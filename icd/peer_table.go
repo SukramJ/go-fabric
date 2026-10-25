@@ -186,7 +186,7 @@ func (t *PeerTable) ConfirmKey(peerNodeID uint64, key []byte, counterStart uint3
 	last := p.CounterStart + p.LastOffset
 	v := checkin.ValidateCounter(last, counterStart, 0)
 	if v.RefreshNeeded {
-		t.logger.Info("icd.peer.keep_checkin_baseline", slog.Uint64("peer_node_id", peerNodeID),
+		t.logger.Info("icd.peer.keep_checkin_baseline", slog.Uint64("node_id", peerNodeID),
 			slog.Uint64("counter_start", uint64(counterStart)), slog.Uint64("last_counter", uint64(last)))
 		return true, nil
 	}
@@ -331,7 +331,7 @@ func (t *PeerTable) ProcessCheckIn(payload []byte) (bool, error) {
 			v = checkin.ValidateCounter(counter, cur.CounterStart, cur.LastOffset)
 			if !v.Valid {
 				t.mu.Unlock()
-				t.logger.Info("icd.peer.replayed_checkin", slog.Uint64("peer_node_id", id))
+				t.logger.Info("icd.peer.replayed_checkin", slog.Uint64("node_id", id))
 				return true, nil
 			}
 		case cur.PendingKey != nil && bytes.Equal(key, cur.PendingKey):
@@ -341,10 +341,10 @@ func (t *PeerTable) ProcessCheckIn(payload []byte) (bool, error) {
 			v = checkin.ValidateCounter(counter, start, 0)
 			if !v.Valid || v.RefreshNeeded {
 				t.mu.Unlock()
-				t.logger.Info("icd.peer.replayed_checkin", slog.Uint64("peer_node_id", id))
+				t.logger.Info("icd.peer.replayed_checkin", slog.Uint64("node_id", id))
 				return true, nil
 			}
-			t.logger.Info("icd.peer.refreshed_key_checkin", slog.Uint64("peer_node_id", id))
+			t.logger.Info("icd.peer.refreshed_key_checkin", slog.Uint64("node_id", id))
 			cur.Key, cur.PendingKey, cur.CounterStart = bytes.Clone(key), nil, start
 		default:
 			// The peer was re-keyed while this payload decrypted.
@@ -372,7 +372,7 @@ func (t *PeerTable) ProcessCheckIn(payload []byte) (bool, error) {
 func (t *PeerTable) runHandler(h CheckInHandler, c ReceivedCheckIn) {
 	defer func() {
 		if r := recover(); r != nil {
-			t.logger.Warn("icd.peer.checkin_handler_failed", slog.Uint64("peer_node_id", c.PeerNodeID), slog.Any("panic", r))
+			t.logger.Warn("icd.peer.checkin_handler_failed", slog.Uint64("node_id", c.PeerNodeID), slog.Any("panic", r))
 		}
 	}()
 	h(c)

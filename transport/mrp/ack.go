@@ -50,7 +50,7 @@ const (
 	// SCOpcodeIcdCheckIn is the ICD Check-In message an intermittently
 	// connected device sends unsecured and unreliably to a registered
 	// client (Spec §4.22.3; matter.js SecureMessageType.IcdCheckInMessage,
-	// IcdCheckInSender.ts:31-37).
+	// IcdCheckInSender.ts:64).
 	SCOpcodeIcdCheckIn uint8 = 0x50
 
 	// DefaultStandaloneAckDelay is the typical piggyback grace window

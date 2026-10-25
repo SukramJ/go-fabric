@@ -35,6 +35,7 @@ func TestStoreImplementsEveryArea(t *testing.T) {
 	_, areas["OTA"] = s.(store.OTA)
 	_, areas["ThermostatPresets"] = s.(store.ThermostatPresets)
 	_, areas["DoorLocks"] = s.(store.DoorLocks)
+	_, areas["ICD"] = s.(store.ICD)
 	for area, ok := range areas {
 		if !ok {
 			t.Errorf("store.Store is not a store.%s", area)

@@ -11,8 +11,9 @@
 // subscription waits on. The message codec is [checkin].
 //
 // It is the Go reading of matter.js packages/protocol/src/icd at 862ad75f
-// (the eight modules index.ts:7-14 re-exports) and of the device's mode
-// machine node/src/behaviors/icd-management/IcdMode.ts, one file per
+// (the eight modules packages/protocol/src/icd/index.ts:7-14 re-exports)
+// and of the device's mode machine
+// node/src/behaviors/icd-management/IcdMode.ts, one file per
 // matter.js file, each citing it. The package knows no node, bridge or
 // controller: the device's ICD Management server (cluster/core) and the
 // controller's ICD client (controller/client) own the persistence and the

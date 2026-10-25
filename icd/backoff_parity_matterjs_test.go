@@ -20,7 +20,7 @@ var (
 )
 
 // sendCycles is IcdCheckInBackOffTest.ts:10-20.
-func sendCycles(b *icd.DoublingBackOff, k icd.ClientKey, cycles int) []int {
+func sendCycles(b icd.CheckInBackOff, k icd.ClientKey, cycles int) []int {
 	var out []int
 	for c := range cycles {
 		if b.ShouldSend(k) {

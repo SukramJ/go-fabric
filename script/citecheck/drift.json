@@ -136,7 +136,7 @@
   },
   {
     "file": "bridge/bridge.go",
-    "line": 665,
+    "line": 669,
     "citation": "ExchangeManager.ts:425-431",
     "resolved": "packages/protocol/src/protocol/ExchangeManager.ts",
     "identifier": "CloseSession",
@@ -145,7 +145,7 @@
   },
   {
     "file": "bridge/bridge.go",
-    "line": 1402,
+    "line": 1406,
     "citation": "Fabric.ts:408-415",
     "resolved": "packages/protocol/src/fabric/Fabric.ts",
     "identifier": "initiateForceClose",
@@ -154,7 +154,7 @@
   },
   {
     "file": "bridge/bridge.go",
-    "line": 1727,
+    "line": 1731,
     "citation": "Session.ts:248",
     "resolved": "packages/protocol/src/session/Session.ts",
     "identifier": "initiateClose",
@@ -262,7 +262,7 @@
   },
   {
     "file": "bridge/outbound_reliable.go",
-    "line": 25,
+    "line": 26,
     "citation": "InteractionMessenger.ts:721",
     "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
     "identifier": "DataReport",
@@ -550,7 +550,7 @@
   },
   {
     "file": "client/exchange/manager.go",
-    "line": 201,
+    "line": 202,
     "citation": "ExchangeManager.ts:391-440",
     "resolved": "packages/protocol/src/protocol/ExchangeManager.ts",
     "identifier": "addProtocolHandler",
@@ -559,7 +559,7 @@
   },
   {
     "file": "client/exchange/manager.go",
-    "line": 208,
+    "line": 209,
     "citation": "SecureChannelProtocol.ts:146-148",
     "resolved": "packages/protocol/src/securechannel/SecureChannelProtocol.ts",
     "identifier": "CaseServer",
@@ -631,7 +631,7 @@
   },
   {
     "file": "client/interaction/interaction.go",
-    "line": 140,
+    "line": 144,
     "citation": "ClientInteraction.ts:1249-1251",
     "resolved": "packages/protocol/src/action/client/ClientInteraction.ts",
     "identifier": "maximumPeerResponseTime",
@@ -640,7 +640,7 @@
   },
   {
     "file": "client/interaction/interaction.go",
-    "line": 165,
+    "line": 169,
     "citation": "InteractionMessenger.ts:148-161",
     "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
     "identifier": "StatusResponse",
@@ -667,7 +667,7 @@
   },
   {
     "file": "client/interaction/provider.go",
-    "line": 177,
+    "line": 181,
     "citation": "ClientInteraction.ts:1112",
     "resolved": "packages/protocol/src/action/client/ClientInteraction.ts",
     "identifier": "verifyReachability",
@@ -757,7 +757,7 @@
   },
   {
     "file": "client/interaction/subscribe.go",
-    "line": 118,
+    "line": 134,
     "citation": "InteractionMessenger.ts:938-972",
     "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
     "identifier": "SubscribeResponse",
@@ -766,7 +766,7 @@
   },
   {
     "file": "client/interaction/subscribe.go",
-    "line": 230,
+    "line": 246,
     "citation": "InteractionMessenger.ts:1052-1055",
     "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
     "identifier": "#encodeReadingRequest",
@@ -829,7 +829,7 @@
   },
   {
     "file": "client/peer/connection.go",
-    "line": 824,
+    "line": 835,
     "citation": "PeerConnection.ts:674-696",
     "resolved": "packages/protocol/src/peer/PeerConnection.ts",
     "identifier": "handleConnectionError",
@@ -1616,7 +1616,7 @@
   },
   {
     "file": "controller/client/fabricops.go",
-    "line": 370,
+    "line": 373,
     "citation": "CommissioningClient.ts:406-408",
     "resolved": "packages/node/src/behavior/system/commissioning/CommissioningClient.ts",
     "identifier": "PeerInitiatedCloseError",
@@ -1634,7 +1634,7 @@
   },
   {
     "file": "controller/client/network.go",
-    "line": 186,
+    "line": 196,
     "citation": "NetworkClient.ts:215-238",
     "resolved": "packages/node/src/behavior/system/network/NetworkClient.ts",
     "identifier": "#recomputeConnectionState",
@@ -1661,7 +1661,7 @@
   },
   {
     "file": "controller/client/node.go",
-    "line": 319,
+    "line": 331,
     "citation": "NetworkClient.ts:60-102",
     "resolved": "packages/node/src/behavior/system/network/NetworkClient.ts",
     "identifier": "ClientNode",
@@ -1679,7 +1679,7 @@
   },
   {
     "file": "controller/client/reactions.go",
-    "line": 144,
+    "line": 147,
     "citation": "Peers.ts:837-858",
     "resolved": "packages/node/src/node/client/Peers.ts",
     "identifier": "#onShutdown",
@@ -2086,7 +2086,7 @@
   },
   {
     "file": "node/config.go",
-    "line": 220,
+    "line": 225,
     "citation": "NetworkServer.ts:202-222",
     "resolved": "packages/node/src/behavior/system/network/NetworkServer.ts",
     "identifier": "network",
@@ -2329,7 +2329,7 @@
   },
   {
     "file": "transport/mrp/ack.go",
-    "line": 220,
+    "line": 226,
     "citation": "MessageExchange.ts:428-433",
     "resolved": "packages/protocol/src/protocol/MessageExchange.ts",
     "identifier": "requiresAck",

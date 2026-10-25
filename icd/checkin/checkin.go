@@ -174,7 +174,8 @@ func RefreshNeededAt(offset uint32) bool {
 	return offset >= KeyRefreshOffset
 }
 
-// counterBytes is the counter as uint32 LE (CheckInMessage.ts:138-142).
+// counterBytes is the counter as uint32 LE. Mirrors matter.js
+// CheckInMessage.ts:138-142 (#counterToBytes).
 func counterBytes(counter uint32) []byte {
 	return binary.LittleEndian.AppendUint32(make([]byte, 0, CounterLength), counter)
 }

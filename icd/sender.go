@@ -64,7 +64,7 @@ func (s *Sender) Send(ctx context.Context, req CheckInRequest) (bool, error) {
 	if err != nil {
 		s.ctx.Logger.Debug("icd.checkin.resolve_failed",
 			slog.Uint64("fabric_index", uint64(req.FabricIndex)),
-			slog.Uint64("peer_node_id", req.PeerNodeID), slog.Any("err", err))
+			slog.Uint64("node_id", req.PeerNodeID), slog.Any("err", err))
 		return false, nil
 	}
 	if addr == nil {
@@ -78,7 +78,7 @@ func (s *Sender) Send(ctx context.Context, req CheckInRequest) (bool, error) {
 	if err != nil {
 		s.ctx.Logger.Debug("icd.checkin.send_failed",
 			slog.Uint64("fabric_index", uint64(req.FabricIndex)),
-			slog.Uint64("peer_node_id", req.PeerNodeID), slog.Any("err", err))
+			slog.Uint64("node_id", req.PeerNodeID), slog.Any("err", err))
 		return false, nil
 	}
 	return ok, nil

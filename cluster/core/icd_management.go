@@ -523,7 +523,7 @@ func (s *ICDManagement) loadClients(ctx context.Context) ([]icdClient, error) {
 	return out, nil
 }
 
-// Stop is matter.js's goingOffline reaction (IcdManagementServer.ts:345-347):
+// Stop is matter.js's goingOffline reaction (IcdManagementServer.ts:291, :345-347):
 // the mode machine stops without a transition. It waits for the Check-In
 // pass in flight. Idempotent.
 func (s *ICDManagement) Stop() {
@@ -791,10 +791,10 @@ func (s *ICDManagement) sendCheckIns(ctx context.Context) {
 			switch {
 			case err != nil:
 				s.logger.Warn("icd.management.checkin_failed", slog.Uint64("fabric_index", uint64(fabricIndex)),
-					slog.Uint64("check_in_node_id", reg.CheckInNodeID), slog.Any("err", err))
+					slog.Uint64("node_id", reg.CheckInNodeID), slog.Any("err", err))
 			case !ok:
 				s.logger.Debug("icd.management.checkin_not_sent", slog.Uint64("fabric_index", uint64(fabricIndex)),
-					slog.Uint64("check_in_node_id", reg.CheckInNodeID))
+					slog.Uint64("node_id", reg.CheckInNodeID))
 			}
 		}
 	}

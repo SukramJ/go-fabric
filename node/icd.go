@@ -271,7 +271,8 @@ func (n *Node) ICD() *ICD {
 // before Start (IcdManagementServer.ts:632-634).
 func (i *ICD) RequestActiveMode() { i.srv.RequestActiveMode() }
 
-// EnterIdleMode forces idle mode now (IcdManagementServer.ts:653-655).
+// EnterIdleMode forces idle mode now. Mirrors matter.js
+// IcdManagementServer.ts:653-655 (enterIdleMode).
 func (i *ICD) EnterIdleMode() { i.srv.EnterIdleMode() }
 
 // TriggerUserActiveMode is the device-physical User Active Mode Trigger:
