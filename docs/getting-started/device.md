@@ -223,7 +223,12 @@ a controller's MoveToLevel moves its level, and the "with On/Off" commands
 switch its OnOff.
 The endpoint assembler mounts Descriptor, Identify,
 BridgedDeviceBasicInformation, Groups and ScenesManagement; the device
-layer never does.
+layer never does. To make the device blink, declare
+`identifydef.Declare{HandleIdentify: …, HandleTriggerEffect: …}` — the
+assembler's Identify server runs your handler before it counts
+IdentifyTime, and an error refuses the command — or install them at run
+time with `light.Identify().HandleIdentify(fn)`. An Identify declaration
+takes these two handlers only; the assembler keeps IdentifyTime.
 
 `device.Options` identifies the device:
 

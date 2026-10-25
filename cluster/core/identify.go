@@ -55,6 +55,10 @@ type Identify struct {
 	// clock paces the IdentifyTime countdown (see [Identify.SetClock]).
 	clock clockvar.Var
 
+	// handler is the host's [contract.IdentifyHandler]
+	// ([Identify.SetHandler]); nil runs none.
+	handler atomic.Pointer[identifyHandlerRef]
+
 	// identifyTime is tracked atomically because reads (subscribe
 	// reports), writes (clients setting it directly per spec §1.2.5.1),
 	// and command dispatch (Identify) all touch the same field from
@@ -126,6 +130,30 @@ func NewIdentify() *Identify {
 // SetClock sets the clock the IdentifyTime countdown ticks on; nil is
 // [clock.System]. A countdown already running keeps its clock.
 func (i *Identify) SetClock(c clock.Clock) { i.clock.Store(c) }
+
+// identifyHandlerRef holds a handler for the atomic pointer.
+type identifyHandlerRef struct{ h contract.IdentifyHandler }
+
+// SetHandler sets the host's handler of the Identify and TriggerEffect
+// commands, run before the server's own handling; an error it returns
+// refuses the command. nil removes it. Mirrors matter.js's application
+// override of IdentifyServer.identify and triggerEffect
+// (packages/node/src/behaviors/identify/IdentifyServer.ts:129-135 at
+// 862ad75f).
+func (i *Identify) SetHandler(h contract.IdentifyHandler) {
+	if h == nil {
+		i.handler.Store(nil)
+		return
+	}
+	i.handler.Store(&identifyHandlerRef{h})
+}
+
+func (i *Identify) hostHandler() contract.IdentifyHandler {
+	if r := i.handler.Load(); r != nil {
+		return r.h
+	}
+	return nil
+}
 
 // Close releases the cluster: a running countdown terminates at once —
 // Close returns after its goroutine did — and no later write / command
@@ -201,7 +229,7 @@ func (i *Identify) MatterWrite(_ context.Context, attrID uint32, value any) erro
 }
 
 // MatterInvoke dispatches Identify and TriggerEffect commands.
-func (i *Identify) MatterInvoke(_ context.Context, cmdID uint32, fields any) (any, error) {
+func (i *Identify) MatterInvoke(ctx context.Context, cmdID uint32, fields any) (any, error) {
 	switch cmdID {
 	case identifyCmdIdentify:
 		// Identify command argument is a struct {IdentifyTime: uint16}
@@ -210,6 +238,11 @@ func (i *Identify) MatterInvoke(_ context.Context, cmdID uint32, fields any) (an
 		// commissioner's encoding; coerceUint16 handles both with a
 		// best-effort fallback to 0 (= clear identify).
 		t, _ := coerceUint16(fields)
+		if h := i.hostHandler(); h != nil {
+			if err := h.MatterIdentify(ctx, t); err != nil {
+				return nil, err
+			}
+		}
 		i.identifyTime.Store(uint32(t))
 		i.maybeStartCountdown()
 		// Bump DataVersion after a successful Identify command so
@@ -218,9 +251,16 @@ func (i *Identify) MatterInvoke(_ context.Context, cmdID uint32, fields any) (an
 		// Success path returns nil (status-only response).
 		return nil, nil
 	case identifyCmdTriggerEffect:
-		// TriggerEffect is a no-op for the bridge — we don't actuate
-		// any indicator. Return success so Apple's HAP mapper does
-		// not flag the cluster as broken during the topology probe.
+		// Without a host handler TriggerEffect is a no-op for the
+		// bridge — we don't actuate any indicator. Return success so
+		// Apple's HAP mapper does not flag the cluster as broken during
+		// the topology probe. A host handler gets the effect.
+		if h := i.hostHandler(); h != nil {
+			effect, variant := triggerEffectOf(fields)
+			if err := h.MatterTriggerEffect(ctx, effect, variant); err != nil {
+				return nil, err
+			}
+		}
 		return nil, nil
 	}
 	return nil, im.UnsupportedCommandf("core: Identify command 0x%02X not supported", cmdID)
@@ -287,6 +327,25 @@ func (i *Identify) maybeStartCountdown() {
 			}
 		}
 	}()
+}
+
+// triggerEffectOf reads TriggerEffect's EffectIdentifier and EffectVariant
+// from the generated request the bridge decodes, or from the tag-keyed map
+// of the generic path (tags 0 and 1); 0 for what it cannot read.
+func triggerEffectOf(v any) (effect, variant uint8) {
+	switch x := v.(type) {
+	case identifydef.TriggerEffectRequest:
+		return uint8(x.EffectIdentifier), uint8(x.EffectVariant)
+	case *identifydef.TriggerEffectRequest:
+		if x != nil {
+			return uint8(x.EffectIdentifier), uint8(x.EffectVariant)
+		}
+	case map[uint8]any:
+		e, _ := coerceUint16(x[0])
+		w, _ := coerceUint16(x[1])
+		return uint8(e), uint8(w) //nolint:gosec // 8-bit enums
+	}
+	return 0, 0
 }
 
 // identifyFieldIdentifyTime is the Identify command's IdentifyTime

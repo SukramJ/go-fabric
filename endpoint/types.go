@@ -310,7 +310,13 @@ func (e *Endpoint) clusterTracker(clusterID uint32) *contract.DataVersionTracker
 // instance owned by the endpoint
 // (packages/node/src/behaviors/identify/IdentifyServer.ts).
 func (e *Endpoint) identifyServer() *mattercore.Identify {
-	return e.endpointState().identifyServer()
+	srv := e.endpointState().identifyServer()
+	// The host's Identify and TriggerEffect handler, when its source
+	// offers one (contract.IdentifyHandler); set on every materialisation,
+	// so a reassembled source's handler replaces the former one.
+	h, _ := e.Source.(contract.IdentifyHandler)
+	srv.SetHandler(h)
+	return srv
 }
 
 // endpointState is the concurrency-safe state bound to one stable

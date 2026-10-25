@@ -71,6 +71,10 @@ type Device struct {
 	mu    sync.Mutex
 	parts []*Device
 	host  deviceseam.Host
+
+	// identify holds the host's Identify and TriggerEffect handlers
+	// ([Device.Identify]); never mounted.
+	identify *spec.Server
 }
 
 // Compile-time assertion.
@@ -197,8 +201,14 @@ func New(t *Type, opts Options, decls ...Declaration) (*Device, error) {
 	if err := d.attachHooks(s); err != nil {
 		return nil, err
 	}
+	if d.identify, err = newIdentifyHandlers(s); err != nil {
+		return nil, fmt.Errorf("%s: %w", t.Name, err)
+	}
 	return d, nil
 }
+
+// identifyClusterID is Identify (identify.element.ts, 0x0003).
+const identifyClusterID uint32 = 0x0003
 
 // attachHooks installs every declaration's hooks on its cluster's server,
 // in cluster order.
