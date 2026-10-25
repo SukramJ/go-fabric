@@ -412,16 +412,14 @@ func (c *Controller) findCommissionable(ctx context.Context, id discovery.Identi
 // over DNS-SD — and opens the BTP channel to it (ble.Dial): matter.js's
 // BleScanner.findCommissionableDevices and the BLE channel of its
 // commissioning (packages/protocol/src/common/BleScanner.ts:543-575 at
-// 862ad75f). The scan runs until ctx's deadline on the controller's
-// clock; none found is [ErrNoDevice].
+// 862ad75f). The scan runs until ctx ends, at most [DefaultPairTimeout] on
+// the controller's clock; none found is [ErrNoDevice].
 func (c *Controller) dialBLE(ctx context.Context, central ble.Central, id discovery.Identifier) (discovery.Device, *ble.Channel, error) {
 	sc := ble.NewScanner(central, ble.ScannerOptions{Clock: c.clock, Logger: c.log})
 	defer func() { _ = sc.Close(context.WithoutCancel(ctx)) }()
-	timeout := DefaultPairTimeout
-	if deadline, ok := ctx.Deadline(); ok {
-		timeout = max(time.Until(deadline), time.Millisecond)
-	}
-	devs, err := sc.Find(ctx, id, timeout, false)
+	// ctx's deadline ends the scan first; the timeout bounds it on the
+	// controller's clock otherwise.
+	devs, err := sc.Find(ctx, id, DefaultPairTimeout, false)
 	if err != nil {
 		return discovery.Device{}, nil, err
 	}

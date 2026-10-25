@@ -54,7 +54,18 @@ func (r *Registry) reconcileLabel(n *Node) {
 type nocStatusError struct{ status uint8 }
 
 func (e *nocStatusError) Error() string {
+	if e.status == nocStatusLabelConflict {
+		return "client: cannot set the fabric label because another fabric on this device already uses this name"
+	}
 	return fmt.Sprintf("client: UpdateFabricLabel answered NOCResponse status %d", e.status)
+}
+
+// Unwrap is commissioner.ErrFabricLabelConflict for LabelConflict.
+func (e *nocStatusError) Unwrap() error {
+	if e.status == nocStatusLabelConflict {
+		return commissioner.ErrFabricLabelConflict
+	}
+	return nil
 }
 
 // pushLabel is the reconciliation's work for n: nothing to do is nil; an
@@ -94,11 +105,8 @@ func (r *Registry) pushLabel(ctx context.Context, n *Node) error {
 	if err != nil {
 		return err
 	}
-	switch nr.status {
-	case nocStatusOk:
+	if nr.status == nocStatusOk {
 		return nil
-	case nocStatusLabelConflict:
-		return fmt.Errorf("%w: cannot set fabric label to %q because another fabric on this device already uses this name", commissioner.ErrFabricLabelConflict, label)
 	}
 	return &nocStatusError{status: nr.status}
 }

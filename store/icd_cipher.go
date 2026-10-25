@@ -123,21 +123,21 @@ func openICDKey(aead cipher.AEAD, stored, aad []byte) ([]byte, error) {
 func sealClearICDKeys(ctx context.Context, db *sql.DB) error {
 	var tables int
 	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'matter_icd_registrations'`).Scan(&tables); err != nil {
-		return fmt.Errorf("seal icd keys: %w", err)
+		return fmt.Errorf("store: seal icd keys: %w", err)
 	}
 	if tables == 0 {
 		return nil // a database before migration v7 holds no ICD keys
 	}
 	var n int
 	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM matter_icd_registrations WHERE length(icd_key) = ?`, icdKeySize).Scan(&n); err != nil {
-		return fmt.Errorf("seal icd keys: %w", err)
+		return fmt.Errorf("store: seal icd keys: %w", err)
 	}
 	if n == 0 {
 		return nil
 	}
 	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
-		return fmt.Errorf("seal icd keys: begin tx: %w", err)
+		return fmt.Errorf("store: seal icd keys: begin tx: %w", err)
 	}
 	defer func() { _ = tx.Rollback() }()
 	aead, err := icdAEAD(ctx, tx)
@@ -148,7 +148,7 @@ func sealClearICDKeys(ctx context.Context, db *sql.DB) error {
 SELECT fabric_index, position, check_in_node_id, monitored_subject, icd_key FROM matter_icd_registrations
 WHERE length(icd_key) = ?`, icdKeySize)
 	if err != nil {
-		return fmt.Errorf("seal icd keys: %w", err)
+		return fmt.Errorf("store: seal icd keys: %w", err)
 	}
 	type row struct {
 		fabric        uint8
@@ -161,27 +161,27 @@ WHERE length(icd_key) = ?`, icdKeySize)
 		var r row
 		if err := rows.Scan(&r.fabric, &r.position, &r.node, &r.subject, &r.key); err != nil {
 			_ = rows.Close()
-			return fmt.Errorf("seal icd keys: scan: %w", err)
+			return fmt.Errorf("store: seal icd keys: scan: %w", err)
 		}
 		clear = append(clear, r)
 	}
 	if err := errors.Join(rows.Err(), rows.Close()); err != nil {
-		return fmt.Errorf("seal icd keys: %w", err)
+		return fmt.Errorf("store: seal icd keys: %w", err)
 	}
 	for _, r := range clear {
 		if len(r.node) != 8 || len(r.subject) != 8 {
-			return fmt.Errorf("seal icd keys: node id of %d, subject of %d bytes", len(r.node), len(r.subject))
+			return fmt.Errorf("store: seal icd keys: node id of %d, subject of %d bytes", len(r.node), len(r.subject))
 		}
 		sealed, err := sealICDKey(aead, r.key, icdAAD(r.fabric, binary.BigEndian.Uint64(r.node), binary.BigEndian.Uint64(r.subject)))
 		if err != nil {
 			return err
 		}
 		if _, err := tx.ExecContext(ctx, `UPDATE matter_icd_registrations SET icd_key = ? WHERE fabric_index = ? AND position = ?`, sealed, r.fabric, r.position); err != nil {
-			return fmt.Errorf("seal icd keys: update: %w", err)
+			return fmt.Errorf("store: seal icd keys: update: %w", err)
 		}
 	}
 	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("seal icd keys: commit: %w", err)
+		return fmt.Errorf("store: seal icd keys: commit: %w", err)
 	}
 	return nil
 }

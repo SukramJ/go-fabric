@@ -98,7 +98,7 @@ func (c *Interaction) invokeBatch(ctx context.Context, cmds []CommandRequest, ba
 		if multiple {
 			i = int(e.CommandRef) - base
 			if !e.HasCommandRef || i < 0 || i >= len(cmds) {
-				c.log.Warn("matter.controller.interaction.invoke_response_discarded", slog.Uint64("command_ref", uint64(e.CommandRef)),
+				c.log.Warn("matter.controller.interaction.invoke_response_discarded",
 					slog.Uint64("endpoint", uint64(e.Path.Endpoint)), slog.Uint64("cluster", uint64(e.Path.Cluster)), slog.Uint64("command", uint64(e.Path.Command)))
 				continue
 			}
