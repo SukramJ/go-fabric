@@ -4053,10 +4053,13 @@
     },
     {
       "path": "packages/protocol/test/icd/FabricIcdTest.ts",
-      "status": "planned",
-      "reason": "The fabric's ICD registrations (device role) and Check-In processing (controller role), milestone 5 phases 23 and 24.",
-      "snapshotSha": "887aa640d481599b87d43448937cc99621716dd6",
-      "until": "M5 phase 23"
+      "status": "ported",
+      "go": [
+        "icd:TestFabricIcdDeviceRole",
+        "icd:TestFabricIcdControllerRole"
+      ],
+      "reason": "Go splits matter.js's FabricIcd by role: the device's registrations are icd.Registrations, the controller's peers icd.PeerTable — trial decryption under the current and the pending key, the replay drop, the promotion counted modulo 2^32, ConfirmKey, RefreshNeeded and the peers' wakefulness on the fake clock; the thrown handler error is a handler panic, the broken crypto a peer key the codec cannot use, which ProcessCheckIn returns (icd/fabricicd_parity_matterjs_test.go, icd/fabricicd_controller_parity_matterjs_test.go).",
+      "snapshotSha": "887aa640d481599b87d43448937cc99621716dd6"
     },
     {
       "path": "packages/protocol/test/icd/IcdCheckInBackOffTest.ts",
@@ -4096,18 +4099,25 @@
     },
     {
       "path": "packages/protocol/test/icd/IcdPeerScheduleTest.ts",
-      "status": "excluded",
-      "class": "controller-stage",
-      "until": "M5 phase 24",
-      "reason": "The controller's schedule of an ICD peer's active mode.",
+      "status": "ported",
+      "go": [
+        "icd:TestIcdPeerSchedule"
+      ],
+      "reason": "A LIT peer's active mode after a Check-In, other activity and a StayActive promise, and its next Check-In's deadline with the margin (icd/peer_schedule_parity_matterjs_test.go).",
       "snapshotSha": "a384c9fd72822a0f56f2b4c2e2dc538a6b6db7ed"
     },
     {
       "path": "packages/protocol/test/icd/IcdPeerWakefulnessTest.ts",
-      "status": "excluded",
-      "class": "controller-stage",
-      "until": "M5 phase 24",
-      "reason": "The controller's view of whether an ICD peer is awake and available.",
+      "status": "partial",
+      "go": [
+        "icd:TestIcdPeerWakefulness",
+        "icd:TestAwaitAwake"
+      ],
+      "missing": [
+        "keeps its deadline across a forward wall-clock step",
+        "ends Active Mode on time across a backward wall-clock step"
+      ],
+      "reason": "Awake and available on the fake clock, the subscriptions held, the default wait, the operating-mode flips, suspend and close; matter.js's observables are the On… registrations and the signal channels (icd/peer_wakefulness_parity_matterjs_test.go). Missing: the two wall-clock steps — MockTime.stepWallClock moves the wall clock apart from the monotonic one, clocktest.Fake has one reading, and on the system clock a time.Time carries the monotonic reading a wall step does not move.",
       "snapshotSha": "5bdf22eb5e54328ad9715454ab897b117e9c943d"
     },
     {

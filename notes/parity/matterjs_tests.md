@@ -10,10 +10,10 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 
 | status | files |
 | --- | ---: |
-| ported | 88 |
-| partial | 129 |
-| planned | 20 |
-| excluded | 87 |
+| ported | 90 |
+| partial | 130 |
+| planned | 19 |
+| excluded | 85 |
 | total | 324 |
 
 ## Per directory
@@ -102,7 +102,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 | [protocol/test/events](#protocoltestevents) | 3 | 0 | 2 | 0 | 1 |
 | [protocol/test/fabric](#protocoltestfabric) | 3 | 0 | 3 | 0 | 0 |
 | [protocol/test/groups](#protocoltestgroups) | 5 | 4 | 1 | 0 | 0 |
-| [protocol/test/icd](#protocoltesticd) | 8 | 5 | 0 | 1 | 2 |
+| [protocol/test/icd](#protocoltesticd) | 8 | 7 | 1 | 0 | 0 |
 | [protocol/test/interaction](#protocoltestinteraction) | 1 | 0 | 1 | 0 | 0 |
 | [protocol/test/mdns](#protocoltestmdns) | 3 | 1 | 2 | 0 | 0 |
 | [protocol/test/ota](#protocoltestota) | 2 | 2 | 0 | 0 | 0 |
@@ -801,13 +801,13 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 | file | lines | status | Go tests or class | note |
 | --- | ---: | --- | --- | --- |
 | CheckInMessageTest.ts | 154 | ported | `icd/checkin:TestCheckInMessage` | The nonce, the encoding and the decoding against the CHIP SDK's three vectors, the tampered-nonce, tampered-ciphertext, wrong-key and short-payload refusals as ErrMalformed, the ICD round trip with its two-byte threshold, and the counter validation with the uint32 wrap and the refresh boundary at 2^31 (icd/checkin/checkin_parity_matterjs_test.go). |
-| FabricIcdTest.ts | 463 | planned | until M5 phase 23 | The fabric's ICD registrations (device role) and Check-In processing (controller role), milestone 5 phases 23 and 24. |
+| FabricIcdTest.ts | 463 | ported | `icd:TestFabricIcdDeviceRole`<br>`icd:TestFabricIcdControllerRole` | Go splits matter.js's FabricIcd by role: the device's registrations are icd.Registrations, the controller's peers icd.PeerTable — trial decryption under the current and the pending key, the replay drop, the promotion counted modulo 2^32, ConfirmKey, RefreshNeeded and the peers' wakefulness on the fake clock; the thrown handler error is a handler panic, the broken crypto a peer key the codec cannot use, which ProcessCheckIn returns (icd/fabricicd_parity_matterjs_test.go, icd/fabricicd_controller_parity_matterjs_test.go). |
 | IcdCheckInBackOffTest.ts | 63 | ported | `icd:TestDoublingCheckInBackOff` | The doubling gap capped at the maximum back-off, the one-cycle cap, recordAnswered, resetAll and forget, keyed by icd.ClientKey for matter.js's string key (icd/backoff_parity_matterjs_test.go). |
 | IcdCheckInSenderTest.ts | 97 | ported | `icd:TestIcdCheckInSender` | A decodable 0x50 to the resolved address, and false without an error for an unresolvable client, a failed send and a failing collaborator — matter.js's throw is a returned error (icd/sender_parity_matterjs_test.go). |
 | IcdCheckInSuppressionTest.ts | 32 | ported | `icd:TestIsMonitoredSubjectCovered` | A monitored subject covered by a subscription's node id or by a CAT of a later version, and not covered otherwise; Go carries a session's CATs as the 32-bit tags (icd/suppression_parity_matterjs_test.go). |
 | IcdCounterTest.ts | 60 | ported | `icd:TestIcdCounter` | The boot bump, the change callback on increment and advance, the wrap at 2^32, and the refused advance as ErrCounterAdvance; the fractional and NaN advances are not representable in the Go signature, so the refusal holds the two ends of the range (icd/counter_parity_matterjs_test.go). |
-| IcdPeerScheduleTest.ts | 101 | excluded | `controller-stage` until M5 phase 24 | The controller's schedule of an ICD peer's active mode. |
-| IcdPeerWakefulnessTest.ts | 340 | excluded | `controller-stage` until M5 phase 24 | The controller's view of whether an ICD peer is awake and available. |
+| IcdPeerScheduleTest.ts | 101 | ported | `icd:TestIcdPeerSchedule` | A LIT peer's active mode after a Check-In, other activity and a StayActive promise, and its next Check-In's deadline with the margin (icd/peer_schedule_parity_matterjs_test.go). |
+| IcdPeerWakefulnessTest.ts | 340 | partial | `icd:TestIcdPeerWakefulness`<br>`icd:TestAwaitAwake` | Awake and available on the fake clock, the subscriptions held, the default wait, the operating-mode flips, suspend and close; matter.js's observables are the On… registrations and the signal channels (icd/peer_wakefulness_parity_matterjs_test.go). Missing: the two wall-clock steps — MockTime.stepWallClock moves the wall clock apart from the monotonic one, clocktest.Fake has one reading, and on the system clock a time.Time carries the monotonic reading a wall step does not move. Missing: “keeps its deadline across a forward wall-clock step”; “ends Active Mode on time across a backward wall-clock step”. |
 
 ## protocol/test/interaction
 
@@ -957,10 +957,6 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 
 - `DclVendorInfoServiceSeedTest.ts` — The subject, matter.js DclVendorInfoService seeding from a bundled vendor snapshot (DclVendorInfoService.ts, SeedTypes.ts), has no Go counterpart in controller/dcl; the service is a feature for the owner. With DclVendorInfoServiceTest, milestone 6 phase 27 (owner review of PR #164).
 - `DclVendorInfoServiceTest.ts` — The subject, matter.js DclVendorInfoService (packages/protocol/src/dcl/DclVendorInfoService.ts, 497 lines: vendor fetch, storage, field normalisation, built-in vendors, update timer, productInfoFor), has no Go counterpart in controller/dcl; the ledger read it builds on is Client.Vendors (DclClientTest), the service itself is a feature for the owner. Milestone 6 phase 27 (completeness) brings the vendor information service; findings register (owner review of PR #164).
-
-### protocol/test/icd
-
-- `FabricIcdTest.ts` — The fabric's ICD registrations (device role) and Check-In processing (controller role), milestone 5 phases 23 and 24.
 
 ### protocol/test/peer
 
