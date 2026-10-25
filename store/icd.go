@@ -105,10 +105,7 @@ func (s *Store) ReplaceICDRegistrations(ctx context.Context, fabricIndex uint8, 
 		}
 	}
 	for i, r := range regs {
-		sealed, err := sealICDKey(aead, r.Key, icdAAD(fabricIndex, r.CheckInNodeID, r.MonitoredSubject))
-		if err != nil {
-			return err
-		}
+		sealed := sealICDKey(aead, r.Key, icdAAD(fabricIndex, r.CheckInNodeID, r.MonitoredSubject))
 		if _, err := tx.ExecContext(ctx, `
 INSERT INTO matter_icd_registrations (fabric_index, position, check_in_node_id, monitored_subject, icd_key, client_type)
 VALUES (?, ?, ?, ?, ?, ?)`, fabricIndex, i, uint64ToBE(r.CheckInNodeID), uint64ToBE(r.MonitoredSubject), sealed, r.ClientType); err != nil {

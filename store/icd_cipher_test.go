@@ -11,6 +11,79 @@ import (
 	"github.com/SukramJ/go-fabric/store"
 )
 
+// TestICDKeyErrors: Upgrade on a database without registrations creates
+// no key; a stored key that is not 16 hex bytes fails the registration
+// and the listing of a sealed key; a sealed key cut short does not open.
+func TestICDKeyErrors(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	db := openTestDB(t)
+	s := store.New(db)
+	if err := store.Upgrade(ctx, db); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok, _ := s.GetSetting(ctx, store.SettingICDKey); ok {
+		t.Fatal("Upgrade created a key without a registration")
+	}
+	idx, err := s.AddFabric(ctx, store.FabricRecord{
+		FabricID: 1, NodeID: 2, RootPublicKey: uncompressedP256Fixture(1), RootCert: []byte{0x15, 0x18},
+		VendorID: 0xFFF1, CompressedID: [8]byte{1, 2, 3, 4, 5, 6, 7, 8},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	reg := []store.ICDRegistration{{CheckInNodeID: 1, MonitoredSubject: 1, Key: bytes.Repeat([]byte{1}, 16)}}
+	if err := s.ReplaceICDRegistrations(ctx, idx, reg); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.ExecContext(ctx, `UPDATE matter_icd_registrations SET icd_key = substr(icd_key, 1, 20)`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.ListICDRegistrations(ctx); err == nil {
+		t.Fatal("a sealed key cut short opened")
+	}
+	if err := s.SetSetting(ctx, store.SettingICDKey, "not hex"); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.ReplaceICDRegistrations(ctx, idx, reg); err == nil {
+		t.Fatal("a registration under a malformed key setting succeeded")
+	}
+	if _, err := s.ListICDRegistrations(ctx); err == nil {
+		t.Fatal("a listing under a malformed key setting succeeded")
+	}
+	// A clear row under a malformed key setting: Upgrade cannot seal it.
+	if _, err := db.ExecContext(ctx, `UPDATE matter_icd_registrations SET icd_key = ?`, bytes.Repeat([]byte{1}, 16)); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.Upgrade(ctx, db); err == nil {
+		t.Fatal("Upgrade sealed under a malformed key setting")
+	}
+	if err := s.SetSetting(ctx, store.SettingICDKey, "abcd"); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.Upgrade(ctx, db); err == nil {
+		t.Fatal("Upgrade sealed under a 2-byte key")
+	}
+	// A clear row Upgrade cannot read (a node id of 3 bytes) fails it.
+	if _, err := db.ExecContext(ctx, `UPDATE matter_icd_registrations SET icd_key = ?, check_in_node_id = ?`, bytes.Repeat([]byte{1}, 16), []byte{1, 2, 3}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.ExecContext(ctx, `DELETE FROM matter_settings WHERE key = ?`, store.SettingICDKey); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.Upgrade(ctx, db); err == nil {
+		t.Fatal("Upgrade sealed a malformed row")
+	}
+	// Without the table (a database before migration v7) Upgrade has
+	// nothing to seal.
+	if _, err := db.ExecContext(ctx, `DROP TABLE matter_icd_registrations`); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.Upgrade(ctx, db); err != nil {
+		t.Fatalf("Upgrade without the table: %v", err)
+	}
+}
+
 // TestICDKeysSealedAtRest: a registration's ICDToken key is stored sealed
 // under the store's ICD key — the column holds neither the key nor 16
 // bytes — and comes back clear; a key an earlier release stored in clear

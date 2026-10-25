@@ -56,9 +56,7 @@ func icdAEAD(ctx context.Context, q sqlExecQuerier) (cipher.AEAD, error) {
 	}
 	if !ok {
 		key := make([]byte, icdKeySize)
-		if _, err := rand.Read(key); err != nil {
-			return nil, fmt.Errorf("store: icd key: %w", err)
-		}
+		_, _ = rand.Read(key) // crypto/rand.Read never fails
 		if _, err := q.ExecContext(ctx, `INSERT OR IGNORE INTO matter_settings (key, value) VALUES (?, ?)`, SettingICDKey, hex.EncodeToString(key)); err != nil {
 			return nil, fmt.Errorf("store: icd key: %w", err)
 		}
@@ -90,12 +88,10 @@ func icdAAD(fabricIndex uint8, checkInNodeID, monitoredSubject uint64) []byte {
 
 // sealICDKey is the at-rest form of an ICDToken key: the nonce, then the
 // sealed key.
-func sealICDKey(aead cipher.AEAD, key, aad []byte) ([]byte, error) {
+func sealICDKey(aead cipher.AEAD, key, aad []byte) []byte {
 	nonce := make([]byte, aead.NonceSize(), aead.NonceSize()+len(key)+aead.Overhead())
-	if _, err := rand.Read(nonce); err != nil {
-		return nil, fmt.Errorf("store: icd key nonce: %w", err)
-	}
-	return aead.Seal(nonce, nonce, key, aad), nil
+	_, _ = rand.Read(nonce) // crypto/rand.Read never fails
+	return aead.Seal(nonce, nonce, key, aad)
 }
 
 // openICDKey is the ICDToken key of a stored value: a sealed one opened,
@@ -172,10 +168,7 @@ WHERE length(icd_key) = ?`, icdKeySize)
 		if len(r.node) != 8 || len(r.subject) != 8 {
 			return fmt.Errorf("store: seal icd keys: node id of %d, subject of %d bytes", len(r.node), len(r.subject))
 		}
-		sealed, err := sealICDKey(aead, r.key, icdAAD(r.fabric, binary.BigEndian.Uint64(r.node), binary.BigEndian.Uint64(r.subject)))
-		if err != nil {
-			return err
-		}
+		sealed := sealICDKey(aead, r.key, icdAAD(r.fabric, binary.BigEndian.Uint64(r.node), binary.BigEndian.Uint64(r.subject)))
 		if _, err := tx.ExecContext(ctx, `UPDATE matter_icd_registrations SET icd_key = ? WHERE fabric_index = ? AND position = ?`, sealed, r.fabric, r.position); err != nil {
 			return fmt.Errorf("store: seal icd keys: update: %w", err)
 		}
