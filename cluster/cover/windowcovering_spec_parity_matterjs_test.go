@@ -6,6 +6,7 @@ package cover_test
 import (
 	"context"
 	"errors"
+	"slices"
 	"testing"
 
 	"github.com/SukramJ/go-fabric/cluster/cover"
@@ -34,20 +35,37 @@ func TestServerMatchesTheGeneratedDefinition(t *testing.T) {
 	}
 }
 
-// TestFeatureMapIsDerivedFromWhatTheServerServes pins the refusal of every
-// other FeatureMap — New with ErrFeatureMap, NewWindowCoveringServer with a
-// panic: an axis without its position-aware feature, and a feature the
-// server has no state for.
+// TestFeatureMapIsDerivedFromWhatTheServerServes pins the FeatureMaps the
+// server serves — every combination of Lift and Tilt, each with or
+// without its position-aware feature, as matter.js's WindowCoveringServer
+// branches per feature (WindowCoveringServer.ts:123-141 at 862ad75f) —
+// and the refusal of the rest, New with ErrFeatureMap,
+// NewWindowCoveringServer with a panic: AbsolutePosition, a position-aware
+// feature without its axis, no axis.
 func TestFeatureMapIsDerivedFromWhatTheServerServes(t *testing.T) {
 	t.Parallel()
+	lf, tl := uint32(wcdef.FeatureLift), uint32(wcdef.FeatureTilt)
+	palf, patl := uint32(wcdef.FeaturePositionAwareLift), uint32(wcdef.FeaturePositionAwareTilt)
+	tiltType := uint8(wcdef.TypeTiltBlindLift)
+	for _, fm := range []uint32{lf, lf | palf, tl, tl | patl, lf | tl, lf | palf | tl, lf | tl | patl, lf | palf | tl | patl} {
+		cfg := cover.Config{FeatureMap: fm}
+		switch {
+		case fm&lf != 0 && fm&tl != 0:
+			cfg.Type, cfg.EndProductType = tiltType, uint8(wcdef.EndProductTypeInteriorBlind)
+		case fm&tl != 0:
+			cfg.Type, cfg.EndProductType = uint8(wcdef.TypeShutter), uint8(wcdef.EndProductTypeSwingingShutter)
+		}
+		if _, err := cover.New(cfg); err != nil {
+			t.Errorf("FeatureMap 0x%X: %v", fm, err)
+		}
+	}
 	for _, fm := range []uint32{
-		uint32(wcdef.FeatureLift),
-		uint32(wcdef.FeatureTilt),
-		cover.ServedFeatureMap | uint32(wcdef.FeatureTilt),
-		cover.ServedTiltFeatureMap | uint32(wcdef.FeatureLift),
+		palf,
+		lf | patl,
+		tl | palf,
 		cover.ServedLiftTiltFeatureMap | 1<<3, // AbsolutePosition (bit 3)
 	} {
-		if _, err := cover.New(cover.Config{FeatureMap: fm}); !errors.Is(err, cover.ErrFeatureMap) {
+		if _, err := cover.New(cover.Config{FeatureMap: fm, Type: tiltType}); !errors.Is(err, cover.ErrFeatureMap) {
 			t.Errorf("FeatureMap 0x%X: New error %v, want ErrFeatureMap", fm, err)
 		}
 	}
@@ -56,7 +74,51 @@ func TestFeatureMapIsDerivedFromWhatTheServerServes(t *testing.T) {
 			t.Error("NewWindowCoveringServer accepted a FeatureMap New refuses")
 		}
 	}()
-	cover.NewWindowCoveringServer(cover.Config{FeatureMap: uint32(wcdef.FeatureTilt)})
+	cover.NewWindowCoveringServer(cover.Config{FeatureMap: palf})
+}
+
+// TestLiftWithoutPositionAwareness: a Lift-only covering (FeatureMap 0x1)
+// serves no position attribute and no GoToLiftPercentage, leaves
+// LiftPositionAware out of ConfigStatus, and moves by direction —
+// UpOrOpen Opening, DownOrClose Closing, StopMotion Stopped — as matter.js's
+// WindowCoveringServer does without position awareness
+// (WindowCoveringServer.ts:123-127, :420-446, :487-504, :518-560 at
+// 862ad75f).
+func TestLiftWithoutPositionAwareness(t *testing.T) {
+	t.Parallel()
+	srv, err := cover.New(cover.Config{FeatureMap: uint32(wcdef.FeatureLift)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, a := range []uint32{wcdef.AttrCurrentPositionLiftPercent100ths, wcdef.AttrTargetPositionLiftPercent100ths, wcdef.AttrCurrentPositionLiftPercentage} {
+		if _, ok := srv.MatterRead(a); ok || slices.Contains(srv.MatterAttributes(), a) {
+			t.Errorf("attribute 0x%04X served", a)
+		}
+	}
+	if slices.Contains(srv.MatterAcceptedCommands(), wcdef.CmdGoToLiftPercentage) {
+		t.Error("GoToLiftPercentage accepted")
+	}
+	if st, _ := srv.MatterRead(wcdef.AttrConfigStatus); st.(uint8)&(1<<3) != 0 {
+		t.Errorf("ConfigStatus 0x%02X names LiftPositionAware", st)
+	}
+	status := func() uint8 { v, _ := srv.MatterRead(wcdef.AttrOperationalStatus); return v.(uint8) }
+	ctx := context.Background()
+	for _, c := range []struct {
+		cmd  uint32
+		want uint8
+	}{
+		{wcdef.CmdUpOrOpen, 1 | 1<<2},
+		{wcdef.CmdStopMotion, 0},
+		{wcdef.CmdDownOrClose, 2 | 2<<2},
+		{wcdef.CmdStopMotion, 0},
+	} {
+		if _, err := srv.MatterInvoke(ctx, c.cmd, nil); err != nil {
+			t.Fatalf("command 0x%02X: %v", c.cmd, err)
+		}
+		if got := status(); got != c.want {
+			t.Fatalf("after command 0x%02X OperationalStatus 0x%02X, want 0x%02X", c.cmd, got, c.want)
+		}
+	}
 }
 
 // TestGoToLiftPercentageTakesTheGeneratedRequest pins the shape the bridge

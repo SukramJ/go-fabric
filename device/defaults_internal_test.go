@@ -32,7 +32,7 @@ func TestSelfHeldFactoriesRefuseASelectionTheyDoNotServe(t *testing.T) {
 		{"ColorControl unknown bit", 0x0300, spec.Options{Features: 1 << 7}},
 		{"Thermostat without HEAT or COOL", 0x0201, spec.Options{}},
 		{"DoorLock unserved bit", 0x0101, spec.Options{Features: 1 << 20}},
-		{"WindowCovering Lift alone", 0x0102, spec.Options{Features: 0x1}},
+		{"WindowCovering AbsolutePosition", 0x0102, spec.Options{Features: 0x1 | 0x4 | 0x8}},
 		{"HepaFilterMonitoring ResetCondition", 0x0071, spec.Options{Commands: []uint32{hepadef.CmdResetCondition}}},
 	}
 	for _, tc := range cases {
