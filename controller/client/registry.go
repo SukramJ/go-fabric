@@ -337,6 +337,9 @@ func (h *nodeHolder) get() *Node {
 // takes a session.
 func (r *Registry) bindPeer(n *Node, p *peer.Peer) {
 	n.bind(p, r.cfg.Commissioner.Interaction(p))
+	// The peer's physical property the session parameters read
+	// (Peer.ts:305-315).
+	p.SetLongIdleTimeOperating(func() bool { return n.Properties().LongIdleTimeOperating })
 	follow := func() {
 		d := p.Descriptor()
 		n.updateRecord(func(rec *Record) { rec.applyPeer(d) })

@@ -5,6 +5,7 @@ package client
 
 import (
 	"github.com/SukramJ/go-fabric/client/interaction"
+	"github.com/SukramJ/go-fabric/icd"
 	"github.com/SukramJ/go-fabric/im"
 )
 
@@ -87,3 +88,51 @@ func MaxEventNumber(n *Node) uint64 {
 
 // DeliverEvent hands e to the node as an event of a report.
 func DeliverEvent(n *Node, e interaction.EventData) { n.deliverEvent(&e) }
+
+// ICDTable is the registry's ICD peer table of a fabric — matter.js
+// FabricManager.for(index).icd in the IcdClient tests.
+func ICDTable(r *Registry, fabricIndex uint8) *icd.PeerTable { return r.icdTable(fabricIndex) }
+
+// SetICDCounterStart moves the stored registration's counter start, as
+// IcdClientTest.ts:188-194 writes state.counterStart.
+func SetICDCounterStart(n *Node, start uint32) {
+	n.icd.mu.Lock()
+	if n.icd.reg != nil {
+		n.icd.reg.CounterStart = start
+	}
+	n.icd.mu.Unlock()
+}
+
+// RebaseICDPeer sets the fed peer's counter state and the stored
+// registration's, as IcdClientTest.ts:188-194 and :701 write them.
+func RebaseICDPeer(n *Node, counterStart, lastOffset uint32) {
+	c := n.icd
+	c.mu.Lock()
+	fed, h := c.fed, c.handler
+	if c.reg != nil {
+		c.reg.CounterStart, c.reg.LastOffset = counterStart, lastOffset
+	}
+	c.mu.Unlock()
+	if fed == nil {
+		return
+	}
+	t := c.env.table(fed.FabricIndex)
+	if e, ok := t.PeerFor(fed.NodeID); ok {
+		e.CounterStart, e.LastOffset = counterStart, lastOffset
+		t.AddPeer(e, h)
+	}
+}
+
+// SetICDFedOffset raises the fed peer's replay floor alone, as
+// IcdClientTest.ts:698-701 writes fabric.icd.peerFor(..).lastOffset.
+func SetICDFedOffset(n *Node, lastOffset uint32) {
+	c := n.icd
+	c.mu.Lock()
+	fed, h := c.fed, c.handler
+	c.mu.Unlock()
+	t := c.env.table(fed.FabricIndex)
+	if e, ok := t.PeerFor(fed.NodeID); ok {
+		e.LastOffset = lastOffset
+		t.AddPeer(e, h)
+	}
+}

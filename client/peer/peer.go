@@ -51,6 +51,25 @@ type Peer struct {
 	// icdAwait reports a sleeping LIT ICD peer the controller awaits
 	// (SetICDAwait); nil for a peer that is no registered ICD.
 	icdAwait atomic.Pointer[func() bool]
+	// litOperating reports the peer's physical property
+	// isLongIdleTimeOperating (SetLongIdleTimeOperating).
+	litOperating atomic.Pointer[func() bool]
+}
+
+// LITMinIdleInterval is the idle interval a LIT ICD peer is assumed to
+// have when no source gives its SII: the 500 ms default is too aggressive
+// for a sleeping LIT ICD. Mirrors matter.js Peer.ts:59 (LIT_MIN_IDLE_INTERVAL).
+const LITMinIdleInterval = 5 * time.Second
+
+// SetLongIdleTimeOperating sets the report of the peer's physical property
+// isLongIdleTimeOperating — a LIT ICD operating as LIT — which
+// [Peer.SessionParameters] reads (Peer.ts:305-315). nil removes it.
+func (p *Peer) SetLongIdleTimeOperating(fn func() bool) {
+	if fn == nil {
+		p.litOperating.Store(nil)
+		return
+	}
+	p.litOperating.Store(&fn)
 }
 
 // SetICDAwait sets the report of whether the peer is a LIT ICD the
@@ -390,8 +409,9 @@ func (p *Peer) NewestSession() *exchange.Session {
 // SessionParameters is the best guess of the peer's session parameters:
 // what its last session reported, the intervals it does not report taken
 // from its TXT record, the fallbacks for the rest. Mirrors matter.js
-// Peer.sessionParameters (Peer.ts:281-317) without the BasicInformation,
-// TCP and LIT ICD inputs.
+// Peer.sessionParameters (Peer.ts:281-317) without the BasicInformation
+// and TCP inputs. With no SII from either source, a LIT-operating peer's
+// idle interval is [LITMinIdleInterval] (:305-315).
 func (p *Peer) SessionParameters() sessionparams.Parameters {
 	p.mu.Lock()
 	var r sessionparams.Parameters
@@ -405,6 +425,9 @@ func (p *Peer) SessionParameters() sessionparams.Parameters {
 	p.mu.Unlock()
 	if r.SessionIdleInterval == 0 && dd.SII != nil {
 		r.SessionIdleInterval = uint32(dd.SII.Milliseconds()) //nolint:gosec // TXTData bounds SII to one hour
+	}
+	if fn := p.litOperating.Load(); fn != nil && r.SessionIdleInterval == 0 && (*fn)() {
+		r.SessionIdleInterval = uint32(LITMinIdleInterval.Milliseconds())
 	}
 	if r.SessionActiveInterval == 0 && dd.SAI != nil {
 		r.SessionActiveInterval = uint32(dd.SAI.Milliseconds()) //nolint:gosec // TXTData bounds SAI to one hour
