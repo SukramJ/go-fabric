@@ -248,7 +248,16 @@ func (c *Controller) Close() {
 	c.once.Do(func() {
 		ctx, cancel := context.WithTimeout(context.Background(), closeTimeout)
 		defer cancel()
-		c.shutdown(ctx)
+		// The stack's close waits for work that needs the clock: a CASE
+		// attempt in flight awaits the acknowledgement of its last
+		// StatusReport, which the device sends standalone after its ACK
+		// timeout. With a fake clock the close runs under Site.Run, as
+		// Restart's does, so that timer fires instead of the close
+		// waiting on a clock nobody moves.
+		_ = c.site.Run(ctx, func(ctx context.Context) error {
+			c.shutdown(ctx)
+			return nil
+		})
 	})
 }
 
