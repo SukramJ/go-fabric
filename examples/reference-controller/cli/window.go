@@ -58,7 +58,7 @@ func cmdWindowOpen(e *env, args []string) error {
 		}
 		ctx, cancel := e.timeoutCtx()
 		defer cancel()
-		w, err := n.OpenCommissioningWindow(ctx, time.Duration(timeout)*time.Second, client.WindowOptions{Basic: basic})
+		w, err := n.OpenCommissioningWindow(ctx, time.Duration(timeout)*time.Second, client.WindowOptions{Basic: basic}) //nolint:gosec // windowTimeout parses 16 bits
 		if err != nil {
 			return err
 		}

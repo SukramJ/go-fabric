@@ -156,19 +156,19 @@ WHERE length(icd_key) = ?`, icdKeySize)
 		node, subject []byte
 		key           []byte
 	}
-	var clear []row
+	var plain []row
 	for rows.Next() {
 		var r row
 		if err := rows.Scan(&r.fabric, &r.position, &r.node, &r.subject, &r.key); err != nil {
 			_ = rows.Close()
 			return fmt.Errorf("store: seal icd keys: scan: %w", err)
 		}
-		clear = append(clear, r)
+		plain = append(plain, r)
 	}
 	if err := errors.Join(rows.Err(), rows.Close()); err != nil {
 		return fmt.Errorf("store: seal icd keys: %w", err)
 	}
-	for _, r := range clear {
+	for _, r := range plain {
 		if len(r.node) != 8 || len(r.subject) != 8 {
 			return fmt.Errorf("store: seal icd keys: node id of %d, subject of %d bytes", len(r.node), len(r.subject))
 		}

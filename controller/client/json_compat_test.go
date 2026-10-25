@@ -105,8 +105,8 @@ func commandByName(t *testing.T, cluster uint32, name string) client.Field {
 	if def == nil {
 		t.Fatalf("cluster %d has no definition", cluster)
 	}
-	for _, c := range def.Commands {
-		if c.Direction == spec.Request && strings.EqualFold(c.Name, name) {
+	for i := range def.Commands {
+		if c := &def.Commands[i]; c.Direction == spec.Request && strings.EqualFold(c.Name, name) {
 			return client.CommandField(cluster, c.ID)
 		}
 	}

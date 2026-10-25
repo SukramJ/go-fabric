@@ -4,7 +4,6 @@
 package controller
 
 import (
-	"context"
 	"database/sql"
 	"fmt"
 
@@ -20,7 +19,10 @@ import (
 // cascades need them on every pooled connection), a busy timeout of 5 s
 // and the write-ahead log, the reference controller's settings. The file
 // is created when it does not exist; the schemas are [New]'s to apply.
-// The caller closes the database after the controller.
+//
+// The file is opened on first use — [New]'s schemas, which report a path
+// that cannot be opened. The caller closes the database after the
+// controller.
 //
 // matter.js keeps a controller's fabric and nodes in the StorageService
 // of the controller's Environment (packages/matter.js/src/CommissioningController.ts:338-349
@@ -33,10 +35,6 @@ func OpenDB(path string) (*sql.DB, error) {
 	}
 	db, err := sql.Open("sqlite", "file:"+path+"?_pragma=foreign_keys(1)&_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)")
 	if err != nil {
-		return nil, fmt.Errorf("controller: open %q: %w", path, err)
-	}
-	if err := db.PingContext(context.Background()); err != nil {
-		_ = db.Close()
 		return nil, fmt.Errorf("controller: open %q: %w", path, err)
 	}
 	return db, nil

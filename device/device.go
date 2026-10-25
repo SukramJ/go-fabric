@@ -414,9 +414,6 @@ func defaultServer(t *Type, r *ClusterRequirement, s *settings, sibling func(uin
 	// starts where matter.js's does: the default server's initialize
 	// values, then SelectDefaultValue for what is still unset
 	// (defaults_fallback.go).
-	if init, ok := initializeDefaults[r.ID]; ok {
-		init(features, initial)
-	}
 	srv, err := spec.NewServer(def, opts, generatedConfig(r.ID, features, initial, s.self))
 	switch {
 	case errors.Is(err, spec.ErrFabricScoped):
@@ -429,9 +426,13 @@ func defaultServer(t *Type, r *ClusterRequirement, s *settings, sibling func(uin
 }
 
 // generatedConfig is the configuration of the generated server of cluster
-// id: its Initial, unimplemented commands until the host handles them,
-// and a PowerSource's own additions ([powerSource]).
+// id: its Initial with the default server's initialize values
+// ([initializeDefaults]), unimplemented commands until the host handles
+// them, and a PowerSource's own additions ([powerSource]).
 func generatedConfig(id, features uint32, initial map[uint32]any, self func() (uint16, bool)) spec.ServerConfig {
+	if init, ok := initializeDefaults[id]; ok {
+		init(features, initial)
+	}
 	cfg := spec.ServerConfig{Initial: initial, Unimplemented: true}
 	if id == powersourcedef.ClusterID {
 		powerSource(&cfg, features, self)
