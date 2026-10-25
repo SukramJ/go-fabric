@@ -288,6 +288,9 @@ type ICDManagement struct {
 	passes  sync.WaitGroup
 
 	changes cluster.AttributeChanges
+	// dataVersion is the cluster's DataVersion: a root server keeps its
+	// own and advances it before it reports a change.
+	dataVersion cluster.DataVersionTracker
 }
 
 var (
@@ -296,6 +299,7 @@ var (
 	_ contract.ClusterCommandLister    = (*ICDManagement)(nil)
 	_ contract.FabricScopedReader      = (*ICDManagement)(nil)
 	_ contract.AttributeChangeNotifier = (*ICDManagement)(nil)
+	_ contract.ClusterDataVersion      = (*ICDManagement)(nil)
 )
 
 // NewICDManagement returns the server of a validated configuration
@@ -687,7 +691,7 @@ func (s *ICDManagement) operatingModeChanged(changed bool) {
 	if !changed {
 		return
 	}
-	s.changes.Notify(icddef.AttrOperatingMode)
+	s.notify(icddef.AttrOperatingMode)
 	s.mu.Lock()
 	fn := s.onModeChanged
 	s.mu.Unlock()
@@ -825,7 +829,7 @@ func (s *ICDManagement) FabricRemoved(ctx context.Context, fabricIndex uint8) {
 		}
 	}
 	if removed {
-		s.changes.Notify(icddef.AttrRegisteredClients)
+		s.notify(icddef.AttrRegisteredClients)
 	}
 	s.operatingModeChanged(changed)
 }
@@ -905,11 +909,11 @@ func (s *ICDManagement) read(attrID uint32, keep func(icdClient) bool) (any, boo
 	case icddef.AttrClientsSupportedPerFabric:
 		return c.ClientsSupportedPerFabric, true
 	case icddef.AttrUserActiveModeTriggerHint:
-		return c.UserActiveModeTriggerHint, true
+		return uint32(c.UserActiveModeTriggerHint), true
 	case icddef.AttrUserActiveModeTriggerInstruction:
 		return c.UserActiveModeTriggerInstruction, true
 	case icddef.AttrOperatingMode:
-		return s.OperatingMode(), true
+		return uint8(s.OperatingMode()), true
 	case icddef.AttrMaximumCheckInBackoff:
 		return c.MaximumCheckInBackoff, true
 	}
@@ -1025,7 +1029,7 @@ func (s *ICDManagement) registerClient(ctx context.Context, req icddef.RegisterC
 	counter := s.counter
 	s.mu.Unlock()
 
-	s.changes.Notify(icddef.AttrRegisteredClients)
+	s.notify(icddef.AttrRegisteredClients)
 	s.operatingModeChanged(changed)
 	var value uint32
 	if counter != nil {
@@ -1073,7 +1077,7 @@ func (s *ICDManagement) unregisterClient(ctx context.Context, req icddef.Unregis
 	s.mu.Unlock()
 	s.backOff.Forget(icd.ClientKey{FabricIndex: fabric, CheckInNodeID: req.CheckInNodeId})
 
-	s.changes.Notify(icddef.AttrRegisteredClients)
+	s.notify(icddef.AttrRegisteredClients)
 	s.operatingModeChanged(changed)
 	return nil
 }
@@ -1125,6 +1129,15 @@ func (s *ICDManagement) MatterAcceptedCommands() []uint32 { return s.inst.Matter
 
 // MatterGeneratedCommands implements [contract.ClusterCommandLister].
 func (s *ICDManagement) MatterGeneratedCommands() []uint32 { return s.inst.MatterGeneratedCommands() }
+
+// notify advances the DataVersion and reports the attributes changed.
+func (s *ICDManagement) notify(attrIDs ...uint32) {
+	s.dataVersion.Bump()
+	s.changes.Notify(attrIDs...)
+}
+
+// MatterDataVersion implements [contract.ClusterDataVersion].
+func (s *ICDManagement) MatterDataVersion() uint32 { return s.dataVersion.Current() }
 
 // OnAttributeChange implements [contract.AttributeChangeNotifier]:
 // RegisteredClients and OperatingMode changes. The counter's quality "C"

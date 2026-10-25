@@ -293,6 +293,7 @@ func New(cfg Config) (*Node, error) { //nolint:funlen // the composition root: o
 	n.root.DiagnosticLogs.AttachExchangeOpener(n.br)
 	n.root.DiagnosticLogs.SetLogger(n.logger)
 	n.br.AttachRootClusters(n.root.Servers())
+	n.wireICD()
 	if n.commissionerControl, err = n.buildCommissionerControl(); err != nil {
 		return nil, err
 	}
@@ -490,6 +491,9 @@ func (n *Node) fabricRemoved(ctx context.Context, fabricIndex uint8) {
 		log.DropFabric(fabricIndex)
 	}
 	n.removeFabricBindings(fabricIndex)
+	if srv := n.root.ICDManagement; srv != nil {
+		srv.FabricRemoved(ctx, fabricIndex)
+	}
 	n.reopenWhenIdle()
 }
 
@@ -707,6 +711,13 @@ func (n *Node) Start(ctx context.Context) error {
 	for _, fabric := range loaded {
 		n.br.AnnounceFabric(ctx, fabric.CompressedID, fabric.NodeID)
 	}
+	// An ICD enters active mode once its fabrics are announced: the first
+	// Check-Ins go out (IcdManagementServer.ts:252-343, #online).
+	if srv := n.root.ICDManagement; srv != nil {
+		if err := srv.Start(ctx); err != nil {
+			n.logger.Warn("icd.start_failed", slog.Any("err", err))
+		}
+	}
 	// The Binding servers register their entries once the node is online
 	// and its CASE identities are loaded (BindingManager.ts:65-78: the
 	// queue flushes on the node's online event).
@@ -785,6 +796,9 @@ func (n *Node) Stop(ctx context.Context) error {
 	}
 	n.stopReannounceLoop()
 	n.stopHealthProbe()
+	if srv := n.root.ICDManagement; srv != nil {
+		srv.Stop()
+	}
 	err := n.br.Stop(ctx)
 	// The devices are unbound once no controller reaches them: each
 	// device's queue drains before Stop returns.

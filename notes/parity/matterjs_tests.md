@@ -10,9 +10,9 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` ‚
 
 | status | files |
 | --- | ---: |
-| ported | 87 |
+| ported | 88 |
 | partial | 129 |
-| planned | 21 |
+| planned | 20 |
 | excluded | 87 |
 | total | 324 |
 
@@ -53,7 +53,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` ‚
 | [node/test/behaviors/groupcast](#nodetestbehaviorsgroupcast) | 1 | 0 | 1 | 0 | 0 |
 | [node/test/behaviors/groups](#nodetestbehaviorsgroups) | 1 | 1 | 0 | 0 | 0 |
 | [node/test/behaviors/hepa-filter-monitoring](#nodetestbehaviorshepa-filter-monitoring) | 1 | 1 | 0 | 0 | 0 |
-| [node/test/behaviors/icd-management](#nodetestbehaviorsicd-management) | 2 | 0 | 1 | 1 | 0 |
+| [node/test/behaviors/icd-management](#nodetestbehaviorsicd-management) | 2 | 1 | 1 | 0 | 0 |
 | [node/test/behaviors/identify](#nodetestbehaviorsidentify) | 1 | 0 | 1 | 0 | 0 |
 | [node/test/behaviors/level-control](#nodetestbehaviorslevel-control) | 4 | 1 | 3 | 0 | 0 |
 | [node/test/behaviors/measurement](#nodetestbehaviorsmeasurement) | 1 | 0 | 1 | 0 | 0 |
@@ -364,7 +364,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` ‚
 
 | file | lines | status | Go tests or class | note |
 | --- | ---: | --- | --- | --- |
-| IcdManagementServerTest.ts | 1415 | planned | until M5 phase 23 | The device-side ICD server (attribute defaults, constraints, counter, RegisterClient, StayActive), which milestone 5 phase 23 builds. |
+| IcdManagementServerTest.ts | 1415 | ported | `node:TestIcdManagementServer` | The ICD Management server of a node with node.Config.ICD on a commissioned fabrictest pair: the attribute defaults, the refused timings, the counter's boot bump and persistence, the MRP fast-poll pad, subscription persistence off, RegisterClient (slots, the Administrator update), UnregisterClient (NOT_FOUND), StayActiveRequest, the Manage-privilege VerificationKey rule after Pair.Grant, the LIT feature, the restore after a restart and the drop on fabric removal, the advertisement with ICD, SAT and no SII for LIT, the trigger, the DSLS switch, the idle/active mode on the site's clock and the Check-In pass with a recording sender over the real icd.Sender; the server variants the facade cannot state (a LIT server without its OperatingMode, a LITS server without CIP) and the prune of a key of a departed fabric are checked on the cluster/core server's own configuration (node/icd_management_server_parity_matterjs_test.go). |
 | IcdModeTest.ts | 180 | partial | `icd:TestIcdModeState` | The machine on the fake clock: start, the may-enter-idle signal without a transition, the forced idle, the two wakes, the window that is never shortened, stop, the promise from one clock reading and in whole milliseconds (icd/mode_parity_matterjs_test.go). Missing: the two wall-clock steps ‚Äî MockTime.stepWallClock moves the wall clock apart from the monotonic one, clocktest.Fake has one reading, and on the system clock a time.Time carries the monotonic reading a wall step does not move. Missing: ‚Äúkeeps the active deadline and promise across a forward step‚Äù; ‚Äúkeeps the active deadline and promise across a backward step‚Äù. |
 
 ## node/test/behaviors/identify
@@ -926,10 +926,6 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` ‚
 ### node/test/behaviors/access-control
 
 - `AccessControlCustomExtensionTest.ts` ‚Äî A manufacturer extension of AccessControl (a custom attribute and command): the root AccessControl server takes no extension elements; the subject is missing. Milestone 5.
-
-### node/test/behaviors/icd-management
-
-- `IcdManagementServerTest.ts` ‚Äî The device-side ICD server (attribute defaults, constraints, counter, RegisterClient, StayActive), which milestone 5 phase 23 builds.
 
 ### node/test/behaviors/thread-network-diagnostics
 

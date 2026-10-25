@@ -992,9 +992,11 @@
     },
     {
       "path": "packages/node/test/behaviors/icd-management/IcdManagementServerTest.ts",
-      "status": "planned",
-      "until": "M5 phase 23",
-      "reason": "The device-side ICD server (attribute defaults, constraints, counter, RegisterClient, StayActive), which milestone 5 phase 23 builds.",
+      "status": "ported",
+      "go": [
+        "node:TestIcdManagementServer"
+      ],
+      "reason": "The ICD Management server of a node with node.Config.ICD on a commissioned fabrictest pair: the attribute defaults, the refused timings, the counter's boot bump and persistence, the MRP fast-poll pad, subscription persistence off, RegisterClient (slots, the Administrator update), UnregisterClient (NOT_FOUND), StayActiveRequest, the Manage-privilege VerificationKey rule after Pair.Grant, the LIT feature, the restore after a restart and the drop on fabric removal, the advertisement with ICD, SAT and no SII for LIT, the trigger, the DSLS switch, the idle/active mode on the site's clock and the Check-In pass with a recording sender over the real icd.Sender; the server variants the facade cannot state (a LIT server without its OperatingMode, a LITS server without CIP) and the prune of a key of a departed fabric are checked on the cluster/core server's own configuration (node/icd_management_server_parity_matterjs_test.go).",
       "snapshotSha": "f168fd993e7a6406e0233a3d47dea95842515a2b"
     },
     {

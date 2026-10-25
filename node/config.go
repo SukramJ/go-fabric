@@ -74,6 +74,11 @@ type Config struct {
 	// OTA mounts the OTA Software Update Requestor on the root when set;
 	// nil leaves it out (and the OtaRequestor device type with it).
 	OTA *OtaConfig
+	// ICD makes the node an intermittently connected device: ICD
+	// Management on the root, Check-Ins to its registered clients, the
+	// ICD advertisement ([ICDConfig], [Node.ICD]). nil, the default, is a
+	// node that is no ICD: nothing mounts and nothing changes.
+	ICD *ICDConfig
 	// OTAProvider serves OTA images: the OTA Software Update Provider on an
 	// endpoint of device type OtaProvider beside the Aggregator, its images
 	// over BDX (ADR 0021). nil, or no ImageSource, mounts none. With
@@ -309,6 +314,16 @@ func (c *Config) rootDeviceConditions() []string {
 	if c.Network.WiFi.Reporter != nil {
 		out = append(out, conditionWiFi)
 	}
+	// An ICD states the condition RootNode's IcdManagement requirement
+	// names ("Sit | Lit", root-node.element.ts:91): LIT for a LIT-capable
+	// ICD, SIT otherwise.
+	if c.ICD != nil {
+		if c.ICD.Mode == ICDModeLIT {
+			out = append(out, conditionLIT)
+		} else {
+			out = append(out, conditionSIT)
+		}
+	}
 	return out
 }
 
@@ -538,6 +553,11 @@ func (c *Config) Validate() error {
 	}
 	if c.OTA != nil && c.OTA.Dir == "" {
 		errs = append(errs, errors.New("node: OTA.Dir must be set"))
+	}
+	if c.ICD != nil {
+		if err := c.ICD.validate(); err != nil {
+			errs = append(errs, err)
+		}
 	}
 	if err := errors.Join(errs...); err != nil {
 		return fmt.Errorf("%w: %w", ErrInvalidConfig, err)
