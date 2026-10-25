@@ -103,6 +103,27 @@ const DefaultDiscoveryTimeout = 15 * time.Minute
 // packages/node/src/node/client/Peers.ts:204-206). The end of the
 // search's time or of ctx is no error; a closed controller is.
 func (c *Controller) Discover(ctx context.Context, id discovery.Identifier, timeout time.Duration) ([]client.Device, error) {
+	return c.DiscoverWith(ctx, id, timeout, DiscoverOptions{})
+}
+
+// DiscoverOptions are the options of [Controller.DiscoverWith].
+type DiscoverOptions struct {
+	// First ends the search at the first device id selects that DNS-SD
+	// reports with an address, and returns that device alone — matter.js
+	// Peers.locate, whose InstanceDiscovery takes the first node found as
+	// its result and stops (packages/node/src/node/client/Peers.ts:189-194,
+	// packages/node/src/behavior/system/controller/discovery/
+	// InstanceDiscovery.ts:25-31 at 862ad75f), as commissionNode's
+	// discovery by identifier stops at the first device
+	// (CommissioningController.ts:462-500). None before timeout is an
+	// empty result, as for a full search.
+	First bool
+}
+
+// DiscoverWith is [Controller.Discover] with options: with
+// [DiscoverOptions].First it returns as soon as the first matching device
+// answers instead of when the timeout passes.
+func (c *Controller) DiscoverWith(ctx context.Context, id discovery.Identifier, timeout time.Duration, opts DiscoverOptions) ([]client.Device, error) {
 	if c.names == nil {
 		return nil, fmt.Errorf("%w: the controller is closed", ErrConfiguration)
 	}
@@ -115,7 +136,23 @@ func (c *Controller) Discover(ctx context.Context, id discovery.Identifier, time
 	defer cancel()
 	t := c.clock.AfterFunc(timeout, cancel)
 	defer t.Stop()
-	found, err := sc.FindCommissionable(ctx, id, nil)
+	var first []client.Device
+	var onFound func(discovery.Device)
+	if opts.First {
+		onFound = func(d discovery.Device) {
+			if first == nil && len(d.Addresses) > 0 {
+				first = []client.Device{d}
+				cancel()
+			}
+		}
+	}
+	found, err := sc.FindCommissionable(ctx, id, onFound)
+	if opts.First {
+		found = first
+		if found == nil {
+			found = []client.Device{}
+		}
+	}
 	if err != nil && !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
 		return found, err
 	}

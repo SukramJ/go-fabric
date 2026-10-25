@@ -342,6 +342,13 @@ func TestReferenceController(t *testing.T) {
 		t.Fatal(err)
 	}
 	nid := "0x4321"
+	start := time.Now()
+	if out := tl.run("discover", "--code", manual, "--first"); !strings.Contains(out, "discriminator "+strconv.Itoa(int(harnessDiscriminator))) || strings.Count(out, "\n") != 1 {
+		t.Fatalf("discover --first:\n%s", out)
+	}
+	if took := time.Since(start); took >= 60*time.Second {
+		t.Fatalf("discover --first took %v, the whole --timeout", took)
+	}
 	out := tl.run("pair", "--code", manual, "--node-id", nid, "--label", "kitchen")
 	if !strings.Contains(out, "paired node 17185") || !strings.Contains(out, "endpoint 0:") {
 		t.Fatalf("pair:\n%s", out)
