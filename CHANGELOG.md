@@ -10,6 +10,8 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+## [0.12.1] — 2026-10-25
+
 ### Changed
 
 - A bridged device that declares PowerSource now also mounts PowerSourceConfiguration (§1.20): BridgedNode's `BridgedPowerSourceInfo, D` is mandatory under the condition the declaration states (matter.js reads a trailing `D` as an announced deprecation, `Conformance.ts`), so the kit's devices no longer report the "BridgedNode PowerSourceConfiguration mandatory" violation. `powersourceconfigurationdef.Declare` on such a device is accepted. The reference bridge's battery and mains devices gain the cluster.
@@ -4796,7 +4798,8 @@ consumer of an older pseudo-version should read.
   earlier than it was. Both fields are gone; the commit holding the file is
   its provenance.
 
-[Unreleased]: https://github.com/SukramJ/go-fabric/compare/v0.12.0...HEAD
+[Unreleased]: https://github.com/SukramJ/go-fabric/compare/v0.12.1...HEAD
+[0.12.1]: https://github.com/SukramJ/go-fabric/compare/v0.12.0...v0.12.1
 [0.12.0]: https://github.com/SukramJ/go-fabric/compare/v0.11.0...v0.12.0
 [0.11.0]: https://github.com/SukramJ/go-fabric/compare/v0.10.9...v0.11.0
 [0.10.9]: https://github.com/SukramJ/go-fabric/compare/v0.10.8...v0.10.9
