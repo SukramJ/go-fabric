@@ -1,0 +1,10 @@
+# The TODO-marker allowance of script/aheadcheck: register rows of
+# notes/parity/by_design.md accepted without a marker. Each is a matter.js
+# fact the owner's reviewer reads from the tree at the pin; the line goes in
+# the commit that records the row's marker, and the file goes with the last.
+BD-chip-BooleanStateConfiguration-RulesInServer
+BD-chip-WaterHeaterManagement-RulesInServer
+BD-chip-AlarmBase-RulesInServer
+BD-chip-Appliance-RulesInServer
+BD-chip-DeviceEnergyManagement-EnergyEvse-RulesInServer
+BD-chip-ClosureDimension-RulesInServer

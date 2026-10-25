@@ -6,6 +6,7 @@ GOFUMPT         ?= gofumpt
 GOLANGCI_LINT   ?= golangci-lint
 GOVULNCHECK     ?= govulncheck
 MATTERJS_DIR    ?= ../matter.js
+MATTERJS_REF    ?= HEAD
 
 # Pinned on purpose, and to the same versions .github/workflows/ci.yml uses.
 # openccu-loom's setup target installs @latest, which is how a local checkout
@@ -214,6 +215,15 @@ testparity-snapshot: ## refresh script/testparity/matterjs_tests.json from $(MAT
 .PHONY: testparity-check
 testparity-check: ## fail if the test register and the snapshot disagree, a Go test it names is gone, the page is stale or planned is off its ratchet
 	$(GO) test -count=1 -run 'Testparity' ./script/testparity/
+
+.PHONY: ahead-check
+ahead-check: ## check the Ahead-of-matter.js markers of notes/parity/by_design.md at the pin and at MATTERJS_REF (weekly: MATTERJS_REF=origin/main)
+	@# Built, not `go run`, for the same reason as cite-check: exit 2 (no clone,
+	@# the pin or the ref unresolvable) must not read as a finding.
+	@bin=$$(mktemp -d)/aheadcheck; $(GO) build -o $$bin ./script/aheadcheck || exit 1; \
+	$$bin -matterjs $(MATTERJS_DIR) -ref $(MATTERJS_REF); rc=$$?; rm -rf $$(dirname $$bin); \
+	if [ $$rc -eq 2 ]; then echo "ahead-check: no matter.js clone with the pin and $(MATTERJS_REF) at $(MATTERJS_DIR)"; fi; \
+	exit $$rc
 
 .PHONY: cite-report
 cite-report: ## regenerate script/citecheck/drift.json and summary.md — the matter.js citations checked at the pin
