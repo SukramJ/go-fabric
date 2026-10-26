@@ -187,6 +187,10 @@ type connection struct {
 // runs, which it kicks when opts asks (Peer.ts:628-673). It returns the
 // running process, nil on a closed peer.
 func (p *Peer) initiateConnection(opts ConnectOptions) *connection {
+	// The network profile reads the peer's medium through the host's hook
+	// (Peer.SetMedium), which may take the host's own lock: it runs before
+	// the peer's lock, as the host's fabric lookup does (ADR 0026 P6).
+	network, margin, netErr := p.connectNetwork(opts)
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	if c := p.connecting; c != nil {
@@ -207,9 +211,8 @@ func (p *Peer) initiateConnection(opts ConnectOptions) *connection {
 	if handleError == nil {
 		handleError = p.set.errorHandler()
 	}
-	network, margin, err := p.connectNetwork(opts)
-	if err != nil {
-		return &connection{fatal: err, done: closedDone}
+	if netErr != nil {
+		return &connection{fatal: netErr, done: closedDone}
 	}
 	ctx, cancel := context.WithCancel(p.ctx)
 	c := &connection{

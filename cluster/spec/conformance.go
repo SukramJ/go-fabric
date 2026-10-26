@@ -157,8 +157,8 @@ func (c Conformance) Applicability(ctx FeatureContext) Applicability {
 	return c.applicability(ctx, false)
 }
 
-// ApplicabilityDeprecatedOptional is [Conformance.Applicability] with
-// deprecated and obsolete terms optional — applicabilityFor's
+// ApplicabilityDeprecatedOptional is [Conformance.Applicability] with the
+// terms that deprecate or retire an element optional — applicabilityFor's
 // deprecatedIsOptional (packages/model/src/aspects/Conformance.ts:182,
 // :985-987 at 862ad75f), which a client judges an element the peer
 // implements by.
