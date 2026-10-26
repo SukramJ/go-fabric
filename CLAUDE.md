@@ -5,9 +5,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 `go-fabric` is the **device side** of Matter as an embeddable Go library: TLV
 codec, Interaction Model, PASE/CASE, MRP over IPv6 UDP, DNS-SD, the cluster
 servers a bridge needs, and the endpoint assembler. A host application keeps
-its own device model and reaches the wire through `contract/`. It is a
-semantic port of matter.js, and that is the single most important thing to
-know before changing anything here.
+its own device model and reaches the wire through `contract/`. It implements
+the Matter specification (currently 1.6.1) in Go and follows matter.js as its
+reference implementation — not a translation of matter.js's TypeScript, but
+its behaviour, mirrored — and that is the single most important thing to know
+before changing anything here.
 
 ## Commands
 
@@ -179,13 +181,39 @@ Home-Assistant-specific shims (Entity-Domain → Cluster mapping, HA
 Device Registry as data source) that do not translate here. When in
 doubt, pull the pattern from matter.js itself, not from ha-bridge.
 
-**Goal:** this module is a 100 % port of matter.js — **semantically**, not
-syntactically. TypeScript idioms (decorators, `Behavior.with(...)` mixins,
-`Promise<T>`) translate to Go idioms (struct-with-methods,
-`context.Context`, goroutines). The same defaults, the same constraints, the
-same wire shape, the same order of attributes / commands / events. Where the
-Go translation forces a different surface, the Go code calls out the matter.js
-function it mirrors in a comment + the contract it enforces.
+**What this module is.** go-fabric implements the Matter specification
+(currently 1.6.1) in Go. It is not a port of matter.js's TypeScript code; it
+follows matter.js because matter.js is production-hardened against the
+ecosystems (Apple Home, Google Home, Alexa, …), and that hardening is what we
+adopt. matter.js is our executable specification: where its production-hardened
+behaviour departs from the spec text, we follow matter.js and record the
+departure. The spec still defines what is mandatory. The order of authority:
+
+1. **matter.js HEAD** decides wherever it models something. Schema values are
+   taken verbatim (`parity/schema.json`), and implemented behaviour is
+   mirrored — the same defaults, the same constraints, the same status codes,
+   the same wire shape, the same order of attributes / commands / events.
+   Where the spec text and matter.js's behaviour diverge, matter.js wins; a
+   deliberate exception is a `by_design.md` entry.
+2. **connectedhomeip** decides where matter.js leaves a behaviour open, and is
+   the authority on tool and controller behaviour matter.js does not model.
+3. **The specification** is the frame both are read against; it is never
+   committed (CSA licence).
+
+**Scope.** Everything the spec makes mandatory (certifiability,
+[ADR 0011](./docs/adr/0011-certifiability-is-a-goal.md)) plus what matter.js
+implements. Going beyond matter.js is allowed when justified and recorded in
+the *Ahead of matter.js* register (Workflow step 5).
+
+**Tests.** Three sources secure the module against devices and ecosystems
+nobody has tried: matter.js's tests, ported by meaning rather than line by
+line (`script/testparity/`); the chip-tool suite and the CSA certification
+cases (`internal/chiptool/`); and this module's own tests.
+
+TypeScript idioms (decorators, `Behavior.with(...)` mixins, `Promise<T>`)
+translate to Go idioms (struct-with-methods, `context.Context`, goroutines).
+Where the Go translation forces a different surface, the Go code calls out the
+matter.js function it mirrors in a comment + the contract it enforces.
 
 ### Workflow
 
