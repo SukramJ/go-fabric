@@ -8,8 +8,10 @@ first change here and treat it as binding.
 is not a port of [matter.js](https://github.com/matter-js/matter.js)'s
 TypeScript code, but it follows matter.js HEAD as its reference
 implementation: matter.js is production-hardened against Apple Home, Google
-Home and Alexa, and that hardening is what this module adopts. The order of
-authority is fixed:
+Home and Alexa, and that hardening is what this module adopts. matter.js is our executable specification: where its production-hardened
+behaviour departs from the spec text, we follow matter.js and record the
+departure. The spec still defines what is mandatory. The
+order of authority is fixed:
 
 1. **matter.js HEAD** decides wherever it models something — schema values
    verbatim, implemented behaviour mirrored. Where the spec text and

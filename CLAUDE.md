@@ -185,7 +185,9 @@ doubt, pull the pattern from matter.js itself, not from ha-bridge.
 (currently 1.6.1) in Go. It is not a port of matter.js's TypeScript code; it
 follows matter.js because matter.js is production-hardened against the
 ecosystems (Apple Home, Google Home, Alexa, …), and that hardening is what we
-adopt. The order of authority:
+adopt. matter.js is our executable specification: where its production-hardened
+behaviour departs from the spec text, we follow matter.js and record the
+departure. The spec still defines what is mandatory. The order of authority:
 
 1. **matter.js HEAD** decides wherever it models something. Schema values are
    taken verbatim (`parity/schema.json`), and implemented behaviour is
