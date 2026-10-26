@@ -10,6 +10,10 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+### Fixed
+
+- A device subscription admitted after its priming data was read lost an attribute change made in between: the change was neither in the priming report nor marked dirty, so the subscriber never saw it (the controller-side CI flake "flips requiresAwait when a registered DSLS peer switches SIT→LIT at runtime": the OperatingMode flip landed inside a recreated subscription's priming read). `bridge` now admits the subscription, priming, before it reads the initial data, as matter.js attaches the change handlers before the initial report (`ServerSubscription.ts:731-739` at 862ad75f); a change during the read goes out in the first report after the SubscribeResponse, and a Subscribe that matches no path is released again after the KeepSubscriptions teardown, in matter.js's order (`InteractionServer.ts:647-662`).
+
 ## [0.13.0] — 2026-10-26
 
 ### Changed
