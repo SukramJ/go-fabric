@@ -181,6 +181,12 @@ func copyUint8(v *uint8) *uint8 {
 // once and counts null — "no name" — as a name that may not repeat within
 // a scenario, so a single scenario of five unnamed presets refuses its
 // step 13. No Occupancy: the endpoint has no occupancy sensor.
+//
+// It serves the optional TemperatureSetpointHold (off: following its
+// program; with it TemperatureSetpointHoldDuration, null) and
+// ThermostatRunningState (idle), the attributes a week-program thermostat
+// reports (cluster/thermo ThermostatConfig). A controller's hold write is
+// stored: the endpoint declares no Sink.
 type demoThermostat struct {
 	name string
 
@@ -227,6 +233,7 @@ func (t *demoThermostat) device(opts device.Options) (*device.Thermostat, error)
 		},
 	}
 	count, room := uint8(5), int16(2150)
+	hold, idle := thermostatdef.TemperatureSetpointHoldSetpointHoldOff, thermostatdef.RelayStateBitmap(0)
 	efficient, comfort := "Efficient", "Comfort"
 	balances := []epdef.BalanceStruct{{Step: 0, Label: &efficient}, {Step: 50}, {Step: 100, Label: &comfort}}
 	priorities := []epdef.EnergyPriorityEnum{epdef.EnergyPriorityEfficiency, epdef.EnergyPriorityComfort}
@@ -237,6 +244,7 @@ func (t *demoThermostat) device(opts device.Options) (*device.Thermostat, error)
 			PresetStore: t.presets,
 			Initial: thermostatdef.Patch{
 				NumberOfPresets: &count, PresetTypes: &presetTypes, Presets: &presets, LocalTemperature: &room,
+				TemperatureSetpointHold: &hold, ThermostatRunningState: &idle,
 			},
 		},
 		epdef.Declare{
