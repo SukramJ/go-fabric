@@ -635,7 +635,7 @@ func (s *ThermostatServer) SetSystemMode(mode uint8) {
 func (s *ThermostatServer) SetTemperatureSetpointHold(hold uint8) {
 	if _, err := s.inst.CheckSet(thermoAttrTemperatureSetpointHold, hold, s.MatterRead); err != nil {
 		s.logger().Warn("matter.thermostat.inbound_setpoint_hold_ignored",
-			slog.Int("temperature_setpoint_hold", int(hold)), slog.String("reason", err.Error()))
+			slog.String("attribute", "temperature_setpoint_hold"), slog.Int("value", int(hold)), slog.String("reason", err.Error()))
 		return
 	}
 	s.mu.Lock()
@@ -656,7 +656,7 @@ func (s *ThermostatServer) SetTemperatureSetpointHold(hold uint8) {
 func (s *ThermostatServer) SetThermostatRunningState(state uint16) {
 	if _, err := s.inst.CheckSet(thermoAttrThermostatRunningState, state, s.MatterRead); err != nil {
 		s.logger().Warn("matter.thermostat.inbound_running_state_ignored",
-			slog.Int("thermostat_running_state", int(state)), slog.String("reason", err.Error()))
+			slog.String("attribute", "thermostat_running_state"), slog.Int("value", int(state)), slog.String("reason", err.Error()))
 		return
 	}
 	s.mu.Lock()
