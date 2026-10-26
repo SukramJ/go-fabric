@@ -10,6 +10,8 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+## [0.13.2] — 2026-10-26
+
 ### Added
 
 - The schema snapshot carries matter.js's Large Message quality ("L") of commands (brief CP): `parity/schema.json` refreshed at the same pin 862ad75f, the extractor emitting the effective quality of every command and event; 25 request and 14 response commands carry it (CameraAvStreamManagement, CommodityPrice, PushAvStreamTransport, TlsCertificateManagement, TlsClientManagement, WebRtcTransportProvider, WebRtcTransportRequestor). `schema.CommandLargeMessage(clusterID, commandID)` reports it for a request command (`Quality.ts:71` at 862ad75f).
@@ -4885,7 +4887,8 @@ consumer of an older pseudo-version should read.
   earlier than it was. Both fields are gone; the commit holding the file is
   its provenance.
 
-[Unreleased]: https://github.com/SukramJ/go-fabric/compare/v0.13.1...HEAD
+[Unreleased]: https://github.com/SukramJ/go-fabric/compare/v0.13.2...HEAD
+[0.13.2]: https://github.com/SukramJ/go-fabric/compare/v0.13.1...v0.13.2
 [0.13.1]: https://github.com/SukramJ/go-fabric/compare/v0.13.0...v0.13.1
 [0.13.0]: https://github.com/SukramJ/go-fabric/compare/v0.12.4...v0.13.0
 [0.12.4]: https://github.com/SukramJ/go-fabric/compare/v0.12.3...v0.12.4
