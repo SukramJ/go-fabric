@@ -12,4 +12,4 @@ package schema
 // The TestMatterSchemaSnapshotHashMatchesEmbedded test recomputes the
 // hash at test time and fails when they diverge — catching hand-edits
 // to generated constants that did not go through the generator.
-const SchemaSnapshotSHA256 = "3b18deb666e85dab9401a536f86946be841a99a5532f1fd52faa913fd87cb3b0"
+const SchemaSnapshotSHA256 = "e9a514b3540da900e23ebf71c6451b1b202d50e6edf59f4920bf7f1f184322a2"

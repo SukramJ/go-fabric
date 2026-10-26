@@ -143,7 +143,7 @@ block below.
 
 | Side | Source |
 | --- | --- |
-| snapshot | `parity/schema.json`, matter.js `862ad75f4d3c7ab528b8a3954168146082cad8a6`, Matter 1.6.1, SHA-256 `3b18deb666e85dab9401a536f86946be841a99a5532f1fd52faa913fd87cb3b0` |
+| snapshot | `parity/schema.json`, matter.js `862ad75f4d3c7ab528b8a3954168146082cad8a6`, Matter 1.6.1, SHA-256 `e9a514b3540da900e23ebf71c6451b1b202d50e6edf59f4920bf7f1f184322a2` |
 | CHIP | connectedhomeip `6170af8461b10b1766044122ac83332c6d00ab20`, `data_model/1.6.1` (git tree `77969732bddf4bd12ba57eb1c6fa032eb2613425`) |
 | CHIP's source | specification `1.6.1-attempt-4` (`49f70c101b4211df3febb975a7f7f9d6e4c4bc94`), alchemy version: v1.7.10 |
 | read | at test time from a connectedhomeip checkout; nothing of it is committed (ADR 0015) |
@@ -209,9 +209,9 @@ What CHIP states and the snapshot does not carry, counted in CHIP's model.
 | Aspect | CHIP elements | Why |
 | --- | ---: | --- |
 | cluster provisional status | 3 | The snapshot does not record that a cluster is provisional; the clusters CHIP marks are listed below. |
-| command quality | 39 | The snapshot records no quality for commands (CHIP marks large-message commands L). |
+| command quality | 0 | Commands CHIP gives a quality the snapshot records none for; the snapshot records the effective command quality (largeMessage, L) since brief CP. |
 | definitions outside the snapshot | 5 | CHIP global types matter.js defines in a shared definitions scope (WebRtcTransportDefinitions) that the extractor does not emit. |
-| event quality | 0 | The snapshot records no quality for events. |
+| event quality | 0 | Events CHIP gives a quality the snapshot records none for; the snapshot records the effective event quality since brief CP. |
 | global commands | 2 | AtomicRequest / AtomicResponse: matter.js models them in the clusters that use them (load-data-model.ts globalCommands). |
 | members CHIP does not state | 4 | A command, event or data type whose fields CHIP leaves unstated because the specification gives them by reference (Level Control's *WithOnOff commands); the snapshot's fields have nothing to be compared with. |
 | semantic namespaces | 28 | The snapshot carries no semantic namespaces. |

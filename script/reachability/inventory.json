@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 6592,
+  "entry_points": 6596,
   "entry_packages": [
     ".",
     "bdx",
@@ -259,9 +259,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 16134,
-    "reachable": 11408,
-    "whitelisted": 4723,
+    "total_exported": 16136,
+    "reachable": 11409,
+    "whitelisted": 4724,
     "unreachable": 3
   },
   "by_package": [
@@ -6596,6 +6596,13 @@
     },
     {
       "package": "client/interaction",
+      "identifier": "TestInferLargeMessageParity",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/interaction/large_message_parity_matterjs_test.go",
+      "line": 153
+    },
+    {
+      "package": "client/interaction",
       "identifier": "TestInputChunkAttributes",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/interaction/input_chunk_parity_matterjs_test.go",
@@ -6627,14 +6634,14 @@
       "identifier": "TestInvokeLargeMessageParity",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/interaction/large_message_parity_matterjs_test.go",
-      "line": 97
+      "line": 99
     },
     {
       "package": "client/interaction",
       "identifier": "TestLargeMessageTransportParity",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/interaction/large_message_parity_matterjs_test.go",
-      "line": 63
+      "line": 65
     },
     {
       "package": "client/interaction",

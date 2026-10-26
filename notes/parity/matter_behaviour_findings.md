@@ -452,12 +452,6 @@ Controller side:
   to join on, and `Node.InvokeBatch` is the one multi-command form
   (ClientInvokeTest, 39 cases `missing`). Owner decision 2026-10-26:
   decided with the milestone 6 concept. (Milestone 6 phase 27.)
-- **`largeMessage` is not inferred.** `inferLargeMessage` reads the
-  schema's "L" quality (`ClientInteraction.ts:716-719`); the snapshot
-  extractor does not emit it, so `ClientRequest.LargeMessage` is set by the
-  caller. Owner decision 2026-10-26: the extractor and `schema/` gain the
-  quality in a small pull request after `v0.13.0`, a snapshot refresh at
-  the same pin. (After v0.13.0.)
 - **The device-side BDX responder takes no per-transfer MRP delay.**
   `TransferOptions.AdditionalMrpDelay` (matter.js `bdxAdditionalMrpDelay`)
   is computed by the update manager but `node`'s BDX responder has no port

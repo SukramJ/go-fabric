@@ -8,7 +8,9 @@ package interaction
 // largeMessage flag of a read requires TCP; ClientInteraction.ts:1235) and
 // the explicit-flag cases of packages/protocol/test/action/InvokeLargeMessageTest.ts
 // (an invoke's flag defaults off, reaches its exchange and every part a
-// split sends, ClientInteraction.ts:716-737). A recording provider stands
+// split sends, ClientInteraction.ts:716-737) and its inference cases (an
+// undecided invoke of a command with the "L" quality carries the flag,
+// :111-127, :716-719). A recording provider stands
 // in for matter.js's: it records each exchange's options and refuses the
 // exchange, ending the interaction.
 
@@ -137,6 +139,107 @@ func TestInvokeLargeMessageParity(t *testing.T) {
 			r := p.required()
 			if len(r) != 2 || !isTCP(r[0]) || !isTCP(r[1]) {
 				t.Errorf("required %v, want TCP on both parts", r)
+			}
+		})
+	})
+}
+
+// The inference cases of InvokeLargeMessageTest.ts ("inferLargeMessage",
+// "ClientInteraction.invoke inference policy") at 862ad75f: an invoke the
+// caller left undecided carries LargeMessage when any of its commands has
+// the "L" quality in the snapshot (ClientInteraction.ts:111-127,
+// :716-719), and the inferred flag requires TCP on the exchange and on
+// every part of a split.
+func TestInferLargeMessageParity(t *testing.T) {
+	t.Parallel()
+	no := false
+	toggle := im.ConcreteCommandPath{Endpoint: 1, Cluster: 6, Command: 2, HasEndpoint: true, HasCluster: true, HasCommand: true}
+	// WebRtcTransportProvider.ProvideOffer, the "L" command the matter.js
+	// cases use (web-rtc-transport-provider.element.ts:76).
+	provideOffer := im.ConcreteCommandPath{Endpoint: 2, Cluster: 0x0553, Command: 0x02, HasEndpoint: true, HasCluster: true, HasCommand: true}
+	// CameraAvStreamManagement.CaptureSnapshot
+	// (camera-av-stream-management.element.ts:299).
+	captureSnapshot := im.ConcreteCommandPath{Endpoint: 1, Cluster: 0x0551, Command: 0x0C, HasEndpoint: true, HasCluster: true, HasCommand: true}
+	inferred := func(paths ...im.ConcreteCommandPath) bool {
+		return (InvokeOptions{}).inferLargeMessage(paths...).large()
+	}
+	t.Run("inferLargeMessage", func(t *testing.T) {
+		t.Parallel()
+		t.Run("detects L quality on a concrete command request", func(t *testing.T) {
+			if !inferred(provideOffer) {
+				t.Error("not inferred")
+			}
+		})
+		t.Run("returns false for a command without L quality", func(t *testing.T) {
+			if inferred(toggle) {
+				t.Error("inferred")
+			}
+		})
+		t.Run("flags the whole invoke when any one command carries L quality", func(t *testing.T) {
+			if !inferred(toggle, provideOffer) {
+				t.Error("not inferred")
+			}
+		})
+		t.Run("swallows MalformedRequestError when cluster/command unresolved", func(t *testing.T) {
+			// A path the snapshot does not model infers nothing and fails
+			// nothing; the exchange reports what the peer makes of it.
+			unknown := im.ConcreteCommandPath{Endpoint: 1, Cluster: 0x1234, Command: 0xFF, HasEndpoint: true, HasCluster: true, HasCommand: true}
+			if inferred(unknown) {
+				t.Error("inferred")
+			}
+		})
+	})
+	t.Run("ClientInteraction.invoke inference policy", func(t *testing.T) {
+		t.Parallel()
+		t.Run("preserves an explicit largeMessage:false on a command with L quality", func(t *testing.T) {
+			var o InvokeOptions
+			o.LargeMessage = &no
+			got := o.inferLargeMessage(provideOffer)
+			if got.LargeMessage != &no || *got.LargeMessage {
+				t.Errorf("LargeMessage %v, want the caller's false", got.LargeMessage)
+			}
+		})
+	})
+	t.Run("an inferred large message requires TCP", func(t *testing.T) {
+		t.Parallel()
+		t.Run("for a single L command the caller left undecided", func(t *testing.T) {
+			p := &recordingProvider{}
+			if _, err := Bind(p, Config{}).Invoke(context.Background(), captureSnapshot, nil, InvokeOptions{}); !errors.Is(err, errRecorded) {
+				t.Fatal(err)
+			}
+			if r := p.required(); len(r) != 1 || !isTCP(r[0]) {
+				t.Errorf("required %v, want TCP as for LargeMessage true", r)
+			}
+		})
+		t.Run("for no command of an invoke the caller set to false", func(t *testing.T) {
+			p := &recordingProvider{}
+			var o InvokeOptions
+			o.LargeMessage = &no
+			if _, err := Bind(p, Config{}).Invoke(context.Background(), captureSnapshot, nil, o); !errors.Is(err, errRecorded) {
+				t.Fatal(err)
+			}
+			if r := p.required(); len(r) != 1 || r[0] != nil {
+				t.Errorf("required %v, want none", r)
+			}
+		})
+		t.Run("for every part of a split invoke when one command carries L", func(t *testing.T) {
+			p := &recordingProvider{}
+			cmds := []CommandRequest{{Path: toggle}, {Path: captureSnapshot}}
+			if _, err := Bind(p, Config{}).InvokeBatch(context.Background(), cmds, 1, InvokeOptions{}); !errors.Is(err, errRecorded) {
+				t.Fatal(err)
+			}
+			r := p.required()
+			if len(r) != 2 || !isTCP(r[0]) || !isTCP(r[1]) {
+				t.Errorf("required %v, want TCP on both parts", r)
+			}
+		})
+		t.Run("for no command without L", func(t *testing.T) {
+			p := &recordingProvider{}
+			if _, err := Bind(p, Config{}).Invoke(context.Background(), toggle, nil, InvokeOptions{}); !errors.Is(err, errRecorded) {
+				t.Fatal(err)
+			}
+			if r := p.required(); len(r) != 1 || r[0] != nil {
+				t.Errorf("required %v, want none", r)
 			}
 		})
 	})
