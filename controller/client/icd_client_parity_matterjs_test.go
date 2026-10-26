@@ -496,11 +496,23 @@ func TestIcdClientParity(t *testing.T) {
 				t.Fatal("the device took the key")
 			}
 			p.site.Net().Filter(nil)
-			p.wakeDevice(t)
-			p.eventually(t, "the refresh", func() bool {
+			// The pending key is offered again on a check-in once the
+			// device is reachable. The blackout may have made the device
+			// reap the session its unacknowledged reports ran on; the
+			// refresh on that session then fails and waits for the next
+			// check-in, the peer reconnecting meanwhile — so the device
+			// checks in until the refresh lands.
+			refreshed := func() bool {
 				r, _ := p.icd().Registration()
 				return r.PendingKey == nil && bytes.Equal(r.Key, pending)
-			})
+			}
+			for i := 0; !refreshed(); i++ {
+				if i == 4 {
+					t.Fatal("the pending key was not offered again")
+				}
+				p.wakeDevice(t)
+				p.advance(t, 20*time.Second)
+			}
 			if !bytes.Equal(p.deviceKey(t), pending) {
 				t.Fatal("the device holds another key")
 			}
