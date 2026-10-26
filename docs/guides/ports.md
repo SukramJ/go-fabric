@@ -97,6 +97,20 @@ Use `Observers` instead.
 
 *Source: `node/config.go:37-205`, `node/config.go:221-281`, `node/config.go:367-415`, `node/client.go:29-51`, `node/ota_provider.go:25-39`, `node/commissioner_control.go:23-34`, `node/observers.go:4-71`, `node/persist.go:57-77`, `node/root.go:392-403`, `node/root.go:536-540`, `node/doc.go:49-64`, `bridge/bridge.go:2168-2180`.*
 
+## `controller.Config`: the controller's ports added in v0.13.0
+
+| Field | What it does | When nil or zero |
+| --- | --- | --- |
+| `OTA` (`controller.OTAConfig`) | the OTA push: the update manager (`Controller.SoftwareUpdates`) over an image store (`Images`, nil is an in-memory one without ledgers) and the controller's own node with the OTA provider | no OTA push, no own node |
+| `OTA.StartNode` | starts the own node from a `controller.OwnNodeSpec` and returns it as a `controller.OwnNode` with its address: `node/controllernode.Start`, or a test's starter that runs it on its site (`fabrictest.Site.ControllerConfig` sets one) | required with `OTA`: `New` refuses with `ErrConfiguration` |
+| `TCP` (`controller.TCPConfig{Incoming, Outgoing}`) | a TCP listener (`Controller.TCPAddr`) and the TCP initiator | UDP only |
+| `TransportPreference` | the transport each peer prefers | UDP |
+| `Networks`, `OwnNetworkProfile` | the network profiles' defaults and the profile our own MRP margin comes from | matter.js's defaults (`peer.DefaultTemplates`); `fast` |
+| `Advertise`, `Advertiser` | the `_matterd._udp` commissioner record and the advertiser publishing it | no record; `mdns.NewZeroconf()` when `Advertise` is set |
+
+`controller/commissioner.Context.Scanners` (`CommissionedScanner`) are the
+scanners told to forget a device once it is commissioned; nil is none.
+
 ## `bridge`: the `Attach…` and `Set…` ports
 
 The facade attaches all of these. A host that drives `bridge/` directly

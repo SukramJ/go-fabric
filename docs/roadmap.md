@@ -252,6 +252,25 @@ Milestone 5 also closes issues #274 (the Ahead-of-matter.js marker check,
 wave CN) and #273 (wave CO, three pull requests after phase 25), owner
 decision 2026-10-25.
 
+**Status 2026-10-26.** Phase 25 (brief CM) is one bundle for `v0.13.0`:
+the OTA push from the controller (`controller/softwareupdate` after
+`SoftwareUpdateManager.ts`, `OtaAnnouncements.ts` and the
+`DclOtaUpdateService` store; the provider on the controller's own node,
+composed by `node/controllernode`; the reference controller's `ota serve`
+updates the reference daemon over the air), the TCP initiator
+(`client/peer`, `client/exchange`; `ClientNodeTcpTest`), the network
+profiles and MRP margins (`client/peer.NetworkProfiles`;
+`NetworkProfileTest`, `MRPTest`), the `_matterd._udp` commissioner
+advertisement, the parked register items (`Interaction.Close` and the
+abandoned subscribe, write chunking across messages, `includeKnownVersions`
+on a subscription, `Cluster.Supports` by conformance, nodes kept when they
+fail to load, `Registry.CompleteCommissioning`, the payload identity
+check) and the `MarkComplete` break. The four controller-discovery test
+files and `ReportedSessionParametersTest` move to milestone 6 phase 27
+with their reasons. The Thread border-router client is milestone 6 phase
+26a ([ADR 0027](./adr/0027-thread-border-router-over-otbr-rest.md)).
+Milestone 5 closes with `v0.13.0` and wave CO (issue #273).
+
 ### Milestone 6: Completeness
 
 | Phase | Content | Proof |

@@ -167,11 +167,15 @@ its error on stderr.
   ```
 
 - `ota serve --image <file> [--version N] [--vendor N] [--product N] [--announce <node>] [--once] [--yes]`
-  — serves the image from the own node's OTA provider to requestors of its
-  vendor and product below its version (defaults from the image header);
-  each offer is asked on the console unless `--yes`; `--announce` sends
-  AnnounceOtaProvider to a node. Runs until Ctrl-C, or `--once` until one
-  update is done.
+  — serves the image through the controller's OTA push
+  (`controller.Config.OTA`): the image goes into the update manager's store
+  and is offered by its header, so `--version`, `--vendor` and `--product`
+  must match it. With `--announce` the console grants that node's consent
+  (unless `--yes`) and the manager announces the provider and follows the
+  update — the node gets a default subscription for the time it runs;
+  without it every paired node of the vendor and product gets the consent
+  and the image when it queries. Each status is printed. Runs until Ctrl-C,
+  or `--once` until one update is done.
 
   ```sh
   reference-controller ota serve --image light-v2.ota --announce 0x4321 --once
@@ -234,8 +238,9 @@ speaks BlueZ over the D-Bus system bus, without cgo, on Linux only.
 
 A group message is sealed and sent by a node of the fabric, and an OTA
 image is served by one; the controller role has neither. `group` and `ota`
-therefore start a node of the tool's own (as the module's live tests do),
-commission it into the tool's fabric on first use and keep it in the same
+therefore open the controller with its OTA push, whose own node
+(`Controller.OwnNode`, started by `node/controllernode`) the controller
+commissions into the tool's fabric on first use and keeps in the same
 database. It serves no device; it advertises on DNS-SD like any node while it
 runs. `pair`, `read`, `write`, `invoke`, `subscribe`, `events`, `bind` and
 `unpair` do not start it.
@@ -249,7 +254,7 @@ One SQLite file holds:
 | `matter_settings` `controller.ca` | The CA: root certificate, root key, certificate counter (JSON, matter.js `CertificateAuthority` field names). With `--ca-key` the root key is not here; `rootKeyRef` names the key file. |
 | `matter_settings` `controller.ca.fabric` | The fabric: fabric id, root node id, vendor id, IPK, fabric index, label, the controller's operational key and NOC (matter.js `Fabric.Config` names). |
 | `matter_settings` `controller.dcl.trust` | The DCL trust store, with `--dcl prod` or `testnet`. |
-| `matter_settings` `controller.self`, `controller.group.<id>` | The own node's passcode, discriminator, salt and node id; each group `group create` made (key set, epoch key, members). |
+| `matter_settings` `controller.ownnode`, `controller.group.<id>` | The own node's passcode, discriminator, salt and node id (moved from `controller.self` on the first start of v0.13.0); each group `group create` made (key set, epoch key, members). |
 | `matter_client_values`, `matter_client_versions` | The client registry: every paired node's record and cached image (`controller/client/sqlstore`). |
 | the other `matter_*` tables | The own node's store (its fabric, keys, ACL). |
 
