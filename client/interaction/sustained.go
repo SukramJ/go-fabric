@@ -521,6 +521,15 @@ func (c *Interaction) awaitClosedOrModeFlip(ctx context.Context, outer *Subscrip
 			}
 		})
 		defer unsubscribe()
+		// The feed may have landed between the caller's wakefulness read
+		// and the observer above: matter.js cannot lose it (no await
+		// between `#wakefulness()` and `peerFed.on`), a goroutine can, and
+		// a lost feed would leave the subscription without its hold on the
+		// wakefulness until a later loss. A wakefulness present now is the
+		// feed.
+		if outer.wakefulness() != nil {
+			return ctx.Err() == nil
+		}
 		select {
 		case <-closed:
 			return false

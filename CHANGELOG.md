@@ -35,6 +35,10 @@ pseudo-version of `main`.
 - `client/interaction.Interaction.Close` (brief CM §5): matter.js's `ClientInteraction.close` (`ClientInteraction.ts:264-297` at 862ad75f) — the subscriptions of the interaction's peer close, every running exchange is aborted with the reason (`ErrClosed` without one) and `Close` returns once they ended; later interactions fail with the reason. `Interaction.CloseSubscriptions` is its first step alone. A subscription whose establishment fails or is cancelled is abandoned rather than dropped: its exchange waits for the peer's priming report and answers it `INVALID_SUBSCRIPTION`, as is a report being processed when the caller gives up (`ClientInteraction.ts:1084-1097`, `InteractionMessenger.ts:1116-1137`); the device keeps no subscription for it.
 - `controller/commissioner.Context.Scanners` (`CommissionedScanner`, brief CM §5): once a device is commissioned, every scanner forgets it by the BLE address it was reached at and by its identity (`ControllerCommissioner.ts:321-341`, `:721-723`); `controller/ble.Scanner` is one. `client/discovery.CommissionedIdentity` and `Device.Identity` (`controller/ble.CommissionedIdentity` is now an alias of it), `controller/ble.Channel.PeripheralAddress`.
 
+### Fixed
+
+- A sustained subscription established just before its peer's ICD registration landed could miss the feed and keep running without its hold on the peer's wakefulness, so `ICDClient.NextExpectedCheckIn` reported a deadline while subscribed and the recreate for the registered mode waited for a later loss (CI flake `TestIcdClientParity/availability`): the wait for close-or-feed now treats a wakefulness already present as the feed, which matter.js's single-threaded `#awaitClosedOrModeFlip` (`SustainedSubscription.ts:459-486` at 862ad75f) cannot lose.
+
 ## [0.12.4] — 2026-10-25
 
 ### Added
