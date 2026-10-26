@@ -1890,8 +1890,8 @@
       "stepsSkipped": 0
     },
     "TSTAT/2.1": {
-      "steps": 28,
-      "stepsSkipped": 48
+      "steps": 31,
+      "stepsSkipped": 45
     },
     "TSTAT/2.2": {
       "tests": 1,
