@@ -10,6 +10,10 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+### Fixed
+
+- `controller/softwareupdate`: a data race between a consent that replaced a queued entry's target and endpoint (`queueUpdate`) and the goroutine announcing that entry (`triggerUpdateOnNode`), found by the race detector in CI (`TestOTAConsentChangesQueuedOptionsParity`); the announcing goroutine now reads the endpoint under the manager's lock.
+
 ## [0.13.1] — 2026-10-26
 
 ### Fixed
