@@ -43,8 +43,8 @@ const ProgressTimeout = 15 * time.Minute
 // (SoftwareUpdateManager.ts:961-967, Minutes(5)).
 const queueCheckInterval = 5 * time.Minute
 
-// maxApplyDelay is the longest DelayedActionTime an apply is allowed
-// with, a day (OtaSoftwareUpdateProviderServer.ts:467-473, MAX_DELAYED_ACTION_TIME).
+// maxApplyDelay is the longest delay an apply is allowed with, a day
+// (OtaSoftwareUpdateProviderServer.ts:467-473, MAX_DELAYED_ACTION_TIME).
 const maxApplyDelay = 24 * time.Hour
 
 // ErrNotApplicable is a node that is not currently applicable for OTA

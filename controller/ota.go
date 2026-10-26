@@ -312,7 +312,7 @@ func (c *Controller) sessionAdded(p *peer.Peer, s *exchange.Session) {
 }
 
 // reportStarted feeds a report's session to the armer
-// (RebootResubscribeArmer.ts:165-172).
+// (RebootResubscribeArmer.ts:68, :165-172).
 func (c *Controller) reportStarted(s *exchange.Session) {
 	if c.armer != nil {
 		c.armer.ReportStarted(armerSession{s: s, initiator: c.peers.Initiated(s)})

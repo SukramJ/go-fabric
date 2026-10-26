@@ -60,7 +60,7 @@ type ConcreteLimits struct {
 }
 
 // Limits are a profile's limits with its BDX margin and its sub-profiles —
-// matter.js NetworkProfiles.Limits (NetworkProfile.ts:262-284).
+// matter.js's Limits (NetworkProfile.ts:262-284).
 type Limits struct {
 	ConcreteLimits
 	// BDXAdditionalMrpDelay is the margin of bulk transfer exchanges; nil
@@ -87,7 +87,7 @@ type Templates struct {
 
 func durationPtr(d time.Duration) *time.Duration { return &d }
 
-// ConservativeLimits are matter.js NetworkProfiles.conservative
+// ConservativeLimits are matter.js's conservative profile
 // (NetworkProfile.ts:347-361): 4 exchanges 100 ms apart, a 1.5 s MRP
 // margin, CASE establishment 4 at a time each released after 10 s, address
 // probes 2 at a time released after 15 s.

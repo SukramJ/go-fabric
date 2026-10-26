@@ -153,7 +153,7 @@ func (r *otaRig) snapshot() (statuses []mattercore.OTAUpdateStatus, done, failed
 
 // TestOTAPushFromTheController: the controller's own node serves an image
 // the controller pushes to a device — consent, announcement, QueryImage,
-// a BDX download, ApplyUpdateRequest and NotifyUpdateApplied — and the
+// a BDX download, the apply request and the applied notification — and the
 // device runs the new version (OtaTest.ts:91 "Successfully processes a
 // software update"). It is the end-to-end proof of brief CM §1.4.
 func TestOTAPushFromTheController(t *testing.T) {

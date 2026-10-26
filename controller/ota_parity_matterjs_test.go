@@ -172,8 +172,8 @@ func TestOTAQueuedUpdateViaConsentParity(t *testing.T) {
 }
 
 // TestOTANoUpdatesWithoutRequestorParity: a node without an OTA requestor
-// is no update target: the check reports nothing — OtaTest.ts:1293-1347,
-// #preparePeerForUpdate (:703-776).
+// is no update target: the check reports nothing — OtaTest.ts:1293-1347.
+// The rule is #preparePeerForUpdate (SoftwareUpdateManager.ts:703-776).
 func TestOTANoUpdatesWithoutRequestorParity(t *testing.T) {
 	t.Parallel()
 	r := newOTARigWith(t, nil, nil)

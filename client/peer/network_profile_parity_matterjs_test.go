@@ -286,7 +286,7 @@ func TestConnectionThrottledByTheConnectProfile(t *testing.T) {
 	eventually(t, "the slot released", func() bool { return connect.Semaphore.Running() == 0 })
 }
 
-// TestConnectionOnANamedNetwork: ConnectOptions.Network names the profile
+// TestConnectionOnANamedNetwork: a connect's Network option names the profile
 // the process throttles on — "icdLit" has no connect sub-profile, so its
 // slot is the profile's own (PeerConnection.ts:110-118) — and a name no
 // profile has fails the connect (NetworkProfile.ts:136-148).

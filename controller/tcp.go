@@ -15,11 +15,11 @@ import (
 
 // TCPConfig selects the controller's Matter TCP roles — matter.js
 // NetworkServer.State.tcp resolved by resolveTcpConfig
-// (packages/node/src/behavior/system/network/NetworkServer.ts:211-217,
-// :261-272 at 862ad75f). The zero value is TCP off.
+// (packages/node/src/behavior/system/network/NetworkServer.ts:261-272 at
+// 862ad75f; the state :211-217). The zero value is TCP off.
 type TCPConfig struct {
 	// Incoming accepts TCP connections on the controller's UDP port (the
-	// tcpServer role, ServerNetworkRuntime.ts:203-226).
+	// tcpServer role, ServerNetworkRuntime.ts:334-338; the listener :203-226).
 	Incoming bool
 	// Outgoing opens TCP connections to peers that serve TCP when an
 	// interaction requires or prefers it (the tcpClient role).

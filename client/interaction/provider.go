@@ -61,7 +61,7 @@ type ExchangeOptions struct {
 }
 
 // ClientRequest is what every interaction request carries for its
-// exchange — matter.js ClientRequest (action/client/ClientRequest.ts:12-90
+// exchange — matter.js ClientRequest (action/client/ClientRequest.ts:13-87
 // at 862ad75f): the network profile and the MRP margin override. It is
 // embedded in [ReadRequest], [SubscribeRequest], [WriteOptions] and
 // [InvokeOptions].
