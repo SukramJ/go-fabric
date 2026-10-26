@@ -1009,8 +1009,13 @@ func unknownLast(e *queueEntry) int {
 // UpdateAvailable; the entry is in progress once the announcement went
 // out, reset when it failed.
 func (m *Manager) triggerUpdateOnNode(e *queueEntry) {
+	// The entry's endpoint is read under the lock that queueUpdate writes
+	// it under: a later consent for the same node replaces Target and
+	// endpoint of a queued entry (#queueUpdate :892-920) while this
+	// goroutine, started by triggerQueuedUpdate, announces the earlier one.
 	m.mu.Lock()
 	a := m.announcements
+	endpoint := e.endpoint
 	m.mu.Unlock()
 	if a == nil {
 		m.log.Info("ota.manager.not_initialized", slog.String("node", peerString(e.peer)))
@@ -1025,7 +1030,7 @@ func (m *Manager) triggerUpdateOnNode(e *queueEntry) {
 		return
 	}
 	m.log.Info("ota.manager.announcing", slog.String("node", peerString(e.peer)))
-	if err := a.announceOtaProvider(context.Background(), n, e.endpoint, announceUpdateAvailable); err != nil {
+	if err := a.announceOtaProvider(context.Background(), n, endpoint, announceUpdateAvailable); err != nil {
 		m.log.Warn("ota.manager.announce_failed", slog.String("node", peerString(e.peer)), slog.Any("err", err))
 		m.mu.Lock()
 		e.reset()
