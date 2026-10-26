@@ -427,37 +427,40 @@
     },
     {
       "path": "packages/node/test/behavior/system/controller/discovery/CommissioningIdentityTest.ts",
-      "status": "planned",
-      "until": "M5 phase 25",
-      "reason": "The commissioner's vendor/product identity check of an advertised device against the onboarding payload. Controller discovery: milestone 5 phase 25 (concept v5 F.0 19.3).",
+      "status": "ported",
+      "go": [
+        "client/discovery:TestCommissioningIdentityParity",
+        "client/discovery:TestAdvertisedIdentity"
+      ],
+      "reason": "CommissioningDiscovery.identityMismatch (CommissioningDiscovery.ts:109-140 at 862ad75f) is client/discovery.MismatchOf over discovery.Identity (0 the unspecified value both codecs report as absent); controller.Pair passes over a device whose VP record contradicts the code's vendor or product, over DNS-SD and over BLE (fix: #namesThisDevice, :79-90).",
       "snapshotSha": "a5d21a5f6705a7679a5040c96a9daaa727a4a730"
     },
     {
       "path": "packages/node/test/behavior/system/controller/discovery/ContinuousDiscoveryTest.ts",
       "status": "planned",
-      "until": "M5 phase 25",
-      "reason": "Continuous discovery creating one node for a device that concurrent discoveries report. Controller discovery: milestone 5 phase 25 (concept v5 F.0 19.3).",
+      "until": "M6 phase 27",
+      "reason": "Continuous discovery creating one node for a device that concurrent discoveries report. Left planned in brief CM: it tests matter.js's controller Discovery behaviour (Discovery, ParallelPaseDiscovery, CommissioningDiscovery, ContinuousDiscovery over a ScannerSet: parallel PASE attempts, cancellation and abort, the error kinds, transport selection from the discovery capabilities), which the Go controller does not have in that shape — Controller.Pair finds one device per transport serially and Discover is DNS-SD only. The identity check of the same class is ported (CommissioningIdentityTest). Milestone 6 phase 27 (the register at 100 %).",
       "snapshotSha": "c0adf3e65a382f5be567ed488776e7d38d6f490c"
     },
     {
       "path": "packages/node/test/behavior/system/controller/discovery/DiscoveryCancelTest.ts",
       "status": "planned",
-      "until": "M5 phase 25",
-      "reason": "Cancellation and abort of a commissioning discovery before and after the PASE win, cancel reasons and settling. Controller discovery: milestone 5 phase 25 (concept v5 F.0 19.3).",
+      "until": "M6 phase 27",
+      "reason": "Cancellation and abort of a commissioning discovery before and after the PASE win, cancel reasons and settling. Left planned in brief CM: it tests matter.js's controller Discovery behaviour (Discovery, ParallelPaseDiscovery, CommissioningDiscovery, ContinuousDiscovery over a ScannerSet: parallel PASE attempts, cancellation and abort, the error kinds, transport selection from the discovery capabilities), which the Go controller does not have in that shape — Controller.Pair finds one device per transport serially and Discover is DNS-SD only. The identity check of the same class is ported (CommissioningIdentityTest). Milestone 6 phase 27 (the register at 100 %).",
       "snapshotSha": "1613033bcf3b348c3340969c197ef12d366c0995"
     },
     {
       "path": "packages/node/test/behavior/system/controller/discovery/DiscoveryErrorTest.ts",
       "status": "planned",
-      "until": "M5 phase 25",
-      "reason": "The error kinds a commissioning discovery reports (not discovered, incomplete, aggregate, no transport, unusable device). Controller discovery: milestone 5 phase 25 (concept v5 F.0 19.3).",
+      "until": "M6 phase 27",
+      "reason": "The error kinds a commissioning discovery reports (not discovered, incomplete, aggregate, no transport, unusable device). Left planned in brief CM: it tests matter.js's controller Discovery behaviour (Discovery, ParallelPaseDiscovery, CommissioningDiscovery, ContinuousDiscovery over a ScannerSet: parallel PASE attempts, cancellation and abort, the error kinds, transport selection from the discovery capabilities), which the Go controller does not have in that shape — Controller.Pair finds one device per transport serially and Discover is DNS-SD only. The identity check of the same class is ported (CommissioningIdentityTest). Milestone 6 phase 27 (the register at 100 %).",
       "snapshotSha": "9b754259f919ad36968baa4bbcd6411c032123a5"
     },
     {
       "path": "packages/node/test/behavior/system/controller/discovery/DiscoveryTransportsTest.ts",
       "status": "planned",
-      "until": "M5 phase 25",
-      "reason": "Selection and reporting of the discovery transports (IP network, BLE) from the onboarding payload. Controller discovery: milestone 5 phase 25 (concept v5 F.0 19.3).",
+      "until": "M6 phase 27",
+      "reason": "Selection and reporting of the discovery transports (IP network, BLE) from the onboarding payload. Left planned in brief CM: it tests matter.js's controller Discovery behaviour (Discovery, ParallelPaseDiscovery, CommissioningDiscovery, ContinuousDiscovery over a ScannerSet: parallel PASE attempts, cancellation and abort, the error kinds, transport selection from the discovery capabilities), which the Go controller does not have in that shape — Controller.Pair finds one device per transport serially and Discover is DNS-SD only. The identity check of the same class is ported (CommissioningIdentityTest). Milestone 6 phase 27 (the register at 100 %).",
       "snapshotSha": "4d32c07967e95dbb8ba1fad22a962328a051280b"
     },
     {
@@ -1197,46 +1200,41 @@
       "path": "packages/node/test/behaviors/ota/OtaTest.ts",
       "status": "partial",
       "go": [
-        "node:TestOtaParityMatterJS",
-        "node:TestOtaBusyParityMatterJS",
+        "cluster/core:TestOTARequestor_AnnouncementDuringQuery",
         "cluster/core:TestParityMatterJS_OTAProviderApplyConsentAndToken",
         "cluster/core:TestParityMatterJS_OTAProviderApplyDelay",
-        "cluster/core:TestParityMatterJS_OTAProviderQueryInProgress",
         "cluster/core:TestParityMatterJS_OTAProviderDoneClearsConsent",
-        "cluster/core:TestOTARequestor_AnnouncementDuringQuery"
+        "cluster/core:TestParityMatterJS_OTAProviderQueryInProgress",
+        "controller/softwareupdate:TestManagerAppliedUpdateAfterResubscriptionParity",
+        "controller/softwareupdate:TestManagerApplyFailureOnStartUpParity",
+        "controller/softwareupdate:TestManagerCancelledResetsForRetryParity",
+        "controller/softwareupdate:TestManagerCleanupPurgesTestImagesParity",
+        "controller/softwareupdate:TestManagerStalledAfterApplyDelayParity",
+        "controller/softwareupdate:TestManagerSuppressNextStartUpParity",
+        "controller:TestOTACancelByRemovingConsentParity",
+        "controller:TestOTAConsentChangesQueuedOptionsParity",
+        "controller:TestOTANoUpdatesWithoutRequestorParity",
+        "controller:TestOTAPushFromTheController",
+        "controller:TestOTAQueuedUpdateViaConsentParity",
+        "controller:TestOTARejectsInvalidTransferOptionsParity",
+        "controller:TestOTATransferOptionsParity",
+        "node:TestOtaBusyParityMatterJS",
+        "node:TestOtaParityMatterJS"
       ],
       "missing": [
         "OTA reboot: closes older sessions and does not re-subscribe a device that feeds its subscription",
         "OTA reboot: force re-subscribes (Mechanism B) when the subscription is not fed within the grace window",
         "a real inbound subscription report announces the session it arrived over",
         "OTA reboot: the failed-apply detection path does not disarm the peer",
-        "Cancel a software update before download by removing consent",
-        "resolves transfer options from the consent, then from state",
-        "lets a later consent change and clear the options of a queued update",
-        "rejects invalid transfer options before touching any state",
-        "Queue processes a single update via addUpdateConsent",
-        "Does not report updates for nodes without OTA requestor",
-        "Cancelled status resets queue entry for retry",
-        "does not count an update as stalled while the device waits out its apply delay",
-        "Apply failure detected when startUp fires after Applying state",
-        "fails an applied update when the node resubscribes with its previous version (apply delay none)",
-        "fails an applied update when the node resubscribes with its previous version (apply delay 2 min)",
-        "keeps an applied update when the node resubscribes at or above the target version",
-        "keeps an applied update while the controller resubscribes before its restart deadline",
-        "keeps an applied update while the controller resubscribes during its apply delay",
         "keeps an applied update when the node goes away as the restart deadline passes",
-        "keeps an update that waits for its apply when the controller resubscribes",
         "triggerUpdateOnNode skips announcement when BDX session is active",
         "A running BDX transfer keeps a long download out of the stalled state",
         "A retried BDX transfer counts as progress although its byte counter restarts",
         "A running BDX transfer keeps its in-progress entry alive, including a session opened for a retry",
         "An open BDX session that never transfers a block does not count as progress",
-        "A BDX transfer that stops moving data is reset for retry",
-        "suppressNextStartUp: suppresses startUp on matching session ID",
-        "suppressNextStartUp: different session ID does NOT suppress startUp",
-        "Cleanup purges stored test-mode OTA when allowTestOtaImages is disabled, preserves prod/local"
+        "A BDX transfer that stops moving data is reset for retry"
       ],
-      "reason": "The requestor's cases run on two fabrictest devices of one site, the Go provider being a node's (node/ota_parity_matterjs_test.go): the update through download, apply and NotifyUpdateApplied after the restart into the new version, the restart from storage into the new and the previous version, the failed apply, no query while applying, the announcement during a running query (fix: handled once the query ended, OtaSoftwareUpdateRequestorServer.ts:376-420, :568-582) and the Busy describe (the provider's Busy is its consent port obtaining). The provider's answers run on the provider (cluster/core/ota_provider_parity_matterjs_test.go): the apply without consent, the update-token rules (fix: OtaSoftwareUpdateProviderServer.ts:417-430, :444-464), the apply delay on the wire, queryImage cases A, B (the provider's half) and C, and Done clearing the consent. Missing, controller-side SoftwareUpdateManager (a Register candidate; no Go manager in this wave): its reboot detection (RebootResubscribeArmer, handlePeerShutdown, closeForPeer, the reportStarted signal it reads, the failed-apply detection on startUp, suppressNextStartUp), its consent queue (removeConsent, addUpdateConsent, queuedUpdates, the Cancelled reset), its transfer options (bdxTransferOptionsFor), its update check of nodes without a requestor, its stalled detection by BDX progress and by the apply delay, its outcome after the resubscription (updateFailed, updateDone), triggerUpdateOnNode's skip of a running transfer and the DCL store cleanup of test images; the queryImage Case B record of the suppressed startUp is the manager's too.",
+      "reason": "The requestor's cases run on two fabrictest devices of one site, the Go provider being a node's (node/ota_parity_matterjs_test.go): the update through download, apply and NotifyUpdateApplied after the restart into the new version, the restart from storage into the new and the previous version, the failed apply, no query while applying, the announcement during a running query (fix: handled once the query ended, OtaSoftwareUpdateRequestorServer.ts:376-420, :568-582) and the Busy describe. The provider's answers run on the provider (cluster/core/ota_provider_parity_matterjs_test.go): the apply without consent, the update-token rules (fix: OtaSoftwareUpdateProviderServer.ts:417-430, :444-464), the apply delay on the wire, queryImage cases A, B (the provider's half) and C, and Done clearing the consent. The controller's SoftwareUpdateManager (controller/softwareupdate, brief CM §1) runs the push end to end on a site (controller/ota_e2e_test.go, controller/ota_parity_matterjs_test.go: transfer options, the queued path, no requestor, the cancel by removing the consent with a requestor that cannot consent) and its queue cases on its own state, as matter.js sets su.internal.updateQueue directly (controller/softwareupdate/manager_parity_matterjs_test.go: Cancelled reset, the stall during the apply delay, the failed apply on startUp, the startUp suppression, the outcome after the resubscription, the test-image cleanup). Go cannot express a negative, fractional or NaN block size or a NaN delay; those invalid-option cases are the type's. Missing: the reboot cases that need the armer driving a real subscription through a device restart (Mechanism A/B, the inbound report's session, the disarm on the failed apply, the node going away at the deadline — the armer's own cases are RebootResubscribeArmerTest's), and the BDX liveness cases (a running, retried, idle or stopped transfer, triggerUpdateOnNode's skip of a running one), which need a BDX session held open mid-transfer.",
       "snapshotSha": "a6e773f32ed4c1c3eb3a3c00ca1d8b474cd448ae"
     },
     {
@@ -2128,18 +2126,12 @@
     },
     {
       "path": "packages/node/test/node/ClientChunkedWriteTest.ts",
-      "status": "partial",
+      "status": "ported",
       "go": [
-        "client/interaction:TestWriteChunksLists"
+        "client/interaction:TestWriteChunksLists",
+        "controller/client:TestClientChunkedWriteParity"
       ],
-      "missing": [
-        "writes a whole list larger than one message as an empty REPLACE and ADDs across chunks",
-        "writes a list with a matching data version that fits one message",
-        "writes a list with a matching data version across chunks",
-        "rejects every entry of a list write with a stale data version",
-        "writes small values whose statuses do not fit one WriteResponse although the request does"
-      ],
-      "reason": "Chunking a large list write is covered; the data-version and response-size cases are not.",
+      "reason": "The six cases on fabrictest against the module's device (a light with a UserLabel; a datagram larger than one UDP message dropped and recorded, as the matter.js test intercepts it): the 50-label list chunked and whole, a matching data version in one message and across chunks, a stale one rejected on every entry, small values whose statuses do not fit one WriteResponse (fix: sendWriteCommand and #chunkWriteRequest, InteractionMessenger.ts:1269-1450 at 862ad75f; client/interaction write_chunk.go).",
       "snapshotSha": "92a0a9c188df808ee51a8c7f0c402072bc4efdc1"
     },
     {
@@ -2156,10 +2148,9 @@
         "reconnects after device address change with expired records",
         "reconnects after device address change with stale MDNS records",
         "tracks peer online status with session lifecycle",
-        "closes a non-sustained subscription when the node is disabled",
         "subscribes to a peer that is not initially available (recreate)"
       ],
-      "reason": "Staggered addresses and the last-known address as fallback keep their client/peer tests; on fabrictest (controller/client:TestClientConnectivityParity) a command to a stopped device fails and succeeds once it is back, the default subscription is lost and re-established with a new id after a timeout and a long absence and signals alive, a close during the reconnection and a shutdown while an exchange is being established log no error, disable ends the subscription and enable starts a fresh one, a restart keeps an uncommissioned node and subscribes to a device once it is back. Missing: a second device address, a moved address and blocked or stale DNS-SD (fabrictest gives a device one address and answers DNS-SD in-process; the peer-level tests cover the connection logic), the online/offline lifecycle events of sessions (no such events on client.Node; Hooks.ConnectionStateChanged is the subscription's state), a non-sustained subscription closed by disabling the node (client.Node.Disable closes the default subscription only — a register candidate), and hosts closed and recreated on the site's stored state (fabrictest keeps stores per host object; Restart is the supported path).",
+      "reason": "Staggered addresses and the last-known address as fallback keep their client/peer tests; on fabrictest (controller/client:TestClientConnectivityParity) a command to a stopped device fails and succeeds once it is back, the default subscription is lost and re-established with a new id after a timeout and a long absence and signals alive, a close during the reconnection and a shutdown while an exchange is being established log no error, disable ends the subscription and enable starts a fresh one, a restart keeps an uncommissioned node and subscribes to a device once it is back. Missing: a second device address, a moved address and blocked or stale DNS-SD (fabrictest gives a device one address and answers DNS-SD in-process; the peer-level tests cover the connection logic), the online/offline lifecycle events of sessions (no such events on client.Node; Hooks.ConnectionStateChanged is the subscription's state), a non-sustained subscription closed by disabling the node (client.Node.Disable closes the default subscription only — a register candidate), and hosts closed and recreated on the site's stored state (fabrictest keeps stores per host object; Restart is the supported path). Disable closes every subscription of the node, not only the default one (fix: ClientNode.disable cancelling the interaction, ClientNode.ts:239-253, ClientInteraction.ts:270-282).",
       "snapshotSha": "d8d5ef04cd30330aea21df86f89bd871e5043671"
     },
     {
@@ -2251,7 +2242,7 @@
         "correctly splits different-path commands when maxPathsPerInvoke is 1",
         "splits duplicate command paths into separate batches"
       ],
-      "reason": "Sequential commands through a client node reach the device in order (controller/client:TestClientInvokeParity on fabrictest). Missing: matter.js's invoke batcher — batching up to the peer's maxPathsPerInvoke, its bypasses (maxPathsPerInvoke 1, timed, per-request options), splitting, commandRef matching, the cache cleared when the node goes offline, closing the batcher, the batch exchange aborted with its context — and the network propagation of invoke options (network profiles, MRP delays, expected processing times observed on the exchange): the Go client sends one command per InvokeRequest (client/interaction Interaction.Invoke) and offers no seam to observe the exchange's timing; the device's maxPathsPerInvoke is not configurable on the Go node (always 10).",
+      "reason": "Sequential commands through a client node reach the device in order (controller/client:TestClientInvokeParity on fabrictest). A multi-command invoke goes through Node.InvokeBatch in batches of the peer's MaxPathsPerInvoke, each numbered by CommandRef (client/interaction InvokeBatch); the device's MaxPathsPerInvoke is node.Config.MaxPathsPerInvoke. Missing: matter.js's batcher of single commands — the commands invoked in one timer tick joined into a batch up to the peer's maxPathsPerInvoke, its bypasses (maxPathsPerInvoke 1, timed, per-request options), its lanes per network, the cache cleared when the node goes offline, closing it, the batch exchange aborted with its context — has no Go counterpart (a goroutine has no timer tick to join on; whether the Go client batches concurrent invokes, and over which window, is an owner decision, brief CM's questions), and the network propagation of invoke options observed on the exchange (no seam to observe the exchange's timing).",
       "snapshotSha": "a743554ce3a6060f13492259bb66a152d9bfca31"
     },
     {
@@ -2284,10 +2275,13 @@
     },
     {
       "path": "packages/node/test/node/ClientNodeTcpTest.ts",
-      "status": "excluded",
-      "class": "controller-stage",
-      "until": "M5 phase 25",
-      "reason": "The controller's TCP transport (interface registration, preference, commissioning over TCP), which milestone 5 phase 25 builds.",
+      "status": "ported",
+      "go": [
+        "controller:TestClientNodeTcpParity",
+        "controller:TestLargeMessageReadOverTCP",
+        "client/peer:TestPeerTransportGateParity"
+      ],
+      "reason": "The controller's and the device's TCP roles (controller.Config.TCP, node.Network.TCP), the transport preference (controller.Config.TransportPreference, Peer.SetTransportPreference), commissioning and default traffic over UDP, the soft TCP preference, the session-parameter gate and the tcp-unsupported flag, on a loopback site; the gate cases that set a peer's reported parameters by hand on a client/peer harness peer. Beyond matter.js, whose mock TCP does not survive CASE, a large-message read runs over a real TCP session.",
       "snapshotSha": "6503ded1a403462512bb4bd206ee6f882ad140d9"
     },
     {
@@ -2441,13 +2435,12 @@
       "path": "packages/node/test/node/ClientSubscribeTest.ts",
       "status": "partial",
       "go": [
-        "controller/client:TestClientSubscribeParity",
+        "controller/client:TestClientSubscribeCacheFabricFilterParity",
+        "controller/client:TestClientSubscribeCancelledParity",
         "controller/client:TestClientSubscribeDataVersionFiltersParity",
-        "controller/client:TestClientSubscribeCacheFabricFilterParity"
+        "controller/client:TestClientSubscribeParity"
       ],
       "missing": [
-        "sends only the caller's data version filters with includeKnownVersions",
-        "keeps includeKnownVersions when a sustained subscription replaces a lost one",
         "follows the fabric filter the default subscription sends",
         "sends a default subscription given as a built request as it is",
         "forgets data versions when the default subscription's fabric filter changes",
@@ -2470,13 +2463,11 @@
         "reports not subscribed when an active default subscription ends",
         "records no data version for a report of a subscription opened before a switch",
         "records data versions again once a subscription opened before a switch is replaced",
-        "answers the priming report that arrives after the cancel with INVALID_SUBSCRIPTION",
         "answers the priming report with INVALID_SUBSCRIPTION when the session signal aborts",
-        "answers the priming report it is processing during the cancel with INVALID_SUBSCRIPTION",
         "answers the priming report with INVALID_SUBSCRIPTION when processing fails before reading it",
         "answers the priming report with INVALID_SUBSCRIPTION when processing it fails"
       ],
-      "reason": "The empty subscription refused, the version filters a read or subscription sends (injected; the caller's kept, first and winning; none with the other fabric filter; recomputed from the caller's filters and its refreshRequest when a sustained subscription is replaced; the replacement applied by the refreshed request's fabric filter) and the versions kept across a controller restart run on fabrictest through a client node (controller/client:TestClientSubscribe*; fix: ClientStructure.injectVersionFilters' caller and fabric-filter rules and ClientNodeInteraction.subscribe's refreshRequest at 862ad75f). Missing: includeKnownVersions on a subscription (client.Node.Subscribe takes an interaction.SubscribeRequest, which has no such field — an API change); the run-time change of the default subscription (autoSubscribe, defaultSubscription, its fabric filter) and the reactions serialised against Start, the cache's recorded fabric filter with adoptFabricFilter and its storage failures (the Go cache records no filter; the default subscription is fixed at Start); the default subscription's ownership across replacements (no replacement at run time; matter.js drives the internal request callbacks); and the priming report answered INVALID_SUBSCRIPTION after a cancel or a failing updated (client/interaction acknowledges it Success and its Updated cannot fail — brief BH's path).",
+      "reason": "The empty subscription refused, the version filters a read or subscription sends (injected; the caller's kept, first and winning; none with the other fabric filter; recomputed from the caller's filters and its refreshRequest when a sustained subscription is replaced; the replacement applied by the refreshed request's fabric filter) and the versions kept across a controller restart run on fabrictest through a client node (controller/client:TestClientSubscribe*; fix: ClientStructure.injectVersionFilters' caller and fabric-filter rules and ClientNodeInteraction.subscribe's refreshRequest at 862ad75f). includeKnownVersions on a subscription — the caller's filters only, in the first request and in a sustained subscription's replacement — runs through client.SubscribeRequest (fix: ClientNodeInteraction.ts:123-124, a break: the request embeds the subscription's paths as ReadRequest does). Missing: the run-time change of the default subscription (autoSubscribe, defaultSubscription, its fabric filter) and the reactions serialised against Start, the cache's recorded fabric filter with adoptFabricFilter and its storage failures (the Go cache records no filter; the default subscription is fixed at Start); the default subscription's ownership across replacements (no replacement at run time; matter.js drives the internal request callbacks). The priming report of a subscription cancelled while being established is answered INVALID_SUBSCRIPTION, whether it arrives after the cancel or is being processed during it (controller/client:TestClientSubscribeCancelledParity; fix: the abandoned establishment, ClientInteraction.ts:1084-1097, InteractionMessenger.ts:1116-1137). Still missing there: the session-signal variant on a separate interaction, and the two cases whose updated callback fails — a Go Updated returns no error.",
       "snapshotSha": "135021253b6d8e65e441f9ad42fdb5dd5f695ff9"
     },
     {
@@ -2484,22 +2475,16 @@
       "status": "partial",
       "go": [
         "client/peer:TestParityTimingDefaults",
-        "client/peer:TestParityTimingMerge"
+        "client/peer:TestParityTimingMerge",
+        "controller/client:TestClientTuningParity"
       ],
       "missing": [
-        "ethernet-operational peers use the fast profile with no MRP margin",
         "wifi-operational peers use the wifi profile with a 1s MRP margin",
-        "exposes the peer's MRP margin on the session so peer-initiated exchanges inherit it",
         "adopts sessions that predate its construction",
-        "custom profiles propagate to NetworkProfiles",
-        "a configured bdxAdditionalMrpDelay propagates to NetworkProfiles",
-        "ownNetworkProfileId sets the sender-side MRP margin",
-        "ownNetworkProfileId defaults to fast (no sender-side margin)",
         "connection timeout limits retransmission packets",
-        "connect concurrency 1 serializes peer connections",
         "thread devices on different channels use independent profiles"
       ],
-      "reason": "Default and configured connection timing are covered; the network profiles and MRP margins are not.",
+      "reason": "Default and configured connection timing, the medium profile of an Ethernet peer and its session margin (on the site's Ethernet device; matter.js checks the session margin on a Wi-Fi one), configured profiles and BDX margins reaching the controller's NetworkProfiles, and the own profile's sender-side margin (fabrictest.ControllerOptions.Networks, OwnNetworkProfile; controller.Config.Networks, OwnNetworkProfile) are covered. Missing: a Wi-Fi-operational and a Thread device (the site's devices are Ethernet-attached: node.Config.WiFiCommissioning needs a driver and the node has no Thread interface), a peer set built after the sessions it should adopt (the Go set is built once, with the controller), and the packet count against the connection timeout, a runtime-dependent characterisation.",
       "snapshotSha": "0cad53772922911f1cb81cb2bd3eb8892bb20694"
     },
     {
@@ -2660,20 +2645,15 @@
         "controller/client:TestPeerBehaviorDiscoveredParity"
       ],
       "missing": [
-        "builds a cluster even when the peer reports an empty AttributeList",
         "builds a cluster for an ID a custom model resolves but the specification does not allow",
         "judges a revision-conformant element against the revision the peer sent",
         "leaves a revision-conformant element to the peer on a write from a client node",
         "distinguishes shapes that differ only in revision",
         "shares a behavior with a peer that reports the standard revision",
-        "omits an attribute the peer reports whose conformance before a trailing deprecation excludes it",
-        "keeps the conformance of a reported attribute that the peer's features make mandatory",
         "exposes an obsolete attribute the peer reports",
-        "omits a disallowed attribute the peer reports",
-        "tolerates a peer that does not report a revision",
         "returns a peer behavior as it is"
       ],
-      "reason": "The analysis of a discovered shape into a client.Cluster — readiness from a well-formed AttributeList, an ID that is no legal MEI, unknown attribute names, the revision the peer sent (known, beyond the model, unknown cluster), a listed or unlisted deprecated attribute — runs on the cluster's input (controller/client:TestPeerBehaviorDiscoveredParity). Missing: the behavior class itself and its identity (fingerprint cache, a known shape returned as it is; BD-Matter-ClientNode-NoGeneratedTypes); a custom matter model handed with the shape (CustomIllegalMei, RevGated, WithObsolete); the conformance of a peer cluster's attributes — mandatory attributes kept supported under an empty AttributeList, a listed attribute excluded by its conformance before a trailing D, a disallowed (X) one, the effective conformance string, a revision-gated element validated against the peer's revision or left to the peer on a client write (client.Cluster.Supports follows the AttributeList only); the revision of a cluster the peer reports none for (matter.js the model's, 1 for an unknown cluster; client.Cluster.Revision is 0 — a decision for the owner).",
+      "reason": "The analysis of a discovered shape into a client.Cluster — readiness from a well-formed AttributeList, an ID that is no legal MEI, unknown attribute names, the revision the peer sent (known, beyond the model, unknown cluster), a listed or unlisted deprecated attribute — runs on the cluster's input (controller/client:TestPeerBehaviorDiscoveredParity). The conformance of a peer cluster's attributes runs on the same input: client.Cluster.Supports judges a listed attribute by its conformance under the peer's features and revision, a deprecated one counting as optional (fix: supportOverrideOf, PeerBehavior.ts:381-397, applicabilityFor's deprecatedIsOptional, Conformance.ts:985-987 at 862ad75f) — a disallowed attribute and one its features exclude before a trailing D stay out, one the features make mandatory is in; client.Cluster.Revision is the model's when the peer reports none (fix: PeerBehavior.ts:426-434; 1 for an unknown cluster). Missing: the behavior class itself and its identity (fingerprint cache, a known shape returned as it is, two shapes that differ only in revision; BD-Matter-ClientNode-NoGeneratedTypes); a custom matter model handed with the shape (CustomIllegalMei, RevGated, WithObsolete), and with it the revision-gated element validated against the peer's revision or left to the peer on a client write.",
       "snapshotSha": "aa253cbd1374b4704ffecad0539b2dd746afbb76"
     },
     {
@@ -2739,9 +2719,9 @@
     {
       "path": "packages/node/test/node/ReportedSessionParametersTest.ts",
       "status": "planned",
-      "reason": "The session parameters the peer sent in PASE, CASE and resumed CASE, held by the controller. Left planned in BI-2: both cases assert both ends with configured intervals; fabrictest sets neither the controller's exchange.Config.LocalParameters nor the device's session intervals, and the device's record of what the controller sent has no accessor.",
-      "snapshotSha": "da6d23d239f29280dae99d8c5448bde73a71ed85",
-      "until": "M5 phase 25"
+      "until": "M6 phase 27",
+      "reason": "The session parameters the peer sent in PASE, CASE and resumed CASE, held by both ends. Left planned in brief CM: both cases configure the device's session intervals and read the device's record of what the controller sent; node.Config has no session-interval option and the device's sessions no accessor for the reported parameters (the controller's side is client/exchange.Session.ReportedParameters). Milestone 6 phase 27.",
+      "snapshotSha": "da6d23d239f29280dae99d8c5448bde73a71ed85"
     },
     {
       "path": "packages/node/test/node/ScanNetworksRejectionCommissioningTest.ts",
@@ -2907,10 +2887,17 @@
     },
     {
       "path": "packages/node/test/node/SplitCommissioningTest.ts",
-      "status": "planned",
-      "reason": "A second controller completing a PASE-only commissioning a first one started, and its failure paths. Left planned in BI-2: controller/client has no completeCommissioning (only the first half exists: commissioner Options.FinalizeCommissioning) and fabrictest cannot share a CA and fabric between two controllers.",
-      "snapshotSha": "d891eb17597311ef293584b301a8fd74ba18ab57",
-      "until": "M5 phase 25"
+      "status": "partial",
+      "go": [
+        "controller/client:TestSplitCommissioningParity"
+      ],
+      "missing": [
+        "throws CommissioningError and removes the peer when CommissioningComplete returns a non-Ok errorCode",
+        "keeps the device's CommissioningComplete status as the cause of the CommissioningError",
+        "aborts and leaves no node if the fabric cannot be persisted"
+      ],
+      "reason": "Registry.CompleteCommissioning ports Peers.completeCommissioning (Peers.ts:236-359 at 862ad75f): the hand-off of the commissioner's FinalizeCommissioning completed — the node created on the shared fabric, its peer seeded, started, CommissioningComplete with the extended fail-safe timeout, the device's fail-safe disarmed and the default subscription up; a second completion refused (ErrAlreadyCommissioned) without touching the node; no phantom node when it cannot be reached; a fabric the registry does not hold refused (ErrForeignFabric). matter.js runs the halves on two controllers sharing a fabric; fabrictest gives each controller its own CA and fabric, so the port runs both on one controller. Missing: the non-Ok errorCode and the status cause need a device that answers CommissioningComplete so (the Go device answers Ok once its fail-safe is armed by the same fabric); the fabric persistence failure has no Go shape (commissioner.NewFabric persists at creation).",
+      "snapshotSha": "d891eb17597311ef293584b301a8fd74ba18ab57"
     },
     {
       "path": "packages/node/test/node/client/CacheFabricFilterTest.ts",
@@ -2921,14 +2908,12 @@
     },
     {
       "path": "packages/node/test/node/client/ClientNodeInteractionIcdTest.ts",
-      "status": "partial",
+      "status": "ported",
       "go": [
+        "controller/client:TestClientNodeInteractionIcdLitRouting",
         "controller/client:TestClientNodeInteractionIcdParity"
       ],
-      "missing": [
-        "routes a woken LIT read through the icdLit network profile"
-      ],
-      "reason": "A read, write and invoke of a sleeping LIT peer held until its Check-In, a non-ICD peer passed through (controller/client/icd_hold_parity_matterjs_test.go). Missing: the icdLit network profile — this module has no network profiles; the priority intent travels with the sustained subscription's connection.",
+      "reason": "A read, write and invoke of a sleeping LIT peer held until its Check-In, a non-ICD peer passed through (controller/client/icd_hold_parity_matterjs_test.go), and a woken LIT read routed through the icdLit network profile (icd_lit_routing_parity_matterjs_test.go).",
       "snapshotSha": "9da38fcd797e58ae516b293033782ad23ec8d803"
     },
     {
@@ -2960,10 +2945,12 @@
     },
     {
       "path": "packages/node/test/node/client/PeersCommissionedTest.ts",
-      "status": "planned",
-      "reason": "The controller's list of commissioned peers excluding discoveries and groups. Left planned in BI-2: the one case needs group nodes (peers.forAddress of a group id, nodeType \"group\"), which controller/client does not have (doc 'Not here: Groups'); the commissioned/discovered/forAddress split holds in TestRegistryRestore.",
-      "snapshotSha": "aa2b783cf0406787a80b300f04c989826c6f4c44",
-      "until": "M5 phase 25"
+      "status": "ported",
+      "go": [
+        "controller/client:TestPeersCommissionedParity"
+      ],
+      "reason": "Registry.Commissioned holds the commissioned node and an operational node a peer address created (ForAddress), never one of a group node id (fix: Peers.ts:410-413, nodeType \"client\"). The Go registry holds no commissionable discoveries (client/discovery reports them without registering a node), so that exclusion has nothing to exclude; a group address makes no group node type either, only an excluded entry.",
+      "snapshotSha": "aa2b783cf0406787a80b300f04c989826c6f4c44"
     },
     {
       "path": "packages/node/test/node/client/PeersForDescriptorTest.ts",
@@ -2995,10 +2982,12 @@
     },
     {
       "path": "packages/node/test/node/client/PeersLoadFailureTest.ts",
-      "status": "planned",
-      "reason": "Keeping a fabric's other peers usable when one cannot load from storage. Left planned in BI-2: the Go registry drops a node that fails to load (logged once, registry.go NewRegistry; TestRegistryRestore) where matter.js keeps it with a rejected construction and a typed cause — a decision for the owner, not a port.",
-      "snapshotSha": "d9dd1bd67c3bbce5693ec21654053b12010f0547",
-      "until": "M5 phase 25"
+      "status": "ported",
+      "go": [
+        "controller/client:TestPeersLoadFailureParity"
+      ],
+      "reason": "A stored node whose peer names a fabric the controller does not have is kept, unavailable with the cause (client.Node.LoadError, ErrLoadFailed wrapping peer.ErrNoFabric; Start refuses with it), the warning logged once; the fabric's other node loads and is the one commissioned node (fix: Peers.ts:144-161 at 862ad75f). The stored data stays until the node is erased. matter.js's EndpointBehaviorsError wrapper and the unhandled-rejection check have no Go shape: the cause is the error chain.",
+      "snapshotSha": "d9dd1bd67c3bbce5693ec21654053b12010f0547"
     },
     {
       "path": "packages/node/test/node/client/WireChangeKeysTest.ts",
@@ -3051,10 +3040,27 @@
     },
     {
       "path": "packages/protocol/test/action/InvokeLargeMessageTest.ts",
-      "status": "excluded",
-      "class": "controller-stage",
-      "until": "M5 phase 25",
-      "reason": "The largeMessage command quality steering an invoke onto TCP, which the controller gains with its TCP initiator in milestone 5 phase 25.",
+      "status": "partial",
+      "go": [
+        "client/interaction:TestInvokeLargeMessageParity"
+      ],
+      "missing": [
+        "parses largeMessage from quality DSL string 'L'",
+        "does not set largeMessage when quality is empty",
+        "CommandModel with largeMessage quality reports effectiveQuality.largeMessage",
+        "CommandModel without largeMessage quality does not report largeMessage",
+        "largeMessage flag matches the pattern used in ClientCommandMethod",
+        "detects L quality on a concrete command request",
+        "returns false for a command without L quality",
+        "flags the whole invoke when any one command carries L quality",
+        "ignores legacy command requests (no model link)",
+        "detects L quality on a wildcard command request",
+        "swallows MalformedRequestError when cluster/command unresolved",
+        "rethrows non-MalformedRequestError raised during model probing",
+        "preserves an explicit largeMessage:false on a command with L quality",
+        "does not batch L commands even when batchable shape allows it"
+      ],
+      "reason": "An invoke's explicit LargeMessage defaults off and reaches its exchange and every part an InvokeBatch split sends. Missing: the Large Message quality of a command (the 'L' quality) is not in parity/schema.json — the extractor emits no largeMessage quality — so the CommandModel quality, inferLargeMessage and the inference policy cases have no Go subject (a question to the owner: extend the extractor); the ClientCommandMethod pattern is matter.js's typed command API; and the controller has no automatic invoke batcher, so 'does not batch L commands' does not arise.",
       "snapshotSha": "08ffe617eb5b02a7b5253cde9e714413da17f104"
     },
     {
@@ -3064,29 +3070,39 @@
         "client/interaction:TestClientInteractionInvokeCommandRefWireHandling",
         "client/interaction:TestClientInteractionInvokeDelayReportData",
         "client/interaction:TestClientInteractionInvokeResponseWithoutInteractionModelRevision",
-        "client/interaction:TestClientInteractionInvokeStatusOrigin"
+        "client/interaction:TestClientInteractionInvokeStatusOrigin",
+        "client/interaction:TestInvokeBatchOneExchange",
+        "client/interaction:TestInvokeBatchRefusals",
+        "client/interaction:TestInvokeBatchSplitsRefLessParity"
       ],
       "missing": [
-        "synthesizes NO_COMMAND_RESPONSE for a request command that received no response",
         "does not synthesize NO_COMMAND_RESPONSE for an unanswered wildcard command (no concrete path)",
-        "discards a stray CommandDataIB that matches no sent command instead of throwing",
         "passes a stray CommandStatusIB up to the caller (spec submits all status entries)",
-        "splits a multi-command invoke for a maxPathsPerInvoke=1 peer into ref-less single invokes",
-        "refuses to split an invoke for a provider reporting no usable path limit",
         "aborts an in-flight batch on close instead of awaiting its response",
         "rejects commands queued behind an in-flight batch with the close reason",
         "does not mutate the caller's request when inferring largeMessage",
         "sends DelayReportData in its own message",
         "refuses a request with DelayReportData before anything is sent"
       ],
-      "reason": "14 cases ported on the scripted rig for the Go single-command Invoke (no commandRef on the wire, abort during and before the exchange with no retransmission after, a read's abort, suppressResponse, concurrent single invokes, no DelayReportData, a response without InteractionModelRevision, received vs local error statuses); missing are the multi-command/batched invoke cases (reconciliation, stray entries, splitting by maxPathsPerInvoke), ClientInteraction.close, largeMessage inference and DelayReportData sending, none of which the Go Invoke has (one concrete command per exchange, no Close, no forward features).",
+      "reason": "14 cases ported on the scripted rig for the Go single-command Invoke (no commandRef on the wire, abort during and before the exchange with no retransmission after, a read's abort, suppressResponse, concurrent single invokes, no DelayReportData, a response without InteractionModelRevision, received vs local error statuses). The multi-command invoke runs through Interaction.InvokeBatch (client/interaction:TestInvokeBatch*): NoCommandResponse synthesized for a command the peer did not answer, a stray CommandDataIB discarded, the split into ref-less single invokes for a MaxPathsPerInvoke-1 peer, the refusal of a split below one path (ClientInteraction.ts:510-517, :616-700 at 862ad75f). Missing: the wildcard command (a Go invoke names a concrete path), the stray CommandStatusIB passed up (InvokeBatch returns one Result per command, so a status for no sent command has no slot), the batcher's close cases (the Go client batches no single commands across a tick, see ClientInvokeTest), largeMessage inference (the schema snapshot carries no \"L\" quality) and DelayReportData sending.",
       "snapshotSha": "501b3a3570c0c93de6ce67f0ea5dfb310b4b3e56"
     },
     {
       "path": "packages/protocol/test/action/client/ClientInteractionSubscribeTest.ts",
-      "status": "planned",
-      "reason": "Every case drives ClientInteraction.close (ClientInteraction.ts:264-297) over its in-flight interaction set, the abandoned-subscribe termination (:1096, :1260-1300) or initBdx (:1185-1215); the Go Interaction has no Close, no in-flight tracking, no abandonment and no client BDX, and adding them spans subscribe.go/read.go/write.go (another agent's files) and is no small fix. Milestone 5 phase 25 (the controller remainder) brings ClientInteraction.close, the in-flight set and the abandonment; findings register (owner review of PR #164).",
-      "until": "M5 phase 25",
+      "status": "partial",
+      "go": [
+        "client/interaction:TestClientInteractionSubscribeAbortedParity",
+        "client/interaction:TestClientInteractionSubscribeAbandonedReportParity",
+        "client/interaction:TestClientInteractionSubscribeClosedWhileProcessingParity"
+      ],
+      "missing": [
+        "waits on close for an attempt that reuses the request of an abandoned subscribe",
+        "still ends on close when closing the exchange of an abandoned subscribe fails",
+        "waits on close for a BDX exchange still being created",
+        "does not wait on close for a BDX exchange whose creation failed",
+        "aborts the creation of a BDX exchange on close"
+      ],
+      "reason": "Interaction.Close (ClientInteraction.ts:264-297 at 862ad75f), its in-flight set and the abandoned establishment (:1084-1097, InteractionMessenger.ts:1116-1137) run on the scripted peer: an aborted subscribe returns at once and Close ends the wait for its report; a report that arrives after the abort, and one being processed when the interaction closes, are answered INVALID_SUBSCRIPTION once. Missing: the reuse of an abandoned subscribe's request object (Go requests are values) and a failing exchange close (the Go exchange's Close cannot fail) have no Go shape; the three BDX cases need the client-side BDX initiation (ClientInteraction.initBdx, :1185-1215), which the Go client has not.",
       "snapshotSha": "8a0fabd64c26bf89368d2a5fb75bc39d9f23a1a3"
     },
     {
@@ -3103,10 +3119,11 @@
     },
     {
       "path": "packages/protocol/test/action/client/LargeMessageTransportTest.ts",
-      "status": "excluded",
-      "class": "controller-stage",
-      "until": "M5 phase 25",
-      "reason": "The transport requirement of a large-payload read, which needs the controller's TCP initiator of milestone 5 phase 25.",
+      "status": "ported",
+      "go": [
+        "client/interaction:TestLargeMessageTransportParity"
+      ],
+      "reason": "A read's ClientRequest.LargeMessage requires TCP of its exchange (ExchangeOptions.RequiredTransport), and nil and false require nothing, through a recording provider.",
       "snapshotSha": "c24beaf874e59c6d35ddb66ccd36b6ac1984ac2f"
     },
     {
@@ -3825,24 +3842,19 @@
       "path": "packages/protocol/test/dcl/DclOtaUpdateServiceTest.ts",
       "status": "partial",
       "go": [
-        "controller/dcl:TestOTAVersions",
-        "controller/dcl:TestOTATestNet",
-        "controller/dcl:TestVerifyImage",
-        "controller/dcl:TestOTADownload",
         "controller/dcl:TestDclOtaUpdateServiceCheckForUpdate",
+        "controller/dcl:TestDclOtaUpdateServiceCustomDclConfig",
         "controller/dcl:TestDclOtaUpdateServiceDownloadUpdate",
         "controller/dcl:TestDclOtaUpdateServiceIntegration",
-        "controller/dcl:TestDclOtaUpdateServiceCustomDclConfig"
+        "controller/dcl:TestOTADownload",
+        "controller/dcl:TestOTATestNet",
+        "controller/dcl:TestOTAVersions",
+        "controller/dcl:TestVerifyImage",
+        "controller/softwareupdate:TestImagesFindDeleteParity",
+        "controller/softwareupdate:TestImagesStoredUpdatesParity"
       ],
       "missing": [
-        "skips stored test-mode files when isProduction is true",
-        "surfaces local-mode stored files regardless of isProduction",
-        "surfaces stored prod-mode files when isProduction is false",
         "reuses existing valid OTA file instead of re-downloading",
-        "lists all stored OTA images",
-        "returns empty array when no updates are stored",
-        "filters by mode using new mode parameter",
-        "deletes specific OTA file by filename",
         "deletes specific product file",
         "deletes all files for a vendor",
         "does not throw error when file not found with correct pattern",
@@ -3864,8 +3876,6 @@
         "removes the specification version when all versions of a mode are deleted",
         "removes the specification version when all files of a vendor are deleted",
         "takes the specification version for a local image from the options",
-        "stores multiple versions for same vid/pid/mode",
-        "stores files with three different modes",
         "store() accepts boolean for backward compatibility",
         "migrates old bare keys to version-keyed format",
         "migrates test mode bare keys",
@@ -3881,7 +3891,7 @@
         "keeps a stored image that fails validation when forced",
         "reads no image from a URL"
       ],
-      "reason": "The ledger lookup (skip rules, applicability ranges, targeted version, prod/test ledger, custom and default ledger URLs, the compliance record's specification version), the download and the image verification are ported; the rest exercises the service's own image store (stored-file surfacing, reuse, find, delete, force, file designators, stored specification version, version-keyed storage, migration, offline mode, createUpdateInfoFromFile), which Go leaves to the host's image catalogue (cluster/core.OTAImageSource), so it has no Go counterpart.",
+      "reason": "The ledger lookup (skip rules, applicability ranges, targeted version, prod/test ledger, custom and default ledger URLs, the compliance record's specification version), the download and the image verification are ported. The service's image store is controller/softwareupdate.Images (brief CM §1): the stored images checkForUpdate surfaces by isProduction, find, delete by filename and the versions and modes kept side by side are ported (controller/softwareupdate:TestImages*). Missing: what the reduced store does not have — delete by vendor, product or mode pattern, force re-download and reuse through the ledger download, file designators, the stored specification-version metadata cases, the version-keyed storage migration, offline-mode download refusals and createUpdateInfoFromFile.",
       "snapshotSha": "117d4880582471fa355cb7c37aefe7f9ed22be18"
     },
     {
@@ -4162,13 +4172,14 @@
       "path": "packages/protocol/test/interaction/InteractionClientMessengerTest.ts",
       "status": "partial",
       "go": [
-        "im:TestMessengerParity_ReadRequestWithManyDataVersionFilters",
-        "im:TestMessengerParity_SubscribeRequestWithManyDataVersionFilters",
-        "im:TestMessengerParity_SubscribeRequestRoundTrip",
-        "im:TestMessengerParity_ReadRequestFitsPayload",
         "client/interaction:TestInteractionClientMessengerRead",
         "client/interaction:TestInteractionClientMessengerSubscribe",
-        "client/interaction:TestInteractionClientMessengerWrites"
+        "client/interaction:TestInteractionClientMessengerWriteChunking",
+        "client/interaction:TestInteractionClientMessengerWrites",
+        "im:TestMessengerParity_ReadRequestFitsPayload",
+        "im:TestMessengerParity_ReadRequestWithManyDataVersionFilters",
+        "im:TestMessengerParity_SubscribeRequestRoundTrip",
+        "im:TestMessengerParity_SubscribeRequestWithManyDataVersionFilters"
       ],
       "missing": [
         "throws a received error when the peer answers a read with a StatusResponse ${status}",
@@ -4183,17 +4194,9 @@
         "answers a report it cannot decode with INVALID_SUBSCRIPTION",
         "sends nothing when no report waits for a status and it is not asked to await one",
         "does not consider a report with SuppressResponse as waiting for a status",
-        "does not consider a report waiting for a status once it was answered",
-        "chunks a write that does not fit one message and merges the statuses of all chunks",
-        "chunks a write whose statuses would not fit one WriteResponse although the request does",
-        "sends a whole list that does not fit one message as an empty REPLACE followed by ADDs",
-        "sends a whole ACL that does not fit one message as a filled REPLACE followed by ADDs",
-        "sends the ADDs of a versioned list write without DataVersion once its REPLACE succeeded",
-        "keeps the DataVersion on the ADDs of a list write whose REPLACE failed",
-        "keeps the DataVersion on the ADDs of a repeated list write whose second REPLACE failed",
-        "stops sending chunks when the peer answers a chunk with an error status"
+        "does not consider a report waiting for a status once it was answered"
       ],
-      "reason": "Read, subscribe, the read refused by a StatusResponse (UnsupportedAccess and Success) and every write that fits one message or is refused are ported through Interaction against a scripted peer; missing are the 0x7777 StatusResponse variant (a Go status is a uint8, im/status.go:61), the report iterator split between iteration and close (Go has no iterator; Read returns after the final ack), the abandonSubscription group (no Go counterpart, InteractionMessenger.ts:1116-1137) and write chunking across messages (InteractionMessenger.ts:1269-1460), which the one-message Go write refuses instead.",
+      "reason": "Read, subscribe, the read refused by a StatusResponse (UnsupportedAccess and Success) and every write that fits one message or is refused are ported through Interaction against a scripted peer; missing are the 0x7777 StatusResponse variant (a Go status is a uint8, im/status.go:61), the report iterator split between iteration and close (Go has no iterator; Read returns after the final ack), the abandonSubscription group (no Go counterpart, InteractionMessenger.ts:1116-1137). The write chunking across messages runs through Interaction.Write (client/interaction:TestInteractionClientMessengerWriteChunking; fix: InteractionMessenger.ts:1269-1450). The abandonSubscription group's behaviour is ported through the abandoned subscribe (client/interaction:TestClientInteractionSubscribe*), not as messenger-level cases.",
       "snapshotSha": "89392f25092ecabc32ce49513ea6c3f0bc0add26"
     },
     {
@@ -4244,18 +4247,17 @@
       "path": "packages/protocol/test/mdns/MdnsTest.ts",
       "status": "partial",
       "go": [
+        "controller:TestControllerAdvertisesItsCommissionerRecord",
+        "mdns:TestCommissionerAdvertisementParity",
         "mdns:TestParityMdnsServer_CommissionableTXTSchemaLock",
         "mdns:TestParityMdnsServer_OperationalSIIFloor500ms"
       ],
       "missing": [
         "has correct crypto installed",
         "it broadcasts the device fabric on one port and expires",
-        "it broadcasts the controller commissioner on one port",
-        "it omits vendor details from commissioner broadcasts when privacy masked",
-        "it allows announcements of multiple devices on different ports",
         "splits oversized announcements into multiple packets with all records in the answer section"
       ],
-      "reason": "The commissionable and operational TXT content BuildCommissionableService/BuildOperationalService own is covered; the rest stays missing: the crypto case checks matter.js's MockCrypto itself, the announcement and TTL-0 expiry packets (record order, _services._dns-sd PTRs, cache-flush bits, overflow splitting) are assembled by grandcat/zeroconf's RegisterProxy/Shutdown, not by go-fabric code a unit test can drive, the operational TXT also differs by design (SAT always emitted, notes/parity/by_design.md BD-mDNS-SAT-AlwaysEmitted), and the device side has no _matterd._udp commissioner advertisement, so the three commissioner cases have no Go subject.",
+      "reason": "The commissionable, operational and commissioner (_matterd._udp, BuildCommissionerService, controller.Config.Advertise) record content go-fabric builds is covered, the commissioner cases at the record level; the rest stays missing: the crypto case checks matter.js's MockCrypto itself, and the announcement and TTL-0 expiry packets (record order, _services._dns-sd PTRs, cache-flush bits, overflow splitting) are assembled by grandcat/zeroconf's RegisterProxy/Shutdown, not by go-fabric code a unit test can drive; the operational TXT also differs by design (SAT always emitted, notes/parity/by_design.md BD-mDNS-SAT-AlwaysEmitted).",
       "snapshotSha": "1457c02635be7e2e331f32fe7f36473952a60e54"
     },
     {
@@ -4303,9 +4305,13 @@
     },
     {
       "path": "packages/protocol/test/peer/NetworkProfileTest.ts",
-      "status": "planned",
-      "reason": "matter.js's NetworkProfiles (per-medium throttle semaphores, additive MRP margins, connect/probe sub-profiles) has no Go counterpart: client/peer documents network profiles as out of scope by ADR 0020's stage split (the LAN is the one network, MRP margins are 0), and porting the class is a feature, not a fix. Milestone 5 phase 25 (the controller remainder) brings the network profiles; findings register, \"Network profiles\" (owner review of PR #164).",
-      "until": "M5 phase 25",
+      "status": "ported",
+      "go": [
+        "client/peer:TestNetworkProfilesParity",
+        "client/peer:TestNetworkProfilesForMedium",
+        "client/peer:TestSemaphoreParity"
+      ],
+      "reason": "NetworkProfiles (client/peer/network.go): the templates and their margins, the BDX margin, the connect and probe sub-profiles inheriting the parent's margin, layered defaults and the refusal of unknown ids; TestNetworkProfilesForMedium and TestSemaphoreParity hold forPeer's medium selection and the throttle semaphore.",
       "snapshotSha": "96b368b7b5483585ae5cced11100b36ba550ccd6"
     },
     {
@@ -4409,10 +4415,18 @@
     },
     {
       "path": "packages/protocol/test/peer/PeerConnectionSocketOwnershipTest.ts",
-      "status": "planned",
-      "reason": "Ownership of the channel a pairing opens: the UDP (and, for the commissioner, BLE) rule applies now, the TCP describe with the TCP initiator of milestone 5 phase 25.",
-      "snapshotSha": "9a8ee919d14a3f7f88f32b7a6c220c691f43a27d",
-      "until": "M5 phase 25"
+      "status": "partial",
+      "go": [
+        "client/peer:TestPeerConnectionSocketOwnershipParity",
+        "controller:TestLargeMessageReadOverTCP"
+      ],
+      "missing": [
+        "does not close the channel when a later step throws after ownership transferred",
+        "does not close on success (session adopts the channel)",
+        "invokes close on failure (harmless because real UdpChannel.close is a no-op)"
+      ],
+      "reason": "A TCP attempt's channel is closed when the pairing fails or is aborted (client/peer harness), and kept by the session it established (the loopback large-message read). Missing: the step after a transferred ownership has no counterpart — the Go attempt's only later step, the TCP session-parameter check, drops the session, whose channel then closes as its last; and the two UDP cases characterise a per-attempt UdpChannel whose close is a no-op, where the Go attempt shares the manager's socket and closes nothing.",
+      "snapshotSha": "9a8ee919d14a3f7f88f32b7a6c220c691f43a27d"
     },
     {
       "path": "packages/protocol/test/peer/PeerDescriptorTest.ts",
@@ -4450,7 +4464,7 @@
       "go": [
         "client/peer:TestRebootResubscribeArmerParity"
       ],
-      "reason": "The armer on a session table and a subscription set that implement its context as SessionManager and ClientSubscriptions do, on the fake clock: the return, the grace window, the evidence of post-return reports, re-arming, the return-timeout recovery (client/peer/reboot_armer_parity_matterjs_test.go). The OTA call site that arms a peer arrives with phase 25.",
+      "reason": "The armer on a session table and a subscription set that implement its context as SessionManager and ClientSubscriptions do, on the fake clock: the return, the grace window, the evidence of post-return reports, re-arming, the return-timeout recovery (client/peer/reboot_armer_parity_matterjs_test.go). The OTA call site that arms a peer is the controller's update manager (controller/softwareupdate, OnStatusChange on Applying; SoftwareUpdateManager.ts:1253-1321 at 862ad75f), its outcome cases in controller/softwareupdate:TestManagerAppliedUpdateAfterResubscriptionParity.",
       "snapshotSha": "9bb466928aabe62ec0f56bb215d217c223096c49"
     },
     {
@@ -4501,27 +4515,18 @@
     },
     {
       "path": "packages/protocol/test/protocol/MRPTest.ts",
-      "status": "partial",
+      "status": "ported",
       "go": [
-        "secure/operational:TestEntry_RetransmitBaseInterval_FreshDefaultsToIdle",
-        "secure/operational:TestEntry_RetransmitBaseInterval_ActiveAfterMarkActiveRx",
-        "transport/mrp:TestBackoffDuration_TransmissionExponent",
-        "client/exchange:TestMRPRetransmissionIntervalOf",
+        "client/exchange:TestMRPMarginFor",
+        "client/exchange:TestMRPMaxPeerResponseTimeOf",
         "client/exchange:TestMRPMaxRetransmissionIntervalOf",
-        "client/exchange:TestMRPMaxPeerResponseTimeOf"
+        "client/exchange:TestMRPRetransmissionIntervalOf",
+        "client/exchange:TestMRPRetransmissionIntervalPadded",
+        "secure/operational:TestEntry_RetransmitBaseInterval_ActiveAfterMarkActiveRx",
+        "secure/operational:TestEntry_RetransmitBaseInterval_FreshDefaultsToIdle",
+        "transport/mrp:TestBackoffDuration_TransmissionExponent"
       ],
-      "missing": [
-        "selects the bdx margin for bulk transfer",
-        "selects the messaging margin for other protocols",
-        "has no margin to offer when the peer's medium is unknown",
-        "uses the active interval for retransmissions while the peer is active",
-        "uses the idle interval for retransmissions when the peer is no longer active",
-        "adds fixedBackoff as a flat pad after the backoff, not amplified by the exponent",
-        "applies additionalDelay (amplified) and fixedBackoff (flat) independently",
-        "includes additionalDelay (amplified) and fixedBackoff (flat) so the maximum upper-bounds real sends",
-        "adds our sender-side fixedBackoff to the local return leg only"
-      ],
-      "reason": "The unpadded interval, the maximum interval per peer activity and the peer response time of the udp, tcp and ble channels are ported against client/exchange; the network-profile margins (MRP.marginFor), additionalDelay and fixedBackoff do not exist in Go (the retransmission formula has no pad), so every case that passes them stays missing.",
+      "reason": "The retransmission interval with and without its pad (RetransmissionInterval, RetransmissionIntervalPadded with Pad{Additional, Fixed}), its maximum, MarginFor and the peer response time of the udp (with the padded local leg), tcp and ble channels, against client/exchange.",
       "snapshotSha": "bed8f378fbba434e2451dcd1446b4815d0730193"
     },
     {
@@ -4562,33 +4567,24 @@
       "path": "packages/protocol/test/protocol/MessageExchangeTest.ts",
       "status": "partial",
       "go": [
-        "client/exchange:TestMessageExchangePeerLossDeclaration",
+        "client/exchange:TestMessageExchangeAckWaitAbort",
+        "client/exchange:TestMessageExchangeActivityTracking",
+        "client/exchange:TestMessageExchangeBDXRetransmissionIntervalCap",
+        "client/exchange:TestMessageExchangeCloseNotification",
+        "client/exchange:TestMessageExchangeClosingNotification",
+        "client/exchange:TestMessageExchangeCrossProtocolStatusReport",
         "client/exchange:TestMessageExchangeHasUnackedMessage",
         "client/exchange:TestMessageExchangeLivenessKickOnDuplicate",
-        "client/exchange:TestMessageExchangeRetransmissionTimersDoNotOutliveTheirMessage",
-        "client/exchange:TestMessageExchangeBDXRetransmissionIntervalCap",
-        "client/exchange:TestMessageExchangeActivityTracking",
-        "client/exchange:TestMessageExchangeCloseNotification",
-        "client/exchange:TestMessageExchangeCrossProtocolStatusReport",
-        "client/exchange:TestMessageExchangeAckWaitAbort"
+        "client/exchange:TestMessageExchangeMRPBackoffMargin",
+        "client/exchange:TestMessageExchangePaddedBDXCap",
+        "client/exchange:TestMessageExchangePeerLossDeclaration",
+        "client/exchange:TestMessageExchangeRetransmissionTimersDoNotOutliveTheirMessage"
       ],
       "missing": [
-        "retransmits a BDX message within the peer's response budget",
-        "leaves a non-BDX schedule uncapped",
-        "emits closing once when close is invoked again after the exchange completed its close",
         "emits closed but not closing when destroyed",
-        "uses peerAdditionalMrpDelay and ignores the throttle profile margin",
-        "falls back to localAdditionalMrpDelay as a floor when no peer margin is given",
-        "applies no margin when neither local nor peer margin is set",
-        "applies the session's peer margin to peer-initiated exchanges",
-        "applies the session's peer margin to initiated exchanges without an explicit margin",
-        "prefers the explicit peer margin over the session's",
-        "selects the BDX margin for BDX exchanges, in either direction",
-        "selects the messaging margin for other protocols",
-        "passes localFixedMrpBackoff through as the fixed backoff pad, separate from additionalDelay",
         "does not wake a sleeping LIT peer on an outbound message"
       ],
-      "reason": "Peer loss, the unacked state, the BDX liveness kick and idle-cadence cap, timers that outlive their message, activity, the close/destroy end, cross-protocol StatusReports and the ack-wait abort are ported against the controller exchange; the network-profile margins (localAdditionalMrpDelay, peer margins, localFixedMrpBackoff, and the two cap cases that pad with a 20 s margin) do not exist in Go, the exchange has no closing notification (Done reports only the end), and ICD wakefulness is not in the controller exchange.",
+      "reason": "Peer loss, the unacked state, the BDX liveness kick and the padded and unpadded BDX caps, timers that outlive their message, activity, the close end and its closing hook (Options.OnClosing), cross-protocol StatusReports, the ack-wait abort and the MRP margins (Config.LocalAdditionalMrpDelay and LocalFixedMrpBackoff, Options.PeerAdditionalMrpDelay, Session.SetPeerMargins) are ported against the controller exchange. Missing: Go's OnClosing also runs on the final close of a destroyed exchange, since its one user — a network profile's slot — is released on closing or closed alike (PeerExchangeProvider.ts:136-141), so the destroy-without-closing characterisation does not hold; and ICD wakefulness is not in the controller exchange.",
       "snapshotSha": "cb0854d0c154eff327c28217659b4cdc6fb1bdbf"
     },
     {
@@ -4625,22 +4621,19 @@
       "status": "partial",
       "go": [
         "bridge:TestTCPConnectionDropEvictsBoundSessions",
-        "bridge:TestTcpSessionBindingConnectionDropEvictsSessions",
-        "bridge:TestTcpSessionBindingManagerReaction",
-        "bridge:TestTcpSessionBindingConnectionLifecycle",
         "bridge:TestTcpSessionBindingChannelTypeDetection",
+        "bridge:TestTcpSessionBindingConnectionDropEvictsSessions",
+        "bridge:TestTcpSessionBindingConnectionLifecycle",
+        "bridge:TestTcpSessionBindingManagerReaction",
+        "client/exchange:TestTCPSessionBindingParity",
+        "client/peer:TestPeerTCPSessionSelectionParity",
         "transport/tcp:TestTcpTransportOnDisconnect"
       ],
       "missing": [
-        "gives the closed exchange a cause that claims nothing about the peer",
         "disconnect listener can be removed",
-        "onDisconnect is detected via typeof check",
-        "finds a TCP session among mixed sessions",
-        "returns undefined when no TCP session exists",
-        "skips closing TCP sessions",
-        "returns undefined when all TCP sessions are closing"
+        "onDisconnect is detected via typeof check"
       ],
-      "reason": "The binding by connection identity, the eviction on a drop and its two log lines on the node's logger (or slog.Default), the survivor on another connection, the lifecycle and the TCP/UDP route type are ported on the bridge (the device-side ExchangeManager) and the listener's disconnect callback on transport/tcp. Missing: \"gives the closed exchange a cause that claims nothing about the peer\", js-runtime-only: the error cause of the rejected promise a closed exchange holds (the device bridge's exchanges hold no awaitable); \"disconnect listener can be removed\", js-runtime-only: an observer handle (the listener's onClose is a Serve argument, nothing to remove); \"onDisconnect is detected via typeof check\", js-runtime-only: a duck-typed probe of a TypeScript object; the four TCP session selection cases (\"finds a TCP session among mixed sessions\", \"returns undefined when no TCP session exists\", \"skips closing TCP sessions\", \"returns undefined when all TCP sessions are closing\"), controller-side: PeerExchangeProvider's choice of a TCP session among a peer's sessions, which the module's controller does not make (client/peer opens UDP sessions); Register candidate.",
+      "reason": "The binding by connection identity, the eviction on a drop and its two log lines on the node's logger (or slog.Default), the survivor on another connection, the lifecycle and the TCP/UDP route type are ported on the bridge (the device-side ExchangeManager) and, for the controller, on client/exchange (Manager.AttachChannel; the cause of an evicted exchange is ErrTransportClosed, no peer loss) with the TCP session selection on client/peer (Peer.NewestSessionOn); the listener's disconnect callback on transport/tcp. Missing: \"disconnect listener can be removed\", js-runtime-only: an observer handle (the listener's onClose is a Serve argument, nothing to remove); \"onDisconnect is detected via typeof check\", js-runtime-only: a duck-typed probe of a TypeScript object.",
       "snapshotSha": "088544374dc6f4f411f779db8aef663d0eae36f1"
     },
     {

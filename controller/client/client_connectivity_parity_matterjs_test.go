@@ -195,6 +195,29 @@ func TestClientConnectivityParity(t *testing.T) {
 		}
 	})
 
+	// ClientConnectivityTest.ts:609-633: closing the node's interaction
+	// closes every subscription it owns, not only the sustained one.
+	t.Run("closes a non-sustained subscription when the node is disabled", func(t *testing.T) {
+		t.Parallel()
+		cp := newClientPair(t, clientPairOptions{})
+		var sub *interaction.Subscription
+		cp.run(t, func(ctx context.Context) (err error) {
+			sub, err = cp.node.Subscribe(ctx, client.SubscribeRequest{SubscribeRequest: interaction.SubscribeRequest{Attributes: []im.ConcreteAttributePath{{}}, Events: []im.ConcreteEventPath{{IsUrgent: true}}}})
+			return err
+		})
+		select {
+		case <-sub.Done():
+			t.Fatal("closed before the disable")
+		default:
+		}
+		cp.run(t, cp.node.Disable)
+		select {
+		case <-sub.Done():
+		default:
+			t.Fatal("the non-sustained subscription survived the disable")
+		}
+	})
+
 	t.Run("establishes a fresh sustained subscription after disable/enable", func(t *testing.T) {
 		t.Parallel()
 		cp := newClientPair(t, clientPairOptions{})

@@ -14,6 +14,7 @@ import (
 	"github.com/SukramJ/go-fabric/client/interaction"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	netcomm "github.com/SukramJ/go-fabric/cluster/spec/networkcommissioning"
+	"github.com/SukramJ/go-fabric/controller/thread"
 	"github.com/SukramJ/go-fabric/transport/btp"
 )
 
@@ -73,38 +74,22 @@ const (
 // packages/protocol/src/thread/meshcopTlvTypes.ts:18).
 const meshCopNetworkName = 3
 
-// errThreadTLV is a dataset BasicTlv.walk refuses
-// (packages/protocol/src/thread/BasicTlvCodec.ts).
-var errThreadTLV = errors.New("commissioner: truncated Thread TLV")
-
 // threadNetworkNameOf is the Network Name of a Thread operational
-// dataset: the MeshCoP TLVs walked as BasicTlv.walk does (one-byte type,
-// one-byte length, 0xFF for a two-byte big-endian length), the Network
-// Name TLV read as UTF-8 (OperationalDataset.ts:53-69, :133-136). Only
-// what the flow needs: the other TLVs are not validated. ok is false
-// without a Network Name TLV.
+// dataset, the whole dataset decoded as OperationalDataset.decode does
+// (controller/thread.DecodeDataset; OperationalDataset.ts:53-69 at
+// 862ad75f): a stream that does not walk and a known TLV of the wrong
+// size both fail, and resolveThreadNetworkName then keeps the supplied
+// name (ControllerCommissioningFlow.ts:269-276). ok is false without a
+// Network Name TLV.
 func threadNetworkNameOf(dataset []byte) (name string, ok bool, err error) {
-	for off := 0; off < len(dataset); {
-		if off+2 > len(dataset) {
-			return "", false, fmt.Errorf("%w: header at offset %d", errThreadTLV, off)
-		}
-		typ, l, start := dataset[off], int(dataset[off+1]), off+2
-		if l == 0xff {
-			if off+4 > len(dataset) {
-				return "", false, fmt.Errorf("%w: extended-length header at offset %d", errThreadTLV, off)
-			}
-			l, start = int(dataset[off+2])<<8|int(dataset[off+3]), off+4
-		}
-		end := start + l
-		if end > len(dataset) {
-			return "", false, fmt.Errorf("%w: value at offset %d (type=%d, length=%d)", errThreadTLV, off, typ, l)
-		}
-		if typ == meshCopNetworkName {
-			name, ok = string(dataset[start:end]), true
-		}
-		off = end
+	d, err := thread.DecodeDataset(dataset)
+	if err != nil {
+		return "", false, err
 	}
-	return name, ok, nil
+	if d.NetworkName == nil {
+		return "", false, nil
+	}
+	return *d.NetworkName, true, nil
 }
 
 // resolveThreadNetworkName is resolveThreadNetworkName (:256-286): the
@@ -165,8 +150,8 @@ func (f *flow) validateNetwork(context.Context) (stepResult, error) {
 		return 0, newError(ErrCommissioning, "Initial information collection failed. No network features or status collected. This should never happen.", nil)
 	}
 	wifi := f.opts.WiFiNetwork
-	thread := f.opts.ThreadNetwork
-	if (wifi == nil || wifi.SSID == "" || wifi.Credentials == "") && (thread == nil || len(thread.OperationalDataset) == 0) {
+	tn := f.opts.ThreadNetwork
+	if (wifi == nil || wifi.SSID == "" || wifi.Credentials == "") && (tn == nil || len(tn.OperationalDataset) == 0) {
 		anyEthernet := len(f.data.networkFeatures) == 0
 		for _, n := range f.data.networkFeatures {
 			if n.featureMap&uint32(netcomm.FeatureEthernetNetworkInterface) != 0 {
@@ -325,8 +310,8 @@ func (f *flow) configureNetworkThread(ctx context.Context) (stepResult, error) {
 		f.log.Info("matter.controller.commissioning.thread_skipped_connected")
 		return stepSkipped, nil
 	}
-	thread := f.opts.ThreadNetwork
-	if thread == nil {
+	tn := f.opts.ThreadNetwork
+	if tn == nil {
 		return stepSkipped, nil
 	}
 	if f.data.networkFeatures != nil && f.data.networkStatus != nil {
@@ -340,7 +325,7 @@ func (f *flow) configureNetworkThread(ctx context.Context) (stepResult, error) {
 			return stepSkipped, nil
 		}
 	}
-	name, err := resolveThreadNetworkName(thread, f.log)
+	name, err := resolveThreadNetworkName(tn, f.log)
 	if err != nil {
 		return 0, err
 	}
@@ -357,7 +342,7 @@ func (f *flow) configureNetworkThread(ctx context.Context) (stepResult, error) {
 	}
 	network, dropped, err := f.withChannelDropFallback(func() (netcomm.NetworkInfoStruct, error) {
 		bc := f.nextBreadcrumb()
-		res, err := f.invoke(ctx, netcomm.ClusterID, netcomm.CmdAddOrUpdateThreadNetwork, netcomm.AddOrUpdateThreadNetworkRequest{OperationalDataset: thread.OperationalDataset, Breadcrumb: &bc}, true)
+		res, err := f.invoke(ctx, netcomm.ClusterID, netcomm.CmdAddOrUpdateThreadNetwork, netcomm.AddOrUpdateThreadNetworkRequest{OperationalDataset: tn.OperationalDataset, Breadcrumb: &bc}, true)
 		if err != nil {
 			return netcomm.NetworkInfoStruct{}, err
 		}

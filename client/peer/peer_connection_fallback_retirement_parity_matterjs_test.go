@@ -15,7 +15,6 @@ package peer
 
 import (
 	"context"
-	"net/netip"
 	"testing"
 	"time"
 
@@ -41,7 +40,7 @@ func fallbackPeer(t *testing.T, discovered ...string) (*harness, *Peer) {
 func attemptAt(c *connection, addr string) *attempt {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	return c.attempts[addressOf(udpAddr(addr)).AddrPort()]
+	return c.attempts[attemptKey{ap: addressOf(udpAddr(addr)).AddrPort()}]
 }
 
 // TestPeerConnectionFallbackRetirementAfterStabilization is the describe
@@ -141,18 +140,18 @@ func TestPeerConnectionFallbackRetirementKeepAlive(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			_, p := fallbackPeer(t)
-			c := &connection{p: p, attempts: map[netip.AddrPort]*attempt{}}
+			c := &connection{p: p, attempts: map[attemptKey]*attempt{}}
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 			opAttempt := &attempt{addr: op, ctx: ctx, cancel: cancel}
-			c.attempts[op.AddrPort()] = opAttempt
+			c.attempts[attemptKey{ap: op.AddrPort()}] = opAttempt
 			if tc.others > 0 {
-				c.attempts[other.AddrPort()] = &attempt{addr: other, ctx: context.Background(), cancel: func() {}}
+				c.attempts[attemptKey{ap: other.AddrPort()}] = &attempt{addr: other, ctx: context.Background(), cancel: func() {}}
 			}
 			c.mu.Lock()
 			c.deleteAddressLocked(op, "test", tc.force)
 			c.mu.Unlock()
-			_, kept := c.attempts[op.AddrPort()]
+			_, kept := c.attempts[attemptKey{ap: op.AddrPort()}]
 			if tc.deleted == kept || tc.deleted != (ctx.Err() != nil) {
 				t.Fatalf("operational attempt kept %v, cancelled %v; want deleted %v", kept, ctx.Err() != nil, tc.deleted)
 			}

@@ -74,6 +74,22 @@ type Context struct {
 	// attempt retransmitted past the MRP budget — matter.js
 	// Peer.establishmentUnresponsive (Peer.ts:197-204).
 	EstablishmentUnresponsive func(p *Peer)
+	// SessionAdded is called when a peer takes a session — the
+	// SessionManager's sessions.added a controller's reboot armer watches
+	// (RebootResubscribeArmer.ts:117-150 at 862ad75f); nil ignores it.
+	SessionAdded func(p *Peer, s *exchange.Session)
+	// DialTCP opens a TCP connection for a connection attempt over TCP;
+	// nil is no TCP interface — an attempt over TCP fails as a network
+	// error (PeerSet.ts:284-288 at 862ad75f).
+	DialTCP DialTCP
+	// TransportPreference is the transport preference each new peer takes
+	// (PeerSet.ts:151-157, :178-180): [exchange.TransportTCP] or UDP.
+	TransportPreference exchange.Transport
+	// Networks are the network profiles that throttle the peers'
+	// connections and exchanges and pad their MRP backoff; nil is
+	// NewNetworkProfiles over the defaults on Clock (matter.js PeerSet's
+	// env.get(NetworkProfiles), PeerSet.ts:212 at 862ad75f).
+	Networks *NetworkProfiles
 }
 
 // Set manages the peers on our fabrics and their operational connections.
@@ -85,6 +101,12 @@ type Set struct {
 	log   *slog.Logger
 	clock exchange.Clock
 	rand  func() float64
+
+	// networks is [Context].Networks or the default profiles.
+	networks *NetworkProfiles
+	// initiated are the sessions a connection process of the set opened
+	// (Initiated).
+	initiated sync.Map
 
 	// mu guards disconnected, handleError, peers and timing.
 	mu           sync.Mutex
@@ -112,8 +134,23 @@ func NewSet(c Context) (*Set, error) {
 	if s.rand == nil {
 		s.rand = rand.Float64
 	}
+	s.networks = c.Networks
+	if s.networks == nil {
+		s.networks = NewNetworkProfiles(s.clock, nil, s.log)
+	}
 	return s, nil
 }
+
+// Initiated reports a session a connection process of the set opened —
+// a CASE session we initiated, not one the peer opened towards us
+// (the armer's session isInitiator, RebootResubscribeArmer.ts:131-134).
+func (s *Set) Initiated(x *exchange.Session) bool {
+	_, ok := s.initiated.Load(x)
+	return ok
+}
+
+// Networks are the set's network profiles.
+func (s *Set) Networks() *NetworkProfiles { return s.networks }
 
 // Timing is the set's timing (PeerSet.ts:226-228).
 func (s *Set) Timing() Timing {
@@ -188,6 +225,11 @@ func (s *Set) Size() int {
 	return len(s.peers)
 }
 
+// ErrNoFabric is a peer whose fabric the host's fabric lookup does not
+// know — matter.js FabricNotFoundError, as a peer restored against
+// another fabric store meets it (PeersLoadFailureTest).
+var ErrNoFabric = errors.New("peer: no fabric")
+
 // AddKnownPeer adds the peer d describes, or updates the known peer: its
 // operational address and CATs replace the peer's when d gives them, its
 // discovery data fills only what the peer does not know, its reported
@@ -202,7 +244,7 @@ func (s *Set) AddKnownPeer(d Descriptor) (*Peer, error) {
 	// another call added meanwhile is the one kept.
 	fabric, ok := s.ctx.Fabrics(d.Address)
 	if !ok || fabric.Identity == nil {
-		return nil, fmt.Errorf("peer: no fabric with index %d", d.Address.FabricIndex)
+		return nil, fmt.Errorf("%w with index %d", ErrNoFabric, d.Address.FabricIndex)
 	}
 	s.mu.Lock()
 	for _, p := range s.peers {
@@ -213,6 +255,7 @@ func (s *Set) AddKnownPeer(d Descriptor) (*Peer, error) {
 		}
 	}
 	p := newPeer(s, d, fabric)
+	p.preferTCP = s.ctx.TransportPreference == exchange.TransportTCP
 	s.peers = append(s.peers, p)
 	s.mu.Unlock()
 	p.start()

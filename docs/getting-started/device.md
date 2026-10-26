@@ -139,7 +139,6 @@ func newNode(ctx context.Context, db *sql.DB, network node.Network, adv mdns.Adv
 		_ = n.Stop(context.WithoutCancel(ctx))
 		return nil, err
 	}
-	n.Aggregator().MarkComplete() //nolint:contextcheck // the node's own; every device is added: stale endpoint numbers may go
 	return n, nil
 }
 ```
@@ -343,14 +342,11 @@ no other device is given them, as a closed matter.js endpoint keeps its
 number. `Forget(ctx, key)` frees them — the device is gone for good, and
 an `Add` of the key later is numbered like a new device.
 
-Call `MarkComplete` once every device you know about is added. Until then
-the node keeps the stored endpoint numbers of devices that are absent.
-Afterwards, a stored device missing from the set that no `Remove` reserved
-— one a previous run served and this run never added — loses its number.
-A host whose model loads asynchronously calls `MarkComplete` after the
-load. If it is called too early, the endpoint numbers of devices not yet
-loaded are garbage-collected at boot, and every controller sees those
-devices as new.
+A device a previous run served and this run has not added yet keeps its
+stored number too, however long the host's model takes to load: the node
+never drops a number because its device is absent, as matter.js keeps
+every stored number until its endpoint is deleted. `Forget` is the one
+call that frees a number.
 
 Once a device is added, it has a lifecycle of its own:
 `Device.SetReachable(ctx, false)` reports it unreachable (the bridged

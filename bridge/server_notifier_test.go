@@ -107,7 +107,7 @@ func newSourceHarness(t *testing.T, src contract.EndpointSource) (h *secureHarne
 		}
 		specs := []endpoint.Spec{{StableKey: endpoint.StringKey("dev"), DeviceType: src.MatterDeviceType(), FriendlyName: "Device", Source: src}}
 		return func(ctx context.Context) (*endpoint.Topology, error) {
-			return asm.Assemble(ctx, []endpoint.Snapshot{{Scope: "app", Endpoints: specs, ModelComplete: true}})
+			return asm.Assemble(ctx, []endpoint.Snapshot{{Scope: "app", Endpoints: specs}})
 		}, nil
 	})
 	h.allowAll()

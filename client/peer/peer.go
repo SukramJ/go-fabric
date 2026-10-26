@@ -21,9 +21,10 @@ import (
 // Peer is a node on one of our fabrics: its descriptor, its sessions, its
 // operational DNS-SD service and the work that keeps a session to it. It
 // is matter.js Peer (packages/protocol/src/peer/Peer.ts:64-674 at
-// 0ceb202d) without the transport preference, the network profile, the
-// BasicInformation and physical-properties inputs, and the client
-// interaction (stages 3 and 4). It is safe for concurrent use.
+// 0ceb202d) without the transport preference, the BasicInformation input
+// and the client interaction (stages 3 and 4); of its physical
+// properties it takes the medium ([Peer.SetMedium]) its network profile
+// is selected by. It is safe for concurrent use.
 type Peer struct {
 	set     *Set
 	address handshake.PeerAddress
@@ -54,7 +55,42 @@ type Peer struct {
 	// litOperating reports the peer's physical property
 	// isLongIdleTimeOperating (SetLongIdleTimeOperating).
 	litOperating atomic.Pointer[func() bool]
+	// mediumOf reports the peer's network medium (SetMedium).
+	mediumOf atomic.Pointer[func() Medium]
+	// preferTCP is the TCP transport preference (SetTransportPreference),
+	// guarded by mu.
+	preferTCP bool
 }
+
+// SetMedium sets the report of the peer's network medium, the physical
+// properties its network profile is selected by — matter.js
+// Peer.physicalProperties, which the client node sets
+// (packages/node/src/behavior/system/network/NetworkClient.ts:71 at
+// 862ad75f). nil removes it: the peer's medium is unknown.
+func (p *Peer) SetMedium(fn func() Medium) {
+	if fn == nil {
+		p.mediumOf.Store(nil)
+		return
+	}
+	p.mediumOf.Store(&fn)
+}
+
+// medium is the peer's medium, nil while unknown.
+func (p *Peer) medium() *Medium {
+	fn := p.mediumOf.Load()
+	if fn == nil {
+		return nil
+	}
+	m := (*fn)()
+	return &m
+}
+
+// Networks are the network profiles of the peer's set.
+func (p *Peer) Networks() *NetworkProfiles { return p.set.networks }
+
+// Network is the profile of the peer's medium — matter.js Peer.network
+// (Peer.ts:330-332), NetworkProfiles.forPeer.
+func (p *Peer) Network() *NetworkProfile { return p.set.networks.ForPeer(p) }
 
 // LITMinIdleInterval is the idle interval a LIT ICD peer is assumed to
 // have when no source gives its SII: the 500 ms default is too aggressive
@@ -248,6 +284,10 @@ func (p *Peer) mergeKnown(d Descriptor) {
 		p.desc.ReportedSessionParameters = &r
 		p.changedLocked()
 	}
+	if !p.desc.TCPUnsupported && d.TCPUnsupported {
+		p.desc.TCPUnsupported = true // PeerSet.ts:333-335
+		p.changedLocked()
+	}
 }
 
 // changedLocked records a descriptor change: one save runs for every
@@ -300,12 +340,30 @@ func (p *Peer) addSession(s *exchange.Session) {
 	}
 	p.sessions = append(p.sessions, s)
 	p.followAddressLocked(s)
+	// Only a known medium pads the session's exchanges: the unknown
+	// fallback would inflate every exchange of a peer never characterised
+	// (Peer.ts:182-186).
+	s.SetPeerMargins(func() *exchange.Margins {
+		if p.medium() == nil {
+			return nil
+		}
+		m := p.Network().Margins
+		return &m
+	})
 	if r := s.ReportedParameters(); r != nil && (p.desc.ReportedSessionParameters == nil || *p.desc.ReportedSessionParameters != *r) {
 		p.desc.ReportedSessionParameters = r
 		p.changedLocked()
 	}
+	// A session that reports a TCP server lifts the flag (Peer.ts:176-180).
+	if r := s.ReportedParameters(); r != nil && p.desc.TCPUnsupported && exchange.PeerParameters(r).SupportedTransports&sessionparams.TransportTCPServer != 0 {
+		p.desc.TCPUnsupported = false
+		p.changedLocked()
+	}
 	p.mu.Unlock()
 	p.sessionAdded()
+	if fn := p.set.ctx.SessionAdded; fn != nil {
+		fn(p, s)
+	}
 	for _, o := range p.observing() {
 		if o.SessionAdded != nil {
 			o.SessionAdded(s)
@@ -322,8 +380,19 @@ func (p *Peer) addSession(s *exchange.Session) {
 
 // followAddressLocked makes the session's address the operational address
 // (Peer.ts:142-144, :161-163).
+//
+// A TCP session's remote port may be ephemeral (an inbound connection):
+// the operational address takes the discovered port (Peer.ts:149-160).
 func (p *Peer) followAddressLocked(s *exchange.Session) {
-	if a := s.Addr(); a != nil && !sameUDPAddr(p.desc.OperationalAddress, a) {
+	a := s.Addr()
+	if a != nil && s.Transport() == exchange.TransportTCP {
+		addrs := p.service.Addresses()
+		if len(addrs) == 0 {
+			return
+		}
+		a = &net.UDPAddr{IP: a.IP, Port: int(addrs[0].Port), Zone: a.Zone}
+	}
+	if a != nil && !sameUDPAddr(p.desc.OperationalAddress, a) {
 		p.desc.OperationalAddress = cloneUDPAddr(a)
 		p.changedLocked()
 	}
@@ -392,11 +461,41 @@ func (p *Peer) HasSession() bool { return p.NewestSession() != nil }
 // NewestSession is the live session the peer was last heard from on — the
 // highest [exchange.Session.ActiveTimestamp], the first of equals — nil
 // when none (Peer.ts:581-601).
-func (p *Peer) NewestSession() *exchange.Session {
+func (p *Peer) NewestSession() *exchange.Session { return p.newestOn(nil) }
+
+// NewestSessionOn is [Peer.NewestSession] among the sessions over t —
+// Peer.newestSession(type) (Peer.ts:581-601 at 862ad75f).
+func (p *Peer) NewestSessionOn(t exchange.Transport) *exchange.Session { return p.newestOn(&t) }
+
+// SessionFor is the newest session over the first transport
+// [Peer.ResolveTransports] lists for required and preferred that has one,
+// the newest of all without a list — Peer.connect's lookup
+// (Peer.ts:438-447), which PeerExchangeProvider repeats for each exchange
+// (PeerExchangeProvider.ts:104-115).
+func (p *Peer) SessionFor(required, preferred *exchange.Transport) *exchange.Session {
+	return p.sessionFor(p.ResolveTransports(required, preferred))
+}
+
+func (p *Peer) sessionFor(transports []exchange.Transport) *exchange.Session {
+	if transports == nil {
+		return p.NewestSession()
+	}
+	for _, t := range transports {
+		if s := p.NewestSessionOn(t); s != nil {
+			return s
+		}
+	}
+	return nil
+}
+
+func (p *Peer) newestOn(t *exchange.Transport) *exchange.Session {
 	var found *exchange.Session
 	var at time.Time
 	for _, s := range p.Sessions() {
 		if s.IsClosed() || s.IsPeerLost() {
+			continue
+		}
+		if t != nil && s.Transport() != *t {
 			continue
 		}
 		if t := s.ActiveTimestamp(); found == nil || at.Before(t) {
@@ -410,7 +509,7 @@ func (p *Peer) NewestSession() *exchange.Session {
 // what its last session reported, the intervals it does not report taken
 // from its TXT record, the fallbacks for the rest. Mirrors matter.js
 // Peer.sessionParameters (Peer.ts:281-317) without the BasicInformation
-// and TCP inputs. With no SII from either source, a LIT-operating peer's
+// input; a peer marked TCP-unsupported has the TCP server role cleared. With no SII from either source, a LIT-operating peer's
 // idle interval is [LITMinIdleInterval] (:305-315).
 func (p *Peer) SessionParameters() sessionparams.Parameters {
 	p.mu.Lock()
@@ -422,6 +521,7 @@ func (p *Peer) SessionParameters() sessionparams.Parameters {
 	if p.desc.DiscoveryData != nil {
 		dd = *p.desc.DiscoveryData
 	}
+	unsupported := p.desc.TCPUnsupported
 	p.mu.Unlock()
 	if r.SessionIdleInterval == 0 && dd.SII != nil {
 		r.SessionIdleInterval = uint32(dd.SII.Milliseconds()) //nolint:gosec // TXTData bounds SII to one hour
@@ -435,7 +535,13 @@ func (p *Peer) SessionParameters() sessionparams.Parameters {
 	if r.SessionActiveThreshold == 0 && dd.SAT != nil {
 		r.SessionActiveThreshold = uint16(dd.SAT.Milliseconds()) //nolint:gosec // TXTData bounds SAT to 65535 ms
 	}
-	return exchange.PeerParameters(&r)
+	out := exchange.PeerParameters(&r)
+	if unsupported {
+		// A TCP-unsupported peer keeps its client role and loses the server
+		// one (Peer.ts:290-293).
+		out.SupportedTransports &^= sessionparams.TransportTCPServer
+	}
+	return out
 }
 
 // Disconnect aborts the connection process and waits for it to end; with

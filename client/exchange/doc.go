@@ -18,7 +18,8 @@
 // reliably and returns once the peer acknowledged, [Exchange.Next]
 // waits for the peer's next message, [Exchange.Close] ends it.
 //
-// Scope: UDP only and unicast only (no group sessions). An exchange a
+// Scope: unicast only (no group sessions), over the manager's socket or
+// a TCP connection a session is bound to ([Manager.AttachChannel]). An exchange a
 // peer opens reaches a [ProtocolHandler] installed with
 // [Manager.SetProtocolHandler] (ADR 0020, stage 3): on a secure session
 // any protocol's but the Secure Channel's, whose CloseSession handling is

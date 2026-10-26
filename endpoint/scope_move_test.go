@@ -13,8 +13,8 @@ import (
 
 // TestReusedRecordTakesTheNewScope is brief BV-1 §4's store fact: a source
 // that moves from scope A to scope B keeps its endpoint number, and its
-// record moves to B, so B's GC collects it once B is complete and the
-// source is gone.
+// record moves to B, so an owner that lists (or erases) B's numbers finds
+// it; absent from both scopes, it keeps its record (nothing is collected).
 func TestReusedRecordTakesTheNewScope(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
@@ -34,13 +34,13 @@ func TestReusedRecordTakesTheNewScope(t *testing.T) {
 
 	assemble(endpoint.Snapshot{Scope: "A", Endpoints: []endpoint.Spec{lamp}})
 	id := store.rows[key].EndpointID
-	assemble(endpoint.Snapshot{Scope: "A"}, endpoint.Snapshot{Scope: "B", Endpoints: []endpoint.Spec{lamp}, ModelComplete: true})
+	assemble(endpoint.Snapshot{Scope: "A"}, endpoint.Snapshot{Scope: "B", Endpoints: []endpoint.Spec{lamp}})
 	rec, ok := store.rows[key]
 	if !ok || rec.EndpointID != id || rec.Scope != "B" {
 		t.Fatalf("after the move: %+v (stored %v), want endpoint %d under scope B", rec, ok, id)
 	}
-	assemble(endpoint.Snapshot{Scope: "A"}, endpoint.Snapshot{Scope: "B", ModelComplete: true})
-	if _, ok := store.rows[key]; ok {
-		t.Error("removed from complete scope B, the record survived")
+	assemble(endpoint.Snapshot{Scope: "A"}, endpoint.Snapshot{Scope: "B"})
+	if rec, ok := store.rows[key]; !ok || rec.EndpointID != id {
+		t.Errorf("absent from every snapshot, the record is %+v (stored %v), want it kept at %d", rec, ok, id)
 	}
 }

@@ -6,6 +6,7 @@ package exchange
 import (
 	"net"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/SukramJ/go-fabric/secure/channel"
@@ -37,6 +38,9 @@ type Session struct {
 	createdAt            time.Time
 	closing              chan struct{}
 	closingOnce          sync.Once
+	// peerMargins resolves the MRP margins of the peer's network medium
+	// (SetPeerMargins).
+	peerMargins atomic.Pointer[func() *Margins]
 
 	// Unsecured session state: the initiator's ephemeral node id — ours,
 	// or the peer's on an inbound session — and the reception window of
@@ -53,8 +57,11 @@ type Session struct {
 	// parameters, timestamps, the open exchanges, closed, peerLost and
 	// deferredClose). It is released before an exchange is aborted or the
 	// manager is told.
-	mu              sync.Mutex
-	addr            *net.UDPAddr
+	mu   sync.Mutex
+	addr *net.UDPAddr
+	// channel is the connection the session is bound to (channel.go), nil
+	// for a session on the manager's socket. It never changes.
+	channel         Channel
 	params          sessionparams.Parameters
 	timestamp       time.Time
 	activeTimestamp time.Time
@@ -83,8 +90,12 @@ func (s *Session) Addr() *net.UDPAddr {
 // override aside — matter.js `session.channel.networkAddress = address`,
 // the in-place migration of PeerAddressMonitor.ts:243 and :170
 // (packages/protocol/src/peer/, 0ceb202d). A nil addr is ignored.
+//
+// A session bound to a TCP connection stays on it: its address names the
+// connection (matter.js probes and migrates UDP sessions only,
+// PeerAddressMonitor.ts:138-139 at 862ad75f).
 func (s *Session) SetAddr(addr *net.UDPAddr) {
-	if addr == nil {
+	if addr == nil || s.channel != nil {
 		return
 	}
 	s.mu.Lock()
@@ -96,8 +107,10 @@ func (s *Session) SetAddr(addr *net.UDPAddr) {
 func (s *Session) IsSecure() bool { return s.secure != nil }
 
 // UsesMRP reports whether the session runs MRP: not over a reliable
-// carrier (matter.js Session.ts:355-356).
-func (s *Session) UsesMRP() bool { return !s.m.reliable }
+// carrier — a BTP manager or a TCP channel (matter.js Session.ts:355-356).
+func (s *Session) UsesMRP() bool {
+	return !s.m.reliable && (s.channel == nil || !s.channel.Reliable())
+}
 
 // NodeID is our node id on the session: the ephemeral initiator node id
 // on an unsecured session we opened, the operational node id on a CASE
@@ -236,6 +249,34 @@ func (s *Session) ActiveTimestamp() time.Time {
 	return s.activeTimestamp
 }
 
+// SetPeerMargins sets the resolver of the MRP margins of the peer's
+// network medium, which an exchange of the session pads its sends with
+// unless the exchange carries its own (Options.PeerAdditionalMrpDelay).
+// A resolver that returns nil, or none, pads nothing. Mirrors matter.js
+// Session.peerMrpMarginsResolver, which the peer sets on each of its
+// sessions to its network profile's margins once its medium is known
+// (packages/protocol/src/peer/Peer.ts:184-186 at 862ad75f).
+func (s *Session) SetPeerMargins(fn func() *Margins) {
+	if fn == nil {
+		s.peerMargins.Store(nil)
+		return
+	}
+	s.peerMargins.Store(&fn)
+}
+
+// PeerMargins are the MRP margins of the peer's medium the session's
+// exchanges pad their sends with, nil when none is known — matter.js
+// Session.peerMrpMargins.
+func (s *Session) PeerMargins() *Margins { return s.peerMarginsNow() }
+
+// peerMarginsNow is the resolver's margins, nil without one.
+func (s *Session) peerMarginsNow() *Margins {
+	if fn := s.peerMargins.Load(); fn != nil {
+		return (*fn)()
+	}
+	return nil
+}
+
 // timing is the peer's intervals and whether the peer is active now.
 func (s *Session) timing() (Intervals, bool) {
 	now := s.m.clock.Now()
@@ -344,7 +385,12 @@ func (s *Session) liveExchanges() []*Exchange {
 // closed with [ErrSessionClosed], it leaves the manager's tables and its
 // keys are dropped. [Manager.CloseSession] tells the peer first. It is
 // idempotent.
-func (s *Session) Close() {
+func (s *Session) Close() { s.closeWith(ErrSessionClosed) }
+
+// closeWith closes the session, its exchanges aborted with cause; the
+// last session of a TCP connection closes the connection
+// (ExchangeManager.ts:668-710).
+func (s *Session) closeWith(cause error) {
 	s.mu.Lock()
 	if s.closed {
 		s.mu.Unlock()
@@ -354,10 +400,13 @@ func (s *Session) Close() {
 	s.mu.Unlock()
 	s.markClosing()
 	for _, x := range s.liveExchanges() {
-		x.abort(ErrSessionClosed)
+		x.abort(cause)
 	}
 	s.m.forget(s)
 	if s.secure != nil {
 		s.secure.Close()
+	}
+	if s.channel != nil {
+		s.m.closeChannelIfLast(s.channel)
 	}
 }

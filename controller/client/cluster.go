@@ -226,13 +226,24 @@ func (c *Cluster) exposed() *shape {
 // announced.
 func (c *Cluster) Ready() bool { return c.exposed() != nil }
 
-// Revision is the peer's ClusterRevision, 0 when it reported none or one
-// below 1 (PeerBehavior.ts:429-434).
+// Revision is the peer's ClusterRevision; when it reported none or one
+// below 1 the model's — the snapshot's revision of the cluster, 1 for a
+// cluster the snapshot does not know (PeerBehavior.ts:426-434 at
+// 862ad75f: the revision override only for a valid, differing one;
+// PeerBehaviorTest "tolerates a peer that does not report a revision").
+// 0 while the cluster has no shape.
 func (c *Cluster) Revision() uint16 {
-	if s := c.exposed(); s != nil {
+	s := c.exposed()
+	if s == nil {
+		return 0
+	}
+	if s.revision != 0 {
 		return s.revision
 	}
-	return 0
+	if rev, ok := schema.ClusterRevision(c.id); ok {
+		return rev
+	}
+	return 1
 }
 
 // FeatureMap is the peer's FeatureMap.
@@ -288,16 +299,46 @@ func (c *Cluster) GeneratedCommands() []uint32 {
 }
 
 // Supports reports whether the peer supports the attribute: a global
-// attribute always (PeerBehavior.ts:488-492), any other when the peer
+// attribute always (PeerBehavior.ts:488-492); any other when the peer
 // lists it — the support override of maybeOverrideSupport (:478-507),
-// which for a named or unknown cluster the lists alone decide (:484-486).
+// which for a named or unknown cluster the lists alone decide (:484-486)
+// — and, for a cluster of the model, its conformance under the peer's
+// features and revision allows it: an element the peer implements
+// although its conformance deprecates it counts as optional
+// (supportOverrideOf, :381-397), a disallowed one or one its features
+// exclude before a trailing "D" stays out (PeerBehaviorTest "omits a
+// disallowed attribute the peer reports", "omits an attribute the peer
+// reports whose conformance before a trailing deprecation excludes it").
 func (c *Cluster) Supports(attr uint32) bool {
 	if isGlobal(attr) {
 		return true
 	}
 	s := c.exposed()
-	return s != nil && slices.Contains(s.attributes, attr)
+	if s == nil || !slices.Contains(s.attributes, attr) {
+		return false
+	}
+	if c.def == nil {
+		return true
+	}
+	a := c.def.Attribute(attr)
+	if a == nil {
+		return true
+	}
+	ctx := peerContext{FeatureContext: spec.Context(c.def, s.featureMap), revision: c.Revision()}
+	return a.Conformance.Applicability(ctx) != spec.ApplicabilityNone ||
+		a.Conformance.ApplicabilityDeprecatedOptional(ctx) != spec.ApplicabilityNone
 }
+
+// peerContext is a cluster definition's conformance context under the
+// peer's features and the revision it reported (a "Rev >= vN" element is
+// judged against it, PeerBehaviorTest "judges a revision-conformant
+// element against the revision the peer sent").
+type peerContext struct {
+	spec.FeatureContext
+	revision uint16
+}
+
+func (p peerContext) Revision() uint16 { return p.revision }
 
 // SupportsCommand reports whether the peer accepts the command: it lists
 // it in its AcceptedCommandList (PeerBehavior.ts:450-455,

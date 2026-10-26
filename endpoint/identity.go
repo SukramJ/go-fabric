@@ -60,8 +60,8 @@ func (k StringKey) String() string { return string(k) }
 type Record struct {
 	Key SourceKey
 	// Scope is the [Snapshot.Scope] the source belongs to. Carried
-	// because garbage collection lists one scope at a time and the key
-	// is opaque here, so a store has no other way to answer
+	// because an owner lists (and erases) one scope at a time and the
+	// key is opaque here, so a store has no other way to answer
 	// ListEndpoints. A store whose own key type already names the scope
 	// should read it from there and reject a Scope that disagrees,
 	// rather than keep two unchecked sources for one column.
@@ -99,7 +99,7 @@ type Store interface {
 	// id. An empty scope means "every scope".
 	ListEndpoints(ctx context.Context, scope string) ([]Record, error)
 	// RemoveEndpoint deletes the record for key. Idempotent: a missing
-	// row is not an error, because the assembler's garbage collection
-	// does not coordinate with concurrent removals.
+	// row is not an error, because an owner's removals do not
+	// coordinate with each other.
 	RemoveEndpoint(ctx context.Context, key SourceKey) error
 }

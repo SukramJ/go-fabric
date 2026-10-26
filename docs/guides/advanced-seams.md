@@ -104,8 +104,8 @@ A sensor built from a classified measurement source does not need the
 seam: `device.Measurement(src)` mounts it on a device of the kit.
 
 **Costs.** With `Config.Topology` the node builds no assembler and no
-`Aggregator` (`Node.Aggregator` is nil). Endpoint numbering, the
-vanished-source collection (`Snapshot.ModelComplete`), device-type
+`Aggregator` (`Node.Aggregator` is nil). Endpoint numbering, erasing
+the numbers of devices that are gone (`Store.RemoveEndpoint`), device-type
 validation of the bridged endpoints and the bridged NodeLabel and scene
 persistence are the host assembler's to get right.
 
@@ -240,3 +240,25 @@ on the facade: `Node.DiagnosticEvents`, `Node.OnDiagnosticEvent` and
 **Costs.** None beyond the type: the ring is the node's.
 
 *Source: `node/facade.go`, `node/diagnostics.go`, `node/node.go` (`diagRing`, `ringLogs`), `diagevent/ring.go:58`.*
+
+## `node/controllernode` and `controller/softwareupdate`
+
+**Gives.** The controller's own node — the server node its OTA push serves
+updates from — as the controller's `OwnNode` port: `controllernode.Start`
+(node.New and Start over `controllernode.Config(spec)`), `Wrap` for a node
+a host started itself, and `Node` to reach the `node.Node` back; and the
+update manager the controller runs (`softwareupdate.Manager`, its image
+store `Images` and the provider ports `Manager.ProviderConfig`).
+
+**When.** A host that runs the own node differently — on its own socket or
+advertiser, in a test site — sets `controller.OTAConfig.StartNode` to its
+own starter over `controllernode.Config`; the reference controller does,
+to reach the node's group messaging. A host that wants the update
+decisions without the controller's facade builds a `softwareupdate.Manager`
+over its registry.
+
+**Costs.** The own node's configuration is the controller's spec: a
+starter that changes its commissioning window or store breaks the
+controller's commissioning of it on the next start.
+
+*Source: `node/controllernode/controllernode.go`, `controller/ota.go`, `controller/softwareupdate/manager.go`, `controller/softwareupdate/provider.go`.*

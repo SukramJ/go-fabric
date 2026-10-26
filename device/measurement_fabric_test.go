@@ -173,7 +173,7 @@ func TestMeasurementServesEveryBuiltinClassOverTheWire(t *testing.T) {
 	for _, d := range append(slices.Clone(devices), thermo.Device) {
 		specs = append(specs, d.Spec())
 	}
-	topo, err := a.Assemble(context.Background(), []endpoint.Snapshot{{Scope: "test", Endpoints: specs, ModelComplete: true}})
+	topo, err := a.Assemble(context.Background(), []endpoint.Snapshot{{Scope: "test", Endpoints: specs}})
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -68,6 +68,8 @@ type clientPairOptions struct {
 	controller fabrictest.ControllerOptions
 	// configure edits the device's configuration.
 	configure func(*node.Config)
+	// lightDecls are the light's extra declarations (a UserLabel, say).
+	lightDecls []device.Declaration
 }
 
 // clientPair is MockSite.addCommissionedPair with
@@ -91,7 +93,7 @@ func newClientPair(t *testing.T, o clientPairOptions) *clientPair {
 	cp := &clientPair{site: site}
 	topo := fabrictest.Topology{Configure: o.configure}
 	if !o.rootOnly {
-		l, err := device.NewOnOffLight(device.Options{StableKey: endpoint.StringKey("light:1"), Name: "light:1"})
+		l, err := device.NewOnOffLight(device.Options{StableKey: endpoint.StringKey("light:1"), Name: "light:1"}, o.lightDecls...)
 		if err != nil {
 			t.Fatal(err)
 		}

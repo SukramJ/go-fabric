@@ -42,10 +42,13 @@ func seedPartitions(t *testing.T, path string) (idA, idB uint16) {
 	return idA, idB
 }
 
-// TestPartitionCompletenessIsPerPartition is #229: of two partitions, the
-// one marked complete collects its vanished stored numbers, the other —
-// never marked complete — keeps its own.
-func TestPartitionCompletenessIsPerPartition(t *testing.T) {
+// TestPartitionsKeepTheirStoredNumbers: of two partitions after a
+// restart, each hands its stored numbers back to the keys that return,
+// whenever they return — nothing is collected because a key was absent
+// from an assembly (matter.js keeps every stored number,
+// packages/node/src/storage/server/ServerEndpointStores.ts:33-45 at
+// 862ad75f). It replaces #229's completeness test with v0.13.0.
+func TestPartitionsKeepTheirStoredNumbers(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	path := filepath.Join(t.TempDir(), "node.db")
@@ -60,7 +63,9 @@ func TestPartitionCompletenessIsPerPartition(t *testing.T) {
 	if err := m.Start(ctx); err != nil {
 		t.Fatal(err)
 	}
-	agg.Partition("ccu1").MarkComplete() // plug:a vanished from ccu1
+	if err := agg.Partition("ccu1").Add(ctx, newPlug(t, "plug:other")); err != nil {
+		t.Fatal(err) // an assembly of ccu1 without plug:a
+	}
 	for _, k := range []string{"plug:a", "plug:b"} {
 		p := "ccu1"
 		if k == "plug:b" {
@@ -70,11 +75,11 @@ func TestPartitionCompletenessIsPerPartition(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	if got, _ := endpointOf(t, m, "plug:a"); got == idA {
-		t.Errorf("plug:a got its stored %d back; complete ccu1 should have collected it", idA)
+	if got, _ := endpointOf(t, m, "plug:a"); got != idA {
+		t.Errorf("plug:a endpoint %d, want its stored %d", got, idA)
 	}
 	if got, _ := endpointOf(t, m, "plug:b"); got != idB {
-		t.Errorf("plug:b endpoint %d, want its stored %d (ccu2 is not complete)", got, idB)
+		t.Errorf("plug:b endpoint %d, want its stored %d", got, idB)
 	}
 	if eps := agg.Partition("ccu2").Endpoints(); len(eps) != 1 || len(agg.Endpoints()) != 0 {
 		t.Errorf("ccu2 holds %d, the default %d; want 1, 0", len(eps), len(agg.Endpoints()))
@@ -274,9 +279,9 @@ func TestBatchRemoveUnbindsAfterTheReassembly(t *testing.T) {
 	}
 }
 
-// TestBatchMarkCompleteCollectsInTheSameAssembly: MarkComplete in a batch
-// makes the batch's one reassembly collect.
-func TestBatchMarkCompleteCollectsInTheSameAssembly(t *testing.T) {
+// TestBatchCollectsNothing: a batch's one reassembly without a stored key
+// leaves its number stored for the key's return.
+func TestBatchCollectsNothing(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	path := filepath.Join(t.TempDir(), "node.db")
@@ -287,7 +292,6 @@ func TestBatchMarkCompleteCollectsInTheSameAssembly(t *testing.T) {
 	}
 	before := node.Reassemblies(m.Aggregator())
 	err := m.Aggregator().Partition("ccu1").Batch(ctx, func(b *node.Batch) error {
-		b.MarkComplete()
 		return b.Add(newPlug(t, "plug:x"))
 	})
 	if err != nil {
@@ -299,8 +303,8 @@ func TestBatchMarkCompleteCollectsInTheSameAssembly(t *testing.T) {
 	if err := m.Aggregator().Partition("ccu1").Add(ctx, newPlug(t, "plug:a")); err != nil {
 		t.Fatal(err)
 	}
-	if got, _ := endpointOf(t, m, "plug:a"); got == idA {
-		t.Errorf("plug:a got its stored %d back; the batch's assembly should have collected it", idA)
+	if got, _ := endpointOf(t, m, "plug:a"); got != idA {
+		t.Errorf("plug:a endpoint %d, want its stored %d", got, idA)
 	}
 }
 

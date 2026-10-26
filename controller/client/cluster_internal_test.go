@@ -15,6 +15,7 @@ import (
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	"github.com/SukramJ/go-fabric/cluster/spec/onoff"
+	"github.com/SukramJ/go-fabric/schema"
 	"github.com/SukramJ/go-fabric/tlv"
 )
 
@@ -83,9 +84,9 @@ func TestClusterShape(t *testing.T) {
 	}
 
 	// An empty AttributeList falls back to the ids received; a revision
-	// below 1 is none (:779-795, PeerBehavior.ts:429-434).
+	// below 1 is none, so the model's stands (:779-795, PeerBehavior.ts:426-434).
 	e := shaped(onoff.ClusterID, map[uint32]spec.Node{onoff.AttrOnOff: boolNode(false), spec.AttrAttributeList: listNode(), spec.AttrClusterRevision: uintNode(0)})
-	if e.AttributeListReported() || !reflect.DeepEqual(e.AttributeList(), []uint32{0, 0xFFFB, 0xFFFD}) || e.Revision() != 0 {
+	if rev, _ := schema.ClusterRevision(onoff.ClusterID); e.AttributeListReported() || !reflect.DeepEqual(e.AttributeList(), []uint32{0, 0xFFFB, 0xFFFD}) || e.Revision() != rev {
 		t.Fatalf("fallback %v revision %d", e.AttributeList(), e.Revision())
 	}
 

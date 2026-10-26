@@ -131,8 +131,8 @@ Commit: [`0bac952`](https://github.com/SukramJ/go-zendure2mqtt/commit/0bac9524e3
 ## 4. The aggregator batch at the device run
 
 The batch is the one from `newNode` in [A host's view](host-view.md#newnode):
-`Aggregator().Add` for each device, then `MarkComplete`. A daemon has to
-decide when its device list is complete:
+`Aggregator().Add` for each device. A daemon has to decide when a device
+is added and when it is gone:
 
 - **At start** the daemon adds every device its backend lists
   (`Source.Devices()`) before `Start`, so the first reading finds its
@@ -140,11 +140,10 @@ decide when its device list is complete:
 - **A device that appears later** goes through the same `Add`, on a running
   node, which then reassembles. A cloud login can list a unit after the
   start, and a reading can name a unit the node does not serve yet.
-- **`MarkComplete`** comes once the backend says its upstream is usable. The
-  local backend's list is then the configured one, and the cloud's list
-  comes from its login. Before that point the stored endpoint numbers of
-  units not yet listed are kept, so a slow login does not renumber
-  anything.
+- **A slow login** renumbers nothing: the stored endpoint number of a
+  unit not yet listed is kept however long the list takes, since the node
+  never drops a number because its device is absent (v0.13.0 removed
+  `MarkComplete`, the call that let it).
 - **A device that vanishes:** the daemon never removes a unit (its state
   and its MQTT side keep every serial it saw), and the projection mirrors
   that. A unit the backend no longer reaches becomes unreachable (step 6).
@@ -277,6 +276,6 @@ step, and this page does not claim it.
 *Source: the daemon pull request
 [SukramJ/go-zendure2mqtt#64](https://github.com/SukramJ/go-zendure2mqtt/pull/64);
 `node/config.go` (`Config`, `Commissioning`, `Store`), `node/aggregator.go`
-(`Add`, `MarkComplete`), `device/electrical_sensor_gen.go`,
+(`Add`), `device/electrical_sensor_gen.go`,
 `device/base.go` (`withBridgedPowerSource`, `Device.PowerSource`),
 `device/lifecycle.go` (`SetReachable`), `node/node.go` (`PairingCodes`).*

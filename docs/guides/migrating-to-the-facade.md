@@ -42,6 +42,15 @@ still held there. Each row names the facade route, or the section of
 | `cluster/core` | `SoftwareVersionFromString` (`daemon_matter.go:527`) | `node.SoftwareVersionFromString` |
 | `cluster/core` | `RegulatoryIndoorOutdoor` (`daemon_matter.go:506`) | `node.RegulatoryIndoorOutdoor` for `Commissioning.LocationCapability` |
 
+## Removed or changed in v0.13.0: `MarkComplete`, `Priority`, `SubscribeRequest`
+
+| Symbol | Route |
+| --- | --- |
+| `node.Aggregator.MarkComplete`, `node.Partition.MarkComplete`, `node.Batch.MarkComplete` | drop the call: a stored endpoint number is kept until `Forget` (or `RetirePartition` for a whole source) erases it, whether or not the device is in the set; `Forget` a device that is gone for good |
+| `endpoint.Snapshot.ModelComplete`, `endpoint.Snapshot.Retain` (a host with its own assembler) | drop the fields: the assembler collects no stored identity absent from its snapshots; erase one with `endpoint.Store.RemoveEndpoint` |
+| `client/peer.ConnectOptions.Priority`, `client/interaction.ExchangeOptions.Priority` | `Network: peer.NetworkICDLit`, the unthrottled profile matter.js routes an await-mode LIT ICD through |
+| `controller/client.SubscribeRequest` as an alias of `interaction.SubscribeRequest` | a struct now, as `client.ReadRequest` is: `client.SubscribeRequest{SubscribeRequest: client.SubscribePaths{…}, IncludeKnownVersions: …}`, or set the promoted fields on a `var req client.SubscribeRequest`; `client.SubscribePaths` is the old alias; `fabrictest.SubscribeRequest` is `client.SubscribePaths` |
+
 ## The node features in v0.10.4
 
 Nothing was removed; each route is an alias of the type it replaces or a
@@ -139,13 +148,11 @@ import; a host that uses none of them changes nothing.
 
 A host whose devices come from several sources that load on their own
 (two CCUs) gives each its partition: `agg.Partition("ccu1")` returns a
-handle with `Add`, `Replace`, `Remove`, `MarkComplete`, `Batch` and
-`Endpoints`. Each partition is its own snapshot scope with its own
-completeness, so `Partition("ccu1").MarkComplete()` collects the vanished
-stored numbers of `ccu1` alone, while `ccu2`, still loading, keeps its
-own. A StableKey stays unique across partitions. A source removed from
+handle with `Add`, `Replace`, `Remove`, `Forget`, `Batch` and
+`Endpoints`. Each partition is its own snapshot scope. A StableKey stays
+unique across partitions. A source removed from
 the configuration has no handle after a restart:
-`agg.RetirePartition(ctx, "ccu2")` collects its stored numbers once. A
+`agg.RetirePartition(ctx, "ccu2")` erases its stored numbers once. A
 source's initial load is one `Batch`: every `Add` in it applies at once
 and returns its own error, and the node reassembles once afterwards. The
 Aggregator's own methods are the default partition (`node.Scope`), so a

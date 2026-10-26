@@ -26,6 +26,7 @@ import (
 	"time"
 
 	"github.com/SukramJ/go-fabric/client/exchange"
+	clientpeer "github.com/SukramJ/go-fabric/client/peer"
 	"github.com/SukramJ/go-fabric/clock/clocktest"
 	"github.com/SukramJ/go-fabric/icd"
 	"github.com/SukramJ/go-fabric/im"
@@ -94,7 +95,7 @@ func newICDRig(t *testing.T, fail func(n int) error) *icdRig {
 		r.mu.Lock()
 		r.attempts++
 		n := r.attempts
-		r.priority = append(r.priority, opts.Priority)
+		r.priority = append(r.priority, opts.Network == clientpeer.NetworkICDLit)
 		fail := r.fail
 		r.mu.Unlock()
 		if fail != nil {

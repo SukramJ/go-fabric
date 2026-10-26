@@ -160,7 +160,7 @@ func resumptionRecordFor(t *testing.T, h *harness) handshake.ResumptionRecord {
 // currentExchange is the CASE exchange of the process's attempt at
 // addr1; c.mu is held.
 func currentExchange(c *connection) *exchange.Exchange {
-	if att := c.attempts[addressOf(udpAddr(addr1)).AddrPort()]; att != nil {
+	if att := c.attempts[attemptKey{ap: addressOf(udpAddr(addr1)).AddrPort()}]; att != nil {
 		return att.exchange.Load()
 	}
 	return nil

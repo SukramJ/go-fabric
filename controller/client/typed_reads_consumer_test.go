@@ -79,7 +79,7 @@ func TestTypedReadsConsumer(t *testing.T) {
 	reports := 0
 	var sub *client.Subscription
 	err = site.Run(ctx, func(ctx context.Context) (err error) {
-		sub, err = cn.Subscribe(ctx, client.SubscribeRequest{
+		sub, err = cn.Subscribe(ctx, client.SubscribeRequest{SubscribeRequest: client.SubscribePaths{
 			Attributes: []client.AttributePath{
 				client.ClusterAt(lightEP, onoffdef.ClusterID),
 				client.ClusterAt(lightEP, levelcontroldef.ClusterID),
@@ -89,7 +89,7 @@ func TestTypedReadsConsumer(t *testing.T) {
 				reports++
 				mu.Unlock()
 			},
-		})
+		}})
 		return err
 	})
 	if err != nil {

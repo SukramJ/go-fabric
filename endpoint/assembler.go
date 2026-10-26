@@ -130,9 +130,9 @@ func New(s Store, cfg Config, logger *slog.Logger) (*Assembler, error) {
 
 // Assemble produces the topology from the given snapshots of
 // [Spec] values. Endpoint IDs are looked up in the store; new
-// sources receive a fresh ID allocated under a transaction. Vanished
-// sources (rows in the store with no matching snapshot entry) are
-// removed.
+// sources receive a fresh ID allocated under a transaction. A stored
+// source absent from the snapshots keeps its row and its number
+// (see [Snapshot]); the owner removes one with [Store.RemoveEndpoint].
 //
 // Snapshots must have unique Scope values; the assembler does not
 // deduplicate. The caller is expected to pass exactly one snapshot per
@@ -177,10 +177,6 @@ func (a *Assembler) Assemble(ctx context.Context, snapshots []Snapshot) (*Topolo
 			}
 			topology.Endpoints = append(topology.Endpoints, eps...)
 		}
-	}
-
-	if err := a.gcVanished(ctx, snapshots, seen); err != nil {
-		return nil, err
 	}
 
 	// Release the state of sources that vanished / were de-exposed this
@@ -332,7 +328,8 @@ func (a *Assembler) assignOrReuseID(ctx context.Context, scope string, sourceKey
 	case err == nil:
 		// Already assigned — refresh device_type if it drifted, and the
 		// scope if the source moved to another snapshot: a record that
-		// kept its old scope would never be listed by the new scope's GC.
+		// kept its old scope would never be listed by the new scope, nor
+		// erased with it (node.Aggregator.RetirePartition).
 		if rec.DeviceType != deviceType || rec.Scope != scope {
 			rec.DeviceType = deviceType
 			rec.Scope = scope
@@ -355,67 +352,4 @@ func (a *Assembler) assignOrReuseID(ctx context.Context, scope string, sourceKey
 	default:
 		return 0, fmt.Errorf("endpoint: lookup: %w", err)
 	}
-}
-
-// gcVanished removes store rows for sources that no longer appear
-// in any snapshot. seen contains every key produced this run; we
-// list the persisted keys per central and drop the difference.
-//
-// Snapshots that are not model-complete are exempt: at daemon boot the
-// topology is assembled before the readiness-gated CCU device load has
-// populated the model, so a registered central briefly contributes an
-// empty (or partial) device list. Treating that as "every device
-// vanished" would delete all persisted endpoint-ID rows on each boot
-// and renumber the bridged fleet — controllers key their accessory
-// cache on the endpoint number, so persisted numbers must survive a
-// restart. Mirrors matter.js, which reserves persisted endpoint
-// numbers at initialization (packages/node/src/storage/server/
-// ServerEndpointStores.ts, assignNumber) and erases one only on
-// explicit endpoint deletion (packages/node/src/node/server/
-// ServerEndpointInitializer.ts, eraseDescendant).
-func (a *Assembler) gcVanished(ctx context.Context, snapshots []Snapshot, seen map[SourceKey]struct{}) error {
-	for _, snap := range snapshots {
-		if !snap.ModelComplete {
-			// The central has not finished its initial device load; an
-			// absent source is "not loaded yet", not "vanished". Keep
-			// every persisted row until a model-complete snapshot vouches
-			// for the fleet.
-			a.logger.Debug(
-				"endpoint.gc_skipped",
-				slog.String("scope", snap.Scope),
-				slog.String("reason", "model incomplete"),
-			)
-			continue
-		}
-		records, err := a.store.ListEndpoints(ctx, snap.Scope)
-		if err != nil {
-			return fmt.Errorf("endpoint: gc list: %w", err)
-		}
-		retained := make(map[string]bool, len(snap.Retain))
-		for _, key := range snap.Retain {
-			if key != nil {
-				retained[key.String()] = true
-			}
-		}
-		for _, rec := range records {
-			if _, kept := seen[rec.Key]; kept {
-				continue
-			}
-			if rec.Key != nil && retained[rec.Key.String()] {
-				// Reserved by the owner (Snapshot.Retain): the number
-				// waits for the key's return.
-				continue
-			}
-			if err := a.store.RemoveEndpoint(ctx, rec.Key); err != nil {
-				return fmt.Errorf("endpoint: gc remove: %w", err)
-			}
-			a.logger.Debug(
-				"endpoint.gc",
-				slog.String("scope", snap.Scope),
-				slog.String("source", rec.Key.String()),
-				slog.Int("endpoint", int(rec.EndpointID)),
-			)
-		}
-	}
-	return nil
 }

@@ -73,8 +73,8 @@ func TestHostTopology(t *testing.T) {
 		calls++
 		mu.Unlock()
 		return asm.Assemble(ctx, []endpoint.Snapshot{
-			{Scope: "ccu-a", Endpoints: []endpoint.Spec{specOf(plugA, centralKey{"ccu-a", "plug:1"})}, ModelComplete: true},
-			{Scope: "ccu-b", Endpoints: []endpoint.Spec{specOf(plugB, centralKey{"ccu-b", "plug:1"})}, ModelComplete: false},
+			{Scope: "ccu-a", Endpoints: []endpoint.Spec{specOf(plugA, centralKey{"ccu-a", "plug:1"})}},
+			{Scope: "ccu-b", Endpoints: []endpoint.Spec{specOf(plugB, centralKey{"ccu-b", "plug:1"})}},
 		})
 	}
 	n := newNode(t, cfg)

@@ -127,6 +127,15 @@ func queryQNames(id Identifier) []string {
 	return append(base, sub("_CM"))
 }
 
+// CommissionedIdentity identifies a commissioned device independently of
+// the transport that discovered it — matter.js CommissionableDeviceIdentity
+// (packages/protocol/src/common/Scanner.ts:222-239 at 862ad75f): the long
+// discriminator and "<vendor>+<product>" or only "<vendor>".
+type CommissionedIdentity struct {
+	D  uint16
+	VP string
+}
+
 // Device is a commissionable node as the scanner reports it, matter.js
 // CommissionableDevice (packages/protocol/src/common/Scanner.ts:203-211).
 type Device struct {
@@ -142,6 +151,16 @@ type Device struct {
 	Hostname string
 	// Addresses are the node's addresses, most desirable first.
 	Addresses []Address
+}
+
+// Identity is d's [CommissionedIdentity]; ok is false without a VP —
+// matter.js derives one only from both D and VP
+// (ControllerCommissioner.ts:328-331).
+func (d Device) Identity() (id CommissionedIdentity, ok bool) {
+	if d.VP == nil {
+		return CommissionedIdentity{}, false
+	}
+	return CommissionedIdentity{D: d.D, VP: *d.VP}, true
 }
 
 func (d Device) clone() Device {

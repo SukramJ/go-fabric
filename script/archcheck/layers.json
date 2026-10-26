@@ -8,7 +8,7 @@
     {"name": "servers", "packages": ["cluster/...", "binding"]},
     {"name": "endpoints", "packages": ["endpoint", "endpoint/...", "device", "device/...", "internal/deviceseam"]},
     {"name": "roles", "packages": ["bridge", "controller/...", "internal/bridgeseam", "internal/nodeseam"]},
-    {"name": "facade", "packages": ["node", "node/metrics/..."]},
+    {"name": "facade", "packages": ["node", "node/controllernode", "node/metrics/..."]},
     {"name": "support", "packages": [".", "conformance", "fabrictest", "cluster/spec/spectest", "bridge/bridgetest", "endpoint/endpointtest", "store/storetest", "controller/ble/bletest", "internal/paritytest", "internal/chiptool", "internal/chipdm", "examples/...", "script/...", "ble/..."]}
   ],
   "exceptions": []

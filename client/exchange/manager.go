@@ -85,6 +85,17 @@ type Config struct {
 	// (`usesMrp = supportsMRP && !channel?.isReliable`) for a manager whose
 	// one channel is a BleChannel (packages/protocol/src/ble/Ble.ts:38).
 	Reliable bool
+	// LocalAdditionalMrpDelay is the MRP margin of our own network, the
+	// sender-side axis every exchange's backoff takes the larger of it and
+	// the peer's margin for — matter.js SessionManager.localAdditionalMrpDelay,
+	// set from the node's own network profile ("fast" by default, so 0;
+	// ServerNetworkRuntime.ts:405-406, NetworkServer.ts:242 at 862ad75f).
+	LocalAdditionalMrpDelay time.Duration
+	// LocalFixedMrpBackoff is the flat pad added after every exchange's
+	// backoff, not amplified by it — matter.js
+	// SessionManager.localFixedMrpBackoff (SessionManager.ts:238-242), an
+	// ICD sender's fast-polling grace; 0 for a controller.
+	LocalFixedMrpBackoff time.Duration
 }
 
 // Manager is the controller's exchange manager: one socket, the session
@@ -100,6 +111,10 @@ type Manager struct {
 	// retransmitted is [Config.Retransmitted].
 	retransmitted func()
 	reliable      bool
+	// localAdditional and localFixed are [Config].LocalAdditionalMrpDelay
+	// and LocalFixedMrpBackoff.
+	localAdditional time.Duration
+	localFixed      time.Duration
 
 	// inflight counts the messages delivered to an exchange whose reader
 	// has not finished with them (internal/inflight ExchangeDelivered):
@@ -118,13 +133,17 @@ type Manager struct {
 
 	// mu guards closed, the handler, session and exchange tables and the
 	// id counters below.
-	mu             sync.Mutex
-	closed         bool
-	handlers       map[uint16]ProtocolHandler
-	checkIn        CheckInReceiver
-	sessions       map[uint16]*Session
-	unsecured      map[uint64]*Session
-	exchanges      map[uint32]*Exchange
+	mu        sync.Mutex
+	closed    bool
+	handlers  map[uint16]ProtocolHandler
+	checkIn   CheckInReceiver
+	sessions  map[uint16]*Session
+	unsecured map[uint64]*Session
+	exchanges map[uint32]*Exchange
+	// channels and channelAddrs are the attached channels by the address
+	// that names them and back (channel.go).
+	channels       map[*net.UDPAddr]Channel
+	channelAddrs   map[Channel]*net.UDPAddr
 	exchangeID     uint16
 	nextSessionID  uint16
 	sessionIDLimit uint16
@@ -144,21 +163,25 @@ func NewManager(conn Conn, cfg Config) (*Manager, error) {
 		return nil, fmt.Errorf("exchange: seed: %w", err)
 	}
 	m := &Manager{
-		conn:          conn,
-		clock:         cfg.Clock,
-		rand:          cfg.Rand,
-		log:           cfg.Logger,
-		local:         DefaultLocalParameters(),
-		peerLost:      cfg.PeerLost,
-		retransmitted: cfg.Retransmitted,
-		reliable:      cfg.Reliable,
-		counter:       counter,
-		sessions:      make(map[uint16]*Session),
+		conn:            conn,
+		clock:           cfg.Clock,
+		rand:            cfg.Rand,
+		log:             cfg.Logger,
+		local:           DefaultLocalParameters(),
+		peerLost:        cfg.PeerLost,
+		retransmitted:   cfg.Retransmitted,
+		reliable:        cfg.Reliable,
+		counter:         counter,
+		localAdditional: cfg.LocalAdditionalMrpDelay,
+		localFixed:      cfg.LocalFixedMrpBackoff,
+		sessions:        make(map[uint16]*Session),
 		// unsecured is keyed by our ephemeral initiator node id
 		// (SessionManager.ts:446-454).
-		unsecured: make(map[uint64]*Session),
-		exchanges: make(map[uint32]*Exchange),
-		handlers:  make(map[uint16]ProtocolHandler),
+		unsecured:    make(map[uint64]*Session),
+		exchanges:    make(map[uint32]*Exchange),
+		handlers:     make(map[uint16]ProtocolHandler),
+		channels:     make(map[*net.UDPAddr]Channel),
+		channelAddrs: make(map[Channel]*net.UDPAddr),
 		// The exchange counter and the session-id cursor start at a
 		// random value (ExchangeManager.ts:729-734, SessionManager.ts:264).
 		exchangeID:     binary.LittleEndian.Uint16(seed[0:2]),
@@ -180,6 +203,11 @@ func NewManager(conn Conn, cfg Config) (*Manager, error) {
 	}
 	return m, nil
 }
+
+// LocalAdditionalMrpDelay is our own network's MRP margin
+// ([Config].LocalAdditionalMrpDelay) — matter.js
+// SessionManager.localAdditionalMrpDelay.
+func (m *Manager) LocalAdditionalMrpDelay() time.Duration { return m.localAdditional }
 
 // LocalParameters is our session parameters.
 func (m *Manager) LocalParameters() sessionparams.Parameters { return m.local }
@@ -271,6 +299,7 @@ func (m *Manager) NewUnsecuredSession(addr *net.UDPAddr, peer *sessionparams.Par
 	s := &Session{
 		m:         m,
 		addr:      addr,
+		channel:   m.channelOf(addr),
 		window:    mrp.NewWindow(),
 		params:    PeerParameters(peer),
 		exchanges: make(map[*Exchange]struct{}),
@@ -404,6 +433,7 @@ func (m *Manager) NewSecureSession(cfg SecureSessionConfig) (*Session, error) {
 		id:                   cfg.ID,
 		peer:                 cfg.Channel.PeerSessionID,
 		addr:                 cfg.Addr,
+		channel:              m.channelOf(cfg.Addr),
 		secure:               ch,
 		cats:                 append([]uint32(nil), cfg.CaseAuthenticatedTags...),
 		attestationChallenge: append([]byte(nil), cfg.AttestationChallenge...),
@@ -541,9 +571,16 @@ func (m *Manager) closeAll() {
 	for _, s := range m.unsecured {
 		all = append(all, s)
 	}
+	chans := make([]Channel, 0, len(m.channelAddrs))
+	for ch := range m.channelAddrs {
+		chans = append(chans, ch)
+	}
 	m.mu.Unlock()
 	for _, s := range all {
 		s.Close()
+	}
+	for _, ch := range chans {
+		_ = ch.Close()
 	}
 }
 
@@ -720,6 +757,7 @@ func (m *Manager) newInboundSession(hdr *message.Header, src *net.UDPAddr) *Sess
 	s := &Session{
 		m:         m,
 		addr:      src,
+		channel:   m.channelOf(src),
 		nodeID:    hdr.SourceNodeID,
 		inbound:   true,
 		window:    mrp.NewWindow(),
@@ -895,7 +933,7 @@ func (m *Manager) sendAck(s *Session, msg *Message, dest uint64) {
 	if err != nil {
 		return
 	}
-	_ = m.conn.Send(s.Addr(), datagram)
+	_ = m.send(s, s.Addr(), datagram)
 }
 
 // seal frames one message on s: on the unsecured session with the global

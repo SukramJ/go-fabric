@@ -94,6 +94,11 @@ var floors = []packageFloor{
 	{pkg: "github.com/SukramJ/go-fabric/controller/client/sqlstore", min: 85},
 	{pkg: "github.com/SukramJ/go-fabric/controller/commissioner", min: 85},
 	{pkg: "github.com/SukramJ/go-fabric/controller/dcl", min: 85},
+	{
+		pkg: "github.com/SukramJ/go-fabric/controller/softwareupdate",
+		min: 29,
+		why: "brief CM §1: measured 29.4. The manager runs against a controller and a device: its end-to-end and OtaTest cases are the controller package's (controller:TestOTA*), which a per-package profile does not count; the package's own tests set the queue's state as matter.js's do",
+	},
 	{pkg: "github.com/SukramJ/go-fabric/controller/dcl/snapshot", min: 83},
 	{pkg: "github.com/SukramJ/go-fabric/client/discovery", min: 95},
 	{pkg: "github.com/SukramJ/go-fabric/groups", min: 93},
@@ -107,7 +112,11 @@ var floors = []packageFloor{
 	{pkg: "github.com/SukramJ/go-fabric/client/exchange", min: 93},
 	{pkg: "github.com/SukramJ/go-fabric/client/interaction", min: 91},
 	{pkg: "github.com/SukramJ/go-fabric/client/handshake", min: 86},
-	{pkg: "github.com/SukramJ/go-fabric/client/peer", min: 93},
+	{
+		pkg: "github.com/SukramJ/go-fabric/client/peer",
+		min: 91,
+		why: "brief CM §2/§3: measured 91.5 (was 93). The TCP initiator's and the network profiles' remaining paths — a TCP dial, a profile's run-time Configure, the cooling of a released slot — run through the controller's TCP and network tests (controller:TestClientNodeTcpParity, client/peer's profile tests on a harness without TCP)",
+	},
 	{pkg: "github.com/SukramJ/go-fabric/controller/thread", min: 97},
 	{pkg: "github.com/SukramJ/go-fabric/diagevent", min: 96},
 	{pkg: "github.com/SukramJ/go-fabric/eligibility", min: 90},
@@ -125,8 +134,8 @@ var floors = []packageFloor{
 	{pkg: "github.com/SukramJ/go-fabric/endpoint/sqlitestore", min: 77},
 	{
 		pkg: "github.com/SukramJ/go-fabric/examples/host-view",
-		min: 35,
-		why: "brief BU: measured 36.2. The tests drive the declared devices over the wire and on a node; run and main bind the network, which a unit test does not",
+		min: 34,
+		why: "brief CM §6: measured 34.8 once MarkComplete went (brief BU: 36.2). The tests drive the declared devices over the wire and on a node; run and main bind the network, which a unit test does not",
 	},
 	{
 		pkg: "github.com/SukramJ/go-fabric/examples/reference-bridge",
@@ -198,6 +207,11 @@ var floors = []packageFloor{
 		pkg: "github.com/SukramJ/go-fabric/node",
 		min: 83,
 		why: "the end-to-end tests commission the node over UDP with bridgetest.Commissioner (PASE, AddNOC, CASE, re-establishment after a restart, RemoveFabric); the enhanced commissioning window, UpdateNOC's fabric hook, CASE resumption and the OTA applier have no test in the package",
+	},
+	{
+		pkg: "github.com/SukramJ/go-fabric/node/controllernode",
+		min: 67,
+		why: "brief CM §1: measured 67.9; Start's failure paths (node.New refusing the spec, a socket address that does not resolve) have no test",
 	},
 	{pkg: "github.com/SukramJ/go-fabric/node/metrics/expvar", min: 100},
 	{pkg: "github.com/SukramJ/go-fabric/parity", min: 100},

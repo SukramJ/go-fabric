@@ -184,7 +184,8 @@ func (*idsFailingStore) NodeIDs() ([]string, error) { return nil, errors.New("do
 // TestRegistryRestore: Peers.initialize — every stored node is restored in
 // id order, a commissioned one bound to its protocol peer from its record
 // (CommissioningClient.ts:139-142, :699-706); a node that cannot load is
-// logged and skipped; the id counter passes every stored peerN.
+// logged and kept, unavailable (Peers.ts:144-161); the id counter passes
+// every stored peerN.
 func TestRegistryRestore(t *testing.T) {
 	t.Parallel()
 	h := newRegHarness(t)
@@ -198,8 +199,13 @@ func TestRegistryRestore(t *testing.T) {
 	_ = h.store.Save("broken", 0, recordCluster, map[uint32][]byte{recHostname: {0xFF}}, nil)
 
 	r := h.registry(t, nil)
-	if got := ids(r.Nodes()); !slices.Equal(got, []string{"kitchen", "peer1", "peer12x", "peer3"}) {
+	if got := ids(r.Nodes()); !slices.Equal(got, []string{"broken", "foreign", "kitchen", "peer1", "peer12x", "peer3"}) {
 		t.Fatalf("restored %v", got)
+	}
+	for _, id := range []string{"broken", "foreign"} {
+		if n := r.Get(id); n.LoadError() == nil || n.IsCommissioned() {
+			t.Fatalf("%s: load error %v, commissioned %v", id, n.LoadError(), n.IsCommissioned())
+		}
 	}
 	if !h.logs.has("matter.controller.client.registry.load_failed") {
 		t.Fatal("no load_failed")
@@ -217,7 +223,7 @@ func TestRegistryRestore(t *testing.T) {
 	if got := ids(r.Commissioned()); !slices.Equal(got, []string{"peer1"}) {
 		t.Fatalf("commissioned %v", got)
 	}
-	if r.Get("peer3").peer() != nil || r.Get("nope") != nil || r.Size() != 4 {
+	if r.Get("peer3").peer() != nil || r.Get("nope") != nil || r.Size() != 6 {
 		t.Fatal("peer3 is bound")
 	}
 	if _, err := r.Get("peer3").Read(t.Context(), ReadRequest{}); !errors.Is(err, ErrNotCommissioned) {

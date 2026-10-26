@@ -252,13 +252,32 @@ Milestone 5 also closes issues #274 (the Ahead-of-matter.js marker check,
 wave CN) and #273 (wave CO, three pull requests after phase 25), owner
 decision 2026-10-25.
 
+**Status 2026-10-26.** Phase 25 (brief CM) is one bundle for `v0.13.0`:
+the OTA push from the controller (`controller/softwareupdate` after
+`SoftwareUpdateManager.ts`, `OtaAnnouncements.ts` and the
+`DclOtaUpdateService` store; the provider on the controller's own node,
+composed by `node/controllernode`; the reference controller's `ota serve`
+updates the reference daemon over the air), the TCP initiator
+(`client/peer`, `client/exchange`; `ClientNodeTcpTest`), the network
+profiles and MRP margins (`client/peer.NetworkProfiles`;
+`NetworkProfileTest`, `MRPTest`), the `_matterd._udp` commissioner
+advertisement, the parked register items (`Interaction.Close` and the
+abandoned subscribe, write chunking across messages, `includeKnownVersions`
+on a subscription, `Cluster.Supports` by conformance, nodes kept when they
+fail to load, `Registry.CompleteCommissioning`, the payload identity
+check) and the `MarkComplete` break. The four controller-discovery test
+files and `ReportedSessionParametersTest` move to milestone 6 phase 27
+with their reasons. The Thread border-router client is milestone 6 phase
+26a ([ADR 0027](./adr/0027-thread-border-router-over-otbr-rest.md)).
+Milestone 5 closes with `v0.13.0` and wave CO (issue #273). Owner decisions 2026-10-26 at the CM review: the invoke batcher is decided with the milestone 6 concept; the snapshot extractor gains the "L" (large message) quality in a small pull request after `v0.13.0`; the controller's own node stays behind the `controller.OwnNode` port with no layering exception.
+
 ### Milestone 6: Completeness
 
 | Phase | Content | Proof |
 | --- | --- | --- |
 | 26 | the 15 clusters matter.js serves as generated stubs, through the generated default server: Camera (7), TLS (2), Thread and network infrastructure (4), AmbientContextSensing, WaterTankLevelMonitoring; `WebRtcTransportRequestor` with its logic (224 / 605) as the one camera-side server matter.js hand-writes; the 12 device types (Camera, SnapshotCamera, FloodlightCamera, CameraController, VideoDoorbell, AudioDoorbell, Intercom, Chime, CastingVideoClient, ThreadBorderRouter, NetworkInfrastructureManager, …) | `chipdm-check` green; every snapshot device type in a devicegen list |
 | 26a | a Thread Border Router over OTBR REST ([ADR 0027](./adr/0027-thread-border-router-over-otbr-rest.md), proposed): the dataset codec moves to `thread/` (layer `foundation`, `controller/thread` forwards until `v0.12.0`); `cluster/threadbr` with ThreadBorderRouterManagement (chip's rules, `ThreadBorderRouterManagementCluster.cpp` at `6170af84`, line-cited; a `by_design` entry for logic matter.js's stub does not carry) and ThreadNetworkDiagnostics (the mandatory set plus `MLECNT` / `MACCNT`); the Thread variant of NetworkCommissioning next to the Wi-Fi one, `ScanNetworks` answering the border router's own network from the active dataset; the adapter `thread/otbr` over stdlib `net/http` after `@matter/thread-br-client`'s `OtbrRestClient.ts`, no new dependency, MeshCoP out; the reference daemon's optional `--otbr` flag adds one `ThreadBorderRouter` endpoint | unit tests one per cited chip rule; adapter tests against recorded OTBR REST fixtures in both key formats; the harness's `TBRM` family (`Test_TC_TBRM_2_1` … `2_4`, `3_1_Simulated`) against the daemon with a virtual OTBR built as chip's CI builds it (`otbr-agent` with the simulation RCP), manually dispatched first; a real OTBR in the manual test plan |
-| 27 | the comparison swept: every remaining ◐ / ○ row is ✅ or a `by_design` entry; the findings register empty; the test-porting register at 100 % for `packages/node/test` (endpoint, validation, storage) | the three registers agree; one spot-check run of the CSA Test Harness (`project-chip/certification-tool`) against the reference daemon, report under `notes/` (owner, 2026-10-21; the harness stays outside the guards, see `docs/certifiability.md`) |
+| 27 | the comparison swept: every remaining ◐ / ○ row is ✅ or a `by_design` entry; the findings register empty (the controller remainder of phase 25 included: the invoke batcher, the controller's `Discovery` shape, reported session parameters on the device, the device-side BDX MRP delay); the test-porting register at 100 % for `packages/node/test` (endpoint, validation, storage) | the three registers agree; one spot-check run of the CSA Test Harness (`project-chip/certification-tool`) against the reference daemon, report under `notes/` (owner, 2026-10-21; the harness stays outside the guards, see `docs/certifiability.md`) |
 
 Excluded by decision, restated so they are not re-opened by accident:
 **Joint Fabric** (two stub clusters and no behaviour at the pin; deferred

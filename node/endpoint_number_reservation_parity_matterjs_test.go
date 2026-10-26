@@ -27,15 +27,10 @@ import (
 	"github.com/SukramJ/go-fabric/node"
 )
 
-// reservationDevice is a started device whose Aggregator is complete, so
-// a model-complete assembly would collect any number nothing reserves.
+// reservationDevice is a started device with an empty Aggregator.
 func reservationDevice(t *testing.T) *fabrictest.Device {
 	t.Helper()
-	d := quietSite(t).AddDevice(fabrictest.Topology{})
-	if err := d.Act(func(n *node.Node) error { n.Aggregator().MarkComplete(); return nil }); err != nil {
-		t.Fatal(err)
-	}
-	return d
+	return quietSite(t).AddDevice(fabrictest.Topology{})
 }
 
 // addLights adds a kit light per key and returns their numbers.
@@ -107,7 +102,6 @@ func TestEndpointNumberReservationParityMatterJS(t *testing.T) {
 			t.Fatal(err)
 		}
 		after := addLights(t, d, "light1", "light3", "light4", "light2")
-		aggregatorDo(t, d, func(a *node.Aggregator) error { a.MarkComplete(); return nil })
 		for _, k := range []string{"light1", "light2", "light3"} {
 			if after[k] != numbers[k] {
 				t.Errorf("after the restart %s at %d, want %d", k, after[k], numbers[k])
@@ -188,7 +182,6 @@ func TestEndpointNumberReservationParityMatterJS(t *testing.T) {
 		var number uint16
 		aggregatorDo(t, d, func(a *node.Aggregator) error {
 			p := a.Partition("hub")
-			p.MarkComplete()
 			if err := p.Add(ctx, kitLight(t, "hub:light")); err != nil {
 				return err
 			}

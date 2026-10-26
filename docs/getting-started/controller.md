@@ -178,7 +178,7 @@ func use(ctx context.Context, n *client.Node) error {
 	if _, err := n.Invoke(ctx, toggle, onoffdef.ToggleRequest{}, client.InvokeOptions{}); err != nil {
 		return err
 	}
-	sub, err := n.Subscribe(ctx, client.SubscribeRequest{
+	sub, err := n.Subscribe(ctx, client.SubscribeRequest{SubscribeRequest: client.SubscribePaths{
 		Attributes:         []client.AttributePath{client.AttributeAt(1, onoffdef.ClusterID, onoffdef.AttrOnOff)},
 		MaxIntervalCeiling: client.Interval(time.Minute),
 		Updated: func(r *client.Report) { // keep it short: it runs on the report's exchange
@@ -187,7 +187,7 @@ func use(ctx context.Context, n *client.Node) error {
 				fmt.Printf("OnOff: %v\n", st.OnOff)
 			}
 		},
-	})
+	}})
 	if err != nil {
 		return err
 	}
@@ -386,16 +386,24 @@ doc comment names the fields a host sets.
   scalar `spec.Value`: `spec.Int16(2250)`, `spec.Uint8(20)`,
   `spec.Uint(onoffdef.StartUpOnOffToggle)`, `spec.Null[uint16]()`.
   `DataVersion` makes a write conditional. The write goes to the peer
-  only, and the image follows when the peer reports the new value.
+  only, and the image follows when the peer reports the new value. A write
+  that does not fit one message goes in chunks, each answered by its own
+  WriteResponse, the statuses concatenated; a timed write must fit one.
 - **Invoke.** `Node.Invoke` takes the command path and the generated
   request type (`onoffdef.ToggleRequest{}`).
   `InvokeOptions{Timed: true}` sends a TimedRequest first.
-- **Subscribe.** `Node.Subscribe` applies each report to the image before
+- **Subscribe.** `Node.Subscribe` takes a `client.SubscribeRequest`, which
+  embeds the paths as `ReadRequest` does (`req.Attributes = …`, or
+  `client.SubscribeRequest{SubscribeRequest: client.SubscribePaths{…}}`);
+  `IncludeKnownVersions` keeps the cached versions out of the first and
+  every later request. It applies each report to the image before
   `Updated` sees it. `Updated` runs on the goroutine that reads the report,
   inside the report's exchange, so keep it short. The reference controller
   hands each report to a channel. `Sustain` re-establishes a subscription
-  that was lost. `Subscription.Close` ends it, and so does the node's
-  `Close`; `Done` is closed then.
+  that was lost. `Subscription.Close` ends it, and so do the node's
+  `Close` and `Disable`; `Done` is closed then. A subscription given up
+  while the peer primes it is answered `INVALID_SUBSCRIPTION`, so the
+  device keeps none for it.
 
 *Source: `controller/client/surface.go`, `controller/client/interact.go:15-122`, `cluster/spec/value.go`, `client/interaction/subscribe.go:44-90`, `client/interaction/handler.go:126-138`, `examples/reference-controller/cli/interact.go:289-330`.*
 
@@ -507,6 +515,65 @@ its own, in parallel, as matter.js splits an invoke. A command's own status
 is its `Result.Status` — `NoCommandResponse` for a command the peer did not
 answer — and not an error; the error is an exchange that failed.
 
+### OTA push
+
+`controller.Config.OTA` (`controller.OTAConfig`) runs matter.js's
+software-update manager: `Controller.SoftwareUpdates()` is a
+`softwareupdate.Manager` — `AddUpdateConsent` queues a node's update and
+announces the provider to it, `ForceUpdate` announces at once,
+`RemoveConsent` cancels, `QueryUpdates` and `CheckForUpdates` look for
+updates in the `softwareupdate.Images` store and the DCL ledgers,
+`QueuedUpdates` shows the queue. The provider runs on the controller's own
+node, which `OTAConfig.StartNode` starts (required;
+`node/controllernode.Start`) in the controller's database and the
+controller commissions into its fabric on first use; `Controller.OwnNode()`
+returns it. The update needs the node's default subscription: the manager
+judges a node on current data only.
+
+```go
+images := softwareupdate.NewImages(softwareupdate.ImagesConfig{})
+c, err := controller.New(ctx, controller.Config{ /* … */
+	OTA: &controller.OTAConfig{Images: images, AllowTestImages: true, StartNode: controllernode.Start},
+})
+_, _ = images.Store(ctx, image, softwareupdate.ModeLocal, nil)
+_, err = c.SoftwareUpdates().AddUpdateConsent(ctx, peer, softwareupdate.Target{
+	VendorID: 0xFFF1, ProductID: 0x8000, TargetSoftwareVersion: 2,
+})
+```
+
+### TCP
+
+`controller.Config.TCP` turns the TCP initiator on (`Outgoing`) and a TCP
+listener (`Incoming`): a peer that advertises a TCP server and accepts TCP
+in its session parameters is reached over TCP when the controller prefers
+it (`Config.TransportPreference`) or an interaction carries a large message
+(`ClientRequest.LargeMessage`); the sessions of a dropped connection close. `Controller.TCPAddr()` is the listener's
+address.
+
+### Network profiles
+
+`controller.Config.Networks` sets the network profiles a peer's
+connections, exchanges and address probes are throttled by, per medium
+(`peer.DefaultTemplates`: fast, wifi, thread, conservative, unknown,
+unlimited, icdLit), and
+`OwnNetworkProfile` the MRP margin our own messages carry. A peer of
+unknown medium gets the conservative limits; an await-mode LIT ICD goes on
+the unthrottled `icdLit` profile.
+
+### The commissioner advertisement
+
+`controller.Config.Advertise` (`controller.Advertise{Name, DeviceType,
+VendorID, ProductID, PrivacyMasked}`) publishes the controller's
+`_matterd._udp` record, so a device's commissioner discovery finds it.
+
+### Completing a commissioning
+
+`Registry.CompleteCommissioning(ctx, nodeID, client.CompleteOptions{…})`
+finishes a commissioning another commissioner ran up to its operational
+hand-off (`commissioner.Options.FinalizeCommissioning`): the node is
+created on the shared fabric, started, and sent CommissioningComplete; any
+failure before an Ok deletes it.
+
 ### The fabric label
 
 `Registry.SetFabricLabel(ctx, label)` renames our fabric at run time:
@@ -557,9 +624,11 @@ line. The commissioner provisions the dataset as bytes
 
 ## What is not here yet
 
-BLE on macOS and Windows (ADR 0024 decision 6) and TCP on the controller
-side are outside the current stages. Group messages and OTA images need a node of
-the fabric. The reference controller starts its own node for `group` and
-`ota` and keeps it in the same database.
+BLE on macOS and Windows (ADR 0024 decision 6) is outside the current
+stages. Group messages need a node of the fabric: the reference
+controller uses the controller's own node (`Controller.OwnNode`) for
+`group` and `ota`. A batcher that joins single invokes into one
+InvokeRequest, as matter.js's does within a timer tick, is not ported:
+`Node.InvokeBatch` is the explicit form.
 
-*Source: `controller/commissioner/doc.go:15-19`, `client/peer/doc.go:12-16`, `examples/reference-controller/README.md` (The controller's own node).*
+*Source: `controller/ota.go`, `controller/tcp.go`, `controller/advertise.go`, `controller/softwareupdate`, `node/controllernode`, `client/peer/network.go`, `controller/client/complete.go`, `examples/reference-controller/README.md` (The controller's own node).*

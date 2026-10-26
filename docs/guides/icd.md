@@ -127,7 +127,7 @@ attribute values (under a cluster ID no cluster has), so it survives a
 controller restart.
 
 `client/peer.RebootResubscribeArmer` re-subscribes a peer that restarts
-after an OTA apply. The OTA push of milestone 5 phase 25 arms it.
+after an OTA apply. The controller's OTA push (`controller.Config.OTA`) arms it.
 
 *Source: `node/icd.go`, `cluster/core/icd_management.go`, `icd/`,
 `icd/checkin/`, `store/icd.go`, `controller/client/icd.go`,

@@ -45,6 +45,22 @@ const (
 	clLevelControl         = 0x8
 	clPump                 = 0x200
 	pumpAlarmMask          = 0x22
+
+	clOccupancySensing          = 0x406
+	occupancyPIRFeature         = 2
+	occupancyUltrasonicDelay    = 0x20
+	levelControlLightingFeature = 2
+	levelControlRemainingTime   = 0x1
+	clRvcCleanMode              = 0x55
+	rvcCleanModeOnMode          = 0x3
+)
+
+// occupancyMandatoryAttributes and rvcCleanModeMandatoryAttributes are
+// PeerBehaviorTest.ts OCCUPANCY_MANDATORY_ATTRIBUTES and
+// RVC_CLEAN_MODE_MANDATORY_ATTRIBUTES.
+var (
+	occupancyMandatoryAttributes    = []uint64{0x0, 0x1, 0x2, 65528, 65529, 65531, 65532, 65533}
+	rvcCleanModeMandatoryAttributes = []uint64{0x0, 0x1, 65528, 65529, 65531, 65532, 65533}
 )
 
 // pumpMandatoryAttributes is PeerBehaviorTest.ts PUMP_MANDATORY_ATTRIBUTES.
@@ -110,6 +126,61 @@ func TestPeerBehaviorDiscoveredParity(t *testing.T) {
 		c := discovered(clPump, 5, 0, append(slices.Clone(pumpMandatoryAttributes), pumpAlarmMask)...)
 		if !c.Supports(pumpAlarmMask) {
 			t.Fatal("AlarmMask not supported though the peer lists it")
+		}
+	})
+
+	// PeerBehaviorTest.ts:79-96: the shape stands under an empty
+	// AttributeList; the model's attributes stay defined.
+	t.Run("builds a cluster even when the peer reports an empty AttributeList", func(t *testing.T) {
+		t.Parallel()
+		c := discovered(clNetworkCommissioning, 1, ethernetFeature)
+		if !c.Ready() || c.Definition() == nil || c.Definition().Attribute(4) == nil {
+			t.Fatalf("ready %v, definition %v", c.Ready(), c.Definition() != nil)
+		}
+	})
+
+	// :274-285: "[HoldTime & US], D" without the Ultrasonic feature.
+	t.Run("omits an attribute the peer reports whose conformance before a trailing deprecation excludes it", func(t *testing.T) {
+		t.Parallel()
+		c := discovered(clOccupancySensing, 5, occupancyPIRFeature, append(slices.Clone(occupancyMandatoryAttributes), occupancyUltrasonicDelay)...)
+		if c.Definition() == nil {
+			t.Fatal("OccupancySensing has no definition")
+		}
+		if c.Supports(occupancyUltrasonicDelay) {
+			t.Fatal("UltrasonicOccupiedToUnoccupiedDelay supported without the Ultrasonic feature")
+		}
+	})
+
+	// :287-301: RemainingTime is "LT", mandatory with the Lighting feature.
+	t.Run("keeps the conformance of a reported attribute that the peer's features make mandatory", func(t *testing.T) {
+		t.Parallel()
+		c := discovered(clLevelControl, 0, levelControlLightingFeature, 0x0, 0x1, 0xf, 0x11, 65528, 65529, 65531, 65532, 65533)
+		if !c.Supports(levelControlRemainingTime) {
+			t.Fatal("RemainingTime not supported")
+		}
+		if a := c.Definition().Attribute(levelControlRemainingTime); a == nil || a.Conformance.Applicability(spec.Context(c.Definition(), levelControlLightingFeature)) != spec.ApplicabilityMandatory {
+			t.Fatal("RemainingTime is not mandatory under the Lighting feature")
+		}
+	})
+
+	// :328-337: OnMode is "X" in RVC Clean Mode.
+	t.Run("omits a disallowed attribute the peer reports", func(t *testing.T) {
+		t.Parallel()
+		c := discovered(clRvcCleanMode, 0, 0, append(slices.Clone(rvcCleanModeMandatoryAttributes), rvcCleanModeOnMode)...)
+		if c.Definition() == nil {
+			t.Fatal("RVC Clean Mode has no definition")
+		}
+		if c.Supports(rvcCleanModeOnMode) {
+			t.Fatal("OnMode supported though disallowed")
+		}
+	})
+
+	// :339-349: no revision reported — the model's; 1 for a cluster the
+	// model does not know.
+	t.Run("tolerates a peer that does not report a revision", func(t *testing.T) {
+		t.Parallel()
+		if r := discovered(unknownCluster, 0, 0, 2).Revision(); r != 1 {
+			t.Fatalf("revision %d, want 1", r)
 		}
 	})
 

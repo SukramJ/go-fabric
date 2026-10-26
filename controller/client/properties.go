@@ -10,6 +10,7 @@ import (
 	"slices"
 	"time"
 
+	"github.com/SukramJ/go-fabric/client/peer"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	"github.com/SukramJ/go-fabric/cluster/spec/basicinformation"
 	"github.com/SukramJ/go-fabric/cluster/spec/descriptor"
@@ -45,6 +46,21 @@ type Properties struct {
 	ThreadActive, WifiActive, EthernetActive *bool
 	ThreadPan                                *uint64
 	ThreadChannel                            *uint16
+}
+
+// Medium is the part of the properties a peer's network profile is
+// selected by (client/peer.NetworkProfiles.ForPeer, NetworkProfile.ts:184-221
+// at 862ad75f).
+func (p Properties) Medium() peer.Medium {
+	m := peer.Medium{
+		SupportsThread: p.SupportsThread, SupportsWifi: p.SupportsWifi, SupportsEthernet: p.SupportsEthernet,
+		RootEndpointServers: len(p.RootEndpointServerList),
+		ThreadActive:        p.ThreadActive, WifiActive: p.WifiActive, EthernetActive: p.EthernetActive,
+	}
+	if p.ThreadChannel != nil {
+		m.ThreadChannel = *p.ThreadChannel
+	}
+	return m
 }
 
 // Cluster and attribute ids the properties read. ThreadNetworkDiagnostics

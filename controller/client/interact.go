@@ -9,6 +9,7 @@ import (
 	"sync"
 
 	"github.com/SukramJ/go-fabric/client/interaction"
+	"github.com/SukramJ/go-fabric/client/peer"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 )
 
@@ -23,6 +24,19 @@ type ReadRequest struct {
 	IncludeKnownVersions bool
 }
 
+// SubscribeRequest is a subscription through the node — matter.js
+// ClientSubscribe with ClientNodeInteraction's includeKnownVersions
+// (packages/node/src/node/client/ClientNodeInteraction.ts:111-124 at
+// 862ad75f): what it sends ([SubscribePaths], embedded, its fields
+// promoted) and IncludeKnownVersions.
+type SubscribeRequest struct {
+	interaction.SubscribeRequest
+	// IncludeKnownVersions skips the version filters — in the first
+	// request and, for a sustained subscription, in every later one it
+	// sends — so the peer sends every value (:123-124).
+	IncludeKnownVersions bool
+}
+
 // Read reads from the peer and applies the report to the image —
 // ClientNodeInteraction.read (ClientNodeInteraction.ts:91-112): unless
 // IncludeKnownVersions, and when the read has the default subscription's
@@ -32,6 +46,7 @@ type ReadRequest struct {
 // gets the report as the peer sent it, its chunks merged.
 func (n *Node) Read(ctx context.Context, req ReadRequest) (*Report, error) {
 	r := req.ReadRequest
+	n.routeICD(&r.ClientRequest)
 	sc := newScope(r.Attributes, r.NoFabricFilter)
 	n.mu.RLock()
 	if !req.IncludeKnownVersions {
@@ -52,6 +67,25 @@ func (n *Node) Read(ctx context.Context, req ReadRequest) (*Report, error) {
 	n.noteICDActive()
 	n.apply(sc, rep)
 	return rep, nil
+}
+
+// routeICD routes a one-shot interaction with an await-mode LIT ICD peer
+// through the unthrottled "icdLit" network profile, so an interaction a
+// wake releases is not queued behind bulk traffic; a non-LIT peer, a node
+// without an ICD client, and a caller that named a network keep theirs.
+// The routing is applied to the caller's copy, so a reused request never
+// caches it across a SIT⇄LIT flip. Mirrors matter.js
+// ClientNodeInteraction.#awaitModeIcdRouting
+// (packages/node/src/node/client/ClientNodeInteraction.ts:300-318 at
+// 862ad75f), applied at :78-81 (read) and :188-191 (write) — and to invoke
+// the same way.
+func (n *Node) routeICD(r *interaction.ClientRequest) {
+	if n.icd == nil || r.Network != "" {
+		return
+	}
+	if w := n.icd.Wakefulness(); w != nil && w.RequiresAwait() {
+		r.Network = peer.NetworkICDLit
+	}
 }
 
 // holdICD holds an interaction with a sleeping LIT ICD peer until it wakes
@@ -88,9 +122,18 @@ func (n *Node) noteICDActive() {
 // produced them. Mirrors matter.js
 // packages/node/src/node/client/ClientNodeInteraction.ts:119-181 at
 // 862ad75f (callerRefresh :125, sent :129-132, refreshRequest :162-168).
-func (n *Node) Subscribe(ctx context.Context, req SubscribeRequest) (*Subscription, error) {
+// With IncludeKnownVersions no version goes along, in the first request
+// nor in a re-subscription's (withKnownVersions, :123-124).
+func (n *Node) Subscribe(ctx context.Context, sr SubscribeRequest) (*Subscription, error) {
+	req := sr.SubscribeRequest
+	withKnownVersions := func(sc scope, filters []DataVersionFilter) []DataVersionFilter {
+		if sr.IncludeKnownVersions {
+			return filters
+		}
+		return n.s.withKnownVersions(sc, filters, false)
+	}
 	callerFilters := slices.Clone(req.DataVersionFilters)
-	var callerRefresh func(SubscribeRequest) SubscribeRequest
+	var callerRefresh func(SubscribePaths) SubscribePaths
 	if req.Sustain {
 		callerRefresh = req.RefreshRequest
 	}
@@ -100,7 +143,7 @@ func (n *Node) Subscribe(ctx context.Context, req SubscribeRequest) (*Subscripti
 	sent := newScope(req.Attributes, req.NoFabricFilter)
 	r := req
 	n.mu.RLock()
-	r.DataVersionFilters = n.s.withKnownVersions(sent, callerFilters, false)
+	r.DataVersionFilters = withKnownVersions(sent, callerFilters)
 	n.mu.RUnlock()
 	floor, ceiling := n.IntervalBounds(req.MinIntervalFloor, req.MaxIntervalCeiling)
 	r.MinIntervalFloor, r.MaxIntervalCeiling = &floor, &ceiling
@@ -113,7 +156,7 @@ func (n *Node) Subscribe(ctx context.Context, req SubscribeRequest) (*Subscripti
 			req.Updated(rep)
 		}
 	}
-	r.RefreshRequest = func(x SubscribeRequest) SubscribeRequest {
+	r.RefreshRequest = func(x SubscribePaths) SubscribePaths {
 		x.DataVersionFilters = slices.Clone(callerFilters)
 		if callerRefresh != nil {
 			x = callerRefresh(x)
@@ -121,7 +164,7 @@ func (n *Node) Subscribe(ctx context.Context, req SubscribeRequest) (*Subscripti
 		sc := newScope(x.Attributes, x.NoFabricFilter)
 		n.mu.RLock()
 		x.EventFilters = []EventMinimumNumber{{EventMin: n.settings.maxEventNumber + 1}}
-		x.DataVersionFilters = n.s.withKnownVersions(sc, x.DataVersionFilters, false)
+		x.DataVersionFilters = withKnownVersions(sc, x.DataVersionFilters)
 		n.mu.RUnlock()
 		sentMu.Lock()
 		sent = sc
@@ -138,7 +181,7 @@ func (n *Node) Subscribe(ctx context.Context, req SubscribeRequest) (*Subscripti
 }
 
 // observeRequest hands a subscription request to the test seam.
-func (n *Node) observeRequest(r SubscribeRequest) {
+func (n *Node) observeRequest(r SubscribePaths) {
 	n.mu.RLock()
 	f := n.requestObserver
 	n.mu.RUnlock()
@@ -162,6 +205,7 @@ func (n *Node) Write(ctx context.Context, writes []WriteRequest, opts WriteOptio
 	if err := n.holdICD(ctx); err != nil {
 		return nil, err
 	}
+	n.routeICD(&opts.ClientRequest)
 	st, err := ia.Write(ctx, writes, opts)
 	if err == nil {
 		n.noteICDActive()
@@ -179,6 +223,7 @@ func (n *Node) Invoke(ctx context.Context, path CommandPath, fields spec.Encodab
 	if err := n.holdICD(ctx); err != nil {
 		return Result{}, err
 	}
+	n.routeICD(&opts.ClientRequest)
 	res, err := ia.Invoke(ctx, path, fields, opts)
 	if err == nil {
 		n.noteICDActive()
@@ -203,6 +248,7 @@ func (n *Node) InvokeBatch(ctx context.Context, cmds []CommandRequest, opts Invo
 	if err := n.holdICD(ctx); err != nil {
 		return nil, err
 	}
+	n.routeICD(&opts.ClientRequest)
 	res, err := ia.InvokeBatch(ctx, cmds, n.MaxPathsPerInvoke(), opts)
 	if err == nil {
 		n.noteICDActive()

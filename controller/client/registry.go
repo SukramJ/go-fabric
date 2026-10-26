@@ -39,7 +39,12 @@ type RegistryConfig struct {
 	// the commissioner binds.
 	Subscriptions *interaction.Subscriptions
 	// AutoStart starts every commissioned, enabled node in Start —
-	// matter.js NetworkServer.autoStartCommissionedPeers (Peers.ts:155).
+	// matter.js NetworkServer.autoStartCommissionedPeers (NetworkServer.ts:236,
+	// read by Peers.#nodeOnline, Peers.ts:164-175 at 862ad75f). matter.js
+	// defaults it to true; the registry, a seam below the controller,
+	// leaves it to its composer: controller.New sets it unless
+	// controller.Config.ManualStart, so the controller's default is
+	// matter.js's.
 	AutoStart bool
 	// Node is the template of every node: its Hooks, Logger, Clock, Rand
 	// and FlushInterval. ID, Peer, Interaction and Store are the
@@ -162,8 +167,13 @@ func NewRegistry(cfg RegistryConfig) (*Registry, error) {
 		r.reserveID(id)
 		n, err := r.restore(id)
 		if err != nil {
+			// A node that cannot load is kept, unavailable, with the
+			// cause — its id stays visible and the others load
+			// (Peers.ts:144-161 at 862ad75f).
 			r.log.Warn("matter.controller.client.registry.load_failed", slog.String("node", id), slog.Any("err", err))
-			continue
+			if n, err = r.unavailable(id, err); err != nil {
+				continue
+			}
 		}
 		r.add(n)
 	}
@@ -229,6 +239,32 @@ func (r *Registry) restore(id string) (*Node, error) {
 	}
 	return r.build(id, p)
 }
+
+// unavailable is the node of id that failed to load with cause: no image,
+// no peer, its store untouched until it is erased (Delete, Forget), its
+// Start and LoadError the cause.
+func (r *Registry) unavailable(id string, cause error) (*Node, error) {
+	cfg := r.nodeConfig(id)
+	cfg.Store = unavailableStore{r.store}
+	n, err := newNode(cfg)
+	if err != nil {
+		return nil, err
+	}
+	n.loadErr = fmt.Errorf("%w: %q: %w", ErrLoadFailed, id, cause)
+	return n, nil
+}
+
+// unavailableStore is a failed node's view of the store: it reads and
+// writes nothing, so the stored data stays as it was, and erases.
+type unavailableStore struct{ Store }
+
+func (unavailableStore) Load(string) ([]StoredEndpoint, error) { return nil, nil }
+
+func (unavailableStore) Save(string, uint16, uint32, map[uint32][]byte, *uint32) error { return nil }
+
+func (unavailableStore) EraseCluster(string, uint16, uint32) error { return nil }
+
+func (unavailableStore) EraseEndpoint(string, uint16) error { return nil }
 
 // build creates a node of id, bound to p when it is not nil, its hooks
 // the registry's.
@@ -340,6 +376,11 @@ func (r *Registry) bindPeer(n *Node, p *peer.Peer) {
 	// The peer's physical property the session parameters read
 	// (Peer.ts:305-315).
 	p.SetLongIdleTimeOperating(func() bool { return n.Properties().LongIdleTimeOperating })
+	// The peer's medium selects its network profile: matter.js sets the
+	// peer's physicalProperties from the client node at startup
+	// (packages/node/src/behavior/system/network/NetworkClient.ts:71 at
+	// 862ad75f).
+	p.SetMedium(func() peer.Medium { return n.Properties().Medium() })
 	follow := func() {
 		d := p.Descriptor()
 		n.updateRecord(func(rec *Record) { rec.applyPeer(d) })
@@ -518,17 +559,22 @@ func (r *Registry) Nodes() []*Node {
 	return slices.Clone(r.nodes)
 }
 
-// Commissioned are the nodes with a peer address — Peers.commissioned
-// (Peers.ts:397-400).
+// Commissioned are the operational nodes with a peer address — a group
+// address names no commissioned node — Peers.commissioned (Peers.ts:410-413
+// at 862ad75f: nodeType "client" and commissioned).
 func (r *Registry) Commissioned() []*Node {
 	var out []*Node
 	for _, n := range r.Nodes() {
-		if n.IsCommissioned() {
+		if a, ok := n.PeerAddress(); ok && !isGroupNodeID(a.NodeID) {
 			out = append(out, n)
 		}
 	}
 	return out
 }
+
+// isGroupNodeID reports a Group Node ID, 0xFFFF_FFFF_FFFF_xxxx — matter.js
+// NodeId.fromGroupId (packages/types/src/datatype/NodeId.ts:62-64).
+func isGroupNodeID(id uint64) bool { return id&0xFFFF_FFFF_FFFF_0000 == 0xFFFF_FFFF_FFFF_0000 }
 
 // Get is the node of local id, nil when there is none.
 //

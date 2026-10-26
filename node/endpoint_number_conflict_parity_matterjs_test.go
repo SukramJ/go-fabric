@@ -73,7 +73,7 @@ func assembleWith(t *testing.T, store endpoint.Store, specs ...endpoint.Spec) *e
 	if err != nil {
 		t.Fatal(err)
 	}
-	topo, err := a.Assemble(context.Background(), []endpoint.Snapshot{{Scope: "host", Endpoints: specs, ModelComplete: true}})
+	topo, err := a.Assemble(context.Background(), []endpoint.Snapshot{{Scope: "host", Endpoints: specs}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -268,10 +268,12 @@ func TestEndpointNumberConflictParityMatterJS(t *testing.T) {
 	t.Run("keeps a closed endpoint's number for its return", func(t *testing.T) {
 		// ServerEndpointStores.ts:20-22 at 862ad75f: "Each number is
 		// reserved for one store"; a closed endpoint keeps it
-		// (ServerEndpointInitializer.ts:67-69). In Go the owner lists the
-		// reserved key in Snapshot.Retain; a model-complete assembly then
-		// keeps its record, gives the number to no other key and hands it
-		// back on the key's return.
+		// (ServerEndpointInitializer.ts:67-69), and load keeps every
+		// stored number (ServerEndpointStores.ts:33-45). The assembler
+		// keeps the record of a key absent from the snapshots, gives the
+		// number to no other key and hands it back on the key's return;
+		// only the erase (ServerEndpointInitializer.ts:59-65, here
+		// Store.RemoveEndpoint) frees it.
 		store := memstore.New()
 		topo := assembleWith(t, store, kitSpec(t, "closed"), kitSpec(t, "kept"))
 		closed := numberOf(topo, "closed")
@@ -280,10 +282,10 @@ func TestEndpointNumberConflictParityMatterJS(t *testing.T) {
 			t.Fatal(err)
 		}
 		ctx := context.Background()
-		if _, err := a.Assemble(ctx, []endpoint.Snapshot{{Scope: "host", Endpoints: []endpoint.Spec{kitSpec(t, "kept")}, ModelComplete: true, Retain: []endpoint.SourceKey{endpoint.StringKey("closed")}}}); err != nil {
+		if _, err := a.Assemble(ctx, []endpoint.Snapshot{{Scope: "host", Endpoints: []endpoint.Spec{kitSpec(t, "kept")}}}); err != nil {
 			t.Fatal(err)
 		}
-		topo, err = a.Assemble(ctx, []endpoint.Snapshot{{Scope: "host", Endpoints: []endpoint.Spec{kitSpec(t, "kept"), kitSpec(t, "newcomer")}, ModelComplete: true, Retain: []endpoint.SourceKey{endpoint.StringKey("closed")}}})
+		topo, err = a.Assemble(ctx, []endpoint.Snapshot{{Scope: "host", Endpoints: []endpoint.Spec{kitSpec(t, "kept"), kitSpec(t, "newcomer")}}})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -294,10 +296,17 @@ func TestEndpointNumberConflictParityMatterJS(t *testing.T) {
 		if n := numberOf(topo, "closed"); n != closed {
 			t.Errorf("the returning endpoint is at %d, want its reserved %d", n, closed)
 		}
-		// Without the reservation the same assembly collects it.
+		// Absent again, it still keeps its number.
 		assembleWith(t, store, kitSpec(t, "kept"))
+		if n := numberOf(assembleWith(t, store, kitSpec(t, "closed")), "closed"); n != closed {
+			t.Errorf("a closed endpoint absent from an assembly came back at %d, want %d", n, closed)
+		}
+		// Erased, it is a new endpoint.
+		if err := store.RemoveEndpoint(ctx, endpoint.StringKey("closed")); err != nil {
+			t.Fatal(err)
+		}
 		if n := numberOf(assembleWith(t, store, kitSpec(t, "closed")), "closed"); n == closed {
-			t.Errorf("an unreserved closed endpoint kept %d", n)
+			t.Errorf("an erased endpoint kept %d", n)
 		}
 	})
 

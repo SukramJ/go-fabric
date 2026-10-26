@@ -42,7 +42,7 @@ func TestBridgedNodeLabelWriteSticks(t *testing.T) {
 	}
 	assemble := func(a *endpoint.Assembler, s endpoint.Spec) (*endpoint.TopologyDispatcher, uint16) {
 		t.Helper()
-		topo, err := a.Assemble(context.Background(), []endpoint.Snapshot{{Scope: "s", ModelComplete: true, Endpoints: []endpoint.Spec{s}}})
+		topo, err := a.Assemble(context.Background(), []endpoint.Snapshot{{Scope: "s", Endpoints: []endpoint.Spec{s}}})
 		if err != nil {
 			t.Fatal(err)
 		}

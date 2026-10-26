@@ -128,6 +128,7 @@ func cmdGroup(e *env, args []string) error {
 	if len(args) == 0 {
 		return fmt.Errorf("usage: %s", commands["group"].usage)
 	}
+	e.ownNode = true
 	switch args[0] {
 	case "create":
 		return cmdGroupCreate(e, args[1:])

@@ -410,3 +410,51 @@ func TestAcceptedFailedAttestation(t *testing.T) {
 		t.Fatal("a garbage DAC parsed")
 	}
 }
+
+// forgetRecorder records the scanners' ForgetCommissioned calls.
+type forgetRecorder struct {
+	mu    sync.Mutex
+	calls []*discovery.CommissionedIdentity
+	addrs [][]string
+}
+
+func (r *forgetRecorder) ForgetCommissioned(addresses []string, identity *discovery.CommissionedIdentity) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.calls = append(r.calls, identity)
+	r.addrs = append(r.addrs, addresses)
+}
+
+// TestCommissionForgetsTheDevice: once commissioned, every scanner forgets
+// the device by its identity — D and VP of its discovery data — and no
+// BLE address, the device having been reached over UDP; a failed
+// commissioning forgets nothing (ControllerCommissioner.ts:321-341,
+// :721-723 at 862ad75f).
+func TestCommissionForgetsTheDevice(t *testing.T) {
+	t.Parallel()
+	_, addr := startNode(t, nil, "127.0.0.1:0")
+	conn := newFakeMDNS()
+	c := newController(t, discovery.NewNames(conn, discard()), "127.0.0.1:0")
+	rec := &forgetRecorder{}
+	c.com.ctx.Scanners = []CommissionedScanner{rec}
+	c.announceNode(t, conn, addr.Port, commissionedNode)
+	dev := c.find(t)
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+	if _, err := c.com.Commission(ctx, Options{Fabric: c.fabric, Passcode: 11111111, NodeID: commissionedNode, Addresses: udpAddrs(dev), DiscoveryData: &dev}); err == nil {
+		t.Fatal("a wrong passcode commissioned")
+	}
+	rec.mu.Lock()
+	if len(rec.calls) != 0 {
+		t.Errorf("a failed commissioning forgot the device: %+v", rec.calls)
+	}
+	rec.mu.Unlock()
+	if _, err := c.com.Commission(ctx, Options{Fabric: c.fabric, Passcode: nodePasscode, NodeID: commissionedNode, Addresses: udpAddrs(dev), DiscoveryData: &dev}); err != nil {
+		t.Fatal(err)
+	}
+	rec.mu.Lock()
+	defer rec.mu.Unlock()
+	if len(rec.calls) != 1 || rec.calls[0] == nil || *rec.calls[0] != (discovery.CommissionedIdentity{D: nodeDiscriminator, VP: "65521+32769"}) || len(rec.addrs[0]) != 0 {
+		t.Fatalf("forgot %+v at %v, want the device's identity once and no BLE address", rec.calls, rec.addrs)
+	}
+}

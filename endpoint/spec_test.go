@@ -80,9 +80,8 @@ func TestAssembleFromSpecsBuildsThreeTierTopology(t *testing.T) {
 	}
 
 	top, err := specAssembler(t).Assemble(context.Background(), []endpoint.Snapshot{{
-		Scope:         central,
-		Endpoints:     specs,
-		ModelComplete: true,
+		Scope:     central,
+		Endpoints: specs,
 	}})
 	if err != nil {
 		t.Fatalf("Assemble: %v", err)
@@ -161,7 +160,6 @@ func TestAssembleCapsNodeLabelFromSpec(t *testing.T) {
 			FriendlyName: overLong,
 			Source:       specSource{deviceType: 0x010A},
 		}},
-		ModelComplete: true,
 	}})
 	if err != nil {
 		t.Fatalf("Assemble: %v", err)
@@ -199,13 +197,13 @@ func TestAssembleReusesEndpointIDsAcrossReassembly(t *testing.T) {
 	a := specAssembler(t)
 	ctx := context.Background()
 
-	before, err := a.Assemble(ctx, []endpoint.Snapshot{{Scope: central, Endpoints: []endpoint.Spec{first}, ModelComplete: true}})
+	before, err := a.Assemble(ctx, []endpoint.Snapshot{{Scope: central, Endpoints: []endpoint.Spec{first}}})
 	if err != nil {
 		t.Fatalf("Assemble (first): %v", err)
 	}
 	firstID := before.Bridged()[0].ID
 
-	after, err := a.Assemble(ctx, []endpoint.Snapshot{{Scope: central, Endpoints: []endpoint.Spec{second, first}, ModelComplete: true}})
+	after, err := a.Assemble(ctx, []endpoint.Snapshot{{Scope: central, Endpoints: []endpoint.Spec{second, first}}})
 	if err != nil {
 		t.Fatalf("Assemble (second): %v", err)
 	}

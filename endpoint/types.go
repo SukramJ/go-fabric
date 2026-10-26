@@ -20,42 +20,22 @@ import (
 type Snapshot struct {
 	// Scope names the owner-side partition these endpoints come from —
 	// one controller, one site, one upstream hub. The assembler treats
-	// it as an opaque label: it garbage-collects persisted identities
-	// one scope at a time, so a partition that has not loaded yet
-	// cannot delete another's rows. An owner with a single partition
-	// may use any non-empty constant.
+	// it as an opaque label and records it with each persisted
+	// identity, so an owner lists or erases one partition's numbers at
+	// a time. An owner with a single partition may use any non-empty
+	// constant.
 	Scope string
 	// Endpoints describes every bridged endpoint this central
 	// contributes. nil-safe — an empty slice produces zero endpoints.
+	// A stored identity absent from every snapshot keeps its endpoint
+	// number: the assembler collects nothing, as matter.js keeps every
+	// stored number until its store is erased
+	// (packages/node/src/storage/server/ServerEndpointStores.ts:33-45
+	// load, :109-130 assignNumber;
+	// packages/node/src/node/server/ServerEndpointInitializer.ts:59-65
+	// eraseDescendant, :67-69 deactivateDescendant at 862ad75f). The
+	// owner erases a number with [Store.RemoveEndpoint].
 	Endpoints []Spec
-	// ModelComplete reports whether this scope's initial source load
-	// has finished, i.e. Endpoints is the authoritative full fleet
-	// rather than a boot-time (still-empty or partially loaded) view. The
-	// assembler only garbage-collects persisted endpoint-ID rows for
-	// model-complete snapshots: the topology is first assembled at
-	// daemon start, before the readiness-gated source load, and a
-	// scope that has not loaded yet must keep every persisted
-	// endpoint number so its bridged endpoints reappear under their old
-	// IDs once the load completes. Mirrors matter.js, which reserves
-	// every persisted endpoint number at node initialization
-	// (packages/node/src/storage/server/ServerEndpointStores.ts,
-	// assignNumber + the load() pre-allocation pass) and releases one
-	// only on explicit endpoint deletion
-	// (packages/node/src/node/server/ServerEndpointInitializer.ts,
-	// eraseDescendant) — never because state has not been populated yet.
-	// See BD-Matter-EndpointID-Persistent in notes/parity/by_design.md.
-	ModelComplete bool
-	// Retain lists stored identities of this scope that a model-complete
-	// snapshot keeps although Endpoints no longer holds them, matched by
-	// String(): the owner reserved their numbers for the key's return. A
-	// key listed here and assembled again gets its stored number back.
-	// Mirrors matter.js, where a closed endpoint keeps its number
-	// reservation and only an erased store frees it
-	// (packages/node/src/node/server/ServerEndpointInitializer.ts:67-69
-	// deactivateDescendant, :59-65 eraseDescendant;
-	// packages/node/src/storage/server/ServerEndpointStores.ts:20-22,
-	// :109-130 assignNumber at 862ad75f).
-	Retain []SourceKey
 }
 
 // Endpoint describes one Matter endpoint in the assembled topology.

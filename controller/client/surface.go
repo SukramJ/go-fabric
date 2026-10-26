@@ -46,7 +46,8 @@ type (
 	//	var req client.ReadRequest
 	//	req.Attributes = []client.AttributePath{client.ClusterAt(1, onoffdef.ClusterID)}
 	ReadPaths = interaction.ReadRequest
-	// SubscribeRequest is a subscription: the paths and filters of a read
+	// SubscribePaths are a subscription as it is sent, the part of
+	// [SubscribeRequest] the subscription sends: the paths and filters of a read
 	// ([ReadPaths]); MinIntervalFloor and MaxIntervalCeiling ([Interval];
 	// nil for the defaults, the node's bounds applied over them);
 	// ReplaceSubscriptions (false, the default, keeps the other
@@ -56,7 +57,8 @@ type (
 	// called once the subscription ended; Sustain, which re-establishes a
 	// lost subscription. The [Subscription] it returns ends with
 	// [Subscription.Close] or with the node; its Done channel closes then.
-	SubscribeRequest = interaction.SubscribeRequest
+	// A SubscribeRequest's fields are promoted.
+	SubscribePaths = interaction.SubscribeRequest
 	// Subscription is an established subscription: ID, MaxInterval, Done
 	// (closed when it ended) and Close (idempotent; the peer learns of it
 	// from the next report it sends).

@@ -13,7 +13,6 @@ It is built the way a host is meant to build one (ADR 0018):
 n, err := node.New(cfg)                         // the node: root, Aggregator, sessions, PASE/CASE, window
 lamp, err := device.NewOnOffLight(opts, ...)    // one device.New<Type> per device
 err = n.Aggregator().Add(ctx, lamp)             // … for each device of the fleet
-n.Aggregator().MarkComplete()                   // the fleet is complete from the first assembly
 err = n.Run(ctx)                                // Start, wait for ctx, Stop
 ```
 

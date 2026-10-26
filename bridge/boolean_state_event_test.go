@@ -61,7 +61,7 @@ func TestBooleanStateChangeEvent(t *testing.T) {
 		t.Fatal(err)
 	}
 	snap := func(ctx context.Context) (*endpoint.Topology, error) {
-		return asm.Assemble(ctx, []endpoint.Snapshot{{Scope: "s", ModelComplete: true, Endpoints: []endpoint.Spec{{
+		return asm.Assemble(ctx, []endpoint.Snapshot{{Scope: "s", Endpoints: []endpoint.Spec{{
 			StableKey: endpoint.StringKey("contact"), DeviceAddress: "C", DeviceType: 0x0015,
 			FriendlyName: "Contact", ChannelAddress: "C:1", Measurement: src,
 		}}}})
@@ -111,7 +111,7 @@ func TestPathValuesReportOnlyMovedAttributes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	topo, err := asm.Assemble(context.Background(), []endpoint.Snapshot{{Scope: "s", ModelComplete: true, Endpoints: []endpoint.Spec{{
+	topo, err := asm.Assemble(context.Background(), []endpoint.Snapshot{{Scope: "s", Endpoints: []endpoint.Spec{{
 		StableKey: endpoint.StringKey("contact"), DeviceAddress: "C", DeviceType: 0x0015,
 		FriendlyName: "Contact", ChannelAddress: "C:1", Measurement: src,
 	}}}})

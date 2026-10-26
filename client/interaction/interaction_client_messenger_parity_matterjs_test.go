@@ -187,9 +187,10 @@ func icmRefused(t *testing.T, s *scripted, done <-chan writeResult) {
 }
 
 // TestInteractionClientMessengerWrites ports the "writes" group
-// (InteractionClientMessengerTest.ts:532-802) as far as a write that fits
-// one message goes; Go refuses every write that does not (ErrRequestTooLarge)
-// where matter.js chunks it, so the chunking cases stay missing.
+// (InteractionClientMessengerTest.ts:532-802) for a write that fits one
+// message and the writes refused before anything is sent; the chunking
+// cases are TestInteractionClientMessengerWriteChunking
+// (write_chunk_parity_matterjs_test.go).
 func TestInteractionClientMessengerWrites(t *testing.T) {
 	t.Parallel()
 
@@ -277,7 +278,8 @@ func TestInteractionClientMessengerWrites(t *testing.T) {
 		c := interaction.New(s.mgr, s.session, nil)
 		w := icmWrite(1, icmOctetList(8))
 		w.Path.HasEndpoint = false
-		icmRefused(t, s, writeAsync(c, []interaction.WriteRequest{w}, interaction.WriteOptions{}))
+		// The messenger's whole-list IB: Write chunks no list here.
+		icmRefused(t, s, writeAsync(c, []interaction.WriteRequest{w}, interaction.WriteOptions{DisableListChunking: true}))
 	})
 
 	t.Run("refuses a single value that does not fit one message", func(t *testing.T) {

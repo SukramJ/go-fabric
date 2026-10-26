@@ -37,7 +37,7 @@ func TestSpecPartsComposeAChildEndpoint(t *testing.T) {
 		}},
 	}
 	assemble := func() *Topology {
-		topo, err := a.Assemble(context.Background(), []Snapshot{{Scope: "s", ModelComplete: true, Endpoints: []Spec{spec}}})
+		topo, err := a.Assemble(context.Background(), []Snapshot{{Scope: "s", Endpoints: []Spec{spec}}})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -121,7 +121,7 @@ func TestComposedSourceWithoutClustersIsBridged(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	topo, err := a.Assemble(context.Background(), []Snapshot{{Scope: "s", ModelComplete: true, Endpoints: []Spec{{
+	topo, err := a.Assemble(context.Background(), []Snapshot{{Scope: "s", Endpoints: []Spec{{
 		StableKey: StringKey("oven"), DeviceType: dtOven, FriendlyName: "Oven",
 		Source: deviceTypeSource{dt: dtOven},
 		Parts: []Spec{{
@@ -177,7 +177,7 @@ func TestBridgedNodePartsListIsFullFamily(t *testing.T) {
 			Parts:  parts,
 		}
 	}
-	topo, err := a.Assemble(context.Background(), []Snapshot{{Scope: "s", ModelComplete: true, Endpoints: []Spec{{
+	topo, err := a.Assemble(context.Background(), []Snapshot{{Scope: "s", Endpoints: []Spec{{
 		StableKey: StringKey("fridge"), DeviceType: dtRefrigerator, FriendlyName: "Fridge",
 		Source: deviceTypeSource{dt: dtRefrigerator},
 		Parts: []Spec{

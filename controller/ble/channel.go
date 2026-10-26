@@ -212,6 +212,11 @@ func (c *Channel) PeerAddress() *net.UDPAddr { return c.addr }
 // Peripheral is the peripheral the channel runs to.
 func (c *Channel) Peripheral() Peripheral { return c.peripheral }
 
+// PeripheralAddress is the peripheral's address — the BLE address the
+// commissioner hands the scanners once the device is commissioned
+// (commissioner.CommissionedScanner).
+func (c *Channel) PeripheralAddress() string { return c.peripheral.Address }
+
 // Conn is the BTP session as a transport.Conn.
 func (c *Channel) Conn() *btp.Conn { return c.btpConn }
 

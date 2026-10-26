@@ -126,6 +126,9 @@ type env struct {
 	attests bool
 	// central is Options.Central.
 	central func(adapter string) (ble.Central, error)
+	// ownNode is set by a command that needs the controller's own node
+	// (group, ota): the stack opens the controller with its OTA push.
+	ownNode bool
 }
 
 // Run is the tool: args without the program name. A command that fails

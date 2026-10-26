@@ -62,7 +62,7 @@ func hostNode(t *testing.T, db *sql.DB) (*node.Node, node.EndpointPersistence) {
 		if label := ep.NodeLabel(ctx, spec.StableKey); label != "" {
 			spec.NodeLabel = label
 		}
-		return asm.Assemble(ctx, []endpoint.Snapshot{{Scope: "host", Endpoints: []endpoint.Spec{spec}, ModelComplete: true}})
+		return asm.Assemble(ctx, []endpoint.Snapshot{{Scope: "host", Endpoints: []endpoint.Spec{spec}}})
 	}
 	return newNode(t, cfg), ep
 }

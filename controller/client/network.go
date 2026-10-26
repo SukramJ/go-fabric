@@ -21,8 +21,8 @@ import (
 // event urgent, fabric-filtered, replacing our other subscriptions —
 // narrowed by the stored options (NetworkClient.ts:121-128 at 0ceb202d).
 // The caller holds the lock.
-func (n *Node) defaultRequest() SubscribeRequest {
-	r := SubscribeRequest{
+func (n *Node) defaultRequest() SubscribePaths {
+	r := SubscribePaths{
 		Attributes:           []AttributePath{{}},
 		Events:               []EventPath{{IsUrgent: true}},
 		ReplaceSubscriptions: true,
@@ -126,7 +126,7 @@ func (n *Node) syncAutoSubscribe(ctx context.Context) error {
 		}
 		n.recompute()
 	}
-	s, err := n.Subscribe(ctx, sreq)
+	s, err := n.Subscribe(ctx, SubscribeRequest{SubscribeRequest: sreq})
 	if err != nil {
 		return err
 	}
@@ -152,7 +152,7 @@ func (n *Node) adoptDefaultSubscription(s *Subscription, own **Subscription) {
 // before its first attempt — SustainedSubscription.ts:187-204 reading the
 // subscription's request, its version filters and event minimum, and
 // handing the result to the request's updated (here: the image).
-func (n *Node) bootstrapRead(ctx context.Context, req SubscribeRequest) error {
+func (n *Node) bootstrapRead(ctx context.Context, req SubscribePaths) error {
 	sc := newScope(req.Attributes, req.NoFabricFilter)
 	n.mu.RLock()
 	r := ReadPaths{
@@ -408,7 +408,7 @@ func (n *Node) Seeded() bool {
 
 // icdSustainHooks gives the default subscription the ICD branches of the
 // sustained subscription (ClientNodeInteraction.ts:174, :178).
-func (n *Node) icdSustainHooks(req *SubscribeRequest) {
+func (n *Node) icdSustainHooks(req *SubscribePaths) {
 	if n.icd != nil {
 		req.Wakefulness = n.icd.Wakefulness
 		req.PeerFed = n.icd.peerFed

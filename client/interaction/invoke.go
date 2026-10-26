@@ -35,6 +35,8 @@ type InvokeOptions struct {
 	// SuppressResponse asks the peer for no InvokeResponse: the send
 	// expects an acknowledgement only and Invoke returns the zero Result.
 	SuppressResponse bool
+	// ClientRequest names the invoke exchange's network profile and margin.
+	ClientRequest
 }
 
 // Result is the peer's answer to the command — the "cmd-response" or
@@ -99,11 +101,11 @@ func (c *Interaction) Invoke(ctx context.Context, path im.ConcreteCommandPath, f
 // ClientInteraction.#invokeSingle (ClientInteraction.ts:487-649 at
 // 862ad75f) up to the decoding of its entries.
 func (c *Interaction) exchangeInvoke(ctx context.Context, invokes []im.CommandInvocation, opts InvokeOptions) ([]im.InvokeResponseEntry, error) {
-	m, err := c.begin(ctx, ExchangeOptions{})
+	m, ctx, err := c.begin(ctx, opts.exchangeOptions())
 	if err != nil {
 		return nil, err
 	}
-	defer m.x.Close()
+	defer m.close()
 	// A timeout alone marks the invoke timed, as a write's does. Mirrors
 	// matter.js packages/protocol/src/action/request/Invoke.ts:114
 	// (timedRequest = !!options.timed || !!timeout).

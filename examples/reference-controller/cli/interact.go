@@ -296,7 +296,7 @@ func cmdSubscribe(e *env, args []string) error {
 		reports := make(chan *interaction.Report, 16)
 		sctx, scancel := e.timeoutCtx()
 		defer scancel()
-		sub, err := n.Subscribe(sctx, interaction.SubscribeRequest{
+		sub, err := n.Subscribe(sctx, client.SubscribeRequest{SubscribeRequest: interaction.SubscribeRequest{
 			Attributes: attrs, Events: events,
 			MinIntervalFloor:   interaction.Interval(minI.or(0)),
 			MaxIntervalCeiling: interaction.Interval(maxI.or(60 * time.Second)),
@@ -306,7 +306,7 @@ func cmdSubscribe(e *env, args []string) error {
 				case <-ctx.Done():
 				}
 			},
-		})
+		}})
 		if err != nil {
 			return fmt.Errorf("subscribe: %w", err)
 		}

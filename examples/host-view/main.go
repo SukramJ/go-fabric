@@ -74,7 +74,6 @@ func newNode(ctx context.Context, cfg node.Config, b *bridge) (*node.Node, error
 			return nil, err
 		}
 	}
-	n.Aggregator().MarkComplete() //nolint:contextcheck // the node's own: every device is added
 	return n, nil
 }
 

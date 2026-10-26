@@ -141,7 +141,7 @@ func newGroupsHarnessWith(t *testing.T, n int, withGroupcast bool) *groupsHarnes
 			}
 		}
 		snap := func(ctx context.Context) (*endpoint.Topology, error) {
-			return asm.Assemble(ctx, []endpoint.Snapshot{{Scope: "lamps", Endpoints: specs, ModelComplete: true}})
+			return asm.Assemble(ctx, []endpoint.Snapshot{{Scope: "lamps", Endpoints: specs}})
 		}
 		gkm, err := mattercore.NewGroupKeyManagement(st, mattercore.GroupKeyMgmtConfig{Groups: mgr})
 		if err != nil {
