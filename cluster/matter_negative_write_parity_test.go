@@ -88,6 +88,10 @@ func (refusingThermostatSink) SetSetpoint(context.Context, uint32, int16, []ther
 	return errors.New("device refused")
 }
 
+func (refusingThermostatSink) SetTemperatureSetpointHold(context.Context, uint8) error {
+	return errors.New("device refused")
+}
+
 func newRefusingThermostatServer() *thermo.ThermostatServer {
 	cfg := thermo.DefaultThermostatConfig()
 	cfg.Sink = refusingThermostatSink{}

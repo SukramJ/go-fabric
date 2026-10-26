@@ -382,7 +382,9 @@ const coverMoveStep = 950 * time.Millisecond
 
 // newThermostatServer is the module's Thermostat server ([thermo.New]),
 // at its default limits and setpoints; a declared Sink
-// (thermostatdef.Declare) is told every change it admits.
+// (thermostatdef.Declare) is told every change it admits. An Initial that
+// sets TemperatureSetpointHold or ThermostatRunningState serves it
+// (thermo.ThermostatConfig takes both by their attribute names).
 func newThermostatServer(b defaultBuild) (contract.ClusterServer, error) {
 	// The element's defaults: the absolute limits 7 / 30 °C (heat) and
 	// 16 / 32 °C (cool), the occupied setpoints 20 and 26 °C (matter.js

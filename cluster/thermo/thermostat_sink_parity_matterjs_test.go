@@ -25,6 +25,9 @@ type sinkCall struct {
 	attrID     uint32
 	value      int16
 	companions []thermo.SetpointChange
+	// hold is a SetTemperatureSetpointHold call with holdValue.
+	hold      bool
+	holdValue uint8
 }
 
 // recordingThermoSink records every call and refuses each with err.
@@ -45,6 +48,13 @@ func (r *recordingThermoSink) SetSetpoint(_ context.Context, attrID uint32, valu
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.calls = append(r.calls, sinkCall{attrID: attrID, value: value, companions: companions})
+	return r.err
+}
+
+func (r *recordingThermoSink) SetTemperatureSetpointHold(_ context.Context, hold uint8) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.calls = append(r.calls, sinkCall{hold: true, holdValue: hold})
 	return r.err
 }
 

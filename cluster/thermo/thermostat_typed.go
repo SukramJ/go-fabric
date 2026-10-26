@@ -50,8 +50,9 @@ var setpointKeys = map[uint32]struct {
 // all or nothing, each value checked against its attribute's type,
 // constraint and the selection's enum values, stored without the [Sink]
 // and reported — no write veto. LocalTemperature (null included),
-// LocalTemperatureCalibration, SystemMode and, with OCC, Occupancy are
-// stored as given. A setpoint or user setpoint limit is held to its
+// LocalTemperatureCalibration, SystemMode, with OCC Occupancy, and the
+// served TemperatureSetpointHold, TemperatureSetpointHoldDuration and
+// ThermostatRunningState are stored as given. A setpoint or user setpoint limit is held to its
 // limits as a write is and runs the reconcile a write runs (matter.js #reconcileSetpoints on the attribute's $Changing),
 // so a companion may move with it and is reported too; an absolute limit
 // is held to the user limits as [ThermostatServer.SetAbsoluteSetpointLimit]
@@ -130,6 +131,22 @@ func (s *ThermostatServer) SetAttributes(values map[uint32]any) error {
 		occupied := n&1 != 0
 		note(thermoAttrOccupancy, s.occupied != occupied)
 		s.occupied = occupied
+	}
+	if n, ok := checked[thermoAttrTemperatureSetpointHold].(uint8); ok {
+		note(thermoAttrTemperatureSetpointHold, s.hold != n)
+		s.hold = n
+	}
+	if v, ok := checked[thermoAttrTemperatureSetpointHoldDur]; ok {
+		var d *uint16
+		if n, isUint := v.(uint16); isUint {
+			d = &n
+		}
+		note(thermoAttrTemperatureSetpointHoldDur, !equalDuration(s.holdDuration, d))
+		s.holdDuration = d
+	}
+	if n, ok := checked[thermoAttrThermostatRunningState].(uint16); ok {
+		note(thermoAttrThermostatRunningState, s.runningState != n)
+		s.runningState = n
 	}
 	s.mu.Unlock()
 

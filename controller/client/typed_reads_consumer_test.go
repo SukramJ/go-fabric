@@ -35,6 +35,8 @@ func (h *heatingSink) SetSetpoint(_ context.Context, _ uint32, value int16, _ []
 	return nil
 }
 
+func (*heatingSink) SetTemperatureSetpointHold(context.Context, uint8) error { return nil }
+
 // TestTypedReadsConsumer is the gate-2 consumer's controller program
 // (notes/briefs/reports/G2-consumer/controller_test.go.txt) on the typed
 // surface: it commissions a bridge with a dimmable light and a

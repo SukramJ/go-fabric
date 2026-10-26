@@ -295,14 +295,16 @@ var ports = map[string]portSet{
 		ports: []portDecl{{
 			name: "Sink",
 			doc: []string{
-				"Sink applies a SystemMode write and a setpoint change (a write",
-				"or a SetpointRaiseLower) the kit's Thermostat server admitted,",
-				"with the companions that move with it; an error answers FAILURE",
-				"and stores nothing (cluster/thermo Sink).",
+				"Sink applies a SystemMode write, a setpoint change (a write or",
+				"a SetpointRaiseLower) with the companions that move with it,",
+				"and a TemperatureSetpointHold write, each one the kit's",
+				"Thermostat server admitted; an error answers FAILURE and",
+				"stores nothing (cluster/thermo Sink).",
 			},
 			methods: []string{
 				"SetSystemMode(ctx context.Context, mode uint8) error",
 				"SetSetpoint(ctx context.Context, attrID uint32, value int16, companions []SetpointChange) error",
+				"SetTemperatureSetpointHold(ctx context.Context, hold uint8) error",
 			},
 		}, {
 			name: "PresetStore",
