@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 6591,
+  "entry_points": 6592,
   "entry_packages": [
     ".",
     "bdx",
@@ -259,9 +259,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 16133,
+    "total_exported": 16134,
     "reachable": 11408,
-    "whitelisted": 4722,
+    "whitelisted": 4723,
     "unreachable": 3
   },
   "by_package": [
@@ -3492,6 +3492,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/securechannel_test.go",
       "line": 836
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestHandleSubscribeRequest_ChangeDuringPrimingReadIsReported",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/subscribe_priming_change_test.go",
+      "line": 55
     },
     {
       "package": "bridge",

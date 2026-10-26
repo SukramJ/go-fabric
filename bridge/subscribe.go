@@ -1073,17 +1073,17 @@ func (b *Bridge) handleSubscribeRequest(
 		b.noteSubscriptionEstablishmentStarted(subFabricIndex, subscriptionPeerNodeID(requestHdr, subSubjectNodeID))
 	}
 
-	initialReport, matchedPaths := b.buildInitialReport(subCtx, dispatcher, req)
-	// A Subscribe whose (possibly wildcard) paths match zero attributes
-	// AND zero events cannot be established — matter.js
-	// ServerSubscription.ts:610-614 rejects it with InvalidAction. The
-	// matched count is taken BEFORE DataVersionFilter suppression, so a
-	// legitimately quiet re-subscribe (all clusters cached) still
-	// establishes.
-	if matchedPaths == 0 {
-		return b.rejectSubscribeInvalidAction(src, requestHdr, proto, "no_match")
-	}
-	subID, regErr := b.registerSubscription(src, requestHdr, proto, req, &initialReport)
+	// The subscription is admitted, priming, before its initial data is
+	// read: a change made while the data is collected marks it dirty and
+	// goes out after the priming report, instead of falling between the
+	// read and the admission unseen. matter.js attaches the subscription's
+	// change handlers before it reads the initial report
+	// (ServerSubscription.ts:731-739 sendInitialReport at 862ad75f) and
+	// clears the peer's other subscriptions before that
+	// (InteractionServer.ts:647-662); the re-establishment after a restart
+	// (subscription_reestablish.go) already admits first.
+	var stamp im.ReportData
+	subID, regErr := b.registerSubscription(src, requestHdr, proto, req, &stamp)
 	if regErr != nil {
 		// The manager refused the subscription (per-fabric quota, cadence
 		// out of range, cadence inverted after clamp). The controller must
@@ -1092,6 +1092,18 @@ func (b *Bridge) handleSubscribeRequest(
 		// reports the bridge never sends.
 		return b.rejectSubscribeStatus(src, requestHdr, proto, "manager", subscribeRejectStatus(regErr))
 	}
+	initialReport, matchedPaths := b.buildInitialReport(subCtx, dispatcher, req)
+	// A Subscribe whose (possibly wildcard) paths match zero attributes
+	// AND zero events cannot be established — matter.js
+	// ServerSubscription.ts:610-614 rejects it with InvalidAction, after
+	// the admission above as there. The matched count is taken BEFORE
+	// DataVersionFilter suppression, so a legitimately quiet re-subscribe
+	// (all clusters cached) still establishes.
+	if matchedPaths == 0 {
+		b.abandonPrimingSubscription(subID)
+		return b.rejectSubscribeInvalidAction(src, requestHdr, proto, "no_match")
+	}
+	initialReport.HasSubscription, initialReport.SubscriptionID = stamp.HasSubscription, stamp.SubscriptionID
 	// The priming report waits for the peer's StatusResponse per chunk,
 	// which arrives on this session: hand its turn on.
 	leaveSessionOrder(ctx)
