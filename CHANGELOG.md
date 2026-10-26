@@ -16,6 +16,7 @@ pseudo-version of `main`.
 
 ### Changed
 
+- `schema.SchemaSnapshotSHA256` changes with the refreshed snapshot (the added command qualities, nothing else; same pin 862ad75f): **a host pinning the snapshot's bytes updates its pin** after this release.
 - `client/interaction.Interaction.Invoke` and `InvokeBatch` (and `controller/client.Node.Invoke` / `InvokeBatch`) infer `LargeMessage` when the caller left it nil: an invoke with any command carrying the "L" quality requires TCP, on every part of a split, as matter.js's `ClientInteraction.invoke` does (`ClientInteraction.ts:111-127`, `:716-719` at 862ad75f). An explicit `false` stands; the caller's options are not changed.
 
 ## [0.13.1] — 2026-10-26

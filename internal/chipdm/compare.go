@@ -75,8 +75,8 @@ var normalizationRules = map[string]string{
 // not compared; Result.NotCompared counts the CHIP elements stating one.
 var notCarried = map[string]string{
 	"cluster provisional status":       "The snapshot does not record that a cluster is provisional; the clusters CHIP marks are listed below.",
-	"command quality":                  "The snapshot records no quality for commands (CHIP marks large-message commands L).",
-	"event quality":                    "The snapshot records no quality for events.",
+	"command quality":                  "Commands CHIP gives a quality the snapshot records none for; the snapshot records the effective command quality (largeMessage, L) since brief CP.",
+	"event quality":                    "Events CHIP gives a quality the snapshot records none for; the snapshot records the effective event quality since brief CP.",
 	"semantic namespaces":              "The snapshot carries no semantic namespaces.",
 	"global commands":                  "AtomicRequest / AtomicResponse: matter.js models them in the clusters that use them (load-data-model.ts globalCommands).",
 	"definitions outside the snapshot": "CHIP global types matter.js defines in a shared definitions scope (WebRtcTransportDefinitions) that the extractor does not emit.",
