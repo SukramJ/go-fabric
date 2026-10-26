@@ -42,7 +42,7 @@ still held there. Each row names the facade route, or the section of
 | `cluster/core` | `SoftwareVersionFromString` (`daemon_matter.go:527`) | `node.SoftwareVersionFromString` |
 | `cluster/core` | `RegulatoryIndoorOutdoor` (`daemon_matter.go:506`) | `node.RegulatoryIndoorOutdoor` for `Commissioning.LocationCapability` |
 
-## Changed in v0.13.2: the Thermostat `Sink`
+## Changed in v0.13.3: the Thermostat `Sink`
 
 | Symbol | Route |
 | --- | --- |

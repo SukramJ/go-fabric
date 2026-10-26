@@ -189,6 +189,7 @@ by type assertion.
 | `mdns.Reannouncer` | the `Advertiser` | the periodic re-announce loop (30 min default) and `Node.TriggerReannounce` | no loop; `TriggerReannounce` is a no-op |
 | `mdns.Enabled` | the `Advertiser` | says whether it publishes at all | `mdns.IsEnabled` takes the advertiser at its word |
 | `onoff.Sink` | `onoff.Config.Sink` | consents to every OnOff change before it is stored; an error answers FAILURE | changes are stored without asking |
+| `thermo.SchedulePort` (`thermostatdef.SchedulePort`) | `thermostatdef.Declare{SchedulePort: …}`, `thermo.ThermostatConfig.SchedulePort` | with MatterScheduleConfiguration: switches the device to the schedule a SetActiveScheduleRequest named, and stores the schedules an atomic write committed; an error answers with its status, FAILURE without one ([Thermostat](thermostat.md#week-programs-msch)) | schedules live in memory |
 | `thermo.Sink` (`thermostatdef.Sink`) | `thermostatdef.Declare{Sink: …}`, `thermo.ThermostatConfig.Sink` | consents to every SystemMode, setpoint and — when the hold is served — TemperatureSetpointHold change a controller asks for, before it is stored; an error answers with its status, FAILURE without one ([Thermostat](thermostat.md)) | changes are stored without asking |
 
 Host ports of the root servers, reached through `node.Config` or
