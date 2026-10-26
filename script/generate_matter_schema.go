@@ -16,6 +16,8 @@
 //     clusterClassifications, unbindableClusters
 //   - timed_gen.go — timedInvokePaths (every request command whose
 //     effective access carries "T", the timed-interaction quality)
+//   - large_message_gen.go — largeMessageCommands (every request command
+//     whose effective quality carries "L", the Large Message quality)
 //   - schema_provenance_gen.go — SchemaSnapshotSHA256
 //
 // It reads the same bytes package parity embeds rather than a second copy of
@@ -62,6 +64,7 @@ const (
 	accessFile      = "schema/attribute_access_gen.go"
 	requirementFile = "schema/devicetype_requirements_gen.go"
 	timedFile       = "schema/timed_gen.go"
+	largeMsgFile    = "schema/large_message_gen.go"
 )
 
 // moduleRoot returns the directory holding this module's go.mod, found by
@@ -115,8 +118,9 @@ type snapshotAttribute struct {
 }
 
 // snapshotCommand mirrors one command of a cluster in parity/schema.json:
-// its direction and the access of its effective layer, where the extractor
-// records the timed quality ("T") as access.timed.
+// its direction and the access and quality of its effective layer, where
+// the extractor records the timed quality ("T") as access.timed and the
+// Large Message quality ("L") as quality.largeMessage.
 type snapshotCommand struct {
 	ID        uint32 `json:"id"`
 	Name      string `json:"name"`
@@ -125,6 +129,9 @@ type snapshotCommand struct {
 		Access struct {
 			Timed bool `json:"timed"`
 		} `json:"access"`
+		Quality struct {
+			LargeMessage bool `json:"largeMessage"`
+		} `json:"quality"`
 	} `json:"effective"`
 }
 
@@ -266,6 +273,12 @@ func main() {
 		os.Exit(1)
 	}
 	fmt.Printf("wrote %s\n", timedFile)
+
+	if err := writeLargeMessageFile(snap.Clusters); err != nil {
+		fmt.Fprintf(os.Stderr, "write %s: %v\n", largeMsgFile, err)
+		os.Exit(1)
+	}
+	fmt.Printf("wrote %s\n", largeMsgFile)
 
 	if err := writeRequirementsFile(snap); err != nil {
 		fmt.Fprintf(os.Stderr, "write %s: %v\n", requirementFile, err)
@@ -590,6 +603,46 @@ func writeTimedFile(clusters []snapshotCluster) error {
 		return err
 	}
 	return writeIfChanged(timedFile, out)
+}
+
+// writeLargeMessageFile emits largeMessageCommands: every request command
+// whose effective quality carries the Large Message quality ("L", matter.js
+// Quality.largeMessage, packages/model/src/aspects/Quality.ts:71), which
+// matter.js's client reads to send the invoke over TCP
+// (packages/protocol/src/action/client/ClientInteraction.ts:111-127
+// inferLargeMessage, which probes the request command's schema).
+func writeLargeMessageFile(clusters []snapshotCluster) error {
+	var buf bytes.Buffer
+	buf.WriteString(fileHeaderTpl)
+	buf.WriteString("// largeMessageCommands lists every request command whose effective quality\n")
+	buf.WriteString("// in parity/schema.json carries the Large Message quality (\"L\"): its\n")
+	buf.WriteString("// invoke needs a transport that carries large messages (TCP).\n")
+	buf.WriteString("var largeMessageCommands = map[uint32]map[uint32]struct{}{\n")
+	for _, c := range clusters {
+		cmds := slices.Clone(c.Commands)
+		sort.Slice(cmds, func(i, j int) bool { return cmds[i].ID < cmds[j].ID })
+		var rows []string
+		for _, m := range cmds {
+			if m.Direction != "request" || m.Effective == nil || !m.Effective.Quality.LargeMessage {
+				continue
+			}
+			rows = append(rows, fmt.Sprintf("\t\t0x%02X: {}, // %s\n", m.ID, m.Name))
+		}
+		if len(rows) == 0 {
+			continue
+		}
+		fmt.Fprintf(&buf, "\t0x%04X: { // %s\n", c.ID, c.Name)
+		for _, r := range rows {
+			buf.WriteString(r)
+		}
+		buf.WriteString("\t},\n")
+	}
+	buf.WriteString("}\n")
+	out, err := format.Source(buf.Bytes())
+	if err != nil {
+		return err
+	}
+	return writeIfChanged(largeMsgFile, out)
 }
 
 // hasQuality reports whether a matter.js quality string carries flag as a
