@@ -10,6 +10,14 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+### Added
+
+- The Thermostat server serves the optional `TemperatureSetpointHold` and `ThermostatRunningState` (issue #273, brief CO PR 1): `thermo.ThermostatConfig.TemperatureSetpointHold` and `.ThermostatRunningState` — or a `thermostatdef.Declare` whose `Initial` sets them — serve each from its initial value, and the device reports its own changes through the new inbound setters `ThermostatServer.SetTemperatureSetpointHold` and `ThermostatServer.SetThermostatRunningState` (or the typed server's `Set`), stored and reported as the host's change without the `Sink`. With the hold the server also serves `TemperatureSetpointHoldDuration`, null and stored as written, as matter.js initialises it (`ThermostatServer.ts:365-369` at 862ad75f); `SetpointHoldExpiryTimestamp` stays unserved, as in matter.js (`:372-379`). The reference bridge's thermostat serves both, and the chip-tool suite reads them and writes the hold.
+
+### Changed
+
+- **Break:** `thermo.Sink` and `thermostatdef.Sink` gain `SetTemperatureSetpointHold(ctx, hold uint8) error`: a controller's write of `TemperatureSetpointHold` reaches the host after the definition admitted it and before it is stored, and the host's refusal refuses the write with its status (FAILURE for an error without one), as a `SystemMode` write does. An unchanged hold does not call it. matter.js stores the hold only (its reaction is commented out, `ThermostatServer.ts:381` at 862ad75f). Migration guide: "Changed in v0.13.2".
+
 ## [0.13.2] — 2026-10-26
 
 ### Added

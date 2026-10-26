@@ -189,6 +189,7 @@ by type assertion.
 | `mdns.Reannouncer` | the `Advertiser` | the periodic re-announce loop (30 min default) and `Node.TriggerReannounce` | no loop; `TriggerReannounce` is a no-op |
 | `mdns.Enabled` | the `Advertiser` | says whether it publishes at all | `mdns.IsEnabled` takes the advertiser at its word |
 | `onoff.Sink` | `onoff.Config.Sink` | consents to every OnOff change before it is stored; an error answers FAILURE | changes are stored without asking |
+| `thermo.Sink` (`thermostatdef.Sink`) | `thermostatdef.Declare{Sink: …}`, `thermo.ThermostatConfig.Sink` | consents to every SystemMode, setpoint and — when the hold is served — TemperatureSetpointHold change a controller asks for, before it is stored; an error answers with its status, FAILURE without one ([Thermostat](thermostat.md)) | changes are stored without asking |
 
 Host ports of the root servers, reached through `node.Config` or
 `Node.Root()`:
@@ -212,4 +213,4 @@ AcceptedCommandList. AccessControl, OperationalCredentials and
 GroupKeyManagement have a definition but no `Declare`: their servers are
 the hand-written `cluster/core` ones the node mounts.
 
-*Source: `cluster/levelcontrol/native.go:18-73`, `mdns/reannounce.go:15-55`, `node/reannounce.go:15-50`, `node/config.go:237-256`, `cluster/onoff/server.go:55-73`, `cluster/core/wifi_network_diagnostics.go:26-28`, `cluster/core/ota_software_update_requestor.go:180`, `cluster/core/ota_provider.go:96-138`, `cluster/core/commissioner_control.go:73-111`, `cluster/core/actions.go:63`, `cluster/core/diagnostic_logs.go:62-67`, `node/node.go:909-915`.*
+*Source: `cluster/levelcontrol/native.go:18-73`, `mdns/reannounce.go:15-55`, `node/reannounce.go:15-50`, `node/config.go:237-256`, `cluster/onoff/server.go:55-73`, `cluster/thermo/thermostat_server.go:261-288`, `cluster/core/wifi_network_diagnostics.go:26-28`, `cluster/core/ota_software_update_requestor.go:180`, `cluster/core/ota_provider.go:96-138`, `cluster/core/commissioner_control.go:73-111`, `cluster/core/actions.go:63`, `cluster/core/diagnostic_logs.go:62-67`, `node/node.go:909-915`.*

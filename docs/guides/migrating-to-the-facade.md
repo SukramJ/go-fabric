@@ -42,6 +42,12 @@ still held there. Each row names the facade route, or the section of
 | `cluster/core` | `SoftwareVersionFromString` (`daemon_matter.go:527`) | `node.SoftwareVersionFromString` |
 | `cluster/core` | `RegulatoryIndoorOutdoor` (`daemon_matter.go:506`) | `node.RegulatoryIndoorOutdoor` for `Commissioning.LocationCapability` |
 
+## Changed in v0.13.2: the Thermostat `Sink`
+
+| Symbol | Route |
+| --- | --- |
+| `thermo.Sink`, `thermostatdef.Sink` (a host's own implementation) | add `SetTemperatureSetpointHold(ctx context.Context, hold uint8) error`; the server calls it only when it serves TemperatureSetpointHold (`thermo.ThermostatConfig.TemperatureSetpointHold`, or the declaration's `Initial` setting it), so a host that serves no hold returns `nil` |
+
 ## Removed or changed in v0.13.0: `MarkComplete`, `Priority`, `SubscribeRequest`
 
 | Symbol | Route |
