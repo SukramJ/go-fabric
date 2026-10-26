@@ -162,6 +162,11 @@ func (s *sinkRecorder) SetSetpoint(_ context.Context, attrID uint32, _ int16, co
 	return s.err
 }
 
+func (s *sinkRecorder) SetTemperatureSetpointHold(context.Context, uint8) error {
+	s.calls = append(s.calls, tdef.AttrTemperatureSetpointHold)
+	return s.err
+}
+
 // TestSetActivePresetRequestGoesThroughTheSink: the preset's setpoints
 // reach the Sink in one call, heating first; a refusal stores nothing and
 // leaves the preset inactive.

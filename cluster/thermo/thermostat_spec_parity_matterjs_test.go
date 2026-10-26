@@ -17,7 +17,7 @@ import (
 // TestServerMatchesTheGeneratedDefinition holds every selection the server
 // serves against matter.js thermostat-cluster.element.ts
 // (spectest.CheckServer): HEAT, COOL, HEAT+COOL and HEAT+COOL+AUTO, each
-// with and without LTNE, OCC and PRES.
+// with and without LTNE, OCC, PRES and MSCH (with PRES as well).
 func TestServerMatchesTheGeneratedDefinition(t *testing.T) {
 	t.Parallel()
 	for _, base := range []uint32{
@@ -29,11 +29,18 @@ func TestServerMatchesTheGeneratedDefinition(t *testing.T) {
 		for _, f := range []uint32{
 			base, base | thermo.ThermostatFeatureLTNE, base | thermo.ThermostatFeatureOCC,
 			base | thermo.ThermostatFeaturePRES, base | thermo.ThermostatFeatureOCC | thermo.ThermostatFeaturePRES,
+			base | thermo.ThermostatFeatureMSCH, base | thermo.ThermostatFeaturePRES | thermo.ThermostatFeatureMSCH,
 		} {
 			cfg := thermo.DefaultThermostatConfig()
 			cfg.Features = f
 			cfg.NumberOfPresets = 1
 			cfg.PresetTypes = []thermo.PresetType{{PresetScenario: tdef.PresetScenarioOccupied, NumberOfPresets: 1}}
+			mode := tdef.SystemModeHeat
+			if f&thermo.ThermostatFeatureHEAT == 0 {
+				mode = tdef.SystemModeCool
+			}
+			cfg.ScheduleTypes = []thermo.ScheduleType{{SystemMode: mode, NumberOfSchedules: 1}}
+			cfg.NumberOfSchedules, cfg.NumberOfScheduleTransitions = 1, 1
 			srv, err := thermo.New(cfg)
 			if err != nil {
 				t.Fatalf("features 0x%X: %v", f, err)
@@ -44,13 +51,14 @@ func TestServerMatchesTheGeneratedDefinition(t *testing.T) {
 }
 
 // TestFeaturesTheServerDoesNotServeAreRefused pins the refusal of a
-// feature whose elements the server does not serve — the schedules
-// (MatterScheduleConfiguration, "not yet implemented" in matter.js),
-// Setback, which matter.js refuses, the events and the suggestions — New with
-// ErrFeatures, NewThermostatServer with a panic.
+// feature whose elements the server does not serve — Setback, which
+// matter.js refuses, the events and the suggestions — New with
+// ErrFeatures, NewThermostatServer with a panic. MatterScheduleConfiguration
+// ("not yet implemented" in matter.js) is served ahead of it
+// (schedules.go).
 func TestFeaturesTheServerDoesNotServeAreRefused(t *testing.T) {
 	t.Parallel()
-	for _, f := range []tdef.Feature{tdef.FeatureMatterScheduleConfiguration, tdef.FeatureSetback, tdef.FeatureEvents, tdef.FeatureThermostatSuggestions} {
+	for _, f := range []tdef.Feature{tdef.FeatureSetback, tdef.FeatureEvents, tdef.FeatureThermostatSuggestions} {
 		cfg := thermo.DefaultThermostatConfig()
 		cfg.Features |= uint32(f)
 		if _, err := thermo.New(cfg); !errors.Is(err, thermo.ErrFeatures) {

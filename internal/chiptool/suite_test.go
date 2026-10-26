@@ -32,6 +32,7 @@ func TestChipToolSuite(t *testing.T) {
 		run  func(*testing.T, *fixture)
 	}{
 		{"datamodel", testDataModelSweep},
+		{"thermostat", testThermostatHold},
 	}
 	for _, leg := range legs {
 		start := time.Now()

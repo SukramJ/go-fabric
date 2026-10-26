@@ -50,8 +50,9 @@ var setpointKeys = map[uint32]struct {
 // all or nothing, each value checked against its attribute's type,
 // constraint and the selection's enum values, stored without the [Sink]
 // and reported — no write veto. LocalTemperature (null included),
-// LocalTemperatureCalibration, SystemMode and, with OCC, Occupancy are
-// stored as given. A setpoint or user setpoint limit is held to its
+// LocalTemperatureCalibration, SystemMode, with OCC Occupancy, and the
+// served TemperatureSetpointHold, TemperatureSetpointHoldDuration and
+// ThermostatRunningState are stored as given. A setpoint or user setpoint limit is held to its
 // limits as a write is and runs the reconcile a write runs (matter.js #reconcileSetpoints on the attribute's $Changing),
 // so a companion may move with it and is reported too; an absolute limit
 // is held to the user limits as [ThermostatServer.SetAbsoluteSetpointLimit]
@@ -63,13 +64,14 @@ var setpointKeys = map[uint32]struct {
 // Presets and ActivePresetHandle, which the host owns too, go through
 // [ThermostatServer.SetPresets] and [ThermostatServer.SetActivePresetHandle]
 // — validated against the preset rules and persisted through the
-// [PresetStore] under the command queue — before the other attributes, in
-// that order: a refusal there leaves the other attributes unset (a
-// refused handle after accepted presets keeps the presets).
+// [PresetStore] under the command queue — and then Schedules and
+// ActiveScheduleHandle through [ThermostatServer.SetSchedules] and
+// [ThermostatServer.SetActiveScheduleHandle], before the other attributes,
+// in that order: a refusal there leaves the attributes after it unset.
 // ControlSequenceOfOperation is derived from the features, and
-// MinSetpointDeadBand, PresetTypes and NumberOfPresets are the
-// configuration's: [spec.ErrNotHeld] for a value other than the one they
-// read (any value for the two lists).
+// MinSetpointDeadBand, PresetTypes, NumberOfPresets, ScheduleTypes and the
+// three schedule counts are the configuration's: [spec.ErrNotHeld] for a
+// value other than the one they read (any value for the lists and counts).
 func (s *ThermostatServer) SetAttributes(values map[uint32]any) error {
 	checked, presets, err := s.checkSet(values)
 	if err != nil {
@@ -131,6 +133,7 @@ func (s *ThermostatServer) SetAttributes(values map[uint32]any) error {
 		note(thermoAttrOccupancy, s.occupied != occupied)
 		s.occupied = occupied
 	}
+	s.setOptionalLocked(checked, note)
 	s.mu.Unlock()
 
 	if len(changed) > 0 {
@@ -150,6 +153,27 @@ func (s *ThermostatServer) SetAttributes(values map[uint32]any) error {
 	return nil
 }
 
+// setOptionalLocked stores the hold, its duration and the running state
+// checked holds, noting each change; the caller holds s.mu.
+func (s *ThermostatServer) setOptionalLocked(checked map[uint32]any, note func(id uint32, moved bool)) {
+	if n, ok := checked[thermoAttrTemperatureSetpointHold].(uint8); ok {
+		note(thermoAttrTemperatureSetpointHold, s.hold != n)
+		s.hold = n
+	}
+	if v, ok := checked[thermoAttrTemperatureSetpointHoldDur]; ok {
+		var d *uint16
+		if n, isUint := v.(uint16); isUint {
+			d = &n
+		}
+		note(thermoAttrTemperatureSetpointHoldDur, !equalDuration(s.holdDuration, d))
+		s.holdDuration = d
+	}
+	if n, ok := checked[thermoAttrThermostatRunningState].(uint16); ok {
+		note(thermoAttrThermostatRunningState, s.runningState != n)
+		s.runningState = n
+	}
+}
+
 // presetValues are the Presets and ActivePresetHandle a
 // [ThermostatServer.SetAttributes] sets, each when given.
 type presetValues struct {
@@ -157,6 +181,13 @@ type presetValues struct {
 	hasPresets bool
 	handle     []byte
 	hasHandle  bool
+
+	// schedules and scheduleHandle are Schedules and ActiveScheduleHandle
+	// (MSCH), each when given.
+	schedules         []Schedule
+	hasSchedules      bool
+	scheduleHandle    []byte
+	hasScheduleHandle bool
 }
 
 // setPresetAttributes applies p through the preset setters, Presets first.
@@ -168,7 +199,17 @@ func (s *ThermostatServer) setPresetAttributes(p presetValues) error {
 		}
 	}
 	if p.hasHandle {
-		return s.SetActivePresetHandle(ctx, p.handle)
+		if err := s.SetActivePresetHandle(ctx, p.handle); err != nil {
+			return err
+		}
+	}
+	if p.hasSchedules {
+		if err := s.SetSchedules(p.schedules); err != nil {
+			return err
+		}
+	}
+	if p.hasScheduleHandle {
+		return s.SetActiveScheduleHandle(p.scheduleHandle)
 	}
 	return nil
 }
@@ -195,7 +236,19 @@ func (s *ThermostatServer) checkSet(values map[uint32]any) (map[uint32]any, pres
 			handle, _ := v.([]byte) // octstr per CheckSet; nil is null
 			presets.handle, presets.hasHandle = handle, true
 			continue
-		case tdef.AttrPresetTypes, tdef.AttrNumberOfPresets:
+		case tdef.AttrSchedules:
+			list, err := schedulesValue(v)
+			if err != nil {
+				return nil, presets, err
+			}
+			presets.schedules, presets.hasSchedules = list, true
+			continue
+		case tdef.AttrActiveScheduleHandle:
+			handle, _ := v.([]byte) // octstr per CheckSet; nil is null
+			presets.scheduleHandle, presets.hasScheduleHandle = handle, true
+			continue
+		case tdef.AttrPresetTypes, tdef.AttrNumberOfPresets, tdef.AttrScheduleTypes, tdef.AttrNumberOfSchedules,
+			tdef.AttrNumberOfScheduleTransitions, tdef.AttrNumberOfScheduleTransitionPerDay:
 			return nil, presets, fmt.Errorf("%w: thermostat: attribute 0x%04X is the configuration's", spec.ErrNotHeld, id)
 		case thermoAttrControlSequenceOfOperation, thermoAttrMinSetpointDeadBand:
 			if cur, _ := s.MatterRead(id); v != cur {

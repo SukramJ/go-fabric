@@ -5,6 +5,7 @@ package thermo
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"slices"
 	"sync"
@@ -373,6 +374,14 @@ func (s *ThermostatServer) beginWrite(ctx context.Context, req tdef.AtomicReques
 	}
 
 	st := newAtomicWriteState(peer, req.AttributeRequests, *req.Timeout)
+	// Schedules starts as the stored list: chip OnAtomicWriteBegin,
+	// InitializePendingSchedules (ThermostatClusterSchedules.cpp:620-628 at
+	// 645b267a) — so a CommitWrite without a write commits what is there.
+	if st.holds(tdef.AttrSchedules) {
+		s.mu.RLock()
+		st.stage(tdef.AttrSchedules, cloneSchedules(s.schedules))
+		s.mu.RUnlock()
+	}
 	s.atomic.add(st)
 	st.start(s.clk)
 	timeout := uint16(st.timeout / time.Millisecond) //nolint:gosec // at most maxAtomicTimeout, 9000 ms
@@ -402,35 +411,99 @@ func (s *ThermostatServer) rollbackWrite(ctx context.Context, req tdef.AtomicReq
 // the command reports FAILURE with the reasons in the attributes'
 // statuses. The state closes whatever the outcome.
 //
-// Presets is the one atomic attribute this server serves (Schedules is
-// MatterScheduleConfiguration, which it does not), so the unit is at most
-// that one value.
+// The unit runs in two passes, as chip's CommitWrite does
+// (ThermostatClusterAtomic.cpp:442-447 at 645b267a): every attribute's
+// precommit — the Presets validation and commit checks, chip's
+// PrecommitSchedules — and, only when all passed, every commit. With
+// Presets alone that is the one validate-and-apply matter.js runs.
 func (s *ThermostatServer) commitWrite(ctx context.Context, req tdef.AtomicRequestRequest) (any, error) {
 	st, err := s.existingAtomicState(ctx, req)
 	if err != nil {
 		return nil, err
 	}
 	defer st.close()
-	statuses := make([]tdef.AtomicResponseAttributeStatusEntry, 0, len(req.AttributeRequests))
-	failed := false
-	for _, attr := range req.AttributeRequests {
-		status := tdef.StatusSuccess
-		if v, ok := st.staged(attr); ok && attr == tdef.AttrPresets {
-			staged, _ := v.([]Preset) // writePresets stages a []Preset
-			if err := s.commitPresets(ctx, staged); err != nil {
-				status = tdef.Status(statusOf(err, "committing attribute Presets", s.logger()))
+	statuses := make([]tdef.AtomicResponseAttributeStatusEntry, len(req.AttributeRequests))
+	for i, attr := range req.AttributeRequests {
+		statuses[i] = tdef.AtomicResponseAttributeStatusEntry{AttributeId: attr, StatusCode: tdef.StatusSuccess}
+	}
+	run := func(step string, fn func(attr uint32, v any) error) bool {
+		ok := true
+		for i, attr := range req.AttributeRequests {
+			v, staged := st.staged(attr)
+			if !staged || statuses[i].StatusCode != tdef.StatusSuccess {
+				continue
+			}
+			if err := fn(attr, v); err != nil {
+				statuses[i].StatusCode = tdef.Status(statusOf(err, step+" attribute "+atomicAttributeName(attr), s.logger()))
+				ok = false
 			}
 		}
-		if status != tdef.StatusSuccess {
-			failed = true
-		}
-		statuses = append(statuses, tdef.AtomicResponseAttributeStatusEntry{AttributeId: attr, StatusCode: status})
+		return ok
 	}
+	done := run("precommitting", func(attr uint32, v any) error { return s.precommitAtomic(attr, v) }) &&
+		run("committing", func(attr uint32, v any) error { return s.commitAtomic(ctx, attr, v) })
 	command := tdef.StatusSuccess
-	if failed {
+	if !done {
 		command = tdef.StatusFailure
 	}
 	return tdef.AtomicResponse{StatusCode: command, AttributeStatus: statuses}, nil
+}
+
+// atomicAttributeName names an atomic attribute for the log.
+func atomicAttributeName(attr uint32) string {
+	if a := tdef.Definition.Attribute(attr); a != nil {
+		return a.Name
+	}
+	return fmt.Sprintf("0x%04X", attr)
+}
+
+// precommitAtomic checks a staged value before anything is committed:
+// Presets as matter.js validates and normalises its commit
+// (ThermostatServer.ts:1289-1291, :1508-1595 at 862ad75f) and, with MSCH,
+// chip's check that no schedule uses a removed preset
+// (ThermostatClusterPresets.cpp:708-724 at 645b267a); Schedules as chip's
+// PrecommitSchedules.
+func (s *ThermostatServer) precommitAtomic(attr uint32, v any) error {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	switch attr {
+	case tdef.AttrPresets:
+		staged, _ := v.([]Preset) // writePresets stages a []Preset
+		next := clonePresets(staged)
+		issued := map[string]bool{}
+		if err := s.presetRules().validatePresetWrite(next, s.presets, false, issued); err != nil {
+			return err
+		}
+		if err := normalizePresetCommit(next, s.presets, false, issued, s.activePresetHandle); err != nil {
+			return err
+		}
+		return s.presetsInUseBySchedules(s.presets, next)
+	case tdef.AttrSchedules:
+		staged, _ := v.([]Schedule) // writeSchedules and beginWrite stage a []Schedule
+		// The staged list held to the attribute's schema, as matter.js
+		// validates a staged value on commit (AtomicWriteHandler.ts:271-339;
+		// AtomicWriteHandlerTest "discards a valid Presets write when the
+		// Schedules write fails").
+		if _, err := s.inst.CheckValue(tdef.AttrSchedules, spec.List[Schedule](staged), s.readLocked); err != nil {
+			return spec.Errorf(im.StatusConstraintError, "thermo: staged Schedules: %v", err)
+		}
+		return precommitSchedules(s.schedules, staged, s.activeScheduleHandle)
+	}
+	return nil
+}
+
+// commitAtomic applies a staged value after every precommit passed. The
+// caller holds s.op.
+func (s *ThermostatServer) commitAtomic(ctx context.Context, attr uint32, v any) error {
+	switch attr {
+	case tdef.AttrPresets:
+		staged, _ := v.([]Preset)
+		return s.commitPresets(ctx, staged)
+	case tdef.AttrSchedules:
+		staged, _ := v.([]Schedule)
+		return s.commitSchedules(ctx, staged)
+	}
+	return nil
 }
 
 // statusOf is the status an attribute reports for an error raised while
@@ -454,6 +527,19 @@ func statusOf(err error, step string, log *slog.Logger) im.StatusCode {
 // INVALID_IN_STATE; another peer's hold is BUSY (CHIP and TC-TSTAT-4.2
 // step 15, :467-469).
 func (s *ThermostatServer) writeAtomicAttribute(ctx context.Context, attrID uint32, v any, validate func(v any) error) error {
+	return s.stageAtomicAttribute(ctx, attrID, im.StatusBusy, func() (any, error) {
+		if err := validate(v); err != nil {
+			return nil, err
+		}
+		return v, nil
+	})
+}
+
+// stageAtomicAttribute stages the value stage computes in the atomic write
+// that holds attrID, for the peer holding it; another peer's write is
+// answered otherPeer — BUSY for Presets (matter.js), INVALID_IN_STATE for
+// Schedules (chip ThermostatClusterSchedules.cpp:572-575 at 645b267a).
+func (s *ThermostatServer) stageAtomicAttribute(ctx context.Context, attrID uint32, otherPeer im.StatusCode, stage func() (any, error)) error {
 	now := s.clk.Now()
 	st := s.atomic.forAttribute(now, attrID)
 	if st == nil {
@@ -464,9 +550,10 @@ func (s *ThermostatServer) writeAtomicAttribute(ctx context.Context, attrID uint
 		return spec.Errorf(im.StatusInvalidInState, "thermo: there is no atomic write in progress for this peer")
 	}
 	if st.peer != peer {
-		return spec.Errorf(im.StatusBusy, "thermo: attribute is part of an atomic write in progress for a different peer")
+		return spec.Errorf(otherPeer, "thermo: attribute is part of an atomic write in progress for a different peer")
 	}
-	if err := validate(v); err != nil {
+	v, err := stage()
+	if err != nil {
 		return err
 	}
 	st.stage(attrID, v)

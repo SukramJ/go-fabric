@@ -710,13 +710,15 @@ type SetpointChange struct {
 	Value  int16
 }
 
-// Sink applies a SystemMode write and a setpoint change (a write
-// or a SetpointRaiseLower) the kit's Thermostat server admitted,
-// with the companions that move with it; an error answers FAILURE
-// and stores nothing (cluster/thermo Sink).
+// Sink applies a SystemMode write, a setpoint change (a write or
+// a SetpointRaiseLower) with the companions that move with it,
+// and a TemperatureSetpointHold write, each one the kit's
+// Thermostat server admitted; an error answers FAILURE and
+// stores nothing (cluster/thermo Sink).
 type Sink interface {
 	SetSystemMode(ctx context.Context, mode uint8) error
 	SetSetpoint(ctx context.Context, attrID uint32, value int16, companions []SetpointChange) error
+	SetTemperatureSetpointHold(ctx context.Context, hold uint8) error
 }
 
 // PresetStore persists the presets (their TLV encoding) and the
@@ -726,6 +728,17 @@ type Sink interface {
 type PresetStore interface {
 	LoadPresets(ctx context.Context) (presets, activeHandle []byte, ok bool, err error)
 	SavePresets(ctx context.Context, presets, activeHandle []byte) error
+}
+
+// SchedulePort is the device's week program behind the
+// MatterScheduleConfiguration feature: SetActiveSchedule switches
+// to a stored schedule a SetActiveScheduleRequest named, and
+// CommitSchedules stores the list an atomic write committed; an
+// error refuses the change with its status, FAILURE without one
+// (cluster/thermo SchedulePort).
+type SchedulePort interface {
+	SetActiveSchedule(ctx context.Context, handle []byte) error
+	CommitSchedules(ctx context.Context, schedules []ScheduleStruct) error
 }
 
 // Declare is the declaration of the Thermostat cluster on a device:
@@ -771,6 +784,8 @@ type Declare struct {
 	Sink Sink
 	// PresetStore is the host port the kit's server runs on ([PresetStore]).
 	PresetStore PresetStore
+	// SchedulePort is the host port the kit's server runs on ([SchedulePort]).
+	SchedulePort SchedulePort
 	// HostServer is the host's own server for the cluster, mounted in
 	// place of the kit's — also for a cluster the device type does not
 	// list. The hooks above go on it; Initial, Features and the ports are

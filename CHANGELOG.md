@@ -10,6 +10,23 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+### Added
+
+- The Thermostat server serves the optional `TemperatureSetpointHold` and `ThermostatRunningState` (issue #273, brief CO PR 1): `thermo.ThermostatConfig.TemperatureSetpointHold` and `.ThermostatRunningState` — or a `thermostatdef.Declare` whose `Initial` sets them — serve each from its initial value, and the device reports its own changes through the new inbound setters `ThermostatServer.SetTemperatureSetpointHold` and `ThermostatServer.SetThermostatRunningState` (or the typed server's `Set`), stored and reported as the host's change without the `Sink`. With the hold the server also serves `TemperatureSetpointHoldDuration`, null and stored as written, as matter.js initialises it (`ThermostatServer.ts:365-369` at 862ad75f); `SetpointHoldExpiryTimestamp` stays unserved, as in matter.js (`:372-379`). The reference bridge's thermostat serves both, and the chip-tool suite reads them and writes the hold.
+- MatterScheduleConfiguration (MSCH) on the Thermostat server, ahead of matter.js (which does not implement it, `ThermostatServer.ts:82` at 862ad75f), after connectedhomeip's `ThermostatSchedules` (`ThermostatClusterSchedules.cpp` at 645b267a; issue #273, brief CO). `thermo.ThermostatFeatureMSCH` is served.
+  - `ThermostatConfig` (or the declaration's `Initial`) carries `ScheduleTypes`, the three counts, the device's `Schedules` and the `ActiveScheduleHandle`. A schedule the device supplies needs a handle, and a null `BuiltIn` makes it built in.
+  - The new port is `thermo.SchedulePort` (`thermostatdef.SchedulePort`, `Declare.SchedulePort`). `SetActiveScheduleRequest` validates the handle, as chip does (an unknown one is INVALID_COMMAND), and then calls `SetActiveSchedule`.
+  - `Schedules` is written only inside an `AtomicRequest`. Each write is validated with chip's `AppendPendingSchedule` rules, CommitWrite precommits as chip's `PrecommitSchedules` does, and then `CommitSchedules` stores the list. The port's error fails the commit.
+  - The device's own changes arrive through `ThermostatServer.SetSchedules` and `SetActiveScheduleHandle`. The getters are `Schedules` and `ActiveScheduleHandle`.
+  - The bridge decodes a `Schedules` write with the generated definition.
+  - The reference bridge serves MSCH behind `--thermostat-schedules`, off by default. Hosts gate MSCH behind a flag, off by default, until a live pairing is verified. The chip-tool suite turns it on, reads the schedule attributes, switches the active schedule and commits an atomic write.
+
+### Changed
+
+- **Break:** `thermo.Sink.SetTemperatureSetpointHold` and `thermostatdef.Sink.SetTemperatureSetpointHold` (`Sink.SetTemperatureSetpointHold(ctx, hold uint8) error`) are added to the Thermostat Sink: a controller's write of `TemperatureSetpointHold` reaches the host after the definition admitted it and before it is stored, and the host's refusal refuses the write with its status (FAILURE for an error without one), as a `SystemMode` write does. An unchanged hold does not call it. matter.js stores the hold only (its reaction is commented out, `ThermostatServer.ts:381` at 862ad75f). Migration guide: "Changed in v0.13.3".
+- The AtomicRequest CommitWrite precommits every staged attribute before it commits any of them, as connectedhomeip does (`ThermostatClusterAtomic.cpp:442-447` at 645b267a). A failure in one attribute leaves the others reported SUCCESS and nothing applied, as matter.js's `AtomicWriteHandlerTest` "CommitWrite of more than one attribute" cases have it. Those five cases are now ported.
+- The `ErrFeatures` refusal no longer covers MatterScheduleConfiguration. The new `thermo.ErrSchedules` refuses an invalid schedule configuration.
+
 ## [0.13.2] — 2026-10-26
 
 ### Added

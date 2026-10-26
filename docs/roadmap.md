@@ -249,8 +249,8 @@ ICDM and ICDB are classified as not applicable to the reference daemon,
 which is mains-powered and sets no `Config.ICD`, and applicable to a host
 that sets it. The [ICD guide](./guides/icd.md) is the host's view.
 Milestone 5 also closes issues #274 (the Ahead-of-matter.js marker check,
-wave CN) and #273 (wave CO, three pull requests after phase 25), owner
-decision 2026-10-25.
+wave CN) and #273 (wave CO, one pull request after phase 25; owner decisions
+2026-10-25 and 2026-10-26).
 
 **Status 2026-10-26.** Phase 25 (brief CM) is one bundle for `v0.13.0`:
 the OTA push from the controller (`controller/softwareupdate` after
@@ -269,7 +269,7 @@ check) and the `MarkComplete` break. The four controller-discovery test
 files and `ReportedSessionParametersTest` move to milestone 6 phase 27
 with their reasons. The Thread border-router client is milestone 6 phase
 26a ([ADR 0027](./adr/0027-thread-border-router-over-otbr-rest.md)).
-Milestone 5 closes with `v0.13.0` and wave CO (issue #273). Owner decisions 2026-10-26 at the CM review: the invoke batcher is decided with the milestone 6 concept; the snapshot extractor gains the "L" (large message) quality in a small pull request after `v0.13.0`; the controller's own node stays behind the `controller.OwnNode` port with no layering exception.
+Wave CO (brief CO, pull request 287) released as `v0.13.3` (2026-10-26): the Thermostat serves `TemperatureSetpointHold` (with its duration) and `ThermostatRunningState`, the hold reaching the host through `Sink.SetTemperatureSetpointHold`; MatterScheduleConfiguration ahead of matter.js after connectedhomeip (`SchedulePort`, `SetActiveScheduleRequest`, the Schedules atomic write, the first row of the Ahead-of-matter.js register with a chip source), the five multi-attribute `AtomicWriteHandlerTest` cases ported; hosts serve MSCH behind a flag until the owner's live pairing with Apple Home is verified. TEVT (the seven Thermostat events) is a milestone 6 candidate. **Milestone 5 is closed with `v0.13.3`.** Owner decisions 2026-10-26 at the CM review: the invoke batcher is decided with the milestone 6 concept; the snapshot extractor gains the "L" (large message) quality in a small pull request after `v0.13.0`; the controller's own node stays behind the `controller.OwnNode` port with no layering exception.
 
 ### Milestone 6: Completeness
 

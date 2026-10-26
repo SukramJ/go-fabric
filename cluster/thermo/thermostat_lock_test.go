@@ -38,6 +38,8 @@ func (e *echoSink) SetSetpoint(_ context.Context, attrID uint32, value int16, co
 	return nil
 }
 
+func (*echoSink) SetTemperatureSetpointHold(context.Context, uint8) error { return nil }
+
 // echoSetpoint stores value through the inbound setter for attrID.
 func echoSetpoint(srv *thermo.ThermostatServer, attrID uint32, value int16) {
 	if attrID == tdef.AttrOccupiedHeatingSetpoint {

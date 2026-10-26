@@ -382,7 +382,9 @@ const coverMoveStep = 950 * time.Millisecond
 
 // newThermostatServer is the module's Thermostat server ([thermo.New]),
 // at its default limits and setpoints; a declared Sink
-// (thermostatdef.Declare) is told every change it admits.
+// (thermostatdef.Declare) is told every change it admits. An Initial that
+// sets TemperatureSetpointHold or ThermostatRunningState serves it
+// (thermo.ThermostatConfig takes both by their attribute names).
 func newThermostatServer(b defaultBuild) (contract.ClusterServer, error) {
 	// The element's defaults: the absolute limits 7 / 30 °C (heat) and
 	// 16 / 32 °C (cool), the occupied setpoints 20 and 26 °C (matter.js
@@ -397,10 +399,14 @@ func newThermostatServer(b defaultBuild) (contract.ClusterServer, error) {
 		if d.PresetStore != nil {
 			cfg.PresetStore = d.PresetStore
 		}
+		if d.SchedulePort != nil {
+			cfg.SchedulePort = d.SchedulePort
+		}
 	}
-	// The limits and the presets the device ships with (NumberOfPresets,
-	// PresetTypes, Presets, ActivePresetHandle) are the server's
-	// configuration; the setpoints it starts with are too, under their
+	// The limits, the presets the device ships with (NumberOfPresets,
+	// PresetTypes, Presets, ActivePresetHandle) and its schedules
+	// (ScheduleTypes, the three counts, Schedules, ActiveScheduleHandle) are
+	// the server's configuration; the setpoints it starts with are too, under their
 	// Config names.
 	configFrom(&cfg, b.def, b.initial)
 	for id, dst := range map[uint32]*int16{

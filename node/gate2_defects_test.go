@@ -363,6 +363,8 @@ type heating struct {
 
 func (h *heating) SetSystemMode(context.Context, uint8) error { return nil }
 
+func (*heating) SetTemperatureSetpointHold(context.Context, uint8) error { return nil }
+
 func (h *heating) SetSetpoint(_ context.Context, attrID uint32, value int16, _ []thermostatdef.SetpointChange) error {
 	h.mu.Lock()
 	defer h.mu.Unlock()

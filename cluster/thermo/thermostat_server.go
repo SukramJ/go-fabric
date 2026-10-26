@@ -8,7 +8,13 @@
 // selectable Occupancy (the unoccupied setpoints, occupancy from the host)
 // and Presets (presets, the active preset and the atomic writes a
 // controller changes them with, persisted through a [PresetStore])
-// features, as matter.js's ThermostatServer serves them.
+// features, as matter.js's ThermostatServer serves them, and on request
+// the optional TemperatureSetpointHold (with TemperatureSetpointHoldDuration)
+// and ThermostatRunningState. Ahead of matter.js, which does not implement
+// it, the server serves MatterScheduleConfiguration (the device's week
+// programs, the active one, SetActiveScheduleRequest and the atomic write
+// of Schedules) after connectedhomeip's ThermostatSchedules, behind a
+// [SchedulePort] (schedules.go).
 //
 // The server holds its own state. Without a host port it answers every
 // write and command without forwarding it anywhere — the reference daemon
@@ -16,11 +22,14 @@
 // front of chip-tool. A host that drives a device sets
 // [ThermostatConfig.Sink]: SystemMode and occupied-setpoint changes a
 // controller asks for reach the host before they are stored, and the
-// host refuses one by returning an error. The device's own changes come
+// host refuses one by returning an error; so does a TemperatureSetpointHold
+// write when the server serves the hold. The device's own changes come
 // back through [ThermostatServer.SetSystemMode],
 // [ThermostatServer.SetOccupiedHeatingSetpoint],
-// [ThermostatServer.SetOccupiedCoolingSetpoint] and
-// [ThermostatServer.SetLocalTemperature], which do not call the Sink.
+// [ThermostatServer.SetOccupiedCoolingSetpoint],
+// [ThermostatServer.SetLocalTemperature],
+// [ThermostatServer.SetTemperatureSetpointHold] and
+// [ThermostatServer.SetThermostatRunningState], which do not call the Sink.
 //
 // The cluster's identity is the generated definition (cluster/spec/
 // thermostat, ADR 0013): ids, revision, the feature check, the attribute
@@ -61,21 +70,23 @@ const (
 
 // Feature bits (thermostat-cluster.element.ts).
 const (
-	ThermostatFeatureHEAT = uint32(tdef.FeatureHeating)                    // bit 0 — Heating
-	ThermostatFeatureCOOL = uint32(tdef.FeatureCooling)                    // bit 1 — Cooling
-	ThermostatFeatureAUTO = uint32(tdef.FeatureAutoMode)                   // bit 5 — AutoMode (requires HEAT+COOL)
-	ThermostatFeatureLTNE = uint32(tdef.FeatureLocalTemperatureNotExposed) // bit 6 — LocalTemperatureNotExposed
-	ThermostatFeatureOCC  = uint32(tdef.FeatureOccupancy)                  // bit 2 — Occupancy
-	ThermostatFeaturePRES = uint32(tdef.FeaturePresets)                    // bit 8 — Presets
+	ThermostatFeatureHEAT = uint32(tdef.FeatureHeating)                     // bit 0 — Heating
+	ThermostatFeatureCOOL = uint32(tdef.FeatureCooling)                     // bit 1 — Cooling
+	ThermostatFeatureAUTO = uint32(tdef.FeatureAutoMode)                    // bit 5 — AutoMode (requires HEAT+COOL)
+	ThermostatFeatureLTNE = uint32(tdef.FeatureLocalTemperatureNotExposed)  // bit 6 — LocalTemperatureNotExposed
+	ThermostatFeatureOCC  = uint32(tdef.FeatureOccupancy)                   // bit 2 — Occupancy
+	ThermostatFeaturePRES = uint32(tdef.FeaturePresets)                     // bit 8 — Presets
+	ThermostatFeatureMSCH = uint32(tdef.FeatureMatterScheduleConfiguration) // bit 7 — MatterScheduleConfiguration
 )
 
 // servedFeatures are the features whose elements the server serves.
-// MatterScheduleConfiguration (matter.js: "not implemented yet",
-// ThermostatServer.ts:126-128 at 862ad75f), ScheduleConfiguration and
-// Setback (deprecated, refused, :120-125), Events and
-// ThermostatSuggestions are not.
+// MatterScheduleConfiguration is served ahead of matter.js ("not
+// implemented yet", ThermostatServer.ts:82 and :126-128 at 862ad75f),
+// after connectedhomeip (schedules.go). ScheduleConfiguration and Setback
+// (deprecated, refused, :120-125), Events and ThermostatSuggestions are
+// not.
 const servedFeatures = ThermostatFeatureHEAT | ThermostatFeatureCOOL | ThermostatFeatureAUTO | ThermostatFeatureLTNE |
-	ThermostatFeatureOCC | ThermostatFeaturePRES
+	ThermostatFeatureOCC | ThermostatFeaturePRES | ThermostatFeatureMSCH
 
 // ErrFeatures reports a ThermostatConfig.Features the server refuses.
 var ErrFeatures = errors.New("thermo: feature selection not served")
@@ -106,6 +117,9 @@ const (
 	thermoAttrOccupancy                   = tdef.AttrOccupancy
 	thermoAttrUnoccupiedHeatingSetpoint   = tdef.AttrUnoccupiedHeatingSetpoint
 	thermoAttrUnoccupiedCoolingSetpoint   = tdef.AttrUnoccupiedCoolingSetpoint
+	thermoAttrTemperatureSetpointHold     = tdef.AttrTemperatureSetpointHold
+	thermoAttrTemperatureSetpointHoldDur  = tdef.AttrTemperatureSetpointHoldDuration
+	thermoAttrThermostatRunningState      = tdef.AttrThermostatRunningState
 )
 
 // defaultMinSetpointDeadBand is MinSetpointDeadBand's default, 2.0 °C in
@@ -177,6 +191,42 @@ type ThermostatConfig struct {
 	// PresetStore persists the presets and the active handle; nil keeps
 	// them in memory.
 	PresetStore PresetStore
+	// TemperatureSetpointHold serves the optional TemperatureSetpointHold
+	// attribute (TemperatureSetpointHoldEnum: 0 SetpointHoldOff — follow the
+	// schedule, 1 SetpointHoldOn — hold the setpoint) starting at the value
+	// given; nil does not serve it. With it the server also serves
+	// TemperatureSetpointHoldDuration, null, as matter.js initialises it
+	// (ThermostatServer.ts:365-369 at 862ad75f) — stored as written, with no
+	// hold timer. SetpointHoldExpiryTimestamp is not served (matter.js
+	// leaves it unset, :372-379). A controller's write of the hold reaches
+	// the [Sink]; the device's own change comes back through
+	// [ThermostatServer.SetTemperatureSetpointHold].
+	TemperatureSetpointHold *uint8
+	// ThermostatRunningState serves the optional, read-only
+	// ThermostatRunningState attribute (RelayStateBitmap: Heat, Cool, Fan
+	// and their stages) starting at the bitmap given; nil does not serve
+	// it. The device reports changes through
+	// [ThermostatServer.SetThermostatRunningState].
+	ThermostatRunningState *uint16
+	// ScheduleTypes, NumberOfSchedules, NumberOfScheduleTransitions and
+	// NumberOfScheduleTransitionPerDay (nil for no per-day limit) configure
+	// MatterScheduleConfiguration (MSCH): the schedule types the device
+	// supports, the number of schedules and of transitions across them it
+	// holds, and the transitions a day may carry. Schedules are the
+	// device's own week programs — each with a handle, a null BuiltIn taken
+	// as built in — and ActiveScheduleHandle the one it follows (nil for
+	// none; one that names no schedule is cleared with a warning). The
+	// device's later changes come back through [ThermostatServer.SetSchedules]
+	// and [ThermostatServer.SetActiveScheduleHandle].
+	ScheduleTypes                    []ScheduleType
+	NumberOfSchedules                uint8
+	NumberOfScheduleTransitions      uint8
+	NumberOfScheduleTransitionPerDay *uint8
+	Schedules                        []Schedule
+	ActiveScheduleHandle             []byte
+	// SchedulePort switches the device's active schedule and stores the
+	// schedules a controller wrote, with MSCH; nil keeps them in memory.
+	SchedulePort SchedulePort
 	// Clock times the atomic writes; nil is the system clock.
 	Clock clock.Clock
 	// Sink is the optional host port; nil keeps the server self-contained.
@@ -200,11 +250,23 @@ type ThermostatConfig struct {
 // :614 at matter.js 0ceb202d). For comparison, onoff's Sink answers every
 // error, a status error included, with FAILURE.
 //
+// With [ThermostatConfig.TemperatureSetpointHold] a write of
+// TemperatureSetpointHold reaches the Sink the same way, as
+// SetTemperatureSetpointHold. matter.js stores the hold only (its
+// reaction is commented out, ThermostatServer.ts:381 at 862ad75f) and
+// connectedhomeip gives it no behaviour either
+// (src/app/clusters/thermostat-server/ThermostatClusterBase.cpp:357-358 at
+// 6170af84, an optional attribute only); the hold reaching the host is
+// this module's port, so a device that follows a week program learns that
+// a controller asked it to hold or to resume.
+//
 // The setpoint limits (Min/MaxHeat/CoolSetpointLimit) are configuration,
 // not device commands: their writes do not call the Sink, and neither
-// does LocalTemperatureCalibration. The host's own changes
-// ([ThermostatServer.SetSystemMode], [ThermostatServer.SetOccupiedHeatingSetpoint],
-// [ThermostatServer.SetOccupiedCoolingSetpoint]) do not call it.
+// do LocalTemperatureCalibration and TemperatureSetpointHoldDuration.
+// The host's own changes ([ThermostatServer.SetSystemMode],
+// [ThermostatServer.SetOccupiedHeatingSetpoint],
+// [ThermostatServer.SetOccupiedCoolingSetpoint],
+// [ThermostatServer.SetTemperatureSetpointHold]) do not call it.
 //
 // The Sink runs with no lock held that the inbound setters or a read
 // take: it may read the server (MatterRead) and may confirm the change
@@ -243,6 +305,11 @@ type Sink interface {
 	// skips an equal value on commit, :760-762, and fires $Changing only
 	// for fields that changed, :1042-1043).
 	SetSetpoint(ctx context.Context, attrID uint32, value int16, companions []SetpointChange) error
+	// SetTemperatureSetpointHold is a TemperatureSetpointHold write the
+	// definition admitted (0 SetpointHoldOff, 1 SetpointHoldOn), on a
+	// server that serves the hold. A value equal to the stored one is no
+	// change and does not call it.
+	SetTemperatureSetpointHold(ctx context.Context, hold uint8) error
 }
 
 // SetpointChange is one attribute a setpoint change would move besides
@@ -321,6 +388,24 @@ type ThermostatServer struct {
 
 	systemMode uint8 // SystemModeEnum value
 
+	// Optional state, served on request
+	// ([ThermostatConfig.TemperatureSetpointHold],
+	// [ThermostatConfig.ThermostatRunningState]): the hold, its duration
+	// (nil is null) and the relay state.
+	hold         uint8
+	holdDuration *uint16
+	runningState uint16
+
+	// MSCH-gated state (schedules.go): the configuration, the stored
+	// schedules, the active handle and the port.
+	scheduleTypes               []ScheduleType
+	numberOfSchedules           uint8
+	numberOfScheduleTransitions uint8
+	transitionsPerDay           *uint8
+	schedules                   []Schedule
+	activeScheduleHandle        []byte
+	schedulePort                SchedulePort
+
 	clk    clock.Clock
 	atomic atomicWrites
 
@@ -341,7 +426,8 @@ type ThermostatServer struct {
 // feature the server does not serve (Setback, the schedule, event and
 // suggestion features) is refused with [ErrFeatures]; a negative
 // MinSetpointDeadBand with [ErrSetpoints], a preset configuration the
-// write rules refuse with [ErrPresets].
+// write rules refuse with [ErrPresets], a schedule configuration with
+// [ErrSchedules].
 //
 // Limits and initial setpoints that violate the setpoint rules are
 // repaired, preferring the heating side (the cooling side without HEAT):
@@ -365,7 +451,7 @@ func New(cfg ThermostatConfig) (*ThermostatServer, error) {
 	if features&^servedFeatures != 0 {
 		return nil, fmt.Errorf("%w: 0x%X names features the server does not serve", ErrFeatures, features&^servedFeatures)
 	}
-	inst, err := spec.New(tdef.Definition, spec.Options{Features: features, Attributes: servedOptional(features)})
+	inst, err := spec.New(tdef.Definition, spec.Options{Features: features, Attributes: servedOptionalFor(cfg, features)})
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", ErrFeatures, err)
 	}
@@ -416,6 +502,9 @@ func New(cfg ThermostatConfig) (*ThermostatServer, error) {
 		}
 	}
 	s.initOccupancy(cfg.Occupied)
+	if err := s.initOptional(cfg); err != nil {
+		return nil, err
+	}
 
 	st := s.setpointState()
 	before := st
@@ -449,17 +538,41 @@ func New(cfg ThermostatConfig) (*ThermostatServer, error) {
 		}
 	}
 
-	// SystemMode default: Auto with the AUTO feature, Heat with HEAT,
-	// Cool when COOL-only.
+	if features&ThermostatFeatureMSCH != 0 {
+		if err := s.seedSchedules(cfg); err != nil {
+			return nil, err
+		}
+	}
+
+	s.systemMode = defaultSystemMode(features)
+	return s, nil
+}
+
+// defaultSystemMode is SystemMode's default: Auto with the AUTO feature,
+// Heat with HEAT, Cool when COOL-only.
+func defaultSystemMode(features uint32) uint8 {
 	switch {
 	case features&ThermostatFeatureAUTO != 0:
-		s.systemMode = uint8(tdef.SystemModeAuto)
+		return uint8(tdef.SystemModeAuto)
 	case features&ThermostatFeatureHEAT != 0:
-		s.systemMode = uint8(tdef.SystemModeHeat)
+		return uint8(tdef.SystemModeHeat)
 	default: // COOL-only; New refused a selection with neither
-		s.systemMode = uint8(tdef.SystemModeCool)
+		return uint8(tdef.SystemModeCool)
 	}
-	return s, nil
+}
+
+// servedOptionalFor is [servedOptional] with the optional attributes the
+// configuration asks for: TemperatureSetpointHold with its duration, and
+// ThermostatRunningState.
+func servedOptionalFor(cfg ThermostatConfig, features uint32) []uint32 {
+	optional := servedOptional(features)
+	if cfg.TemperatureSetpointHold != nil {
+		optional = append(optional, thermoAttrTemperatureSetpointHold, thermoAttrTemperatureSetpointHoldDur)
+	}
+	if cfg.ThermostatRunningState != nil {
+		optional = append(optional, thermoAttrThermostatRunningState)
+	}
+	return optional
 }
 
 // initOccupancy is matter.js #setupOccupancyIntegration
@@ -475,6 +588,30 @@ func (s *ThermostatServer) initOccupancy(occupied *bool) {
 		return
 	}
 	s.occupied = *occupied
+}
+
+// initOptional takes the initial TemperatureSetpointHold and
+// ThermostatRunningState, each checked against its type
+// (TemperatureSetpointHoldEnum, RelayStateBitmap). The hold's duration
+// starts null: matter.js's #setupThermostatLogic initialises
+// temperatureSetpointHoldDuration to null when temperatureSetpointHold is
+// present (ThermostatServer.ts:365-369 at 862ad75f), which makes it a
+// served attribute (packages/node/src/behavior/cluster/ValidatedElements.ts:252:
+// an attribute is implemented when its state is not undefined).
+func (s *ThermostatServer) initOptional(cfg ThermostatConfig) error {
+	if h := cfg.TemperatureSetpointHold; h != nil {
+		if _, err := s.inst.CheckSet(thermoAttrTemperatureSetpointHold, *h, s.MatterRead); err != nil {
+			return fmt.Errorf("thermo: TemperatureSetpointHold %d: %w", *h, err)
+		}
+		s.hold = *h
+	}
+	if r := cfg.ThermostatRunningState; r != nil {
+		if _, err := s.inst.CheckSet(thermoAttrThermostatRunningState, *r, s.MatterRead); err != nil {
+			return fmt.Errorf("thermo: ThermostatRunningState 0x%04X: %w", *r, err)
+		}
+		s.runningState = *r
+	}
+	return nil
 }
 
 // NewThermostatServer constructs the cluster as [New] does; it panics on a
@@ -539,6 +676,48 @@ func (s *ThermostatServer) SetSystemMode(mode uint8) {
 	s.mu.Unlock()
 	if changed {
 		s.changes.NotifyFrom(contract.OriginHostSet, thermoAttrSystemMode)
+	}
+}
+
+// SetTemperatureSetpointHold records a TemperatureSetpointHold the device
+// took on itself — a manual change on the device holds the setpoint, the
+// next program step resumes the schedule: stored and reported through the
+// change notifier, without the Sink. A server that does not serve the
+// hold ([ThermostatConfig.TemperatureSetpointHold] nil), or a value
+// outside TemperatureSetpointHoldEnum, is logged and changes nothing.
+func (s *ThermostatServer) SetTemperatureSetpointHold(hold uint8) {
+	if _, err := s.inst.CheckSet(thermoAttrTemperatureSetpointHold, hold, s.MatterRead); err != nil {
+		s.logger().Warn("matter.thermostat.inbound_setpoint_hold_ignored",
+			slog.String("attribute", "temperature_setpoint_hold"), slog.Int("value", int(hold)), slog.String("reason", err.Error()))
+		return
+	}
+	s.mu.Lock()
+	changed := s.hold != hold
+	s.hold = hold
+	s.mu.Unlock()
+	if changed {
+		s.changes.NotifyFrom(contract.OriginHostSet, thermoAttrTemperatureSetpointHold)
+	}
+}
+
+// SetThermostatRunningState records the relays the device runs right now
+// (RelayStateBitmap: bit 0 Heat, 1 Cool, 2 Fan, 3-6 the second and third
+// stages): stored and reported through the change notifier. The
+// attribute is read-only to a controller. A server that does not serve it
+// ([ThermostatConfig.ThermostatRunningState] nil), or a bitmap with a bit
+// RelayStateBitmap does not define, is logged and changes nothing.
+func (s *ThermostatServer) SetThermostatRunningState(state uint16) {
+	if _, err := s.inst.CheckSet(thermoAttrThermostatRunningState, state, s.MatterRead); err != nil {
+		s.logger().Warn("matter.thermostat.inbound_running_state_ignored",
+			slog.String("attribute", "thermostat_running_state"), slog.Int("value", int(state)), slog.String("reason", err.Error()))
+		return
+	}
+	s.mu.Lock()
+	changed := s.runningState != state
+	s.runningState = state
+	s.mu.Unlock()
+	if changed {
+		s.changes.NotifyFrom(contract.OriginHostSet, thermoAttrThermostatRunningState)
 	}
 }
 
@@ -613,15 +792,22 @@ func sinkError(what string, err error) error {
 // selection does not serve returns (nil, false) — the IM dispatcher
 // handles the UnsupportedAttribute response.
 func (s *ThermostatServer) MatterRead(attrID uint32) (any, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.readLocked(attrID)
+}
+
+// readLocked is [ThermostatServer.MatterRead] for a caller holding s.mu.
+func (s *ThermostatServer) readLocked(attrID uint32) (any, bool) {
 	if v, ok := s.inst.ReadGlobal(attrID); ok {
 		return v, true
 	}
 	if !s.inst.Serves(attrID) {
 		return nil, false
 	}
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
+	if v, ok := s.readOptionalLocked(attrID); ok {
+		return v, true
+	}
 	switch attrID {
 	case thermoAttrLocalTemperature:
 		if s.localTemp == nil {
@@ -686,18 +872,59 @@ func (s *ThermostatServer) MatterRead(attrID uint32) (any, bool) {
 	}
 }
 
-// MatterReadFiltered implements [contract.FabricScopedReader] for the one
-// attribute whose value depends on the reader: Presets, which the peer
-// holding an atomic write of it reads as it staged it — matter.js's
-// Presets getter (ThermostatServer.ts:1680-1699 at 862ad75f). Every other
-// attribute falls through to [ThermostatServer.MatterRead].
+// readOptionalLocked reads the hold, its duration, the running state and
+// the MSCH attributes; false for any other attribute. The caller holds
+// s.mu and checked that the attribute is served.
+func (s *ThermostatServer) readOptionalLocked(attrID uint32) (any, bool) {
+	switch attrID {
+	case thermoAttrTemperatureSetpointHold:
+		return s.hold, true
+	case thermoAttrTemperatureSetpointHoldDur:
+		if s.holdDuration == nil {
+			return nil, true
+		}
+		return *s.holdDuration, true
+	case thermoAttrThermostatRunningState:
+		return s.runningState, true
+	case tdef.AttrScheduleTypes:
+		return spec.List[ScheduleType](slices.Clone(s.scheduleTypes)), true
+	case tdef.AttrNumberOfSchedules:
+		return s.numberOfSchedules, true
+	case tdef.AttrNumberOfScheduleTransitions:
+		return s.numberOfScheduleTransitions, true
+	case tdef.AttrNumberOfScheduleTransitionPerDay:
+		if s.transitionsPerDay == nil {
+			return nil, true
+		}
+		return *s.transitionsPerDay, true
+	case tdef.AttrActiveScheduleHandle:
+		if s.activeScheduleHandle == nil {
+			return nil, true
+		}
+		return bytes.Clone(s.activeScheduleHandle), true
+	case tdef.AttrSchedules:
+		return spec.List[Schedule](cloneSchedules(s.schedules)), true
+	}
+	return nil, false
+}
+
+// MatterReadFiltered implements [contract.FabricScopedReader] for the two
+// attributes whose value depends on the reader: Presets and Schedules,
+// which the peer holding an atomic write of them reads as it staged them —
+// matter.js's Presets getter (ThermostatServer.ts:1680-1699 at 862ad75f),
+// chip's Schedules read (ThermostatClusterSchedules.cpp:517-533 at
+// 645b267a). Every other attribute falls through to
+// [ThermostatServer.MatterRead].
 func (s *ThermostatServer) MatterReadFiltered(ctx context.Context, attrID uint32) (any, bool) {
-	if attrID != tdef.AttrPresets || !s.inst.Serves(attrID) {
+	if (attrID != tdef.AttrPresets && attrID != tdef.AttrSchedules) || !s.inst.Serves(attrID) {
 		return nil, false
 	}
 	if v, ok := s.pendingAtomicValue(ctx, attrID); ok {
-		if presets, isPresets := v.([]Preset); isPresets {
-			return spec.List[Preset](clonePresets(presets)), true
+		switch staged := v.(type) {
+		case []Preset:
+			return spec.List[Preset](clonePresets(staged)), true
+		case []Schedule:
+			return spec.List[Schedule](cloneSchedules(staged)), true
 		}
 	}
 	return s.MatterRead(attrID)
@@ -720,8 +947,11 @@ func (s *ThermostatServer) MatterWrite(ctx context.Context, attrID uint32, value
 	if err := s.veto.Check(ctx, attrID, storedWrite(attrID, v)); err != nil {
 		return err
 	}
-	if attrID == tdef.AttrPresets {
+	switch attrID {
+	case tdef.AttrPresets:
 		return s.writePresets(ctx, v)
+	case tdef.AttrSchedules:
+		return s.writeSchedules(ctx, v)
 	}
 	s.op.Lock()
 	defer s.op.Unlock()
@@ -767,6 +997,26 @@ func (s *ThermostatServer) MatterWrite(ctx context.Context, attrID uint32, value
 		s.mu.Unlock()
 		if changed {
 			s.changes.NotifyFrom(contract.OriginControllerWrite, thermoAttrLocalTemperatureCalibration)
+		}
+		return nil
+	case thermoAttrTemperatureSetpointHold:
+		n, _ := v.(uint64)                // an enum8 per ValidateWrite
+		return s.writeHold(ctx, uint8(n)) //nolint:gosec // an enum8 per ValidateWrite
+	case thermoAttrTemperatureSetpointHoldDur:
+		// "RW VM", plain state in matter.js, with no hold timer (its
+		// reaction is commented out, ThermostatServer.ts:381-386 at
+		// 862ad75f); the definition checked "max 1440" and null.
+		var d *uint16
+		if n, ok := v.(uint64); ok {
+			m := uint16(n) //nolint:gosec // a uint16 per ValidateWrite
+			d = &m
+		}
+		s.mu.Lock()
+		changed := !equalDuration(s.holdDuration, d)
+		s.holdDuration = d
+		s.mu.Unlock()
+		if changed {
+			s.changes.NotifyFrom(contract.OriginControllerWrite, thermoAttrTemperatureSetpointHoldDur)
 		}
 		return nil
 	default: // thermoAttrSystemMode, the last writable attribute
@@ -835,6 +1085,39 @@ func (s *ThermostatServer) writeSystemMode(ctx context.Context, v uint8) error {
 	s.mu.Unlock()
 	s.changes.NotifyFrom(contract.OriginControllerWrite, thermoAttrSystemMode)
 	return nil
+}
+
+// writeHold applies a TemperatureSetpointHold the definition admitted. With
+// a [Sink] the hold goes to the host first; a refusal stores nothing and
+// answers as [Sink] describes. An unchanged hold is no change and does not
+// call the Sink (Datasource.ts:760-762 at 0ceb202d, as for SystemMode).
+// matter.js stores the value only (ThermostatServer.ts:381 at 862ad75f);
+// the Sink call is this module's. The caller holds s.op.
+func (s *ThermostatServer) writeHold(ctx context.Context, v uint8) error {
+	s.mu.RLock()
+	same := s.hold == v
+	s.mu.RUnlock()
+	if same {
+		return nil
+	}
+	if s.sink != nil {
+		if err := s.sink.SetTemperatureSetpointHold(ctx, v); err != nil {
+			return sinkError(fmt.Sprintf("TemperatureSetpointHold %d", v), err)
+		}
+	}
+	s.mu.Lock()
+	s.hold = v
+	s.mu.Unlock()
+	s.changes.NotifyFrom(contract.OriginControllerWrite, thermoAttrTemperatureSetpointHold)
+	return nil
+}
+
+// equalDuration compares two nullable TemperatureSetpointHoldDuration values.
+func equalDuration(a, b *uint16) bool {
+	if a == nil || b == nil {
+		return a == b
+	}
+	return *a == *b
 }
 
 // writeSetpoint writes an occupied setpoint or a user setpoint limit and
@@ -1004,6 +1287,8 @@ func (s *ThermostatServer) MatterInvoke(ctx context.Context, cmdID uint32, field
 		return nil, s.handleSetpointRaiseLower(ctx, fields)
 	case cmdID == tdef.CmdSetActivePresetRequest && s.inst.Accepts(cmdID):
 		return nil, s.handleSetActivePresetRequest(ctx, fields)
+	case cmdID == tdef.CmdSetActiveScheduleRequest && s.inst.Accepts(cmdID):
+		return nil, s.handleSetActiveScheduleRequest(ctx, fields)
 	case cmdID == tdef.CmdAtomicRequest && s.inst.Accepts(cmdID):
 		s.op.Lock()
 		defer s.op.Unlock()
@@ -1418,9 +1703,9 @@ func controlSequenceOfOperation(features uint32) uint8 {
 }
 
 // MatterAcceptedCommands implements [contract.ClusterCommandLister]:
-// SetpointRaiseLower, the only mandatory command, and with PRES
-// SetActivePresetRequest and AtomicRequest; the schedule commands carry
-// MSCH conformance, a feature the server does not serve. Without the lister the dispatcher synthesised an empty
+// SetpointRaiseLower, the only mandatory command, with PRES
+// SetActivePresetRequest, with MSCH SetActiveScheduleRequest, and with
+// either AtomicRequest. Without the lister the dispatcher synthesised an empty
 // AcceptedCommandList, and a controller that reads the list before
 // invoking — Apple Home and Google Home both do — saw a thermostat that
 // accepts nothing. Found by the chip-tool data-model sweep.

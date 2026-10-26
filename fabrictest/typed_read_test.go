@@ -29,6 +29,8 @@ func (nullSink) SetSetpoint(context.Context, uint32, int16, []thermostatdef.Setp
 	return nil
 }
 
+func (nullSink) SetTemperatureSetpointHold(context.Context, uint8) error { return nil }
+
 // TestTypedReadOverTheWire reads whole clusters of two bridged devices
 // over the wire and holds each generated StateFrom against the State the
 // device's typed server reads from the same stored values — the
