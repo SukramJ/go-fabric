@@ -15,9 +15,9 @@ const clusterThermostat = 0x0201
 
 // testThermostatHold is the capability leg for the week-program
 // attributes the reference thermostat serves (issue #273, brief CO PR 1):
-// chip-tool reads TemperatureSetpointHold, TemperatureSetpointHoldDuration
-// (null, served with the hold as matter.js initialises it,
-// ThermostatServer.ts:365-369 at 862ad75f) and ThermostatRunningState,
+// chip-tool reads the hold, its duration and ThermostatRunningState —
+// the duration null, as matter.js sets temperatureSetpointHoldDuration
+// (ThermostatServer.ts:365-369 at 862ad75f) —
 // writes the hold on and reads it back, and writes it off again so the
 // legs after this one see the daemon as it started.
 func testThermostatHold(t *testing.T, f *fixture) {

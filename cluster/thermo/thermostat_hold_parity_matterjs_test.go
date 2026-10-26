@@ -76,10 +76,11 @@ func (r *holdChangeRecorder) attrs(origin contract.Origin) []uint32 {
 
 // TestTemperatureSetpointHoldServedOnRequest: without the configuration
 // none of the optional attributes is served; with the hold the server
-// serves TemperatureSetpointHold and TemperatureSetpointHoldDuration, null
-// (matter.js ThermostatServer.ts:365-369 makes the duration present, and
-// ValidatedElements.ts:252 counts a defined state as implemented), and
-// not SetpointHoldExpiryTimestamp (left unset, :372-379); with the running
+// serves it and its duration, null. matter.js sets
+// temperatureSetpointHoldDuration to null when the hold is present
+// (ThermostatServer.ts:365-369), and ValidatedElements.ts:252 counts a
+// defined state as implemented. SetpointHoldExpiryTimestamp is not
+// served (left unset, :372-379); with the running
 // state ThermostatRunningState.
 func TestTemperatureSetpointHoldServedOnRequest(t *testing.T) {
 	t.Parallel()
