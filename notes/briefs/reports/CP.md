@@ -75,19 +75,22 @@ paragraph names the inference. `75f2bb4f` commits the regenerated
 reachability snapshot, the citation artefacts (one line moved, drift count
 unchanged), and the CHIP cross-check page.
 
-## Guards (HEAD `75f2bb4f`, before the rebase)
+## Guards
 
-| Guard | Result |
-| --- | --- |
-| `go test ./schema/... ./script/...` | ok |
-| `make reachability` / `reachability-check` | ok (snapshot committed) |
-| `make cite-check` | ok after committing the artefacts |
-| `make testparity-check` | ok |
-| `make chipdm-check` | ok after `make chipdm-report` (see below) |
-| `make apidiff-check` | ok after the `SchemaSnapshotSHA256` CHANGELOG line |
-| `go test -race ./client/...` | ok |
-| `mkdocs build --strict` | ok |
-| `make ci` | build, vet, test ok; golangci-lint hit its 5 min timeout once ("0 issues" for the run before it); lint and cover-check rerun separately — see the PR's CI |
+After the rebase onto `origin/main` (`f1f0f426`, v0.13.1), HEAD `866b7f7e`:
+`make reachability-check`, `cite-check`, `testparity-check`,
+`chipdm-check`, `apidiff-check`, `ci` — all exit 0.
+
+Before the rebase, HEAD `75f2bb4f`: `go test ./schema/... ./script/...`,
+`go test -race ./client/...`, `mkdocs build --strict`, `make lint`,
+`make cover-check` — all exit 0 (one earlier `make ci` run hit
+golangci-lint's 5 min timeout under load; the rerun passed). `cite-check`
+needed the artefacts committed (one line moved, drift count unchanged),
+`chipdm-check` a `make chipdm-report` (below), `apidiff-check` the
+`SchemaSnapshotSHA256` CHANGELOG line. The rebase conflicted in
+`CHANGELOG.md` (resolved: this entry above `[0.13.1]`) and in the
+generated reachability and citation artefacts (regenerated, `866b7f7e`).
+The full `make race` was not run; the client package ran with `-race`.
 
 ## Differences from the brief
 
