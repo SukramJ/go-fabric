@@ -16,7 +16,7 @@ pseudo-version of `main`.
 
 ### Changed
 
-- **Break:** `thermo.Sink` and `thermostatdef.Sink` gain `SetTemperatureSetpointHold(ctx, hold uint8) error`: a controller's write of `TemperatureSetpointHold` reaches the host after the definition admitted it and before it is stored, and the host's refusal refuses the write with its status (FAILURE for an error without one), as a `SystemMode` write does. An unchanged hold does not call it. matter.js stores the hold only (its reaction is commented out, `ThermostatServer.ts:381` at 862ad75f). Migration guide: "Changed in v0.13.2".
+- **Break:** `thermo.Sink.SetTemperatureSetpointHold` and `thermostatdef.Sink.SetTemperatureSetpointHold` (`Sink.SetTemperatureSetpointHold(ctx, hold uint8) error`) are added to the Thermostat Sink: a controller's write of `TemperatureSetpointHold` reaches the host after the definition admitted it and before it is stored, and the host's refusal refuses the write with its status (FAILURE for an error without one), as a `SystemMode` write does. An unchanged hold does not call it. matter.js stores the hold only (its reaction is commented out, `ThermostatServer.ts:381` at 862ad75f). Migration guide: "Changed in v0.13.2".
 
 ## [0.13.2] — 2026-10-26
 
