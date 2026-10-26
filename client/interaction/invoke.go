@@ -13,6 +13,7 @@ import (
 	"github.com/SukramJ/go-fabric/client/exchange"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	"github.com/SukramJ/go-fabric/im"
+	"github.com/SukramJ/go-fabric/schema"
 	"github.com/SukramJ/go-fabric/tlv"
 )
 
@@ -78,6 +79,7 @@ type Result struct {
 // Errors of the exchange layer pass through unchanged.
 func (c *Interaction) Invoke(ctx context.Context, path im.ConcreteCommandPath, fields spec.Encodable, opts InvokeOptions) (Result, error) {
 	path.HasEndpoint, path.HasCluster, path.HasCommand = true, true, true
+	opts = opts.inferLargeMessage(path)
 	entries, err := c.exchangeInvoke(ctx, []im.CommandInvocation{{Path: path, Fields: fields}}, opts)
 	if err != nil || opts.SuppressResponse {
 		return Result{}, err
@@ -90,6 +92,33 @@ func (c *Interaction) Invoke(ctx context.Context, path im.ConcreteCommandPath, f
 		return res, &StatusError{Status: res.Status, ClusterStatus: res.ClusterStatus}
 	}
 	return res, nil
+}
+
+// inferLargeMessage returns opts with LargeMessage set when the caller left
+// it nil and any of paths names a request command carrying the matter.js
+// Large Message quality ("L", [schema.CommandLargeMessage]). An explicit
+// value — false included — stands. opts is a copy and the caller's
+// LargeMessage pointer is never written through, so the caller's options
+// stay as they were.
+//
+// Mirrors matter.js ClientInteraction.invoke (ClientInteraction.ts:716-719
+// at 862ad75f: "Copy instead of mutating the caller-owned request") with
+// inferLargeMessage (:111-127), which probes each command's schema for
+// effectiveQuality.largeMessage. matter.js skips a legacy command request,
+// which carries no model; here every command is named by its path, and a
+// path the snapshot does not model (a custom cluster) infers nothing.
+func (o InvokeOptions) inferLargeMessage(paths ...im.ConcreteCommandPath) InvokeOptions {
+	if o.LargeMessage != nil {
+		return o
+	}
+	for _, p := range paths {
+		if schema.CommandLargeMessage(p.Cluster, p.Command) {
+			large := true
+			o.LargeMessage = &large
+			return o
+		}
+	}
+	return o
 }
 
 // exchangeInvoke sends one InvokeRequest of invokes on a fresh exchange —

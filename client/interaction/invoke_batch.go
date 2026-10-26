@@ -54,6 +54,13 @@ func (c *Interaction) InvokeBatch(ctx context.Context, cmds []CommandRequest, ma
 	if maxPaths < 1 {
 		return nil, fmt.Errorf("interaction: cannot split an invoke into batches of %d paths", maxPaths)
 	}
+	// The inference covers the whole request before it is split, so every
+	// part carries it (ClientInteraction.ts:716-737).
+	paths := make([]im.ConcreteCommandPath, len(cmds))
+	for i, cmd := range cmds {
+		paths[i] = cmd.Path
+	}
+	opts = opts.inferLargeMessage(paths...)
 	results := make([]Result, len(cmds))
 	var wg sync.WaitGroup
 	var mu sync.Mutex
