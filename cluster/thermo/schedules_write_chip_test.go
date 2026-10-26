@@ -230,7 +230,7 @@ func TestChipThermostatSchedulesWrite(t *testing.T) {
 
 	t.Run("AppendPendingScheduleRejectsWhenTotalTransitionsExceedMaximum (:333)", func(t *testing.T) {
 		// Five transitions exceed NumberOfScheduleTransitions 4, in one
-		// schedule as across two: RESOURCE_EXHAUSTED (:986-991). The schema's
+		// schedule as across two: RESOURCE_EXHAUSTED (:990-995). The schema's
 		// "1 to numberOfScheduleTransitions" names an attribute the
 		// definition does not resolve, so chip's count answers.
 		p := schedulesThermostat(t, func(cfg *thermo.ThermostatConfig) { cfg.NumberOfScheduleTransitionPerDay = nil })
@@ -239,7 +239,7 @@ func TestChipThermostatSchedulesWrite(t *testing.T) {
 			tdef.ScheduleDayOfWeekSunday, tdef.ScheduleDayOfWeekMonday, tdef.ScheduleDayOfWeekTuesday,
 			tdef.ScheduleDayOfWeekWednesday, tdef.ScheduleDayOfWeekThursday,
 		}
-		var five []thermo.ScheduleTransition
+		five := make([]thermo.ScheduleTransition, 0, len(days))
 		for _, d := range days {
 			five = append(five, heatTransition(0, d))
 		}

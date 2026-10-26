@@ -202,7 +202,7 @@ func TestChipActiveScheduleHandleDefaultsToNull(t *testing.T) {
 
 // TestChipSetActiveScheduleRequestWithUnknownHandleIsInvalidCommand ports
 // SetActiveScheduleRequestWithUnknownHandleIsInvalidCommand (:153-168):
-// chip SetActiveSchedule (ThermostatClusterSchedules.cpp:743-760). The port
+// chip SetActiveSchedule (ThermostatClusterSchedules.cpp:743-758). The port
 // is not called.
 func TestChipSetActiveScheduleRequestWithUnknownHandleIsInvalidCommand(t *testing.T) {
 	t.Parallel()

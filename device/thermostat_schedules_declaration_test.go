@@ -23,7 +23,9 @@ func (p *switchingPort) SetActiveSchedule(_ context.Context, handle []byte) erro
 	return nil
 }
 
-func (*switchingPort) CommitSchedules(context.Context, []thermostatdef.ScheduleStruct) error { return nil }
+func (*switchingPort) CommitSchedules(context.Context, []thermostatdef.ScheduleStruct) error {
+	return nil
+}
 
 // TestThermostatDeclaresSchedules: a declaration with the
 // MatterScheduleConfiguration feature takes the schedule types, counts,

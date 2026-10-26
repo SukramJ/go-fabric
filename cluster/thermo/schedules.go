@@ -166,7 +166,7 @@ func (s *ThermostatServer) seedSchedules(cfg ThermostatConfig) error {
 // schedule with a handle of its own (a SetActiveScheduleRequest names it),
 // a null BuiltIn taken as built in — a schedule the device supplies is
 // one a controller cannot remove. chip takes the delegate's list as it is
-// (ThermostatClusterSchedules.h:83-91); the handle rule is what its
+// (ThermostatClusterSchedules.h:74-83); the handle rule is what its
 // SetActiveSchedule and PrecommitSchedules need of it.
 func (s *ThermostatServer) hostSchedules(list []Schedule) ([]Schedule, error) {
 	out := cloneSchedules(list)

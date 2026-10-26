@@ -34,7 +34,7 @@ const scheduleHandleLength = 16
 const scheduleNameLength = 64
 
 // validScheduleDays are the weekday bits a transition may carry: Sunday to
-// Saturday, not Away (ThermostatClusterSchedules.cpp:300-304).
+// Saturday, not Away (ThermostatClusterSchedules.cpp:301-304).
 const validScheduleDays = tdef.ScheduleDayOfWeekSunday | tdef.ScheduleDayOfWeekMonday | tdef.ScheduleDayOfWeekTuesday |
 	tdef.ScheduleDayOfWeekWednesday | tdef.ScheduleDayOfWeekThursday | tdef.ScheduleDayOfWeekFriday |
 	tdef.ScheduleDayOfWeekSaturday
@@ -86,7 +86,7 @@ func (s *ThermostatServer) scheduleRules() scheduleRules {
 
 // scheduleType is the ScheduleTypeStruct for mode, if any — chip
 // MaximumScheduleTypeCount and GetScheduleTypeFeatures
-// (ThermostatClusterSchedules.cpp:189-216, :258-282).
+// (ThermostatClusterSchedules.cpp:183-206, :257-281).
 func (r scheduleRules) scheduleType(mode tdef.SystemModeEnum) (ScheduleType, bool) {
 	for _, t := range r.types {
 		if t.SystemMode == mode {
@@ -127,54 +127,21 @@ func (r scheduleRules) appendPending(stored, pending []Schedule, sc Schedule) (S
 	exhausted := func(format string, args ...any) error {
 		return spec.Errorf(im.StatusResourceExhausted, "thermo: schedule: "+format, args...)
 	}
-	// Field sizes first (:798-810, :817-823).
-	if !sc.ScheduleHandle.Null && len(sc.ScheduleHandle.Value) > scheduleHandleLength {
-		return sc, constraint("handle longer than %d bytes", scheduleHandleLength)
+	if err := checkScheduleSizes(sc); err != nil {
+		return sc, err
 	}
-	if sc.Name != nil && len(*sc.Name) > scheduleNameLength {
-		return sc, constraint("name longer than %d bytes", scheduleNameLength)
-	}
-	if sc.PresetHandle != nil && len(*sc.PresetHandle) > scheduleHandleLength {
-		return sc, constraint("preset handle longer than %d bytes", scheduleHandleLength)
-	}
-	for _, t := range sc.Transitions {
-		if t.PresetHandle != nil && len(*t.PresetHandle) > scheduleHandleLength {
-			return sc, constraint("transition preset handle longer than %d bytes", scheduleHandleLength)
-		}
-	}
-	// IsValidScheduleEntry: SystemMode Auto, Cool or Heat (:46-63, :835-838).
+	// IsValidScheduleEntry: SystemMode Auto, Cool or Heat (:48-66, :837-840).
 	switch sc.SystemMode {
 	case tdef.SystemModeAuto, tdef.SystemModeCool, tdef.SystemModeHeat:
 	default:
 		return sc, constraint("SystemMode %d is not Auto, Cool or Heat", sc.SystemMode)
 	}
-	if sc.ScheduleHandle.Null {
-		// A new schedule cannot claim to be built in (:840-847).
-		if !sc.BuiltIn.Null && sc.BuiltIn.Value {
-			return sc, constraint("a new schedule cannot be built in")
-		}
-		sc.BuiltIn = spec.ValueOf(false)
-	} else {
-		// (a) an existing schedule has the handle (:851-864) …
-		match, ok := scheduleWithHandle(stored, sc.ScheduleHandle.Value)
-		if !ok {
-			return sc, spec.Errorf(im.StatusNotFound, "thermo: schedule: handle %s names no schedule", handleKey(sc.ScheduleHandle.Value))
-		}
-		// (b) … no pending schedule has it yet (:866-873) …
-		if _, dup := scheduleWithHandle(pending, sc.ScheduleHandle.Value); dup {
-			return sc, constraint("handle %s is already in the list", handleKey(sc.ScheduleHandle.Value))
-		}
-		// (c)/(d) … and BuiltIn matches the stored schedule's (:875-899).
-		if match.BuiltIn.Null {
-			return sc, spec.Errorf(im.StatusInvalidInState, "thermo: schedule: stored schedule %s has no BuiltIn", handleKey(sc.ScheduleHandle.Value))
-		}
-		if sc.BuiltIn.Null {
-			sc.BuiltIn = match.BuiltIn
-		} else if sc.BuiltIn.Value != match.BuiltIn.Value {
-			return sc, constraint("BuiltIn differs from the stored schedule's")
-		}
+	builtIn, err := resolveBuiltIn(stored, pending, sc)
+	if err != nil {
+		return sc, err
 	}
-	// The schedule type of the SystemMode (:902-913).
+	sc.BuiltIn = builtIn
+	// The schedule type of the SystemMode (:905-940).
 	typ, ok := r.scheduleType(sc.SystemMode)
 	if !ok || typ.NumberOfSchedules == 0 {
 		return sc, constraint("no schedule type for SystemMode %d", sc.SystemMode)
@@ -197,7 +164,7 @@ func (r scheduleRules) appendPending(stored, pending []Schedule, sc Schedule) (S
 	if err := r.validateTransitionsPerDay(sc); err != nil {
 		return sc, err
 	}
-	// The counts with sc appended (:945-993).
+	// The counts with sc appended (:947-995).
 	count, typeCount, total := 1, 1, len(sc.Transitions)
 	for _, o := range pending {
 		count++
@@ -217,8 +184,68 @@ func (r scheduleRules) appendPending(stored, pending []Schedule, sc Schedule) (S
 	return sc, nil
 }
 
+// checkScheduleSizes is AppendPendingSchedule's field-size check, made
+// before anything else (ThermostatClusterSchedules.cpp:798-834 at
+// 645b267a): the handle, the name, the preset handle and each
+// transition's preset handle.
+func checkScheduleSizes(sc Schedule) error {
+	constraint := func(format string, args ...any) error {
+		return spec.Errorf(im.StatusConstraintError, "thermo: schedule: "+format, args...)
+	}
+	if !sc.ScheduleHandle.Null && len(sc.ScheduleHandle.Value) > scheduleHandleLength {
+		return constraint("handle longer than %d bytes", scheduleHandleLength)
+	}
+	if sc.Name != nil && len(*sc.Name) > scheduleNameLength {
+		return constraint("name longer than %d bytes", scheduleNameLength)
+	}
+	if sc.PresetHandle != nil && len(*sc.PresetHandle) > scheduleHandleLength {
+		return constraint("preset handle longer than %d bytes", scheduleHandleLength)
+	}
+	for _, t := range sc.Transitions {
+		if t.PresetHandle != nil && len(*t.PresetHandle) > scheduleHandleLength {
+			return constraint("transition preset handle longer than %d bytes", scheduleHandleLength)
+		}
+	}
+	return nil
+}
+
+// resolveBuiltIn is AppendPendingSchedule's handle check and the BuiltIn
+// it settles on (ThermostatClusterSchedules.cpp:842-903 at 645b267a).
+func resolveBuiltIn(stored, pending []Schedule, sc Schedule) (spec.Nullable[bool], error) {
+	constraint := func(format string, args ...any) error {
+		return spec.Errorf(im.StatusConstraintError, "thermo: schedule: "+format, args...)
+	}
+	if sc.ScheduleHandle.Null {
+		// A new schedule cannot claim to be built in (:842-850).
+		if !sc.BuiltIn.Null && sc.BuiltIn.Value {
+			return sc.BuiltIn, constraint("a new schedule cannot be built in")
+		}
+		return spec.ValueOf(false), nil
+	}
+	// (a) an existing schedule has the handle (:853-868) …
+	match, ok := scheduleWithHandle(stored, sc.ScheduleHandle.Value)
+	if !ok {
+		return sc.BuiltIn, spec.Errorf(im.StatusNotFound, "thermo: schedule: handle %s names no schedule", handleKey(sc.ScheduleHandle.Value))
+	}
+	// (b) … no pending schedule has it yet (:869-876) …
+	if _, dup := scheduleWithHandle(pending, sc.ScheduleHandle.Value); dup {
+		return sc.BuiltIn, constraint("handle %s is already in the list", handleKey(sc.ScheduleHandle.Value))
+	}
+	// (c)/(d) … and BuiltIn matches the stored schedule's (:880-903).
+	if match.BuiltIn.Null {
+		return sc.BuiltIn, spec.Errorf(im.StatusInvalidInState, "thermo: schedule: stored schedule %s has no BuiltIn", handleKey(sc.ScheduleHandle.Value))
+	}
+	if sc.BuiltIn.Null {
+		return match.BuiltIn, nil
+	}
+	if sc.BuiltIn.Value != match.BuiltIn.Value {
+		return sc.BuiltIn, constraint("BuiltIn differs from the stored schedule's")
+	}
+	return sc.BuiltIn, nil
+}
+
 // validateTransitions is chip ValidateScheduleTransitions
-// (ThermostatClusterSchedules.cpp:292-445 at 645b267a).
+// (ThermostatClusterSchedules.cpp:292-446 at 645b267a).
 func (r scheduleRules) validateTransitions(sc Schedule, feats tdef.ScheduleTypeFeaturesBitmap) error { //nolint:gocognit,gocyclo,cyclop,funlen // one rule per chip check, in chip's order
 	constraint := func(i int, format string, args ...any) error {
 		return spec.Errorf(im.StatusConstraintError, "thermo: schedule transition %d: "+format, append([]any{i}, args...)...)
@@ -328,7 +355,7 @@ func (r scheduleRules) validateTransitionsPerDay(sc Schedule) error {
 // pendingSchedules validates list as the pending schedules, entry by entry
 // in its order — chip WriteAttribute's ReplaceAll, which clears the
 // pending list and appends every entry through AppendPendingSchedule
-// (ThermostatClusterSchedules.cpp:568-586). The dispatcher hands an
+// (ThermostatClusterSchedules.cpp:579-604). The dispatcher hands an
 // AppendItem over as the staged list with the item after it, whose
 // re-validation from the start comes to the same result (an entry is
 // validated against the entries before it only). It returns the
@@ -346,7 +373,7 @@ func (r scheduleRules) pendingSchedules(stored, list []Schedule) ([]Schedule, er
 }
 
 // precommitSchedules is chip ThermostatSchedules::PrecommitSchedules
-// (ThermostatClusterSchedules.cpp:1000-1072 at 645b267a): a built-in
+// (ThermostatClusterSchedules.cpp:1000-1070 at 645b267a): a built-in
 // schedule the pending list dropped is CONSTRAINT_ERROR, and an active
 // schedule it dropped INVALID_IN_STATE.
 func precommitSchedules(stored, pending []Schedule, active []byte) error {
@@ -368,7 +395,7 @@ func precommitSchedules(stored, pending []Schedule, active []byte) error {
 
 // issueScheduleHandles gives every schedule without a handle a new one:
 // chip leaves it to the delegate's CommitPendingSchedules
-// (ThermostatClusterSchedules.h:136-147 at 645b267a: "it is the
+// (ThermostatClusterSchedules.h:134-145 at 645b267a: "it is the
 // responsibility of this API to allocate unique schedule handles"); here
 // the server issues 16 random bytes, as matter.js does for a preset
 // (ThermostatServer.ts:1526 at 862ad75f).
@@ -388,7 +415,7 @@ func issueScheduleHandles(list []Schedule) error {
 
 // writeSchedules is a controller's write of Schedules: only the peer
 // holding an atomic write of it may write, any other request is
-// INVALID_IN_STATE — chip WriteAttribute (ThermostatClusterSchedules.cpp:555-566
+// INVALID_IN_STATE — chip WriteAttribute (ThermostatClusterSchedules.cpp:562-578
 // at 645b267a), which answers another peer INVALID_IN_STATE too, where the
 // Presets write answers it BUSY. The list is validated as the pending
 // schedules ([scheduleRules.pendingSchedules]) and staged.

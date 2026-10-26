@@ -451,14 +451,7 @@ func New(cfg ThermostatConfig) (*ThermostatServer, error) {
 	if features&^servedFeatures != 0 {
 		return nil, fmt.Errorf("%w: 0x%X names features the server does not serve", ErrFeatures, features&^servedFeatures)
 	}
-	optional := servedOptional(features)
-	if cfg.TemperatureSetpointHold != nil {
-		optional = append(optional, thermoAttrTemperatureSetpointHold, thermoAttrTemperatureSetpointHoldDur)
-	}
-	if cfg.ThermostatRunningState != nil {
-		optional = append(optional, thermoAttrThermostatRunningState)
-	}
-	inst, err := spec.New(tdef.Definition, spec.Options{Features: features, Attributes: optional})
+	inst, err := spec.New(tdef.Definition, spec.Options{Features: features, Attributes: servedOptionalFor(cfg, features)})
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", ErrFeatures, err)
 	}
@@ -551,17 +544,35 @@ func New(cfg ThermostatConfig) (*ThermostatServer, error) {
 		}
 	}
 
-	// SystemMode default: Auto with the AUTO feature, Heat with HEAT,
-	// Cool when COOL-only.
+	s.systemMode = defaultSystemMode(features)
+	return s, nil
+}
+
+// defaultSystemMode is SystemMode's default: Auto with the AUTO feature,
+// Heat with HEAT, Cool when COOL-only.
+func defaultSystemMode(features uint32) uint8 {
 	switch {
 	case features&ThermostatFeatureAUTO != 0:
-		s.systemMode = uint8(tdef.SystemModeAuto)
+		return uint8(tdef.SystemModeAuto)
 	case features&ThermostatFeatureHEAT != 0:
-		s.systemMode = uint8(tdef.SystemModeHeat)
+		return uint8(tdef.SystemModeHeat)
 	default: // COOL-only; New refused a selection with neither
-		s.systemMode = uint8(tdef.SystemModeCool)
+		return uint8(tdef.SystemModeCool)
 	}
-	return s, nil
+}
+
+// servedOptionalFor is [servedOptional] with the optional attributes the
+// configuration asks for: TemperatureSetpointHold with its duration, and
+// ThermostatRunningState.
+func servedOptionalFor(cfg ThermostatConfig, features uint32) []uint32 {
+	optional := servedOptional(features)
+	if cfg.TemperatureSetpointHold != nil {
+		optional = append(optional, thermoAttrTemperatureSetpointHold, thermoAttrTemperatureSetpointHoldDur)
+	}
+	if cfg.ThermostatRunningState != nil {
+		optional = append(optional, thermoAttrThermostatRunningState)
+	}
+	return optional
 }
 
 // initOccupancy is matter.js #setupOccupancyIntegration
@@ -794,6 +805,9 @@ func (s *ThermostatServer) readLocked(attrID uint32) (any, bool) {
 	if !s.inst.Serves(attrID) {
 		return nil, false
 	}
+	if v, ok := s.readOptionalLocked(attrID); ok {
+		return v, true
+	}
 	switch attrID {
 	case thermoAttrLocalTemperature:
 		if s.localTemp == nil {
@@ -845,6 +859,24 @@ func (s *ThermostatServer) readLocked(attrID uint32) (any, bool) {
 		return bytes.Clone(s.activePresetHandle), true
 	case tdef.AttrPresets:
 		return spec.List[Preset](clonePresets(s.presets)), true
+	case thermoAttrControlSequenceOfOperation:
+		// Mandatory (M conformance). Derived from the supported modes:
+		// 4=CoolingAndHeating, 2=HeatingOnly, 0=CoolingOnly. The value
+		// follows the device's immutable HEAT/COOL capability; a write is
+		// accepted and ignored, as the specification and matter.js have it
+		// (see MatterWrite). Being immutable it is (correctly) not in
+		// MatterReportable.
+		return controlSequenceOfOperation(s.features), true
+	default: // thermoAttrSystemMode, the last served attribute
+		return s.systemMode, true
+	}
+}
+
+// readOptionalLocked reads the hold, its duration, the running state and
+// the MSCH attributes; false for any other attribute. The caller holds
+// s.mu and checked that the attribute is served.
+func (s *ThermostatServer) readOptionalLocked(attrID uint32) (any, bool) {
+	switch attrID {
 	case thermoAttrTemperatureSetpointHold:
 		return s.hold, true
 	case thermoAttrTemperatureSetpointHoldDur:
@@ -872,24 +904,15 @@ func (s *ThermostatServer) readLocked(attrID uint32) (any, bool) {
 		return bytes.Clone(s.activeScheduleHandle), true
 	case tdef.AttrSchedules:
 		return spec.List[Schedule](cloneSchedules(s.schedules)), true
-	case thermoAttrControlSequenceOfOperation:
-		// Mandatory (M conformance). Derived from the supported modes:
-		// 4=CoolingAndHeating, 2=HeatingOnly, 0=CoolingOnly. The value
-		// follows the device's immutable HEAT/COOL capability; a write is
-		// accepted and ignored, as the specification and matter.js have it
-		// (see MatterWrite). Being immutable it is (correctly) not in
-		// MatterReportable.
-		return controlSequenceOfOperation(s.features), true
-	default: // thermoAttrSystemMode, the last served attribute
-		return s.systemMode, true
 	}
+	return nil, false
 }
 
 // MatterReadFiltered implements [contract.FabricScopedReader] for the two
 // attributes whose value depends on the reader: Presets and Schedules,
 // which the peer holding an atomic write of them reads as it staged them —
 // matter.js's Presets getter (ThermostatServer.ts:1680-1699 at 862ad75f),
-// chip's Schedules read (ThermostatClusterSchedules.cpp:515-530 at
+// chip's Schedules read (ThermostatClusterSchedules.cpp:517-533 at
 // 645b267a). Every other attribute falls through to
 // [ThermostatServer.MatterRead].
 func (s *ThermostatServer) MatterReadFiltered(ctx context.Context, attrID uint32) (any, bool) {

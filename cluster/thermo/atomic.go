@@ -538,7 +538,7 @@ func (s *ThermostatServer) writeAtomicAttribute(ctx context.Context, attrID uint
 // stageAtomicAttribute stages the value stage computes in the atomic write
 // that holds attrID, for the peer holding it; another peer's write is
 // answered otherPeer — BUSY for Presets (matter.js), INVALID_IN_STATE for
-// Schedules (chip ThermostatClusterSchedules.cpp:562-566 at 645b267a).
+// Schedules (chip ThermostatClusterSchedules.cpp:572-575 at 645b267a).
 func (s *ThermostatServer) stageAtomicAttribute(ctx context.Context, attrID uint32, otherPeer im.StatusCode, stage func() (any, error)) error {
 	now := s.clk.Now()
 	st := s.atomic.forAttribute(now, attrID)

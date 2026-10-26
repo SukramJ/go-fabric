@@ -133,22 +133,7 @@ func (s *ThermostatServer) SetAttributes(values map[uint32]any) error {
 		note(thermoAttrOccupancy, s.occupied != occupied)
 		s.occupied = occupied
 	}
-	if n, ok := checked[thermoAttrTemperatureSetpointHold].(uint8); ok {
-		note(thermoAttrTemperatureSetpointHold, s.hold != n)
-		s.hold = n
-	}
-	if v, ok := checked[thermoAttrTemperatureSetpointHoldDur]; ok {
-		var d *uint16
-		if n, isUint := v.(uint16); isUint {
-			d = &n
-		}
-		note(thermoAttrTemperatureSetpointHoldDur, !equalDuration(s.holdDuration, d))
-		s.holdDuration = d
-	}
-	if n, ok := checked[thermoAttrThermostatRunningState].(uint16); ok {
-		note(thermoAttrThermostatRunningState, s.runningState != n)
-		s.runningState = n
-	}
+	s.setOptionalLocked(checked, note)
 	s.mu.Unlock()
 
 	if len(changed) > 0 {
@@ -166,6 +151,27 @@ func (s *ThermostatServer) SetAttributes(values map[uint32]any) error {
 		}
 	}
 	return nil
+}
+
+// setOptionalLocked stores the hold, its duration and the running state
+// checked holds, noting each change; the caller holds s.mu.
+func (s *ThermostatServer) setOptionalLocked(checked map[uint32]any, note func(id uint32, moved bool)) {
+	if n, ok := checked[thermoAttrTemperatureSetpointHold].(uint8); ok {
+		note(thermoAttrTemperatureSetpointHold, s.hold != n)
+		s.hold = n
+	}
+	if v, ok := checked[thermoAttrTemperatureSetpointHoldDur]; ok {
+		var d *uint16
+		if n, isUint := v.(uint16); isUint {
+			d = &n
+		}
+		note(thermoAttrTemperatureSetpointHoldDur, !equalDuration(s.holdDuration, d))
+		s.holdDuration = d
+	}
+	if n, ok := checked[thermoAttrThermostatRunningState].(uint16); ok {
+		note(thermoAttrThermostatRunningState, s.runningState != n)
+		s.runningState = n
+	}
 }
 
 // presetValues are the Presets and ActivePresetHandle a
