@@ -4,11 +4,30 @@
 This is a standing contract, not an audit you run once. Read it before your
 first change here and treat it as binding.
 
-`go-fabric` is a deliberate, behaviour-level port of
-[matter.js](https://github.com/matter-js/matter.js) HEAD. This page defines
-what "parity" means in practice and which standing guards keep the port
-honest, so that a change which merely *looks* right but drifts from the gold
-standard cannot land unnoticed.
+`go-fabric` implements the Matter specification (currently 1.6.1) in Go. It
+is not a port of [matter.js](https://github.com/matter-js/matter.js)'s
+TypeScript code, but it follows matter.js HEAD as its reference
+implementation: matter.js is production-hardened against Apple Home, Google
+Home and Alexa, and that hardening is what this module adopts. The order of
+authority is fixed:
+
+1. **matter.js HEAD** decides wherever it models something — schema values
+   verbatim, implemented behaviour mirrored. Where the spec text and
+   matter.js's behaviour diverge, matter.js wins; a deliberate exception is
+   recorded in `notes/parity/by_design.md`.
+2. **connectedhomeip** decides where matter.js leaves a behaviour open, and
+   for tool and controller behaviour matter.js does not model.
+3. **The specification** is the frame both are read against.
+
+The scope is everything the specification makes mandatory — certifiability is
+a goal — plus what matter.js implements; going beyond matter.js is allowed
+when justified and registered. Three test sources hold it: matter.js's tests
+ported by meaning rather than line by line, the chip-tool suite with the CSA
+certification cases, and this module's own tests.
+
+This page defines what "parity" means in practice and which standing guards
+keep it honest, so that a change which merely *looks* right but drifts from
+the reference cannot land unnoticed.
 
 It complements the
 [`matter.js is the gold standard`](../CLAUDE.md) section of this repository's

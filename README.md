@@ -13,8 +13,10 @@ side** (`controller/`, [ADR 0020](./docs/adr/0020-commissioner-and-controller-ro
 it is a full commissioner: discovery, attestation (with the CSA Distributed
 Compliance Ledger, opt-in), NOC issuance, the client interaction and a typed
 image of a remote node, bindings and the group sender —
-`examples/reference-controller` drives it from the command line. It is a
-semantic port of [matter.js](https://github.com/matter-js/matter.js)
+`examples/reference-controller` drives it from the command line. It
+implements the Matter specification (currently 1.6.1) and follows
+[matter.js](https://github.com/matter-js/matter.js) as its reference
+implementation — not a translation of its TypeScript, but its behaviour
 — cluster IDs, revisions, attribute IDs, constraints and wire shape are
 mirrored from matter.js HEAD rather than transcribed from the specification,
 and the extracted matter.js element model ships embedded so parity is a test,
