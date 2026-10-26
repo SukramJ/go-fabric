@@ -494,6 +494,10 @@ for (const raw of out.clusters as any[]) {
         if (conformance !== undefined) e.conformance = conformance;
         const access = accessOut(m.effectiveAccess);
         if (access !== undefined) e.access = access;
+        // The command's qualities — largeMessage ("L") is the one matter.js
+        // reads from a command (ClientInteraction.ts inferLargeMessage).
+        const quality = qualityOut(m.effectiveQuality);
+        if (quality !== undefined) e.quality = quality;
         e.fields = fieldsOut(m);
         c.effective = e;
     }
@@ -513,6 +517,8 @@ for (const raw of out.clusters as any[]) {
         if (conformance !== undefined) e.conformance = conformance;
         const access = accessOut(m.effectiveAccess);
         if (access !== undefined) e.access = access;
+        const quality = qualityOut(m.effectiveQuality);
+        if (quality !== undefined) e.quality = quality;
         e.fields = fieldsOut(m);
         ev.effective = e;
     }
