@@ -232,6 +232,34 @@ func TestClientInteractionInvokeCommandRefWireHandling(t *testing.T) {
 	})
 }
 
+// TestClientInteractionInvokeLargeMessageInference ports the inference case
+// (ClientInteractionInvokeTest.ts:633-661 at 862ad75f): an invoke of
+// WebRtcTransportProvider.ProvideOffer, a command with the "L" quality,
+// infers LargeMessage on a copy (ClientInteraction.ts:716-719) — the
+// caller's options keep their nil. The session-bound rig ignores the
+// required transport (ClientRequest.ts:81-84), so the request goes out.
+func TestClientInteractionInvokeLargeMessageInference(t *testing.T) {
+	t.Parallel()
+	t.Run("does not mutate the caller's request when inferring largeMessage", func(t *testing.T) {
+		t.Parallel()
+		s := newScripted(t)
+		c := interaction.New(s.mgr, s.session, nil)
+		provideOffer := im.ConcreteCommandPath{Endpoint: 2, Cluster: 0x0553, Command: 0x02, HasEndpoint: true, HasCluster: true, HasCommand: true}
+		opts := interaction.InvokeOptions{}
+		done := ciInvoke(context.Background(), c, provideOffer, opts)
+		req := ciRefLess(t, s, s.next(t))
+		if len(req.Invokes) != 1 || req.Invokes[0].Path != provideOffer {
+			t.Fatalf("request %+v", req)
+		}
+		if r := await(t, done); r.err != nil {
+			t.Fatal(r.err)
+		}
+		if opts.LargeMessage != nil {
+			t.Errorf("caller's LargeMessage %v, want nil", *opts.LargeMessage)
+		}
+	})
+}
+
 func TestClientInteractionInvokeDelayReportData(t *testing.T) {
 	t.Parallel()
 	t.Run("sends no DelayReportData", func(t *testing.T) {
