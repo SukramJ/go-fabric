@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 6618,
+  "entry_points": 6620,
   "entry_packages": [
     ".",
     "bdx",
@@ -259,9 +259,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 16145,
+    "total_exported": 16147,
     "reachable": 11412,
-    "whitelisted": 4730,
+    "whitelisted": 4732,
     "unreachable": 3
   },
   "by_package": [
@@ -20600,6 +20600,20 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/thermo/atomic_commit_parity_matterjs_test.go",
       "line": 134
+    },
+    {
+      "package": "cluster/thermo",
+      "identifier": "TestScheduleHelpersInternal",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/thermo/schedules_rules_internal_test.go",
+      "line": 150
+    },
+    {
+      "package": "cluster/thermo",
+      "identifier": "TestScheduleRulesAppendPending",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/thermo/schedules_rules_internal_test.go",
+      "line": 56
     },
     {
       "package": "cluster/thermo",

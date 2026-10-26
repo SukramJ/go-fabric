@@ -21,6 +21,7 @@ const clusterThermostat = 0x0201
 // writes the hold on and reads it back, and writes it off again so the
 // legs after this one see the daemon as it started.
 func testThermostatHold(t *testing.T, f *fixture) {
+	t.Helper()
 	ep, ok := f.thermostatEndpoint()
 	if !ok {
 		t.Fatal("no endpoint of the Thermostat device type serves the Thermostat cluster")
