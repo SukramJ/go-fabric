@@ -4,24 +4,26 @@
 package controller
 
 import (
-	"bytes"
 	"context"
 	"crypto/rand"
+	"database/sql"
 	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net"
 	"time"
 
+	"github.com/SukramJ/go-fabric/bdx"
 	"github.com/SukramJ/go-fabric/client/exchange"
 	"github.com/SukramJ/go-fabric/client/peer"
+	"github.com/SukramJ/go-fabric/clock"
 	"github.com/SukramJ/go-fabric/controller/attestation"
 	"github.com/SukramJ/go-fabric/controller/client"
 	"github.com/SukramJ/go-fabric/controller/commissioner"
 	"github.com/SukramJ/go-fabric/controller/softwareupdate"
 	"github.com/SukramJ/go-fabric/mdns"
-	"github.com/SukramJ/go-fabric/node"
 	"github.com/SukramJ/go-fabric/secure/setup"
 	"github.com/SukramJ/go-fabric/store"
 )
@@ -34,12 +36,14 @@ import (
 // 862ad75f; docs/OTA.md "Enable OTA Provider on Controller Creation").
 //
 // matter.js serves the provider from the controller's ServerNode. This
-// module's controller role runs no server node, so it starts a node.Node
-// of its own — the controller's own node, in the controller's database,
-// commissioned into our fabric by our commissioner on its first start —
-// and mounts node/'s OTA provider on it with the update manager as its
-// image source, consent and apply policy (controller/softwareupdate). The
-// provider is one implementation, the device-side one.
+// module's controller role runs no server node: a server node is the node
+// facade, a layer above the roles (ADR 0026 principle 1). So the controller
+// has [OTAConfig].StartNode start one — the controller's own node, in the
+// controller's database, commissioned into our fabric by our commissioner
+// on its first start — with node/'s OTA provider mounted and the update
+// manager as its image source, consent and apply policy
+// (controller/softwareupdate); node/controllernode.Start is that starter.
+// The provider is one implementation, the device-side one.
 type OTAConfig struct {
 	// Images is the image store and the ledger lookups; nil is an
 	// in-memory store without ledgers, which offers local images only.
@@ -68,10 +72,53 @@ type OTAConfig struct {
 	Advertiser mdns.Advertiser
 	// ProductID is the own node's product id; 0 is 0x8000.
 	ProductID uint16
-	// StartNode builds and starts the own node from its configuration and
-	// returns it with its address — a seam: a test runs it on its site
-	// (fabrictest.Site.ControllerConfig). nil is node.New and Start.
-	StartNode func(ctx context.Context, cfg node.Config) (*node.Node, *net.UDPAddr, error)
+	// StartNode starts the own node from spec and returns it with its
+	// address (required): node/controllernode.Start, or a test's starter
+	// that runs the node on its site (fabrictest.Site.ControllerConfig).
+	StartNode func(ctx context.Context, spec OwnNodeSpec) (OwnNode, *net.UDPAddr, error)
+}
+
+// OwnNodeSpec is what [OTAConfig].StartNode starts the own node with:
+// node/controllernode.Config makes the node.Config of it.
+type OwnNodeSpec struct {
+	// NodeID is the node id the node takes on our fabric; the
+	// commissioning that follows looks it up by it.
+	NodeID uint64
+	// Listen and Advertiser are [OTAConfig]'s, defaulted.
+	Listen     string
+	Advertiser mdns.Advertiser
+	// Passcode, Discriminator, Salt and Iterations are its commissioning
+	// window's — the record the controller keeps of the node.
+	Passcode      uint32
+	Discriminator uint16
+	Salt          []byte
+	Iterations    int
+	// VendorID is our fabric's vendor; ProductID [OTAConfig]'s, defaulted;
+	// SerialNumber names the node.
+	VendorID, ProductID uint16
+	SerialNumber        string
+	// DB is the controller's database, which the node keeps its state in.
+	DB *sql.DB
+	// Provider is the OTA provider the node mounts: the update manager's
+	// ports (softwareupdate.Manager.ProviderConfig).
+	Provider softwareupdate.ProviderConfig
+	// Logger and Clock are the controller's.
+	Logger *slog.Logger
+	Clock  clock.Clock
+}
+
+// OwnNode is the own node as the controller's OTA push uses it; a
+// node.Node wrapped by node/controllernode.Wrap is one.
+type OwnNode interface {
+	// OTAProviderEndpoint is the provider's endpoint number.
+	OTAProviderEndpoint() (uint16, bool)
+	// BDX is the provider's BDX responder.
+	BDX() *bdx.Responder
+	// HoldsFabric reports whether the node's fabric table holds the
+	// fabric of fabricID with that root public key, the node as nodeID.
+	HoldsFabric(ctx context.Context, fabricID, nodeID uint64, rootPublicKey []byte) (bool, error)
+	// Stop stops the node.
+	Stop(ctx context.Context) error
 }
 
 // ownNodeKey is the settings key of the own node's record.
@@ -162,26 +209,13 @@ func (c *Controller) startOTA(ctx context.Context, cfg Config) error {
 	if product == 0 {
 		product = 0x8000
 	}
-	ncfg := node.Config{
-		Network:            node.Network{Listen: listen},
-		Advertiser:         adv,
-		Commissioning:      node.Commissioning{Passcode: rec.Passcode, Discriminator: rec.Discriminator, PBKDFIterations: 1000, Salt: rec.Salt},
-		ProductDescription: node.ProductDescription{VendorID: c.fabric.RootVendorID, ProductID: product},
-		BasicInformation: node.BasicInformation{
-			VendorName: "go-fabric", ProductName: "controller", NodeLabel: "controller", SerialNumber: fmt.Sprintf("%016X", rec.NodeID),
-			HardwareVersion: 1, HardwareVersionString: "1", SoftwareVersion: 1, SoftwareVersionString: "1",
-		},
-		Store:       node.Store{DB: cfg.DB},
-		OTAProvider: mgr.ProviderConfig(),
-		Logger:      c.log,
-		Clock:       c.clock,
+	spec := OwnNodeSpec{
+		NodeID: rec.NodeID, Listen: listen, Advertiser: adv,
+		Passcode: rec.Passcode, Discriminator: rec.Discriminator, Salt: rec.Salt, Iterations: 1000,
+		VendorID: c.fabric.RootVendorID, ProductID: product, SerialNumber: fmt.Sprintf("%016X", rec.NodeID),
+		DB: cfg.DB, Provider: mgr.ProviderConfig(), Logger: c.log, Clock: c.clock,
 	}
-	start := o.StartNode
-	if start == nil {
-		start = startOwnNode
-	}
-	//nolint:contextcheck // the node runs on its own context until Stop
-	n, addr, err := start(ctx, ncfg)
+	n, addr, err := o.StartNode(ctx, spec)
 	if err != nil {
 		return fmt.Errorf("controller: own node: %w", err)
 	}
@@ -199,40 +233,13 @@ func (c *Controller) startOTA(ctx context.Context, cfg Config) error {
 	return nil
 }
 
-// startOwnNode is node.New and Start; the address is the node's socket,
-// loopback for an unspecified one.
-func startOwnNode(ctx context.Context, cfg node.Config) (*node.Node, *net.UDPAddr, error) {
-	n, err := node.New(cfg)
-	if err != nil {
-		return nil, nil, err
-	}
-	if err := n.Start(ctx); err != nil {
-		return nil, nil, err
-	}
-	addr, err := net.ResolveUDPAddr("udp", n.Bridge().LocalAddr())
-	if err != nil {
-		_ = n.Stop(context.WithoutCancel(ctx))
-		return nil, nil, err
-	}
-	if addr.IP.IsUnspecified() {
-		addr.IP = net.IPv6loopback
-	}
-	return n, addr, nil
-}
-
 // commissionOwnNode commissions the own node into our fabric unless its
 // fabric table holds it, and adds it to the peers at its address — DNS-SD
 // is not needed for it.
 func (c *Controller) commissionOwnNode(ctx context.Context, rec ownNodeRecord, addr *net.UDPAddr) error {
-	fabrics, err := c.ownNode.FabricInfos(ctx)
+	have, err := c.ownNode.HoldsFabric(ctx, c.fabric.FabricID, rec.NodeID, c.fabric.RootPublicKey)
 	if err != nil {
 		return err
-	}
-	have := false
-	for _, f := range fabrics {
-		if f.FabricID == c.fabric.FabricID && f.NodeID == rec.NodeID && bytes.Equal(f.RootPublicKey, c.fabric.RootPublicKey) {
-			have = true
-		}
 	}
 	if !have {
 		// The own node runs the CSA test attestation: it is accepted.
@@ -261,7 +268,7 @@ func (c *Controller) fabricIndex() uint8 { return c.fabric.AddressOf(0).FabricIn
 // OwnNode is the controller's own node — the node the OTA provider runs on
 // and the group sender a program may use — with its node id and address;
 // nil without [Config].OTA.
-func (c *Controller) OwnNode() (n *node.Node, nodeID uint64, addr *net.UDPAddr) {
+func (c *Controller) OwnNode() (n OwnNode, nodeID uint64, addr *net.UDPAddr) {
 	return c.ownNode, c.ownNodeID, c.ownAddr
 }
 
@@ -337,14 +344,14 @@ func (c *Controller) otaHooks(user func(id string) client.Hooks) func(id string)
 			h = user(id)
 		}
 		inner := h
-		node := func() *client.Node {
+		nodeOf := func() *client.Node {
 			if r := c.registry.Load(); r != nil {
 				return r.Get(id)
 			}
 			return nil
 		}
 		h.Changed = func() {
-			if m, n := c.ota.Load(), node(); m != nil && n != nil {
+			if m, n := c.ota.Load(), nodeOf(); m != nil && n != nil {
 				m.NodeChanged(n)
 			}
 			if inner.Changed != nil {
@@ -352,7 +359,7 @@ func (c *Controller) otaHooks(user func(id string) client.Hooks) func(id string)
 			}
 		}
 		h.Event = func(endpoint uint16, cluster, event uint32, e client.EventData, value any) {
-			if m, n := c.ota.Load(), node(); m != nil && n != nil {
+			if m, n := c.ota.Load(), nodeOf(); m != nil && n != nil {
 				m.NodeEvent(n, endpoint, cluster, event, value)
 			}
 			if inner.Event != nil {
@@ -360,7 +367,7 @@ func (c *Controller) otaHooks(user func(id string) client.Hooks) func(id string)
 			}
 		}
 		h.SubscriptionStatusChanged = func(active bool) {
-			if m, n := c.ota.Load(), node(); m != nil && n != nil {
+			if m, n := c.ota.Load(), nodeOf(); m != nil && n != nil {
 				m.NodeSubscription(n, active)
 			}
 			if inner.SubscriptionStatusChanged != nil {

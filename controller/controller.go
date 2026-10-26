@@ -53,7 +53,6 @@ import (
 	"github.com/SukramJ/go-fabric/controller/commissioner"
 	"github.com/SukramJ/go-fabric/controller/softwareupdate"
 	"github.com/SukramJ/go-fabric/mdns"
-	"github.com/SukramJ/go-fabric/node"
 	"github.com/SukramJ/go-fabric/store"
 	"github.com/SukramJ/go-fabric/transport/udp"
 )
@@ -199,7 +198,7 @@ type Controller struct {
 	ota       atomic.Pointer[softwareupdate.Manager]
 	registry  atomic.Pointer[client.Registry]
 	armer     *peer.RebootResubscribeArmer
-	ownNode   *node.Node
+	ownNode   OwnNode
 	ownNodeID uint64
 	ownAddr   *net.UDPAddr
 }
@@ -221,6 +220,8 @@ func New(ctx context.Context, cfg Config) (_ *Controller, err error) {
 		return nil, fmt.Errorf("%w: DB is required", ErrConfiguration)
 	case cfg.Attestation == nil:
 		return nil, fmt.Errorf("%w: Attestation is required (attestation.TestStore() for development devices)", ErrConfiguration)
+	case cfg.OTA != nil && cfg.OTA.StartNode == nil:
+		return nil, fmt.Errorf("%w: OTA.StartNode is required (node/controllernode.Start)", ErrConfiguration)
 	}
 	log := cfg.Logger
 	if log == nil {
@@ -262,28 +263,9 @@ func New(ctx context.Context, cfg Config) (_ *Controller, err error) {
 	if c.fabric, err = commissioner.NewFabric(authority, fcfg); err != nil {
 		return nil, err
 	}
-	networks := peer.NewNetworkProfiles(clk, nil, log)
-	if cfg.Networks != nil {
-		networks.SetDefaults(*cfg.Networks)
-	}
-	own, err := networks.Get(cmp.Or(cfg.OwnNetworkProfile, peer.NetworkFast))
+	networks, err := c.openTransports(ctx, cfg, listen, openNames, clk, log)
 	if err != nil {
-		return nil, fmt.Errorf("%w: OwnNetworkProfile: %w", ErrConfiguration, err)
-	}
-	if err := c.openNetwork(ctx, listen, cfg.Listener, openNames, exchange.Config{
-		Logger: log, Clock: clk, LocalAdditionalMrpDelay: own.AdditionalMrpDelay, LocalParameters: localParameters(cfg.TCP),
-	}); err != nil {
 		return nil, err
-	}
-	if cfg.TCP.Incoming {
-		if err := c.listenTCP(ctx); err != nil {
-			return nil, err
-		}
-	}
-	if cfg.Advertise != nil {
-		if err := c.advertise(ctx, *cfg.Advertise, cfg.Advertiser, c.fabric.RootVendorID); err != nil {
-			return nil, err
-		}
 	}
 	resumption := &peer.MemoryResumptionStore{}
 	fabrics := []*commissioner.Fabric{c.fabric}
@@ -308,6 +290,20 @@ func New(ctx context.Context, cfg Config) (_ *Controller, err error) {
 	}); err != nil {
 		return nil, err
 	}
+	if err := c.openRegistry(ctx, cfg, fabrics, clk, log); err != nil {
+		return nil, err
+	}
+	if !cfg.ManualStart {
+		if err := c.reg.Start(ctx); err != nil {
+			return nil, err
+		}
+	}
+	return c, nil
+}
+
+// openRegistry builds the node registry over the commissioner and, with
+// OTA, starts the OTA push: the steps of [New] after the commissioner.
+func (c *Controller) openRegistry(ctx context.Context, cfg Config, fabrics []*commissioner.Fabric, clk clock.Clock, log *slog.Logger) error {
 	nodeCfg := cfg.Node
 	if nodeCfg.Logger == nil {
 		nodeCfg.Logger = log
@@ -317,27 +313,52 @@ func New(ctx context.Context, cfg Config) (_ *Controller, err error) {
 	}
 	hooksFor := cfg.HooksFor
 	if cfg.OTA != nil {
-		hooksFor = c.otaHooks(cfg.HooksFor)
+		hooksFor = c.otaHooks(cfg.HooksFor) //nolint:contextcheck // node hooks carry no context; the manager's work runs on its own lifetime
 	}
+	var err error
 	//nolint:contextcheck // as commissioner.New
 	if c.reg, err = client.NewRegistry(client.RegistryConfig{
 		Store: sqlstore.New(cfg.DB), Commissioner: c.com, Peers: c.peers, Exchanges: c.mgr,
 		Fabrics: fabrics, Subscriptions: c.subs, Logger: log, Clock: clk, Node: nodeCfg, HooksFor: hooksFor, AutoStart: !cfg.ManualStart,
 	}); err != nil {
-		return nil, err
+		return err
 	}
 	c.registry.Store(c.reg)
 	if cfg.OTA != nil {
-		if err := c.startOTA(ctx, cfg); err != nil {
+		return c.startOTA(ctx, cfg)
+	}
+	return nil
+}
+
+// openTransports builds the network profiles and opens the network over
+// the own profile's margin, the TCP listener with TCP.Incoming and the
+// commissioner advertisement with Advertise: the steps of [New] between
+// the fabric and the peers.
+func (c *Controller) openTransports(ctx context.Context, cfg Config, listen string, openNames func(*slog.Logger) (*discovery.Names, error), clk clock.Clock, log *slog.Logger) (*peer.NetworkProfiles, error) {
+	networks := peer.NewNetworkProfiles(clk, nil, log)
+	if cfg.Networks != nil {
+		networks.SetDefaults(*cfg.Networks)
+	}
+	own, err := networks.Get(cmp.Or(cfg.OwnNetworkProfile, peer.NetworkFast))
+	if err != nil {
+		return nil, fmt.Errorf("%w: OwnNetworkProfile: %w", ErrConfiguration, err)
+	}
+	if err := c.openNetwork(ctx, listen, cfg.Listener, openNames, exchange.Config{
+		Logger: log, Clock: clk, LocalAdditionalMrpDelay: own.AdditionalMrpDelay, LocalParameters: localParameters(cfg.TCP),
+	}); err != nil {
+		return nil, err
+	}
+	if cfg.TCP.Incoming {
+		if err := c.listenTCP(ctx); err != nil {
 			return nil, err
 		}
 	}
-	if !cfg.ManualStart {
-		if err := c.reg.Start(ctx); err != nil {
+	if cfg.Advertise != nil {
+		if err := c.advertise(ctx, *cfg.Advertise, cfg.Advertiser, c.fabric.RootVendorID); err != nil {
 			return nil, err
 		}
 	}
-	return c, nil
+	return networks, nil
 }
 
 // openNetwork opens the socket (or takes the one [Config].Listener

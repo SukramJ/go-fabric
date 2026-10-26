@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 6558,
+  "entry_points": 6573,
   "entry_packages": [
     ".",
     "bdx",
@@ -194,6 +194,7 @@
     "controller/commissioner",
     "controller/dcl",
     "controller/dcl/snapshot",
+    "controller/softwareupdate",
     "controller/thread",
     "device",
     "diagevent",
@@ -221,6 +222,7 @@
     "internal/serialqueue",
     "mdns",
     "node",
+    "node/controllernode",
     "node/metrics/expvar",
     "parity",
     "schema",
@@ -257,9 +259,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 16067,
-    "reachable": 11357,
-    "whitelisted": 4707,
+    "total_exported": 16120,
+    "reachable": 11399,
+    "whitelisted": 4718,
     "unreachable": 3
   },
   "by_package": [
@@ -22791,6 +22793,76 @@
       "line": 174
     },
     {
+      "package": "controller/softwareupdate",
+      "identifier": "ConsentState",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/softwareupdate/manager.go",
+      "line": 159
+    },
+    {
+      "package": "controller/softwareupdate",
+      "identifier": "Peer",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/softwareupdate/manager.go",
+      "line": 30
+    },
+    {
+      "package": "controller/softwareupdate",
+      "identifier": "QueryImageRequest",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/softwareupdate/manager.go",
+      "line": 466
+    },
+    {
+      "package": "controller/softwareupdate",
+      "identifier": "Status",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/softwareupdate/manager.go",
+      "line": 35
+    },
+    {
+      "package": "controller/softwareupdate",
+      "identifier": "TestManagerAppliedUpdateAfterResubscriptionParity",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/softwareupdate/manager_parity_matterjs_test.go",
+      "line": 195
+    },
+    {
+      "package": "controller/softwareupdate",
+      "identifier": "TestManagerApplyFailureOnStartUpParity",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/softwareupdate/manager_parity_matterjs_test.go",
+      "line": 137
+    },
+    {
+      "package": "controller/softwareupdate",
+      "identifier": "TestManagerCancelledResetsForRetryParity",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/softwareupdate/manager_parity_matterjs_test.go",
+      "line": 93
+    },
+    {
+      "package": "controller/softwareupdate",
+      "identifier": "TestManagerCleanupPurgesTestImagesParity",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/softwareupdate/manager_parity_matterjs_test.go",
+      "line": 235
+    },
+    {
+      "package": "controller/softwareupdate",
+      "identifier": "TestManagerStalledAfterApplyDelayParity",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/softwareupdate/manager_parity_matterjs_test.go",
+      "line": 111
+    },
+    {
+      "package": "controller/softwareupdate",
+      "identifier": "TestManagerSuppressNextStartUpParity",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/softwareupdate/manager_parity_matterjs_test.go",
+      "line": 155
+    },
+    {
       "package": "controller/thread",
       "identifier": "TestBasicTlvCodecEncode",
       "reason": "auto-whitelist:pattern=test-file",
@@ -24966,6 +25038,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/ota_provider_test.go",
       "line": 24
+    },
+    {
+      "package": "examples/reference-bridge",
+      "identifier": "TestOTAPushToTheReferenceDaemon",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-bridge/ota_push_e2e_test.go",
+      "line": 30
     },
     {
       "package": "examples/reference-bridge",

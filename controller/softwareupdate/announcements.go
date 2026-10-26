@@ -165,7 +165,7 @@ func (a *announcements) processQueueEntry() {
 // applicable node gets our DefaultOTAProviders record unless it holds the
 // same one; a failed write waits for the next day. matter.js deliberately
 // sends no Simple Announcement after it (:200-203).
-func (a *announcements) announceDefaultProvider(ctx context.Context, p Peer) error {
+func (a *announcements) announceDefaultProvider(ctx context.Context, p Peer) error { //nolint:unparam // the callers keep matter.js's catch (:131-157)
 	n := a.m.nodeAt(p)
 	if n == nil || !n.IsCommissioned() {
 		return nil
@@ -212,7 +212,7 @@ func (a *announcements) announceDefaultProvider(ctx context.Context, p Peer) err
 // announceOtaProvider sends AnnounceOTAProvider to the node's requestor
 // endpoint (:266-292). A closed connection is logged and retried later;
 // any other failure is only logged, as matter.js's.
-func (a *announcements) announceOtaProvider(ctx context.Context, n *client.Node, endpoint uint16, reason otareq.AnnouncementReasonEnum) error {
+func (a *announcements) announceOtaProvider(ctx context.Context, n *client.Node, endpoint uint16, reason otareq.AnnouncementReasonEnum) error { //nolint:unparam // the caller keeps matter.js's catch (SoftwareUpdateManager.ts:991-1025)
 	cfg := a.m.cfg
 	req := otareq.AnnounceOtaProviderRequest{
 		ProviderNodeId: cfg.ProviderNodeID, VendorId: cfg.VendorID, AnnouncementReason: reason, Endpoint: cfg.ProviderEndpoint,
@@ -247,7 +247,7 @@ type otaTarget struct {
 	peer     Peer
 }
 
-// peerApplicableForUpdate is peerApplicableForUpdate (:217-253): a node
+// peerApplicableForUpdate is peerApplicableForUpdate (:221-253): a node
 // with BasicInformation, commissioned, enabled and subscribed — so the
 // manager works on current data — with an OTA requestor endpoint
 // (#findOtaRequestorEndpointOn, :255-262).

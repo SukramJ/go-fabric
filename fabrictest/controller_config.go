@@ -13,7 +13,7 @@ import (
 	"github.com/SukramJ/go-fabric/client/discovery"
 	"github.com/SukramJ/go-fabric/controller"
 	"github.com/SukramJ/go-fabric/controller/attestation"
-	"github.com/SukramJ/go-fabric/node"
+	"github.com/SukramJ/go-fabric/node/controllernode"
 )
 
 // ControllerConfig is a controller.Config wired to the site, for a
@@ -83,7 +83,8 @@ func (s *Site) ControllerConfig(opts ControllerOptions) controller.Config {
 
 // startOwnNode runs a controller's own node on the site ([Site.AddNode]):
 // the site's network, clock and DNS-SD, the controller's store.
-func (s *Site) startOwnNode(_ context.Context, cfg node.Config) (*node.Node, *net.UDPAddr, error) {
-	d := s.AddNode(cfg)
-	return d.Node(), d.Addr(), nil
+// The node is node/controllernode's.
+func (s *Site) startOwnNode(_ context.Context, spec controller.OwnNodeSpec) (controller.OwnNode, *net.UDPAddr, error) {
+	d := s.AddNode(controllernode.Config(spec)) //nolint:contextcheck // as AddController: the node's services run under contexts of their own
+	return controllernode.Wrap(d.Node()), d.Addr(), nil
 }

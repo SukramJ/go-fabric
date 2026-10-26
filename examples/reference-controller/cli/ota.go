@@ -5,17 +5,17 @@ package cli
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"flag"
 	"fmt"
 	"os"
 	"strconv"
+	"time"
 
 	"github.com/SukramJ/go-fabric/bdx/otaimage"
-	"github.com/SukramJ/go-fabric/client/interaction"
 	mattercore "github.com/SukramJ/go-fabric/cluster/core"
-	otadef "github.com/SukramJ/go-fabric/cluster/spec/otasoftwareupdaterequestor"
-	"github.com/SukramJ/go-fabric/im"
+	"github.com/SukramJ/go-fabric/controller/softwareupdate"
 )
 
 // statusNames names the OTA update states (mattercore.OTAUpdateStatus).
@@ -38,25 +38,27 @@ func cmdOTA(e *env, args []string) error {
 	if len(args) == 0 || args[0] != "serve" {
 		return fmt.Errorf("usage: %s", commands["ota"].usage)
 	}
+	e.ownNode = true
 	return cmdOTAServe(e, args[1:])
 }
 
-// cmdOTAServe serves one image from the own node's OTA provider — the
-// provider side of TestLiveOTAProvider (node/ota_live_test.go): the image
-// source answers QueryImage for the image's vendor and product below its
-// version, the console grants the consent, and --announce sends
-// AnnounceOtaProvider to a node. It runs until Ctrl-C, or with --once
-// until one update is done.
+// cmdOTAServe serves one image through the controller's OTA push
+// (controller.Config.OTA, controller/softwareupdate): the image goes into
+// the update manager's store, the console grants the consent (or --yes),
+// and with --announce the manager pushes it to that node — it announces
+// the provider and follows the update to its end; without --announce the
+// image is offered to every paired node of its vendor and product that
+// asks. It runs until Ctrl-C, or with --once until one update is done.
 func cmdOTAServe(e *env, args []string) error {
 	var imagePath, announce string
 	var version, vendor, product uint
 	var once, yes bool
 	pos, err := parseArgs(e, "ota serve", args, func(fs *flag.FlagSet) {
 		fs.StringVar(&imagePath, "image", "", "the OTA image file (Matter OTA format)")
-		fs.UintVar(&version, "version", 0, "the software version offered (default the image header's)")
-		fs.UintVar(&vendor, "vendor", 0, "the vendor id it is offered to (default the image header's)")
-		fs.UintVar(&product, "product", 0, "the product id it is offered to (default the image header's)")
-		fs.StringVar(&announce, "announce", "", "announce the provider to this node")
+		fs.UintVar(&version, "version", 0, "the software version offered (the image header's; another one is refused)")
+		fs.UintVar(&vendor, "vendor", 0, "the vendor id it is offered to (the image header's; another one is refused)")
+		fs.UintVar(&product, "product", 0, "the product id it is offered to (the image header's; another one is refused)")
+		fs.StringVar(&announce, "announce", "", "push the image to this node")
 		fs.BoolVar(&once, "once", false, "exit after the first update is done")
 		fs.BoolVar(&yes, "yes", false, "grant every consent without asking")
 	})
@@ -74,17 +76,14 @@ func cmdOTAServe(e *env, args []string) error {
 	if err != nil {
 		return fmt.Errorf("%s: %w", imagePath, err)
 	}
-	if version == 0 {
-		version = uint(h.SoftwareVersion)
+	// The update manager offers an image by its header (matter.js's OTA
+	// store keys it so, DclOtaUpdateService.ts:534-536 at 862ad75f).
+	if (version != 0 && version != uint(h.SoftwareVersion)) || (vendor != 0 && vendor != uint(h.VendorID)) || (product != 0 && product != uint(h.ProductID)) {
+		return fmt.Errorf("--version, --vendor and --product must match the image header (%d, %04X, %04X)", h.SoftwareVersion, h.VendorID, h.ProductID)
 	}
-	if vendor == 0 {
-		vendor = uint(h.VendorID)
-	}
-	if product == 0 {
-		product = uint(h.ProductID)
-	}
-	if version > 0xFFFFFFFF || vendor > 0xFFFF || product > 0xFFFF {
-		return errors.New("--version, --vendor or --product out of range")
+	versionString := h.SoftwareVersionString
+	if versionString == "" {
+		versionString = strconv.FormatUint(uint64(h.SoftwareVersion), 10)
 	}
 	return withStack(e, func(s *stack) error {
 		ctx, cancel := e.timeoutCtx()
@@ -93,16 +92,13 @@ func cmdOTAServe(e *env, args []string) error {
 		if err != nil {
 			return err
 		}
-		done := make(chan struct{}, 1)
-		imgs := self.images
-		imgs.mu.Lock()
-		imgs.image, imgs.yes = image, yes
-		imgs.vendor, imgs.product, imgs.version = uint16(vendor), uint16(product), uint32(version) //nolint:gosec // G115: range checked above
-		imgs.versionS = h.SoftwareVersionString
-		if imgs.versionS == "" {
-			imgs.versionS = strconv.FormatUint(uint64(version), 10)
+		mgr := s.ctl.SoftwareUpdates()
+		if _, err := s.images.Store(ctx, image, softwareupdate.ModeLocal, nil); err != nil {
+			return err
 		}
-		imgs.onStatus = func(p mattercore.OTAPeer, st mattercore.OTAUpdateStatus, v uint32) {
+		done := make(chan struct{}, 1)
+		s.statusMu.Lock()
+		s.onStatus = func(p softwareupdate.Peer, st softwareupdate.Status, v uint32) {
 			e.printf("node %d: %s (version %d)\n", p.NodeID, statusName(st), v)
 			if st == mattercore.OTAUpdateDone {
 				select {
@@ -111,26 +107,22 @@ func cmdOTAServe(e *env, args []string) error {
 				}
 			}
 		}
-		imgs.mu.Unlock()
-		provEP, err := self.providerEndpoint()
-		if err != nil {
-			return err
-		}
-		e.printf("serving version %d for %04X:%04X from node %d endpoint %d\n", version, vendor, product, self.nodeID, provEP)
+		s.statusMu.Unlock()
+		provEP, _ := self.n.OTAProviderEndpoint()
+		e.printf("serving version %d for %04X:%04X from node %d endpoint %d\n", h.SoftwareVersion, h.VendorID, h.ProductID, self.nodeID, provEP)
+		target := softwareupdate.Target{VendorID: h.VendorID, ProductID: h.ProductID, TargetSoftwareVersion: h.SoftwareVersion}
 		if announce != "" {
-			n, id, err := s.node(announce)
-			if err != nil {
+			if err := pushTo(ctx, e, s, mgr, announce, target, versionString, yes); err != nil {
 				return err
 			}
-			req := otadef.AnnounceOtaProviderRequest{
-				ProviderNodeId: self.nodeID, VendorId: fabricVendorID,
-				AnnouncementReason: otadef.AnnouncementReasonUpdateAvailable, Endpoint: provEP,
-			}
-			if _, err := n.Invoke(ctx, rootCommand(otadef.ClusterID, otadef.CmdAnnounceOtaProvider), req, interaction.InvokeOptions{}); err != nil {
-				return fmt.Errorf("AnnounceOtaProvider to node %d: %w", id, err)
-			}
-			e.printf("announced to node %d\n", id)
+		} else if err := offerAll(ctx, e, s, mgr, target, versionString, yes); err != nil {
+			return err
 		}
+		defer func() {
+			for _, f := range s.restore {
+				f()
+			}
+		}()
 		for {
 			select {
 			case <-e.ctx.Done():
@@ -144,7 +136,76 @@ func cmdOTAServe(e *env, args []string) error {
 	})
 }
 
-// rootCommand is the root endpoint's command path.
-func rootCommand(cluster, command uint32) im.ConcreteCommandPath {
-	return im.ConcreteCommandPath{Endpoint: 0, Cluster: cluster, Command: command, HasEndpoint: true, HasCluster: true, HasCommand: true}
+// pushTo starts the node, waits for its subscription — the manager updates
+// a node on current data only (OtaAnnouncements.ts:221-253 at 862ad75f) —
+// asks the console unless yes, and hands the consent to the manager, which
+// announces the provider (SoftwareUpdateManager.addUpdateConsent, :1153-1196).
+func pushTo(ctx context.Context, e *env, s *stack, mgr *softwareupdate.Manager, arg string, t softwareupdate.Target, versionString string, yes bool) error {
+	n, id, err := s.node(arg)
+	if err != nil {
+		return err
+	}
+	// The tool pairs its nodes without a default subscription
+	// (pair.go); the update needs one for the time it runs.
+	if !n.AutoSubscribe() {
+		if err := n.SetAutoSubscribe(ctx, true); err != nil {
+			return err
+		}
+		s.restore = append(s.restore, func() { _ = n.SetAutoSubscribe(context.Background(), false) }) //nolint:contextcheck // runs at the end, after ctx
+	}
+	if err := n.Start(ctx); err != nil {
+		return err
+	}
+	if err := waitUntil(ctx, n.SubscriptionActive); err != nil {
+		return fmt.Errorf("node %d: no subscription: %w", id, err)
+	}
+	p, _ := n.PeerAddress()
+	if !yes && !confirm(e, fmt.Sprintf("update node %d to version %d (%s)?", id, t.TargetSoftwareVersion, versionString)) {
+		return errors.New("declined")
+	}
+	queued, err := mgr.AddUpdateConsent(ctx, p, t)
+	if err != nil {
+		return err
+	}
+	if !queued {
+		return fmt.Errorf("node %d is not applicable for an OTA update (no OTA requestor, or another vendor or product)", id)
+	}
+	e.printf("announced to node %d\n", id)
+	return nil
+}
+
+// offerAll grants the consent for every paired node of the image's vendor
+// and product, after one question unless yes: a node that queries on its
+// own then gets the image (SoftwareUpdateManager.updateExistsFor,
+// :385-468, a consent held for the version).
+func offerAll(ctx context.Context, e *env, s *stack, mgr *softwareupdate.Manager, t softwareupdate.Target, versionString string, yes bool) error {
+	nodes := s.reg.Commissioned()
+	if len(nodes) == 0 {
+		return nil
+	}
+	if !yes && !confirm(e, fmt.Sprintf("offer version %d (%s) to the paired nodes of %04X:%04X?", t.TargetSoftwareVersion, versionString, t.VendorID, t.ProductID)) {
+		return errors.New("declined")
+	}
+	for _, n := range nodes {
+		if p, ok := n.PeerAddress(); ok {
+			if _, err := mgr.AddUpdateConsent(ctx, p, t); err != nil && !errors.Is(err, softwareupdate.ErrMismatch) {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+// waitUntil polls cond until it holds or ctx ends.
+func waitUntil(ctx context.Context, cond func() bool) error {
+	t := time.NewTicker(50 * time.Millisecond)
+	defer t.Stop()
+	for !cond() {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-t.C:
+		}
+	}
+	return nil
 }

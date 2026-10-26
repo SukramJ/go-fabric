@@ -49,7 +49,7 @@ const (
 
 // ErrOTA is an update check, store or download that failed — matter.js
 // OtaUpdateError (DclOtaUpdateService.ts:33-37).
-var ErrOTA = errors.New("softwareupdate")
+var ErrOTA = errors.New("softwareupdate: OTA update failed")
 
 // StoredImage is a stored image's entry — DclOtaUpdateService.OtaUpdateListEntry
 // (:1298-1310).
@@ -112,7 +112,6 @@ type Blobs interface {
 type MemoryBlobs struct {
 	mu    sync.Mutex
 	files map[string][]byte
-	meta  map[string]uint32
 }
 
 // Put implements [Blobs].
@@ -205,7 +204,7 @@ func fileName(vid, pid uint16, mode Mode, version uint32) string {
 	return strconv.FormatUint(uint64(vid), 16) + "." + strconv.FormatUint(uint64(pid), 16) + "." + string(mode) + "." + strconv.FormatUint(uint64(version), 10)
 }
 
-// Store stores an image — DclOtaUpdateService.store (:538-612): it is
+// Store stores an image — DclOtaUpdateService.store (:541-612): it is
 // written under its vendor, product, mode and version, read back and
 // checked against its header (and against info's vendor, product and
 // version when given), the specification version recorded; a failed check
@@ -416,6 +415,7 @@ func sourceOf(m Mode) string {
 		return SourceProd
 	case ModeTest:
 		return SourceTest
+	case ModeLocal:
 	}
 	return SourceLocal
 }

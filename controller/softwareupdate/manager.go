@@ -67,8 +67,8 @@ type Target struct {
 	ProductID             uint16
 	TargetSoftwareVersion uint32
 	// MaxBDXBlockSize caps the block size of this transfer over
-	// [Config].MaxBDXBlockSize; 0 falls back to it.
-	MaxBDXBlockSize uint16
+	// [Config].MaxBDXBlockSize; nil falls back to it. It must be positive.
+	MaxBDXBlockSize *uint16
 	// BDXAdditionalMrpDelay is the transfer's MRP margin over
 	// [Config].BDXAdditionalMrpDelay; nil falls back to it. It must not
 	// be negative.
@@ -76,6 +76,9 @@ type Target struct {
 }
 
 func (t Target) assert() error {
+	if t.MaxBDXBlockSize != nil && *t.MaxBDXBlockSize == 0 {
+		return fmt.Errorf("%w: maxBdxBlockSize must be a positive integer, got 0", ErrTransferOptions)
+	}
 	if t.BDXAdditionalMrpDelay != nil && *t.BDXAdditionalMrpDelay < 0 {
 		return fmt.Errorf("%w: bdxAdditionalMrpDelay must be a finite, non-negative duration, got %v", ErrTransferOptions, *t.BDXAdditionalMrpDelay)
 	}
@@ -83,15 +86,15 @@ func (t Target) assert() error {
 }
 
 // TransferOptions are a peer's BDX options — bdxTransferOptionsFor
-// (:1127-1144): 0 and nil leave the decision to the peer and its medium.
+// (:1133-1144): 0 and nil leave the decision to the peer and its medium.
 type TransferOptions struct {
-	MaxBlockSize       uint16
+	MaxBlockSize       *uint16
 	AdditionalMrpDelay *time.Duration
 }
 
 // SoftwareUpdateInfo is an update found for a node — matter.js
 // SoftwareUpdateInfo (:116-137).
-type SoftwareUpdateInfo struct {
+type SoftwareUpdateInfo struct { //nolint:revive // matter.js's name (SoftwareUpdateInfo); UpdateInfo is the store's
 	VendorID              uint16
 	ProductID             uint16
 	SoftwareVersion       uint32
@@ -320,7 +323,7 @@ func (m *Manager) Start() {
 	m.checkTimer = m.clock.AfterFunc(delay, m.initializeUpdateCheck)
 }
 
-// initializeUpdateCheck is #initializeUpdateCheck (:256-271).
+// initializeUpdateCheck is #initializeUpdateCheck (:261-271).
 func (m *Manager) initializeUpdateCheck() {
 	if err := m.CheckForUpdates(context.Background()); err != nil {
 		m.log.Info("ota.manager.initial_check_failed", slog.Any("err", err))
@@ -438,7 +441,7 @@ func (m *Manager) NodeEvent(n *client.Node, endpoint uint16, cluster, event uint
 		return
 	}
 	if p, ok := n.PeerAddress(); ok && m.isObserved(p) {
-		m.onSoftwareVersionChanged(p, ev.SoftwareVersion, true, nil)
+		m.onSoftwareVersionChanged(p, ev.SoftwareVersion, true)
 	}
 }
 
@@ -488,7 +491,7 @@ func (m *Manager) versionMaybeChanged(n *client.Node) {
 	}
 	m.mu.Unlock()
 	if changed {
-		m.onSoftwareVersionChanged(p, st.SoftwareVersion, false, nil)
+		m.onSoftwareVersionChanged(p, st.SoftwareVersion, false)
 	}
 }
 
@@ -496,21 +499,19 @@ func (m *Manager) indexOfLocked(p Peer) int {
 	return slices.IndexFunc(m.queue, func(e *queueEntry) bool { return e.peer == p })
 }
 
-// onSoftwareVersionChanged is #onSoftwareVersionChanged (:778-842): a
+// onSoftwareVersionChanged is #onSoftwareVersionChanged (:769-842): a
 // startUp of the reboot the provider already handled is suppressed; a
 // version below the target after a startUp of an Applying or WaitForApply
 // update fails it; a version at or above the target completes it and
 // drops the consents it covers.
-func (m *Manager) onSoftwareVersionChanged(p Peer, newVersion uint32, isStartUp bool, sessionID *uint16) {
+func (m *Manager) onSoftwareVersionChanged(p Peer, newVersion uint32, isStartUp bool) {
 	m.mu.Lock()
 	if isStartUp {
 		if suppressed, ok := m.startUpSuppress[p]; ok {
 			delete(m.startUpSuppress, p)
 			var current uint16
 			var have bool
-			if sessionID != nil {
-				current, have = *sessionID, true
-			} else if m.cfg.SessionID != nil {
+			if m.cfg.SessionID != nil {
 				m.mu.Unlock()
 				current, have = m.cfg.SessionID(p)
 				m.mu.Lock()
@@ -555,14 +556,18 @@ func (m *Manager) onSoftwareVersionChanged(p Peer, newVersion uint32, isStartUp 
 	m.triggerQueuedUpdate()
 }
 
-// onSubscribedAfterApply is #onSubscribedAfterApply (:844-870): an
+// onSubscribedAfterApply is #onSubscribedAfterApply (:848-870): an
 // Applying update whose node reports a version below the target over a
 // subscription established after its restart deadline did not apply.
 func (m *Manager) onSubscribedAfterApply(p Peer, n *client.Node) {
-	st, ok := basicInformation(n)
-	if !ok {
-		return
+	if st, ok := basicInformation(n); ok {
+		m.subscribedAfterApply(p, st.SoftwareVersion)
 	}
+}
+
+// subscribedAfterApply is onSubscribedAfterApply over the version the
+// node reports.
+func (m *Manager) subscribedAfterApply(p Peer, version uint32) {
 	m.mu.Lock()
 	i := m.indexOfLocked(p)
 	if i < 0 {
@@ -571,15 +576,15 @@ func (m *Manager) onSubscribedAfterApply(p Peer, n *client.Node) {
 	}
 	e := m.queue[i]
 	if e.status == nil || *e.status != mattercore.OTAUpdateApplying || e.started.IsZero() ||
-		m.clock.Now().Before(e.started.Add(peer.RebootReturnTimeout(e.applyDelay))) || st.SoftwareVersion >= e.TargetSoftwareVersion {
+		m.clock.Now().Before(e.started.Add(peer.RebootReturnTimeout(e.applyDelay))) || version >= e.TargetSoftwareVersion {
 		m.mu.Unlock()
 		return
 	}
-	m.log.Warn("ota.manager.apply_failed_resubscribed", slog.String("node", peerString(p)), slog.Uint64("version", uint64(st.SoftwareVersion)))
+	m.log.Warn("ota.manager.apply_failed_resubscribed", slog.String("node", peerString(p)), slog.Uint64("version", uint64(version)))
 	m.failAppliedLocked(i)
 }
 
-// failAppliedLocked is #failAppliedUpdate (:872-877); it unlocks m.mu.
+// failAppliedLocked is #failAppliedUpdate (:875-880); it unlocks m.mu.
 func (m *Manager) failAppliedLocked(i int) {
 	p := m.queue[i].peer
 	m.queue = slices.Delete(m.queue, i, i+1)
@@ -608,7 +613,7 @@ func (m *Manager) bdxSessionFor(p Peer) *bdx.ServerSession {
 	return m.cfg.BDX.SessionFor(bdx.Peer{FabricIndex: p.FabricIndex, NodeID: p.NodeID}, "ota")
 }
 
-// isTransferring is #isTransferring (:330-336): any change of the
+// isTransferring is #isTransferring (:334-336): any change of the
 // counter is liveness.
 func isTransferring(e *queueEntry, transferred *uint64) bool {
 	if transferred == nil {
@@ -629,7 +634,7 @@ func transferredOf(s *bdx.ServerSession) *uint64 {
 	return &v
 }
 
-// QueuedUpdates is a snapshot of the update queue — queuedUpdates (:290-320).
+// QueuedUpdates is a snapshot of the update queue — queuedUpdates (:293-320).
 func (m *Manager) QueuedUpdates() []PendingUpdate {
 	m.mu.Lock()
 	entries := make([]queueEntry, len(m.queue))
@@ -666,7 +671,7 @@ func (m *Manager) QueuedUpdates() []PendingUpdate {
 	return out
 }
 
-// validatePeerDetails is #validatePeerDetails (:362-379).
+// validatePeerDetails is #validatePeerDetails (:360-379).
 func (m *Manager) validatePeerDetails(p Peer, version uint32, vid, pid uint16) bool {
 	n := m.nodeAt(p)
 	if n == nil {
@@ -677,7 +682,7 @@ func (m *Manager) validatePeerDetails(p Peer, version uint32, vid, pid uint16) b
 }
 
 // UpdateExistsFor is the stored update the querying node gets —
-// updateExistsFor (:381-468): the node's details must match the query;
+// updateExistsFor (:385-468): the node's details must match the query;
 // the applicable stored images over its version (prod ones, the others
 // only with AllowTestImages), highest first; a requestor that can consent
 // gets the first, flagged consent-required unless the manager holds its
@@ -747,7 +752,7 @@ func (m *Manager) CheckForUpdates(ctx context.Context) error {
 	return nil
 }
 
-// cleanupObsoleteUpdates is #cleanupObsoleteUpdates (:476-556): a stored
+// cleanupObsoleteUpdates is #cleanupObsoleteUpdates (:483-556): a stored
 // prod or test image every node of its product runs at or above goes, and
 // so does every test image while test images are not allowed; local
 // images stay.
@@ -796,7 +801,7 @@ func (m *Manager) cleanupObsoleteUpdates(ctx context.Context) {
 
 // QueryUpdates checks every node, or only, for updates over the ledgers
 // and — with includeStored — the stored images, and returns the nodes it
-// found one for — queryUpdates (:558-623).
+// found one for — queryUpdates (:559-623).
 func (m *Manager) QueryUpdates(ctx context.Context, only *client.Node, includeStored bool) ([]PeerUpdate, error) {
 	type group struct {
 		vid, pid uint16
@@ -898,18 +903,19 @@ func (m *Manager) checkProductForUpdates(ctx context.Context, vid, pid uint16, v
 			break
 		}
 		if held != nil {
-			m.queueUpdate(&queueEntry{consent: consent{Target: Target{
+			e := &queueEntry{consent: consent{Target: Target{
 				VendorID: vid, ProductID: pid, TargetSoftwareVersion: info.SoftwareVersion,
 				MaxBDXBlockSize: held.MaxBDXBlockSize, BDXAdditionalMrpDelay: held.BDXAdditionalMrpDelay,
-			}, peer: t.peer}, endpoint: t.endpoint})
+			}, peer: t.peer}, endpoint: t.endpoint}
+			m.queueUpdate(e) //nolint:contextcheck // the queue's work runs on the manager's lifetime
 		} else if fn := m.cfg.OnUpdateAvailable; fn != nil {
-			fn(t.peer, details) // requestConsentForUpdate (:882-885)
+			fn(t.peer, details) // requestConsentForUpdate (:885-887)
 		}
 	}
 	return peers, nil
 }
 
-// queueUpdate is #queueUpdate (:887-920): an entry of a node already
+// queueUpdate is #queueUpdate (:892-920): an entry of a node already
 // queued replaces it unless it is in progress.
 func (m *Manager) queueUpdate(e *queueEntry) {
 	m.mu.Lock()
@@ -929,7 +935,7 @@ func (m *Manager) queueUpdate(e *queueEntry) {
 	m.triggerQueuedUpdate()
 }
 
-// triggerQueuedUpdate is #triggerQueuedUpdate (:922-983): in-progress
+// triggerQueuedUpdate is #triggerQueuedUpdate (:931-983): in-progress
 // entries are refreshed by their transfer's liveness and reset when
 // stalled; with none in progress the queue — fresh entries first, reset
 // ones last — announces its first entry, and a periodic check watches for
@@ -998,7 +1004,7 @@ func unknownLast(e *queueEntry) int {
 	return 0
 }
 
-// triggerUpdateOnNode is #triggerUpdateOnNode (:985-1025): unless a BDX
+// triggerUpdateOnNode is #triggerUpdateOnNode (:991-1025): unless a BDX
 // transfer of the node runs, the provider is announced with reason
 // UpdateAvailable; the entry is in progress once the announcement went
 // out, reset when it failed.
@@ -1036,7 +1042,7 @@ func (m *Manager) triggerUpdateOnNode(e *queueEntry) {
 
 // ForceUpdate updates the node now: a stale in-progress entry without a
 // running transfer is dropped, the consent added and the update announced
-// at once — forceUpdate (:1027-1086). A node with a transfer running is
+// at once — forceUpdate (:1031-1086). A node with a transfer running is
 // left alone; one not applicable is [ErrNotApplicable].
 func (m *Manager) ForceUpdate(ctx context.Context, p Peer, t Target) error {
 	if err := t.assert(); err != nil {
@@ -1082,11 +1088,11 @@ func (m *Manager) ForceUpdate(ctx context.Context, p Peer, t Target) error {
 	if only {
 		return nil // only entry, already being processed
 	}
-	m.triggerUpdateOnNode(entry)
+	m.triggerUpdateOnNode(entry) //nolint:contextcheck // as matter.js, the announcement is not bound to the caller
 	return nil
 }
 
-// cancelUpdate is #cancelUpdate (:1088-1123): the node's transfer is
+// cancelUpdate is #cancelUpdate (:1091-1123): the node's transfer is
 // closed; an update not yet Applying or Done is dropped and reported
 // failed, the reboot arming lifted.
 func (m *Manager) cancelUpdate(p Peer) {
@@ -1121,7 +1127,7 @@ func (m *Manager) cancelUpdate(p Peer) {
 
 // TransferOptionsFor is how BDX carries the node's pending update: its
 // queued entry's or consent's options, else the defaults —
-// bdxTransferOptionsFor (:1127-1144).
+// bdxTransferOptionsFor (:1133-1144).
 func (m *Manager) TransferOptionsFor(p Peer) TransferOptions {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -1131,9 +1137,13 @@ func (m *Manager) TransferOptionsFor(p Peer) TransferOptions {
 	} else if j := slices.IndexFunc(m.consents, func(c consent) bool { return c.peer == p }); j >= 0 {
 		pending = &m.consents[j].Target
 	}
-	out := TransferOptions{MaxBlockSize: m.cfg.MaxBDXBlockSize, AdditionalMrpDelay: m.cfg.BDXAdditionalMrpDelay}
+	out := TransferOptions{AdditionalMrpDelay: m.cfg.BDXAdditionalMrpDelay}
+	if m.cfg.MaxBDXBlockSize != 0 {
+		b := m.cfg.MaxBDXBlockSize
+		out.MaxBlockSize = &b
+	}
 	if pending != nil {
-		if pending.MaxBDXBlockSize != 0 {
+		if pending.MaxBDXBlockSize != nil {
 			out.MaxBlockSize = pending.MaxBDXBlockSize
 		}
 		if pending.BDXAdditionalMrpDelay != nil {
@@ -1145,7 +1155,7 @@ func (m *Manager) TransferOptionsFor(p Peer) TransferOptions {
 
 // AddUpdateConsent adds (or replaces) the node's consent and, when the
 // node is applicable now, queues its update — addUpdateConsent
-// (:1146-1196). It reports whether the update was queued; a node whose
+// (:1153-1196). It reports whether the update was queued; a node whose
 // vendor or product differs from t is [ErrMismatch].
 func (m *Manager) AddUpdateConsent(_ context.Context, p Peer, t Target) (bool, error) {
 	if err := t.assert(); err != nil {
@@ -1166,12 +1176,12 @@ func (m *Manager) AddUpdateConsent(_ context.Context, p Peer, t Target) (bool, e
 		m.log.Info("ota.manager.not_applicable_yet", slog.String("node", peerString(p)))
 		return false, nil
 	}
-	m.queueUpdate(&queueEntry{consent: consent{Target: t, peer: p}, endpoint: d.endpoint})
+	m.queueUpdate(&queueEntry{consent: consent{Target: t, peer: p}, endpoint: d.endpoint}) //nolint:contextcheck // the queue's work runs on the manager's lifetime
 	return true, nil
 }
 
 // HasConsent reports a consent of the node, for version when it is not 0
-// — hasConsent (:1198-1208).
+// — hasConsent (:1204-1211).
 func (m *Manager) HasConsent(p Peer, version uint32) bool {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -1181,7 +1191,7 @@ func (m *Manager) HasConsent(p Peer, version uint32) bool {
 }
 
 // RemoveConsent removes the node's consent (for version when it is not 0)
-// and cancels its update — removeConsent (:1210-1230).
+// and cancels its update — removeConsent (:1217-1232).
 func (m *Manager) RemoveConsent(p Peer, version uint32) {
 	m.mu.Lock()
 	if i := slices.IndexFunc(m.consents, func(c consent) bool {
@@ -1196,7 +1206,7 @@ func (m *Manager) RemoveConsent(p Peer, version uint32) {
 }
 
 // SuppressNextStartUp suppresses the node's next StartUp event on session
-// sessionID — suppressNextStartUp (:1232-1239), called by the provider for
+// sessionID — suppressNextStartUp (:1239-1241), called by the provider for
 // a QueryImage it took for the node's restart.
 func (m *Manager) SuppressNextStartUp(p Peer, sessionID uint16) {
 	m.mu.Lock()
@@ -1205,7 +1215,7 @@ func (m *Manager) SuppressNextStartUp(p Peer, sessionID uint16) {
 }
 
 // OnStatusChange takes a status the provider reports for the node —
-// onOtaStatusChange (:1241-1321): Done completes the update and drops
+// onOtaStatusChange (:1253-1321): Done completes the update and drops
 // the consents it covers; Cancelled (a BDX interruption) resets it for a
 // retry; any other status moves it on, and Applying arms the reboot
 // re-subscription with the apply delay and, the first time, reports the

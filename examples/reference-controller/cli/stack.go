@@ -5,9 +5,7 @@ package cli
 
 import (
 	"context"
-	"crypto/rand"
 	"database/sql"
-	"encoding/binary"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -15,6 +13,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/SukramJ/go-fabric/client/discovery"
@@ -27,6 +26,7 @@ import (
 	"github.com/SukramJ/go-fabric/controller/commissioner"
 	"github.com/SukramJ/go-fabric/controller/dcl"
 	"github.com/SukramJ/go-fabric/controller/dcl/snapshot"
+	"github.com/SukramJ/go-fabric/controller/softwareupdate"
 	"github.com/SukramJ/go-fabric/store"
 	"github.com/SukramJ/go-fabric/transport/udp"
 )
@@ -70,6 +70,13 @@ type stack struct {
 	policy   attestation.Policy
 
 	self *selfNode
+	// images is the own node's image store; onStatus the serving
+	// command's observer of the update statuses, under statusMu.
+	images   *softwareupdate.Images
+	statusMu sync.Mutex
+	onStatus func(p softwareupdate.Peer, st softwareupdate.Status, v uint32)
+	// restore undoes what a command changed on a node for its run.
+	restore []func()
 }
 
 // openDB opens the database and applies the node store's and the client
@@ -89,17 +96,6 @@ func openDB(ctx context.Context, path string) (*sql.DB, error) {
 	}
 	return db, nil
 }
-
-// randomUint64 draws the own node's ids (self.go).
-func randomUint64() uint64 {
-	var b [8]byte
-	_, _ = rand.Read(b[:]) // crypto/rand.Read never fails
-	return binary.BigEndian.Uint64(b[:])
-}
-
-// Operational node id range — matter.js packages/types/src/datatype/
-// NodeId.ts:27-28 at 0ceb202d.
-const operationalNodeMax = 0xFFFF_FFEF_FFFF_FFFF
 
 // isIPv4Listen reports whether a listen address names an IPv4 host.
 func isIPv4Listen(addr string) bool {
@@ -159,11 +155,19 @@ func openStack(e *env) (_ *stack, err error) {
 	if hooks.names != nil {
 		openNames = hooks.names
 	}
-	s.ctl, err = controller.New(e.ctx, controller.Config{
+	cfg := controller.Config{
 		DB: s.db, Attestation: attestation.Trust(mode, snap, online), Listener: l,
 		VendorID: fabricVendorID, Label: fabricLabel, CAKey: rootSigner,
 		Logger: e.log, Node: client.Config{Logger: e.log}, ManualStart: true, Names: openNames,
-	})
+	}
+	if e.ownNode {
+		if err := migrateSelfRecord(e.ctx, s.settings); err != nil {
+			_ = l.Close()
+			return nil, err
+		}
+		cfg.OTA = s.ownNodeConfig()
+	}
+	s.ctl, err = controller.New(e.ctx, cfg)
 	if err != nil {
 		return nil, err // New closed the socket
 	}
@@ -171,13 +175,10 @@ func openStack(e *env) (_ *stack, err error) {
 	return s, nil
 }
 
-// close tears the stack down: the own node, the controller, the trust
-// store, the database.
+// close tears the stack down: the controller (with its own node), the
+// trust store, the database.
 func (s *stack) close() {
 	ctx := context.Background()
-	if s.self != nil {
-		s.self.stop()
-	}
 	if s.ctl != nil {
 		_ = s.ctl.Close(ctx)
 	}

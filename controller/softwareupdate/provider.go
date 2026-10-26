@@ -11,7 +11,6 @@ import (
 	"github.com/SukramJ/go-fabric/bdx"
 	mattercore "github.com/SukramJ/go-fabric/cluster/core"
 	provdef "github.com/SukramJ/go-fabric/cluster/spec/otasoftwareupdateprovider"
-	"github.com/SukramJ/go-fabric/node"
 )
 
 // The provider side: the manager as the ports of node/'s OTA provider
@@ -23,23 +22,42 @@ import (
 // reports (#updateInProgressDetails → onOtaStatusChange, :599-645), the
 // startUp suppression (:221-224) and the transfer options (:293-298).
 
+// ProviderConfig is what the OTA provider that serves the manager's
+// updates runs with: the ports and hooks of node/'s provider
+// (node.OTAProviderConfig, field by field), in cluster/core's types, so
+// that this package stays below the node facade (ADR 0026 principle 1).
+type ProviderConfig struct {
+	ImageSource       mattercore.OTAImageSource
+	Consent           mattercore.OTAConsent
+	ApplyPolicy       mattercore.OTAApplyPolicy
+	BDXMaxBlockSize   uint16
+	OnStatusChange    func(peer mattercore.OTAPeer, status mattercore.OTAUpdateStatus, version uint32)
+	RebootQuery       func(peer mattercore.OTAPeer, sessionID uint16)
+	TransferBlockSize func(peer mattercore.OTAPeer) uint16
+}
+
 // ProviderConfig is the provider configuration that serves the manager's
-// updates: a node.Config's OTAProvider. The controller mounts it on its
-// provider node (controller.Config.OTA).
-func (m *Manager) ProviderConfig() *node.OTAProviderConfig {
-	return &node.OTAProviderConfig{
-		ImageSource:       providerPorts{m},
-		Consent:           providerPorts{m},
-		ApplyPolicy:       providerPorts{m},
-		BDXMaxBlockSize:   m.cfg.MaxBDXBlockSize,
-		OnStatusChange:    m.providerStatus,
-		RebootQuery:       func(p node.OTAPeer, sessionID uint16) { m.SuppressNextStartUp(peerOf(p), sessionID) },
-		TransferBlockSize: func(p node.OTAPeer) uint16 { return m.TransferOptionsFor(peerOf(p)).MaxBlockSize },
+// updates. The controller hands it to its own node
+// (controller.OwnNodeSpec.Provider).
+func (m *Manager) ProviderConfig() ProviderConfig {
+	return ProviderConfig{
+		ImageSource:     providerPorts{m},
+		Consent:         providerPorts{m},
+		ApplyPolicy:     providerPorts{m},
+		BDXMaxBlockSize: m.cfg.MaxBDXBlockSize,
+		OnStatusChange:  m.providerStatus,
+		RebootQuery:     func(p mattercore.OTAPeer, sessionID uint16) { m.SuppressNextStartUp(peerOf(p), sessionID) },
+		TransferBlockSize: func(p mattercore.OTAPeer) uint16 {
+			if b := m.TransferOptionsFor(peerOf(p)).MaxBlockSize; b != nil {
+				return *b
+			}
+			return 0
+		},
 	}
 }
 
 // SetBDX gives the manager the provider's BDX responder, once the
-// provider node is built (node.Node.BDX).
+// provider node is built (controller.OwnNode.BDX).
 func (m *Manager) SetBDX(r *bdx.Responder) {
 	m.mu.Lock()
 	m.cfg.BDX = r

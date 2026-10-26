@@ -44,10 +44,15 @@ type otaRig struct {
 
 func newOTARig(t *testing.T, edit func(*controller.OTAConfig)) *otaRig {
 	t.Helper()
+	return newOTARigWith(t, edit, &node.OtaConfig{Dir: filepath.Join(t.TempDir(), "ota"), Harness: true})
+}
+
+// newOTARigWith is newOTARig with the device's OTA requestor configured
+// by devOTA; nil runs the device without one.
+func newOTARigWith(t *testing.T, edit func(*controller.OTAConfig), devOTA *node.OtaConfig) *otaRig {
+	t.Helper()
 	r := &otaRig{site: fabrictest.NewSite(t, fabrictest.Options{}), images: softwareupdate.NewImages(softwareupdate.ImagesConfig{})}
-	r.dev = r.site.AddDevice(fabrictest.Topology{Configure: func(cfg *node.Config) {
-		cfg.OTA = &node.OtaConfig{Dir: filepath.Join(t.TempDir(), "ota"), Harness: true}
-	}})
+	r.dev = r.site.AddDevice(fabrictest.Topology{Configure: func(cfg *node.Config) { cfg.OTA = devOTA }})
 	ota := &controller.OTAConfig{
 		Images: r.images, AllowTestImages: true,
 		OnStatus: func(_ softwareupdate.Peer, s softwareupdate.Status, _ uint32) {
@@ -101,6 +106,18 @@ func (r *otaRig) eventually(t *testing.T, what string, cond func() bool) {
 	if err := r.site.Eventually(ctx, what, cond); err != nil {
 		t.Fatal(err)
 	}
+}
+
+// isolate drops every datagram to and from the device while on: an
+// announcement the manager sends then waits out its retransmissions, and
+// the queued entry stays queued.
+func (r *otaRig) isolate(on bool) {
+	if !on {
+		r.site.Net().Filter(nil)
+		return
+	}
+	dev := r.dev.Addr().String()
+	r.site.Net().Filter(func(d fabrictest.Datagram) bool { return d.From.String() != dev && d.To.String() != dev })
 }
 
 func (r *otaRig) peer(t *testing.T) softwareupdate.Peer {
