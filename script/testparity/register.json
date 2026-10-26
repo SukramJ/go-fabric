@@ -1311,17 +1311,13 @@
       "path": "packages/node/test/behaviors/thermostat/AtomicWriteHandlerTest.ts",
       "status": "partial",
       "go": [
-        "cluster/thermo:TestParityMatterJS_AtomicWriteHandlerTest"
+        "cluster/thermo:TestParityMatterJS_AtomicWriteHandlerTest",
+        "cluster/thermo:TestParityMatterJS_AtomicWriteHandlerCommitTest"
       ],
       "missing": [
-        "accepts an attribute whose atomic quality is inherited from the element it overrides",
-        "applies every pending write when all of them succeed",
-        "reports an attribute the peer did not write as SUCCESS, in the CommitWrite request's order",
-        "validates an attribute once the other pending attributes are staged",
-        "discards a valid Schedules write when the Presets write fails",
-        "discards a valid Presets write when the Schedules write fails"
+        "accepts an attribute whose atomic quality is inherited from the element it overrides"
       ],
-      "reason": "BeginWrite's command-level and per-attribute answers, the timeout and the BUSY of a write another peer holds run over the wire on fabrictest (a second peer is a second controller on its own fabric, the PASE peer a PASE session). Missing: the inherited-quality case, js-runtime-only: a TypeScript schema extension of a behavior class (the atomic quality is the generated definition's); the five CommitWrite cases, M4: findings entry \"The thermostat serves no Schedules\": they stage Schedules (MatterScheduleConfiguration) beside Presets, the Go thermostat's only other atomic attribute, which the server does not serve (matter.js's ThermostatServer does not implement it either, ThermostatServer.ts:126-128; its test stages the value through the behavior).",
+      "reason": "BeginWrite's command-level and per-attribute answers, the timeout and the BUSY of a write another peer holds run over the wire on fabrictest (a second peer is a second controller on its own fabric, the PASE peer a PASE session). The five CommitWrite cases of more than one attribute run in the package on a thermostat serving Presets and Schedules (MatterScheduleConfiguration, served ahead of matter.js after chip, brief CO): the values are staged through the server's write, the Schedules value the write refuses (TransitionTime 1440) on the atomic-write state as matter.js's stageAs does; \"validates an attribute once the other pending attributes are staged\" is the presets precommit reading the staged Schedules (chip's in-use check), the Go server having no presets$AtomicChanged observer. Missing: the inherited-quality case, js-runtime-only: a TypeScript schema extension of a behavior class (the atomic quality is the generated definition's).",
       "snapshotSha": "169b7cc8fea0d7a2db31d147679b19a13463772d"
     },
     {

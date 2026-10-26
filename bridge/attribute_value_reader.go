@@ -68,6 +68,10 @@ func attributeValueReader(path im.ConcreteAttributePath, el tlv.Element, dec *tl
 		// generated definition decodes (brief BL), as matter.js decodes it
 		// with the attribute's TlvSchema.
 		return generatedAttributeValue(thermostatdef.Definition, path.Attribute, el, dec, false)
+	case path.Cluster == thermostatdef.ClusterID && path.Attribute == thermostatdef.AttrSchedules && el.IsContainer:
+		// Thermostat Schedules (0x0201:0x0051), a list of ScheduleStruct
+		// (MatterScheduleConfiguration, brief CO), decodes the same way.
+		return generatedAttributeValue(thermostatdef.Definition, path.Attribute, el, dec, false)
 	}
 	return primitiveAttributeValue(el, dec)
 }
@@ -518,6 +522,8 @@ func listItemValue(path im.ConcreteAttributePath, el tlv.Element, dec *tlv.Decod
 		v, err := mattercore.DecodeDefaultOTAProvidersWrite(dec, el, true)
 		return im.AttributeValue{Value: v}, err
 	case path.Cluster == thermostatdef.ClusterID && path.Attribute == thermostatdef.AttrPresets && el.IsContainer:
+		return generatedAttributeValue(thermostatdef.Definition, path.Attribute, el, dec, true)
+	case path.Cluster == thermostatdef.ClusterID && path.Attribute == thermostatdef.AttrSchedules && el.IsContainer:
 		return generatedAttributeValue(thermostatdef.Definition, path.Attribute, el, dec, true)
 	}
 	v, err := primitiveAttributeValue(el, dec)

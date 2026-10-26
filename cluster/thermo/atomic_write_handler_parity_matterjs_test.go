@@ -15,12 +15,12 @@
 // of the invoke (matter.js's cmd-status); a refusal per attribute is the
 // AtomicResponse the device answers.
 //
-// Not ported: the inherited-atomic-quality case (a TypeScript schema
-// extension of a behavior class, which Go has no counterpart for: the
-// quality comes from the generated definition) and the five cases of
-// "CommitWrite of more than one attribute", which stage Schedules —
-// MatterScheduleConfiguration, which the server does not serve (matter.js
-// does not implement it either, ThermostatServer.ts:126-128).
+// The five cases of "CommitWrite of more than one attribute", which stage
+// Schedules beside Presets, run in the package
+// (atomic_commit_parity_matterjs_test.go). Not ported: the
+// inherited-atomic-quality case (a TypeScript schema extension of a
+// behavior class, which Go has no counterpart for: the quality comes from
+// the generated definition).
 package thermo_test
 
 import (

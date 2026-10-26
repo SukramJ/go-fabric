@@ -928,7 +928,7 @@ func (s *ThermostatServer) MatterWrite(ctx context.Context, attrID uint32, value
 	case tdef.AttrPresets:
 		return s.writePresets(ctx, v)
 	case tdef.AttrSchedules:
-		return spec.Errorf(im.StatusInvalidInState, "thermo: there is no atomic write in progress for this attribute")
+		return s.writeSchedules(ctx, v)
 	}
 	s.op.Lock()
 	defer s.op.Unlock()

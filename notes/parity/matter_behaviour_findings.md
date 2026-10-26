@@ -599,13 +599,6 @@ Found by the phase-19 port (brief BR, 2026-10-20). Line numbers at
   `missing` for this. (Milestone 4, a host option: a feature selection
   changes the FeatureMap a controller sees, and the event needs the
   bridge's change observation `booleanStateEvents` has for BooleanState.)
-- **The thermostat serves no Schedules.** MatterScheduleConfiguration's
-  Schedules is the second atomic attribute a CommitWrite of more than one
-  attribute needs (`AtomicWriteHandlerTest.ts:392-516` stages it beside
-  Presets through the behavior); the Go thermostat serves Presets alone,
-  as matter.js's ThermostatServer does not implement the feature
-  (`ThermostatServer.ts:126-128`). Five `AtomicWriteHandlerTest.ts` cases
-  are `missing` for this. (Milestone 4, with a Schedules implementation.)
 - **The Groupcast server has no Listener-only configuration.** The module
   builds Groupcast with Listener, Sender and PerGroup
   (`GroupcastServer.ts:81-83` as RootEndpoint installs it); a node without
