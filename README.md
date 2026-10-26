@@ -26,7 +26,7 @@ element model ships embedded so parity is a test, not a claim.
 
 ## Status
 
-As of `v0.13.2` (2026-10-26); the numbers are [the roadmap's baseline](./docs/roadmap.md#baseline-2026-10-17-v060).
+As of `v0.13.3` (2026-10-26); the numbers are [the roadmap's baseline](./docs/roadmap.md#baseline-2026-10-17-v060).
 
 | Area | State |
 | --- | --- |

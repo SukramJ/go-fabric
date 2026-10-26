@@ -10,6 +10,8 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+## [0.13.3] — 2026-10-26
+
 ### Added
 
 - The Thermostat server serves the optional `TemperatureSetpointHold` and `ThermostatRunningState` (issue #273, brief CO PR 1): `thermo.ThermostatConfig.TemperatureSetpointHold` and `.ThermostatRunningState` — or a `thermostatdef.Declare` whose `Initial` sets them — serve each from its initial value, and the device reports its own changes through the new inbound setters `ThermostatServer.SetTemperatureSetpointHold` and `ThermostatServer.SetThermostatRunningState` (or the typed server's `Set`), stored and reported as the host's change without the `Sink`. With the hold the server also serves `TemperatureSetpointHoldDuration`, null and stored as written, as matter.js initialises it (`ThermostatServer.ts:365-369` at 862ad75f); `SetpointHoldExpiryTimestamp` stays unserved, as in matter.js (`:372-379`). The reference bridge's thermostat serves both, and the chip-tool suite reads them and writes the hold.
@@ -4904,7 +4906,8 @@ consumer of an older pseudo-version should read.
   earlier than it was. Both fields are gone; the commit holding the file is
   its provenance.
 
-[Unreleased]: https://github.com/SukramJ/go-fabric/compare/v0.13.2...HEAD
+[Unreleased]: https://github.com/SukramJ/go-fabric/compare/v0.13.3...HEAD
+[0.13.3]: https://github.com/SukramJ/go-fabric/compare/v0.13.2...v0.13.3
 [0.13.2]: https://github.com/SukramJ/go-fabric/compare/v0.13.1...v0.13.2
 [0.13.1]: https://github.com/SukramJ/go-fabric/compare/v0.13.0...v0.13.1
 [0.13.0]: https://github.com/SukramJ/go-fabric/compare/v0.12.4...v0.13.0
