@@ -89,6 +89,7 @@ pin lift confirms by re-reading the row, [`pin-lifts.md`](./pin-lifts.md)).
 | BD-chip-Appliance-RulesInServer | `MicrowaveOvenControlServer.ts:18`, `LaundryWasherControlsServer.ts:18`, `LaundryDryerControlsServer.ts:14` are empty subclasses (absence: the class lines); the oven cavity has logic (`OvenCavityOperationalStateServer.ts:21-107`) and is not a marker | `packages/node/src/behaviors/microwave-oven-control/MicrowaveOvenControlServer.ts`<br>`packages/node/src/behaviors/laundry-washer-controls/LaundryWasherControlsServer.ts`<br>`packages/node/src/behaviors/laundry-dryer-controls/LaundryDryerControlsServer.ts` | `"export class MicrowaveOvenControlServer extends MicrowaveOvenControlBehavior {}"`<br>`"export class LaundryWasherControlsServer extends LaundryWasherControlsBehavior {}"`<br>`"export class LaundryDryerControlsServer extends LaundryDryerControlsBehavior {}"` | connectedhomeip |
 | BD-chip-DeviceEnergyManagement-EnergyEvse-RulesInServer | `DeviceEnergyManagementServer.ts:18`, `EnergyEvseServer.ts:14` are empty subclasses (absence: the class lines) | `packages/node/src/behaviors/device-energy-management/DeviceEnergyManagementServer.ts`<br>`packages/node/src/behaviors/energy-evse/EnergyEvseServer.ts` | `"export class DeviceEnergyManagementServer extends DeviceEnergyManagementBehavior {}"`<br>`"export class EnergyEvseServer extends EnergyEvseBehavior {}"` | connectedhomeip |
 | BD-chip-ClosureDimension-RulesInServer | `ClosureDimensionServer.ts:17` is the empty subclass (absence: the class line, 17 lines in all) | `packages/node/src/behaviors/closure-dimension/ClosureDimensionServer.ts` | `"export class ClosureDimensionServer extends ClosureDimensionBehavior {}"` | connectedhomeip |
+| BD-chip-Thermostat-Schedules | `ThermostatServer.ts:82`, the class doc lists the feature unimplemented (presence; :126-128 warns when it is enabled) | `packages/node/src/behaviors/thermostat/ThermostatServer.ts` | `"MatterScheduleConfiguration: This feature is not implemented yet."` | connectedhomeip `src/app/clusters/thermostat-server/ThermostatClusterSchedules.cpp` at `645b267a` (`SetActiveSchedule` :741, `AppendPendingSchedule` :795, `ValidateScheduleTransitions` :292, `ValidateTransitionsPerDay` :457, the atomic hooks :620-663, `PrecommitSchedules` :1000) |
 
 ---
 
@@ -4532,3 +4533,59 @@ that one. Reasoning: a BLE adapter held open between pairings costs the
 host's radio, and the scanner that could still hold the advertisement is
 the one that found it.
 
+
+
+### BD-chip-Thermostat-Schedules — MatterScheduleConfiguration follows connectedhomeip; matter.js does not implement it
+
+matter.js's `ThermostatServer` lists MatterScheduleConfiguration as not
+implemented (`packages/node/src/behaviors/thermostat/ThermostatServer.ts:82`
+at `862ad75f`; `:126-128` warns when the feature is enabled), so the
+feature's behaviour in `cluster/thermo` (`schedules.go`, `schedules_write.go`,
+the Schedules branch of `atomic.go`) follows connectedhomeip's
+`ThermostatSchedules` at `645b267a` — the harness commit `6170af84` has no
+schedules server — with chip's `TestThermostatClusterSchedules.cpp` cases
+ported in `schedules_chip_test.go` and `schedules_write_chip_test.go`
+(brief CO, issue #273). Four choices inside it are recorded here rather
+than as rows of their own. (1) A Schedules write from a peer that does not
+hold the atomic write is INVALID_IN_STATE, whether no write is open or
+another peer holds it (`ThermostatClusterSchedules.cpp:572-575`; chip's
+case `WriteToSchedulesFromDifferentNodeDuringAtomicWriteIsInvalidInState`,
+`:558`), where Presets keeps matter.js's BUSY for another peer
+(`AtomicWriteHandler.ts:467-469`, TC-TSTAT-4.2 step 15): each attribute
+answers as its authority does. (2) The server issues a 16-byte handle to a
+new schedule at commit, as matter.js does for a preset
+(`ThermostatServer.ts:1526`); chip leaves allocation to the delegate
+(`ThermostatClusterSchedules.h:134-145`), and the `SchedulePort` receives
+the list with its handles so a host need not invent them. (3) CommitWrite
+precommits every staged attribute before it commits any
+(`ThermostatClusterAtomic.cpp:442-447`); matter.js validates and applies
+in one unit (`AtomicWriteHandler.ts:271-339`), and the observable result
+is the same — the five "CommitWrite of more than one attribute" cases of
+`AtomicWriteHandlerTest.ts:392-516` are ported and pass. (4) With MSCH a
+Presets commit refuses to drop a preset a schedule or a transition names,
+INVALID_IN_STATE (`ThermostatClusterPresets.cpp:708-724`); matter.js has
+no schedules to check. Hosts serve MSCH behind a flag, off by default,
+until a live pairing with Apple Home is verified (owner decision
+2026-10-26; the reference bridge's `--thermostat-schedules`). Retire the
+register row when matter.js implements the feature; then reconcile onto
+it.
+
+### BD-Matter-Thermostat-Hold-ReachesHost — a TemperatureSetpointHold write reaches the Sink; matter.js only stores it
+
+matter.js's `ThermostatServer` initialises the hold's companions and
+nothing else: its reaction to a hold change is commented out
+(`ThermostatServer.ts:381`, `#handleTemperatureSetpointHoldChange` at
+`:385`, at `862ad75f`), and connectedhomeip gives the attribute no
+behaviour either (`src/app/clusters/thermostat-server/ThermostatClusterBase.cpp:357-358`
+at `6170af84`, an optional attribute). `cluster/thermo` serves the hold on
+request (`ThermostatConfig.TemperatureSetpointHold`) and hands a
+controller's write to `Sink.SetTemperatureSetpointHold` after the
+definition admitted it and before it is stored, as a SystemMode write is
+handed over; the host's refusal refuses the write with its status
+(`writeHold`, `thermostat_server.go`). Everything else mirrors matter.js:
+`TemperatureSetpointHoldDuration` is served null with the hold and stored
+as written (`ThermostatServer.ts:365-369`), `SetpointHoldExpiryTimestamp`
+stays unserved (`:372-379`), and no hold timer runs. Reasoning: a device
+that follows a week program must learn that a controller asked it to hold
+or to resume, and the Sink is where every other admitted write reaches the
+host (brief CO, issue #273).
