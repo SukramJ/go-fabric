@@ -399,10 +399,14 @@ func newThermostatServer(b defaultBuild) (contract.ClusterServer, error) {
 		if d.PresetStore != nil {
 			cfg.PresetStore = d.PresetStore
 		}
+		if d.SchedulePort != nil {
+			cfg.SchedulePort = d.SchedulePort
+		}
 	}
-	// The limits and the presets the device ships with (NumberOfPresets,
-	// PresetTypes, Presets, ActivePresetHandle) are the server's
-	// configuration; the setpoints it starts with are too, under their
+	// The limits, the presets the device ships with (NumberOfPresets,
+	// PresetTypes, Presets, ActivePresetHandle) and its schedules
+	// (ScheduleTypes, the three counts, Schedules, ActiveScheduleHandle) are
+	// the server's configuration; the setpoints it starts with are too, under their
 	// Config names.
 	configFrom(&cfg, b.def, b.initial)
 	for id, dst := range map[uint32]*int16{

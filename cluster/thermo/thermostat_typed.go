@@ -64,13 +64,14 @@ var setpointKeys = map[uint32]struct {
 // Presets and ActivePresetHandle, which the host owns too, go through
 // [ThermostatServer.SetPresets] and [ThermostatServer.SetActivePresetHandle]
 // — validated against the preset rules and persisted through the
-// [PresetStore] under the command queue — before the other attributes, in
-// that order: a refusal there leaves the other attributes unset (a
-// refused handle after accepted presets keeps the presets).
+// [PresetStore] under the command queue — and then Schedules and
+// ActiveScheduleHandle through [ThermostatServer.SetSchedules] and
+// [ThermostatServer.SetActiveScheduleHandle], before the other attributes,
+// in that order: a refusal there leaves the attributes after it unset.
 // ControlSequenceOfOperation is derived from the features, and
-// MinSetpointDeadBand, PresetTypes and NumberOfPresets are the
-// configuration's: [spec.ErrNotHeld] for a value other than the one they
-// read (any value for the two lists).
+// MinSetpointDeadBand, PresetTypes, NumberOfPresets, ScheduleTypes and the
+// three schedule counts are the configuration's: [spec.ErrNotHeld] for a
+// value other than the one they read (any value for the lists and counts).
 func (s *ThermostatServer) SetAttributes(values map[uint32]any) error {
 	checked, presets, err := s.checkSet(values)
 	if err != nil {
@@ -174,6 +175,13 @@ type presetValues struct {
 	hasPresets bool
 	handle     []byte
 	hasHandle  bool
+
+	// schedules and scheduleHandle are Schedules and ActiveScheduleHandle
+	// (MSCH), each when given.
+	schedules         []Schedule
+	hasSchedules      bool
+	scheduleHandle    []byte
+	hasScheduleHandle bool
 }
 
 // setPresetAttributes applies p through the preset setters, Presets first.
@@ -185,7 +193,17 @@ func (s *ThermostatServer) setPresetAttributes(p presetValues) error {
 		}
 	}
 	if p.hasHandle {
-		return s.SetActivePresetHandle(ctx, p.handle)
+		if err := s.SetActivePresetHandle(ctx, p.handle); err != nil {
+			return err
+		}
+	}
+	if p.hasSchedules {
+		if err := s.SetSchedules(p.schedules); err != nil {
+			return err
+		}
+	}
+	if p.hasScheduleHandle {
+		return s.SetActiveScheduleHandle(p.scheduleHandle)
 	}
 	return nil
 }
@@ -212,7 +230,19 @@ func (s *ThermostatServer) checkSet(values map[uint32]any) (map[uint32]any, pres
 			handle, _ := v.([]byte) // octstr per CheckSet; nil is null
 			presets.handle, presets.hasHandle = handle, true
 			continue
-		case tdef.AttrPresetTypes, tdef.AttrNumberOfPresets:
+		case tdef.AttrSchedules:
+			list, err := schedulesValue(v)
+			if err != nil {
+				return nil, presets, err
+			}
+			presets.schedules, presets.hasSchedules = list, true
+			continue
+		case tdef.AttrActiveScheduleHandle:
+			handle, _ := v.([]byte) // octstr per CheckSet; nil is null
+			presets.scheduleHandle, presets.hasScheduleHandle = handle, true
+			continue
+		case tdef.AttrPresetTypes, tdef.AttrNumberOfPresets, tdef.AttrScheduleTypes, tdef.AttrNumberOfSchedules,
+			tdef.AttrNumberOfScheduleTransitions, tdef.AttrNumberOfScheduleTransitionPerDay:
 			return nil, presets, fmt.Errorf("%w: thermostat: attribute 0x%04X is the configuration's", spec.ErrNotHeld, id)
 		case thermoAttrControlSequenceOfOperation, thermoAttrMinSetpointDeadBand:
 			if cur, _ := s.MatterRead(id); v != cur {

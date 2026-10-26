@@ -730,6 +730,17 @@ type PresetStore interface {
 	SavePresets(ctx context.Context, presets, activeHandle []byte) error
 }
 
+// SchedulePort is the device's week program behind the
+// MatterScheduleConfiguration feature: SetActiveSchedule switches
+// to a stored schedule a SetActiveScheduleRequest named, and
+// CommitSchedules stores the list an atomic write committed; an
+// error refuses the change with its status, FAILURE without one
+// (cluster/thermo SchedulePort).
+type SchedulePort interface {
+	SetActiveSchedule(ctx context.Context, handle []byte) error
+	CommitSchedules(ctx context.Context, schedules []ScheduleStruct) error
+}
+
 // Declare is the declaration of the Thermostat cluster on a device:
 // device.New<Type> and device.FromSpec take it, and every field is
 // optional — the zero value mounts the cluster (an optional one too)
@@ -773,6 +784,8 @@ type Declare struct {
 	Sink Sink
 	// PresetStore is the host port the kit's server runs on ([PresetStore]).
 	PresetStore PresetStore
+	// SchedulePort is the host port the kit's server runs on ([SchedulePort]).
+	SchedulePort SchedulePort
 	// HostServer is the host's own server for the cluster, mounted in
 	// place of the kit's — also for a cluster the device type does not
 	// list. The hooks above go on it; Initial, Features and the ports are

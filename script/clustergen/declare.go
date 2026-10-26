@@ -318,6 +318,20 @@ var ports = map[string]portSet{
 				"LoadPresets(ctx context.Context) (presets, activeHandle []byte, ok bool, err error)",
 				"SavePresets(ctx context.Context, presets, activeHandle []byte) error",
 			},
+		}, {
+			name: "SchedulePort",
+			doc: []string{
+				"SchedulePort is the device's week program behind the",
+				"MatterScheduleConfiguration feature: SetActiveSchedule switches",
+				"to a stored schedule a SetActiveScheduleRequest named, and",
+				"CommitSchedules stores the list an atomic write committed; an",
+				"error refuses the change with its status, FAILURE without one",
+				"(cluster/thermo SchedulePort).",
+			},
+			methods: []string{
+				"SetActiveSchedule(ctx context.Context, handle []byte) error",
+				"CommitSchedules(ctx context.Context, schedules []ScheduleStruct) error",
+			},
 		}},
 		types: []string{
 			"// SetpointChange is one setpoint a Sink's setpoint change moves with",

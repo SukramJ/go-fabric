@@ -10,7 +10,11 @@
 // controller changes them with, persisted through a [PresetStore])
 // features, as matter.js's ThermostatServer serves them, and on request
 // the optional TemperatureSetpointHold (with TemperatureSetpointHoldDuration)
-// and ThermostatRunningState.
+// and ThermostatRunningState. Ahead of matter.js, which does not implement
+// it, the server serves MatterScheduleConfiguration (the device's week
+// programs, the active one, SetActiveScheduleRequest and the atomic write
+// of Schedules) after connectedhomeip's ThermostatSchedules, behind a
+// [SchedulePort] (schedules.go).
 //
 // The server holds its own state. Without a host port it answers every
 // write and command without forwarding it anywhere — the reference daemon
@@ -66,21 +70,23 @@ const (
 
 // Feature bits (thermostat-cluster.element.ts).
 const (
-	ThermostatFeatureHEAT = uint32(tdef.FeatureHeating)                    // bit 0 — Heating
-	ThermostatFeatureCOOL = uint32(tdef.FeatureCooling)                    // bit 1 — Cooling
-	ThermostatFeatureAUTO = uint32(tdef.FeatureAutoMode)                   // bit 5 — AutoMode (requires HEAT+COOL)
-	ThermostatFeatureLTNE = uint32(tdef.FeatureLocalTemperatureNotExposed) // bit 6 — LocalTemperatureNotExposed
-	ThermostatFeatureOCC  = uint32(tdef.FeatureOccupancy)                  // bit 2 — Occupancy
-	ThermostatFeaturePRES = uint32(tdef.FeaturePresets)                    // bit 8 — Presets
+	ThermostatFeatureHEAT = uint32(tdef.FeatureHeating)                     // bit 0 — Heating
+	ThermostatFeatureCOOL = uint32(tdef.FeatureCooling)                     // bit 1 — Cooling
+	ThermostatFeatureAUTO = uint32(tdef.FeatureAutoMode)                    // bit 5 — AutoMode (requires HEAT+COOL)
+	ThermostatFeatureLTNE = uint32(tdef.FeatureLocalTemperatureNotExposed)  // bit 6 — LocalTemperatureNotExposed
+	ThermostatFeatureOCC  = uint32(tdef.FeatureOccupancy)                   // bit 2 — Occupancy
+	ThermostatFeaturePRES = uint32(tdef.FeaturePresets)                     // bit 8 — Presets
+	ThermostatFeatureMSCH = uint32(tdef.FeatureMatterScheduleConfiguration) // bit 7 — MatterScheduleConfiguration
 )
 
 // servedFeatures are the features whose elements the server serves.
-// MatterScheduleConfiguration (matter.js: "not implemented yet",
-// ThermostatServer.ts:126-128 at 862ad75f), ScheduleConfiguration and
-// Setback (deprecated, refused, :120-125), Events and
-// ThermostatSuggestions are not.
+// MatterScheduleConfiguration is served ahead of matter.js ("not
+// implemented yet", ThermostatServer.ts:82 and :126-128 at 862ad75f),
+// after connectedhomeip (schedules.go). ScheduleConfiguration and Setback
+// (deprecated, refused, :120-125), Events and ThermostatSuggestions are
+// not.
 const servedFeatures = ThermostatFeatureHEAT | ThermostatFeatureCOOL | ThermostatFeatureAUTO | ThermostatFeatureLTNE |
-	ThermostatFeatureOCC | ThermostatFeaturePRES
+	ThermostatFeatureOCC | ThermostatFeaturePRES | ThermostatFeatureMSCH
 
 // ErrFeatures reports a ThermostatConfig.Features the server refuses.
 var ErrFeatures = errors.New("thermo: feature selection not served")
@@ -202,6 +208,25 @@ type ThermostatConfig struct {
 	// it. The device reports changes through
 	// [ThermostatServer.SetThermostatRunningState].
 	ThermostatRunningState *uint16
+	// ScheduleTypes, NumberOfSchedules, NumberOfScheduleTransitions and
+	// NumberOfScheduleTransitionPerDay (nil for no per-day limit) configure
+	// MatterScheduleConfiguration (MSCH): the schedule types the device
+	// supports, the number of schedules and of transitions across them it
+	// holds, and the transitions a day may carry. Schedules are the
+	// device's own week programs — each with a handle, a null BuiltIn taken
+	// as built in — and ActiveScheduleHandle the one it follows (nil for
+	// none; one that names no schedule is cleared with a warning). The
+	// device's later changes come back through [ThermostatServer.SetSchedules]
+	// and [ThermostatServer.SetActiveScheduleHandle].
+	ScheduleTypes                    []ScheduleType
+	NumberOfSchedules                uint8
+	NumberOfScheduleTransitions      uint8
+	NumberOfScheduleTransitionPerDay *uint8
+	Schedules                        []Schedule
+	ActiveScheduleHandle             []byte
+	// SchedulePort switches the device's active schedule and stores the
+	// schedules a controller wrote, with MSCH; nil keeps them in memory.
+	SchedulePort SchedulePort
 	// Clock times the atomic writes; nil is the system clock.
 	Clock clock.Clock
 	// Sink is the optional host port; nil keeps the server self-contained.
@@ -371,6 +396,16 @@ type ThermostatServer struct {
 	holdDuration *uint16
 	runningState uint16
 
+	// MSCH-gated state (schedules.go): the configuration, the stored
+	// schedules, the active handle and the port.
+	scheduleTypes               []ScheduleType
+	numberOfSchedules           uint8
+	numberOfScheduleTransitions uint8
+	transitionsPerDay           *uint8
+	schedules                   []Schedule
+	activeScheduleHandle        []byte
+	schedulePort                SchedulePort
+
 	clk    clock.Clock
 	atomic atomicWrites
 
@@ -391,7 +426,8 @@ type ThermostatServer struct {
 // feature the server does not serve (Setback, the schedule, event and
 // suggestion features) is refused with [ErrFeatures]; a negative
 // MinSetpointDeadBand with [ErrSetpoints], a preset configuration the
-// write rules refuse with [ErrPresets].
+// write rules refuse with [ErrPresets], a schedule configuration with
+// [ErrSchedules].
 //
 // Limits and initial setpoints that violate the setpoint rules are
 // repaired, preferring the heating side (the cooling side without HEAT):
@@ -506,6 +542,12 @@ func New(cfg ThermostatConfig) (*ThermostatServer, error) {
 			if err := s.savePresets(context.Background(), s.presets, nil); err != nil {
 				return nil, fmt.Errorf("%w: %w", ErrPresets, err)
 			}
+		}
+	}
+
+	if features&ThermostatFeatureMSCH != 0 {
+		if err := s.seedSchedules(cfg); err != nil {
+			return nil, err
 		}
 	}
 
@@ -739,15 +781,19 @@ func sinkError(what string, err error) error {
 // selection does not serve returns (nil, false) — the IM dispatcher
 // handles the UnsupportedAttribute response.
 func (s *ThermostatServer) MatterRead(attrID uint32) (any, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.readLocked(attrID)
+}
+
+// readLocked is [ThermostatServer.MatterRead] for a caller holding s.mu.
+func (s *ThermostatServer) readLocked(attrID uint32) (any, bool) {
 	if v, ok := s.inst.ReadGlobal(attrID); ok {
 		return v, true
 	}
 	if !s.inst.Serves(attrID) {
 		return nil, false
 	}
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
 	switch attrID {
 	case thermoAttrLocalTemperature:
 		if s.localTemp == nil {
@@ -808,6 +854,24 @@ func (s *ThermostatServer) MatterRead(attrID uint32) (any, bool) {
 		return *s.holdDuration, true
 	case thermoAttrThermostatRunningState:
 		return s.runningState, true
+	case tdef.AttrScheduleTypes:
+		return spec.List[ScheduleType](slices.Clone(s.scheduleTypes)), true
+	case tdef.AttrNumberOfSchedules:
+		return s.numberOfSchedules, true
+	case tdef.AttrNumberOfScheduleTransitions:
+		return s.numberOfScheduleTransitions, true
+	case tdef.AttrNumberOfScheduleTransitionPerDay:
+		if s.transitionsPerDay == nil {
+			return nil, true
+		}
+		return *s.transitionsPerDay, true
+	case tdef.AttrActiveScheduleHandle:
+		if s.activeScheduleHandle == nil {
+			return nil, true
+		}
+		return bytes.Clone(s.activeScheduleHandle), true
+	case tdef.AttrSchedules:
+		return spec.List[Schedule](cloneSchedules(s.schedules)), true
 	case thermoAttrControlSequenceOfOperation:
 		// Mandatory (M conformance). Derived from the supported modes:
 		// 4=CoolingAndHeating, 2=HeatingOnly, 0=CoolingOnly. The value
@@ -821,18 +885,23 @@ func (s *ThermostatServer) MatterRead(attrID uint32) (any, bool) {
 	}
 }
 
-// MatterReadFiltered implements [contract.FabricScopedReader] for the one
-// attribute whose value depends on the reader: Presets, which the peer
-// holding an atomic write of it reads as it staged it — matter.js's
-// Presets getter (ThermostatServer.ts:1680-1699 at 862ad75f). Every other
-// attribute falls through to [ThermostatServer.MatterRead].
+// MatterReadFiltered implements [contract.FabricScopedReader] for the two
+// attributes whose value depends on the reader: Presets and Schedules,
+// which the peer holding an atomic write of them reads as it staged them —
+// matter.js's Presets getter (ThermostatServer.ts:1680-1699 at 862ad75f),
+// chip's Schedules read (ThermostatClusterSchedules.cpp:515-530 at
+// 645b267a). Every other attribute falls through to
+// [ThermostatServer.MatterRead].
 func (s *ThermostatServer) MatterReadFiltered(ctx context.Context, attrID uint32) (any, bool) {
-	if attrID != tdef.AttrPresets || !s.inst.Serves(attrID) {
+	if (attrID != tdef.AttrPresets && attrID != tdef.AttrSchedules) || !s.inst.Serves(attrID) {
 		return nil, false
 	}
 	if v, ok := s.pendingAtomicValue(ctx, attrID); ok {
-		if presets, isPresets := v.([]Preset); isPresets {
-			return spec.List[Preset](clonePresets(presets)), true
+		switch staged := v.(type) {
+		case []Preset:
+			return spec.List[Preset](clonePresets(staged)), true
+		case []Schedule:
+			return spec.List[Schedule](cloneSchedules(staged)), true
 		}
 	}
 	return s.MatterRead(attrID)
@@ -855,8 +924,11 @@ func (s *ThermostatServer) MatterWrite(ctx context.Context, attrID uint32, value
 	if err := s.veto.Check(ctx, attrID, storedWrite(attrID, v)); err != nil {
 		return err
 	}
-	if attrID == tdef.AttrPresets {
+	switch attrID {
+	case tdef.AttrPresets:
 		return s.writePresets(ctx, v)
+	case tdef.AttrSchedules:
+		return spec.Errorf(im.StatusInvalidInState, "thermo: there is no atomic write in progress for this attribute")
 	}
 	s.op.Lock()
 	defer s.op.Unlock()
@@ -1192,6 +1264,8 @@ func (s *ThermostatServer) MatterInvoke(ctx context.Context, cmdID uint32, field
 		return nil, s.handleSetpointRaiseLower(ctx, fields)
 	case cmdID == tdef.CmdSetActivePresetRequest && s.inst.Accepts(cmdID):
 		return nil, s.handleSetActivePresetRequest(ctx, fields)
+	case cmdID == tdef.CmdSetActiveScheduleRequest && s.inst.Accepts(cmdID):
+		return nil, s.handleSetActiveScheduleRequest(ctx, fields)
 	case cmdID == tdef.CmdAtomicRequest && s.inst.Accepts(cmdID):
 		s.op.Lock()
 		defer s.op.Unlock()
@@ -1606,9 +1680,9 @@ func controlSequenceOfOperation(features uint32) uint8 {
 }
 
 // MatterAcceptedCommands implements [contract.ClusterCommandLister]:
-// SetpointRaiseLower, the only mandatory command, and with PRES
-// SetActivePresetRequest and AtomicRequest; the schedule commands carry
-// MSCH conformance, a feature the server does not serve. Without the lister the dispatcher synthesised an empty
+// SetpointRaiseLower, the only mandatory command, with PRES
+// SetActivePresetRequest, with MSCH SetActiveScheduleRequest, and with
+// either AtomicRequest. Without the lister the dispatcher synthesised an empty
 // AcceptedCommandList, and a controller that reads the list before
 // invoking — Apple Home and Google Home both do — saw a thermostat that
 // accepts nothing. Found by the chip-tool data-model sweep.
