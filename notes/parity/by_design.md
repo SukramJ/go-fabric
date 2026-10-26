@@ -595,8 +595,8 @@ These rewrite TypeScript constructs into Go. Wire output is identical; the surfa
 | BD-Matter-TimeSync-NoUTCFeature | matter.js `time-synchronization.element.ts:32-35` — `UtcTime` and `Granularity` both carry `conformance: "M"` unconditionally; no `UTC` feature flag exists | `cluster/core/time_synchronization.go::MatterRead` returns `FeatureMap = 0` while exposing UTCTime + Granularity | The matter-exhaustive audit drift L1-D14 ("UTC-Feature-Bit nicht gesetzt obwohl UTCTime exponiert wird") is a **false positive**: it presumes a non-existent UTC feature flag. UTCTime and Granularity are mandatory regardless of any feature flag; the optional TZ / NTPC / NTPS / TSC features gate additional attributes (TimeZone, DefaultNtp, TrustedTimeSource, …) that the bridge intentionally does not implement. `FeatureMap = 0` is therefore correct — the bridge advertises no optional time-sync features, which matches the implemented surface. |
 | BD-Matter-Dispatcher-Synthesises-Globals | matter.js's behaviour layer auto-generates the Matter §7.13.2 global attributes (FeatureMap, ClusterRevision, AttributeList, AcceptedCommandList, GeneratedCommandList) on every cluster server | `endpoint/dispatcher.go::attributesFor` seeds the five universal globals at the start of every wildcard-attribute expansion and dedupes them against the per-server `MatterAttributes()` extras (lines 269-300 + 378-405) | The audit drifts L1-D04 / L1-D06 / L1-D12 ("MatterAttributes lister fehlt FeatureMap + ClusterRevision") are **false positives**: per-cluster `MatterAttributes()` enumerations focus on cluster-specific attributes; the dispatcher universally adds the five Matter-1.3 globals (EventList intentionally omitted — Apple iOS Matter SDK schema-mismatch reject). Regression tripwire: `TestRead_WildcardAttribute_ListerWithoutGlobalsStillGetsThem`. The wildcard-expansion contract is centrally enforced; per-cluster servers neither need nor benefit from listing globals again. |
 | BD-Matter-EndpointID-Persistent | matter.js `@matter/node` Storage-Layer persists endpoint IDs across restarts so commissioners can re-use cached subscription targets | `endpoint/assembler.go::assignOrReuseID` looks the (source-key → endpoint-id) record up in the `store.EndpointStore` (SQLite) and reuses the persisted ID; a fresh allocation only happens when no record exists for that source key | Audit drift L6-D01 ("Endpoint-IDs werden beim Reassemble potenziell neu vergeben … bootid-basiert") is a **false positive**. Endpoint IDs come from the persistent endpoint store (not from `bootid.Salt()` — that one only feeds the UniqueID hash, see `BD-Matter-UniqueID-Stable`). A reassemble that finds the same source key reuses the same endpoint ID, so Apple's HAP-Mapper does not see a topology shuffle. Cross-restart durability of those store rows additionally depends on the boot-time GC gate documented in `BD-Matter-EndpointGC-ModelCompleteGate` (next row): before that gate landed, boot-time assembly against not-yet-loaded centrals erased every persisted row, and endpoint-number stability held only accidentally via deterministic re-allocation. |
-| BD-Matter-EndpointGC-ModelCompleteGate | matter.js has no boot-time "empty model" window: `packages/node/src/storage/server/ServerEndpointStores.ts` pre-allocates every persisted endpoint number at `load()` ("Ensure all known numbers are allocated") and `assignNumber` reuses the stored number; the only release path is `eraseStoreForEndpoint`, invoked from `packages/node/src/node/server/ServerEndpointInitializer.ts::eraseDescendant` on explicit endpoint deletion | go-fabric assembles its topology from asynchronous CCU snapshots (Bridge.Start runs before the readiness-gated device load), so the same "numbers reserved until explicit removal" contract is enforced via `endpoint.Snapshot.ModelComplete`: `Assembler.gcVanished` (endpoint/assembler.go) skips vanished-source GC for any central whose initial southbound bring-up has not completed; `cmd/openccu-loom/daemon_matter.go::wireMatterCentralReadiness` latches per-central readiness from CentralSouthboundReadyEvent and `matterSnapshotter` stamps the flag | Mechanism divergence, behaviour parity: without the gate every daemon boot deleted ALL persisted endpoint-ID rows (boot assembly saw registered centrals with empty ModelRegistries and treated the whole fleet as vanished), so endpoint numbers were only accidentally stable via deterministic re-allocation and any fleet/exposure change across a restart renumbered everything after the change point — violating BD-Matter-EndpointID-Persistent and Matter §9.12.4 endpoint-number preservation. Failure direction is fail-safe: a missed ready event only defers GC of genuinely removed devices to a later model-complete assembly; it never deletes rows on stale information. Since v0.10.2 the facade's Aggregator carries the gate per partition (`node.Aggregator.Partition`, #229): each partition is its own snapshot scope with its own `MarkComplete`, so one source that never finishes loading holds back only its own numbers, and `Aggregator.RetirePartition` is the explicit erase of a whole scope, the counterpart of matter.js's `eraseStoreForEndpoint`; `assignOrReuseID` rewrites a reused record's scope so a source that moved partition stays collectable. Since v0.12.2 (brief CK §2) the Aggregator passes `endpoint.Snapshot.Retain`, so a removed key's number is a reservation, not a vanished row; the remaining divergence is a stored key neither re-added nor removed after a restart, which `MarkComplete` collects where matter.js keeps every stored number (`ServerEndpointStores.ts:33-45` load, `:109-130` assignNumber) — owner decision 2026-10-25: `MarkComplete` goes in v0.13.0 (wave CL, a Break with a migration-guide line), after which the facade mirrors matter.js in full. Pinned by TestParityMatterJS_EndpointNumbersReservedUntilExplicitRemoval, TestAssemble_GCSkipsCentralWithIncompleteModel, TestAssemble_GCOfVanishedStillWorksAfterIncompleteAssembly (endpoint) and TestMatterSnapshotter_StampsModelCompletePerCentral (cmd). |
-| BD-Matter-EndpointNumber-Monotonic | matter.js `packages/node/src/storage/server/ServerEndpointStores.ts::assignNumber` allocates from the persisted `#nextNumber` (`NEXT_NUMBER_KEY`) and skips numbers held in `#allocatedNumbers` / `#preAllocatedNumbers`; `eraseStoreForEndpoint` drops a number from those sets but never rewinds the counter, so a released number is not preferentially reissued | `store/endpoints.go::allocateEndpointID` allocates from the `next_endpoint_id` row of `matter_metadata` (migration 035), lifts the counter above every number `matter_endpoints` already holds, skips occupied numbers and wraps only past 65534 | Mechanism divergence, behaviour parity: the counter lives in SQLite instead of an in-process field, and the occupancy skip-set is read per transaction rather than held in memory, because two writers (assembly and the retrying upsert path) share one database. The former allocator returned the smallest unused number, so a number freed by `Assembler.gcVanished` — device unpaired, or exposure revoked — went to the next unrelated source. That is invisible on the wire: the Aggregator's `Descriptor.PartsList` set is identical before and after, so Apple Home / Google Home keep the cached DeviceTypeList and cluster set for that number and render the new device under the removed device's identity. Until v0.12.1 a source key removed and re-added later got a fresh number; since v0.12.2 (brief CK §2) the facade's Aggregator keeps the number of a removed key and its parts as a reservation in the settings table and hands it back on `Add` of the same key, as matter.js keeps a closed endpoint's reservation (`ServerEndpointStores.ts:20-22`, `:117-123`; `ServerEndpointInitializer.ts:67-69` at `862ad75f`); only `Forget` (Aggregator, Partition, Batch) and `RetirePartition` free it, the counterpart of `eraseStoreForEndpoint` (`ServerEndpointInitializer.ts:59-65`). The counter itself stays monotonic. Pinned by `TestParityMatterJS_EndpointNumberNotReissuedAfterRemoval`, `TestParityMatterJS_EndpointNumberFreshAfterReAdd`, `TestParityMatterJS_EndpointNumberSeedsAboveExistingRows`. |
+| BD-Matter-EndpointGC-ModelCompleteGate | matter.js has no boot-time "empty model" window: `packages/node/src/storage/server/ServerEndpointStores.ts` pre-allocates every persisted endpoint number at `load()` (`:33-45`) and `assignNumber` reuses the stored number (`:109-130`); the only release path is `eraseStoreForEndpoint`, invoked from `packages/node/src/node/server/ServerEndpointInitializer.ts::eraseDescendant` (`:59-69`) on explicit endpoint deletion (at `862ad75f`) | **Closed in v0.13.0** (brief CM §6, owner decision 2026-10-25). The assembler collects no stored identity absent from a snapshot: a stored key keeps its endpoint number until `Forget` (Aggregator, Partition, Batch) or `RetirePartition` erases it, the counterpart of `eraseStoreForEndpoint`; `node.Aggregator.MarkComplete`, `endpoint.Snapshot.ModelComplete` and `endpoint.Snapshot.Retain` are removed (migration guide, "Removed or changed in v0.13.0") | History, kept because the entry is cited: from v0.3 the module assembled from asynchronous host snapshots, and the gate — `ModelComplete` per snapshot, since v0.10.2 per partition (#229), since v0.12.2 with `Retain` as a reservation (brief CK §2) — kept a boot-time assembly against a not-yet-loaded source from erasing every row. The one divergence it left was a stored key neither re-added nor removed after a restart, which `MarkComplete` collected where matter.js keeps the number; with the gate gone the facade mirrors matter.js in full, and a host that knows a device is gone for good says so with `Forget`. Pinned by `TestStoredNumbersSurviveAbsence`, `TestEndpointNumberReservationParityMatterJS` and `TestRetirePartitionCollectsItsRecords` (node). |
+| BD-Matter-EndpointNumber-Monotonic | matter.js `packages/node/src/storage/server/ServerEndpointStores.ts::assignNumber` allocates from the persisted `#nextNumber` (`NEXT_NUMBER_KEY`) and skips numbers held in `#allocatedNumbers` / `#preAllocatedNumbers`; `eraseStoreForEndpoint` drops a number from those sets but never rewinds the counter, so a released number is not preferentially reissued | `store/endpoints.go::allocateEndpointID` allocates from the `next_endpoint_id` row of `matter_metadata` (migration 035), lifts the counter above every number `matter_endpoints` already holds, skips occupied numbers and wraps only past 65534 | Mechanism divergence, behaviour parity: the counter lives in SQLite instead of an in-process field, and the occupancy skip-set is read per transaction rather than held in memory, because two writers (assembly and the retrying upsert path) share one database. The former allocator returned the smallest unused number, so a number freed by `Assembler.gcVanished` — device unpaired, or exposure revoked — went to the next unrelated source. That is invisible on the wire: the Aggregator's `Descriptor.PartsList` set is identical before and after, so Apple Home / Google Home keep the cached DeviceTypeList and cluster set for that number and render the new device under the removed device's identity. Until v0.12.1 a source key removed and re-added later got a fresh number; since v0.12.2 (brief CK §2) the facade's Aggregator keeps the number of a removed key and its parts as a reservation in the settings table and hands it back on `Add` of the same key, as matter.js keeps a closed endpoint's reservation (`ServerEndpointStores.ts:20-22`, `:117-123`; `ServerEndpointInitializer.ts:67-69` at `862ad75f`); only `Forget` (Aggregator, Partition, Batch) and `RetirePartition` free it, the counterpart of `eraseStoreForEndpoint` (`ServerEndpointInitializer.ts:59-65`); since v0.13.0 (brief CM §6) no assembly collects a stored number either, `MarkComplete` being gone. The counter itself stays monotonic. Pinned by `TestEndpointNumberReservationParityMatterJS` (node), `TestRowAboveTheCounterIsNotReissued` (endpoint/sqlitestore) and `TestRemovedNumberIsNotReissued` (endpoint/memstore). |
 | BD-Matter-Reassemble-Closes-Removed | matter.js packages/protocol/src/interaction/SubscriptionHandler.ts — when a BridgedNode endpoint is removed from the Aggregator the `endpoint.lifecycle.remove()` path causes any subscription targeting that endpoint to be closed by the InteractionServer | `im/subscription/manager.go::CloseEndpoint` terminates only the subscriptions whose paths reference the removed endpoint ID (via `subReferencesEndpoint`) — subscriptions on the other 29 of 30 endpoints stay open | Audit drift L6-D08 ("Reassemble closes all subscriptions; matter.js does partial update") is a **false positive**: it conflates "all subscriptions targeting the removed endpoint" with "all subscriptions in the bridge". `CloseEndpoint(endpointID)` is targeted; the partial-update story holds. matter.js's "partielles Endpoint-Update" applies to attribute reports on existing endpoints, not to endpoint removal. |
 | BD-Matter-SetReachable-LockReleased | matter.js BridgedDeviceBasicInformationServer emits ReachableChanged through its async `events.reachableChanged.emit` EventEmitter pattern | `cluster/core/bridged_device_basic_information.go::SetReachable` releases the internal `b.mu` **before** calling `emitter.MatterEmitEvent` (lines 438-455) so the emit path cannot deadlock against a Subscribe-Manager mutex acquired downstream | Audit drift L10-D06 ("ReachableChanged-Event synchron emittiert; Deadlock-Risiko wenn unter Lock") is a **false positive**: the emit runs after the unlock; there is no nesting of `b.mu` and any downstream lock. The synchronous-vs-asynchronous distinction is purely an internal-dispatch shape; observable behaviour is identical. |
 | BD-Matter-DN-TXT-Set | matter.js `MdnsBroadcaster.ts::buildCommissionableInstanceData` emits the `DN` TXT key when a device name is supplied | `mdns/service.go::BuildCommissionableService` emits `DN` when `cfg.DeviceName != ""`; `bridge/bridge.go:1156` sets `DeviceName: params.NodeLabel` so the bridge's NodeLabel surfaces as the DN value | Audit drift L7-D03 ("DN TXT-Key fehlt im commissionable Record") is a **false positive**: the DN key is already wired through the bridge's parameter pipe; an empty DeviceName (and therefore an omitted DN) only happens when the bridge is started without a NodeLabel, which is rejected by `Config.Validate()`. |
@@ -4191,17 +4191,19 @@ the budget would move the fake clock mid-build. Reasoning: the budget
 exists to end work that waits for a clock nobody moves; a construction
 waits for the CPU, and `Options.Wait` still ends one that never returns.
 
-### BD-Matter-ICD-NoNetworkProfiles — the sustained subscription records the priority intent; no connection is throttled until phase 25
+### BD-Matter-ICD-NoNetworkProfiles — superseded in v0.13.0: the LIT recreate goes out on the `icdLit` network profile
 
 matter.js re-subscribes a LIT peer on the `icdLit` network profile so the
 recreate bypasses the per-network throttle and lands inside the peer's
 active window (`packages/protocol/src/action/client/subscription/SustainedSubscription.ts:133-149`
-at `862ad75f`). Go has one network and no throttle (findings register,
-"Network profiles"), so `ConnectOptions.Priority`
-(`client/peer/connection.go:92-102`) marks the connection and the park-resume
-takes it, while nothing is queued behind it. Reasoning: the flag is what the
-profile exists for; the profile itself arrives with phase 25's network
-profiles, and the flag is already the seam it plugs into.
+at `862ad75f`). Until v0.12.4 Go had one network and no throttle, and
+`ConnectOptions.Priority` marked the connection instead. Since brief CM §3
+(v0.13.0) `client/peer.NetworkProfiles` carries matter.js's profiles,
+limits and margins (`peer/NetworkProfile.ts` at `862ad75f`) and the
+sustained subscription names `peer.NetworkICDLit` through
+`ConnectOptions.Network` / `ExchangeOptions.Network`; `Priority` is removed
+(migration guide, v0.13.0). No divergence remains; the entry stays because
+the brief CH report and ADR 0029 cite it.
 
 ### BD-Matter-ICDClient-OneOperationSlot — the ICD client serialises on one operation slot with abandonment, not on matter.js's transaction participant
 
@@ -4396,3 +4398,137 @@ there is reported, not silently widened into a scan the caller did not
 ask for; a caller that wants the fallback calls `Pair` without the
 address. go-fabric-server's `commission_on_network` with `ip_addr`
 implements matterjs-server's "dial first, then discover" on top of it.
+
+### BD-Matter-OwnNode-SeparateIdentity — the controller's OTA provider is an own node, with its own node id, composed above the controller role
+
+matter.js serves the OTA provider from the controller's `ServerNode`, so
+the announced `providerNodeId` is the fabric's root node id and the
+provider endpoint is one of the controller's own
+(`packages/node/src/behavior/system/software-update/OtaAnnouncements.ts:47-58`,
+`:272-278` at `862ad75f`; `docs/OTA.md`, "Enable OTA Provider on Controller
+Creation"). The controller role here runs no server node, so brief CM §1.3
+composes one: `node/controllernode.Start` starts a `node.Node` with node/'s
+OTA provider in the controller's database, `Controller.OwnNode` commissions
+it into the fabric on first use with a node id of its own, and the
+announcement names that id. The layering guard forbids `controller → node`
+(the facade sits above the role), so the controller reaches it through the
+`controller.OwnNode` port and `OTAConfig.StartNode` is required, with no
+`archcheck` exception (owner decision 2026-10-26). Reasoning: one OTA
+provider implementation in the module and a controller whose own identity
+stays a CASE initiator; a device sees a provider node like any other on the
+fabric, and the one line of configuration is cheaper than an import cycle
+between the facade and the role.
+
+### BD-Matter-CommissionerAdvert-PrivacyMask — `Advertise.PrivacyMasked` drops the vendor subtype and VP, nothing else
+
+matter.js's `CommissionerMdnsAdvertisement` leaves the `_V<vendor>` subtype
+and the `VP` key out when `isPrivacyMasked`, and keeps `DN` and `DT`
+(`packages/protocol/src/advertisement/mdns/CommissionerMdnsAdvertisement.ts:33-71`
+at `862ad75f`); the base class adds `SII`/`SAI`/`SAT` only when they differ
+from the MRP defaults (`MdnsAdvertisement.ts:191-193`). Go's
+`controller.Advertise{PrivacyMasked}` (brief CM §4, `mdns.BuildCommissionerService`)
+does the same and writes no session-interval keys, the controller
+advertising the defaults. Reasoning: the record is the commissioner's
+discoverability for a commissionee-initiated flow (UDC), which the
+controller does not run yet; the masking mirrored is the one the class
+defines, and the interval keys would state the defaults.
+
+### BD-Matter-SupportedTransports-AbsentIsZero — a 1.5+ peer with no transport bits is read as "parameter absent"
+
+matter.js tells an absent tag 8 from `tcpServer: false`
+(`packages/protocol/src/peer/Peer.ts:357-410` at `862ad75f`): `false`
+denies TCP, absence defers to the DNS-SD `T` key. Go's session parameters
+carry `SupportedTransports` as a bitmap, so a zero and an absent tag
+coincide; a zero at 1.5+ is treated as absent and the `T` key decides
+(`client/peer.Peer.ResolveTransports`, brief CM §2). Reasoning: an optional
+wrapper on a hot struct for one case the DNS-SD record settles anyway; a
+peer that denies TCP and advertises no `T` resolves to UDP as in matter.js,
+and one that advertises `T` while denying it meets the post-CASE check
+(`BD-Matter-TCPParamCheck-AfterCASE`), is marked and falls back.
+
+### BD-Matter-TCPParamCheck-AfterCASE — the TCP session-parameter validation runs after the CASE handshake
+
+matter.js validates the peer's session parameters inside `caseClient.pair`
+(`validateSessionParameters`, `packages/protocol/src/peer/PeerConnection.ts:596-621`
+at `862ad75f`), so a TCP attempt whose peer reports no TCP server fails
+before the session exists. `client/handshake.CASE` has no validation hook,
+so `client/peer/connection.go` (brief CM §2) applies the same rule to the
+established session's reported parameters: the peer is marked
+(`MarkTCPUnsupported`), the session closed, `ErrTCPUnsupported` returned,
+and the connection falls back to UDP as matter.js's does. Reasoning: the
+peer sees one TCP session established and closed instead of an aborted
+Sigma exchange; the outcome — marked, fallen back — is the same. The hook
+in `client/handshake` (an owner path) would close this entry.
+
+### BD-Matter-ExchangeOnClosing-OnDestroy — `Options.OnClosing` runs when the exchange is destroyed as well as when it closes
+
+matter.js releases a network profile's slot on the session's `closing`
+observable (`packages/protocol/src/peer/Peer.ts:168-170` at `862ad75f`),
+which the destroy path does not emit. Go's `client/exchange.Options.OnClosing`
+(brief CM §3) runs once from `notifyClosing`, on close and on destroy
+alike. Reasoning: the hook's one use is returning the throttle slot
+(`client/peer.Slot`), and a slot held by a destroyed exchange would leak
+until the peer is forgotten; running it on both paths is the safe
+direction and changes nothing on the wire.
+
+### BD-Matter-DefaultOTAProviders-CompareWithoutFabricIndex — the announcement compares the existing entry without its FabricIndex
+
+matter.js filters the peer's `DefaultOTAProviders` to its own fabric index
+and then compares the whole record, `fabricIndex` included, before it
+writes (`OtaAnnouncements.ts:170-197` at `862ad75f`). Go's
+`controller/softwareupdate` announcement (brief CM §1) compares provider
+node id and endpoint only: the read is fabric-filtered, so every entry
+returned is of the controller's fabric, and the Go client decodes the
+fabric-scoped list without the index. Reasoning: same write decision, one
+field fewer to carry through the decoder.
+
+### BD-Matter-SubscriptionUpdated-NoError — a subscription's `Updated` cannot fail
+
+matter.js's subscription handler may throw while a priming report is
+processed, and the client then answers the report `INVALID_SUBSCRIPTION`
+(`packages/node/test/node/ClientSubscribeTest.ts:1275-1330` at `862ad75f`,
+"answers the priming report with INVALID_SUBSCRIPTION when processing it
+fails" and "… before reading it"). Go's `Updated` is a callback without an
+error return, so the host's handler cannot fail the subscription; the
+`INVALID_SUBSCRIPTION` answer is ported for the client's own failures
+(decode, cancellation; brief CM §5), and the two handler cases have no Go
+shape. Reasoning: an observer's error is the host's to handle; a reporting
+channel that a host callback could tear down is not the facade's design.
+
+### BD-Matter-InvokeBatch-StrayStatusDropped — `InvokeBatch` drops a CommandStatusIB that matches no sent command
+
+matter.js passes such a status up to the caller
+(`packages/protocol/test/action/client/ClientInteractionInvokeTest.ts:180`,
+"passes a stray CommandStatusIB up to the caller"; `ClientInteraction.ts:616-700`
+at `862ad75f`). Go's `Interaction.InvokeBatch` (brief CM §5) returns one
+`Result` per sent command, so a status for no command has no slot and is
+logged and dropped, as a stray CommandDataIB is in both. Reasoning: a typed
+result per command is the batch's contract; the spec's "submit all status
+entries" is honoured on the device side, and a stray entry from a peer is
+a peer defect the log records.
+
+### BD-Matter-CommissionableDiscovery-NotInRegistry — a commissionable discovery is a value, not a registry node
+
+matter.js registers a commissionable discovery as a node of its own kind
+and filters it out of `Peers.commissioned`
+(`packages/node/src/node/client/Peers.ts:410-413` at `862ad75f`). Go's
+`client/discovery` reports discoveries as values and the registry
+(`controller/client.Registry`) holds commissioned nodes only, so
+`Registry.Commissioned` filters group nodes alone (brief CM §5).
+Reasoning: the registry is persistent state; a discovery is transient, and
+nothing in the facade addresses a device before it is paired.
+
+### BD-Matter-Scanners-PerPairing — the commissioner forgets a commissioned device on the scanners of its own pairing
+
+matter.js keeps a long-lived `ScannerSet` in the environment and, after
+`executeCommissioning`, every scanner forgets the device by its addresses
+and identity (`packages/protocol/src/peer/ControllerCommissioner.ts:321-341`,
+`:721-723` at `862ad75f`). Go's BLE scanner lives for one pairing
+(ADR 0024; `controller/ble.Scanner` is opened by `Pair` and closed after
+it), so `controller.New` passes no `Scanners` and
+`commissioner.Context.Scanners` (brief CM §5) carries the scanners of the
+pairing at hand; `controller/ble.Scanner.ForgetCommissioned` is called on
+that one. Reasoning: a BLE adapter held open between pairings costs the
+host's radio, and the scanner that could still hold the advertisement is
+the one that found it.
+

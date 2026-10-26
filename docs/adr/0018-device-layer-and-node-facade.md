@@ -92,7 +92,9 @@ lamp.OnOff().Set(ctx, onoff.State{OnOff: true}) // endpoint.set({onOff:{onOff:tr
   the whole-snapshot `Reassemble` for hosts that use the layer. Internally
   the layer produces `endpoint.Spec` values for the existing assembler, so
   endpoint-id persistence, scope garbage collection and `ModelComplete`
-  hold unchanged (`BD-Matter-EndpointID-Persistent`).
+  hold unchanged (`BD-Matter-EndpointID-Persistent`; `ModelComplete` and
+  the collection went in v0.13.0, brief CM §6, see
+  `BD-Matter-EndpointGC-ModelCompleteGate`).
 
 **The existing layer stays.** `contract.EndpointSource`, `endpoint.Spec`
 and `bridge.Snapshotter` remain the Matter-near level; `device/` is built
@@ -158,7 +160,7 @@ decision names what it mirrors and what it leaves for later.
    Name, Vendor, Reachable, Conditions); `AddPart` fills `Spec.Parts`;
    `node.Aggregator.Add` / `Remove` keep the set and produce the
    `endpoint.Snapshot` the existing assembler consumes, so endpoint-id
-   persistence and `ModelComplete` are unchanged. A device added under the
+   persistence and `ModelComplete` are unchanged (the latter until v0.13.0). A device added under the
    aggregator is a BridgedNode, as `BridgedDeviceBasicInformationServer.ts:111-125`
    injects that device type at run time.
 5. **The facade.** `node.Config` mirrors the subset of

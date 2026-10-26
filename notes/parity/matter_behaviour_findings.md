@@ -445,33 +445,31 @@ Device side:
 
 Controller side:
 
-- **Network profiles.** One network, MRP margins 0
-  (`client/peer/doc.go:15-17`, `client/exchange/mrp.go:62-65`);
-  matter.js `peer/NetworkProfile.ts:78-245` with the margins of
-  `protocol/MRP.ts:162-190`. Register `until M5 phase 25`
-  (NetworkProfileTest; 32 cases with BH-1's MRP cases). (Milestone 5 phase 25.)
-- **`ClientInteraction.close`, in-flight tracking, abandoned subscriptions,
-  multi-command invoke and write chunking.** `client/interaction` has
-  no Close, no in-flight set, no abandonment and one command per invoke
-  (`action/client/ClientInteraction.ts:264-297`, `:520-640`); `Write`
-  refuses an oversized write with `ErrRequestTooLarge` where matter.js
-  chunks (`interaction/InteractionMessenger.ts:1269-1460`). `AckWaitAbort`
-  exists to build the abandonment on. Register `until M5 phase 25`
-  (ClientInteractionSubscribeTest); ClientChunkedWriteTest (5 cases) and
-  ClientInvokeTest's batching (39 cases) are `missing` under it since brief
-  BI, and the device's MaxPathsPerInvoke is fixed at 10. (Milestone 5 phase 25.)
-- **No `_matterd._udp` commissioner advertisement**
-  (`packages/protocol/test/mdns/MdnsTest.ts:546-713`). (Milestone 5 phase 25.)
-- **`ForgetCommissioned` is not wired into the commissioner.**
-  `controller/commissioner/commissioner.go:516-517` says matter.js has no
-  such call; its BLE scanner has one, run after `executeCommissioning`
-  (`peer/ControllerCommissioner.ts:325-340`, `:721-723`). `ble.Scanner.ForgetCommissioned`
-  exists since brief BH. (Milestone 5 phase 25.)
-- **`threadNetworkNameOf` does not reject an undecodable dataset.**
-  `controller/commissioner/network.go:86` walks the TLVs itself; matter.js
-  decodes the whole dataset and falls back to the supplied name when the
-  decode fails (`peer/ControllerCommissioningFlow.ts:264-288`,
-  `resolveThreadNetworkName`). Ten lines onto `controller/thread`. (Milestone 5 phase 25.)
+- **The invoke batcher.** matter.js joins the single invokes of one timer
+  tick into one InvokeRequest up to the peer's MaxPathsPerInvoke, with
+  lanes per network and bypasses for options that keep a command alone
+  (`action/client/ClientInteraction.ts:715-1000`); a goroutine has no tick
+  to join on, and `Node.InvokeBatch` is the one multi-command form
+  (ClientInvokeTest, 39 cases `missing`). Owner decision 2026-10-26:
+  decided with the milestone 6 concept. (Milestone 6 phase 27.)
+- **`largeMessage` is not inferred.** `inferLargeMessage` reads the
+  schema's "L" quality (`ClientInteraction.ts:716-719`); the snapshot
+  extractor does not emit it, so `ClientRequest.LargeMessage` is set by the
+  caller. Owner decision 2026-10-26: the extractor and `schema/` gain the
+  quality in a small pull request after `v0.13.0`, a snapshot refresh at
+  the same pin. (After v0.13.0.)
+- **The device-side BDX responder takes no per-transfer MRP delay.**
+  `TransferOptions.AdditionalMrpDelay` (matter.js `bdxAdditionalMrpDelay`)
+  is computed by the update manager but `node`'s BDX responder has no port
+  for it. (Milestone 6 phase 27.)
+- **The controller's discovery has no `Discovery` / `ParallelPaseDiscovery`
+  shape** — a scanner set, parallel PASE attempts, cancellation and error
+  kinds (ContinuousDiscoveryTest, DiscoveryCancelTest, DiscoveryErrorTest,
+  DiscoveryTransportsTest; register `until M6 phase 27`). (Milestone 6 phase 27.)
+- **Reported session parameters on the device** have no configuration
+  (`node.Config` session intervals) and no accessor for what the controller
+  sent (ReportedSessionParametersTest; register `until M6 phase 27`).
+  (Milestone 6 phase 27.)
 - **A whitespace-only `issuer_name` in an installed revocation set matches
   every issuer.** `controller/dcl/revocation.go:688-701` decodes it to no
   issuer and `:166-173` then matches any; matter.js keeps the empty hex
@@ -537,38 +535,6 @@ Device side:
 
 Controller side:
 
-- **`Node.Disable` closes the default subscription only.**
-  `controller/client/node.go:382`; matter.js closes every subscription of
-  the node (ClientConnectivityTest "closes a non-sustained subscription
-  when the node is disabled"). (Milestone 5 phase 25.)
-- **`includeKnownVersions` has no subscription form.** `Node.Subscribe`
-  takes `interaction.SubscribeRequest`, so a subscription cannot opt out
-  of the injected version filters as `ReadRequest.IncludeKnownVersions`
-  does (`ClientNodeInteraction.ts:123-124`). API change. (Milestone 5
-  phase 25.)
-- **A priming report after a cancelled establishment is acknowledged
-  Success.** `client/interaction/handler.go`; matter.js answers
-  INVALID_SUBSCRIPTION (five ClientSubscribeTest cases; brief BH's path).
-  (Milestone 5 phase 25.)
-- **`Cluster.Supports` applies no conformance, `Cluster.Revision` is 0
-  without a report.** `controller/client/cluster.go:228`, `:291`;
-  matter.js takes the model's revision when the peer reports none or an
-  invalid one (`PeerBehavior.ts:429-434`, override only for a valid,
-  differing revision) and judges mandatory unlisted, deprecated and
-  disallowed attributes by conformance (PeerBehaviorTest, 12 cases
-  `missing`). (Milestone 5 phase 25.)
-- **Registry `AutoStart` is opt-in.** `controller/client/registry.go:41-43`;
-  matter.js `NetworkServer.autoStartCommissionedPeers` defaults to true
-  (`behavior/system/network/NetworkServer.ts:236`). A default change is a
-  break for hosts; the ports set it where matter.js relies on the default.
-  (Milestone 5 phase 25, with the API review.)
-- **A node that fails to load is dropped.** `controller/client/registry.go:153-155`
-  logs and skips it; matter.js keeps the node with a rejected construction
-  and a typed cause so its id stays visible (`node/client/Peers.ts:144-161`;
-  PeersLoadFailureTest, register `until M5 phase 25`). (Milestone 5 phase 25.)
-- **fabrictest carries no group messages**, so group invokes, their
-  dispatch endpoints and group nodes (PeersCommissionedTest, register
-  `until M5 phase 25`) have no in-process test. (Milestone 5 phase 25.)
 
 Found by the phase-18b security and commissioning port (brief BO, PR #184, 2026-10-19).
 Line numbers at `862ad75f`.
