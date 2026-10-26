@@ -16,11 +16,13 @@ image of a remote node, bindings and the group sender —
 `examples/reference-controller` drives it from the command line. It
 implements the Matter specification (currently 1.6.1) and follows
 [matter.js](https://github.com/matter-js/matter.js) as its reference
-implementation — not a translation of its TypeScript, but its behaviour
-— cluster IDs, revisions, attribute IDs, constraints and wire shape are
-mirrored from matter.js HEAD rather than transcribed from the specification,
-and the extracted matter.js element model ships embedded so parity is a test,
-not a claim.
+implementation — not a translation of its TypeScript, but its behaviour.
+matter.js is our executable specification: where its production-hardened
+behaviour departs from the spec text, we follow matter.js and record the
+departure; the spec still defines what is mandatory. Cluster IDs, revisions,
+attribute IDs, constraints and wire shape are mirrored from matter.js HEAD
+rather than transcribed from the specification, and the extracted matter.js
+element model ships embedded so parity is a test, not a claim.
 
 ## Status
 
