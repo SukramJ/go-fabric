@@ -405,6 +405,11 @@ func TestResolveThreadNetworkName(t *testing.T) {
 		{"", []byte{0x03, 0xff, 0x00}, "", nil},                   // truncated extended length
 		{"", []byte{0x03, 0xff, 0x00, 0x02, 'h', 'i'}, "hi", nil}, // extended length
 		{"Given", []byte{0x00, 0x01, 0x0b}, "Given", nil},         // no name TLV
+		// A dataset that walks but does not decode — a one-byte PAN ID
+		// TLV (OperationalDataset.ts:123-124) — keeps the given name rather
+		// than verify it against the Network Name TLV it carries
+		// (ControllerCommissioningFlow.ts:269-276).
+		{"Other", append([]byte{0x01, 0x01, 0x0b}, threadDataset("MyHome")...), "Other", nil},
 	} {
 		got, err := resolveThreadNetworkName(&ThreadNetwork{NetworkName: c.given, OperationalDataset: c.dataset}, log)
 		if got != c.want || !errors.Is(err, c.err) {

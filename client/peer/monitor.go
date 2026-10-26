@@ -217,15 +217,7 @@ func (m *monitor) run(reason ReachabilityReason) bool {
 		log.Info("matter.controller.peer.address_gone_probing")
 	}
 	mgr := p.set.ctx.Exchanges
-	// The probe network: the medium profile's probe sub-profile, else the
-	// profile itself (PeerAddressMonitor.ts:202-203); the margin is the
-	// medium's messaging margin (PeerExchangeProvider.ts:89-91).
-	network := p.Network()
-	margin := network.Margins.Messaging
-	probeNetwork := network
-	if network.ProbeAddress != nil {
-		probeNetwork = network.ProbeAddress
-	}
+	probeNetwork, margin := probeNetworkOf(p)
 	if probe(ctx, mgr, s, nil, log, probeNetwork, &margin) {
 		if reason == ReasonAddressChange {
 			m.advanceBackoff()
@@ -259,6 +251,19 @@ func (m *monitor) run(reason ReachabilityReason) bool {
 	log.Info("matter.controller.peer.all_probes_failed")
 	s.HandlePeerLoss(&exchange.PeerUnresponsiveError{})
 	return false
+}
+
+// probeNetworkOf is the network a probe of p goes out on — the medium
+// profile's probe sub-profile, else the profile itself
+// (PeerAddressMonitor.ts:202-203) — with the medium's messaging margin
+// (PeerExchangeProvider.ts:89-91).
+func probeNetworkOf(p *Peer) (*NetworkProfile, time.Duration) {
+	network := p.Network()
+	margin := network.Margins.Messaging
+	if network.ProbeAddress != nil {
+		return network.ProbeAddress, margin
+	}
+	return network, margin
 }
 
 // cooldownLocked is the current probe cooldown: the Fibonacci position or

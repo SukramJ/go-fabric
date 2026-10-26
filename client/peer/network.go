@@ -147,7 +147,8 @@ type PartialConcreteLimits struct {
 	Delay, Timeout, AdditionalMrpDelay *time.Duration
 }
 
-// PartialLimits: see [PartialConcreteLimits].
+// PartialLimits is a partial [Limits], as [PartialConcreteLimits] is a
+// partial [ConcreteLimits].
 type PartialLimits struct {
 	PartialConcreteLimits
 	BDXAdditionalMrpDelay *time.Duration
@@ -248,7 +249,7 @@ func (n *NetworkProfiles) SetDefaults(cfg ProfilesConfig) {
 	cfg.each(func(id string, p *PartialLimits) {
 		base, _ := n.defaults.template(id)
 		merged := *base
-		merged.ConcreteLimits = merged.ConcreteLimits.merged(p.PartialConcreteLimits)
+		merged.ConcreteLimits = merged.merged(p.PartialConcreteLimits)
 		if p.BDXAdditionalMrpDelay != nil {
 			merged.BDXAdditionalMrpDelay = durationPtr(*p.BDXAdditionalMrpDelay)
 		}

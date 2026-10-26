@@ -66,11 +66,11 @@ func (c *Interaction) ReadWith(ctx context.Context, r ReadRequest) (*Report, err
 	if err != nil {
 		return nil, err
 	}
-	m, err := c.begin(ctx, r.exchangeOptions())
+	m, ctx, err := c.begin(ctx, r.exchangeOptions())
 	if err != nil {
 		return nil, err
 	}
-	defer m.x.Close()
+	defer m.close()
 	if err := m.send(ctx, im.OpcodeReadRequest, req, 0); err != nil {
 		return nil, err
 	}

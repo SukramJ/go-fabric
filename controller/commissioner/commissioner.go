@@ -76,6 +76,19 @@ type Context struct {
 	// Resumption holds the CASE responder's resumption records, usually the
 	// peer set's store; nil keeps none.
 	Resumption handshake.ResumptionStore
+	// Scanners are the scanners that may still hold a commissioned
+	// device's advertisement — matter.js's ScannerSet
+	// (ControllerCommissioner.ts:321-341 at 862ad75f); nil is none.
+	Scanners []CommissionedScanner
+}
+
+// CommissionedScanner is a scanner that forgets a commissioned device:
+// its advertisement described a commissioning window that is now closed —
+// matter.js Scanner.forgetCommissionedDevice (common/Scanner.ts), which
+// its BLE scanner implements (controller/ble.Scanner.ForgetCommissioned)
+// and its mDNS scanner does not.
+type CommissionedScanner interface {
+	ForgetCommissioned(peripheralAddresses []string, identity *discovery.CommissionedIdentity)
 }
 
 // Channel is a commissioning channel other than the controller's UDP
@@ -513,9 +526,32 @@ func (c *Commissioner) commissionConnectedNode(ctx context.Context, pase *exchan
 		}
 		return Result{}, err
 	}
-	// No Scanner.forgetCommissionedDevice (:721-723): the mDNS scanner of
-	// matter.js does not implement it; the node withdraws its record.
+	// The device's commissioning window is closed now (:721-723).
+	c.forgetCommissioned(opts)
 	return Result{Address: address, FabricIndexOnPeer: f.data.fabricIndex}, nil
+}
+
+// forgetCommissioned is #forgetCommissionedDevice (:321-341): every
+// scanner forgets the device by the BLE address it was reached at and,
+// with discovery data that carries D and VP, by its identity. The mDNS
+// scanner implements none of it; the node withdraws its record.
+func (c *Commissioner) forgetCommissioned(opts Options) {
+	if len(c.ctx.Scanners) == 0 {
+		return
+	}
+	var addresses []string
+	if ch, ok := opts.Channel.(interface{ PeripheralAddress() string }); ok {
+		addresses = append(addresses, ch.PeripheralAddress())
+	}
+	var identity *discovery.CommissionedIdentity
+	if opts.DiscoveryData != nil {
+		if id, ok := opts.DiscoveryData.Identity(); ok {
+			identity = &id
+		}
+	}
+	for _, s := range c.ctx.Scanners {
+		s.ForgetCommissioned(addresses, identity)
+	}
 }
 
 // transitionToCase is the flow's transition (:671-716): a non-concurrent

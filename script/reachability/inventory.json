@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 6573,
+  "entry_points": 6578,
   "entry_packages": [
     ".",
     "bdx",
@@ -259,9 +259,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 16120,
-    "reachable": 11399,
-    "whitelisted": 4718,
+    "total_exported": 16124,
+    "reachable": 11401,
+    "whitelisted": 4720,
     "unreachable": 3
   },
   "by_package": [
@@ -6137,7 +6137,7 @@
       "identifier": "TestMRPRetransmissionIntervalPadded",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/margins_parity_matterjs_test.go",
-      "line": 55
+      "line": 58
     },
     {
       "package": "client/exchange",
@@ -6186,7 +6186,7 @@
       "identifier": "TestMessageExchangeClosingNotification",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/margins_parity_matterjs_test.go",
-      "line": 235
+      "line": 239
     },
     {
       "package": "client/exchange",
@@ -6214,14 +6214,14 @@
       "identifier": "TestMessageExchangeMRPBackoffMargin",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/margins_parity_matterjs_test.go",
-      "line": 140
+      "line": 144
     },
     {
       "package": "client/exchange",
       "identifier": "TestMessageExchangePaddedBDXCap",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/margins_parity_matterjs_test.go",
-      "line": 216
+      "line": 220
     },
     {
       "package": "client/exchange",
@@ -20785,6 +20785,13 @@
     },
     {
       "package": "controller/ble",
+      "identifier": "CommissionedIdentity",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/ble/scanner.go",
+      "line": 564
+    },
+    {
+      "package": "controller/ble",
       "identifier": "TestBleListeningClock",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/ble/listening_parity_matterjs_test.go",
@@ -21873,7 +21880,7 @@
       "identifier": "TestBLERearmInterval",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/network_test.go",
-      "line": 526
+      "line": 531
     },
     {
       "package": "controller/commissioner",
@@ -21887,7 +21894,14 @@
       "identifier": "TestChannelDropFallback",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/network_test.go",
-      "line": 476
+      "line": 481
+    },
+    {
+      "package": "controller/commissioner",
+      "identifier": "TestCommissionForgetsTheDevice",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/commissioner/node_test.go",
+      "line": 433
     },
     {
       "package": "controller/commissioner",
@@ -22062,7 +22076,7 @@
       "identifier": "TestFlowRearmsBeforeNetworkStep",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/network_test.go",
-      "line": 508
+      "line": 513
     },
     {
       "package": "controller/commissioner",
@@ -22083,7 +22097,7 @@
       "identifier": "TestNetworkStepsRegistration",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/network_test.go",
-      "line": 445
+      "line": 450
     },
     {
       "package": "controller/commissioner",
@@ -22223,7 +22237,7 @@
       "identifier": "TestValidateNetwork",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/network_test.go",
-      "line": 416
+      "line": 421
     },
     {
       "package": "controller/dcl",

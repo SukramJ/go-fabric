@@ -559,13 +559,9 @@ func (s *Scanner) FindContinuously(ctx context.Context, id discovery.Identifier,
 }
 
 // CommissionedIdentity identifies a commissioned device independently of
-// the transport that discovered it — matter.js CommissionableDeviceIdentity
-// (packages/protocol/src/common/Scanner.ts:222-239): the long
-// discriminator and "<vendor>+<product>" or only "<vendor>".
-type CommissionedIdentity struct {
-	D  uint16
-	VP string
-}
+// the transport that discovered it: [discovery.CommissionedIdentity], the
+// commissioner's (commissioner.CommissionedScanner).
+type CommissionedIdentity = discovery.CommissionedIdentity
 
 // ForgetCommissioned forgets the records of a device that was
 // commissioned: its advertisement described a commissioning window that is

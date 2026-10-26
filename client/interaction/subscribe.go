@@ -207,13 +207,35 @@ func (c *Interaction) subscribeOnce(ctx context.Context, peer exchange.PeerAddre
 	if err != nil {
 		return nil, err
 	}
-	m, err := c.begin(ctx, opts)
+	m, ctx, err := c.begin(ctx, opts)
 	if err != nil {
 		return nil, err
 	}
-	defer m.x.Close()
+	abandoned := false
+	defer func() {
+		if !abandoned {
+			m.close()
+		}
+	}()
+	// A failed establishment is abandoned, not dropped: the request may
+	// have reached the peer, which may hold the subscription and send its
+	// report — unless the peer or the session ended it (ClientInteraction.ts:1084-1097
+	// at 862ad75f).
+	fail := func(err error) (*Subscription, error) {
+		awaitReport := !errors.Is(err, exchange.ErrTransient) && !errors.Is(err, exchange.ErrNetwork) &&
+			!errors.Is(err, exchange.ErrRetransmissionLimit) && !errors.Is(err, exchange.ErrSessionClosed) && !isStatusError(err)
+		if awaitReport || m.reportAwaitsStatus {
+			abandoned = true
+			//nolint:contextcheck // the abandonment outlives the caller's ctx and ends with the interaction's closing (ClientInteraction.ts:1285-1300)
+			go func() {
+				defer m.close()
+				c.abandonSubscription(m, awaitReport)
+			}()
+		}
+		return nil, c.closedCause(ctx, err)
+	}
 	if err := m.send(ctx, im.OpcodeSubscribeRequest, payload, 0); err != nil {
-		return nil, err
+		return fail(err)
 	}
 	a := newAssembler(c.log)
 	a.report.Session = m.x.Session()
@@ -224,14 +246,14 @@ func (c *Interaction) subscribeOnce(ctx context.Context, peer exchange.PeerAddre
 		}
 		return nil
 	}); err != nil {
-		return nil, err
+		return fail(err)
 	}
 	if err := ctx.Err(); err != nil {
-		return nil, err
+		return fail(err)
 	}
 	msg, err := m.next(ctx, im.OpcodeSubscribeResponse, 0)
 	if err != nil {
-		return nil, err
+		return fail(err)
 	}
 	resp, err := im.UnmarshalSubscribeResponseTLV(tlv.NewDecoder(msg.Payload))
 	if err != nil {
@@ -244,6 +266,48 @@ func (c *Interaction) subscribeOnce(ctx context.Context, peer exchange.PeerAddre
 	c.log.Info("matter.controller.interaction.subscribed",
 		slog.Uint64("subscription_id", uint64(resp.SubscriptionID)), slog.Int("max_interval", int(resp.MaxInterval)), slog.Duration("timeout", sub.timeout()))
 	return sub, nil
+}
+
+// abandonSubscription ends an abandoned establishment on the peer —
+// InteractionMessenger.abandonSubscription (InteractionMessenger.ts:1116-1137
+// at 862ad75f) under the interaction's closing: a report whose status is
+// owed is answered INVALID_SUBSCRIPTION; otherwise, with awaitReport, the
+// next report is awaited and answered so. A failure is logged only.
+func (c *Interaction) abandonSubscription(m *messenger, awaitReport bool) {
+	ctx := c.abort
+	id := m.reportSubscriptionID
+	if !m.reportAwaitsStatus {
+		if !awaitReport {
+			return
+		}
+		msg, err := m.x.Next(ctx, exchange.ReceiveOptions{})
+		if err != nil {
+			c.log.Debug("matter.controller.interaction.abandoned_not_terminated", slog.Any("err", err))
+			return
+		}
+		if msg.ProtocolID != im.InteractionModelProtocolID || msg.Opcode != im.OpcodeReportData {
+			return
+		}
+		if rd, err := decodeReport(msg.Payload); err == nil {
+			id = rd.SubscriptionID
+		}
+	}
+	m.reportAwaitsStatus = false
+	// Sent once even while closing; the closing ends only the wait for
+	// its acknowledgement and the retransmissions (ackWaitAbort,
+	// InteractionMessenger.ts:1129, MessageExchange.ts:125-130).
+	if err := m.sendInvalidSubscription(ctx.Done()); err != nil {
+		c.log.Debug("matter.controller.interaction.abandoned_not_terminated", slog.Uint64("subscription_id", uint64(id)), slog.Any("err", err))
+		return
+	}
+	c.log.Debug("matter.controller.interaction.abandoned_terminated", slog.Uint64("subscription_id", uint64(id)))
+}
+
+// isStatusError reports a StatusResponse the peer sent in place of the
+// expected message — matter.js ReceivedStatusResponseError.
+func isStatusError(err error) bool {
+	var se *StatusError
+	return errors.As(err, &se)
 }
 
 // subscribeRequest is a SubscribeRequest whose DataVersionFilters

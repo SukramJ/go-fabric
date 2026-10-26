@@ -482,12 +482,23 @@ func readDataReports(ctx context.Context, log *slog.Logger, m *messenger, first 
 				return err
 			}
 		}
+		// A report read owes its status until it is consumed, unless it
+		// suppresses the response (InteractionMessenger.ts:1013-1025).
+		m.reportAwaitsStatus = !rd.SuppressResponse || rd.MoreChunkedMessages
+		m.reportSubscriptionID = rd.SubscriptionID
 		if err := consume(rd); err != nil {
 			if errors.Is(err, errStopReports) {
+				m.reportAwaitsStatus = false
 				return nil
 			}
 			return err
 		}
+		// Aborted while the report was processed: its status stays owed,
+		// for an abandoned subscribe to answer (ClientSubscribeTest.ts:1244-1273).
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		m.reportAwaitsStatus = false
 		if rd.MoreChunkedMessages {
 			if err := m.sendStatus(ctx, im.StatusSuccess); err != nil {
 				return err

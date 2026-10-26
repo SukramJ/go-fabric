@@ -27,11 +27,13 @@ func TestMRPMarginFor(t *testing.T) {
 	t.Parallel()
 	m := &Margins{Messaging: 1500 * time.Millisecond, BDX: 5 * time.Second}
 	t.Run("selects the bdx margin for bulk transfer", func(t *testing.T) {
+		t.Parallel()
 		if d, ok := MarginFor(m, bdxProtocolID); !ok || d != 5*time.Second {
 			t.Errorf("%v %v", d, ok)
 		}
 	})
 	t.Run("selects the messaging margin for other protocols", func(t *testing.T) {
+		t.Parallel()
 		for _, p := range []uint16{imProtocolID, mrp.SecureChannelProtocolID} {
 			if d, ok := MarginFor(m, p); !ok || d != 1500*time.Millisecond {
 				t.Errorf("protocol %d: %v %v", p, d, ok)
@@ -39,6 +41,7 @@ func TestMRPMarginFor(t *testing.T) {
 		}
 	})
 	t.Run("has no margin to offer when the peer's medium is unknown", func(t *testing.T) {
+		t.Parallel()
 		if _, ok := MarginFor(nil, bdxProtocolID); ok {
 			t.Error("a margin for nil margins")
 		}
@@ -67,6 +70,7 @@ func TestMRPRetransmissionIntervalPadded(t *testing.T) {
 		{"uses the idle interval for retransmissions when the peer is no longer active", 1, false, mrpParams.Idle},
 	} {
 		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
 			lo, hi := mrpRange(c.base, c.n, add)
 			for _, r := range []float64{0, 0.5, 0.999} {
 				if d := RetransmissionIntervalPadded(c.n, mrpParams, c.active, r, add); d < lo || d > hi {

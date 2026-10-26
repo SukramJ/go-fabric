@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"log/slog"
 	mrand "math/rand/v2"
+	"sync"
 	"time"
 
 	"github.com/SukramJ/go-fabric/client/exchange"
@@ -91,7 +92,21 @@ type Interaction struct {
 	// subscribe of one attempt — matter.js's injected subscribe
 	// (SustainedSubscription.Configuration.subscribe).
 	attemptHook func(ctx context.Context, req SubscribeRequest, opts ExchangeOptions) (*Subscription, error)
+
+	// closeMu guards closed and the in-flight count's Add against Close;
+	// inflight is #interactions, one per running exchange
+	// (ClientInteraction.ts:225-226); abort is #abort (:228, :291-293),
+	// which every running exchange's context follows.
+	closeMu  sync.Mutex
+	closed   error
+	inflight sync.WaitGroup
+	abort    context.Context
+	abortFn  context.CancelCauseFunc
 }
+
+// ErrClosed is the reason of [Interaction.Close] without one — matter.js
+// ClosedError "Interaction component closed" (ClientInteraction.ts:265-267).
+var ErrClosed = errors.New("interaction: interaction component closed")
 
 // Config configures an [Interaction] — what matter.js ClientInteraction
 // takes from its context (ClientInteraction.ts:140-147).
@@ -120,6 +135,7 @@ func New(mgr *exchange.Manager, s *exchange.Session, log *slog.Logger) *Interact
 // Bind returns the interaction over provider p.
 func Bind(p Provider, cfg Config) *Interaction {
 	c := &Interaction{provider: p, subs: cfg.Subscriptions, log: cfg.Logger, clock: cfg.Clock, rand: cfg.Rand}
+	c.abort, c.abortFn = context.WithCancelCause(context.Background())
 	if c.log == nil {
 		c.log = slog.Default()
 	}
@@ -148,19 +164,98 @@ func (c *Interaction) MaximumPeerResponseTime(ept time.Duration, includeSending 
 	return c.provider.MaximumPeerResponseTime(ept, includeSending)
 }
 
+// Close closes the interaction — ClientInteraction.close
+// (ClientInteraction.ts:264-297 at 862ad75f): the subscriptions of its
+// peer close so none outlives it (a sustained one would retry forever),
+// every running exchange is aborted with reason, and Close returns once
+// they have ended. Later interactions fail with reason; nil is
+// [ErrClosed]. Idempotent; the first reason stays.
+func (c *Interaction) Close(reason error) {
+	if reason == nil {
+		reason = ErrClosed
+	}
+	c.closeMu.Lock()
+	if c.closed == nil {
+		c.closed = reason
+	}
+	reason = c.closed
+	c.closeMu.Unlock()
+	c.CloseSubscriptions()
+	c.abortFn(reason)
+	c.inflight.Wait()
+}
+
+// CloseSubscriptions closes every subscription of the interaction's peer
+// — the first step of Close (ClientInteraction.ts:270-282), which a
+// disabled node runs alone (ClientNode.disable, ClientNode.ts:239-253).
+func (c *Interaction) CloseSubscriptions() {
+	if c.subs == nil || c.provider == nil {
+		return
+	}
+	peer, ok := c.provider.PeerAddress()
+	if !ok {
+		return
+	}
+	for _, s := range c.subs.Active() {
+		if s.peer == peer {
+			s.Close()
+		}
+	}
+}
+
 // messenger is one IM exchange — matter.js InteractionClientMessenger.
 type messenger struct {
-	x *exchange.Exchange
+	x       *exchange.Exchange
+	release func()
+	// reportAwaitsStatus and reportSubscriptionID are #reportAwaitsStatus
+	// and #subscriptionId (InteractionMessenger.ts:982, :1013-1025 at
+	// 862ad75f): a report was read whose status is still owed, and the
+	// subscription it named.
+	reportAwaitsStatus   bool
+	reportSubscriptionID uint32
+}
+
+// close closes the exchange and ends its in-flight entry.
+func (m *messenger) close() {
+	m.x.Close()
+	m.release()
 }
 
 // begin opens the interaction's exchange — ClientInteraction.#begin
-// (ClientInteraction.ts:1168-1237) through the provider's initiateExchange.
-func (c *Interaction) begin(ctx context.Context, opts ExchangeOptions) (*messenger, error) {
-	x, err := c.provider.InitiateExchange(ctx, opts)
-	if err != nil {
-		return nil, err
+// (ClientInteraction.ts:1168-1237) through the provider's initiateExchange
+// — as one in-flight entry (:1191-1197): the context it returns, which the
+// exchange's work runs under, ends with ctx and with [Interaction.Close];
+// a closed interaction refuses with its close reason.
+func (c *Interaction) begin(ctx context.Context, opts ExchangeOptions) (*messenger, context.Context, error) {
+	c.closeMu.Lock()
+	if err := c.closed; err != nil {
+		c.closeMu.Unlock()
+		return nil, ctx, err
 	}
-	return &messenger{x: x}, nil
+	c.inflight.Add(1)
+	c.closeMu.Unlock()
+	ictx, cancel := context.WithCancelCause(ctx)
+	stop := context.AfterFunc(c.abort, func() { cancel(context.Cause(c.abort)) })
+	release := func() {
+		stop()
+		cancel(nil)
+		c.inflight.Done()
+	}
+	x, err := c.provider.InitiateExchange(ictx, opts)
+	if err != nil {
+		release()
+		return nil, ctx, c.closedCause(ictx, err)
+	}
+	return &messenger{x: x, release: release}, ictx, nil
+}
+
+// closedCause is err, or the close reason when Close aborted ictx.
+func (c *Interaction) closedCause(ictx context.Context, err error) error {
+	//nolint:contextcheck // c.abort is the interaction's closing, not a request context
+	if cause := context.Cause(ictx); cause != nil && c.abort.Err() != nil && errors.Is(cause, context.Cause(c.abort)) {
+		return cause
+	}
+	return err
 }
 
 // send sends one IM message reliably.
@@ -177,6 +272,20 @@ func (m *messenger) sendStatus(ctx context.Context, status im.StatusCode) error 
 		return err
 	}
 	return m.x.Send(ctx, im.OpcodeStatusResponse, b, exchange.SendOptions{})
+}
+
+// sendInvalidSubscription sends a StatusResponse INVALID_SUBSCRIPTION
+// whose wait for the acknowledgement ackWaitAbort ends — sendInvalidSubscription
+// (InteractionMessenger.ts:1070-1080 at 862ad75f).
+func (m *messenger) sendInvalidSubscription(ackWaitAbort <-chan struct{}) error {
+	enc := tlv.NewEncoder()
+	im.StatusResponse{Status: im.StatusInvalidSubscription}.MarshalTLV(enc)
+	b, err := enc.Bytes()
+	if err != nil {
+		return err
+	}
+	//nolint:contextcheck // sent once whatever ends; ackWaitAbort ends the wait (MessageExchange.ts:125-130)
+	return m.x.Send(context.Background(), im.OpcodeStatusResponse, b, exchange.SendOptions{AckWaitAbort: ackWaitAbort})
 }
 
 // next waits for the next message, which must carry want: a

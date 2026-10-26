@@ -481,6 +481,14 @@ func (n *Node) Disable(ctx context.Context) error {
 	if err := n.Stop(ctx); err != nil {
 		return err
 	}
+	// Every subscription of the node goes, not only the default one:
+	// ClientNode.disable cancels the node's interaction, which closes the
+	// subscriptions it owns (ClientNode.ts:239-253, ClientInteraction.ts:270-282
+	// at 862ad75f; ClientConnectivityTest "closes a non-sustained
+	// subscription when the node is disabled").
+	if ia, err := n.interaction(); err == nil {
+		ia.CloseSubscriptions()
+	}
 	n.mu.Lock()
 	n.settings.disabled = true
 	n.saveSettingsLocked()

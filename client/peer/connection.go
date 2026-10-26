@@ -562,16 +562,6 @@ func (c *connection) pendingDeleteLocked(a discovery.Address) {
 	}
 }
 
-// attemptingLocked reports an attempt at any variant of a.
-func (c *connection) attemptingLocked(a discovery.Address) bool {
-	for k := range c.attempts {
-		if k.ap == a.AddrPort() {
-			return true
-		}
-	}
-	return false
-}
-
 // retireStaleFallback drops the speculative fallback once discovery
 // settled on addresses without it, so the discovered address starts
 // without the stagger (PeerConnection.ts:264-303).
@@ -847,24 +837,9 @@ func (c *connection) attemptOnce(att *attempt, attemptNo int) error {
 	if r := p.set.ctx.Resumption; r != nil {
 		opts.Resumption = r
 	}
-	addr := att.addr.UDPAddr()
-	var ch exchange.Channel
-	if att.tcp {
-		// A TCP attempt opens its connection first (PeerSet.ts:274-304);
-		// the address the manager names it by binds the handshake's
-		// sessions to it.
-		dial := p.set.ctx.DialTCP
-		if dial == nil {
-			return ErrNoTCP
-		}
-		var err error
-		if ch, err = dial(local, addr); err != nil {
-			if local.Err() != nil {
-				return nil
-			}
-			return fmt.Errorf("%w: %w", exchange.ErrNetwork, err)
-		}
-		addr = p.set.ctx.Exchanges.AttachChannel(ch)
+	addr, ch, err := c.attemptAddress(local, att)
+	if err != nil || addr == nil {
+		return err
 	}
 	s, _, err := handshake.CASE(local, p.set.ctx.Exchanges, addr, fabric, p.address.NodeID, opts)
 	if err == nil && att.tcp && p.tcpDenied(s.ReportedParameters()) {
@@ -894,6 +869,30 @@ func (c *connection) attemptOnce(att *attempt, attemptNo int) error {
 		return nil
 	}
 	return err
+}
+
+// attemptAddress is the address an attempt's handshake runs on: the
+// socket's, or — for a TCP attempt — the address the manager names the
+// connection by that the attempt opens first, which binds the handshake's
+// sessions to it (PeerSet.ts:274-304). A nil address without an error is
+// a dial ctx ended.
+func (c *connection) attemptAddress(ctx context.Context, att *attempt) (*net.UDPAddr, exchange.Channel, error) {
+	addr := att.addr.UDPAddr()
+	if !att.tcp {
+		return addr, nil, nil
+	}
+	dial := c.p.set.ctx.DialTCP
+	if dial == nil {
+		return nil, nil, ErrNoTCP
+	}
+	ch, err := dial(ctx, addr)
+	if err != nil {
+		if ctx.Err() != nil {
+			return nil, nil, nil //nolint:nilerr // a dial the attempt's end cut short ends the attempt, no error
+		}
+		return nil, nil, fmt.Errorf("%w: %w", exchange.ErrNetwork, err)
+	}
+	return c.p.set.ctx.Exchanges.AttachChannel(ch), ch, nil
 }
 
 // onKickLocked is the kick handler of one attempt (PeerConnection.ts:568-594):

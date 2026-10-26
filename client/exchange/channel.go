@@ -46,6 +46,7 @@ func (t Transport) String() string {
 		return "tcp"
 	case TransportBLE:
 		return "ble"
+	case TransportUDP:
 	}
 	return "udp"
 }
@@ -75,9 +76,10 @@ func (m *Manager) AttachChannel(ch Channel) *net.UDPAddr {
 		return a
 	}
 	a := &net.UDPAddr{}
-	if r, ok := ch.Remote().(*net.TCPAddr); ok {
+	switch r := ch.Remote().(type) {
+	case *net.TCPAddr:
 		a = &net.UDPAddr{IP: r.IP, Port: r.Port, Zone: r.Zone}
-	} else if r, ok := ch.Remote().(*net.UDPAddr); ok {
+	case *net.UDPAddr:
 		*a = *r
 	}
 	m.channels[a] = ch

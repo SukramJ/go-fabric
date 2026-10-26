@@ -154,11 +154,11 @@ func (c *Interaction) Write(ctx context.Context, writes []WriteRequest, opts Wri
 			return nil, fmt.Errorf("%w: a timed write whose statuses take up to %d bytes, at most %d", ErrRequestTooLarge, size, exchange.MaxPayloadSize)
 		}
 	}
-	m, err := c.begin(ctx, opts.exchangeOptions())
+	m, ctx, err := c.begin(ctx, opts.exchangeOptions())
 	if err != nil {
 		return nil, err
 	}
-	defer m.x.Close()
+	defer m.close()
 	if req.TimedRequest {
 		timeout := opts.TimedTimeout
 		if timeout == 0 {

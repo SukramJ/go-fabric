@@ -2151,10 +2151,9 @@
         "reconnects after device address change with expired records",
         "reconnects after device address change with stale MDNS records",
         "tracks peer online status with session lifecycle",
-        "closes a non-sustained subscription when the node is disabled",
         "subscribes to a peer that is not initially available (recreate)"
       ],
-      "reason": "Staggered addresses and the last-known address as fallback keep their client/peer tests; on fabrictest (controller/client:TestClientConnectivityParity) a command to a stopped device fails and succeeds once it is back, the default subscription is lost and re-established with a new id after a timeout and a long absence and signals alive, a close during the reconnection and a shutdown while an exchange is being established log no error, disable ends the subscription and enable starts a fresh one, a restart keeps an uncommissioned node and subscribes to a device once it is back. Missing: a second device address, a moved address and blocked or stale DNS-SD (fabrictest gives a device one address and answers DNS-SD in-process; the peer-level tests cover the connection logic), the online/offline lifecycle events of sessions (no such events on client.Node; Hooks.ConnectionStateChanged is the subscription's state), a non-sustained subscription closed by disabling the node (client.Node.Disable closes the default subscription only — a register candidate), and hosts closed and recreated on the site's stored state (fabrictest keeps stores per host object; Restart is the supported path).",
+      "reason": "Staggered addresses and the last-known address as fallback keep their client/peer tests; on fabrictest (controller/client:TestClientConnectivityParity) a command to a stopped device fails and succeeds once it is back, the default subscription is lost and re-established with a new id after a timeout and a long absence and signals alive, a close during the reconnection and a shutdown while an exchange is being established log no error, disable ends the subscription and enable starts a fresh one, a restart keeps an uncommissioned node and subscribes to a device once it is back. Missing: a second device address, a moved address and blocked or stale DNS-SD (fabrictest gives a device one address and answers DNS-SD in-process; the peer-level tests cover the connection logic), the online/offline lifecycle events of sessions (no such events on client.Node; Hooks.ConnectionStateChanged is the subscription's state), a non-sustained subscription closed by disabling the node (client.Node.Disable closes the default subscription only — a register candidate), and hosts closed and recreated on the site's stored state (fabrictest keeps stores per host object; Restart is the supported path). Disable closes every subscription of the node, not only the default one (fix: ClientNode.disable cancelling the interaction, ClientNode.ts:239-253, ClientInteraction.ts:270-282).",
       "snapshotSha": "d8d5ef04cd30330aea21df86f89bd871e5043671"
     },
     {
@@ -2439,9 +2438,10 @@
       "path": "packages/node/test/node/ClientSubscribeTest.ts",
       "status": "partial",
       "go": [
-        "controller/client:TestClientSubscribeParity",
+        "controller/client:TestClientSubscribeCacheFabricFilterParity",
+        "controller/client:TestClientSubscribeCancelledParity",
         "controller/client:TestClientSubscribeDataVersionFiltersParity",
-        "controller/client:TestClientSubscribeCacheFabricFilterParity"
+        "controller/client:TestClientSubscribeParity"
       ],
       "missing": [
         "sends only the caller's data version filters with includeKnownVersions",
@@ -2468,13 +2468,11 @@
         "reports not subscribed when an active default subscription ends",
         "records no data version for a report of a subscription opened before a switch",
         "records data versions again once a subscription opened before a switch is replaced",
-        "answers the priming report that arrives after the cancel with INVALID_SUBSCRIPTION",
         "answers the priming report with INVALID_SUBSCRIPTION when the session signal aborts",
-        "answers the priming report it is processing during the cancel with INVALID_SUBSCRIPTION",
         "answers the priming report with INVALID_SUBSCRIPTION when processing fails before reading it",
         "answers the priming report with INVALID_SUBSCRIPTION when processing it fails"
       ],
-      "reason": "The empty subscription refused, the version filters a read or subscription sends (injected; the caller's kept, first and winning; none with the other fabric filter; recomputed from the caller's filters and its refreshRequest when a sustained subscription is replaced; the replacement applied by the refreshed request's fabric filter) and the versions kept across a controller restart run on fabrictest through a client node (controller/client:TestClientSubscribe*; fix: ClientStructure.injectVersionFilters' caller and fabric-filter rules and ClientNodeInteraction.subscribe's refreshRequest at 862ad75f). Missing: includeKnownVersions on a subscription (client.Node.Subscribe takes an interaction.SubscribeRequest, which has no such field — an API change); the run-time change of the default subscription (autoSubscribe, defaultSubscription, its fabric filter) and the reactions serialised against Start, the cache's recorded fabric filter with adoptFabricFilter and its storage failures (the Go cache records no filter; the default subscription is fixed at Start); the default subscription's ownership across replacements (no replacement at run time; matter.js drives the internal request callbacks); and the priming report answered INVALID_SUBSCRIPTION after a cancel or a failing updated (client/interaction acknowledges it Success and its Updated cannot fail — brief BH's path).",
+      "reason": "The empty subscription refused, the version filters a read or subscription sends (injected; the caller's kept, first and winning; none with the other fabric filter; recomputed from the caller's filters and its refreshRequest when a sustained subscription is replaced; the replacement applied by the refreshed request's fabric filter) and the versions kept across a controller restart run on fabrictest through a client node (controller/client:TestClientSubscribe*; fix: ClientStructure.injectVersionFilters' caller and fabric-filter rules and ClientNodeInteraction.subscribe's refreshRequest at 862ad75f). Missing: includeKnownVersions on a subscription (client.Node.Subscribe takes an interaction.SubscribeRequest, which has no such field — an API change); the run-time change of the default subscription (autoSubscribe, defaultSubscription, its fabric filter) and the reactions serialised against Start, the cache's recorded fabric filter with adoptFabricFilter and its storage failures (the Go cache records no filter; the default subscription is fixed at Start); the default subscription's ownership across replacements (no replacement at run time; matter.js drives the internal request callbacks). The priming report of a subscription cancelled while being established is answered INVALID_SUBSCRIPTION, whether it arrives after the cancel or is being processed during it (controller/client:TestClientSubscribeCancelledParity; fix: the abandoned establishment, ClientInteraction.ts:1084-1097, InteractionMessenger.ts:1116-1137). Still missing there: the session-signal variant on a separate interaction, and the two cases whose updated callback fails — a Go Updated returns no error.",
       "snapshotSha": "135021253b6d8e65e441f9ad42fdb5dd5f695ff9"
     },
     {
@@ -3091,9 +3089,20 @@
     },
     {
       "path": "packages/protocol/test/action/client/ClientInteractionSubscribeTest.ts",
-      "status": "planned",
-      "reason": "Every case drives ClientInteraction.close (ClientInteraction.ts:264-297) over its in-flight interaction set, the abandoned-subscribe termination (:1096, :1260-1300) or initBdx (:1185-1215); the Go Interaction has no Close, no in-flight tracking, no abandonment and no client BDX, and adding them spans subscribe.go/read.go/write.go (another agent's files) and is no small fix. Milestone 5 phase 25 (the controller remainder) brings ClientInteraction.close, the in-flight set and the abandonment; findings register (owner review of PR #164).",
-      "until": "M5 phase 25",
+      "status": "partial",
+      "go": [
+        "client/interaction:TestClientInteractionSubscribeAbortedParity",
+        "client/interaction:TestClientInteractionSubscribeAbandonedReportParity",
+        "client/interaction:TestClientInteractionSubscribeClosedWhileProcessingParity"
+      ],
+      "missing": [
+        "waits on close for an attempt that reuses the request of an abandoned subscribe",
+        "still ends on close when closing the exchange of an abandoned subscribe fails",
+        "waits on close for a BDX exchange still being created",
+        "does not wait on close for a BDX exchange whose creation failed",
+        "aborts the creation of a BDX exchange on close"
+      ],
+      "reason": "Interaction.Close (ClientInteraction.ts:264-297 at 862ad75f), its in-flight set and the abandoned establishment (:1084-1097, InteractionMessenger.ts:1116-1137) run on the scripted peer: an aborted subscribe returns at once and Close ends the wait for its report; a report that arrives after the abort, and one being processed when the interaction closes, are answered INVALID_SUBSCRIPTION once. Missing: the reuse of an abandoned subscribe's request object (Go requests are values) and a failing exchange close (the Go exchange's Close cannot fail) have no Go shape; the three BDX cases need the client-side BDX initiation (ClientInteraction.initBdx, :1185-1215), which the Go client has not.",
       "snapshotSha": "8a0fabd64c26bf89368d2a5fb75bc39d9f23a1a3"
     },
     {
