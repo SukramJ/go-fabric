@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/SukramJ/go-fabric/client/interaction"
+	"github.com/SukramJ/go-fabric/controller/client"
 	"github.com/SukramJ/go-fabric/fabrictest"
 	"github.com/SukramJ/go-fabric/im"
 )
@@ -57,7 +58,7 @@ func TestClientSubscribeCancelledParity(t *testing.T) {
 		ctx, cancel := context.WithCancel(parityCtx(t))
 		errc := make(chan error, 1)
 		go func() {
-			_, err := cp.node.Subscribe(ctx, request())
+			_, err := cp.node.Subscribe(ctx, client.SubscribeRequest{SubscribeRequest: request()})
 			errc <- err
 		}()
 		// The device primes the subscription; its replies are held.
@@ -80,7 +81,7 @@ func TestClientSubscribeCancelledParity(t *testing.T) {
 		req.Updated = func(*interaction.Report) { cancel() }
 		var err error
 		cp.run(t, func(context.Context) error {
-			_, err = cp.node.Subscribe(ctx, req)
+			_, err = cp.node.Subscribe(ctx, client.SubscribeRequest{SubscribeRequest: req})
 			return nil
 		})
 		if !errors.Is(err, context.Canceled) {

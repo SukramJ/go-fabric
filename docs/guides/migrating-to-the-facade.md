@@ -42,13 +42,14 @@ still held there. Each row names the facade route, or the section of
 | `cluster/core` | `SoftwareVersionFromString` (`daemon_matter.go:527`) | `node.SoftwareVersionFromString` |
 | `cluster/core` | `RegulatoryIndoorOutdoor` (`daemon_matter.go:506`) | `node.RegulatoryIndoorOutdoor` for `Commissioning.LocationCapability` |
 
-## Removed in v0.13.0: `MarkComplete`
+## Removed or changed in v0.13.0: `MarkComplete`, `Priority`, `SubscribeRequest`
 
 | Symbol | Route |
 | --- | --- |
 | `node.Aggregator.MarkComplete`, `node.Partition.MarkComplete`, `node.Batch.MarkComplete` | drop the call: a stored endpoint number is kept until `Forget` (or `RetirePartition` for a whole source) erases it, whether or not the device is in the set; `Forget` a device that is gone for good |
 | `endpoint.Snapshot.ModelComplete`, `endpoint.Snapshot.Retain` (a host with its own assembler) | drop the fields: the assembler collects no stored identity absent from its snapshots; erase one with `endpoint.Store.RemoveEndpoint` |
 | `client/peer.ConnectOptions.Priority`, `client/interaction.ExchangeOptions.Priority` | `Network: peer.NetworkICDLit`, the unthrottled profile matter.js routes an await-mode LIT ICD through |
+| `controller/client.SubscribeRequest` as an alias of `interaction.SubscribeRequest` | a struct now, as `client.ReadRequest` is: `client.SubscribeRequest{SubscribeRequest: client.SubscribePaths{…}, IncludeKnownVersions: …}`, or set the promoted fields on a `var req client.SubscribeRequest`; `client.SubscribePaths` is the old alias; `fabrictest.SubscribeRequest` is `client.SubscribePaths` |
 
 ## The node features in v0.10.4
 

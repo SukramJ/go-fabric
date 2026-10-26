@@ -36,6 +36,7 @@ import (
 
 	"github.com/SukramJ/go-fabric/client/interaction"
 	"github.com/SukramJ/go-fabric/cluster/onoff"
+	"github.com/SukramJ/go-fabric/cluster/spec/accesscontrol"
 	basicinfo "github.com/SukramJ/go-fabric/cluster/spec/basicinformation"
 	onoffdef "github.com/SukramJ/go-fabric/cluster/spec/onoff"
 	"github.com/SukramJ/go-fabric/controller/client"
@@ -51,7 +52,7 @@ func TestClientSubscribeParity(t *testing.T) {
 		t.Parallel()
 		cp := newClientPair(t, clientPairOptions{rootOnly: true})
 		err := cp.site.Run(parityCtx(t), func(ctx context.Context) error {
-			_, err := cp.node.Subscribe(ctx, interaction.SubscribeRequest{})
+			_, err := cp.node.Subscribe(ctx, client.SubscribeRequest{})
 			return err
 		})
 		if !errors.Is(err, interaction.ErrMalformedRequest) {
@@ -78,6 +79,12 @@ func readClusters(t *testing.T, cp *clientPair, req client.ReadRequest) map[uint
 // subscription of endpoint 0 that keeps the others, closed after its
 // priming report, and the clusters that report carried.
 func primingClusters(t *testing.T, cp *clientPair, req interaction.SubscribeRequest) map[uint32]uint32 {
+	t.Helper()
+	return primingClustersOf(t, cp, client.SubscribeRequest{SubscribeRequest: req})
+}
+
+// primingClustersOf is primingClusters over a node subscription request.
+func primingClustersOf(t *testing.T, cp *clientPair, req client.SubscribeRequest) map[uint32]uint32 {
 	t.Helper()
 	req.Attributes = []im.ConcreteAttributePath{rootPath()}
 	var mu sync.Mutex
@@ -109,6 +116,13 @@ func primingClusters(t *testing.T, cp *clientPair, req interaction.SubscribeRequ
 // controller's registry instead (interaction.Subscriptions.CloseForPeer,
 // as TestLiveClientNode does) and keeps the device's versions.
 func resubscribedClusters(t *testing.T, req interaction.SubscribeRequest) map[uint32]uint32 {
+	t.Helper()
+	return resubscribedClustersOf(t, client.SubscribeRequest{SubscribeRequest: req})
+}
+
+// resubscribedClustersOf is resubscribedClusters over a node subscription
+// request.
+func resubscribedClustersOf(t *testing.T, req client.SubscribeRequest) map[uint32]uint32 {
 	t.Helper()
 	cp := newClientPair(t, clientPairOptions{})
 	req.Attributes = []im.ConcreteAttributePath{rootPath()}
@@ -305,6 +319,31 @@ func TestClientSubscribeDataVersionFiltersParity(t *testing.T) {
 		}
 	})
 
+	// ClientSubscribeTest.ts:237-255.
+	t.Run("sends only the caller's data version filters with includeKnownVersions", func(t *testing.T) {
+		t.Parallel()
+		cp := newClientPair(t, clientPairOptions{})
+		all := primingClustersOf(t, cp, client.SubscribeRequest{IncludeKnownVersions: true})
+		if !has(all, basicinfo.ClusterID) || !has(all, accesscontrol.ClusterID) {
+			t.Fatalf("priming clusters %v, want BasicInformation and AccessControl", all)
+		}
+		filters := []im.DataVersionFilter{{Endpoint: 0, Cluster: basicinfo.ClusterID, DataVersion: all[basicinfo.ClusterID]}}
+		filtered := primingClustersOf(t, cp, client.SubscribeRequest{
+			SubscribeRequest: interaction.SubscribeRequest{DataVersionFilters: filters}, IncludeKnownVersions: true,
+		})
+		if has(filtered, basicinfo.ClusterID) || !has(filtered, accesscontrol.ClusterID) {
+			t.Fatalf("priming clusters %v, want AccessControl without BasicInformation", filtered)
+		}
+	})
+
+	// ClientSubscribeTest.ts:340-346.
+	t.Run("keeps includeKnownVersions when a sustained subscription replaces a lost one", func(t *testing.T) {
+		t.Parallel()
+		if !has(resubscribedClustersOf(t, client.SubscribeRequest{IncludeKnownVersions: true}), basicinfo.ClusterID) {
+			t.Fatal("the replacement's priming report lacks BasicInformation")
+		}
+	})
+
 	t.Run("injects known data versions when a sustained subscription replaces a lost one", func(t *testing.T) {
 		t.Parallel()
 		if has(resubscribedClusters(t, interaction.SubscribeRequest{}), basicinfo.ClusterID) {
@@ -368,7 +407,7 @@ func TestClientSubscribeCacheFabricFilterParity(t *testing.T) {
 		var s *interaction.Subscription
 		cp.run(t, func(ctx context.Context) error {
 			var err error
-			s, err = cp.node.Subscribe(ctx, req)
+			s, err = cp.node.Subscribe(ctx, client.SubscribeRequest{SubscribeRequest: req})
 			return err
 		})
 		defer s.Close()

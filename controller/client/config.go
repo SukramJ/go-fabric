@@ -181,4 +181,8 @@ var (
 	ErrClosed = errors.New("client: node is closed")
 	// ErrConfig: an invalid Config.
 	ErrConfig = errors.New("client: invalid config")
+	// ErrLoadFailed: a stored node that failed to load — [Node.LoadError]
+	// and its Start; the registry keeps it so its id stays visible
+	// (Peers.ts:144-161 at 862ad75f).
+	ErrLoadFailed = errors.New("client: node is unavailable because it failed to load")
 )

@@ -29,9 +29,9 @@ type (
 	// DataVersionFilters, NoFabricFilter.
 	ReadRequest = client.ReadPaths
 	// SubscribeRequest is a subscription [Subscribe] establishes
-	// (client.SubscribeRequest: the paths, the interval bounds, Updated
+	// (client.SubscribePaths: the paths, the interval bounds, Updated
 	// for every report, Closed).
-	SubscribeRequest = client.SubscribeRequest
+	SubscribeRequest = client.SubscribePaths
 	// Subscription is an established subscription (client.Subscription);
 	// the site closes it, or Close does.
 	Subscription = client.Subscription

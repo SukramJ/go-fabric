@@ -225,6 +225,11 @@ func (s *Set) Size() int {
 	return len(s.peers)
 }
 
+// ErrNoFabric is a peer whose fabric the host's fabric lookup does not
+// know — matter.js FabricNotFoundError, as a peer restored against
+// another fabric store meets it (PeersLoadFailureTest).
+var ErrNoFabric = errors.New("peer: no fabric")
+
 // AddKnownPeer adds the peer d describes, or updates the known peer: its
 // operational address and CATs replace the peer's when d gives them, its
 // discovery data fills only what the peer does not know, its reported
@@ -239,7 +244,7 @@ func (s *Set) AddKnownPeer(d Descriptor) (*Peer, error) {
 	// another call added meanwhile is the one kept.
 	fabric, ok := s.ctx.Fabrics(d.Address)
 	if !ok || fabric.Identity == nil {
-		return nil, fmt.Errorf("peer: no fabric with index %d", d.Address.FabricIndex)
+		return nil, fmt.Errorf("%w with index %d", ErrNoFabric, d.Address.FabricIndex)
 	}
 	s.mu.Lock()
 	for _, p := range s.peers {

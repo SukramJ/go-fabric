@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 6578,
+  "entry_points": 6584,
   "entry_packages": [
     ".",
     "bdx",
@@ -259,8 +259,8 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 16124,
-    "reachable": 11401,
+    "total_exported": 16131,
+    "reachable": 11408,
     "whitelisted": 4720,
     "unreachable": 3
   },
@@ -21033,7 +21033,7 @@
       "identifier": "AttributeData",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "controller/client/surface.go",
-      "line": 73
+      "line": 75
     },
     {
       "package": "controller/client",
@@ -21047,7 +21047,7 @@
       "identifier": "AttributeStatus",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "controller/client/surface.go",
-      "line": 75
+      "line": 77
     },
     {
       "package": "controller/client",
@@ -21068,7 +21068,7 @@
       "identifier": "CommandRequest",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "controller/client/surface.go",
-      "line": 99
+      "line": 101
     },
     {
       "package": "controller/client",
@@ -21096,14 +21096,14 @@
       "identifier": "Device",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "controller/client/surface.go",
-      "line": 118
+      "line": 120
     },
     {
       "package": "controller/client",
       "identifier": "DeviceTypeViolation",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "controller/client/surface.go",
-      "line": 128
+      "line": 130
     },
     {
       "package": "controller/client",
@@ -21117,7 +21117,7 @@
       "identifier": "EventData",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "controller/client/surface.go",
-      "line": 79
+      "line": 81
     },
     {
       "package": "controller/client",
@@ -21138,7 +21138,7 @@
       "identifier": "EventStatus",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "controller/client/surface.go",
-      "line": 81
+      "line": 83
     },
     {
       "package": "controller/client",
@@ -21159,7 +21159,7 @@
       "identifier": "InvokeOptions",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "controller/client/surface.go",
-      "line": 103
+      "line": 105
     },
     {
       "package": "controller/client",
@@ -21187,7 +21187,7 @@
       "identifier": "PeerAddress",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "controller/client/surface.go",
-      "line": 115
+      "line": 117
     },
     {
       "package": "controller/client",
@@ -21208,14 +21208,14 @@
       "identifier": "Report",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "controller/client/surface.go",
-      "line": 68
+      "line": 70
     },
     {
       "package": "controller/client",
       "identifier": "Result",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "controller/client/surface.go",
-      "line": 107
+      "line": 109
     },
     {
       "package": "controller/client",
@@ -21236,7 +21236,7 @@
       "identifier": "SessionParameters",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "controller/client/surface.go",
-      "line": 126
+      "line": 128
     },
     {
       "package": "controller/client",
@@ -21257,28 +21257,28 @@
       "identifier": "StatusError",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "controller/client/surface.go",
-      "line": 111
+      "line": 113
     },
     {
       "package": "controller/client",
-      "identifier": "SubscribeRequest",
+      "identifier": "SubscribePaths",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "controller/client/surface.go",
-      "line": 59
+      "line": 61
     },
     {
       "package": "controller/client",
       "identifier": "Subscription",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "controller/client/surface.go",
-      "line": 63
+      "line": 65
     },
     {
       "package": "controller/client",
       "identifier": "SupportedTransports",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "controller/client/surface.go",
-      "line": 121
+      "line": 123
     },
     {
       "package": "controller/client",
@@ -21362,21 +21362,21 @@
       "identifier": "TestClusterDecoded",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/cluster_internal_test.go",
-      "line": 117
+      "line": 118
     },
     {
       "package": "controller/client",
       "identifier": "TestClusterNames",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/cluster_internal_test.go",
-      "line": 37
+      "line": 38
     },
     {
       "package": "controller/client",
       "identifier": "TestClusterShape",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/cluster_internal_test.go",
-      "line": 54
+      "line": 55
     },
     {
       "package": "controller/client",
@@ -21432,7 +21432,7 @@
       "identifier": "TestEveryGeneratedClusterIsKnown",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/cluster_internal_test.go",
-      "line": 159
+      "line": 160
     },
     {
       "package": "controller/client",
@@ -21516,7 +21516,7 @@
       "identifier": "TestPeerBehaviorDiscoveredParity",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/peer_behavior_parity_matterjs_internal_test.go",
-      "line": 53
+      "line": 69
     },
     {
       "package": "controller/client",
@@ -21621,7 +21621,7 @@
       "identifier": "TestRegistryAutoStart",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/registry_internal_test.go",
-      "line": 251
+      "line": 257
     },
     {
       "package": "controller/client",
@@ -21635,7 +21635,7 @@
       "identifier": "TestRegistryErase",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/registry_internal_test.go",
-      "line": 305
+      "line": 311
     },
     {
       "package": "controller/client",
@@ -21649,7 +21649,7 @@
       "identifier": "TestRegistryRestore",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/registry_internal_test.go",
-      "line": 188
+      "line": 189
     },
     {
       "package": "controller/client",
@@ -21782,7 +21782,7 @@
       "identifier": "Timing",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "controller/client/surface.go",
-      "line": 124
+      "line": 126
     },
     {
       "package": "controller/client",
@@ -21810,28 +21810,28 @@
       "identifier": "WriteOptions",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "controller/client/surface.go",
-      "line": 91
+      "line": 93
     },
     {
       "package": "controller/client",
       "identifier": "WriteRequest",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "controller/client/surface.go",
-      "line": 87
+      "line": 89
     },
     {
       "package": "controller/client",
       "identifier": "WriteStatus",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "controller/client/surface.go",
-      "line": 93
+      "line": 95
     },
     {
       "package": "controller/client",
       "identifier": "WriteStatuses",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "controller/client/surface.go",
-      "line": 96
+      "line": 98
     },
     {
       "package": "controller/commissioner",

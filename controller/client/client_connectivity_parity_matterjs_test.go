@@ -202,7 +202,7 @@ func TestClientConnectivityParity(t *testing.T) {
 		cp := newClientPair(t, clientPairOptions{})
 		var sub *interaction.Subscription
 		cp.run(t, func(ctx context.Context) (err error) {
-			sub, err = cp.node.Subscribe(ctx, interaction.SubscribeRequest{Attributes: []im.ConcreteAttributePath{{}}, Events: []im.ConcreteEventPath{{IsUrgent: true}}})
+			sub, err = cp.node.Subscribe(ctx, client.SubscribeRequest{SubscribeRequest: interaction.SubscribeRequest{Attributes: []im.ConcreteAttributePath{{}}, Events: []im.ConcreteEventPath{{IsUrgent: true}}}})
 			return err
 		})
 		select {

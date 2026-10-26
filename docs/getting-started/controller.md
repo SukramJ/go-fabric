@@ -178,7 +178,7 @@ func use(ctx context.Context, n *client.Node) error {
 	if _, err := n.Invoke(ctx, toggle, onoffdef.ToggleRequest{}, client.InvokeOptions{}); err != nil {
 		return err
 	}
-	sub, err := n.Subscribe(ctx, client.SubscribeRequest{
+	sub, err := n.Subscribe(ctx, client.SubscribeRequest{SubscribeRequest: client.SubscribePaths{
 		Attributes:         []client.AttributePath{client.AttributeAt(1, onoffdef.ClusterID, onoffdef.AttrOnOff)},
 		MaxIntervalCeiling: client.Interval(time.Minute),
 		Updated: func(r *client.Report) { // keep it short: it runs on the report's exchange
@@ -187,7 +187,7 @@ func use(ctx context.Context, n *client.Node) error {
 				fmt.Printf("OnOff: %v\n", st.OnOff)
 			}
 		},
-	})
+	}})
 	if err != nil {
 		return err
 	}

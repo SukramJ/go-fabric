@@ -776,7 +776,7 @@ func (c *connection) attemptOnce(att *attempt, attemptNo int) error {
 	}
 	fabric, ok := p.set.ctx.Fabrics(p.address)
 	if !ok {
-		return fmt.Errorf("peer: no fabric with index %d", p.address.FabricIndex)
+		return fmt.Errorf("%w with index %d", ErrNoFabric, p.address.FabricIndex)
 	}
 	c.mu.Lock()
 	isFallback := c.fallback != nil && c.addrsAttempted > 1

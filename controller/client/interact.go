@@ -24,6 +24,19 @@ type ReadRequest struct {
 	IncludeKnownVersions bool
 }
 
+// SubscribeRequest is a subscription through the node — matter.js
+// ClientSubscribe with ClientNodeInteraction's includeKnownVersions
+// (packages/node/src/node/client/ClientNodeInteraction.ts:111-124 at
+// 862ad75f): what it sends ([SubscribePaths], embedded, its fields
+// promoted) and IncludeKnownVersions.
+type SubscribeRequest struct {
+	interaction.SubscribeRequest
+	// IncludeKnownVersions skips the version filters — in the first
+	// request and, for a sustained subscription, in every later one it
+	// sends — so the peer sends every value (:123-124).
+	IncludeKnownVersions bool
+}
+
 // Read reads from the peer and applies the report to the image —
 // ClientNodeInteraction.read (ClientNodeInteraction.ts:91-112): unless
 // IncludeKnownVersions, and when the read has the default subscription's
@@ -109,9 +122,18 @@ func (n *Node) noteICDActive() {
 // produced them. Mirrors matter.js
 // packages/node/src/node/client/ClientNodeInteraction.ts:119-181 at
 // 862ad75f (callerRefresh :125, sent :129-132, refreshRequest :162-168).
-func (n *Node) Subscribe(ctx context.Context, req SubscribeRequest) (*Subscription, error) {
+// With IncludeKnownVersions no version goes along, in the first request
+// nor in a re-subscription's (withKnownVersions, :123-124).
+func (n *Node) Subscribe(ctx context.Context, sr SubscribeRequest) (*Subscription, error) {
+	req := sr.SubscribeRequest
+	withKnownVersions := func(sc scope, filters []DataVersionFilter) []DataVersionFilter {
+		if sr.IncludeKnownVersions {
+			return filters
+		}
+		return n.s.withKnownVersions(sc, filters, false)
+	}
 	callerFilters := slices.Clone(req.DataVersionFilters)
-	var callerRefresh func(SubscribeRequest) SubscribeRequest
+	var callerRefresh func(SubscribePaths) SubscribePaths
 	if req.Sustain {
 		callerRefresh = req.RefreshRequest
 	}
@@ -121,7 +143,7 @@ func (n *Node) Subscribe(ctx context.Context, req SubscribeRequest) (*Subscripti
 	sent := newScope(req.Attributes, req.NoFabricFilter)
 	r := req
 	n.mu.RLock()
-	r.DataVersionFilters = n.s.withKnownVersions(sent, callerFilters, false)
+	r.DataVersionFilters = withKnownVersions(sent, callerFilters)
 	n.mu.RUnlock()
 	floor, ceiling := n.IntervalBounds(req.MinIntervalFloor, req.MaxIntervalCeiling)
 	r.MinIntervalFloor, r.MaxIntervalCeiling = &floor, &ceiling
@@ -134,7 +156,7 @@ func (n *Node) Subscribe(ctx context.Context, req SubscribeRequest) (*Subscripti
 			req.Updated(rep)
 		}
 	}
-	r.RefreshRequest = func(x SubscribeRequest) SubscribeRequest {
+	r.RefreshRequest = func(x SubscribePaths) SubscribePaths {
 		x.DataVersionFilters = slices.Clone(callerFilters)
 		if callerRefresh != nil {
 			x = callerRefresh(x)
@@ -142,7 +164,7 @@ func (n *Node) Subscribe(ctx context.Context, req SubscribeRequest) (*Subscripti
 		sc := newScope(x.Attributes, x.NoFabricFilter)
 		n.mu.RLock()
 		x.EventFilters = []EventMinimumNumber{{EventMin: n.settings.maxEventNumber + 1}}
-		x.DataVersionFilters = n.s.withKnownVersions(sc, x.DataVersionFilters, false)
+		x.DataVersionFilters = withKnownVersions(sc, x.DataVersionFilters)
 		n.mu.RUnlock()
 		sentMu.Lock()
 		sent = sc
@@ -159,7 +181,7 @@ func (n *Node) Subscribe(ctx context.Context, req SubscribeRequest) (*Subscripti
 }
 
 // observeRequest hands a subscription request to the test seam.
-func (n *Node) observeRequest(r SubscribeRequest) {
+func (n *Node) observeRequest(r SubscribePaths) {
 	n.mu.RLock()
 	f := n.requestObserver
 	n.mu.RUnlock()

@@ -182,7 +182,7 @@ func CheckFeatures(def *Cluster, features uint32) error {
 // chip's TC-DEM-2.6 runs (--featureSet 0x7C).
 func featureApplicability(c Conformance, ctx FeatureContext) Applicability {
 	if c.Op != ConfOtherwise {
-		return assessOuter(c, ctx)
+		return assessOuter(c, ctx, false)
 	}
 	provisional := false
 	for i, node := range c.Args {

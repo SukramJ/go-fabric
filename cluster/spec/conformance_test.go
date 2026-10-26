@@ -107,3 +107,27 @@ func TestIsMandatory(t *testing.T) {
 		t.Error("Field.Mandatory")
 	}
 }
+
+// TestApplicabilityDeprecatedOptional: applicabilityFor's
+// deprecatedIsOptional (packages/model/src/aspects/Conformance.ts:985-987
+// at 862ad75f) makes a deprecated or obsolete term optional; a disallowed
+// one stays out, and a trailing "D" still leaves the terms before it to
+// decide (:936-939).
+func TestApplicabilityDeprecatedOptional(t *testing.T) {
+	t.Parallel()
+	ctx := features{"US": false}
+	for _, c := range []struct {
+		name string
+		c    spec.Conformance
+		want spec.Applicability
+	}{
+		{"D", op(spec.ConfDeprecated), spec.ApplicabilityOptional},
+		{"Z", op(spec.ConfObsolete), spec.ApplicabilityOptional},
+		{"X", op(spec.ConfDisallowed), spec.ApplicabilityNone},
+		{"[US], D", op(spec.ConfOtherwise, op(spec.ConfOptionalIf, name("US")), op(spec.ConfDeprecated)), spec.ApplicabilityNone},
+	} {
+		if got := c.c.ApplicabilityDeprecatedOptional(ctx); got != c.want {
+			t.Errorf("%s: %v, want %v", c.name, got, c.want)
+		}
+	}
+}

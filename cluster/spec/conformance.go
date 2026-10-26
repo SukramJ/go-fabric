@@ -154,6 +154,19 @@ func (c Conformance) IsDisallowed() bool { return c.Op == ConfDisallowed }
 // in packages/model/src/aspects/Conformance.ts) for a server: deprecated
 // and obsolete terms are disallowed.
 func (c Conformance) Applicability(ctx FeatureContext) Applicability {
+	return c.applicability(ctx, false)
+}
+
+// ApplicabilityDeprecatedOptional is [Conformance.Applicability] with
+// deprecated and obsolete terms optional — applicabilityFor's
+// deprecatedIsOptional (packages/model/src/aspects/Conformance.ts:182,
+// :985-987 at 862ad75f), which a client judges an element the peer
+// implements by.
+func (c Conformance) ApplicabilityDeprecatedOptional(ctx FeatureContext) Applicability {
+	return c.applicability(ctx, true)
+}
+
+func (c Conformance) applicability(ctx FeatureContext, deprecatedIsOptional bool) Applicability {
 	if c.Op == ConfOtherwise {
 		fallback := ApplicabilityNone
 		provisional := false
@@ -167,7 +180,7 @@ func (c Conformance) Applicability(ctx FeatureContext) Applicability {
 			if node.Op == ConfDeprecated && i == len(c.Args)-1 {
 				continue
 			}
-			switch assessOuter(node, ctx) {
+			switch assessOuter(node, ctx, deprecatedIsOptional) {
 			case ApplicabilityConditional:
 				fallback = ApplicabilityConditional
 			case ApplicabilityOptional:
@@ -184,14 +197,14 @@ func (c Conformance) Applicability(ctx FeatureContext) Applicability {
 		}
 		return fallback
 	}
-	return assessOuter(c, ctx)
+	return assessOuter(c, ctx, deprecatedIsOptional)
 }
 
-func assessOuter(c Conformance, ctx FeatureContext) Applicability {
+func assessOuter(c Conformance, ctx FeatureContext, deprecatedIsOptional bool) Applicability {
 	switch c.Op {
 	case ConfChoice:
 		// Choice conformance is ignored for these purposes.
-		return assessOuter(arg(c), ctx)
+		return assessOuter(arg(c), ctx, deprecatedIsOptional)
 	case ConfOptional, ConfEmpty, "":
 		return ApplicabilityOptional
 	case ConfOptionalIf:
@@ -199,7 +212,12 @@ func assessOuter(c Conformance, ctx FeatureContext) Applicability {
 			return a
 		}
 		return ApplicabilityOptional
-	case ConfDisallowed, ConfDeprecated, ConfObsolete:
+	case ConfDisallowed:
+		return ApplicabilityNone
+	case ConfDeprecated, ConfObsolete:
+		if deprecatedIsOptional {
+			return ApplicabilityOptional
+		}
 		return ApplicabilityNone
 	case ConfProvisional:
 		return ApplicabilityOptional

@@ -37,6 +37,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net"
+	"slices"
 	"sync/atomic"
 	"time"
 
@@ -538,6 +539,7 @@ func (c *Controller) Pair(ctx context.Context, code string, opts PairOptions) (*
 		return nil, fmt.Errorf("%w: pairing over BLE needs PairOptions.WiFi or Thread: a device on BLE has no network yet", ErrConfiguration)
 	}
 	passcode, id := pc.Passcode, pc.Identifier()
+	identity := discovery.Identity{VendorID: pc.VendorID, ProductID: pc.ProductID}
 	if _, ok := ctx.Deadline(); !ok {
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithTimeout(ctx, DefaultPairTimeout)
@@ -546,7 +548,7 @@ func (c *Controller) Pair(ctx context.Context, code string, opts PairOptions) (*
 	var dev *discovery.Device
 	var channel commissioner.Channel
 	if opts.BLE != nil {
-		d, ch, err := c.dialBLE(ctx, opts.BLE, id)
+		d, ch, err := c.dialBLE(ctx, opts.BLE, id, identity)
 		if err != nil {
 			return nil, err
 		}
@@ -554,7 +556,7 @@ func (c *Controller) Pair(ctx context.Context, code string, opts PairOptions) (*
 		dev, channel = &d, ch
 	} else if known != nil {
 		dev = known
-	} else if dev = c.findCommissionable(ctx, id); dev == nil {
+	} else if dev = c.findCommissionable(ctx, id, identity); dev == nil {
 		return nil, ErrNoDevice
 	}
 	n, err := c.reg.ForDevice(ctx, *dev)
@@ -602,15 +604,17 @@ func DeviceAt(addr *net.UDPAddr) (client.Device, error) {
 }
 
 // findCommissionable is the first commissionable device id selects that
-// DNS-SD reports with an address before ctx ends; nil when none does.
-func (c *Controller) findCommissionable(ctx context.Context, id discovery.Identifier) *discovery.Device {
+// DNS-SD reports with an address before ctx ends, passing over one whose
+// VP record contradicts the code's vendor or product
+// (CommissioningDiscovery.ts:62-90 at 862ad75f); nil when none does.
+func (c *Controller) findCommissionable(ctx context.Context, id discovery.Identifier, identity discovery.Identity) *discovery.Device {
 	sc := discovery.NewScanner(c.names)
 	defer sc.Close()
 	fctx, found := context.WithCancel(ctx)
 	defer found()
 	var dev *discovery.Device
 	_, _ = sc.FindCommissionable(fctx, id, func(d discovery.Device) {
-		if dev == nil && len(d.Addresses) > 0 {
+		if dev == nil && len(d.Addresses) > 0 && c.namesThisDevice(identity, d) {
 			dev = &d
 			found()
 		}
@@ -625,7 +629,7 @@ func (c *Controller) findCommissionable(ctx context.Context, id discovery.Identi
 // commissioning (packages/protocol/src/common/BleScanner.ts:543-575 at
 // 862ad75f). The scan runs until ctx ends, at most [DefaultPairTimeout] on
 // the controller's clock; none found is [ErrNoDevice].
-func (c *Controller) dialBLE(ctx context.Context, central ble.Central, id discovery.Identifier) (discovery.Device, *ble.Channel, error) {
+func (c *Controller) dialBLE(ctx context.Context, central ble.Central, id discovery.Identifier, identity discovery.Identity) (discovery.Device, *ble.Channel, error) {
 	sc := ble.NewScanner(central, ble.ScannerOptions{Clock: c.clock, Logger: c.log})
 	defer func() { _ = sc.Close(context.WithoutCancel(ctx)) }()
 	// ctx's deadline ends the scan first; the timeout bounds it on the
@@ -634,6 +638,7 @@ func (c *Controller) dialBLE(ctx context.Context, central ble.Central, id discov
 	if err != nil {
 		return discovery.Device{}, nil, err
 	}
+	devs = slices.DeleteFunc(devs, func(d ble.Device) bool { return !c.namesThisDevice(identity, d.Commissionable()) })
 	if len(devs) == 0 {
 		return discovery.Device{}, nil, fmt.Errorf("%w over BLE", ErrNoDevice)
 	}
@@ -642,6 +647,21 @@ func (c *Controller) dialBLE(ctx context.Context, central ble.Central, id discov
 		return discovery.Device{}, nil, err
 	}
 	return devs[0].Commissionable(), ch, nil
+}
+
+// namesThisDevice reports whether d may be the device the code names:
+// one whose advertisement positively names another vendor or product is
+// passed over — CommissioningDiscovery.#namesThisDevice (:79-90).
+func (c *Controller) namesThisDevice(identity discovery.Identity, d discovery.Device) bool {
+	m := discovery.MismatchOf(identity, d.AdvertisedIdentity())
+	if m == nil {
+		return true
+	}
+	// reason is the facet, offered what the device advertises, expected
+	// what the code names.
+	c.log.Info("matter.controller.pair.passing_over", slog.String("instance", d.InstanceID), slog.String("reason", m.Facet),
+		slog.Int("offered", int(m.Advertised)), slog.Int("expected", int(m.Payload)))
+	return false
 }
 
 func random() uint64 {

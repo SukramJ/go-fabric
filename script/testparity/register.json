@@ -427,37 +427,40 @@
     },
     {
       "path": "packages/node/test/behavior/system/controller/discovery/CommissioningIdentityTest.ts",
-      "status": "planned",
-      "until": "M5 phase 25",
-      "reason": "The commissioner's vendor/product identity check of an advertised device against the onboarding payload. Controller discovery: milestone 5 phase 25 (concept v5 F.0 19.3).",
+      "status": "ported",
+      "go": [
+        "client/discovery:TestCommissioningIdentityParity",
+        "client/discovery:TestAdvertisedIdentity"
+      ],
+      "reason": "CommissioningDiscovery.identityMismatch (CommissioningDiscovery.ts:109-140 at 862ad75f) is client/discovery.MismatchOf over discovery.Identity (0 the unspecified value both codecs report as absent); controller.Pair passes over a device whose VP record contradicts the code's vendor or product, over DNS-SD and over BLE (fix: #namesThisDevice, :79-90).",
       "snapshotSha": "a5d21a5f6705a7679a5040c96a9daaa727a4a730"
     },
     {
       "path": "packages/node/test/behavior/system/controller/discovery/ContinuousDiscoveryTest.ts",
       "status": "planned",
-      "until": "M5 phase 25",
-      "reason": "Continuous discovery creating one node for a device that concurrent discoveries report. Controller discovery: milestone 5 phase 25 (concept v5 F.0 19.3).",
+      "until": "M6 phase 27",
+      "reason": "Continuous discovery creating one node for a device that concurrent discoveries report. Left planned in brief CM: it tests matter.js's controller Discovery behaviour (Discovery, ParallelPaseDiscovery, CommissioningDiscovery, ContinuousDiscovery over a ScannerSet: parallel PASE attempts, cancellation and abort, the error kinds, transport selection from the discovery capabilities), which the Go controller does not have in that shape — Controller.Pair finds one device per transport serially and Discover is DNS-SD only. The identity check of the same class is ported (CommissioningIdentityTest). Milestone 6 phase 27 (the register at 100 %).",
       "snapshotSha": "c0adf3e65a382f5be567ed488776e7d38d6f490c"
     },
     {
       "path": "packages/node/test/behavior/system/controller/discovery/DiscoveryCancelTest.ts",
       "status": "planned",
-      "until": "M5 phase 25",
-      "reason": "Cancellation and abort of a commissioning discovery before and after the PASE win, cancel reasons and settling. Controller discovery: milestone 5 phase 25 (concept v5 F.0 19.3).",
+      "until": "M6 phase 27",
+      "reason": "Cancellation and abort of a commissioning discovery before and after the PASE win, cancel reasons and settling. Left planned in brief CM: it tests matter.js's controller Discovery behaviour (Discovery, ParallelPaseDiscovery, CommissioningDiscovery, ContinuousDiscovery over a ScannerSet: parallel PASE attempts, cancellation and abort, the error kinds, transport selection from the discovery capabilities), which the Go controller does not have in that shape — Controller.Pair finds one device per transport serially and Discover is DNS-SD only. The identity check of the same class is ported (CommissioningIdentityTest). Milestone 6 phase 27 (the register at 100 %).",
       "snapshotSha": "1613033bcf3b348c3340969c197ef12d366c0995"
     },
     {
       "path": "packages/node/test/behavior/system/controller/discovery/DiscoveryErrorTest.ts",
       "status": "planned",
-      "until": "M5 phase 25",
-      "reason": "The error kinds a commissioning discovery reports (not discovered, incomplete, aggregate, no transport, unusable device). Controller discovery: milestone 5 phase 25 (concept v5 F.0 19.3).",
+      "until": "M6 phase 27",
+      "reason": "The error kinds a commissioning discovery reports (not discovered, incomplete, aggregate, no transport, unusable device). Left planned in brief CM: it tests matter.js's controller Discovery behaviour (Discovery, ParallelPaseDiscovery, CommissioningDiscovery, ContinuousDiscovery over a ScannerSet: parallel PASE attempts, cancellation and abort, the error kinds, transport selection from the discovery capabilities), which the Go controller does not have in that shape — Controller.Pair finds one device per transport serially and Discover is DNS-SD only. The identity check of the same class is ported (CommissioningIdentityTest). Milestone 6 phase 27 (the register at 100 %).",
       "snapshotSha": "9b754259f919ad36968baa4bbcd6411c032123a5"
     },
     {
       "path": "packages/node/test/behavior/system/controller/discovery/DiscoveryTransportsTest.ts",
       "status": "planned",
-      "until": "M5 phase 25",
-      "reason": "Selection and reporting of the discovery transports (IP network, BLE) from the onboarding payload. Controller discovery: milestone 5 phase 25 (concept v5 F.0 19.3).",
+      "until": "M6 phase 27",
+      "reason": "Selection and reporting of the discovery transports (IP network, BLE) from the onboarding payload. Left planned in brief CM: it tests matter.js's controller Discovery behaviour (Discovery, ParallelPaseDiscovery, CommissioningDiscovery, ContinuousDiscovery over a ScannerSet: parallel PASE attempts, cancellation and abort, the error kinds, transport selection from the discovery capabilities), which the Go controller does not have in that shape — Controller.Pair finds one device per transport serially and Discover is DNS-SD only. The identity check of the same class is ported (CommissioningIdentityTest). Milestone 6 phase 27 (the register at 100 %).",
       "snapshotSha": "4d32c07967e95dbb8ba1fad22a962328a051280b"
     },
     {
@@ -2444,8 +2447,6 @@
         "controller/client:TestClientSubscribeParity"
       ],
       "missing": [
-        "sends only the caller's data version filters with includeKnownVersions",
-        "keeps includeKnownVersions when a sustained subscription replaces a lost one",
         "follows the fabric filter the default subscription sends",
         "sends a default subscription given as a built request as it is",
         "forgets data versions when the default subscription's fabric filter changes",
@@ -2472,7 +2473,7 @@
         "answers the priming report with INVALID_SUBSCRIPTION when processing fails before reading it",
         "answers the priming report with INVALID_SUBSCRIPTION when processing it fails"
       ],
-      "reason": "The empty subscription refused, the version filters a read or subscription sends (injected; the caller's kept, first and winning; none with the other fabric filter; recomputed from the caller's filters and its refreshRequest when a sustained subscription is replaced; the replacement applied by the refreshed request's fabric filter) and the versions kept across a controller restart run on fabrictest through a client node (controller/client:TestClientSubscribe*; fix: ClientStructure.injectVersionFilters' caller and fabric-filter rules and ClientNodeInteraction.subscribe's refreshRequest at 862ad75f). Missing: includeKnownVersions on a subscription (client.Node.Subscribe takes an interaction.SubscribeRequest, which has no such field — an API change); the run-time change of the default subscription (autoSubscribe, defaultSubscription, its fabric filter) and the reactions serialised against Start, the cache's recorded fabric filter with adoptFabricFilter and its storage failures (the Go cache records no filter; the default subscription is fixed at Start); the default subscription's ownership across replacements (no replacement at run time; matter.js drives the internal request callbacks). The priming report of a subscription cancelled while being established is answered INVALID_SUBSCRIPTION, whether it arrives after the cancel or is being processed during it (controller/client:TestClientSubscribeCancelledParity; fix: the abandoned establishment, ClientInteraction.ts:1084-1097, InteractionMessenger.ts:1116-1137). Still missing there: the session-signal variant on a separate interaction, and the two cases whose updated callback fails — a Go Updated returns no error.",
+      "reason": "The empty subscription refused, the version filters a read or subscription sends (injected; the caller's kept, first and winning; none with the other fabric filter; recomputed from the caller's filters and its refreshRequest when a sustained subscription is replaced; the replacement applied by the refreshed request's fabric filter) and the versions kept across a controller restart run on fabrictest through a client node (controller/client:TestClientSubscribe*; fix: ClientStructure.injectVersionFilters' caller and fabric-filter rules and ClientNodeInteraction.subscribe's refreshRequest at 862ad75f). includeKnownVersions on a subscription — the caller's filters only, in the first request and in a sustained subscription's replacement — runs through client.SubscribeRequest (fix: ClientNodeInteraction.ts:123-124, a break: the request embeds the subscription's paths as ReadRequest does). Missing: the run-time change of the default subscription (autoSubscribe, defaultSubscription, its fabric filter) and the reactions serialised against Start, the cache's recorded fabric filter with adoptFabricFilter and its storage failures (the Go cache records no filter; the default subscription is fixed at Start); the default subscription's ownership across replacements (no replacement at run time; matter.js drives the internal request callbacks). The priming report of a subscription cancelled while being established is answered INVALID_SUBSCRIPTION, whether it arrives after the cancel or is being processed during it (controller/client:TestClientSubscribeCancelledParity; fix: the abandoned establishment, ClientInteraction.ts:1084-1097, InteractionMessenger.ts:1116-1137). Still missing there: the session-signal variant on a separate interaction, and the two cases whose updated callback fails — a Go Updated returns no error.",
       "snapshotSha": "135021253b6d8e65e441f9ad42fdb5dd5f695ff9"
     },
     {
@@ -2650,20 +2651,15 @@
         "controller/client:TestPeerBehaviorDiscoveredParity"
       ],
       "missing": [
-        "builds a cluster even when the peer reports an empty AttributeList",
         "builds a cluster for an ID a custom model resolves but the specification does not allow",
         "judges a revision-conformant element against the revision the peer sent",
         "leaves a revision-conformant element to the peer on a write from a client node",
         "distinguishes shapes that differ only in revision",
         "shares a behavior with a peer that reports the standard revision",
-        "omits an attribute the peer reports whose conformance before a trailing deprecation excludes it",
-        "keeps the conformance of a reported attribute that the peer's features make mandatory",
         "exposes an obsolete attribute the peer reports",
-        "omits a disallowed attribute the peer reports",
-        "tolerates a peer that does not report a revision",
         "returns a peer behavior as it is"
       ],
-      "reason": "The analysis of a discovered shape into a client.Cluster — readiness from a well-formed AttributeList, an ID that is no legal MEI, unknown attribute names, the revision the peer sent (known, beyond the model, unknown cluster), a listed or unlisted deprecated attribute — runs on the cluster's input (controller/client:TestPeerBehaviorDiscoveredParity). Missing: the behavior class itself and its identity (fingerprint cache, a known shape returned as it is; BD-Matter-ClientNode-NoGeneratedTypes); a custom matter model handed with the shape (CustomIllegalMei, RevGated, WithObsolete); the conformance of a peer cluster's attributes — mandatory attributes kept supported under an empty AttributeList, a listed attribute excluded by its conformance before a trailing D, a disallowed (X) one, the effective conformance string, a revision-gated element validated against the peer's revision or left to the peer on a client write (client.Cluster.Supports follows the AttributeList only); the revision of a cluster the peer reports none for (matter.js the model's, 1 for an unknown cluster; client.Cluster.Revision is 0 — a decision for the owner).",
+      "reason": "The analysis of a discovered shape into a client.Cluster — readiness from a well-formed AttributeList, an ID that is no legal MEI, unknown attribute names, the revision the peer sent (known, beyond the model, unknown cluster), a listed or unlisted deprecated attribute — runs on the cluster's input (controller/client:TestPeerBehaviorDiscoveredParity). The conformance of a peer cluster's attributes runs on the same input: client.Cluster.Supports judges a listed attribute by its conformance under the peer's features and revision, a deprecated one counting as optional (fix: supportOverrideOf, PeerBehavior.ts:381-397, applicabilityFor's deprecatedIsOptional, Conformance.ts:985-987 at 862ad75f) — a disallowed attribute and one its features exclude before a trailing D stay out, one the features make mandatory is in; client.Cluster.Revision is the model's when the peer reports none (fix: PeerBehavior.ts:426-434; 1 for an unknown cluster). Missing: the behavior class itself and its identity (fingerprint cache, a known shape returned as it is, two shapes that differ only in revision; BD-Matter-ClientNode-NoGeneratedTypes); a custom matter model handed with the shape (CustomIllegalMei, RevGated, WithObsolete), and with it the revision-gated element validated against the peer's revision or left to the peer on a client write.",
       "snapshotSha": "aa253cbd1374b4704ffecad0539b2dd746afbb76"
     },
     {
@@ -2729,9 +2725,9 @@
     {
       "path": "packages/node/test/node/ReportedSessionParametersTest.ts",
       "status": "planned",
-      "reason": "The session parameters the peer sent in PASE, CASE and resumed CASE, held by the controller. Left planned in BI-2: both cases assert both ends with configured intervals; fabrictest sets neither the controller's exchange.Config.LocalParameters nor the device's session intervals, and the device's record of what the controller sent has no accessor.",
-      "snapshotSha": "da6d23d239f29280dae99d8c5448bde73a71ed85",
-      "until": "M5 phase 25"
+      "until": "M6 phase 27",
+      "reason": "The session parameters the peer sent in PASE, CASE and resumed CASE, held by both ends. Left planned in brief CM: both cases configure the device's session intervals and read the device's record of what the controller sent; node.Config has no session-interval option and the device's sessions no accessor for the reported parameters (the controller's side is client/exchange.Session.ReportedParameters). Milestone 6 phase 27.",
+      "snapshotSha": "da6d23d239f29280dae99d8c5448bde73a71ed85"
     },
     {
       "path": "packages/node/test/node/ScanNetworksRejectionCommissioningTest.ts",
@@ -2897,10 +2893,17 @@
     },
     {
       "path": "packages/node/test/node/SplitCommissioningTest.ts",
-      "status": "planned",
-      "reason": "A second controller completing a PASE-only commissioning a first one started, and its failure paths. Left planned in BI-2: controller/client has no completeCommissioning (only the first half exists: commissioner Options.FinalizeCommissioning) and fabrictest cannot share a CA and fabric between two controllers.",
-      "snapshotSha": "d891eb17597311ef293584b301a8fd74ba18ab57",
-      "until": "M5 phase 25"
+      "status": "partial",
+      "go": [
+        "controller/client:TestSplitCommissioningParity"
+      ],
+      "missing": [
+        "throws CommissioningError and removes the peer when CommissioningComplete returns a non-Ok errorCode",
+        "keeps the device's CommissioningComplete status as the cause of the CommissioningError",
+        "aborts and leaves no node if the fabric cannot be persisted"
+      ],
+      "reason": "Registry.CompleteCommissioning ports Peers.completeCommissioning (Peers.ts:236-359 at 862ad75f): the hand-off of the commissioner's FinalizeCommissioning completed — the node created on the shared fabric, its peer seeded, started, CommissioningComplete with the extended fail-safe timeout, the device's fail-safe disarmed and the default subscription up; a second completion refused (ErrAlreadyCommissioned) without touching the node; no phantom node when it cannot be reached; a fabric the registry does not hold refused (ErrForeignFabric). matter.js runs the halves on two controllers sharing a fabric; fabrictest gives each controller its own CA and fabric, so the port runs both on one controller. Missing: the non-Ok errorCode and the status cause need a device that answers CommissioningComplete so (the Go device answers Ok once its fail-safe is armed by the same fabric); the fabric persistence failure has no Go shape (commissioner.NewFabric persists at creation).",
+      "snapshotSha": "d891eb17597311ef293584b301a8fd74ba18ab57"
     },
     {
       "path": "packages/node/test/node/client/CacheFabricFilterTest.ts",
@@ -2948,10 +2951,12 @@
     },
     {
       "path": "packages/node/test/node/client/PeersCommissionedTest.ts",
-      "status": "planned",
-      "reason": "The controller's list of commissioned peers excluding discoveries and groups. Left planned in BI-2: the one case needs group nodes (peers.forAddress of a group id, nodeType \"group\"), which controller/client does not have (doc 'Not here: Groups'); the commissioned/discovered/forAddress split holds in TestRegistryRestore.",
-      "snapshotSha": "aa2b783cf0406787a80b300f04c989826c6f4c44",
-      "until": "M5 phase 25"
+      "status": "ported",
+      "go": [
+        "controller/client:TestPeersCommissionedParity"
+      ],
+      "reason": "Registry.Commissioned holds the commissioned node and an operational node a peer address created (ForAddress), never one of a group node id (fix: Peers.ts:410-413, nodeType \"client\"). The Go registry holds no commissionable discoveries (client/discovery reports them without registering a node), so that exclusion has nothing to exclude; a group address makes no group node type either, only an excluded entry.",
+      "snapshotSha": "aa2b783cf0406787a80b300f04c989826c6f4c44"
     },
     {
       "path": "packages/node/test/node/client/PeersForDescriptorTest.ts",
@@ -2983,10 +2988,12 @@
     },
     {
       "path": "packages/node/test/node/client/PeersLoadFailureTest.ts",
-      "status": "planned",
-      "reason": "Keeping a fabric's other peers usable when one cannot load from storage. Left planned in BI-2: the Go registry drops a node that fails to load (logged once, registry.go NewRegistry; TestRegistryRestore) where matter.js keeps it with a rejected construction and a typed cause — a decision for the owner, not a port.",
-      "snapshotSha": "d9dd1bd67c3bbce5693ec21654053b12010f0547",
-      "until": "M5 phase 25"
+      "status": "ported",
+      "go": [
+        "controller/client:TestPeersLoadFailureParity"
+      ],
+      "reason": "A stored node whose peer names a fabric the controller does not have is kept, unavailable with the cause (client.Node.LoadError, ErrLoadFailed wrapping peer.ErrNoFabric; Start refuses with it), the warning logged once; the fabric's other node loads and is the one commissioned node (fix: Peers.ts:144-161 at 862ad75f). The stored data stays until the node is erased. matter.js's EndpointBehaviorsError wrapper and the unhandled-rejection check have no Go shape: the cause is the error chain.",
+      "snapshotSha": "d9dd1bd67c3bbce5693ec21654053b12010f0547"
     },
     {
       "path": "packages/node/test/node/client/WireChangeKeysTest.ts",
@@ -4478,7 +4485,7 @@
       "go": [
         "client/peer:TestRebootResubscribeArmerParity"
       ],
-      "reason": "The armer on a session table and a subscription set that implement its context as SessionManager and ClientSubscriptions do, on the fake clock: the return, the grace window, the evidence of post-return reports, re-arming, the return-timeout recovery (client/peer/reboot_armer_parity_matterjs_test.go). The OTA call site that arms a peer arrives with phase 25.",
+      "reason": "The armer on a session table and a subscription set that implement its context as SessionManager and ClientSubscriptions do, on the fake clock: the return, the grace window, the evidence of post-return reports, re-arming, the return-timeout recovery (client/peer/reboot_armer_parity_matterjs_test.go). The OTA call site that arms a peer is the controller's update manager (controller/softwareupdate, OnStatusChange on Applying; SoftwareUpdateManager.ts:1253-1321 at 862ad75f), its outcome cases in controller/softwareupdate:TestManagerAppliedUpdateAfterResubscriptionParity.",
       "snapshotSha": "9bb466928aabe62ec0f56bb215d217c223096c49"
     },
     {

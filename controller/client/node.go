@@ -38,7 +38,10 @@ type Node struct {
 	// mu guards the node's mutable state, every field below it, and the
 	// image: the structure, its Endpoints and Clusters all share this lock.
 	// What the structure emits is delivered after it is released.
+	//
+	// loadErr is why the stored node failed to load ([Node.LoadError]).
 	mu        sync.RWMutex
+	loadErr   error
 	settings  settings
 	record    Record
 	started   bool
@@ -71,7 +74,7 @@ type Node struct {
 	warned          map[[2]uint64]bool
 	// requestObserver is a test seam: it sees each subscription request the
 	// node hands to the interaction.
-	requestObserver func(SubscribeRequest)
+	requestObserver func(SubscribePaths)
 	// icd is the ICD client a [Registry] gives its nodes, nil otherwise;
 	// storedICD its stored registration until the registry built it.
 	icd       *ICDClient
@@ -342,6 +345,9 @@ func (n *Node) saveSettingsLocked() {
 func (n *Node) Start(ctx context.Context) error {
 	n.mu.Lock()
 	switch {
+	case n.loadErr != nil:
+		n.mu.Unlock()
+		return n.loadErr
 	case n.closing:
 		n.mu.Unlock()
 		return ErrClosed
@@ -509,6 +515,15 @@ func (n *Node) Enable(ctx context.Context) error {
 	n.saveSettingsLocked()
 	n.mu.Unlock()
 	return n.Start(ctx)
+}
+
+// LoadError is why a stored node failed to load ([ErrLoadFailed] with the
+// cause), nil for a node that loaded — matter.js's construction error of
+// a peer kept unavailable (Peers.ts:144-161 at 862ad75f).
+func (n *Node) LoadError() error {
+	n.mu.RLock()
+	defer n.mu.RUnlock()
+	return n.loadErr
 }
 
 // Disabled reports whether the node is disabled.
