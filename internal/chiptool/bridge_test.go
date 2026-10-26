@@ -191,6 +191,11 @@ type bridgeOptions struct {
 	// enableKey arms TestEventTrigger (--enable-key, hex); empty leaves it
 	// off.
 	enableKey string
+	// thermostatSchedules serves MatterScheduleConfiguration on the demo
+	// thermostat (--thermostat-schedules), for the capability suite's
+	// thermostat leg; the certification families' daemons leave it off,
+	// as a host does by default (issue #273).
+	thermostatSchedules bool
 }
 
 // chipTestEnableKey is the test enable key CHIP's apps and certification
@@ -260,6 +265,9 @@ func startBridgeWith(t *testing.T, bin string, flags map[string]bool, opts bridg
 	}
 	if opts.enableKey != "" {
 		args = append(args, "--enable-key", opts.enableKey)
+	}
+	if opts.thermostatSchedules {
+		args = append(args, "--thermostat-schedules")
 	}
 	// --wifi serves WiFiNetworkDiagnostics on the root from the daemon's
 	// simulated Wi-Fi link (examples/reference-bridge/wifi.go, brief AM),

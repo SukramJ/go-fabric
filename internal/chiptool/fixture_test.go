@@ -48,7 +48,7 @@ func newFixture(ctx context.Context, t *testing.T) *fixture {
 	t.Helper()
 	tool := resolveChipTool(t)
 	bridgeBin := requireBridgeBinary(t)
-	flags := requireBridgeFlags(t, bridgeBin, "db", "listen", "app-pipe", "enable-key")
+	flags := requireBridgeFlags(t, bridgeBin, "db", "listen", "app-pipe", "enable-key", "thermostat-schedules")
 	ctl := newController(t, tool.bin, controllerNodeID)
 	// The FIFO and the database live in the controller's directory, which
 	// in the image harness is the directory the container shares.
@@ -56,6 +56,8 @@ func newFixture(ctx context.Context, t *testing.T) *fixture {
 		dbPath:    filepath.Join(ctl.storageDir, "dut.db"),
 		appPipe:   filepath.Join(ctl.storageDir, "app.fifo"),
 		enableKey: chipTestEnableKey,
+		// The thermostat leg reads and writes the week programs.
+		thermostatSchedules: true,
 	})
 
 	out, err := ctl.pair(ctx, t, pairTargetHost, br.info.port, br.info.passcode)

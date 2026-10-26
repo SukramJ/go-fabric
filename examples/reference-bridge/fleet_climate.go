@@ -187,8 +187,18 @@ func copyUint8(v *uint8) *uint8 {
 // ThermostatRunningState (idle), the attributes a week-program thermostat
 // reports (cluster/thermo ThermostatConfig). A controller's hold write is
 // stored: the endpoint declares no Sink.
+//
+// With --thermostat-schedules it also serves MatterScheduleConfiguration
+// (cluster/thermo schedules.go, ahead of matter.js): one schedule type,
+// Heat, of two schedules with names and setpoints, eight transitions in
+// all, four a day, and one built-in week program, active. A host gates the
+// feature behind a flag, off by default, until a live ecosystem pairing is
+// verified (issue #273); the chip-tool suite turns it on.
 type demoThermostat struct {
 	name string
+
+	// schedules serves MSCH (--thermostat-schedules).
+	schedules bool
 
 	// presets and settings are the daemon's store (attachStore); nil keeps
 	// the presets and KeypadLockout in memory.
@@ -238,15 +248,19 @@ func (t *demoThermostat) device(opts device.Options) (*device.Thermostat, error)
 	balances := []epdef.BalanceStruct{{Step: 0, Label: &efficient}, {Step: 50}, {Step: 100, Label: &comfort}}
 	priorities := []epdef.EnergyPriorityEnum{epdef.EnergyPriorityEfficiency, epdef.EnergyPriorityComfort}
 	balance := uint8(1)
-	d, err := device.NewThermostat(opts,
-		thermostatdef.Declare{
-			Features:    thermostatdef.FeatureHeating | thermostatdef.FeatureCooling | thermostatdef.FeaturePresets,
-			PresetStore: t.presets,
-			Initial: thermostatdef.Patch{
-				NumberOfPresets: &count, PresetTypes: &presetTypes, Presets: &presets, LocalTemperature: &room,
-				TemperatureSetpointHold: &hold, ThermostatRunningState: &idle,
-			},
+	decl := thermostatdef.Declare{
+		Features:    thermostatdef.FeatureHeating | thermostatdef.FeatureCooling | thermostatdef.FeaturePresets,
+		PresetStore: t.presets,
+		Initial: thermostatdef.Patch{
+			NumberOfPresets: &count, PresetTypes: &presetTypes, Presets: &presets, LocalTemperature: &room,
+			TemperatureSetpointHold: &hold, ThermostatRunningState: &idle,
 		},
+	}
+	if t.schedules {
+		t.declareSchedules(&decl)
+	}
+	d, err := device.NewThermostat(opts,
+		decl,
 		epdef.Declare{
 			Features: epdef.FeatureEnergyBalance,
 			Initial:  epdef.Patch{EnergyBalances: &balances, EnergyPriorities: &priorities, CurrentEnergyBalance: &balance},
@@ -265,6 +279,54 @@ func (t *demoThermostat) device(opts device.Options) (*device.Thermostat, error)
 	t.srv = d.Thermostat()
 	t.mu.Unlock()
 	return d, nil
+}
+
+// weekdaysHandle is the handle of the demo thermostat's built-in week
+// program.
+var weekdaysHandle = []byte("Weekdays")
+
+// declareSchedules adds MatterScheduleConfiguration to the declaration:
+// the configuration the type comment names, and the thermostat itself as
+// the SchedulePort.
+func (t *demoThermostat) declareSchedules(decl *thermostatdef.Declare) {
+	decl.Features |= thermostatdef.FeatureMatterScheduleConfiguration
+	types := []thermostatdef.ScheduleTypeStruct{{
+		SystemMode: thermostatdef.SystemModeHeat, NumberOfSchedules: 2,
+		ScheduleTypeFeatures: thermostatdef.ScheduleTypeFeaturesSupportsNames | thermostatdef.ScheduleTypeFeaturesSupportsSetpoints,
+	}}
+	weekdays := thermostatdef.ScheduleDayOfWeekMonday | thermostatdef.ScheduleDayOfWeekTuesday | thermostatdef.ScheduleDayOfWeekWednesday |
+		thermostatdef.ScheduleDayOfWeekThursday | thermostatdef.ScheduleDayOfWeekFriday
+	day, night := int16(2100), int16(1800)
+	name := "Weekdays"
+	schedules := []thermostatdef.ScheduleStruct{{
+		ScheduleHandle: spec.ValueOf(weekdaysHandle), SystemMode: thermostatdef.SystemModeHeat, Name: &name,
+		Transitions: []thermostatdef.ScheduleTransitionStruct{
+			{DayOfWeek: weekdays, TransitionTime: 6 * 60, HeatingSetpoint: &day},
+			{DayOfWeek: weekdays, TransitionTime: 22 * 60, HeatingSetpoint: &night},
+		},
+		BuiltIn: spec.ValueOf(true),
+	}}
+	total, perDay := uint8(8), uint8(4)
+	two := uint8(2)
+	active := weekdaysHandle
+	decl.Initial.ScheduleTypes, decl.Initial.NumberOfSchedules = &types, &two
+	decl.Initial.NumberOfScheduleTransitions, decl.Initial.NumberOfScheduleTransitionPerDay = &total, &perDay
+	decl.Initial.Schedules, decl.Initial.ActiveScheduleHandle = &schedules, &active
+	decl.SchedulePort = t
+}
+
+// SetActiveSchedule implements thermostatdef.SchedulePort: the demo
+// thermostat follows the schedule a controller switched to.
+func (t *demoThermostat) SetActiveSchedule(_ context.Context, handle []byte) error {
+	slog.Info("thermostat.schedule", slog.String("device", t.name), slog.String("active", string(handle)))
+	return nil
+}
+
+// CommitSchedules implements thermostatdef.SchedulePort: the demo
+// thermostat takes every schedule list the server committed.
+func (t *demoThermostat) CommitSchedules(_ context.Context, schedules []thermostatdef.ScheduleStruct) error {
+	slog.Info("thermostat.schedules", slog.String("device", t.name), slog.Int("count", len(schedules)))
+	return nil
 }
 
 // reportTemperature is the device's room sensor reporting, in 0.01 °C.
