@@ -547,7 +547,9 @@ _, err = c.SoftwareUpdates().AddUpdateConsent(ctx, peer, softwareupdate.Target{
 listener (`Incoming`): a peer that advertises a TCP server and accepts TCP
 in its session parameters is reached over TCP when the controller prefers
 it (`Config.TransportPreference`) or an interaction carries a large message
-(`ClientRequest.LargeMessage`); the sessions of a dropped connection close. `Controller.TCPAddr()` is the listener's
+(`ClientRequest.LargeMessage`; an invoke that leaves it nil sets it when one
+of its commands has matter.js's Large Message quality, as
+`schema.CommandLargeMessage` reports it); the sessions of a dropped connection close. `Controller.TCPAddr()` is the listener's
 address.
 
 ### Network profiles

@@ -10,6 +10,14 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+### Added
+
+- The schema snapshot carries matter.js's Large Message quality ("L") of commands (brief CP): `parity/schema.json` refreshed at the same pin 862ad75f, the extractor emitting the effective quality of every command and event; 25 request and 14 response commands carry it (CameraAvStreamManagement, CommodityPrice, PushAvStreamTransport, TlsCertificateManagement, TlsClientManagement, WebRtcTransportProvider, WebRtcTransportRequestor). `schema.CommandLargeMessage(clusterID, commandID)` reports it for a request command (`Quality.ts:71` at 862ad75f).
+
+### Changed
+
+- `client/interaction.Interaction.Invoke` and `InvokeBatch` (and `controller/client.Node.Invoke` / `InvokeBatch`) infer `LargeMessage` when the caller left it nil: an invoke with any command carrying the "L" quality requires TCP, on every part of a split, as matter.js's `ClientInteraction.invoke` does (`ClientInteraction.ts:111-127`, `:716-719` at 862ad75f). An explicit `false` stands; the caller's options are not changed.
+
 ## [0.13.1] — 2026-10-26
 
 ### Fixed
