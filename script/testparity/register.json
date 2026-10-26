@@ -3842,24 +3842,19 @@
       "path": "packages/protocol/test/dcl/DclOtaUpdateServiceTest.ts",
       "status": "partial",
       "go": [
-        "controller/dcl:TestOTAVersions",
-        "controller/dcl:TestOTATestNet",
-        "controller/dcl:TestVerifyImage",
-        "controller/dcl:TestOTADownload",
         "controller/dcl:TestDclOtaUpdateServiceCheckForUpdate",
+        "controller/dcl:TestDclOtaUpdateServiceCustomDclConfig",
         "controller/dcl:TestDclOtaUpdateServiceDownloadUpdate",
         "controller/dcl:TestDclOtaUpdateServiceIntegration",
-        "controller/dcl:TestDclOtaUpdateServiceCustomDclConfig"
+        "controller/dcl:TestOTADownload",
+        "controller/dcl:TestOTATestNet",
+        "controller/dcl:TestOTAVersions",
+        "controller/dcl:TestVerifyImage",
+        "controller/softwareupdate:TestImagesFindDeleteParity",
+        "controller/softwareupdate:TestImagesStoredUpdatesParity"
       ],
       "missing": [
-        "skips stored test-mode files when isProduction is true",
-        "surfaces local-mode stored files regardless of isProduction",
-        "surfaces stored prod-mode files when isProduction is false",
         "reuses existing valid OTA file instead of re-downloading",
-        "lists all stored OTA images",
-        "returns empty array when no updates are stored",
-        "filters by mode using new mode parameter",
-        "deletes specific OTA file by filename",
         "deletes specific product file",
         "deletes all files for a vendor",
         "does not throw error when file not found with correct pattern",
@@ -3881,8 +3876,6 @@
         "removes the specification version when all versions of a mode are deleted",
         "removes the specification version when all files of a vendor are deleted",
         "takes the specification version for a local image from the options",
-        "stores multiple versions for same vid/pid/mode",
-        "stores files with three different modes",
         "store() accepts boolean for backward compatibility",
         "migrates old bare keys to version-keyed format",
         "migrates test mode bare keys",
@@ -3898,7 +3891,7 @@
         "keeps a stored image that fails validation when forced",
         "reads no image from a URL"
       ],
-      "reason": "The ledger lookup (skip rules, applicability ranges, targeted version, prod/test ledger, custom and default ledger URLs, the compliance record's specification version), the download and the image verification are ported; the rest exercises the service's own image store (stored-file surfacing, reuse, find, delete, force, file designators, stored specification version, version-keyed storage, migration, offline mode, createUpdateInfoFromFile), which Go leaves to the host's image catalogue (cluster/core.OTAImageSource), so it has no Go counterpart.",
+      "reason": "The ledger lookup (skip rules, applicability ranges, targeted version, prod/test ledger, custom and default ledger URLs, the compliance record's specification version), the download and the image verification are ported. The service's image store is controller/softwareupdate.Images (brief CM §1): the stored images checkForUpdate surfaces by isProduction, find, delete by filename and the versions and modes kept side by side are ported (controller/softwareupdate:TestImages*). Missing: what the reduced store does not have — delete by vendor, product or mode pattern, force re-download and reuse through the ledger download, file designators, the stored specification-version metadata cases, the version-keyed storage migration, offline-mode download refusals and createUpdateInfoFromFile.",
       "snapshotSha": "117d4880582471fa355cb7c37aefe7f9ed22be18"
     },
     {
