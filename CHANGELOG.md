@@ -10,6 +10,8 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+## [0.13.0] — 2026-10-26
+
 ### Changed
 
 - **Break:** `controller/client.SubscribeRequest` — the parameter of `Node.Subscribe` — is a struct, no longer an alias of `client/interaction.SubscribeRequest` (brief CM §5): it embeds the subscription's paths (`client.SubscribePaths`, the old alias) and adds `IncludeKnownVersions`, which keeps the cached data versions out of the first request and of every re-subscription of a sustained one — matter.js's `includeKnownVersions` on `ClientNodeInteraction.subscribe` (`ClientNodeInteraction.ts:123-124` at 862ad75f), as `client.ReadRequest` already has. `fabrictest.SubscribeRequest` is `client.SubscribePaths`. Migration guide: "Removed or changed in v0.13.0".
@@ -4865,7 +4867,8 @@ consumer of an older pseudo-version should read.
   earlier than it was. Both fields are gone; the commit holding the file is
   its provenance.
 
-[Unreleased]: https://github.com/SukramJ/go-fabric/compare/v0.12.4...HEAD
+[Unreleased]: https://github.com/SukramJ/go-fabric/compare/v0.13.0...HEAD
+[0.13.0]: https://github.com/SukramJ/go-fabric/compare/v0.12.4...v0.13.0
 [0.12.4]: https://github.com/SukramJ/go-fabric/compare/v0.12.3...v0.12.4
 [0.12.3]: https://github.com/SukramJ/go-fabric/compare/v0.12.2...v0.12.3
 [0.12.2]: https://github.com/SukramJ/go-fabric/compare/v0.12.1...v0.12.2
