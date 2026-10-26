@@ -83,7 +83,7 @@ Planned ratchet 17 → 12.
 `endpoint.Snapshot.ModelComplete` and `Retain` removed; stored endpoint
 numbers are kept until `Forget` or `RetirePartition`.
 
-### §7 Docs, guards, report — `73f71e02`
+### §7 Docs, guards, report — `73f71e02`, `b32d95d9`, `96d28344`, `0a3b6170`, `3078ea81`
 
 Roadmap status, comparison rows (OTA push, TCP initiator, network profiles,
 commissioner advertisement) ✅, the controller guide sections, ports,
@@ -92,7 +92,27 @@ controller README, CHANGELOG (Breaks first), migration guide.
 
 ## Guards
 
-GUARDS
+| Guard | HEAD | Result |
+| --- | --- | --- |
+| `make ci` | `0a3b6170` | build, build-32bit, vet, archcheck, apidiff-check, test, lint green; `cover-check` stopped on `node:TestSessionDiagnostics` (a wall-clock comparison the bundle does not touch; 10/10 alone) |
+| `make cover-check bluez-check` | `3078ea81` | green (the whole suite with coverage) |
+| `make race` ×2 | `b32d95d9` | green, green (the first run at `73f71e02` found a lock-order inversion — the connection's network profile read the node's medium hook under the peer lock — fixed in `b32d95d9`) |
+| `make reachability-check` | `3078ea81` | green (unreached 3) |
+| `make cite-check` | `3078ea81` | green (hard 0, drift 258, ratchet 259 → 258) |
+| `make apidiff-check` | `b32d95d9` | green: the Breaks named — `client/interaction.ExchangeOptions.Priority`, `client/peer.ConnectOptions.Priority`, `controller/ble.CommissionedIdentity` and `Scanner.ForgetCommissioned` (alias of the discovery type), `controller/client.SubscribeRequest` and `Node.Subscribe`, `endpoint.Snapshot.ModelComplete` / `Retain`, `node.Aggregator` / `Batch` / `Partition.MarkComplete` |
+| `make testparity-check` | `b32d95d9` | green (planned 12) |
+| `go test ./script/...` | `0a3b6170` | green |
+| `mkdocs build --strict` | `b32d95d9` | green |
+| `make stress-flakes` | `b32d95d9` | green |
+| OTA e2e | in `make test` | `examples/reference-bridge:TestOTAPushToTheReferenceDaemon`, `controller:TestOTAPushFromTheController` |
+| `make chiptool-test` | — | skipped: the reference bridge's composition and FeatureMap did not move |
+
+`TestIcdClientParity/key_refresh_outcome/offers_the_same_pending_key_again_after_the_request_was_lost`
+failed 2 in 10 (0 in 10 at `dbf93f30`): the blackout let the device reap
+the session its unacknowledged reports ran on, and the refresh then ran on
+it. The case now has the device check in until the refresh lands
+(15/15). Its other cases failed only under the load of a parallel race
+run.
 
 ## Differences from the brief
 
