@@ -111,9 +111,13 @@ var ErrMalformedRequest = errors.New("interaction: malformed request")
 //     AccessControl ACL or Extension (:149-171);
 //   - a timed write first sends a TimedRequest on the same exchange and
 //     waits for its Success (:369-371; the timeout defaults to 10 s, :159);
-//   - one WriteRequest, MoreChunkedMessages false (Write.ts:77); one
-//     that does not fit a message, or a timed one whose WriteResponse
-//     might not, is an ErrRequestTooLarge before anything is sent;
+//   - the write goes in WriteRequest messages that each fit the session's
+//     payload and whose WriteResponse — every status at its largest —
+//     fits it too, each answered by its WriteResponse, the statuses
+//     concatenated (sendWriteCommand, InteractionMessenger.ts:1269-1450 at
+//     862ad75f; [chunkWrite]); a timed or suppressed write that does not
+//     fit one message, or a value that fits none, is an
+//     ErrRequestTooLarge before anything is sent;
 //   - with SuppressResponse the send expects an acknowledgement only; a
 //     message in its place is tolerated unless it is a StatusResponse
 //     with an error (IM:1138-1162, the "Matter-SDK bug" of :1156), and the
@@ -125,34 +129,15 @@ func (c *Interaction) Write(ctx context.Context, writes []WriteRequest, opts Wri
 	if err != nil {
 		return nil, err
 	}
-	enc := tlv.NewEncoder()
-	req.MarshalTLV(enc, func(e *tlv.Encoder, tag tlv.Tag, v im.AttributeValue) {
-		if value, ok := v.Value.(spec.Encodable); ok {
-			value.EncodeTLV(e, tag)
-		}
-	})
-	payload, err := enc.Bytes()
+	// The chunks fit the payload of the session the write goes on: a TCP
+	// session takes larger messages (MessageExchange.maxPayloadSize).
+	maxPayload := exchange.MaxPayloadSize
+	if s := c.provider.Session(); s != nil {
+		maxPayload = s.MaxPayloadSize()
+	}
+	chunks, err := chunkWrite(req, maxPayload)
 	if err != nil {
 		return nil, err
-	}
-	// A write that does not fit one message is refused before anything is
-	// sent. Mirrors matter.js
-	// packages/protocol/src/interaction/InteractionMessenger.ts:1343-1354
-	// (a timed or suppressed write) and :1388-1392 (a value too large for a
-	// message); matter.js chunks any other write, which this one-message
-	// write does not.
-	if len(payload) > exchange.MaxPayloadSize {
-		return nil, fmt.Errorf("%w: a write of %d bytes, at most %d", ErrRequestTooLarge, len(payload), exchange.MaxPayloadSize)
-	}
-	// A timed write cannot be chunked, so its WriteResponse — every status
-	// at its largest, Failure with a cluster status — must fit one message
-	// too. Mirrors matter.js
-	// packages/protocol/src/interaction/InteractionMessenger.ts:103-106,
-	// :1335-1354.
-	if req.TimedRequest {
-		if size := worstWriteResponseSize(req); size > exchange.MaxPayloadSize {
-			return nil, fmt.Errorf("%w: a timed write whose statuses take up to %d bytes, at most %d", ErrRequestTooLarge, size, exchange.MaxPayloadSize)
-		}
 	}
 	m, ctx, err := c.begin(ctx, opts.exchangeOptions())
 	if err != nil {
@@ -168,52 +153,53 @@ func (c *Interaction) Write(ctx context.Context, writes []WriteRequest, opts Wri
 			return nil, err
 		}
 	}
-	c.log.Debug("matter.controller.interaction.write", slog.Int("attributes", len(req.Writes)), slog.Bool("timed", req.TimedRequest))
+	c.log.Debug("matter.controller.interaction.write", slog.Int("attributes", len(req.Writes)), slog.Bool("timed", req.TimedRequest), slog.Int("chunks", len(chunks)))
 	if req.SuppressResponse {
-		err := m.x.Send(ctx, im.OpcodeWriteRequest, payload, exchange.SendOptions{ExpectAckOnly: true})
+		payload, err := encodeWrite(chunks[0])
+		if err != nil {
+			return nil, err
+		}
+		err = m.x.Send(ctx, im.OpcodeWriteRequest, payload, exchange.SendOptions{ExpectAckOnly: true})
 		var unexpected *exchange.UnexpectedMessageError
 		if errors.As(err, &unexpected) {
 			return nil, statusOf(unexpected.Message)
 		}
 		return nil, err
 	}
-	if err := m.send(ctx, im.OpcodeWriteRequest, payload, 0); err != nil {
-		return nil, err
-	}
-	msg, err := m.next(ctx, im.OpcodeWriteResponse, 0)
-	if err != nil {
-		return nil, err
-	}
-	resp, err := im.UnmarshalWriteResponseTLV(tlv.NewDecoder(msg.Payload))
-	if err != nil {
-		return nil, fmt.Errorf("%w: WriteResponse: %w", ErrUnexpectedMessage, err)
-	}
-	out := make(WriteStatuses, 0, len(resp.Responses))
-	for _, r := range resp.Responses {
-		s := WriteStatus{Path: r.Path, Status: r.Status.Status}
-		if r.Status.HasClusterStatus {
-			cs := r.Status.ClusterStatus
-			s.ClusterStatus = &cs
+	var out WriteStatuses
+	var replaced []im.ConcreteAttributePath
+	for _, chunk := range chunks {
+		sent := chunk.Writes
+		chunk.Writes = unversionReplacedAdds(chunk.Writes, replaced)
+		payload, err := encodeWrite(chunk)
+		if err != nil {
+			return nil, err
 		}
-		out = append(out, s)
+		if err := m.send(ctx, im.OpcodeWriteRequest, payload, 0); err != nil {
+			return nil, err
+		}
+		msg, err := m.next(ctx, im.OpcodeWriteResponse, 0)
+		if err != nil {
+			return nil, err
+		}
+		resp, err := im.UnmarshalWriteResponseTLV(tlv.NewDecoder(msg.Payload))
+		if err != nil {
+			return nil, fmt.Errorf("%w: WriteResponse: %w", ErrUnexpectedMessage, err)
+		}
+		for _, r := range resp.Responses {
+			s := WriteStatus{Path: r.Path, Status: r.Status.Status}
+			if r.Status.HasClusterStatus {
+				cs := r.Status.ClusterStatus
+				s.ClusterStatus = &cs
+			}
+			out = append(out, s)
+		}
+		replaced = noteReplaced(replaced, sent, resp.Responses)
+	}
+	if out == nil {
+		out = WriteStatuses{}
 	}
 	return out, nil
-}
-
-// worstWriteResponseSize is the size of req's WriteResponse with every
-// status at its largest (maxStatusSizeOf, InteractionMessenger.ts:103-106).
-func worstWriteResponseSize(req im.WriteRequest) int {
-	worst := im.WriteResponse{Responses: make([]im.AttributeStatus, 0, len(req.Writes))}
-	for _, w := range req.Writes {
-		worst.Responses = append(worst.Responses, im.AttributeStatus{
-			Path:   w.Path,
-			Status: im.StatusIB{Status: im.StatusFailure, ClusterStatus: uint8(im.StatusFailure), HasClusterStatus: true},
-		})
-	}
-	enc := tlv.NewEncoder()
-	worst.MarshalTLV(enc)
-	b, _ := enc.Bytes()
-	return len(b)
 }
 
 // statusOf is throwIfErrorStatusMessage (InteractionMessenger.ts:201-214)
