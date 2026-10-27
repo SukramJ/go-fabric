@@ -107,6 +107,8 @@ var areaKeys = []string{
 	"role", "running", "schedule_handle", "scope", "send_failures", "send_interval", "service",
 	"sessions", "since_last_restart", "skid", "source", "source_endpoint",
 	"source_node_id", "ssid", "stack", "stage", "state", "status_code",
+	// ble/esphome (brief BP1): the proxy, its advertisement and its link.
+	"encrypted", "feature_flags", "note", "proxy", "rssi", "silent",
 	"status_name", "statuses", "step", "stored", "stored_fabrics", "subject",
 	"subscriptions_reaped", "subsystem", "supported", "suppress_response",
 	"sw_version", "system_mode", "target", "tcp", "test", "timed", "timeout",

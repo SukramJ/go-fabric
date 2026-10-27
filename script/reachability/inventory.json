@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 6646,
+  "entry_points": 6647,
   "entry_packages": [
     ".",
     "bdx",
@@ -260,9 +260,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 16163,
+    "total_exported": 16164,
     "reachable": 11426,
-    "whitelisted": 4734,
+    "whitelisted": 4735,
     "unreachable": 3
   },
   "by_package": [
@@ -25381,7 +25381,14 @@
       "identifier": "TestPairBLEWithoutBLEOrNetwork",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-controller/cli/pair_ble_test.go",
-      "line": 41
+      "line": 42
+    },
+    {
+      "package": "examples/reference-controller/cli",
+      "identifier": "TestPairBluetoothProxyFlag",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-controller/cli/pair_ble_test.go",
+      "line": 68
     },
     {
       "package": "examples/reference-controller/cli",
@@ -25395,7 +25402,7 @@
       "identifier": "TestPairOverBLE",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-controller/cli/pair_ble_test.go",
-      "line": 68
+      "line": 89
     },
     {
       "package": "examples/reference-controller/cli",
