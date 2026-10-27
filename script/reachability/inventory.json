@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 6784,
+  "entry_points": 6788,
   "entry_packages": [
     ".",
     "bdx",
@@ -264,9 +264,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 16478,
-    "reachable": 11640,
-    "whitelisted": 4835,
+    "total_exported": 16503,
+    "reachable": 11663,
+    "whitelisted": 4837,
     "unreachable": 3
   },
   "by_package": [
@@ -325,7 +325,7 @@
       "identifier": "Entry",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "binding/manager.go",
-      "line": 23
+      "line": 24
     },
     {
       "package": "binding",
@@ -23674,6 +23674,13 @@
     },
     {
       "package": "device",
+      "identifier": "TestEveryKitServerHasItsHostDecided",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "device/host_methods_test.go",
+      "line": 349
+    },
+    {
+      "package": "device",
       "identifier": "TestEveryTypeConstructsAndConforms",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/conformance_test.go",
@@ -23727,6 +23734,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/types_gen_test.go",
       "line": 16
+    },
+    {
+      "package": "device",
+      "identifier": "TestHostIsTheKitServer",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "device/host_methods_test.go",
+      "line": 384
     },
     {
       "package": "device",
@@ -25763,7 +25777,7 @@
       "identifier": "TestReferenceController",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-controller/cli/main_test.go",
-      "line": 337
+      "line": 336
     },
     {
       "package": "examples/reference-controller/cli",
@@ -25777,7 +25791,7 @@
       "identifier": "TestReferenceControllerOTA",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-controller/cli/main_test.go",
-      "line": 489
+      "line": 488
     },
     {
       "package": "examples/reference-controller/cli",
