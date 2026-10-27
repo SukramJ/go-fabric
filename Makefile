@@ -433,5 +433,22 @@ bluez-check: ## the ble/bluez sub-module: build (Linux and the stub), vet, test,
 	cd $(BLUEZ_DIR) && $(GO) mod tidy -diff
 	cd $(BLUEZ_DIR) && $(GO) mod verify
 
+# ble/esphome is a Go module of its own as well (ADR 0024 decision 3): BLE
+# commissioning through ESPHome Bluetooth proxies, with its one Noise
+# library. Pure Go, so it builds for every platform; its tests run against
+# the in-process fake proxy (ble/esphome/esphometest).
+ESPHOME_DIR ?= ble/esphome
+
+.PHONY: esphome-check
+esphome-check: ## the ble/esphome sub-module: build (Linux, darwin, windows), vet, test with -race, golangci-lint, go mod tidy -diff
+	cd $(ESPHOME_DIR) && $(GO) build ./...
+	cd $(ESPHOME_DIR) && GOOS=darwin $(GO) build ./...
+	cd $(ESPHOME_DIR) && GOOS=windows $(GO) build ./...
+	cd $(ESPHOME_DIR) && $(GO) vet ./...
+	cd $(ESPHOME_DIR) && CGO_ENABLED=1 $(GO) test -race -count=1 ./...
+	cd $(ESPHOME_DIR) && $(GOLANGCI_LINT) run --timeout=5m ./...
+	cd $(ESPHOME_DIR) && $(GO) mod tidy -diff
+	cd $(ESPHOME_DIR) && $(GO) mod verify
+
 .PHONY: ci
-ci: build build-32bit vet archcheck apidiff-check test lint cover-check bluez-check ## everything the pipeline runs
+ci: build build-32bit vet archcheck apidiff-check test lint cover-check bluez-check esphome-check ## everything the pipeline runs

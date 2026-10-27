@@ -18,6 +18,7 @@ import (
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	basicinfo "github.com/SukramJ/go-fabric/cluster/spec/basicinformation"
 	"github.com/SukramJ/go-fabric/controller"
+	"github.com/SukramJ/go-fabric/controller/ble"
 	"github.com/SukramJ/go-fabric/controller/client"
 	"github.com/SukramJ/go-fabric/controller/commissioner"
 	"github.com/SukramJ/go-fabric/im"
@@ -83,6 +84,16 @@ func networkOptions(ssid, credentials, dataset string) (*commissioner.WiFiNetwor
 // errNoBLE is pair --ble in a build without a BLE central.
 var errNoBLE = errors.New("this build has no BLE; build ble/bluez/cmd/reference-controller")
 
+// errNoProxies is --bluetooth-proxy in a build without the ESPHome proxies.
+var errNoProxies = errors.New("this build has no ESPHome Bluetooth proxies; build ble/esphome/cmd/reference-controller")
+
+// stringsFlag is a repeatable string flag.
+type stringsFlag []string
+
+func (f *stringsFlag) String() string { return strings.Join(*f, " ") }
+
+func (f *stringsFlag) Set(s string) error { *f = append(*f, s); return nil }
+
 // errBLENeedsNetwork is pair --ble without the network the device is to join.
 var errBLENeedsNetwork = errors.New("pair --ble needs --wifi-ssid and --wifi-credentials, or --thread-dataset: a device on BLE has no network yet")
 
@@ -101,9 +112,11 @@ func cmdPair(e *env, args []string) error {
 	var wifiSSID, wifiCredentials, threadDataset string
 	var useBLE bool
 	var bleAdapter string
+	var proxies stringsFlag
 	pos, err := parseArgs(e, "pair", args, func(fs *flag.FlagSet) {
 		fs.BoolVar(&useBLE, "ble", false, "find the device over BLE and commission it over BTP (needs the BLE build, and --wifi-ssid or --thread-dataset)")
 		fs.StringVar(&bleAdapter, "ble-adapter", "hci0", "the Bluetooth adapter for --ble")
+		fs.Var(&proxies, "bluetooth-proxy", "an ESPHome Bluetooth proxy for --ble instead of an adapter: host[:port][,key]; repeatable (needs the ESPHome build)")
 		fs.StringVar(&wifiSSID, "wifi-ssid", "", "the SSID of the Wi-Fi network the device is to join")
 		fs.StringVar(&wifiCredentials, "wifi-credentials", "", "the Wi-Fi network's passphrase (with --wifi-ssid)")
 		fs.StringVar(&threadDataset, "thread-dataset", "", "the Thread operational dataset the device is to join, as hex")
@@ -142,8 +155,14 @@ func cmdPair(e *env, args []string) error {
 	if err != nil {
 		return err
 	}
+	if len(proxies) > 0 {
+		useBLE = true
+		if e.proxies == nil {
+			return errNoProxies
+		}
+	}
 	if useBLE {
-		if e.central == nil {
+		if len(proxies) == 0 && e.central == nil {
 			return errNoBLE
 		}
 		if wifi == nil && thread == nil {
@@ -167,8 +186,13 @@ func cmdPair(e *env, args []string) error {
 		}
 		over := ""
 		if useBLE {
-			central, err := e.central(bleAdapter)
-			if err != nil {
+			var central ble.Central
+			var err error
+			if len(proxies) > 0 {
+				if central, err = e.proxies(proxies, e.log); err != nil {
+					return fmt.Errorf("bluetooth proxies: %w", err)
+				}
+			} else if central, err = e.central(bleAdapter); err != nil {
 				return fmt.Errorf("ble adapter %s: %w", bleAdapter, err)
 			}
 			if c, ok := central.(io.Closer); ok {
