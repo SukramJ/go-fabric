@@ -251,7 +251,7 @@ func NewAvSettings(cfg AvSettingsConfig) (*AvSettings, error) {
 	return a, nil
 }
 
-func setIf[T any](dst *T, v *T) {
+func setIf[T any](dst, v *T) {
 	if v != nil {
 		*dst = *v
 	}
@@ -487,7 +487,7 @@ func (a *AvSettings) knownVideoStreamID(id uint16) bool {
 func (a *AvSettings) updatePresetID() {
 	next := a.currentPresetID
 	for {
-		next = uint8(int(next)%int(a.maxPresets) + 1)
+		next = uint8(int(next)%int(a.maxPresets) + 1) //nolint:gosec // at most maxPresets, a uint8
 		if next == a.currentPresetID {
 			return
 		}
@@ -588,7 +588,7 @@ func (a *AvSettings) mptzSetPosition(ctx context.Context, fields any) (any, erro
 	if moving { // :788
 		return nil, avStatus(im.StatusBusy, "the camera is moving")
 	}
-	if err := a.mech.MptzSetPosition(ctx, MPTZ{Pan: req.Pan, Tilt: req.Tilt, Zoom: req.Zoom}); err != nil { // :797-802
+	if err := a.mech.MptzSetPosition(ctx, MPTZ(req)); err != nil { // :797-802
 		return nil, portError("MPTZSetPosition", err)
 	}
 	a.startMovement(req.Pan, req.Tilt, req.Zoom)
@@ -621,7 +621,7 @@ func (a *AvSettings) mptzRelativeMove(ctx context.Context, fields any) (any, err
 		if d > span || d < -span {
 			return nil, avStatus(im.StatusConstraintError, "PanDelta %d outside ±%d", d, span)
 		}
-		newPan = ptr(int16(min(max(int(deref(pos.Pan))+d, panMin), panMax)))
+		newPan = ptr(int16(min(max(int(deref(pos.Pan))+d, panMin), panMax))) //nolint:gosec // held to the int16 limits
 	}
 	if req.TiltDelta != nil { // :864-894
 		if !a.HasFeature("MTILT") {
@@ -631,7 +631,7 @@ func (a *AvSettings) mptzRelativeMove(ctx context.Context, fields any) (any, err
 		if d > span || d < -span {
 			return nil, avStatus(im.StatusConstraintError, "TiltDelta %d outside ±%d", d, span)
 		}
-		newTilt = ptr(int16(min(max(int(deref(pos.Tilt))+d, tiltMin), tiltMax)))
+		newTilt = ptr(int16(min(max(int(deref(pos.Tilt))+d, tiltMin), tiltMax))) //nolint:gosec // held to the int16 limits
 	}
 	if req.ZoomDelta != nil { // :896-928
 		if !a.HasFeature("MZOOM") {
@@ -641,7 +641,7 @@ func (a *AvSettings) mptzRelativeMove(ctx context.Context, fields any) (any, err
 		if d > span || d < -span {
 			return nil, avStatus(im.StatusConstraintError, "ZoomDelta %d outside ±%d", d, span)
 		}
-		newZoom = ptr(uint8(min(max(int(deref(pos.Zoom))+d, 1), zoomMax)))
+		newZoom = ptr(uint8(min(max(int(deref(pos.Zoom))+d, 1), zoomMax))) //nolint:gosec // held to 1 to ZoomMax, a uint8
 	}
 	if req.PanDelta == nil && req.TiltDelta == nil && req.ZoomDelta == nil { // :931
 		return nil, avStatus(im.StatusInvalidCommand, "MPTZRelativeMove names no delta")

@@ -49,8 +49,8 @@ func withID(id uint16) func(*camera.WebRTCSession) {
 	return func(s *camera.WebRTCSession) { s.Id = id }
 }
 
-func withPeer(node uint64) func(*camera.WebRTCSession) {
-	return func(s *camera.WebRTCSession) { s.PeerNodeId = node }
+func withPeer(nodeID uint64) func(*camera.WebRTCSession) {
+	return func(s *camera.WebRTCSession) { s.PeerNodeId = nodeID }
 }
 
 func withFabric(f uint8) func(*camera.WebRTCSession) {
@@ -174,13 +174,13 @@ func wantStatus(t *testing.T, err error, want im.StatusCode) {
 	}
 }
 
-func answer(r *camera.Requestor, fabric uint8, node uint64, id uint16, sdp string) error {
-	_, err := r.MatterInvoke(peer(fabric, node), wrdef.CmdAnswer, wrdef.AnswerRequest{WebRtcSessionId: id, Sdp: sdp})
+func answer(r *camera.Requestor, fabric uint8, nodeID uint64, id uint16, sdp string) error {
+	_, err := r.MatterInvoke(peer(fabric, nodeID), wrdef.CmdAnswer, wrdef.AnswerRequest{WebRtcSessionId: id, Sdp: sdp})
 	return err
 }
 
-func end(r *camera.Requestor, fabric uint8, node uint64, id uint16) error {
-	_, err := r.MatterInvoke(peer(fabric, node), wrdef.CmdEnd, wrdef.EndRequest{WebRtcSessionId: id, Reason: userHangup})
+func end(r *camera.Requestor, fabric uint8, nodeID uint64, id uint16) error {
+	_, err := r.MatterInvoke(peer(fabric, nodeID), wrdef.CmdEnd, wrdef.EndRequest{WebRtcSessionId: id, Reason: userHangup})
 	return err
 }
 
@@ -367,6 +367,7 @@ func TestParityMatterJS_RequestorCommands(t *testing.T) { //nolint:gocognit,gocy
 	// "with a session of the same id from another peer node" (:386-444).
 	const otherPeer uint64 = 43
 	withOtherPeer := func(t *testing.T) (*camera.Requestor, *recorder) {
+		t.Helper()
 		r, rec := signallingRequestor(t)
 		upsert(t, r, makeSession(withID(sessionID), withPeer(otherPeer), withFabric(fabric1), withUsage(wrdef.StreamUsageRecording)))
 		return r, rec
