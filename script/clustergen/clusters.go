@@ -141,12 +141,15 @@ var committed = []string{
 	"PowerSourceConfiguration",
 	"EcosystemInformation",
 	"Actions",
-	// cluster/camera (brief 26-A1): WebRtcTransportRequestor after
-	// matter.js's WebRtcTransportRequestorServer.ts, Chime and
-	// CameraAvSettingsUserLevelManagement after connectedhomeip.
+	// cluster/camera (briefs 26-A1, 26-A2): WebRtcTransportRequestor after
+	// matter.js's WebRtcTransportRequestorServer.ts; Chime,
+	// CameraAvSettingsUserLevelManagement, CameraAvStreamManagement and
+	// ZoneManagement after connectedhomeip.
 	"WebRtcTransportRequestor",
 	"Chime",
 	"CameraAvSettingsUserLevelManagement",
+	"CameraAvStreamManagement",
+	"ZoneManagement",
 	// cluster/media (ADR 0022)
 	"MediaPlayback",
 	"KeypadInput",
@@ -178,10 +181,8 @@ var committed = []string{
 	// behaviour stub (`export class XServer extends XBehavior {}`, e.g.
 	// packages/node/src/behaviors/thread-network-diagnostics/
 	// ThreadNetworkDiagnosticsServer.ts at 862ad75f).
-	"CameraAvStreamManagement",
 	"WebRtcTransportProvider",
 	"PushAvStreamTransport",
-	"ZoneManagement",
 	"ThreadNetworkDiagnostics",
 	"ThreadBorderRouterManagement",
 	"JointFabricDatastore",

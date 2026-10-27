@@ -2,8 +2,9 @@
 // Copyright (C) 2026 SukramJ.
 
 // Package camera contains the servers of the camera surface (milestone 6,
-// concept v10 §C wave 26-A1): the signalling side of a WebRTC stream, the
-// chime, and the camera's pan, tilt and zoom.
+// concept v10 §C waves 26-A1 and 26-A2): the signalling side of a WebRTC
+// stream, the chime, the camera's pan, tilt and zoom, its streams and its
+// zones.
 //
 //   - [Requestor] serves WebRtcTransportRequestor (0x0554) after matter.js's
 //     WebRtcTransportRequestorServer
@@ -20,6 +21,15 @@
 //     src/app/clusters/camera-av-settings-user-level-management-server/
 //     CameraAvSettingsUserLevelManagementLogic.cpp), cited by line; the
 //     Ahead-of-matter.js register in notes/parity/by_design.md lists them.
+//   - [AvStream] serves CameraAvStreamManagement (0x0551) and [Zones]
+//     ZoneManagement (0x0550), both after connectedhomeip as well
+//     (src/app/clusters/camera-av-stream-management-server/
+//     CameraAVStreamManagementCluster.cpp, src/app/clusters/
+//     zone-management-server/ZoneManagementCluster.cpp and zone-geometry.h
+//     at 6170af84): the allocated streams behind a port per encoder and the
+//     capture, reference-counted for the transports; the zones and
+//     triggers behind the [ZonePort], with chip's polygon rules
+//     ([ZoneSelfIntersecting]).
 //
 // Each server is built on its generated definition (cluster/spec/…, ADR
 // 0013) and the generated server ([spec.Server]); its port is the
@@ -30,8 +40,11 @@
 // Persistence: chip persists SelectedChime and Enabled
 // (ChimeCluster.cpp:83-104, :221-223, :233-235) and the camera's position,
 // presets and DPTZ streams (CameraAvSettingsUserLevelManagementLogic.cpp:
-// 139-332). The store port has no record for such attributes, so here the
-// host persists them: every change is reported through the server's change
-// notification (the typed OnChanged), and the declaration's Initial
-// restores them.
+// 139-332), the allocated streams, the priorities and the settings of the
+// stream management (CameraAVStreamManagementCluster.cpp:1300-1850) and
+// the Sensitivity of the zone management (ZoneManagementCluster.cpp:
+// 139-168; its zones and triggers are the delegate's). The store port has
+// no record for such attributes, so here the host persists them: every
+// change is reported through the server's change notification (the typed
+// OnChanged), and the declaration's Initial restores them.
 package camera

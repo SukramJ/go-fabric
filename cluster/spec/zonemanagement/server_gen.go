@@ -223,6 +223,21 @@ func (s *Server) EmitZoneStopped(endpoint uint16, data ZoneStoppedEvent) error {
 	return spec.EmitOn(s.Underlying(), endpoint, EventZoneStopped, data)
 }
 
+// ZonePort is the camera's zone and trigger store (cluster/camera
+// Zones, after connectedhomeip's ZoneManagement Delegate): the kit's
+// server validates a zone (its constraints, the vertex bounds,
+// duplicates and self-intersection) or a trigger before it calls the
+// port, and keeps Zones and Triggers. CreateTwoDCartesianZone returns
+// the new zone's id. An error answers its status, FAILURE without one.
+type ZonePort interface {
+	CreateTwoDCartesianZone(ctx context.Context, zone TwoDCartesianZoneStruct) (zoneID uint16, err error)
+	UpdateTwoDCartesianZone(ctx context.Context, zoneID uint16, zone TwoDCartesianZoneStruct) error
+	RemoveZone(ctx context.Context, zoneID uint16) error
+	CreateTrigger(ctx context.Context, trigger ZoneTriggerControlStruct) error
+	UpdateTrigger(ctx context.Context, trigger ZoneTriggerControlStruct) error
+	RemoveTrigger(ctx context.Context, zoneID uint16) error
+}
+
 // Declare is the declaration of the ZoneManagement cluster on a device:
 // device.New<Type> and device.FromSpec take it, and every field is
 // optional — the zero value mounts the cluster (an optional one too)
@@ -259,6 +274,8 @@ type Declare struct {
 	// HandleRemoveTrigger handles the RemoveTrigger command in place of the server
 	// (Server.HandleRemoveTrigger), inline; an optional command it handles is accepted.
 	HandleRemoveTrigger func(ctx context.Context, req RemoveTriggerRequest) (struct{}, error)
+	// ZonePort is the host port the kit's server runs on ([ZonePort]).
+	ZonePort ZonePort
 	// HostServer is the host's own server for the cluster, mounted in
 	// place of the kit's — also for a cluster the device type does not
 	// list. The hooks above go on it; Initial, Features and the ports are
