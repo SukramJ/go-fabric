@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 6675,
+  "entry_points": 6678,
   "entry_packages": [
     ".",
     "bdx",
@@ -261,9 +261,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 16275,
-    "reachable": 11503,
-    "whitelisted": 4769,
+    "total_exported": 16281,
+    "reachable": 11507,
+    "whitelisted": 4771,
     "unreachable": 3
   },
   "by_package": [
@@ -20972,14 +20972,14 @@
       "identifier": "PairingPhase",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "controller/controller.go",
-      "line": 525
+      "line": 529
     },
     {
       "package": "controller",
       "identifier": "PairingStep",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "controller/controller.go",
-      "line": 521
+      "line": 525
     },
     {
       "package": "controller/attestation",
@@ -23114,7 +23114,7 @@
       "identifier": "QueryImageRequest",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "controller/softwareupdate/manager.go",
-      "line": 469
+      "line": 473
     },
     {
       "package": "controller/softwareupdate",
@@ -23177,35 +23177,49 @@
       "identifier": "TestObserveCheckFinished",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/softwareupdate/observe_test.go",
-      "line": 122
+      "line": 183
     },
     {
       "package": "controller/softwareupdate",
       "identifier": "TestObserveFailedApply",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/softwareupdate/observe_test.go",
-      "line": 108
+      "line": 169
+    },
+    {
+      "package": "controller/softwareupdate",
+      "identifier": "TestObserveQueuedTargetReplaced",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/softwareupdate/observe_test.go",
+      "line": 123
+    },
+    {
+      "package": "controller/softwareupdate",
+      "identifier": "TestObserveQueuedUpdateSequence",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/softwareupdate/observe_test.go",
+      "line": 90
     },
     {
       "package": "controller/softwareupdate",
       "identifier": "TestObserveRemovedConsent",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/softwareupdate/observe_test.go",
-      "line": 87
+      "line": 148
     },
     {
       "package": "controller/softwareupdate",
       "identifier": "TestObserveUnsubscribe",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/softwareupdate/observe_test.go",
-      "line": 138
+      "line": 199
     },
     {
       "package": "controller/softwareupdate",
       "identifier": "TestUpdateEventKindNames",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/softwareupdate/observe_test.go",
-      "line": 166
+      "line": 227
     },
     {
       "package": "controller/thread",
