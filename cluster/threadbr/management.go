@@ -187,6 +187,11 @@ func NewManagement(ctx context.Context, cfg ManagementConfig) (*ManagementServer
 	return s, nil
 }
 
+// BorderRouter is the border router the server manages; the
+// ThreadNetworkDiagnostics and NetworkCommissioning servers of the same
+// border router read it too (ADR 0027 decision 3).
+func (s *ManagementServer) BorderRouter() BorderRouter { return s.br }
+
 // AttachFailSafe wires the node's fail-safe: whether it is armed
 // (FailSafeContext::IsFailSafeArmed, :212) and the Breadcrumb an
 // activation writes (BreadCrumbTracker::SetBreadCrumb, :288). The node
