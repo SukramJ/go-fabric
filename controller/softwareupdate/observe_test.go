@@ -81,6 +81,67 @@ func TestObserveAppliedUpdate(t *testing.T) {
 	}
 }
 
+// TestObserveQueuedUpdateSequence: one update through #queueUpdate
+// (:892-920) and onOtaStatusChange (:1253-1321) reports queued,
+// transfer_started, applying, done — in that order, each once: queueing
+// the same target again (the periodic re-check) reports nothing, and the
+// Downloading of a retry after a BDX interruption (Cancelled resets the
+// entry) does not report the transfer started a second time.
+func TestObserveQueuedUpdateSequence(t *testing.T) {
+	t.Parallel()
+	r := newManagerRig(t, nil)
+	l := observe(t, r.m)
+	tg := Target{VendorID: 0xFFF1, ProductID: 0x8001, TargetSoftwareVersion: 2}
+	r.m.queueUpdate(&queueEntry{consent: consent{Target: tg, peer: testPeer}})
+	r.m.queueUpdate(&queueEntry{consent: consent{Target: tg, peer: testPeer}})
+	v := uint32(2)
+	r.m.OnStatusChange(testPeer, mattercore.OTAUpdateQuerying, &v, 0)
+	r.m.OnStatusChange(testPeer, mattercore.OTAUpdateDownloading, &v, 0)
+	r.m.OnStatusChange(testPeer, mattercore.OTAUpdateCancelled, &v, 0)
+	r.m.OnStatusChange(testPeer, mattercore.OTAUpdateDownloading, &v, 0)
+	r.m.OnStatusChange(testPeer, mattercore.OTAUpdateWaitForApply, &v, 0)
+	r.m.OnStatusChange(testPeer, mattercore.OTAUpdateApplying, &v, 0)
+	r.m.OnStatusChange(testPeer, mattercore.OTAUpdateDone, &v, 0)
+	l.await(t, 4)
+	time.Sleep(10 * time.Millisecond)
+	evs := l.await(t, 4)
+	want := []UpdateEventKind{UpdateQueued, UpdateTransferStarted, UpdateApplying, UpdateDone}
+	if len(evs) != len(want) {
+		t.Fatalf("events %v, want queued, transfer_started, applying, done", kinds(evs))
+	}
+	for i, e := range evs {
+		if e.Kind != want[i] || e.Peer != testPeer || e.Target != tg || e.Err != nil {
+			t.Errorf("event %d %+v, want %v", i, e, want[i])
+		}
+	}
+}
+
+// TestObserveQueuedTargetReplaced: a queued entry not yet in progress
+// that takes a different target (#queueUpdate's replacement, :907-914)
+// reports queued again, with the new target; once in progress, a new
+// target is skipped (:900-906) and reports nothing.
+func TestObserveQueuedTargetReplaced(t *testing.T) {
+	t.Parallel()
+	r := newManagerRig(t, nil)
+	l := observe(t, r.m)
+	t2 := Target{VendorID: 0xFFF1, ProductID: 0x8001, TargetSoftwareVersion: 2}
+	t3 := t2
+	t3.TargetSoftwareVersion = 3
+	r.m.queueUpdate(&queueEntry{consent: consent{Target: t2, peer: testPeer}})
+	r.m.queueUpdate(&queueEntry{consent: consent{Target: t3, peer: testPeer}})
+	v := uint32(3)
+	r.m.OnStatusChange(testPeer, mattercore.OTAUpdateDownloading, &v, 0)
+	r.m.queueUpdate(&queueEntry{consent: consent{Target: t2, peer: testPeer}})
+	l.await(t, 3)
+	time.Sleep(10 * time.Millisecond)
+	evs := l.await(t, 3)
+	if len(evs) != 3 || evs[0].Kind != UpdateQueued || evs[0].Target != t2 ||
+		evs[1].Kind != UpdateQueued || evs[1].Target != t3 ||
+		evs[2].Kind != UpdateTransferStarted || evs[2].Target != t3 {
+		t.Fatalf("events %v (%+v), want queued v2, queued v3, transfer_started v3", kinds(evs), evs)
+	}
+}
+
 // TestObserveRemovedConsent: removing the consent of a queued update
 // reports the consent gone, then the update failed as cancelled
 // (removeConsent → #cancelUpdate, :1217-1232, :1091-1123).
@@ -165,7 +226,7 @@ func TestObserveUnsubscribe(t *testing.T) {
 // TestUpdateEventKindNames: the kinds' names, as a UI shows them.
 func TestUpdateEventKindNames(t *testing.T) {
 	t.Parallel()
-	want := []string{"unknown", "available", "consent_changed", "check_finished", "applying", "done", "failed", "unknown"}
+	want := []string{"unknown", "available", "consent_changed", "check_finished", "applying", "done", "failed", "queued", "transfer_started", "unknown"}
 	for k := range want {
 		if got := UpdateEventKind(k).String(); got != want[k] {
 			t.Errorf("kind %d: %q, want %q", k, got, want[k])
