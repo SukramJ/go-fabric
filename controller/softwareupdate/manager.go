@@ -1323,35 +1323,45 @@ func (m *Manager) OnStatusChange(p Peer, status Status, version *uint32, applyDe
 		m.log.Info("ota.manager.bdx_cancelled_retry", slog.String("node", peerString(p)))
 		m.triggerQueuedUpdate()
 	default:
-		wasApplying := e.status != nil && *e.status == mattercore.OTAUpdateApplying
-		e.started = m.clock.Now()
-		s := status
-		e.status = &s
-		e.applyDelay = 0
-		if status == mattercore.OTAUpdateApplying {
-			e.applyDelay = applyDelay
+		m.progressLocked(p, e, status, applyDelay)
+	}
+}
+
+// progressLocked is onOtaStatusChange's last branch (:1296-1320): the
+// entry takes the status and its time; the first Downloading reports the
+// transfer started, Applying arms the reboot re-subscription and, the
+// first time, reports the update applying. It is called with m.mu held
+// and releases it.
+func (m *Manager) progressLocked(p Peer, e *queueEntry, status Status, applyDelay time.Duration) {
+	wasApplying := e.status != nil && *e.status == mattercore.OTAUpdateApplying
+	e.started = m.clock.Now()
+	s := status
+	e.status = &s
+	e.applyDelay = 0
+	if status == mattercore.OTAUpdateApplying {
+		e.applyDelay = applyDelay
+	}
+	applying := m.cfg.OnUpdateApplying
+	target := e.Target
+	transferStarted := status == mattercore.OTAUpdateDownloading && !e.transferStarted
+	if transferStarted {
+		e.transferStarted = true
+	}
+	m.mu.Unlock()
+	if transferStarted {
+		m.emit(UpdateEvent{Kind: UpdateTransferStarted, Peer: p, Target: target})
+	}
+	if status != mattercore.OTAUpdateApplying {
+		return
+	}
+	if m.cfg.Armer != nil {
+		m.cfg.Armer.Arm(p, applyDelay)
+	}
+	if !wasApplying {
+		if applying != nil {
+			applying(p)
 		}
-		applying := m.cfg.OnUpdateApplying
-		target := e.Target
-		transferStarted := status == mattercore.OTAUpdateDownloading && !e.transferStarted
-		if transferStarted {
-			e.transferStarted = true
-		}
-		m.mu.Unlock()
-		if transferStarted {
-			m.emit(UpdateEvent{Kind: UpdateTransferStarted, Peer: p, Target: target})
-		}
-		if status == mattercore.OTAUpdateApplying {
-			if m.cfg.Armer != nil {
-				m.cfg.Armer.Arm(p, applyDelay)
-			}
-			if !wasApplying {
-				if applying != nil {
-					applying(p)
-				}
-				m.emit(UpdateEvent{Kind: UpdateApplying, Peer: p, Target: target})
-			}
-		}
+		m.emit(UpdateEvent{Kind: UpdateApplying, Peer: p, Target: target})
 	}
 }
 
