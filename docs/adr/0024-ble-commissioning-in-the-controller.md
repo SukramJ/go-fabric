@@ -39,6 +39,23 @@ BSD-2-Clause); CoreBluetooth and WinRT need cgo or COM.
    `github.com/SukramJ/go-fabric/ble/bluez`, with its own `go.mod`: BlueZ
    over D-Bus, Linux only, no cgo. The main module keeps its five direct
    dependencies; a host without BLE never pulls `godbus`.
+   *Amended 2026-10-27 (owner decision, brief BP1): a second platform
+   module, `github.com/SukramJ/go-fabric/ble/esphome`, reaches BLE through
+   ESPHome Bluetooth proxies (`bluetooth_proxy: active: true`) over the
+   ESPHome native API on TCP — plaintext, or
+   `Noise_NNpsk0_25519_ChaChaPoly_SHA256` with the device's API key
+   (prologue `NoiseAPIInit` + the client hello, aioesphomeapi
+   `_frame_helper/noise.py:301`, ESPHome `api_frame_helper_noise.cpp:26-27,
+   :274-276`) through `github.com/flynn/noise` (BSD-3-Clause), its one
+   dependency beyond the main module. It is pure Go and builds for every
+   platform, so decision 6 does not bind it. The API messages are encoded by
+   hand after aioesphomeapi's `api.proto` (MIT, read at 3b2a4a2d). A proxy
+   serves one API subscriber, the newest, so commissioning through a proxy
+   takes it from Home Assistant while the pairing runs; the central does
+   not fight for it (`ErrProxyBusy` after a second silence). Proof: an
+   in-process fake proxy (`esphometest`) over `bletest`'s peripherals runs
+   the commissioner's BLE tests, a Noise known-answer test derived from the
+   Noise specification; a real proxy is in the manual test plan.*
 4. **The commissioner provisions the network** after
    `ControllerCommissioningFlow.ts`: Wi-Fi credentials or a Thread
    operational dataset, `ConnectNetwork`, then operational discovery over
