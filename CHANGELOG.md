@@ -10,8 +10,6 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
-## [0.13.4] — 2026-10-27
-
 ### Added
 
 - `cluster/camera`, the camera signalling servers (milestone 6, brief 26-A1, concept v10 wave 26-A1):
@@ -20,21 +18,12 @@ pseudo-version of `main`.
   - `camera.AvSettings` serves CameraAvSettingsUserLevelManagement after connectedhomeip's `CameraAvSettingsUserLevelManagementLogic.cpp`, ahead of matter.js. The new ports are `MechanicalPTZ`, the optional `MechanicalPresets` and `DigitalPTZ` (`cameraavsettingsuserlevelmanagementdef.Declare`). The server validates MPTZ targets, tracks MovementState until the host calls `PhysicalMovementComplete`, and keeps the presets and the DPTZ streams the host announces.
   - Chime and CameraAvSettingsUserLevelManagement keep the generated server without their ports. The host persists their state through the change notifications and restores it through `Initial`. The [camera guide](docs/guides/camera.md) describes the model.
 - `core.AccessControl.NotifyLocalEntryInstalled`: moves the ACL's data version for an entry the node appended itself, without an AccessControlEntryChanged event.
-- `cluster/netinfra`: WiFiNetworkManagement and ThreadNetworkDirectory servers, ahead of matter.js (whose servers are the generated stubs, `WiFiNetworkManagementServer.ts:14` and `ThreadNetworkDirectoryServer.ts:14` at 862ad75f), after connectedhomeip at 6170af84 (brief 26-B). The kit mounts both by default on NetworkInfrastructureManager and ThreadBorderRouter.
-  - `netinfra.WiFiManagementServer`: the host sets the credentials with `SetNetworkCredentials` and drops them with `ClearNetworkCredentials`, under chip's SSID and WPA-personal checks (`netinfra.ErrInvalidCredentials`). A new passphrase advances `PassphraseSurrogate`. `NetworkPassphraseRequest` answers over CASE only (UNSUPPORTED_ACCESS otherwise; INVALID_IN_STATE without credentials). The passphrase is never logged.
-  - `netinfra.ThreadDirectoryServer` over the new port `netinfra.ThreadNetworkStore` (= `threadnetworkdirectorydef.ThreadNetworkStore`, generated, `Declare.ThreadNetworkStore`; the in-memory `netinfra.MemoryThreadNetworkStore` without one). `AddNetwork`, `RemoveNetwork` and `GetOperationalDataset` follow chip's dataset checks and status codes. A `PreferredExtendedPanID` write must name a stored network. The store keeps it too (`LoadPreferred`, `SavePreferred`), as chip keeps it in attribute storage: it is loaded at start, and a saved one that names no stored network is cleared with a warning. `ReloadNetworks` takes in a store the host changed.
-  - chip's `TestWiFiNetworkManagementCluster.cpp` (10 cases) and `TestThreadNetworkDirectoryCluster.cpp` (7 of 8; the storage-migration case is chip's own format) are ported, plus a wire test on a commissioned pair.
-- matter.js's `ThreadNetworkDiagnosticsProvisionalTest.ts` is ported (`device`): the provisional `ExtAddress` and `Rloc16` are absent until the declaration supplies them. This passed without a change.
-- Guide: [Network infrastructure](docs/guides/network-infrastructure.md).
-- The sub-module `ble/esphome` (`github.com/SukramJ/go-fabric/ble/esphome`, brief BP1): a `controller/ble.Central` whose radios are ESPHome Bluetooth proxies (`bluetooth_proxy: active: true`), reached over the ESPHome native API on TCP, plaintext or Noise (`Noise_NNpsk0_25519_ChaChaPoly_SHA256` with the device's API key; `github.com/flynn/noise`, BSD-3-Clause, the module's one Noise library). A host commissions over BLE without a Bluetooth adapter or D-Bus: `esphome.NewCentral([]esphome.Proxy{{Addr, Key}}, esphome.Options{})` goes to `controller.PairOptions.BLE`. Scanning runs on every proxy, a peripheral two proxies see is connected through the stronger one, a proxy that drops is reconnected with backoff, and the central implements `ble.Reachability` from the proxies' connection slots. A proxy has one API subscriber — the newest; the central logs `ble.esphome.proxy_taken` when it subscribes, presumes a proxy that falls silent taken, reconnects once and then reports `esphome.ErrProxyBusy` until the next scan. The API messages are encoded by hand after aioesphomeapi's `api.proto` (MIT, cited per message); neither matter.js nor connectedhomeip commissions through a proxy. `ble/esphome/esphometest` is an in-process fake proxy over `controller/ble/bletest`'s peripherals, and the commissioner's BLE tests run against it. Guide: `docs/guides/ble-proxies.md`.
-- `ble/esphome/cmd/reference-controller`: the reference controller through ESPHome proxies; `pair --bluetooth-proxy host[:port][,key]` (repeatable, implies `--ble`). `examples/reference-controller/cli.Options` gains `Proxies`.
 
 ### Changed
 
 - The schema snapshot carries the datatypes of the definition-only clusters (`definitions`, WebRtcTransportDefinitions at the pin), so `SchemaSnapshotSHA256` moved. The WebRTC transport requestor and provider definitions now type their sessions, ICE candidates and ICE servers as `WebRTCSessionStruct`, `ICECandidateStruct` and `ICEServerStruct` (the [migration guide](docs/guides/migrating-to-the-facade.md) has the routes):
   - `webrtctransportrequestor`: `CurrentSessionsEntry`, `IceCandidatesRequestIceCandidatesEntry` and `OfferRequestIceServersEntry` are removed; `State.CurrentSessions`, `Patch.CurrentSessions`, `IceCandidatesRequest.IceCandidates` and `OfferRequest.IceServers` change type.
   - `webrtctransportprovider`: `CurrentSessionsEntry`, `ProvideIceCandidatesRequestIceCandidatesEntry`, `ProvideOfferRequestIceServersEntry` and `SolicitOfferRequestIceServersEntry` are removed; `State.CurrentSessions`, `Patch.CurrentSessions`, `ProvideIceCandidatesRequest.IceCandidates`, `ProvideOfferRequest.IceServers` and `SolicitOfferRequest.IceServers` change type.
-- WiFiNetworkManagement's `Ssid` and `PassphraseSurrogate` and ThreadNetworkDirectory's `ThreadNetworks` and `ThreadNetworkTableSize` are no longer set through the typed server's `Set`: they follow the credentials and the store (`spec.ErrNotHeld`). A host's `Handle…` registered on either cluster still replaces the server's command.
 
 ### Fixed
 
@@ -43,6 +32,28 @@ pseudo-version of `main`.
 ### Ecosystems
 
 - No host device carries a camera cluster until a live pairing with Apple Home has passed (concept v10 §D, the rule of MSCH). The reference bridge composes none of them.
+
+## [0.13.5] — 2026-10-27
+
+### Added
+
+- The sub-module `ble/esphome` (`github.com/SukramJ/go-fabric/ble/esphome`, brief BP1): a `controller/ble.Central` whose radios are ESPHome Bluetooth proxies (`bluetooth_proxy: active: true`), reached over the ESPHome native API on TCP, plaintext or Noise (`Noise_NNpsk0_25519_ChaChaPoly_SHA256` with the device's API key; `github.com/flynn/noise`, BSD-3-Clause, the module's one Noise library). A host commissions over BLE without a Bluetooth adapter or D-Bus: `esphome.NewCentral([]esphome.Proxy{{Addr, Key}}, esphome.Options{})` goes to `controller.PairOptions.BLE`. Scanning runs on every proxy, a peripheral two proxies see is connected through the stronger one, a proxy that drops is reconnected with backoff, and the central implements `ble.Reachability` from the proxies' connection slots. A proxy has one API subscriber — the newest; the central logs `ble.esphome.proxy_taken` when it subscribes, presumes a proxy that falls silent taken, reconnects once and then reports `esphome.ErrProxyBusy` until the next scan. The API messages are encoded by hand after aioesphomeapi's `api.proto` (MIT, cited per message); neither matter.js nor connectedhomeip commissions through a proxy. `ble/esphome/esphometest` is an in-process fake proxy over `controller/ble/bletest`'s peripherals, and the commissioner's BLE tests run against it. Guide: `docs/guides/ble-proxies.md`.
+- `ble/esphome/cmd/reference-controller`: the reference controller through ESPHome proxies; `pair --bluetooth-proxy host[:port][,key]` (repeatable, implies `--ble`). `examples/reference-controller/cli.Options` gains `Proxies`.
+
+## [0.13.4] — 2026-10-27
+
+### Added
+
+- `cluster/netinfra`: WiFiNetworkManagement and ThreadNetworkDirectory servers, ahead of matter.js (whose servers are the generated stubs, `WiFiNetworkManagementServer.ts:14` and `ThreadNetworkDirectoryServer.ts:14` at 862ad75f), after connectedhomeip at 6170af84 (brief 26-B). The kit mounts both by default on NetworkInfrastructureManager and ThreadBorderRouter.
+  - `netinfra.WiFiManagementServer`: the host sets the credentials with `SetNetworkCredentials` and drops them with `ClearNetworkCredentials`, under chip's SSID and WPA-personal checks (`netinfra.ErrInvalidCredentials`). A new passphrase advances `PassphraseSurrogate`. `NetworkPassphraseRequest` answers over CASE only (UNSUPPORTED_ACCESS otherwise; INVALID_IN_STATE without credentials). The passphrase is never logged.
+  - `netinfra.ThreadDirectoryServer` over the new port `netinfra.ThreadNetworkStore` (= `threadnetworkdirectorydef.ThreadNetworkStore`, generated, `Declare.ThreadNetworkStore`; the in-memory `netinfra.MemoryThreadNetworkStore` without one). `AddNetwork`, `RemoveNetwork` and `GetOperationalDataset` follow chip's dataset checks and status codes. A `PreferredExtendedPanID` write must name a stored network. The store keeps it too (`LoadPreferred`, `SavePreferred`), as chip keeps it in attribute storage: it is loaded at start, and a saved one that names no stored network is cleared with a warning. `ReloadNetworks` takes in a store the host changed.
+  - chip's `TestWiFiNetworkManagementCluster.cpp` (10 cases) and `TestThreadNetworkDirectoryCluster.cpp` (7 of 8; the storage-migration case is chip's own format) are ported, plus a wire test on a commissioned pair.
+- matter.js's `ThreadNetworkDiagnosticsProvisionalTest.ts` is ported (`device`): the provisional `ExtAddress` and `Rloc16` are absent until the declaration supplies them. This passed without a change.
+- Guide: [Network infrastructure](docs/guides/network-infrastructure.md).
+
+### Changed
+
+- WiFiNetworkManagement's `Ssid` and `PassphraseSurrogate` and ThreadNetworkDirectory's `ThreadNetworks` and `ThreadNetworkTableSize` are no longer set through the typed server's `Set`: they follow the credentials and the store (`spec.ErrNotHeld`). A host's `Handle…` registered on either cluster still replaces the server's command.
 
 ## [0.13.3] — 2026-10-26
 
