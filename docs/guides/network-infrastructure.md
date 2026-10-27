@@ -39,7 +39,8 @@ as chip's do, so the host sets them again at every start.
 ## ThreadNetworkDirectory: the datasets
 
 The directory stores Thread operational datasets, keyed by their Extended
-PAN ID. The host persists them through a `ThreadNetworkStore`
+PAN ID, and the preferred network. The host persists both through a
+`ThreadNetworkStore`
 (`threadnetworkdirectorydef.ThreadNetworkStore`, declared as
 `Declare.ThreadNetworkStore`):
 
@@ -49,12 +50,14 @@ PAN ID. The host persists them through a `ThreadNetworkStore`
 | `LoadNetworks(ctx)` | at construction and on `ReloadNetworks` |
 | `SaveNetwork(ctx, extPanID, dataset)` | after `AddNetwork` passed its checks |
 | `RemoveNetwork(ctx, extPanID)` | after `RemoveNetwork` passed its checks |
+| `LoadPreferred(ctx)` | at construction; `ok` false when nothing was saved |
+| `SavePreferred(ctx, extPanID)` | on a change of `PreferredExtendedPanID` (a controller's write, the host's `Set`, a clearing); nil is null |
 
-Without a store, the server keeps the datasets in memory, in a
+Without a store, the server keeps both in memory, in a
 `netinfra.MemoryThreadNetworkStore` of 32 networks (chip's default
 capacity), or of the `Initial`'s `ThreadNetworkTableSize`. The server
 checks the capacity and the presence of a network itself. A store's error
-answers the command with FAILURE and changes nothing.
+answers the command or the write with FAILURE and changes nothing.
 
 | Command or write | Refused with |
 | --- | --- |
@@ -63,11 +66,14 @@ answers the command with FAILURE and changes nothing.
 | `GetOperationalDataset` | UNSUPPORTED_ACCESS without a CASE session; CONSTRAINT_ERROR for a wrong-sized ID; NOT_FOUND |
 | write of `PreferredExtendedPanID` | CONSTRAINT_ERROR unless it names a stored network; an empty value is null |
 
-The preferred network is server state. The host persists it from the
-change reports and passes it back as the declaration's `Initial`
-(`PreferredExtendedPanId`), which must name a stored network. A host that
-changes the store outside the cluster calls `ReloadNetworks`, which
-re-reads the store and reports `ThreadNetworks` when it moved.
+The preferred network is the store's, as chip keeps it in attribute
+storage. At start the server serves the saved one. A saved network the
+store no longer holds is cleared with a warning, and the clearing is saved.
+When the store has saved none, the declaration's `Initial`
+(`PreferredExtendedPanId`) is the fallback, and it must name a stored
+network. A host that changes the store outside the cluster calls
+`ReloadNetworks`, which re-reads the datasets and reports `ThreadNetworks`
+when it moved. A preferred network the store dropped is cleared.
 
 The server checks a dataset the way chip's `OperationalDatasetView` reads
 one, taking the first sub-TLV of each type. It does not use the

@@ -171,17 +171,22 @@ func (s *Server) HandleGetOperationalDataset(fn func(ctx context.Context, req Ge
 }
 
 // ThreadNetworkStore persists the directory's operational datasets,
-// each an opaque blob keyed by its Extended PAN ID: Capacity is
-// ThreadNetworkTableSize, LoadNetworks returns the stored datasets
-// in a stable order, SaveNetwork adds or replaces one and
-// RemoveNetwork drops one; an error answers the command FAILURE
-// and changes nothing. Without one the kit's server keeps the
-// datasets in memory (cluster/netinfra ThreadNetworkStore).
+// each an opaque blob keyed by its Extended PAN ID, and the preferred
+// network: Capacity is ThreadNetworkTableSize, LoadNetworks returns
+// the stored datasets in a stable order, SaveNetwork adds or replaces
+// one and RemoveNetwork drops one; LoadPreferred returns the saved
+// PreferredExtendedPanID (ok false when none was saved) and
+// SavePreferred stores it (nil or empty for null). An error answers
+// the command or write FAILURE and changes nothing. Without one the
+// kit's server keeps both in memory (cluster/netinfra
+// ThreadNetworkStore).
 type ThreadNetworkStore interface {
 	Capacity() uint8
 	LoadNetworks(ctx context.Context) (datasets [][]byte, err error)
 	SaveNetwork(ctx context.Context, extendedPanID, dataset []byte) error
 	RemoveNetwork(ctx context.Context, extendedPanID []byte) error
+	LoadPreferred(ctx context.Context) (extendedPanID []byte, ok bool, err error)
+	SavePreferred(ctx context.Context, extendedPanID []byte) error
 }
 
 // Declare is the declaration of the ThreadNetworkDirectory cluster on a device:

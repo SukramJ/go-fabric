@@ -29,7 +29,8 @@ func newWiFiManagementServer(b defaultBuild) (contract.ClusterServer, error) {
 // ([netinfra.NewThreadDirectory]) over the declared ThreadNetworkStore
 // (tdirdef.Declare), an in-memory store without one — of the Initial's
 // ThreadNetworkTableSize when it sets one. The Initial's
-// PreferredExtendedPanId is the preferred network it starts with; it must
+// PreferredExtendedPanId is the preferred network it starts with when the
+// store saved none (netinfra.ThreadDirectoryConfig); it must
 // name a stored network.
 func newThreadDirectoryServer(b defaultBuild) (contract.ClusterServer, error) {
 	cfg := netinfra.ThreadDirectoryConfig{DataVersion: b.cfg.DataVersion, Logger: Logger}

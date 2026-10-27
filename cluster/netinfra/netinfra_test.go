@@ -18,8 +18,10 @@ import (
 
 // failingStore is a ThreadNetworkStore whose calls fail.
 type failingStore struct {
-	load, save, remove error
-	datasets           [][]byte
+	load, save, remove, loadPref, savePref error
+	datasets                               [][]byte
+	preferred                              []byte
+	hasPreferred                           bool
 }
 
 func (f *failingStore) Capacity() uint8 { return 2 }
@@ -29,6 +31,18 @@ func (f *failingStore) LoadNetworks(context.Context) ([][]byte, error) { return 
 func (f *failingStore) SaveNetwork(context.Context, []byte, []byte) error { return f.save }
 
 func (f *failingStore) RemoveNetwork(context.Context, []byte) error { return f.remove }
+
+func (f *failingStore) LoadPreferred(context.Context) (id []byte, ok bool, err error) {
+	return f.preferred, f.hasPreferred, f.loadPref
+}
+
+func (f *failingStore) SavePreferred(_ context.Context, id []byte) error {
+	if f.savePref != nil {
+		return f.savePref
+	}
+	f.preferred, f.hasPreferred = id, true
+	return nil
+}
 
 // TestThreadDirectoryStoreRefusals: a store that fails to load, holds a
 // dataset the server would not accept, holds one twice or more than its

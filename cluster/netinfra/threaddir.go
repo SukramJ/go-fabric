@@ -35,12 +35,16 @@ type ThreadNetwork = tdir.ThreadNetworkStruct
 // ThreadNetworkDirectoryStorage (ThreadNetworkDirectoryStorage.h:31-124):
 // Capacity is the table size (:73), LoadNetworks the stored datasets in a
 // stable order (:86, :95), SaveNetwork adds or replaces the dataset of an
-// Extended PAN ID (:106) and RemoveNetwork drops one (:114). The server
-// validates every dataset before it saves it, treats it as an opaque blob
-// otherwise (:98-100) and checks the capacity and the presence itself, so
-// a store has no sentinel errors to answer; an error it returns answers
-// the command FAILURE and changes nothing. The calls run under the
-// server's lock: the store must not call back into the server.
+// Extended PAN ID (:106) and RemoveNetwork drops one (:114). LoadPreferred
+// and SavePreferred keep PreferredExtendedPanID, which chip keeps in
+// attribute storage (ThreadNetworkDirectoryCluster.cpp:113, :150), as
+// thermo.PresetStore keeps the presets with their active handle; nil or
+// empty is null. The server validates every dataset before it saves it,
+// treats it as an opaque blob otherwise (:98-100) and checks the capacity
+// and the presence itself, so a store has no sentinel errors to answer; an
+// error it returns answers the command or the write FAILURE and changes
+// nothing. The calls run under the server's lock: the store must not call
+// back into the server.
 type ThreadNetworkStore = tdir.ThreadNetworkStore
 
 // ExtendedPanIDLen is the size of a Thread Extended PAN ID
@@ -75,14 +79,16 @@ var ErrInvalidThreadNetworks = errors.New("netinfra: the Thread network store ho
 
 // MemoryThreadNetworkStore is a [ThreadNetworkStore] in memory, the
 // server's default: networks in the order they were first added, an
-// update keeping its place.
+// update keeping its place, and the preferred network.
 type MemoryThreadNetworkStore struct {
 	capacity uint8
 
-	// mu guards ids and datasets.
-	mu       sync.Mutex
-	ids      []string
-	datasets map[string][]byte
+	// mu guards ids, datasets, preferred and hasPreferred.
+	mu           sync.Mutex
+	ids          []string
+	datasets     map[string][]byte
+	preferred    []byte
+	hasPreferred bool
 }
 
 // NewMemoryThreadNetworkStore returns an empty in-memory store of
@@ -128,6 +134,25 @@ func (m *MemoryThreadNetworkStore) SaveNetwork(_ context.Context, extendedPanID,
 	return nil
 }
 
+// LoadPreferred implements [ThreadNetworkStore]: ok false until a
+// SavePreferred.
+func (m *MemoryThreadNetworkStore) LoadPreferred(context.Context) (extendedPanID []byte, ok bool, err error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return slices.Clone(m.preferred), m.hasPreferred, nil
+}
+
+// SavePreferred implements [ThreadNetworkStore]; nil or empty is null.
+func (m *MemoryThreadNetworkStore) SavePreferred(_ context.Context, extendedPanID []byte) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.preferred, m.hasPreferred = nil, true
+	if len(extendedPanID) > 0 {
+		m.preferred = slices.Clone(extendedPanID)
+	}
+	return nil
+}
+
 // RemoveNetwork implements [ThreadNetworkStore]; a network not stored is
 // no error.
 func (m *MemoryThreadNetworkStore) RemoveNetwork(_ context.Context, extendedPanID []byte) error {
@@ -146,7 +171,8 @@ type ThreadDirectoryConfig struct {
 	// [DefaultThreadNetworkCapacity] when nil.
 	Store ThreadNetworkStore
 	// PreferredExtendedPanID is the preferred network the server starts
-	// with, nil for none; it must name a stored network.
+	// with when the store has none saved (LoadPreferred ok false), nil for
+	// none; it must name a stored network.
 	PreferredExtendedPanID []byte
 	// DataVersion is an optional host-owned tracker.
 	DataVersion *cluster.DataVersionTracker
@@ -168,9 +194,9 @@ type directoryEntry struct {
 // GetOperationalDataset with chip's checks and status codes, and the
 // writable PreferredExtendedPanID, which must name a stored network
 // (:139-151). ThreadNetworks and ThreadNetworkTableSize are the store's.
-// The preferred network is server state: a host persists it from the
-// change reports and hands it back as [ThreadDirectoryConfig]'s
-// PreferredExtendedPanID (chip keeps it in attribute storage, :113).
+// The preferred network is persisted through the store
+// (LoadPreferred, SavePreferred), as chip keeps it in attribute storage
+// (:113, :150).
 type ThreadDirectoryServer struct {
 	*spec.Instance
 	// SelfHeld is the typed server's command handlers, write veto and
@@ -203,8 +229,11 @@ var (
 // store's networks: ThreadNetworkTableSize is its capacity (:83-84),
 // ThreadNetworks its datasets (:153-183), FeatureMap 0 (:89-90). A store
 // that fails to load or holds a dataset the server would not accept is
-// [ErrInvalidThreadNetworks]; a preferred network it does not hold is
-// refused.
+// [ErrInvalidThreadNetworks]. The preferred network is the store's saved
+// one — cleared with a warning when it names no stored network, as the
+// thermostat clears an unknown active handle — or, when the store saved
+// none, the configuration's, which is refused when it names no stored
+// network.
 func NewThreadDirectory(ctx context.Context, cfg ThreadDirectoryConfig) (*ThreadDirectoryServer, error) {
 	s := &ThreadDirectoryServer{store: cfg.Store, logger: cfg.Logger}
 	if s.store == nil {
@@ -216,12 +245,9 @@ func NewThreadDirectory(ctx context.Context, cfg ThreadDirectoryConfig) (*Thread
 	if err := s.load(ctx); err != nil {
 		return nil, err
 	}
-	var preferred any
-	if cfg.PreferredExtendedPanID != nil {
-		if _, ok := s.entries[string(cfg.PreferredExtendedPanID)]; !ok {
-			return nil, fmt.Errorf("netinfra: the preferred Extended PAN ID %X names no stored network", cfg.PreferredExtendedPanID)
-		}
-		preferred = slices.Clone(cfg.PreferredExtendedPanID)
+	preferred, err := s.loadPreferred(ctx, cfg.PreferredExtendedPanID)
+	if err != nil {
+		return nil, err
 	}
 	srv, err := spec.NewServer(tdir.Definition, spec.Options{}, spec.ServerConfig{
 		DataVersion: cfg.DataVersion,
@@ -241,6 +267,55 @@ func NewThreadDirectory(ctx context.Context, cfg ThreadDirectoryConfig) (*Thread
 	}
 	s.Instance, s.SelfHeld, s.srv = srv.Instance, spec.NewSelfHeld(srv), srv
 	return s, nil
+}
+
+// loadPreferred is the preferred network the server starts with: the
+// store's saved one, or fallback when it saved none; nil for null.
+func (s *ThreadDirectoryServer) loadPreferred(ctx context.Context, fallback []byte) (any, error) {
+	saved, ok, err := s.store.LoadPreferred(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("%w: the preferred network: %w", ErrInvalidThreadNetworks, err)
+	}
+	if !ok {
+		if len(fallback) == 0 {
+			return nil, nil
+		}
+		if _, held := s.entries[string(fallback)]; !held {
+			return nil, fmt.Errorf("netinfra: the preferred Extended PAN ID %X names no stored network", fallback)
+		}
+		return slices.Clone(fallback), nil
+	}
+	if len(saved) == 0 {
+		return nil, nil
+	}
+	if _, held := s.entries[string(saved)]; !held {
+		s.logger.Warn("netinfra.thread_directory.preferred.cleared", slog.String("reason", "the saved preferred network names no stored network"))
+		if err := s.store.SavePreferred(ctx, nil); err != nil {
+			return nil, fmt.Errorf("%w: the preferred network: %w", ErrInvalidThreadNetworks, err)
+		}
+		return nil, nil
+	}
+	return slices.Clone(saved), nil
+}
+
+// savePreferredLocked persists the preferred network about to be stored
+// (nil for null) when it differs from the served one; the returned undo
+// puts the store back when the change is not stored after all.
+func (s *ThreadDirectoryServer) savePreferredLocked(ctx context.Context, next any) (undo func(), err error) {
+	cur, _ := s.preferredLocked()
+	nb, _ := next.([]byte)
+	if bytes.Equal(cur, nb) {
+		return func() {}, nil
+	}
+	if err := s.store.SavePreferred(ctx, nb); err != nil {
+		s.logger.Error("netinfra.thread_directory.preferred.store", slog.Any("err", err))
+		return nil, spec.Errorf(im.StatusFailure, "netinfra: PreferredExtendedPanID: %w", err)
+	}
+	return func() {
+		if err := s.store.SavePreferred(ctx, cur); err != nil {
+			s.logger.Error("netinfra.thread_directory.preferred.store", slog.Any("err", err))
+		}
+	}, nil
 }
 
 // load reads the store into the server's table.
@@ -274,7 +349,7 @@ func (s *ThreadDirectoryServer) load(ctx context.Context) error {
 // the cluster and reports ThreadNetworks when it moved. chip reads the
 // storage on every read (:153-183); this server serves its table, so a
 // host that writes the store directly calls this. A preferred network
-// the store no longer holds is cleared.
+// the store no longer holds is cleared, and the store saves the clearing.
 func (s *ThreadDirectoryServer) ReloadNetworks(ctx context.Context) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -287,6 +362,9 @@ func (s *ThreadDirectoryServer) ReloadNetworks(ctx context.Context) error {
 	}
 	if p, ok := s.preferredLocked(); ok {
 		if _, held := s.entries[string(p)]; !held {
+			if err := s.store.SavePreferred(ctx, nil); err != nil {
+				return fmt.Errorf("netinfra: clearing the preferred network: %w", err)
+			}
 			changes[tdir.AttrPreferredExtendedPanId] = nil
 		}
 	}
@@ -584,23 +662,28 @@ func (s *ThreadDirectoryServer) checkPreferredLocked(value any) (any, error) {
 }
 
 // SetPreferredExtendedPanID sets the preferred network from the host,
-// nil for none, under the write's rule.
+// nil for none, under the write's rule; the store saves it.
 func (s *ThreadDirectoryServer) SetPreferredExtendedPanID(extendedPanID []byte) error {
 	return s.SetAttributes(map[uint32]any{tdir.AttrPreferredExtendedPanId: extendedPanID})
 }
 
 // SetAttributes implements [spec.AttributeSetter]: PreferredExtendedPanID
-// under the write's rule; ThreadNetworks and ThreadNetworkTableSize are
-// the store's ([spec.ErrNotHeld] for a value other than the one served).
+// under the write's rule, saved through the store; ThreadNetworks and
+// ThreadNetworkTableSize are the store's ([spec.ErrNotHeld] for a value
+// other than the one served).
 func (s *ThreadDirectoryServer) SetAttributes(values map[uint32]any) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	set := map[uint32]any{}
+	undo := func() {}
 	for _, id := range slices.Sorted(maps.Keys(values)) {
 		switch v := values[id]; id {
 		case tdir.AttrPreferredExtendedPanId:
 			stored, err := s.checkPreferredLocked(v)
 			if err != nil {
+				return err
+			}
+			if undo, err = s.savePreferredLocked(context.Background(), stored); err != nil {
 				return err
 			}
 			set[id] = stored
@@ -611,11 +694,13 @@ func (s *ThreadDirectoryServer) SetAttributes(values map[uint32]any) error {
 					continue
 				}
 			}
+			undo()
 			return fmt.Errorf("%w: netinfra: ThreadNetworks follows the store (ReloadNetworks)", spec.ErrNotHeld)
 		case tdir.AttrThreadNetworkTableSize:
 			if c, ok := v.(uint8); ok && c == s.store.Capacity() {
 				continue
 			}
+			undo()
 			return fmt.Errorf("%w: netinfra: ThreadNetworkTableSize is the store's capacity", spec.ErrNotHeld)
 		default:
 			set[id] = v
@@ -624,7 +709,11 @@ func (s *ThreadDirectoryServer) SetAttributes(values map[uint32]any) error {
 	if len(set) == 0 {
 		return nil
 	}
-	return s.srv.SetAttributes(set)
+	if err := s.srv.SetAttributes(set); err != nil {
+		undo()
+		return err
+	}
+	return nil
 }
 
 // --- plumbing -------------------------------------------------------------
@@ -643,8 +732,10 @@ func (s *ThreadDirectoryServer) MatterRead(attrID uint32) (any, bool) {
 }
 
 // MatterWrite implements [contract.ClusterServer]: PreferredExtendedPanID
-// under chip's rule (:139-151), then the definition's checks and the
-// host's veto; every other attribute is read-only (:97-106).
+// under chip's rule (:139-151), saved through the store as chip writes
+// attribute storage (:150) — a store's error answers FAILURE — then the
+// definition's checks and the host's veto, whose refusal puts the store
+// back; every other attribute is read-only (:97-106).
 func (s *ThreadDirectoryServer) MatterWrite(ctx context.Context, attrID uint32, value any) error {
 	if attrID != tdir.AttrPreferredExtendedPanId {
 		return s.srv.MatterWrite(ctx, attrID, value)
@@ -655,7 +746,15 @@ func (s *ThreadDirectoryServer) MatterWrite(ctx context.Context, attrID uint32, 
 	if err != nil {
 		return err
 	}
-	return s.srv.MatterWrite(ctx, attrID, stored)
+	undo, err := s.savePreferredLocked(ctx, stored)
+	if err != nil {
+		return err
+	}
+	if err := s.srv.MatterWrite(ctx, attrID, stored); err != nil {
+		undo()
+		return err
+	}
+	return nil
 }
 
 // MatterInvoke implements [contract.ClusterServer]: a host's handler
