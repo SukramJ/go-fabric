@@ -92,6 +92,8 @@ pin lift confirms by re-reading the row, [`pin-lifts.md`](./pin-lifts.md)).
 | BD-chip-Thermostat-Schedules | `ThermostatServer.ts:82`, the class doc lists the feature unimplemented (presence; :126-128 warns when it is enabled) | `packages/node/src/behaviors/thermostat/ThermostatServer.ts` | `"MatterScheduleConfiguration: This feature is not implemented yet."` | connectedhomeip `src/app/clusters/thermostat-server/ThermostatClusterSchedules.cpp` at `645b267a` (`SetActiveSchedule` :741, `AppendPendingSchedule` :795, `ValidateScheduleTransitions` :292, `ValidateTransitionsPerDay` :457, the atomic hooks :620-663, `PrecommitSchedules` :1000) |
 | BD-chip-Chime-RulesInServer | `ChimeServer.ts:14` is the empty subclass (absence: the class body, 14 lines in all) | `packages/node/src/behaviors/chime/ChimeServer.ts` | `class ChimeServer` | connectedhomeip `src/app/clusters/chime-server/ChimeCluster.cpp` at `6170af84` (`IsSupportedChimeID` :176, `SetSelectedChime` :215, `SetEnabled` :228, `HandlePlayChimeSound` :258, `GenerateChimeStartedPlayingEvent` :291), tests `tests/TestChimeCluster.cpp` |
 | BD-chip-CameraAvSettings-RulesInServer | `CameraAvSettingsUserLevelManagementServer.ts:18` is the empty subclass (absence: the class body, 18 lines in all) | `packages/node/src/behaviors/camera-av-settings-user-level-management/CameraAvSettingsUserLevelManagementServer.ts` | `class CameraAvSettingsUserLevelManagementServer` | connectedhomeip `src/app/clusters/camera-av-settings-user-level-management-server/CameraAvSettingsUserLevelManagementLogic.cpp` at `6170af84` (the handlers :721-1261, `OnPhysicalMovementComplete` :1265, the limit setters :339-407, the DPTZ streams :469-591), tests `tests/TestCameraAvSettingsUserLevelManagementCluster.cpp` |
+| BD-chip-CameraAvStreamManagement-RulesInServer | `CameraAvStreamManagementServer.ts:18` is the empty subclass (absence: the class body, 18 lines in all) | `packages/node/src/behaviors/camera-av-stream-management/CameraAvStreamManagementServer.ts` | `class CameraAvStreamManagementServer` | connectedhomeip `src/app/clusters/camera-av-stream-management-server/CameraAVStreamManagementCluster.cpp` at `6170af84` (`Init` :76, the reference counts :486-557, `SetViewport` :1137, the handlers :2065-2669, `IsResourceAvailableForStreamAllocation` :2717), `CameraAVStreamManagementCluster.h` (the delegate :159-372, `ValidateStreamForModifyOrDeallocateImpl` :794), tests `tests/TestCameraAVStreamManagementCluster.cpp` |
+| BD-chip-ZoneManagement-RulesInServer | `ZoneManagementServer.ts:14` is the empty subclass (absence: the class body, 14 lines in all) | `packages/node/src/behaviors/zone-management/ZoneManagementServer.ts` | `class ZoneManagementServer` | connectedhomeip `src/app/clusters/zone-management-server/ZoneManagementCluster.cpp` at `6170af84` (`ValidateConfiguration` :85, the Sensitivity write :259-284, the handlers :462-659, the events :701-733), `zone-geometry.h` (`IsZoneSelfIntersecting` :158), tests `tests/TestZoneManagementCluster.cpp`, `tests/TestZonePolygon.cpp` |
 | BD-chip-WiFiNetworkManagement-RulesInServer | `WiFiNetworkManagementServer.ts:14` is the empty subclass (absence: the class line, 14 lines in all) | `packages/node/src/behaviors/wi-fi-network-management/WiFiNetworkManagementServer.ts` | `"export class WiFiNetworkManagementServer extends WiFiNetworkManagementBehavior {}"` | connectedhomeip `src/app/clusters/wifi-network-management-server/WiFiNetworkManagementCluster.cpp` at `6170af84` (`ClearNetworkCredentials` :62, `SetNetworkCredentials` :74, `ReadAttribute` :105, `InvokeCommand` :123) |
 | BD-chip-ThreadNetworkDirectory-RulesInServer | `ThreadNetworkDirectoryServer.ts:14` is the empty subclass (absence: the class line, 14 lines in all) | `packages/node/src/behaviors/thread-network-directory/ThreadNetworkDirectoryServer.ts` | `"export class ThreadNetworkDirectoryServer extends ThreadNetworkDirectoryBehavior {}"` | connectedhomeip `src/app/clusters/thread-network-directory-server/ThreadNetworkDirectoryCluster.cpp` at `6170af84` (`WritePreferredExtendedPanId` :139, `ReadThreadNetworks` :153, `HandleAddNetworkRequest` :214, `HandleRemoveNetworkRequest` :278, `HandleOperationalDatasetRequest` :309; `ThreadNetworkDirectoryStorage.h`) |
 
@@ -4751,6 +4753,62 @@ sizes, `ThreadOperationalDataset.cpp:172-301`), not through
 two views. chip's seven unit cases are ported (`threaddir_chip_test.go`; the
 storage-migration case is chip's own format). Retire when matter.js's
 server gains the rules.
+
+### BD-chip-CameraAvStreamManagement-RulesInServer — stream allocation, reference counts and the viewport follow connectedhomeip behind four ports
+
+matter.js's `CameraAvStreamManagementServer.ts:18` at `862ad75f` is the
+empty subclass: a controller's AllocateVideoStream is stored unchecked and
+no stream table exists. `cluster/camera/avstream.go` (`camera.AvStream`)
+follows connectedhomeip's `CameraAVStreamManagementCluster.cpp` at
+`6170af84`: the configuration check of `Init` (:76-160), each request in
+chip's order with chip's status codes (:2065-2669), a reused stream
+narrowed to the intersection of both ranges, reference counts that refuse
+to deallocate a stream in use or an Internal one (:486-557), the aspect
+ratio rule of `SetViewport` (:1137-1171), the privacy modes and the image
+size bound on capture. The host supplies the encoders through
+`VideoStreamPort`, `AudioStreamPort`, `SnapshotStreamPort` and
+`SnapshotCapturePort`; the ports are called outside the server's lock.
+Pinned by `avstream_chip_test.go` (chip's 57 cluster cases; the seven
+storage-migration cases :1790-1929 are left out because the host persists)
+and `avstream_rules_test.go`.
+
+### BD-chip-CameraAvStream-DefaultsWhereTheModelHasNone — attributes without a model default start at chip's values
+
+The matter.js model names no default for most CameraAvStreamManagement
+attributes, and matter.js refuses to serve a mandatory attribute without
+a value. Requiring every camera host to set them would put chip's member
+defaults into each host; the server starts them at chip's values instead
+(`CameraAVStreamManagementCluster.h:405-445`, `:740-764`: NightVision On,
+the maximum levels 254, StatusLightBrightness Medium, the rest zero or
+false) and keeps the model's default where it names one
+(MicrophoneAGCEnabled and StatusLightEnabled `true`, chip `false`), since
+schema values come from matter.js verbatim. Owner decision 2026-10-27.
+
+### BD-chip-CameraAvStream-SnapshotBound — the capture size bound is the TCP message size less chip's margin, configurable
+
+chip bounds a captured snapshot by its platform packet buffer
+(`CameraAVStreamManagementCluster.h:53-55`), which the module does not
+have. `DefaultMaxSnapshotSize` is matter.js's MaxTCPMessageSize fallback
+(64000) less chip's 100, and `Config.MaxSnapshotSize` overrides it; the
+bound is not read from the session's negotiated size at invoke time.
+Owner decision 2026-10-27.
+
+### BD-chip-ZoneManagement-RulesInServer — zone and trigger rules follow connectedhomeip behind `ZonePort`
+
+matter.js's `ZoneManagementServer.ts:14` at `862ad75f` is the empty
+subclass, so a controller could store a self-intersecting or duplicate
+zone. `cluster/camera/zone.go` (`camera.Zones`) follows
+`ZoneManagementCluster.cpp` at `6170af84`: `ValidateConfiguration` (:85),
+the Sensitivity write (:259-284), the handlers (:462-659), the events
+(:701-733) and the polygon rules of `zone-geometry.h:158-317`
+(`camera.ZoneSelfIntersecting`). chip checks only the user-defined budget
+on create (:473), not MaxZones over every zone, and so does the server
+(owner decision 2026-10-27). Two chip tests build USERDEFINED without
+TWODCART (`TestZoneManagementCluster.cpp:223-239`, `:308-315`); the
+matter.js model makes USERDEFINED `[TWODCART]`, so the server refuses that
+configuration (`ErrZonesConfig`) and the port asserts the refusal. Pinned
+by `zone_chip_test.go` (11 cluster cases, 16 polygons) and
+`zone_rules_test.go`.
 
 ### BD-Matter-GeneratedServerSuffices — clusters whose generated server is complete: no source carries behaviour beyond the model
 

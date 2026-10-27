@@ -12,6 +12,15 @@ pseudo-version of `main`.
 
 ### Added
 
+- `cluster/camera`, the camera stream servers (milestone 6, brief 26-A2, concept v10 wave 26-A2), both after connectedhomeip at 6170af84, ahead of matter.js:
+  - `camera.AvStream` serves CameraAvStreamManagement after `CameraAVStreamManagementCluster.cpp`. It runs on four new ports (`cameraavstreammanagementdef.Declare`): `VideoStreamPort` (VDO), `AudioStreamPort` (ADO), `SnapshotStreamPort` and `SnapshotCapturePort` (SNP). The server validates each allocation against the cluster's rules, the stream priorities and the snapshot capabilities before the port allocates, keeps the allocated streams (a reused id narrows the stream to the intersection of both ranges; `VideoStreamAllocated` tells the host how), counts their references (`UpdateVideoStreamRefCount` and its audio and snapshot twins), refuses to deallocate a stream in use, holds the Viewport to the sensor's aspect ratio, and refuses a snapshot while a privacy mode is on. `ReusableVideoStreamID`, `ReusableSnapshotStreamID` and `ResourceAvailable` are chip's helpers for the port.
+  - `camera.Zones` serves ZoneManagement after `ZoneManagementCluster.cpp` and `zone-geometry.h`. It runs on the new port `ZonePort` (`zonemanagementdef.Declare.ZonePort`). The server validates a zone (its constraints, the vertex bounds, a duplicate, a self-intersecting polygon — `camera.ZoneSelfIntersecting`) and a trigger before the port stores it, keeps Zones and Triggers and the user-defined budget, and emits `ZoneTriggered` and `ZoneStopped` when the host reports them.
+  - Both keep the generated server without their ports. The host persists their state through the change notifications and restores it through `Initial`. chip's unit tests are ported (57 stream cases, 11 zone cases, the polygon cases). The [camera guide](docs/guides/camera.md) gains the stream and the zone model.
+
+## [0.13.6] — 2026-10-27
+
+### Added
+
 - `cluster/camera`, the camera signalling servers (milestone 6, brief 26-A1, concept v10 wave 26-A1):
   - `camera.Requestor` serves WebRtcTransportRequestor after matter.js's `WebRtcTransportRequestorServer.ts` (at 862ad75f). The host registers a session with `UpsertSession` and drops it with `RemoveSession`. `Offer`, `Answer`, `IceCandidates` and `End` answer `NOT_FOUND` unless the invoking peer holds the session (same id, fabric and peer node). A held session goes to the new port `RequestorPort` (`webrtctransportrequestordef.Declare.RequestorPort`), and the optional `RequestorRefusals` hears of each refusal. `CurrentSessions` reads per fabric. The node adds the Operate/CASE entry the camera needs to the first fabric's ACL. The device kit makes the requestor the default of every device that mounts it, such as `device.NewCameraController`. matter.js's `WebRtcTransportRequestorServerTest.ts` is ported.
   - `camera.Chime` serves Chime after connectedhomeip's `ChimeCluster.cpp` (at 6170af84), ahead of matter.js. It runs on the new port `ChimePort` (`chimedef.Declare.ChimePort`): `InstalledChimeSounds` and `PlayChimeSound`. A write of `SelectedChime` must name an installed sound (`NOT_FOUND`). `PlayChimeSound` emits `ChimeStartedPlaying`.
@@ -4953,7 +4962,8 @@ consumer of an older pseudo-version should read.
   earlier than it was. Both fields are gone; the commit holding the file is
   its provenance.
 
-[Unreleased]: https://github.com/SukramJ/go-fabric/compare/v0.13.5...HEAD
+[Unreleased]: https://github.com/SukramJ/go-fabric/compare/v0.13.6...HEAD
+[0.13.6]: https://github.com/SukramJ/go-fabric/compare/v0.13.5...v0.13.6
 [0.13.5]: https://github.com/SukramJ/go-fabric/compare/v0.13.4...v0.13.5
 [0.13.4]: https://github.com/SukramJ/go-fabric/compare/v0.13.3...v0.13.4
 [0.13.3]: https://github.com/SukramJ/go-fabric/compare/v0.13.2...v0.13.3

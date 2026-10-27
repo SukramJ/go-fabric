@@ -1608,7 +1608,7 @@
   },
   {
     "file": "controller/client/fabricops.go",
-    "line": 190,
+    "line": 187,
     "citation": "CommissioningClient.ts:883-895",
     "resolved": "packages/node/src/behavior/system/commissioning/CommissioningClient.ts",
     "identifier": "NetworkAddress",
@@ -1617,7 +1617,7 @@
   },
   {
     "file": "controller/client/fabricops.go",
-    "line": 210,
+    "line": 207,
     "citation": "CommissioningClient.ts:664-680",
     "resolved": "packages/node/src/behavior/system/commissioning/CommissioningClient.ts",
     "identifier": "#catsChanged",
@@ -1626,7 +1626,7 @@
   },
   {
     "file": "controller/client/fabricops.go",
-    "line": 390,
+    "line": 386,
     "citation": "CommissioningClient.ts:406-408",
     "resolved": "packages/node/src/behavior/system/commissioning/CommissioningClient.ts",
     "identifier": "PeerInitiatedCloseError",

@@ -6,11 +6,14 @@ package device
 import (
 	"errors"
 	"fmt"
+	"maps"
 
 	"github.com/SukramJ/go-fabric/cluster/camera"
 	avdef "github.com/SukramJ/go-fabric/cluster/spec/cameraavsettingsuserlevelmanagement"
+	csdef "github.com/SukramJ/go-fabric/cluster/spec/cameraavstreammanagement"
 	chimedef "github.com/SukramJ/go-fabric/cluster/spec/chime"
 	wrdef "github.com/SukramJ/go-fabric/cluster/spec/webrtctransportrequestor"
+	zmdef "github.com/SukramJ/go-fabric/cluster/spec/zonemanagement"
 	"github.com/SukramJ/go-fabric/contract"
 )
 
@@ -21,13 +24,18 @@ import (
 // declaration carries one; Chime and CameraAvSettingsUserLevelManagement
 // run on the ports their declarations carry and keep the generated server
 // without them. Each takes the values the host persisted from the
-// declaration's Initial ([configFrom]).
+// declaration's Initial ([configFrom]). CameraAvStreamManagement and
+// ZoneManagement (brief 26-A2) run on the ports their declarations carry
+// — a stream port per feature, the ZonePort — and keep the generated
+// server without them.
 
 func init() {
 	for id, f := range map[uint32]serverFactory{
 		wrdef.ClusterID:    newRequestorServer,
 		chimedef.ClusterID: newChimeServer,
 		avdef.ClusterID:    newAvSettingsServer,
+		csdef.ClusterID:    newAvStreamServer,
+		zmdef.ClusterID:    newZonesServer,
 	} {
 		selfHeldDefaults[id] = f
 	}
@@ -77,6 +85,45 @@ func newAvSettingsServer(b defaultBuild) (contract.ClusterServer, error) {
 	configFrom(&cfg, b.def, b.initial)
 	srv, err := camera.NewAvSettings(cfg)
 	if errors.Is(err, camera.ErrAvSettingsConfig) || errors.Is(err, camera.ErrNoMechanicalPTZ) || errors.Is(err, camera.ErrNoDigitalPTZ) {
+		return nil, notServed(err)
+	}
+	return srv, err
+}
+
+// newAvStreamServer is the module's CameraAvStreamManagement server
+// ([camera.NewAvStream]) on the declared stream ports, with the features
+// and optional attributes of the selection; the persisted streams and
+// priorities start from Initial, every other value of Initial is set as
+// the server's SetAttributes sets it.
+func newAvStreamServer(b defaultBuild) (contract.ClusterServer, error) {
+	d, _ := b.ports.(csdef.Declare)
+	cfg := camera.AvStreamConfig{
+		Features: camera.AvStreamFeature(b.opts.Features), Attributes: b.opts.Attributes,
+		Video: d.VideoStreamPort, Audio: d.AudioStreamPort, Snapshot: d.SnapshotStreamPort, Capture: d.SnapshotCapturePort,
+		DataVersion: b.cfg.DataVersion,
+	}
+	configFrom(&cfg, b.def, b.initial)
+	cfg.Initial = maps.Clone(b.initial)
+	clear(b.initial)
+	srv, err := camera.NewAvStream(cfg)
+	if errors.Is(err, camera.ErrAvStreamConfig) || errors.Is(err, camera.ErrNoStreamPort) {
+		return nil, notServed(err)
+	}
+	return srv, err
+}
+
+// newZonesServer is the module's ZoneManagement server ([camera.NewZones])
+// on the declared ZonePort; the limits, Sensitivity, the zones and the
+// triggers start from Initial.
+func newZonesServer(b defaultBuild) (contract.ClusterServer, error) {
+	d, _ := b.ports.(zmdef.Declare)
+	if d.ZonePort == nil {
+		return nil, notServed(fmt.Errorf("zone management: %w", errNoPort))
+	}
+	cfg := camera.ZonesConfig{Features: camera.ZoneFeature(b.opts.Features), Port: d.ZonePort, DataVersion: b.cfg.DataVersion}
+	configFrom(&cfg, b.def, b.initial)
+	srv, err := camera.NewZones(cfg)
+	if errors.Is(err, camera.ErrZonesConfig) {
 		return nil, notServed(err)
 	}
 	return srv, err
