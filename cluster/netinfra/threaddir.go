@@ -18,7 +18,6 @@ import (
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	tdir "github.com/SukramJ/go-fabric/cluster/spec/threadnetworkdirectory"
 	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/controller/thread"
 	"github.com/SukramJ/go-fabric/im"
 )
 
@@ -358,73 +357,108 @@ func validDatasetFraming(blob []byte) bool {
 	return true
 }
 
+// The MeshCoP sub-TLV types chip's getters locate (src/lib/support/
+// ThreadOperationalDataset.cpp, ThreadTLV's k* types; Thread spec §8.10).
+const (
+	tlvChannel         = 0
+	tlvPANID           = 1
+	tlvExtPANID        = 2
+	tlvNetworkName     = 3
+	tlvPSKc            = 4
+	tlvNetworkKey      = 5
+	tlvMeshLocalPrefix = 7
+	tlvSecurityPolicy  = 12
+	tlvActiveTimestamp = 14
+	tlvChannelMask     = 53
+)
+
+// locate is chip's OperationalDatasetView::Locate
+// (ThreadOperationalDataset.cpp:172-185): the value of the first sub-TLV of
+// type typ in a framed dataset; false when there is none.
+func locate(blob []byte, typ byte) ([]byte, bool) {
+	for i := 0; i+2 <= len(blob); {
+		n := int(blob[i+1])
+		if blob[i] == typ {
+			return blob[i+2 : i+2+n], true
+		}
+		i += 2 + n
+	}
+	return nil, false
+}
+
 // parseDataset holds an AddNetwork dataset to chip's checks
 // (ThreadNetworkDirectoryCluster.cpp:231-245): it frames as a dataset and
 // carries the Active Timestamp, Channel, Channel Mask, Extended PAN ID,
 // Network Key, Mesh-Local Prefix, Network Name, PAN ID, PKSc and Security
 // Policy sub-TLVs in the sizes chip's getters demand
-// (ThreadOperationalDataset.cpp:193-301). The TLVs are decoded by the
-// commissioner's codec (controller/thread DecodeDataset, which wave 26a of
-// concept v10 moves to thread/); chip's stricter sizes — the three-byte
-// Channel on page 0 (:202-211), a PSKc of 16 bytes (:276-283), a network
-// name of at most 16 (:257-265), a non-empty Channel Mask (:285-292) — are
-// checked on top, and a name of at least one byte, which the
-// ThreadNetworkStruct's constraint "1 to 16" needs.
+// (ThreadOperationalDataset.cpp:193-301): the first of each type, as
+// Locate finds it. On top it refuses an empty Network Name, which the
+// ThreadNetworkStruct's constraint "1 to 16" could not serve (chip's
+// GetNetworkName checks the maximum only, :257-265).
+//
+// The checks are this package's own rather than the commissioner's codec
+// (controller/thread): a cluster server does not import a role
+// (script/archcheck, servers -> roles); concept v10 wave 26a moves the
+// codec to thread/, below both.
 func parseDataset(blob []byte) (directoryEntry, error) {
 	if !validDatasetFraming(blob) {
 		return directoryEntry{}, datasetError("not a framed dataset of at most %d bytes", maxDatasetLen)
 	}
-	ds, err := thread.DecodeDataset(blob)
+	sized := func(name string, typ byte, ok func(n int) bool) ([]byte, error) {
+		v, found := locate(blob, typ)
+		if !found {
+			return nil, datasetError("no %s", name)
+		}
+		if !ok(len(v)) {
+			return nil, datasetError("%s of %d bytes", name, len(v))
+		}
+		return v, nil
+	}
+	exactly := func(want int) func(int) bool { return func(n int) bool { return n == want } }
+	extPANID, err := sized("Extended PAN ID", tlvExtPANID, exactly(ExtendedPanIDLen)) // :230-237
 	if err != nil {
-		return directoryEntry{}, datasetError("%w", err)
+		return directoryEntry{}, err
 	}
-	switch {
-	case ds.ExtPANID == nil:
-		return directoryEntry{}, datasetError("no Extended PAN ID")
-	case ds.ActiveTimestamp == nil:
-		return directoryEntry{}, datasetError("no Active Timestamp")
-	case ds.Channel == nil:
-		return directoryEntry{}, datasetError("no Channel")
-	case len(ds.ChannelMask) == 0:
-		return directoryEntry{}, datasetError("no Channel Mask")
-	case ds.NetworkKey == nil:
-		return directoryEntry{}, datasetError("no Network Key")
-	case ds.MeshLocalPrefix == nil:
-		return directoryEntry{}, datasetError("no Mesh-Local Prefix")
-	case ds.NetworkName == nil || len(*ds.NetworkName) > maxNetworkNameLen:
-		return directoryEntry{}, datasetError("no Network Name of at most %d bytes", maxNetworkNameLen)
-	case *ds.NetworkName == "":
-		// chip takes an empty name (:257-265 checks the maximum only); the
-		// ThreadNetworkStruct's NetworkName is "1 to 16", so ThreadNetworks
-		// could not serve it.
-		return directoryEntry{}, datasetError("an empty Network Name")
-	case ds.PANID == nil:
-		return directoryEntry{}, datasetError("no PAN ID")
-	case len(ds.PSKc) != pskcLen:
-		return directoryEntry{}, datasetError("no PSKc of %d bytes", pskcLen)
-	case ds.SecurityPolicy == nil:
-		return directoryEntry{}, datasetError("no Security Policy")
-	}
-	entries, err := thread.WalkTLVs(blob)
+	ts, err := sized("Active Timestamp", tlvActiveTimestamp, exactly(8)) // :193-200
 	if err != nil {
-		return directoryEntry{}, datasetError("%w", err)
+		return directoryEntry{}, err
 	}
-	for _, e := range entries {
-		if e.Type == thread.TLVChannel {
-			if len(e.Value) != 3 || e.Value[0] != 0 {
-				return directoryEntry{}, datasetError("Channel is not the three-byte form on page 0")
-			}
-			break
+	channel, err := sized("Channel", tlvChannel, exactly(3)) // :202-211
+	if err != nil {
+		return directoryEntry{}, err
+	}
+	if channel[0] != 0 {
+		return directoryEntry{}, datasetError("Channel on page %d, not 0", channel[0])
+	}
+	name, err := sized("Network Name", tlvNetworkName, func(n int) bool { return n >= 1 && n <= maxNetworkNameLen }) // :257-265
+	if err != nil {
+		return directoryEntry{}, err
+	}
+	for _, c := range []struct {
+		name string
+		typ  byte
+		ok   func(int) bool
+	}{
+		{"Channel Mask", tlvChannelMask, func(n int) bool { return n > 0 }}, // :285-292
+		{"Network Key", tlvNetworkKey, exactly(16)},                         // :248-255
+		{"Mesh-Local Prefix", tlvMeshLocalPrefix, exactly(8)},               // :239-246
+		{"PAN ID", tlvPANID, exactly(2)},                                    // :267-274
+		{"PSKc", tlvPSKc, exactly(pskcLen)},                                 // :276-283
+		{"Security Policy", tlvSecurityPolicy, exactly(4)},                  // :294-301
+	} {
+		if _, err := sized(c.name, c.typ, c.ok); err != nil {
+			return directoryEntry{}, err
 		}
 	}
+	timestamp := binary.BigEndian.Uint64(ts)
 	return directoryEntry{
 		dataset:   slices.Clone(blob),
-		timestamp: binary.BigEndian.Uint64(ds.ActiveTimestamp),
+		timestamp: timestamp,
 		network: ThreadNetwork{
-			ExtendedPanId:   slices.Clone(ds.ExtPANID),
-			NetworkName:     *ds.NetworkName,
-			Channel:         *ds.Channel,
-			ActiveTimestamp: binary.BigEndian.Uint64(ds.ActiveTimestamp),
+			ExtendedPanId:   slices.Clone(extPANID),
+			NetworkName:     string(name),
+			Channel:         binary.BigEndian.Uint16(channel[1:]),
+			ActiveTimestamp: timestamp,
 		},
 	}, nil
 }

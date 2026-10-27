@@ -69,8 +69,10 @@ change reports and passes it back as the declaration's `Initial`
 changes the store outside the cluster calls `ReloadNetworks`, which
 re-reads the store and reports `ThreadNetworks` when it moved.
 
-Datasets are decoded by the commissioner's codec (`controller/thread`).
-Concept v10 wave 26a moves that codec to `thread/`.
+The server checks a dataset the way chip's `OperationalDatasetView` reads
+one, taking the first sub-TLV of each type. It does not use the
+commissioner's codec (`controller/thread`), because a cluster server does
+not import a role. Concept v10 wave 26a moves that codec to `thread/`.
 
 ## ThreadNetworkDiagnostics
 
