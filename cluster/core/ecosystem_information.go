@@ -319,3 +319,6 @@ func (e *EcosystemInformation) SetMatterEventEmitter(emitter contract.EventEmitt
 func (e *EcosystemInformation) SetBeforeWrite(fn func(ctx context.Context, attrID uint32, value any) error) {
 	e.veto.Set(fn)
 }
+
+// The host methods the typed server's Host returns (brief CK-2).
+var _ ecodef.Host = (*EcosystemInformation)(nil)

@@ -42,6 +42,23 @@ still held there. Each row names the facade route, or the section of
 | `cluster/core` | `SoftwareVersionFromString` (`daemon_matter.go:527`) | `node.SoftwareVersionFromString` |
 | `cluster/core` | `RegulatoryIndoorOutdoor` (`daemon_matter.go:506`) | `node.RegulatoryIndoorOutdoor` for `Commissioning.LocationCapability` |
 
+## Added after v0.13.6: `<cluster>def.Server.Host()`
+
+A host that type-asserts a typed server's `Underlying()` to reach the
+kit server's own methods calls `Host()` instead. `Underlying()` stays, so
+nothing breaks.
+
+| Before | After |
+| --- | --- |
+| `d.WiFiNetworkManagement().Underlying().(*netinfra.WiFiManagementServer).SetNetworkCredentials(…)` | `d.WiFiNetworkManagement().Host().SetNetworkCredentials(…)` |
+| `d.ThreadNetworkDirectory().Underlying().(*netinfra.ThreadDirectoryServer).ReloadNetworks(ctx)` | `d.ThreadNetworkDirectory().Host().ReloadNetworks(ctx)` |
+| `….Underlying().(*energy.EvseServer).SetHardwareState(…)`, `.Close()` | `d.EnergyEvse().Host().SetHardwareState(…)`, `.Close()` |
+| `….Underlying().(*energy.DeviceEnergyManagementServer).Close()` | `d.DeviceEnergyManagement().Host().Close()` |
+| a kit server's setter the typed `Set` reaches (`thermo.ThermostatServer.SetPresets`, `appliance.MicrowaveServer.SetCookTime`, …) | `Set(Patch{…})` |
+
+The [Host ports](ports.md#clusterdefhost-the-kit-servers-host-methods)
+guide lists every `Host`.
+
 ## Changed in v0.13.4: the WebRTC transport structs
 
 | Symbol | Route |

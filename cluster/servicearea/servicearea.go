@@ -817,3 +817,6 @@ func (s *Server) RemoveSupportedMapsEntry(mapID uint32) {
 	s.mu.Unlock()
 	s.report(changed)
 }
+
+// The host methods the typed server's Host returns (brief CK-2).
+var _ sa.Host = (*Server)(nil)

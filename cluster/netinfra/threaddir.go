@@ -772,3 +772,6 @@ func (s *ThreadDirectoryServer) MatterAcceptedCommands() []uint32 {
 func (s *ThreadDirectoryServer) MatterGeneratedCommands() []uint32 {
 	return s.srv.MatterGeneratedCommands()
 }
+
+// The host methods the typed server's Host returns (brief CK-2).
+var _ tdir.Host = (*ThreadDirectoryServer)(nil)

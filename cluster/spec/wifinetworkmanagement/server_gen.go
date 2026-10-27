@@ -148,6 +148,29 @@ func (s *Server) HandleNetworkPassphraseRequest(fn func(ctx context.Context, req
 	return spec.HandleOn(s.Underlying(), CmdNetworkPassphraseRequest, fn)
 }
 
+// Host is the WiFiNetworkManagement kit server's host methods: the ones Set, Get and
+// the typed handlers do not reach (cluster/netinfra WiFiManagementServer).
+type Host interface {
+	// SetNetworkCredentials stores the network's SSID and passphrase:
+	// a pair outside chip's limits changes nothing and is refused;
+	// Ssid and PassphraseSurrogate change with it.
+	SetNetworkCredentials(ssid, passphrase []byte) error
+	// ClearNetworkCredentials drops the credentials: Ssid and
+	// PassphraseSurrogate read null.
+	ClearNetworkCredentials() error
+	// Passphrase returns the stored passphrase, nil without
+	// credentials.
+	Passphrase() []byte
+}
+
+// Host returns the mounted server's host methods when it implements
+// Host — the kit's server does; nil for a server that does not, as the
+// generated one and a host's own (Declare.HostServer) normally do not.
+func (s *Server) Host() Host {
+	h, _ := s.Underlying().(Host)
+	return h
+}
+
 // Declare is the declaration of the WiFiNetworkManagement cluster on a device:
 // device.New<Type> and device.FromSpec take it, and every field is
 // optional — the zero value mounts the cluster (an optional one too)

@@ -1385,3 +1385,6 @@ func (s *EvseServer) MatterWrite(ctx context.Context, attrID uint32, value any) 
 func (s *EvseServer) MatterInvoke(ctx context.Context, cmdID uint32, fields any) (any, error) {
 	return spec.InvokeHeld(ctx, &s.SelfHeld, cmdID, fields)
 }
+
+// The host methods the typed server's Host returns (brief CK-2).
+var _ evse.Host = (*EvseServer)(nil)

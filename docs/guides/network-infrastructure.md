@@ -13,13 +13,16 @@ server holds a radio: the host supplies the network's state.
 ## WiFiNetworkManagement: the credentials
 
 The server starts without credentials. In that state `Ssid` and
-`PassphraseSurrogate` read null. The host sets the network's credentials on
-the mounted server:
+`PassphraseSurrogate` read null. The host sets the network's credentials
+through the typed server's `Host`, the kit server's host methods
+(`wifinetworkmanagementdef.Host`):
 
 ```go
-wifi := d.WiFiNetworkManagement().Underlying().(*netinfra.WiFiManagementServer)
-err := wifi.SetNetworkCredentials([]byte("home"), passphrase)
+err := d.WiFiNetworkManagement().Host().SetNetworkCredentials([]byte("home"), passphrase)
 ```
+
+`Host` also has `ClearNetworkCredentials` and `Passphrase`; `Ssid` is the
+typed server's `Get`. `Host` is nil when the host mounted its own server.
 
 | Rule | Behaviour |
 | --- | --- |
@@ -72,7 +75,7 @@ store no longer holds is cleared with a warning, and the clearing is saved.
 When the store has saved none, the declaration's `Initial`
 (`PreferredExtendedPanId`) is the fallback, and it must name a stored
 network. A host that changes the store outside the cluster calls
-`ReloadNetworks`, which re-reads the datasets and reports `ThreadNetworks`
+`ReloadNetworks` (`d.ThreadNetworkDirectory().Host().ReloadNetworks(ctx)`), which re-reads the datasets and reports `ThreadNetworks`
 when it moved. A preferred network the store dropped is cleared.
 
 The server checks a dataset the way chip's `OperationalDatasetView` reads

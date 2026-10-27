@@ -269,6 +269,21 @@ func (s *Server) EmitResumed(endpoint uint16, data ResumedEvent) error {
 	return spec.EmitOn(s.Underlying(), endpoint, EventResumed, data)
 }
 
+// Host is the DeviceEnergyManagement kit server's host methods: the ones Set, Get and
+// the typed handlers do not reach (cluster/energy DeviceEnergyManagementServer).
+type Host interface {
+	// Close stops the adjustment and pause timers.
+	Close()
+}
+
+// Host returns the mounted server's host methods when it implements
+// Host — the kit's server does; nil for a server that does not, as the
+// generated one and a host's own (Declare.HostServer) normally do not.
+func (s *Server) Host() Host {
+	h, _ := s.Underlying().(Host)
+	return h
+}
+
 // DemManager is the device's energy management behind the kit's
 // server: the hooks run after the server's checks; an error
 // answers FAILURE and changes nothing (cluster/energy).

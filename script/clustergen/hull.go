@@ -165,7 +165,7 @@ func (g *generator) server() ([]byte, error) {
 	w.p("")
 	w.p("\t\"github.com/SukramJ/go-fabric/cluster/spec\"")
 	w.p("\t\"github.com/SukramJ/go-fabric/contract\"")
-	for _, imp := range ports[c.Name].imports {
+	for _, imp := range hostImports(c.Name) {
 		w.p("\t%q", imp)
 	}
 	w.p(")")
@@ -259,6 +259,7 @@ func (g *generator) server() ([]byte, error) {
 		w.p("\treturn spec.EmitOn(s.Underlying(), endpoint, %s, data)", he.eventID)
 		w.p("}")
 	}
+	g.hostInterface(w)
 	w.p("")
 	g.declaration(w, cmds)
 
@@ -328,6 +329,9 @@ func (g *generator) stateOnly(fields []hullField, omitted []hullOmitted, nullabl
 	if ps := ports[g.c.Name]; len(ps.ports) > 0 || len(ps.types) > 0 || len(ps.imports) > 0 {
 		return nil, fmt.Errorf("definition-only cluster %s has declared ports", g.c.Name)
 	}
+	if _, ok := hosts[g.c.Name]; ok {
+		return nil, fmt.Errorf("definition-only cluster %s has a Host", g.c.Name)
+	}
 	w := &writer{}
 	w.WriteString(header)
 	w.p("package %s", g.pkg)
@@ -374,6 +378,11 @@ func (g *generator) serverTest(w *writer) { //nolint:funlen // one generated tes
 	w.p("\tif s.Underlying() != srv {")
 	w.p("\t\tt.Error(\"the typed server does not hold its server\")")
 	w.p("\t}")
+	if _, ok := hosts[g.c.Name]; ok {
+		w.p("\tif s.Host() != nil {")
+		w.p("\t\tt.Error(\"the generated server has the kit server's host methods\")")
+		w.p("\t}")
+	}
 	w.p("\tif err := s.Set(Patch{}); err != nil {")
 	w.p("\t\tt.Error(err)")
 	w.p("\t}")

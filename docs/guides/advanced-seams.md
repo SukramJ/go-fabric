@@ -51,7 +51,8 @@ A host names none of the packages below for these:
 | A PowerSource's EndpointList | a declared PowerSource names its own endpoint unless `powersourcedef.Declare{Initial: Patch{EndpointList: …}}` names others; Status, Description, BatChargeLevel, BatReplaceability and WiredCurrentType take matter.js's defaults |
 | ContentControl | `contentcontroldef.Declare{ContentControl: port}` (Enable/Disable, each feature's commands a further interface of the port) |
 | ClosureControl's host state | `closurecontroldef.Server.Set(Patch{MainState, CurrentErrorList, OverallCurrentState})`: the typed Set reaches the server's own setters (MainState Error with a list raises OperationalError, Disengaged the EngageStateChanged event); `closure.ControlServer`'s `SetCurrentPosition`, `SetMainState`, `SetErrorList` and `ReportError` stay its server methods on `cluster/wire` types |
-| The EV charger (seam) | `cluster/energy.NewEnergyEvse` with its `EvseHost`, mounted with `energyevsedef.Declare{HostServer: …}`: the charger is a state machine the host drives through the server's own methods, which the typed hull does not cover; its declaration route is milestone 5's |
+| The EV charger | the kit's `energy.EvseServer` is the EnergyEvse default: a state machine whose hardware inputs (`SetHardwareState`, `SetFault`, the hardware limits, `ReportRFID`, `DiagnosticsComplete`) and `Close` are `energyevsedef.Server.Host()`, the attributes it computes refused by `Set`; a charger with an `EvseHost` is `cluster/energy.NewEnergyEvse` mounted with `energyevsedef.Declare{HostServer: …}` (seam), and `Host()` reaches it too, since it is the kit's type |
+| A kit server's own methods | `<cluster>def.Server.Host()`: the methods of the kit's server that `Set`, `Get` and the typed handlers do not reach, as the cluster's `Host` interface ([Host ports](ports.md#clusterdefhost-the-kit-servers-host-methods)); nil over a server that does not implement it |
 | ContentAppObserver (seam) | `cluster/media.NewContentAppObserver` through `device.HostServer`: no device type serves the cluster (matter.js's ContentApp lists it as a client, `ObserverClient`), so it has no declaration |
 | Window errors | `node.ErrAdministratorWindowOpen`, `ErrCommissioningBlocked`, `ErrCommissioningWindowAlreadyOpen`, `ErrCommissioningWindowNotConfigured` (the bridge's values, for `errors.Is`) |
 
@@ -60,6 +61,20 @@ type: a host that names it does not import the package, and code written
 against the original keeps compiling.
 
 *Source: `node/facade.go`, `node/config.go`, `node/mdns.go`, `node/attestation.go`, `node/credentials.go`, `node/health.go`, `node/store_path.go`, `node/observers.go`, `node/lifecycle.go` (`Topology`), `device/lifecycle.go`, `contract/` (`Change`).*
+
+## `Underlying()`
+
+Every typed server's `Underlying()` returns the `contract.ClusterServer`
+it wraps. It is a seam for two cases: a host that mounts its own server
+type (`Declare.HostServer`, `device.WithServer`) and wants it back, and a
+host or test that needs the contract value itself (`MatterRead`,
+`MatterInvoke`). A host that stays on the facade does not type-assert it:
+`Set`, `Get` and the typed handlers reach the server's state, and `Host()`
+the kit server's own methods.
+
+**Costs.** A type assertion names the kit's server package and its type,
+which the facade does not keep stable: the assertion compiles against one
+server and breaks when the device mounts another.
 
 ## `bridge`
 

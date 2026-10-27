@@ -1211,3 +1211,6 @@ func (s *CommodityTariffServer) MatterWrite(ctx context.Context, attrID uint32, 
 func (s *CommodityTariffServer) MatterInvoke(ctx context.Context, cmdID uint32, fields any) (any, error) {
 	return spec.InvokeHeld(ctx, &s.SelfHeld, cmdID, fields)
 }
+
+// The host methods the typed server's Host returns (brief CK-2).
+var _ ct.Host = (*CommodityTariffServer)(nil)

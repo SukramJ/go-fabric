@@ -11,6 +11,7 @@ import (
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	"github.com/SukramJ/go-fabric/contract"
+	"time"
 )
 
 // State is the typed state of the Switch cluster: one field per attribute
@@ -184,6 +185,36 @@ func (s *Server) EmitMultiPressOngoing(endpoint uint16, data MultiPressOngoingEv
 // spec.ErrNoEvents for a server without one.
 func (s *Server) EmitMultiPressComplete(endpoint uint16, data MultiPressCompleteEvent) error {
 	return spec.EmitOn(s.Underlying(), endpoint, EventMultiPressComplete, data)
+}
+
+// Host is the Switch kit server's host methods: the ones Set, Get and
+// the typed handlers do not reach (cluster/switch Server).
+// The positions and presses come in through the server's
+// contract.SwitchPositionSink and contract.SwitchEventEmitter.
+type Host interface {
+	// RawPosition returns the last raw position reported, debounced
+	// or not.
+	RawPosition() uint8
+	// SetDebounceDelay sets the debounce delay of a raw position; 0
+	// decides one at once.
+	SetDebounceDelay(d time.Duration)
+	// SetLongPressDelay sets the hold that makes a press long; 0 is
+	// the default.
+	SetLongPressDelay(d time.Duration)
+	// SetMultiPressDelay sets the release that ends a multi-press
+	// sequence; 0 is the default.
+	SetMultiPressDelay(d time.Duration)
+	// ResetState starts a clean cycle: pending debounced positions,
+	// timers and results not applied yet are dropped.
+	ResetState()
+}
+
+// Host returns the mounted server's host methods when it implements
+// Host — the kit's server does; nil for a server that does not, as the
+// generated one and a host's own (Declare.HostServer) normally do not.
+func (s *Server) Host() Host {
+	h, _ := s.Underlying().(Host)
+	return h
 }
 
 // Declare is the declaration of the Switch cluster on a device:

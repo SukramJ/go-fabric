@@ -174,6 +174,40 @@ fails `node.New`.
 
 *Source: `bridge/bridge.go:29-177`, `bridge/securechannel.go:242-262`, `bridge/ackpump.go:36-58`.*
 
+## `<cluster>def.Host`: the kit server's host methods
+
+A port is what the kit's server calls on the host. `Host` is the other
+direction: the methods of the kit's server that the host calls and the
+typed server's `Set`, `Get`, `OnChanged`, `OnWrite`, `MarkChanged`,
+`Handle<Command>` and `Emit<Event>` do not reach — a state machine's
+input, a change with its own rule, state no attribute carries. The
+cluster's typed server returns them: `d.EnergyEvse().Host()`. `Host()` is
+nil when the mounted server does not implement the interface, as a host's
+own server (`Declare.HostServer`) normally does not; the kit's server
+does, also when the host mounts it itself. A cluster whose kit server has
+no such method has no `Host`.
+
+| Cluster | `Host` |
+| --- | --- |
+| BooleanStateConfiguration | `SetSensorFault` (the event on every call, the attribute when served) |
+| CameraAvSettingsUserLevelManagement | `AddMoveCapableVideoStream`, `UpdateMoveCapableVideoStream`, `UpdateMoveCapableVideoStreams`, `RemoveMoveCapableVideoStream`, `PhysicalMovementComplete` |
+| CameraAvStreamManagement | `UpdateVideoStreamRefCount`, `UpdateAudioStreamRefCount`, `UpdateSnapshotStreamRefCount`, `ReusableVideoStreamID`, `ReusableSnapshotStreamID`, `ResourceAvailable` |
+| Chime | `SoundsChanged` |
+| CommodityTariff | `SyncTime` (the poll the server runs itself with a `SyncInterval`) |
+| DeviceEnergyManagement | `Close` (stops its timers) |
+| DishwasherAlarm, RefrigeratorAlarm, TemperatureAlarm | `ResetLatchedAlarms` |
+| DoorLock | `SetDoorState` (DoorStateChange and the door counters), `Users` |
+| EcosystemInformation | `DirectoryChanged` |
+| EnergyEvse | `SetHardwareState`, `SetFault`, `SetMaxHardwareChargeCurrent`, `SetMaxHardwareDischargeCurrent`, `SetCableAssemblyLimit`, `SetNominalMainsVoltage`, `ReportRFID`, `DiagnosticsComplete`, their getters, `IsPluggedIn`, `Targets`, `Close` |
+| ServiceArea | `RemoveSupportedAreasEntry`, `RemoveSupportedMapsEntry` (with what names the area or map) |
+| SmokeCoAlarm | `Refresh` (for a `StateSource` that is no `contract.ChangeNotifier`) |
+| Switch | `RawPosition`, `SetDebounceDelay`, `SetLongPressDelay`, `SetMultiPressDelay`, `ResetState` |
+| ThreadNetworkDirectory | `ReloadNetworks` |
+| WiFiNetworkManagement | `SetNetworkCredentials`, `ClearNetworkCredentials`, `Passphrase` |
+
+*Source: `script/clustergen/hosts.go`; the decision on every method of
+every kit server is `device/host_methods_test.go`.*
+
 ## Optional interfaces of cluster ports
 
 Some cluster servers take a host port and look for more capabilities on it

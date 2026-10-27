@@ -394,6 +394,65 @@ func (s *Server) EmitRfid(endpoint uint16, data RfidEvent) error {
 	return spec.EmitOn(s.Underlying(), endpoint, EventRfid, data)
 }
 
+// Host is the EnergyEvse kit server's host methods: the ones Set, Get and
+// the typed handlers do not reach (cluster/energy EvseServer).
+// The charger is a state machine the hardware's inputs drive; the
+// attributes it computes from them are refused by Set.
+type Host interface {
+	// SetHardwareState is the hardware's plug and demand state
+	// (chip's HwSetState): NotPluggedIn, PluggedInNoDemand and
+	// PluggedInDemand drive the state machine, any other is FAILURE.
+	SetHardwareState(next StateEnum) error
+	// SetFault records a fault (chip's HwSetFault): Fault is emitted,
+	// FaultState changes, the state machine enters or leaves Fault;
+	// the same fault again is FAILURE.
+	SetFault(fault FaultStateEnum) error
+	// SetMaxHardwareChargeCurrent is the hardware's charge limit in mA
+	// (chip's HwSetMaxHardwareChargeCurrentLimit).
+	SetMaxHardwareChargeCurrent(mA int64) error
+	// SetMaxHardwareDischargeCurrent is the hardware's discharge limit
+	// in mA (chip's HwSetMaxHardwareDischargeCurrentLimit).
+	SetMaxHardwareDischargeCurrent(mA int64) error
+	// SetCableAssemblyLimit is the cable's limit in mA (chip's
+	// HwSetCableAssemblyLimit).
+	SetCableAssemblyLimit(mA int64) error
+	// SetNominalMainsVoltage is the mains voltage in mV (chip's
+	// HwSetNominalMainsVoltage); below 100 V is CONSTRAINT_ERROR.
+	SetNominalMainsVoltage(mV int64) error
+	// ReportRFID emits the Rfid event (chip's HwSetRFID).
+	ReportRFID(uid []byte) error
+	// DiagnosticsComplete returns from DisabledDiagnostics to Disabled
+	// (chip's HwDiagnosticsComplete); in any other SupplyState it is
+	// FAILURE.
+	DiagnosticsComplete() error
+	// HardwareState returns the state the hardware last reported.
+	HardwareState() StateEnum
+	// MaxHardwareChargeCurrent returns the hardware charge limit in mA.
+	MaxHardwareChargeCurrent() int64
+	// MaxHardwareDischargeCurrent returns the hardware discharge limit
+	// in mA.
+	MaxHardwareDischargeCurrent() int64
+	// CableAssemblyLimit returns the cable's limit in mA.
+	CableAssemblyLimit() int64
+	// NominalMainsVoltage returns the mains voltage in mV.
+	NominalMainsVoltage() int64
+	// IsPluggedIn reports whether a vehicle is plugged in (chip's
+	// IsEvsePluggedIn).
+	IsPluggedIn() bool
+	// Targets returns the stored charging target schedules.
+	Targets() []ChargingTargetScheduleStruct
+	// Close stops the enabled-until timer.
+	Close()
+}
+
+// Host returns the mounted server's host methods when it implements
+// Host — the kit's server does; nil for a server that does not, as the
+// generated one and a host's own (Declare.HostServer) normally do not.
+func (s *Server) Host() Host {
+	h, _ := s.Underlying().(Host)
+	return h
+}
+
 // Declare is the declaration of the EnergyEvse cluster on a device:
 // device.New<Type> and device.FromSpec take it, and every field is
 // optional — the zero value mounts the cluster (an optional one too)

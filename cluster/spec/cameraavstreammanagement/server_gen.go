@@ -526,6 +526,38 @@ func (s *Server) HandleCaptureSnapshot(fn func(ctx context.Context, req CaptureS
 	return spec.HandleOn(s.Underlying(), CmdCaptureSnapshot, fn)
 }
 
+// Host is the CameraAvStreamManagement kit server's host methods: the ones Set, Get and
+// the typed handlers do not reach (cluster/camera AvStream).
+type Host interface {
+	// UpdateVideoStreamRefCount counts the video stream's use by a
+	// transport up or down; a stream in use is not deallocated.
+	UpdateVideoStreamRefCount(videoStreamID uint16, increment bool) error
+	// UpdateAudioStreamRefCount counts the audio stream's use up or
+	// down.
+	UpdateAudioStreamRefCount(audioStreamID uint16, increment bool) error
+	// UpdateSnapshotStreamRefCount counts the snapshot stream's use up
+	// or down.
+	UpdateSnapshotStreamRefCount(snapshotStreamID uint16, increment bool) error
+	// ReusableVideoStreamID is an allocated video stream a request
+	// can reuse (chip's GetReusableVideoStreamId).
+	ReusableVideoStreamID(req VideoStreamStruct) (uint16, bool)
+	// ReusableSnapshotStreamID is an allocated snapshot stream a
+	// request can reuse (chip's GetReusableSnapshotStreamId).
+	ReusableSnapshotStreamID(req SnapshotStreamStruct) (uint16, bool)
+	// ResourceAvailable reports whether a stream of the candidate's
+	// encoded pixel rate still fits (chip's
+	// IsResourceAvailableForStreamAllocation).
+	ResourceAvailable(candidateEncodedPixelRate uint32, encoderRequired bool) bool
+}
+
+// Host returns the mounted server's host methods when it implements
+// Host — the kit's server does; nil for a server that does not, as the
+// generated one and a host's own (Declare.HostServer) normally do not.
+func (s *Server) Host() Host {
+	h, _ := s.Underlying().(Host)
+	return h
+}
+
 // StreamAllocationAction tells a VideoStreamPort how a stream came
 // out of an allocation (connectedhomeip's StreamAllocationAction,
 // CameraAVStreamManagementCluster.h:127-132).

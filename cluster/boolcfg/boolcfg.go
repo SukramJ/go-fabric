@@ -555,3 +555,6 @@ func (s *Server) alarmsStateChanged() {
 	s.mu.Unlock()
 	_ = s.srv.Emit(endpoint, def.EventAlarmsStateChanged, ev)
 }
+
+// The host methods the typed server's Host returns (brief CK-2).
+var _ def.Host = (*Server)(nil)

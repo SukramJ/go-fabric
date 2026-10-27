@@ -877,3 +877,6 @@ func (s *Server) gesture(event uint32, payload any, position uint8, move bool) {
 	s.mu.Unlock()
 	s.drain()
 }
+
+// The host methods the typed server's Host returns (brief CK-2).
+var _ swdef.Host = (*Server)(nil)

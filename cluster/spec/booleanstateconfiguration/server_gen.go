@@ -210,6 +210,23 @@ func (s *Server) EmitSensorFault(endpoint uint16, data SensorFaultEvent) error {
 	return spec.EmitOn(s.Underlying(), endpoint, EventSensorFault, data)
 }
 
+// Host is the BooleanStateConfiguration kit server's host methods: the ones Set, Get and
+// the typed handlers do not reach (cluster/boolcfg Server).
+type Host interface {
+	// SetSensorFault records a sensor fault: the SensorFault event is
+	// emitted on every call when the event is in the EventList, and
+	// the SensorFault attribute, when served, changes with it.
+	SetSensorFault(fault SensorFaultBitmap)
+}
+
+// Host returns the mounted server's host methods when it implements
+// Host — the kit's server does; nil for a server that does not, as the
+// generated one and a host's own (Declare.HostServer) normally do not.
+func (s *Server) Host() Host {
+	h, _ := s.Underlying().(Host)
+	return h
+}
+
 // Delegate is told what a controller changed — CurrentSensitivityLevel
 // (quality N, the host persists it), and what EnableDisableAlarm and
 // SuppressAlarm did; an error answers FAILURE (cluster/boolcfg

@@ -673,6 +673,25 @@ func (s *Server) EmitLockUserChange(endpoint uint16, data LockUserChangeEvent) e
 	return spec.EmitOn(s.Underlying(), endpoint, EventLockUserChange, data)
 }
 
+// Host is the DoorLock kit server's host methods: the ones Set, Get and
+// the typed handlers do not reach (cluster/lock DoorLockServer).
+type Host interface {
+	// SetDoorState records the door's state (DPS) and emits
+	// DoorStateChange; DoorOpen and DoorClosed count in DoorOpenEvents
+	// and DoorClosedEvents when they are served.
+	SetDoorState(state DoorStateEnum) error
+	// Users returns a copy of the user database.
+	Users() []store.DoorLockUser
+}
+
+// Host returns the mounted server's host methods when it implements
+// Host — the kit's server does; nil for a server that does not, as the
+// generated one and a host's own (Declare.HostServer) normally do not.
+func (s *Server) Host() Host {
+	h, _ := s.Underlying().(Host)
+	return h
+}
+
 // StateSource is the lock's actuator: it reports whether the bolt is
 // jammed and locked, and LockInvoke runs a LockDoor or UnlockDoor
 // (cmdID) the kit's DoorLock server admitted (cluster/lock

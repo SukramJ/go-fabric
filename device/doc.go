@@ -21,8 +21,9 @@
 // without a typed package. [FromSpec] builds the same device from data.
 //
 // A device's typed accessors (DimmableLight.OnOff, …) wrap the server the
-// device mounts for the cluster, whatever its type (Underlying returns it),
-// and read and set its state; OnChanged sees every change with its origin
+// device mounts for the cluster, whatever its type (Underlying returns it,
+// a seam), and read and set its state; Host returns the kit server's host
+// methods the typed server does not reach; OnChanged sees every change with its origin
 // ([contract.Change]), OnChangedAsync runs on the device's own goroutine.
 // Once the device is added to a node, [Device.SetReachable],
 // [Device.Rename] and [Device.EndpointNumber] are its lifecycle.

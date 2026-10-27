@@ -227,6 +227,23 @@ func (s *Server) EmitNotify(endpoint uint16, data NotifyEvent) error {
 	return spec.EmitOn(s.Underlying(), endpoint, EventNotify, data)
 }
 
+// Host is the TemperatureAlarm kit server's host methods: the ones Set, Get and
+// the typed handlers do not reach (cluster/alarmbase Server).
+type Host interface {
+	// ResetLatchedAlarms clears alarms from State, latched or not —
+	// chip's ResetLatchedAlarms; Set's State keeps a latched alarm. An
+	// alarm outside Supported is refused.
+	ResetLatchedAlarms(alarms uint32) error
+}
+
+// Host returns the mounted server's host methods when it implements
+// Host — the kit's server does; nil for a server that does not, as the
+// generated one and a host's own (Declare.HostServer) normally do not.
+func (s *Server) Host() Host {
+	h, _ := s.Underlying().(Host)
+	return h
+}
+
 // Delegate is asked before a command changes Mask (ModifyEnabledAlarms)
 // or State (Reset); an error refuses the command and answers FAILURE.
 // Without one every command is accepted (cluster/alarmbase).

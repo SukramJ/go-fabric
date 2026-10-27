@@ -170,6 +170,24 @@ func (s *Server) HandleGetOperationalDataset(fn func(ctx context.Context, req Ge
 	return spec.HandleOn(s.Underlying(), CmdGetOperationalDataset, fn)
 }
 
+// Host is the ThreadNetworkDirectory kit server's host methods: the ones Set, Get and
+// the typed handlers do not reach (cluster/netinfra ThreadDirectoryServer).
+type Host interface {
+	// ReloadNetworks re-reads the ThreadNetworkStore after the host
+	// changed it outside the cluster and reports ThreadNetworks when
+	// it moved; a preferred network the store no longer holds is
+	// cleared.
+	ReloadNetworks(ctx context.Context) error
+}
+
+// Host returns the mounted server's host methods when it implements
+// Host — the kit's server does; nil for a server that does not, as the
+// generated one and a host's own (Declare.HostServer) normally do not.
+func (s *Server) Host() Host {
+	h, _ := s.Underlying().(Host)
+	return h
+}
+
 // ThreadNetworkStore persists the directory's operational datasets,
 // each an opaque blob keyed by its Extended PAN ID, and the preferred
 // network: Capacity is ThreadNetworkTableSize, LoadNetworks returns
