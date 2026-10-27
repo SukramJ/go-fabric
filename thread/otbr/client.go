@@ -169,7 +169,7 @@ func (c *Client) fetchJSON(ctx context.Context, path string) (any, KeyFormat, er
 }
 
 // fetchText is #fetchText (OtbrRestClient.ts:779-788): false on 204.
-func (c *Client) fetchText(ctx context.Context, path string) (string, bool, error) {
+func (c *Client) fetchText(ctx context.Context, path string) (text string, ok bool, err error) {
 	r, err := c.do(ctx, http.MethodGet, path, "text/plain", "", nil)
 	if err != nil {
 		return "", false, err
@@ -198,33 +198,34 @@ func (c *Client) mutate(ctx context.Context, method, path, contentType string, b
 
 // record is the normalized JSON object at path, [CodeProtocol] for another
 // shape.
-func (c *Client) record(ctx context.Context, path string) (map[string]any, KeyFormat, error) {
-	body, format, err := c.fetchJSON(ctx, path)
+func (c *Client) record(ctx context.Context, path string) (map[string]any, error) {
+	body, _, err := c.fetchJSON(ctx, path)
 	if err != nil {
-		return nil, "", err
+		return nil, err
 	}
 	obj, ok := body.(map[string]any)
 	if !ok {
-		return nil, "", restError(CodeProtocol, "%s did not return a JSON object", path)
+		return nil, protocolError("%s did not return a JSON object", path)
 	}
-	return obj, format, nil
+	return obj, nil
 }
 
-func expectString(rec map[string]any, key, where string) (string, error) {
+// expectString is a /node field that must be a string.
+func expectString(rec map[string]any, key string) (string, error) {
 	s, ok := rec[key].(string)
 	if !ok {
-		return "", restError(CodeProtocol, "%s: missing or non-string field %s", where, key)
+		return "", protocolError("/node: missing or non-string field %s", key)
 	}
 	return s, nil
 }
 
 func expectUint(rec map[string]any, key, where string, maxValue uint64) (uint64, error) {
 	if _, ok := asNumber(rec[key]); !ok {
-		return 0, restError(CodeProtocol, "%s: missing or non-numeric field %s", where, key)
+		return 0, protocolError("%s: missing or non-numeric field %s", where, key)
 	}
 	n, ok := asUint(rec[key], maxValue)
 	if !ok {
-		return 0, restError(CodeProtocol, "%s: field %s out of range", where, key)
+		return 0, protocolError("%s: field %s out of range", where, key)
 	}
 	return n, nil
 }
@@ -255,13 +256,13 @@ func leaderData(rec map[string]any, where string) (LeaderData, error) {
 // number or a hex string.
 func (c *Client) Node(ctx context.Context) (NodeInfo, error) {
 	const where = "/node"
-	body, _, err := c.record(ctx, where)
+	body, err := c.record(ctx, where)
 	if err != nil {
 		return NodeInfo{}, err
 	}
 	leaderRaw, ok := body["leaderData"].(map[string]any)
 	if !ok {
-		return NodeInfo{}, restError(CodeProtocol, "%s: missing or non-object field leaderData", where)
+		return NodeInfo{}, protocolError("%s: missing or non-object field leaderData", where)
 	}
 	ld, err := leaderData(leaderRaw, where+".leaderData")
 	if err != nil {
@@ -269,12 +270,12 @@ func (c *Client) Node(ctx context.Context) (NodeInfo, error) {
 	}
 	var errs []error
 	str := func(key string) string {
-		s, err := expectString(body, key, where)
+		s, err := expectString(body, key)
 		errs = append(errs, err)
 		return s
 	}
 	hexOf := func(key string, n int) []byte {
-		s, err := expectString(body, key, where)
+		s, err := expectString(body, key)
 		if err != nil {
 			errs = append(errs, err)
 			return nil
@@ -298,7 +299,7 @@ func (c *Client) Node(ctx context.Context) (NodeInfo, error) {
 	}
 	rloc16, ok := parseRloc16(body["rloc16"])
 	if !ok {
-		return NodeInfo{}, restError(CodeProtocol, "%s: missing or invalid field rloc16", where)
+		return NodeInfo{}, protocolError("%s: missing or invalid field rloc16", where)
 	}
 	info.Rloc16 = rloc16
 	for _, key := range []string{"numOfRouter", "routerCount"} { // OtbrRestClient.ts:200
@@ -320,12 +321,12 @@ func (c *Client) ProbeNode(ctx context.Context) (format KeyFormat, networkName s
 	}
 	obj, ok := body.(map[string]any)
 	if !ok || format == "" {
-		return "", "", nil, restError(CodeProtocol, "/node did not return an OTBR node object")
+		return "", "", nil, protocolError("/node did not return an OTBR node object")
 	}
-	if networkName, err = expectString(obj, "networkName", "/node"); err != nil {
+	if networkName, err = expectString(obj, "networkName"); err != nil {
 		return "", "", nil, err
 	}
-	xp, err := expectString(obj, "extPanId", "/node")
+	xp, err := expectString(obj, "extPanId")
 	if err != nil {
 		return "", "", nil, err
 	}
@@ -345,7 +346,7 @@ func (c *Client) Diagnostics(ctx context.Context) ([]any, error) {
 	}
 	list, ok := body.([]any)
 	if !ok {
-		return nil, restError(CodeProtocol, "/diagnostics did not return a JSON array")
+		return nil, protocolError("/diagnostics did not return a JSON array")
 	}
 	return list, nil
 }
@@ -378,7 +379,7 @@ func (c *Client) jsonString(ctx context.Context, path string) (string, error) {
 	}
 	s, ok := body.(string)
 	if !ok {
-		return "", restError(CodeProtocol, "GET %s did not return a string", path)
+		return "", protocolError("GET %s did not return a string", path)
 	}
 	return s, nil
 }
@@ -391,7 +392,7 @@ func (c *Client) jsonNumber(ctx context.Context, path string) (float64, error) {
 	}
 	n, ok := asNumber(body)
 	if !ok {
-		return 0, restError(CodeProtocol, "GET %s did not return a number", path)
+		return 0, protocolError("GET %s did not return a number", path)
 	}
 	return n, nil
 }
@@ -421,7 +422,7 @@ func (c *Client) Rloc16(ctx context.Context) (uint16, error) {
 		return 0, err
 	}
 	if n < 0 || n > math.MaxUint16 || n != math.Trunc(n) {
-		return 0, restError(CodeProtocol, "GET /node/rloc16 out of range")
+		return 0, protocolError("GET /node/rloc16 out of range")
 	}
 	return uint16(n), nil
 }
@@ -461,7 +462,7 @@ func (c *Client) BorderAgentID(ctx context.Context) ([]byte, error) {
 
 // LeaderData fetches /node/leader-data (OtbrRestClient.ts:335-351).
 func (c *Client) LeaderData(ctx context.Context) (LeaderData, error) {
-	rec, _, err := c.record(ctx, "/node/leader-data")
+	rec, err := c.record(ctx, "/node/leader-data")
 	if err != nil {
 		return LeaderData{}, err
 	}
@@ -518,7 +519,7 @@ func (c *Client) Joiners(ctx context.Context) ([]any, error) {
 	}
 	list, ok := body.([]any)
 	if !ok {
-		return nil, restError(CodeProtocol, "/node/commissioner/joiner did not return a JSON array")
+		return nil, protocolError("/node/commissioner/joiner did not return a JSON array")
 	}
 	return list, nil
 }
@@ -535,7 +536,7 @@ func collection(body any, where string) ([]any, error) {
 			return list, nil
 		}
 	}
-	return nil, restError(CodeProtocol, "%s did not return a JSON array", where)
+	return nil, protocolError("%s did not return a JSON array", where)
 }
 
 // DiagnosticsCollection fetches the post-2024 diagnostics collection

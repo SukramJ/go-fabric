@@ -305,6 +305,8 @@ func channelPage0Mask(v thread.DatasetView) []byte {
 // SleepyEndDevice when it is not rx-on-when-idle (:126-141).
 func routingRole(d thread.NodeDiagnostics) tnd.RoutingRoleEnum {
 	switch d.Role {
+	case thread.RoleDisabled:
+		return tnd.RoutingRoleUnspecified
 	case thread.RoleDetached:
 		return tnd.RoutingRoleUnassigned
 	case thread.RoleRouter:

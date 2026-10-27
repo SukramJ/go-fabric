@@ -6,6 +6,7 @@ package threadbr_test
 import (
 	"context"
 	"errors"
+	"slices"
 	"testing"
 
 	tbrm "github.com/SukramJ/go-fabric/cluster/spec/threadborderroutermanagement"
@@ -82,7 +83,7 @@ func TestDiagnosticsEdges(t *testing.T) {
 	})
 	mustT(t, s.Refresh(context.Background()))
 	long := append([]byte{0x03, 17}, []byte("seventeen-bytes!!")...)
-	br.set(func(f *fakeBorderRouter) { f.active = append(long, chipDataset...) })
+	br.set(func(f *fakeBorderRouter) { f.active = slices.Concat(long, chipDataset) })
 	mustT(t, s.Refresh(context.Background()))
 	if v := read(t, s, tnd.AttrNetworkName); v != nil {
 		t.Errorf("NetworkName over 16 bytes = %v", v)

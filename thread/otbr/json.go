@@ -132,19 +132,19 @@ var hexDigits = regexp.MustCompile(`^[0-9a-fA-F]*$`)
 // and, with expectedLen > 0, a wrong byte count (parseHexBytes.ts:10-28).
 func parseHexBytes(s, where string, expectedLen int) ([]byte, error) {
 	if !hexDigits.MatchString(s) {
-		return nil, restError(CodeProtocol, "%s: not hex", where)
+		return nil, protocolError("%s: not hex", where)
 	}
 	if len(s)%2 != 0 {
-		return nil, restError(CodeProtocol, "%s: odd hex length", where)
+		return nil, protocolError("%s: odd hex length", where)
 	}
 	if expectedLen > 0 && len(s) != expectedLen*2 {
-		return nil, restError(CodeProtocol, "%s: expected %d bytes, got %d", where, expectedLen, len(s)/2)
+		return nil, protocolError("%s: expected %d bytes, got %d", where, expectedLen, len(s)/2)
 	}
 	b, _ := hex.DecodeString(s)
 	return b, nil
 }
 
-var rloc16String = regexp.MustCompile(`^(?:0x[0-9a-fA-F]{1,4}|[0-9]{1,5})$`)
+var rloc16String = regexp.MustCompile(`^(?:0x[0-9a-fA-F]{1,4}|\d{1,5})$`)
 
 // parseRloc16 reads a 16-bit RLOC from a JSON number (legacy builds) or a
 // hex string like "0x4800" (post-2024 builds); false for an absent,
@@ -153,7 +153,7 @@ func parseRloc16(v any) (uint16, bool) {
 	switch x := v.(type) {
 	case json.Number:
 		n, ok := asUint(x, math.MaxUint16)
-		return uint16(n), ok
+		return uint16(n), ok //nolint:gosec // G115: bounded by asUint
 	case string:
 		if !rloc16String.MatchString(x) {
 			return 0, false

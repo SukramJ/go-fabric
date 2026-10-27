@@ -13,7 +13,7 @@ import (
 	"github.com/SukramJ/go-fabric/thread/otbr/otbrtest"
 )
 
-func do(t *testing.T, srv *otbrtest.Server, method, path, body string) (int, string) {
+func do(t *testing.T, srv *otbrtest.Server, method, path, body string) (status int, text string) {
 	t.Helper()
 	req, err := http.NewRequest(method, srv.URL+path, strings.NewReader(body))
 	if err != nil {
@@ -50,7 +50,7 @@ func TestServer(t *testing.T) {
 			t.Errorf("put: %d", st)
 		}
 		do(t, srv, "PUT", "/node/state", `"enable"`)
-		var states []string
+		states := make([]string, 0, 3)
 		for range 3 {
 			_, body := do(t, srv, "GET", "/node/state", "")
 			states = append(states, strings.TrimSpace(body))

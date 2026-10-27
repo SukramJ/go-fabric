@@ -89,10 +89,12 @@ func newDemoBorderRouter(raw string, logger *slog.Logger) (*demoBorderRouter, er
 
 // refresh reads the border router again.
 func (b *demoBorderRouter) refresh(ctx context.Context) {
-	for _, r := range []interface{ Refresh(context.Context) error }{
-		b.device.ThreadBorderRouterManagement().Underlying().(*threadbr.ManagementServer),
-		b.device.ThreadNetworkDiagnostics().Underlying().(*threadbr.DiagnosticsServer),
-	} {
+	type refresher interface{ Refresh(context.Context) error }
+	for _, srv := range []any{b.device.ThreadBorderRouterManagement().Underlying(), b.device.ThreadNetworkDiagnostics().Underlying()} {
+		r, ok := srv.(refresher)
+		if !ok {
+			continue
+		}
 		if err := r.Refresh(ctx); err != nil {
 			b.logger.Warn("otbr.refresh", slog.Any("err", err))
 		}

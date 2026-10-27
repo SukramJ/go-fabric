@@ -34,7 +34,7 @@ type failSafeSync struct {
 // attachFailSafe wires the topology's fail-safe participants to the
 // root's GeneralCommissioning: whether the fail-safe is armed, and the
 // Breadcrumb a completed command writes.
-func (n *Node) attachFailSafe(t *endpoint.Topology) {
+func (n *Node) attachFailSafe(ctx context.Context, t *endpoint.Topology) {
 	gc := n.root.GeneralCommissioning
 	if gc == nil {
 		return
@@ -50,7 +50,7 @@ func (n *Node) attachFailSafe(t *endpoint.Topology) {
 				continue
 			}
 			p.AttachFailSafe(gc.FailSafeArmed, func(v uint64) {
-				_ = gc.MatterWrite(context.WithoutCancel(n.life), gencommdef.AttrBreadcrumb, v)
+				_ = gc.MatterWrite(context.WithoutCancel(ctx), gencommdef.AttrBreadcrumb, v)
 			})
 			participants = append(participants, p)
 		}

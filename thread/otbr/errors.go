@@ -47,8 +47,9 @@ func (e *Error) Error() string {
 
 func (e *Error) Unwrap() error { return e.Cause }
 
-func restError(code Code, format string, args ...any) *Error {
-	return &Error{Code: code, Message: fmt.Sprintf(format, args...)}
+// protocolError is a [CodeProtocol] error.
+func protocolError(format string, args ...any) *Error {
+	return &Error{Code: CodeProtocol, Message: fmt.Sprintf(format, args...)}
 }
 
 // codeForStatus maps a non-2xx status as python-otbr-api does

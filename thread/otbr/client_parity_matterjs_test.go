@@ -536,7 +536,7 @@ func TestOtbrRestClientShapeErrors(t *testing.T) {
 		t.Errorf("Error %v", e)
 	}
 	failing, _ := NewClient(Config{Host: "br.example", HTTPClient: &http.Client{Transport: roundTripFunc(func(*http.Request) (*http.Response, error) {
-		return &http.Response{StatusCode: 200, Body: io.NopCloser(errReader{}), Header: http.Header{}}, nil
+		return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(errReader{}), Header: http.Header{}}, nil
 	})}})
 	_, err := failing.Node(ctx)
 	expectCode(t, err, CodeUnreachable)

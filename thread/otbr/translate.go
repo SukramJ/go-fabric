@@ -31,7 +31,7 @@ const timeoutExpMin = 4
 func requireUint(rec map[string]any, key, where string, maxValue uint64) (uint64, error) {
 	n, ok := asUint(rec[key], maxValue)
 	if !ok {
-		return 0, restError(CodeProtocol, "%s: missing numeric %s", where, key)
+		return 0, protocolError("%s: missing numeric %s", where, key)
 	}
 	return n, nil
 }
@@ -47,7 +47,7 @@ func requireUint64(rec map[string]any, key, where string) (uint64, error) {
 		if decimalDigits.MatchString(v) {
 			n, err := strconv.ParseUint(v, 10, 64)
 			if err != nil {
-				return 0, restError(CodeProtocol, "%s: %s outside uint64 range", where, key)
+				return 0, protocolError("%s: %s outside uint64 range", where, key)
 			}
 			return n, nil
 		}
@@ -61,11 +61,11 @@ func requireUint64(rec map[string]any, key, where string) (uint64, error) {
 		}
 		f = math.Trunc(f)
 		if f < 0 || f >= math.MaxUint64 {
-			return 0, restError(CodeProtocol, "%s: %s outside uint64 range", where, key)
+			return 0, protocolError("%s: %s outside uint64 range", where, key)
 		}
 		return uint64(f), nil
 	}
-	return 0, restError(CodeProtocol, "%s: missing numeric %s", where, key)
+	return 0, protocolError("%s: missing numeric %s", where, key)
 }
 
 // fields collects a record's first error.
@@ -109,12 +109,12 @@ func translateRoute(rec map[string]any) (thread.Route64, error) {
 	r := thread.Route64{IDSequence: uint8(f.uint("idSequence", math.MaxUint8))} //nolint:gosec // bounded
 	data, ok := rec["routeData"].([]any)
 	if !ok {
-		return thread.Route64{}, restError(CodeProtocol, "route: missing routeData array")
+		return thread.Route64{}, protocolError("route: missing routeData array")
 	}
 	for _, raw := range data {
 		e, ok := raw.(map[string]any)
 		if !ok {
-			return thread.Route64{}, restError(CodeProtocol, "route.routeData: entry is not an object")
+			return thread.Route64{}, protocolError("route.routeData: entry is not an object")
 		}
 		g := &fields{rec: e, where: "route.routeData"}
 		r.Entries = append(r.Entries, thread.Route64Entry{
@@ -176,11 +176,11 @@ func translateChildTable(list []any) ([]thread.ChildTableEntry, error) {
 	for _, raw := range list {
 		rec, ok := raw.(map[string]any)
 		if !ok {
-			return nil, restError(CodeProtocol, "childTable: entry is not an object")
+			return nil, protocolError("childTable: entry is not an object")
 		}
 		modeRec, ok := rec["mode"].(map[string]any)
 		if !ok {
-			return nil, restError(CodeProtocol, "childTable: entry missing mode")
+			return nil, protocolError("childTable: entry missing mode")
 		}
 		f := &fields{rec: rec, where: "childTable"}
 		exp := f.uint("timeout", timeoutExpMin+31)
@@ -221,7 +221,7 @@ func optional[T any](field string, fn func() (T, error)) *T {
 func Translate(entry any) (thread.DiagnosticResponse, error) {
 	rec, ok := entry.(map[string]any)
 	if !ok {
-		return thread.DiagnosticResponse{}, restError(CodeProtocol, "translateNodeJson: input is not an object")
+		return thread.DiagnosticResponse{}, protocolError("translateNodeJson: input is not an object")
 	}
 	var out thread.DiagnosticResponse
 	if s, ok := rec["extAddress"].(string); ok { // :276-279
@@ -253,7 +253,7 @@ func Translate(entry any) (thread.DiagnosticResponse, error) {
 		}
 	}
 	if v, ok := asUint(rec["version"], math.MaxUint16); ok { // :352-353
-		version := uint16(v)
+		version := uint16(v) //nolint:gosec // G115: bounded by asUint
 		out.Version = &version
 	}
 	return out, nil

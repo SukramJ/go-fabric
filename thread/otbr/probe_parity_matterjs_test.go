@@ -64,7 +64,7 @@ func TestOtbrRestProbeNeverFetchesActions(t *testing.T) {
 	t.Parallel()
 	s := newStub().on("GET", "/node", 200, otbrtest.NodeCamel).on("GET", "/api/diagnostics", 200, "[]")
 	probe(t, s, 500*time.Millisecond)
-	var seen []string
+	seen := make([]string, 0, len(s.requests))
 	for _, r := range s.requests {
 		seen = append(seen, r.url)
 	}

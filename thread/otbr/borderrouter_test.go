@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"net/http"
 	"testing"
 	"time"
 
@@ -120,7 +121,7 @@ func TestBorderRouterReplaceAndClear(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, r := range srv.Requests()[n:] {
-		if r.Method != "GET" {
+		if r.Method != http.MethodGet {
 			t.Errorf("the identical dataset wrote %s %s", r.Method, r.Path)
 		}
 	}

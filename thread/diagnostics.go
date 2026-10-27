@@ -35,6 +35,8 @@ func (r DeviceRole) Attached() bool {
 	switch r {
 	case RoleChild, RoleRouter, RoleLeader:
 		return true
+	case RoleDisabled, RoleDetached:
+		return false
 	}
 	return false
 }

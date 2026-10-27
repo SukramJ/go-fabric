@@ -173,7 +173,7 @@ func writeJSON(w http.ResponseWriter, v any) {
 	_ = json.NewEncoder(w).Encode(v)
 }
 
-func (s *Server) serve(w http.ResponseWriter, r *http.Request) {
+func (s *Server) serve(w http.ResponseWriter, r *http.Request) { //nolint:funlen // the routing table: one case per endpoint
 	body, _ := io.ReadAll(r.Body)
 	s.mu.Lock()
 	defer s.mu.Unlock()
