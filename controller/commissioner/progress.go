@@ -55,8 +55,9 @@ func (p StepPhase) String() string {
 // subscription, packages/node/src/behavior/system/commissioning/
 // CommissioningClient.ts:343-361 at 862ad75f), reported after the
 // flow's last step — 98.1 here, as this port does not run matter.js's
-// 99.1 AdditionalLogic.AddDefaultOtaProvider; a commissioning that ends
-// before the node starts reports it Skipped, with no Started before it.
+// 99.1 AdditionalLogic.AddDefaultOtaProvider. It has no Skipped case:
+// every successful commissioning starts the node, and a failed step is
+// the last report (:438-462).
 //
 // Err is the error of a Failed step: the step's own, or that of the
 // failsafe bookkeeping after it (:397-424). A recoverable failure

@@ -83,8 +83,8 @@ func TestPairProgress(t *testing.T) {
 // TestPairProgressAttestationFailure: a device whose attestation the
 // default policy rejects — the site's test Certification Declaration —
 // reports OperationalCredentials.DeviceAttestation failed with the error
-// Pair returns, no further step of the flow (:438-462), and the node's
-// start, which does not happen, skipped.
+// Pair returns, and nothing after it (:438-462): no Subscribe 21.1
+// either.
 func TestPairProgressAttestationFailure(t *testing.T) {
 	t.Parallel()
 	site, dev, c := siteController(t, fabrictest.Topology{}, nil)
@@ -100,15 +100,8 @@ func TestPairProgressAttestationFailure(t *testing.T) {
 		t.Fatal("Pair accepted a test attestation under the default policy")
 	}
 	l.mu.Lock()
-	if n := len(l.steps); n < 2 {
-		l.mu.Unlock()
-		t.Fatalf("progress %q", l.lines())
-	}
-	last, skipped := l.steps[len(l.steps)-2], l.steps[len(l.steps)-1]
+	last := l.steps[len(l.steps)-1]
 	l.mu.Unlock()
-	if skipped.Number != 21 || skipped.Sub != 1 || skipped.Name != "Subscribe" || skipped.Phase != controller.PairingSkipped || skipped.Err != nil {
-		t.Errorf("last report %+v, want 21.1 Subscribe skipped", skipped)
-	}
 	if last.Number != 10 || last.Sub != 1 || last.Name != "OperationalCredentials.DeviceAttestation" || last.Phase != controller.PairingFailed {
 		t.Fatalf("last report %+v, want 10.1 DeviceAttestation failed; all %q", last, l.lines())
 	}

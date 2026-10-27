@@ -286,8 +286,7 @@ for what comes before its flow; `Discovery` 2.1 (DNS-SD or BLE, skipped
 with `PairOptions.Address`) and `PASE` 2.2 are this module's names, and
 they are reported first. `Subscribe` 21.1, also this module's, is
 reported last: the node's start, its initial read and default
-subscription; it is reported skipped when `Pair` returns before the node
-starts. The callback runs on `Pair`'s goroutine and must
+subscription. A failed step is the last report. The callback runs on `Pair`'s goroutine and must
 not block. `commissioner.Options.Progress` is the same hook one layer
 down.
 

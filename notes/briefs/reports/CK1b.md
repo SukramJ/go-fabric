@@ -44,15 +44,15 @@ matter.js at `862ad75f`.
 - `commissioner.StepSubscribe = "Subscribe"` and `commissioner.ReportSubscribe`
   are new. `client.Registry.Commission` reports the step started before
   `n.Start` and succeeded or failed (with Start's error) after it
-  (`CommissioningClient.ts:343-361`). It is reported skipped, with no
-  started before it (the same shape as `Discovery` skipped), whenever
-  `Commission` returns before the node starts. That includes a commissioner
-  failure and a refused fabric operation.
+  (`CommissioningClient.ts:343-361`). Owner decision 2026-10-27: a failed
+  step is the last report, as in matter.js (`:438-462`). Every successful
+  commission starts the node (`commission` ends in `n.Start`), so there is
+  no skipped case, and the doc comments say so.
 - 99.1 `AdditionalLogic.AddDefaultOtaProvider` does not run in this port's
   flow (CK-1's report), so Subscribe follows 98.1.
 - Tests: `TestPairProgress` ends with `21.1 Subscribe started`, then
-  `succeeded`. `TestPairProgressAttestationFailure` now ends with 10.1
-  failed, then 21.1 skipped. The new `TestPairProgressSubscribeFailure`
+  `succeeded`. `TestPairProgressAttestationFailure` still ends with 10.1
+  failed. The new `TestPairProgressSubscribeFailure`
   uses the existing fault seam, `fabrictest.Network.Filter`: once Subscribe
   starts, it drops the device's datagrams. The initial read fails, and the
   step is reported failed with the error Pair returns.
@@ -80,19 +80,17 @@ FeatureMap did not change.
 
 ## Differences from the brief
 
-- Brief CK-1b §2 says that when Pair returns before the node starts, the
-  step is reported skipped. That covers only returns from
-  `Registry.Commission`. A Pair that fails in discovery (`ErrNoDevice`, a
-  BLE dial error) or in `ForDevice` never reaches commissioning, and it
-  reports no Subscribe step.
+- Brief CK-1b §2 asked for a skipped case when Pair returns before the
+  node starts. After the owner's decision of 2026-10-27, there is none: a
+  failed step is the last report, and no successful Pair returns without
+  starting the node.
 - `UpdateQueued` is also emitted for a replacement that changes the target
   of a queued entry. "Once per entry" holds for the same target.
 
 ## Questions
 
-1. Should a Pair that fails before commissioning (discovery or `ForDevice`)
-   also report `Subscribe` skipped, so that every Pair that reached
-   Discovery ends with a 21.1 report?
+1. (Answered by the owner on 2026-10-27: a failed step is the last
+   report, and there is no Subscribe skipped case.)
 
 ## by_design candidates
 

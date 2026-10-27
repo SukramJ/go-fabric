@@ -505,9 +505,9 @@ type PairOptions struct {
 	// Progress, when set, is called on Pair's goroutine as each step of
 	// the pairing starts and ends ([PairingStep]): the search for the
 	// device (skipped with Address), PASE, the commissioning steps under
-	// matter.js's names, then the node's start, "Subscribe" 21.1 (skipped
-	// when Pair returns before the node starts). Pair waits for it, so it
-	// must not block.
+	// matter.js's names, then the node's start, "Subscribe" 21.1. A
+	// failed step is the last report. Pair waits for it, so it must not
+	// block.
 	// It is the commissioner's Options.Progress, which Edit may replace.
 	Progress func(PairingStep)
 	// Edit adjusts the commissioner's options last (a seam).

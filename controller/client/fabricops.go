@@ -160,18 +160,15 @@ var defaultCASEConnectionTiming = Timing{
 //
 // The node's start is reported through o.Progress as the step
 // commissioner.StepSubscribe 21.1 — started, then succeeded or failed with
-// the start's error; a Commission that returns before the node starts
-// reports it skipped.
+// the start's error. It is never skipped: every commission that succeeds
+// starts the node, and one that fails earlier reports nothing after its
+// failed step, as matter.js reports nothing after a failure
+// (ControllerCommissioningFlow.ts:438-462 at 862ad75f).
 func (r *Registry) Commission(ctx context.Context, n *Node, o CommissionOptions) error {
-	starting := false
-	err := r.runFabricOperation(n, opCommission, func() error { return r.commission(ctx, n, o, &starting) })
-	if !starting {
-		commissioner.ReportSubscribe(o.Progress, commissioner.StepSkipped, nil)
-	}
-	return err
+	return r.runFabricOperation(n, opCommission, func() error { return r.commission(ctx, n, o) })
 }
 
-func (r *Registry) commission(ctx context.Context, n *Node, o CommissionOptions, starting *bool) error {
+func (r *Registry) commission(ctx context.Context, n *Node, o CommissionOptions) error {
 	if n.IsCommissioned() {
 		return fmt.Errorf("%w: %s", ErrAlreadyCommissioned, n.ID())
 	}
@@ -238,7 +235,6 @@ func (r *Registry) commission(ctx context.Context, n *Node, o CommissionOptions,
 	if h := n.cfg.Hooks.Commissioned; h != nil {
 		h()
 	}
-	*starting = true
 	commissioner.ReportSubscribe(o.Progress, commissioner.StepStarted, nil)
 	if err := n.Start(ctx); err != nil {
 		commissioner.ReportSubscribe(o.Progress, commissioner.StepFailed, err)

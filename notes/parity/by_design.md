@@ -561,8 +561,8 @@ step before its flow runs, so the module names the two phases Go runs there
 itself: `Discovery` 2.1 and `PASE` 2.2 (`controller/commissioner/progress.go`).
 Nor does it name the node's start after the flow (the initial read and the
 default subscription, `CommissioningClient.ts:343-361`), which the module
-reports as `Subscribe` 21.1 from `client.Registry.Commission`, skipped when
-the commissioning ends before the node starts.
+reports as `Subscribe` 21.1 from `client.Registry.Commission`. It is never
+skipped, and as in matter.js a failed step is the last report.
 `softwareupdate.Manager.Observe` mirrors the four events of
 `SoftwareUpdateManager.ts:1420-1438` (`updateAvailable` :886, `updateApplying`
 :1317, `updateDone` :829/:1279, `updateFailed` :878/:1123) and adds two the
