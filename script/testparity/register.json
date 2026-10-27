@@ -4904,6 +4904,568 @@
       ],
       "reason": "Dialing, accepting, receiving, the disconnect notification and closing the listener with its connections are ported on loopback sockets; supports(ChannelType) and the non-IP rejection have no Go counterpart (Listener and Dialer are TCP-only types and Dial takes a host:port string, not a ServerAddress union), and the Dialer keeps no per-address connection pool to reuse (TcpTransport.ts:149-169).",
       "snapshotSha": "2bd01254e917beb77613a9be516573772dcf2cc7"
+    },
+    {
+      "path": "packages/thread-br-client/test/AesCcm8Test.ts",
+      "status": "excluded",
+      "class": "device-ble-thread",
+      "reason": "MeshCoP over CoAP/DTLS with EC-JPAKE, its crypto, the _meshcop discovery, the border-router selection or the credentials registry: out of the module (ADR 0027 decision 5; the host names its border router).",
+      "snapshotSha": "2ce2c2f122530c8d99a35cab4790b104408a32e9"
+    },
+    {
+      "path": "packages/thread-br-client/test/AesCmacPrf128Test.ts",
+      "status": "excluded",
+      "class": "device-ble-thread",
+      "reason": "MeshCoP over CoAP/DTLS with EC-JPAKE, its crypto, the _meshcop discovery, the border-router selection or the credentials registry: out of the module (ADR 0027 decision 5; the host names its border router).",
+      "snapshotSha": "e6776161aa820eb59915df5dde0b9482e64ddf51"
+    },
+    {
+      "path": "packages/thread-br-client/test/AgnersCrossValidationTest.ts",
+      "status": "excluded",
+      "class": "device-ble-thread",
+      "reason": "MeshCoP over CoAP/DTLS with EC-JPAKE, its crypto, the _meshcop discovery, the border-router selection or the credentials registry: out of the module (ADR 0027 decision 5; the host names its border router).",
+      "snapshotSha": "670873b0dea19d7d661d9cc06c95ffa9c6e462ab"
+    },
+    {
+      "path": "packages/thread-br-client/test/AntiReplayWindowTest.ts",
+      "status": "excluded",
+      "class": "device-ble-thread",
+      "reason": "MeshCoP over CoAP/DTLS with EC-JPAKE, its crypto, the _meshcop discovery, the border-router selection or the credentials registry: out of the module (ADR 0027 decision 5; the host names its border router).",
+      "snapshotSha": "ae2fc9c31fe0c856710e74d879207fa62e551a53"
+    },
+    {
+      "path": "packages/thread-br-client/test/BorderRouterRegistryTest.ts",
+      "status": "excluded",
+      "class": "device-ble-thread",
+      "reason": "MeshCoP over CoAP/DTLS with EC-JPAKE, its crypto, the _meshcop discovery, the border-router selection or the credentials registry: out of the module (ADR 0027 decision 5; the host names its border router).",
+      "snapshotSha": "bd9a74954f4ff4e7d1d37576e04a600c27620d04"
+    },
+    {
+      "path": "packages/thread-br-client/test/CaseNormalizerTest.ts",
+      "status": "ported",
+      "go": [
+        "thread/otbr:TestNormalizeKeysIrregularAndFirstLetter",
+        "thread/otbr:TestNormalizeKeysStructure",
+        "thread/otbr:TestDetectKeyFormat"
+      ],
+      "reason": "All 11 cases run against otbr.NormalizeKeys: the irregular keys, the first letter, idempotence, nesting, arrays, primitives, empty containers; detectKeyFormat is added.",
+      "snapshotSha": "639b81fe415c699db2118cb65c1c0ff5c36db521"
+    },
+    {
+      "path": "packages/thread-br-client/test/ClientHelloMessageTest.ts",
+      "status": "excluded",
+      "class": "device-ble-thread",
+      "reason": "MeshCoP over CoAP/DTLS with EC-JPAKE, its crypto, the _meshcop discovery, the border-router selection or the credentials registry: out of the module (ADR 0027 decision 5; the host names its border router).",
+      "snapshotSha": "bf2227974811b1a022c6dfcf4791f0840505c1c2"
+    },
+    {
+      "path": "packages/thread-br-client/test/ClientKeyExchangeMessageTest.ts",
+      "status": "excluded",
+      "class": "device-ble-thread",
+      "reason": "MeshCoP over CoAP/DTLS with EC-JPAKE, its crypto, the _meshcop discovery, the border-router selection or the credentials registry: out of the module (ADR 0027 decision 5; the host names its border router).",
+      "snapshotSha": "b8aa04116a1e349e9d1b20a4dbddab0be1b72037"
+    },
+    {
+      "path": "packages/thread-br-client/test/CoapClientTest.ts",
+      "status": "excluded",
+      "class": "device-ble-thread",
+      "reason": "MeshCoP over CoAP/DTLS with EC-JPAKE, its crypto, the _meshcop discovery, the border-router selection or the credentials registry: out of the module (ADR 0027 decision 5; the host names its border router).",
+      "snapshotSha": "210f7132604cf6594d3947c381d6e7ffb28937bd"
+    },
+    {
+      "path": "packages/thread-br-client/test/CoapMessageTest.ts",
+      "status": "excluded",
+      "class": "device-ble-thread",
+      "reason": "MeshCoP over CoAP/DTLS with EC-JPAKE, its crypto, the _meshcop discovery, the border-router selection or the credentials registry: out of the module (ADR 0027 decision 5; the host names its border router).",
+      "snapshotSha": "5e5834736e88879e3e0853e747137ad9e045bc19"
+    },
+    {
+      "path": "packages/thread-br-client/test/CommissionerTest.ts",
+      "status": "excluded",
+      "class": "device-ble-thread",
+      "reason": "MeshCoP over CoAP/DTLS with EC-JPAKE, its crypto, the _meshcop discovery, the border-router selection or the credentials registry: out of the module (ADR 0027 decision 5; the host names its border router).",
+      "snapshotSha": "770873ab057a54d68f39c82f9c16f7104129ec93"
+    },
+    {
+      "path": "packages/thread-br-client/test/ConnectDtlsTest.ts",
+      "status": "excluded",
+      "class": "device-ble-thread",
+      "reason": "MeshCoP over CoAP/DTLS with EC-JPAKE, its crypto, the _meshcop discovery, the border-router selection or the credentials registry: out of the module (ADR 0027 decision 5; the host names its border router).",
+      "snapshotSha": "295c12cbb6a9d7a043b26379a35d7b9a52b70d57"
+    },
+    {
+      "path": "packages/thread-br-client/test/ConnectMeshcopTest.ts",
+      "status": "excluded",
+      "class": "device-ble-thread",
+      "reason": "MeshCoP over CoAP/DTLS with EC-JPAKE, its crypto, the _meshcop discovery, the border-router selection or the credentials registry: out of the module (ADR 0027 decision 5; the host names its border router).",
+      "snapshotSha": "f851857844ba5078e1e3f634fd7a83c93c326cc5"
+    },
+    {
+      "path": "packages/thread-br-client/test/DiagnosticResetTest.ts",
+      "status": "excluded",
+      "class": "device-ble-thread",
+      "reason": "The DiagnosticSource abstraction over MeshCoP and REST (and its collection/action machinery): otbr.BorderRouter reads /node and /diagnostics directly, and MeshCoP stays out (ADR 0027 decision 5).",
+      "snapshotSha": "dc26832ccb3ffb8cb31882cfd8545a0484750e7e"
+    },
+    {
+      "path": "packages/thread-br-client/test/DiagnosticSourceTest.ts",
+      "status": "excluded",
+      "class": "device-ble-thread",
+      "reason": "The DiagnosticSource abstraction over MeshCoP and REST (and its collection/action machinery): otbr.BorderRouter reads /node and /diagnostics directly, and MeshCoP stays out (ADR 0027 decision 5).",
+      "snapshotSha": "b154a4a2877718b7bab8a9c0171c4d675bace7f6"
+    },
+    {
+      "path": "packages/thread-br-client/test/DtlsChannelInterfaceTest.ts",
+      "status": "excluded",
+      "class": "device-ble-thread",
+      "reason": "MeshCoP over CoAP/DTLS with EC-JPAKE, its crypto, the _meshcop discovery, the border-router selection or the credentials registry: out of the module (ADR 0027 decision 5; the host names its border router).",
+      "snapshotSha": "ee7c9ff9e2d84d2d30aeae51951aff82fb8a1c9d"
+    },
+    {
+      "path": "packages/thread-br-client/test/DtlsCipherStateTest.ts",
+      "status": "excluded",
+      "class": "device-ble-thread",
+      "reason": "MeshCoP over CoAP/DTLS with EC-JPAKE, its crypto, the _meshcop discovery, the border-router selection or the credentials registry: out of the module (ADR 0027 decision 5; the host names its border router).",
+      "snapshotSha": "246fbc68c4e897924f9fd05aab7da0f5ecf1f8c1"
+    },
+    {
+      "path": "packages/thread-br-client/test/DtlsClientTest.ts",
+      "status": "excluded",
+      "class": "device-ble-thread",
+      "reason": "MeshCoP over CoAP/DTLS with EC-JPAKE, its crypto, the _meshcop discovery, the border-router selection or the credentials registry: out of the module (ADR 0027 decision 5; the host names its border router).",
+      "snapshotSha": "55ccaeef59ad9d9b87a8edb2885dfe554e3ac987"
+    },
+    {
+      "path": "packages/thread-br-client/test/DtlsRecordTest.ts",
+      "status": "excluded",
+      "class": "device-ble-thread",
+      "reason": "MeshCoP over CoAP/DTLS with EC-JPAKE, its crypto, the _meshcop discovery, the border-router selection or the credentials registry: out of the module (ADR 0027 decision 5; the host names its border router).",
+      "snapshotSha": "90f4a5b060462086fba302146a177d88c66b7a4e"
+    },
+    {
+      "path": "packages/thread-br-client/test/DtlsRetransmitTimerTest.ts",
+      "status": "excluded",
+      "class": "device-ble-thread",
+      "reason": "MeshCoP over CoAP/DTLS with EC-JPAKE, its crypto, the _meshcop discovery, the border-router selection or the credentials registry: out of the module (ADR 0027 decision 5; the host names its border router).",
+      "snapshotSha": "e85a9e615e46f344b8e2f93dce2709a17ec415ce"
+    },
+    {
+      "path": "packages/thread-br-client/test/EcJpakePmsTest.ts",
+      "status": "excluded",
+      "class": "device-ble-thread",
+      "reason": "MeshCoP over CoAP/DTLS with EC-JPAKE, its crypto, the _meshcop discovery, the border-router selection or the credentials registry: out of the module (ADR 0027 decision 5; the host names its border router).",
+      "snapshotSha": "d53ef9b8c53cd95c0105300ec2c141a76b1815f6"
+    },
+    {
+      "path": "packages/thread-br-client/test/EcJpakeRound2Test.ts",
+      "status": "excluded",
+      "class": "device-ble-thread",
+      "reason": "MeshCoP over CoAP/DTLS with EC-JPAKE, its crypto, the _meshcop discovery, the border-router selection or the credentials registry: out of the module (ADR 0027 decision 5; the host names its border router).",
+      "snapshotSha": "b05b1384bc215e13e384be3a02d64d0d222b0b53"
+    },
+    {
+      "path": "packages/thread-br-client/test/EcJpakeRoundRoundTripTest.ts",
+      "status": "excluded",
+      "class": "device-ble-thread",
+      "reason": "MeshCoP over CoAP/DTLS with EC-JPAKE, its crypto, the _meshcop discovery, the border-router selection or the credentials registry: out of the module (ADR 0027 decision 5; the host names its border router).",
+      "snapshotSha": "51240deb403917340d72c60e0b1bd5cbb963ba0e"
+    },
+    {
+      "path": "packages/thread-br-client/test/EcJpakeRoundTest.ts",
+      "status": "excluded",
+      "class": "device-ble-thread",
+      "reason": "MeshCoP over CoAP/DTLS with EC-JPAKE, its crypto, the _meshcop discovery, the border-router selection or the credentials registry: out of the module (ADR 0027 decision 5; the host names its border router).",
+      "snapshotSha": "c0e682053890e8411695f854d68cb4b2e12de23c"
+    },
+    {
+      "path": "packages/thread-br-client/test/EnergyScanTest.ts",
+      "status": "excluded",
+      "class": "device-ble-thread",
+      "reason": "MeshCoP over CoAP/DTLS with EC-JPAKE, its crypto, the _meshcop discovery, the border-router selection or the credentials registry: out of the module (ADR 0027 decision 5; the host names its border router).",
+      "snapshotSha": "b020ca99d3bfe9742c4aa9f24f7bce66a681d760"
+    },
+    {
+      "path": "packages/thread-br-client/test/ExtPanIdLockManagerTest.ts",
+      "status": "excluded",
+      "class": "device-ble-thread",
+      "reason": "MeshCoP over CoAP/DTLS with EC-JPAKE, its crypto, the _meshcop discovery, the border-router selection or the credentials registry: out of the module (ADR 0027 decision 5; the host names its border router).",
+      "snapshotSha": "da8c0f46fb396236aec343c96553939db3660e42"
+    },
+    {
+      "path": "packages/thread-br-client/test/FinishedMessageTest.ts",
+      "status": "excluded",
+      "class": "device-ble-thread",
+      "reason": "MeshCoP over CoAP/DTLS with EC-JPAKE, its crypto, the _meshcop discovery, the border-router selection or the credentials registry: out of the module (ADR 0027 decision 5; the host names its border router).",
+      "snapshotSha": "f0ff5e5845c65653881277b1e124e243c87da5d6"
+    },
+    {
+      "path": "packages/thread-br-client/test/HandshakeMessageTest.ts",
+      "status": "excluded",
+      "class": "device-ble-thread",
+      "reason": "MeshCoP over CoAP/DTLS with EC-JPAKE, its crypto, the _meshcop discovery, the border-router selection or the credentials registry: out of the module (ADR 0027 decision 5; the host names its border router).",
+      "snapshotSha": "e767e9792779b8530a2ac182ad9955ea4651840e"
+    },
+    {
+      "path": "packages/thread-br-client/test/HandshakeTranscriptTest.ts",
+      "status": "excluded",
+      "class": "device-ble-thread",
+      "reason": "MeshCoP over CoAP/DTLS with EC-JPAKE, its crypto, the _meshcop discovery, the border-router selection or the credentials registry: out of the module (ADR 0027 decision 5; the host names its border router).",
+      "snapshotSha": "cbdea2fdc8f82aedbe6518ee8ffd7e921ac70616"
+    },
+    {
+      "path": "packages/thread-br-client/test/HelloVerifyRequestMessageTest.ts",
+      "status": "excluded",
+      "class": "device-ble-thread",
+      "reason": "MeshCoP over CoAP/DTLS with EC-JPAKE, its crypto, the _meshcop discovery, the border-router selection or the credentials registry: out of the module (ADR 0027 decision 5; the host names its border router).",
+      "snapshotSha": "672926d362966a14253fb64d71bd13bae70d79b7"
+    },
+    {
+      "path": "packages/thread-br-client/test/HybridDiagnosticSourceTest.ts",
+      "status": "excluded",
+      "class": "device-ble-thread",
+      "reason": "The DiagnosticSource abstraction over MeshCoP and REST (and its collection/action machinery): otbr.BorderRouter reads /node and /diagnostics directly, and MeshCoP stays out (ADR 0027 decision 5).",
+      "snapshotSha": "e2bf1f97dd855410e7b0a6706ededf44dff824c4"
+    },
+    {
+      "path": "packages/thread-br-client/test/Ip6AddressTlvTest.ts",
+      "status": "excluded",
+      "class": "device-ble-thread",
+      "reason": "MeshCoP over CoAP/DTLS with EC-JPAKE, its crypto, the _meshcop discovery, the border-router selection or the credentials registry: out of the module (ADR 0027 decision 5; the host names its border router).",
+      "snapshotSha": "1f164175bac8e462a183ff53e16c068d66e53e83"
+    },
+    {
+      "path": "packages/thread-br-client/test/LeadKaTest.ts",
+      "status": "excluded",
+      "class": "device-ble-thread",
+      "reason": "MeshCoP over CoAP/DTLS with EC-JPAKE, its crypto, the _meshcop discovery, the border-router selection or the credentials registry: out of the module (ADR 0027 decision 5; the host names its border router).",
+      "snapshotSha": "da81fa7d66892a4488db752a9eef159dc6b9b6ad"
+    },
+    {
+      "path": "packages/thread-br-client/test/LeadPetTest.ts",
+      "status": "excluded",
+      "class": "device-ble-thread",
+      "reason": "MeshCoP over CoAP/DTLS with EC-JPAKE, its crypto, the _meshcop discovery, the border-router selection or the credentials registry: out of the module (ADR 0027 decision 5; the host names its border router).",
+      "snapshotSha": "f806ab8e55fa1e4d1cd6f07417b4b45e61bc17dc"
+    },
+    {
+      "path": "packages/thread-br-client/test/MeshLocalAddrTest.ts",
+      "status": "excluded",
+      "class": "device-ble-thread",
+      "reason": "MeshCoP over CoAP/DTLS with EC-JPAKE, its crypto, the _meshcop discovery, the border-router selection or the credentials registry: out of the module (ADR 0027 decision 5; the host names its border router).",
+      "snapshotSha": "ec80a0ea6f4368e1c6a8a7585a0b6ea2a333e310"
+    },
+    {
+      "path": "packages/thread-br-client/test/NetworkDataTlvTest.ts",
+      "status": "excluded",
+      "class": "device-ble-thread",
+      "reason": "The DiagnosticSource abstraction over MeshCoP and REST (and its collection/action machinery): otbr.BorderRouter reads /node and /diagnostics directly, and MeshCoP stays out (ADR 0027 decision 5).",
+      "snapshotSha": "11952f0f2093e285d408fa256a9d31a7d113b49f"
+    },
+    {
+      "path": "packages/thread-br-client/test/NetworkDiagTlvTypesTest.ts",
+      "status": "excluded",
+      "class": "device-ble-thread",
+      "reason": "The DiagnosticSource abstraction over MeshCoP and REST (and its collection/action machinery): otbr.BorderRouter reads /node and /diagnostics directly, and MeshCoP stays out (ADR 0027 decision 5).",
+      "snapshotSha": "e72ed53e0fa32bba3e0869f4f161afd4a6ed0d01"
+    },
+    {
+      "path": "packages/thread-br-client/test/NetworkDiagnosticTlvTest.ts",
+      "status": "excluded",
+      "class": "device-ble-thread",
+      "reason": "The DiagnosticSource abstraction over MeshCoP and REST (and its collection/action machinery): otbr.BorderRouter reads /node and /diagnostics directly, and MeshCoP stays out (ADR 0027 decision 5).",
+      "snapshotSha": "ee63b5fb1077cb5a258fcec348fe64bb6c648d56"
+    },
+    {
+      "path": "packages/thread-br-client/test/NobleDtlsChannelHandshakeTest.ts",
+      "status": "excluded",
+      "class": "device-ble-thread",
+      "reason": "MeshCoP over CoAP/DTLS with EC-JPAKE, its crypto, the _meshcop discovery, the border-router selection or the credentials registry: out of the module (ADR 0027 decision 5; the host names its border router).",
+      "snapshotSha": "f99a972bb03366ff9f829bc368e5e36e10822cd8"
+    },
+    {
+      "path": "packages/thread-br-client/test/OtbrRestActionRunnerTest.ts",
+      "status": "excluded",
+      "class": "device-ble-thread",
+      "reason": "The DiagnosticSource abstraction over MeshCoP and REST (and its collection/action machinery): otbr.BorderRouter reads /node and /diagnostics directly, and MeshCoP stays out (ADR 0027 decision 5).",
+      "snapshotSha": "008b52c8a80eeff8908910138c5ed4557cb54c07"
+    },
+    {
+      "path": "packages/thread-br-client/test/OtbrRestClientTest.ts",
+      "status": "partial",
+      "go": [
+        "thread/otbr:TestOtbrRestClientGetNodePascal",
+        "thread/otbr:TestOtbrRestClientGetNodeCamel",
+        "thread/otbr:TestOtbrRestClientGetNodeRejectsBadRloc16",
+        "thread/otbr:TestOtbrRestClientGetNodeWithoutRouterCount",
+        "thread/otbr:TestOtbrRestClientGetDiagnostics",
+        "thread/otbr:TestOtbrRestClientGetDataset",
+        "thread/otbr:TestOtbrRestClientUnreachable",
+        "thread/otbr:TestOtbrRestClientNon2xx",
+        "thread/otbr:TestOtbrRestClientTimeout",
+        "thread/otbr:TestOtbrRestClientBracketsIPv6",
+        "thread/otbr:TestOtbrRestClientReadOnlyGetters",
+        "thread/otbr:TestOtbrRestClientGetterEdges",
+        "thread/otbr:TestOtbrRestClientMutations",
+        "thread/otbr:TestOtbrRestClientCollectionReads",
+        "thread/otbr:TestOtbrRestClientDetectDiagnosticsAPI"
+      ],
+      "missing": [
+        "deletePendingDataset DELETEs the pending endpoint",
+        "factoryReset DELETEs /node",
+        "factoryReset throws rest_not_allowed on 405",
+        "setCommissionerState PUTs \"disable\" as JSON",
+        "addJoiner POSTs pskd/eui64/timeout as JSON",
+        "addJoiner rejects when both eui64 and discerner are given",
+        "removeJoiner DELETEs with the joiner id as a JSON string",
+        "postAction posts a vnd.api+json task envelope and returns the action id",
+        "postAction throws rest_protocol when the response carries no action id",
+        "getAction returns the status and the completed result id",
+        "getAction returns status without a result id while pending",
+        "clearDiagnostics issues DELETE /api/diagnostics"
+      ],
+      "reason": "The reads, the error classification, the timeout, the IPv6 bracketing and the wrapped mutations run against otbr.Client; the missing cases test operations the client does not wrap (factoryReset, the commissioner state, the joiners, the collection API's actions; ADR 0027 decision 4).",
+      "snapshotSha": "cd3218c3c5cf1ed4477269179de2c9a546f0a870"
+    },
+    {
+      "path": "packages/thread-br-client/test/OtbrRestCollectionDiagnosticsTest.ts",
+      "status": "excluded",
+      "class": "device-ble-thread",
+      "reason": "The DiagnosticSource abstraction over MeshCoP and REST (and its collection/action machinery): otbr.BorderRouter reads /node and /diagnostics directly, and MeshCoP stays out (ADR 0027 decision 5).",
+      "snapshotSha": "653f5dcd4412a5f2bd7778f1cfcb5716698ef4d4"
+    },
+    {
+      "path": "packages/thread-br-client/test/OtbrRestDiagnosticSourceTest.ts",
+      "status": "excluded",
+      "class": "device-ble-thread",
+      "reason": "The DiagnosticSource abstraction over MeshCoP and REST (and its collection/action machinery): otbr.BorderRouter reads /node and /diagnostics directly, and MeshCoP stays out (ADR 0027 decision 5).",
+      "snapshotSha": "bc97d6b13bae80e94a5c7b5039a51ee4a3462267"
+    },
+    {
+      "path": "packages/thread-br-client/test/OtbrRestProbeTest.ts",
+      "status": "ported",
+      "go": [
+        "thread/otbr:TestOtbrRestProbePascalLegacy",
+        "thread/otbr:TestOtbrRestProbeCamelCollection",
+        "thread/otbr:TestOtbrRestProbeNoDiagnostics",
+        "thread/otbr:TestOtbrRestProbeNeverFetchesActions",
+        "thread/otbr:TestOtbrRestProbeMisses"
+      ],
+      "reason": "All 10 cases run against otbr.Probe over a stub transport: both key formats, the three diagnostics flavours, no /api/actions, and the six misses (network error, garbage, missing fields, empty object, error status, timeout).",
+      "snapshotSha": "bd4a5f736e101ba3ff2f5d5ea08573b012251fd8"
+    },
+    {
+      "path": "packages/thread-br-client/test/PanIdQueryTest.ts",
+      "status": "excluded",
+      "class": "device-ble-thread",
+      "reason": "MeshCoP over CoAP/DTLS with EC-JPAKE, its crypto, the _meshcop discovery, the border-router selection or the credentials registry: out of the module (ADR 0027 decision 5; the host names its border router).",
+      "snapshotSha": "a5a7eddfd84a440861bab126506c3afc555c6fc4"
+    },
+    {
+      "path": "packages/thread-br-client/test/Pbkdf2AesCmacTest.ts",
+      "status": "excluded",
+      "class": "device-ble-thread",
+      "reason": "MeshCoP over CoAP/DTLS with EC-JPAKE, its crypto, the _meshcop discovery, the border-router selection or the credentials registry: out of the module (ADR 0027 decision 5; the host names its border router).",
+      "snapshotSha": "50aeed4dd88219f3fcd00b2b50825dccefa988a7"
+    },
+    {
+      "path": "packages/thread-br-client/test/PortableCryptoSmokeTest.ts",
+      "status": "excluded",
+      "class": "device-ble-thread",
+      "reason": "MeshCoP over CoAP/DTLS with EC-JPAKE, its crypto, the _meshcop discovery, the border-router selection or the credentials registry: out of the module (ADR 0027 decision 5; the host names its border router).",
+      "snapshotSha": "1c8beafb28e6852fe95b6f8166e18b213366057c"
+    },
+    {
+      "path": "packages/thread-br-client/test/PskcTest.ts",
+      "status": "excluded",
+      "class": "device-ble-thread",
+      "reason": "MeshCoP over CoAP/DTLS with EC-JPAKE, its crypto, the _meshcop discovery, the border-router selection or the credentials registry: out of the module (ADR 0027 decision 5; the host names its border router).",
+      "snapshotSha": "f1bcc4a8e4e7600af49ec85ecc46f47b7080aae0"
+    },
+    {
+      "path": "packages/thread-br-client/test/SchnorrZkpTest.ts",
+      "status": "excluded",
+      "class": "device-ble-thread",
+      "reason": "MeshCoP over CoAP/DTLS with EC-JPAKE, its crypto, the _meshcop discovery, the border-router selection or the credentials registry: out of the module (ADR 0027 decision 5; the host names its border router).",
+      "snapshotSha": "470e6c44145dd7da4651d584b87fd6d00254ab00"
+    },
+    {
+      "path": "packages/thread-br-client/test/SelectBrTest.ts",
+      "status": "excluded",
+      "class": "device-ble-thread",
+      "reason": "MeshCoP over CoAP/DTLS with EC-JPAKE, its crypto, the _meshcop discovery, the border-router selection or the credentials registry: out of the module (ADR 0027 decision 5; the host names its border router).",
+      "snapshotSha": "eacb49a3dc04b78401bd32f78a2b7379560737aa"
+    },
+    {
+      "path": "packages/thread-br-client/test/SelectSourceTest.ts",
+      "status": "excluded",
+      "class": "device-ble-thread",
+      "reason": "MeshCoP over CoAP/DTLS with EC-JPAKE, its crypto, the _meshcop discovery, the border-router selection or the credentials registry: out of the module (ADR 0027 decision 5; the host names its border router).",
+      "snapshotSha": "0300939e9aafb31582343ed2390fa9a80e7a31be"
+    },
+    {
+      "path": "packages/thread-br-client/test/ServerHelloMessageTest.ts",
+      "status": "excluded",
+      "class": "device-ble-thread",
+      "reason": "MeshCoP over CoAP/DTLS with EC-JPAKE, its crypto, the _meshcop discovery, the border-router selection or the credentials registry: out of the module (ADR 0027 decision 5; the host names its border router).",
+      "snapshotSha": "b12bb135789aefcd7451533e83c1887ba7a2bf0e"
+    },
+    {
+      "path": "packages/thread-br-client/test/ServerKeyExchangeMessageTest.ts",
+      "status": "excluded",
+      "class": "device-ble-thread",
+      "reason": "MeshCoP over CoAP/DTLS with EC-JPAKE, its crypto, the _meshcop discovery, the border-router selection or the credentials registry: out of the module (ADR 0027 decision 5; the host names its border router).",
+      "snapshotSha": "7d2d396ebd424ef3bf9a3602f218bc60d44c8f33"
+    },
+    {
+      "path": "packages/thread-br-client/test/ThreadCredentialsRegistryTest.ts",
+      "status": "excluded",
+      "class": "device-ble-thread",
+      "reason": "MeshCoP over CoAP/DTLS with EC-JPAKE, its crypto, the _meshcop discovery, the border-router selection or the credentials registry: out of the module (ADR 0027 decision 5; the host names its border router).",
+      "snapshotSha": "c375d6fc301f9ea7a3bfbb65457ee7fefa624fd8"
+    },
+    {
+      "path": "packages/thread-br-client/test/TlsPrfTest.ts",
+      "status": "excluded",
+      "class": "device-ble-thread",
+      "reason": "MeshCoP over CoAP/DTLS with EC-JPAKE, its crypto, the _meshcop discovery, the border-router selection or the credentials registry: out of the module (ADR 0027 decision 5; the host names its border router).",
+      "snapshotSha": "1b625a97e5abf8b47828d188451e6dde79824b23"
+    },
+    {
+      "path": "packages/thread-br-client/test/TranslationTest.ts",
+      "status": "partial",
+      "go": [
+        "thread/otbr:TestTranslateRouterWithChildren",
+        "thread/otbr:TestTranslateWithoutChildren",
+        "thread/otbr:TestTranslateRloc16",
+        "thread/otbr:TestTranslateAllFixtureEntries",
+        "thread/otbr:TestTranslateMleCounters",
+        "thread/otbr:TestTranslateModeAllZero"
+      ],
+      "missing": [
+        "reads the post-2024 `ipv6Addresses` field name (not just legacy `ip6AddressList`)",
+        "returns response with empty unknown[] (rest never produces unknown TLVs)",
+        "parseIpv6 expands `fd00:0:0:1:0:ff:fe00:7400` to 16 bytes",
+        "parseIpv6 expands `::1` (low compression)",
+        "parseIpv6 expands `fe80::1`",
+        "parseIpv6 expands `::` (all zero)",
+        "parseIpv6 throws on too many groups",
+        "parseIpv6 throws on multiple :: occurrences",
+        "treats parentPriority -1 as low, +1 as high, 0 as medium"
+      ],
+      "reason": "otbr.Translate covers the records the ThreadNetworkDiagnostics server reads; the missing cases test records it does not translate (IPv6 addresses, connectivity, unknown TLVs).",
+      "snapshotSha": "f9e5320e15e7a52e3587ddf45e47ec678c946c11"
+    },
+    {
+      "path": "packages/thread-br-client/test/TypeListTlvTest.ts",
+      "status": "excluded",
+      "class": "device-ble-thread",
+      "reason": "The DiagnosticSource abstraction over MeshCoP and REST (and its collection/action machinery): otbr.BorderRouter reads /node and /diagnostics directly, and MeshCoP stays out (ADR 0027 decision 5).",
+      "snapshotSha": "c776a173b87b40216b0d8328246c8c20003a584b"
+    },
+    {
+      "path": "packages/thread-br-client/test/UdpEncapsulationTlvTest.ts",
+      "status": "excluded",
+      "class": "device-ble-thread",
+      "reason": "MeshCoP over CoAP/DTLS with EC-JPAKE, its crypto, the _meshcop discovery, the border-router selection or the credentials registry: out of the module (ADR 0027 decision 5; the host names its border router).",
+      "snapshotSha": "c88020ed821b83db67ea750dc79d911faf858211"
+    },
+    {
+      "path": "packages/thread-br-client/test/diag/ChildIpv6AddressListTest.ts",
+      "status": "excluded",
+      "class": "device-ble-thread",
+      "reason": "A MeshCoP network-diagnostic TLV codec: the REST surface carries these records as JSON (otbr.Translate), and MeshCoP stays out of the module (ADR 0027 decision 5).",
+      "snapshotSha": "bc65aaa7650457c39fe5133f39a83fe60f39fea4"
+    },
+    {
+      "path": "packages/thread-br-client/test/diag/ChildTableTest.ts",
+      "status": "excluded",
+      "class": "device-ble-thread",
+      "reason": "A MeshCoP network-diagnostic TLV codec: the REST surface carries these records as JSON (otbr.Translate), and MeshCoP stays out of the module (ADR 0027 decision 5).",
+      "snapshotSha": "4a0e514063855a72de4b686cb85fed826f4ac927"
+    },
+    {
+      "path": "packages/thread-br-client/test/diag/ConnectivityTest.ts",
+      "status": "excluded",
+      "class": "device-ble-thread",
+      "reason": "A MeshCoP network-diagnostic TLV codec: the REST surface carries these records as JSON (otbr.Translate), and MeshCoP stays out of the module (ADR 0027 decision 5).",
+      "snapshotSha": "c7b0fd8c1c0d5e0ab7e44ad81ef5a9bbcf2ce5ef"
+    },
+    {
+      "path": "packages/thread-br-client/test/diag/Ipv6AddressListTest.ts",
+      "status": "excluded",
+      "class": "device-ble-thread",
+      "reason": "A MeshCoP network-diagnostic TLV codec: the REST surface carries these records as JSON (otbr.Translate), and MeshCoP stays out of the module (ADR 0027 decision 5).",
+      "snapshotSha": "af26de1c5c35031718147b660ec9c70c8b84280f"
+    },
+    {
+      "path": "packages/thread-br-client/test/diag/LeaderDataTest.ts",
+      "status": "excluded",
+      "class": "device-ble-thread",
+      "reason": "A MeshCoP network-diagnostic TLV codec: the REST surface carries these records as JSON (otbr.Translate), and MeshCoP stays out of the module (ADR 0027 decision 5).",
+      "snapshotSha": "c427782d9bfc88d25e8a4000c0e37449d1380341"
+    },
+    {
+      "path": "packages/thread-br-client/test/diag/MacCountersTest.ts",
+      "status": "excluded",
+      "class": "device-ble-thread",
+      "reason": "A MeshCoP network-diagnostic TLV codec: the REST surface carries these records as JSON (otbr.Translate), and MeshCoP stays out of the module (ADR 0027 decision 5).",
+      "snapshotSha": "2f8f4cc45c85ff525d49b7364cac38d3272e6235"
+    },
+    {
+      "path": "packages/thread-br-client/test/diag/MleCountersTest.ts",
+      "status": "excluded",
+      "class": "device-ble-thread",
+      "reason": "A MeshCoP network-diagnostic TLV codec: the REST surface carries these records as JSON (otbr.Translate), and MeshCoP stays out of the module (ADR 0027 decision 5).",
+      "snapshotSha": "98473c9be221d0eee95758894b13086b5fcbf053"
+    },
+    {
+      "path": "packages/thread-br-client/test/diag/ModeTest.ts",
+      "status": "excluded",
+      "class": "device-ble-thread",
+      "reason": "A MeshCoP network-diagnostic TLV codec: the REST surface carries these records as JSON (otbr.Translate), and MeshCoP stays out of the module (ADR 0027 decision 5).",
+      "snapshotSha": "4d0fc7e78dc7933dab22c94a393f3a2675e559bc"
+    },
+    {
+      "path": "packages/thread-br-client/test/diag/PrimitivesTest.ts",
+      "status": "excluded",
+      "class": "device-ble-thread",
+      "reason": "A MeshCoP network-diagnostic TLV codec: the REST surface carries these records as JSON (otbr.Translate), and MeshCoP stays out of the module (ADR 0027 decision 5).",
+      "snapshotSha": "5ae49bec6fa3081ec0cd7179dea37e386540c645"
+    },
+    {
+      "path": "packages/thread-br-client/test/diag/Route64Test.ts",
+      "status": "excluded",
+      "class": "device-ble-thread",
+      "reason": "A MeshCoP network-diagnostic TLV codec: the REST surface carries these records as JSON (otbr.Translate), and MeshCoP stays out of the module (ADR 0027 decision 5).",
+      "snapshotSha": "9d6d75dc010881c518cc9766e27b723dcf4477a1"
+    },
+    {
+      "path": "packages/thread-br-client/test/diag/RouterNeighborTest.ts",
+      "status": "excluded",
+      "class": "device-ble-thread",
+      "reason": "A MeshCoP network-diagnostic TLV codec: the REST surface carries these records as JSON (otbr.Translate), and MeshCoP stays out of the module (ADR 0027 decision 5).",
+      "snapshotSha": "7ffe7eb3a97d01ffea6bdf50181ce62fcb0f6fa2"
+    },
+    {
+      "path": "packages/thread-br-client/test/diag/TimeoutTest.ts",
+      "status": "excluded",
+      "class": "device-ble-thread",
+      "reason": "A MeshCoP network-diagnostic TLV codec: the REST surface carries these records as JSON (otbr.Translate), and MeshCoP stays out of the module (ADR 0027 decision 5).",
+      "snapshotSha": "cd2b04aca476a5ef6abef8dfd7fbbf574298d7f8"
+    },
+    {
+      "path": "packages/thread-br-client/test/diag/VendorInfoTest.ts",
+      "status": "excluded",
+      "class": "device-ble-thread",
+      "reason": "A MeshCoP network-diagnostic TLV codec: the REST surface carries these records as JSON (otbr.Translate), and MeshCoP stays out of the module (ADR 0027 decision 5).",
+      "snapshotSha": "dcf6f2c7040133a60e72e3de6b2d86fbc512e468"
+    },
+    {
+      "path": "packages/thread-br-client/test/diagnostic/DefaultTlvSetTest.ts",
+      "status": "excluded",
+      "class": "device-ble-thread",
+      "reason": "The DiagnosticSource abstraction over MeshCoP and REST (and its collection/action machinery): otbr.BorderRouter reads /node and /diagnostics directly, and MeshCoP stays out (ADR 0027 decision 5).",
+      "snapshotSha": "82724a5e679277f9d7cc1630171b09d533fbf466"
     }
   ]
 }

@@ -114,8 +114,13 @@ router's own network from the active dataset, or an empty list without one.
 The Thread Border Router device type couples the two clusters only on an
 endpoint that also carries SecondaryNetworkInterface
 (`thread-border-router.ts:34-39`). The device kit composes one device type
-per endpoint, so the kit does not mount this server. A host mounts it next to
-the management server.
+per endpoint, so the kit does not mount this server. Neither does the reference
+daemon: connectedhomeip's own border-router app at the harness commit
+`6170af84` composes endpoint 1 of ThreadNetworkDiagnostics and
+ThreadBorderRouterManagement only, with NetworkCommissioning on endpoint 0 for
+the primary interface (`examples/thread-br-app/thread-br-common/thread-br-app.matter:1759-1979`).
+`core.ThreadNetworkCommissioning` is for a host whose device is itself a Thread
+participant.
 
 ## The reference daemon
 

@@ -122,7 +122,10 @@ optional feature `PC` (:22). The REST contract needs `net/http` only, which
    `cluster/` may import it — `servers` sits below
    `roles` in `script/archcheck/layers.json`. `controller/thread` forwards
    until `v0.12.0`, the window the `controller/<name>` → `client/` moves
-   use (`CLAUDE.md`, ADR 0026 principle 12).
+   use (`CLAUDE.md`, ADR 0026 principle 12). That window had passed when
+   the move landed: wave 26a removed `controller/thread` at once, with a
+   migration-guide line, instead of keeping forwarders (owner decision
+   2026-10-27).
 
 3. **Three servers, one delegate.** `cluster/threadbr/` holds
    - `ThreadBorderRouterManagement` with chip's rules from the table

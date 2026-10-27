@@ -8,7 +8,8 @@
 // Three artefacts, one of them generated from the other two:
 //
 //   - matterjs_tests.json — the SNAPSHOT. Every *Test.ts under
-//     packages/node/test and packages/protocol/test of matter.js at the commit
+//     packages/node/test, packages/protocol/test and packages/thread-br-client/test
+//     of matter.js at the commit
 //     parity/schema.json names in matter.sourceCommit, with its line count,
 //     the SHA-1 of its blob and its top-level describe names. Written by
 //     `go run ./script/testparity -snapshot` (make testparity-snapshot) from a
@@ -90,7 +91,7 @@ const (
 )
 
 // snapshotRoots are the matter.js test trees the register covers.
-var snapshotRoots = []string{"packages/node/test", "packages/protocol/test"}
+var snapshotRoots = []string{"packages/node/test", "packages/protocol/test", "packages/thread-br-client/test"}
 
 func main() {
 	snapshot := flag.Bool("snapshot", false, "regenerate "+snapshotFile+" from the matter.js clone in $MATTERJS_DIR (default ../matter.js) at the commit "+schemaFile+" names")

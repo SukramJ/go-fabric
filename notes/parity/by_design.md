@@ -96,6 +96,9 @@ pin lift confirms by re-reading the row, [`pin-lifts.md`](./pin-lifts.md)).
 | BD-chip-ZoneManagement-RulesInServer | `ZoneManagementServer.ts:14` is the empty subclass (absence: the class body, 14 lines in all) | `packages/node/src/behaviors/zone-management/ZoneManagementServer.ts` | `class ZoneManagementServer` | connectedhomeip `src/app/clusters/zone-management-server/ZoneManagementCluster.cpp` at `6170af84` (`ValidateConfiguration` :85, the Sensitivity write :259-284, the handlers :462-659, the events :701-733), `zone-geometry.h` (`IsZoneSelfIntersecting` :158), tests `tests/TestZoneManagementCluster.cpp`, `tests/TestZonePolygon.cpp` |
 | BD-chip-WiFiNetworkManagement-RulesInServer | `WiFiNetworkManagementServer.ts:14` is the empty subclass (absence: the class line, 14 lines in all) | `packages/node/src/behaviors/wi-fi-network-management/WiFiNetworkManagementServer.ts` | `"export class WiFiNetworkManagementServer extends WiFiNetworkManagementBehavior {}"` | connectedhomeip `src/app/clusters/wifi-network-management-server/WiFiNetworkManagementCluster.cpp` at `6170af84` (`ClearNetworkCredentials` :62, `SetNetworkCredentials` :74, `ReadAttribute` :105, `InvokeCommand` :123) |
 | BD-chip-ThreadNetworkDirectory-RulesInServer | `ThreadNetworkDirectoryServer.ts:14` is the empty subclass (absence: the class line, 14 lines in all) | `packages/node/src/behaviors/thread-network-directory/ThreadNetworkDirectoryServer.ts` | `"export class ThreadNetworkDirectoryServer extends ThreadNetworkDirectoryBehavior {}"` | connectedhomeip `src/app/clusters/thread-network-directory-server/ThreadNetworkDirectoryCluster.cpp` at `6170af84` (`WritePreferredExtendedPanId` :139, `ReadThreadNetworks` :153, `HandleAddNetworkRequest` :214, `HandleRemoveNetworkRequest` :278, `HandleOperationalDatasetRequest` :309; `ThreadNetworkDirectoryStorage.h`) |
+| BD-Thread-TBRM-ChipLogic | `ThreadBorderRouterManagementServer.ts:14` is the empty subclass (absence: the class line, 14 lines in all) | `packages/node/src/behaviors/thread-border-router-management/ThreadBorderRouterManagementServer.ts` | `"export class ThreadBorderRouterManagementServer extends ThreadBorderRouterManagementBehavior {}"` | connectedhomeip `src/app/clusters/thread-border-router-management-server/ThreadBorderRouterManagementCluster.cpp` at `6170af84` (`ReadAttribute` :32, `InvokeCommand` :148, `OnActivateDatasetComplete` :272, `OnPlatformEventHandler` :297; `ThreadBorderRouterManagementDelegate.h:63-106`), tests `tests/TestThreadBorderRouterManagementCluster.cpp` |
+| BD-Thread-TND-FromBorderRouter | `ThreadNetworkDiagnosticsServer.ts:14` is the empty subclass (absence: the class line, 14 lines in all) | `packages/node/src/behaviors/thread-network-diagnostics/ThreadNetworkDiagnosticsServer.ts` | `"export class ThreadNetworkDiagnosticsServer extends ThreadNetworkDiagnosticsBehavior {}"` | connectedhomeip `src/app/clusters/thread-network-diagnostics-server/DirectThreadNetworkDiagnosticsProvider.cpp` at `6170af84` (`ReadAttribute` :59, the unconfigured nulls :65-92, `RoutingRole` :104-145, the tables :184-293, the counts :325-571, the dataset attributes :577-689), `ThreadNetworkDiagnosticsCluster.cpp` |
+| BD-Thread-NetComm-ThreadVariant | `NetworkCommissioningServer.ts:18` is the empty subclass: no network-type branch, no Thread logic (absence: the class line, 18 lines in all) | `packages/node/src/behaviors/network-commissioning/NetworkCommissioningServer.ts` | `"export class NetworkCommissioningServer extends NetworkCommissioningBehavior {}"` | connectedhomeip `src/app/clusters/network-commissioning/NetworkCommissioningCluster.cpp` at `6170af84` (the Thread paths: `HandleScanNetworks` :349-367, `HandleAddOrUpdateThreadNetwork` :561-587, `OnFinished` :904-928, `ReadAttribute` :1102-1108) over `src/platform/OpenThread/GenericNetworkCommissioningThreadDriver.cpp` |
 
 ---
 
@@ -4738,10 +4741,11 @@ Network Name is refused with CONSTRAINT_ERROR: the model's struct
 constraint "1 to 16" (matter.js's `thread-network-directory.element.ts`)
 wins over chip accepting it. (3) The dataset is checked the way chip's
 `OperationalDatasetView` reads it (first sub-TLV of each type, chip's
-sizes, `ThreadOperationalDataset.cpp:172-301`), not through
-`controller/thread`'s codec, which `archcheck` keeps out of a server
-(servers → roles); wave 26a moves the codec to `thread/` and reconciles the
-two views. chip's seven unit cases are ported (`threaddir_chip_test.go`; the
+sizes, `ThreadOperationalDataset.cpp:172-301`) through `thread.DatasetView`,
+the view `thread` holds next to the matter.js codec `thread.DecodeDataset`,
+which reads the last occurrence and accepts the one-byte Channel; a
+directory that judges what a controller hands it reads as chip does (wave
+26a reconciled the two views into one package). chip's seven unit cases are ported (`threaddir_chip_test.go`; the
 storage-migration case is chip's own format). Retire when matter.js's
 server gains the rules.
 
