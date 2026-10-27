@@ -4951,7 +4951,8 @@ consumer of an older pseudo-version should read.
   earlier than it was. Both fields are gone; the commit holding the file is
   its provenance.
 
-[Unreleased]: https://github.com/SukramJ/go-fabric/compare/v0.13.4...HEAD
+[Unreleased]: https://github.com/SukramJ/go-fabric/compare/v0.13.5...HEAD
+[0.13.5]: https://github.com/SukramJ/go-fabric/compare/v0.13.4...v0.13.5
 [0.13.4]: https://github.com/SukramJ/go-fabric/compare/v0.13.3...v0.13.4
 [0.13.3]: https://github.com/SukramJ/go-fabric/compare/v0.13.2...v0.13.3
 [0.13.2]: https://github.com/SukramJ/go-fabric/compare/v0.13.1...v0.13.2
