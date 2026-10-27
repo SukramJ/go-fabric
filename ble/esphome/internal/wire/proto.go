@@ -91,7 +91,7 @@ const (
 )
 
 // ErrMalformed is a message that does not decode as protobuf.
-var ErrMalformed = errors.New("esphome: malformed protobuf message")
+var ErrMalformed = errors.New("wire: malformed protobuf message")
 
 // Message is one API message: its id and its encoding.
 type Message interface {

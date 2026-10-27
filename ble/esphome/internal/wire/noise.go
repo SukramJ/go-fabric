@@ -38,12 +38,12 @@ var (
 	// ErrInvalidKey is a handshake the device refused for the key:
 	// "Handshake MAC failure" or a response that fails authentication
 	// (noise.py:305-323, :336-352).
-	ErrInvalidKey = errors.New("esphome: invalid encryption key")
+	ErrInvalidKey = errors.New("wire: invalid encryption key")
 	// ErrHandshake is any other failed Noise handshake.
-	ErrHandshake = errors.New("esphome: Noise handshake failed")
+	ErrHandshake = errors.New("wire: Noise handshake failed")
 	// ErrMalformedKey is an API key that is not base64 of 32 bytes
 	// (noise_encryption.py:51-65).
-	ErrMalformedKey = errors.New("esphome: malformed API key, expected base64 of 32 bytes")
+	ErrMalformedKey = errors.New("wire: malformed API key, expected base64 of 32 bytes")
 )
 
 // noiseHello is the client hello: an empty frame (noise.py:50).

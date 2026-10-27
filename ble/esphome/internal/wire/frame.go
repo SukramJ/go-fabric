@@ -16,12 +16,12 @@ import (
 var (
 	// ErrRequiresEncryption is a plaintext client answered with the Noise
 	// preamble: the device has an API key (_frame_helper/plain_text.py:153-158).
-	ErrRequiresEncryption = errors.New("esphome: the device requires encryption (an API key)")
+	ErrRequiresEncryption = errors.New("wire: the device requires encryption (an API key)")
 	// ErrPlaintextDevice is a Noise client answered with the plaintext
 	// preamble: the device has no API key (_frame_helper/noise.py:160-167).
-	ErrPlaintextDevice = errors.New("esphome: the device uses the plaintext protocol (no API key)")
+	ErrPlaintextDevice = errors.New("wire: the device uses the plaintext protocol (no API key)")
 	// ErrProtocol is a frame that breaks the framing.
-	ErrProtocol = errors.New("esphome: API protocol error")
+	ErrProtocol = errors.New("wire: API protocol error")
 )
 
 // MaxFrameSize bounds a frame's length: the firmware's 16-bit length, the
