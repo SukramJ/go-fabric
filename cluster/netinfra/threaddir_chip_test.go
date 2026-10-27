@@ -193,6 +193,20 @@ func TestThreadNetworkDirectoryCluster_TestAddNetworkCommand(t *testing.T) {
 	if st := add(nil); st != im.StatusConstraintError {
 		t.Errorf("empty dataset: %v, want CONSTRAINT_ERROR", st)
 	}
+	// Beyond chip: an empty Network Name, which ThreadNetworks cannot
+	// serve ("1 to 16"), and the one-byte Channel chip's getter refuses
+	// (ThreadOperationalDataset.cpp:206).
+	unnamed := slices.Concat(dataset1[:len(dataset1)-len(tlvSuffix)], tlvSuffix[:28], []byte{0x03, 0x00}, tlvSuffix[45:])
+	if st := add(unnamed); st != im.StatusConstraintError {
+		t.Errorf("empty Network Name: %v, want CONSTRAINT_ERROR", st)
+	}
+	oneByteChannel := slices.Concat(dataset1[:10], []byte{0x00, 0x01, 0x0f}, dataset1[15:])
+	if st := add(oneByteChannel); st != im.StatusConstraintError {
+		t.Errorf("one-byte Channel: %v, want CONSTRAINT_ERROR", st)
+	}
+	if !dirty.empty() {
+		t.Error("a refused dataset reported a change")
+	}
 	if st := add(dataset1); st != im.StatusSuccess {
 		t.Errorf("valid dataset: %v, want SUCCESS", st)
 	}

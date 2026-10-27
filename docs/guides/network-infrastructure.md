@@ -58,7 +58,7 @@ answers the command with FAILURE and changes nothing.
 
 | Command or write | Refused with |
 | --- | --- |
-| `AddNetwork` (timed) | CONSTRAINT_ERROR for a dataset that lacks one of the ten sub-TLVs chip requires or has one in the wrong size; INVALID_IN_STATE when the Active Timestamp is not newer than the stored network's; RESOURCE_EXHAUSTED when the table is full |
+| `AddNetwork` (timed) | CONSTRAINT_ERROR for a dataset that lacks one of the ten sub-TLVs chip requires, has one in the wrong size, or has an empty Network Name; INVALID_IN_STATE when the Active Timestamp is not newer than the stored network's; RESOURCE_EXHAUSTED when the table is full |
 | `RemoveNetwork` (timed) | CONSTRAINT_ERROR for an Extended PAN ID that is not 8 bytes, or for the preferred network; NOT_FOUND for a network not stored |
 | `GetOperationalDataset` | UNSUPPORTED_ACCESS without a CASE session; CONSTRAINT_ERROR for a wrong-sized ID; NOT_FOUND |
 | write of `PreferredExtendedPanID` | CONSTRAINT_ERROR unless it names a stored network; an empty value is null |

@@ -368,7 +368,8 @@ func validDatasetFraming(blob []byte) bool {
 // concept v10 moves to thread/); chip's stricter sizes — the three-byte
 // Channel on page 0 (:202-211), a PSKc of 16 bytes (:276-283), a network
 // name of at most 16 (:257-265), a non-empty Channel Mask (:285-292) — are
-// checked on top.
+// checked on top, and a name of at least one byte, which the
+// ThreadNetworkStruct's constraint "1 to 16" needs.
 func parseDataset(blob []byte) (directoryEntry, error) {
 	if !validDatasetFraming(blob) {
 		return directoryEntry{}, datasetError("not a framed dataset of at most %d bytes", maxDatasetLen)
@@ -392,6 +393,11 @@ func parseDataset(blob []byte) (directoryEntry, error) {
 		return directoryEntry{}, datasetError("no Mesh-Local Prefix")
 	case ds.NetworkName == nil || len(*ds.NetworkName) > maxNetworkNameLen:
 		return directoryEntry{}, datasetError("no Network Name of at most %d bytes", maxNetworkNameLen)
+	case *ds.NetworkName == "":
+		// chip takes an empty name (:257-265 checks the maximum only); the
+		// ThreadNetworkStruct's NetworkName is "1 to 16", so ThreadNetworks
+		// could not serve it.
+		return directoryEntry{}, datasetError("an empty Network Name")
 	case ds.PANID == nil:
 		return directoryEntry{}, datasetError("no PAN ID")
 	case len(ds.PSKc) != pskcLen:
