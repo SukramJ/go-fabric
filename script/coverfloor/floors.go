@@ -303,6 +303,9 @@ var floors = []packageFloor{
 	// The two unreachable error returns of boolcfg.New (a definition
 	// spec.NewServer refuses, an initial value SetAttributes refuses).
 	{pkg: "github.com/SukramJ/go-fabric/cluster/boolcfg", min: 98},
+	// The unreachable construction errors of the two netinfra servers (a
+	// definition spec.NewServer refuses, a store-held value Set refuses).
+	{pkg: "github.com/SukramJ/go-fabric/cluster/netinfra", min: 97},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/spec", min: 97},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/spec/activatedcarbonfiltermonitoring", min: 100},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/spec/closurecontrol", min: 100},

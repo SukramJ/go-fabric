@@ -92,6 +92,8 @@ pin lift confirms by re-reading the row, [`pin-lifts.md`](./pin-lifts.md)).
 | BD-chip-Thermostat-Schedules | `ThermostatServer.ts:82`, the class doc lists the feature unimplemented (presence; :126-128 warns when it is enabled) | `packages/node/src/behaviors/thermostat/ThermostatServer.ts` | `"MatterScheduleConfiguration: This feature is not implemented yet."` | connectedhomeip `src/app/clusters/thermostat-server/ThermostatClusterSchedules.cpp` at `645b267a` (`SetActiveSchedule` :741, `AppendPendingSchedule` :795, `ValidateScheduleTransitions` :292, `ValidateTransitionsPerDay` :457, the atomic hooks :620-663, `PrecommitSchedules` :1000) |
 | BD-chip-Chime-RulesInServer | `ChimeServer.ts:14` is the empty subclass (absence: the class body, 14 lines in all) | `packages/node/src/behaviors/chime/ChimeServer.ts` | `class ChimeServer` | connectedhomeip `src/app/clusters/chime-server/ChimeCluster.cpp` at `6170af84` (`IsSupportedChimeID` :176, `SetSelectedChime` :215, `SetEnabled` :228, `HandlePlayChimeSound` :258, `GenerateChimeStartedPlayingEvent` :291), tests `tests/TestChimeCluster.cpp` |
 | BD-chip-CameraAvSettings-RulesInServer | `CameraAvSettingsUserLevelManagementServer.ts:18` is the empty subclass (absence: the class body, 18 lines in all) | `packages/node/src/behaviors/camera-av-settings-user-level-management/CameraAvSettingsUserLevelManagementServer.ts` | `class CameraAvSettingsUserLevelManagementServer` | connectedhomeip `src/app/clusters/camera-av-settings-user-level-management-server/CameraAvSettingsUserLevelManagementLogic.cpp` at `6170af84` (the handlers :721-1261, `OnPhysicalMovementComplete` :1265, the limit setters :339-407, the DPTZ streams :469-591), tests `tests/TestCameraAvSettingsUserLevelManagementCluster.cpp` |
+| BD-chip-WiFiNetworkManagement-RulesInServer | `WiFiNetworkManagementServer.ts:14` is the empty subclass (absence: the class line, 14 lines in all) | `packages/node/src/behaviors/wi-fi-network-management/WiFiNetworkManagementServer.ts` | `"export class WiFiNetworkManagementServer extends WiFiNetworkManagementBehavior {}"` | connectedhomeip `src/app/clusters/wifi-network-management-server/WiFiNetworkManagementCluster.cpp` at `6170af84` (`ClearNetworkCredentials` :62, `SetNetworkCredentials` :74, `ReadAttribute` :105, `InvokeCommand` :123) |
+| BD-chip-ThreadNetworkDirectory-RulesInServer | `ThreadNetworkDirectoryServer.ts:14` is the empty subclass (absence: the class line, 14 lines in all) | `packages/node/src/behaviors/thread-network-directory/ThreadNetworkDirectoryServer.ts` | `"export class ThreadNetworkDirectoryServer extends ThreadNetworkDirectoryBehavior {}"` | connectedhomeip `src/app/clusters/thread-network-directory-server/ThreadNetworkDirectoryCluster.cpp` at `6170af84` (`WritePreferredExtendedPanId` :139, `ReadThreadNetworks` :153, `HandleAddNetworkRequest` :214, `HandleRemoveNetworkRequest` :278, `HandleOperationalDatasetRequest` :309; `ThreadNetworkDirectoryStorage.h`) |
 
 ---
 
@@ -4649,3 +4651,85 @@ emits none without a remote actor (`AccessControlServer.ts:284-302`;
 until the host removes them, as matter.js's server has no fabric-removal
 hook at the pin.
 
+### BD-chip-WiFiNetworkManagement-RulesInServer — the credential, surrogate and CASE rules are connectedhomeip's; matter.js has none
+
+matter.js's `WiFiNetworkManagementServer` is the empty subclass
+(`packages/node/src/behaviors/wi-fi-network-management/WiFiNetworkManagementServer.ts:14`
+at `862ad75f`), so `cluster/netinfra/wifimgmt.go` follows connectedhomeip's
+`WiFiNetworkManagementCluster.cpp` at the harness commit `6170af84` (wave
+26-B, concept v10): the credentials are host state set through
+`SetNetworkCredentials` / `ClearNetworkCredentials` with chip's SSID and
+WPA-personal checks (`:44-56`, `:62-103` — a passphrase of 8 to 63 bytes or
+a 64-hex-digit PSK); a new passphrase advances `PassphraseSurrogate`;
+`NetworkPassphraseRequest` answers over a CASE session only
+(UNSUPPORTED_ACCESS otherwise, `:129-131`) and INVALID_IN_STATE without
+credentials (`:132`); the passphrase is never logged, never in an error
+and never an attribute. The session kind comes from the request context
+the bridge stamps, as `cluster/core/ota_provider.go` reads it; a group
+message does not count as CASE (chip's `kGroup`). chip's ten unit cases
+are ported (`wifimgmt_chip_test.go`). Reasoning: a NetworkInfrastructureManager
+device type mandates the cluster and chip is the only reference with
+rules. Retire when matter.js's server gains them; then re-derive from it.
+
+### BD-chip-ThreadNetworkDirectory-RulesInServer — the directory's commands follow connectedhomeip behind a `ThreadNetworkStore` port
+
+matter.js's `ThreadNetworkDirectoryServer` is the empty subclass
+(`packages/node/src/behaviors/thread-network-directory/ThreadNetworkDirectoryServer.ts:14`
+at `862ad75f`); `cluster/netinfra/threaddir.go` follows connectedhomeip's
+`ThreadNetworkDirectoryCluster.cpp` at `6170af84` (wave 26-B): `AddNetwork`
+(`:214-276`; CONSTRAINT_ERROR on a bad dataset, INVALID_IN_STATE, and
+RESOURCE_EXHAUSTED when the table is full), `RemoveNetwork` (`:278-307`;
+NOT_FOUND), `GetOperationalDataset` (`:309-335`; UNSUPPORTED_ACCESS without
+CASE, NOT_FOUND), and the `PreferredExtendedPanID` write (`:139-151`: null
+or an id of a stored network, CONSTRAINT_ERROR otherwise). The host's
+storage is the generated `ThreadNetworkStore` port (`Declare.ThreadNetworkStore`,
+in the spirit of chip's `ThreadNetworkDirectoryStorage.h`): the networks
+and the preferred id, which chip keeps in attribute storage (`:151`) and
+this port persists through `LoadPreferred` / `SavePreferred` as the
+`PresetStore` persists the active preset; an in-memory store of 32
+networks (chip's default, `CHIP_CONFIG_MAX_THREAD_NETWORK_DIRECTORY_STORAGE_CAPACITY`
+= `CHIP_CONFIG_MAX_FABRICS * 2`, `src/lib/core/CHIPConfig.h:1891`) stands in
+without one. Three deliberate differences inside it. (1) `ThreadNetworks`
+is served from the server's own table, loaded at construction and after
+each command; a host that writes the store outside the cluster calls
+`ReloadNetworks` — chip reads its storage on every read (`:153-183`), which
+leaves its data version unaware of an out-of-band change. (2) An empty
+Network Name is refused with CONSTRAINT_ERROR: the model's struct
+constraint "1 to 16" (matter.js's `thread-network-directory.element.ts`)
+wins over chip accepting it. (3) The dataset is checked the way chip's
+`OperationalDatasetView` reads it (first sub-TLV of each type, chip's
+sizes, `ThreadOperationalDataset.cpp:172-301`), not through
+`controller/thread`'s codec, which `archcheck` keeps out of a server
+(servers → roles); wave 26a moves the codec to `thread/` and reconciles the
+two views. chip's seven unit cases are ported (`threaddir_chip_test.go`; the
+storage-migration case is chip's own format). Retire when matter.js's
+server gains the rules.
+
+### BD-Matter-GeneratedServerSuffices — clusters whose generated server is complete: no source carries behaviour beyond the model
+
+Audit of 2026-10-27 (owner question at the milestone 6 concept; read map
+`read-generated-clusters-chip-rules.md`, connectedhomeip at the harness
+commit `6170af84`, matter.js at `862ad75f`): for every cluster this module
+serves, chip's server was checked for command handlers and validation
+beyond the data model. Every cluster where chip carries such rules already
+has a hand-written server here (`cluster/core`, `energy`, `media`,
+`appliance`, `closure`, `fan`, `pump`, `valve`, `filter`, `thermo` and the
+measurement projections; the `BD-chip-*` entries above record each rule
+set), or is a milestone 6 wave (concept v10). What remains generated is
+complete by the model alone — no `*Server.ts` logic at the pin (the 14-line
+shell), no chip handler, no chip status beyond UnsupportedAttribute /
+UnsupportedCommand: **WaterTankLevelMonitoring** (0x0079; chip has no server
+at all), **MeterIdentification** (0x0B06), **ElectricalGridConditions**
+(0x00A0; one `Status::Failure` on a read error,
+`electrical-grid-conditions-server.cpp:160`), **FixedLabel**, and the
+attribute-only measurement clusters (Temperature, RelativeHumidity,
+Illuminance, Pressure, Flow, BooleanState, the ten concentration
+measurements, ElectricalPowerMeasurement, SoilMeasurement — their host
+projections in `cluster/measurement` add the materialisers, not rules).
+Reasoning: the generated server enforces the model's constraints and
+conformance (ADR 0017); a rule that no reference implementation has is not
+a gap. Two findings came out of the same audit and are register entries,
+not divergences: TimeSynchronization's optional features (milestone 6 wave
+27-B) and AirQuality's feature-gated values. Re-read at every pin lift
+together with the Ahead-of-matter.js markers: a `*Server.ts` of one of
+these clusters growing past the shell reopens the question.

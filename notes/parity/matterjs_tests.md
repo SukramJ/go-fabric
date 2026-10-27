@@ -10,9 +10,9 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` â
 
 | status | files |
 | --- | ---: |
-| ported | 107 |
+| ported | 108 |
 | partial | 133 |
-| planned | 11 |
+| planned | 10 |
 | excluded | 73 |
 | total | 324 |
 
@@ -68,7 +68,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` â
 | [node/test/behaviors/switch](#nodetestbehaviorsswitch) | 1 | 1 | 0 | 0 | 0 |
 | [node/test/behaviors/thermostat](#nodetestbehaviorsthermostat) | 6 | 2 | 4 | 0 | 0 |
 | [node/test/behaviors/thermostat-user-interface-configuration](#nodetestbehaviorsthermostat-user-interface-configuration) | 1 | 1 | 0 | 0 | 0 |
-| [node/test/behaviors/thread-network-diagnostics](#nodetestbehaviorsthread-network-diagnostics) | 1 | 0 | 0 | 1 | 0 |
+| [node/test/behaviors/thread-network-diagnostics](#nodetestbehaviorsthread-network-diagnostics) | 1 | 1 | 0 | 0 | 0 |
 | [node/test/behaviors/time-format-localization](#nodetestbehaviorstime-format-localization) | 1 | 1 | 0 | 0 | 0 |
 | [node/test/behaviors/unit-localization](#nodetestbehaviorsunit-localization) | 1 | 1 | 0 | 0 | 0 |
 | [node/test/behaviors/web-rtc-transport-requestor](#nodetestbehaviorsweb-rtc-transport-requestor) | 1 | 1 | 0 | 0 | 0 |
@@ -463,7 +463,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` â
 
 | file | lines | status | Go tests or class | note |
 | --- | ---: | --- | --- | --- |
-| ThreadNetworkDiagnosticsProvisionalTest.ts | 37 | planned | until M6 phase 26 | Provisional ThreadNetworkDiagnostics attributes absent by default and present once supplied. Thread network diagnostics are milestone 6 phase 26 work (concept v5 F.0 19.2). |
+| ThreadNetworkDiagnosticsProvisionalTest.ts | 37 | ported | `device:TestParityMatterJS_ThreadNetworkDiagnosticsProvisional` | Both cases run on a ThreadBorderRouter built by the device kit: ExtAddress and Rloc16 ("P, M") are optional to spec.Conformance, absent from the AttributeList of the generated server by default and listed once the declaration's Initial supplies them, null as in the matter.js case (device/threaddiag_parity_matterjs_test.go). |
 
 ## node/test/behaviors/time-format-localization
 
@@ -925,10 +925,6 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` â
 ### node/test/behaviors/access-control
 
 - `AccessControlCustomExtensionTest.ts` â€” A manufacturer extension of AccessControl (a custom attribute and command): the root AccessControl server takes no extension elements; the subject is missing. Milestone 5.
-
-### node/test/behaviors/thread-network-diagnostics
-
-- `ThreadNetworkDiagnosticsProvisionalTest.ts` â€” Provisional ThreadNetworkDiagnostics attributes absent by default and present once supplied. Thread network diagnostics are milestone 6 phase 26 work (concept v5 F.0 19.2).
 
 ### node/test/endpoint/type
 

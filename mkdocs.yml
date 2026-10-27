@@ -26,6 +26,7 @@ exclude_docs: |
   concept-v7-*.md
   concept-v8-*.md
   concept-v9-*.md
+  concept-v10-*.md
   requirements.txt
 
 theme:
@@ -81,6 +82,7 @@ nav:
       - Host ports: guides/ports.md
       - Thermostat: guides/thermostat.md
       - Camera: guides/camera.md
+      - Network infrastructure: guides/network-infrastructure.md
       - Advanced seams: guides/advanced-seams.md
       - Migrating to the facade: guides/migrating-to-the-facade.md
       - Concurrency: guides/concurrency.md

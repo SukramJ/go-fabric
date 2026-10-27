@@ -1380,9 +1380,11 @@
     },
     {
       "path": "packages/node/test/behaviors/thread-network-diagnostics/ThreadNetworkDiagnosticsProvisionalTest.ts",
-      "status": "planned",
-      "until": "M6 phase 26",
-      "reason": "Provisional ThreadNetworkDiagnostics attributes absent by default and present once supplied. Thread network diagnostics are milestone 6 phase 26 work (concept v5 F.0 19.2).",
+      "status": "ported",
+      "go": [
+        "device:TestParityMatterJS_ThreadNetworkDiagnosticsProvisional"
+      ],
+      "reason": "Both cases run on a ThreadBorderRouter built by the device kit: ExtAddress and Rloc16 (\"P, M\") are optional to spec.Conformance, absent from the AttributeList of the generated server by default and listed once the declaration's Initial supplies them, null as in the matter.js case (device/threaddiag_parity_matterjs_test.go).",
       "snapshotSha": "b7c1de35767659dbb9969e8df122c54dc799b4f3"
     },
     {
