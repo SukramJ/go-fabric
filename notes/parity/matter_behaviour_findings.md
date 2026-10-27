@@ -450,8 +450,9 @@ Controller side:
   lanes per network and bypasses for options that keep a command alone
   (`action/client/ClientInteraction.ts:715-1000`); a goroutine has no tick
   to join on, and `Node.InvokeBatch` is the one multi-command form
-  (ClientInvokeTest, 39 cases `missing`). Owner decision 2026-10-26:
-  decided with the milestone 6 concept. (Milestone 6 phase 27.)
+  (ClientInvokeTest, 39 cases `missing`). Owner decision 2026-10-27
+  (concept v10, 0.1): implemented after matter.js in wave 27-A, with the 39
+  cases ported. (Milestone 6 phase 27.)
 - **The device-side BDX responder takes no per-transfer MRP delay.**
   `TransferOptions.AdditionalMrpDelay` (matter.js `bdxAdditionalMrpDelay`)
   is computed by the update manager but `node`'s BDX responder has no port

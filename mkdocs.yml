@@ -26,6 +26,7 @@ exclude_docs: |
   concept-v7-*.md
   concept-v8-*.md
   concept-v9-*.md
+  concept-v10-*.md
   requirements.txt
 
 theme:
