@@ -170,6 +170,20 @@ func (s *Server) HandleGetOperationalDataset(fn func(ctx context.Context, req Ge
 	return spec.HandleOn(s.Underlying(), CmdGetOperationalDataset, fn)
 }
 
+// ThreadNetworkStore persists the directory's operational datasets,
+// each an opaque blob keyed by its Extended PAN ID: Capacity is
+// ThreadNetworkTableSize, LoadNetworks returns the stored datasets
+// in a stable order, SaveNetwork adds or replaces one and
+// RemoveNetwork drops one; an error answers the command FAILURE
+// and changes nothing. Without one the kit's server keeps the
+// datasets in memory (cluster/netinfra ThreadNetworkStore).
+type ThreadNetworkStore interface {
+	Capacity() uint8
+	LoadNetworks(ctx context.Context) (datasets [][]byte, err error)
+	SaveNetwork(ctx context.Context, extendedPanID, dataset []byte) error
+	RemoveNetwork(ctx context.Context, extendedPanID []byte) error
+}
+
 // Declare is the declaration of the ThreadNetworkDirectory cluster on a device:
 // device.New<Type> and device.FromSpec take it, and every field is
 // optional — the zero value mounts the cluster (an optional one too)
@@ -195,6 +209,8 @@ type Declare struct {
 	// HandleGetOperationalDataset handles the GetOperationalDataset command in place of the server
 	// (Server.HandleGetOperationalDataset), inline; an optional command it handles is accepted.
 	HandleGetOperationalDataset func(ctx context.Context, req GetOperationalDatasetRequest) (OperationalDatasetResponse, error)
+	// ThreadNetworkStore is the host port the kit's server runs on ([ThreadNetworkStore]).
+	ThreadNetworkStore ThreadNetworkStore
 	// HostServer is the host's own server for the cluster, mounted in
 	// place of the kit's — also for a cluster the device type does not
 	// list. The hooks above go on it; Initial, Features and the ports are

@@ -22,6 +22,7 @@ import (
 	"github.com/SukramJ/go-fabric/cluster/levelcontrol"
 	"github.com/SukramJ/go-fabric/cluster/light"
 	"github.com/SukramJ/go-fabric/cluster/lock"
+	"github.com/SukramJ/go-fabric/cluster/netinfra"
 	"github.com/SukramJ/go-fabric/cluster/onoff"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	lockdef "github.com/SukramJ/go-fabric/cluster/spec/doorlock"
@@ -88,6 +89,8 @@ func TestSelfHeldDefaults(t *testing.T) {
 			return New(&ElectricalMeterType, testOptions("meter"), withOptional(0x0B07), withFeatures(0x0090, uint32(epmdef.FeatureAlternatingCurrent)),
 				withFeatures(0x0091, uint32(eemdef.FeatureImportedEnergy|eemdef.FeatureCumulativeEnergy)))
 		}, (*energy.CommodityMeteringServer)(nil)},
+		{0x0451, func() (*Device, error) { return New(&NetworkInfrastructureManagerType, testOptions("nim")) }, (*netinfra.WiFiManagementServer)(nil)},
+		{0x0453, func() (*Device, error) { return New(&NetworkInfrastructureManagerType, testOptions("nim-tnd")) }, (*netinfra.ThreadDirectoryServer)(nil)},
 	}
 	covered := map[uint32]bool{}
 	for _, tc := range slices.Concat(cases, portCases(), declaredCases(), mediaCases()) {
