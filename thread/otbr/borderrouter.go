@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/SukramJ/go-fabric/clock"
 	"github.com/SukramJ/go-fabric/cluster/threadbr"
 	"github.com/SukramJ/go-fabric/thread"
 )
@@ -33,6 +34,8 @@ type BorderRouterConfig struct {
 	// PollInterval is how often an activation reads /node/state; 0 is
 	// [DefaultPollInterval].
 	PollInterval time.Duration
+	// Clock paces the poll; the system clock when nil.
+	Clock clock.Clock
 }
 
 // ErrNoThreadVersion is a border router whose diagnostics carry no
@@ -73,6 +76,7 @@ func NewBorderRouter(c *Client, cfg BorderRouterConfig) (*BorderRouter, error) {
 	if cfg.PollInterval == 0 {
 		cfg.PollInterval = DefaultPollInterval
 	}
+	cfg.Clock = clock.Or(cfg.Clock)
 	return &BorderRouter{c: c, cfg: cfg, configured: true}, nil
 }
 
@@ -165,7 +169,7 @@ func (b *BorderRouter) SetActiveDataset(ctx context.Context, dataset []byte) err
 // awaitAttached reads /node/state until the border router is attached
 // (ADR 0027 decision 4: the REST surface has no attach callback).
 func (b *BorderRouter) awaitAttached(ctx context.Context) error {
-	tick := time.NewTicker(b.cfg.PollInterval)
+	tick := b.cfg.Clock.NewTicker(b.cfg.PollInterval)
 	defer tick.Stop()
 	for {
 		role, err := b.c.State(ctx)
@@ -175,7 +179,7 @@ func (b *BorderRouter) awaitAttached(ctx context.Context) error {
 		select {
 		case <-ctx.Done():
 			return fmt.Errorf("otbr: the border router did not attach (role %q): %w", role, ctx.Err())
-		case <-tick.C:
+		case <-tick.C():
 		}
 	}
 }

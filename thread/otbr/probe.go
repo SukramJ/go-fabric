@@ -8,6 +8,8 @@ import (
 	"errors"
 	"net/http"
 	"time"
+
+	"github.com/SukramJ/go-fabric/clock"
 )
 
 // DefaultProbeTimeout is the probe's per-request timeout
@@ -44,7 +46,7 @@ func Probe(ctx context.Context, host string, port int, timeout time.Duration, ht
 	if err == nil {
 		var api DiagnosticsAPI
 		if api, err = c.DetectDiagnosticsAPI(ctx); err == nil {
-			return &Capability{BaseURL: c.BaseURL(), KeyFormat: format, ProbedAt: time.Now(), NetworkName: name, ExtPANID: xp, DiagnosticsAPI: api}, nil
+			return &Capability{BaseURL: c.BaseURL(), KeyFormat: format, ProbedAt: clock.System{}.Now(), NetworkName: name, ExtPANID: xp, DiagnosticsAPI: api}, nil
 		}
 	}
 	if _, ok := errors.AsType[*Error](err); ok {
