@@ -118,7 +118,7 @@ var floors = []packageFloor{
 		min: 91,
 		why: "brief CM §2/§3: measured 91.5 (was 93). The TCP initiator's and the network profiles' remaining paths — a TCP dial, a profile's run-time Configure, the cooling of a released slot — run through the controller's TCP and network tests (controller:TestClientNodeTcpParity, client/peer's profile tests on a harness without TCP)",
 	},
-	{pkg: "github.com/SukramJ/go-fabric/controller/thread", min: 97},
+	{pkg: "github.com/SukramJ/go-fabric/thread", min: 97},
 	{pkg: "github.com/SukramJ/go-fabric/diagevent", min: 96},
 	{pkg: "github.com/SukramJ/go-fabric/eligibility", min: 90},
 	{pkg: "github.com/SukramJ/go-fabric/device", min: 97},

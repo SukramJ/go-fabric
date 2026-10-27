@@ -4833,32 +4833,32 @@
       "path": "packages/protocol/test/thread/BasicTlvCodecTest.ts",
       "status": "ported",
       "go": [
-        "controller/thread:TestBasicTlvCodecWalk",
-        "controller/thread:TestBasicTlvCodecEncode"
+        "thread:TestBasicTlvCodecWalk",
+        "thread:TestBasicTlvCodecEncode"
       ],
-      "reason": "All 11 cases run against the new controller/thread WalkTLVs / EncodeTLVs (short and 0xFF extended length, truncation errors, the 0xFFFF limit); the TLV type range case pins that TLV.Type is a byte, the Go form of the 0..255 check.",
+      "reason": "All 11 cases run against thread WalkTLVs (moved from controller/thread) / EncodeTLVs (short and 0xFF extended length, truncation errors, the 0xFFFF limit); the TLV type range case pins that TLV.Type is a byte, the Go form of the 0..255 check.",
       "snapshotSha": "b913ee2b36fecdebf55e7e21655976367ce0035c"
     },
     {
       "path": "packages/protocol/test/thread/MeshCopTlvTypesTest.ts",
       "status": "ported",
       "go": [
-        "controller/thread:TestMeshCopTlvTypesType",
-        "controller/thread:TestMeshCopTlvTypesName"
+        "thread:TestMeshCopTlvTypesType",
+        "thread:TestMeshCopTlvTypesName"
       ],
-      "reason": "All 6 cases run against controller/thread's TLVType constants, the 43-entry type table (no duplicates, the post-spec extensions) and TLVType.Name, the reverse lookup of MeshCopTlvTypeName.",
+      "reason": "All 6 cases run against thread's TLVType constants, the 43-entry type table (no duplicates, the post-spec extensions) and TLVType.Name, the reverse lookup of MeshCopTlvTypeName.",
       "snapshotSha": "09349adbb983699d1b1a6d51bd83e999e4c5d756"
     },
     {
       "path": "packages/protocol/test/thread/OperationalDatasetTest.ts",
       "status": "ported",
       "go": [
-        "controller/thread:TestOperationalDatasetDecode",
-        "controller/thread:TestOperationalDatasetEncode",
-        "controller/thread:TestOperationalDatasetDecodeHex",
-        "controller/thread:TestOperationalDatasetRedact"
+        "thread:TestOperationalDatasetDecode",
+        "thread:TestOperationalDatasetEncode",
+        "thread:TestOperationalDatasetDecodeHex",
+        "thread:TestOperationalDatasetRedact"
       ],
-      "reason": "All 18 cases run against controller/thread's DecodeDataset / DecodeDatasetHex / Encode / Redact: the synthetic-1 fixture, unknown TLVs, the security policy, both CHANNEL forms, byte-identical replay of non-canonical encodings, canonical encoding of a mutated or in-memory dataset, hex with whitespace and redaction; the ArrayBuffer case decodes a sub-slice of a larger buffer, Go's one byte type.",
+      "reason": "All 18 cases run against thread's DecodeDataset / DecodeDatasetHex / Encode / Redact: the synthetic-1 fixture, unknown TLVs, the security policy, both CHANNEL forms, byte-identical replay of non-canonical encodings, canonical encoding of a mutated or in-memory dataset, hex with whitespace and redaction; the ArrayBuffer case decodes a sub-slice of a larger buffer, Go's one byte type.",
       "snapshotSha": "23a7743a0cdbbf0bc272afab04f65fa1ea695e03"
     },
     {

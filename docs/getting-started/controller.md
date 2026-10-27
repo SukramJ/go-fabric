@@ -656,7 +656,8 @@ a device found over DNS-SD that advertises Wi-Fi or Thread.
 
 ### Thread datasets
 
-`thread.DecodeDataset(b)` (package `controller/thread`) reads a Thread
+`thread.DecodeDataset(b)` (package `thread`; `controller/thread` forwards
+to it until the next minor release) reads a Thread
 operational dataset, as matter.js's `OperationalDataset.decode` does:
 `NetworkName`, `ExtPANID`, `Channel`, `PANID` and every other MeshCoP TLV;
 `DecodeDatasetHex` takes hex, and `Redact` drops the secrets for a log

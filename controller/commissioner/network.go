@@ -14,7 +14,7 @@ import (
 	"github.com/SukramJ/go-fabric/client/interaction"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	netcomm "github.com/SukramJ/go-fabric/cluster/spec/networkcommissioning"
-	"github.com/SukramJ/go-fabric/controller/thread"
+	"github.com/SukramJ/go-fabric/thread"
 	"github.com/SukramJ/go-fabric/transport/btp"
 )
 
@@ -76,7 +76,7 @@ const meshCopNetworkName = 3
 
 // threadNetworkNameOf is the Network Name of a Thread operational
 // dataset, the whole dataset decoded as OperationalDataset.decode does
-// (controller/thread.DecodeDataset; OperationalDataset.ts:53-69 at
+// (thread.DecodeDataset; OperationalDataset.ts:53-69 at
 // 862ad75f): a stream that does not walk and a known TLV of the wrong
 // size both fail, and resolveThreadNetworkName then keeps the supplied
 // name (ControllerCommissioningFlow.ts:269-276). ok is false without a
