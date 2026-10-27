@@ -10,7 +10,7 @@
 // (:291-314), the mock delegate MockCameraAVStreamManagementDelegate
 // (:127-282). The 57 cases of TestCameraAVStreamManagementCluster are
 // ported; the seven of TestCodegenCameraAVStreamManagementMigration
-// (:1801-1929) test chip's storage migration, which has no counterpart
+// (:1790-1929) test chip's storage migration, which has no counterpart
 // here (the host persists), and are left out.
 package camera_test
 
