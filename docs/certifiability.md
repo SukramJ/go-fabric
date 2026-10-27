@@ -568,7 +568,8 @@ whose family is not in that list is "not yet run", not "not supported".
 | CONCON, MESSAGES | the module serves ContentControl (`cluster/media`) and Messages (`cluster/core`), but chip has no case of either family at the harness pin | (c) no case |
 | ICDM, ICDB | not applicable to the reference daemon: it is mains-powered and sets no `node.Config.ICD`, so it serves no ICD Management (`ICDM.S` is false in its generated PICS). Applicable to a host that sets `Config.ICD`: the module then serves ICD Management and the Check-In protocol after matter.js ([ICD guide](./guides/icd.md)); the harness does not run the families against such a node | (b) not supported |
 | SC_TC, the BLE and Thread cases of DD and SC | Bluetooth, Thread | (d) out of scope |
-| CNET Thread cases | the device side has no Thread radio | (d) out of scope |
+| CNET Thread cases | the device side has no Thread radio; the Thread NetworkCommissioning variant over a border router (`core.ThreadNetworkCommissioning`, ADR 0027) is not on the reference daemon | (c) not yet run |
+| TBRM | the module serves ThreadBorderRouterManagement over an OTBR (`cluster/threadbr`, ADR 0027) and the reference daemon's `--otbr` adds the endpoint, but the harness does not run the family against a daemon with a virtual OTBR yet (`.github/workflows/otbr-virtual.yml` builds one, dispatch-only) | (c) not yet run |
 
 CNET runs twice. The `CNET` row is the certified default composition, whose
 NetworkCommissioning is Ethernet-only; its Wi-Fi cases are not applicable or

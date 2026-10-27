@@ -42,6 +42,12 @@ still held there. Each row names the facade route, or the section of
 | `cluster/core` | `SoftwareVersionFromString` (`daemon_matter.go:527`) | `node.SoftwareVersionFromString` |
 | `cluster/core` | `RegulatoryIndoorOutdoor` (`daemon_matter.go:506`) | `node.RegulatoryIndoorOutdoor` for `Commissioning.LocationCapability` |
 
+## Moved in the next release: the Thread dataset codec
+
+| Symbol | Route |
+| --- | --- |
+| `controller/thread` (every identifier: `DecodeDataset`, `DecodeDatasetHex`, `OperationalDataset`, `WalkTLVs`, `EncodeTLVs`, `TLV`, `TLVType` and its constants, `SecurityPolicy`, `DecodeSecurityPolicy`, `ErrThreadTLV`, `ErrThreadDataset`, `ErrInvalidTLV`) | the same identifiers in `github.com/SukramJ/go-fabric/thread`: change the import path, nothing else. `controller/thread` forwards until the next minor release (ADR 0027 decision 2) |
+
 ## Changed in v0.13.4: the WebRTC transport structs
 
 | Symbol | Route |
