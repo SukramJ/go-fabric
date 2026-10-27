@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net"
+	"slices"
 	"sync"
 	"time"
 
@@ -47,6 +48,33 @@ type Options struct {
 	// SilenceTimeout is how long a subscribed proxy may stay silent
 	// before the central presumes its subscription taken.
 	SilenceTimeout time.Duration
+	// Discover, when set, finds the proxies over DNS-SD as well: the
+	// central starts with the proxies NewCentral is given and the ones
+	// discovered, and keeps the discovered set current ([DiscoverOptions]).
+	Discover *DiscoverOptions
+}
+
+// normalize fills the defaults.
+func (o *Options) normalize() {
+	if o.Logger == nil {
+		o.Logger = slog.New(slog.DiscardHandler)
+	}
+	if o.Clock == nil {
+		o.Clock = clock.System{}
+	}
+	if o.Dial == nil {
+		var d net.Dialer
+		o.Dial = d.DialContext
+	}
+	if o.ClientInfo == "" {
+		o.ClientInfo = DefaultClientInfo
+	}
+	if o.ConnectTimeout <= 0 {
+		o.ConnectTimeout = DefaultConnectTimeout
+	}
+	if o.SilenceTimeout <= 0 {
+		o.SilenceTimeout = DefaultSilenceTimeout
+	}
 }
 
 // sighting is one proxy's last report of a peripheral.
@@ -68,7 +96,17 @@ type Central struct {
 	ctx     context.Context
 	cancel  context.CancelFunc
 	wg      sync.WaitGroup
+	disc    *DiscoverOptions
+	rescans chan struct{}
+
+	// setMu guards proxies and skipped. Lock order: setMu before a
+	// proxy's mu, never after.
+	setMu   sync.Mutex
 	proxies []*proxy
+	// skipped are the discovered devices refused for good, by instance
+	// name, with the config_hash they were refused at: they are dialled
+	// again only when their configuration changes.
+	skipped map[string]string
 
 	// mu guards callback, scanning and sightings.
 	mu        sync.Mutex
@@ -87,43 +125,41 @@ var (
 // wrong or missing key, no active connections — fails NewCentral naming
 // it, and so does every proxy being unreachable; a proxy that is only
 // unreachable while another answers is retried in the background.
+//
+// With Options.Discover the proxies are found over DNS-SD as well
+// ([Discover]); proxies may then be empty. A discovered device that is no
+// usable proxy is skipped with a log line; NewCentral fails only when no
+// proxy, given or discovered, answers.
 func NewCentral(proxies []Proxy, opts Options) (*Central, error) {
-	if len(proxies) == 0 {
+	if len(proxies) == 0 && opts.Discover == nil {
 		return nil, ErrNoProxies
 	}
-	if opts.Logger == nil {
-		opts.Logger = slog.New(slog.DiscardHandler)
-	}
-	if opts.Clock == nil {
-		opts.Clock = clock.System{}
-	}
-	if opts.Dial == nil {
-		var d net.Dialer
-		opts.Dial = d.DialContext
-	}
-	if opts.ClientInfo == "" {
-		opts.ClientInfo = DefaultClientInfo
-	}
-	if opts.ConnectTimeout <= 0 {
-		opts.ConnectTimeout = DefaultConnectTimeout
-	}
-	if opts.SilenceTimeout <= 0 {
-		opts.SilenceTimeout = DefaultSilenceTimeout
-	}
-	c := &Central{opts: opts, log: opts.Logger, clk: opts.Clock, sightings: map[uint64]map[*proxy]sighting{}}
+	opts.normalize()
+	c := &Central{opts: opts, log: opts.Logger, clk: opts.Clock, sightings: map[uint64]map[*proxy]sighting{}, skipped: map[string]string{}}
 	c.ctx, c.cancel = context.WithCancel(context.Background())
+	if opts.Discover != nil {
+		d, err := opts.Discover.normalized()
+		if err != nil {
+			c.cancel()
+			return nil, err
+		}
+		c.disc, c.rescans = &d, make(chan struct{}, 1)
+	}
+	var static []*proxy
 	for _, cfg := range proxies {
 		p, err := newProxy(c, cfg)
 		if err != nil {
+			c.cancel()
 			return nil, err
 		}
-		c.proxies = append(c.proxies, p)
+		p.static = true
+		static = append(static, p)
 	}
-	first := make([]*apiConn, len(c.proxies))
-	errs := make([]error, len(c.proxies))
+	first := make([]*apiConn, len(static))
+	errs := make([]error, len(static))
 	var wg sync.WaitGroup
 	ctx, cancel := clock.WithTimeout(c.ctx, c.clk, opts.ConnectTimeout)
-	for i, p := range c.proxies {
+	for i, p := range static {
 		wg.Go(func() { first[i], errs[i] = p.dial(ctx) })
 	}
 	wg.Wait()
@@ -132,27 +168,78 @@ func NewCentral(proxies []Proxy, opts Options) (*Central, error) {
 	refused := false
 	for i, err := range errs {
 		if err != nil {
-			failed = append(failed, fmt.Errorf("proxy %s: %w", c.proxies[i].name, err))
+			failed = append(failed, fmt.Errorf("proxy %s: %w", static[i].name, err))
 			refused = refused || permanent(err)
 		}
 	}
-	if refused || len(failed) == len(c.proxies) {
+	abort := func(err error) (*Central, error) {
 		for _, a := range first {
 			if a != nil {
 				a.close(context.Canceled)
 			}
 		}
 		c.cancel()
-		return nil, errors.Join(failed...)
+		c.wg.Wait()
+		return nil, err
+	}
+	if refused {
+		return abort(errors.Join(failed...))
 	}
 	for _, err := range failed {
 		c.log.Warn("ble.esphome.proxy_unreachable", slog.Any("err", err))
 	}
-	for i, p := range c.proxies {
+	c.proxies = static
+	for i, p := range static {
+		c.start(p, first[i])
+	}
+	if c.disc != nil {
+		c.rescan(c.ctx)
+	}
+	if c.answering() == 0 {
+		if len(failed) > 0 {
+			return abort(errors.Join(failed...))
+		}
+		return abort(fmt.Errorf("%w: none answered and none was discovered over DNS-SD", ErrNoProxies))
+	}
+	if c.disc != nil {
 		c.wg.Add(1)
-		go p.run(first[i])
+		go c.discoverLoop()
 	}
 	return c, nil
+}
+
+// start runs a proxy of the set; first is its first connection, nil when
+// that failed.
+func (c *Central) start(p *proxy, first *apiConn) {
+	if first != nil {
+		// Counted as connected before the run loop attaches it, so
+		// NewCentral sees the proxy answering.
+		p.mu.Lock()
+		p.api, p.flags = first, first.flags
+		p.mu.Unlock()
+	}
+	c.wg.Add(1)
+	go p.run(first)
+}
+
+// answering is the number of proxies with an API connection.
+func (c *Central) answering() int {
+	n := 0
+	for _, p := range c.proxyList() {
+		p.mu.Lock()
+		if p.api != nil {
+			n++
+		}
+		p.mu.Unlock()
+	}
+	return n
+}
+
+// proxyList is a snapshot of the proxy set.
+func (c *Central) proxyList() []*proxy {
+	c.setMu.Lock()
+	defer c.setMu.Unlock()
+	return slices.Clone(c.proxies)
 }
 
 // Close disconnects from every proxy; the connections through them are
@@ -186,8 +273,15 @@ func (c *Central) StartScanning(context.Context) error {
 	fresh := !c.scanning
 	c.scanning = true
 	c.mu.Unlock()
+	ps := c.proxyList()
+	if len(ps) == 0 {
+		// Only a discovered set can be empty; a proxy found while the
+		// scan runs subscribes when it attaches.
+		c.triggerRescan()
+		return nil
+	}
 	busy := 0
-	for _, p := range c.proxies {
+	for _, p := range ps {
 		if fresh {
 			p.reset()
 		}
@@ -198,7 +292,7 @@ func (c *Central) StartScanning(context.Context) error {
 		p.mu.Unlock()
 		p.subscribe()
 	}
-	if busy == len(c.proxies) {
+	if busy == len(ps) {
 		return ErrProxyBusy
 	}
 	return nil
@@ -210,7 +304,7 @@ func (c *Central) StopScanning(context.Context) error {
 	c.mu.Lock()
 	c.scanning = false
 	c.mu.Unlock()
-	for _, p := range c.proxies {
+	for _, p := range c.proxyList() {
 		p.unsubscribeIfIdle()
 	}
 	return nil

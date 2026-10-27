@@ -11,7 +11,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/bridge/bridgetest"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/controller"
 	"github.com/SukramJ/go-fabric/controller/attestation"
@@ -19,7 +18,6 @@ import (
 	"github.com/SukramJ/go-fabric/controller/commissioner"
 	"github.com/SukramJ/go-fabric/fabrictest"
 	"github.com/SukramJ/go-fabric/node"
-	"github.com/SukramJ/go-fabric/transport/btp"
 )
 
 // wifiDriver is a Wi-Fi driver that joins every network it is given.
@@ -49,17 +47,7 @@ func TestPairOverBLE(t *testing.T) {
 	site, dev, c := siteController(t, fabrictest.Topology{Configure: func(cfg *node.Config) {
 		cfg.Network.WiFiCommissioning = node.WiFiCommissioning{Driver: drv}
 	}}, nil)
-	p := &bletest.Peripheral{
-		Address: "C0:FF:EE:00:0B:1E", Discriminator: dev.Discriminator(), VendorID: 0xFFF1, ProductID: 0x8001,
-		Serve: func(conn *btp.Conn) (func([]byte), func()) {
-			srv, err := bridgetest.ServeConn(dev.Bridge(), conn)
-			if err != nil {
-				t.Error(err)
-				return nil, nil
-			}
-			return srv.Deliver, srv.Close
-		},
-	}
+	p := dev.BLE()
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 	if _, err := c.Pair(ctx, manualCode(t, dev), controller.PairOptions{BLE: bletest.NewCentral(p)}); !errors.Is(err, controller.ErrConfiguration) {
