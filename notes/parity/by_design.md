@@ -4805,6 +4805,58 @@ configuration (`ErrZonesConfig`) and the port asserts the refusal. Pinned
 by `zone_chip_test.go` (11 cluster cases, 16 polygons) and
 `zone_rules_test.go`.
 
+### BD-Thread-TBRM-ChipLogic — ThreadBorderRouterManagement follows connectedhomeip behind the `BorderRouter` port
+
+matter.js's `ThreadBorderRouterManagementServer.ts:14` at `862ad75f` is the
+empty subclass. `cluster/threadbr.ManagementServer` follows connectedhomeip's
+`ThreadBorderRouterManagementCluster.cpp` at `6170af84`: the reads (:32),
+the command rules of `InvokeCommand` (:148-322: NEEDS_TIMED and
+FAILSAFE_REQUIRED, the pending dataset's sequence, INVALID_IN_STATE, the
+revert on fail-safe expiry), `OnActivateDatasetComplete` (:272) and the
+fail-safe events (:297), with `ThreadBorderRouterManagementDelegate.h:63-106`
+as the port. `thread/otbr.BorderRouter` adapts OTBR's REST API as chip's
+`GenericThreadBorderRouterDelegate` adapts OpenThread; the activation polls
+the node state until attached, bounded by the fail-safe's context. Three
+deliberate differences: the server caches the border router's values (read
+at construction, after each command and on `Refresh`; chip reads the
+delegate on every read), so an agent id that is not 16 bytes fails
+construction rather than the read; `PanChange` is a feature selection, not
+a port method; and the activation flag is held in memory, not persisted as
+chip's `kFailsafeActiveDatasetConfigured`, so there is no revert after a
+reboot. The fail-safe check is node-wide, as in the Wi-Fi variant. Pinned by
+`management_chip_test.go` (chip's 22 cases) and the `fabrictest` wire tests.
+
+### BD-Thread-TND-FromBorderRouter — ThreadNetworkDiagnostics served from a border router's diagnostics record
+
+matter.js's `ThreadNetworkDiagnosticsServer.ts:14` at `862ad75f` is the
+empty subclass. `cluster/threadbr.DiagnosticsServer` serves the 17
+mandatory attributes, the two provisional ones, MLECNT and the four MACCNT
+counts a border router's REST diagnostics record carries, following chip's
+`DirectThreadNetworkDiagnosticsProvider.cpp` at `6170af84` (`ReadAttribute`
+:59, the unconfigured nulls :65-92, `RoutingRole` :104-145, the tables
+:184-293, the counts :325-571, the dataset attributes :577-689), with the
+record translated as matter.js's `thread-br-client` `translation.ts` does.
+ThreadVersion comes from the record, else from the configuration;
+BorderRouterName is the host's. Owner decision 2026-10-27 (three register
+rows for wave 26a).
+
+### BD-Thread-NetComm-ThreadVariant — the Thread variant of NetworkCommissioning follows connectedhomeip; the kit does not mount it
+
+matter.js's `NetworkCommissioningServer.ts:18` at `862ad75f` is the empty
+subclass with no network-type branch. `core.ThreadNetworkCommissioning`
+(`cluster/core/network_commissioning_thread.go`) follows chip's
+`NetworkCommissioningCluster.cpp` at `6170af84` (`HandleScanNetworks`
+:349-367, `HandleAddOrUpdateThreadNetwork` :561-587, `OnFinished`
+:904-928, `ReadAttribute` :1102-1108) over its OpenThread driver, with
+MaxNetworks 1 and `ScanNetworks` answering the active dataset's network;
+an InterfaceEnabled write accepts only the border router's current value.
+Neither the device kit nor the reference daemon mounts it on the border
+router endpoint: chip's reference `examples/thread-br-app/thread-br-common/
+thread-br-app.matter` at `6170af84` composes endpoint 1 from
+ThreadNetworkDiagnostics and TBRM only, and the device type couples the
+Thread variant to a Secondary Network Interface. A host whose device is
+itself a Thread participant mounts it. Owner decision 2026-10-27.
+
 ### BD-Matter-GeneratedServerSuffices — clusters whose generated server is complete: no source carries behaviour beyond the model
 
 Audit of 2026-10-27 (owner question at the milestone 6 concept; read map
