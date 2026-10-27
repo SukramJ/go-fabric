@@ -42,6 +42,16 @@
 // the proxy is taken again it marks it busy — [ErrProxyBusy] — until the next
 // scan starts. A proxy dedicated to commissioning, or a Home Assistant whose
 // use of it may flap during a pairing, is the deployment this assumes.
+//
+// # Discovery
+//
+// [Discover] finds the proxies over DNS-SD ([ServiceType], browsed with
+// client/discovery's cache), connects to each device once and keeps those
+// with ACTIVE_CONNECTIONS and REMOTE_CACHING; [Keys] gives each device's key
+// by name or MAC. [Options.Discover] keeps a central's discovered set
+// current ([DiscoverOptions]). Whether a device is a proxy is not in its TXT
+// record (esphome/components/mdns/mdns_component.cpp:133-242): it is in the
+// feature flags the device reports once connected.
 package esphome
 
 import (

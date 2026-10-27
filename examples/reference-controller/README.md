@@ -16,7 +16,7 @@ This build has no BLE. The BLE build is
 the same command line over BlueZ (§BLE below);
 [`ble/esphome/cmd/reference-controller`](../../ble/esphome/cmd/reference-controller/main.go)
 reaches BLE through ESPHome Bluetooth proxies instead (`--bluetooth-proxy`,
-§BLE).
+`--bluetooth-proxy-discover`, §BLE).
 
 Every command opens the database, does its work and exits; the next command
 is the same fabric, so every node paired before still trusts it.
@@ -242,14 +242,18 @@ speaks BlueZ over the D-Bus system bus, without cgo, on Linux only.
 ```sh
 cd ble/esphome && go build -o reference-controller ./cmd/reference-controller
 reference-controller pair --bluetooth-proxy proxy-office.local,$KEY --code MT:-24J0AFN00KA0648G00 --wifi-ssid lab --wifi-credentials secret12
+reference-controller pair --bluetooth-proxy-discover --bluetooth-proxy-key kitchen-proxy=$KEY --code MT:-24J0AFN00KA0648G00 --wifi-ssid lab --wifi-credentials secret12
 ```
 
 `ble/esphome` is the other BLE module: its `cmd/reference-controller` is this
 command line with `cli.Options.Proxies` set to `esphome.NewCentral`.
 `--bluetooth-proxy host[:port][,key]` (repeatable, port 6053 by default, the
 key as the device's `api: encryption: key:` holds it) names an ESPHome
-Bluetooth proxy with `active: true`, and implies `--ble`. The host needs no
-adapter. A proxy serves one API subscriber, so the pairing takes it from Home
+Bluetooth proxy with `active: true`, and implies `--ble`.
+`--bluetooth-proxy-discover` finds the proxies over DNS-SD as well, and
+`--bluetooth-proxy-key name=key` (repeatable) gives a discovered device's key
+by its name or MAC; a device without one is used only when it answers
+plaintext. The host needs no adapter. A proxy serves one API subscriber, so the pairing takes it from Home
 Assistant while it runs
 ([guide](../../docs/guides/ble-proxies.md)).
 

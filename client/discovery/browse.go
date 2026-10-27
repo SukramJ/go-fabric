@@ -44,10 +44,11 @@ var errServiceType = errors.New("discovery: browse: empty service type")
 // closes.
 //
 // matter.js browses no foreign service type: its DnssdNames
-// (packages/general/src/net/dns-sd/DnssdNames.ts at 0ceb202d) is generic,
-// and MdnsService narrows it to Matter's types (MdnsService.ts:25-27,
-// :90-95). Browse widens the same cache for one type by an ingress filter,
-// as the commissionable scanner does (CommissionableMdnsScanner.ts:95-103).
+// (packages/general/src/net/dns-sd/DnssdNames.ts at 862ad75f) is generic,
+// and MdnsService narrows it to Matter's types
+// (packages/protocol/src/mdns/MdnsService.ts:27, :90-94). Browse widens
+// the same cache for one type by an ingress filter, as the commissionable
+// scanner does (CommissionableMdnsScanner.ts:100-105).
 func (n *Names) Browse(ctx context.Context, serviceType string) ([]Instance, error) {
 	st := strings.TrimSuffix(strings.ToLower(strings.TrimSpace(serviceType)), ".")
 	if st == "" {
