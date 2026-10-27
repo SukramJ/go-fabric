@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"log/slog"
 	"strings"
 	"sync"
 	"testing"
@@ -59,6 +60,26 @@ func TestPairBLEWithoutBLEOrNetwork(t *testing.T) {
 		}})
 	if !errors.Is(err, refused) || !strings.Contains(err.Error(), "ble adapter hci9") {
 		t.Fatalf("adapter error: %v", err)
+	}
+}
+
+// TestPairBluetoothProxyFlag: --bluetooth-proxy needs the ESPHome build,
+// implies --ble, and hands every spec, in order, to Options.Proxies.
+func TestPairBluetoothProxyFlag(t *testing.T) {
+	stderr = &bytes.Buffer{}
+	db := t.TempDir() + "/x.db"
+	if err := run([]string{"--db", db, "pair", "--bluetooth-proxy", "p.local", "--passcode", "20202021", "--discriminator", "3840", "--wifi-ssid", "lab"}, strings.NewReader(""), &bytes.Buffer{}); !errors.Is(err, errNoProxies) || !strings.Contains(err.Error(), "ble/esphome/cmd/reference-controller") {
+		t.Fatalf("plain build: %v", err)
+	}
+	refused := errors.New("proxy refused")
+	var got []string
+	err := Run([]string{"--db", db, "--listen", "127.0.0.1:0", "pair", "--bluetooth-proxy", "a.local,KEY", "--bluetooth-proxy", "b.local:6054", "--passcode", "20202021", "--discriminator", "3840", "--thread-dataset", "0e080000000000010000"}, strings.NewReader(""), &bytes.Buffer{},
+		Options{Proxies: func(specs []string, _ *slog.Logger) (ble.Central, error) {
+			got = specs
+			return nil, refused
+		}})
+	if !errors.Is(err, refused) || !strings.Contains(err.Error(), "bluetooth proxies") || strings.Join(got, " ") != "a.local,KEY b.local:6054" {
+		t.Fatalf("proxies %q: %v", got, err)
 	}
 }
 

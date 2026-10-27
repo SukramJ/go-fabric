@@ -1,0 +1,11 @@
+go-fabric/ble/esphome
+Copyright 2026 SukramJ
+
+Licensed under the Apache License, Version 2.0 (the "License"); you may
+not use this software except in compliance with the License. A copy of
+the License is in the file LICENSE.
+
+This module is the ESPHome Bluetooth proxy platform layer of go-fabric
+(github.com/SukramJ/go-fabric), whose NOTICE applies to the main module it
+requires. The attribution of the Go modules this module adds is in
+THIRD-PARTY-NOTICES.md.
