@@ -450,7 +450,7 @@ func TestLiveBinding(t *testing.T) {
 		}
 	}
 	writeBinding(bindTH2, bindTH3)
-	if got := b.Entries(); len(got) != 2 || got[0].FabricIndex != dutFabric {
+	if got := coreEntries(b); len(got) != 2 || got[0].FabricIndex != dutFabric {
 		t.Fatalf("the DUT's Binding %+v", got)
 	}
 
@@ -550,7 +550,7 @@ func TestLiveBinding(t *testing.T) {
 	if err := restarted.Start(ctx); err != nil {
 		t.Fatal(err)
 	}
-	if got := sw2.Binding().Underlying().(*mattercore.Binding).Entries(); len(got) != 2 || got[0].Node != bindTH2 || got[1].Group != group || got[0].FabricIndex != dutFabric {
+	if got := coreEntries(sw2.Binding().Host()); len(got) != 2 || got[0].Node != bindTH2 || got[1].Group != group || got[0].FabricIndex != dutFabric {
 		t.Fatalf("the restored Binding list %+v", got)
 	}
 	again := &bindHost{established: map[uint64]binding.Resolution{}}
@@ -570,4 +570,16 @@ func TestLiveBinding(t *testing.T) {
 	if !onOff(targets[bindTH2].plug.srv) {
 		t.Fatal("TH2 is not on through the restored binding")
 	}
+}
+
+// coreEntries is b's entries in core's presence-flag form, for comparing
+// with core.TargetStruct literals.
+func coreEntries(b interface {
+	Entries() []bindingdef.TargetStruct
+}) []mattercore.TargetStruct {
+	var out []mattercore.TargetStruct
+	for _, t := range b.Entries() {
+		out = append(out, mattercore.TargetFromDef(t))
+	}
+	return out
 }

@@ -15,6 +15,7 @@ import (
 	"github.com/SukramJ/go-fabric/client/peer"
 	mattercore "github.com/SukramJ/go-fabric/cluster/core"
 	"github.com/SukramJ/go-fabric/cluster/spec"
+	bindingdef "github.com/SukramJ/go-fabric/cluster/spec/binding"
 	"github.com/SukramJ/go-fabric/im"
 )
 
@@ -320,14 +321,14 @@ func (m *Manager) Attach(endpoint uint16, b *mattercore.Binding) {
 		m.mu.Unlock()
 		return
 	}
-	stop := b.OnChange(func(_ uint8, added, removed []mattercore.TargetStruct) {
+	stop := b.OnChange(func(_ uint8, added, removed []bindingdef.TargetStruct) {
 		// BindingServer registers the added entries, then unregisters
 		// the removed ones (:136-148).
 		for _, e := range added {
-			m.Register(endpoint, e)
+			m.Register(endpoint, mattercore.TargetFromDef(e))
 		}
 		for _, e := range removed {
-			m.Unregister(endpoint, e)
+			m.Unregister(endpoint, mattercore.TargetFromDef(e))
 		}
 	})
 	m.attached[endpoint] = attachment{b: b, stop: stop}
@@ -340,7 +341,7 @@ func (m *Manager) Attach(endpoint uint16, b *mattercore.Binding) {
 		m.post(func() { m.disposeServer(endpoint) })
 	}
 	for _, e := range b.Entries() {
-		m.Register(endpoint, e)
+		m.Register(endpoint, mattercore.TargetFromDef(e))
 	}
 }
 

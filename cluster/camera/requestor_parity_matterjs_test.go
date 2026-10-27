@@ -233,7 +233,7 @@ func TestParityMatterJS_RequestorUpsertRemove(t *testing.T) {
 		r := newRequestor(t, nil)
 		s := makeSession()
 		upsert(t, r, s)
-		r.RemoveSession(camera.KeyOf(s))
+		r.RemoveSession(wrdef.KeyOf(s))
 		if got := r.Sessions(); len(got) != 0 {
 			t.Fatalf("sessions %+v", got)
 		}
@@ -242,7 +242,7 @@ func TestParityMatterJS_RequestorUpsertRemove(t *testing.T) {
 		r := newRequestor(t, nil)
 		s := makeSession()
 		upsert(t, r, s)
-		key := camera.KeyOf(s)
+		key := wrdef.KeyOf(s)
 		key.ID = 999
 		r.RemoveSession(key)
 		if got := r.Sessions(); len(got) != 1 {
@@ -253,7 +253,7 @@ func TestParityMatterJS_RequestorUpsertRemove(t *testing.T) {
 		r := newRequestor(t, nil)
 		a, b := makeSession(withPeer(10)), makeSession(withPeer(99))
 		upsert(t, r, a, b)
-		r.RemoveSession(camera.KeyOf(b))
+		r.RemoveSession(wrdef.KeyOf(b))
 		if got := peers(r.Sessions()); !slices.Equal(got, []uint64{10}) {
 			t.Fatalf("peer nodes %v", got)
 		}
@@ -262,7 +262,7 @@ func TestParityMatterJS_RequestorUpsertRemove(t *testing.T) {
 		r := newRequestor(t, nil)
 		a, b := makeSession(withFabric(1)), makeSession(withFabric(2))
 		upsert(t, r, a, b)
-		r.RemoveSession(camera.KeyOf(b))
+		r.RemoveSession(wrdef.KeyOf(b))
 		if got := fabrics(r.Sessions()); !slices.Equal(got, []uint8{1}) {
 			t.Fatalf("fabrics %v", got)
 		}

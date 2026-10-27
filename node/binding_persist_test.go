@@ -59,7 +59,7 @@ func TestNodeBindingPersisted(t *testing.T) {
 	}
 
 	n, b = boot()
-	if got := b.Entries(); !slices.Equal(got, entries) {
+	if got := coreEntries(b); !slices.Equal(got, entries) {
 		t.Fatalf("restored %+v, want %+v", got, entries)
 	}
 	node.RemoveFabricBindings(n, 1)
@@ -68,7 +68,7 @@ func TestNodeBindingPersisted(t *testing.T) {
 	}
 
 	_, b = boot()
-	if got := b.Entries(); !slices.Equal(got, entries[2:]) {
+	if got := coreEntries(b); !slices.Equal(got, entries[2:]) {
 		t.Fatalf("after RemoveFabric restored %+v, want %+v", got, entries[2:])
 	}
 }

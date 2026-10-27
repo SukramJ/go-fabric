@@ -23,9 +23,9 @@
 
 ## §2 The decision table (summary)
 
-- **Count:** 49 methods in `Host`, on 16 kit servers serving 18 clusters (the AlarmBase `Host` is shared by three clusters).
+- **Count at the first hand-back:** 49 methods in `Host`, on 16 kit servers serving 18 clusters (the AlarmBase `Host` is shared by three clusters).
   - 179 methods are reached by the typed layer or are wiring, across 57 kit types.
-  - 4 are deferred.
+  - 4 were deferred; the owner's decisions below resolved them.
 - **The table is a test:** `device/host_methods_test.go` `TestEveryKitServerHasItsHostDecided`.
   - It checks that every cluster of `selfHeldDefaults` has a decision.
   - Each kit type's exported methods are counted beyond the typed-layer and contract interfaces it implements, the methods of its embedded types, and `SetEndpoint`. They must equal `Host ∪ covered ∪ deferred` exactly.
@@ -112,16 +112,26 @@ Run under `flock guards.lock`.
 - The guard test is in `device`, not in `script/clustergen`. Only `device` can see `selfHeldDefaults`. `script/clustergen` gained `TestEveryHostIsGenerated` and `TestDefinitionOnlyHostRefused`.
 - The brief's V examples `SetPresets`, `SetSchedules`, `SetActivePresetHandle`, `SetActiveScheduleHandle`, `SetPreferredExtendedPanID`, `UpdateTariff`, `ClearTariff`, `SetCurrentPrice`, `SetCookTime` and `SetSelectedWattIndex` are not in `Host`. The typed `Set` reaches each one with the same checks. One difference: `Set` saves presets under `context.Background()`, while `SetPresets(ctx, …)` uses the caller's context.
 
+## Owner decisions (2026-10-27) and their follow-up
+
+- **Q1, move the types.**
+  - Binding: `core.Binding.Entries` and `OnChange` now take and return `bindingdef.TargetStruct`, and `bindingdef.Host` names them.
+    - I chose conversion over an alias. `core.TargetStruct` carries methods (`Key`, `HasNode`, `HasEndpoint`, …) that the binding manager and the persistence use. An alias of a type from another package cannot carry them, and the generated shape gives presence through pointers.
+    - `core.TargetStruct` therefore stays the server's stored form (`BindingConfig`, `binding.Entry`), and `core.TargetFromDef` and `TargetStruct.Def` convert between the two forms.
+    - The public host surface is one shape, the generated one.
+  - Requestor: `camera.SessionKey` and `camera.KeyOf` moved to `webrtctransportrequestordef` (generated through the new `hostDecl.types`), with no alias left.
+  - Both are breaks, under CHANGELOG Changed and in the migration guide.
+- **Q2, the switch.** `switchclusterdef.Host` embeds `contract.SwitchPositionSink` and `contract.SwitchEventEmitter`. The generator rule is written in `hosts.go`'s doc and in the ports guide. The device test counts an embedded contract interface's methods as the Host's.
+- **26a and CK-1b merged.** ThreadBorderRouterManagement and ThreadNetworkDiagnostics (`cluster/threadbr`) got a `Host`, `Refresh`. `BorderRouter` and the fail-safe wiring count as covered.
+- **Now:** 22 clusters have a `Host`, and nothing is deferred.
+
 ## Left out
 
-- **Binding:** `Entries` and `OnChange` are deferred. Both take `core.TargetStruct`, which `bindingdef` cannot name, since `core` imports `bindingdef`. `bindingdef.State` is empty (the fabric-scoped list is omitted), so `Get` does not cover them either.
-- **WebRtcTransportRequestor:** `UpsertSession` and `RemoveSession` are deferred. `RemoveSession` takes `camera.SessionKey`, and moving it touches `cluster/camera`.
-- **Root-node `cluster/core` servers** (BasicInformation, GeneralCommissioning, ICDManagement, …): the node wires them, and they are not the device's defaults. The brief scopes the kit's defaults.
+- The root-node `cluster/core` servers: the node wires them, and they are not the device's defaults.
 
 ## Questions
 
-- **Q1:** Binding's `Entries` / `OnChange` (and the requestor's session pair): should their types move to the def packages (`bindingdef.TargetStruct` has pointer fields where `core.TargetStruct` has presence flags), so that they can join a `Host`? Or should they stay seams?
-- **Q2:** The switch's position and press inputs are contract methods (`contract.SwitchPositionSink`, `contract.SwitchEventEmitter`), so a host still asserts `Underlying()` for them. Should `switchclusterdef.Host` embed those two interfaces?
+None open.
 
 ## by_design candidates
 

@@ -96,6 +96,8 @@ import (
 	h_tc "github.com/SukramJ/go-fabric/cluster/spec/temperaturecontrol"
 	h_thermostat "github.com/SukramJ/go-fabric/cluster/spec/thermostat"
 	h_tui "github.com/SukramJ/go-fabric/cluster/spec/thermostatuserinterfaceconfiguration"
+	h_tbrm "github.com/SukramJ/go-fabric/cluster/spec/threadborderroutermanagement"
+	h_tnd "github.com/SukramJ/go-fabric/cluster/spec/threadnetworkdiagnostics"
 	h_tdir "github.com/SukramJ/go-fabric/cluster/spec/threadnetworkdirectory"
 	h_user "github.com/SukramJ/go-fabric/cluster/spec/userlabel"
 	h_valve "github.com/SukramJ/go-fabric/cluster/spec/valveconfigurationandcontrol"
@@ -108,6 +110,7 @@ import (
 	h_zm "github.com/SukramJ/go-fabric/cluster/spec/zonemanagement"
 	switchserver "github.com/SukramJ/go-fabric/cluster/switch"
 	"github.com/SukramJ/go-fabric/cluster/thermo"
+	"github.com/SukramJ/go-fabric/cluster/threadbr"
 	"github.com/SukramJ/go-fabric/cluster/valve"
 	"github.com/SukramJ/go-fabric/contract"
 )
@@ -148,9 +151,8 @@ func kitOf[T contract.ClusterServer]() reflect.Type { return reflect.TypeFor[T](
 var hostCases = map[uint32]hostCase{
 	h_onoff.ClusterID: {kit: kitOf[*onoff.Server](), covered: []string{"OnOff", "Set", "SetScenes"}},
 	h_level.ClusterID: {kit: kitOf[*levelcontrol.Server]()},
-	// Binding: Persist and RemoveFabric are the node's wiring; Entries and
-	// OnChange take core.TargetStruct, which bindingdef cannot name.
-	h_binding.ClusterID: {kit: kitOf[*core.Binding](), covered: []string{"Persist", "RemoveFabric"}, deferred: []string{"Entries", "OnChange"}},
+	// Binding: Persist and RemoveFabric are the node's wiring.
+	h_binding.ClusterID: {kit: kitOf[*core.Binding](), host: hostOf[h_binding.Host](h_binding.Wrap), covered: []string{"Persist", "RemoveFabric"}},
 	h_switch.ClusterID:  {kit: kitOf[*switchserver.Server](), host: hostOf[h_switch.Host](h_switch.Wrap), covered: []string{"CurrentPosition", "Endpoint"}},
 	h_lock.ClusterID:    {kit: kitOf[*lock.DoorLockServer](), host: hostOf[h_lock.Host](h_lock.Wrap), covered: []string{"ReportAlarm", "SetLockState", "User"}},
 	h_wc.ClusterID:      {kit: kitOf[*cover.WindowCoveringServer](), covered: []string{"SetCurrentPosition", "SetOperationalStatus", "SetTargetPosition"}},
@@ -183,10 +185,14 @@ var hostCases = map[uint32]hostCase{
 	h_grid.ClusterID:  {kit: kitOf[*energy.GridConditionsServer](), covered: []string{"SetCurrentConditions", "SetForecastConditions", "SetLocalGenerationAvailable"}},
 	h_tui.ClusterID:   {kit: kitOf[*thermo.ThermostatUIServer]()},
 	h_meter.ClusterID: {kit: kitOf[*energy.CommodityMeteringServer](), covered: []string{"MaximumMeteredQuantities", "MeteredQuantity", "MeteredQuantityTimestamp", "SetMaximumMeteredQuantities", "SetMeteredQuantity", "SetMeteredQuantityTimestamp", "SetTariffUnit", "TariffUnit"}},
-	// The camera servers (cluster/camera): the WebRtcTransportRequestor's
-	// RemoveSession takes the kit's SessionKey, which moves to its def
-	// package with the camera wave that owns cluster/camera.
-	h_wr.ClusterID:    {kit: kitOf[*camera.Requestor](), covered: []string{"Sessions"}, deferred: []string{"RemoveSession", "UpsertSession"}},
+	// The camera servers (cluster/camera).
+	h_wr.ClusterID: {kit: kitOf[*camera.Requestor](), host: hostOf[h_wr.Host](h_wr.Wrap), covered: []string{"Sessions"}},
+	// The Thread border router (cluster/threadbr): BorderRouter is the
+	// host's own port, the fail-safe methods the node's wiring.
+	h_tbrm.ClusterID: {kit: kitOf[*threadbr.ManagementServer](), host: hostOf[h_tbrm.Host](h_tbrm.Wrap), covered: []string{
+		"AttachFailSafe", "BorderRouter", "OnCommissioningComplete", "OnFailSafeExpired",
+	}},
+	h_tnd.ClusterID:   {kit: kitOf[*threadbr.DiagnosticsServer](), host: hostOf[h_tnd.Host](h_tnd.Wrap)},
 	h_chime.ClusterID: {kit: kitOf[*camera.Chime](), host: hostOf[h_chime.Host](h_chime.Wrap), covered: []string{"Enabled", "SelectedChime"}},
 	h_av.ClusterID: {kit: kitOf[*camera.AvSettings](), host: hostOf[h_av.Host](h_av.Wrap), covered: []string{
 		"MovementState", "NextPresetID", "Position", "Presets", "SetPanMax", "SetPanMin", "SetPosition", "SetTiltMax", "SetTiltMin", "SetZoomMax", "Streams",
@@ -290,9 +296,10 @@ var typedLayer = []reflect.Type{
 }
 
 // kitMethods are the exported methods of a kit server beyond the typed
-// layer, the contract, the methods its embedded types bring, and the
+// layer, the contract (but for an interface its Host embeds), the methods
+// its embedded types bring, and the
 // bridge's SetEndpoint.
-func kitMethods(kit reflect.Type) []string {
+func kitMethods(kit, host reflect.Type) []string {
 	if kit == reflect.TypeFor[*spec.Server]() {
 		return nil // the generated server, whose methods are the typed layer's
 	}
@@ -302,7 +309,13 @@ func kitMethods(kit reflect.Type) []string {
 			continue
 		}
 		for i := range it.NumMethod() {
-			skip[it.Method(i).Name] = true
+			name := it.Method(i).Name
+			if host != nil {
+				if _, inHost := host.MethodByName(name); inHost {
+					continue // a contract interface the Host embeds is the Host's
+				}
+			}
+			skip[name] = true
 		}
 	}
 	if elem := kit.Elem(); elem.Kind() == reflect.Struct {
@@ -354,7 +367,11 @@ func TestEveryKitServerHasItsHostDecided(t *testing.T) {
 				inHost = append(inHost, hostType.Method(i).Name)
 			}
 		}
-		got := kitMethods(c.kit)
+		var host reflect.Type
+		if c.host != nil {
+			host = c.host.typ
+		}
+		got := kitMethods(c.kit, host)
 		want := slices.Sorted(slices.Values(slices.Concat(inHost, c.covered, c.deferred)))
 		if !slices.Equal(got, want) {
 			t.Errorf("cluster 0x%04X (%v): methods %v, decided %v (Host %v)", id, c.kit, got, want, inHost)

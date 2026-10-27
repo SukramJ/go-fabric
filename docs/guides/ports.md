@@ -185,10 +185,12 @@ cluster's typed server returns them: `d.EnergyEvse().Host()`. `Host()` is
 nil when the mounted server does not implement the interface, as a host's
 own server (`Declare.HostServer`) normally does not; the kit's server
 does, also when the host mounts it itself. A cluster whose kit server has
-no such method has no `Host`.
+no such method has no `Host`. A `Host` may embed a `contract` interface
+the kit server implements for host inputs: the switch's.
 
 | Cluster | `Host` |
 | --- | --- |
+| Binding | `Entries`, `OnChange` (per fabric, the entries gained and lost), in `bindingdef.TargetStruct` |
 | BooleanStateConfiguration | `SetSensorFault` (the event on every call, the attribute when served) |
 | CameraAvSettingsUserLevelManagement | `AddMoveCapableVideoStream`, `UpdateMoveCapableVideoStream`, `UpdateMoveCapableVideoStreams`, `RemoveMoveCapableVideoStream`, `PhysicalMovementComplete` |
 | CameraAvStreamManagement | `UpdateVideoStreamRefCount`, `UpdateAudioStreamRefCount`, `UpdateSnapshotStreamRefCount`, `ReusableVideoStreamID`, `ReusableSnapshotStreamID`, `ResourceAvailable` |
@@ -201,8 +203,10 @@ no such method has no `Host`.
 | EnergyEvse | `SetHardwareState`, `SetFault`, `SetMaxHardwareChargeCurrent`, `SetMaxHardwareDischargeCurrent`, `SetCableAssemblyLimit`, `SetNominalMainsVoltage`, `ReportRFID`, `DiagnosticsComplete`, their getters, `IsPluggedIn`, `Targets`, `Close` |
 | ServiceArea | `RemoveSupportedAreasEntry`, `RemoveSupportedMapsEntry` (with what names the area or map) |
 | SmokeCoAlarm | `Refresh` (for a `StateSource` that is no `contract.ChangeNotifier`) |
-| Switch | `RawPosition`, `SetDebounceDelay`, `SetLongPressDelay`, `SetMultiPressDelay`, `ResetState` |
+| Switch | `contract.SwitchPositionSink` (`SetRawPosition`, `SetCurrentPosition`) and `contract.SwitchEventEmitter` (`FireInitialPress` …), `RawPosition`, `SetDebounceDelay`, `SetLongPressDelay`, `SetMultiPressDelay`, `ResetState` |
+| ThreadBorderRouterManagement, ThreadNetworkDiagnostics | `Refresh` (the host schedules it) |
 | ThreadNetworkDirectory | `ReloadNetworks` |
+| WebRtcTransportRequestor | `UpsertSession`, `RemoveSession` (by `webrtctransportrequestordef.SessionKey`) |
 | WiFiNetworkManagement | `SetNetworkCredentials`, `ClearNetworkCredentials`, `Passphrase` |
 
 *Source: `script/clustergen/hosts.go`; the decision on every method of

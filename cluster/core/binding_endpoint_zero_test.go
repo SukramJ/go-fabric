@@ -25,7 +25,7 @@ func TestBinding_EndpointAndClusterZeroArePresent(t *testing.T) {
 	if err := b.MatterWrite(context.Background(), bindingdef.AttrBinding, write); err != nil {
 		t.Fatal(err)
 	}
-	e := b.Entries()
+	e := coreEntries(b)
 	if len(e) != 1 || !e[0].HasEndpoint() || e[0].Endpoint != 0 || !e[0].HasCluster() || e[0].Cluster != 0 {
 		t.Fatalf("entries %+v: endpoint 0 / cluster 0 read as absent", e)
 	}

@@ -55,6 +55,16 @@ nothing breaks.
 | `….Underlying().(*energy.EvseServer).SetHardwareState(…)`, `.Close()` | `d.EnergyEvse().Host().SetHardwareState(…)`, `.Close()` |
 | `….Underlying().(*energy.DeviceEnergyManagementServer).Close()` | `d.DeviceEnergyManagement().Host().Close()` |
 | a kit server's setter the typed `Set` reaches (`thermo.ThermostatServer.SetPresets`, `appliance.MicrowaveServer.SetCookTime`, …) | `Set(Patch{…})` |
+| `….Underlying().(*core.Binding).Entries()` | `d.Binding().Host().Entries()` |
+| `….Underlying().(contract.SwitchPositionSink).SetRawPosition(p)` | `d.Switch().Host().SetRawPosition(p)` |
+
+Two signatures change with it (breaks):
+
+| Symbol | Route |
+| --- | --- |
+| `core.Binding.Entries() []core.TargetStruct` | returns `[]bindingdef.TargetStruct` (pointer fields: nil is absent); `core.TargetFromDef(t)` gives the presence-flag form with `Key`, `HasNode`, … |
+| `core.Binding.OnChange(func(uint8, added, removed []core.TargetStruct))` | `OnChange(func(uint8, added, removed []bindingdef.TargetStruct))` |
+| `camera.SessionKey`, `camera.KeyOf` | `webrtctransportrequestordef.SessionKey`, `webrtctransportrequestordef.KeyOf`; `Requestor.RemoveSession` takes the def type |
 
 The [Host ports](ports.md#clusterdefhost-the-kit-servers-host-methods)
 guide lists every `Host`.

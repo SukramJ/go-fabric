@@ -190,8 +190,13 @@ func (s *Server) EmitMultiPressComplete(endpoint uint16, data MultiPressComplete
 // Host is the Switch kit server's host methods: the ones Set, Get and
 // the typed handlers do not reach (cluster/switch Server).
 // The positions and presses come in through the server's
-// contract.SwitchPositionSink and contract.SwitchEventEmitter.
+// contract.SwitchPositionSink and contract.SwitchEventEmitter, which
+// Host embeds.
 type Host interface {
+	// SwitchPositionSink takes the raw and the decided position.
+	contract.SwitchPositionSink
+	// SwitchEventEmitter takes the presses of a momentary switch.
+	contract.SwitchEventEmitter
 	// RawPosition returns the last raw position reported, debounced
 	// or not.
 	RawPosition() uint8

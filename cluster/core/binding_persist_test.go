@@ -76,7 +76,7 @@ func TestBindingPersist(t *testing.T) {
 	if err := restarted.Persist(st.config()); err != nil {
 		t.Fatal(err)
 	}
-	if got := restarted.Entries(); !slices.Equal(got, st.stored()) {
+	if got := coreEntries(restarted); !slices.Equal(got, st.stored()) {
 		t.Fatalf("restored %+v, stored %+v", got, st.stored())
 	}
 
@@ -99,7 +99,7 @@ func TestBindingPersist(t *testing.T) {
 	if err := kept.Persist(core.BindingConfig{Load: func() ([]core.TargetStruct, error) { return nil, nil }}); err != nil {
 		t.Fatal(err)
 	}
-	if len(kept.Entries()) != 1 {
+	if len(coreEntries(kept)) != 1 {
 		t.Fatal("nothing stored replaced the list")
 	}
 	r := &changeRecorder{}
@@ -107,11 +107,11 @@ func TestBindingPersist(t *testing.T) {
 	if err := kept.Persist(core.BindingConfig{Load: func() ([]core.TargetStruct, error) { return []core.TargetStruct{}, nil }}); err != nil {
 		t.Fatal(err)
 	}
-	if len(kept.Entries()) != 0 || len(r.take()) != 1 {
+	if len(coreEntries(kept)) != 0 || len(r.take()) != 1 {
 		t.Fatal("a stored empty list was not restored, or the observers did not hear it")
 	}
 	// Without Save, nothing is stored and the write commits.
-	if err := kept.MatterWrite(fabricCtx(1), 0, entries); err != nil || len(kept.Entries()) != 1 {
+	if err := kept.MatterWrite(fabricCtx(1), 0, entries); err != nil || len(coreEntries(kept)) != 1 {
 		t.Fatalf("write without Save: %v", err)
 	}
 }
@@ -142,11 +142,11 @@ func TestBindingPersistFailures(t *testing.T) {
 	if err := b.MatterWrite(fabricCtx(1), 0, []core.TargetStruct{{Node: 3, Endpoint: 1}}); err == nil {
 		t.Fatal("a write whose save failed committed")
 	}
-	if got := b.Entries(); len(got) != 1 || got[0].Node != 2 || len(r.take()) != 0 {
+	if got := coreEntries(b); len(got) != 1 || got[0].Node != 2 || len(r.take()) != 0 {
 		t.Fatalf("a refused write changed the list: %+v", got)
 	}
 	b.RemoveFabric(1)
-	if len(b.Entries()) != 0 {
+	if len(coreEntries(b)) != 0 {
 		t.Fatal("RemoveFabric kept a removed fabric's entries when the save failed")
 	}
 }

@@ -13,17 +13,22 @@ import "slices"
 // interface in its <cluster>def package and a Server.Host accessor, and
 // the kit server implements the interface. What Set, Get, OnChanged,
 // OnWrite, MarkChanged, Handle<Command> and Emit<Event> already reach
-// stays out, as do the contract methods and the bridge's wiring
-// (SetEndpoint). Hand-written: which methods are host methods is the
-// server's decision, not the schema's.
+// stays out, as does the bridge's wiring (SetEndpoint). A Host may embed
+// a contract interface the kit server implements for host inputs (the
+// switch's contract.SwitchPositionSink and contract.SwitchEventEmitter):
+// a method line naming the interface embeds it, and the device's decision
+// table lists its methods as the Host's. Hand-written: which methods are
+// host methods is the server's decision, not the schema's.
 
 // hostDecl is a cluster's Host interface: its doc after the standard
 // first line, its method lines (a line starting with "//" is the next
-// method's doc) and the packages they name beyond the generated ones.
+// method's doc), the types they need beyond the generated ones (rendered
+// before the interface) and the packages they name.
 type hostDecl struct {
 	server  string // the kit server, as the doc names it
 	doc     []string
 	methods []string
+	types   []string
 	imports []string
 }
 
@@ -248,9 +253,14 @@ var hosts = map[string]hostDecl{
 		server: "cluster/switch Server",
 		doc: []string{
 			"The positions and presses come in through the server's",
-			"contract.SwitchPositionSink and contract.SwitchEventEmitter.",
+			"contract.SwitchPositionSink and contract.SwitchEventEmitter, which",
+			"Host embeds.",
 		},
 		methods: []string{
+			"// SwitchPositionSink takes the raw and the decided position.",
+			"contract.SwitchPositionSink",
+			"// SwitchEventEmitter takes the presses of a momentary switch.",
+			"contract.SwitchEventEmitter",
 			"// RawPosition returns the last raw position reported, debounced",
 			"// or not.",
 			"RawPosition() uint8",
@@ -268,6 +278,62 @@ var hosts = map[string]hostDecl{
 			"ResetState()",
 		},
 		imports: []string{"time"},
+	},
+	"Binding": {
+		server: "cluster/core Binding",
+		methods: []string{
+			"// Entries returns every fabric's entries, in list order.",
+			"Entries() []TargetStruct",
+			"// OnChange registers fn to learn, after each committed write, the",
+			"// entries one fabric gained (added) and lost (removed), once per",
+			"// fabric whose entries changed; it returns the function that",
+			"// removes the registration.",
+			"OnChange(fn func(fabricIndex uint8, added, removed []TargetStruct)) (stop func())",
+		},
+	},
+	"WebRtcTransportRequestor": {
+		server: "cluster/camera Requestor",
+		types: []string{
+			"// SessionKey identifies a tracked session. The session id alone is",
+			"// not unique: each provider node allocates its own, so two peers, or",
+			"// one peer on two fabrics, may use the same id at the same time.",
+			"// Mirrors matter.js WebRtcTransportRequestorServer.ts:189-196",
+			"// (SessionKey) and :185-187 (isSameSession).",
+			"type SessionKey struct {",
+			"\tID          uint16",
+			"\tFabricIndex uint8",
+			"\tPeerNodeID  uint64",
+			"}",
+			"",
+			"// KeyOf is the key of a session.",
+			"func KeyOf(s WebRTCSessionStruct) SessionKey {",
+			"\treturn SessionKey{ID: s.Id, FabricIndex: s.FabricIndex, PeerNodeID: s.PeerNodeId}",
+			"}",
+		},
+		methods: []string{
+			"// UpsertSession registers or updates a session the host initiated",
+			"// with a peer: a session must be registered before the peer's",
+			"// signalling for it is accepted, and it appears in CurrentSessions.",
+			"UpsertSession(session WebRTCSessionStruct) error",
+			"// RemoveSession stops tracking a session, after the host tore its",
+			"// stream down; a key no session has changes nothing.",
+			"RemoveSession(key SessionKey)",
+		},
+	},
+	"ThreadBorderRouterManagement": {
+		server: "cluster/threadbr ManagementServer",
+		methods: []string{
+			"// Refresh reads the border router again and reports what moved;",
+			"// the host schedules it.",
+			"Refresh(ctx context.Context) error",
+		},
+	},
+	"ThreadNetworkDiagnostics": {
+		server: "cluster/threadbr DiagnosticsServer",
+		methods: []string{
+			"// Refresh reads the border router again and reports what moved.",
+			"Refresh(ctx context.Context) error",
+		},
 	},
 	"EcosystemInformation": {
 		server: "cluster/core EcosystemInformation",
@@ -287,6 +353,12 @@ func (g *generator) hostInterface(w *writer) {
 		return
 	}
 	w.p("")
+	for _, line := range h.types {
+		w.p("%s", line)
+	}
+	if len(h.types) > 0 {
+		w.p("")
+	}
 	w.p("// Host is the %s kit server's host methods: the ones Set, Get and", g.c.Name)
 	w.p("// the typed handlers do not reach (%s).", h.server)
 	for _, line := range h.doc {

@@ -25,12 +25,12 @@ func TestTypedBindingServer(t *testing.T) {
 	b := core.NewBinding()
 	s := bindingdef.Wrap(b)
 	var changes []string
-	stop := b.OnChange(func(fabric uint8, added, removed []core.TargetStruct) {
+	stop := b.OnChange(func(fabric uint8, added, removed []bindingdef.TargetStruct) {
 		for _, a := range added {
-			changes = append(changes, "+"+a.Key())
+			changes = append(changes, "+"+core.TargetFromDef(a).Key())
 		}
 		for _, r := range removed {
-			changes = append(changes, "-"+r.Key())
+			changes = append(changes, "-"+core.TargetFromDef(r).Key())
 		}
 	})
 	defer stop()
@@ -41,7 +41,7 @@ func TestTypedBindingServer(t *testing.T) {
 	if err := b.SetAttributes(map[uint32]any{bindingdef.AttrBinding: set}); err != nil {
 		t.Fatal(err)
 	}
-	if got := b.Entries(); !slices.Equal(got, set) {
+	if got := coreEntries(b); !slices.Equal(got, set) {
 		t.Errorf("entries %+v", got)
 	}
 	if !slices.Equal(changes, []string{"+1/7//1/", "+2//3//"}) {
@@ -53,7 +53,7 @@ func TestTypedBindingServer(t *testing.T) {
 	if err := b.SetAttributes(map[uint32]any{bindingdef.AttrBinding: bad}); !errors.Is(err, spec.ErrInvalidValue) {
 		t.Errorf("an invalid list: %v", err)
 	}
-	if got := b.Entries(); len(got) != 2 {
+	if got := coreEntries(b); len(got) != 2 {
 		t.Errorf("a refused list changed the entries: %+v", got)
 	}
 	if err := s.Set(bindingdef.Patch{}); err != nil {
@@ -87,7 +87,7 @@ func TestTypedBindingServer(t *testing.T) {
 	if err := b.MatterWrite(ctx, bindingdef.AttrBinding, write); !errors.Is(err, refusal) {
 		t.Errorf("a vetoed write: %v", err)
 	}
-	if got := b.Entries(); !slices.Equal(got, set) {
+	if got := coreEntries(b); !slices.Equal(got, set) {
 		t.Errorf("a vetoed write stored %+v", got)
 	}
 	write[0].Node = ptrU64(8)
@@ -98,7 +98,7 @@ func TestTypedBindingServer(t *testing.T) {
 		t.Errorf("the veto saw %+v", seen)
 	}
 	want := []core.TargetStruct{{Group: 3, FabricIndex: 2}, {Node: 8, Endpoint: 2, FabricIndex: 1}}
-	if got := b.Entries(); !slices.Equal(got, want) {
+	if got := coreEntries(b); !slices.Equal(got, want) {
 		t.Errorf("entries after the write %+v, want %+v", got, want)
 	}
 }
