@@ -21,7 +21,9 @@ pseudo-version of `main`.
 
 ### Changed
 
-- The schema snapshot carries the datatypes of the definition-only clusters (`definitions`, WebRtcTransportDefinitions at the pin). The WebRTC transport requestor and provider definitions therefore type their sessions, ICE candidates and ICE servers: `WebRTCSessionStruct`, `ICECandidateStruct` and `ICEServerStruct` replace the empty `CurrentSessionsEntry`, `IceCandidatesRequestIceCandidatesEntry` and `OfferRequestIceServersEntry` (and the provider's equivalents).
+- The schema snapshot carries the datatypes of the definition-only clusters (`definitions`, WebRtcTransportDefinitions at the pin), so `SchemaSnapshotSHA256` moved. The WebRTC transport requestor and provider definitions now type their sessions, ICE candidates and ICE servers as `WebRTCSessionStruct`, `ICECandidateStruct` and `ICEServerStruct` (the [migration guide](docs/guides/migrating-to-the-facade.md) has the routes):
+  - `webrtctransportrequestor`: `CurrentSessionsEntry`, `IceCandidatesRequestIceCandidatesEntry` and `OfferRequestIceServersEntry` are removed; `State.CurrentSessions`, `Patch.CurrentSessions`, `IceCandidatesRequest.IceCandidates` and `OfferRequest.IceServers` change type.
+  - `webrtctransportprovider`: `CurrentSessionsEntry`, `ProvideIceCandidatesRequestIceCandidatesEntry`, `ProvideOfferRequestIceServersEntry` and `SolicitOfferRequestIceServersEntry` are removed; `State.CurrentSessions`, `Patch.CurrentSessions`, `ProvideIceCandidatesRequest.IceCandidates`, `ProvideOfferRequest.IceServers` and `SolicitOfferRequest.IceServers` change type.
 
 ### Ecosystems
 

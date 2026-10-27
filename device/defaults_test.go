@@ -90,7 +90,7 @@ func TestSelfHeldDefaults(t *testing.T) {
 		}, (*energy.CommodityMeteringServer)(nil)},
 	}
 	covered := map[uint32]bool{}
-	for _, tc := range slices.Concat(cases, portCases(), declaredCases(), mediaCases()) {
+	for _, tc := range slices.Concat(cases, portCases(), declaredCases(), mediaCases(), cameraCases()) {
 		t.Run(fmt.Sprintf("0x%04X", tc.cluster), func(t *testing.T) {
 			t.Parallel()
 			d, err := tc.build()
