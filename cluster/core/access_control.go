@@ -1211,8 +1211,9 @@ func (a *AccessControl) NotifyAdminEntryInstalled(entry store.ACLEntry) {
 }
 
 // NotifyLocalEntryInstalled reports an entry the node itself appended to
-// a fabric's ACL — the WebRtcTransportRequestor's Operate entry
-// (node/webrtc_requestor_acl.go): the ACL changed, so the DataVersion
+// a fabric's ACL — the WebRtcTransportRequestor's and the OTA provider's
+// Operate entries (node/webrtc_requestor_acl.go, node/ota_provider.go):
+// the ACL changed, so the DataVersion
 // moves, and no AccessControlEntryChanged event is emitted, because
 // matter.js emits none for a change without a remote actor
 // (packages/node/src/behaviors/access-control/AccessControlServer.ts:

@@ -25,6 +25,10 @@ pseudo-version of `main`.
   - `webrtctransportrequestor`: `CurrentSessionsEntry`, `IceCandidatesRequestIceCandidatesEntry` and `OfferRequestIceServersEntry` are removed; `State.CurrentSessions`, `Patch.CurrentSessions`, `IceCandidatesRequest.IceCandidates` and `OfferRequest.IceServers` change type.
   - `webrtctransportprovider`: `CurrentSessionsEntry`, `ProvideIceCandidatesRequestIceCandidatesEntry`, `ProvideOfferRequestIceServersEntry` and `SolicitOfferRequestIceServersEntry` are removed; `State.CurrentSessions`, `Patch.CurrentSessions`, `ProvideIceCandidatesRequest.IceCandidates`, `ProvideOfferRequest.IceServers` and `SolicitOfferRequest.IceServers` change type.
 
+### Fixed
+
+- The OTA provider's Operate ACL entry (`node.Config.OTAProvider`) no longer emits an AccessControlEntryChanged event: the node installs it as a local change, and matter.js emits no event for an ACL change without a remote actor (`AccessControlServer.ts:284-302` at 862ad75f). The data version still moves (`core.AccessControl.NotifyLocalEntryInstalled`).
+
 ### Ecosystems
 
 - No host device carries a camera cluster until a live pairing with Apple Home has passed (concept v10 §D, the rule of MSCH). The reference bridge composes none of them.

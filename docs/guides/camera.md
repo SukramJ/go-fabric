@@ -48,6 +48,9 @@ WebRtcTransportRequestor:
 6. The host calls `Requestor.RemoveSession` when it tears a stream down
    itself.
 
+A removed fabric's sessions stay in `CurrentSessions` until the host
+removes them, as in matter.js, whose server has no fabric-removal hook.
+
 The four commands are large messages, so a controller sends them over
 TCP. `CurrentSessions` is fabric-sensitive: a peer reads its own fabric's
 sessions only.

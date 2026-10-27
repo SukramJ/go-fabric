@@ -779,13 +779,6 @@ Identify, WindowCovering and ServiceArea tests (brief BJ, PR #170,
   values from the declaration's `Initial` (brief 26-A1). A host that does
   not persist them starts at chip's defaults after a restart. (Milestone 6,
   with the camera stream wave 26-A2 if a store record is wanted.)
-- **WebRtcTransportRequestor keeps a removed fabric's sessions.**
-  `cluster/camera.Requestor` drops a session on End or the host's
-  `RemoveSession` only; a RemoveFabric leaves the fabric's entries of
-  CurrentSessions until the host removes them. Not yet checked whether
-  matter.js clears a fabric-scoped attribute's entries of a removed fabric
-  for this cluster. (Milestone 6, wave 26-A3 with the provider.)
-
 Raised with `cluster/alarm`, `cluster/fan`, `cluster/pump`,
 FlowMeasurement, `cluster/opstate` and `cluster/modebase`.
 `../connectedhomeip` was not checked out when they were written, so the
