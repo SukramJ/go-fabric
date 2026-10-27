@@ -418,6 +418,13 @@ ble-virtual-test: ## BLE end to end over btvirt: the BLE build pairs a matter.js
 	@# exit 1 a defect.
 	script/ble-virtual-test.sh
 
+.PHONY: otbr-virtual-test
+otbr-virtual-test: ## the OTBR adapter against an otbr-agent on the simulation RCP, built from ot-br-posix (Linux; sudo, the agent's bootstrap dependencies; OTBR_REF picks the ref)
+	@# The same script .github/workflows/otbr-virtual.yml runs (ADR 0027
+	@# decision 7). Exit 2 is the environment (the clone, the bootstrap, the
+	@# builds, the agent), exit 1 a defect.
+	script/otbr-virtual-test.sh
+
 # ble/bluez is a Go module of its own (ADR 0024 decision 3): the main
 # module's ./... does not reach it, so it has its own leg. The !linux stub
 # is built for darwin as well.

@@ -68,6 +68,10 @@ var committed = []string{
 	// both as the generated stub)
 	"WiFiNetworkManagement",
 	"ThreadNetworkDirectory",
+	// cluster/threadbr, after connectedhomeip over an OTBR's REST API
+	// (ADR 0027, brief 26a; matter.js serves both as the generated stub)
+	"ThreadBorderRouterManagement",
+	"ThreadNetworkDiagnostics",
 	// cluster/thermo
 	"Thermostat",
 	"TemperatureControl",
@@ -183,8 +187,6 @@ var committed = []string{
 	// ThreadNetworkDiagnosticsServer.ts at 862ad75f).
 	"WebRtcTransportProvider",
 	"PushAvStreamTransport",
-	"ThreadNetworkDiagnostics",
-	"ThreadBorderRouterManagement",
 	"JointFabricDatastore",
 	"JointFabricAdministrator",
 	"TlsCertificateManagement",

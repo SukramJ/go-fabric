@@ -94,6 +94,8 @@ type Node struct {
 	client   *clientStack
 	bindings *binding.Manager
 	bindSync bindingSync
+	// failSafe holds the topology's fail-safe participants (failsafe.go).
+	failSafe failSafeSync
 	// userLabels keeps the bridged endpoints' UserLabel lists in the
 	// store (user_labels.go).
 	userLabels userLabelSync
@@ -286,6 +288,7 @@ func New(cfg Config) (*Node, error) { //nolint:funlen // the composition root: o
 		cfg: &n.cfg, logger: n.logger, bootReason: n.bootReason, st: n.st, groups: n.groups, connector: n.br,
 		onFabricInstalled:       n.observedFabricInstalled,
 		onCommissioningComplete: n.commissioningCompleted,
+		onFailSafeExpired:       n.failSafeExpired,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("node: %w", err)
@@ -617,6 +620,7 @@ func (n *Node) observedFabricChanged(ctx context.Context, fabricIndex uint8) {
 // root's CommissioningComplete hook calls it after its own body
 // (root.go).
 func (n *Node) commissioningCompleted(ctx context.Context, fabricIndex uint8) {
+	n.failSafeCommitted(ctx)
 	n.ensureOTAProviderACL(ctx)
 	n.ensureRequestorACL(ctx)
 	for _, o := range n.observerList() {

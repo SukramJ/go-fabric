@@ -76,9 +76,12 @@ network. A host that changes the store outside the cluster calls
 when it moved. A preferred network the store dropped is cleared.
 
 The server checks a dataset the way chip's `OperationalDatasetView` reads
-one, taking the first sub-TLV of each type. It does not use the
-commissioner's codec (`controller/thread`), because a cluster server does
-not import a role. Concept v10 wave 26a moves that codec to `thread/`.
+one, taking the first sub-TLV of each type and holding it to chip's sizes:
+`thread.DatasetView`, which the Thread Border Router Management server
+uses too ([Thread Border Router](thread-border-router.md)). The
+commissioner's codec in the same package (`thread.DecodeDataset`, after
+matter.js) reads the last occurrence and accepts the one-byte Channel; a
+directory that judges what a controller hands it reads as chip does.
 
 ## ThreadNetworkDiagnostics
 

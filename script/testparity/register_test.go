@@ -17,6 +17,7 @@ import (
 	"go/token"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -73,7 +74,8 @@ func TestTestparitySnapshotIsThePin(t *testing.T) {
 		if !shaPattern.MatchString(f.SHA) {
 			t.Errorf("%s: sha %q", f.Path, f.SHA)
 		}
-		if !strings.HasSuffix(f.Path, "Test.ts") || (!strings.HasPrefix(f.Path, snapshotRoots[0]+"/") && !strings.HasPrefix(f.Path, snapshotRoots[1]+"/")) {
+		underRoot := slices.ContainsFunc(snapshotRoots, func(r string) bool { return strings.HasPrefix(f.Path, r+"/") })
+		if !strings.HasSuffix(f.Path, "Test.ts") || !underRoot {
 			t.Errorf("%s: not a *Test.ts under the snapshot roots", f.Path)
 		}
 		if f.Lines <= 0 {

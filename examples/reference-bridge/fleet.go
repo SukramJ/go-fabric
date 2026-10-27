@@ -993,6 +993,9 @@ type fleet struct {
 	// media is the video player and content app pair (media.go), served
 	// with --media; nil without.
 	media *demoMedia
+	// otbr is the ThreadBorderRouter endpoint (otbr.go), served with
+	// --otbr; nil without.
+	otbr *demoBorderRouter
 
 	// configChange raises the ConfigurationVersion of every bridged device
 	// (the app pipe's SimulateConfigurationVersionChange); wired by main.
@@ -1181,6 +1184,10 @@ func (f *fleet) endpoints() ([]node.Endpoint, error) { //nolint:funlen // the fl
 			errs = append(errs, err)
 		}
 		out = append(out, pair...)
+	}
+	// The border router (--otbr) comes after it, for the same reason.
+	if f.otbr != nil {
+		out = append(out, f.otbr.device)
 	}
 	if err := errors.Join(errs...); err != nil {
 		return nil, fmt.Errorf("fleet: %w", err)
