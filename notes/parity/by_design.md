@@ -4728,6 +4728,62 @@ two views. chip's seven unit cases are ported (`threaddir_chip_test.go`; the
 storage-migration case is chip's own format). Retire when matter.js's
 server gains the rules.
 
+### BD-chip-CameraAvStreamManagement-RulesInServer — stream allocation, reference counts and the viewport follow connectedhomeip behind four ports
+
+matter.js's `CameraAvStreamManagementServer.ts:18` at `862ad75f` is the
+empty subclass: a controller's AllocateVideoStream is stored unchecked and
+no stream table exists. `cluster/camera/avstream.go` (`camera.AvStream`)
+follows connectedhomeip's `CameraAVStreamManagementCluster.cpp` at
+`6170af84`: the configuration check of `Init` (:76-160), each request in
+chip's order with chip's status codes (:2065-2669), a reused stream
+narrowed to the intersection of both ranges, reference counts that refuse
+to deallocate a stream in use or an Internal one (:486-557), the aspect
+ratio rule of `SetViewport` (:1137-1171), the privacy modes and the image
+size bound on capture. The host supplies the encoders through
+`VideoStreamPort`, `AudioStreamPort`, `SnapshotStreamPort` and
+`SnapshotCapturePort`; the ports are called outside the server's lock.
+Pinned by `avstream_chip_test.go` (chip's 57 cluster cases; the seven
+storage-migration cases :1790-1929 are left out because the host persists)
+and `avstream_rules_test.go`.
+
+### BD-chip-CameraAvStream-DefaultsWhereTheModelHasNone — attributes without a model default start at chip's values
+
+The matter.js model names no default for most CameraAvStreamManagement
+attributes, and matter.js refuses to serve a mandatory attribute without
+a value. Requiring every camera host to set them would put chip's member
+defaults into each host; the server starts them at chip's values instead
+(`CameraAVStreamManagementCluster.h:405-445`, `:740-764`: NightVision On,
+the maximum levels 254, StatusLightBrightness Medium, the rest zero or
+false) and keeps the model's default where it names one
+(MicrophoneAGCEnabled and StatusLightEnabled `true`, chip `false`), since
+schema values come from matter.js verbatim. Owner decision 2026-10-27.
+
+### BD-chip-CameraAvStream-SnapshotBound — the capture size bound is the TCP message size less chip's margin, configurable
+
+chip bounds a captured snapshot by its platform packet buffer
+(`CameraAVStreamManagementCluster.h:53-55`), which the module does not
+have. `DefaultMaxSnapshotSize` is matter.js's MaxTCPMessageSize fallback
+(64000) less chip's 100, and `Config.MaxSnapshotSize` overrides it; the
+bound is not read from the session's negotiated size at invoke time.
+Owner decision 2026-10-27.
+
+### BD-chip-ZoneManagement-RulesInServer — zone and trigger rules follow connectedhomeip behind `ZonePort`
+
+matter.js's `ZoneManagementServer.ts:14` at `862ad75f` is the empty
+subclass, so a controller could store a self-intersecting or duplicate
+zone. `cluster/camera/zone.go` (`camera.Zones`) follows
+`ZoneManagementCluster.cpp` at `6170af84`: `ValidateConfiguration` (:85),
+the Sensitivity write (:259-284), the handlers (:462-659), the events
+(:701-733) and the polygon rules of `zone-geometry.h:158-317`
+(`camera.ZoneSelfIntersecting`). chip checks only the user-defined budget
+on create (:473), not MaxZones over every zone, and so does the server
+(owner decision 2026-10-27). Two chip tests build USERDEFINED without
+TWODCART (`TestZoneManagementCluster.cpp:223-239`, `:308-315`); the
+matter.js model makes USERDEFINED `[TWODCART]`, so the server refuses that
+configuration (`ErrZonesConfig`) and the port asserts the refusal. Pinned
+by `zone_chip_test.go` (11 cluster cases, 16 polygons) and
+`zone_rules_test.go`.
+
 ### BD-Matter-GeneratedServerSuffices — clusters whose generated server is complete: no source carries behaviour beyond the model
 
 Audit of 2026-10-27 (owner question at the milestone 6 concept; read map
