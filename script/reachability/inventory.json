@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 6691,
+  "entry_points": 6784,
   "entry_packages": [
     ".",
     "bdx",
@@ -179,6 +179,7 @@
     "cluster/spec/zonemanagement",
     "cluster/switch",
     "cluster/thermo",
+    "cluster/threadbr",
     "cluster/transition",
     "cluster/valve",
     "cluster/wire",
@@ -197,7 +198,6 @@
     "controller/dcl",
     "controller/dcl/snapshot",
     "controller/softwareupdate",
-    "controller/thread",
     "device",
     "diagevent",
     "eligibility",
@@ -252,6 +252,9 @@
     "secure/spake2",
     "store",
     "store/memstore",
+    "thread",
+    "thread/otbr",
+    "thread/otbr/otbrtest",
     "tlv",
     "transport",
     "transport/btp",
@@ -261,9 +264,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 16344,
-    "reachable": 11550,
-    "whitelisted": 4791,
+    "total_exported": 16478,
+    "reachable": 11640,
+    "whitelisted": 4835,
     "unreachable": 3
   },
   "by_package": [
@@ -8415,6 +8418,34 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/general_diagnostics_internal_test.go",
       "line": 55
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestThreadNetworkCommissioningAttributes",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/network_commissioning_thread_test.go",
+      "line": 139
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestThreadNetworkCommissioningCommands",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/network_commissioning_thread_test.go",
+      "line": 224
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestThreadNetworkCommissioningInterfaceEnabled",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/network_commissioning_thread_test.go",
+      "line": 343
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestThreadNetworkCommissioningScan",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/network_commissioning_thread_test.go",
+      "line": 186
     },
     {
       "package": "cluster/core",
@@ -20947,6 +20978,13 @@
       "line": 40
     },
     {
+      "package": "cluster/threadbr",
+      "identifier": "BorderRouter",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/threadbr/management.go",
+      "line": 57
+    },
+    {
       "package": "cluster/valve",
       "identifier": "OpenRequest",
       "reason": "auto-whitelist:pattern=type-alias",
@@ -23362,90 +23400,6 @@
       "line": 227
     },
     {
-      "package": "controller/thread",
-      "identifier": "TestBasicTlvCodecEncode",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/thread/tlv_parity_matterjs_test.go",
-      "line": 85
-    },
-    {
-      "package": "controller/thread",
-      "identifier": "TestBasicTlvCodecWalk",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/thread/tlv_parity_matterjs_test.go",
-      "line": 35
-    },
-    {
-      "package": "controller/thread",
-      "identifier": "TestDatasetFieldsRoundTrip",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/thread/dataset_test.go",
-      "line": 46
-    },
-    {
-      "package": "controller/thread",
-      "identifier": "TestDatasetReplayEdges",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/thread/dataset_test.go",
-      "line": 17
-    },
-    {
-      "package": "controller/thread",
-      "identifier": "TestDecodeDatasetHexWhitespace",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/thread/dataset_test.go",
-      "line": 108
-    },
-    {
-      "package": "controller/thread",
-      "identifier": "TestDecodeUTF8MatchesTextDecoder",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/thread/dataset_test.go",
-      "line": 90
-    },
-    {
-      "package": "controller/thread",
-      "identifier": "TestMeshCopTlvTypesName",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/thread/meshcop_parity_matterjs_test.go",
-      "line": 61
-    },
-    {
-      "package": "controller/thread",
-      "identifier": "TestMeshCopTlvTypesType",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/thread/meshcop_parity_matterjs_test.go",
-      "line": 11
-    },
-    {
-      "package": "controller/thread",
-      "identifier": "TestOperationalDatasetDecode",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/thread/dataset_parity_matterjs_test.go",
-      "line": 51
-    },
-    {
-      "package": "controller/thread",
-      "identifier": "TestOperationalDatasetDecodeHex",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/thread/dataset_parity_matterjs_test.go",
-      "line": 194
-    },
-    {
-      "package": "controller/thread",
-      "identifier": "TestOperationalDatasetEncode",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/thread/dataset_parity_matterjs_test.go",
-      "line": 129
-    },
-    {
-      "package": "controller/thread",
-      "identifier": "TestOperationalDatasetRedact",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/thread/dataset_parity_matterjs_test.go",
-      "line": 219
-    },
-    {
       "package": "device",
       "identifier": "AvailabilityProbe",
       "reason": "auto-whitelist:pattern=type-alias",
@@ -25551,6 +25505,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/ota_push_e2e_test.go",
       "line": 30
+    },
+    {
+      "package": "examples/reference-bridge",
+      "identifier": "TestOTBRFlag",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-bridge/otbr_test.go",
+      "line": 17
     },
     {
       "package": "examples/reference-bridge",
@@ -31676,6 +31637,356 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/spake2/spake2_test.go",
       "line": 69
+    },
+    {
+      "package": "thread",
+      "identifier": "TestBasicTlvCodecEncode",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "thread/tlv_parity_matterjs_test.go",
+      "line": 85
+    },
+    {
+      "package": "thread",
+      "identifier": "TestBasicTlvCodecWalk",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "thread/tlv_parity_matterjs_test.go",
+      "line": 35
+    },
+    {
+      "package": "thread",
+      "identifier": "TestDatasetFieldsRoundTrip",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "thread/dataset_test.go",
+      "line": 46
+    },
+    {
+      "package": "thread",
+      "identifier": "TestDatasetReplayEdges",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "thread/dataset_test.go",
+      "line": 17
+    },
+    {
+      "package": "thread",
+      "identifier": "TestDecodeDatasetHexWhitespace",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "thread/dataset_test.go",
+      "line": 108
+    },
+    {
+      "package": "thread",
+      "identifier": "TestDecodeUTF8MatchesTextDecoder",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "thread/dataset_test.go",
+      "line": 90
+    },
+    {
+      "package": "thread",
+      "identifier": "TestMeshCopTlvTypesName",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "thread/meshcop_parity_matterjs_test.go",
+      "line": 61
+    },
+    {
+      "package": "thread",
+      "identifier": "TestMeshCopTlvTypesType",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "thread/meshcop_parity_matterjs_test.go",
+      "line": 11
+    },
+    {
+      "package": "thread",
+      "identifier": "TestOperationalDatasetDecode",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "thread/dataset_parity_matterjs_test.go",
+      "line": 51
+    },
+    {
+      "package": "thread",
+      "identifier": "TestOperationalDatasetDecodeHex",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "thread/dataset_parity_matterjs_test.go",
+      "line": 194
+    },
+    {
+      "package": "thread",
+      "identifier": "TestOperationalDatasetEncode",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "thread/dataset_parity_matterjs_test.go",
+      "line": 129
+    },
+    {
+      "package": "thread",
+      "identifier": "TestOperationalDatasetRedact",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "thread/dataset_parity_matterjs_test.go",
+      "line": 219
+    },
+    {
+      "package": "thread/otbr",
+      "identifier": "LeaderData",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "thread/otbr/client.go",
+      "line": 83
+    },
+    {
+      "package": "thread/otbr",
+      "identifier": "TestBorderRouterActivationAndRevert",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "thread/otbr/borderrouter_test.go",
+      "line": 83
+    },
+    {
+      "package": "thread/otbr",
+      "identifier": "TestBorderRouterFailures",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "thread/otbr/borderrouter_test.go",
+      "line": 153
+    },
+    {
+      "package": "thread/otbr",
+      "identifier": "TestBorderRouterReads",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "thread/otbr/borderrouter_test.go",
+      "line": 46
+    },
+    {
+      "package": "thread/otbr",
+      "identifier": "TestBorderRouterReplaceAndClear",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "thread/otbr/borderrouter_test.go",
+      "line": 114
+    },
+    {
+      "package": "thread/otbr",
+      "identifier": "TestBorderRouterVersionFromItsRecord",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "thread/otbr/borderrouter_test.go",
+      "line": 213
+    },
+    {
+      "package": "thread/otbr",
+      "identifier": "TestDetectKeyFormat",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "thread/otbr/probe_parity_matterjs_test.go",
+      "line": 155
+    },
+    {
+      "package": "thread/otbr",
+      "identifier": "TestNormalizeKeysIrregularAndFirstLetter",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "thread/otbr/probe_parity_matterjs_test.go",
+      "line": 102
+    },
+    {
+      "package": "thread/otbr",
+      "identifier": "TestNormalizeKeysStructure",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "thread/otbr/probe_parity_matterjs_test.go",
+      "line": 120
+    },
+    {
+      "package": "thread/otbr",
+      "identifier": "TestOtbrDecodeJSON",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "thread/otbr/client_parity_matterjs_test.go",
+      "line": 564
+    },
+    {
+      "package": "thread/otbr",
+      "identifier": "TestOtbrRestClientBracketsIPv6",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "thread/otbr/client_parity_matterjs_test.go",
+      "line": 252
+    },
+    {
+      "package": "thread/otbr",
+      "identifier": "TestOtbrRestClientCollectionReads",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "thread/otbr/client_parity_matterjs_test.go",
+      "line": 421
+    },
+    {
+      "package": "thread/otbr",
+      "identifier": "TestOtbrRestClientDetectDiagnosticsAPI",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "thread/otbr/client_parity_matterjs_test.go",
+      "line": 443
+    },
+    {
+      "package": "thread/otbr",
+      "identifier": "TestOtbrRestClientGetDataset",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "thread/otbr/client_parity_matterjs_test.go",
+      "line": 205
+    },
+    {
+      "package": "thread/otbr",
+      "identifier": "TestOtbrRestClientGetDiagnostics",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "thread/otbr/client_parity_matterjs_test.go",
+      "line": 186
+    },
+    {
+      "package": "thread/otbr",
+      "identifier": "TestOtbrRestClientGetNodeCamel",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "thread/otbr/client_parity_matterjs_test.go",
+      "line": 135
+    },
+    {
+      "package": "thread/otbr",
+      "identifier": "TestOtbrRestClientGetNodePascal",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "thread/otbr/client_parity_matterjs_test.go",
+      "line": 116
+    },
+    {
+      "package": "thread/otbr",
+      "identifier": "TestOtbrRestClientGetNodeRejectsBadRloc16",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "thread/otbr/client_parity_matterjs_test.go",
+      "line": 166
+    },
+    {
+      "package": "thread/otbr",
+      "identifier": "TestOtbrRestClientGetNodeWithoutRouterCount",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "thread/otbr/client_parity_matterjs_test.go",
+      "line": 176
+    },
+    {
+      "package": "thread/otbr",
+      "identifier": "TestOtbrRestClientGetterEdges",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "thread/otbr/client_parity_matterjs_test.go",
+      "line": 338
+    },
+    {
+      "package": "thread/otbr",
+      "identifier": "TestOtbrRestClientMutations",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "thread/otbr/client_parity_matterjs_test.go",
+      "line": 370
+    },
+    {
+      "package": "thread/otbr",
+      "identifier": "TestOtbrRestClientNon2xx",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "thread/otbr/client_parity_matterjs_test.go",
+      "line": 230
+    },
+    {
+      "package": "thread/otbr",
+      "identifier": "TestOtbrRestClientReadOnlyGetters",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "thread/otbr/client_parity_matterjs_test.go",
+      "line": 271
+    },
+    {
+      "package": "thread/otbr",
+      "identifier": "TestOtbrRestClientShapeErrors",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "thread/otbr/client_parity_matterjs_test.go",
+      "line": 466
+    },
+    {
+      "package": "thread/otbr",
+      "identifier": "TestOtbrRestClientTimeout",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "thread/otbr/client_parity_matterjs_test.go",
+      "line": 241
+    },
+    {
+      "package": "thread/otbr",
+      "identifier": "TestOtbrRestClientUnreachable",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "thread/otbr/client_parity_matterjs_test.go",
+      "line": 220
+    },
+    {
+      "package": "thread/otbr",
+      "identifier": "TestOtbrRestProbeCamelCollection",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "thread/otbr/probe_parity_matterjs_test.go",
+      "line": 42
+    },
+    {
+      "package": "thread/otbr",
+      "identifier": "TestOtbrRestProbeMisses",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "thread/otbr/probe_parity_matterjs_test.go",
+      "line": 79
+    },
+    {
+      "package": "thread/otbr",
+      "identifier": "TestOtbrRestProbeNeverFetchesActions",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "thread/otbr/probe_parity_matterjs_test.go",
+      "line": 63
+    },
+    {
+      "package": "thread/otbr",
+      "identifier": "TestOtbrRestProbeNoDiagnostics",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "thread/otbr/probe_parity_matterjs_test.go",
+      "line": 53
+    },
+    {
+      "package": "thread/otbr",
+      "identifier": "TestOtbrRestProbePascalLegacy",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "thread/otbr/probe_parity_matterjs_test.go",
+      "line": 31
+    },
+    {
+      "package": "thread/otbr",
+      "identifier": "TestTranslateAllFixtureEntries",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "thread/otbr/translate_parity_matterjs_test.go",
+      "line": 102
+    },
+    {
+      "package": "thread/otbr",
+      "identifier": "TestTranslateMleCounters",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "thread/otbr/translate_parity_matterjs_test.go",
+      "line": 127
+    },
+    {
+      "package": "thread/otbr",
+      "identifier": "TestTranslateModeAllZero",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "thread/otbr/translate_parity_matterjs_test.go",
+      "line": 159
+    },
+    {
+      "package": "thread/otbr",
+      "identifier": "TestTranslateRloc16",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "thread/otbr/translate_parity_matterjs_test.go",
+      "line": 89
+    },
+    {
+      "package": "thread/otbr",
+      "identifier": "TestTranslateRouterWithChildren",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "thread/otbr/translate_parity_matterjs_test.go",
+      "line": 53
+    },
+    {
+      "package": "thread/otbr",
+      "identifier": "TestTranslateSkipsMalformedFields",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "thread/otbr/translate_parity_matterjs_test.go",
+      "line": 170
+    },
+    {
+      "package": "thread/otbr",
+      "identifier": "TestTranslateWithoutChildren",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "thread/otbr/translate_parity_matterjs_test.go",
+      "line": 79
     },
     {
       "package": "tlv",

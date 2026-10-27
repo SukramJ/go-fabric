@@ -1,7 +1,9 @@
 # ADR 0027 — A Thread Border Router over OTBR REST: ThreadBorderRouterManagement enters the scope as a server with logic; the Thread radio stays out
 
 - **Status**: Accepted (2026-10-25; roadmap milestone 6, phase 26a — the four
-  open points decided by the owner on 2026-10-23, see "Decisions taken")
+  open points decided by the owner on 2026-10-23, see "Decisions taken");
+  implemented in wave 26a (brief `notes/briefs/2026-10-27-M6-26a-thread-border-router.md`,
+  report `notes/briefs/reports/26a.md`)
 - **Date**: 2026-10-23
 - **Related**: [ADR 0024 — BLE commissioning in the controller role](./0024-ble-commissioning-in-the-controller.md)
   (decision 4: provisioning a Thread dataset needs no Thread radio),
@@ -120,7 +122,10 @@ optional feature `PC` (:22). The REST contract needs `net/http` only, which
    `cluster/` may import it — `servers` sits below
    `roles` in `script/archcheck/layers.json`. `controller/thread` forwards
    until `v0.12.0`, the window the `controller/<name>` → `client/` moves
-   use (`CLAUDE.md`, ADR 0026 principle 12).
+   use (`CLAUDE.md`, ADR 0026 principle 12). That window had passed when
+   the move landed: wave 26a removed `controller/thread` at once, with a
+   migration-guide line, instead of keeping forwarders (owner decision
+   2026-10-27).
 
 3. **Three servers, one delegate.** `cluster/threadbr/` holds
    - `ThreadBorderRouterManagement` with chip's rules from the table

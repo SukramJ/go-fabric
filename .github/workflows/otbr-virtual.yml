@@ -1,0 +1,52 @@
+# The virtual OTBR of ADR 0027 decision 7: an otbr-agent with its REST API
+# on OpenThread's simulation RCP, built as connectedhomeip's CI builds it
+# (.github/workflows/tests.yaml:327-359 at 6170af84), and thread/otbr's live
+# test (TestLiveOTBR) against it: the probe, an activation of chip's test
+# dataset that attaches, the diagnostics, the revert.
+#
+# Manual only, like ble-virtual.yml: the build takes long and is unverified
+# until a dispatched run has passed (ADR 0027: "that the simulation RCP runs
+# on the ubuntu-24.04 runner"). The harness's TBRM family against the
+# reference daemon's --otbr endpoint on this agent is the next step once
+# this job is green. The steps are script/otbr-virtual-test.sh, the same as
+# `make otbr-virtual-test` locally.
+name: otbr-virtual
+
+on:
+  workflow_dispatch:
+    inputs:
+      otbr_ref:
+        description: ot-br-posix ref to build
+        required: false
+        default: main
+
+permissions:
+  contents: read
+
+env:
+  CGO_ENABLED: "0"
+  GO_VERSION: "1.27.3"
+
+jobs:
+  otbr-virtual:
+    name: OTBR REST on the simulation RCP (TestLiveOTBR)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+      - name: build the agent and the RCP, run the live test
+        env:
+          OTBR_REF: ${{ inputs.otbr_ref }}
+          OTBR_LOG_DIR: ${{ runner.temp }}/otbr-virtual-logs
+        run: make otbr-virtual-test
+      - name: upload logs
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: otbr-virtual-logs
+          path: ${{ runner.temp }}/otbr-virtual-logs
+          if-no-files-found: ignore

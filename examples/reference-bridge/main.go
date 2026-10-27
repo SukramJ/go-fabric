@@ -86,6 +86,7 @@ type flags struct {
 	dbPath, listen, tcp, label, salt, logLevel string
 	appPipe, enableKey, otaDir, dcl            string
 	attestationDir, metricsExpvar              string
+	otbr                                       string
 	passcode, discriminator                    uint
 	iterations                                 int
 	advertise, osHostName, otaHarness, wifi    bool
@@ -118,6 +119,7 @@ func parseFlags() flags {
 	flag.BoolVar(&f.wifiSim, "wifi-sim", false, "TESTING ONLY: NetworkCommissioning with the Wi-Fi feature instead of Ethernet, over a simulated driver that connects to any SSID after a short delay and stays on the Ethernet address; see wifisim.go")
 	flag.StringVar(&f.metricsExpvar, "metrics-expvar", "", "address (\"127.0.0.1:9090\") to serve the node's metrics on as expvar's /debug/vars; off when empty; see metrics.go")
 	flag.BoolVar(&f.thermostatSchedules, "thermostat-schedules", false, "serve MatterScheduleConfiguration (week programs) on the demo thermostat; off by default until a live ecosystem pairing is verified (issue #273); see fleet_climate.go")
+	flag.StringVar(&f.otbr, "otbr", "", "add a ThreadBorderRouter endpoint over the OpenThread Border Router's REST API at this URL (\"http://[fd00::1]:8081\"); off when empty; see otbr.go")
 	flag.BoolVar(&f.media, "media", false, "TESTING ONLY: add a simulated video player (CastingVideoPlayer) and content app (ContentApp) after chip's tv-app, for the media certification families; see media.go")
 	flag.Parse()
 	return f
@@ -227,6 +229,13 @@ func run() error { //nolint:funlen // the composition root: one sequential pass,
 		if devices.media, err = newDemoMedia(logger); err != nil {
 			return err
 		}
+	}
+	if f.otbr != "" {
+		// The ThreadBorderRouter endpoint (otbr.go), off by default.
+		if devices.otbr, err = newDemoBorderRouter(f.otbr, logger); err != nil {
+			return err
+		}
+		go devices.otbr.watch(ctx)
 	}
 	n, err := assemble(ctx, devices, cfg, applier)
 	if err != nil {

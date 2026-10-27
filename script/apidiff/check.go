@@ -47,6 +47,15 @@ func parse(out string) []change {
 // split splits "./cluster/spec.(*Report).Values" into the package
 // ("cluster/spec") and the symbol ("Report.Values").
 func split(subject string) change {
+	// A removed package is reported as "package <import path>: removed";
+	// the CHANGELOG names it by its module-relative path.
+	if rest, ok := strings.CutPrefix(subject, "package "); ok {
+		rel := strings.TrimPrefix(strings.TrimPrefix(rest, module), "/")
+		if rel == "" {
+			rel = "."
+		}
+		return change{Package: rel, Symbol: rel}
+	}
 	subject = strings.TrimPrefix(subject, "./")
 	if subject == "." {
 		return change{Package: ".", Symbol: module}

@@ -84,6 +84,7 @@ nav:
       - Camera: guides/camera.md
       - BLE through ESPHome proxies: guides/ble-proxies.md
       - Network infrastructure: guides/network-infrastructure.md
+      - Thread Border Router: guides/thread-border-router.md
       - Advanced seams: guides/advanced-seams.md
       - Migrating to the facade: guides/migrating-to-the-facade.md
       - Concurrency: guides/concurrency.md

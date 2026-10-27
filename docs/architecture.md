@@ -136,7 +136,7 @@ The layers and their allowed direction are held by `script/archcheck`
 
 | Out | Why | Record |
 | --- | --- | --- |
-| Thread radio | needs hardware and a border router; a commissioner can still hand a device a Thread dataset | concept v3 |
+| Thread radio | needs hardware and a border router; a commissioner can still hand a device a Thread dataset; an existing OpenThread Border Router is managed over its REST API instead (`thread/otbr`, `cluster/threadbr`) | concept v3, [ADR 0027](adr/0027-thread-border-router-over-otbr-rest.md) |
 | Bluetooth on the device side | a LAN-attached node has no use for it; the commissioner's BLE is decided | [ADR 0024](adr/0024-ble-commissioning-in-the-controller.md) |
 | Joint Fabric | no matter.js behaviour to mirror at the pin | [ADR 0020](adr/0020-commissioner-and-controller-role.md) |
 | Camera and WebRTC clusters | need a media path in the host | [matter.js comparison](matterjs-comparison.md) |

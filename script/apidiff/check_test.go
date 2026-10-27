@@ -44,6 +44,16 @@ const changelog = "# Changelog\n\n## [Unreleased]\n\n### Added\n\n- `spec.Bool`,
 	"### Changed\n\n- `client.Cluster.Decoded` returns one value.\n\n### Removed\n\n- `node/old`: gone.\n\n" +
 	"## [0.10.2] — 2026-10-23\n\n### Removed\n\n- `spec.Bool`.\n"
 
+func TestSplitRemovedPackage(t *testing.T) {
+	c := split("package " + module + "/controller/thread")
+	if c.Package != "controller/thread" || c.Symbol != "controller/thread" {
+		t.Fatalf("split(package …/controller/thread) = %+v", c)
+	}
+	if got := unannounced([]change{c}, "- `controller/thread`: moved to `thread`"); len(got) != 0 {
+		t.Fatalf("announced removal reported: %+v", got)
+	}
+}
+
 func TestUnannounced(t *testing.T) {
 	text := unreleased(changelog, "v0.10.2")
 	missing := unannounced(parse(report), text)
