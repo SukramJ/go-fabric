@@ -51,7 +51,11 @@ without their types and access.
    priority, feature title — with inheritance resolved through matter.js's
    `effective*` accessors; a `datatypes` list per cluster (enums with values
    and conformance, bitmaps with bit ranges, structs with fields), `base` for
-   a derived cluster, and `globalDatatypes`. It refuses to emit when a raw
+   a derived cluster, `globalDatatypes`, and `definitions` — the datatypes of
+   the id-less definition clusters other clusters reference by
+   `Owner.Name` (WebRtcTransportDefinitions, added by brief 26-A1 on
+   2026-10-27, so the WebRTC transport sessions and ICE candidates carry
+   their fields). It refuses to emit when a raw
    element has no operational model. The snapshot grows from 525 KB to
    3.4 MB; it is test data and generator input, never linked into a host.
 2. **One generated package per cluster** under `cluster/spec/<name>/`,

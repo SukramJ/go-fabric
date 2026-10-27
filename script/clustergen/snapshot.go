@@ -22,6 +22,10 @@ type snapshot struct {
 	} `json:"matter"`
 	Clusters        []*cluster  `json:"clusters"`
 	GlobalDatatypes []*datatype `json:"globalDatatypes"`
+	// Definitions are the definition-only clusters (no id, datatypes only)
+	// other clusters reference by "Owner.Name": WebRtcTransportDefinitions
+	// at the pin.
+	Definitions []*cluster `json:"definitions"`
 }
 
 type cluster struct {
@@ -152,6 +156,17 @@ func parseSnapshot(raw []byte) (*snapshot, error) {
 
 func (s *snapshot) cluster(name string) *cluster {
 	for _, c := range s.Clusters {
+		if c.Name == name {
+			return c
+		}
+	}
+	return nil
+}
+
+// definition finds a definition-only cluster by name, nil when there is
+// none.
+func (s *snapshot) definition(name string) *cluster {
+	for _, c := range s.Definitions {
 		if c.Name == name {
 			return c
 		}
