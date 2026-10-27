@@ -260,6 +260,10 @@ func TestTypedServer(t *testing.T) {
 	if err := decl.Attach(srv); err != nil {
 		t.Error(err)
 	}
+	var _ VideoStreamPort = d.VideoStreamPort
+	var _ AudioStreamPort = d.AudioStreamPort
+	var _ SnapshotStreamPort = d.SnapshotStreamPort
+	var _ SnapshotCapturePort = d.SnapshotCapturePort
 	// Every handler declared: each is installed, and refused by the
 	// empty definition's AcceptedCommandList.
 	all := d
