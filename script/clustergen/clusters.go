@@ -137,6 +137,12 @@ var committed = []string{
 	"PowerSourceConfiguration",
 	"EcosystemInformation",
 	"Actions",
+	// cluster/camera (brief 26-A1): WebRtcTransportRequestor after
+	// matter.js's WebRtcTransportRequestorServer.ts, Chime and
+	// CameraAvSettingsUserLevelManagement after connectedhomeip.
+	"WebRtcTransportRequestor",
+	"Chime",
+	"CameraAvSettingsUserLevelManagement",
 	// cluster/media (ADR 0022)
 	"MediaPlayback",
 	"KeypadInput",
@@ -163,19 +169,14 @@ var committed = []string{
 	"WaterTankLevelMonitoring",
 	"AmbientContextSensing",
 	"WiFiNetworkManagement",
-	"Chime",
 	// The camera, Thread, Joint Fabric and TLS clusters (brief CL §1,
 	// owner decision 2026-10-25): served by the generated server as
 	// matter.js serves them — its server for each is the generated
 	// behaviour stub (`export class XServer extends XBehavior {}`, e.g.
 	// packages/node/src/behaviors/thread-network-diagnostics/
-	// ThreadNetworkDiagnosticsServer.ts at 862ad75f), except
-	// WebRtcTransportRequestorServer.ts, whose session logic is not ported
-	// here (docs/matterjs-comparison.md).
+	// ThreadNetworkDiagnosticsServer.ts at 862ad75f).
 	"CameraAvStreamManagement",
-	"CameraAvSettingsUserLevelManagement",
 	"WebRtcTransportProvider",
-	"WebRtcTransportRequestor",
 	"PushAvStreamTransport",
 	"ZoneManagement",
 	"ThreadNetworkDiagnostics",

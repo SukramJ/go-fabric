@@ -157,6 +157,16 @@ func (s *Server) EmitChimeStartedPlaying(endpoint uint16, data ChimeStartedPlayi
 	return spec.EmitOn(s.Underlying(), endpoint, EventChimeStartedPlaying, data)
 }
 
+// ChimePort is the device's chime: InstalledChimeSounds lists the
+// sounds it has, read on every read of the attribute (an error fails
+// the read), and PlayChimeSound plays one; an error answers its
+// status, FAILURE without one (cluster/camera Chime, after
+// connectedhomeip's ChimeDelegate).
+type ChimePort interface {
+	InstalledChimeSounds() ([]ChimeSoundStruct, error)
+	PlayChimeSound(ctx context.Context, chimeID uint8) error
+}
+
 // Declare is the declaration of the Chime cluster on a device:
 // device.New<Type> and device.FromSpec take it, and every field is
 // optional — the zero value mounts the cluster (an optional one too)
@@ -179,6 +189,8 @@ type Declare struct {
 	// HandlePlayChimeSound handles the PlayChimeSound command in place of the server
 	// (Server.HandlePlayChimeSound), inline; an optional command it handles is accepted.
 	HandlePlayChimeSound func(ctx context.Context, req PlayChimeSoundRequest) (struct{}, error)
+	// ChimePort is the host port the kit's server runs on ([ChimePort]).
+	ChimePort ChimePort
 	// HostServer is the host's own server for the cluster, mounted in
 	// place of the kit's — also for a cluster the device type does not
 	// list. The hooks above go on it; Initial, Features and the ports are

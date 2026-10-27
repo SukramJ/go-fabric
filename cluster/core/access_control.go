@@ -1210,6 +1210,16 @@ func (a *AccessControl) NotifyAdminEntryInstalled(entry store.ACLEntry) {
 		}, contract.EventPriorityInfo)
 }
 
+// NotifyLocalEntryInstalled reports an entry the node itself appended to
+// a fabric's ACL — the WebRtcTransportRequestor's Operate entry
+// (node/webrtc_requestor_acl.go): the ACL changed, so the DataVersion
+// moves, and no AccessControlEntryChanged event is emitted, because
+// matter.js emits none for a change without a remote actor
+// (packages/node/src/behaviors/access-control/AccessControlServer.ts:
+// 286-302, #handleAccessControlListChange returns when the context has no
+// session's fabric).
+func (a *AccessControl) NotifyLocalEntryInstalled() { a.dataVersion.Bump() }
+
 // aclEntriesEqual reports whether two stored ACL lists hold the same
 // entries in the same order (positions and fabric stamps ignored).
 func aclEntriesEqual(a, b []store.ACLEntry) bool {

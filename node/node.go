@@ -618,6 +618,7 @@ func (n *Node) observedFabricChanged(ctx context.Context, fabricIndex uint8) {
 // (root.go).
 func (n *Node) commissioningCompleted(ctx context.Context, fabricIndex uint8) {
 	n.ensureOTAProviderACL(ctx)
+	n.ensureRequestorACL(ctx)
 	for _, o := range n.observerList() {
 		if fn := o.OnCommissioningComplete; fn != nil {
 			observe(n.logger, "commissioning_complete", func() error { return fn(fabricIndex) })
@@ -699,6 +700,7 @@ func (n *Node) Start(ctx context.Context) error {
 		return err
 	}
 	n.ensureOTAProviderACL(ctx)
+	n.ensureRequestorACL(ctx)
 
 	// Fabrics of a previous run: their CASE identities, the subscriptions
 	// their controllers held, then their operational records — matter.js
