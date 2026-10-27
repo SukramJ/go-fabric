@@ -136,10 +136,7 @@ type hostSpec struct {
 // hostOf is the hostSpec of the cluster whose typed server wrap builds.
 func hostOf[H any, S interface{ Host() H }](wrap func(contract.ClusterServer) S) *hostSpec {
 	return &hostSpec{typ: reflect.TypeFor[H](), of: func(srv contract.ClusterServer) any {
-		if h := any(wrap(srv).Host()); h != nil {
-			return h
-		}
-		return nil
+		return any(wrap(srv).Host()) // a nil Host is a nil any
 	}}
 }
 

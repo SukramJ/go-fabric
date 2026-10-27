@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 6675,
+  "entry_points": 6679,
   "entry_packages": [
     ".",
     "bdx",
@@ -261,9 +261,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 16305,
-    "reachable": 11523,
-    "whitelisted": 4779,
+    "total_exported": 16325,
+    "reachable": 11541,
+    "whitelisted": 4781,
     "unreachable": 3
   },
   "by_package": [
@@ -23636,6 +23636,13 @@
     },
     {
       "package": "device",
+      "identifier": "TestEveryKitServerHasItsHostDecided",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "device/host_methods_test.go",
+      "line": 339
+    },
+    {
+      "package": "device",
       "identifier": "TestEveryTypeConstructsAndConforms",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/conformance_test.go",
@@ -23689,6 +23696,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/types_gen_test.go",
       "line": 16
+    },
+    {
+      "package": "device",
+      "identifier": "TestHostIsTheKitServer",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "device/host_methods_test.go",
+      "line": 370
     },
     {
       "package": "device",
