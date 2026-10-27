@@ -10,6 +10,11 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+### Added
+
+- The sub-module `ble/esphome` (`github.com/SukramJ/go-fabric/ble/esphome`, brief BP1): a `controller/ble.Central` whose radios are ESPHome Bluetooth proxies (`bluetooth_proxy: active: true`), reached over the ESPHome native API on TCP, plaintext or Noise (`Noise_NNpsk0_25519_ChaChaPoly_SHA256` with the device's API key; `github.com/flynn/noise`, BSD-3-Clause, the module's one Noise library). A host commissions over BLE without a Bluetooth adapter or D-Bus: `esphome.NewCentral([]esphome.Proxy{{Addr, Key}}, esphome.Options{})` goes to `controller.PairOptions.BLE`. Scanning runs on every proxy, a peripheral two proxies see is connected through the stronger one, a proxy that drops is reconnected with backoff, and the central implements `ble.Reachability` from the proxies' connection slots. A proxy has one API subscriber — the newest; the central logs `ble.esphome.proxy_taken` when it subscribes, presumes a proxy that falls silent taken, reconnects once and then reports `esphome.ErrProxyBusy` until the next scan. The API messages are encoded by hand after aioesphomeapi's `api.proto` (MIT, cited per message); neither matter.js nor connectedhomeip commissions through a proxy. `ble/esphome/esphometest` is an in-process fake proxy over `controller/ble/bletest`'s peripherals, and the commissioner's BLE tests run against it. Guide: `docs/guides/ble-proxies.md`.
+- `ble/esphome/cmd/reference-controller`: the reference controller through ESPHome proxies; `pair --bluetooth-proxy host[:port][,key]` (repeatable, implies `--ble`). `examples/reference-controller/cli.Options` gains `Proxies`.
+
 ## [0.13.3] — 2026-10-26
 
 ### Added
