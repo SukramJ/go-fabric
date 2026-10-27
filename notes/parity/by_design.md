@@ -559,13 +559,22 @@ their names and numbers (`ControllerCommissioningFlow.ts:536-656` at
 CASE connection, `GeneralCommissioning.Complete` 20.1). matter.js names no
 step before its flow runs, so the module names the two phases Go runs there
 itself: `Discovery` 2.1 and `PASE` 2.2 (`controller/commissioner/progress.go`).
+Nor does it name the node's start after the flow (the initial read and the
+default subscription, `CommissioningClient.ts:343-361`), which the module
+reports as `Subscribe` 21.1 from `client.Registry.Commission`, skipped when
+the commissioning ends before the node starts.
 `softwareupdate.Manager.Observe` mirrors the four events of
 `SoftwareUpdateManager.ts:1420-1438` (`updateAvailable` :886, `updateApplying`
 :1317, `updateDone` :829/:1279, `updateFailed` :878/:1123) and adds two the
 host needs to drive a UI and matter.js does not emit: `consent_changed`
 (AddUpdateConsent / RemoveConsent) and `check_finished` (the end of
 QueryUpdates, with the per-product errors it logged and passed over). Both
-are marked Go-only in the doc comments. Pinned by
+are marked Go-only in the doc comments. Two more are Go-only too:
+`queued`, where `#queueUpdate` (`:892-920`) adds an entry or gives a queued
+one a new target, and `transfer_started`, at the entry's first `Downloading`
+in `onOtaStatusChange` (`:1253-1321`), which the provider reports when the
+node's BDX session starts (`OtaSoftwareUpdateProviderServer.ts:308-327`).
+Pinned by
 `controller/pair_progress_test.go` and `controller/softwareupdate/observe_test.go`.
 
 > **Rule of thumb (CLAUDE.md):** matter.js HEAD is the gold standard for everything under ``. Cluster IDs / revisions / attribute IDs / constraints / defaults / wire shape are taken verbatim. Any item below is a **deliberate** divergence with a documented reason. Bug-class drift (hand-coded revisions etc.) does **not** belong here — it belongs in a fix.

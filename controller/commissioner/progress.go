@@ -49,6 +49,14 @@ func (p StepPhase) String() string {
 // the commissioning channel), numbered after the "step 2 (device
 // discovery and commissioning channel establishment)" executeCommissioning
 // names (:444-446). Reports arrive in execution order, so 2.x precedes 0.1.
+// matter.js names no step for what runs after the flow either; the
+// module reports the node's start as [StepSubscribe] 21.1, its own
+// number after the flow's 20.1 (the initial read and the default
+// subscription, packages/node/src/behavior/system/commissioning/
+// CommissioningClient.ts:343-361 at 862ad75f), reported after the
+// flow's last step — 98.1 here, as this port does not run matter.js's
+// 99.1 AdditionalLogic.AddDefaultOtaProvider; a commissioning that ends
+// before the node starts reports it Skipped, with no Started before it.
 //
 // Err is the error of a Failed step: the step's own, or that of the
 // failsafe bookkeeping after it (:397-424). A recoverable failure
@@ -63,16 +71,27 @@ type Step struct {
 	Err    error
 }
 
-// The names of the two steps before the flow, this module's (see [Step]).
+// The names of the two steps before the flow and the one after it, this
+// module's (see [Step]).
 const (
 	StepDiscovery = "Discovery"
 	StepPASE      = "PASE"
+	StepSubscribe = "Subscribe"
 )
 
 // report calls the progress hook, if any.
 func (o *Options) report(number, sub uint8, name string, phase StepPhase, err error) {
 	if o.Progress != nil {
 		o.Progress(Step{Number: number, Sub: sub, Name: name, Phase: phase, Err: err})
+	}
+}
+
+// ReportSubscribe reports the [StepSubscribe] step through progress, a nil
+// progress reporting nothing. The node starts after
+// [Commissioner.Commission] returned, so its caller reports it.
+func ReportSubscribe(progress func(Step), phase StepPhase, err error) {
+	if progress != nil {
+		progress(Step{Number: 21, Sub: 1, Name: StepSubscribe, Phase: phase, Err: err})
 	}
 }
 

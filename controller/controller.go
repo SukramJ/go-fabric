@@ -504,8 +504,10 @@ type PairOptions struct {
 	Thread *commissioner.ThreadNetwork
 	// Progress, when set, is called on Pair's goroutine as each step of
 	// the pairing starts and ends ([PairingStep]): the search for the
-	// device (skipped with Address), PASE, then the commissioning steps
-	// under matter.js's names. Pair waits for it, so it must not block.
+	// device (skipped with Address), PASE, the commissioning steps under
+	// matter.js's names, then the node's start, "Subscribe" 21.1 (skipped
+	// when Pair returns before the node starts). Pair waits for it, so it
+	// must not block.
 	// It is the commissioner's Options.Progress, which Edit may replace.
 	Progress func(PairingStep)
 	// Edit adjusts the commissioner's options last (a seam).
@@ -515,8 +517,10 @@ type PairOptions struct {
 // PairingStep is one report of [PairOptions].Progress: the step's
 // number, sub-step and name — matter.js's step names verbatim
 // (packages/protocol/src/peer/ControllerCommissioningFlow.ts:536-656 at
-// 862ad75f), so a UI can show them, and "Discovery" 2.1 and "PASE" 2.2,
-// this module's names for the steps before matter.js's flow — its
+// 862ad75f), so a UI can show them, "Discovery" 2.1 and "PASE" 2.2,
+// this module's names for the steps before matter.js's flow, and
+// "Subscribe" 21.1, its name for the node's start after it (the initial
+// read and the default subscription) — its
 // phase, and the error of a failed step (commissioner.Step).
 type PairingStep = commissioner.Step
 

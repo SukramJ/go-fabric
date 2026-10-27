@@ -45,7 +45,9 @@ func (l *progressLog) lines() []string {
 // and PASE first, the module's own 2.1 and 2.2. An IP device has no
 // network steps (:596-626); this device's regulatory configuration is
 // skipped (:1185-1188), time synchronisation always is (:1200-1211), and
-// so is the ACL step, whose standard entry is enough (:1516-1522).
+// so is the ACL step, whose standard entry is enough (:1516-1522). The
+// node's start — the initial read and the default subscription
+// (CommissioningClient.ts:343-361) — ends it, the module's own 21.1.
 func TestPairProgress(t *testing.T) {
 	t.Parallel()
 	site, dev, c := siteController(t, fabrictest.Topology{}, nil)
@@ -71,6 +73,7 @@ func TestPairProgress(t *testing.T) {
 		"18.1 Reconnect started", "18.1 Reconnect succeeded",
 		"20.1 GeneralCommissioning.Complete started", "20.1 GeneralCommissioning.Complete succeeded",
 		"98.1 OperationalCredentials.UpdateFabricLabel started", "98.1 OperationalCredentials.UpdateFabricLabel succeeded",
+		"21.1 Subscribe started", "21.1 Subscribe succeeded",
 	}
 	if got := l.lines(); !slices.Equal(got, want) {
 		t.Fatalf("progress %q,\nwant %q", got, want)
@@ -80,7 +83,8 @@ func TestPairProgress(t *testing.T) {
 // TestPairProgressAttestationFailure: a device whose attestation the
 // default policy rejects — the site's test Certification Declaration —
 // reports OperationalCredentials.DeviceAttestation failed with the error
-// Pair returns, and nothing after it (:438-462).
+// Pair returns, no further step of the flow (:438-462), and the node's
+// start, which does not happen, skipped.
 func TestPairProgressAttestationFailure(t *testing.T) {
 	t.Parallel()
 	site, dev, c := siteController(t, fabrictest.Topology{}, nil)
@@ -96,11 +100,56 @@ func TestPairProgressAttestationFailure(t *testing.T) {
 		t.Fatal("Pair accepted a test attestation under the default policy")
 	}
 	l.mu.Lock()
-	last := l.steps[len(l.steps)-1]
+	if n := len(l.steps); n < 2 {
+		l.mu.Unlock()
+		t.Fatalf("progress %q", l.lines())
+	}
+	last, skipped := l.steps[len(l.steps)-2], l.steps[len(l.steps)-1]
 	l.mu.Unlock()
+	if skipped.Number != 21 || skipped.Sub != 1 || skipped.Name != "Subscribe" || skipped.Phase != controller.PairingSkipped || skipped.Err != nil {
+		t.Errorf("last report %+v, want 21.1 Subscribe skipped", skipped)
+	}
 	if last.Number != 10 || last.Sub != 1 || last.Name != "OperationalCredentials.DeviceAttestation" || last.Phase != controller.PairingFailed {
 		t.Fatalf("last report %+v, want 10.1 DeviceAttestation failed; all %q", last, l.lines())
 	}
+	if last.Err == nil || !errors.Is(pairErr, last.Err) {
+		t.Errorf("failed step's error %v, Pair's %v", last.Err, pairErr)
+	}
+}
+
+// TestPairProgressSubscribeFailure: a device that stops answering once
+// it is commissioned — the site's network drops its datagrams from the
+// moment the node starts — fails the node's initial read, and Pair
+// reports Subscribe 21.1 started, then failed with the error it returns.
+func TestPairProgressSubscribeFailure(t *testing.T) {
+	t.Parallel()
+	site, dev, c := siteController(t, fabrictest.Topology{}, nil)
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+	l := &progressLog{}
+	addr := dev.Addr().String()
+	progress := func(s controller.PairingStep) {
+		l.add(s)
+		if s.Name == "Subscribe" && s.Phase == controller.PairingStarted {
+			site.Net().Filter(func(d fabrictest.Datagram) bool { return d.From.String() != addr && d.To.String() != addr })
+		}
+	}
+	var pairErr error
+	_ = site.Run(ctx, func(ctx context.Context) error {
+		_, pairErr = c.Pair(ctx, manualCode(t, dev), controller.PairOptions{OnAttestationFailure: attestation.Accept(), Progress: progress})
+		return nil
+	})
+	site.Net().Filter(nil)
+	if pairErr == nil {
+		t.Fatal("Pair succeeded with the device unreachable for its initial read")
+	}
+	got := l.lines()
+	if len(got) < 2 || got[len(got)-2] != "21.1 Subscribe started" || got[len(got)-1] != "21.1 Subscribe failed" {
+		t.Fatalf("progress %q, want it to end with Subscribe started, failed", got)
+	}
+	l.mu.Lock()
+	last := l.steps[len(l.steps)-1]
+	l.mu.Unlock()
 	if last.Err == nil || !errors.Is(pairErr, last.Err) {
 		t.Errorf("failed step's error %v, Pair's %v", last.Err, pairErr)
 	}
