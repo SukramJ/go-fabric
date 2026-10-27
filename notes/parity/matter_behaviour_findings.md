@@ -453,6 +453,22 @@ Controller side:
   (ClientInvokeTest, 39 cases `missing`). Owner decision 2026-10-27
   (concept v10, 0.1): implemented after matter.js in wave 27-A, with the 39
   cases ported. (Milestone 6 phase 27.)
+- **TimeSynchronization serves the UTC part only.** chip's
+  `TimeSynchronizationCluster.cpp` at `6170af84` gates TimeZone, DSTOffset,
+  the NTP attributes and the trusted time source on the TZ, NTPC, NTPS and
+  TSC features (`:104-159`, `:221-237`) and handles `SetUTCTime`,
+  `SetTrustedTimeSource`, `SetTimeZone` and `SetDSTOffset` (`:1036-1051`);
+  matter.js's server is the shell. `cluster/core/time_synchronization.go`
+  serves FeatureMap 0 (`BD-Matter-TimeSync-NoUTCFeature`). Owner decision
+  2026-10-27: implemented after chip behind a host port in milestone 6 wave
+  27-B, with an Ahead-of-matter.js register row. (Milestone 6 phase 27.)
+- **AirQuality accepts a host value whose feature is off.** chip refuses a
+  value whose enum member needs an unset feature (Fair, Moderate, VeryPoor,
+  ExtremelyPoor: `AirQualityCluster.cpp:66-74` at `6170af84`,
+  CONSTRAINT_ERROR); the Go projection in `cluster/measurement` stores what
+  the host gives. Part of the host-value conformance check named under
+  "field conformance on the host's own values" (phase 21d); owner decision
+  2026-10-27: milestone 6 wave 27-B. (Milestone 6 phase 27.)
 - **The device-side BDX responder takes no per-transfer MRP delay.**
   `TransferOptions.AdditionalMrpDelay` (matter.js `bdxAdditionalMrpDelay`)
   is computed by the update manager but `node`'s BDX responder has no port

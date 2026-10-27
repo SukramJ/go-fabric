@@ -55,7 +55,7 @@ sonst chips, mit Register-Zeile.
 | **26-C Sensorik-Rest** | `AmbientContextSensing` nach chip (944 + Delegate, Tests 1 153); `WaterTankLevelMonitoring` bleibt generiert (keine Quelle hat Logik → `by_design`-Eintrag, Vergleichszeile ✅) | chip | mit 26-B |
 | **26-D Joint Fabric** | `JointFabricAdministrator` (chip 491 + `JCMCommissionee` 510, Test 843) und `JointFabricDatastore` (chip 795) nach chip, hinter Ports; Gerätetyp JointFabricAdministrator; Parität gegen chips Unit-Tests, kein Ökosystem-Test möglich (Owner-Entscheidung 0.3, 2026-10-27; ADR 0020 Stufe 6c damit vorgezogen) | chip | `v0.13.9` |
 | **27-A Controller-Rest** | Invoke-Batcher nach matter.js (`ClientInteraction.ts`, 39 Fälle), `Discovery`/`ParallelPaseDiscovery`-Form (4 Dateien), DCL-Vendor-Info-Service (2 Dateien, 952 Zeilen), NOC-Rotation + PQC-Phase-1-Größen (`FabricAuthority.ts:88-99, :181-186`) | matter.js | `v0.13.10` |
-| **27-B Geräte-Rest** | gemeldete Session-Parameter (`node.Config`-Option + Accessor, 77 Zeilen), BDX-MRP-Verzögerung (`TransferOptions.AdditionalMrpDelay`), TEVT (die sieben Thermostat-Events; `ActiveScheduleChange` dann tatsächlich emittiert), Komposita in `devicegen` (VideoDoorbell, FloodlightCamera) | matter.js | `v0.13.11` |
+| **27-B Geräte-Rest** | gemeldete Session-Parameter (`node.Config`-Option + Accessor, 77 Zeilen), BDX-MRP-Verzögerung (`TransferOptions.AdditionalMrpDelay`), TEVT (die sieben Thermostat-Events; `ActiveScheduleChange` dann tatsächlich emittiert), Komposita in `devicegen` (VideoDoorbell, FloodlightCamera), TimeSynchronization-Features TZ/NTPC/NTPS/TSC nach chip hinter einem Host-Port (Audit 2026-10-27), AirQuality-Host-Wert-Konformität | matter.js | `v0.13.11` |
 | **27-C Sweep** | Vergleichstabelle, Findings-Register, Test-Register, Roadmap-Zeilen 278/279, `docs/certifiability.md`; Gruppen-Multicast gegen einen echten Controller (Owner-Handtest mit Apple Home / chip-tool-Gruppe), ARL bleibt ausgeschlossen | — | **`v0.14.0` schließt M6** |
 
 Jede Welle ist ein Brief mit Port-Form, chip-Zeilen am Harness-Commit
@@ -117,6 +117,12 @@ Netz-/Controller-Welle); ein Release pro gemergter Welle.
   FloodlightCamera) in 27-B; CastingVideoClient bleibt ausgeschlossen.
 - **0.6 DCL-Vendor-Info-Service:** in 27-A portieren (Empfehlung, nicht
   abgefragt).
+- **0.8 Audit der generierten Server (2026-10-27):** jeder Cluster mit
+  chip-Regeln hat schon einen handgeschriebenen Server oder ist eine
+  M6-Welle; modellvollständig bleiben WaterTank, MeterIdentification,
+  ElectricalGridConditions, FixedLabel und die Messcluster
+  (`BD-Matter-GeneratedServerSuffices`). TimeSynchronization-Features und
+  der AirQuality-Wert-Check kommen in 27-B (Findings-Einträge).
 - **0.7 Parallelität:** zwei Opus-Agenten (Kamera-Strang 26-A1→A2→A3 ∥
   Netz-/Controller-Strang 26-B→26a→26-C→26-D→27-A), dann 27-B und 27-C;
   ein Release pro Welle `v0.13.4`–`v0.13.11`, **`v0.14.0` schließt M6**.
