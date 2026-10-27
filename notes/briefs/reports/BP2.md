@@ -106,7 +106,32 @@ its hand-built peripheral (its harness is no `fabrictest` site). Guide:
 
 ## Guards
 
-GUARDS
+Bundle 1 under the guard lock at `819627fb` (HEAD unchanged after):
+
+| Guard | Result |
+| --- | --- |
+| `make ci` | **failed in `lint`**: gocyclo 31 on `cmdPair` (the new flags). Everything before it passed (build, build-32bit, vet, archcheck, apidiff-check, test). Fixed in `990666c8` (the proxy-flag checks moved to `ProxyFlags.check`). |
+| `make race` ×2 | pass, pass |
+| `ble/esphome` `go test -race -count=1 ./...` | pass |
+| `go test ./script/...` | pass |
+| `make reachability-check` (snapshot `819627fb`: unreached 3, unchanged) | pass |
+| `make cite-check` (`cite-report` snapshot `819627fb`: 5929 → 5931 citations, hard errors 0) | pass |
+| `make archcheck` | pass |
+| `mkdocs build --strict` | pass |
+
+Bundle 2 at `990666c8`, the rest of `make ci` after `lint`:
+
+| Guard | Result |
+| --- | --- |
+| `make lint` | pass |
+| `make cover-check` | **failed once**: `controller/ble` `TestBleScannerTimeoutEndsOneDiscovery` hung for the 10-minute test timeout under the coverage run (stuck in `Scanner.wait`, `scanner.go:442`). The package is untouched by this wave; the test passed in `make ci`'s `test` and in both race runs, and 200 runs of it with `-cover` pass. Re-run under the lock: pass. |
+| `make bluez-check`, `make esphome-check` | pass |
+| `go test ./examples/reference-controller/...` | pass |
+
+Before the bundles: `client/discovery` `TestBrowse*` `-race -count=3`, the
+`ble/esphome` discovery and commissioner tests `-race -count=3`, golangci-lint
+on the nested module and the touched main-module packages (0 issues).
+Skipped: chip-tool (no device-side change).
 
 ## Differences from the brief
 
@@ -156,6 +181,11 @@ GUARDS
    failure; S6 opens the central per pairing, as the CLI does.
 3. Dependabot for `ble/bluez` and `ble/esphome` (BP1 Q3 again)?
    Recommendation: add both in a CI-only change.
+4. `controller/ble`'s `TestBleScannerTimeoutEndsOneDiscovery` hung once
+   under `make cover-check` on the loaded host (untouched package; 200
+   isolated runs pass). Record it in the findings register as a flake to
+   chase? Recommendation: yes, a fake-clock ordering race in
+   `Scanner.wait` is the likely cause.
 
 ## by_design candidate
 
