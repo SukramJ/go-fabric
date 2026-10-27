@@ -11,6 +11,7 @@ import (
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	"github.com/SukramJ/go-fabric/contract"
+	"github.com/SukramJ/go-fabric/thread"
 )
 
 // State is the typed state of the ThreadBorderRouterManagement cluster: one field per attribute
@@ -201,6 +202,31 @@ func (s *Server) HandleSetPendingDatasetRequest(fn func(ctx context.Context, req
 	return spec.HandleOn(s.Underlying(), CmdSetPendingDatasetRequest, fn)
 }
 
+// BorderRouter is the Thread Border Router the kit's
+// ThreadBorderRouterManagement and ThreadNetworkDiagnostics servers
+// manage and read, connectedhomeip's
+// ThreadBorderRouterManagementDelegate in Go (cluster/threadbr
+// BorderRouter; thread/otbr adapts an OpenThread Border Router's
+// REST API to it). Dataset returns the active or the pending
+// dataset, nil when there is none; SetActiveDataset returns once the
+// border router is attached to the network or ctx ends, which the
+// fail-safe's expiry does; CommitActiveDataset and
+// RevertActiveDataset run at CommissioningComplete and at the
+// fail-safe's expiry; Diagnostics is the node's diagnostics. Without
+// one the generated servers serve both clusters.
+type BorderRouter interface {
+	BorderRouterName() string
+	BorderAgentID(ctx context.Context) ([]byte, error)
+	ThreadVersion(ctx context.Context) (uint16, error)
+	InterfaceEnabled(ctx context.Context) (bool, error)
+	Dataset(ctx context.Context, pending bool) (dataset []byte, err error)
+	SetActiveDataset(ctx context.Context, dataset []byte) error
+	CommitActiveDataset(ctx context.Context) error
+	RevertActiveDataset(ctx context.Context) error
+	SetPendingDataset(ctx context.Context, dataset []byte) error
+	Diagnostics(ctx context.Context) (thread.NodeDiagnostics, error)
+}
+
 // Declare is the declaration of the ThreadBorderRouterManagement cluster on a device:
 // device.New<Type> and device.FromSpec take it, and every field is
 // optional — the zero value mounts the cluster (an optional one too)
@@ -231,6 +257,8 @@ type Declare struct {
 	// HandleSetPendingDatasetRequest handles the SetPendingDatasetRequest command in place of the server
 	// (Server.HandleSetPendingDatasetRequest), inline; an optional command it handles is accepted.
 	HandleSetPendingDatasetRequest func(ctx context.Context, req SetPendingDatasetRequestRequest) (struct{}, error)
+	// BorderRouter is the host port the kit's server runs on ([BorderRouter]).
+	BorderRouter BorderRouter
 	// HostServer is the host's own server for the cluster, mounted in
 	// place of the kit's — also for a cluster the device type does not
 	// list. The hooks above go on it; Initial, Features and the ports are
