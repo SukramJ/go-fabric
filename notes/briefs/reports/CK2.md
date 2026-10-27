@@ -92,7 +92,19 @@ None. Every `Host` signature names def types: the kit's types are already aliase
 
 ## Guards
 
-Filled in from the bundle summary (HEAD, one exit line per guard): see the PR description.
+Run under `flock guards.lock`.
+
+**Bundle 1, at `4ce0bc9c`**
+- `make reachability` 0, `cite-report` 0 (no drift).
+- `make ci` 2: one revive finding in the new test (`if-return`), fixed in `d82649da`. Everything before lint passed: build, 32-bit, vet, archcheck, apidiff-check, test.
+- `make race` 0 twice, `go test ./script/...` 0, `mkdocs build --strict` 0.
+
+**Bundle 2, at `d82649da`** (the ci rest)
+- `lint`, `cover-check`, `bluez-check` and `esphome-check` all 0.
+- `reachability-check` 2: the snapshot's line numbers had moved with the fix. Regenerated in `943e4ef1`, then `reachability-check` 0.
+- Unreached stays 3, so the ratchet is unchanged.
+
+**Not run:** chip-tool. Neither the daemon's composition nor any FeatureMap moved.
 
 ## Differences
 
