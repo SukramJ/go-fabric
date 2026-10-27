@@ -9197,14 +9197,14 @@
       "identifier": "ThreadNetwork",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/netinfra/threaddir.go",
-      "line": 31
+      "line": 30
     },
     {
       "package": "cluster/netinfra",
       "identifier": "ThreadNetworkStore",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/netinfra/threaddir.go",
-      "line": 45
+      "line": 44
     },
     {
       "package": "cluster/onoff",
