@@ -211,11 +211,11 @@ type Config struct {
 	RequestConsent func(ctx context.Context, p Peer, req QueryImageRequest, d AvailableDetails) (ConsentState, time.Duration)
 
 	// OnUpdateAvailable learns an update a node has no consent for
-	// (events.updateAvailable, :1351-1352); the host grants it with
+	// (events.updateAvailable, :1421-1422); the host grants it with
 	// AddUpdateConsent.
 	OnUpdateAvailable func(p Peer, info SoftwareUpdateInfo)
 	// OnUpdateApplying, OnUpdateDone and OnUpdateFailed are
-	// events.updateApplying, updateDone and updateFailed (:1354-1369).
+	// events.updateApplying, updateDone and updateFailed (:1424-1438); [Manager.Observe] reports them too.
 	OnUpdateApplying, OnUpdateDone, OnUpdateFailed func(p Peer)
 	// OnStatus observes each status the provider reports for a node.
 	OnStatus func(p Peer, status Status, version uint32)
@@ -273,6 +273,8 @@ type Manager struct {
 	announcements          *announcements
 	closed                 bool
 	work                   sync.WaitGroup
+	// obs are the observers of [Manager.Observe], with their own lock.
+	obs observers
 }
 
 // New returns the manager over cfg; [Manager.Start] starts it.
@@ -362,6 +364,7 @@ func (m *Manager) Close() {
 		a.close()
 	}
 	m.work.Wait()
+	m.obs.close()
 }
 
 // goWork runs fn on a goroutine Close waits for, unless closed.
@@ -553,6 +556,7 @@ func (m *Manager) onSoftwareVersionChanged(p Peer, newVersion uint32, isStartUp 
 	if done != nil {
 		done(p)
 	}
+	m.emit(UpdateEvent{Kind: UpdateDone, Peer: p, Target: e.Target})
 	m.triggerQueuedUpdate()
 }
 
@@ -586,7 +590,7 @@ func (m *Manager) subscribedAfterApply(p Peer, version uint32) {
 
 // failAppliedLocked is #failAppliedUpdate (:875-880); it unlocks m.mu.
 func (m *Manager) failAppliedLocked(i int) {
-	p := m.queue[i].peer
+	p, target := m.queue[i].peer, m.queue[i].Target
 	m.queue = slices.Delete(m.queue, i, i+1)
 	delete(m.startUpSuppress, p)
 	failed := m.cfg.OnUpdateFailed
@@ -594,6 +598,7 @@ func (m *Manager) failAppliedLocked(i int) {
 	if failed != nil {
 		failed(p)
 	}
+	m.emit(UpdateEvent{Kind: UpdateFailed, Peer: p, Target: target, Err: ErrNotApplied})
 	m.triggerQueuedUpdate()
 }
 
@@ -801,8 +806,24 @@ func (m *Manager) cleanupObsoleteUpdates(ctx context.Context) {
 
 // QueryUpdates checks every node, or only, for updates over the ledgers
 // and — with includeStored — the stored images, and returns the nodes it
-// found one for — queryUpdates (:559-623).
+// found one for — queryUpdates (:559-623). A check the manager ran (it
+// was not suppressed) ends with an [UpdateCheckFinished] event.
 func (m *Manager) QueryUpdates(ctx context.Context, only *client.Node, includeStored bool) ([]PeerUpdate, error) {
+	out, ran, failed := m.queryUpdates(ctx, only, includeStored)
+	if ran {
+		ev := UpdateEvent{Kind: UpdateCheckFinished, Updates: slices.Clone(out), Err: failed}
+		if only != nil {
+			ev.Peer, _ = only.PeerAddress()
+		}
+		m.emit(ev)
+	}
+	return out, nil
+}
+
+// queryUpdates is QueryUpdates; ran is false when the manager was
+// suppressed before the check ended, failed joins the errors of the
+// products whose check failed and was passed over.
+func (m *Manager) queryUpdates(ctx context.Context, only *client.Node, includeStored bool) (_ []PeerUpdate, ran bool, failed error) {
 	type group struct {
 		vid, pid uint16
 		version  uint32
@@ -812,7 +833,7 @@ func (m *Manager) QueryUpdates(ctx context.Context, only *client.Node, includeSt
 	groups := map[string]*group{}
 	for _, n := range m.cfg.Registry.Nodes() {
 		if m.suppressed() {
-			return nil, nil
+			return nil, false, nil
 		}
 		if only != nil && n != only {
 			continue
@@ -832,17 +853,18 @@ func (m *Manager) QueryUpdates(ctx context.Context, only *client.Node, includeSt
 	}
 	if len(groups) == 0 {
 		m.log.Info("ota.manager.no_updatable_nodes")
-		return nil, nil
+		return nil, true, nil
 	}
 	var out []PeerUpdate
 	for _, k := range order {
 		if m.suppressed() {
-			return nil, nil
+			return nil, false, nil
 		}
 		g := groups[k]
 		peers, err := m.checkProductForUpdates(ctx, g.vid, g.pid, g.version, g.targets, includeStored)
 		if err != nil {
 			m.log.Warn("ota.manager.check_failed", slog.Int("vendor_id", int(g.vid)), slog.Int("product_id", int(g.pid)), slog.Any("err", err))
+			failed = errors.Join(failed, err)
 			continue
 		}
 		m.mu.Lock()
@@ -853,7 +875,7 @@ func (m *Manager) QueryUpdates(ctx context.Context, only *client.Node, includeSt
 		}
 		m.mu.Unlock()
 	}
-	return out, nil
+	return out, true, failed
 }
 
 func (m *Manager) suppressed() bool {
@@ -908,8 +930,11 @@ func (m *Manager) checkProductForUpdates(ctx context.Context, vid, pid uint16, v
 				MaxBDXBlockSize: held.MaxBDXBlockSize, BDXAdditionalMrpDelay: held.BDXAdditionalMrpDelay,
 			}, peer: t.peer}, endpoint: t.endpoint}
 			m.queueUpdate(e) //nolint:contextcheck // the queue's work runs on the manager's lifetime
-		} else if fn := m.cfg.OnUpdateAvailable; fn != nil {
-			fn(t.peer, details) // requestConsentForUpdate (:885-887)
+		} else {
+			if fn := m.cfg.OnUpdateAvailable; fn != nil {
+				fn(t.peer, details) // requestConsentForUpdate (:885-887)
+			}
+			m.emit(UpdateEvent{Kind: UpdateAvailable, Peer: t.peer, Target: Target{VendorID: vid, ProductID: pid, TargetSoftwareVersion: info.SoftwareVersion}, Info: details})
 		}
 	}
 	return peers, nil
@@ -1116,6 +1141,7 @@ func (m *Manager) cancelUpdate(p Peer) {
 		m.log.Info("ota.manager.cancel_too_late", slog.String("node", peerString(p)))
 		return
 	}
+	target := m.queue[i].Target
 	m.queue = slices.Delete(m.queue, i, i+1)
 	delete(m.startUpSuppress, p)
 	failed := m.cfg.OnUpdateFailed
@@ -1127,6 +1153,7 @@ func (m *Manager) cancelUpdate(p Peer) {
 	if failed != nil {
 		failed(p)
 	}
+	m.emit(UpdateEvent{Kind: UpdateFailed, Peer: p, Target: target, Err: ErrUpdateCancelled})
 	m.triggerQueuedUpdate()
 }
 
@@ -1177,6 +1204,7 @@ func (m *Manager) AddUpdateConsent(_ context.Context, p Peer, t Target) (bool, e
 	m.mu.Lock()
 	m.consents = append(slices.DeleteFunc(m.consents, func(c consent) bool { return c.peer == p }), consent{Target: t, peer: p})
 	m.mu.Unlock()
+	m.emit(UpdateEvent{Kind: UpdateConsentChanged, Peer: p, Target: t, Consented: true})
 	if !ok {
 		m.log.Info("ota.manager.not_applicable_yet", slog.String("node", peerString(p)))
 		return false, nil
@@ -1199,14 +1227,20 @@ func (m *Manager) HasConsent(p Peer, version uint32) bool {
 // and cancels its update — removeConsent (:1217-1232).
 func (m *Manager) RemoveConsent(p Peer, version uint32) {
 	m.mu.Lock()
+	var removed *Target
 	if i := slices.IndexFunc(m.consents, func(c consent) bool {
 		return c.peer == p && (version == 0 || c.TargetSoftwareVersion == version)
 	}); i >= 0 {
+		t := m.consents[i].Target
+		removed = &t
 		m.consents = slices.Delete(m.consents, i, i+1)
 	} else {
 		m.log.Info("ota.manager.no_consent", slog.String("node", peerString(p)))
 	}
 	m.mu.Unlock()
+	if removed != nil {
+		m.emit(UpdateEvent{Kind: UpdateConsentChanged, Peer: p, Target: *removed})
+	}
 	m.cancelUpdate(p)
 }
 
@@ -1263,6 +1297,7 @@ func (m *Manager) OnStatusChange(p Peer, status Status, version *uint32, applyDe
 		if done != nil {
 			done(p)
 		}
+		m.emit(UpdateEvent{Kind: UpdateDone, Peer: p, Target: e.Target})
 		m.triggerQueuedUpdate()
 	case mattercore.OTAUpdateCancelled:
 		e.reset()
@@ -1282,13 +1317,17 @@ func (m *Manager) OnStatusChange(p Peer, status Status, version *uint32, applyDe
 			e.applyDelay = applyDelay
 		}
 		applying := m.cfg.OnUpdateApplying
+		target := e.Target
 		m.mu.Unlock()
 		if status == mattercore.OTAUpdateApplying {
 			if m.cfg.Armer != nil {
 				m.cfg.Armer.Arm(p, applyDelay)
 			}
-			if !wasApplying && applying != nil {
-				applying(p)
+			if !wasApplying {
+				if applying != nil {
+					applying(p)
+				}
+				m.emit(UpdateEvent{Kind: UpdateApplying, Peer: p, Target: target})
 			}
 		}
 	}
