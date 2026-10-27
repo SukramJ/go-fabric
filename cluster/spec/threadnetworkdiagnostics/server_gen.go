@@ -664,6 +664,21 @@ func (s *Server) EmitNetworkFaultChange(endpoint uint16, data NetworkFaultChange
 	return spec.EmitOn(s.Underlying(), endpoint, EventNetworkFaultChange, data)
 }
 
+// Host is the ThreadNetworkDiagnostics kit server's host methods: the ones Set, Get and
+// the typed handlers do not reach (cluster/threadbr DiagnosticsServer).
+type Host interface {
+	// Refresh reads the border router again and reports what moved.
+	Refresh(ctx context.Context) error
+}
+
+// Host returns the mounted server's host methods when it implements
+// Host — the kit's server does; nil for a server that does not, as the
+// generated one and a host's own (Declare.HostServer) normally do not.
+func (s *Server) Host() Host {
+	h, _ := s.Underlying().(Host)
+	return h
+}
+
 // Declare is the declaration of the ThreadNetworkDiagnostics cluster on a device:
 // device.New<Type> and device.FromSpec take it, and every field is
 // optional — the zero value mounts the cluster (an optional one too)

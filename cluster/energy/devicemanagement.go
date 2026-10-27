@@ -1164,3 +1164,6 @@ func (s *DeviceEnergyManagementServer) SetAttributes(values map[uint32]any) erro
 	}
 	return nil
 }
+
+// The host methods the typed server's Host returns (brief CK-2).
+var _ dem.Host = (*DeviceEnergyManagementServer)(nil)

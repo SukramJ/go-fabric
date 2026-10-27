@@ -157,6 +157,22 @@ func (s *Server) EmitChimeStartedPlaying(endpoint uint16, data ChimeStartedPlayi
 	return spec.EmitOn(s.Underlying(), endpoint, EventChimeStartedPlaying, data)
 }
 
+// Host is the Chime kit server's host methods: the ones Set, Get and
+// the typed handlers do not reach (cluster/camera Chime).
+type Host interface {
+	// SoundsChanged reports a change of the port's installed sounds:
+	// InstalledChimeSounds advances its data version and is reported.
+	SoundsChanged() error
+}
+
+// Host returns the mounted server's host methods when it implements
+// Host — the kit's server does; nil for a server that does not, as the
+// generated one and a host's own (Declare.HostServer) normally do not.
+func (s *Server) Host() Host {
+	h, _ := s.Underlying().(Host)
+	return h
+}
+
 // ChimePort is the device's chime: InstalledChimeSounds lists the
 // sounds it has, read on every read of the attribute (an error fails
 // the read), and PlayChimeSound plays one; an error answers its

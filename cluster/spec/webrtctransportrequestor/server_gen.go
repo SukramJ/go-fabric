@@ -156,6 +156,42 @@ func (s *Server) HandleEnd(fn func(ctx context.Context, req EndRequest) (struct{
 	return spec.HandleOn(s.Underlying(), CmdEnd, fn)
 }
 
+// SessionKey identifies a tracked session. The session id alone is
+// not unique: each provider node allocates its own, so two peers, or
+// one peer on two fabrics, may use the same id at the same time.
+// Mirrors matter.js WebRtcTransportRequestorServer.ts:189-196
+// (SessionKey) and :185-187 (isSameSession).
+type SessionKey struct {
+	ID          uint16
+	FabricIndex uint8
+	PeerNodeID  uint64
+}
+
+// KeyOf is the key of a session.
+func KeyOf(s WebRTCSessionStruct) SessionKey {
+	return SessionKey{ID: s.Id, FabricIndex: s.FabricIndex, PeerNodeID: s.PeerNodeId}
+}
+
+// Host is the WebRtcTransportRequestor kit server's host methods: the ones Set, Get and
+// the typed handlers do not reach (cluster/camera Requestor).
+type Host interface {
+	// UpsertSession registers or updates a session the host initiated
+	// with a peer: a session must be registered before the peer's
+	// signalling for it is accepted, and it appears in CurrentSessions.
+	UpsertSession(session WebRTCSessionStruct) error
+	// RemoveSession stops tracking a session, after the host tore its
+	// stream down; a key no session has changes nothing.
+	RemoveSession(key SessionKey)
+}
+
+// Host returns the mounted server's host methods when it implements
+// Host — the kit's server does; nil for a server that does not, as the
+// generated one and a host's own (Declare.HostServer) normally do not.
+func (s *Server) Host() Host {
+	h, _ := s.Underlying().(Host)
+	return h
+}
+
 // Signal is a signalling command a peer invokes on the requestor
 // (matter.js WebRtcTransportRequestorServer.SignalKind).
 type Signal string

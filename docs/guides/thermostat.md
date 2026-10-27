@@ -140,8 +140,10 @@ The device's own changes come back through `SetLocalTemperature`,
 `SetSystemMode`, `SetOccupiedHeatingSetpoint`, `SetOccupiedCoolingSetpoint`,
 `SetOccupied`, `SetAbsoluteSetpointLimit`, `SetPresets`,
 `SetActivePresetHandle`, `SetTemperatureSetpointHold` and
-`SetThermostatRunningState`, or through the typed server's `Set`. They do
-not call the Sink. A change they store is reported as the host's change
+`SetThermostatRunningState`, the kit server's methods. The typed server's
+`Set` reaches every one of them (a `Patch` with `Presets` goes through
+`SetPresets`), so `thermostatdef` has no `Host`: a host on the facade uses
+`Set`. They do not call the Sink. A change they store is reported as the host's change
 (`contract.OriginHostSet`); LocalTemperature is reported by the
 subscription's own reporting instead. `SetSystemMode`, the setpoint setters
 and the hold and running-state setters log and ignore a value the

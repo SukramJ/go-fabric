@@ -42,6 +42,33 @@ still held there. Each row names the facade route, or the section of
 | `cluster/core` | `SoftwareVersionFromString` (`daemon_matter.go:527`) | `node.SoftwareVersionFromString` |
 | `cluster/core` | `RegulatoryIndoorOutdoor` (`daemon_matter.go:506`) | `node.RegulatoryIndoorOutdoor` for `Commissioning.LocationCapability` |
 
+## Added after v0.13.6: `<cluster>def.Server.Host()`
+
+A host that type-asserts a typed server's `Underlying()` to reach the
+kit server's own methods calls `Host()` instead. `Underlying()` stays, so
+nothing breaks.
+
+| Before | After |
+| --- | --- |
+| `d.WiFiNetworkManagement().Underlying().(*netinfra.WiFiManagementServer).SetNetworkCredentials(…)` | `d.WiFiNetworkManagement().Host().SetNetworkCredentials(…)` |
+| `d.ThreadNetworkDirectory().Underlying().(*netinfra.ThreadDirectoryServer).ReloadNetworks(ctx)` | `d.ThreadNetworkDirectory().Host().ReloadNetworks(ctx)` |
+| `….Underlying().(*energy.EvseServer).SetHardwareState(…)`, `.Close()` | `d.EnergyEvse().Host().SetHardwareState(…)`, `.Close()` |
+| `….Underlying().(*energy.DeviceEnergyManagementServer).Close()` | `d.DeviceEnergyManagement().Host().Close()` |
+| a kit server's setter the typed `Set` reaches (`thermo.ThermostatServer.SetPresets`, `appliance.MicrowaveServer.SetCookTime`, …) | `Set(Patch{…})` |
+| `….Underlying().(*core.Binding).Entries()` | `d.Binding().Host().Entries()` |
+| `….Underlying().(contract.SwitchPositionSink).SetRawPosition(p)` | `d.Switch().Host().SetRawPosition(p)` |
+
+Two signatures change with it (breaks):
+
+| Symbol | Route |
+| --- | --- |
+| `core.Binding.Entries() []core.TargetStruct` | returns `[]bindingdef.TargetStruct` (pointer fields: nil is absent); `core.TargetFromDef(t)` gives the presence-flag form with `Key`, `HasNode`, … |
+| `core.Binding.OnChange(func(uint8, added, removed []core.TargetStruct))` | `OnChange(func(uint8, added, removed []bindingdef.TargetStruct))` |
+| `camera.SessionKey`, `camera.KeyOf` | `webrtctransportrequestordef.SessionKey`, `webrtctransportrequestordef.KeyOf`; `Requestor.RemoveSession` takes the def type |
+
+The [Host ports](ports.md#clusterdefhost-the-kit-servers-host-methods)
+guide lists every `Host`.
+
 ## Removed in the next release: `controller/thread`
 
 | Symbol | Route |

@@ -35,22 +35,6 @@ type (
 	Signal = wrdef.Signal
 )
 
-// SessionKey identifies a tracked session. The session id alone is not
-// unique: each provider node allocates its own, so two peers, or one peer
-// on two fabrics, may use the same id at the same time. Mirrors matter.js
-// WebRtcTransportRequestorServer.ts:189-196 (SessionKey) and :185-187
-// (isSameSession).
-type SessionKey struct {
-	ID          uint16
-	FabricIndex uint8
-	PeerNodeID  uint64
-}
-
-// KeyOf is the key of a session.
-func KeyOf(s WebRTCSession) SessionKey {
-	return SessionKey{ID: s.Id, FabricIndex: s.FabricIndex, PeerNodeID: s.PeerNodeId}
-}
-
 // RequestorConfig carries the construction parameters of a [Requestor].
 type RequestorConfig struct {
 	// Port receives the signalling; nil drops it (the commands are still
@@ -134,7 +118,7 @@ func (r *Requestor) Sessions() []WebRTCSession {
 // UpsertSession registers or updates a session the host initiated with a
 // peer: a session must be registered before the peer's signalling for it
 // is accepted, and it appears in CurrentSessions. A session with the same
-// [SessionKey] is replaced in place. The deprecated VideoStreamId and
+// [wrdef.SessionKey] is replaced in place. The deprecated VideoStreamId and
 // AudioStreamId carry the first entry of VideoStreams and AudioStreams,
 // null without one. The table is held to the attribute's schema; a
 // session it refuses is an error and changes nothing. Mirrors matter.js
@@ -146,7 +130,7 @@ func (r *Requestor) UpsertSession(session WebRTCSession) error {
 	enriched.VideoStreamId = firstStream(session.VideoStreams) // :104
 	enriched.AudioStreamId = firstStream(session.AudioStreams) // :105
 	return r.change(contract.OriginHostSet, func(sessions []WebRTCSession) ([]WebRTCSession, bool) {
-		idx := slices.IndexFunc(sessions, func(s WebRTCSession) bool { return KeyOf(s) == KeyOf(session) })
+		idx := slices.IndexFunc(sessions, func(s WebRTCSession) bool { return wrdef.KeyOf(s) == wrdef.KeyOf(session) })
 		if idx == -1 { // :109-110
 			return append(sessions, enriched), true
 		}
@@ -158,18 +142,18 @@ func (r *Requestor) UpsertSession(session WebRTCSession) error {
 // RemoveSession stops tracking a session, after the host tore its stream
 // down; a key no session has changes nothing. Mirrors matter.js
 // WebRtcTransportRequestorServer.ts:116-122.
-func (r *Requestor) RemoveSession(key SessionKey) {
+func (r *Requestor) RemoveSession(key wrdef.SessionKey) {
 	_ = r.change(contract.OriginHostSet, func(sessions []WebRTCSession) ([]WebRTCSession, bool) {
 		return removeKey(sessions, key)
 	})
 }
 
 // removeKey drops the session of key; false when no session has it.
-func removeKey(sessions []WebRTCSession, key SessionKey) ([]WebRTCSession, bool) {
-	if !slices.ContainsFunc(sessions, func(s WebRTCSession) bool { return KeyOf(s) == key }) {
+func removeKey(sessions []WebRTCSession, key wrdef.SessionKey) ([]WebRTCSession, bool) {
+	if !slices.ContainsFunc(sessions, func(s WebRTCSession) bool { return wrdef.KeyOf(s) == key }) {
 		return sessions, false
 	}
-	return slices.DeleteFunc(sessions, func(s WebRTCSession) bool { return KeyOf(s) == key }), true
+	return slices.DeleteFunc(sessions, func(s WebRTCSession) bool { return wrdef.KeyOf(s) == key }), true
 }
 
 // firstStream is a stream list's first id, null for none (matter.js
@@ -347,7 +331,7 @@ func (r *Requestor) end(ctx context.Context, fields any) (any, error) {
 	if err != nil {
 		return nil, err
 	}
-	key := KeyOf(session)
+	key := wrdef.KeyOf(session)
 	_ = r.change(contract.OriginCommand, func(sessions []WebRTCSession) ([]WebRTCSession, bool) {
 		return removeKey(sessions, key)
 	})
@@ -369,9 +353,9 @@ func (r *Requestor) findSessionStrict(ctx context.Context, signal Signal, id uin
 		return WebRTCSession{}, spec.Errorf(im.StatusFailure, "WebRtcTransportRequestor: %s needs a peer's node session", signal)
 	}
 	node, _ := im.SubjectFromContext(ctx)
-	key := SessionKey{ID: id, FabricIndex: fabric, PeerNodeID: node}
+	key := wrdef.SessionKey{ID: id, FabricIndex: fabric, PeerNodeID: node}
 	r.mu.Lock()
-	idx := slices.IndexFunc(r.sessions, func(s WebRTCSession) bool { return KeyOf(s) == key })
+	idx := slices.IndexFunc(r.sessions, func(s WebRTCSession) bool { return wrdef.KeyOf(s) == key })
 	var session WebRTCSession
 	if idx >= 0 {
 		session = r.sessions[idx]
@@ -385,3 +369,6 @@ func (r *Requestor) findSessionStrict(ctx context.Context, signal Signal, id uin
 	}
 	return session, nil
 }
+
+// The host methods the typed server's Host returns (brief CK-2).
+var _ wrdef.Host = (*Requestor)(nil)

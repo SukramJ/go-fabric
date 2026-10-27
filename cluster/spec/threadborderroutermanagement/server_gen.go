@@ -202,6 +202,22 @@ func (s *Server) HandleSetPendingDatasetRequest(fn func(ctx context.Context, req
 	return spec.HandleOn(s.Underlying(), CmdSetPendingDatasetRequest, fn)
 }
 
+// Host is the ThreadBorderRouterManagement kit server's host methods: the ones Set, Get and
+// the typed handlers do not reach (cluster/threadbr ManagementServer).
+type Host interface {
+	// Refresh reads the border router again and reports what moved;
+	// the host schedules it.
+	Refresh(ctx context.Context) error
+}
+
+// Host returns the mounted server's host methods when it implements
+// Host — the kit's server does; nil for a server that does not, as the
+// generated one and a host's own (Declare.HostServer) normally do not.
+func (s *Server) Host() Host {
+	h, _ := s.Underlying().(Host)
+	return h
+}
+
 // BorderRouter is the Thread Border Router the kit's
 // ThreadBorderRouterManagement and ThreadNetworkDiagnostics servers
 // manage and read, connectedhomeip's

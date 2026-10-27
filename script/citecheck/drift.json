@@ -64,7 +64,7 @@
   },
   {
     "file": "binding/manager.go",
-    "line": 82,
+    "line": 83,
     "citation": "BindingManager.ts:333",
     "resolved": "packages/node/src/behaviors/binding/BindingManager.ts",
     "identifier": "forAddress",
@@ -73,7 +73,7 @@
   },
   {
     "file": "binding/manager.go",
-    "line": 427,
+    "line": 428,
     "citation": "BindingManager.ts:147-157",
     "resolved": "packages/node/src/behaviors/binding/BindingManager.ts",
     "identifier": "sourceEndpoint",
@@ -82,7 +82,7 @@
   },
   {
     "file": "binding/manager.go",
-    "line": 506,
+    "line": 507,
     "citation": "BindingManager.ts:513-520",
     "resolved": "packages/node/src/behaviors/binding/BindingManager.ts",
     "identifier": "#scheduleGroupRecheck",

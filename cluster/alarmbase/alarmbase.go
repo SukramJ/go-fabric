@@ -513,3 +513,10 @@ type statusError struct {
 
 func (e statusError) Error() string                   { return e.msg }
 func (e statusError) MatterStatusCode() im.StatusCode { return e.status }
+
+// The host methods the typed server's Host returns (brief CK-2).
+var (
+	_ dwa.Host = (*Server)(nil)
+	_ rfa.Host = (*Server)(nil)
+	_ tma.Host = (*Server)(nil)
+)

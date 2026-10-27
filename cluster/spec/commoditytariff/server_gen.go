@@ -292,6 +292,24 @@ func (s *Server) HandleGetDayEntry(fn func(ctx context.Context, req GetDayEntryR
 	return spec.HandleOn(s.Underlying(), CmdGetDayEntry, fn)
 }
 
+// Host is the CommodityTariff kit server's host methods: the ones Set, Get and
+// the typed handlers do not reach (cluster/energy CommodityTariffServer).
+type Host interface {
+	// SyncTime is chip's time poll: a delayed tariff whose StartDate
+	// has come is committed, and the current day, day entry and
+	// tariff components are derived again at the server's clock. The
+	// server runs it itself with a SyncInterval.
+	SyncTime() error
+}
+
+// Host returns the mounted server's host methods when it implements
+// Host — the kit's server does; nil for a server that does not, as the
+// generated one and a host's own (Declare.HostServer) normally do not.
+func (s *Server) Host() Host {
+	h, _ := s.Underlying().(Host)
+	return h
+}
+
 // TimeSource is the time the kit's CommodityTariff server reads the
 // current day and day entry from, in place of the node's clock — a
 // host that runs the tariff on its own time, as chip's

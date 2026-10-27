@@ -297,3 +297,6 @@ func (s *WiFiManagementServer) MatterAcceptedCommands() []uint32 {
 func (s *WiFiManagementServer) MatterGeneratedCommands() []uint32 {
 	return s.srv.MatterGeneratedCommands()
 }
+
+// The host methods the typed server's Host returns (brief CK-2).
+var _ wdef.Host = (*WiFiManagementServer)(nil)

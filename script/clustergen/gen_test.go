@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"flag"
+	"maps"
 	"os"
 	"path/filepath"
 	"slices"
@@ -295,5 +296,37 @@ func TestLiterals(t *testing.T) {
 	}
 	if featureTitle(&feature{Name: "N"}) != "N" {
 		t.Error("featureTitle")
+	}
+}
+
+// TestEveryHostIsGenerated: each hosts entry names a snapshot cluster
+// with a generated server, whose server_gen.go declares the Host
+// interface and the typed server's Host accessor.
+func TestEveryHostIsGenerated(t *testing.T) {
+	t.Parallel()
+	snap := testSnapshot(t)
+	for _, name := range slices.Sorted(maps.Keys(hosts)) {
+		o, err := generate(snap, name)
+		if err != nil {
+			t.Fatalf("%s: %v", name, err)
+		}
+		src := string(o.Server)
+		if !strings.Contains(src, "type Host interface {") || !strings.Contains(src, "func (s *Server) Host() Host {") {
+			t.Errorf("%s: server_gen.go has no Host", name)
+		}
+	}
+}
+
+// TestDefinitionOnlyHostRefused: a definition-only cluster has no server
+// to carry a Host. Not parallel: it adds a hosts entry for its run.
+//
+//nolint:paralleltest // it changes the hosts table for its run
+func TestDefinitionOnlyHostRefused(t *testing.T) {
+	snap := testSnapshot(t)
+	name := definitionOnly[0]
+	hosts[name] = hostDecl{}
+	defer delete(hosts, name)
+	if _, err := generate(snap, name); err == nil || !strings.Contains(err.Error(), "has a Host") {
+		t.Errorf("%s: %v, want the Host refused", name, err)
 	}
 }

@@ -1436,3 +1436,6 @@ func (s *DoorLockServer) OnMatterValueChanged(cb func()) (unsubscribe func()) {
 		}
 	})
 }
+
+// The host methods the typed server's Host returns (brief CK-2).
+var _ lockdef.Host = (*DoorLockServer)(nil)

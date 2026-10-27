@@ -570,3 +570,6 @@ func (s *ManagementServer) MatterAcceptedCommands() []uint32 {
 func (s *ManagementServer) MatterGeneratedCommands() []uint32 {
 	return s.srv.MatterGeneratedCommands()
 }
+
+// The host methods the typed server's Host returns (brief CK-2).
+var _ tbrm.Host = (*ManagementServer)(nil)

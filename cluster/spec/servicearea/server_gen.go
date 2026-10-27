@@ -187,6 +187,26 @@ func (s *Server) HandleSkipArea(fn func(ctx context.Context, req SkipAreaRequest
 	return spec.HandleOn(s.Underlying(), CmdSkipArea, fn)
 }
 
+// Host is the ServiceArea kit server's host methods: the ones Set, Get and
+// the typed handlers do not reach (cluster/servicearea Server).
+type Host interface {
+	// RemoveSupportedAreasEntry removes an area and everything that
+	// names it: it leaves SelectedAreas and Progress, and CurrentArea
+	// becomes null when it was the area.
+	RemoveSupportedAreasEntry(areaID uint32)
+	// RemoveSupportedMapsEntry removes a map and the first area that
+	// lies on it.
+	RemoveSupportedMapsEntry(mapID uint32)
+}
+
+// Host returns the mounted server's host methods when it implements
+// Host — the kit's server does; nil for a server that does not, as the
+// generated one and a host's own (Declare.HostServer) normally do not.
+func (s *Server) Host() Host {
+	h, _ := s.Underlying().(Host)
+	return h
+}
+
 // Selector decides a SelectAreas request whose areas are all
 // supported (areas without duplicates): a non-Success status is
 // answered as is and changes nothing, an error answers FAILURE

@@ -123,6 +123,22 @@ func (s *Server) OnWrite(fn func(ctx context.Context, next State, attrID uint32)
 	return spec.OnWriteOf(s.Underlying(), fn)
 }
 
+// Host is the EcosystemInformation kit server's host methods: the ones Set, Get and
+// the typed handlers do not reach (cluster/core EcosystemInformation).
+type Host interface {
+	// DirectoryChanged tells the server the host's directory moved:
+	// DeviceDirectory and LocationDirectory change.
+	DirectoryChanged()
+}
+
+// Host returns the mounted server's host methods when it implements
+// Host — the kit's server does; nil for a server that does not, as the
+// generated one and a host's own (Declare.HostServer) normally do not.
+func (s *Server) Host() Host {
+	h, _ := s.Underlying().(Host)
+	return h
+}
+
 // Declare is the declaration of the EcosystemInformation cluster on a device:
 // device.New<Type> and device.FromSpec take it, and every field is
 // optional — the zero value mounts the cluster (an optional one too)

@@ -249,6 +249,35 @@ func (s *Server) HandleDptzRelativeMove(fn func(ctx context.Context, req DptzRel
 	return spec.HandleOn(s.Underlying(), CmdDptzRelativeMove, fn)
 }
 
+// Host is the CameraAvSettingsUserLevelManagement kit server's host methods: the ones Set, Get and
+// the typed handlers do not reach (cluster/camera AvSettings).
+type Host interface {
+	// AddMoveCapableVideoStream adds an allocated stream with its
+	// default viewport to DPTZStreams.
+	AddMoveCapableVideoStream(videoStreamID uint16, viewport ViewportStruct)
+	// UpdateMoveCapableVideoStream sets a known stream's viewport; an
+	// unknown stream changes nothing.
+	UpdateMoveCapableVideoStream(videoStreamID uint16, viewport ViewportStruct)
+	// UpdateMoveCapableVideoStreams sets every stream's viewport, after
+	// the device's default viewport changed.
+	UpdateMoveCapableVideoStreams(viewport ViewportStruct)
+	// RemoveMoveCapableVideoStream removes a deallocated stream; an
+	// unknown one changes nothing.
+	RemoveMoveCapableVideoStream(videoStreamID uint16)
+	// PhysicalMovementComplete reports the end of the movement a
+	// command started: on success (nil) the target becomes
+	// MPTZPosition; either way MovementState returns to Idle.
+	PhysicalMovementComplete(err error)
+}
+
+// Host returns the mounted server's host methods when it implements
+// Host — the kit's server does; nil for a server that does not, as the
+// generated one and a host's own (Declare.HostServer) normally do not.
+func (s *Server) Host() Host {
+	h, _ := s.Underlying().(Host)
+	return h
+}
+
 // MechanicalPTZ moves the camera (MPAN, MTILT, MZOOM) to a target
 // the kit's server validated: it starts the movement and returns,
 // and the host reports the end through the server's

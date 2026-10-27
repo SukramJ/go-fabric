@@ -27,11 +27,11 @@ type changeRecorder struct {
 	got []bindingChange
 }
 
-func (r *changeRecorder) fn(fabric uint8, added, removed []core.TargetStruct) {
-	keys := func(l []core.TargetStruct) []string {
+func (r *changeRecorder) fn(fabric uint8, added, removed []bindingdef.TargetStruct) {
+	keys := func(l []bindingdef.TargetStruct) []string {
 		out := make([]string, 0, len(l))
 		for _, t := range l {
-			out = append(out, t.Key())
+			out = append(out, core.TargetFromDef(t).Key())
 		}
 		return out
 	}
@@ -121,7 +121,7 @@ func TestBindingOnChange(t *testing.T) {
 	if got := r.take(); len(got) != 0 {
 		t.Fatalf("a refused write reported %+v", got)
 	}
-	if got := b.Entries(); len(got) != 1 || got[0].Key() != "1/2//3/6" {
+	if got := coreEntries(b); len(got) != 1 || got[0].Key() != "1/2//3/6" {
 		t.Fatalf("entries after refused writes %+v", got)
 	}
 	stop()
@@ -157,7 +157,7 @@ func TestBindingFabricScopedWrite(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := []string{"2//7//", "1/4//1/"}
-	entries := b.Entries()
+	entries := coreEntries(b)
 	got := make([]string, 0, len(entries))
 	for _, e := range entries {
 		got = append(got, e.Key())
@@ -207,7 +207,7 @@ func TestBindingGeneratedValue(t *testing.T) {
 	if err := b.MatterWrite(fabricCtx(4), 0, []bindingdef.TargetStruct{{Node: &node, Endpoint: &ep, Cluster: &cl}}); err != nil {
 		t.Fatal(err)
 	}
-	if got := b.Entries(); len(got) != 1 || got[0] != (core.TargetStruct{Node: 2, Endpoint: 1, Cluster: 6, FabricIndex: 4}) {
+	if got := coreEntries(b); len(got) != 1 || got[0] != (core.TargetStruct{Node: 2, Endpoint: 1, Cluster: 6, FabricIndex: 4}) {
 		t.Fatalf("entries %+v", got)
 	}
 	zero := uint16(0)
@@ -236,7 +236,7 @@ func TestBindingRemoveFabric(t *testing.T) {
 	if got := r.take(); !slices.EqualFunc(got, []bindingChange{{1, nil, []string{"1/2//1/"}}}, eqChange) {
 		t.Fatalf("changes %+v", got)
 	}
-	if got := b.Entries(); len(got) != 1 || got[0].FabricIndex != 2 {
+	if got := coreEntries(b); len(got) != 1 || got[0].FabricIndex != 2 {
 		t.Fatalf("entries %+v", got)
 	}
 }
@@ -289,4 +289,18 @@ func TestBindingOrigins(t *testing.T) {
 	want("host set", contract.OriginHostSet)
 	b.RemoveFabric(2)
 	want("fabric removed", contract.OriginUnknown)
+}
+
+// coreEntries is b's entries in core's presence-flag form, for comparing
+// with core.TargetStruct literals.
+func coreEntries(b interface {
+	Entries() []bindingdef.TargetStruct
+},
+) []core.TargetStruct {
+	entries := b.Entries()
+	out := make([]core.TargetStruct, 0, len(entries))
+	for _, t := range entries {
+		out = append(out, core.TargetFromDef(t))
+	}
+	return out
 }

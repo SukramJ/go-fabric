@@ -19,8 +19,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/cluster/core"
-
 	"github.com/miekg/dns"
 
 	"github.com/SukramJ/go-fabric/bdx/otaimage"
@@ -417,8 +415,8 @@ func TestReferenceController(t *testing.T) {
 	if out := tl.run("bind", nid, strconv.Itoa(int(h.swEP)), "--group", "257"); !strings.Contains(out, "to group 257") {
 		t.Fatalf("bind --group:\n%s", out)
 	}
-	entries := h.sw.Binding().Underlying().(*core.Binding).Entries()
-	if len(entries) != 2 || entries[0].Node != harnessNodeID || entries[0].Endpoint != h.plugEP || entries[1].Group != 257 {
+	entries := h.sw.Binding().Host().Entries()
+	if len(entries) != 2 || entries[0].Node == nil || *entries[0].Node != harnessNodeID || entries[0].Endpoint == nil || *entries[0].Endpoint != h.plugEP || entries[1].Group == nil || *entries[1].Group != 257 {
 		t.Fatalf("switch Binding %+v", entries)
 	}
 

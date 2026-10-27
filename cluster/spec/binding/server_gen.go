@@ -122,6 +122,26 @@ func (s *Server) OnWrite(fn func(ctx context.Context, next State, attrID uint32)
 	return spec.OnWriteOf(s.Underlying(), fn)
 }
 
+// Host is the Binding kit server's host methods: the ones Set, Get and
+// the typed handlers do not reach (cluster/core Binding).
+type Host interface {
+	// Entries returns every fabric's entries, in list order.
+	Entries() []TargetStruct
+	// OnChange registers fn to learn, after each committed write, the
+	// entries one fabric gained (added) and lost (removed), once per
+	// fabric whose entries changed; it returns the function that
+	// removes the registration.
+	OnChange(fn func(fabricIndex uint8, added, removed []TargetStruct)) (stop func())
+}
+
+// Host returns the mounted server's host methods when it implements
+// Host — the kit's server does; nil for a server that does not, as the
+// generated one and a host's own (Declare.HostServer) normally do not.
+func (s *Server) Host() Host {
+	h, _ := s.Underlying().(Host)
+	return h
+}
+
 // Declare is the declaration of the Binding cluster on a device:
 // device.New<Type> and device.FromSpec take it, and every field is
 // optional — the zero value mounts the cluster (an optional one too)

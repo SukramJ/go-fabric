@@ -204,7 +204,7 @@ func TestDemTriggers(t *testing.T) {
 		t.Fatal(err)
 	}
 	d := e.dem.server()
-	defer d.Underlying().(*energy.DeviceEnergyManagementServer).Close()
+	defer d.Host().Close()
 	invoke := func(cmd uint32, fields any) error {
 		_, err := d.Underlying().MatterInvoke(context.Background(), cmd, fields)
 		return err

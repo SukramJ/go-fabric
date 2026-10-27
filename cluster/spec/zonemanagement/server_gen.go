@@ -223,6 +223,25 @@ func (s *Server) EmitZoneStopped(endpoint uint16, data ZoneStoppedEvent) error {
 	return spec.EmitOn(s.Underlying(), endpoint, EventZoneStopped, data)
 }
 
+// Host is the ZoneManagement kit server's host methods: the ones Set, Get and
+// the typed handlers do not reach (cluster/camera Zones).
+type Host interface {
+	// ZoneTriggered emits the ZoneTriggered event the host reports for
+	// a zone, under the zone's trigger control.
+	ZoneTriggered(zoneID uint16, reason ZoneEventTriggeredReasonEnum) error
+	// ZoneStopped emits the ZoneStopped event the host reports for a
+	// zone.
+	ZoneStopped(zoneID uint16, reason ZoneEventStoppedReasonEnum) error
+}
+
+// Host returns the mounted server's host methods when it implements
+// Host — the kit's server does; nil for a server that does not, as the
+// generated one and a host's own (Declare.HostServer) normally do not.
+func (s *Server) Host() Host {
+	h, _ := s.Underlying().(Host)
+	return h
+}
+
 // ZonePort is the camera's zone and trigger store (cluster/camera
 // Zones, after connectedhomeip's ZoneManagement Delegate): the kit's
 // server validates a zone (its constraints, the vertex bounds,

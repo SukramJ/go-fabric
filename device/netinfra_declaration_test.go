@@ -52,9 +52,9 @@ func TestNetworkInfrastructureManagerDeclaresTheNetinfraServers(t *testing.T) {
 		t.Errorf("PreferredExtendedPanId %v, want %X", st.PreferredExtendedPanId, extPanID)
 	}
 
-	wifi, ok := d.WiFiNetworkManagement().Underlying().(*netinfra.WiFiManagementServer)
-	if !ok {
-		t.Fatalf("WiFiNetworkManagement is %T", d.WiFiNetworkManagement().Underlying())
+	wifi := d.WiFiNetworkManagement().Host()
+	if wifi == nil {
+		t.Fatalf("WiFiNetworkManagement is %T, no Host", d.WiFiNetworkManagement().Underlying())
 	}
 	if err := wifi.SetNetworkCredentials([]byte("home"), []byte("password123")); err != nil {
 		t.Fatal(err)

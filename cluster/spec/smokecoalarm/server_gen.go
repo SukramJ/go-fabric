@@ -305,6 +305,23 @@ func (s *Server) EmitAllClear(endpoint uint16, data AllClearEvent) error {
 	return spec.EmitOn(s.Underlying(), endpoint, EventAllClear, data)
 }
 
+// Host is the SmokeCoAlarm kit server's host methods: the ones Set, Get and
+// the typed handlers do not reach (cluster/alarm Server).
+type Host interface {
+	// Refresh reads the StateSource and emits the events its change
+	// since the previous Refresh calls for — for a source that is no
+	// contract.ChangeNotifier.
+	Refresh()
+}
+
+// Host returns the mounted server's host methods when it implements
+// Host — the kit's server does; nil for a server that does not, as the
+// generated one and a host's own (Declare.HostServer) normally do not.
+func (s *Server) Host() Host {
+	h, _ := s.Underlying().(Host)
+	return h
+}
+
 // SelfTester is a StateSource that runs the self-test: SelfTest starts
 // it and returns; the source then reports TestInProgress until it ends.
 type SelfTester interface {

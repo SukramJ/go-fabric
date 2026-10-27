@@ -56,7 +56,7 @@ type Binding struct {
 // bindingObserver is one [Binding.OnChange] registration; its address
 // identifies it for the stop function.
 type bindingObserver struct {
-	fn func(fabricIndex uint8, added, removed []TargetStruct)
+	fn func(fabricIndex uint8, added, removed []bindingdef.TargetStruct)
 }
 
 // TargetStruct mirrors the Binding cluster's TargetStruct (Matter
@@ -218,7 +218,7 @@ func (b *Binding) MatterClusterID() uint32 { return bindingClusterID }
 func (b *Binding) MatterRead(attrID uint32) (any, bool) {
 	switch attrID {
 	case bindingAttrBinding:
-		return b.Entries(), true
+		return b.entries(), true
 	case cluster.AttrGlobalFeatureMap, cluster.AttrGlobalClusterRevision:
 		return bindingInst.ReadGlobal(attrID)
 	}
@@ -246,13 +246,73 @@ func (b *Binding) MatterReadFiltered(ctx context.Context, attrID uint32) (any, b
 	return out, true
 }
 
-// Entries returns every fabric's entries, in list order, under a copy —
-// what matter.js's BindingServer registers with its manager when it starts
-// (BindingServer.ts:120-126).
-func (b *Binding) Entries() []TargetStruct {
+// Entries returns every fabric's entries, in list order, in the
+// generated form — what matter.js's BindingServer registers with its
+// manager when it starts (BindingServer.ts:120-126). It is
+// bindingdef.Host's.
+func (b *Binding) Entries() []bindingdef.TargetStruct { return defTargets(b.entries()) }
+
+// entries returns every fabric's entries, in list order, under a copy.
+func (b *Binding) entries() []TargetStruct {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
 	return append([]TargetStruct{}, b.bindings...)
+}
+
+// Def returns the entry in the generated form: a field the entry lacks is
+// nil.
+func (t TargetStruct) Def() bindingdef.TargetStruct {
+	d := bindingdef.TargetStruct{FabricIndex: t.FabricIndex}
+	if t.HasNode() {
+		n := t.Node
+		d.Node = &n
+	}
+	if t.HasGroup() {
+		g := t.Group
+		d.Group = &g
+	}
+	if t.HasEndpoint() {
+		e := t.Endpoint
+		d.Endpoint = &e
+	}
+	if t.HasCluster() {
+		c := t.Cluster
+		d.Cluster = &c
+	}
+	return d
+}
+
+// TargetFromDef returns the entry of a generated TargetStruct, the
+// presence flags set for a zero Endpoint or Cluster.
+func TargetFromDef(t bindingdef.TargetStruct) TargetStruct {
+	e := TargetStruct{FabricIndex: t.FabricIndex}
+	if t.Node != nil {
+		e.Node = *t.Node
+	}
+	if t.Group != nil {
+		e.Group = *t.Group
+	}
+	// The flag is set for a zero value only, where it is needed: a
+	// non-zero value is present by itself.
+	if t.Endpoint != nil {
+		e.Endpoint, e.EndpointPresent = *t.Endpoint, *t.Endpoint == 0
+	}
+	if t.Cluster != nil {
+		e.Cluster, e.ClusterPresent = *t.Cluster, *t.Cluster == 0
+	}
+	return e
+}
+
+// defTargets is l in the generated form; nil for nil.
+func defTargets(l []TargetStruct) []bindingdef.TargetStruct {
+	if l == nil {
+		return nil
+	}
+	out := make([]bindingdef.TargetStruct, len(l))
+	for i, t := range l {
+		out[i] = t.Def()
+	}
+	return out
 }
 
 // MatterWrite replaces the bindings list. The value is a []TargetStruct,
@@ -447,22 +507,7 @@ func bindingWriteList(value any, fabric uint8, request bool) ([]TargetStruct, er
 		}
 		out := make([]TargetStruct, 0, len(v))
 		for _, t := range v {
-			e := TargetStruct{FabricIndex: t.FabricIndex}
-			if t.Node != nil {
-				e.Node = *t.Node
-			}
-			if t.Group != nil {
-				e.Group = *t.Group
-			}
-			// The flag is set for a zero value only, where it is needed:
-			// a non-zero value is present by itself.
-			if t.Endpoint != nil {
-				e.Endpoint, e.EndpointPresent = *t.Endpoint, *t.Endpoint == 0
-			}
-			if t.Cluster != nil {
-				e.Cluster, e.ClusterPresent = *t.Cluster, *t.Cluster == 0
-			}
-			out = append(out, e)
+			out = append(out, TargetFromDef(t))
 		}
 		return out, nil
 	default:
@@ -491,8 +536,9 @@ func (e bindingStatusError) MatterStatusCode() im.StatusCode { return e.code }
 // locks. It returns the function that removes the registration. Mirrors
 // the interactionEnd reaction of matter.js's BindingServer, which diffs
 // the list by BindingManager.entryKey and registers the added entries and
-// unregisters the removed ones (BindingServer.ts:127-157).
-func (b *Binding) OnChange(fn func(fabricIndex uint8, added, removed []TargetStruct)) (stop func()) {
+// unregisters the removed ones (BindingServer.ts:127-157). The entries
+// are in the generated form; it is bindingdef.Host's.
+func (b *Binding) OnChange(fn func(fabricIndex uint8, added, removed []bindingdef.TargetStruct)) (stop func()) {
 	if fn == nil {
 		return func() {}
 	}
@@ -516,8 +562,9 @@ func (b *Binding) notify(origin contract.Origin, before, after []TargetStruct) {
 	b.obsMu.Unlock()
 	diffs := diffBindings(before, after)
 	for _, d := range diffs {
+		added, removed := defTargets(d.added), defTargets(d.removed)
 		for _, o := range obs {
-			o.fn(d.fabric, d.added, d.removed)
+			o.fn(d.fabric, added, removed)
 		}
 	}
 	if len(diffs) > 0 {
@@ -594,3 +641,6 @@ func (b *Binding) MatterReportable() []uint32 {
 func (b *Binding) MatterAttributes() []uint32 {
 	return bindingInst.MatterAttributes()
 }
+
+// The host methods the typed server's Host returns (brief CK-2).
+var _ bindingdef.Host = (*Binding)(nil)
