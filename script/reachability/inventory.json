@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 6662,
+  "entry_points": 6675,
   "entry_packages": [
     ".",
     "bdx",
@@ -261,9 +261,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 16242,
-    "reachable": 11480,
-    "whitelisted": 4759,
+    "total_exported": 16275,
+    "reachable": 11503,
+    "whitelisted": 4769,
     "unreachable": 3
   },
   "by_package": [
@@ -20968,6 +20968,20 @@
       "line": 19
     },
     {
+      "package": "controller",
+      "identifier": "PairingPhase",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/controller.go",
+      "line": 525
+    },
+    {
+      "package": "controller",
+      "identifier": "PairingStep",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/controller.go",
+      "line": 521
+    },
+    {
       "package": "controller/attestation",
       "identifier": "FuzzDecodeAttestationElements",
       "reason": "auto-whitelist:pattern=test-file",
@@ -22334,6 +22348,13 @@
     },
     {
       "package": "controller/commissioner",
+      "identifier": "TestFlowProgress",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/commissioner/progress_test.go",
+      "line": 23
+    },
+    {
+      "package": "controller/commissioner",
       "identifier": "TestFlowRearmsBeforeNetworkStep",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/network_test.go",
@@ -22478,6 +22499,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/scan_networks_rejection_parity_matterjs_test.go",
       "line": 24
+    },
+    {
+      "package": "controller/commissioner",
+      "identifier": "TestStepPhaseNames",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/commissioner/progress_test.go",
+      "line": 70
     },
     {
       "package": "controller/commissioner",
@@ -23086,7 +23114,7 @@
       "identifier": "QueryImageRequest",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "controller/softwareupdate/manager.go",
-      "line": 466
+      "line": 469
     },
     {
       "package": "controller/softwareupdate",
@@ -23136,6 +23164,48 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/softwareupdate/manager_parity_matterjs_test.go",
       "line": 155
+    },
+    {
+      "package": "controller/softwareupdate",
+      "identifier": "TestObserveAppliedUpdate",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/softwareupdate/observe_test.go",
+      "line": 64
+    },
+    {
+      "package": "controller/softwareupdate",
+      "identifier": "TestObserveCheckFinished",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/softwareupdate/observe_test.go",
+      "line": 122
+    },
+    {
+      "package": "controller/softwareupdate",
+      "identifier": "TestObserveFailedApply",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/softwareupdate/observe_test.go",
+      "line": 108
+    },
+    {
+      "package": "controller/softwareupdate",
+      "identifier": "TestObserveRemovedConsent",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/softwareupdate/observe_test.go",
+      "line": 87
+    },
+    {
+      "package": "controller/softwareupdate",
+      "identifier": "TestObserveUnsubscribe",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/softwareupdate/observe_test.go",
+      "line": 138
+    },
+    {
+      "package": "controller/softwareupdate",
+      "identifier": "TestUpdateEventKindNames",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/softwareupdate/observe_test.go",
+      "line": 166
     },
     {
       "package": "controller/thread",
