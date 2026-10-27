@@ -6,7 +6,6 @@ package netinfra
 import (
 	"bytes"
 	"context"
-	"encoding/binary"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -19,6 +18,7 @@ import (
 	tdir "github.com/SukramJ/go-fabric/cluster/spec/threadnetworkdirectory"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
+	"github.com/SukramJ/go-fabric/thread"
 )
 
 // ThreadNetworkDirectory (0x0453) after connectedhomeip
@@ -53,15 +53,8 @@ const ExtendedPanIDLen = 8
 
 // maxDatasetLen is the largest operational dataset
 // (ThreadNetworkDirectoryStorage.h:34, kMaxThreadDatasetLen; the AddNetwork
-// field's constraint "max 254").
-const maxDatasetLen = 254
-
-// maxNetworkNameLen is kSizeNetworkName (src/lib/support/
-// ThreadOperationalDataset.h:38).
-const maxNetworkNameLen = 16
-
-// pskcLen is kSizePSKc (ThreadOperationalDataset.h:42).
-const pskcLen = 16
+// field's constraint "max 254"), chip's kSizeOperationalDataset.
+const maxDatasetLen = thread.MaxDatasetLen
 
 // DefaultThreadNetworkCapacity is the capacity of the in-memory store:
 // chip's default CHIP_CONFIG_MAX_THREAD_NETWORK_DIRECTORY_STORAGE_CAPACITY,
@@ -416,126 +409,59 @@ func datasetError(format string, args ...any) error {
 	return fmt.Errorf("netinfra: operational dataset: "+format, args...)
 }
 
-// validDatasetFraming is chip's OperationalDatasetView::IsValid
-// (src/lib/support/ThreadOperationalDataset.cpp:151-164): at most 254
-// bytes, every TLV inside the blob, no TLV in the extended-length form.
-func validDatasetFraming(blob []byte) bool {
-	if len(blob) > maxDatasetLen {
-		return false
-	}
-	for i := 0; i < len(blob); {
-		if i+2 > len(blob) || blob[i+1] == 0xff {
-			return false
-		}
-		i += 2 + int(blob[i+1])
-		if i > len(blob) {
-			return false
-		}
-	}
-	return true
-}
-
-// The MeshCoP sub-TLV types chip's getters locate (src/lib/support/
-// ThreadOperationalDataset.cpp, ThreadTLV's k* types; Thread spec §8.10).
-const (
-	tlvChannel         = 0
-	tlvPANID           = 1
-	tlvExtPANID        = 2
-	tlvNetworkName     = 3
-	tlvPSKc            = 4
-	tlvNetworkKey      = 5
-	tlvMeshLocalPrefix = 7
-	tlvSecurityPolicy  = 12
-	tlvActiveTimestamp = 14
-	tlvChannelMask     = 53
-)
-
-// locate is chip's OperationalDatasetView::Locate
-// (ThreadOperationalDataset.cpp:172-185): the value of the first sub-TLV of
-// type typ in a framed dataset; false when there is none.
-func locate(blob []byte, typ byte) ([]byte, bool) {
-	for i := 0; i+2 <= len(blob); {
-		n := int(blob[i+1])
-		if blob[i] == typ {
-			return blob[i+2 : i+2+n], true
-		}
-		i += 2 + n
-	}
-	return nil, false
-}
-
 // parseDataset holds an AddNetwork dataset to chip's checks
-// (ThreadNetworkDirectoryCluster.cpp:231-245): it frames as a dataset and
-// carries the Active Timestamp, Channel, Channel Mask, Extended PAN ID,
-// Network Key, Mesh-Local Prefix, Network Name, PAN ID, PKSc and Security
-// Policy sub-TLVs in the sizes chip's getters demand
-// (ThreadOperationalDataset.cpp:193-301): the first of each type, as
-// Locate finds it. On top it refuses an empty Network Name, which the
-// ThreadNetworkStruct's constraint "1 to 16" could not serve (chip's
-// GetNetworkName checks the maximum only, :257-265).
-//
-// The checks are this package's own rather than the commissioner's codec
-// (controller/thread): a cluster server does not import a role
-// (script/archcheck, servers -> roles); concept v10 wave 26a moves the
-// codec to thread/, below both.
+// (ThreadNetworkDirectoryCluster.cpp:231-245) through chip's dataset view
+// ([thread.DatasetView], src/lib/support/ThreadOperationalDataset.cpp:
+// 149-310): it frames as a dataset (IsValid, :151-164) and carries the
+// Active Timestamp, Channel, Channel Mask, Extended PAN ID, Network Key,
+// Mesh-Local Prefix, Network Name, PAN ID, PKSc and Security Policy
+// sub-TLVs in the sizes chip's getters demand (:193-301), the first of
+// each type (Locate, :173-186). On top it refuses an empty Network Name,
+// which the ThreadNetworkStruct's constraint "1 to 16" could not serve
+// (chip's GetNetworkName checks the maximum only, :257-265).
 func parseDataset(blob []byte) (directoryEntry, error) {
-	if !validDatasetFraming(blob) {
+	view, err := thread.NewDatasetView(blob)
+	if err != nil {
 		return directoryEntry{}, datasetError("not a framed dataset of at most %d bytes", maxDatasetLen)
 	}
-	sized := func(name string, typ byte, ok func(n int) bool) ([]byte, error) {
-		v, found := locate(blob, typ)
-		if !found {
-			return nil, datasetError("no %s", name)
-		}
-		if !ok(len(v)) {
-			return nil, datasetError("%s of %d bytes", name, len(v))
-		}
-		return v, nil
-	}
-	exactly := func(want int) func(int) bool { return func(n int) bool { return n == want } }
-	extPANID, err := sized("Extended PAN ID", tlvExtPANID, exactly(ExtendedPanIDLen)) // :230-237
+	extPANID, err := view.ExtPANID() // :230-237
 	if err != nil {
-		return directoryEntry{}, err
+		return directoryEntry{}, datasetError("%w", err)
 	}
-	ts, err := sized("Active Timestamp", tlvActiveTimestamp, exactly(8)) // :193-200
+	timestamp, err := view.ActiveTimestamp() // :193-200
 	if err != nil {
-		return directoryEntry{}, err
+		return directoryEntry{}, datasetError("%w", err)
 	}
-	channel, err := sized("Channel", tlvChannel, exactly(3)) // :202-211
+	channel, err := view.Channel() // :202-211
 	if err != nil {
-		return directoryEntry{}, err
+		return directoryEntry{}, datasetError("%w", err)
 	}
-	if channel[0] != 0 {
-		return directoryEntry{}, datasetError("Channel on page %d, not 0", channel[0])
-	}
-	name, err := sized("Network Name", tlvNetworkName, func(n int) bool { return n >= 1 && n <= maxNetworkNameLen }) // :257-265
+	name, err := view.NetworkName() // :257-265
 	if err != nil {
-		return directoryEntry{}, err
+		return directoryEntry{}, datasetError("%w", err)
 	}
-	for _, c := range []struct {
-		name string
-		typ  byte
-		ok   func(int) bool
-	}{
-		{"Channel Mask", tlvChannelMask, func(n int) bool { return n > 0 }}, // :285-292
-		{"Network Key", tlvNetworkKey, exactly(16)},                         // :248-255
-		{"Mesh-Local Prefix", tlvMeshLocalPrefix, exactly(8)},               // :239-246
-		{"PAN ID", tlvPANID, exactly(2)},                                    // :267-274
-		{"PSKc", tlvPSKc, exactly(pskcLen)},                                 // :276-283
-		{"Security Policy", tlvSecurityPolicy, exactly(4)},                  // :294-301
+	if name == "" {
+		return directoryEntry{}, datasetError("an empty Network Name")
+	}
+	for _, check := range []func() error{
+		func() error { _, err := view.ChannelMask(); return err },     // :285-292
+		func() error { _, err := view.NetworkKey(); return err },      // :248-255
+		func() error { _, err := view.MeshLocalPrefix(); return err }, // :239-246
+		func() error { _, err := view.PANID(); return err },           // :267-274
+		func() error { _, err := view.PSKc(); return err },            // :276-283
+		func() error { _, err := view.SecurityPolicy(); return err },  // :294-301
 	} {
-		if _, err := sized(c.name, c.typ, c.ok); err != nil {
-			return directoryEntry{}, err
+		if err := check(); err != nil {
+			return directoryEntry{}, datasetError("%w", err)
 		}
 	}
-	timestamp := binary.BigEndian.Uint64(ts)
 	return directoryEntry{
 		dataset:   slices.Clone(blob),
 		timestamp: timestamp,
 		network: ThreadNetwork{
 			ExtendedPanId:   slices.Clone(extPANID),
-			NetworkName:     string(name),
-			Channel:         binary.BigEndian.Uint16(channel[1:]),
+			NetworkName:     name,
+			Channel:         channel,
 			ActiveTimestamp: timestamp,
 		},
 	}, nil

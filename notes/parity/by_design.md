@@ -96,6 +96,9 @@ pin lift confirms by re-reading the row, [`pin-lifts.md`](./pin-lifts.md)).
 | BD-chip-ZoneManagement-RulesInServer | `ZoneManagementServer.ts:14` is the empty subclass (absence: the class body, 14 lines in all) | `packages/node/src/behaviors/zone-management/ZoneManagementServer.ts` | `class ZoneManagementServer` | connectedhomeip `src/app/clusters/zone-management-server/ZoneManagementCluster.cpp` at `6170af84` (`ValidateConfiguration` :85, the Sensitivity write :259-284, the handlers :462-659, the events :701-733), `zone-geometry.h` (`IsZoneSelfIntersecting` :158), tests `tests/TestZoneManagementCluster.cpp`, `tests/TestZonePolygon.cpp` |
 | BD-chip-WiFiNetworkManagement-RulesInServer | `WiFiNetworkManagementServer.ts:14` is the empty subclass (absence: the class line, 14 lines in all) | `packages/node/src/behaviors/wi-fi-network-management/WiFiNetworkManagementServer.ts` | `"export class WiFiNetworkManagementServer extends WiFiNetworkManagementBehavior {}"` | connectedhomeip `src/app/clusters/wifi-network-management-server/WiFiNetworkManagementCluster.cpp` at `6170af84` (`ClearNetworkCredentials` :62, `SetNetworkCredentials` :74, `ReadAttribute` :105, `InvokeCommand` :123) |
 | BD-chip-ThreadNetworkDirectory-RulesInServer | `ThreadNetworkDirectoryServer.ts:14` is the empty subclass (absence: the class line, 14 lines in all) | `packages/node/src/behaviors/thread-network-directory/ThreadNetworkDirectoryServer.ts` | `"export class ThreadNetworkDirectoryServer extends ThreadNetworkDirectoryBehavior {}"` | connectedhomeip `src/app/clusters/thread-network-directory-server/ThreadNetworkDirectoryCluster.cpp` at `6170af84` (`WritePreferredExtendedPanId` :139, `ReadThreadNetworks` :153, `HandleAddNetworkRequest` :214, `HandleRemoveNetworkRequest` :278, `HandleOperationalDatasetRequest` :309; `ThreadNetworkDirectoryStorage.h`) |
+| BD-Thread-TBRM-ChipLogic | `ThreadBorderRouterManagementServer.ts:14` is the empty subclass (absence: the class line, 14 lines in all) | `packages/node/src/behaviors/thread-border-router-management/ThreadBorderRouterManagementServer.ts` | `"export class ThreadBorderRouterManagementServer extends ThreadBorderRouterManagementBehavior {}"` | connectedhomeip `src/app/clusters/thread-border-router-management-server/ThreadBorderRouterManagementCluster.cpp` at `6170af84` (`ReadAttribute` :32, `InvokeCommand` :148, `OnActivateDatasetComplete` :272, `OnPlatformEventHandler` :297; `ThreadBorderRouterManagementDelegate.h:63-106`), tests `tests/TestThreadBorderRouterManagementCluster.cpp` |
+| BD-Thread-TND-FromBorderRouter | `ThreadNetworkDiagnosticsServer.ts:14` is the empty subclass (absence: the class line, 14 lines in all) | `packages/node/src/behaviors/thread-network-diagnostics/ThreadNetworkDiagnosticsServer.ts` | `"export class ThreadNetworkDiagnosticsServer extends ThreadNetworkDiagnosticsBehavior {}"` | connectedhomeip `src/app/clusters/thread-network-diagnostics-server/DirectThreadNetworkDiagnosticsProvider.cpp` at `6170af84` (`ReadAttribute` :59, the unconfigured nulls :65-92, `RoutingRole` :104-145, the tables :184-293, the counts :325-571, the dataset attributes :577-689), `ThreadNetworkDiagnosticsCluster.cpp` |
+| BD-Thread-NetComm-ThreadVariant | `NetworkCommissioningServer.ts:18` is the empty subclass: no network-type branch, no Thread logic (absence: the class line, 18 lines in all) | `packages/node/src/behaviors/network-commissioning/NetworkCommissioningServer.ts` | `"export class NetworkCommissioningServer extends NetworkCommissioningBehavior {}"` | connectedhomeip `src/app/clusters/network-commissioning/NetworkCommissioningCluster.cpp` at `6170af84` (the Thread paths: `HandleScanNetworks` :349-367, `HandleAddOrUpdateThreadNetwork` :561-587, `OnFinished` :904-928, `ReadAttribute` :1102-1108) over `src/platform/OpenThread/GenericNetworkCommissioningThreadDriver.cpp` |
 
 ---
 
@@ -552,6 +555,23 @@ accessory only when VendorName, ProductName, VendorID and ProductID are all
 non-empty (`endpoint/materialize.go`). With neither value set the attribute
 is not served, as in matter.js. Pinned by
 `TestParityMatterJS_BridgedVendorNameComesFromTheHost`.
+
+### BD-Matter-ControllerProgressAndUpdateEvents — two Go-named commissioning steps and two Go-only update events
+
+`controller.PairOptions.Progress` reports matter.js's commissioning steps by
+their names and numbers (`ControllerCommissioningFlow.ts:536-656` at
+`862ad75f`: `GetInitialData` 0.1 … `Reconnect` 18.1, which includes the
+CASE connection, `GeneralCommissioning.Complete` 20.1). matter.js names no
+step before its flow runs, so the module names the two phases Go runs there
+itself: `Discovery` 2.1 and `PASE` 2.2 (`controller/commissioner/progress.go`).
+`softwareupdate.Manager.Observe` mirrors the four events of
+`SoftwareUpdateManager.ts:1420-1438` (`updateAvailable` :886, `updateApplying`
+:1317, `updateDone` :829/:1279, `updateFailed` :878/:1123) and adds two the
+host needs to drive a UI and matter.js does not emit: `consent_changed`
+(AddUpdateConsent / RemoveConsent) and `check_finished` (the end of
+QueryUpdates, with the per-product errors it logged and passed over). Both
+are marked Go-only in the doc comments. Pinned by
+`controller/pair_progress_test.go` and `controller/softwareupdate/observe_test.go`.
 
 > **Rule of thumb (CLAUDE.md):** matter.js HEAD is the gold standard for everything under ``. Cluster IDs / revisions / attribute IDs / constraints / defaults / wire shape are taken verbatim. Any item below is a **deliberate** divergence with a documented reason. Bug-class drift (hand-coded revisions etc.) does **not** belong here — it belongs in a fix.
 
@@ -4721,10 +4741,11 @@ Network Name is refused with CONSTRAINT_ERROR: the model's struct
 constraint "1 to 16" (matter.js's `thread-network-directory.element.ts`)
 wins over chip accepting it. (3) The dataset is checked the way chip's
 `OperationalDatasetView` reads it (first sub-TLV of each type, chip's
-sizes, `ThreadOperationalDataset.cpp:172-301`), not through
-`controller/thread`'s codec, which `archcheck` keeps out of a server
-(servers → roles); wave 26a moves the codec to `thread/` and reconciles the
-two views. chip's seven unit cases are ported (`threaddir_chip_test.go`; the
+sizes, `ThreadOperationalDataset.cpp:172-301`) through `thread.DatasetView`,
+the view `thread` holds next to the matter.js codec `thread.DecodeDataset`,
+which reads the last occurrence and accepts the one-byte Channel; a
+directory that judges what a controller hands it reads as chip does (wave
+26a reconciled the two views into one package). chip's seven unit cases are ported (`threaddir_chip_test.go`; the
 storage-migration case is chip's own format). Retire when matter.js's
 server gains the rules.
 
@@ -4783,6 +4804,58 @@ matter.js model makes USERDEFINED `[TWODCART]`, so the server refuses that
 configuration (`ErrZonesConfig`) and the port asserts the refusal. Pinned
 by `zone_chip_test.go` (11 cluster cases, 16 polygons) and
 `zone_rules_test.go`.
+
+### BD-Thread-TBRM-ChipLogic — ThreadBorderRouterManagement follows connectedhomeip behind the `BorderRouter` port
+
+matter.js's `ThreadBorderRouterManagementServer.ts:14` at `862ad75f` is the
+empty subclass. `cluster/threadbr.ManagementServer` follows connectedhomeip's
+`ThreadBorderRouterManagementCluster.cpp` at `6170af84`: the reads (:32),
+the command rules of `InvokeCommand` (:148-322: NEEDS_TIMED and
+FAILSAFE_REQUIRED, the pending dataset's sequence, INVALID_IN_STATE, the
+revert on fail-safe expiry), `OnActivateDatasetComplete` (:272) and the
+fail-safe events (:297), with `ThreadBorderRouterManagementDelegate.h:63-106`
+as the port. `thread/otbr.BorderRouter` adapts OTBR's REST API as chip's
+`GenericThreadBorderRouterDelegate` adapts OpenThread; the activation polls
+the node state until attached, bounded by the fail-safe's context. Three
+deliberate differences: the server caches the border router's values (read
+at construction, after each command and on `Refresh`; chip reads the
+delegate on every read), so an agent id that is not 16 bytes fails
+construction rather than the read; `PanChange` is a feature selection, not
+a port method; and the activation flag is held in memory, not persisted as
+chip's `kFailsafeActiveDatasetConfigured`, so there is no revert after a
+reboot. The fail-safe check is node-wide, as in the Wi-Fi variant. Pinned by
+`management_chip_test.go` (chip's 22 cases) and the `fabrictest` wire tests.
+
+### BD-Thread-TND-FromBorderRouter — ThreadNetworkDiagnostics served from a border router's diagnostics record
+
+matter.js's `ThreadNetworkDiagnosticsServer.ts:14` at `862ad75f` is the
+empty subclass. `cluster/threadbr.DiagnosticsServer` serves the 17
+mandatory attributes, the two provisional ones, MLECNT and the four MACCNT
+counts a border router's REST diagnostics record carries, following chip's
+`DirectThreadNetworkDiagnosticsProvider.cpp` at `6170af84` (`ReadAttribute`
+:59, the unconfigured nulls :65-92, `RoutingRole` :104-145, the tables
+:184-293, the counts :325-571, the dataset attributes :577-689), with the
+record translated as matter.js's `thread-br-client` `translation.ts` does.
+ThreadVersion comes from the record, else from the configuration;
+BorderRouterName is the host's. Owner decision 2026-10-27 (three register
+rows for wave 26a).
+
+### BD-Thread-NetComm-ThreadVariant — the Thread variant of NetworkCommissioning follows connectedhomeip; the kit does not mount it
+
+matter.js's `NetworkCommissioningServer.ts:18` at `862ad75f` is the empty
+subclass with no network-type branch. `core.ThreadNetworkCommissioning`
+(`cluster/core/network_commissioning_thread.go`) follows chip's
+`NetworkCommissioningCluster.cpp` at `6170af84` (`HandleScanNetworks`
+:349-367, `HandleAddOrUpdateThreadNetwork` :561-587, `OnFinished`
+:904-928, `ReadAttribute` :1102-1108) over its OpenThread driver, with
+MaxNetworks 1 and `ScanNetworks` answering the active dataset's network;
+an InterfaceEnabled write accepts only the border router's current value.
+Neither the device kit nor the reference daemon mounts it on the border
+router endpoint: chip's reference `examples/thread-br-app/thread-br-common/
+thread-br-app.matter` at `6170af84` composes endpoint 1 from
+ThreadNetworkDiagnostics and TBRM only, and the device type couples the
+Thread variant to a Secondary Network Interface. A host whose device is
+itself a Thread participant mounts it. Owner decision 2026-10-27.
 
 ### BD-Matter-GeneratedServerSuffices — clusters whose generated server is complete: no source carries behaviour beyond the model
 

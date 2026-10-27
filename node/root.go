@@ -106,6 +106,9 @@ type rootDeps struct {
 	// onCommissioningComplete runs after the root's own
 	// CommissioningComplete handling (the host's observer).
 	onCommissioningComplete func(ctx context.Context, fabricIndex uint8)
+	// onFailSafeExpired runs after the root's own fail-safe expiry:
+	// the topology's fail-safe participants revert (failsafe.go).
+	onFailSafeExpired func(ctx context.Context, fabricIndex uint8)
 }
 
 // buildRoot constructs endpoint 0's cluster surface and cross-wires the
@@ -200,7 +203,16 @@ func buildRoot(ctx context.Context, d rootDeps) (*RootClusters, error) { //nolin
 
 	// The fail-safe hooks between the two clusters (wiring.go:184-200 at b4ea1f96^).
 	generalCom.SetOnFailSafeArmed(func(context.Context, uint8) { opCreds.ClearPendingState() })
-	generalCom.SetOnFailSafeExpired(opCreds.OnFailSafeExpiry)
+	// The topology's fail-safe participants revert after the root's own
+	// rollback (failsafe.go).
+	participants := d.onFailSafeExpired
+	expired := func(ctx context.Context, fi uint8) {
+		opCreds.OnFailSafeExpiry(ctx, fi)
+		if participants != nil {
+			participants(ctx, fi)
+		}
+	}
+	generalCom.SetOnFailSafeExpired(expired)
 
 	deviceTypes := []mattercore.DeviceTypeStruct{{DeviceType: deviceTypeRootNode, Revision: deviceTypeRevision(schema.DeviceTypeID(deviceTypeRootNode))}}
 	if cfg.OTA != nil {
@@ -272,7 +284,6 @@ func buildRoot(ctx context.Context, d rootDeps) (*RootClusters, error) { //nolin
 		wifiNC := r.WiFiNetworkCommissioning
 		// The network list is committed with the commissioning and reverted
 		// with the failsafe (NetworkCommissioningCluster.cpp:984-1014).
-		expired := opCreds.OnFailSafeExpiry
 		generalCom.SetOnFailSafeExpired(func(ctx context.Context, fi uint8) {
 			expired(ctx, fi)
 			wifiNC.OnFailSafeExpired()

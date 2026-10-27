@@ -2,7 +2,8 @@
   "commit": "862ad75f4d3c7ab528b8a3954168146082cad8a6",
   "roots": [
     "packages/node/test",
-    "packages/protocol/test"
+    "packages/protocol/test",
+    "packages/thread-br-client/test"
   ],
   "files": [
     {
@@ -2632,6 +2633,621 @@
       "sha": "2bd01254e917beb77613a9be516573772dcf2cc7",
       "describes": [
         "TcpTransport"
+      ]
+    },
+    {
+      "path": "packages/thread-br-client/test/AesCcm8Test.ts",
+      "lines": 154,
+      "sha": "2ce2c2f122530c8d99a35cab4790b104408a32e9",
+      "describes": [
+        "AesCcm8.encrypt (RFC 3610 §8 vectors)",
+        "AesCcm8.decrypt (RFC 3610 §8 vectors)",
+        "AesCcm8 round-trip"
+      ]
+    },
+    {
+      "path": "packages/thread-br-client/test/AesCmacPrf128Test.ts",
+      "lines": 37,
+      "sha": "e6776161aa820eb59915df5dde0b9482e64ddf51",
+      "describes": [
+        "AesCmacPrf128.compute (RFC 4615)"
+      ]
+    },
+    {
+      "path": "packages/thread-br-client/test/AgnersCrossValidationTest.ts",
+      "lines": 88,
+      "sha": "670873b0dea19d7d661d9cc06c95ffa9c6e462ab",
+      "describes": [
+        "OperationalDataset cross-validation against Agners' Python parser"
+      ]
+    },
+    {
+      "path": "packages/thread-br-client/test/AntiReplayWindowTest.ts",
+      "lines": 87,
+      "sha": "ae2fc9c31fe0c856710e74d879207fa62e551a53",
+      "describes": [
+        "AntiReplayWindow"
+      ]
+    },
+    {
+      "path": "packages/thread-br-client/test/BorderRouterRegistryTest.ts",
+      "lines": 1107,
+      "sha": "bd9a74954f4ff4e7d1d37576e04a600c27620d04",
+      "describes": [
+        "BorderRouterRegistry"
+      ]
+    },
+    {
+      "path": "packages/thread-br-client/test/CaseNormalizerTest.ts",
+      "lines": 84,
+      "sha": "639b81fe415c699db2118cb65c1c0ff5c36db521",
+      "describes": [
+        "normalizeKeys"
+      ]
+    },
+    {
+      "path": "packages/thread-br-client/test/ClientHelloMessageTest.ts",
+      "lines": 177,
+      "sha": "bf2227974811b1a022c6dfcf4791f0840505c1c2",
+      "describes": [
+        "ClientHelloMessage.build"
+      ]
+    },
+    {
+      "path": "packages/thread-br-client/test/ClientKeyExchangeMessageTest.ts",
+      "lines": 51,
+      "sha": "b8aa04116a1e349e9d1b20a4dbddab0be1b72037",
+      "describes": [
+        "ServerHelloDoneMessage.parse",
+        "ClientKeyExchangeMessage.build"
+      ]
+    },
+    {
+      "path": "packages/thread-br-client/test/CoapClientTest.ts",
+      "lines": 524,
+      "sha": "210f7132604cf6594d3947c381d6e7ffb28937bd",
+      "describes": [
+        "CoapClient"
+      ]
+    },
+    {
+      "path": "packages/thread-br-client/test/CoapMessageTest.ts",
+      "lines": 242,
+      "sha": "5e5834736e88879e3e0853e747137ad9e045bc19",
+      "describes": [
+        "CoapMessage"
+      ]
+    },
+    {
+      "path": "packages/thread-br-client/test/CommissionerTest.ts",
+      "lines": 346,
+      "sha": "770873ab057a54d68f39c82f9c16f7104129ec93",
+      "describes": [
+        "Commissioner"
+      ]
+    },
+    {
+      "path": "packages/thread-br-client/test/ConnectDtlsTest.ts",
+      "lines": 53,
+      "sha": "295c12cbb6a9d7a043b26379a35d7b9a52b70d57",
+      "describes": [
+        "connectDtls"
+      ]
+    },
+    {
+      "path": "packages/thread-br-client/test/ConnectMeshcopTest.ts",
+      "lines": 249,
+      "sha": "f851857844ba5078e1e3f634fd7a83c93c326cc5",
+      "describes": [
+        "connectMeshcop"
+      ]
+    },
+    {
+      "path": "packages/thread-br-client/test/DiagnosticResetTest.ts",
+      "lines": 338,
+      "sha": "dc26832ccb3ffb8cb31882cfd8545a0484750e7e",
+      "describes": [
+        "MeshCopDiagnosticSource.resetCounters",
+        "OtbrRestDiagnosticSource.resetCounters"
+      ]
+    },
+    {
+      "path": "packages/thread-br-client/test/DiagnosticSourceTest.ts",
+      "lines": 699,
+      "sha": "b154a4a2877718b7bab8a9c0171c4d675bace7f6",
+      "describes": [
+        "MeshCopDiagnosticSource",
+        "missingRouterIds"
+      ]
+    },
+    {
+      "path": "packages/thread-br-client/test/DtlsChannelInterfaceTest.ts",
+      "lines": 38,
+      "sha": "ee7c9ff9e2d84d2d30aeae51951aff82fb8a1c9d",
+      "describes": [
+        "DtlsChannel / DtlsConnectOpts — interface shape"
+      ]
+    },
+    {
+      "path": "packages/thread-br-client/test/DtlsCipherStateTest.ts",
+      "lines": 295,
+      "sha": "246fbc68c4e897924f9fd05aab7da0f5ecf1f8c1",
+      "describes": [
+        "DtlsCipherState role-based key/salt selection",
+        "DtlsCipherState.nonceFor",
+        "DtlsCipherState.aadFor",
+        "DtlsCipherState sequence + epoch counters",
+        "DtlsRecord + DtlsCipherState end-to-end (epoch=1)"
+      ]
+    },
+    {
+      "path": "packages/thread-br-client/test/DtlsClientTest.ts",
+      "lines": 845,
+      "sha": "55ccaeef59ad9d9b87a8edb2885dfe554e3ac987",
+      "describes": [
+        "DtlsClient — happy-path handshake (mirror server)",
+        "DtlsClient — failure paths",
+        "DtlsClient — retransmit",
+        "DtlsClient — multi-record datagram",
+        "DtlsClient — pre/post-state guards"
+      ]
+    },
+    {
+      "path": "packages/thread-br-client/test/DtlsRecordTest.ts",
+      "lines": 325,
+      "sha": "90f4a5b060462086fba302146a177d88c66b7a4e",
+      "describes": [
+        "DtlsRecord plaintext (epoch=0)",
+        "DtlsRecord encrypted (epoch=1)"
+      ]
+    },
+    {
+      "path": "packages/thread-br-client/test/DtlsRetransmitTimerTest.ts",
+      "lines": 173,
+      "sha": "e85a9e615e46f344b8e2f93dce2709a17ec415ce",
+      "describes": [
+        "DtlsRetransmitTimer — RFC 6347 §4.2.4 doubling"
+      ]
+    },
+    {
+      "path": "packages/thread-br-client/test/EcJpakePmsTest.ts",
+      "lines": 107,
+      "sha": "d53ef9b8c53cd95c0105300ec2c141a76b1815f6",
+      "describes": [
+        "EcJpakePms.derive (mbedTLS oracle)"
+      ]
+    },
+    {
+      "path": "packages/thread-br-client/test/EcJpakeRound2Test.ts",
+      "lines": 204,
+      "sha": "b05b1384bc215e13e384be3a02d64d0d222b0b53",
+      "describes": [
+        "EcJpakeRound.parseRound2 + verifyRound2Zkp (mbedTLS oracle)",
+        "EcJpakeRound.serializeRound2 (byte-identical round-trip with mbedTLS oracle)",
+        "EcJpakeRound.buildRound2 (deterministic ephemerals)"
+      ]
+    },
+    {
+      "path": "packages/thread-br-client/test/EcJpakeRoundRoundTripTest.ts",
+      "lines": 65,
+      "sha": "51240deb403917340d72c60e0b1bd5cbb963ba0e",
+      "describes": [
+        "EcJpakeRound parse -\u003e serialize round-trip"
+      ]
+    },
+    {
+      "path": "packages/thread-br-client/test/EcJpakeRoundTest.ts",
+      "lines": 163,
+      "sha": "c0e682053890e8411695f854d68cb4b2e12de23c",
+      "describes": [
+        "EcJpakeRound.parseRound1 (mbedTLS oracle)",
+        "EcJpakeRound.serializeRound1 (byte-identical with mbedTLS oracle)",
+        "EcJpakeRound.parseRound1 defensive copies",
+        "EcJpakeRound.buildRound1 (deterministic ephemerals)"
+      ]
+    },
+    {
+      "path": "packages/thread-br-client/test/EnergyScanTest.ts",
+      "lines": 308,
+      "sha": "b020ca99d3bfe9742c4aa9f24f7bce66a681d760",
+      "describes": [
+        "MeshCopDiagnosticSource.energyScan",
+        "OtbrRestClient.getEnergyScanTask"
+      ]
+    },
+    {
+      "path": "packages/thread-br-client/test/ExtPanIdLockManagerTest.ts",
+      "lines": 148,
+      "sha": "da8c0f46fb396236aec343c96553939db3660e42",
+      "describes": [
+        "ExtPanIdLockManager"
+      ]
+    },
+    {
+      "path": "packages/thread-br-client/test/FinishedMessageTest.ts",
+      "lines": 50,
+      "sha": "f0ff5e5845c65653881277b1e124e243c87da5d6",
+      "describes": [
+        "FinishedMessage",
+        "ChangeCipherSpec"
+      ]
+    },
+    {
+      "path": "packages/thread-br-client/test/HandshakeMessageTest.ts",
+      "lines": 203,
+      "sha": "e767e9792779b8530a2ac182ad9955ea4651840e",
+      "describes": [
+        "HandshakeType.isHandshakeType",
+        "HandshakeMessage envelope"
+      ]
+    },
+    {
+      "path": "packages/thread-br-client/test/HandshakeTranscriptTest.ts",
+      "lines": 77,
+      "sha": "cbdea2fdc8f82aedbe6518ee8ffd7e921ac70616",
+      "describes": [
+        "HandshakeTranscript"
+      ]
+    },
+    {
+      "path": "packages/thread-br-client/test/HelloVerifyRequestMessageTest.ts",
+      "lines": 58,
+      "sha": "672926d362966a14253fb64d71bd13bae70d79b7",
+      "describes": [
+        "HelloVerifyRequestMessage.parse"
+      ]
+    },
+    {
+      "path": "packages/thread-br-client/test/HybridDiagnosticSourceTest.ts",
+      "lines": 111,
+      "sha": "e2bf1f97dd855410e7b0a6706ededf44dff824c4",
+      "describes": [
+        "HybridDiagnosticSource"
+      ]
+    },
+    {
+      "path": "packages/thread-br-client/test/Ip6AddressTlvTest.ts",
+      "lines": 25,
+      "sha": "1f164175bac8e462a183ff53e16c068d66e53e83",
+      "describes": [
+        "Ip6AddressTlv"
+      ]
+    },
+    {
+      "path": "packages/thread-br-client/test/LeadKaTest.ts",
+      "lines": 90,
+      "sha": "da81fa7d66892a4488db752a9eef159dc6b9b6ad",
+      "describes": [
+        "LeadKa"
+      ]
+    },
+    {
+      "path": "packages/thread-br-client/test/LeadPetTest.ts",
+      "lines": 96,
+      "sha": "f806ab8e55fa1e4d1cd6f07417b4b45e61bc17dc",
+      "describes": [
+        "LeadPet"
+      ]
+    },
+    {
+      "path": "packages/thread-br-client/test/MeshLocalAddrTest.ts",
+      "lines": 46,
+      "sha": "ec80a0ea6f4368e1c6a8a7585a0b6ea2a333e310",
+      "describes": [
+        "meshLocalAddr"
+      ]
+    },
+    {
+      "path": "packages/thread-br-client/test/NetworkDataTlvTest.ts",
+      "lines": 95,
+      "sha": "11952f0f2093e285d408fa256a9d31a7d113b49f",
+      "describes": [
+        "NetworkData.decode"
+      ]
+    },
+    {
+      "path": "packages/thread-br-client/test/NetworkDiagTlvTypesTest.ts",
+      "lines": 66,
+      "sha": "e72ed53e0fa32bba3e0869f4f161afd4a6ed0d01",
+      "describes": [
+        "NetworkDiagTlvType",
+        "NetworkDiagTlvTypeName"
+      ]
+    },
+    {
+      "path": "packages/thread-br-client/test/NetworkDiagnosticTlvTest.ts",
+      "lines": 67,
+      "sha": "ee63b5fb1077cb5a258fcec348fe64bb6c648d56",
+      "describes": [
+        "NetworkDiagnosticTlv"
+      ]
+    },
+    {
+      "path": "packages/thread-br-client/test/NobleDtlsChannelHandshakeTest.ts",
+      "lines": 883,
+      "sha": "f99a972bb03366ff9f829bc368e5e36e10822cd8",
+      "describes": [
+        "NobleDtlsChannel — UDP-bound EC-JPAKE handshake"
+      ]
+    },
+    {
+      "path": "packages/thread-br-client/test/OtbrRestActionRunnerTest.ts",
+      "lines": 62,
+      "sha": "008b52c8a80eeff8908910138c5ed4557cb54c07",
+      "describes": [
+        "runActionToCompletion"
+      ]
+    },
+    {
+      "path": "packages/thread-br-client/test/OtbrRestClientTest.ts",
+      "lines": 730,
+      "sha": "cd3218c3c5cf1ed4477269179de2c9a546f0a870",
+      "describes": [
+        "OtbrRestClient",
+        "OtbrRestClient read-only getters",
+        "OtbrRestClient mutations",
+        "OtbrRestClient collection API",
+        "OtbrRestClient.detectDiagnosticsApi"
+      ]
+    },
+    {
+      "path": "packages/thread-br-client/test/OtbrRestCollectionDiagnosticsTest.ts",
+      "lines": 285,
+      "sha": "653f5dcd4412a5f2bd7778f1cfcb5716698ef4d4",
+      "describes": [
+        "OtbrRestDiagnosticSource collection API"
+      ]
+    },
+    {
+      "path": "packages/thread-br-client/test/OtbrRestDiagnosticSourceTest.ts",
+      "lines": 186,
+      "sha": "bc97d6b13bae80e94a5c7b5039a51ee4a3462267",
+      "describes": [
+        "OtbrRestDiagnosticSource"
+      ]
+    },
+    {
+      "path": "packages/thread-br-client/test/OtbrRestProbeTest.ts",
+      "lines": 189,
+      "sha": "bd4a5f736e101ba3ff2f5d5ea08573b012251fd8",
+      "describes": [
+        "OtbrRestProbe"
+      ]
+    },
+    {
+      "path": "packages/thread-br-client/test/PanIdQueryTest.ts",
+      "lines": 274,
+      "sha": "a5a7eddfd84a440861bab126506c3afc555c6fc4",
+      "describes": [
+        "MeshCopDiagnosticSource.panIdQuery"
+      ]
+    },
+    {
+      "path": "packages/thread-br-client/test/Pbkdf2AesCmacTest.ts",
+      "lines": 79,
+      "sha": "50aeed4dd88219f3fcd00b2b50825dccefa988a7",
+      "describes": [
+        "pbkdf2AesCmac"
+      ]
+    },
+    {
+      "path": "packages/thread-br-client/test/PortableCryptoSmokeTest.ts",
+      "lines": 39,
+      "sha": "1c8beafb28e6852fe95b6f8166e18b213366057c",
+      "describes": [
+        "portable crypto smoke (StandardCrypto only, no node:crypto)"
+      ]
+    },
+    {
+      "path": "packages/thread-br-client/test/PskcTest.ts",
+      "lines": 68,
+      "sha": "f1bcc4a8e4e7600af49ec85ecc46f47b7080aae0",
+      "describes": [
+        "Pskc.derive"
+      ]
+    },
+    {
+      "path": "packages/thread-br-client/test/SchnorrZkpTest.ts",
+      "lines": 331,
+      "sha": "470e6c44145dd7da4651d584b87fd6d00254ab00",
+      "describes": [
+        "SchnorrZkp.verify (mbedTLS oracle)",
+        "SchnorrZkp.generate -\u003e verify round-trip",
+        "SchnorrZkp custom generator (round-2 prep)"
+      ]
+    },
+    {
+      "path": "packages/thread-br-client/test/SelectBrTest.ts",
+      "lines": 166,
+      "sha": "eacb49a3dc04b78401bd32f78a2b7379560737aa",
+      "describes": [
+        "selectBr",
+        "decodeStateBitmap"
+      ]
+    },
+    {
+      "path": "packages/thread-br-client/test/SelectSourceTest.ts",
+      "lines": 263,
+      "sha": "0300939e9aafb31582343ed2390fa9a80e7a31be",
+      "describes": [
+        "selectSource"
+      ]
+    },
+    {
+      "path": "packages/thread-br-client/test/ServerHelloMessageTest.ts",
+      "lines": 172,
+      "sha": "b12bb135789aefcd7451533e83c1887ba7a2bf0e",
+      "describes": [
+        "ServerHelloMessage.parse"
+      ]
+    },
+    {
+      "path": "packages/thread-br-client/test/ServerKeyExchangeMessageTest.ts",
+      "lines": 58,
+      "sha": "7d2d396ebd424ef3bf9a3602f218bc60d44c8f33",
+      "describes": [
+        "ServerKeyExchangeMessage.parse"
+      ]
+    },
+    {
+      "path": "packages/thread-br-client/test/ThreadCredentialsRegistryTest.ts",
+      "lines": 225,
+      "sha": "c375d6fc301f9ea7a3bfbb65457ee7fefa624fd8",
+      "describes": [
+        "ThreadCredentialsRegistry"
+      ]
+    },
+    {
+      "path": "packages/thread-br-client/test/TlsPrfTest.ts",
+      "lines": 247,
+      "sha": "1b625a97e5abf8b47828d188451e6dde79824b23",
+      "describes": []
+    },
+    {
+      "path": "packages/thread-br-client/test/TranslationTest.ts",
+      "lines": 261,
+      "sha": "f9e5320e15e7a52e3587ddf45e47ec678c946c11",
+      "describes": [
+        "translateNodeJson"
+      ]
+    },
+    {
+      "path": "packages/thread-br-client/test/TypeListTlvTest.ts",
+      "lines": 53,
+      "sha": "c776a173b87b40216b0d8328246c8c20003a584b",
+      "describes": [
+        "TypeListTlv"
+      ]
+    },
+    {
+      "path": "packages/thread-br-client/test/UdpEncapsulationTlvTest.ts",
+      "lines": 45,
+      "sha": "c88020ed821b83db67ea750dc79d911faf858211",
+      "describes": [
+        "UdpEncapsulationTlv"
+      ]
+    },
+    {
+      "path": "packages/thread-br-client/test/diag/ChildIpv6AddressListTest.ts",
+      "lines": 50,
+      "sha": "bc65aaa7650457c39fe5133f39a83fe60f39fea4",
+      "describes": [
+        "ChildIpv6AddressList.decode"
+      ]
+    },
+    {
+      "path": "packages/thread-br-client/test/diag/ChildTableTest.ts",
+      "lines": 90,
+      "sha": "4a0e514063855a72de4b686cb85fed826f4ac927",
+      "describes": [
+        "ChildTable"
+      ]
+    },
+    {
+      "path": "packages/thread-br-client/test/diag/ConnectivityTest.ts",
+      "lines": 65,
+      "sha": "c7b0fd8c1c0d5e0ab7e44ad81ef5a9bbcf2ce5ef",
+      "describes": [
+        "Connectivity"
+      ]
+    },
+    {
+      "path": "packages/thread-br-client/test/diag/Ipv6AddressListTest.ts",
+      "lines": 50,
+      "sha": "af26de1c5c35031718147b660ec9c70c8b84280f",
+      "describes": [
+        "Ipv6AddressList"
+      ]
+    },
+    {
+      "path": "packages/thread-br-client/test/diag/LeaderDataTest.ts",
+      "lines": 42,
+      "sha": "c427782d9bfc88d25e8a4000c0e37449d1380341",
+      "describes": [
+        "LeaderData"
+      ]
+    },
+    {
+      "path": "packages/thread-br-client/test/diag/MacCountersTest.ts",
+      "lines": 77,
+      "sha": "2f8f4cc45c85ff525d49b7364cac38d3272e6235",
+      "describes": [
+        "MacCounters"
+      ]
+    },
+    {
+      "path": "packages/thread-br-client/test/diag/MleCountersTest.ts",
+      "lines": 89,
+      "sha": "98473c9be221d0eee95758894b13086b5fcbf053",
+      "describes": [
+        "MleCounters"
+      ]
+    },
+    {
+      "path": "packages/thread-br-client/test/diag/ModeTest.ts",
+      "lines": 45,
+      "sha": "4d0fc7e78dc7933dab22c94a393f3a2675e559bc",
+      "describes": [
+        "Mode"
+      ]
+    },
+    {
+      "path": "packages/thread-br-client/test/diag/PrimitivesTest.ts",
+      "lines": 119,
+      "sha": "5ae49bec6fa3081ec0cd7179dea37e386540c645",
+      "describes": [
+        "ExtMacAddress",
+        "Eui64",
+        "Address16",
+        "BatteryLevel",
+        "SupplyVoltage",
+        "MaxChildTimeout",
+        "ChannelPages"
+      ]
+    },
+    {
+      "path": "packages/thread-br-client/test/diag/Route64Test.ts",
+      "lines": 90,
+      "sha": "9d6d75dc010881c518cc9766e27b723dcf4477a1",
+      "describes": [
+        "Route64"
+      ]
+    },
+    {
+      "path": "packages/thread-br-client/test/diag/RouterNeighborTest.ts",
+      "lines": 111,
+      "sha": "7ffe7eb3a97d01ffea6bdf50181ce62fcb0f6fa2",
+      "describes": [
+        "RouterNeighbor.decode"
+      ]
+    },
+    {
+      "path": "packages/thread-br-client/test/diag/TimeoutTest.ts",
+      "lines": 34,
+      "sha": "cd2b04aca476a5ef6abef8dfd7fbbf574298d7f8",
+      "describes": [
+        "Timeout"
+      ]
+    },
+    {
+      "path": "packages/thread-br-client/test/diag/VendorInfoTest.ts",
+      "lines": 100,
+      "sha": "dcf6f2c7040133a60e72e3de6b2d86fbc512e468",
+      "describes": [
+        "Version",
+        "VendorName",
+        "VendorModel",
+        "VendorSwVersion",
+        "ThreadStackVersion",
+        "VendorAppUrl"
+      ]
+    },
+    {
+      "path": "packages/thread-br-client/test/diagnostic/DefaultTlvSetTest.ts",
+      "lines": 41,
+      "sha": "82724a5e679277f9d7cc1630171b09d533fbf466",
+      "describes": [
+        "DefaultTlvSet"
       ]
     }
   ]

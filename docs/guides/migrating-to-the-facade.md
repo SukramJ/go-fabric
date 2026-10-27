@@ -59,6 +59,12 @@ nothing breaks.
 The [Host ports](ports.md#clusterdefhost-the-kit-servers-host-methods)
 guide lists every `Host`.
 
+## Removed in the next release: `controller/thread`
+
+| Symbol | Route |
+| --- | --- |
+| `controller/thread` (every identifier: `DecodeDataset`, `DecodeDatasetHex`, `OperationalDataset`, `WalkTLVs`, `EncodeTLVs`, `TLV`, `TLVType` and its constants, `SecurityPolicy`, `DecodeSecurityPolicy`, `ErrThreadTLV`, `ErrThreadDataset`, `ErrInvalidTLV`) | the same identifiers in `github.com/SukramJ/go-fabric/thread`: change the import path, nothing else (ADR 0027 decision 2; removed at once in wave 26a) |
+
 ## Changed in v0.13.4: the WebRTC transport structs
 
 | Symbol | Route |

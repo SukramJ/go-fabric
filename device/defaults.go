@@ -44,6 +44,8 @@ import (
 	tadef "github.com/SukramJ/go-fabric/cluster/spec/temperaturealarm"
 	thermostatdef "github.com/SukramJ/go-fabric/cluster/spec/thermostat"
 	tuidef "github.com/SukramJ/go-fabric/cluster/spec/thermostatuserinterfaceconfiguration"
+	tbrmdef "github.com/SukramJ/go-fabric/cluster/spec/threadborderroutermanagement"
+	tnddef "github.com/SukramJ/go-fabric/cluster/spec/threadnetworkdiagnostics"
 	tdirdef "github.com/SukramJ/go-fabric/cluster/spec/threadnetworkdirectory"
 	userlabeldef "github.com/SukramJ/go-fabric/cluster/spec/userlabel"
 	wifimgmtdef "github.com/SukramJ/go-fabric/cluster/spec/wifinetworkmanagement"
@@ -149,6 +151,11 @@ var selfHeldDefaults = map[uint32]serverFactory{
 	wifimgmtdef.ClusterID: newWiFiManagementServer,  // WiFiNetworkManagement: cluster/netinfra.
 	tdirdef.ClusterID:     newThreadDirectoryServer, // ThreadNetworkDirectory: cluster/netinfra, Declare.ThreadNetworkStore.
 
+	// The Thread Border Router servers over the declared BorderRouter
+	// (defaults_threadbr.go).
+	tbrmdef.ClusterID: newThreadBorderRouterManagementServer, // ThreadBorderRouterManagement: cluster/threadbr, Declare.BorderRouter.
+	tnddef.ClusterID:  newThreadNetworkDiagnosticsServer,     // ThreadNetworkDiagnostics: cluster/threadbr, the management server's BorderRouter.
+
 	// The appliance, sensor-configuration and energy servers
 	// (defaults_appliance.go).
 	washerdef.ClusterID:   newLaundryWasherControlsServer,                          // LaundryWasherControls: cluster/appliance.
@@ -167,8 +174,9 @@ var selfHeldDefaults = map[uint32]serverFactory{
 
 // coupledLast are the defaults built after the device's other servers,
 // because they couple to them: LevelControl follows OnOff and moves
-// ColorControl's colour temperature.
-var coupledLast = []uint32{lvldef.ClusterID}
+// ColorControl's colour temperature; ThreadNetworkDiagnostics reads the
+// ThreadBorderRouterManagement server's border router.
+var coupledLast = []uint32{lvldef.ClusterID, tnddef.ClusterID}
 
 // buildOrder returns the indexes of reqs in the order their defaults are
 // built: the type's order, the coupled clusters last.

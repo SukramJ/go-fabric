@@ -268,6 +268,34 @@ minute).
   established with `ReplaceSubscriptions` drops the default.
 - `NoInitialRead`: skips the initial read after commissioning.
 
+`PairOptions.Progress` (a `func(controller.PairingStep)`) follows the
+pairing step by step: each step is reported `PairingStarted`, then
+`PairingSucceeded`, `PairingFailed` with the error, or `PairingSkipped`.
+The steps carry matter.js's numbers and names
+(`ControllerCommissioningFlow.ts`): `GetInitialData` 0.1,
+`GeneralCommissioning.ArmFailsafe` 7.1,
+`GeneralCommissioning.ConfigureRegulatoryInformation` 8.1,
+`TimeSynchronization.SynchronizeTime` 8.2,
+`OperationalCredentials.DeviceAttestation` 10.1,
+`OperationalCredentials.Certificates` 11.1, `AccessControl` 15.1,
+`NetworkCommissioning.Validate`, `.Wifi` and `.Thread` 16.1 to 16.3 (BLE
+or a given network only), `Reconnect` 18.1 (the operational CASE
+connection), `GeneralCommissioning.Complete` 20.1 and
+`OperationalCredentials.UpdateFabricLabel` 98.1. matter.js names no step
+for what comes before its flow; `Discovery` 2.1 (DNS-SD or BLE, skipped
+with `PairOptions.Address`) and `PASE` 2.2 are this module's names, and
+they are reported first. The callback runs on `Pair`'s goroutine and must
+not block. `commissioner.Options.Progress` is the same hook one layer
+down.
+
+```go
+_, err := c.Pair(ctx, code, controller.PairOptions{
+	Progress: func(s controller.PairingStep) {
+		log.Printf("%d.%d %s %s %v", s.Number, s.Sub, s.Name, s.Phase, s.Err)
+	},
+})
+```
+
 A second `Commission` of a commissioned node is `ErrAlreadyCommissioned`.
 A commission or decommission already running for that node is
 `ErrFabricOperationInProgress`. `Registry.Decommission` sends RemoveFabric
@@ -287,7 +315,7 @@ module never pulls its D-Bus dependency; the reference controller's BLE
 build is its `cmd/reference-controller` (`pair --ble`, rights and BlueZ
 version in the reference controller's README).
 
-*Source: `examples/reference-controller/cli/pair.go:37-189`, `examples/reference-controller/cli/pair.go:214-246`, `ble/bluez/doc.go:4-30`, `controller/client/fabricops.go:108-157`, `controller/client/fabricops.go:224-232`, `controller/commissioner/commissioner.go:85-123`, `controller/commissioner/doc.go:4-19`, `controller/client/registry.go:177-192`.*
+*Source: `examples/reference-controller/cli/pair.go:37-189`, `examples/reference-controller/cli/pair.go:214-246`, `ble/bluez/doc.go:4-30`, `controller/client/fabricops.go:108-157`, `controller/client/fabricops.go:224-232`, `controller/commissioner/commissioner.go:85-123`, `controller/commissioner/doc.go:4-19`, `controller/commissioner/progress.go`, `controller/client/registry.go:177-192`.*
 
 ## Attestation and the DCL
 
@@ -530,6 +558,18 @@ controller commissions into its fabric on first use; `Controller.OwnNode()`
 returns it. The update needs the node's default subscription: the manager
 judges a node on current data only.
 
+`Manager.Observe(fn)` reports the manager's state as it moves, as a
+`softwareupdate.UpdateEvent` with the peer, the target and, where it
+applies, an error. `UpdateAvailable`, `UpdateApplying`, `UpdateDone` and
+`UpdateFailed` are matter.js's `updateAvailable`, `updateApplying`,
+`updateDone` and `updateFailed`. `UpdateConsentChanged` (a consent added
+or removed) and `UpdateCheckFinished` (a check's end, with the nodes it
+found an update for) are this module's own. A failed update carries
+`ErrNotApplied` or `ErrUpdateCancelled`. Events arrive in order on a
+goroutine of the manager's that holds none of its locks, so `fn` may call
+back into the manager. The returned function unsubscribes and is
+idempotent. The `OTAConfig.OnUpdate…` callbacks remain.
+
 ```go
 images := softwareupdate.NewImages(softwareupdate.ImagesConfig{})
 c, err := controller.New(ctx, controller.Config{ /* … */
@@ -616,7 +656,7 @@ a device found over DNS-SD that advertises Wi-Fi or Thread.
 
 ### Thread datasets
 
-`thread.DecodeDataset(b)` (package `controller/thread`) reads a Thread
+`thread.DecodeDataset(b)` (package `thread`) reads a Thread
 operational dataset, as matter.js's `OperationalDataset.decode` does:
 `NetworkName`, `ExtPANID`, `Channel`, `PANID` and every other MeshCoP TLV;
 `DecodeDatasetHex` takes hex, and `Redact` drops the secrets for a log
