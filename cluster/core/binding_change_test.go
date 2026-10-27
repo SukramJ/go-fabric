@@ -295,7 +295,8 @@ func TestBindingOrigins(t *testing.T) {
 // with core.TargetStruct literals.
 func coreEntries(b interface {
 	Entries() []bindingdef.TargetStruct
-}) []core.TargetStruct {
+},
+) []core.TargetStruct {
 	var out []core.TargetStruct
 	for _, t := range b.Entries() {
 		out = append(out, core.TargetFromDef(t))

@@ -576,7 +576,8 @@ func TestLiveBinding(t *testing.T) {
 // with core.TargetStruct literals.
 func coreEntries(b interface {
 	Entries() []bindingdef.TargetStruct
-}) []mattercore.TargetStruct {
+},
+) []mattercore.TargetStruct {
 	var out []mattercore.TargetStruct
 	for _, t := range b.Entries() {
 		out = append(out, mattercore.TargetFromDef(t))

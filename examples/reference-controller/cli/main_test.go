@@ -19,7 +19,6 @@ import (
 	"testing"
 	"time"
 
-
 	"github.com/miekg/dns"
 
 	"github.com/SukramJ/go-fabric/bdx/otaimage"

@@ -92,17 +92,16 @@ None. Every `Host` signature names def types: the kit's types are already aliase
 
 ## Guards
 
-Run under `flock guards.lock`.
+**Guards: CI** on #305 from `3131cf0e` and the commit on top. The coordinator pushed `3131cf0e` and stopped the local bundle.
 
-**Bundle 1, at `4ce0bc9c`**
-- `make reachability` 0, `cite-report` 0 (no drift).
-- `make ci` 2: one revive finding in the new test (`if-return`), fixed in `d82649da`. Everything before lint passed: build, 32-bit, vet, archcheck, apidiff-check, test.
-- `make race` 0 twice, `go test ./script/...` 0, `mkdocs build --strict` 0.
+**First round** (at `4ce0bc9c` / `d82649da`, before the owner's decisions), under the flock: `make ci`, `make race` twice, `go test ./script/...`, reachability (unreached 3, unchanged), cite-report and `mkdocs build --strict` all passed.
 
-**Bundle 2, at `d82649da`** (the ci rest)
-- `lint`, `cover-check`, `bluez-check` and `esphome-check` all 0.
-- `reachability-check` 2: the snapshot's line numbers had moved with the fix. Regenerated in `943e4ef1`, then `reachability-check` 0.
-- Unreached stays 3, so the ratchet is unchanged.
+**Stopped bundle at `3131cf0e`** (what it reported before the stop):
+- clustergen 0, reachability 0, cite-report 0 (snapshots committed in `3131cf0e`).
+- apidiff-check 0, `go test ./script/...` 0.
+- `make ci` 2: gofumpt in three converted test files, fixed in the commit on top.
+- `make race` 2: one failure, `node` `TestSessionDiagnostics` (`inspect_test.go:276`, "idle 0s, want AsOf - LastActivity"), a session-idle timing assertion that nothing in this change touches.
+- Not re-run.
 
 **Not run:** chip-tool. Neither the daemon's composition nor any FeatureMap moved.
 
@@ -113,6 +112,8 @@ Run under `flock guards.lock`.
 - The brief's V examples `SetPresets`, `SetSchedules`, `SetActivePresetHandle`, `SetActiveScheduleHandle`, `SetPreferredExtendedPanID`, `UpdateTariff`, `ClearTariff`, `SetCurrentPrice`, `SetCookTime` and `SetSelectedWattIndex` are not in `Host`. The typed `Set` reaches each one with the same checks. One difference: `Set` saves presets under `context.Background()`, while `SetPresets(ctx, …)` uses the caller's context.
 
 ## Owner decisions (2026-10-27) and their follow-up
+
+The type moves are in the first bullet. `core.Binding.Entries` / `OnChange` take `bindingdef.TargetStruct`, with `core.TargetFromDef` and `TargetStruct.Def` converting. `camera.SessionKey` / `KeyOf` become `webrtctransportrequestordef.SessionKey` / `KeyOf`.
 
 - **Q1, move the types.**
   - Binding: `core.Binding.Entries` and `OnChange` now take and return `bindingdef.TargetStruct`, and `bindingdef.Host` names them.
