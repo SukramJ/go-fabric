@@ -17,8 +17,11 @@ type UpdateEventKind uint8
 // updateDone and updateFailed (packages/node/src/behavior/system/
 // software-update/SoftwareUpdateManager.ts:1420-1438 at 862ad75f), emitted
 // where matter.js emits them (:886; :1317; :829, :1279; :878, :1123).
-// ConsentChanged and CheckFinished are this module's own: matter.js emits
-// nothing when a consent is added or removed, or when a check ends.
+// ConsentChanged, CheckFinished, Queued and TransferStarted are this
+// module's own: matter.js emits nothing when a consent is added or
+// removed, when a check ends, when #queueUpdate queues an entry (:892-920)
+// or when onOtaStatusChange first sees Downloading (:1253-1321). One
+// update reports Queued, TransferStarted, Applying, then Done or Failed.
 const (
 	// UpdateAvailable: a check found an update for a node the manager
 	// holds no consent for (requestConsentForUpdate, :885-887); Info
@@ -43,10 +46,21 @@ const (
 	// UpdateFailed: the update failed or was cancelled (:878, :1123); Err
 	// is [ErrNotApplied] or [ErrUpdateCancelled].
 	UpdateFailed
+	// UpdateQueued: an update entered the queue (#queueUpdate, :892-920)
+	// — a consent that queues, ForceUpdate, or a check that found an
+	// update with a consent held — or a queued entry not yet in progress
+	// took a different target; not when a periodic check queues the same
+	// target again. Go-only.
+	UpdateQueued
+	// UpdateTransferStarted: the node began downloading the image — the
+	// entry's first Downloading status, which the provider reports when
+	// the node's BDX session starts; a retry's new session does not
+	// report it again. Go-only.
+	UpdateTransferStarted
 )
 
 // String is the kind's name: available, consent_changed, check_finished,
-// applying, done, failed.
+// applying, done, failed, queued, transfer_started.
 func (k UpdateEventKind) String() string {
 	switch k {
 	case UpdateAvailable:
@@ -61,6 +75,10 @@ func (k UpdateEventKind) String() string {
 		return "done"
 	case UpdateFailed:
 		return "failed"
+	case UpdateQueued:
+		return "queued"
+	case UpdateTransferStarted:
+		return "transfer_started"
 	}
 	return "unknown"
 }

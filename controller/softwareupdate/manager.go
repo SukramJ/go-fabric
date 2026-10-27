@@ -245,6 +245,10 @@ type queueEntry struct {
 	transferred *uint64
 	// applyDelay is the delay of an Applying update.
 	applyDelay time.Duration
+	// transferStarted is whether [UpdateTransferStarted] was emitted for
+	// the entry; reset leaves it, so a retry does not emit it again.
+	// Go-only: matter.js keeps no such mark.
+	transferStarted bool
 }
 
 // Manager is the controller's SoftwareUpdateManager. Safe for concurrent use.
@@ -941,9 +945,13 @@ func (m *Manager) checkProductForUpdates(ctx context.Context, vid, pid uint16, v
 }
 
 // queueUpdate is #queueUpdate (:892-920): an entry of a node already
-// queued replaces it unless it is in progress.
+// queued replaces it unless it is in progress. A new entry, and a
+// replacement that changes the queued target, report [UpdateQueued]
+// (Go-only, matter.js emits nothing here); a periodic re-check that
+// queues the same target again does not.
 func (m *Manager) queueUpdate(e *queueEntry) {
 	m.mu.Lock()
+	queued := true
 	if i := m.indexOfLocked(e.peer); i >= 0 {
 		existing := m.queue[i]
 		if !existing.started.IsZero() {
@@ -951,12 +959,16 @@ func (m *Manager) queueUpdate(e *queueEntry) {
 			m.log.Info("ota.manager.in_progress_skip", slog.String("node", peerString(e.peer)))
 			return
 		}
+		queued = existing.Target != e.Target
 		existing.Target = e.Target
 		existing.endpoint = e.endpoint
 	} else {
 		m.queue = append(m.queue, e)
 	}
 	m.mu.Unlock()
+	if queued {
+		m.emit(UpdateEvent{Kind: UpdateQueued, Peer: e.peer, Target: e.Target})
+	}
 	m.triggerQueuedUpdate()
 }
 
@@ -1258,7 +1270,10 @@ func (m *Manager) SuppressNextStartUp(p Peer, sessionID uint16) {
 // the consents it covers; Cancelled (a BDX interruption) resets it for a
 // retry; any other status moves it on, and Applying arms the reboot
 // re-subscription with the apply delay and, the first time, reports the
-// update applying.
+// update applying. The entry's first Downloading — the provider reports
+// it when the node's BDX session starts (OtaSoftwareUpdateProviderServer
+// .ts:308-327 at 862ad75f) — reports [UpdateTransferStarted], once per
+// entry: the Downloading of a retry's fresh session does not.
 func (m *Manager) OnStatusChange(p Peer, status Status, version *uint32, applyDelay time.Duration) {
 	if fn := m.cfg.OnStatus; fn != nil {
 		var v uint32
@@ -1308,28 +1323,45 @@ func (m *Manager) OnStatusChange(p Peer, status Status, version *uint32, applyDe
 		m.log.Info("ota.manager.bdx_cancelled_retry", slog.String("node", peerString(p)))
 		m.triggerQueuedUpdate()
 	default:
-		wasApplying := e.status != nil && *e.status == mattercore.OTAUpdateApplying
-		e.started = m.clock.Now()
-		s := status
-		e.status = &s
-		e.applyDelay = 0
-		if status == mattercore.OTAUpdateApplying {
-			e.applyDelay = applyDelay
+		m.progressLocked(p, e, status, applyDelay)
+	}
+}
+
+// progressLocked is onOtaStatusChange's last branch (:1296-1320): the
+// entry takes the status and its time; the first Downloading reports the
+// transfer started, Applying arms the reboot re-subscription and, the
+// first time, reports the update applying. It is called with m.mu held
+// and releases it.
+func (m *Manager) progressLocked(p Peer, e *queueEntry, status Status, applyDelay time.Duration) {
+	wasApplying := e.status != nil && *e.status == mattercore.OTAUpdateApplying
+	e.started = m.clock.Now()
+	s := status
+	e.status = &s
+	e.applyDelay = 0
+	if status == mattercore.OTAUpdateApplying {
+		e.applyDelay = applyDelay
+	}
+	applying := m.cfg.OnUpdateApplying
+	target := e.Target
+	transferStarted := status == mattercore.OTAUpdateDownloading && !e.transferStarted
+	if transferStarted {
+		e.transferStarted = true
+	}
+	m.mu.Unlock()
+	if transferStarted {
+		m.emit(UpdateEvent{Kind: UpdateTransferStarted, Peer: p, Target: target})
+	}
+	if status != mattercore.OTAUpdateApplying {
+		return
+	}
+	if m.cfg.Armer != nil {
+		m.cfg.Armer.Arm(p, applyDelay)
+	}
+	if !wasApplying {
+		if applying != nil {
+			applying(p)
 		}
-		applying := m.cfg.OnUpdateApplying
-		target := e.Target
-		m.mu.Unlock()
-		if status == mattercore.OTAUpdateApplying {
-			if m.cfg.Armer != nil {
-				m.cfg.Armer.Arm(p, applyDelay)
-			}
-			if !wasApplying {
-				if applying != nil {
-					applying(p)
-				}
-				m.emit(UpdateEvent{Kind: UpdateApplying, Peer: p, Target: target})
-			}
-		}
+		m.emit(UpdateEvent{Kind: UpdateApplying, Peer: p, Target: target})
 	}
 }
 

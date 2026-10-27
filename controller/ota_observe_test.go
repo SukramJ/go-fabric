@@ -50,9 +50,12 @@ func (u *updateEvents) has(k softwareupdate.UpdateEventKind) func() bool {
 
 // TestOTAObserveAppliedUpdate: the observer of a queued and applied
 // update — consent, announcement, the BDX download, apply, the applied
-// notification (OtaTest.ts:91 at 862ad75f) — sees the consent, then the
-// update applying, then done (SoftwareUpdateManager.ts:1317, :1279), each
-// for the device's peer and the target.
+// notification (OtaTest.ts:91 at 862ad75f) — sees the consent, the
+// update queued (#queueUpdate, SoftwareUpdateManager.ts:892-920), its
+// transfer started (the provider's Downloading at the BDX session start,
+// OtaSoftwareUpdateProviderServer.ts:308-327), then the update applying
+// and done (SoftwareUpdateManager.ts:1317, :1279), each for the device's
+// peer and the target.
 func TestOTAObserveAppliedUpdate(t *testing.T) {
 	t.Parallel()
 	r := newOTARig(t, nil)
@@ -66,7 +69,7 @@ func TestOTAObserveAppliedUpdate(t *testing.T) {
 		return err
 	})
 	r.eventually(t, "the done event", u.has(softwareupdate.UpdateDone))
-	if got, want := u.kinds(), []string{"consent_changed", "applying", "done"}; !slices.Equal(got, want) {
+	if got, want := u.kinds(), []string{"consent_changed", "queued", "transfer_started", "applying", "done"}; !slices.Equal(got, want) {
 		t.Fatalf("events %q, want %q", got, want)
 	}
 	p := r.peer(t)
@@ -82,7 +85,8 @@ func TestOTAObserveAppliedUpdate(t *testing.T) {
 
 // TestOTAObserveRemovedConsent: a forced update whose consent is removed
 // before the device fetched anything is reported as the consent added,
-// the consent removed and the update failed as cancelled (removeConsent
+// the update queued, the consent removed and the update failed as
+// cancelled (removeConsent
 // → #cancelUpdate, SoftwareUpdateManager.ts:1217-1232, :1091-1123).
 func TestOTAObserveRemovedConsent(t *testing.T) {
 	t.Parallel()
@@ -98,10 +102,10 @@ func TestOTAObserveRemovedConsent(t *testing.T) {
 	r.eventually(t, "the failed event", u.has(softwareupdate.UpdateFailed))
 	r.isolate(false)
 	evs := u.snapshot()
-	if got, want := u.kinds(), []string{"consent_changed", "consent_changed", "failed"}; !slices.Equal(got, want) {
+	if got, want := u.kinds(), []string{"consent_changed", "queued", "consent_changed", "failed"}; !slices.Equal(got, want) {
 		t.Fatalf("events %q, want %q", got, want)
 	}
-	if !evs[0].Consented || evs[1].Consented || !errors.Is(evs[2].Err, softwareupdate.ErrUpdateCancelled) {
+	if !evs[0].Consented || evs[2].Consented || !errors.Is(evs[3].Err, softwareupdate.ErrUpdateCancelled) {
 		t.Errorf("events %+v", evs)
 	}
 }
