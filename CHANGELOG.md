@@ -10,6 +10,8 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+## [0.13.7] — 2026-10-27
+
 ### Added
 
 - `<cluster>def.Host` and `<cluster>def.Server.Host()` (brief CK-2, issue #293): the methods of the kit's own servers that a host calls and the typed server's `Set`, `Get` and handlers do not reach, generated for 22 clusters from `script/clustergen/hosts.go` — the EV charger's hardware inputs and `Close`, DeviceEnergyManagement's `Close`, the Wi-Fi credentials, `ReloadNetworks`, the door state and users, the switch's delays and its position and press inputs (`switchclusterdef.Host` embeds `contract.SwitchPositionSink` and `contract.SwitchEventEmitter`), the AlarmBase reset, Binding's `Entries` and `OnChange`, the WebRTC requestor's sessions, the border router's `Refresh`, the camera servers' stream and zone methods and the rest the [Host ports](docs/guides/ports.md) guide lists. `Host()` is nil over a server that does not implement it; `Underlying()` stays, as a seam ([Advanced seams](docs/guides/advanced-seams.md)). A test holds every kit server's methods to the decision: in `Host` or reached by the typed layer. `core.TargetFromDef` and `core.TargetStruct.Def` convert a Binding entry between its generated and its presence-flag form.
@@ -4981,7 +4983,8 @@ consumer of an older pseudo-version should read.
   earlier than it was. Both fields are gone; the commit holding the file is
   its provenance.
 
-[Unreleased]: https://github.com/SukramJ/go-fabric/compare/v0.13.6...HEAD
+[Unreleased]: https://github.com/SukramJ/go-fabric/compare/v0.13.7...HEAD
+[0.13.7]: https://github.com/SukramJ/go-fabric/compare/v0.13.6...v0.13.7
 [0.13.6]: https://github.com/SukramJ/go-fabric/compare/v0.13.5...v0.13.6
 [0.13.5]: https://github.com/SukramJ/go-fabric/compare/v0.13.4...v0.13.5
 [0.13.4]: https://github.com/SukramJ/go-fabric/compare/v0.13.3...v0.13.4
