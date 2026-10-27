@@ -284,7 +284,9 @@ connection), `GeneralCommissioning.Complete` 20.1 and
 `OperationalCredentials.UpdateFabricLabel` 98.1. matter.js names no step
 for what comes before its flow; `Discovery` 2.1 (DNS-SD or BLE, skipped
 with `PairOptions.Address`) and `PASE` 2.2 are this module's names, and
-they are reported first. The callback runs on `Pair`'s goroutine and must
+they are reported first. `Subscribe` 21.1, also this module's, is
+reported last: the node's start, its initial read and default
+subscription. A failed step is the last report. The callback runs on `Pair`'s goroutine and must
 not block. `commissioner.Options.Progress` is the same hook one layer
 down.
 
@@ -563,8 +565,11 @@ judges a node on current data only.
 applies, an error. `UpdateAvailable`, `UpdateApplying`, `UpdateDone` and
 `UpdateFailed` are matter.js's `updateAvailable`, `updateApplying`,
 `updateDone` and `updateFailed`. `UpdateConsentChanged` (a consent added
-or removed) and `UpdateCheckFinished` (a check's end, with the nodes it
-found an update for) are this module's own. A failed update carries
+or removed), `UpdateCheckFinished` (a check's end, with the nodes it
+found an update for), `UpdateQueued` (an update entered the queue) and
+`UpdateTransferStarted` (the node began downloading it, once per update,
+not again for a retry) are this module's own. One update reports queued,
+transfer started, applying, then done or failed. A failed update carries
 `ErrNotApplied` or `ErrUpdateCancelled`. Events arrive in order on a
 goroutine of the manager's that holds none of its locks, so `fn` may call
 back into the manager. The returned function unsubscribes and is

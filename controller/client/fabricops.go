@@ -157,6 +157,13 @@ var defaultCASEConnectionTiming = Timing{
 // newly commissioned (:314); record and settings are saved (:316) and the
 // node started (:327) — an error of its initial read is returned and the
 // node stays commissioned. A commissioner error leaves the node as it was.
+//
+// The node's start is reported through o.Progress as the step
+// commissioner.StepSubscribe 21.1 — started, then succeeded or failed with
+// the start's error. It is never skipped: every commission that succeeds
+// starts the node, and one that fails earlier reports nothing after its
+// failed step, as matter.js reports nothing after a failure
+// (ControllerCommissioningFlow.ts:438-462 at 862ad75f).
 func (r *Registry) Commission(ctx context.Context, n *Node, o CommissionOptions) error {
 	return r.runFabricOperation(n, opCommission, func() error { return r.commission(ctx, n, o) })
 }
@@ -228,7 +235,13 @@ func (r *Registry) commission(ctx context.Context, n *Node, o CommissionOptions)
 	if h := n.cfg.Hooks.Commissioned; h != nil {
 		h()
 	}
-	return n.Start(ctx)
+	commissioner.ReportSubscribe(o.Progress, commissioner.StepStarted, nil)
+	if err := n.Start(ctx); err != nil {
+		commissioner.ReportSubscribe(o.Progress, commissioner.StepFailed, err)
+		return err
+	}
+	commissioner.ReportSubscribe(o.Progress, commissioner.StepSucceeded, nil)
+	return nil
 }
 
 // Decommission removes the node from its fabric and deletes it —
