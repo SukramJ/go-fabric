@@ -10,6 +10,19 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+### Added
+
+- `cluster/netinfra`: WiFiNetworkManagement and ThreadNetworkDirectory servers, ahead of matter.js (whose servers are the generated stubs, `WiFiNetworkManagementServer.ts:14` and `ThreadNetworkDirectoryServer.ts:14` at 862ad75f), after connectedhomeip at 6170af84 (brief 26-B). The kit mounts both by default on NetworkInfrastructureManager and ThreadBorderRouter.
+  - `netinfra.WiFiManagementServer`: the host sets the credentials with `SetNetworkCredentials` and drops them with `ClearNetworkCredentials`, under chip's SSID and WPA-personal checks (`netinfra.ErrInvalidCredentials`). A new passphrase advances `PassphraseSurrogate`. `NetworkPassphraseRequest` answers over CASE only (UNSUPPORTED_ACCESS otherwise; INVALID_IN_STATE without credentials). The passphrase is never logged.
+  - `netinfra.ThreadDirectoryServer` over the new port `netinfra.ThreadNetworkStore` (= `threadnetworkdirectorydef.ThreadNetworkStore`, generated, `Declare.ThreadNetworkStore`; the in-memory `netinfra.MemoryThreadNetworkStore` without one). `AddNetwork`, `RemoveNetwork` and `GetOperationalDataset` follow chip's dataset checks and status codes. A `PreferredExtendedPanID` write must name a stored network. The store keeps it too (`LoadPreferred`, `SavePreferred`), as chip keeps it in attribute storage: it is loaded at start, and a saved one that names no stored network is cleared with a warning. `ReloadNetworks` takes in a store the host changed.
+  - chip's `TestWiFiNetworkManagementCluster.cpp` (10 cases) and `TestThreadNetworkDirectoryCluster.cpp` (7 of 8; the storage-migration case is chip's own format) are ported, plus a wire test on a commissioned pair.
+- matter.js's `ThreadNetworkDiagnosticsProvisionalTest.ts` is ported (`device`): the provisional `ExtAddress` and `Rloc16` are absent until the declaration supplies them. This passed without a change.
+- Guide: [Network infrastructure](docs/guides/network-infrastructure.md).
+
+### Changed
+
+- WiFiNetworkManagement's `Ssid` and `PassphraseSurrogate` and ThreadNetworkDirectory's `ThreadNetworks` and `ThreadNetworkTableSize` are no longer set through the typed server's `Set`: they follow the credentials and the store (`spec.ErrNotHeld`). A host's `Handle…` registered on either cluster still replaces the server's command.
+
 ## [0.13.3] — 2026-10-26
 
 ### Added

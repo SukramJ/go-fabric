@@ -44,7 +44,9 @@ import (
 	tadef "github.com/SukramJ/go-fabric/cluster/spec/temperaturealarm"
 	thermostatdef "github.com/SukramJ/go-fabric/cluster/spec/thermostat"
 	tuidef "github.com/SukramJ/go-fabric/cluster/spec/thermostatuserinterfaceconfiguration"
+	tdirdef "github.com/SukramJ/go-fabric/cluster/spec/threadnetworkdirectory"
 	userlabeldef "github.com/SukramJ/go-fabric/cluster/spec/userlabel"
+	wifimgmtdef "github.com/SukramJ/go-fabric/cluster/spec/wifinetworkmanagement"
 	wcdef "github.com/SukramJ/go-fabric/cluster/spec/windowcovering"
 	switchserver "github.com/SukramJ/go-fabric/cluster/switch"
 	"github.com/SukramJ/go-fabric/cluster/thermo"
@@ -141,6 +143,11 @@ var selfHeldDefaults = map[uint32]serverFactory{
 	// The servers that run on a host port the declaration carries
 	// (defaults_ports.go).
 	fandef.ClusterID: newFanControlServer, // FanControl: cluster/fan, matter.js FanControlServer.ts.
+
+	// The network-infrastructure servers after connectedhomeip
+	// (defaults_netinfra.go).
+	wifimgmtdef.ClusterID: newWiFiManagementServer,  // WiFiNetworkManagement: cluster/netinfra.
+	tdirdef.ClusterID:     newThreadDirectoryServer, // ThreadNetworkDirectory: cluster/netinfra, Declare.ThreadNetworkStore.
 
 	// The appliance, sensor-configuration and energy servers
 	// (defaults_appliance.go).

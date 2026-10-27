@@ -64,6 +64,10 @@ var committed = []string{
 	"WindowCovering",
 	// cluster/lock
 	"DoorLock",
+	// cluster/netinfra, after connectedhomeip (brief 26-B; matter.js serves
+	// both as the generated stub)
+	"WiFiNetworkManagement",
+	"ThreadNetworkDirectory",
 	// cluster/thermo
 	"Thermostat",
 	"TemperatureControl",
@@ -162,7 +166,6 @@ var committed = []string{
 	"Groupcast",
 	"WaterTankLevelMonitoring",
 	"AmbientContextSensing",
-	"WiFiNetworkManagement",
 	"Chime",
 	// The camera, Thread, Joint Fabric and TLS clusters (brief CL §1,
 	// owner decision 2026-10-25): served by the generated server as
@@ -180,7 +183,6 @@ var committed = []string{
 	"ZoneManagement",
 	"ThreadNetworkDiagnostics",
 	"ThreadBorderRouterManagement",
-	"ThreadNetworkDirectory",
 	"JointFabricDatastore",
 	"JointFabricAdministrator",
 	"TlsCertificateManagement",
