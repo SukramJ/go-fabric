@@ -219,6 +219,7 @@ func (f *flow) execute(ctx context.Context) error {
 	rearmedAfterPrevious := false
 	for _, s := range f.steps {
 		f.log.Info("matter.controller.commissioning.step", slog.String("step", fmt.Sprintf("%d.%d", s.number, s.sub)), slog.String("name", s.name))
+		f.report(s, StepStarted, nil)
 		// A step with reArmFailsafe re-arms first, unless the previous
 		// step's bookkeeping just did or the BLE re-arm timer runs
 		// (:385-393).
@@ -236,6 +237,7 @@ func (f *flow) execute(ctx context.Context) error {
 			f.results[[2]int{s.number, s.sub}] = res
 			rearmedAfterPrevious, err = f.afterStep(ctx, s)
 			if err == nil {
+				f.report(s, phaseOf(res), nil)
 				if res == stepStop {
 					break
 				}
@@ -244,6 +246,7 @@ func (f *flow) execute(ctx context.Context) error {
 		}
 		if ce, ok := err.(*CommissioningError); ok && ce.Kind == errRecoverable { //nolint:errorlint // instanceof RecoverableCommissioningError (:431)
 			f.log.Warn("matter.controller.commissioning.step_failed_recoverable", slog.String("name", s.name), slog.Any("err", err))
+			f.report(s, StepFailed, err)
 			continue
 		}
 		if isCommissioningError(err) || isStatusError(err) {
@@ -253,13 +256,31 @@ func (f *flow) execute(ctx context.Context) error {
 			// (:459, general/src/MatterError.ts:87-92); a status error
 			// itself is repacked (:462, util/Error.ts:88-104).
 			if se, ok := err.(*interaction.StatusError); ok { //nolint:errorlint // the top-level instanceof of :459
-				return newError(ErrCommissioning, se.Error(), se)
+				err = newError(ErrCommissioning, se.Error(), se)
 			}
-			return err
 		}
+		f.report(s, StepFailed, err)
 		return err
 	}
 	return nil
+}
+
+// report reports the step through Options.Progress ([Step]); a failed
+// step's err is the error the flow returns or, recoverable, goes on after.
+func (f *flow) report(s step, phase StepPhase, err error) {
+	f.opts.report(uint8(s.number), uint8(s.sub), s.name, phase, err) //nolint:gosec // step numbers are 0-99 (:536-656)
+}
+
+// phaseOf is the phase a step's result reports: Stop as Succeeded.
+func phaseOf(res stepResult) StepPhase {
+	switch res {
+	case stepFailure:
+		return StepFailed
+	case stepSkipped:
+		return StepSkipped
+	case stepSuccess, stepStop:
+	}
+	return StepSucceeded
 }
 
 // afterStep is the failsafe bookkeeping after a successful step
