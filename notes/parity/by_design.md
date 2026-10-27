@@ -4589,3 +4589,32 @@ stays unserved (`:372-379`), and no hold timer runs. Reasoning: a device
 that follows a week program must learn that a controller asked it to hold
 or to resume, and the Sink is where every other admitted write reaches the
 host (brief CO, issue #273).
+
+### BD-Matter-GeneratedServerSuffices — clusters whose generated server is complete: no source carries behaviour beyond the model
+
+Audit of 2026-10-27 (owner question at the milestone 6 concept; read map
+`read-generated-clusters-chip-rules.md`, connectedhomeip at the harness
+commit `6170af84`, matter.js at `862ad75f`): for every cluster this module
+serves, chip's server was checked for command handlers and validation
+beyond the data model. Every cluster where chip carries such rules already
+has a hand-written server here (`cluster/core`, `energy`, `media`,
+`appliance`, `closure`, `fan`, `pump`, `valve`, `filter`, `thermo` and the
+measurement projections; the `BD-chip-*` entries above record each rule
+set), or is a milestone 6 wave (concept v10). What remains generated is
+complete by the model alone — no `*Server.ts` logic at the pin (the 14-line
+shell), no chip handler, no chip status beyond UnsupportedAttribute /
+UnsupportedCommand: **WaterTankLevelMonitoring** (0x0079; chip has no server
+at all), **MeterIdentification** (0x0B06), **ElectricalGridConditions**
+(0x00A0; one `Status::Failure` on a read error,
+`electrical-grid-conditions-server.cpp:160`), **FixedLabel**, and the
+attribute-only measurement clusters (Temperature, RelativeHumidity,
+Illuminance, Pressure, Flow, BooleanState, the ten concentration
+measurements, ElectricalPowerMeasurement, SoilMeasurement — their host
+projections in `cluster/measurement` add the materialisers, not rules).
+Reasoning: the generated server enforces the model's constraints and
+conformance (ADR 0017); a rule that no reference implementation has is not
+a gap. Two findings came out of the same audit and are register entries,
+not divergences: TimeSynchronization's optional features (milestone 6 wave
+27-B) and AirQuality's feature-gated values. Re-read at every pin lift
+together with the Ahead-of-matter.js markers: a `*Server.ts` of one of
+these clusters growing past the shell reopens the question.
