@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 6620,
+  "entry_points": 6641,
   "entry_packages": [
     ".",
     "bdx",
@@ -34,6 +34,7 @@
     "cluster/media",
     "cluster/modebase",
     "cluster/modeselect",
+    "cluster/netinfra",
     "cluster/onoff",
     "cluster/opstate",
     "cluster/pump",
@@ -259,9 +260,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 16147,
-    "reachable": 11412,
-    "whitelisted": 4732,
+    "total_exported": 16163,
+    "reachable": 11426,
+    "whitelisted": 4734,
     "unreachable": 3
   },
   "by_package": [
@@ -9190,6 +9191,20 @@
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/modeselect/modeselect_server.go",
       "line": 91
+    },
+    {
+      "package": "cluster/netinfra",
+      "identifier": "ThreadNetwork",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/netinfra/threaddir.go",
+      "line": 31
+    },
+    {
+      "package": "cluster/netinfra",
+      "identifier": "ThreadNetworkStore",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/netinfra/threaddir.go",
+      "line": 45
     },
     {
       "package": "cluster/onoff",
@@ -23077,14 +23092,14 @@
       "identifier": "TestADeclaredSelectionTheServerDoesNotServeIsRefused",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/defaults_test.go",
-      "line": 140
+      "line": 143
     },
     {
       "package": "device",
       "identifier": "TestADefaultSelectionKeepsTheGeneratedServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/defaults_test.go",
-      "line": 164
+      "line": 167
     },
     {
       "package": "device",
@@ -23280,7 +23295,7 @@
       "identifier": "TestDimmableLightCouplesItsServers",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/defaults_test.go",
-      "line": 187
+      "line": 190
     },
     {
       "package": "device",
@@ -23560,7 +23575,7 @@
       "identifier": "TestSelfHeldDefaults",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/defaults_test.go",
-      "line": 45
+      "line": 46
     },
     {
       "package": "device",
