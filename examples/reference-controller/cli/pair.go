@@ -159,15 +159,11 @@ func cmdPair(e *env, args []string) error { //nolint:funlen // one flag per line
 		return err
 	}
 	pf := ProxyFlags{Proxies: proxies, Discover: discoverProxies, Keys: proxyKeys}
-	if len(proxyKeys) > 0 && !discoverProxies {
-		return errors.New("--bluetooth-proxy-key needs --bluetooth-proxy-discover")
+	viaProxies, err := pf.check(e)
+	if err != nil {
+		return err
 	}
-	if pf.set() {
-		useBLE = true
-		if e.proxies == nil {
-			return errNoProxies
-		}
-	}
+	useBLE = useBLE || viaProxies
 	if useBLE {
 		if !pf.set() && e.central == nil {
 			return errNoBLE

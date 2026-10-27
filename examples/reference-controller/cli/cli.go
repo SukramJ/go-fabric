@@ -64,6 +64,21 @@ type ProxyFlags struct {
 // set reports whether a proxy flag is given.
 func (f ProxyFlags) set() bool { return len(f.Proxies) > 0 || f.Discover }
 
+// check validates the proxy flags against the build; true when they ask
+// for BLE through proxies.
+func (f ProxyFlags) check(e *env) (bool, error) {
+	if len(f.Keys) > 0 && !f.Discover {
+		return false, errors.New("--bluetooth-proxy-key needs --bluetooth-proxy-discover")
+	}
+	if !f.set() {
+		return false, nil
+	}
+	if e.proxies == nil {
+		return true, errNoProxies
+	}
+	return true, nil
+}
+
 // stderr is where the log and the usage go.
 var stderr io.Writer = os.Stderr
 
