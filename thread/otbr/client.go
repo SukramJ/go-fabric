@@ -301,7 +301,7 @@ func (c *Client) Node(ctx context.Context) (NodeInfo, error) {
 		return NodeInfo{}, restError(CodeProtocol, "%s: missing or invalid field rloc16", where)
 	}
 	info.Rloc16 = rloc16
-	for _, key := range []string{"numOfRouter", "routerCount"} { // OtbrRestClient.ts:118-125
+	for _, key := range []string{"numOfRouter", "routerCount"} { // OtbrRestClient.ts:200
 		if n, ok := asNumber(body[key]); ok {
 			info.NumOfRouter = int(n)
 			break

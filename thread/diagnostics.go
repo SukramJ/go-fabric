@@ -11,12 +11,11 @@ package thread
 // (the decode/encode functions of tlv/diag/) are not, since MeshCoP stays
 // out of the module (ADR 0027 decision 5).
 
-// DeviceRole is a Thread node's role as OpenThread names it: the string
-// the OTBR REST surface answers on /node/state and in /node
-// (OtbrRestClient.ts:275-282, "router", "leader", "child", "disabled"),
-// and OpenThread's otDeviceRole that connectedhomeip maps to the
-// RoutingRole attribute (DirectThreadNetworkDiagnosticsProvider.cpp:104-145
-// at 6170af84).
+// DeviceRole is a Thread node's role: the string the border router's REST
+// surface answers on /node/state and in /node (OtbrRestClient.ts:275-282,
+// "router", "leader", "child", "disabled"). It is the otDeviceRole that
+// connectedhomeip maps to the RoutingRole attribute
+// (DirectThreadNetworkDiagnosticsProvider.cpp:104-145 at 6170af84).
 type DeviceRole string
 
 // The roles of otDeviceRole.

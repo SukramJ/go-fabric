@@ -49,7 +49,7 @@ func translate(t *testing.T, entry any) thread.DiagnosticResponse {
 	return r
 }
 
-// TranslationTest.ts:21-83.
+// thread-br-client/test/TranslationTest.ts:21-83.
 func TestTranslateRouterWithChildren(t *testing.T) {
 	t.Parallel()
 	d := translate(t, entryWithRloc16(t, 5120))
@@ -75,7 +75,7 @@ func TestTranslateRouterWithChildren(t *testing.T) {
 	}
 }
 
-// TranslationTest.ts:85-96.
+// thread-br-client/test/TranslationTest.ts:85-96.
 func TestTranslateWithoutChildren(t *testing.T) {
 	t.Parallel()
 	d := translate(t, entryWithRloc16(t, 18432))
@@ -84,7 +84,7 @@ func TestTranslateWithoutChildren(t *testing.T) {
 	}
 }
 
-// TranslationTest.ts:98-112: a hex-string rloc16, and a malformed one
+// thread-br-client/test/TranslationTest.ts:98-112: a hex-string rloc16, and a malformed one
 // omitted rather than mis-decoded.
 func TestTranslateRloc16(t *testing.T) {
 	t.Parallel()
@@ -98,7 +98,7 @@ func TestTranslateRloc16(t *testing.T) {
 	}
 }
 
-// TranslationTest.ts:120-126.
+// thread-br-client/test/TranslationTest.ts:120-126.
 func TestTranslateAllFixtureEntries(t *testing.T) {
 	t.Parallel()
 	for _, e := range fixtureEntries(t) {
@@ -122,7 +122,7 @@ func mle(overrides map[string]any) map[string]any {
 	return m
 }
 
-// TranslationTest.ts:178-225: the OTBR's MLE counter names, absence,
+// thread-br-client/test/TranslationTest.ts:178-225: the OTBR's MLE counter names, absence,
 // 64-bit strings, the uint64 bound, a negative and a malformed counter.
 func TestTranslateMleCounters(t *testing.T) {
 	t.Parallel()
@@ -155,7 +155,7 @@ func TestTranslateMleCounters(t *testing.T) {
 	}
 }
 
-// TranslationTest.ts:227-238.
+// thread-br-client/test/TranslationTest.ts:227-238.
 func TestTranslateModeAllZero(t *testing.T) {
 	t.Parallel()
 	zero := json.Number("0")

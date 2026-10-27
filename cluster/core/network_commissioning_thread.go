@@ -23,10 +23,10 @@ import (
 
 // ThreadNetworkCommissioning is the NetworkCommissioning cluster (0x0031)
 // with the Thread feature over a Thread Border Router's
-// [tbrmdef.BorderRouter] — the same one its ThreadBorderRouterManagement
-// server manages (cluster/threadbr), so both clusters reflect one network
-// as the ThreadBorderRouter device type demands of an endpoint that also
-// carries SecondaryNetworkInterface (matter.js
+// [tbrmdef.BorderRouter], the one cluster/threadbr's management server
+// manages. Both clusters then reflect one network, as the border router's
+// device type demands of an endpoint that also supports the secondary
+// network interface device type (matter.js
 // packages/node/src/devices/thread-border-router.ts:34-39 at 862ad75f;
 // ADR 0027 decision 3). MaxNetworks is 1.
 //
