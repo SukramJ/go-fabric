@@ -43,54 +43,169 @@ const (
 // fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type Feature uint32
 
-// CurrentSessionsEntry is the anonymous struct CurrentSessionsEntry.
-type CurrentSessionsEntry struct{}
+// WebRTCSessionStruct is the WebRTCSessionStruct struct.
+type WebRTCSessionStruct struct {
+	Id              uint16                 // 0: WebRTCSessionID, M
+	PeerNodeId      uint64                 // 1: node-id, M
+	PeerEndpointId  uint16                 // 2: endpoint-no, M
+	StreamUsage     StreamUsageEnum        // 3: StreamUsageEnum, M
+	VideoStreamId   *spec.Nullable[uint16] // 4: CameraAvStreamManagement.VideoStreamID, O, D, X
+	AudioStreamId   *spec.Nullable[uint16] // 5: CameraAvStreamManagement.AudioStreamID, O, D, X
+	MetadataEnabled bool                   // 6: bool, M
+	VideoStreams    *[]uint16              // 7: list[CameraAvStreamManagement.VideoStreamID], O.a+, 1 to 16
+	AudioStreams    *[]uint16              // 8: list[CameraAvStreamManagement.AudioStreamID], O.a+, 1 to 16
+	FabricIndex     uint8                  // 254: FabricIndex, M, 1 to 254
+}
 
 // EncodeTLV implements spec.Encodable.
-func (v CurrentSessionsEntry) EncodeTLV(enc *tlv.Encoder, tag tlv.Tag) {
+func (v WebRTCSessionStruct) EncodeTLV(enc *tlv.Encoder, tag tlv.Tag) {
 	enc.StartStruct(tag)
+	spec.PutUint[uint16](enc, tlv.ContextTag(0), v.Id)
+	spec.PutUint[uint64](enc, tlv.ContextTag(1), v.PeerNodeId)
+	spec.PutUint[uint16](enc, tlv.ContextTag(2), v.PeerEndpointId)
+	spec.PutUint[StreamUsageEnum](enc, tlv.ContextTag(3), v.StreamUsage)
+	spec.PutOptional(enc, tlv.ContextTag(4), v.VideoStreamId, spec.PutNullable(spec.PutUint[uint16]))
+	spec.PutOptional(enc, tlv.ContextTag(5), v.AudioStreamId, spec.PutNullable(spec.PutUint[uint16]))
+	spec.PutBool(enc, tlv.ContextTag(6), v.MetadataEnabled)
+	spec.PutOptional(enc, tlv.ContextTag(7), v.VideoStreams, spec.PutList(spec.PutUint[uint16]))
+	spec.PutOptional(enc, tlv.ContextTag(8), v.AudioStreams, spec.PutList(spec.PutUint[uint16]))
+	spec.PutUint[uint8](enc, tlv.ContextTag(254), v.FabricIndex)
 	_ = enc.EndContainer()
 }
 
 // DecodeTLV decodes the structure n into v.
-func (v *CurrentSessionsEntry) DecodeTLV(n spec.Node) error {
-	return spec.DecodeFields(n, "CurrentSessionsEntry")
+func (v *WebRTCSessionStruct) DecodeTLV(n spec.Node) error {
+	return spec.DecodeFields(n, "WebRTCSessionStruct",
+		spec.Bind(0, "Id", true, &v.Id, spec.DecodeUint[uint16](16)),
+		spec.Bind(1, "PeerNodeId", true, &v.PeerNodeId, spec.DecodeUint[uint64](64)),
+		spec.Bind(2, "PeerEndpointId", true, &v.PeerEndpointId, spec.DecodeUint[uint16](16)),
+		spec.Bind(3, "StreamUsage", true, &v.StreamUsage, spec.DecodeUint[StreamUsageEnum](8)),
+		spec.Bind(4, "VideoStreamId", false, &v.VideoStreamId, spec.DecodeOptional(spec.DecodeNullable(spec.DecodeUint[uint16](16)))),
+		spec.Bind(5, "AudioStreamId", false, &v.AudioStreamId, spec.DecodeOptional(spec.DecodeNullable(spec.DecodeUint[uint16](16)))),
+		spec.Bind(6, "MetadataEnabled", true, &v.MetadataEnabled, spec.DecodeBool),
+		spec.Bind(7, "VideoStreams", false, &v.VideoStreams, spec.DecodeOptional(spec.DecodeListIn(spec.DecodeUint[uint16](16), 1, 16))),
+		spec.Bind(8, "AudioStreams", false, &v.AudioStreams, spec.DecodeOptional(spec.DecodeListIn(spec.DecodeUint[uint16](16), 1, 16))),
+		spec.Bind(254, "FabricIndex", true, &v.FabricIndex, spec.DecodeUintIn[uint8](8, 1, 254)),
+	)
 }
 
-// OfferRequestIceServersEntry is the anonymous struct OfferRequestIceServersEntry.
-type OfferRequestIceServersEntry struct{}
+// WebRTCSessionStructDef describes WebRTCSessionStruct.
+//
+// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
+var WebRTCSessionStructDef = &spec.Struct{Name: "WebRTCSessionStruct", Fields: []spec.Field{
+	{ID: 0, Name: "Id", Type: spec.Type{Name: "WebRTCSessionID", Kind: spec.KindUint, Bits: 16}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
+	{ID: 1, Name: "PeerNodeId", Type: spec.Type{Name: "node-id", Kind: spec.KindUint, Bits: 64}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
+	{ID: 2, Name: "PeerEndpointId", Type: spec.Type{Name: "endpoint-no", Kind: spec.KindUint, Bits: 16}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
+	{ID: 3, Name: "StreamUsage", Type: spec.Type{Name: "StreamUsageEnum", Kind: spec.KindEnum, Bits: 8, Enum: StreamUsageEnumDef}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
+	{ID: 4, Name: "VideoStreamId", Type: spec.Type{Name: "CameraAvStreamManagement.VideoStreamID", Kind: spec.KindUint, Bits: 16}, Conformance: spec.Conformance{Text: "O, D", Op: spec.ConfOtherwise, Args: []spec.Conformance{{Op: spec.ConfOptional}, {Op: spec.ConfDeprecated}}}, Quality: spec.Quality{Nullable: true}},
+	{ID: 5, Name: "AudioStreamId", Type: spec.Type{Name: "CameraAvStreamManagement.AudioStreamID", Kind: spec.KindUint, Bits: 16}, Conformance: spec.Conformance{Text: "O, D", Op: spec.ConfOtherwise, Args: []spec.Conformance{{Op: spec.ConfOptional}, {Op: spec.ConfDeprecated}}}, Quality: spec.Quality{Nullable: true}},
+	{ID: 6, Name: "MetadataEnabled", Type: spec.Type{Name: "bool", Kind: spec.KindBool}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
+	{ID: 7, Name: "VideoStreams", Type: spec.Type{Name: "list", Kind: spec.KindList, Entry: &spec.Field{Name: "entry", Type: spec.Type{Name: "CameraAvStreamManagement.VideoStreamID", Kind: spec.KindUint, Bits: 16}}}, Conformance: spec.Conformance{Text: "O.a+", Op: spec.ConfChoice, Choice: &spec.Choice{Name: "a", Num: 1, OrMore: true, OrLess: false}, Args: []spec.Conformance{{Op: spec.ConfOptional}}}, Constraint: spec.Constraint{Text: "1 to 16", Min: &spec.Bound{Int: 1}, Max: &spec.Bound{Int: 16}}},
+	{ID: 8, Name: "AudioStreams", Type: spec.Type{Name: "list", Kind: spec.KindList, Entry: &spec.Field{Name: "entry", Type: spec.Type{Name: "CameraAvStreamManagement.AudioStreamID", Kind: spec.KindUint, Bits: 16}}}, Conformance: spec.Conformance{Text: "O.a+", Op: spec.ConfChoice, Choice: &spec.Choice{Name: "a", Num: 1, OrMore: true, OrLess: false}, Args: []spec.Conformance{{Op: spec.ConfOptional}}}, Constraint: spec.Constraint{Text: "1 to 16", Min: &spec.Bound{Int: 1}, Max: &spec.Bound{Int: 16}}},
+	{ID: 254, Name: "FabricIndex", Type: spec.Type{Name: "FabricIndex", Kind: spec.KindUint, Bits: 8}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "1 to 254", Min: &spec.Bound{Int: 1}, Max: &spec.Bound{Int: 254}}},
+}}
+
+// StreamUsageEnum is the StreamUsageEnum enum8.
+//
+// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
+type StreamUsageEnum uint8
+
+// StreamUsageEnum values.
+const (
+	StreamUsageInternal  StreamUsageEnum = 0 // M
+	StreamUsageRecording StreamUsageEnum = 1 // O
+	StreamUsageAnalysis  StreamUsageEnum = 2 // O
+	StreamUsageLiveView  StreamUsageEnum = 3 // M
+)
+
+// StreamUsageEnumDef describes StreamUsageEnum.
+//
+// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
+var StreamUsageEnumDef = &spec.Enum{Name: "StreamUsageEnum", Bits: 8, Values: []spec.EnumValue{
+	{Value: 0, Name: "Internal", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
+	{Value: 1, Name: "Recording", Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional}},
+	{Value: 2, Name: "Analysis", Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional}},
+	{Value: 3, Name: "LiveView", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
+}}
+
+// ICEServerStruct is the ICEServerStruct struct.
+type ICEServerStruct struct {
+	Urls       []string // 0: list[string], M, max 10[max 2000]
+	Username   *string  // 1: string, O, max 508
+	Credential *string  // 2: string, O, max 512
+	Caid       *uint16  // 3: TlsCertificateManagement.TLSCAID, O, 0 to 65534
+}
 
 // EncodeTLV implements spec.Encodable.
-func (v OfferRequestIceServersEntry) EncodeTLV(enc *tlv.Encoder, tag tlv.Tag) {
+func (v ICEServerStruct) EncodeTLV(enc *tlv.Encoder, tag tlv.Tag) {
 	enc.StartStruct(tag)
+	spec.PutList(spec.PutString)(enc, tlv.ContextTag(0), v.Urls)
+	spec.PutOptional(enc, tlv.ContextTag(1), v.Username, spec.PutString)
+	spec.PutOptional(enc, tlv.ContextTag(2), v.Credential, spec.PutString)
+	spec.PutOptional(enc, tlv.ContextTag(3), v.Caid, spec.PutUint[uint16])
 	_ = enc.EndContainer()
 }
 
 // DecodeTLV decodes the structure n into v.
-func (v *OfferRequestIceServersEntry) DecodeTLV(n spec.Node) error {
-	return spec.DecodeFields(n, "OfferRequestIceServersEntry")
+func (v *ICEServerStruct) DecodeTLV(n spec.Node) error {
+	return spec.DecodeFields(n, "ICEServerStruct",
+		spec.Bind(0, "Urls", true, &v.Urls, spec.DecodeListIn(spec.DecodeString, 0, 10)),
+		spec.Bind(1, "Username", false, &v.Username, spec.DecodeOptional(spec.DecodeStringIn(0, 508))),
+		spec.Bind(2, "Credential", false, &v.Credential, spec.DecodeOptional(spec.DecodeStringIn(0, 512))),
+		spec.Bind(3, "Caid", false, &v.Caid, spec.DecodeOptional(spec.DecodeUintIn[uint16](16, 0, 65534))),
+	)
 }
 
-// IceCandidatesRequestIceCandidatesEntry is the anonymous struct IceCandidatesRequestIceCandidatesEntry.
-type IceCandidatesRequestIceCandidatesEntry struct{}
+// ICEServerStructDef describes ICEServerStruct.
+//
+// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
+var ICEServerStructDef = &spec.Struct{Name: "ICEServerStruct", Fields: []spec.Field{
+	{ID: 0, Name: "Urls", Type: spec.Type{Name: "list", Kind: spec.KindList, Entry: &spec.Field{Name: "entry", Type: spec.Type{Name: "string", Kind: spec.KindString}}}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "max 10[max 2000]", Max: &spec.Bound{Int: 10}, Entry: &spec.Constraint{Text: "max 2000", Max: &spec.Bound{Int: 2000}}}},
+	{ID: 1, Name: "Username", Type: spec.Type{Name: "string", Kind: spec.KindString}, Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional}, Constraint: spec.Constraint{Text: "max 508", Max: &spec.Bound{Int: 508}}},
+	{ID: 2, Name: "Credential", Type: spec.Type{Name: "string", Kind: spec.KindString}, Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional}, Constraint: spec.Constraint{Text: "max 512", Max: &spec.Bound{Int: 512}}},
+	{ID: 3, Name: "Caid", Type: spec.Type{Name: "TlsCertificateManagement.TLSCAID", Kind: spec.KindUint, Bits: 16}, Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional}, Constraint: spec.Constraint{Text: "0 to 65534", Min: &spec.Bound{Int: 0}, Max: &spec.Bound{Int: 65534}}},
+}}
+
+// ICECandidateStruct is the ICECandidateStruct struct.
+type ICECandidateStruct struct {
+	Candidate     string                // 0: string, M
+	SdpMid        spec.Nullable[string] // 1: string, M, min 1, X
+	SdpmLineIndex spec.Nullable[uint16] // 2: uint16, M, X
+}
 
 // EncodeTLV implements spec.Encodable.
-func (v IceCandidatesRequestIceCandidatesEntry) EncodeTLV(enc *tlv.Encoder, tag tlv.Tag) {
+func (v ICECandidateStruct) EncodeTLV(enc *tlv.Encoder, tag tlv.Tag) {
 	enc.StartStruct(tag)
+	spec.PutString(enc, tlv.ContextTag(0), v.Candidate)
+	spec.PutNullable(spec.PutString)(enc, tlv.ContextTag(1), v.SdpMid)
+	spec.PutNullable(spec.PutUint[uint16])(enc, tlv.ContextTag(2), v.SdpmLineIndex)
 	_ = enc.EndContainer()
 }
 
 // DecodeTLV decodes the structure n into v.
-func (v *IceCandidatesRequestIceCandidatesEntry) DecodeTLV(n spec.Node) error {
-	return spec.DecodeFields(n, "IceCandidatesRequestIceCandidatesEntry")
+func (v *ICECandidateStruct) DecodeTLV(n spec.Node) error {
+	return spec.DecodeFields(n, "ICECandidateStruct",
+		spec.Bind(0, "Candidate", true, &v.Candidate, spec.DecodeString),
+		spec.Bind(1, "SdpMid", true, &v.SdpMid, spec.DecodeNullable(spec.DecodeStringIn(1, 2147483647))),
+		spec.Bind(2, "SdpmLineIndex", true, &v.SdpmLineIndex, spec.DecodeNullable(spec.DecodeUint[uint16](16))),
+	)
 }
+
+// ICECandidateStructDef describes ICECandidateStruct.
+//
+// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
+var ICECandidateStructDef = &spec.Struct{Name: "ICECandidateStruct", Fields: []spec.Field{
+	{ID: 0, Name: "Candidate", Type: spec.Type{Name: "string", Kind: spec.KindString}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
+	{ID: 1, Name: "SdpMid", Type: spec.Type{Name: "string", Kind: spec.KindString}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Quality: spec.Quality{Nullable: true}, Constraint: spec.Constraint{Text: "min 1", Min: &spec.Bound{Int: 1}}},
+	{ID: 2, Name: "SdpmLineIndex", Type: spec.Type{Name: "uint16", Kind: spec.KindUint, Bits: 16}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Quality: spec.Quality{Nullable: true}},
+}}
 
 // OfferRequest is the Offer command payload.
 type OfferRequest struct {
-	WebRtcSessionId    uint16                         // 0: WebRtcTransportDefinitions.WebRTCSessionID, M
-	Sdp                string                         // 1: string, M
-	IceServers         *[]OfferRequestIceServersEntry // 2: list[WebRtcTransportDefinitions.ICEServerStruct], O, max 10
-	IceTransportPolicy *string                        // 3: string, O, max 16
+	WebRtcSessionId    uint16             // 0: WebRtcTransportDefinitions.WebRTCSessionID, M
+	Sdp                string             // 1: string, M
+	IceServers         *[]ICEServerStruct // 2: list[WebRtcTransportDefinitions.ICEServerStruct], O, max 10
+	IceTransportPolicy *string            // 3: string, O, max 16
 }
 
 // EncodeTLV implements spec.Encodable.
@@ -98,7 +213,7 @@ func (v OfferRequest) EncodeTLV(enc *tlv.Encoder, tag tlv.Tag) {
 	enc.StartStruct(tag)
 	spec.PutUint[uint16](enc, tlv.ContextTag(0), v.WebRtcSessionId)
 	spec.PutString(enc, tlv.ContextTag(1), v.Sdp)
-	spec.PutOptional(enc, tlv.ContextTag(2), v.IceServers, spec.PutList(spec.PutStruct[OfferRequestIceServersEntry]))
+	spec.PutOptional(enc, tlv.ContextTag(2), v.IceServers, spec.PutList(spec.PutStruct[ICEServerStruct]))
 	spec.PutOptional(enc, tlv.ContextTag(3), v.IceTransportPolicy, spec.PutString)
 	_ = enc.EndContainer()
 }
@@ -108,7 +223,7 @@ func (v *OfferRequest) DecodeTLV(n spec.Node) error {
 	return spec.DecodeFields(n, "Offer",
 		spec.Bind(0, "WebRtcSessionId", true, &v.WebRtcSessionId, spec.DecodeUint[uint16](16)),
 		spec.Bind(1, "Sdp", true, &v.Sdp, spec.DecodeString),
-		spec.Bind(2, "IceServers", false, &v.IceServers, spec.DecodeOptional(spec.DecodeListIn(spec.DecodeStruct[OfferRequestIceServersEntry], 0, 10))),
+		spec.Bind(2, "IceServers", false, &v.IceServers, spec.DecodeOptional(spec.DecodeListIn(spec.DecodeStruct[ICEServerStruct], 0, 10))),
 		spec.Bind(3, "IceTransportPolicy", false, &v.IceTransportPolicy, spec.DecodeOptional(spec.DecodeStringIn(0, 16))),
 	)
 }
@@ -137,15 +252,15 @@ func (v *AnswerRequest) DecodeTLV(n spec.Node) error {
 
 // IceCandidatesRequest is the IceCandidates command payload.
 type IceCandidatesRequest struct {
-	WebRtcSessionId uint16                                   // 0: WebRtcTransportDefinitions.WebRTCSessionID, M
-	IceCandidates   []IceCandidatesRequestIceCandidatesEntry // 1: list[WebRtcTransportDefinitions.ICECandidateStruct], M, min 1
+	WebRtcSessionId uint16               // 0: WebRtcTransportDefinitions.WebRTCSessionID, M
+	IceCandidates   []ICECandidateStruct // 1: list[WebRtcTransportDefinitions.ICECandidateStruct], M, min 1
 }
 
 // EncodeTLV implements spec.Encodable.
 func (v IceCandidatesRequest) EncodeTLV(enc *tlv.Encoder, tag tlv.Tag) {
 	enc.StartStruct(tag)
 	spec.PutUint[uint16](enc, tlv.ContextTag(0), v.WebRtcSessionId)
-	spec.PutList(spec.PutStruct[IceCandidatesRequestIceCandidatesEntry])(enc, tlv.ContextTag(1), v.IceCandidates)
+	spec.PutList(spec.PutStruct[ICECandidateStruct])(enc, tlv.ContextTag(1), v.IceCandidates)
 	_ = enc.EndContainer()
 }
 
@@ -153,7 +268,7 @@ func (v IceCandidatesRequest) EncodeTLV(enc *tlv.Encoder, tag tlv.Tag) {
 func (v *IceCandidatesRequest) DecodeTLV(n spec.Node) error {
 	return spec.DecodeFields(n, "IceCandidates",
 		spec.Bind(0, "WebRtcSessionId", true, &v.WebRtcSessionId, spec.DecodeUint[uint16](16)),
-		spec.Bind(1, "IceCandidates", true, &v.IceCandidates, spec.DecodeListIn(spec.DecodeStruct[IceCandidatesRequestIceCandidatesEntry], 1, 2147483647)),
+		spec.Bind(1, "IceCandidates", true, &v.IceCandidates, spec.DecodeListIn(spec.DecodeStruct[ICECandidateStruct], 1, 2147483647)),
 	)
 }
 
@@ -190,8 +305,8 @@ func decodeIceCandidatesRequest(n spec.Node) (any, error) {
 func decodeEndRequest(n spec.Node) (any, error) { return spec.DecodeStruct[EndRequest](n) }
 
 func decodeAttrCurrentSessions(n spec.Node) (any, error) {
-	v, err := spec.DecodeList(spec.DecodeStruct[CurrentSessionsEntry])(n)
-	return spec.List[CurrentSessionsEntry](v), err
+	v, err := spec.DecodeList(spec.DecodeStruct[WebRTCSessionStruct])(n)
+	return spec.List[WebRTCSessionStruct](v), err
 }
 
 // Definition is the WebRtcTransportRequestor cluster definition.
@@ -200,7 +315,7 @@ var Definition = &spec.Cluster{
 	Attributes: []spec.Attribute{
 		{
 			ID: AttrCurrentSessions, Name: "CurrentSessions",
-			Type:        spec.Type{Name: "list", Kind: spec.KindList, Entry: &spec.Field{Name: "entry", Type: spec.Type{Name: "WebRtcTransportDefinitions.WebRTCSessionStruct", Kind: spec.KindStruct, Struct: &spec.Struct{Name: "CurrentSessionsEntry", Fields: nil}}, FabricSensitive: true}},
+			Type:        spec.Type{Name: "list", Kind: spec.KindList, Entry: &spec.Field{Name: "entry", Type: spec.Type{Name: "WebRtcTransportDefinitions.WebRTCSessionStruct", Kind: spec.KindStruct, Struct: WebRTCSessionStructDef}, FabricSensitive: true}},
 			Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory},
 			Access:      spec.Access{RW: "R", Read: spec.PrivilegeAdminister, Write: spec.PrivilegeAdminister, Fabric: "S"},
 			Decode:      decodeAttrCurrentSessions,
@@ -215,7 +330,7 @@ var Definition = &spec.Cluster{
 			Fields: []spec.Field{
 				{ID: 0, Name: "WebRtcSessionId", Type: spec.Type{Name: "WebRtcTransportDefinitions.WebRTCSessionID", Kind: spec.KindUint, Bits: 16}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 				{ID: 1, Name: "Sdp", Type: spec.Type{Name: "string", Kind: spec.KindString}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
-				{ID: 2, Name: "IceServers", Type: spec.Type{Name: "list", Kind: spec.KindList, Entry: &spec.Field{Name: "entry", Type: spec.Type{Name: "WebRtcTransportDefinitions.ICEServerStruct", Kind: spec.KindStruct, Struct: &spec.Struct{Name: "OfferRequestIceServersEntry", Fields: nil}}}}, Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional}, Constraint: spec.Constraint{Text: "max 10", Max: &spec.Bound{Int: 10}}},
+				{ID: 2, Name: "IceServers", Type: spec.Type{Name: "list", Kind: spec.KindList, Entry: &spec.Field{Name: "entry", Type: spec.Type{Name: "WebRtcTransportDefinitions.ICEServerStruct", Kind: spec.KindStruct, Struct: ICEServerStructDef}}}, Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional}, Constraint: spec.Constraint{Text: "max 10", Max: &spec.Bound{Int: 10}}},
 				{ID: 3, Name: "IceTransportPolicy", Type: spec.Type{Name: "string", Kind: spec.KindString}, Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional}, Constraint: spec.Constraint{Text: "max 16", Max: &spec.Bound{Int: 16}}},
 			},
 			Decode: decodeOfferRequest,
@@ -238,7 +353,7 @@ var Definition = &spec.Cluster{
 			Access:      spec.Access{RW: "R", Read: spec.PrivilegeOperate, Write: spec.PrivilegeOperate},
 			Fields: []spec.Field{
 				{ID: 0, Name: "WebRtcSessionId", Type: spec.Type{Name: "WebRtcTransportDefinitions.WebRTCSessionID", Kind: spec.KindUint, Bits: 16}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
-				{ID: 1, Name: "IceCandidates", Type: spec.Type{Name: "list", Kind: spec.KindList, Entry: &spec.Field{Name: "entry", Type: spec.Type{Name: "WebRtcTransportDefinitions.ICECandidateStruct", Kind: spec.KindStruct, Struct: &spec.Struct{Name: "IceCandidatesRequestIceCandidatesEntry", Fields: nil}}}}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "min 1", Min: &spec.Bound{Int: 1}}},
+				{ID: 1, Name: "IceCandidates", Type: spec.Type{Name: "list", Kind: spec.KindList, Entry: &spec.Field{Name: "entry", Type: spec.Type{Name: "WebRtcTransportDefinitions.ICECandidateStruct", Kind: spec.KindStruct, Struct: ICECandidateStructDef}}}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "min 1", Min: &spec.Bound{Int: 1}}},
 			},
 			Decode: decodeIceCandidatesRequest,
 		},

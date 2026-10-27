@@ -197,6 +197,12 @@ func (g *generator) crossClusterStruct(name string) *datatype {
 	}
 	c := g.snap.cluster(owner)
 	if c == nil {
+		// A definition-only cluster's struct (WebRtcTransportDefinitions.
+		// WebRTCSessionStruct), which matter.js's model resolves the same
+		// way (web-rtc-transport-definitions.element.ts:51-75).
+		c = g.snap.definition(owner)
+	}
+	if c == nil {
 		return nil
 	}
 	for _, d := range c.Datatypes {

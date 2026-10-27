@@ -27,14 +27,14 @@ func TestDefinitionMatchesSnapshot(t *testing.T) {
 // struct and payload and decodes it back.
 func TestCodecsRoundTrip(t *testing.T) {
 	t.Parallel()
-	spectest.RoundTrip(t, CurrentSessionsEntry{}, spec.DecodeStruct[CurrentSessionsEntry])
-	spectest.RoundTrip(t, OfferRequestIceServersEntry{}, spec.DecodeStruct[OfferRequestIceServersEntry])
-	spectest.RoundTrip(t, IceCandidatesRequestIceCandidatesEntry{}, spec.DecodeStruct[IceCandidatesRequestIceCandidatesEntry])
-	spectest.RoundTripCommand(t, Definition, CmdOffer, spec.Request, OfferRequest{WebRtcSessionId: uint16(1), Sdp: "x", IceServers: spectest.Ptr([]OfferRequestIceServersEntry{OfferRequestIceServersEntry{}}), IceTransportPolicy: spectest.Ptr("x")})
+	spectest.RoundTrip(t, WebRTCSessionStruct{Id: uint16(1), PeerNodeId: uint64(1), PeerEndpointId: uint16(1), StreamUsage: StreamUsageEnum(0), VideoStreamId: spectest.Ptr(spec.ValueOf(uint16(1))), AudioStreamId: spectest.Ptr(spec.ValueOf(uint16(1))), MetadataEnabled: true, VideoStreams: spectest.Ptr([]uint16{uint16(1)}), AudioStreams: spectest.Ptr([]uint16{uint16(1)}), FabricIndex: uint8(1)}, spec.DecodeStruct[WebRTCSessionStruct])
+	spectest.RoundTrip(t, ICEServerStruct{Urls: []string{"x"}, Username: spectest.Ptr("x"), Credential: spectest.Ptr("x"), Caid: spectest.Ptr(uint16(1))}, spec.DecodeStruct[ICEServerStruct])
+	spectest.RoundTrip(t, ICECandidateStruct{Candidate: "x", SdpMid: spec.ValueOf("x"), SdpmLineIndex: spec.ValueOf(uint16(1))}, spec.DecodeStruct[ICECandidateStruct])
+	spectest.RoundTripCommand(t, Definition, CmdOffer, spec.Request, OfferRequest{WebRtcSessionId: uint16(1), Sdp: "x", IceServers: spectest.Ptr([]ICEServerStruct{ICEServerStruct{Urls: []string{"x"}, Username: spectest.Ptr("x"), Credential: spectest.Ptr("x"), Caid: spectest.Ptr(uint16(1))}}), IceTransportPolicy: spectest.Ptr("x")})
 	spectest.RoundTripCommand(t, Definition, CmdAnswer, spec.Request, AnswerRequest{WebRtcSessionId: uint16(1), Sdp: "x"})
-	spectest.RoundTripCommand(t, Definition, CmdIceCandidates, spec.Request, IceCandidatesRequest{WebRtcSessionId: uint16(1), IceCandidates: []IceCandidatesRequestIceCandidatesEntry{IceCandidatesRequestIceCandidatesEntry{}}})
+	spectest.RoundTripCommand(t, Definition, CmdIceCandidates, spec.Request, IceCandidatesRequest{WebRtcSessionId: uint16(1), IceCandidates: []ICECandidateStruct{ICECandidateStruct{Candidate: "x", SdpMid: spec.ValueOf("x"), SdpmLineIndex: spec.ValueOf(uint16(1))}}})
 	spectest.RoundTripCommand(t, Definition, CmdEnd, spec.Request, EndRequest{WebRtcSessionId: uint16(1), Reason: uint8(1)})
-	spectest.RoundTripAttribute(t, Definition, AttrCurrentSessions, spec.List[CurrentSessionsEntry]([]CurrentSessionsEntry{CurrentSessionsEntry{}}))
+	spectest.RoundTripAttribute(t, Definition, AttrCurrentSessions, spec.List[WebRTCSessionStruct]([]WebRTCSessionStruct{WebRTCSessionStruct{Id: uint16(1), PeerNodeId: uint64(1), PeerEndpointId: uint16(1), StreamUsage: StreamUsageEnum(0), VideoStreamId: spectest.Ptr(spec.ValueOf(uint16(1))), AudioStreamId: spectest.Ptr(spec.ValueOf(uint16(1))), MetadataEnabled: true, VideoStreams: spectest.Ptr([]uint16{uint16(1)}), AudioStreams: spectest.Ptr([]uint16{uint16(1)}), FabricIndex: uint8(1)}}))
 }
 
 // TestTypedServer drives every method of the typed server once.
@@ -56,7 +56,7 @@ func TestTypedServer(t *testing.T) {
 	}
 	_ = s.Get()
 	full := Patch{
-		CurrentSessions: new([]CurrentSessionsEntry),
+		CurrentSessions: new([]WebRTCSessionStruct),
 	}
 	values := full.AttributeValues()
 	// The stored values read back into a State, field by field.
@@ -66,7 +66,7 @@ func TestTypedServer(t *testing.T) {
 	// definition: the controller's typed read equals the State the
 	// device reads from the same stored values.
 	sample := Patch{
-		CurrentSessions: spectest.Ptr([]CurrentSessionsEntry{CurrentSessionsEntry{}}),
+		CurrentSessions: spectest.Ptr([]WebRTCSessionStruct{WebRTCSessionStruct{Id: uint16(1), PeerNodeId: uint64(1), PeerEndpointId: uint16(1), StreamUsage: StreamUsageEnum(0), VideoStreamId: spectest.Ptr(spec.ValueOf(uint16(1))), AudioStreamId: spectest.Ptr(spec.ValueOf(uint16(1))), MetadataEnabled: true, VideoStreams: spectest.Ptr([]uint16{uint16(1)}), AudioStreams: spectest.Ptr([]uint16{uint16(1)}), FabricIndex: uint8(1)}}),
 	}
 	stored := sample.AttributeValues()
 	var device State
@@ -82,7 +82,7 @@ func TestTypedServer(t *testing.T) {
 	if len(values) != 1 {
 		t.Errorf("a patch of every field sets %d values, want 1", len(values))
 	}
-	if _, ok := values[AttrCurrentSessions].(spec.List[CurrentSessionsEntry]); !ok {
+	if _, ok := values[AttrCurrentSessions].(spec.List[WebRTCSessionStruct]); !ok {
 		t.Errorf("CurrentSessions is stored as %T, want its spec.List", values[AttrCurrentSessions])
 	}
 	s.OnChanged(func(State, contract.Change) {})()
@@ -114,6 +114,7 @@ func TestTypedServer(t *testing.T) {
 	if err := decl.Attach(srv); err != nil {
 		t.Error(err)
 	}
+	var _ RequestorPort = d.RequestorPort
 	// Every handler declared: each is installed, and refused by the
 	// empty definition's AcceptedCommandList.
 	all := d

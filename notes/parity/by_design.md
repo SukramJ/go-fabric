@@ -90,6 +90,8 @@ pin lift confirms by re-reading the row, [`pin-lifts.md`](./pin-lifts.md)).
 | BD-chip-DeviceEnergyManagement-EnergyEvse-RulesInServer | `DeviceEnergyManagementServer.ts:18`, `EnergyEvseServer.ts:14` are empty subclasses (absence: the class lines) | `packages/node/src/behaviors/device-energy-management/DeviceEnergyManagementServer.ts`<br>`packages/node/src/behaviors/energy-evse/EnergyEvseServer.ts` | `"export class DeviceEnergyManagementServer extends DeviceEnergyManagementBehavior {}"`<br>`"export class EnergyEvseServer extends EnergyEvseBehavior {}"` | connectedhomeip |
 | BD-chip-ClosureDimension-RulesInServer | `ClosureDimensionServer.ts:17` is the empty subclass (absence: the class line, 17 lines in all) | `packages/node/src/behaviors/closure-dimension/ClosureDimensionServer.ts` | `"export class ClosureDimensionServer extends ClosureDimensionBehavior {}"` | connectedhomeip |
 | BD-chip-Thermostat-Schedules | `ThermostatServer.ts:82`, the class doc lists the feature unimplemented (presence; :126-128 warns when it is enabled) | `packages/node/src/behaviors/thermostat/ThermostatServer.ts` | `"MatterScheduleConfiguration: This feature is not implemented yet."` | connectedhomeip `src/app/clusters/thermostat-server/ThermostatClusterSchedules.cpp` at `645b267a` (`SetActiveSchedule` :741, `AppendPendingSchedule` :795, `ValidateScheduleTransitions` :292, `ValidateTransitionsPerDay` :457, the atomic hooks :620-663, `PrecommitSchedules` :1000) |
+| BD-chip-Chime-RulesInServer | `ChimeServer.ts:14` is the empty subclass (absence: the class body, 14 lines in all) | `packages/node/src/behaviors/chime/ChimeServer.ts` | `class ChimeServer` | connectedhomeip `src/app/clusters/chime-server/ChimeCluster.cpp` at `6170af84` (`IsSupportedChimeID` :176, `SetSelectedChime` :215, `SetEnabled` :228, `HandlePlayChimeSound` :258, `GenerateChimeStartedPlayingEvent` :291), tests `tests/TestChimeCluster.cpp` |
+| BD-chip-CameraAvSettings-RulesInServer | `CameraAvSettingsUserLevelManagementServer.ts:18` is the empty subclass (absence: the class body, 18 lines in all) | `packages/node/src/behaviors/camera-av-settings-user-level-management/CameraAvSettingsUserLevelManagementServer.ts` | `class CameraAvSettingsUserLevelManagementServer` | connectedhomeip `src/app/clusters/camera-av-settings-user-level-management-server/CameraAvSettingsUserLevelManagementLogic.cpp` at `6170af84` (the handlers :721-1261, `OnPhysicalMovementComplete` :1265, the limit setters :339-407, the DPTZ streams :469-591), tests `tests/TestCameraAvSettingsUserLevelManagementCluster.cpp` |
 | BD-chip-WiFiNetworkManagement-RulesInServer | `WiFiNetworkManagementServer.ts:14` is the empty subclass (absence: the class line, 14 lines in all) | `packages/node/src/behaviors/wi-fi-network-management/WiFiNetworkManagementServer.ts` | `"export class WiFiNetworkManagementServer extends WiFiNetworkManagementBehavior {}"` | connectedhomeip `src/app/clusters/wifi-network-management-server/WiFiNetworkManagementCluster.cpp` at `6170af84` (`ClearNetworkCredentials` :62, `SetNetworkCredentials` :74, `ReadAttribute` :105, `InvokeCommand` :123) |
 | BD-chip-ThreadNetworkDirectory-RulesInServer | `ThreadNetworkDirectoryServer.ts:14` is the empty subclass (absence: the class line, 14 lines in all) | `packages/node/src/behaviors/thread-network-directory/ThreadNetworkDirectoryServer.ts` | `"export class ThreadNetworkDirectoryServer extends ThreadNetworkDirectoryBehavior {}"` | connectedhomeip `src/app/clusters/thread-network-directory-server/ThreadNetworkDirectoryCluster.cpp` at `6170af84` (`WritePreferredExtendedPanId` :139, `ReadThreadNetworks` :153, `HandleAddNetworkRequest` :214, `HandleRemoveNetworkRequest` :278, `HandleOperationalDatasetRequest` :309; `ThreadNetworkDirectoryStorage.h`) |
 
@@ -4612,6 +4614,63 @@ stays unserved (`:372-379`), and no hold timer runs. Reasoning: a device
 that follows a week program must learn that a controller asked it to hold
 or to resume, and the Sink is where every other admitted write reaches the
 host (brief CO, issue #273).
+
+### BD-chip-Chime-RulesInServer — the Chime rules are connectedhomeip's; matter.js has none
+
+matter.js's `ChimeServer` is the empty subclass (`packages/node/src/behaviors/chime/ChimeServer.ts:14`
+at `862ad75f`), so `cluster/camera.Chime` follows connectedhomeip's
+`ChimeCluster.cpp` at `6170af84` (wave 26-A1, concept v10) behind the
+generated `ChimePort`: `SelectedChime` must name an installed sound
+(`IsSupportedChimeID` `:176`, `SetSelectedChime` `:215-225`, NOT_FOUND
+otherwise), `Enabled` is plain state (`:228-237`), `PlayChimeSound` plays
+the given or the selected chime through the port and emits
+`ChimeStartedPlaying` on success (`:258-303`; a ChimeID given in the command
+is checked, the stored selection is not, as chip has it). chip's twelve unit
+cases are ported (`chime_chip_test.go`); persistence is the host's through
+the change reports and `Initial`. Reasoning: the Chime device type mandates
+the cluster and chip is the only reference with rules. Retire when
+matter.js's server gains them.
+
+### BD-chip-CameraAvSettings-RulesInServer — mechanical and digital PTZ follow connectedhomeip behind host ports
+
+matter.js's `CameraAvSettingsUserLevelManagementServer` is the empty
+subclass (`…/CameraAvSettingsUserLevelManagementServer.ts:18` at
+`862ad75f`); `cluster/camera.AvSettings` follows connectedhomeip's
+`CameraAvSettingsUserLevelManagementLogic.cpp` at `6170af84` (wave
+26-A1): the limit setters (`:339-407`), the move-capable video streams
+(`:469-591`), and the handlers `MPTZSetPosition` `:721`,
+`MPTZRelativeMove` `:816`, `MPTZMoveToPreset` `:967`, `MPTZSavePreset`
+`:1030`, `MPTZRemovePreset` `:1143`, `DPTZSetViewport` `:1197`,
+`DPTZRelativeMove` `:1224`, with `OnPhysicalMovementComplete` `:1265` as
+the host's report through `PhysicalMovementComplete`; the host moves the
+camera through the generated `MechanicalPTZ`, `MechanicalPresets` and
+`DigitalPTZ` ports. Two deliberate differences. (1) `MPTZPresets` is
+served under the MPRESETS feature as the definition conforms it, where
+chip gates it on MPAN (`:117`): the model wins. (2) After a restart the
+next preset id skips a restored preset; chip starts its counter at 1
+whatever is stored and would append a duplicate id (`:1060-1062`,
+`:1105-1110`), which breaks `MoveToPreset` and `RemovePreset`. Thirteen of
+chip's seventeen unit cases are ported (`avsettings_chip_test.go`; the four
+`TestMigrate…` cases are chip's storage migration). Retire when matter.js's
+server gains the rules.
+
+### BD-Matter-WebRtcRequestor-ACLThroughNode — the requestor's Operate ACL entry is installed by the node, not inside the server
+
+matter.js's `WebRtcTransportRequestorServer` installs one Operate/CASE
+entry for the first fabric from inside the behaviour when the node comes
+online (`WebRtcTransportRequestorServer.ts:56-94` at `862ad75f`, no
+duplicate on repeated online events). A cluster server here has no access
+to the node's AccessControl, so `node/webrtc_requestor_acl.go` installs the
+same entry at `Start` and after `CommissioningComplete`, the way the OTA
+provider's entry is installed; both are local changes that move the ACL's
+data version without an `AccessControlEntryChanged` event, as matter.js
+emits none without a remote actor (`AccessControlServer.ts:284-302`;
+`core.AccessControl.NotifyLocalEntryInstalled`). The session table,
+`UpsertSession`/`RemoveSession`, the NOT_FOUND identity checks and the
+`refused` signal mirror matter.js (28 cases ported,
+`requestor_parity_matterjs_test.go`); a removed fabric's sessions stay
+until the host removes them, as matter.js's server has no fabric-removal
+hook at the pin.
 
 ### BD-chip-WiFiNetworkManagement-RulesInServer — the credential, surrogate and CASE rules are connectedhomeip's; matter.js has none
 

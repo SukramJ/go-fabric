@@ -10,6 +10,29 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+### Added
+
+- `cluster/camera`, the camera signalling servers (milestone 6, brief 26-A1, concept v10 wave 26-A1):
+  - `camera.Requestor` serves WebRtcTransportRequestor after matter.js's `WebRtcTransportRequestorServer.ts` (at 862ad75f). The host registers a session with `UpsertSession` and drops it with `RemoveSession`. `Offer`, `Answer`, `IceCandidates` and `End` answer `NOT_FOUND` unless the invoking peer holds the session (same id, fabric and peer node). A held session goes to the new port `RequestorPort` (`webrtctransportrequestordef.Declare.RequestorPort`), and the optional `RequestorRefusals` hears of each refusal. `CurrentSessions` reads per fabric. The node adds the Operate/CASE entry the camera needs to the first fabric's ACL. The device kit makes the requestor the default of every device that mounts it, such as `device.NewCameraController`. matter.js's `WebRtcTransportRequestorServerTest.ts` is ported.
+  - `camera.Chime` serves Chime after connectedhomeip's `ChimeCluster.cpp` (at 6170af84), ahead of matter.js. It runs on the new port `ChimePort` (`chimedef.Declare.ChimePort`): `InstalledChimeSounds` and `PlayChimeSound`. A write of `SelectedChime` must name an installed sound (`NOT_FOUND`). `PlayChimeSound` emits `ChimeStartedPlaying`.
+  - `camera.AvSettings` serves CameraAvSettingsUserLevelManagement after connectedhomeip's `CameraAvSettingsUserLevelManagementLogic.cpp`, ahead of matter.js. The new ports are `MechanicalPTZ`, the optional `MechanicalPresets` and `DigitalPTZ` (`cameraavsettingsuserlevelmanagementdef.Declare`). The server validates MPTZ targets, tracks MovementState until the host calls `PhysicalMovementComplete`, and keeps the presets and the DPTZ streams the host announces.
+  - Chime and CameraAvSettingsUserLevelManagement keep the generated server without their ports. The host persists their state through the change notifications and restores it through `Initial`. The [camera guide](docs/guides/camera.md) describes the model.
+- `core.AccessControl.NotifyLocalEntryInstalled`: moves the ACL's data version for an entry the node appended itself, without an AccessControlEntryChanged event.
+
+### Changed
+
+- The schema snapshot carries the datatypes of the definition-only clusters (`definitions`, WebRtcTransportDefinitions at the pin), so `SchemaSnapshotSHA256` moved. The WebRTC transport requestor and provider definitions now type their sessions, ICE candidates and ICE servers as `WebRTCSessionStruct`, `ICECandidateStruct` and `ICEServerStruct` (the [migration guide](docs/guides/migrating-to-the-facade.md) has the routes):
+  - `webrtctransportrequestor`: `CurrentSessionsEntry`, `IceCandidatesRequestIceCandidatesEntry` and `OfferRequestIceServersEntry` are removed; `State.CurrentSessions`, `Patch.CurrentSessions`, `IceCandidatesRequest.IceCandidates` and `OfferRequest.IceServers` change type.
+  - `webrtctransportprovider`: `CurrentSessionsEntry`, `ProvideIceCandidatesRequestIceCandidatesEntry`, `ProvideOfferRequestIceServersEntry` and `SolicitOfferRequestIceServersEntry` are removed; `State.CurrentSessions`, `Patch.CurrentSessions`, `ProvideIceCandidatesRequest.IceCandidates`, `ProvideOfferRequest.IceServers` and `SolicitOfferRequest.IceServers` change type.
+
+### Fixed
+
+- The OTA provider's Operate ACL entry (`node.Config.OTAProvider`) no longer emits an AccessControlEntryChanged event: the node installs it as a local change, and matter.js emits no event for an ACL change without a remote actor (`AccessControlServer.ts:284-302` at 862ad75f). The data version still moves (`core.AccessControl.NotifyLocalEntryInstalled`).
+
+### Ecosystems
+
+- No host device carries a camera cluster until a live pairing with Apple Home has passed (concept v10 §D, the rule of MSCH). The reference bridge composes none of them.
+
 ## [0.13.5] — 2026-10-27
 
 ### Added

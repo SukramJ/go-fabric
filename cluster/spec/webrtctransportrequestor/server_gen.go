@@ -18,13 +18,13 @@ import (
 // slice. [Server.Get] fills it from the stored values; an attribute the
 // server does not serve stays at its zero value.
 type State struct {
-	CurrentSessions []CurrentSessionsEntry // attribute 0x0000: list[WebRtcTransportDefinitions.WebRTCSessionStruct], M, R S A
+	CurrentSessions []WebRTCSessionStruct // attribute 0x0000: list[WebRtcTransportDefinitions.WebRTCSessionStruct], M, R S A
 }
 
 // Patch is a change to the WebRtcTransportRequestor state: each non-nil field is set, the
 // others are left as they are.
 type Patch struct {
-	CurrentSessions *[]CurrentSessionsEntry // attribute 0x0000
+	CurrentSessions *[]WebRTCSessionStruct // attribute 0x0000
 }
 
 // FromAttributeValues implements spec.StateReader: each field the value
@@ -53,7 +53,7 @@ func StateFrom(values spec.Values) (state State, absent []uint32) {
 func (p Patch) AttributeValues() map[uint32]any {
 	v := map[uint32]any{}
 	if p.CurrentSessions != nil {
-		v[AttrCurrentSessions] = spec.List[CurrentSessionsEntry](*p.CurrentSessions)
+		v[AttrCurrentSessions] = spec.List[WebRTCSessionStruct](*p.CurrentSessions)
 	}
 	return v
 }
@@ -156,6 +156,40 @@ func (s *Server) HandleEnd(fn func(ctx context.Context, req EndRequest) (struct{
 	return spec.HandleOn(s.Underlying(), CmdEnd, fn)
 }
 
+// Signal is a signalling command a peer invokes on the requestor
+// (matter.js WebRtcTransportRequestorServer.SignalKind).
+type Signal string
+
+// The signals.
+const (
+	SignalOffer         Signal = "offer"
+	SignalAnswer        Signal = "answer"
+	SignalIceCandidates Signal = "iceCandidates"
+	SignalEnd           Signal = "end"
+)
+
+// RequestorPort receives the signalling a peer sends for a session
+// the kit's server tracks (cluster/camera Requestor): the SDP offer,
+// the SDP answer, ICE candidates and the end of the session, each
+// with the session it names. End is called after the session left
+// CurrentSessions. matter.js's WebRtcTransportRequestorServer.Events
+// (offer, answer, iceCandidates, end).
+type RequestorPort interface {
+	Offer(ctx context.Context, session WebRTCSessionStruct, req OfferRequest)
+	Answer(ctx context.Context, session WebRTCSessionStruct, sdp string)
+	IceCandidates(ctx context.Context, session WebRTCSessionStruct, candidates []ICECandidateStruct)
+	End(ctx context.Context, session WebRTCSessionStruct, reason uint8)
+}
+
+// RequestorRefusals is an optional interface of a [RequestorPort]:
+// Refused is called for each signal the kit's server answered
+// NOT_FOUND because it tracks no session of that id for the peer's
+// fabric and node — matter.js's refused event, with the id the peer
+// named.
+type RequestorRefusals interface {
+	Refused(ctx context.Context, signal Signal, webRtcSessionID uint16, fabricIndex uint8, peerNodeID uint64)
+}
+
 // Declare is the declaration of the WebRtcTransportRequestor cluster on a device:
 // device.New<Type> and device.FromSpec take it, and every field is
 // optional — the zero value mounts the cluster (an optional one too)
@@ -184,6 +218,8 @@ type Declare struct {
 	// HandleEnd handles the End command in place of the server
 	// (Server.HandleEnd), inline; an optional command it handles is accepted.
 	HandleEnd func(ctx context.Context, req EndRequest) (struct{}, error)
+	// RequestorPort is the host port the kit's server runs on ([RequestorPort]).
+	RequestorPort RequestorPort
 	// HostServer is the host's own server for the cluster, mounted in
 	// place of the kit's — also for a cluster the device type does not
 	// list. The hooks above go on it; Initial, Features and the ports are

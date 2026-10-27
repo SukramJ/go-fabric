@@ -203,9 +203,12 @@ func (n *Node) ensureOTAProviderACLOn(ctx context.Context, fabricIndex uint8, ep
 		n.logger.Warn("ota.provider.acl_add", slog.Any("err", err))
 		return
 	}
-	// The ACL changed: DataVersion and AccessControlEntryChanged, as
-	// matter.js's setStateOf(AccessControlServer) reports it.
-	n.root.AccessControl.NotifyAdminEntryInstalled(entry)
+	// The ACL changed: the DataVersion moves, and no
+	// AccessControlEntryChanged is emitted, because matter.js's
+	// setStateOf(AccessControlServer) runs without a remote actor and
+	// #handleAccessControlListChange returns before its events
+	// (AccessControlServer.ts:284-302 at 862ad75f).
+	n.root.AccessControl.NotifyLocalEntryInstalled()
 	n.logger.Info("ota.provider.acl_added", slog.Int("fabric_index", int(fabricIndex)), slog.Int("endpoint", int(epID)),
 		slog.String("hint", "anyone in the fabric may access the OTA Software Update Provider cluster"))
 }

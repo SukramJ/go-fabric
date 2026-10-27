@@ -1407,9 +1407,13 @@
     },
     {
       "path": "packages/node/test/behaviors/web-rtc-transport-requestor/WebRtcTransportRequestorServerTest.ts",
-      "status": "planned",
-      "until": "M6 phase 26",
-      "reason": "The WebRTC transport requestor server, which milestone 6 phase 26 builds.",
+      "status": "ported",
+      "go": [
+        "cluster/camera:TestParityMatterJS_RequestorUpsertRemove",
+        "cluster/camera:TestParityMatterJS_RequestorCommands",
+        "cluster/camera:TestParityMatterJS_RequestorACLInstall"
+      ],
+      "reason": "The 28 cases run on cluster/camera's Requestor (brief 26-A1): upsert and remove by session key, the four commands' identity checks under the context the bridge stamps for a CASE invoke (matter.js's mocked remote actor), the refused, empty-candidate and end cases, the signalling handed to the RequestorPort; the ACL install over the wire on fabrictest, the repeated online event a device restart (cluster/camera/requestor_parity_matterjs_test.go).",
       "snapshotSha": "b2f3d0d4396de6304fc14b4663892bacfa4c8f3c"
     },
     {

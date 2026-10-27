@@ -249,6 +249,39 @@ func (s *Server) HandleDptzRelativeMove(fn func(ctx context.Context, req DptzRel
 	return spec.HandleOn(s.Underlying(), CmdDptzRelativeMove, fn)
 }
 
+// MechanicalPTZ moves the camera (MPAN, MTILT, MZOOM) to a target
+// the kit's server validated: it starts the movement and returns,
+// and the host reports the end through the server's
+// PhysicalMovementComplete; an error answers its status, FAILURE
+// without one, and BUSY is how a device that cannot move now
+// refuses (cluster/camera AvSettings, after connectedhomeip's
+// CameraAvSettingsUserLevelManagementDelegate).
+type MechanicalPTZ interface {
+	MptzSetPosition(ctx context.Context, target MPTZStruct) error
+	MptzRelativeMove(ctx context.Context, target MPTZStruct) error
+}
+
+// MechanicalPresets is an optional interface of a [MechanicalPTZ]
+// that MechanicalPresets (MPRESETS) requires: MptzMoveToPreset moves
+// to a stored preset, MptzSavePreset and MptzRemovePreset are told
+// before the server stores or erases one; an error refuses the
+// command with its status.
+type MechanicalPresets interface {
+	MptzMoveToPreset(ctx context.Context, presetID uint8, target MPTZStruct) error
+	MptzSavePreset(ctx context.Context, presetID uint8) error
+	MptzRemovePreset(ctx context.Context, presetID uint8) error
+}
+
+// DigitalPTZ changes the viewport of a video stream (DPTZ):
+// DptzSetViewport applies a viewport, DptzRelativeMove moves and
+// zooms the current one and returns the viewport it arrived at;
+// the stream is one the server knows. An error answers its status,
+// FAILURE without one (cluster/camera AvSettings).
+type DigitalPTZ interface {
+	DptzSetViewport(ctx context.Context, videoStreamID uint16, viewport ViewportStruct) error
+	DptzRelativeMove(ctx context.Context, req DptzRelativeMoveRequest) (ViewportStruct, error)
+}
+
 // Declare is the declaration of the CameraAvSettingsUserLevelManagement cluster on a device:
 // device.New<Type> and device.FromSpec take it, and every field is
 // optional — the zero value mounts the cluster (an optional one too)
@@ -288,6 +321,10 @@ type Declare struct {
 	// HandleDptzRelativeMove handles the DptzRelativeMove command in place of the server
 	// (Server.HandleDptzRelativeMove), inline; an optional command it handles is accepted.
 	HandleDptzRelativeMove func(ctx context.Context, req DptzRelativeMoveRequest) (struct{}, error)
+	// MechanicalPTZ is the host port the kit's server runs on ([MechanicalPTZ]).
+	MechanicalPTZ MechanicalPTZ
+	// DigitalPTZ is the host port the kit's server runs on ([DigitalPTZ]).
+	DigitalPTZ DigitalPTZ
 	// HostServer is the host's own server for the cluster, mounted in
 	// place of the kit's — also for a cluster the device type does not
 	// list. The hooks above go on it; Initial, Features and the ports are

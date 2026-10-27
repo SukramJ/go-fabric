@@ -18,13 +18,13 @@ import (
 // slice. [Server.Get] fills it from the stored values; an attribute the
 // server does not serve stays at its zero value.
 type State struct {
-	CurrentSessions []CurrentSessionsEntry // attribute 0x0000: list[WebRtcTransportDefinitions.WebRTCSessionStruct], M, R S M
+	CurrentSessions []WebRTCSessionStruct // attribute 0x0000: list[WebRtcTransportDefinitions.WebRTCSessionStruct], M, R S M
 }
 
 // Patch is a change to the WebRtcTransportProvider state: each non-nil field is set, the
 // others are left as they are.
 type Patch struct {
-	CurrentSessions *[]CurrentSessionsEntry // attribute 0x0000
+	CurrentSessions *[]WebRTCSessionStruct // attribute 0x0000
 }
 
 // FromAttributeValues implements spec.StateReader: each field the value
@@ -53,7 +53,7 @@ func StateFrom(values spec.Values) (state State, absent []uint32) {
 func (p Patch) AttributeValues() map[uint32]any {
 	v := map[uint32]any{}
 	if p.CurrentSessions != nil {
-		v[AttrCurrentSessions] = spec.List[CurrentSessionsEntry](*p.CurrentSessions)
+		v[AttrCurrentSessions] = spec.List[WebRTCSessionStruct](*p.CurrentSessions)
 	}
 	return v
 }

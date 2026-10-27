@@ -786,18 +786,16 @@ Identify, WindowCovering and ServiceArea tests (brief BJ, PR #170,
 
 ## Application cluster servers — open items
 
-- **WebRtcTransportRequestor is served by the generated server without
-  matter.js's session logic.** matter.js's `WebRtcTransportRequestorServer`
-  (`packages/node/src/behaviors/web-rtc-transport-requestor/WebRtcTransportRequestorServer.ts:42-187`
-  at `862ad75f`) tracks offered and answered sessions, auto-installs the
-  ACL entry a provider needs and emits the session events; Go's
-  `cluster/spec/webrtctransportrequestor` (brief CL §1, owner scope
-  decision 2026-10-25) answers by the definition only. The ACL
-  auto-install writes to AccessControl, an owner path, so the port is a
-  wave of its own (milestone 6 completeness, with the camera device types
-  that compose it). Until then a camera host drives the requestor's state
-  itself.
-
+- **Chime and CameraAvSettingsUserLevelManagement persist nothing
+  themselves.** chip persists SelectedChime and Enabled
+  (`ChimeCluster.cpp:83-104`, `:221-223`, `:233-235` at `6170af84`) and the
+  camera's MPTZPosition, MPTZPresets and DPTZStreams
+  (`CameraAvSettingsUserLevelManagementLogic.cpp:139-332`); `store.Port`
+  has no record for such attributes, so `cluster/camera` reports every
+  change through the server's change notification and takes the restored
+  values from the declaration's `Initial` (brief 26-A1). A host that does
+  not persist them starts at chip's defaults after a restart. (Milestone 6,
+  with the camera stream wave 26-A2 if a store record is wanted.)
 Raised with `cluster/alarm`, `cluster/fan`, `cluster/pump`,
 FlowMeasurement, `cluster/opstate` and `cluster/modebase`.
 `../connectedhomeip` was not checked out when they were written, so the

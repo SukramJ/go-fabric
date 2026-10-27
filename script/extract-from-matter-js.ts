@@ -730,6 +730,28 @@ if (unmatched.length) {
     process.exit(1);
 }
 
+// The definition-only clusters: a cluster element without an id that only
+// declares datatypes other clusters reference by "Owner.Name" — at the pin
+// WebRtcTransportDefinitions (web-rtc-transport-definitions.element.ts:12-76),
+// whose WebRTCSessionStruct, ICECandidateStruct and ICEServerStruct the
+// WebRTC transport provider and requestor carry. matter.js's model resolves
+// such a reference into the owner's datatype as for any cluster, so the
+// snapshot lists each one's datatypes, as a cluster's "datatypes". An
+// id-less base (AlarmBase, ModeBase, …) is not one: its derivations carry
+// its datatypes already. Appended as a new key: every key above keeps its
+// content and position.
+const bases = new Set((out.clusters as any[]).map(raw => raw.base).filter(b => b !== undefined));
+const definitions: any[] = [];
+for (const c of (Matter as any).children) {
+    if (c.tag !== "cluster" || c.id !== undefined || bases.has(c.name)) continue;
+    const datatypes: any[] = [];
+    for (const d of c.datatypes) datatypes.push(datatypeOut(d));
+    datatypes.sort((a, b) => a.name.localeCompare(b.name));
+    definitions.push({ name: c.name, datatypes });
+}
+definitions.sort((a, b) => a.name.localeCompare(b.name));
+(out as any).definitions = definitions;
+
 console.log(JSON.stringify(out, null, 2));
 
 // The import above is a bare `@matter/model` specifier, so node has to resolve

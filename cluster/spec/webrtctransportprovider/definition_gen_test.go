@@ -27,18 +27,17 @@ func TestDefinitionMatchesSnapshot(t *testing.T) {
 // struct and payload and decodes it back.
 func TestCodecsRoundTrip(t *testing.T) {
 	t.Parallel()
-	spectest.RoundTrip(t, CurrentSessionsEntry{}, spec.DecodeStruct[CurrentSessionsEntry])
-	spectest.RoundTrip(t, SolicitOfferRequestIceServersEntry{}, spec.DecodeStruct[SolicitOfferRequestIceServersEntry])
-	spectest.RoundTrip(t, ProvideOfferRequestIceServersEntry{}, spec.DecodeStruct[ProvideOfferRequestIceServersEntry])
-	spectest.RoundTrip(t, ProvideIceCandidatesRequestIceCandidatesEntry{}, spec.DecodeStruct[ProvideIceCandidatesRequestIceCandidatesEntry])
-	spectest.RoundTripCommand(t, Definition, CmdSolicitOffer, spec.Request, SolicitOfferRequest{StreamUsage: StreamUsageEnum(0), OriginatingEndpointId: uint16(1), VideoStreamId: spectest.Ptr(spec.ValueOf(uint16(1))), AudioStreamId: spectest.Ptr(spec.ValueOf(uint16(1))), IceServers: spectest.Ptr([]SolicitOfferRequestIceServersEntry{SolicitOfferRequestIceServersEntry{}}), IceTransportPolicy: spectest.Ptr("x"), MetadataEnabled: spectest.Ptr(true), VideoStreams: spectest.Ptr([]uint16{uint16(1)}), AudioStreams: spectest.Ptr([]uint16{uint16(1)})})
+	spectest.RoundTrip(t, WebRTCSessionStruct{Id: uint16(1), PeerNodeId: uint64(1), PeerEndpointId: uint16(1), StreamUsage: StreamUsageEnum(0), VideoStreamId: spectest.Ptr(spec.ValueOf(uint16(1))), AudioStreamId: spectest.Ptr(spec.ValueOf(uint16(1))), MetadataEnabled: true, VideoStreams: spectest.Ptr([]uint16{uint16(1)}), AudioStreams: spectest.Ptr([]uint16{uint16(1)}), FabricIndex: uint8(1)}, spec.DecodeStruct[WebRTCSessionStruct])
+	spectest.RoundTrip(t, ICEServerStruct{Urls: []string{"x"}, Username: spectest.Ptr("x"), Credential: spectest.Ptr("x"), Caid: spectest.Ptr(uint16(1))}, spec.DecodeStruct[ICEServerStruct])
+	spectest.RoundTrip(t, ICECandidateStruct{Candidate: "x", SdpMid: spec.ValueOf("x"), SdpmLineIndex: spec.ValueOf(uint16(1))}, spec.DecodeStruct[ICECandidateStruct])
+	spectest.RoundTripCommand(t, Definition, CmdSolicitOffer, spec.Request, SolicitOfferRequest{StreamUsage: StreamUsageEnum(0), OriginatingEndpointId: uint16(1), VideoStreamId: spectest.Ptr(spec.ValueOf(uint16(1))), AudioStreamId: spectest.Ptr(spec.ValueOf(uint16(1))), IceServers: spectest.Ptr([]ICEServerStruct{ICEServerStruct{Urls: []string{"x"}, Username: spectest.Ptr("x"), Credential: spectest.Ptr("x"), Caid: spectest.Ptr(uint16(1))}}), IceTransportPolicy: spectest.Ptr("x"), MetadataEnabled: spectest.Ptr(true), VideoStreams: spectest.Ptr([]uint16{uint16(1)}), AudioStreams: spectest.Ptr([]uint16{uint16(1)})})
 	spectest.RoundTripCommand(t, Definition, CmdSolicitOfferResponse, spec.Response, SolicitOfferResponse{WebRtcSessionId: uint16(1), DeferredOffer: true, VideoStreamId: spectest.Ptr(spec.ValueOf(uint16(1))), AudioStreamId: spectest.Ptr(spec.ValueOf(uint16(1)))})
-	spectest.RoundTripCommand(t, Definition, CmdProvideOffer, spec.Request, ProvideOfferRequest{WebRtcSessionId: spec.ValueOf(uint16(1)), Sdp: "x", StreamUsage: spectest.Ptr(StreamUsageEnum(0)), OriginatingEndpointId: spectest.Ptr(uint16(1)), VideoStreamId: spectest.Ptr(spec.ValueOf(uint16(1))), AudioStreamId: spectest.Ptr(spec.ValueOf(uint16(1))), IceServers: spectest.Ptr([]ProvideOfferRequestIceServersEntry{ProvideOfferRequestIceServersEntry{}}), IceTransportPolicy: spectest.Ptr("x"), MetadataEnabled: spectest.Ptr(true), VideoStreams: spectest.Ptr([]uint16{uint16(1)}), AudioStreams: spectest.Ptr([]uint16{uint16(1)})})
+	spectest.RoundTripCommand(t, Definition, CmdProvideOffer, spec.Request, ProvideOfferRequest{WebRtcSessionId: spec.ValueOf(uint16(1)), Sdp: "x", StreamUsage: spectest.Ptr(StreamUsageEnum(0)), OriginatingEndpointId: spectest.Ptr(uint16(1)), VideoStreamId: spectest.Ptr(spec.ValueOf(uint16(1))), AudioStreamId: spectest.Ptr(spec.ValueOf(uint16(1))), IceServers: spectest.Ptr([]ICEServerStruct{ICEServerStruct{Urls: []string{"x"}, Username: spectest.Ptr("x"), Credential: spectest.Ptr("x"), Caid: spectest.Ptr(uint16(1))}}), IceTransportPolicy: spectest.Ptr("x"), MetadataEnabled: spectest.Ptr(true), VideoStreams: spectest.Ptr([]uint16{uint16(1)}), AudioStreams: spectest.Ptr([]uint16{uint16(1)})})
 	spectest.RoundTripCommand(t, Definition, CmdProvideOfferResponse, spec.Response, ProvideOfferResponse{WebRtcSessionId: uint16(1), VideoStreamId: spectest.Ptr(spec.ValueOf(uint16(1))), AudioStreamId: spectest.Ptr(spec.ValueOf(uint16(1)))})
 	spectest.RoundTripCommand(t, Definition, CmdProvideAnswer, spec.Request, ProvideAnswerRequest{WebRtcSessionId: uint16(1), Sdp: "x"})
-	spectest.RoundTripCommand(t, Definition, CmdProvideIceCandidates, spec.Request, ProvideIceCandidatesRequest{WebRtcSessionId: uint16(1), IceCandidates: []ProvideIceCandidatesRequestIceCandidatesEntry{ProvideIceCandidatesRequestIceCandidatesEntry{}}})
+	spectest.RoundTripCommand(t, Definition, CmdProvideIceCandidates, spec.Request, ProvideIceCandidatesRequest{WebRtcSessionId: uint16(1), IceCandidates: []ICECandidateStruct{ICECandidateStruct{Candidate: "x", SdpMid: spec.ValueOf("x"), SdpmLineIndex: spec.ValueOf(uint16(1))}}})
 	spectest.RoundTripCommand(t, Definition, CmdEndSession, spec.Request, EndSessionRequest{WebRtcSessionId: uint16(1), Reason: uint8(1)})
-	spectest.RoundTripAttribute(t, Definition, AttrCurrentSessions, spec.List[CurrentSessionsEntry]([]CurrentSessionsEntry{CurrentSessionsEntry{}}))
+	spectest.RoundTripAttribute(t, Definition, AttrCurrentSessions, spec.List[WebRTCSessionStruct]([]WebRTCSessionStruct{WebRTCSessionStruct{Id: uint16(1), PeerNodeId: uint64(1), PeerEndpointId: uint16(1), StreamUsage: StreamUsageEnum(0), VideoStreamId: spectest.Ptr(spec.ValueOf(uint16(1))), AudioStreamId: spectest.Ptr(spec.ValueOf(uint16(1))), MetadataEnabled: true, VideoStreams: spectest.Ptr([]uint16{uint16(1)}), AudioStreams: spectest.Ptr([]uint16{uint16(1)}), FabricIndex: uint8(1)}}))
 }
 
 // TestTypedServer drives every method of the typed server once.
@@ -60,7 +59,7 @@ func TestTypedServer(t *testing.T) {
 	}
 	_ = s.Get()
 	full := Patch{
-		CurrentSessions: new([]CurrentSessionsEntry),
+		CurrentSessions: new([]WebRTCSessionStruct),
 	}
 	values := full.AttributeValues()
 	// The stored values read back into a State, field by field.
@@ -70,7 +69,7 @@ func TestTypedServer(t *testing.T) {
 	// definition: the controller's typed read equals the State the
 	// device reads from the same stored values.
 	sample := Patch{
-		CurrentSessions: spectest.Ptr([]CurrentSessionsEntry{CurrentSessionsEntry{}}),
+		CurrentSessions: spectest.Ptr([]WebRTCSessionStruct{WebRTCSessionStruct{Id: uint16(1), PeerNodeId: uint64(1), PeerEndpointId: uint16(1), StreamUsage: StreamUsageEnum(0), VideoStreamId: spectest.Ptr(spec.ValueOf(uint16(1))), AudioStreamId: spectest.Ptr(spec.ValueOf(uint16(1))), MetadataEnabled: true, VideoStreams: spectest.Ptr([]uint16{uint16(1)}), AudioStreams: spectest.Ptr([]uint16{uint16(1)}), FabricIndex: uint8(1)}}),
 	}
 	stored := sample.AttributeValues()
 	var device State
@@ -86,7 +85,7 @@ func TestTypedServer(t *testing.T) {
 	if len(values) != 1 {
 		t.Errorf("a patch of every field sets %d values, want 1", len(values))
 	}
-	if _, ok := values[AttrCurrentSessions].(spec.List[CurrentSessionsEntry]); !ok {
+	if _, ok := values[AttrCurrentSessions].(spec.List[WebRTCSessionStruct]); !ok {
 		t.Errorf("CurrentSessions is stored as %T, want its spec.List", values[AttrCurrentSessions])
 	}
 	s.OnChanged(func(State, contract.Change) {})()
