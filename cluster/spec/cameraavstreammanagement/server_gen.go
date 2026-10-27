@@ -526,6 +526,74 @@ func (s *Server) HandleCaptureSnapshot(fn func(ctx context.Context, req CaptureS
 	return spec.HandleOn(s.Underlying(), CmdCaptureSnapshot, fn)
 }
 
+// StreamAllocationAction tells a VideoStreamPort how a stream came
+// out of an allocation (connectedhomeip's StreamAllocationAction,
+// CameraAVStreamManagementCluster.h:127-132).
+type StreamAllocationAction uint8
+
+// The allocation actions.
+const (
+	// StreamNewAllocation is a fresh stream: start it.
+	StreamNewAllocation StreamAllocationAction = iota
+	// StreamModification is a reused stream whose ranges narrowed:
+	// restart it if it runs.
+	StreamModification
+	// StreamReuse is a reused stream left as it was: nothing to do.
+	StreamReuse
+)
+
+// VideoStreamPort is the camera's video encoder (VDO): the kit's
+// server (cluster/camera AvStream) validates a request against the
+// cluster's rules before it calls VideoStreamAllocate with the
+// requested stream (its id and reference count ignored), which
+// allocates or reuses a stream and returns its id; the server then
+// narrows a reused stream to the intersection of both ranges and
+// calls VideoStreamAllocated with the stream as allocated, which
+// is where the host starts it. VideoStreamModify and
+// VideoStreamDeallocate act on a stream the server knows. An error
+// answers its status, FAILURE without one (after connectedhomeip's
+// CameraAVStreamManagementDelegate).
+type VideoStreamPort interface {
+	VideoStreamAllocate(ctx context.Context, args VideoStreamStruct) (videoStreamID uint16, err error)
+	VideoStreamAllocated(ctx context.Context, stream VideoStreamStruct, action StreamAllocationAction)
+	VideoStreamModify(ctx context.Context, videoStreamID uint16, watermarkEnabled, osdEnabled *bool) error
+	VideoStreamDeallocate(ctx context.Context, videoStreamID uint16) error
+}
+
+// AudioStreamPort is the camera's audio encoder (ADO):
+// AudioStreamAllocate allocates or reuses a stream for a request
+// the kit's server validated (its id and reference count ignored)
+// and returns its id; AudioStreamDeallocate releases a stream the
+// server knows. An error answers its status, FAILURE without one.
+type AudioStreamPort interface {
+	AudioStreamAllocate(ctx context.Context, args AudioStreamStruct) (audioStreamID uint16, err error)
+	AudioStreamDeallocate(ctx context.Context, audioStreamID uint16) error
+}
+
+// SnapshotStreamPort is the camera's snapshot encoder (SNP):
+// SnapshotStreamAllocate allocates or reuses a stream for a request
+// the kit's server validated and matched against
+// SnapshotCapabilities (FrameRate is the requested MaxFrameRate,
+// EncodedPixels and HardwareEncoder the matching capability's; the
+// id and reference count ignored) and returns its id;
+// SnapshotStreamModify and SnapshotStreamDeallocate act on a stream
+// the server knows. An error answers its status, FAILURE without one.
+type SnapshotStreamPort interface {
+	SnapshotStreamAllocate(ctx context.Context, args SnapshotStreamStruct) (snapshotStreamID uint16, err error)
+	SnapshotStreamModify(ctx context.Context, snapshotStreamID uint16, watermarkEnabled, osdEnabled *bool) error
+	SnapshotStreamDeallocate(ctx context.Context, snapshotStreamID uint16) error
+}
+
+// SnapshotCapturePort takes a picture (SNP): CaptureSnapshot is
+// called once the kit's server checked that a snapshot stream
+// exists (the named one, when snapshotStreamID is not nil), the
+// resolution and the privacy modes, and returns the image; an image
+// larger than the server's bound answers RESOURCE_EXHAUSTED, an
+// error its status, FAILURE without one.
+type SnapshotCapturePort interface {
+	CaptureSnapshot(ctx context.Context, snapshotStreamID *uint16, resolution VideoResolutionStruct) (CaptureSnapshotResponse, error)
+}
+
 // Declare is the declaration of the CameraAvStreamManagement cluster on a device:
 // device.New<Type> and device.FromSpec take it, and every field is
 // optional — the zero value mounts the cluster (an optional one too)
@@ -574,6 +642,14 @@ type Declare struct {
 	// HandleCaptureSnapshot handles the CaptureSnapshot command in place of the server
 	// (Server.HandleCaptureSnapshot), inline; an optional command it handles is accepted.
 	HandleCaptureSnapshot func(ctx context.Context, req CaptureSnapshotRequest) (CaptureSnapshotResponse, error)
+	// VideoStreamPort is the host port the kit's server runs on ([VideoStreamPort]).
+	VideoStreamPort VideoStreamPort
+	// AudioStreamPort is the host port the kit's server runs on ([AudioStreamPort]).
+	AudioStreamPort AudioStreamPort
+	// SnapshotStreamPort is the host port the kit's server runs on ([SnapshotStreamPort]).
+	SnapshotStreamPort SnapshotStreamPort
+	// SnapshotCapturePort is the host port the kit's server runs on ([SnapshotCapturePort]).
+	SnapshotCapturePort SnapshotCapturePort
 	// HostServer is the host's own server for the cluster, mounted in
 	// place of the kit's — also for a cluster the device type does not
 	// list. The hooks above go on it; Initial, Features and the ports are

@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 6662,
+  "entry_points": 6675,
   "entry_packages": [
     ".",
     "bdx",
@@ -261,9 +261,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 16242,
-    "reachable": 11480,
-    "whitelisted": 4759,
+    "total_exported": 16305,
+    "reachable": 11523,
+    "whitelisted": 4779,
     "unreachable": 3
   },
   "by_package": [
@@ -7340,10 +7340,31 @@
     },
     {
       "package": "cluster/camera",
+      "identifier": "AudioStream",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/camera/avstream.go",
+      "line": 33
+    },
+    {
+      "package": "cluster/camera",
+      "identifier": "AudioStreamPort",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/camera/avstream.go",
+      "line": 48
+    },
+    {
+      "package": "cluster/camera",
       "identifier": "AvFeature",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/camera/avsettings.go",
       "line": 27
+    },
+    {
+      "package": "cluster/camera",
+      "identifier": "AvStreamFeature",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/camera/avstream.go",
+      "line": 29
     },
     {
       "package": "cluster/camera",
@@ -7438,6 +7459,83 @@
     },
     {
       "package": "cluster/camera",
+      "identifier": "SnapshotCapturePort",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/camera/avstream.go",
+      "line": 52
+    },
+    {
+      "package": "cluster/camera",
+      "identifier": "SnapshotImage",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/camera/avstream.go",
+      "line": 41
+    },
+    {
+      "package": "cluster/camera",
+      "identifier": "SnapshotStream",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/camera/avstream.go",
+      "line": 35
+    },
+    {
+      "package": "cluster/camera",
+      "identifier": "SnapshotStreamPort",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/camera/avstream.go",
+      "line": 50
+    },
+    {
+      "package": "cluster/camera",
+      "identifier": "StreamAllocationAction",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/camera/avstream.go",
+      "line": 44
+    },
+    {
+      "package": "cluster/camera",
+      "identifier": "StreamUsage",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/camera/avstream.go",
+      "line": 37
+    },
+    {
+      "package": "cluster/camera",
+      "identifier": "TwoDZone",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/camera/zone.go",
+      "line": 32
+    },
+    {
+      "package": "cluster/camera",
+      "identifier": "Vertex",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/camera/zone.go",
+      "line": 34
+    },
+    {
+      "package": "cluster/camera",
+      "identifier": "VideoResolution",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/camera/avstream.go",
+      "line": 39
+    },
+    {
+      "package": "cluster/camera",
+      "identifier": "VideoStream",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/camera/avstream.go",
+      "line": 31
+    },
+    {
+      "package": "cluster/camera",
+      "identifier": "VideoStreamPort",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/camera/avstream.go",
+      "line": 46
+    },
+    {
+      "package": "cluster/camera",
       "identifier": "Viewport",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/camera/avsettings.go",
@@ -7449,6 +7547,48 @@
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/camera/requestor.go",
       "line": 26
+    },
+    {
+      "package": "cluster/camera",
+      "identifier": "Zone",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/camera/zone.go",
+      "line": 29
+    },
+    {
+      "package": "cluster/camera",
+      "identifier": "ZoneFeature",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/camera/zone.go",
+      "line": 27
+    },
+    {
+      "package": "cluster/camera",
+      "identifier": "ZonePort",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/camera/zone.go",
+      "line": 38
+    },
+    {
+      "package": "cluster/camera",
+      "identifier": "ZoneStoppedReason",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/camera/zone.go",
+      "line": 42
+    },
+    {
+      "package": "cluster/camera",
+      "identifier": "ZoneTrigger",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/camera/zone.go",
+      "line": 36
+    },
+    {
+      "package": "cluster/camera",
+      "identifier": "ZoneTriggeredReason",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/camera/zone.go",
+      "line": 40
     },
     {
       "package": "cluster/closure",
