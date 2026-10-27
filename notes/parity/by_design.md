@@ -551,6 +551,23 @@ non-empty (`endpoint/materialize.go`). With neither value set the attribute
 is not served, as in matter.js. Pinned by
 `TestParityMatterJS_BridgedVendorNameComesFromTheHost`.
 
+### BD-Matter-ControllerProgressAndUpdateEvents — two Go-named commissioning steps and two Go-only update events
+
+`controller.PairOptions.Progress` reports matter.js's commissioning steps by
+their names and numbers (`ControllerCommissioningFlow.ts:536-656` at
+`862ad75f`: `GetInitialData` 0.1 … `Reconnect` 18.1, which includes the
+CASE connection, `GeneralCommissioning.Complete` 20.1). matter.js names no
+step before its flow runs, so the module names the two phases Go runs there
+itself: `Discovery` 2.1 and `PASE` 2.2 (`controller/commissioner/progress.go`).
+`softwareupdate.Manager.Observe` mirrors the four events of
+`SoftwareUpdateManager.ts:1420-1438` (`updateAvailable` :886, `updateApplying`
+:1317, `updateDone` :829/:1279, `updateFailed` :878/:1123) and adds two the
+host needs to drive a UI and matter.js does not emit: `consent_changed`
+(AddUpdateConsent / RemoveConsent) and `check_finished` (the end of
+QueryUpdates, with the per-product errors it logged and passed over). Both
+are marked Go-only in the doc comments. Pinned by
+`controller/pair_progress_test.go` and `controller/softwareupdate/observe_test.go`.
+
 > **Rule of thumb (CLAUDE.md):** matter.js HEAD is the gold standard for everything under ``. Cluster IDs / revisions / attribute IDs / constraints / defaults / wire shape are taken verbatim. Any item below is a **deliberate** divergence with a documented reason. Bug-class drift (hand-coded revisions etc.) does **not** belong here — it belongs in a fix.
 
 ### Idiomatic translations TypeScript → Go (not real divergence)
