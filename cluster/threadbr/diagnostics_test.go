@@ -182,8 +182,10 @@ func TestDiagnosticsUnconfigured(t *testing.T) {
 	br.notFound = true
 	br.diag = meshDiagnostics()
 	s := newDiagnostics(t, br, 0)
-	for _, id := range []uint32{tnd.AttrChannel, tnd.AttrNetworkName, tnd.AttrPanId, tnd.AttrExtendedPanId, tnd.AttrMeshLocalPrefix,
-		tnd.AttrPartitionId, tnd.AttrSecurityPolicy, tnd.AttrChannelPage0Mask, tnd.AttrOperationalDatasetComponents, tnd.AttrExtAddress, tnd.AttrRloc16} {
+	for _, id := range []uint32{
+		tnd.AttrChannel, tnd.AttrNetworkName, tnd.AttrPanId, tnd.AttrExtendedPanId, tnd.AttrMeshLocalPrefix,
+		tnd.AttrPartitionId, tnd.AttrSecurityPolicy, tnd.AttrChannelPage0Mask, tnd.AttrOperationalDatasetComponents, tnd.AttrExtAddress, tnd.AttrRloc16,
+	} {
 		if v := read(t, s, id); v != nil {
 			t.Errorf("attribute 0x%04X = %v, want null", id, v)
 		}

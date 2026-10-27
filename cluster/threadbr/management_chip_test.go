@@ -11,8 +11,8 @@ import (
 	"time"
 
 	"github.com/SukramJ/go-fabric/cluster"
-	"github.com/SukramJ/go-fabric/cluster/threadbr"
 	tbrm "github.com/SukramJ/go-fabric/cluster/spec/threadborderroutermanagement"
+	"github.com/SukramJ/go-fabric/cluster/threadbr"
 	"github.com/SukramJ/go-fabric/im"
 )
 
