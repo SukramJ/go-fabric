@@ -502,9 +502,35 @@ type PairOptions struct {
 	// none.
 	WiFi   *commissioner.WiFiNetwork
 	Thread *commissioner.ThreadNetwork
+	// Progress, when set, is called on Pair's goroutine as each step of
+	// the pairing starts and ends ([PairingStep]): the search for the
+	// device (skipped with Address), PASE, then the commissioning steps
+	// under matter.js's names. Pair waits for it, so it must not block.
+	// It is the commissioner's Options.Progress, which Edit may replace.
+	Progress func(PairingStep)
 	// Edit adjusts the commissioner's options last (a seam).
 	Edit func(*commissioner.Options)
 }
+
+// PairingStep is one report of [PairOptions].Progress: the step's
+// number, sub-step and name — matter.js's step names verbatim
+// (packages/protocol/src/peer/ControllerCommissioningFlow.ts:536-656 at
+// 862ad75f), so a UI can show them, and "Discovery" 2.1 and "PASE" 2.2,
+// this module's names for the steps before matter.js's flow — its
+// phase, and the error of a failed step (commissioner.Step).
+type PairingStep = commissioner.Step
+
+// PairingPhase is a [PairingStep]'s phase: started, then succeeded,
+// failed or skipped (commissioner.StepPhase).
+type PairingPhase = commissioner.StepPhase
+
+// The phases of a [PairingStep].
+const (
+	PairingStarted   = commissioner.StepStarted
+	PairingSucceeded = commissioner.StepSucceeded
+	PairingFailed    = commissioner.StepFailed
+	PairingSkipped   = commissioner.StepSkipped
+)
 
 // Pair finds the commissionable device a QR code ("MT:…") or a manual
 // pairing code names, over DNS-SD by its discriminator, and commissions
@@ -547,17 +573,24 @@ func (c *Controller) Pair(ctx context.Context, code string, opts PairOptions) (*
 	}
 	var dev *discovery.Device
 	var channel commissioner.Channel
-	if opts.BLE != nil {
-		d, ch, err := c.dialBLE(ctx, opts.BLE, id, identity)
-		if err != nil {
-			return nil, err
-		}
-		defer func() { _ = ch.Close() }()
-		dev, channel = &d, ch
-	} else if known != nil {
+	if known != nil {
+		commissioner.ReportDiscovery(opts.Progress, PairingSkipped, nil)
 		dev = known
-	} else if dev = c.findCommissionable(ctx, id, identity); dev == nil {
-		return nil, ErrNoDevice
+	} else {
+		commissioner.ReportDiscovery(opts.Progress, PairingStarted, nil)
+		if opts.BLE != nil {
+			d, ch, err := c.dialBLE(ctx, opts.BLE, id, identity)
+			if err != nil {
+				commissioner.ReportDiscovery(opts.Progress, PairingFailed, err)
+				return nil, err
+			}
+			defer func() { _ = ch.Close() }()
+			dev, channel = &d, ch
+		} else if dev = c.findCommissionable(ctx, id, identity); dev == nil {
+			commissioner.ReportDiscovery(opts.Progress, PairingFailed, ErrNoDevice)
+			return nil, ErrNoDevice
+		}
+		commissioner.ReportDiscovery(opts.Progress, PairingSucceeded, nil)
 	}
 	n, err := c.reg.ForDevice(ctx, *dev)
 	if err != nil {
@@ -566,6 +599,7 @@ func (c *Controller) Pair(ctx context.Context, code string, opts PairOptions) (*
 	o := commissioner.Options{
 		Passcode: passcode, OnAttestationFailure: opts.OnAttestationFailure,
 		Channel: channel, WiFiNetwork: opts.WiFi, ThreadNetwork: opts.Thread,
+		Progress: opts.Progress,
 	}
 	if o.OnAttestationFailure.Decide == nil && o.OnAttestationFailure.OnFailure == nil {
 		o.OnAttestationFailure = attestation.Reject()

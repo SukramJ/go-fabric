@@ -163,6 +163,11 @@ type Options struct {
 	// CASEConnectionTiming overrides the peer set's timing for that
 	// connection (:95-101).
 	CASEConnectionTiming *peer.Timing
+	// Progress, when set, is called on the commissioning goroutine as
+	// each step starts and ends: [StepPASE] first, then the flow's steps
+	// in matter.js's order and names ([Step]). Commission waits for it,
+	// so it must not block.
+	Progress func(Step)
 }
 
 // Result is a successful commissioning — matter.js CommissionResult
@@ -275,20 +280,24 @@ func (c *Commissioner) Commission(ctx context.Context, opts Options) (Result, er
 		opts.Timeout = DefaultPASETimeout
 	}
 	var session *exchange.Session
+	opts.report(2, 2, StepPASE, StepStarted, nil)
 	if opts.Channel != nil {
 		s, err := c.establishOverChannel(ctx, opts.Channel, opts.Timeout, opts.Passcode)
 		if err != nil {
 			_ = opts.Channel.Close()
+			opts.report(2, 2, StepPASE, StepFailed, err)
 			return Result{}, err
 		}
 		session = s
 	} else {
 		res, err := c.establishFromCandidates(ctx, addressesToCandidates(opts.Addresses, opts.DiscoveryData), opts.Timeout, opts.Passcode, true)
 		if err != nil {
+			opts.report(2, 2, StepPASE, StepFailed, err)
 			return Result{}, err
 		}
 		session = res.session
 	}
+	opts.report(2, 2, StepPASE, StepSucceeded, nil)
 	nodeID := opts.NodeID
 	if opts.ClaimNodeIDAfterPASE != nil {
 		id, ok := opts.ClaimNodeIDAfterPASE()
