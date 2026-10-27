@@ -10,6 +10,13 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+### Added
+
+- `cluster/camera`, the camera stream servers (milestone 6, brief 26-A2, concept v10 wave 26-A2), both after connectedhomeip at 6170af84, ahead of matter.js:
+  - `camera.AvStream` serves CameraAvStreamManagement after `CameraAVStreamManagementCluster.cpp`. It runs on four new ports (`cameraavstreammanagementdef.Declare`): `VideoStreamPort` (VDO), `AudioStreamPort` (ADO), `SnapshotStreamPort` and `SnapshotCapturePort` (SNP). The server validates each allocation against the cluster's rules, the stream priorities and the snapshot capabilities before the port allocates, keeps the allocated streams (a reused id narrows the stream to the intersection of both ranges; `VideoStreamAllocated` tells the host how), counts their references (`UpdateVideoStreamRefCount` and its audio and snapshot twins), refuses to deallocate a stream in use, holds the Viewport to the sensor's aspect ratio, and refuses a snapshot while a privacy mode is on. `ReusableVideoStreamID`, `ReusableSnapshotStreamID` and `ResourceAvailable` are chip's helpers for the port.
+  - `camera.Zones` serves ZoneManagement after `ZoneManagementCluster.cpp` and `zone-geometry.h`. It runs on the new port `ZonePort` (`zonemanagementdef.Declare.ZonePort`). The server validates a zone (its constraints, the vertex bounds, a duplicate, a self-intersecting polygon — `camera.ZoneSelfIntersecting`) and a trigger before the port stores it, keeps Zones and Triggers and the user-defined budget, and emits `ZoneTriggered` and `ZoneStopped` when the host reports them.
+  - Both keep the generated server without their ports. The host persists their state through the change notifications and restores it through `Initial`. chip's unit tests are ported (57 stream cases, 11 zone cases, the polygon cases). The [camera guide](docs/guides/camera.md) gains the stream and the zone model.
+
 ## [0.13.6] — 2026-10-27
 
 ### Added
