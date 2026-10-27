@@ -10,6 +10,8 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+## [0.13.6] — 2026-10-27
+
 ### Added
 
 - `cluster/camera`, the camera signalling servers (milestone 6, brief 26-A1, concept v10 wave 26-A1):
@@ -4951,7 +4953,8 @@ consumer of an older pseudo-version should read.
   earlier than it was. Both fields are gone; the commit holding the file is
   its provenance.
 
-[Unreleased]: https://github.com/SukramJ/go-fabric/compare/v0.13.5...HEAD
+[Unreleased]: https://github.com/SukramJ/go-fabric/compare/v0.13.6...HEAD
+[0.13.6]: https://github.com/SukramJ/go-fabric/compare/v0.13.5...v0.13.6
 [0.13.5]: https://github.com/SukramJ/go-fabric/compare/v0.13.4...v0.13.5
 [0.13.4]: https://github.com/SukramJ/go-fabric/compare/v0.13.3...v0.13.4
 [0.13.3]: https://github.com/SukramJ/go-fabric/compare/v0.13.2...v0.13.3
