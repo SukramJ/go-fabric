@@ -90,6 +90,8 @@ pin lift confirms by re-reading the row, [`pin-lifts.md`](./pin-lifts.md)).
 | BD-chip-DeviceEnergyManagement-EnergyEvse-RulesInServer | `DeviceEnergyManagementServer.ts:18`, `EnergyEvseServer.ts:14` are empty subclasses (absence: the class lines) | `packages/node/src/behaviors/device-energy-management/DeviceEnergyManagementServer.ts`<br>`packages/node/src/behaviors/energy-evse/EnergyEvseServer.ts` | `"export class DeviceEnergyManagementServer extends DeviceEnergyManagementBehavior {}"`<br>`"export class EnergyEvseServer extends EnergyEvseBehavior {}"` | connectedhomeip |
 | BD-chip-ClosureDimension-RulesInServer | `ClosureDimensionServer.ts:17` is the empty subclass (absence: the class line, 17 lines in all) | `packages/node/src/behaviors/closure-dimension/ClosureDimensionServer.ts` | `"export class ClosureDimensionServer extends ClosureDimensionBehavior {}"` | connectedhomeip |
 | BD-chip-Thermostat-Schedules | `ThermostatServer.ts:82`, the class doc lists the feature unimplemented (presence; :126-128 warns when it is enabled) | `packages/node/src/behaviors/thermostat/ThermostatServer.ts` | `"MatterScheduleConfiguration: This feature is not implemented yet."` | connectedhomeip `src/app/clusters/thermostat-server/ThermostatClusterSchedules.cpp` at `645b267a` (`SetActiveSchedule` :741, `AppendPendingSchedule` :795, `ValidateScheduleTransitions` :292, `ValidateTransitionsPerDay` :457, the atomic hooks :620-663, `PrecommitSchedules` :1000) |
+| BD-chip-WiFiNetworkManagement-RulesInServer | `WiFiNetworkManagementServer.ts:14` is the empty subclass (absence: the class line, 14 lines in all) | `packages/node/src/behaviors/wi-fi-network-management/WiFiNetworkManagementServer.ts` | `"export class WiFiNetworkManagementServer extends WiFiNetworkManagementBehavior {}"` | connectedhomeip `src/app/clusters/wifi-network-management-server/WiFiNetworkManagementCluster.cpp` at `6170af84` (`ClearNetworkCredentials` :62, `SetNetworkCredentials` :74, `ReadAttribute` :105, `InvokeCommand` :123) |
+| BD-chip-ThreadNetworkDirectory-RulesInServer | `ThreadNetworkDirectoryServer.ts:14` is the empty subclass (absence: the class line, 14 lines in all) | `packages/node/src/behaviors/thread-network-directory/ThreadNetworkDirectoryServer.ts` | `"export class ThreadNetworkDirectoryServer extends ThreadNetworkDirectoryBehavior {}"` | connectedhomeip `src/app/clusters/thread-network-directory-server/ThreadNetworkDirectoryCluster.cpp` at `6170af84` (`WritePreferredExtendedPanId` :139, `ReadThreadNetworks` :153, `HandleAddNetworkRequest` :214, `HandleRemoveNetworkRequest` :278, `HandleOperationalDatasetRequest` :309; `ThreadNetworkDirectoryStorage.h`) |
 
 ---
 
@@ -4610,6 +4612,60 @@ stays unserved (`:372-379`), and no hold timer runs. Reasoning: a device
 that follows a week program must learn that a controller asked it to hold
 or to resume, and the Sink is where every other admitted write reaches the
 host (brief CO, issue #273).
+
+### BD-chip-WiFiNetworkManagement-RulesInServer — the credential, surrogate and CASE rules are connectedhomeip's; matter.js has none
+
+matter.js's `WiFiNetworkManagementServer` is the empty subclass
+(`packages/node/src/behaviors/wi-fi-network-management/WiFiNetworkManagementServer.ts:14`
+at `862ad75f`), so `cluster/netinfra/wifimgmt.go` follows connectedhomeip's
+`WiFiNetworkManagementCluster.cpp` at the harness commit `6170af84` (wave
+26-B, concept v10): the credentials are host state set through
+`SetNetworkCredentials` / `ClearNetworkCredentials` with chip's SSID and
+WPA-personal checks (`:44-56`, `:62-103` — a passphrase of 8 to 63 bytes or
+a 64-hex-digit PSK); a new passphrase advances `PassphraseSurrogate`;
+`NetworkPassphraseRequest` answers over a CASE session only
+(UNSUPPORTED_ACCESS otherwise, `:129-131`) and INVALID_IN_STATE without
+credentials (`:132`); the passphrase is never logged, never in an error
+and never an attribute. The session kind comes from the request context
+the bridge stamps, as `cluster/core/ota_provider.go` reads it; a group
+message does not count as CASE (chip's `kGroup`). chip's ten unit cases
+are ported (`wifimgmt_chip_test.go`). Reasoning: a NetworkInfrastructureManager
+device type mandates the cluster and chip is the only reference with
+rules. Retire when matter.js's server gains them; then re-derive from it.
+
+### BD-chip-ThreadNetworkDirectory-RulesInServer — the directory's commands follow connectedhomeip behind a `ThreadNetworkStore` port
+
+matter.js's `ThreadNetworkDirectoryServer` is the empty subclass
+(`packages/node/src/behaviors/thread-network-directory/ThreadNetworkDirectoryServer.ts:14`
+at `862ad75f`); `cluster/netinfra/threaddir.go` follows connectedhomeip's
+`ThreadNetworkDirectoryCluster.cpp` at `6170af84` (wave 26-B): `AddNetwork`
+(`:214-276`; CONSTRAINT_ERROR on a bad dataset, INVALID_IN_STATE, and
+RESOURCE_EXHAUSTED when the table is full), `RemoveNetwork` (`:278-307`;
+NOT_FOUND), `GetOperationalDataset` (`:309-335`; UNSUPPORTED_ACCESS without
+CASE, NOT_FOUND), and the `PreferredExtendedPanID` write (`:139-151`: null
+or an id of a stored network, CONSTRAINT_ERROR otherwise). The host's
+storage is the generated `ThreadNetworkStore` port (`Declare.ThreadNetworkStore`,
+in the spirit of chip's `ThreadNetworkDirectoryStorage.h`): the networks
+and the preferred id, which chip keeps in attribute storage (`:151`) and
+this port persists through `LoadPreferred` / `SavePreferred` as the
+`PresetStore` persists the active preset; an in-memory store of 32
+networks (chip's default, `CHIP_CONFIG_MAX_THREAD_NETWORK_DIRECTORY_STORAGE_CAPACITY`
+= `CHIP_CONFIG_MAX_FABRICS * 2`, `src/lib/core/CHIPConfig.h:1891`) stands in
+without one. Three deliberate differences inside it. (1) `ThreadNetworks`
+is served from the server's own table, loaded at construction and after
+each command; a host that writes the store outside the cluster calls
+`ReloadNetworks` — chip reads its storage on every read (`:153-183`), which
+leaves its data version unaware of an out-of-band change. (2) An empty
+Network Name is refused with CONSTRAINT_ERROR: the model's struct
+constraint "1 to 16" (matter.js's `thread-network-directory.element.ts`)
+wins over chip accepting it. (3) The dataset is checked the way chip's
+`OperationalDatasetView` reads it (first sub-TLV of each type, chip's
+sizes, `ThreadOperationalDataset.cpp:172-301`), not through
+`controller/thread`'s codec, which `archcheck` keeps out of a server
+(servers → roles); wave 26a moves the codec to `thread/` and reconciles the
+two views. chip's seven unit cases are ported (`threaddir_chip_test.go`; the
+storage-migration case is chip's own format). Retire when matter.js's
+server gains the rules.
 
 ### BD-Matter-GeneratedServerSuffices — clusters whose generated server is complete: no source carries behaviour beyond the model
 
