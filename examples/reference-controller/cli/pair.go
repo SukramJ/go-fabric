@@ -105,7 +105,7 @@ var errBLENeedsNetwork = errors.New("pair --ble needs --wifi-ssid and --wifi-cre
 // advertisement instead and runs PASE over BTP (PairOptions.BLE); the
 // network steps then put it on the network, where operational discovery
 // finds it over DNS-SD.
-func cmdPair(e *env, args []string) error {
+func cmdPair(e *env, args []string) error { //nolint:funlen // one flag per line: the command's whole surface, BLE adapter and proxies included
 	var code, label string
 	var passcode, discriminator uint
 	var nodeIDArg string
