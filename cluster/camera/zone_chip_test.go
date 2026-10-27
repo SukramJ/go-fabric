@@ -309,12 +309,12 @@ func TestChipZonePolygon(t *testing.T) {
 		return out
 	}
 	valid := map[string][]camera.Vertex{ // TestValidZones :48-80
-		"simple triangle":           v(10, 10, 20, 10, 20, 20),
-		"simple rectangle":          v(10, 10, 20, 10, 20, 20, 10, 20),
-		"convex pentagon":           v(10, 10, 20, 10, 20, 20, 15, 25, 10, 20),
-		"concave pentagon":          v(10, 10, 20, 10, 20, 20, 15, 15, 10, 20),
-		"arrow head":                v(10, 10, 20, 20, 30, 10, 20, 15),
-		"three collinear of four":   v(10, 10, 20, 10, 30, 10, 20, 15),
+		"simple triangle":         v(10, 10, 20, 10, 20, 20),
+		"simple rectangle":        v(10, 10, 20, 10, 20, 20, 10, 20),
+		"convex pentagon":         v(10, 10, 20, 10, 20, 20, 15, 25, 10, 20),
+		"concave pentagon":        v(10, 10, 20, 10, 20, 20, 15, 15, 10, 20),
+		"arrow head":              v(10, 10, 20, 20, 30, 10, 20, 15),
+		"three collinear of four": v(10, 10, 20, 10, 30, 10, 20, 15),
 	}
 	for name, zone := range valid {
 		if camera.ZoneSelfIntersecting(zone) {
@@ -322,16 +322,16 @@ func TestChipZonePolygon(t *testing.T) {
 		}
 	}
 	intersecting := map[string][]camera.Vertex{ // TestSelfIntersectingZones :82-139
-		"hourglass":                     v(10, 10, 20, 20, 20, 10, 10, 20),
-		"apex crossing the base":        v(10, 10, 20, 10, 20, 20, 15, 5, 10, 20),
-		"overlapping first edges":       v(2, 2, 10, 2, 7, 2, 10, 1, 1, 1),
-		"duplicates and inner loops":    v(0, 0, 1, 0, 2, 0, 2, 1, 1, 0, 0, 1),
-		"duplicates and overlaps":       v(0, 0, 2, 0, 2, 1, 2, 0, 1, 0),
-		"duplicate, overlapping edges":  v(0, 0, 1, 0, 0, 0, 0, 1),
-		"adjacent duplicates":           v(0, 0, 0, 0, 1, 0, 0, 1),
-		"first and last duplicate":      v(0, 0, 1, 0, 1, 1, 0, 0),
-		"three overlapping":             v(0, 0, 2, 0, 1, 0),
-		"four collinear, overlapping":   v(0, 0, 2, 0, 1, 0, 3, 0),
+		"hourglass":                    v(10, 10, 20, 20, 20, 10, 10, 20),
+		"apex crossing the base":       v(10, 10, 20, 10, 20, 20, 15, 5, 10, 20),
+		"overlapping first edges":      v(2, 2, 10, 2, 7, 2, 10, 1, 1, 1),
+		"duplicates and inner loops":   v(0, 0, 1, 0, 2, 0, 2, 1, 1, 0, 0, 1),
+		"duplicates and overlaps":      v(0, 0, 2, 0, 2, 1, 2, 0, 1, 0),
+		"duplicate, overlapping edges": v(0, 0, 1, 0, 0, 0, 0, 1),
+		"adjacent duplicates":          v(0, 0, 0, 0, 1, 0, 0, 1),
+		"first and last duplicate":     v(0, 0, 1, 0, 1, 1, 0, 0),
+		"three overlapping":            v(0, 0, 2, 0, 1, 0),
+		"four collinear, overlapping":  v(0, 0, 2, 0, 1, 0, 3, 0),
 	}
 	for name, zone := range intersecting {
 		if !camera.ZoneSelfIntersecting(zone) {

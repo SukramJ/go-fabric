@@ -19,9 +19,9 @@ func TestAvStreamConfigRules(t *testing.T) {
 	m := &mockStreams{}
 	base := camera.AvStreamConfig{Video: m, Audio: m, Snapshot: m, Capture: m}
 	cases := []struct {
-		name  string
-		edit  func(*camera.AvStreamConfig)
-		want  error
+		name string
+		edit func(*camera.AvStreamConfig)
+		want error
 	}{
 		{"none of VDO ADO SNP :85-90", func(c *camera.AvStreamConfig) { c.Features = camera.FeaturePrivacy }, camera.ErrAvStreamConfig},
 		{"WMARK without VDO or SNP :93-102", func(c *camera.AvStreamConfig) { c.Features = camera.FeatureAudio | camera.FeatureWatermark }, camera.ErrAvStreamConfig},

@@ -270,7 +270,9 @@ func wantCode(t *testing.T, what string, got, want im.StatusCode) {
 
 func bptr(b bool) *bool { return &b }
 
-func res(w, h uint16) csdef.VideoResolutionStruct { return csdef.VideoResolutionStruct{Width: w, Height: h} }
+func res(w, h uint16) csdef.VideoResolutionStruct {
+	return csdef.VideoResolutionStruct{Width: w, Height: h}
+}
 
 // videoAllocate is the request the command cases share (:1098-1113).
 func videoAllocate() csdef.VideoStreamAllocateRequest {
@@ -352,124 +354,148 @@ func TestChipAvStreamAttributes(t *testing.T) { //nolint:funlen // one subtest p
 		check func(t *testing.T, a *camera.AvStream)
 	}{
 		{"TestReadMaxConcurrentEncoders", ":431-436", func(t *testing.T, a *camera.AvStream) {
+			t.Helper()
 			if readStream[uint8](t, a, csdef.AttrMaxConcurrentEncoders) != 1 {
 				t.Fatal("MaxConcurrentEncoders")
 			}
 		}},
 		{"TestReadMaxEncodedPixelRate", ":438-443", func(t *testing.T, a *camera.AvStream) {
+			t.Helper()
 			if readStream[uint32](t, a, csdef.AttrMaxEncodedPixelRate) != 248832000 {
 				t.Fatal("MaxEncodedPixelRate")
 			}
 		}},
 		{"TestReadVideoSensorParams", ":445-454", func(t *testing.T, a *camera.AvStream) {
+			t.Helper()
 			p := readStream[csdef.VideoSensorParamsStruct](t, a, csdef.AttrVideoSensorParams)
 			if p.SensorWidth != 1920 || p.SensorHeight != 1080 || p.MaxFps != 120 || p.MaxHdrfps == nil || *p.MaxHdrfps != 30 {
 				t.Fatalf("VideoSensorParams %+v", p)
 			}
 		}},
 		{"TestReadNightVisionUsesInfrared", ":456-461", func(t *testing.T, a *camera.AvStream) {
+			t.Helper()
 			if readStream[bool](t, a, csdef.AttrNightVisionUsesInfrared) {
 				t.Fatal("NightVisionUsesInfrared")
 			}
 		}},
 		{"TestReadMinViewportResolution", ":463-469", func(t *testing.T, a *camera.AvStream) {
+			t.Helper()
 			if r := readStream[csdef.VideoResolutionStruct](t, a, csdef.AttrMinViewportResolution); r != res(640, 480) {
 				t.Fatalf("MinViewportResolution %+v", r)
 			}
 		}},
 		{"TestReadRateDistortionTradeOffPoints", ":471-484", func(t *testing.T, a *camera.AvStream) {
+			t.Helper()
 			if l := readStream[[]csdef.RateDistortionTradeOffPointsStruct](t, a, csdef.AttrRateDistortionTradeOffPoints); len(l) != 1 {
 				t.Fatalf("RateDistortionTradeOffPoints %d", len(l))
 			}
 		}},
 		{"TestReadMaxContentBufferSize", ":486-491", func(t *testing.T, a *camera.AvStream) {
+			t.Helper()
 			if readStream[uint32](t, a, csdef.AttrMaxContentBufferSize) != 4096 {
 				t.Fatal("MaxContentBufferSize")
 			}
 		}},
 		{"TestReadMicrophoneCapabilities", ":493-508", func(t *testing.T, a *camera.AvStream) {
+			t.Helper()
 			c := readStream[csdef.AudioCapabilitiesStruct](t, a, csdef.AttrMicrophoneCapabilities)
 			if c.MaxNumberOfChannels != 2 || len(c.SupportedCodecs) != 2 {
 				t.Fatalf("MicrophoneCapabilities %+v", c)
 			}
 		}},
 		{"TestReadSpeakerCapabilities", ":510-525", func(t *testing.T, a *camera.AvStream) {
+			t.Helper()
 			c := readStream[csdef.AudioCapabilitiesStruct](t, a, csdef.AttrSpeakerCapabilities)
 			if c.MaxNumberOfChannels != 2 || len(c.SupportedCodecs) != 2 {
 				t.Fatalf("SpeakerCapabilities %+v", c)
 			}
 		}},
 		{"TestReadTwoWayTalkSupport", ":527-532", func(t *testing.T, a *camera.AvStream) {
+			t.Helper()
 			if readStream[csdef.TwoWayTalkSupportTypeEnum](t, a, csdef.AttrTwoWayTalkSupport) != csdef.TwoWayTalkSupportTypeFullDuplex {
 				t.Fatal("TwoWayTalkSupport")
 			}
 		}},
 		{"TestReadSnapshotCapabilities", ":534-546", func(t *testing.T, a *camera.AvStream) {
+			t.Helper()
 			if l := readStream[[]csdef.SnapshotCapabilitiesStruct](t, a, csdef.AttrSnapshotCapabilities); len(l) != 2 {
 				t.Fatalf("SnapshotCapabilities %d", len(l))
 			}
 		}},
 		{"TestReadMaxNetworkBandwidth", ":548-553", func(t *testing.T, a *camera.AvStream) {
+			t.Helper()
 			if readStream[uint32](t, a, csdef.AttrMaxNetworkBandwidth) != 128000000 {
 				t.Fatal("MaxNetworkBandwidth")
 			}
 		}},
 		{"TestReadCurrentFrameRate", ":555-560", func(t *testing.T, a *camera.AvStream) {
+			t.Helper()
 			if readStream[uint16](t, a, csdef.AttrCurrentFrameRate) != 0 {
 				t.Fatal("CurrentFrameRate")
 			}
 		}},
 		{"TestReadSupportedStreamUsages", ":577-589", func(t *testing.T, a *camera.AvStream) {
+			t.Helper()
 			if l := readStream[[]camera.StreamUsage](t, a, csdef.AttrSupportedStreamUsages); len(l) != 2 {
 				t.Fatalf("SupportedStreamUsages %v", l)
 			}
 		}},
 		{"TestReadAllocatedVideoStreams", ":591-603", func(t *testing.T, a *camera.AvStream) {
+			t.Helper()
 			if l := readStream[[]camera.VideoStream](t, a, csdef.AttrAllocatedVideoStreams); len(l) != 0 {
 				t.Fatalf("AllocatedVideoStreams %v", l)
 			}
 		}},
 		{"TestReadAllocatedAudioStreams", ":605-617", func(t *testing.T, a *camera.AvStream) {
+			t.Helper()
 			if l := readStream[[]camera.AudioStream](t, a, csdef.AttrAllocatedAudioStreams); len(l) != 0 {
 				t.Fatalf("AllocatedAudioStreams %v", l)
 			}
 		}},
 		{"TestReadAllocatedSnapshotStreams", ":619-631", func(t *testing.T, a *camera.AvStream) {
+			t.Helper()
 			if l := readStream[[]camera.SnapshotStream](t, a, csdef.AttrAllocatedSnapshotStreams); len(l) != 0 {
 				t.Fatalf("AllocatedSnapshotStreams %v", l)
 			}
 		}},
 		{"TestReadStreamUsagePriorities", ":633-645", func(t *testing.T, a *camera.AvStream) {
+			t.Helper()
 			if l := readStream[[]camera.StreamUsage](t, a, csdef.AttrStreamUsagePriorities); len(l) != 2 {
 				t.Fatalf("StreamUsagePriorities %v", l)
 			}
 		}},
 		{"TestReadHardPrivacyModeOn", ":683-688", func(t *testing.T, a *camera.AvStream) {
+			t.Helper()
 			if !readStream[bool](t, a, csdef.AttrHardPrivacyModeOn) {
 				t.Fatal("HardPrivacyModeOn")
 			}
 		}},
 		{"TestReadSpeakerMaxLevel", ":794-799", func(t *testing.T, a *camera.AvStream) {
+			t.Helper()
 			if readStream[uint8](t, a, csdef.AttrSpeakerMaxLevel) != 254 {
 				t.Fatal("SpeakerMaxLevel")
 			}
 		}},
 		{"TestReadSpeakerMinLevel", ":801-806", func(t *testing.T, a *camera.AvStream) {
+			t.Helper()
 			if readStream[uint8](t, a, csdef.AttrSpeakerMinLevel) != 1 {
 				t.Fatal("SpeakerMinLevel")
 			}
 		}},
 		{"TestReadMicrophoneMaxLevel", ":855-860", func(t *testing.T, a *camera.AvStream) {
+			t.Helper()
 			if readStream[uint8](t, a, csdef.AttrMicrophoneMaxLevel) != 254 {
 				t.Fatal("MicrophoneMaxLevel")
 			}
 		}},
 		{"TestReadMicrophoneMinLevel", ":862-867", func(t *testing.T, a *camera.AvStream) {
+			t.Helper()
 			if readStream[uint8](t, a, csdef.AttrMicrophoneMinLevel) != 1 {
 				t.Fatal("MicrophoneMinLevel")
 			}
 		}},
 		{"TestReadMicrophoneAGCEnabled", ":869-874", func(t *testing.T, a *camera.AvStream) {
+			t.Helper()
 			if !readStream[bool](t, a, csdef.AttrMicrophoneAgcEnabled) {
 				t.Fatal("MicrophoneAgcEnabled")
 			}
@@ -501,8 +527,10 @@ func TestChipAvStreamReadWrite(t *testing.T) {
 		{"TestReadWriteImageFlipHorizontal :900-913", csdef.AttrImageFlipHorizontal, false, []any{true, false}},
 		{"TestReadWriteImageFlipVertical :915-928", csdef.AttrImageFlipVertical, false, []any{true, false}},
 		{"TestReadWriteStatusLightEnabled :930-943", csdef.AttrStatusLightEnabled, true, []any{false, true}},
-		{"TestReadWriteStatusLightBrightness :945-968", csdef.AttrStatusLightBrightness, csdef.ThreeLevelAutoMedium,
-			[]any{csdef.ThreeLevelAutoLow, csdef.ThreeLevelAutoHigh, csdef.ThreeLevelAutoAuto, csdef.ThreeLevelAutoMedium}},
+		{
+			"TestReadWriteStatusLightBrightness :945-968", csdef.AttrStatusLightBrightness, csdef.ThreeLevelAutoMedium,
+			[]any{csdef.ThreeLevelAutoLow, csdef.ThreeLevelAutoHigh, csdef.ThreeLevelAutoAuto, csdef.ThreeLevelAutoMedium},
+		},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -544,10 +572,10 @@ func TestChipAvStreamReadWrite(t *testing.T) {
 		}
 	})
 	levels := []struct {
-		name               string
-		level, minA, maxA  uint32
-		write, readBack    uint8
-		outOfRange         []uint8
+		name              string
+		level, minA, maxA uint32
+		write, readBack   uint8
+		outOfRange        []uint8
 	}{
 		{"TestReadWriteSpeakerVolumeLevel :762-792", csdef.AttrSpeakerVolumeLevel, csdef.AttrSpeakerMinLevel, csdef.AttrSpeakerMaxLevel, 100, 100, []uint8{0, 255}},
 		{"TestReadWriteMicrophoneVolumeLevel :823-853", csdef.AttrMicrophoneVolumeLevel, csdef.AttrMicrophoneMinLevel, csdef.AttrMicrophoneMaxLevel, 50, 50, []uint8{0, 255}},

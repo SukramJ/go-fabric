@@ -76,8 +76,10 @@ func TestZoneCommandRules(t *testing.T) { //nolint:funlen // one rule per block
 		wantCode(t, "after a removal", st, im.StatusSuccess)
 	})
 	t.Run("update and remove of a zone :523-610", func(t *testing.T) {
-		mfg := camera.Zone{ZoneId: 9, ZoneType: zmdef.ZoneTypeTwoDcartZone, ZoneSource: zmdef.ZoneSourceMfg,
-			TwoDCartesianZone: &camera.TwoDZone{Name: "door", Use: zmdef.ZoneUseMotion, Vertices: triangle(200)}}
+		mfg := camera.Zone{
+			ZoneId: 9, ZoneType: zmdef.ZoneTypeTwoDcartZone, ZoneSource: zmdef.ZoneSourceMfg,
+			TwoDCartesianZone: &camera.TwoDZone{Name: "door", Use: zmdef.ZoneUseMotion, Vertices: triangle(200)},
+		}
 		z, _ := newChipZones(t, twoDUser, func(cfg *camera.ZonesConfig) { cfg.Zones = []camera.Zone{mfg} })
 		update := func(id uint16, zone camera.TwoDZone) im.StatusCode {
 			_, st := invokeZones(z, zmdef.CmdUpdateTwoDCartesianZone, zmdef.UpdateTwoDCartesianZoneRequest{ZoneId: id, Zone: zone})
@@ -103,10 +105,14 @@ func TestZoneCommandRules(t *testing.T) { //nolint:funlen // one rule per block
 		wantCode(t, "remove with a trigger", remove(1), im.StatusInvalidInState)
 	})
 	t.Run("the trigger's checks :612-659", func(t *testing.T) {
-		privacy := camera.Zone{ZoneId: 3, ZoneType: zmdef.ZoneTypeTwoDcartZone, ZoneSource: zmdef.ZoneSourceMfg,
-			TwoDCartesianZone: &camera.TwoDZone{Use: zmdef.ZoneUsePrivacy, Vertices: triangle(0)}}
-		motion := camera.Zone{ZoneId: 4, ZoneType: zmdef.ZoneTypeTwoDcartZone, ZoneSource: zmdef.ZoneSourceMfg,
-			TwoDCartesianZone: &camera.TwoDZone{Use: zmdef.ZoneUseMotion, Vertices: triangle(50)}}
+		privacy := camera.Zone{
+			ZoneId: 3, ZoneType: zmdef.ZoneTypeTwoDcartZone, ZoneSource: zmdef.ZoneSourceMfg,
+			TwoDCartesianZone: &camera.TwoDZone{Use: zmdef.ZoneUsePrivacy, Vertices: triangle(0)},
+		}
+		motion := camera.Zone{
+			ZoneId: 4, ZoneType: zmdef.ZoneTypeTwoDcartZone, ZoneSource: zmdef.ZoneSourceMfg,
+			TwoDCartesianZone: &camera.TwoDZone{Use: zmdef.ZoneUseMotion, Vertices: triangle(50)},
+		}
 		z, m := newChipZones(t, camera.FeatureTwoDimensionalCartesianZone|camera.FeaturePerZoneSensitivity, func(cfg *camera.ZonesConfig) {
 			cfg.Zones = []camera.Zone{privacy, motion}
 		})
