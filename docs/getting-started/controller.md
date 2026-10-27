@@ -606,6 +606,7 @@ decodes a value a host holds. An unknown or zero version reports false.
 ### Pairing over BLE
 
 `PairOptions.BLE` is a Bluetooth LE central (`ble/bluez` on Linux,
+`ble/esphome` through ESPHome Bluetooth proxies — [guide](../guides/ble-proxies.md) —,
 `controller/ble/bletest` in a test): `Pair` then finds the device by its
 BLE advertisement instead of DNS-SD, runs PASE over BTP, and the network
 steps provision `PairOptions.WiFi` or `PairOptions.Thread` before CASE

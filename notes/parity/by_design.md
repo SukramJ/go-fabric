@@ -3503,6 +3503,27 @@ commissioning leaves. Report BB §4.
 By design. The harness image has no CHIPoBLE; the DUT state, not the
 transport, is what the cases judge.
 
+### BD-Controller-BleOverEsphomeProxies — `ble/esphome` commissions through ESPHome Bluetooth proxies; matter.js and chip reach BLE only through a local adapter
+
+matter.js's `packages/nodejs-ble` reaches BLE through noble on a local
+adapter and names proxies only as a reason for `isPeripheralReachable`
+(`BleScanner.ts:46-52` at `862ad75f`); connectedhomeip has no proxy
+transport either. `ble/esphome` (brief BP1, ADR 0024 decision 3 amended
+2026-10-27) runs the BlueZ platform's sequence — scan for the Matter
+service data, connect, C1 write-with-response, C2 indications, C3 read —
+over the ESPHome native API after aioesphomeapi (`api.proto`,
+`_frame_helper/noise.py` at 3b2a4a2d) and ESPHome's `bluetooth_proxy`
+behaviour (at 1cc6c9d1): the client writes C2's CCCD itself (the firmware
+registers locally only, `bluetooth_connection_bluedroid.cpp:325`), parses
+the raw advertisement bytes, takes the ATT MTU from
+`BluetoothDeviceConnectionResponse`, and implements `isPeripheralReachable`
+from the proxies' free connection slots. A proxy has one API subscriber;
+the central logs `ble.esphome.proxy_taken`, reconnects once after 30 s of
+silence and reports `ErrProxyBusy` on a second silence, cleared by the
+next fresh scan. Reasoning: a host without a Bluetooth adapter commissions
+through the proxies a Home Assistant site already has; neither reference
+offers this, so there is no behaviour to mirror and no marker to watch.
+
 ### BD-Controller-BluezScanWithoutUuidFilter — `ble/bluez` scans LE without a `UUIDs` discovery filter
 
 matter.js scans with noble's `startScanningAsync([MatterBle.SERVICE_UUID_SHORT],

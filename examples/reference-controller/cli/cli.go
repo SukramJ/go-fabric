@@ -8,10 +8,12 @@
 // and the DCL trust store — lives in one SQLite database (--db), so every
 // run is the same fabric and every node it paired still trusts it.
 //
-// Two programs run it: examples/reference-controller (no BLE) and
-// ble/bluez/cmd/reference-controller (BLE over BlueZ, a module of its own,
-// so the main module never imports godbus — ADR 0024 decision 3). They
-// differ only in [Options.Central].
+// Three programs run it: examples/reference-controller (no BLE),
+// ble/bluez/cmd/reference-controller (BLE over BlueZ) and
+// ble/esphome/cmd/reference-controller (BLE through ESPHome Bluetooth
+// proxies), the last two modules of their own, so the main module never
+// imports godbus or a Noise library — ADR 0024 decision 3. They differ only
+// in [Options.Central] and [Options.Proxies].
 //
 // It is an example, not API (README.md §API stability): copy from it, do
 // not build against it. The README beside the program lists every command.
@@ -40,6 +42,10 @@ type Options struct {
 	// Central opens the BLE central on an adapter (--ble-adapter) for
 	// pair --ble; nil is a build without BLE.
 	Central func(adapter string) (ble.Central, error)
+	// Proxies opens the BLE central over ESPHome Bluetooth proxies
+	// (--bluetooth-proxy host[:port][,key], repeatable) for pair; nil is a
+	// build without them.
+	Proxies func(specs []string, log *slog.Logger) (ble.Central, error)
 }
 
 // stderr is where the log and the usage go.
@@ -93,7 +99,7 @@ var commands map[string]command
 
 func init() {
 	commands = map[string]command{
-		"pair":      {"pair --code <MT:… | 11 or 21 digits> | --passcode N --discriminator N [--node-id N] [--label L] [--wifi-ssid S --wifi-credentials C | --thread-dataset HEX] [--ble [--ble-adapter hci0]]", cmdPair},
+		"pair":      {"pair --code <MT:… | 11 or 21 digits> | --passcode N --discriminator N [--node-id N] [--label L] [--wifi-ssid S --wifi-credentials C | --thread-dataset HEX] [--ble [--ble-adapter hci0 | --bluetooth-proxy host[:port][,key] …]]", cmdPair},
 		"discover":  {"discover [--code <MT:… | 11 or 21 digits> | --discriminator N] [--first]", cmdDiscover},
 		"unpair":    {"unpair <node>", cmdUnpair},
 		"nodes":     {"nodes", cmdNodes},
@@ -126,6 +132,8 @@ type env struct {
 	attests bool
 	// central is Options.Central.
 	central func(adapter string) (ble.Central, error)
+	// proxies is Options.Proxies.
+	proxies func(specs []string, log *slog.Logger) (ble.Central, error)
 	// ownNode is set by a command that needs the controller's own node
 	// (group, ota): the stack opens the controller with its OTA push.
 	ownNode bool
@@ -159,7 +167,7 @@ func Run(args []string, stdin io.Reader, stdout io.Writer, o Options) error {
 	}
 	ctx, stop := signal.NotifyContext(baseContext(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
-	return cmd.run(&env{ctx: ctx, opts: opts, stdin: stdin, stdout: stdout, log: log, central: o.Central}, fs.Args()[1:])
+	return cmd.run(&env{ctx: ctx, opts: opts, stdin: stdin, stdout: stdout, log: log, central: o.Central, proxies: o.Proxies}, fs.Args()[1:])
 }
 
 // baseContext is the context every run derives from; a test replaces it.
