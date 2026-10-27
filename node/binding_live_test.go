@@ -578,8 +578,9 @@ func coreEntries(b interface {
 	Entries() []bindingdef.TargetStruct
 },
 ) []mattercore.TargetStruct {
-	var out []mattercore.TargetStruct
-	for _, t := range b.Entries() {
+	entries := b.Entries()
+	out := make([]mattercore.TargetStruct, 0, len(entries))
+	for _, t := range entries {
 		out = append(out, mattercore.TargetFromDef(t))
 	}
 	return out

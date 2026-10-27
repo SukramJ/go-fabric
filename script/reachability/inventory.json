@@ -25777,7 +25777,7 @@
       "identifier": "TestReferenceController",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-controller/cli/main_test.go",
-      "line": 336
+      "line": 335
     },
     {
       "package": "examples/reference-controller/cli",
@@ -25791,7 +25791,7 @@
       "identifier": "TestReferenceControllerOTA",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-controller/cli/main_test.go",
-      "line": 488
+      "line": 487
     },
     {
       "package": "examples/reference-controller/cli",
