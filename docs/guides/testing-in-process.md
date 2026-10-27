@@ -152,6 +152,35 @@ started: a test that wants `AutoStart` calls `Registry().Start`.
 
 *Source: `fabrictest/node.go`, `fabrictest/controller.go`.*
 
+## BLE
+
+`Device.BLE()` is the device as a peripheral of the in-memory BLE model
+(`controller/ble/bletest`): it advertises the device's discriminator, vendor
+id and product id, and serves every BTP session through the device's own
+bridge. A central on it commissions the device over BLE —
+`controller.PairOptions.BLE`, PASE over BTP, the network steps, then CASE on
+the site's network — with no BTP peripheral built by hand:
+
+```go
+site := fabrictest.NewSite(t, fabrictest.Options{})
+dev := site.AddDevice(fabrictest.Topology{Configure: func(cfg *node.Config) {
+	cfg.Network.WiFiCommissioning = node.WiFiCommissioning{Driver: wifi}
+}})
+err := site.Run(ctx, func(ctx context.Context) error {
+	_, err := ctl.Pair(ctx, code, controller.PairOptions{
+		BLE:  bletest.NewCentral(dev.BLE()),
+		WiFi: &commissioner.WiFiNetwork{SSID: "lab", Credentials: "secret12"},
+	})
+	return err
+})
+```
+
+The peripheral goes behind any test central: `bletest.NewCentral`, or a
+platform's double such as `ble/esphome/esphometest`, which puts it behind a
+fake ESPHome proxy.
+
+*Source: `fabrictest/ble.go`.*
+
 ## A program's own composition
 
 `Site.AddController` builds the controller stack the site's way. A program

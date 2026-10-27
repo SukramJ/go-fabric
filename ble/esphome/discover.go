@@ -175,7 +175,7 @@ func candidates(ctx context.Context, b Browser, keys Keys, timeout time.Duration
 
 // skip logs a discovered device that is not used.
 func skip(log *slog.Logger, c candidate, reason error) {
-	log.Info("ble.esphome.proxy_skipped", slog.String("proxy", c.name), slog.Any("addresses", c.addrs), slog.Any("reason", reason))
+	log.Info("ble.esphome.proxy_skipped", slog.String("proxy", c.name), slog.Any("addresses", c.addrs), slog.String("reason", reason.Error()))
 }
 
 // Discover browses DNS-SD for timeout for ESPHome devices

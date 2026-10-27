@@ -112,11 +112,14 @@ func cmdPair(e *env, args []string) error { //nolint:funlen // one flag per line
 	var wifiSSID, wifiCredentials, threadDataset string
 	var useBLE bool
 	var bleAdapter string
-	var proxies stringsFlag
+	var proxies, proxyKeys stringsFlag
+	var discoverProxies bool
 	pos, err := parseArgs(e, "pair", args, func(fs *flag.FlagSet) {
 		fs.BoolVar(&useBLE, "ble", false, "find the device over BLE and commission it over BTP (needs the BLE build, and --wifi-ssid or --thread-dataset)")
 		fs.StringVar(&bleAdapter, "ble-adapter", "hci0", "the Bluetooth adapter for --ble")
 		fs.Var(&proxies, "bluetooth-proxy", "an ESPHome Bluetooth proxy for --ble instead of an adapter: host[:port][,key]; repeatable (needs the ESPHome build)")
+		fs.BoolVar(&discoverProxies, "bluetooth-proxy-discover", false, "find ESPHome Bluetooth proxies over DNS-SD for --ble, beside any --bluetooth-proxy (needs the ESPHome build)")
+		fs.Var(&proxyKeys, "bluetooth-proxy-key", "the API key of a discovered proxy: name=key, the name its device name or MAC; repeatable (with --bluetooth-proxy-discover)")
 		fs.StringVar(&wifiSSID, "wifi-ssid", "", "the SSID of the Wi-Fi network the device is to join")
 		fs.StringVar(&wifiCredentials, "wifi-credentials", "", "the Wi-Fi network's passphrase (with --wifi-ssid)")
 		fs.StringVar(&threadDataset, "thread-dataset", "", "the Thread operational dataset the device is to join, as hex")
@@ -155,14 +158,18 @@ func cmdPair(e *env, args []string) error { //nolint:funlen // one flag per line
 	if err != nil {
 		return err
 	}
-	if len(proxies) > 0 {
+	pf := ProxyFlags{Proxies: proxies, Discover: discoverProxies, Keys: proxyKeys}
+	if len(proxyKeys) > 0 && !discoverProxies {
+		return errors.New("--bluetooth-proxy-key needs --bluetooth-proxy-discover")
+	}
+	if pf.set() {
 		useBLE = true
 		if e.proxies == nil {
 			return errNoProxies
 		}
 	}
 	if useBLE {
-		if len(proxies) == 0 && e.central == nil {
+		if !pf.set() && e.central == nil {
 			return errNoBLE
 		}
 		if wifi == nil && thread == nil {
@@ -188,8 +195,8 @@ func cmdPair(e *env, args []string) error { //nolint:funlen // one flag per line
 		if useBLE {
 			var central ble.Central
 			var err error
-			if len(proxies) > 0 {
-				if central, err = e.proxies(proxies, e.log); err != nil {
+			if pf.set() {
+				if central, err = e.proxies(pf, e.log); err != nil {
 					return fmt.Errorf("bluetooth proxies: %w", err)
 				}
 			} else if central, err = e.central(bleAdapter); err != nil {

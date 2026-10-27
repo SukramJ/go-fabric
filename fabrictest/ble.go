@@ -27,15 +27,16 @@ func (d *Device) BLE() *bletest.Peripheral {
 	pd := d.cfg.ProductDescription
 	disc := d.cfg.Commissioning.Discriminator
 	d.mu.Unlock()
+	address := fmt.Sprintf("C0:FF:EE:00:%02X:%02X", (d.index>>8)&0xFF, d.index&0xFF)
 	return &bletest.Peripheral{
-		Address:       fmt.Sprintf("C0:FF:EE:00:%02X:%02X", (d.index>>8)&0xFF, d.index&0xFF),
+		Address:       address,
 		Discriminator: disc,
 		VendorID:      pd.VendorID,
 		ProductID:     pd.ProductID,
 		Serve: func(conn *btp.Conn) (func([]byte), func()) {
 			srv, err := bridgetest.ServeConn(d.Bridge(), conn)
 			if err != nil {
-				d.site.log.Warn("fabrictest.ble_serve_failed", slog.Int("device", d.index), slog.Any("err", err))
+				d.site.log.Warn("fabrictest.ble_serve_failed", slog.String("address", address), slog.Any("err", err))
 				return nil, nil
 			}
 			return srv.Deliver, srv.Close
