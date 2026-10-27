@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 6647,
+  "entry_points": 6661,
   "entry_packages": [
     ".",
     "bdx",
@@ -21,6 +21,7 @@
     "cluster/alarmbase",
     "cluster/appliance",
     "cluster/boolcfg",
+    "cluster/camera",
     "cluster/closure",
     "cluster/core",
     "cluster/cover",
@@ -260,9 +261,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 16164,
-    "reachable": 11426,
-    "whitelisted": 4735,
+    "total_exported": 16242,
+    "reachable": 11480,
+    "whitelisted": 4759,
     "unreachable": 3
   },
   "by_package": [
@@ -7336,6 +7337,118 @@
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/boolcfg/boolcfg.go",
       "line": 45
+    },
+    {
+      "package": "cluster/camera",
+      "identifier": "AvFeature",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/camera/avsettings.go",
+      "line": 27
+    },
+    {
+      "package": "cluster/camera",
+      "identifier": "ChimePort",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/camera/chime.go",
+      "line": 30
+    },
+    {
+      "package": "cluster/camera",
+      "identifier": "ChimeSound",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/camera/chime.go",
+      "line": 27
+    },
+    {
+      "package": "cluster/camera",
+      "identifier": "DPTZStream",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/camera/avsettings.go",
+      "line": 33
+    },
+    {
+      "package": "cluster/camera",
+      "identifier": "DigitalPTZ",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/camera/avsettings.go",
+      "line": 44
+    },
+    {
+      "package": "cluster/camera",
+      "identifier": "ICECandidate",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/camera/requestor.go",
+      "line": 28
+    },
+    {
+      "package": "cluster/camera",
+      "identifier": "MPTZ",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/camera/avsettings.go",
+      "line": 29
+    },
+    {
+      "package": "cluster/camera",
+      "identifier": "MPTZPreset",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/camera/avsettings.go",
+      "line": 31
+    },
+    {
+      "package": "cluster/camera",
+      "identifier": "MechanicalPTZ",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/camera/avsettings.go",
+      "line": 39
+    },
+    {
+      "package": "cluster/camera",
+      "identifier": "MechanicalPresets",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/camera/avsettings.go",
+      "line": 42
+    },
+    {
+      "package": "cluster/camera",
+      "identifier": "PhysicalMovement",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/camera/avsettings.go",
+      "line": 37
+    },
+    {
+      "package": "cluster/camera",
+      "identifier": "RequestorPort",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/camera/requestor.go",
+      "line": 30
+    },
+    {
+      "package": "cluster/camera",
+      "identifier": "RequestorRefusals",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/camera/requestor.go",
+      "line": 33
+    },
+    {
+      "package": "cluster/camera",
+      "identifier": "Signal",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/camera/requestor.go",
+      "line": 35
+    },
+    {
+      "package": "cluster/camera",
+      "identifier": "Viewport",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/camera/avsettings.go",
+      "line": 35
+    },
+    {
+      "package": "cluster/camera",
+      "identifier": "WebRTCSession",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/camera/requestor.go",
+      "line": 26
     },
     {
       "package": "cluster/closure",
@@ -19939,17 +20052,31 @@
     },
     {
       "package": "cluster/spec/webrtctransportprovider",
+      "identifier": "ICECandidateStructDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/webrtctransportprovider/definition_gen.go",
+      "line": 205
+    },
+    {
+      "package": "cluster/spec/webrtctransportprovider",
+      "identifier": "ICEServerStructDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/webrtctransportprovider/definition_gen.go",
+      "line": 170
+    },
+    {
+      "package": "cluster/spec/webrtctransportprovider",
       "identifier": "StreamUsageEnum",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/webrtctransportprovider/definition_gen.go",
-      "line": 57
+      "line": 119
     },
     {
       "package": "cluster/spec/webrtctransportprovider",
       "identifier": "StreamUsageEnumDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/webrtctransportprovider/definition_gen.go",
-      "line": 70
+      "line": 132
     },
     {
       "package": "cluster/spec/webrtctransportprovider",
@@ -19970,7 +20097,14 @@
       "identifier": "TestTypedServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/webrtctransportprovider/definition_gen_test.go",
-      "line": 45
+      "line": 44
+    },
+    {
+      "package": "cluster/spec/webrtctransportprovider",
+      "identifier": "WebRTCSessionStructDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/webrtctransportprovider/definition_gen.go",
+      "line": 103
     },
     {
       "package": "cluster/spec/webrtctransportrequestor",
@@ -19978,6 +20112,34 @@
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/webrtctransportrequestor/definition_gen.go",
       "line": 44
+    },
+    {
+      "package": "cluster/spec/webrtctransportrequestor",
+      "identifier": "ICECandidateStructDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/webrtctransportrequestor/definition_gen.go",
+      "line": 197
+    },
+    {
+      "package": "cluster/spec/webrtctransportrequestor",
+      "identifier": "ICEServerStructDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/webrtctransportrequestor/definition_gen.go",
+      "line": 162
+    },
+    {
+      "package": "cluster/spec/webrtctransportrequestor",
+      "identifier": "StreamUsageEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/webrtctransportrequestor/definition_gen.go",
+      "line": 111
+    },
+    {
+      "package": "cluster/spec/webrtctransportrequestor",
+      "identifier": "StreamUsageEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/webrtctransportrequestor/definition_gen.go",
+      "line": 124
     },
     {
       "package": "cluster/spec/webrtctransportrequestor",
@@ -19999,6 +20161,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/webrtctransportrequestor/definition_gen_test.go",
       "line": 41
+    },
+    {
+      "package": "cluster/spec/webrtctransportrequestor",
+      "identifier": "WebRTCSessionStructDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/webrtctransportrequestor/definition_gen.go",
+      "line": 95
     },
     {
       "package": "cluster/spec/wifinetworkdiagnostics",
