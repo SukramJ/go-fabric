@@ -118,6 +118,15 @@ jobs:
           echo "Release notes for ${VERSION}:" >&2
           cat RELEASE_NOTES.md >&2
 
+      # Stable releases open with the one-line sponsoring note in
+      # .github/SPONSORING.md; a prerelease tag does not.
+      - name: Prepend sponsoring note
+        if: env.PRERELEASE == ''
+        run: |
+          set -euo pipefail
+          { cat .github/SPONSORING.md; cat RELEASE_NOTES.md; } > notes.tmp
+          mv notes.tmp RELEASE_NOTES.md
+
       # gh is preinstalled on the runner, so there is no third-party action to
       # pin here. --verify-tag refuses to invent a tag if the ref went missing
       # between the push and this step.
