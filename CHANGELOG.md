@@ -10,6 +10,8 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+## [0.13.4] — 2026-10-27
+
 ### Added
 
 - `cluster/netinfra`: WiFiNetworkManagement and ThreadNetworkDirectory servers, ahead of matter.js (whose servers are the generated stubs, `WiFiNetworkManagementServer.ts:14` and `ThreadNetworkDirectoryServer.ts:14` at 862ad75f), after connectedhomeip at 6170af84 (brief 26-B). The kit mounts both by default on NetworkInfrastructureManager and ThreadBorderRouter.
@@ -4919,7 +4921,8 @@ consumer of an older pseudo-version should read.
   earlier than it was. Both fields are gone; the commit holding the file is
   its provenance.
 
-[Unreleased]: https://github.com/SukramJ/go-fabric/compare/v0.13.3...HEAD
+[Unreleased]: https://github.com/SukramJ/go-fabric/compare/v0.13.4...HEAD
+[0.13.4]: https://github.com/SukramJ/go-fabric/compare/v0.13.3...v0.13.4
 [0.13.3]: https://github.com/SukramJ/go-fabric/compare/v0.13.2...v0.13.3
 [0.13.2]: https://github.com/SukramJ/go-fabric/compare/v0.13.1...v0.13.2
 [0.13.1]: https://github.com/SukramJ/go-fabric/compare/v0.13.0...v0.13.1
