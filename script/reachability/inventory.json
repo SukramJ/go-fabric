@@ -23639,7 +23639,7 @@
       "identifier": "TestEveryKitServerHasItsHostDecided",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/host_methods_test.go",
-      "line": 339
+      "line": 336
     },
     {
       "package": "device",
@@ -23702,7 +23702,7 @@
       "identifier": "TestHostIsTheKitServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/host_methods_test.go",
-      "line": 370
+      "line": 367
     },
     {
       "package": "device",
