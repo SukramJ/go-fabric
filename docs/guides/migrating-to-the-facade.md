@@ -42,6 +42,15 @@ still held there. Each row names the facade route, or the section of
 | `cluster/core` | `SoftwareVersionFromString` (`daemon_matter.go:527`) | `node.SoftwareVersionFromString` |
 | `cluster/core` | `RegulatoryIndoorOutdoor` (`daemon_matter.go:506`) | `node.RegulatoryIndoorOutdoor` for `Commissioning.LocationCapability` |
 
+## Changed in v0.13.4: the WebRTC transport structs
+
+| Symbol | Route |
+| --- | --- |
+| `webrtctransportrequestordef.CurrentSessionsEntry`, `webrtctransportproviderdef.CurrentSessionsEntry` (empty structs) | `WebRTCSessionStruct` of the same package, with the session's fields |
+| `webrtctransportrequestordef.IceCandidatesRequestIceCandidatesEntry`, `webrtctransportproviderdef.ProvideIceCandidatesRequestIceCandidatesEntry` | `ICECandidateStruct` |
+| `webrtctransportrequestordef.OfferRequestIceServersEntry`, `webrtctransportproviderdef.SolicitOfferRequestIceServersEntry`, `webrtctransportproviderdef.ProvideOfferRequestIceServersEntry` | `ICEServerStruct` |
+| a host's own handlers of the requestor's four commands (`Declare.HandleOffer` …) | still run in place of the kit's server; or drop them and implement `RequestorPort` ([Camera](camera.md)) |
+
 ## Changed in v0.13.3: the Thermostat `Sink`
 
 | Symbol | Route |

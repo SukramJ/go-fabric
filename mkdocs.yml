@@ -80,6 +80,7 @@ nav:
   - Guides:
       - Host ports: guides/ports.md
       - Thermostat: guides/thermostat.md
+      - Camera: guides/camera.md
       - Advanced seams: guides/advanced-seams.md
       - Migrating to the facade: guides/migrating-to-the-facade.md
       - Concurrency: guides/concurrency.md

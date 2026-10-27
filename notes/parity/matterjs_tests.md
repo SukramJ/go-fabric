@@ -10,9 +10,9 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` â
 
 | status | files |
 | --- | ---: |
-| ported | 106 |
+| ported | 107 |
 | partial | 133 |
-| planned | 12 |
+| planned | 11 |
 | excluded | 73 |
 | total | 324 |
 
@@ -71,7 +71,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` â
 | [node/test/behaviors/thread-network-diagnostics](#nodetestbehaviorsthread-network-diagnostics) | 1 | 0 | 0 | 1 | 0 |
 | [node/test/behaviors/time-format-localization](#nodetestbehaviorstime-format-localization) | 1 | 1 | 0 | 0 | 0 |
 | [node/test/behaviors/unit-localization](#nodetestbehaviorsunit-localization) | 1 | 1 | 0 | 0 | 0 |
-| [node/test/behaviors/web-rtc-transport-requestor](#nodetestbehaviorsweb-rtc-transport-requestor) | 1 | 0 | 0 | 1 | 0 |
+| [node/test/behaviors/web-rtc-transport-requestor](#nodetestbehaviorsweb-rtc-transport-requestor) | 1 | 1 | 0 | 0 | 0 |
 | [node/test/behaviors/window-covering](#nodetestbehaviorswindow-covering) | 1 | 1 | 0 | 0 | 0 |
 | [node/test/devices](#nodetestdevices) | 1 | 1 | 0 | 0 | 0 |
 | [node/test/endpoint](#nodetestendpoint) | 8 | 0 | 1 | 0 | 7 |
@@ -481,7 +481,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` â
 
 | file | lines | status | Go tests or class | note |
 | --- | ---: | --- | --- | --- |
-| WebRtcTransportRequestorServerTest.ts | 605 | planned | until M6 phase 26 | The WebRTC transport requestor server, which milestone 6 phase 26 builds. |
+| WebRtcTransportRequestorServerTest.ts | 605 | ported | `cluster/camera:TestParityMatterJS_RequestorUpsertRemove`<br>`cluster/camera:TestParityMatterJS_RequestorCommands`<br>`cluster/camera:TestParityMatterJS_RequestorACLInstall` | The 28 cases run on cluster/camera's Requestor (brief 26-A1): upsert and remove by session key, the four commands' identity checks under the context the bridge stamps for a CASE invoke (matter.js's mocked remote actor), the refused, empty-candidate and end cases, the signalling handed to the RequestorPort; the ACL install over the wire on fabrictest, the repeated online event a device restart (cluster/camera/requestor_parity_matterjs_test.go). |
 
 ## node/test/behaviors/window-covering
 
@@ -929,10 +929,6 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` â
 ### node/test/behaviors/thread-network-diagnostics
 
 - `ThreadNetworkDiagnosticsProvisionalTest.ts` â€” Provisional ThreadNetworkDiagnostics attributes absent by default and present once supplied. Thread network diagnostics are milestone 6 phase 26 work (concept v5 F.0 19.2).
-
-### node/test/behaviors/web-rtc-transport-requestor
-
-- `WebRtcTransportRequestorServerTest.ts` â€” The WebRTC transport requestor server, which milestone 6 phase 26 builds.
 
 ### node/test/endpoint/type
 

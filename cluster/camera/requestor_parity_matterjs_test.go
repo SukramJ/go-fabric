@@ -24,8 +24,8 @@ import (
 	"github.com/SukramJ/go-fabric/bridge/bridgetest"
 	"github.com/SukramJ/go-fabric/cluster/camera"
 	"github.com/SukramJ/go-fabric/cluster/spec"
-	"github.com/SukramJ/go-fabric/controller"
 	wrdef "github.com/SukramJ/go-fabric/cluster/spec/webrtctransportrequestor"
+	"github.com/SukramJ/go-fabric/controller"
 	"github.com/SukramJ/go-fabric/fabrictest"
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/node"
@@ -45,7 +45,9 @@ func makeSession(edit ...func(*camera.WebRTCSession)) camera.WebRTCSession {
 	return s
 }
 
-func withID(id uint16) func(*camera.WebRTCSession) { return func(s *camera.WebRTCSession) { s.Id = id } }
+func withID(id uint16) func(*camera.WebRTCSession) {
+	return func(s *camera.WebRTCSession) { s.Id = id }
+}
 
 func withPeer(node uint64) func(*camera.WebRTCSession) {
 	return func(s *camera.WebRTCSession) { s.PeerNodeId = node }
