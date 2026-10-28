@@ -30,11 +30,15 @@ type TCPConfig struct {
 // reported in our session parameters, not only over DNS-SD, so a peer
 // learns it during PASE and CASE (ServerNetworkRuntime.ts:355-364); the
 // MAX_TCP_MESSAGE_SIZE field only when a TCP role is (SessionManager.ts:346-359).
-func localParameters(t TCPConfig) *sessionparams.Parameters {
-	if !t.Incoming && !t.Outgoing {
+func localParameters(t TCPConfig, s *SessionIntervals) *sessionparams.Parameters {
+	if !t.Incoming && !t.Outgoing && s == nil {
 		return nil
 	}
 	p := exchange.DefaultLocalParameters()
+	s.apply(&p)
+	if !t.Incoming && !t.Outgoing {
+		return &p
+	}
 	if t.Outgoing {
 		p.SupportedTransports |= sessionparams.TransportTCPClient
 	}

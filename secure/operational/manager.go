@@ -365,6 +365,17 @@ func (e *Entry) SetPeerMRPIntervals(idleMs, activeMs, activeThresholdMs uint32) 
 	e.mu.Unlock()
 }
 
+// PeerMRPIntervals returns what the peer advertised in its handshake's
+// SessionParameters (milliseconds; 0 = not advertised) — the device's
+// record of the controller's intervals, the counterpart of
+// client/exchange.Session.ReportedParameters on the initiator (matter.js
+// NodeSession.ts:136, :175 reportedParameters, ReportedSessionParametersTest.ts).
+func (e *Entry) PeerMRPIntervals() (idleMs, activeMs, activeThresholdMs uint32) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	return e.peerIdleIntervalMs, e.peerActiveIntervalMs, e.peerActiveThresholdMs
+}
+
 // SetPeerTransportParameters stores what the peer stated about transports
 // in its SessionParameters: the SupportedTransports bitmap and
 // MaxTCPMessageSize, already passed through the Matter 1.5 gate
@@ -1379,6 +1390,10 @@ type SessionInfo struct {
 	// away without closing its session.
 	LastActivity     time.Time
 	LastPeerActivity time.Time
+	// PeerIdleIntervalMs, PeerActiveIntervalMs and PeerActiveThresholdMs
+	// are the intervals the peer advertised in its handshake
+	// ([Entry.PeerMRPIntervals]); 0 when it advertised none.
+	PeerIdleIntervalMs, PeerActiveIntervalMs, PeerActiveThresholdMs uint32
 }
 
 // SessionTableOccupancy is how much of the session-id space the bridge
@@ -1475,6 +1490,10 @@ func (m *Manager) Sessions() []SessionInfo {
 			IsPASE:           e.isPase,
 			LastActivity:     e.lastActivity,
 			LastPeerActivity: e.lastPeerActivity,
+
+			PeerIdleIntervalMs:    e.peerIdleIntervalMs,
+			PeerActiveIntervalMs:  e.peerActiveIntervalMs,
+			PeerActiveThresholdMs: e.peerActiveThresholdMs,
 		}
 		e.mu.Unlock()
 		out = append(out, info)

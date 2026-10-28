@@ -2159,7 +2159,7 @@
   },
   {
     "file": "secure/operational/manager.go",
-    "line": 818,
+    "line": 829,
     "citation": "packages/protocol/src/session/SessionManager.ts:490-508",
     "resolved": "packages/protocol/src/session/SessionManager.ts",
     "identifier": "getNextAvailableSessionId",
@@ -2168,7 +2168,7 @@
   },
   {
     "file": "secure/operational/manager.go",
-    "line": 844,
+    "line": 855,
     "citation": "packages/protocol/src/session/SessionManager.ts:513",
     "resolved": "packages/protocol/src/session/SessionManager.ts",
     "identifier": "getSession",
@@ -2177,7 +2177,7 @@
   },
   {
     "file": "secure/operational/manager.go",
-    "line": 947,
+    "line": 958,
     "citation": "Session.ts:248",
     "resolved": "packages/protocol/src/session/Session.ts",
     "identifier": "initiateClose",
