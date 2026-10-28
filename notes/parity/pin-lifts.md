@@ -24,6 +24,39 @@ behaviour compared, never on the check's finding alone. Owner's work (Fable
 row); the reading map behind each section is a Sonnet `read-*.md` under
 `notes/reference/`, verified line by line before anything landed here.
 
+## Milestone 6 (2026-10-28, wave 27-C) — what the next lift re-reads
+
+No lift; the pin stays `862ad75f`. Milestone 6 added 18 rows to the
+*Ahead of matter.js* register (12 before wave 26-B, 30 now; `make
+ahead-check` holds every marker at the pin and at HEAD). The next lift
+re-reads each of their markers first, because each names a matter.js
+server that was the generated stub at the pin:
+
+- phase 26, camera (waves 26-A1 … 26-A3): `BD-chip-Chime-RulesInServer`,
+  `BD-chip-CameraAvSettings-RulesInServer`,
+  `BD-chip-CameraAvStreamManagement-RulesInServer`,
+  `BD-chip-ZoneManagement-RulesInServer`,
+  `BD-chip-WebRtcTransportProvider-RulesInServer`,
+  `BD-chip-PushAvStreamTransport-RulesInServer`,
+  `BD-chip-TlsCertificateManagement-RulesInServer`,
+  `BD-chip-TlsClientManagement-RulesInServer`;
+- phase 26, network infrastructure (wave 26-B):
+  `BD-chip-WiFiNetworkManagement-RulesInServer`,
+  `BD-chip-ThreadNetworkDirectory-RulesInServer`;
+- phase 26a, the Thread Border Router: `BD-Thread-TBRM-ChipLogic`,
+  `BD-Thread-TND-FromBorderRouter`, `BD-Thread-NetComm-ThreadVariant`;
+- phase 26, sensing (wave 26-C): `BD-chip-AmbientContextSensing-RulesInServer`;
+- phase 26, Joint Fabric (wave 26-D):
+  `BD-chip-JointFabricDatastore-RulesInServer`,
+  `BD-chip-JointFabricAdministrator-RulesInServer`, `BD-chip-JCM-Commissioner`;
+- phase 27 (wave 27-B): `BD-chip-TimeSynchronization-Features`.
+
+The Thermostat events (TEVT, wave 27-B) are described inside
+`BD-chip-Thermostat-Schedules` but have no register row of their own; its
+marker (`ThermostatServer.ts:82`) is the schedules', so a lift re-reads the
+events in `ThermostatServer.ts` by hand until a row is added.
+WebRtcTransportRequestor mirrors matter.js and is no register row.
+
 ## 0ceb202d → 862ad75f (2026-10-18, milestone 2 phase 14)
 
 57 commits; 16 skipped (7 `[CHIP BUILD]`, 7 version bumps, `ci:` #4787,
