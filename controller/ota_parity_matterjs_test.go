@@ -224,9 +224,15 @@ func TestOTACancelByRemovingConsentParity(t *testing.T) {
 	if q := mgr.QueuedUpdates(); len(q) != 0 {
 		t.Errorf("queue %+v, want empty", q)
 	}
-	// The requestor queries after its announcement jitter: the site's
-	// clock is stepped over it rather than walked timer by timer.
-	r.run(t, func(ctx context.Context) error { return r.site.Step(ctx, 15*time.Minute) })
+	// The requestor queries after its announcement jitter when a
+	// retransmission of the announcement reached it once the isolation
+	// ended, else at its 24 h query interval (UpdateQueryInterval): under
+	// load the retransmissions can all be spent while isolated. The site's
+	// clock is stepped in 15-minute slices until the query arrives, at most
+	// 25 h, rather than walked timer by timer (#306).
+	for i := 0; i < 100 && !queried.Load(); i++ {
+		r.run(t, func(ctx context.Context) error { return r.site.Step(ctx, 15*time.Minute) })
+	}
 	r.eventually(t, "the device's query", queried.Load)
 	r.eventually(t, "the requestor idle", func() bool {
 		v, _ := r.dev.Node().Root().OTARequestor.MatterRead(otareq.AttrUpdateState)
