@@ -303,7 +303,7 @@ type Config struct {
 	// [github.com/SukramJ/go-fabric/node] sets both. An ICD's record
 	// replaces the threshold and, while LIT, omits SII
 	// ([Bridge.SetICDAdvertisement]). Mirrors matter.js
-	// DeviceAdvertiser.ts:361-364, which advertises the SessionManager's
+	// DeviceAdvertiser.ts:361-364, which advertises the session manager's
 	// intervals unless the ICD provider governs them.
 	SessionIntervals SessionIntervals
 }

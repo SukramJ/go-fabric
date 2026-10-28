@@ -5,9 +5,9 @@ package node
 
 // The node's reported session intervals (Config.Sessions): matter.js
 // ServerNetworkRuntime.ts:357-363 spreads sessions.intervals into the
-// SessionManager's sessionParameters, which the PASE and CASE responders
-// report, and SessionManager.ts:58-67 refuses an active threshold above
-// 65535 ms.
+// session manager's parameters, which the PASE and CASE responders report.
+// matter.js refuses an active threshold above 65535 ms
+// (SessionManager.ts:58-67, assertActiveThreshold).
 
 import (
 	"log/slog"

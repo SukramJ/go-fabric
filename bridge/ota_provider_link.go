@@ -230,7 +230,7 @@ type initiatedSecureExchange struct {
 // exchange adds to the peer's MRP base interval before the backoff
 // amplifies it. Mirrors matter.js MessageExchange.peerAdditionalMrpDelay
 // (MessageExchange.ts:352-363 at 862ad75f), the setter for an exchange the
-// peer initiated, which BdxProtocol.onNewExchange calls
+// peer initiated, which the BDX responder calls on an inbound init
 // (BdxProtocol.ts:139-142). It implements [bdx.MrpDelayExchange].
 func (e *initiatedSecureExchange) SetPeerAdditionalMrpDelay(d time.Duration) {
 	e.peerMargin.Store(int64(max(d, 0)))

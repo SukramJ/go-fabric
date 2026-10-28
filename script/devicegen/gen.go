@@ -97,8 +97,8 @@ type typeModel struct {
 // cluster requirement but the Descriptor (VideoDoorbell, FloodlightCamera;
 // matter.js generates their files with no behaviours of their own,
 // packages/node/src/devices/video-doorbell.ts:28-33,
-// floodlight-camera.ts:31-36 at 862ad75f). matter.js places a component on
-// an endpoint below the composite (DeviceTypeConformance.ts:596-613: only a
+// packages/node/src/devices/floodlight-camera.ts:31-36 at 862ad75f).
+// matter.js places a component on an endpoint below the composite (DeviceTypeConformance.ts:596-613: only a
 // utility device type counts on the composing endpoint itself), and its
 // StandardDeviceTypeCorpusTest pins the missing components as "component
 // endpoints are the developer's to add" (:310, :328-358). Every component

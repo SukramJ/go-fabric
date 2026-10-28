@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 6977,
+  "entry_points": 7016,
   "entry_packages": [
     ".",
     "bdx",
@@ -268,9 +268,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 16770,
-    "reachable": 11813,
-    "whitelisted": 4954,
+    "total_exported": 16793,
+    "reachable": 11830,
+    "whitelisted": 4960,
     "unreachable": 3
   },
   "by_package": [
@@ -3819,6 +3819,13 @@
     },
     {
       "package": "bridge",
+      "identifier": "TestOperationalRecordCarriesSessionIntervals",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/advertised_intervals_test.go",
+      "line": 16
+    },
+    {
+      "package": "bridge",
       "identifier": "TestOperationalSessionLookupPASEResolver",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/pase_resolver_test.go",
@@ -3984,6 +3991,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/outbound_reliable_test.go",
       "line": 20
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestOutboundTrackerMarginJoinsTheBaseInterval",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/outbound_margin_internal_test.go",
+      "line": 19
     },
     {
       "package": "bridge",
@@ -9090,6 +9104,13 @@
     },
     {
       "package": "cluster/jointfabric",
+      "identifier": "CommissionerPeer",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/jointfabric/administrator.go",
+      "line": 34
+    },
+    {
+      "package": "cluster/jointfabric",
       "identifier": "CommissionerReach",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/jointfabric/administrator.go",
@@ -9149,14 +9170,14 @@
       "identifier": "ICACCSRStatus",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/jointfabric/administrator.go",
-      "line": 35
+      "line": 37
     },
     {
       "package": "cluster/jointfabric",
       "identifier": "ICACStatus",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/jointfabric/administrator.go",
-      "line": 37
+      "line": 39
     },
     {
       "package": "cluster/jointfabric",
@@ -21595,7 +21616,7 @@
       "identifier": "SetpointChange",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/thermo/thermostat_server.go",
-      "line": 319
+      "line": 320
     },
     {
       "package": "cluster/thermo",
@@ -24479,7 +24500,7 @@
       "identifier": "TestEveryGeneratedFileIsRegistered",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/registry_test.go",
-      "line": 44
+      "line": 43
     },
     {
       "package": "device",
@@ -24493,7 +24514,7 @@
       "identifier": "TestEveryTypeConstructsAndConforms",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/conformance_test.go",
-      "line": 272
+      "line": 285
     },
     {
       "package": "device",
@@ -24738,7 +24759,7 @@
       "identifier": "TestRefusalsWrapTheirSentinel",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/conformance_test.go",
-      "line": 328
+      "line": 341
     },
     {
       "package": "device",
@@ -29848,7 +29869,7 @@
       "identifier": "AttestationChain",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 171
+      "line": 174
     },
     {
       "package": "node",
@@ -29869,14 +29890,14 @@
       "identifier": "CapabilityMinimaStruct",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 159
+      "line": 162
     },
     {
       "package": "node",
       "identifier": "CommissioningApprover",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 153
+      "line": 156
     },
     {
       "package": "node",
@@ -29911,7 +29932,7 @@
       "identifier": "DeviceTypeValidationMode",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 165
+      "line": 168
     },
     {
       "package": "node",
@@ -29939,7 +29960,7 @@
       "identifier": "GeneralDiagnosticsFeatures",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 162
+      "line": 165
     },
     {
       "package": "node",
@@ -29981,14 +30002,14 @@
       "identifier": "OTAApplier",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 147
+      "line": 150
     },
     {
       "package": "node",
       "identifier": "OTAApplyPolicy",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 138
+      "line": 141
     },
     {
       "package": "node",
@@ -30002,14 +30023,14 @@
       "identifier": "OTAConsent",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 132
+      "line": 135
     },
     {
       "package": "node",
       "identifier": "OTAConsentState",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 135
+      "line": 138
     },
     {
       "package": "node",
@@ -30044,14 +30065,14 @@
       "identifier": "OTAImageSource",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 129
+      "line": 132
     },
     {
       "package": "node",
       "identifier": "OTAPeer",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 141
+      "line": 144
     },
     {
       "package": "node",
@@ -30065,7 +30086,7 @@
       "identifier": "OTAUpdateStatus",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 144
+      "line": 147
     },
     {
       "package": "node",
@@ -30093,7 +30114,7 @@
       "identifier": "ReverseCommissioner",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 156
+      "line": 159
     },
     {
       "package": "node",
@@ -30202,6 +30223,13 @@
     },
     {
       "package": "node",
+      "identifier": "TestResponderSessionParamsCarryIntervals",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "node/session_intervals_internal_test.go",
+      "line": 23
+    },
+    {
+      "package": "node",
       "identifier": "TestResponderSessionParamsCarryTCP",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "node/issue89_internal_test.go",
@@ -30223,10 +30251,24 @@
     },
     {
       "package": "node",
+      "identifier": "TestSessionIntervalsValidate",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "node/session_intervals_internal_test.go",
+      "line": 77
+    },
+    {
+      "package": "node",
       "identifier": "TestUniqueIDRotationOnOffOn",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "node/persist_internal_test.go",
       "line": 167
+    },
+    {
+      "package": "node",
+      "identifier": "TimeSynchronizationConfig",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "node/facade.go",
+      "line": 129
     },
     {
       "package": "node",
@@ -30247,14 +30289,14 @@
       "identifier": "WiFiReporter",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 150
+      "line": 153
     },
     {
       "package": "node",
       "identifier": "WindowStatus",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 168
+      "line": 171
     },
     {
       "package": "schema",

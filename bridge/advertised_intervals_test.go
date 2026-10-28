@@ -10,7 +10,7 @@ import (
 
 // The operational record carries the node's session intervals
 // (Config.SessionIntervals), as matter.js DeviceAdvertiser.ts:361-364
-// advertises the SessionManager's, capped by
+// advertises the session manager's, capped by
 // SessionIntervals.forAdvertisement (SessionIntervals.ts:69-92) at
 // 862ad75f; an ICD's provider replaces them.
 func TestOperationalRecordCarriesSessionIntervals(t *testing.T) {
