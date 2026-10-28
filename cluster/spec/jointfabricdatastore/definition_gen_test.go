@@ -251,6 +251,8 @@ func TestTypedServer(t *testing.T) {
 	if err := decl.Attach(srv); err != nil {
 		t.Error(err)
 	}
+	var _ DatastoreSync = d.Sync
+	var _ DatastoreStore = d.Store
 	// Every handler declared: each is installed, and refused by the
 	// empty definition's AcceptedCommandList.
 	all := d
