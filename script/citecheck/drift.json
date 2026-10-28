@@ -1806,6 +1806,16 @@
     "occurrences": 4
   },
   {
+    "file": "device/defaults_sensing.go",
+    "line": 21,
+    "citation": "packages/node/src/devices/thermostat.ts:133-138",
+    "resolved": "packages/node/src/devices/thermostat.ts",
+    "at": "862ad75f",
+    "identifier": "MutableEndpoint",
+    "nearest": 166,
+    "occurrences": 2
+  },
+  {
     "file": "device/device.go",
     "line": 589,
     "citation": "packages/node/src/endpoints/bridged-node.ts:39-73",
