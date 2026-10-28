@@ -32,12 +32,12 @@ type commissionee struct {
 	accessingFabric uint8
 	// peer is the commissioner the reach reads (the invoking session);
 	// reach is the administrator's at the announcement.
-	peer  CommissionerPeer
-	reach CommissionerReach
-	info            jcm.Info
-	machine         *jcm.Machine
-	result          jcm.Result
-	done            bool
+	peer    CommissionerPeer
+	reach   CommissionerReach
+	info    jcm.Info
+	machine *jcm.Machine
+	result  jcm.Result
+	done    bool
 
 	// next and perform replace the stage order and a stage in tests, as
 	// chip's test subclasses override them (TestJCMCommissionee.cpp:102-169).
