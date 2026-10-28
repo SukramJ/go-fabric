@@ -190,6 +190,7 @@ the kit server implements for host inputs: the switch's.
 
 | Cluster | `Host` |
 | --- | --- |
+| AmbientContextSensing | `AddDetection`, `SetObjectCount`, `Close` (stops the hold-time timer) — [Ambient context sensing](sensing.md) |
 | Binding | `Entries`, `OnChange` (per fabric, the entries gained and lost), in `bindingdef.TargetStruct` |
 | BooleanStateConfiguration | `SetSensorFault` (the event on every call, the attribute when served) |
 | CameraAvSettingsUserLevelManagement | `AddMoveCapableVideoStream`, `UpdateMoveCapableVideoStream`, `UpdateMoveCapableVideoStreams`, `RemoveMoveCapableVideoStream`, `PhysicalMovementComplete` |

@@ -99,6 +99,7 @@ pin lift confirms by re-reading the row, [`pin-lifts.md`](./pin-lifts.md)).
 | BD-Thread-TBRM-ChipLogic | `ThreadBorderRouterManagementServer.ts:14` is the empty subclass (absence: the class line, 14 lines in all) | `packages/node/src/behaviors/thread-border-router-management/ThreadBorderRouterManagementServer.ts` | `"export class ThreadBorderRouterManagementServer extends ThreadBorderRouterManagementBehavior {}"` | connectedhomeip `src/app/clusters/thread-border-router-management-server/ThreadBorderRouterManagementCluster.cpp` at `6170af84` (`ReadAttribute` :32, `InvokeCommand` :148, `OnActivateDatasetComplete` :272, `OnPlatformEventHandler` :297; `ThreadBorderRouterManagementDelegate.h:63-106`), tests `tests/TestThreadBorderRouterManagementCluster.cpp` |
 | BD-Thread-TND-FromBorderRouter | `ThreadNetworkDiagnosticsServer.ts:14` is the empty subclass (absence: the class line, 14 lines in all) | `packages/node/src/behaviors/thread-network-diagnostics/ThreadNetworkDiagnosticsServer.ts` | `"export class ThreadNetworkDiagnosticsServer extends ThreadNetworkDiagnosticsBehavior {}"` | connectedhomeip `src/app/clusters/thread-network-diagnostics-server/DirectThreadNetworkDiagnosticsProvider.cpp` at `6170af84` (`ReadAttribute` :59, the unconfigured nulls :65-92, `RoutingRole` :104-145, the tables :184-293, the counts :325-571, the dataset attributes :577-689), `ThreadNetworkDiagnosticsCluster.cpp` |
 | BD-Thread-NetComm-ThreadVariant | `NetworkCommissioningServer.ts:18` is the empty subclass: no network-type branch, no Thread logic (absence: the class line, 18 lines in all) | `packages/node/src/behaviors/network-commissioning/NetworkCommissioningServer.ts` | `"export class NetworkCommissioningServer extends NetworkCommissioningBehavior {}"` | connectedhomeip `src/app/clusters/network-commissioning/NetworkCommissioningCluster.cpp` at `6170af84` (the Thread paths: `HandleScanNetworks` :349-367, `HandleAddOrUpdateThreadNetwork` :561-587, `OnFinished` :904-928, `ReadAttribute` :1102-1108) over `src/platform/OpenThread/GenericNetworkCommissioningThreadDriver.cpp` |
+| BD-chip-AmbientContextSensing-RulesInServer | `AmbientContextSensingServer.ts:14` is the empty subclass (absence: the class line, 14 lines in all) | `packages/node/src/behaviors/ambient-context-sensing/AmbientContextSensingServer.ts` | `"export class AmbientContextSensingServer extends AmbientContextSensingBehavior {}"` | connectedhomeip `src/app/clusters/ambient-context-sensing-server/AmbientContextSensingCluster.cpp` at `6170af84` (the constructor and `Startup` :48-89, `WriteAttribute` :140-159, `AddDetection` :205-301, `SetObjectCountConfig` :303-367, `SetObjectCount` :369-385, `SetHoldTimeLimits` :438-466, `TimerFired` :498-509, `UpdateDetectionAttributes` :600-646, `CheckPredictedActivity` :844-892; `AmbientContextSensingDelegate.h:78-106`), tests `tests/TestAmbientContextSensingCluster.cpp` |
 
 ---
 
@@ -4896,7 +4897,9 @@ set), or is a milestone 6 wave (concept v10). What remains generated is
 complete by the model alone — no `*Server.ts` logic at the pin (the 14-line
 shell), no chip handler, no chip status beyond UnsupportedAttribute /
 UnsupportedCommand: **WaterTankLevelMonitoring** (0x0079; chip has no server
-at all), **MeterIdentification** (0x0B06), **ElectricalGridConditions**
+at all — `src/app/clusters/water-tank-level-monitoring-server` is absent at
+`6170af84` — and matter.js's `WaterTankLevelMonitoringServer.ts:14` is the
+empty subclass; brief 26-C), **MeterIdentification** (0x0B06), **ElectricalGridConditions**
 (0x00A0; one `Status::Failure` on a read error,
 `electrical-grid-conditions-server.cpp:160`), **FixedLabel**, and the
 attribute-only measurement clusters (Temperature, RelativeHumidity,

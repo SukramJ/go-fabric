@@ -241,6 +241,8 @@ type Host interface {
 	// for HoldTime against ObjectCountConfig's threshold (chip's
 	// SetObjectCount).
 	SetObjectCount(count uint16) error
+	// Close stops the hold-time timer (chip's Shutdown).
+	Close()
 }
 
 // Host returns the mounted server's host methods when it implements

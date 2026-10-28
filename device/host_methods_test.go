@@ -201,9 +201,9 @@ var hostCases = map[uint32]hostCase{
 	}},
 	h_cs.ClusterID: {kit: kitOf[*camera.AvStream](), host: hostOf[h_cs.Host](h_cs.Wrap), covered: []string{"AudioStreams", "SnapshotStreams", "StreamUsagePriorities", "VideoStreams"}},
 	h_zm.ClusterID: {kit: kitOf[*camera.Zones](), host: hostOf[h_zm.Host](h_zm.Wrap), covered: []string{"Sensitivity", "SetSensitivity", "TriggerFor", "TriggerList", "ZoneList"}},
-	// AmbientContextSensing (cluster/sensing): Close stops the hold-time
-	// timer (wiring).
-	h_acs.ClusterID: {kit: kitOf[*sensing.AmbientContext](), host: hostOf[h_acs.Host](h_acs.Wrap), covered: []string{"Close", "HoldTime", "ObjectCountConfig"}},
+	// AmbientContextSensing (cluster/sensing): HoldTime and
+	// ObjectCountConfig are what Get reads.
+	h_acs.ClusterID: {kit: kitOf[*sensing.AmbientContext](), host: hostOf[h_acs.Host](h_acs.Wrap), covered: []string{"HoldTime", "ObjectCountConfig"}},
 	// The media servers: their event helpers are Emit<Event>'s.
 	h_mp.ClusterID:       {kit: kitOf[*media.PlaybackServer](), covered: []string{"EmitStateChanged"}},
 	h_keypad.ClusterID:   {kit: kitOf[*media.KeypadServer]()},
