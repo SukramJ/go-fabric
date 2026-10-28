@@ -4848,7 +4848,16 @@ delegate on every read), so an agent id that is not 16 bytes fails
 construction rather than the read; `PanChange` is a feature selection, not
 a port method; and the activation flag is held in memory, not persisted as
 chip's `kFailsafeActiveDatasetConfigured`, so there is no revert after a
-reboot. The fail-safe check is node-wide, as in the Wi-Fi variant. Pinned by
+reboot. The fail-safe check is node-wide, as in the Wi-Fi variant. The
+revert over REST ends with the interface disabled and the dataset left in
+place when the border router answers `DELETE /node/dataset/active` with
+405: ot-br-posix at main registers only GET and PUT on that path
+(`rest_web_server.cpp`, the `RegisterGet`/`RegisterPut` of
+`OT_REST_RESOURCE_PATH_NODE_DATASET_ACTIVE`), matter.js's
+`deleteActiveDataset` (`OtbrRestClient.ts:428-433`) targets a firmware that
+had the route, and chip's empty-dataset attach
+(`GenericThreadBorderRouterDelegate.cpp:191-208`) has no REST equivalent
+(found by the first virtual OTBR run, 2026-10-28). Pinned by
 `management_chip_test.go` (chip's 22 cases) and the `fabrictest` wire tests.
 
 ### BD-Thread-TND-FromBorderRouter — ThreadNetworkDiagnostics served from a border router's diagnostics record
