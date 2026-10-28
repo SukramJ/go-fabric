@@ -213,8 +213,8 @@ type pending struct {
 	attrs  []uint32
 }
 
-func (p *pending) event(fn func())    { p.events = append(p.events, fn) }
-func (p *pending) changed(id uint32)  { p.attrs = append(p.attrs, id) }
+func (p *pending) event(fn func())   { p.events = append(p.events, fn) }
+func (p *pending) changed(id uint32) { p.attrs = append(p.attrs, id) }
 func (t *TimeSynchronization) flush(origin contract.Origin, p *pending) {
 	if len(p.attrs) > 0 {
 		t.changes.NotifyFrom(origin, p.attrs...)

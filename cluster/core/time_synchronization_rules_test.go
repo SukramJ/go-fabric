@@ -162,7 +162,7 @@ func TestTimeSyncSetDSTOffsetRules(t *testing.T) {
 		list []tsdef.DSTOffsetStruct
 		want im.StatusCode
 	}{
-		"three": {[]tsdef.DSTOffsetStruct{{ValidUntil: spec.ValueOf(h)}, {ValidStarting: h, ValidUntil: spec.ValueOf(2 * h)}, {ValidStarting: 2 * h, ValidUntil: spec.NullOf[uint64]()}}, im.StatusResourceExhausted},
+		"three":                 {[]tsdef.DSTOffsetStruct{{ValidUntil: spec.ValueOf(h)}, {ValidStarting: h, ValidUntil: spec.ValueOf(2 * h)}, {ValidStarting: 2 * h, ValidUntil: spec.NullOf[uint64]()}}, im.StatusResourceExhausted},
 		"ends before it starts": {[]tsdef.DSTOffsetStruct{{ValidStarting: 2 * h, ValidUntil: spec.ValueOf(h)}}, im.StatusConstraintError},
 		"overlap":               {[]tsdef.DSTOffsetStruct{{ValidUntil: spec.ValueOf(2 * h)}, {ValidStarting: h, ValidUntil: spec.NullOf[uint64]()}}, im.StatusConstraintError},
 		"open-ended first":      {[]tsdef.DSTOffsetStruct{{ValidUntil: spec.NullOf[uint64]()}, {ValidStarting: h, ValidUntil: spec.NullOf[uint64]()}}, im.StatusConstraintError},
