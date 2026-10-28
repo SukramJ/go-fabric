@@ -271,7 +271,11 @@ func New(ctx context.Context, cfg Config) (_ *Controller, err error) {
 	} else if found {
 		fcfg.FabricID, fcfg.RootNodeID = 0, 0 // the stored record decides
 	}
-	if c.fabric, err = commissioner.NewFabric(authority, fcfg); err != nil {
+	// The operational key is rotated on every start, as matter.js's
+	// controller does for the fabric it keeps itself (FabricAuthority
+	// defaultFabric with rotateNoc, packages/matter.js/src/MatterController.ts:402-415
+	// at 862ad75f).
+	if c.fabric, err = commissioner.NewFabricAuthority(authority, log).DefaultFabric(fcfg, true); err != nil {
 		return nil, err
 	}
 	networks, err := c.openTransports(ctx, cfg, listen, openNames, clk, log)

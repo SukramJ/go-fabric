@@ -3995,25 +3995,17 @@
         "controller/commissioner:TestFabricAuthorityCreateFabric",
         "controller/commissioner:TestFabricAuthorityDefaultAdminVendorID",
         "controller/commissioner:TestFabricAuthorityKeypairRotation",
-        "controller/commissioner:TestFabricAuthorityFabricCreation"
+        "controller/commissioner:TestFabricAuthorityFabricCreation",
+        "controller/commissioner:TestFabricAuthorityRotation",
+        "controller/commissioner:TestFabricAuthorityFabricAdded"
       ],
       "missing": [
         "refuses the Matter Standard vendor ID as admin vendor ID",
-        "rotates NOC keypair when getting default fabric with rotateNoc=true",
         "rotated fabric sends to a group at once with the keys of the previous fabric",
         "rotated fabric keeps receiving Check-Ins of the ICD peers of the previous fabric",
-        "rotation occurs exactly once per runtime per fabric",
-        "rotatedFabricIndices Set correctly prevents duplicate rotations",
-        "new fabric is properly persisted after rotation",
-        "preserves fabricId from operational certificate during rotation",
-        "preserves nodeId from operational certificate during rotation",
-        "preserves caseAuthenticatedTags during rotation",
-        "handles fabric without caseAuthenticatedTags during rotation",
-        "rotation works with multiple fabrics",
-        "emits fabricAdded event when creating fabric",
         "refuses a NOC for another fabric ID and takes over nothing"
       ],
-      "reason": "createFabric/defaultFabric are commissioner.NewFabric over a ca.FabricStore: the reserved-vendor refusal, persistence before completion, a failing store, the created fabric and the no-rotation path are ported; the Go controller never rotates its NOC key (no rotateNoc, no FabricBuilder.updateOperationalCert, no group or ICD state on its fabric), has no fabricAdded event, and its zero VendorID means unset (DEFAULT_ADMIN_VENDOR_ID), so an explicit 0 cannot be expressed.",
+      "reason": "createFabric/defaultFabric are commissioner.FabricAuthority over a ca.FabricStore (FabricAuthority.ts:49-207 at 862ad75f): the reserved-vendor refusal, persistence before completion, a failing store, the created fabric, the NOC key rotation of DefaultFabric once per authority (a new key and NOC under the old NOC's fabric id, node id and CATs, persisted; none with rotateNOC false; a changed node id refused), the label, and OnFabricAdded. Missing: an explicit admin vendor id 0 (the zero VendorID means unset, DEFAULT_ADMIN_VENDOR_ID), the group keys and ICD peers a rotated fabric carries over (the Go fabric holds neither; the controller keeps them in its registry), and FabricBuilder.updateOperationalCert (no builder: the rotation builds the fabric itself).",
       "snapshotSha": "4f8ba2cbb4d304486b6fba557d00c9b99f3499e4"
     },
     {
