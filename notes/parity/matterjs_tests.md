@@ -11,8 +11,8 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 | status | files |
 | --- | ---: |
 | ported | 112 |
-| partial | 137 |
-| planned | 6 |
+| partial | 140 |
+| planned | 3 |
 | excluded | 141 |
 | total | 396 |
 
@@ -30,7 +30,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 | [node/test/behavior/supervision](#nodetestbehaviorsupervision) | 1 | 0 | 0 | 0 | 1 |
 | [node/test/behavior/system/commissioning](#nodetestbehaviorsystemcommissioning) | 6 | 2 | 3 | 0 | 1 |
 | [node/test/behavior/system/controller/discovery](#nodetestbehaviorsystemcontrollerdiscovery) | 6 | 3 | 3 | 0 | 0 |
-| [node/test/behavior/system/dcl](#nodetestbehaviorsystemdcl) | 1 | 0 | 0 | 1 | 0 |
+| [node/test/behavior/system/dcl](#nodetestbehaviorsystemdcl) | 1 | 0 | 1 | 0 | 0 |
 | [node/test/behavior/system/events](#nodetestbehaviorsystemevents) | 1 | 0 | 1 | 0 | 0 |
 | [node/test/behavior/system/icd](#nodetestbehaviorsystemicd) | 5 | 4 | 1 | 0 | 0 |
 | [node/test/behavior/system/network](#nodetestbehaviorsystemnetwork) | 2 | 1 | 1 | 0 | 0 |
@@ -98,7 +98,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 | [protocol/test/certificate](#protocoltestcertificate) | 5 | 2 | 3 | 0 | 0 |
 | [protocol/test/codec](#protocoltestcodec) | 3 | 2 | 1 | 0 | 0 |
 | [protocol/test/common](#protocoltestcommon) | 8 | 3 | 2 | 0 | 3 |
-| [protocol/test/dcl](#protocoltestdcl) | 10 | 4 | 4 | 2 | 0 |
+| [protocol/test/dcl](#protocoltestdcl) | 10 | 4 | 6 | 0 | 0 |
 | [protocol/test/events](#protocoltestevents) | 3 | 0 | 2 | 0 | 1 |
 | [protocol/test/fabric](#protocoltestfabric) | 3 | 0 | 3 | 0 | 0 |
 | [protocol/test/groups](#protocoltestgroups) | 5 | 4 | 1 | 0 | 0 |
@@ -213,7 +213,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 
 | file | lines | status | Go tests or class | note |
 | --- | ---: | --- | --- | --- |
-| DclBehaviorTest.ts | 253 | planned | until M6 phase 27 | The DCL configuration defaults (production/test URLs, certificate sources) and the offline switch of the DCL services. Milestone 6 phase 27 with the DCL services (concept v5 F.0 19.3). |
+| DclBehaviorTest.ts | 253 | partial | `controller:TestVendorInfoOffline` | The vendor information service of the controller (controller.Controller.VendorInfo over Config.DCL, DclBehavior.vendorInfoService :101-115 at 862ad75f) offline: the snapshot's and the static vendors without the ledger, one service. Missing: DclBehavior's state and config getters (the Go controller has no behavior state; Config.DCL holds the production URL and the offline switch, and the certificate service takes its own options, attestation.Trust), the environment and config reading (matter.js's Environment), and the warnings about a shared service (each Go controller owns its service). Missing: “has correct default production URL”; “has correct default test URL”; “fetchTestCertificates defaults to false”; “fetchGithubCertificates defaults to true”; “productionConfig returns DclConfig with production URL”; “testConfig returns DclConfig with test URL”; “configForProduction(true) returns production config”; “configForProduction(false) returns test config”; “overrides productionUrl”; “overrides testUrl”; “overrides fetchTestCertificates”; “overrides fetchGithubCertificates”; “passes custom productionUrl to vendorInfoService config”; “defaults to false”; “is read from the environment”; “reads boolean environment variables as booleans”; “is read from config”; “warns when an offline node gets an existing online service”; “does not warn when an existing service matches”; “does not warn when an online node gets an existing offline service”. |
 
 ## node/test/behavior/system/events
 
@@ -770,8 +770,8 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 | DclConfigTest.ts | 59 | ported | `controller/dcl:TestDclConfig`<br>`controller/dcl:TestDclConfigDclGithubConfig` | The production and test-net ledger URLs (ProductionURL, TestNetURL, a custom Client.BaseURL) and the GitHub certificate source defaults (DefaultGitHubConfig, a custom GitHubConfig) are ported. |
 | DclCrlAuthenticationTest.ts | 811 | partial | `controller/dcl:TestRevocationPAASignedCRL`<br>`controller/dcl:TestRevocationPAIDelegated`<br>`controller/dcl:TestRevocationRejectedPoints`<br>`controller/dcl:TestDclCrlAuthenticationSignerForms`<br>`controller/dcl:TestDclCrlAuthenticationVendorAndProduct`<br>`controller/dcl:TestDclCrlAuthenticationCRLChecks`<br>`controller/dcl:TestDclCrlAuthenticationAuthorityName`<br>`controller/dcl:TestDclCrlAuthenticationForeignEntry`<br>`controller/dcl:TestDclCrlAuthenticationPartitions`<br>`controller/dcl:TestDclCrlAuthenticationRetrying`<br>`controller/dcl:TestDclCrlAuthenticationMLDSAForwardFeaturesOff` | Every signer-form, vendor/product, CRL-check, authority-name, partition, retry and forward-features-off case is ported against CertificateStore.IsRevoked; the five cases of describe("ML-DSA") run with the pqc-phase-1 forward feature on, which the port does not have (it admits no ML-DSA CRL signer or signature), so the accepting ones would fail and the refusing ones would pass vacuously. Missing: “verifies a CRL signed with ML-DSA”; “ignores an ML-DSA CRL signed with another key”; “ignores an ML-DSA CRL whose algorithm identifier carries parameters”; “accepts a CRL from an ML-DSA signer the approved PAA delegated”; “ignores an EC-signed CRL from an ML-DSA signer”. |
 | DclOtaUpdateServiceTest.ts | 2043 | partial | `controller/dcl:TestDclOtaUpdateServiceCheckForUpdate`<br>`controller/dcl:TestDclOtaUpdateServiceCustomDclConfig`<br>`controller/dcl:TestDclOtaUpdateServiceDownloadUpdate`<br>`controller/dcl:TestDclOtaUpdateServiceIntegration`<br>`controller/dcl:TestOTADownload`<br>`controller/dcl:TestOTATestNet`<br>`controller/dcl:TestOTAVersions`<br>`controller/dcl:TestVerifyImage`<br>`controller/softwareupdate:TestImagesFindDeleteParity`<br>`controller/softwareupdate:TestImagesStoredUpdatesParity` | The ledger lookup (skip rules, applicability ranges, targeted version, prod/test ledger, custom and default ledger URLs, the compliance record's specification version), the download and the image verification are ported. The service's image store is controller/softwareupdate.Images (brief CM §1): the stored images checkForUpdate surfaces by isProduction, find, delete by filename and the versions and modes kept side by side are ported (controller/softwareupdate:TestImages*). Missing: what the reduced store does not have — delete by vendor, product or mode pattern, force re-download and reuse through the ledger download, file designators, the stored specification-version metadata cases, the version-keyed storage migration, offline-mode download refusals and createUpdateInfoFromFile. Missing: “reuses existing valid OTA file instead of re-downloading”; “deletes specific product file”; “deletes all files for a vendor”; “does not throw error when file not found with correct pattern”; “throws error when file not found with invalid pattern”; “throws no error when specific product not found”; “deletes specific version by filename”; “deletes all versions for a mode”; “re-downloads file when force is true”; “returns file designator for existing file”; “throws error for non-existent file with invalid pattern”; “throws error for non-existent file with valid pattern”; “keeps the specification version of a stored image”; “drops the specification version when an image is stored again without one”; “records the specification version when an already stored image is reused”; “does not store an invalid specification version”; “removes unreadable metadata when reading it”; “removes the specification version when a forced download replaces the image and fails”; “removes the specification version with the stored image”; “removes the specification version when all versions of a mode are deleted”; “removes the specification version when all files of a vendor are deleted”; “takes the specification version for a local image from the options”; “store() accepts boolean for backward compatibility”; “migrates old bare keys to version-keyed format”; “migrates test mode bare keys”; “handles corrupt files during migration gracefully”; “leaves already-migrated storage untouched”; “asks the DCL nothing and finds only stored updates”; “serves a stored image and downloads none it lacks”; “keeps a stored image when a forced download is refused”; “removes a stored image that fails validation and downloads none”; “keeps a stored image it cannot read (${kind})”; “online, replaces a stored image it cannot read (${kind})”; “online, removes a stored image it cannot read even when no replacement arrives (${kind})”; “keeps a stored image that fails validation when forced”; “reads no image from a URL”. |
-| DclVendorInfoServiceSeedTest.ts | 270 | planned | until M6 phase 27 | The subject, matter.js DclVendorInfoService seeding from a bundled vendor snapshot (DclVendorInfoService.ts, SeedTypes.ts), has no Go counterpart in controller/dcl; the service is a feature for the owner. With DclVendorInfoServiceTest, milestone 6 phase 27 (owner review of PR #164). |
-| DclVendorInfoServiceTest.ts | 682 | planned | until M6 phase 27 | The subject, matter.js DclVendorInfoService (packages/protocol/src/dcl/DclVendorInfoService.ts, 497 lines: vendor fetch, storage, field normalisation, built-in vendors, update timer, productInfoFor), has no Go counterpart in controller/dcl; the ledger read it builds on is Client.Vendors (DclClientTest), the service itself is a feature for the owner. Milestone 6 phase 27 (completeness) brings the vendor information service; findings register (owner review of PR #164). |
+| DclVendorInfoServiceSeedTest.ts | 270 | partial | `controller/dcl:TestDclVendorInfoServiceSeedParity`<br>`controller/dcl/snapshot:TestVendorSeed` | The seed of VendorInfoService (#consumeVendorSeed, DclVendorInfoService.ts:405-456 at 862ad75f; the embedded snapshot's Snapshot.VendorSeed): applied to an emptier store and stored, skipped for a full one, only ledger vendors stored, and the offline cases (seeded and static vendors without the ledger and no timer, a stored record over a static one, an earlier run's store, a product as absent). Missing: a malformed entry inside the stream (the snapshot refuses the whole vendor file when it loads, snapshot.ErrMalformed, so the service never sees one). Missing: “aborts stream on malformed vendor entry”. |
+| DclVendorInfoServiceTest.ts | 682 | partial | `controller/dcl:TestDclVendorInfoServiceParity`<br>`controller/dcl:TestDclVendorInfoServiceProductInfoParity` | controller/dcl VendorInfoService (DclVendorInfoService.ts:166-468 at 862ad75f) on the client's mock ledger: the fetch and store at construction, the stored vendors of a later run, the normalised fields, the static vendors under a ledger record, pagination, Update and one fetch for concurrent ones, a failed and an empty answer, the periodic refresh, Close with a fetch in flight, the ledger URL, and ProductInfoFor (decoded fields, revisions with their URL, NOT_FOUND absent, other errors returned, closed). Missing: a close during the construction's fetch (NewVendorInfoService returns before a Close can run) and the client timeout (dcl.Client.Timeout, the client's own option). Missing: “leaves no update timer running when closed during the startup fetch”; “passes timeout option to DCL client”. |
 
 ## protocol/test/events
 
@@ -1001,10 +1001,6 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 
 ## Planned
 
-### node/test/behavior/system/dcl
-
-- `DclBehaviorTest.ts` — The DCL configuration defaults (production/test URLs, certificate sources) and the offline switch of the DCL services. Milestone 6 phase 27 with the DCL services (concept v5 F.0 19.3).
-
 ### node/test/behaviors/access-control
 
 - `AccessControlCustomExtensionTest.ts` — A manufacturer extension of AccessControl (a custom attribute and command): the root AccessControl server takes no extension elements; the subject is missing. Milestone 5.
@@ -1016,8 +1012,3 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 ### node/test/node
 
 - `ReportedSessionParametersTest.ts` — The session parameters the peer sent in PASE, CASE and resumed CASE, held by both ends. Left planned in brief CM: both cases configure the device's session intervals and read the device's record of what the controller sent; node.Config has no session-interval option and the device's sessions no accessor for the reported parameters (the controller's side is client/exchange.Session.ReportedParameters). Milestone 6 phase 27.
-
-### protocol/test/dcl
-
-- `DclVendorInfoServiceSeedTest.ts` — The subject, matter.js DclVendorInfoService seeding from a bundled vendor snapshot (DclVendorInfoService.ts, SeedTypes.ts), has no Go counterpart in controller/dcl; the service is a feature for the owner. With DclVendorInfoServiceTest, milestone 6 phase 27 (owner review of PR #164).
-- `DclVendorInfoServiceTest.ts` — The subject, matter.js DclVendorInfoService (packages/protocol/src/dcl/DclVendorInfoService.ts, 497 lines: vendor fetch, storage, field normalisation, built-in vendors, update timer, productInfoFor), has no Go counterpart in controller/dcl; the ledger read it builds on is Client.Vendors (DclClientTest), the service itself is a feature for the owner. Milestone 6 phase 27 (completeness) brings the vendor information service; findings register (owner review of PR #164).

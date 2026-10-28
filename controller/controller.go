@@ -37,6 +37,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -51,6 +52,7 @@ import (
 	"github.com/SukramJ/go-fabric/controller/client"
 	"github.com/SukramJ/go-fabric/controller/client/sqlstore"
 	"github.com/SukramJ/go-fabric/controller/commissioner"
+	"github.com/SukramJ/go-fabric/controller/dcl"
 	"github.com/SukramJ/go-fabric/controller/softwareupdate"
 	"github.com/SukramJ/go-fabric/mdns"
 	"github.com/SukramJ/go-fabric/store"
@@ -169,6 +171,9 @@ type Config struct {
 	// mdns.NewZeroconf(), which Close closes. A test passes
 	// mdns.NewNoop().
 	Advertiser mdns.Advertiser
+	// DCL configures the controller's ledger services ([DCLConfig]); the
+	// zero value is the production ledger, online.
+	DCL DCLConfig
 }
 
 // Controller is a running controller: one fabric, the nodes paired into
@@ -191,6 +196,12 @@ type Controller struct {
 	tcpAddr *net.TCPAddr
 	// unadvertise withdraws the commissioner record (advertise.go).
 	unadvertise func(context.Context) error
+
+	// dcl is the configuration of the ledger services, vendorInfo the
+	// vendor information service built on first use (vendorinfo.go).
+	dcl        DCLConfig
+	vendorMu   sync.Mutex
+	vendorInfo *dcl.VendorInfoService
 
 	// The OTA push (ota.go): the update manager and the reboot armer, the
 	// own node with its node id and address; registry is reg for the
@@ -240,7 +251,7 @@ func New(ctx context.Context, cfg Config) (_ *Controller, err error) {
 		openNames = discovery.Open
 	}
 	clk := clock.Or(cfg.Clock)
-	c := &Controller{db: cfg.DB, log: log, clock: clk, stop: func() {}}
+	c := &Controller{db: cfg.DB, log: log, clock: clk, stop: func() {}, dcl: cfg.DCL}
 	defer func() {
 		if err != nil {
 			_ = c.Close(context.WithoutCancel(ctx))
@@ -397,6 +408,7 @@ func (c *Controller) openNetwork(ctx context.Context, listen string, l *udp.List
 // idempotent.
 func (c *Controller) Close(ctx context.Context) error {
 	var errs []error
+	c.closeVendorInfo()
 	if m := c.ota.Swap(nil); m != nil {
 		m.Close()
 	}

@@ -501,9 +501,33 @@
     },
     {
       "path": "packages/node/test/behavior/system/dcl/DclBehaviorTest.ts",
-      "status": "planned",
-      "until": "M6 phase 27",
-      "reason": "The DCL configuration defaults (production/test URLs, certificate sources) and the offline switch of the DCL services. Milestone 6 phase 27 with the DCL services (concept v5 F.0 19.3).",
+      "status": "partial",
+      "go": [
+        "controller:TestVendorInfoOffline"
+      ],
+      "missing": [
+        "has correct default production URL",
+        "has correct default test URL",
+        "fetchTestCertificates defaults to false",
+        "fetchGithubCertificates defaults to true",
+        "productionConfig returns DclConfig with production URL",
+        "testConfig returns DclConfig with test URL",
+        "configForProduction(true) returns production config",
+        "configForProduction(false) returns test config",
+        "overrides productionUrl",
+        "overrides testUrl",
+        "overrides fetchTestCertificates",
+        "overrides fetchGithubCertificates",
+        "passes custom productionUrl to vendorInfoService config",
+        "defaults to false",
+        "is read from the environment",
+        "reads boolean environment variables as booleans",
+        "is read from config",
+        "warns when an offline node gets an existing online service",
+        "does not warn when an existing service matches",
+        "does not warn when an online node gets an existing offline service"
+      ],
+      "reason": "The vendor information service of the controller (controller.Controller.VendorInfo over Config.DCL, DclBehavior.vendorInfoService :101-115 at 862ad75f) offline: the snapshot's and the static vendors without the ledger, one service. Missing: DclBehavior's state and config getters (the Go controller has no behavior state; Config.DCL holds the production URL and the offline switch, and the certificate service takes its own options, attestation.Trust), the environment and config reading (matter.js's Environment), and the warnings about a shared service (each Go controller owns its service).",
       "snapshotSha": "3aa10da7c5cb2c5748e34ea35de431b1c1d9698f"
     },
     {
@@ -3887,16 +3911,29 @@
     },
     {
       "path": "packages/protocol/test/dcl/DclVendorInfoServiceSeedTest.ts",
-      "status": "planned",
-      "reason": "The subject, matter.js DclVendorInfoService seeding from a bundled vendor snapshot (DclVendorInfoService.ts, SeedTypes.ts), has no Go counterpart in controller/dcl; the service is a feature for the owner. With DclVendorInfoServiceTest, milestone 6 phase 27 (owner review of PR #164).",
-      "until": "M6 phase 27",
+      "status": "partial",
+      "go": [
+        "controller/dcl:TestDclVendorInfoServiceSeedParity",
+        "controller/dcl/snapshot:TestVendorSeed"
+      ],
+      "missing": [
+        "aborts stream on malformed vendor entry"
+      ],
+      "reason": "The seed of VendorInfoService (#consumeVendorSeed, DclVendorInfoService.ts:405-456 at 862ad75f; the embedded snapshot's Snapshot.VendorSeed): applied to an emptier store and stored, skipped for a full one, only ledger vendors stored, and the offline cases (seeded and static vendors without the ledger and no timer, a stored record over a static one, an earlier run's store, a product as absent). Missing: a malformed entry inside the stream (the snapshot refuses the whole vendor file when it loads, snapshot.ErrMalformed, so the service never sees one).",
       "snapshotSha": "dbc5f6e9dd6e9b6563fee27833b3baeeb05dc4b6"
     },
     {
       "path": "packages/protocol/test/dcl/DclVendorInfoServiceTest.ts",
-      "status": "planned",
-      "reason": "The subject, matter.js DclVendorInfoService (packages/protocol/src/dcl/DclVendorInfoService.ts, 497 lines: vendor fetch, storage, field normalisation, built-in vendors, update timer, productInfoFor), has no Go counterpart in controller/dcl; the ledger read it builds on is Client.Vendors (DclClientTest), the service itself is a feature for the owner. Milestone 6 phase 27 (completeness) brings the vendor information service; findings register (owner review of PR #164).",
-      "until": "M6 phase 27",
+      "status": "partial",
+      "go": [
+        "controller/dcl:TestDclVendorInfoServiceParity",
+        "controller/dcl:TestDclVendorInfoServiceProductInfoParity"
+      ],
+      "missing": [
+        "leaves no update timer running when closed during the startup fetch",
+        "passes timeout option to DCL client"
+      ],
+      "reason": "controller/dcl VendorInfoService (DclVendorInfoService.ts:166-468 at 862ad75f) on the client's mock ledger: the fetch and store at construction, the stored vendors of a later run, the normalised fields, the static vendors under a ledger record, pagination, Update and one fetch for concurrent ones, a failed and an empty answer, the periodic refresh, Close with a fetch in flight, the ledger URL, and ProductInfoFor (decoded fields, revisions with their URL, NOT_FOUND absent, other errors returned, closed). Missing: a close during the construction's fetch (NewVendorInfoService returns before a Close can run) and the client timeout (dcl.Client.Timeout, the client's own option).",
       "snapshotSha": "7b6c7c4ac0261f9fc1b23913e81a8ff236a79692"
     },
     {

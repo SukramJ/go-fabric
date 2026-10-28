@@ -4,10 +4,12 @@
 package snapshot_test
 
 import (
+	"context"
 	"errors"
 	"testing"
 	"testing/fstest"
 
+	"github.com/SukramJ/go-fabric/controller/dcl"
 	"github.com/SukramJ/go-fabric/controller/dcl/snapshot"
 )
 
@@ -51,5 +53,35 @@ func TestVendors(t *testing.T) {
 	empty, err := snapshot.Load(fstest.MapFS{})
 	if err != nil || len(empty.Vendors()) != 5 {
 		t.Fatalf("no vendor list: %d vendors (%v), want the 5 static ones", len(empty.Vendors()), err)
+	}
+}
+
+// TestVendorSeed: the embedded vendor list is a seed of
+// dcl.VendorInfoService — its own records only, the static vendors left
+// to the service, its expected count the file's; a service seeded with it
+// offline resolves the vendors without the ledger.
+func TestVendorSeed(t *testing.T) {
+	t.Parallel()
+	s, err := snapshot.Embedded()
+	if err != nil {
+		t.Fatal(err)
+	}
+	seed := s.VendorSeed()
+	if seed == nil || len(seed.Vendors) == 0 || seed.ExpectedCount != len(seed.Vendors) {
+		t.Fatalf("seed %+v", seed)
+	}
+	for _, v := range seed.Vendors {
+		if v.Creator == "System" {
+			t.Fatalf("a static vendor in the seed: %+v", v)
+		}
+	}
+	svc, err := dcl.NewVendorInfoService(context.Background(), dcl.VendorInfoOptions{Offline: true, Seed: seed})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer svc.Close()
+	first := seed.Vendors[0]
+	if v, ok := svc.InfoFor(first.VendorID); !ok || v.VendorName != first.VendorName {
+		t.Fatalf("InfoFor(%d) = %+v, %v", first.VendorID, v, ok)
 	}
 }

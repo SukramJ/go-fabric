@@ -89,6 +89,7 @@ func (s *Snapshot) loadVendors(fsys fs.FS) error {
 	if err := json.Unmarshal(b, &seed); err != nil {
 		return fmt.Errorf("%w: %s: %w", ErrMalformed, VendorsFile, err)
 	}
+	s.seed = &dcl.VendorSeed{BuiltAt: seed.BuiltAt, ExpectedCount: seed.ExpectedCount}
 	for _, e := range seed.Entries {
 		if e.VendorID == nil || *e.VendorID < 0 || *e.VendorID > 0xFFFF || e.VendorName == "" || (e.Kind != KindProduction && e.Kind != KindTest) {
 			return fmt.Errorf("%w: %s: invalid vendor entry shape %+v", ErrMalformed, VendorsFile, e)
@@ -98,8 +99,26 @@ func (s *Snapshot) loadVendors(fsys fs.FS) error {
 			ID: id, Name: e.VendorName, CompanyLegalName: e.CompanyLegalName, CompanyPreferredName: e.CompanyPreferredName,
 			LandingPageURL: e.VendorLandingPageURL, Creator: e.Creator,
 		}
+		s.seed.Vendors = append(s.seed.Vendors, dcl.VendorInfo{
+			VendorID: id, VendorName: e.VendorName, CompanyLegalName: e.CompanyLegalName, CompanyPreferredName: e.CompanyPreferredName,
+			VendorLandingPageURL: e.VendorLandingPageURL, Creator: e.Creator,
+		})
 	}
 	return nil
+}
+
+// VendorSeed is the snapshot's vendor list as a seed of
+// dcl.VendorInfoService (matter.js DclVendorInfoService's seed option,
+// DclVendorInfoService.ts:405-456 at 862ad75f): the ledger's records it
+// was built with, without the static vendors; nil when the snapshot has
+// no vendor list.
+func (s *Snapshot) VendorSeed() *dcl.VendorSeed {
+	if s.seed == nil {
+		return nil
+	}
+	seed := *s.seed
+	seed.Vendors = slices.Clone(s.seed.Vendors)
+	return &seed
 }
 
 // Vendors is every vendor the snapshot knows — the ledger's records it
