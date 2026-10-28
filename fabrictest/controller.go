@@ -81,6 +81,9 @@ type ControllerOptions struct {
 	// device with TCP does. The fabrictest Controller dials (Outgoing);
 	// Incoming is controller.New's ([Site.ControllerConfig]).
 	TCP controller.TCPConfig
+	// Sessions are the controller's own session intervals, reported in its
+	// handshakes (controller.Config.Sessions); nil is the defaults.
+	Sessions *controller.SessionIntervals
 	// TransportPreference is each peer's preferred transport
 	// (controller.Config.TransportPreference).
 	TransportPreference exchange.Transport
@@ -234,10 +237,23 @@ func (c *Controller) build() (*stack, error) {
 		return st, err
 	}
 	xcfg := exchange.Config{Clock: clk, Logger: log, LocalAdditionalMrpDelay: own.AdditionalMrpDelay}
-	if c.opts.TCP.Outgoing {
+	if c.opts.TCP.Outgoing || c.opts.Sessions != nil {
 		p := exchange.DefaultLocalParameters()
-		p.SupportedTransports |= sessionparams.TransportTCPClient
-		p.MaxTCPMessageSize = sessionparams.DefaultMaxTCPMessageSize
+		if c.opts.TCP.Outgoing {
+			p.SupportedTransports |= sessionparams.TransportTCPClient
+			p.MaxTCPMessageSize = sessionparams.DefaultMaxTCPMessageSize
+		}
+		if s := c.opts.Sessions; s != nil {
+			if s.Idle > 0 {
+				p.SessionIdleInterval = uint32(s.Idle / time.Millisecond) //nolint:gosec // test option
+			}
+			if s.Active > 0 {
+				p.SessionActiveInterval = uint32(s.Active / time.Millisecond) //nolint:gosec // test option
+			}
+			if s.ActiveThreshold > 0 {
+				p.SessionActiveThreshold = uint16(s.ActiveThreshold / time.Millisecond) //nolint:gosec // test option
+			}
+		}
 		xcfg.LocalParameters = &p
 	}
 	if st.mgr, err = exchange.NewManager(l, xcfg); err != nil {

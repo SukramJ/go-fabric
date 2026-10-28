@@ -87,6 +87,12 @@ type SessionInfo struct {
 	// Idle and PeerIdle are AsOf minus LastActivity and LastPeerActivity;
 	// 0 when the timestamp is zero.
 	Idle, PeerIdle time.Duration
+	// PeerIdleInterval, PeerActiveInterval and PeerActiveThreshold are the
+	// session intervals the peer reported in its handshake (PASE
+	// PBKDFParamRequest or CASE Sigma1 SessionParameters, also on a resumed
+	// session); 0 when it reported none. The device's record of what the
+	// controller sent (matter.js NodeSession.reportedParameters).
+	PeerIdleInterval, PeerActiveInterval, PeerActiveThreshold time.Duration
 }
 
 // Occupancy is how much of the session-id space the node holds.
@@ -137,6 +143,10 @@ func (n *Node) SessionDiagnostics() SessionDiagnostics {
 			LastPeerActivity: s.LastPeerActivity,
 			Idle:             ageAt(now, s.LastActivity),
 			PeerIdle:         ageAt(now, s.LastPeerActivity),
+
+			PeerIdleInterval:    time.Duration(s.PeerIdleIntervalMs) * time.Millisecond,
+			PeerActiveInterval:  time.Duration(s.PeerActiveIntervalMs) * time.Millisecond,
+			PeerActiveThreshold: time.Duration(s.PeerActiveThresholdMs) * time.Millisecond,
 		})
 	}
 	occ := n.sec.sessions.Occupancy()
