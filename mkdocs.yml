@@ -83,6 +83,7 @@ nav:
       - Thermostat: guides/thermostat.md
       - Camera: guides/camera.md
       - Ambient context sensing: guides/sensing.md
+      - Joint Fabric: guides/joint-fabric.md
       - BLE through ESPHome proxies: guides/ble-proxies.md
       - Network infrastructure: guides/network-infrastructure.md
       - Thread Border Router: guides/thread-border-router.md

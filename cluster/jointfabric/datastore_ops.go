@@ -267,6 +267,7 @@ func aclStatus(e *aclEntry) *StatusEntry                       { return &e.Statu
 func sameEndpointGroup(a, b EndpointGroupIDEntry) bool {
 	return a.NodeId == b.NodeId && a.EndpointId == b.EndpointId && a.GroupId == b.GroupId
 }
+
 func sameNodeKeySet(nodeID uint64, id uint16) func(NodeKeySetEntry) bool {
 	return func(e NodeKeySetEntry) bool { return e.NodeId == nodeID && e.GroupKeySetId == id }
 }

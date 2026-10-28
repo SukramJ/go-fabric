@@ -42,22 +42,31 @@ type nopSync struct{}
 func (nopSync) SyncEndpointGroupID(context.Context, uint64, jointfabric.EndpointGroupIDEntry) error {
 	return nil
 }
+
 func (nopSync) SyncNodeKeySet(context.Context, uint64, jointfabric.NodeKeySetEntry) error { return nil }
+
 func (nopSync) SyncBinding(context.Context, uint64, jointfabric.EndpointBindingEntry) error {
 	return nil
 }
+
 func (nopSync) SyncBindings(context.Context, uint64, []jointfabric.EndpointBindingEntry) error {
 	return nil
 }
-func (nopSync) SyncACL(context.Context, uint64, jointfabric.ACLEntry) error            { return nil }
-func (nopSync) SyncACLs(context.Context, uint64, []jointfabric.ACLEntry) error         { return nil }
+
+func (nopSync) SyncACL(context.Context, uint64, jointfabric.ACLEntry) error { return nil }
+
+func (nopSync) SyncACLs(context.Context, uint64, []jointfabric.ACLEntry) error { return nil }
+
 func (nopSync) SyncGroupKeySet(context.Context, uint64, jointfabric.GroupKeySet) error { return nil }
+
 func (nopSync) FetchEndpointList(context.Context, uint64) ([]jointfabric.EndpointEntry, error) {
 	return nil, nil
 }
+
 func (nopSync) FetchEndpointGroupList(context.Context, uint64, uint16) ([]jointfabric.GroupEntry, error) {
 	return nil, nil
 }
+
 func (nopSync) FetchEndpointBindingList(context.Context, uint64, uint16) ([]jointfabric.EndpointBindingEntry, error) {
 	return nil, nil
 }
@@ -65,6 +74,7 @@ func (nopSync) FetchGroupKeySetList(context.Context, uint64) ([]uint16, error) {
 func (nopSync) FetchGroupKeySet(context.Context, uint64, uint16) (jointfabric.GroupKeySet, error) {
 	return jointfabric.GroupKeySet{}, nil
 }
+
 func (nopSync) FetchACLList(context.Context, uint64) ([]jointfabric.ACLEntry, error) { return nil, nil }
 
 // keyPort is the administrator key's CSR.

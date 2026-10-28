@@ -216,8 +216,10 @@ func TestUpdateGroupPushesACLsOfTheGroup(t *testing.T) {
 	group.Subjects = spec.Nullable[[]uint64]{Value: []uint64{0x10}}
 	mustOK(t, d.AddACLToNode(ctx, 1, group))
 	s.reset()
-	mustOK(t, d.UpdateGroup(ctx, dsdef.UpdateGroupRequest{GroupId: 0x10, FriendlyName: spec.Nullable[string]{Null: true}, GroupKeySetId: nullU16(), GroupCat: nullU16(), GroupCatVersion: nullU16(),
-		GroupPermission: spec.Nullable[dsdef.DatastoreAccessControlEntryPrivilegeEnum]{Value: dsdef.DatastoreAccessControlEntryPrivilegeOperate}}))
+	mustOK(t, d.UpdateGroup(ctx, dsdef.UpdateGroupRequest{
+		GroupId: 0x10, FriendlyName: spec.Nullable[string]{Null: true}, GroupKeySetId: nullU16(), GroupCat: nullU16(), GroupCatVersion: nullU16(),
+		GroupPermission: spec.Nullable[dsdef.DatastoreAccessControlEntryPrivilegeEnum]{Value: dsdef.DatastoreAccessControlEntryPrivilegeOperate},
+	}))
 	if e := s.lastACL; e == nil || e.AclEntry.Privilege != dsdef.DatastoreAccessControlEntryPrivilegeOperate || e.StatusEntry.State != statePending {
 		t.Fatalf("ACL push %+v", e)
 	}
@@ -446,8 +448,10 @@ func TestDatastoreAttributes(t *testing.T) {
 		t.Fatal("NodeList change did not advance the data version")
 	}
 	mustOK(t, d.SetStatus(ctx, stateCommitted, 99, 0))
-	for _, id := range []uint32{dsdef.AttrAnchorRootCa, dsdef.AttrAnchorNodeId, dsdef.AttrAnchorVendorId, dsdef.AttrFriendlyName, dsdef.AttrGroupKeySetList, dsdef.AttrGroupList,
-		dsdef.AttrNodeList, dsdef.AttrAdminList, dsdef.AttrStatus, dsdef.AttrEndpointGroupIdList, dsdef.AttrEndpointBindingList, dsdef.AttrNodeKeySetList, dsdef.AttrNodeAclList, dsdef.AttrNodeEndpointList} {
+	for _, id := range []uint32{
+		dsdef.AttrAnchorRootCa, dsdef.AttrAnchorNodeId, dsdef.AttrAnchorVendorId, dsdef.AttrFriendlyName, dsdef.AttrGroupKeySetList, dsdef.AttrGroupList,
+		dsdef.AttrNodeList, dsdef.AttrAdminList, dsdef.AttrStatus, dsdef.AttrEndpointGroupIdList, dsdef.AttrEndpointBindingList, dsdef.AttrNodeKeySetList, dsdef.AttrNodeAclList, dsdef.AttrNodeEndpointList,
+	} {
 		if _, ok := d.MatterRead(id); !ok {
 			t.Errorf("attribute %#x not served", id)
 		}

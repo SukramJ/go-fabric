@@ -18,39 +18,51 @@ type fakeDatastoreSync struct{}
 func (fakeDatastoreSync) SyncEndpointGroupID(context.Context, uint64, dsdef.DatastoreEndpointGroupIDEntryStruct) error {
 	return nil
 }
+
 func (fakeDatastoreSync) SyncNodeKeySet(context.Context, uint64, dsdef.DatastoreNodeKeySetEntryStruct) error {
 	return nil
 }
+
 func (fakeDatastoreSync) SyncBinding(context.Context, uint64, dsdef.DatastoreEndpointBindingEntryStruct) error {
 	return nil
 }
+
 func (fakeDatastoreSync) SyncBindings(context.Context, uint64, []dsdef.DatastoreEndpointBindingEntryStruct) error {
 	return nil
 }
+
 func (fakeDatastoreSync) SyncACL(context.Context, uint64, dsdef.DatastoreACLEntryStruct) error {
 	return nil
 }
+
 func (fakeDatastoreSync) SyncACLs(context.Context, uint64, []dsdef.DatastoreACLEntryStruct) error {
 	return nil
 }
+
 func (fakeDatastoreSync) SyncGroupKeySet(context.Context, uint64, dsdef.DatastoreGroupKeySetStruct) error {
 	return nil
 }
+
 func (fakeDatastoreSync) FetchEndpointList(context.Context, uint64) ([]dsdef.DatastoreEndpointEntryStruct, error) {
 	return nil, nil
 }
+
 func (fakeDatastoreSync) FetchEndpointGroupList(context.Context, uint64, uint16) ([]dsdef.DatastoreGroupInformationEntryStruct, error) {
 	return nil, nil
 }
+
 func (fakeDatastoreSync) FetchEndpointBindingList(context.Context, uint64, uint16) ([]dsdef.DatastoreEndpointBindingEntryStruct, error) {
 	return nil, nil
 }
+
 func (fakeDatastoreSync) FetchGroupKeySetList(context.Context, uint64) ([]uint16, error) {
 	return nil, nil
 }
+
 func (fakeDatastoreSync) FetchGroupKeySet(context.Context, uint64, uint16) (dsdef.DatastoreGroupKeySetStruct, error) {
 	return dsdef.DatastoreGroupKeySetStruct{}, nil
 }
+
 func (fakeDatastoreSync) FetchACLList(context.Context, uint64) ([]dsdef.DatastoreACLEntryStruct, error) {
 	return nil, nil
 }

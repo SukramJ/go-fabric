@@ -34,7 +34,7 @@ func TestEnumToStringError(t *testing.T) {
 // TestEnumToStringStage is :71-79: each stage's name.
 func TestEnumToStringStage(t *testing.T) {
 	for s, want := range map[jcm.Stage]string{
-		jcm.StageIdle:                              "IDLE",
+		jcm.StageIdle: "IDLE",
 		jcm.StageVerifyingAdministratorInformation: "VERIFYING_ADMINISTRATOR_INFORMATION",
 		jcm.StagePerformingVendorIDVerification:    "PERFORMING_VENDOR_ID_VERIFICATION_PROCEDURE",
 		jcm.StageAskingUserForConsent:              "ASKING_USER_FOR_CONSENT",
