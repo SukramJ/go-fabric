@@ -195,6 +195,14 @@ func (s *Server) Host() Host {
 	return h
 }
 
+// Peer is the commissioner a CommissionerReach reaches: the fabric
+// index and the node id of the session that invoked
+// AnnounceJointFabricAdministrator.
+type Peer struct {
+	FabricIndex uint8
+	NodeID      uint64
+}
+
 // AdministratorPort is the administrator application's key: IcacCsr
 // returns the PKCS#10 CSR of the key the administrator's ICAC will
 // certify — connectedhomeip's JointFabricAdministrator::Delegate
@@ -209,16 +217,17 @@ type AdministratorPort interface {
 // that invoked AnnounceJointFabricAdministrator and has it sign the
 // Vendor ID Verification — connectedhomeip's JCMCommissionee reads over
 // the invoking session (JCMCommissionee.cpp:46-69, :297-322 at
-// 6170af84). ctx is the invoke's context, which names the peer
-// (im.SubjectFromContext, im.FabricFilterFromContext); the reads are
-// not fabric-filtered. Without one AnnounceJointFabricAdministrator
-// fails.
+// 6170af84). peer names the commissioner: the invoking session's
+// fabric and node; the reads are not fabric-filtered. ctx is the
+// invoke's context, which the fail-safe's expiry cancels. Without one
+// AnnounceJointFabricAdministrator fails; a node mounts its own
+// (node.Node's client stack) when the declaration has none.
 type CommissionerReach interface {
-	ReadAdministratorFabricIndex(ctx context.Context, endpointID uint16) (fabricIndex uint8, null bool, err error)
-	ReadFabrics(ctx context.Context) ([]operationalcredentials.FabricDescriptorStruct, error)
-	ReadTrustedRootCertificates(ctx context.Context) ([][]byte, error)
-	ReadNOCs(ctx context.Context) ([]operationalcredentials.NOCStruct, error)
-	SignVIDVerification(ctx context.Context, fabricIndex uint8, clientChallenge []byte) (resp operationalcredentials.SignVidVerificationResponse, attestationChallenge []byte, err error)
+	ReadAdministratorFabricIndex(ctx context.Context, peer Peer, endpointID uint16) (fabricIndex uint8, null bool, err error)
+	ReadFabrics(ctx context.Context, peer Peer) ([]operationalcredentials.FabricDescriptorStruct, error)
+	ReadTrustedRootCertificates(ctx context.Context, peer Peer) ([][]byte, error)
+	ReadNOCs(ctx context.Context, peer Peer) ([]operationalcredentials.NOCStruct, error)
+	SignVIDVerification(ctx context.Context, peer Peer, fabricIndex uint8, clientChallenge []byte) (resp operationalcredentials.SignVidVerificationResponse, attestationChallenge []byte, err error)
 }
 
 // Declare is the declaration of the JointFabricAdministrator cluster on a device:

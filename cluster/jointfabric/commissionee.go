@@ -10,6 +10,7 @@ import (
 	"slices"
 
 	"github.com/SukramJ/go-fabric/client/jcm"
+	opcreds "github.com/SukramJ/go-fabric/cluster/spec/operationalcredentials"
 	"github.com/SukramJ/go-fabric/secure/mattercert"
 )
 
@@ -29,10 +30,14 @@ var errCommissionerInfo = errors.New("jointfabric: the commissioner's administra
 type commissionee struct {
 	a               *Administrator
 	accessingFabric uint8
-	info            jcm.Info
-	machine         *jcm.Machine
-	result          jcm.Result
-	done            bool
+	// peer is the commissioner the reach reads (the invoking session);
+	// reach is the administrator's at the announcement.
+	peer    CommissionerPeer
+	reach   CommissionerReach
+	info    jcm.Info
+	machine *jcm.Machine
+	result  jcm.Result
+	done    bool
 
 	// next and perform replace the stage order and a stage in tests, as
 	// chip's test subclasses override them (TestJCMCommissionee.cpp:102-169).
@@ -42,7 +47,7 @@ type commissionee struct {
 
 // newCommissionee is the JCMCommissionee constructor (JCMCommissionee.h:54-66).
 func (a *Administrator) newCommissionee(accessingFabric uint8, endpointID uint16) *commissionee {
-	c := &commissionee{a: a, accessingFabric: accessingFabric, info: jcm.NewInfo()}
+	c := &commissionee{a: a, accessingFabric: accessingFabric, info: jcm.NewInfo(), peer: CommissionerPeer{FabricIndex: accessingFabric}, reach: a.reachPort()}
 	c.info.AdminEndpointID = endpointID
 	return c
 }
@@ -138,10 +143,10 @@ func (c *commissionee) storeEndpointID() jcm.Result {
 // InvalidAdministratorFabricIndex (ReadCommissionerAdminFabricIndex
 // :183-224).
 func (c *commissionee) readCommissionerAdminFabricIndex(ctx context.Context) jcm.Result {
-	if c.a.reach == nil {
+	if c.reach == nil {
 		return jcm.ReadAdminAttributeFailed
 	}
-	idx, null, err := c.a.reach.ReadAdministratorFabricIndex(ctx, c.info.AdminEndpointID)
+	idx, null, err := c.reach.ReadAdministratorFabricIndex(ctx, c.peer, c.info.AdminEndpointID)
 	switch {
 	case err != nil, null: // :186-191, :207-211
 		return jcm.ReadAdminAttributeFailed
@@ -155,7 +160,7 @@ func (c *commissionee) readCommissionerAdminFabricIndex(ctx context.Context) jcm
 // readAdminFabrics takes the root public key, fabric id and vendor id of
 // the commissioner's administrator fabric (ReadAdminFabrics :226-261).
 func (c *commissionee) readAdminFabrics(ctx context.Context) error {
-	fabrics, err := c.a.reach.ReadFabrics(ctx)
+	fabrics, err := c.reach.ReadFabrics(ctx, c.peer)
 	if err != nil {
 		return err
 	}
@@ -172,7 +177,7 @@ func (c *commissionee) readAdminFabrics(ctx context.Context) error {
 // readAdminCerts takes the trusted root whose public key is the
 // administrator fabric's (ReadAdminCerts :342-408).
 func (c *commissionee) readAdminCerts(ctx context.Context) error {
-	roots, err := c.a.reach.ReadTrustedRootCertificates(ctx)
+	roots, err := c.reach.ReadTrustedRootCertificates(ctx, c.peer)
 	if err != nil {
 		return err
 	}
@@ -192,7 +197,7 @@ func (c *commissionee) readAdminCerts(ctx context.Context) error {
 // readAdminNOCs takes the NOC and ICAC of the administrator fabric; an
 // empty NOC or a missing ICAC is refused (ReadAdminNOCs :410-479).
 func (c *commissionee) readAdminNOCs(ctx context.Context) error {
-	nocs, err := c.a.reach.ReadNOCs(ctx)
+	nocs, err := c.reach.ReadNOCs(ctx, c.peer)
 	if err != nil {
 		return err
 	}
@@ -212,7 +217,7 @@ func (c *commissionee) readAdminNOCs(ctx context.Context) error {
 // fetchCommissionerInfo reads the fabrics, the roots and the NOCs in turn
 // (FetchCommissionerInfo :263-295).
 func (c *commissionee) fetchCommissionerInfo(ctx context.Context) error {
-	if c.a.reach == nil {
+	if c.reach == nil {
 		return errCommissionerInfo
 	}
 	if err := c.readAdminFabrics(ctx); err != nil {
@@ -238,7 +243,7 @@ func (c *commissionee) performVendorIDVerification(ctx context.Context) jcm.Resu
 		rcac := c.info.AdminRCAC
 		lookup = func(context.Context, uint16, []byte) ([]byte, error) { return rcac, nil }
 	}
-	if err := jcm.VerifyVendorID(ctx, c.a.reach, &c.info, lookup, nil); err != nil { // :310-319
+	if err := jcm.VerifyVendorID(ctx, peerSigner{c.reach, c.peer}, &c.info, lookup, nil); err != nil { // :310-319
 		return jcm.VendorIDVerificationFailed
 	}
 	return jcm.Success
@@ -272,4 +277,15 @@ func (c *commissionee) validateAdministratorIDsMatch(accessingFabricID uint64, a
 		return jcm.AdministratorIDMismatched
 	}
 	return jcm.Success
+}
+
+// peerSigner is the reach's SignVIDVerification bound to the peer, the
+// jcm.Signer VerifyVendorID sends the request through.
+type peerSigner struct {
+	reach CommissionerReach
+	peer  CommissionerPeer
+}
+
+func (s peerSigner) SignVIDVerification(ctx context.Context, fabricIndex uint8, clientChallenge []byte) (opcreds.SignVidVerificationResponse, []byte, error) {
+	return s.reach.SignVIDVerification(ctx, s.peer, fabricIndex, clientChallenge)
 }

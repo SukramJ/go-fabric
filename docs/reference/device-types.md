@@ -2,7 +2,7 @@
 
 # Device types
 
-The 88 device types of the `device` package, from the matter.js model at
+The 90 device types of the `device` package, from the matter.js model at
 `862ad75` (Matter 1.6.1). Each section is what the type's `device.<Name>Type`
 carries: the server and client clusters matter.js's generator derives,
 whether the type mandates each, the features it requires and the
@@ -534,6 +534,10 @@ Conditions: ActiveTariff.
 | Groups | `0x0004` | `M` | mandatory | — | — | `groupsdef.Declare` |
 | FanControl | `0x0202` | `M` | mandatory | — | — | `fancontroldef.Declare` |
 | OnOff | `0x0006` | `O` | optional | — | — | `onoffdef.Declare` |
+
+## FloodlightCamera
+
+`device.NewFloodlightCamera` · id `0x0144` · revision 1 · simple · matter.js `packages/node/src/devices/floodlight-camera.ts`
 
 ## FlowSensor
 
@@ -1110,6 +1114,10 @@ Conditions: Cooler, Heater.
 | ThreadNetworkDiagnostics | `0x0035` | `M` | mandatory | — | — | `threadnetworkdiagnosticsdef.Declare` |
 | ThreadBorderRouterManagement | `0x0452` | `M` | mandatory | — | — | `threadborderroutermanagementdef.Declare` |
 | ThreadNetworkDirectory | `0x0453` | `O` | optional | — | — | `threadnetworkdirectorydef.Declare` |
+
+## VideoDoorbell
+
+`device.NewVideoDoorbell` · id `0x0143` · revision 1 · simple · matter.js `packages/node/src/devices/video-doorbell.ts`
 
 ## VideoRemoteControl
 

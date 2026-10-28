@@ -62,6 +62,7 @@ var committed = []string{
 	"ExtendedColorLight",
 	"ExtractorHood",
 	"Fan",
+	"FloodlightCamera",
 	"FlowSensor",
 	"GenericSwitch",
 	"HeatPump",
@@ -106,6 +107,7 @@ var committed = []string{
 	"Thermostat",
 	"ThermostatController",
 	"ThreadBorderRouter",
+	"VideoDoorbell",
 	"VideoRemoteControl",
 	"WaterFreezeDetector",
 	"WaterHeater",
@@ -127,15 +129,13 @@ var excluded = map[string]string{
 	// (ThreadBorderRouter, NetworkInfrastructureManager,
 	// JointFabricAdministrator) left the group on 2026-10-25 (brief CL §1,
 	// owner decision): their clusters have generated servers. The media
-	// device types left it with ADR 0022, OtaProvider with ADR 0021.
-	// Camera / media by their mandatory requirements (owner's decision,
+	// device types left it with ADR 0022, OtaProvider with ADR 0021, and
+	// the composites VideoDoorbell and FloodlightCamera with wave 27-B
+	// (concept v10 0.5): their components are committed device types, which
+	// their generated constructors take as parts (gen.go compositeComponents).
+	// Camera / media by its mandatory requirements (owner's decision,
 	// 2026-10-11), read from parity/schema.json effective.requirements:
-	// VideoDoorbell and FloodlightCamera mandate a Camera component
-	// ("deviceType Camera, M, 1"), whose mandatory server clusters
-	// CameraAvStreamManagement and WebRtcTransportProvider are the F.2
-	// camera family; CastingVideoClient mandates the media client clusters
-	// KeypadInput, ContentLauncher and ApplicationBasic ("M").
-	"VideoDoorbell":      cameraMedia,
-	"FloodlightCamera":   cameraMedia,
+	// CastingVideoClient mandates the media client clusters KeypadInput,
+	// ContentLauncher and ApplicationBasic ("M").
 	"CastingVideoClient": cameraMedia,
 }

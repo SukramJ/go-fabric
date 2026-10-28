@@ -203,6 +203,9 @@ Defaults worth knowing:
 | `BasicInformation.UniqueID` | derived on the first boot and pinned in the store |
 | `Locales` | `en-US` alone |
 | `Logger` | `slog.Default()` |
+| `Sessions` | the Matter MRP intervals (500 ms idle, 300 ms active, 4000 ms active threshold); set, the PASE and CASE session parameters and the operational record carry the node's own (`node.SessionIntervals`, whole milliseconds, the threshold at most 65535 ms); `Node.SessionParameters` returns what the node reports ([Limits](../guides/limits.md#transport-and-reliability)) |
+| `Limits.BDXAdditionalMrpDelay` | no margin; set, the exchange of every inbound BDX transfer (an OTA requestor's download) adds it to the peer's MRP base interval, as matter.js's `bdxAdditionalMrpDelay` does |
+| `TimeSynchronization` | UTCTime and Granularity alone; set, the root TimeSynchronization serves the TZ, NTPC, NTPS and TSC features it names, after connectedhomeip ([Time synchronization](#time-synchronization)) |
 | `TLS` | no TLS servers; set, TlsCertificateManagement and TlsClientManagement mount on endpoint 0 (`node.TLSConfig`: the `CertificatePort`, per-fabric maxima defaulting to chip's 5, the stores defaulting to the node's) and every camera's PushAvStreamTransport without its own TLS lookups validates against them ([Camera](../guides/camera.md#the-transport-model)) |
 
 *Source: `node/config.go:37-205`, `node/config.go:303-365`, `node/config.go:466-524`, `node/node.go:131-148`.*
@@ -326,6 +329,27 @@ calls:
 
 *Source: `device/doc_gen.go`, `device/defaults.go`, `device/options.go` (`Options`, `WithServer`, `HostServer`, `WithChangeNotifier`, `WithClientClusters`), `device/hostserver_gen.go`, `device/measurement.go` (`Measurement`), `device/device.go`, `cluster/spec/onoff/server_gen.go` (`Declare`, `OnChanged`, `OnChangedAsync`), `contract/` (`Change`, `Origin`), `cluster/onoff/server.go` (`Set`, `SetAttributes`, `Handle`).*
 
+### Composite device types
+
+VideoDoorbell and FloodlightCamera are composites: their requirements are
+device types only (a Camera and a Doorbell; an OnOffLight and a Camera).
+matter.js generates them with no behaviours of their own and counts a
+component on an endpoint below the composite, never on the composite's
+endpoint itself (`DeviceTypeConformance.ts:596-613` at `862ad75f`). Their
+constructors take the components and add them as parts:
+
+```go
+camera, _ := device.NewCamera(device.Options{StableKey: endpoint.StringKey("door/cam")}, camDecls...)
+bell, _ := device.NewDoorbell(device.Options{StableKey: endpoint.StringKey("door/bell")})
+door, err := device.NewVideoDoorbell(device.Options{StableKey: endpoint.StringKey("door")}, camera, bell)
+// door.Camera(), door.Doorbell(); err wraps device.ErrComposition without a component
+```
+
+Each endpoint keeps one device type in its DeviceTypeList; the node's
+device-type validation accepts the composition with its parts and reports
+the two `instanceCount` violations matter.js pins for a composite without
+them.
+
 ## The Aggregator
 
 `Node.Aggregator()` is the Aggregator endpoint's set of bridged devices.
@@ -377,6 +401,28 @@ working. A host calls it before `Start` when, for example, it cannot serve
 its configured attestation chain.
 
 *Source: `node/node.go:900-907`, `node/node.go:692-711`, `node/commissioning.go:424-452`, `node/node.go:835-855`.*
+
+## Time synchronization
+
+The root's TimeSynchronization serves UTCTime from the node's clock and
+Granularity. `Config.TimeSynchronization` adds the features after
+connectedhomeip (`TimeSynchronizationCluster.cpp` at `6170af84`;
+matter.js's server is the generated behaviour):
+
+| Feature | Attributes and commands | What the host supplies |
+| --- | --- | --- |
+| TZ | TimeZone (one default entry, offset 0), DSTOffset, LocalTime (UTC plus the zone's and the DST offset in effect, null without a DST list), TimeZoneDatabase, the two list sizes (2); SetTimeZone with SetTimeZoneResponse, SetDSTOffset; the events DSTTableEmpty, DSTStatus and TimeZoneStatus | `TimeZoneDatabase` (nil is None) and, with a database, `DSTOffsetsFor`, which answers SetTimeZone with the zone's DST offsets |
+| NTPC | DefaultNTP, SupportsDNSResolve; SetDefaultNTP (an IPv6 address, or a domain when `SupportsDNSResolve`) | `SupportsDNSResolve` |
+| NTPS | NTPServerAvailable | `NTPServerAvailable`, changed later with `SetNTPServerAvailable` |
+| TSC | TrustedTimeSource; SetTrustedTimeSource (null emits MissingTrustedTimeSource) | nothing; a removed fabric's source is cleared |
+
+The node persists TrustedTimeSource, DefaultNTP, TimeZone and DSTOffset in
+its store. UTCTime stays the node's clock. SetUTCTime answers chip's
+statuses without setting it (`HandleSetUTCTime`, :1110-1136):
+INVALID_COMMAND for a granularity or time source outside its enum,
+TimeNotAccepted for NoTimeGranularity or a granularity coarser than the
+node's milliseconds, SUCCESS otherwise. The trusted time source is stored
+and reported but not read. The reference daemon turns no feature on.
 
 ## Persistence
 

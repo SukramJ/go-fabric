@@ -167,7 +167,7 @@ var hostCases = map[uint32]hostCase{
 		"ActivePresetHandle", "ActiveScheduleHandle", "Presets", "Schedules",
 		"SetAbsoluteSetpointLimit", "SetActivePresetHandle", "SetActiveScheduleHandle", "SetLocalTemperature",
 		"SetOccupied", "SetOccupiedCoolingSetpoint", "SetOccupiedHeatingSetpoint", "SetPresets", "SetSchedules",
-		"SetSystemMode", "SetTemperatureSetpointHold", "SetThermostatRunningState",
+		"SetSystemMode", "SetTemperatureSetpointHold", "SetThermostatRunningMode", "SetThermostatRunningState",
 	}},
 	h_color.ClusterID:  {kit: kitOf[*light.ColorControlServer](), covered: []string{"Color", "Set", "SetColorWriter", "SetWriter", "SyncColorTemperatureWithLevel"}},
 	h_eco.ClusterID:    {kit: kitOf[*core.EcosystemInformation](), host: hostOf[h_eco.Host](h_eco.Wrap)},
@@ -218,7 +218,7 @@ var hostCases = map[uint32]hostCase{
 		"GroupKeySetList", "GroupList", "NodeACLList", "NodeEndpointList", "NodeKeySetList", "NodeList", "OnFabricRemoved", "Status",
 	}},
 	h_jfa.ClusterID: {kit: kitOf[*jointfabric.Administrator](), host: hostOf[h_jfa.Host](h_jfa.Wrap), covered: []string{
-		"AttachFailSafe", "AttachNode", "OnCommissioningComplete", "OnFabricRemoved", "OnFailSafeExpired",
+		"AttachCommissionerReach", "AttachFailSafe", "AttachNode", "OnCommissioningComplete", "OnFabricRemoved", "OnFailSafeExpired",
 	}},
 	h_acs.ClusterID: {kit: kitOf[*sensing.AmbientContext](), host: hostOf[h_acs.Host](h_acs.Wrap), covered: []string{"HoldTime", "ObjectCountConfig"}},
 	// The media servers: their event helpers are Emit<Event>'s.

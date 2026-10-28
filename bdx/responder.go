@@ -62,6 +62,22 @@ type ScopeConfig struct {
 	// MessageTimeout is the messenger's wait for each message of the peer;
 	// zero is [TransferIdleTimeout].
 	MessageTimeout time.Duration
+	// AdditionalMrpDelay, when set, is the MRP margin of the session's
+	// exchange: BdxProtocol.Config.additionalMrpDelay (BdxProtocol.ts:223),
+	// applied as the exchange's peerAdditionalMrpDelay (:139-142). nil is
+	// the responder's default ([Responder.SetAdditionalMrpDelay]).
+	AdditionalMrpDelay *time.Duration
+}
+
+// MrpDelayExchange is an [Exchange] whose MRP retransmissions take an
+// additional delay: the margin joins the peer's base interval before the
+// backoff amplifies it. Mirrors matter.js MessageExchange's
+// peerAdditionalMrpDelay setter (MessageExchange.ts:352-363 at 862ad75f).
+// A [Responder] sets it on the exchange of every session it accepts when
+// the session has a delay; an exchange without the method keeps its own.
+type MrpDelayExchange interface {
+	Exchange
+	SetPeerAdditionalMrpDelay(d time.Duration)
 }
 
 // Responder serves the BDX exchanges peers open — the responder side of
@@ -79,6 +95,9 @@ type Responder struct {
 	sessions map[*ServerSession]struct{}
 	started  []*startedListener
 	clock    clock.Clock // a session's activity stamps; nil is clock.System
+	// mrpDelay is the default MRP margin of an accepted session's exchange
+	// (SetAdditionalMrpDelay); nil leaves the exchange's own.
+	mrpDelay *time.Duration
 }
 
 type scopeKey struct {
@@ -110,6 +129,35 @@ func (r *Responder) SetClock(c clock.Clock) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.clock = c
+}
+
+// SetAdditionalMrpDelay sets the MRP margin of the exchange of every
+// session the responder accepts whose scope configuration names none
+// ([ScopeConfig.AdditionalMrpDelay]); a negative d clears it. Mirrors
+// matter.js's BDX margin of the node's network profile,
+// LimitsConfig.bdxAdditionalMrpDelay (NetworkServer.ts:152-153 at
+// 862ad75f; NetworkProfile.ts:156-159, `bdx: limits.bdxAdditionalMrpDelay
+// ?? additionalMrpDelay`), which MessageExchange #sendAdditionalDelay reads
+// for a BDX exchange (MessageExchange.ts:1219-1222).
+func (r *Responder) SetAdditionalMrpDelay(d time.Duration) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if d < 0 {
+		r.mrpDelay = nil
+		return
+	}
+	r.mrpDelay = &d
+}
+
+// mrpDelayFor is the margin of a session under cfg: the scope's, else the
+// responder's default.
+func (r *Responder) mrpDelayFor(cfg ScopeConfig) *time.Duration {
+	if cfg.AdditionalMrpDelay != nil {
+		return cfg.AdditionalMrpDelay
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.mrpDelay
 }
 
 func (r *Responder) now() time.Time {
@@ -267,6 +315,13 @@ func (r *Responder) HandleExchange(ctx context.Context, peer Peer, first Message
 		return
 	}
 	file := parts[1]
+	// :139-142: the scope's additionalMrpDelay becomes the exchange's
+	// peerAdditionalMrpDelay before the messenger takes it.
+	if d := r.mrpDelayFor(entry.cfg); d != nil {
+		if mx, ok := ex.(MrpDelayExchange); ok {
+			mx.SetPeerAdditionalMrpDelay(*d)
+		}
+	}
 	m := NewMessenger(ex, entry.cfg.MessageTimeout)
 	sessCtx, cancel := context.WithCancelCause(ctx)
 	defer cancel(nil)

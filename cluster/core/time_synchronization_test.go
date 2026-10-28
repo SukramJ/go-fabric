@@ -9,6 +9,7 @@ import (
 
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/cluster/core"
+	tsdef "github.com/SukramJ/go-fabric/cluster/spec/timesynchronization"
 )
 
 func TestTimeSync_ClusterID(t *testing.T) {
@@ -94,7 +95,7 @@ func TestTimeSync_InvokeSetUTCTimeAccepted(t *testing.T) {
 	ts := core.NewTimeSynchronization()
 	// SetUTCTime (0x00) is accepted and returns nil (Success) — the bridge
 	// does not adjust the host clock but must not return UnsupportedCommand.
-	_, err := ts.MatterInvoke(context.Background(), 0x00, nil)
+	_, err := ts.MatterInvoke(context.Background(), 0x00, tsdef.SetUtcTimeRequest{UtcTime: 1, Granularity: tsdef.GranularityMillisecondsGranularity})
 	if err != nil {
 		t.Errorf("MatterInvoke(SetUTCTime/0x00) expected nil, got %v", err)
 	}

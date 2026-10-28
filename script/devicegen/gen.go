@@ -86,6 +86,45 @@ type typeModel struct {
 	dt      *deviceType
 	servers []*clusterReq
 	clients []*clusterReq
+	// components are a composite's mandatory component device types, in
+	// the requirements' order (compositeComponents); nil for every other
+	// device type.
+	components []string
+}
+
+// compositeComponents returns the mandatory component device types of a
+// composite: a device type whose requirements are device types only — no
+// cluster requirement but the Descriptor (VideoDoorbell, FloodlightCamera;
+// matter.js generates their files with no behaviours of their own,
+// packages/node/src/devices/video-doorbell.ts:28-33,
+// packages/node/src/devices/floodlight-camera.ts:31-36 at 862ad75f).
+// matter.js places a component on an endpoint below the composite (DeviceTypeConformance.ts:596-613: only a
+// utility device type counts on the composing endpoint itself), and its
+// StandardDeviceTypeCorpusTest pins the missing components as "component
+// endpoints are the developer's to add" (:310, :328-358). Every component
+// must be a committed device type, so the generated constructor can take
+// it. nil for any other device type.
+func compositeComponents(dt *deviceType, committedTypes map[string]bool) ([]string, error) {
+	var out []string
+	for _, r := range dt.Effective.Requirements {
+		switch r.Element {
+		case "serverCluster", "clientCluster":
+			if r.ID == nil || *r.ID != descriptorClusterID {
+				return nil, nil
+			}
+		case "deviceType":
+			if isMandatory(r.Conformance) {
+				out = append(out, r.Name)
+			}
+		default:
+		}
+	}
+	for _, c := range out {
+		if !committedTypes[c] {
+			return nil, fmt.Errorf("%s: component device type %s is not committed", dt.Name, c)
+		}
+	}
+	return out, nil
 }
 
 // model derives a device type's requirements as matter.js's EndpointFile
@@ -115,6 +154,13 @@ func (g *generator) model(name string) (*typeModel, error) {
 		return nil, err
 	}
 	if m.clients, err = g.side(dt, "client"); err != nil {
+		return nil, err
+	}
+	committedTypes := make(map[string]bool, len(committed))
+	for _, c := range committed {
+		committedTypes[c] = true
+	}
+	if m.components, err = compositeComponents(dt, committedTypes); err != nil {
 		return nil, err
 	}
 	return m, nil
@@ -431,6 +477,12 @@ func (g *generator) body(m *typeModel, imports map[string]string) ([]byte, error
 	}
 	w.WriteString("}\n\n")
 
+	if len(m.components) > 0 {
+		if err := writeComposite(&w, n, dt.Name, m.components, imports); err != nil {
+			return nil, err
+		}
+		return w.Bytes(), nil
+	}
 	fmt.Fprintf(&w, "// %s is an endpoint of the %s device type.\n", n, dt.Name)
 	fmt.Fprintf(&w, "type %s struct{ *Device }\n\n", n)
 	fmt.Fprintf(&w, "// New%s returns a %s device: its mandatory server clusters and the\n", n, dt.Name)
@@ -458,6 +510,91 @@ func (g *generator) body(m *typeModel, imports map[string]string) ([]byte, error
 		fmt.Fprintf(&w, "func (d *%s) %s() %s { return %s.WrapOn(d.Server(0x%04X), d.queue) }\n", n, method, acc.Type, acc.Alias, cr.def.ID)
 	}
 	return w.Bytes(), nil
+}
+
+// writeComposite writes a composite's device and its constructor: the
+// composite endpoint with each mandatory component as a part
+// ([Device.AddPart]), one parameter per component, and an accessor per
+// component. A component the host leaves nil is a composition error.
+func writeComposite(w *bytes.Buffer, n, name string, components []string, imports map[string]string) error {
+	imports["fmt"] = ""
+	params := make([]string, len(components))
+	fields := make([]string, len(components))
+	for i, c := range components {
+		cn := exportName(c)
+		if deviceMethods[cn] {
+			return fmt.Errorf("%s: component accessor %s shadows a Device method", name, cn)
+		}
+		fields[i] = lowerFirst(cn)
+		params[i] = fmt.Sprintf("%s *%s", fields[i], cn)
+	}
+	fmt.Fprintf(w, "// %s is an endpoint of the %s device type, a composite: its\n", n, name)
+	fmt.Fprintf(w, "// mandatory components (%s) are its parts, endpoints below it.\n", strings.Join(components, ", "))
+	fmt.Fprintf(w, "type %s struct {\n\t*Device\n", n)
+	for i, c := range components {
+		fmt.Fprintf(w, "\t%s *%s\n", fields[i], exportName(c))
+	}
+	w.WriteString("}\n\n")
+	fmt.Fprintf(w, "// New%s returns a %s device with its mandatory components as\n", n, name)
+	w.WriteString("// its parts, in this order: matter.js places a component on an endpoint\n")
+	w.WriteString("// below the composite (DeviceTypeConformance.ts candidatesOf). Each\n")
+	w.WriteString("// component must be given; further parts join with [Device.AddPart].\n")
+	fmt.Fprintf(w, "func New%s(opts Options, %s, decls ...Declaration) (*%s, error) {\n", n, strings.Join(params, ", "), n)
+	conds := make([]string, len(fields))
+	parts := make([]string, len(fields))
+	kv := make([]string, len(fields))
+	for i, f := range fields {
+		conds[i] = f + " == nil"
+		parts[i] = f + ".Device"
+		kv[i] = f + ": " + f
+	}
+	fmt.Fprintf(w, "\tif %s {\n", strings.Join(conds, " || "))
+	fmt.Fprintf(w, "\t\treturn nil, fmt.Errorf(\"%%w: %s needs its components %s\", ErrComposition)\n\t}\n", name, strings.Join(components, " and "))
+	fmt.Fprintf(w, "\td, err := FromSpec(Spec{Type: %sID, Options: opts, Declarations: decls})\n\tif err != nil {\n\t\treturn nil, err\n\t}\n", n)
+	fmt.Fprintf(w, "\tfor _, p := range []*Device{%s} {\n\t\tif err := d.AddPart(p); err != nil {\n\t\t\treturn nil, err\n\t\t}\n\t}\n", strings.Join(parts, ", "))
+	fmt.Fprintf(w, "\treturn &%s{Device: d, %s}, nil\n}\n", n, strings.Join(kv, ", "))
+	for i, c := range components {
+		cn := exportName(c)
+		fmt.Fprintf(w, "\n// %s is the device's %s component.\n", cn, c)
+		fmt.Fprintf(w, "func (d *%s) %s() *%s { return d.%s }\n", n, cn, cn, fields[i])
+	}
+	return nil
+}
+
+// writeCompositeTest writes a composite's constructor test: refused without
+// its components and without a StableKey; built from components made by
+// their own constructors, with each component its part and accessor.
+func writeCompositeTest(w *bytes.Buffer, n, name string, components []string) {
+	nils := strings.TrimSuffix(strings.Repeat("nil, ", len(components)), ", ")
+	fmt.Fprintf(w, "\tif _, err := New%s(testOptions(%q), %s); err == nil {\n\t\tt.Error(\"%s: constructed without its components\")\n\t}\n", n, name, nils, name)
+	fmt.Fprintf(w, "\t{\n")
+	vars := make([]string, len(components))
+	for i, c := range components {
+		cn := exportName(c)
+		vars[i] = lowerFirst(cn)
+		fmt.Fprintf(w, "\t\t%s, err := New%s(testOptions(%q), testWith(t, %q)...)\n\t\tif err != nil {\n\t\t\tt.Fatalf(\"%s: component %s: %%v\", err)\n\t\t}\n", vars[i], cn, name+"/"+c, c, name, c)
+	}
+	args := strings.Join(vars, ", ")
+	fmt.Fprintf(w, "\t\tif _, err := New%s(Options{}, %s); err == nil {\n\t\t\tt.Error(\"%s: constructed without a StableKey\")\n\t\t}\n", n, args, name)
+	fmt.Fprintf(w, "\t\td, err := New%s(testOptions(%q), %s, testWith(t, %q)...)\n\t\tif err != nil {\n\t\t\tt.Fatalf(\"%s: %%v\", err)\n\t\t}\n", n, name, args, name, name)
+	fmt.Fprintf(w, "\t\tif d.Type() != &%sType {\n\t\t\tt.Errorf(\"%s: type %%v\", d.Type().Name)\n\t\t}\n", n, name)
+	fmt.Fprintf(w, "\t\tif parts := d.Parts(); len(parts) != %d", len(components))
+	for i, v := range vars {
+		fmt.Fprintf(w, " || parts[%d] != %s.Device", i, v)
+	}
+	fmt.Fprintf(w, " {\n\t\t\tt.Errorf(\"%s: parts %%v\", parts)\n\t\t}\n", name)
+	for i, c := range components {
+		fmt.Fprintf(w, "\t\tif d.%s() != %s {\n\t\t\tt.Error(\"%s: %s accessor\")\n\t\t}\n", exportName(c), vars[i], name, c)
+	}
+	w.WriteString("\t}\n")
+}
+
+// lowerFirst lower-cases s's first letter: a parameter or field name.
+func lowerFirst(s string) string {
+	if s == "" {
+		return s
+	}
+	return strings.ToLower(s[:1]) + s[1:]
 }
 
 // accessor returns the Go type of a server cluster's typed accessor, when
@@ -619,6 +756,10 @@ func (g *generator) generateTest(names []string) (*output, error) {
 			return nil, err
 		}
 		n := exportName(name)
+		if len(m.components) > 0 {
+			writeCompositeTest(&w, n, name, m.components)
+			continue
+		}
 		fmt.Fprintf(&w, "\tif _, err := New%s(Options{}); err == nil {\n\t\tt.Error(\"%s: constructed without a StableKey\")\n\t}\n", n, name)
 		fmt.Fprintf(&w, "\tif d, err := New%s(testOptions(%q), testWith(t, %q)...); err == nil {\n", n, name, name)
 		fmt.Fprintf(&w, "\t\tif d.Type() != &%sType {\n\t\t\tt.Errorf(\"%s: type %%v\", d.Type().Name)\n\t\t}\n", n, name)

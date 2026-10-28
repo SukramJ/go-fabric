@@ -42,6 +42,21 @@ still held there. Each row names the facade route, or the section of
 | `cluster/core` | `SoftwareVersionFromString` (`daemon_matter.go:527`) | `node.SoftwareVersionFromString` |
 | `cluster/core` | `RegulatoryIndoorOutdoor` (`daemon_matter.go:506`) | `node.RegulatoryIndoorOutdoor` for `Commissioning.LocationCapability` |
 
+## Changed in the next release: `CommissionerReach` takes the peer
+
+Every method of `jfadef.CommissionerReach` (`jointfabric.CommissionerReach`)
+takes the commissioner as its second argument, a `jfadef.Peer{FabricIndex,
+NodeID}` (`jointfabric.CommissionerPeer`): the invoking session's fabric
+index and node id, which an implementation read from the context before
+(`im.FabricFilterFromContext`, `im.SubjectFromContext`). Add the argument:
+
+```go
+func (r myReach) ReadFabrics(ctx context.Context, peer jfadef.Peer) ([]opcreds.FabricDescriptorStruct, error)
+```
+
+A node with `Config.Client` on needs no reach of its own: it mounts one
+over its client stack where the declaration names none.
+
 ## Added after v0.13.6: `<cluster>def.Server.Host()`
 
 A host that type-asserts a typed server's `Underlying()` to reach the

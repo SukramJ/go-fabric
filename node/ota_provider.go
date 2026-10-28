@@ -74,6 +74,9 @@ func (n *Node) buildOTAProvider() error {
 	}
 	n.bdx = bdx.NewResponder(n.logger)
 	n.bdx.SetClock(n.cfg.Clock) // the transfers' activity on the provider's clock
+	if d := n.cfg.Limits.BDXAdditionalMrpDelay; d > 0 {
+		n.bdx.SetAdditionalMrpDelay(d)
+	}
 	p, err := mattercore.NewOTAProvider(mattercore.OTAProviderConfig{
 		ImageSource: cfg.ImageSource, Consent: cfg.Consent, ApplyPolicy: cfg.ApplyPolicy,
 		BDX: n.bdx, BDXMaxBlockSize: cfg.BDXMaxBlockSize, OnStatusChange: cfg.OnStatusChange,

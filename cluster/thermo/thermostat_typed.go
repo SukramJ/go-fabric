@@ -84,6 +84,7 @@ func (s *ThermostatServer) SetAttributes(values map[uint32]any) error {
 		return nil
 	}
 	s.mu.Lock()
+	before := s.eventStateLocked()
 	st := s.setpointState()
 	setpoints, err := st.applySet(checked)
 	if err != nil {
@@ -134,7 +135,9 @@ func (s *ThermostatServer) SetAttributes(values map[uint32]any) error {
 		s.occupied = occupied
 	}
 	s.setOptionalLocked(checked, note)
+	after := s.eventStateLocked()
 	s.mu.Unlock()
+	s.emitChanges(context.Background(), before, after)
 
 	if len(changed) > 0 {
 		slices.Sort(changed)

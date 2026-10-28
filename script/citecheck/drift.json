@@ -19,7 +19,7 @@
   },
   {
     "file": "bdx/responder.go",
-    "line": 192,
+    "line": 240,
     "citation": "BdxProtocol.ts:204-211",
     "resolved": "packages/protocol/src/bdx/BdxProtocol.ts",
     "identifier": "SessionFor",
@@ -28,7 +28,7 @@
   },
   {
     "file": "bdx/responder.go",
-    "line": 312,
+    "line": 367,
     "citation": "BdxProtocol.ts:159-164",
     "resolved": "packages/protocol/src/bdx/BdxProtocol.ts",
     "identifier": "onNewExchange",
@@ -136,7 +136,7 @@
   },
   {
     "file": "bridge/bridge.go",
-    "line": 669,
+    "line": 683,
     "citation": "ExchangeManager.ts:425-431",
     "resolved": "packages/protocol/src/protocol/ExchangeManager.ts",
     "identifier": "CloseSession",
@@ -145,7 +145,7 @@
   },
   {
     "file": "bridge/bridge.go",
-    "line": 1406,
+    "line": 1420,
     "citation": "Fabric.ts:408-415",
     "resolved": "packages/protocol/src/fabric/Fabric.ts",
     "identifier": "initiateForceClose",
@@ -154,7 +154,7 @@
   },
   {
     "file": "bridge/bridge.go",
-    "line": 1731,
+    "line": 1745,
     "citation": "Session.ts:248",
     "resolved": "packages/protocol/src/session/Session.ts",
     "identifier": "initiateClose",
@@ -1389,7 +1389,7 @@
   },
   {
     "file": "cluster/thermo/thermostat_server.go",
-    "line": 249,
+    "line": 250,
     "citation": "packages/node/src/behaviors/thermostat/ThermostatServer.ts:594-601",
     "resolved": "packages/node/src/behaviors/thermostat/ThermostatServer.ts",
     "identifier": "systemMode",
@@ -1398,7 +1398,7 @@
   },
   {
     "file": "cluster/thermo/thermostat_server.go",
-    "line": 299,
+    "line": 300,
     "citation": "ThermostatServer.ts:219-220",
     "resolved": "packages/node/src/behaviors/thermostat/ThermostatServer.ts",
     "identifier": "SetpointRaiseLower",
@@ -1407,7 +1407,7 @@
   },
   {
     "file": "cluster/thermo/thermostat_server.go",
-    "line": 1062,
+    "line": 1088,
     "citation": "ThermostatServer.ts:614",
     "resolved": "packages/node/src/behaviors/thermostat/ThermostatServer.ts",
     "at": "0ceb202d",
@@ -1417,7 +1417,7 @@
   },
   {
     "file": "cluster/thermo/thermostat_server.go",
-    "line": 1318,
+    "line": 1349,
     "citation": "thermostat-cluster.element.ts:510-514",
     "resolved": "packages/model/src/standard/elements/thermostat-cluster.element.ts",
     "identifier": "SetpointRaiseLowerModeEnum",
@@ -1426,7 +1426,7 @@
   },
   {
     "file": "cluster/thermo/thermostat_server.go",
-    "line": 1450,
+    "line": 1481,
     "citation": "ThermostatServer.ts:219-220",
     "resolved": "packages/node/src/behaviors/thermostat/ThermostatServer.ts",
     "at": "0ceb202d",
@@ -1436,7 +1436,7 @@
   },
   {
     "file": "cluster/thermo/thermostat_server.go",
-    "line": 1620,
+    "line": 1656,
     "citation": "thermostat-cluster.element.ts:322-323",
     "resolved": "packages/model/src/standard/elements/thermostat-cluster.element.ts",
     "identifier": "SetpointRaiseLower",
@@ -1825,7 +1825,7 @@
   },
   {
     "file": "device/type.go",
-    "line": 169,
+    "line": 166,
     "citation": "packages/node/src/node/client/ClientStructure.ts:871",
     "resolved": "packages/node/src/node/client/ClientStructure.ts",
     "identifier": "#node",
@@ -2051,7 +2051,7 @@
   },
   {
     "file": "node/config.go",
-    "line": 230,
+    "line": 245,
     "citation": "NetworkServer.ts:202-222",
     "resolved": "packages/node/src/behavior/system/network/NetworkServer.ts",
     "identifier": "network",
@@ -2078,7 +2078,7 @@
   },
   {
     "file": "node/security.go",
-    "line": 670,
+    "line": 674,
     "citation": "CaseServer.ts:210",
     "resolved": "packages/protocol/src/session/case/CaseServer.ts",
     "identifier": "SessionManager",

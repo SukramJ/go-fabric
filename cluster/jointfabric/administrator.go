@@ -30,6 +30,8 @@ type (
 	AdministratorPort = jfadef.AdministratorPort
 	// CommissionerReach reads the announcing commissioner.
 	CommissionerReach = jfadef.CommissionerReach
+	// CommissionerPeer names the commissioner a CommissionerReach reaches.
+	CommissionerPeer = jfadef.Peer
 	// ICACCSRStatus is an ICACCSRRequest or
 	// OpenJointCommissioningWindow cluster status.
 	ICACCSRStatus = jfadef.ICACCSRResponseStatusCodeEnum
@@ -182,6 +184,26 @@ func (a *Administrator) AttachNode(fabrics FabricTable, window wire.WindowContro
 	a.mu.Lock()
 	a.fabrics, a.window = fabrics, window
 	a.mu.Unlock()
+}
+
+// AttachCommissionerReach gives the administrator the node's reach of
+// the announcing commissioner when its configuration ([AdministratorConfig].Reach)
+// names none; the node calls it as the endpoint joins the topology, with
+// its client stack ([github.com/SukramJ/go-fabric/node]). A configured
+// reach stays.
+func (a *Administrator) AttachCommissionerReach(r CommissionerReach) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if a.reach == nil {
+		a.reach = r
+	}
+}
+
+// reachPort is the reach an announcement reads through.
+func (a *Administrator) reachPort() CommissionerReach {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.reach
 }
 
 // AttachFailSafe hands the administrator the node's fail-safe state; the
@@ -415,6 +437,10 @@ func (a *Administrator) announceJointFabricAdministrator(ctx context.Context, fi
 		a.mu.Unlock()
 	}()
 	c := a.newCommissionee(fabricIndex, req.EndpointId)
+	// The invoking session names the commissioner (JCMCommissionee.cpp:
+	// 46-69 reads over it).
+	nodeID, _ := im.SubjectFromContext(ctx)
+	c.peer = CommissionerPeer{FabricIndex: fabricIndex, NodeID: nodeID}
 	result := c.run(run)
 	if result != jcm.Success || run.Err() != nil { // :256-266
 		return nil, statusErr(im.StatusFailure, "trust verification: %s", result)

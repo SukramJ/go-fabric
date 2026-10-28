@@ -336,7 +336,10 @@ type security struct {
 // maxPathsPerInvoke, when non-zero, replaces the default MaxPathsPerInvoke:
 // the session parameters state the node's own (SessionManager
 // sessionParameters carry basicInformation.maxPathsPerInvoke).
-func responderSessionParams(tcp bridge.TCPConfig, maxPathsPerInvoke uint16) *sessionparams.Parameters {
+//
+// intervals are the node's MRP intervals ([Config.Sessions]); nil is the
+// defaults (ServerNetworkRuntime.ts:359 spreads sessions.intervals).
+func responderSessionParams(tcp bridge.TCPConfig, maxPathsPerInvoke uint16, intervals *SessionIntervals) *sessionparams.Parameters {
 	var transports uint16
 	if tcp.Incoming {
 		transports |= sessionparams.TransportTCPServer
@@ -348,6 +351,7 @@ func responderSessionParams(tcp bridge.TCPConfig, maxPathsPerInvoke uint16) *ses
 	if maxPathsPerInvoke != 0 {
 		p.MaxPathsPerInvoke = maxPathsPerInvoke
 	}
+	intervals.apply(&p)
 	return &p
 }
 

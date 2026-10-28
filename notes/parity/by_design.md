@@ -104,6 +104,7 @@ pin lift confirms by re-reading the row, [`pin-lifts.md`](./pin-lifts.md)).
 | BD-Thread-TND-FromBorderRouter | `ThreadNetworkDiagnosticsServer.ts:14` is the empty subclass (absence: the class line, 14 lines in all) | `packages/node/src/behaviors/thread-network-diagnostics/ThreadNetworkDiagnosticsServer.ts` | `"export class ThreadNetworkDiagnosticsServer extends ThreadNetworkDiagnosticsBehavior {}"` | connectedhomeip `src/app/clusters/thread-network-diagnostics-server/DirectThreadNetworkDiagnosticsProvider.cpp` at `6170af84` (`ReadAttribute` :59, the unconfigured nulls :65-92, `RoutingRole` :104-145, the tables :184-293, the counts :325-571, the dataset attributes :577-689), `ThreadNetworkDiagnosticsCluster.cpp` |
 | BD-Thread-NetComm-ThreadVariant | `NetworkCommissioningServer.ts:18` is the empty subclass: no network-type branch, no Thread logic (absence: the class line, 18 lines in all) | `packages/node/src/behaviors/network-commissioning/NetworkCommissioningServer.ts` | `"export class NetworkCommissioningServer extends NetworkCommissioningBehavior {}"` | connectedhomeip `src/app/clusters/network-commissioning/NetworkCommissioningCluster.cpp` at `6170af84` (the Thread paths: `HandleScanNetworks` :349-367, `HandleAddOrUpdateThreadNetwork` :561-587, `OnFinished` :904-928, `ReadAttribute` :1102-1108) over `src/platform/OpenThread/GenericNetworkCommissioningThreadDriver.cpp` |
 | BD-chip-AmbientContextSensing-RulesInServer | `AmbientContextSensingServer.ts:14` is the empty subclass (absence: the class line, 14 lines in all) | `packages/node/src/behaviors/ambient-context-sensing/AmbientContextSensingServer.ts` | `"export class AmbientContextSensingServer extends AmbientContextSensingBehavior {}"` | connectedhomeip `src/app/clusters/ambient-context-sensing-server/AmbientContextSensingCluster.cpp` at `6170af84` (the constructor and `Startup` :48-89, `WriteAttribute` :140-159, `AddDetection` :205-301, `SetObjectCountConfig` :303-367, `SetObjectCount` :369-385, `SetHoldTimeLimits` :438-466, `TimerFired` :498-509, `UpdateDetectionAttributes` :600-646, `CheckPredictedActivity` :844-892; `AmbientContextSensingDelegate.h:78-106`), tests `tests/TestAmbientContextSensingCluster.cpp` |
+| BD-chip-TimeSynchronization-Features | `TimeSynchronizationServer.ts:14` is the empty subclass (absence: the class line, 14 lines in all) | `packages/node/src/behaviors/time-synchronization/TimeSynchronizationServer.ts` | `"export class TimeSynchronizationServer extends TimeSynchronizationBehavior {}"` | connectedhomeip `src/app/clusters/time-synchronization-server/TimeSynchronizationCluster.cpp` at `6170af84` (the attribute gating :186-248, the feature logic :619-1028, `HandleSetUTCTime` :1110-1136, the four handlers :1138-1275), `TimeSyncDataProvider.h:58-75`, tests `tests/TestTimeSynchronizationCluster.cpp` |
 | BD-chip-JointFabricDatastore-RulesInServer | `JointFabricDatastoreServer.ts:14` is the empty subclass (absence: the class line, 14 lines in all) | `packages/node/src/behaviors/joint-fabric-datastore/JointFabricDatastoreServer.ts` | `"export class JointFabricDatastoreServer extends JointFabricDatastoreBehavior {}"` | connectedhomeip `src/app/server/JointFabricDatastore.cpp` at `6170af84` (the operations :181-2373, `RefreshNode`/`ContinueRefresh` :241-1130, the status codes), `JointFabricDatastore.h` (the capacities :512-517, the delegate :166-285, `MarkEntryCommittedIfFound` :75-85), `src/app/clusters/joint-fabric-datastore-server/joint-fabric-datastore-server.cpp` (the 20 commands :293-785), tests `src/app/server/tests/TestJointFabricDatastore.cpp` |
 | BD-chip-JointFabricAdministrator-RulesInServer | `JointFabricAdministratorServer.ts:14` is the empty subclass (absence: the class line, 14 lines in all) | `packages/node/src/behaviors/joint-fabric-administrator/JointFabricAdministratorServer.ts` | `"export class JointFabricAdministratorServer extends JointFabricAdministratorBehavior {}"` | connectedhomeip `src/app/clusters/joint-fabric-administrator-server/joint-fabric-administrator-server.cpp` at `6170af84` (the handlers :172-449), `JCMCommissionee.{h,cpp}`, `src/app/server/JointFabricAdministrator.h`, `src/credentials/jcm/` (`TrustVerification.cpp`, `VendorIdVerificationClient.cpp`), tests `joint-fabric-administrator-server/tests/TestJCMCommissionee.cpp`, `src/credentials/tests/jcm/` |
 | BD-chip-JCM-Commissioner | `ControllerCommissioningFlow.ts:576-583` runs `OperationalCredentials.Certificates` right after `OperationalCredentials.DeviceAttestation`, no Joint Commissioning step between (absence: the two step pushes, :573-585) | `packages/protocol/src/peer/ControllerCommissioningFlow.ts` | `"name: \"OperationalCredentials.DeviceAttestation\",\n            stepLogic: () => this.#deviceAttestation(),\n        });\n\n        this.commissioningSteps.push({\n            stepNumber: 11, // includes 11-13"` | connectedhomeip `src/controller/jcm/DeviceCommissioner.cpp` at `6170af84` (:45-550), `src/controller/jcm/AutoCommissioner.{h,cpp}` (the read paths `.h:56-66`), `src/controller/AutoCommissioner.cpp:522-531` (the stage after attestation), tests `src/controller/tests/jcm/TestJCMCommissioner.cpp` |
@@ -636,7 +637,7 @@ These rewrite TypeScript constructs into Go. Wire output is identical; the surfa
 | L7-D03 | matter.js `MdnsAdvertisement.ts:153` — MAC-derived hostname `<12hexUC>0000.local`; chip `ServiceNaming.cpp:89` `MakeHostName` from MAC/EUI-64 | `mdns/service.go::defaultHostName` — the first up, multicast-capable interface's MAC plus `0000`, as matter.js does (TC-SC-4.3); without a usable MAC a stable 16-hex-digit name hashed from the OS host name. **On macOS** the OS host name is kept | The macOS exception is the divergence: there mDNSResponder owns the host's A/AAAA records, and a separately published name lost its address records, so Apple Home tore the fabric down after CommissioningComplete (`mdns/zeroconf.go` Publish). A product certifies on its own platform; a macOS-hosted product sets `Config.HostName` to a MAC-derived name it publishes addresses for. Drift L7-D03 (LOW, macOS only). |
 | BD-Matter-UniqueID-Stable | matter.js `BasicInformationServer.createUniqueId()` — 32-char random persisted with Quality "FN" so the value survives bridge restarts | `cluster/core/basic_information.go::uniqueID` mixes `bootid.Salt()` into a deterministic SHA-256 derivation; `bootid/bootid.go` defaults `rotationEnabled = false`, so `Salt()` returns `[16]byte{}` and the hash collapses to a stable function of vendor/product/nodeLabel/serialNumber | go-fabric produces a stable UniqueID across daemon restarts by default. Rotation is opt-in via `matter.dev_rotate_unique_ids=true` and is intended for the dev/debug workflow where pair-iteration has corrupted Apple's HMHome state. Audit drift L1-D19 (in `audit_runs/2026-05-18_resolution_status.md`) is a **false positive**: it assumes `bootid.Salt()` rotates unconditionally, but the default zeroed salt means the production daemon's UniqueID is stable. The bootid package docstring spells out the contract; no code change required. |
 | BD-Matter-SoftwareVersion-StringDerived | matter.js derives SoftwareVersionString from the numeric SoftwareVersion default (`packages/node/src/behaviors/basic-information/BasicInformationServer.ts:71` — `setDefault("softwareVersionString", state.softwareVersion.toString())`) and has no string-to-numeric path; its consumers supply the numeric value directly | go-fabric's authoritative version is the human-readable daemon build string (`build.Version`), so `core.SoftwareVersionFromString` derives the numeric attribute from the string instead, using the stable monotonic encoding `major*1_000_000 + minor*1_000 + patch` (components clamped to 999; semver pre-release/build-metadata suffixes dropped, so "0.32.0-rc.1" → 32000; leading "v" tolerated; non-semver strings such as "dev" and all-zero results floor at 1, never advertising matter.js's development default 0 from `BasicInformationServer.ts:59`) | The matter.js invariant — both attributes describe the same release — is preserved; only the derivation direction differs. When the string is absent, the fallback mirrors matter.js exactly (decimal rendering of the numeric value). Guards: `TestSoftwareVersionFromString`, `TestBasicInfo_SoftwareVersionDerivedFromVersionString`, `TestParityMatterJS_BasicInfoServer_SoftwareVersionStringFallback`. |
-| BD-Matter-TimeSync-NoUTCFeature | matter.js `time-synchronization.element.ts:32-35` — `UtcTime` and `Granularity` both carry `conformance: "M"` unconditionally; no `UTC` feature flag exists | `cluster/core/time_synchronization.go::MatterRead` returns `FeatureMap = 0` while exposing UTCTime + Granularity | The matter-exhaustive audit drift L1-D14 ("UTC-Feature-Bit nicht gesetzt obwohl UTCTime exponiert wird") is a **false positive**: it presumes a non-existent UTC feature flag. UTCTime and Granularity are mandatory regardless of any feature flag; the optional TZ / NTPC / NTPS / TSC features gate additional attributes (TimeZone, DefaultNtp, TrustedTimeSource, …) that the bridge intentionally does not implement. `FeatureMap = 0` is therefore correct — the bridge advertises no optional time-sync features, which matches the implemented surface. |
+| BD-Matter-TimeSync-NoUTCFeature | matter.js `time-synchronization.element.ts:32-35` — `UtcTime` and `Granularity` both carry `conformance: "M"` unconditionally; no `UTC` feature flag exists | `cluster/core/time_synchronization.go::MatterRead` returns `FeatureMap = 0` while exposing UTCTime + Granularity | The matter-exhaustive audit drift L1-D14 ("UTC-Feature-Bit nicht gesetzt obwohl UTCTime exponiert wird") is a **false positive**: it presumes a non-existent UTC feature flag. UTCTime and Granularity are mandatory regardless of any feature flag; the optional TZ / NTPC / NTPS / TSC features gate additional attributes (TimeZone, DefaultNtp, TrustedTimeSource, …) that the node serves after connectedhomeip when the host selects them (wave 27-B, `BD-chip-TimeSynchronization-Features`); `FeatureMap` is that selection, 0 by default, so a node without a selection advertises no optional time-sync feature. |
 | BD-Matter-Dispatcher-Synthesises-Globals | matter.js's behaviour layer auto-generates the Matter §7.13.2 global attributes (FeatureMap, ClusterRevision, AttributeList, AcceptedCommandList, GeneratedCommandList) on every cluster server | `endpoint/dispatcher.go::attributesFor` seeds the five universal globals at the start of every wildcard-attribute expansion and dedupes them against the per-server `MatterAttributes()` extras (lines 269-300 + 378-405) | The audit drifts L1-D04 / L1-D06 / L1-D12 ("MatterAttributes lister fehlt FeatureMap + ClusterRevision") are **false positives**: per-cluster `MatterAttributes()` enumerations focus on cluster-specific attributes; the dispatcher universally adds the five Matter-1.3 globals (EventList intentionally omitted — Apple iOS Matter SDK schema-mismatch reject). Regression tripwire: `TestRead_WildcardAttribute_ListerWithoutGlobalsStillGetsThem`. The wildcard-expansion contract is centrally enforced; per-cluster servers neither need nor benefit from listing globals again. |
 | BD-Matter-EndpointID-Persistent | matter.js `@matter/node` Storage-Layer persists endpoint IDs across restarts so commissioners can re-use cached subscription targets | `endpoint/assembler.go::assignOrReuseID` looks the (source-key → endpoint-id) record up in the `store.EndpointStore` (SQLite) and reuses the persisted ID; a fresh allocation only happens when no record exists for that source key | Audit drift L6-D01 ("Endpoint-IDs werden beim Reassemble potenziell neu vergeben … bootid-basiert") is a **false positive**. Endpoint IDs come from the persistent endpoint store (not from `bootid.Salt()` — that one only feeds the UniqueID hash, see `BD-Matter-UniqueID-Stable`). A reassemble that finds the same source key reuses the same endpoint ID, so Apple's HAP-Mapper does not see a topology shuffle. Cross-restart durability of those store rows additionally depends on the boot-time GC gate documented in `BD-Matter-EndpointGC-ModelCompleteGate` (next row): before that gate landed, boot-time assembly against not-yet-loaded centrals erased every persisted row, and endpoint-number stability held only accidentally via deterministic re-allocation. |
 | BD-Matter-EndpointGC-ModelCompleteGate | matter.js has no boot-time "empty model" window: `packages/node/src/storage/server/ServerEndpointStores.ts` pre-allocates every persisted endpoint number at `load()` (`:33-45`) and `assignNumber` reuses the stored number (`:109-130`); the only release path is `eraseStoreForEndpoint`, invoked from `packages/node/src/node/server/ServerEndpointInitializer.ts::eraseDescendant` (`:59-69`) on explicit endpoint deletion (at `862ad75f`) | **Closed in v0.13.0** (brief CM §6, owner decision 2026-10-25). The assembler collects no stored identity absent from a snapshot: a stored key keeps its endpoint number until `Forget` (Aggregator, Partition, Batch) or `RetirePartition` erases it, the counterpart of `eraseStoreForEndpoint`; `node.Aggregator.MarkComplete`, `endpoint.Snapshot.ModelComplete` and `endpoint.Snapshot.Retain` are removed (migration guide, "Removed or changed in v0.13.0") | History, kept because the entry is cited: from v0.3 the module assembled from asynchronous host snapshots, and the gate — `ModelComplete` per snapshot, since v0.10.2 per partition (#229), since v0.12.2 with `Retain` as a reservation (brief CK §2) — kept a boot-time assembly against a not-yet-loaded source from erasing every row. The one divergence it left was a stored key neither re-added nor removed after a restart, which `MarkComplete` collected where matter.js keeps the number; with the gate gone the facade mirrors matter.js in full, and a host that knows a device is gone for good says so with `Forget`. Pinned by `TestStoredNumbersSurviveAbsence`, `TestEndpointNumberReservationParityMatterJS` and `TestRetirePartitionCollectsItsRecords` (node). |
@@ -4651,6 +4652,23 @@ until a live pairing with Apple Home is verified (owner decision
 register row when matter.js implements the feature; then reconcile onto
 it.
 
+
+**The events (wave 27-B, TEVT).** matter.js's `ThermostatServer.ts` emits
+none of the model's eight events (its only `events.` emit is the custom
+`calibratedTemperature$Changed`, :525), so the TEVT feature follows
+connectedhomeip: `ThermostatClusterEvents.cpp` (every `Generate*` gated on
+`Feature::kEvents`, :33-36, :59-61, :83-86, :109-112, …) with the emit
+sites `ThermostatClusterBase.cpp:158-162, :179-183, :246-250, :283-287`,
+`ThermostatClusterSetpointsBase.cpp:63-85` and
+`ThermostatClusterPresets.cpp:461-500`. Emitted: SystemModeChange,
+LocalTemperatureChange, SetpointChange, RunningStateChange,
+RunningModeChange, ActivePresetChange; ActiveScheduleChange keeps the emit
+of the `645b267a` schedule port; OccupancyChange is in the EventList and
+never emitted, as chip never emits it; a user-limit change emits no
+SetpointChange, and ActivePresetChange on a setpoint write fires only when
+a preset was active. ThermostatRunningMode is served with TEVT and AUTO,
+as the conformance says (chip's test serves it without AUTO). Pinned by
+the thermostat event cases of `cluster/thermo` (5 chip cases, 6 rules).
 ### BD-Matter-Thermostat-Hold-ReachesHost — a TemperatureSetpointHold write reaches the Sink; matter.js only stores it
 
 matter.js's `ThermostatServer` initialises the hold's companions and
@@ -5089,6 +5107,55 @@ revision carries it (owner decision 2026-10-28); device-side PQC (NOC,
 ICAC, CASE) stays out, as matter.js admits ML-DSA only in the attestation
 certificates. Pinned by the `*_parity_matterjs_test.go` ports listed in
 `notes/briefs/reports/27A.md` (test register, planned ratchet 3).
+
+### BD-chip-TimeSynchronization-Features — TZ, NTPC, NTPS and TSC follow connectedhomeip when the host selects them; UTC stays the node's clock
+
+matter.js's `TimeSynchronizationServer.ts:14` at `862ad75f` is the empty
+subclass. `core.NewTimeSynchronizationWith` (`node.Config.TimeSynchronization`)
+follows connectedhomeip's `TimeSynchronizationCluster.cpp` at `6170af84`:
+the attribute gating (:186-248), the feature logic (:619-1028), the four
+handlers with their statuses and events (`HandleSetTrustedTimeSource`
+:1138-1157, `HandleSetTimeZone` :1161-1213, `HandleSetDSTOffset`
+:1216-1243, `HandleSetDefaultNTP` :1246-1275), LocalTime, fabric removal
+and persistence through `store.Settings` (chip's `TimeSyncDataProvider.h:58-75`).
+The features are off by default and `FeatureMap` is the host's selection;
+UTC stays the node's clock and chip's trusted-source client is not ported.
+`SetUTCTime` answers chip's statuses (:1110-1136) without setting the
+clock: INVALID_COMMAND for a granularity or time source outside its enum,
+TimeNotAccepted for NoTimeGranularity or a granularity coarser than the
+node's milliseconds (owner decision 2026-10-28). Two edges: a SetTimeZone
+list over two entries answers CONSTRAINT_ERROR from the request constraint
+before chip's RESOURCE_EXHAUSTED check (:1168-1171) can; an IPv4 NTP
+address counts as a domain, as in chip's default delegate; no DSTTableEmpty
+at startup, since the emitter attaches after construction. Pinned by
+`cluster/core` time-synchronization tests (3 chip cases, 9 rules, 1 wire).
+
+### BD-chip-AirQuality-NoDefault — a feature-gated value is refused as chip refuses it; the attribute starts unset, as the model gives no default
+
+matter.js's `AirQualityServer.ts:14` at `862ad75f` is the empty subclass;
+the kit's generated server already refuses a value whose feature is off
+(the definition's conformance check), as chip's `SetAirQuality`
+(`AirQualityCluster.cpp:63-90`: ConstraintError per level, Unknown
+accepted) does, so wave 27-B changed no code and ported 11 of chip's 12
+cases. An out-of-enum value answers ConstraintError (the definition's
+check) where chip answers InvalidValue. chip starts AirQuality at Unknown
+(`AirQualityCluster.h:43`); the kit starts unset, as matter.js's
+`DefaultValue.ts:26-75` gives an enum no default.
+
+### BD-Matter-CompositeDeviceTypesAsParts — VideoDoorbell and FloodlightCamera compose their components as parts; no superset on the composite's own endpoint
+
+matter.js counts a simple component of a composite only on an endpoint
+below the composite: `DeviceTypeConformance.ts` `candidatesOf` (:586-599)
+counts the composing endpoint itself only for a utility device type it
+lists (`listsUtility`, :601-613), every other candidate comes from the
+composition scope — the endpoint's children, never the endpoint itself
+(`ResolvedEndpoint.ts:216-243`) — and the device type id must match
+exactly (:590-591). OnOffLight, Camera and Doorbell are simple, so
+`device.NewVideoDoorbell` and `NewFloodlightCamera` (devicegen, wave 27-B)
+add the components as parts, the kit's one-device-type-per-endpoint rule
+stays, and a superset type on the composite's own endpoint is not offered
+(owner decision 2026-10-28, after the citation: matter.js does not count
+it). ADR 0018's addendum records the shape.
 
 ### BD-Matter-GeneratedServerSuffices — clusters whose generated server is complete: no source carries behaviour beyond the model
 

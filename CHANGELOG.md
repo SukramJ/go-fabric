@@ -10,6 +10,22 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+### Added
+
+- The node's session intervals (brief 27-B). `node.Config.Sessions` (`node.SessionIntervals{Idle, Active, ActiveThreshold}`, nil the Matter defaults) is what the PASE and CASE session parameters report and what the operational DNS-SD record advertises (SII, SAI, SAT; an ICD's record still carries its own threshold), as matter.js's `sessions.intervals`; a threshold above 65535 ms is refused. `Node.SessionParameters` returns what the node reports. `bridge.Config.SessionIntervals` carries them to the operational record.
+- `node.Limits.BDXAdditionalMrpDelay`: the MRP margin of every inbound BDX transfer's exchange (matter.js `bdxAdditionalMrpDelay`), amplified by the backoff. `bdx.ScopeConfig.AdditionalMrpDelay`, `bdx.Responder.SetAdditionalMrpDelay` and `bdx.MrpDelayExchange` carry it to the bridge's exchange.
+- The Thermostat's Events feature (TEVT), after connectedhomeip ahead of matter.js: SystemModeChange, LocalTemperatureChange, SetpointChange, RunningStateChange, RunningModeChange, ActiveScheduleChange and ActivePresetChange where chip emits them, with chip's payloads; `thermo.ThermostatFeatureTEVT`, `ThermostatServer.MatterEvents`, `SetEndpoint`, and `SetThermostatRunningMode` for ThermostatRunningMode, which TEVT and AUTO make mandatory. The [thermostat guide](docs/guides/thermostat.md#events-tevt) lists them.
+- The composite device types VideoDoorbell and FloodlightCamera: `device.NewVideoDoorbell(opts, camera, doorbell, ...)` and `device.NewFloodlightCamera(opts, light, camera, ...)` add their components as parts, as matter.js places them. `script/devicegen` generates a composite (a device type whose requirements are device types only) this way.
+- TimeSynchronization's TZ, NTPC, NTPS and TSC features after connectedhomeip, ahead of matter.js: `core.NewTimeSynchronizationWith(core.TimeSynchronizationConfig)`, `node.Config.TimeSynchronization` (`node.TimeSynchronizationConfig`). TimeZone, DSTOffset and LocalTime with SetTimeZone and SetDSTOffset and their events, DefaultNTP with SetDefaultNTP, NTPServerAvailable, TrustedTimeSource with SetTrustedTimeSource and MissingTrustedTimeSource; persisted in the node's store, a removed fabric's trusted source cleared. Off unless configured; UTCTime stays the node's clock.
+- The node's `CommissionerReach`: a Joint Fabric Administrator whose declaration names no reach reads the announcing commissioner over the node's client stack (`node.Config.Client`) — a CASE session to the invoking peer, its AdministratorFabricIndex, Fabrics, TrustedRootCertificates and NOCs, and SignVIDVerificationRequest. `jointfabric.Administrator.AttachCommissionerReach`.
+
+### Changed
+
+- `jfadef.CommissionerReach` (`jointfabric.CommissionerReach`) takes the commissioner explicitly: every method — `CommissionerReach.ReadAdministratorFabricIndex`, `CommissionerReach.ReadFabrics`, `CommissionerReach.ReadTrustedRootCertificates`, `CommissionerReach.ReadNOCs`, `CommissionerReach.SignVIDVerification` — takes as its second argument a `jfadef.Peer{FabricIndex, NodeID}` (`jointfabric.CommissionerPeer`), the invoking session's, which an implementation read from the context before. Migration guide: "Changed in the next release: `CommissionerReach` takes the peer".
+- `core.TimeSynchronization` is no longer comparable: it holds the features' state (a mutex and lists). Compare pointers.
+- `core.TimeSynchronization` answers SetUTCTime with connectedhomeip's statuses (`TimeSynchronizationCluster.cpp:1110-1136`): INVALID_COMMAND for a granularity or a time source outside its enum, TimeNotAccepted for NoTimeGranularity or a granularity coarser than milliseconds, SUCCESS otherwise. The clock is still not set; it accepted every request before.
+- A Thermostat without TEVT keeps emitting nothing; `SetActiveScheduleRequest` now emits ActiveScheduleChange with TEVT.
+
 ## [0.13.11] — 2026-10-28
 
 ### Added

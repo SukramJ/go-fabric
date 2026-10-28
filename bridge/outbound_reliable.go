@@ -92,6 +92,11 @@ type outboundEntry struct {
 	dest       net.Addr
 	retries    int
 	nextSendAt time.Time
+	// margin joins the base interval of every (re)transmission, so the
+	// backoff amplifies it: the exchange's additional MRP delay (matter.js
+	// MRP.ts retransmissionIntervalOf, `additionalDelay`). Zero for every
+	// exchange but a BDX responder's that set one ([TrackWithMargin]).
+	margin time.Duration
 	// sentWall is the tracker's clock reading when the datagram first
 	// left, used only to report the peer's round-trip in diagnostics. It is
 	// deliberately NOT the injected `now` the retransmit schedule runs on:
@@ -132,13 +137,23 @@ func (t *outboundReliableTracker) baseInterval(sessionID uint16, now time.Time) 
 // AckCounter=counter clears the entry; otherwise the next ACK pump
 // tick resends it after the Matter §4.12.6 backoff.
 func (t *outboundReliableTracker) Track(counter uint32, sessionID, exchangeID uint16, datagram []byte, dest net.Addr, now time.Time) {
+	t.TrackWithMargin(counter, sessionID, exchangeID, datagram, dest, now, 0)
+}
+
+// TrackWithMargin is [outboundReliableTracker.Track] with margin added to
+// the base interval of every (re)transmission before the backoff
+// amplifies it: matter.js MessageExchange #sendAdditionalDelay
+// (MessageExchange.ts:1219-1222 at 862ad75f) passed as
+// retransmissionIntervalOf's additionalDelay (MRP.ts, `baseInterval =
+// (isPeerActive ? activeInterval : idleInterval) + additionalDelay`).
+func (t *outboundReliableTracker) TrackWithMargin(counter uint32, sessionID, exchangeID uint16, datagram []byte, dest net.Addr, now time.Time, margin time.Duration) {
 	cp := make([]byte, len(datagram))
 	copy(cp, datagram)
 	// The initial wait before the first retransmit uses the full spec
 	// formula at transmission 0 — matter.js MRP.ts:129 evaluates the
 	// peer-appropriate base interval for every transmission including
 	// the first.
-	delay := mrp.BackoffDuration(t.baseInterval(sessionID, now), 0, rand.Float64) + time.Duration(t.fixedBackoff.Load())
+	delay := mrp.BackoffDuration(t.baseInterval(sessionID, now)+margin, 0, rand.Float64) + time.Duration(t.fixedBackoff.Load())
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	t.pending[outboundKey{sessionID, counter}] = &outboundEntry{
@@ -148,6 +163,7 @@ func (t *outboundReliableTracker) Track(counter uint32, sessionID, exchangeID ui
 		datagram:   cp,
 		dest:       dest,
 		nextSendAt: now.Add(delay),
+		margin:     margin,
 		sentWall:   t.clock.Now(),
 	}
 }
@@ -362,7 +378,7 @@ func (t *outboundReliableTracker) Tick(now time.Time, send func(net.Addr, []byte
 		// may have gone idle since the last attempt), margin,
 		// exponential growth past the threshold, and jitter. Mirrors
 		// matter.js MRP.ts:125-146 retransmissionIntervalOf.
-		delay := mrp.BackoffDuration(t.baseInterval(p.sessionID, now), p.retries, rand.Float64) + time.Duration(t.fixedBackoff.Load())
+		delay := mrp.BackoffDuration(t.baseInterval(p.sessionID, now)+p.margin, p.retries, rand.Float64) + time.Duration(t.fixedBackoff.Load())
 		p.nextSendAt = now.Add(delay)
 		todo = append(todo, resend{key: key, p: p, dest: p.dest, datagram: p.datagram, due: due})
 	}

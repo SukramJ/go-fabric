@@ -157,11 +157,8 @@ func TypeByID(id schema.DeviceTypeID) (*Type, bool) {
 // Descriptor's DeviceTypeList carries it (a 32-bit devtype-id), or
 // (nil, false) for an id device/ does not generate: an id above 0xFFFF, a
 // manufacturer-specific or unknown one, and the snapshot device types
-// script/devicegen excludes (its excluded list: the camera family —
-// Camera, SnapshotCamera, AudioDoorbell, Intercom, Chime,
-// CameraController, VideoDoorbell, FloodlightCamera —, the media client
-// CastingVideoClient, and the infrastructure types ThreadBorderRouter,
-// NetworkInfrastructureManager and JointFabricAdministrator). It reads the generated registry (types_gen.go), so a
+// script/devicegen excludes (its excluded list: the media client
+// CastingVideoClient). It reads the generated registry (types_gen.go), so a
 // regeneration that commits a type makes Lookup find it.
 //
 // A client view resolves a remote endpoint's device type through it, as

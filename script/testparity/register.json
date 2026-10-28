@@ -2740,7 +2740,7 @@
       "path": "packages/node/test/node/ReportedSessionParametersTest.ts",
       "status": "planned",
       "until": "M6 phase 27",
-      "reason": "The session parameters the peer sent in PASE, CASE and resumed CASE, held by both ends. Left planned in brief CM: both cases configure the device's session intervals and read the device's record of what the controller sent; node.Config has no session-interval option and the device's sessions no accessor for the reported parameters (the controller's side is client/exchange.Session.ReportedParameters). Milestone 6 phase 27.",
+      "reason": "The session parameters the peer sent in PASE, CASE and resumed CASE, held by both ends. Left planned in briefs CM and 27-B: both cases configure the device's session intervals (node.Config.Sessions since 27-B) and read the device's record of what the controller sent, for which the device's sessions have no accessor (secure/operational.Entry keeps the peer's intervals without a getter; the controller's side is client/exchange.Session.ReportedParameters). Owner decision 2026-10-28: the owner adds the secure/ accessor after brief 27-B merges and ports both cases. Milestone 6 phase 27.",
       "snapshotSha": "da6d23d239f29280dae99d8c5448bde73a71ed85"
     },
     {

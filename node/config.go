@@ -149,6 +149,14 @@ type Config struct {
 	// GeneralDiagnosticsServer.timeSnapshot does without a
 	// TimeSynchronizationBehavior (GeneralDiagnosticsServer.ts:168-182).
 	DisableTimeSynchronization bool
+	// TimeSynchronization selects the root TimeSynchronization's features
+	// TZ, NTPC, NTPS and TSC after connectedhomeip
+	// ([TimeSynchronizationConfig]); nil serves UTCTime and Granularity
+	// alone, as before. The node persists their state in its store and
+	// clears a removed fabric's trusted time source; the config's Store is
+	// the node's. UTCTime stays the node's clock. It excludes
+	// DisableTimeSynchronization.
+	TimeSynchronization *TimeSynchronizationConfig
 	// GeneralDiagnosticsFeatures selects the root GeneralDiagnostics'
 	// features (mattercore.NewGeneralDiagnosticsWith); nil keeps
 	// matter.js's default selection, DataModelTest
@@ -164,6 +172,13 @@ type Config struct {
 	// basicInformation.maxPathsPerInvoke, which InteractionServer.ts:198
 	// enforces.
 	MaxPathsPerInvoke uint16
+	// Sessions are the MRP intervals the node reports in its session
+	// parameters and its operational DNS-SD record ([SessionIntervals]);
+	// nil is the Matter defaults, 500 ms idle, 300 ms active and a 4000 ms
+	// active threshold. An ICD's operational record carries the ICD's
+	// active threshold and, while LIT, no idle interval
+	// (IcdManagementServer.ts:482-495); its session parameters keep these.
+	Sessions *SessionIntervals
 	// CapabilityMinima is the root BasicInformation's CapabilityMinima:
 	// a zero field takes matter.js's default (the Matter floor of 3 for
 	// CaseSessionsPerFabric and SubscriptionsPerFabric, 20 for the four
@@ -545,6 +560,8 @@ func (c *Config) Validate() error {
 		errs = append(errs, fmt.Errorf("node: SupportedFabrics %d exceeds %d", c.SupportedFabrics, maxSupportedFabrics))
 	}
 	errs = append(errs, c.Limits.validate()...)
+	errs = append(errs, c.Sessions.validate()...)
+	errs = append(errs, c.timeSynchronizationErrors()...)
 	if at := c.Attestation; at.Files != nil && (at.Chain != nil || at.CertificationDeclaration != nil) {
 		errs = append(errs, errors.New("node: Attestation.Files excludes Chain and CertificationDeclaration"))
 	} else if at.Files == nil && at.BlockCommissioningOnError {
@@ -569,6 +586,15 @@ func (c *Config) Validate() error {
 	}
 	if err := errors.Join(errs...); err != nil {
 		return fmt.Errorf("%w: %w", ErrInvalidConfig, err)
+	}
+	return nil
+}
+
+// timeSynchronizationErrors refuses TimeSynchronization beside
+// DisableTimeSynchronization.
+func (c *Config) timeSynchronizationErrors() []error {
+	if c.DisableTimeSynchronization && c.TimeSynchronization != nil {
+		return []error{errors.New("node: TimeSynchronization excludes DisableTimeSynchronization")}
 	}
 	return nil
 }
