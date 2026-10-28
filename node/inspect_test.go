@@ -272,8 +272,15 @@ func TestSessionDiagnostics(t *testing.T) {
 		if s.Subscriptions != counts[s.ID] {
 			t.Errorf("session %d subscriptions %d, want %d", s.ID, s.Subscriptions, counts[s.ID])
 		}
-		if !s.LastActivity.IsZero() && s.Idle != d.AsOf.Sub(s.LastActivity) {
-			t.Errorf("session %d idle %v, want AsOf - LastActivity", s.ID, s.Idle)
+		// AsOf is taken before the sessions are read: activity that lands in
+		// between leaves LastActivity after AsOf, and Idle is clamped to zero
+		// (ageAt) rather than negative.
+		wantIdle := d.AsOf.Sub(s.LastActivity)
+		if s.LastActivity.After(d.AsOf) {
+			wantIdle = 0
+		}
+		if !s.LastActivity.IsZero() && s.Idle != wantIdle {
+			t.Errorf("session %d idle %v, want %v (AsOf - LastActivity, clamped at zero)", s.ID, s.Idle, wantIdle)
 		}
 	}
 	o := d.Occupancy
