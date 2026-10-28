@@ -32,6 +32,20 @@ appendix at the bottom lists Tier-2 items that were duplicated as open bullets
 but are already fixed; only the bullets that remain in the Tier-2/3 body below
 are genuinely open.
 
+**Milestone 6 sweep (wave 27-C, 2026-10-28).** 61 open items before the
+sweep, 58 after. Closed and removed: the discovery errors and abort (wave
+27-A, `client/discovery` sessions), the controller-side software-update
+manager (milestone 5 phase 25, brief CM, `controller/softwareupdate`) and
+the node's session intervals (wave 27-B, `node.Config.Sessions`). Kept with
+a decision: the reported session parameters on the device (owner decision
+2026-10-28), the camera persistence (owner decision Q5 of brief 26-A1),
+SetRegulatoryConfig's CountryCode (owner decision, an Apple Home check
+first), ColorControl's primaries (brief BR decision 19.4), the Wi-Fi
+fail-safe binding (before milestone 7, report BA). Every other open item
+still carries the milestone tag of the wave that raised it; that milestone
+has passed without it, and its new milestone is an owner decision (report
+27-C, Questions).
+
 **How to use an entry.** Each finding gives (1) the Go defect with file:line,
 (2) the matter.js reference to mirror, (3) the failure it produces in the bridge
 scenario, (4) a fix package a mid-level implementation agent can execute,
@@ -395,12 +409,6 @@ Controller side:
   `client/discovery/solicitor.go:368-375`; matter.js #4756 sends the
   remaining TTL rounded up and omits a record past half its TTL
   (`DnssdSolicitor.ts:280-291`, RFC 6762 § 7.1). (Left open by phase 16; milestone 5 phase 25.)
-- **Discovery has one error and no abort.** matter.js #4747 distinguishes
-  `DeviceNotDiscoveredError`, `DiscoveryIncompleteError`,
-  `NoDiscoveryTransportError` and lets the caller abort every attempt
-  (`DiscoveryError.ts:9-31`); `client/discovery` and the commissioner
-  report one error and stop on context cancellation only. (Milestone 5,
-  controller remainder.)
 - **A status the peer sent is not told from a local one.**
   `client/interaction/interaction.go:56` `StatusError`; matter.js #4750
   `ResultStatus.received` (`ResultStatus.ts:1-35`). Low. (Milestone 5.)
@@ -446,6 +454,9 @@ Controller side:
   what the controller sent (ReportedSessionParametersTest; register `until
   M6 phase 27`): `secure/operational.Entry` stores the peer's intervals
   (`SetPeerMRPIntervals`) without a getter. (Milestone 6 phase 27.)
+  Kept past milestone 6: owner decision 2026-10-28 (test register,
+  ReportedSessionParametersTest) — the owner adds the `secure/` accessor
+  after brief 27-B and ports both cases.
 - **A whitespace-only `issuer_name` in an installed revocation set matches
   every issuer.** `controller/dcl/revocation.go:688-701` decodes it to no
   issuer and `:166-173` then matches any; matter.js keeps the empty hex
@@ -556,19 +567,6 @@ Line numbers at `862ad75f`.
 Found by the phase-19 port (brief BR, 2026-10-20). Line numbers at
 `862ad75f`.
 
-- **No controller-side SoftwareUpdateManager.** matter.js's controller
-  keeps a manager beside its OTA provider: the reboot detection
-  (RebootResubscribeArmer, handlePeerShutdown, closeForPeer,
-  suppressNextStartUp, the failed-apply detection on startUp), the consent
-  queue (addUpdateConsent, removeConsent, queuedUpdates), the BDX transfer
-  options per consent, the stalled detection by BDX progress, the update
-  check of the controller's nodes and the DCL store cleanup
-  (`SoftwareUpdateManager.ts`). The Go provider is a node's and carries
-  the consent of an offered image and the in-progress entries only; 29
-  `OtaTest.ts` cases are `missing` for this. (Register candidate,
-  milestone 5 phase 25 with the rest of OTA push from the controller,
-  the RebootResubscribeArmer phase 24; `docs/roadmap.md`. Decided in
-  the BR review, 2026-10-20.)
 - **OccupancySensing has no feature selection.** The Go server serves
   PassiveInfrared alone (`cluster/measurement/definitions.go`
   `occupancyInst`), so neither another detector type nor the
@@ -597,14 +595,6 @@ Found by the phase-19 port (brief BR, 2026-10-20). Line numbers at
   ones) has no Go counterpart: `client/peer` opens UDP sessions. Four
   `TcpSessionBindingTest.ts` cases are `missing` for this. (Register
   candidate, with a controller TCP transport.)
-- **The node's session intervals are not configurable.** matter.js takes
-  `sessions.intervals` (idle and active interval, active threshold) into
-  the SessionManager's parameters (`SessionsBehaviorTest.ts:15-25`); the
-  Go node states `bridge.DefaultSessionParameters` in Sigma2
-  (`node/security.go` `responderSessionParams`) and `node.Config` has no
-  field for them. One `SessionsBehaviorTest.ts` case is `missing` for
-  this; its sibling of the wall clock waits on the monotonic reading
-  below. (Milestone 4, a node option.)
 - **The event store is volatile only.** matter.js keeps the events of a
   former run with `events: { nonvolatile: true }`
   (`EventsBehaviorTest.ts:45-54`); the Go node's event log lives in
@@ -759,6 +749,9 @@ Identify, WindowCovering and ServiceArea tests (brief BJ, PR #170,
   values from the declaration's `Initial` (brief 26-A1). A host that does
   not persist them starts at chip's defaults after a restart. (Milestone 6,
   with the camera stream wave 26-A2 if a store record is wanted.)
+  Kept past milestone 6: persistence is the host's, owner decision Q5 of
+  brief 26-A1 (report 26-A2, "A store record for the streams, zones and
+  settings").
 Raised with `cluster/alarm`, `cluster/fan`, `cluster/pump`,
 FlowMeasurement, `cluster/opstate` and `cluster/modebase`.
 `../connectedhomeip` was not checked out when they were written, so the
