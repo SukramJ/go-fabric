@@ -347,7 +347,7 @@ func (a *Administrator) openJointCommissioningWindow(ctx context.Context, fields
 	var fabric store.FabricRecord
 	var err error
 	if fabrics == nil || fabricIndex == 0 {
-		err = errors.New("no fabric")
+		err = errors.New("jointfabric: no fabric")
 	} else {
 		fabric, err = fabrics.GetFabric(ctx, fabricIndex)
 	}
