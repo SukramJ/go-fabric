@@ -2201,50 +2201,23 @@
       "path": "packages/node/test/node/ClientInvokeTest.ts",
       "status": "partial",
       "go": [
-        "controller/client:TestClientInvokeParity"
+        "controller/client:TestClientInvokeParity",
+        "client/interaction:TestInvokeBatcherParity"
       ],
       "missing": [
-        "executes commands via the batcher",
-        "requires MockTime.resolve for batched commands (non-root endpoints)",
-        "bypasses batching when maxPathsPerInvoke is 1",
         "clears maxPathsPerInvoke cache when node goes offline",
-        "rejects pending commands when batcher is closed",
-        "bypasses batching for timed invoke requests",
-        "batches different commands together while splitting duplicates",
         "direct invoke (#invokeSingle) propagates network to exchange",
         "batched invoke (#invokeWithBatching) propagates network to exchange",
         "split invoke (#invokeWithSplitting) propagates network to each exchange",
-        "command with expectedProcessingTime never joins a batch",
-        "command with useExtendedFailSafeMessageResponseTimeout never joins a batch",
-        "command with additionalMrpDelay never joins a batch",
         "command with interactionModelRevision never joins a batch",
-        "command with timeout never joins a batch",
         "command with beforeDispatch never joins a batch",
-        "command with timedRequest never joins a batch",
-        "command with suppressResponse never joins a batch",
         "command with delayReportData never joins a batch",
-        "command with largeMessage never joins a batch",
-        "timed command goes out alone after a TimedRequest",
-        "command with suppressResponse goes out alone",
         "only a non-default interaction model revision keeps a command out of the batch",
-        "command without an endpoint never joins a batch",
-        "abort, network, skipValidation and icdAwaitTimeout do not keep a command out of the batch",
-        "command with its own expected processing time keeps it",
-        "command with the extended fail-safe timeout keeps it",
-        "command with its own MRP delay keeps it",
         "command with an address override keeps it",
-        "commands without options share a batch (characterization)",
-        "command with options goes out alone and ahead of the batch invoked before it",
-        "commands for different networks go into separate batches",
-        "batches for different networks do not wait on each other",
         "command without a network and one naming the default network share a batch",
-        "command queued while the interaction closes is rejected with the close reason",
-        "direct invoke keeps its expected processing time (characterization)",
-        "stops the batch exchange of a command whose acting context aborts",
-        "correctly splits different-path commands when maxPathsPerInvoke is 1",
-        "splits duplicate command paths into separate batches"
+        "command queued while the interaction closes is rejected with the close reason"
       ],
-      "reason": "Sequential commands through a client node reach the device in order (controller/client:TestClientInvokeParity on fabrictest). A multi-command invoke goes through Node.InvokeBatch in batches of the peer's MaxPathsPerInvoke, each numbered by CommandRef (client/interaction InvokeBatch); the device's MaxPathsPerInvoke is node.Config.MaxPathsPerInvoke. Missing: matter.js's batcher of single commands — the commands invoked in one timer tick joined into a batch up to the peer's maxPathsPerInvoke, its bypasses (maxPathsPerInvoke 1, timed, per-request options), its lanes per network, the cache cleared when the node goes offline, closing it, the batch exchange aborted with its context — has no Go counterpart (a goroutine has no timer tick to join on; whether the Go client batches concurrent invokes, and over which window, is an owner decision, brief CM's questions), and the network propagation of invoke options observed on the exchange (no seam to observe the exchange's timing).",
+      "reason": "The batcher of single commands (client/interaction Interaction.Invoke, ClientInteraction.#invokeWithBatching at 862ad75f) on the scripted rig — one InvokeRequest per batch window and network lane, numbered by CommandRef, its bypasses (MaxPathsPerInvoke 1, endpoint 0, timed, suppressed, expected processing time, extended fail-safe timeout, MRP delay, Large Message, NoBatch), duplicate paths in separate batches, a split by MaxPathsPerInvoke, close and abort — and the commands through it on fabrictest (controller/client:TestClientInvokeParity). Missing: the maxPathsPerInvoke cache (the Go provider reads the session parameters on every invoke, there is no cache to clear), the network observed on the exchange (the scripted session provider takes no network), the interaction model revision, beforeDispatch, DelayReportData and address-override options (the Go InvokeOptions has none of them), an interaction-level default network, and a close while the peer connects (no seam holds the connect).",
       "snapshotSha": "a743554ce3a6060f13492259bb66a152d9bfca31"
     },
     {
@@ -3045,7 +3018,8 @@
       "status": "partial",
       "go": [
         "client/interaction:TestInvokeLargeMessageParity",
-        "client/interaction:TestInferLargeMessageParity"
+        "client/interaction:TestInferLargeMessageParity",
+        "client/interaction:TestInvokeBatcherParity"
       ],
       "missing": [
         "parses largeMessage from quality DSL string 'L'",
@@ -3055,10 +3029,9 @@
         "largeMessage flag matches the pattern used in ClientCommandMethod",
         "ignores legacy command requests (no model link)",
         "detects L quality on a wildcard command request",
-        "rethrows non-MalformedRequestError raised during model probing",
-        "does not batch L commands even when batchable shape allows it"
+        "rethrows non-MalformedRequestError raised during model probing"
       ],
-      "reason": "An invoke's explicit LargeMessage defaults off and reaches its exchange and every part an InvokeBatch split sends; an invoke the caller left undecided infers it from the 'L' quality of any of its commands in parity/schema.json (schema.CommandLargeMessage; ClientInteraction.ts:111-127, :716-719 at 862ad75f), an explicit false stands, and a path the snapshot does not model infers nothing. Missing: the Quality DSL parse and the CommandModel quality cases test matter.js's model classes (the Go subject is the generated snapshot, held by schema:TestCommandLargeMessageMatchesSnapshot); the ClientCommandMethod pattern is matter.js's typed command API; a legacy command request, a wildcard command and a non-MalformedRequestError during probing have no Go form (every Go invoke names a concrete path and the probe is a map lookup); and the controller has no automatic invoke batcher, so 'does not batch L commands' does not arise.",
+      "reason": "An invoke's explicit LargeMessage defaults off and reaches its exchange and every part an InvokeBatch split sends; an invoke the caller left undecided infers it from the 'L' quality of any of its commands in parity/schema.json (schema.CommandLargeMessage; ClientInteraction.ts:111-127, :716-719 at 862ad75f), an explicit false stands, a path the snapshot does not model infers nothing, and a Large Message command never joins a batch (client/interaction:TestInvokeBatcherParity). Missing: the Quality DSL parse and the CommandModel quality cases test matter.js's model classes (the Go subject is the generated snapshot, held by schema:TestCommandLargeMessageMatchesSnapshot); the ClientCommandMethod pattern is matter.js's typed command API; a legacy command request, a wildcard command and a non-MalformedRequestError during probing have no Go form (every Go invoke names a concrete path and the probe is a map lookup).",
       "snapshotSha": "08ffe617eb5b02a7b5253cde9e714413da17f104"
     },
     {
@@ -3072,17 +3045,16 @@
         "client/interaction:TestInvokeBatchOneExchange",
         "client/interaction:TestInvokeBatchRefusals",
         "client/interaction:TestInvokeBatchSplitsRefLessParity",
-        "client/interaction:TestClientInteractionInvokeLargeMessageInference"
+        "client/interaction:TestClientInteractionInvokeLargeMessageInference",
+        "client/interaction:TestInvokeBatcherCloseParity"
       ],
       "missing": [
         "does not synthesize NO_COMMAND_RESPONSE for an unanswered wildcard command (no concrete path)",
         "passes a stray CommandStatusIB up to the caller (spec submits all status entries)",
-        "aborts an in-flight batch on close instead of awaiting its response",
-        "rejects commands queued behind an in-flight batch with the close reason",
         "sends DelayReportData in its own message",
         "refuses a request with DelayReportData before anything is sent"
       ],
-      "reason": "15 cases ported on the scripted rig for the Go single-command Invoke (no commandRef on the wire, abort during and before the exchange with no retransmission after, a read's abort, suppressResponse, concurrent single invokes, no DelayReportData, a response without InteractionModelRevision, received vs local error statuses, the largeMessage inference on a copy of the caller's options). The multi-command invoke runs through Interaction.InvokeBatch (client/interaction:TestInvokeBatch*): NoCommandResponse synthesized for a command the peer did not answer, a stray CommandDataIB discarded, the split into ref-less single invokes for a MaxPathsPerInvoke-1 peer, the refusal of a split below one path (ClientInteraction.ts:510-517, :616-700 at 862ad75f). Missing: the wildcard command (a Go invoke names a concrete path), the stray CommandStatusIB passed up (InvokeBatch returns one Result per command, so a status for no sent command has no slot), the batcher's close cases (the Go client batches no single commands across a tick, see ClientInvokeTest) and DelayReportData sending.",
+      "reason": "15 cases ported on the scripted rig for the Go single-command Invoke (no commandRef on the wire, abort during and before the exchange with no retransmission after, a read's abort, suppressResponse, concurrent single invokes, no DelayReportData, a response without InteractionModelRevision, received vs local error statuses, the largeMessage inference on a copy of the caller's options); the multi-command invoke through Interaction.InvokeBatch (client/interaction:TestInvokeBatch*: NoCommandResponse for an unanswered command, a stray CommandDataIB discarded, the ref-less split for a MaxPathsPerInvoke-1 peer, the refusal below one path; ClientInteraction.ts:510-517, :616-700 at 862ad75f); the batcher's close cases (client/interaction:TestInvokeBatcherCloseParity: an in-flight batch aborted with the close reason, the batch queued behind it rejected with it). Missing: the wildcard command (a Go invoke names a concrete path), the stray CommandStatusIB passed up (InvokeBatch returns one Result per command, so a status for no sent command has no slot) and DelayReportData sending.",
       "snapshotSha": "501b3a3570c0c93de6ce67f0ea5dfb310b4b3e56"
     },
     {

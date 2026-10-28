@@ -10,9 +10,9 @@
 // handler of the reports a peer pushes, and sustained subscriptions. An
 // [Interaction] is bound to an exchange [Provider]: one session, or a peer
 // whose sessions come and go. An invoke of several commands is split by
-// the peer's MaxPathsPerInvoke (InvokeBatch); the batching of single
-// commands across a timer tick, ICD wakefulness, TCP and large messages
-// are not ported.
+// the peer's MaxPathsPerInvoke (InvokeBatch), and single commands invoked
+// within one batch duration share an InvokeRequest when the peer takes
+// more than one path (Invoke, ClientInteraction.ts:744-1005 at 862ad75f).
 //
 // The messages are encoded and decoded with im/'s client encoders and
 // decoders, the shapes of matter.js's TLV message definitions.
@@ -102,6 +102,12 @@ type Interaction struct {
 	inflight sync.WaitGroup
 	abort    context.Context
 	abortFn  context.CancelCauseFunc
+
+	// batchMu guards the batcher: lanes is #batchLanes and nextCommandRef
+	// #nextCommandRef (ClientInteraction.ts:233-236 at 862ad75f).
+	batchMu        sync.Mutex
+	lanes          map[string]*batchLane
+	nextCommandRef uint16
 }
 
 // ErrClosed is the reason of [Interaction.Close] without one — matter.js
@@ -181,6 +187,9 @@ func (c *Interaction) Close(reason error) {
 	reason = c.closed
 	c.closeMu.Unlock()
 	c.CloseSubscriptions()
+	// The queued commands are rejected before the abort, so an in-flight
+	// batch cancels instead of running to completion (ClientInteraction.ts:284-295).
+	c.closeBatches(reason)
 	c.abortFn(reason)
 	c.inflight.Wait()
 }
