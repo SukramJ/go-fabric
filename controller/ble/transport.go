@@ -22,8 +22,8 @@ func (transport) Kind() discovery.TransportKind { return discovery.TransportBLE 
 
 func (t transport) FindContinuously(ctx context.Context, id discovery.Identifier, found func(discovery.Device)) error {
 	_, err := t.s.FindContinuously(ctx, id, func(d Device) { found(d.Commissionable()) }, 0)
-	if ctx.Err() != nil {
-		return nil
+	if err != nil && ctx.Err() == nil {
+		return err
 	}
-	return err
+	return nil
 }

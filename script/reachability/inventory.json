@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 6896,
+  "entry_points": 6916,
   "entry_packages": [
     ".",
     "bdx",
@@ -266,9 +266,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 16610,
-    "reachable": 11742,
-    "whitelisted": 4865,
+    "total_exported": 16669,
+    "reachable": 11794,
+    "whitelisted": 4872,
     "unreachable": 3
   },
   "by_package": [
@@ -6533,10 +6533,24 @@
     },
     {
       "package": "client/interaction",
+      "identifier": "FlushingBatches",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/interaction/export_test.go",
+      "line": 19
+    },
+    {
+      "package": "client/interaction",
       "identifier": "FuzzDecodeReport",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/interaction/fuzz_report_test.go",
       "line": 24
+    },
+    {
+      "package": "client/interaction",
+      "identifier": "QueuedInvokes",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/interaction/export_test.go",
+      "line": 8
     },
     {
       "package": "client/interaction",
@@ -21334,14 +21348,14 @@
       "identifier": "PairingPhase",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "controller/controller.go",
-      "line": 529
+      "line": 544
     },
     {
       "package": "controller",
       "identifier": "PairingStep",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "controller/controller.go",
-      "line": 525
+      "line": 540
     },
     {
       "package": "controller/attestation",
@@ -21411,14 +21425,14 @@
       "identifier": "TestPqcAttestationCertificatesAnnexHExamples",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/attestation/pqcattestationcertificates_parity_matterjs_test.go",
-      "line": 154
+      "line": 156
     },
     {
       "package": "controller/attestation",
       "identifier": "TestPqcAttestationCertificatesParsing",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/attestation/pqcattestationcertificates_parity_matterjs_test.go",
-      "line": 189
+      "line": 193
     },
     {
       "package": "controller/ble",
@@ -22668,6 +22682,13 @@
     },
     {
       "package": "controller/commissioner",
+      "identifier": "TestFabricAuthorityFabricAdded",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/commissioner/fabricauthority_rotation_parity_matterjs_test.go",
+      "line": 221
+    },
+    {
+      "package": "controller/commissioner",
       "identifier": "TestFabricAuthorityFabricCreation",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/fabricauthority_parity_matterjs_test.go",
@@ -22679,6 +22700,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/fabricauthority_parity_matterjs_test.go",
       "line": 137
+    },
+    {
+      "package": "controller/commissioner",
+      "identifier": "TestFabricAuthorityRotation",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/commissioner/fabricauthority_rotation_parity_matterjs_test.go",
+      "line": 30
     },
     {
       "package": "controller/commissioner",
@@ -23316,6 +23344,27 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/dcl/ota_parity_matterjs_test.go",
       "line": 479
+    },
+    {
+      "package": "controller/dcl",
+      "identifier": "TestDclVendorInfoServiceParity",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/dcl/vendorinfo_parity_matterjs_test.go",
+      "line": 84
+    },
+    {
+      "package": "controller/dcl",
+      "identifier": "TestDclVendorInfoServiceProductInfoParity",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/dcl/vendorinfo_parity_matterjs_test.go",
+      "line": 333
+    },
+    {
+      "package": "controller/dcl",
+      "identifier": "TestDclVendorInfoServiceSeedParity",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/dcl/vendorinfo_parity_matterjs_test.go",
+      "line": 403
     },
     {
       "package": "controller/dcl",

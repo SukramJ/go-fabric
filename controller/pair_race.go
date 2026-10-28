@@ -67,8 +67,8 @@ func (c *Controller) pairDiscovered(ctx context.Context, pc PairingCode, identit
 	if err == nil {
 		return n, nil
 	}
-	if n = r.winnerNode(); n != nil {
-		return n, err
+	if winner := r.winnerNode(); winner != nil {
+		return winner, err
 	}
 	if !r.attempted() {
 		err = fmt.Errorf("%w: %w", ErrNoDevice, err)
@@ -122,11 +122,11 @@ func (c *Controller) pairAttempt(actx, pairCtx context.Context, cand discovery.C
 }
 
 // bothContexts is a context that ends with a or b.
-func bothContexts(a, b context.Context) (context.Context, func()) {
+func bothContexts(a, b context.Context) (ctx context.Context, stop func()) {
 	ctx, cancel := context.WithCancelCause(a)
-	stop := context.AfterFunc(b, func() { cancel(context.Cause(b)) })
+	stopB := context.AfterFunc(b, func() { cancel(context.Cause(b)) })
 	return ctx, func() {
-		stop()
+		stopB()
 		cancel(nil)
 	}
 }

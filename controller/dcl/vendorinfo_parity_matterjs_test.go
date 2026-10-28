@@ -341,12 +341,14 @@ func TestDclVendorInfoServiceProductInfoParity(t *testing.T) {
 		"schemaVersion": 0,
 	}
 	open := func(t *testing.T, offline bool) (*vendorRig, *VendorInfoService) {
+		t.Helper()
 		r := newVendorRig()
 		r.mock.addResponse(vendorsPath, vendorsPage())
 		r.mock.addResponse("/dcl/model/models/4447/1", map[string]any{"model": model})
 		r.mock.addStatus("/dcl/model/models/4447/2", map[string]any{"code": CodeNotFound, "message": "not found", "details": []any{}}, http.StatusNotFound)
 		r.mock.addStatus("/dcl/model/models/4447/3", map[string]any{"code": 13, "message": "internal", "details": []any{}}, http.StatusInternalServerError)
-		return r, r.open(t, func(o *VendorInfoOptions) { o.Offline = offline })
+		s := r.open(t, func(o *VendorInfoOptions) { o.Offline = offline })
+		return r, s
 	}
 	t.Run("returns ProductInfo with decoded fields for a known VID/PID", func(t *testing.T) {
 		t.Parallel()

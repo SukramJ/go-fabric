@@ -195,6 +195,7 @@ func pqcKey(t *testing.T, alg attestation.KeyAlgorithm) crypto.Signer {
 			t.Fatal(err)
 		}
 		return k
+	case attestation.KeyECDSAP256:
 	}
 	k, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {

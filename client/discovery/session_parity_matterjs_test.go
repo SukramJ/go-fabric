@@ -55,8 +55,8 @@ func (f *fixedTransport) FindContinuously(ctx context.Context, id discovery.Iden
 	if f.beforeReport != nil {
 		f.beforeReport()
 	}
-	for _, d := range f.devices {
-		found(d)
+	for i := range f.devices {
+		found(f.devices[i])
 	}
 	if f.afterReport != nil {
 		f.afterReport()

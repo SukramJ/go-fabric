@@ -153,7 +153,7 @@ func TestInvokeBatcherParity(t *testing.T) {
 		// batches" (:973-1003): on, toggle, on — the second on goes into a
 		// batch of its own, after the first.
 		s, c := batchingPair(t, 10)
-		var chs []<-chan invokeResult
+		chs := make([]<-chan invokeResult, 0, 3)
 		for i, cmd := range []uint32{ciOn, ciToggle, ciOn} {
 			chs = append(chs, ciInvoke(context.Background(), c, ciPath(1, cmd), batched()))
 			queued(t, c, i+1)
@@ -175,7 +175,7 @@ func TestInvokeBatcherParity(t *testing.T) {
 		// batch go as a part of two (numbered) and a part of one
 		// (ref-less), each request with only its own commands.
 		s, c := batchingPair(t, 2)
-		var chs []<-chan invokeResult
+		chs := make([]<-chan invokeResult, 0, 3)
 		for i, ep := range []uint16{1, 2, 3} {
 			chs = append(chs, ciInvoke(context.Background(), c, ciPath(ep, ciToggle), batched()))
 			queued(t, c, i+1)

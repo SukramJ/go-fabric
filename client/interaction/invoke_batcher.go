@@ -152,7 +152,7 @@ func (c *Interaction) invokeBatched(ctx context.Context, cmd CommandRequest, opt
 	}
 	p := &pendingCommand{ref: ref, cmd: cmd, ctx: ctx, done: make(chan struct{})}
 	lane.pending = append(lane.pending, p)
-	c.armLane(lane, max(opts.BatchDuration, 0))
+	c.armLane(lane, max(opts.BatchDuration, 0)) //nolint:contextcheck // a batch outlives any one caller's context (ClientInteraction.ts:934-958)
 	c.batchMu.Unlock()
 
 	select {

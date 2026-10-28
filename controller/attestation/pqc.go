@@ -121,6 +121,7 @@ func VerifyIssuedBy(c, issuer *x509.Certificate) error {
 			return fmt.Errorf("attestation: signature does not verify: %w", err)
 		}
 		return nil
+	default:
+		return fmt.Errorf("attestation: signature algorithm %v is neither ecdsa-with-SHA256 nor ML-DSA", c.SignatureAlgorithm)
 	}
-	return fmt.Errorf("attestation: signature algorithm %v is neither ecdsa-with-SHA256 nor ML-DSA", c.SignatureAlgorithm)
 }

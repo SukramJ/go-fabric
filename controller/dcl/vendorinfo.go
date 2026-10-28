@@ -186,7 +186,7 @@ func NewVendorInfoService(ctx context.Context, opts VendorInfoOptions) (*VendorI
 		s.mu.Lock()
 		if !s.closed {
 			s.ticker = s.opts.Clock.NewTicker(interval)
-			s.loop.Go(func() { s.run(s.ticker) })
+			s.loop.Go(func() { s.run(s.ticker) }) //nolint:contextcheck // the periodic refresh runs until Close, no caller's context
 		}
 		s.mu.Unlock()
 	}

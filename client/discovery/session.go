@@ -214,7 +214,7 @@ func start[T any](ctx context.Context, k kind[T], transports []Transport, opts S
 		s.clock = fabricclock.System{}
 	}
 	s.ctx = context.WithoutCancel(ctx)
-	s.scan, s.stopFn = context.WithCancel(s.ctx)
+	s.scan, s.stopFn = context.WithCancel(s.ctx) //nolint:gosec // G118: Stop and the end of run call stopFn
 	// The caller's context ends the discovery as a cancel with its cause
 	// does (the abort option, :202-205, :496-499), at once when it already
 	// ended.
@@ -438,6 +438,7 @@ func (s *Session[T]) failure(err error) error {
 // describe names a discovery of id (Discovery.#description, :125-158).
 func describe(id Identifier) string {
 	switch id.kind {
+	case identifyAny:
 	case identifyInstance:
 		return "discovery of node instance " + id.instanceID
 	case identifyLongDiscriminator:
