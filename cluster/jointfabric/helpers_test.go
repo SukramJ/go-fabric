@@ -160,7 +160,7 @@ type fakeReach struct {
 	mu      sync.Mutex
 }
 
-func (r *fakeReach) ReadAdministratorFabricIndex(ctx context.Context, _ uint16) (fabricIndex uint8, null bool, err error) {
+func (r *fakeReach) ReadAdministratorFabricIndex(ctx context.Context, _ CommissionerPeer, _ uint16) (fabricIndex uint8, null bool, err error) {
 	if r.block {
 		close(r.waiting)
 		<-ctx.Done()
@@ -169,24 +169,24 @@ func (r *fakeReach) ReadAdministratorFabricIndex(ctx context.Context, _ uint16) 
 	return r.adminIndex, r.null, r.readErr
 }
 
-func (r *fakeReach) ReadFabrics(context.Context) ([]opcreds.FabricDescriptorStruct, error) {
+func (r *fakeReach) ReadFabrics(context.Context, CommissionerPeer) ([]opcreds.FabricDescriptorStruct, error) {
 	if r.fabricsErr != nil {
 		return nil, r.fabricsErr
 	}
 	return []opcreds.FabricDescriptorStruct{{RootPublicKey: r.f.rootPub, VendorId: r.f.vendorID, FabricId: r.f.fabricID, NodeId: r.f.nodeID, FabricIndex: r.adminIndex}}, nil
 }
 
-func (r *fakeReach) ReadTrustedRootCertificates(context.Context) ([][]byte, error) {
+func (r *fakeReach) ReadTrustedRootCertificates(context.Context, CommissionerPeer) ([][]byte, error) {
 	return [][]byte{r.f.rcac}, nil
 }
 
-func (r *fakeReach) ReadNOCs(context.Context) ([]opcreds.NOCStruct, error) {
+func (r *fakeReach) ReadNOCs(context.Context, CommissionerPeer) ([]opcreds.NOCStruct, error) {
 	n := opcreds.NOCStruct{Noc: r.f.noc, FabricIndex: r.adminIndex}
 	n.Icac.Value = r.f.icac
 	return []opcreds.NOCStruct{n}, nil
 }
 
-func (r *fakeReach) SignVIDVerification(_ context.Context, fabricIndex uint8, challenge []byte) (opcreds.SignVidVerificationResponse, []byte, error) {
+func (r *fakeReach) SignVIDVerification(_ context.Context, _ CommissionerPeer, fabricIndex uint8, challenge []byte) (opcreds.SignVidVerificationResponse, []byte, error) {
 	r.mu.Lock()
 	r.signs++
 	r.mu.Unlock()
