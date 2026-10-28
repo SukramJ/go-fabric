@@ -305,7 +305,8 @@ consumer asked for a camera, which is why this is milestone 6 and not 2.
 | 26 | 26-A3 | camera transport: the TLS clusters, WebRtcTransportProvider, PushAvStreamTransport | `v0.13.9` |
 | 26 | 26-D | Joint Fabric (ADR 0020 stage 6c) | `v0.13.10` |
 | 27 | 27-A | the controller remainder: the invoke batcher, discovery sessions, DCL vendor information, NOC rotation, PQC phase 1 | `v0.13.11` |
-| 27 | 27-B | the device remainder: session intervals, the BDX MRP delay, TEVT, the composite device types, TimeSynchronization's features, AirQuality's feature-gated values | `v0.14.0` |
+| 27 | 27-B | the device remainder: session intervals, the BDX MRP delay, TEVT, the composite device types, TimeSynchronization's features, AirQuality's feature-gated values | `v0.13.12` |
+| 27 | #326 | the peer's reported session parameters on both ends | `v0.14.0` |
 | 27 | 27-C | the sweep: the comparison, the findings, test and Ahead-of-matter.js registers, this page and the certifiability page | `v0.14.0` |
 
 The snapshot's 135 clusters each have a server; 90 of its 91 device types

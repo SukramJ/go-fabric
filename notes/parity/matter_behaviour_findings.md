@@ -33,12 +33,12 @@ but are already fixed; only the bullets that remain in the Tier-2/3 body below
 are genuinely open.
 
 **Milestone 6 sweep (wave 27-C, 2026-10-28).** 61 open items before the
-sweep, 58 after. Closed and removed: the discovery errors and abort (wave
+sweep, 57 after. Closed and removed: the discovery errors and abort (wave
 27-A, `client/discovery` sessions), the controller-side software-update
-manager (milestone 5 phase 25, brief CM, `controller/softwareupdate`) and
-the node's session intervals (wave 27-B, `node.Config.Sessions`). Kept with
-a decision: the reported session parameters on the device (owner decision
-2026-10-28), the camera persistence (owner decision Q5 of brief 26-A1),
+manager (milestone 5 phase 25, brief CM, `controller/softwareupdate`), the
+node's session intervals (wave 27-B, `node.Config.Sessions`) and the
+reported session parameters on the device (#326, `node.SessionInfo`). Kept
+with a decision: the camera persistence (owner decision Q5 of brief 26-A1),
 SetRegulatoryConfig's CountryCode (owner decision, an Apple Home check
 first), ColorControl's primaries (brief BR decision 19.4), the Wi-Fi
 fail-safe binding (before milestone 7, report BA). Every other open item
@@ -448,15 +448,6 @@ Device side:
 
 Controller side:
 
-- **Reported session parameters on the device**: the node's own intervals
-  are configurable since wave 27-B (`node.Config.Sessions`,
-  `Node.SessionParameters`), but the device's sessions have no accessor for
-  what the controller sent (ReportedSessionParametersTest; register `until
-  M6 phase 27`): `secure/operational.Entry` stores the peer's intervals
-  (`SetPeerMRPIntervals`) without a getter. (Milestone 6 phase 27.)
-  Kept past milestone 6: owner decision 2026-10-28 (test register,
-  ReportedSessionParametersTest) — the owner adds the `secure/` accessor
-  after brief 27-B and ports both cases.
 - **A whitespace-only `issuer_name` in an installed revocation set matches
   every issuer.** `controller/dcl/revocation.go:688-701` decodes it to no
   issuer and `:166-173` then matches any; matter.js keeps the empty hex
