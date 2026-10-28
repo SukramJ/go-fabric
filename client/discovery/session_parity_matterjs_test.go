@@ -720,7 +720,8 @@ func TestParallelPaseRaceParity(t *testing.T) {
 		if n := r.started.Load(); n != 1 {
 			t.Fatalf("%d started before the first slot", n)
 		}
-		for len(clk.Armed()) < 2 {
+		// The discovery's timeout and the two stagger waits.
+		for len(clk.Armed()) < 3 {
 			time.Sleep(time.Millisecond)
 		}
 		clk.Advance(discovery.CrossDeviceStagger)
@@ -791,4 +792,28 @@ func TestContinuousDiscoveryParity(t *testing.T) {
 			t.Fatalf("%v, %v", list, err)
 		}
 	})
+}
+
+// TestPASERaceParity: PaseDiscovery (PaseDiscovery.ts:28-71 at 862ad75f)
+// — the race's winner is the attempt's result, and a race without a
+// device reports one of the discovery outcomes, ErrDiscovery's kinds
+// (DiscoveryError.ts:12-29).
+func TestPASERaceParity(t *testing.T) {
+	t.Parallel()
+	clk := newClock()
+	s := discovery.PASERace(context.Background(), []discovery.Transport{newFixed(deviceA)}, discovery.SessionOptions{Clock: clk},
+		func(_ context.Context, c discovery.Candidate, win func() bool) (string, error) {
+			if !win() {
+				return "", errors.New("lost")
+			}
+			return c.Device.InstanceID, nil
+		})
+	if got, err := outcome(t, s, clk); err != nil || got != "device-a" {
+		t.Fatalf("%q, %v", got, err)
+	}
+	none := discovery.PASERace(context.Background(), []discovery.Transport{newFixed()}, discovery.SessionOptions{Clock: clk, Timeout: time.Second},
+		func(context.Context, discovery.Candidate, func() bool) (string, error) { return "", nil })
+	if _, err := outcome(t, none, clk); !errors.Is(err, discovery.ErrDiscovery) || !errors.Is(err, discovery.ErrDeviceNotDiscovered) {
+		t.Fatalf("err %v, want ErrDeviceNotDiscovered, an ErrDiscovery", err)
+	}
 }

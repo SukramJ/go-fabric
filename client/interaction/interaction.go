@@ -12,7 +12,8 @@
 // whose sessions come and go. An invoke of several commands is split by
 // the peer's MaxPathsPerInvoke (InvokeBatch), and single commands invoked
 // within one batch duration share an InvokeRequest when the peer takes
-// more than one path (Invoke, ClientInteraction.ts:744-1005 at 862ad75f).
+// more than one path (Invoke). The batcher is matter.js's
+// #invokeWithBatching (ClientInteraction.ts:744-1005 at 862ad75f).
 //
 // The messages are encoded and decoded with im/'s client encoders and
 // decoders, the shapes of matter.js's TLV message definitions.
@@ -25,6 +26,7 @@ import (
 	"log/slog"
 	mrand "math/rand/v2"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/SukramJ/go-fabric/client/exchange"
@@ -108,6 +110,8 @@ type Interaction struct {
 	batchMu        sync.Mutex
 	lanes          map[string]*batchLane
 	nextCommandRef uint16
+	// flushing counts the lane flushes running (a test seam's reading).
+	flushing atomic.Int32
 }
 
 // ErrClosed is the reason of [Interaction.Close] without one — matter.js

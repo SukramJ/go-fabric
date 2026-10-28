@@ -274,8 +274,8 @@ func (p *peerProvider) VerifyReachability(ctx context.Context) bool {
 func (p *peerProvider) maxPathsPerInvoke() int { return int(p.p.SessionParameters().MaxPathsPerInvoke) }
 
 // connect connects to the peer unless an existing session is required
-// — ExchangeProvider.connect, awaited before a command is queued for a
-// batch (ClientInteraction.ts:756-760).
+// — the provider's connect, which #invokeWithBatching awaits before a
+// command is queued for a batch (ClientInteraction.ts:756-760).
 func (p *peerProvider) connect(ctx context.Context, opts ExchangeOptions) error {
 	if opts.RequireExistingSession {
 		return nil

@@ -403,6 +403,15 @@ func TestInvokeBatcherParity(t *testing.T) {
 		if r := await(t, done); !errors.Is(r.err, context.Canceled) {
 			t.Fatalf("err %v, want context.Canceled", r.err)
 		}
+		// The command returns at once; its batch's exchange winds down on
+		// the flush's goroutine.
+		deadline := time.Now().Add(5 * time.Second)
+		for interaction.FlushingBatches(c) != 0 {
+			if time.Now().After(deadline) {
+				t.Fatal("the batch did not stop")
+			}
+			time.Sleep(time.Millisecond)
+		}
 		ciNoRetransmission(t, s)
 	})
 	t.Run("an abandoned command leaves the batch to the others", func(t *testing.T) {

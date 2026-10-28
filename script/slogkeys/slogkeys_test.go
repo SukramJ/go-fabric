@@ -107,6 +107,8 @@ var areaKeys = []string{
 	"role", "running", "schedule_handle", "scope", "send_failures", "send_interval", "service",
 	"sessions", "since_last_restart", "skid", "source", "source_endpoint",
 	"source_node_id", "ssid", "stack", "stage", "state", "status_code",
+	// client/discovery sessions and the DCL vendor info (brief 27-A).
+	"built_at", "discovery", "instead_of", "transport", "vendors",
 	// ble/esphome (brief BP1): the proxy, its advertisement and its link.
 	"encrypted", "feature_flags", "note", "proxy", "rssi", "silent",
 	"status_name", "statuses", "step", "stored", "stored_fabrics", "subject",

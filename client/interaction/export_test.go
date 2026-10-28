@@ -14,3 +14,6 @@ func QueuedInvokes(c *Interaction) int {
 	}
 	return n
 }
+
+// FlushingBatches is the number of batch flushes still running on c.
+func FlushingBatches(c *Interaction) int { return int(c.flushing.Load()) }

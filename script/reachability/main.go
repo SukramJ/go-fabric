@@ -394,6 +394,12 @@ func unifyReachableVariants(res *rta.Result, ssaPkgs []*ssa.Package) map[*ssa.Fu
 	reachable := make(map[*ssa.Function]bool, len(res.Reachable))
 	for fn := range res.Reachable {
 		reachable[fn] = true
+		// A generic function is reached through its instances
+		// (ssa.InstantiateGenerics): the instance reaches its origin, the
+		// declaration the inventory classifies.
+		if o := fn.Origin(); o != nil {
+			reachable[o] = true
+		}
 	}
 	sig := make(map[string]bool, len(reachable))
 	for fn := range reachable {
@@ -670,6 +676,8 @@ func (idx *referenceIndex) markType(t types.Type, seen map[types.Type]bool) { //
 	switch u := t.(type) {
 	case *types.Named:
 		idx.namedTypes[types.TypeString(u, nil)] = true
+		// An instance of a generic type reaches its declaration.
+		idx.namedTypes[types.TypeString(u.Origin(), nil)] = true
 		for t := range u.TypeArgs().Types() {
 			idx.markType(t, seen)
 		}

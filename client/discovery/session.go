@@ -131,7 +131,7 @@ type SessionOptions struct {
 // without a result — matter.js DiscoveryError (DiscoveryError.ts:12).
 // [*AggregateError] is not of it, as matter.js's DiscoveryAggregateError
 // is no subtype (:31).
-var ErrDiscovery = errors.New("discovery")
+var ErrDiscovery = errors.New("discovery: no result")
 
 // The outcomes of a discovery without a result (DiscoveryError.ts:14-29).
 var (

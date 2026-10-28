@@ -310,7 +310,7 @@ func (s *VendorInfoService) ProductInfoFor(ctx context.Context, vid, pid uint16)
 	}
 	m, err := s.client.Model(ctx, vid, pid)
 	if IsNotFound(err) {
-		s.log.Debug("matter.controller.dcl.vendor_info.product_not_found", slog.Int("vendor", int(vid)), slog.Int("product", int(pid)))
+		s.log.Debug("matter.controller.dcl.vendor_info.product_not_found", slog.Int("vendor_id", int(vid)), slog.Int("product_id", int(pid)))
 		return ProductInfo{}, false, nil
 	}
 	if err != nil {

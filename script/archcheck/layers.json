@@ -1,7 +1,7 @@
 {
   "reading_order": "Layers are listed lowest first. A package belongs to the layer of the most specific pattern matching it, whatever the order here: the longest base path wins, and an exact name wins over an x/... pattern of the same base (so cluster in model-and-protocol beats cluster/... in servers).",
   "layers": [
-    {"name": "foundation", "packages": ["clock", "clock/clocktest", "tlv", "schema", "parity", "internal/clockvar", "internal/inflight", "internal/serialqueue", "thread"]},
+    {"name": "foundation", "packages": ["clock", "clock/clocktest", "tlv", "schema", "parity", "internal/clockvar", "internal/forward", "internal/inflight", "internal/serialqueue", "thread"]},
     {"name": "transport", "packages": ["transport/...", "mdns", "internal/udpseam", "internal/channelseam"]},
     {"name": "security-and-storage", "packages": ["secure/...", "icd", "icd/...", "commissioning", "store", "store/memstore", "bdx/...", "diagevent", "bootid"]},
     {"name": "model-and-protocol", "packages": ["im", "im/...", "groups", "cluster", "cluster/spec", "cluster/spec/...", "cluster/wire", "contract", "eligibility", "client/..."]},

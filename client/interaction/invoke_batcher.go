@@ -15,8 +15,8 @@ import (
 	"github.com/SukramJ/go-fabric/im"
 )
 
-// maxCommandRef is the highest CommandRef the batcher hands out before it
-// wraps to 1 — matter.js MAX_COMMAND_REF
+// maxCommandRef is the highest command reference the batcher hands out
+// before it wraps to 1 — matter.js MAX_COMMAND_REF
 // (packages/protocol/src/action/client/ClientInteraction.ts:98 at 862ad75f).
 const maxCommandRef = 0xffff
 
@@ -90,6 +90,10 @@ type pendingCommand struct {
 	answered bool
 	err      error
 	finished bool
+	// abandon, set while the command's batch is in flight, counts the
+	// command out of it; the caller's abort runs it at once, so the batch
+	// stops before the caller returns.
+	abandon func()
 }
 
 // finish resolves the command once; the caller holds c.batchMu.
@@ -164,6 +168,9 @@ func (c *Interaction) invokeBatched(ctx context.Context, cmd CommandRequest, opt
 		p.aborted = true
 		lane.remove(p)
 		p.finish(Result{}, false, ctx.Err())
+		if p.abandon != nil {
+			p.abandon()
+		}
 		return Result{}, false, ctx.Err()
 	}
 }
@@ -292,6 +299,8 @@ func (c *Interaction) flushLane(lane *batchLane, gen uint64) {
 	}
 	c.inflight.Add(1)
 	c.closeMu.Unlock()
+	c.flushing.Add(1)
+	defer c.flushing.Add(-1)
 	defer c.inflight.Done()
 	for _, batch := range partitionBatch(cmds) {
 		lane.send.Lock()
@@ -379,14 +388,26 @@ func (c *Interaction) executeBatch(batch []*pendingCommand, network string) {
 	defer cancel()
 	unabandoned := int32(len(live)) //nolint:gosec // a lane holds at most 0xFFFF commands
 	stops := make([]func() bool, 0, len(live))
+	c.batchMu.Lock()
 	for _, p := range live {
-		stops = append(stops, context.AfterFunc(p.ctx, func() {
-			if atomic.AddInt32(&unabandoned, -1) == 0 {
-				cancel()
-			}
-		}))
+		var once sync.Once
+		abandon := func() {
+			once.Do(func() {
+				if atomic.AddInt32(&unabandoned, -1) == 0 {
+					cancel()
+				}
+			})
+		}
+		p.abandon = abandon
+		stops = append(stops, context.AfterFunc(p.ctx, abandon))
 	}
+	c.batchMu.Unlock()
 	defer func() {
+		c.batchMu.Lock()
+		for _, p := range live {
+			p.abandon = nil
+		}
+		c.batchMu.Unlock()
 		for _, stop := range stops {
 			stop()
 		}
