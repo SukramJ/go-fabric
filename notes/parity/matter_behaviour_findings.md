@@ -478,6 +478,11 @@ Controller side:
   `controller/commissioner/connection.go:252` `launch`; matter.js closes it
   with the composed signal's reason (`peer/CommissioningConnection.ts:140-151`).
   Low, no deterministic test.
+- **PQC Phase 1 on the device side.** A device's own ML-DSA attestation
+  chain files are refused by the 600-byte limit (`secure/attestation/files.go`;
+  matter.js allows 10 240 bytes for a PQC chain, `certificate/kinds/common.ts:19`).
+  The controller side is ported behind the forward-feature switch (wave
+  27-A, `controller/attestation/pqc.go`). (Milestone 6.)
 
 Found by the phase-16 port of `packages/node/test/node` (brief BI, PR #168,
 2026-10-19). Line numbers at `862ad75f`.

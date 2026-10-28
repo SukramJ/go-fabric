@@ -3330,8 +3330,9 @@ module changes when matter.js does.
 `DclCertificateService.ts:1849-1874` parses a CRL's `nextUpdate` and never
 reads it, so an expired CRL still revokes — mirrored, pinned by a test.
 Not ported: out-of-band revocation sets and seed data, the on-demand PAA
-fetch by subject key id, the compliance endpoint, the vendor-info service,
-OTA image storage, ML-DSA certificates. `attestation.PAAStore` and
+fetch by subject key id, the compliance endpoint, OTA image storage,
+ML-DSA PAAs in the ledger stores (the attestation validator admits them
+behind PQC Phase 1, wave 27-A). `attestation.PAAStore` and
 `Revocations` take no context (a change would break the API before the
 freeze); on-demand CRL fetches are bounded by the client timeout. Reports
 AS, AX §10.
