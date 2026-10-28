@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 6794,
+  "entry_points": 6795,
   "entry_packages": [
     ".",
     "bdx",
@@ -264,9 +264,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 16510,
+    "total_exported": 16511,
     "reachable": 11665,
-    "whitelisted": 4842,
+    "whitelisted": 4843,
     "unreachable": 3
   },
   "by_package": [
@@ -31790,7 +31790,7 @@
       "identifier": "TestBorderRouterFailures",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "thread/otbr/borderrouter_test.go",
-      "line": 153
+      "line": 175
     },
     {
       "package": "thread/otbr",
@@ -31804,6 +31804,13 @@
       "identifier": "TestBorderRouterReplaceAndClear",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "thread/otbr/borderrouter_test.go",
+      "line": 136
+    },
+    {
+      "package": "thread/otbr",
+      "identifier": "TestBorderRouterRevertWithoutDeleteRoute",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "thread/otbr/borderrouter_test.go",
       "line": 114
     },
     {
@@ -31811,7 +31818,7 @@
       "identifier": "TestBorderRouterVersionFromItsRecord",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "thread/otbr/borderrouter_test.go",
-      "line": 213
+      "line": 235
     },
     {
       "package": "thread/otbr",
