@@ -18,6 +18,11 @@ pseudo-version of `main`.
 - `controller/commissioner.FabricAuthority` after matter.js (brief 27-A): `CreateFabric`, `DefaultFabric` with the NOC key rotation once per authority, `OnFabricAdded`, `ErrNodeIDChanged`.
 - `controller/attestation`: PQC Phase 1 (brief 27-A) — ML-DSA-44/65 PAA and PAI keys and ML-DSA signatures in the chain validation over the standard library's `crypto/mldsa`, `KeyAlgorithmOf`, `MayIssue`, `VerifyIssuedBy`. Off as in matter.js: an ML-DSA attestation certificate is `ErrMLDSAAttestationDisabled`. No new dependency.
 
+### Changed
+
+- `controller.New` rotates the controller's operational key on every start, as matter.js's controller does for a fabric it keeps itself: a new key pair and NOC under the same fabric, saved over the stored record.
+- `controller.Pair` commissions every matching device it finds in parallel and keeps the first to establish PASE (matter.js's CommissioningDiscovery); with `PairOptions.BLE` it searches DNS-SD as well.
+
 ## [0.13.10] — 2026-10-28
 
 ### Added
@@ -34,8 +39,6 @@ pseudo-version of `main`.
 
 ### Changed
 
-- `controller.New` rotates the controller's operational key on every start, as matter.js's controller does for a fabric it keeps itself: a new key pair and NOC under the same fabric, saved over the stored record.
-- `controller.Pair` commissions every matching device it finds in parallel and keeps the first to establish PASE (matter.js's CommissioningDiscovery); with `PairOptions.BLE` it searches DNS-SD as well.
 - `controller/attestation` parses attestation certificates with PQC Phase 1's 10240-byte limit; a traditional certificate stays bound to 600 bytes.
 
 ## [0.13.8] — 2026-10-28
