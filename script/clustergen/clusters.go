@@ -187,12 +187,8 @@ var committed = []string{
 	// cluster/sensing (brief 26-C): AmbientContextSensing after
 	// connectedhomeip.
 	"AmbientContextSensing",
-	// The Joint Fabric clusters (brief CL §1,
-	// owner decision 2026-10-25): served by the generated server as
-	// matter.js serves them — its server for each is the generated
-	// behaviour stub (`export class XServer extends XBehavior {}`, e.g.
-	// packages/node/src/behaviors/thread-network-diagnostics/
-	// ThreadNetworkDiagnosticsServer.ts at 862ad75f).
+	// cluster/jointfabric (brief 26-D): JointFabricDatastore and
+	// JointFabricAdministrator after connectedhomeip.
 	"JointFabricDatastore",
 	"JointFabricAdministrator",
 }

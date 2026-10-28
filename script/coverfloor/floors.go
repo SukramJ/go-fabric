@@ -78,6 +78,7 @@ var floors = []packageFloor{
 	{pkg: "github.com/SukramJ/go-fabric/cluster/camera", min: 90},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/tls", min: 88},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/sensing", min: 93},
+	{pkg: "github.com/SukramJ/go-fabric/cluster/jointfabric", min: 83},
 	{
 		pkg: "github.com/SukramJ/go-fabric/cluster/transition",
 		min: 93,
@@ -104,6 +105,7 @@ var floors = []packageFloor{
 	},
 	{pkg: "github.com/SukramJ/go-fabric/controller/dcl/snapshot", min: 83},
 	{pkg: "github.com/SukramJ/go-fabric/client/discovery", min: 95},
+	{pkg: "github.com/SukramJ/go-fabric/client/jcm", min: 83},
 	{pkg: "github.com/SukramJ/go-fabric/groups", min: 93},
 	// The module's lowest measured package (76.7 when last raised).
 	// contract is the host-facing interface vocabulary, and much of what is uncovered

@@ -29,6 +29,8 @@ type failSafeParticipant interface {
 type failSafeSync struct {
 	mu           sync.Mutex
 	participants []failSafeParticipant
+	// removed are the fabric-removal participants (jointfabric.go).
+	removed []fabricRemovedParticipant
 }
 
 // attachFailSafe wires the topology's fail-safe participants to the

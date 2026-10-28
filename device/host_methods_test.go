@@ -21,6 +21,7 @@ import (
 	"github.com/SukramJ/go-fabric/cluster/energy"
 	"github.com/SukramJ/go-fabric/cluster/fan"
 	"github.com/SukramJ/go-fabric/cluster/filter"
+	"github.com/SukramJ/go-fabric/cluster/jointfabric"
 	"github.com/SukramJ/go-fabric/cluster/levelcontrol"
 	"github.com/SukramJ/go-fabric/cluster/light"
 	"github.com/SukramJ/go-fabric/cluster/lock"
@@ -69,6 +70,8 @@ import (
 	h_fan "github.com/SukramJ/go-fabric/cluster/spec/fancontrol"
 	h_fixed "github.com/SukramJ/go-fabric/cluster/spec/fixedlabel"
 	h_hepa "github.com/SukramJ/go-fabric/cluster/spec/hepafiltermonitoring"
+	h_jfa "github.com/SukramJ/go-fabric/cluster/spec/jointfabricadministrator"
+	h_jfds "github.com/SukramJ/go-fabric/cluster/spec/jointfabricdatastore"
 	h_keypad "github.com/SukramJ/go-fabric/cluster/spec/keypadinput"
 	h_ldc "github.com/SukramJ/go-fabric/cluster/spec/laundrydryercontrols"
 	h_washer "github.com/SukramJ/go-fabric/cluster/spec/laundrywashercontrols"
@@ -207,6 +210,16 @@ var hostCases = map[uint32]hostCase{
 	h_pa.ClusterID: {kit: kitOf[*camera.PushTransport](), host: hostOf[h_pa.Host](h_pa.Wrap), covered: []string{"AttachTLS", "Close", "Connections"}},
 	// AmbientContextSensing (cluster/sensing): HoldTime and
 	// ObjectCountConfig are what Get reads.
+	// The Joint Fabric servers (cluster/jointfabric): the datastore's
+	// getters are what Get reads, OnFabricRemoved and the Attach and
+	// fail-safe methods the node's wiring.
+	h_jfds.ClusterID: {kit: kitOf[*jointfabric.Datastore](), host: hostOf[h_jfds.Host](h_jfds.Wrap), covered: []string{
+		"AdminList", "AnchorNodeID", "AnchorRootCA", "AnchorVendorID", "EndpointBindingList", "EndpointGroupIDList", "FriendlyName",
+		"GroupKeySetList", "GroupList", "NodeACLList", "NodeEndpointList", "NodeKeySetList", "NodeList", "OnFabricRemoved", "Status",
+	}},
+	h_jfa.ClusterID: {kit: kitOf[*jointfabric.Administrator](), host: hostOf[h_jfa.Host](h_jfa.Wrap), covered: []string{
+		"AttachFailSafe", "AttachNode", "OnCommissioningComplete", "OnFabricRemoved", "OnFailSafeExpired",
+	}},
 	h_acs.ClusterID: {kit: kitOf[*sensing.AmbientContext](), host: hostOf[h_acs.Host](h_acs.Wrap), covered: []string{"HoldTime", "ObjectCountConfig"}},
 	// The media servers: their event helpers are Emit<Event>'s.
 	h_mp.ClusterID:       {kit: kitOf[*media.PlaybackServer](), covered: []string{"EmitStateChanged"}},

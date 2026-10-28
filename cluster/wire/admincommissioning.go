@@ -167,6 +167,11 @@ type OpenWindowParams struct {
 	// OpenWindow. Defaults to false (commissioned), which applies the
 	// standard 900-s cap.
 	IsUncommissioned bool
+	// JointFabric opens the window as a Joint Fabric administrator's
+	// joint commissioning window: an enhanced window advertised CM=3
+	// (connectedhomeip CommissioningWindowManager.cpp:413-419, :491 at
+	// 6170af84). The JointFabricAdministrator server sets it.
+	JointFabric bool
 }
 
 // AdministratorCommissioning is the cluster server.

@@ -497,6 +497,7 @@ func (n *Node) fabricRemoved(ctx context.Context, fabricIndex uint8) {
 		log.DropFabric(fabricIndex)
 	}
 	n.removeFabricBindings(fabricIndex)
+	n.fabricRemovedParticipants(ctx, fabricIndex)
 	if srv := n.root.ICDManagement; srv != nil {
 		srv.FabricRemoved(ctx, fabricIndex)
 	}
