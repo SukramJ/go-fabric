@@ -228,6 +228,31 @@ func (s *Server) EmitAmbientContextDetectEnded(endpoint uint16, data AmbientCont
 	return spec.EmitOn(s.Underlying(), endpoint, EventAmbientContextDetectEnded, data)
 }
 
+// Host is the AmbientContextSensing kit server's host methods: the ones Set, Get and
+// the typed handlers do not reach (cluster/sensing AmbientContext).
+type Host interface {
+	// AddDetection records a detection the device made, its tags on
+	// AmbientContextTypeSupported: a new one is held for HoldTime and
+	// emits AmbientContextDetectStarted, the same one again keeps its
+	// start and hold, capped at HoldTimeLimits.HoldTimeMax (chip's
+	// AddDetection).
+	AddDetection(d AmbientContextTypeStruct) error
+	// SetObjectCount records the device's object count (OC & OI), held
+	// for HoldTime against ObjectCountConfig's threshold (chip's
+	// SetObjectCount).
+	SetObjectCount(count uint16) error
+	// Close stops the hold-time timer (chip's Shutdown).
+	Close()
+}
+
+// Host returns the mounted server's host methods when it implements
+// Host — the kit's server does; nil for a server that does not, as the
+// generated one and a host's own (Declare.HostServer) normally do not.
+func (s *Server) Host() Host {
+	h, _ := s.Underlying().(Host)
+	return h
+}
+
 // Declare is the declaration of the AmbientContextSensing cluster on a device:
 // device.New<Type> and device.FromSpec take it, and every field is
 // optional — the zero value mounts the cluster (an optional one too)

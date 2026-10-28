@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 6795,
+  "entry_points": 6821,
   "entry_packages": [
     ".",
     "bdx",
@@ -39,6 +39,7 @@
     "cluster/onoff",
     "cluster/opstate",
     "cluster/pump",
+    "cluster/sensing",
     "cluster/servicearea",
     "cluster/spec",
     "cluster/spec/accesscontrol",
@@ -264,9 +265,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 16511,
-    "reachable": 11665,
-    "whitelisted": 4843,
+    "total_exported": 16539,
+    "reachable": 11685,
+    "whitelisted": 4851,
     "unreachable": 3
   },
   "by_package": [
@@ -9664,6 +9665,55 @@
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/pump/pump_server.go",
       "line": 121
+    },
+    {
+      "package": "cluster/sensing",
+      "identifier": "AmbientContextFeature",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/sensing/ambient.go",
+      "line": 30
+    },
+    {
+      "package": "cluster/sensing",
+      "identifier": "Detection",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/sensing/ambient.go",
+      "line": 34
+    },
+    {
+      "package": "cluster/sensing",
+      "identifier": "HoldTimeLimits",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/sensing/ambient.go",
+      "line": 38
+    },
+    {
+      "package": "cluster/sensing",
+      "identifier": "Namespace",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/sensing/ambient.go",
+      "line": 42
+    },
+    {
+      "package": "cluster/sensing",
+      "identifier": "ObjectCountConfig",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/sensing/ambient.go",
+      "line": 36
+    },
+    {
+      "package": "cluster/sensing",
+      "identifier": "PredictedActivity",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/sensing/ambient.go",
+      "line": 40
+    },
+    {
+      "package": "cluster/sensing",
+      "identifier": "SemanticTag",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/sensing/ambient.go",
+      "line": 32
     },
     {
       "package": "cluster/servicearea",
@@ -23520,6 +23570,13 @@
     },
     {
       "package": "device",
+      "identifier": "TestAmbientContextKit",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "device/defaults_sensing_test.go",
+      "line": 53
+    },
+    {
+      "package": "device",
       "identifier": "TestAnOptionalCommandThePortLacksIsUnsupported",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/defaults_media_optional_test.go",
@@ -23712,7 +23769,7 @@
       "identifier": "TestEveryKitServerHasItsHostDecided",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/host_methods_test.go",
-      "line": 349
+      "line": 354
     },
     {
       "package": "device",
@@ -23775,7 +23832,7 @@
       "identifier": "TestHostIsTheKitServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/host_methods_test.go",
-      "line": 384
+      "line": 389
     },
     {
       "package": "device",

@@ -76,6 +76,7 @@ var floors = []packageFloor{
 	{pkg: "github.com/SukramJ/go-fabric/cluster/switch", min: 97},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/thermo", min: 95},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/camera", min: 90},
+	{pkg: "github.com/SukramJ/go-fabric/cluster/sensing", min: 93},
 	{
 		pkg: "github.com/SukramJ/go-fabric/cluster/transition",
 		min: 93,
