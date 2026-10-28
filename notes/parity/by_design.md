@@ -3555,6 +3555,22 @@ next fresh scan. Reasoning: a host without a Bluetooth adapter commissions
 through the proxies a Home Assistant site already has; neither reference
 offers this, so there is no behaviour to mirror and no marker to watch.
 
+**Discovery (brief BP2, 2026-10-27).** The proxies are found over DNS-SD
+(`_esphomelib._tcp.local.`, the service ESPHome's `mdns_component.cpp`
+advertises with the TXT keys `version`, `mac`, `config_hash`, `board`) and
+keyed per device by name or MAC (`esphome.Keys`, `ParseKey`); whether a
+device is a Bluetooth proxy is learned after connecting, from its
+capability flags, not from the record. matter.js's DNS-SD ingress admits
+Matter's three service types only (`MdnsService.ts:27, :90-94` and
+`CommissionableMdnsScanner.ts:100-105` at `862ad75f`), so
+`client/discovery.Names.Browse` widens the filter for the requested type
+while a browse runs. The central re-browses every five minutes and on every
+proxy loss, follows a moved address and drops a discovered proxy only when
+it is unadvertised and idle; a given proxy always stays. matter.js has no
+counterpart (it reaches BLE through a local adapter only), so the discovery
+is this module's own, pinned by `ble/esphome`'s discovery tests and
+`fabrictest.Device.BLE()`.
+
 ### BD-Controller-BluezScanWithoutUuidFilter — `ble/bluez` scans LE without a `UUIDs` discovery filter
 
 matter.js scans with noble's `startScanningAsync([MatterBle.SERVICE_UUID_SHORT],

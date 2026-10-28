@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -63,12 +64,23 @@ func withPort(addr string) string {
 // connections through it and its connection slots.
 type proxy struct {
 	c    *Central
-	addr string
 	name string
 	psk  []byte
+	// ctx ends the proxy's run loop: the central's close, or the proxy
+	// leaving a discovered set (stop).
+	ctx  context.Context
+	stop context.CancelFunc
+	// static is a proxy NewCentral was given; it stays regardless of
+	// discovery. key is a discovered proxy's instance name, lower case.
+	static bool
+	key    string
 
 	// mu guards everything below.
-	mu         sync.Mutex
+	mu sync.Mutex
+	// addrs are the host:port the proxy is dialled at, in order; the
+	// first is the one that answered last. Discovery replaces them when
+	// the proxy's DNS-SD records move.
+	addrs      []string
 	api        *apiConn
 	flags      uint32
 	subscribed bool
@@ -85,10 +97,12 @@ type proxy struct {
 	wake            chan struct{}
 }
 
-func newProxy(c *Central, cfg Proxy) (*proxy, error) {
-	p := &proxy{c: c, addr: withPort(cfg.Addr), name: cfg.Name, conns: map[uint64]*connection{}, wake: make(chan struct{}, 1)}
+func newProxy(c *Central, cfg Proxy, more ...string) (*proxy, error) {
+	addr := withPort(cfg.Addr)
+	p := &proxy{c: c, addrs: append([]string{addr}, more...), name: cfg.Name, conns: map[uint64]*connection{}, wake: make(chan struct{}, 1)}
+	p.ctx, p.stop = context.WithCancel(c.ctx)
 	if p.name == "" {
-		p.name = p.addr
+		p.name = addr
 	}
 	if cfg.Key != "" {
 		k, err := wire.DecodeKey(cfg.Key)
@@ -111,15 +125,54 @@ func permanent(err error) bool {
 	return false
 }
 
-// dial opens and checks one API connection.
+// dial opens and checks one API connection at the proxy's addresses; the
+// one that answered moves to the front.
 func (p *proxy) dial(ctx context.Context) (*apiConn, error) {
-	a, err := dialAPI(ctx, p.addr, p.psk, &p.c.opts)
+	p.mu.Lock()
+	addrs := slices.Clone(p.addrs)
+	p.mu.Unlock()
+	a, addr, err := dialFirst(ctx, addrs, p.psk, &p.c.opts)
 	if err != nil {
 		return nil, err
 	}
-	// Connections need ACTIVE_CONNECTIONS (`active: true`) and the V3
-	// connect REMOTE_CACHING selects (aioesphomeapi client.py:1330-1343;
-	// the firmware sets both with active, bluetooth_proxy.h:207-235).
+	p.mu.Lock()
+	if i := slices.Index(p.addrs, addr); i > 0 {
+		p.addrs = append([]string{addr}, slices.Delete(p.addrs, i, i+1)...)
+	}
+	p.mu.Unlock()
+	return a, nil
+}
+
+// dialFirst opens and checks an API connection at the first of addrs that
+// answers; a permanent refusal ends the attempt, since every address is
+// the same device.
+func dialFirst(ctx context.Context, addrs []string, psk []byte, o *Options) (*apiConn, string, error) {
+	var errs []error
+	for _, addr := range addrs {
+		a, err := dialChecked(ctx, addr, psk, o)
+		if err == nil {
+			return a, addr, nil
+		}
+		errs = append(errs, err)
+		if permanent(err) || ctx.Err() != nil {
+			return nil, "", err
+		}
+	}
+	if len(errs) == 1 {
+		return nil, "", errs[0]
+	}
+	return nil, "", errors.Join(errs...)
+}
+
+// dialChecked opens one API connection and checks the features a
+// commissioning proxy needs: ACTIVE_CONNECTIONS (`active: true`) and the
+// V3 connect REMOTE_CACHING selects (aioesphomeapi client.py:1330-1343;
+// the firmware sets both with active, bluetooth_proxy.h:207-235).
+func dialChecked(ctx context.Context, addr string, psk []byte, o *Options) (*apiConn, error) {
+	a, err := dialAPI(ctx, addr, psk, o)
+	if err != nil {
+		return nil, err
+	}
 	switch {
 	case a.flags&wire.FeatureActiveConnections == 0:
 		a.close(ErrNoActiveConnections)
@@ -129,6 +182,54 @@ func (p *proxy) dial(ctx context.Context) (*apiConn, error) {
 		return nil, ErrNoRemoteCaching
 	}
 	return a, nil
+}
+
+// setAddrs takes the addresses discovery found a proxy at. The address
+// that answered last stays in front while it is among them. When the set
+// changed — the proxy moved, or took a further address — a reconnect
+// backoff is cut short and setAddrs reports true.
+func (p *proxy) setAddrs(addrs []string) bool {
+	p.mu.Lock()
+	was, now := slices.Sorted(slices.Values(p.addrs)), slices.Sorted(slices.Values(addrs))
+	changed := !slices.Equal(was, now)
+	if slices.Contains(addrs, p.addrs[0]) {
+		rest := slices.DeleteFunc(slices.Clone(addrs), func(a string) bool { return a == p.addrs[0] })
+		p.addrs = append(p.addrs[:1:1], rest...)
+	} else {
+		p.addrs = slices.Clone(addrs)
+	}
+	p.mu.Unlock()
+	if changed {
+		p.wakeUp()
+	}
+	return changed
+}
+
+// at reports whether the proxy is dialled at one of addrs.
+func (p *proxy) at(addrs []string) bool {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	for _, a := range addrs {
+		if slices.Contains(p.addrs, a) {
+			return true
+		}
+	}
+	return false
+}
+
+// idle reports whether the proxy has neither an API connection nor a GATT
+// connection through it: dropping it disturbs nothing.
+func (p *proxy) idle() bool {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.api == nil && len(p.conns) == 0
+}
+
+func (p *proxy) wakeUp() {
+	select {
+	case p.wake <- struct{}{}:
+	default:
+	}
 }
 
 // run keeps the proxy connected until the central closes: first is the
@@ -143,9 +244,9 @@ func (p *proxy) run(first *apiConn) {
 				return
 			}
 			var err error
-			a, err = p.dial(p.c.ctx)
+			a, err = p.dial(p.ctx)
 			if err != nil {
-				if p.c.ctx.Err() != nil {
+				if p.ctx.Err() != nil {
 					return
 				}
 				p.c.log.Warn("ble.esphome.proxy_unreachable", slog.String("proxy", p.name), slog.Any("err", err), slog.Duration("retry", backoff))
@@ -176,21 +277,24 @@ func (p *proxy) waitUsable() bool {
 			return true
 		}
 		select {
-		case <-p.c.ctx.Done():
+		case <-p.ctx.Done():
 			return false
 		case <-p.wake:
 		}
 	}
 }
 
-// sleep waits d; false when the central closed.
+// sleep waits d, or until woken (a new address, a fresh scan); false when
+// the proxy stopped.
 func (p *proxy) sleep(d time.Duration) bool {
 	t := p.c.clk.NewTimer(d)
 	defer t.Stop()
 	select {
-	case <-p.c.ctx.Done():
+	case <-p.ctx.Done():
 		return false
 	case <-t.C():
+		return true
+	case <-p.wake:
 		return true
 	}
 }
@@ -215,7 +319,7 @@ func (p *proxy) attach(a *apiConn) error {
 		select {
 		case <-a.done:
 			return a.cause()
-		case <-p.c.ctx.Done():
+		case <-p.ctx.Done():
 			a.close(context.Canceled)
 			return context.Canceled
 		case now := <-tk.C():
@@ -269,6 +373,8 @@ func (p *proxy) detach(a *apiConn, cause error) {
 	p.c.forgetProxy(p)
 	if !errors.Is(cause, context.Canceled) {
 		p.c.log.Info("ble.esphome.proxy_lost", slog.String("proxy", p.name), slog.Any("err", cause))
+		// A proxy whose address moved (DHCP) is found again by its name.
+		p.c.triggerRescan()
 	}
 }
 
@@ -328,10 +434,7 @@ func (p *proxy) reset() {
 	p.mu.Lock()
 	p.busy, p.takenOnce = false, false
 	p.mu.Unlock()
-	select {
-	case p.wake <- struct{}{}:
-	default:
-	}
+	p.wakeUp()
 }
 
 // handle is a message the API connection does not answer itself.

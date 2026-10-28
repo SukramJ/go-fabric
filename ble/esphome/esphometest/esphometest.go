@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -149,13 +150,52 @@ func New(opts Options, peripherals ...*bletest.Peripheral) (*Proxy, error) {
 	}
 	p.ln = ln
 	p.wg.Add(2)
-	go p.accept()
+	go p.accept(ln)
 	go p.advertise()
 	return p, nil
 }
 
 // Addr is the proxy's host:port.
-func (p *Proxy) Addr() string { return p.ln.Addr().String() }
+func (p *Proxy) Addr() string {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.ln.Addr().String()
+}
+
+// Port is the proxy's TCP port.
+func (p *Proxy) Port() uint16 {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	_, port, _ := net.SplitHostPort(p.ln.Addr().String())
+	n, _ := strconv.ParseUint(port, 10, 16)
+	return uint16(n)
+}
+
+// Move puts the proxy on a new loopback port and drops its clients, as a
+// device that took a new address from DHCP does; the old port refuses
+// connections, and a [Network] the proxy advertises on answers with the
+// new one from here on.
+func (p *Proxy) Move() error {
+	var lc net.ListenConfig
+	ln, err := lc.Listen(context.Background(), "tcp", "127.0.0.1:0")
+	if err != nil {
+		return err
+	}
+	p.mu.Lock()
+	if p.closed {
+		p.mu.Unlock()
+		_ = ln.Close()
+		return errors.New("esphometest: the proxy is closed")
+	}
+	old := p.ln
+	p.ln = ln
+	p.wg.Add(1)
+	p.mu.Unlock()
+	_ = old.Close()
+	go p.accept(ln)
+	p.DropClients()
+	return nil
+}
 
 // Close stops the proxy.
 func (p *Proxy) Close() {
@@ -166,8 +206,9 @@ func (p *Proxy) Close() {
 	}
 	p.closed = true
 	close(p.stop)
+	ln := p.ln
 	p.mu.Unlock()
-	_ = p.ln.Close()
+	_ = ln.Close()
 	p.DropClients()
 	p.wg.Wait()
 }
@@ -234,6 +275,13 @@ func (p *Proxy) Events() []string {
 	return append([]string(nil), p.events...)
 }
 
+// Clients is the number of API clients connected.
+func (p *Proxy) Clients() int {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return len(p.sessions)
+}
+
 // Connections is the number of slots in use.
 func (p *Proxy) Connections() int {
 	p.mu.Lock()
@@ -247,10 +295,10 @@ func (p *Proxy) event(format string, args ...any) {
 	p.mu.Unlock()
 }
 
-func (p *Proxy) accept() {
+func (p *Proxy) accept(ln net.Listener) {
 	defer p.wg.Done()
 	for {
-		nc, err := p.ln.Accept()
+		nc, err := ln.Accept()
 		if err != nil {
 			return
 		}

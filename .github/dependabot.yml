@@ -21,6 +21,37 @@ updates:
       go-minor-patch:
         update-types: ["minor", "patch"]
 
+  # The nested modules (ble/bluez, ble/esphome): their own third-party
+  # requires (godbus, flynn/noise, miekg/dns). Their require of go-fabric
+  # itself is set by the release (the nested module is tagged with the
+  # release that ships it), so Dependabot leaves it alone.
+  - package-ecosystem: gomod
+    directory: "/ble/bluez"
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    commit-message:
+      prefix: "chore(deps)"
+    ignore:
+      - dependency-name: "github.com/SukramJ/go-fabric"
+    groups:
+      go-minor-patch:
+        update-types: ["minor", "patch"]
+  - package-ecosystem: gomod
+    directory: "/ble/esphome"
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    commit-message:
+      prefix: "chore(deps)"
+    ignore:
+      - dependency-name: "github.com/SukramJ/go-fabric"
+    groups:
+      go-minor-patch:
+        update-types: ["minor", "patch"]
+
   # GitHub Actions (pinned by commit SHA; Dependabot bumps the SHA and
   # keeps the `# vX` version comment in sync).
   - package-ecosystem: github-actions
