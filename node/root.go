@@ -4,6 +4,7 @@
 package node
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
@@ -269,6 +270,13 @@ func buildRoot(ctx context.Context, d rootDeps) (*RootClusters, error) { //nolin
 	r.AdministratorCommissioning = wire.NewAdministratorCommissioning()
 	if !cfg.DisableTimeSynchronization {
 		r.TimeSynchronization = mattercore.NewTimeSynchronization()
+		if tc := cfg.TimeSynchronization; tc != nil {
+			c := *tc
+			c.Store, c.Logger = d.st, cmp.Or(c.Logger, d.logger)
+			if r.TimeSynchronization, err = mattercore.NewTimeSynchronizationWith(c); err != nil {
+				return nil, fmt.Errorf("time synchronization: %w", err)
+			}
+		}
 		r.TimeSynchronization.SetClock(cfg.Clock)
 		r.GeneralDiagnostics.SetUTCClock(r.TimeSynchronization.UTC)
 	}

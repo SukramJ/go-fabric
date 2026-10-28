@@ -149,6 +149,14 @@ type Config struct {
 	// GeneralDiagnosticsServer.timeSnapshot does without a
 	// TimeSynchronizationBehavior (GeneralDiagnosticsServer.ts:168-182).
 	DisableTimeSynchronization bool
+	// TimeSynchronization selects the root TimeSynchronization's features
+	// TZ, NTPC, NTPS and TSC after connectedhomeip
+	// ([TimeSynchronizationConfig]); nil serves UTCTime and Granularity
+	// alone, as before. The node persists their state in its store and
+	// clears a removed fabric's trusted time source; the config's Store is
+	// the node's. UTCTime stays the node's clock. It excludes
+	// DisableTimeSynchronization.
+	TimeSynchronization *TimeSynchronizationConfig
 	// GeneralDiagnosticsFeatures selects the root GeneralDiagnostics'
 	// features (mattercore.NewGeneralDiagnosticsWith); nil keeps
 	// matter.js's default selection, DataModelTest
@@ -553,6 +561,9 @@ func (c *Config) Validate() error {
 	}
 	errs = append(errs, c.Limits.validate()...)
 	errs = append(errs, c.Sessions.validate()...)
+	if c.DisableTimeSynchronization && c.TimeSynchronization != nil {
+		errs = append(errs, errors.New("node: TimeSynchronization excludes DisableTimeSynchronization"))
+	}
 	if at := c.Attestation; at.Files != nil && (at.Chain != nil || at.CertificationDeclaration != nil) {
 		errs = append(errs, errors.New("node: Attestation.Files excludes Chain and CertificationDeclaration"))
 	} else if at.Files == nil && at.BlockCommissioningOnError {

@@ -125,6 +125,9 @@ func ValidateSetupPIN(pin uint32) error {
 // the lower packages' own, owned here so `go doc` shows node.X and a host
 // implements node.OTAImageSource without importing cluster/core.
 
+// TimeSynchronizationConfig is the type of [Config].TimeSynchronization: the root TimeSynchronization's features ([mattercore.TimeSynchronizationConfig]).
+type TimeSynchronizationConfig = mattercore.TimeSynchronizationConfig
+
 // OTAImageSource is the type of [OTAProviderConfig].ImageSource: where the provider reads the images it offers ([mattercore.OTAImageSource]).
 type OTAImageSource = mattercore.OTAImageSource
 
