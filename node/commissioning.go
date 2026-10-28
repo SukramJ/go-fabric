@@ -152,6 +152,11 @@ func (h *commissioningHost) transition(ctx context.Context, window *bridge.Commi
 		adv := h.advert
 		adv.Discriminator = window.Discriminator()
 		adv.CommissioningMode = 2 // §4.3.1.3 CM=2: enhanced window opened by an admin
+		if window.IsJointFabric() {
+			// CM=3: a joint commissioning window (connectedhomeip
+			// CommissioningWindowManager.cpp:491, kEnabledJointFabric).
+			adv.CommissioningMode = 3
+		}
 		h.announce(ctx, adv, "commissioning.window.announce")
 		h.logger.Info("commissioning.window.open", slog.Int("discriminator", int(adv.Discriminator)))
 		return false

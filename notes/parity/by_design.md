@@ -104,6 +104,9 @@ pin lift confirms by re-reading the row, [`pin-lifts.md`](./pin-lifts.md)).
 | BD-Thread-TND-FromBorderRouter | `ThreadNetworkDiagnosticsServer.ts:14` is the empty subclass (absence: the class line, 14 lines in all) | `packages/node/src/behaviors/thread-network-diagnostics/ThreadNetworkDiagnosticsServer.ts` | `"export class ThreadNetworkDiagnosticsServer extends ThreadNetworkDiagnosticsBehavior {}"` | connectedhomeip `src/app/clusters/thread-network-diagnostics-server/DirectThreadNetworkDiagnosticsProvider.cpp` at `6170af84` (`ReadAttribute` :59, the unconfigured nulls :65-92, `RoutingRole` :104-145, the tables :184-293, the counts :325-571, the dataset attributes :577-689), `ThreadNetworkDiagnosticsCluster.cpp` |
 | BD-Thread-NetComm-ThreadVariant | `NetworkCommissioningServer.ts:18` is the empty subclass: no network-type branch, no Thread logic (absence: the class line, 18 lines in all) | `packages/node/src/behaviors/network-commissioning/NetworkCommissioningServer.ts` | `"export class NetworkCommissioningServer extends NetworkCommissioningBehavior {}"` | connectedhomeip `src/app/clusters/network-commissioning/NetworkCommissioningCluster.cpp` at `6170af84` (the Thread paths: `HandleScanNetworks` :349-367, `HandleAddOrUpdateThreadNetwork` :561-587, `OnFinished` :904-928, `ReadAttribute` :1102-1108) over `src/platform/OpenThread/GenericNetworkCommissioningThreadDriver.cpp` |
 | BD-chip-AmbientContextSensing-RulesInServer | `AmbientContextSensingServer.ts:14` is the empty subclass (absence: the class line, 14 lines in all) | `packages/node/src/behaviors/ambient-context-sensing/AmbientContextSensingServer.ts` | `"export class AmbientContextSensingServer extends AmbientContextSensingBehavior {}"` | connectedhomeip `src/app/clusters/ambient-context-sensing-server/AmbientContextSensingCluster.cpp` at `6170af84` (the constructor and `Startup` :48-89, `WriteAttribute` :140-159, `AddDetection` :205-301, `SetObjectCountConfig` :303-367, `SetObjectCount` :369-385, `SetHoldTimeLimits` :438-466, `TimerFired` :498-509, `UpdateDetectionAttributes` :600-646, `CheckPredictedActivity` :844-892; `AmbientContextSensingDelegate.h:78-106`), tests `tests/TestAmbientContextSensingCluster.cpp` |
+| BD-chip-JointFabricDatastore-RulesInServer | `JointFabricDatastoreServer.ts:14` is the empty subclass (absence: the class line, 14 lines in all) | `packages/node/src/behaviors/joint-fabric-datastore/JointFabricDatastoreServer.ts` | `"export class JointFabricDatastoreServer extends JointFabricDatastoreBehavior {}"` | connectedhomeip `src/app/server/JointFabricDatastore.cpp` at `6170af84` (the operations :181-2373, `RefreshNode`/`ContinueRefresh` :241-1130, the status codes), `JointFabricDatastore.h` (the capacities :512-517, the delegate :166-285, `MarkEntryCommittedIfFound` :75-85), `src/app/clusters/joint-fabric-datastore-server/joint-fabric-datastore-server.cpp` (the 20 commands :293-785), tests `src/app/server/tests/TestJointFabricDatastore.cpp` |
+| BD-chip-JointFabricAdministrator-RulesInServer | `JointFabricAdministratorServer.ts:14` is the empty subclass (absence: the class line, 14 lines in all) | `packages/node/src/behaviors/joint-fabric-administrator/JointFabricAdministratorServer.ts` | `"export class JointFabricAdministratorServer extends JointFabricAdministratorBehavior {}"` | connectedhomeip `src/app/clusters/joint-fabric-administrator-server/joint-fabric-administrator-server.cpp` at `6170af84` (the handlers :172-449), `JCMCommissionee.{h,cpp}`, `src/app/server/JointFabricAdministrator.h`, `src/credentials/jcm/` (`TrustVerification.cpp`, `VendorIdVerificationClient.cpp`), tests `joint-fabric-administrator-server/tests/TestJCMCommissionee.cpp`, `src/credentials/tests/jcm/` |
+| BD-chip-JCM-Commissioner | `ControllerCommissioningFlow.ts:576-583` runs `OperationalCredentials.Certificates` right after `OperationalCredentials.DeviceAttestation`, no Joint Commissioning step between (absence: the two step pushes, :573-585) | `packages/protocol/src/peer/ControllerCommissioningFlow.ts` | `"name: \"OperationalCredentials.DeviceAttestation\",\n            stepLogic: () => this.#deviceAttestation(),\n        });\n\n        this.commissioningSteps.push({\n            stepNumber: 11, // includes 11-13"` | connectedhomeip `src/controller/jcm/DeviceCommissioner.cpp` at `6170af84` (:45-550), `src/controller/jcm/AutoCommissioner.{h,cpp}` (the read paths `.h:56-66`), `src/controller/AutoCommissioner.cpp:522-531` (the stage after attestation), tests `src/controller/tests/jcm/TestJCMCommissioner.cpp` |
 
 ---
 
@@ -4919,6 +4922,173 @@ client only), so the kit refuses a kit `Declare` for it and a host mounts
 `sensing.NewAmbientContext` as `HostServer` (owner decision 2026-10-28).
 Pinned by `ambient_chip_test.go` (chip's 15 cases, 14 by meaning) and
 `ambient_rules_test.go`.
+
+### BD-chip-TlsCertificateManagement-RulesInServer — root and client certificate tables follow connectedhomeip behind the `CertificatePort`; reads serve the full certificate
+
+matter.js's `TlsCertificateManagementServer.ts:14` at `862ad75f` is the
+empty subclass. `cluster/tls.CertificateManagement` follows connectedhomeip's
+`TLSCertificateManagementCluster.cpp` at `6170af84` (the constructor's
+maxima :61-73, the nine handlers :230-575 with chip's status codes and
+the fabric-scoped tables) and its example delegate's table rules
+(`CertificateTableImpl.cpp`, `IncrementingIdHelper.h`: ids shared across
+fabrics, from 0). The keys and the CSR are the host's behind the
+`CertificatePort`; the tables persist as one settings record per server.
+Two deliberate differences: the reads of ProvisionedRootCertificates and
+ProvisionedClientCertificates serve the full certificates, as matter.js's
+generated behaviour does (rule 1) — chip's id-only encoding outside a
+large-payload transport (:136-166) is not mirrored (owner decision
+2026-10-28); and `ClientCSR` publishes a change notification for the new
+entry. The node mounts both TLS servers on endpoint 0 through
+`node.Config.TLS`, as chip serves them on the root endpoint only. Pinned
+by `tls/*_chip_test.go` (17 + 16 of chip's cases) and the fuzz target
+`FuzzCertificateUpserts` (chip's three `FUZZ_TEST`).
+
+### BD-chip-TlsClientManagement-RulesInServer — endpoint provisioning follows connectedhomeip; an endpoint in use answers the model's EndpointInUse
+
+matter.js's `TlsClientManagementServer.ts:14` at `862ad75f` is the empty
+subclass. `cluster/tls.ClientManagement` follows connectedhomeip's
+`TLSClientManagementCluster.cpp` at `6170af84` (:53-275: the maxima
+5…254, the hostname and id constraints, the cluster-specific
+`RootCertificateNotFound` / `ClientCertificateNotFound` :195/:199) and
+its example delegate (`examples/all-clusters-app/all-clusters-common/src/
+tls-client-management-instance.cpp:262-432`), and it is the certificate
+server's dependency checker. `RemoveEndpoint` of an endpoint a push
+transport uses answers the model's cluster status EndpointInUse, not the
+example delegate's INVALID_IN_STATE (owner decision 2026-10-28: the
+matter.js schema defines that status for this case). Pinned by
+`tls/client_chip_test.go` (chip's 16 cases).
+
+### BD-chip-WebRtcTransportProvider-RulesInServer — offer, answer, ICE and session rules follow connectedhomeip behind the `ProviderPort`
+
+matter.js's `WebRtcTransportProviderServer.ts:14` at `862ad75f` is the
+empty subclass: a controller could open a session on an unallocated
+stream or under privacy mode. `cluster/camera.Provider` follows
+connectedhomeip's `WebRTCTransportProviderCluster.cpp` at `6170af84`: the
+validators (:133-209, :400-592), the session table (:295-398, ids ≤ 65534)
+and the five handlers (:595-1213) with chip's status codes; the stream
+checks go through `camera.StreamSource`, which the AvStream server (26-A2)
+implements with the camera app's answers. The WebRTC stack is the host's
+behind the `ProviderPort`, as the requestor's is. Pinned by
+`provider_chip_test.go` (chip's 7 cases) and `provider_rules_test.go`.
+
+### BD-chip-PushAvStreamTransport-RulesInServer — push transports follow connectedhomeip behind the `PushTransportPort`; ExpiryTime is taken as seconds until deallocation
+
+matter.js's `PushAvStreamTransportServer.ts:14` at `862ad75f` is the
+empty subclass. `cluster/camera.PushTransport` follows connectedhomeip's
+`PushAVStreamTransportLogic.cpp` at `6170af84` (:293-1603 and
+:1903-2031: the URL check, the options and stream validation, the six
+handlers the matter.js model has, the events, the expiry timer, four
+transports per fabric) with the TLS endpoint, zone and stream checks
+against the node's servers (without a TLS client lookup every allocation
+is InvalidTLSEndpoint, as chip answers without a delegate; without Zones a
+non-empty zone list is DYNAMIC_CONSTRAINT_ERROR). UpdateMotionZoneOptions,
+the AmbientContext trigger, SFrameConfig and the CMAF CENC fields are not
+in the matter.js model at the pin, so their chip checks are left out.
+chip's `ScheduleTransportDeallocate` takes ExpiryTime as the seconds until
+deallocation (:1216, :357-385) although the field is an epoch value; the
+server mirrors chip, the authority where matter.js has no logic. Pinned by
+`pushtransport_chip_test.go` (7 of chip's 9 logic cases, 17 of 33 URL
+cases; the storage cases are chip's buffers) and `pushtransport_rules_test.go`.
+
+### BD-chip-JointFabricDatastore-RulesInServer — the datastore's tables, refresh and sync follow connectedhomeip behind the `DatastoreSync` port
+
+matter.js's `JointFabricDatastoreServer.ts:14` at `862ad75f` is the empty
+subclass. `cluster/jointfabric.Datastore` follows connectedhomeip's
+`JointFabricDatastore.cpp` at `6170af84`: the operations and their status
+codes (:181-2373), the refresh (:241-1130), the pending/committed state
+(`MarkEntryCommittedIfFound`, `.h:75-85`), the capacities (`.h:512-517`)
+and the 20 commands the model has at the pin
+(`joint-fabric-datastore-server.cpp:293-785`). The pushes to the member
+nodes are the host's behind `DatastoreSync` (chip's `Delegate`,
+`.h:166-250`), synchronous — chip's two failure points collapse into one,
+handled as chip handles the completion; the tables persist as one record
+per server (chip keeps them in memory) and every attribute a change
+touches is reported (chip reports NodeList only). Two recorded
+divergences (owner decision 2026-10-28): the refresh's binding merge
+removes only the refreshed endpoint's missing committed bindings, as the
+groups' merge does (:397) — chip's predicate (:567-585) also drops the
+node's bindings on every other endpoint, which a node with bindings on two
+endpoints shows; and a refresh of a node the datastore does not hold ends
+cleanly — chip leaves `mRefreshingNodeId` set (:247-249) and refuses every
+later refresh. Pinned by `datastore_chip_test.go` (chip's 26 cases) and
+`datastore_rules_test.go` (the rules of `TC_JFDS_2_2…2_5`).
+
+### BD-chip-JointFabricAdministrator-RulesInServer — the administrator's commands and the commissionee's trust verification follow connectedhomeip; the anchor is recorded at CommissioningComplete as chip's example app does
+
+matter.js's `JointFabricAdministratorServer.ts:14` at `862ad75f` is the
+empty subclass. `cluster/jointfabric.Administrator` follows connectedhomeip's
+`joint-fabric-administrator-server.cpp:172-449` at `6170af84`
+(OpenJointCommissioningWindow :173-237 with its cluster-specific statuses,
+AnnounceJointFabricAdministrator :239-290, ICACCSRRequest :305-354, AddICAC
+:356-391 with the VerifyAddICAC steps; the fail-safe handler :109-117) and
+`JCMCommissionee.cpp` (the commissionee's trust verification, 510 lines),
+with `client/jcm` after `src/credentials/jcm` (`TrustVerification.cpp`,
+`VendorIdVerificationClient.cpp`), behind `AdministratorPort` (chip's
+`GetIcacCsr` delegate, `JointFabricAdministrator.h:29-36`) and
+`CommissionerReach` (the reads of the announcing commissioner; a node
+adapter follows in wave 27-B). TransferAnchorRequest and
+TransferAnchorComplete answer SUCCESS without effect, as chip's empty
+handlers do (:439-449). The joint window is advertised with CM=3. One
+addition from chip's example application, kept in the server so a kit
+device records its anchor without host code (owner decision 2026-10-28):
+at CommissioningComplete the administrator takes the fabric whose NOC
+carries the administrator and anchor CATs as AdministratorFabricIndex and
+records it in the datastore (`examples/jf-admin-app/linux/JFAManager.cpp:95-157`);
+chip's server does not do this. Pinned by `commissionee_chip_test.go`
+(13 + 3 + 9 of chip's cases; the four C++ liveness cases are one context
+test) and `administrator_rules_test.go` (the statuses `TC_JFADMIN` checks).
+
+### BD-chip-JCM-Commissioner — joint commissioning runs as step 10.2 after chip's commissioner
+
+matter.js's commissioning flow has no joint-commissioning step
+(`ControllerCommissioningFlow.ts:536-656` at `862ad75f`). The Go
+commissioner runs chip's (`src/controller/jcm/DeviceCommissioner.cpp`
+:45-…: read the admin's fabric index and endpoint, its fabrics and NOCs,
+verify the vendor id, ask the host for consent) as the Go-named step 10.2
+`JointFabric.TrustVerification`, between DeviceAttestation 10.1 and
+Certificates 11.1, where chip's AutoCommissioner runs
+`kJCMTrustVerification` after the attestation revocation check
+(`src/controller/AutoCommissioner.cpp:522-531`); `Options.JointFabric`
+carries the consent, the trust anchors and the stage progress, and
+`Options.CATs` sets the issued NOC's CATs. chip's CM=3 check on the
+commissioner side is not ported. Pinned by `jcm_chip_test.go` (chip's 7
+cases of `TestJCMCommissioner.cpp`) and the `fabrictest` end-to-end
+(anchor recorded, refused consent aborts with `ErrJointFabric`).
+
+### BD-Matter-ControllerRemainder — the invoke batcher, the discovery sessions, the vendor-info service and the NOC rotation after matter.js, with five Go-shaped edges
+
+Wave 27-A mirrors four matter.js controller behaviours (all at `862ad75f`):
+the invoke batcher (`ClientInteraction.ts` `#invokeWithBatching` :744-1005,
+`isBatchable` :185-214: one lane per network, CommandRefs per lane, a
+faster window restarts the timer, a batch above maxPathsPerInvoke is
+split, alone-and-at-once for endpoint 0, timed, suppressed-response,
+Large Message and the other `isBatchable` exclusions); the discovery
+sessions (`behavior/system/controller/discovery/`: `Discovery.ts:37`,
+`InstanceDiscovery.ts:18`, `ContinuousDiscovery.ts:18`,
+`ParallelPaseDiscovery.ts:45`, `PaseDiscovery.ts:28`,
+`CommissioningDiscovery.ts:23`) as `client/discovery.Session[T]` with
+`FindInstance`, `FindAll`, `Race`, `CommissioningRace` and `PASERace`, so
+`controller.Pair` races DNS-SD and BLE and the first PASE wins; the
+DCL vendor-info service (`DclVendorInfoService.ts:166-468`, wired as
+`DclBehavior.ts:101-115` wires it: `controller.Config.DCL`,
+`Controller.VendorInfo`); and the NOC rotation (`FabricAuthority.ts:57,
+:181-205`, on every controller start as `MatterController.ts:402-415`;
+no opt-out, owner decision 2026-10-28). Five Go-shaped edges: the batch
+window's Instant is a goroutine yield, not a clock timer, and there is no
+interaction-level default lane; the race's transports report as the
+progress sub-steps `Discovery.IP` / `Discovery.BLE` (number 2.1, Go
+names — an extension of BD-Matter-ControllerProgressAndUpdateEvents);
+`VendorInfoService.Observe` is Go-only and `ProductInfo` bitmaps are kept
+raw; `FabricAuthority` manages one fabric per store and never rotates a
+key an `OperationalSigner` holds; `Discover` reports a device only once it
+has an address. PQC phase 1 (`Specification.ts:78-105`, the forward
+feature) is implemented on Go 1.27's `crypto/mldsa` and `crypto/x509`
+(no dependency; the circl decision of 2026-10-28 is superseded) and stays
+off behind `internal/forward`, as matter.js keeps it off until a released
+revision carries it (owner decision 2026-10-28); device-side PQC (NOC,
+ICAC, CASE) stays out, as matter.js admits ML-DSA only in the attestation
+certificates. Pinned by the `*_parity_matterjs_test.go` ports listed in
+`notes/briefs/reports/27A.md` (test register, planned ratchet 3).
 
 ### BD-Matter-GeneratedServerSuffices — clusters whose generated server is complete: no source carries behaviour beyond the model
 

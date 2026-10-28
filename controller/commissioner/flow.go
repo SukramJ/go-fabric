@@ -172,6 +172,9 @@ func (f *flow) initializeSteps() {
 		{11, 1, "OperationalCredentials.Certificates", f.certificates},
 		{15, 1, "AccessControl", f.configureAccessControlLists},
 	}
+	if f.opts.JointFabric != nil { // jcm.go
+		f.steps = append(f.steps, step{10, 2, StepJointFabric, f.jointFabricTrustVerification})
+	}
 	if f.ble || f.opts.WiFiNetwork != nil || f.opts.ThreadNetwork != nil {
 		f.steps = append(f.steps, step{16, 1, "NetworkCommissioning.Validate", f.validateNetwork})
 		if f.opts.WiFiNetwork != nil {
@@ -847,7 +850,7 @@ func (f *flow) certificates(ctx context.Context) (stepResult, error) {
 	if _, err := f.invoke(ctx, opCredsCluster, cmdAddTrustedRootCertificate, octetsRequest(f.fabric.CA.RootCert()), true); err != nil {
 		return 0, err
 	}
-	noc, err := f.fabric.CA.GenerateNOC(operationalKey, f.fabric.FabricID, f.address.NodeID, nil)
+	noc, err := f.fabric.CA.GenerateNOC(operationalKey, f.fabric.FabricID, f.address.NodeID, f.opts.CATs)
 	if err != nil {
 		return 0, err
 	}

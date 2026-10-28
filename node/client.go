@@ -241,6 +241,7 @@ func (n *Node) observeTopology(inner func(context.Context) (*endpoint.Topology, 
 		n.persistUserLabels(ctx, t)
 		n.attachFailSafe(ctx, t)
 		n.attachTLS(t)
+		n.attachNodeServices(t)
 		n.bindSync.mu.Lock()
 		n.bindSync.topo = t
 		running := n.bindSync.running

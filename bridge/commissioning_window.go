@@ -148,6 +148,11 @@ type CommissioningWindow struct {
 	// window opener). See [CommissioningWindow.HasSuppliedVerifier].
 	hasVerifier bool
 
+	// jointFabric records that the window is a Joint Fabric
+	// administrator's joint commissioning window
+	// ([wire.OpenWindowParams].JointFabric), advertised CM=3.
+	jointFabric bool
+
 	// closeTimer fires when the window expires so the bridge auto-
 	// reverts to "no PASE acceptor". Cancelled when RevokeWindow
 	// closes the window early.
@@ -289,6 +294,16 @@ func (w *CommissioningWindow) Timing() (openedAt, deadline time.Time, timeout ti
 		return time.Time{}, time.Time{}, 0
 	}
 	return w.openedAt, w.expiresAt, w.timeout
+}
+
+// IsJointFabric reports whether the open window is a joint commissioning
+// window (OpenJointCommissioningWindow, connectedhomeip
+// CommissioningWindowManager.cpp:413-419 at 6170af84), which the node
+// advertises CM=3 (:491).
+func (w *CommissioningWindow) IsJointFabric() bool {
+	w.mu.RLock()
+	defer w.mu.RUnlock()
+	return w.jointFabric
 }
 
 // HasSuppliedVerifier reports whether the currently-open window was opened
@@ -493,6 +508,7 @@ func (w *CommissioningWindow) closeLocked() (hook, restore func()) {
 	w.adminVendorSet = false
 	w.isBasicWindow = false
 	w.hasVerifier = false
+	w.jointFabric = false
 	if w.closeTimer != nil {
 		w.closeTimer.Stop()
 		w.closeTimer = nil
@@ -620,6 +636,7 @@ func (w *CommissioningWindow) OpenWindow(ctx context.Context, params wire.OpenWi
 	// per Matter §11.19.5.2.
 	w.isBasicWindow = params.IsBasicWindow
 	w.hasVerifier = !params.IsBasicWindow && len(params.PAKEPasscodeVerifier) > 0
+	w.jointFabric = params.JointFabric && w.hasVerifier
 	if params.AdminFabricIndex != 0 {
 		w.adminFabric = params.AdminFabricIndex
 		w.adminFabricSet = true
