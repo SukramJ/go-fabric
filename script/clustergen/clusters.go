@@ -145,15 +145,21 @@ var committed = []string{
 	"PowerSourceConfiguration",
 	"EcosystemInformation",
 	"Actions",
-	// cluster/camera (briefs 26-A1, 26-A2): WebRtcTransportRequestor after
-	// matter.js's WebRtcTransportRequestorServer.ts; Chime,
-	// CameraAvSettingsUserLevelManagement, CameraAvStreamManagement and
-	// ZoneManagement after connectedhomeip.
+	// cluster/camera (briefs 26-A1, 26-A2, 26-A3): WebRtcTransportRequestor
+	// after matter.js's WebRtcTransportRequestorServer.ts; Chime,
+	// CameraAvSettingsUserLevelManagement, CameraAvStreamManagement,
+	// ZoneManagement, WebRtcTransportProvider and PushAvStreamTransport
+	// after connectedhomeip.
 	"WebRtcTransportRequestor",
 	"Chime",
 	"CameraAvSettingsUserLevelManagement",
 	"CameraAvStreamManagement",
 	"ZoneManagement",
+	"WebRtcTransportProvider",
+	"PushAvStreamTransport",
+	// cluster/tls (brief 26-A3): after connectedhomeip.
+	"TlsCertificateManagement",
+	"TlsClientManagement",
 	// cluster/media (ADR 0022)
 	"MediaPlayback",
 	"KeypadInput",
@@ -179,18 +185,14 @@ var committed = []string{
 	"Groupcast",
 	"WaterTankLevelMonitoring",
 	"AmbientContextSensing",
-	// The camera, Thread, Joint Fabric and TLS clusters (brief CL §1,
+	// The Joint Fabric clusters (brief CL §1,
 	// owner decision 2026-10-25): served by the generated server as
 	// matter.js serves them — its server for each is the generated
 	// behaviour stub (`export class XServer extends XBehavior {}`, e.g.
 	// packages/node/src/behaviors/thread-network-diagnostics/
 	// ThreadNetworkDiagnosticsServer.ts at 862ad75f).
-	"WebRtcTransportProvider",
-	"PushAvStreamTransport",
 	"JointFabricDatastore",
 	"JointFabricAdministrator",
-	"TlsCertificateManagement",
-	"TlsClientManagement",
 }
 
 // definitionOnly lists the clusters whose definition is committed without

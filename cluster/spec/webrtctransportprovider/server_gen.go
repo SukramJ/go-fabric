@@ -163,6 +163,67 @@ func (s *Server) HandleEndSession(fn func(ctx context.Context, req EndSessionReq
 	return spec.HandleOn(s.Underlying(), CmdEndSession, fn)
 }
 
+// Host is the WebRtcTransportProvider kit server's host methods: the ones Set, Get and
+// the typed handlers do not reach (cluster/camera Provider).
+type Host interface {
+	// UpsertSession stores or replaces a session of CurrentSessions by
+	// its id — the host's change of a session the provider signals
+	// (connectedhomeip WebRTCTransportProviderCluster::UpsertSession).
+	UpsertSession(session WebRTCSessionStruct) error
+	// RemoveSession drops the session of the id from CurrentSessions;
+	// an unknown id changes nothing (chip's RemoveSession).
+	RemoveSession(sessionID uint16)
+}
+
+// Host returns the mounted server's host methods when it implements
+// Host — the kit's server does; nil for a server that does not, as the
+// generated one and a host's own (Declare.HostServer) normally do not.
+func (s *Server) Host() Host {
+	h, _ := s.Underlying().(Host)
+	return h
+}
+
+// OfferArgs is a SolicitOffer or ProvideOffer the server validated
+// (connectedhomeip Delegate::OfferRequestArgs and
+// ProvideOfferRequestArgs, WebRTCTransportProviderCluster.h:50-68):
+// the session id the server allocated (or the re-offered session's),
+// the stream usage, the streams after the server's checks and
+// selection (nil: the kind was not requested), the ICE settings, the
+// requestor's node, fabric and endpoint, and — for ProvideOffer —
+// the SDP offer.
+type OfferArgs struct {
+	SessionID             uint16
+	StreamUsage           StreamUsageEnum
+	VideoStreams          *[]uint16
+	AudioStreams          *[]uint16
+	IceServers            *[]ICEServerStruct
+	IceTransportPolicy    *string
+	MetadataEnabled       *bool
+	PeerNodeID            uint64
+	FabricIndex           uint8
+	OriginatingEndpointID uint16
+	Sdp                   string
+}
+
+// ProviderPort is the camera's WebRTC stack (cluster/camera Provider,
+// after connectedhomeip's WebRTCTransportProvider Delegate): the
+// kit's server validates each command — its constraints, the privacy
+// modes, the stream usage and the streams against the camera's
+// CameraAvStreamManagement, the requestor's session — before it
+// calls the port, and keeps CurrentSessions. SolicitOffer and
+// ProvideOffer return the session to store; deferredOffer reports a
+// camera in standby that sends its offer later. The host counts the
+// streams a session uses (the AvStream's reference counts). An error
+// answers its status, FAILURE without one; EndSession's ends the
+// session too.
+type ProviderPort interface {
+	SolicitOffer(ctx context.Context, args OfferArgs) (session WebRTCSessionStruct, deferredOffer bool, err error)
+	ProvideOffer(ctx context.Context, args OfferArgs) (session WebRTCSessionStruct, err error)
+	ProvideAnswer(ctx context.Context, sessionID uint16, sdp string) error
+	ProvideIceCandidates(ctx context.Context, sessionID uint16, candidates []ICECandidateStruct) error
+	EndSession(ctx context.Context, sessionID uint16, reason uint8) error
+}
+
 // Declare is the declaration of the WebRtcTransportProvider cluster on a device:
 // device.New<Type> and device.FromSpec take it, and every field is
 // optional — the zero value mounts the cluster (an optional one too)
@@ -196,6 +257,8 @@ type Declare struct {
 	// HandleEndSession handles the EndSession command in place of the server
 	// (Server.HandleEndSession), inline; an optional command it handles is accepted.
 	HandleEndSession func(ctx context.Context, req EndSessionRequest) (struct{}, error)
+	// ProviderPort is the host port the kit's server runs on ([ProviderPort]).
+	ProviderPort ProviderPort
 	// HostServer is the host's own server for the cluster, mounted in
 	// place of the kit's — also for a cluster the device type does not
 	// list. The hooks above go on it; Initial, Features and the ports are
