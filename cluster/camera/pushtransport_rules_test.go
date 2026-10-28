@@ -378,3 +378,14 @@ func TestPushEventsAndExpiry(t *testing.T) {
 	}
 	var _ padef.Host = p
 }
+
+func TestPushAttachTLS(t *testing.T) {
+	p, _ := newPush(t, func(c *camera.PushTransportConfig) { c.TLSEndpoints, c.TLSCertificates = nil, nil })
+	_, err := pushInvoke(p, padef.CmdAllocatePushTransport, padef.AllocatePushTransportRequest{TransportOptions: motionOptions()})
+	wantPushCluster(t, "before AttachTLS", err, padef.StatusCodeInvalidTlsEndpoint)
+	p.AttachTLS(fakeTLS{}, fakeCerts{})
+	allocatePush(t, p, motionOptions())
+	// A lookup already set stays.
+	p.AttachTLS(fakeTLS{nullCCDID: true}, nil)
+	allocatePush(t, p, motionOptions())
+}

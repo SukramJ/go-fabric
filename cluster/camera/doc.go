@@ -37,7 +37,7 @@
 //     PushAVStreamTransportLogic.cpp at 6170af84): the WebRTC sessions and
 //     the push connections, each request checked against the camera's
 //     [StreamSource] and, for a push transport, its [ZoneSource] and the
-//     node's TLS servers (cluster/tls) before the host's [ProviderPort] or
+//     node's TLS servers (cluster/tls, node.Config.TLS) before the host's [ProviderPort] or
 //     [PushTransportPort] runs it.
 //
 // Each server is built on its generated definition (cluster/spec/…, ADR

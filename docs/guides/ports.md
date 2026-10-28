@@ -208,7 +208,7 @@ the kit server implements for host inputs: the switch's.
 | ThreadBorderRouterManagement, ThreadNetworkDiagnostics | `Refresh` (the host schedules it) |
 | ThreadNetworkDirectory | `ReloadNetworks` |
 | TlsCertificateManagement | `RootCertificate`, `ClientCertificate`, `SetDependencyChecker` |
-| TlsClientManagement | `ProvisionedEndpoint`, `MutateEndpointReferenceCount`, `RootCertificateInUse`, `ClientCertificateInUse` |
+| TlsClientManagement | `ProvisionedEndpoint`, `MutateEndpointReferenceCount` (an endpoint in use is not removed: EndpointInUse), `RootCertificateInUse`, `ClientCertificateInUse` |
 | WebRtcTransportProvider | `UpsertSession`, `RemoveSession` (by the session id) |
 | WebRtcTransportRequestor | `UpsertSession`, `RemoveSession` (by `webrtctransportrequestordef.SessionKey`) |
 | WiFiNetworkManagement | `SetNetworkCredentials`, `ClearNetworkCredentials`, `Passphrase` |

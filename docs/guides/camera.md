@@ -28,8 +28,11 @@ ZoneManagement, WebRtcTransportProvider and PushAvStreamTransport get the
 kit's server once the declaration carries their ports; the two
 transports check against the device's CameraAvStreamManagement and
 ZoneManagement servers. The TLS servers (`cluster/tls`) are node-scoped:
-RootNode lists them, and the host builds them with
-`tls.NewCertificateManagement` and `tls.NewClientManagement`. Without the port they keep the
+`node.Config.TLS` (`node.TLSConfig`: the `CertificatePort`, the maxima,
+the stores) mounts them on endpoint 0, as connectedhomeip serves them,
+and hands their lookups to every PushAvStreamTransport whose declaration
+names no `TLSEndpoints` or `TLSCertificates` of its own
+(`PushTransport.AttachTLS`). Without the port they keep the
 generated server, and the kit logs `device.default_server.generated`.
 
 ## The signalling model
@@ -321,7 +324,8 @@ camera's zones, `InvalidZone`), the streams, the segment duration against
 the key-frame interval (`InvalidOptions`), the bandwidth (the port) and
 the pre-roll (`InvalidPreRollLength`). The port then allocates the
 transport with its `TLSCredentials`, the endpoint and its DER
-certificates. The transport starts inactive; `SetTransportStatus`
+certificates; without the node's TLS servers or the declaration's
+lookups every allocation is InvalidTLSEndpoint. The transport starts inactive; `SetTransportStatus`
 activates it, `ManuallyTriggerTransport` triggers an active, not
 continuous one. An ExpiryTime deallocates the transport after that many
 seconds, as chip counts it. The host reports an upload's start and end
@@ -336,7 +340,10 @@ signed client certificate and then a TLS endpoint naming both
 with node-wide ids, refuses a duplicate (`ALREADY_EXISTS`), a full
 fabric (`RESOURCE_EXHAUSTED`) and a certificate the port judges invalid
 (`DYNAMIC_CONSTRAINT_ERROR`), and keeps a certificate an endpoint names
-(`INVALID_IN_STATE`). The fingerprint of `Lookup…Certificate` is the
+(`INVALID_IN_STATE`); an endpoint a user counts (`MutateEndpointReferenceCount`)
+is not removed (EndpointInUse). Reads of the certificate lists serve the
+full certificates, as matter.js's generated behaviour; chip's id-only
+encoding outside a large-payload transport is not mirrored. The fingerprint of `Lookup…Certificate` is the
 certificate's SHA-256. A removed fabric takes its entries along
 (`MatterFabricRemoved`). The tables persist through any `store.Settings`
 (the node's store) under the device's key.

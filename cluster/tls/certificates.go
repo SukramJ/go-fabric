@@ -82,6 +82,12 @@ type CertificateManagementConfig struct {
 // the removal of a fabric's entries — while the [CertificatePort] holds
 // the keys. Mirrors TLSCertificateManagementCluster.cpp at 6170af84
 // (matter.js's server is the generated behaviour).
+//
+// A read of ProvisionedRootCertificates or ProvisionedClientCertificates
+// serves the full entries, certificates included, as matter.js's generated
+// behaviour does (rule 1). chip encodes the ids alone on a transport
+// without large payloads (TLSCertificateManagementCluster.cpp:136-166);
+// that is not mirrored.
 type CertificateManagement struct {
 	*spec.Instance
 	spec.SelfHeld
@@ -659,7 +665,12 @@ func (c *CertificateManagement) removeClient(ctx context.Context, fields any) (a
 // keys. Mirrors chip OnFabricRemoved (:571-575) and
 // CertificateTableImpl::RemoveFabric (CertificateTableImpl.cpp:572-599).
 func (c *CertificateManagement) MatterFabricRemoved(fabricIndex uint8) {
-	ctx := context.Background()
+	c.FabricRemoved(context.Background(), fabricIndex)
+}
+
+// FabricRemoved is [CertificateManagement.MatterFabricRemoved] on ctx, the
+// node's call inside RemoveFabric.
+func (c *CertificateManagement) FabricRemoved(ctx context.Context, fabricIndex uint8) {
 	c.mu.Lock()
 	prev := cloneRecord(c.rec)
 	var dropped []uint16

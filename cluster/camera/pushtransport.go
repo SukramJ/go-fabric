@@ -132,6 +132,8 @@ type PushTransport struct {
 	conns    []TransportConfiguration
 	timers   map[uint16]clock.Timer
 	lastID   uint16
+	tlsEP    padef.TLSEndpoints
+	tlsCerts padef.TLSCertificates
 }
 
 // Compile-time assertions.
@@ -164,7 +166,10 @@ func NewPushTransport(cfg PushTransportConfig) (*PushTransport, error) {
 	if clk == nil {
 		clk = clock.System{}
 	}
-	p := &PushTransport{port: cfg.Port, cfg: cfg, view: streamView{cfg.Streams}, clock: clk, timers: map[uint16]clock.Timer{}}
+	p := &PushTransport{
+		port: cfg.Port, cfg: cfg, view: streamView{cfg.Streams}, clock: clk, timers: map[uint16]clock.Timer{},
+		tlsEP: cfg.TLSEndpoints, tlsCerts: cfg.TLSCertificates,
+	}
 	p.conns = slices.Clone(cfg.Connections)
 	handlers := map[uint32]spec.CommandHandler{
 		padef.CmdAllocatePushTransport:    p.allocate,
@@ -195,6 +200,22 @@ func (p *PushTransport) Connections() []TransportConfiguration {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	return slices.Clone(p.conns)
+}
+
+// AttachTLS hands the server the node's TLS servers: each lookup the
+// configuration left nil is set, one the host set stays. The node calls
+// it for every PushAvStreamTransport of its topology when it mounts the
+// TLS servers on endpoint 0 (node.Config.TLS); chip wires the same
+// delegates (CodegenIntegration.cpp:124, :133).
+func (p *PushTransport) AttachTLS(endpoints padef.TLSEndpoints, certificates padef.TLSCertificates) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.tlsEP == nil {
+		p.tlsEP = endpoints
+	}
+	if p.tlsCerts == nil {
+		p.tlsCerts = certificates
+	}
 }
 
 // Close stops the expiry timers (chip's Shutdown, :105-112).
@@ -495,19 +516,22 @@ func pushRequest[T any](fields any, name string) (T, error) {
 // certificates; InvalidTLSEndpoint otherwise, and always without the
 // endpoint server (:966-972).
 func (p *PushTransport) credentials(fabric uint8, endpointID uint16) (TLSCredentials, error) {
-	if p.cfg.TLSEndpoints == nil {
+	p.mu.Lock()
+	endpoints, certificates := p.tlsEP, p.tlsCerts
+	p.mu.Unlock()
+	if endpoints == nil {
 		return TLSCredentials{}, pushErr(padef.StatusCodeInvalidTlsEndpoint, "no TLS client management")
 	}
-	ep, ok := p.cfg.TLSEndpoints.ProvisionedEndpoint(fabric, endpointID)
+	ep, ok := endpoints.ProvisionedEndpoint(fabric, endpointID)
 	if !ok || ep.Ccdid.Null { // :924-933
 		return TLSCredentials{}, pushErr(padef.StatusCodeInvalidTlsEndpoint, "TLS endpoint %d is not provisioned with a client certificate", endpointID)
 	}
 	cred := TLSCredentials{Endpoint: ep}
-	if p.cfg.TLSCertificates == nil { // :951-954
+	if certificates == nil { // :951-954
 		return cred, nil
 	}
-	client, okc := p.cfg.TLSCertificates.ClientCertificate(fabric, ep.Ccdid.Value) // :944-945
-	root, okr := p.cfg.TLSCertificates.RootCertificate(fabric, ep.Caid)            // :946-947
+	client, okc := certificates.ClientCertificate(fabric, ep.Ccdid.Value) // :944-945
+	root, okr := certificates.RootCertificate(fabric, ep.Caid)            // :946-947
 	if !okc || !okr {
 		return TLSCredentials{}, pushErr(padef.StatusCodeInvalidTlsEndpoint, "TLS endpoint %d's certificates are not provisioned", endpointID)
 	}

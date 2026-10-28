@@ -202,7 +202,7 @@ var hostCases = map[uint32]hostCase{
 	h_cs.ClusterID: {kit: kitOf[*camera.AvStream](), host: hostOf[h_cs.Host](h_cs.Wrap), covered: []string{"AudioStreams", "PrivacyModes", "SnapshotStreams", "StreamUsagePriorities", "SupportedStreamUsages", "VideoStreams"}},
 	h_zm.ClusterID: {kit: kitOf[*camera.Zones](), host: hostOf[h_zm.Host](h_zm.Wrap), covered: []string{"MaxZones", "Sensitivity", "SetSensitivity", "TriggerFor", "TriggerList", "ZoneList"}},
 	h_wp.ClusterID: {kit: kitOf[*camera.Provider](), host: hostOf[h_wp.Host](h_wp.Wrap), covered: []string{"Sessions"}},
-	h_pa.ClusterID: {kit: kitOf[*camera.PushTransport](), host: hostOf[h_pa.Host](h_pa.Wrap), covered: []string{"Close", "Connections"}},
+	h_pa.ClusterID: {kit: kitOf[*camera.PushTransport](), host: hostOf[h_pa.Host](h_pa.Wrap), covered: []string{"AttachTLS", "Close", "Connections"}},
 	// The media servers: their event helpers are Emit<Event>'s.
 	h_mp.ClusterID:       {kit: kitOf[*media.PlaybackServer](), covered: []string{"EmitStateChanged"}},
 	h_keypad.ClusterID:   {kit: kitOf[*media.KeypadServer]()},

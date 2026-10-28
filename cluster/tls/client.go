@@ -390,7 +390,9 @@ func (m *ClientManagement) find(ctx context.Context, fields any) (any, error) {
 // remove carries out RemoveEndpoint. Mirrors chip HandleRemoveEndpoint
 // (:249-271) and the example delegate's RemoveProvisionedEndpointByID
 // (tls-client-management-instance.cpp:341-362): an unknown endpoint is
-// NOT_FOUND, one in use (a reference count above 0) INVALID_IN_STATE.
+// NOT_FOUND; one in use (a reference count above 0) answers the model's
+// cluster status EndpointInUse, where chip's example delegate answers
+// INVALID_IN_STATE (:352) — owner decision 2026-10-28.
 func (m *ClientManagement) remove(ctx context.Context, fields any) (any, error) {
 	req, err := requestOf[tcldef.RemoveEndpointRequest](fields, "TlsClientManagement", "RemoveEndpoint")
 	if err != nil {
@@ -408,7 +410,7 @@ func (m *ClientManagement) remove(ctx context.Context, fields any) (any, error) 
 		return nil, spec.Errorf(im.StatusNotFound, "TlsClientManagement: endpoint %d not found", req.EndpointId)
 	case m.rec.Endpoints[i].ReferenceCount != 0: // :352
 		m.mu.Unlock()
-		return nil, spec.Errorf(im.StatusInvalidInState, "TlsClientManagement: endpoint %d is in use", req.EndpointId)
+		return nil, clusterStatus{tcldef.StatusCodeEndpointInUse, fmt.Sprintf("TlsClientManagement: endpoint %d is in use", req.EndpointId)}
 	}
 	prev := cloneEndpoints(m.rec)
 	m.rec.Endpoints = slices.Delete(m.rec.Endpoints, i, i+1)
@@ -425,12 +427,18 @@ func (m *ClientManagement) remove(ctx context.Context, fields any) (any, error) 
 // OnFabricRemoved (:272-275) and the example delegate's RemoveFabric
 // (tls-client-management-instance.cpp:391-408).
 func (m *ClientManagement) MatterFabricRemoved(fabricIndex uint8) {
+	m.FabricRemoved(context.Background(), fabricIndex)
+}
+
+// FabricRemoved is [ClientManagement.MatterFabricRemoved] on ctx, the
+// node's call inside RemoveFabric.
+func (m *ClientManagement) FabricRemoved(ctx context.Context, fabricIndex uint8) {
 	m.mu.Lock()
 	prev := cloneEndpoints(m.rec)
 	m.rec.Endpoints = slices.DeleteFunc(m.rec.Endpoints, func(e endpointEntry) bool { return e.Fabric == fabricIndex })
 	changed := len(prev.Endpoints) != len(m.rec.Endpoints)
 	if changed {
-		_ = m.commitLocked(context.Background(), prev)
+		_ = m.commitLocked(ctx, prev)
 	}
 	m.mu.Unlock()
 	if changed {

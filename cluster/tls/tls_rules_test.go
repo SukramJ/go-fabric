@@ -279,8 +279,10 @@ func TestProvisionEndpointRules(t *testing.T) {
 	if err := m.MutateEndpointReferenceCount(testFabric, id, 2); err != nil {
 		t.Fatal(err)
 	}
-	_, err = m.MatterInvoke(ctx, tcldef.CmdRemoveEndpoint, tcldef.RemoveEndpointRequest{EndpointId: id}) // instance :352
-	wantStatus(t, "in use", err, im.StatusInvalidInState)
+	_, err = m.MatterInvoke(ctx, tcldef.CmdRemoveEndpoint, tcldef.RemoveEndpointRequest{EndpointId: id}) // instance :352, owner decision: EndpointInUse
+	if code, ok := clusterCode(err); !ok || code != uint8(tcldef.StatusCodeEndpointInUse) {
+		t.Fatalf("in use: %v", err)
+	}
 	// An update keeps the id and resets the count (instance :315-321).
 	upd.EndpointId = spec.ValueOf(id)
 	resp, err := invoke[tcldef.ProvisionEndpointResponse](ctx, t, m, tcldef.CmdProvisionEndpoint, upd)
