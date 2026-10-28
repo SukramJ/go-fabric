@@ -437,45 +437,66 @@
     },
     {
       "path": "packages/node/test/behavior/system/controller/discovery/ContinuousDiscoveryTest.ts",
-      "status": "planned",
-      "until": "M6 phase 27",
-      "reason": "Continuous discovery creating one node for a device that concurrent discoveries report. Left planned in brief CM: it tests matter.js's controller Discovery behaviour (Discovery, ParallelPaseDiscovery, CommissioningDiscovery, ContinuousDiscovery over a ScannerSet: parallel PASE attempts, cancellation and abort, the error kinds, transport selection from the discovery capabilities), which the Go controller does not have in that shape — Controller.Pair finds one device per transport serially and Discover is DNS-SD only. The identity check of the same class is ported (CommissioningIdentityTest). Milestone 6 phase 27 (the register at 100 %).",
+      "status": "ported",
+      "go": [
+        "client/discovery:TestContinuousDiscoveryParity"
+      ],
+      "reason": "Two concurrent continuous discoveries (client/discovery FindAll, ContinuousDiscovery.ts:18-44 at 862ad75f) each report the device once and list it; the one node per device is controller/client Registry.ForDevice's findOrCreate (Peers.ts:371-389).",
       "snapshotSha": "c0adf3e65a382f5be567ed488776e7d38d6f490c"
     },
     {
       "path": "packages/node/test/behavior/system/controller/discovery/DiscoveryCancelTest.ts",
-      "status": "planned",
-      "until": "M6 phase 27",
-      "reason": "Cancellation and abort of a commissioning discovery before and after the PASE win, cancel reasons and settling. Left planned in brief CM: it tests matter.js's controller Discovery behaviour (Discovery, ParallelPaseDiscovery, CommissioningDiscovery, ContinuousDiscovery over a ScannerSet: parallel PASE attempts, cancellation and abort, the error kinds, transport selection from the discovery capabilities), which the Go controller does not have in that shape — Controller.Pair finds one device per transport serially and Discover is DNS-SD only. The identity check of the same class is ported (CommissioningIdentityTest). Milestone 6 phase 27 (the register at 100 %).",
+      "status": "partial",
+      "go": [
+        "client/discovery:TestDiscoveryCancelParity"
+      ],
+      "missing": [
+        "rejects with the cancel reason when the node fails to start after the cancel",
+        "does not commission a device whose PASE was in progress when the commissioning was canceled",
+        "does not commission a device whose PASE was in progress when the caller aborted",
+        "does not commission a device whose PASE was in progress when every scanner failed"
+      ],
+      "reason": "The interruption of a discovery session (client/discovery Session, matter.js Discovery.ts:37-483 at 862ad75f) on fixed and failing transports: a cancel, the timeout and the caller's context before the result close the race, an interruption after it is ignored, the first reason stays, the outcome waits for the aborted attempts, and the failure of one transport against all. Missing: the node's start (a Go session starts no node) and the three real-device cases, which need a PASE held mid-way on fabrictest (no seam).",
       "snapshotSha": "1613033bcf3b348c3340969c197ef12d366c0995"
     },
     {
       "path": "packages/node/test/behavior/system/controller/discovery/DiscoveryErrorTest.ts",
-      "status": "planned",
-      "until": "M6 phase 27",
-      "reason": "The error kinds a commissioning discovery reports (not discovered, incomplete, aggregate, no transport, unusable device). Left planned in brief CM: it tests matter.js's controller Discovery behaviour (Discovery, ParallelPaseDiscovery, CommissioningDiscovery, ContinuousDiscovery over a ScannerSet: parallel PASE attempts, cancellation and abort, the error kinds, transport selection from the discovery capabilities), which the Go controller does not have in that shape — Controller.Pair finds one device per transport serially and Discover is DNS-SD only. The identity check of the same class is ported (CommissioningIdentityTest). Milestone 6 phase 27 (the register at 100 %).",
+      "status": "partial",
+      "go": [
+        "client/discovery:TestDiscoveryErrorParity"
+      ],
+      "missing": [
+        "reports the error of a known node that could not be refreshed",
+        "reports the error a subclass throws for the found node"
+      ],
+      "reason": "The outcomes of a discovery without a result (client/discovery ErrDeviceNotDiscovered, ErrDiscoveryIncomplete, ErrNoDiscoveryTransport, AggregateError; DiscoveryError.ts:12-31 at 862ad75f) and a found device that cannot be used (SessionOptions.Prepare, the ClientNodeFactory step of Discovery.ts:333-357, :404-453). Missing: a known node's refresh (Prepare does not tell a new device from a known one) and a subclass's error (the Go kinds are closed).",
       "snapshotSha": "9b754259f919ad36968baa4bbcd6411c032123a5"
     },
     {
       "path": "packages/node/test/behavior/system/controller/discovery/DiscoveryTransportsTest.ts",
-      "status": "planned",
-      "until": "M6 phase 27",
-      "reason": "Selection and reporting of the discovery transports (IP network, BLE) from the onboarding payload. Left planned in brief CM: it tests matter.js's controller Discovery behaviour (Discovery, ParallelPaseDiscovery, CommissioningDiscovery, ContinuousDiscovery over a ScannerSet: parallel PASE attempts, cancellation and abort, the error kinds, transport selection from the discovery capabilities), which the Go controller does not have in that shape — Controller.Pair finds one device per transport serially and Discover is DNS-SD only. The identity check of the same class is ported (CommissioningIdentityTest). Milestone 6 phase 27 (the register at 100 %).",
+      "status": "partial",
+      "go": [
+        "client/discovery:TestDiscoveryTransportsParity"
+      ],
+      "missing": [
+        "names every identifier the caller states",
+        "reports that BLE is installed but was not asked for",
+        "stays silent about BLE where BLE is not installed at all",
+        "reports BLE requested where BLE is not enabled",
+        "warns where no scanner participates"
+      ],
+      "reason": "The transport selection from the payload's discovery capabilities (client/discovery SelectTransports, Discovery.ts:272-273, :496-505 at 862ad75f) and the identifier a transport is given. Missing: several identifiers at once (a Go Identifier selects by one) and the four log reports (#reportTransports, :378-402; the Go session logs them, the tests assert no log).",
       "snapshotSha": "4d32c07967e95dbb8ba1fad22a962328a051280b"
     },
     {
       "path": "packages/node/test/behavior/system/controller/discovery/ParallelPaseRaceTest.ts",
-      "status": "partial",
+      "status": "ported",
       "go": [
+        "client/discovery:TestParallelPaseRaceParity",
         "controller/commissioner:TestConnectionStaggerAndWinner",
         "controller/commissioner:TestConnectionHoldingResponder"
       ],
-      "missing": [
-        "rejects with the winner's own error",
-        "does not start a staggered attempt once a candidate has won",
-        "ends pending stagger waits when discovery ends without a win"
-      ],
-      "reason": "The staggered parallel PASE attempts and the winner are covered by the commissioner's connection tests; the winner's-own-error and stagger-wait endings are not.",
+      "reason": "The race of client/discovery Race (ParallelPaseDiscovery.ts:45-216 at 862ad75f): the winner while a loser fails, the winner's own error, attempts one CrossDeviceStagger apart, none started after a win, stagger waits ended with the discovery; the per-address stagger of one device is the commissioner's connection (TestConnectionStaggerAndWinner).",
       "snapshotSha": "4ffda2419c4a36087d7b506fca0e0b49d27eece7"
     },
     {

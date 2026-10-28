@@ -37,7 +37,6 @@ import (
 	"fmt"
 	"log/slog"
 	"net"
-	"slices"
 	"sync/atomic"
 	"time"
 
@@ -568,42 +567,36 @@ func (c *Controller) Pair(ctx context.Context, code string, opts PairOptions) (*
 	if opts.BLE != nil && opts.WiFi == nil && opts.Thread == nil {
 		return nil, fmt.Errorf("%w: pairing over BLE needs PairOptions.WiFi or Thread: a device on BLE has no network yet", ErrConfiguration)
 	}
-	passcode, id := pc.Passcode, pc.Identifier()
+	passcode := pc.Passcode
 	identity := discovery.Identity{VendorID: pc.VendorID, ProductID: pc.ProductID}
 	if _, ok := ctx.Deadline(); !ok {
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithTimeout(ctx, DefaultPairTimeout)
 		defer cancel()
 	}
-	var dev *discovery.Device
-	var channel commissioner.Channel
-	if known != nil {
-		commissioner.ReportDiscovery(opts.Progress, PairingSkipped, nil)
-		dev = known
-	} else {
-		commissioner.ReportDiscovery(opts.Progress, PairingStarted, nil)
-		if opts.BLE != nil {
-			d, ch, err := c.dialBLE(ctx, opts.BLE, id, identity)
-			if err != nil {
-				commissioner.ReportDiscovery(opts.Progress, PairingFailed, err)
-				return nil, err
-			}
-			defer func() { _ = ch.Close() }()
-			dev, channel = &d, ch
-		} else if dev = c.findCommissionable(ctx, id, identity); dev == nil {
-			commissioner.ReportDiscovery(opts.Progress, PairingFailed, ErrNoDevice)
-			return nil, ErrNoDevice
-		}
-		commissioner.ReportDiscovery(opts.Progress, PairingSucceeded, nil)
+	if known == nil {
+		return c.pairDiscovered(ctx, pc, identity, opts)
 	}
-	n, err := c.reg.ForDevice(ctx, *dev)
+	commissioner.ReportDiscovery(opts.Progress, PairingSkipped, nil)
+	n, err := c.reg.ForDevice(ctx, *known)
 	if err != nil {
 		return nil, err
 	}
+	o := c.pairOptions(passcode, nil, opts, opts.Progress)
+	if err := c.reg.Commission(ctx, n, client.CommissionOptions{Options: o, AutoSubscribe: opts.AutoSubscribe}); err != nil {
+		return n, err
+	}
+	return n, nil
+}
+
+// pairOptions are the commissioner's options of a Pair: the passcode,
+// the channel (nil over IP), the network, progress and the attestation
+// policy (Reject by default), then opts.Edit.
+func (c *Controller) pairOptions(passcode uint32, channel commissioner.Channel, opts PairOptions, progress func(PairingStep)) commissioner.Options {
 	o := commissioner.Options{
 		Passcode: passcode, OnAttestationFailure: opts.OnAttestationFailure,
 		Channel: channel, WiFiNetwork: opts.WiFi, ThreadNetwork: opts.Thread,
-		Progress: opts.Progress,
+		Progress: progress,
 	}
 	if o.OnAttestationFailure.Decide == nil && o.OnAttestationFailure.OnFailure == nil {
 		o.OnAttestationFailure = attestation.Reject()
@@ -611,10 +604,7 @@ func (c *Controller) Pair(ctx context.Context, code string, opts PairOptions) (*
 	if opts.Edit != nil {
 		opts.Edit(&o)
 	}
-	if err := c.reg.Commission(ctx, n, client.CommissionOptions{Options: o, AutoSubscribe: opts.AutoSubscribe}); err != nil {
-		return n, err
-	}
-	return n, nil
+	return o
 }
 
 // DeviceAt is the client.Device of a device known by its address alone,
@@ -639,67 +629,6 @@ func DeviceAt(addr *net.UDPAddr) (client.Device, error) {
 		ip = ip.Unmap()
 	}
 	return client.Device{Addresses: []discovery.Address{{IP: ip, Port: ap.Port()}}}, nil
-}
-
-// findCommissionable is the first commissionable device id selects that
-// DNS-SD reports with an address before ctx ends, passing over one whose
-// VP record contradicts the code's vendor or product
-// (CommissioningDiscovery.ts:62-90 at 862ad75f); nil when none does.
-func (c *Controller) findCommissionable(ctx context.Context, id discovery.Identifier, identity discovery.Identity) *discovery.Device {
-	sc := discovery.NewScanner(c.names)
-	defer sc.Close()
-	fctx, found := context.WithCancel(ctx)
-	defer found()
-	var dev *discovery.Device
-	_, _ = sc.FindCommissionable(fctx, id, func(d discovery.Device) {
-		if dev == nil && len(d.Addresses) > 0 && c.namesThisDevice(identity, d) {
-			dev = &d
-			found()
-		}
-	})
-	return dev
-}
-
-// dialBLE scans central until the first device id selects advertises —
-// the long discriminator of a QR code, the short one of a manual code, as
-// over DNS-SD — and opens the BTP channel to it (ble.Dial): matter.js's
-// BleScanner.findCommissionableDevices and the BLE channel of its
-// commissioning (packages/protocol/src/common/BleScanner.ts:543-575 at
-// 862ad75f). The scan runs until ctx ends, at most [DefaultPairTimeout] on
-// the controller's clock; none found is [ErrNoDevice].
-func (c *Controller) dialBLE(ctx context.Context, central ble.Central, id discovery.Identifier, identity discovery.Identity) (discovery.Device, *ble.Channel, error) {
-	sc := ble.NewScanner(central, ble.ScannerOptions{Clock: c.clock, Logger: c.log})
-	defer func() { _ = sc.Close(context.WithoutCancel(ctx)) }()
-	// ctx's deadline ends the scan first; the timeout bounds it on the
-	// controller's clock otherwise.
-	devs, err := sc.Find(ctx, id, DefaultPairTimeout, false)
-	if err != nil {
-		return discovery.Device{}, nil, err
-	}
-	devs = slices.DeleteFunc(devs, func(d ble.Device) bool { return !c.namesThisDevice(identity, d.Commissionable()) })
-	if len(devs) == 0 {
-		return discovery.Device{}, nil, fmt.Errorf("%w over BLE", ErrNoDevice)
-	}
-	ch, err := ble.Dial(ctx, central, devs[0].Peripheral, ble.DialOptions{Clock: c.clock, Logger: c.log})
-	if err != nil {
-		return discovery.Device{}, nil, err
-	}
-	return devs[0].Commissionable(), ch, nil
-}
-
-// namesThisDevice reports whether d may be the device the code names:
-// one whose advertisement positively names another vendor or product is
-// passed over — CommissioningDiscovery.#namesThisDevice (:79-90).
-func (c *Controller) namesThisDevice(identity discovery.Identity, d discovery.Device) bool {
-	m := discovery.MismatchOf(identity, d.AdvertisedIdentity())
-	if m == nil {
-		return true
-	}
-	// reason is the facet, offered what the device advertises, expected
-	// what the code names.
-	c.log.Info("matter.controller.pair.passing_over", slog.String("instance", d.InstanceID), slog.String("reason", m.Facet),
-		slog.Int("offered", int(m.Advertised)), slog.Int("expected", int(m.Payload)))
-	return false
 }
 
 func random() uint64 {
