@@ -17,12 +17,12 @@ import (
 // cluster, with the declaration's feature selection and its Initial as
 // the configuration ([configFrom]); a selection without HA, OC, OI or AUD
 // keeps the generated server. No device type at the pin lists the cluster
-// as a server (matter.js has it only as the thermostat's client,
-// packages/node/src/devices/thermostat.ts:133-138 at 862ad75f), so a host
-// mounts it on another type as the declaration's HostServer
-// (acsdef.Declare{HostServer: srv} with [sensing.NewAmbientContext]), the
-// route for a cluster a type does not list (MutableEndpoint.with,
-// [WithServer]).
+// as a server: matter.js has it only as the thermostat's client
+// (AmbientContextSensingClient, packages/node/src/devices/thermostat.ts:133-138
+// at 862ad75f). A host mounts it on another type as the declaration's
+// HostServer (acsdef.Declare{HostServer: srv} with
+// [sensing.NewAmbientContext]), the route for a cluster a type does not
+// list ([WithServer]).
 
 func init() {
 	selfHeldDefaults[acsdef.ClusterID] = newAmbientContextServer
