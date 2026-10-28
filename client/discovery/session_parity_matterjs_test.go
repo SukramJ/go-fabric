@@ -817,3 +817,39 @@ func TestPASERaceParity(t *testing.T) {
 		t.Fatalf("err %v, want ErrDeviceNotDiscovered, an ErrDiscovery", err)
 	}
 }
+
+// TestSessionDescriptions: a session names what it looks for as matter.js's
+// Discovery.toString does (Discovery.ts:117-158), and Wait gives up with
+// its own context while the discovery runs on.
+func TestSessionDescriptions(t *testing.T) {
+	t.Parallel()
+	for id, want := range map[discovery.Identifier]string{
+		discovery.AnyCommissionable():         "node discovery",
+		discovery.ByInstanceID("abc"):         "discovery of node instance abc",
+		discovery.ByLongDiscriminator(3840):   "discovery of node with discriminator 3840",
+		discovery.ByShortDiscriminator(15):    "discovery of node with discriminator 15",
+		discovery.ByVendor(0xFFF1):            "discovery of node from vendor 65521",
+		discovery.ByVendorProduct(0xFFF1, 32): "discovery of product 32 from vendor 65521",
+		discovery.ByProduct(32):               "discovery of product 32",
+		discovery.ByDeviceType(0x100):         "discovery of node with device type 256",
+	} {
+		clk := newClock()
+		s := discovery.FindAll(context.Background(), []discovery.Transport{newFixed()}, discovery.SessionOptions{Identifier: id, Clock: clk}, nil)
+		if s.String() != want {
+			t.Errorf("%q, want %q", s.String(), want)
+		}
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+		if _, err := s.Wait(ctx); err == nil {
+			t.Error("Wait with an ended context returned no error")
+		}
+		s.Cancel(nil)
+		if _, err := outcome(t, s, clk); err == nil {
+			t.Error("a cancelled session reported no error")
+		}
+	}
+	caps := discovery.CapabilitiesOf(0b101)
+	if !caps.SoftAP || caps.BLE || !caps.OnIPNetwork {
+		t.Fatalf("%+v", caps)
+	}
+}
