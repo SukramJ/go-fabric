@@ -2,9 +2,9 @@
 // Copyright (C) 2026 SukramJ.
 
 // Package camera contains the servers of the camera surface (milestone 6,
-// concept v10 §C waves 26-A1 and 26-A2): the signalling side of a WebRTC
-// stream, the chime, the camera's pan, tilt and zoom, its streams and its
-// zones.
+// concept v10 §C waves 26-A1 to 26-A3): the signalling side of a WebRTC
+// stream, the chime, the camera's pan, tilt and zoom, its streams, its
+// zones and its transports.
 //
 //   - [Requestor] serves WebRtcTransportRequestor (0x0554) after matter.js's
 //     WebRtcTransportRequestorServer
@@ -30,6 +30,15 @@
 //     capture, reference-counted for the transports; the zones and
 //     triggers behind the [ZonePort], with chip's polygon rules
 //     ([ZoneSelfIntersecting]).
+//   - [Provider] serves WebRtcTransportProvider (0x0553) and [PushTransport]
+//     serves PushAvStreamTransport (0x0555), the camera's two transports, after
+//     connectedhomeip (src/app/clusters/webrtc-transport-provider-server/
+//     WebRTCTransportProviderCluster.cpp, push-av-stream-transport-server/
+//     PushAVStreamTransportLogic.cpp at 6170af84): the WebRTC sessions and
+//     the push connections, each request checked against the camera's
+//     [StreamSource] and, for a push transport, its [ZoneSource] and the
+//     node's TLS servers (cluster/tls) before the host's [ProviderPort] or
+//     [PushTransportPort] runs it.
 //
 // Each server is built on its generated definition (cluster/spec/…, ADR
 // 0013) and the generated server ([spec.Server]); its port is the

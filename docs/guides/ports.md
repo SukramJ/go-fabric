@@ -201,11 +201,15 @@ the kit server implements for host inputs: the switch's.
 | DoorLock | `SetDoorState` (DoorStateChange and the door counters), `Users` |
 | EcosystemInformation | `DirectoryChanged` |
 | EnergyEvse | `SetHardwareState`, `SetFault`, `SetMaxHardwareChargeCurrent`, `SetMaxHardwareDischargeCurrent`, `SetCableAssemblyLimit`, `SetNominalMainsVoltage`, `ReportRFID`, `DiagnosticsComplete`, their getters, `IsPluggedIn`, `Targets`, `Close` |
+| PushAvStreamTransport | `TransportStarted`, `TransportStopped` (PushTransportBegin and PushTransportEnd) |
 | ServiceArea | `RemoveSupportedAreasEntry`, `RemoveSupportedMapsEntry` (with what names the area or map) |
 | SmokeCoAlarm | `Refresh` (for a `StateSource` that is no `contract.ChangeNotifier`) |
 | Switch | `contract.SwitchPositionSink` (`SetRawPosition`, `SetCurrentPosition`) and `contract.SwitchEventEmitter` (`FireInitialPress` …), `RawPosition`, `SetDebounceDelay`, `SetLongPressDelay`, `SetMultiPressDelay`, `ResetState` |
 | ThreadBorderRouterManagement, ThreadNetworkDiagnostics | `Refresh` (the host schedules it) |
 | ThreadNetworkDirectory | `ReloadNetworks` |
+| TlsCertificateManagement | `RootCertificate`, `ClientCertificate`, `SetDependencyChecker` |
+| TlsClientManagement | `ProvisionedEndpoint`, `MutateEndpointReferenceCount`, `RootCertificateInUse`, `ClientCertificateInUse` |
+| WebRtcTransportProvider | `UpsertSession`, `RemoveSession` (by the session id) |
 | WebRtcTransportRequestor | `UpsertSession`, `RemoveSession` (by `webrtctransportrequestordef.SessionKey`) |
 | WiFiNetworkManagement | `SetNetworkCredentials`, `ClearNetworkCredentials`, `Passphrase` |
 
@@ -228,6 +232,11 @@ by type assertion.
 | `camera.MechanicalPTZ`, `camera.MechanicalPresets`, `camera.DigitalPTZ` | `cameraavsettingsuserlevelmanagementdef.Declare{MechanicalPTZ: …, DigitalPTZ: …}`, `camera.AvSettingsConfig` | start a validated movement (the host reports its end), store and remove presets, change a stream's viewport; an error answers with its status ([Camera](camera.md#pan-tilt-and-zoom)) | the generated server |
 | `camera.VideoStreamPort`, `camera.AudioStreamPort`, `camera.SnapshotStreamPort`, `camera.SnapshotCapturePort` | `cameraavstreammanagementdef.Declare{VideoStreamPort: …, AudioStreamPort: …, SnapshotStreamPort: …, SnapshotCapturePort: …}`, `camera.AvStreamConfig` | allocate, modify and release a validated stream and return its id, start a stream as allocated, take a snapshot; an error answers with its status ([Camera](camera.md#the-stream-model)) | the generated server |
 | `camera.ZonePort` (`zonemanagementdef.ZonePort`) | `zonemanagementdef.Declare{ZonePort: …}`, `camera.ZonesConfig.Port` | store a validated zone (and return its id) or trigger, remove one; an error answers with its status ([Camera](camera.md#the-zone-model)) | the generated server |
+| `camera.ProviderPort` (`webrtctransportproviderdef.ProviderPort`) | `webrtctransportproviderdef.Declare{ProviderPort: …}`, `camera.ProviderConfig.Port` | answer a validated SolicitOffer or ProvideOffer with the session to store, take an answer, ICE candidates and the end of a session; an error answers with its status ([Camera](camera.md#the-transport-model)) | the generated server |
+| `camera.PushTransportPort` (`pushavstreamtransportdef.PushTransportPort`) | `pushavstreamtransportdef.Declare{PushTransportPort: …}`, `camera.PushTransportConfig.Port` | allocate, modify, activate, trigger and release a validated push transport, report a busy one, the bandwidth and the CMAF session number ([Camera](camera.md#the-transport-model)) | the generated server |
+| `pushavstreamtransportdef.TLSEndpoints`, `TLSCertificates` | `pushavstreamtransportdef.Declare{TLSEndpoints: …, TLSCertificates: …}` (the TLS servers' typed `Host`) | look up the TLS endpoint and its certificates a transport names | every allocation is InvalidTLSEndpoint; without certificates the transport has none |
+| `tls.CertificatePort` (`tlscertificatemanagementdef.CertificatePort`) | `tls.CertificateManagementConfig.Port` | make a client key and its CSR, judge a certificate's validity and key, drop a removed key ([Camera](camera.md#the-transport-model)) | — (required) |
+| `tls.Store` (`tlscertificatemanagementdef.CertificateStore`, `tlsclientmanagementdef.EndpointStore`) | `tls.CertificateManagementConfig.Store`, `tls.ClientManagementConfig.Store` (any `store.Settings`) | persist the certificate and endpoint tables | the tables stay in memory |
 | `closurecontroldef.StopObserver` | a `closurecontroldef.Mover` | hears of a Stop the server ignores because the closure is not in motion (`StopIgnored`); an error answers FAILURE | the idle Stop is a SUCCESS no-op |
 | `mdns.Reannouncer` | the `Advertiser` | the periodic re-announce loop (30 min default) and `Node.TriggerReannounce` | no loop; `TriggerReannounce` is a no-op |
 | `mdns.Enabled` | the `Advertiser` | says whether it publishes at all | `mdns.IsEnabled` takes the advertiser at its word |
