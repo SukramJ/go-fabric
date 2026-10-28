@@ -440,18 +440,6 @@ Device side:
 
 Controller side:
 
-- **The invoke batcher.** matter.js joins the single invokes of one timer
-  tick into one InvokeRequest up to the peer's MaxPathsPerInvoke, with
-  lanes per network and bypasses for options that keep a command alone
-  (`action/client/ClientInteraction.ts:715-1000`); a goroutine has no tick
-  to join on, and `Node.InvokeBatch` is the one multi-command form
-  (ClientInvokeTest, 39 cases `missing`). Owner decision 2026-10-27
-  (concept v10, 0.1): implemented after matter.js in wave 27-A, with the 39
-  cases ported. (Milestone 6 phase 27.)
-- **The controller's discovery has no `Discovery` / `ParallelPaseDiscovery`
-  shape** — a scanner set, parallel PASE attempts, cancellation and error
-  kinds (ContinuousDiscoveryTest, DiscoveryCancelTest, DiscoveryErrorTest,
-  DiscoveryTransportsTest; register `until M6 phase 27`). (Milestone 6 phase 27.)
 - **Reported session parameters on the device**: the node's own intervals
   are configurable since wave 27-B (`node.Config.Sessions`,
   `Node.SessionParameters`), but the device's sessions have no accessor for
@@ -467,13 +455,11 @@ Controller side:
   `controller/commissioner/connection.go:252` `launch`; matter.js closes it
   with the composed signal's reason (`peer/CommissioningConnection.ts:140-151`).
   Low, no deterministic test.
-- **DCL vendor information service** (`dcl/DclVendorInfoService.ts`, 497
-  lines; 41 cases): register `until M6 phase 27`. (Milestone 6.)
-- **PQC Phase 1 and controller NOC rotation.** An ML-DSA certificate is
-  refused by the 600-byte limit (`secure/attestation/files.go`; matter.js
-  allows 10 240 bytes for a PQC chain, `certificate/kinds/common.ts:19`) and
-  never classified; the controller never rotates its NOC key
-  (`fabric/FabricAuthority.ts:88-99`, `:181-186`). (Milestone 6.)
+- **PQC Phase 1 on the device side.** A device's own ML-DSA attestation
+  chain files are refused by the 600-byte limit (`secure/attestation/files.go`;
+  matter.js allows 10 240 bytes for a PQC chain, `certificate/kinds/common.ts:19`).
+  The controller side is ported behind the forward-feature switch (wave
+  27-A, `controller/attestation/pqc.go`). (Milestone 6.)
 
 Found by the phase-16 port of `packages/node/test/node` (brief BI, PR #168,
 2026-10-19). Line numbers at `862ad75f`.

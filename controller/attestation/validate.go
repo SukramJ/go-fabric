@@ -189,24 +189,27 @@ func checkChain(store PAAStore, dac, pai *attCert, findings *[]Finding) (*attCer
 		return nil, fmt.Errorf("attestation: trust store PAA: %w", err)
 	}
 	// The PAA key is read inside matter.js's try (DAV:272-279), so a key
-	// it cannot use fails the chain as the signature does.
-	paaKey, err := P256Key(paa.x509)
+	// it cannot use fails the chain as the signature does. The key and the
+	// signature are EC P-256 or, with PQC Phase 1, ML-DSA (pqc.go).
+	paaAlgorithm, err := KeyAlgorithmOf(paa.x509)
 	if err == nil {
-		err = VerifySignedBy(pai.x509, paaKey)
+		err = VerifyIssuedBy(pai.x509, paa.x509)
 	}
 	if err != nil {
 		return nil, fail(CertificateChainInvalid, "PAI signature verification failed: "+err.Error())
 	}
 	// Reading the PAI key apart from the DAC check (DAV:281-286).
-	paiKey, err := P256Key(pai.x509)
+	paiAlgorithm, err := KeyAlgorithmOf(pai.x509)
 	if err != nil {
 		return nil, &Error{Check: CertificateUnparseable, Message: "Device returned a PAI whose public key cannot be read: " + err.Error(), Err: err}
 	}
-	// mayIssue (DAV:288-294; kinds/CertificateSignature.ts:46-54): a PAI
-	// key no stronger than its PAA's. Both are EC P-256 here — the one
-	// algorithm this validator admits — so the strengths are equal.
+	// mayIssue (DAV:288-294; kinds/CertificateSignature.ts:40-54): a PAI
+	// key no stronger than its PAA's.
+	if !MayIssue(paaAlgorithm, paiAlgorithm) {
+		return nil, fail(CertificateChainInvalid, fmt.Sprintf("PAI key algorithm %s is stronger than the %s of its PAA", paiAlgorithm, paaAlgorithm))
+	}
 	// The DAC's signature by the PAI (DAV:296-303).
-	if err := VerifySignedBy(dac.x509, paiKey); err != nil {
+	if err := VerifyIssuedBy(dac.x509, pai.x509); err != nil {
 		return nil, fail(CertificateChainInvalid, "DAC signature verification failed: "+err.Error())
 	}
 

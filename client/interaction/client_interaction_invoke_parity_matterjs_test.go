@@ -9,10 +9,10 @@ package interaction_test
 // DelayReportData, a response without InteractionModelRevision) and the
 // origin of its error statuses.
 //
-// The Go Invoke sends one command on its own exchange and never batches;
-// its context stands for both the request's and the session's abort
-// signal. A case that needs a multi-command invoke, batching or
-// ClientInteraction.close stays missing.
+// The rig's peer reports no MaxPathsPerInvoke, so these Invokes go on
+// their own exchange, unbatched; the batcher's cases are
+// invoke_batcher_parity_matterjs_test.go's. The context stands for both the
+// request's and the session's abort signal.
 
 import (
 	"context"

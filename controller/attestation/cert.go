@@ -20,6 +20,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/SukramJ/go-fabric/internal/forward"
 )
 
 // maxDERCertificateSize is matter.js MAX_DER_CERTIFICATE_SIZE
@@ -72,15 +74,24 @@ func checkRequiredExtensions(c *x509.Certificate, authorityKeyID bool) error {
 // parseAttCert is Paa/Pai/Dac.fromAsn1 (kinds/AttestationCertificates.ts:
 // 34-72): the DER parse with the size limit and the required extensions,
 // the Matter vendor and product id of the subject, the validity in Matter
-// epoch seconds. ML-DSA certificates (PQC Phase 1, disabled by default,
-// :22-32) do not parse here.
+// epoch seconds. It parses with PQC Phase 1's size limit
+// (parseAttestationCertificate, :31-39, Certificate.ts:610-622); a
+// traditional certificate stays bound to 600 bytes, and one that uses
+// ML-DSA while the feature is off is [ErrMLDSAAttestationDisabled]
+// (pqc.go).
 func parseAttCert(der []byte, authorityKeyID bool) (*attCert, error) {
-	if len(der) > maxDERCertificateSize {
-		return nil, fmt.Errorf("attestation: DER certificate of %d bytes exceeds the %d byte limit", len(der), maxDERCertificateSize)
+	if len(der) > maxPQCDERCertificateSize {
+		return nil, fmt.Errorf("attestation: DER certificate of %d bytes exceeds the %d byte limit", len(der), maxPQCDERCertificateSize)
 	}
 	c, err := x509.ParseCertificate(der)
 	if err != nil {
 		return nil, err
+	}
+	switch {
+	case usesMLDSA(c) && !forward.Enabled(forward.PQCPhase1):
+		return nil, fmt.Errorf("%w: this certificate uses %v", ErrMLDSAAttestationDisabled, c.SignatureAlgorithm)
+	case !usesMLDSA(c) && len(der) > maxDERCertificateSize:
+		return nil, fmt.Errorf("attestation: DER certificate of %d bytes exceeds the %d byte limit", len(der), maxDERCertificateSize)
 	}
 	if err := checkRequiredExtensions(c, authorityKeyID); err != nil {
 		return nil, err

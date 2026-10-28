@@ -104,6 +104,8 @@ type Snapshot struct {
 	// vendors are the vendor list's records over the static vendors
 	// ([Snapshot.Vendors]).
 	vendors map[uint16]Vendor
+	// seed is the vendor list as the file states it ([Snapshot.VendorSeed]).
+	seed *dcl.VendorSeed
 }
 
 var _ attestation.PAAStore = (*Snapshot)(nil)

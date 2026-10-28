@@ -44,9 +44,9 @@ type CommandRequest struct {
 // responses by it; a batch of one sends no CommandRef and takes the
 // responses by position (:510-517); a response for no command of the batch
 // is dropped, and a command without a response is NoCommandResponse
-// (:616-646). matter.js's batching of single commands across one timer
-// tick (#invokeWithBatching) is no part of it: the caller's batch is the
-// batch.
+// (:616-646). The batching of single commands across one batch window
+// (#invokeWithBatching) is [Interaction.Invoke]'s, no part of it: the
+// caller's batch is the batch.
 func (c *Interaction) InvokeBatch(ctx context.Context, cmds []CommandRequest, maxPaths int, opts InvokeOptions) ([]Result, error) {
 	if len(cmds) == 0 {
 		return nil, ErrNoCommands
@@ -68,7 +68,18 @@ func (c *Interaction) InvokeBatch(ctx context.Context, cmds []CommandRequest, ma
 	for start := 0; start < len(cmds); start += maxPaths {
 		end := min(start+maxPaths, len(cmds))
 		wg.Go(func() {
-			if err := c.invokeBatch(ctx, cmds[start:end], start, results[start:end], opts); err != nil {
+			refs := make([]uint16, end-start)
+			for i := range refs {
+				refs[i] = uint16(start + i) //nolint:gosec // a batch holds at most MaxPathsPerInvoke commands
+			}
+			answered := make([]bool, end-start)
+			err := c.invokeBatch(ctx, cmds[start:end], refs, results[start:end], answered, opts)
+			for i, ok := range answered {
+				if !ok && err == nil && !opts.SuppressResponse {
+					results[start+i] = Result{Status: im.StatusNoCommandResponse}
+				}
+			}
+			if err != nil {
 				mu.Lock()
 				errs = append(errs, err)
 				mu.Unlock()
@@ -82,29 +93,33 @@ func (c *Interaction) InvokeBatch(ctx context.Context, cmds []CommandRequest, ma
 	return results, nil
 }
 
-// invokeBatch sends one batch — cmds, numbered from base when it holds
-// several — and fills out, one Result per command.
-func (c *Interaction) invokeBatch(ctx context.Context, cmds []CommandRequest, base int, out []Result, opts InvokeOptions) error {
+// invokeBatch sends one batch — cmds, numbered by refs when it holds
+// several — and fills out with the Result of every command the peer
+// answered, marking it in answered; a batch of one goes without its
+// CommandRef and takes the answer by position (ClientInteraction.ts:510-517).
+func (c *Interaction) invokeBatch(ctx context.Context, cmds []CommandRequest, refs []uint16, out []Result, answered []bool, opts InvokeOptions) error {
 	multiple := len(cmds) > 1
 	invokes := make([]im.CommandInvocation, len(cmds))
+	index := make(map[uint16]int, len(cmds))
 	for i, cmd := range cmds {
 		path := cmd.Path
 		path.HasEndpoint, path.HasCluster, path.HasCommand = true, true, true
 		invokes[i] = im.CommandInvocation{Path: path, Fields: cmd.Fields}
 		if multiple {
-			invokes[i].CommandRef, invokes[i].HasCommandRef = uint16(base+i), true //nolint:gosec // a batch holds at most MaxPathsPerInvoke commands
+			invokes[i].CommandRef, invokes[i].HasCommandRef = refs[i], true
+			index[refs[i]] = i
 		}
 	}
 	entries, err := c.exchangeInvoke(ctx, invokes, opts)
 	if err != nil || opts.SuppressResponse {
 		return err
 	}
-	answered := make([]bool, len(cmds))
 	for _, e := range entries {
 		i := 0
 		if multiple {
-			i = int(e.CommandRef) - base
-			if !e.HasCommandRef || i < 0 || i >= len(cmds) {
+			var ok bool
+			i, ok = index[e.CommandRef]
+			if !e.HasCommandRef || !ok {
 				c.log.Warn("matter.controller.interaction.invoke_response_discarded",
 					slog.Uint64("endpoint", uint64(e.Path.Endpoint)), slog.Uint64("cluster", uint64(e.Path.Cluster)), slog.Uint64("command", uint64(e.Path.Command)))
 				continue
@@ -114,11 +129,6 @@ func (c *Interaction) invokeBatch(ctx context.Context, cmds []CommandRequest, ba
 			continue
 		}
 		out[i], answered[i] = resultOf(e), true
-	}
-	for i := range cmds {
-		if !answered[i] {
-			out[i] = Result{Status: im.StatusNoCommandResponse}
-		}
 	}
 	return nil
 }
