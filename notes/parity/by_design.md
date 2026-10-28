@@ -4919,6 +4919,73 @@ client only), so the kit refuses a kit `Declare` for it and a host mounts
 Pinned by `ambient_chip_test.go` (chip's 15 cases, 14 by meaning) and
 `ambient_rules_test.go`.
 
+### BD-chip-TlsCertificateManagement-RulesInServer — root and client certificate tables follow connectedhomeip behind the `CertificatePort`; reads serve the full certificate
+
+matter.js's `TlsCertificateManagementServer.ts:14` at `862ad75f` is the
+empty subclass. `cluster/tls.CertificateManagement` follows connectedhomeip's
+`TLSCertificateManagementCluster.cpp` at `6170af84` (the constructor's
+maxima :61-73, the nine handlers :230-575 with chip's status codes and
+the fabric-scoped tables) and its example delegate's table rules
+(`CertificateTableImpl.cpp`, `IncrementingIdHelper.h`: ids shared across
+fabrics, from 0). The keys and the CSR are the host's behind the
+`CertificatePort`; the tables persist as one settings record per server.
+Two deliberate differences: the reads of ProvisionedRootCertificates and
+ProvisionedClientCertificates serve the full certificates, as matter.js's
+generated behaviour does (rule 1) — chip's id-only encoding outside a
+large-payload transport (:136-166) is not mirrored (owner decision
+2026-10-28); and `ClientCSR` publishes a change notification for the new
+entry. The node mounts both TLS servers on endpoint 0 through
+`node.Config.TLS`, as chip serves them on the root endpoint only. Pinned
+by `tls/*_chip_test.go` (17 + 16 of chip's cases) and the fuzz target
+`FuzzCertificateUpserts` (chip's three `FUZZ_TEST`).
+
+### BD-chip-TlsClientManagement-RulesInServer — endpoint provisioning follows connectedhomeip; an endpoint in use answers the model's EndpointInUse
+
+matter.js's `TlsClientManagementServer.ts:14` at `862ad75f` is the empty
+subclass. `cluster/tls.ClientManagement` follows connectedhomeip's
+`TLSClientManagementCluster.cpp` at `6170af84` (:53-275: the maxima
+5…254, the hostname and id constraints, the cluster-specific
+`RootCertificateNotFound` / `ClientCertificateNotFound` :195/:199) and
+its example delegate (`examples/all-clusters-app/all-clusters-common/src/
+tls-client-management-instance.cpp:262-432`), and it is the certificate
+server's dependency checker. `RemoveEndpoint` of an endpoint a push
+transport uses answers the model's cluster status EndpointInUse, not the
+example delegate's INVALID_IN_STATE (owner decision 2026-10-28: the
+matter.js schema defines that status for this case). Pinned by
+`tls/client_chip_test.go` (chip's 16 cases).
+
+### BD-chip-WebRtcTransportProvider-RulesInServer — offer, answer, ICE and session rules follow connectedhomeip behind the `ProviderPort`
+
+matter.js's `WebRtcTransportProviderServer.ts:14` at `862ad75f` is the
+empty subclass: a controller could open a session on an unallocated
+stream or under privacy mode. `cluster/camera.Provider` follows
+connectedhomeip's `WebRTCTransportProviderCluster.cpp` at `6170af84`: the
+validators (:133-209, :400-592), the session table (:295-398, ids ≤ 65534)
+and the five handlers (:595-1213) with chip's status codes; the stream
+checks go through `camera.StreamSource`, which the AvStream server (26-A2)
+implements with the camera app's answers. The WebRTC stack is the host's
+behind the `ProviderPort`, as the requestor's is. Pinned by
+`provider_chip_test.go` (chip's 7 cases) and `provider_rules_test.go`.
+
+### BD-chip-PushAvStreamTransport-RulesInServer — push transports follow connectedhomeip behind the `PushTransportPort`; ExpiryTime is taken as seconds until deallocation
+
+matter.js's `PushAvStreamTransportServer.ts:14` at `862ad75f` is the
+empty subclass. `cluster/camera.PushTransport` follows connectedhomeip's
+`PushAVStreamTransportLogic.cpp` at `6170af84` (:293-1603 and
+:1903-2031: the URL check, the options and stream validation, the six
+handlers the matter.js model has, the events, the expiry timer, four
+transports per fabric) with the TLS endpoint, zone and stream checks
+against the node's servers (without a TLS client lookup every allocation
+is InvalidTLSEndpoint, as chip answers without a delegate; without Zones a
+non-empty zone list is DYNAMIC_CONSTRAINT_ERROR). UpdateMotionZoneOptions,
+the AmbientContext trigger, SFrameConfig and the CMAF CENC fields are not
+in the matter.js model at the pin, so their chip checks are left out.
+chip's `ScheduleTransportDeallocate` takes ExpiryTime as the seconds until
+deallocation (:1216, :357-385) although the field is an epoch value; the
+server mirrors chip, the authority where matter.js has no logic. Pinned by
+`pushtransport_chip_test.go` (7 of chip's 9 logic cases, 17 of 33 URL
+cases; the storage cases are chip's buffers) and `pushtransport_rules_test.go`.
+
 ### BD-Matter-GeneratedServerSuffices — clusters whose generated server is complete: no source carries behaviour beyond the model
 
 Audit of 2026-10-27 (owner question at the milestone 6 concept; read map
