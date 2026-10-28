@@ -349,7 +349,7 @@ func (d *Datastore) AddGroup(ctx context.Context, req AddGroupRequest) error {
 // ForceAddGroup adds a group of any CAT — the administrator's own groups
 // of the administrator and anchor CATs, which AddGroup refuses. Mirrors
 // ForceAddGroup (:1387-1407), which the administrator application calls
-// (examples/jf-admin-app/linux/JFAManager.cpp:183-197).
+// (examples/jf-admin-app/linux/JFAManager.cpp:185-197).
 func (d *Datastore) ForceAddGroup(ctx context.Context, req AddGroupRequest) error {
 	return d.update(ctx, func() error { return d.addGroupLocked(req, false) })
 }
@@ -925,7 +925,7 @@ func (d *Datastore) removeNodeKeySetEntryLocked(groupID, ks uint16, p *[]pushFn)
 
 // ForceAddNodeKeySetEntry adds a Committed key set entry for a node — the
 // administrator's own (ForceAddNodeKeySetEntry :2364-2373, called by the
-// administrator application, JFAManager.cpp:180).
+// administrator application, JFAManager.cpp:182).
 func (d *Datastore) ForceAddNodeKeySetEntry(ctx context.Context, ks uint16, nodeID uint64) error {
 	return d.update(ctx, func() error {
 		d.t.NodeKeySets = append(d.t.NodeKeySets, NodeKeySetEntry{NodeId: nodeID, GroupKeySetId: ks, StatusEntry: StatusEntry{State: stateCommitted}})

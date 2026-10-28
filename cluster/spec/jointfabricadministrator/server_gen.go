@@ -176,6 +176,25 @@ func (s *Server) HandleAnnounceJointFabricAdministrator(fn func(ctx context.Cont
 	return spec.HandleOn(s.Underlying(), CmdAnnounceJointFabricAdministrator, fn)
 }
 
+// Host is the JointFabricAdministrator kit server's host methods: the ones Set, Get and
+// the typed handlers do not reach (cluster/jointfabric Administrator).
+type Host interface {
+	// PeerAdministratorEndpoint is the announcing commissioner's
+	// JointFabricAdministrator endpoint, 0xFFFF when none.
+	PeerAdministratorEndpoint() uint16
+	// VIDVerifiedFabric is the fabric whose VID verification
+	// succeeded, 0 when none.
+	VIDVerifiedFabric() uint8
+}
+
+// Host returns the mounted server's host methods when it implements
+// Host — the kit's server does; nil for a server that does not, as the
+// generated one and a host's own (Declare.HostServer) normally do not.
+func (s *Server) Host() Host {
+	h, _ := s.Underlying().(Host)
+	return h
+}
+
 // AdministratorPort is the administrator application's key: IcacCsr
 // returns the PKCS#10 CSR of the key the administrator's ICAC will
 // certify — connectedhomeip's JointFabricAdministrator::Delegate

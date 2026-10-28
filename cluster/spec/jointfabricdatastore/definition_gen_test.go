@@ -86,6 +86,9 @@ func TestTypedServer(t *testing.T) {
 	if s.Underlying() != srv {
 		t.Error("the typed server does not hold its server")
 	}
+	if s.Host() != nil {
+		t.Error("the generated server has the kit server's host methods")
+	}
 	if err := s.Set(Patch{}); err != nil {
 		t.Error(err)
 	}
