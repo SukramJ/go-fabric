@@ -1010,6 +1010,38 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 	} else if !refusesFixture("Fan") {
 		t.Errorf("Fan: %v", err)
 	}
+	if _, err := NewFloodlightCamera(testOptions("FloodlightCamera"), nil, nil); err == nil {
+		t.Error("FloodlightCamera: constructed without its components")
+	}
+	{
+		onOffLight, err := NewOnOffLight(testOptions("FloodlightCamera/OnOffLight"), testWith(t, "OnOffLight")...)
+		if err != nil {
+			t.Fatalf("FloodlightCamera: component OnOffLight: %v", err)
+		}
+		camera, err := NewCamera(testOptions("FloodlightCamera/Camera"), testWith(t, "Camera")...)
+		if err != nil {
+			t.Fatalf("FloodlightCamera: component Camera: %v", err)
+		}
+		if _, err := NewFloodlightCamera(Options{}, onOffLight, camera); err == nil {
+			t.Error("FloodlightCamera: constructed without a StableKey")
+		}
+		d, err := NewFloodlightCamera(testOptions("FloodlightCamera"), onOffLight, camera, testWith(t, "FloodlightCamera")...)
+		if err != nil {
+			t.Fatalf("FloodlightCamera: %v", err)
+		}
+		if d.Type() != &FloodlightCameraType {
+			t.Errorf("FloodlightCamera: type %v", d.Type().Name)
+		}
+		if parts := d.Parts(); len(parts) != 2 || parts[0] != onOffLight.Device || parts[1] != camera.Device {
+			t.Errorf("FloodlightCamera: parts %v", parts)
+		}
+		if d.OnOffLight() != onOffLight {
+			t.Error("FloodlightCamera: OnOffLight accessor")
+		}
+		if d.Camera() != camera {
+			t.Error("FloodlightCamera: Camera accessor")
+		}
+	}
 	if _, err := NewFlowSensor(Options{}); err == nil {
 		t.Error("FlowSensor: constructed without a StableKey")
 	}
@@ -2120,6 +2152,38 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		t.Errorf("ThreadBorderRouter: FromSpec refuses with %v, NewThreadBorderRouter with %v", serr, err)
 	} else if !refusesFixture("ThreadBorderRouter") {
 		t.Errorf("ThreadBorderRouter: %v", err)
+	}
+	if _, err := NewVideoDoorbell(testOptions("VideoDoorbell"), nil, nil); err == nil {
+		t.Error("VideoDoorbell: constructed without its components")
+	}
+	{
+		camera, err := NewCamera(testOptions("VideoDoorbell/Camera"), testWith(t, "Camera")...)
+		if err != nil {
+			t.Fatalf("VideoDoorbell: component Camera: %v", err)
+		}
+		doorbell, err := NewDoorbell(testOptions("VideoDoorbell/Doorbell"), testWith(t, "Doorbell")...)
+		if err != nil {
+			t.Fatalf("VideoDoorbell: component Doorbell: %v", err)
+		}
+		if _, err := NewVideoDoorbell(Options{}, camera, doorbell); err == nil {
+			t.Error("VideoDoorbell: constructed without a StableKey")
+		}
+		d, err := NewVideoDoorbell(testOptions("VideoDoorbell"), camera, doorbell, testWith(t, "VideoDoorbell")...)
+		if err != nil {
+			t.Fatalf("VideoDoorbell: %v", err)
+		}
+		if d.Type() != &VideoDoorbellType {
+			t.Errorf("VideoDoorbell: type %v", d.Type().Name)
+		}
+		if parts := d.Parts(); len(parts) != 2 || parts[0] != camera.Device || parts[1] != doorbell.Device {
+			t.Errorf("VideoDoorbell: parts %v", parts)
+		}
+		if d.Camera() != camera {
+			t.Error("VideoDoorbell: Camera accessor")
+		}
+		if d.Doorbell() != doorbell {
+			t.Error("VideoDoorbell: Doorbell accessor")
+		}
 	}
 	if _, err := NewVideoRemoteControl(Options{}); err == nil {
 		t.Error("VideoRemoteControl: constructed without a StableKey")

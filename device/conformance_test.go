@@ -222,6 +222,19 @@ var fixtures = map[string]fixture{
 	}},
 	"MicrowaveOven":   {with: opts(feat(0x005F, mwocdef.FeaturePowerAsNumber))},
 	"OccupancySensor": {with: opts(feat(0x0406, occdef.FeaturePassiveInfrared))},
+	// The composites' components are parts (brief 27-B §4): matter.js
+	// counts a simple component only on an endpoint below the composite
+	// (DeviceTypeConformance.ts:596-613 at 862ad75f).
+	"FloodlightCamera": {parts: func(t *testing.T, d *Device) {
+		t.Helper()
+		part(t, d, "OnOffLight", nil)
+		part(t, d, "Camera", nil)
+	}},
+	"VideoDoorbell": {parts: func(t *testing.T, d *Device) {
+		t.Helper()
+		part(t, d, "Camera", nil)
+		part(t, d, "Doorbell", nil)
+	}},
 	"Oven": {parts: func(t *testing.T, d *Device) {
 		t.Helper()
 		part(t, d, "TemperatureControlledCabinet", []string{"Heater"})

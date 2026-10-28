@@ -67,6 +67,8 @@ var committedTypes = []*Type{
 	&IntercomType,
 	&AudioDoorbellType,
 	&CameraType,
+	&VideoDoorbellType,
+	&FloodlightCameraType,
 	&SnapshotCameraType,
 	&ChimeType,
 	&CameraControllerType,

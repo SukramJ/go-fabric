@@ -43,12 +43,14 @@ func testGenerator(t *testing.T) *generator {
 // dimmable-light.ts), a simple type with a mandatory-with-extension
 // cluster and a mandatory PowerSource component, which stays in the model
 // (SmokeCoAlarm; requirement-coverage.ts:41-44), and a utility endpoint
-// type with conditional optional servers (BridgedNode, bridged-node.ts).
+// type with conditional optional servers (BridgedNode, bridged-node.ts),
+// and a composite whose components are its constructor's parts
+// (VideoDoorbell, video-doorbell.ts).
 // Run with -update after a deliberate generator change and read the diff.
 func TestGolden(t *testing.T) {
 	t.Parallel()
 	g := testGenerator(t)
-	for _, name := range []string{"DimmableLight", "SmokeCoAlarm", "BridgedNode"} {
+	for _, name := range []string{"DimmableLight", "SmokeCoAlarm", "BridgedNode", "VideoDoorbell"} {
 		o, err := g.generate(name)
 		if err != nil {
 			t.Fatalf("%s: %v", name, err)
