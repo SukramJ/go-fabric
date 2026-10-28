@@ -215,6 +215,65 @@ func (s *Server) HandleRemoveClientCertificate(fn func(ctx context.Context, req 
 	return spec.HandleOn(s.Underlying(), CmdRemoveClientCertificate, fn)
 }
 
+// DependencyChecker answers whether a certificate is still named by
+// a provisioned TLS endpoint, which keeps it from being removed
+// (INVALID_IN_STATE); the node's TlsClientManagement server is one.
+// Mirrors connectedhomeip Tls::CertificateDependencyChecker
+// (tls-certificate-management-server/CertificateTable.h:212-237).
+type DependencyChecker interface {
+	RootCertificateInUse(fabricIndex uint8, caid uint16) bool
+	ClientCertificateInUse(fabricIndex uint8, ccdid uint16) bool
+}
+
+// Host is the TlsCertificateManagement kit server's host methods: the ones Set, Get and
+// the typed handlers do not reach (cluster/tls CertificateManagement).
+type Host interface {
+	// RootCertificate returns a fabric's root certificate of the id.
+	RootCertificate(fabricIndex uint8, caid uint16) (TLSCertStruct, bool)
+	// ClientCertificate returns a fabric's client certificate of the
+	// id; ClientCertificate is null until it is provisioned.
+	ClientCertificate(fabricIndex uint8, ccdid uint16) (TLSClientCertificateDetailStruct, bool)
+	// SetDependencyChecker installs the check of a removal; without
+	// one every certificate may be removed.
+	SetDependencyChecker(checker DependencyChecker)
+}
+
+// Host returns the mounted server's host methods when it implements
+// Host — the kit's server does; nil for a server that does not, as the
+// generated one and a host's own (Declare.HostServer) normally do not.
+func (s *Server) Host() Host {
+	h, _ := s.Underlying().(Host)
+	return h
+}
+
+// CertificatePort is the node's TLS key store (cluster/tls
+// CertificateManagement, after connectedhomeip's
+// TLSCertificateManagementDelegate and CertificateTableImpl).
+// GenerateCSR makes the client key pair of ccdid — a new one when
+// newKey is set, the one it made before otherwise — and returns its
+// DER CSR (at most 3000 bytes) and its signature of the 32-byte
+// nonce (at most 128 bytes). CertificateValid reports whether a DER
+// certificate is valid at the current time (chip's
+// Crypto::IsCertificateValidAtCurrentTime); ClientKeyMatches whether
+// a client certificate carries ccdid's public key. RemoveClientKey
+// drops a key whose entry left the table. The server keeps the
+// tables and calls the port after its own checks; a GenerateCSR
+// error answers its status, FAILURE without one.
+type CertificatePort interface {
+	GenerateCSR(ctx context.Context, fabricIndex uint8, ccdid uint16, newKey bool, nonce []byte) (csr, nonceSignature []byte, err error)
+	CertificateValid(ctx context.Context, certificate []byte) bool
+	ClientKeyMatches(ctx context.Context, fabricIndex uint8, ccdid uint16, certificate []byte) bool
+	RemoveClientKey(ctx context.Context, fabricIndex uint8, ccdid uint16)
+}
+
+// CertificateStore persists the certificate tables under the
+// device's StableKey; the node's store (node.Node.Store) is one.
+// Without one they stay in memory (cluster/tls Store).
+type CertificateStore interface {
+	GetSetting(ctx context.Context, key string) (value string, ok bool, err error)
+	SetSetting(ctx context.Context, key, value string) error
+}
+
 // Declare is the declaration of the TlsCertificateManagement cluster on a device:
 // device.New<Type> and device.FromSpec take it, and every field is
 // optional — the zero value mounts the cluster (an optional one too)
@@ -258,6 +317,10 @@ type Declare struct {
 	// HandleRemoveClientCertificate handles the RemoveClientCertificate command in place of the server
 	// (Server.HandleRemoveClientCertificate), inline; an optional command it handles is accepted.
 	HandleRemoveClientCertificate func(ctx context.Context, req RemoveClientCertificateRequest) (struct{}, error)
+	// CertificatePort is the host port the kit's server runs on ([CertificatePort]).
+	CertificatePort CertificatePort
+	// CertificateStore is the host port the kit's server runs on ([CertificateStore]).
+	CertificateStore CertificateStore
 	// HostServer is the host's own server for the cluster, mounted in
 	// place of the kit's — also for a cluster the device type does not
 	// list. The hooks above go on it; Initial, Features and the ports are

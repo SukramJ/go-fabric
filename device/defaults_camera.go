@@ -9,9 +9,12 @@ import (
 	"maps"
 
 	"github.com/SukramJ/go-fabric/cluster/camera"
+	"github.com/SukramJ/go-fabric/cluster/spec"
 	avdef "github.com/SukramJ/go-fabric/cluster/spec/cameraavsettingsuserlevelmanagement"
 	csdef "github.com/SukramJ/go-fabric/cluster/spec/cameraavstreammanagement"
 	chimedef "github.com/SukramJ/go-fabric/cluster/spec/chime"
+	padef "github.com/SukramJ/go-fabric/cluster/spec/pushavstreamtransport"
+	wpdef "github.com/SukramJ/go-fabric/cluster/spec/webrtctransportprovider"
 	wrdef "github.com/SukramJ/go-fabric/cluster/spec/webrtctransportrequestor"
 	zmdef "github.com/SukramJ/go-fabric/cluster/spec/zonemanagement"
 	"github.com/SukramJ/go-fabric/contract"
@@ -27,7 +30,14 @@ import (
 // declaration's Initial ([configFrom]). CameraAvStreamManagement and
 // ZoneManagement (brief 26-A2) run on the ports their declarations carry
 // — a stream port per feature, the ZonePort — and keep the generated
-// server without them.
+// server without them. WebRtcTransportProvider and PushAvStreamTransport
+// (brief 26-A3) run on the ProviderPort and PushTransportPort their
+// declarations carry, against the device's CameraAvStreamManagement and
+// ZoneManagement servers (PushAvStreamTransport is built after them,
+// coupledLast) and the TLS lookups its declaration names; the two TLS
+// servers run where the device type lists them (RootNode), the
+// certificate server on its CertificatePort, the client server over the
+// device's certificate server.
 
 func init() {
 	for id, f := range map[uint32]serverFactory{
@@ -36,6 +46,8 @@ func init() {
 		avdef.ClusterID:    newAvSettingsServer,
 		csdef.ClusterID:    newAvStreamServer,
 		zmdef.ClusterID:    newZonesServer,
+		wpdef.ClusterID:    newProviderServer,
+		padef.ClusterID:    newPushTransportServer,
 	} {
 		selfHeldDefaults[id] = f
 	}
@@ -127,4 +139,47 @@ func newZonesServer(b defaultBuild) (contract.ClusterServer, error) {
 		return nil, notServed(err)
 	}
 	return srv, err
+}
+
+// newProviderServer is the module's WebRtcTransportProvider server
+// ([camera.NewProvider]) on the declared ProviderPort, against the
+// device's CameraAvStreamManagement server.
+func newProviderServer(b defaultBuild) (contract.ClusterServer, error) {
+	d, _ := b.ports.(wpdef.Declare)
+	if d.ProviderPort == nil {
+		return nil, notServed(fmt.Errorf("webrtc transport provider: %w", errNoPort))
+	}
+	cfg := camera.ProviderConfig{Port: d.ProviderPort, DataVersion: b.cfg.DataVersion}
+	if av, ok := b.sibling(csdef.ClusterID).(*camera.AvStream); ok {
+		cfg.Streams = av
+	}
+	return camera.NewProvider(cfg)
+}
+
+// newPushTransportServer is the module's PushAvStreamTransport server
+// ([camera.NewPushTransport]) on the declared PushTransportPort, against
+// the device's CameraAvStreamManagement and ZoneManagement servers and
+// the declared TLS lookups; Initial.CurrentConnections are the persisted
+// transports.
+func newPushTransportServer(b defaultBuild) (contract.ClusterServer, error) {
+	d, _ := b.ports.(padef.Declare)
+	if d.PushTransportPort == nil {
+		return nil, notServed(fmt.Errorf("push av stream transport: %w", errNoPort))
+	}
+	cfg := camera.PushTransportConfig{
+		Features: camera.PushFeature(b.opts.Features), Port: d.PushTransportPort,
+		TLSEndpoints: d.TLSEndpoints, TLSCertificates: d.TLSCertificates,
+		Clock: b.clock, DataVersion: b.cfg.DataVersion,
+	}
+	if av, ok := b.sibling(csdef.ClusterID).(*camera.AvStream); ok {
+		cfg.Streams = av
+	}
+	if z, ok := b.sibling(zmdef.ClusterID).(*camera.Zones); ok {
+		cfg.Zones = z
+	}
+	if v, ok := b.initial[padef.AttrCurrentConnections]; ok {
+		spec.Assign(&cfg.Connections, v)
+		delete(b.initial, padef.AttrCurrentConnections)
+	}
+	return camera.NewPushTransport(cfg)
 }

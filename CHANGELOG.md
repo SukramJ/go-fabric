@@ -10,6 +10,12 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+### Added
+
+- The camera's transports, after connectedhomeip (brief 26-A3, ahead of matter.js). `camera.Provider` serves WebRtcTransportProvider on a `ProviderPort`: SolicitOffer, ProvideOffer, ProvideAnswer, ProvideICECandidates and EndSession with chip's checks, the session table with the provider's own ids, the streams checked against the camera's `camera.StreamSource` (`*camera.AvStream` is one; new `AvStream.SupportedStreamUsages` and `PrivacyModes`). `camera.PushTransport` serves PushAvStreamTransport on a `PushTransportPort`: the six commands of the model with chip's option, TLS endpoint, URL (`camera.ValidPushURL`), stream and motion-zone checks (new `Zones.MaxZones`), the per-fabric connection table, the expiry timer, and the PushTransportBegin/End events (`TransportStarted`, `TransportStopped`). The device kit makes both the Camera's default once the declaration carries their ports.
+- `cluster/tls`: `tls.CertificateManagement` (TlsCertificateManagement) and `tls.ClientManagement` (TlsClientManagement) after connectedhomeip — the per-fabric root and client certificate tables and TLS endpoints with node-wide ids, chip's statuses including RootCertificateNotFound, ClientCertificateNotFound and EndpointAlreadyInstalled, the dependency check that keeps a certificate an endpoint names, the fabric's entries leaving with it; the key material behind a `CertificatePort`, the tables persisted through any `store.Settings`. `node.Config.TLS` (`node.TLSConfig`) mounts both on endpoint 0 (`RootClusters.TLSCertificateManagement`, `TLSClientManagement`) and hands them to every camera PushAvStreamTransport without its own TLS lookups (`PushTransport.AttachTLS`); a fabric's removal drops its entries. An endpoint in use is not removed (EndpointInUse).
+- Generated: `ProviderPort` and `OfferArgs` (webrtctransportproviderdef), `PushTransportPort`, `TLSEndpoints`, `TLSCertificates` and `TLSCredentials` (pushavstreamtransportdef), `CertificatePort`, `CertificateStore` and `DependencyChecker` (tlscertificatemanagementdef), `EndpointStore` (tlsclientmanagementdef), and the four clusters' `Host` interfaces.
+
 ## [0.13.8] — 2026-10-28
 
 ### Fixed

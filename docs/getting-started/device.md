@@ -176,7 +176,8 @@ with `node.ErrInvalidConfig` when any check fails. It checks:
 - `UniqueID` is at most 32 bytes;
 - `LocationCapability` is a valid regulatory location;
 - `Network.ReannounceInterval` is not negative;
-- `OTA.Dir` is set when `OTA` is.
+- `OTA.Dir` is set when `OTA` is;
+- `TLS.CertificatePort` is set when `TLS` is.
 
 The quickstart uses the CSA test vendor `0xFFF1`. With no `Attestation` set,
 the node serves the CSA test attestation chain and test Certification
@@ -202,6 +203,7 @@ Defaults worth knowing:
 | `BasicInformation.UniqueID` | derived on the first boot and pinned in the store |
 | `Locales` | `en-US` alone |
 | `Logger` | `slog.Default()` |
+| `TLS` | no TLS servers; set, TlsCertificateManagement and TlsClientManagement mount on endpoint 0 (`node.TLSConfig`: the `CertificatePort`, per-fabric maxima defaulting to chip's 5, the stores defaulting to the node's) and every camera's PushAvStreamTransport without its own TLS lookups validates against them ([Camera](../guides/camera.md#the-transport-model)) |
 
 *Source: `node/config.go:37-205`, `node/config.go:303-365`, `node/config.go:466-524`, `node/node.go:131-148`.*
 

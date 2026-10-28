@@ -16,12 +16,23 @@ Thermostat's `SchedulePort` does.
 | CameraAvSettingsUserLevelManagement (`0x0552`) | `camera.AvSettings` | connectedhomeip `CameraAvSettingsUserLevelManagementLogic.cpp` (ahead of matter.js) | `MechanicalPTZ`, `MechanicalPresets`, `DigitalPTZ` |
 | CameraAvStreamManagement (`0x0551`) | `camera.AvStream` | connectedhomeip `CameraAVStreamManagementCluster.cpp` (ahead of matter.js) | `VideoStreamPort`, `AudioStreamPort`, `SnapshotStreamPort`, `SnapshotCapturePort` |
 | ZoneManagement (`0x0550`) | `camera.Zones` | connectedhomeip `ZoneManagementCluster.cpp`, `zone-geometry.h` (ahead of matter.js) | `ZonePort` |
+| WebRtcTransportProvider (`0x0553`) | `camera.Provider` | connectedhomeip `WebRTCTransportProviderCluster.cpp` (ahead of matter.js) | `ProviderPort` |
+| PushAvStreamTransport (`0x0555`) | `camera.PushTransport` | connectedhomeip `PushAVStreamTransportLogic.cpp` (ahead of matter.js) | `PushTransportPort`, `TLSEndpoints`, `TLSCertificates` |
+| TlsCertificateManagement (`0x0801`) | `tls.CertificateManagement` | connectedhomeip `TLSCertificateManagementCluster.cpp` (ahead of matter.js) | `CertificatePort`, `CertificateStore` |
+| TlsClientManagement (`0x0802`) | `tls.ClientManagement` | connectedhomeip `TLSClientManagementCluster.cpp` (ahead of matter.js) | `EndpointStore` |
 
 The device kit makes `camera.Requestor` the default of every device that
 mounts WebRtcTransportRequestor, such as `device.NewCameraController`.
 Chime, CameraAvSettingsUserLevelManagement, CameraAvStreamManagement and
-ZoneManagement get the kit's server once the declaration carries their
-ports. Without the port they keep the
+ZoneManagement, WebRtcTransportProvider and PushAvStreamTransport get the
+kit's server once the declaration carries their ports; the two
+transports check against the device's CameraAvStreamManagement and
+ZoneManagement servers. The TLS servers (`cluster/tls`) are node-scoped:
+`node.Config.TLS` (`node.TLSConfig`: the `CertificatePort`, the maxima,
+the stores) mounts them on endpoint 0, as connectedhomeip serves them,
+and hands their lookups to every PushAvStreamTransport whose declaration
+names no `TLSEndpoints` or `TLSCertificates` of its own
+(`PushTransport.AttachTLS`). Without the port they keep the
 generated server, and the kit logs `device.default_server.generated`.
 
 ## The signalling model
@@ -269,6 +280,74 @@ SensitivityMax (`CONSTRAINT_ERROR`); the host sets it with
 **Events.** The host reports motion with `Zones.ZoneTriggered(zone,
 reason)` and its end with `Zones.ZoneStopped(zone, reason)`.
 
+## The transport model
+
+Both transports check a request against the camera's stream state, a
+`camera.StreamSource`. The device's `*camera.AvStream` is one. The rules
+are the answers of connectedhomeip's camera app: a stream id must name an
+allocated stream, a null id picks the first allocated stream of the
+usage (WebRTC also takes another usage's stream when none matches), and
+the privacy modes refuse a usage (`INVALID_IN_STATE`: hard privacy every
+usage, soft livestream privacy LiveView, soft recording privacy
+Recording and Analysis). The host counts the streams a transport uses
+with the AvStream's `Update…StreamRefCount`.
+
+**WebRTC offer and answer.** A controller either asks the camera for an
+offer (`SolicitOffer`) or sends its own (`ProvideOffer`). For a new
+session the server checks the constraints (at most 10 ICE servers of at
+most 10 URLs, the lengths of the username, credential and transport
+policy), the privacy modes, a usage in StreamUsagePriorities
+(`DYNAMIC_CONSTRAINT_ERROR`), the stream lists or the deprecated stream
+ids (not both, `INVALID_COMMAND`), each stream, and a `turns:` or
+`stuns:` server against a known UTCTime (`ProviderConfig.UTCTimeKnown`).
+It then allocates a session id from 0 and calls the `ProviderPort` with
+the validated `OfferArgs`. The port returns the session to store in
+CurrentSessions, and for a solicited offer whether the offer is
+deferred. A `ProvideOffer` with a session id is a re-offer of the
+invoker's session (`NOT_FOUND` for another peer's). `ProvideAnswer`,
+`ProvideICECandidates` and `EndSession` name a session of the invoker's
+node and fabric; `EndSession` removes the session whatever the port
+answers. The host changes a session itself with `Provider.UpsertSession`
+and `RemoveSession`.
+
+**Push transports.** `AllocatePushTransport` checks, in chip's order: the
+fabric's room (4 transports, `PushTransportConfig.MaxPerFabric`), the
+transport options (the stream names and counts, the URL length, the
+trigger's fields per type, the CMAF segment of 500 to 65500 ms and a
+chunk of at most half of it), the TLS endpoint (a provisioned endpoint
+of the fabric with a client certificate, `InvalidTLSEndpoint`), the
+format (CMAF over CMAF ingest, `InvalidCombination`), the URL (`https`,
+a host, a path that ends in `/`, no query or fragment, `InvalidURL`;
+`camera.ValidPushURL`), the usage among SupportedStreamUsages
+(`InvalidStreamUsage`), the motion zones (unique, within MaxZones, the
+camera's zones, `InvalidZone`), the streams, the segment duration against
+the key-frame interval (`InvalidOptions`), the bandwidth (the port) and
+the pre-roll (`InvalidPreRollLength`). The port then allocates the
+transport with its `TLSCredentials`, the endpoint and its DER
+certificates; without the node's TLS servers or the declaration's
+lookups every allocation is InvalidTLSEndpoint. The transport starts inactive; `SetTransportStatus`
+activates it, `ManuallyTriggerTransport` triggers an active, not
+continuous one. An ExpiryTime deallocates the transport after that many
+seconds, as chip counts it. The host reports an upload's start and end
+with `PushTransport.TransportStarted` and `TransportStopped`, the
+PushTransportBegin and PushTransportEnd events.
+
+**TLS provisioning.** A controller provisions a root certificate
+(`ProvisionRootCertificate`), asks for a client CSR (`ClientCSR`; the
+`CertificatePort` makes the key and signs the nonce), provisions the
+signed client certificate and then a TLS endpoint naming both
+(`ProvisionEndpoint`). The certificate server keeps per-fabric tables
+with node-wide ids, refuses a duplicate (`ALREADY_EXISTS`), a full
+fabric (`RESOURCE_EXHAUSTED`) and a certificate the port judges invalid
+(`DYNAMIC_CONSTRAINT_ERROR`), and keeps a certificate an endpoint names
+(`INVALID_IN_STATE`); an endpoint a user counts (`MutateEndpointReferenceCount`)
+is not removed (EndpointInUse). Reads of the certificate lists serve the
+full certificates, as matter.js's generated behaviour; chip's id-only
+encoding outside a large-payload transport is not mirrored. The fingerprint of `Lookup…Certificate` is the
+certificate's SHA-256. A removed fabric takes its entries along
+(`MatterFabricRemoved`). The tables persist through any `store.Settings`
+(the node's store) under the device's key.
+
 ## Persistence
 
 connectedhomeip persists SelectedChime and Enabled, the camera's
@@ -279,7 +358,10 @@ management's Sensitivity (its zones and triggers are the delegate's).
 through the server's change notification (the typed `OnChanged`). The
 host persists the values and hands them back in the declaration's
 `Initial` (or `ChimeConfig`, `AvSettingsConfig`, `AvStreamConfig`,
-`ZonesConfig`).
+`ZonesConfig`). The push transports are the same: the host persists
+CurrentConnections and hands them back in `PushTransportConfig.Connections`
+(or the declaration's `Initial`). The TLS tables persist through the
+servers' `Store`.
 
 ## The ecosystem gate
 

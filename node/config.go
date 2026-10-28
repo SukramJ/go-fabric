@@ -79,6 +79,11 @@ type Config struct {
 	// ICD advertisement ([ICDConfig], [Node.ICD]). nil, the default, is a
 	// node that is no ICD: nothing mounts and nothing changes.
 	ICD *ICDConfig
+	// TLS mounts TlsCertificateManagement and TlsClientManagement on the
+	// root and hands them to the topology's PushAvStreamTransport servers
+	// ([TLSConfig], [RootClusters].TLSCertificateManagement); nil mounts
+	// neither.
+	TLS *TLSConfig
 	// OTAProvider serves OTA images: the OTA Software Update Provider on an
 	// endpoint of device type OtaProvider beside the Aggregator, its images
 	// over BDX (ADR 0021). nil, or no ImageSource, mounts none. With
@@ -550,6 +555,9 @@ func (c *Config) Validate() error {
 	}
 	if c.Network.ReannounceInterval < 0 {
 		errs = append(errs, fmt.Errorf("node: Network.ReannounceInterval %v is negative", c.Network.ReannounceInterval))
+	}
+	if c.TLS != nil && c.TLS.CertificatePort == nil {
+		errs = append(errs, errNoCertificatePort)
 	}
 	if c.OTA != nil && c.OTA.Dir == "" {
 		errs = append(errs, errors.New("node: OTA.Dir must be set"))
