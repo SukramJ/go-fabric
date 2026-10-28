@@ -10,6 +10,8 @@ import (
 	"errors"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
+	"github.com/SukramJ/go-fabric/cluster/spec/tlscertificatemanagement"
+	"github.com/SukramJ/go-fabric/cluster/spec/tlsclientmanagement"
 	"github.com/SukramJ/go-fabric/contract"
 )
 
@@ -190,6 +192,78 @@ func (s *Server) EmitPushTransportEnd(endpoint uint16, data PushTransportEndEven
 	return spec.EmitOn(s.Underlying(), endpoint, EventPushTransportEnd, data)
 }
 
+// Host is the PushAvStreamTransport kit server's host methods: the ones Set, Get and
+// the typed handlers do not reach (cluster/camera PushTransport).
+type Host interface {
+	// TransportStarted emits PushTransportBegin for a connection the
+	// host started; an unknown connection is NOT_FOUND
+	// (connectedhomeip NotifyTransportStarted).
+	TransportStarted(connectionID uint16, triggerType TransportTriggerTypeEnum, activationReason *TriggerActivationReasonEnum) error
+	// TransportStopped emits PushTransportEnd for a connection the
+	// host stopped (chip's NotifyTransportStopped).
+	TransportStopped(connectionID uint16) error
+}
+
+// Host returns the mounted server's host methods when it implements
+// Host — the kit's server does; nil for a server that does not, as the
+// generated one and a host's own (Declare.HostServer) normally do not.
+func (s *Server) Host() Host {
+	h, _ := s.Underlying().(Host)
+	return h
+}
+
+// TLSCredentials are what a transport uploads with: its TLS
+// endpoint and the endpoint's root and client certificates, DER
+// (connectedhomeip's SetTLSCerts, PushAVStreamTransportLogic.cpp
+// :920-1011, which runs just before AllocatePushTransport). The
+// certificates are empty without a TLSCertificates lookup.
+type TLSCredentials struct {
+	Endpoint                 tlsclientmanagement.TLSEndpointStruct
+	RootCertificate          []byte
+	ClientCertificate        []byte
+	IntermediateCertificates [][]byte
+}
+
+// PushTransportPort is the camera's push uploader (cluster/camera
+// PushTransport, after connectedhomeip's PushAvStreamTransportDelegate,
+// push-av-stream-transport-delegate.h:42-348): the kit's server
+// validates each command — the transport options, the TLS endpoint,
+// the URL, the streams against the camera's CameraAvStreamManagement
+// and the motion zones against its ZoneManagement — before it calls
+// the port, and keeps CurrentConnections. TransportBusy reports a
+// connection that uploads now; ValidateBandwidthLimit refuses a
+// transport the network cannot carry; CMAFSessionNumber is the CMAF
+// session number of the events. An error answers its status,
+// FAILURE without one.
+type PushTransportPort interface {
+	AllocatePushTransport(ctx context.Context, connectionID uint16, fabricIndex uint8, options TransportOptionsStruct, credentials TLSCredentials) error
+	DeallocatePushTransport(ctx context.Context, connectionID uint16) error
+	ModifyPushTransport(ctx context.Context, connectionID uint16, options TransportOptionsStruct) error
+	SetTransportStatus(ctx context.Context, connectionIDs []uint16, status TransportStatusEnum) error
+	ManuallyTriggerTransport(ctx context.Context, connectionID uint16, reason TriggerActivationReasonEnum, timeControl *TransportMotionTriggerTimeControlStruct) error
+	TransportBusy(connectionID uint16) bool
+	ValidateBandwidthLimit(ctx context.Context, usage StreamUsageEnum, videoStreamID, audioStreamID *uint16) error
+	CMAFSessionNumber(connectionID uint16) (sessionNumber uint64, ok bool)
+}
+
+// TLSEndpoints is the node's TlsClientManagement server, where a
+// transport's TLSEndpointID must name a provisioned endpoint of the
+// accessing fabric with a client certificate (its typed server's
+// Host is one). Without it every AllocatePushTransport is
+// InvalidTLSEndpoint, as chip answers without a TLS client delegate.
+type TLSEndpoints interface {
+	ProvisionedEndpoint(fabricIndex uint8, endpointID uint16) (tlsclientmanagement.TLSEndpointStruct, bool)
+}
+
+// TLSCertificates is the node's TlsCertificateManagement server, which
+// holds the endpoint's root and client certificates (its typed
+// server's Host is one). Without it the transport is allocated
+// without certificates, as chip's.
+type TLSCertificates interface {
+	RootCertificate(fabricIndex uint8, caid uint16) (tlscertificatemanagement.TLSCertStruct, bool)
+	ClientCertificate(fabricIndex uint8, ccdid uint16) (tlscertificatemanagement.TLSClientCertificateDetailStruct, bool)
+}
+
 // Declare is the declaration of the PushAvStreamTransport cluster on a device:
 // device.New<Type> and device.FromSpec take it, and every field is
 // optional — the zero value mounts the cluster (an optional one too)
@@ -229,6 +303,12 @@ type Declare struct {
 	// HandleFindTransport handles the FindTransport command in place of the server
 	// (Server.HandleFindTransport), inline; an optional command it handles is accepted.
 	HandleFindTransport func(ctx context.Context, req FindTransportRequest) (FindTransportResponse, error)
+	// PushTransportPort is the host port the kit's server runs on ([PushTransportPort]).
+	PushTransportPort PushTransportPort
+	// TLSEndpoints is the host port the kit's server runs on ([TLSEndpoints]).
+	TLSEndpoints TLSEndpoints
+	// TLSCertificates is the host port the kit's server runs on ([TLSCertificates]).
+	TLSCertificates TLSCertificates
 	// HostServer is the host's own server for the cluster, mounted in
 	// place of the kit's — also for a cluster the device type does not
 	// list. The hooks above go on it; Initial, Features and the ports are

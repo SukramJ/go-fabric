@@ -85,6 +85,7 @@ import (
 	h_oven "github.com/SukramJ/go-fabric/cluster/spec/ovencavityoperationalstate"
 	h_ovenm "github.com/SukramJ/go-fabric/cluster/spec/ovenmode"
 	h_pump "github.com/SukramJ/go-fabric/cluster/spec/pumpconfigurationandcontrol"
+	h_pa "github.com/SukramJ/go-fabric/cluster/spec/pushavstreamtransport"
 	h_rfa "github.com/SukramJ/go-fabric/cluster/spec/refrigeratoralarm"
 	h_rtcc "github.com/SukramJ/go-fabric/cluster/spec/refrigeratorandtemperaturecontrolledcabinetmode"
 	h_rvcc "github.com/SukramJ/go-fabric/cluster/spec/rvccleanmode"
@@ -106,6 +107,7 @@ import (
 	h_wol "github.com/SukramJ/go-fabric/cluster/spec/wakeonlan"
 	h_whmg "github.com/SukramJ/go-fabric/cluster/spec/waterheatermanagement"
 	h_whm "github.com/SukramJ/go-fabric/cluster/spec/waterheatermode"
+	h_wp "github.com/SukramJ/go-fabric/cluster/spec/webrtctransportprovider"
 	h_wr "github.com/SukramJ/go-fabric/cluster/spec/webrtctransportrequestor"
 	h_wifi "github.com/SukramJ/go-fabric/cluster/spec/wifinetworkmanagement"
 	h_wc "github.com/SukramJ/go-fabric/cluster/spec/windowcovering"
@@ -199,8 +201,10 @@ var hostCases = map[uint32]hostCase{
 	h_av.ClusterID: {kit: kitOf[*camera.AvSettings](), host: hostOf[h_av.Host](h_av.Wrap), covered: []string{
 		"MovementState", "NextPresetID", "Position", "Presets", "SetPanMax", "SetPanMin", "SetPosition", "SetTiltMax", "SetTiltMin", "SetZoomMax", "Streams",
 	}},
-	h_cs.ClusterID: {kit: kitOf[*camera.AvStream](), host: hostOf[h_cs.Host](h_cs.Wrap), covered: []string{"AudioStreams", "SnapshotStreams", "StreamUsagePriorities", "VideoStreams"}},
-	h_zm.ClusterID: {kit: kitOf[*camera.Zones](), host: hostOf[h_zm.Host](h_zm.Wrap), covered: []string{"Sensitivity", "SetSensitivity", "TriggerFor", "TriggerList", "ZoneList"}},
+	h_cs.ClusterID: {kit: kitOf[*camera.AvStream](), host: hostOf[h_cs.Host](h_cs.Wrap), covered: []string{"AudioStreams", "PrivacyModes", "SnapshotStreams", "StreamUsagePriorities", "SupportedStreamUsages", "VideoStreams"}},
+	h_zm.ClusterID: {kit: kitOf[*camera.Zones](), host: hostOf[h_zm.Host](h_zm.Wrap), covered: []string{"MaxZones", "Sensitivity", "SetSensitivity", "TriggerFor", "TriggerList", "ZoneList"}},
+	h_wp.ClusterID: {kit: kitOf[*camera.Provider](), host: hostOf[h_wp.Host](h_wp.Wrap), covered: []string{"Sessions"}},
+	h_pa.ClusterID: {kit: kitOf[*camera.PushTransport](), host: hostOf[h_pa.Host](h_pa.Wrap), covered: []string{"AttachTLS", "Close", "Connections"}},
 	// AmbientContextSensing (cluster/sensing): HoldTime and
 	// ObjectCountConfig are what Get reads.
 	h_acs.ClusterID: {kit: kitOf[*sensing.AmbientContext](), host: hostOf[h_acs.Host](h_acs.Wrap), covered: []string{"HoldTime", "ObjectCountConfig"}},

@@ -203,6 +203,9 @@ func (z *Zones) ZoneList() []Zone {
 	return slices.Clone(z.zones)
 }
 
+// MaxZones returns MaxZones.
+func (z *Zones) MaxZones() uint8 { return z.cfg.MaxZones }
+
 // TriggerList returns Triggers.
 func (z *Zones) TriggerList() []ZoneTrigger {
 	z.mu.Lock()

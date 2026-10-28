@@ -500,6 +500,15 @@ func (n *Node) fabricRemoved(ctx context.Context, fabricIndex uint8) {
 	if srv := n.root.ICDManagement; srv != nil {
 		srv.FabricRemoved(ctx, fabricIndex)
 	}
+	// The root's TLS tables drop the fabric's entries
+	// (TLSCertificateManagementCluster.cpp:571-575,
+	// TLSClientManagementCluster.cpp:272-275 at 6170af84).
+	if srv := n.root.TLSClientManagement; srv != nil {
+		srv.FabricRemoved(ctx, fabricIndex)
+	}
+	if srv := n.root.TLSCertificateManagement; srv != nil {
+		srv.FabricRemoved(ctx, fabricIndex)
+	}
 	n.reopenWhenIdle()
 }
 

@@ -65,6 +65,9 @@ func TestTypedServer(t *testing.T) {
 	if s.Underlying() != srv {
 		t.Error("the typed server does not hold its server")
 	}
+	if s.Host() != nil {
+		t.Error("the generated server has the kit server's host methods")
+	}
 	if err := s.Set(Patch{}); err != nil {
 		t.Error(err)
 	}
@@ -145,6 +148,9 @@ func TestTypedServer(t *testing.T) {
 	if err := decl.Attach(srv); err != nil {
 		t.Error(err)
 	}
+	var _ PushTransportPort = d.PushTransportPort
+	var _ TLSEndpoints = d.TLSEndpoints
+	var _ TLSCertificates = d.TLSCertificates
 	// Every handler declared: each is installed, and refused by the
 	// empty definition's AcceptedCommandList.
 	all := d

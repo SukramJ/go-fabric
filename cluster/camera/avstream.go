@@ -533,6 +533,22 @@ func (a *AvStream) StreamUsagePriorities() []StreamUsage {
 	return slices.Clone(a.priorities)
 }
 
+// SupportedStreamUsages returns SupportedStreamUsages.
+func (a *AvStream) SupportedStreamUsages() []StreamUsage {
+	return slices.Clone(a.supportedStreamUsages())
+}
+
+// PrivacyModes returns HardPrivacyModeOn, SoftRecordingPrivacyModeEnabled
+// and SoftLivestreamPrivacyModeEnabled, false where the server does not
+// serve one — what the transports check before they stream (chip's
+// IsHardPrivacyModeActive … in the camera app's stream manager,
+// camera-av-stream-manager.cpp:309-329).
+func (a *AvStream) PrivacyModes() (hard, softRecording, softLivestream bool) {
+	return stored[bool](a, csdef.AttrHardPrivacyModeOn),
+		stored[bool](a, csdef.AttrSoftRecordingPrivacyModeEnabled),
+		stored[bool](a, csdef.AttrSoftLivestreamPrivacyModeEnabled)
+}
+
 // The reference counts, chip's UpdateVideoStreamRefCount …
 // UpdateSnapshotStreamRefCount (CameraAVStreamManagementCluster.cpp:
 // 486-557): a transport that uses a stream (WebRTC, PushAV) counts it up

@@ -10,6 +10,8 @@ import (
 	avdef "github.com/SukramJ/go-fabric/cluster/spec/cameraavsettingsuserlevelmanagement"
 	csdef "github.com/SukramJ/go-fabric/cluster/spec/cameraavstreammanagement"
 	chimedef "github.com/SukramJ/go-fabric/cluster/spec/chime"
+	padef "github.com/SukramJ/go-fabric/cluster/spec/pushavstreamtransport"
+	wpdef "github.com/SukramJ/go-fabric/cluster/spec/webrtctransportprovider"
 	wrdef "github.com/SukramJ/go-fabric/cluster/spec/webrtctransportrequestor"
 	zmdef "github.com/SukramJ/go-fabric/cluster/spec/zonemanagement"
 )
@@ -56,6 +58,44 @@ func (fakeZones) RemoveTrigger(context.Context, uint16) error { return nil }
 // (defaults_camera.go): the requestor without a port, Chime and
 // CameraAvSettingsUserLevelManagement on theirs; CameraAvStreamManagement
 // and ZoneManagement on theirs (brief 26-A2).
+type fakeProvider struct{}
+
+func (fakeProvider) SolicitOffer(context.Context, wpdef.OfferArgs) (wpdef.WebRTCSessionStruct, bool, error) {
+	return wpdef.WebRTCSessionStruct{}, false, nil
+}
+
+func (fakeProvider) ProvideOffer(context.Context, wpdef.OfferArgs) (wpdef.WebRTCSessionStruct, error) {
+	return wpdef.WebRTCSessionStruct{}, nil
+}
+func (fakeProvider) ProvideAnswer(context.Context, uint16, string) error { return nil }
+func (fakeProvider) ProvideIceCandidates(context.Context, uint16, []wpdef.ICECandidateStruct) error {
+	return nil
+}
+func (fakeProvider) EndSession(context.Context, uint16, uint8) error { return nil }
+
+type fakePush struct{}
+
+func (fakePush) AllocatePushTransport(context.Context, uint16, uint8, padef.TransportOptionsStruct, padef.TLSCredentials) error {
+	return nil
+}
+func (fakePush) DeallocatePushTransport(context.Context, uint16) error { return nil }
+func (fakePush) ModifyPushTransport(context.Context, uint16, padef.TransportOptionsStruct) error {
+	return nil
+}
+
+func (fakePush) SetTransportStatus(context.Context, []uint16, padef.TransportStatusEnum) error {
+	return nil
+}
+
+func (fakePush) ManuallyTriggerTransport(context.Context, uint16, padef.TriggerActivationReasonEnum, *padef.TransportMotionTriggerTimeControlStruct) error {
+	return nil
+}
+func (fakePush) TransportBusy(uint16) bool { return false }
+func (fakePush) ValidateBandwidthLimit(context.Context, padef.StreamUsageEnum, *uint16, *uint16) error {
+	return nil
+}
+func (fakePush) CMAFSessionNumber(uint16) (uint64, bool) { return 0, false }
+
 func cameraCases() []struct {
 	cluster uint32
 	build   func() (*Device, error)
@@ -82,5 +122,11 @@ func cameraCases() []struct {
 				Initial: zmdef.Patch{MaxZones: &maxZones, SensitivityMax: &sensMax}, ZonePort: fakeZones{},
 			})
 		}, (*camera.Zones)(nil)},
+		{wpdef.ClusterID, func() (*Device, error) {
+			return New(&CameraType, testOptions("provider"), wpdef.Declare{ProviderPort: fakeProvider{}})
+		}, (*camera.Provider)(nil)},
+		{padef.ClusterID, func() (*Device, error) {
+			return New(&CameraType, testOptions("push"), padef.Declare{PushTransportPort: fakePush{}})
+		}, (*camera.PushTransport)(nil)},
 	}
 }

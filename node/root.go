@@ -20,6 +20,7 @@ import (
 	gencommdef "github.com/SukramJ/go-fabric/cluster/spec/generalcommissioning"
 	tfldef "github.com/SukramJ/go-fabric/cluster/spec/timeformatlocalization"
 	userlabeldef "github.com/SukramJ/go-fabric/cluster/spec/userlabel"
+	"github.com/SukramJ/go-fabric/cluster/tls"
 	"github.com/SukramJ/go-fabric/cluster/wire"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/endpoint"
@@ -87,6 +88,10 @@ type RootClusters struct {
 	PowerSourceConfiguration *mattercore.PowerSourceConfiguration
 	// ICDManagement is nil unless [Config].ICD is set.
 	ICDManagement *mattercore.ICDManagement
+	// TLSCertificateManagement and TLSClientManagement are nil unless
+	// [Config].TLS is set.
+	TLSCertificateManagement *tls.CertificateManagement
+	TLSClientManagement      *tls.ClientManagement
 
 	servers []contract.ClusterServer
 }
@@ -310,6 +315,12 @@ func buildRoot(ctx context.Context, d rootDeps) (*RootClusters, error) { //nolin
 		}
 	}
 
+	if cfg.TLS != nil {
+		if r.TLSCertificateManagement, r.TLSClientManagement, err = buildTLS(ctx, cfg.TLS, d.st); err != nil {
+			return nil, fmt.Errorf("root %w", err)
+		}
+	}
+
 	if wifi := cfg.Network.WiFi; wifi.Reporter != nil {
 		r.WiFiNetworkDiagnostics, err = mattercore.NewWiFiNetworkDiagnostics(mattercore.WiFiNetworkDiagnosticsConfig{
 			Reporter: wifi.Reporter, Features: wifi.Features, Attributes: wifi.Attributes,
@@ -347,16 +358,27 @@ func buildRoot(ctx context.Context, d rootDeps) (*RootClusters, error) { //nolin
 		r.Groupcast,
 		r.Descriptor,
 	)
-	if r.OTARequestor != nil {
-		servers = append(servers, r.OTARequestor)
-	}
-	if r.ICDManagement != nil {
-		servers = append(servers, r.ICDManagement)
-	}
+	servers = append(servers, r.configured()...)
 	servers = append(servers, optional...)
 	r.servers = servers
 	r.Descriptor.SetServerListProvider(clusterIDsOf(r.servers))
 	return r, nil
+}
+
+// configured are the root servers the configuration adds, in mount
+// order: the OTA requestor, ICD Management and the two TLS servers.
+func (r *RootClusters) configured() []contract.ClusterServer {
+	var out []contract.ClusterServer
+	if r.OTARequestor != nil {
+		out = append(out, r.OTARequestor)
+	}
+	if r.ICDManagement != nil {
+		out = append(out, r.ICDManagement)
+	}
+	if r.TLSCertificateManagement != nil {
+		out = append(out, r.TLSCertificateManagement, r.TLSClientManagement)
+	}
+	return out
 }
 
 // attestationMaterial returns the configured chain and CD, or the CSA

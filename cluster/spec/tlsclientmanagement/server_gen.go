@@ -157,6 +157,39 @@ func (s *Server) HandleRemoveEndpoint(fn func(ctx context.Context, req RemoveEnd
 	return spec.HandleOn(s.Underlying(), CmdRemoveEndpoint, fn)
 }
 
+// Host is the TlsClientManagement kit server's host methods: the ones Set, Get and
+// the typed handlers do not reach (cluster/tls ClientManagement).
+type Host interface {
+	// ProvisionedEndpoint returns a fabric's provisioned TLS endpoint
+	// (connectedhomeip FindProvisionedEndpointByID); the
+	// PushAvStreamTransport server validates a TLSEndpointID with it.
+	ProvisionedEndpoint(fabricIndex uint8, endpointID uint16) (TLSEndpointStruct, bool)
+	// MutateEndpointReferenceCount counts a user of an endpoint up or
+	// down; an endpoint in use is not removed (chip's
+	// MutateEndpointReferenceCount).
+	MutateEndpointReferenceCount(fabricIndex uint8, endpointID uint16, delta int8) error
+	// RootCertificateInUse and ClientCertificateInUse are the
+	// TlsCertificateManagement server's dependency check.
+	RootCertificateInUse(fabricIndex uint8, caid uint16) bool
+	ClientCertificateInUse(fabricIndex uint8, ccdid uint16) bool
+}
+
+// Host returns the mounted server's host methods when it implements
+// Host — the kit's server does; nil for a server that does not, as the
+// generated one and a host's own (Declare.HostServer) normally do not.
+func (s *Server) Host() Host {
+	h, _ := s.Underlying().(Host)
+	return h
+}
+
+// EndpointStore persists the provisioned TLS endpoints under the
+// device's StableKey; the node's store (node.Node.Store) is one.
+// Without one they stay in memory (cluster/tls Store).
+type EndpointStore interface {
+	GetSetting(ctx context.Context, key string) (value string, ok bool, err error)
+	SetSetting(ctx context.Context, key, value string) error
+}
+
 // Declare is the declaration of the TlsClientManagement cluster on a device:
 // device.New<Type> and device.FromSpec take it, and every field is
 // optional — the zero value mounts the cluster (an optional one too)
@@ -182,6 +215,8 @@ type Declare struct {
 	// HandleRemoveEndpoint handles the RemoveEndpoint command in place of the server
 	// (Server.HandleRemoveEndpoint), inline; an optional command it handles is accepted.
 	HandleRemoveEndpoint func(ctx context.Context, req RemoveEndpointRequest) (struct{}, error)
+	// EndpointStore is the host port the kit's server runs on ([EndpointStore]).
+	EndpointStore EndpointStore
 	// HostServer is the host's own server for the cluster, mounted in
 	// place of the kit's — also for a cluster the device type does not
 	// list. The hooks above go on it; Initial, Features and the ports are
