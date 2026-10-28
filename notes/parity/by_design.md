@@ -3333,8 +3333,9 @@ module changes when matter.js does.
 `DclCertificateService.ts:1849-1874` parses a CRL's `nextUpdate` and never
 reads it, so an expired CRL still revokes — mirrored, pinned by a test.
 Not ported: out-of-band revocation sets and seed data, the on-demand PAA
-fetch by subject key id, the compliance endpoint, the vendor-info service,
-OTA image storage, ML-DSA certificates. `attestation.PAAStore` and
+fetch by subject key id, the compliance endpoint, OTA image storage,
+ML-DSA PAAs in the ledger stores (the attestation validator admits them
+behind PQC Phase 1, wave 27-A). `attestation.PAAStore` and
 `Revocations` take no context (a change would break the API before the
 freeze); on-demand CRL fetches are bounded by the client timeout. Reports
 AS, AX §10.
@@ -5053,6 +5054,41 @@ carries the consent, the trust anchors and the stage progress, and
 commissioner side is not ported. Pinned by `jcm_chip_test.go` (chip's 7
 cases of `TestJCMCommissioner.cpp`) and the `fabrictest` end-to-end
 (anchor recorded, refused consent aborts with `ErrJointFabric`).
+
+### BD-Matter-ControllerRemainder — the invoke batcher, the discovery sessions, the vendor-info service and the NOC rotation after matter.js, with five Go-shaped edges
+
+Wave 27-A mirrors four matter.js controller behaviours (all at `862ad75f`):
+the invoke batcher (`ClientInteraction.ts` `#invokeWithBatching` :744-1005,
+`isBatchable` :185-214: one lane per network, CommandRefs per lane, a
+faster window restarts the timer, a batch above maxPathsPerInvoke is
+split, alone-and-at-once for endpoint 0, timed, suppressed-response,
+Large Message and the other `isBatchable` exclusions); the discovery
+sessions (`behavior/system/controller/discovery/`: `Discovery.ts:37`,
+`InstanceDiscovery.ts:18`, `ContinuousDiscovery.ts:18`,
+`ParallelPaseDiscovery.ts:45`, `PaseDiscovery.ts:28`,
+`CommissioningDiscovery.ts:23`) as `client/discovery.Session[T]` with
+`FindInstance`, `FindAll`, `Race`, `CommissioningRace` and `PASERace`, so
+`controller.Pair` races DNS-SD and BLE and the first PASE wins; the
+DCL vendor-info service (`DclVendorInfoService.ts:166-468`, wired as
+`DclBehavior.ts:101-115` wires it: `controller.Config.DCL`,
+`Controller.VendorInfo`); and the NOC rotation (`FabricAuthority.ts:57,
+:181-205`, on every controller start as `MatterController.ts:402-415`;
+no opt-out, owner decision 2026-10-28). Five Go-shaped edges: the batch
+window's Instant is a goroutine yield, not a clock timer, and there is no
+interaction-level default lane; the race's transports report as the
+progress sub-steps `Discovery.IP` / `Discovery.BLE` (number 2.1, Go
+names — an extension of BD-Matter-ControllerProgressAndUpdateEvents);
+`VendorInfoService.Observe` is Go-only and `ProductInfo` bitmaps are kept
+raw; `FabricAuthority` manages one fabric per store and never rotates a
+key an `OperationalSigner` holds; `Discover` reports a device only once it
+has an address. PQC phase 1 (`Specification.ts:78-105`, the forward
+feature) is implemented on Go 1.27's `crypto/mldsa` and `crypto/x509`
+(no dependency; the circl decision of 2026-10-28 is superseded) and stays
+off behind `internal/forward`, as matter.js keeps it off until a released
+revision carries it (owner decision 2026-10-28); device-side PQC (NOC,
+ICAC, CASE) stays out, as matter.js admits ML-DSA only in the attestation
+certificates. Pinned by the `*_parity_matterjs_test.go` ports listed in
+`notes/briefs/reports/27A.md` (test register, planned ratchet 3).
 
 ### BD-Matter-GeneratedServerSuffices — clusters whose generated server is complete: no source carries behaviour beyond the model
 

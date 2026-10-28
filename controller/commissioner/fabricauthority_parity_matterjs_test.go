@@ -4,14 +4,14 @@
 package commissioner
 
 // A port of matter.js packages/protocol/test/fabric/FabricAuthorityTest.ts at
-// 862ad75f: the controller's own fabric — admin vendor checks, persistence, no rotation.
+// 862ad75f: the controller's own fabric — admin vendor checks, persistence.
 //
 // matter.js's FabricAuthority.createFabric / defaultFabric over a
-// FabricManager is NewFabric over a ca.FabricStore here: the controller
-// owns one fabric, NewFabric mints it (createFabric) or loads it
-// (defaultFabric), and it never rotates the NOC key (rotateNoc=false).
-// The rotation cases, the fabricAdded event and FabricBuilder have no Go
-// counterpart and stay in the register's missing list.
+// FabricManager is FabricAuthority over a ca.FabricStore here, NewFabric
+// the load without rotation (rotateNoc=false). The rotation and
+// fabricAdded cases are fabricauthority_rotation_parity_matterjs_test.go's;
+// the group and ICD state of a rotated fabric and FabricBuilder stay in the
+// register's missing list.
 
 import (
 	"bytes"
@@ -133,7 +133,7 @@ func TestFabricAuthorityDefaultAdminVendorID(t *testing.T) {
 }
 
 // TestFabricAuthorityKeypairRotation: describe "keypair rotation" (:129) —
-// the one case Go has, as NewFabric never rotates.
+// NewFabric, the load without rotation.
 func TestFabricAuthorityKeypairRotation(t *testing.T) {
 	t.Parallel()
 	t.Run("does not rotate when rotateNoc=false", func(t *testing.T) {

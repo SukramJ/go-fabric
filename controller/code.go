@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/SukramJ/go-fabric/client/discovery"
@@ -122,7 +123,10 @@ type DiscoverOptions struct {
 
 // DiscoverWith is [Controller.Discover] with options: with
 // [DiscoverOptions].First it returns as soon as the first matching device
-// answers instead of when the timeout passes.
+// answers instead of when the timeout passes. The search is a
+// discovery.FindAll session (matter.js ContinuousDiscovery), with First a
+// discovery.FindInstance one (InstanceDiscovery); a device is reported
+// once it has an address.
 func (c *Controller) DiscoverWith(ctx context.Context, id discovery.Identifier, timeout time.Duration, opts DiscoverOptions) ([]client.Device, error) {
 	if c.names == nil {
 		return nil, fmt.Errorf("%w: the controller is closed", ErrConfiguration)
@@ -132,29 +136,36 @@ func (c *Controller) DiscoverWith(ctx context.Context, id discovery.Identifier, 
 	}
 	sc := discovery.NewScanner(c.names)
 	defer sc.Close()
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-	t := c.clock.AfterFunc(timeout, cancel)
-	defer t.Stop()
-	var first []client.Device
-	var onFound func(discovery.Device)
+	transports := []discovery.Transport{discovery.IPTransport(sc)}
+	so := discovery.SessionOptions{Identifier: id, Timeout: timeout, Clock: c.clock, Logger: c.log}
+	// The end of ctx is the end of the search, no error: the outcome of a
+	// cancelled session is the cancellation, so the session runs on a
+	// context of its own that ctx stops.
+	sctx := context.WithoutCancel(ctx)
 	if opts.First {
-		onFound = func(d discovery.Device) {
-			if first == nil && len(d.Addresses) > 0 {
-				first = []client.Device{d}
-				cancel()
-			}
+		s := discovery.FindInstance(sctx, transports, so)
+		stop := context.AfterFunc(ctx, s.Stop)
+		defer stop()
+		cand, err := s.Wait(sctx)
+		switch {
+		case err == nil:
+			return []client.Device{cand.Device}, nil
+		case errors.Is(err, discovery.ErrDeviceNotDiscovered):
+			return []client.Device{}, nil
 		}
+		return []client.Device{}, err
 	}
-	found, err := sc.FindCommissionable(ctx, id, onFound)
-	if opts.First {
-		found = first
-		if found == nil {
-			found = []client.Device{}
-		}
-	}
-	if err != nil && !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
-		return found, err
-	}
-	return found, nil
+	var mu sync.Mutex
+	found := []client.Device{}
+	s := discovery.FindAll(sctx, transports, so, func(cand discovery.Candidate) {
+		mu.Lock()
+		found = append(found, cand.Device)
+		mu.Unlock()
+	})
+	stop := context.AfterFunc(ctx, s.Stop)
+	defer stop()
+	_, err := s.Wait(sctx)
+	mu.Lock()
+	defer mu.Unlock()
+	return found, err
 }

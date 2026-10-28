@@ -12,6 +12,7 @@ import (
 	"github.com/SukramJ/go-fabric/client/exchange"
 	"github.com/SukramJ/go-fabric/clock/clocktest"
 	"github.com/SukramJ/go-fabric/secure/channel"
+	"github.com/SukramJ/go-fabric/secure/sessionparams"
 	"github.com/SukramJ/go-fabric/transport/message"
 )
 
@@ -63,6 +64,13 @@ type scripted struct {
 
 func newScripted(t *testing.T) *scripted {
 	t.Helper()
+	return newScriptedWith(t, nil)
+}
+
+// newScriptedWith is newScripted with the session parameters the peer
+// reported (nil reported nothing).
+func newScriptedWith(t *testing.T, reported *sessionparams.Parameters) *scripted {
+	t.Helper()
 	conn := &fakeConn{ch: make(chan []byte, 1024)}
 	clock := newFakeClock()
 	m, err := exchange.NewManager(conn, exchange.Config{Clock: clock, Rand: func() float64 { return 0.5 }})
@@ -74,7 +82,7 @@ func newScripted(t *testing.T) *scripted {
 	s, err := m.NewSecureSession(exchange.SecureSessionConfig{
 		ID: 0x0101, Addr: peerAddr, FabricIndex: 1,
 		Channel:        channel.Config{EncryptKey: i2r, DecryptKey: r2i, LocalNodeID: 0x1111, PeerNodeID: 0x2222, PeerSessionID: 0x7101},
-		PeerParameters: exchange.PeerParameters(nil),
+		PeerParameters: exchange.PeerParameters(reported),
 	})
 	if err != nil {
 		t.Fatal(err)

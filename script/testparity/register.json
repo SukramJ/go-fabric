@@ -437,52 +437,97 @@
     },
     {
       "path": "packages/node/test/behavior/system/controller/discovery/ContinuousDiscoveryTest.ts",
-      "status": "planned",
-      "until": "M6 phase 27",
-      "reason": "Continuous discovery creating one node for a device that concurrent discoveries report. Left planned in brief CM: it tests matter.js's controller Discovery behaviour (Discovery, ParallelPaseDiscovery, CommissioningDiscovery, ContinuousDiscovery over a ScannerSet: parallel PASE attempts, cancellation and abort, the error kinds, transport selection from the discovery capabilities), which the Go controller does not have in that shape — Controller.Pair finds one device per transport serially and Discover is DNS-SD only. The identity check of the same class is ported (CommissioningIdentityTest). Milestone 6 phase 27 (the register at 100 %).",
+      "status": "ported",
+      "go": [
+        "client/discovery:TestContinuousDiscoveryParity"
+      ],
+      "reason": "Two concurrent continuous discoveries (client/discovery FindAll, ContinuousDiscovery.ts:18-44 at 862ad75f) each report the device once and list it; the one node per device is controller/client Registry.ForDevice's findOrCreate (Peers.ts:371-389).",
       "snapshotSha": "c0adf3e65a382f5be567ed488776e7d38d6f490c"
     },
     {
       "path": "packages/node/test/behavior/system/controller/discovery/DiscoveryCancelTest.ts",
-      "status": "planned",
-      "until": "M6 phase 27",
-      "reason": "Cancellation and abort of a commissioning discovery before and after the PASE win, cancel reasons and settling. Left planned in brief CM: it tests matter.js's controller Discovery behaviour (Discovery, ParallelPaseDiscovery, CommissioningDiscovery, ContinuousDiscovery over a ScannerSet: parallel PASE attempts, cancellation and abort, the error kinds, transport selection from the discovery capabilities), which the Go controller does not have in that shape — Controller.Pair finds one device per transport serially and Discover is DNS-SD only. The identity check of the same class is ported (CommissioningIdentityTest). Milestone 6 phase 27 (the register at 100 %).",
+      "status": "partial",
+      "go": [
+        "client/discovery:TestDiscoveryCancelParity"
+      ],
+      "missing": [
+        "rejects with the cancel reason when the node fails to start after the cancel",
+        "does not commission a device whose PASE was in progress when the commissioning was canceled",
+        "does not commission a device whose PASE was in progress when the caller aborted",
+        "does not commission a device whose PASE was in progress when every scanner failed"
+      ],
+      "reason": "The interruption of a discovery session (client/discovery Session, matter.js Discovery.ts:37-483 at 862ad75f) on fixed and failing transports: a cancel, the timeout and the caller's context before the result close the race, an interruption after it is ignored, the first reason stays, the outcome waits for the aborted attempts, and the failure of one transport against all. Missing: the node's start (a Go session starts no node) and the three real-device cases, which need a PASE held mid-way on fabrictest (no seam).",
       "snapshotSha": "1613033bcf3b348c3340969c197ef12d366c0995"
     },
     {
       "path": "packages/node/test/behavior/system/controller/discovery/DiscoveryErrorTest.ts",
-      "status": "planned",
-      "until": "M6 phase 27",
-      "reason": "The error kinds a commissioning discovery reports (not discovered, incomplete, aggregate, no transport, unusable device). Left planned in brief CM: it tests matter.js's controller Discovery behaviour (Discovery, ParallelPaseDiscovery, CommissioningDiscovery, ContinuousDiscovery over a ScannerSet: parallel PASE attempts, cancellation and abort, the error kinds, transport selection from the discovery capabilities), which the Go controller does not have in that shape — Controller.Pair finds one device per transport serially and Discover is DNS-SD only. The identity check of the same class is ported (CommissioningIdentityTest). Milestone 6 phase 27 (the register at 100 %).",
+      "status": "partial",
+      "go": [
+        "client/discovery:TestDiscoveryErrorParity"
+      ],
+      "missing": [
+        "reports the error of a known node that could not be refreshed",
+        "reports the error a subclass throws for the found node"
+      ],
+      "reason": "The outcomes of a discovery without a result (client/discovery ErrDeviceNotDiscovered, ErrDiscoveryIncomplete, ErrNoDiscoveryTransport, AggregateError; DiscoveryError.ts:12-31 at 862ad75f) and a found device that cannot be used (SessionOptions.Prepare, the ClientNodeFactory step of Discovery.ts:333-357, :404-453). Missing: a known node's refresh (Prepare does not tell a new device from a known one) and a subclass's error (the Go kinds are closed).",
       "snapshotSha": "9b754259f919ad36968baa4bbcd6411c032123a5"
     },
     {
       "path": "packages/node/test/behavior/system/controller/discovery/DiscoveryTransportsTest.ts",
-      "status": "planned",
-      "until": "M6 phase 27",
-      "reason": "Selection and reporting of the discovery transports (IP network, BLE) from the onboarding payload. Left planned in brief CM: it tests matter.js's controller Discovery behaviour (Discovery, ParallelPaseDiscovery, CommissioningDiscovery, ContinuousDiscovery over a ScannerSet: parallel PASE attempts, cancellation and abort, the error kinds, transport selection from the discovery capabilities), which the Go controller does not have in that shape — Controller.Pair finds one device per transport serially and Discover is DNS-SD only. The identity check of the same class is ported (CommissioningIdentityTest). Milestone 6 phase 27 (the register at 100 %).",
+      "status": "partial",
+      "go": [
+        "client/discovery:TestDiscoveryTransportsParity"
+      ],
+      "missing": [
+        "names every identifier the caller states",
+        "reports that BLE is installed but was not asked for",
+        "stays silent about BLE where BLE is not installed at all",
+        "reports BLE requested where BLE is not enabled",
+        "warns where no scanner participates"
+      ],
+      "reason": "The transport selection from the payload's discovery capabilities (client/discovery SelectTransports, Discovery.ts:272-273, :496-505 at 862ad75f) and the identifier a transport is given. Missing: several identifiers at once (a Go Identifier selects by one) and the four log reports (#reportTransports, :378-402; the Go session logs them, the tests assert no log).",
       "snapshotSha": "4d32c07967e95dbb8ba1fad22a962328a051280b"
     },
     {
       "path": "packages/node/test/behavior/system/controller/discovery/ParallelPaseRaceTest.ts",
-      "status": "partial",
+      "status": "ported",
       "go": [
+        "client/discovery:TestParallelPaseRaceParity",
         "controller/commissioner:TestConnectionStaggerAndWinner",
         "controller/commissioner:TestConnectionHoldingResponder"
       ],
-      "missing": [
-        "rejects with the winner's own error",
-        "does not start a staggered attempt once a candidate has won",
-        "ends pending stagger waits when discovery ends without a win"
-      ],
-      "reason": "The staggered parallel PASE attempts and the winner are covered by the commissioner's connection tests; the winner's-own-error and stagger-wait endings are not.",
+      "reason": "The race of client/discovery Race (ParallelPaseDiscovery.ts:45-216 at 862ad75f): the winner while a loser fails, the winner's own error, attempts one CrossDeviceStagger apart, none started after a win, stagger waits ended with the discovery; the per-address stagger of one device is the commissioner's connection (TestConnectionStaggerAndWinner).",
       "snapshotSha": "4ffda2419c4a36087d7b506fca0e0b49d27eece7"
     },
     {
       "path": "packages/node/test/behavior/system/dcl/DclBehaviorTest.ts",
-      "status": "planned",
-      "until": "M6 phase 27",
-      "reason": "The DCL configuration defaults (production/test URLs, certificate sources) and the offline switch of the DCL services. Milestone 6 phase 27 with the DCL services (concept v5 F.0 19.3).",
+      "status": "partial",
+      "go": [
+        "controller:TestVendorInfoOffline"
+      ],
+      "missing": [
+        "has correct default production URL",
+        "has correct default test URL",
+        "fetchTestCertificates defaults to false",
+        "fetchGithubCertificates defaults to true",
+        "productionConfig returns DclConfig with production URL",
+        "testConfig returns DclConfig with test URL",
+        "configForProduction(true) returns production config",
+        "configForProduction(false) returns test config",
+        "overrides productionUrl",
+        "overrides testUrl",
+        "overrides fetchTestCertificates",
+        "overrides fetchGithubCertificates",
+        "passes custom productionUrl to vendorInfoService config",
+        "defaults to false",
+        "is read from the environment",
+        "reads boolean environment variables as booleans",
+        "is read from config",
+        "warns when an offline node gets an existing online service",
+        "does not warn when an existing service matches",
+        "does not warn when an online node gets an existing offline service"
+      ],
+      "reason": "The vendor information service of the controller (controller.Controller.VendorInfo over Config.DCL, DclBehavior.vendorInfoService :101-115 at 862ad75f) offline: the snapshot's and the static vendors without the ledger, one service. Missing: DclBehavior's state and config getters (the Go controller has no behavior state; Config.DCL holds the production URL and the offline switch, and the certificate service takes its own options, attestation.Trust), the environment and config reading (matter.js's Environment), and the warnings about a shared service (each Go controller owns its service).",
       "snapshotSha": "3aa10da7c5cb2c5748e34ea35de431b1c1d9698f"
     },
     {
@@ -2201,50 +2246,23 @@
       "path": "packages/node/test/node/ClientInvokeTest.ts",
       "status": "partial",
       "go": [
-        "controller/client:TestClientInvokeParity"
+        "controller/client:TestClientInvokeParity",
+        "client/interaction:TestInvokeBatcherParity"
       ],
       "missing": [
-        "executes commands via the batcher",
-        "requires MockTime.resolve for batched commands (non-root endpoints)",
-        "bypasses batching when maxPathsPerInvoke is 1",
         "clears maxPathsPerInvoke cache when node goes offline",
-        "rejects pending commands when batcher is closed",
-        "bypasses batching for timed invoke requests",
-        "batches different commands together while splitting duplicates",
         "direct invoke (#invokeSingle) propagates network to exchange",
         "batched invoke (#invokeWithBatching) propagates network to exchange",
         "split invoke (#invokeWithSplitting) propagates network to each exchange",
-        "command with expectedProcessingTime never joins a batch",
-        "command with useExtendedFailSafeMessageResponseTimeout never joins a batch",
-        "command with additionalMrpDelay never joins a batch",
         "command with interactionModelRevision never joins a batch",
-        "command with timeout never joins a batch",
         "command with beforeDispatch never joins a batch",
-        "command with timedRequest never joins a batch",
-        "command with suppressResponse never joins a batch",
         "command with delayReportData never joins a batch",
-        "command with largeMessage never joins a batch",
-        "timed command goes out alone after a TimedRequest",
-        "command with suppressResponse goes out alone",
         "only a non-default interaction model revision keeps a command out of the batch",
-        "command without an endpoint never joins a batch",
-        "abort, network, skipValidation and icdAwaitTimeout do not keep a command out of the batch",
-        "command with its own expected processing time keeps it",
-        "command with the extended fail-safe timeout keeps it",
-        "command with its own MRP delay keeps it",
         "command with an address override keeps it",
-        "commands without options share a batch (characterization)",
-        "command with options goes out alone and ahead of the batch invoked before it",
-        "commands for different networks go into separate batches",
-        "batches for different networks do not wait on each other",
         "command without a network and one naming the default network share a batch",
-        "command queued while the interaction closes is rejected with the close reason",
-        "direct invoke keeps its expected processing time (characterization)",
-        "stops the batch exchange of a command whose acting context aborts",
-        "correctly splits different-path commands when maxPathsPerInvoke is 1",
-        "splits duplicate command paths into separate batches"
+        "command queued while the interaction closes is rejected with the close reason"
       ],
-      "reason": "Sequential commands through a client node reach the device in order (controller/client:TestClientInvokeParity on fabrictest). A multi-command invoke goes through Node.InvokeBatch in batches of the peer's MaxPathsPerInvoke, each numbered by CommandRef (client/interaction InvokeBatch); the device's MaxPathsPerInvoke is node.Config.MaxPathsPerInvoke. Missing: matter.js's batcher of single commands — the commands invoked in one timer tick joined into a batch up to the peer's maxPathsPerInvoke, its bypasses (maxPathsPerInvoke 1, timed, per-request options), its lanes per network, the cache cleared when the node goes offline, closing it, the batch exchange aborted with its context — has no Go counterpart (a goroutine has no timer tick to join on; whether the Go client batches concurrent invokes, and over which window, is an owner decision, brief CM's questions), and the network propagation of invoke options observed on the exchange (no seam to observe the exchange's timing).",
+      "reason": "The batcher of single commands (client/interaction Interaction.Invoke, ClientInteraction.#invokeWithBatching at 862ad75f) on the scripted rig — one InvokeRequest per batch window and network lane, numbered by CommandRef, its bypasses (MaxPathsPerInvoke 1, endpoint 0, timed, suppressed, expected processing time, extended fail-safe timeout, MRP delay, Large Message, NoBatch), duplicate paths in separate batches, a split by MaxPathsPerInvoke, close and abort — and the commands through it on fabrictest (controller/client:TestClientInvokeParity). Missing: the maxPathsPerInvoke cache (the Go provider reads the session parameters on every invoke, there is no cache to clear), the network observed on the exchange (the scripted session provider takes no network), the interaction model revision, beforeDispatch, DelayReportData and address-override options (the Go InvokeOptions has none of them), an interaction-level default network, and a close while the peer connects (no seam holds the connect).",
       "snapshotSha": "a743554ce3a6060f13492259bb66a152d9bfca31"
     },
     {
@@ -3045,7 +3063,8 @@
       "status": "partial",
       "go": [
         "client/interaction:TestInvokeLargeMessageParity",
-        "client/interaction:TestInferLargeMessageParity"
+        "client/interaction:TestInferLargeMessageParity",
+        "client/interaction:TestInvokeBatcherParity"
       ],
       "missing": [
         "parses largeMessage from quality DSL string 'L'",
@@ -3055,10 +3074,9 @@
         "largeMessage flag matches the pattern used in ClientCommandMethod",
         "ignores legacy command requests (no model link)",
         "detects L quality on a wildcard command request",
-        "rethrows non-MalformedRequestError raised during model probing",
-        "does not batch L commands even when batchable shape allows it"
+        "rethrows non-MalformedRequestError raised during model probing"
       ],
-      "reason": "An invoke's explicit LargeMessage defaults off and reaches its exchange and every part an InvokeBatch split sends; an invoke the caller left undecided infers it from the 'L' quality of any of its commands in parity/schema.json (schema.CommandLargeMessage; ClientInteraction.ts:111-127, :716-719 at 862ad75f), an explicit false stands, and a path the snapshot does not model infers nothing. Missing: the Quality DSL parse and the CommandModel quality cases test matter.js's model classes (the Go subject is the generated snapshot, held by schema:TestCommandLargeMessageMatchesSnapshot); the ClientCommandMethod pattern is matter.js's typed command API; a legacy command request, a wildcard command and a non-MalformedRequestError during probing have no Go form (every Go invoke names a concrete path and the probe is a map lookup); and the controller has no automatic invoke batcher, so 'does not batch L commands' does not arise.",
+      "reason": "An invoke's explicit LargeMessage defaults off and reaches its exchange and every part an InvokeBatch split sends; an invoke the caller left undecided infers it from the 'L' quality of any of its commands in parity/schema.json (schema.CommandLargeMessage; ClientInteraction.ts:111-127, :716-719 at 862ad75f), an explicit false stands, a path the snapshot does not model infers nothing, and a Large Message command never joins a batch (client/interaction:TestInvokeBatcherParity). Missing: the Quality DSL parse and the CommandModel quality cases test matter.js's model classes (the Go subject is the generated snapshot, held by schema:TestCommandLargeMessageMatchesSnapshot); the ClientCommandMethod pattern is matter.js's typed command API; a legacy command request, a wildcard command and a non-MalformedRequestError during probing have no Go form (every Go invoke names a concrete path and the probe is a map lookup).",
       "snapshotSha": "08ffe617eb5b02a7b5253cde9e714413da17f104"
     },
     {
@@ -3072,17 +3090,16 @@
         "client/interaction:TestInvokeBatchOneExchange",
         "client/interaction:TestInvokeBatchRefusals",
         "client/interaction:TestInvokeBatchSplitsRefLessParity",
-        "client/interaction:TestClientInteractionInvokeLargeMessageInference"
+        "client/interaction:TestClientInteractionInvokeLargeMessageInference",
+        "client/interaction:TestInvokeBatcherCloseParity"
       ],
       "missing": [
         "does not synthesize NO_COMMAND_RESPONSE for an unanswered wildcard command (no concrete path)",
         "passes a stray CommandStatusIB up to the caller (spec submits all status entries)",
-        "aborts an in-flight batch on close instead of awaiting its response",
-        "rejects commands queued behind an in-flight batch with the close reason",
         "sends DelayReportData in its own message",
         "refuses a request with DelayReportData before anything is sent"
       ],
-      "reason": "15 cases ported on the scripted rig for the Go single-command Invoke (no commandRef on the wire, abort during and before the exchange with no retransmission after, a read's abort, suppressResponse, concurrent single invokes, no DelayReportData, a response without InteractionModelRevision, received vs local error statuses, the largeMessage inference on a copy of the caller's options). The multi-command invoke runs through Interaction.InvokeBatch (client/interaction:TestInvokeBatch*): NoCommandResponse synthesized for a command the peer did not answer, a stray CommandDataIB discarded, the split into ref-less single invokes for a MaxPathsPerInvoke-1 peer, the refusal of a split below one path (ClientInteraction.ts:510-517, :616-700 at 862ad75f). Missing: the wildcard command (a Go invoke names a concrete path), the stray CommandStatusIB passed up (InvokeBatch returns one Result per command, so a status for no sent command has no slot), the batcher's close cases (the Go client batches no single commands across a tick, see ClientInvokeTest) and DelayReportData sending.",
+      "reason": "15 cases ported on the scripted rig for the Go single-command Invoke (no commandRef on the wire, abort during and before the exchange with no retransmission after, a read's abort, suppressResponse, concurrent single invokes, no DelayReportData, a response without InteractionModelRevision, received vs local error statuses, the largeMessage inference on a copy of the caller's options); the multi-command invoke through Interaction.InvokeBatch (client/interaction:TestInvokeBatch*: NoCommandResponse for an unanswered command, a stray CommandDataIB discarded, the ref-less split for a MaxPathsPerInvoke-1 peer, the refusal below one path; ClientInteraction.ts:510-517, :616-700 at 862ad75f); the batcher's close cases (client/interaction:TestInvokeBatcherCloseParity: an in-flight batch aborted with the close reason, the batch queued behind it rejected with it). Missing: the wildcard command (a Go invoke names a concrete path), the stray CommandStatusIB passed up (InvokeBatch returns one Result per command, so a status for no sent command has no slot) and DelayReportData sending.",
       "snapshotSha": "501b3a3570c0c93de6ce67f0ea5dfb310b4b3e56"
     },
     {
@@ -3438,7 +3455,8 @@
         "controller/attestation:TestCertificatesParseMatterFallbackVidPid",
         "controller/attestation:TestCertificatesPaaFromAsn1",
         "controller/commissioner:TestCertificatesGetPublicKeyFromCsr",
-        "secure/mattercert:TestBuildDNStandardAttributes"
+        "secure/mattercert:TestBuildDNStandardAttributes",
+        "controller/attestation:TestCertificatesPQCSizeLimit"
       ],
       "missing": [
         "recode root certificate",
@@ -3461,8 +3479,7 @@
         "verify operational certificate via ICAC and ROOT with fabricId in root not matching",
         "validates TLV order preserve",
         "generates a valid CSR",
-        "rejects a DER operational certificate larger than 600 bytes before parsing",
-        "rejects a DER attestation certificate larger than the PQC limit before parsing"
+        "rejects a DER operational certificate larger than 600 bytes before parsing"
       ],
       "reason": "Ported on the CERTIFICATE_SETS: TLV to TBS DER of NOCs, chain verification without an ICAC, the ICAC fabric-id mismatch, the CAT limits, the ICAC decode, the 400-byte TLV cap, the Mvid/Mpid fallback, PAA parsing and CSR key extraction; missing: Go has no Matter-TLV certificate encoder and no X.509-to-TLV parser for operational certificates (recode, fromAsn1, external, extension and 600-byte cases) (the Google set's X.520 DN attributes and the NOC issuer by authorityKeyIdentifier verify since the owner review of PR #164).",
       "snapshotSha": "eb21fd73fb5c20b830d82dc26bf526478f47996d"
@@ -3512,43 +3529,33 @@
       "go": [
         "controller/attestation:TestPqcAttestationCertificatesAnnexHExamples",
         "controller/attestation:TestPqcAttestationCertificatesParsing",
-        "secure/attestation:TestPqcAttestationCertificatesDeviceCertification"
+        "secure/attestation:TestPqcAttestationCertificatesDeviceCertification",
+        "controller/attestation:TestMlDsa",
+        "controller/attestation:TestPqcAttestationChains",
+        "controller/attestation:TestPqcAttestationFeatureOff"
       ],
       "missing": [
-        "accepts a chain under an ML-DSA PAA and PAI",
-        "creates a ${layout.paa} PAA, a ${layout.pai} PAI and a DAC that verify",
         "creates certificates OpenSSL accepts",
         "does not seed an ML-DSA PAA but seeds the entries after it",
         "does not store an ML-DSA PAA fetched from GitHub",
         "does not store an ML-DSA PAA fetched from the DCL",
-        "does not validate a device chain of a ${layout.pai} PAI under a ${layout.paa} PAA",
         "fetches an ML-DSA PAA from the DCL",
-        "parses ${name} as a ${kind} with a ${keyAlgorithm} key signed with ${signatureAlgorithm}",
         "re-encodes ${name} byte for byte",
         "refuses a chain it cannot serve without segmented responses",
         "refuses a key that does not match the declared signature algorithm",
         "refuses a signature object of another algorithm",
         "refuses to add an ML-DSA PAA",
-        "rejects ${name}",
-        "rejects a ${layout.pai} PAI under a ${layout.paa} PAA",
-        "rejects a PAI the trusted ML-DSA PAA did not sign",
-        "rejects a tampered certificate",
-        "rejects an ML-DSA issuer key for an ECDSA signature",
-        "rejects an ML-DSA key in a DAC",
         "rejects an ML-DSA public key that is not canonical RFC 9881",
         "rejects an ML-DSA signature BIT STRING with unused bits",
         "rejects an ML-DSA signature algorithm with parameters",
         "rejects an ML-DSA signature of the wrong length",
         "rejects an ML-DSA signature that is not a BIT STRING",
-        "rejects an issuer key of another algorithm",
         "rejects differing inner and outer signature algorithms",
         "returns a stored ML-DSA PAA without a recovery re-fetch",
         "seeds an ML-DSA PAA",
-        "serves a stored ML-DSA PAA without trying to repair it",
-        "verifies a PAA's self-signature",
-        "verifies chain link ${index + 1} against its issuer's key"
+        "serves a stored ML-DSA PAA without trying to repair it"
       ],
-      "reason": "Ported: the traditional-certificate refusals (unsupported key algorithm or curve, unsupported signature algorithm, non-OID algorithm and curve, EC key with unused bits, over 600 bytes, an ML-DSA certificate where only traditional ones parse) and the device-side refusal of an unservable ML-DSA-signed DAC; missing: PQC Phase 1 (matter.js forward feature pqc-phase-1) is not implemented in controller/attestation or controller/dcl, and with it off Go refuses ML-DSA certificates by the 600-byte limit instead of classifying them as MlDsaAttestationDisabledError (\"not supported\", logged at DEBUG), and LoadChainFiles takes no product description.",
+      "reason": "PQC Phase 1 in controller/attestation behind the module's forward-feature switch (internal/forward PQCPhase1, off as matter.js's pqc-phase-1, Specification.ts:78-105 at 862ad75f): the Annex H certificates (testdata/pqc-annex-h, PqcAnnexHCertificates.ts verbatim) parse with their key and signature algorithms and verify link by link (VerifyIssuedBy over crypto/mldsa), a tampered certificate, a foreign issuer key and an ML-DSA DAC key are refused, chains under ML-DSA PAAs and PAIs pass Validate and a PAI stronger than its PAA or not signed by it fails (mayIssue); with the feature off every ML-DSA certificate is ErrMLDSAAttestationDisabled; the traditional refusals and the device-side refusal stay as before. Missing: the DER surgery cases of 'parsing' (parameters, unused bits, a non-BIT-STRING, a wrong signature length, a non-canonical key, differing algorithms: the decoding is crypto/x509's, not exercised here), the generation and OpenSSL cases (no ML-DSA certificate generation in the module), the trust-store cases (controller/dcl's ledger and GitHub stores stay traditional) and LoadChainFiles' product description.",
       "snapshotSha": "1975ee1c9e9037e4bb081e4976244e5fd769b6e2"
     },
     {
@@ -3894,16 +3901,29 @@
     },
     {
       "path": "packages/protocol/test/dcl/DclVendorInfoServiceSeedTest.ts",
-      "status": "planned",
-      "reason": "The subject, matter.js DclVendorInfoService seeding from a bundled vendor snapshot (DclVendorInfoService.ts, SeedTypes.ts), has no Go counterpart in controller/dcl; the service is a feature for the owner. With DclVendorInfoServiceTest, milestone 6 phase 27 (owner review of PR #164).",
-      "until": "M6 phase 27",
+      "status": "partial",
+      "go": [
+        "controller/dcl:TestDclVendorInfoServiceSeedParity",
+        "controller/dcl/snapshot:TestVendorSeed"
+      ],
+      "missing": [
+        "aborts stream on malformed vendor entry"
+      ],
+      "reason": "The seed of VendorInfoService (#consumeVendorSeed, DclVendorInfoService.ts:405-456 at 862ad75f; the embedded snapshot's Snapshot.VendorSeed): applied to an emptier store and stored, skipped for a full one, only ledger vendors stored, and the offline cases (seeded and static vendors without the ledger and no timer, a stored record over a static one, an earlier run's store, a product as absent). Missing: a malformed entry inside the stream (the snapshot refuses the whole vendor file when it loads, snapshot.ErrMalformed, so the service never sees one).",
       "snapshotSha": "dbc5f6e9dd6e9b6563fee27833b3baeeb05dc4b6"
     },
     {
       "path": "packages/protocol/test/dcl/DclVendorInfoServiceTest.ts",
-      "status": "planned",
-      "reason": "The subject, matter.js DclVendorInfoService (packages/protocol/src/dcl/DclVendorInfoService.ts, 497 lines: vendor fetch, storage, field normalisation, built-in vendors, update timer, productInfoFor), has no Go counterpart in controller/dcl; the ledger read it builds on is Client.Vendors (DclClientTest), the service itself is a feature for the owner. Milestone 6 phase 27 (completeness) brings the vendor information service; findings register (owner review of PR #164).",
-      "until": "M6 phase 27",
+      "status": "partial",
+      "go": [
+        "controller/dcl:TestDclVendorInfoServiceParity",
+        "controller/dcl:TestDclVendorInfoServiceProductInfoParity"
+      ],
+      "missing": [
+        "leaves no update timer running when closed during the startup fetch",
+        "passes timeout option to DCL client"
+      ],
+      "reason": "controller/dcl VendorInfoService (DclVendorInfoService.ts:166-468 at 862ad75f) on the client's mock ledger: the fetch and store at construction, the stored vendors of a later run, the normalised fields, the static vendors under a ledger record, pagination, Update and one fetch for concurrent ones, a failed and an empty answer, the periodic refresh, Close with a fetch in flight, the ledger URL, and ProductInfoFor (decoded fields, revisions with their URL, NOT_FOUND absent, other errors returned, closed). Missing: a close during the construction's fetch (NewVendorInfoService returns before a Close can run) and the client timeout (dcl.Client.Timeout, the client's own option).",
       "snapshotSha": "7b6c7c4ac0261f9fc1b23913e81a8ff236a79692"
     },
     {
@@ -3965,25 +3985,17 @@
         "controller/commissioner:TestFabricAuthorityCreateFabric",
         "controller/commissioner:TestFabricAuthorityDefaultAdminVendorID",
         "controller/commissioner:TestFabricAuthorityKeypairRotation",
-        "controller/commissioner:TestFabricAuthorityFabricCreation"
+        "controller/commissioner:TestFabricAuthorityFabricCreation",
+        "controller/commissioner:TestFabricAuthorityRotation",
+        "controller/commissioner:TestFabricAuthorityFabricAdded"
       ],
       "missing": [
         "refuses the Matter Standard vendor ID as admin vendor ID",
-        "rotates NOC keypair when getting default fabric with rotateNoc=true",
         "rotated fabric sends to a group at once with the keys of the previous fabric",
         "rotated fabric keeps receiving Check-Ins of the ICD peers of the previous fabric",
-        "rotation occurs exactly once per runtime per fabric",
-        "rotatedFabricIndices Set correctly prevents duplicate rotations",
-        "new fabric is properly persisted after rotation",
-        "preserves fabricId from operational certificate during rotation",
-        "preserves nodeId from operational certificate during rotation",
-        "preserves caseAuthenticatedTags during rotation",
-        "handles fabric without caseAuthenticatedTags during rotation",
-        "rotation works with multiple fabrics",
-        "emits fabricAdded event when creating fabric",
         "refuses a NOC for another fabric ID and takes over nothing"
       ],
-      "reason": "createFabric/defaultFabric are commissioner.NewFabric over a ca.FabricStore: the reserved-vendor refusal, persistence before completion, a failing store, the created fabric and the no-rotation path are ported; the Go controller never rotates its NOC key (no rotateNoc, no FabricBuilder.updateOperationalCert, no group or ICD state on its fabric), has no fabricAdded event, and its zero VendorID means unset (DEFAULT_ADMIN_VENDOR_ID), so an explicit 0 cannot be expressed.",
+      "reason": "createFabric/defaultFabric are commissioner.FabricAuthority over a ca.FabricStore (FabricAuthority.ts:49-207 at 862ad75f): the reserved-vendor refusal, persistence before completion, a failing store, the created fabric, the NOC key rotation of DefaultFabric once per authority (a new key and NOC under the old NOC's fabric id, node id and CATs, persisted; none with rotateNOC false; a changed node id refused), the label, and OnFabricAdded. Missing: an explicit admin vendor id 0 (the zero VendorID means unset, DEFAULT_ADMIN_VENDOR_ID), the group keys and ICD peers a rotated fabric carries over (the Go fabric holds neither; the controller keeps them in its registry), and FabricBuilder.updateOperationalCert (no builder: the rotation builds the fabric itself).",
       "snapshotSha": "4f8ba2cbb4d304486b6fba557d00c9b99f3499e4"
     },
     {

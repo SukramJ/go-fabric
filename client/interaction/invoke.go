@@ -36,6 +36,16 @@ type InvokeOptions struct {
 	// SuppressResponse asks the peer for no InvokeResponse: the send
 	// expects an acknowledgement only and Invoke returns the zero Result.
 	SuppressResponse bool
+	// BatchDuration is how long a single command waits for others to
+	// share its InvokeRequest — matter.js Invoke.Definition.batchDuration
+	// (packages/protocol/src/action/request/Invoke.ts:50 at 862ad75f);
+	// 0 is matter.js's default, Instant (ClientInteraction.ts:796): the
+	// commands invoked concurrently. A queued batch flushes at the
+	// earliest deadline of its commands. Only [Interaction.Invoke] batches.
+	BatchDuration time.Duration
+	// NoBatch sends the command on its own — batchDuration false
+	// (ClientInteraction.ts:195).
+	NoBatch bool
 	// ClientRequest names the invoke exchange's network profile and margin.
 	ClientRequest
 }
@@ -76,10 +86,30 @@ type Result struct {
 //     (ControllerCommissioningFlow.ts:506-530): a CommandStatusIB other
 //     than Success is a *StatusError.
 //
+// A single command for an endpoint other than 0 without per-request
+// options joins the batch of its network when the peer's MaxPathsPerInvoke
+// is above 1: the commands invoked within [InvokeOptions.BatchDuration]
+// go as one InvokeRequest (see invokeBatched). The order on the wire can
+// then differ from the call order (ClientInteraction.ts:703-714).
+//
 // Errors of the exchange layer pass through unchanged.
 func (c *Interaction) Invoke(ctx context.Context, path im.ConcreteCommandPath, fields spec.Encodable, opts InvokeOptions) (Result, error) {
 	path.HasEndpoint, path.HasCluster, path.HasCommand = true, true, true
 	opts = opts.inferLargeMessage(path)
+	// Batching buys nothing when the peer takes one path per invoke
+	// (ClientInteraction.ts:723-730).
+	if c.maxPathsPerInvoke() > 1 && batchable(path, opts) {
+		res, answered, err := c.invokeBatched(ctx, CommandRequest{Path: path, Fields: fields}, opts)
+		switch {
+		case err != nil:
+			return Result{}, err
+		case !answered:
+			return Result{}, ErrNoResponse
+		case res.Status != im.StatusSuccess:
+			return res, &StatusError{Status: res.Status, ClusterStatus: res.ClusterStatus}
+		}
+		return res, nil
+	}
 	entries, err := c.exchangeInvoke(ctx, []im.CommandInvocation{{Path: path, Fields: fields}}, opts)
 	if err != nil || opts.SuppressResponse {
 		return Result{}, err

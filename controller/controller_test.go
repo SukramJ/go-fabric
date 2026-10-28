@@ -4,6 +4,7 @@
 package controller_test
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
 	"errors"
@@ -49,12 +50,16 @@ func config(db *sql.DB) controller.Config {
 }
 
 // TestNewKeepsTheFabric opens the controller twice on one database: the
-// second run loads the fabric the first created, and no node is paired.
+// second run loads the fabric the first created, with its operational key
+// rotated (matter.js MatterController's defaultFabric with rotateNoc,
+// packages/matter.js/src/MatterController.ts:402-415 at 862ad75f), and no
+// node is paired.
 func TestNewKeepsTheFabric(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	db := openDB(t)
 	var fabricID, nodeID uint64
+	var noc []byte
 	for run := range 2 {
 		c, err := controller.New(ctx, config(db))
 		if err != nil {
@@ -62,12 +67,14 @@ func TestNewKeepsTheFabric(t *testing.T) {
 		}
 		f := c.Fabric()
 		if run == 0 {
-			fabricID, nodeID = f.FabricID, f.RootNodeID
+			fabricID, nodeID, noc = f.FabricID, f.RootNodeID, f.Identity.NOC
 			if fabricID == 0 || nodeID == 0 {
 				t.Errorf("first run: fabric %x node %x", fabricID, nodeID)
 			}
 		} else if f.FabricID != fabricID || f.RootNodeID != nodeID {
 			t.Errorf("run %d: fabric %x node %x, want the first run's %x / %x", run, f.FabricID, f.RootNodeID, fabricID, nodeID)
+		} else if bytes.Equal(f.Identity.NOC, noc) {
+			t.Errorf("run %d: the NOC was not rotated", run)
 		}
 		if n := len(c.Nodes()); n != 0 || c.Registry() == nil || c.Commissioner() == nil {
 			t.Errorf("run %d: %d nodes, registry %v, commissioner %v", run, n, c.Registry() != nil, c.Commissioner() != nil)

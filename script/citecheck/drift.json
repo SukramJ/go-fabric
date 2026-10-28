@@ -604,7 +604,7 @@
   },
   {
     "file": "client/interaction/interaction.go",
-    "line": 46,
+    "line": 48,
     "citation": "InteractionMessenger.ts:186-190",
     "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
     "identifier": "MatterFlowError",
@@ -613,7 +613,7 @@
   },
   {
     "file": "client/interaction/interaction.go",
-    "line": 56,
+    "line": 58,
     "citation": "ControllerCommissioningFlow.ts:519-523",
     "resolved": "packages/protocol/src/peer/ControllerCommissioningFlow.ts",
     "identifier": "StatusResponseError",
@@ -622,7 +622,7 @@
   },
   {
     "file": "client/interaction/interaction.go",
-    "line": 58,
+    "line": 60,
     "citation": "InteractionMessenger.ts:201-214",
     "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
     "identifier": "ReceivedStatusResponseError",
@@ -631,7 +631,7 @@
   },
   {
     "file": "client/interaction/interaction.go",
-    "line": 162,
+    "line": 172,
     "citation": "ClientInteraction.ts:1249-1251",
     "resolved": "packages/protocol/src/action/client/ClientInteraction.ts",
     "identifier": "maximumPeerResponseTime",
@@ -640,7 +640,7 @@
   },
   {
     "file": "client/interaction/interaction.go",
-    "line": 266,
+    "line": 279,
     "citation": "InteractionMessenger.ts:148-161",
     "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
     "identifier": "StatusResponse",
@@ -649,7 +649,7 @@
   },
   {
     "file": "client/interaction/invoke.go",
-    "line": 74,
+    "line": 84,
     "citation": "InteractionMessenger.ts:1082-1105",
     "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
     "identifier": "StatusResponse",
@@ -667,7 +667,7 @@
   },
   {
     "file": "client/interaction/provider.go",
-    "line": 262,
+    "line": 266,
     "citation": "ClientInteraction.ts:1112",
     "resolved": "packages/protocol/src/action/client/ClientInteraction.ts",
     "identifier": "verifyReachability",
@@ -1481,7 +1481,7 @@
   },
   {
     "file": "controller/attestation/cert.go",
-    "line": 95,
+    "line": 106,
     "citation": "Certificate.ts:587-596",
     "resolved": "packages/protocol/src/certificate/kinds/Certificate.ts",
     "identifier": "parseDate",
@@ -1770,7 +1770,7 @@
   },
   {
     "file": "controller/code.go",
-    "line": 55,
+    "line": 56,
     "citation": "PairingCodeSchema.ts:330-345",
     "resolved": "packages/types/src/schema/PairingCodeSchema.ts",
     "at": "862ad75f",

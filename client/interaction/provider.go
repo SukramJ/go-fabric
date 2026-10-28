@@ -159,7 +159,11 @@ func (p *sessionProvider) MaximumPeerResponseTime(ept time.Duration, includeSend
 }
 
 func (p *sessionProvider) VerifyReachability(context.Context) bool { return true }
-func (p *sessionProvider) ReadPathsSupported() int                 { return DefaultReadPathsSupported }
+
+// maxPathsPerInvoke is the dedicated session's (ExchangeProvider.ts:130-132).
+func (p *sessionProvider) maxPathsPerInvoke() int { return int(p.s.Parameters().MaxPathsPerInvoke) }
+
+func (p *sessionProvider) ReadPathsSupported() int { return DefaultReadPathsSupported }
 
 func (p *sessionProvider) SubscribePathsSupported() int { return DefaultSubscribePathsSupported }
 func (p *sessionProvider) Session() *exchange.Session   { return p.s }
@@ -263,6 +267,24 @@ func (p *peerProvider) MaximumPeerResponseTime(ept time.Duration, includeSending
 func (p *peerProvider) VerifyReachability(ctx context.Context) bool {
 	ok, _ := p.p.VerifyReachability(ctx, peer.ReasonSessionSuspect)
 	return ok
+}
+
+// maxPathsPerInvoke is the peer's session parameters'
+// (PeerExchangeProvider.ts:30-32).
+func (p *peerProvider) maxPathsPerInvoke() int { return int(p.p.SessionParameters().MaxPathsPerInvoke) }
+
+// connect connects to the peer unless an existing session is required
+// — the provider's connect, which #invokeWithBatching awaits before a
+// command is queued for a batch (ClientInteraction.ts:756-760).
+func (p *peerProvider) connect(ctx context.Context, opts ExchangeOptions) error {
+	if opts.RequireExistingSession {
+		return nil
+	}
+	_, err := p.p.Connect(ctx, peer.ConnectOptions{
+		ConnectionTimeout: opts.ConnectionTimeout, Network: opts.Network, AdditionalMrpDelay: opts.AdditionalMrpDelay,
+		RequiredTransport: opts.RequiredTransport, PreferredTransport: opts.PreferredTransport,
+	})
+	return err
 }
 
 func (p *peerProvider) ReadPathsSupported() int      { return DefaultReadPathsSupported }

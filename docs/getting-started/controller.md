@@ -220,6 +220,15 @@ after a restart. `commissioner.NewFabric` with a store loads the stored
 fabric record (fabric id, our node id, IPK, index, label, key and NOC). It
 mints and saves a new record only when the store has none.
 
+`controller.New` rotates the operational key on every start, as
+matter.js's controller does for a fabric it keeps itself
+(`commissioner.FabricAuthority.DefaultFabric` with rotation): a new key
+pair and a new NOC from the same CA, under the same fabric id, node id and
+CASE Authenticated Tags, saved over the old record. The peers trust the
+new NOC as they trusted the old one. An authority rotates a fabric once;
+`FabricAuthority.CreateFabric` mints a new fabric and `OnFabricAdded`
+reports it.
+
 A stored record wins over the configuration. A non-zero `FabricID` or
 `RootNodeID` that differs from the stored record is `ErrFabricMismatch`.
 That is why `controller.New` sets both fields to zero once a record exists.
@@ -229,7 +238,7 @@ the fabric under `controller.ca.fabric`.
 The database therefore holds the fabric's private keys. Anyone with the
 file controls every node paired to it.
 
-*Source: `controller/ca/doc.go:4-17`, `controller/commissioner/fabric.go:23-69`, `controller/ca/persist.go:94-115`, `examples/reference-controller/README.md` (The database).*
+*Source: `controller/ca/doc.go:4-17`, `controller/commissioner/fabric.go:23-69`, `controller/commissioner/fabricauthority.go`, `controller/ca/persist.go:94-115`, `examples/reference-controller/README.md` (The database).*
 
 ## Pairing
 
@@ -340,6 +349,27 @@ over matter.js's static vendors (the test vendors 0xFFF1–0xFFF4 and Nabu
 Casa), so a vendor id resolves to a name without the network.
 `make update-dcl-snapshot` refreshes them with the certificates (or alone,
 `go run ./script/dclsnapshot -vendors-only`).
+
+`Controller.VendorInfo(ctx)` is the vendor information service of a
+running controller, matter.js's `DclVendorInfoService`: seeded from the
+snapshot's vendors, refreshed from the ledger at once and daily, the
+static vendors under every id the ledger does not name.
+`InfoFor(vendorID)`, `Vendors()` and `ProductInfoFor(ctx, vid, pid)` (the
+ledger's device model as a UI shows it; absent for a product the ledger
+does not have) answer; `Observe` reports every refresh. `Config.DCL`
+(`controller.DCLConfig`) sets the ledger URL, a `dcl.Store` that keeps the
+fetched vendors, the refresh period, and `Offline`, which keeps the
+service off the network: it then serves the stored, seeded and static
+vendors and answers every product as absent. `dcl.NewVendorInfoService`
+builds one without a controller.
+
+PQC Phase 1 — ML-DSA-44 and ML-DSA-65 keys in a PAA and a PAI, ML-DSA
+signatures on any attestation certificate, the DAC key on EC P-256 — is
+implemented in `controller/attestation` over the standard library's
+`crypto/mldsa`, but off, as in matter.js: an ML-DSA attestation
+certificate is refused with `attestation.ErrMLDSAAttestationDisabled`
+until a released Matter revision carries the feature. Operational
+certificates stay EC P-256 either way.
 
 The policy decides what a finding does:
 
@@ -499,6 +529,25 @@ true})` returns the first device that answers with an address instead, as
 soon as it answers — matter.js's `Peers.locate`; none before the timeout is
 an empty result. The reference controller's `discover --first` uses it.
 
+Both run on a discovery session of `client/discovery`, the shape of
+matter.js's controller discovery: `discovery.FindAll` (ContinuousDiscovery:
+every device until the timeout, `Stop` or the context ends; a callback per
+device), `discovery.FindInstance` (InstanceDiscovery: the first device),
+and the PASE races `discovery.Race`, `discovery.CommissioningRace` and
+`discovery.PASERace` (ParallelPaseDiscovery, CommissioningDiscovery,
+PaseDiscovery): every device found gets an attempt, one second apart, and
+the first to establish PASE wins; the others are cancelled. A session runs
+on `discovery.Transport`s — `discovery.IPTransport` over DNS-SD,
+`ble.Transport` over a BLE scanner — selected by the payload's discovery
+capabilities (`discovery.SelectTransports`: the IP network always, BLE where
+the payload names it). `Session.Cancel(reason)` and the end of the
+context interrupt it, `Session.Stop` ends the search with the result it
+has, `Session.Wait` returns the outcome once every attempt has finished. A
+session that ends without a result reports why: `ErrDeviceNotDiscovered`,
+`ErrDiscoveryIncomplete` (found, but no attempt won and none failed),
+`ErrNoDiscoveryTransport`, or an `*AggregateError` of the transports' or
+the attempts' own errors.
+
 ### Pairing by address
 
 `PairOptions.Address` (a `*net.UDPAddr`) pairs a device at that address
@@ -536,6 +585,19 @@ Basic feature is `client.ErrNoBasicWindow`.
 one was open.
 
 ### Batched invokes
+
+`Node.Invoke` batches by itself when the peer takes more than one path per
+InvokeRequest (its `MaxPathsPerInvoke`): single commands invoked within one
+batch window share an InvokeRequest, numbered by CommandRef, and each
+caller gets its own answer — matter.js's batcher. The window is
+`InvokeOptions.BatchDuration`; 0 is matter.js's default, the commands
+invoked concurrently. Batches form per network profile and go one after
+the other; a command for endpoint 0, or one with its own options (timed,
+suppressed response, expected processing time, extended fail-safe
+timeout, MRP delay, Large Message, `NoBatch`) goes on its own and at once.
+Two commands for one path go into different batches. Cancelling a
+command's context abandons that command only; the batch's exchange stops
+once every command in it is abandoned.
 
 `Node.InvokeBatch(ctx, []client.CommandRequest, opts)` sends several
 commands and returns one `Result` per command, in their order. The
@@ -652,12 +714,19 @@ decodes a value a host holds. An unknown or zero version reports false.
 
 `PairOptions.BLE` is a Bluetooth LE central (`ble/bluez` on Linux,
 `ble/esphome` through ESPHome Bluetooth proxies — [guide](../guides/ble-proxies.md) —,
-`controller/ble/bletest` in a test): `Pair` then finds the device by its
-BLE advertisement instead of DNS-SD, runs PASE over BTP, and the network
-steps provision `PairOptions.WiFi` or `PairOptions.Thread` before CASE
-finds the device on the network. A device on BLE has no network yet, so
-one of the two is required. `PairOptions.WiFi` and `Thread` also provision
-a device found over DNS-SD that advertises Wi-Fi or Thread.
+`controller/ble/bletest` in a test): `Pair` then searches over BLE and
+DNS-SD at once — BLE where the code names it (a QR code's discovery
+capabilities) or names nothing (a manual code) — and commissions the
+first device to establish PASE, over whichever transport it was found
+on; the other attempt is cancelled (matter.js's parallel PASE race). Over
+BLE it runs PASE over BTP, and the network steps provision
+`PairOptions.WiFi` or `PairOptions.Thread` before CASE finds the device on
+the network. A device on BLE has no network yet, so one of the two is
+required. `PairOptions.WiFi` and `Thread` also provision a device found
+over DNS-SD that advertises Wi-Fi or Thread. While both transports search,
+`PairOptions.Progress` reports the sub-steps `Discovery.IP` and
+`Discovery.BLE` of Discovery 2.1: each started, then the winner's
+succeeded and the other's skipped (or failed with its search's error).
 
 ### Thread datasets
 
@@ -675,8 +744,6 @@ line. The commissioner provisions the dataset as bytes
 BLE on macOS and Windows (ADR 0024 decision 6) is outside the current
 stages. Group messages need a node of the fabric: the reference
 controller uses the controller's own node (`Controller.OwnNode`) for
-`group` and `ota`. A batcher that joins single invokes into one
-InvokeRequest, as matter.js's does within a timer tick, is not ported:
-`Node.InvokeBatch` is the explicit form.
+`group` and `ota`.
 
 *Source: `controller/ota.go`, `controller/tcp.go`, `controller/advertise.go`, `controller/softwareupdate`, `node/controllernode`, `client/peer/network.go`, `controller/client/complete.go`, `examples/reference-controller/README.md` (The controller's own node).*
