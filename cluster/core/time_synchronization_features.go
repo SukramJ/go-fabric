@@ -467,8 +467,8 @@ func (t *TimeSynchronization) FabricRemoved(ctx context.Context, fabricIndex uin
 // the handlers answer RESOURCE_EXHAUSTED; errInvalid its malformed data
 // (CONSTRAINT_ERROR).
 var (
-	errTimeSyncTooMany = errors.New("list longer than the node holds")
-	errTimeSyncInvalid = errors.New("malformed list")
+	errTimeSyncTooMany = errors.New("core: list longer than the node holds")
+	errTimeSyncInvalid = errors.New("core: malformed list")
 )
 
 // statusOf is the handlers' answer to a setter's error (:1168-1178,

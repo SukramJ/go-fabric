@@ -135,25 +135,6 @@
     "occurrences": 10
   },
   {
-    "file": "bridge/advertised_intervals_test.go",
-    "line": 12,
-    "citation": "DeviceAdvertiser.ts:361-364",
-    "resolved": "packages/protocol/src/protocol/DeviceAdvertiser.ts",
-    "at": "862ad75f",
-    "identifier": "SessionManager",
-    "nearest": 231,
-    "occurrences": 3
-  },
-  {
-    "file": "bridge/bridge.go",
-    "line": 306,
-    "citation": "DeviceAdvertiser.ts:361-364",
-    "resolved": "packages/protocol/src/protocol/DeviceAdvertiser.ts",
-    "identifier": "SessionManager",
-    "nearest": 231,
-    "occurrences": 3
-  },
-  {
     "file": "bridge/bridge.go",
     "line": 683,
     "citation": "ExchangeManager.ts:425-431",
@@ -278,16 +259,6 @@
     "identifier": "invokeRequests",
     "nearest": 976,
     "occurrences": 6
-  },
-  {
-    "file": "bridge/ota_provider_link.go",
-    "line": 234,
-    "citation": "BdxProtocol.ts:139-142",
-    "resolved": "packages/protocol/src/bdx/BdxProtocol.ts",
-    "at": "862ad75f",
-    "identifier": "onNewExchange",
-    "nearest": 110,
-    "occurrences": 1
   },
   {
     "file": "bridge/outbound_reliable.go",
@@ -2113,15 +2084,6 @@
     "identifier": "SessionManager",
     "nearest": 56,
     "occurrences": 3
-  },
-  {
-    "file": "node/session_intervals_internal_test.go",
-    "line": 9,
-    "citation": "SessionManager.ts:58-67",
-    "resolved": "packages/protocol/src/session/SessionManager.ts",
-    "identifier": "sessionParameters",
-    "nearest": 89,
-    "occurrences": 14
   },
   {
     "file": "schema/fabric_scoped.go",

@@ -23,6 +23,7 @@ pseudo-version of `main`.
 ### Changed
 
 - `jfadef.CommissionerReach` (`jointfabric.CommissionerReach`) takes the commissioner explicitly: every method's second argument is a `jfadef.Peer{FabricIndex, NodeID}` (`jointfabric.CommissionerPeer`), the invoking session's, which an implementation read from the context before. Migration guide: "Changed in the next release: `CommissionerReach` takes the peer".
+- `core.TimeSynchronization` is no longer comparable: it holds the features' state (a mutex and lists). Compare pointers.
 - A Thermostat without TEVT keeps emitting nothing; `SetActiveScheduleRequest` now emits ActiveScheduleChange with TEVT.
 
 ## [0.13.9] — 2026-10-28
