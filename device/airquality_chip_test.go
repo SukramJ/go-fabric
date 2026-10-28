@@ -116,12 +116,16 @@ func TestChipAirQualityFeatureConstrainedValues(t *testing.T) {
 		accepted []aqdef.AirQualityEnum
 		refused  []aqdef.AirQualityEnum
 	}{
-		"no features": {0,
+		"no features": {
+			0,
 			[]aqdef.AirQualityEnum{aqdef.AirQualityUnknown, aqdef.AirQualityGood, aqdef.AirQualityPoor},
-			[]aqdef.AirQualityEnum{aqdef.AirQualityFair, aqdef.AirQualityModerate, aqdef.AirQualityVeryPoor, aqdef.AirQualityExtremelyPoor}},
-		"fair only": {aqdef.FeatureFair,
+			[]aqdef.AirQualityEnum{aqdef.AirQualityFair, aqdef.AirQualityModerate, aqdef.AirQualityVeryPoor, aqdef.AirQualityExtremelyPoor},
+		},
+		"fair only": {
+			aqdef.FeatureFair,
 			[]aqdef.AirQualityEnum{aqdef.AirQualityFair, aqdef.AirQualityGood, aqdef.AirQualityPoor, aqdef.AirQualityUnknown},
-			[]aqdef.AirQualityEnum{aqdef.AirQualityModerate, aqdef.AirQualityVeryPoor, aqdef.AirQualityExtremelyPoor}},
+			[]aqdef.AirQualityEnum{aqdef.AirQualityModerate, aqdef.AirQualityVeryPoor, aqdef.AirQualityExtremelyPoor},
+		},
 	} {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
