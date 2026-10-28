@@ -10,6 +10,8 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+## [0.13.8] — 2026-10-28
+
 ### Fixed
 
 - `thread/otbr`: the revert of an unconfirmed active dataset tolerates a border router that answers `DELETE /node/dataset/active` with 405 (ot-br-posix at main registers no DELETE route) — the interface is disabled and the dataset left in place, as the virtual OTBR run showed; the live test expects that.
@@ -19,7 +21,7 @@ pseudo-version of `main`.
 - ESPHome Bluetooth proxies found over DNS-SD, with keys per device (brief BP2). `esphome.Discover(ctx, browser, keys, timeout)` browses `_esphomelib._tcp.local`, connects to each device once and returns the proxies with active connections; `esphome.Keys` holds the API keys by device name or MAC (`esphome.ParseKey("name=key")`), and a device without one is used only when it answers plaintext. `esphome.Options.Discover` (`DiscoverOptions{Browser, Keys, Rescan, Timeout}`) makes `NewCentral` start with the given and the discovered proxies and keep the discovered set current: it browses again every five minutes and after every proxy loss, follows a proxy whose address changed, and adds or drops proxies without touching a running connection. Every device left out is logged as `ble.esphome.proxy_skipped` with the reason. `esphometest.Network` is an in-memory DNS-SD network the fake proxies advertise on. The reference controller's `pair` gains `--bluetooth-proxy-discover` and `--bluetooth-proxy-key name=key` (repeatable); its `cli.Options.Proxies` hook takes a `cli.ProxyFlags`. The [ESPHome proxies guide](docs/guides/ble-proxies.md) describes discovery.
 - `discovery.Names.Browse(ctx, serviceType)` and `discovery.Instance`: a browse of any DNS-SD service type on the commissioner's cache, its instances with their addresses and TXT parameters.
 - `fabrictest.Device.BLE()`: the device as a peripheral of `controller/ble/bletest`, advertising its commissionable payload and serving BTP through the device's own bridge, so a consumer pairs a site's device over BLE without building a BTP peripheral ([Testing in process](docs/guides/testing-in-process.md#ble)).
-- `ble/esphome` requires go-fabric `v0.13.7` (was `v0.13.3`).
+- `ble/esphome` requires go-fabric `v0.13.8` (was `v0.13.3`).
 - `cluster/sensing`, the AmbientContextSensing server (milestone 6, brief 26-C, concept v10 wave 26-C), after connectedhomeip `AmbientContextSensingCluster.cpp` at 6170af84, ahead of matter.js. `sensing.AmbientContext` holds the detections with their hold time on the device's clock, derives HumanActivityDetected, ObjectIdentified and AudioContextDetected from them, holds the object count against ObjectCountConfig's threshold, checks the supported list and the predicted activity, accepts a controller's write of HoldTime and ObjectCountConfig, and emits AmbientContextDetectStarted and AmbientContextDetectEnded. It needs no port: the host's inputs are `ambientcontextsensingdef.Host` (`AddDetection`, `SetObjectCount`, `Close`) and the typed `Set` of the configuration attributes. No device type lists the cluster as a server; a host mounts it as `ambientcontextsensingdef.Declare{HostServer: …}`, and the kit makes it the default where a type lists it. chip's SensorFusion feature is not in the matter.js model and not served. The host persists HoldTime and ObjectCountConfig through the change notification. chip's unit tests are ported (14 of 15; the SensorFusion case checks that the attribute is absent). WaterTankLevelMonitoring stays generated (`BD-Matter-GeneratedServerSuffices`). Guide: [Ambient context sensing](docs/guides/sensing.md).
 
 ## [0.13.7] — 2026-10-27
@@ -4995,7 +4997,8 @@ consumer of an older pseudo-version should read.
   earlier than it was. Both fields are gone; the commit holding the file is
   its provenance.
 
-[Unreleased]: https://github.com/SukramJ/go-fabric/compare/v0.13.7...HEAD
+[Unreleased]: https://github.com/SukramJ/go-fabric/compare/v0.13.8...HEAD
+[0.13.8]: https://github.com/SukramJ/go-fabric/compare/v0.13.7...v0.13.8
 [0.13.7]: https://github.com/SukramJ/go-fabric/compare/v0.13.6...v0.13.7
 [0.13.6]: https://github.com/SukramJ/go-fabric/compare/v0.13.5...v0.13.6
 [0.13.5]: https://github.com/SukramJ/go-fabric/compare/v0.13.4...v0.13.5
