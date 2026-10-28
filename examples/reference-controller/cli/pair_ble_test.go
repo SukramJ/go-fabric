@@ -72,14 +72,27 @@ func TestPairBluetoothProxyFlag(t *testing.T) {
 		t.Fatalf("plain build: %v", err)
 	}
 	refused := errors.New("proxy refused")
-	var got []string
+	var got ProxyFlags
 	err := Run([]string{"--db", db, "--listen", "127.0.0.1:0", "pair", "--bluetooth-proxy", "a.local,KEY", "--bluetooth-proxy", "b.local:6054", "--passcode", "20202021", "--discriminator", "3840", "--thread-dataset", "0e080000000000010000"}, strings.NewReader(""), &bytes.Buffer{},
-		Options{Proxies: func(specs []string, _ *slog.Logger) (ble.Central, error) {
-			got = specs
+		Options{Proxies: func(flags ProxyFlags, _ *slog.Logger) (ble.Central, error) {
+			got = flags
 			return nil, refused
 		}})
-	if !errors.Is(err, refused) || !strings.Contains(err.Error(), "bluetooth proxies") || strings.Join(got, " ") != "a.local,KEY b.local:6054" {
-		t.Fatalf("proxies %q: %v", got, err)
+	if !errors.Is(err, refused) || !strings.Contains(err.Error(), "bluetooth proxies") || strings.Join(got.Proxies, " ") != "a.local,KEY b.local:6054" || got.Discover {
+		t.Fatalf("proxies %+v: %v", got, err)
+	}
+	// Discovery with keys per device, which implies --ble as well.
+	err = Run([]string{"--db", db, "--listen", "127.0.0.1:0", "pair", "--bluetooth-proxy-discover", "--bluetooth-proxy-key", "kitchen=K1", "--bluetooth-proxy-key", "AA:BB:CC:DD:EE:FF=K2", "--passcode", "20202021", "--discriminator", "3840", "--thread-dataset", "0e080000000000010000"}, strings.NewReader(""), &bytes.Buffer{},
+		Options{Proxies: func(flags ProxyFlags, _ *slog.Logger) (ble.Central, error) {
+			got = flags
+			return nil, refused
+		}})
+	if !errors.Is(err, refused) || !got.Discover || len(got.Proxies) != 0 || strings.Join(got.Keys, " ") != "kitchen=K1 AA:BB:CC:DD:EE:FF=K2" {
+		t.Fatalf("discovery %+v: %v", got, err)
+	}
+	// A key without discovery is refused before anything opens.
+	if err := run([]string{"--db", db, "pair", "--bluetooth-proxy-key", "kitchen=K1", "--passcode", "20202021", "--discriminator", "3840", "--wifi-ssid", "lab"}, strings.NewReader(""), &bytes.Buffer{}); err == nil || !strings.Contains(err.Error(), "--bluetooth-proxy-discover") {
+		t.Fatalf("key without discovery: %v", err)
 	}
 }
 

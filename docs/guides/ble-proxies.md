@@ -72,15 +72,73 @@ session through it ends with `btp.ErrDisconnected`. The central implements
 `ble.Reachability`: a device is a candidate while a connected, non-busy proxy
 reports it and has a connection slot for it.
 
+## Discovery and keys per device
+
+A proxy does not have to be listed. ESPHome devices advertise their API over
+DNS-SD as `_esphomelib._tcp.local` on the API port, named after the device
+(`kitchen-proxy`), with TXT keys such as `version`, `mac` (twelve hex
+digits), `config_hash`, `board`, and `api_encryption` when the device has an
+API key. Whether a device is a Bluetooth proxy is not in that record: it is
+in the feature flags the device reports once connected. `esphome.Discover`
+therefore browses for a while, connects to each device once, and returns the
+ones with active connections:
+
+```go
+names, err := discovery.Open(log) // client/discovery: the commissioner's DNS-SD cache
+if err != nil {
+	return err
+}
+defer names.Close()
+keys := esphome.Keys{
+	"kitchen-proxy":     kitchenKey, // by the device's name …
+	"AA:BB:CC:DD:EE:FF": hallKey,    // … or by its MAC
+}
+proxies, err := esphome.Discover(ctx, names, keys, 3*time.Second)
+```
+
+Keys are per device, by name or by MAC (any spelling; a name matches first).
+A device without a key is used only when it answers plaintext; one that
+advertises `api_encryption` without a key in `Keys` is not dialled at all.
+Every device left out — no key, a wrong key, no `bluetooth_proxy: active:
+true`, unreachable — is logged as `ble.esphome.proxy_skipped` with the
+reason.
+
+A central keeps the discovered set current when `Options.Discover` is set:
+
+```go
+central, err := esphome.NewCentral(nil, esphome.Options{Logger: log,
+	Discover: &esphome.DiscoverOptions{Browser: names, Keys: keys}})
+```
+
+It starts with the proxies it is given and the ones it finds, browses again
+every `Rescan` (five minutes) and after every proxy loss, and adds or drops
+proxies without touching a running connection: a new proxy joins
+(`ble.esphome.proxy_discovered`), a known one whose address changed — a DHCP
+lease — is followed by its name after the loss (`ble.esphome.proxy_moved`),
+and one no longer advertised leaves once it has no connection
+(`ble.esphome.proxy_removed`). A proxy given in the list stays regardless,
+and a device advertised at its address is that proxy, not a second one. A
+device refused for good (a wrong key, no active connections) is dialled
+again only when its `config_hash` changes. `NewCentral` fails when no proxy,
+given or discovered, answers.
+
+The one-subscriber rule is unchanged: a discovered proxy is taken from Home
+Assistant exactly as a listed one is.
+
 ## The reference controller
 
 `ble/esphome/cmd/reference-controller` is the reference controller with
 proxies. `pair` takes `--bluetooth-proxy host[:port][,key]`, repeatable,
-which implies `--ble`:
+which implies `--ble`; `--bluetooth-proxy-discover` finds the proxies over
+DNS-SD as well, with `--bluetooth-proxy-key name=key` (repeatable, the name
+a device name or a MAC) for their keys:
 
 ```sh
 cd ble/esphome && go build -o reference-controller ./cmd/reference-controller
 ./reference-controller pair --bluetooth-proxy proxy-office.local,$KEY \
+  --code MT:-24J0AFN00KA0648G00 --wifi-ssid lab --wifi-credentials secret12
+./reference-controller pair --bluetooth-proxy-discover \
+  --bluetooth-proxy-key kitchen-proxy=$KEY \
   --code MT:-24J0AFN00KA0648G00 --wifi-ssid lab --wifi-credentials secret12
 ```
 
@@ -88,5 +146,9 @@ cd ble/esphome && go build -o reference-controller ./cmd/reference-controller
 
 `ble/esphome/esphometest` is an in-process proxy speaking the API over a
 loopback listener, plaintext or Noise, in front of `controller/ble/bletest`'s
-peripherals. The commissioner's BLE tests run against it unchanged but for
-the central.
+peripherals. Its `Network` is an in-memory DNS-SD network the fake proxies
+advertise on as ESPHome devices do; a `discovery.Names` on `Network.Conn()`
+browses them. The commissioner's BLE tests run against it unchanged but for
+the central — once with the proxy listed, once discovered. A
+`fabrictest.Device`'s `BLE()` is the peripheral to put behind the fake proxy
+([Testing in process](testing-in-process.md#ble)).

@@ -43,9 +43,40 @@ type Options struct {
 	// pair --ble; nil is a build without BLE.
 	Central func(adapter string) (ble.Central, error)
 	// Proxies opens the BLE central over ESPHome Bluetooth proxies
-	// (--bluetooth-proxy host[:port][,key], repeatable) for pair; nil is a
-	// build without them.
-	Proxies func(specs []string, log *slog.Logger) (ble.Central, error)
+	// (--bluetooth-proxy host[:port][,key], repeatable;
+	// --bluetooth-proxy-discover with --bluetooth-proxy-key name=key,
+	// repeatable) for pair; nil is a build without them.
+	Proxies func(flags ProxyFlags, log *slog.Logger) (ble.Central, error)
+}
+
+// ProxyFlags are pair's ESPHome Bluetooth proxy flags.
+type ProxyFlags struct {
+	// Proxies are the --bluetooth-proxy specs, host[:port][,key].
+	Proxies []string
+	// Discover is --bluetooth-proxy-discover: find the proxies over
+	// DNS-SD as well.
+	Discover bool
+	// Keys are the --bluetooth-proxy-key specs, name=key, the keys of
+	// discovered proxies by name or MAC.
+	Keys []string
+}
+
+// set reports whether a proxy flag is given.
+func (f ProxyFlags) set() bool { return len(f.Proxies) > 0 || f.Discover }
+
+// check validates the proxy flags against the build; true when they ask
+// for BLE through proxies.
+func (f ProxyFlags) check(e *env) (bool, error) {
+	if len(f.Keys) > 0 && !f.Discover {
+		return false, errors.New("--bluetooth-proxy-key needs --bluetooth-proxy-discover")
+	}
+	if !f.set() {
+		return false, nil
+	}
+	if e.proxies == nil {
+		return true, errNoProxies
+	}
+	return true, nil
 }
 
 // stderr is where the log and the usage go.
@@ -99,7 +130,7 @@ var commands map[string]command
 
 func init() {
 	commands = map[string]command{
-		"pair":      {"pair --code <MT:… | 11 or 21 digits> | --passcode N --discriminator N [--node-id N] [--label L] [--wifi-ssid S --wifi-credentials C | --thread-dataset HEX] [--ble [--ble-adapter hci0 | --bluetooth-proxy host[:port][,key] …]]", cmdPair},
+		"pair":      {"pair --code <MT:… | 11 or 21 digits> | --passcode N --discriminator N [--node-id N] [--label L] [--wifi-ssid S --wifi-credentials C | --thread-dataset HEX] [--ble [--ble-adapter hci0 | --bluetooth-proxy host[:port][,key] … | --bluetooth-proxy-discover [--bluetooth-proxy-key name=key …]]]", cmdPair},
 		"discover":  {"discover [--code <MT:… | 11 or 21 digits> | --discriminator N] [--first]", cmdDiscover},
 		"unpair":    {"unpair <node>", cmdUnpair},
 		"nodes":     {"nodes", cmdNodes},
@@ -133,7 +164,7 @@ type env struct {
 	// central is Options.Central.
 	central func(adapter string) (ble.Central, error)
 	// proxies is Options.Proxies.
-	proxies func(specs []string, log *slog.Logger) (ble.Central, error)
+	proxies func(flags ProxyFlags, log *slog.Logger) (ble.Central, error)
 	// ownNode is set by a command that needs the controller's own node
 	// (group, ota): the stack opens the controller with its OTA push.
 	ownNode bool

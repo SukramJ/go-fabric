@@ -13,11 +13,11 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"strconv"
 	"sync"
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/bridge/bridgetest"
 	"github.com/SukramJ/go-fabric/client/exchange"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/controller"
@@ -36,13 +36,31 @@ import (
 	"github.com/SukramJ/go-fabric/ble/esphome/esphometest"
 )
 
+// modes are the two ways a central learns its proxy: given, or
+// discovered over DNS-SD.
+var modes = []struct {
+	name     string
+	discover bool
+}{{"static", false}, {"discovered", true}}
+
 // newCentral is a central over a fake proxy — Noise when key is set — in
 // front of the peripherals, which it has seen once, so a Dial without a
-// scan finds them as bletest's central does.
-func newCentral(t *testing.T, key string, ps ...*bletest.Peripheral) ble.Central {
+// scan finds them as bletest's central does. With discover the proxy is
+// not given but advertised on an in-memory DNS-SD network, its key given
+// by its name.
+func newCentral(t *testing.T, key string, discover bool, ps ...*bletest.Peripheral) ble.Central {
 	t.Helper()
-	f := fake(t, esphometest.Options{Key: key}, ps...)
-	c := central(t, esphome.Options{}, esphome.Proxy{Addr: f.Addr(), Key: key})
+	f := fake(t, esphometest.Options{Key: key, Name: "commission-proxy"}, ps...)
+	var c *esphome.Central
+	if discover {
+		mdnsNet := esphometest.NewNetwork()
+		mdnsNet.Advertise(f)
+		c = central(t, esphome.Options{Discover: &esphome.DiscoverOptions{
+			Browser: names(t, mdnsNet), Keys: esphome.Keys{"commission-proxy": key}, Timeout: browseWindow,
+		}})
+	} else {
+		c = central(t, esphome.Options{}, esphome.Proxy{Addr: f.Addr(), Key: key})
+	}
 	if len(ps) > 0 {
 		s := watch(c)
 		if err := c.StartScanning(context.Background()); err != nil {
@@ -111,44 +129,41 @@ func manualCode(t *testing.T, dev *fabrictest.Device) string {
 // its advertisement, runs PASE over BTP, provisions the network and
 // completes over CASE on the site's network.
 func TestPairOverBLE(t *testing.T) {
-	for _, key := range []string{"", testKey} {
-		drv := &wifiDriver{}
-		site, dev, c := siteController(t, fabrictest.Topology{Configure: func(cfg *node.Config) {
-			cfg.Network.WiFiCommissioning = node.WiFiCommissioning{Driver: drv}
-		}})
-		p := &bletest.Peripheral{
-			Address: "C0:FF:EE:00:0B:1E", Discriminator: dev.Discriminator(), VendorID: 0xFFF1, ProductID: 0x8001,
-			Serve: func(conn *btp.Conn) (func([]byte), func()) {
-				srv, err := bridgetest.ServeConn(dev.Bridge(), conn)
-				if err != nil {
-					t.Error(err)
-					return nil, nil
-				}
-				return srv.Deliver, srv.Close
-			},
+	for _, mode := range modes {
+		for _, key := range []string{"", testKey} {
+			t.Run(mode.name+"/key="+strconv.FormatBool(key != ""), func(t *testing.T) { pairOverBLE(t, key, mode.discover) })
 		}
-		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
-		if _, err := c.Pair(ctx, manualCode(t, dev), controller.PairOptions{BLE: newCentral(t, key, p)}); !errors.Is(err, controller.ErrConfiguration) {
-			t.Fatalf("BLE without a network: %v, want ErrConfiguration", err)
-		}
-		if err := site.Run(ctx, func(ctx context.Context) error {
-			_, err := c.Pair(ctx, manualCode(t, dev), controller.PairOptions{
-				BLE: newCentral(t, key, p), WiFi: &commissioner.WiFiNetwork{SSID: "lab", Credentials: "secret12"},
-				OnAttestationFailure: attestation.Accept(),
-			})
-			return err
-		}); err != nil {
-			t.Fatalf("Pair over BLE (key %q): %v", key, err)
-		}
-		cancel()
-		drv.mu.Lock()
-		if len(drv.connects) != 1 || drv.connects[0] != "lab/secret12" {
-			t.Fatalf("driver connects %q", drv.connects)
-		}
-		drv.mu.Unlock()
-		if len(c.Nodes()) != 1 {
-			t.Fatalf("%d nodes", len(c.Nodes()))
-		}
+	}
+}
+
+func pairOverBLE(t *testing.T, key string, discover bool) {
+	t.Helper()
+	drv := &wifiDriver{}
+	site, dev, c := siteController(t, fabrictest.Topology{Configure: func(cfg *node.Config) {
+		cfg.Network.WiFiCommissioning = node.WiFiCommissioning{Driver: drv}
+	}})
+	p := dev.BLE()
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	if _, err := c.Pair(ctx, manualCode(t, dev), controller.PairOptions{BLE: newCentral(t, key, discover, p)}); !errors.Is(err, controller.ErrConfiguration) {
+		t.Fatalf("BLE without a network: %v, want ErrConfiguration", err)
+	}
+	if err := site.Run(ctx, func(ctx context.Context) error {
+		_, err := c.Pair(ctx, manualCode(t, dev), controller.PairOptions{
+			BLE: newCentral(t, key, discover, p), WiFi: &commissioner.WiFiNetwork{SSID: "lab", Credentials: "secret12"},
+			OnAttestationFailure: attestation.Accept(),
+		})
+		return err
+	}); err != nil {
+		t.Fatalf("Pair over BLE (key %q): %v", key, err)
+	}
+	cancel()
+	drv.mu.Lock()
+	if len(drv.connects) != 1 || drv.connects[0] != "lab/secret12" {
+		t.Fatalf("driver connects %q", drv.connects)
+	}
+	drv.mu.Unlock()
+	if len(c.Nodes()) != 1 {
+		t.Fatalf("%d nodes", len(c.Nodes()))
 	}
 }
 
@@ -186,9 +201,16 @@ func echo(t *testing.T, got chan<- message.ProtocolHeader) *bletest.Peripheral {
 // through a proxy: the segment size from the proxy's ATT_MTU, a message of
 // several segments each way.
 func TestDialRunsExchangesWithoutMRP(t *testing.T) {
+	for _, mode := range modes {
+		t.Run(mode.name, func(t *testing.T) { dialRunsExchangesWithoutMRP(t, mode.discover) })
+	}
+}
+
+func dialRunsExchangesWithoutMRP(t *testing.T, discover bool) {
+	t.Helper()
 	got := make(chan message.ProtocolHeader, 4)
 	p := echo(t, got)
-	central := newCentral(t, testKey, p)
+	central := newCentral(t, testKey, discover, p)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	ch, err := ble.Dial(ctx, central, ble.Peripheral{Address: p.Address}, ble.DialOptions{})
@@ -237,9 +259,16 @@ func TestDialRunsExchangesWithoutMRP(t *testing.T) {
 // TestChannelClosesWhenPeripheralDrops is controller/ble/channel_test.go's
 // through a proxy.
 func TestChannelClosesWhenPeripheralDrops(t *testing.T) {
+	for _, mode := range modes {
+		t.Run(mode.name, func(t *testing.T) { channelClosesWhenPeripheralDrops(t, mode.discover) })
+	}
+}
+
+func channelClosesWhenPeripheralDrops(t *testing.T, discover bool) {
+	t.Helper()
 	got := make(chan message.ProtocolHeader, 4)
 	p := echo(t, got)
-	central := newCentral(t, "", p)
+	central := newCentral(t, "", discover, p)
 	ch, err := ble.Dial(context.Background(), central, ble.Peripheral{Address: p.Address}, ble.DialOptions{})
 	if err != nil {
 		t.Fatal(err)

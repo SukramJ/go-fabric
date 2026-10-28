@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 6789,
+  "entry_points": 6794,
   "entry_packages": [
     ".",
     "bdx",
@@ -264,9 +264,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 16504,
-    "reachable": 11663,
-    "whitelisted": 4838,
+    "total_exported": 16510,
+    "reachable": 11665,
+    "whitelisted": 4842,
     "unreachable": 3
   },
   "by_package": [
@@ -5555,6 +5555,34 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/discovery/fuzz_txt_test.go",
       "line": 59
+    },
+    {
+      "package": "client/discovery",
+      "identifier": "TestBrowse_AsksForWhatAnInstanceLacks",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/discovery/browse_test.go",
+      "line": 70
+    },
+    {
+      "package": "client/discovery",
+      "identifier": "TestBrowse_CachedInstancesAndWithdrawals",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/discovery/browse_test.go",
+      "line": 97
+    },
+    {
+      "package": "client/discovery",
+      "identifier": "TestBrowse_FindsAForeignServiceType",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/discovery/browse_test.go",
+      "line": 34
+    },
+    {
+      "package": "client/discovery",
+      "identifier": "TestBrowse_Refusals",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/discovery/browse_test.go",
+      "line": 144
     },
     {
       "package": "client/discovery",
@@ -25777,7 +25805,7 @@
       "identifier": "TestPairOverBLE",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-controller/cli/pair_ble_test.go",
-      "line": 89
+      "line": 102
     },
     {
       "package": "examples/reference-controller/cli",
