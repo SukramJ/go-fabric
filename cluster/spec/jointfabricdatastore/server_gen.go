@@ -372,6 +372,104 @@ func (s *Server) HandleRemoveAclFromNode(fn func(ctx context.Context, req Remove
 	return spec.HandleOn(s.Underlying(), CmdRemoveAclFromNode, fn)
 }
 
+// Host is the JointFabricDatastore kit server's host methods: the ones Set, Get and
+// the typed handlers do not reach (cluster/jointfabric Datastore).
+type Host interface {
+	// SetAnchorRootCA, SetAnchorNodeID, SetAnchorVendorID,
+	// SetAnchorFabricIndex, SetFriendlyName and SetStatus set the
+	// anchor and the datastore's own record (chip's setters).
+	SetAnchorRootCA(ctx context.Context, rcac []byte) error
+	SetAnchorNodeID(ctx context.Context, nodeID uint64) error
+	SetAnchorVendorID(ctx context.Context, vendorID uint16) error
+	SetAnchorFabricIndex(ctx context.Context, fabricIndex uint8) error
+	SetFriendlyName(ctx context.Context, name string) error
+	SetStatus(ctx context.Context, state DatastoreStateEnum, updateTimestamp uint32, failureCode uint8) error
+	// AnchorFabricIndex is the Joint Fabric's index on this node.
+	AnchorFabricIndex() uint8
+	// AddPendingNode, UpdateNode, RemoveNode and RefreshNode keep the
+	// node list; RefreshNode reconciles a node through the
+	// DatastoreSync before it returns.
+	AddPendingNode(ctx context.Context, nodeID uint64, name string) error
+	UpdateNode(ctx context.Context, nodeID uint64, name string) error
+	RemoveNode(ctx context.Context, nodeID uint64) error
+	RefreshNode(ctx context.Context, nodeID uint64) error
+	// The key sets.
+	AddGroupKeySetEntry(ctx context.Context, ks DatastoreGroupKeySetStruct) error
+	UpdateGroupKeySetEntry(ctx context.Context, ks DatastoreGroupKeySetStruct) error
+	RemoveGroupKeySetEntry(ctx context.Context, id uint16) error
+	IsGroupKeySetEntryPresent(id uint16) bool
+	// ForceAddNodeKeySetEntry adds a Committed key set entry, the
+	// administrator's own.
+	ForceAddNodeKeySetEntry(ctx context.Context, ks uint16, nodeID uint64) error
+	// The administrators.
+	AddAdmin(ctx context.Context, a DatastoreAdministratorInformationEntryStruct) error
+	UpdateAdmin(ctx context.Context, nodeID uint64, name *string, icac *[]byte) error
+	RemoveAdmin(ctx context.Context, nodeID uint64) error
+	// The groups; ForceAddGroup also adds the administrator and anchor
+	// CAT groups AddGroup refuses.
+	AddGroup(ctx context.Context, req AddGroupRequest) error
+	ForceAddGroup(ctx context.Context, req AddGroupRequest) error
+	UpdateGroup(ctx context.Context, req UpdateGroupRequest) error
+	RemoveGroup(ctx context.Context, groupID uint16) error
+	// The endpoints' names, memberships and bindings and the nodes'
+	// ACL entries; each pushes through the DatastoreSync before it
+	// returns.
+	UpdateEndpointForNode(ctx context.Context, nodeID uint64, endpointID uint16, name string) error
+	AddGroupIDToEndpointForNode(ctx context.Context, nodeID uint64, endpointID, groupID uint16) error
+	RemoveGroupIDFromEndpointForNode(ctx context.Context, nodeID uint64, endpointID, groupID uint16) error
+	AddBindingToEndpointForNode(ctx context.Context, nodeID uint64, endpointID uint16, binding DatastoreBindingTargetStruct) error
+	RemoveBindingFromEndpointForNode(ctx context.Context, listID uint16, nodeID uint64, endpointID uint16) error
+	AddACLToNode(ctx context.Context, nodeID uint64, entry DatastoreAccessControlEntryStruct) error
+	RemoveACLFromNode(ctx context.Context, listID uint16, nodeID uint64) error
+	// Wait waits for the pushes and refreshes the commands started.
+	Wait()
+}
+
+// Host returns the mounted server's host methods when it implements
+// Host — the kit's server does; nil for a server that does not, as the
+// generated one and a host's own (Declare.HostServer) normally do not.
+func (s *Server) Host() Host {
+	h, _ := s.Underlying().(Host)
+	return h
+}
+
+// DatastoreSync carries the datastore's entries to the member nodes
+// and fetches their lists for a refresh — connectedhomeip's
+// JointFabricDatastore::Delegate (JointFabricDatastore.h:166-285 at
+// 6170af84). Each Sync writes one entry (an entry whose StatusEntry
+// is DeletePending removes it; a zero entry with only the ids set
+// removes it too) or, for the bindings and the ACLs, the node's whole
+// list; SyncBindings may mark an entry of the list CommitFailed with
+// its FailureCode in place. An error leaves the entry as it was
+// (Pending or DeletePending) for the next RefreshNode. Each Fetch
+// reads the node's current list; an error ends the refresh with the
+// node Pending. The datastore calls it outside its lock.
+type DatastoreSync interface {
+	SyncEndpointGroupID(ctx context.Context, nodeID uint64, entry DatastoreEndpointGroupIDEntryStruct) error
+	SyncNodeKeySet(ctx context.Context, nodeID uint64, entry DatastoreNodeKeySetEntryStruct) error
+	SyncBinding(ctx context.Context, nodeID uint64, entry DatastoreEndpointBindingEntryStruct) error
+	SyncBindings(ctx context.Context, nodeID uint64, entries []DatastoreEndpointBindingEntryStruct) error
+	SyncACL(ctx context.Context, nodeID uint64, entry DatastoreACLEntryStruct) error
+	SyncACLs(ctx context.Context, nodeID uint64, entries []DatastoreACLEntryStruct) error
+	SyncGroupKeySet(ctx context.Context, nodeID uint64, keySet DatastoreGroupKeySetStruct) error
+	FetchEndpointList(ctx context.Context, nodeID uint64) ([]DatastoreEndpointEntryStruct, error)
+	FetchEndpointGroupList(ctx context.Context, nodeID uint64, endpointID uint16) ([]DatastoreGroupInformationEntryStruct, error)
+	FetchEndpointBindingList(ctx context.Context, nodeID uint64, endpointID uint16) ([]DatastoreEndpointBindingEntryStruct, error)
+	FetchGroupKeySetList(ctx context.Context, nodeID uint64) ([]uint16, error)
+	FetchGroupKeySet(ctx context.Context, nodeID uint64, groupKeySetID uint16) (DatastoreGroupKeySetStruct, error)
+	FetchACLList(ctx context.Context, nodeID uint64) ([]DatastoreACLEntryStruct, error)
+}
+
+// DatastoreStore persists the datastore's tables as one settings
+// record under the device's StableKey; the node's store
+// (node.Node.Store) is one. Without one the tables stay in memory, as
+// connectedhomeip keeps them (JointFabricDatastore.h:562, "TODO:
+// Persist these members").
+type DatastoreStore interface {
+	GetSetting(ctx context.Context, key string) (value string, ok bool, err error)
+	SetSetting(ctx context.Context, key, value string) error
+}
+
 // Declare is the declaration of the JointFabricDatastore cluster on a device:
 // device.New<Type> and device.FromSpec take it, and every field is
 // optional — the zero value mounts the cluster (an optional one too)
@@ -448,6 +546,10 @@ type Declare struct {
 	// HandleRemoveAclFromNode handles the RemoveAclFromNode command in place of the server
 	// (Server.HandleRemoveAclFromNode), inline; an optional command it handles is accepted.
 	HandleRemoveAclFromNode func(ctx context.Context, req RemoveAclFromNodeRequest) (struct{}, error)
+	// Sync is the host port the kit's server runs on ([DatastoreSync]).
+	Sync DatastoreSync
+	// Store is the host port the kit's server runs on ([DatastoreStore]).
+	Store DatastoreStore
 	// HostServer is the host's own server for the cluster, mounted in
 	// place of the kit's — also for a cluster the device type does not
 	// list. The hooks above go on it; Initial, Features and the ports are

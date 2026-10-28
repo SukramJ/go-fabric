@@ -10,6 +10,7 @@ import (
 	"errors"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
+	"github.com/SukramJ/go-fabric/cluster/spec/operationalcredentials"
 	"github.com/SukramJ/go-fabric/contract"
 )
 
@@ -175,6 +176,51 @@ func (s *Server) HandleAnnounceJointFabricAdministrator(fn func(ctx context.Cont
 	return spec.HandleOn(s.Underlying(), CmdAnnounceJointFabricAdministrator, fn)
 }
 
+// Host is the JointFabricAdministrator kit server's host methods: the ones Set, Get and
+// the typed handlers do not reach (cluster/jointfabric Administrator).
+type Host interface {
+	// PeerAdministratorEndpoint is the announcing commissioner's
+	// JointFabricAdministrator endpoint, 0xFFFF when none.
+	PeerAdministratorEndpoint() uint16
+	// VIDVerifiedFabric is the fabric whose VID verification
+	// succeeded, 0 when none.
+	VIDVerifiedFabric() uint8
+}
+
+// Host returns the mounted server's host methods when it implements
+// Host — the kit's server does; nil for a server that does not, as the
+// generated one and a host's own (Declare.HostServer) normally do not.
+func (s *Server) Host() Host {
+	h, _ := s.Underlying().(Host)
+	return h
+}
+
+// AdministratorPort is the administrator application's key: IcacCsr
+// returns the PKCS#10 CSR of the key the administrator's ICAC will
+// certify — connectedhomeip's JointFabricAdministrator::Delegate
+// GetIcacCsr (JointFabricAdministrator.h:34-41 at 6170af84). The
+// server answers ICACCSRRequest with it and checks AddICAC's public
+// key against it.
+type AdministratorPort interface {
+	IcacCsr(ctx context.Context) ([]byte, error)
+}
+
+// CommissionerReach reads the administrator data of the commissioner
+// that invoked AnnounceJointFabricAdministrator and has it sign the
+// Vendor ID Verification — connectedhomeip's JCMCommissionee reads over
+// the invoking session (JCMCommissionee.cpp:46-69, :297-322 at
+// 6170af84). ctx is the invoke's context, which names the peer
+// (im.SubjectFromContext, im.FabricFilterFromContext); the reads are
+// not fabric-filtered. Without one AnnounceJointFabricAdministrator
+// fails.
+type CommissionerReach interface {
+	ReadAdministratorFabricIndex(ctx context.Context, endpointID uint16) (fabricIndex uint8, null bool, err error)
+	ReadFabrics(ctx context.Context) ([]operationalcredentials.FabricDescriptorStruct, error)
+	ReadTrustedRootCertificates(ctx context.Context) ([][]byte, error)
+	ReadNOCs(ctx context.Context) ([]operationalcredentials.NOCStruct, error)
+	SignVIDVerification(ctx context.Context, fabricIndex uint8, clientChallenge []byte) (resp operationalcredentials.SignVidVerificationResponse, attestationChallenge []byte, err error)
+}
+
 // Declare is the declaration of the JointFabricAdministrator cluster on a device:
 // device.New<Type> and device.FromSpec take it, and every field is
 // optional — the zero value mounts the cluster (an optional one too)
@@ -209,6 +255,10 @@ type Declare struct {
 	// HandleAnnounceJointFabricAdministrator handles the AnnounceJointFabricAdministrator command in place of the server
 	// (Server.HandleAnnounceJointFabricAdministrator), inline; an optional command it handles is accepted.
 	HandleAnnounceJointFabricAdministrator func(ctx context.Context, req AnnounceJointFabricAdministratorRequest) (struct{}, error)
+	// AdministratorPort is the host port the kit's server runs on ([AdministratorPort]).
+	AdministratorPort AdministratorPort
+	// CommissionerReach is the host port the kit's server runs on ([CommissionerReach]).
+	CommissionerReach CommissionerReach
 	// HostServer is the host's own server for the cluster, mounted in
 	// place of the kit's — also for a cluster the device type does not
 	// list. The hooks above go on it; Initial, Features and the ports are

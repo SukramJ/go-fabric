@@ -198,6 +198,8 @@ the kit server implements for host inputs: the switch's.
 | Chime | `SoundsChanged` |
 | CommodityTariff | `SyncTime` (the poll the server runs itself with a `SyncInterval`) |
 | DeviceEnergyManagement | `Close` (stops its timers) |
+| JointFabricAdministrator | `PeerAdministratorEndpoint`, `VIDVerifiedFabric` — [Joint Fabric](joint-fabric.md) |
+| JointFabricDatastore | the anchor and status setters, `AnchorFabricIndex`, the node, key set, admin, group, endpoint, binding and ACL operations (each pushing through the `DatastoreSync` before it returns), `RefreshNode`, `ForceAddGroup`, `ForceAddNodeKeySetEntry`, `Wait` — [Joint Fabric](joint-fabric.md) |
 | DishwasherAlarm, RefrigeratorAlarm, TemperatureAlarm | `ResetLatchedAlarms` |
 | DoorLock | `SetDoorState` (DoorStateChange and the door counters), `Users` |
 | EcosystemInformation | `DirectoryChanged` |
@@ -232,6 +234,10 @@ by type assertion.
 | `camera.ChimePort` (`chimedef.ChimePort`) | `chimedef.Declare{ChimePort: …}`, `camera.ChimeConfig.Port` | lists the installed sounds and plays one; an error answers with its status, FAILURE without one ([Camera](camera.md#chime)) | the generated server |
 | `camera.MechanicalPTZ`, `camera.MechanicalPresets`, `camera.DigitalPTZ` | `cameraavsettingsuserlevelmanagementdef.Declare{MechanicalPTZ: …, DigitalPTZ: …}`, `camera.AvSettingsConfig` | start a validated movement (the host reports its end), store and remove presets, change a stream's viewport; an error answers with its status ([Camera](camera.md#pan-tilt-and-zoom)) | the generated server |
 | `camera.VideoStreamPort`, `camera.AudioStreamPort`, `camera.SnapshotStreamPort`, `camera.SnapshotCapturePort` | `cameraavstreammanagementdef.Declare{VideoStreamPort: …, AudioStreamPort: …, SnapshotStreamPort: …, SnapshotCapturePort: …}`, `camera.AvStreamConfig` | allocate, modify and release a validated stream and return its id, start a stream as allocated, take a snapshot; an error answers with its status ([Camera](camera.md#the-stream-model)) | the generated server |
+| `jointfabric.DatastoreSync` (`jointfabricdatastoredef.DatastoreSync`) | `jointfabricdatastoredef.Declare{Sync: …}`, `jointfabric.DatastoreConfig.Sync` | pushes an entry, or a node's binding or ACL list, to the member node and fetches its lists for a refresh; an error leaves the entry Pending ([Joint Fabric](joint-fabric.md)) | the generated server |
+| `jointfabric.DatastoreStore` (`jointfabricdatastoredef.DatastoreStore`) | `jointfabricdatastoredef.Declare{Store: …}` | persists the tables as one settings record under the StableKey; the node's store is one | the tables stay in memory |
+| `jointfabric.AdministratorPort` (`jointfabricadministratordef.AdministratorPort`) | `jointfabricadministratordef.Declare{AdministratorPort: …}`, `jointfabric.AdministratorConfig.Port` | the administrator key's ICAC CSR | the generated server |
+| `jointfabric.CommissionerReach` (`jointfabricadministratordef.CommissionerReach`) | `jointfabricadministratordef.Declare{CommissionerReach: …}` | reads the announcing commissioner's administrator data and has it sign the VID verification | AnnounceJointFabricAdministrator fails |
 | `camera.ZonePort` (`zonemanagementdef.ZonePort`) | `zonemanagementdef.Declare{ZonePort: …}`, `camera.ZonesConfig.Port` | store a validated zone (and return its id) or trigger, remove one; an error answers with its status ([Camera](camera.md#the-zone-model)) | the generated server |
 | `camera.ProviderPort` (`webrtctransportproviderdef.ProviderPort`) | `webrtctransportproviderdef.Declare{ProviderPort: …}`, `camera.ProviderConfig.Port` | answer a validated SolicitOffer or ProvideOffer with the session to store, take an answer, ICE candidates and the end of a session; an error answers with its status ([Camera](camera.md#the-transport-model)) | the generated server |
 | `camera.PushTransportPort` (`pushavstreamtransportdef.PushTransportPort`) | `pushavstreamtransportdef.Declare{PushTransportPort: …}`, `camera.PushTransportConfig.Port` | allocate, modify, activate, trigger and release a validated push transport, report a busy one, the bandwidth and the CMAF session number ([Camera](camera.md#the-transport-model)) | the generated server |
@@ -260,7 +266,7 @@ Host ports of the root servers, reached through `node.Config` or
 | `core.LogProvider` | DiagnosticLogs content. The facade serves its diagnostic event ring |
 
 Clusters the generated server serves with no hand-written logic — among
-them the camera, Thread, Joint Fabric and TLS clusters, as matter.js serves
+them the camera, Thread and TLS clusters, as matter.js serves
 them with its generated behaviour stubs — have no port beyond their
 `Declare`: its command handler fields (`<cluster>def.Declare{…}`, or the
 typed server's setters at run time) are the host's part, and a mandatory

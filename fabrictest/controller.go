@@ -49,6 +49,10 @@ type ControllerOptions struct {
 	Label string
 	// CATs are the CASE Authenticated Tags of the controller's NOC.
 	CATs []uint32
+	// IntermediateCA issues the fabric's NOCs under an ICAC (a 3-tier
+	// PKI, ca.Config.IntermediateCA) — what a Joint Fabric administrator's
+	// fabric needs (connectedhomeip jcm/DeviceCommissioner.cpp:204-213).
+	IntermediateCA bool
 	// Logger receives the controller's logs; nil is the site's logger.
 	Logger *slog.Logger
 	// Registry, when set, edits the configuration of the client node
@@ -247,7 +251,7 @@ func (c *Controller) build() (*stack, error) {
 		_ = l.Serve(ctx, mgr.HandleDatagram)
 	}()
 	st.names = discovery.NewNames(newQueryConn(c.site), log)
-	if st.ca, err = ca.New(ca.Config{Store: c.caStore, Clock: clk}); err != nil {
+	if st.ca, err = ca.New(ca.Config{Store: c.caStore, Clock: clk, IntermediateCA: c.opts.IntermediateCA}); err != nil {
 		return st, fmt.Errorf("certificate authority: %w", err)
 	}
 	if st.fabric, err = commissioner.NewFabric(st.ca, commissioner.FabricConfig{

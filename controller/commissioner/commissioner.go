@@ -168,6 +168,16 @@ type Options struct {
 	// in matter.js's order and names ([Step]). Commission waits for it,
 	// so it must not block.
 	Progress func(Step)
+	// CATs are the CASE Authenticated Tags of the device's NOC — a Joint
+	// Fabric administrator's administrator and anchor CATs, as
+	// connectedhomeip's credential issuer sets them
+	// (SetCredentialIssuerCATValues; examples/jf-control-app/commands/
+	// pairing/PairingCommand.cpp:113-140 at 6170af84). nil issues none.
+	CATs []uint32
+	// JointFabric, when set, runs Joint Commissioning: the device's Joint
+	// Fabric administrator is verified, and the host consents, before its
+	// NOC is issued ([JointFabricOptions], step [StepJointFabric]).
+	JointFabric *JointFabricOptions
 }
 
 // Result is a successful commissioning — matter.js CommissionResult

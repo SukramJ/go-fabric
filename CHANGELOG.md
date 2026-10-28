@@ -10,6 +10,10 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+### Added
+
+- Joint Fabric after connectedhomeip (brief 26-D, ADR 0020 stage 6c; matter.js has no logic at its pin). `cluster/jointfabric`: `Datastore` serves JointFabricDatastore (0x0752) — the registry of nodes, administrators, groups, key sets, endpoints, bindings and ACLs with chip's pending/committed states and status codes, the 20 commands, the pushes to the member nodes through the host's `DatastoreSync` (after the command's answer) and `RefreshNode`, persisted through an optional `DatastoreStore`; `Administrator` serves JointFabricAdministrator (0x0753) — the joint commissioning window (`OpenJointCommissioningWindow`, advertised CM=3), the trust verification of a commissioner that announces itself (the JCMCommissionee over the host's `CommissionerReach`), `ICACCSRRequest` from the host's `AdministratorPort`, the `AddICAC` checks, and the anchor taken at CommissioningComplete when a fabric's NOC carries the administrator and anchor CATs. The JointFabricAdministrator device kit mounts both once the declarations carry their ports. `client/jcm` is the trust verification both roles share (the stage machine, the Vendor ID Verification). The commissioner runs Joint Commissioning with `Options.JointFabric` (step 10.2 `JointFabric.TrustVerification`: the device's administrator verified, its vendor id verified, the host's `Consent`) and issues `Options.CATs` on the device's NOC. `wire.OpenWindowParams.JointFabric` and `bridge.CommissioningWindow.IsJointFabric`; `fabrictest.ControllerOptions.IntermediateCA`. The [Joint Fabric guide](docs/guides/joint-fabric.md) describes it.
+
 ## [0.13.9] — 2026-10-28
 
 ### Added
