@@ -190,7 +190,18 @@ func (b *BorderRouter) clear(ctx context.Context) error {
 		return err
 	}
 	if err := b.c.deleteActiveDataset(ctx); err != nil {
-		return err
+		// ot-br-posix at main registers only GET and PUT on
+		// /node/dataset/active (rest_web_server.cpp, RegisterGet/RegisterPut
+		// of OT_REST_RESOURCE_PATH_NODE_DATASET_ACTIVE) and answers DELETE
+		// with 405; matter.js's deleteActiveDataset (OtbrRestClient.ts:428-433)
+		// targets a firmware that had the route. chip's revert attaches an
+		// empty dataset (GenericThreadBorderRouterDelegate.cpp:191-208), which
+		// REST cannot express, so the revert ends with the interface disabled
+		// and the dataset left in place.
+		var oe *Error
+		if !errors.As(err, &oe) || oe.Code != CodeNotAllowed {
+			return err
+		}
 	}
 	b.mu.Lock()
 	b.configured = false

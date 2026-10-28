@@ -33,6 +33,9 @@ type Options struct {
 	// keys (node-camel.json.ts: routerCount, a hex-string rloc16); false
 	// is the older PascalCase (node.json.ts).
 	Camel bool
+	// NoDelete answers DELETE /node/dataset/active with 405, as ot-br-posix
+	// at main does (the route is not registered).
+	NoDelete bool
 	// Diagnostics is the flavour served: "legacy" (default, GET
 	// /diagnostics), "collection" (/api/diagnostics as well), "none".
 	Diagnostics string
@@ -214,6 +217,10 @@ func (s *Server) serve(w http.ResponseWriter, r *http.Request) { //nolint:funlen
 	case "PUT /node/dataset/pending":
 		s.putDataset(w, &s.pending, body)
 	case "DELETE /node/dataset/active":
+		if s.opts.NoDelete {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
 		if s.state != "disabled" {
 			w.WriteHeader(http.StatusConflict)
 			return

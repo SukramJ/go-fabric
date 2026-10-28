@@ -109,6 +109,28 @@ func TestBorderRouterActivationAndRevert(t *testing.T) {
 	}
 }
 
+// A border router without the DELETE route (ot-br-posix at main answers
+// 405): the revert disables the interface and leaves the dataset in place.
+func TestBorderRouterRevertWithoutDeleteRoute(t *testing.T) {
+	t.Parallel()
+	br, srv := newBR(t, otbrtest.Options{AttachPolls: 3, NoDelete: true})
+	ctx := context.Background()
+	ds := fakeDataset(t)
+	if err := br.SetActiveDataset(ctx, ds); err != nil {
+		t.Fatal(err)
+	}
+	if err := br.RevertActiveDataset(ctx); err != nil {
+		t.Fatalf("revert against a 405: %v", err)
+	}
+	if srv.State() != "disabled" || !bytes.Equal(srv.Active(), ds) {
+		t.Errorf("after the revert: %s, %x, want disabled with the dataset in place", srv.State(), srv.Active())
+	}
+	// A second activation still works from the disabled state.
+	if err := br.SetActiveDataset(ctx, ds); err != nil || srv.State() != "leader" {
+		t.Errorf("re-activation: %v, %s", err, srv.State())
+	}
+}
+
 // Replacing an active dataset disables the interface first (the OTBR's
 // 409), an identical attached one is a no-op, the empty one clears.
 func TestBorderRouterReplaceAndClear(t *testing.T) {

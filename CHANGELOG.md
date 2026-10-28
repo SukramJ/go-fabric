@@ -10,6 +10,10 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+### Fixed
+
+- `thread/otbr`: the revert of an unconfirmed active dataset tolerates a border router that answers `DELETE /node/dataset/active` with 405 (ot-br-posix at main registers no DELETE route) — the interface is disabled and the dataset left in place, as the virtual OTBR run showed; the live test expects that.
+
 ### Added
 
 - ESPHome Bluetooth proxies found over DNS-SD, with keys per device (brief BP2). `esphome.Discover(ctx, browser, keys, timeout)` browses `_esphomelib._tcp.local`, connects to each device once and returns the proxies with active connections; `esphome.Keys` holds the API keys by device name or MAC (`esphome.ParseKey("name=key")`), and a device without one is used only when it answers plaintext. `esphome.Options.Discover` (`DiscoverOptions{Browser, Keys, Rescan, Timeout}`) makes `NewCentral` start with the given and the discovered proxies and keep the discovered set current: it browses again every five minutes and after every proxy loss, follows a proxy whose address changed, and adds or drops proxies without touching a running connection. Every device left out is logged as `ble.esphome.proxy_skipped` with the reason. `esphometest.Network` is an in-memory DNS-SD network the fake proxies advertise on. The reference controller's `pair` gains `--bluetooth-proxy-discover` and `--bluetooth-proxy-key name=key` (repeatable); its `cli.Options.Proxies` hook takes a `cli.ProxyFlags`. The [ESPHome proxies guide](docs/guides/ble-proxies.md) describes discovery.

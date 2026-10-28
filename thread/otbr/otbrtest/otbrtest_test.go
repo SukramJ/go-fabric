@@ -64,6 +64,11 @@ func TestServer(t *testing.T) {
 		if st, _ := do(t, srv, "DELETE", "/node/dataset/active", ""); st != http.StatusConflict {
 			t.Errorf("delete while up: %d", st)
 		}
+		// ot-br-posix at main registers no DELETE route on the dataset.
+		noDel := otbrtest.New(otbrtest.Options{Camel: camel, NoDelete: true})
+		if st, _ := do(t, noDel, "DELETE", "/node/dataset/active", ""); st != http.StatusMethodNotAllowed {
+			t.Errorf("delete without the route: %d", st)
+		}
 		if st, _ := do(t, srv, "PUT", "/node/state", `"bogus"`); st != http.StatusBadRequest {
 			t.Errorf("bogus state: %d", st)
 		}
