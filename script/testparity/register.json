@@ -3455,7 +3455,8 @@
         "controller/attestation:TestCertificatesParseMatterFallbackVidPid",
         "controller/attestation:TestCertificatesPaaFromAsn1",
         "controller/commissioner:TestCertificatesGetPublicKeyFromCsr",
-        "secure/mattercert:TestBuildDNStandardAttributes"
+        "secure/mattercert:TestBuildDNStandardAttributes",
+        "controller/attestation:TestCertificatesPQCSizeLimit"
       ],
       "missing": [
         "recode root certificate",
@@ -3478,8 +3479,7 @@
         "verify operational certificate via ICAC and ROOT with fabricId in root not matching",
         "validates TLV order preserve",
         "generates a valid CSR",
-        "rejects a DER operational certificate larger than 600 bytes before parsing",
-        "rejects a DER attestation certificate larger than the PQC limit before parsing"
+        "rejects a DER operational certificate larger than 600 bytes before parsing"
       ],
       "reason": "Ported on the CERTIFICATE_SETS: TLV to TBS DER of NOCs, chain verification without an ICAC, the ICAC fabric-id mismatch, the CAT limits, the ICAC decode, the 400-byte TLV cap, the Mvid/Mpid fallback, PAA parsing and CSR key extraction; missing: Go has no Matter-TLV certificate encoder and no X.509-to-TLV parser for operational certificates (recode, fromAsn1, external, extension and 600-byte cases) (the Google set's X.520 DN attributes and the NOC issuer by authorityKeyIdentifier verify since the owner review of PR #164).",
       "snapshotSha": "eb21fd73fb5c20b830d82dc26bf526478f47996d"
@@ -3529,43 +3529,33 @@
       "go": [
         "controller/attestation:TestPqcAttestationCertificatesAnnexHExamples",
         "controller/attestation:TestPqcAttestationCertificatesParsing",
-        "secure/attestation:TestPqcAttestationCertificatesDeviceCertification"
+        "secure/attestation:TestPqcAttestationCertificatesDeviceCertification",
+        "controller/attestation:TestMlDsa",
+        "controller/attestation:TestPqcAttestationChains",
+        "controller/attestation:TestPqcAttestationFeatureOff"
       ],
       "missing": [
-        "accepts a chain under an ML-DSA PAA and PAI",
-        "creates a ${layout.paa} PAA, a ${layout.pai} PAI and a DAC that verify",
         "creates certificates OpenSSL accepts",
         "does not seed an ML-DSA PAA but seeds the entries after it",
         "does not store an ML-DSA PAA fetched from GitHub",
         "does not store an ML-DSA PAA fetched from the DCL",
-        "does not validate a device chain of a ${layout.pai} PAI under a ${layout.paa} PAA",
         "fetches an ML-DSA PAA from the DCL",
-        "parses ${name} as a ${kind} with a ${keyAlgorithm} key signed with ${signatureAlgorithm}",
         "re-encodes ${name} byte for byte",
         "refuses a chain it cannot serve without segmented responses",
         "refuses a key that does not match the declared signature algorithm",
         "refuses a signature object of another algorithm",
         "refuses to add an ML-DSA PAA",
-        "rejects ${name}",
-        "rejects a ${layout.pai} PAI under a ${layout.paa} PAA",
-        "rejects a PAI the trusted ML-DSA PAA did not sign",
-        "rejects a tampered certificate",
-        "rejects an ML-DSA issuer key for an ECDSA signature",
-        "rejects an ML-DSA key in a DAC",
         "rejects an ML-DSA public key that is not canonical RFC 9881",
         "rejects an ML-DSA signature BIT STRING with unused bits",
         "rejects an ML-DSA signature algorithm with parameters",
         "rejects an ML-DSA signature of the wrong length",
         "rejects an ML-DSA signature that is not a BIT STRING",
-        "rejects an issuer key of another algorithm",
         "rejects differing inner and outer signature algorithms",
         "returns a stored ML-DSA PAA without a recovery re-fetch",
         "seeds an ML-DSA PAA",
-        "serves a stored ML-DSA PAA without trying to repair it",
-        "verifies a PAA's self-signature",
-        "verifies chain link ${index + 1} against its issuer's key"
+        "serves a stored ML-DSA PAA without trying to repair it"
       ],
-      "reason": "Ported: the traditional-certificate refusals (unsupported key algorithm or curve, unsupported signature algorithm, non-OID algorithm and curve, EC key with unused bits, over 600 bytes, an ML-DSA certificate where only traditional ones parse) and the device-side refusal of an unservable ML-DSA-signed DAC; missing: PQC Phase 1 (matter.js forward feature pqc-phase-1) is not implemented in controller/attestation or controller/dcl, and with it off Go refuses ML-DSA certificates by the 600-byte limit instead of classifying them as MlDsaAttestationDisabledError (\"not supported\", logged at DEBUG), and LoadChainFiles takes no product description.",
+      "reason": "PQC Phase 1 in controller/attestation behind the module's forward-feature switch (internal/forward PQCPhase1, off as matter.js's pqc-phase-1, Specification.ts:78-105 at 862ad75f): the Annex H certificates (testdata/pqc-annex-h, PqcAnnexHCertificates.ts verbatim) parse with their key and signature algorithms and verify link by link (VerifyIssuedBy over crypto/mldsa), a tampered certificate, a foreign issuer key and an ML-DSA DAC key are refused, chains under ML-DSA PAAs and PAIs pass Validate and a PAI stronger than its PAA or not signed by it fails (mayIssue); with the feature off every ML-DSA certificate is ErrMLDSAAttestationDisabled; the traditional refusals and the device-side refusal stay as before. Missing: the DER surgery cases of 'parsing' (parameters, unused bits, a non-BIT-STRING, a wrong signature length, a non-canonical key, differing algorithms: the decoding is crypto/x509's, not exercised here), the generation and OpenSSL cases (no ML-DSA certificate generation in the module), the trust-store cases (controller/dcl's ledger and GitHub stores stay traditional) and LoadChainFiles' product description.",
       "snapshotSha": "1975ee1c9e9037e4bb081e4976244e5fd769b6e2"
     },
     {

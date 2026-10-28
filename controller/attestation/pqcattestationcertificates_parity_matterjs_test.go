@@ -7,7 +7,8 @@ package attestation
 // 862ad75f: the traditional-certificate refusals of its "Annex H examples"
 // and "parsing" groups — parseAttCert (Paa/Pai/Dac.fromAsn1 and
 // Certificate.parseAsn1Certificate), P256Key (publicKey) and VerifySignedBy
-// (verifySignature). PQC Phase 1 itself is not ported (see the register).
+// (verifySignature). The PQC Phase 1 cases are
+// pqc_parity_matterjs_test.go's.
 
 import (
 	"bytes"
@@ -18,6 +19,7 @@ import (
 	"encoding/asn1"
 	"encoding/hex"
 	"encoding/pem"
+	"errors"
 	"strings"
 	"testing"
 
@@ -171,15 +173,17 @@ func TestPqcAttestationCertificatesAnnexHExamples(t *testing.T) {
 	})
 	t.Run("rejects ML-DSA certificates where only traditional certificates are allowed", func(t *testing.T) {
 		// Noc.fromAsn1 has no Go counterpart (Go parses no operational
-		// certificate from DER); parseAttCert is the traditional
-		// Certificate.parseAsn1Certificate.
+		// certificate from DER), and the traditional
+		// Certificate.parseAsn1Certificate is the ledger's
+		// (controller/dcl's 600-byte parse). With PQC Phase 1 off — this
+		// test's state — the attestation parser refuses ML-DSA as well.
 		block, _ := pem.Decode([]byte(pqcPaiMlDsa44ByPaaMlDsa44))
 		if block == nil {
 			t.Fatal("Annex H PEM does not decode")
 		}
 		_, err := parseAttCert(block.Bytes, true)
-		if err == nil || !strings.Contains(err.Error(), "600 byte limit") {
-			t.Fatalf("parseAttCert = %v, want the 600 byte limit", err)
+		if !errors.Is(err, ErrMLDSAAttestationDisabled) {
+			t.Fatalf("parseAttCert = %v, want ErrMLDSAAttestationDisabled", err)
 		}
 	})
 }
