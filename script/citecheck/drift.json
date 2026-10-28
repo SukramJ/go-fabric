@@ -2051,7 +2051,7 @@
   },
   {
     "file": "node/config.go",
-    "line": 225,
+    "line": 230,
     "citation": "NetworkServer.ts:202-222",
     "resolved": "packages/node/src/behavior/system/network/NetworkServer.ts",
     "identifier": "network",

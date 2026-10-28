@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 6821,
+  "entry_points": 6896,
   "entry_packages": [
     ".",
     "bdx",
@@ -181,6 +181,7 @@
     "cluster/switch",
     "cluster/thermo",
     "cluster/threadbr",
+    "cluster/tls",
     "cluster/transition",
     "cluster/valve",
     "cluster/wire",
@@ -265,9 +266,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 16539,
-    "reachable": 11685,
-    "whitelisted": 4851,
+    "total_exported": 16610,
+    "reachable": 11742,
+    "whitelisted": 4865,
     "unreachable": 3
   },
   "by_package": [
@@ -7435,6 +7436,13 @@
     },
     {
       "package": "cluster/camera",
+      "identifier": "ICEServer",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/camera/provider.go",
+      "line": 29
+    },
+    {
+      "package": "cluster/camera",
       "identifier": "MPTZ",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/camera/avsettings.go",
@@ -7463,10 +7471,45 @@
     },
     {
       "package": "cluster/camera",
+      "identifier": "OfferArgs",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/camera/provider.go",
+      "line": 33
+    },
+    {
+      "package": "cluster/camera",
       "identifier": "PhysicalMovement",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/camera/avsettings.go",
       "line": 37
+    },
+    {
+      "package": "cluster/camera",
+      "identifier": "ProviderPort",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/camera/provider.go",
+      "line": 31
+    },
+    {
+      "package": "cluster/camera",
+      "identifier": "ProviderSession",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/camera/provider.go",
+      "line": 27
+    },
+    {
+      "package": "cluster/camera",
+      "identifier": "PushFeature",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/camera/pushtransport.go",
+      "line": 28
+    },
+    {
+      "package": "cluster/camera",
+      "identifier": "PushTransportPort",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/camera/pushtransport.go",
+      "line": 34
     },
     {
       "package": "cluster/camera",
@@ -7530,6 +7573,27 @@
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/camera/avstream.go",
       "line": 37
+    },
+    {
+      "package": "cluster/camera",
+      "identifier": "TLSCredentials",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/camera/pushtransport.go",
+      "line": 36
+    },
+    {
+      "package": "cluster/camera",
+      "identifier": "TransportConfiguration",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/camera/pushtransport.go",
+      "line": 30
+    },
+    {
+      "package": "cluster/camera",
+      "identifier": "TransportOptions",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/camera/pushtransport.go",
+      "line": 32
     },
     {
       "package": "cluster/camera",
@@ -21070,6 +21134,41 @@
       "line": 57
     },
     {
+      "package": "cluster/tls",
+      "identifier": "CertificatePort",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/tls/certificates.go",
+      "line": 32
+    },
+    {
+      "package": "cluster/tls",
+      "identifier": "ClientCertificate",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/tls/certificates.go",
+      "line": 30
+    },
+    {
+      "package": "cluster/tls",
+      "identifier": "DependencyChecker",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/tls/certificates.go",
+      "line": 34
+    },
+    {
+      "package": "cluster/tls",
+      "identifier": "Endpoint",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/tls/client.go",
+      "line": 26
+    },
+    {
+      "package": "cluster/tls",
+      "identifier": "RootCertificate",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/tls/certificates.go",
+      "line": 28
+    },
+    {
       "package": "cluster/valve",
       "identifier": "OpenRequest",
       "reason": "auto-whitelist:pattern=type-alias",
@@ -23769,7 +23868,7 @@
       "identifier": "TestEveryKitServerHasItsHostDecided",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/host_methods_test.go",
-      "line": 354
+      "line": 358
     },
     {
       "package": "device",
@@ -23832,7 +23931,7 @@
       "identifier": "TestHostIsTheKitServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/host_methods_test.go",
-      "line": 389
+      "line": 393
     },
     {
       "package": "device",
