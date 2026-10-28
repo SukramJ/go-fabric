@@ -32,10 +32,12 @@ import (
 	"github.com/SukramJ/go-fabric/cluster/onoff"
 	"github.com/SukramJ/go-fabric/cluster/opstate"
 	"github.com/SukramJ/go-fabric/cluster/pump"
+	"github.com/SukramJ/go-fabric/cluster/sensing"
 	"github.com/SukramJ/go-fabric/cluster/servicearea"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	h_login "github.com/SukramJ/go-fabric/cluster/spec/accountlogin"
 	h_acf "github.com/SukramJ/go-fabric/cluster/spec/activatedcarbonfiltermonitoring"
+	h_acs "github.com/SukramJ/go-fabric/cluster/spec/ambientcontextsensing"
 	h_basic "github.com/SukramJ/go-fabric/cluster/spec/applicationbasic"
 	h_launcher "github.com/SukramJ/go-fabric/cluster/spec/applicationlauncher"
 	h_output "github.com/SukramJ/go-fabric/cluster/spec/audiooutput"
@@ -203,6 +205,9 @@ var hostCases = map[uint32]hostCase{
 	h_zm.ClusterID: {kit: kitOf[*camera.Zones](), host: hostOf[h_zm.Host](h_zm.Wrap), covered: []string{"MaxZones", "Sensitivity", "SetSensitivity", "TriggerFor", "TriggerList", "ZoneList"}},
 	h_wp.ClusterID: {kit: kitOf[*camera.Provider](), host: hostOf[h_wp.Host](h_wp.Wrap), covered: []string{"Sessions"}},
 	h_pa.ClusterID: {kit: kitOf[*camera.PushTransport](), host: hostOf[h_pa.Host](h_pa.Wrap), covered: []string{"AttachTLS", "Close", "Connections"}},
+	// AmbientContextSensing (cluster/sensing): HoldTime and
+	// ObjectCountConfig are what Get reads.
+	h_acs.ClusterID: {kit: kitOf[*sensing.AmbientContext](), host: hostOf[h_acs.Host](h_acs.Wrap), covered: []string{"HoldTime", "ObjectCountConfig"}},
 	// The media servers: their event helpers are Emit<Event>'s.
 	h_mp.ClusterID:       {kit: kitOf[*media.PlaybackServer](), covered: []string{"EmitStateChanged"}},
 	h_keypad.ClusterID:   {kit: kitOf[*media.KeypadServer]()},

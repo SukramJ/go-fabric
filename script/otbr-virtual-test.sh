@@ -34,6 +34,7 @@ git -C "$repo" submodule update --init --recursive --depth 1 >"$LOG_DIR/submodul
 (cd "$repo" && PLATFORM=Linux ./script/cmake-build \
 	-DBUILD_TESTING=OFF -DCMAKE_BUILD_TYPE=Debug \
 	-DOTBR_REST=ON -DOTBR_WEB=OFF -DOTBR_BORDER_ROUTING=ON -DOTBR_MDNS=openthread \
+	-DOTBR_VENDOR_NAME=GoFabricTest -DOTBR_PRODUCT_NAME=GoFabricTest \
 	-DOT_POSIX_SETTINGS_PATH='"tmp"' -DOT_FIREWALL=OFF -DOT_LOG_LEVEL=INFO -DOT_TREL=OFF) \
 	>"$LOG_DIR/agent-build.log" 2>&1 || environment "otbr-agent build"
 (cd "$repo/third_party/openthread/repo" && ./script/cmake-build simulation \

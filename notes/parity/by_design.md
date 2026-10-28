@@ -103,6 +103,7 @@ pin lift confirms by re-reading the row, [`pin-lifts.md`](./pin-lifts.md)).
 | BD-Thread-TBRM-ChipLogic | `ThreadBorderRouterManagementServer.ts:14` is the empty subclass (absence: the class line, 14 lines in all) | `packages/node/src/behaviors/thread-border-router-management/ThreadBorderRouterManagementServer.ts` | `"export class ThreadBorderRouterManagementServer extends ThreadBorderRouterManagementBehavior {}"` | connectedhomeip `src/app/clusters/thread-border-router-management-server/ThreadBorderRouterManagementCluster.cpp` at `6170af84` (`ReadAttribute` :32, `InvokeCommand` :148, `OnActivateDatasetComplete` :272, `OnPlatformEventHandler` :297; `ThreadBorderRouterManagementDelegate.h:63-106`), tests `tests/TestThreadBorderRouterManagementCluster.cpp` |
 | BD-Thread-TND-FromBorderRouter | `ThreadNetworkDiagnosticsServer.ts:14` is the empty subclass (absence: the class line, 14 lines in all) | `packages/node/src/behaviors/thread-network-diagnostics/ThreadNetworkDiagnosticsServer.ts` | `"export class ThreadNetworkDiagnosticsServer extends ThreadNetworkDiagnosticsBehavior {}"` | connectedhomeip `src/app/clusters/thread-network-diagnostics-server/DirectThreadNetworkDiagnosticsProvider.cpp` at `6170af84` (`ReadAttribute` :59, the unconfigured nulls :65-92, `RoutingRole` :104-145, the tables :184-293, the counts :325-571, the dataset attributes :577-689), `ThreadNetworkDiagnosticsCluster.cpp` |
 | BD-Thread-NetComm-ThreadVariant | `NetworkCommissioningServer.ts:18` is the empty subclass: no network-type branch, no Thread logic (absence: the class line, 18 lines in all) | `packages/node/src/behaviors/network-commissioning/NetworkCommissioningServer.ts` | `"export class NetworkCommissioningServer extends NetworkCommissioningBehavior {}"` | connectedhomeip `src/app/clusters/network-commissioning/NetworkCommissioningCluster.cpp` at `6170af84` (the Thread paths: `HandleScanNetworks` :349-367, `HandleAddOrUpdateThreadNetwork` :561-587, `OnFinished` :904-928, `ReadAttribute` :1102-1108) over `src/platform/OpenThread/GenericNetworkCommissioningThreadDriver.cpp` |
+| BD-chip-AmbientContextSensing-RulesInServer | `AmbientContextSensingServer.ts:14` is the empty subclass (absence: the class line, 14 lines in all) | `packages/node/src/behaviors/ambient-context-sensing/AmbientContextSensingServer.ts` | `"export class AmbientContextSensingServer extends AmbientContextSensingBehavior {}"` | connectedhomeip `src/app/clusters/ambient-context-sensing-server/AmbientContextSensingCluster.cpp` at `6170af84` (the constructor and `Startup` :48-89, `WriteAttribute` :140-159, `AddDetection` :205-301, `SetObjectCountConfig` :303-367, `SetObjectCount` :369-385, `SetHoldTimeLimits` :438-466, `TimerFired` :498-509, `UpdateDetectionAttributes` :600-646, `CheckPredictedActivity` :844-892; `AmbientContextSensingDelegate.h:78-106`), tests `tests/TestAmbientContextSensingCluster.cpp` |
 
 ---
 
@@ -4852,7 +4853,16 @@ delegate on every read), so an agent id that is not 16 bytes fails
 construction rather than the read; `PanChange` is a feature selection, not
 a port method; and the activation flag is held in memory, not persisted as
 chip's `kFailsafeActiveDatasetConfigured`, so there is no revert after a
-reboot. The fail-safe check is node-wide, as in the Wi-Fi variant. Pinned by
+reboot. The fail-safe check is node-wide, as in the Wi-Fi variant. The
+revert over REST ends with the interface disabled and the dataset left in
+place when the border router answers `DELETE /node/dataset/active` with
+405: ot-br-posix at main registers only GET and PUT on that path
+(`rest_web_server.cpp`, the `RegisterGet`/`RegisterPut` of
+`OT_REST_RESOURCE_PATH_NODE_DATASET_ACTIVE`), matter.js's
+`deleteActiveDataset` (`OtbrRestClient.ts:428-433`) targets a firmware that
+had the route, and chip's empty-dataset attach
+(`GenericThreadBorderRouterDelegate.cpp:191-208`) has no REST equivalent
+(found by the first virtual OTBR run, 2026-10-28). Pinned by
 `management_chip_test.go` (chip's 22 cases) and the `fabrictest` wire tests.
 
 ### BD-Thread-TND-FromBorderRouter — ThreadNetworkDiagnostics served from a border router's diagnostics record
@@ -4886,6 +4896,29 @@ ThreadNetworkDiagnostics and TBRM only, and the device type couples the
 Thread variant to a Secondary Network Interface. A host whose device is
 itself a Thread participant mounts it. Owner decision 2026-10-27.
 
+### BD-chip-AmbientContextSensing-RulesInServer — detections, hold times and the count rules follow connectedhomeip; the kit mounts it only as a host server
+
+matter.js's `AmbientContextSensingServer.ts:14` at `862ad75f` is the empty
+subclass: the generated behaviour derives no detection attribute and
+expires nothing, so a sensor would report a detection forever.
+`cluster/sensing.AmbientContext` follows connectedhomeip's
+`AmbientContextSensingCluster.cpp` at `6170af84`: the constructor and
+Startup (:48-89), the writes of ObjectCountConfig and HoldTime (:140-159),
+`AddDetection` (:205-301), `SetObjectCountConfig` (:303-367),
+`SetObjectCount` (:369-385), `SetHoldTimeLimits` (:438-466), the expiry
+timer (:498-509 with :792-842) and `CheckPredictedActivity` (:844-892);
+chip's delegate (`AmbientContextSensingDelegate.h:78-106`) becomes the
+server's own state and the module's clock, so there is no port. A repeated
+detection keeps chip's hold from the first start (:284; owner decision
+2026-10-28). SensorFusion is not served: the matter.js model
+(`ambient-context-sensing.element.ts:22-29`) has HA, OC, OI, AUD and PRED
+only, and schema values come from matter.js verbatim. No device type at
+the pin lists the cluster as a server (matter.js has it as a thermostat
+client only), so the kit refuses a kit `Declare` for it and a host mounts
+`sensing.NewAmbientContext` as `HostServer` (owner decision 2026-10-28).
+Pinned by `ambient_chip_test.go` (chip's 15 cases, 14 by meaning) and
+`ambient_rules_test.go`.
+
 ### BD-Matter-GeneratedServerSuffices — clusters whose generated server is complete: no source carries behaviour beyond the model
 
 Audit of 2026-10-27 (owner question at the milestone 6 concept; read map
@@ -4900,7 +4933,9 @@ set), or is a milestone 6 wave (concept v10). What remains generated is
 complete by the model alone — no `*Server.ts` logic at the pin (the 14-line
 shell), no chip handler, no chip status beyond UnsupportedAttribute /
 UnsupportedCommand: **WaterTankLevelMonitoring** (0x0079; chip has no server
-at all), **MeterIdentification** (0x0B06), **ElectricalGridConditions**
+at all — `src/app/clusters/water-tank-level-monitoring-server` is absent at
+`6170af84` — and matter.js's `WaterTankLevelMonitoringServer.ts:14` is the
+empty subclass; brief 26-C), **MeterIdentification** (0x0B06), **ElectricalGridConditions**
 (0x00A0; one `Status::Failure` on a read error,
 `electrical-grid-conditions-server.cpp:160`), **FixedLabel**, and the
 attribute-only measurement clusters (Temperature, RelativeHumidity,

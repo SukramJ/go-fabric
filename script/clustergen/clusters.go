@@ -184,6 +184,8 @@ var committed = []string{
 	// (register line 441, brief AX §11).
 	"Groupcast",
 	"WaterTankLevelMonitoring",
+	// cluster/sensing (brief 26-C): AmbientContextSensing after
+	// connectedhomeip.
 	"AmbientContextSensing",
 	// The Joint Fabric clusters (brief CL §1,
 	// owner decision 2026-10-25): served by the generated server as
