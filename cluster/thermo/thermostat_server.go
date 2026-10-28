@@ -82,11 +82,12 @@ const (
 // servedFeatures are the features whose elements the server serves.
 // MatterScheduleConfiguration is served ahead of matter.js ("not
 // implemented yet", ThermostatServer.ts:82 and :126-128 at 862ad75f),
-// after connectedhomeip (schedules.go). ScheduleConfiguration and Setback
-// (deprecated, refused, :120-125), Events and ThermostatSuggestions are
+// after connectedhomeip (schedules.go), and so are the Events feature's
+// events, which matter.js does not emit (events.go). ScheduleConfiguration
+// and Setback (deprecated, refused, :120-125) and ThermostatSuggestions are
 // not.
 const servedFeatures = ThermostatFeatureHEAT | ThermostatFeatureCOOL | ThermostatFeatureAUTO | ThermostatFeatureLTNE |
-	ThermostatFeatureOCC | ThermostatFeaturePRES | ThermostatFeatureMSCH
+	ThermostatFeatureOCC | ThermostatFeaturePRES | ThermostatFeatureMSCH | ThermostatFeatureTEVT
 
 // ErrFeatures reports a ThermostatConfig.Features the server refuses.
 var ErrFeatures = errors.New("thermo: feature selection not served")
@@ -395,6 +396,14 @@ type ThermostatServer struct {
 	hold         uint8
 	holdDuration *uint16
 	runningState uint16
+	// runningMode is ThermostatRunningMode, served with TEVT and AUTO
+	// (ThermostatRunningModeEnum; [ThermostatServer.SetThermostatRunningMode]).
+	runningMode uint8
+	// endpoint is where a host change's events go ([ThermostatServer.SetEndpoint]).
+	endpoint endpointStamp
+	// pendingSetpointEvents are the SetpointChange events commitSetpoints
+	// queued under mu (events.go).
+	pendingSetpointEvents []tdef.SetpointChangeEvent
 
 	// MSCH-gated state (schedules.go): the configuration, the stored
 	// schedules, the active handle and the port.
@@ -451,7 +460,7 @@ func New(cfg ThermostatConfig) (*ThermostatServer, error) {
 	if features&^servedFeatures != 0 {
 		return nil, fmt.Errorf("%w: 0x%X names features the server does not serve", ErrFeatures, features&^servedFeatures)
 	}
-	inst, err := spec.New(tdef.Definition, spec.Options{Features: features, Attributes: servedOptionalFor(cfg, features)})
+	inst, err := spec.New(tdef.Definition, spec.Options{Features: features, Attributes: servedOptionalFor(cfg, features), Events: servedEvents(features)})
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", ErrFeatures, err)
 	}
@@ -545,6 +554,8 @@ func New(cfg ThermostatConfig) (*ThermostatServer, error) {
 	}
 
 	s.systemMode = defaultSystemMode(features)
+	// The initial reconcile is no change a controller hears of.
+	s.pendingSetpointEvents = nil
 	return s, nil
 }
 
@@ -652,10 +663,14 @@ func (s *ThermostatServer) MatterClusterID() uint32 { return ThermostatClusterID
 // nullable). Pass nil to set null (sensor unavailable). The value is
 // stored as given — no range check, no log — and not announced through
 // the change notifier: LocalTemperature is in [ThermostatServer.MatterReportable].
+// With TEVT a changed value emits LocalTemperatureChange (events.go).
 func (s *ThermostatServer) SetLocalTemperature(t *int16) {
 	s.mu.Lock()
+	before := s.eventStateLocked()
 	s.localTemp = t
+	after := s.eventStateLocked()
 	s.mu.Unlock()
+	s.emitChanges(context.Background(), before, after)
 }
 
 // SetSystemMode records a SystemMode the device took on itself: stored and
@@ -671,11 +686,14 @@ func (s *ThermostatServer) SetSystemMode(mode uint8) {
 		return
 	}
 	s.mu.Lock()
+	before := s.eventStateLocked()
 	changed := s.systemMode != mode
 	s.systemMode = mode
+	after := s.eventStateLocked()
 	s.mu.Unlock()
 	if changed {
 		s.changes.NotifyFrom(contract.OriginHostSet, thermoAttrSystemMode)
+		s.emitChanges(context.Background(), before, after)
 	}
 }
 
@@ -713,11 +731,14 @@ func (s *ThermostatServer) SetThermostatRunningState(state uint16) {
 		return
 	}
 	s.mu.Lock()
+	before := s.eventStateLocked()
 	changed := s.runningState != state
 	s.runningState = state
+	after := s.eventStateLocked()
 	s.mu.Unlock()
 	if changed {
 		s.changes.NotifyFrom(contract.OriginHostSet, thermoAttrThermostatRunningState)
+		s.emitChanges(context.Background(), before, after)
 	}
 }
 
@@ -746,6 +767,7 @@ func (s *ThermostatServer) setInboundSetpoint(heat bool, v int16) {
 		return
 	}
 	s.mu.Lock()
+	before := s.eventStateLocked()
 	st := s.setpointState()
 	lo, hi := st.effectiveLimits(heat)
 	n := min(max(int(v), lo), hi)
@@ -759,7 +781,9 @@ func (s *ThermostatServer) setInboundSetpoint(heat bool, v int16) {
 	if err == nil {
 		changed = s.commitSetpoints(st)
 	}
+	after := s.eventStateLocked()
 	s.mu.Unlock()
+	s.emitChanges(context.Background(), before, after)
 	if err != nil {
 		s.logger().Warn("matter.thermostat.inbound_setpoint_ignored",
 			slog.String("attribute", name), slog.Int("value", int(v)), slog.String("reason", err.Error()))
@@ -859,6 +883,8 @@ func (s *ThermostatServer) readLocked(attrID uint32) (any, bool) {
 		return bytes.Clone(s.activePresetHandle), true
 	case tdef.AttrPresets:
 		return spec.List[Preset](clonePresets(s.presets)), true
+	case tdef.AttrThermostatRunningMode:
+		return s.runningMode, true
 	case thermoAttrControlSequenceOfOperation:
 		// Mandatory (M conformance). Derived from the supported modes:
 		// 4=CoolingAndHeating, 2=HeatingOnly, 0=CoolingOnly. The value
@@ -1081,9 +1107,12 @@ func (s *ThermostatServer) writeSystemMode(ctx context.Context, v uint8) error {
 		}
 	}
 	s.mu.Lock()
+	before := s.eventStateLocked()
 	s.systemMode = v
+	after := s.eventStateLocked()
 	s.mu.Unlock()
 	s.changes.NotifyFrom(contract.OriginControllerWrite, thermoAttrSystemMode)
+	s.emitChanges(ctx, before, after)
 	return nil
 }
 
@@ -1182,6 +1211,7 @@ func (s *ThermostatServer) writeSetpoint(ctx context.Context, attrID uint32, v i
 		// inbound setter cannot land in between.
 		changed := s.commitSetpoints(st)
 		s.mu.Unlock()
+		s.flushSetpointEvents(ctx)
 		if !t.limit {
 			s.clearActivePresetOnDirectWrite(ctx, t.unoccu)
 		}
@@ -1230,6 +1260,7 @@ func (s *ThermostatServer) writeSetpoint(ctx context.Context, attrID uint32, v i
 	}
 	changed := s.commitSetpoints(next)
 	s.mu.Unlock()
+	s.flushSetpointEvents(ctx)
 	s.clearActivePresetOnDirectWrite(ctx, t.unoccu)
 	return changed, nil
 }
@@ -1481,19 +1512,23 @@ func (s *ThermostatServer) applyRaiseLower(ctx context.Context, unoccupied bool,
 	s.mu.Lock()
 	changed := make([]uint32, 0, len(moves))
 	for _, m := range moves {
+		dst := &s.unoccHeat
 		switch m.AttrID {
 		case thermoAttrOccupiedCoolingSetpoint:
-			s.occupCool = m.Value
+			dst = &s.occupCool
 		case thermoAttrOccupiedHeatingSetpoint:
-			s.occupHeat = m.Value
+			dst = &s.occupHeat
 		case thermoAttrUnoccupiedCoolingSetpoint:
-			s.unoccCool = m.Value
-		default:
-			s.unoccHeat = m.Value
+			dst = &s.unoccCool
 		}
+		if *dst != m.Value {
+			s.queueSetpointEventLocked(m.AttrID, *dst, m.Value)
+		}
+		*dst = m.Value
 		changed = append(changed, m.AttrID)
 	}
 	s.mu.Unlock()
+	s.flushSetpointEvents(ctx)
 	// What the command moved reaches the listeners from the command, as
 	// applyCommandSetpoints reports it (Datasource.ts:1473-1476).
 	slices.Sort(changed)
@@ -1526,6 +1561,7 @@ func (s *ThermostatServer) applyCommandSetpoints(ctx context.Context, cur, next 
 	s.mu.Lock()
 	changed := s.commitSetpoints(next)
 	s.mu.Unlock()
+	s.flushSetpointEvents(ctx)
 	s.changes.NotifyFrom(contract.OriginCommand, changed...)
 	return nil
 }
@@ -1742,6 +1778,10 @@ func (s *ThermostatServer) MatterReportable() []uint32 {
 // and the optional ones the server serves for it (servedOptional) —
 // chip-tool and Apple Home validate AttributeList conformance.
 func (s *ThermostatServer) MatterAttributes() []uint32 { return s.inst.MatterAttributes() }
+
+// MatterEvents implements [contract.ClusterEventLister]: the TEVT events
+// the selection emits (servedEvents), none without TEVT.
+func (s *ThermostatServer) MatterEvents() []uint32 { return s.inst.MatterEvents() }
 
 // thermoConstraintErr is a typed [im.StatusCodeError] returned when a
 // setpoint or SystemMode write violates limit constraints.

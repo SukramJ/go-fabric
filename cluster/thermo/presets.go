@@ -467,6 +467,7 @@ func (s *ThermostatServer) clearActivePresetOnDirectWrite(ctx context.Context, u
 		s.mu.Unlock()
 		return
 	}
+	previous := s.activePresetHandle
 	s.activePresetHandle = nil
 	presets := s.presets
 	s.mu.Unlock()
@@ -474,6 +475,10 @@ func (s *ThermostatServer) clearActivePresetOnDirectWrite(ctx context.Context, u
 		s.logger().Warn("matter.thermostat.active_preset_not_saved", slog.String("reason", err.Error()))
 	}
 	s.changes.NotifyFrom(contract.OriginFrom(ctx), tdef.AttrActivePresetHandle)
+	// chip clears the active preset after a write of a setpoint in effect
+	// through SetActivePreset(null), which emits ActivePresetChange
+	// (ThermostatCluster.h:215-224, ThermostatClusterPresets.cpp:499).
+	s.emitActivePresetChange(ctx, previous, nil)
 }
 
 // presetRequest normalises the SetActivePresetRequest payload: the bridge
@@ -518,6 +523,7 @@ func (s *ThermostatServer) handleSetActivePresetRequest(ctx context.Context, fie
 	}
 	st := s.setpointState()
 	unoccupied := !s.occupiedLocked()
+	previous := bytes.Clone(s.activePresetHandle)
 	s.mu.RUnlock()
 	if !req.PresetHandle.Null && preset == nil {
 		return spec.Errorf(im.StatusInvalidCommand, "Requested PresetHandle not found")
@@ -550,7 +556,13 @@ func (s *ThermostatServer) handleSetActivePresetRequest(ctx context.Context, fie
 			return err
 		}
 	}
-	return s.storeActiveHandle(ctx, handle)
+	if err := s.storeActiveHandle(ctx, handle); err != nil {
+		return err
+	}
+	// chip's SetActivePreset emits the event on every accepted request,
+	// the unchanged handle included (ThermostatClusterPresets.cpp:461-500).
+	s.emitActivePresetChange(ctx, previous, handle)
+	return nil
 }
 
 // seedPresets is matter.js initialize's preset part

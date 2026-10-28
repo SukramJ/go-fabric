@@ -149,7 +149,8 @@ func (s *ThermostatServer) commitSetpoints(st setpointState) []uint32 {
 	var changed []uint32
 	set := func(dst *int16, v int, id uint32) {
 		if int(*dst) != v {
-			*dst = int16(v) //nolint:gosec // reconciled values stay within the int16 absolute limits
+			s.queueSetpointEventLocked(id, *dst, int16(v)) //nolint:gosec // reconciled values stay within the int16 absolute limits
+			*dst = int16(v)                                //nolint:gosec // reconciled values stay within the int16 absolute limits
 			changed = append(changed, id)
 		}
 	}
