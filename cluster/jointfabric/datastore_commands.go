@@ -57,7 +57,7 @@ func (d *Datastore) commands() map[uint32]spec.CommandHandler {
 			return d.RemoveGroup(ctx, r.GroupId)
 		}),
 		dsdef.CmdAddAdmin: handler("AddAdmin", func(ctx context.Context, r dsdef.AddAdminRequest) error { // :435-465
-			return d.AddAdmin(ctx, AdminEntry{NodeId: r.NodeId, FriendlyName: r.FriendlyName, VendorId: r.VendorId, Icac: r.Icac})
+			return d.AddAdmin(ctx, AdminEntry(r))
 		}),
 		dsdef.CmdUpdateAdmin: handler("UpdateAdmin", func(ctx context.Context, r dsdef.UpdateAdminRequest) error { // :467-489
 			return d.UpdateAdmin(ctx, r.NodeId, r.FriendlyName, r.Icac)

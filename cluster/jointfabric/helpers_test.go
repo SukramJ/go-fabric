@@ -160,7 +160,7 @@ type fakeReach struct {
 	mu      sync.Mutex
 }
 
-func (r *fakeReach) ReadAdministratorFabricIndex(ctx context.Context, _ uint16) (uint8, bool, error) {
+func (r *fakeReach) ReadAdministratorFabricIndex(ctx context.Context, _ uint16) (fabricIndex uint8, null bool, err error) {
 	if r.block {
 		close(r.waiting)
 		<-ctx.Done()

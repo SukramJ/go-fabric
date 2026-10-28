@@ -325,8 +325,8 @@ func (d *Datastore) RemoveAdmin(ctx context.Context, nodeID uint64) error {
 // validPrivilege is a privilege of the enum — connectedhomeip's decoder
 // makes any other kUnknownEnumValue (:1510-1512).
 func validPrivilege(p dsdef.DatastoreAccessControlEntryPrivilegeEnum) bool {
-	for _, v := range dsdef.DatastoreAccessControlEntryPrivilegeEnumDef.Values {
-		if v.Value == uint64(p) {
+	for i := range dsdef.DatastoreAccessControlEntryPrivilegeEnumDef.Values {
+		if dsdef.DatastoreAccessControlEntryPrivilegeEnumDef.Values[i].Value == uint64(p) {
 			return true
 		}
 	}

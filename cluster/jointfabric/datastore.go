@@ -466,8 +466,8 @@ func cloneKeySet(k GroupKeySet) GroupKeySet {
 
 func cloneKeySets(in []GroupKeySet) []GroupKeySet {
 	out := make([]GroupKeySet, len(in))
-	for i, k := range in {
-		out[i] = cloneKeySet(k)
+	for i := range in {
+		out[i] = cloneKeySet(in[i])
 	}
 	return out
 }

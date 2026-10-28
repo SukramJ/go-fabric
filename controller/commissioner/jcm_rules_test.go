@@ -23,6 +23,7 @@ func TestJCMParseRefusals(t *testing.T) {
 	anon := tlv.AnonymousTag()
 	edit := func(f *jfbFabric, path uint32, n func(t *testing.T) spec.Node) func(t *testing.T) error {
 		return func(t *testing.T) error {
+			t.Helper()
 			tr, _ := newTrust(t, &delegate{})
 			r := f.report(t)
 			for i := range r.Attributes {
@@ -36,20 +37,24 @@ func TestJCMParseRefusals(t *testing.T) {
 	f := newJFBFabric(t)
 	cases := map[string]func(t *testing.T) error{
 		"null AdministratorFabricIndex": edit(f, jfadef.AttrAdministratorFabricIndex, func(t *testing.T) spec.Node {
+			t.Helper()
 			return nodeOf(t, func(e *tlv.Encoder) { e.PutNull(anon) })
 		}),
 		"VID Verification Statement": edit(f, opcredsdef.AttrFabrics, func(t *testing.T) spec.Node {
+			t.Helper()
 			st := make([]byte, 85)
 			return nodeOf(t, func(e *tlv.Encoder) {
 				spec.List[opcredsdef.FabricDescriptorStruct]{{RootPublicKey: f.rootPub, VendorId: f.vendorID, FabricId: f.fabricID, FabricIndex: f.index, VidVerificationStatement: &st}}.EncodeTLV(e, anon)
 			})
 		}),
 		"no ICAC": edit(f, opcredsdef.AttrNocs, func(t *testing.T) spec.Node {
+			t.Helper()
 			n := opcredsdef.NOCStruct{Noc: f.noc, FabricIndex: f.index}
 			n.Icac.Null = true
 			return nodeOf(t, func(e *tlv.Encoder) { spec.List[opcredsdef.NOCStruct]{n}.EncodeTLV(e, anon) })
 		}),
 		"another root": edit(f, opcredsdef.AttrTrustedRootCertificates, func(t *testing.T) spec.Node {
+			t.Helper()
 			other := newJFBFabric(t)
 			return nodeOf(t, func(e *tlv.Encoder) { e.StartArray(anon); e.PutOctets(anon, other.rcac); _ = e.EndContainer() })
 		}),

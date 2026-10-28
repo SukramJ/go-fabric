@@ -133,7 +133,8 @@ func (t *jcmTrust) parse(r *interaction.Report) error {
 // AdministratorFabricIndex is set; a null or undefined one refuses
 // (ParseAdminFabricIndexAndEndpointId :87-136).
 func (t *jcmTrust) parseAdminFabricIndexAndEndpointID(r *interaction.Report) error {
-	for _, a := range r.Attributes {
+	for i := range r.Attributes {
+		a := &r.Attributes[i]
 		if a.Path.Cluster != jfadef.ClusterID || a.Path.Attribute != jfadef.AttrAdministratorFabricIndex {
 			continue
 		}
@@ -280,8 +281,9 @@ func nextJCMStage(s jcm.Stage) jcm.Stage {
 		return jcm.StageAskingUserForConsent
 	case jcm.StageAskingUserForConsent:
 		return jcm.StageComplete
+	default:
+		return jcm.StageError
 	}
-	return jcm.StageError
 }
 
 // performStage is PerformTrustVerificationStage (:443-474).
@@ -296,8 +298,9 @@ func (t *jcmTrust) performStage(ctx context.Context, s jcm.Stage) {
 			return t.askUserForConsent()
 		case jcm.StageComplete:
 			return jcm.Success
+		default:
+			return jcm.InternalError
 		}
-		return jcm.InternalError
 	})
 }
 
@@ -312,7 +315,7 @@ func (t *jcmTrust) verifyAdministratorInformation() jcm.Result {
 		return jcm.InvalidAdministratorFabricIndex
 	}
 	noc, err := mattercert.Decode(t.info.AdminNOC) // :383-390
-	if err != nil || !slices.ContainsFunc(noc.Subject.CASEAuthTags, func(c uint32) bool { return uint16(c>>16) == adminCATIdentifier }) {
+	if err != nil || !slices.ContainsFunc(noc.Subject.CASEAuthTags, func(c uint32) bool { return c>>16 == uint32(adminCATIdentifier) }) {
 		return jcm.InvalidAdministratorCAT
 	}
 	return jcm.Success

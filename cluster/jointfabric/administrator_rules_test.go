@@ -7,6 +7,7 @@
 package jointfabric
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"testing"
@@ -250,7 +251,7 @@ func TestAnchorOnCommissioningComplete(t *testing.T) {
 	if got := fx.a.administratorFabricIndex(); got != 4 {
 		t.Fatalf("AdministratorFabricIndex %d", got)
 	}
-	if d.AnchorFabricIndex() != 4 || d.AnchorNodeID() != anchor.nodeID || d.AnchorVendorID() != anchor.vendorID || string(d.AnchorRootCA()) != string(anchor.rcac) {
+	if d.AnchorFabricIndex() != 4 || d.AnchorNodeID() != anchor.nodeID || d.AnchorVendorID() != anchor.vendorID || !bytes.Equal(d.AnchorRootCA(), anchor.rcac) {
 		t.Fatalf("anchor %d %#x %#x", d.AnchorFabricIndex(), d.AnchorNodeID(), d.AnchorVendorID())
 	}
 	mustOK(t, d.AddPendingNode(ctx, 9, "n"))

@@ -36,7 +36,7 @@ type jfbDevice struct {
 	noAdmin   bool
 }
 
-func (d *jfbDevice) handle(req imRequest) (uint8, []byte, bool) {
+func (d *jfbDevice) handle(req imRequest) (opcode uint8, payload []byte, ok bool) {
 	switch req.opcode {
 	case im.OpcodeReadRequest:
 		noc := opcredsdef.NOCStruct{Noc: d.f.noc, FabricIndex: d.f.index}
@@ -111,12 +111,12 @@ func TestJointFabricStep(t *testing.T) {
 		var asked TrustInfo
 		fl.opts.JointFabric = &JointFabricOptions{Consent: func(info TrustInfo) bool { asked = info; return c.consent }}
 		_, err := fl.jointFabricTrustVerification(t.Context())
-		switch {
-		case c.want == jcm.Success:
+		switch c.want {
+		case jcm.Success:
 			if err != nil || asked.AdminVendorID != f.vendorID {
 				t.Errorf("%s: %v, asked %+v", c.name, err, asked)
 			}
-		case c.want == 0xFFFF:
+		case 0xFFFF:
 			if !errors.Is(err, ErrJointFabric) || !errors.Is(err, errJCMParse) {
 				t.Errorf("%s: %v", c.name, err)
 			}
@@ -131,7 +131,7 @@ func TestJointFabricStep(t *testing.T) {
 	fl.opts.JointFabric = &JointFabricOptions{}
 	fl.initializeSteps()
 	fl.sortSteps()
-	var names []string
+	names := make([]string, 0, len(fl.steps))
 	for _, s := range fl.steps {
 		names = append(names, s.name)
 	}

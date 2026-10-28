@@ -294,7 +294,8 @@ func (d *Datastore) syncKeySets(ctx context.Context) {
 	}
 	var removals []removal
 	d.mu.Lock()
-	for _, ks := range d.t.GroupKeySets { // :771-784
+	for i := range d.t.GroupKeySets { // :771-784
+		ks := &d.t.GroupKeySets[i]
 		for _, e := range d.t.NodeKeySets {
 			if e.GroupKeySetId == ks.GroupKeySetId && e.StatusEntry.State == stateDeletePending {
 				removals = append(removals, removal{e.NodeId, e.GroupKeySetId})
@@ -311,20 +312,21 @@ func (d *Datastore) syncKeySets(ctx context.Context) {
 	}
 	var pushes []keyPush
 	d.commit(ctx, func() {
-		for _, ks := range d.t.GroupKeySets { // :826-913
+		for i := range d.t.GroupKeySets { // :826-913
+			ks := &d.t.GroupKeySets[i]
 			d.t.NodeKeySets = slices.DeleteFunc(d.t.NodeKeySets, func(e NodeKeySetEntry) bool {
 				return e.GroupKeySetId == ks.GroupKeySetId && e.StatusEntry.State == stateCommitFailed && permanent(e.StatusEntry.FailureCode)
 			})
 			for _, e := range d.t.NodeKeySets {
 				if e.GroupKeySetId == ks.GroupKeySetId && (e.StatusEntry.State == statePending || e.StatusEntry.State == stateCommitFailed) {
-					pushes = append(pushes, keyPush{e.NodeId, cloneKeySet(ks)})
+					pushes = append(pushes, keyPush{e.NodeId, cloneKeySet(*ks)})
 				}
 			}
 		}
 		d.markLocked(dsdef.AttrNodeKeySetList)
 	})
-	for _, p := range pushes {
-		_ = d.pushKeySet(p.node, p.ks)(ctx)
+	for i := range pushes {
+		_ = d.pushKeySet(pushes[i].node, pushes[i].ks)(ctx)
 	}
 }
 

@@ -278,7 +278,7 @@ func nocCATs(noc []byte) []uint32 {
 
 // hasCATIdentifier is CATValues::ContainsIdentifier (CASEAuthTag.h:158-169).
 func hasCATIdentifier(cats []uint32, identifier uint16) bool {
-	return slices.ContainsFunc(cats, func(c uint32) bool { return uint16(c>>16) == identifier })
+	return slices.ContainsFunc(cats, func(c uint32) bool { return c>>16 == uint32(identifier) })
 }
 
 // PeerAdministratorEndpoint returns the announcing commissioner's

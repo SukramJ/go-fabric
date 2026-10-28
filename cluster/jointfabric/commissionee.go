@@ -92,8 +92,9 @@ func nextCommissioneeStage(s jcm.Stage) jcm.Stage {
 		return jcm.StageCrossCheckingAdministratorIDs
 	case jcm.StageCrossCheckingAdministratorIDs:
 		return jcm.StageComplete
+	default:
+		return jcm.StageError
 	}
-	return jcm.StageError
 }
 
 // performStage is PerformTrustVerificationStage (:120-151).
@@ -113,8 +114,9 @@ func (c *commissionee) performStage(ctx context.Context, stage jcm.Stage) {
 			return c.crossCheckAdministratorIDs(ctx)
 		case jcm.StageComplete:
 			return jcm.Success
+		default:
+			return jcm.InternalError
 		}
-		return jcm.InternalError
 	})
 }
 

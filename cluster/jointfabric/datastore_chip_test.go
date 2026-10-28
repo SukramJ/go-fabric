@@ -150,9 +150,9 @@ func (s *trackingSync) FetchACLList(context.Context, uint64) ([]ACLEntry, error)
 	return nil, nil
 }
 
-func newStore(t *testing.T, sync DatastoreSync) *Datastore {
+func newStore(t *testing.T, port DatastoreSync) *Datastore {
 	t.Helper()
-	d, err := NewDatastore(t.Context(), DatastoreConfig{Sync: sync})
+	d, err := NewDatastore(t.Context(), DatastoreConfig{Sync: port})
 	if err != nil {
 		t.Fatal(err)
 	}

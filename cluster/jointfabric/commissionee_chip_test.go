@@ -11,6 +11,7 @@
 package jointfabric
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"slices"
@@ -65,7 +66,8 @@ func TestNextStageFollowsExpectedOrder(t *testing.T) {
 func TestSuccessfulProgressionAdvancesAllStages(t *testing.T) {
 	p := newProgression(t, 2)
 	p.c.start(t.Context())
-	want := []jcm.Stage{jcm.StageStoringEndpointID}
+	want := make([]jcm.Stage, 0, 5)
+	want = append(want, jcm.StageStoringEndpointID)
 	for _, s := range []jcm.Stage{jcm.StageStoringEndpointID, jcm.StageReadingCommissionerAdminFabricIndex, jcm.StagePerformingVendorIDVerification, jcm.StageCrossCheckingAdministratorIDs} {
 		if !slices.Equal(p.stages, want) {
 			t.Fatalf("stages %v, want %v", p.stages, want)
@@ -142,7 +144,7 @@ func TestReadAdminFabricsPopulatesCommissionerInfo(t *testing.T) {
 	if err := c.readAdminFabrics(t.Context()); err != nil {
 		t.Fatal(err)
 	}
-	if c.info.AdminFabricID != fx.f.fabricID || c.info.AdminVendorID != fx.f.vendorID || string(c.info.RootPublicKey) != string(fx.f.rootPub) {
+	if c.info.AdminFabricID != fx.f.fabricID || c.info.AdminVendorID != fx.f.vendorID || !bytes.Equal(c.info.RootPublicKey, fx.f.rootPub) {
 		t.Fatalf("info %+v", c.info)
 	}
 	c.info.AdminFabricIndex = 9
@@ -159,7 +161,7 @@ func TestReadAdminCertsPopulatesCommissionerRcac(t *testing.T) {
 	if err := c.readAdminCerts(t.Context()); err != nil {
 		t.Fatal(err)
 	}
-	if string(c.info.AdminRCAC) != string(fx.f.rcac) {
+	if !bytes.Equal(c.info.AdminRCAC, fx.f.rcac) {
 		t.Fatal("RCAC not taken")
 	}
 	c.info.RootPublicKey = newJFFabric(t, 1).rootPub
@@ -176,7 +178,7 @@ func TestReadAdminNOCsPopulatesCommissionerCerts(t *testing.T) {
 	if err := c.readAdminNOCs(t.Context()); err != nil {
 		t.Fatal(err)
 	}
-	if string(c.info.AdminNOC) != string(fx.f.noc) || string(c.info.AdminICAC) != string(fx.f.icac) {
+	if !bytes.Equal(c.info.AdminNOC, fx.f.noc) || !bytes.Equal(c.info.AdminICAC, fx.f.icac) {
 		t.Fatal("NOC and ICAC not taken")
 	}
 }

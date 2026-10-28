@@ -399,11 +399,11 @@ type memStore struct {
 	m  map[string]string
 }
 
-func (m *memStore) GetSetting(_ context.Context, key string) (string, bool, error) {
+func (m *memStore) GetSetting(_ context.Context, key string) (value string, ok bool, err error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	v, ok := m.m[key]
-	return v, ok, nil
+	value, ok = m.m[key]
+	return value, ok, nil
 }
 
 func (m *memStore) SetSetting(_ context.Context, key, value string) error {
