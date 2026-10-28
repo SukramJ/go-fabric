@@ -39,6 +39,7 @@ import (
 	washerdef "github.com/SukramJ/go-fabric/cluster/spec/laundrywashercontrols"
 	lvldef "github.com/SukramJ/go-fabric/cluster/spec/levelcontrol"
 	onoffdef "github.com/SukramJ/go-fabric/cluster/spec/onoff"
+	padef "github.com/SukramJ/go-fabric/cluster/spec/pushavstreamtransport"
 	rfadef "github.com/SukramJ/go-fabric/cluster/spec/refrigeratoralarm"
 	switchdef "github.com/SukramJ/go-fabric/cluster/spec/switchcluster"
 	tadef "github.com/SukramJ/go-fabric/cluster/spec/temperaturealarm"
@@ -175,8 +176,10 @@ var selfHeldDefaults = map[uint32]serverFactory{
 // coupledLast are the defaults built after the device's other servers,
 // because they couple to them: LevelControl follows OnOff and moves
 // ColorControl's colour temperature; ThreadNetworkDiagnostics reads the
-// ThreadBorderRouterManagement server's border router.
-var coupledLast = []uint32{lvldef.ClusterID, tnddef.ClusterID}
+// ThreadBorderRouterManagement server's border router;
+// PushAvStreamTransport validates against CameraAvStreamManagement and
+// ZoneManagement.
+var coupledLast = []uint32{lvldef.ClusterID, tnddef.ClusterID, padef.ClusterID}
 
 // buildOrder returns the indexes of reqs in the order their defaults are
 // built: the type's order, the coupled clusters last.

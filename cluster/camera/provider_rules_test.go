@@ -94,7 +94,7 @@ func TestSolicitOfferRules(t *testing.T) {
 		{"long policy", nil, solicit(usage, func(r *wpdef.SolicitOfferRequest) { r.IceTransportPolicy = str(17) }), true, im.StatusConstraintError},      // :636-643
 		{"hard privacy", func(f *fakeStreams) { f.hard = true }, solicit(usage), true, im.StatusInvalidInState},                                          // :413
 		{"soft livestream privacy", func(f *fakeStreams) { f.softLive = true }, solicit(usage), true, im.StatusInvalidInState},                           // :427
-		{"soft recording privacy", func(f *fakeStreams) { f.softRec = true }, solicit(wpdef.StreamUsageRecording), true, im.StatusInvalidInState},                         // :441
+		{"soft recording privacy", func(f *fakeStreams) { f.softRec = true }, solicit(wpdef.StreamUsageRecording), true, im.StatusInvalidInState},        // :441
 		{"usage not prioritised", nil, solicit(wpdef.StreamUsageAnalysis), true, im.StatusDynamicConstraintError},                                        // :654-659
 		{"lists and ids", nil, solicit(usage, func(r *wpdef.SolicitOfferRequest) { r.VideoStreams = &[]uint16{1} }), true, im.StatusInvalidCommand},      // :663-668
 		{"null id without streams", func(f *fakeStreams) { f.videos = nil }, solicit(usage), true, im.StatusInvalidInState},                              // :517
