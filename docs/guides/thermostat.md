@@ -18,7 +18,8 @@ programs (MatterScheduleConfiguration) add a second port, the
 | Presets (PRES) | yes | presets and the atomic write, persisted through a `PresetStore` |
 | MatterScheduleConfiguration (MSCH) | yes | ahead of matter.js ("not implemented yet"), after connectedhomeip; see [Week programs](#week-programs-msch) |
 | ScheduleConfiguration, Setback | no | deprecated; matter.js refuses them |
-| Events (TEVT), ThermostatSuggestions | no | |
+| Events (TEVT) | yes | ahead of matter.js, after connectedhomeip; see [Events](#events-tevt) |
+| ThermostatSuggestions | no | |
 
 `thermo.New` refuses a selection naming a feature it does not serve
 (`thermo.ErrFeatures`).
@@ -100,9 +101,36 @@ schedule clears the active handle.
   INVALID_IN_STATE.
 - Only when every check passes does the commit hand the list to the port.
 
-`SetActiveScheduleRequest` emits no `ActiveScheduleChange` event. The
-event belongs to the Events feature (TEVT), which the server does not
-serve.
+With the Events feature (TEVT), `SetActiveScheduleRequest` emits
+`ActiveScheduleChange` with the previous and the new handle.
+
+
+## Events (TEVT)
+
+matter.js's server emits none of the cluster's eight events. The server
+follows connectedhomeip (`ThermostatClusterEvents.cpp` and its call sites
+at `6170af84`): every event needs TEVT, and the EventList carries the
+events of the selection (LocalTemperatureChange without LTNE,
+OccupancyChange with OCC, RunningModeChange with AUTO,
+ActiveScheduleChange with MSCH, ActivePresetChange with PRES).
+
+| Event | Emitted when | Payload |
+| --- | --- | --- |
+| SystemModeChange | SystemMode changes (a write, `SetSystemMode`, `SetAttributes`) | the previous and the current mode |
+| LocalTemperatureChange | LocalTemperature changes (`SetLocalTemperature`, `SetAttributes`) | the current value, null included |
+| SetpointChange | one of the four occupied and unoccupied setpoints changes, by a write, a command, a host setter or a companion the deadband moves | Heat or Cool, Occupied or no occupancy, the previous and the current setpoint; a user limit emits none |
+| RunningStateChange | ThermostatRunningState changes | the previous and the current relays |
+| RunningModeChange | ThermostatRunningMode changes (`SetThermostatRunningMode`) | the previous and the current mode |
+| ActiveScheduleChange | `SetActiveScheduleRequest` succeeds | the previous and the new handle |
+| ActivePresetChange | `SetActivePresetRequest` succeeds (the same handle again included), or a write of a setpoint in effect clears the active preset | the previous and the new handle |
+| OccupancyChange | never: connectedhomeip does not emit it | |
+
+With TEVT and AUTO the server serves `ThermostatRunningMode` (0x001E),
+which the selection makes mandatory. The host sets it with
+`SetThermostatRunningMode`: Off always, Cool with COOL, Heat with HEAT,
+anything else `ConstraintError`, as chip's `SetRunningMode` does. The
+events of a host change go to the endpoint the bridge stamped
+(`SetEndpoint`); a command's go to its endpoint.
 
 **Ecosystems.** Hosts gate MSCH behind a flag, off by default, until a
 live pairing is verified. From issue #273, verbatim:

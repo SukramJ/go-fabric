@@ -427,11 +427,6 @@ Device side:
   fail-safe when the PASE session that armed it is closed by the peer
   before CommissioningComplete (`common/FailsafeContext.ts:77-86`).
   Crosses `secure/channel` and `bridge`. (Milestone 3.)
-- **The operational advertisement carries the module's SII/SAI defaults,
-  not the node's session parameters.** `mdns/service.go:293-302`; matter.js
-  reads the session manager's parameters, or an ICD provider's
-  (`protocol/DeviceAdvertiser.ts:363-364`). (Milestone 5 phase 23, with the
-  ICD server.)
 - **Session parameters: a local MaxPathsPerInvoke of 0 is not refused and
   an oversized wire value is masked.** `secure/sessionparams/sessionparams.go:182`
   keeps the low 16 bits; matter.js refuses the local value
@@ -453,34 +448,16 @@ Controller side:
   (ClientInvokeTest, 39 cases `missing`). Owner decision 2026-10-27
   (concept v10, 0.1): implemented after matter.js in wave 27-A, with the 39
   cases ported. (Milestone 6 phase 27.)
-- **TimeSynchronization serves the UTC part only.** chip's
-  `TimeSynchronizationCluster.cpp` at `6170af84` gates TimeZone, DSTOffset,
-  the NTP attributes and the trusted time source on the TZ, NTPC, NTPS and
-  TSC features (`:104-159`, `:221-237`) and handles `SetUTCTime`,
-  `SetTrustedTimeSource`, `SetTimeZone` and `SetDSTOffset` (`:1036-1051`);
-  matter.js's server is the shell. `cluster/core/time_synchronization.go`
-  serves FeatureMap 0 (`BD-Matter-TimeSync-NoUTCFeature`). Owner decision
-  2026-10-27: implemented after chip behind a host port in milestone 6 wave
-  27-B, with an Ahead-of-matter.js register row. (Milestone 6 phase 27.)
-- **AirQuality accepts a host value whose feature is off.** chip refuses a
-  value whose enum member needs an unset feature (Fair, Moderate, VeryPoor,
-  ExtremelyPoor: `AirQualityCluster.cpp:66-74` at `6170af84`,
-  CONSTRAINT_ERROR); the Go projection in `cluster/measurement` stores what
-  the host gives. Part of the host-value conformance check named under
-  "field conformance on the host's own values" (phase 21d); owner decision
-  2026-10-27: milestone 6 wave 27-B. (Milestone 6 phase 27.)
-- **The device-side BDX responder takes no per-transfer MRP delay.**
-  `TransferOptions.AdditionalMrpDelay` (matter.js `bdxAdditionalMrpDelay`)
-  is computed by the update manager but `node`'s BDX responder has no port
-  for it. (Milestone 6 phase 27.)
 - **The controller's discovery has no `Discovery` / `ParallelPaseDiscovery`
   shape** — a scanner set, parallel PASE attempts, cancellation and error
   kinds (ContinuousDiscoveryTest, DiscoveryCancelTest, DiscoveryErrorTest,
   DiscoveryTransportsTest; register `until M6 phase 27`). (Milestone 6 phase 27.)
-- **Reported session parameters on the device** have no configuration
-  (`node.Config` session intervals) and no accessor for what the controller
-  sent (ReportedSessionParametersTest; register `until M6 phase 27`).
-  (Milestone 6 phase 27.)
+- **Reported session parameters on the device**: the node's own intervals
+  are configurable since wave 27-B (`node.Config.Sessions`,
+  `Node.SessionParameters`), but the device's sessions have no accessor for
+  what the controller sent (ReportedSessionParametersTest; register `until
+  M6 phase 27`): `secure/operational.Entry` stores the peer's intervals
+  (`SetPeerMRPIntervals`) without a getter. (Milestone 6 phase 27.)
 - **A whitespace-only `issuer_name` in an installed revocation set matches
   every issuer.** `controller/dcl/revocation.go:688-701` decodes it to no
   issuer and `:166-173` then matches any; matter.js keeps the empty hex

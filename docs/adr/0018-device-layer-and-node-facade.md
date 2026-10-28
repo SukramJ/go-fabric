@@ -177,6 +177,23 @@ decision names what it mirrors and what it leaves for later.
    the daemon. The chip-tool suite and the certification families decide
    the migration, run locally (Linux, Docker) in this wave.
 
+### Addendum 2026-10-28: composite device types (wave 27-B)
+
+Concept v10 0.5 takes VideoDoorbell and FloodlightCamera in; CastingVideoClient
+stays excluded. A composite is a device type whose requirements are device
+types only. `script/devicegen` generates its constructor with one
+parameter per mandatory component (`NewVideoDoorbell(opts, camera,
+doorbell, decls...)`), which adds each as a part (`AddPart`), and an
+accessor per component. matter.js counts a simple component only on an
+endpoint below the composite (`DeviceTypeConformance.ts:596-613` at
+`862ad75f`, candidatesOf; only a utility device type counts on the
+composing endpoint), and its corpus test pins the missing components as
+"component endpoints are the developer's to add"
+(`StandardDeviceTypeCorpusTest.ts:310`, `:328-358`). So the rule that an
+endpoint carries one device type in the kit does not change: the
+composite and each component are endpoints of their own, the components
+the composite's parts.
+
 ## Consequences
 
 - A device type the host wants is one constructor call; the cluster set,

@@ -36,7 +36,16 @@ jfa, err := device.NewJointFabricAdministrator(opts,
 ```
 
 The node gives the Administrator its fabric table, its commissioning
-window and its fail-safe when the endpoint joins the topology. It tells
+window and its fail-safe when the endpoint joins the topology. With
+`node.Config.Client` on, it also gives an Administrator whose declaration
+names no `CommissionerReach` its own: the node opens a CASE session to the
+peer that invoked AnnounceJointFabricAdministrator (the `jfadef.Peer`
+every method takes: the invoking session's fabric index and node id),
+reads its AdministratorFabricIndex, Fabrics, TrustedRootCertificates and
+NOCs unfiltered, and sends it SignVIDVerificationRequest with that
+session's attestation challenge. The announcing node must grant this node
+Administer on that fabric; a refused read answers the announcement
+FAILURE. A host's own reach goes into the declaration as before. It tells
 both servers about a fabric's removal. When the Joint Fabric is removed,
 the datastore is wiped.
 
@@ -134,6 +143,3 @@ uses the administrator and anchor CATs without `JointFabric`.
 
 - chip's endpoint-scoped `SyncNode(nodeId, endpointId, bindings)` overload
   is not in the port; the datastore never calls it.
-- The commissionee's `CommissionerReach` has no node adapter yet. The host
-  reads the commissioner itself, for example through the node's client
-  stack.

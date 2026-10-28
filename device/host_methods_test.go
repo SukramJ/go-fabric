@@ -218,7 +218,7 @@ var hostCases = map[uint32]hostCase{
 		"GroupKeySetList", "GroupList", "NodeACLList", "NodeEndpointList", "NodeKeySetList", "NodeList", "OnFabricRemoved", "Status",
 	}},
 	h_jfa.ClusterID: {kit: kitOf[*jointfabric.Administrator](), host: hostOf[h_jfa.Host](h_jfa.Wrap), covered: []string{
-		"AttachFailSafe", "AttachNode", "OnCommissioningComplete", "OnFabricRemoved", "OnFailSafeExpired",
+		"AttachCommissionerReach", "AttachFailSafe", "AttachNode", "OnCommissioningComplete", "OnFabricRemoved", "OnFailSafeExpired",
 	}},
 	h_acs.ClusterID: {kit: kitOf[*sensing.AmbientContext](), host: hostOf[h_acs.Host](h_acs.Wrap), covered: []string{"HoldTime", "ObjectCountConfig"}},
 	// The media servers: their event helpers are Emit<Event>'s.
