@@ -221,9 +221,25 @@ type initiatedSecureExchange struct {
 	// cause is why the exchange ended when it did not end by Close: the
 	// reliable tracker gave up on a message it sent (fail).
 	cause atomic.Pointer[error]
+	// peerMargin (nanoseconds) is the additional MRP delay of every
+	// message this exchange sends ([initiatedSecureExchange.SetPeerAdditionalMrpDelay]).
+	peerMargin atomic.Int64
 }
 
-var _ bdx.Exchange = (*initiatedSecureExchange)(nil)
+// SetPeerAdditionalMrpDelay sets the margin every later message of the
+// exchange adds to the peer's MRP base interval before the backoff
+// amplifies it. Mirrors matter.js MessageExchange.peerAdditionalMrpDelay
+// (MessageExchange.ts:352-363 at 862ad75f), the setter for an exchange the
+// peer initiated, which BdxProtocol.onNewExchange calls
+// (BdxProtocol.ts:139-142). It implements [bdx.MrpDelayExchange].
+func (e *initiatedSecureExchange) SetPeerAdditionalMrpDelay(d time.Duration) {
+	e.peerMargin.Store(int64(max(d, 0)))
+}
+
+var (
+	_ bdx.Exchange         = (*initiatedSecureExchange)(nil)
+	_ bdx.MrpDelayExchange = (*initiatedSecureExchange)(nil)
+)
 
 // fail ends the exchange because a message it sent was never
 // acknowledged: a pending Receive and every later Send return err.
@@ -462,7 +478,7 @@ func (e *initiatedSecureExchange) Send(_ context.Context, protocolID uint16, opc
 	}
 	datagram := append(hdr.Marshal(), enc.Ciphertext...) //nolint:gocritic // single-allocation join
 	if tracker != nil {
-		tracker.Track(hdr.MessageCounter, e.sessionID, e.exchangeID, datagram, dest, e.b.clk().Now())
+		tracker.TrackWithMargin(hdr.MessageCounter, e.sessionID, e.exchangeID, datagram, dest, e.b.clk().Now(), time.Duration(e.peerMargin.Load()))
 	}
 	if err := sendVia(listener, dest, datagram); err != nil {
 		if tracker != nil {

@@ -59,6 +59,16 @@ type Limits struct {
 	// (mattercore.DefaultMaxGroupKeysPerFabric,
 	// GroupKeyManagementServer.ts:609). Bound: 1 to 65535.
 	MaxGroupKeysPerFabric uint16
+	// BDXAdditionalMrpDelay is the margin the node adds to a peer's MRP
+	// base interval on the exchange of every inbound BDX transfer its BDX
+	// responder accepts (an OTA requestor's image download); the backoff
+	// amplifies it. Mirrors matter.js LimitsConfig.bdxAdditionalMrpDelay
+	// (NetworkServer.ts:152-153 at 862ad75f), the BDX class of the network
+	// profile's MRP margins (NetworkProfile.ts:156-159), applied as the
+	// exchange's peerAdditionalMrpDelay (BdxProtocol.ts:139-142). 0 adds
+	// none. Bound: not negative (SoftwareUpdateManager.ts:60-67,
+	// assertTransferOptions).
+	BDXAdditionalMrpDelay time.Duration
 }
 
 // Access-control capacity bounds (Matter, access-control.element.ts:38-49
@@ -78,6 +88,9 @@ func (l Limits) validate() []error {
 		if v < time.Second || v > ceiling || v%time.Second != 0 {
 			errs = append(errs, fmt.Errorf("node: Limits.SubscriptionMaxInterval %v is not whole seconds from 1s to %v", v, ceiling))
 		}
+	}
+	if l.BDXAdditionalMrpDelay < 0 {
+		errs = append(errs, fmt.Errorf("node: Limits.BDXAdditionalMrpDelay %v is negative", l.BDXAdditionalMrpDelay))
 	}
 	for _, f := range []struct {
 		name     string

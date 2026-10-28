@@ -116,6 +116,7 @@ func TestLimitsValidate(t *testing.T) {
 		"AccessControlEntriesPerFabric": {AccessControlEntriesPerFabric: 3},
 		"SubjectsPerAccessControlEntry": {SubjectsPerAccessControlEntry: 65535},
 		"TargetsPerAccessControlEntry":  {TargetsPerAccessControlEntry: 2},
+		"BDXAdditionalMrpDelay":         {BDXAdditionalMrpDelay: -time.Millisecond},
 	} {
 		cfg := minimalConfig(openDB(t, filepath.Join(t.TempDir(), "node.db")))
 		cfg.Limits = limits
