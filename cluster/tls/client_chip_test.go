@@ -14,6 +14,7 @@ package tls_test
 import (
 	"bytes"
 	"context"
+	"errors"
 	"slices"
 	"testing"
 
@@ -47,14 +48,14 @@ func provisionRequest(caid uint16) tcldef.ProvisionEndpointRequest {
 
 func provisionEndpoint(t *testing.T, m *tls.ClientManagement, req tcldef.ProvisionEndpointRequest) uint16 {
 	t.Helper()
-	resp, err := invoke[tcldef.ProvisionEndpointResponse](t, m, peer(testFabric), tcldef.CmdProvisionEndpoint, req)
+	resp, err := invoke[tcldef.ProvisionEndpointResponse](peer(testFabric), t, m, tcldef.CmdProvisionEndpoint, req)
 	wantStatus(t, "ProvisionEndpoint", err, im.StatusSuccess)
 	return resp.EndpointId
 }
 
 func clusterCode(err error) (uint8, bool) {
-	cs, ok := err.(im.MatterClusterStatusError)
-	if !ok {
+	var cs im.MatterClusterStatusError
+	if !errors.As(err, &cs) {
 		return 0, false
 	}
 	return cs.MatterClusterStatus(), true
@@ -166,7 +167,7 @@ func TestFindEndpointSuccess(t *testing.T) {
 	m, _, roots := newClient(t)
 	req := provisionRequest(roots[0])
 	id := provisionEndpoint(t, m, req)
-	resp, err := invoke[tcldef.FindEndpointResponse](t, m, peer(testFabric), tcldef.CmdFindEndpoint, tcldef.FindEndpointRequest{EndpointId: id})
+	resp, err := invoke[tcldef.FindEndpointResponse](peer(testFabric), t, m, tcldef.CmdFindEndpoint, tcldef.FindEndpointRequest{EndpointId: id})
 	wantStatus(t, "FindEndpoint", err, im.StatusSuccess)
 	if resp.Endpoint.EndpointId != id || !bytes.Equal(resp.Endpoint.Hostname, req.Hostname) {
 		t.Fatalf("FindEndpointResponse %+v", resp)

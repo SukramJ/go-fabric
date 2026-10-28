@@ -14,6 +14,7 @@ package camera_test
 
 import (
 	"context"
+	"errors"
 	"sync"
 	"testing"
 
@@ -209,8 +210,8 @@ func allocatePush(t *testing.T, p *camera.PushTransport, o padef.TransportOption
 }
 
 func pushCluster(err error) (uint8, bool) {
-	cs, ok := err.(im.MatterClusterStatusError)
-	if !ok {
+	var cs im.MatterClusterStatusError
+	if !errors.As(err, &cs) {
 		return 0, false
 	}
 	return cs.MatterClusterStatus(), true

@@ -32,7 +32,7 @@ func (f *fakeStreams) VideoStreams() []camera.VideoStream          { return f.vi
 func (f *fakeStreams) AudioStreams() []camera.AudioStream          { return f.audios }
 func (f *fakeStreams) StreamUsagePriorities() []camera.StreamUsage { return f.priorities }
 func (f *fakeStreams) SupportedStreamUsages() []camera.StreamUsage { return f.supported }
-func (f *fakeStreams) PrivacyModes() (bool, bool, bool)            { return f.hard, f.softRec, f.softLive }
+func (f *fakeStreams) PrivacyModes() (hard, rec, live bool)        { return f.hard, f.softRec, f.softLive }
 
 const (
 	liveView  = csdef.StreamUsageLiveView

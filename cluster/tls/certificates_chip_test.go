@@ -52,16 +52,16 @@ type mockKeys struct {
 	csrs    int
 }
 
-func (m *mockKeys) GenerateCSR(_ context.Context, _ uint8, _ uint16, _ bool, _ []byte) ([]byte, []byte, error) {
+func (m *mockKeys) GenerateCSR(_ context.Context, _ uint8, _ uint16, _ bool, _ []byte) (csr, sig []byte, err error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if m.csrErr != nil {
 		return nil, nil, m.csrErr
 	}
 	m.csrs++
-	csr := make([]byte, 32)
+	csr = make([]byte, 32)
 	csr[0], csr[1], csr[2] = 1, 2, 3
-	sig := make([]byte, 32)
+	sig = make([]byte, 32)
 	sig[0], sig[1], sig[2] = 4, 5, 6
 	return csr, sig, nil
 }
@@ -83,11 +83,11 @@ func (m *mockKeys) RemoveClientKey(_ context.Context, _ uint8, ccdid uint16) {
 // testCertificate is chip's GenerateTestCertificate (:46-70): a
 // self-signed certificate valid from the CHIP epoch on, with a serial
 // that makes each one distinct.
-func testCertificate(t testing.TB, serial int64) []byte {
-	t.Helper()
+func testCertificate(tb testing.TB, serial int64) []byte {
+	tb.Helper()
 	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
-		t.Fatal(err)
+		tb.Fatal(err)
 	}
 	tmpl := &x509.Certificate{
 		SerialNumber: big.NewInt(serial),
@@ -97,7 +97,7 @@ func testCertificate(t testing.TB, serial int64) []byte {
 	}
 	der, err := x509.CreateCertificate(rand.Reader, tmpl, tmpl, &key.PublicKey, key)
 	if err != nil {
-		t.Fatal(err)
+		tb.Fatal(err)
 	}
 	return der
 }
@@ -151,9 +151,9 @@ func readAs[T any](t *testing.T, read func(uint32) (any, bool), attrID uint32) T
 	return got
 }
 
-func invoke[R any](t *testing.T, c interface {
+func invoke[R any](ctx context.Context, t *testing.T, c interface {
 	MatterInvoke(context.Context, uint32, any) (any, error)
-}, ctx context.Context, cmd uint32, req any,
+}, cmd uint32, req any,
 ) (R, error) {
 	t.Helper()
 	resp, err := c.MatterInvoke(ctx, cmd, req)
@@ -169,7 +169,7 @@ func invoke[R any](t *testing.T, c interface {
 
 func provisionRoot(t *testing.T, c *tls.CertificateManagement, cert []byte) uint16 {
 	t.Helper()
-	resp, err := invoke[tcmdef.ProvisionRootCertificateResponse](t, c, peer(testFabric), tcmdef.CmdProvisionRootCertificate,
+	resp, err := invoke[tcmdef.ProvisionRootCertificateResponse](peer(testFabric), t, c, tcmdef.CmdProvisionRootCertificate,
 		tcmdef.ProvisionRootCertificateRequest{Certificate: cert, Caid: spec.NullOf[uint16]()})
 	wantStatus(t, "ProvisionRootCertificate", err, im.StatusSuccess)
 	return resp.Caid
@@ -179,7 +179,7 @@ func clientCSR(t *testing.T, c *tls.CertificateManagement) tcmdef.ClientCsrRespo
 	t.Helper()
 	nonce := make([]byte, 32)
 	nonce[0], nonce[1], nonce[2] = 1, 2, 3
-	resp, err := invoke[tcmdef.ClientCsrResponse](t, c, peer(testFabric), tcmdef.CmdClientCsr,
+	resp, err := invoke[tcmdef.ClientCsrResponse](peer(testFabric), t, c, tcmdef.CmdClientCsr,
 		tcmdef.ClientCsrRequest{Nonce: nonce, Ccdid: spec.NullOf[uint16]()})
 	wantStatus(t, "ClientCSR", err, im.StatusSuccess)
 	return resp
@@ -252,7 +252,7 @@ func TestFindRootCertificateSuccess(t *testing.T) {
 	c, _ := newCerts(t)
 	cert := testCertificate(t, 1)
 	caid := provisionRoot(t, c, cert)
-	resp, err := invoke[tcmdef.FindRootCertificateResponse](t, c, peer(testFabric), tcmdef.CmdFindRootCertificate,
+	resp, err := invoke[tcmdef.FindRootCertificateResponse](peer(testFabric), t, c, tcmdef.CmdFindRootCertificate,
 		tcmdef.FindRootCertificateRequest{Caid: spec.ValueOf(caid)})
 	wantStatus(t, "FindRootCertificate", err, im.StatusSuccess)
 	if len(resp.CertificateDetails) != 1 || resp.CertificateDetails[0].Caid != caid || !bytes.Equal(*resp.CertificateDetails[0].Certificate, cert) {
@@ -317,7 +317,7 @@ func TestFindClientCertificateSuccess(t *testing.T) {
 	_, err := c.MatterInvoke(peer(testFabric), tcmdef.CmdProvisionClientCertificate,
 		tcmdef.ProvisionClientCertificateRequest{Ccdid: ccdid, ClientCertificate: cert, IntermediateCertificates: [][]byte{}})
 	wantStatus(t, "ProvisionClientCertificate", err, im.StatusSuccess)
-	resp, err := invoke[tcmdef.FindClientCertificateResponse](t, c, peer(testFabric), tcmdef.CmdFindClientCertificate,
+	resp, err := invoke[tcmdef.FindClientCertificateResponse](peer(testFabric), t, c, tcmdef.CmdFindClientCertificate,
 		tcmdef.FindClientCertificateRequest{Ccdid: spec.ValueOf(ccdid)})
 	wantStatus(t, "FindClientCertificate", err, im.StatusSuccess)
 	if len(resp.CertificateDetails) != 1 || resp.CertificateDetails[0].Ccdid != ccdid ||

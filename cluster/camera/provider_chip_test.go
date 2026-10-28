@@ -44,7 +44,7 @@ func (m *mockProvider) session(args camera.OfferArgs) camera.ProviderSession {
 	return s
 }
 
-func (m *mockProvider) SolicitOffer(_ context.Context, args camera.OfferArgs) (camera.ProviderSession, bool, error) {
+func (m *mockProvider) SolicitOffer(_ context.Context, args camera.OfferArgs) (session camera.ProviderSession, deferred bool, err error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if m.err != nil {

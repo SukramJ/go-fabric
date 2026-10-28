@@ -384,45 +384,7 @@ func (p *PushTransport) validateStreams(o TransportOptions) (TransportOptions, e
 		return out, pushf(im.StatusInvalidCommand, "no stream")
 	}
 	if hasNew {
-		videoNames := map[string]bool{}
-		count := 0
-		if o.VideoStreams != nil {
-			ids := map[uint16]bool{}
-			for _, s := range *o.VideoStreams {
-				videoNames[s.VideoStreamName], ids[s.VideoStreamId] = true, true
-			}
-			if len(videoNames) != len(*o.VideoStreams) || len(ids) != len(*o.VideoStreams) { // :706-713
-				return out, pushErr(padef.StatusCodeDuplicateStreamValues, "a duplicate video stream name or id")
-			}
-			for _, s := range *o.VideoStreams {
-				if _, ok := p.view.video(s.VideoStreamId); !ok { // :718-723, SetVideoStream
-					return out, pushf(im.StatusInvalidCommand, "video stream %d is not allocated", s.VideoStreamId)
-				}
-			}
-			count += len(*o.VideoStreams)
-		}
-		if o.AudioStreams != nil {
-			names, ids := map[string]bool{}, map[uint16]bool{}
-			for _, s := range *o.AudioStreams {
-				names[s.AudioStreamName], ids[s.AudioStreamId] = true, true
-			}
-			if len(names) != len(*o.AudioStreams) || len(ids) != len(*o.AudioStreams) { // :743-750
-				return out, pushErr(padef.StatusCodeDuplicateStreamValues, "a duplicate audio stream name or id")
-			}
-			for _, s := range *o.AudioStreams {
-				if videoNames[s.AudioStreamName] { // :756-764
-					return out, pushErr(padef.StatusCodeInvalidStream, "audio stream name %q is a video stream's", s.AudioStreamName)
-				}
-				if _, ok := p.view.audio(s.AudioStreamId); !ok { // :766-771, SetAudioStream
-					return out, pushf(im.StatusInvalidCommand, "audio stream %d is not allocated", s.AudioStreamId)
-				}
-			}
-			count += len(*o.AudioStreams)
-		}
-		if count == 0 { // :776-781
-			return out, pushErr(padef.StatusCodeInvalidStream, "no stream")
-		}
-		return out, nil
+		return out, p.validateStreamLists(o)
 	}
 	if o.VideoStreamId != nil {
 		id, err := p.oldStream(o.StreamUsage, *o.VideoStreamId, true)
@@ -443,6 +405,51 @@ func (p *PushTransport) validateStreams(o TransportOptions) (TransportOptions, e
 		out.AudioStreams = &[]padef.AudioStreamStruct{{AudioStreamName: "audio", AudioStreamId: id}} // :866-872
 	}
 	return out, nil
+}
+
+// validateStreamLists is the list part of ValidateStreamParameters
+// (:686-782): no duplicate names or ids, the lists' streams allocated, an
+// audio name no video stream's, one stream at least.
+func (p *PushTransport) validateStreamLists(o TransportOptions) error {
+	videoNames := map[string]bool{}
+	count := 0
+	if o.VideoStreams != nil {
+		ids := map[uint16]bool{}
+		for _, s := range *o.VideoStreams {
+			videoNames[s.VideoStreamName], ids[s.VideoStreamId] = true, true
+		}
+		if len(videoNames) != len(*o.VideoStreams) || len(ids) != len(*o.VideoStreams) { // :706-713
+			return pushErr(padef.StatusCodeDuplicateStreamValues, "a duplicate video stream name or id")
+		}
+		for _, s := range *o.VideoStreams {
+			if !p.view.allocated(s.VideoStreamId, true) { // :718-723, SetVideoStream
+				return pushf(im.StatusInvalidCommand, "video stream %d is not allocated", s.VideoStreamId)
+			}
+		}
+		count += len(*o.VideoStreams)
+	}
+	if o.AudioStreams != nil {
+		names, ids := map[string]bool{}, map[uint16]bool{}
+		for _, s := range *o.AudioStreams {
+			names[s.AudioStreamName], ids[s.AudioStreamId] = true, true
+		}
+		if len(names) != len(*o.AudioStreams) || len(ids) != len(*o.AudioStreams) { // :743-750
+			return pushErr(padef.StatusCodeDuplicateStreamValues, "a duplicate audio stream name or id")
+		}
+		for _, s := range *o.AudioStreams {
+			if videoNames[s.AudioStreamName] { // :756-764
+				return pushErr(padef.StatusCodeInvalidStream, "audio stream name %q is a video stream's", s.AudioStreamName)
+			}
+			if !p.view.allocated(s.AudioStreamId, false) { // :766-771, SetAudioStream
+				return pushf(im.StatusInvalidCommand, "audio stream %d is not allocated", s.AudioStreamId)
+			}
+		}
+		count += len(*o.AudioStreams)
+	}
+	if count == 0 { // :776-781
+		return pushErr(padef.StatusCodeInvalidStream, "no stream")
+	}
+	return nil
 }
 
 // oldStream resolves a deprecated stream id: null is the camera app's
@@ -468,13 +475,7 @@ func (p *PushTransport) oldStream(usage padef.StreamUsageEnum, id spec.Nullable[
 		}
 		return 0, pushf(im.StatusInvalidInState, "no allocated stream of StreamUsage %d", usage)
 	}
-	ok := false
-	if video {
-		_, ok = p.view.video(id.Value)
-	} else {
-		_, ok = p.view.audio(id.Value)
-	}
-	if !ok {
+	if !p.view.allocated(id.Value, video) {
 		return 0, pushErr(padef.StatusCodeInvalidStream, "stream %d is not allocated", id.Value)
 	}
 	return id.Value, nil
@@ -658,7 +659,7 @@ func (p *PushTransport) allocate(ctx context.Context, fields any) (any, error) {
 	p.mu.Lock()
 	p.conns = append(p.conns, conn)
 	if o.ExpiryTime != nil { // :1213-1217
-		p.scheduleLocked(id, *o.ExpiryTime)
+		p.scheduleLocked(ctx, id, *o.ExpiryTime)
 	}
 	p.mu.Unlock()
 	p.publish()
@@ -689,17 +690,17 @@ func (p *PushTransport) generateID() (uint16, bool) {
 // scheduleLocked arms the expiry of a connection. chip's
 // ScheduleTransportDeallocate (:357-385) takes ExpiryTime as the seconds
 // until the deallocation (:1216); the timer runs on the server's clock.
-func (p *PushTransport) scheduleLocked(id uint16, seconds uint32) {
+func (p *PushTransport) scheduleLocked(ctx context.Context, id uint16, seconds uint32) {
 	if t, ok := p.timers[id]; ok {
 		t.Stop()
 	}
-	p.timers[id] = p.clock.AfterFunc(time.Duration(seconds)*time.Second, func() { p.expire(id) })
+	p.timers[id] = p.clock.AfterFunc(time.Duration(seconds)*time.Second, func() { p.expire(context.WithoutCancel(ctx), id) })
 }
 
 // expire is chip's PushAVStreamTransportDeallocateCallback (:262-292):
 // the port deallocates, and on success the connection leaves.
-func (p *PushTransport) expire(id uint16) {
-	if err := p.port.DeallocatePushTransport(context.Background(), id); err != nil {
+func (p *PushTransport) expire(ctx context.Context, id uint16) {
+	if err := p.port.DeallocatePushTransport(ctx, id); err != nil {
 		return
 	}
 	p.remove(id)

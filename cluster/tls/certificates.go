@@ -128,7 +128,7 @@ func NewCertificateManagement(ctx context.Context, cfg CertificateManagementConf
 		port: cfg.Port, store: cfg.Store, key: settingCertificates + cfg.Key, cfg: cfg, checker: cfg.Checker,
 		roots: idAllocator{maxID: MaxCertificateID}, clients: idAllocator{maxID: MaxCertificateID},
 	}
-	if _, err := load(ctx, cfg.Store, c.key, &c.rec); err != nil {
+	if err := load(ctx, cfg.Store, c.key, &c.rec); err != nil {
 		return nil, err
 	}
 	c.roots.next, c.clients.next = c.rec.NextRoot, c.rec.NextClient
@@ -264,10 +264,10 @@ func accessingFabric(ctx context.Context) uint8 {
 	return fabric
 }
 
-func requestOf[T any](fields any, cluster, name string) (T, error) {
+func requestOf[T any](fields any, clusterName, name string) (T, error) {
 	req, ok := spec.RequestOf[T](fields)
 	if !ok {
-		return req, spec.Errorf(im.StatusInvalidCommand, "%s: %s payload %T", cluster, name, fields)
+		return req, spec.Errorf(im.StatusInvalidCommand, "%s: %s payload %T", clusterName, name, fields)
 	}
 	return req, nil
 }

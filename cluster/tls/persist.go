@@ -72,22 +72,23 @@ type endpointEntry struct {
 	ReferenceCount uint8   `json:"referenceCount"`
 }
 
-// load reads the record under key into v; false when none was saved.
-func load(ctx context.Context, s Store, key string, v any) (bool, error) {
+// load reads the record under key into v; v stays as it is when none was
+// saved.
+func load(ctx context.Context, s Store, key string, v any) error {
 	if s == nil {
-		return false, nil
+		return nil
 	}
 	raw, ok, err := s.GetSetting(ctx, key)
 	if err != nil {
-		return false, fmt.Errorf("%w: load %s: %w", ErrStore, key, err)
+		return fmt.Errorf("%w: load %s: %w", ErrStore, key, err)
 	}
 	if !ok {
-		return false, nil
+		return nil
 	}
 	if err := json.Unmarshal([]byte(raw), v); err != nil {
-		return false, fmt.Errorf("%w: decode %s: %w", ErrStore, key, err)
+		return fmt.Errorf("%w: decode %s: %w", ErrStore, key, err)
 	}
-	return true, nil
+	return nil
 }
 
 // save writes v under key.

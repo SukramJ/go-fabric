@@ -7,6 +7,7 @@
 package tls_test
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"errors"
@@ -27,11 +28,11 @@ type mapStore struct {
 	failSet bool
 }
 
-func (s *mapStore) GetSetting(_ context.Context, key string) (string, bool, error) {
+func (s *mapStore) GetSetting(_ context.Context, key string) (value string, ok bool, err error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	v, ok := s.m[key]
-	return v, ok, nil
+	value, ok = s.m[key]
+	return value, ok, nil
 }
 
 func (s *mapStore) SetSetting(_ context.Context, key, value string) error {
@@ -89,9 +90,9 @@ func TestProvisionRootRules(t *testing.T) {
 	wantStatus(t, "invalid", err, im.StatusDynamicConstraintError)
 	// An update replaces the entry under its CAID.
 	next := testCertificate(t, 4)
-	resp, err := invoke[tcmdef.ProvisionRootCertificateResponse](t, c, ctx, tcmdef.CmdProvisionRootCertificate, req(next, spec.ValueOf(caid)))
+	resp, err := invoke[tcmdef.ProvisionRootCertificateResponse](ctx, t, c, tcmdef.CmdProvisionRootCertificate, req(next, spec.ValueOf(caid)))
 	wantStatus(t, "update", err, im.StatusSuccess)
-	if got, _ := c.RootCertificate(testFabric, caid); resp.Caid != caid || string(*got.Certificate) != string(next) {
+	if got, _ := c.RootCertificate(testFabric, caid); resp.Caid != caid || !bytes.Equal(*got.Certificate, next) {
 		t.Fatalf("update: CAID %d", resp.Caid)
 	}
 	for i := int64(10); i < 14; i++ {
@@ -100,7 +101,7 @@ func TestProvisionRootRules(t *testing.T) {
 	_, err = c.MatterInvoke(ctx, tcmdef.CmdProvisionRootCertificate, req(testCertificate(t, 20), spec.NullOf[uint16]())) // :251
 	wantStatus(t, "capacity", err, im.StatusResourceExhausted)
 	// The capacity is per fabric; the ids are the node's.
-	resp, err = invoke[tcmdef.ProvisionRootCertificateResponse](t, c, peer(otherFabric), tcmdef.CmdProvisionRootCertificate, req(cert, spec.NullOf[uint16]()))
+	resp, err = invoke[tcmdef.ProvisionRootCertificateResponse](peer(otherFabric), t, c, tcmdef.CmdProvisionRootCertificate, req(cert, spec.NullOf[uint16]()))
 	wantStatus(t, "other fabric", err, im.StatusSuccess)
 	if resp.Caid != 5 {
 		t.Fatalf("other fabric's CAID %d, want 5", resp.Caid)
@@ -113,7 +114,7 @@ func TestLookupAndFindRules(t *testing.T) {
 	cert := testCertificate(t, 1)
 	caid := provisionRoot(t, c, cert)
 	sum := sha256.Sum256(cert)
-	resp, err := invoke[tcmdef.LookupRootCertificateResponse](t, c, ctx, tcmdef.CmdLookupRootCertificate, tcmdef.LookupRootCertificateRequest{Fingerprint: sum[:]})
+	resp, err := invoke[tcmdef.LookupRootCertificateResponse](ctx, t, c, tcmdef.CmdLookupRootCertificate, tcmdef.LookupRootCertificateRequest{Fingerprint: sum[:]})
 	wantStatus(t, "lookup", err, im.StatusSuccess)
 	if resp.Caid != caid {
 		t.Fatalf("lookup CAID %d", resp.Caid)
@@ -124,7 +125,7 @@ func TestLookupAndFindRules(t *testing.T) {
 	wantStatus(t, "unknown fingerprint", err, im.StatusNotFound)
 	_, err = c.MatterInvoke(peer(otherFabric), tcmdef.CmdLookupRootCertificate, tcmdef.LookupRootCertificateRequest{Fingerprint: sum[:]})
 	wantStatus(t, "other fabric's lookup", err, im.StatusNotFound)
-	all, err := invoke[tcmdef.FindRootCertificateResponse](t, c, ctx, tcmdef.CmdFindRootCertificate, tcmdef.FindRootCertificateRequest{Caid: spec.NullOf[uint16]()})
+	all, err := invoke[tcmdef.FindRootCertificateResponse](ctx, t, c, tcmdef.CmdFindRootCertificate, tcmdef.FindRootCertificateRequest{Caid: spec.NullOf[uint16]()})
 	wantStatus(t, "find all", err, im.StatusSuccess)
 	if len(all.CertificateDetails) != 1 {
 		t.Fatalf("find all %+v", all)
@@ -152,7 +153,7 @@ func TestClientCSRRules(t *testing.T) {
 	wantStatus(t, "unknown CCDID", err, im.StatusFailure)
 	first := clientCSR(t, c).Ccdid
 	// A CSR of an existing CCDID adds no entry.
-	resp, err := invoke[tcmdef.ClientCsrResponse](t, c, ctx, tcmdef.CmdClientCsr, tcmdef.ClientCsrRequest{Nonce: make([]byte, 32), Ccdid: spec.ValueOf(first)})
+	resp, err := invoke[tcmdef.ClientCsrResponse](ctx, t, c, tcmdef.CmdClientCsr, tcmdef.ClientCsrRequest{Nonce: make([]byte, 32), Ccdid: spec.ValueOf(first)})
 	wantStatus(t, "renew", err, im.StatusSuccess)
 	if resp.Ccdid != first || len(readAs[[]tcmdef.TLSClientCertificateDetailStruct](t, c.MatterRead, tcmdef.AttrProvisionedClientCertificates)) != 1 {
 		t.Fatalf("renew %+v", resp)
@@ -212,7 +213,7 @@ func TestProvisionClientRules(t *testing.T) {
 	_, err = c.MatterInvoke(ctx, tcmdef.CmdProvisionClientCertificate, req(cert, nil)) // :450
 	wantStatus(t, "duplicate", err, im.StatusAlreadyExists)
 	sum := sha256.Sum256(cert)
-	resp, err := invoke[tcmdef.LookupClientCertificateResponse](t, c, ctx, tcmdef.CmdLookupClientCertificate, tcmdef.LookupClientCertificateRequest{Fingerprint: sum[:]})
+	resp, err := invoke[tcmdef.LookupClientCertificateResponse](ctx, t, c, tcmdef.CmdLookupClientCertificate, tcmdef.LookupClientCertificateRequest{Fingerprint: sum[:]})
 	wantStatus(t, "lookup", err, im.StatusSuccess)
 	if resp.Ccdid != ccdid {
 		t.Fatalf("lookup CCDID %d", resp.Ccdid)
@@ -282,7 +283,7 @@ func TestProvisionEndpointRules(t *testing.T) {
 	wantStatus(t, "in use", err, im.StatusInvalidInState)
 	// An update keeps the id and resets the count (instance :315-321).
 	upd.EndpointId = spec.ValueOf(id)
-	resp, err := invoke[tcldef.ProvisionEndpointResponse](t, m, ctx, tcldef.CmdProvisionEndpoint, upd)
+	resp, err := invoke[tcldef.ProvisionEndpointResponse](ctx, t, m, tcldef.CmdProvisionEndpoint, upd)
 	wantStatus(t, "update", err, im.StatusSuccess)
 	if e, _ := m.ProvisionedEndpoint(testFabric, id); resp.EndpointId != id || e.ReferenceCount != 0 || e.Port != 8443 {
 		t.Fatalf("update %+v", e)

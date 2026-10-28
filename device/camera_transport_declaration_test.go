@@ -5,6 +5,7 @@ package device_test
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/SukramJ/go-fabric/cluster/camera"
@@ -78,7 +79,8 @@ func peerContext() context.Context {
 }
 
 func codeOf(err error) im.StatusCode {
-	if sc, ok := err.(im.StatusCodeError); ok {
+	var sc im.StatusCodeError
+	if errors.As(err, &sc) {
 		return sc.MatterStatusCode()
 	}
 	if err == nil {

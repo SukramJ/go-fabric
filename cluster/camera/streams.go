@@ -98,14 +98,14 @@ func (v streamView) video(id uint16) (VideoStream, bool) {
 	return VideoStream{}, false
 }
 
-// audio returns the allocated audio stream of the id (:237-253).
-func (v streamView) audio(id uint16) (AudioStream, bool) {
-	for _, s := range v.audios() {
-		if s.AudioStreamId == id {
-			return s, true
-		}
+// allocated reports whether a video (ValidateVideoStreamID, :219-235) or
+// audio stream (ValidateAudioStreamID, :237-253) of the id is allocated.
+func (v streamView) allocated(id uint16, video bool) bool {
+	if video {
+		_, ok := v.video(id)
+		return ok
 	}
-	return AudioStream{}, false
+	return slices.ContainsFunc(v.audios(), func(s AudioStream) bool { return s.AudioStreamId == id })
 }
 
 // autoSelect is the stream manager's ValidateStreamUsage selection

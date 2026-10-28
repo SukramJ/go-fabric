@@ -29,8 +29,8 @@ type Endpoint = tcldef.TLSEndpointStruct
 // TLSClientManagementCluster.h:35).
 const (
 	MaxEndpointID     uint16 = 65534
-	MinHostnameLength        = 4
-	MaxHostnameLength        = 253
+	MinHostnameLength int    = 4
+	MaxHostnameLength int    = 253
 )
 
 // Configuration errors.
@@ -123,7 +123,7 @@ func NewClientManagement(ctx context.Context, cfg ClientManagementConfig) (*Clie
 		return nil, fmt.Errorf("%w: MaxProvisioned %d", ErrClientConfig, cfg.MaxProvisioned)
 	}
 	m := &ClientManagement{certs: cfg.Certificates, store: cfg.Store, key: settingEndpoints + cfg.Key, cfg: cfg, ids: idAllocator{maxID: 0xFFFF}}
-	if _, err := load(ctx, cfg.Store, m.key, &m.rec); err != nil {
+	if err := load(ctx, cfg.Store, m.key, &m.rec); err != nil {
 		return nil, err
 	}
 	m.ids.next = m.rec.Next
@@ -230,7 +230,7 @@ func (m *ClientManagement) MutateEndpointReferenceCount(fabricIndex uint8, endpo
 			m.mu.Unlock()
 			return ErrReferenceCount
 		}
-		e.ReferenceCount = uint8(int(e.ReferenceCount) + int(delta))
+		e.ReferenceCount = uint8(int(e.ReferenceCount) + int(delta)) //nolint:gosec // 0..255, checked above
 	} else {
 		e.ReferenceCount = 0 // :426
 	}

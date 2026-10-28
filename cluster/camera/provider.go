@@ -269,7 +269,7 @@ func (p *Provider) streamID(id *spec.Nullable[uint16], video bool) (*[]uint16, e
 	if id == nil {
 		return nil, nil
 	}
-	kind, has, known := "audio", len(p.view.audios()) > 0, false
+	kind, has := "audio", len(p.view.audios()) > 0
 	if video {
 		kind, has = "video", len(p.view.videos()) > 0
 	}
@@ -279,12 +279,7 @@ func (p *Provider) streamID(id *spec.Nullable[uint16], video bool) (*[]uint16, e
 		}
 		return &[]uint16{}, nil
 	}
-	if video {
-		_, known = p.view.video(id.Value)
-	} else {
-		_, known = p.view.audio(id.Value)
-	}
-	if !known { // :531
+	if !p.view.allocated(id.Value, video) { // :531
 		return nil, spec.Errorf(im.StatusDynamicConstraintError, "WebRtcTransportProvider: %s stream %d is not allocated", kind, id.Value)
 	}
 	return &[]uint16{id.Value}, nil
@@ -312,13 +307,7 @@ func (p *Provider) streamList(in *[]uint16, video bool, out *[]uint16) (*[]uint1
 		seen[id] = true
 	}
 	for _, id := range *in {
-		known := false
-		if video {
-			_, known = p.view.video(id)
-		} else {
-			_, known = p.view.audio(id)
-		}
-		if !known { // :587
+		if !p.view.allocated(id, video) { // :587
 			return nil, spec.Errorf(im.StatusDynamicConstraintError, "WebRtcTransportProvider: %s stream %d is not allocated", kind, id)
 		}
 	}
