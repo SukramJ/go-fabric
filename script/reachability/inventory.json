@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 6916,
+  "entry_points": 6918,
   "entry_packages": [
     ".",
     "bdx",
@@ -221,6 +221,7 @@
     "internal/chipdm",
     "internal/chiptool",
     "internal/clockvar",
+    "internal/forward",
     "internal/inflight",
     "internal/paritytest",
     "internal/serialqueue",
@@ -23364,7 +23365,7 @@
       "identifier": "TestDclVendorInfoServiceSeedParity",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/dcl/vendorinfo_parity_matterjs_test.go",
-      "line": 403
+      "line": 405
     },
     {
       "package": "controller/dcl",
