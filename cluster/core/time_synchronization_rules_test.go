@@ -11,6 +11,7 @@ package core_test
 
 import (
 	"context"
+	"errors"
 	"slices"
 	"strings"
 	"testing"
@@ -345,5 +346,43 @@ func TestTimeSyncRefusesAnUnknownFeature(t *testing.T) {
 	t.Parallel()
 	if _, err := core.NewTimeSynchronizationWith(core.TimeSynchronizationConfig{Features: 1 << 7}); err == nil {
 		t.Fatal("an unknown feature bit was accepted")
+	}
+}
+
+// SetUTCTime answers chip's statuses (TimeSynchronizationCluster.cpp:
+// 1110-1136): INVALID_COMMAND for a granularity or a time source outside
+// its enum, TimeNotAccepted for NoTimeGranularity and for one coarser than
+// the node's MillisecondsGranularity, SUCCESS otherwise; the clock stays.
+func TestTimeSyncSetUTCTimeStatuses(t *testing.T) {
+	t.Parallel()
+	bad := tsdef.TimeSourceEnum(17)
+	gnss := tsdef.TimeSourceGnss
+	for label, tc := range map[string]struct {
+		req         tsdef.SetUtcTimeRequest
+		want        im.StatusCode
+		notAccepted bool
+	}{
+		"milliseconds":        {tsdef.SetUtcTimeRequest{Granularity: tsdef.GranularityMillisecondsGranularity}, im.StatusSuccess, false},
+		"microseconds, gnss":  {tsdef.SetUtcTimeRequest{Granularity: tsdef.GranularityMicrosecondsGranularity, TimeSource: &gnss}, im.StatusSuccess, false},
+		"granularity 5":       {tsdef.SetUtcTimeRequest{Granularity: 5}, im.StatusInvalidCommand, false},
+		"time source 17":      {tsdef.SetUtcTimeRequest{Granularity: tsdef.GranularityMillisecondsGranularity, TimeSource: &bad}, im.StatusInvalidCommand, false},
+		"seconds is coarser":  {tsdef.SetUtcTimeRequest{Granularity: tsdef.GranularitySecondsGranularity}, im.StatusFailure, true},
+		"minutes is coarser":  {tsdef.SetUtcTimeRequest{Granularity: tsdef.GranularityMinutesGranularity}, im.StatusFailure, true},
+		"no time granularity": {tsdef.SetUtcTimeRequest{Granularity: tsdef.GranularityNoTimeGranularity}, im.StatusFailure, true},
+	} {
+		srv, _, _ := tsServer(t, core.TimeSynchronizationConfig{})
+		before, _ := srv.UTC()
+		_, err := srv.MatterInvoke(context.Background(), tsdef.CmdSetUtcTime, tc.req)
+		if got := tsStatus(err); got != tc.want {
+			t.Errorf("%s: %v, want %v", label, err, tc.want)
+			continue
+		}
+		var cs interface{ MatterClusterStatus() uint8 }
+		if gotCS := errors.As(err, &cs) && cs.MatterClusterStatus() == uint8(tsdef.StatusCodeTimeNotAccepted); gotCS != tc.notAccepted {
+			t.Errorf("%s: %v, TimeNotAccepted %v", label, err, tc.notAccepted)
+		}
+		if after, _ := srv.UTC(); !after.Equal(before) {
+			t.Errorf("%s: the clock moved", label)
+		}
 	}
 }

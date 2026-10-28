@@ -417,9 +417,12 @@ matter.js's server is the generated behaviour):
 | TSC | TrustedTimeSource; SetTrustedTimeSource (null emits MissingTrustedTimeSource) | nothing; a removed fabric's source is cleared |
 
 The node persists TrustedTimeSource, DefaultNTP, TimeZone and DSTOffset in
-its store. UTCTime stays the node's clock: SetUTCTime is answered without
-effect, and the trusted time source is stored and reported but not
-read. The reference daemon turns no feature on.
+its store. UTCTime stays the node's clock. SetUTCTime answers chip's
+statuses without setting it (`HandleSetUTCTime`, :1110-1136):
+INVALID_COMMAND for a granularity or time source outside its enum,
+TimeNotAccepted for NoTimeGranularity or a granularity coarser than the
+node's milliseconds, SUCCESS otherwise. The trusted time source is stored
+and reported but not read. The reference daemon turns no feature on.
 
 ## Persistence
 

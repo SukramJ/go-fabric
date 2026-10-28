@@ -729,3 +729,41 @@ func (t *TimeSynchronization) DefaultNTP() (string, bool) {
 	}
 	return *t.state.defaultNTP, true
 }
+
+// timeNotAccepted is SetUTCTime's cluster-specific failure TimeNotAccepted
+// (chip's ClusterSpecificFailure(StatusCode::kTimeNotAccepted)).
+type timeNotAccepted struct{ msg string }
+
+func (e timeNotAccepted) Error() string                 { return e.msg }
+func (timeNotAccepted) MatterStatusCode() im.StatusCode { return im.StatusFailure }
+func (timeNotAccepted) MatterClusterStatus() uint8 {
+	return uint8(timesyncdef.StatusCodeTimeNotAccepted)
+}
+
+var _ im.MatterClusterStatusError = timeNotAccepted{}
+
+// handleSetUTCTime answers SetUTCTime with chip's statuses
+// (HandleSetUTCTime, TimeSynchronizationCluster.cpp:1110-1136 at
+// 6170af84): a granularity or a time source outside its enum is
+// INVALID_COMMAND; NoTimeGranularity, or one coarser than the current
+// Granularity, is TimeNotAccepted; anything else is SUCCESS. The clock is
+// not set: UTCTime stays the node's clock and Granularity the host
+// clock's (chip sets the system clock and takes the granularity, :856-872),
+// so the current granularity is always MillisecondsGranularity.
+func handleSetUTCTime(fields any) error {
+	req, ok := requestFields[timesyncdef.SetUtcTimeRequest](fields)
+	if !ok {
+		return spec.Errorf(im.StatusInvalidCommand, "core: SetUTCTime carried %T", fields)
+	}
+	if req.Granularity > timesyncdef.GranularityMicrosecondsGranularity { // :1119-1122
+		return spec.Errorf(im.StatusInvalidCommand, "core: SetUTCTime granularity %d", req.Granularity)
+	}
+	if ts := req.TimeSource; ts != nil && *ts > timesyncdef.TimeSourceGnss { // :1123-1126
+		return spec.Errorf(im.StatusInvalidCommand, "core: SetUTCTime time source %d", *ts)
+	}
+	current := timesyncdef.GranularityEnum(GranularityMillisecGran)
+	if req.Granularity != timesyncdef.GranularityNoTimeGranularity && req.Granularity >= current { // :1128-1133
+		return nil
+	}
+	return timeNotAccepted{fmt.Sprintf("core: SetUTCTime granularity %d is coarser than the node's %d", req.Granularity, current)}
+}

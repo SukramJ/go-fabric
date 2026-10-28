@@ -221,12 +221,7 @@ func (t *TimeSynchronization) MatterInvoke(ctx context.Context, cmdID uint32, fi
 		}
 	}
 	if cmdID == timeSyncCmdSetUTCTime {
-		// Accept the command and return Success. The bridge's clock is
-		// managed by the host OS; no adjustment is applied here.
-		// Mirrors matter.js TimeSynchronizationServer.ts::setUtcTime which
-		// stores the value — we omit the store because the bridge is not a
-		// time-coordinator.
-		return nil, nil
+		return nil, handleSetUTCTime(fields)
 	}
 	return nil, im.UnsupportedCommandf("core: TimeSynchronization command 0x%02X not supported", cmdID)
 }
