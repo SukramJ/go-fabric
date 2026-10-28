@@ -457,8 +457,8 @@ func streamIDOf(id *spec.Nullable[uint16]) *spec.Nullable[uint16] {
 
 // provideOffer carries out ProvideOffer. Mirrors chip HandleProvideOffer
 // (:843-1133): the constraints; a session id names the invoker's session
-// (NOT_FOUND otherwise) and a re-offer keeps its id, taking the
-// deprecated stream ids the request names; a null id is a new session,
+// (NOT_FOUND otherwise) and a re-offer keeps its id, taking the stream
+// ids (VideoStreamID, AudioStreamID) the request names; a null id is a new session,
 // validated as SolicitOffer's but RESOURCE_EXHAUSTED when the camera
 // cannot provide the usage; then the port, and the session it returns is
 // stored.
