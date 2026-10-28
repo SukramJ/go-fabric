@@ -164,6 +164,13 @@ type Config struct {
 	// basicInformation.maxPathsPerInvoke, which InteractionServer.ts:198
 	// enforces.
 	MaxPathsPerInvoke uint16
+	// Sessions are the MRP intervals the node reports in its session
+	// parameters and its operational DNS-SD record ([SessionIntervals]);
+	// nil is the Matter defaults, 500 ms idle, 300 ms active and a 4000 ms
+	// active threshold. An ICD's operational record carries the ICD's
+	// active threshold and, while LIT, no idle interval
+	// (IcdManagementServer.ts:482-495); its session parameters keep these.
+	Sessions *SessionIntervals
 	// CapabilityMinima is the root BasicInformation's CapabilityMinima:
 	// a zero field takes matter.js's default (the Matter floor of 3 for
 	// CaseSessionsPerFabric and SubscriptionsPerFabric, 20 for the four
@@ -545,6 +552,7 @@ func (c *Config) Validate() error {
 		errs = append(errs, fmt.Errorf("node: SupportedFabrics %d exceeds %d", c.SupportedFabrics, maxSupportedFabrics))
 	}
 	errs = append(errs, c.Limits.validate()...)
+	errs = append(errs, c.Sessions.validate()...)
 	if at := c.Attestation; at.Files != nil && (at.Chain != nil || at.CertificationDeclaration != nil) {
 		errs = append(errs, errors.New("node: Attestation.Files excludes Chain and CertificationDeclaration"))
 	} else if at.Files == nil && at.BlockCommissioningOnError {

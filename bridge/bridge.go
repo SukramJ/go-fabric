@@ -297,6 +297,20 @@ type Config struct {
 	// Mirrors matter.js InteractionServer.ts:198, which takes it from the
 	// node's BasicInformation state.
 	MaxPathsPerInvoke uint16
+	// SessionIntervals are the MRP intervals the operational DNS-SD record
+	// advertises (SII, SAI, SAT); a zero field is the Matter default. The
+	// host reports the same values in its session parameters;
+	// [github.com/SukramJ/go-fabric/node] sets both. An ICD's record
+	// replaces the threshold and, while LIT, omits SII
+	// ([Bridge.SetICDAdvertisement]). Mirrors matter.js
+	// DeviceAdvertiser.ts:361-364, which advertises the SessionManager's
+	// intervals unless the ICD provider governs them.
+	SessionIntervals SessionIntervals
+}
+
+// SessionIntervals are a node's MRP intervals ([Config.SessionIntervals]).
+type SessionIntervals struct {
+	Idle, Active, ActiveThreshold time.Duration
 }
 
 // validate reports whether the config carries every required field.
@@ -2073,6 +2087,11 @@ func (b *Bridge) AnnounceFabric(ctx context.Context, compressedFabricID [8]byte,
 		// for the operational advertisement only (MdnsAdvertisement.ts:205-206).
 		TCPClient: b.cfg.TCP.Outgoing,
 		TCPServer: b.cfg.TCP.Incoming,
+		// The node's reported intervals (DeviceAdvertiser.ts:361-364); the
+		// record caps them (mdns capAdvertisedIntervals).
+		SessionIdleInterval:    uint32(b.cfg.SessionIntervals.Idle.Milliseconds()),            //nolint:gosec // G115: node bounds it to uint32
+		SessionActiveInterval:  uint32(b.cfg.SessionIntervals.Active.Milliseconds()),          //nolint:gosec // G115: node bounds it to uint32
+		SessionActiveThreshold: uint32(b.cfg.SessionIntervals.ActiveThreshold.Milliseconds()), //nolint:gosec // G115: node bounds it to uint16
 	}
 	// An ICD governs its own advertised intervals: the ICD key, its
 	// threshold as SAT, and no SII while LIT (DeviceAdvertiser.ts:361-364,

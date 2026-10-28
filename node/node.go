@@ -241,6 +241,8 @@ func New(cfg Config) (*Node, error) { //nolint:funlen // the composition root: o
 		Clock:         n.cfg.Clock,
 		// The invoke path refuses what BasicInformation does not advertise.
 		MaxPathsPerInvoke: cfg.MaxPathsPerInvoke,
+		// The operational record advertises the reported intervals.
+		SessionIntervals: cfg.Sessions.advertised(),
 	}, n.logger)
 	if err != nil {
 		return nil, fmt.Errorf("node: bridge: %w", err)
@@ -320,7 +322,7 @@ func New(cfg Config) (*Node, error) { //nolint:funlen // the composition root: o
 	cm := cfg.Commissioning
 	n.sec = wireSecurity(n.life, n.br, n.st, n.root, n.caseIDs, paseParams{
 		passcode: cm.Passcode, salt: cm.Salt, iterations: cm.PBKDFIterations,
-	}, responderSessionParams(cfg.Network.TCP, cfg.MaxPathsPerInvoke), cfg.Limits, n.logger)
+	}, responderSessionParams(cfg.Network.TCP, cfg.MaxPathsPerInvoke, cfg.Sessions), cfg.Limits, n.logger)
 	n.wireICD()
 
 	// --- the commissioning window (main.go:329-360 at b4ea1f96^) ---------------------
