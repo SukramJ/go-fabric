@@ -43,10 +43,10 @@ func (r *tsEvents) MatterEmitEvent(endpoint uint16, _, event uint32, data any, _
 	r.data = append(r.data, data)
 }
 
-func (r *tsEvents) take() ([]uint32, []any) {
+func (r *tsEvents) take() (ids []uint32, data []any) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	ids, data := r.ids, r.data
+	ids, data = r.ids, r.data
 	r.ids, r.data = nil, nil
 	return ids, data
 }
@@ -58,11 +58,11 @@ type tsSettings struct {
 	fail bool
 }
 
-func (s *tsSettings) GetSetting(_ context.Context, key string) (string, bool, error) {
+func (s *tsSettings) GetSetting(_ context.Context, key string) (value string, ok bool, err error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	v, ok := s.m[key]
-	return v, ok, nil
+	value, ok = s.m[key]
+	return value, ok, nil
 }
 
 func (s *tsSettings) SetSetting(_ context.Context, key, value string) error {
@@ -78,7 +78,7 @@ func (s *tsSettings) SetSetting(_ context.Context, key, value string) error {
 	return nil
 }
 
-func (s *tsSettings) GetMetadataCounter(context.Context, string) (uint64, bool, error) {
+func (s *tsSettings) GetMetadataCounter(context.Context, string) (value uint64, ok bool, err error) {
 	return 0, false, nil
 }
 func (s *tsSettings) SetMetadataCounter(context.Context, string, uint64) error { return nil }

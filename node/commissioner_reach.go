@@ -45,7 +45,7 @@ func (r commissionerReach) interaction(ctx context.Context, p jointfabric.Commis
 	if set == nil {
 		return nil, errNoClientStack
 	}
-	pr, err := set.For(handshake.PeerAddress{FabricIndex: p.FabricIndex, NodeID: p.NodeID})
+	pr, err := set.For(handshake.PeerAddress{FabricIndex: p.FabricIndex, NodeID: p.NodeID}) //nolint:contextcheck // the peer runs on the peer set's context, not the invoke's
 	if err != nil {
 		return nil, fmt.Errorf("node: commissioner %d:%#x: %w", p.FabricIndex, p.NodeID, err)
 	}
@@ -83,7 +83,7 @@ func opCredsPath(attr uint32) im.ConcreteAttributePath {
 
 // ReadAdministratorFabricIndex reads the commissioner's
 // AdministratorFabricIndex on endpointID (JCMCommissionee.cpp:183-224).
-func (r commissionerReach) ReadAdministratorFabricIndex(ctx context.Context, p jointfabric.CommissionerPeer, endpointID uint16) (uint8, bool, error) {
+func (r commissionerReach) ReadAdministratorFabricIndex(ctx context.Context, p jointfabric.CommissionerPeer, endpointID uint16) (fabricIndex uint8, null bool, err error) {
 	v, err := r.read(ctx, p, im.ConcreteAttributePath{Endpoint: endpointID, Cluster: jfadef.ClusterID, Attribute: jfadef.AttrAdministratorFabricIndex})
 	if err != nil {
 		return 0, false, err

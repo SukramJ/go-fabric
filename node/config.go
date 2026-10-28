@@ -561,9 +561,7 @@ func (c *Config) Validate() error {
 	}
 	errs = append(errs, c.Limits.validate()...)
 	errs = append(errs, c.Sessions.validate()...)
-	if c.DisableTimeSynchronization && c.TimeSynchronization != nil {
-		errs = append(errs, errors.New("node: TimeSynchronization excludes DisableTimeSynchronization"))
-	}
+	errs = append(errs, c.timeSynchronizationErrors()...)
 	if at := c.Attestation; at.Files != nil && (at.Chain != nil || at.CertificationDeclaration != nil) {
 		errs = append(errs, errors.New("node: Attestation.Files excludes Chain and CertificationDeclaration"))
 	} else if at.Files == nil && at.BlockCommissioningOnError {
@@ -588,6 +586,15 @@ func (c *Config) Validate() error {
 	}
 	if err := errors.Join(errs...); err != nil {
 		return fmt.Errorf("%w: %w", ErrInvalidConfig, err)
+	}
+	return nil
+}
+
+// timeSynchronizationErrors refuses TimeSynchronization beside
+// DisableTimeSynchronization.
+func (c *Config) timeSynchronizationErrors() []error {
+	if c.DisableTimeSynchronization && c.TimeSynchronization != nil {
+		return []error{errors.New("node: TimeSynchronization excludes DisableTimeSynchronization")}
 	}
 	return nil
 }

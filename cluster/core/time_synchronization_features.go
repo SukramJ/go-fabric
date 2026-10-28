@@ -688,7 +688,7 @@ func (t *TimeSynchronization) checkDefaultNTP(ntp *string) error {
 	if len(*ntp) > defaultNTPMaxLen {
 		return spec.Errorf(im.StatusConstraintError, "core: DefaultNTP of %d bytes, at most %d", len(*ntp), defaultNTPMaxLen)
 	}
-	if !ntpAddressValid(*ntp) && !(ntpAddressDomain(*ntp) && t.cfg.SupportsDNSResolve) {
+	if useable := ntpAddressValid(*ntp) || (ntpAddressDomain(*ntp) && t.cfg.SupportsDNSResolve); !useable {
 		return spec.Errorf(im.StatusInvalidCommand, "core: DefaultNTP %q is neither an IPv6 address nor a domain the node resolves", *ntp)
 	}
 	return nil

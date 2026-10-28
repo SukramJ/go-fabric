@@ -268,17 +268,8 @@ func buildRoot(ctx context.Context, d rootDeps) (*RootClusters, error) { //nolin
 		return nil, fmt.Errorf("root descriptor: %w", err)
 	}
 	r.AdministratorCommissioning = wire.NewAdministratorCommissioning()
-	if !cfg.DisableTimeSynchronization {
-		r.TimeSynchronization = mattercore.NewTimeSynchronization()
-		if tc := cfg.TimeSynchronization; tc != nil {
-			c := *tc
-			c.Store, c.Logger = d.st, cmp.Or(c.Logger, d.logger)
-			if r.TimeSynchronization, err = mattercore.NewTimeSynchronizationWith(c); err != nil {
-				return nil, fmt.Errorf("time synchronization: %w", err)
-			}
-		}
-		r.TimeSynchronization.SetClock(cfg.Clock)
-		r.GeneralDiagnostics.SetUTCClock(r.TimeSynchronization.UTC)
+	if r.TimeSynchronization, err = d.timeSynchronization(cfg, r.GeneralDiagnostics); err != nil { //nolint:contextcheck // the constructor takes no context; it reads the store once
+		return nil, err
 	}
 	r.DiagnosticLogs = mattercore.NewDiagnosticLogs()
 	r.DiagnosticLogs.SetClock(cfg.Clock)
@@ -597,3 +588,25 @@ func (unknownEthernet) PHYRate() (ethdiagdef.PHYRateEnum, bool) { return 0, fals
 func (unknownEthernet) FullDuplex() (duplex, ok bool)           { return false, false }
 func (unknownEthernet) CarrierDetect() (carrier, ok bool)       { return false, false }
 func (unknownEthernet) TimeSinceReset() (uint64, bool)          { return 0, false }
+
+// timeSynchronization builds the root TimeSynchronization: without
+// features, or with [Config].TimeSynchronization's on the node's store;
+// nil with DisableTimeSynchronization.
+// GeneralDiagnostics takes its UTC clock.
+func (d rootDeps) timeSynchronization(cfg *Config, gd *mattercore.GeneralDiagnostics) (*mattercore.TimeSynchronization, error) {
+	if cfg.DisableTimeSynchronization {
+		return nil, nil
+	}
+	ts := mattercore.NewTimeSynchronization()
+	if tc := cfg.TimeSynchronization; tc != nil {
+		c := *tc
+		c.Store, c.Logger = d.st, cmp.Or(c.Logger, d.logger)
+		var err error
+		if ts, err = mattercore.NewTimeSynchronizationWith(c); err != nil { //nolint:contextcheck // the constructor takes no context; it reads the store once
+			return nil, fmt.Errorf("time synchronization: %w", err)
+		}
+	}
+	ts.SetClock(cfg.Clock)
+	gd.SetUTCClock(ts.UTC)
+	return ts, nil
+}
