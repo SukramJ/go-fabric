@@ -10,15 +10,8 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
-## [0.13.11] — 2026-10-28
-
 ### Added
 
-- `client/interaction`: the invoke batcher after matter.js (brief 27-A). `Interaction.Invoke` joins single commands of one batch window into one InvokeRequest when the peer takes more than one path per invoke — per network lane, numbered by CommandRef, duplicate paths in separate batches, split by MaxPathsPerInvoke — and sends a command for endpoint 0 or with its own options alone. New `InvokeOptions.BatchDuration` (0 is matter.js's Instant) and `NoBatch`. `controller/client.Node.Invoke` batches through it; no facade option is new.
-- `client/discovery`: discovery sessions in matter.js's shape (brief 27-A). `Session` (cancelable, `Stop`, `Cancel`, `Wait`), `FindInstance`, `FindAll`, and the parallel PASE races `Race`, `CommissioningRace`, `PASERace`; `Transport` with `IPTransport` and `controller/ble.Transport`; `SelectTransports`, `Capabilities`/`CapabilitiesOf`; the outcomes `ErrDeviceNotDiscovered`, `ErrDiscoveryIncomplete`, `ErrNoDiscoveryTransport`, `AggregateError`. `controller.Pair` with `PairOptions.BLE` searches over BLE and DNS-SD at once and commissions the first device to establish PASE; the new progress sub-steps `PairingStepDiscoveryIP` and `PairingStepDiscoveryBLE` report the transports. `Controller.Discover` runs on the sessions.
-- `controller/dcl.VendorInfoService` after matter.js's `DclVendorInfoService` (brief 27-A): `InfoFor`, `Vendors`, `ProductInfoFor`, `Update`, `Observe`, offline mode, seeded by `snapshot.Snapshot.VendorSeed`. `controller.Config.DCL` (`controller.DCLConfig`) and `Controller.VendorInfo`.
-- `controller/commissioner.FabricAuthority` after matter.js (brief 27-A): `CreateFabric`, `DefaultFabric` with the NOC key rotation once per authority, `OnFabricAdded`, `ErrNodeIDChanged`.
-- `controller/attestation`: PQC Phase 1 (brief 27-A) — ML-DSA-44/65 PAA and PAI keys and ML-DSA signatures in the chain validation over the standard library's `crypto/mldsa`, `KeyAlgorithmOf`, `MayIssue`, `VerifyIssuedBy`. Off as in matter.js: an ML-DSA attestation certificate is `ErrMLDSAAttestationDisabled`. No new dependency.
 - The node's session intervals (brief 27-B). `node.Config.Sessions` (`node.SessionIntervals{Idle, Active, ActiveThreshold}`, nil the Matter defaults) is what the PASE and CASE session parameters report and what the operational DNS-SD record advertises (SII, SAI, SAT; an ICD's record still carries its own threshold), as matter.js's `sessions.intervals`; a threshold above 65535 ms is refused. `Node.SessionParameters` returns what the node reports. `bridge.Config.SessionIntervals` carries them to the operational record.
 - `node.Limits.BDXAdditionalMrpDelay`: the MRP margin of every inbound BDX transfer's exchange (matter.js `bdxAdditionalMrpDelay`), amplified by the backoff. `bdx.ScopeConfig.AdditionalMrpDelay`, `bdx.Responder.SetAdditionalMrpDelay` and `bdx.MrpDelayExchange` carry it to the bridge's exchange.
 - The Thermostat's Events feature (TEVT), after connectedhomeip ahead of matter.js: SystemModeChange, LocalTemperatureChange, SetpointChange, RunningStateChange, RunningModeChange, ActiveScheduleChange and ActivePresetChange where chip emits them, with chip's payloads; `thermo.ThermostatFeatureTEVT`, `ThermostatServer.MatterEvents`, `SetEndpoint`, and `SetThermostatRunningMode` for ThermostatRunningMode, which TEVT and AUTO make mandatory. The [thermostat guide](docs/guides/thermostat.md#events-tevt) lists them.
@@ -28,12 +21,25 @@ pseudo-version of `main`.
 
 ### Changed
 
-- `controller.New` rotates the controller's operational key on every start, as matter.js's controller does for a fabric it keeps itself: a new key pair and NOC under the same fabric, saved over the stored record.
-- `controller.Pair` commissions every matching device it finds in parallel and keeps the first to establish PASE (matter.js's CommissioningDiscovery); with `PairOptions.BLE` it searches DNS-SD as well.
-- `jfadef.CommissionerReach` (`jointfabric.CommissionerReach`) takes the commissioner explicitly: every method's second argument is a `jfadef.Peer{FabricIndex, NodeID}` (`jointfabric.CommissionerPeer`), the invoking session's, which an implementation read from the context before. Migration guide: "Changed in the next release: `CommissionerReach` takes the peer".
+- `jfadef.CommissionerReach` (`jointfabric.CommissionerReach`) takes the commissioner explicitly: every method — `CommissionerReach.ReadAdministratorFabricIndex`, `CommissionerReach.ReadFabrics`, `CommissionerReach.ReadTrustedRootCertificates`, `CommissionerReach.ReadNOCs`, `CommissionerReach.SignVIDVerification` — takes as its second argument a `jfadef.Peer{FabricIndex, NodeID}` (`jointfabric.CommissionerPeer`), the invoking session's, which an implementation read from the context before. Migration guide: "Changed in the next release: `CommissionerReach` takes the peer".
 - `core.TimeSynchronization` is no longer comparable: it holds the features' state (a mutex and lists). Compare pointers.
 - `core.TimeSynchronization` answers SetUTCTime with connectedhomeip's statuses (`TimeSynchronizationCluster.cpp:1110-1136`): INVALID_COMMAND for a granularity or a time source outside its enum, TimeNotAccepted for NoTimeGranularity or a granularity coarser than milliseconds, SUCCESS otherwise. The clock is still not set; it accepted every request before.
 - A Thermostat without TEVT keeps emitting nothing; `SetActiveScheduleRequest` now emits ActiveScheduleChange with TEVT.
+
+## [0.13.11] — 2026-10-28
+
+### Added
+
+- `client/interaction`: the invoke batcher after matter.js (brief 27-A). `Interaction.Invoke` joins single commands of one batch window into one InvokeRequest when the peer takes more than one path per invoke — per network lane, numbered by CommandRef, duplicate paths in separate batches, split by MaxPathsPerInvoke — and sends a command for endpoint 0 or with its own options alone. New `InvokeOptions.BatchDuration` (0 is matter.js's Instant) and `NoBatch`. `controller/client.Node.Invoke` batches through it; no facade option is new.
+- `client/discovery`: discovery sessions in matter.js's shape (brief 27-A). `Session` (cancelable, `Stop`, `Cancel`, `Wait`), `FindInstance`, `FindAll`, and the parallel PASE races `Race`, `CommissioningRace`, `PASERace`; `Transport` with `IPTransport` and `controller/ble.Transport`; `SelectTransports`, `Capabilities`/`CapabilitiesOf`; the outcomes `ErrDeviceNotDiscovered`, `ErrDiscoveryIncomplete`, `ErrNoDiscoveryTransport`, `AggregateError`. `controller.Pair` with `PairOptions.BLE` searches over BLE and DNS-SD at once and commissions the first device to establish PASE; the new progress sub-steps `PairingStepDiscoveryIP` and `PairingStepDiscoveryBLE` report the transports. `Controller.Discover` runs on the sessions.
+- `controller/dcl.VendorInfoService` after matter.js's `DclVendorInfoService` (brief 27-A): `InfoFor`, `Vendors`, `ProductInfoFor`, `Update`, `Observe`, offline mode, seeded by `snapshot.Snapshot.VendorSeed`. `controller.Config.DCL` (`controller.DCLConfig`) and `Controller.VendorInfo`.
+- `controller/commissioner.FabricAuthority` after matter.js (brief 27-A): `CreateFabric`, `DefaultFabric` with the NOC key rotation once per authority, `OnFabricAdded`, `ErrNodeIDChanged`.
+- `controller/attestation`: PQC Phase 1 (brief 27-A) — ML-DSA-44/65 PAA and PAI keys and ML-DSA signatures in the chain validation over the standard library's `crypto/mldsa`, `KeyAlgorithmOf`, `MayIssue`, `VerifyIssuedBy`. Off as in matter.js: an ML-DSA attestation certificate is `ErrMLDSAAttestationDisabled`. No new dependency.
+
+### Changed
+
+- `controller.New` rotates the controller's operational key on every start, as matter.js's controller does for a fabric it keeps itself: a new key pair and NOC under the same fabric, saved over the stored record.
+- `controller.Pair` commissions every matching device it finds in parallel and keeps the first to establish PASE (matter.js's CommissioningDiscovery); with `PairOptions.BLE` it searches DNS-SD as well.
 
 ## [0.13.10] — 2026-10-28
 
