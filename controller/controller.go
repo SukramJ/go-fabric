@@ -158,6 +158,14 @@ type Config struct {
 	// TCP selects the controller's TCP roles ([TCPConfig]); the zero value
 	// is TCP off, as matter.js's (NetworkServer.ts:211-217).
 	TCP TCPConfig
+	// Sessions sets the session intervals the controller reports in its
+	// handshakes (PBKDFParamRequest / Sigma1 SessionParameters) —
+	// matter.js's sessions.intervals fed into the SessionManager
+	// (ServerNetworkRuntime.ts:354-362 at 862ad75f), the controller-side
+	// counterpart of node.Config.Sessions. nil is the Matter defaults
+	// (500 ms / 300 ms / 4000 ms); an interval outside whole milliseconds
+	// from 0 to the field's bound is [ErrConfiguration].
+	Sessions *SessionIntervals
 	// TransportPreference is the transport each peer prefers for its
 	// connections: exchange.TransportTCP is a soft hint — a connection
 	// falls back to UDP when the peer does not serve TCP — and needs
@@ -358,8 +366,11 @@ func (c *Controller) openTransports(ctx context.Context, cfg Config, listen stri
 	if err != nil {
 		return nil, fmt.Errorf("%w: OwnNetworkProfile: %w", ErrConfiguration, err)
 	}
+	if err := cfg.Sessions.validate(); err != nil {
+		return nil, err
+	}
 	if err := c.openNetwork(ctx, listen, cfg.Listener, openNames, exchange.Config{
-		Logger: log, Clock: clk, LocalAdditionalMrpDelay: own.AdditionalMrpDelay, LocalParameters: localParameters(cfg.TCP),
+		Logger: log, Clock: clk, LocalAdditionalMrpDelay: own.AdditionalMrpDelay, LocalParameters: localParameters(cfg.TCP, cfg.Sessions),
 	}); err != nil {
 		return nil, err
 	}

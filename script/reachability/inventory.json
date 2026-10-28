@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 7039,
+  "entry_points": 7041,
   "entry_packages": [
     ".",
     "bdx",
@@ -269,8 +269,8 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 16852,
-    "reachable": 11882,
+    "total_exported": 16853,
+    "reachable": 11883,
     "whitelisted": 4967,
     "unreachable": 3
   },
@@ -21911,14 +21911,14 @@
       "identifier": "PairingPhase",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "controller/controller.go",
-      "line": 544
+      "line": 555
     },
     {
       "package": "controller",
       "identifier": "PairingStep",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "controller/controller.go",
-      "line": 540
+      "line": 551
     },
     {
       "package": "controller/attestation",

@@ -12,6 +12,10 @@ pseudo-version of `main`.
 
 ### Added
 
+- The peer's reported session intervals on the device: `node.SessionInfo.PeerIdleInterval`, `PeerActiveInterval` and `PeerActiveThreshold` (what the controller sent in PBKDFParamRequest or Sigma1, also on a resumed session), over the new `secure/operational.Entry.PeerMRPIntervals` and the `Peer*Ms` fields of `operational.SessionInfo`; `controller.Config.Sessions` (`controller.SessionIntervals`), the controller's own intervals in its handshakes, the counterpart of `node.Config.Sessions`; `fabrictest.ControllerOptions.Sessions`. matter.js's `ReportedSessionParametersTest.ts` is ported (both cases), the test register's last planned file of milestone 6 phase 27.
+
+### Added
+
 - The node's session intervals (brief 27-B). `node.Config.Sessions` (`node.SessionIntervals{Idle, Active, ActiveThreshold}`, nil the Matter defaults) is what the PASE and CASE session parameters report and what the operational DNS-SD record advertises (SII, SAI, SAT; an ICD's record still carries its own threshold), as matter.js's `sessions.intervals`; a threshold above 65535 ms is refused. `Node.SessionParameters` returns what the node reports. `bridge.Config.SessionIntervals` carries them to the operational record.
 - `node.Limits.BDXAdditionalMrpDelay`: the MRP margin of every inbound BDX transfer's exchange (matter.js `bdxAdditionalMrpDelay`), amplified by the backoff. `bdx.ScopeConfig.AdditionalMrpDelay`, `bdx.Responder.SetAdditionalMrpDelay` and `bdx.MrpDelayExchange` carry it to the bridge's exchange.
 - The Thermostat's Events feature (TEVT), after connectedhomeip ahead of matter.js: SystemModeChange, LocalTemperatureChange, SetpointChange, RunningStateChange, RunningModeChange, ActiveScheduleChange and ActivePresetChange where chip emits them, with chip's payloads; `thermo.ThermostatFeatureTEVT`, `ThermostatServer.MatterEvents`, `SetEndpoint`, and `SetThermostatRunningMode` for ThermostatRunningMode, which TEVT and AUTO make mandatory. The [thermostat guide](docs/guides/thermostat.md#events-tevt) lists them.
