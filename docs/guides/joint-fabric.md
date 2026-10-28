@@ -67,7 +67,8 @@ for the pushes that commands started.
 
 The tables persist as one settings record under the device's StableKey
 when the declaration carries a `DatastoreStore`. The node's store is one.
-chip keeps them in memory only. Every attribute that a change touches is
+A change whose save fails is undone and answers `FAILURE`, as the TLS
+servers do. chip keeps the tables in memory only. Every attribute that a change touches is
 reported. chip reports only NodeList.
 
 ## The administrator

@@ -463,3 +463,26 @@ func TestDatastoreAttributes(t *testing.T) {
 		t.Fatalf("Status = %v", v)
 	}
 }
+
+// failingStore refuses every save.
+type failingStore struct{ memStore }
+
+func (*failingStore) SetSetting(context.Context, string, string) error {
+	return errors.New("store: disk full")
+}
+
+// TestDatastoreSaveFailureRestores: a save that fails leaves the tables as
+// they were and answers FAILURE, as the TLS servers do.
+func TestDatastoreSaveFailureRestores(t *testing.T) {
+	d, err := NewDatastore(t.Context(), DatastoreConfig{Sync: newTrackingSync(), Store: &failingStore{}, Key: "ep"})
+	mustOK(t, err)
+	if err := d.AddPendingNode(t.Context(), 5, "n"); !errors.Is(err, ErrStore) {
+		t.Fatalf("AddPendingNode = %v, want ErrStore", err)
+	}
+	if len(d.NodeList()) != 0 {
+		t.Fatal("the failed save kept the node")
+	}
+	if got := invoke(t, d, dsdef.CmdAddPendingNode, dsdef.AddPendingNodeRequest{NodeId: 5, FriendlyName: "n"}); got != im.StatusFailure {
+		t.Fatalf("command: %#x", got)
+	}
+}

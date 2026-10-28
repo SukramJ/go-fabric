@@ -107,6 +107,8 @@ var (
 	ErrInvalidArgument = errors.New("jointfabric: value out of bounds")
 	// ErrSync wraps a DatastoreSync's error.
 	ErrSync = errors.New("jointfabric: sync to the node failed")
+	// ErrStore reports tables the store could not load or save.
+	ErrStore = errors.New("jointfabric: store")
 )
 
 func constraintError(format string, args ...any) error {
@@ -175,8 +177,9 @@ type tables struct {
 	Endpoints         []EndpointEntry        `json:"endpoints,omitempty"`
 }
 
-// settingPrefix keys the persisted record.
-const settingPrefix = "joint_fabric_datastore."
+// settingPrefix keys the persisted record, followed by the device's
+// StableKey — the TLS servers' shape (cluster/tls/persist.go).
+const settingPrefix = "jointfabric.datastore:"
 
 // Datastore implements [contract.ClusterServer] for JointFabricDatastore:
 // the Joint Fabric's registry of its nodes, administrators, groups, key
@@ -208,8 +211,6 @@ type Datastore struct {
 	refreshing uint64 // 0: no refresh (kUndefinedNodeId)
 	inRefresh  bool
 
-	// persistMu orders the persisted records.
-	persistMu sync.Mutex
 	// pushes are the pushes the commands started.
 	pushes sync.WaitGroup
 }
@@ -232,11 +233,11 @@ func NewDatastore(ctx context.Context, cfg DatastoreConfig) (*Datastore, error) 
 	if d.store != nil {
 		v, ok, err := d.store.GetSetting(ctx, d.key)
 		if err != nil {
-			return nil, fmt.Errorf("jointfabric: load datastore: %w", err)
+			return nil, fmt.Errorf("%w: load %s: %w", ErrStore, d.key, err)
 		}
 		if ok && v != "" {
 			if err := json.Unmarshal([]byte(v), &d.t); err != nil {
-				return nil, fmt.Errorf("jointfabric: decode datastore: %w", err)
+				return nil, fmt.Errorf("%w: decode %s: %w", ErrStore, d.key, err)
 			}
 		}
 	}
@@ -275,45 +276,48 @@ func (d *Datastore) takeDirtyLocked() []uint32 {
 	return ids
 }
 
-// changed reports the attributes a change touched and persists the
-// tables; it runs outside d.mu. connectedhomeip reports NodeList only
-// (MarkNodeListChanged, joint-fabric-datastore-server.cpp:287-291); here
-// every attribute a change touches advances the data version and is
-// reported.
-func (d *Datastore) changed(ctx context.Context, ids []uint32) {
-	if len(ids) == 0 {
-		return
-	}
-	if d.srv != nil {
-		_ = d.srv.MarkChanged(ids...)
-	}
-	d.persist(ctx)
-}
-
-// persist writes the tables to the store.
-func (d *Datastore) persist(ctx context.Context) {
-	if d.store == nil {
-		return
-	}
-	d.persistMu.Lock()
-	defer d.persistMu.Unlock()
-	d.mu.Lock()
-	b, err := json.Marshal(d.t)
-	d.mu.Unlock()
-	if err != nil {
-		return
-	}
-	_ = d.store.SetSetting(context.WithoutCancel(ctx), d.key, string(b))
-}
-
-// update runs fn under the lock and reports what it changed.
+// update runs fn under the lock, saves the tables when it changed them
+// and reports what it changed. A save that fails restores the tables as
+// they were and is the change's error (ErrStore), as the TLS servers
+// answer a failed save (cluster/tls/certificates.go). connectedhomeip
+// reports NodeList only (MarkNodeListChanged,
+// joint-fabric-datastore-server.cpp:287-291); here every attribute a
+// change touches advances the data version and is reported.
 func (d *Datastore) update(ctx context.Context, fn func() error) error {
 	d.mu.Lock()
+	var prev []byte
+	if d.store != nil {
+		prev, _ = json.Marshal(d.t)
+	}
 	err := fn()
 	ids := d.takeDirtyLocked()
+	if len(ids) > 0 && d.store != nil {
+		if serr := d.saveLocked(ctx); serr != nil {
+			d.t = tables{}
+			_ = json.Unmarshal(prev, &d.t)
+			ids = nil
+			if err == nil {
+				err = serr
+			}
+		}
+	}
 	d.mu.Unlock()
-	d.changed(ctx, ids)
+	if len(ids) > 0 && d.srv != nil {
+		_ = d.srv.MarkChanged(ids...)
+	}
 	return err
+}
+
+// saveLocked writes the tables to the store; the caller holds d.mu.
+func (d *Datastore) saveLocked(ctx context.Context) error {
+	b, err := json.Marshal(d.t)
+	if err != nil {
+		return fmt.Errorf("%w: encode %s: %w", ErrStore, d.key, err)
+	}
+	if err := d.store.SetSetting(context.WithoutCancel(ctx), d.key, string(b)); err != nil {
+		return fmt.Errorf("%w: save %s: %w", ErrStore, d.key, err)
+	}
+	return nil
 }
 
 // pushFn is a push to a node: the port call and, once it returned, its
