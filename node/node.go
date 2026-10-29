@@ -22,6 +22,7 @@ import (
 	"github.com/SukramJ/go-fabric/bridge"
 	"github.com/SukramJ/go-fabric/clock"
 	mattercore "github.com/SukramJ/go-fabric/cluster/core"
+	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/diagevent"
 	"github.com/SukramJ/go-fabric/endpoint"
 	"github.com/SukramJ/go-fabric/endpoint/sqlitestore"
@@ -60,9 +61,13 @@ type Node struct {
 	br        *bridge.Bridge
 	root      *RootClusters
 	agg       *Aggregator
-	caseIDs   *caseIdentities
-	sec       *security
-	window    *commissioningHost
+	// aggServers are the Aggregator endpoint's servers ([Node.Surface]);
+	// surfaceDigest is Config.Surface's digest, computed once.
+	aggServers    []contract.ClusterServer
+	surfaceDigest [32]byte
+	caseIDs       *caseIdentities
+	sec           *security
+	window        *commissioningHost
 	// observers are the hooks Observe registered after
 	// Config.Observers (observers.go).
 	observers observerSet
@@ -164,6 +169,7 @@ func New(cfg Config) (*Node, error) { //nolint:funlen // the composition root: o
 		attestationErr: attestationErr,
 	}
 	n.life, n.cancel = context.WithCancel(ctx)
+	n.surfaceDigest = cfg.Surface.Digest()
 	ok := false
 	defer func() {
 		if !ok {
@@ -313,6 +319,7 @@ func New(cfg Config) (*Node, error) { //nolint:funlen // the composition root: o
 		return nil, fmt.Errorf("node: %w", err)
 	}
 	n.br.AttachAggregatorClusters(aggregatorServers)
+	n.aggServers = aggregatorServers
 	// The OTA provider and its BDX responder (ADR 0021).
 	if err := n.buildOTAProvider(); err != nil {
 		return nil, err
