@@ -22597,7 +22597,7 @@
       "identifier": "TestConformanceStatusString",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/conformance_internal_test.go",
-      "line": 267
+      "line": 273
     },
     {
       "package": "controller/client",
@@ -22618,21 +22618,21 @@
       "identifier": "TestEndpointConformance",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/conformance_internal_test.go",
-      "line": 121
+      "line": 127
     },
     {
       "package": "controller/client",
       "identifier": "TestEndpointConformanceUnknown",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/conformance_internal_test.go",
-      "line": 188
+      "line": 194
     },
     {
       "package": "controller/client",
       "identifier": "TestEndpointDevice",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/conformance_internal_test.go",
-      "line": 95
+      "line": 96
     },
     {
       "package": "controller/client",
@@ -22695,7 +22695,7 @@
       "identifier": "TestNodeConditionsOfTheImage",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/conformance_internal_test.go",
-      "line": 241
+      "line": 247
     },
     {
       "package": "controller/client",
