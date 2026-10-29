@@ -194,6 +194,8 @@ endpoint carries one device type in the kit does not change: the
 composite and each component are endpoints of their own, the components
 the composite's parts.
 
+**Addendum 2026-10-29 (wave 27-C follow-up, owner decision on report 27-C Q3).** CastingVideoClient is generated too (`device.NewCastingVideoClient`): its stated exclusion reason was stale once the media and camera families were served, and the generator emits the client-only type as it emits VideoRemoteControl (Binding and the optional ContentAppObserver as servers, the media clients as matter.js's `casting-video-client.ts` at `862ad75f` lists them). devicegen's `excluded` map is empty; 91 of 91 snapshot device types have a constructor.
+
 A superset device type on the composite's own endpoint (an OnOffLight's
 clusters on the FloodlightCamera endpoint, both types in its
 DeviceTypeList) was considered on the owner's request (2026-10-28) and is

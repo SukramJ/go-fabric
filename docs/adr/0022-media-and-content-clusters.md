@@ -52,7 +52,7 @@ read at the pin (`0ceb202d`, 2026-10-14) measured:
   `ObserverClient` gate MediaInput, ApplicationLauncher and the
   ContentAppObserver client (wave 24 measured: on CastingVideoPlayer
   `ContentAppPlatform` gates the whole ApplicationLauncher cluster with
-  the AP feature mandatory inside it; on ContentApp AP is disallowed). CastingVideoClient stays out (the
+  the AP feature mandatory inside it; on ContentApp AP is disallowed). CastingVideoClient stayed out until the 27-C follow-up of 2026-10-29, which generates it (ADR 0018 addendum) (the
   client role).
 - **chip's families:** about 33 server-side YAML cases (ALOGIN, APBSC,
   APPLAUNCHER, APPOBSERVER, AUDIOOUTPUT, CHANNEL, CONTENTLAUNCHER,
