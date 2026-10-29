@@ -10,6 +10,10 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+### Changed
+
+- The findings register is triaged (owner decision on report 27-C, 2026-10-29): every open bullet names its post-pause wave (H1 device IM and write path, H2 commissioning and security, H3 node options and the embedding layer, C1 controller remainder two) or its reason to stay (owner hand test, consumer need, harness note); the camera persistence bullet became `BD-Matter-CameraPersistenceIsTheHosts`; `by_design.md` gains `BD-Matter-BTP-NoStallRenegotiation` and the Thermostat-events register row.
+
 ### Added
 
 - The peer's reported session intervals on the device: `node.SessionInfo.PeerIdleInterval`, `PeerActiveInterval` and `PeerActiveThreshold` (what the controller sent in PBKDFParamRequest or Sigma1, also on a resumed session), over the new `secure/operational.Entry.PeerMRPIntervals` and the `Peer*Ms` fields of `operational.SessionInfo`; `controller.Config.Sessions` (`controller.SessionIntervals`), the controller's own intervals in its handshakes, the counterpart of `node.Config.Sessions`; `fabrictest.ControllerOptions.Sessions`. matter.js's `ReportedSessionParametersTest.ts` is ported (both cases), the test register's last planned file of milestone 6 phase 27.

@@ -32,6 +32,16 @@ appendix at the bottom lists Tier-2 items that were duplicated as open bullets
 but are already fixed; only the bullets that remain in the Tier-2/3 body below
 are genuinely open.
 
+**Triage 2026-10-29 (owner decision on report 27-C Q1).** Every open
+bullet below carries a `Triage 2026-10-29` tag: the post-pause waves H1
+(the device IM and write path), H2 (commissioning and security, Fable's
+paths), H3 (node options and the embedding layer) and C1 (the controller
+remainder two), or "owner" (a hand test or re-audit), "when a consumer
+asks", or "harness note". The waves are planned when the owner ends the
+pause after `v0.14.0`; the tag replaces the milestone tag the raising wave
+gave. The camera persistence bullet left the register for
+`BD-Matter-CameraPersistenceIsTheHosts` in `by_design.md`.
+
 **Milestone 6 sweep (wave 27-C, 2026-10-28).** 61 open items before the
 sweep, 57 after. Closed and removed: the discovery errors and abort (wave
 27-A, `client/discovery` sessions), the controller-side software-update
@@ -340,10 +350,10 @@ light and plug types (RootNode `GroupcastListenerCond`) — is built:
 PerGroup and, since wave 20 (report AN), Sender — FeatureMap 0x07, the
 group sender in `groups/`. What remains:
 
-- **Field conformance does not hold the host's own values.** matter.js validates every commit, the host's included (`ValueValidator.ts:392-467`, `conformance.ts:19-60` at `862ad75f`). Since brief CT `spec.Instance.CheckConformance` holds a controller's write of a struct attribute on a generic server; the host's `Initial`/`Set` and the checks self-held servers call are not held, because the reference bridge's CHIP-mirrored tariff thresholds (both `O.b`) and DEM forecasts fail the check. Route: correct the samples (a chip-tool families run of SETRF and DEM decides what they publish), then hold the host path; brief CT report, question 1.
-- **A request field outside its constraint is answered by the handler, not refused on the wire.** matter.js's request TLV schema refuses it before the behavior runs (`CommandInvokeResponse.ts:484-487` at `862ad75f`, CONSTRAINT_ERROR); the Go generic server passes it to the handler, and the OnOff, DoorLock, EVSE, WaterHeater and CommodityPrice ports pin the handler's status. Route: a request-constraint check in `spec.Server`'s invoke path, with those ports' expectations re-read against the pin; brief CT report, question 2.
-- **A command response is held to field presence only.** matter.js validates the whole response payload (`ProtocolService.ts:725-740` at `862ad75f`; DoorLock switches the constraint off per response, `DoorLockServer.ts:704-707`); the Go server checks which fields a response carries, not their enum values or nested structs. Route: with the request check above.
-- **Groupcast's membership quota does not follow a raised `MaxGroupsPerFabric`.** matter.js derives `MaxMembershipCount` from `maxGroupsPerFabric × 2` (`GroupcastServer.ts:928` at `862ad75f`), so the Groupcast per-fabric quota `floor(MaxMembershipCount/2)` always equals the group cap. The module's `groupcastMaxMembershipCount = 44` is a constant (`cluster/core/groupcast.go:52`); since brief CC a host can set `node.Config.Limits.MaxGroupsPerFabric` above 22 and is then still held to Groupcast's quota of 22. Route: derive the Groupcast constants from the configured group limit when the Groupcast server is composed (the wave that next touches `groups/`; M5).
+- **Field conformance does not hold the host's own values.** matter.js validates every commit, the host's included (`ValueValidator.ts:392-467`, `conformance.ts:19-60` at `862ad75f`). Since brief CT `spec.Instance.CheckConformance` holds a controller's write of a struct attribute on a generic server; the host's `Initial`/`Set` and the checks self-held servers call are not held, because the reference bridge's CHIP-mirrored tariff thresholds (both `O.b`) and DEM forecasts fail the check. Route: correct the samples (a chip-tool families run of SETRF and DEM decides what they publish), then hold the host path; brief CT report, question 1. (Triage 2026-10-29: wave H1, the device IM and write path.)
+- **A request field outside its constraint is answered by the handler, not refused on the wire.** matter.js's request TLV schema refuses it before the behavior runs (`CommandInvokeResponse.ts:484-487` at `862ad75f`, CONSTRAINT_ERROR); the Go generic server passes it to the handler, and the OnOff, DoorLock, EVSE, WaterHeater and CommodityPrice ports pin the handler's status. Route: a request-constraint check in `spec.Server`'s invoke path, with those ports' expectations re-read against the pin; brief CT report, question 2. (Triage 2026-10-29: wave H1, the device IM and write path.)
+- **A command response is held to field presence only.** matter.js validates the whole response payload (`ProtocolService.ts:725-740` at `862ad75f`; DoorLock switches the constraint off per response, `DoorLockServer.ts:704-707`); the Go server checks which fields a response carries, not their enum values or nested structs. Route: with the request check above. (Triage 2026-10-29: wave H1, the device IM and write path.)
+- **Groupcast's membership quota does not follow a raised `MaxGroupsPerFabric`.** matter.js derives `MaxMembershipCount` from `maxGroupsPerFabric × 2` (`GroupcastServer.ts:928` at `862ad75f`), so the Groupcast per-fabric quota `floor(MaxMembershipCount/2)` always equals the group cap. The module's `groupcastMaxMembershipCount = 44` is a constant (`cluster/core/groupcast.go:52`); since brief CC a host can set `node.Config.Limits.MaxGroupsPerFabric` above 22 and is then still held to Groupcast's quota of 22. Route: derive the Groupcast constants from the configured group limit when the Groupcast server is composed (the wave that next touches `groups/`; M5). (Triage 2026-10-29: wave H1, the device IM and write path.)
 - **Groupcast has not met a real controller.** The evidence is the in-process
   end-to-end test (`bridge/groupcast_e2e_test.go`) and the wire fixtures
   matter.js produced (`bridge/testdata/groupcast-wire-fixtures.json`).
@@ -361,7 +371,7 @@ What the lift from `0ceb202d` to `862ad75f` showed (`pin-lifts.md`, first
 section): upstream fixes this module lacks. Each closes with the wave that
 ports the matter.js test named, or earlier when a consumer needs it.
 
-Device side:
+Device side:. (Triage 2026-10-29: owner's hand test (manual test list C5), no wave.)
 
 - **Keep-alive reports suppress the response.** An empty max-interval
   DataReport goes out with `SuppressResponse = true`
@@ -371,7 +381,7 @@ Device side:
   #4766; ServerSubscriptionTest "keep-alive status"). Fix: send
   `SuppressResponse = false`, wait for the status, end the subscription on
   INVALID_SUBSCRIPTION as `closeSubscriptionByExchange` already does for data
-  reports. (Left open by phase 16; milestone 3.)
+  reports. (Triage 2026-10-29: wave H1, the device IM and write path.)
 - **A subscription that ends while the node runs stays persisted.**
   `im/subscription/manager.go:128-149` keeps the former matter.js line: closed
   on session close = not terminated = re-established after a restart.
@@ -380,20 +390,19 @@ Device side:
   (`Subscription.ts:21-40`, `ServerSubscription.ts:766-812`,
   SubscriptionsServerTest "drops the stored subscription when the peer closes
   its session while the node keeps running"). Fix: terminate on every close
-  except the one `Stop` performs. (Left open by phase 16; milestone 3.)
+  except the one `Stop` performs. (Triage 2026-10-29: wave H1, the device IM and write path.)
 - **No BUSY for a write that races a chunked write.** A chunked write holds
   its attribute (`bridge/exchange_routing.go:62` `writeTxs`); another
   exchange writing the same attribute is not answered BUSY as matter.js does
   (`InteractionServer.ts:507,526` at `862ad75f`, #4768; InteractionProtocolTest
   "answers BUSY to another exchange's write of an attribute while a chunked
-  write holds it"). (Left open by phase 16; milestone 3.)
+  write holds it"). (Triage 2026-10-29: wave H1, the device IM and write path.)
 - **Utility component on the composing endpoint is not a candidate.**
   `endpoint/devicetype_conformance.go:842-850` `candidatesOf` iterates the
   composition scope; matter.js #4745 prepends the composing endpoint when it
   lists the utility component itself (`DeviceTypeConformance.ts:596-614`,
   Core § 9.2.1; Heat Pump and Solar Power examples). A composed product that
-  carries its Power Source on the composing endpoint is refused here.
-  (Device type validation; before milestone 4's device kit.)
+  carries its Power Source on the composing endpoint is refused here. (Triage 2026-10-29: wave H3, node options and the embedding layer.)
 - **A Root-asserted condition can refuse.** Conditions true for the node
   endpoint only because a device type asserts them at `Root`
   (`devicetype_conformance.go:503-526`) produce violations that
@@ -403,12 +412,12 @@ Device side:
   (With the previous item.)
 
 
-Controller side:
+Controller side:. (Triage 2026-10-29: wave H3, node options and the embedding layer.)
 
 - **Known answers are sent with their original TTL.**
   `client/discovery/solicitor.go:368-375`; matter.js #4756 sends the
   remaining TTL rounded up and omits a record past half its TTL
-  (`DnssdSolicitor.ts:280-291`, RFC 6762 § 7.1). (Left open by phase 16; milestone 5 phase 25.)
+  (`DnssdSolicitor.ts:280-291`, RFC 6762 § 7.1). (Triage 2026-10-29: wave C1, the controller remainder two.)
 - **A status the peer sent is not told from a local one.**
   `client/interaction/interaction.go:56` `StatusError`; matter.js #4750
   `ResultStatus.received` (`ResultStatus.ts:1-35`). Low. (Milestone 5.)
@@ -417,46 +426,46 @@ Found by the phase-16 port of `packages/protocol/test` (brief BH, PR #164,
 2026-10-18). Each closes with the fix named, or with the milestone in
 brackets; the feature-sized ones carry an `until` in the test register.
 
-Device side:
+Device side:. (Triage 2026-10-29: wave C1, the controller remainder two.)
 
 - **An empty ICAC is dropped from the CASE signed data.**
   `secure/sigma/sigma.go:811-822` `signedDataBytes` omits tag 2 when the
   ICAC is empty; matter.js re-encodes the field as received
   (`session/case/CaseServer.ts:294-299`, `TlvSignedData.encode` with
   `responderIcac`), so a peer that sends an empty ICAC (`300200`) signs a
-  TBS this side does not rebuild. (Milestone 3.)
+  TBS this side does not rebuild. (Triage 2026-10-29: wave H2, commissioning and security (Fable).)
 - **The group sender keeps its node id after UpdateNOC.**
   `groups/sender.go:208,225` captures the fabric's node id when the sender
   is created; matter.js reads it per message from the current fabric
-  (`session/GroupSession.ts:184-189`, `:204-206`). (Brief BH, two agents.)
+  (`session/GroupSession.ts:184-189`, `:204-206`). (Triage 2026-10-29: wave H2, commissioning and security (Fable).)
 - **A PASE session closed by the peer does not expire the fail-safe.**
   `ExpireFailSafe` is reached from RevokeCommissioning only
   (`bridge/commissioning_window.go:724-727`); matter.js expires the
   fail-safe when the PASE session that armed it is closed by the peer
   before CommissioningComplete (`common/FailsafeContext.ts:77-86`).
-  Crosses `secure/channel` and `bridge`. (Milestone 3.)
+  Crosses `secure/channel` and `bridge`. (Triage 2026-10-29: wave H2, commissioning and security (Fable).)
 - **Session parameters: a local MaxPathsPerInvoke of 0 is not refused and
   an oversized wire value is masked.** `secure/sessionparams/sessionparams.go:182`
   keeps the low 16 bits; matter.js refuses the local value
   (`session/SessionManager.ts:368-374`) and takes the fallback for anything
-  a uint16 cannot carry (`session/SessionParameters.ts:65-80`). Low.
+  a uint16 cannot carry (`session/SessionParameters.ts:65-80`). Low. (Triage 2026-10-29: wave H2, commissioning and security (Fable).)
 - **The device CSR subject is CN=CSR.**
   `cluster/core/operational_credentials.go:1481-1483` uses commonName,
   `commissioning/csr.go:84` an empty subject; matter.js uses
   organizationName "CSR" (`certificate/kinds/Certificate.ts:264-267`). A
   NOCSR wire difference every controller so far accepted. Low.
 
-Controller side:
+Controller side:. (Triage 2026-10-29: wave H2, commissioning and security (Fable).)
 
 - **A whitespace-only `issuer_name` in an installed revocation set matches
   every issuer.** `controller/dcl/revocation.go:688-701` decodes it to no
   issuer and `:166-173` then matches any; matter.js keeps the empty hex
   string, which matches nothing (`dcl/DclCertificateService.ts:97-109`,
-  `:125-127`). Revokes more, never less. Low.
+  `:125-127`). Revokes more, never less. Low. (Triage 2026-10-29: wave C1, the controller remainder two.)
 - **The close cause of a PASE session that lost the race.**
   `controller/commissioner/connection.go:252` `launch`; matter.js closes it
   with the composed signal's reason (`peer/CommissioningConnection.ts:140-151`).
-  Low, no deterministic test.
+  Low, no deterministic test. (Triage 2026-10-29: wave C1, the controller remainder two.)
 - **PQC Phase 1 on the device side.** A device's own ML-DSA attestation
   chain files are refused by the 600-byte limit (`secure/attestation/files.go`;
   matter.js allows 10 240 bytes for a PQC chain, `certificate/kinds/common.ts:19`).
@@ -466,42 +475,39 @@ Controller side:
 Found by the phase-16 port of `packages/node/test/node` (brief BI, PR #168,
 2026-10-19). Line numbers at `862ad75f`.
 
-Device side:
+Device side:. (Triage 2026-10-29: wave H2, commissioning and security (Fable), once matter.js ships the forward feature for the device side.)
 
 - **AttributePathIB `WildcardPathFlags` (tag 7) is not decoded.** The
   decoder in `im/` reads tags 0–5; a read that asks to skip the global
-  lists reads them all (AttributeReadResponseTest "skipAttributeList").
-  (Milestone 3.)
+  lists reads them all (AttributeReadResponseTest "skipAttributeList"). (Triage 2026-10-29: wave H1, the device IM and write path.)
 - **A write path without cluster or attribute is answered per path.**
   `im/write.go:292-298` appends an AttributeStatus of INVALID_ACTION for
   the path and goes on; matter.js and chip refuse the whole interaction
   with a StatusResponse of INVALID_ACTION
   (`action/server/AttributeWriteResponse.ts:278-285`, `:305-312`; chip
-  `WriteHandler.cpp` `GetConcreteAttributePath` → `SuccessOrExit`).
-  (Milestone 3.)
+  `WriteHandler.cpp` `GetConcreteAttributePath` → `SuccessOrExit`). (Triage 2026-10-29: wave H1, the device IM and write path.)
 - **No `isHeldByOtherWrite` on a wildcard write.** matter.js skips, in a
   wildcard or group write, an attribute another write interaction holds
   (`AttributeWriteResponse.ts:355-358`); the Go write has no such check.
-  Goes with the BUSY item above. (Milestone 3.)
+  Goes with the BUSY item above. (Triage 2026-10-29: wave H1, the device IM and write path.)
 - **A closed PASE session does not restart the commissioning
   advertisement.** The device keeps its commissionable record during PASE
   and publishes nothing when the session closes; matter.js starts a
   commissioning advertisement round on every PASE session that closes
-  while the window is open (`protocol/DeviceAdvertiser.ts:131-162`).
-  (Milestone 3.)
+  while the window is open (`protocol/DeviceAdvertiser.ts:131-162`). (Triage 2026-10-29: wave H2, commissioning and security (Fable).)
 - **A host-initiated RemoveFabric does not flush the Leave event.**
   `node/node.go:707` `RemoveFabric` closes the fabric's subscriptions
   without a last report; matter.js `Fabric.leave` closes each session
   through `closeSubscriptions(true)` so the Leave event reaches the
   controller (`fabric/Fabric.ts:447-457`; ClientNodeTest "erases node
-  after leave event"). (Milestone 3.)
+  after leave event"). (Triage 2026-10-29: wave H1, the device IM and write path.)
 - **Data versions are drawn anew at every start.**
   `contract.DataVersionTracker` is the host's, and the module's own
   trackers start random; matter.js loads a persistent cluster's version
   from its store and draws one only when the store has none
   (`behavior/state/managed/Datasource.ts:597`, `:802`), so a controller's
   cache survives a device restart where this side sends every cluster
-  again. (Milestone 4, the embedding layer.)
+  again. (Triage 2026-10-29: wave H1, the device IM and write path.)
 - **SetRegulatoryConfig's CountryCode never reaches Location.**
   `bridge/fields_reader.go:466-479` drops the field on decode, a deliberate
   revert after an Apple Home regression; matter.js writes it to
@@ -513,7 +519,7 @@ Controller side:
 
 
 Found by the phase-18b security and commissioning port (brief BO, PR #184, 2026-10-19).
-Line numbers at `862ad75f`.
+Line numbers at `862ad75f`. (Triage 2026-10-29: owner: a re-audit with Apple Home before it moves (manual test list), no wave.)
 
 - **The effective ACL is applied entry by entry.** matter.js applies a
   written ACL to the manager when the interaction ends
@@ -528,10 +534,10 @@ Line numbers at `862ad75f`.
   keep reading the list in force, and the interaction's end store the
   collected list as one replacement (`#applyDelayedAclUpdateFor`) —
   more than a few dozen lines in `im/`, `bridge/` and the ACL server,
-  so brief BR left it. (Milestone 4; security path, the owner's read.)
+  so brief BR left it. (Triage 2026-10-29: wave H2, commissioning and security (Fable).)
 - **No extension access-check hook.** `extensionEntryAccessCheck`
   (`AccessControlServer.ts:441-450`) is an overridable check per entry; Go
-  has none. (Milestone 4, with `AccessControlCustomExtensionTest.ts`.)
+  has none. (Triage 2026-10-29: wave H2, commissioning and security (Fable).)
 
 - **AdministratorCommissioning checks in another order.** matter.js: an open
   window → Busy, a timeout outside 180–900 s → InvalidCommand, an armed
@@ -540,13 +546,12 @@ Line numbers at `862ad75f`.
   `bridge/commissioning_window.go` checks the fail-safe and the fabric
   first, so an armed fail-safe with an invalid timeout gets Busy, and a PASE
   session without fabric Busy instead of UnsupportedAccess. Needs a read
-  against chip's order and the CADMIN cases before a change. (Milestone 3,
-  phase 19.)
+  against chip's order and the CADMIN cases before a change. (Triage 2026-10-29: wave H2, commissioning and security (Fable).)
 - **No Basic commissioning window (BC).** `openBasicCommissioningWindow`
   (`AdministratorCommissioningServer.ts:106-116`) answers
   UnsupportedCommand; the window code carries `IsBasicWindow` without a
   feature to reach it. One `CommissioningWindowLifetimeTest.ts` case is
-  `missing` for this. (Milestone 4, a node option.)
+  `missing` for this. (Triage 2026-10-29: wave H3, node options and the embedding layer.)
 - **FailSafeExpiryLengthSeconds is 900 where matter.js seeds 60.**
   `GeneralCommissioningServer.ts:39-41` seeds 60 s (900 s for
   MaxCumulativeFailsafeSeconds, `:44-46`); `NewGeneralCommissioning` floors
@@ -556,7 +561,7 @@ Line numbers at `862ad75f`.
   SetRegulatoryConfig CountryCode item below.)
 
 Found by the phase-19 port (brief BR, 2026-10-20). Line numbers at
-`862ad75f`.
+`862ad75f`. (Triage 2026-10-29: wave H2, commissioning and security (Fable).)
 
 - **OccupancySensing has no feature selection.** The Go server serves
   PassiveInfrared alone (`cluster/measurement/definitions.go`
@@ -565,27 +570,23 @@ Found by the phase-19 port (brief BR, 2026-10-20). Line numbers at
   emitted, where matter.js emits it on `occupancy$Changed` with the
   feature (`OccupancySensingServer.ts` `initialize`,
   `#emitOccupancyChanged`). One `OccupancySensingServerTest.ts` case is
-  `missing` for this. (Milestone 4, a host option: a feature selection
-  changes the FeatureMap a controller sees, and the event needs the
-  bridge's change observation `booleanStateEvents` has for BooleanState.)
+  `missing` for this. (Triage 2026-10-29: wave H3, node options and the embedding layer.)
 - **The Groupcast server has no Listener-only configuration.** The module
   builds Groupcast with Listener, Sender and PerGroup
   (`GroupcastServer.ts:81-83` as RootEndpoint installs it); a node without
   the Sender feature (`ListenerOnlyRootEndpoint`) cannot be configured, so
-  one `GroupcastServerTest.ts` loop case is `missing`. (Milestone 4, a
-  node option.)
+  one `GroupcastServerTest.ts` loop case is `missing`. (Triage 2026-10-29: wave H3, node options and the embedding layer.)
 - **The concentration servers serve NumericMeasurement only.** Every
   `cluster/measurement` concentration server is bound to the MEA
   selection (`concentration.go` `concOptions`), and its host port
   carries a number (`contract.FloatMeasurementSource`), so the
   LevelIndication feature and its LevelValue cannot be served; two
-  `ConcentrationMeasurementServerTest.ts` cases are `missing` for this.
-  (Milestone 4, a host option and a level source in `contract/`.)
+  `ConcentrationMeasurementServerTest.ts` cases are `missing` for this. (Triage 2026-10-29: wave H3, node options and the embedding layer.)
 - **The controller chooses no TCP session.** `PeerExchangeProvider`'s
   selection of a TCP session among a peer's sessions (skipping closing
   ones) has no Go counterpart: `client/peer` opens UDP sessions. Four
   `TcpSessionBindingTest.ts` cases are `missing` for this. (Register
-  candidate, with a controller TCP transport.)
+  candidate, with a controller TCP transport.). (Triage 2026-10-29: wave C1, the controller remainder two, with the controller's TCP transport.)
 - **The event store is volatile only.** matter.js keeps the events of a
   former run with `events: { nonvolatile: true }`
   (`EventsBehaviorTest.ts:45-54`); the Go node's event log lives in
@@ -594,7 +595,7 @@ Found by the phase-19 port (brief BR, 2026-10-20). Line numbers at
   node option over the store.)
 
 Found by the phase-18d Binding port (brief BQ, PR #189, 2026-10-20).
-Line numbers at `862ad75f`.
+Line numbers at `862ad75f`. (Triage 2026-10-29: wave H3, node options and the embedding layer.)
 
 - **A group write leaves no log line.** matter.js logs every write at
   info (`ClientInteraction.ts:317`); `groups.Sender.Write` logs nothing,
@@ -602,7 +603,7 @@ Line numbers at `862ad75f`.
   it. (Milestone 3, phase 19, with the next `groups/` fix.)
 
 Found by the phase-18a system-set port (brief BN, PR #182, 2026-10-19).
-Line numbers at `862ad75f`.
+Line numbers at `862ad75f`. (Triage 2026-10-29: wave H1, the device IM and write path.)
 
 - **The node does not run matter.js's DataModelTest check when it comes
   online.** `GeneralDiagnosticsServer.ts` `#online` (`:352`) runs
@@ -611,25 +612,23 @@ Line numbers at `862ad75f`.
   logged. `cluster/core` has the check (`CheckDataModelTest`) and the
   feature selection (`NewGeneralDiagnosticsWith`), but `node.Config`
   carries neither a feature selection nor MaxPathsPerInvoke, so nothing
-  calls it at `Node.Start`. (Milestone 3, wave 18b: `node/` is its path.)
+  calls it at `Node.Start`. (Triage 2026-10-29: wave H1, the device IM and write path.)
 - **A grouped ConfigurationVersion change is not persisted as one.**
   `Bridge.IncreaseNodeConfigurationVersionWith` raises the node's version
   once for a change across several bridged devices
   (`BasicInformationServer.ts:132-138`,
   `BridgedDeviceBasicInformationServer.ts:72-90`); the node facade
   (`Aggregator.IncreaseConfigurationVersion`) still takes one device key
-  and persists per call. (Milestone 3, wave 18b.)
+  and persists per call. (Triage 2026-10-29: wave H1, the device IM and write path.)
 - **CapabilityMinima is not a node option.** matter.js lets the
   application override the Matter 1.6 defaults
   (`CapabilityMinimaTest.ts`, "caller-provided values win"); the Go port
-  runs on `core.Config`, `node.Config` has no field. (Milestone 3,
-  wave 18b.)
+  runs on `core.Config`, `node.Config` has no field. (Triage 2026-10-29: wave H3, node options and the embedding layer.)
 - **A bridged endpoint cannot opt into TagList.** `Descriptor.EnableTagList`
   / `AddTags` exist on the server (`DescriptorServer.ts:122-147`), but
   `endpoint.Spec` carries no tags, so a host's device model cannot set
   them; the default stays off for Apple (the note at
-  `cluster/core/descriptor.go` `MatterAttributes`). (Milestone 4, the
-  embedding layer.)
+  `cluster/core/descriptor.go` `MatterAttributes`). (Triage 2026-10-29: wave H3, node options and the embedding layer.)
 - **The groups manager holds no key set 0.** `KeySetsTest.ts` reads the
   only key of the default key set and the second-newest key of the IPK
   key set (§4.14.2.6); `groups/manager.go` loads key sets from 1 and the
@@ -637,7 +636,7 @@ Line numbers at `862ad75f`.
   (Milestone 3, wave 18b, the security path.)
 
 Found by the phase-17d DoorLock port (brief BM, PR #176, 2026-10-19).
-Line numbers at `862ad75f`.
+Line numbers at `862ad75f`. (Triage 2026-10-29: wave H2, commissioning and security (Fable).)
 
 - **`clock.Clock` has no monotonic reading.** matter.js measures the
   wrong-code lockout on `Time.nowUs` (`DoorLockServer.ts:1184`, `:1192-1195`)
@@ -651,8 +650,7 @@ Line numbers at `862ad75f`.
   (`GeneralDiagnosticsOperationalHoursTest.ts:27-40`) steps the wall clock
   alone and stays `missing`; its UpTime twin runs on a package seam
   (`core.UpTimeFrom`) instead of the clock.
-  Fix: a monotonic reading on `clock.Clock` and `clocktest.Fake`.
-  (Milestone 4, the embedding layer.)
+  Fix: a monotonic reading on `clock.Clock` and `clocktest.Fake`. (Triage 2026-10-29: wave H3, node options and the embedding layer.)
 - **An ExpiringUser provisioned without ExpiringUserTimeout logs no
   warning.** `#warnIfExpiryUnbounded` (`DoorLockServer.ts:1233-1240`, run
   by SetUser Add and Modify, `:291`, `:328`, `:480`) warns that the user's PIN is
@@ -661,7 +659,7 @@ Line numbers at `862ad75f`.
   logs nothing. (Milestone 3, next lock change.)
 
 Found by the phase-17c Thermostat port (brief BL, PR #175, 2026-10-19).
-Line numbers at `862ad75f`.
+Line numbers at `862ad75f`. (Triage 2026-10-29: wave H3, node options and the embedding layer.)
 
 - **A staged Presets write bumps the DataVersion and is re-reported.** A
   controller's write of Presets inside an atomic write is staged in the
@@ -673,8 +671,7 @@ Line numbers at `862ad75f`.
   `AtomicWriteHandler.ts:243-266`) and the write's transaction has nothing
   to commit, so neither the version nor a report moves until CommitWrite.
   Fix: a cluster server's write reports "staged, not stored" and the
-  dispatcher skips the bump. (Milestone 3, with the next `im` write-path
-  change.)
+  dispatcher skips the bump. (Triage 2026-10-29: wave H1, the device IM and write path.)
 - **The OccupancySensing coupling is not built.** matter.js's
   `#setupOccupancyIntegration` follows the Occupancy attribute of an
   OccupancySensing server on the endpoint `localOccupancyMeasurementEndpoint`
@@ -685,7 +682,7 @@ Line numbers at `862ad75f`.
   thermostat with an occupancy sensor wires the two itself. (Milestone 4,
   the embedding layer.)
 
-Found by the phase-17b Switch server (brief BK, PR #171, 2026-10-19).
+Found by the phase-17b Switch server (brief BK, PR #171, 2026-10-19). (Triage 2026-10-29: wave H3, node options and the embedding layer.)
 
 - **The materialised Switch server runs on the system clock.**
   `contract.MeasurementContext` carries `EndpointID` only
@@ -695,7 +692,7 @@ Found by the phase-17b Switch server (brief BK, PR #171, 2026-10-19).
   behaviors take `Time` from the node's environment. A bridged button's
   long-press and multi-press timers cannot be driven by a fake clock in an
   in-process test. Fix: the context carries the node's clock (an additive
-  field). (Milestone 4, the embedding layer.)
+  field). (Triage 2026-10-29: wave H3, node options and the embedding layer.)
 - **TC-SWTCH-2.6 is not covered.** It needs ActionSwitch, which excludes
   MomentarySwitchRelease (`switch.element.ts:25-27` at `862ad75f`: MSR
   "[MS & !AS]", MSM "AS, [MS & MSR]"); the daemon's one button serves MSR.
@@ -706,20 +703,18 @@ Found by the phase-17b Switch server (brief BK, PR #171, 2026-10-19).
 
 Found by the phase-17a port of the OnOff, LevelControl, ColorControl,
 Identify, WindowCovering and ServiceArea tests (brief BJ, PR #170,
-2026-10-19). Line numbers at `862ad75f`.
+2026-10-19). Line numbers at `862ad75f`. (Triage 2026-10-29: harness note, the next CHIP image lift (not a parity gap).)
 
 - **TriggerEffect has no host hook.** `cluster/core/identify.go:49-52`
   answers Success and does nothing; matter.js emits
   `events.effectTriggered` with the request so the host performs the
   effect (`behaviors/identify/IdentifyServer.ts:26`, `:134`, `:150`). The
   acceptance on every endpoint is `BD-Matter-Identify-TriggerEffectEverywhere`;
-  the missing hook is this item. (Milestone 4, the embedding layer.)
+  the missing hook is this item. (Triage 2026-10-29: wave H3, node options and the embedding layer.)
 - **ColorControl serves no primaries.** Primary1X … Primary6Intensity and
   NumberOfPrimaries are absent from `cluster/light`, so a light cannot
   supply one (ColorControlServerTest "accepts a primary a light supplies
-  without stating the number of primaries"). Optional attributes; low.
-  (Milestone 4, when a consumer asks; moved from milestone 3 by brief BR,
-  decision 19.4.)
+  without stating the number of primaries"). Optional attributes; low. (Triage 2026-10-29: when a consumer asks (brief BR decision 19.4); no wave.)
 - **ColorControl `MatterQuiesce` leaves the quieter's pending-report
   timers.** `cluster/light/colorcontrol_transitions.go` stops the engine
   only; the LevelControl fix of PR #170 (`MatterQuiesce` drops the held
@@ -728,26 +723,7 @@ Identify, WindowCovering and ServiceArea tests (brief BJ, PR #170,
   too. No matter.js test checks it. (Milestone 3, with brief BL's
   in-wave fixes or the next lights wave.)
 
-## Application cluster servers — open items
-
-- **Chime and CameraAvSettingsUserLevelManagement persist nothing
-  themselves.** chip persists SelectedChime and Enabled
-  (`ChimeCluster.cpp:83-104`, `:221-223`, `:233-235` at `6170af84`) and the
-  camera's MPTZPosition, MPTZPresets and DPTZStreams
-  (`CameraAvSettingsUserLevelManagementLogic.cpp:139-332`); `store.Port`
-  has no record for such attributes, so `cluster/camera` reports every
-  change through the server's change notification and takes the restored
-  values from the declaration's `Initial` (brief 26-A1). A host that does
-  not persist them starts at chip's defaults after a restart. (Milestone 6,
-  with the camera stream wave 26-A2 if a store record is wanted.)
-  Kept past milestone 6: persistence is the host's, owner decision Q5 of
-  brief 26-A1 (report 26-A2, "A store record for the streams, zones and
-  settings").
-Raised with `cluster/alarm`, `cluster/fan`, `cluster/pump`,
-FlowMeasurement, `cluster/opstate` and `cluster/modebase`.
-`../connectedhomeip` was not checked out when they were written, so the
-rules below that matter.js does not carry and that were taken from memory
-of connectedhomeip are marked unverified:
+## Application cluster servers — open items. (Triage 2026-10-29: wave H1, the device IM and write path.)
 
 - **Wi-Fi NetworkCommissioning (TESTING ONLY) does not persist its
   committed networks across a restart.** TC-CNET-4.1, 4.4 and 4.9 find no
@@ -756,12 +732,11 @@ of connectedhomeip are marked unverified:
   (`src/platform/Linux/NetworkCommissioningWiFiDriver.cpp:77-118, :135-138`
   at the harness pin). Fix: persist the committed `Networks` entry through
   the node's store and re-issue `Connect` on start; class (a) in the
-  CNETWIFI row of `docs/certifiability.md`. (Phase 13, report BB §4.)
+  CNETWIFI row of `docs/certifiability.md`. (Triage 2026-10-29: wave H2, commissioning and security (Fable), before milestone 7 makes the Wi-Fi server real.)
 - **The simulated Wi-Fi driver connects to any SSID.** TC-CNET-4.23
   expects a wrong SSID to fail; `--wifi-sim` accepts every network.
   Fix: a configurable SSID list for the simulated driver
-  (`--wifi-sim-ssid`), so 4.23 moves from class (c) to a pass. (Phase 13,
-  report BB §4.)
+  (`--wifi-sim-ssid`), so 4.23 moves from class (c) to a pass. (Triage 2026-10-29: wave H2, commissioning and security (Fable), before milestone 7 makes the Wi-Fi server real.)
 
 - **Wi-Fi NetworkCommissioning: the fail-safe check is not bound to the
   accessing fabric.** `core.WiFiNetworkCommissioning` gates its commands
@@ -774,7 +749,7 @@ of connectedhomeip are marked unverified:
   today; must land before milestone 7 makes the server real. (Phase 12,
   report BA.)
 
----
+---. (Triage 2026-10-29: wave H2, commissioning and security (Fable), before milestone 7 makes the Wi-Fi server real.)
 
 ## Tier 3 — LOW
 
