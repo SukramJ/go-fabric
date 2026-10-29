@@ -200,6 +200,24 @@ reachability-check: reachability ## regenerate, then fail if the committed snaps
 		git --no-pager diff --stat -- script/reachability/; \
 		exit 1; \
 	}
+
+.PHONY: surface
+surface: ## regenerate script/surfacecheck/surface.json and summary.md — what a controller sees of the reference daemon
+	@# Builds examples/reference-bridge and runs it with --dump-surface: default
+	@# flags, zero-value surface policies, nothing started (ADR 0030).
+	GO=$(GO) $(GO) run ./script/surfacecheck
+
+.PHONY: surface-check
+surface-check: surface ## regenerate, then fail if the committed surface snapshot moved
+	@git diff --quiet -- script/surfacecheck/surface.json script/surfacecheck/summary.md || { \
+		echo ""; \
+		echo "The committed surface snapshot is stale: regenerating it changed the file."; \
+		echo "Run 'make surface', read the diff — it is what a controller sees change — and"; \
+		echo "commit it with the change that moved it."; \
+		echo ""; \
+		git --no-pager diff --stat -- script/surfacecheck/; \
+		exit 1; \
+	}
 	$(GO) test -count=1 -run 'Reachab' ./script/reachability/
 
 .PHONY: testparity
@@ -458,4 +476,4 @@ esphome-check: ## the ble/esphome sub-module: build (Linux, darwin, windows), ve
 	cd $(ESPHOME_DIR) && $(GO) mod verify
 
 .PHONY: ci
-ci: build build-32bit vet archcheck apidiff-check test lint cover-check bluez-check esphome-check ## everything the pipeline runs
+ci: build build-32bit vet archcheck apidiff-check test lint cover-check surface-check bluez-check esphome-check ## everything the pipeline runs
