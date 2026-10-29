@@ -105,6 +105,7 @@ pin lift confirms by re-reading the row, [`pin-lifts.md`](./pin-lifts.md)).
 | BD-Thread-NetComm-ThreadVariant | `NetworkCommissioningServer.ts:18` is the empty subclass: no network-type branch, no Thread logic (absence: the class line, 18 lines in all) | `packages/node/src/behaviors/network-commissioning/NetworkCommissioningServer.ts` | `"export class NetworkCommissioningServer extends NetworkCommissioningBehavior {}"` | connectedhomeip `src/app/clusters/network-commissioning/NetworkCommissioningCluster.cpp` at `6170af84` (the Thread paths: `HandleScanNetworks` :349-367, `HandleAddOrUpdateThreadNetwork` :561-587, `OnFinished` :904-928, `ReadAttribute` :1102-1108) over `src/platform/OpenThread/GenericNetworkCommissioningThreadDriver.cpp` |
 | BD-chip-AmbientContextSensing-RulesInServer | `AmbientContextSensingServer.ts:14` is the empty subclass (absence: the class line, 14 lines in all) | `packages/node/src/behaviors/ambient-context-sensing/AmbientContextSensingServer.ts` | `"export class AmbientContextSensingServer extends AmbientContextSensingBehavior {}"` | connectedhomeip `src/app/clusters/ambient-context-sensing-server/AmbientContextSensingCluster.cpp` at `6170af84` (the constructor and `Startup` :48-89, `WriteAttribute` :140-159, `AddDetection` :205-301, `SetObjectCountConfig` :303-367, `SetObjectCount` :369-385, `SetHoldTimeLimits` :438-466, `TimerFired` :498-509, `UpdateDetectionAttributes` :600-646, `CheckPredictedActivity` :844-892; `AmbientContextSensingDelegate.h:78-106`), tests `tests/TestAmbientContextSensingCluster.cpp` |
 | BD-chip-TimeSynchronization-Features | `TimeSynchronizationServer.ts:14` is the empty subclass (absence: the class line, 14 lines in all) | `packages/node/src/behaviors/time-synchronization/TimeSynchronizationServer.ts` | `"export class TimeSynchronizationServer extends TimeSynchronizationBehavior {}"` | connectedhomeip `src/app/clusters/time-synchronization-server/TimeSynchronizationCluster.cpp` at `6170af84` (the attribute gating :186-248, the feature logic :619-1028, `HandleSetUTCTime` :1110-1136, the four handlers :1138-1275), `TimeSyncDataProvider.h:58-75`, tests `tests/TestTimeSynchronizationCluster.cpp` |
+| BD-chip-Thermostat-Events | `ThermostatServer.ts:525` is the only `events.` emit of the server, the custom `calibratedTemperature$Changed` (absence: none of the model's eight Thermostat events is emitted anywhere in the file, 1790 lines) | `packages/node/src/behaviors/thermostat/ThermostatServer.ts` | `"this.events.calibratedTemperature$Changed.emit(temperature, oldTemperature, this.context);"` | connectedhomeip `src/app/clusters/thermostat-server/ThermostatClusterEvents.cpp` at `6170af84` (every `Generate*` gated on `Feature::kEvents`, :33-36, :59-61, :83-86, :109-112), the emit sites `ThermostatClusterBase.cpp:158-162, :179-183, :246-250, :283-287`, `ThermostatClusterSetpointsBase.cpp:63-85`, `ThermostatClusterPresets.cpp:461-500`; the entry is the events paragraph of `BD-chip-Thermostat-Schedules` |
 | BD-chip-JointFabricDatastore-RulesInServer | `JointFabricDatastoreServer.ts:14` is the empty subclass (absence: the class line, 14 lines in all) | `packages/node/src/behaviors/joint-fabric-datastore/JointFabricDatastoreServer.ts` | `"export class JointFabricDatastoreServer extends JointFabricDatastoreBehavior {}"` | connectedhomeip `src/app/server/JointFabricDatastore.cpp` at `6170af84` (the operations :181-2373, `RefreshNode`/`ContinueRefresh` :241-1130, the status codes), `JointFabricDatastore.h` (the capacities :512-517, the delegate :166-285, `MarkEntryCommittedIfFound` :75-85), `src/app/clusters/joint-fabric-datastore-server/joint-fabric-datastore-server.cpp` (the 20 commands :293-785), tests `src/app/server/tests/TestJointFabricDatastore.cpp` |
 | BD-chip-JointFabricAdministrator-RulesInServer | `JointFabricAdministratorServer.ts:14` is the empty subclass (absence: the class line, 14 lines in all) | `packages/node/src/behaviors/joint-fabric-administrator/JointFabricAdministratorServer.ts` | `"export class JointFabricAdministratorServer extends JointFabricAdministratorBehavior {}"` | connectedhomeip `src/app/clusters/joint-fabric-administrator-server/joint-fabric-administrator-server.cpp` at `6170af84` (the handlers :172-449), `JCMCommissionee.{h,cpp}`, `src/app/server/JointFabricAdministrator.h`, `src/credentials/jcm/` (`TrustVerification.cpp`, `VendorIdVerificationClient.cpp`), tests `joint-fabric-administrator-server/tests/TestJCMCommissionee.cpp`, `src/credentials/tests/jcm/` |
 | BD-chip-JCM-Commissioner | `ControllerCommissioningFlow.ts:576-583` runs `OperationalCredentials.Certificates` right after `OperationalCredentials.DeviceAttestation`, no Joint Commissioning step between (absence: the two step pushes, :573-585) | `packages/protocol/src/peer/ControllerCommissioningFlow.ts` | `"name: \"OperationalCredentials.DeviceAttestation\",\n            stepLogic: () => this.#deviceAttestation(),\n        });\n\n        this.commissioningSteps.push({\n            stepNumber: 11, // includes 11-13"` | connectedhomeip `src/controller/jcm/DeviceCommissioner.cpp` at `6170af84` (:45-550), `src/controller/jcm/AutoCommissioner.{h,cpp}` (the read paths `.h:56-66`), `src/controller/AutoCommissioner.cpp:522-531` (the stage after attestation), tests `src/controller/tests/jcm/TestJCMCommissioner.cpp` |
@@ -5156,6 +5157,39 @@ add the components as parts, the kit's one-device-type-per-endpoint rule
 stays, and a superset type on the composite's own endpoint is not offered
 (owner decision 2026-10-28, after the citation: matter.js does not count
 it). ADR 0018's addendum records the shape.
+
+### BD-Matter-CameraPersistenceIsTheHosts — Chime and the camera settings persist through the host, not a store record
+
+connectedhomeip persists Chime's SelectedChime and Enabled through its
+attribute persistence (`ChimeCluster.cpp:83-104`, `:221-223`, `:233-235` at
+`6170af84`, `LoadPersistentAttributes`) and the camera's MPTZPosition,
+MPTZPresets and DPTZStreams (`CameraAvSettingsUserLevelManagementLogic.cpp:139-332`,
+`StoreMPTZPosition` …); matter.js's servers for both are the empty
+subclasses and persist nothing of their own. `cluster/camera` reports every
+change through the server's change notification and takes the restored
+values from the declaration's `Initial`; no `store.Port` record is added
+(owner decision Q5 of brief 26-A1, kept at report 26-A2 and the milestone-6
+sweep): persistence is the host's, as every other host-owned value of the
+device model, so a host that does not persist them starts at chip's
+defaults after a restart. Moved here from the findings register at the
+triage of 2026-10-29.
+
+### BD-Matter-BTP-NoStallRenegotiation — a BTP central that stalls after the handshake is not re-established with a smaller segment size
+
+matter.js's `BtpSessionHandler` reports a session whose first messages are
+never acknowledged in submission order (`stalledAfterHandshake`,
+`packages/protocol/src/ble/BtpSessionHandler.ts:53-82` at `862ad75f`), and
+its own comment calls the remedy "an interop workaround with no basis in
+the specification": the noble transport may establish a fresh session with
+a smaller segment size and resend the messages (`NobleBleChannel.ts`, the
+handshake :591-630 with the segment size derived from the ATT MTU, :40-41,
+:523). `transport/btp` and `controller/ble` report the stall and close the
+session on the acknowledgement timeout, as a transport that cannot
+renegotiate does in matter.js (:79), and do not re-establish it: the
+workaround targets peripherals matter.js met through noble, none of which
+this module's `ble/bluez` or `ble/esphome` paths have shown; a stall seen
+in the field reopens this entry as a finding. Recorded at the milestone-6
+sweep (report 27-C, 2026-10-29).
 
 ### BD-Matter-GeneratedServerSuffices — clusters whose generated server is complete: no source carries behaviour beyond the model
 
