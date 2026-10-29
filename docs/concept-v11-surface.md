@@ -1,6 +1,6 @@
 # Konzept v11 — Die Oberfläche als Wert: Referenz, Spezifikationsstufe, Controller-Profil
 
-Stand 2026-10-29. Faktenbasis: go-fabric `8f2926a9` (v0.14.0), matter.js-Pin
+Stand 2026-10-30 (Rev. 2 nach Owner-Review am PR #333). Faktenbasis: go-fabric `8f2926a9` (v0.14.0), matter.js-Pin
 `862ad75f`, chip `6170af84`. Jede Zeile mit `file:line` wurde in dieser
 Sitzung gelesen; alles andere ist als **unverifiziert** markiert. Sprache:
 Deutsch (Phasenkonzept); Briefs, Issues, Doku, Register auf Englisch.
@@ -304,6 +304,14 @@ Entscheidung erbeten, E.5).
 Ein Host wählt Profile, wie er die Stufe wählt: als Operator-Einstellung.
 Konflikte sind deshalb `Remove`, nie `Refuse`.
 
+**Ein Profil darf seine Stufe mitbringen** (Owner-Anregung aus dem Review
+zu v11). `Profile.Level` ist optional; ist es gesetzt und `Policies.Level`
+der Nullwert, gilt die Stufe des Profils. Ein explizit gesetztes
+`Policies.Level` gewinnt immer. Ein typischer Operator stellt damit einen
+Wert ein (`apple-home`), ein Experte zwei. Welche Stufe ein Profil trägt,
+ist eine gemessene Register-Zeile wie jede andere; ein Profil ohne Messung
+trägt keine.
+
 ### C.7 Wo die Policies greifen
 
 Heute baut `device.New` (`device/device.go:117`) seine Server sofort; die
@@ -345,13 +353,41 @@ bedient, die Stufe, die Profile, die entfernten Elemente mit Grund.
 
 ### C.9 Stabilität der Oberfläche über die Zeit
 
-Der Vorfall in loom war ein **nachträgliches** Einschalten. `FeatureMap`
-trägt die Qualität F (fixed; `cluster/spec/model.go:67`); ein Controller
-darf sie cachen. Der Standard hat seit 1.4 ein Signal dafür, dass sich die
-Konfiguration eines Geräts geändert hat: `ConfigurationVersion` auf
+Der Vorfall in loom hatte **zwei Hälften** (Owner-Bericht, loom 0.94.0):
+ein nachträgliches Einschalten, nach dem Apple Home keine Daten mehr lud,
+**und** ein Neu-Pairing, das nicht gelang. Dieser Abschnitt adressiert nur
+die erste Hälfte. Die zweite — ein Controller, der die eingeschaltete
+Oberfläche von vornherein nicht annimmt — ist die Profil-Achse (C.6) und
+wird erst durch den Handtest in S5 messbar. C.9 ist deshalb nicht „die
+Lösung für den Apple-Ausfall“, sondern die Regel, die ein Einschalten im
+Betrieb standardkonform ankündigt.
+
+`FeatureMap` trägt die Qualität F (fixed; `cluster/spec/model.go:67`); ein
+Controller darf sie cachen. Der Standard hat ein Signal dafür, dass sich
+die Konfiguration eines Geräts geändert hat: `ConfigurationVersion` auf
 BasicInformation und BridgedDeviceBasicInformation — beide im Snapshot
 (`parity/schema.json:27490, :44979`), die Endpoint-Schicht trägt den Wert
 schon (`endpoint/spec.go:87-90`, `Endpoint.IncreaseConfigurationVersion`).
+Das Attribut existiert **ab 1.4.2**, nicht ab 1.4 — gemessen an der Quelle
+des Konzepts, `git grep -l ConfigurationVersion <tag> --
+packages/model/src/standard/elements`: an v0.13.0 (1.4) und v0.14.0 (1.4.1)
+in keiner Elementdatei, an v0.16.0 (1.4.2), v0.17.0 (1.5.1) und v0.18.0
+(1.6.1) in `basic-information.element.ts` und
+`bridged-device-basic-information.element.ts`. Der Owner-Review hat
+dasselbe Bild in connectedhomeips `data_model/` je Version gelesen (nicht
+committet).
+
+Daraus folgt eine Wechselwirkung zwischen C.5 und C.9: an einer Stufe
+unter 1.4.2 würde die Stufen-Policy genau das Signal entfernen, auf das
+`Announce` baut. Regel: **die Stufe entfernt `ConfigurationVersion` nie.**
+Die Ausnahme steht als einzige hand-begründete Zeile neben der berechneten
+Ausnahmeliste (C.5) und im Protokoll jedes Endpoints mit dem Grund
+„kept: surface-change signal“. Begründung: das Signal ist mehr wert als
+die Exaktheit der Stufe, und es bleibt ein optionales Attribut mit eigener
+ID, das ein Controller älterer Generation nicht kennen muss. Zeigt eine
+Messung (S5), dass ein Controller an dem Attribut scheitert, wird die Regel
+für sein Profil zu „unter 1.4.2 nur `Reendpoint`“ — eine Profil-Zeile, kein
+Umbau.
 
 Regel: der `Surface.Digest()` jedes Endpoints wird mit dem Endpoint-
 Datensatz persistiert (`endpoint.Record`, neben `DeviceType`, das
@@ -362,9 +398,11 @@ Neustart für denselben `StableKey` ab, gilt der konfigurierte Modus:
 | Modus | Wirkung | Wann |
 | --- | --- | --- |
 | `Announce` (Default) | `ConfigurationVersion` des Endpoints steigt, Descriptor-DataVersion steigt, ein `slog`-Ereignis `surface changed` mit dem Diff | Der standardkonforme Weg. |
-| `Reendpoint` | Die Endpoint-Nummer wird zurückgezogen und neu vergeben; der Controller sieht ein Gerät verschwinden und ein neues erscheinen | Für Controller, die `ConfigurationVersion` nachweislich ignorieren (Profil-Regel) oder auf Owner-Wunsch. |
+| `Reendpoint` (**Vorschlag**, Owner entscheidet in E.1) | Die Endpoint-Nummer wird zurückgezogen und neu vergeben; der Controller sieht ein Gerät verschwinden und ein neues erscheinen | Für Controller, die `ConfigurationVersion` nachweislich ignorieren (Profil-Regel) oder auf Owner-Wunsch. |
 
-Für den Root-Endpoint gibt es nur `Announce`.
+Für den Root-Endpoint gibt es nur `Announce`. Fällt E.1 gegen
+`Reendpoint`, bleibt C.9 bei `Announce` plus Protokoll; die Tabelle
+verliert eine Zeile, nichts sonst ändert sich.
 
 **Unverifiziert, Phase S4 liest es zuerst:** ob und wie matter.js
 `ConfigurationVersion` bei einer Behavior-Änderung erhöht
@@ -422,6 +460,10 @@ tut, ein `by_design`-Eintrag.
    Cluster ein Endpoint erreicht, entscheiden die Gerätetypen des Hosts.
 8. **Verhalten bleibt immer das der Pin-Revision.** Stufe und Profil
    entfernen Oberfläche, nie Logik.
+9. **Die Stufe entfernt `ConfigurationVersion` nie** (C.9). Die einzige
+   hand-begründete Ausnahme neben der berechneten Liste.
+10. **Ein Profil darf eine Stufe mitbringen; ein explizites Level
+    gewinnt** (C.6).
 
 ## E. Offene Fragen an den Owner
 
