@@ -1,6 +1,6 @@
 # Konzept v11 — Die Oberfläche als Wert: Referenz, Spezifikationsstufe, Controller-Profil
 
-Stand 2026-10-30 (Rev. 2 nach Owner-Review am PR #333). Faktenbasis: go-fabric `8f2926a9` (v0.14.0), matter.js-Pin
+Stand 2026-10-30 (Rev. 3: Owner-Entscheidungen zu Abschnitt E). Faktenbasis: go-fabric `8f2926a9` (v0.14.0), matter.js-Pin
 `862ad75f`, chip `6170af84`. Jede Zeile mit `file:line` wurde in dieser
 Sitzung gelesen; alles andere ist als **unverifiziert** markiert. Sprache:
 Deutsch (Phasenkonzept); Briefs, Issues, Doku, Register auf Englisch.
@@ -296,10 +296,10 @@ Konfidenzstufen der bestehenden Seite `docs/matter-ecosystem-observations.md`
 ausgeliefert: heute ist kein Element gemessen, und das Konzept behauptet
 keines. Die erste Zeile kommt aus dem Owner-Handtest, den #331 motiviert:
 Apple Home, Thermostat, MSCH allein, dann Hold allein, dann RunningState
-allein — je ein Pairing, je ein Befund. Ein Profil mit einer Zeile der
-Konfidenz *Reported* darf im Register stehen, aber nur eine *Reproduced*-
-Zeile darf im ausgelieferten Profil ein Element entfernen (Owner-
-Entscheidung erbeten, E.5).
+allein — je ein Pairing, je ein Befund. Nur eine Zeile der Konfidenz
+*Reproduced* darf im ausgelieferten Profil ein Element entfernen;
+*Reported*- und *Inherited*-Zeilen stehen im Register und erscheinen im
+Protokoll als Warnung (Owner-Entscheidung E.5).
 
 Ein Host wählt Profile, wie er die Stufe wählt: als Operator-Einstellung.
 Konflikte sind deshalb `Remove`, nie `Refuse`.
@@ -320,7 +320,9 @@ Feature-Auswahl entscheidet die `spec.Instance`. Die Policies müssen also
 `Surface *surface.Policies`; `node.Config` bekommt `Surface
 surface.Policies`. Ein Gerät, das mit einem anderen `Policies.Digest()`
 gebaut wurde als der Knoten, den es betritt, wird beim `Add` mit
-`ErrPolicyMismatch` abgewiesen. Vergisst ein Host das Feld, gilt der
+`ErrPolicyMismatch` abgewiesen — Policies gelten nur auf Knoten-Ebene
+(Owner-Entscheidung E.2); wer je Gerät differenzieren will, schreibt eine
+`Custom`-Policy, die auf `Element.Endpoint` prüft. Vergisst ein Host das Feld, gilt der
 Nullwert: Baseline, Pin, keine Profile — die sichere Seite. Ein Host
 verliert durch das Vergessen nur seine Operator-Einstellungen, nie den
 Schutz.
@@ -385,24 +387,27 @@ Ausnahmeliste (C.5) und im Protokoll jedes Endpoints mit dem Grund
 „kept: surface-change signal“. Begründung: das Signal ist mehr wert als
 die Exaktheit der Stufe, und es bleibt ein optionales Attribut mit eigener
 ID, das ein Controller älterer Generation nicht kennen muss. Zeigt eine
-Messung (S5), dass ein Controller an dem Attribut scheitert, wird die Regel
-für sein Profil zu „unter 1.4.2 nur `Reendpoint`“ — eine Profil-Zeile, kein
-Umbau.
+Messung (S5), dass ein Controller an dem Attribut scheitert, bekommt sein
+Profil eine Zeile, die das Attribut für ihn entfernt und die Ankündigung
+auf den `slog`-Weg beschränkt — eine Profil-Zeile, kein Umbau.
 
 Regel: der `Surface.Digest()` jedes Endpoints wird mit dem Endpoint-
 Datensatz persistiert (`endpoint.Record`, neben `DeviceType`, das
 `assignOrReuseID` heute schon bei Drift aktualisiert,
 `endpoint/assembler.go:325-340`). Weicht der Digest bei Reassembly oder
-Neustart für denselben `StableKey` ab, gilt der konfigurierte Modus:
+Neustart für denselben `StableKey` ab, **kündigt der Knoten die Änderung
+an** (`Announce`, der einzige Modus; Owner-Entscheidung E.1):
+`ConfigurationVersion` des Endpoints steigt, die Descriptor-DataVersion
+steigt, ein `slog`-Ereignis `surface changed` trägt den Diff. Für den Root
+gilt dasselbe über BasicInformation.
 
-| Modus | Wirkung | Wann |
-| --- | --- | --- |
-| `Announce` (Default) | `ConfigurationVersion` des Endpoints steigt, Descriptor-DataVersion steigt, ein `slog`-Ereignis `surface changed` mit dem Diff | Der standardkonforme Weg. |
-| `Reendpoint` (**Vorschlag**, Owner entscheidet in E.1) | Die Endpoint-Nummer wird zurückgezogen und neu vergeben; der Controller sieht ein Gerät verschwinden und ein neues erscheinen | Für Controller, die `ConfigurationVersion` nachweislich ignorieren (Profil-Regel) oder auf Owner-Wunsch. |
-
-Für den Root-Endpoint gibt es nur `Announce`. Fällt E.1 gegen
-`Reendpoint`, bleibt C.9 bei `Announce` plus Protokoll; die Tabelle
-verliert eine Zeile, nichts sonst ändert sich.
+Ein Modus, der die Endpoint-Nummer neu vergibt (der Controller sähe ein
+Gerät verschwinden und ein neues erscheinen), wird **nicht** gebaut. Er
+kostete dem Nutzer Raumzuordnungen im Controller, und kein gemessener
+Controller verlangt ihn. Zeigt eine Profil-Messung (S5) einen Controller,
+der `ConfigurationVersion` ignoriert, verlangt dessen Profil-Zeile den
+Modus, und er wird dann gebaut — als Profil-Regel, nicht als globaler
+Schalter.
 
 **Unverifiziert, Phase S4 liest es zuerst:** ob und wie matter.js
 `ConfigurationVersion` bei einer Behavior-Änderung erhöht
@@ -429,8 +434,8 @@ tut, ein `by_design`-Eintrag.
 4. **Policy-Kette**: Präzedenz; Protokoll-Vollständigkeit; `Add` mit
    fremdem Digest abgewiesen; Nullwert = Baseline (die fünf Listen jedes
    gegateten Clusters gleichen matter.js).
-5. **Stabilität**: Digest-Drift → `ConfigurationVersion` steigt;
-   `Reendpoint` vergibt neu; kein Drift → nichts passiert.
+5. **Stabilität**: Digest-Drift → `ConfigurationVersion` steigt; kein
+   Drift → nichts passiert.
 6. **chip-tool**: Default-Build unverändert, Commissioning-Guard grün. Die
    Erweiterung `BD-chip-Thermostat-Schedules` auf einem Thermostat-
    Endpoint des Referenz-Daemons (Flag `--extensions`), PICS
@@ -464,24 +469,28 @@ tut, ein `by_design`-Eintrag.
    hand-begründete Ausnahme neben der berechneten Liste.
 10. **Ein Profil darf eine Stufe mitbringen; ein explizites Level
     gewinnt** (C.6).
+11. **Die Stufe begrenzt auch den Root-Endpoint** (E.3); die berechnete
+    Ausnahmeliste zeigt, was dort bleibt.
+12. **TEVT wird in S2 gegatet.** Gemessen 2026-10-30:
+    `MATTERJS_REF=origin/main make ahead-check` — alle 31 Marker halten am
+    Pin `862ad75f` und an `origin/main` `d87a6392` (2026-10-29); matter.js
+    hat die Thermostat-Events nicht aufgeholt.
 
-## E. Offene Fragen an den Owner
+## E. Owner-Entscheidungen (2026-10-30)
 
-1. **`Reendpoint` als Modus** — gewünscht, oder reicht `Announce` plus
-   Protokoll? `Reendpoint` kostet dem Nutzer Raumzuordnungen im
-   Controller.
-2. **Policies je Gerät überschreibbar** (#331, offene Frage)? Vorschlag:
-   nein. Ein Knoten, eine Oberfläche; wer je Gerät differenzieren will,
-   schreibt eine `Custom`-Policy, die auf `Element.Endpoint` prüft.
-3. **Root-Oberfläche unter der Stufe** (#332, offene Frage)? Vorschlag:
-   ja, dieselbe Regel; die Ausnahmeliste zeigt, was bleibt.
-4. **TEVT**: Register-Zeile oder nach dem nächsten Pin-Lift aufgeholt?
-   `make ahead-check` entscheidet; das Konzept nimmt nichts an.
-5. **Profil-Regel-Schwelle**: entfernt nur *Reproduced*, oder auch
-   *Reported*? Vorschlag: *Reproduced* entfernt, *Reported* steht im
-   Register und im Protokoll als Warnung.
-6. **Paketname** `surface` — oder `exposure`? `surface` ist kurz und
-   deckt sich mit der Sprache in #331.
+1. **Nur `Announce`.** Kein Modus, der Endpoint-Nummern neu vergibt; eine
+   Profil-Zeile darf ihn später verlangen, gebaut wird er erst dann (C.9).
+2. **Policies nur auf Knoten-Ebene.** Kein Überschreiben je Gerät; `Add`
+   mit fremdem Digest wird abgewiesen; Differenzierung je Gerät ist eine
+   `Custom`-Policy (C.7).
+3. **Die Stufe begrenzt auch den Root-Endpoint.** Dieselbe Regel für alle
+   Endpoints (D.11).
+4. **TEVT wird gegatet.** Vorab an `origin/main` geprüft; der Marker hält
+   (D.12). Holt matter.js auf, fällt die Zeile per Pin-Lift-Urteil
+   „caught up“ und das Gate wird Baseline.
+5. **Nur *Reproduced* entfernt.** *Reported* und *Inherited* sind
+   Register- und Protokollzeilen (C.6).
+6. **Paketname `surface`.**
 
 ## F. Phasen
 
@@ -493,7 +502,7 @@ weiteren, S2 bis S4 sind untereinander unabhängig, S5 setzt S4 voraus.
 | **S1 Wert und Protokoll** | `surface/` (Surface, Element, Policy, Policies, Report), Komposition als `compose(...)`, `Node.Surface()`, `Device.Surface()`, `--dump-surface`, `script/surfacecheck` mit erstem Snapshot. Keine Verhaltensänderung. | Fable (Entwurf, Paket-Doku), Opus (Implementierung nach Brief) | Snapshot committet; Protokoll vollständig; alle Guards grün; `apidiff` meldet nur Zusätze. |
 | **S2 Referenz** | `AheadElements` in `thermo` und jedem Server, den die Messung nennt; Referenz-Policy; `ErrExtensionNotEnabled`; `ahead-check` mit Spalte `surface`, Vollständigkeit, Beißprobe; `--extensions` im Daemon; PICS; `TC_TSTAT_4_5`; CHANGELOG **Breaking** für Hosts, die MSCH/TEVT setzen. | Fable (Register, Messung, `by_design`-Zeilen), Opus (Gates) | Default-Build: fünf Listen = matter.js für jede gegatete Zeile; Commissioning-Guard grün; 4.5 läuft oder ist klassifiziert. |
 | **S3 Stufe** | Extraktor an den matter.js-Tags verifizieren (oder Stufen-Extraktor); `schema/levels_gen.go`; Stufen-Policy; Ausnahmeliste berechnet; `docs/reference/spec-levels.md`; chipdm-Gegenprobe; `--spec-level` im Daemon; ADR-Nachtrag zu 0015 (Quelle der Stufen). | Sonnet (Extraktion, Generator), Fable (Policy-Regeln, ADR), Opus (Guards) | `--spec-level 1.4.2`: kein Closure, keine Kamera, kein Chime komponiert; Thermostat ohne TEVT/TSUGGEST; am Pin unverändert. |
-| **S4 Stabilität** | matter.js zu `ConfigurationVersion` lesen; Digest im `endpoint.Record`; `Announce`; optional `Reendpoint`; Guards. | Fable | Drift-Test: Version steigt; Neustart ohne Drift: nichts. |
+| **S4 Stabilität** | matter.js zu `ConfigurationVersion` lesen; Digest im `endpoint.Record`; `Announce`; Guards. | Fable | Drift-Test: Version steigt; Neustart ohne Drift: nichts. |
 | **S5 Profile** | `Profile`, Register `notes/parity/controller_profiles.md` mit Konfidenzspalte; Owner-Handtest Apple Home (MSCH / Hold / RunningState je einzeln); erste Zeilen; `eligibility.Compat` als Client-Zwilling dokumentiert. | Fable; Handtest Owner | Profil `apple-home` existiert; entfernt genau die *Reproduced*-Zeilen; Protokoll nennt jede. |
 
 Begleitend: **ADR 0030** „Die bediente Oberfläche ist ein Wert unter
