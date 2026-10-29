@@ -570,6 +570,9 @@ whose family is not in that list is "not yet run", not "not supported".
 | SC_TC, the BLE and Thread cases of DD and SC | Bluetooth, Thread | (d) out of scope |
 | CNET Thread cases | the device side has no Thread radio; the Thread NetworkCommissioning variant over a border router (`core.ThreadNetworkCommissioning`, ADR 0027) is not on the reference daemon | (c) not yet run |
 | TBRM | the module serves ThreadBorderRouterManagement over an OTBR (`cluster/threadbr`, ADR 0027) and the reference daemon's `--otbr` adds the endpoint, but the harness does not run the family against a daemon with a virtual OTBR yet (`.github/workflows/otbr-virtual.yml` builds one, dispatch-only) | (c) not yet run |
+| JFADMIN, JFDS | the module serves JointFabricAdministrator and JointFabricDatastore after connectedhomeip (`cluster/jointfabric`, wave 26-D; report 26-D cites `TC_JFDS_2_2` and `TC_JFADMIN_2_2`), but the reference daemon composes neither and the harness does not run the families | (c) not yet run |
+| the camera, TLS, network-infrastructure and AmbientContextSensing families | the module serves the seven camera clusters, the two TLS clusters (`cluster/camera`, `cluster/tls`, waves 26-A1 to 26-A3), WiFiNetworkManagement and ThreadNetworkDirectory (`cluster/netinfra`, wave 26-B) and AmbientContextSensing (`cluster/sensing`, wave 26-C), but the reference daemon composes none of them and the harness does not run their families | (c) not yet run |
+| the TZ, NTPC, NTPS and TSC cases of TIMESYNC | the module serves the four features after connectedhomeip since wave 27-B (`node.Config.TimeSynchronization`); the reference daemon turns none on, so the cases stay not applicable in the status block above | (c) not yet run |
 
 CNET runs twice. The `CNET` row is the certified default composition, whose
 NetworkCommissioning is Ethernet-only; its Wi-Fi cases are not applicable or

@@ -10,11 +10,15 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
-## [0.13.12] — 2026-10-28
-
 ### Added
 
 - The peer's reported session intervals on the device: `node.SessionInfo.PeerIdleInterval`, `PeerActiveInterval` and `PeerActiveThreshold` (what the controller sent in PBKDFParamRequest or Sigma1, also on a resumed session), over the new `secure/operational.Entry.PeerMRPIntervals` and the `Peer*Ms` fields of `operational.SessionInfo`; `controller.Config.Sessions` (`controller.SessionIntervals`), the controller's own intervals in its handshakes, the counterpart of `node.Config.Sessions`; `fabrictest.ControllerOptions.Sessions`. matter.js's `ReportedSessionParametersTest.ts` is ported (both cases), the test register's last planned file of milestone 6 phase 27.
+
+### Changed
+
+- Milestone 6 closed (wave 27-C; docs and registers only, no API change). `docs/matterjs-comparison.md` is swept: every row that is not ✅ names the decision that keeps it, the camera and home-automation-remainder rows are ✅, the rows of wave 27-A that the 27-B merge had dropped are back, and the non-goals name the Thread radio and the Access Restriction List. The findings register records the sweep (61 open items before, 57 after: four closed, four kept with a decision, the rest awaiting their new milestone). `docs/roadmap.md` lists milestone 6's waves with their releases; concept v10 moved to `docs/history/`. `docs/certifiability.md` lists the Joint Fabric, camera, TLS, network-infrastructure, AmbientContextSensing and TimeSynchronization-feature families as not yet run. `notes/parity/pin-lifts.md` names the 18 Ahead-of-matter.js markers milestone 6 added for the next lift.
+
+## [0.13.12] — 2026-10-28
 
 ### Added
 

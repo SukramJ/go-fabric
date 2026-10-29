@@ -289,9 +289,35 @@ matter.js logic exists, `BD-Matter-ARL-NotMounted`), the **Thread radio**
 135/135, 91/91, no row of the comparison older than its milestone. No
 consumer asked for a camera, which is why this is milestone 6 and not 2.
 
-**Status 2026-10-27.** [Concept v10](https://github.com/SukramJ/go-fabric/blob/main/docs/concept-v10-completeness.md) (German) plans the milestone from the read map of 2026-10-26: the 17 clusters of phase 26 already have generated servers (brief CL, 2026-10-25); matter.js carries behaviour for `WebRtcTransportRequestor` only, connectedhomeip for 15 of the 17, none for WaterTankLevelMonitoring. Waves: 26-A1 camera signalling (`WebRtcTransportRequestor` after matter.js, Chime, CameraAvSettingsUserLevelManagement) → 26-A2 streams (CameraAvStreamManagement, ZoneManagement) → 26-A3 transport (TLS, WebRtcTransportProvider, PushAvStreamTransport), in parallel 26-B network infrastructure (WiFiNetworkManagement, ThreadNetworkDirectory, the provisional ThreadNetworkDiagnostics attributes) → 26a Thread Border Router (ADR 0027) → 26-C AmbientContextSensing (WaterTankLevelMonitoring stays generated, a `by_design` entry) → 26-D Joint Fabric after connectedhomeip (owner decision 2026-10-27: stage 6c of ADR 0020 is pulled into this milestone) → 27-A the controller remainder (the invoke batcher — owner decision 2026-10-27: implemented after matter.js —, the `Discovery` shape, the DCL vendor information service, NOC rotation with the PQC phase 1 sizes) → 27-B the device remainder (reported session parameters, the BDX MRP delay, TEVT, composite device types in `devicegen`, TimeSynchronization's optional features after connectedhomeip, AirQuality's feature-gated values) → 27-C the sweep. An audit of every generated server against connectedhomeip (2026-10-27) found no further rules to port: `BD-Matter-GeneratedServerSuffices` lists the clusters that are complete by the model alone. Every chip-sourced server is a row of the Ahead-of-matter.js register with a host port and the chip unit tests as parity cases; camera clusters stay out of host devices until a live pairing with Apple Home passes. One release per wave, `v0.13.4` onwards; **milestone 6 closes with `v0.14.0`.**
+**Status 2026-10-27.** [Concept v10](https://github.com/SukramJ/go-fabric/blob/main/docs/history/concept-v10-completeness.md) (German, in the history since the milestone closed) plans the milestone from the read map of 2026-10-26: the 17 clusters of phase 26 already have generated servers (brief CL, 2026-10-25); matter.js carries behaviour for `WebRtcTransportRequestor` only, connectedhomeip for 15 of the 17, none for WaterTankLevelMonitoring. Waves: 26-A1 camera signalling (`WebRtcTransportRequestor` after matter.js, Chime, CameraAvSettingsUserLevelManagement) → 26-A2 streams (CameraAvStreamManagement, ZoneManagement) → 26-A3 transport (TLS, WebRtcTransportProvider, PushAvStreamTransport), in parallel 26-B network infrastructure (WiFiNetworkManagement, ThreadNetworkDirectory, the provisional ThreadNetworkDiagnostics attributes) → 26a Thread Border Router (ADR 0027) → 26-C AmbientContextSensing (WaterTankLevelMonitoring stays generated, a `by_design` entry) → 26-D Joint Fabric after connectedhomeip (owner decision 2026-10-27: stage 6c of ADR 0020 is pulled into this milestone) → 27-A the controller remainder (the invoke batcher — owner decision 2026-10-27: implemented after matter.js —, the `Discovery` shape, the DCL vendor information service, NOC rotation with the PQC phase 1 sizes) → 27-B the device remainder (reported session parameters, the BDX MRP delay, TEVT, composite device types in `devicegen`, TimeSynchronization's optional features after connectedhomeip, AirQuality's feature-gated values) → 27-C the sweep. An audit of every generated server against connectedhomeip (2026-10-27) found no further rules to port: `BD-Matter-GeneratedServerSuffices` lists the clusters that are complete by the model alone. Every chip-sourced server is a row of the Ahead-of-matter.js register with a host port and the chip unit tests as parity cases; camera clusters stay out of host devices until a live pairing with Apple Home passes. One release per wave, `v0.13.4` onwards; **milestone 6 closes with `v0.14.0`.**
 
 **Status 2026-10-28.** Wave 26-D implements Joint Fabric after connectedhomeip, ahead of matter.js (ADR 0020 stage 6c): the JointFabricDatastore and JointFabricAdministrator servers in `cluster/jointfabric` behind the host ports `DatastoreSync`, `DatastoreStore`, `AdministratorPort` and `CommissionerReach`, the shared trust verification in `client/jcm`, and the commissioner's Joint Commissioning step with the host's consent ([Joint Fabric guide](guides/joint-fabric.md)); chip's 62 unit tests ported, 58 by meaning and 4 C++ lifetime cases replaced by a context test.
+
+**Status 2026-10-28: closed.** Every wave landed with its release:
+
+| Phase | Wave | Content | Release |
+| --- | --- | --- | --- |
+| 26 | 26-B | WiFiNetworkManagement, ThreadNetworkDirectory, the provisional ThreadNetworkDiagnostics attributes | `v0.13.4` |
+| 26 | 26-A1 | camera signalling: WebRtcTransportRequestor, Chime, CameraAvSettingsUserLevelManagement | `v0.13.6` |
+| 26 | 26-A2 | camera streams: CameraAvStreamManagement, ZoneManagement | `v0.13.7` |
+| 26a | 26a | the Thread Border Router over OTBR REST (ADR 0027) | `v0.13.7` |
+| 26 | 26-C | AmbientContextSensing; WaterTankLevelMonitoring stays generated | `v0.13.8` |
+| 26 | 26-A3 | camera transport: the TLS clusters, WebRtcTransportProvider, PushAvStreamTransport | `v0.13.9` |
+| 26 | 26-D | Joint Fabric (ADR 0020 stage 6c) | `v0.13.10` |
+| 27 | 27-A | the controller remainder: the invoke batcher, discovery sessions, DCL vendor information, NOC rotation, PQC phase 1 | `v0.13.11` |
+| 27 | 27-B | the device remainder: session intervals, the BDX MRP delay, TEVT, the composite device types, TimeSynchronization's features, AirQuality's feature-gated values | `v0.13.12` |
+| 27 | #326 | the peer's reported session parameters on both ends | `v0.14.0` |
+| 27 | 27-C | the sweep: the comparison, the findings, test and Ahead-of-matter.js registers, this page and the certifiability page | `v0.14.0` |
+
+The snapshot's 135 clusters each have a server; 90 of its 91 device types
+are generated (CastingVideoClient stays excluded,
+`script/devicegen/devicetypes.go`). What the sweep left open is in
+[report 27-C](https://github.com/SukramJ/go-fabric/blob/main/notes/briefs/reports/27C.md):
+the rows the comparison keeps with their decisions, the findings that
+outlived their milestone tags, and the owner's hand tests (group multicast
+against a real controller, the ESPHome proxy live test, the Apple Home
+camera pairing) and the CSA Test Harness spot check of phase 27, which
+stay open. **Milestone 6 is closed with `v0.14.0`.**
 
 ### Milestone 7: BLE on the device side
 
