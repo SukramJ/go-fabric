@@ -1,6 +1,6 @@
 # Konzept v11 — Die Oberfläche als Wert: Referenz, Spezifikationsstufe, Controller-Profil
 
-Stand 2026-10-30 (Rev. 3: Owner-Entscheidungen zu Abschnitt E). Faktenbasis: go-fabric `8f2926a9` (v0.14.0), matter.js-Pin
+Stand 2026-10-30 (Rev. 4: ConfigurationVersion nach Root und Bridged Endpoint getrennt). Faktenbasis: go-fabric `8f2926a9` (v0.14.0), matter.js-Pin
 `862ad75f`, chip `6170af84`. Jede Zeile mit `file:line` wurde in dieser
 Sitzung gelesen; alles andere ist als **unverifiziert** markiert. Sprache:
 Deutsch (Phasenkonzept); Briefs, Issues, Doku, Register auf Englisch.
@@ -379,17 +379,34 @@ in keiner Elementdatei, an v0.16.0 (1.4.2), v0.17.0 (1.5.1) und v0.18.0
 dasselbe Bild in connectedhomeips `data_model/` je Version gelesen (nicht
 committet).
 
-Daraus folgt eine Wechselwirkung zwischen C.5 und C.9: an einer Stufe
-unter 1.4.2 würde die Stufen-Policy genau das Signal entfernen, auf das
-`Announce` baut. Regel: **die Stufe entfernt `ConfigurationVersion` nie.**
-Die Ausnahme steht als einzige hand-begründete Zeile neben der berechneten
-Ausnahmeliste (C.5) und im Protokoll jedes Endpoints mit dem Grund
-„kept: surface-change signal“. Begründung: das Signal ist mehr wert als
-die Exaktheit der Stufe, und es bleibt ein optionales Attribut mit eigener
-ID, das ein Controller älterer Generation nicht kennen muss. Zeigt eine
-Messung (S5), dass ein Controller an dem Attribut scheitert, bekommt sein
-Profil eine Zeile, die das Attribut für ihn entfernt und die Ankündigung
-auf den `slog`-Weg beschränkt — eine Profil-Zeile, kein Umbau.
+Das Attribut hat am Pin **zwei verschiedene Konformitäten**
+(`parity/schema.json`, generiert nach `cluster/spec/*/definition_gen.go`):
+
+| Cluster | Konformität | Revision am Pin | Folge |
+| --- | --- | --- | --- |
+| BasicInformation (Root) | `Rev >= v6` — **Pflicht** ab Revision 6 (`cluster/spec/basicinformation/definition_gen.go:508`) | 6 (`:25`) | Die allgemeine Regel „Pflicht am Pin → bleibt“ (C.3, C.5) hält es. Keine Ausnahme nötig. |
+| BridgedDeviceBasicInformation | `[Rev >= v6]` — **optional** (`cluster/spec/bridgeddevicebasicinformation/definition_gen.go:572`) | 6 (`:25`) | Die Stufen-Policy würde es unter 1.4.2 entfernen. Hier greift die Ausnahme. |
+
+Daraus folgt die Wechselwirkung zwischen C.5 und C.9: an einer Stufe unter
+1.4.2 würde die Stufen-Policy auf **Bridged Endpoints** genau das Signal
+entfernen, auf das `Announce` baut. Regel: **die Stufe entfernt
+`ConfigurationVersion` auf Bridged Endpoints nie.** Die Ausnahme steht als
+einzige hand-begründete Zeile neben der berechneten Ausnahmeliste (C.5),
+nur für BridgedDeviceBasicInformation, und im Protokoll jedes Bridged
+Endpoints mit dem Grund „kept: surface-change signal“. Am Root erscheint
+sie nicht; dort trägt die berechnete Liste das Attribut als Pflicht am
+Pin. Begründung: das Signal ist mehr wert als die Exaktheit der Stufe, und
+es bleibt ein optionales Attribut mit eigener ID, das ein Controller
+älterer Generation nicht kennen muss.
+
+Der Profil-Rückfall ist entsprechend **auf Bridged Endpoints beschränkt**:
+zeigt eine Messung (S5), dass ein Controller an dem Attribut scheitert,
+bekommt sein Profil eine Zeile, die es auf Bridged Endpoints für ihn
+entfernt und die Ankündigung dort auf den `slog`-Weg beschränkt. Am Root
+darf keine Operator-Policy es entfernen — das bräche die Konformität an
+der neuesten Revision, was C.3 jeder Operator-Policy verbietet; dort
+bleibt das Attribut, und die Ankündigung am Root tut, was das Profil
+erlaubt (Wert erhöhen oder nur protokollieren).
 
 Regel: der `Surface.Digest()` jedes Endpoints wird mit dem Endpoint-
 Datensatz persistiert (`endpoint.Record`, neben `DeviceType`, das
@@ -465,8 +482,11 @@ tut, ein `by_design`-Eintrag.
    Cluster ein Endpoint erreicht, entscheiden die Gerätetypen des Hosts.
 8. **Verhalten bleibt immer das der Pin-Revision.** Stufe und Profil
    entfernen Oberfläche, nie Logik.
-9. **Die Stufe entfernt `ConfigurationVersion` nie** (C.9). Die einzige
-   hand-begründete Ausnahme neben der berechneten Liste.
+9. **Die Stufe entfernt `ConfigurationVersion` auf Bridged Endpoints
+   nie** (C.9). Die einzige hand-begründete Ausnahme neben der berechneten
+   Liste, nur für BridgedDeviceBasicInformation; am Root ist das Attribut
+   Pflicht am Pin und bleibt durch die allgemeine Regel. Kein Profil
+   entfernt es am Root.
 10. **Ein Profil darf eine Stufe mitbringen; ein explizites Level
     gewinnt** (C.6).
 11. **Die Stufe begrenzt auch den Root-Endpoint** (E.3); die berechnete
