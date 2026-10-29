@@ -133,7 +133,7 @@ measured gap and the four tranches are in
 | Ambient sensing (AmbientContextSensing, WaterTankLevelMonitoring) | ✅ (generated behaviour stubs: `AmbientContextSensingServer.ts:14`, `WaterTankLevelMonitoringServer.ts:14`) | [`cluster/sensing`](https://github.com/SukramJ/go-fabric/tree/main/cluster/sensing) for AmbientContextSensing (brief 26-C); the generated server of WaterTankLevelMonitoring | ✅ | — | AmbientContextSensing follows connectedhomeip ahead of matter.js (`BD-chip-AmbientContextSensing-RulesInServer`, the [ambient context sensing guide](guides/sensing.md)): the detections with their hold time, the detection attributes derived from them, the object count against its threshold, the supported-list and predicted-activity checks, the HoldTime and ObjectCountConfig writes and both events; chip's SensorFusion feature is not in the matter.js model and not served. WaterTankLevelMonitoring stays generated: no source carries logic (chip has no server for it at `6170af84`; `BD-Matter-GeneratedServerSuffices`). No device type lists either as a server; a host mounts the AmbientContextSensing server as a declaration's `HostServer`. |
 | TimeSynchronization's TZ, NTPC, NTPS and TSC | ✅ (`TimeSynchronizationServer.ts:14`, the generated behaviour) | [`core.TimeSynchronization`](https://github.com/SukramJ/go-fabric/blob/main/cluster/core/time_synchronization_features.go) with `node.Config.TimeSynchronization` (wave 27-B) | ✅ | — | The four features follow connectedhomeip's `TimeSynchronizationCluster.cpp` ahead of matter.js: the time-zone and DST lists with their rules and events, LocalTime, the default NTP server, the NTP server flag and the trusted time source with MissingTrustedTimeSource, persisted in the node's store. UTCTime stays the node's clock; chip's client that reads time from the trusted source is not ported. Off unless configured; the reference daemon turns none on. |
 | Thermostat events (TEVT) | ✅ in the model; `ThermostatServer.ts` emits none of the eight | [`cluster/thermo`](https://github.com/SukramJ/go-fabric/blob/main/cluster/thermo/events.go) (wave 27-B) | ✅ | — | Served ahead of matter.js after connectedhomeip's `ThermostatClusterEvents.cpp`: the events where chip emits them, ThermostatRunningMode with TEVT and AUTO ([thermostat guide](guides/thermostat.md#events-tevt)). |
-| Composite device types (VideoDoorbell, FloodlightCamera) | ✅ (`video-doorbell.ts`, `floodlight-camera.ts`: no behaviours) | generated constructors that take the components as parts (wave 27-B) | ✅ | — | As matter.js places them: each component an endpoint below the composite, validated by the node's device-type validation. CastingVideoClient stays excluded. |
+| Composite device types (VideoDoorbell, FloodlightCamera) | ✅ (`video-doorbell.ts`, `floodlight-camera.ts`: no behaviours) | generated constructors that take the components as parts (wave 27-B) | ✅ | — | As matter.js places them: each component an endpoint below the composite, validated by the node's device-type validation. CastingVideoClient, client behaviours plus Binding and the optional ContentAppObserver as matter.js has it, is generated too (27-C follow-up). |
 | WiFiNetworkManagement, ThreadNetworkDirectory (network infrastructure) | ✅ (generated behaviour stubs, `WiFiNetworkManagementServer.ts:14`, `ThreadNetworkDirectoryServer.ts:14`) | full after connectedhomeip at `6170af84` ([`cluster/netinfra`](https://github.com/SukramJ/go-fabric/tree/main/cluster/netinfra), brief 26-B): the Wi-Fi credentials as host state with chip's validation, PassphraseSurrogate rule and the CASE-only `NetworkPassphraseRequest`; the Thread datasets behind the `ThreadNetworkStore` port with chip's dataset checks and status codes, `PreferredExtendedPanID` held to a stored network | ✅ | — | Ahead of matter.js (`BD-chip-WiFiNetworkManagement-RulesInServer`, `BD-chip-ThreadNetworkDirectory-RulesInServer`); chip's unit tests ported as parity cases. The kit mounts both on NetworkInfrastructureManager and ThreadBorderRouter ([Network infrastructure](./guides/network-infrastructure.md)). |
 
 ## 6. Device model and composition
@@ -155,8 +155,6 @@ measured gap and the four tranches are in
 | `packages/testing` — its own test harness | Go's `testing`, plus [`bridge/bridgetest`](../bridge/bridgetest) and [`endpoint/endpointtest`](../endpoint/endpointtest) for consumers | ✅ | — | |
 | chip-tool / CSA `Test_TC_*` execution | `internal/chiptool/`, [`conformance/`](../conformance), `.github/workflows/chiptool.yml` | ✅ | — | Three CI jobs including a control leg that separates our defects from environment failures. |
 | `support/codegen` `validate-chipdm-model` — the model against CHIP's data model XML | [`internal/chipdm`](../internal/chipdm), [`chip-datamodel-crosscheck.md`](./chip-datamodel-crosscheck.md) | ✅ | — | A port of matter.js's comparison, run against the snapshot wherever a connectedhomeip checkout is present (CI provides one; the XML is read, never committed); every difference is classified ([ADR 0015](./adr/0015-chip-data-model-read-at-run-time.md)). |
-| `packages/cli-tool`, `nodejs-shell` — interactive shells | — | ○ | **Low** | `examples/reference-bridge` covers the "run it and pair it" need. |
-| `packages/mqtt`, `react-native`, `nodejs-ws` — runtime bindings | — | ○ | **No** | Host concerns. This module is a library; the host owns its own surfaces. |
 | Diagnostics for a failed pairing | [`diagevent/`](../diagevent) | ✅ | — | A bounded trace explaining a pairing that failed without an error on the wire. No matter.js equivalent — a divergence in our favour. |
 
 ---
@@ -191,6 +189,13 @@ re-opened by accident (the first is kept for its history):
 5. **No Access Restriction List.** The Managed Aggregator use case is not
    served (`BD-Matter-ARL-NotMounted`); the re-activation checklist is in
    `by_design.md`.
+6. **No interactive shells.** matter.js's tools (`packages/cli-tool`,
+   `nodejs-shell`) are not mirror targets; the reference CLI
+   (`examples/reference-controller`) and daemon (`examples/reference-bridge`)
+   cover the use.
+7. **No runtime bindings.** matter.js's runtime bindings (`packages/mqtt`,
+   `react-native`, `nodejs-ws`) are not mirror targets; this module is a
+   library, and the reference CLI and daemon cover the use.
 
 ## If you are looking for the next thing to build
 

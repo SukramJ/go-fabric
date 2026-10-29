@@ -15,6 +15,9 @@ import (
 // its `server.mandatory` / `server.optional` blocks and its
 // `client.mandatory` / `client.optional` blocks, transcribed in order —
 // packages/node/src/devices/on-off-light-switch.ts:75-95 is the shape of all eleven.
+// CastingVideoClient (casting-video-client.ts at 862ad75f: the Binding
+// server, the optional ContentAppObserver server, client behaviours only)
+// has the same shape and is held here too.
 type controllerParity struct {
 	ty                              *Type
 	id, revision                    uint16
@@ -100,6 +103,13 @@ var controllerTypes = []controllerParity{
 		[]string{"OnOff", "MediaPlayback", "KeypadInput"},
 		[]string{"LevelControl", "WakeOnLan", "Channel", "TargetNavigator", "MediaInput", "LowPower", "ContentLauncher", "AudioOutput", "ApplicationLauncher", "AccountLogin", "ContentControl"},
 	},
+	{
+		&CastingVideoClientType, 0x0029, 2,
+		[]string{"Binding"},
+		[]string{"ContentAppObserver"},
+		[]string{"OnOff", "KeypadInput", "ContentLauncher", "ApplicationBasic"},
+		[]string{"LevelControl", "Messages", "WakeOnLan", "Channel", "TargetNavigator", "MediaPlayback", "MediaInput", "LowPower", "AudioOutput", "ApplicationLauncher", "AccountLogin", "ContentControl"},
+	},
 }
 
 func splitNames(reqs []ClusterRequirement) (mandatory, optional []string) {
@@ -114,8 +124,8 @@ func splitNames(reqs []ClusterRequirement) (mandatory, optional []string) {
 }
 
 // TestControllerDeviceTypesParity: each of the eleven controller device
-// types names its identity, its servers and its client set as the matter.js
-// device file does, and its client set is the snapshot's clientCluster
+// types and CastingVideoClient names its identity, its servers and its
+// client set as the matter.js device file does, and its client set is the snapshot's clientCluster
 // requirements (parity/schema.json, read through schema), mandatory where
 // the conformance is "M" — what matter.js's RequirementGenerator emits as
 // `client.mandatory`.

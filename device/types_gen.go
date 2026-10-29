@@ -25,6 +25,7 @@ var committedTypes = []*Type{
 	&ContentAppType,
 	&ModeSelectType,
 	&BasicVideoPlayerType,
+	&CastingVideoClientType,
 	&VideoRemoteControlType,
 	&FanType,
 	&AirQualitySensorType,

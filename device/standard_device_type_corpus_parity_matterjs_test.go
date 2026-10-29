@@ -77,7 +77,8 @@ var pinnedViolations = map[string][]string{
 
 // devicegenExcluded reads script/devicegen's excluded map — the snapshot
 // device types the module does not commit, each with its reason — from the
-// generator's source.
+// generator's source. The map may be empty (every snapshot device type
+// committed); the test fails only when the declaration is not found.
 func devicegenExcluded(t *testing.T) map[string]string {
 	t.Helper()
 	f, err := parser.ParseFile(token.NewFileSet(), "../script/devicegen/devicetypes.go", nil, 0)
@@ -99,6 +100,7 @@ func devicegenExcluded(t *testing.T) map[string]string {
 		return true
 	})
 	out := map[string]string{}
+	found := false
 	ast.Inspect(f, func(n ast.Node) bool {
 		vs, ok := n.(*ast.ValueSpec)
 		if !ok || len(vs.Names) != 1 || vs.Names[0].Name != "excluded" || len(vs.Values) != 1 {
@@ -108,6 +110,7 @@ func devicegenExcluded(t *testing.T) map[string]string {
 		if !ok {
 			return true
 		}
+		found = true
 		for _, el := range lit.Elts {
 			kv, ok := el.(*ast.KeyValueExpr)
 			if !ok {
@@ -127,8 +130,8 @@ func devicegenExcluded(t *testing.T) map[string]string {
 		}
 		return false
 	})
-	if len(out) == 0 {
-		t.Fatal("no excluded device types read from script/devicegen")
+	if !found {
+		t.Fatal("no excluded map read from script/devicegen")
 	}
 	return out
 }

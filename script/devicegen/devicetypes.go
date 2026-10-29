@@ -23,7 +23,8 @@ package main
 // Intercom, Chime, CameraController, ThreadBorderRouter,
 // NetworkInfrastructureManager, JointFabricAdministrator), which brief CL
 // takes in with the generated servers of their clusters (owner decision,
-// 2026-10-25). Sorted by name.
+// 2026-10-25), and CastingVideoClient, which wave 27-C2 takes in (owner
+// decision, 2026-10-29). Sorted by name.
 var committed = []string{
 	"Aggregator",
 	"AirPurifier",
@@ -34,6 +35,7 @@ var committed = []string{
 	"BridgedNode",
 	"Camera",
 	"CameraController",
+	"CastingVideoClient",
 	"CastingVideoPlayer",
 	"Chime",
 	"Closure",
@@ -117,25 +119,21 @@ var committed = []string{
 	"WindowCoveringController",
 }
 
-// cameraMedia is the group of the device types not named in Appendix F.3
-// whose mandatory requirements are its excluded families.
-const cameraMedia = "camera / media (Appendix F.3: their mandatory clusters are the excluded camera and media families)"
-
 // excluded names every other snapshot device type with its group in
-// docs/history/concept-matter-1.6.1-and-device-layer.md Appendix F.3.
-var excluded = map[string]string{
-	// The camera device types (Camera, SnapshotCamera, AudioDoorbell,
-	// Intercom, Chime, CameraController) and the infrastructure ones
-	// (ThreadBorderRouter, NetworkInfrastructureManager,
-	// JointFabricAdministrator) left the group on 2026-10-25 (brief CL §1,
-	// owner decision): their clusters have generated servers. The media
-	// device types left it with ADR 0022, OtaProvider with ADR 0021, and
-	// the composites VideoDoorbell and FloodlightCamera with wave 27-B
-	// (concept v10 0.5): their components are committed device types, which
-	// their generated constructors take as parts (gen.go compositeComponents).
-	// Camera / media by its mandatory requirements (owner's decision,
-	// 2026-10-11), read from parity/schema.json effective.requirements:
-	// CastingVideoClient mandates the media client clusters KeypadInput,
-	// ContentLauncher and ApplicationBasic ("M").
-	"CastingVideoClient": cameraMedia,
-}
+// docs/history/concept-matter-1.6.1-and-device-layer.md Appendix F.3. It is
+// empty since wave 27-C2: every snapshot device type is committed. The
+// camera device types (Camera, SnapshotCamera, AudioDoorbell, Intercom,
+// Chime, CameraController) and the infrastructure ones (ThreadBorderRouter,
+// NetworkInfrastructureManager, JointFabricAdministrator) left the group on
+// 2026-10-25 (brief CL §1, owner decision): their clusters have generated
+// servers. The media device types left it with ADR 0022, OtaProvider with
+// ADR 0021, and the composites VideoDoorbell and FloodlightCamera with wave
+// 27-B (concept v10 0.5): their components are committed device types,
+// which their generated constructors take as parts (gen.go
+// compositeComponents). CastingVideoClient, excluded as camera / media by
+// its mandatory media client clusters (owner's decision, 2026-10-11), left
+// it with wave 27-C2 (owner decision, 2026-10-29): matter.js
+// casting-video-client.ts carries the Binding server, the optional
+// ContentAppObserver server and client behaviours only, which the
+// generator emits as it does for VideoRemoteControl.
+var excluded = map[string]string{}

@@ -30,8 +30,9 @@
 //	                                     # names another for the latter)
 //
 // The committed set is the device types in scope (committed in
-// devicetypes.go); every other snapshot device type is listed in
-// excluded with its reason.
+// devicetypes.go): since wave 27-C2 every snapshot device type, 91/91.
+// excluded, empty now, is where a snapshot device type taken out of scope
+// is listed with its reason.
 package main
 
 import (

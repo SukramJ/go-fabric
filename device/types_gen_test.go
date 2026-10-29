@@ -312,6 +312,29 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 	} else if !refusesFixture("CameraController") {
 		t.Errorf("CameraController: %v", err)
 	}
+	if _, err := NewCastingVideoClient(Options{}); err == nil {
+		t.Error("CastingVideoClient: constructed without a StableKey")
+	}
+	if d, err := NewCastingVideoClient(testOptions("CastingVideoClient"), testWith(t, "CastingVideoClient")...); err == nil {
+		if d.Type() != &CastingVideoClientType {
+			t.Errorf("CastingVideoClient: type %v", d.Type().Name)
+		}
+		if s := d.Binding(); s == nil || s.Underlying() != d.Server(0x001E) {
+			t.Error("CastingVideoClient: mandatory Binding not mounted")
+		}
+		if s, srv := d.ContentAppObserver(), d.Server(0x0510); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
+			t.Error("CastingVideoClient: optional ContentAppObserver is not the device's server")
+		}
+		if s, err := FromSpec(Spec{Type: CastingVideoClientID, Options: testOptions("CastingVideoClient"), Declarations: testWith(t, "CastingVideoClient")}); err != nil {
+			t.Errorf("CastingVideoClient: FromSpec: %v", err)
+		} else {
+			sameDevice(t, "CastingVideoClient", s, d.Device)
+		}
+	} else if _, serr := FromSpec(Spec{Type: CastingVideoClientID, Options: testOptions("CastingVideoClient"), Declarations: testWith(t, "CastingVideoClient")}); serr == nil || serr.Error() != err.Error() {
+		t.Errorf("CastingVideoClient: FromSpec refuses with %v, NewCastingVideoClient with %v", serr, err)
+	} else if !refusesFixture("CastingVideoClient") {
+		t.Errorf("CastingVideoClient: %v", err)
+	}
 	if _, err := NewCastingVideoPlayer(Options{}); err == nil {
 		t.Error("CastingVideoPlayer: constructed without a StableKey")
 	}

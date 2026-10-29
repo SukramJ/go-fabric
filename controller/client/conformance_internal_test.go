@@ -91,7 +91,8 @@ func keys(vs []endpoint.DeviceTypeViolation) []string {
 
 // TestEndpointDevice: a plug endpoint resolves to the generated
 // OnOffPlugInUnit type with the snapshot's revision beside the peer's; an
-// unknown or excluded device type to none.
+// unknown device type to none; CastingVideoClient, the last type devicegen
+// excluded, resolves since every snapshot device type is generated.
 func TestEndpointDevice(t *testing.T) {
 	t.Parallel()
 	n := cleanPlug().node(t)
@@ -102,12 +103,17 @@ func TestEndpointDevice(t *testing.T) {
 	if rev, ok := plug.DeviceRevision(); !ok || rev != 1 || plug.Device().Revision != fabricdevice.OnOffPlugInUnitRevision {
 		t.Fatalf("peer revision %d %v, snapshot %d", rev, ok, plug.Device().Revision)
 	}
-	for _, dt := range []uint64{0xFFF1_0001, 0x0029} { // manufacturer-specific; CastingVideoClient (excluded, camera / media by its mandatory requirements)
+	for _, dt := range []uint64{0xFFF1_0001, 0xFFFF_FFFF} { // manufacturer-specific; the client view's unknown device type
 		f := cleanPlug()
 		f.dt = dt
 		if d := f.node(t).Endpoint(1).Device(); d != nil {
 			t.Errorf("device type %#x: Device() = %s", dt, d.Name)
 		}
+	}
+	cvc := cleanPlug()
+	cvc.dt = 0x0029
+	if d := cvc.node(t).Endpoint(1).Device(); d != &fabricdevice.CastingVideoClientType {
+		t.Errorf("device type 0x29: Device() = %v", d)
 	}
 	if d := newEndpoint(&n.mu, 7).Device(); d != nil {
 		t.Errorf("an endpoint of no known type: %s", d.Name)

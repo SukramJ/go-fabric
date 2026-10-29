@@ -269,8 +269,8 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 16853,
-    "reachable": 11883,
+    "total_exported": 16858,
+    "reachable": 11888,
     "whitelisted": 4967,
     "unreachable": 3
   },
@@ -22597,7 +22597,7 @@
       "identifier": "TestConformanceStatusString",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/conformance_internal_test.go",
-      "line": 267
+      "line": 273
     },
     {
       "package": "controller/client",
@@ -22618,21 +22618,21 @@
       "identifier": "TestEndpointConformance",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/conformance_internal_test.go",
-      "line": 121
+      "line": 127
     },
     {
       "package": "controller/client",
       "identifier": "TestEndpointConformanceUnknown",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/conformance_internal_test.go",
-      "line": 188
+      "line": 194
     },
     {
       "package": "controller/client",
       "identifier": "TestEndpointDevice",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/conformance_internal_test.go",
-      "line": 95
+      "line": 96
     },
     {
       "package": "controller/client",
@@ -22695,7 +22695,7 @@
       "identifier": "TestNodeConditionsOfTheImage",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/conformance_internal_test.go",
-      "line": 241
+      "line": 247
     },
     {
       "package": "controller/client",
@@ -24466,14 +24466,14 @@
       "identifier": "TestControllerDeviceDeclaresClients",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/controller_types_test.go",
-      "line": 179
+      "line": 189
     },
     {
       "package": "device",
       "identifier": "TestControllerDeviceTypesParity",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/controller_types_test.go",
-      "line": 122
+      "line": 132
     },
     {
       "package": "device",
@@ -24550,7 +24550,7 @@
       "identifier": "TestEveryGeneratedFileIsRegistered",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/registry_test.go",
-      "line": 43
+      "line": 41
     },
     {
       "package": "device",
@@ -24683,7 +24683,7 @@
       "identifier": "TestLookup",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/registry_test.go",
-      "line": 18
+      "line": 17
     },
     {
       "package": "device",
@@ -24858,7 +24858,7 @@
       "identifier": "TestStandardDeviceTypeCorpusParityMatterJS",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/standard_device_type_corpus_parity_matterjs_test.go",
-      "line": 145
+      "line": 148
     },
     {
       "package": "device",
