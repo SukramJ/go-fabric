@@ -14,6 +14,7 @@ import (
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/endpoint"
+	"github.com/SukramJ/go-fabric/surface"
 )
 
 // Options is what the host states about one device beyond its type: the
@@ -44,6 +45,10 @@ type Options struct {
 	// Conditions are the device-type conditions the host states for the
 	// endpoint ([endpoint.Spec.DeviceConditions]).
 	Conditions []string
+	// Surface are the surface policies the device is composed under; nil
+	// is the zero value, no policy. A node refuses a device composed under
+	// policies other than its own (node.Config.Surface).
+	Surface *surface.Policies
 }
 
 // SourceKey is the type of [Options].StableKey ([endpoint.SourceKey]).
@@ -137,6 +142,11 @@ type settings struct {
 	// identify are the hooks of an identifydef.Declare, installed on the
 	// device's Identify handlers ([Device.Identify]).
 	identify []func(contract.ClusterServer) error
+	// measured are the clusters a measurement source projects, which the
+	// assembler builds; cut is what the surface policies removed
+	// (compose).
+	measured map[uint32]bool
+	cut      surfaceCut
 }
 
 func newSettings() *settings {
