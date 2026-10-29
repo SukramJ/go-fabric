@@ -309,9 +309,11 @@ consumer asked for a camera, which is why this is milestone 6 and not 2.
 | 27 | #326 | the peer's reported session parameters on both ends | `v0.14.0` |
 | 27 | 27-C | the sweep: the comparison, the findings, test and Ahead-of-matter.js registers, this page and the certifiability page | `v0.14.0` |
 
-The snapshot's 135 clusters each have a server; 90 of its 91 device types
-are generated (CastingVideoClient stays excluded,
-`script/devicegen/devicetypes.go`). What the sweep left open is in
+The snapshot's 135 clusters each have a server, and its device types are
+generated 91/91 (CastingVideoClient, the last excluded one, joined in the
+27-C follow-up, owner decision 2026-10-29: matter.js's
+`casting-video-client.ts` carries client behaviours only, which the
+generator emits as for the controller device types). What the sweep left open is in
 [report 27-C](https://github.com/SukramJ/go-fabric/blob/main/notes/briefs/reports/27C.md):
 the rows the comparison keeps with their decisions, the findings that
 outlived their milestone tags, and the owner's hand tests (group multicast

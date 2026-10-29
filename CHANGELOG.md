@@ -13,6 +13,7 @@ pseudo-version of `main`.
 ### Added
 
 - The peer's reported session intervals on the device: `node.SessionInfo.PeerIdleInterval`, `PeerActiveInterval` and `PeerActiveThreshold` (what the controller sent in PBKDFParamRequest or Sigma1, also on a resumed session), over the new `secure/operational.Entry.PeerMRPIntervals` and the `Peer*Ms` fields of `operational.SessionInfo`; `controller.Config.Sessions` (`controller.SessionIntervals`), the controller's own intervals in its handshakes, the counterpart of `node.Config.Sessions`; `fabrictest.ControllerOptions.Sessions`. matter.js's `ReportedSessionParametersTest.ts` is ported (both cases), the test register's last planned file of milestone 6 phase 27.
+- The CastingVideoClient device type (0x0029, revision 2) is generated: `device.NewCastingVideoClient`, with the Binding server, the optional ContentAppObserver server and the client clusters of matter.js `casting-video-client.ts`; every snapshot device type is now generated (91/91).
 
 ### Changed
 

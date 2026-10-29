@@ -2,7 +2,7 @@
 
 # Device types
 
-The 90 device types of the `device` package, from the matter.js model at
+The 91 device types of the `device` package, from the matter.js model at
 `862ad75` (Matter 1.6.1). Each section is what the type's `device.<Name>Type`
 carries: the server and client clusters matter.js's generator derives,
 whether the type mandates each, the features it requires and the
@@ -159,6 +159,34 @@ Conditions: FabricSynchronizedNode.
 | PushAvStreamTransport | `0x0555` | `O` | optional |
 | TlsCertificateManagement | `0x0801` | `O` | optional |
 | TlsClientManagement | `0x0802` | `O` | optional |
+
+## CastingVideoClient
+
+`device.NewCastingVideoClient` · id `0x0029` · revision 2 · simple · matter.js `packages/node/src/devices/casting-video-client.ts`
+
+| Server cluster | ID | Conformance | Required | Features | Elements | Declaration |
+| --- | --- | --- | --- | --- | --- | --- |
+| Binding | `0x001E` | `Simple & Client` | mandatory | — | — | `bindingdef.Declare` |
+| ContentAppObserver | `0x0510` | `O` | optional | — | — | `contentappobserverdef.Declare` |
+
+| Client cluster | ID | Conformance | Required |
+| --- | --- | --- | --- |
+| OnOff | `0x0006` | `M` | mandatory |
+| KeypadInput | `0x0509` | `M` | mandatory |
+| ContentLauncher | `0x050A` | `M` | mandatory |
+| ApplicationBasic | `0x050D` | `M` | mandatory |
+| LevelControl | `0x0008` | `O` | optional |
+| Messages | `0x0097` | `O` | optional |
+| WakeOnLan | `0x0503` | `O` | optional |
+| Channel | `0x0504` | `O` | optional |
+| TargetNavigator | `0x0505` | `O` | optional |
+| MediaPlayback | `0x0506` | `O` | optional |
+| MediaInput | `0x0507` | `O` | optional |
+| LowPower | `0x0508` | `O` | optional |
+| AudioOutput | `0x050B` | `O` | optional |
+| ApplicationLauncher | `0x050C` | `O` | optional |
+| AccountLogin | `0x050E` | `O` | optional |
+| ContentControl | `0x050F` | `P, O` | optional |
 
 ## CastingVideoPlayer
 

@@ -13,15 +13,13 @@ import (
 )
 
 // TestLookup: the registry finds a generated type by its 32-bit device
-// type id and misses an excluded snapshot type, an unknown id and one
-// above 0xFFFF.
+// type id and misses an unknown id and one above 0xFFFF.
 func TestLookup(t *testing.T) {
 	t.Parallel()
 	if ty, ok := Lookup(uint32(OnOffPlugInUnitID)); !ok || ty != &OnOffPlugInUnitType || ty.Name != "OnOffPlugInUnit" {
 		t.Fatalf("Lookup(OnOffPlugInUnit) %v %v", ty, ok)
 	}
 	for _, id := range []uint32{
-		0x0029,      // CastingVideoClient: excluded (camera / media by its mandatory client clusters)
 		0xFFF1_0001, // manufacturer-specific
 		0x0001_010A, // above 0xFFFF: not OnOffPlugInUnit
 		0xFFFF_FFFF, // the client view's unknown device type

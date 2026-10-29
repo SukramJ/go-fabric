@@ -743,8 +743,7 @@
     {
       "path": "packages/node/test/behaviors/access-control/AccessControlCustomExtensionTest.ts",
       "status": "planned",
-      "until": "M5",
-      "reason": "A manufacturer extension of AccessControl (a custom attribute and command): the root AccessControl server takes no extension elements; the subject is missing. Milestone 5.",
+      "reason": "A manufacturer extension of AccessControl (a custom attribute and command): no subject exists in the module (the root AccessControl server takes no extension elements); the port waits until a consumer asks for one (owner decision 2026-10-29).",
       "snapshotSha": "4ee3a54035ed20ee81b0e0687711943b476254c5"
     },
     {
@@ -1731,8 +1730,7 @@
     {
       "path": "packages/node/test/endpoint/type/SemanticNamespaceTest.ts",
       "status": "planned",
-      "until": "M5",
-      "reason": "Semantic tag namespaces as values (standard tags, custom namespaces): schema and device carry no namespace table and the device kit no TagList declaration; the subject is missing. Milestone 5.",
+      "reason": "Semantic tag namespaces as values (standard tags, custom namespaces): no subject exists in the module (schema and device carry no namespace table, the device kit no TagList declaration); the port waits until a consumer asks for one (owner decision 2026-10-29).",
       "snapshotSha": "bf9c7994abef9eb3e7b6cd8775458ff982bdd910"
     },
     {

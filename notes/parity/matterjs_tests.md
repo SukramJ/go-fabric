@@ -263,7 +263,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 | file | lines | status | Go tests or class | note |
 | --- | ---: | --- | --- | --- |
 | AccessControlAuxiliaryTest.ts | 380 | partial | `bridge:TestACLWriteWithAuxiliaryTypeOverTheWire`<br>`groups:TestAuxiliaryACLEntries`<br>`cluster/core:TestGroupcastAuxiliaryACLParityMatterJS`<br>`endpoint:TestCheckACLWithTheAuxiliaryFeature`<br>`cluster/core:TestAccessControlAuxiliaryEventsPerChangedFabric`<br>`cluster/core:TestAccessControlAuxiliarySplitsProviderEntries`<br>`cluster/core:TestAccessControlAuxiliaryRestart`<br>`cluster/core:TestAccessControlAuxiliaryLocalWrite`<br>`cluster/core:TestAccessControlAuxiliaryControllerWrite` | Provider entries next to the real ones, after a restart, across local and controller ACL writes, the refused AuxiliaryType on both, AuxiliaryAccessUpdated per changed fabric, the per-entry split and the feature gate are ported (cluster/core/access_control_auxiliary_parity_matterjs_test.go on fabrictest, the installed list asserted as the device's access check). Missing: "ignores provider entries without AuxiliaryType", js-runtime-only: a provider entry is a TypeScript object that may lack the field, where the Go AuxiliaryACLSource yields store.ACLEntry, served as Groupcast; "keeps the applied real entries when auxiliary entries change during a controller ACL write", M4: findings entry "The effective ACL is applied entry by entry" (matter.js delays the written list to the interaction's end, AccessControlServer.ts:545-602; the Go write lands in the store at once); "applies an overridden extension access check to a fabric commissioned after startup", M4: findings entry "No extension access-check hook" (:441-450). Missing: “ignores provider entries without AuxiliaryType”; “keeps the applied real entries when auxiliary entries change during a controller ACL write”; “applies an overridden extension access check to a fabric commissioned after startup”. |
-| AccessControlCustomExtensionTest.ts | 239 | planned | until M5 | A manufacturer extension of AccessControl (a custom attribute and command): the root AccessControl server takes no extension elements; the subject is missing. Milestone 5. |
+| AccessControlCustomExtensionTest.ts | 239 | planned | — | A manufacturer extension of AccessControl (a custom attribute and command): no subject exists in the module (the root AccessControl server takes no extension elements); the port waits until a consumer asks for one (owner decision 2026-10-29). |
 
 ## node/test/behaviors/basic-information
 
@@ -536,7 +536,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 | EndpointTypeTest.ts | 44 | excluded | `js-runtime-only` | The TypeScript EndpointType.is guard. |
 | MutableEndpointClientClustersTest.ts | 187 | partial | `device:TestClientListCarriesTheMandatoryClientClusters` | The TypeScript endpoint builder's client slot; its one Matter-visible case, the mandatory client clusters a device type adds, is covered. Missing: “defaults clientClusters to empty when not provided”; “accepts an explicit clientClusters slot”; “compiles type-level checks”; “withClientClusters extends the clientClusters slot at runtime”; “routes server-only args to behaviors slot”; “routes client-only args to clientClusters slot”; “routes mixed args correctly”; “routes same cluster server + client in one call to separate slots”; “idempotent on duplicate args”; “type-level: explicit .withClientClusters(...) narrows clientClusters key”; “does not auto-register optional client clusters (on-off-light)”; “auto-registers mandatory and leaves optional un-registered (camera-controller)”; “does not double-add when .with() supplies a mandatory client”. |
 | MutableEndpointTest.ts | 160 | excluded | `js-runtime-only` | The TypeScript MutableEndpoint builder (fields, behaviors, defaults). |
-| SemanticNamespaceTest.ts | 89 | planned | until M5 | Semantic tag namespaces as values (standard tags, custom namespaces): schema and device carry no namespace table and the device kit no TagList declaration; the subject is missing. Milestone 5. |
+| SemanticNamespaceTest.ts | 89 | planned | — | Semantic tag namespaces as values (standard tags, custom namespaces): no subject exists in the module (schema and device carry no namespace table, the device kit no TagList declaration); the port waits until a consumer asks for one (owner decision 2026-10-29). |
 
 ## node/test/endpoint/validation
 
@@ -1003,8 +1003,8 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 
 ### node/test/behaviors/access-control
 
-- `AccessControlCustomExtensionTest.ts` — A manufacturer extension of AccessControl (a custom attribute and command): the root AccessControl server takes no extension elements; the subject is missing. Milestone 5.
+- `AccessControlCustomExtensionTest.ts` — A manufacturer extension of AccessControl (a custom attribute and command): no subject exists in the module (the root AccessControl server takes no extension elements); the port waits until a consumer asks for one (owner decision 2026-10-29).
 
 ### node/test/endpoint/type
 
-- `SemanticNamespaceTest.ts` — Semantic tag namespaces as values (standard tags, custom namespaces): schema and device carry no namespace table and the device kit no TagList declaration; the subject is missing. Milestone 5.
+- `SemanticNamespaceTest.ts` — Semantic tag namespaces as values (standard tags, custom namespaces): no subject exists in the module (schema and device carry no namespace table, the device kit no TagList declaration); the port waits until a consumer asks for one (owner decision 2026-10-29).

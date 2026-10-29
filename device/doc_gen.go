@@ -156,6 +156,7 @@
 //   - [BridgedNode] (0x0013)
 //   - [Camera] (0x0142)
 //   - [CameraController] (0x0147)
+//   - [CastingVideoClient] (0x0029)
 //   - [CastingVideoPlayer] (0x0023)
 //   - [Chime] (0x0146)
 //   - [Closure] (0x0230)
