@@ -294,6 +294,9 @@ var floors = []packageFloor{
 		min: 0,
 		why: "the contract table, exercised by store's and store/memstore's tests, and go credits that coverage to them (80.8 % of it run against memstore)",
 	},
+	// Brief S1: measured 98.4 and 91.7.
+	{pkg: "github.com/SukramJ/go-fabric/surface", min: 95},
+	{pkg: "github.com/SukramJ/go-fabric/surface/surfacetest", min: 90},
 	{pkg: "github.com/SukramJ/go-fabric/tlv", min: 91},
 	{pkg: "github.com/SukramJ/go-fabric/transport", min: 0, why: "the Conn interface only, no statements to cover"},
 	{pkg: "github.com/SukramJ/go-fabric/transport/btp", min: 93},
