@@ -7,7 +7,10 @@
 // Specification), never the "effective" layer script/extract-from-matter-js.ts
 // reads (RequirementResolver does not exist at v0.13.0). Ids only — no
 // names, no text, no datatypes. `mandatory` lists what the element's own
-// conformance makes unconditionally mandatory (conformance text "M").
+// conformance makes unconditionally mandatory at the tag's cluster
+// revision: conformance text "M", or "Rev >= vN" with N at most the
+// cluster's ClusterRevision (BasicInformation.ConfigurationVersion at
+// revision 6, concept v11 §C.9).
 //
 // Run inside a matter.js checkout at the tag (make generate-level TAG=…
 // copies it there, as generate-matter-schema does for the main extractor).
@@ -15,7 +18,13 @@ import { ClusterModel, DeviceTypeModel, Matter, Specification } from "@matter/mo
 import { execSync } from "node:child_process";
 
 const sorted = (ids: Iterable<number>) => [...new Set(ids)].sort((a, b) => a - b);
-const isMandatory = (m: any) => m.conformance !== undefined && `${m.conformance}`.trim() === "M";
+function isMandatory(m: any, revision: number): boolean {
+    if (m.conformance === undefined) return false;
+    const text = `${m.conformance}`.trim();
+    if (text === "M") return true;
+    const rev = /^Rev >= v(\d+)$/.exec(text);
+    return rev !== null && Number(rev[1]) <= revision;
+}
 
 let sourceCommit: string | undefined;
 let tag: string | undefined;
@@ -46,7 +55,7 @@ for (const c of Matter.clusters as ClusterModel[]) {
     }
     features.sort((a, b) => a.bit - b.bit);
     const ids = (ms: any[]) => sorted(ms.filter(m => typeof m.id === "number").map(m => m.id));
-    const mand = (ms: any[]) => ids(ms.filter(isMandatory));
+    const mand = (ms: any[]) => ids(ms.filter(m => isMandatory(m, c.revision)));
     const attributes = c.attributes as any[];
     const commands = c.commands as any[];
     const events = c.events as any[];
