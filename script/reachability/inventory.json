@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 7155,
+  "entry_points": 7156,
   "entry_packages": [
     ".",
     "bdx",
@@ -6258,7 +6258,7 @@
       "identifier": "TestMessageExchangeClosingNotification",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/margins_parity_matterjs_test.go",
-      "line": 239
+      "line": 245
     },
     {
       "package": "client/exchange",
@@ -6293,7 +6293,7 @@
       "identifier": "TestMessageExchangePaddedBDXCap",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/margins_parity_matterjs_test.go",
-      "line": 220
+      "line": 226
     },
     {
       "package": "client/exchange",
@@ -25221,7 +25221,7 @@
       "identifier": "TestAssignOrReuseID_DeviceTypeDrift",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/dispatcher_test.go",
-      "line": 1402
+      "line": 1410
     },
     {
       "package": "endpoint",
@@ -25249,7 +25249,7 @@
       "identifier": "TestBridgedNodeRevisionFromSchema",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/materialize_test.go",
-      "line": 167
+      "line": 161
     },
     {
       "package": "endpoint",
@@ -25284,35 +25284,35 @@
       "identifier": "TestClusterDataVersion_WithVersion",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/dispatcher_test.go",
-      "line": 1077
+      "line": 1085
     },
     {
       "package": "endpoint",
       "identifier": "TestClusterDataVersion_WithoutVersion",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/dispatcher_test.go",
-      "line": 1086
+      "line": 1094
     },
     {
       "package": "endpoint",
       "identifier": "TestClusterServersBothNilReturnsNil",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/materialize_test.go",
-      "line": 150
+      "line": 144
     },
     {
       "package": "endpoint",
       "identifier": "TestClusterServersBridgedNodeHostTypeListedOnce",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/materialize_test.go",
-      "line": 188
+      "line": 182
     },
     {
       "package": "endpoint",
       "identifier": "TestClusterServersFromMeasurement",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/materialize_test.go",
-      "line": 132
+      "line": 129
     },
     {
       "package": "endpoint",
@@ -25368,28 +25368,28 @@
       "identifier": "TestCurrentDataVersion_BridgedIgnoresInstanceTracker",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/dispatcher_test.go",
-      "line": 1230
+      "line": 1238
     },
     {
       "package": "endpoint",
       "identifier": "TestCurrentDataVersion_BridgedStableAcrossCalls",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/dispatcher_test.go",
-      "line": 1210
+      "line": 1218
     },
     {
       "package": "endpoint",
       "identifier": "TestCurrentDataVersion_ClusterNotFound",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/dispatcher_test.go",
-      "line": 1196
+      "line": 1204
     },
     {
       "package": "endpoint",
       "identifier": "TestCurrentDataVersion_RootUsesInstanceTracker",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/dispatcher_test.go",
-      "line": 1254
+      "line": 1262
     },
     {
       "package": "endpoint",
@@ -25480,14 +25480,14 @@
       "identifier": "TestDeviceTypeRevision_KnownType",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/dispatcher_test.go",
-      "line": 1372
+      "line": 1380
     },
     {
       "package": "endpoint",
       "identifier": "TestDeviceTypeRevision_UnknownType",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/dispatcher_test.go",
-      "line": 1388
+      "line": 1396
     },
     {
       "package": "endpoint",
@@ -25613,21 +25613,21 @@
       "identifier": "TestInvokeErrorStatus_InvalidCommandArgument",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/dispatcher_test.go",
-      "line": 935
+      "line": 943
     },
     {
       "package": "endpoint",
       "identifier": "TestInvokeErrorStatus_Nil",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/dispatcher_test.go",
-      "line": 923
+      "line": 931
     },
     {
       "package": "endpoint",
       "identifier": "TestInvokeUnsupportedCommandMapsTo0x81",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/dispatcher_test.go",
-      "line": 1496
+      "line": 1504
     },
     {
       "package": "endpoint",
@@ -25641,14 +25641,14 @@
       "identifier": "TestInvoke_SuccessAndUnknownCommand",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/dispatcher_test.go",
-      "line": 651
+      "line": 659
     },
     {
       "package": "endpoint",
       "identifier": "TestInvoke_TypedStatusCodeError_TakesPriority",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/dispatcher_test.go",
-      "line": 795
+      "line": 803
     },
     {
       "package": "endpoint",
@@ -25767,35 +25767,35 @@
       "identifier": "TestReadOne_FabricScoped_FallThrough",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/dispatcher_test.go",
-      "line": 1159
+      "line": 1167
     },
     {
       "package": "endpoint",
       "identifier": "TestReadOne_FabricScoped_NilValue",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/dispatcher_test.go",
-      "line": 1145
+      "line": 1153
     },
     {
       "package": "endpoint",
       "identifier": "TestReadOne_FabricScoped_NonNilValue",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/dispatcher_test.go",
-      "line": 1131
+      "line": 1139
     },
     {
       "package": "endpoint",
       "identifier": "TestReadOne_MatterRead_NilValue",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/dispatcher_test.go",
-      "line": 1179
+      "line": 1187
     },
     {
       "package": "endpoint",
       "identifier": "TestReadOne_SynthesizeGlobal",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/dispatcher_test.go",
-      "line": 1024
+      "line": 1032
     },
     {
       "package": "endpoint",
@@ -25809,7 +25809,7 @@
       "identifier": "TestRead_ConcreteEndpointReturnsUnsupportedCluster",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/dispatcher_test.go",
-      "line": 547
+      "line": 555
     },
     {
       "package": "endpoint",
@@ -25844,21 +25844,21 @@
       "identifier": "TestRead_WildcardAttributeReturnsGlobals",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/dispatcher_test.go",
-      "line": 334
+      "line": 342
     },
     {
       "package": "endpoint",
       "identifier": "TestRead_WildcardAttribute_ListerExpands",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/dispatcher_test.go",
-      "line": 468
+      "line": 476
     },
     {
       "package": "endpoint",
       "identifier": "TestRead_WildcardAttribute_ListerWithoutGlobalsStillGetsThem",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/dispatcher_test.go",
-      "line": 432
+      "line": 440
     },
     {
       "package": "endpoint",
@@ -25879,56 +25879,56 @@
       "identifier": "TestRead_WildcardEndpointSkipsEndpointsWithoutCluster",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/dispatcher_test.go",
-      "line": 519
+      "line": 527
     },
     {
       "package": "endpoint",
       "identifier": "TestRenderSourceKey_CentralAddress",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/dispatcher_test.go",
-      "line": 1330
+      "line": 1338
     },
     {
       "package": "endpoint",
       "identifier": "TestRenderSourceKey_EndpointKeyPointer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/dispatcher_test.go",
-      "line": 1303
+      "line": 1311
     },
     {
       "package": "endpoint",
       "identifier": "TestRenderSourceKey_Nil",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/dispatcher_test.go",
-      "line": 1283
+      "line": 1291
     },
     {
       "package": "endpoint",
       "identifier": "TestRenderSourceKey_NilPointer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/dispatcher_test.go",
-      "line": 1313
+      "line": 1321
     },
     {
       "package": "endpoint",
       "identifier": "TestRenderSourceKey_ReflectiveFallback",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/dispatcher_test.go",
-      "line": 1356
+      "line": 1364
     },
     {
       "package": "endpoint",
       "identifier": "TestRenderSourceKey_SourceKey",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/dispatcher_test.go",
-      "line": 1294
+      "line": 1302
     },
     {
       "package": "endpoint",
       "identifier": "TestRenderSourceKey_Stringer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/dispatcher_test.go",
-      "line": 1346
+      "line": 1354
     },
     {
       "package": "endpoint",
@@ -25991,21 +25991,21 @@
       "identifier": "TestSynthesizeGlobalRead_AcceptedCommandList_WithLister",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/dispatcher_test.go",
-      "line": 969
+      "line": 977
     },
     {
       "package": "endpoint",
       "identifier": "TestSynthesizeGlobalRead_EventList_ReturnsUnsupported",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/dispatcher_test.go",
-      "line": 1013
+      "line": 1021
     },
     {
       "package": "endpoint",
       "identifier": "TestSynthesizeGlobalRead_GeneratedCommandList_WithLister",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/dispatcher_test.go",
-      "line": 991
+      "line": 999
     },
     {
       "package": "endpoint",
@@ -26089,7 +26089,7 @@
       "identifier": "TestWriteErrorStatus_WordingIsNoStatus",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/dispatcher_test.go",
-      "line": 893
+      "line": 901
     },
     {
       "package": "endpoint",
@@ -26110,14 +26110,14 @@
       "identifier": "TestWrite_ConstraintMaps",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/dispatcher_test.go",
-      "line": 618
+      "line": 626
     },
     {
       "package": "endpoint",
       "identifier": "TestWrite_GenericErrorMapsToFailure",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/dispatcher_test.go",
-      "line": 632
+      "line": 640
     },
     {
       "package": "endpoint",
@@ -26138,7 +26138,7 @@
       "identifier": "TestWrite_IsNull",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/dispatcher_test.go",
-      "line": 871
+      "line": 879
     },
     {
       "package": "endpoint",
@@ -26152,35 +26152,35 @@
       "identifier": "TestWrite_ReadOnlyMapsToUnsupportedWrite",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/dispatcher_test.go",
-      "line": 588
+      "line": 596
     },
     {
       "package": "endpoint",
       "identifier": "TestWrite_Success",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/dispatcher_test.go",
-      "line": 573
+      "line": 581
     },
     {
       "package": "endpoint",
       "identifier": "TestWrite_TypedStatusCodeError_TakesPriority",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/dispatcher_test.go",
-      "line": 773
+      "line": 781
     },
     {
       "package": "endpoint",
       "identifier": "TestWrite_TypedStatusCodeError_WrappedInFmt",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/dispatcher_test.go",
-      "line": 813
+      "line": 821
     },
     {
       "package": "endpoint",
       "identifier": "TestWrite_UnknownAttributeMaps",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/dispatcher_test.go",
-      "line": 603
+      "line": 611
     },
     {
       "package": "endpoint",
@@ -26194,14 +26194,14 @@
       "identifier": "TestWrite_UnsupportedCluster",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/dispatcher_test.go",
-      "line": 855
+      "line": 863
     },
     {
       "package": "endpoint",
       "identifier": "TestWrite_UnsupportedEndpoint",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/dispatcher_test.go",
-      "line": 839
+      "line": 847
     },
     {
       "package": "endpoint",

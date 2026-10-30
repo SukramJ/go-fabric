@@ -137,8 +137,13 @@ type ReachableChangedEvent = bdbidef.ReachableChangedEvent
 // unknown attributes.
 var errBridgedBasicInfoUnknown = spec.Errorf(im.StatusUnsupportedWrite, "core: BridgedDeviceBasicInformation unknown / read-only attribute")
 
-// BridgedConfig carries the bridged device's static metadata. NodeLabel
-// + Reachable + UniqueID are mandatory; the rest are optional.
+// BridgedConfig carries the bridged device's static metadata. Reachable +
+// UniqueID are mandatory; the rest, NodeLabel included, are optional —
+// matter.js: "All attributes are optional except for the "reachable"
+// attribute" (BridgedDeviceBasicInformationServer.ts:20 at 862ad75f),
+// NodeLabel conformance "O" (bridged-device-basic-information.element.ts:30).
+// An empty NodeLabel is served as the empty string; a controller may write
+// its own.
 type BridgedConfig struct {
 	VendorName         string
 	VendorID           uint16
@@ -171,7 +176,7 @@ type BridgedConfig struct {
 }
 
 // NewBridgedDeviceBasicInformation constructs the cluster from cfg.
-// UniqueID and NodeLabel are mandatory.
+// UniqueID is mandatory; NodeLabel may be empty.
 //
 // When SerialNumber comes in empty we backfill it from UniqueID so the
 // attribute does not surface as `(nil, false)` (= UnsupportedAttribute)
@@ -188,9 +193,6 @@ type BridgedConfig struct {
 func NewBridgedDeviceBasicInformation(cfg BridgedConfig) (*BridgedDeviceBasicInformation, error) {
 	if cfg.UniqueID == "" {
 		return nil, errors.New("core: BridgedDeviceBasicInformation Config.UniqueID must be non-empty")
-	}
-	if cfg.NodeLabel == "" {
-		return nil, errors.New("core: BridgedDeviceBasicInformation Config.NodeLabel must be non-empty")
 	}
 	serialNumber := cfg.SerialNumber
 	if serialNumber == "" {

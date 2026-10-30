@@ -320,13 +320,21 @@ func TestRead_WildcardClusterFansOut(t *testing.T) {
 		HasAttribute: true,
 	}
 	results := d.Read(context.Background(), path)
-	if len(results) != 2 {
-		t.Fatalf("want 2 results (one per cluster), got %d", len(results))
-	}
+	// The wildcard also reaches Identify, the Descriptor and
+	// BridgedDeviceBasicInformation of the bridged endpoint; the two
+	// source clusters each answer once.
+	var fromSource int
 	for i, r := range results {
+		if r.Path.Cluster != 0x0006 && r.Path.Cluster != 0x0008 {
+			continue
+		}
+		fromSource++
 		if r.Status != im.StatusSuccess {
 			t.Errorf("result[%d] status = %v, want StatusSuccess", i, r.Status)
 		}
+	}
+	if fromSource != 2 {
+		t.Fatalf("want 2 results from the source clusters (one per cluster), got %d of %d", fromSource, len(results))
 	}
 }
 
