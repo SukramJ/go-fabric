@@ -115,14 +115,14 @@ func TestConnectionStateParityMatterJS(t *testing.T) {
 		cp, log := connectedPair(t)
 		mark := log.mark()
 		cp.loseSubscription(t)
-		if got := log.since(mark); !slices.Equal(got, []client.ConnectionState{client.Reconnecting}) {
-			t.Fatalf("transitions %v after the loss, want [Reconnecting]", got)
+		// The state is visible before the hook has run (recompute releases
+		// mu, then calls it), so the log, not the state, is what to wait for.
+		cp.eventually(t, "the Reconnecting transition in the log", func() bool { return len(log.since(mark)) >= 1 })
+		if got := log.since(mark); got[0] != client.Reconnecting {
+			t.Fatalf("transitions %v after the loss, want [Reconnecting] first", got)
 		}
-		cp.eventually(t, "WaitingForDeviceDiscovery", func() bool { return cp.state() == client.WaitingForDeviceDiscovery })
 		want := []client.ConnectionState{client.Reconnecting, client.WaitingForDeviceDiscovery}
-		if got := log.since(mark); !slices.Equal(got, want) {
-			t.Fatalf("transitions %v, want %v", got, want)
-		}
+		cp.eventually(t, "the WaitingForDeviceDiscovery transition in the log", func() bool { return slices.Equal(log.since(mark), want) })
 		// The next unanswered establishments signal again; the latch
 		// emits nothing more.
 		cp.advance(t, 2*advanceStep*30)

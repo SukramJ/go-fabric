@@ -698,7 +698,15 @@ func TestIcdClientParity(t *testing.T) {
 		})
 		t.Run("has no nextExpectedCheckin while subscribed", func(t *testing.T) {
 			p := litOperatingPair(t)
-			p.advance(t, 2*time.Second)
+			// Let the subscription recreated for the registration establish:
+			// ten awaited 200 ms advances (IcdClientTest.ts:2272-2276), each
+			// one a Step that waits for the site to go quiet, so the
+			// recreate's exchanges finish between the clock moves. One 2 s
+			// step fired the timers in a row and the assertion saw the gap
+			// between the released and the new hold.
+			for range 10 {
+				p.advance(t, 200*time.Millisecond)
+			}
 			if _, ok := p.icd().NextExpectedCheckIn(); ok {
 				t.Fatal("a deadline while subscribed")
 			}

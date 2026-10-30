@@ -82,11 +82,11 @@ func TestClusterServersMomentarySwitch(t *testing.T) {
 		Measurement: fakeMomentarySwitchSource{supportsLong: true},
 	}
 	servers := ClusterServers(ep)
-	if len(servers) != 1 {
-		t.Fatalf("ClusterServers() returned %d servers, want 1", len(servers))
-	}
-	if id := servers[0].MatterClusterID(); id != 0x003B {
-		t.Errorf("MatterClusterID() = 0x%04X, want 0x003B (GenericSwitch)", id)
+	// A bridged endpoint's surface: Identify, the inner cluster, the
+	// Descriptor and BridgedDeviceBasicInformation (an unnamed endpoint
+	// serves an empty NodeLabel; it keeps its Descriptor since 2026-10-30).
+	if ids := clusterIDsOf(servers); !hasID(ids, 0x003B) || !hasID(ids, 0x001D) || !hasID(ids, 0x0039) {
+		t.Fatalf("ClusterServers() = %#x, want GenericSwitch 0x003B, Descriptor and BridgedDeviceBasicInformation", ids)
 	}
 }
 
@@ -112,19 +112,16 @@ func TestClusterServersFromSource(t *testing.T) {
 	}
 
 	first := ClusterServers(ep)
-	if len(first) != 1 {
-		t.Fatalf("want 1 server, got %d", len(first))
-	}
-	if got := first[0].MatterClusterID(); got != 0x1234 {
-		t.Errorf("ClusterID = 0x%04X, want 0x1234", got)
+	if ids := clusterIDsOf(first); !hasID(ids, 0x1234) || !hasID(ids, 0x001D) || !hasID(ids, 0x0039) {
+		t.Fatalf("ClusterServers() = %#x, want the source's 0x1234, Descriptor and BridgedDeviceBasicInformation", ids)
 	}
 
 	// Mutate the returned slice to verify independence.
-	_ = append(first, fakeServer{id: 0xDEAD}) //nolint:staticcheck // SA4006: deliberate mutate-and-discard to assert ClusterServers returns a fresh slice
+	first[0] = fakeServer{id: 0xDEAD}
 
 	second := ClusterServers(ep)
-	if len(second) != 1 {
-		t.Errorf("second call: want 1 server, got %d — ClusterServers not returning a fresh slice", len(second))
+	if ids := clusterIDsOf(second); len(second) != len(first) || hasID(ids, 0xDEAD) {
+		t.Errorf("second call: %#x — ClusterServers not returning a fresh slice", ids)
 	}
 }
 
@@ -136,13 +133,10 @@ func TestClusterServersFromMeasurement(t *testing.T) {
 		Measurement: fakeBoolMeasurement{},
 	}
 	servers := ClusterServers(ep)
-	if len(servers) != 1 {
-		t.Fatalf("want 1 server, got %d", len(servers))
-	}
 	// OccupancySensing cluster ID per Matter Application Cluster Spec 1.5.1.
 	const wantID uint32 = 0x0406
-	if got := servers[0].MatterClusterID(); got != wantID {
-		t.Errorf("ClusterID = 0x%04X, want 0x%04X (OccupancySensing)", got, wantID)
+	if ids := clusterIDsOf(servers); !hasID(ids, wantID) || !hasID(ids, 0x001D) || !hasID(ids, 0x0039) {
+		t.Errorf("ClusterServers() = %#x, want OccupancySensing 0x%04X, Descriptor and BridgedDeviceBasicInformation", ids, wantID)
 	}
 }
 
@@ -217,4 +211,22 @@ func TestClusterServersBridgedNodeHostTypeListedOnce(t *testing.T) {
 		t.Fatalf("endpoint %d has no Descriptor", ep.ID)
 	}
 	t.Fatal("no bridged endpoint assembled")
+}
+
+// clusterIDsOf lists the cluster ids of servers in order.
+func clusterIDsOf(servers []contract.ClusterServer) []uint32 {
+	ids := make([]uint32, 0, len(servers))
+	for _, s := range servers {
+		ids = append(ids, s.MatterClusterID())
+	}
+	return ids
+}
+
+func hasID(ids []uint32, id uint32) bool {
+	for _, v := range ids {
+		if v == id {
+			return true
+		}
+	}
+	return false
 }

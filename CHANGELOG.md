@@ -10,6 +10,11 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+### Fixed
+
+- A bridged endpoint whose device has no name (`device.Options.Name` empty, `endpoint.Spec.FriendlyName` empty) serves its Descriptor again. `core.NewBridgedDeviceBasicInformation` accepts an empty NodeLabel — matter.js: every BridgedDeviceBasicInformation attribute but Reachable is optional (`BridgedDeviceBasicInformationServer.ts:20`), NodeLabel conformance "O" — and the materialiser keeps the Descriptor when the cluster cannot be built. Before, such an endpoint served only its inner clusters, which no controller can place in the topology.
+- Two test flakes of the race job: `TestMessageExchangePaddedBDXCap` advanced the clock before the retransmission timer was armed; `TestIcdClientParity` "has no nextExpectedCheckin while subscribed" asserted after one 2 s step instead of matter.js's ten awaited 200 ms advances (`IcdClientTest.ts:2272-2276`); `TestConnectionStateParityMatterJS` read its transition log after polling the state, which `Node.recompute` publishes before it calls the `ConnectionStateChanged` hook — the test now waits on the log, and the hook calls are queued in transition order (one synchronous step in matter.js, `ClientNodeLifecycle.ts:104-110`). All three are in `STRESS_FLAKES`.
+
 ## [0.15.0] — 2026-10-30
 
 ### Changed

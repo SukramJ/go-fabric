@@ -46,6 +46,15 @@ type Node struct {
 	record    Record
 	started   bool
 	connState ConnectionState
+	// pendingStates are the connection-state transitions whose
+	// ConnectionStateChanged hook has not run yet, in transition order;
+	// draining marks the one recompute that delivers them. In matter.js a
+	// transition and its emit are one synchronous step
+	// (ClientNodeLifecycle.ts:104-110); here the hook runs with mu
+	// released, so the queue keeps the order and a hook that re-enters the
+	// node cannot deadlock.
+	pendingStates []ConnectionState
+	draining      bool
 	// props are the physical properties, nil until computed after a change;
 	// frozen while the node is stopped (ClientNodePhysicalProperties.ts:100-133).
 	props  *Properties

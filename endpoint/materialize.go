@@ -229,18 +229,22 @@ func ClusterServers(ep *Endpoint) []contract.ClusterServer { //nolint:funlen // 
 		Reachable: reachable,
 	})
 	if err != nil {
-		// NodeLabel / UniqueID validation fail safely — return inner
-		// only; Apple will still see the cluster surface but reject
-		// the topology, which is the same outcome as before this fix.
-		return append([]contract.ClusterServer(nil), inner...)
+		// Only an empty UniqueID is refused, and uniqueIDFor never
+		// returns one; should it ever fail, the endpoint keeps its
+		// Descriptor — every endpoint serves one — and leaves out
+		// BridgedDeviceBasicInformation alone. Returning the inner
+		// clusters only (as before 2026-10-30) served an endpoint with
+		// no Descriptor, which a controller cannot place in the topology.
+		bridged = nil
+	} else {
+		// Stamp the endpoint id so SetReachable can address the §9.13.6
+		// ReachableChanged event to the right (endpoint, cluster, event)
+		// triple. Without this the event would fire at endpoint 0 and the
+		// commissioner's subscription path mismatch would silently swallow
+		// it (subscription paths are scoped per endpoint per matter.js
+		// SubscriptionHandler.ts).
+		bridged.SetEndpoint(ep.ID)
 	}
-	// Stamp the endpoint id so SetReachable can address the §9.13.6
-	// ReachableChanged event to the right (endpoint, cluster, event)
-	// triple. Without this the event would fire at endpoint 0 and the
-	// commissioner's subscription path mismatch would silently swallow
-	// it (subscription paths are scoped per endpoint per matter.js
-	// SubscriptionHandler.ts).
-	bridged.SetEndpoint(ep.ID)
 
 	// Per-DeviceType revisions extracted from matter.js's
 	// `packages/model/src/standard/elements/*.element.ts`. Apple Home's
@@ -303,12 +307,18 @@ func ClusterServers(ep *Endpoint) []contract.ClusterServer { //nolint:funlen // 
 	// Descriptor construction.
 	descriptor, derr := mattercore.NewDescriptor(deviceTypes, nil, ep.ClientClusters, ep.PartIDs)
 	if derr != nil {
+		if bridged == nil {
+			return clusters
+		}
 		return append(clusters, bridged)
 	}
 
 	out := make([]contract.ClusterServer, 0, len(clusters)+2)
 	out = append(out, clusters...)
-	out = append(out, descriptor, bridged)
+	out = append(out, descriptor)
+	if bridged != nil {
+		out = append(out, bridged)
+	}
 	installServerList(descriptor, out)
 	return out
 }

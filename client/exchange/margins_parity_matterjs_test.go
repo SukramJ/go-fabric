@@ -208,6 +208,12 @@ func paddedRetransmissionsWithin(t *testing.T, protocol uint16, window time.Dura
 	x := e.exchange(t, protocol)
 	done := sendAsync(x, 1, nil, SendOptions{})
 	e.conn.waitSent(t, 1)
+	// The timer is armed: Send hands the datagram to the conn and arms the
+	// retransmission afterwards, both under x.mu (transmitLocked), so
+	// waitSent returns before the timer exists; an Advance in that gap
+	// starts the schedule late and the retransmission can fall outside the
+	// window. HasUnackedMessage takes x.mu and returns after the arming.
+	_ = x.HasUnackedMessage()
 	for elapsed := time.Duration(0); elapsed < window; elapsed += 500 * time.Millisecond {
 		e.clock.Advance(500 * time.Millisecond)
 	}
