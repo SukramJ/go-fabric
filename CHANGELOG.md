@@ -10,6 +10,8 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+## [0.15.3] — 2026-10-30
+
 ### Added
 
 - `surface.Warn`: the verdict of a policy that keeps an element and flags it (JSON `"warn"`), ordered between `Keep` and `Remove`. A controller profile's Reported or Inherited row that names a served element is now a `Warn` decision instead of a `Keep` decision whose reason starts with "warning"; a reader of the report (a host's status page) counts profile warnings by the verdict, not by the text. The served surface, the digest and the reason texts are unchanged. ADR 0030 decision 2 amended.
@@ -5126,7 +5128,8 @@ consumer of an older pseudo-version should read.
   earlier than it was. Both fields are gone; the commit holding the file is
   its provenance.
 
-[Unreleased]: https://github.com/SukramJ/go-fabric/compare/v0.15.2...HEAD
+[Unreleased]: https://github.com/SukramJ/go-fabric/compare/v0.15.3...HEAD
+[0.15.3]: https://github.com/SukramJ/go-fabric/compare/v0.15.2...v0.15.3
 [0.15.2]: https://github.com/SukramJ/go-fabric/compare/v0.15.1...v0.15.2
 [0.15.1]: https://github.com/SukramJ/go-fabric/compare/v0.15.0...v0.15.1
 [0.15.0]: https://github.com/SukramJ/go-fabric/compare/v0.14.0...v0.15.0
