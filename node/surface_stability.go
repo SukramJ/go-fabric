@@ -106,7 +106,7 @@ func (p persisted) loadSurface(ctx context.Context, storeKey string) (digest [32
 	}
 	b, err := hex.DecodeString(st.Digest)
 	if err != nil || len(b) != len(digest) {
-		p.logger.Warn("surface.restore", slog.String("key", storeKey), slog.String("digest", st.Digest))
+		p.logger.Warn("surface.restore", slog.String("key", storeKey), slog.String("value", st.Digest))
 		return digest, nil, false
 	}
 	copy(digest[:], b)
@@ -235,9 +235,9 @@ func (n *Node) announceSurface(ctx context.Context) {
 		n.logger.Info("surface changed",
 			slog.String("key", d.key),
 			slog.Int("endpoint", int(d.ep.ID)),
-			slog.String("before", hex.EncodeToString(d.before[:])[:12]),
-			slog.String("after", hex.EncodeToString(d.after[:])[:12]),
-			slog.Any("changes", lines))
+			slog.String("from", hex.EncodeToString(d.before[:])[:12]),
+			slog.String("to", hex.EncodeToString(d.after[:])[:12]),
+			slog.Any("changed", lines))
 	}
 }
 
