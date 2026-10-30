@@ -299,13 +299,17 @@ func init() {
 }
 
 // Report returns the head of a report composed under p: the policies'
-// digest, the effective level and its origin, and the selected profiles,
-// sorted, each once; no surface and no decision. device.Device and the
+// digest, the effective level and its origin, the selected profiles and
+// the enabled extensions, each sorted and each once; no surface and no
+// decision. device.Device and the
 // node start their reports with it.
 func (p Policies) Report() Report {
 	r := Report{Policies: p.Digest(), Level: p.EffectiveLevel(), LevelOrigin: p.LevelOrigin()}
 	if names := p.profileNames(); len(names) > 0 {
 		r.Profiles = names
+	}
+	if ids := p.Extensions.IDs(); len(ids) > 0 {
+		r.Extensions = ids
 	}
 	return r
 }

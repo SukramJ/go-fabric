@@ -10,6 +10,10 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+### Added
+
+- `surface.Report.Extensions`: the enabled ahead-of-matter.js register IDs, sorted, next to the level, its origin and the profiles — `Policies.Report()` fills it, `Node.Surface()` and `Device.Surface()` carry it, the JSON gains `extensions`. A host's pages can show the node's three policy axes from one report.
+
 ## [0.15.1] — 2026-10-30
 
 ### Fixed

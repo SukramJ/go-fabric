@@ -292,8 +292,12 @@ type Report struct {
 	LevelOrigin string
 	// Profiles are the selected controller profiles ([Policies].Profiles),
 	// sorted, each once.
-	Profiles  []string
-	Effective Surface
+	Profiles []string
+	// Extensions are the enabled "Ahead of matter.js" register IDs
+	// ([Policies].Extensions), sorted; nil when none is enabled. A host's
+	// pages show them next to the level and the profiles.
+	Extensions []string
+	Effective  Surface
 	// Decisions has at least one row per candidate element ([Evaluate]).
 	Decisions []Decision
 	// Withheld are the elements the level policy withheld its endpoint
@@ -320,7 +324,7 @@ type Reporter interface {
 func (r Report) Clone() Report {
 	out := Report{
 		Policies: r.Policies, Level: r.Level, LevelOrigin: r.LevelOrigin, Profiles: slices.Clone(r.Profiles),
-		Effective: r.Effective.Clone(), Decisions: slices.Clone(r.Decisions), Withheld: slices.Clone(r.Withheld),
+		Extensions: slices.Clone(r.Extensions), Effective: r.Effective.Clone(), Decisions: slices.Clone(r.Decisions), Withheld: slices.Clone(r.Withheld),
 		Assembled: r.Assembled,
 	}
 	if r.Changed != nil {
@@ -340,6 +344,7 @@ type (
 		Changed     []wireSurfaceChange `json:"changed"`
 		Decisions   []wireDecision      `json:"decisions"`
 		Effective   wireSurface         `json:"effective"`
+		Extensions  []string            `json:"extensions"`
 		Level       string              `json:"level"`
 		LevelOrigin string              `json:"level_origin"`
 		Policies    string              `json:"policies"`
@@ -395,6 +400,7 @@ func (r Report) MarshalJSON() ([]byte, error) {
 		Changed:     make([]wireSurfaceChange, 0, len(r.Changed)),
 		Decisions:   make([]wireDecision, 0, len(r.Decisions)),
 		Effective:   r.Effective.wire(true),
+		Extensions:  append(make([]string, 0, len(r.Extensions)), r.Extensions...),
 		Level:       string(r.Level),
 		LevelOrigin: r.LevelOrigin,
 		Policies:    hex.EncodeToString(r.Policies[:]),
@@ -429,12 +435,15 @@ func (r *Report) UnmarshalJSON(b []byte) error {
 		return fmt.Errorf("surface: report policies %q is no SHA-256 digest", w.Policies)
 	}
 	out := Report{
-		Level: Level(w.Level), LevelOrigin: w.LevelOrigin, Profiles: w.Profiles,
+		Level: Level(w.Level), LevelOrigin: w.LevelOrigin, Profiles: w.Profiles, Extensions: w.Extensions,
 		Effective: w.Effective.value(), Assembled: w.Assembled,
 	}
 	copy(out.Policies[:], digest)
 	if len(out.Profiles) == 0 {
 		out.Profiles = nil
+	}
+	if len(out.Extensions) == 0 {
+		out.Extensions = nil
 	}
 	for _, c := range w.Changed {
 		v, err := c.value()
