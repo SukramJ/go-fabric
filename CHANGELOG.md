@@ -10,6 +10,8 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+## [0.15.1] — 2026-10-30
+
 ### Fixed
 
 - A bridged endpoint whose device has no name (`device.Options.Name` empty, `endpoint.Spec.FriendlyName` empty) serves its Descriptor again. `core.NewBridgedDeviceBasicInformation` accepts an empty NodeLabel — matter.js: every BridgedDeviceBasicInformation attribute but Reachable is optional (`BridgedDeviceBasicInformationServer.ts:20`), NodeLabel conformance "O" — and the materialiser keeps the Descriptor when the cluster cannot be built. Before, such an endpoint served only its inner clusters, which no controller can place in the topology.
@@ -5110,7 +5112,8 @@ consumer of an older pseudo-version should read.
   earlier than it was. Both fields are gone; the commit holding the file is
   its provenance.
 
-[Unreleased]: https://github.com/SukramJ/go-fabric/compare/v0.15.0...HEAD
+[Unreleased]: https://github.com/SukramJ/go-fabric/compare/v0.15.1...HEAD
+[0.15.1]: https://github.com/SukramJ/go-fabric/compare/v0.15.0...v0.15.1
 [0.15.0]: https://github.com/SukramJ/go-fabric/compare/v0.14.0...v0.15.0
 [0.14.0]: https://github.com/SukramJ/go-fabric/compare/v0.13.12...v0.14.0
 [0.13.12]: https://github.com/SukramJ/go-fabric/compare/v0.13.11...v0.13.12
