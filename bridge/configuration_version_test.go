@@ -81,3 +81,40 @@ func TestIncreaseNodeConfigurationVersionWithRaisesTheNodeOnce(t *testing.T) {
 		t.Errorf("nil bridge raised %+v", none)
 	}
 }
+
+// TestIncreaseEndpointConfigurationVersionRaisesOneEndpoint: inside the
+// grouped change one bridged endpoint is raised — not the other 29 of its
+// device — and the node once; the root, the Aggregator and an unknown
+// number raise nothing.
+func TestIncreaseEndpointConfigurationVersionRaisesOneEndpoint(t *testing.T) {
+	t.Parallel()
+	b := newStartedBridgeWithSnapshotter(t, manyTempSensorsSnapshotterForTest())
+	bi, err := mattercore.NewBasicInformation(mattercore.Config{VendorID: 0xFFF1, ProductID: 0x8001, NodeLabel: "n", VendorName: "v", ProductName: "p", SerialNumber: "s"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	b.AttachRootClusters([]contract.ClusterServer{bi})
+	target := b.Topology().Bridged()[3]
+	got := b.IncreaseNodeConfigurationVersionWith(func(c *ConfigurationChange) {
+		if v, ok := c.IncreaseEndpointConfigurationVersion(target.ID); !ok || v != 2 {
+			t.Errorf("endpoint %d: %d, %v; want 2, true", target.ID, v, ok)
+		}
+		for _, id := range []uint16{0, 1, 0xFFFE} {
+			if _, ok := c.IncreaseEndpointConfigurationVersion(id); ok {
+				t.Errorf("endpoint %d raised", id)
+			}
+		}
+	})
+	if got.Node != 2 || len(got.Bridged) != 1 || got.Bridged[target.ID] != 2 {
+		t.Errorf("grouped change = %+v; want node 2 and endpoint %d at 2 alone", got, target.ID)
+	}
+	for _, ep := range b.Topology().Bridged() {
+		if ep.ID != target.ID && ep.ConfigurationVersion() != 1 {
+			t.Errorf("endpoint %d serves %d, want 1", ep.ID, ep.ConfigurationVersion())
+		}
+	}
+	empty := &ConfigurationChange{b: &Bridge{}, bridged: map[uint16]uint32{}}
+	if _, ok := empty.IncreaseEndpointConfigurationVersion(2); ok {
+		t.Error("a bridge without a topology raised an endpoint")
+	}
+}
