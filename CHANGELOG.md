@@ -10,6 +10,8 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+## [0.15.0] — 2026-10-30
+
 ### Changed
 
 - **Breaking for hosts that select ahead-of-matter.js surface.** An element a server implements ahead of matter.js now composes only when its *Ahead of matter.js* register ID is enabled: `thermostatdef.Declare.Features` with MatterScheduleConfiguration (`BD-chip-Thermostat-Schedules`) or Events (`BD-chip-Thermostat-Events`); the features of `node.Config.TimeSynchronization` (`BD-chip-TimeSynchronization-Features`); the Thread NetworkCommissioning variant (`BD-Thread-NetComm-ThreadVariant` — declared, but no `node.Config` field selects the variant yet, so nothing refuses it today). Each now fails `device.New` / `node.New` with `surface.ErrExtensionNotEnabled`, naming the register ID, unless that ID is in `surface.Policies.Extensions` on both `node.Config.Surface` and `device.Options.Surface`. Selecting an ahead element the same code did not enable is a host bug, refused rather than silently stripped ([ADR 0030](docs/adr/0030-the-served-surface-is-a-value-under-policies.md) decision 3). A host that never selected these elements needs no source change.
@@ -5103,7 +5105,8 @@ consumer of an older pseudo-version should read.
   earlier than it was. Both fields are gone; the commit holding the file is
   its provenance.
 
-[Unreleased]: https://github.com/SukramJ/go-fabric/compare/v0.14.0...HEAD
+[Unreleased]: https://github.com/SukramJ/go-fabric/compare/v0.15.0...HEAD
+[0.15.0]: https://github.com/SukramJ/go-fabric/compare/v0.14.0...v0.15.0
 [0.14.0]: https://github.com/SukramJ/go-fabric/compare/v0.13.12...v0.14.0
 [0.13.12]: https://github.com/SukramJ/go-fabric/compare/v0.13.11...v0.13.12
 [0.13.11]: https://github.com/SukramJ/go-fabric/compare/v0.13.10...v0.13.11
