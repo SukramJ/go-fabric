@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 7042,
+  "entry_points": 7070,
   "entry_packages": [
     ".",
     "bdx",
@@ -244,6 +244,7 @@
     "script/errprefix",
     "script/reachability",
     "script/slogkeys",
+    "script/surfacecheck",
     "script/testparity",
     "secure",
     "secure/aesccm",
@@ -257,6 +258,8 @@
     "secure/spake2",
     "store",
     "store/memstore",
+    "surface",
+    "surface/surfacetest",
     "thread",
     "thread/otbr",
     "thread/otbr/otbrtest",
@@ -269,9 +272,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 16858,
-    "reachable": 11888,
-    "whitelisted": 4967,
+    "total_exported": 16914,
+    "reachable": 11931,
+    "whitelisted": 4980,
     "unreachable": 3
   },
   "by_package": [
@@ -24277,28 +24280,28 @@
       "identifier": "AvailabilityProbe",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "device/options.go",
-      "line": 58
+      "line": 63
     },
     {
       "package": "device",
       "identifier": "Option",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "device/options.go",
-      "line": 81
+      "line": 86
     },
     {
       "package": "device",
       "identifier": "SourceKey",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "device/options.go",
-      "line": 50
+      "line": 55
     },
     {
       "package": "device",
       "identifier": "StringKey",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "device/options.go",
-      "line": 54
+      "line": 59
     },
     {
       "package": "device",
@@ -24460,6 +24463,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/declared_coverage_test.go",
       "line": 43
+    },
+    {
+      "package": "device",
+      "identifier": "TestConformanceOf",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "device/surface_test.go",
+      "line": 445
     },
     {
       "package": "device",
@@ -24862,6 +24872,62 @@
     },
     {
       "package": "device",
+      "identifier": "TestSurfaceEqualsTheWire",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "device/surface_test.go",
+      "line": 127
+    },
+    {
+      "package": "device",
+      "identifier": "TestSurfaceMandatoryFeatureKept",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "device/surface_test.go",
+      "line": 273
+    },
+    {
+      "package": "device",
+      "identifier": "TestSurfaceNumberOnceAssembled",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "device/surface_test.go",
+      "line": 412
+    },
+    {
+      "package": "device",
+      "identifier": "TestSurfaceRefuse",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "device/surface_test.go",
+      "line": 348
+    },
+    {
+      "package": "device",
+      "identifier": "TestSurfaceRemoveElementAndCluster",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "device/surface_test.go",
+      "line": 301
+    },
+    {
+      "package": "device",
+      "identifier": "TestSurfaceRemoveFeature",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "device/surface_test.go",
+      "line": 231
+    },
+    {
+      "package": "device",
+      "identifier": "TestSurfaceReportComplete",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "device/surface_test.go",
+      "line": 369
+    },
+    {
+      "package": "device",
+      "identifier": "TestSurfaceTypeMandatedElementDeclared",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "device/surface_test.go",
+      "line": 481
+    },
+    {
+      "package": "device",
       "identifier": "TestTemperatureAlarmWithoutItsThresholds",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/defaults_coverage_test.go",
@@ -25209,6 +25275,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/materialize_test.go",
       "line": 94
+    },
+    {
+      "package": "endpoint",
+      "identifier": "TestClusterSurfaceReadsAsTheDispatcher",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "endpoint/surface_test.go",
+      "line": 15
     },
     {
       "package": "endpoint",
@@ -25842,6 +25915,13 @@
     },
     {
       "package": "endpoint",
+      "identifier": "TestSurfaceEndpoint",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "endpoint/surface_test.go",
+      "line": 46
+    },
+    {
+      "package": "endpoint",
       "identifier": "TestSynthesizeGlobalRead_AcceptedCommandList_WithLister",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/dispatcher_test.go",
@@ -26262,6 +26342,13 @@
     },
     {
       "package": "examples/reference-bridge",
+      "identifier": "TestDumpSurface",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-bridge/surface_test.go",
+      "line": 24
+    },
+    {
+      "package": "examples/reference-bridge",
       "identifier": "TestEnergyMarketDevices",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/fleet_energy_market_test.go",
@@ -26301,6 +26388,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/wire_shape_test.go",
       "line": 73
+    },
+    {
+      "package": "examples/reference-bridge",
+      "identifier": "TestFormatSurface",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-bridge/surface_test.go",
+      "line": 67
     },
     {
       "package": "examples/reference-bridge",
@@ -29912,7 +30006,7 @@
       "identifier": "Advertiser",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/config.go",
-      "line": 29
+      "line": 30
     },
     {
       "package": "node",
@@ -30017,7 +30111,7 @@
       "identifier": "Groups",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/config.go",
-      "line": 35
+      "line": 36
     },
     {
       "package": "node",
