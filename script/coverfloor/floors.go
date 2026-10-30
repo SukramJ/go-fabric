@@ -206,6 +206,11 @@ var floors = []packageFloor{
 	},
 	{pkg: "github.com/SukramJ/go-fabric/internal/paritytest", min: 97},
 	{
+		pkg: "github.com/SukramJ/go-fabric/internal/surfaceseam",
+		min: 0,
+		why: "declaration-only seam: a function variable surface installs from its init, so the package holds no statement a test could execute",
+	},
+	{
 		pkg: "github.com/SukramJ/go-fabric/internal/udpseam",
 		min: 0,
 		why: "declaration-only seam: an interface and a function variable transport/udp installs from its init, so the package holds no statement a test could execute",
@@ -243,6 +248,7 @@ var floors = []packageFloor{
 	{pkg: "github.com/SukramJ/go-fabric/script/slogkeys", min: 0, why: "test only, no statements to cover: the guard is the test"},
 	{pkg: "github.com/SukramJ/go-fabric/script/levelgen", min: 40, why: "the dump parser, the writer and the table half of run are tested (measured 41.0); measureInternal builds and runs the reference daemon, which make generate-levels exercises and TestSpecLevelsDocIsCurrent regenerates in memory"},
 	{pkg: "github.com/SukramJ/go-fabric/script/levelgen/leveltable", min: 97},
+	{pkg: "github.com/SukramJ/go-fabric/script/profilegen", min: 95},
 	{pkg: "github.com/SukramJ/go-fabric/script/surfacecheck", min: 50, why: "the summary and the committed snapshot are tested (measured 50.9); run, which builds and runs the reference daemon, is exercised by make surface-check"},
 	{
 		pkg: "github.com/SukramJ/go-fabric/script/dclsnapshot",

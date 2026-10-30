@@ -1266,6 +1266,8 @@
     }
   },
   "level": "1.6.1",
+  "level_origin": "pin",
   "policies": "fc6822f08d6c5d98a1632f05ea480c2666bc0701ab657f56500011c73e050c24",
+  "profiles": [],
   "withheld": []
 }

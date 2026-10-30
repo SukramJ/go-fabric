@@ -4,7 +4,7 @@
     {"name": "foundation", "packages": ["clock", "clock/clocktest", "tlv", "schema", "parity", "internal/clockvar", "internal/forward", "internal/inflight", "internal/serialqueue", "thread"]},
     {"name": "transport", "packages": ["transport/...", "mdns", "internal/udpseam", "internal/channelseam"]},
     {"name": "security-and-storage", "packages": ["secure/...", "icd", "icd/...", "commissioning", "store", "store/memstore", "bdx/...", "diagevent", "bootid"]},
-    {"name": "model-and-protocol", "packages": ["im", "im/...", "groups", "cluster", "cluster/spec", "cluster/spec/...", "cluster/wire", "contract", "eligibility", "surface", "client/..."]},
+    {"name": "model-and-protocol", "packages": ["im", "im/...", "groups", "cluster", "cluster/spec", "cluster/spec/...", "cluster/wire", "contract", "eligibility", "surface", "internal/surfaceseam", "client/..."]},
     {"name": "servers", "packages": ["cluster/...", "binding"]},
     {"name": "endpoints", "packages": ["endpoint", "endpoint/...", "device", "device/...", "internal/deviceseam"]},
     {"name": "roles", "packages": ["bridge", "controller/...", "internal/bridgeseam", "internal/nodeseam"]},

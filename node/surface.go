@@ -371,10 +371,8 @@ func (n *Node) recordWithheld(ctx context.Context, entries []surfaceEntry) error
 // the effective surface.
 func (n *Node) Surface() surface.Report {
 	policies := n.cfg.Surface
-	rep := surface.Report{
-		Policies: n.surfaceDigest, Level: policies.EffectiveLevel(), Decisions: slices.Clone(n.rootDecisions),
-		Changed: n.announcedChanges(),
-	}
+	rep := policies.Report()
+	rep.Policies, rep.Decisions, rep.Changed = n.surfaceDigest, slices.Clone(n.rootDecisions), n.announcedChanges()
 	if topo := n.br.Topology(); topo != nil {
 		return n.assembledReport(rep, topo)
 	}
