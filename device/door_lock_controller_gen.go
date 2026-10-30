@@ -54,10 +54,11 @@ type DoorLockController struct{ *Device }
 // [FromSpec] with Type DoorLockControllerID (see [New]).
 func NewDoorLockController(opts Options, decls ...Declaration) (*DoorLockController, error) {
 	d, err := FromSpec(Spec{Type: DoorLockControllerID, Options: opts, Declarations: decls})
-	if err != nil {
+	if d == nil {
 		return nil, err
 	}
-	return &DoorLockController{d}, nil
+	// A device the specification level withheld comes with its error ([New]).
+	return &DoorLockController{d}, err
 }
 
 // Binding is the device's typed Binding server; the type mandates it.

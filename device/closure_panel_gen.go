@@ -48,10 +48,11 @@ type ClosurePanel struct{ *Device }
 // [FromSpec] with Type ClosurePanelID (see [New]).
 func NewClosurePanel(opts Options, decls ...Declaration) (*ClosurePanel, error) {
 	d, err := FromSpec(Spec{Type: ClosurePanelID, Options: opts, Declarations: decls})
-	if err != nil {
+	if d == nil {
 		return nil, err
 	}
-	return &ClosurePanel{d}, nil
+	// A device the specification level withheld comes with its error ([New]).
+	return &ClosurePanel{d}, err
 }
 
 // ClosureDimension is the device's typed ClosureDimension server; the type mandates it.

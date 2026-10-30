@@ -94,10 +94,11 @@ type BasicVideoPlayer struct{ *Device }
 // [FromSpec] with Type BasicVideoPlayerID (see [New]).
 func NewBasicVideoPlayer(opts Options, decls ...Declaration) (*BasicVideoPlayer, error) {
 	d, err := FromSpec(Spec{Type: BasicVideoPlayerID, Options: opts, Declarations: decls})
-	if err != nil {
+	if d == nil {
 		return nil, err
 	}
-	return &BasicVideoPlayer{d}, nil
+	// A device the specification level withheld comes with its error ([New]).
+	return &BasicVideoPlayer{d}, err
 }
 
 // OnOff is the device's typed OnOff server; the type mandates it.

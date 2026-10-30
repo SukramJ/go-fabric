@@ -489,7 +489,7 @@ func (g *generator) body(m *typeModel, imports map[string]string) ([]byte, error
 	w.WriteString("// optional ones declared, each with its default server or the host's —\n")
 	fmt.Fprintf(&w, "// [FromSpec] with Type %sID (see [New]).\n", n)
 	fmt.Fprintf(&w, "func New%s(opts Options, decls ...Declaration) (*%s, error) {\n", n, n)
-	fmt.Fprintf(&w, "\td, err := FromSpec(Spec{Type: %sID, Options: opts, Declarations: decls})\n\tif err != nil {\n\t\treturn nil, err\n\t}\n\treturn &%s{d}, nil\n}\n", n, n)
+	fmt.Fprintf(&w, "\td, err := FromSpec(Spec{Type: %sID, Options: opts, Declarations: decls})\n\tif d == nil {\n\t\treturn nil, err\n\t}\n\t// A device the specification level withheld comes with its error ([New]).\n\treturn &%s{d}, err\n}\n", n, n)
 
 	for _, cr := range m.servers {
 		acc, ok := g.accessor(cr)
@@ -550,7 +550,7 @@ func writeComposite(w *bytes.Buffer, n, name string, components []string, import
 	}
 	fmt.Fprintf(w, "\tif %s {\n", strings.Join(conds, " || "))
 	fmt.Fprintf(w, "\t\treturn nil, fmt.Errorf(\"%%w: %s needs its components %s\", ErrComposition)\n\t}\n", name, strings.Join(components, " and "))
-	fmt.Fprintf(w, "\td, err := FromSpec(Spec{Type: %sID, Options: opts, Declarations: decls})\n\tif err != nil {\n\t\treturn nil, err\n\t}\n", n)
+	fmt.Fprintf(w, "\td, err := FromSpec(Spec{Type: %sID, Options: opts, Declarations: decls})\n\tif d == nil {\n\t\treturn nil, err\n\t}\n\tif err != nil {\n\t\t// Withheld by the specification level ([New]): no parts.\n\t\treturn &%s{Device: d}, err\n\t}\n", n, n)
 	fmt.Fprintf(w, "\tfor _, p := range []*Device{%s} {\n\t\tif err := d.AddPart(p); err != nil {\n\t\t\treturn nil, err\n\t\t}\n\t}\n", strings.Join(parts, ", "))
 	fmt.Fprintf(w, "\treturn &%s{Device: d, %s}, nil\n}\n", n, strings.Join(kv, ", "))
 	for i, c := range components {

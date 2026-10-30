@@ -46,10 +46,11 @@ type OtaProvider struct{ *Device }
 // [FromSpec] with Type OtaProviderID (see [New]).
 func NewOtaProvider(opts Options, decls ...Declaration) (*OtaProvider, error) {
 	d, err := FromSpec(Spec{Type: OtaProviderID, Options: opts, Declarations: decls})
-	if err != nil {
+	if d == nil {
 		return nil, err
 	}
-	return &OtaProvider{d}, nil
+	// A device the specification level withheld comes with its error ([New]).
+	return &OtaProvider{d}, err
 }
 
 // OtaSoftwareUpdateProvider is the device's typed OtaSoftwareUpdateProvider server; the type mandates it.

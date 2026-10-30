@@ -62,10 +62,11 @@ type BridgedNode struct{ *Device }
 // [FromSpec] with Type BridgedNodeID (see [New]).
 func NewBridgedNode(opts Options, decls ...Declaration) (*BridgedNode, error) {
 	d, err := FromSpec(Spec{Type: BridgedNodeID, Options: opts, Declarations: decls})
-	if err != nil {
+	if d == nil {
 		return nil, err
 	}
-	return &BridgedNode{d}, nil
+	// A device the specification level withheld comes with its error ([New]).
+	return &BridgedNode{d}, err
 }
 
 // PowerSourceConfiguration is the device's typed PowerSourceConfiguration server, nil until a declaration mounts it.

@@ -52,10 +52,11 @@ type ThreadBorderRouter struct{ *Device }
 // [FromSpec] with Type ThreadBorderRouterID (see [New]).
 func NewThreadBorderRouter(opts Options, decls ...Declaration) (*ThreadBorderRouter, error) {
 	d, err := FromSpec(Spec{Type: ThreadBorderRouterID, Options: opts, Declarations: decls})
-	if err != nil {
+	if d == nil {
 		return nil, err
 	}
-	return &ThreadBorderRouter{d}, nil
+	// A device the specification level withheld comes with its error ([New]).
+	return &ThreadBorderRouter{d}, err
 }
 
 // ThreadNetworkDiagnostics is the device's typed ThreadNetworkDiagnostics server; the type mandates it.

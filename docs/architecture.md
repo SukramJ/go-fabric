@@ -122,7 +122,12 @@ root's TimeSynchronization features, the Thread NetworkCommissioning
 variant) unless `surface.Policies.Extensions` enables that row
 (`surface.ErrExtensionNotEnabled`); otherwise the zero-value policies keep
 everything, so a node that selects no ahead element composes as it did
-before. The reference daemon prints its report
+before. The second built-in policy composes at a specification level
+(`surface.Policies.Level`, the daemon's `--spec-level`): a Matter revision
+matter.js has shipped, whose table (`schema.Levels`, `schema/levels_gen.go`)
+is generated from matter.js's release tags (`parity/levels/`), never from
+connectedhomeip's XML ([spec levels](reference/spec-levels.md)). The
+reference daemon prints its report
 with `--dump-surface`, and `make surface-check` holds it as a committed
 snapshot (`script/surfacecheck`): every change of what the daemon serves
 is a review diff. The clusters the endpoint assembler mounts on a bridged

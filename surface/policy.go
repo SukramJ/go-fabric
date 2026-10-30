@@ -76,6 +76,13 @@ type Policies struct {
 	// candidate tagged with a row ([Reference].Ahead) not in it
 	// ([ErrExtensionNotEnabled]).
 	Extensions Extensions
+	// Level is the specification level the node composes at ([Level]):
+	// the built-in level policy, judged after the reference policy,
+	// removes the optional surface the level does not know, keeps what
+	// the pin mandates and withholds a device whose type or mandated
+	// cluster it does not know ([ErrWithheld]). "" is the pin's level,
+	// which changes nothing.
+	Level Level
 	// Custom are the host's own policies, judged in order after the
 	// built-in ones.
 	Custom []Policy
@@ -86,15 +93,19 @@ type Policies struct {
 const policiesDigestDomain = "go-fabric surface.Policies v2\n"
 
 // Digest identifies the policies: the SHA-256 over the enabled extensions,
-// sorted, then every custom policy's kind, name and description, in order.
-// The zero value has a fixed digest. A device carries the digest of the
-// policies it was composed under, and a node refuses a device whose digest
-// is not its own.
+// sorted, the level when it is not the pin's, then every custom policy's
+// kind, name and description, in order. The zero value has a fixed
+// digest, and a Level naming the pin's level has the same one: the two
+// compose alike. A device carries the digest of the policies it was
+// composed under, and a node refuses a device whose digest is not its own.
 func (p Policies) Digest() [32]byte {
 	var b strings.Builder
 	b.WriteString(policiesDigestDomain)
 	for _, id := range p.Extensions.IDs() {
 		fmt.Fprintf(&b, "extensions\x00%s\n", id)
+	}
+	if l := p.EffectiveLevel(); l != PinLevel() {
+		fmt.Fprintf(&b, "level\x00%s\n", l)
 	}
 	for _, pol := range p.Custom {
 		name, desc := "<nil>", ""
@@ -110,9 +121,12 @@ func (p Policies) Digest() [32]byte {
 }
 
 // chain is every policy, in the order they judge: the built-in reference
-// policy, then the custom ones.
-func (p Policies) chain() []Policy {
-	return append([]Policy{referencePolicy{enabled: p.Extensions}}, p.Custom...)
+// policy, the built-in level policy — built over the candidates, so it
+// judges each cluster's features as a set — then the custom ones.
+func (p Policies) chain(candidates []Element) []Policy {
+	chain := make([]Policy, 0, 2+len(p.Custom))
+	chain = append(chain, referencePolicy{enabled: p.Extensions}, newLevelPolicy(p.EffectiveLevel(), candidates))
+	return append(chain, p.Custom...)
 }
 
 // ErrRefused is wrapped by the [*RefusedError] [Evaluate] returns when a
@@ -167,8 +181,15 @@ const mandatoryKeptPrefix = "kept: mandatory at pin ("
 // evaluation with a [*RefusedError] naming every refusing decision; the
 // decisions are returned beside it. When the reference policy refused, the
 // error also matches [ErrExtensionNotEnabled] and names the register IDs.
+// Without a refusal, a level that does not know a candidate device type or
+// mandated cluster fails it with a [*WithheldError] ([ErrWithheld]), the
+// decisions beside it. A [Policies].Level [Policies.Validate] rejects
+// fails it before any judgement.
 func Evaluate(candidates []Element, p Policies) (kept []Element, decisions []Decision, err error) {
-	chain := p.chain()
+	if err := p.Validate(); err != nil {
+		return nil, nil, err
+	}
+	chain := p.chain(candidates)
 	for i, pol := range chain {
 		if pol == nil {
 			return nil, nil, fmt.Errorf("surface: policy %d of the chain is nil", i)
@@ -216,6 +237,14 @@ func Evaluate(candidates []Element, p Policies) (kept []Element, decisions []Dec
 	if len(refused) > 0 {
 		return nil, decisions, &RefusedError{Decisions: refused, ahead: slices.Sorted(maps.Keys(ahead))}
 	}
+	for _, pol := range chain {
+		if lp, ok := pol.(*levelPolicy); ok && len(lp.withheld) > 0 {
+			return nil, decisions, &WithheldError{
+				Endpoint: lp.withheld[0].Endpoint, Elements: slices.Clone(lp.withheld),
+				Report: Report{Level: lp.level, Decisions: decisions, Withheld: slices.Clone(lp.withheld)},
+			}
+		}
+	}
 	return kept, decisions, nil
 }
 
@@ -223,12 +252,15 @@ func Evaluate(candidates []Element, p Policies) (kept []Element, decisions []Dec
 // of the policies it was composed under, the effective surface read from
 // its built servers, and every decision.
 type Report struct {
-	Policies  [32]byte
+	Policies [32]byte
+	// Level is the specification level the surface was composed at: the
+	// pin's when [Policies].Level is "".
+	Level     Level
 	Effective Surface
 	// Decisions has at least one row per candidate element ([Evaluate]).
 	Decisions []Decision
-	// Withheld are the elements a policy withheld without failing the
-	// composition; empty in this phase.
+	// Withheld are the elements the level policy withheld its endpoint
+	// for: a device type or a mandated cluster the level does not know.
 	Withheld []Element
 }
 
@@ -240,7 +272,7 @@ type Reporter interface {
 // Clone returns a deep copy of r.
 func (r Report) Clone() Report {
 	return Report{
-		Policies: r.Policies, Effective: r.Effective.Clone(),
+		Policies: r.Policies, Level: r.Level, Effective: r.Effective.Clone(),
 		Decisions: slices.Clone(r.Decisions), Withheld: slices.Clone(r.Withheld),
 	}
 }
@@ -250,11 +282,12 @@ type (
 	wireReport struct {
 		Decisions []wireDecision `json:"decisions"`
 		Effective wireSurface    `json:"effective"`
+		Level     string         `json:"level"`
 		Policies  string         `json:"policies"`
 		Withheld  []wireElement  `json:"withheld"`
 	}
 	wireElement struct {
-		Cluster   id16   `json:"cluster"`
+		Cluster   id32   `json:"cluster"`
 		Endpoint  string `json:"endpoint"`
 		ID        kindID `json:"id"`
 		Kind      Kind   `json:"kind"`
@@ -263,7 +296,7 @@ type (
 		Reference string `json:"reference"`
 	}
 	wireDecision struct {
-		Cluster   id16    `json:"cluster"`
+		Cluster   id32    `json:"cluster"`
 		Endpoint  string  `json:"endpoint"`
 		ID        kindID  `json:"id"`
 		Kind      Kind    `json:"kind"`
@@ -278,7 +311,7 @@ type (
 
 func elementWire(e Element) wireElement {
 	return wireElement{
-		Cluster: id16(e.Cluster), Endpoint: e.Endpoint, ID: idOf(e.Kind, e.ID), Kind: e.Kind,
+		Cluster: id32(e.Cluster), Endpoint: e.Endpoint, ID: idOf(e.Kind, e.ID), Kind: e.Kind,
 		Mandatory: e.Mandatory, Origin: e.Origin, Reference: e.Reference.Ahead,
 	}
 }
@@ -298,6 +331,7 @@ func (r Report) MarshalJSON() ([]byte, error) {
 	w := wireReport{
 		Decisions: make([]wireDecision, 0, len(r.Decisions)),
 		Effective: r.Effective.wire(true),
+		Level:     string(r.Level),
 		Policies:  hex.EncodeToString(r.Policies[:]),
 		Withheld:  make([]wireElement, 0, len(r.Withheld)),
 	}
@@ -325,7 +359,7 @@ func (r *Report) UnmarshalJSON(b []byte) error {
 	if err != nil || len(digest) != len(r.Policies) {
 		return fmt.Errorf("surface: report policies %q is no SHA-256 digest", w.Policies)
 	}
-	out := Report{Effective: w.Effective.value()}
+	out := Report{Level: Level(w.Level), Effective: w.Effective.value()}
 	copy(out.Policies[:], digest)
 	for _, d := range w.Decisions {
 		el := wireElement{

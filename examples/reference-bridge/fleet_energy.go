@@ -387,7 +387,7 @@ func (m *demoMeter) device(opts device.Options) (*device.ElectricalUtilityMeter,
 		MeterSerialNumber: &serial, Null: []uint32{mtrid.AttrMeterType, mtrid.AttrPointOfDelivery},
 	}})
 	if err != nil {
-		return nil, err
+		return withheldOr(d, err)
 	}
 	m.mu.Lock()
 	m.srv = d.MeterIdentification()

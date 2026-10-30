@@ -69,10 +69,11 @@ type DimmerSwitch struct{ *Device }
 // [FromSpec] with Type DimmerSwitchID (see [New]).
 func NewDimmerSwitch(opts Options, decls ...Declaration) (*DimmerSwitch, error) {
 	d, err := FromSpec(Spec{Type: DimmerSwitchID, Options: opts, Declarations: decls})
-	if err != nil {
+	if d == nil {
 		return nil, err
 	}
-	return &DimmerSwitch{d}, nil
+	// A device the specification level withheld comes with its error ([New]).
+	return &DimmerSwitch{d}, err
 }
 
 // Binding is the device's typed Binding server; the type mandates it.

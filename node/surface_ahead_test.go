@@ -103,8 +103,8 @@ func TestNodeAheadNotSelected(t *testing.T) {
 			t.Fatal(err)
 		}
 		a, b := plain.Surface(), all.Surface()
-		if len(a.Decisions) != 0 {
-			t.Errorf("root decisions %+v, want none", a.Decisions)
+		if fd := featureDecisions(a.Decisions); len(fd) != 0 {
+			t.Errorf("root feature decisions %+v, want none", fd)
 		}
 		if diff := surface.Diff(surface.Surface{Root: a.Effective.Root}, surface.Surface{Root: b.Effective.Root}); len(diff) != 0 {
 			t.Errorf("enabling rows the node does not select changes the root: %v", diff)
@@ -130,10 +130,10 @@ func TestNodeAheadTimeSynchronizationEnabled(t *testing.T) {
 	if c.FeatureMap != uint32(timeSyncFeatures) {
 		t.Errorf("FeatureMap 0x%X, want 0x%X", c.FeatureMap, uint32(timeSyncFeatures))
 	}
-	if len(rep.Decisions) != 4 {
+	if len(featureDecisions(rep.Decisions)) != 4 {
 		t.Fatalf("root decisions %+v, want one per feature", rep.Decisions)
 	}
-	for _, d := range rep.Decisions {
+	for _, d := range featureDecisions(rep.Decisions) {
 		if d.Endpoint != "" || d.Cluster != tsdef.ClusterID || d.Kind != surface.KindFeature ||
 			d.Reference.Ahead != timeSyncRow || d.Verdict != surface.Keep || d.Mandatory || d.Origin != surface.OriginHostDeclared {
 			t.Errorf("decision %+v", d)

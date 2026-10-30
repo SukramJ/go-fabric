@@ -74,10 +74,11 @@ type CameraController struct{ *Device }
 // [FromSpec] with Type CameraControllerID (see [New]).
 func NewCameraController(opts Options, decls ...Declaration) (*CameraController, error) {
 	d, err := FromSpec(Spec{Type: CameraControllerID, Options: opts, Declarations: decls})
-	if err != nil {
+	if d == nil {
 		return nil, err
 	}
-	return &CameraController{d}, nil
+	// A device the specification level withheld comes with its error ([New]).
+	return &CameraController{d}, err
 }
 
 // WebRtcTransportRequestor is the device's typed WebRtcTransportRequestor server; the type mandates it.

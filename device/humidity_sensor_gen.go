@@ -47,10 +47,11 @@ type HumiditySensor struct{ *Device }
 // [FromSpec] with Type HumiditySensorID (see [New]).
 func NewHumiditySensor(opts Options, decls ...Declaration) (*HumiditySensor, error) {
 	d, err := FromSpec(Spec{Type: HumiditySensorID, Options: opts, Declarations: decls})
-	if err != nil {
+	if d == nil {
 		return nil, err
 	}
-	return &HumiditySensor{d}, nil
+	// A device the specification level withheld comes with its error ([New]).
+	return &HumiditySensor{d}, err
 }
 
 // RelativeHumidityMeasurement is the device's typed RelativeHumidityMeasurement server; the type mandates it.

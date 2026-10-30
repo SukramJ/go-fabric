@@ -5,6 +5,7 @@ package device
 
 import (
 	"cmp"
+	"errors"
 	"fmt"
 	"math/bits"
 	"slices"
@@ -61,10 +62,19 @@ func compose(t *Type, s *settings, opts Options) ([]contract.ClusterServer, surf
 	if opts.Surface != nil {
 		policies = *opts.Surface
 	}
-	rep := surface.Report{Policies: policies.Digest()}
+	rep := surface.Report{Policies: policies.Digest(), Level: policies.EffectiveLevel()}
 	candidates := candidatesOf(t, s, endpoint.RenderSourceKey(opts.StableKey))
+	for i := range candidates {
+		candidates[i].Levels = surface.ElementLevels(candidates[i])
+	}
+	s.candidates = candidates
 	kept, decisions, err := surface.Evaluate(candidates, policies)
 	rep.Decisions = decisions
+	if w := (*surface.WithheldError)(nil); errors.As(err, &w) {
+		rep.Withheld = w.Elements
+		w.Report = rep.Clone()
+		return nil, rep, fmt.Errorf("%s: %w", t.Name, w)
+	}
 	if err != nil {
 		return nil, rep, fmt.Errorf("%s: %w", t.Name, err)
 	}

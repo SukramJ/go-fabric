@@ -8,6 +8,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -17,6 +18,7 @@ import (
 
 	"github.com/SukramJ/go-fabric/device"
 	"github.com/SukramJ/go-fabric/node"
+	"github.com/SukramJ/go-fabric/schema"
 	"github.com/SukramJ/go-fabric/surface"
 )
 
@@ -43,10 +45,59 @@ func surfacePolicies(f flags) (surface.Policies, error) {
 	if f.thermostatSchedules {
 		ids = append(ids, schedulesRow)
 	}
-	if len(ids) == 0 {
-		return surface.Policies{}, nil
+	var p surface.Policies
+	if len(ids) > 0 {
+		p.Extensions = surface.NewExtensions(ids...)
 	}
-	return surface.Policies{Extensions: surface.NewExtensions(ids...)}, nil
+	// --spec-level: an operator's setting (concept v11 §C.5); "" is the
+	// pin's level. An unknown level stops the daemon with the list.
+	p.Level = surface.Level(strings.TrimSpace(f.specLevel))
+	if err := p.Validate(); err != nil {
+		return surface.Policies{}, fmt.Errorf("--spec-level: %w", err)
+	}
+	return p, nil
+}
+
+// levelList names the selectable levels (schema.Levels) for the flag's
+// help.
+func levelList() string {
+	names := make([]string, 0, len(schema.Levels()))
+	for _, l := range schema.Levels() {
+		names = append(names, string(l))
+	}
+	return strings.Join(names, ", ")
+}
+
+// withheldOr returns the device the specification level withheld with its
+// error, so the node records it (node.Aggregator.Add), and nil with any
+// other error.
+func withheldOr[T any](d *T, err error) (*T, error) {
+	if errors.Is(err, surface.ErrWithheld) && d != nil {
+		return d, err
+	}
+	return nil, err
+}
+
+// addAll adds eps to the node's Aggregator and returns those it added. A
+// device the specification level withheld is logged once, with its type
+// and the level, and skipped: the daemon runs on (concept v11 §C.3).
+func addAll(ctx context.Context, agg *node.Aggregator, eps []node.Endpoint, logger *slog.Logger) ([]node.Endpoint, error) {
+	added := make([]node.Endpoint, 0, len(eps))
+	for _, ep := range eps {
+		err := agg.Add(ctx, ep)
+		var w *surface.WithheldError
+		switch {
+		case errors.As(err, &w):
+			name, _ := schema.DeviceTypeName(schema.DeviceTypeID(ep.Spec().DeviceType))
+			logger.Warn("surface.withheld", slog.String("key", w.Endpoint), slog.String("device_type", name),
+				slog.String("spec_level", string(w.Report.Level)))
+		case err != nil:
+			return nil, fmt.Errorf("aggregator: %w", err)
+		default:
+			added = append(added, ep)
+		}
+	}
+	return added, nil
 }
 
 // surfaceDB is the in-memory SQLite store a --dump-surface composition

@@ -59,10 +59,11 @@ type NetworkInfrastructureManager struct{ *Device }
 // [FromSpec] with Type NetworkInfrastructureManagerID (see [New]).
 func NewNetworkInfrastructureManager(opts Options, decls ...Declaration) (*NetworkInfrastructureManager, error) {
 	d, err := FromSpec(Spec{Type: NetworkInfrastructureManagerID, Options: opts, Declarations: decls})
-	if err != nil {
+	if d == nil {
 		return nil, err
 	}
-	return &NetworkInfrastructureManager{d}, nil
+	// A device the specification level withheld comes with its error ([New]).
+	return &NetworkInfrastructureManager{d}, err
 }
 
 // ThreadNetworkDiagnostics is the device's typed ThreadNetworkDiagnostics server; the type mandates it.

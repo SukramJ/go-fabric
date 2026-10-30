@@ -43,8 +43,12 @@ func NewFloodlightCamera(opts Options, onOffLight *OnOffLight, camera *Camera, d
 		return nil, fmt.Errorf("%w: FloodlightCamera needs its components OnOffLight and Camera", ErrComposition)
 	}
 	d, err := FromSpec(Spec{Type: FloodlightCameraID, Options: opts, Declarations: decls})
-	if err != nil {
+	if d == nil {
 		return nil, err
+	}
+	if err != nil {
+		// Withheld by the specification level ([New]): no parts.
+		return &FloodlightCamera{Device: d}, err
 	}
 	for _, p := range []*Device{onOffLight.Device, camera.Device} {
 		if err := d.AddPart(p); err != nil {

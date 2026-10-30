@@ -511,7 +511,7 @@ func (s *demoSoilSensor) device(opts device.Options) (*device.SoilSensor, error)
 		Initial: soildef.Patch{SoilMoistureMeasurementLimits: &limits, SoilMoistureMeasuredValue: value},
 	})
 	if err != nil {
-		return nil, err
+		return withheldOr(d, err)
 	}
 	s.mu.Lock()
 	s.srv = d.SoilMeasurement()

@@ -84,10 +84,11 @@ type DimmableLight struct{ *Device }
 // [FromSpec] with Type DimmableLightID (see [New]).
 func NewDimmableLight(opts Options, decls ...Declaration) (*DimmableLight, error) {
 	d, err := FromSpec(Spec{Type: DimmableLightID, Options: opts, Declarations: decls})
-	if err != nil {
+	if d == nil {
 		return nil, err
 	}
-	return &DimmableLight{d}, nil
+	// A device the specification level withheld comes with its error ([New]).
+	return &DimmableLight{d}, err
 }
 
 // OnOff is the device's typed OnOff server; the type mandates it.

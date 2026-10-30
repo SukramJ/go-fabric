@@ -70,10 +70,11 @@ type Dishwasher struct{ *Device }
 // [FromSpec] with Type DishwasherID (see [New]).
 func NewDishwasher(opts Options, decls ...Declaration) (*Dishwasher, error) {
 	d, err := FromSpec(Spec{Type: DishwasherID, Options: opts, Declarations: decls})
-	if err != nil {
+	if d == nil {
 		return nil, err
 	}
-	return &Dishwasher{d}, nil
+	// A device the specification level withheld comes with its error ([New]).
+	return &Dishwasher{d}, err
 }
 
 // OperationalState is the device's typed OperationalState server; the type mandates it.

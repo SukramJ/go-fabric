@@ -124,7 +124,7 @@ func TestNodeSurface(t *testing.T) {
 	for _, d := range rep.Decisions {
 		speaks[d.Endpoint] = true
 	}
-	if !speaks["light"] || !speaks["owner"] || !speaks["part"] || speaks["plug"] || speaks[""] || speaks[node.AggregatorSurfaceKey] {
+	if !speaks["light"] || !speaks["owner"] || !speaks["part"] || speaks["plug"] || !speaks[""] || speaks[node.AggregatorSurfaceKey] {
 		t.Fatalf("decisions for %v", speaks)
 	}
 	if !json.Valid(mustJSON(t, rep)) {

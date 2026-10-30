@@ -42,8 +42,9 @@ type MeterReferencePoint struct{ *Device }
 // [FromSpec] with Type MeterReferencePointID (see [New]).
 func NewMeterReferencePoint(opts Options, decls ...Declaration) (*MeterReferencePoint, error) {
 	d, err := FromSpec(Spec{Type: MeterReferencePointID, Options: opts, Declarations: decls})
-	if err != nil {
+	if d == nil {
 		return nil, err
 	}
-	return &MeterReferencePoint{d}, nil
+	// A device the specification level withheld comes with its error ([New]).
+	return &MeterReferencePoint{d}, err
 }

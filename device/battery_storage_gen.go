@@ -40,8 +40,9 @@ type BatteryStorage struct{ *Device }
 // [FromSpec] with Type BatteryStorageID (see [New]).
 func NewBatteryStorage(opts Options, decls ...Declaration) (*BatteryStorage, error) {
 	d, err := FromSpec(Spec{Type: BatteryStorageID, Options: opts, Declarations: decls})
-	if err != nil {
+	if d == nil {
 		return nil, err
 	}
-	return &BatteryStorage{d}, nil
+	// A device the specification level withheld comes with its error ([New]).
+	return &BatteryStorage{d}, err
 }

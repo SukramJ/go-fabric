@@ -70,10 +70,11 @@ type LaundryDryer struct{ *Device }
 // [FromSpec] with Type LaundryDryerID (see [New]).
 func NewLaundryDryer(opts Options, decls ...Declaration) (*LaundryDryer, error) {
 	d, err := FromSpec(Spec{Type: LaundryDryerID, Options: opts, Declarations: decls})
-	if err != nil {
+	if d == nil {
 		return nil, err
 	}
-	return &LaundryDryer{d}, nil
+	// A device the specification level withheld comes with its error ([New]).
+	return &LaundryDryer{d}, err
 }
 
 // OperationalState is the device's typed OperationalState server; the type mandates it.

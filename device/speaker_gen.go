@@ -47,10 +47,11 @@ type Speaker struct{ *Device }
 // [FromSpec] with Type SpeakerID (see [New]).
 func NewSpeaker(opts Options, decls ...Declaration) (*Speaker, error) {
 	d, err := FromSpec(Spec{Type: SpeakerID, Options: opts, Declarations: decls})
-	if err != nil {
+	if d == nil {
 		return nil, err
 	}
-	return &Speaker{d}, nil
+	// A device the specification level withheld comes with its error ([New]).
+	return &Speaker{d}, err
 }
 
 // OnOff is the device's typed OnOff server; the type mandates it.

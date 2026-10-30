@@ -47,10 +47,11 @@ type DoorLock struct{ *Device }
 // [FromSpec] with Type DoorLockID (see [New]).
 func NewDoorLock(opts Options, decls ...Declaration) (*DoorLock, error) {
 	d, err := FromSpec(Spec{Type: DoorLockID, Options: opts, Declarations: decls})
-	if err != nil {
+	if d == nil {
 		return nil, err
 	}
-	return &DoorLock{d}, nil
+	// A device the specification level withheld comes with its error ([New]).
+	return &DoorLock{d}, err
 }
 
 // DoorLock is the device's typed DoorLock server; the type mandates it.

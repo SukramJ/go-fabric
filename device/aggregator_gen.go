@@ -51,10 +51,11 @@ type Aggregator struct{ *Device }
 // [FromSpec] with Type AggregatorID (see [New]).
 func NewAggregator(opts Options, decls ...Declaration) (*Aggregator, error) {
 	d, err := FromSpec(Spec{Type: AggregatorID, Options: opts, Declarations: decls})
-	if err != nil {
+	if d == nil {
 		return nil, err
 	}
-	return &Aggregator{d}, nil
+	// A device the specification level withheld comes with its error ([New]).
+	return &Aggregator{d}, err
 }
 
 // Actions is the device's typed Actions server, nil until a declaration mounts it.

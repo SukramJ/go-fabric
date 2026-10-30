@@ -146,7 +146,7 @@ type (
 		Events     []id32 `json:"events"`
 		FeatureMap id32   `json:"featureMap"`
 		Generated  []id32 `json:"generated"`
-		ID         id16   `json:"id"`
+		ID         id32   `json:"id"`
 		Revision   uint16 `json:"revision"`
 	}
 )
@@ -174,7 +174,7 @@ func (e Endpoint) wire(numbers bool) wireEndpoint {
 	}
 	for _, c := range e.Clusters {
 		w.Clusters = append(w.Clusters, wireCluster{
-			ID: id16(c.ID), Revision: c.Revision, FeatureMap: id32(c.FeatureMap),
+			ID: id32(c.ID), Revision: c.Revision, FeatureMap: id32(c.FeatureMap),
 			Attributes: sorted(c.Attributes), Accepted: sorted(c.Accepted),
 			Generated: sorted(c.Generated), Events: sorted(c.Events),
 		})

@@ -82,10 +82,11 @@ type OnOffPlugInUnit struct{ *Device }
 // [FromSpec] with Type OnOffPlugInUnitID (see [New]).
 func NewOnOffPlugInUnit(opts Options, decls ...Declaration) (*OnOffPlugInUnit, error) {
 	d, err := FromSpec(Spec{Type: OnOffPlugInUnitID, Options: opts, Declarations: decls})
-	if err != nil {
+	if d == nil {
 		return nil, err
 	}
-	return &OnOffPlugInUnit{d}, nil
+	// A device the specification level withheld comes with its error ([New]).
+	return &OnOffPlugInUnit{d}, err
 }
 
 // OnOff is the device's typed OnOff server; the type mandates it.

@@ -157,7 +157,7 @@ func (d *demoEnergyTariff) device(opts device.Options) (*device.ElectricalEnergy
 			TimeSource: &d.clock,
 		})
 	if err != nil {
-		return nil, err
+		return withheldOr(dev, err)
 	}
 	d.mu.Lock()
 	d.price = cp.WrapOn(dev.Server(cp.ClusterID), nil)
@@ -587,7 +587,7 @@ func (m *demoElectricalMeter) testEventTrigger(trigger uint64) bool {
 func (m *demoElectricalMeter) device(opts device.Options) (*device.ElectricalMeter, error) {
 	meter, err := device.NewElectricalMeter(opts, append(electricalDeclarations(), commtr.Declare{})...)
 	if err != nil {
-		return nil, err
+		return withheldOr(meter, err)
 	}
 	sensor, err := device.NewElectricalSensor(partOf(opts, "demo:electricalmeter:sensor"), electricalSensorDeclarations()...)
 	if err != nil {

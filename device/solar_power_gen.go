@@ -40,8 +40,9 @@ type SolarPower struct{ *Device }
 // [FromSpec] with Type SolarPowerID (see [New]).
 func NewSolarPower(opts Options, decls ...Declaration) (*SolarPower, error) {
 	d, err := FromSpec(Spec{Type: SolarPowerID, Options: opts, Declarations: decls})
-	if err != nil {
+	if d == nil {
 		return nil, err
 	}
-	return &SolarPower{d}, nil
+	// A device the specification level withheld comes with its error ([New]).
+	return &SolarPower{d}, err
 }

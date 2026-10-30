@@ -65,7 +65,7 @@ func TestMarshalJSONCanonical(t *testing.T) {
 		`{"endpoints":[{"clusters":[],"deviceTypes":[{"id":"0x000e","revision":2}],"key":"aggregator"}`,
 		`"key":"light","number":3}`,
 		`"generated":[]`,
-		`"root":{"clusters":[{"accepted":[],"attributes":["0x00000000","0x00000001","0x0000fffd"],"events":[],"featureMap":"0x00000000","generated":[],"id":"0x001d","revision":3}]`,
+		`"root":{"clusters":[{"accepted":[],"attributes":["0x00000000","0x00000001","0x0000fffd"],"events":[],"featureMap":"0x00000000","generated":[],"id":"0x0000001d","revision":3}]`,
 	} {
 		if !strings.Contains(got, want) {
 			t.Errorf("canonical JSON lacks %s:\n%s", want, got)

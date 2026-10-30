@@ -59,10 +59,11 @@ type WaterHeater struct{ *Device }
 // [FromSpec] with Type WaterHeaterID (see [New]).
 func NewWaterHeater(opts Options, decls ...Declaration) (*WaterHeater, error) {
 	d, err := FromSpec(Spec{Type: WaterHeaterID, Options: opts, Declarations: decls})
-	if err != nil {
+	if d == nil {
 		return nil, err
 	}
-	return &WaterHeater{d}, nil
+	// A device the specification level withheld comes with its error ([New]).
+	return &WaterHeater{d}, err
 }
 
 // WaterHeaterManagement is the device's typed WaterHeaterManagement server; the type mandates it.

@@ -54,10 +54,11 @@ type Closure struct{ *Device }
 // [FromSpec] with Type ClosureID (see [New]).
 func NewClosure(opts Options, decls ...Declaration) (*Closure, error) {
 	d, err := FromSpec(Spec{Type: ClosureID, Options: opts, Declarations: decls})
-	if err != nil {
+	if d == nil {
 		return nil, err
 	}
-	return &Closure{d}, nil
+	// A device the specification level withheld comes with its error ([New]).
+	return &Closure{d}, err
 }
 
 // ClosureControl is the device's typed ClosureControl server; the type mandates it.

@@ -102,6 +102,7 @@ func summary(rep surface.Report) []byte {
 	b.WriteString("| Metric | Value |\n|---|---|\n")
 	fmt.Fprintf(&b, "| %s | `%s` |\n", digestLabel, hex.EncodeToString(digest[:]))
 	fmt.Fprintf(&b, "| Policies digest | `%s` |\n", hex.EncodeToString(rep.Policies[:]))
+	fmt.Fprintf(&b, "| Specification level | %s |\n", rep.Level)
 	fmt.Fprintf(&b, "| Endpoints (the root included) | %d |\n", len(all))
 	fmt.Fprintf(&b, "| Clusters | %d |\n", clusters)
 	fmt.Fprintf(&b, "| Decisions | %d |\n", len(rep.Decisions))

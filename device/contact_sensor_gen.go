@@ -52,10 +52,11 @@ type ContactSensor struct{ *Device }
 // [FromSpec] with Type ContactSensorID (see [New]).
 func NewContactSensor(opts Options, decls ...Declaration) (*ContactSensor, error) {
 	d, err := FromSpec(Spec{Type: ContactSensorID, Options: opts, Declarations: decls})
-	if err != nil {
+	if d == nil {
 		return nil, err
 	}
-	return &ContactSensor{d}, nil
+	// A device the specification level withheld comes with its error ([New]).
+	return &ContactSensor{d}, err
 }
 
 // BooleanState is the device's typed BooleanState server; the type mandates it.

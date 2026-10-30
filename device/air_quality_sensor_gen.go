@@ -107,10 +107,11 @@ type AirQualitySensor struct{ *Device }
 // [FromSpec] with Type AirQualitySensorID (see [New]).
 func NewAirQualitySensor(opts Options, decls ...Declaration) (*AirQualitySensor, error) {
 	d, err := FromSpec(Spec{Type: AirQualitySensorID, Options: opts, Declarations: decls})
-	if err != nil {
+	if d == nil {
 		return nil, err
 	}
-	return &AirQualitySensor{d}, nil
+	// A device the specification level withheld comes with its error ([New]).
+	return &AirQualitySensor{d}, err
 }
 
 // AirQuality is the device's typed AirQuality server; the type mandates it.

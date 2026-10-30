@@ -47,10 +47,11 @@ type PressureSensor struct{ *Device }
 // [FromSpec] with Type PressureSensorID (see [New]).
 func NewPressureSensor(opts Options, decls ...Declaration) (*PressureSensor, error) {
 	d, err := FromSpec(Spec{Type: PressureSensorID, Options: opts, Declarations: decls})
-	if err != nil {
+	if d == nil {
 		return nil, err
 	}
-	return &PressureSensor{d}, nil
+	// A device the specification level withheld comes with its error ([New]).
+	return &PressureSensor{d}, err
 }
 
 // PressureMeasurement is the device's typed PressureMeasurement server; the type mandates it.

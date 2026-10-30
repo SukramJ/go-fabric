@@ -75,3 +75,19 @@ Read at test time (2); commit nothing derived from the XML.
   which is what the coverage job measures.
 - Nothing derived from connectedhomeip's data model is distributed with this
   module (`THIRD-PARTY-NOTICES.md`).
+
+## Addendum 2026-10-30 — specification levels
+
+ADR 0030 decision 5 adds a second use of the per-version data model:
+the specification-level table the surface policy filters by
+(`parity/levels/<level>.json`, `schema/levels_gen.go`). That table is
+**not** derived from the XML. It is extracted from matter.js's tagged
+releases, whose `Specification.REVISION` names the revision each tag
+models (v0.13.0 = 1.4, v0.14.0 = 1.4.1, v0.16.0 = 1.4.2, v0.17.0 =
+1.5.1, v0.17.9 = 1.6.0, v0.18.0 = 1.6.1), under Apache-2.0, by
+`script/extract-levels-from-matter-js.ts`. The XML's role is
+unchanged: `internal/chipdm` compares the level files with
+`data_model/<level>` at test time, from the checkout, in memory, and
+commits only the acknowledged-difference table. The decision above
+— read at test time, commit nothing derived from the XML — holds for
+the levels as for the pin.

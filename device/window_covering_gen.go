@@ -52,10 +52,11 @@ type WindowCovering struct{ *Device }
 // [FromSpec] with Type WindowCoveringID (see [New]).
 func NewWindowCovering(opts Options, decls ...Declaration) (*WindowCovering, error) {
 	d, err := FromSpec(Spec{Type: WindowCoveringID, Options: opts, Declarations: decls})
-	if err != nil {
+	if d == nil {
 		return nil, err
 	}
-	return &WindowCovering{d}, nil
+	// A device the specification level withheld comes with its error ([New]).
+	return &WindowCovering{d}, err
 }
 
 // WindowCovering is the device's typed WindowCovering server; the type mandates it.

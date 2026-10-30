@@ -257,25 +257,32 @@ jobs:
         run: |
           echo "commit=$(sed -n 's/^CHIP_TEST_IMAGE_COMMIT *?= *//p' Makefile)" >> "$GITHUB_OUTPUT"
           echo "version=$(sed -n 's/^CHIP_DATA_MODEL_VERSION *?= *//p' Makefile)" >> "$GITHUB_OUTPUT"
+          echo "levels=$(sed -n 's/^CHIP_LEVEL_DATA_MODELS *?= *//p' Makefile)" >> "$GITHUB_OUTPUT"
       - name: cache the CHIP data model checkout
         id: chip-cache
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ runner.temp }}/connectedhomeip
-          key: chipdm-${{ steps.pins.outputs.commit }}-${{ steps.pins.outputs.version }}
+          key: chipdm-${{ steps.pins.outputs.commit }}-${{ steps.pins.outputs.version }}-${{ steps.pins.outputs.levels }}
       # A blob-filtered, depth-1 partial clone of the pinned commit with only
-      # data_model/<version> checked out: a few MB, no authentication. The
-      # same fetch script/chiptool-setup.sh makes, with a narrower sparse set.
+      # data_model/<version> and the specification levels' directories
+      # (CHIP_LEVEL_DATA_MODELS, the level cross-check) checked out: a few MB,
+      # no authentication. The same fetch script/chiptool-setup.sh makes,
+      # with a narrower sparse set.
       - name: fetch connectedhomeip data_model at the pin
         if: steps.chip-cache.outputs.cache-hit != 'true'
         env:
           CHIP_DIR: ${{ runner.temp }}/connectedhomeip
           PIN: ${{ steps.pins.outputs.commit }}
           DM: data_model/${{ steps.pins.outputs.version }}
+          LEVELS: ${{ steps.pins.outputs.levels }}
         run: |
+          dirs="$DM"
+          for l in $LEVELS; do dirs="$dirs data_model/$l"; done
           git init -q "$CHIP_DIR"
           git -C "$CHIP_DIR" remote add origin https://github.com/project-chip/connectedhomeip.git
-          git -C "$CHIP_DIR" sparse-checkout set --cone "$DM"
+          # shellcheck disable=SC2086 # one directory per word
+          git -C "$CHIP_DIR" sparse-checkout set --cone $dirs
           git -C "$CHIP_DIR" fetch -q --depth 1 --filter=blob:none origin "$PIN"
           git -C "$CHIP_DIR" -c advice.detachedHead=false checkout -q FETCH_HEAD
           du -sh "$CHIP_DIR"

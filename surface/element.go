@@ -6,6 +6,8 @@ package surface
 import (
 	"fmt"
 	"strconv"
+
+	"github.com/SukramJ/go-fabric/schema"
 )
 
 // Kind is what an [Element] or a [Change] is about.
@@ -51,8 +53,9 @@ const (
 	// optional element or initial value, an opted-in optional cluster, a
 	// host's own server.
 	OriginHostDeclared
-	// OriginKitDefault: a default server's own optional choice the device
-	// layer makes. No candidate carries it in this phase (package doc).
+	// OriginKitDefault: a server's own optional choice — an optional root
+	// cluster the node mounts by default, an element a hand-written server
+	// serves on its own (the level policy's server-internal decisions).
 	OriginKitDefault
 )
 
@@ -96,6 +99,11 @@ type Element struct {
 	// at the pin — the device type mandates it, or the cluster's
 	// conformance does for the selected features.
 	Mandatory bool
+	// Levels are the specification levels the element exists at
+	// ([ElementLevels], from the generated table); the device layer and
+	// the node fill it. 0 is an element no level knows — a vendor's — which
+	// the level policy does not control. It is not part of the JSON.
+	Levels schema.LevelSet
 }
 
 // String names the element: "attribute 0x0001 of cluster 0x0006 on

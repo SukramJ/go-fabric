@@ -56,10 +56,11 @@ type RainSensor struct{ *Device }
 // [FromSpec] with Type RainSensorID (see [New]).
 func NewRainSensor(opts Options, decls ...Declaration) (*RainSensor, error) {
 	d, err := FromSpec(Spec{Type: RainSensorID, Options: opts, Declarations: decls})
-	if err != nil {
+	if d == nil {
 		return nil, err
 	}
-	return &RainSensor{d}, nil
+	// A device the specification level withheld comes with its error ([New]).
+	return &RainSensor{d}, err
 }
 
 // BooleanState is the device's typed BooleanState server; the type mandates it.

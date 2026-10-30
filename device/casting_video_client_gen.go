@@ -101,10 +101,11 @@ type CastingVideoClient struct{ *Device }
 // [FromSpec] with Type CastingVideoClientID (see [New]).
 func NewCastingVideoClient(opts Options, decls ...Declaration) (*CastingVideoClient, error) {
 	d, err := FromSpec(Spec{Type: CastingVideoClientID, Options: opts, Declarations: decls})
-	if err != nil {
+	if d == nil {
 		return nil, err
 	}
-	return &CastingVideoClient{d}, nil
+	// A device the specification level withheld comes with its error ([New]).
+	return &CastingVideoClient{d}, err
 }
 
 // Binding is the device's typed Binding server; the type mandates it.

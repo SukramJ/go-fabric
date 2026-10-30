@@ -79,10 +79,11 @@ type PumpController struct{ *Device }
 // [FromSpec] with Type PumpControllerID (see [New]).
 func NewPumpController(opts Options, decls ...Declaration) (*PumpController, error) {
 	d, err := FromSpec(Spec{Type: PumpControllerID, Options: opts, Declarations: decls})
-	if err != nil {
+	if d == nil {
 		return nil, err
 	}
-	return &PumpController{d}, nil
+	// A device the specification level withheld comes with its error ([New]).
+	return &PumpController{d}, err
 }
 
 // Binding is the device's typed Binding server; the type mandates it.

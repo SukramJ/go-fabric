@@ -71,10 +71,11 @@ type TemperatureControlledCabinet struct{ *Device }
 // [FromSpec] with Type TemperatureControlledCabinetID (see [New]).
 func NewTemperatureControlledCabinet(opts Options, decls ...Declaration) (*TemperatureControlledCabinet, error) {
 	d, err := FromSpec(Spec{Type: TemperatureControlledCabinetID, Options: opts, Declarations: decls})
-	if err != nil {
+	if d == nil {
 		return nil, err
 	}
-	return &TemperatureControlledCabinet{d}, nil
+	// A device the specification level withheld comes with its error ([New]).
+	return &TemperatureControlledCabinet{d}, err
 }
 
 // TemperatureControl is the device's typed TemperatureControl server; the type mandates it.

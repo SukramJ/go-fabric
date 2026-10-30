@@ -12,7 +12,8 @@ import (
 )
 
 // The JSON forms of an id: a lower-case hex string with the 0x prefix,
-// four digits for a device type or a cluster id and eight for an
+// four digits for a device type id and eight for a cluster id (Matter
+// cluster ids are 32-bit; a vendor cluster does not fit four), an
 // attribute, command or event id, a feature's mask and a FeatureMap.
 // Decoding also accepts the decimal number the first snapshot carried.
 type (
@@ -41,7 +42,7 @@ func (v *kindID) UnmarshalJSON(b []byte) error { return unmarshalID(&v.v, b) }
 
 // idOf is the JSON form of an element's id of kind k.
 func idOf(k Kind, id uint32) kindID {
-	return kindID{v: id, wide: k != KindDeviceType && k != KindCluster}
+	return kindID{v: id, wide: k != KindDeviceType}
 }
 
 func hexJSON(v uint32, width int) []byte {

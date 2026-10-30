@@ -53,10 +53,11 @@ type ElectricalMeter struct{ *Device }
 // [FromSpec] with Type ElectricalMeterID (see [New]).
 func NewElectricalMeter(opts Options, decls ...Declaration) (*ElectricalMeter, error) {
 	d, err := FromSpec(Spec{Type: ElectricalMeterID, Options: opts, Declarations: decls})
-	if err != nil {
+	if d == nil {
 		return nil, err
 	}
-	return &ElectricalMeter{d}, nil
+	// A device the specification level withheld comes with its error ([New]).
+	return &ElectricalMeter{d}, err
 }
 
 // ElectricalPowerMeasurement is the device's typed ElectricalPowerMeasurement server; the type mandates it.

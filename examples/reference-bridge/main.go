@@ -96,6 +96,7 @@ type flags struct {
 	thermostatSchedules                        bool
 	dumpSurface                                bool
 	extensions                                 string
+	specLevel                                  string
 }
 
 func parseFlags() flags {
@@ -125,6 +126,7 @@ func parseFlags() flags {
 	flag.StringVar(&f.extensions, "extensions", "", "comma-separated \"Ahead of matter.js\" register IDs to enable (surface.Policies.Extensions, notes/parity/by_design.md), on the node and every device; an unknown ID stops the daemon with the list of known ones; see surface.go")
 	flag.StringVar(&f.otbr, "otbr", "", "add a ThreadBorderRouter endpoint over the OpenThread Border Router's REST API at this URL (\"http://[fd00::1]:8081\"); off when empty; see otbr.go")
 	flag.BoolVar(&f.media, "media", false, "TESTING ONLY: add a simulated video player (CastingVideoPlayer) and content app (ContentApp) after chip's tv-app, for the media certification families; see media.go")
+	flag.StringVar(&f.specLevel, "spec-level", "", "the Matter specification level to compose at (surface.Policies.Level): one of the revisions matter.js has shipped, "+levelList()+"; the default is the pin's. Optional elements the level does not know are removed, devices whose type it does not know are withheld and logged, behaviour and ClusterRevision stay the pin's; an unknown level stops the daemon with the list; see surface.go")
 	flag.BoolVar(&f.dumpSurface, "dump-surface", false, "print the node's served surface — the effective surface of the root, the Aggregator and every device, the surface policies' digest and every decision (package surface) — as JSON on stdout and exit, composed as the other flags say, before any socket is bound, any mDNS record published or the --db store opened (the composition runs on an in-memory store); see surface.go")
 	flag.Parse()
 	return f
@@ -363,10 +365,8 @@ func assemble(ctx context.Context, devices *fleet, cfg node.Config, applier *ota
 		return nil, err
 	}
 	agg := n.Aggregator()
-	for _, ep := range eps {
-		if err := agg.Add(ctx, ep); err != nil {
-			return nil, fmt.Errorf("aggregator: %w", err)
-		}
+	if eps, err = addAll(ctx, agg, eps, cfg.Logger); err != nil {
+		return nil, err
 	}
 	// The app pipe's SimulateConfigurationVersionChange raises every
 	// bridged device's ConfigurationVersion, persisted by the node.

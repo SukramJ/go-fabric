@@ -52,10 +52,11 @@ type OccupancySensor struct{ *Device }
 // [FromSpec] with Type OccupancySensorID (see [New]).
 func NewOccupancySensor(opts Options, decls ...Declaration) (*OccupancySensor, error) {
 	d, err := FromSpec(Spec{Type: OccupancySensorID, Options: opts, Declarations: decls})
-	if err != nil {
+	if d == nil {
 		return nil, err
 	}
-	return &OccupancySensor{d}, nil
+	// A device the specification level withheld comes with its error ([New]).
+	return &OccupancySensor{d}, err
 }
 
 // OccupancySensing is the device's typed OccupancySensing server; the type mandates it.

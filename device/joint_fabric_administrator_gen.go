@@ -47,10 +47,11 @@ type JointFabricAdministrator struct{ *Device }
 // [FromSpec] with Type JointFabricAdministratorID (see [New]).
 func NewJointFabricAdministrator(opts Options, decls ...Declaration) (*JointFabricAdministrator, error) {
 	d, err := FromSpec(Spec{Type: JointFabricAdministratorID, Options: opts, Declarations: decls})
-	if err != nil {
+	if d == nil {
 		return nil, err
 	}
-	return &JointFabricAdministrator{d}, nil
+	// A device the specification level withheld comes with its error ([New]).
+	return &JointFabricAdministrator{d}, err
 }
 
 // JointFabricDatastore is the device's typed JointFabricDatastore server; the type mandates it.

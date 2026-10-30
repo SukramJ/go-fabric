@@ -57,10 +57,11 @@ type WaterValve struct{ *Device }
 // [FromSpec] with Type WaterValveID (see [New]).
 func NewWaterValve(opts Options, decls ...Declaration) (*WaterValve, error) {
 	d, err := FromSpec(Spec{Type: WaterValveID, Options: opts, Declarations: decls})
-	if err != nil {
+	if d == nil {
 		return nil, err
 	}
-	return &WaterValve{d}, nil
+	// A device the specification level withheld comes with its error ([New]).
+	return &WaterValve{d}, err
 }
 
 // ValveConfigurationAndControl is the device's typed ValveConfigurationAndControl server; the type mandates it.

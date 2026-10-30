@@ -111,10 +111,11 @@ type CastingVideoPlayer struct{ *Device }
 // [FromSpec] with Type CastingVideoPlayerID (see [New]).
 func NewCastingVideoPlayer(opts Options, decls ...Declaration) (*CastingVideoPlayer, error) {
 	d, err := FromSpec(Spec{Type: CastingVideoPlayerID, Options: opts, Declarations: decls})
-	if err != nil {
+	if d == nil {
 		return nil, err
 	}
-	return &CastingVideoPlayer{d}, nil
+	// A device the specification level withheld comes with its error ([New]).
+	return &CastingVideoPlayer{d}, err
 }
 
 // OnOff is the device's typed OnOff server; the type mandates it.
