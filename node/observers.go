@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/SukramJ/go-fabric/store"
+	"github.com/SukramJ/go-fabric/surface"
 )
 
 // Observers are the host's callbacks on the node's fabric and
@@ -71,6 +72,16 @@ type Observers struct {
 	// the facade switched the PASE acceptor and published or withdrew
 	// the commissionable record.
 	OnWindowTransition func(WindowSnapshot) error
+	// OnSurfaceChanged runs after an assembly changed an endpoint's served
+	// surface against the one persisted for its key — once the node has
+	// raised the ConfigurationVersions, bumped the DataVersions, stored
+	// the new surface and recorded the change ([Node.Surface] lists it
+	// under Changed) — once per changed endpoint, with the change. The
+	// announcement is this module's (concept v11 §D, by_design
+	// BD-Matter-SurfaceChange-ConfigurationVersion); matter.js raises the
+	// versions and has no event for it, so a host that mirrors a change
+	// to its own pages (a stream event) observes it here.
+	OnSurfaceChanged func(surface.SurfaceChange) error
 }
 
 // FabricInfo names one fabric, as OperationalCredentials' AddNOC hook

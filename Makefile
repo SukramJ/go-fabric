@@ -72,7 +72,8 @@ STRESS_FLAKES = \
 	'./controller/client:^TestIcdClientParity$$/availability' \
 	'./cluster/core:^TestICDManagementRegistrationLifecycle$$' \
 	'./client/exchange:^TestMessageExchangePaddedBDXCap$$' \
-	'./controller/client:^TestConnectionStateParityMatterJS$$'
+	'./controller/client:^TestConnectionStateParityMatterJS$$' \
+	'./controller/ble:^TestBleScannerTimeoutEndsOneDiscovery$$'
 
 .DEFAULT_GOAL := help
 
