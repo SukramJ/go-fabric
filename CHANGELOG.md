@@ -16,6 +16,7 @@ pseudo-version of `main`.
 
 ### Fixed
 
+- A device the specification level withheld stays in `Node.Surface().Withheld` no longer after it is gone: `Aggregator.Remove` (and `Batch.Remove`) of a withheld key drops its record and returns nil instead of `ErrUnknownKey` — the key was declared, the node knows it — and `Forget` drops it too (go-fabric-server PR 20's finding).
 - `controller/ble`: a discovery's timeout timer is armed before its waiter is visible to the scanner (`Scanner.expiry`), so a fake clock advanced right after the waiter appeared cannot leave the timer unarmed — the `TestBleScannerTimeoutEndsOneDiscovery` hang of #306. No behaviour change on a real clock.
 - `controller/client` `TestIcdClientParity/availability/has_no_nextExpectedCheckin_while_subscribed` waits for the recreated subscription to be established before reading the deadline (race-job flake, #306).
 

@@ -440,7 +440,9 @@ func (b *Batch) Replace(key device.SourceKey, ep Endpoint) error {
 
 // Remove drops the endpoint with key from the batch's partition; see
 // [Aggregator.Remove]. The device is unbound after the batch's
-// reassembly.
+// reassembly. A key the specification level withheld (its Add returned
+// [surface.ErrWithheld]; no partition holds it) is known: Remove drops
+// its withheld record from [Node.Surface] and returns nil.
 func (b *Batch) Remove(key device.SourceKey) error {
 	if key == nil {
 		return ErrNoStableKey
@@ -448,6 +450,10 @@ func (b *Batch) Remove(key device.SourceKey) error {
 	a := b.a
 	a.mu.Lock()
 	part, i := a.findLocked(key.String())
+	if part == nil && a.n.dropWithheld(key.String()) {
+		a.mu.Unlock()
+		return nil
+	}
 	if part == nil || part.scope != b.scope {
 		a.mu.Unlock()
 		return fmt.Errorf("%w: %s", ErrUnknownKey, key)
