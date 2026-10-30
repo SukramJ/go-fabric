@@ -423,6 +423,28 @@ generate-matter-schema: ## regenerate parity/schema.json, schema/ and the genera
 	@# script/devicegen/devicetypes.go lists which.
 	$(GO) run ./script/devicegen
 
+# The specification levels (concept v11 §C.5, ADR 0030 decision 5): one
+# matter.js release tag per Matter revision matter.js shipped, extracted by
+# script/extract-levels-from-matter-js.ts into parity/levels/<revision>.json
+# (script/generate-level.sh: a detached worktree of MATTERJS_DIR at the tag,
+# the tag's own npm ci and model build, removed again on exit), then
+# schema/levels_gen.go and docs/reference/spec-levels.md (script/levelgen).
+# Refreshing a level file is a review decision like the main snapshot — it
+# changes what upstream says a revision contains; read the diff before
+# committing. LEVELS_WORKDIR picks where the worktrees go.
+MATTERJS_LEVEL_TAGS ?= v0.13.0 v0.14.0 v0.16.0 v0.17.0 v0.17.9 v0.18.0
+
+.PHONY: generate-levels
+generate-levels: ## re-extract every parity/levels/<level>.json from MATTERJS_LEVEL_TAGS, then schema/levels_gen.go (a review decision)
+	@for t in $(MATTERJS_LEVEL_TAGS); do script/generate-level.sh $$t "$(MATTERJS_DIR)" parity/levels || exit $$?; done
+	$(GO) run ./script/levelgen
+
+.PHONY: generate-level
+generate-level: ## re-extract one level: make generate-level TAG=v0.16.0 (a review decision)
+	@test -n "$(TAG)" || { echo "generate-level: set TAG=<matter.js tag>"; exit 2; }
+	script/generate-level.sh "$(TAG)" "$(MATTERJS_DIR)" parity/levels
+	$(GO) run ./script/levelgen
+
 .PHONY: update-dcl-snapshot
 update-dcl-snapshot: ## refetch controller/dcl/snapshot/data (PAAs, CD signers, SOURCE) from the production DCL — a review step, read the diff before committing
 	@# Never automatic: like the schema refresh this changes what the

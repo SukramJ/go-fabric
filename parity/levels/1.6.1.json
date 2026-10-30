@@ -1,0 +1,7663 @@
+{
+  "matter": {
+    "revision": "1.6.1",
+    "tag": "v0.18.0",
+    "sourceCommit": "7e1f5d7892dcea4330828b6a82d31ffe2a04cc0b",
+    "method": "model"
+  },
+  "deviceTypes": [
+    {
+      "id": 10,
+      "revision": 4
+    },
+    {
+      "id": 11,
+      "revision": 4
+    },
+    {
+      "id": 14,
+      "revision": 2
+    },
+    {
+      "id": 15,
+      "revision": 3
+    },
+    {
+      "id": 17,
+      "revision": 1
+    },
+    {
+      "id": 18,
+      "revision": 1
+    },
+    {
+      "id": 19,
+      "revision": 3
+    },
+    {
+      "id": 20,
+      "revision": 1
+    },
+    {
+      "id": 21,
+      "revision": 2
+    },
+    {
+      "id": 22,
+      "revision": 5
+    },
+    {
+      "id": 23,
+      "revision": 1
+    },
+    {
+      "id": 24,
+      "revision": 2
+    },
+    {
+      "id": 25,
+      "revision": 1
+    },
+    {
+      "id": 34,
+      "revision": 1
+    },
+    {
+      "id": 35,
+      "revision": 2
+    },
+    {
+      "id": 36,
+      "revision": 2
+    },
+    {
+      "id": 39,
+      "revision": 1
+    },
+    {
+      "id": 40,
+      "revision": 2
+    },
+    {
+      "id": 41,
+      "revision": 2
+    },
+    {
+      "id": 42,
+      "revision": 2
+    },
+    {
+      "id": 43,
+      "revision": 5
+    },
+    {
+      "id": 44,
+      "revision": 1
+    },
+    {
+      "id": 45,
+      "revision": 3
+    },
+    {
+      "id": 64,
+      "revision": 1
+    },
+    {
+      "id": 65,
+      "revision": 2
+    },
+    {
+      "id": 66,
+      "revision": 1
+    },
+    {
+      "id": 67,
+      "revision": 2
+    },
+    {
+      "id": 68,
+      "revision": 2
+    },
+    {
+      "id": 69,
+      "revision": 1
+    },
+    {
+      "id": 112,
+      "revision": 3
+    },
+    {
+      "id": 113,
+      "revision": 6
+    },
+    {
+      "id": 114,
+      "revision": 4
+    },
+    {
+      "id": 115,
+      "revision": 2
+    },
+    {
+      "id": 116,
+      "revision": 4
+    },
+    {
+      "id": 117,
+      "revision": 2
+    },
+    {
+      "id": 118,
+      "revision": 2
+    },
+    {
+      "id": 119,
+      "revision": 2
+    },
+    {
+      "id": 120,
+      "revision": 1
+    },
+    {
+      "id": 121,
+      "revision": 2
+    },
+    {
+      "id": 122,
+      "revision": 1
+    },
+    {
+      "id": 123,
+      "revision": 2
+    },
+    {
+      "id": 124,
+      "revision": 2
+    },
+    {
+      "id": 144,
+      "revision": 2
+    },
+    {
+      "id": 145,
+      "revision": 2
+    },
+    {
+      "id": 256,
+      "revision": 4
+    },
+    {
+      "id": 257,
+      "revision": 4
+    },
+    {
+      "id": 259,
+      "revision": 4
+    },
+    {
+      "id": 260,
+      "revision": 4
+    },
+    {
+      "id": 261,
+      "revision": 4
+    },
+    {
+      "id": 262,
+      "revision": 4
+    },
+    {
+      "id": 263,
+      "revision": 4
+    },
+    {
+      "id": 266,
+      "revision": 5
+    },
+    {
+      "id": 267,
+      "revision": 6
+    },
+    {
+      "id": 268,
+      "revision": 5
+    },
+    {
+      "id": 269,
+      "revision": 5
+    },
+    {
+      "id": 271,
+      "revision": 3
+    },
+    {
+      "id": 272,
+      "revision": 3
+    },
+    {
+      "id": 304,
+      "revision": 1
+    },
+    {
+      "id": 320,
+      "revision": 2
+    },
+    {
+      "id": 321,
+      "revision": 2
+    },
+    {
+      "id": 322,
+      "revision": 1
+    },
+    {
+      "id": 323,
+      "revision": 1
+    },
+    {
+      "id": 324,
+      "revision": 1
+    },
+    {
+      "id": 325,
+      "revision": 1
+    },
+    {
+      "id": 326,
+      "revision": 2
+    },
+    {
+      "id": 327,
+      "revision": 1
+    },
+    {
+      "id": 328,
+      "revision": 2
+    },
+    {
+      "id": 514,
+      "revision": 7
+    },
+    {
+      "id": 515,
+      "revision": 5
+    },
+    {
+      "id": 560,
+      "revision": 1
+    },
+    {
+      "id": 561,
+      "revision": 1
+    },
+    {
+      "id": 574,
+      "revision": 2
+    },
+    {
+      "id": 769,
+      "revision": 7
+    },
+    {
+      "id": 770,
+      "revision": 3
+    },
+    {
+      "id": 771,
+      "revision": 4
+    },
+    {
+      "id": 772,
+      "revision": 5
+    },
+    {
+      "id": 773,
+      "revision": 3
+    },
+    {
+      "id": 774,
+      "revision": 3
+    },
+    {
+      "id": 775,
+      "revision": 3
+    },
+    {
+      "id": 777,
+      "revision": 1
+    },
+    {
+      "id": 778,
+      "revision": 2
+    },
+    {
+      "id": 1292,
+      "revision": 2
+    },
+    {
+      "id": 1293,
+      "revision": 3
+    },
+    {
+      "id": 1295,
+      "revision": 1
+    },
+    {
+      "id": 1296,
+      "revision": 1
+    },
+    {
+      "id": 1297,
+      "revision": 1
+    },
+    {
+      "id": 1298,
+      "revision": 1
+    },
+    {
+      "id": 1299,
+      "revision": 1
+    },
+    {
+      "id": 1300,
+      "revision": 1
+    },
+    {
+      "id": 2112,
+      "revision": 4
+    },
+    {
+      "id": 2128,
+      "revision": 4
+    }
+  ],
+  "clusters": [
+    {
+      "id": 3,
+      "revision": 6,
+      "features": [],
+      "attributes": [
+        0,
+        1,
+        65528,
+        65529,
+        65530,
+        65531,
+        65532,
+        65533
+      ],
+      "commands": [
+        0,
+        64
+      ],
+      "events": [],
+      "mandatory": {
+        "attributes": [
+          0,
+          1,
+          65528,
+          65529,
+          65531,
+          65532
+        ],
+        "commands": [
+          0
+        ],
+        "events": []
+      }
+    },
+    {
+      "id": 4,
+      "revision": 4,
+      "features": [
+        {
+          "bit": 0,
+          "code": "GN"
+        }
+      ],
+      "attributes": [
+        0,
+        65528,
+        65529,
+        65530,
+        65531,
+        65532,
+        65533
+      ],
+      "commands": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "events": [],
+      "mandatory": {
+        "attributes": [
+          0,
+          65528,
+          65529,
+          65531
+        ],
+        "commands": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5
+        ],
+        "events": []
+      }
+    },
+    {
+      "id": 6,
+      "revision": 6,
+      "features": [
+        {
+          "bit": 0,
+          "code": "LT"
+        },
+        {
+          "bit": 1,
+          "code": "DF"
+        },
+        {
+          "bit": 2,
+          "code": "OFFONLY"
+        }
+      ],
+      "attributes": [
+        0,
+        16384,
+        16385,
+        16386,
+        16387,
+        65528,
+        65529,
+        65530,
+        65531,
+        65532,
+        65533
+      ],
+      "commands": [
+        0,
+        1,
+        2,
+        64,
+        65,
+        66
+      ],
+      "events": [],
+      "mandatory": {
+        "attributes": [
+          0,
+          65528,
+          65529,
+          65531
+        ],
+        "commands": [
+          0
+        ],
+        "events": []
+      }
+    },
+    {
+      "id": 8,
+      "revision": 7,
+      "features": [
+        {
+          "bit": 0,
+          "code": "OO"
+        },
+        {
+          "bit": 1,
+          "code": "LT"
+        },
+        {
+          "bit": 2,
+          "code": "FQ"
+        }
+      ],
+      "attributes": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        16384,
+        65528,
+        65529,
+        65530,
+        65531,
+        65532,
+        65533
+      ],
+      "commands": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8
+      ],
+      "events": [],
+      "mandatory": {
+        "attributes": [
+          0,
+          15,
+          17,
+          65528,
+          65529,
+          65531
+        ],
+        "commands": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7
+        ],
+        "events": []
+      }
+    },
+    {
+      "id": 29,
+      "revision": 3,
+      "features": [
+        {
+          "bit": 0,
+          "code": "TAGLIST"
+        }
+      ],
+      "attributes": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        65528,
+        65529,
+        65530,
+        65531,
+        65532,
+        65533
+      ],
+      "commands": [],
+      "events": [],
+      "mandatory": {
+        "attributes": [
+          0,
+          1,
+          2,
+          3,
+          65528,
+          65529,
+          65531
+        ],
+        "commands": [],
+        "events": []
+      }
+    },
+    {
+      "id": 30,
+      "revision": 1,
+      "features": [],
+      "attributes": [
+        0,
+        65528,
+        65529,
+        65530,
+        65531,
+        65532,
+        65533
+      ],
+      "commands": [],
+      "events": [],
+      "mandatory": {
+        "attributes": [
+          0,
+          65528,
+          65529,
+          65531,
+          65532
+        ],
+        "commands": [],
+        "events": []
+      }
+    },
+    {
+      "id": 31,
+      "revision": 3,
+      "features": [
+        {
+          "bit": 0,
+          "code": "EXTS"
+        },
+        {
+          "bit": 1,
+          "code": "MNGD"
+        },
+        {
+          "bit": 2,
+          "code": "AUX"
+        }
+      ],
+      "attributes": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        65528,
+        65529,
+        65530,
+        65531,
+        65532,
+        65533
+      ],
+      "commands": [
+        0,
+        1
+      ],
+      "events": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "mandatory": {
+        "attributes": [
+          0,
+          2,
+          3,
+          4,
+          65528,
+          65529,
+          65531
+        ],
+        "commands": [],
+        "events": [
+          0
+        ]
+      }
+    },
+    {
+      "id": 37,
+      "revision": 1,
+      "features": [],
+      "attributes": [
+        0,
+        1,
+        2,
+        65528,
+        65529,
+        65530,
+        65531,
+        65532,
+        65533
+      ],
+      "commands": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11
+      ],
+      "events": [
+        0,
+        1
+      ],
+      "mandatory": {
+        "attributes": [
+          0,
+          1,
+          65528,
+          65529,
+          65531,
+          65532
+        ],
+        "commands": [],
+        "events": [
+          0,
+          1
+        ]
+      }
+    },
+    {
+      "id": 40,
+      "revision": 6,
+      "features": [],
+      "attributes": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21,
+        22,
+        24,
+        65528,
+        65529,
+        65530,
+        65531,
+        65532,
+        65533
+      ],
+      "commands": [],
+      "events": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "mandatory": {
+        "attributes": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          19,
+          65528,
+          65529,
+          65531,
+          65532
+        ],
+        "commands": [],
+        "events": [
+          0
+        ]
+      }
+    },
+    {
+      "id": 41,
+      "revision": 1,
+      "features": [],
+      "attributes": [
+        65528,
+        65529,
+        65530,
+        65531,
+        65532,
+        65533
+      ],
+      "commands": [
+        0,
+        1,
+        2,
+        3,
+        4
+      ],
+      "events": [],
+      "mandatory": {
+        "attributes": [
+          65528,
+          65529,
+          65531,
+          65532
+        ],
+        "commands": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ],
+        "events": []
+      }
+    },
+    {
+      "id": 42,
+      "revision": 1,
+      "features": [],
+      "attributes": [
+        0,
+        1,
+        2,
+        3,
+        65528,
+        65529,
+        65530,
+        65531,
+        65532,
+        65533
+      ],
+      "commands": [
+        0
+      ],
+      "events": [
+        0,
+        1,
+        2
+      ],
+      "mandatory": {
+        "attributes": [
+          0,
+          1,
+          2,
+          3,
+          65528,
+          65529,
+          65531,
+          65532
+        ],
+        "commands": [],
+        "events": [
+          0,
+          1,
+          2
+        ]
+      }
+    },
+    {
+      "id": 43,
+      "revision": 1,
+      "features": [],
+      "attributes": [
+        0,
+        1,
+        65528,
+        65529,
+        65530,
+        65531,
+        65532,
+        65533
+      ],
+      "commands": [],
+      "events": [],
+      "mandatory": {
+        "attributes": [
+          0,
+          1,
+          65528,
+          65529,
+          65531,
+          65532
+        ],
+        "commands": [],
+        "events": []
+      }
+    },
+    {
+      "id": 44,
+      "revision": 1,
+      "features": [
+        {
+          "bit": 0,
+          "code": "CALFMT"
+        }
+      ],
+      "attributes": [
+        0,
+        1,
+        2,
+        65528,
+        65529,
+        65530,
+        65531,
+        65532,
+        65533
+      ],
+      "commands": [],
+      "events": [],
+      "mandatory": {
+        "attributes": [
+          0,
+          65528,
+          65529,
+          65531
+        ],
+        "commands": [],
+        "events": []
+      }
+    },
+    {
+      "id": 45,
+      "revision": 2,
+      "features": [
+        {
+          "bit": 0,
+          "code": "TEMP"
+        }
+      ],
+      "attributes": [
+        0,
+        1,
+        65528,
+        65529,
+        65530,
+        65531,
+        65532,
+        65533
+      ],
+      "commands": [],
+      "events": [],
+      "mandatory": {
+        "attributes": [
+          65528,
+          65529,
+          65531
+        ],
+        "commands": [],
+        "events": []
+      }
+    },
+    {
+      "id": 46,
+      "revision": 1,
+      "features": [],
+      "attributes": [
+        0,
+        65528,
+        65529,
+        65530,
+        65531,
+        65532,
+        65533
+      ],
+      "commands": [],
+      "events": [],
+      "mandatory": {
+        "attributes": [
+          0,
+          65528,
+          65529,
+          65531,
+          65532
+        ],
+        "commands": [],
+        "events": []
+      }
+    },
+    {
+      "id": 47,
+      "revision": 3,
+      "features": [
+        {
+          "bit": 0,
+          "code": "WIRED"
+        },
+        {
+          "bit": 1,
+          "code": "BAT"
+        },
+        {
+          "bit": 2,
+          "code": "RECHG"
+        },
+        {
+          "bit": 3,
+          "code": "REPLC"
+        }
+      ],
+      "attributes": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21,
+        22,
+        23,
+        24,
+        25,
+        26,
+        27,
+        28,
+        29,
+        30,
+        31,
+        65528,
+        65529,
+        65530,
+        65531,
+        65532,
+        65533
+      ],
+      "commands": [],
+      "events": [
+        0,
+        1,
+        2
+      ],
+      "mandatory": {
+        "attributes": [
+          0,
+          1,
+          2,
+          31,
+          65528,
+          65529,
+          65531
+        ],
+        "commands": [],
+        "events": []
+      }
+    },
+    {
+      "id": 48,
+      "revision": 2,
+      "features": [
+        {
+          "bit": 0,
+          "code": "TC"
+        },
+        {
+          "bit": 1,
+          "code": "NR"
+        }
+      ],
+      "attributes": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        65528,
+        65529,
+        65530,
+        65531,
+        65532,
+        65533
+      ],
+      "commands": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+      ],
+      "events": [],
+      "mandatory": {
+        "attributes": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          65528,
+          65529,
+          65531
+        ],
+        "commands": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5
+        ],
+        "events": []
+      }
+    },
+    {
+      "id": 49,
+      "revision": 2,
+      "features": [
+        {
+          "bit": 0,
+          "code": "WI"
+        },
+        {
+          "bit": 1,
+          "code": "TH"
+        },
+        {
+          "bit": 2,
+          "code": "ET"
+        }
+      ],
+      "attributes": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        65528,
+        65529,
+        65530,
+        65531,
+        65532,
+        65533
+      ],
+      "commands": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8
+      ],
+      "events": [],
+      "mandatory": {
+        "attributes": [
+          0,
+          1,
+          4,
+          5,
+          6,
+          7,
+          65528,
+          65529,
+          65531
+        ],
+        "commands": [],
+        "events": []
+      }
+    },
+    {
+      "id": 50,
+      "revision": 1,
+      "features": [],
+      "attributes": [
+        65528,
+        65529,
+        65530,
+        65531,
+        65532,
+        65533
+      ],
+      "commands": [
+        0,
+        1
+      ],
+      "events": [],
+      "mandatory": {
+        "attributes": [
+          65528,
+          65529,
+          65531,
+          65532
+        ],
+        "commands": [
+          0,
+          1
+        ],
+        "events": []
+      }
+    },
+    {
+      "id": 51,
+      "revision": 3,
+      "features": [
+        {
+          "bit": 0,
+          "code": "DMTEST"
+        }
+      ],
+      "attributes": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        65528,
+        65529,
+        65530,
+        65531,
+        65532,
+        65533
+      ],
+      "commands": [
+        0,
+        1,
+        2,
+        3,
+        4
+      ],
+      "events": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "mandatory": {
+        "attributes": [
+          0,
+          1,
+          2,
+          8,
+          65528,
+          65529,
+          65531
+        ],
+        "commands": [
+          0,
+          1,
+          2
+        ],
+        "events": [
+          3
+        ]
+      }
+    },
+    {
+      "id": 52,
+      "revision": 1,
+      "features": [
+        {
+          "bit": 0,
+          "code": "WTRMRK"
+        }
+      ],
+      "attributes": [
+        0,
+        1,
+        2,
+        3,
+        65528,
+        65529,
+        65530,
+        65531,
+        65532,
+        65533
+      ],
+      "commands": [
+        0
+      ],
+      "events": [
+        0
+      ],
+      "mandatory": {
+        "attributes": [
+          65528,
+          65529,
+          65531
+        ],
+        "commands": [],
+        "events": []
+      }
+    },
+    {
+      "id": 53,
+      "revision": 3,
+      "features": [
+        {
+          "bit": 0,
+          "code": "PKTCNT"
+        },
+        {
+          "bit": 1,
+          "code": "ERRCNT"
+        },
+        {
+          "bit": 2,
+          "code": "MLECNT"
+        },
+        {
+          "bit": 3,
+          "code": "MACCNT"
+        }
+      ],
+      "attributes": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21,
+        22,
+        23,
+        24,
+        25,
+        26,
+        27,
+        28,
+        29,
+        30,
+        31,
+        32,
+        33,
+        34,
+        35,
+        36,
+        37,
+        38,
+        39,
+        40,
+        41,
+        42,
+        43,
+        44,
+        45,
+        46,
+        47,
+        48,
+        49,
+        50,
+        51,
+        52,
+        53,
+        54,
+        55,
+        56,
+        57,
+        58,
+        59,
+        60,
+        61,
+        62,
+        63,
+        64,
+        65528,
+        65529,
+        65530,
+        65531,
+        65532,
+        65533
+      ],
+      "commands": [
+        0
+      ],
+      "events": [
+        0,
+        1
+      ],
+      "mandatory": {
+        "attributes": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12,
+          13,
+          59,
+          60,
+          61,
+          62,
+          65528,
+          65529,
+          65531
+        ],
+        "commands": [],
+        "events": []
+      }
+    },
+    {
+      "id": 54,
+      "revision": 1,
+      "features": [
+        {
+          "bit": 0,
+          "code": "PKTCNT"
+        },
+        {
+          "bit": 1,
+          "code": "ERRCNT"
+        }
+      ],
+      "attributes": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        65528,
+        65529,
+        65530,
+        65531,
+        65532,
+        65533
+      ],
+      "commands": [
+        0
+      ],
+      "events": [
+        0,
+        1,
+        2
+      ],
+      "mandatory": {
+        "attributes": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          65528,
+          65529,
+          65531
+        ],
+        "commands": [],
+        "events": []
+      }
+    },
+    {
+      "id": 55,
+      "revision": 1,
+      "features": [
+        {
+          "bit": 0,
+          "code": "PKTCNT"
+        },
+        {
+          "bit": 1,
+          "code": "ERRCNT"
+        }
+      ],
+      "attributes": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        65528,
+        65529,
+        65530,
+        65531,
+        65532,
+        65533
+      ],
+      "commands": [
+        0
+      ],
+      "events": [],
+      "mandatory": {
+        "attributes": [
+          65528,
+          65529,
+          65531
+        ],
+        "commands": [],
+        "events": []
+      }
+    },
+    {
+      "id": 56,
+      "revision": 2,
+      "features": [
+        {
+          "bit": 0,
+          "code": "TZ"
+        },
+        {
+          "bit": 1,
+          "code": "NTPC"
+        },
+        {
+          "bit": 2,
+          "code": "NTPS"
+        },
+        {
+          "bit": 3,
+          "code": "TSC"
+        }
+      ],
+      "attributes": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        65528,
+        65529,
+        65530,
+        65531,
+        65532,
+        65533
+      ],
+      "commands": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "events": [
+        0,
+        1,
+        2,
+        3,
+        4
+      ],
+      "mandatory": {
+        "attributes": [
+          0,
+          1,
+          65528,
+          65529,
+          65531
+        ],
+        "commands": [
+          0
+        ],
+        "events": [
+          3
+        ]
+      }
+    },
+    {
+      "id": 57,
+      "revision": 6,
+      "features": [
+        {
+          "bit": 20,
+          "code": "BIS"
+        }
+      ],
+      "attributes": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21,
+        22,
+        24,
+        65528,
+        65529,
+        65530,
+        65531,
+        65532,
+        65533
+      ],
+      "commands": [
+        128
+      ],
+      "events": [
+        0,
+        1,
+        2,
+        3,
+        128
+      ],
+      "mandatory": {
+        "attributes": [
+          17,
+          65528,
+          65529,
+          65531
+        ],
+        "commands": [],
+        "events": [
+          3
+        ]
+      }
+    },
+    {
+      "id": 59,
+      "revision": 2,
+      "features": [
+        {
+          "bit": 0,
+          "code": "LS"
+        },
+        {
+          "bit": 1,
+          "code": "MS"
+        },
+        {
+          "bit": 2,
+          "code": "MSR"
+        },
+        {
+          "bit": 3,
+          "code": "MSL"
+        },
+        {
+          "bit": 4,
+          "code": "MSM"
+        },
+        {
+          "bit": 5,
+          "code": "AS"
+        }
+      ],
+      "attributes": [
+        0,
+        1,
+        2,
+        65528,
+        65529,
+        65530,
+        65531,
+        65532,
+        65533
+      ],
+      "commands": [],
+      "events": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6
+      ],
+      "mandatory": {
+        "attributes": [
+          0,
+          1,
+          65528,
+          65529,
+          65531
+        ],
+        "commands": [],
+        "events": []
+      }
+    },
+    {
+      "id": 60,
+      "revision": 1,
+      "features": [
+        {
+          "bit": 0,
+          "code": "BC"
+        }
+      ],
+      "attributes": [
+        0,
+        1,
+        2,
+        65528,
+        65529,
+        65530,
+        65531,
+        65532,
+        65533
+      ],
+      "commands": [
+        0,
+        1,
+        2
+      ],
+      "events": [],
+      "mandatory": {
+        "attributes": [
+          0,
+          1,
+          2,
+          65528,
+          65529,
+          65531
+        ],
+        "commands": [
+          0,
+          2
+        ],
+        "events": []
+      }
+    },
+    {
+      "id": 62,
+      "revision": 2,
+      "features": [],
+      "attributes": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        65528,
+        65529,
+        65530,
+        65531,
+        65532,
+        65533
+      ],
+      "commands": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14
+      ],
+      "events": [],
+      "mandatory": {
+        "attributes": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          65528,
+          65529,
+          65531,
+          65532
+        ],
+        "commands": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12,
+          13,
+          14
+        ],
+        "events": []
+      }
+    },
+    {
+      "id": 63,
+      "revision": 4,
+      "features": [
+        {
+          "bit": 0,
+          "code": "CS"
+        },
+        {
+          "bit": 1,
+          "code": "GCAST"
+        }
+      ],
+      "attributes": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        65528,
+        65529,
+        65530,
+        65531,
+        65532,
+        65533
+      ],
+      "commands": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "events": [],
+      "mandatory": {
+        "attributes": [
+          0,
+          1,
+          2,
+          3,
+          65528,
+          65529,
+          65531
+        ],
+        "commands": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5
+        ],
+        "events": []
+      }
+    },
+    {
+      "id": 64,
+      "revision": 1,
+      "features": [],
+      "attributes": [
+        0,
+        65528,
+        65529,
+        65530,
+        65531,
+        65532,
+        65533
+      ],
+      "commands": [],
+      "events": [],
+      "mandatory": {
+        "attributes": [
+          0,
+          65528,
+          65529,
+          65531,
+          65532
+        ],
+        "commands": [],
+        "events": []
+      }
+    },
+    {
+      "id": 65,
+      "revision": 1,
+      "features": [],
+      "attributes": [
+        0,
+        65528,
+        65529,
+        65530,
+        65531,
+        65532,
+        65533
+      ],
+      "commands": [],
+      "events": [],
+      "mandatory": {
+        "attributes": [
+          0,
+          65528,
+          65529,
+          65531,
+          65532
+        ],
+        "commands": [],
+        "events": []
+      }
+    },
+    {
+      "id": 69,
+      "revision": 3,
+      "features": [
+        {
+          "bit": 0,
+          "code": "CHGEVENT"
+        }
+      ],
+      "attributes": [
+        0,
+        65528,
+        65529,
+        65530,
+        65531,
+        65532,
+        65533
+      ],
+      "commands": [],
+      "events": [
+        0
+      ],
+      "mandatory": {
+        "attributes": [
+          0,
+          65528,
+          65529,
+          65531
+        ],
+        "commands": [],
+        "events": []
+      }
+    },
+    {
+      "id": 70,
+      "revision": 3,
+      "features": [
+        {
+          "bit": 0,
+          "code": "CIP"
+        },
+        {
+          "bit": 1,
+          "code": "UAT"
+        },
+        {
+          "bit": 2,
+          "code": "LITS"
+        },
+        {
+          "bit": 3,
+          "code": "DSLS"
+        }
+      ],
+      "attributes": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        65528,
+        65529,
+        65530,
+        65531,
+        65532,
+        65533
+      ],
+      "commands": [
+        0,
+        1,
+        2,
+        3,
+        4
+      ],
+      "events": [],
+      "mandatory": {
+        "attributes": [
+          0,
+          1,
+          2,
+          65528,
+          65529,
+          65531
+        ],
+        "commands": [],
+        "events": []
+      }
+    },
+    {
+      "id": 72,
+      "revision": 2,
+      "features": [],
+      "attributes": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        65528,
+        65529,
+        65530,
+        65531,
+        65532,
+        65533
+      ],
+      "commands": [
+        0,
+        1,
+        2,
+        3,
+        4
+      ],
+      "events": [
+        0,
+        1
+      ],
+      "mandatory": {
+        "attributes": [
+          0,
+          1,
+          3,
+          4,
+          5,
+          65528,
+          65529,
+          65531,
+          65532
+        ],
+        "commands": [],
+        "events": [
+          0
+        ]
+      }
+    },
+    {
+      "id": 73,
+      "revision": 2,
+      "features": [
+        {
+          "bit": 0,
+          "code": "DEPONOFF"
+        }
+      ],
+      "attributes": [
+        0,
+        1,
+        2,
+        3,
+        65528,
+        65529,
+        65530,
+        65531,
+        65532,
+        65533
+      ],
+      "commands": [
+        0,
+        1
+      ],
+      "events": [],
+      "mandatory": {
+        "attributes": [
+          65528,
+          65529,
+          65531
+        ],
+        "commands": [
+          0,
+          1
+        ],
+        "events": []
+      }
+    },
+    {
+      "id": 74,
+      "revision": 1,
+      "features": [],
+      "attributes": [
+        0,
+        1,
+        65528,
+        65529,
+        65530,
+        65531,
+        65532,
+        65533
+      ],
+      "commands": [],
+      "events": [],
+      "mandatory": {
+        "attributes": [
+          0,
+          1,
+          65528,
+          65529,
+          65531,
+          65532
+        ],
+        "commands": [],
+        "events": []
+      }
+    },
+    {
+      "id": 80,
+      "revision": 2,
+      "features": [
+        {
+          "bit": 0,
+          "code": "DEPONOFF"
+        }
+      ],
+      "attributes": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        65528,
+        65529,
+        65530,
+        65531,
+        65532,
+        65533
+      ],
+      "commands": [
+        0
+      ],
+      "events": [],
+      "mandatory": {
+        "attributes": [
+          0,
+          1,
+          2,
+          3,
+          65528,
+          65529,
+          65531
+        ],
+        "commands": [
+          0
+        ],
+        "events": []
+      }
+    },
+    {
+      "id": 81,
+      "revision": 3,
+      "features": [
+        {
+          "bit": 0,
+          "code": "DEPONOFF"
+        }
+      ],
+      "attributes": [
+        0,
+        1,
+        2,
+        3,
+        65528,
+        65529,
+        65530,
+        65531,
+        65532,
+        65533
+      ],
+      "commands": [
+        0,
+        1
+      ],
+      "events": [],
+      "mandatory": {
+        "attributes": [
+          0,
+          1,
+          65528,
+          65529,
+          65531
+        ],
+        "commands": [
+          0,
+          1
+        ],
+        "events": []
+      }
+    },
+    {
+      "id": 82,
+      "revision": 3,
+      "features": [
+        {
+          "bit": 0,
+          "code": "DEPONOFF"
+        }
+      ],
+      "attributes": [
+        0,
+        1,
+        2,
+        3,
+        65528,
+        65529,
+        65530,
+        65531,
+        65532,
+        65533
+      ],
+      "commands": [
+        0,
+        1
+      ],
+      "events": [],
+      "mandatory": {
+        "attributes": [
+          0,
+          1,
+          65528,
+          65529,
+          65531
+        ],
+        "commands": [
+          0,
+          1
+        ],
+        "events": []
+      }
+    },
+    {
+      "id": 83,
+      "revision": 2,
+      "features": [
+        {
+          "bit": 0,
+          "code": "SPIN"
+        },
+        {
+          "bit": 1,
+          "code": "RINSE"
+        }
+      ],
+      "attributes": [
+        0,
+        1,
+        2,
+        3,
+        65528,
+        65529,
+        65530,
+        65531,
+        65532,
+        65533
+      ],
+      "commands": [],
+      "events": [],
+      "mandatory": {
+        "attributes": [
+          65528,
+          65529,
+          65531
+        ],
+        "commands": [],
+        "events": []
+      }
+    },
+    {
+      "id": 84,
+      "revision": 4,
+      "features": [
+        {
+          "bit": 0,
+          "code": "DEPONOFF"
+        },
+        {
+          "bit": 20,
+          "code": "DIRECTMODECH"
+        }
+      ],
+      "attributes": [
+        0,
+        1,
+        2,
+        3,
+        65528,
+        65529,
+        65530,
+        65531,
+        65532,
+        65533
+      ],
+      "commands": [
+        0,
+        1
+      ],
+      "events": [],
+      "mandatory": {
+        "attributes": [
+          65528,
+          65529,
+          65531
+        ],
+        "commands": [
+          0,
+          1
+        ],
+        "events": []
+      }
+    },
+    {
+      "id": 85,
+      "revision": 5,
+      "features": [
+        {
+          "bit": 0,
+          "code": "DEPONOFF"
+        },
+        {
+          "bit": 20,
+          "code": "DIRECTMODECH"
+        }
+      ],
+      "attributes": [
+        0,
+        1,
+        2,
+        3,
+        65528,
+        65529,
+        65530,
+        65531,
+        65532,
+        65533
+      ],
+      "commands": [
+        0,
+        1
+      ],
+      "events": [],
+      "mandatory": {
+        "attributes": [
+          65528,
+          65529,
+          65531
+        ],
+        "commands": [
+          0,
+          1
+        ],
+        "events": []
+      }
+    },
+    {
+      "id": 86,
+      "revision": 1,
+      "features": [
+        {
+          "bit": 0,
+          "code": "TN"
+        },
+        {
+          "bit": 1,
+          "code": "TL"
+        },
+        {
+          "bit": 2,
+          "code": "STEP"
+        }
+      ],
+      "attributes": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        65528,
+        65529,
+        65530,
+        65531,
+        65532,
+        65533
+      ],
+      "commands": [
+        0
+      ],
+      "events": [],
+      "mandatory": {
+        "attributes": [
+          65528,
+          65529,
+          65531
+        ],
+        "commands": [
+          0
+        ],
+        "events": []
+      }
+    },
+    {
+      "id": 87,
+      "revision": 1,
+      "features": [
+        {
+          "bit": 0,
+          "code": "RESET"
+        }
+      ],
+      "attributes": [
+        0,
+        1,
+        2,
+        3,
+        65528,
+        65529,
+        65530,
+        65531,
+        65532,
+        65533
+      ],
+      "commands": [
+        0,
+        1
+      ],
+      "events": [
+        0
+      ],
+      "mandatory": {
+        "attributes": [
+          0,
+          2,
+          3,
+          65528,
+          65529,
+          65531
+        ],
+        "commands": [],
+        "events": [
+          0
+        ]
+      }
+    },
+    {
+      "id": 89,
+      "revision": 3,
+      "features": [
+        {
+          "bit": 0,
+          "code": "DEPONOFF"
+        }
+      ],
+      "attributes": [
+        0,
+        1,
+        2,
+        3,
+        65528,
+        65529,
+        65530,
+        65531,
+        65532,
+        65533
+      ],
+      "commands": [
+        0,
+        1
+      ],
+      "events": [],
+      "mandatory": {
+        "attributes": [
+          0,
+          1,
+          65528,
+          65529,
+          65531
+        ],
+        "commands": [
+          0,
+          1
+        ],
+        "events": []
+      }
+    },
+    {
+      "id": 91,
+      "revision": 1,
+      "features": [
+        {
+          "bit": 0,
+          "code": "FAIR"
+        },
+        {
+          "bit": 1,
+          "code": "MOD"
+        },
+        {
+          "bit": 2,
+          "code": "VPOOR"
+        },
+        {
+          "bit": 3,
+          "code": "XPOOR"
+        }
+      ],
+      "attributes": [
+        0,
+        65528,
+        65529,
+        65530,
+        65531,
+        65532,
+        65533
+      ],
+      "commands": [],
+      "events": [],
+      "mandatory": {
+        "attributes": [
+          0,
+          65528,
+          65529,
+          65531
+        ],
+        "commands": [],
+        "events": []
+      }
+    },
+    {
+      "id": 92,
+      "revision": 2,
+      "features": [
+        {
+          "bit": 0,
+          "code": "SMOKE"
+        },
+        {
+          "bit": 1,
+          "code": "CO"
+        }
+      ],
+      "attributes": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        65528,
+        65529,
+        65530,
+        65531,
+        65532,
+        65533
+      ],
+      "commands": [
+        0
+      ],
+      "events": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10
+      ],
+      "mandatory": {
+        "attributes": [
+          0,
+          3,
+          5,
+          6,
+          7,
+          65528,
+          65529,
+          65531
+        ],
+        "commands": [],
+        "events": [
+          2,
+          3,
+          4,
+          5,
+          10
+        ]
+      }
+    },
+    {
+      "id": 93,
+      "revision": 1,
+      "features": [
+        {
+          "bit": 0,
+          "code": "RESET"
+        }
+      ],
+      "attributes": [
+        0,
+        1,
+        2,
+        3,
+        65528,
+        65529,
+        65530,
+        65531,
+        65532,
+        65533
+      ],
+      "commands": [
+        0,
+        1
+      ],
+      "events": [
+        0
+      ],
+      "mandatory": {
+        "attributes": [
+          0,
+          2,
+          3,
+          65528,
+          65529,
+          65531
+        ],
+        "commands": [],
+        "events": [
+          0
+        ]
+      }
+    },
+    {
+      "id": 94,
+      "revision": 2,
+      "features": [
+        {
+          "bit": 0,
+          "code": "DEPONOFF"
+        }
+      ],
+      "attributes": [
+        0,
+        1,
+        2,
+        3,
+        65528,
+        65529,
+        65530,
+        65531,
+        65532,
+        65533
+      ],
+      "commands": [
+        0,
+        1
+      ],
+      "events": [],
+      "mandatory": {
+        "attributes": [
+          65528,
+          65529,
+          65531
+        ],
+        "commands": [],
+        "events": []
+      }
+    },
+    {
+      "id": 95,
+      "revision": 1,
+      "features": [
+        {
+          "bit": 0,
+          "code": "PWRNUM"
+        },
+        {
+          "bit": 1,
+          "code": "WATTS"
+        },
+        {
+          "bit": 2,
+          "code": "PWRLMTS"
+        }
+      ],
+      "attributes": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        65528,
+        65529,
+        65530,
+        65531,
+        65532,
+        65533
+      ],
+      "commands": [
+        0,
+        1
+      ],
+      "events": [],
+      "mandatory": {
+        "attributes": [
+          0,
+          1,
+          65528,
+          65529,
+          65531
+        ],
+        "commands": [
+          0
+        ],
+        "events": []
+      }
+    },
+    {
+      "id": 96,
+      "revision": 3,
+      "features": [],
+      "attributes": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        65528,
+        65529,
+        65530,
+        65531,
+        65532,
+        65533
+      ],
+      "commands": [
+        0,
+        1,
+        2,
+        3,
+        4
+      ],
+      "events": [
+        0,
+        1
+      ],
+      "mandatory": {
+        "attributes": [
+          0,
+          1,
+          3,
+          4,
+          5,
+          65528,
+          65529,
+          65531,
+          65532
+        ],
+        "commands": [],
+        "events": [
+          0
+        ]
+      }
+    },
+    {
+      "id": 97,
+      "revision": 3,
+      "features": [],
+      "attributes": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        65528,
+        65529,
+        65530,
+        65531,
+        65532,
+        65533
+      ],
+      "commands": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        128
+      ],
+      "events": [
+        0,
+        1
+      ],
+      "mandatory": {
+        "attributes": [
+          0,
+          1,
+          3,
+          4,
+          5,
+          65528,
+          65529,
+          65531,
+          65532
+        ],
+        "commands": [],
+        "events": [
+          0
+        ]
+      }
+    },
+    {
+      "id": 98,
+      "revision": 1,
+      "features": [
+        {
+          "bit": 0,
+          "code": "SN"
+        }
+      ],
+      "attributes": [
+        0,
+        1,
+        2,
+        65528,
+        65529,
+        65530,
+        65531,
+        65532,
+        65533
+      ],
+      "commands": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        64
+      ],
+      "events": [],
+      "mandatory": {
+        "attributes": [
+          1,
+          2,
+          65528,
+          65529,
+          65531
+        ],
+        "commands": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6
+        ],
+        "events": []
+      }
+    },
+    {
+      "id": 100,
+      "revision": 1,
+      "features": [
+        {
+          "bit": 0,
+          "code": "RESET"
+        },
+        {
+          "bit": 20,
+          "code": "OVER"
+        },
+        {
+          "bit": 21,
+          "code": "UNDER"
+        },
+        {
+          "bit": 22,
+          "code": "MAJOR"
+        },
+        {
+          "bit": 23,
+          "code": "MINOR"
+        },
+        {
+          "bit": 24,
+          "code": "OCRIADJ"
+        },
+        {
+          "bit": 25,
+          "code": "OMAJADJ"
+        },
+        {
+          "bit": 26,
+          "code": "OMINADJ"
+        },
+        {
+          "bit": 27,
+          "code": "UMINADJ"
+        },
+        {
+          "bit": 28,
+          "code": "UMAJADJ"
+        },
+        {
+          "bit": 29,
+          "code": "UCRIADJ"
+        }
+      ],
+      "attributes": [
+        0,
+        1,
+        2,
+        3,
+        128,
+        129,
+        130,
+        131,
+        132,
+        133,
+        65528,
+        65529,
+        65530,
+        65531,
+        65532,
+        65533
+      ],
+      "commands": [
+        0,
+        1,
+        128
+      ],
+      "events": [
+        0
+      ],
+      "mandatory": {
+        "attributes": [
+          0,
+          2,
+          3,
+          65528,
+          65529,
+          65531
+        ],
+        "commands": [],
+        "events": [
+          0
+        ]
+      }
+    },
+    {
+      "id": 101,
+      "revision": 1,
+      "features": [
+        {
+          "bit": 0,
+          "code": "LN"
+        },
+        {
+          "bit": 1,
+          "code": "SD"
+        },
+        {
+          "bit": 2,
+          "code": "PGA"
+        }
+      ],
+      "attributes": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        65528,
+        65529,
+        65530,
+        65531,
+        65532,
+        65533
+      ],
+      "commands": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "events": [
+        0
+      ],
+      "mandatory": {
+        "attributes": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          65528,
+          65529,
+          65531
+        ],
+        "commands": [
+          0,
+          1,
+          2,
+          3,
+          5
+        ],
+        "events": [
+          0
+        ]
+      }
+    },
+    {
+      "id": 113,
+      "revision": 1,
+      "features": [
+        {
+          "bit": 0,
+          "code": "CON"
+        },
+        {
+          "bit": 1,
+          "code": "WRN"
+        },
+        {
+          "bit": 2,
+          "code": "REP"
+        }
+      ],
+      "attributes": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        65528,
+        65529,
+        65530,
+        65531,
+        65532,
+        65533
+      ],
+      "commands": [
+        0
+      ],
+      "events": [],
+      "mandatory": {
+        "attributes": [
+          2,
+          65528,
+          65529,
+          65531
+        ],
+        "commands": [],
+        "events": []
+      }
+    },
+    {
+      "id": 114,
+      "revision": 1,
+      "features": [
+        {
+          "bit": 0,
+          "code": "CON"
+        },
+        {
+          "bit": 1,
+          "code": "WRN"
+        },
+        {
+          "bit": 2,
+          "code": "REP"
+        }
+      ],
+      "attributes": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        65528,
+        65529,
+        65530,
+        65531,
+        65532,
+        65533
+      ],
+      "commands": [
+        0
+      ],
+      "events": [],
+      "mandatory": {
+        "attributes": [
+          2,
+          65528,
+          65529,
+          65531
+        ],
+        "commands": [],
+        "events": []
+      }
+    },
+    {
+      "id": 121,
+      "revision": 1,
+      "features": [
+        {
+          "bit": 0,
+          "code": "CON"
+        },
+        {
+          "bit": 1,
+          "code": "WRN"
+        },
+        {
+          "bit": 2,
+          "code": "REP"
+        }
+      ],
+      "attributes": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        65528,
+        65529,
+        65530,
+        65531,
+        65532,
+        65533
+      ],
+      "commands": [
+        0
+      ],
+      "events": [],
+      "mandatory": {
+        "attributes": [
+          2,
+          65528,
+          65529,
+          65531
+        ],
+        "commands": [],
+        "events": []
+      }
+    },
+    {
+      "id": 128,
+      "revision": 2,
+      "features": [
+        {
+          "bit": 0,
+          "code": "VIS"
+        },
+        {
+          "bit": 1,
+          "code": "AUD"
+        },
+        {
+          "bit": 2,
+          "code": "SPRS"
+        },
+        {
+          "bit": 3,
+          "code": "SENSLVL"
+        },
+        {
+          "bit": 4,
+          "code": "FAULTEV"
+        }
+      ],
+      "attributes": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        65528,
+        65529,
+        65530,
+        65531,
+        65532,
+        65533
+      ],
+      "commands": [
+        0,
+        1
+      ],
+      "events": [
+        0,
+        1
+      ],
+      "mandatory": {
+        "attributes": [
+          65528,
+          65529,
+          65531
+        ],
+        "commands": [],
+        "events": []
+      }
+    },
+    {
+      "id": 129,
+      "revision": 1,
+      "features": [
+        {
+          "bit": 0,
+          "code": "TS"
+        },
+        {
+          "bit": 1,
+          "code": "LVL"
+        }
+      ],
+      "attributes": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        65528,
+        65529,
+        65530,
+        65531,
+        65532,
+        65533
+      ],
+      "commands": [
+        0,
+        1
+      ],
+      "events": [
+        0,
+        1
+      ],
+      "mandatory": {
+        "attributes": [
+          0,
+          1,
+          3,
+          4,
+          5,
+          65528,
+          65529,
+          65531
+        ],
+        "commands": [
+          0,
+          1
+        ],
+        "events": []
+      }
+    },
+    {
+      "id": 144,
+      "revision": 3,
+      "features": [
+        {
+          "bit": 0,
+          "code": "DIRC"
+        },
+        {
+          "bit": 1,
+          "code": "ALTC"
+        },
+        {
+          "bit": 2,
+          "code": "POLY"
+        },
+        {
+          "bit": 3,
+          "code": "HARM"
+        },
+        {
+          "bit": 4,
+          "code": "PWRQ"
+        }
+      ],
+      "attributes": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        65528,
+        65529,
+        65530,
+        65531,
+        65532,
+        65533
+      ],
+      "commands": [],
+      "events": [
+        0
+      ],
+      "mandatory": {
+        "attributes": [
+          0,
+          1,
+          2,
+          8,
+          65528,
+          65529,
+          65531
+        ],
+        "commands": [],
+        "events": []
+      }
+    },
+    {
+      "id": 145,
+      "revision": 2,
+      "features": [
+        {
+          "bit": 0,
+          "code": "IMPE"
+        },
+        {
+          "bit": 1,
+          "code": "EXPE"
+        },
+        {
+          "bit": 2,
+          "code": "CUME"
+        },
+        {
+          "bit": 3,
+          "code": "PERE"
+        },
+        {
+          "bit": 4,
+          "code": "APPE"
+        },
+        {
+          "bit": 5,
+          "code": "REAE"
+        }
+      ],
+      "attributes": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        65528,
+        65529,
+        65530,
+        65531,
+        65532,
+        65533
+      ],
+      "commands": [],
+      "events": [
+        0,
+        1
+      ],
+      "mandatory": {
+        "attributes": [
+          0,
+          65528,
+          65529,
+          65531
+        ],
+        "commands": [],
+        "events": []
+      }
+    },
+    {
+      "id": 148,
+      "revision": 2,
+      "features": [
+        {
+          "bit": 0,
+          "code": "EM"
+        },
+        {
+          "bit": 1,
+          "code": "TP"
+        }
+      ],
+      "attributes": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        65528,
+        65529,
+        65530,
+        65531,
+        65532,
+        65533
+      ],
+      "commands": [
+        0,
+        1
+      ],
+      "events": [
+        0,
+        1
+      ],
+      "mandatory": {
+        "attributes": [
+          0,
+          1,
+          5,
+          65528,
+          65529,
+          65531
+        ],
+        "commands": [
+          0,
+          1
+        ],
+        "events": [
+          0,
+          1
+        ]
+      }
+    },
+    {
+      "id": 149,
+      "revision": 4,
+      "features": [
+        {
+          "bit": 0,
+          "code": "FORE"
+        }
+      ],
+      "attributes": [
+        0,
+        1,
+        2,
+        3,
+        65528,
+        65529,
+        65530,
+        65531,
+        65532,
+        65533
+      ],
+      "commands": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "events": [
+        0
+      ],
+      "mandatory": {
+        "attributes": [
+          0,
+          1,
+          2,
+          65528,
+          65529,
+          65531
+        ],
+        "commands": [],
+        "events": []
+      }
+    },
+    {
+      "id": 151,
+      "revision": 3,
+      "features": [
+        {
+          "bit": 0,
+          "code": "CONF"
+        },
+        {
+          "bit": 1,
+          "code": "RESP"
+        },
+        {
+          "bit": 2,
+          "code": "RPLY"
+        },
+        {
+          "bit": 3,
+          "code": "PROT"
+        }
+      ],
+      "attributes": [
+        0,
+        1,
+        65528,
+        65529,
+        65530,
+        65531,
+        65532,
+        65533
+      ],
+      "commands": [
+        0,
+        1
+      ],
+      "events": [
+        0,
+        1,
+        2
+      ],
+      "mandatory": {
+        "attributes": [
+          0,
+          1,
+          65528,
+          65529,
+          65531
+        ],
+        "commands": [
+          0,
+          1
+        ],
+        "events": [
+          0,
+          1,
+          2
+        ]
+      }
+    },
+    {
+      "id": 152,
+      "revision": 4,
+      "features": [
+        {
+          "bit": 0,
+          "code": "PA"
+        },
+        {
+          "bit": 1,
+          "code": "PFR"
+        },
+        {
+          "bit": 2,
+          "code": "SFR"
+        },
+        {
+          "bit": 3,
+          "code": "STA"
+        },
+        {
+          "bit": 4,
+          "code": "PAU"
+        },
+        {
+          "bit": 5,
+          "code": "FA"
+        },
+        {
+          "bit": 6,
+          "code": "CON"
+        }
+      ],
+      "attributes": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        65528,
+        65529,
+        65530,
+        65531,
+        65532,
+        65533
+      ],
+      "commands": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+      ],
+      "events": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "mandatory": {
+        "attributes": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          65528,
+          65529,
+          65531
+        ],
+        "commands": [],
+        "events": []
+      }
+    },
+    {
+      "id": 153,
+      "revision": 4,
+      "features": [
+        {
+          "bit": 0,
+          "code": "PREF"
+        },
+        {
+          "bit": 1,
+          "code": "SOC"
+        },
+        {
+          "bit": 2,
+          "code": "PNC"
+        },
+        {
+          "bit": 3,
+          "code": "RFID"
+        },
+        {
+          "bit": 4,
+          "code": "V2X"
+        }
+      ],
+      "attributes": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        35,
+        36,
+        37,
+        38,
+        39,
+        48,
+        49,
+        50,
+        64,
+        65,
+        66,
+        67,
+        65528,
+        65529,
+        65530,
+        65531,
+        65532,
+        65533
+      ],
+      "commands": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+      ],
+      "events": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "mandatory": {
+        "attributes": [
+          0,
+          1,
+          2,
+          3,
+          5,
+          6,
+          7,
+          64,
+          65,
+          66,
+          65528,
+          65529,
+          65531
+        ],
+        "commands": [
+          1,
+          2
+        ],
+        "events": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ]
+      }
+    },
+    {
+      "id": 155,
+      "revision": 1,
+      "features": [
+        {
+          "bit": 0,
+          "code": "BALA"
+        },
+        {
+          "bit": 1,
+          "code": "LPMS"
+        }
+      ],
+      "attributes": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        65528,
+        65529,
+        65530,
+        65531,
+        65532,
+        65533
+      ],
+      "commands": [],
+      "events": [],
+      "mandatory": {
+        "attributes": [
+          65528,
+          65529,
+          65531
+        ],
+        "commands": [],
+        "events": []
+      }
+    },
+    {
+      "id": 156,
+      "revision": 1,
+      "features": [
+        {
+          "bit": 0,
+          "code": "NODE"
+        },
+        {
+          "bit": 1,
+          "code": "TREE"
+        },
+        {
+          "bit": 2,
+          "code": "SET"
+        },
+        {
+          "bit": 3,
+          "code": "DYPF"
+        }
+      ],
+      "attributes": [
+        0,
+        1,
+        65528,
+        65529,
+        65530,
+        65531,
+        65532,
+        65533
+      ],
+      "commands": [],
+      "events": [],
+      "mandatory": {
+        "attributes": [
+          65528,
+          65529,
+          65531
+        ],
+        "commands": [],
+        "events": []
+      }
+    },
+    {
+      "id": 157,
+      "revision": 2,
+      "features": [
+        {
+          "bit": 0,
+          "code": "DEPONOFF"
+        }
+      ],
+      "attributes": [
+        0,
+        1,
+        2,
+        3,
+        65528,
+        65529,
+        65530,
+        65531,
+        65532,
+        65533
+      ],
+      "commands": [
+        0,
+        1
+      ],
+      "events": [],
+      "mandatory": {
+        "attributes": [
+          65528,
+          65529,
+          65531
+        ],
+        "commands": [
+          0,
+          1
+        ],
+        "events": []
+      }
+    },
+    {
+      "id": 158,
+      "revision": 1,
+      "features": [
+        {
+          "bit": 0,
+          "code": "DEPONOFF"
+        }
+      ],
+      "attributes": [
+        0,
+        1,
+        2,
+        3,
+        65528,
+        65529,
+        65530,
+        65531,
+        65532,
+        65533
+      ],
+      "commands": [
+        0,
+        1
+      ],
+      "events": [],
+      "mandatory": {
+        "attributes": [
+          65528,
+          65529,
+          65531
+        ],
+        "commands": [
+          0,
+          1
+        ],
+        "events": []
+      }
+    },
+    {
+      "id": 159,
+      "revision": 2,
+      "features": [
+        {
+          "bit": 0,
+          "code": "DEPONOFF"
+        }
+      ],
+      "attributes": [
+        0,
+        1,
+        2,
+        3,
+        65528,
+        65529,
+        65530,
+        65531,
+        65532,
+        65533
+      ],
+      "commands": [
+        0,
+        1
+      ],
+      "events": [],
+      "mandatory": {
+        "attributes": [
+          65528,
+          65529,
+          65531
+        ],
+        "commands": [
+          0,
+          1
+        ],
+        "events": []
+      }
+    },
+    {
+      "id": 160,
+      "revision": 1,
+      "features": [
+        {
+          "bit": 0,
+          "code": "FORE"
+        }
+      ],
+      "attributes": [
+        0,
+        1,
+        2,
+        65528,
+        65529,
+        65530,
+        65531,
+        65532,
+        65533
+      ],
+      "commands": [],
+      "events": [
+        0
+      ],
+      "mandatory": {
+        "attributes": [
+          0,
+          1,
+          65528,
+          65529,
+          65531
+        ],
+        "commands": [],
+        "events": []
+      }
+    },
+    {
+      "id": 257,
+      "revision": 10,
+      "features": [
+        {
+          "bit": 0,
+          "code": "PIN"
+        },
+        {
+          "bit": 1,
+          "code": "RID"
+        },
+        {
+          "bit": 2,
+          "code": "FGP"
+        },
+        {
+          "bit": 4,
+          "code": "WDSCH"
+        },
+        {
+          "bit": 5,
+          "code": "DPS"
+        },
+        {
+          "bit": 6,
+          "code": "FACE"
+        },
+        {
+          "bit": 7,
+          "code": "COTA"
+        },
+        {
+          "bit": 8,
+          "code": "USR"
+        },
+        {
+          "bit": 10,
+          "code": "YDSCH"
+        },
+        {
+          "bit": 11,
+          "code": "HDSCH"
+        },
+        {
+          "bit": 12,
+          "code": "UBOLT"
+        },
+        {
+          "bit": 13,
+          "code": "ALIRO"
+        },
+        {
+          "bit": 14,
+          "code": "ALBU"
+        }
+      ],
+      "attributes": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        17,
+        18,
+        19,
+        20,
+        21,
+        22,
+        23,
+        24,
+        25,
+        26,
+        27,
+        28,
+        33,
+        34,
+        35,
+        36,
+        37,
+        38,
+        39,
+        40,
+        41,
+        42,
+        43,
+        44,
+        48,
+        49,
+        50,
+        51,
+        52,
+        53,
+        128,
+        129,
+        130,
+        131,
+        132,
+        133,
+        134,
+        135,
+        136,
+        65528,
+        65529,
+        65530,
+        65531,
+        65532,
+        65533
+      ],
+      "commands": [
+        0,
+        1,
+        2,
+        3,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        26,
+        27,
+        28,
+        29,
+        34,
+        35,
+        36,
+        37,
+        38,
+        39,
+        40,
+        41
+      ],
+      "events": [
+        0,
+        1,
+        2,
+        3,
+        4
+      ],
+      "mandatory": {
+        "attributes": [
+          0,
+          1,
+          2,
+          37,
+          38,
+          65528,
+          65529,
+          65531
+        ],
+        "commands": [
+          0,
+          1
+        ],
+        "events": [
+          0,
+          2,
+          3
+        ]
+      }
+    },
+    {
+      "id": 258,
+      "revision": 8,
+      "features": [
+        {
+          "bit": 0,
+          "code": "LF"
+        },
+        {
+          "bit": 1,
+          "code": "TL"
+        },
+        {
+          "bit": 2,
+          "code": "PA_LF"
+        },
+        {
+          "bit": 4,
+          "code": "PA_TL"
+        }
+      ],
+      "attributes": [
+        0,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        23,
+        26,
+        65528,
+        65529,
+        65530,
+        65531,
+        65532,
+        65533
+      ],
+      "commands": [
+        0,
+        1,
+        2,
+        5,
+        8
+      ],
+      "events": [],
+      "mandatory": {
+        "attributes": [
+          0,
+          7,
+          10,
+          13,
+          23,
+          65528,
+          65529,
+          65531
+        ],
+        "commands": [
+          0,
+          1,
+          2
+        ],
+        "events": []
+      }
+    },
+    {
+      "id": 260,
+      "revision": 1,
+      "features": [
+        {
+          "bit": 0,
+          "code": "PS"
+        },
+        {
+          "bit": 1,
+          "code": "LT"
+        },
+        {
+          "bit": 2,
+          "code": "IS"
+        },
+        {
+          "bit": 3,
+          "code": "SP"
+        },
+        {
+          "bit": 4,
+          "code": "VT"
+        },
+        {
+          "bit": 5,
+          "code": "PD"
+        },
+        {
+          "bit": 6,
+          "code": "CL"
+        },
+        {
+          "bit": 7,
+          "code": "PT"
+        },
+        {
+          "bit": 8,
+          "code": "MO"
+        }
+      ],
+      "attributes": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        65528,
+        65529,
+        65530,
+        65531,
+        65532,
+        65533
+      ],
+      "commands": [
+        0,
+        1,
+        2
+      ],
+      "events": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "mandatory": {
+        "attributes": [
+          1,
+          2,
+          3,
+          4,
+          65528,
+          65529,
+          65531
+        ],
+        "commands": [
+          1
+        ],
+        "events": [
+          0,
+          3
+        ]
+      }
+    },
+    {
+      "id": 261,
+      "revision": 1,
+      "features": [
+        {
+          "bit": 0,
+          "code": "PS"
+        },
+        {
+          "bit": 1,
+          "code": "LT"
+        },
+        {
+          "bit": 2,
+          "code": "UT"
+        },
+        {
+          "bit": 3,
+          "code": "LM"
+        },
+        {
+          "bit": 4,
+          "code": "SP"
+        },
+        {
+          "bit": 5,
+          "code": "TR"
+        },
+        {
+          "bit": 6,
+          "code": "RO"
+        },
+        {
+          "bit": 7,
+          "code": "MD"
+        }
+      ],
+      "attributes": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        65528,
+        65529,
+        65530,
+        65531,
+        65532,
+        65533
+      ],
+      "commands": [
+        0,
+        1
+      ],
+      "events": [],
+      "mandatory": {
+        "attributes": [
+          0,
+          1,
+          65528,
+          65529,
+          65531
+        ],
+        "commands": [
+          0
+        ],
+        "events": []
+      }
+    },
+    {
+      "id": 336,
+      "revision": 2,
+      "features": [
+        {
+          "bit": 0,
+          "code": "SELRUN"
+        },
+        {
+          "bit": 1,
+          "code": "PROG"
+        },
+        {
+          "bit": 2,
+          "code": "MAPS"
+        }
+      ],
+      "attributes": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        65528,
+        65529,
+        65530,
+        65531,
+        65532,
+        65533
+      ],
+      "commands": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "events": [],
+      "mandatory": {
+        "attributes": [
+          0,
+          2,
+          65528,
+          65529,
+          65531
+        ],
+        "commands": [
+          0,
+          1
+        ],
+        "events": []
+      }
+    },
+    {
+      "id": 512,
+      "revision": 5,
+      "features": [
+        {
+          "bit": 0,
+          "code": "PRSCONST"
+        },
+        {
+          "bit": 1,
+          "code": "PRSCOMP"
+        },
+        {
+          "bit": 2,
+          "code": "FLW"
+        },
+        {
+          "bit": 3,
+          "code": "SPD"
+        },
+        {
+          "bit": 4,
+          "code": "TEMP"
+        },
+        {
+          "bit": 5,
+          "code": "AUTO"
+        },
+        {
+          "bit": 6,
+          "code": "LOCAL"
+        }
+      ],
+      "attributes": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21,
+        22,
+        23,
+        32,
+        33,
+        34,
+        65528,
+        65529,
+        65530,
+        65531,
+        65532,
+        65533
+      ],
+      "commands": [],
+      "events": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16
+      ],
+      "mandatory": {
+        "attributes": [
+          0,
+          1,
+          2,
+          17,
+          18,
+          19,
+          32,
+          65528,
+          65529,
+          65531
+        ],
+        "commands": [],
+        "events": []
+      }
+    },
+    {
+      "id": 513,
+      "revision": 11,
+      "features": [
+        {
+          "bit": 0,
+          "code": "HEAT"
+        },
+        {
+          "bit": 1,
+          "code": "COOL"
+        },
+        {
+          "bit": 2,
+          "code": "OCC"
+        },
+        {
+          "bit": 4,
+          "code": "SB"
+        },
+        {
+          "bit": 5,
+          "code": "AUTO"
+        },
+        {
+          "bit": 6,
+          "code": "LTNE"
+        },
+        {
+          "bit": 7,
+          "code": "MSCH"
+        },
+        {
+          "bit": 8,
+          "code": "PRES"
+        },
+        {
+          "bit": 9,
+          "code": "TEVT"
+        },
+        {
+          "bit": 10,
+          "code": "TSUGGEST"
+        }
+      ],
+      "attributes": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21,
+        22,
+        23,
+        24,
+        25,
+        26,
+        27,
+        28,
+        30,
+        35,
+        36,
+        37,
+        41,
+        48,
+        49,
+        50,
+        52,
+        53,
+        54,
+        55,
+        56,
+        57,
+        58,
+        64,
+        65,
+        66,
+        67,
+        68,
+        69,
+        70,
+        71,
+        72,
+        73,
+        74,
+        75,
+        76,
+        77,
+        78,
+        79,
+        80,
+        81,
+        82,
+        83,
+        84,
+        85,
+        86,
+        65528,
+        65529,
+        65530,
+        65531,
+        65532,
+        65533
+      ],
+      "commands": [
+        0,
+        2,
+        5,
+        6,
+        7,
+        8,
+        253,
+        254
+      ],
+      "events": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+      ],
+      "mandatory": {
+        "attributes": [
+          0,
+          27,
+          28,
+          65528,
+          65529,
+          65531
+        ],
+        "commands": [
+          0
+        ],
+        "events": []
+      }
+    },
+    {
+      "id": 514,
+      "revision": 6,
+      "features": [
+        {
+          "bit": 0,
+          "code": "SPD"
+        },
+        {
+          "bit": 1,
+          "code": "AUT"
+        },
+        {
+          "bit": 2,
+          "code": "RCK"
+        },
+        {
+          "bit": 3,
+          "code": "WND"
+        },
+        {
+          "bit": 4,
+          "code": "STEP"
+        },
+        {
+          "bit": 5,
+          "code": "DIR"
+        }
+      ],
+      "attributes": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        65528,
+        65529,
+        65530,
+        65531,
+        65532,
+        65533
+      ],
+      "commands": [
+        0
+      ],
+      "events": [],
+      "mandatory": {
+        "attributes": [
+          0,
+          1,
+          2,
+          3,
+          65528,
+          65529,
+          65531
+        ],
+        "commands": [],
+        "events": []
+      }
+    },
+    {
+      "id": 516,
+      "revision": 2,
+      "features": [],
+      "attributes": [
+        0,
+        1,
+        2,
+        65528,
+        65529,
+        65530,
+        65531,
+        65532,
+        65533
+      ],
+      "commands": [],
+      "events": [],
+      "mandatory": {
+        "attributes": [
+          0,
+          1,
+          65528,
+          65529,
+          65531,
+          65532
+        ],
+        "commands": [],
+        "events": []
+      }
+    },
+    {
+      "id": 768,
+      "revision": 9,
+      "features": [
+        {
+          "bit": 0,
+          "code": "HS"
+        },
+        {
+          "bit": 1,
+          "code": "EHUE"
+        },
+        {
+          "bit": 2,
+          "code": "CL"
+        },
+        {
+          "bit": 3,
+          "code": "XY"
+        },
+        {
+          "bit": 4,
+          "code": "CT"
+        }
+      ],
+      "attributes": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        15,
+        16,
+        17,
+        18,
+        19,
+        21,
+        22,
+        23,
+        25,
+        26,
+        27,
+        32,
+        33,
+        34,
+        36,
+        37,
+        38,
+        40,
+        41,
+        42,
+        48,
+        49,
+        50,
+        51,
+        52,
+        54,
+        55,
+        56,
+        58,
+        59,
+        60,
+        16384,
+        16385,
+        16386,
+        16387,
+        16388,
+        16389,
+        16390,
+        16394,
+        16395,
+        16396,
+        16397,
+        16400,
+        65528,
+        65529,
+        65530,
+        65531,
+        65532,
+        65533
+      ],
+      "commands": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        64,
+        65,
+        66,
+        67,
+        68,
+        71,
+        75,
+        76
+      ],
+      "events": [],
+      "mandatory": {
+        "attributes": [
+          8,
+          15,
+          16,
+          16385,
+          16394,
+          65528,
+          65529,
+          65531
+        ],
+        "commands": [],
+        "events": []
+      }
+    },
+    {
+      "id": 1024,
+      "revision": 5,
+      "features": [],
+      "attributes": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        65528,
+        65529,
+        65530,
+        65531,
+        65532,
+        65533
+      ],
+      "commands": [],
+      "events": [],
+      "mandatory": {
+        "attributes": [
+          0,
+          1,
+          2,
+          65528,
+          65529,
+          65531,
+          65532
+        ],
+        "commands": [],
+        "events": []
+      }
+    },
+    {
+      "id": 1026,
+      "revision": 6,
+      "features": [],
+      "attributes": [
+        0,
+        1,
+        2,
+        3,
+        65528,
+        65529,
+        65530,
+        65531,
+        65532,
+        65533
+      ],
+      "commands": [],
+      "events": [],
+      "mandatory": {
+        "attributes": [
+          0,
+          1,
+          2,
+          65528,
+          65529,
+          65531,
+          65532
+        ],
+        "commands": [],
+        "events": []
+      }
+    },
+    {
+      "id": 1027,
+      "revision": 5,
+      "features": [
+        {
+          "bit": 0,
+          "code": "EXT"
+        }
+      ],
+      "attributes": [
+        0,
+        1,
+        2,
+        3,
+        16,
+        17,
+        18,
+        19,
+        20,
+        65528,
+        65529,
+        65530,
+        65531,
+        65532,
+        65533
+      ],
+      "commands": [],
+      "events": [],
+      "mandatory": {
+        "attributes": [
+          0,
+          1,
+          2,
+          65528,
+          65529,
+          65531
+        ],
+        "commands": [],
+        "events": []
+      }
+    },
+    {
+      "id": 1028,
+      "revision": 5,
+      "features": [],
+      "attributes": [
+        0,
+        1,
+        2,
+        3,
+        65528,
+        65529,
+        65530,
+        65531,
+        65532,
+        65533
+      ],
+      "commands": [],
+      "events": [],
+      "mandatory": {
+        "attributes": [
+          0,
+          1,
+          2,
+          65528,
+          65529,
+          65531,
+          65532
+        ],
+        "commands": [],
+        "events": []
+      }
+    },
+    {
+      "id": 1029,
+      "revision": 5,
+      "features": [],
+      "attributes": [
+        0,
+        1,
+        2,
+        3,
+        65528,
+        65529,
+        65530,
+        65531,
+        65532,
+        65533
+      ],
+      "commands": [],
+      "events": [],
+      "mandatory": {
+        "attributes": [
+          0,
+          1,
+          2,
+          65528,
+          65529,
+          65531,
+          65532
+        ],
+        "commands": [],
+        "events": []
+      }
+    },
+    {
+      "id": 1030,
+      "revision": 7,
+      "features": [
+        {
+          "bit": 0,
+          "code": "OTHER"
+        },
+        {
+          "bit": 1,
+          "code": "PIR"
+        },
+        {
+          "bit": 2,
+          "code": "US"
+        },
+        {
+          "bit": 3,
+          "code": "PHY"
+        },
+        {
+          "bit": 4,
+          "code": "AIR"
+        },
+        {
+          "bit": 5,
+          "code": "RAD"
+        },
+        {
+          "bit": 6,
+          "code": "RFS"
+        },
+        {
+          "bit": 7,
+          "code": "VIS"
+        },
+        {
+          "bit": 9,
+          "code": "OCCEVENT"
+        }
+      ],
+      "attributes": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        16,
+        17,
+        18,
+        32,
+        33,
+        34,
+        48,
+        49,
+        50,
+        65528,
+        65529,
+        65530,
+        65531,
+        65532,
+        65533
+      ],
+      "commands": [],
+      "events": [
+        0
+      ],
+      "mandatory": {
+        "attributes": [
+          0,
+          65528,
+          65529,
+          65531
+        ],
+        "commands": [],
+        "events": []
+      }
+    },
+    {
+      "id": 1036,
+      "revision": 5,
+      "features": [
+        {
+          "bit": 0,
+          "code": "MEA"
+        },
+        {
+          "bit": 1,
+          "code": "LEV"
+        },
+        {
+          "bit": 2,
+          "code": "MED"
+        },
+        {
+          "bit": 3,
+          "code": "CRI"
+        },
+        {
+          "bit": 4,
+          "code": "PEA"
+        },
+        {
+          "bit": 5,
+          "code": "AVG"
+        }
+      ],
+      "attributes": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        65528,
+        65529,
+        65530,
+        65531,
+        65532,
+        65533
+      ],
+      "commands": [],
+      "events": [],
+      "mandatory": {
+        "attributes": [
+          9,
+          65528,
+          65529,
+          65531
+        ],
+        "commands": [],
+        "events": []
+      }
+    },
+    {
+      "id": 1037,
+      "revision": 5,
+      "features": [
+        {
+          "bit": 0,
+          "code": "MEA"
+        },
+        {
+          "bit": 1,
+          "code": "LEV"
+        },
+        {
+          "bit": 2,
+          "code": "MED"
+        },
+        {
+          "bit": 3,
+          "code": "CRI"
+        },
+        {
+          "bit": 4,
+          "code": "PEA"
+        },
+        {
+          "bit": 5,
+          "code": "AVG"
+        }
+      ],
+      "attributes": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        65528,
+        65529,
+        65530,
+        65531,
+        65532,
+        65533
+      ],
+      "commands": [],
+      "events": [],
+      "mandatory": {
+        "attributes": [
+          9,
+          65528,
+          65529,
+          65531
+        ],
+        "commands": [],
+        "events": []
+      }
+    },
+    {
+      "id": 1043,
+      "revision": 5,
+      "features": [
+        {
+          "bit": 0,
+          "code": "MEA"
+        },
+        {
+          "bit": 1,
+          "code": "LEV"
+        },
+        {
+          "bit": 2,
+          "code": "MED"
+        },
+        {
+          "bit": 3,
+          "code": "CRI"
+        },
+        {
+          "bit": 4,
+          "code": "PEA"
+        },
+        {
+          "bit": 5,
+          "code": "AVG"
+        }
+      ],
+      "attributes": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        65528,
+        65529,
+        65530,
+        65531,
+        65532,
+        65533
+      ],
+      "commands": [],
+      "events": [],
+      "mandatory": {
+        "attributes": [
+          9,
+          65528,
+          65529,
+          65531
+        ],
+        "commands": [],
+        "events": []
+      }
+    },
+    {
+      "id": 1045,
+      "revision": 5,
+      "features": [
+        {
+          "bit": 0,
+          "code": "MEA"
+        },
+        {
+          "bit": 1,
+          "code": "LEV"
+        },
+        {
+          "bit": 2,
+          "code": "MED"
+        },
+        {
+          "bit": 3,
+          "code": "CRI"
+        },
+        {
+          "bit": 4,
+          "code": "PEA"
+        },
+        {
+          "bit": 5,
+          "code": "AVG"
+        }
+      ],
+      "attributes": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        65528,
+        65529,
+        65530,
+        65531,
+        65532,
+        65533
+      ],
+      "commands": [],
+      "events": [],
+      "mandatory": {
+        "attributes": [
+          9,
+          65528,
+          65529,
+          65531
+        ],
+        "commands": [],
+        "events": []
+      }
+    },
+    {
+      "id": 1066,
+      "revision": 5,
+      "features": [
+        {
+          "bit": 0,
+          "code": "MEA"
+        },
+        {
+          "bit": 1,
+          "code": "LEV"
+        },
+        {
+          "bit": 2,
+          "code": "MED"
+        },
+        {
+          "bit": 3,
+          "code": "CRI"
+        },
+        {
+          "bit": 4,
+          "code": "PEA"
+        },
+        {
+          "bit": 5,
+          "code": "AVG"
+        }
+      ],
+      "attributes": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        65528,
+        65529,
+        65530,
+        65531,
+        65532,
+        65533
+      ],
+      "commands": [],
+      "events": [],
+      "mandatory": {
+        "attributes": [
+          9,
+          65528,
+          65529,
+          65531
+        ],
+        "commands": [],
+        "events": []
+      }
+    },
+    {
+      "id": 1067,
+      "revision": 5,
+      "features": [
+        {
+          "bit": 0,
+          "code": "MEA"
+        },
+        {
+          "bit": 1,
+          "code": "LEV"
+        },
+        {
+          "bit": 2,
+          "code": "MED"
+        },
+        {
+          "bit": 3,
+          "code": "CRI"
+        },
+        {
+          "bit": 4,
+          "code": "PEA"
+        },
+        {
+          "bit": 5,
+          "code": "AVG"
+        }
+      ],
+      "attributes": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        65528,
+        65529,
+        65530,
+        65531,
+        65532,
+        65533
+      ],
+      "commands": [],
+      "events": [],
+      "mandatory": {
+        "attributes": [
+          9,
+          65528,
+          65529,
+          65531
+        ],
+        "commands": [],
+        "events": []
+      }
+    },
+    {
+      "id": 1068,
+      "revision": 5,
+      "features": [
+        {
+          "bit": 0,
+          "code": "MEA"
+        },
+        {
+          "bit": 1,
+          "code": "LEV"
+        },
+        {
+          "bit": 2,
+          "code": "MED"
+        },
+        {
+          "bit": 3,
+          "code": "CRI"
+        },
+        {
+          "bit": 4,
+          "code": "PEA"
+        },
+        {
+          "bit": 5,
+          "code": "AVG"
+        }
+      ],
+      "attributes": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        65528,
+        65529,
+        65530,
+        65531,
+        65532,
+        65533
+      ],
+      "commands": [],
+      "events": [],
+      "mandatory": {
+        "attributes": [
+          9,
+          65528,
+          65529,
+          65531
+        ],
+        "commands": [],
+        "events": []
+      }
+    },
+    {
+      "id": 1069,
+      "revision": 5,
+      "features": [
+        {
+          "bit": 0,
+          "code": "MEA"
+        },
+        {
+          "bit": 1,
+          "code": "LEV"
+        },
+        {
+          "bit": 2,
+          "code": "MED"
+        },
+        {
+          "bit": 3,
+          "code": "CRI"
+        },
+        {
+          "bit": 4,
+          "code": "PEA"
+        },
+        {
+          "bit": 5,
+          "code": "AVG"
+        }
+      ],
+      "attributes": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        65528,
+        65529,
+        65530,
+        65531,
+        65532,
+        65533
+      ],
+      "commands": [],
+      "events": [],
+      "mandatory": {
+        "attributes": [
+          9,
+          65528,
+          65529,
+          65531
+        ],
+        "commands": [],
+        "events": []
+      }
+    },
+    {
+      "id": 1070,
+      "revision": 5,
+      "features": [
+        {
+          "bit": 0,
+          "code": "MEA"
+        },
+        {
+          "bit": 1,
+          "code": "LEV"
+        },
+        {
+          "bit": 2,
+          "code": "MED"
+        },
+        {
+          "bit": 3,
+          "code": "CRI"
+        },
+        {
+          "bit": 4,
+          "code": "PEA"
+        },
+        {
+          "bit": 5,
+          "code": "AVG"
+        }
+      ],
+      "attributes": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        65528,
+        65529,
+        65530,
+        65531,
+        65532,
+        65533
+      ],
+      "commands": [],
+      "events": [],
+      "mandatory": {
+        "attributes": [
+          9,
+          65528,
+          65529,
+          65531
+        ],
+        "commands": [],
+        "events": []
+      }
+    },
+    {
+      "id": 1071,
+      "revision": 5,
+      "features": [
+        {
+          "bit": 0,
+          "code": "MEA"
+        },
+        {
+          "bit": 1,
+          "code": "LEV"
+        },
+        {
+          "bit": 2,
+          "code": "MED"
+        },
+        {
+          "bit": 3,
+          "code": "CRI"
+        },
+        {
+          "bit": 4,
+          "code": "PEA"
+        },
+        {
+          "bit": 5,
+          "code": "AVG"
+        }
+      ],
+      "attributes": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        65528,
+        65529,
+        65530,
+        65531,
+        65532,
+        65533
+      ],
+      "commands": [],
+      "events": [],
+      "mandatory": {
+        "attributes": [
+          9,
+          65528,
+          65529,
+          65531
+        ],
+        "commands": [],
+        "events": []
+      }
+    },
+    {
+      "id": 1072,
+      "revision": 1,
+      "features": [],
+      "attributes": [
+        0,
+        1,
+        65528,
+        65529,
+        65530,
+        65531,
+        65532,
+        65533
+      ],
+      "commands": [],
+      "events": [],
+      "mandatory": {
+        "attributes": [
+          0,
+          1,
+          65528,
+          65529,
+          65531,
+          65532
+        ],
+        "commands": [],
+        "events": []
+      }
+    },
+    {
+      "id": 1073,
+      "revision": 1,
+      "features": [
+        {
+          "bit": 0,
+          "code": "HA"
+        },
+        {
+          "bit": 1,
+          "code": "OC"
+        },
+        {
+          "bit": 2,
+          "code": "OI"
+        },
+        {
+          "bit": 3,
+          "code": "AUD"
+        },
+        {
+          "bit": 4,
+          "code": "PRED"
+        }
+      ],
+      "attributes": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        65528,
+        65529,
+        65530,
+        65531,
+        65532,
+        65533
+      ],
+      "commands": [],
+      "events": [
+        0,
+        1
+      ],
+      "mandatory": {
+        "attributes": [
+          65528,
+          65529,
+          65531
+        ],
+        "commands": [],
+        "events": []
+      }
+    },
+    {
+      "id": 1105,
+      "revision": 1,
+      "features": [],
+      "attributes": [
+        0,
+        1,
+        65528,
+        65529,
+        65530,
+        65531,
+        65532,
+        65533
+      ],
+      "commands": [
+        0,
+        1
+      ],
+      "events": [],
+      "mandatory": {
+        "attributes": [
+          0,
+          1,
+          65528,
+          65529,
+          65531,
+          65532
+        ],
+        "commands": [
+          0,
+          1
+        ],
+        "events": []
+      }
+    },
+    {
+      "id": 1106,
+      "revision": 1,
+      "features": [
+        {
+          "bit": 0,
+          "code": "PC"
+        }
+      ],
+      "attributes": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        65528,
+        65529,
+        65530,
+        65531,
+        65532,
+        65533
+      ],
+      "commands": [
+        0,
+        1,
+        2,
+        3,
+        4
+      ],
+      "events": [],
+      "mandatory": {
+        "attributes": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          65528,
+          65529,
+          65531
+        ],
+        "commands": [
+          0,
+          1,
+          2,
+          3
+        ],
+        "events": []
+      }
+    },
+    {
+      "id": 1107,
+      "revision": 1,
+      "features": [],
+      "attributes": [
+        0,
+        1,
+        2,
+        65528,
+        65529,
+        65530,
+        65531,
+        65532,
+        65533
+      ],
+      "commands": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "events": [],
+      "mandatory": {
+        "attributes": [
+          0,
+          1,
+          2,
+          65528,
+          65529,
+          65531,
+          65532
+        ],
+        "commands": [
+          0,
+          1,
+          2,
+          3
+        ],
+        "events": []
+      }
+    },
+    {
+      "id": 1283,
+      "revision": 1,
+      "features": [],
+      "attributes": [
+        0,
+        1,
+        65528,
+        65529,
+        65530,
+        65531,
+        65532,
+        65533
+      ],
+      "commands": [],
+      "events": [],
+      "mandatory": {
+        "attributes": [
+          65528,
+          65529,
+          65531,
+          65532
+        ],
+        "commands": [],
+        "events": []
+      }
+    },
+    {
+      "id": 1284,
+      "revision": 2,
+      "features": [
+        {
+          "bit": 0,
+          "code": "CL"
+        },
+        {
+          "bit": 1,
+          "code": "LI"
+        },
+        {
+          "bit": 2,
+          "code": "EG"
+        },
+        {
+          "bit": 3,
+          "code": "RP"
+        }
+      ],
+      "attributes": [
+        0,
+        1,
+        2,
+        65528,
+        65529,
+        65530,
+        65531,
+        65532,
+        65533
+      ],
+      "commands": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+      ],
+      "events": [],
+      "mandatory": {
+        "attributes": [
+          65528,
+          65529,
+          65531
+        ],
+        "commands": [
+          2,
+          3
+        ],
+        "events": []
+      }
+    },
+    {
+      "id": 1285,
+      "revision": 2,
+      "features": [],
+      "attributes": [
+        0,
+        1,
+        65528,
+        65529,
+        65530,
+        65531,
+        65532,
+        65533
+      ],
+      "commands": [
+        0,
+        1
+      ],
+      "events": [
+        0
+      ],
+      "mandatory": {
+        "attributes": [
+          0,
+          65528,
+          65529,
+          65531,
+          65532
+        ],
+        "commands": [
+          0,
+          1
+        ],
+        "events": []
+      }
+    },
+    {
+      "id": 1286,
+      "revision": 2,
+      "features": [
+        {
+          "bit": 0,
+          "code": "AS"
+        },
+        {
+          "bit": 1,
+          "code": "VS"
+        },
+        {
+          "bit": 2,
+          "code": "TT"
+        },
+        {
+          "bit": 3,
+          "code": "AT"
+        },
+        {
+          "bit": 4,
+          "code": "AA"
+        }
+      ],
+      "attributes": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        65528,
+        65529,
+        65530,
+        65531,
+        65532,
+        65533
+      ],
+      "commands": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14
+      ],
+      "events": [
+        0
+      ],
+      "mandatory": {
+        "attributes": [
+          0,
+          65528,
+          65529,
+          65531
+        ],
+        "commands": [
+          0,
+          1,
+          2,
+          10
+        ],
+        "events": []
+      }
+    },
+    {
+      "id": 1287,
+      "revision": 1,
+      "features": [
+        {
+          "bit": 0,
+          "code": "NU"
+        }
+      ],
+      "attributes": [
+        0,
+        1,
+        65528,
+        65529,
+        65530,
+        65531,
+        65532,
+        65533
+      ],
+      "commands": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "events": [],
+      "mandatory": {
+        "attributes": [
+          0,
+          1,
+          65528,
+          65529,
+          65531
+        ],
+        "commands": [
+          0,
+          1,
+          2
+        ],
+        "events": []
+      }
+    },
+    {
+      "id": 1288,
+      "revision": 1,
+      "features": [],
+      "attributes": [
+        65528,
+        65529,
+        65530,
+        65531,
+        65532,
+        65533
+      ],
+      "commands": [
+        0
+      ],
+      "events": [],
+      "mandatory": {
+        "attributes": [
+          65528,
+          65529,
+          65531,
+          65532
+        ],
+        "commands": [
+          0
+        ],
+        "events": []
+      }
+    },
+    {
+      "id": 1289,
+      "revision": 1,
+      "features": [
+        {
+          "bit": 0,
+          "code": "NV"
+        },
+        {
+          "bit": 1,
+          "code": "LK"
+        },
+        {
+          "bit": 2,
+          "code": "NK"
+        }
+      ],
+      "attributes": [
+        65528,
+        65529,
+        65530,
+        65531,
+        65532,
+        65533
+      ],
+      "commands": [
+        0,
+        1
+      ],
+      "events": [],
+      "mandatory": {
+        "attributes": [
+          65528,
+          65529,
+          65531
+        ],
+        "commands": [
+          0,
+          1
+        ],
+        "events": []
+      }
+    },
+    {
+      "id": 1290,
+      "revision": 2,
+      "features": [
+        {
+          "bit": 0,
+          "code": "CS"
+        },
+        {
+          "bit": 1,
+          "code": "UP"
+        },
+        {
+          "bit": 2,
+          "code": "AS"
+        },
+        {
+          "bit": 3,
+          "code": "TT"
+        },
+        {
+          "bit": 4,
+          "code": "AT"
+        }
+      ],
+      "attributes": [
+        0,
+        1,
+        65528,
+        65529,
+        65530,
+        65531,
+        65532,
+        65533
+      ],
+      "commands": [
+        0,
+        1,
+        2
+      ],
+      "events": [],
+      "mandatory": {
+        "attributes": [
+          65528,
+          65529,
+          65531
+        ],
+        "commands": [],
+        "events": []
+      }
+    },
+    {
+      "id": 1291,
+      "revision": 1,
+      "features": [
+        {
+          "bit": 0,
+          "code": "NU"
+        }
+      ],
+      "attributes": [
+        0,
+        1,
+        65528,
+        65529,
+        65530,
+        65531,
+        65532,
+        65533
+      ],
+      "commands": [
+        0,
+        1
+      ],
+      "events": [],
+      "mandatory": {
+        "attributes": [
+          0,
+          1,
+          65528,
+          65529,
+          65531
+        ],
+        "commands": [
+          0
+        ],
+        "events": []
+      }
+    },
+    {
+      "id": 1292,
+      "revision": 2,
+      "features": [
+        {
+          "bit": 0,
+          "code": "AP"
+        }
+      ],
+      "attributes": [
+        0,
+        1,
+        65528,
+        65529,
+        65530,
+        65531,
+        65532,
+        65533
+      ],
+      "commands": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "events": [],
+      "mandatory": {
+        "attributes": [
+          65528,
+          65529,
+          65531
+        ],
+        "commands": [
+          0,
+          1,
+          2,
+          3
+        ],
+        "events": []
+      }
+    },
+    {
+      "id": 1293,
+      "revision": 1,
+      "features": [],
+      "attributes": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        65528,
+        65529,
+        65530,
+        65531,
+        65532,
+        65533
+      ],
+      "commands": [],
+      "events": [],
+      "mandatory": {
+        "attributes": [
+          2,
+          4,
+          5,
+          6,
+          7,
+          65528,
+          65529,
+          65531,
+          65532
+        ],
+        "commands": [],
+        "events": []
+      }
+    },
+    {
+      "id": 1294,
+      "revision": 2,
+      "features": [],
+      "attributes": [
+        65528,
+        65529,
+        65530,
+        65531,
+        65532,
+        65533
+      ],
+      "commands": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "events": [
+        0
+      ],
+      "mandatory": {
+        "attributes": [
+          65528,
+          65529,
+          65531,
+          65532
+        ],
+        "commands": [
+          0,
+          1,
+          2,
+          3
+        ],
+        "events": []
+      }
+    },
+    {
+      "id": 1295,
+      "revision": 1,
+      "features": [
+        {
+          "bit": 0,
+          "code": "ST"
+        },
+        {
+          "bit": 1,
+          "code": "PM"
+        },
+        {
+          "bit": 2,
+          "code": "BU"
+        },
+        {
+          "bit": 3,
+          "code": "OCR"
+        },
+        {
+          "bit": 4,
+          "code": "SCR"
+        },
+        {
+          "bit": 5,
+          "code": "BC"
+        },
+        {
+          "bit": 6,
+          "code": "BA"
+        },
+        {
+          "bit": 7,
+          "code": "BTW"
+        }
+      ],
+      "attributes": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        65528,
+        65529,
+        65530,
+        65531,
+        65532,
+        65533
+      ],
+      "commands": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16
+      ],
+      "events": [
+        0,
+        1
+      ],
+      "mandatory": {
+        "attributes": [
+          0,
+          65528,
+          65529,
+          65531
+        ],
+        "commands": [
+          3,
+          4
+        ],
+        "events": []
+      }
+    },
+    {
+      "id": 1296,
+      "revision": 1,
+      "features": [],
+      "attributes": [
+        65528,
+        65529,
+        65530,
+        65531,
+        65532,
+        65533
+      ],
+      "commands": [
+        0,
+        1
+      ],
+      "events": [],
+      "mandatory": {
+        "attributes": [
+          65528,
+          65529,
+          65531,
+          65532
+        ],
+        "commands": [
+          0,
+          1
+        ],
+        "events": []
+      }
+    },
+    {
+      "id": 1360,
+      "revision": 1,
+      "features": [
+        {
+          "bit": 0,
+          "code": "TWODCART"
+        },
+        {
+          "bit": 1,
+          "code": "PERZONESENS"
+        },
+        {
+          "bit": 2,
+          "code": "USERDEFINED"
+        },
+        {
+          "bit": 3,
+          "code": "FOCUSZONES"
+        }
+      ],
+      "attributes": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        65528,
+        65529,
+        65530,
+        65531,
+        65532,
+        65533
+      ],
+      "commands": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "events": [
+        0,
+        1
+      ],
+      "mandatory": {
+        "attributes": [
+          1,
+          2,
+          3,
+          4,
+          65528,
+          65529,
+          65531
+        ],
+        "commands": [
+          4,
+          5
+        ],
+        "events": [
+          0,
+          1
+        ]
+      }
+    },
+    {
+      "id": 1361,
+      "revision": 2,
+      "features": [
+        {
+          "bit": 0,
+          "code": "ADO"
+        },
+        {
+          "bit": 1,
+          "code": "VDO"
+        },
+        {
+          "bit": 2,
+          "code": "SNP"
+        },
+        {
+          "bit": 3,
+          "code": "PRIV"
+        },
+        {
+          "bit": 4,
+          "code": "SPKR"
+        },
+        {
+          "bit": 5,
+          "code": "ICTL"
+        },
+        {
+          "bit": 6,
+          "code": "WMARK"
+        },
+        {
+          "bit": 7,
+          "code": "OSD"
+        },
+        {
+          "bit": 8,
+          "code": "STOR"
+        },
+        {
+          "bit": 9,
+          "code": "HDR"
+        },
+        {
+          "bit": 10,
+          "code": "NV"
+        }
+      ],
+      "attributes": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21,
+        22,
+        23,
+        24,
+        25,
+        26,
+        27,
+        28,
+        29,
+        30,
+        31,
+        32,
+        33,
+        34,
+        35,
+        36,
+        37,
+        38,
+        39,
+        40,
+        41,
+        65528,
+        65529,
+        65530,
+        65531,
+        65532,
+        65533
+      ],
+      "commands": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13
+      ],
+      "events": [],
+      "mandatory": {
+        "attributes": [
+          6,
+          11,
+          14,
+          18,
+          65528,
+          65529,
+          65531
+        ],
+        "commands": [
+          11
+        ],
+        "events": []
+      }
+    },
+    {
+      "id": 1362,
+      "revision": 1,
+      "features": [
+        {
+          "bit": 0,
+          "code": "DPTZ"
+        },
+        {
+          "bit": 1,
+          "code": "MPAN"
+        },
+        {
+          "bit": 2,
+          "code": "MTILT"
+        },
+        {
+          "bit": 3,
+          "code": "MZOOM"
+        },
+        {
+          "bit": 4,
+          "code": "MPRESETS"
+        }
+      ],
+      "attributes": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        65528,
+        65529,
+        65530,
+        65531,
+        65532,
+        65533
+      ],
+      "commands": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6
+      ],
+      "events": [],
+      "mandatory": {
+        "attributes": [
+          65528,
+          65529,
+          65531
+        ],
+        "commands": [],
+        "events": []
+      }
+    },
+    {
+      "id": 1363,
+      "revision": 2,
+      "features": [
+        {
+          "bit": 0,
+          "code": "METADATA"
+        }
+      ],
+      "attributes": [
+        0,
+        65528,
+        65529,
+        65530,
+        65531,
+        65532,
+        65533
+      ],
+      "commands": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6
+      ],
+      "events": [],
+      "mandatory": {
+        "attributes": [
+          0,
+          65528,
+          65529,
+          65531
+        ],
+        "commands": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6
+        ],
+        "events": []
+      }
+    },
+    {
+      "id": 1364,
+      "revision": 2,
+      "features": [],
+      "attributes": [
+        0,
+        65528,
+        65529,
+        65530,
+        65531,
+        65532,
+        65533
+      ],
+      "commands": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "events": [],
+      "mandatory": {
+        "attributes": [
+          0,
+          65528,
+          65529,
+          65531,
+          65532
+        ],
+        "commands": [
+          0,
+          1,
+          2,
+          3
+        ],
+        "events": []
+      }
+    },
+    {
+      "id": 1365,
+      "revision": 2,
+      "features": [
+        {
+          "bit": 0,
+          "code": "PERZONESENS"
+        },
+        {
+          "bit": 1,
+          "code": "METADATA"
+        }
+      ],
+      "attributes": [
+        0,
+        1,
+        65528,
+        65529,
+        65530,
+        65531,
+        65532,
+        65533
+      ],
+      "commands": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+      ],
+      "events": [
+        0,
+        1
+      ],
+      "mandatory": {
+        "attributes": [
+          0,
+          1,
+          65528,
+          65529,
+          65531
+        ],
+        "commands": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7
+        ],
+        "events": [
+          0,
+          1
+        ]
+      }
+    },
+    {
+      "id": 1366,
+      "revision": 2,
+      "features": [],
+      "attributes": [
+        0,
+        1,
+        2,
+        65528,
+        65529,
+        65530,
+        65531,
+        65532,
+        65533
+      ],
+      "commands": [
+        0
+      ],
+      "events": [
+        0
+      ],
+      "mandatory": {
+        "attributes": [
+          0,
+          1,
+          2,
+          65528,
+          65529,
+          65531,
+          65532
+        ],
+        "commands": [
+          0
+        ],
+        "events": []
+      }
+    },
+    {
+      "id": 1792,
+      "revision": 1,
+      "features": [
+        {
+          "bit": 0,
+          "code": "PRICE"
+        },
+        {
+          "bit": 1,
+          "code": "FCRED"
+        },
+        {
+          "bit": 2,
+          "code": "AUXLD"
+        },
+        {
+          "bit": 3,
+          "code": "PEAKP"
+        },
+        {
+          "bit": 4,
+          "code": "PWRTHLD"
+        },
+        {
+          "bit": 5,
+          "code": "RNDM"
+        }
+      ],
+      "attributes": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        65528,
+        65529,
+        65530,
+        65531,
+        65532,
+        65533
+      ],
+      "commands": [
+        0,
+        1
+      ],
+      "events": [],
+      "mandatory": {
+        "attributes": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12,
+          13,
+          14,
+          15,
+          16,
+          65528,
+          65529,
+          65531
+        ],
+        "commands": [
+          0,
+          1
+        ],
+        "events": []
+      }
+    },
+    {
+      "id": 1872,
+      "revision": 1,
+      "features": [],
+      "attributes": [
+        0,
+        1,
+        65528,
+        65529,
+        65530,
+        65531,
+        65532,
+        65533
+      ],
+      "commands": [],
+      "events": [],
+      "mandatory": {
+        "attributes": [
+          0,
+          1,
+          65528,
+          65529,
+          65531,
+          65532
+        ],
+        "commands": [],
+        "events": []
+      }
+    },
+    {
+      "id": 1873,
+      "revision": 1,
+      "features": [],
+      "attributes": [
+        0,
+        65528,
+        65529,
+        65530,
+        65531,
+        65532,
+        65533
+      ],
+      "commands": [
+        0,
+        1,
+        2
+      ],
+      "events": [
+        0
+      ],
+      "mandatory": {
+        "attributes": [
+          0,
+          65528,
+          65529,
+          65531,
+          65532
+        ],
+        "commands": [
+          0,
+          1,
+          2
+        ],
+        "events": [
+          0
+        ]
+      }
+    },
+    {
+      "id": 1874,
+      "revision": 1,
+      "features": [],
+      "attributes": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        65528,
+        65529,
+        65530,
+        65531,
+        65532,
+        65533
+      ],
+      "commands": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19
+      ],
+      "events": [],
+      "mandatory": {
+        "attributes": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12,
+          13,
+          65528,
+          65529,
+          65531,
+          65532
+        ],
+        "commands": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12,
+          13,
+          14,
+          15,
+          16,
+          17,
+          18,
+          19
+        ],
+        "events": []
+      }
+    },
+    {
+      "id": 1875,
+      "revision": 1,
+      "features": [],
+      "attributes": [
+        0,
+        65528,
+        65529,
+        65530,
+        65531,
+        65532,
+        65533
+      ],
+      "commands": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8
+      ],
+      "events": [],
+      "mandatory": {
+        "attributes": [
+          0,
+          65528,
+          65529,
+          65531,
+          65532
+        ],
+        "commands": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8
+        ],
+        "events": []
+      }
+    },
+    {
+      "id": 2049,
+      "revision": 1,
+      "features": [],
+      "attributes": [
+        0,
+        1,
+        2,
+        3,
+        65528,
+        65529,
+        65530,
+        65531,
+        65532,
+        65533
+      ],
+      "commands": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14
+      ],
+      "events": [],
+      "mandatory": {
+        "attributes": [
+          0,
+          1,
+          2,
+          3,
+          65528,
+          65529,
+          65531,
+          65532
+        ],
+        "commands": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12,
+          13,
+          14
+        ],
+        "events": []
+      }
+    },
+    {
+      "id": 2050,
+      "revision": 1,
+      "features": [],
+      "attributes": [
+        0,
+        1,
+        65528,
+        65529,
+        65530,
+        65531,
+        65532,
+        65533
+      ],
+      "commands": [
+        0,
+        1,
+        2,
+        3,
+        4
+      ],
+      "events": [],
+      "mandatory": {
+        "attributes": [
+          0,
+          1,
+          65528,
+          65529,
+          65531,
+          65532
+        ],
+        "commands": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ],
+        "events": []
+      }
+    },
+    {
+      "id": 2822,
+      "revision": 1,
+      "features": [
+        {
+          "bit": 0,
+          "code": "PWRTHLD"
+        }
+      ],
+      "attributes": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        65528,
+        65529,
+        65530,
+        65531,
+        65532,
+        65533
+      ],
+      "commands": [],
+      "events": [],
+      "mandatory": {
+        "attributes": [
+          0,
+          1,
+          2,
+          65528,
+          65529,
+          65531
+        ],
+        "commands": [],
+        "events": []
+      }
+    },
+    {
+      "id": 2823,
+      "revision": 1,
+      "features": [],
+      "attributes": [
+        0,
+        1,
+        2,
+        3,
+        65528,
+        65529,
+        65530,
+        65531,
+        65532,
+        65533
+      ],
+      "commands": [],
+      "events": [],
+      "mandatory": {
+        "attributes": [
+          0,
+          1,
+          2,
+          3,
+          65528,
+          65529,
+          65531,
+          65532
+        ],
+        "commands": [],
+        "events": []
+      }
+    }
+  ]
+}
