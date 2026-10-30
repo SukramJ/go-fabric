@@ -34,7 +34,9 @@
 // its own. The clusters the endpoint assembler mounts (Descriptor,
 // BridgedDeviceBasicInformation, Identify, Groups, ScenesManagement) and
 // the clusters a measurement source projects are neither candidates nor
-// part of a device's effective surface. The node adds one candidate per
+// part of a device's effective surface; a node's report reads them from
+// its assembled topology once it has one ([Report].Assembled). The node
+// adds one candidate per
 // root feature its configuration selects that a root server declares as
 // ahead of matter.js (concept v11 S2), and one per root cluster it mounts
 // (concept v11 S3): mandatory for the RootNode device type's mandatory
@@ -66,8 +68,14 @@
 // withholds an endpoint whose device type or mandated cluster the level
 // does not know ([ErrWithheld]). An element no level knows — a vendor's —
 // is not level-controlled, and [Policies.ServerInternal] records what a
-// hand-written server chose itself. The served ClusterRevision stays the
-// pin's. [Policies.Custom] takes the host's own policies, and package
+// hand-written server or the endpoint assembler chose itself. The served
+// ClusterRevision stays the pin's.
+//
+// A surface that changes under a paired controller is announced (ADR 0030
+// decision 6, concept v11 §C.9): a node persists every endpoint's
+// effective surface, raises the ConfigurationVersion when an endpoint
+// comes back with another one, and reports each change as a
+// [SurfaceChange] in [Report].Changed. [Policies.Custom] takes the host's own policies, and package
 // surfacetest has the policies the tests use.
 //
 // The built-in policies never gate a whole cluster: which clusters reach

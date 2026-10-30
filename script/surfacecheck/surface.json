@@ -1,4 +1,6 @@
 {
+  "assembled": false,
+  "changed": [],
   "decisions": [
     {"cluster":"0x00000028","endpoint":"","id":"0x00000028","kind":"cluster","mandatory":true,"origin":"device-type","policy":"","reason":"","reference":"","verdict":"keep"},
     {"cluster":"0x0000001f","endpoint":"","id":"0x0000001f","kind":"cluster","mandatory":true,"origin":"device-type","policy":"","reason":"","reference":"","verdict":"keep"},
