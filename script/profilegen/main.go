@@ -295,7 +295,8 @@ func checkRules(rules []rule) error {
 		cluster, id   uint32
 	}
 	seen := map[key]int{}
-	for _, r := range rules {
+	for i := range rules {
+		r := &rules[i]
 		k := key{r.profile, r.kind, r.cluster, r.id}
 		if prev, ok := seen[k]; ok {
 			return fmt.Errorf("line %d: profile %q has a row for %q already (line %d)", r.line, r.profile, r.cell, prev)
@@ -360,9 +361,10 @@ var registerProfiles = []Profile{
 	for _, name := range reg.profiles {
 		var rules []rule
 		level := ""
-		for _, r := range reg.rules {
+		for i := range reg.rules {
+			r := &reg.rules[i]
 			if r.profile == name {
-				rules = append(rules, r)
+				rules = append(rules, *r)
 				if r.effect == "level" {
 					level = r.level
 				}
@@ -377,7 +379,8 @@ var registerProfiles = []Profile{
 			fmt.Fprintf(&b, "Level: %q,\n", level)
 		}
 		b.WriteString("Rules: []ProfileRule{\n")
-		for _, r := range rules {
+		for i := range rules {
+			r := &rules[i]
 			fmt.Fprintf(&b, "{ // %s\n", r.cell)
 			if r.kind != kindLevel {
 				fmt.Fprintf(&b, "Element: ElementPattern{Kind: %s, Cluster: 0x%04X, ID: 0x%X},\n", goKinds[r.kind], r.cluster, r.id)

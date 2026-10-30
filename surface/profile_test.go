@@ -22,7 +22,7 @@ var msch = surface.Element{Endpoint: "tstat", Cluster: 0x0201, Kind: surface.Kin
 
 func TestProfilesFromTheRegister(t *testing.T) {
 	ps := surface.Profiles()
-	var names []string
+	names := make([]string, 0, len(ps))
 	for _, p := range ps {
 		names = append(names, p.Name)
 		for _, r := range p.Rules {
