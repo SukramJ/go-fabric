@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 7125,
+  "entry_points": 7135,
   "entry_packages": [
     ".",
     "bdx",
@@ -274,9 +274,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 16972,
-    "reachable": 11973,
-    "whitelisted": 4996,
+    "total_exported": 16974,
+    "reachable": 11974,
+    "whitelisted": 4997,
     "unreachable": 3
   },
   "by_package": [
@@ -3605,6 +3605,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/configuration_version_test.go",
       "line": 19
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestIncreaseEndpointConfigurationVersionRaisesOneEndpoint",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/configuration_version_test.go",
+      "line": 89
     },
     {
       "package": "bridge",
@@ -24499,7 +24506,7 @@
       "identifier": "TestConformanceOf",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/surface_test.go",
-      "line": 445
+      "line": 465
     },
     {
       "package": "device",
@@ -24933,49 +24940,49 @@
       "identifier": "TestSurfaceMandatoryFeatureKept",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/surface_test.go",
-      "line": 273
+      "line": 293
     },
     {
       "package": "device",
       "identifier": "TestSurfaceNumberOnceAssembled",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/surface_test.go",
-      "line": 412
+      "line": 432
     },
     {
       "package": "device",
       "identifier": "TestSurfaceRefuse",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/surface_test.go",
-      "line": 348
+      "line": 368
     },
     {
       "package": "device",
       "identifier": "TestSurfaceRemoveElementAndCluster",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/surface_test.go",
-      "line": 301
+      "line": 321
     },
     {
       "package": "device",
       "identifier": "TestSurfaceRemoveFeature",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/surface_test.go",
-      "line": 231
+      "line": 251
     },
     {
       "package": "device",
       "identifier": "TestSurfaceReportComplete",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/surface_test.go",
-      "line": 369
+      "line": 389
     },
     {
       "package": "device",
       "identifier": "TestSurfaceTypeMandatedElementDeclared",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/surface_test.go",
-      "line": 481
+      "line": 501
     },
     {
       "package": "device",
