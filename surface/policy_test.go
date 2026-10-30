@@ -180,7 +180,7 @@ func TestReportJSON(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	r := surface.Report{Policies: p.Digest(), Effective: sample(), Decisions: ds, Withheld: cands[:1]}
+	r := surface.Report{Policies: p.Digest(), Effective: sample(), Decisions: ds, Withheld: cands[:1], Extensions: []string{"BD-A", "BD-B"}}
 	b, err := json.Marshal(r)
 	if err != nil {
 		t.Fatal(err)
@@ -193,8 +193,11 @@ func TestReportJSON(t *testing.T) {
 		t.Fatal(err)
 	}
 	if !reflect.DeepEqual(back.Decisions, r.Decisions) || back.Policies != r.Policies || !reflect.DeepEqual(back.Withheld, r.Withheld) ||
-		back.Effective.Digest() != r.Effective.Digest() {
+		back.Effective.Digest() != r.Effective.Digest() || !reflect.DeepEqual(back.Extensions, r.Extensions) {
 		t.Fatalf("round trip: %+v", back)
+	}
+	if !strings.Contains(string(b), `"extensions":["BD-A","BD-B"]`) {
+		t.Fatalf("report JSON lacks the extensions: %s", b)
 	}
 	c := r.Clone()
 	c.Decisions[0].Reason = "changed"
