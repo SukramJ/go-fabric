@@ -19,6 +19,7 @@ import (
 	"github.com/SukramJ/go-fabric/endpoint"
 	"github.com/SukramJ/go-fabric/internal/deviceseam"
 	"github.com/SukramJ/go-fabric/schema"
+	"github.com/SukramJ/go-fabric/surface"
 )
 
 // Errors New and AddPart wrap.
@@ -75,6 +76,9 @@ type Device struct {
 	// identify holds the host's Identify and TriggerEffect handlers
 	// ([Device.Identify]); never mounted.
 	identify *spec.Server
+
+	// report is the surface report compose and New computed (Surface).
+	report surface.Report
 }
 
 // Compile-time assertion.
@@ -164,39 +168,13 @@ func New(t *Type, opts Options, decls ...Declaration) (*Device, error) {
 	if s.notifier != nil {
 		d.source = &notifyingSource{Device: d, notifier: s.notifier}
 	}
-	// The defaults are built in [buildOrder] — a default that couples to
-	// the endpoint's other servers after them — and mounted in the type's
-	// order.
-	built := make(map[uint32]contract.ClusterServer, len(eff.Servers))
-	sibling := func(id uint32) contract.ClusterServer { return built[id] }
-	for _, i := range buildOrder(eff.Servers) {
-		r := &eff.Servers[i]
-		if _, ok := assemblerMounted[r.ID]; ok || m.ids[r.ID] {
-			continue
-		}
-		srv, ok := s.servers[r.ID]
-		if !ok && !r.Mandatory && !s.optional[r.ID] {
-			continue
-		}
-		if !ok {
-			var err error
-			if srv, err = defaultServer(eff, r, s, sibling); err != nil {
-				return nil, err
-			}
-		}
-		built[r.ID] = srv
-	}
-	for i := range eff.Servers {
-		if srv, ok := built[eff.Servers[i].ID]; ok {
-			d.servers = append(d.servers, srv)
-		}
-	}
-	// Host servers for clusters the type does not list, after the type's
-	// own (MutableEndpoint.ts:95-110 extends the type's behaviors).
-	for _, id := range s.serverOrder {
-		if _, listed := eff.Server(id); !listed {
-			d.servers = append(d.servers, s.servers[id])
-		}
+	// The servers are decided by the surface policies and built from what
+	// they keep (compose, surface.go): the defaults in [buildOrder] — a
+	// default that couples to the endpoint's other servers after them —
+	// mounted in the type's order.
+	s.measured = m.ids
+	if d.servers, d.report, err = compose(eff, s, opts); err != nil {
+		return nil, err
 	}
 	if err := d.attachHooks(s); err != nil {
 		return nil, err
@@ -204,6 +182,7 @@ func New(t *Type, opts Options, decls ...Declaration) (*Device, error) {
 	if d.identify, err = newIdentifyHandlers(s); err != nil {
 		return nil, fmt.Errorf("%s: %w", t.Name, err)
 	}
+	d.report.Effective = d.effective()
 	return d, nil
 }
 
@@ -328,13 +307,9 @@ func defaultServer(t *Type, r *ClusterRequirement, s *settings, sibling func(uin
 	// features the cluster itself marks mandatory ("M"), which
 	// spec.CheckFeatures demands of every selection — EnergyEvse's PREF
 	// (owner's decision, 2026-10-11).
-	features := r.Features | clusterMandatedFeatures(def)
-	if sel, ok := s.features[r.ID]; ok {
-		if missing := r.Features &^ sel; missing != 0 {
-			return nil, fmt.Errorf("%w: %s requires %s feature %s (conformance M); the selection 0x%X leaves it out",
-				ErrConfiguration, t.Name, r.Name, strings.Join(featureNames(r, missing), ", "), sel)
-		}
-		features = sel
+	features, err := selection(t, r, s)
+	if err != nil {
+		return nil, err
 	}
 	if err := spec.CheckFeatures(def, features); err != nil {
 		// RequirementGenerator.ts:188-199, EndpointFile.ts:144-158: a
@@ -362,6 +337,8 @@ func defaultServer(t *Type, r *ClusterRequirement, s *settings, sibling func(uin
 		default:
 		}
 	}
+	// Without the elements the surface policies removed (compose).
+	opts = s.cut.trim(r.ID, opts)
 	inst, err := spec.New(def, opts)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %s %s: %w", ErrConfiguration, t.Name, r.Name, err)
@@ -375,9 +352,7 @@ func defaultServer(t *Type, r *ClusterRequirement, s *settings, sibling func(uin
 			initial[e.ID] = v
 		}
 	}
-	for id, v := range s.initial[r.ID] {
-		initial[id] = v
-	}
+	maps.Copy(initial, s.cut.initial(r.ID, s.initial[r.ID]))
 	if factory, held := selfHeldDefaults[r.ID]; held {
 		srv, err := factory(defaultBuild{
 			def: def, opts: opts, clock: s.clock, sibling: sibling, deviceType: uint16(t.ID), key: s.key,
@@ -423,6 +398,22 @@ func defaultServer(t *Type, r *ClusterRequirement, s *settings, sibling func(uin
 	}
 	fillSelectDefaults(def, srv)
 	return srv, nil
+}
+
+// selection is the feature selection of r's default server: the device
+// type's mandated features and the cluster's own "M" ones, or the host's
+// selection, which must hold the type's — without the bits the surface
+// policies removed (compose).
+func selection(t *Type, r *ClusterRequirement, s *settings) (uint32, error) {
+	features := r.Features | clusterMandatedFeatures(r.Definition)
+	if sel, ok := s.features[r.ID]; ok {
+		if missing := r.Features &^ sel; missing != 0 {
+			return 0, fmt.Errorf("%w: %s requires %s feature %s (conformance M); the selection 0x%X leaves it out",
+				ErrConfiguration, t.Name, r.Name, strings.Join(featureNames(r, missing), ", "), sel)
+		}
+		features = sel
+	}
+	return features &^ s.cut.features[r.ID], nil
 }
 
 // generatedConfig is the configuration of the generated server of cluster

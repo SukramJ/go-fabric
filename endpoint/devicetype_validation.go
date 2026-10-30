@@ -270,8 +270,8 @@ func (s *assembledSubject) ServerClusterShape(clusterID uint32) (ClusterShape, b
 	}
 	sh := ClusterShape{
 		FeaturesKnown: true, AttributesKnown: true, CommandsKnown: true, EventsKnown: true,
-		Attributes:       globalList(srv, cluster.AttrGlobalAttributeList),
-		AcceptedCommands: globalList(srv, cluster.AttrGlobalAcceptedCommandList),
+		Attributes:       GlobalList(srv, cluster.AttrGlobalAttributeList),
+		AcceptedCommands: GlobalList(srv, cluster.AttrGlobalAcceptedCommandList),
 	}
 	sh.FeatureMap = featureMapOf(srv)
 	if lister, ok := srv.(contract.ClusterEventLister); ok {
@@ -294,37 +294,7 @@ func featureMapOf(srv contract.ClusterServer) uint32 {
 	if !ok {
 		return 0
 	}
-	switch x := v.(type) {
-	case uint32:
-		return x
-	case uint16:
-		return uint32(x)
-	case uint8:
-		return uint32(x)
-	case uint64:
-		return uint32(x) //nolint:gosec // a FeatureMap is a map32; higher bits name no feature
-	case int:
-		if x < 0 {
-			return 0
-		}
-		return uint32(x) //nolint:gosec // bounded above by the map32 FeatureMap type
-	default:
-		return 0
-	}
-}
-
-// globalList reads a list-valued global attribute: the server's own answer,
-// the dispatcher's synthesis otherwise.
-func globalList(srv contract.ClusterServer, attrID uint32) []uint32 {
-	v, ok := srv.MatterRead(attrID)
-	if !ok {
-		v, ok = synthesizeGlobalRead(srv, attrID)
-	}
-	ids, isList := v.([]uint32)
-	if !ok || !isList {
-		return nil
-	}
-	return ids
+	return uintOf(v)
 }
 
 // assembledNodeConditions: CustomNetworkConfig, always — matter.js answers

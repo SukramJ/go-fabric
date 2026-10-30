@@ -176,6 +176,10 @@ jobs:
       # anything here noticing.
       - name: reachability
         run: make reachability-check
+      # What a controller sees of the reference daemon (--dump-surface,
+      # ADR 0030): every change of it is a review diff in the pull request.
+      - name: surface
+        run: make surface-check
 
   testparity:
     name: testparity

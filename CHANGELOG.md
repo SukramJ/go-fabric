@@ -10,6 +10,16 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+### Added
+
+- The served surface as a value (concept v11 phase S1, [ADR 0030](docs/adr/0030-the-served-surface-is-a-value-under-policies.md)). Package `surface`: `Surface` (canonical JSON, `Digest`, `Diff`), the candidate `Element` with its `Origin`, the policy chain (`Policy`, `Verdict`, `Decision`, `Policies`, `Evaluate`, `ErrRefused`) and the `Report`; `surface/surfacetest` has the policies tests use. No built-in policy ships yet.
+- `device.Options.Surface` composes a device under surface policies: the device layer lists its candidate elements, the policies judge them, the servers are built from what they keep; `Device.Surface()` reports the effective surface and every decision.
+- `node.Config.Surface` holds the node's policies; `Aggregator.Add` and `Replace` refuse a device composed under other ones (`node.ErrPolicyMismatch`); `Node.Surface()` reports the root, the Aggregator (`node.AggregatorSurfaceKey`) and every endpoint.
+- `endpoint.ClusterSurface`, `endpoint.SurfaceEndpoint`, `endpoint.GlobalList` and `endpoint.RenderSourceKey`: a server's surface read as the dispatcher serves it.
+- The reference daemon's `--dump-surface` prints the node's surface report as JSON and exits before anything is started; `make surface` / `make surface-check` hold it as a committed snapshot (`script/surfacecheck`, a CI step).
+
+Behaviour under the zero-value `surface.Policies` is unchanged: every device composes exactly as before.
+
 ## [0.14.0] — 2026-10-29
 
 ### Changed

@@ -1807,7 +1807,7 @@
   },
   {
     "file": "device/device.go",
-    "line": 589,
+    "line": 580,
     "citation": "packages/node/src/endpoints/bridged-node.ts:39-73",
     "resolved": "packages/node/src/endpoints/bridged-node.ts",
     "identifier": "BridgedNode",
@@ -2033,7 +2033,7 @@
   },
   {
     "file": "node/config.go",
-    "line": 40,
+    "line": 41,
     "citation": "packages/node/src/node/ServerNode.ts:107-127",
     "resolved": "packages/node/src/node/ServerNode.ts",
     "identifier": "commissioning",
@@ -2042,7 +2042,7 @@
   },
   {
     "file": "node/config.go",
-    "line": 44,
+    "line": 45,
     "citation": "NetworkServer.ts:202-222",
     "resolved": "packages/node/src/behavior/system/network/NetworkServer.ts",
     "identifier": "network",
@@ -2051,7 +2051,7 @@
   },
   {
     "file": "node/config.go",
-    "line": 245,
+    "line": 252,
     "citation": "NetworkServer.ts:202-222",
     "resolved": "packages/node/src/behavior/system/network/NetworkServer.ts",
     "identifier": "network",

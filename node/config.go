@@ -21,6 +21,7 @@ import (
 	"github.com/SukramJ/go-fabric/mdns"
 	"github.com/SukramJ/go-fabric/secure/setup"
 	"github.com/SukramJ/go-fabric/store"
+	"github.com/SukramJ/go-fabric/surface"
 )
 
 // Advertiser is the type of [Config].Advertiser: what publishes the node
@@ -134,6 +135,12 @@ type Config struct {
 	// Identify, Descriptor, FixedLabel and UserLabel — an Actions server,
 	// say (the daemon's buildAggregatorClusters extra, wiring.go:330-345 at b4ea1f96^).
 	AggregatorServers []contract.ClusterServer
+	// Surface are the surface policies the node's devices are composed
+	// under (package surface, ADR 0030). A device carries the digest of the
+	// policies it was built with (device.Options.Surface), and
+	// [Aggregator.Add] refuses one whose digest is not this one's
+	// ([ErrPolicyMismatch]). The zero value is no policy.
+	Surface surface.Policies
 	// SupportedFabrics is OperationalCredentials' SupportedFabrics, the
 	// number of fabrics the node admits (Matter §11.18.4.4: 1 to 254); 0
 	// is 5, the facade's value before it was configurable. matter.js

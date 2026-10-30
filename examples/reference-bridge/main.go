@@ -35,6 +35,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"database/sql"
 	"encoding/hex"
 	"errors"
 	"flag"
@@ -93,6 +94,7 @@ type flags struct {
 	wifiSim                                    bool
 	otaProvider, media                         bool
 	thermostatSchedules                        bool
+	dumpSurface                                bool
 }
 
 func parseFlags() flags {
@@ -121,6 +123,7 @@ func parseFlags() flags {
 	flag.BoolVar(&f.thermostatSchedules, "thermostat-schedules", false, "serve MatterScheduleConfiguration (week programs) on the demo thermostat; off by default until a live ecosystem pairing is verified (issue #273); see fleet_climate.go")
 	flag.StringVar(&f.otbr, "otbr", "", "add a ThreadBorderRouter endpoint over the OpenThread Border Router's REST API at this URL (\"http://[fd00::1]:8081\"); off when empty; see otbr.go")
 	flag.BoolVar(&f.media, "media", false, "TESTING ONLY: add a simulated video player (CastingVideoPlayer) and content app (ContentApp) after chip's tv-app, for the media certification families; see media.go")
+	flag.BoolVar(&f.dumpSurface, "dump-surface", false, "print the node's served surface — the effective surface of the root, the Aggregator and every device, the surface policies' digest and every decision (package surface) — as JSON on stdout and exit, composed as the other flags say, before any socket is bound, any mDNS record published or the --db store opened (the composition runs on an in-memory store); see surface.go")
 	flag.Parse()
 	return f
 }
@@ -171,73 +174,10 @@ func run() error { //nolint:funlen // the composition root: one sequential pass,
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	// --- the node -----------------------------------------------------------
-	// The node opens --db itself (node.Store.Path) and builds its
-	// advertiser: Zeroconf with the subtype responder, which answers the
-	// `_L<discriminator>._sub` browse every commissioner filtering by
-	// discriminator sends (chip-tool's `pairing onnetwork-long`, Apple
-	// Home, Google Home), or nothing under --advertise=false.
-	devices := newFleet()
-	devices.thermostat.schedules = f.thermostatSchedules
-	otaDownloads := f.otaDir
-	if otaDownloads == "" {
-		otaDownloads = filepath.Join(filepath.Dir(f.dbPath), "ota")
+	if f.dumpSurface {
+		return dumpSurface(ctx, f, logger, passcode, discriminator, tcpConfig, os.Stdout)
 	}
-	// The daemon's applier (ota.go); it reaches BasicInformation and the
-	// requestor once the node has built them.
-	applier := &otaApplier{
-		vendorID: testVendorID, productID: testProductID,
-		dir: otaDownloads, harness: f.otaHarness, logger: logger,
-	}
-	// Actions on the Aggregator (Aggregator: optional), over the demo
-	// scenes (fleet_node.go).
-	actions, err := node.NewActions(node.ActionsConfig{Host: devices.actions})
-	if err != nil {
-		return fmt.Errorf("aggregator actions: %w", err)
-	}
-	cfg := nodeConfig(f, passcode, discriminator, tcpConfig, applier, actions, logger)
-	cfg.Attestation = attestationConfig(f.attestationDir)
-	// The listener's verdict, logged when it fails (node.Config.Health).
-	cfg.Health.OnSample = func(s node.HealthSample) {
-		if !s.Healthy {
-			logger.Warn("health.listener", slog.String("note", s.Note))
-		}
-	}
-	applyTestWiFi(&cfg, f, devices)
-	applyMetrics(&cfg, f.metricsExpvar)
-	if f.otaProvider {
-		// The OTA provider with its test image (ota_provider.go), TESTING
-		// ONLY.
-		images, err := newTestImages()
-		if err != nil {
-			return err
-		}
-		devices.otaImages = images
-		cfg.OTAProvider = &node.OTAProviderConfig{ImageSource: images, Consent: images}
-		// The ledger lookup of the offered image (dcl.go), off by default.
-		if ledger, err := dclClient(f.dcl); err != nil {
-			return err
-		} else if ledger != nil {
-			cfg.OTAProvider.ImageSource = &ledgerCheckedImages{
-				OTAImageSource: images, versions: &node.DCLOTAVersions{Client: ledger, Logger: logger},
-				image: func(string) []byte { return images.image }, logger: logger,
-			}
-		}
-	}
-	if f.media {
-		// The video player and content app (media.go), TESTING ONLY.
-		if devices.media, err = newDemoMedia(logger); err != nil {
-			return err
-		}
-	}
-	if f.otbr != "" {
-		// The ThreadBorderRouter endpoint (otbr.go), off by default.
-		if devices.otbr, err = newDemoBorderRouter(f.otbr, logger); err != nil {
-			return err
-		}
-		go devices.otbr.watch(ctx)
-	}
-	n, err := assemble(ctx, devices, cfg, applier)
+	n, devices, err := compose(ctx, f, logger, passcode, discriminator, tcpConfig, nil)
 	if err != nil {
 		return err
 	}
@@ -289,6 +229,99 @@ func run() error { //nolint:funlen // the composition root: one sequential pass,
 	}
 	logger.Info("shutting down")
 	return nil
+}
+
+// dumpEnv is what a --dump-surface composition runs on instead of the
+// daemon's own: an in-memory store and a scratch OTA download directory.
+type dumpEnv struct {
+	db     *sql.DB
+	otaDir string
+}
+
+// compose builds the node and its devices from the flags, unstarted — the
+// one composition run() starts and --dump-surface reports. dump, when set,
+// replaces the store and the OTA directory and disables mDNS.
+func compose(ctx context.Context, f flags, logger *slog.Logger, passcode uint32, discriminator uint16, tcpConfig node.TCPConfig, dump *dumpEnv) (*node.Node, *fleet, error) { //nolint:funlen // the composition root: one sequential pass, readable top to bottom
+	// The node opens --db itself (node.Store.Path) and builds its
+	// advertiser: Zeroconf with the subtype responder, which answers the
+	// `_L<discriminator>._sub` browse every commissioner filtering by
+	// discriminator sends (chip-tool's `pairing onnetwork-long`, Apple
+	// Home, Google Home), or nothing under --advertise=false.
+	devices := newFleet()
+	devices.thermostat.schedules = f.thermostatSchedules
+	otaDownloads := f.otaDir
+	if otaDownloads == "" {
+		otaDownloads = filepath.Join(filepath.Dir(f.dbPath), "ota")
+	}
+	if dump != nil {
+		otaDownloads = dump.otaDir
+	}
+	// The daemon's applier (ota.go); it reaches BasicInformation and the
+	// requestor once the node has built them.
+	applier := &otaApplier{
+		vendorID: testVendorID, productID: testProductID,
+		dir: otaDownloads, harness: f.otaHarness, logger: logger,
+	}
+	// Actions on the Aggregator (Aggregator: optional), over the demo
+	// scenes (fleet_node.go).
+	actions, err := node.NewActions(node.ActionsConfig{Host: devices.actions})
+	if err != nil {
+		return nil, nil, fmt.Errorf("aggregator actions: %w", err)
+	}
+	cfg := nodeConfig(f, passcode, discriminator, tcpConfig, applier, actions, logger)
+	cfg.Attestation = attestationConfig(f.attestationDir)
+	// The listener's verdict, logged when it fails (node.Config.Health).
+	cfg.Health.OnSample = func(s node.HealthSample) {
+		if !s.Healthy {
+			logger.Warn("health.listener", slog.String("note", s.Note))
+		}
+	}
+	applyTestWiFi(&cfg, f, devices)
+	applyMetrics(&cfg, f.metricsExpvar)
+	if dump != nil {
+		// The surface dump touches neither --db nor the network.
+		cfg.Store = node.Store{DB: dump.db}
+		cfg.Network.MDNS = node.MDNS{Disabled: true}
+	}
+	if f.otaProvider {
+		// The OTA provider with its test image (ota_provider.go), TESTING
+		// ONLY.
+		images, err := newTestImages()
+		if err != nil {
+			return nil, nil, err
+		}
+		devices.otaImages = images
+		cfg.OTAProvider = &node.OTAProviderConfig{ImageSource: images, Consent: images}
+		// The ledger lookup of the offered image (dcl.go), off by default.
+		if ledger, err := dclClient(f.dcl); err != nil {
+			return nil, nil, err
+		} else if ledger != nil {
+			cfg.OTAProvider.ImageSource = &ledgerCheckedImages{
+				OTAImageSource: images, versions: &node.DCLOTAVersions{Client: ledger, Logger: logger},
+				image: func(string) []byte { return images.image }, logger: logger,
+			}
+		}
+	}
+	if f.media {
+		// The video player and content app (media.go), TESTING ONLY.
+		if devices.media, err = newDemoMedia(logger); err != nil {
+			return nil, nil, err
+		}
+	}
+	if f.otbr != "" {
+		// The ThreadBorderRouter endpoint (otbr.go), off by default.
+		if devices.otbr, err = newDemoBorderRouter(f.otbr, logger); err != nil {
+			return nil, nil, err
+		}
+		if dump == nil {
+			go devices.otbr.watch(ctx)
+		}
+	}
+	n, err := assemble(ctx, devices, cfg, applier)
+	if err != nil {
+		return nil, nil, err
+	}
+	return n, devices, nil
 }
 
 // assemble builds the node for the fleet, unstarted: node.New, the OTA

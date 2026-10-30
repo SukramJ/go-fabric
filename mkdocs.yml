@@ -130,6 +130,7 @@ nav:
           - "ADR 0027 — A Thread Border Router over OTBR REST (accepted 2026-10-25)": adr/0027-thread-border-router-over-otbr-rest.md
           - "ADR 0028 — The test site paces by counted in-flight work": adr/0028-site-paces-by-counted-work.md
           - "ADR 0029 — ICD state split by role, no transaction model": adr/0029-icd-split-by-role.md
+          - "ADR 0030 — The served surface is a value under policies": adr/0030-the-served-surface-is-a-value-under-policies.md
       - Device types: reference/device-types.md
       - matter.js comparison: matterjs-comparison.md
       - Parity contract: matter-parity-contract.md
