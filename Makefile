@@ -301,9 +301,8 @@ CHIP_DATA_MODEL_VERSION ?= 1.6.1
 
 # The data_model directories the specification-level cross-check reads
 # (internal/chipdm TestChipDataModelLevels, ADR 0015 addendum 2026-10-30):
-# one per level in parity/levels that connectedhomeip has at the pin. 1.6.0
-# has none and is skipped (internal/chipdm LevelsWithoutDataModel).
-CHIP_LEVEL_DATA_MODELS ?= 1.4 1.4.1 1.4.2 1.5.1 1.6.1
+# one per level in parity/levels (DataModelVersion: 1.6.0 reads data_model/1.6).
+CHIP_LEVEL_DATA_MODELS ?= 1.4 1.4.1 1.4.2 1.5.1 1.6 1.6.1
 
 .PHONY: chiptool-extract
 chiptool-extract: ## copy chip-tool out of the pinned chip-cert-bins image into ./bin (arm64 hosts; ~2.5 GiB pull)
