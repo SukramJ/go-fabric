@@ -20,6 +20,7 @@ import (
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/device"
 	"github.com/SukramJ/go-fabric/node"
+	"github.com/SukramJ/go-fabric/surface"
 )
 
 // --- the change-notification fan-out the devices share -------------------
@@ -935,6 +936,10 @@ func (s *dimmer) moveTarget(moveMode uint8) uint8 {
 // device models, which [fleet.endpoints] turns into the node's bridged
 // endpoints.
 type fleet struct {
+	// surface are the daemon's surface policies (surface.go), the node's
+	// and every device's; nil is the zero value.
+	surface *surface.Policies
+
 	light    *demoLight
 	valve    *demoValve
 	selector *demoSelector
@@ -1067,16 +1072,39 @@ func part(key string, conditions ...string) device.Options {
 	return device.Options{StableKey: device.StringKey(key), Conditions: conditions}
 }
 
+// bridged and part are the daemon's [bridged] and [part] Options under its
+// surface policies (surface.go): every device the node takes carries the
+// node's policies, or Add refuses it (node.ErrPolicyMismatch).
+func (f *fleet) bridged(key, name string) device.Options {
+	o := bridged(key, name)
+	o.Surface = f.surface
+	return o
+}
+
+func (f *fleet) part(key string, conditions ...string) device.Options {
+	o := part(key, conditions...)
+	o.Surface = f.surface
+	return o
+}
+
+// partOf are the Options of a part of the device built with parent: its
+// own StableKey and conditions under the parent's surface policies.
+func partOf(parent device.Options, key string, conditions ...string) device.Options {
+	o := part(key, conditions...)
+	o.Surface = parent.Surface
+	return o
+}
+
 // smokeDevice is the smoke alarm with its battery: SmokeCoAlarm requires a
 // PowerSource device-type component, a part of its own carrying the
 // battery, as matter.js composes it (examples/device-smoke-co-alarm,
 // parts: [PowerSourceEndpoint]).
 func (f *fleet) smokeDevice() (*device.SmokeCoAlarm, error) {
-	smoke, err := device.NewSmokeCoAlarm(bridged("smoke", f.smoke.name), f.smoke.declaration())
+	smoke, err := device.NewSmokeCoAlarm(f.bridged("smoke", f.smoke.name), f.smoke.declaration())
 	if err != nil {
 		return nil, err
 	}
-	battery, err := device.NewPowerSource(part("demo:smoke:battery"), batteryDeclaration(f.smoke.battery))
+	battery, err := device.NewPowerSource(f.part("demo:smoke:battery"), batteryDeclaration(f.smoke.battery))
 	if err != nil {
 		return nil, err
 	}
@@ -1091,7 +1119,7 @@ func (f *fleet) smokeDevice() (*device.SmokeCoAlarm, error) {
 // vacuumDevice is the robot with its ServiceArea on the same endpoint
 // (fleet_servicearea.go).
 func (f *fleet) vacuumDevice() (*device.RoboticVacuumCleaner, error) {
-	d, err := device.NewRoboticVacuumCleaner(bridged("vacuum", f.vacuum.name),
+	d, err := device.NewRoboticVacuumCleaner(f.bridged("vacuum", f.vacuum.name),
 		append(f.vacuum.declarations(), f.vacuumArea.declaration())...)
 	if err != nil {
 		return nil, err
@@ -1133,49 +1161,49 @@ func (f *fleet) endpoints() ([]node.Endpoint, error) { //nolint:funlen // the fl
 		}
 		out = append(out, ep)
 	}
-	add(f.light.device(bridged("light", f.light.name)))
-	add(device.NewTemperatureSensor(bridged("thermometer", "Study Thermometer"), temperatureDeclaration(thermometerCelsius)))
-	add(device.NewWaterValve(bridged("valve", f.valve.name), f.valve.declaration()))
-	add(device.NewModeSelect(bridged("selector", f.selector.name), f.selector.declaration()))
-	add(f.speaker.device(bridged("speaker", f.speaker.name)))
+	add(f.light.device(f.bridged("light", f.light.name)))
+	add(device.NewTemperatureSensor(f.bridged("thermometer", "Study Thermometer"), temperatureDeclaration(thermometerCelsius)))
+	add(device.NewWaterValve(f.bridged("valve", f.valve.name), f.valve.declaration()))
+	add(device.NewModeSelect(f.bridged("selector", f.selector.name), f.selector.declaration()))
+	add(f.speaker.device(f.bridged("speaker", f.speaker.name)))
 
-	add(f.ceiling.device(bridged("ceiling", f.ceiling.name)))
-	add(device.NewFan(bridged("fan", f.fan.name), f.fan.declaration()))
+	add(f.ceiling.device(f.bridged("ceiling", f.ceiling.name)))
+	add(device.NewFan(f.bridged("fan", f.fan.name), f.fan.declaration()))
 	add(f.smokeDevice())
-	add(f.pump.device(bridged("pump", f.pump.name)))
-	add(f.flow.flowSensor(bridged("flow", f.flow.name)))
-	add(f.washer.device(bridged("washer", f.washer.name)))
+	add(f.pump.device(f.bridged("pump", f.pump.name)))
+	add(f.flow.flowSensor(f.bridged("flow", f.flow.name)))
+	add(f.washer.device(f.bridged("washer", f.washer.name)))
 	add(f.vacuumDevice())
-	add(f.thermostat.device(bridged("thermostat", f.thermostat.name)))
-	add(f.blind.device(bridged("blind", f.blind.name)))
-	add(device.NewDoorLock(bridged("lock", f.lock.name), f.lock.declaration()))
-	add(f.humidity.humiditySensor(bridged("humidity", f.humidity.name)))
-	add(f.occupancy.occupancySensor(bridged("occupancy", f.occupancy.name)))
-	add(f.contact.device(bridged("contact", f.contact.name)))
-	add(f.button.device(bridged("button", f.button.name)))
-	add(device.NewAirPurifier(bridged("purifier", f.purifier.name), f.purifier.declarations()...))
-	add(f.garage.device(bridged("garage", f.garage.name)))
-	add(f.colorLight.device(bridged("colorlight", f.colorLight.name)))
+	add(f.thermostat.device(f.bridged("thermostat", f.thermostat.name)))
+	add(f.blind.device(f.bridged("blind", f.blind.name)))
+	add(device.NewDoorLock(f.bridged("lock", f.lock.name), f.lock.declaration()))
+	add(f.humidity.humiditySensor(f.bridged("humidity", f.humidity.name)))
+	add(f.occupancy.occupancySensor(f.bridged("occupancy", f.occupancy.name)))
+	add(f.contact.device(f.bridged("contact", f.contact.name)))
+	add(f.button.device(f.bridged("button", f.button.name)))
+	add(device.NewAirPurifier(f.bridged("purifier", f.purifier.name), f.purifier.declarations()...))
+	add(f.garage.device(f.bridged("garage", f.garage.name)))
+	add(f.colorLight.device(f.bridged("colorlight", f.colorLight.name)))
 	// Refrigerator requires a TemperatureControlledCabinet part: the
 	// compartment is a part of the fridge's endpoint.
-	add(f.fridge.device(bridged("fridge", f.fridge.name)))
-	add(device.NewAirQualitySensor(bridged("airquality", f.airQuality.name), f.airQuality.declarations()...))
-	add(f.heater.device(bridged("waterheater", f.heater.name)))
-	add(f.meter.device(bridged("meter", f.meter.name)))
-	add(f.dishwasher.device(bridged("dishwasher", f.dishwasher.name)))
+	add(f.fridge.device(f.bridged("fridge", f.fridge.name)))
+	add(device.NewAirQualitySensor(f.bridged("airquality", f.airQuality.name), f.airQuality.declarations()...))
+	add(f.heater.device(f.bridged("waterheater", f.heater.name)))
+	add(f.meter.device(f.bridged("meter", f.meter.name)))
+	add(f.dishwasher.device(f.bridged("dishwasher", f.dishwasher.name)))
 	// Oven requires a TemperatureControlledCabinet part with the Heater
 	// condition: the cavity is a part of the oven's endpoint.
-	add(f.oven.device(bridged("oven", f.oven.name)))
-	add(f.microwave.device(bridged("microwave", f.microwave.name)))
-	add(f.dryer.device(bridged("dryer", f.dryer.name)))
+	add(f.oven.device(f.bridged("oven", f.oven.name)))
+	add(f.microwave.device(f.bridged("microwave", f.microwave.name)))
+	add(f.dryer.device(f.bridged("dryer", f.dryer.name)))
 	// EnergyEvse requires PowerSource, DeviceEnergyManagement and
 	// ElectricalSensor device types: the charger's parts (fleet_evse.go).
-	add(f.evse.device(bridged("evse", f.evse.name)))
-	add(f.panel.device(bridged("panel", f.panel.name)))
-	add(f.soil.device(bridged("soil", f.soil.name)))
-	add(f.energyTariff.device(bridged("tariff", f.energyTariff.name)))
-	add(f.electricalMeter.device(bridged("electricalmeter", f.electricalMeter.name)))
-	add(f.esa.device(bridged("esa", f.esa.name)))
+	add(f.evse.device(f.bridged("evse", f.evse.name)))
+	add(f.panel.device(f.bridged("panel", f.panel.name)))
+	add(f.soil.device(f.bridged("soil", f.soil.name)))
+	add(f.energyTariff.device(f.bridged("tariff", f.energyTariff.name)))
+	add(f.electricalMeter.device(f.bridged("electricalmeter", f.electricalMeter.name)))
+	add(f.esa.device(f.bridged("esa", f.esa.name)))
 	// The media pair (--media, TESTING ONLY) comes last, so every device
 	// above keeps its number with or without it.
 	if f.media != nil {

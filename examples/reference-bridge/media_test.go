@@ -31,7 +31,7 @@ import (
 func startMediaFleet(t *testing.T) (f *fleet, player, app *endpoint.Endpoint, br *matterbridge.Bridge) {
 	t.Helper()
 	f = newFleet()
-	m, err := newDemoMedia(slog.New(slog.DiscardHandler))
+	m, err := newDemoMedia(nil, slog.New(slog.DiscardHandler))
 	if err != nil {
 		t.Fatal(err)
 	}

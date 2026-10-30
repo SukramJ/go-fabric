@@ -188,17 +188,16 @@ func copyUint8(v *uint8) *uint8 {
 // reports (cluster/thermo ThermostatConfig). A controller's hold write is
 // stored: the endpoint declares no Sink.
 //
-// With --thermostat-schedules it also serves MatterScheduleConfiguration
-// (cluster/thermo schedules.go, ahead of matter.js): one schedule type,
-// Heat, of two schedules with names and setpoints, eight transitions in
-// all, four a day, and one built-in week program, active. A host gates the
-// feature behind a flag, off by default, until a live ecosystem pairing is
+// When its surface policies enable the register row
+// BD-chip-Thermostat-Schedules (--thermostat-schedules, or the row in
+// --extensions) it also serves MatterScheduleConfiguration (cluster/thermo
+// schedules.go, ahead of matter.js): one schedule type, Heat, of two
+// schedules with names and setpoints, eight transitions in all, four a
+// day, and one built-in week program, active. A host gates the feature
+// behind a flag, off by default, until a live ecosystem pairing is
 // verified (issue #273); the chip-tool suite turns it on.
 type demoThermostat struct {
 	name string
-
-	// schedules serves MSCH (--thermostat-schedules).
-	schedules bool
 
 	// presets and settings are the daemon's store (attachStore); nil keeps
 	// the presets and KeypadLockout in memory.
@@ -256,7 +255,7 @@ func (t *demoThermostat) device(opts device.Options) (*device.Thermostat, error)
 			TemperatureSetpointHold: &hold, ThermostatRunningState: &idle,
 		},
 	}
-	if t.schedules {
+	if opts.Surface != nil && opts.Surface.Extensions.Has(schedulesRow) {
 		t.declareSchedules(&decl)
 	}
 	d, err := device.NewThermostat(opts,
@@ -280,6 +279,10 @@ func (t *demoThermostat) device(opts device.Options) (*device.Thermostat, error)
 	t.mu.Unlock()
 	return d, nil
 }
+
+// schedulesRow is the "Ahead of matter.js" register row of
+// MatterScheduleConfiguration (thermo.Ahead).
+const schedulesRow = "BD-chip-Thermostat-Schedules"
 
 // weekdaysHandle is the handle of the demo thermostat's built-in week
 // program.

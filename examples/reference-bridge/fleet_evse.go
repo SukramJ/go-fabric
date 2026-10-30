@@ -209,15 +209,15 @@ func (e *demoEvse) device(opts device.Options) (*device.EnergyEvse, error) {
 	if err != nil {
 		return nil, err
 	}
-	power, err := device.NewPowerSource(part("demo:evse:power"), wiredPowerSource())
+	power, err := device.NewPowerSource(partOf(opts, "demo:evse:power"), wiredPowerSource())
 	if err != nil {
 		return nil, err
 	}
-	esa, err := e.dem.device(part("demo:evse:dem", conditionControllableEsa))
+	esa, err := e.dem.device(partOf(opts, "demo:evse:dem", conditionControllableEsa))
 	if err != nil {
 		return nil, err
 	}
-	meter, err := device.NewElectricalSensor(part("demo:evse:meter"), electricalSensorDeclarations()...)
+	meter, err := device.NewElectricalSensor(partOf(opts, "demo:evse:meter"), electricalSensorDeclarations()...)
 	if err != nil {
 		return nil, err
 	}

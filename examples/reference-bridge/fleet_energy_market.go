@@ -589,7 +589,7 @@ func (m *demoElectricalMeter) device(opts device.Options) (*device.ElectricalMet
 	if err != nil {
 		return nil, err
 	}
-	sensor, err := device.NewElectricalSensor(part("demo:electricalmeter:sensor"), electricalSensorDeclarations()...)
+	sensor, err := device.NewElectricalSensor(partOf(opts, "demo:electricalmeter:sensor"), electricalSensorDeclarations()...)
 	if err != nil {
 		return nil, err
 	}

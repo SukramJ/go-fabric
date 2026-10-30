@@ -722,7 +722,7 @@ func (r *demoFridge) device(opts device.Options) (*device.Refrigerator, error) {
 	r.mu.Lock()
 	r.alarm = rfadef.WrapOn(fridge.Server(rfadef.ClusterID), nil)
 	r.mu.Unlock()
-	cabinet, err := device.NewTemperatureControlledCabinet(part("demo:fridge:cabinet", conditionCooler), r.cabinet.declarations()...)
+	cabinet, err := device.NewTemperatureControlledCabinet(partOf(opts, "demo:fridge:cabinet", conditionCooler), r.cabinet.declarations()...)
 	if err != nil {
 		return nil, err
 	}
