@@ -22015,7 +22015,7 @@
       "identifier": "CommissionedIdentity",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "controller/ble/scanner.go",
-      "line": 564
+      "line": 579
     },
     {
       "package": "controller/ble",

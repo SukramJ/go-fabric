@@ -2060,7 +2060,7 @@
   },
   {
     "file": "node/observers.go",
-    "line": 49,
+    "line": 50,
     "citation": "FabricManager.ts:253",
     "resolved": "packages/protocol/src/fabric/FabricManager.ts",
     "identifier": "deleted",

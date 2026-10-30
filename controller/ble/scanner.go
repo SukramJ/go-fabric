@@ -430,15 +430,25 @@ func (s *Scanner) finishLocked(w *waiter, err error) {
 	}
 }
 
+// expiry arms the discovery timeout before its waiter becomes visible:
+// a nil channel for no timeout, else one closed when timeout elapses on
+// the scanner's clock. Armed under the scanner's lock together with the
+// waiter, so a test that waits for the waiter and then advances a fake
+// clock (TestBleScannerTimeoutEndsOneDiscovery) cannot run past a timer
+// not yet armed — armed inside wait, after the waiter was counted, the
+// timeout could be set on a clock already advanced and never fire.
+func (s *Scanner) expiry(timeout time.Duration) (expired <-chan struct{}, stop func()) {
+	if timeout <= 0 {
+		return nil, func() {}
+	}
+	ch := make(chan struct{})
+	t := s.clock.AfterFunc(timeout, func() { close(ch) })
+	return ch, func() { t.Stop() }
+}
+
 // wait blocks until w is woken, ctx ends or timeout (0: none) elapses.
 // A timeout and ctx end the waiter alone (:326-345).
-func (s *Scanner) wait(ctx context.Context, w *waiter, timeout time.Duration) error {
-	var expired chan struct{}
-	if timeout > 0 {
-		expired = make(chan struct{})
-		t := s.clock.AfterFunc(timeout, func() { close(expired) })
-		defer t.Stop()
-	}
+func (s *Scanner) wait(ctx context.Context, w *waiter, expired <-chan struct{}) error {
 	select {
 	case <-w.wake:
 		s.mu.Lock()
@@ -490,9 +500,11 @@ func (s *Scanner) Find(ctx context.Context, id discovery.Identifier, timeout tim
 		s.mu.Unlock()
 		return devicesOf(found), nil
 	}
+	expired, stop := s.expiry(timeout)
+	defer stop()
 	w := s.addWaiterLocked(id)
 	s.mu.Unlock()
-	if err := s.wait(ctx, w, timeout); err != nil {
+	if err := s.wait(ctx, w, expired); err != nil {
 		return nil, err
 	}
 	s.mu.Lock()
@@ -541,9 +553,12 @@ func (s *Scanner) FindContinuously(ctx context.Context, id discovery.Identifier,
 			break
 		}
 		s.mu.Lock()
+		expired, stop := s.expiry(remaining)
 		w := s.addWaiterLocked(id)
 		s.mu.Unlock()
-		if err := s.wait(ctx, w, remaining); err != nil {
+		err := s.wait(ctx, w, expired)
+		stop()
+		if err != nil {
 			return nil, err
 		}
 		s.mu.Lock()

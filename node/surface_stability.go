@@ -213,6 +213,7 @@ func (n *Node) announceSurface(ctx context.Context) {
 	})
 	n.persisted.storeConfigVersions(ctx, topo, versions)
 	at := n.cfg.Clock.Now()
+	announced := make([]surface.SurfaceChange, 0, len(drifts))
 	for i := range drifts {
 		d := &drifts[i]
 		if !d.ep.IsRoot() && !d.ep.IsAggregator() {
@@ -227,7 +228,9 @@ func (n *Node) announceSurface(ctx context.Context) {
 			}
 		}
 		n.persisted.storeSurface(ctx, d.storeKey, d.surface)
-		n.recordChange(surface.SurfaceChange{Endpoint: d.key, Before: d.before, After: d.after, Changes: d.changes, At: at})
+		change := surface.SurfaceChange{Endpoint: d.key, Before: d.before, After: d.after, Changes: d.changes, At: at}
+		n.recordChange(change)
+		announced = append(announced, change)
 		lines := make([]string, 0, len(d.changes))
 		for _, ch := range d.changes {
 			lines = append(lines, ch.String())
@@ -238,6 +241,17 @@ func (n *Node) announceSurface(ctx context.Context) {
 			slog.String("from", hex.EncodeToString(d.before[:])[:12]),
 			slog.String("to", hex.EncodeToString(d.after[:])[:12]),
 			slog.Any("changed", lines))
+	}
+	// The observers run last, once every change is recorded and logged:
+	// an observer that reads Node.Surface sees the whole announcement.
+	obs := n.observerList()
+	for i := range announced {
+		c := &announced[i]
+		for _, o := range obs {
+			if fn := o.OnSurfaceChanged; fn != nil {
+				observe(n.logger, "surface_changed", func() error { return fn(*c) })
+			}
+		}
 	}
 }
 

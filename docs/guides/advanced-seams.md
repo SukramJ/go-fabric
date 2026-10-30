@@ -26,6 +26,7 @@ A host names none of the packages below for these:
 | The commissioning window | `Node.Window()`: open, kind (`WindowOwn`, `WindowBasic`, `WindowEnhanced`), advertised discriminator and mode, opened-at, deadline and timeout on the node's clock — the value `OnWindowTransition` receives; `Node.OpenBasicWindow` |
 | Health | `Config.Health{Interval, OnSample}`, `Node.Health`, `Node.LocalAddr` |
 | Fabrics | `Node.FabricInfos`, `Node.RemoveFabric`, `Config.Observers`, and `Node.Observe` for hooks registered on a running node |
+| The served surface | `Node.Surface()`: the policies' digest, level, profiles, extensions, the effective surface, every decision, the withheld elements and the announced changes; `Observers.OnSurfaceChanged` for each change as it is announced |
 | Sessions | `Node.SessionDiagnostics()`: each session's id, fabric, peer and local node id, PASE or CASE, subscription count, last activity and idle ages, the session intervals the peer reported in its handshake (`PeerIdleInterval`, `PeerActiveInterval`, `PeerActiveThreshold`), and the session table's occupancy — read-only; `Node.Clock()` for ages a host computes itself |
 | UniqueID | `Node.UniqueID`; `Config.BootID.RotateUniqueIDs` for the development rotation |
 | The served topology | `Node.Topology()`: the Aggregator's endpoint and each bridged device's key, endpoint, device type and its revision, name, reachability, mounted clusters (id, schema name, revision: `node.ClusterInfo`) and parts (`node.BridgeTopology`, `node.BridgedDevice`) |

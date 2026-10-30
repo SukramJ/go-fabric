@@ -245,8 +245,20 @@ func TestSurfaceChangeInProcess(t *testing.T) {
 	ep := bridged(t, run.n, "thermo")
 	const identify uint32 = 0x0003
 	desc, therm, ident := ep.ClusterDataVersion(0x001D), ep.ClusterDataVersion(thermostatdef.ClusterID), ep.ClusterDataVersion(identify)
+	var observed []surface.SurfaceChange
+	unobserve := run.n.Observe(node.Observers{OnSurfaceChanged: func(c surface.SurfaceChange) error {
+		observed = append(observed, c)
+		return nil
+	}})
+	defer unobserve()
 	if err := run.n.Aggregator().Replace(context.Background(), endpoint.StringKey("thermo"), thermostat(t, "thermo", true, &p)); err != nil {
 		t.Fatal(err)
+	}
+	// The observer saw the one change the report lists, after it was
+	// recorded: the same endpoint, digests and element changes.
+	if rep := run.n.Surface(); len(observed) != 1 || len(rep.Changed) != 1 || observed[0].Endpoint != "thermo" ||
+		observed[0].Before != rep.Changed[0].Before || observed[0].After != rep.Changed[0].After || len(observed[0].Changes) == 0 {
+		t.Fatalf("observed %+v, report %+v", observed, rep.Changed)
 	}
 	ep = bridged(t, run.n, "thermo")
 	if ep.ClusterDataVersion(0x001D) == desc || ep.ClusterDataVersion(thermostatdef.ClusterID) == therm {

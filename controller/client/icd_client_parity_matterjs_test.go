@@ -707,6 +707,11 @@ func TestIcdClientParity(t *testing.T) {
 			for range 10 {
 				p.advance(t, 200*time.Millisecond)
 			}
+			// Under load the recreate's exchanges may still be in flight
+			// after the tenth step (seen in the race job of #346): wait for
+			// the subscription to be established — matter.js's settled()
+			// after each advance — before reading the deadline.
+			p.eventually(t, "the recreated subscription", p.node.SubscriptionActive)
 			if _, ok := p.icd().NextExpectedCheckIn(); ok {
 				t.Fatal("a deadline while subscribed")
 			}

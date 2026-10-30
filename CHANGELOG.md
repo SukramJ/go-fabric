@@ -10,6 +10,15 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+### Added
+
+- `node.Observers.OnSurfaceChanged`: runs once per endpoint whose served surface an assembly changed against the persisted one, after the node raised the ConfigurationVersions, bumped the DataVersions, stored the surface and recorded the change (`Node.Surface().Changed`), with the `surface.SurfaceChange`. A host mirrors the announcement to its own pages (go-fabric-ui's `surface_changed`) without polling the report.
+
+### Fixed
+
+- `controller/ble`: a discovery's timeout timer is armed before its waiter is visible to the scanner (`Scanner.expiry`), so a fake clock advanced right after the waiter appeared cannot leave the timer unarmed — the `TestBleScannerTimeoutEndsOneDiscovery` hang of #306. No behaviour change on a real clock.
+- `controller/client` `TestIcdClientParity/availability/has_no_nextExpectedCheckin_while_subscribed` waits for the recreated subscription to be established before reading the deadline (race-job flake, #306).
+
 ## [0.15.3] — 2026-10-30
 
 ### Added
