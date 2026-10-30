@@ -35,6 +35,11 @@ this repository.
 | **Inherited** | Taken from matter.js, which encodes it after their own interop testing. Not independently reproduced here. |
 | **Reported** | Third-party report we act on but have not reproduced. |
 
+The device-side controller profiles that act on these observations
+(`surface.Profile`, the daemon's `--profile`) live in the evidence register
+[`notes/parity/controller_profiles.md`](https://github.com/SukramJ/go-fabric/blob/main/notes/parity/controller_profiles.md),
+with the same confidence levels; only a *Reproduced* row removes an element.
+
 A finding does not become more true by being acted on. Several entries below
 are Inherited or Reported and shape real code; that is a deliberate choice to
 follow the gold standard rather than re-derive it, not a claim of measurement.
