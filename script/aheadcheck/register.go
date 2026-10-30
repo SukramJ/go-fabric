@@ -35,6 +35,9 @@ type row struct {
 	noMarker bool
 	// problem is a malformed marker cell, reported as a finding.
 	problem string
+	// surface is the row's measured surface column: "yes", "no", or ""
+	// when the table has no such column.
+	surface string
 }
 
 var (
@@ -56,7 +59,7 @@ func parseRegister(doc string) ([]row, error) {
 		return nil, fmt.Errorf("no heading %q", registerHeading)
 	}
 	var rows []row
-	colEntry, colFile, colText := -1, -1, -1
+	colEntry, colFile, colText, colSurface := -1, -1, -1, -1
 	inTable := false
 	for i := start + 1; i < len(lines); i++ {
 		l := strings.TrimSpace(lines[i])
@@ -76,6 +79,8 @@ func parseRegister(doc string) ([]row, error) {
 					colFile = c
 				case "marker text":
 					colText = c
+				case "surface":
+					colSurface = c
 				}
 			}
 			if colEntry < 0 || colFile < 0 || colText < 0 {
@@ -90,7 +95,11 @@ func parseRegister(doc string) ([]row, error) {
 		if len(cells) <= max(colEntry, colFile, colText) {
 			return nil, fmt.Errorf("line %d: %d cells, want at least %d", i+1, len(cells), max(colEntry, colFile, colText)+1)
 		}
-		rows = append(rows, parseRow(cells[colEntry], cells[colFile], cells[colText], i+1))
+		r := parseRow(cells[colEntry], cells[colFile], cells[colText], i+1)
+		if colSurface >= 0 {
+			r.surface = surfaceCell(&r, cells, colSurface)
+		}
+		rows = append(rows, r)
 	}
 	if !inTable {
 		return nil, errors.New("no register table after " + registerHeading)
@@ -147,6 +156,20 @@ func parseRow(entry, fileCell, textCell string, line int) row {
 		r.markers = append(r.markers, texts[i])
 	}
 	return r
+}
+
+// surfaceCell reads the row's surface column: "yes" or "no". Any other
+// value, or a missing cell, is a problem of the row (the marker cells'
+// problem stays first).
+func surfaceCell(r *row, cells []string, col int) string {
+	v := ""
+	if col < len(cells) {
+		v = strings.ToLower(strings.Trim(cells[col], "` "))
+	}
+	if v != "yes" && v != "no" && r.problem == "" {
+		r.problem = fmt.Sprintf("surface is %q, want yes or no", v)
+	}
+	return v
 }
 
 // splitRow splits a Markdown table row into trimmed cells. A '|' inside a
