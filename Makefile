@@ -299,6 +299,12 @@ CHIP_TEST_IMAGE_COMMIT ?= 6170af8461b10b1766044122ac83332c6d00ab20
 # parity/schema.json's revision.
 CHIP_DATA_MODEL_VERSION ?= 1.6.1
 
+# The data_model directories the specification-level cross-check reads
+# (internal/chipdm TestChipDataModelLevels, ADR 0015 addendum 2026-10-30):
+# one per level in parity/levels that connectedhomeip has at the pin. 1.6.0
+# has none and is skipped (internal/chipdm LevelsWithoutDataModel).
+CHIP_LEVEL_DATA_MODELS ?= 1.4 1.4.1 1.4.2 1.5.1 1.6.1
+
 .PHONY: chiptool-extract
 chiptool-extract: ## copy chip-tool out of the pinned chip-cert-bins image into ./bin (arm64 hosts; ~2.5 GiB pull)
 	@# The image publishes arm64 manifests only. On any other host the pull
@@ -331,7 +337,7 @@ CHIP_ROOT ?= $(if $(GIT_COMMON_DIR),$(abspath $(dir $(GIT_COMMON_DIR))../connect
 
 .PHONY: chiptool-setup
 chiptool-setup: ## sparse connectedhomeip checkout at the harness image's CHIP commit (source to read, nothing to build)
-	script/chiptool-setup.sh "$(CHIP_TEST_IMAGE_COMMIT)" "$(CHIP_ROOT)" "data_model/$(CHIP_DATA_MODEL_VERSION)"
+	script/chiptool-setup.sh "$(CHIP_TEST_IMAGE_COMMIT)" "$(CHIP_ROOT)" "data_model/$(CHIP_DATA_MODEL_VERSION)" $(addprefix data_model/,$(CHIP_LEVEL_DATA_MODELS))
 
 .PHONY: chipdm-check
 chipdm-check: ## run the CHIP data model cross-check against CHIP_ROOT; fails instead of skipping without the checkout

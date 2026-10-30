@@ -147,6 +147,10 @@ func parseXMLDocument(data []byte, filename string) (*xmlNode, error) {
 // xmlLoader accumulates one data model directory.
 type xmlLoader struct {
 	model Model
+	// idsOnly: a device type whose requirements do not load is kept with
+	// its id and name (the level cross-check reads presence only, from
+	// data model versions the full loader was not written for).
+	idsOnly bool
 }
 
 func (l *xmlLoader) uncompared(aspect string, n int) {
@@ -182,6 +186,9 @@ func (l *xmlLoader) addFile(dir, filename string, data []byte) error {
 		}
 	case "device_types":
 		dt, err := loadDeviceType(root, filename)
+		if err != nil && l.idsOnly {
+			dt, err = deviceTypeID(root, filename)
+		}
 		if err != nil {
 			return err
 		}
@@ -502,6 +509,19 @@ func loadDatatype(n *xmlNode) (*Element, error) {
 		return e, nil
 	}
 	return nil, fmt.Errorf("unsupported data type element <%s>", n.tag())
+}
+
+// deviceTypeID reads a device type's id and name only.
+func deviceTypeID(root *xmlNode, filename string) (*DeviceType, error) {
+	name, err := nameOf(root)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", filename, err)
+	}
+	id, err := root.num("id")
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", filename, err)
+	}
+	return &DeviceType{ID: id, Name: name}, nil
 }
 
 func loadDeviceType(root *xmlNode, filename string) (*DeviceType, error) {

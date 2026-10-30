@@ -68,13 +68,19 @@ func DataModelVersion(revision string) string {
 // LoadFiles builds the CHIP model from one data model directory's files,
 // keyed by their path below it ("clusters/OnOff.xml"). Namespaces are not
 // read: the snapshot carries no semantic namespaces to compare them with.
-func LoadFiles(files map[string][]byte) (*Model, error) {
+func LoadFiles(files map[string][]byte) (*Model, error) { return loadFiles(files, false) }
+
+// LoadLevelFiles is [LoadFiles] for the level cross-check: a device type
+// whose requirements do not load is kept with its id and name.
+func LoadLevelFiles(files map[string][]byte) (*Model, error) { return loadFiles(files, true) }
+
+func loadFiles(files map[string][]byte, idsOnly bool) (*Model, error) {
 	names := make([]string, 0, len(files))
 	for name := range files {
 		names = append(names, name)
 	}
 	sort.Strings(names)
-	l := &xmlLoader{}
+	l := &xmlLoader{idsOnly: idsOnly}
 	found := 0
 	for _, name := range names {
 		dir, file := path.Split(name)
@@ -135,6 +141,16 @@ func TreeID(root, commit, version string) (string, error) {
 // reads the commit's tree, and a blobless partial clone fetches the blobs
 // it lacks — and reduces it to the compared model.
 func ReadChipModel(root, commit, version string) (*ChipModel, error) {
+	return readChipModel(root, commit, version, LoadFiles)
+}
+
+// ReadChipLevelModel is [ReadChipModel] for the level cross-check
+// ([LoadLevelFiles]).
+func ReadChipLevelModel(root, commit, version string) (*ChipModel, error) {
+	return readChipModel(root, commit, version, LoadLevelFiles)
+}
+
+func readChipModel(root, commit, version string, load func(map[string][]byte) (*Model, error)) (*ChipModel, error) {
 	tree, err := TreeID(root, commit, version)
 	if err != nil {
 		return nil, err
@@ -147,7 +163,7 @@ func ReadChipModel(root, commit, version string) (*ChipModel, error) {
 	if err != nil {
 		return nil, err
 	}
-	model, err := LoadFiles(files)
+	model, err := load(files)
 	if err != nil {
 		return nil, err
 	}
