@@ -24,8 +24,8 @@ import (
 	_ "modernc.org/sqlite"
 
 	"github.com/SukramJ/go-fabric/cluster/core"
-	tbrmdef "github.com/SukramJ/go-fabric/cluster/spec/threadborderroutermanagement"
 	thermostatdef "github.com/SukramJ/go-fabric/cluster/spec/thermostat"
+	tbrmdef "github.com/SukramJ/go-fabric/cluster/spec/threadborderroutermanagement"
 	tsdef "github.com/SukramJ/go-fabric/cluster/spec/timesynchronization"
 	"github.com/SukramJ/go-fabric/cluster/thermo"
 	"github.com/SukramJ/go-fabric/device"
@@ -251,15 +251,16 @@ type silentBorderRouter struct{}
 
 var errSilent = errors.New("aheadcheck: no border router")
 
-func (silentBorderRouter) BorderRouterName() string                         { return "aheadcheck" }
-func (silentBorderRouter) BorderAgentID(context.Context) ([]byte, error)    { return nil, errSilent }
-func (silentBorderRouter) ThreadVersion(context.Context) (uint16, error)    { return 0, errSilent }
-func (silentBorderRouter) InterfaceEnabled(context.Context) (bool, error)   { return false, errSilent }
-func (silentBorderRouter) Dataset(context.Context, bool) ([]byte, error)    { return nil, errSilent }
-func (silentBorderRouter) SetActiveDataset(context.Context, []byte) error   { return errSilent }
-func (silentBorderRouter) CommitActiveDataset(context.Context) error        { return errSilent }
-func (silentBorderRouter) RevertActiveDataset(context.Context) error        { return errSilent }
-func (silentBorderRouter) SetPendingDataset(context.Context, []byte) error  { return errSilent }
+func (silentBorderRouter) BorderRouterName() string                      { return "aheadcheck" }
+func (silentBorderRouter) BorderAgentID(context.Context) ([]byte, error) { return nil, errSilent }
+func (silentBorderRouter) ThreadVersion(context.Context) (uint16, error) { return 0, errSilent }
+func (silentBorderRouter) InterfaceEnabled(context.Context) (bool, error) { return false, errSilent }
+
+func (silentBorderRouter) Dataset(context.Context, bool) ([]byte, error)   { return nil, errSilent }
+func (silentBorderRouter) SetActiveDataset(context.Context, []byte) error  { return errSilent }
+func (silentBorderRouter) CommitActiveDataset(context.Context) error       { return errSilent }
+func (silentBorderRouter) RevertActiveDataset(context.Context) error       { return errSilent }
+func (silentBorderRouter) SetPendingDataset(context.Context, []byte) error { return errSilent }
 func (silentBorderRouter) Diagnostics(context.Context) (thread.NodeDiagnostics, error) {
 	return thread.NodeDiagnostics{}, errSilent
 }
