@@ -77,9 +77,11 @@ value.
    shipped.
 
 6. **A surface change under a paired controller is announced, never
-   silent.** Each endpoint's surface digest is persisted with its endpoint
-   record; a drift raises `ConfigurationVersion` and the Descriptor's data
-   version and logs the diff. No mode re-allocates endpoint numbers; a
+   silent.** Each endpoint's effective surface and its digest are persisted
+   in the node's settings next to the ConfigurationVersion (amended
+   2026-10-30, wave S4: no endpoint-record or store change); a drift raises
+   `ConfigurationVersion` and the Descriptor's data version and logs the
+   diff. No mode re-allocates endpoint numbers; a
    measured controller profile may ask for one later.
 
 7. **Whole clusters are not gated.** Which clusters reach an endpoint is

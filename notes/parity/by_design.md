@@ -115,6 +115,7 @@ pin lift confirms by re-reading the row, [`pin-lifts.md`](./pin-lifts.md)).
 | BD-chip-JointFabricDatastore-RulesInServer | `JointFabricDatastoreServer.ts:14` is the empty subclass (absence: the class line, 14 lines in all) | `packages/node/src/behaviors/joint-fabric-datastore/JointFabricDatastoreServer.ts` | `"export class JointFabricDatastoreServer extends JointFabricDatastoreBehavior {}"` | connectedhomeip `src/app/server/JointFabricDatastore.cpp` at `6170af84` (the operations :181-2373, `RefreshNode`/`ContinueRefresh` :241-1130, the status codes), `JointFabricDatastore.h` (the capacities :512-517, the delegate :166-285, `MarkEntryCommittedIfFound` :75-85), `src/app/clusters/joint-fabric-datastore-server/joint-fabric-datastore-server.cpp` (the 20 commands :293-785), tests `src/app/server/tests/TestJointFabricDatastore.cpp` | no |
 | BD-chip-JointFabricAdministrator-RulesInServer | `JointFabricAdministratorServer.ts:14` is the empty subclass (absence: the class line, 14 lines in all) | `packages/node/src/behaviors/joint-fabric-administrator/JointFabricAdministratorServer.ts` | `"export class JointFabricAdministratorServer extends JointFabricAdministratorBehavior {}"` | connectedhomeip `src/app/clusters/joint-fabric-administrator-server/joint-fabric-administrator-server.cpp` at `6170af84` (the handlers :172-449), `JCMCommissionee.{h,cpp}`, `src/app/server/JointFabricAdministrator.h`, `src/credentials/jcm/` (`TrustVerification.cpp`, `VendorIdVerificationClient.cpp`), tests `joint-fabric-administrator-server/tests/TestJCMCommissionee.cpp`, `src/credentials/tests/jcm/` | no |
 | BD-chip-JCM-Commissioner | `ControllerCommissioningFlow.ts:576-583` runs `OperationalCredentials.Certificates` right after `OperationalCredentials.DeviceAttestation`, no Joint Commissioning step between (absence: the two step pushes, :573-585) | `packages/protocol/src/peer/ControllerCommissioningFlow.ts` | `"name: \"OperationalCredentials.DeviceAttestation\",\n            stepLogic: () => this.#deviceAttestation(),\n        });\n\n        this.commissioningSteps.push({\n            stepNumber: 11, // includes 11-13"` | connectedhomeip `src/controller/jcm/DeviceCommissioner.cpp` at `6170af84` (:45-550), `src/controller/jcm/AutoCommissioner.{h,cpp}` (the read paths `.h:56-66`), `src/controller/AutoCommissioner.cpp:522-531` (the stage after attestation), tests `src/controller/tests/jcm/TestJCMCommissioner.cpp` | no |
+| BD-Matter-SurfaceChange-ConfigurationVersion | `BasicInformationServer.ts:35-37` leaves the "when" to the application: the version is "seeded to 1 and constrained to only ever increase", and the application bumps it "with `increaseConfigurationVersion`" (`:132`); the only production caller at the pin is the bridged-to-root coupling, `BridgedDeviceBasicInformationServer.ts:86` | `packages/node/src/behaviors/basic-information/BasicInformationServer.ts` | `"node's configuration changes in a way clients should detect, bump it with {@link increaseConfigurationVersion},"` | this module: concept v11 §C.9, ADR 0030 decision 6, wave S4 — the node persists each endpoint's effective surface next to its ConfigurationVersion and raises the bridged and the root ConfigurationVersion (one change, matter.js's coupling) when the surface of a returning endpoint differs (`node/surface_stability.go`) | no |
 
 ---
 
@@ -599,6 +600,45 @@ Pinned by
 `controller/pair_progress_test.go` and `controller/softwareupdate/observe_test.go`.
 
 > **Rule of thumb (CLAUDE.md):** matter.js HEAD is the gold standard for everything under ``. Cluster IDs / revisions / attribute IDs / constraints / defaults / wire shape are taken verbatim. Any item below is a **deliberate** divergence with a documented reason. Bug-class drift (hand-coded revisions etc.) does **not** belong here — it belongs in a fix.
+
+### BD-Matter-SurfaceChange-ConfigurationVersion — a changed surface raises ConfigurationVersion by itself
+
+matter.js provides the mechanism and leaves the trigger to the
+application: `BasicInformationServer.ts:35-37` at `862ad75f` documents
+`ConfigurationVersion` as "seeded to 1 and constrained to only ever
+increase" and tells the application to "bump it with
+`increaseConfigurationVersion`" (the method, `:132`) when "the node's
+configuration changes in a way clients should detect";
+`BridgedDeviceBasicInformationServer.ts:49-59` does the same for a bridged
+node and `:86` raises the bridge's own version in the same change. No
+matter.js code raises either version when a behavior's features or
+elements change — the only production caller at the pin is that coupling
+line (`git grep increaseConfigurationVersion 862ad75f -- packages`, tests
+aside).
+
+go-fabric raises it by itself (concept v11 §C.9, ADR 0030 decision 6,
+wave S4, `node/surface_stability.go`): after every assembly the node
+compares each endpoint's effective surface (`surface.Endpoint.Digest`:
+device types, FeatureMap and the four global lists of every cluster) with
+the one it persisted in its settings next to the ConfigurationVersion
+(`bridged_surface_digest.<key>`, `basic_information.surface_digest`); when
+the same `StableKey` comes back with a different surface, one
+`bridge.Bridge.IncreaseNodeConfigurationVersionWith` change raises the
+changed endpoints' versions and the root's once (matter.js's coupling),
+bumps the Descriptor's and the changed clusters' data versions, records the
+diff in `Report.Changed` and logs one `surface changed` record per
+endpoint. A first assembly persists without raising; a withheld endpoint's
+stored surface is dropped, so its return is a first assembly. The host's
+own `IncreaseConfigurationVersion(s)` is unchanged and adds to it.
+
+Reason: a surface change under a paired controller is exactly the case
+the attribute exists for, and a host cannot see it — the surface is
+composed here, from the host's declaration, the kit's defaults and the
+node's policies. Leaving the trigger to the host would repeat the loom
+0.94.0 incident (an element enabled late, Apple Home loading no data) with
+no signal on the wire. Mirroring matter.js here would mean mirroring an
+absence. Behaviour source: this module; connectedhomeip's bridge example
+was not consulted (not recorded).
 
 ### Idiomatic translations TypeScript → Go (not real divergence)
 
