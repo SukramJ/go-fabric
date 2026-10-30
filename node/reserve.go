@@ -200,7 +200,9 @@ func (a *Aggregator) eraseScope(ctx context.Context, scope string) error {
 // matter.js's `delete()` beside `close()` (endpoint/Endpoint.ts:987-992,
 // :1024-1032 at 862ad75f; ServerEndpointInitializer.ts:59-65
 // eraseDescendant). A key no partition holds and nothing is stored for is
-// no error; a key another partition holds is [ErrUnknownKey].
+// no error; a key another partition holds is [ErrUnknownKey]. A key the
+// specification level withheld loses its withheld record in
+// [Node.Surface].
 func (a *Aggregator) Forget(ctx context.Context, key device.SourceKey) error {
 	return a.Partition(Scope).Forget(ctx, key)
 }
@@ -231,6 +233,9 @@ func (b *Batch) Forget(key device.SourceKey) error {
 		b.dropLocked(part, i, k)
 	}
 	a.mu.Unlock()
+	// A device the level withheld has no endpoint and no number, only
+	// its record in the surface report; Forget drops that too.
+	a.n.dropWithheld(k)
 	op := reservationOp{kind: opErase, key: k}
 	if removed != nil {
 		op.tree = reservationTree(removed.Spec())

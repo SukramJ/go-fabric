@@ -339,6 +339,19 @@ func (n *Node) recordWithheld(ctx context.Context, entries []surfaceEntry) error
 	return first
 }
 
+// dropWithheld forgets the withheld record under key — a Remove or Forget
+// of a device the level withheld, which no partition ever held — and
+// reports whether there was one.
+func (n *Node) dropWithheld(key string) bool {
+	n.withheldMu.Lock()
+	defer n.withheldMu.Unlock()
+	if _, ok := n.withheld[key]; !ok {
+		return false
+	}
+	delete(n.withheld, key)
+	return true
+}
+
 // Surface reports the node's surface: the digest of [Config].Surface, the
 // root's decisions (its ahead-of-matter.js features, [AheadRows]), the
 // effective surface — the root endpoint (key "") from the root's servers,
