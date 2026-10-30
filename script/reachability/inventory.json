@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 7094,
+  "entry_points": 7125,
   "entry_packages": [
     ".",
     "bdx",
@@ -242,6 +242,8 @@
     "script/devicegen",
     "script/docscheck",
     "script/errprefix",
+    "script/levelgen",
+    "script/levelgen/leveltable",
     "script/reachability",
     "script/slogkeys",
     "script/surfacecheck",
@@ -272,9 +274,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 16931,
-    "reachable": 11942,
-    "whitelisted": 4986,
+    "total_exported": 16972,
+    "reachable": 11973,
+    "whitelisted": 4996,
     "unreachable": 3
   },
   "by_package": [
@@ -24711,6 +24713,27 @@
     },
     {
       "package": "device",
+      "identifier": "TestLevelRemovesAnOptionalFeature",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "device/surface_level_test.go",
+      "line": 21
+    },
+    {
+      "package": "device",
+      "identifier": "TestLevelServerInternal",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "device/surface_level_test.go",
+      "line": 96
+    },
+    {
+      "package": "device",
+      "identifier": "TestLevelWithholdsAnUnknownType",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "device/surface_level_test.go",
+      "line": 76
+    },
+    {
+      "package": "device",
       "identifier": "TestLifecycleThroughTheSeam",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/lifecycle_internal_test.go",
@@ -26328,6 +26351,13 @@
     },
     {
       "package": "examples/reference-bridge",
+      "identifier": "TestDaemonAtEveryLevel",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-bridge/surface_level_test.go",
+      "line": 86
+    },
+    {
+      "package": "examples/reference-bridge",
       "identifier": "TestDelayedOffReportsItsCountdown",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/conformance_test.go",
@@ -26654,6 +26684,20 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/fleet_node_test.go",
       "line": 26
+    },
+    {
+      "package": "examples/reference-bridge",
+      "identifier": "TestSpecLevelFlag",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-bridge/surface_level_test.go",
+      "line": 170
+    },
+    {
+      "package": "examples/reference-bridge",
+      "identifier": "TestSpecLevelsDocIsCurrent",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-bridge/surface_level_test.go",
+      "line": 137
     },
     {
       "package": "examples/reference-bridge",
@@ -28890,6 +28934,13 @@
     },
     {
       "package": "internal/chipdm",
+      "identifier": "TestChipDataModelLevels",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "internal/chipdm/levels_test.go",
+      "line": 21
+    },
+    {
+      "package": "internal/chipdm",
       "identifier": "TestChipDataModelPins",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "internal/chipdm/crosscheck_test.go",
@@ -28908,6 +28959,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "internal/chipdm/compare_test.go",
       "line": 464
+    },
+    {
+      "package": "internal/chipdm",
+      "identifier": "TestCompareLevelOnFixtures",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "internal/chipdm/levels_test.go",
+      "line": 69
     },
     {
       "package": "internal/chipdm",
@@ -28950,6 +29008,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "internal/chipdm/support_test.go",
       "line": 193
+    },
+    {
+      "package": "internal/chipdm",
+      "identifier": "TestLevelAcknowledgedEntries",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "internal/chipdm/levels_test.go",
+      "line": 115
     },
     {
       "package": "internal/chipdm",
@@ -32695,6 +32760,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/spake2/spake2_test.go",
       "line": 69
+    },
+    {
+      "package": "surface",
+      "identifier": "Level",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "surface/level.go",
+      "line": 21
     },
     {
       "package": "thread",
