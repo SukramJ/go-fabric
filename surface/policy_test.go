@@ -185,7 +185,7 @@ func TestReportJSON(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.HasPrefix(string(b), `{"decisions":[{"cluster":0,"endpoint":"light","id":256,"kind":"device-type","mandatory":true,"origin":"device-type","policy":"","reason":"","reference":"","verdict":"keep"}`) {
+	if !strings.HasPrefix(string(b), `{"decisions":[{"cluster":"0x0000","endpoint":"light","id":"0x0100","kind":"device-type","mandatory":true,"origin":"device-type","policy":"","reason":"","reference":"","verdict":"keep"}`) {
 		t.Fatalf("report JSON: %s", b)
 	}
 	var back surface.Report

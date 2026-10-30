@@ -73,8 +73,10 @@ func (o *Origin) UnmarshalText(b []byte) error { return unmarshalEnum(originName
 // Reference is the reference an element is served against: matter.js's
 // baseline, or an entry of the "Ahead of matter.js" register.
 type Reference struct {
-	// Ahead is the register ID; "" is the matter.js baseline. Every
-	// element is baseline in this phase.
+	// Ahead is the register ID; "" is the matter.js baseline. The device
+	// layer and the node set it from the servers' [AheadSet] declarations;
+	// the built-in reference policy refuses it unless
+	// [Policies].Extensions enables the row.
 	Ahead string
 }
 
