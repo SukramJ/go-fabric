@@ -97,6 +97,7 @@ type flags struct {
 	dumpSurface                                bool
 	extensions                                 string
 	specLevel                                  string
+	profiles                                   string
 }
 
 func parseFlags() flags {
@@ -127,7 +128,8 @@ func parseFlags() flags {
 	flag.StringVar(&f.otbr, "otbr", "", "add a ThreadBorderRouter endpoint over the OpenThread Border Router's REST API at this URL (\"http://[fd00::1]:8081\"); off when empty; see otbr.go")
 	flag.BoolVar(&f.media, "media", false, "TESTING ONLY: add a simulated video player (CastingVideoPlayer) and content app (ContentApp) after chip's tv-app, for the media certification families; see media.go")
 	flag.StringVar(&f.specLevel, "spec-level", "", "the Matter specification level to compose at (surface.Policies.Level): one of the revisions matter.js has shipped, "+levelList()+"; the default is the pin's. Optional elements the level does not know are removed, devices whose type it does not know are withheld and logged, behaviour and ClusterRevision stay the pin's; an unknown level stops the daemon with the list; see surface.go")
-	flag.BoolVar(&f.dumpSurface, "dump-surface", false, "print the node's served surface — the assembled effective surface of the root, the Aggregator and every endpoint, the clusters the endpoint assembler mounts included, the surface policies' digest and every decision (package surface) — as JSON on stdout and exit, composed as the other flags say on an in-memory store and assembled by starting the node on a loopback UDP port the system assigns, then stopping it: no mDNS record is published and the --db store is not opened; see surface.go")
+	flag.StringVar(&f.profiles, "profile", "", "comma-separated controller profiles to compose for (surface.Policies.Profiles): "+profileList()+". A profile removes only what a Reproduced row of notes/parity/controller_profiles.md names and logs every other row that names a served element as a warning decision; a profile's level applies when --spec-level is not set; an unknown profile stops the daemon with the list; see surface.go")
+	flag.BoolVar(&f.dumpSurface, "dump-surface", false, "print the node's served surface — the assembled effective surface of the root, the Aggregator and every endpoint, the clusters the endpoint assembler mounts included, the surface policies' digest, the selected profiles, the effective level and its origin (explicit, profile <name> or pin) and every decision (package surface) — as JSON on stdout and exit, composed as the other flags say on an in-memory store and assembled by starting the node on a loopback UDP port the system assigns, then stopping it: no mDNS record is published and the --db store is not opened; see surface.go")
 	flag.Parse()
 	return f
 }
