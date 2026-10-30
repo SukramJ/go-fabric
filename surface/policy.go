@@ -83,9 +83,23 @@ type Policies struct {
 	// cluster it does not know ([ErrWithheld]). "" is the pin's level,
 	// which changes nothing.
 	Level Level
+	// Profiles are the controller profiles the operator selects, by name
+	// ([Profiles], [ProfileByName]): one built-in policy "profile:<name>"
+	// per profile, judged after the level policy, removes what a
+	// Reproduced row of the register names (a mandatory element is kept)
+	// and records a warning for every other row that names an element. A
+	// profile's level applies when Level is "". An unknown name fails
+	// [Policies.Validate] ([ErrUnknownProfile]), and so do two profiles
+	// with different levels and no explicit Level
+	// ([ErrProfileLevelConflict]).
+	Profiles []string
 	// Custom are the host's own policies, judged in order after the
 	// built-in ones.
 	Custom []Policy
+
+	// injected are profiles package surfacetest adds through
+	// internal/surfaceseam: known beside the register's.
+	injected []Profile
 }
 
 // policiesDigestDomain opens the digest's input, so a change of the
@@ -93,10 +107,12 @@ type Policies struct {
 const policiesDigestDomain = "go-fabric surface.Policies v2\n"
 
 // Digest identifies the policies: the SHA-256 over the enabled extensions,
-// sorted, the level when it is not the pin's, then every custom policy's
-// kind, name and description, in order. The zero value has a fixed
-// digest, and a Level naming the pin's level has the same one: the two
-// compose alike. A device carries the digest of the policies it was
+// sorted, the effective level when it is not the pin's, the selected
+// profile names, sorted, then every custom policy's kind, name and
+// description, in order. The zero value has a fixed digest, and a Level
+// naming the pin's level has the same one: the two compose alike. A
+// profile the register lists is identified by its name; one package
+// surfacetest injected also by its rules. A device carries the digest of the policies it was
 // composed under, and a node refuses a device whose digest is not its own.
 func (p Policies) Digest() [32]byte {
 	var b strings.Builder
@@ -106,6 +122,16 @@ func (p Policies) Digest() [32]byte {
 	}
 	if l := p.EffectiveLevel(); l != PinLevel() {
 		fmt.Fprintf(&b, "level\x00%s\n", l)
+	}
+	for _, name := range p.profileNames() {
+		fmt.Fprintf(&b, "profile\x00%s", name)
+		for _, q := range p.injected {
+			if q.Name == name {
+				fmt.Fprintf(&b, "\x00injected\x00%s", q.describe())
+				break
+			}
+		}
+		b.WriteByte('\n')
 	}
 	for _, pol := range p.Custom {
 		name, desc := "<nil>", ""
@@ -122,10 +148,15 @@ func (p Policies) Digest() [32]byte {
 
 // chain is every policy, in the order they judge: the built-in reference
 // policy, the built-in level policy — built over the candidates, so it
-// judges each cluster's features as a set — then the custom ones.
+// judges each cluster's features as a set — one built-in profile policy
+// per selected profile, sorted by name, then the custom ones.
 func (p Policies) chain(candidates []Element) []Policy {
-	chain := make([]Policy, 0, 2+len(p.Custom))
+	profiles := p.selectedProfiles()
+	chain := make([]Policy, 0, 2+len(profiles)+len(p.Custom))
 	chain = append(chain, referencePolicy{enabled: p.Extensions}, newLevelPolicy(p.EffectiveLevel(), candidates))
+	for _, q := range profiles {
+		chain = append(chain, profilePolicy{profile: q})
+	}
 	return append(chain, p.Custom...)
 }
 
@@ -254,8 +285,14 @@ func Evaluate(candidates []Element, p Policies) (kept []Element, decisions []Dec
 type Report struct {
 	Policies [32]byte
 	// Level is the specification level the surface was composed at: the
-	// pin's when [Policies].Level is "".
-	Level     Level
+	// pin's when neither [Policies].Level nor a selected profile sets one.
+	Level Level
+	// LevelOrigin names where Level comes from ([Policies.LevelOrigin]):
+	// "explicit", "profile <name>[, <name>…]" or "pin".
+	LevelOrigin string
+	// Profiles are the selected controller profiles ([Policies].Profiles),
+	// sorted, each once.
+	Profiles  []string
 	Effective Surface
 	// Decisions has at least one row per candidate element ([Evaluate]).
 	Decisions []Decision
@@ -282,8 +319,8 @@ type Reporter interface {
 // Clone returns a deep copy of r.
 func (r Report) Clone() Report {
 	out := Report{
-		Policies: r.Policies, Level: r.Level, Effective: r.Effective.Clone(),
-		Decisions: slices.Clone(r.Decisions), Withheld: slices.Clone(r.Withheld),
+		Policies: r.Policies, Level: r.Level, LevelOrigin: r.LevelOrigin, Profiles: slices.Clone(r.Profiles),
+		Effective: r.Effective.Clone(), Decisions: slices.Clone(r.Decisions), Withheld: slices.Clone(r.Withheld),
 		Assembled: r.Assembled,
 	}
 	if r.Changed != nil {
@@ -299,13 +336,15 @@ func (r Report) Clone() Report {
 // The wire forms of a report, fields in the order of their JSON keys.
 type (
 	wireReport struct {
-		Assembled bool                `json:"assembled"`
-		Changed   []wireSurfaceChange `json:"changed"`
-		Decisions []wireDecision      `json:"decisions"`
-		Effective wireSurface         `json:"effective"`
-		Level     string              `json:"level"`
-		Policies  string              `json:"policies"`
-		Withheld  []wireElement       `json:"withheld"`
+		Assembled   bool                `json:"assembled"`
+		Changed     []wireSurfaceChange `json:"changed"`
+		Decisions   []wireDecision      `json:"decisions"`
+		Effective   wireSurface         `json:"effective"`
+		Level       string              `json:"level"`
+		LevelOrigin string              `json:"level_origin"`
+		Policies    string              `json:"policies"`
+		Profiles    []string            `json:"profiles"`
+		Withheld    []wireElement       `json:"withheld"`
 	}
 	wireElement struct {
 		Cluster   id32   `json:"cluster"`
@@ -348,16 +387,19 @@ func (w wireElement) value() Element {
 // [Surface.MarshalJSON], the policies' digest in hex, the decisions and
 // withheld elements in their order, their ids in hex as wide as their kind
 // says (a feature's mask eight digits), and the announced changes, their
-// digests in hex and their time in RFC 3339.
+// digests in hex and their time in RFC 3339; the selected profiles and
+// the level's origin.
 func (r Report) MarshalJSON() ([]byte, error) {
 	w := wireReport{
-		Assembled: r.Assembled,
-		Changed:   make([]wireSurfaceChange, 0, len(r.Changed)),
-		Decisions: make([]wireDecision, 0, len(r.Decisions)),
-		Effective: r.Effective.wire(true),
-		Level:     string(r.Level),
-		Policies:  hex.EncodeToString(r.Policies[:]),
-		Withheld:  make([]wireElement, 0, len(r.Withheld)),
+		Assembled:   r.Assembled,
+		Changed:     make([]wireSurfaceChange, 0, len(r.Changed)),
+		Decisions:   make([]wireDecision, 0, len(r.Decisions)),
+		Effective:   r.Effective.wire(true),
+		Level:       string(r.Level),
+		LevelOrigin: r.LevelOrigin,
+		Policies:    hex.EncodeToString(r.Policies[:]),
+		Profiles:    append(make([]string, 0, len(r.Profiles)), r.Profiles...),
+		Withheld:    make([]wireElement, 0, len(r.Withheld)),
 	}
 	for _, d := range r.Decisions {
 		e := elementWire(d.Element)
@@ -386,8 +428,14 @@ func (r *Report) UnmarshalJSON(b []byte) error {
 	if err != nil || len(digest) != len(r.Policies) {
 		return fmt.Errorf("surface: report policies %q is no SHA-256 digest", w.Policies)
 	}
-	out := Report{Level: Level(w.Level), Effective: w.Effective.value(), Assembled: w.Assembled}
+	out := Report{
+		Level: Level(w.Level), LevelOrigin: w.LevelOrigin, Profiles: w.Profiles,
+		Effective: w.Effective.value(), Assembled: w.Assembled,
+	}
 	copy(out.Policies[:], digest)
+	if len(out.Profiles) == 0 {
+		out.Profiles = nil
+	}
 	for _, c := range w.Changed {
 		v, err := c.value()
 		if err != nil {

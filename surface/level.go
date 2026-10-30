@@ -69,21 +69,27 @@ func PinLevel() Level {
 	return ls[len(ls)-1]
 }
 
-// EffectiveLevel is the level p composes at: [Policies].Level, the pin's
-// when it is "".
+// EffectiveLevel is the level p composes at: [Policies].Level when it is
+// set, else the level the selected [Policies].Profiles agree on, else the
+// pin's ([Policies.LevelOrigin] names which).
 func (p Policies) EffectiveLevel() Level {
-	if p.Level == "" {
-		return PinLevel()
+	if p.Level != "" {
+		return p.Level
 	}
-	return p.Level
+	if l, _, ok := p.profileLevel(); ok && l != "" {
+		return l
+	}
+	return PinLevel()
 }
 
 // Validate rejects a level [schema.Levels] does not list:
-// [ErrLevelAbovePin] for one above the pin, [ErrUnknownLevel] otherwise.
-// device.New and node.New call it first.
+// [ErrLevelAbovePin] for one above the pin, [ErrUnknownLevel] otherwise;
+// then a profile name the register does not list ([ErrUnknownProfile]),
+// and two selected profiles with different levels when Level is ""
+// ([ErrProfileLevelConflict]). device.New and node.New call it first.
 func (p Policies) Validate() error {
 	if p.Level == "" || slices.Contains(schema.Levels(), p.Level) {
-		return nil
+		return p.validateProfiles()
 	}
 	names := make([]string, 0, len(schema.Levels()))
 	for _, l := range schema.Levels() {

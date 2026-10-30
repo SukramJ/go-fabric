@@ -71,6 +71,17 @@
 // hand-written server or the endpoint assembler chose itself. The served
 // ClusterRevision stays the pin's.
 //
+// The third axis is the controller profile ([Policies].Profiles, concept
+// v11 §C.6, ADR 0030 decision 8): what a named controller ecosystem
+// tolerates. The [Profiles] are generated from the evidence register
+// notes/parity/controller_profiles.md (script/profilegen); each selected
+// profile is a built-in policy "profile:<name>", judged after the level
+// policy. Only a row of the confidence [Reproduced] removes an element
+// (the chain keeps a mandatory one); a Reported or Inherited row keeps it
+// with a warning decision. A profile may imply a level, which applies when
+// [Policies].Level is "" ([Policies.LevelOrigin]). A profile without a
+// Reproduced row removes nothing.
+//
 // A surface that changes under a paired controller is announced (ADR 0030
 // decision 6, concept v11 §C.9): a node persists every endpoint's
 // effective surface, raises the ConfigurationVersion when an endpoint

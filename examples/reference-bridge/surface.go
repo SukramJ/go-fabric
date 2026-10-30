@@ -25,9 +25,11 @@ import (
 // surfacePolicies are the daemon's surface policies, the node's and every
 // device's (node.Config.Surface, device.Options.Surface): the
 // "Ahead of matter.js" register rows --extensions names, and
-// BD-chip-Thermostat-Schedules with --thermostat-schedules. Every ID must
-// be one the module declares (device.AheadRows, node.AheadRows); a typo
-// stops the daemon with the list of the known ones.
+// BD-chip-Thermostat-Schedules with --thermostat-schedules; the level
+// --spec-level names; the controller profiles --profile names. Every ID
+// must be one the module declares (device.AheadRows, node.AheadRows), the
+// level one of schema.Levels and every profile one of surface.Profiles; a
+// typo stops the daemon with the list of the known ones.
 func surfacePolicies(f flags) (surface.Policies, error) {
 	known := slices.Concat(device.AheadRows(), node.AheadRows())
 	slices.Sort(known)
@@ -52,10 +54,31 @@ func surfacePolicies(f flags) (surface.Policies, error) {
 	// --spec-level: an operator's setting (concept v11 §C.5); "" is the
 	// pin's level. An unknown level stops the daemon with the list.
 	p.Level = surface.Level(strings.TrimSpace(f.specLevel))
-	if err := p.Validate(); err != nil {
+	if err := (surface.Policies{Level: p.Level}).Validate(); err != nil {
 		return surface.Policies{}, fmt.Errorf("--spec-level: %w", err)
 	}
+	// --profile: an operator's setting (concept v11 §C.6). An unknown
+	// profile, or two whose levels differ without --spec-level, stops the
+	// daemon.
+	for name := range strings.SplitSeq(f.profiles, ",") {
+		if name = strings.TrimSpace(name); name != "" {
+			p.Profiles = append(p.Profiles, name)
+		}
+	}
+	if err := p.Validate(); err != nil {
+		return surface.Policies{}, fmt.Errorf("--profile: %w", err)
+	}
 	return p, nil
+}
+
+// profileList names the selectable controller profiles (surface.Profiles)
+// for the flag's help.
+func profileList() string {
+	names := make([]string, 0, len(surface.Profiles()))
+	for _, p := range surface.Profiles() {
+		names = append(names, p.Name)
+	}
+	return strings.Join(names, ", ")
 }
 
 // levelList names the selectable levels (schema.Levels) for the flag's

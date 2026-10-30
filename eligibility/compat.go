@@ -90,6 +90,11 @@ const amazonEndpointCeiling = 90
 // commissions successfully — and the device is missing from the app, or
 // the whole bridge goes unresponsive. Naming the combination is the only
 // way an operator connects the two.
+//
+// Its device-side twin is the controller profile (surface.Profile,
+// concept v11 §C.6): what an ecosystem tolerates of a node's served
+// surface, generated from the evidence register
+// notes/parity/controller_profiles.md.
 func Compat(fabricVendorIDs []uint16, deviceTypes map[uint16]int, endpointCount int) []CompatFinding {
 	var out []CompatFinding
 

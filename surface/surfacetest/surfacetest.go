@@ -4,12 +4,14 @@
 // Package surfacetest has the policies the tests of a surface policy
 // chain use: one that removes, one that refuses and one that keeps the
 // elements it matches. They prove the chain ([surface.Evaluate]) on a real
-// composition without a built-in policy.
+// composition without a built-in policy. [WithProfiles] gives a
+// surface.Policies value a controller profile the register does not list.
 package surfacetest
 
 import (
 	"fmt"
 
+	"github.com/SukramJ/go-fabric/internal/surfaceseam"
 	"github.com/SukramJ/go-fabric/surface"
 )
 
@@ -74,4 +76,19 @@ func (p policy) Judge(e surface.Element) (v surface.Verdict, reason string) {
 		return surface.Keep, ""
 	}
 	return p.verdict, fmt.Sprintf("%s %s", p.name, p.Describe())
+}
+
+// WithProfiles returns p with profiles known beside the register's
+// (surface.Profiles) and selected in p.Profiles: a test runs a rule the
+// evidence register does not carry — a Reproduced remove — without a
+// register row. A profile named like a register profile shadows it. The
+// policies' digest covers an injected profile's rules, so a device and a
+// node composed with different injected rules do not match.
+func WithProfiles(p surface.Policies, profiles ...surface.Profile) surface.Policies {
+	out, ok := surfaceseam.WithProfiles(p, profiles)
+	if !ok {
+		panic("surfacetest: the surface package installed no profile seam")
+	}
+	q, _ := out.(surface.Policies)
+	return q
 }

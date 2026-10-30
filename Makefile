@@ -440,6 +440,15 @@ generate-matter-schema: ## regenerate parity/schema.json, schema/ and the genera
 # committing. LEVELS_WORKDIR picks where the worktrees go.
 MATTERJS_LEVEL_TAGS ?= v0.13.0 v0.14.0 v0.16.0 v0.17.0 v0.17.9 v0.18.0
 
+# The controller profiles (concept v11 §C.6): surface/profiles_gen.go from
+# the evidence register notes/parity/controller_profiles.md
+# (script/profilegen). go test ./script/profilegen/ fails when the
+# generated file is stale or a row breaks the register's rules — a remove
+# row that is not Reproduced among them.
+.PHONY: generate-profiles
+generate-profiles: ## regenerate surface/profiles_gen.go from notes/parity/controller_profiles.md
+	$(GO) run ./script/profilegen
+
 .PHONY: generate-levels
 generate-levels: ## re-extract every parity/levels/<level>.json from MATTERJS_LEVEL_TAGS, then schema/levels_gen.go (a review decision)
 	@for t in $(MATTERJS_LEVEL_TAGS); do script/generate-level.sh $$t "$(MATTERJS_DIR)" parity/levels || exit $$?; done

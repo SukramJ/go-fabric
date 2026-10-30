@@ -127,6 +127,12 @@ before. The second built-in policy composes at a specification level
 matter.js has shipped, whose table (`schema.Levels`, `schema/levels_gen.go`)
 is generated from matter.js's release tags (`parity/levels/`), never from
 connectedhomeip's XML ([spec levels](reference/spec-levels.md)). The
+third axis is the controller profile (`surface.Policies.Profiles`, the
+daemon's `--profile`), generated from the evidence register
+[`notes/parity/controller_profiles.md`](https://github.com/SukramJ/go-fabric/blob/main/notes/parity/controller_profiles.md):
+only a row of the confidence *Reproduced* removes an element, every other
+row that names a served element is a warning decision in the report, and a
+profile's level applies when no explicit level is set. The
 reference daemon prints its report
 with `--dump-surface`, and `make surface-check` holds it as a committed
 snapshot (`script/surfacecheck`): every change of what the daemon serves

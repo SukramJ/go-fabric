@@ -62,7 +62,7 @@ func compose(t *Type, s *settings, opts Options) ([]contract.ClusterServer, surf
 	if opts.Surface != nil {
 		policies = *opts.Surface
 	}
-	rep := surface.Report{Policies: policies.Digest(), Level: policies.EffectiveLevel()}
+	rep := policies.Report()
 	candidates := candidatesOf(t, s, endpoint.RenderSourceKey(opts.StableKey))
 	for i := range candidates {
 		candidates[i].Levels = surface.ElementLevels(candidates[i])
