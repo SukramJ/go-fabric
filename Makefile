@@ -204,7 +204,8 @@ reachability-check: reachability ## regenerate, then fail if the committed snaps
 .PHONY: surface
 surface: ## regenerate script/surfacecheck/surface.json and summary.md — what a controller sees of the reference daemon
 	@# Builds examples/reference-bridge and runs it with --dump-surface: default
-	@# flags, zero-value surface policies, nothing started (ADR 0030).
+	@# flags, zero-value surface policies, the node started on a loopback port to
+	@# assemble its topology and stopped again (ADR 0030).
 	GO=$(GO) $(GO) run ./script/surfacecheck
 
 .PHONY: surface-check

@@ -105,9 +105,10 @@ func addAll(ctx context.Context, agg *node.Aggregator, eps []node.Endpoint, logg
 const surfaceDB = "file:reference-bridge-surface?mode=memory&cache=shared&_pragma=foreign_keys(1)&_pragma=busy_timeout(5000)"
 
 // dumpSurface composes the node exactly as run() does, on an in-memory
-// store, a scratch OTA directory and without mDNS, writes its surface
-// report (node.Node.Surface) to w and stops the node. Nothing is started:
-// no socket is bound, no record published, --db is not opened.
+// store, a scratch OTA directory and without mDNS, starts it on a
+// loopback port the system assigns so the topology is assembled, writes
+// its surface report (node.Node.Surface, assembled) to w and stops the
+// node. No record is published and --db is not opened.
 func dumpSurface(ctx context.Context, f flags, logger *slog.Logger, passcode uint32, discriminator uint16, tcpConfig node.TCPConfig, w io.Writer) error {
 	dir, err := os.MkdirTemp("", "reference-bridge-surface-")
 	if err != nil {
@@ -124,6 +125,9 @@ func dumpSurface(ctx context.Context, f flags, logger *slog.Logger, passcode uin
 		return err
 	}
 	defer func() { _ = n.Stop(context.WithoutCancel(ctx)) }()
+	if err := n.Start(ctx); err != nil {
+		return fmt.Errorf("--dump-surface: %w", err)
+	}
 	compact, err := json.Marshal(n.Surface())
 	if err != nil {
 		return fmt.Errorf("--dump-surface: %w", err)

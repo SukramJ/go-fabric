@@ -127,7 +127,7 @@ func parseFlags() flags {
 	flag.StringVar(&f.otbr, "otbr", "", "add a ThreadBorderRouter endpoint over the OpenThread Border Router's REST API at this URL (\"http://[fd00::1]:8081\"); off when empty; see otbr.go")
 	flag.BoolVar(&f.media, "media", false, "TESTING ONLY: add a simulated video player (CastingVideoPlayer) and content app (ContentApp) after chip's tv-app, for the media certification families; see media.go")
 	flag.StringVar(&f.specLevel, "spec-level", "", "the Matter specification level to compose at (surface.Policies.Level): one of the revisions matter.js has shipped, "+levelList()+"; the default is the pin's. Optional elements the level does not know are removed, devices whose type it does not know are withheld and logged, behaviour and ClusterRevision stay the pin's; an unknown level stops the daemon with the list; see surface.go")
-	flag.BoolVar(&f.dumpSurface, "dump-surface", false, "print the node's served surface — the effective surface of the root, the Aggregator and every device, the surface policies' digest and every decision (package surface) — as JSON on stdout and exit, composed as the other flags say, before any socket is bound, any mDNS record published or the --db store opened (the composition runs on an in-memory store); see surface.go")
+	flag.BoolVar(&f.dumpSurface, "dump-surface", false, "print the node's served surface — the assembled effective surface of the root, the Aggregator and every endpoint, the clusters the endpoint assembler mounts included, the surface policies' digest and every decision (package surface) — as JSON on stdout and exit, composed as the other flags say on an in-memory store and assembled by starting the node on a loopback UDP port the system assigns, then stopping it: no mDNS record is published and the --db store is not opened; see surface.go")
 	flag.Parse()
 	return f
 }
@@ -288,9 +288,14 @@ func compose(ctx context.Context, f flags, logger *slog.Logger, passcode uint32,
 	applyTestWiFi(&cfg, f, devices)
 	applyMetrics(&cfg, f.metricsExpvar)
 	if dump != nil {
-		// The surface dump touches neither --db nor the network.
+		// The surface dump touches neither --db nor the network: it
+		// starts the node to assemble the topology (bridge.Bridge.Start
+		// assembles before it opens its listener, and no other public
+		// path installs a topology), on a loopback port the system
+		// assigns.
 		cfg.Store = node.Store{DB: dump.db}
 		cfg.Network.MDNS = node.MDNS{Disabled: true}
+		cfg.Network.Listen, cfg.Network.PreferIPv4 = "127.0.0.1:0", true
 	}
 	if f.otaProvider {
 		// The OTA provider with its test image (ota_provider.go), TESTING

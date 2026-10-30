@@ -8,8 +8,9 @@
 // writes
 //
 //   - script/surfacecheck/surface.json — the daemon's surface report as
-//     --dump-surface prints it: the effective surface of the root, the
-//     Aggregator and every device, the policies' digest and every
+//     --dump-surface prints it: the assembled effective surface of the
+//     root, the Aggregator and every endpoint (the clusters the endpoint
+//     assembler mounts included), the policies' digest and every
 //     decision;
 //   - script/surfacecheck/summary.md — the digests, the endpoint and
 //     cluster counts, and the clusters per endpoint.
@@ -95,8 +96,9 @@ func summary(rep surface.Report) []byte {
 	b.WriteString("# Surface snapshot summary\n\n")
 	b.WriteString("What a controller sees of the reference daemon (`examples/reference-bridge --dump-surface`,\n")
 	b.WriteString("default flags, zero-value surface policies). `make surface` regenerates it; `make surface-check`\n")
-	b.WriteString("fails when it moved. The clusters the endpoint assembler mounts on a bridged endpoint\n")
-	b.WriteString("(Descriptor, BridgedDeviceBasicInformation, Identify, Groups, ScenesManagement) are not part of it.\n")
+	b.WriteString("fails when it moved. It is the assembled topology: the clusters the endpoint assembler mounts on a\n")
+	b.WriteString("bridged endpoint (Descriptor, BridgedDeviceBasicInformation, Identify, Groups, ScenesManagement,\n")
+	b.WriteString("Binding) and the BridgedNode device type are part of it.\n")
 	b.WriteString("The effective surface digest is the SHA-256 of the canonical JSON — every id a 0x hex string —\n")
 	b.WriteString("without endpoint numbers, so a change of that encoding moves it as well.\n\n")
 	b.WriteString("| Metric | Value |\n|---|---|\n")
