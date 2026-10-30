@@ -54,6 +54,8 @@ sources; an agent transcribes, the owner decides.
 
 ## 2. Current state: wave 5, PR #49
 
+**2026-10-30:** concept v11 wave S1 (the served surface as a value: `surface/`, `Device.Surface`, `Node.Surface`, `--dump-surface`, `make surface-check`; brief `notes/briefs/2026-10-30-S1-surface-value-and-report.md`, report `notes/briefs/reports/S1.md`) opened from `s1/surface-value` with auto-merge.
+
 PR #49 merged 2026-10-11 20:46 as `5739ee8` (squash); the wave branches
 are to be deleted (below). It was branch `wave/2026-10-11-tranche-5`, base
 `main` at `07d9622` (PR #48). The branch holds, in order: the three agent branches

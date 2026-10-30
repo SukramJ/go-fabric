@@ -128,7 +128,7 @@ Depend freely on `bdx/`, `binding/`, `bootid/`, `bridge/`, `client/…`, `cluste
 `commissioning/`, `contract/`, `controller/…`, `device/`, `diagevent/`,
 `eligibility/`, `endpoint/` (including `endpoint/sqlitestore`), `groups/`,
 `im/`, `im/subscription`, `mdns/`, `node/`,
-`parity/`, `schema/`, `secure/…`, `store/`, `tlv/` and `transport/…`. The
+`parity/`, `schema/`, `secure/…`, `store/`, `surface/`, `tlv/` and `transport/…`. The
 device layer `device/` and the node facade `node/` are public API since
 `v0.3.0`; that release freezes nothing, and the `v1.0.0` freeze is still
 ahead.

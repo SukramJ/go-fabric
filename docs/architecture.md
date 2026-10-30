@@ -101,11 +101,35 @@ The order of [`examples/reference-controller`](https://github.com/SukramJ/go-fab
 A refresh of the snapshot is a review decision; regenerating Go from it is
 mechanical and guarded by tests that fail on drift.
 
+## The served surface
+
+What a controller sees of a node — per endpoint its device types and per
+server cluster its revision, FeatureMap, AttributeList, AcceptedCommandList,
+GeneratedCommandList and events — is a value: [`surface`](https://github.com/SukramJ/go-fabric/tree/main/surface)'s
+`Surface`, canonically ordered, hashable and diffable. The device layer
+decides it before it builds a server: it lists the candidate elements with
+their origin (device type, cluster conformance, host declaration), the
+node's policies (`node.Config.Surface`, the same for every device;
+`device.Options.Surface` must match or `Add` refuses the device) judge
+each one — Refuse over Remove over Keep, a mandatory element never
+removed — and the servers are built from what they keep.
+`Device.Surface()` and `Node.Surface()` report the effective surface, read
+from the built servers through the function the dispatcher serves them
+with, and every decision; the zero-value policies keep everything, so a
+node composes as it did before. The reference daemon prints its report
+with `--dump-surface`, and `make surface-check` holds it as a committed
+snapshot (`script/surfacecheck`): every change of what the daemon serves
+is a review diff. The clusters the endpoint assembler mounts on a bridged
+endpoint (Descriptor, BridgedDeviceBasicInformation, Identify, Groups,
+ScenesManagement) are not part of a device's surface yet.
+[ADR 0030](adr/0030-the-served-surface-is-a-value-under-policies.md)
+records the decision.
+
 ## Package map
 
 | Area | Packages |
 | --- | --- |
-| Facade and composition | `node`, `bridge`, `device`, `endpoint`, `contract` |
+| Facade and composition | `node`, `bridge`, `device`, `endpoint`, `contract`, `surface` (the served surface and its policies) |
 | Clusters | `cluster/core` (the system set), `cluster/spec` (generated definitions), `cluster/media`, `cluster/onoff`, `cluster/levelcontrol`, `cluster/light`, `cluster/measurement`, … |
 | Interaction Model | `im`, `im/subscription` |
 | Security | `secure/...` (PASE, CASE, channel, attestation, setup codes, operational sessions), `commissioning` |
@@ -115,7 +139,7 @@ mechanical and guarded by tests that fail on drift.
 | Persistence | `store`, `endpoint/sqlitestore`, `controller/client/sqlstore` |
 | Codec and model | `tlv`, `schema`, `parity` |
 | Time | `clock` (the time port every package reads), `clock/clocktest` (the test clock) |
-| Test support (public API) | `bridge/bridgetest`, `endpoint/endpointtest`, `clock/clocktest`, `fabrictest` (in-process devices and controllers on an in-memory network) |
+| Test support (public API) | `bridge/bridgetest`, `endpoint/endpointtest`, `surface/surfacetest`, `clock/clocktest`, `fabrictest` (in-process devices and controllers on an in-memory network) |
 
 Everything outside `internal/` is public API under the
 [deprecation window](https://github.com/SukramJ/go-fabric/blob/main/README.md#api-stability),
