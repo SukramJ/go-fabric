@@ -1155,6 +1155,12 @@ func (f *fleet) endpoints() ([]node.Endpoint, error) { //nolint:funlen // the fl
 		errs []error
 	)
 	add := func(ep node.Endpoint, err error) {
+		if errors.Is(err, surface.ErrWithheld) && ep != nil {
+			// Withheld by --spec-level: the node records it at Add
+			// (addAll, surface.go).
+			out = append(out, ep)
+			return
+		}
 		if err != nil {
 			errs = append(errs, err)
 			return

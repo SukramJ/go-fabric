@@ -49,7 +49,7 @@ func (g *demoGarage) device(opts device.Options) (*device.Closure, error) {
 		},
 	})
 	if err != nil {
-		return nil, err
+		return withheldOr(d, err)
 	}
 	g.mu.Lock()
 	g.ctl = d.ClosureControl()
@@ -236,7 +236,7 @@ func (p *demoPanel) device(opts device.Options) (*device.ClosurePanel, error) {
 		},
 	})
 	if err != nil {
-		return nil, err
+		return withheldOr(d, err)
 	}
 	p.mu.Lock()
 	p.srv = d.ClosureDimension()
