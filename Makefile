@@ -204,7 +204,8 @@ reachability-check: reachability ## regenerate, then fail if the committed snaps
 .PHONY: surface
 surface: ## regenerate script/surfacecheck/surface.json and summary.md — what a controller sees of the reference daemon
 	@# Builds examples/reference-bridge and runs it with --dump-surface: default
-	@# flags, zero-value surface policies, nothing started (ADR 0030).
+	@# flags, zero-value surface policies, the node started on a loopback port to
+	@# assemble its topology and stopped again (ADR 0030).
 	GO=$(GO) $(GO) run ./script/surfacecheck
 
 .PHONY: surface-check
@@ -301,9 +302,8 @@ CHIP_DATA_MODEL_VERSION ?= 1.6.1
 
 # The data_model directories the specification-level cross-check reads
 # (internal/chipdm TestChipDataModelLevels, ADR 0015 addendum 2026-10-30):
-# one per level in parity/levels that connectedhomeip has at the pin. 1.6.0
-# has none and is skipped (internal/chipdm LevelsWithoutDataModel).
-CHIP_LEVEL_DATA_MODELS ?= 1.4 1.4.1 1.4.2 1.5.1 1.6.1
+# one per level in parity/levels (DataModelVersion: 1.6.0 reads data_model/1.6).
+CHIP_LEVEL_DATA_MODELS ?= 1.4 1.4.1 1.4.2 1.5.1 1.6 1.6.1
 
 .PHONY: chiptool-extract
 chiptool-extract: ## copy chip-tool out of the pinned chip-cert-bins image into ./bin (arm64 hosts; ~2.5 GiB pull)

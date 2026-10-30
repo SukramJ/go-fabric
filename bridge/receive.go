@@ -851,6 +851,31 @@ func (c *ConfigurationChange) IncreaseConfigurationVersion(scope, deviceAddress 
 	return raised
 }
 
+// IncreaseEndpointConfigurationVersion raises the BridgedDeviceBasicInformation
+// ConfigurationVersion of the one bridged endpoint with number id — not the
+// other endpoints of its physical device, and not the node's, which the
+// enclosing call raises once — marks it dirty and returns its new version;
+// false when no bridged endpoint has that number (the root, the Aggregator
+// and a part carry no BridgedDeviceBasicInformation). The node raises it
+// for an endpoint whose served surface changed (node.Node, ADR 0030
+// decision 6).
+func (c *ConfigurationChange) IncreaseEndpointConfigurationVersion(id uint16) (uint32, bool) {
+	topo := c.b.Topology()
+	if topo == nil {
+		return 0, false
+	}
+	for _, ep := range topo.Bridged() {
+		if ep == nil || ep.ID != id {
+			continue
+		}
+		v := ep.IncreaseConfigurationVersion()
+		markConfigurationVersionDirty(c.b.subscriptionManagerLocked(), id, core.BridgedDeviceBasicInformationClusterID)
+		c.bridged[id] = v
+		return v, true
+	}
+	return 0, false
+}
+
 // IncreaseNodeConfigurationVersionWith runs change, then raises the node's
 // BasicInformation ConfigurationVersion once, however many bridged devices
 // change raised through its [ConfigurationChange] — one logical change of

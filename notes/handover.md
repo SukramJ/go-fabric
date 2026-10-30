@@ -54,6 +54,8 @@ sources; an agent transcribes, the owner decides.
 
 ## 2. Current state: wave 5, PR #49
 
+**2026-10-30:** concept v11 wave S4 (surface stability: the persisted per-endpoint surface, the coupled ConfigurationVersion raise on a change, `Report.Changed` / `Report.Assembled`, the assembled surface snapshot, chipdm level 1.6.0; brief `notes/briefs/2026-10-30-S4-surface-stability.md`, report `notes/briefs/reports/S4.md`) opened from `s4/surface-stability` with auto-merge.
+
 **2026-10-30:** concept v11 wave S3 (the specification level: `parity/levels/` from matter.js tags v0.13.0–v0.18.0, `schema/levels_gen.go`, `surface.Policies.Level` and the level policy, `ErrWithheld`, `--spec-level`, `docs/reference/spec-levels.md`, the chipdm level cross-check; brief `notes/briefs/2026-10-30-S3-spec-level.md`, report `notes/briefs/reports/S3.md`) opened from `s3/spec-level` with auto-merge.
 
 **2026-10-30:** concept v11 wave S2 (the reference policy: `surface.Policies.Extensions`, `ErrExtensionNotEnabled`, the servers' `Ahead` declarations, the register's measured `surface` column, `--extensions`; brief `notes/briefs/2026-10-30-S2-reference-policy.md`, report `notes/briefs/reports/S2.md`) opened from `s2/reference-policy` with auto-merge.

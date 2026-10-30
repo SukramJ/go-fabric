@@ -1,4 +1,6 @@
 {
+  "assembled": true,
+  "changed": [],
   "decisions": [
     {"cluster":"0x00000028","endpoint":"","id":"0x00000028","kind":"cluster","mandatory":true,"origin":"device-type","policy":"","reason":"","reference":"","verdict":"keep"},
     {"cluster":"0x0000001f","endpoint":"","id":"0x0000001f","kind":"cluster","mandatory":true,"origin":"device-type","policy":"","reason":"","reference":"","verdict":"keep"},
@@ -591,10 +593,14 @@
         "deviceTypes": [
           {"id":"0x000e","revision":2}
         ],
-        "key": "aggregator"
+        "key": "aggregator",
+        "number": 1
       },
       {
         "clusters": [
+          {"accepted":["0x00000000","0x00000040"],"attributes":["0x00000000","0x00000001","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000000","generated":[],"id":"0x00000003","revision":6},
+          {"accepted":[],"attributes":["0x00000000","0x00000001","0x00000002","0x00000003","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000000","generated":[],"id":"0x0000001d","revision":3},
+          {"accepted":[],"attributes":["0x00000001","0x00000002","0x00000003","0x00000004","0x00000005","0x0000000e","0x0000000f","0x00000011","0x00000012","0x00000018","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":["0x00000003"],"featureMap":"0x00000000","generated":[],"id":"0x00000039","revision":6},
           {"accepted":[],"attributes":["0x00000000","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000000","generated":[],"id":"0x0000005b","revision":1},
           {"accepted":[],"attributes":["0x00000000","0x00000001","0x00000002","0x00000008","0x00000009","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000001","generated":[],"id":"0x0000040c","revision":5},
           {"accepted":[],"attributes":["0x00000000","0x00000001","0x00000002","0x00000008","0x00000009","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000001","generated":[],"id":"0x0000040d","revision":5},
@@ -609,93 +615,140 @@
           {"accepted":[],"attributes":["0x00000000","0x00000001","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000000","generated":[],"id":"0x00000750","revision":1}
         ],
         "deviceTypes": [
-          {"id":"0x002c","revision":1}
+          {"id":"0x002c","revision":1},
+          {"id":"0x0013","revision":3}
         ],
-        "key": "demo:airquality:1"
+        "key": "demo:airquality:1",
+        "number": 27
       },
       {
         "clusters": [
+          {"accepted":["0x00000000","0x00000040"],"attributes":["0x00000000","0x00000001","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000000","generated":[],"id":"0x00000003","revision":6},
+          {"accepted":[],"attributes":["0x00000000","0x00000001","0x00000002","0x00000003","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000000","generated":[],"id":"0x0000001d","revision":3},
+          {"accepted":[],"attributes":["0x00000001","0x00000002","0x00000003","0x00000004","0x00000005","0x0000000e","0x0000000f","0x00000011","0x00000012","0x00000018","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":["0x00000003"],"featureMap":"0x00000000","generated":[],"id":"0x00000039","revision":6},
           {"accepted":["0x00000000","0x00000001","0x00000002","0x00000005"],"attributes":["0x00000000","0x00000007","0x00000008","0x0000000a","0x0000000b","0x0000000d","0x0000000e","0x00000017","0x0000001a","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000005","generated":[],"id":"0x00000102","revision":8}
         ],
         "deviceTypes": [
-          {"id":"0x0202","revision":7}
+          {"id":"0x0202","revision":7},
+          {"id":"0x0013","revision":3}
         ],
-        "key": "demo:blind:1"
+        "key": "demo:blind:1",
+        "number": 16
       },
       {
         "clusters": [
+          {"accepted":["0x00000000","0x00000040"],"attributes":["0x00000000","0x00000001","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000000","generated":[],"id":"0x00000003","revision":6},
+          {"accepted":[],"attributes":["0x00000000","0x00000001","0x00000002","0x00000003","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000000","generated":[],"id":"0x0000001d","revision":3},
+          {"accepted":[],"attributes":["0x00000001","0x00000002","0x00000003","0x00000004","0x00000005","0x0000000e","0x0000000f","0x00000011","0x00000012","0x00000018","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":["0x00000003"],"featureMap":"0x00000000","generated":[],"id":"0x00000039","revision":6},
           {"accepted":[],"attributes":["0x00000000","0x00000001","0x00000002","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":["0x00000001","0x00000002","0x00000003","0x00000004","0x00000005","0x00000006"],"featureMap":"0x0000001e","generated":[],"id":"0x0000003b","revision":2}
         ],
         "deviceTypes": [
-          {"id":"0x000f","revision":3}
+          {"id":"0x000f","revision":3},
+          {"id":"0x0013","revision":3}
         ],
-        "key": "demo:button:1"
+        "key": "demo:button:1",
+        "number": 21
       },
       {
         "clusters": [
+          {"accepted":["0x00000000","0x00000040"],"attributes":["0x00000000","0x00000001","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000000","generated":[],"id":"0x00000003","revision":6},
+          {"accepted":["0x00000000","0x00000001","0x00000002","0x00000003","0x00000004","0x00000005"],"attributes":["0x00000000","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000001","generated":["0x00000000","0x00000001","0x00000002","0x00000003"],"id":"0x00000004","revision":4},
           {"accepted":["0x00000000","0x00000001","0x00000002","0x00000040","0x00000041","0x00000042"],"attributes":["0x00000000","0x00004000","0x00004001","0x00004002","0x00004003","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000001","generated":[],"id":"0x00000006","revision":6},
           {"accepted":["0x00000000","0x00000001","0x00000002","0x00000003","0x00000004","0x00000005","0x00000006","0x00000007"],"attributes":["0x00000000","0x00000001","0x00000002","0x00000003","0x0000000f","0x00000011","0x00004000","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000003","generated":[],"id":"0x00000008","revision":7},
+          {"accepted":[],"attributes":["0x00000000","0x00000001","0x00000002","0x00000003","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000000","generated":[],"id":"0x0000001d","revision":3},
+          {"accepted":[],"attributes":["0x00000001","0x00000002","0x00000003","0x00000004","0x00000005","0x0000000e","0x0000000f","0x00000011","0x00000012","0x00000018","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":["0x00000003"],"featureMap":"0x00000000","generated":[],"id":"0x00000039","revision":6},
+          {"accepted":["0x00000000","0x00000001","0x00000002","0x00000003","0x00000004","0x00000005","0x00000006","0x00000040"],"attributes":["0x00000001","0x00000002","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000001","generated":["0x00000000","0x00000001","0x00000002","0x00000003","0x00000004","0x00000006","0x00000040"],"id":"0x00000062","revision":1},
           {"accepted":["0x0000000a","0x00000047","0x0000004b","0x0000004c"],"attributes":["0x00000002","0x00000007","0x00000008","0x0000000f","0x00000010","0x00004001","0x0000400a","0x0000400b","0x0000400c","0x0000400d","0x00004010","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000010","generated":[],"id":"0x00000300","revision":9}
         ],
         "deviceTypes": [
-          {"id":"0x010c","revision":5}
+          {"id":"0x010c","revision":5},
+          {"id":"0x0013","revision":3}
         ],
-        "key": "demo:ceiling:1"
+        "key": "demo:ceiling:1",
+        "number": 7
       },
       {
         "clusters": [
+          {"accepted":["0x00000000","0x00000040"],"attributes":["0x00000000","0x00000001","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000000","generated":[],"id":"0x00000003","revision":6},
+          {"accepted":["0x00000000","0x00000001","0x00000002","0x00000003","0x00000004","0x00000005"],"attributes":["0x00000000","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000001","generated":["0x00000000","0x00000001","0x00000002","0x00000003"],"id":"0x00000004","revision":4},
           {"accepted":["0x00000000","0x00000001","0x00000002","0x00000040","0x00000041","0x00000042"],"attributes":["0x00000000","0x00004000","0x00004001","0x00004002","0x00004003","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000001","generated":[],"id":"0x00000006","revision":6},
           {"accepted":["0x00000000","0x00000001","0x00000002","0x00000003","0x00000004","0x00000005","0x00000006","0x00000007"],"attributes":["0x00000000","0x00000001","0x00000002","0x00000003","0x0000000f","0x00000011","0x00004000","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000003","generated":[],"id":"0x00000008","revision":7},
+          {"accepted":[],"attributes":["0x00000000","0x00000001","0x00000002","0x00000003","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000000","generated":[],"id":"0x0000001d","revision":3},
+          {"accepted":[],"attributes":["0x00000001","0x00000002","0x00000003","0x00000004","0x00000005","0x0000000e","0x0000000f","0x00000011","0x00000012","0x00000018","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":["0x00000003"],"featureMap":"0x00000000","generated":[],"id":"0x00000039","revision":6},
+          {"accepted":["0x00000000","0x00000001","0x00000002","0x00000003","0x00000004","0x00000005","0x00000006","0x00000040"],"attributes":["0x00000001","0x00000002","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000001","generated":["0x00000000","0x00000001","0x00000002","0x00000003","0x00000004","0x00000006","0x00000040"],"id":"0x00000062","revision":1},
           {"accepted":["0x00000000","0x00000001","0x00000002","0x00000003","0x00000004","0x00000005","0x00000006","0x00000007","0x00000008","0x00000009","0x0000000a","0x00000040","0x00000041","0x00000042","0x00000043","0x00000044","0x00000047","0x0000004b","0x0000004c"],"attributes":["0x00000000","0x00000001","0x00000002","0x00000003","0x00000004","0x00000007","0x00000008","0x0000000f","0x00000010","0x00004000","0x00004001","0x00004002","0x00004003","0x00004004","0x00004005","0x00004006","0x0000400a","0x0000400b","0x0000400c","0x0000400d","0x00004010","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x0000001f","generated":[],"id":"0x00000300","revision":9}
         ],
         "deviceTypes": [
-          {"id":"0x010d","revision":5}
+          {"id":"0x010d","revision":5},
+          {"id":"0x0013","revision":3}
         ],
-        "key": "demo:colorlight:1"
+        "key": "demo:colorlight:1",
+        "number": 24
       },
       {
         "clusters": [
+          {"accepted":["0x00000000","0x00000040"],"attributes":["0x00000000","0x00000001","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000000","generated":[],"id":"0x00000003","revision":6},
+          {"accepted":[],"attributes":["0x00000000","0x00000001","0x00000002","0x00000003","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000000","generated":[],"id":"0x0000001d","revision":3},
+          {"accepted":[],"attributes":["0x00000001","0x00000002","0x00000003","0x00000004","0x00000005","0x0000000e","0x0000000f","0x00000011","0x00000012","0x00000018","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":["0x00000003"],"featureMap":"0x00000000","generated":[],"id":"0x00000039","revision":6},
           {"accepted":[],"attributes":["0x00000000","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":["0x00000000"],"featureMap":"0x00000001","generated":[],"id":"0x00000045","revision":3},
           {"accepted":["0x00000000","0x00000001"],"attributes":["0x00000000","0x00000001","0x00000002","0x00000003","0x00000004","0x00000005","0x00000006","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":["0x00000000"],"featureMap":"0x0000000d","generated":[],"id":"0x00000080","revision":2}
         ],
         "deviceTypes": [
-          {"id":"0x0015","revision":2}
+          {"id":"0x0015","revision":2},
+          {"id":"0x0013","revision":3}
         ],
-        "key": "demo:contact:1"
+        "key": "demo:contact:1",
+        "number": 20
       },
       {
         "clusters": [
+          {"accepted":["0x00000000","0x00000040"],"attributes":["0x00000000","0x00000001","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000000","generated":[],"id":"0x00000003","revision":6},
+          {"accepted":[],"attributes":["0x00000000","0x00000001","0x00000002","0x00000003","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000000","generated":[],"id":"0x0000001d","revision":3},
+          {"accepted":[],"attributes":["0x00000001","0x00000002","0x00000003","0x00000004","0x00000005","0x0000000e","0x0000000f","0x00000011","0x00000012","0x00000018","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":["0x00000003"],"featureMap":"0x00000000","generated":[],"id":"0x00000039","revision":6},
           {"accepted":["0x00000000","0x00000001"],"attributes":["0x00000000","0x00000001","0x00000002","0x00000003","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":["0x00000000"],"featureMap":"0x00000001","generated":[],"id":"0x0000005d","revision":1},
           {"accepted":["0x00000001","0x00000002"],"attributes":["0x00000000","0x00000001","0x00000003","0x00000004","0x00000005","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":["0x00000000","0x00000001"],"featureMap":"0x00000000","generated":["0x00000004"],"id":"0x00000060","revision":3}
         ],
         "deviceTypes": [
-          {"id":"0x0075","revision":2}
+          {"id":"0x0075","revision":2},
+          {"id":"0x0013","revision":3}
         ],
-        "key": "demo:dishwasher:1"
+        "key": "demo:dishwasher:1",
+        "number": 30
       },
       {
         "clusters": [
+          {"accepted":["0x00000000","0x00000040"],"attributes":["0x00000000","0x00000001","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000000","generated":[],"id":"0x00000003","revision":6},
+          {"accepted":[],"attributes":["0x00000000","0x00000001","0x00000002","0x00000003","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000000","generated":[],"id":"0x0000001d","revision":3},
+          {"accepted":[],"attributes":["0x00000001","0x00000002","0x00000003","0x00000004","0x00000005","0x0000000e","0x0000000f","0x00000011","0x00000012","0x00000018","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":["0x00000003"],"featureMap":"0x00000000","generated":[],"id":"0x00000039","revision":6},
           {"accepted":[],"attributes":["0x00000000","0x00000001","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000000","generated":[],"id":"0x0000004a","revision":1},
           {"accepted":["0x00000001","0x00000002"],"attributes":["0x00000000","0x00000001","0x00000003","0x00000004","0x00000005","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":["0x00000000","0x00000001"],"featureMap":"0x00000000","generated":["0x00000004"],"id":"0x00000060","revision":3}
         ],
         "deviceTypes": [
-          {"id":"0x007c","revision":2}
+          {"id":"0x007c","revision":2},
+          {"id":"0x0013","revision":3}
         ],
-        "key": "demo:dryer:1"
+        "key": "demo:dryer:1",
+        "number": 34
       },
       {
         "clusters": [
+          {"accepted":["0x00000000","0x00000040"],"attributes":["0x00000000","0x00000001","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000000","generated":[],"id":"0x00000003","revision":6},
+          {"accepted":[],"attributes":["0x00000000","0x00000001","0x00000002","0x00000003","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000000","generated":[],"id":"0x0000001d","revision":3},
+          {"accepted":[],"attributes":["0x00000001","0x00000002","0x00000003","0x00000004","0x00000005","0x0000000e","0x0000000f","0x00000011","0x00000012","0x00000018","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":["0x00000003"],"featureMap":"0x00000000","generated":[],"id":"0x00000039","revision":6},
           {"accepted":[],"attributes":["0x00000000","0x00000001","0x00000002","0x00000004","0x00000005","0x00000008","0x0000000e","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000002","generated":[],"id":"0x00000090","revision":3},
           {"accepted":[],"attributes":["0x00000000","0x00000001","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":["0x00000000"],"featureMap":"0x00000005","generated":[],"id":"0x00000091","revision":2},
           {"accepted":[],"attributes":["0x00000000","0x00000001","0x00000002","0x00000003","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000000","generated":[],"id":"0x00000b07","revision":1}
         ],
         "deviceTypes": [
-          {"id":"0x0514","revision":1}
+          {"id":"0x0514","revision":1},
+          {"id":"0x0013","revision":3}
         ],
-        "key": "demo:electricalmeter:1"
+        "key": "demo:electricalmeter:1",
+        "number": 42
       },
       {
         "clusters": [
+          {"accepted":[],"attributes":["0x00000000","0x00000001","0x00000002","0x00000003","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000000","generated":[],"id":"0x0000001d","revision":3},
           {"accepted":[],"attributes":["0x00000000","0x00000001","0x00000002","0x00000004","0x00000005","0x00000008","0x0000000e","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000002","generated":[],"id":"0x00000090","revision":3},
           {"accepted":[],"attributes":["0x00000000","0x00000001","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":["0x00000000"],"featureMap":"0x00000005","generated":[],"id":"0x00000091","revision":2},
           {"accepted":[],"attributes":["0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000001","generated":[],"id":"0x0000009c","revision":1}
@@ -703,40 +756,54 @@
         "deviceTypes": [
           {"id":"0x0510","revision":1}
         ],
-        "key": "demo:electricalmeter:sensor"
+        "key": "demo:electricalmeter:sensor",
+        "number": 43
       },
       {
         "clusters": [
+          {"accepted":["0x00000000","0x00000040"],"attributes":["0x00000000","0x00000001","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000000","generated":[],"id":"0x00000003","revision":6},
+          {"accepted":[],"attributes":["0x00000000","0x00000001","0x00000002","0x00000003","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000000","generated":[],"id":"0x0000001d","revision":3},
+          {"accepted":[],"attributes":["0x00000001","0x00000002","0x00000003","0x00000004","0x00000005","0x0000000e","0x0000000f","0x00000011","0x00000012","0x00000018","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":["0x00000003"],"featureMap":"0x00000000","generated":[],"id":"0x00000039","revision":6},
           {"accepted":["0x00000002","0x00000003","0x00000004","0x00000005","0x00000006","0x00000007"],"attributes":["0x00000000","0x00000001","0x00000002","0x00000003","0x00000004","0x00000006","0x00000007","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":["0x00000002","0x00000003"],"featureMap":"0x0000007c","generated":[],"id":"0x00000098","revision":4},
           {"accepted":["0x00000000"],"attributes":["0x00000000","0x00000001","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000000","generated":["0x00000001"],"id":"0x0000009f","revision":2}
         ],
         "deviceTypes": [
-          {"id":"0x050d","revision":3}
+          {"id":"0x050d","revision":3},
+          {"id":"0x0013","revision":3}
         ],
-        "key": "demo:esa:1"
+        "key": "demo:esa:1",
+        "number": 44
       },
       {
         "clusters": [
+          {"accepted":["0x00000000","0x00000040"],"attributes":["0x00000000","0x00000001","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000000","generated":[],"id":"0x00000003","revision":6},
+          {"accepted":[],"attributes":["0x00000000","0x00000001","0x00000002","0x00000003","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000000","generated":[],"id":"0x0000001d","revision":3},
+          {"accepted":[],"attributes":["0x00000001","0x00000002","0x00000003","0x00000004","0x00000005","0x0000000e","0x0000000f","0x00000011","0x00000012","0x00000018","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":["0x00000003"],"featureMap":"0x00000000","generated":[],"id":"0x00000039","revision":6},
           {"accepted":["0x00000001","0x00000002","0x00000003","0x00000004","0x00000005","0x00000006","0x00000007"],"attributes":["0x00000000","0x00000001","0x00000002","0x00000003","0x00000004","0x00000005","0x00000006","0x00000007","0x00000008","0x00000009","0x0000000a","0x00000023","0x00000024","0x00000025","0x00000026","0x00000027","0x00000030","0x00000031","0x00000032","0x00000040","0x00000041","0x00000042","0x00000043","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":["0x00000000","0x00000001","0x00000002","0x00000003","0x00000004","0x00000005"],"featureMap":"0x0000001f","generated":["0x00000000"],"id":"0x00000099","revision":4},
           {"accepted":["0x00000000"],"attributes":["0x00000000","0x00000001","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000000","generated":["0x00000001"],"id":"0x0000009d","revision":2}
         ],
         "deviceTypes": [
-          {"id":"0x050c","revision":2}
+          {"id":"0x050c","revision":2},
+          {"id":"0x0013","revision":3}
         ],
-        "key": "demo:evse:1"
+        "key": "demo:evse:1",
+        "number": 35
       },
       {
         "clusters": [
+          {"accepted":[],"attributes":["0x00000000","0x00000001","0x00000002","0x00000003","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000000","generated":[],"id":"0x0000001d","revision":3},
           {"accepted":["0x00000000","0x00000001","0x00000002","0x00000003","0x00000004","0x00000005","0x00000006","0x00000007"],"attributes":["0x00000000","0x00000001","0x00000002","0x00000003","0x00000004","0x00000005","0x00000006","0x00000007","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":["0x00000000","0x00000001","0x00000002","0x00000003"],"featureMap":"0x0000007b","generated":[],"id":"0x00000098","revision":4},
           {"accepted":["0x00000000"],"attributes":["0x00000000","0x00000001","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000000","generated":["0x00000001"],"id":"0x0000009f","revision":2}
         ],
         "deviceTypes": [
           {"id":"0x050d","revision":3}
         ],
-        "key": "demo:evse:dem"
+        "key": "demo:evse:dem",
+        "number": 37
       },
       {
         "clusters": [
+          {"accepted":[],"attributes":["0x00000000","0x00000001","0x00000002","0x00000003","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000000","generated":[],"id":"0x0000001d","revision":3},
           {"accepted":[],"attributes":["0x00000000","0x00000001","0x00000002","0x00000004","0x00000005","0x00000008","0x0000000e","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000002","generated":[],"id":"0x00000090","revision":3},
           {"accepted":[],"attributes":["0x00000000","0x00000001","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":["0x00000000"],"featureMap":"0x00000005","generated":[],"id":"0x00000091","revision":2},
           {"accepted":[],"attributes":["0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000001","generated":[],"id":"0x0000009c","revision":1}
@@ -744,130 +811,195 @@
         "deviceTypes": [
           {"id":"0x0510","revision":1}
         ],
-        "key": "demo:evse:meter"
+        "key": "demo:evse:meter",
+        "number": 38
       },
       {
         "clusters": [
+          {"accepted":[],"attributes":["0x00000000","0x00000001","0x00000002","0x00000003","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000000","generated":[],"id":"0x0000001d","revision":3},
           {"accepted":[],"attributes":["0x00000000","0x00000001","0x00000002","0x00000005","0x00000007","0x00000008","0x0000001f","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000001","generated":[],"id":"0x0000002f","revision":3}
         ],
         "deviceTypes": [
           {"id":"0x0011","revision":1}
         ],
-        "key": "demo:evse:power"
+        "key": "demo:evse:power",
+        "number": 36
       },
       {
         "clusters": [
+          {"accepted":["0x00000000","0x00000040"],"attributes":["0x00000000","0x00000001","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000000","generated":[],"id":"0x00000003","revision":6},
+          {"accepted":["0x00000000","0x00000001","0x00000002","0x00000003","0x00000004","0x00000005"],"attributes":["0x00000000","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000001","generated":["0x00000000","0x00000001","0x00000002","0x00000003"],"id":"0x00000004","revision":4},
+          {"accepted":[],"attributes":["0x00000000","0x00000001","0x00000002","0x00000003","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000000","generated":[],"id":"0x0000001d","revision":3},
+          {"accepted":[],"attributes":["0x00000001","0x00000002","0x00000003","0x00000004","0x00000005","0x0000000e","0x0000000f","0x00000011","0x00000012","0x00000018","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":["0x00000003"],"featureMap":"0x00000000","generated":[],"id":"0x00000039","revision":6},
           {"accepted":["0x00000000"],"attributes":["0x00000000","0x00000001","0x00000002","0x00000003","0x00000004","0x00000005","0x00000006","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000013","generated":[],"id":"0x00000202","revision":6}
         ],
         "deviceTypes": [
-          {"id":"0x002b","revision":5}
+          {"id":"0x002b","revision":5},
+          {"id":"0x0013","revision":3}
         ],
-        "key": "demo:fan:1"
+        "key": "demo:fan:1",
+        "number": 8
       },
       {
         "clusters": [
+          {"accepted":["0x00000000","0x00000040"],"attributes":["0x00000000","0x00000001","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000000","generated":[],"id":"0x00000003","revision":6},
+          {"accepted":[],"attributes":["0x00000000","0x00000001","0x00000002","0x00000003","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000000","generated":[],"id":"0x0000001d","revision":3},
+          {"accepted":[],"attributes":["0x00000001","0x00000002","0x00000003","0x00000004","0x00000005","0x0000000e","0x0000000f","0x00000011","0x00000012","0x00000018","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":["0x00000003"],"featureMap":"0x00000000","generated":[],"id":"0x00000039","revision":6},
           {"accepted":[],"attributes":["0x00000000","0x00000001","0x00000002","0x00000003","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000000","generated":[],"id":"0x00000404","revision":5}
         ],
         "deviceTypes": [
-          {"id":"0x0306","revision":3}
+          {"id":"0x0306","revision":3},
+          {"id":"0x0013","revision":3}
         ],
-        "key": "demo:flow:1"
+        "key": "demo:flow:1",
+        "number": 12
       },
       {
         "clusters": [
+          {"accepted":["0x00000000","0x00000040"],"attributes":["0x00000000","0x00000001","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000000","generated":[],"id":"0x00000003","revision":6},
+          {"accepted":[],"attributes":["0x00000000","0x00000001","0x00000002","0x00000003","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000000","generated":[],"id":"0x0000001d","revision":3},
+          {"accepted":[],"attributes":["0x00000001","0x00000002","0x00000003","0x00000004","0x00000005","0x0000000e","0x0000000f","0x00000011","0x00000012","0x00000018","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":["0x00000003"],"featureMap":"0x00000000","generated":[],"id":"0x00000039","revision":6},
           {"accepted":["0x00000000"],"attributes":["0x00000000","0x00000001","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000000","generated":["0x00000001"],"id":"0x00000052","revision":3},
           {"accepted":[],"attributes":["0x00000000","0x00000002","0x00000003","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":["0x00000000"],"featureMap":"0x00000000","generated":[],"id":"0x00000057","revision":1}
         ],
         "deviceTypes": [
-          {"id":"0x0070","revision":3}
+          {"id":"0x0070","revision":3},
+          {"id":"0x0013","revision":3}
         ],
-        "key": "demo:fridge:1"
+        "key": "demo:fridge:1",
+        "number": 25
       },
       {
         "clusters": [
+          {"accepted":[],"attributes":["0x00000000","0x00000001","0x00000002","0x00000003","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000000","generated":[],"id":"0x0000001d","revision":3},
           {"accepted":["0x00000000"],"attributes":["0x00000000","0x00000001","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000000","generated":["0x00000001"],"id":"0x00000052","revision":3},
           {"accepted":["0x00000000"],"attributes":["0x00000000","0x00000001","0x00000002","0x00000003","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000005","generated":[],"id":"0x00000056","revision":1}
         ],
         "deviceTypes": [
           {"id":"0x0071","revision":6}
         ],
-        "key": "demo:fridge:cabinet"
+        "key": "demo:fridge:cabinet",
+        "number": 26
       },
       {
         "clusters": [
+          {"accepted":["0x00000000","0x00000040"],"attributes":["0x00000000","0x00000001","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000000","generated":[],"id":"0x00000003","revision":6},
+          {"accepted":[],"attributes":["0x00000000","0x00000001","0x00000002","0x00000003","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000000","generated":[],"id":"0x0000001d","revision":3},
+          {"accepted":[],"attributes":["0x00000001","0x00000002","0x00000003","0x00000004","0x00000005","0x0000000e","0x0000000f","0x00000011","0x00000012","0x00000018","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":["0x00000003"],"featureMap":"0x00000000","generated":[],"id":"0x00000039","revision":6},
           {"accepted":["0x00000000","0x00000001"],"attributes":["0x00000001","0x00000002","0x00000003","0x00000004","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":["0x00000000","0x00000001","0x00000003"],"featureMap":"0x00000011","generated":[],"id":"0x00000104","revision":1}
         ],
         "deviceTypes": [
-          {"id":"0x0230","revision":1}
+          {"id":"0x0230","revision":1},
+          {"id":"0x0013","revision":3}
         ],
-        "key": "demo:garage:1"
+        "key": "demo:garage:1",
+        "number": 23
       },
       {
         "clusters": [
+          {"accepted":["0x00000000","0x00000040"],"attributes":["0x00000000","0x00000001","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000000","generated":[],"id":"0x00000003","revision":6},
+          {"accepted":[],"attributes":["0x00000000","0x00000001","0x00000002","0x00000003","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000000","generated":[],"id":"0x0000001d","revision":3},
+          {"accepted":[],"attributes":["0x00000001","0x00000002","0x00000003","0x00000004","0x00000005","0x0000000e","0x0000000f","0x00000011","0x00000012","0x00000018","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":["0x00000003"],"featureMap":"0x00000000","generated":[],"id":"0x00000039","revision":6},
           {"accepted":[],"attributes":["0x00000000","0x00000001","0x00000002","0x00000003","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000000","generated":[],"id":"0x00000405","revision":5}
         ],
         "deviceTypes": [
-          {"id":"0x0307","revision":3}
+          {"id":"0x0307","revision":3},
+          {"id":"0x0013","revision":3}
         ],
-        "key": "demo:humidity:1"
+        "key": "demo:humidity:1",
+        "number": 18
       },
       {
         "clusters": [
+          {"accepted":["0x00000000","0x00000040"],"attributes":["0x00000000","0x00000001","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000000","generated":[],"id":"0x00000003","revision":6},
+          {"accepted":["0x00000000","0x00000001","0x00000002","0x00000003","0x00000004","0x00000005"],"attributes":["0x00000000","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000001","generated":["0x00000000","0x00000001","0x00000002","0x00000003"],"id":"0x00000004","revision":4},
           {"accepted":["0x00000000","0x00000001","0x00000002","0x00000040","0x00000041","0x00000042"],"attributes":["0x00000000","0x00004000","0x00004001","0x00004002","0x00004003","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000001","generated":[],"id":"0x00000006","revision":6},
-          {"accepted":[],"attributes":["0x00000000","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000000","generated":[],"id":"0x00000040","revision":1}
+          {"accepted":[],"attributes":["0x00000000","0x00000001","0x00000002","0x00000003","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000000","generated":[],"id":"0x0000001d","revision":3},
+          {"accepted":[],"attributes":["0x00000001","0x00000002","0x00000003","0x00000004","0x00000005","0x0000000e","0x0000000f","0x00000011","0x00000012","0x00000018","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":["0x00000003"],"featureMap":"0x00000000","generated":[],"id":"0x00000039","revision":6},
+          {"accepted":[],"attributes":["0x00000000","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000000","generated":[],"id":"0x00000040","revision":1},
+          {"accepted":["0x00000000","0x00000001","0x00000002","0x00000003","0x00000004","0x00000005","0x00000006","0x00000040"],"attributes":["0x00000001","0x00000002","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000001","generated":["0x00000000","0x00000001","0x00000002","0x00000003","0x00000004","0x00000006","0x00000040"],"id":"0x00000062","revision":1}
         ],
         "deviceTypes": [
-          {"id":"0x0100","revision":4}
+          {"id":"0x0100","revision":4},
+          {"id":"0x0013","revision":3}
         ],
-        "key": "demo:light:1"
+        "key": "demo:light:1",
+        "number": 2
       },
       {
         "clusters": [
+          {"accepted":["0x00000000","0x00000040"],"attributes":["0x00000000","0x00000001","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000000","generated":[],"id":"0x00000003","revision":6},
+          {"accepted":[],"attributes":["0x00000000","0x00000001","0x00000002","0x00000003","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000000","generated":[],"id":"0x0000001d","revision":3},
+          {"accepted":[],"attributes":["0x00000001","0x00000002","0x00000003","0x00000004","0x00000005","0x0000000e","0x0000000f","0x00000011","0x00000012","0x00000018","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":["0x00000003"],"featureMap":"0x00000000","generated":[],"id":"0x00000039","revision":6},
           {"accepted":["0x00000000","0x00000001","0x00000003","0x0000000b","0x0000000c","0x0000000d","0x0000000e","0x0000000f","0x00000010","0x00000011","0x00000012","0x00000013","0x0000001a","0x0000001b","0x0000001d","0x00000022","0x00000024","0x00000026","0x00000027"],"attributes":["0x00000000","0x00000001","0x00000002","0x00000011","0x00000012","0x00000014","0x00000015","0x00000016","0x00000017","0x00000018","0x0000001b","0x0000001c","0x00000023","0x00000025","0x00000026","0x00000030","0x00000031","0x00000033","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":["0x00000000","0x00000002","0x00000003","0x00000004"],"featureMap":"0x00001d91","generated":["0x0000000c","0x0000000f","0x00000012","0x0000001c","0x00000023","0x00000025"],"id":"0x00000101","revision":10}
         ],
         "deviceTypes": [
-          {"id":"0x000a","revision":4}
+          {"id":"0x000a","revision":4},
+          {"id":"0x0013","revision":3}
         ],
-        "key": "demo:lock:1"
+        "key": "demo:lock:1",
+        "number": 17
       },
       {
         "clusters": [
+          {"accepted":["0x00000000","0x00000040"],"attributes":["0x00000000","0x00000001","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000000","generated":[],"id":"0x00000003","revision":6},
+          {"accepted":[],"attributes":["0x00000000","0x00000001","0x00000002","0x00000003","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000000","generated":[],"id":"0x0000001d","revision":3},
+          {"accepted":[],"attributes":["0x00000001","0x00000002","0x00000003","0x00000004","0x00000005","0x0000000e","0x0000000f","0x00000011","0x00000012","0x00000018","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":["0x00000003"],"featureMap":"0x00000000","generated":[],"id":"0x00000039","revision":6},
           {"accepted":[],"attributes":["0x00000000","0x00000001","0x00000002","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000000","generated":[],"id":"0x00000b06","revision":1}
         ],
         "deviceTypes": [
-          {"id":"0x0511","revision":1}
+          {"id":"0x0511","revision":1},
+          {"id":"0x0013","revision":3}
         ],
-        "key": "demo:meter:1"
+        "key": "demo:meter:1",
+        "number": 29
       },
       {
         "clusters": [
+          {"accepted":["0x00000000","0x00000040"],"attributes":["0x00000000","0x00000001","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000000","generated":[],"id":"0x00000003","revision":6},
+          {"accepted":[],"attributes":["0x00000000","0x00000001","0x00000002","0x00000003","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000000","generated":[],"id":"0x0000001d","revision":3},
+          {"accepted":[],"attributes":["0x00000001","0x00000002","0x00000003","0x00000004","0x00000005","0x0000000e","0x0000000f","0x00000011","0x00000012","0x00000018","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":["0x00000003"],"featureMap":"0x00000000","generated":[],"id":"0x00000039","revision":6},
           {"accepted":[],"attributes":["0x00000000","0x00000001","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000000","generated":[],"id":"0x0000005e","revision":2},
           {"accepted":["0x00000000","0x00000001"],"attributes":["0x00000000","0x00000001","0x00000002","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000001","generated":[],"id":"0x0000005f","revision":1},
           {"accepted":["0x00000000","0x00000001","0x00000002","0x00000003"],"attributes":["0x00000000","0x00000001","0x00000002","0x00000003","0x00000004","0x00000005","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":["0x00000000","0x00000001"],"featureMap":"0x00000000","generated":["0x00000004"],"id":"0x00000060","revision":3}
         ],
         "deviceTypes": [
-          {"id":"0x0079","revision":2}
+          {"id":"0x0079","revision":2},
+          {"id":"0x0013","revision":3}
         ],
-        "key": "demo:microwave:1"
+        "key": "demo:microwave:1",
+        "number": 33
       },
       {
         "clusters": [
+          {"accepted":["0x00000000","0x00000040"],"attributes":["0x00000000","0x00000001","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000000","generated":[],"id":"0x00000003","revision":6},
+          {"accepted":[],"attributes":["0x00000000","0x00000001","0x00000002","0x00000003","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000000","generated":[],"id":"0x0000001d","revision":3},
+          {"accepted":[],"attributes":["0x00000001","0x00000002","0x00000003","0x00000004","0x00000005","0x0000000e","0x0000000f","0x00000011","0x00000012","0x00000018","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":["0x00000003"],"featureMap":"0x00000000","generated":[],"id":"0x00000039","revision":6},
           {"accepted":[],"attributes":["0x00000000","0x00000001","0x00000002","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000002","generated":[],"id":"0x00000406","revision":7}
         ],
         "deviceTypes": [
-          {"id":"0x0107","revision":4}
+          {"id":"0x0107","revision":4},
+          {"id":"0x0013","revision":3}
         ],
-        "key": "demo:occupancy:1"
-      },
-      {
-        "clusters": [],
-        "deviceTypes": [
-          {"id":"0x007b","revision":2}
-        ],
-        "key": "demo:oven:1"
+        "key": "demo:occupancy:1",
+        "number": 19
       },
       {
         "clusters": [
+          {"accepted":["0x00000000","0x00000040"],"attributes":["0x00000000","0x00000001","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000000","generated":[],"id":"0x00000003","revision":6},
+          {"accepted":[],"attributes":["0x00000000","0x00000001","0x00000002","0x00000003","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000000","generated":[],"id":"0x0000001d","revision":3},
+          {"accepted":[],"attributes":["0x00000001","0x00000002","0x00000003","0x00000004","0x00000005","0x0000000e","0x0000000f","0x00000011","0x00000012","0x00000018","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":["0x00000003"],"featureMap":"0x00000000","generated":[],"id":"0x00000039","revision":6}
+        ],
+        "deviceTypes": [
+          {"id":"0x007b","revision":2},
+          {"id":"0x0013","revision":3}
+        ],
+        "key": "demo:oven:1",
+        "number": 31
+      },
+      {
+        "clusters": [
+          {"accepted":[],"attributes":["0x00000000","0x00000001","0x00000002","0x00000003","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000000","generated":[],"id":"0x0000001d","revision":3},
           {"accepted":["0x00000001","0x00000002"],"attributes":["0x00000000","0x00000001","0x00000003","0x00000004","0x00000005","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":["0x00000000","0x00000001"],"featureMap":"0x00000000","generated":["0x00000004"],"id":"0x00000048","revision":2},
           {"accepted":["0x00000000"],"attributes":["0x00000000","0x00000001","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000000","generated":["0x00000001"],"id":"0x00000049","revision":2},
           {"accepted":["0x00000000"],"attributes":["0x00000000","0x00000001","0x00000002","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000001","generated":[],"id":"0x00000056","revision":1}
@@ -875,158 +1007,231 @@
         "deviceTypes": [
           {"id":"0x0071","revision":6}
         ],
-        "key": "demo:oven:cavity"
+        "key": "demo:oven:cavity",
+        "number": 32
       },
       {
         "clusters": [
+          {"accepted":["0x00000000","0x00000040"],"attributes":["0x00000000","0x00000001","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000000","generated":[],"id":"0x00000003","revision":6},
+          {"accepted":[],"attributes":["0x00000000","0x00000001","0x00000002","0x00000003","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000000","generated":[],"id":"0x0000001d","revision":3},
+          {"accepted":[],"attributes":["0x00000001","0x00000002","0x00000003","0x00000004","0x00000005","0x0000000e","0x0000000f","0x00000011","0x00000012","0x00000018","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":["0x00000003"],"featureMap":"0x00000000","generated":[],"id":"0x00000039","revision":6},
           {"accepted":["0x00000000","0x00000001"],"attributes":["0x00000000","0x00000001","0x00000002","0x00000003","0x00000004","0x00000005","0x00000006","0x00000008","0x00000009","0x0000000b","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x0000005f","generated":[],"id":"0x00000105","revision":1}
         ],
         "deviceTypes": [
-          {"id":"0x0231","revision":1}
+          {"id":"0x0231","revision":1},
+          {"id":"0x0013","revision":3}
         ],
-        "key": "demo:panel:1"
+        "key": "demo:panel:1",
+        "number": 39
       },
       {
         "clusters": [
+          {"accepted":["0x00000000","0x00000040"],"attributes":["0x00000000","0x00000001","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000000","generated":[],"id":"0x00000003","revision":6},
           {"accepted":["0x00000000","0x00000001","0x00000002"],"attributes":["0x00000000","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000000","generated":[],"id":"0x00000006","revision":6},
+          {"accepted":[],"attributes":["0x00000000","0x00000001","0x00000002","0x00000003","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000000","generated":[],"id":"0x0000001d","revision":3},
+          {"accepted":[],"attributes":["0x00000001","0x00000002","0x00000003","0x00000004","0x00000005","0x0000000e","0x0000000f","0x00000011","0x00000012","0x00000018","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":["0x00000003"],"featureMap":"0x00000000","generated":[],"id":"0x00000039","revision":6},
           {"accepted":[],"attributes":["0x00000000","0x00000001","0x00000002","0x00000007","0x00000008","0x00000010","0x00000011","0x00000012","0x00000013","0x00000020","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":["0x00000005","0x00000009"],"featureMap":"0x00000008","generated":[],"id":"0x00000200","revision":5},
           {"accepted":[],"attributes":["0x00000000","0x00000001","0x00000002","0x00000003","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000000","generated":[],"id":"0x00000404","revision":5}
         ],
         "deviceTypes": [
-          {"id":"0x0303","revision":4}
+          {"id":"0x0303","revision":4},
+          {"id":"0x0013","revision":3}
         ],
-        "key": "demo:pump:1"
+        "key": "demo:pump:1",
+        "number": 11
       },
       {
         "clusters": [
+          {"accepted":["0x00000000","0x00000040"],"attributes":["0x00000000","0x00000001","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000000","generated":[],"id":"0x00000003","revision":6},
+          {"accepted":[],"attributes":["0x00000000","0x00000001","0x00000002","0x00000003","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000000","generated":[],"id":"0x0000001d","revision":3},
+          {"accepted":[],"attributes":["0x00000001","0x00000002","0x00000003","0x00000004","0x00000005","0x0000000e","0x0000000f","0x00000011","0x00000012","0x00000018","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":["0x00000003"],"featureMap":"0x00000000","generated":[],"id":"0x00000039","revision":6},
           {"accepted":["0x00000000"],"attributes":["0x00000000","0x00000001","0x00000002","0x00000003","0x00000004","0x00000005","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000007","generated":[],"id":"0x00000071","revision":1},
           {"accepted":["0x00000000"],"attributes":["0x00000000","0x00000001","0x00000002","0x00000003","0x00000004","0x00000005","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000005","generated":[],"id":"0x00000072","revision":1},
           {"accepted":["0x00000000"],"attributes":["0x00000000","0x00000001","0x00000002","0x00000003","0x00000004","0x00000005","0x00000006","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000013","generated":[],"id":"0x00000202","revision":6}
         ],
         "deviceTypes": [
-          {"id":"0x002d","revision":3}
+          {"id":"0x002d","revision":3},
+          {"id":"0x0013","revision":3}
         ],
-        "key": "demo:purifier:1"
+        "key": "demo:purifier:1",
+        "number": 22
       },
       {
         "clusters": [
+          {"accepted":["0x00000000","0x00000040"],"attributes":["0x00000000","0x00000001","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000000","generated":[],"id":"0x00000003","revision":6},
+          {"accepted":[],"attributes":["0x00000000","0x00000001","0x00000002","0x00000003","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000000","generated":[],"id":"0x0000001d","revision":3},
+          {"accepted":[],"attributes":["0x00000001","0x00000002","0x00000003","0x00000004","0x00000005","0x0000000e","0x0000000f","0x00000011","0x00000012","0x00000018","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":["0x00000003"],"featureMap":"0x00000000","generated":[],"id":"0x00000039","revision":6},
           {"accepted":["0x00000000"],"attributes":["0x00000000","0x00000001","0x00000002","0x00000003","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000000","generated":[],"id":"0x00000050","revision":2}
         ],
         "deviceTypes": [
-          {"id":"0x0027","revision":1}
+          {"id":"0x0027","revision":1},
+          {"id":"0x0013","revision":3}
         ],
-        "key": "demo:selector:1"
+        "key": "demo:selector:1",
+        "number": 5
       },
       {
         "clusters": [
+          {"accepted":["0x00000000","0x00000040"],"attributes":["0x00000000","0x00000001","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000000","generated":[],"id":"0x00000003","revision":6},
+          {"accepted":[],"attributes":["0x00000000","0x00000001","0x00000002","0x00000003","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000000","generated":[],"id":"0x0000001d","revision":3},
+          {"accepted":[],"attributes":["0x00000001","0x00000002","0x00000003","0x00000004","0x00000005","0x0000000e","0x0000000f","0x00000011","0x00000012","0x00000018","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":["0x00000003"],"featureMap":"0x00000000","generated":[],"id":"0x00000039","revision":6},
           {"accepted":["0x00000000"],"attributes":["0x00000000","0x00000001","0x00000002","0x00000003","0x00000004","0x00000005","0x00000006","0x00000007","0x00000008","0x00000009","0x0000000a","0x0000000b","0x0000000c","0x0000000d","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":["0x00000000","0x00000001","0x00000002","0x00000003","0x00000004","0x00000005","0x00000006","0x00000007","0x00000008","0x00000009","0x0000000a"],"featureMap":"0x00000003","generated":[],"id":"0x0000005c","revision":2}
         ],
         "deviceTypes": [
-          {"id":"0x0076","revision":2}
+          {"id":"0x0076","revision":2},
+          {"id":"0x0013","revision":3}
         ],
-        "key": "demo:smoke:1"
+        "key": "demo:smoke:1",
+        "number": 9
       },
       {
         "clusters": [
+          {"accepted":[],"attributes":["0x00000000","0x00000001","0x00000002","0x00000003","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000000","generated":[],"id":"0x0000001d","revision":3},
           {"accepted":[],"attributes":["0x00000000","0x00000001","0x00000002","0x0000000c","0x0000000e","0x0000000f","0x00000010","0x0000001f","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000002","generated":[],"id":"0x0000002f","revision":3}
         ],
         "deviceTypes": [
           {"id":"0x0011","revision":1}
         ],
-        "key": "demo:smoke:battery"
+        "key": "demo:smoke:battery",
+        "number": 10
       },
       {
         "clusters": [
+          {"accepted":["0x00000000","0x00000040"],"attributes":["0x00000000","0x00000001","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000000","generated":[],"id":"0x00000003","revision":6},
+          {"accepted":[],"attributes":["0x00000000","0x00000001","0x00000002","0x00000003","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000000","generated":[],"id":"0x0000001d","revision":3},
+          {"accepted":[],"attributes":["0x00000001","0x00000002","0x00000003","0x00000004","0x00000005","0x0000000e","0x0000000f","0x00000011","0x00000012","0x00000018","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":["0x00000003"],"featureMap":"0x00000000","generated":[],"id":"0x00000039","revision":6},
           {"accepted":[],"attributes":["0x00000000","0x00000001","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000000","generated":[],"id":"0x00000430","revision":1}
         ],
         "deviceTypes": [
-          {"id":"0x0045","revision":1}
+          {"id":"0x0045","revision":1},
+          {"id":"0x0013","revision":3}
         ],
-        "key": "demo:soil:1"
+        "key": "demo:soil:1",
+        "number": 40
       },
       {
         "clusters": [
+          {"accepted":["0x00000000","0x00000040"],"attributes":["0x00000000","0x00000001","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000000","generated":[],"id":"0x00000003","revision":6},
           {"accepted":["0x00000000","0x00000001","0x00000002"],"attributes":["0x00000000","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000000","generated":[],"id":"0x00000006","revision":6},
-          {"accepted":["0x00000000","0x00000001","0x00000002","0x00000003","0x00000004","0x00000005","0x00000006","0x00000007"],"attributes":["0x00000000","0x00000002","0x00000003","0x0000000f","0x00000011","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000000","generated":[],"id":"0x00000008","revision":7}
+          {"accepted":["0x00000000","0x00000001","0x00000002","0x00000003","0x00000004","0x00000005","0x00000006","0x00000007"],"attributes":["0x00000000","0x00000002","0x00000003","0x0000000f","0x00000011","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000000","generated":[],"id":"0x00000008","revision":7},
+          {"accepted":[],"attributes":["0x00000000","0x00000001","0x00000002","0x00000003","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000000","generated":[],"id":"0x0000001d","revision":3},
+          {"accepted":[],"attributes":["0x00000001","0x00000002","0x00000003","0x00000004","0x00000005","0x0000000e","0x0000000f","0x00000011","0x00000012","0x00000018","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":["0x00000003"],"featureMap":"0x00000000","generated":[],"id":"0x00000039","revision":6}
         ],
         "deviceTypes": [
-          {"id":"0x0022","revision":1}
+          {"id":"0x0022","revision":1},
+          {"id":"0x0013","revision":3}
         ],
-        "key": "demo:speaker:1"
+        "key": "demo:speaker:1",
+        "number": 6
       },
       {
         "clusters": [
+          {"accepted":["0x00000000","0x00000040"],"attributes":["0x00000000","0x00000001","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000000","generated":[],"id":"0x00000003","revision":6},
+          {"accepted":[],"attributes":["0x00000000","0x00000001","0x00000002","0x00000003","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000000","generated":[],"id":"0x0000001d","revision":3},
+          {"accepted":[],"attributes":["0x00000001","0x00000002","0x00000003","0x00000004","0x00000005","0x0000000e","0x0000000f","0x00000011","0x00000012","0x00000018","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":["0x00000003"],"featureMap":"0x00000000","generated":[],"id":"0x00000039","revision":6},
           {"accepted":["0x00000000","0x00000002"],"attributes":["0x00000000","0x00000001","0x00000002","0x00000003","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":["0x00000000"],"featureMap":"0x00000001","generated":["0x00000001","0x00000003"],"id":"0x00000095","revision":4},
           {"accepted":[],"attributes":["0x00000000","0x00000001","0x00000002","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":["0x00000000"],"featureMap":"0x00000001","generated":[],"id":"0x000000a0","revision":1},
           {"accepted":["0x00000000","0x00000001"],"attributes":["0x00000000","0x00000001","0x00000002","0x00000003","0x00000004","0x00000005","0x00000006","0x00000007","0x00000008","0x00000009","0x0000000a","0x0000000b","0x0000000c","0x0000000d","0x0000000e","0x0000000f","0x00000010","0x00000011","0x00000012","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x0000003f","generated":["0x00000000","0x00000001"],"id":"0x00000700","revision":1}
         ],
         "deviceTypes": [
-          {"id":"0x0513","revision":1}
+          {"id":"0x0513","revision":1},
+          {"id":"0x0013","revision":3}
         ],
-        "key": "demo:tariff:1"
+        "key": "demo:tariff:1",
+        "number": 41
       },
       {
         "clusters": [
+          {"accepted":["0x00000000","0x00000040"],"attributes":["0x00000000","0x00000001","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000000","generated":[],"id":"0x00000003","revision":6},
+          {"accepted":[],"attributes":["0x00000000","0x00000001","0x00000002","0x00000003","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000000","generated":[],"id":"0x0000001d","revision":3},
+          {"accepted":[],"attributes":["0x00000001","0x00000002","0x00000003","0x00000004","0x00000005","0x0000000e","0x0000000f","0x00000011","0x00000012","0x00000018","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":["0x00000003"],"featureMap":"0x00000000","generated":[],"id":"0x00000039","revision":6},
           {"accepted":[],"attributes":["0x00000000","0x00000001","0x00000002","0x00000003","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000000","generated":[],"id":"0x00000402","revision":6}
         ],
         "deviceTypes": [
-          {"id":"0x0302","revision":3}
+          {"id":"0x0302","revision":3},
+          {"id":"0x0013","revision":3}
         ],
-        "key": "demo:thermometer:1"
+        "key": "demo:thermometer:1",
+        "number": 3
       },
       {
         "clusters": [
+          {"accepted":["0x00000000","0x00000040"],"attributes":["0x00000000","0x00000001","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000000","generated":[],"id":"0x00000003","revision":6},
+          {"accepted":[],"attributes":["0x00000000","0x00000001","0x00000002","0x00000003","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000000","generated":[],"id":"0x0000001d","revision":3},
+          {"accepted":[],"attributes":["0x00000001","0x00000002","0x00000003","0x00000004","0x00000005","0x0000000e","0x0000000f","0x00000011","0x00000012","0x00000018","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":["0x00000003"],"featureMap":"0x00000000","generated":[],"id":"0x00000039","revision":6},
           {"accepted":[],"attributes":["0x00000000","0x00000001","0x00000002","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000001","generated":[],"id":"0x0000009b","revision":1},
           {"accepted":["0x00000000","0x00000006","0x000000fe"],"attributes":["0x00000000","0x00000003","0x00000004","0x00000005","0x00000006","0x00000010","0x00000011","0x00000012","0x00000015","0x00000016","0x00000017","0x00000018","0x0000001b","0x0000001c","0x00000023","0x00000024","0x00000029","0x00000048","0x0000004a","0x0000004e","0x00000050","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000103","generated":["0x000000fd"],"id":"0x00000201","revision":11},
           {"accepted":[],"attributes":["0x00000000","0x00000001","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000000","generated":[],"id":"0x00000204","revision":2}
         ],
         "deviceTypes": [
-          {"id":"0x0301","revision":7}
+          {"id":"0x0301","revision":7},
+          {"id":"0x0013","revision":3}
         ],
-        "key": "demo:thermostat:1"
+        "key": "demo:thermostat:1",
+        "number": 15
       },
       {
         "clusters": [
+          {"accepted":["0x00000000","0x00000040"],"attributes":["0x00000000","0x00000001","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000000","generated":[],"id":"0x00000003","revision":6},
+          {"accepted":[],"attributes":["0x00000000","0x00000001","0x00000002","0x00000003","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000000","generated":[],"id":"0x0000001d","revision":3},
+          {"accepted":[],"attributes":["0x00000001","0x00000002","0x00000003","0x00000004","0x00000005","0x0000000e","0x0000000f","0x00000011","0x00000012","0x00000018","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":["0x00000003"],"featureMap":"0x00000000","generated":[],"id":"0x00000039","revision":6},
           {"accepted":["0x00000000"],"attributes":["0x00000000","0x00000001","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000000","generated":["0x00000001"],"id":"0x00000054","revision":4},
           {"accepted":["0x00000000"],"attributes":["0x00000000","0x00000001","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000000","generated":["0x00000001"],"id":"0x00000055","revision":5},
           {"accepted":["0x00000000","0x00000003","0x00000080"],"attributes":["0x00000000","0x00000001","0x00000003","0x00000004","0x00000005","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":["0x00000000","0x00000001"],"featureMap":"0x00000000","generated":["0x00000004"],"id":"0x00000061","revision":3},
           {"accepted":["0x00000000","0x00000002"],"attributes":["0x00000000","0x00000001","0x00000002","0x00000003","0x00000004","0x00000005","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000006","generated":["0x00000001","0x00000003"],"id":"0x00000150","revision":2}
         ],
         "deviceTypes": [
-          {"id":"0x0074","revision":4}
+          {"id":"0x0074","revision":4},
+          {"id":"0x0013","revision":3}
         ],
-        "key": "demo:vacuum:1"
+        "key": "demo:vacuum:1",
+        "number": 14
       },
       {
         "clusters": [
+          {"accepted":["0x00000000","0x00000040"],"attributes":["0x00000000","0x00000001","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000000","generated":[],"id":"0x00000003","revision":6},
+          {"accepted":[],"attributes":["0x00000000","0x00000001","0x00000002","0x00000003","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000000","generated":[],"id":"0x0000001d","revision":3},
+          {"accepted":[],"attributes":["0x00000001","0x00000002","0x00000003","0x00000004","0x00000005","0x0000000e","0x0000000f","0x00000011","0x00000012","0x00000018","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":["0x00000003"],"featureMap":"0x00000000","generated":[],"id":"0x00000039","revision":6},
           {"accepted":["0x00000000","0x00000001"],"attributes":["0x00000000","0x00000001","0x00000003","0x00000004","0x00000005","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000000","generated":[],"id":"0x00000081","revision":1}
         ],
         "deviceTypes": [
-          {"id":"0x0042","revision":1}
+          {"id":"0x0042","revision":1},
+          {"id":"0x0013","revision":3}
         ],
-        "key": "demo:valve:1"
+        "key": "demo:valve:1",
+        "number": 4
       },
       {
         "clusters": [
+          {"accepted":["0x00000000","0x00000040"],"attributes":["0x00000000","0x00000001","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000000","generated":[],"id":"0x00000003","revision":6},
+          {"accepted":[],"attributes":["0x00000000","0x00000001","0x00000002","0x00000003","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000000","generated":[],"id":"0x0000001d","revision":3},
+          {"accepted":[],"attributes":["0x00000001","0x00000002","0x00000003","0x00000004","0x00000005","0x0000000e","0x0000000f","0x00000011","0x00000012","0x00000018","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":["0x00000003"],"featureMap":"0x00000000","generated":[],"id":"0x00000039","revision":6},
           {"accepted":["0x00000000"],"attributes":["0x00000000","0x00000001","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000000","generated":["0x00000001"],"id":"0x00000051","revision":3},
           {"accepted":[],"attributes":["0x00000000","0x00000001","0x00000002","0x00000003","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000003","generated":[],"id":"0x00000053","revision":2},
           {"accepted":["0x00000000","0x00000001","0x00000002","0x00000003"],"attributes":["0x00000000","0x00000001","0x00000002","0x00000003","0x00000004","0x00000005","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":["0x00000000","0x00000001"],"featureMap":"0x00000000","generated":["0x00000004"],"id":"0x00000060","revision":3}
         ],
         "deviceTypes": [
-          {"id":"0x0073","revision":2}
+          {"id":"0x0073","revision":2},
+          {"id":"0x0013","revision":3}
         ],
-        "key": "demo:washer:1"
+        "key": "demo:washer:1",
+        "number": 13
       },
       {
         "clusters": [
+          {"accepted":["0x00000000","0x00000040"],"attributes":["0x00000000","0x00000001","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000000","generated":[],"id":"0x00000003","revision":6},
+          {"accepted":[],"attributes":["0x00000000","0x00000001","0x00000002","0x00000003","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000000","generated":[],"id":"0x0000001d","revision":3},
+          {"accepted":[],"attributes":["0x00000001","0x00000002","0x00000003","0x00000004","0x00000005","0x0000000e","0x0000000f","0x00000011","0x00000012","0x00000018","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":["0x00000003"],"featureMap":"0x00000000","generated":[],"id":"0x00000039","revision":6},
           {"accepted":["0x00000000","0x00000001"],"attributes":["0x00000000","0x00000001","0x00000002","0x00000003","0x00000004","0x00000005","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":["0x00000000","0x00000001"],"featureMap":"0x00000003","generated":[],"id":"0x00000094","revision":2},
           {"accepted":["0x00000000"],"attributes":["0x00000000","0x00000001","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000000","generated":["0x00000001"],"id":"0x0000009e","revision":1},
           {"accepted":["0x00000000"],"attributes":["0x00000000","0x00000003","0x00000004","0x00000010","0x00000012","0x00000015","0x00000016","0x0000001b","0x0000001c","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000001","generated":[],"id":"0x00000201","revision":11}
         ],
         "deviceTypes": [
-          {"id":"0x050f","revision":1}
+          {"id":"0x050f","revision":1},
+          {"id":"0x0013","revision":3}
         ],
-        "key": "demo:waterheater:1"
+        "key": "demo:waterheater:1",
+        "number": 28
       }
     ],
     "root": {

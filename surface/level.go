@@ -278,8 +278,12 @@ func (p *levelPolicy) Judge(el Element) (v Verdict, reason string) {
 
 // ServerInternal returns the level policy's keep decisions on the
 // elements of the effective endpoint ep that the level of p does not know
-// and no element of decided names: what a hand-written server chose
-// itself ([ReasonServerInternal]). It returns none at the pin's level. A
+// and no element of decided names: what a hand-written server or the
+// endpoint assembler chose itself ([ReasonServerInternal]) — and on
+// BridgedDeviceBasicInformation's ConfigurationVersion, which the
+// assembler mounts on every bridged endpoint, the rule that keeps it at
+// every level ([ReasonSurfaceChangeSignal], concept v11 §D.9). It returns
+// none at the pin's level. A
 // feature is its one-bit mask; a command id is matched against the
 // accepted and the generated list alike.
 func (p Policies) ServerInternal(ep Endpoint, decided []Element) []Decision {
@@ -303,7 +307,11 @@ func (p Policies) ServerInternal(ep Endpoint, decided []Element) []Decision {
 		}
 		known[key{cluster, kind, id}] = true
 		el := Element{Endpoint: ep.Key, Cluster: cluster, Kind: kind, ID: id, Origin: OriginKitDefault, Levels: levels}
-		out = append(out, Decision{Element: el, Policy: levelPolicyName, Verdict: Keep, Reason: ReasonServerInternal})
+		reason := ReasonServerInternal
+		if kind == KindAttribute && cluster == bdbiCluster && id == configurationVersion {
+			reason = ReasonSurfaceChangeSignal
+		}
+		out = append(out, Decision{Element: el, Policy: levelPolicyName, Verdict: Keep, Reason: reason})
 	}
 	for _, c := range ep.Clusters {
 		add(c.ID, KindCluster, c.ID, schema.ClusterLevels(c.ID))

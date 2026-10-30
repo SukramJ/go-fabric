@@ -118,8 +118,7 @@ func (p persisted) configVersion(ctx context.Context, key device.SourceKey) uint
 
 // storeConfigVersions persists what bridge.IncreaseConfigurationVersion
 // raised: a version never decreases, so it outlives a restart.
-func (p persisted) storeConfigVersions(topo *endpoint.Topology, v bridge.ConfigurationVersions) {
-	ctx := context.Background()
+func (p persisted) storeConfigVersions(ctx context.Context, topo *endpoint.Topology, v bridge.ConfigurationVersions) {
 	set := func(k string, n uint32) {
 		if err := p.st.SetSetting(ctx, k, strconv.FormatUint(uint64(n), 10)); err != nil {
 			p.logger.Warn("configuration_version.persist", slog.Any("err", err))

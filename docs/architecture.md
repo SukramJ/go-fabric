@@ -130,9 +130,16 @@ connectedhomeip's XML ([spec levels](reference/spec-levels.md)). The
 reference daemon prints its report
 with `--dump-surface`, and `make surface-check` holds it as a committed
 snapshot (`script/surfacecheck`): every change of what the daemon serves
-is a review diff. The clusters the endpoint assembler mounts on a bridged
-endpoint (Descriptor, BridgedDeviceBasicInformation, Identify, Groups,
-ScenesManagement) are not part of a device's surface yet.
+is a review diff. Once the node has assembled its topology, `Node.Surface()`
+reads the assembled endpoints, so the clusters the endpoint assembler mounts
+on a bridged endpoint (Descriptor, BridgedDeviceBasicInformation, Identify,
+Groups, ScenesManagement, Binding) and the BridgedNode device type are part
+of it (`Report.Assembled`). The node persists each endpoint's effective
+surface next to its ConfigurationVersion, and when an endpoint comes back —
+after a restart, a reassembly or a `Replace` — with a different surface it
+announces the change: it raises that endpoint's and, once, the root's
+ConfigurationVersion, bumps the DataVersion of its Descriptor and changed
+clusters, and logs `surface changed` with the diff (`Report.Changed`).
 [ADR 0030](adr/0030-the-served-surface-is-a-value-under-policies.md)
 records the decision.
 

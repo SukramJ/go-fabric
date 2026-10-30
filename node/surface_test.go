@@ -8,6 +8,8 @@ import (
 	"encoding/json"
 	"errors"
 	"path/filepath"
+	"reflect"
+	"slices"
 	"strings"
 	"testing"
 
@@ -56,7 +58,7 @@ func TestAddRefusesOtherSurfacePolicies(t *testing.T) {
 		t.Fatalf("Replace with a device under other policies: %v", err)
 	}
 	// A part is checked like its owner.
-	owner, err := device.NewBridgedNode(device.Options{StableKey: endpoint.StringKey("owner")})
+	owner, err := device.NewBridgedNode(device.Options{StableKey: endpoint.StringKey("owner"), Name: "owner"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -84,7 +86,7 @@ func TestNodeSurface(t *testing.T) {
 	ctx := context.Background()
 	n := surfaceNode(t, surface.Policies{})
 	agg := n.Aggregator()
-	owner, err := device.NewBridgedNode(device.Options{StableKey: endpoint.StringKey("owner")})
+	owner, err := device.NewBridgedNode(device.Options{StableKey: endpoint.StringKey("owner"), Name: "owner"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -131,22 +133,43 @@ func TestNodeSurface(t *testing.T) {
 		t.Fatal("report JSON")
 	}
 
-	// Started, the endpoints carry their numbers; the digest does not
-	// see them. The plug is no device: nothing reports its number.
+	// Started, the report is the assembled topology: every endpoint
+	// carries its number, the device-level clusters are served unchanged
+	// and the assembler's are added, the BridgedNode device type with
+	// them on a bridged endpoint (not on a part).
+	if rep.Assembled {
+		t.Fatal("assembled before the start")
+	}
 	if err := n.Start(ctx); err != nil {
 		t.Fatal(err)
 	}
 	started := n.Surface()
+	if !started.Assembled || started.Effective.Root.Digest() != rep.Effective.Root.Digest() {
+		t.Fatalf("started: assembled %v, root unchanged %v", started.Assembled, started.Effective.Root.Digest() == rep.Effective.Root.Digest())
+	}
 	for _, ep := range started.Effective.Endpoints {
-		if ep.Number == 0 && ep.Key != "plug" {
+		if ep.Number == 0 {
 			t.Errorf("endpoint %q has no number once started", ep.Key)
 		}
 		if ep.Key == node.AggregatorSurfaceKey && ep.Number != 1 {
 			t.Errorf("aggregator number %d", ep.Number)
 		}
+		before := byKey[ep.Key]
+		if len(ep.Clusters) < len(before.Clusters) {
+			t.Errorf("%q: %d clusters assembled, %d device-level", ep.Key, len(ep.Clusters), len(before.Clusters))
+		}
+		for _, c := range before.Clusters {
+			if !slices.ContainsFunc(ep.Clusters, func(x surface.Cluster) bool { return reflect.DeepEqual(x, c) }) {
+				t.Errorf("%q: cluster 0x%04X differs once assembled", ep.Key, c.ID)
+			}
+		}
+		bridgedNode := slices.ContainsFunc(ep.DeviceTypes, func(dt surface.DeviceTypeRef) bool { return dt.ID == 0x0013 })
+		if want := ep.Key != node.AggregatorSurfaceKey && ep.Key != "part"; bridgedNode != want {
+			t.Errorf("%q: BridgedNode listed %v, want %v (%v)", ep.Key, bridgedNode, want, ep.DeviceTypes)
+		}
 	}
-	if started.Effective.Digest() != rep.Effective.Digest() {
-		t.Fatal("starting the node changed the surface digest")
+	if light := started.Effective.Endpoints[1]; light.Key != "light" || len(light.Clusters) <= len(byKey["light"].Clusters) {
+		t.Fatalf("the light gains no assembler cluster: %+v", light)
 	}
 
 	// The zero value's digest is the same on every node.

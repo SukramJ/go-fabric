@@ -262,6 +262,16 @@ type Report struct {
 	// Withheld are the elements the level policy withheld its endpoint
 	// for: a device type or a mandated cluster the level does not know.
 	Withheld []Element
+	// Assembled reports that Effective was read from the assembled
+	// topology: every endpoint as the endpoint assembler mounts it, its
+	// clusters (Descriptor, BridgedDeviceBasicInformation, Identify,
+	// Groups, ScenesManagement, Binding, measurement clusters) and its
+	// device types (BridgedNode) included. False is the device-level view
+	// before the first assembly: each device's own servers and device type.
+	Assembled bool
+	// Changed are the surface changes the reporter announced in this
+	// process ([SurfaceChange]), oldest first; a node keeps the last 100.
+	Changed []SurfaceChange
 }
 
 // Reporter is anything that reports its surface: a device.Device, a node.
@@ -271,20 +281,31 @@ type Reporter interface {
 
 // Clone returns a deep copy of r.
 func (r Report) Clone() Report {
-	return Report{
+	out := Report{
 		Policies: r.Policies, Level: r.Level, Effective: r.Effective.Clone(),
 		Decisions: slices.Clone(r.Decisions), Withheld: slices.Clone(r.Withheld),
+		Assembled: r.Assembled,
 	}
+	if r.Changed != nil {
+		out.Changed = make([]SurfaceChange, len(r.Changed))
+		copy(out.Changed, r.Changed)
+		for i := range out.Changed {
+			out.Changed[i].Changes = slices.Clone(r.Changed[i].Changes)
+		}
+	}
+	return out
 }
 
 // The wire forms of a report, fields in the order of their JSON keys.
 type (
 	wireReport struct {
-		Decisions []wireDecision `json:"decisions"`
-		Effective wireSurface    `json:"effective"`
-		Level     string         `json:"level"`
-		Policies  string         `json:"policies"`
-		Withheld  []wireElement  `json:"withheld"`
+		Assembled bool                `json:"assembled"`
+		Changed   []wireSurfaceChange `json:"changed"`
+		Decisions []wireDecision      `json:"decisions"`
+		Effective wireSurface         `json:"effective"`
+		Level     string              `json:"level"`
+		Policies  string              `json:"policies"`
+		Withheld  []wireElement       `json:"withheld"`
 	}
 	wireElement struct {
 		Cluster   id32   `json:"cluster"`
@@ -326,9 +347,12 @@ func (w wireElement) value() Element {
 // MarshalJSON implements [json.Marshaler]: the canonical encoding of
 // [Surface.MarshalJSON], the policies' digest in hex, the decisions and
 // withheld elements in their order, their ids in hex as wide as their kind
-// says (a feature's mask eight digits).
+// says (a feature's mask eight digits), and the announced changes, their
+// digests in hex and their time in RFC 3339.
 func (r Report) MarshalJSON() ([]byte, error) {
 	w := wireReport{
+		Assembled: r.Assembled,
+		Changed:   make([]wireSurfaceChange, 0, len(r.Changed)),
 		Decisions: make([]wireDecision, 0, len(r.Decisions)),
 		Effective: r.Effective.wire(true),
 		Level:     string(r.Level),
@@ -345,6 +369,9 @@ func (r Report) MarshalJSON() ([]byte, error) {
 	for _, e := range r.Withheld {
 		w.Withheld = append(w.Withheld, elementWire(e))
 	}
+	for i := range r.Changed {
+		w.Changed = append(w.Changed, r.Changed[i].wire())
+	}
 	return json.Marshal(w)
 }
 
@@ -359,8 +386,15 @@ func (r *Report) UnmarshalJSON(b []byte) error {
 	if err != nil || len(digest) != len(r.Policies) {
 		return fmt.Errorf("surface: report policies %q is no SHA-256 digest", w.Policies)
 	}
-	out := Report{Level: Level(w.Level), Effective: w.Effective.value()}
+	out := Report{Level: Level(w.Level), Effective: w.Effective.value(), Assembled: w.Assembled}
 	copy(out.Policies[:], digest)
+	for _, c := range w.Changed {
+		v, err := c.value()
+		if err != nil {
+			return err
+		}
+		out.Changed = append(out.Changed, v)
+	}
 	for _, d := range w.Decisions {
 		el := wireElement{
 			Cluster: d.Cluster, Endpoint: d.Endpoint, ID: d.ID, Kind: d.Kind,

@@ -35,8 +35,7 @@ var LevelAcknowledged = []Acknowledgement{
 }
 
 // LevelsWithoutDataModel are the levels the cross-check does not compare,
-// with the reason.
-var LevelsWithoutDataModel = map[string]string{
-	"1.6.0": "connectedhomeip has no data_model/1.6.0; data_model/1.6 states spec_tag \"1.6\", and nothing this " +
-		"module carries pins matter.js v0.17.9's 1.6.0 to that specification commit (brief S3 part 5.3: skipped)",
-}
+// with the reason. None: 1.6.0 is compared with data_model/1.6
+// (DataModelVersion; owner decision 2026-10-30, brief S4 carry-over), and
+// its two differences are the Thermostat entries above.
+var LevelsWithoutDataModel = map[string]string{}

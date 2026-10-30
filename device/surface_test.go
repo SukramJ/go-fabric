@@ -185,6 +185,26 @@ func TestSurfaceEqualsTheWire(t *testing.T) {
 	if !slices.Contains(clusterOf(declared.Surface(), cid).Attributes, attr) {
 		t.Fatal("the declared device does not serve its declared attribute")
 	}
+	// The assembled surface — what node.Node.Surface reports once the
+	// topology exists — is the wire with no exception: every cluster the
+	// endpoint serves, the assembler's included, and the BridgedNode
+	// device type beside the device's own.
+	for _, ep := range topo.Bridged() {
+		key := endpoint.RenderSourceKey(ep.SourceKey)
+		assembled := endpoint.SurfaceEndpoint(key, endpoint.ClusterServers(ep))
+		wire := wireRead(t, topo, ep.ID)
+		if len(assembled.Clusters) != len(wire) {
+			t.Errorf("%s: %d clusters assembled, %d on the wire", key, len(assembled.Clusters), len(wire))
+		}
+		for _, c := range assembled.Clusters {
+			if !reflect.DeepEqual(c, wire[c.ID]) {
+				t.Errorf("%s assembled cluster 0x%04X:\nsurface %+v\n   wire %+v", key, c.ID, c, wire[c.ID])
+			}
+		}
+		if !slices.ContainsFunc(assembled.DeviceTypes, func(dt surface.DeviceTypeRef) bool { return dt.ID == uint32(BridgedNodeID) }) {
+			t.Errorf("%s: assembled device types %v lack BridgedNode", key, assembled.DeviceTypes)
+		}
+	}
 	if compared < 50 {
 		t.Fatalf("compared %d device types; the guard needs the generated set", compared)
 	}
