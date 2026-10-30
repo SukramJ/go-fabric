@@ -251,7 +251,7 @@ const profilePolicyPrefix = "profile:"
 // profilePolicy is the built-in policy of one selected profile, judged
 // after the level policy: a Reproduced remove rule that matches removes
 // the element (the chain keeps a mandatory one); a warn rule — or a
-// remove rule of any other confidence — keeps it with a warning decision.
+// remove rule of any other confidence — keeps it with a Warn decision.
 type profilePolicy struct{ profile Profile }
 
 func (p profilePolicy) Name() string { return profilePolicyPrefix + p.profile.Name }
@@ -267,7 +267,10 @@ func (p profilePolicy) Judge(el Element) (v Verdict, reason string) {
 		}
 		warns = append(warns, fmt.Sprintf("warning (%s) profile %s: %s (%s)", r.Confidence, p.profile.Name, r.Reason, r.Source))
 	}
-	return Keep, strings.Join(warns, "; ")
+	if len(warns) == 0 {
+		return Keep, ""
+	}
+	return Warn, strings.Join(warns, "; ")
 }
 
 // describe is the profile's rules in the digest's form, for a profile the

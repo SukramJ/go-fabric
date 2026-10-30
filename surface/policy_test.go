@@ -144,6 +144,40 @@ func (explainedKeep) Judge(surface.Element) (v surface.Verdict, reason string) {
 	return surface.Keep, "baseline"
 }
 
+// warnAll flags every element without removing it.
+type warnAll struct{}
+
+func (warnAll) Name() string { return "warn-all" }
+func (warnAll) Judge(surface.Element) (v surface.Verdict, reason string) {
+	return surface.Warn, "flagged"
+}
+
+// A Warn keeps the element — mandatory or not — and is recorded on every
+// candidate, the verdict in the decision, so a reader counts warnings by
+// the verdict and not by the reason's text.
+func TestEvaluateWarnKeepsAndRecords(t *testing.T) {
+	cands := candidates()
+	kept, ds, err := surface.Evaluate(cands, surface.Policies{Custom: []surface.Policy{warnAll{}}})
+	if err != nil || len(kept) != len(cands) {
+		t.Fatalf("kept %d of %d: %v", len(kept), len(cands), err)
+	}
+	if len(ds) != len(cands) {
+		t.Fatalf("%d decisions for %d candidates", len(ds), len(cands))
+	}
+	for _, d := range ds {
+		if d.Verdict != surface.Warn || d.Policy != "warn-all" || d.Reason != "flagged" {
+			t.Fatalf("decision %+v", d)
+		}
+	}
+	if surface.Warn.String() != "warn" || surface.Keep >= surface.Warn || surface.Warn >= surface.Remove {
+		t.Fatalf("Warn %q sits at %d", surface.Warn, surface.Warn)
+	}
+	var v surface.Verdict
+	if err := v.UnmarshalText([]byte("warn")); err != nil || v != surface.Warn {
+		t.Fatalf("verdict %v %v", v, err)
+	}
+}
+
 func TestEvaluateRejectsBadChains(t *testing.T) {
 	if _, _, err := surface.Evaluate(candidates(), surface.Policies{Custom: []surface.Policy{nil}}); err == nil {
 		t.Fatal("a nil policy was judged")

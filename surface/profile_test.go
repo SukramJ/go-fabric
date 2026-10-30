@@ -105,7 +105,7 @@ func TestProfileWarnRow(t *testing.T) {
 			rows = append(rows, d)
 		}
 	}
-	if len(rows) != 1 || rows[0].Element != msch || rows[0].Policy != "profile:apple-home" || rows[0].Verdict != surface.Keep || rows[0].Reason != want {
+	if len(rows) != 1 || rows[0].Element != msch || rows[0].Policy != "profile:apple-home" || rows[0].Verdict != surface.Warn || rows[0].Reason != want {
 		t.Fatalf("decisions %+v", rows)
 	}
 }
@@ -147,7 +147,7 @@ func TestProfileRemoveRule(t *testing.T) {
 	if d := byElement[cands[2]]; d.Verdict != surface.Keep || d.Reason != "kept: mandatory at pin (removed by profile synthetic: r1 (s1))" {
 		t.Errorf("mandatory feature: %+v", d)
 	}
-	if d := byElement[cands[4]]; d.Verdict != surface.Keep || d.Reason != "warning (Reported) profile synthetic: r3 (s3)" {
+	if d := byElement[cands[4]]; d.Verdict != surface.Warn || d.Reason != "warning (Reported) profile synthetic: r3 (s3)" {
 		t.Errorf("Reported remove: %+v", d)
 	}
 }

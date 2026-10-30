@@ -111,8 +111,8 @@ decides it before it builds a server: it lists the candidate elements with
 their origin (device type, cluster conformance, host declaration), the
 node's policies (`node.Config.Surface`, the same for every device;
 `device.Options.Surface` must match or `Add` refuses the device) judge
-each one — Refuse over Remove over Keep, a mandatory element never
-removed — and the servers are built from what they keep.
+each one — Refuse over Remove over Warn over Keep, a mandatory element
+never removed — and the servers are built from what they keep.
 `Device.Surface()` and `Node.Surface()` report the effective surface, read
 from the built servers through the function the dispatcher serves them
 with, and every decision. One policy is built in and judges first: the

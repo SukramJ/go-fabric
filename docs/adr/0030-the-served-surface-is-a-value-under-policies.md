@@ -46,7 +46,9 @@ value.
    `Reference`: matter.js baseline or an *Ahead of matter.js* register
    row; the specification levels the element exists in; whether it is
    mandatory at the pin). The chain evaluates every policy for every
-   element; precedence is `Refuse` over `Remove` over `Keep`; the
+   element; precedence is `Refuse` over `Remove` over `Warn` over `Keep`
+   (`Warn` keeps the element and flags it — a profile's row below
+   *Reproduced*; amended 2026-10-30, release 0.15.3); the
    `Report` names every decision. `surface.Policies` is the node-level
    set: `Extensions` (#331), `Level` (#332), `Profiles` (controller
    profiles), `Custom` (host rules). Its zero value is the matter.js
