@@ -1653,7 +1653,7 @@
   },
   {
     "file": "controller/client/node.go",
-    "line": 62,
+    "line": 71,
     "citation": "NetworkClient.ts:385-391",
     "resolved": "packages/node/src/behavior/system/network/NetworkClient.ts",
     "identifier": "isNewlyCommissioned",
@@ -1662,7 +1662,7 @@
   },
   {
     "file": "controller/client/node.go",
-    "line": 70,
+    "line": 79,
     "citation": "NetworkClient.ts:268-273",
     "resolved": "packages/node/src/behavior/system/network/NetworkClient.ts",
     "identifier": "fabricLabelReconciled",
@@ -1671,7 +1671,7 @@
   },
   {
     "file": "controller/client/node.go",
-    "line": 339,
+    "line": 348,
     "citation": "NetworkClient.ts:60-102",
     "resolved": "packages/node/src/behavior/system/network/NetworkClient.ts",
     "identifier": "ClientNode",

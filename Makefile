@@ -71,7 +71,8 @@ STRESS_FLAKES = \
 	'./controller/commissioner:^Test(Commissioning)?Connection' \
 	'./controller/client:^TestIcdClientParity$$/availability' \
 	'./cluster/core:^TestICDManagementRegistrationLifecycle$$' \
-	'./client/exchange:^TestMessageExchangePaddedBDXCap$$'
+	'./client/exchange:^TestMessageExchangePaddedBDXCap$$' \
+	'./controller/client:^TestConnectionStateParityMatterJS$$'
 
 .DEFAULT_GOAL := help
 

@@ -223,9 +223,29 @@ func (n *Node) recompute() {
 	}
 	changed := st != n.connState
 	n.connState = st
-	n.mu.Unlock()
 	if changed && n.cfg.Hooks.ConnectionStateChanged != nil {
-		n.cfg.Hooks.ConnectionStateChanged(st)
+		n.pendingStates = append(n.pendingStates, st)
+	}
+	if n.draining || len(n.pendingStates) == 0 {
+		n.mu.Unlock()
+		return
+	}
+	n.draining = true
+	n.mu.Unlock()
+	// Deliver the queued transitions in order, mu released around each
+	// hook; a transition that arrives meanwhile — from another goroutine or
+	// from the hook itself — joins the queue and is delivered here.
+	for {
+		n.mu.Lock()
+		if len(n.pendingStates) == 0 {
+			n.draining = false
+			n.mu.Unlock()
+			return
+		}
+		next := n.pendingStates[0]
+		n.pendingStates = n.pendingStates[1:]
+		n.mu.Unlock()
+		n.cfg.Hooks.ConnectionStateChanged(next)
 	}
 }
 
