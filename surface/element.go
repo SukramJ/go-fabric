@@ -53,8 +53,9 @@ const (
 	// optional element or initial value, an opted-in optional cluster, a
 	// host's own server.
 	OriginHostDeclared
-	// OriginKitDefault: a default server's own optional choice the device
-	// layer makes. No candidate carries it in this phase (package doc).
+	// OriginKitDefault: a server's own optional choice — an optional root
+	// cluster the node mounts by default, an element a hand-written server
+	// serves on its own (the level policy's server-internal decisions).
 	OriginKitDefault
 )
 

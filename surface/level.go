@@ -159,7 +159,8 @@ type clusterKey struct {
 // levelPolicy is the built-in policy that composes at a specification
 // level: it removes the optional surface the level does not know, keeps
 // what the pin mandates, and withholds an endpoint whose device type or
-// mandated cluster the level does not know. [Policies.chain] builds it
+// mandated cluster the level does not know — never the root (Endpoint
+// ""), which keeps such an element as mandatory at the pin. [Policies.chain] builds it
 // over the candidates, so it judges each cluster's features as a set.
 type levelPolicy struct {
 	level Level
@@ -188,12 +189,12 @@ func newLevelPolicy(level Level, candidates []Element) *levelPolicy {
 		k := clusterKey{el.Endpoint, el.Cluster}
 		switch el.Kind {
 		case KindDeviceType:
-			if el.Levels != 0 && !el.Levels.Has(level) {
+			if el.Endpoint != "" && el.Levels != 0 && !el.Levels.Has(level) {
 				p.withheld = append(p.withheld, el)
 			}
 		case KindCluster:
 			clusters[k] = el
-			if el.Mandatory && el.Levels != 0 && !el.Levels.Has(level) {
+			if el.Endpoint != "" && el.Mandatory && el.Levels != 0 && !el.Levels.Has(level) {
 				p.withheld = append(p.withheld, el)
 			}
 		case KindFeature:
@@ -241,7 +242,8 @@ func (p *levelPolicy) checkFeatureSet(k clusterKey, feats []Element, clusters ma
 		remaining |= f.ID
 		p.readd[f] = true
 	}
-	if spec.CheckFeatures(def, remaining) == nil {
+	if spec.CheckFeatures(def, remaining) == nil || k.endpoint == "" {
+		// The root is never withheld: every feature is back.
 		return
 	}
 	el, ok := clusters[k]
@@ -300,7 +302,7 @@ func (p Policies) ServerInternal(ep Endpoint, decided []Element) []Decision {
 			return
 		}
 		known[key{cluster, kind, id}] = true
-		el := Element{Endpoint: ep.Key, Cluster: cluster, Kind: kind, ID: id, Levels: levels}
+		el := Element{Endpoint: ep.Key, Cluster: cluster, Kind: kind, ID: id, Origin: OriginKitDefault, Levels: levels}
 		out = append(out, Decision{Element: el, Policy: levelPolicyName, Verdict: Keep, Reason: ReasonServerInternal})
 	}
 	for _, c := range ep.Clusters {

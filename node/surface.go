@@ -154,22 +154,50 @@ func composeRoot(cfg *Config) ([]surface.Decision, []surface.Element, error) {
 	return decisions, cands, nil
 }
 
-// rootNodeType is the Matter RootNode device type (0x0016), whose
-// mandatory server clusters schema.DeviceTypeMandatoryServerClusters lists.
+// rootNodeType is the Matter RootNode device type (0x0016).
 const rootNodeType schema.DeviceTypeID = 0x0016
+
+// rootMandatory reports whether the RootNode device type may mandate the
+// server cluster id at the pin: its requirement's conformance
+// (schema.DeviceTypeClusterRequirement) is "M", or mandatory under a
+// condition — a name, a negated name, "|" or "&" of those, or an otherwise
+// list with such a term. Groupcast's "GroupcastListenerCond,
+// GroupcastSenderCond, O" is one: the device types a host adds later
+// assert GroupcastListenerCond on the root (schema/devicetype_requirements_gen.go),
+// which the root's clusters are judged before. An element the pin may
+// mandate is never removed by an operator-side policy (ADR 0030
+// decision 3); the level keeps it.
+func rootMandatory(id uint32) bool {
+	r, ok := schema.DeviceTypeClusterRequirement(rootNodeType, id, schema.RequirementServerCluster)
+	return ok && mayBeMandatory(r.Conformance)
+}
+
+// mayBeMandatory reports whether a device-type conformance makes its
+// element mandatory under some set of conditions.
+func mayBeMandatory(c schema.Conformance) bool {
+	switch c.Op {
+	case "M", "name", "!", "|", "&":
+		return true
+	case "otherwise":
+		return slices.ContainsFunc(c.Args, mayBeMandatory)
+	default:
+		return false
+	}
+}
 
 // levelRootClusters judges the root's clusters once they are built (owner
 // decision E.3, concept v11 §D.11): one KindCluster candidate per mounted
-// root server — mandatory for the RootNode device type's mandatory set,
+// root server — mandatory when the RootNode device type may mandate it at
+// the pin ([rootMandatory]),
 // host-declared for the servers the configuration adds
 // ([RootClusters.configured]), a kit default otherwise. A cluster a policy
 // removes is not mounted: the level removes an optional root cluster it
-// does not know. A withheld root (a mandatory root cluster the level does
-// not know) fails [New]; the level table has none (brief S3, measured).
+// does not know. The root is never withheld: a cluster the pin may mandate
+// is kept, "kept: mandatory at pin (absent at level <L>)" — Groupcast below
+// 1.6.0 (parity/levels, measured).
 // The root servers' own optional elements are not level-controlled
 // ([Node.Surface] records them, surface.Policies.ServerInternal).
 func (n *Node) levelRootClusters() error {
-	mandatory := schema.DeviceTypeMandatoryServerClusters[rootNodeType]
 	configured := map[uint32]bool{}
 	for _, s := range n.root.configured() {
 		configured[s.MatterClusterID()] = true
@@ -179,7 +207,7 @@ func (n *Node) levelRootClusters() error {
 		id := s.MatterClusterID()
 		el := surface.Element{Cluster: id, Kind: surface.KindCluster, ID: id, Origin: surface.OriginKitDefault}
 		switch {
-		case slices.Contains(mandatory, id):
+		case rootMandatory(id):
 			el.Origin, el.Mandatory = surface.OriginDeviceType, true
 		case configured[id]:
 			el.Origin = surface.OriginHostDeclared

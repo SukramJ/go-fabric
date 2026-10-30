@@ -160,6 +160,15 @@ func TestLevelPolicyWithholds(t *testing.T) {
 	if !strings.Contains(err.Error(), `endpoint "t"`) || !strings.Contains(err.Error(), "1.4.2") {
 		t.Errorf("error text %q", err)
 	}
+	// The root is never withheld: its mandated cluster is kept.
+	root := surface.Element{Cluster: 0x0065, Kind: surface.KindCluster, ID: 0x0065, Origin: surface.OriginDeviceType, Mandatory: true, Levels: set("1.6.0", "1.6.1")}
+	kept, ds, err = surface.Evaluate([]surface.Element{root}, surface.Policies{Level: "1.4"})
+	if err != nil || len(kept) != 1 {
+		t.Fatalf("root: kept %v, %v", kept, err)
+	}
+	if d, _ := decisionOf(ds, root, "level"); d.Reason != "kept: mandatory at pin (absent at level 1.4)" {
+		t.Errorf("root decision %+v", d)
+	}
 	// A refusal wins over a withhold.
 	cands[2].Reference.Ahead = "BD-x"
 	if _, _, err := surface.Evaluate(cands, surface.Policies{Level: "1.4.2"}); !errors.Is(err, surface.ErrRefused) || errors.Is(err, surface.ErrWithheld) {

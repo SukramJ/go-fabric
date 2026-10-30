@@ -13,6 +13,7 @@ import (
 	"github.com/SukramJ/go-fabric/endpoint"
 	"github.com/SukramJ/go-fabric/node"
 	"github.com/SukramJ/go-fabric/surface"
+	"github.com/SukramJ/go-fabric/surface/surfacetest"
 )
 
 // featureDecisions are the decisions on features.
@@ -38,8 +39,8 @@ func TestNodeRejectsAnUnknownLevel(t *testing.T) {
 	}
 }
 
-// TestNodeRootAtALevel: at 1.4.2 the root does not mount Groupcast, its
-// decision names the level, and no mandatory root cluster is touched; at
+// TestNodeRootAtALevel: at 1.4.2 the root keeps Groupcast, which the pin
+// may mandate, its decision naming the level; at
 // the pin (and with the zero value) the root is unchanged and no level
 // decision exists.
 func TestNodeRootAtALevel(t *testing.T) {
@@ -60,13 +61,15 @@ func TestNodeRootAtALevel(t *testing.T) {
 	if low.Level != "1.4.2" {
 		t.Errorf("report level %q", low.Level)
 	}
-	if rootCluster(low, groupcastID).ID != 0 {
-		t.Error("Groupcast is mounted at 1.4.2")
+	// Groupcast's RootNode conformance may make it mandatory at the pin
+	// (rootMandatory): kept, the reason naming the level.
+	if rootCluster(low, groupcastID).ID != groupcastID {
+		t.Error("Groupcast is not mounted at 1.4.2")
 	}
 	var found bool
 	for _, d := range low.Decisions {
 		if d.Kind == surface.KindCluster && d.Endpoint == "" && d.Policy == "level" {
-			if d.ID != groupcastID || d.Verdict != surface.Remove || d.Reason != "absent at level 1.4.2" || d.Mandatory {
+			if d.ID != groupcastID || d.Verdict != surface.Keep || d.Reason != "kept: mandatory at pin (absent at level 1.4.2)" || !d.Mandatory {
 				t.Errorf("root cluster decision %+v", d)
 			}
 			found = true
@@ -75,8 +78,12 @@ func TestNodeRootAtALevel(t *testing.T) {
 	if !found {
 		t.Error("no level decision on Groupcast")
 	}
-	if len(low.Effective.Root.Clusters) != len(pin.Effective.Root.Clusters)-1 {
-		t.Errorf("root clusters %d at 1.4.2, %d at the pin", len(low.Effective.Root.Clusters), len(pin.Effective.Root.Clusters))
+	// A root cluster a policy removes is not mounted: FixedLabel, a kit
+	// default, by a custom policy.
+	const fixedLabel = 0x0040
+	cut := surfaceNode(t, surface.Policies{Custom: []surface.Policy{surfacetest.Remove(surface.KindCluster, surfacetest.Match{ID: fixedLabel})}}).Surface()
+	if rootCluster(cut, fixedLabel).ID != 0 || len(cut.Effective.Root.Clusters) != len(pin.Effective.Root.Clusters)-1 {
+		t.Errorf("FixedLabel removed: %d root clusters, %d at the pin", len(cut.Effective.Root.Clusters), len(pin.Effective.Root.Clusters))
 	}
 }
 
