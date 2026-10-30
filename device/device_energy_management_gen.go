@@ -52,10 +52,11 @@ type DeviceEnergyManagement struct{ *Device }
 // [FromSpec] with Type DeviceEnergyManagementID (see [New]).
 func NewDeviceEnergyManagement(opts Options, decls ...Declaration) (*DeviceEnergyManagement, error) {
 	d, err := FromSpec(Spec{Type: DeviceEnergyManagementID, Options: opts, Declarations: decls})
-	if err != nil {
+	if d == nil {
 		return nil, err
 	}
-	return &DeviceEnergyManagement{d}, nil
+	// A device the specification level withheld comes with its error ([New]).
+	return &DeviceEnergyManagement{d}, err
 }
 
 // DeviceEnergyManagement is the device's typed DeviceEnergyManagement server; the type mandates it.

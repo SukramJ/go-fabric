@@ -77,10 +77,11 @@ type Intercom struct{ *Device }
 // [FromSpec] with Type IntercomID (see [New]).
 func NewIntercom(opts Options, decls ...Declaration) (*Intercom, error) {
 	d, err := FromSpec(Spec{Type: IntercomID, Options: opts, Declarations: decls})
-	if err != nil {
+	if d == nil {
 		return nil, err
 	}
-	return &Intercom{d}, nil
+	// A device the specification level withheld comes with its error ([New]).
+	return &Intercom{d}, err
 }
 
 // CameraAvStreamManagement is the device's typed CameraAvStreamManagement server; the type mandates it.

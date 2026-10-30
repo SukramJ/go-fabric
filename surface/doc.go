@@ -46,11 +46,31 @@
 // tagged candidate whose row [Policies].Extensions does not enable
 // ([ErrExtensionNotEnabled], the error names the register ID): code that
 // selects an ahead element the same code did not enable is a bug (ADR 0030
-// decision 3). [Policies.Custom] takes the host's own policies, and
-// package surfacetest has the policies the tests use.
+// decision 3). A host-supplied server (device.HostServer) is neither
+// tagged nor refused by the reference policy: its features are the host's
+// own behaviour, and the *Ahead of matter.js* register describes this
+// module's code.
+//
+// The second built-in policy, judged next, is the level policy
+// ([Policies].Level, concept v11 §C.5): the specification level is a
+// Matter revision matter.js has shipped, and what exists at each is the
+// generated table of package schema ([schema.Levels], from matter.js's
+// release tags), which the device layer and the node copy into each
+// candidate's [Element].Levels. At a level below the pin it removes an
+// optional element the level does not know, keeps one the pin mandates
+// ("kept: mandatory at pin (absent at level <L>)"), re-adds features
+// whose removal would leave a selection the pin's conformance rejects,
+// never removes BridgedDeviceBasicInformation's ConfigurationVersion, and
+// withholds an endpoint whose device type or mandated cluster the level
+// does not know ([ErrWithheld]). An element no level knows — a vendor's —
+// is not level-controlled, and [Policies.ServerInternal] records what a
+// hand-written server chose itself. The served ClusterRevision stays the
+// pin's. [Policies.Custom] takes the host's own policies, and package
+// surfacetest has the policies the tests use.
 //
 // The built-in policies never gate a whole cluster: which clusters reach
 // an endpoint is the host's decision through the device types it declares
 // (ADR 0030 decision 7). A Custom policy may still remove an opted-in
-// optional cluster.
+// optional cluster. The level policy removes an optional cluster only
+// because the operator's level does not know it.
 package surface

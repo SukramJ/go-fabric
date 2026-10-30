@@ -66,10 +66,11 @@ type RoboticVacuumCleaner struct{ *Device }
 // [FromSpec] with Type RoboticVacuumCleanerID (see [New]).
 func NewRoboticVacuumCleaner(opts Options, decls ...Declaration) (*RoboticVacuumCleaner, error) {
 	d, err := FromSpec(Spec{Type: RoboticVacuumCleanerID, Options: opts, Declarations: decls})
-	if err != nil {
+	if d == nil {
 		return nil, err
 	}
-	return &RoboticVacuumCleaner{d}, nil
+	// A device the specification level withheld comes with its error ([New]).
+	return &RoboticVacuumCleaner{d}, err
 }
 
 // RvcRunMode is the device's typed RvcRunMode server; the type mandates it.

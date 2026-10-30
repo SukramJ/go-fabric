@@ -41,10 +41,11 @@ type PowerSource struct{ *Device }
 // [FromSpec] with Type PowerSourceID (see [New]).
 func NewPowerSource(opts Options, decls ...Declaration) (*PowerSource, error) {
 	d, err := FromSpec(Spec{Type: PowerSourceID, Options: opts, Declarations: decls})
-	if err != nil {
+	if d == nil {
 		return nil, err
 	}
-	return &PowerSource{d}, nil
+	// A device the specification level withheld comes with its error ([New]).
+	return &PowerSource{d}, err
 }
 
 // PowerSource is the device's typed PowerSource server; the type mandates it.

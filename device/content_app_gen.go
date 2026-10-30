@@ -84,10 +84,11 @@ type ContentApp struct{ *Device }
 // [FromSpec] with Type ContentAppID (see [New]).
 func NewContentApp(opts Options, decls ...Declaration) (*ContentApp, error) {
 	d, err := FromSpec(Spec{Type: ContentAppID, Options: opts, Declarations: decls})
-	if err != nil {
+	if d == nil {
 		return nil, err
 	}
-	return &ContentApp{d}, nil
+	// A device the specification level withheld comes with its error ([New]).
+	return &ContentApp{d}, err
 }
 
 // KeypadInput is the device's typed KeypadInput server; the type mandates it.

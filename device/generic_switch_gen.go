@@ -47,10 +47,11 @@ type GenericSwitch struct{ *Device }
 // [FromSpec] with Type GenericSwitchID (see [New]).
 func NewGenericSwitch(opts Options, decls ...Declaration) (*GenericSwitch, error) {
 	d, err := FromSpec(Spec{Type: GenericSwitchID, Options: opts, Declarations: decls})
-	if err != nil {
+	if d == nil {
 		return nil, err
 	}
-	return &GenericSwitch{d}, nil
+	// A device the specification level withheld comes with its error ([New]).
+	return &GenericSwitch{d}, err
 }
 
 // Switch is the device's typed Switch server; the type mandates it.

@@ -52,10 +52,11 @@ type CookSurface struct{ *Device }
 // [FromSpec] with Type CookSurfaceID (see [New]).
 func NewCookSurface(opts Options, decls ...Declaration) (*CookSurface, error) {
 	d, err := FromSpec(Spec{Type: CookSurfaceID, Options: opts, Declarations: decls})
-	if err != nil {
+	if d == nil {
 		return nil, err
 	}
-	return &CookSurface{d}, nil
+	// A device the specification level withheld comes with its error ([New]).
+	return &CookSurface{d}, err
 }
 
 // OnOff is the device's typed OnOff server, nil until a declaration mounts it.

@@ -79,10 +79,11 @@ type Thermostat struct{ *Device }
 // [FromSpec] with Type ThermostatID (see [New]).
 func NewThermostat(opts Options, decls ...Declaration) (*Thermostat, error) {
 	d, err := FromSpec(Spec{Type: ThermostatID, Options: opts, Declarations: decls})
-	if err != nil {
+	if d == nil {
 		return nil, err
 	}
-	return &Thermostat{d}, nil
+	// A device the specification level withheld comes with its error ([New]).
+	return &Thermostat{d}, err
 }
 
 // Thermostat is the device's typed Thermostat server; the type mandates it.

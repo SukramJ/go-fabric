@@ -51,10 +51,11 @@ type ElectricalSensor struct{ *Device }
 // [FromSpec] with Type ElectricalSensorID (see [New]).
 func NewElectricalSensor(opts Options, decls ...Declaration) (*ElectricalSensor, error) {
 	d, err := FromSpec(Spec{Type: ElectricalSensorID, Options: opts, Declarations: decls})
-	if err != nil {
+	if d == nil {
 		return nil, err
 	}
-	return &ElectricalSensor{d}, nil
+	// A device the specification level withheld comes with its error ([New]).
+	return &ElectricalSensor{d}, err
 }
 
 // PowerTopology is the device's typed PowerTopology server; the type mandates it.

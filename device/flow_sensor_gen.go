@@ -47,10 +47,11 @@ type FlowSensor struct{ *Device }
 // [FromSpec] with Type FlowSensorID (see [New]).
 func NewFlowSensor(opts Options, decls ...Declaration) (*FlowSensor, error) {
 	d, err := FromSpec(Spec{Type: FlowSensorID, Options: opts, Declarations: decls})
-	if err != nil {
+	if d == nil {
 		return nil, err
 	}
-	return &FlowSensor{d}, nil
+	// A device the specification level withheld comes with its error ([New]).
+	return &FlowSensor{d}, err
 }
 
 // FlowMeasurement is the device's typed FlowMeasurement server; the type mandates it.

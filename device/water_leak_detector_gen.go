@@ -56,10 +56,11 @@ type WaterLeakDetector struct{ *Device }
 // [FromSpec] with Type WaterLeakDetectorID (see [New]).
 func NewWaterLeakDetector(opts Options, decls ...Declaration) (*WaterLeakDetector, error) {
 	d, err := FromSpec(Spec{Type: WaterLeakDetectorID, Options: opts, Declarations: decls})
-	if err != nil {
+	if d == nil {
 		return nil, err
 	}
-	return &WaterLeakDetector{d}, nil
+	// A device the specification level withheld comes with its error ([New]).
+	return &WaterLeakDetector{d}, err
 }
 
 // BooleanState is the device's typed BooleanState server; the type mandates it.

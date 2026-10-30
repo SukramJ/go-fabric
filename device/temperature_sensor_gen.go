@@ -55,10 +55,11 @@ type TemperatureSensor struct{ *Device }
 // [FromSpec] with Type TemperatureSensorID (see [New]).
 func NewTemperatureSensor(opts Options, decls ...Declaration) (*TemperatureSensor, error) {
 	d, err := FromSpec(Spec{Type: TemperatureSensorID, Options: opts, Declarations: decls})
-	if err != nil {
+	if d == nil {
 		return nil, err
 	}
-	return &TemperatureSensor{d}, nil
+	// A device the specification level withheld comes with its error ([New]).
+	return &TemperatureSensor{d}, err
 }
 
 // TemperatureMeasurement is the device's typed TemperatureMeasurement server; the type mandates it.

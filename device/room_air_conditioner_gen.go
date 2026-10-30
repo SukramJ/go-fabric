@@ -97,10 +97,11 @@ type RoomAirConditioner struct{ *Device }
 // [FromSpec] with Type RoomAirConditionerID (see [New]).
 func NewRoomAirConditioner(opts Options, decls ...Declaration) (*RoomAirConditioner, error) {
 	d, err := FromSpec(Spec{Type: RoomAirConditionerID, Options: opts, Declarations: decls})
-	if err != nil {
+	if d == nil {
 		return nil, err
 	}
-	return &RoomAirConditioner{d}, nil
+	// A device the specification level withheld comes with its error ([New]).
+	return &RoomAirConditioner{d}, err
 }
 
 // OnOff is the device's typed OnOff server; the type mandates it.

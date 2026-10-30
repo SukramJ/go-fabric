@@ -67,11 +67,16 @@ type Node struct {
 	aggServers    []contract.ClusterServer
 	surfaceDigest [32]byte
 	// rootDecisions are the decisions on the root's candidates
-	// (composeRoot).
-	rootDecisions []surface.Decision
-	caseIDs       *caseIdentities
-	sec           *security
-	window        *commissioningHost
+	// (composeRoot, levelRootClusters); rootCandidates the candidates.
+	rootDecisions  []surface.Decision
+	rootCandidates []surface.Element
+	// withheld are the endpoints the level withheld at Add or Replace,
+	// by rendered key ([Node.Surface]).
+	withheldMu sync.Mutex
+	withheld   map[string]surface.Report
+	caseIDs    *caseIdentities
+	sec        *security
+	window     *commissioningHost
 	// observers are the hooks Observe registered after
 	// Config.Observers (observers.go).
 	observers observerSet
@@ -152,7 +157,7 @@ type Node struct {
 // the node was started.
 func New(cfg Config) (*Node, error) { //nolint:funlen // the composition root: one sequential wiring pass, as main.go
 	// The root's surface is decided before anything is opened or built.
-	rootDecisions, err := validateAndComposeRoot(&cfg)
+	rootDecisions, rootCandidates, err := validateAndComposeRoot(&cfg)
 	if err != nil {
 		return nil, err
 	}
@@ -176,7 +181,7 @@ func New(cfg Config) (*Node, error) { //nolint:funlen // the composition root: o
 	}
 	n.life, n.cancel = context.WithCancel(ctx)
 	n.surfaceDigest = cfg.Surface.Digest()
-	n.rootDecisions = rootDecisions
+	n.rootDecisions, n.rootCandidates = rootDecisions, rootCandidates
 	ok := false
 	defer func() {
 		if !ok {
@@ -307,6 +312,9 @@ func New(cfg Config) (*Node, error) { //nolint:funlen // the composition root: o
 	})
 	if err != nil {
 		return nil, fmt.Errorf("node: %w", err)
+	}
+	if err := n.levelRootClusters(); err != nil {
+		return nil, err
 	}
 	n.persisted.restoreRoot(ctx, n.root.BasicInformation)
 	// DiagnosticLogs hands logs over BDX on the requesting session

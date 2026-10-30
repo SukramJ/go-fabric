@@ -67,10 +67,11 @@ type AirPurifier struct{ *Device }
 // [FromSpec] with Type AirPurifierID (see [New]).
 func NewAirPurifier(opts Options, decls ...Declaration) (*AirPurifier, error) {
 	d, err := FromSpec(Spec{Type: AirPurifierID, Options: opts, Declarations: decls})
-	if err != nil {
+	if d == nil {
 		return nil, err
 	}
-	return &AirPurifier{d}, nil
+	// A device the specification level withheld comes with its error ([New]).
+	return &AirPurifier{d}, err
 }
 
 // FanControl is the device's typed FanControl server; the type mandates it.

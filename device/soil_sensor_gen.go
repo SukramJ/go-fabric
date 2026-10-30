@@ -52,10 +52,11 @@ type SoilSensor struct{ *Device }
 // [FromSpec] with Type SoilSensorID (see [New]).
 func NewSoilSensor(opts Options, decls ...Declaration) (*SoilSensor, error) {
 	d, err := FromSpec(Spec{Type: SoilSensorID, Options: opts, Declarations: decls})
-	if err != nil {
+	if d == nil {
 		return nil, err
 	}
-	return &SoilSensor{d}, nil
+	// A device the specification level withheld comes with its error ([New]).
+	return &SoilSensor{d}, err
 }
 
 // SoilMeasurement is the device's typed SoilMeasurement server; the type mandates it.

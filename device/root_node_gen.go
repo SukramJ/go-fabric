@@ -152,10 +152,11 @@ type RootNode struct{ *Device }
 // [FromSpec] with Type RootNodeID (see [New]).
 func NewRootNode(opts Options, decls ...Declaration) (*RootNode, error) {
 	d, err := FromSpec(Spec{Type: RootNodeID, Options: opts, Declarations: decls})
-	if err != nil {
+	if d == nil {
 		return nil, err
 	}
-	return &RootNode{d}, nil
+	// A device the specification level withheld comes with its error ([New]).
+	return &RootNode{d}, err
 }
 
 // BasicInformation is the device's typed BasicInformation server; the type mandates it.

@@ -88,10 +88,11 @@ type Camera struct{ *Device }
 // [FromSpec] with Type CameraID (see [New]).
 func NewCamera(opts Options, decls ...Declaration) (*Camera, error) {
 	d, err := FromSpec(Spec{Type: CameraID, Options: opts, Declarations: decls})
-	if err != nil {
+	if d == nil {
 		return nil, err
 	}
-	return &Camera{d}, nil
+	// A device the specification level withheld comes with its error ([New]).
+	return &Camera{d}, err
 }
 
 // CameraAvStreamManagement is the device's typed CameraAvStreamManagement server; the type mandates it.

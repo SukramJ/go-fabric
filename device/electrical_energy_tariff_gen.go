@@ -58,10 +58,11 @@ type ElectricalEnergyTariff struct{ *Device }
 // [FromSpec] with Type ElectricalEnergyTariffID (see [New]).
 func NewElectricalEnergyTariff(opts Options, decls ...Declaration) (*ElectricalEnergyTariff, error) {
 	d, err := FromSpec(Spec{Type: ElectricalEnergyTariffID, Options: opts, Declarations: decls})
-	if err != nil {
+	if d == nil {
 		return nil, err
 	}
-	return &ElectricalEnergyTariff{d}, nil
+	// A device the specification level withheld comes with its error ([New]).
+	return &ElectricalEnergyTariff{d}, err
 }
 
 // CommodityPrice is the device's typed CommodityPrice server, nil until a declaration mounts it.

@@ -47,10 +47,11 @@ type OtaRequestor struct{ *Device }
 // [FromSpec] with Type OtaRequestorID (see [New]).
 func NewOtaRequestor(opts Options, decls ...Declaration) (*OtaRequestor, error) {
 	d, err := FromSpec(Spec{Type: OtaRequestorID, Options: opts, Declarations: decls})
-	if err != nil {
+	if d == nil {
 		return nil, err
 	}
-	return &OtaRequestor{d}, nil
+	// A device the specification level withheld comes with its error ([New]).
+	return &OtaRequestor{d}, err
 }
 
 // OtaSoftwareUpdateRequestor is the device's typed OtaSoftwareUpdateRequestor server; the type mandates it.

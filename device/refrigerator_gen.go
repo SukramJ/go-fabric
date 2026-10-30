@@ -55,10 +55,11 @@ type Refrigerator struct{ *Device }
 // [FromSpec] with Type RefrigeratorID (see [New]).
 func NewRefrigerator(opts Options, decls ...Declaration) (*Refrigerator, error) {
 	d, err := FromSpec(Spec{Type: RefrigeratorID, Options: opts, Declarations: decls})
-	if err != nil {
+	if d == nil {
 		return nil, err
 	}
-	return &Refrigerator{d}, nil
+	// A device the specification level withheld comes with its error ([New]).
+	return &Refrigerator{d}, err
 }
 
 // RefrigeratorAndTemperatureControlledCabinetMode is the device's typed RefrigeratorAndTemperatureControlledCabinetMode server, nil until a declaration mounts it.

@@ -47,10 +47,11 @@ type Cooktop struct{ *Device }
 // [FromSpec] with Type CooktopID (see [New]).
 func NewCooktop(opts Options, decls ...Declaration) (*Cooktop, error) {
 	d, err := FromSpec(Spec{Type: CooktopID, Options: opts, Declarations: decls})
-	if err != nil {
+	if d == nil {
 		return nil, err
 	}
-	return &Cooktop{d}, nil
+	// A device the specification level withheld comes with its error ([New]).
+	return &Cooktop{d}, err
 }
 
 // OnOff is the device's typed OnOff server; the type mandates it.

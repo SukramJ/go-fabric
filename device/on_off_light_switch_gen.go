@@ -64,10 +64,11 @@ type OnOffLightSwitch struct{ *Device }
 // [FromSpec] with Type OnOffLightSwitchID (see [New]).
 func NewOnOffLightSwitch(opts Options, decls ...Declaration) (*OnOffLightSwitch, error) {
 	d, err := FromSpec(Spec{Type: OnOffLightSwitchID, Options: opts, Declarations: decls})
-	if err != nil {
+	if d == nil {
 		return nil, err
 	}
-	return &OnOffLightSwitch{d}, nil
+	// A device the specification level withheld comes with its error ([New]).
+	return &OnOffLightSwitch{d}, err
 }
 
 // Binding is the device's typed Binding server; the type mandates it.

@@ -43,8 +43,12 @@ func NewVideoDoorbell(opts Options, camera *Camera, doorbell *Doorbell, decls ..
 		return nil, fmt.Errorf("%w: VideoDoorbell needs its components Camera and Doorbell", ErrComposition)
 	}
 	d, err := FromSpec(Spec{Type: VideoDoorbellID, Options: opts, Declarations: decls})
-	if err != nil {
+	if d == nil {
 		return nil, err
+	}
+	if err != nil {
+		// Withheld by the specification level ([New]): no parts.
+		return &VideoDoorbell{Device: d}, err
 	}
 	for _, p := range []*Device{camera.Device, doorbell.Device} {
 		if err := d.AddPart(p); err != nil {

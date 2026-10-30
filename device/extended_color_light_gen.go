@@ -94,10 +94,11 @@ type ExtendedColorLight struct{ *Device }
 // [FromSpec] with Type ExtendedColorLightID (see [New]).
 func NewExtendedColorLight(opts Options, decls ...Declaration) (*ExtendedColorLight, error) {
 	d, err := FromSpec(Spec{Type: ExtendedColorLightID, Options: opts, Declarations: decls})
-	if err != nil {
+	if d == nil {
 		return nil, err
 	}
-	return &ExtendedColorLight{d}, nil
+	// A device the specification level withheld comes with its error ([New]).
+	return &ExtendedColorLight{d}, err
 }
 
 // OnOff is the device's typed OnOff server; the type mandates it.

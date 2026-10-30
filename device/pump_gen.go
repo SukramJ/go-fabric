@@ -97,10 +97,11 @@ type Pump struct{ *Device }
 // [FromSpec] with Type PumpID (see [New]).
 func NewPump(opts Options, decls ...Declaration) (*Pump, error) {
 	d, err := FromSpec(Spec{Type: PumpID, Options: opts, Declarations: decls})
-	if err != nil {
+	if d == nil {
 		return nil, err
 	}
-	return &Pump{d}, nil
+	// A device the specification level withheld comes with its error ([New]).
+	return &Pump{d}, err
 }
 
 // OnOff is the device's typed OnOff server; the type mandates it.

@@ -83,10 +83,11 @@ type MountedOnOffControl struct{ *Device }
 // [FromSpec] with Type MountedOnOffControlID (see [New]).
 func NewMountedOnOffControl(opts Options, decls ...Declaration) (*MountedOnOffControl, error) {
 	d, err := FromSpec(Spec{Type: MountedOnOffControlID, Options: opts, Declarations: decls})
-	if err != nil {
+	if d == nil {
 		return nil, err
 	}
-	return &MountedOnOffControl{d}, nil
+	// A device the specification level withheld comes with its error ([New]).
+	return &MountedOnOffControl{d}, err
 }
 
 // OnOff is the device's typed OnOff server; the type mandates it.

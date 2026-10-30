@@ -106,6 +106,9 @@ func (deviceOption) ClusterDeclaration() spec.ClusterDeclaration { return spec.C
 
 // settings is what the declarations of one New call collected.
 type settings struct {
+	// candidates are the surface candidates compose judged; New
+	// records the server-internal elements against them.
+	candidates []surface.Element
 	// key is the device's StableKey ([defaultBuild] key).
 	key string
 	// self is the device's endpoint number once assembled

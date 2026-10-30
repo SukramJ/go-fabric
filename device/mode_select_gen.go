@@ -41,10 +41,11 @@ type ModeSelect struct{ *Device }
 // [FromSpec] with Type ModeSelectID (see [New]).
 func NewModeSelect(opts Options, decls ...Declaration) (*ModeSelect, error) {
 	d, err := FromSpec(Spec{Type: ModeSelectID, Options: opts, Declarations: decls})
-	if err != nil {
+	if d == nil {
 		return nil, err
 	}
-	return &ModeSelect{d}, nil
+	// A device the specification level withheld comes with its error ([New]).
+	return &ModeSelect{d}, err
 }
 
 // ModeSelect is the device's typed ModeSelect server; the type mandates it.

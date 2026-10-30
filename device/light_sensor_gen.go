@@ -47,10 +47,11 @@ type LightSensor struct{ *Device }
 // [FromSpec] with Type LightSensorID (see [New]).
 func NewLightSensor(opts Options, decls ...Declaration) (*LightSensor, error) {
 	d, err := FromSpec(Spec{Type: LightSensorID, Options: opts, Declarations: decls})
-	if err != nil {
+	if d == nil {
 		return nil, err
 	}
-	return &LightSensor{d}, nil
+	// A device the specification level withheld comes with its error ([New]).
+	return &LightSensor{d}, err
 }
 
 // IlluminanceMeasurement is the device's typed IlluminanceMeasurement server; the type mandates it.

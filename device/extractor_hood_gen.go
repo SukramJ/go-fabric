@@ -56,10 +56,11 @@ type ExtractorHood struct{ *Device }
 // [FromSpec] with Type ExtractorHoodID (see [New]).
 func NewExtractorHood(opts Options, decls ...Declaration) (*ExtractorHood, error) {
 	d, err := FromSpec(Spec{Type: ExtractorHoodID, Options: opts, Declarations: decls})
-	if err != nil {
+	if d == nil {
 		return nil, err
 	}
-	return &ExtractorHood{d}, nil
+	// A device the specification level withheld comes with its error ([New]).
+	return &ExtractorHood{d}, err
 }
 
 // FanControl is the device's typed FanControl server; the type mandates it.

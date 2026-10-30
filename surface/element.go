@@ -6,6 +6,8 @@ package surface
 import (
 	"fmt"
 	"strconv"
+
+	"github.com/SukramJ/go-fabric/schema"
 )
 
 // Kind is what an [Element] or a [Change] is about.
@@ -96,6 +98,11 @@ type Element struct {
 	// at the pin — the device type mandates it, or the cluster's
 	// conformance does for the selected features.
 	Mandatory bool
+	// Levels are the specification levels the element exists at
+	// ([ElementLevels], from the generated table); the device layer and
+	// the node fill it. 0 is an element no level knows — a vendor's — which
+	// the level policy does not control. It is not part of the JSON.
+	Levels schema.LevelSet
 }
 
 // String names the element: "attribute 0x0001 of cluster 0x0006 on

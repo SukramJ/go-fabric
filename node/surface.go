@@ -110,24 +110,32 @@ func rootCandidates(cfg *Config) []surface.Element {
 	return out
 }
 
-// validateAndComposeRoot validates cfg ([Config.Validate]) and then
-// decides the root's surface ([composeRoot]).
-func validateAndComposeRoot(cfg *Config) ([]surface.Decision, error) {
+// validateAndComposeRoot validates cfg ([Config.Validate]) and its
+// surface policies' level (surface.Policies.Validate), then decides the
+// root's feature surface ([composeRoot]).
+func validateAndComposeRoot(cfg *Config) ([]surface.Decision, []surface.Element, error) {
 	if err := cfg.Validate(); err != nil {
-		return nil, err
+		return nil, nil, err
+	}
+	if err := cfg.Surface.Validate(); err != nil {
+		return nil, nil, fmt.Errorf("node: %w", err)
 	}
 	return composeRoot(cfg)
 }
 
-// composeRoot judges the root's candidates by cfg.Surface before the root
-// servers are built: a refusal fails [New]; a feature a custom policy
-// removes leaves cfg's selection (TimeSynchronization's features, copied
-// first). It returns the decisions, which [Node.Surface] reports.
-func composeRoot(cfg *Config) ([]surface.Decision, error) {
+// composeRoot judges the root's feature candidates by cfg.Surface before
+// the root servers are built: a refusal fails [New]; a feature a policy
+// removes — a custom one, or the level — leaves cfg's selection
+// (TimeSynchronization's features, copied first). It returns the
+// decisions, which [Node.Surface] reports, and the candidates.
+func composeRoot(cfg *Config) ([]surface.Decision, []surface.Element, error) {
 	cands := rootCandidates(cfg)
+	for i := range cands {
+		cands[i].Levels = surface.ElementLevels(cands[i])
+	}
 	kept, decisions, err := surface.Evaluate(cands, cfg.Surface)
 	if err != nil {
-		return decisions, fmt.Errorf("node: the root endpoint: %w", err)
+		return decisions, cands, fmt.Errorf("node: the root endpoint: %w", err)
 	}
 	keep := make(map[surface.Element]bool, len(kept))
 	for _, e := range kept {
@@ -143,7 +151,59 @@ func composeRoot(cfg *Config) ([]surface.Decision, error) {
 		ts.Features &^= tsdef.Feature(e.ID)
 		cfg.TimeSynchronization = &ts
 	}
-	return decisions, nil
+	return decisions, cands, nil
+}
+
+// rootNodeType is the Matter RootNode device type (0x0016), whose
+// mandatory server clusters schema.DeviceTypeMandatoryServerClusters lists.
+const rootNodeType schema.DeviceTypeID = 0x0016
+
+// levelRootClusters judges the root's clusters once they are built (owner
+// decision E.3, concept v11 §D.11): one KindCluster candidate per mounted
+// root server — mandatory for the RootNode device type's mandatory set,
+// host-declared for the servers the configuration adds
+// ([RootClusters.configured]), a kit default otherwise. A cluster a policy
+// removes is not mounted: the level removes an optional root cluster it
+// does not know. A withheld root (a mandatory root cluster the level does
+// not know) fails [New]; the level table has none (brief S3, measured).
+// The root servers' own optional elements are not level-controlled
+// ([Node.Surface] records them, surface.Policies.ServerInternal).
+func (n *Node) levelRootClusters() error {
+	mandatory := schema.DeviceTypeMandatoryServerClusters[rootNodeType]
+	configured := map[uint32]bool{}
+	for _, s := range n.root.configured() {
+		configured[s.MatterClusterID()] = true
+	}
+	var cands []surface.Element
+	for _, s := range n.root.servers {
+		id := s.MatterClusterID()
+		el := surface.Element{Cluster: id, Kind: surface.KindCluster, ID: id, Origin: surface.OriginKitDefault}
+		switch {
+		case slices.Contains(mandatory, id):
+			el.Origin, el.Mandatory = surface.OriginDeviceType, true
+		case configured[id]:
+			el.Origin = surface.OriginHostDeclared
+		default:
+		}
+		el.Levels = surface.ElementLevels(el)
+		cands = append(cands, el)
+	}
+	kept, decisions, err := surface.Evaluate(cands, n.cfg.Surface)
+	if err != nil {
+		return fmt.Errorf("node: the root endpoint: %w", err)
+	}
+	keep := map[uint32]bool{}
+	for _, e := range kept {
+		keep[e.ID] = true
+	}
+	servers := slices.DeleteFunc(slices.Clone(n.root.servers), func(s contract.ClusterServer) bool { return !keep[s.MatterClusterID()] })
+	if len(servers) != len(n.root.servers) {
+		n.root.servers = servers
+		n.root.Descriptor.SetServerListProvider(clusterIDsOf(servers))
+	}
+	n.rootDecisions = append(n.rootDecisions, decisions...)
+	n.rootCandidates = append(n.rootCandidates, cands...)
+	return nil
 }
 
 // surfaceEntry is one endpoint an added [Endpoint] brings: the endpoint
@@ -186,7 +246,8 @@ func surfaceEntries(ep Endpoint) []surfaceEntry {
 // key [AggregatorSurfaceKey] ([ErrReservedKey]) or reports a surface
 // composed under policies other than the node's ([ErrPolicyMismatch]). An
 // endpoint without a reporter — a host's own Spec type — passes the
-// second check.
+// second check. An endpoint the specification level withheld is recorded
+// and refused with its *surface.WithheldError ([Node.Surface]).
 func (n *Node) checkSurface(ep Endpoint) error {
 	entries := surfaceEntries(ep)
 	for i := range entries {
@@ -201,7 +262,37 @@ func (n *Node) checkSurface(ep Endpoint) error {
 			return fmt.Errorf("%w: endpoint %q (policies %x…, the node's %x…)", ErrPolicyMismatch, e.key, got[:4], n.surfaceDigest[:4])
 		}
 	}
-	return nil
+	return n.recordWithheld(entries)
+}
+
+// recordWithheld records each entry the specification level withheld
+// (its report lists withheld elements; device.New returned the device
+// with a surface.WithheldError) for [Node.Surface] and returns a
+// *surface.WithheldError naming the first; an entry that is not withheld
+// clears an earlier record under its key.
+func (n *Node) recordWithheld(entries []surfaceEntry) error {
+	n.withheldMu.Lock()
+	defer n.withheldMu.Unlock()
+	var first error
+	for i := range entries {
+		e := &entries[i]
+		if e.reporter == nil {
+			continue
+		}
+		r := e.reporter.Surface()
+		if len(r.Withheld) == 0 {
+			delete(n.withheld, e.key)
+			continue
+		}
+		if n.withheld == nil {
+			n.withheld = map[string]surface.Report{}
+		}
+		n.withheld[e.key] = r
+		if first == nil {
+			first = &surface.WithheldError{Endpoint: e.key, Elements: slices.Clone(r.Withheld), Report: r}
+		}
+	}
+	return first
 }
 
 // Surface reports the node's surface: the digest of [Config].Surface, the
@@ -215,15 +306,27 @@ func (n *Node) checkSurface(ep Endpoint) error {
 // decisions. As for a device, the clusters the endpoint assembler mounts
 // on a bridged endpoint are not part of it. An endpoint's number is filled
 // in once it is assembled.
+//
+// Under a specification level ([Config].Surface's Level) the report names
+// the level; the root's decisions include its clusters (levelRootClusters)
+// and, for the root and the Aggregator endpoint, a keep decision on every
+// served element the level does not know that no candidate decided
+// (surface.Policies.ServerInternal); and an endpoint the level withheld at
+// Add or Replace appears with its decisions and withheld elements, not in
+// the effective surface.
 func (n *Node) Surface() surface.Report {
-	rep := surface.Report{Policies: n.surfaceDigest, Decisions: slices.Clone(n.rootDecisions)}
+	policies := n.cfg.Surface
+	rep := surface.Report{Policies: n.surfaceDigest, Level: policies.EffectiveLevel(), Decisions: slices.Clone(n.rootDecisions)}
 	if n.root != nil {
 		rep.Effective.Root = endpoint.SurfaceEndpoint("", n.root.Servers())
+		rep.Decisions = append(rep.Decisions, policies.ServerInternal(rep.Effective.Root, n.rootCandidates)...)
 	}
 	type entry struct {
 		ep        surface.Endpoint
 		decisions []surface.Decision
 		withheld  []surface.Element
+		// noEndpoint: a withheld endpoint, which serves nothing.
+		noEndpoint bool
 	}
 	var entries []entry
 	if n.aggServers != nil {
@@ -233,7 +336,7 @@ func (n *Node) Surface() surface.Report {
 				agg.Number = ep.ID
 			}
 		}
-		entries = append(entries, entry{ep: agg})
+		entries = append(entries, entry{ep: agg, decisions: policies.ServerInternal(agg, nil)})
 	}
 	if n.agg != nil {
 		for _, ep := range n.agg.all() {
@@ -255,9 +358,16 @@ func (n *Node) Surface() surface.Report {
 			}
 		}
 	}
+	n.withheldMu.Lock()
+	for key, r := range n.withheld {
+		entries = append(entries, entry{ep: surface.Endpoint{Key: key}, decisions: r.Decisions, withheld: r.Withheld, noEndpoint: true})
+	}
+	n.withheldMu.Unlock()
 	slices.SortStableFunc(entries, func(a, b entry) int { return cmp.Compare(a.ep.Key, b.ep.Key) })
 	for _, e := range entries {
-		rep.Effective.Endpoints = append(rep.Effective.Endpoints, e.ep)
+		if !e.noEndpoint {
+			rep.Effective.Endpoints = append(rep.Effective.Endpoints, e.ep)
+		}
 		rep.Decisions = append(rep.Decisions, e.decisions...)
 		rep.Withheld = append(rep.Withheld, e.withheld...)
 	}

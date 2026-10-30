@@ -55,10 +55,11 @@ type IrrigationSystem struct{ *Device }
 // [FromSpec] with Type IrrigationSystemID (see [New]).
 func NewIrrigationSystem(opts Options, decls ...Declaration) (*IrrigationSystem, error) {
 	d, err := FromSpec(Spec{Type: IrrigationSystemID, Options: opts, Declarations: decls})
-	if err != nil {
+	if d == nil {
 		return nil, err
 	}
-	return &IrrigationSystem{d}, nil
+	// A device the specification level withheld comes with its error ([New]).
+	return &IrrigationSystem{d}, err
 }
 
 // OperationalState is the device's typed OperationalState server, nil until a declaration mounts it.

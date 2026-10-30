@@ -57,10 +57,11 @@ type EnergyEvse struct{ *Device }
 // [FromSpec] with Type EnergyEvseID (see [New]).
 func NewEnergyEvse(opts Options, decls ...Declaration) (*EnergyEvse, error) {
 	d, err := FromSpec(Spec{Type: EnergyEvseID, Options: opts, Declarations: decls})
-	if err != nil {
+	if d == nil {
 		return nil, err
 	}
-	return &EnergyEvse{d}, nil
+	// A device the specification level withheld comes with its error ([New]).
+	return &EnergyEvse{d}, err
 }
 
 // EnergyEvse is the device's typed EnergyEvse server; the type mandates it.

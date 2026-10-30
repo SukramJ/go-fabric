@@ -90,10 +90,11 @@ type AudioDoorbell struct{ *Device }
 // [FromSpec] with Type AudioDoorbellID (see [New]).
 func NewAudioDoorbell(opts Options, decls ...Declaration) (*AudioDoorbell, error) {
 	d, err := FromSpec(Spec{Type: AudioDoorbellID, Options: opts, Declarations: decls})
-	if err != nil {
+	if d == nil {
 		return nil, err
 	}
-	return &AudioDoorbell{d}, nil
+	// A device the specification level withheld comes with its error ([New]).
+	return &AudioDoorbell{d}, err
 }
 
 // Switch is the device's typed Switch server; the type mandates it.

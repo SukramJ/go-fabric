@@ -115,6 +115,15 @@ var assemblerMounted = map[uint32]string{
 // carries (OnWrite, Handle…) is installed on its cluster's server, the
 // kit's or the host's.
 //
+// Under [Options].Surface New first rejects a level the policies do not
+// know (surface.Policies.Validate). When the specification level does not
+// know the type or a cluster the type mandates, New returns the device
+// together with a *surface.WithheldError (errors.Is surface.ErrWithheld):
+// the device serves nothing, its Surface() reports the decisions and the
+// withheld elements, and node.Aggregator.Add of it records it as withheld
+// and returns the same error. A level is an operator's setting; the host
+// decides what to show.
+//
 // Mirrors matter.js's construction of an Endpoint from its generated
 // MutableEndpoint type (packages/node/src/devices/dimmable-light.ts:103-116,
 // packages/node/src/endpoint/Endpoint.ts:596-637).
@@ -124,6 +133,11 @@ func New(t *Type, opts Options, decls ...Declaration) (*Device, error) {
 	}
 	if opts.StableKey == nil {
 		return nil, fmt.Errorf("%w: %s needs a StableKey", ErrConfiguration, t.Name)
+	}
+	if opts.Surface != nil {
+		if err := opts.Surface.Validate(); err != nil {
+			return nil, fmt.Errorf("%s: %w", t.Name, err)
+		}
 	}
 	s := newSettings()
 	if opts.StableKey != nil {
@@ -174,6 +188,12 @@ func New(t *Type, opts Options, decls ...Declaration) (*Device, error) {
 	// mounted in the type's order.
 	s.measured = m.ids
 	if d.servers, d.report, err = compose(eff, s, opts); err != nil {
+		if errors.Is(err, surface.ErrWithheld) {
+			// The level withheld the device: it serves nothing and
+			// reports its decisions; node.Aggregator.Add of it records
+			// it and returns the same error.
+			return d, err
+		}
 		return nil, err
 	}
 	if err := d.attachHooks(s); err != nil {
@@ -183,6 +203,9 @@ func New(t *Type, opts Options, decls ...Declaration) (*Device, error) {
 		return nil, fmt.Errorf("%s: %w", t.Name, err)
 	}
 	d.report.Effective = d.effective()
+	if opts.Surface != nil {
+		d.report.Decisions = append(d.report.Decisions, opts.Surface.ServerInternal(d.report.Effective.Endpoints[0], s.candidates)...)
+	}
 	return d, nil
 }
 

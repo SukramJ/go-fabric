@@ -56,10 +56,11 @@ type SecondaryNetworkInterface struct{ *Device }
 // [FromSpec] with Type SecondaryNetworkInterfaceID (see [New]).
 func NewSecondaryNetworkInterface(opts Options, decls ...Declaration) (*SecondaryNetworkInterface, error) {
 	d, err := FromSpec(Spec{Type: SecondaryNetworkInterfaceID, Options: opts, Declarations: decls})
-	if err != nil {
+	if d == nil {
 		return nil, err
 	}
-	return &SecondaryNetworkInterface{d}, nil
+	// A device the specification level withheld comes with its error ([New]).
+	return &SecondaryNetworkInterface{d}, err
 }
 
 // NetworkCommissioning is the device's typed NetworkCommissioning server; the type mandates it.

@@ -45,8 +45,9 @@ type HeatPump struct{ *Device }
 // [FromSpec] with Type HeatPumpID (see [New]).
 func NewHeatPump(opts Options, decls ...Declaration) (*HeatPump, error) {
 	d, err := FromSpec(Spec{Type: HeatPumpID, Options: opts, Declarations: decls})
-	if err != nil {
+	if d == nil {
 		return nil, err
 	}
-	return &HeatPump{d}, nil
+	// A device the specification level withheld comes with its error ([New]).
+	return &HeatPump{d}, err
 }

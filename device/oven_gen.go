@@ -40,8 +40,9 @@ type Oven struct{ *Device }
 // [FromSpec] with Type OvenID (see [New]).
 func NewOven(opts Options, decls ...Declaration) (*Oven, error) {
 	d, err := FromSpec(Spec{Type: OvenID, Options: opts, Declarations: decls})
-	if err != nil {
+	if d == nil {
 		return nil, err
 	}
-	return &Oven{d}, nil
+	// A device the specification level withheld comes with its error ([New]).
+	return &Oven{d}, err
 }

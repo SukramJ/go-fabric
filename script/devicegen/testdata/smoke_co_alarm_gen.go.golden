@@ -67,10 +67,11 @@ type SmokeCoAlarm struct{ *Device }
 // [FromSpec] with Type SmokeCoAlarmID (see [New]).
 func NewSmokeCoAlarm(opts Options, decls ...Declaration) (*SmokeCoAlarm, error) {
 	d, err := FromSpec(Spec{Type: SmokeCoAlarmID, Options: opts, Declarations: decls})
-	if err != nil {
+	if d == nil {
 		return nil, err
 	}
-	return &SmokeCoAlarm{d}, nil
+	// A device the specification level withheld comes with its error ([New]).
+	return &SmokeCoAlarm{d}, err
 }
 
 // SmokeCoAlarm is the device's typed SmokeCoAlarm server; the type mandates it.

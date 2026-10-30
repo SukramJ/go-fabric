@@ -46,10 +46,11 @@ type Chime struct{ *Device }
 // [FromSpec] with Type ChimeID (see [New]).
 func NewChime(opts Options, decls ...Declaration) (*Chime, error) {
 	d, err := FromSpec(Spec{Type: ChimeID, Options: opts, Declarations: decls})
-	if err != nil {
+	if d == nil {
 		return nil, err
 	}
-	return &Chime{d}, nil
+	// A device the specification level withheld comes with its error ([New]).
+	return &Chime{d}, err
 }
 
 // Chime is the device's typed Chime server; the type mandates it.
