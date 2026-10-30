@@ -15,8 +15,9 @@ import (
 	"github.com/SukramJ/go-fabric/surface"
 )
 
-// ErrPolicyMismatch: [Aggregator.Add] (or Replace) of an endpoint composed
-// under surface policies other than the node's [Config].Surface — a
+// ErrPolicyMismatch is the refusal of [Aggregator.Add] (or Replace) of an
+// endpoint composed under surface policies other than the node's
+// [Config].Surface — a
 // device built with another device.Options.Surface. Policies hold for the
 // whole node; a rule for one device is a policy that judges by
 // [surface.Element].Endpoint.
@@ -48,8 +49,9 @@ func surfaceEntries(ep Endpoint) []surfaceEntry {
 	out := []surfaceEntry{top}
 	var parts func([]endpoint.Spec)
 	parts = func(specs []endpoint.Spec) {
-		for _, p := range specs {
-			e := surfaceEntry{key: endpoint.RenderSourceKey(p.StableKey), spec: p}
+		for i := range specs {
+			p := &specs[i]
+			e := surfaceEntry{key: endpoint.RenderSourceKey(p.StableKey), spec: *p}
 			if r, ok := p.Source.(surface.Reporter); ok {
 				e.reporter = r
 			}
@@ -65,7 +67,9 @@ func surfaceEntries(ep Endpoint) []surfaceEntry {
 // composed under policies other than the node's ([ErrPolicyMismatch]). An
 // endpoint without a reporter — a host's own Spec type — passes.
 func (n *Node) checkSurface(ep Endpoint) error {
-	for _, e := range surfaceEntries(ep) {
+	entries := surfaceEntries(ep)
+	for i := range entries {
+		e := &entries[i]
 		if e.reporter == nil {
 			continue
 		}
@@ -108,7 +112,9 @@ func (n *Node) Surface() surface.Report {
 	}
 	if n.agg != nil {
 		for _, ep := range n.agg.all() {
-			for _, e := range surfaceEntries(ep) {
+			own := surfaceEntries(ep)
+			for i := range own {
+				e := &own[i]
 				if e.reporter == nil {
 					entries = append(entries, entry{ep: plainSurface(e.key, e.spec)})
 					continue

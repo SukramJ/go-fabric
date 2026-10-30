@@ -307,16 +307,10 @@ func defaultServer(t *Type, r *ClusterRequirement, s *settings, sibling func(uin
 	// features the cluster itself marks mandatory ("M"), which
 	// spec.CheckFeatures demands of every selection — EnergyEvse's PREF
 	// (owner's decision, 2026-10-11).
-	features := r.Features | clusterMandatedFeatures(def)
-	if sel, ok := s.features[r.ID]; ok {
-		if missing := r.Features &^ sel; missing != 0 {
-			return nil, fmt.Errorf("%w: %s requires %s feature %s (conformance M); the selection 0x%X leaves it out",
-				ErrConfiguration, t.Name, r.Name, strings.Join(featureNames(r, missing), ", "), sel)
-		}
-		features = sel
+	features, err := selection(t, r, s)
+	if err != nil {
+		return nil, err
 	}
-	// The bits the surface policies removed (compose).
-	features &^= s.cut.features[r.ID]
 	if err := spec.CheckFeatures(def, features); err != nil {
 		// RequirementGenerator.ts:188-199, EndpointFile.ts:144-158: a
 		// cluster whose mandated features are no legal selection is not
@@ -343,10 +337,8 @@ func defaultServer(t *Type, r *ClusterRequirement, s *settings, sibling func(uin
 		default:
 		}
 	}
-	// The elements the surface policies removed (compose).
-	opts.Attributes = s.cut.keep(r.ID, surface.KindAttribute, opts.Attributes)
-	opts.Commands = s.cut.keep(r.ID, surface.KindCommand, opts.Commands)
-	opts.Events = s.cut.keep(r.ID, surface.KindEvent, opts.Events)
+	// Without the elements the surface policies removed (compose).
+	opts = s.cut.trim(r.ID, opts)
 	inst, err := spec.New(def, opts)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %s %s: %w", ErrConfiguration, t.Name, r.Name, err)
@@ -360,12 +352,7 @@ func defaultServer(t *Type, r *ClusterRequirement, s *settings, sibling func(uin
 			initial[e.ID] = v
 		}
 	}
-	for id, v := range s.initial[r.ID] {
-		if s.cut.removed(r.ID, surface.KindAttribute, id) {
-			continue
-		}
-		initial[id] = v
-	}
+	maps.Copy(initial, s.cut.initial(r.ID, s.initial[r.ID]))
 	if factory, held := selfHeldDefaults[r.ID]; held {
 		srv, err := factory(defaultBuild{
 			def: def, opts: opts, clock: s.clock, sibling: sibling, deviceType: uint16(t.ID), key: s.key,
@@ -411,6 +398,22 @@ func defaultServer(t *Type, r *ClusterRequirement, s *settings, sibling func(uin
 	}
 	fillSelectDefaults(def, srv)
 	return srv, nil
+}
+
+// selection is the feature selection of r's default server: the device
+// type's mandated features and the cluster's own "M" ones, or the host's
+// selection, which must hold the type's — without the bits the surface
+// policies removed (compose).
+func selection(t *Type, r *ClusterRequirement, s *settings) (uint32, error) {
+	features := r.Features | clusterMandatedFeatures(r.Definition)
+	if sel, ok := s.features[r.ID]; ok {
+		if missing := r.Features &^ sel; missing != 0 {
+			return 0, fmt.Errorf("%w: %s requires %s feature %s (conformance M); the selection 0x%X leaves it out",
+				ErrConfiguration, t.Name, r.Name, strings.Join(featureNames(r, missing), ", "), sel)
+		}
+		features = sel
+	}
+	return features &^ s.cut.features[r.ID], nil
 }
 
 // generatedConfig is the configuration of the generated server of cluster

@@ -22,6 +22,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -57,14 +58,14 @@ func run() error {
 		goTool = "go"
 	}
 	bin := filepath.Join(dir, "reference-bridge")
-	build := exec.Command(goTool, "build", "-o", bin, "./examples/reference-bridge") //nolint:gosec // G204: the go tool the Makefile names
+	build := exec.CommandContext(context.Background(), goTool, "build", "-o", bin, "./examples/reference-bridge") //nolint:gosec // G204: the go tool the Makefile names
 	build.Stdout, build.Stderr = os.Stderr, os.Stderr
 	if err := build.Run(); err != nil {
 		return fmt.Errorf("build the reference daemon: %w", err)
 	}
 	// Run in the scratch directory: the dump opens no store, and nothing
 	// it might write lands in the tree.
-	dump := exec.Command(bin, "--dump-surface") //nolint:gosec // G204: the binary built above
+	dump := exec.CommandContext(context.Background(), bin, "--dump-surface") //nolint:gosec // G204: the binary built above
 	dump.Dir = dir
 	dump.Stderr = os.Stderr
 	out, err := dump.Output()

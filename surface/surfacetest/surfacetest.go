@@ -69,7 +69,7 @@ func (p policy) Describe() string {
 }
 
 // Judge implements [surface.Policy].
-func (p policy) Judge(e surface.Element) (surface.Verdict, string) {
+func (p policy) Judge(e surface.Element) (v surface.Verdict, reason string) {
 	if p.verdict == surface.Keep || e.Kind != p.kind || !p.match.matches(e) {
 		return surface.Keep, ""
 	}

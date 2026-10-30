@@ -19,6 +19,7 @@ import (
 	"github.com/SukramJ/go-fabric/endpoint/endpointtest"
 	"github.com/SukramJ/go-fabric/groups"
 	"github.com/SukramJ/go-fabric/im"
+	"github.com/SukramJ/go-fabric/schema"
 	"github.com/SukramJ/go-fabric/surface"
 	"github.com/SukramJ/go-fabric/surface/surfacetest"
 )
@@ -210,12 +211,14 @@ func optionalFeature(t *testing.T, r ClusterRequirement) (base, bit uint32) {
 // clusters, found in the definition at the default selection.
 func optionalAttribute(t *testing.T) (cid, attr uint32) {
 	t.Helper()
-	for _, r := range OnOffLightType.Servers {
+	for i := range OnOffLightType.Servers {
+		r := &OnOffLightType.Servers[i]
 		if _, mounted := assemblerMounted[r.ID]; mounted || r.Definition == nil {
 			continue
 		}
 		ctx := spec.Context(r.Definition, r.Features|clusterMandatedFeatures(r.Definition))
-		for _, a := range r.Definition.Attributes {
+		for j := range r.Definition.Attributes {
+			a := &r.Definition.Attributes[j]
 			if a.Conformance.Applicability(ctx) == spec.ApplicabilityOptional && a.ID < 0xFFF0 {
 				return r.ID, a.ID
 			}
@@ -437,4 +440,74 @@ func clusterOf(r surface.Report, id uint32) surface.Cluster {
 		}
 	}
 	return surface.Cluster{}
+}
+
+func TestConformanceOf(t *testing.T) {
+	var def *spec.Cluster
+	for _, typ := range Types() {
+		for i := range typ.Servers {
+			if d := typ.Servers[i].Definition; d != nil && len(d.Events) > 0 && len(d.Commands) > 0 {
+				def = d
+				break
+			}
+		}
+		if def != nil {
+			break
+		}
+	}
+	if def == nil {
+		t.Fatal("no cluster definition with events and commands")
+	}
+	if _, ok := conformanceOf(def, surface.KindEvent, def.Events[0].ID); !ok {
+		t.Errorf("event 0x%02X of %s has no conformance", def.Events[0].ID, def.Name)
+	}
+	for i := range def.Commands {
+		if c := &def.Commands[i]; c.Direction == spec.Request {
+			if _, ok := conformanceOf(def, surface.KindCommand, c.ID); !ok {
+				t.Errorf("command 0x%02X of %s has no conformance", c.ID, def.Name)
+			}
+			break
+		}
+	}
+	for _, kind := range []surface.Kind{surface.KindAttribute, surface.KindCommand, surface.KindEvent, surface.KindCluster} {
+		if _, ok := conformanceOf(def, kind, 0xFFFF_0000); ok {
+			t.Errorf("an undefined %s has a conformance", kind)
+		}
+	}
+}
+
+// TestSurfaceTypeMandatedElementDeclared: an element the host declares
+// that the device type already mandates is one candidate, the type's.
+func TestSurfaceTypeMandatedElementDeclared(t *testing.T) {
+	for _, typ := range Types() {
+		for i := range typ.Servers {
+			r := &typ.Servers[i]
+			if _, mounted := assemblerMounted[r.ID]; mounted || r.Definition == nil || !r.Mandatory {
+				continue
+			}
+			for _, e := range r.Elements {
+				if e.Presence != PresenceMandatory || e.Element != schema.RequirementAttribute {
+					continue
+				}
+				d, err := New(typ, testOptions("dup"), withElements(r.ID, spec.Options{Attributes: []uint32{e.ID}}))
+				if err != nil {
+					continue
+				}
+				n := 0
+				for _, dec := range d.Surface().Decisions {
+					if dec.Kind == surface.KindAttribute && dec.Cluster == r.ID && dec.ID == e.ID {
+						n++
+						if dec.Origin != surface.OriginDeviceType || !dec.Mandatory {
+							t.Errorf("%s 0x%04X/0x%04X: %+v", typ.Name, r.ID, e.ID, dec)
+						}
+					}
+				}
+				if n != 1 {
+					t.Errorf("%s 0x%04X/0x%04X: %d candidates", typ.Name, r.ID, e.ID, n)
+				}
+				return
+			}
+		}
+	}
+	t.Fatal("no device type mandates an attribute of a cluster")
 }

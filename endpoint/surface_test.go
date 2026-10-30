@@ -54,7 +54,7 @@ func TestSurfaceEndpoint(t *testing.T) {
 	if want := []surface.DeviceTypeRef{{ID: 0x0100, Revision: 1}, {ID: 0x0013, Revision: 1}}; !reflect.DeepEqual(ep.DeviceTypes, want) {
 		t.Fatalf("device types %v", ep.DeviceTypes)
 	}
-	var ids []uint32
+	ids := make([]uint32, 0, len(ep.Clusters))
 	for _, c := range ep.Clusters {
 		ids = append(ids, c.ID)
 	}

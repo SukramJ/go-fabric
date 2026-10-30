@@ -303,10 +303,29 @@ func cutOf(candidates, kept []surface.Element) surfaceCut {
 	return c
 }
 
-// removed reports whether the cut removes the element of kind with id
-// from cluster.
-func (c surfaceCut) removed(cluster uint32, kind surface.Kind, id uint32) bool {
-	return c.elements[cluster][kind][id]
+// trim returns opts without the attributes, commands and events the cut
+// removes from cluster.
+func (c surfaceCut) trim(cluster uint32, opts spec.Options) spec.Options {
+	opts.Attributes = c.keep(cluster, surface.KindAttribute, opts.Attributes)
+	opts.Commands = c.keep(cluster, surface.KindCommand, opts.Commands)
+	opts.Events = c.keep(cluster, surface.KindEvent, opts.Events)
+	return opts
+}
+
+// initial returns the initial values of cluster without the attributes
+// the cut removes; values itself when it removes none.
+func (c surfaceCut) initial(cluster uint32, values map[uint32]any) map[uint32]any {
+	cut := c.elements[cluster][surface.KindAttribute]
+	if len(cut) == 0 {
+		return values
+	}
+	out := make(map[uint32]any, len(values))
+	for id, v := range values {
+		if !cut[id] {
+			out[id] = v
+		}
+	}
+	return out
 }
 
 // keep returns ids without the ones the cut removes from cluster; ids

@@ -104,7 +104,7 @@ func TestNodeSurface(t *testing.T) {
 	if root.Key != "" || len(root.DeviceTypes) == 0 || len(root.Clusters) == 0 {
 		t.Fatalf("root %+v", root)
 	}
-	var keys []string
+	keys := make([]string, 0, len(rep.Effective.Endpoints))
 	byKey := map[string]surface.Endpoint{}
 	for _, ep := range rep.Effective.Endpoints {
 		keys = append(keys, ep.Key)

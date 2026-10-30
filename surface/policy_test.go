@@ -74,7 +74,7 @@ func TestEvaluateRemoveAndMandatory(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var keptIDs []uint32
+	keptIDs := make([]uint32, 0, len(kept))
 	for _, e := range kept {
 		keptIDs = append(keptIDs, e.ID)
 	}
@@ -132,13 +132,15 @@ func TestEvaluateRefuse(t *testing.T) {
 
 type badPolicy struct{}
 
-func (badPolicy) Name() string                                    { return "bad" }
-func (badPolicy) Judge(surface.Element) (surface.Verdict, string) { return surface.Verdict(9), "?" }
+func (badPolicy) Name() string { return "bad" }
+func (badPolicy) Judge(surface.Element) (v surface.Verdict, reason string) {
+	return surface.Verdict(9), "?"
+}
 
 type explainedKeep struct{}
 
 func (explainedKeep) Name() string { return "explained" }
-func (explainedKeep) Judge(surface.Element) (surface.Verdict, string) {
+func (explainedKeep) Judge(surface.Element) (v surface.Verdict, reason string) {
 	return surface.Keep, "baseline"
 }
 
