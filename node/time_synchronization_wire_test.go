@@ -13,6 +13,7 @@ import (
 	"github.com/SukramJ/go-fabric/fabrictest"
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/node"
+	"github.com/SukramJ/go-fabric/surface"
 )
 
 // Config.TimeSynchronization serves the features on the root over the
@@ -24,6 +25,8 @@ func TestTimeSynchronizationFeaturesOnTheWire(t *testing.T) {
 	site := fabrictest.NewSite(t, fabrictest.Options{})
 	pair := site.CommissionedPair(fabrictest.PairOptions{Device: fabrictest.Topology{Configure: func(cfg *node.Config) {
 		cfg.TimeSynchronization = &node.TimeSynchronizationConfig{Features: tsdef.FeatureTimeZone | tsdef.FeatureTimeSyncClient}
+		// The features are ahead of matter.js (core.TimeSynchronizationAhead).
+		cfg.Surface.Extensions = surface.NewExtensions("BD-chip-TimeSynchronization-Features")
 	}}})
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()

@@ -138,7 +138,7 @@ func TestEndpointNumberReservationParityMatterJS(t *testing.T) {
 		t.Parallel()
 		d := reservationDevice(t)
 		subtree := func() *device.BridgedNode {
-			owner, err := device.NewBridgedNode(device.Options{StableKey: endpoint.StringKey("aggregator"), Name: "aggregator"})
+			owner, err := device.NewBridgedNode(device.Options{StableKey: endpoint.StringKey("subtree-owner"), Name: "subtree-owner"})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -151,7 +151,7 @@ func TestEndpointNumberReservationParityMatterJS(t *testing.T) {
 			t.Helper()
 			aggregatorDo(t, d, func(a *node.Aggregator) error { return a.Add(context.Background(), subtree()) })
 			for _, bd := range d.Node().Topology().Devices {
-				if bd.Key.String() == "aggregator" && len(bd.Parts) == 1 {
+				if bd.Key.String() == "subtree-owner" && len(bd.Parts) == 1 {
 					return bd.Endpoint, bd.Parts[0].Endpoint
 				}
 			}
@@ -160,12 +160,12 @@ func TestEndpointNumberReservationParityMatterJS(t *testing.T) {
 		}
 		owner, child := add()
 		// Closed (Remove), the subtree keeps both numbers.
-		aggregatorDo(t, d, remove("aggregator"))
+		aggregatorDo(t, d, remove("subtree-owner"))
 		if o, c := add(); o != owner || c != child {
 			t.Errorf("re-added after Remove at %d/%d, want %d/%d", o, c, owner, child)
 		}
 		// Deleted (Forget), it frees them: nothing is handed back.
-		aggregatorDo(t, d, forget("aggregator"))
+		aggregatorDo(t, d, forget("subtree-owner"))
 		if len(d.Node().Topology().Devices) != 0 {
 			t.Error("the forgotten subtree is still served")
 		}

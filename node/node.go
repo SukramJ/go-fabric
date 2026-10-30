@@ -32,6 +32,7 @@ import (
 	"github.com/SukramJ/go-fabric/internal/serialqueue"
 	"github.com/SukramJ/go-fabric/mdns"
 	"github.com/SukramJ/go-fabric/store"
+	"github.com/SukramJ/go-fabric/surface"
 	"github.com/SukramJ/go-fabric/transport/udp"
 )
 
@@ -65,6 +66,9 @@ type Node struct {
 	// surfaceDigest is Config.Surface's digest, computed once.
 	aggServers    []contract.ClusterServer
 	surfaceDigest [32]byte
+	// rootDecisions are the decisions on the root's candidates
+	// (composeRoot).
+	rootDecisions []surface.Decision
 	caseIDs       *caseIdentities
 	sec           *security
 	window        *commissioningHost
@@ -150,6 +154,11 @@ func New(cfg Config) (*Node, error) { //nolint:funlen // the composition root: o
 	if err := cfg.Validate(); err != nil {
 		return nil, err
 	}
+	// The root's surface is decided before anything is opened or built.
+	rootDecisions, err := composeRoot(&cfg)
+	if err != nil {
+		return nil, err
+	}
 	attestationErr, err := cfg.resolveAttestation()
 	if err != nil {
 		return nil, err
@@ -170,6 +179,7 @@ func New(cfg Config) (*Node, error) { //nolint:funlen // the composition root: o
 	}
 	n.life, n.cancel = context.WithCancel(ctx)
 	n.surfaceDigest = cfg.Surface.Digest()
+	n.rootDecisions = rootDecisions
 	ok := false
 	defer func() {
 		if !ok {
