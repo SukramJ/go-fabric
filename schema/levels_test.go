@@ -122,4 +122,14 @@ func TestLevelAccessors(t *testing.T) {
 	if _, ok := schema.ClusterRevisionAt(thermostat, "1.7"); ok {
 		t.Error("no revision at an unknown level")
 	}
+	// Groupcast (0x0065) is not in the 1.4 model (parity/levels, measured).
+	if _, ok := schema.ClusterRevisionAt(0x0065, "1.4"); ok {
+		t.Error("no revision where the cluster is absent")
+	}
+	if _, ok := schema.ClusterRevisionAt(0xFFFF_FFFF, "1.4"); ok {
+		t.Error("no revision of an unknown cluster")
+	}
+	if got := schema.LevelSet(0xFF).Levels(); len(got) != len(schema.Levels()) {
+		t.Errorf("bits beyond the levels: %v", got)
+	}
 }

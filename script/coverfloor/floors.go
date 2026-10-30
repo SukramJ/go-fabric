@@ -241,6 +241,8 @@ var floors = []packageFloor{
 	{pkg: "github.com/SukramJ/go-fabric/script/docscheck", min: 0, why: "test only, no statements to cover: the guard is the test"},
 	{pkg: "github.com/SukramJ/go-fabric/script/errprefix", min: 0, why: "test only, no statements to cover: the guard is the test"},
 	{pkg: "github.com/SukramJ/go-fabric/script/slogkeys", min: 0, why: "test only, no statements to cover: the guard is the test"},
+	{pkg: "github.com/SukramJ/go-fabric/script/levelgen", min: 40, why: "the dump parser, the writer and the table half of run are tested (measured 41.0); measureInternal builds and runs the reference daemon, which make generate-levels exercises and TestSpecLevelsDocIsCurrent regenerates in memory"},
+	{pkg: "github.com/SukramJ/go-fabric/script/levelgen/leveltable", min: 97},
 	{pkg: "github.com/SukramJ/go-fabric/script/surfacecheck", min: 50, why: "the summary and the committed snapshot are tested (measured 50.9); run, which builds and runs the reference daemon, is exercised by make surface-check"},
 	{
 		pkg: "github.com/SukramJ/go-fabric/script/dclsnapshot",
