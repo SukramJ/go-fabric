@@ -89,7 +89,7 @@ func TestCompareLevelOnFixtures(t *testing.T) {
 		},
 	}
 	got := CompareLevel("1.4.2", LevelIDsOfFile(f), LevelIDsOfModel(m))
-	var lines []string
+	lines := make([]string, 0, len(got))
 	for _, d := range got {
 		lines = append(lines, d.Path+" chip="+d.Chip+" ours="+d.Ours)
 	}

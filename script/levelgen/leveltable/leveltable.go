@@ -1,13 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright (C) 2026 SukramJ.
 
-// Package leveltable reads the specification level files
-// (parity/levels/<level>.json, extracted from matter.js's release tags by
-// script/extract-levels-from-matter-js.ts) and renders what is generated
-// from them: schema/levels_gen.go and the generated block of
-// docs/reference/spec-levels.md (concept v11 §C.5, brief S3 part 2). It is
-// a library so the drift tests (schema/levels_test.go, the reference
-// daemon's level test) regenerate in memory what script/levelgen writes.
 package leveltable
 
 import (
@@ -136,7 +129,8 @@ func CompareLevels(a, b string) int {
 // name, a newline, its bytes.
 func Hash(files []File) string {
 	h := sha256.New()
-	for _, f := range files {
+	for fi := range files {
+		f := &files[fi]
 		h.Write([]byte(f.Name + "\n"))
 		h.Write(f.raw)
 	}
@@ -288,7 +282,8 @@ package schema
 	b.WriteString("// levels are the specification levels, ascending: the Matter revisions\n")
 	b.WriteString("// matter.js's release tags model (parity/levels/<level>.json).\n")
 	b.WriteString("var levels = []Level{\n")
-	for _, f := range files {
+	for fi := range files {
+		f := &files[fi]
 		fmt.Fprintf(&b, "\t%q, // matter.js %s (%s), method %s\n", f.Matter.Revision, f.Matter.Tag, short(f.Matter.SourceCommit), f.Matter.Method)
 	}
 	b.WriteString("}\n\n")
@@ -302,12 +297,14 @@ package schema
 		attributes, commands, events map[uint32]set
 	}
 	cls := map[uint32]*cl{}
-	for i, f := range files {
+	for i := range files {
+		f := &files[i]
 		bit := set(1) << i
 		for _, d := range f.DeviceTypes {
 			dts[d.ID] |= bit
 		}
-		for _, c := range f.Clusters {
+		for ci := range f.Clusters {
+			c := &f.Clusters[ci]
 			x := cls[c.ID]
 			if x == nil {
 				x = &cl{

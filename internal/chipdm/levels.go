@@ -48,7 +48,8 @@ func LevelIDsOfFile(f leveltable.File) LevelIDs {
 	for _, d := range f.DeviceTypes {
 		out.DeviceTypes[d.ID] = true
 	}
-	for _, c := range f.Clusters {
+	for ci := range f.Clusters {
+		c := &f.Clusters[ci]
 		lc := newLevelCluster()
 		for _, ft := range c.Features {
 			lc.Features[uint32(ft.Bit)] = true

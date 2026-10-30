@@ -108,7 +108,8 @@ func measureInternal(files []leveltable.File) (map[string][]leveltable.Internal,
 		return nil, fmt.Errorf("build the reference daemon: %w", err)
 	}
 	out := map[string][]leveltable.Internal{}
-	for _, f := range files[:len(files)-1] {
+	for fi := range files[:len(files)-1] {
+		f := &files[fi]
 		level := f.Matter.Revision
 		dump := exec.CommandContext(context.Background(), bin, "--dump-surface", "--spec-level", level) //nolint:gosec // G204: the binary built above
 		dump.Dir = dir
@@ -178,5 +179,5 @@ func writeIfChanged(path string, content []byte) error {
 		fmt.Printf("  (unchanged: %s)\n", path)
 		return nil
 	}
-	return os.WriteFile(path, content, 0o600)
+	return os.WriteFile(path, content, 0o600) //nolint:gosec // G703: the generator's own fixed output paths
 }

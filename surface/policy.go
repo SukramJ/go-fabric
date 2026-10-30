@@ -124,8 +124,9 @@ func (p Policies) Digest() [32]byte {
 // policy, the built-in level policy — built over the candidates, so it
 // judges each cluster's features as a set — then the custom ones.
 func (p Policies) chain(candidates []Element) []Policy {
-	builtIn := []Policy{referencePolicy{enabled: p.Extensions}, newLevelPolicy(p.EffectiveLevel(), candidates)}
-	return append(builtIn, p.Custom...)
+	chain := make([]Policy, 0, 2+len(p.Custom))
+	chain = append(chain, referencePolicy{enabled: p.Extensions}, newLevelPolicy(p.EffectiveLevel(), candidates))
+	return append(chain, p.Custom...)
 }
 
 // ErrRefused is wrapped by the [*RefusedError] [Evaluate] returns when a

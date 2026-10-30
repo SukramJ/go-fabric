@@ -221,7 +221,7 @@ func TestServerInternal(t *testing.T) {
 		t.Fatalf("at the pin: %v", got)
 	}
 	got := (surface.Policies{Level: "1.4.2"}).ServerInternal(ep, decided)
-	var names []string
+	names := make([]string, 0, len(got))
 	for _, d := range got {
 		if d.Policy != "level" || d.Verdict != surface.Keep || d.Reason != surface.ReasonServerInternal {
 			t.Errorf("decision %+v", d)

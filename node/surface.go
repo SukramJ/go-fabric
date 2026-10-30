@@ -5,6 +5,7 @@ package node
 
 import (
 	"cmp"
+	"context"
 	"errors"
 	"fmt"
 	"maps"
@@ -185,6 +186,17 @@ func mayBeMandatory(c schema.Conformance) bool {
 	}
 }
 
+// buildLevelledRoot builds the root's servers (buildRoot) and judges its
+// clusters ([Node.levelRootClusters]).
+func (n *Node) buildLevelledRoot(ctx context.Context, d rootDeps) error {
+	root, err := buildRoot(ctx, d)
+	if err != nil {
+		return fmt.Errorf("node: %w", err)
+	}
+	n.root = root
+	return n.levelRootClusters()
+}
+
 // levelRootClusters judges the root's clusters once they are built (owner
 // decision E.3, concept v11 §D.11): one KindCluster candidate per mounted
 // root server — mandatory when the RootNode device type may mandate it at
@@ -202,7 +214,7 @@ func (n *Node) levelRootClusters() error {
 	for _, s := range n.root.configured() {
 		configured[s.MatterClusterID()] = true
 	}
-	var cands []surface.Element
+	cands := make([]surface.Element, 0, len(n.root.servers))
 	for _, s := range n.root.servers {
 		id := s.MatterClusterID()
 		el := surface.Element{Cluster: id, Kind: surface.KindCluster, ID: id, Origin: surface.OriginKitDefault}
@@ -387,12 +399,14 @@ func (n *Node) Surface() surface.Report {
 		}
 	}
 	n.withheldMu.Lock()
-	for key, r := range n.withheld {
+	for key := range n.withheld {
+		r := n.withheld[key]
 		entries = append(entries, entry{ep: surface.Endpoint{Key: key}, decisions: r.Decisions, withheld: r.Withheld, noEndpoint: true})
 	}
 	n.withheldMu.Unlock()
 	slices.SortStableFunc(entries, func(a, b entry) int { return cmp.Compare(a.ep.Key, b.ep.Key) })
-	for _, e := range entries {
+	for i := range entries {
+		e := &entries[i]
 		if !e.noEndpoint {
 			rep.Effective.Endpoints = append(rep.Effective.Endpoints, e.ep)
 		}

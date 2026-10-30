@@ -304,16 +304,12 @@ func New(cfg Config) (*Node, error) { //nolint:funlen // the composition root: o
 	// reads the fabric's KeySets, which GroupKeyManagementServer.keySetWrite
 	// replaced in place).
 	n.groups.OnGroupcastChanged(n.caseIDs.refreshIPK)
-	n.root, err = buildRoot(ctx, rootDeps{
+	if err := n.buildLevelledRoot(ctx, rootDeps{
 		cfg: &n.cfg, logger: n.logger, bootReason: n.bootReason, st: n.st, groups: n.groups, connector: n.br,
 		onFabricInstalled:       n.observedFabricInstalled,
 		onCommissioningComplete: n.commissioningCompleted,
 		onFailSafeExpired:       n.failSafeExpired,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("node: %w", err)
-	}
-	if err := n.levelRootClusters(); err != nil {
+	}); err != nil {
 		return nil, err
 	}
 	n.persisted.restoreRoot(ctx, n.root.BasicInformation)

@@ -259,7 +259,7 @@ func (p *levelPolicy) checkFeatureSet(k clusterKey, feats []Element, clusters ma
 // silently; an unknown one that withholds its endpoint is kept with the
 // withheld reason, a re-added feature and ConfigurationVersion with
 // theirs, and any other is removed (the chain keeps a mandatory one).
-func (p *levelPolicy) Judge(el Element) (Verdict, string) {
+func (p *levelPolicy) Judge(el Element) (v Verdict, reason string) {
 	if p.pin || el.Levels == 0 || el.Levels.Has(p.level) {
 		return Keep, ""
 	}
