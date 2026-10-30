@@ -32,6 +32,7 @@ import (
 	"github.com/SukramJ/go-fabric/internal/serialqueue"
 	"github.com/SukramJ/go-fabric/mdns"
 	"github.com/SukramJ/go-fabric/store"
+	"github.com/SukramJ/go-fabric/surface"
 	"github.com/SukramJ/go-fabric/transport/udp"
 )
 
@@ -65,6 +66,9 @@ type Node struct {
 	// surfaceDigest is Config.Surface's digest, computed once.
 	aggServers    []contract.ClusterServer
 	surfaceDigest [32]byte
+	// rootDecisions are the decisions on the root's candidates
+	// (composeRoot).
+	rootDecisions []surface.Decision
 	caseIDs       *caseIdentities
 	sec           *security
 	window        *commissioningHost
@@ -147,7 +151,9 @@ type Node struct {
 // daemon does before Start; call [Node.Stop] to end them, whether or not
 // the node was started.
 func New(cfg Config) (*Node, error) { //nolint:funlen // the composition root: one sequential wiring pass, as main.go
-	if err := cfg.Validate(); err != nil {
+	// The root's surface is decided before anything is opened or built.
+	rootDecisions, err := validateAndComposeRoot(&cfg)
+	if err != nil {
 		return nil, err
 	}
 	attestationErr, err := cfg.resolveAttestation()
@@ -170,6 +176,7 @@ func New(cfg Config) (*Node, error) { //nolint:funlen // the composition root: o
 	}
 	n.life, n.cancel = context.WithCancel(ctx)
 	n.surfaceDigest = cfg.Surface.Digest()
+	n.rootDecisions = rootDecisions
 	ok := false
 	defer func() {
 		if !ok {

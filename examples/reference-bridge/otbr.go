@@ -16,6 +16,7 @@ import (
 	tnddef "github.com/SukramJ/go-fabric/cluster/spec/threadnetworkdiagnostics"
 	"github.com/SukramJ/go-fabric/cluster/threadbr"
 	"github.com/SukramJ/go-fabric/device"
+	"github.com/SukramJ/go-fabric/surface"
 	"github.com/SukramJ/go-fabric/thread/otbr"
 )
 
@@ -63,9 +64,9 @@ func parseOTBRURL(raw string) (host string, port int, err error) {
 }
 
 // newDemoBorderRouter builds the ThreadBorderRouter endpoint on the
-// border router at raw; the border router must answer (its agent id and
-// name are read at construction).
-func newDemoBorderRouter(raw string, logger *slog.Logger) (*demoBorderRouter, error) {
+// border router at raw under the daemon's surface policies; the border
+// router must answer (its agent id and name are read at construction).
+func newDemoBorderRouter(raw string, policies *surface.Policies, logger *slog.Logger) (*demoBorderRouter, error) {
 	host, port, err := parseOTBRURL(raw)
 	if err != nil {
 		return nil, err
@@ -78,7 +79,7 @@ func newDemoBorderRouter(raw string, logger *slog.Logger) (*demoBorderRouter, er
 	if err != nil {
 		return nil, err
 	}
-	d, err := device.NewThreadBorderRouter(device.Options{StableKey: device.StringKey("otbr"), Name: "Thread Border Router"},
+	d, err := device.NewThreadBorderRouter(device.Options{StableKey: device.StringKey("otbr"), Name: "Thread Border Router", Surface: policies},
 		tbrmdef.Declare{BorderRouter: br, Features: tbrmdef.FeaturePanChange},
 		tnddef.Declare{Features: threadbr.DiagnosticsFeatures})
 	if err != nil {

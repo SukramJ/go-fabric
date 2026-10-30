@@ -115,8 +115,14 @@ each one — Refuse over Remove over Keep, a mandatory element never
 removed — and the servers are built from what they keep.
 `Device.Surface()` and `Node.Surface()` report the effective surface, read
 from the built servers through the function the dispatcher serves them
-with, and every decision; the zero-value policies keep everything, so a
-node composes as it did before. The reference daemon prints its report
+with, and every decision. One policy is built in and judges first: the
+reference policy refuses an element a server declares as an *Ahead of
+matter.js* register row (`surface.AheadSet`; Thermostat MSCH and TEVT, the
+root's TimeSynchronization features, the Thread NetworkCommissioning
+variant) unless `surface.Policies.Extensions` enables that row
+(`surface.ErrExtensionNotEnabled`); otherwise the zero-value policies keep
+everything, so a node that selects no ahead element composes as it did
+before. The reference daemon prints its report
 with `--dump-surface`, and `make surface-check` holds it as a committed
 snapshot (`script/surfacecheck`): every change of what the daemon serves
 is a review diff. The clusters the endpoint assembler mounts on a bridged

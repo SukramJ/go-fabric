@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"slices"
 	"strings"
 )
@@ -66,23 +67,35 @@ type Decision struct {
 }
 
 // Policies are the policies a node composes its devices under. The zero
-// value is no policy: every candidate is served.
+// value enables no extension and adds no custom policy: every candidate of
+// the matter.js baseline is served, and an ahead-of-matter.js candidate is
+// refused.
 type Policies struct {
-	// Custom are the host's own policies, judged in order.
+	// Extensions are the "Ahead of matter.js" register rows the host
+	// enables. The built-in reference policy, judged first, refuses a
+	// candidate tagged with a row ([Reference].Ahead) not in it
+	// ([ErrExtensionNotEnabled]).
+	Extensions Extensions
+	// Custom are the host's own policies, judged in order after the
+	// built-in ones.
 	Custom []Policy
 }
 
 // policiesDigestDomain opens the digest's input, so a change of the
-// encoding cannot collide with an earlier one.
-const policiesDigestDomain = "go-fabric surface.Policies v1\n"
+// encoding cannot collide with an earlier one. v2 added the extensions.
+const policiesDigestDomain = "go-fabric surface.Policies v2\n"
 
-// Digest identifies the policies: the SHA-256 over every policy's kind,
-// name and description, in order. The zero value has a fixed digest. A
-// device carries the digest of the policies it was composed under, and a
-// node refuses a device whose digest is not its own.
+// Digest identifies the policies: the SHA-256 over the enabled extensions,
+// sorted, then every custom policy's kind, name and description, in order.
+// The zero value has a fixed digest. A device carries the digest of the
+// policies it was composed under, and a node refuses a device whose digest
+// is not its own.
 func (p Policies) Digest() [32]byte {
 	var b strings.Builder
 	b.WriteString(policiesDigestDomain)
+	for _, id := range p.Extensions.IDs() {
+		fmt.Fprintf(&b, "extensions\x00%s\n", id)
+	}
 	for _, pol := range p.Custom {
 		name, desc := "<nil>", ""
 		if pol != nil {
@@ -96,8 +109,11 @@ func (p Policies) Digest() [32]byte {
 	return sha256.Sum256([]byte(b.String()))
 }
 
-// chain is every policy, in the order they judge.
-func (p Policies) chain() []Policy { return p.Custom }
+// chain is every policy, in the order they judge: the built-in reference
+// policy, then the custom ones.
+func (p Policies) chain() []Policy {
+	return append([]Policy{referencePolicy{enabled: p.Extensions}}, p.Custom...)
+}
 
 // ErrRefused is wrapped by the [*RefusedError] [Evaluate] returns when a
 // policy refuses an element.
@@ -106,25 +122,41 @@ var ErrRefused = errors.New("surface: composition refused")
 // RefusedError names every refusing decision of one evaluation.
 type RefusedError struct {
 	Decisions []Decision
+	// ahead are the register IDs the built-in reference policy refused,
+	// sorted; empty when only custom policies refused.
+	ahead []string
 }
 
-// Error names each refusal: the policy, the element and the reason.
+// Error names each refusal: the policy, the element and the reason; when
+// the reference policy refused, the register IDs first.
 func (e *RefusedError) Error() string {
 	parts := make([]string, 0, len(e.Decisions))
 	for _, d := range e.Decisions {
 		parts = append(parts, fmt.Sprintf("policy %q refuses %s: %s", d.Policy, d.Element, d.Reason))
 	}
-	return ErrRefused.Error() + ": " + strings.Join(parts, "; ")
+	head := ErrRefused.Error()
+	if len(e.ahead) > 0 {
+		head += " (" + aheadText(e.ahead) + ")"
+	}
+	return head + ": " + strings.Join(parts, "; ")
 }
 
 // Unwrap returns [ErrRefused].
 func (e *RefusedError) Unwrap() error { return ErrRefused }
 
+// Is reports whether target is [ErrExtensionNotEnabled] and the reference
+// policy refused at least one element; errors.Is finds [ErrRefused]
+// through Unwrap.
+func (e *RefusedError) Is(target error) bool {
+	return target == ErrExtensionNotEnabled && len(e.ahead) > 0 //nolint:errorlint // a sentinel compared by identity, as errors.Is does
+}
+
 // mandatoryKeptPrefix opens the reason of a Remove rewritten to Keep.
 const mandatoryKeptPrefix = "kept: mandatory at pin ("
 
-// Evaluate judges every candidate by every policy — no policy short-cuts
-// another — and returns the elements kept, in candidate order, and the
+// Evaluate judges every candidate by every policy — the built-in reference
+// policy first, then [Policies].Custom; no policy short-cuts another — and
+// returns the elements kept, in candidate order, and the
 // decisions. Every verdict other than a plain Keep is a decision; an
 // element no policy spoke about has one Keep decision with Policy "", so
 // every candidate appears at least once.
@@ -133,7 +165,8 @@ const mandatoryKeptPrefix = "kept: mandatory at pin ("
 // Keep, its reason "kept: mandatory at pin (<the policy's reason>)". A
 // Refuse stays a Refuse whatever the element. Any Refuse fails the
 // evaluation with a [*RefusedError] naming every refusing decision; the
-// decisions are returned beside it.
+// decisions are returned beside it. When the reference policy refused, the
+// error also matches [ErrExtensionNotEnabled] and names the register IDs.
 func Evaluate(candidates []Element, p Policies) (kept []Element, decisions []Decision, err error) {
 	chain := p.chain()
 	for i, pol := range chain {
@@ -144,6 +177,7 @@ func Evaluate(candidates []Element, p Policies) (kept []Element, decisions []Dec
 	kept = make([]Element, 0, len(candidates))
 	decisions = make([]Decision, 0, len(candidates))
 	var refused []Decision
+	ahead := map[string]struct{}{}
 	for _, el := range candidates {
 		spoke, removed := false, false
 		for _, pol := range chain {
@@ -163,6 +197,9 @@ func Evaluate(candidates []Element, p Policies) (kept []Element, decisions []Dec
 				}
 			case Refuse:
 				refused = append(refused, d)
+				if _, ok := pol.(referencePolicy); ok {
+					ahead[el.Reference.Ahead] = struct{}{}
+				}
 			default:
 				return nil, nil, fmt.Errorf("surface: policy %q returned verdict %d for %s", d.Policy, v, el)
 			}
@@ -177,7 +214,7 @@ func Evaluate(candidates []Element, p Policies) (kept []Element, decisions []Dec
 		}
 	}
 	if len(refused) > 0 {
-		return nil, decisions, &RefusedError{Decisions: refused}
+		return nil, decisions, &RefusedError{Decisions: refused, ahead: slices.Sorted(maps.Keys(ahead))}
 	}
 	return kept, decisions, nil
 }
@@ -217,18 +254,18 @@ type (
 		Withheld  []wireElement  `json:"withheld"`
 	}
 	wireElement struct {
-		Cluster   uint32 `json:"cluster"`
+		Cluster   id16   `json:"cluster"`
 		Endpoint  string `json:"endpoint"`
-		ID        uint32 `json:"id"`
+		ID        kindID `json:"id"`
 		Kind      Kind   `json:"kind"`
 		Mandatory bool   `json:"mandatory"`
 		Origin    Origin `json:"origin"`
 		Reference string `json:"reference"`
 	}
 	wireDecision struct {
-		Cluster   uint32  `json:"cluster"`
+		Cluster   id16    `json:"cluster"`
 		Endpoint  string  `json:"endpoint"`
-		ID        uint32  `json:"id"`
+		ID        kindID  `json:"id"`
 		Kind      Kind    `json:"kind"`
 		Mandatory bool    `json:"mandatory"`
 		Origin    Origin  `json:"origin"`
@@ -241,21 +278,22 @@ type (
 
 func elementWire(e Element) wireElement {
 	return wireElement{
-		Cluster: e.Cluster, Endpoint: e.Endpoint, ID: e.ID, Kind: e.Kind,
+		Cluster: id16(e.Cluster), Endpoint: e.Endpoint, ID: idOf(e.Kind, e.ID), Kind: e.Kind,
 		Mandatory: e.Mandatory, Origin: e.Origin, Reference: e.Reference.Ahead,
 	}
 }
 
 func (w wireElement) value() Element {
 	return Element{
-		Endpoint: w.Endpoint, Cluster: w.Cluster, Kind: w.Kind, ID: w.ID,
+		Endpoint: w.Endpoint, Cluster: uint32(w.Cluster), Kind: w.Kind, ID: w.ID.v,
 		Origin: w.Origin, Reference: Reference{Ahead: w.Reference}, Mandatory: w.Mandatory,
 	}
 }
 
 // MarshalJSON implements [json.Marshaler]: the canonical encoding of
 // [Surface.MarshalJSON], the policies' digest in hex, the decisions and
-// withheld elements in their order.
+// withheld elements in their order, their ids in hex as wide as their kind
+// says (a feature's mask eight digits).
 func (r Report) MarshalJSON() ([]byte, error) {
 	w := wireReport{
 		Decisions: make([]wireDecision, 0, len(r.Decisions)),

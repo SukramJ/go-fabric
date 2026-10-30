@@ -4,11 +4,13 @@ What a controller sees of the reference daemon (`examples/reference-bridge --dum
 default flags, zero-value surface policies). `make surface` regenerates it; `make surface-check`
 fails when it moved. The clusters the endpoint assembler mounts on a bridged endpoint
 (Descriptor, BridgedDeviceBasicInformation, Identify, Groups, ScenesManagement) are not part of it.
+The effective surface digest is the SHA-256 of the canonical JSON — every id a 0x hex string —
+without endpoint numbers, so a change of that encoding moves it as well.
 
 | Metric | Value |
 |---|---|
-| Effective surface digest | `2bae0c952b6f34bea964cf18398b02a68634635153f67608c481dad0df9005f2` |
-| Policies digest | `46cc38b74bbd5f9458a070b512c7487bf1349d54dcc6c9ded8c0fe4be6b4a927` |
+| Effective surface digest | `f3fb2128686fb8b6a5cd99a682eb0c7ade66c9c1a1ea6c0b9787c0afa429212f` |
+| Policies digest | `fc6822f08d6c5d98a1632f05ea480c2666bc0701ab657f56500011c73e050c24` |
 | Endpoints (the root included) | 45 |
 | Clusters | 118 |
 | Decisions | 556 |

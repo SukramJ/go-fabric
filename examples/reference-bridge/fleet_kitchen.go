@@ -223,7 +223,7 @@ func (o *demoOven) device(opts device.Options) (*device.Oven, error) {
 	if err != nil {
 		return nil, err
 	}
-	cavity, err := device.NewTemperatureControlledCabinet(part("demo:oven:cavity", conditionHeater), o.cavity.declarations()...)
+	cavity, err := device.NewTemperatureControlledCabinet(partOf(opts, "demo:oven:cavity", conditionHeater), o.cavity.declarations()...)
 	if err != nil {
 		return nil, err
 	}

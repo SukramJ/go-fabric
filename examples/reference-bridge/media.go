@@ -24,6 +24,7 @@ import (
 	woldef "github.com/SukramJ/go-fabric/cluster/spec/wakeonlan"
 	"github.com/SukramJ/go-fabric/device"
 	"github.com/SukramJ/go-fabric/node"
+	"github.com/SukramJ/go-fabric/surface"
 )
 
 // --media (TESTING ONLY): two endpoints for the certification harness's
@@ -74,13 +75,15 @@ const (
 // simulations behind their ports.
 type demoMedia struct {
 	logger *slog.Logger
+	// surface are the daemon's surface policies (surface.go).
+	surface *surface.Policies
 
 	player *device.CastingVideoPlayer
 	app    *device.ContentApp
 }
 
-func newDemoMedia(logger *slog.Logger) (*demoMedia, error) {
-	m := &demoMedia{logger: logger}
+func newDemoMedia(policies *surface.Policies, logger *slog.Logger) (*demoMedia, error) {
+	m := &demoMedia{logger: logger, surface: policies}
 	var err error
 	if m.player, err = m.newPlayer(); err != nil {
 		return nil, fmt.Errorf("media player: %w", err)
@@ -130,6 +133,7 @@ func (m *demoMedia) newPlayer() (*device.CastingVideoPlayer, error) {
 	mac := "02005E102002"
 
 	opts := bridged("player", "Living Room TV")
+	opts.Surface = m.surface
 	opts.Conditions = []string{"ContentAppPlatform", "PhysicalInputs"}
 	return device.NewCastingVideoPlayer(opts,
 		mpdef.Declare{
@@ -189,7 +193,9 @@ func (m *demoMedia) newApp() (*device.ContentApp, error) {
 	vendorID, productID := mediaAppVendorID, mediaAppProductID
 	stopped := basicdef.ApplicationStatusStopped
 	allowed := []uint16{mediaAppVendorID}
-	return device.NewContentApp(bridged("contentapp", "Example App"),
+	opts := bridged("contentapp", "Example App")
+	opts.Surface = m.surface
+	return device.NewContentApp(opts,
 		basicdef.Declare{Initial: basicdef.Patch{
 			VendorName: &vendor, VendorId: &vendorID, ApplicationName: &name, ProductId: &productID,
 			Application:        &basicdef.ApplicationStruct{CatalogVendorId: mediaCatalogVendorID, ApplicationId: mediaAppID},

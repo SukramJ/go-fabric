@@ -35,8 +35,22 @@
 // BridgedDeviceBasicInformation, Identify, Groups, ScenesManagement) and
 // the clusters a measurement source projects are neither candidates nor
 // part of a device's effective surface. [OriginKitDefault] is defined for
-// the phases to come; no candidate carries it yet.
+// the phases to come; no candidate carries it yet. The node adds one
+// candidate per root feature its configuration selects that a root
+// server declares as ahead of matter.js (concept v11 S2).
 //
-// No built-in policy ships with this package yet; [Policies.Custom] takes
-// the host's own, and package surfacetest has the policies the tests use.
+// One policy is built in and judges first: the reference policy. A server
+// declares which of its elements implement which row of the "Ahead of
+// matter.js" register ([AheadSet]); the device layer and the node tag each
+// such candidate ([Reference].Ahead), and the reference policy refuses a
+// tagged candidate whose row [Policies].Extensions does not enable
+// ([ErrExtensionNotEnabled], the error names the register ID): code that
+// selects an ahead element the same code did not enable is a bug (ADR 0030
+// decision 3). [Policies.Custom] takes the host's own policies, and
+// package surfacetest has the policies the tests use.
+//
+// The built-in policies never gate a whole cluster: which clusters reach
+// an endpoint is the host's decision through the device types it declares
+// (ADR 0030 decision 7). A Custom policy may still remove an opted-in
+// optional cluster.
 package surface

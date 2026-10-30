@@ -22,7 +22,8 @@
 //     marker per path, in the same order: a Go-quoted string, or
 //     `class <Name>`, which stands for that class's whole body as it reads
 //     at the pin, from its declaration through the lone '}' closing it (the
-//     column contract above the table in by_design.md).
+//     column contract above the table in by_design.md). When the table
+//     has a "surface" column, every row reads yes or no there.
 //  2. Allowance. A row whose two marker cells read "not recorded" is
 //     refused unless it is listed in todo-marker.txt next to this file (one
 //     entry per line, '#' starts a comment; a missing file is an empty
@@ -40,6 +41,18 @@
 // ../matter.js); the working tree is never read. On a blobless clone `git
 // show` fetches exactly the blob it names, which is what the weekly job in
 // .github/workflows/matterjs-pin.yml relies on.
+//
+// # The surface column
+//
+// The column "surface" is measured, not read: the test in surface_test.go
+// (go test, not this program) builds each cluster a server declares an
+// ahead-of-matter.js row for (surface.AheadSet, collected by
+// device.AheadRows and node.AheadRows) with and without the row's
+// elements and compares FeatureMap and the four lists; every declared row
+// must measure yes. It holds the column against the declarations in both
+// directions: a "yes" row without a declaration, a declaration that is no
+// "yes" row, and a "no" row with a declaration each fail (ADR 0030,
+// concept v11 C.4).
 //
 // # Exit status
 //

@@ -13,9 +13,41 @@ import (
 	"log/slog"
 	"os"
 	"slices"
+	"strings"
 
+	"github.com/SukramJ/go-fabric/device"
 	"github.com/SukramJ/go-fabric/node"
+	"github.com/SukramJ/go-fabric/surface"
 )
+
+// surfacePolicies are the daemon's surface policies, the node's and every
+// device's (node.Config.Surface, device.Options.Surface): the
+// "Ahead of matter.js" register rows --extensions names, and
+// BD-chip-Thermostat-Schedules with --thermostat-schedules. Every ID must
+// be one the module declares (device.AheadRows, node.AheadRows); a typo
+// stops the daemon with the list of the known ones.
+func surfacePolicies(f flags) (surface.Policies, error) {
+	known := slices.Concat(device.AheadRows(), node.AheadRows())
+	slices.Sort(known)
+	known = slices.Compact(known)
+	var ids []string
+	for id := range strings.SplitSeq(f.extensions, ",") {
+		if id = strings.TrimSpace(id); id == "" {
+			continue
+		}
+		if !slices.Contains(known, id) {
+			return surface.Policies{}, fmt.Errorf("--extensions: %q is no extension this module declares; known: %s", id, strings.Join(known, ", "))
+		}
+		ids = append(ids, id)
+	}
+	if f.thermostatSchedules {
+		ids = append(ids, schedulesRow)
+	}
+	if len(ids) == 0 {
+		return surface.Policies{}, nil
+	}
+	return surface.Policies{Extensions: surface.NewExtensions(ids...)}, nil
+}
 
 // surfaceDB is the in-memory SQLite store a --dump-surface composition
 // runs on: shared by the pool's connections, gone when the last closes.

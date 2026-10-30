@@ -95,6 +95,7 @@ type flags struct {
 	otaProvider, media                         bool
 	thermostatSchedules                        bool
 	dumpSurface                                bool
+	extensions                                 string
 }
 
 func parseFlags() flags {
@@ -120,7 +121,8 @@ func parseFlags() flags {
 	flag.BoolVar(&f.wifi, "wifi", false, "TESTING ONLY: serve WiFiNetworkDiagnostics on the root from a simulated Wi-Fi link (fixed values, counters the app pipe steps), stating the RootNode condition WiFi; see wifi.go")
 	flag.BoolVar(&f.wifiSim, "wifi-sim", false, "TESTING ONLY: NetworkCommissioning with the Wi-Fi feature instead of Ethernet, over a simulated driver that connects to any SSID after a short delay and stays on the Ethernet address; see wifisim.go")
 	flag.StringVar(&f.metricsExpvar, "metrics-expvar", "", "address (\"127.0.0.1:9090\") to serve the node's metrics on as expvar's /debug/vars; off when empty; see metrics.go")
-	flag.BoolVar(&f.thermostatSchedules, "thermostat-schedules", false, "serve MatterScheduleConfiguration (week programs) on the demo thermostat; off by default until a live ecosystem pairing is verified (issue #273); see fleet_climate.go")
+	flag.BoolVar(&f.thermostatSchedules, "thermostat-schedules", false, "serve MatterScheduleConfiguration (week programs) on the demo thermostat — enables the extension BD-chip-Thermostat-Schedules; off by default until a live ecosystem pairing is verified (issue #273); see fleet_climate.go")
+	flag.StringVar(&f.extensions, "extensions", "", "comma-separated \"Ahead of matter.js\" register IDs to enable (surface.Policies.Extensions, notes/parity/by_design.md), on the node and every device; an unknown ID stops the daemon with the list of known ones; see surface.go")
 	flag.StringVar(&f.otbr, "otbr", "", "add a ThreadBorderRouter endpoint over the OpenThread Border Router's REST API at this URL (\"http://[fd00::1]:8081\"); off when empty; see otbr.go")
 	flag.BoolVar(&f.media, "media", false, "TESTING ONLY: add a simulated video player (CastingVideoPlayer) and content app (ContentApp) after chip's tv-app, for the media certification families; see media.go")
 	flag.BoolVar(&f.dumpSurface, "dump-surface", false, "print the node's served surface — the effective surface of the root, the Aggregator and every device, the surface policies' digest and every decision (package surface) — as JSON on stdout and exit, composed as the other flags say, before any socket is bound, any mDNS record published or the --db store opened (the composition runs on an in-memory store); see surface.go")
@@ -247,8 +249,12 @@ func compose(ctx context.Context, f flags, logger *slog.Logger, passcode uint32,
 	// `_L<discriminator>._sub` browse every commissioner filtering by
 	// discriminator sends (chip-tool's `pairing onnetwork-long`, Apple
 	// Home, Google Home), or nothing under --advertise=false.
+	policies, err := surfacePolicies(f)
+	if err != nil {
+		return nil, nil, err
+	}
 	devices := newFleet()
-	devices.thermostat.schedules = f.thermostatSchedules
+	devices.surface = &policies
 	otaDownloads := f.otaDir
 	if otaDownloads == "" {
 		otaDownloads = filepath.Join(filepath.Dir(f.dbPath), "ota")
@@ -270,6 +276,7 @@ func compose(ctx context.Context, f flags, logger *slog.Logger, passcode uint32,
 	}
 	cfg := nodeConfig(f, passcode, discriminator, tcpConfig, applier, actions, logger)
 	cfg.Attestation = attestationConfig(f.attestationDir)
+	cfg.Surface = policies
 	// The listener's verdict, logged when it fails (node.Config.Health).
 	cfg.Health.OnSample = func(s node.HealthSample) {
 		if !s.Healthy {
@@ -304,13 +311,13 @@ func compose(ctx context.Context, f flags, logger *slog.Logger, passcode uint32,
 	}
 	if f.media {
 		// The video player and content app (media.go), TESTING ONLY.
-		if devices.media, err = newDemoMedia(logger); err != nil {
+		if devices.media, err = newDemoMedia(&policies, logger); err != nil {
 			return nil, nil, err
 		}
 	}
 	if f.otbr != "" {
 		// The ThreadBorderRouter endpoint (otbr.go), off by default.
-		if devices.otbr, err = newDemoBorderRouter(f.otbr, logger); err != nil {
+		if devices.otbr, err = newDemoBorderRouter(f.otbr, &policies, logger); err != nil {
 			return nil, nil, err
 		}
 		if dump == nil {

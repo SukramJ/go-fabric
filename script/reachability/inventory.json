@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 7070,
+  "entry_points": 7094,
   "entry_packages": [
     ".",
     "bdx",
@@ -272,9 +272,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 16914,
-    "reachable": 11931,
-    "whitelisted": 4980,
+    "total_exported": 16931,
+    "reachable": 11942,
+    "whitelisted": 4986,
     "unreachable": 3
   },
   "by_package": [
@@ -24354,6 +24354,34 @@
     },
     {
       "package": "device",
+      "identifier": "TestAheadDeclarationsAreThermo",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "device/surface_ahead_test.go",
+      "line": 42
+    },
+    {
+      "package": "device",
+      "identifier": "TestAheadThermostatDisabled",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "device/surface_ahead_test.go",
+      "line": 56
+    },
+    {
+      "package": "device",
+      "identifier": "TestAheadThermostatEnabled",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "device/surface_ahead_test.go",
+      "line": 111
+    },
+    {
+      "package": "device",
+      "identifier": "TestAheadThermostatNotSelected",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "device/surface_ahead_test.go",
+      "line": 86
+    },
+    {
+      "package": "device",
       "identifier": "TestAlarmDelegateOfTheDeclaration",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/defaults_coverage_test.go",
@@ -26331,7 +26359,7 @@
       "identifier": "TestDemoThermostatSchedulesAreGated",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/thermostat_schedules_test.go",
-      "line": 22
+      "line": 23
     },
     {
       "package": "examples/reference-bridge",
@@ -26346,6 +26374,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/surface_test.go",
       "line": 24
+    },
+    {
+      "package": "examples/reference-bridge",
+      "identifier": "TestDumpSurfaceWithExtensions",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-bridge/surface_test.go",
+      "line": 71
     },
     {
       "package": "examples/reference-bridge",
@@ -26394,7 +26429,7 @@
       "identifier": "TestFormatSurface",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/surface_test.go",
-      "line": 67
+      "line": 121
     },
     {
       "package": "examples/reference-bridge",
@@ -26626,6 +26661,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/fleet_esa_test.go",
       "line": 22
+    },
+    {
+      "package": "examples/reference-bridge",
+      "identifier": "TestSurfacePolicies",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-bridge/surface_test.go",
+      "line": 103
     },
     {
       "package": "examples/reference-bridge",

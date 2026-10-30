@@ -106,10 +106,14 @@ func (e Endpoint) Digest() [32]byte {
 // object keys sorted, no insignificant whitespace, endpoints by key,
 // clusters by ID, every id list ascending and present (empty as []),
 // device types in Descriptor order, endpoint numbers only where assembled.
+// Every id is a lower-case hex string with the 0x prefix: four digits for
+// a device type and a cluster ("0x0201"), eight for an attribute, command
+// or event and for the FeatureMap ("0x00000000"); revisions and endpoint
+// numbers are decimal.
 func (s Surface) MarshalJSON() ([]byte, error) { return json.Marshal(s.wire(true)) }
 
 // UnmarshalJSON implements [json.Unmarshaler] for the encoding
-// [Surface.MarshalJSON] writes.
+// [Surface.MarshalJSON] writes; an id may also be a decimal number.
 func (s *Surface) UnmarshalJSON(b []byte) error {
 	var w wireSurface
 	if err := json.Unmarshal(b, &w); err != nil {
@@ -133,17 +137,17 @@ type (
 		Number      uint16           `json:"number,omitempty"`
 	}
 	wireDeviceType struct {
-		ID       uint32 `json:"id"`
+		ID       id16   `json:"id"`
 		Revision uint16 `json:"revision"`
 	}
 	wireCluster struct {
-		Accepted   []uint32 `json:"accepted"`
-		Attributes []uint32 `json:"attributes"`
-		Events     []uint32 `json:"events"`
-		FeatureMap uint32   `json:"featureMap"`
-		Generated  []uint32 `json:"generated"`
-		ID         uint32   `json:"id"`
-		Revision   uint16   `json:"revision"`
+		Accepted   []id32 `json:"accepted"`
+		Attributes []id32 `json:"attributes"`
+		Events     []id32 `json:"events"`
+		FeatureMap id32   `json:"featureMap"`
+		Generated  []id32 `json:"generated"`
+		ID         id16   `json:"id"`
+		Revision   uint16 `json:"revision"`
 	}
 )
 
@@ -166,11 +170,11 @@ func (e Endpoint) wire(numbers bool) wireEndpoint {
 		w.Number = e.Number
 	}
 	for _, dt := range e.DeviceTypes {
-		w.DeviceTypes = append(w.DeviceTypes, wireDeviceType(dt))
+		w.DeviceTypes = append(w.DeviceTypes, wireDeviceType{ID: id16(dt.ID), Revision: dt.Revision})
 	}
 	for _, c := range e.Clusters {
 		w.Clusters = append(w.Clusters, wireCluster{
-			ID: c.ID, Revision: c.Revision, FeatureMap: c.FeatureMap,
+			ID: id16(c.ID), Revision: c.Revision, FeatureMap: id32(c.FeatureMap),
 			Attributes: sorted(c.Attributes), Accepted: sorted(c.Accepted),
 			Generated: sorted(c.Generated), Events: sorted(c.Events),
 		})
@@ -190,22 +194,23 @@ func (w wireSurface) value() Surface {
 func (w wireEndpoint) value() Endpoint {
 	e := Endpoint{Key: w.Key, Number: w.Number}
 	for _, dt := range w.DeviceTypes {
-		e.DeviceTypes = append(e.DeviceTypes, DeviceTypeRef(dt))
+		e.DeviceTypes = append(e.DeviceTypes, DeviceTypeRef{ID: uint32(dt.ID), Revision: dt.Revision})
 	}
 	for _, c := range w.Clusters {
 		e.Clusters = append(e.Clusters, Cluster{
-			ID: c.ID, Revision: c.Revision, FeatureMap: c.FeatureMap,
-			Attributes: c.Attributes, Accepted: c.Accepted, Generated: c.Generated, Events: c.Events,
+			ID: uint32(c.ID), Revision: c.Revision, FeatureMap: uint32(c.FeatureMap),
+			Attributes: plain32(c.Attributes), Accepted: plain32(c.Accepted),
+			Generated: plain32(c.Generated), Events: plain32(c.Events),
 		})
 	}
 	return e
 }
 
-// sorted is an ascending copy of ids, [] for none.
-func sorted(ids []uint32) []uint32 {
+// sorted is an ascending copy of ids in their JSON form, [] for none.
+func sorted(ids []uint32) []id32 {
 	out := append(make([]uint32, 0, len(ids)), ids...)
 	slices.Sort(out)
-	return out
+	return ids32(out)
 }
 
 // Change is one difference between two surfaces ([Diff]): the element of

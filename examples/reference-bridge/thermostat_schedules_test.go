@@ -16,7 +16,8 @@ import (
 
 // TestDemoThermostatSchedulesAreGated: the demo thermostat serves
 // MatterScheduleConfiguration only with --thermostat-schedules — the host's
-// flag, off by default (issue #273) — and with it the built-in week program
+// flag, off by default (issue #273), which enables the extension
+// BD-chip-Thermostat-Schedules — and with it the built-in week program
 // is stored and active, and SetActiveScheduleRequest switches to it
 // through the thermostat's SchedulePort.
 func TestDemoThermostatSchedulesAreGated(t *testing.T) {
@@ -30,9 +31,12 @@ func TestDemoThermostatSchedulesAreGated(t *testing.T) {
 		t.Errorf("FeatureMap 0x%X serves MSCH without the flag", fm)
 	}
 
-	gated := newDemoThermostat("Thermostat")
-	gated.schedules = true
-	d, err := gated.device(opts)
+	policies, err := surfacePolicies(flags{thermostatSchedules: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	opts.Surface = &policies
+	d, err := newDemoThermostat("Thermostat").device(opts)
 	if err != nil {
 		t.Fatal(err)
 	}
