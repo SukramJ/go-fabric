@@ -61,7 +61,7 @@ func Doc(files []File, pin Pin, internal map[string][]Internal) []byte {
 			f.Matter.Revision, f.Matter.Tag, short(f.Matter.SourceCommit), f.Matter.Method,
 			len(f.DeviceTypes), len(f.Clusters), feat, attr, cmd, ev)
 	}
-	b.WriteString("\nThe last level is the pin's revision. Commands count request and response ids once each id.\n\n")
+	b.WriteString("\nThe last level is the pin's revision. Commands count each id once, request and response alike.\n\n")
 
 	last := files[len(files)-1]
 	pinCl := map[uint32]*Cluster{}
