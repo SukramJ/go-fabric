@@ -64,7 +64,7 @@ func completeness(rows []row, declared []string) []string {
 	}
 	for _, id := range declared {
 		if !inRegister[id] {
-			out = append(out, fmt.Sprintf("%s: declared by a server, but no row of the register", id))
+			out = append(out, id+": declared by a server, but no row of the register")
 		}
 	}
 	slices.Sort(out)
@@ -218,7 +218,7 @@ func measureTimeSynchronization(t *testing.T, row string, with bool) surface.Clu
 	}
 	t.Cleanup(func() { _ = n.Stop(context.Background()) })
 	for _, c := range n.Surface().Effective.Root.Clusters {
-		if c.ID == uint32(tsdef.ClusterID) {
+		if c.ID == tsdef.ClusterID {
 			return c
 		}
 	}
@@ -251,9 +251,9 @@ type silentBorderRouter struct{}
 
 var errSilent = errors.New("aheadcheck: no border router")
 
-func (silentBorderRouter) BorderRouterName() string                      { return "aheadcheck" }
-func (silentBorderRouter) BorderAgentID(context.Context) ([]byte, error) { return nil, errSilent }
-func (silentBorderRouter) ThreadVersion(context.Context) (uint16, error) { return 0, errSilent }
+func (silentBorderRouter) BorderRouterName() string                       { return "aheadcheck" }
+func (silentBorderRouter) BorderAgentID(context.Context) ([]byte, error)  { return nil, errSilent }
+func (silentBorderRouter) ThreadVersion(context.Context) (uint16, error)  { return 0, errSilent }
 func (silentBorderRouter) InterfaceEnabled(context.Context) (bool, error) { return false, errSilent }
 
 func (silentBorderRouter) Dataset(context.Context, bool) ([]byte, error)   { return nil, errSilent }

@@ -43,8 +43,8 @@ var ErrReservedKey = errors.New("node: the endpoint's key is reserved")
 // names with its register row, which the reference policy refuses unless
 // [Config].Surface enables it.
 var aheadByCluster = map[uint32]surface.AheadSet{
-	uint32(tsdef.ClusterID):      mattercore.TimeSynchronizationAhead,
-	uint32(netcommdef.ClusterID): mattercore.NetworkCommissioningAhead,
+	tsdef.ClusterID:      mattercore.TimeSynchronizationAhead,
+	netcommdef.ClusterID: mattercore.NetworkCommissioningAhead,
 }
 
 // AheadRows returns the "Ahead of matter.js" register IDs the root
@@ -75,12 +75,12 @@ func rootFeatures(cfg *Config) map[uint32]uint32 {
 		if cfg.TimeSynchronization != nil {
 			f = uint32(cfg.TimeSynchronization.Features)
 		}
-		out[uint32(tsdef.ClusterID)] = f
+		out[tsdef.ClusterID] = f
 	}
 	if cfg.Network.WiFiCommissioning.Driver != nil {
-		out[uint32(netcommdef.ClusterID)] = mattercore.NetworkCommFeatureWiFi
+		out[netcommdef.ClusterID] = mattercore.NetworkCommFeatureWiFi
 	} else {
-		out[uint32(netcommdef.ClusterID)] = mattercore.NetworkCommFeatureEthernet
+		out[netcommdef.ClusterID] = mattercore.NetworkCommFeatureEthernet
 	}
 	return out
 }
@@ -110,6 +110,15 @@ func rootCandidates(cfg *Config) []surface.Element {
 	return out
 }
 
+// validateAndComposeRoot validates cfg ([Config.Validate]) and then
+// decides the root's surface ([composeRoot]).
+func validateAndComposeRoot(cfg *Config) ([]surface.Decision, error) {
+	if err := cfg.Validate(); err != nil {
+		return nil, err
+	}
+	return composeRoot(cfg)
+}
+
 // composeRoot judges the root's candidates by cfg.Surface before the root
 // servers are built: a refusal fails [New]; a feature a custom policy
 // removes leaves cfg's selection (TimeSynchronization's features, copied
@@ -125,7 +134,7 @@ func composeRoot(cfg *Config) ([]surface.Decision, error) {
 		keep[e] = true
 	}
 	for _, e := range cands {
-		if keep[e] || e.Cluster != uint32(tsdef.ClusterID) {
+		if keep[e] || e.Cluster != tsdef.ClusterID {
 			// The Thread bit is never selected (rootFeatures): only
 			// TimeSynchronization can lose a feature here.
 			continue

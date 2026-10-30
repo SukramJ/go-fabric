@@ -109,7 +109,7 @@ func TestNodeAheadNotSelected(t *testing.T) {
 		if diff := surface.Diff(surface.Surface{Root: a.Effective.Root}, surface.Surface{Root: b.Effective.Root}); len(diff) != 0 {
 			t.Errorf("enabling rows the node does not select changes the root: %v", diff)
 		}
-		if fm := rootCluster(a, uint32(netcommdef.ClusterID)).FeatureMap; fm != mattercore.NetworkCommFeatureEthernet {
+		if fm := rootCluster(a, netcommdef.ClusterID).FeatureMap; fm != mattercore.NetworkCommFeatureEthernet {
 			t.Errorf("NetworkCommissioning FeatureMap 0x%X, want Ethernet", fm)
 		}
 	}
@@ -126,7 +126,7 @@ func TestNodeAheadTimeSynchronizationEnabled(t *testing.T) {
 		t.Fatal(err)
 	}
 	rep := n.Surface()
-	c := rootCluster(rep, uint32(tsdef.ClusterID))
+	c := rootCluster(rep, tsdef.ClusterID)
 	if c.FeatureMap != uint32(timeSyncFeatures) {
 		t.Errorf("FeatureMap 0x%X, want 0x%X", c.FeatureMap, uint32(timeSyncFeatures))
 	}
@@ -134,7 +134,7 @@ func TestNodeAheadTimeSynchronizationEnabled(t *testing.T) {
 		t.Fatalf("root decisions %+v, want one per feature", rep.Decisions)
 	}
 	for _, d := range rep.Decisions {
-		if d.Endpoint != "" || d.Cluster != uint32(tsdef.ClusterID) || d.Kind != surface.KindFeature ||
+		if d.Endpoint != "" || d.Cluster != tsdef.ClusterID || d.Kind != surface.KindFeature ||
 			d.Reference.Ahead != timeSyncRow || d.Verdict != surface.Keep || d.Mandatory || d.Origin != surface.OriginHostDeclared {
 			t.Errorf("decision %+v", d)
 		}
@@ -150,7 +150,7 @@ func TestNodeAheadTimeSynchronizationEnabled(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if reflect.DeepEqual(c, rootCluster(plain.Surface(), uint32(tsdef.ClusterID))) {
+	if reflect.DeepEqual(c, rootCluster(plain.Surface(), tsdef.ClusterID)) {
 		t.Error("the features change nothing on the root")
 	}
 }
@@ -160,14 +160,14 @@ func TestNodeAheadTimeSynchronizationEnabled(t *testing.T) {
 func TestNodeAheadCustomRemove(t *testing.T) {
 	p := surface.Policies{
 		Extensions: surface.NewExtensions(timeSyncRow),
-		Custom:     []surface.Policy{surfacetest.Remove(surface.KindFeature, surfacetest.Match{Cluster: uint32(tsdef.ClusterID), ID: uint32(tsdef.FeatureNtpServer)})},
+		Custom:     []surface.Policy{surfacetest.Remove(surface.KindFeature, surfacetest.Match{Cluster: tsdef.ClusterID, ID: uint32(tsdef.FeatureNtpServer)})},
 	}
 	ts := &node.TimeSynchronizationConfig{Features: tsdef.FeatureTimeZone | tsdef.FeatureNtpServer}
 	n, err := aheadNode(t, ts, p)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if fm := rootCluster(n.Surface(), uint32(tsdef.ClusterID)).FeatureMap; fm != uint32(tsdef.FeatureTimeZone) {
+	if fm := rootCluster(n.Surface(), tsdef.ClusterID).FeatureMap; fm != uint32(tsdef.FeatureTimeZone) {
 		t.Errorf("FeatureMap 0x%X, want TZ alone", fm)
 	}
 	if ts.Features != tsdef.FeatureTimeZone|tsdef.FeatureNtpServer {

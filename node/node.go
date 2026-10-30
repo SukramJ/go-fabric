@@ -151,11 +151,8 @@ type Node struct {
 // daemon does before Start; call [Node.Stop] to end them, whether or not
 // the node was started.
 func New(cfg Config) (*Node, error) { //nolint:funlen // the composition root: one sequential wiring pass, as main.go
-	if err := cfg.Validate(); err != nil {
-		return nil, err
-	}
 	// The root's surface is decided before anything is opened or built.
-	rootDecisions, err := composeRoot(&cfg)
+	rootDecisions, err := validateAndComposeRoot(&cfg)
 	if err != nil {
 		return nil, err
 	}

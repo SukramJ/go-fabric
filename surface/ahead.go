@@ -102,7 +102,7 @@ type referencePolicy struct{ enabled Extensions }
 
 func (referencePolicy) Name() string { return referencePolicyName }
 
-func (p referencePolicy) Judge(el Element) (Verdict, string) {
+func (p referencePolicy) Judge(el Element) (v Verdict, reason string) {
 	if el.Reference.Ahead == "" || p.enabled.Has(el.Reference.Ahead) {
 		return Keep, ""
 	}
