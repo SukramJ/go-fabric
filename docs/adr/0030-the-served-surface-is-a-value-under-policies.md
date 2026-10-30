@@ -3,7 +3,7 @@
 - **Status**: Accepted (owner, 2026-10-30)
 - **Date**: 2026-10-30
 - **Related**:
-  [`../concept-v11-surface.md`](https://github.com/SukramJ/go-fabric/blob/main/docs/concept-v11-surface.md)
+  [`../history/concept-v11-surface.md`](https://github.com/SukramJ/go-fabric/blob/main/docs/history/concept-v11-surface.md)
   (the concept, German working paper; issues #331 and #332),
   [ADR 0015 — the CHIP data model is read at test time](./0015-chip-data-model-read-at-run-time.md),
   [ADR 0018 — device layer and node facade](./0018-device-layer-and-node-facade.md),

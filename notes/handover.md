@@ -54,6 +54,8 @@ sources; an agent transcribes, the owner decides.
 
 ## 2. Current state: wave 5, PR #49
 
+**2026-10-30:** release v0.15.0 — concept v11 (the served surface as a value under policies: ADR 0030, waves S1–S5, PRs #334–#339) closed; the concept moved to `docs/history/concept-v11-surface.md`; the register row `BD-Matter-SurfaceChange-ConfigurationVersion` is in `notes/parity/by_design.md` (#338). Loom follow-up: concept §H.
+
 **2026-10-30:** concept v11 wave S5 (controller profiles: `surface.Profile`, `Policies.Profiles` and the profile policy, the evidence register `notes/parity/controller_profiles.md` generated into `surface/profiles_gen.go` by `script/profilegen`, `--profile`; no shipped profile removes anything — the one row is Reported; brief `notes/briefs/2026-10-30-S5-controller-profiles.md`, report `notes/briefs/reports/S5.md`) opened from `s5/controller-profiles` with auto-merge.
 
 **2026-10-30:** concept v11 wave S4 (surface stability: the persisted per-endpoint surface, the coupled ConfigurationVersion raise on a change, `Report.Changed` / `Report.Assembled`, the assembled surface snapshot, chipdm level 1.6.0; brief `notes/briefs/2026-10-30-S4-surface-stability.md`, report `notes/briefs/reports/S4.md`) opened from `s4/surface-stability` with auto-merge.
