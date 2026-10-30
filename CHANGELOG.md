@@ -10,6 +10,14 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+### Added
+
+- `surface.Warn`: the verdict of a policy that keeps an element and flags it (JSON `"warn"`), ordered between `Keep` and `Remove`. A controller profile's Reported or Inherited row that names a served element is now a `Warn` decision instead of a `Keep` decision whose reason starts with "warning"; a reader of the report (a host's status page) counts profile warnings by the verdict, not by the text. The served surface, the digest and the reason texts are unchanged. ADR 0030 decision 2 amended.
+
+### Changed
+
+- `surface.Remove` and `surface.Refuse` move one up in the `Verdict` enumeration (values 2 and 3; `Warn` takes 1) so the numeric order stays the precedence order. The wire and JSON forms are the names (`MarshalText`), nothing persists the numbers; a consumer that compares verdicts by name or constant is unaffected.
+
 ## [0.15.2] — 2026-10-30
 
 ### Added

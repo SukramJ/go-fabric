@@ -18,10 +18,16 @@ import (
 type Verdict uint8
 
 // Verdicts, in ascending precedence: when several policies judge an
-// element, Refuse wins over Remove, Remove over Keep.
+// element, Refuse wins over Remove, Remove over Warn, Warn over Keep.
 const (
 	// Keep serves the element; the zero value.
 	Keep Verdict = iota
+	// Warn serves the element and flags it: the policy has evidence
+	// against it that does not remove it — a controller profile's row of
+	// a confidence below Reproduced. The element stays in the surface; the
+	// decision is always recorded, so a reader counts warnings by this
+	// verdict and never by the reason's text.
+	Warn
 	// Remove composes without the element: a choice the code could not
 	// foresee, an operator's setting. A mandatory element is kept.
 	Remove
@@ -30,9 +36,9 @@ const (
 	Refuse
 )
 
-var verdictNames = map[Verdict]string{Keep: "keep", Remove: "remove", Refuse: "refuse"}
+var verdictNames = map[Verdict]string{Keep: "keep", Warn: "warn", Remove: "remove", Refuse: "refuse"}
 
-// String returns the verdict's name ("keep", "remove", "refuse").
+// String returns the verdict's name ("keep", "warn", "remove", "refuse").
 func (v Verdict) String() string { return enumName(verdictNames, v) }
 
 // MarshalText implements [encoding.TextMarshaler].
@@ -204,7 +210,8 @@ const mandatoryKeptPrefix = "kept: mandatory at pin ("
 // returns the elements kept, in candidate order, and the
 // decisions. Every verdict other than a plain Keep is a decision; an
 // element no policy spoke about has one Keep decision with Policy "", so
-// every candidate appears at least once.
+// every candidate appears at least once. A Warn keeps the element and is
+// recorded whatever its reason.
 //
 // A Remove of a Mandatory element is kept: the decision is rewritten to
 // Keep, its reason "kept: mandatory at pin (<the policy's reason>)". A
@@ -240,6 +247,7 @@ func Evaluate(candidates []Element, p Policies) (kept []Element, decisions []Dec
 				if reason == "" {
 					continue
 				}
+			case Warn:
 			case Remove:
 				if el.Mandatory {
 					d.Verdict = Keep

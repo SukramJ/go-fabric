@@ -16,7 +16,7 @@
 // states what it would compose as candidate [Element]s, each with its
 // [Origin] — why it exists — and whether it is mandatory at the pin. The
 // [Policies] judge every candidate ([Evaluate]): every policy judges every
-// element, the verdicts merge with Refuse over Remove over Keep, a Remove
+// element, the verdicts merge with Refuse over Remove over Warn over Keep, a Remove
 // of a mandatory element is kept (an operator-side policy never removes
 // what the pin mandates), and a Refuse fails the composition
 // ([ErrRefused]). The [Report] states the policies' digest, the effective
@@ -78,7 +78,7 @@
 // profile is a built-in policy "profile:<name>", judged after the level
 // policy. Only a row of the confidence [Reproduced] removes an element
 // (the chain keeps a mandatory one); a Reported or Inherited row keeps it
-// with a warning decision. A profile may imply a level, which applies when
+// with a [Warn] decision. A profile may imply a level, which applies when
 // [Policies].Level is "" ([Policies.LevelOrigin]). A profile without a
 // Reproduced row removes nothing.
 //

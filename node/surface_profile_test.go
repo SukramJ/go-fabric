@@ -52,7 +52,7 @@ func TestNodeProfile(t *testing.T) {
 	}
 	got := map[surface.Kind]string{}
 	for _, d := range rep.Decisions {
-		if d.Policy == "profile:synthetic" && d.Endpoint == "lamp" && d.Verdict == surface.Keep {
+		if d.Policy == "profile:synthetic" && d.Endpoint == "lamp" && (d.Verdict == surface.Keep || d.Verdict == surface.Warn) {
 			got[d.Kind] = d.Reason
 		}
 	}

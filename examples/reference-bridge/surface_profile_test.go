@@ -65,7 +65,7 @@ func TestDaemonProfileAppleHome(t *testing.T) {
 		t.Fatalf("%d profile decisions, want 1: %+v", len(rows), rows)
 	}
 	d := rows[0]
-	if d.Policy != "profile:apple-home" || d.Verdict != surface.Keep || d.Cluster != 0x0201 || d.Kind != surface.KindFeature || d.ID != 0x80 ||
+	if d.Policy != "profile:apple-home" || d.Verdict != surface.Warn || d.Cluster != 0x0201 || d.Kind != surface.KindFeature || d.ID != 0x80 ||
 		!strings.HasPrefix(d.Reason, "warning (Reported) profile apple-home: ") {
 		t.Fatalf("decision %+v", d)
 	}

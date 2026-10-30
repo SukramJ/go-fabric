@@ -51,7 +51,7 @@ func TestSurfaceProfile(t *testing.T) {
 			mandated: {surface.Keep, "kept: mandatory at pin (removed by profile synthetic: mandated (src-man))"},
 		},
 		surface.KindDeviceType: {
-			uint32(OnOffLightType.ID): {surface.Keep, "warning (Inherited) profile synthetic: type (src-dt)"},
+			uint32(OnOffLightType.ID): {surface.Warn, "warning (Inherited) profile synthetic: type (src-dt)"},
 		},
 	}
 	n := 0
