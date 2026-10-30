@@ -313,8 +313,11 @@ func (p *Partition) Endpoints() []Endpoint {
 // call validates and applies its change at once and returns its own error,
 // and [Partition.Batch] reassembles after fn returns.
 type Batch struct {
-	a       *Aggregator
-	scope   string
+	a     *Aggregator
+	scope string
+	// ctx is the context of [Partition.Batch]: the store work its calls
+	// do (a withheld endpoint's surface dropped) runs under it.
+	ctx     context.Context
 	changed bool
 	// detach are the devices removed or replaced, unbound after the
 	// reassembly.
@@ -338,7 +341,7 @@ type Batch struct {
 // during fn reassembles on its own, and that assembly shows the changes
 // the batch has applied so far.
 func (p *Partition) Batch(ctx context.Context, fn func(b *Batch) error) error {
-	b := &Batch{a: p.a, scope: p.scope}
+	b := &Batch{a: p.a, scope: p.scope, ctx: ctx}
 	fnErr := fn(b)
 	// The reservations first, so the reassembly keeps a removed key's
 	// number and collects a forgotten one's.
@@ -372,7 +375,7 @@ func (b *Batch) Add(ep Endpoint) error {
 		return err
 	}
 	a := b.a
-	if err := a.n.checkSurface(ep); err != nil {
+	if err := a.n.checkSurface(b.ctx, ep); err != nil {
 		return err
 	}
 	a.mu.Lock()
@@ -409,7 +412,7 @@ func (b *Batch) Replace(key device.SourceKey, ep Endpoint) error {
 		return fmt.Errorf("%w: %s replaces %s", ErrKeyMismatch, newKey, key)
 	}
 	a := b.a
-	if err := a.n.checkSurface(ep); err != nil {
+	if err := a.n.checkSurface(b.ctx, ep); err != nil {
 		return err
 	}
 	a.mu.Lock()
@@ -518,7 +521,7 @@ func (a *Aggregator) IncreaseConfigurationVersion(key device.SourceKey) error {
 	}
 	for _, ep := range topo.Bridged() {
 		if ep.SourceKey != nil && key != nil && ep.SourceKey.String() == key.String() {
-			a.n.persisted.storeConfigVersions(topo, a.n.br.IncreaseConfigurationVersion(ep.Scope, ep.DeviceAddress))
+			a.n.persisted.storeConfigVersions(context.Background(), topo, a.n.br.IncreaseConfigurationVersion(ep.Scope, ep.DeviceAddress))
 			return nil
 		}
 	}
@@ -564,7 +567,7 @@ func (a *Aggregator) IncreaseConfigurationVersions(keys ...device.SourceKey) err
 			c.IncreaseConfigurationVersion(d.scope, d.address)
 		}
 	})
-	a.n.persisted.storeConfigVersions(topo, versions)
+	a.n.persisted.storeConfigVersions(context.Background(), topo, versions)
 	return nil
 }
 
@@ -580,6 +583,7 @@ func (a *Aggregator) reassemble(ctx context.Context) error {
 	if err := a.n.br.Reassemble(ctx); err != nil {
 		return fmt.Errorf("node: reassemble: %w", err)
 	}
+	a.n.announceSurface(ctx)
 	a.reassemblies.Add(1)
 	a.n.count(MetricAggregatorReassemblies)
 	return nil

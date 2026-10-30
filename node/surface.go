@@ -288,7 +288,7 @@ func surfaceEntries(ep Endpoint) []surfaceEntry {
 // endpoint without a reporter — a host's own Spec type — passes the
 // second check. An endpoint the specification level withheld is recorded
 // and refused with its *surface.WithheldError ([Node.Surface]).
-func (n *Node) checkSurface(ep Endpoint) error {
+func (n *Node) checkSurface(ctx context.Context, ep Endpoint) error {
 	entries := surfaceEntries(ep)
 	for i := range entries {
 		e := &entries[i]
@@ -302,15 +302,16 @@ func (n *Node) checkSurface(ep Endpoint) error {
 			return fmt.Errorf("%w: endpoint %q (policies %x…, the node's %x…)", ErrPolicyMismatch, e.key, got[:4], n.surfaceDigest[:4])
 		}
 	}
-	return n.recordWithheld(entries)
+	return n.recordWithheld(ctx, entries)
 }
 
 // recordWithheld records each entry the specification level withheld
 // (its report lists withheld elements; device.New returned the device
-// with a surface.WithheldError) for [Node.Surface] and returns a
-// *surface.WithheldError naming the first; an entry that is not withheld
-// clears an earlier record under its key.
-func (n *Node) recordWithheld(entries []surfaceEntry) error {
+// with a surface.WithheldError) for [Node.Surface], drops the surface
+// persisted for it, and returns a *surface.WithheldError naming the
+// first; an entry that is not withheld clears an earlier record under its
+// key.
+func (n *Node) recordWithheld(ctx context.Context, entries []surfaceEntry) error {
 	n.withheldMu.Lock()
 	defer n.withheldMu.Unlock()
 	var first error
@@ -328,6 +329,9 @@ func (n *Node) recordWithheld(entries []surfaceEntry) error {
 			n.withheld = map[string]surface.Report{}
 		}
 		n.withheld[e.key] = r
+		// A withheld endpoint serves nothing: no surface is persisted for
+		// it, and its return is a first assembly (surface_stability.go).
+		n.persisted.forgetSurface(ctx, e.key)
 		if first == nil {
 			first = &surface.WithheldError{Endpoint: e.key, Elements: slices.Clone(r.Withheld), Report: r}
 		}
@@ -343,9 +347,20 @@ func (n *Node) recordWithheld(entries []surfaceEntry) error {
 // by key — and the decisions and withheld elements of every endpoint
 // that reports its own surface (a device.Device), in the same order. An
 // endpoint without a reporter is read from its source's servers, with no
-// decisions. As for a device, the clusters the endpoint assembler mounts
-// on a bridged endpoint are not part of it. An endpoint's number is filled
-// in once it is assembled.
+// decisions.
+//
+// Once the node has assembled its topology (at [Node.Start]) the effective
+// surface is the assembled one and the report says so (Assembled): every
+// endpoint of the topology as a controller's wildcard read returns it —
+// the clusters the endpoint assembler mounts on a bridged endpoint
+// (Descriptor, BridgedDeviceBasicInformation, Identify, Groups,
+// ScenesManagement, Binding), the measurement clusters and the device
+// types its Descriptor lists, BridgedNode included — each with its number.
+// An endpoint without a stable key other than the root and the Aggregator
+// has the key "@" and its number. Before the first assembly it is the
+// device-level view: as for a device, the clusters the endpoint assembler
+// mounts are not part of it. Changed lists the surface changes the node
+// announced ([Node.Start], [Aggregator.Add], Replace, Batch): the last 100.
 //
 // Under a specification level ([Config].Surface's Level) the report names
 // the level; the root's decisions include its clusters (levelRootClusters)
@@ -356,7 +371,13 @@ func (n *Node) recordWithheld(entries []surfaceEntry) error {
 // the effective surface.
 func (n *Node) Surface() surface.Report {
 	policies := n.cfg.Surface
-	rep := surface.Report{Policies: n.surfaceDigest, Level: policies.EffectiveLevel(), Decisions: slices.Clone(n.rootDecisions)}
+	rep := surface.Report{
+		Policies: n.surfaceDigest, Level: policies.EffectiveLevel(), Decisions: slices.Clone(n.rootDecisions),
+		Changed: n.announcedChanges(),
+	}
+	if topo := n.br.Topology(); topo != nil {
+		return n.assembledReport(rep, topo)
+	}
 	if n.root != nil {
 		rep.Effective.Root = endpoint.SurfaceEndpoint("", n.root.Servers())
 		rep.Decisions = append(rep.Decisions, policies.ServerInternal(rep.Effective.Root, n.rootCandidates)...)
@@ -396,6 +417,75 @@ func (n *Node) Surface() surface.Report {
 					entries = append(entries, en)
 				}
 			}
+		}
+	}
+	n.withheldMu.Lock()
+	for key := range n.withheld {
+		r := n.withheld[key]
+		entries = append(entries, entry{ep: surface.Endpoint{Key: key}, decisions: r.Decisions, withheld: r.Withheld, noEndpoint: true})
+	}
+	n.withheldMu.Unlock()
+	slices.SortStableFunc(entries, func(a, b entry) int { return cmp.Compare(a.ep.Key, b.ep.Key) })
+	for i := range entries {
+		e := &entries[i]
+		if !e.noEndpoint {
+			rep.Effective.Endpoints = append(rep.Effective.Endpoints, e.ep)
+		}
+		rep.Decisions = append(rep.Decisions, e.decisions...)
+		rep.Withheld = append(rep.Withheld, e.withheld...)
+	}
+	return rep
+}
+
+// assembledReport completes rep from the assembled topology
+// ([Node.Surface]): the root and every endpoint of topo
+// (assembledSurface), each with the decisions and withheld elements of
+// its reporter and, under a specification level, a keep decision on every
+// served element the level does not know that none of those decided
+// (surface.Policies.ServerInternal) — on a bridged endpoint the elements
+// of the clusters the endpoint assembler mounts, BridgedDeviceBasicInformation's
+// ConfigurationVersion with the D.9 reason. The endpoints the level
+// withheld follow as in the device-level view.
+func (n *Node) assembledReport(rep surface.Report, topo *endpoint.Topology) surface.Report {
+	policies := n.cfg.Surface
+	rep.Assembled = true
+	own := map[string]surface.Report{}
+	if n.agg != nil {
+		for _, ep := range n.agg.all() {
+			entries := surfaceEntries(ep)
+			for i := range entries {
+				if e := &entries[i]; e.reporter != nil {
+					own[e.key] = e.reporter.Surface()
+				}
+			}
+		}
+	}
+	type entry struct {
+		ep        surface.Endpoint
+		decisions []surface.Decision
+		withheld  []surface.Element
+		// noEndpoint: a withheld endpoint, which serves nothing.
+		noEndpoint bool
+	}
+	var entries []entry
+	for _, a := range assembledSurface(topo) {
+		switch {
+		case a.ep.IsRoot():
+			rep.Effective.Root = a.surface
+			rep.Decisions = append(rep.Decisions, policies.ServerInternal(a.surface, n.rootCandidates)...)
+		case a.ep.IsAggregator():
+			entries = append(entries, entry{ep: a.surface, decisions: policies.ServerInternal(a.surface, nil)})
+		default:
+			en := entry{ep: a.surface}
+			var decided []surface.Element
+			if r, ok := own[a.key]; ok {
+				en.decisions, en.withheld = r.Decisions, r.Withheld
+				for _, d := range r.Decisions {
+					decided = append(decided, d.Element)
+				}
+			}
+			en.decisions = append(en.decisions, policies.ServerInternal(a.surface, decided)...)
+			entries = append(entries, en)
 		}
 	}
 	n.withheldMu.Lock()

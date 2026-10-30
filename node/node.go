@@ -74,6 +74,12 @@ type Node struct {
 	// by rendered key ([Node.Surface]).
 	withheldMu sync.Mutex
 	withheld   map[string]surface.Report
+	// announceMu serialises the surface announcement (announceSurface);
+	// changed are the changes it announced, the last maxChanged, under
+	// changedMu ([Node.Surface]).
+	announceMu sync.Mutex
+	changedMu  sync.Mutex
+	changed    []surface.SurfaceChange
 	caseIDs    *caseIdentities
 	sec        *security
 	window     *commissioningHost
@@ -716,6 +722,9 @@ func (n *Node) Start(ctx context.Context) error {
 	if err := n.br.Start(ctx); err != nil {
 		return fmt.Errorf("node: bridge start: %w", err)
 	}
+	// The assembled surface against the one a previous run persisted: a
+	// change raises the ConfigurationVersions (surface_stability.go).
+	n.announceSurface(ctx)
 	n.started.Store(true)
 	n.callbacks.Start()
 	if n.agg != nil {
