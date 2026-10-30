@@ -10,7 +10,19 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+### Changed
+
+- **Breaking for hosts that select ahead-of-matter.js surface.** An element a server implements ahead of matter.js now composes only when its *Ahead of matter.js* register ID is enabled: `thermostatdef.Declare.Features` with MatterScheduleConfiguration (`BD-chip-Thermostat-Schedules`) or Events (`BD-chip-Thermostat-Events`); the features of `node.Config.TimeSynchronization` (`BD-chip-TimeSynchronization-Features`); the Thread NetworkCommissioning variant (`BD-Thread-NetComm-ThreadVariant` — declared, but no `node.Config` field selects the variant yet, so nothing refuses it today). Each now fails `device.New` / `node.New` with `surface.ErrExtensionNotEnabled`, naming the register ID, unless that ID is in `surface.Policies.Extensions` on both `node.Config.Surface` and `device.Options.Surface`. Selecting an ahead element the same code did not enable is a host bug, refused rather than silently stripped ([ADR 0030](docs/adr/0030-the-served-surface-is-a-value-under-policies.md) decision 3). A host that never selected these elements needs no source change.
+- `surface.Policies.Digest` covers the enabled extensions; the zero value's digest changed with the encoding (`go-fabric surface.Policies v2`).
+- The surface JSON (`surface.Surface`, `surface.Report`) renders every id — device type, cluster, attribute, command, event — and the FeatureMap as a lower-case `0x` hex string (four digits for a device type and a cluster, eight otherwise); decoding accepts the decimal numbers too. `Surface.Digest` is over that encoding and moved with it.
+- `node.AggregatorSurfaceKey` is reserved: `Aggregator.Add` and `Replace` refuse an endpoint or part whose rendered `StableKey` equals it (`node.ErrReservedKey`).
+- The reference daemon's `--thermostat-schedules` keeps its meaning and now enables `BD-chip-Thermostat-Schedules` on the node and every device.
+
 ### Added
+
+- The reference policy (concept v11 phase S2): `surface.Extensions` (`NewExtensions`, `Has`, `IDs`), `surface.Policies.Extensions`, `surface.ErrExtensionNotEnabled`, and the declarations `surface.Ahead` / `surface.AheadSet` with `thermo.Ahead`, `core.TimeSynchronizationAhead` and `core.NetworkCommissioningAhead`; `device.AheadRows` and `node.AheadRows` list the register IDs they declare; `node.ErrReservedKey`.
+- The reference daemon's `--extensions id[,id…]` enables register IDs; an unknown ID stops it with the list of known ones. `--dump-surface` shows the register row on the decisions that carry one.
+- `make ahead-check` reads the register's new `surface` column; `script/aheadcheck`'s surface test measures it and holds it against the declarations in both directions.
 
 - The served surface as a value (concept v11 phase S1, [ADR 0030](docs/adr/0030-the-served-surface-is-a-value-under-policies.md)). Package `surface`: `Surface` (canonical JSON, `Digest`, `Diff`), the candidate `Element` with its `Origin`, the policy chain (`Policy`, `Verdict`, `Decision`, `Policies`, `Evaluate`, `ErrRefused`) and the `Report`; `surface/surfacetest` has the policies tests use. No built-in policy ships yet.
 - `device.Options.Surface` composes a device under surface policies: the device layer lists its candidate elements, the policies judge them, the servers are built from what they keep; `Device.Surface()` reports the effective surface and every decision.
@@ -18,7 +30,7 @@ pseudo-version of `main`.
 - `endpoint.ClusterSurface`, `endpoint.SurfaceEndpoint`, `endpoint.GlobalList` and `endpoint.RenderSourceKey`: a server's surface read as the dispatcher serves it.
 - The reference daemon's `--dump-surface` prints the node's surface report as JSON and exits before anything is started; `make surface` / `make surface-check` hold it as a committed snapshot (`script/surfacecheck`, a CI step).
 
-Behaviour under the zero-value `surface.Policies` is unchanged: every device composes exactly as before.
+Behaviour under the zero-value `surface.Policies` is unchanged for every device that selects no ahead-of-matter.js element (see `### Changed`).
 
 ## [0.14.0] — 2026-10-29
 

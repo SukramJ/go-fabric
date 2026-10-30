@@ -35,7 +35,9 @@
 // BridgedDeviceBasicInformation, Identify, Groups, ScenesManagement) and
 // the clusters a measurement source projects are neither candidates nor
 // part of a device's effective surface. [OriginKitDefault] is defined for
-// the phases to come; no candidate carries it yet.
+// the phases to come; no candidate carries it yet. The node adds one
+// candidate per root feature its configuration selects that a root
+// server declares as ahead of matter.js (concept v11 S2).
 //
 // One policy is built in and judges first: the reference policy. A server
 // declares which of its elements implement which row of the "Ahead of
