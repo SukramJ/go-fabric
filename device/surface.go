@@ -10,6 +10,8 @@ import (
 	"slices"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
+	thermostatdef "github.com/SukramJ/go-fabric/cluster/spec/thermostat"
+	"github.com/SukramJ/go-fabric/cluster/thermo"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/endpoint"
 	"github.com/SukramJ/go-fabric/schema"
@@ -155,6 +157,33 @@ func candidatesOf(t *Type, s *settings, key string) []surface.Element {
 	return out
 }
 
+// aheadByCluster are the servers' declarations of their ahead-of-matter.js
+// elements (surface.AheadSet), by cluster id: the device layer tags each
+// candidate a declaration names with its register row, which the
+// reference policy refuses unless surface.Policies.Extensions enables it.
+var aheadByCluster = map[uint32]surface.AheadSet{
+	thermostatdef.ClusterID: thermo.Ahead,
+}
+
+// AheadRows returns the "Ahead of matter.js" register IDs the device
+// layer's server declarations name, sorted: the rows a host enables in
+// surface.Policies.Extensions to select their elements on a device.
+func AheadRows() []string { return aheadRows(aheadByCluster) }
+
+// aheadRows is the sorted union of the register IDs of sets.
+func aheadRows(sets map[uint32]surface.AheadSet) []string {
+	var out []string
+	for _, s := range sets {
+		for _, id := range s.IDs() {
+			if !slices.Contains(out, id) {
+				out = append(out, id)
+			}
+		}
+	}
+	slices.Sort(out)
+	return out
+}
+
 // defaultCandidates are the feature and element candidates of the default
 // server [defaultServer] builds for r: the bits of its feature selection —
 // the device type's and the cluster's mandated features, or the host's
@@ -162,7 +191,8 @@ func candidatesOf(t *Type, s *settings, key string) []surface.Element {
 // declarations add. A feature is mandatory when the device type mandates
 // it or the selection without it fails spec.CheckFeatures; an element when
 // the device type mandates it or its conformance is mandatory for the
-// selection.
+// selection. A candidate the cluster's [aheadByCluster] declaration names
+// carries its register row in Reference.Ahead.
 func defaultCandidates(r *ClusterRequirement, s *settings, key string) []surface.Element {
 	def := r.Definition
 	mandated := clusterMandatedFeatures(def)
@@ -170,10 +200,14 @@ func defaultCandidates(r *ClusterRequirement, s *settings, key string) []surface
 	if sel, ok := s.features[r.ID]; ok {
 		features = sel
 	}
+	ahead := aheadByCluster[r.ID]
 	var out []surface.Element
 	for x := features; x != 0; x &= x - 1 {
 		bit := uint32(1) << bits.TrailingZeros32(x)
-		el := surface.Element{Endpoint: key, Cluster: r.ID, Kind: surface.KindFeature, ID: bit, Origin: surface.OriginHostDeclared}
+		el := surface.Element{
+			Endpoint: key, Cluster: r.ID, Kind: surface.KindFeature, ID: bit, Origin: surface.OriginHostDeclared,
+			Reference: surface.Reference{Ahead: ahead.Row(surface.KindFeature, bit)},
+		}
 		switch {
 		case r.Features&bit != 0:
 			el.Origin, el.Mandatory = surface.OriginDeviceType, true
@@ -218,6 +252,7 @@ func defaultCandidates(r *ClusterRequirement, s *settings, key string) []surface
 	}
 	rest := make([]surface.Element, 0, len(elements))
 	for _, el := range elements {
+		el.Reference.Ahead = ahead.Row(el.Kind, el.ID)
 		rest = append(rest, el)
 	}
 	slices.SortFunc(rest, func(a, b surface.Element) int {
