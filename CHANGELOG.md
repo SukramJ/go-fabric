@@ -10,6 +10,8 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+## [0.15.2] — 2026-10-30
+
 ### Added
 
 - `surface.Report.Extensions`: the enabled ahead-of-matter.js register IDs, sorted, next to the level, its origin and the profiles — `Policies.Report()` fills it, `Node.Surface()` and `Device.Surface()` carry it, the JSON gains `extensions`. A host's pages can show the node's three policy axes from one report.
@@ -5116,7 +5118,8 @@ consumer of an older pseudo-version should read.
   earlier than it was. Both fields are gone; the commit holding the file is
   its provenance.
 
-[Unreleased]: https://github.com/SukramJ/go-fabric/compare/v0.15.1...HEAD
+[Unreleased]: https://github.com/SukramJ/go-fabric/compare/v0.15.2...HEAD
+[0.15.2]: https://github.com/SukramJ/go-fabric/compare/v0.15.1...v0.15.2
 [0.15.1]: https://github.com/SukramJ/go-fabric/compare/v0.15.0...v0.15.1
 [0.15.0]: https://github.com/SukramJ/go-fabric/compare/v0.14.0...v0.15.0
 [0.14.0]: https://github.com/SukramJ/go-fabric/compare/v0.13.12...v0.14.0

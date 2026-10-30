@@ -54,6 +54,8 @@ sources; an agent transcribes, the owner decides.
 
 ## 2. Current state: wave 5, PR #49
 
+**2026-10-30:** release v0.15.2 — `surface.Report.Extensions` (#343) so go-fabric-ui can show level, profiles and extensions on the node status page (brief U5 in go-fabric-ui).
+
 **2026-10-30:** release v0.15.1 — fixes after v0.15.0 (#341): a bridged endpoint without a name keeps its Descriptor (NodeLabel optional, as in matter.js); three race-job flakes (BDX cap, ICD nextExpectedCheckin, connection-state log) with the ConnectionStateChanged hooks queued in transition order. Issues #331/#332 closed as implemented by concept v11.
 
 **2026-10-30:** release v0.15.0 — concept v11 (the served surface as a value under policies: ADR 0030, waves S1–S5, PRs #334–#339) closed; the concept moved to `docs/history/concept-v11-surface.md`; the register row `BD-Matter-SurfaceChange-ConfigurationVersion` is in `notes/parity/by_design.md` (#338). Loom follow-up: concept §H.
