@@ -10,10 +10,16 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+## [0.15.5] — 2026-10-31
+
 ### Added
 
 - `camera.Provider.Offer`, `Answer`, `IceCandidates`, `End`: the camera's signals to the controller's WebRtcTransportRequestor — the requestor's commands invoked on the session's peer node, fabric and `PeerEndpointId` over a CASE session the node initiates, as connectedhomeip's camera app sends them (`webrtc-provider-manager.cpp` at 6170af84). The node attaches the route (`camera.PeerConnector`, `Provider.AttachPeerConnector`) to every provider it assembles; a provider outside a node answers `camera.ErrNoPeerConnector`. `End` removes the session from `CurrentSessions` whatever the peer answers. New errors `camera.ErrUnknownSession`, `camera.ErrNoICECandidates`; the alias `camera.ProviderICECandidate`. Closes #351.
 - `bridge.Bridge.ConnectPeer` and `bridge.PeerSession`: the device-side CASE initiator's session with a peer a controller named, generalised from `ConnectOtaProvider` (unchanged, now a call of it). An Invoke whose request does not fit one message of the session is `bridge.ErrPayloadTooLarge` and is not sent; the camera's signals carry an SDP, which over UDP (1178 bytes of payload) needs the TCP session a controller leaves.
+
+### Changed
+
+- `bridge`: the operational address resolution of a peer the device-side CASE initiator connects to (`ConnectPeer`, `ConnectOtaProvider`) is logged at Debug — `matter.case.initiator.resolving`, `resolved` with the address count, `resolve_failed` — with its duration; a query that waited on it left no trace before (TC-SU-2.4, #306).
 
 ### Fixed
 
@@ -5152,7 +5158,8 @@ consumer of an older pseudo-version should read.
   earlier than it was. Both fields are gone; the commit holding the file is
   its provenance.
 
-[Unreleased]: https://github.com/SukramJ/go-fabric/compare/v0.15.4...HEAD
+[Unreleased]: https://github.com/SukramJ/go-fabric/compare/v0.15.5...HEAD
+[0.15.5]: https://github.com/SukramJ/go-fabric/compare/v0.15.4...v0.15.5
 [0.15.4]: https://github.com/SukramJ/go-fabric/compare/v0.15.3...v0.15.4
 [0.15.3]: https://github.com/SukramJ/go-fabric/compare/v0.15.2...v0.15.3
 [0.15.2]: https://github.com/SukramJ/go-fabric/compare/v0.15.1...v0.15.2
