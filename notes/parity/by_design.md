@@ -100,7 +100,7 @@ pin lift confirms by re-reading the row, [`pin-lifts.md`](./pin-lifts.md)).
 | BD-chip-CameraAvSettings-RulesInServer | `CameraAvSettingsUserLevelManagementServer.ts:18` is the empty subclass (absence: the class body, 18 lines in all) | `packages/node/src/behaviors/camera-av-settings-user-level-management/CameraAvSettingsUserLevelManagementServer.ts` | `class CameraAvSettingsUserLevelManagementServer` | connectedhomeip `src/app/clusters/camera-av-settings-user-level-management-server/CameraAvSettingsUserLevelManagementLogic.cpp` at `6170af84` (the handlers :721-1261, `OnPhysicalMovementComplete` :1265, the limit setters :339-407, the DPTZ streams :469-591), tests `tests/TestCameraAvSettingsUserLevelManagementCluster.cpp` | no |
 | BD-chip-CameraAvStreamManagement-RulesInServer | `CameraAvStreamManagementServer.ts:18` is the empty subclass (absence: the class body, 18 lines in all) | `packages/node/src/behaviors/camera-av-stream-management/CameraAvStreamManagementServer.ts` | `class CameraAvStreamManagementServer` | connectedhomeip `src/app/clusters/camera-av-stream-management-server/CameraAVStreamManagementCluster.cpp` at `6170af84` (`Init` :76, the reference counts :486-557, `SetViewport` :1137, the handlers :2065-2669, `IsResourceAvailableForStreamAllocation` :2717), `CameraAVStreamManagementCluster.h` (the delegate :159-372, `ValidateStreamForModifyOrDeallocateImpl` :794), tests `tests/TestCameraAVStreamManagementCluster.cpp` | no |
 | BD-chip-ZoneManagement-RulesInServer | `ZoneManagementServer.ts:14` is the empty subclass (absence: the class body, 14 lines in all) | `packages/node/src/behaviors/zone-management/ZoneManagementServer.ts` | `class ZoneManagementServer` | connectedhomeip `src/app/clusters/zone-management-server/ZoneManagementCluster.cpp` at `6170af84` (`ValidateConfiguration` :85, the Sensitivity write :259-284, the handlers :462-659, the events :701-733), `zone-geometry.h` (`IsZoneSelfIntersecting` :158), tests `tests/TestZoneManagementCluster.cpp`, `tests/TestZonePolygon.cpp` | no |
-| BD-chip-WebRtcTransportProvider-RulesInServer | `WebRtcTransportProviderServer.ts:14` is the empty subclass (absence: the class body, 14 lines in all) | `packages/node/src/behaviors/web-rtc-transport-provider/WebRtcTransportProviderServer.ts` | `class WebRtcTransportProviderServer` | connectedhomeip `src/app/clusters/webrtc-transport-provider-server/WebRTCTransportProviderCluster.cpp` at `6170af84` (the validators :133-209, :400-592, the session table :295-398, the handlers :595-1213), the camera app's stream answers `examples/camera-app/linux/src/clusters/camera-avstream-mgmt/camera-av-stream-manager.cpp`, tests `tests/TestWebRTCTransportProviderCluster.cpp` | no |
+| BD-chip-WebRtcTransportProvider-RulesInServer | `WebRtcTransportProviderServer.ts:14` is the empty subclass (absence: the class body, 14 lines in all) | `packages/node/src/behaviors/web-rtc-transport-provider/WebRtcTransportProviderServer.ts` | `class WebRtcTransportProviderServer` | connectedhomeip `src/app/clusters/webrtc-transport-provider-server/WebRTCTransportProviderCluster.cpp` at `6170af84` (the validators :133-209, :400-592, the session table :295-398, the handlers :595-1213), the camera app's stream answers `examples/camera-app/linux/src/clusters/camera-avstream-mgmt/camera-av-stream-manager.cpp` and its signals to the requestor `examples/camera-app/linux/src/clusters/webrtc-provider/webrtc-provider-manager.cpp` (FindOrEstablishSession :860-942, SendOfferCommand :1093, SendAnswerCommand :1189, SendICECandidatesCommand :1221, SendEndCommand :1301), tests `tests/TestWebRTCTransportProviderCluster.cpp` | no |
 | BD-chip-PushAvStreamTransport-RulesInServer | `PushAvStreamTransportServer.ts:14` is the empty subclass (absence: the class body, 14 lines in all) | `packages/node/src/behaviors/push-av-stream-transport/PushAvStreamTransportServer.ts` | `class PushAvStreamTransportServer` | connectedhomeip `src/app/clusters/push-av-stream-transport-server/PushAVStreamTransportLogic.cpp` at `6170af84` (`ValidateUrl` :293, `ValidateIncomingTransportOptions` :387, `ValidateStreamParameters` :665, the handlers :880-1603, the events :1903-2031), the camera app's answers `push-av-stream-manager.cpp`, tests `tests/TestPushAVStreamTransportCluster.cpp`, `tests/TestURLParsing.cpp` | no |
 | BD-chip-TlsCertificateManagement-RulesInServer | `TlsCertificateManagementServer.ts:14` is the empty subclass (absence: the class body, 14 lines in all) | `packages/node/src/behaviors/tls-certificate-management/TlsCertificateManagementServer.ts` | `class TlsCertificateManagementServer` | connectedhomeip `src/app/clusters/tls-certificate-management-server/TLSCertificateManagementCluster.cpp` at `6170af84` (the constructor :61-73, the handlers :230-553, `OnFabricRemoved` :571-575), `CertificateTableImpl.cpp`, `IncrementingIdHelper.h`, the example delegate `examples/all-clusters-app/all-clusters-common/src/tls-certificate-management-instance.cpp`, tests `tests/TestTLSCertificateManagementCluster.cpp`, `tests/FuzzTLSCertificateManagementPW.cpp` | no |
 | BD-chip-TlsClientManagement-RulesInServer | `TlsClientManagementServer.ts:14` is the empty subclass (absence: the class body, 14 lines in all) | `packages/node/src/behaviors/tls-client-management/TlsClientManagementServer.ts` | `class TlsClientManagementServer` | connectedhomeip `src/app/clusters/tls-client-management-server/TLSClientManagementCluster.cpp` at `6170af84` (the constructor :53-63, the handlers :177-271, `OnFabricRemoved` :272-275), the example delegate `examples/all-clusters-app/all-clusters-common/src/tls-client-management-instance.cpp`, tests `tests/TestTLSClientManagementCluster.cpp` | no |
@@ -5035,6 +5035,29 @@ checks go through `camera.StreamSource`, which the AvStream server (26-A2)
 implements with the camera app's answers. The WebRTC stack is the host's
 behind the `ProviderPort`, as the requestor's is. Pinned by
 `provider_chip_test.go` (chip's 7 cases) and `provider_rules_test.go`.
+
+The camera's signals to the requestor (issue #351) follow the camera app's
+provider manager, `examples/camera-app/linux/src/clusters/webrtc-provider/
+webrtc-provider-manager.cpp` at `6170af84`: `Provider.Offer`, `Answer`,
+`IceCandidates` and `End` are the requestor's commands invoked on the
+session's peer node and fabric (`FindOrEstablishSession` on the
+ScopedNodeId the request carried, :860-942) at `originatingEndpointId`
+(`SendOfferCommand` :1093-1121, `SendAnswerCommand` :1189-1218,
+`SendICECandidatesCommand` :1221-1298 with an empty SDPMid sent as null
+:1261-1268 and no empty list :1245-1249, `SendEndCommand` :1301-1328 with
+`CleanupSession` after it whatever the result :999-1000). The session is
+`bridge.Bridge.ConnectPeer`, the ADR 0008 initiator the OTA requestor uses
+(ADR 0019), which the node attaches to each assembled provider as the
+`camera.PeerConnector`. One divergence from chip: chip asks for the session
+with `TransportPayloadCapability::kLargePayload` and so establishes it over
+TCP; this node initiates CASE over UDP only and reuses the newest live
+session with the peer of either transport (matter.js `Peer.connect`,
+`Peer.ts:439-459`), and a signal larger than one message of that session is
+`bridge.ErrPayloadTooLarge` and is not sent — a controller that reached the
+camera over TCP leaves the session the signals need. Pinned by
+`cluster/camera/provider_peer_test.go` and the two-device
+`node/webrtc_provider_peers_test.go` (the signals over CASE to a
+`camera.Requestor`, the UDP refusal).
 
 ### BD-chip-PushAvStreamTransport-RulesInServer — push transports follow connectedhomeip behind the `PushTransportPort`; ExpiryTime is taken as seconds until deallocation
 

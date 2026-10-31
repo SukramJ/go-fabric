@@ -749,7 +749,7 @@ func (n *Node) Start(ctx context.Context) error {
 		return err
 	}
 	n.ensureOTAProviderACL(ctx)
-	n.ensureRequestorACL(ctx)
+	n.camerasOnline(ctx)
 
 	// Fabrics of a previous run: their CASE identities, the subscriptions
 	// their controllers held, then their operational records — matter.js

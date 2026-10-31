@@ -589,6 +589,7 @@ func (a *Aggregator) reassemble(ctx context.Context) error {
 	if err := a.n.br.Reassemble(ctx); err != nil {
 		return fmt.Errorf("node: reassemble: %w", err)
 	}
+	a.n.attachCameraPeers()
 	a.n.announceSurface(ctx)
 	a.reassemblies.Add(1)
 	a.n.count(MetricAggregatorReassemblies)
