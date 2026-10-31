@@ -76,7 +76,8 @@ STRESS_FLAKES = \
 	'./controller/ble:^TestBleScannerTimeoutEndsOneDiscovery$$' \
 	'./controller/ble:^TestBleScannerCloseDuringContinuousCallback$$' \
 	'./controller:^TestOTACancelByRemovingConsentParity$$' \
-	'./client/exchange:^TestNextTimeoutIsMaxPeerResponseTime$$'
+	'./client/exchange:^TestNextTimeoutIsMaxPeerResponseTime$$' \
+	'./controller/client:^TestICDEndToEnd$$'
 
 .DEFAULT_GOAL := help
 

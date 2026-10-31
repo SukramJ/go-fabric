@@ -10,6 +10,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/SukramJ/go-fabric/client/interaction"
+
 	icddef "github.com/SukramJ/go-fabric/cluster/spec/icdmanagement"
 	"github.com/SukramJ/go-fabric/controller/client"
 	"github.com/SukramJ/go-fabric/node"
@@ -60,6 +62,14 @@ func TestICDEndToEnd(t *testing.T) {
 		}
 		return active[0].ID()
 	}
+	// The auto-registration moves the sustained subscription onto a new
+	// underlying one; between the two its id is NoSubscription
+	// (ClientSubscription.ts:34, :104), so the id to hold through the
+	// cycles is read once the peer granted it (#306, coverage job).
+	p.eventually(t, "the subscription granted", func() bool {
+		active := p.pair.Controller.Subscriptions().Active()
+		return len(active) == 1 && active[0].ID() != interaction.NoSubscription
+	})
 	before := subID()
 	for cycle := 1; cycle <= 3; cycle++ {
 		// The device's mode never cycles on its own (icd.ModeState,
