@@ -73,7 +73,10 @@ STRESS_FLAKES = \
 	'./cluster/core:^TestICDManagementRegistrationLifecycle$$' \
 	'./client/exchange:^TestMessageExchangePaddedBDXCap$$' \
 	'./controller/client:^TestConnectionStateParityMatterJS$$' \
-	'./controller/ble:^TestBleScannerTimeoutEndsOneDiscovery$$'
+	'./controller/ble:^TestBleScannerTimeoutEndsOneDiscovery$$' \
+	'./controller/ble:^TestBleScannerCloseDuringContinuousCallback$$' \
+	'./controller:^TestOTACancelByRemovingConsentParity$$' \
+	'./client/exchange:^TestNextTimeoutIsMaxPeerResponseTime$$'
 
 .DEFAULT_GOAL := help
 

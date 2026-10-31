@@ -541,7 +541,7 @@
   },
   {
     "file": "client/exchange/exchange_test.go",
-    "line": 245,
+    "line": 246,
     "citation": "MessageExchange.ts:894-918",
     "resolved": "packages/protocol/src/protocol/MessageExchange.ts",
     "identifier": "PeerUnresponsiveError",

@@ -198,8 +198,12 @@ func TestOTANoUpdatesWithoutRequestorParity(t *testing.T) {
 // removed before the device queries is not downloaded: the device returns
 // to Idle on the old version and the manager reports the update failed —
 // OtaTest.ts:1049-1124, removeConsent (:1217) and #cancelUpdate
-// (:1091-1123). The device is isolated while the consent comes and goes,
-// so its query follows the removal, as MockTime orders it there.
+// (:1091-1123). As there, no clock moves between the force and the
+// removal: the announcement reaches the device — the site's network
+// delivers without the clock — and the device's query waits for its
+// announcement jitter, which only the steps below let pass. The device
+// was isolated here before, and the announcement's retransmissions could
+// all be spent while it was; the query then never came (#306).
 func TestOTACancelByRemovingConsentParity(t *testing.T) {
 	t.Parallel()
 	// A requestor that cannot consent, as matter.js's requestUserConsent:
@@ -207,30 +211,40 @@ func TestOTACancelByRemovingConsentParity(t *testing.T) {
 	r := newOTARigWith(t, nil, &node.OtaConfig{Dir: filepath.Join(t.TempDir(), "ota")})
 	r.storeImage(t, 2)
 	mgr := r.c.SoftwareUpdates()
-	r.isolate(true)
-	tg := softwareupdate.Target{VendorID: 0xFFF1, ProductID: 0x8001, TargetSoftwareVersion: 2}
-	r.run(t, func(ctx context.Context) error { return mgr.ForceUpdate(ctx, r.peer(t), tg) })
-	mgr.RemoveConsent(r.peer(t), 0)
 	_, _, provider := r.c.OwnNode()
 	dev := r.dev.Addr().String()
-	var queried atomic.Bool
+	var consentGone, queried atomic.Bool
 	r.site.Net().Filter(func(d fabrictest.Datagram) bool {
-		if d.From.String() == dev && d.To.String() == provider.String() {
+		if consentGone.Load() && d.From.String() == dev && d.To.String() == provider.String() {
 			queried.Store(true)
 		}
 		return true
 	})
+	tg := softwareupdate.Target{VendorID: 0xFFF1, ProductID: 0x8001, TargetSoftwareVersion: 2}
+	// ForceUpdate consents and returns; the manager announces from its
+	// own goroutine, as matter.js's forceUpdate leaves the only queued
+	// entry to #triggerQueuedUpdate (SoftwareUpdateManager.ts:1031-1087).
+	if err := mgr.ForceUpdate(context.Background(), r.peer(t), tg); err != nil {
+		t.Fatal(err)
+	}
+	// The device answered the announcement — the entry is in progress —
+	// before the consent goes, as matter.js's forceUpdate has sent it when
+	// removeConsent follows; its query is scheduled, the clock still.
+	awaitWall(t, "the announcement answered", func() bool {
+		q := mgr.QueuedUpdates()
+		return len(q) == 1 && q[0].Status == softwareupdate.PendingInProgress
+	})
+	r.run(t, func(ctx context.Context) error { return r.site.Settle(ctx) })
+	mgr.RemoveConsent(r.peer(t), 0)
+	consentGone.Store(true)
 	r.eventually(t, "the update failed", func() bool { _, _, failed := r.snapshot(); return failed > 0 })
 	if q := mgr.QueuedUpdates(); len(q) != 0 {
 		t.Errorf("queue %+v, want empty", q)
 	}
-	// The requestor queries after its announcement jitter when a
-	// retransmission of the announcement reached it once the isolation
-	// ended, else at its 24 h query interval (UpdateQueryInterval): under
-	// load the retransmissions can all be spent while isolated. The site's
-	// clock is stepped in 15-minute slices until the query arrives, at most
-	// 25 h, rather than walked timer by timer (#306).
-	for i := 0; i < 100 && !queried.Load(); i++ {
+	// The requestor queries after its announcement jitter of 1-600 s
+	// (OtaSoftwareUpdateRequestorServer.ts:410); the clock is stepped in
+	// 15-minute slices rather than walked timer by timer.
+	for i := 0; i < 8 && !queried.Load(); i++ {
 		r.run(t, func(ctx context.Context) error { return r.site.Step(ctx, 15*time.Minute) })
 	}
 	r.eventually(t, "the device's query", queried.Load)
@@ -244,5 +258,18 @@ func TestOTACancelByRemovingConsentParity(t *testing.T) {
 	}
 	if v, _ := r.dev.Node().Root().BasicInformation.MatterRead(0x0009); v != uint32(1) {
 		t.Errorf("device SoftwareVersion %v, want 1", v)
+	}
+}
+
+// awaitWall polls cond on the wall clock with the site's clock still, for
+// work the network delivers without time passing.
+func awaitWall(t *testing.T, what string, cond func() bool) {
+	t.Helper()
+	deadline := time.Now().Add(fabrictest.DefaultWait)
+	for !cond() {
+		if time.Now().After(deadline) {
+			t.Fatalf("timed out waiting for %s", what)
+		}
+		time.Sleep(time.Millisecond)
 	}
 }

@@ -530,32 +530,16 @@ func (s *Scanner) FindContinuously(ctx context.Context, id discovery.Identifier,
 	defer s.stopDiscovering(ctx)
 	seen := map[string]bool{}
 	for {
-		s.mu.Lock()
-		if s.closed {
-			s.mu.Unlock()
-			break
-		}
-		news := devicesOf(s.devicesLocked(id, false))
-		s.mu.Unlock()
+		news, w, expired, stop := s.nextRound(ctx, id, end)
 		for _, d := range news {
 			if !seen[d.Peripheral.Address] {
 				seen[d.Peripheral.Address] = true
 				callback(d)
 			}
 		}
-		var remaining time.Duration
-		if !end.IsZero() {
-			if remaining = end.Sub(s.clock.Now()); remaining <= 0 {
-				break
-			}
-		}
-		if ctx.Err() != nil {
+		if w == nil {
 			break
 		}
-		s.mu.Lock()
-		expired, stop := s.expiry(remaining)
-		w := s.addWaiterLocked(id)
-		s.mu.Unlock()
 		err := s.wait(ctx, w, expired)
 		stop()
 		if err != nil {
@@ -571,6 +555,35 @@ func (s *Scanner) FindContinuously(ctx context.Context, id discovery.Identifier,
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return devicesOf(s.devicesLocked(id, false)), nil
+}
+
+// nextRound is one turn of findCommissionableDevicesContinuously's loop
+// up to its await (:617-640): the devices stored now and, unless the
+// discovery is over — the scanner closed, ctx done, end reached — the
+// waiter for the next advertisement. The waiter is registered in the
+// critical section of the closed check, before the callbacks run: in
+// matter.js that turn is one synchronous step, so a close or cancel finds
+// the discovery either waiting or before its next check. Here the
+// callbacks run between the two, and a waiter registered after them
+// missed a Close that ran meanwhile and waited forever (#306,
+// TestBleScannerCloseDuringContinuousCallback). A nil waiter ends the
+// discovery once the callbacks for news ran; closed and ctx end it before
+// them, as the loop's condition does (:617).
+func (s *Scanner) nextRound(ctx context.Context, id discovery.Identifier, end time.Time) (news []Device, w *waiter, expired <-chan struct{}, stop func()) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.closed || ctx.Err() != nil {
+		return nil, nil, nil, nil
+	}
+	news = devicesOf(s.devicesLocked(id, false))
+	var remaining time.Duration
+	if !end.IsZero() {
+		if remaining = end.Sub(s.clock.Now()); remaining <= 0 {
+			return news, nil, nil, nil
+		}
+	}
+	expired, stop = s.expiry(remaining)
+	return news, s.addWaiterLocked(id), expired, stop
 }
 
 // CommissionedIdentity identifies a commissioned device independently of
