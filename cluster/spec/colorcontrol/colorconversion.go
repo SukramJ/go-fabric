@@ -7,6 +7,16 @@ import (
 	"math"
 )
 
+// Every product that feeds a sum below is written float64(x*y): the
+// conversions mirror matter.js ColorConversionUtils.ts, whose JavaScript
+// rounds each product before the addition, and Go may otherwise fuse a
+// multiply and an add into one rounding (spec, Floating-point operators:
+// "An explicit floating-point type conversion rounds to the precision of
+// the target type, preventing fusion"). On arm64 the fused form made
+// HSVToRGB(240, 1, 1) return -2.2e-16 for red where amd64 and matter.js
+// return 0 (nightly macOS race job, TestColorConversionBranches); an
+// attribute value must not depend on the architecture.
+
 // The colour-space conversions matter.js's ColorControlServer performs
 // itself when a command switches the colour mode — ported from
 // packages/node/src/behaviors/color-control/ColorConversionUtils.ts at the
@@ -55,10 +65,10 @@ func MiredsToHSV(mireds float64) (hue, saturation float64, ok bool) {
 func HSVToRGB(h, s, v float64) (r, g, b float64) {
 	h /= 360
 	i := math.Floor(h * 6)
-	f := h*6 - i
+	f := float64(h*6) - i
 	p := v * (1 - s)
-	q := v * (1 - f*s)
-	t := v * (1 - (1-f)*s)
+	q := v * (1 - float64(f*s))
+	t := v * (1 - float64((1-f)*s))
 	switch jsMod(i, 6) {
 	case 0:
 		return v, t, p
@@ -92,13 +102,13 @@ func RGBToHSV(r, g, b float64) (h, s, v float64) {
 	case r:
 		h = g - b
 		if g < b {
-			h += d * 6
+			h += float64(d * 6)
 		}
 		h /= 6 * d
 	case g:
-		h = (b - r + d*2) / (6 * d)
+		h = (b - r + float64(d*2)) / (6 * d)
 	default:
-		h = (r - g + d*4) / (6 * d)
+		h = (r - g + float64(d*4)) / (6 * d)
 	}
 	return h * 360, s, v
 }
@@ -113,9 +123,9 @@ func RGBToXY(r, g, b float64) (x, y float64) {
 		return c / 12.92
 	}
 	r, g, b = gamma(r), gamma(g), gamma(b)
-	bigX := r*0.664511 + g*0.154324 + b*0.162028
-	bigY := r*0.283881 + g*0.668433 + b*0.047685
-	bigZ := r*0.000088 + g*0.07231 + b*0.986039
+	bigX := float64(r*0.664511) + float64(g*0.154324) + float64(b*0.162028)
+	bigY := float64(r*0.283881) + float64(g*0.668433) + float64(b*0.047685)
+	bigZ := float64(r*0.000088) + float64(g*0.07231) + float64(b*0.986039)
 	sum := bigX + bigY + bigZ
 	if sum == 0 {
 		return 0, 0
@@ -135,15 +145,15 @@ func XYToRGB(x, y float64) (r, g, b float64) {
 	bigX := (bigY / y) * x
 	bigZ := (bigY / y) * z
 	rgb := [3]float64{
-		bigX*1.656492 - bigY*0.354851 - bigZ*0.255038,
-		-bigX*0.707196 + bigY*1.655397 + bigZ*0.036152,
-		bigX*0.051713 - bigY*0.121364 + bigZ*1.01153,
+		float64(bigX*1.656492) - float64(bigY*0.354851) - float64(bigZ*0.255038),
+		-float64(bigX*0.707196) + float64(bigY*1.655397) + float64(bigZ*0.036152),
+		float64(bigX*0.051713) - float64(bigY*0.121364) + float64(bigZ*1.01153),
 	}
 	for i, c := range rgb {
 		if c <= 0.0031308 {
 			c *= 12.92
 		} else {
-			c = (1.0+0.055)*math.Pow(c, 1.0/2.4) - 0.055
+			c = float64((1.0+0.055)*math.Pow(c, 1.0/2.4)) - 0.055
 		}
 		rgb[i] = max(0, c)
 	}
@@ -170,7 +180,7 @@ func KelvinToMireds(kelvin float64) float64 { return jsRound(1_000_000 / kelvin)
 // correlated colour temperature of x/y, in mireds.
 func XYToMireds(x, y float64) float64 {
 	n := (x - 0.332) / (0.1858 - y)
-	kelvin := math.Abs(437*math.Pow(n, 3) + 3601*math.Pow(n, 2) + 6861*n + 5517) //nolint:staticcheck // matter.js Math.pow, kept for its rounding
+	kelvin := math.Abs(float64(437*math.Pow(n, 3)) + float64(3601*math.Pow(n, 2)) + float64(6861*n) + 5517) //nolint:staticcheck // matter.js Math.pow, kept for its rounding
 	return KelvinToMireds(kelvin)
 }
 
