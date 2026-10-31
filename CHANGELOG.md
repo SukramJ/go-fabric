@@ -10,6 +10,16 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+### Added
+
+- `camera.ErrPayloadTooLarge`: the camera's signal refused for not fitting one message of the session to the peer, the value of `bridge.ErrPayloadTooLarge`, so a camera host recognises it with `cluster/camera` alone and imports nothing of `bridge` (#356).
+- `spec.CarriesStatus`, `spec.StatusOf`: whether an error names its wire status by type — a host's `contract.StatusError` or an `im.StatusCodeError` — and the IM status it answers, as the dispatcher classifies them.
+
+### Fixed
+
+- A port's `contract.StatusError` answers its status. The kit servers that forward a port's refusal (`cluster/camera`, `cluster/thermo`'s Sink and atomic commit, `cluster/tls`, `cluster/lock`, `cluster/cover`, `cluster/jointfabric`, `cluster/threadbr`, `cluster/core`'s TestEventTrigger handler) passed only an `im.StatusCodeError` through and wrapped the facade's own status type in FAILURE — a `ProviderPort.SolicitOffer` that returned `INVALID_IN_STATE` answered FAILURE (#356).
+- Tests (#306): `client/exchange`'s test clock recorded a timer's duration before the fake had armed it, so a test that waits for the record and advances the clock (`TestNextTimeoutIsMaxPeerResponseTime`, `TestMessageExchangePaddedBDXCap`) could advance past a deadline set only afterwards, and the timer never fired — the stress job's "send did not return" (nightly 2026-10-31, 1 of 50). The record now follows the arm.
+
 ## [0.15.5] — 2026-10-31
 
 ### Added

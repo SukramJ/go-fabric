@@ -5053,7 +5053,8 @@ with `TransportPayloadCapability::kLargePayload` and so establishes it over
 TCP; this node initiates CASE over UDP only and reuses the newest live
 session with the peer of either transport (matter.js `Peer.connect`,
 `Peer.ts:439-459`), and a signal larger than one message of that session is
-`bridge.ErrPayloadTooLarge` and is not sent — a controller that reached the
+`camera.ErrPayloadTooLarge` (`bridge.ErrPayloadTooLarge` is the same value,
+#356) and is not sent — a controller that reached the
 camera over TCP leaves the session the signals need. Pinned by
 `cluster/camera/provider_peer_test.go` and the two-device
 `node/webrtc_provider_peers_test.go` (the signals over CASE to a

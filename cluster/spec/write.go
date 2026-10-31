@@ -5,6 +5,7 @@ package spec
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math"
 	"reflect"
@@ -12,6 +13,7 @@ import (
 	"unicode"
 	"unicode/utf16"
 
+	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
 )
 
@@ -49,6 +51,54 @@ func Errorf(status im.StatusCode, format string, args ...any) error {
 		e.wrapped = u.Unwrap()
 	}
 	return e
+}
+
+// CarriesStatus reports whether err names the wire status it answers by
+// type: a host's [contract.StatusError] (by value or by pointer — the
+// facade's way to carry a status, contract/status.go) or an
+// [im.StatusCodeError] (a server's own, [StatusError] among them). A
+// server that forwards a port's refusal returns such an error as is — the
+// dispatcher answers the status it names (endpoint classifyError) — and
+// wraps any other in FAILURE.
+func CarriesStatus(err error) bool {
+	if _, ok := hostStatus(err); ok {
+		return true
+	}
+	_, ok := errors.AsType[im.StatusCodeError](err)
+	return ok
+}
+
+// StatusOf is the IM status err answers: Success for nil, the status a
+// [CarriesStatus] error names, FAILURE for any other error and for a host
+// status naming Success (an error never answers Success) — as the
+// dispatcher answers them, in its order (a host's status first). A
+// cluster-specific status the error carries is not part of it.
+func StatusOf(err error) im.StatusCode {
+	if err == nil {
+		return im.StatusSuccess
+	}
+	if se, ok := hostStatus(err); ok {
+		if se.Status == uint8(im.StatusSuccess) {
+			return im.StatusFailure
+		}
+		return im.StatusCode(se.Status)
+	}
+	if sce, ok := errors.AsType[im.StatusCodeError](err); ok {
+		return sce.MatterStatusCode()
+	}
+	return im.StatusFailure
+}
+
+// hostStatus is the [contract.StatusError] in err's chain, by value or by
+// pointer (the dispatcher's hostStatusError).
+func hostStatus(err error) (contract.StatusError, bool) {
+	if se, ok := errors.AsType[contract.StatusError](err); ok {
+		return se, true
+	}
+	if se, ok := errors.AsType[*contract.StatusError](err); ok && se != nil {
+		return *se, true
+	}
+	return contract.StatusError{}, false
 }
 
 // Peers resolves the current value of a sibling attribute a constraint

@@ -802,11 +802,11 @@ func (s *ThermostatServer) setInboundSetpoint(heat bool, v int16) {
 	}
 }
 
-// sinkError maps a Sink refusal onto the answer: an error carrying an IM
-// status passes through as is, any other answers FAILURE.
+// sinkError maps a Sink refusal onto the answer: an error naming its
+// status by type ([spec.CarriesStatus] — a host's contract.StatusError or
+// an im.StatusCodeError) passes through as is, any other answers FAILURE.
 func sinkError(what string, err error) error {
-	var sc im.StatusCodeError
-	if errors.As(err, &sc) {
+	if spec.CarriesStatus(err) {
 		return err
 	}
 	return spec.Errorf(im.StatusFailure, "thermo: %s refused: %v", what, err)
