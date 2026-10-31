@@ -31549,14 +31549,14 @@
       "identifier": "FuzzDecodeManualCode",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/setup/fuzz_setup_test.go",
-      "line": 180
+      "line": 186
     },
     {
       "package": "secure/setup",
       "identifier": "FuzzDecodeQRCode",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/setup/fuzz_setup_test.go",
-      "line": 154
+      "line": 160
     },
     {
       "package": "secure/setup",
