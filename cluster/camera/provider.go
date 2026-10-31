@@ -63,7 +63,10 @@ type ProviderConfig struct {
 // requestor's node and fabric matched on every signal — while the
 // [ProviderPort] runs the WebRTC stack. The streams are checked against
 // the camera's [StreamSource]. Mirrors WebRTCTransportProviderCluster.cpp
-// at 6170af84 (matter.js's server is the generated behaviour).
+// at 6170af84 (matter.js's server is the generated behaviour). The
+// camera's own signals to the requestor — [Provider.Offer], [Provider.Answer],
+// [Provider.IceCandidates], [Provider.End] — go through the
+// [PeerConnector] the node attaches (provider_peer.go).
 type Provider struct {
 	*spec.Instance
 	spec.SelfHeld
@@ -77,6 +80,9 @@ type Provider struct {
 	mu       sync.Mutex
 	sessions []ProviderSession
 	nextID   uint16
+	// peers reaches a session's requestor for the camera's signals
+	// ([Provider.AttachPeerConnector]); nil until the node attaches one.
+	peers PeerConnector
 }
 
 // Compile-time assertions.

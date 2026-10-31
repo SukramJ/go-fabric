@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 7158,
+  "entry_points": 7165,
   "entry_packages": [
     ".",
     "bdx",
@@ -275,9 +275,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 16997,
-    "reachable": 11992,
-    "whitelisted": 5002,
+    "total_exported": 17005,
+    "reachable": 11999,
+    "whitelisted": 5003,
     "unreachable": 3
   },
   "by_package": [
@@ -7526,6 +7526,13 @@
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/camera/avsettings.go",
       "line": 37
+    },
+    {
+      "package": "cluster/camera",
+      "identifier": "ProviderICECandidate",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/camera/provider_peer.go",
+      "line": 31
     },
     {
       "package": "cluster/camera",
