@@ -114,7 +114,7 @@ var areaKeys = []string{
 	"status_name", "statuses", "step", "stored", "stored_fabrics", "subject",
 	"subscriptions_reaped", "subsystem", "supported", "suppress_response",
 	"sw_version", "system_mode", "target", "tcp", "test", "timed", "timeout",
-	"timeout_ms", "to", "token", "token_version", "total", "total_endpoints",
+	"timeout_ms", "to", "token", "took", "token_version", "total", "total_endpoints",
 	"trimmed_bytes", "type", "unicast", "uri_node", "url", "valid",
 	"valid_mapping", "value", "value_type", "vendor_id", "version",
 	"violation", "what", "with_paths",
