@@ -127,11 +127,19 @@ func (b *Bridge) connectPeer(ctx context.Context, fabricIndex uint8, peerNodeID 
 	if init == nil || init.Initiator == nil {
 		return peerLink{}, errors.New("bridge: CASE initiator provider returned no initiator")
 	}
+	// The resolution has no other trace: a query that waits on it until
+	// ctx ends leaves a log that stops at the caller's last line
+	// (TC-SU-2.4 in CI, 2026-10-31: Querying reported, no Sigma1 sent in
+	// 60 s), so its start and outcome are logged here.
+	started := b.clk().Now()
+	b.logger.Debug("matter.case.initiator.resolving", slog.Int("fabric_index", int(fabricIndex)), slog.Uint64("node_id", peerNodeID))
 	addrs, err := resolver.ResolveOperational(ctx, init.CompressedFabricID, peerNodeID)
 	if err != nil {
+		b.logger.Debug("matter.case.initiator.resolve_failed", slog.Uint64("node_id", peerNodeID), slog.Duration("took", b.clk().Now().Sub(started)), slog.Any("err", err))
 		abandon(init)
 		return peerLink{}, err
 	}
+	b.logger.Debug("matter.case.initiator.resolved", slog.Uint64("node_id", peerNodeID), slog.Int("addresses", len(addrs)), slog.Duration("took", b.clk().Now().Sub(started)))
 	var lastErr error
 	for i, addr := range addrs {
 		if i > 0 {
