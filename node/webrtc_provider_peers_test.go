@@ -169,8 +169,9 @@ func TestCameraProviderSignalsReachTheRequestor(t *testing.T) {
 
 // TestCameraProviderSignalTooLargeForUDP: the camera's CASE session to the
 // requestor runs over UDP, and an answer that does not fit one message is
-// refused before it is sent (bridge.ErrPayloadTooLarge; chip sends its
-// signals with kLargePayload over TCP, webrtc-provider-manager.cpp:860-942).
+// refused before it is sent (camera.ErrPayloadTooLarge, the value of
+// bridge.ErrPayloadTooLarge; chip sends its signals with kLargePayload over
+// TCP, webrtc-provider-manager.cpp:860-942).
 func TestCameraProviderSignalTooLargeForUDP(t *testing.T) {
 	site := quietSite(t)
 	ctx := parityCtx(t)
@@ -200,7 +201,7 @@ func TestCameraProviderSignalTooLargeForUDP(t *testing.T) {
 	// less the 54-byte message overhead).
 	sdp := strings.Repeat("a=candidate:0123456789 ", 66)
 	err = site.Run(ctx, func(ctx context.Context) error { return prov.Answer(ctx, 1, sdp) })
-	if !errors.Is(err, bridge.ErrPayloadTooLarge) {
+	if !errors.Is(err, camera.ErrPayloadTooLarge) || !errors.Is(err, bridge.ErrPayloadTooLarge) {
 		t.Fatalf("a %d-byte answer over UDP: %v", len(sdp), err)
 	}
 	stack.mu.Lock()

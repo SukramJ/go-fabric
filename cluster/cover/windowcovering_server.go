@@ -723,8 +723,7 @@ func (s *WindowCoveringServer) invokeMover(ctx context.Context, cmdID uint32, c 
 		s.tilt.target = prevTilt
 	}
 	s.mu.Unlock()
-	var sc im.StatusCodeError
-	if errors.As(err, &sc) {
+	if spec.CarriesStatus(err) { // a host's contract.StatusError or an im.StatusCodeError
 		return err
 	}
 	return spec.Errorf(im.StatusFailure, "cover: command 0x%02X refused: %v", cmdID, err)

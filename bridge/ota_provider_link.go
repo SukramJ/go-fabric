@@ -15,6 +15,7 @@ import (
 
 	"github.com/SukramJ/go-fabric/bdx"
 	"github.com/SukramJ/go-fabric/clock"
+	"github.com/SukramJ/go-fabric/cluster/camera"
 	"github.com/SukramJ/go-fabric/cluster/core"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	"github.com/SukramJ/go-fabric/im"
@@ -61,8 +62,10 @@ var ErrExchangeClosed = errors.New("bridge: exchange closed")
 // kLargePayload, which establishes the session over TCP
 // (webrtc-provider-manager.cpp:860-942 at 6170af84); this node initiates
 // CASE over UDP only and reuses the newest live session of the peer, so a
-// large payload reaches the peer when the peer came in over TCP.
-var ErrPayloadTooLarge = errors.New("bridge: the command does not fit one message of the session")
+// large payload reaches the peer when the peer came in over TCP. It is
+// [camera.ErrPayloadTooLarge], the value a camera host — which signals
+// through camera.Provider — recognises with cluster/camera alone.
+var ErrPayloadTooLarge = camera.ErrPayloadTooLarge
 
 // ConnectOtaProvider implements [core.OtaProviderConnector]: it returns a
 // secure session with the provider (matter.js

@@ -122,7 +122,9 @@ entry (the node installs it on its own requestors, see above). The signals
 carry an SDP, so they can exceed one UDP message (1178 bytes of payload).
 The node initiates CASE over UDP only and reuses the newest live session
 with the peer, of either transport; a signal that does not fit the session
-it would go over is refused with `bridge.ErrPayloadTooLarge` and not sent.
+it would go over is refused with `camera.ErrPayloadTooLarge` and not sent
+(`bridge.ErrPayloadTooLarge` is the same value; a camera host needs
+`cluster/camera` alone).
 connectedhomeip establishes a TCP session for them
 (`TransportPayloadCapability::kLargePayload`); a controller that reached
 the camera over TCP leaves the session the signals need.
@@ -140,7 +142,8 @@ the list changes, call `Chime.SoundsChanged` to report it.
   succeeds and plays nothing.
 - **PlayChimeSound.** A given `ChimeID` must be installed, or the command
   answers `NOT_FOUND`. Without one, `SelectedChime` plays. The port's
-  error is the answer: its IM status, or `FAILURE` without one. A sound
+  error is the answer: its status (a `contract.StatusError` or an error
+  carrying an IM status), or `FAILURE` without one. A sound
   that started emits `ChimeStartedPlaying`.
 
 A write that does not change a value is stored without a report.
@@ -351,7 +354,10 @@ ids (not both, `INVALID_COMMAND`), each stream, and a `turns:` or
 It then allocates a session id from 0 and calls the `ProviderPort` with
 the validated `OfferArgs`. The port returns the session to store in
 CurrentSessions, and for a solicited offer whether the offer is
-deferred. A `ProvideOffer` with a session id is a re-offer of the
+deferred. An error the port returns is the command's answer: its status
+when the error carries one (a `contract.StatusError` — `INVALID_IN_STATE`
+for a relay that cannot produce an offer of its own — or an error carrying
+an IM status), `FAILURE` otherwise. A `ProvideOffer` with a session id is a re-offer of the
 invoker's session (`NOT_FOUND` for another peer's). `ProvideAnswer`,
 `ProvideICECandidates` and `EndSession` name a session of the invoker's
 node and fabric; `EndSession` removes the session whatever the port

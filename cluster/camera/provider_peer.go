@@ -48,6 +48,19 @@ type PeerSession interface {
 
 // Errors of the provider's signals.
 var (
+	// ErrPayloadTooLarge is a signal whose command does not fit one message
+	// of the session it would go over, refused before it is sent: over UDP
+	// 1178 bytes of payload (matter.js MAX_UDP_MESSAGE_SIZE less the message
+	// overhead, MessageExchange.ts:435-439), over a TCP connection the
+	// connection's largest message. connectedhomeip sends its signals with
+	// TransportPayloadCapability::kLargePayload, over TCP
+	// (webrtc-provider-manager.cpp:860-942 at 6170af84); this node
+	// initiates CASE over UDP only and reuses the newest live session of
+	// the peer, so a large signal reaches the peer when the peer came in
+	// over TCP. bridge.ErrPayloadTooLarge, which the node's [PeerSession]
+	// raises, is this value: a camera host recognises it with this package
+	// alone.
+	ErrPayloadTooLarge = errors.New("camera: the command does not fit one message of the session to the peer")
 	// ErrNoPeerConnector is a signal on a Provider no [PeerConnector] was
 	// attached to: the server runs outside a node, or before the node
 	// assembled it.

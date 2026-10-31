@@ -157,7 +157,8 @@ is stored:
 | `SetTemperatureSetpointHold(ctx, hold)` | a TemperatureSetpointHold write, when the hold is served |
 
 An error refuses the change. The write or command answers with the
-error's status when it carries one (an `im.StatusCodeError`), and with
+error's status when it carries one (a `contract.StatusError` or an
+`im.StatusCodeError`), and with
 FAILURE otherwise. Nothing is stored. A value equal to the stored one is
 no change: the server answers SUCCESS without calling the Sink. Without a
 Sink the server stores every change itself.

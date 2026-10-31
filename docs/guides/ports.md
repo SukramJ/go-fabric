@@ -12,6 +12,12 @@ Two failure modes recur, and they are not interchangeable:
 - **Silent**: the reply looks well-formed, and the missing behaviour never
   shows up as an error anywhere.
 
+A port's error is the answer of the request that called it: a
+`contract.StatusError` answers its status (and cluster status), as does an
+error carrying an IM status (`im.StatusCodeError`); any other error answers
+`FAILURE`. Where a row below says "an error answers with its status", this
+is what it means.
+
 What stays public below the facade, and what going around it costs, is
 on [Advanced seams](advanced-seams.md).
 

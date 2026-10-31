@@ -750,11 +750,11 @@ func (c *CertificateManagement) MatterInvoke(ctx context.Context, cmdID uint32, 
 	return spec.InvokeHeld(ctx, &c.SelfHeld, cmdID, fields)
 }
 
-// portError is a port's refusal: its status when it carries one, FAILURE
-// otherwise.
+// portError is a port's refusal: its status when it names one by type
+// ([spec.CarriesStatus] — a host's contract.StatusError or an
+// im.StatusCodeError), FAILURE otherwise.
 func portError(what string, err error) error {
-	var sc im.StatusCodeError
-	if errors.As(err, &sc) {
+	if spec.CarriesStatus(err) {
 		return err
 	}
 	return spec.Errorf(im.StatusFailure, "tls: %s refused: %v", what, err)

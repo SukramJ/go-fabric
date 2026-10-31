@@ -5,7 +5,6 @@ package jointfabric
 
 import (
 	"context"
-	"errors"
 	"slices"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
@@ -953,8 +952,7 @@ func commandError(err error) error {
 	if err == nil {
 		return nil
 	}
-	var sc im.StatusCodeError
-	if errors.As(err, &sc) {
+	if spec.CarriesStatus(err) { // a host's contract.StatusError or an im.StatusCodeError
 		return err
 	}
 	return spec.Errorf(im.StatusFailure, "JointFabricDatastore: %v", err)

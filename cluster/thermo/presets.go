@@ -74,11 +74,11 @@ func DecodePresets(b []byte) ([]Preset, error) {
 	return []Preset(list), nil
 }
 
-// asStatus is the IM status an error carries, if any.
+// asStatus is the IM status an error carries, if any ([spec.CarriesStatus]:
+// a host's contract.StatusError or an im.StatusCodeError).
 func asStatus(err error) (im.StatusCode, bool) {
-	var sc im.StatusCodeError
-	if errors.As(err, &sc) {
-		return sc.MatterStatusCode(), true
+	if spec.CarriesStatus(err) {
+		return spec.StatusOf(err), true
 	}
 	return 0, false
 }

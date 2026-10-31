@@ -27,12 +27,18 @@ type fakeClock struct {
 
 func newFakeClock() *fakeClock { return &fakeClock{Fake: clocktest.New(time.Unix(1_000_000, 0))} }
 
-// AfterFunc arms the timer on the fake and records d.
+// AfterFunc arms the timer on the fake and then records d: a test that
+// waits for the record ([armedSince], TestMessageExchangePaddedBDXCap) and
+// advances the fake must find the timer armed, or the advance runs past
+// a deadline that is set only afterwards and the timer never fires — the
+// stress job's "send did not return" of TestNextTimeoutIsMaxPeerResponseTime
+// (#306, nightly 2026-10-31), recorded before the arm until then.
 func (c *fakeClock) AfterFunc(d time.Duration, f func()) Timer {
+	t := c.Fake.AfterFunc(d, f)
 	c.mu.Lock()
 	c.started = append(c.started, d)
 	c.mu.Unlock()
-	return c.Fake.AfterFunc(d, f)
+	return t
 }
 
 // durations returns the durations of every timer started so far.
