@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 7165,
+  "entry_points": 7166,
   "entry_packages": [
     ".",
     "bdx",
@@ -275,9 +275,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 17005,
+    "total_exported": 17006,
     "reachable": 11999,
-    "whitelisted": 5003,
+    "whitelisted": 5004,
     "unreachable": 3
   },
   "by_package": [
@@ -6090,49 +6090,49 @@
       "identifier": "TestCloseBehaviour",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/exchange_test.go",
-      "line": 409
+      "line": 425
     },
     {
       "package": "client/exchange",
       "identifier": "TestCloseSessionSendsCloseSession",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/exchange_test.go",
-      "line": 649
+      "line": 665
     },
     {
       "package": "client/exchange",
       "identifier": "TestCloseTimerExpires",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/exchange_test.go",
-      "line": 487
+      "line": 503
     },
     {
       "package": "client/exchange",
       "identifier": "TestDefaultsAndAccessors",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/exchange_test.go",
-      "line": 758
+      "line": 774
     },
     {
       "package": "client/exchange",
       "identifier": "TestDuplicateIsAckedAtOnceAndNotDelivered",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/exchange_test.go",
-      "line": 158
+      "line": 159
     },
     {
       "package": "client/exchange",
       "identifier": "TestExchangeCapEvictsLeastRecentlyActive",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/exchange_test.go",
-      "line": 512
+      "line": 528
     },
     {
       "package": "client/exchange",
       "identifier": "TestExchangeIDsAreConsecutiveAndIndexedApart",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/exchange_test.go",
-      "line": 34
+      "line": 35
     },
     {
       "package": "client/exchange",
@@ -6314,7 +6314,7 @@
       "identifier": "TestNextTimeoutIsMaxPeerResponseTime",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/exchange_test.go",
-      "line": 371
+      "line": 389
     },
     {
       "package": "client/exchange",
@@ -6384,7 +6384,7 @@
       "identifier": "TestPeerLostHook",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/exchange_test.go",
-      "line": 596
+      "line": 612
     },
     {
       "package": "client/exchange",
@@ -6426,49 +6426,49 @@
       "identifier": "TestRetransmissionOptions",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/exchange_test.go",
-      "line": 306
+      "line": 307
     },
     {
       "package": "client/exchange",
       "identifier": "TestRetransmissionSchedule",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/exchange_test.go",
-      "line": 246
+      "line": 247
     },
     {
       "package": "client/exchange",
       "identifier": "TestSecondReliableMessageAcksTheFirstAtOnce",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/exchange_test.go",
-      "line": 194
+      "line": 195
     },
     {
       "package": "client/exchange",
       "identifier": "TestSecondSendWhileUnackedIsFlowError",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/exchange_test.go",
-      "line": 139
+      "line": 140
     },
     {
       "package": "client/exchange",
       "identifier": "TestSecureSessionRoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/exchange_test.go",
-      "line": 557
+      "line": 573
     },
     {
       "package": "client/exchange",
       "identifier": "TestSendContextCancelled",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/exchange_test.go",
-      "line": 342
+      "line": 343
     },
     {
       "package": "client/exchange",
       "identifier": "TestSendWaitsForAckAndPiggybacksOwedAck",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/exchange_test.go",
-      "line": 96
+      "line": 97
     },
     {
       "package": "client/exchange",
@@ -6482,7 +6482,7 @@
       "identifier": "TestSessionIDAllocation",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/exchange_test.go",
-      "line": 676
+      "line": 692
     },
     {
       "package": "client/exchange",
@@ -6510,7 +6510,7 @@
       "identifier": "TestStatusReportTravelsOnSecureChannel",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/exchange_test.go",
-      "line": 221
+      "line": 222
     },
     {
       "package": "client/exchange",
@@ -6524,14 +6524,14 @@
       "identifier": "TestUnsecuredSessionParameters",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/exchange_test.go",
-      "line": 721
+      "line": 737
     },
     {
       "package": "client/exchange",
       "identifier": "TestUnsolicitedMessageWithoutAckIsDropped",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/exchange_test.go",
-      "line": 70
+      "line": 71
     },
     {
       "package": "client/exchange",
@@ -22022,7 +22022,7 @@
       "identifier": "CommissionedIdentity",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "controller/ble/scanner.go",
-      "line": 579
+      "line": 592
     },
     {
       "package": "controller/ble",
@@ -22036,56 +22036,63 @@
       "identifier": "TestBleScannerAnotherTimeoutDoesNotEndDiscovery",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/ble/scanner_parity_matterjs_test.go",
-      "line": 606
+      "line": 639
     },
     {
       "package": "controller/ble",
       "identifier": "TestBleScannerCancelEndsEveryDiscoveryForIdentifier",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/ble/scanner_parity_matterjs_test.go",
-      "line": 690
+      "line": 723
     },
     {
       "package": "controller/ble",
       "identifier": "TestBleScannerCancelEndsOnlyTheCanceled",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/ble/scanner_parity_matterjs_test.go",
-      "line": 663
+      "line": 696
     },
     {
       "package": "controller/ble",
       "identifier": "TestBleScannerClose",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/ble/scanner_parity_matterjs_test.go",
-      "line": 1431
+      "line": 1464
+    },
+    {
+      "package": "controller/ble",
+      "identifier": "TestBleScannerCloseDuringContinuousCallback",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/ble/scanner_parity_matterjs_test.go",
+      "line": 614
     },
     {
       "package": "controller/ble",
       "identifier": "TestBleScannerCloseSettlesContinuousDiscovery",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/ble/scanner_parity_matterjs_test.go",
-      "line": 736
+      "line": 769
     },
     {
       "package": "controller/ble",
       "identifier": "TestBleScannerDeduplicationAndAging",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/ble/scanner_parity_matterjs_test.go",
-      "line": 834
+      "line": 867
     },
     {
       "package": "controller/ble",
       "identifier": "TestBleScannerDiscoveriesAskingDifferently",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/ble/scanner_parity_matterjs_test.go",
-      "line": 631
+      "line": 664
     },
     {
       "package": "controller/ble",
       "identifier": "TestBleScannerDiscoveriesForOneIdentifier",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/ble/scanner_parity_matterjs_test.go",
-      "line": 1408
+      "line": 1441
     },
     {
       "package": "controller/ble",
@@ -22099,14 +22106,14 @@
       "identifier": "TestBleScannerFailsDiscoveriesWhenScanCannotStart",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/ble/scanner_parity_matterjs_test.go",
-      "line": 712
+      "line": 745
     },
     {
       "package": "controller/ble",
       "identifier": "TestBleScannerForgetCommissionedDevice",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/ble/scanner_parity_matterjs_test.go",
-      "line": 969
+      "line": 1002
     },
     {
       "package": "controller/ble",
@@ -22134,7 +22141,7 @@
       "identifier": "TestBleScannerIgnoresNonMatterServiceData",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/ble/scanner_parity_matterjs_test.go",
-      "line": 758
+      "line": 791
     },
     {
       "package": "controller/ble",
@@ -22197,7 +22204,7 @@
       "identifier": "TestBleScannerOverlapping",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/ble/scanner_parity_matterjs_test.go",
-      "line": 1149
+      "line": 1182
     },
     {
       "package": "controller/ble",
@@ -22218,7 +22225,7 @@
       "identifier": "TestBleScannerReachabilityCases",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/ble/scanner_parity_matterjs_test.go",
-      "line": 1043
+      "line": 1076
     },
     {
       "package": "controller/ble",

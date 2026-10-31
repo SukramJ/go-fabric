@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"slices"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -368,6 +369,23 @@ func TestSendContextCancelled(t *testing.T) {
 // TestNextTimeoutIsMaxPeerResponseTime: Next waits MaxPeerResponseTime of
 // our own intervals plus the processing time (MessageExchange.ts:834-860)
 // and then fails with PeerMessageMissingError.
+// armedSince waits until a timer of want was started on clock after the
+// first before timers, failing with every duration started since.
+func armedSince(t *testing.T, clock *fakeClock, before int, want time.Duration) {
+	t.Helper()
+	deadline := time.Now().Add(30 * time.Second)
+	for {
+		d := clock.durations()[before:]
+		if slices.Contains(d, want) {
+			return
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("no timer of %v started since; started %v", want, d)
+		}
+		time.Sleep(time.Millisecond)
+	}
+}
+
 func TestNextTimeoutIsMaxPeerResponseTime(t *testing.T) {
 	t.Parallel()
 	m, _, clock := newTestManager(t, Config{})
@@ -386,13 +404,11 @@ func TestNextTimeoutIsMaxPeerResponseTime(t *testing.T) {
 			_, err := x.Next(context.Background(), ReceiveOptions{ExpectedProcessingTime: tc.ept})
 			done <- err
 		}()
-		deadline := time.Now().Add(5 * time.Second)
-		for len(clock.durations()) == before && time.Now().Before(deadline) {
-			time.Sleep(time.Millisecond)
-		}
-		if d := clock.durations(); d[len(d)-1] != tc.want {
-			t.Fatalf("Next timeout %v, want %v", d[len(d)-1], tc.want)
-		}
+		// Next's timer is among those started since before — not the last
+		// one, which the manager's own work may have armed meanwhile — and
+		// the wait for it is bounded as waitErr's is, not by a shorter
+		// deadline a loaded host runs past (#306).
+		armedSince(t, clock, before, tc.want)
 		clock.Advance(tc.want)
 		err := waitErr(t, done)
 		var missing *PeerMessageMissingError
