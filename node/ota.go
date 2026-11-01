@@ -244,7 +244,11 @@ func buildOtaRequestor(cfg *Config, connector mattercore.OtaProviderConnector, b
 		Logger:          cfg.Logger,
 		TimeSource:      cfg.Clock,
 	}
-	if ota.Harness {
+	switch {
+	case ota.AnnouncedUpdateQueryDelay != nil:
+		d := *ota.AnnouncedUpdateQueryDelay
+		rcfg.AnnouncedUpdateQueryDelay = &d
+	case ota.Harness:
 		// The matter.js cert requestor's wait after an announcement
 		// (OtaRequestorTestInstance.ts:65, :327-335), as the daemon's.
 		quick := 250 * time.Millisecond
