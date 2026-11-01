@@ -60,10 +60,9 @@ var (
 // src/app/ReadHandler.cpp:598 ProcessEventFilters stores EventMin
 // from EventFilterIB.EventMin and uses it to gate the event query.
 type EventMinimumNumber struct {
-	// NodeID is the optional node filter from EventFilterIB tag 0.
-	// In a bridge context this is always the bridge's own NodeID or
-	// omitted; go-fabric stores it for completeness but does not
-	// use it in the query — only EventMin is applied.
+	// NodeID is the optional node filter from EventFilterIB tag 0: the
+	// filter applies only to the node with this operational node id
+	// ([EventFiltersFor]).
 	NodeID    uint64
 	HasNodeID bool
 	// EventMin is the minimum event number (INCLUSIVE lower bound): the

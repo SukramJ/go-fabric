@@ -1120,7 +1120,12 @@ func (b *Bridge) handleSubscribeRequest(
 		// reports the bridge never sends.
 		return b.rejectSubscribeStatus(src, requestHdr, proto, "manager", subscribeRejectStatus(regErr))
 	}
-	initialReport, matchedPaths := b.buildInitialReport(subCtx, dispatcher, req)
+	// One EventFilterIB applies to the priming report: the first for this
+	// node (matter.js EventReadResponse.ts:68-77; review 2026-11
+	// W2-wire-05).
+	primingReq := req
+	primingReq.EventFilters = im.EventFiltersFor(req.EventFilters, b.localNodeIDFor(requestHdr.SessionID, subFabricIndex))
+	initialReport, matchedPaths := b.buildInitialReport(subCtx, dispatcher, primingReq)
 	// A Subscribe whose (possibly wildcard) paths match zero attributes
 	// AND zero events cannot be established — matter.js
 	// ServerSubscription.ts:610-614 rejects it with InvalidAction, after
@@ -1586,6 +1591,25 @@ func (b *Bridge) resolveSessionSubject(sessionID uint16) (nodeID uint64, cats []
 	}
 	nodeID, cats, _ = resolver.SubjectFor(sessionID)
 	return nodeID, cats
+}
+
+// localNodeIDFor returns this node's operational node id on the session's
+// accessing fabric — the session's local node id — or 0 for a session
+// without a fabric, as matter.js EventReadResponse.ts:68 takes
+// UNSPECIFIED_NODE_ID there. It selects the EventFilterIB that applies to
+// this node ([im.EventFiltersFor]).
+func (b *Bridge) localNodeIDFor(sessionID uint16, fabricIndex uint8) uint64 {
+	if sessionID == 0 || fabricIndex == 0 || fabricIndex == endpointpkg.FabricIndexUnresolvable {
+		return 0
+	}
+	b.mu.RLock()
+	sessions := b.sessions
+	b.mu.RUnlock()
+	sess, ok := sessions.Lookup(sessionID)
+	if !ok || sess == nil {
+		return 0
+	}
+	return sess.LocalNodeID()
 }
 
 // resolveSessionPASE reports whether sessionID was established over

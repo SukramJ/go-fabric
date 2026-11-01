@@ -252,8 +252,12 @@ func (b *Bridge) dispatchReadRequest(ctx context.Context, src net.Addr, requestH
 	// #readAllowedEvents.
 	if len(req.EventRequests) > 0 {
 		auth := b.eventReadAuthorizer(dispatcher, readFabricIndex, readPASE, readSubjectNodeID, readSubjectCATs)
+		// One EventFilterIB applies: the first for this node (matter.js
+		// EventReadResponse.ts:68-77; review 2026-11 W2-wire-05).
+		eventReq := req
+		eventReq.EventFilters = im.EventFiltersFor(req.EventFilters, b.localNodeIDFor(requestHdr.SessionID, readFabricIndex))
 		report.EventReports = append(im.DeniedEventPathStatuses(readCtx, auth, req.EventRequests),
-			im.AuthorizeEventReports(readCtx, auth, im.HandleReadEventRequest(req, b.eventLog))...)
+			im.AuthorizeEventReports(readCtx, auth, im.HandleReadEventRequest(eventReq, b.eventLog))...)
 	}
 	// Diagnostic: show what we returned per path.
 	for i, r := range report.Reports {

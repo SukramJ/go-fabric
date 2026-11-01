@@ -582,26 +582,38 @@ func HandleReadRequest(ctx context.Context, d Dispatcher, req ReadRequest) Repor
 	return rd
 }
 
-// minEventNumberFromFilters computes the minimum event-number floor from a
-// set of [EventMinimumNumber] filters. Returns 0 (no filtering) when filters
-// is empty. Takes the minimum across all entries — any event whose Number is
-// < the floor is already known to the controller and shall not be re-sent
-// (EventMin is an inclusive lower bound — see [EventLog.Query]).
-//
-// matter.js: EventHandler.ts getEvents → EventFilters passed to EventHandler.
-// chip: src/app/ReadHandler.cpp:598 ProcessEventFilters — stores per-entry
-// mEventMin and applies it in GetScheduledEventInfo.
+// EventFiltersFor returns the one EventFilterIB that applies to the node
+// whose operational node id on the accessing fabric is localNodeID: the
+// first filter without a NodeID or with NodeID == localNodeID, as a
+// one-element slice, or nil when none applies. The rest are ignored. Pass
+// 0 for a session without a fabric. A filter addressed to another node
+// (a controller managing several sends one per node) does not lower the
+// floor. Mirrors matter.js
+// packages/protocol/src/action/server/EventReadResponse.ts:68-77 (the
+// first matching filter sets #eventMinVersion, then break; nodeId is
+// UNSPECIFIED_NODE_ID without a fabric). Review 2026-11 W2-wire-05.
+func EventFiltersFor(filters []EventMinimumNumber, localNodeID uint64) []EventMinimumNumber {
+	for _, f := range filters {
+		if !f.HasNodeID || f.NodeID == localNodeID {
+			return []EventMinimumNumber{f}
+		}
+	}
+	return nil
+}
+
+// minEventNumberFromFilters returns the event-number floor of filters: the
+// EventMin of the first entry, 0 (no filtering) when filters is empty. The
+// caller selects the entry for this node with [EventFiltersFor]; any event
+// whose Number is below the floor is already known to the controller
+// (EventMin is an inclusive lower bound — see [EventLog.Query]). Mirrors
+// matter.js EventReadResponse.ts:68-77 (one filter applies) and
+// packages/protocol/src/events/OccurrenceManager.ts:250-254 (that single
+// value bounds the query).
 func minEventNumberFromFilters(filters []EventMinimumNumber) uint64 {
 	if len(filters) == 0 {
 		return 0
 	}
-	floor := filters[0].EventMin
-	for _, f := range filters[1:] {
-		if f.EventMin < floor {
-			floor = f.EventMin
-		}
-	}
-	return floor
+	return filters[0].EventMin
 }
 
 // BuildEventReports evaluates paths against log and returns a slice of
@@ -619,10 +631,11 @@ func minEventNumberFromFilters(filters []EventMinimumNumber) uint64 {
 // de-duplicated by [EventRecord].Number before returning so a wildcard
 // path that overlaps with a concrete path does not produce duplicates.
 //
-// filters carries the EventFilterIB minimum-event-number constraints the
-// controller sent (Matter §10.6.9). Pass nil to return all buffered events.
-// When filters is non-empty the minimum EventMin across all entries is used
-// as the INCLUSIVE lower bound — events with Number < minNumber are excluded.
+// filters carries the EventFilterIB minimum-event-number constraint for
+// this node (Matter §10.6.9), selected from the request's with
+// [EventFiltersFor]. Pass nil to return all buffered events. The first
+// entry's EventMin is the INCLUSIVE lower bound — events with Number <
+// minNumber are excluded.
 // The returned [EventReport].Timestamp is sourced from
 // [EventRecord].EpochMS (POSIX milliseconds — Matter §10.6.6.1
 // EpochTimestamp, encoded at tag 3), matching the millisecond timestamp
@@ -702,7 +715,8 @@ func BuildEventReports(paths []ConcreteEventPath, log *EventLog, filters []Event
 // (EventReadResponse.process) for the request-level dispatch and
 // matter.js packages/protocol/src/interaction/EventHandler.ts (getEvents)
 // for the per-path log query. Passes req.EventFilters to [BuildEventReports]
-// for minimum-event-number gating.
+// for minimum-event-number gating; the caller selects them for this node
+// with [EventFiltersFor] first.
 func HandleReadEventRequest(req ReadRequest, log *EventLog) []EventReport {
 	return BuildEventReports(req.EventRequests, log, req.EventFilters)
 }
