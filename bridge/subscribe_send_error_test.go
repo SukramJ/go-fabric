@@ -50,6 +50,7 @@ func TestReportSubscriptionEventsSurvivesTransientSendError(t *testing.T) {
 	// Point the target at a session the lookup does not know: the send
 	// fails with ErrUnsolicitedSessionMissing before any datagram leaves.
 	b.routing.subTargets.Store(subID, subTarget{
+		pase:                true, // a PASE subscriber: the report is not ACL-gated
 		src:                 peerAddr,
 		hasPeerSourceNodeID: true,
 		peerSourceNodeID:    0xBBBB4444,
@@ -66,6 +67,7 @@ func TestReportSubscriptionEventsSurvivesTransientSendError(t *testing.T) {
 
 	// Session re-adopted — the next report must reach the peer.
 	b.routing.subTargets.Store(subID, subTarget{
+		pase:                true, // a PASE subscriber: the report is not ACL-gated
 		src:                 peerAddr,
 		hasPeerSourceNodeID: true,
 		peerSourceNodeID:    0xBBBB4444,
@@ -90,6 +92,7 @@ func TestReportSubscriptionEventsEvictsAfterSendErrorCap(t *testing.T) {
 
 	const subID uint32 = 8484
 	b.routing.subTargets.Store(subID, subTarget{
+		pase:                true, // a PASE subscriber: the report is not ACL-gated
 		src:                 peerAddr,
 		hasPeerSourceNodeID: true,
 		peerSourceNodeID:    0xBBBB4444,

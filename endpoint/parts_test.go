@@ -24,7 +24,7 @@ func TestSpecPartsComposeAChildEndpoint(t *testing.T) {
 	t.Parallel()
 	const dtSmokeCoAlarm, dtPowerSource = 0x0076, 0x0011
 	store := newInternalFakeStore()
-	a, err := New(store, Config{VendorID: 1, ProductID: 1, NodeLabel: "x"}, nil)
+	a, err := New(store, Config{VendorID: 1, ProductID: 1}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -117,7 +117,7 @@ func TestSpecPartsComposeAChildEndpoint(t *testing.T) {
 func TestComposedSourceWithoutClustersIsBridged(t *testing.T) {
 	t.Parallel()
 	const dtOven, dtCabinet = 0x007B, 0x0071
-	a, err := New(newInternalFakeStore(), Config{VendorID: 1, ProductID: 1, NodeLabel: "x"}, nil)
+	a, err := New(newInternalFakeStore(), Config{VendorID: 1, ProductID: 1}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -166,7 +166,7 @@ func TestComposedSourceWithoutClustersIsBridged(t *testing.T) {
 func TestBridgedNodePartsListIsFullFamily(t *testing.T) {
 	t.Parallel()
 	const dtRefrigerator, dtCabinet, dtPowerSource = 0x0070, 0x0071, 0x0011
-	a, err := New(newInternalFakeStore(), Config{VendorID: 1, ProductID: 1, NodeLabel: "x"}, nil)
+	a, err := New(newInternalFakeStore(), Config{VendorID: 1, ProductID: 1}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

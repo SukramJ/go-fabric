@@ -57,6 +57,17 @@ func answerReportChunks(b *Bridge, peerConn *net.UDPConn) <-chan uint8 {
 			if err != nil {
 				return
 			}
+			// On the PASE test session the reply is sealed: open it.
+			b.mu.RLock()
+			pase, isPASE := b.sessions.(paseTestLookup)
+			b.mu.RUnlock()
+			if isPASE {
+				plain, _, err := pase.peer.Decrypt(&hdr, securityFlagsByte(&hdr), got[hdrLen:])
+				if err != nil {
+					return
+				}
+				got = append(append([]byte{}, got[:hdrLen]...), plain...)
+			}
 			rproto, _, err := message.UnmarshalProtocolHeader(got[hdrLen:])
 			if err != nil {
 				return
@@ -95,13 +106,14 @@ func nextSubscribeOpcode(t *testing.T, opcodes <-chan uint8) uint8 {
 // SubscribeResponse, with the subscription registered in the manager.
 func TestHandleSubscribeRequest_MatchingPath_EstablishesAndReplies(t *testing.T) {
 	t.Parallel()
-	fake := &aclStoreFake{} // PASE (SessionID=0) bypasses ACL entirely; empty entries is fine.
+	fake := &aclStoreFake{} // PASE bypasses ACL entirely; empty entries is fine.
 	b := newACLTestBridge(t, fake)
 	mgr := subscription.NewManager(subscription.Config{}, nil, nil)
 	b.AttachSubscriptionManager(mgr)
+	attachPASETestPeer(t, b) // the PASE auth mode, not fabric 0, grants (W2-sec-03)
 
 	peerConn, peerAddr := newSubscribeTestPeer(t)
-	hdr := &message.Header{SessionID: 0, MessageCounter: 102}
+	hdr := &message.Header{SessionID: paseTestSessionID, MessageCounter: 102}
 	proto := message.ProtocolHeader{ProtocolID: im.InteractionModelProtocolID, Opcode: im.OpcodeSubscribeRequest, ExchangeID: 1}
 	req := im.SubscribeRequest{
 		AttributeRequests:  []im.ConcreteAttributePath{accessControlACLPath()},
@@ -152,8 +164,9 @@ func TestHandleSubscribeRequest_DataVersionFilterFullSuppression_StillEstablishe
 	mgr := subscription.NewManager(subscription.Config{}, nil, nil)
 	b.AttachSubscriptionManager(mgr)
 
+	attachPASETestPeer(t, b) // the PASE auth mode, not fabric 0, grants (W2-sec-03)
 	path := accessControlACLPath()
-	results := b.readAuthorizedResults(context.Background(), b.Dispatcher(), path)
+	results := b.readAuthorizedResults(im.WithAuthModePASE(context.Background()), b.Dispatcher(), path)
 	if len(results) != 1 || results[0].Status != im.StatusSuccess {
 		t.Fatalf("precondition: want exactly 1 successful read of AccessControl.ACL, got %+v", results)
 	}
@@ -172,7 +185,7 @@ func TestHandleSubscribeRequest_DataVersionFilterFullSuppression_StillEstablishe
 	}
 
 	peerConn, peerAddr := newSubscribeTestPeer(t)
-	hdr := &message.Header{SessionID: 0, MessageCounter: 103}
+	hdr := &message.Header{SessionID: paseTestSessionID, MessageCounter: 103}
 	proto := message.ProtocolHeader{ProtocolID: im.InteractionModelProtocolID, Opcode: im.OpcodeSubscribeRequest, ExchangeID: 1}
 	req := im.SubscribeRequest{
 		AttributeRequests: []im.ConcreteAttributePath{path},

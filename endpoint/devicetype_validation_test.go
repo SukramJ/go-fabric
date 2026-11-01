@@ -489,7 +489,7 @@ func TestTopologyFacts(t *testing.T) {
 		listedServer{dtServer{id: clIdentify}},
 		nil,
 	})
-	agg := &Endpoint{ID: 1, DeviceType: dtAggregator}
+	agg := &Endpoint{ID: 1, Aggregator: true, DeviceType: dtAggregator}
 	orphan := &Endpoint{ID: 7, DeviceType: 0, ParentEndpointID: 9, HasParentEndpointID: true}
 	self := &Endpoint{ID: 8, ParentEndpointID: 8, HasParentEndpointID: true}
 	f := newTopologyFacts(&Topology{Endpoints: []*Endpoint{root, agg, nil, orphan, self}})
@@ -554,7 +554,7 @@ func TestTopologyFacts(t *testing.T) {
 // without the Lighting feature.
 func TestValidateDeviceTypesAssembledBridge(t *testing.T) {
 	t.Parallel()
-	a, err := New(&oneEndpointStore{}, Config{VendorID: 1, ProductID: 1, NodeLabel: "x", RootDeviceConditions: []string{conditionLanguage}}, nil)
+	a, err := New(&oneEndpointStore{}, Config{VendorID: 1, ProductID: 1, RootDeviceConditions: []string{conditionLanguage}}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -589,7 +589,7 @@ func TestDeviceTypeValidatorModes(t *testing.T) {
 	topo := func(withSingleton bool) *Topology {
 		root := &Endpoint{ID: 0, DeviceType: dtRootNode}
 		root.PublishClusterServers([]contract.ClusterServer{descriptorFor(t, nil, dtRootNode)})
-		agg := &Endpoint{ID: 1, DeviceType: dtAggregator}
+		agg := &Endpoint{ID: 1, Aggregator: true, DeviceType: dtAggregator}
 		servers := []contract.ClusterServer{descriptorFor(t, nil, dtAggregator)}
 		if withSingleton {
 			servers = append(servers, dtServer{id: clBasicInfo})

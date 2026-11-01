@@ -14,10 +14,16 @@ commissioning window, the fabric hooks, and every port of `bridge/` in its
 documented order. You configure it with one `node.Config` and add devices to
 its Aggregator.
 
-Use the facade with your own topology when you already have an endpoint
-assembler over your own device model: set `Config.Topology` to your
-`bridge.Snapshotter`. The facade then builds no Aggregator, and everything
-else (stores, root servers, sessions, group state) stays the facade's.
+Use the facade with your own topology when you already map your own device
+model onto endpoints: set `Config.Topology` to your `bridge.Snapshotter`. The
+facade then builds no assembler of its own, and everything else (stores,
+root servers, sessions, group state) stays the facade's. The topology your
+snapshotter returns must come from an `endpoint.Assembler` over your
+`endpoint.Spec`s — "your own assembler" means your own `Spec` producer, not
+your own `endpoint.Topology`. `Endpoint` and `Topology` are read-only to a
+host: the per-cluster DataVersions, the Identify and Groups servers, a
+written NodeLabel and the scene tables live in state only the assembler
+fills, so a hand-built topology loses them on every `Reassemble`.
 
 Use **`bridge/` directly** only if you need to replace one of the
 collaborators the facade wires. `bridge.New` installs a no-op for every port

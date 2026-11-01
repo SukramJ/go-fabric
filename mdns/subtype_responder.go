@@ -22,11 +22,17 @@ import (
 	"github.com/SukramJ/go-fabric/internal/clockvar"
 )
 
-// subtypePTRTTL matches grandcat/zeroconf's default record TTL (3200 s)
-// so the subtype PTR lives exactly as long as the primary instance PTR
-// it points at — a shorter subtype TTL would let the filter record
-// expire from commissioner caches while the instance is still valid.
-const subtypePTRTTL = 3200
+// subtypePTRTTL is the subtype PTR's TTL, 120 s: matter.js builds every
+// advertised record with DEFAULT_MDNS_TTL (packages/general/src/codec/
+// DnsCodec.ts:20, the subtype PTRs at packages/protocol/src/advertisement/
+// mdns/CommissionableMdnsAdvertisement.ts:54-60), and chip's
+// src/lib/dnssd/wire/records/ResourceRecord.h:35 kDefaultTtl is 120. A
+// node that vanishes without its goodbyes leaves the filter record in a
+// commissioner's cache for two minutes, not 53; the periodic re-announce
+// refreshes it while the node lives. Review 2026-11 W2-wire-06;
+// notes/parity/by_design.md L7-D02 records the records grandcat/zeroconf
+// emits.
+const subtypePTRTTL = 120
 
 // SubtypeResponder is a side-car mDNS responder that serves PTR
 // queries for service subtypes (`_<sub>._sub.<service>.local.`) with

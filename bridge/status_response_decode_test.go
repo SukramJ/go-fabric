@@ -120,6 +120,10 @@ func TestReadChunkLoopAbortsOnErrorStatusResponse(t *testing.T) {
 	const sessionID uint16 = 78
 	b := newStartedBridgeWithSnapshotter(t, manyTempSensorsSnapshotterForTest())
 	peerConn, peerSess, peerAddr := chunkTestPeer(t, b, sessionID)
+	// PASE, so the wildcard read is served and spans several chunks: a
+	// session without a fabric is denied and its one empty chunk asks no
+	// StatusResponse, which left the abort untested.
+	markPASE(b, sessionID)
 
 	const readExchange uint16 = 0x2001
 	request := encryptIMFromPeer(t, peerSess, sessionID, message.ProtocolHeader{

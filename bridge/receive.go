@@ -438,7 +438,7 @@ func (b *Bridge) handleIMOpcode(ctx context.Context, src net.Addr, requestHdr *m
 	case imGateAbsorbStatusResp:
 		return b.absorbStatusResponse(src, requestHdr, proto, payload)
 	case imGateRejectUnsupported:
-		return b.rejectUnsupportedOpcode(src, proto)
+		return b.rejectUnsupportedOpcode(src, requestHdr, proto)
 	case imGateRejectGroupSession:
 		return b.rejectGroupSession(src, requestHdr, proto)
 	case imGateDropUnsecured:

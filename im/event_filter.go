@@ -60,42 +60,94 @@ func readDataVersionFilterArray(dec *tlv.Decoder) ([]DataVersionFilter, error) {
 //	tag 1 = DataVersion (uint32)
 func readDataVersionFilterFields(dec *tlv.Decoder) (DataVersionFilter, error) {
 	var f DataVersionFilter
+	var hasPath, hasVersion bool
 	for {
 		el, err := dec.Next()
 		if err != nil {
 			return DataVersionFilter{}, err
 		}
 		if el.IsEndContainer {
+			// Path and DataVersion are mandatory, and so are the path's
+			// endpoint and cluster: matter.js
+			// packages/types/src/protocol/types/TlvDataVersionFilter.ts:16-17,
+			// TlvClusterPath.ts:16-17 (TlvField). Review 2026-11 W2-wire-04.
+			switch {
+			case !hasPath:
+				return DataVersionFilter{}, missingField(0, "DataVersionFilterIB.Path")
+			case !hasVersion:
+				return DataVersionFilter{}, missingField(1, "DataVersionFilterIB.DataVersion")
+			}
 			return f, nil
 		}
 		if el.Tag.Kind != tlv.TagKindContext {
+			if err := skipField(dec, el); err != nil {
+				return DataVersionFilter{}, err
+			}
 			continue
 		}
 		switch uint8(el.Tag.Number & 0xFF) {
 		case 0: // Path (ClusterPathIB — a List)
-			if !el.IsContainer {
-				continue
+			if !el.IsContainer || el.Type != tlv.TypeList {
+				return DataVersionFilter{}, &FieldError{Status: StatusInvalidAction, Tag: 0, Reason: "ClusterPathIB not a list"}
 			}
-			for {
-				inner, innerErr := dec.Next()
-				if innerErr != nil {
-					return DataVersionFilter{}, innerErr
-				}
-				if inner.IsEndContainer {
-					break
-				}
-				if inner.Tag.Kind != tlv.TagKindContext {
-					continue
-				}
-				switch uint8(inner.Tag.Number & 0xFF) {
-				case 1: // EndpointID
-					f.Endpoint = uint16(inner.Uint & 0xFFFF)
-				case 2: // ClusterID
-					f.Cluster = uint32(inner.Uint & 0xFFFFFFFF)
-				}
+			if f.Endpoint, f.Cluster, err = readClusterPathFields(dec); err != nil {
+				return DataVersionFilter{}, err
 			}
+			hasPath = true
 		case 1: // DataVersion (uint32)
-			f.DataVersion = uint32(el.Uint & 0xFFFFFFFF)
+			v, err := uint32Field(el)
+			if err != nil {
+				return DataVersionFilter{}, err
+			}
+			f.DataVersion = v
+			hasVersion = true
+		default:
+			if err := skipField(dec, el); err != nil {
+				return DataVersionFilter{}, err
+			}
+		}
+	}
+}
+
+// readClusterPathFields parses a ClusterPathIB after its list opener has
+// been consumed: endpoint (tag 1) and cluster (tag 2) are mandatory and
+// type- and range-checked (matter.js
+// packages/types/src/protocol/types/TlvClusterPath.ts:16-17; review
+// 2026-11 W2-wire-03, W2-wire-04). Other fields are skipped.
+func readClusterPathFields(dec *tlv.Decoder) (endpoint uint16, cluster uint32, err error) {
+	var hasEndpoint, hasCluster bool
+	for {
+		inner, nextErr := dec.Next()
+		if nextErr != nil {
+			return 0, 0, nextErr
+		}
+		if inner.IsEndContainer {
+			if !hasEndpoint {
+				return 0, 0, missingField(1, "ClusterPathIB.Endpoint")
+			}
+			if !hasCluster {
+				return 0, 0, missingField(2, "ClusterPathIB.Cluster")
+			}
+			return endpoint, cluster, nil
+		}
+		if inner.Tag.Kind != tlv.TagKindContext {
+			if skipErr := skipField(dec, inner); skipErr != nil {
+				return 0, 0, skipErr
+			}
+			continue
+		}
+		switch uint8(inner.Tag.Number & 0xFF) {
+		case 1: // EndpointID
+			endpoint, err = uint16Field(inner)
+			hasEndpoint = true
+		case 2: // ClusterID
+			cluster, err = uint32Field(inner)
+			hasCluster = true
+		default:
+			err = skipField(dec, inner)
+		}
+		if err != nil {
+			return 0, 0, err
 		}
 	}
 }
@@ -159,12 +211,20 @@ func readEventFilterFields(dec *tlv.Decoder) (EventMinimumNumber, error) {
 	)
 
 	var f EventMinimumNumber
+	hasEventMin := false
 	for {
 		el, err := dec.Next()
 		if err != nil {
 			return EventMinimumNumber{}, err
 		}
 		if el.IsEndContainer {
+			// EventMin is mandatory: matter.js
+			// packages/types/src/protocol/types/TlvEventFilter.ts:17
+			// (TlvField); chip src/app/ReadHandler.cpp:603. Review
+			// 2026-11 W2-wire-04.
+			if !hasEventMin {
+				return EventMinimumNumber{}, missingField(tagEventFilterEventMin, "EventFilterIB.EventMin")
+			}
 			return f, nil
 		}
 		if el.Tag.Kind != tlv.TagKindContext {
@@ -177,10 +237,15 @@ func readEventFilterFields(dec *tlv.Decoder) (EventMinimumNumber, error) {
 		}
 		switch uint8(el.Tag.Number & 0xFF) {
 		case tagEventFilterNodeID:
-			f.NodeID = el.Uint
+			if f.NodeID, err = uint64Field(el); err != nil {
+				return EventMinimumNumber{}, err
+			}
 			f.HasNodeID = true
 		case tagEventFilterEventMin:
-			f.EventMin = el.Uint
+			if f.EventMin, err = uint64Field(el); err != nil {
+				return EventMinimumNumber{}, err
+			}
+			hasEventMin = true
 		default:
 			if el.IsContainer {
 				if skipErr := skipContainer(dec); skipErr != nil {

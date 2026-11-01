@@ -29,9 +29,6 @@ func newBridge(t *testing.T) *bridge.Bridge {
 		bridge.Config{
 			Listen:     "127.0.0.1:0",
 			PreferIPv4: true,
-			VendorID:   0x1234,
-			ProductID:  0x5678,
-			NodeLabel:  "bridgetest",
 		},
 		nil,
 	)

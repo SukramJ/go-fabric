@@ -202,23 +202,36 @@ func readEventPathFields(dec *tlv.Decoder) (ConcreteEventPath, error) {
 			return p, nil
 		}
 		if el.Tag.Kind != tlv.TagKindContext {
+			if err := skipField(dec, el); err != nil {
+				return ConcreteEventPath{}, fmt.Errorf("%w: %w", ErrInvalidPath, err)
+			}
 			continue
 		}
+		// Type- and range-checked, never masked (review 2026-11
+		// W2-wire-03): matter.js
+		// packages/types/src/protocol/types/TlvEventPath.ts:18-21 (bounded
+		// TlvEndpointNumber / TlvClusterId / TlvEventId); chip
+		// src/app/MessageDef/EventPathIB.cpp:160 ParsePath.
 		switch uint8(el.Tag.Number & 0xFF) {
 		case tagEventPathNode:
-			p.Node = el.Uint
+			p.Node, err = uint64Field(el)
 			p.HasNode = true
 		case tagEventPathEndpoint:
-			p.Endpoint = uint16(el.Uint & 0xFFFF)
+			p.Endpoint, err = uint16Field(el)
 			p.HasEndpoint = true
 		case tagEventPathCluster:
-			p.Cluster = uint32(el.Uint & 0xFFFFFFFF)
+			p.Cluster, err = uint32Field(el)
 			p.HasCluster = true
 		case tagEventPathEvent:
-			p.Event = uint32(el.Uint & 0xFFFFFFFF)
+			p.Event, err = uint32Field(el)
 			p.HasEvent = true
 		case tagEventPathIsUrgent:
 			p.IsUrgent = el.Bool
+		default:
+			err = skipField(dec, el)
+		}
+		if err != nil {
+			return ConcreteEventPath{}, fmt.Errorf("%w: %w", ErrInvalidPath, err)
 		}
 	}
 }

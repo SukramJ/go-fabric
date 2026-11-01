@@ -125,7 +125,8 @@ func TestBuildInitialReport_EventOnlyEmptyLog_Establishes(t *testing.T) {
 			{HasEvent: true, Event: 0x01},
 		},
 	}
-	report, matched := b.buildInitialReport(context.Background(), dispatcher, req)
+	// A PASE subscriber: the PASE auth mode, not fabric 0, grants (W2-sec-03).
+	report, matched := b.buildInitialReport(im.WithAuthModePASE(context.Background()), dispatcher, req)
 	if matched == 0 {
 		t.Fatal("buildInitialReport: matched = 0 for an event-only subscribe with an empty log — would misfire into no_match rejection")
 	}

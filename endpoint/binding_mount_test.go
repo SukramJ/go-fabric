@@ -24,7 +24,7 @@ import (
 func TestDeclaredClientMountsBinding(t *testing.T) {
 	t.Parallel()
 	const switchDT, onOff, webRTCProvider = 0x0103, 0x0006, 0x0553
-	a, err := New(newInternalFakeStore(), Config{VendorID: 1, ProductID: 1, NodeLabel: "x"}, nil)
+	a, err := New(newInternalFakeStore(), Config{VendorID: 1, ProductID: 1}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -62,7 +62,7 @@ func TestParityMatterJS_BridgedVendorNameComesFromTheHost(t *testing.T) {
 			DeviceType: contract.MeasurementClassDeviceType(contract.MeasurementFlow), Measurement: labelFlow{},
 		}
 	}
-	base := endpoint.Config{VendorID: 0xFFF1, ProductID: 0x8001, NodeLabel: "Bridge"}
+	base := endpoint.Config{VendorID: 0xFFF1, ProductID: 0x8001}
 	withNode := base
 	withNode.VendorName = "Node Vendor"
 

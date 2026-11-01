@@ -283,6 +283,16 @@ func (m *Manager) completeMessage(msg *Message, c candidate) {
 // receptionWindow returns the reception state for (key, source node),
 // creating it on first use. Only authenticated messages reach here, so
 // the map grows with genuine senders only.
+//
+// The state is keyed on the operational key, not on fabric and key set:
+// key sets that derive the same key share one window, as in matter.js
+// packages/protocol/src/groups/MessagingState.ts:80-98
+// (receptionStateFor). It is dropped with the last key set deriving the
+// key — [Manager.Reload] after KeySetWrite / KeySetRemove and
+// [Manager.ForgetFabric] run forgetUnreferenced, matter.js
+// packages/protocol/src/groups/FabricGroups.ts:185-219
+// (#forgetUnreferencedReceptionState). Pinned by
+// TestReceptionStateTeardownParity (review 2026-11 W2-sec-05).
 func (m *Manager) receptionWindow(key []byte, source uint64) *mrp.Window {
 	k := hex.EncodeToString(key)
 	m.receptionMu.Lock()

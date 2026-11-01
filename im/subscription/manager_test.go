@@ -1116,10 +1116,13 @@ func TestTick_CriticalEventAndDirty_OnlyOneReporterCallPerFloor(t *testing.T) {
 	ctx := context.Background()
 	t0 := time.Now()
 
-	// Fire a Critical event at t0.
+	// Fire a Critical event at t0: in the log first, as the bridge does.
+	log := im.NewEventLog()
+	m.SetEventSource(log)
+	num := log.Append(im.EventRecord{Priority: im.EventPriorityCritical, Endpoint: 1, Cluster: 0x0006, EventID: 0x0001})
 	m.OnEventFired(subscription.EventFiring{
 		Path:     eventPath,
-		Number:   1,
+		Number:   num,
 		Priority: im.EventPriorityCritical,
 	})
 

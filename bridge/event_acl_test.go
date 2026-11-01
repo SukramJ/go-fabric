@@ -89,6 +89,10 @@ func TestAuthorizedEventReports_PASEBypass(t *testing.T) {
 	rec := acEntryChangedReport(1)
 
 	target := subTarget{fabricIndex: 0}
+	if got := b.authorizedEventReports(context.Background(), target, []im.EventReport{rec}); len(got) != 0 {
+		t.Fatalf("fabric 0 without PASE: want no event, got %d (review 2026-11 W2-sec-03)", len(got))
+	}
+	target.pase = true
 	if got := b.authorizedEventReports(context.Background(), target, []im.EventReport{rec}); len(got) != 1 {
 		t.Fatalf("PASE bypass: want 1 event, got %d", len(got))
 	}

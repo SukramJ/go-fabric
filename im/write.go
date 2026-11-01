@@ -155,7 +155,12 @@ func readAttributeData(dec *tlv.Decoder, valueReader AttributeValueReader) (Attr
 		}
 		switch uint8(el.Tag.Number & 0xFF) {
 		case tagAttributeDataDataVersion:
-			w.DataVersion = uint32(el.Uint & 0xFFFFFFFF)
+			// TlvUInt32, never masked (review 2026-11 W2-wire-03).
+			v, err := uint32Field(el)
+			if err != nil {
+				return AttributeWrite{}, fmt.Errorf("%w: DataVersion: %w", ErrInvalidWriteRequest, err)
+			}
+			w.DataVersion = v
 			w.HasDataVersion = true
 		case tagAttributeDataPath:
 			if !el.IsContainer || el.Type != tlv.TypeList {

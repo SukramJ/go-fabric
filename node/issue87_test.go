@@ -53,7 +53,6 @@ func TestHostTopology(t *testing.T) {
 	cfg := minimalConfig(db)
 	asm, err := endpoint.New(sqlitestore.New(db), endpoint.Config{
 		VendorID: cfg.ProductDescription.VendorID, ProductID: cfg.ProductDescription.ProductID,
-		NodeLabel: cfg.BasicInformation.NodeLabel,
 	}, slog.New(slog.DiscardHandler))
 	if err != nil {
 		t.Fatal(err)

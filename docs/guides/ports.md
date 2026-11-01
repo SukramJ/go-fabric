@@ -83,7 +83,7 @@ these interfaces does not drag the host's dependencies into the module.
 | `Client` | the node's client stack, which the Binding entries reach other nodes through | no client stack. A Binding entry that names a node is dropped |
 | `EndpointPersistence` | scene tables and bridged NodeLabels, kept by the host | the facade's own, in the settings table |
 | `Groups` | the group state, for a host with its own assembler | the facade builds one over the credential store |
-| `Topology` | the host's own `bridge.Snapshotter` | the facade's Aggregator under one scope |
+| `Topology` | the host's own `bridge.Snapshotter`. The topology it returns comes from an `endpoint.Assembler` over the host's `endpoint.Spec`s; `Endpoint` and `Topology` are read-only to a host | the facade's Aggregator under one scope |
 | `AggregatorServers` | extra servers on the Aggregator (an Actions server, say) | none |
 | `Observers` | the host's callbacks on fabric, commissioning and window events; `Node.Observe` registers more on a running node, each after these, in registration order, until its unsubscribe | nothing observes. An observer's error or panic is logged, never returned |
 | `Metrics` | the node's named counters and gauges ([Observability](observability.md)); `node/metrics/expvar` publishes them on expvar | nothing recorded |
@@ -95,7 +95,10 @@ Ports the facade leaves to the host are reached through `Node.Root()` and
 
 - the GeneralDiagnostics TestEventTrigger enable key;
 - the PowerSource endpoints of PowerSourceConfiguration;
-- the bridge's `SetOnReassembled` and `SetOnFabricAdded` hooks.
+- the bridge's `SetOnReassembled` hook.
+
+A fabric's installation (AddNOC) reaches the host through
+`Observers.OnFabricAdded`; the bridge has no hook for it.
 
 Setting a cluster hook that the facade wires itself, such as
 OperationalCredentials `SetOnFabricRemoved`, replaces the facade's wiring.
@@ -163,7 +166,10 @@ the next `Reassemble`.
 | `AttachCaseInitiatorProvider`, `AttachOperationalResolver` (+ `ReestablishFormerSubscriptions`) | former subscriptions are dropped at restart (silent) |
 | `AttachBDXResponder` | BDX exchanges are dropped; an OTA download fails (fails closed) |
 | `AttachDiagnosticEvents` | `Bridge.DiagnosticEvents` stays empty |
-| `SetOnReassembled`, `SetOnFabricAdded`, `SetOnFabricRemoved` | nil-safe observer hooks |
+| `AttachMetrics` | silent: the named counters and gauges are recorded nowhere |
+| `SetSubscriptionPersistence` | on by default; off, no subscription is recorded or re-established after a restart |
+| `SetICDAdvertisement`, `SetLocalFixedMRPBackoff`, `SetOnInboundActivity` | an ICD only, silent: the ICD's record and MRP padding stay those of a non-ICD node, and inbound traffic does not extend its active window |
+| `SetOnReassembled`, `SetOnFabricRemoved` | nil-safe observer hooks. A fabric's installation is observed on the node (`node.Observers.OnFabricAdded`) |
 | `SetDeviceTypeValidation` | warn mode: each new violation is logged once; strict refuses what an addition causes; off judges only singleton placement |
 
 Strict refuses only what an addition causes. Each `Start` and `Reassemble`

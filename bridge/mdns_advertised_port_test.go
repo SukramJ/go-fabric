@@ -55,10 +55,7 @@ func advertisedPort(t *testing.T, noop *mdns.Noop, serviceType string) uint16 {
 func startEphemeralBridge(t *testing.T, noop *mdns.Noop) *bridge.Bridge {
 	t.Helper()
 	b, err := bridge.New(emptySnapshotter, noop, bridge.Config{
-		Listen:    ":0",
-		VendorID:  0x1234,
-		ProductID: 0x5678,
-		NodeLabel: "test-advertised-port",
+		Listen: ":0",
 	}, nil)
 	if err != nil {
 		t.Fatalf("New: %v", err)

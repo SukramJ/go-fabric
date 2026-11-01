@@ -345,10 +345,7 @@ func newBridgeWithAdvertiser(t *testing.T, advertiser mdns.Advertiser, buf *byte
 		wbEmptySnapshotter,
 		advertiser,
 		Config{
-			Listen:    ":0",
-			VendorID:  0x1234,
-			ProductID: 0x5678,
-			NodeLabel: "log-test",
+			Listen: ":0",
 		},
 		logger,
 	)

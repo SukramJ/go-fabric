@@ -83,6 +83,7 @@ func TestReportSubscriptionEventsRidesAFreshBridgeInitiatedExchange(t *testing.T
 		subscribeExchange uint16 = 17
 	)
 	b.routing.subTargets.Store(subID, subTarget{
+		pase:                true, // a PASE subscriber: the report is not ACL-gated
 		src:                 peerAddr,
 		hasPeerSourceNodeID: true,
 		peerSourceNodeID:    0xBBBB4444,
@@ -135,6 +136,7 @@ func TestOngoingReportsFollowThePeerAddressOfLaterInboundTraffic(t *testing.T) {
 
 	const subID uint32 = 8686
 	b.routing.subTargets.Store(subID, subTarget{
+		pase:                true, // a PASE subscriber: the report is not ACL-gated
 		src:                 oldAddr,
 		hasPeerSourceNodeID: true,
 		peerSourceNodeID:    0xBBBB4444,
