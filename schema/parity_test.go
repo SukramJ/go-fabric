@@ -6,128 +6,118 @@ package schema_test
 import (
 	"testing"
 
+	accesscontroldef "github.com/SukramJ/go-fabric/cluster/spec/accesscontrol"
+	administratorcommissioningdef "github.com/SukramJ/go-fabric/cluster/spec/administratorcommissioning"
+	basicinformationdef "github.com/SukramJ/go-fabric/cluster/spec/basicinformation"
+	bindingdef "github.com/SukramJ/go-fabric/cluster/spec/binding"
+	booleanstatedef "github.com/SukramJ/go-fabric/cluster/spec/booleanstate"
+	bridgeddevicebasicinformationdef "github.com/SukramJ/go-fabric/cluster/spec/bridgeddevicebasicinformation"
+	carbondioxideconcentrationmeasurementdef "github.com/SukramJ/go-fabric/cluster/spec/carbondioxideconcentrationmeasurement"
+	colorcontroldef "github.com/SukramJ/go-fabric/cluster/spec/colorcontrol"
+	descriptordef "github.com/SukramJ/go-fabric/cluster/spec/descriptor"
+	diagnosticlogsdef "github.com/SukramJ/go-fabric/cluster/spec/diagnosticlogs"
+	doorlockdef "github.com/SukramJ/go-fabric/cluster/spec/doorlock"
+	electricalenergymeasurementdef "github.com/SukramJ/go-fabric/cluster/spec/electricalenergymeasurement"
+	electricalpowermeasurementdef "github.com/SukramJ/go-fabric/cluster/spec/electricalpowermeasurement"
+	generalcommissioningdef "github.com/SukramJ/go-fabric/cluster/spec/generalcommissioning"
+	generaldiagnosticsdef "github.com/SukramJ/go-fabric/cluster/spec/generaldiagnostics"
+	groupkeymanagementdef "github.com/SukramJ/go-fabric/cluster/spec/groupkeymanagement"
+	groupsdef "github.com/SukramJ/go-fabric/cluster/spec/groups"
+	icdmanagementdef "github.com/SukramJ/go-fabric/cluster/spec/icdmanagement"
+	identifydef "github.com/SukramJ/go-fabric/cluster/spec/identify"
+	illuminancemeasurementdef "github.com/SukramJ/go-fabric/cluster/spec/illuminancemeasurement"
+	levelcontroldef "github.com/SukramJ/go-fabric/cluster/spec/levelcontrol"
+	networkcommissioningdef "github.com/SukramJ/go-fabric/cluster/spec/networkcommissioning"
+	occupancysensingdef "github.com/SukramJ/go-fabric/cluster/spec/occupancysensing"
+	onoffdef "github.com/SukramJ/go-fabric/cluster/spec/onoff"
+	operationalcredentialsdef "github.com/SukramJ/go-fabric/cluster/spec/operationalcredentials"
+	otasoftwareupdaterequestordef "github.com/SukramJ/go-fabric/cluster/spec/otasoftwareupdaterequestor"
+	pm10concentrationmeasurementdef "github.com/SukramJ/go-fabric/cluster/spec/pm10concentrationmeasurement"
+	pm25concentrationmeasurementdef "github.com/SukramJ/go-fabric/cluster/spec/pm25concentrationmeasurement"
+	powersourcedef "github.com/SukramJ/go-fabric/cluster/spec/powersource"
+	pressuremeasurementdef "github.com/SukramJ/go-fabric/cluster/spec/pressuremeasurement"
+	relativehumiditymeasurementdef "github.com/SukramJ/go-fabric/cluster/spec/relativehumiditymeasurement"
+	scenesmanagementdef "github.com/SukramJ/go-fabric/cluster/spec/scenesmanagement"
+	smokecoalarmdef "github.com/SukramJ/go-fabric/cluster/spec/smokecoalarm"
+	switchclusterdef "github.com/SukramJ/go-fabric/cluster/spec/switchcluster"
+	temperaturemeasurementdef "github.com/SukramJ/go-fabric/cluster/spec/temperaturemeasurement"
+	thermostatdef "github.com/SukramJ/go-fabric/cluster/spec/thermostat"
+	thermostatuserinterfaceconfigurationdef "github.com/SukramJ/go-fabric/cluster/spec/thermostatuserinterfaceconfiguration"
+	timesynchronizationdef "github.com/SukramJ/go-fabric/cluster/spec/timesynchronization"
+	windowcoveringdef "github.com/SukramJ/go-fabric/cluster/spec/windowcovering"
+	"github.com/SukramJ/go-fabric/cluster/wire"
 	"github.com/SukramJ/go-fabric/schema"
 )
 
-// TestParityCodeMatchesGeneratedSchema verifies that the codeRev literals
-// below — a maintained snapshot of the revision constants hand-coded in
-// the bridge's cluster packages — match the corresponding entry in the
-// codegen'd schema maps.
-//
-// This does NOT read the actual constants from the cluster source
-// files: codeRev is a transcribed literal, not an import or a
-// MatterRead(0xFFFD) off a constructed server, so a hand-edited
-// revision constant that this table is not also updated for will not
-// fail here. The per-cluster parity tests
-// (parity_matterjs_test.go under each cluster package, e.g.
-// cluster/core/parity_matterjs_test.go) are the
-// guard that reads the real constant for the clusters they cover; this
-// test only catches a matter.js HEAD schema-snapshot update that this
-// table's codeRev values were not updated to track. When matter.js bumps
-// a revision:
-//  1. Refresh parity/schema.json, then run `go generate ./schema/...` —
-//     clusters.go is updated.
-//  2. This test fails, naming the drifted cluster.
-//  3. Update the constant in the cluster source file, then update codeRev here.
+// TestParityCodeMatchesGeneratedSchema holds the revision every
+// spec-based server serves — the generated definition's Revision, which
+// [spec.Instance.ReadGlobal] answers for 0xFFFD — against the schema the
+// schema generator emitted from the same snapshot, so a definition and the
+// schema tables that drift apart fail here, naming the cluster. The rows
+// read the constants themselves; they used to be a hand-copied table that
+// a drifted constant passed (W3-clugen-08). The few revisions a server
+// still states by hand (OperationalCredentials, AccessControl,
+// GroupKeyManagement) are held against matter.js by
+// cluster/core/parity_matterjs_test.go, which reads those constants.
 func TestParityCodeMatchesGeneratedSchema(t *testing.T) {
 	t.Parallel()
-
-	// Each pair maps a cluster ID to the revision value currently used in
-	// the corresponding cluster source file. Covers all clusters from the
-	// Covers: core/, measurement/, and wire/ packages.
-	//
-	// Source references (package → file → constant):
-	//   core/access_control.go        → accessControlClusterRevision
-	//   core/basic_information.go     → basicInfoClusterRevision
-	//   core/binding.go               → bindingClusterRevision
-	//   core/bridged_device_basic_information.go → bridgedBasicInfoClusterRevision
-	//   core/descriptor.go            → descriptorClusterRevision
-	//   core/diagnostic_logs.go       → diaglogsClusterRevision
-	//   core/general_commissioning.go → gencommClusterRevision
-	//   core/general_diagnostics.go   → gendiagClusterRevision
-	//   core/group_key_management.go  → groupKeyMgmtClusterRevision
-	//   core/icd_management.go        → icdClusterRevision
-	//   core/identify.go              → identifyClusterRevision
-	//   core/network_commissioning.go → netcommClusterRevision
-	//   core/operational_credentials.go → opcredsClusterRevision
-	//   core/ota_software_update_requestor.go → otaRequestorClusterRevision
-	//   core/power_source.go          → powersrcClusterRevision
-	//   core/time_synchronization.go  → timeSyncClusterRevision
-	//   measurement/measurement.go    → tempMeasClusterRevision, humidityClusterRevision, etc.
-	//   wire/genericswitch.go         → switchClusterRevision
-	//   wire/admincommissioning.go    → admCommClusterRevision
-	//   model/generic/switch_matter.go → onoff.Revision()
-	//   model/custom/light/matter.go  → onoff.Revision(), matterLevelControlClusterRevision, etc.
-	//   model/custom/climate/matter.go → matterThermClusterRevision, etc.
-	//   model/custom/cover/matter.go  → matterWindowCoveringClusterRevision
-	//   model/custom/lock/matter.go   → the DoorLock cluster's revision constant
-	//     (also covered directly by model/custom/lock/parity_matterjs_test.go,
-	//     which reads it via MatterRead(0xFFFD) off a constructed server)
-	//   model/custom/siren/matter.go  → matterSmokeCOAlarmClusterRevision
 	cases := []struct {
 		id      uint32
-		name    string // human-readable; used only in error messages
+		name    string
 		codeRev uint16
 	}{
-		// core/ cluster servers
-		{0x001F, "AccessControl", 3},
-		{0x0028, "BasicInformation", 6},
-		{0x001E, "Binding", 1},
-		{0x0039, "BridgedDeviceBasicInformation", 6},
-		{0x001D, "Descriptor", 3},
-		{0x0032, "DiagnosticLogs", 1},
-		{0x0030, "GeneralCommissioning", 2},
-		{0x0033, "GeneralDiagnostics", 3},
-		{0x003F, "GroupKeyManagement", 4},
-		{0x0046, "IcdManagement", 3},
-		{0x0003, "Identify", 6},
-		{0x0031, "NetworkCommissioning", 2},
-		{0x003E, "OperationalCredentials", 2},
-		{0x002A, "OtaSoftwareUpdateRequestor", 1},
-		{0x002F, "PowerSource (core)", 3},
-		{0x0038, "TimeSynchronization", 2},
-
-		// measurement/ cluster servers
-		{0x0402, "TemperatureMeasurement", 6},
-		{0x0405, "RelativeHumidityMeasurement", 5},
-		{0x0400, "IlluminanceMeasurement", 5},
-		{0x0403, "PressureMeasurement", 5},
-		{0x0045, "BooleanState", 3},
-		{0x0406, "OccupancySensing", 7},
-		{0x040D, "CarbonDioxideConcentrationMeasurement", 5},
-		{0x042A, "Pm25ConcentrationMeasurement", 5},
-		{0x042D, "Pm10ConcentrationMeasurement", 5},
-		{0x0090, "ElectricalPowerMeasurement", 3},
-		{0x0091, "ElectricalEnergyMeasurement", 2},
-
-		// wire/ cluster servers
-		{0x003B, "Switch (GenericSwitch)", 2},
-		{0x003C, "AdministratorCommissioning", 1},
-
-		// model/generic + model/custom cluster servers
-		{0x0006, "OnOff", 6},
-		{0x0004, "Groups", 4},
-		{0x0008, "LevelControl", 7},
-		{0x0300, "ColorControl", 9},
-		{0x0201, "Thermostat", 11},
-		{0x0204, "ThermostatUserInterfaceConfiguration", 2},
-		{0x0102, "WindowCovering", 8},
-		{0x0101, "DoorLock", 10},
-		{0x005C, "SmokeCoAlarm", 2},
-		{0x0062, "ScenesManagement", 1},
+		{accesscontroldef.ClusterID, accesscontroldef.Name, accesscontroldef.Revision},
+		{basicinformationdef.ClusterID, basicinformationdef.Name, basicinformationdef.Revision},
+		{bindingdef.ClusterID, bindingdef.Name, bindingdef.Revision},
+		{bridgeddevicebasicinformationdef.ClusterID, bridgeddevicebasicinformationdef.Name, bridgeddevicebasicinformationdef.Revision},
+		{descriptordef.ClusterID, descriptordef.Name, descriptordef.Revision},
+		{diagnosticlogsdef.ClusterID, diagnosticlogsdef.Name, diagnosticlogsdef.Revision},
+		{generalcommissioningdef.ClusterID, generalcommissioningdef.Name, generalcommissioningdef.Revision},
+		{generaldiagnosticsdef.ClusterID, generaldiagnosticsdef.Name, generaldiagnosticsdef.Revision},
+		{groupkeymanagementdef.ClusterID, groupkeymanagementdef.Name, groupkeymanagementdef.Revision},
+		{icdmanagementdef.ClusterID, icdmanagementdef.Name, icdmanagementdef.Revision},
+		{identifydef.ClusterID, identifydef.Name, identifydef.Revision},
+		{networkcommissioningdef.ClusterID, networkcommissioningdef.Name, networkcommissioningdef.Revision},
+		{operationalcredentialsdef.ClusterID, operationalcredentialsdef.Name, operationalcredentialsdef.Revision},
+		{otasoftwareupdaterequestordef.ClusterID, otasoftwareupdaterequestordef.Name, otasoftwareupdaterequestordef.Revision},
+		{powersourcedef.ClusterID, powersourcedef.Name, powersourcedef.Revision},
+		{timesynchronizationdef.ClusterID, timesynchronizationdef.Name, timesynchronizationdef.Revision},
+		{temperaturemeasurementdef.ClusterID, temperaturemeasurementdef.Name, temperaturemeasurementdef.Revision},
+		{relativehumiditymeasurementdef.ClusterID, relativehumiditymeasurementdef.Name, relativehumiditymeasurementdef.Revision},
+		{illuminancemeasurementdef.ClusterID, illuminancemeasurementdef.Name, illuminancemeasurementdef.Revision},
+		{pressuremeasurementdef.ClusterID, pressuremeasurementdef.Name, pressuremeasurementdef.Revision},
+		{booleanstatedef.ClusterID, booleanstatedef.Name, booleanstatedef.Revision},
+		{occupancysensingdef.ClusterID, occupancysensingdef.Name, occupancysensingdef.Revision},
+		{carbondioxideconcentrationmeasurementdef.ClusterID, carbondioxideconcentrationmeasurementdef.Name, carbondioxideconcentrationmeasurementdef.Revision},
+		{pm25concentrationmeasurementdef.ClusterID, pm25concentrationmeasurementdef.Name, pm25concentrationmeasurementdef.Revision},
+		{pm10concentrationmeasurementdef.ClusterID, pm10concentrationmeasurementdef.Name, pm10concentrationmeasurementdef.Revision},
+		{electricalpowermeasurementdef.ClusterID, electricalpowermeasurementdef.Name, electricalpowermeasurementdef.Revision},
+		{electricalenergymeasurementdef.ClusterID, electricalenergymeasurementdef.Name, electricalenergymeasurementdef.Revision},
+		{switchclusterdef.ClusterID, switchclusterdef.Name, switchclusterdef.Revision},
+		{administratorcommissioningdef.ClusterID, administratorcommissioningdef.Name, administratorcommissioningdef.Revision},
+		{onoffdef.ClusterID, onoffdef.Name, onoffdef.Revision},
+		{groupsdef.ClusterID, groupsdef.Name, groupsdef.Revision},
+		{levelcontroldef.ClusterID, levelcontroldef.Name, levelcontroldef.Revision},
+		{colorcontroldef.ClusterID, colorcontroldef.Name, colorcontroldef.Revision},
+		{thermostatdef.ClusterID, thermostatdef.Name, thermostatdef.Revision},
+		{thermostatuserinterfaceconfigurationdef.ClusterID, thermostatuserinterfaceconfigurationdef.Name, thermostatuserinterfaceconfigurationdef.Revision},
+		{windowcoveringdef.ClusterID, windowcoveringdef.Name, windowcoveringdef.Revision},
+		{doorlockdef.ClusterID, doorlockdef.Name, doorlockdef.Revision},
+		{smokecoalarmdef.ClusterID, smokecoalarmdef.Name, smokecoalarmdef.Revision},
+		{scenesmanagementdef.ClusterID, scenesmanagementdef.Name, scenesmanagementdef.Revision},
 	}
-
 	for _, c := range cases {
 		schemaRev, ok := schema.ClusterRevision(c.id)
 		if !ok {
-			t.Errorf("cluster 0x%04X (%s) not found in generated schema — refresh parity/schema.json and run `go generate ./schema/...`",
-				c.id, c.name)
+			t.Errorf("cluster 0x%04X (%s) not found in generated schema — refresh parity/schema.json and run `make generate-matter-schema`", c.id, c.name)
 			continue
 		}
 		if c.codeRev != schemaRev {
-			t.Errorf("cluster 0x%04X (%s): this table's codeRev %d != matter.js schema revision %d — update BOTH the constant in the cluster source file AND codeRev here",
-				c.id, c.name, c.codeRev, schemaRev)
+			t.Errorf("cluster 0x%04X (%s): the definition's Revision %d != the schema's %d — regenerate both from one snapshot", c.id, c.name, c.codeRev, schemaRev)
 		}
+	}
+	if rev, ok := schema.ClusterRevision(0x0024); ok && rev != wire.SchedulesClusterRevision {
+		t.Errorf("Schedules (0x0024): wire.SchedulesClusterRevision %d != the schema's %d", wire.SchedulesClusterRevision, rev)
 	}
 }
 

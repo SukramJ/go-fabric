@@ -131,7 +131,16 @@ type generator struct {
 }
 
 // generate produces the package of cluster name.
-func generate(snap *snapshot, name string) (*output, error) {
+func generate(snap *snapshot, name string) (out *output, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			ce, ok := r.(confError)
+			if !ok {
+				panic(r)
+			}
+			out, err = nil, fmt.Errorf("%s: %w", name, ce.err)
+		}
+	}()
 	c := snap.cluster(name)
 	if c == nil {
 		return nil, fmt.Errorf("no cluster %s in the snapshot", name)
@@ -1435,6 +1444,9 @@ func constraintLiteral(c *constraint, typeName, metatype string) string {
 	if ref := referenceOf(c.In); ref != "" {
 		parts = append(parts, fmt.Sprintf("In: %q", ref))
 	}
+	if c.CpMax != nil {
+		parts = append(parts, fmt.Sprintf("CpMax: %d", *c.CpMax))
+	}
 	if c.Entry != nil {
 		if lit := constraintLiteral(c.Entry, "", ""); lit != "" {
 			parts = append(parts, "Entry: &"+lit)
@@ -1504,8 +1516,9 @@ func referenceOf(raw json.RawMessage) string {
 // carries it, as matter.js restates it (packages/model/src/logic/
 // DefaultValue.ts:37-59 castValue → EncodedValue.ts:21-43 at 862ad75f; the
 // scale per type name is FieldValue.ts:227-256 numericValue); the empty
-// list as spec.EmptyListDefault. A unit the type name does not scale, and
-// every other field value or list, is not rendered.
+// list as spec.EmptyListDefault; a reference, an octet string or a
+// non-empty list as spec.UnresolvedDefault. A unit the type name does not
+// scale, and every other field value, is not rendered.
 func defaultLiteral(raw json.RawMessage, typeName, metatype string) string {
 	if len(raw) == 0 {
 		return ""
@@ -1527,9 +1540,20 @@ func defaultLiteral(raw json.RawMessage, typeName, metatype string) string {
 		if len(x) == 0 {
 			return "spec.EmptyListDefault{}"
 		}
+		return `spec.UnresolvedDefault{Kind: "list"}`
 	case map[string]any:
 		if n, ok := encodedUnit(x, typeName, metatype); ok {
 			return "float64(" + strconv.FormatFloat(n, 'g', -1, 64) + ")"
+		}
+		// A field value the runtime does not resolve keeps a marker, so a
+		// stated default is told apart from none (W3-clugen-07).
+		switch x["type"] {
+		case "reference":
+			if name, ok := x["name"].(string); ok {
+				return fmt.Sprintf("spec.UnresolvedDefault{Kind: %q, Name: %q}", "reference", name)
+			}
+		case "bytes":
+			return `spec.UnresolvedDefault{Kind: "bytes"}`
 		}
 	}
 	return ""
@@ -1572,16 +1596,27 @@ func encodedUnit(fv map[string]any, typeName, metatype string) (float64, bool) {
 }
 
 // confLiteral renders a conformance AST as a spec.Conformance literal.
+//
+// A node it cannot render fails the generation ([confError], recovered
+// into generate's error) rather than degrading to "desc": a pin lift that
+// adds a conformance node must not turn a mandatory or disallowed element
+// into a conditional one unnoticed, as script/generate_matter_schema.go
+// (schemaConformance, "unknown conformance node") refuses it
+// (W3-clugen-03).
 func confLiteral(c *conformance) string {
 	if c == nil {
 		return "spec.Conformance{}"
 	}
 	body, err := astLiteral(c.AST)
 	if err != nil {
-		return fmt.Sprintf("spec.Conformance{Text: %q, Op: spec.ConfDesc}", c.Text)
+		panic(confError{fmt.Errorf("conformance %q: %w", c.Text, err)})
 	}
 	return fmt.Sprintf("spec.Conformance{Text: %q, %s}", c.Text, body)
 }
+
+// confError carries a conformance confLiteral cannot render out of the
+// writers, which return no error, to generate.
+type confError struct{ err error }
 
 var opLiteral = map[string]string{
 	"M": "spec.ConfMandatory", "O": "spec.ConfOptional", "P": "spec.ConfProvisional", "D": "spec.ConfDeprecated",

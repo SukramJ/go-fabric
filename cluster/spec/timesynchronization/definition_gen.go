@@ -640,6 +640,7 @@ var Definition = &spec.Cluster{
 			Access:      spec.Access{RW: "R", Read: spec.PrivilegeView},
 			Quality:     spec.Quality{NonVolatile: true},
 			Constraint:  spec.Constraint{Text: "1 to 2", Min: &spec.Bound{Int: 1}, Max: &spec.Bound{Int: 2}},
+			Default:     spec.UnresolvedDefault{Kind: "list"},
 			Decode:      decodeAttrTimeZone,
 		},
 		{

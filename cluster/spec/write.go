@@ -12,6 +12,7 @@ import (
 	"strings"
 	"unicode"
 	"unicode/utf16"
+	"unicode/utf8"
 
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
@@ -306,6 +307,15 @@ func (i *Instance) checkLength(t Type, c Constraint, value any, peers Peers) (v 
 	}
 	if !i.satisfies(c, float64(n), peers) {
 		return nil, fmt.Sprintf("length %d violates %q", n, c.Text)
+	}
+	// After the length, a string's codepoints against cpMax. Mirrors
+	// matter.js packages/node/src/behavior/state/validation/constraint.ts:213-232
+	// at 862ad75f ([...value].length > cpMax is a ConstraintError;
+	// W3-clugen-02).
+	if s, ok := value.(string); ok && c.CpMax > 0 {
+		if cp := utf8.RuneCountInString(s); cp > c.CpMax {
+			return nil, fmt.Sprintf("%d codepoints violate %q", cp, c.Text)
+		}
 	}
 	return value, ""
 }

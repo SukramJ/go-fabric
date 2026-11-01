@@ -227,9 +227,12 @@ func TestLiterals(t *testing.T) {
 		{`{"type":"percent","value":0.07}`, "percent100ths", "float64(7)"},
 		{`{"type":"percent","value":50}`, "percent", "float64(50)"},
 		{`{"type":"celsius","value":26}`, "int16", ""},
-		{`{"type":"bytes","value":"00"}`, "octstr", ""},
+		// A field value the runtime does not resolve keeps a marker
+		// (W3-clugen-07).
+		{`{"type":"bytes","value":"00"}`, "octstr", `spec.UnresolvedDefault{Kind: "bytes"}`},
+		{`{"type":"reference","name":"AbsMinHeatSetpointLimit"}`, "temperature", `spec.UnresolvedDefault{Kind: "reference", Name: "AbsMinHeatSetpointLimit"}`},
 		{`[]`, "list", "spec.EmptyListDefault{}"},
-		{`[1]`, "list", ""},
+		{`[1]`, "list", `spec.UnresolvedDefault{Kind: "list"}`},
 	} {
 		if got := defaultLiteral(raw(c.in), c.typ, "integer"); got != c.want {
 			t.Errorf("defaultLiteral(%s, %s) = %q, want %q", c.in, c.typ, got, c.want)
@@ -277,9 +280,16 @@ func TestLiterals(t *testing.T) {
 	if confLiteral(nil) != "spec.Conformance{}" || confText(nil) != "O" || confComment(nil) != "" || confField(nil) != "" {
 		t.Error("empty conformance")
 	}
-	if got := confLiteral(&conformance{Text: "?", AST: raw(`{"type":"bogus"}`)}); !strings.Contains(got, "ConfDesc") {
-		t.Errorf("an unknown node renders %q", got)
-	}
+	// An unknown node fails the generation, not a silent "desc"
+	// (W3-clugen-03).
+	func() {
+		defer func() {
+			if _, ok := recover().(confError); !ok {
+				t.Error("confLiteral of an unknown node did not fail")
+			}
+		}()
+		confLiteral(&conformance{Text: "?", AST: raw(`{"type":"bogus"}`)})
+	}()
 	for _, ast := range []string{
 		`[`, `{"type":"name","param":1}`, `{"type":"revision","param":"x"}`, `{"type":"choice","param":1}`,
 		`{"type":"choice","param":{"name":"a","num":1,"expr":{"type":"bogus"}}}`, `{"type":"otherwise","param":1}`,

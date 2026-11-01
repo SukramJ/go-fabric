@@ -1686,6 +1686,7 @@ var Definition = &spec.Cluster{
 			Access:      spec.Access{RW: "RW", Read: spec.PrivilegeView, Write: spec.PrivilegeManage},
 			Quality:     spec.Quality{NonVolatile: true},
 			Constraint:  spec.Constraint{Text: "desc", Desc: true},
+			Default:     spec.UnresolvedDefault{Kind: "reference", Name: "AbsMinHeatSetpointLimit"},
 		},
 		{
 			ID: AttrMaxHeatSetpointLimit, Name: "MaxHeatSetpointLimit",
@@ -1694,6 +1695,7 @@ var Definition = &spec.Cluster{
 			Access:      spec.Access{RW: "RW", Read: spec.PrivilegeView, Write: spec.PrivilegeManage},
 			Quality:     spec.Quality{NonVolatile: true},
 			Constraint:  spec.Constraint{Text: "desc", Desc: true},
+			Default:     spec.UnresolvedDefault{Kind: "reference", Name: "AbsMaxHeatSetpointLimit"},
 		},
 		{
 			ID: AttrMinCoolSetpointLimit, Name: "MinCoolSetpointLimit",
@@ -1702,6 +1704,7 @@ var Definition = &spec.Cluster{
 			Access:      spec.Access{RW: "RW", Read: spec.PrivilegeView, Write: spec.PrivilegeManage},
 			Quality:     spec.Quality{NonVolatile: true},
 			Constraint:  spec.Constraint{Text: "desc", Desc: true},
+			Default:     spec.UnresolvedDefault{Kind: "reference", Name: "AbsMinCoolSetpointLimit"},
 		},
 		{
 			ID: AttrMaxCoolSetpointLimit, Name: "MaxCoolSetpointLimit",
@@ -1710,6 +1713,7 @@ var Definition = &spec.Cluster{
 			Access:      spec.Access{RW: "RW", Read: spec.PrivilegeView, Write: spec.PrivilegeManage},
 			Quality:     spec.Quality{NonVolatile: true},
 			Constraint:  spec.Constraint{Text: "desc", Desc: true},
+			Default:     spec.UnresolvedDefault{Kind: "reference", Name: "AbsMaxCoolSetpointLimit"},
 		},
 		{
 			ID: AttrMinSetpointDeadBand, Name: "MinSetpointDeadBand",
