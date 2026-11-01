@@ -8,8 +8,10 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strconv"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -255,6 +257,21 @@ func TestOTACancelByRemovingConsentParity(t *testing.T) {
 	phase("consent removed")
 	r.eventually(t, "the update failed", func() bool { _, _, failed := r.snapshot(); return failed > 0 })
 	phase("update failed")
+	// DIAG: sample the goroutines 600 ms into the first step, while a held
+	// datagram (seen in the coverage job) would still be held.
+	dumpDone := make(chan struct{})
+	go func() {
+		defer close(dumpDone)
+		time.Sleep(600 * time.Millisecond)
+		buf := make([]byte, 1<<20)
+		n := runtime.Stack(buf, true)
+		for _, g := range strings.Split(string(buf[:n]), "\n\n") {
+			if strings.Contains(g, "go-fabric/") && !strings.Contains(g, "fabrictest.(*Site).quiet") && !strings.Contains(g, "testing.tRunner") && !strings.Contains(g, "ota_parity_matterjs_test.go") {
+				t.Logf("DIAG goroutine:\n%s", g)
+			}
+		}
+	}()
+	defer func() { <-dumpDone }()
 	if q := mgr.QueuedUpdates(); len(q) != 0 {
 		t.Errorf("queue %+v, want empty", q)
 	}
