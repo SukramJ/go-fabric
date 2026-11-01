@@ -54,6 +54,7 @@ Findings of the whole-codebase review of 2026-11-01 (`notes/review/2026-11/`).
 - `tlv`: `PutUTF8`, `PutUTF8WithMax` and `PutUTF8Bounded` write each ill-formed UTF-8 sequence as U+FFFD, as matter.js's TextEncoder-based encoder can write nothing else; a bounded string ill-formed from its first byte was trimmed to "" (W1-wire-03).
 - `tlv`, `cluster/spec`, `bridge`, `cluster/core`: a character string that carries an IS1 is bounded by the length it arrived with before it is cut at the IS1, as matter.js's TlvString checks it — a 40-byte NodeLabel whose sixth byte is 0x1F is CONSTRAINT_ERROR instead of the accepted "ABCDE"; `DecodeStringIn` and the bridge's attribute-write decoder check it, and BasicInformation answers a NodeLabel or Location value its schema refused CONSTRAINT_ERROR (W1-wire-04).
 - `secure/operational`: a new secure session counts its peer active from its creation, as matter.js and chip do, so the first reliable message of a session this node opened retransmits at the peer's active interval; `SessionInfo.LastPeerActivity` is the creation time until the peer sends (W1-conc-09).
+- `transport/message`: `MarshalPacket` refuses the reserved DSIZ 0b11 with `ErrReservedDestSize`; it encoded a header every receiver discards (W1-wire-06).
 
 ## [0.15.6] — 2026-11-01
 

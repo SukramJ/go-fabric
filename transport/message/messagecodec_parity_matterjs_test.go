@@ -290,3 +290,14 @@ func TestMessageCodecDecodeRefusesCrossFieldShapes(t *testing.T) {
 		}
 	})
 }
+
+// The reserved DSIZ 0b11 is never encoded: every decoder discards it
+// (matter.js MessageCodec.ts:210-213 at 862ad75f, chip
+// MessageHeader.cpp:192-195 at 6170af84), and matter.js derives its flags
+// from the fields present, so it cannot build one.
+func TestMessageCodecEncodeRefusesTheReservedDestSize(t *testing.T) {
+	t.Parallel()
+	if _, err := (Header{MessageCounter: 1, DestSize: 3}).MarshalPacket(); !errors.Is(err, ErrReservedDestSize) {
+		t.Fatalf("MarshalPacket(DSIZ 0b11) = %v, want ErrReservedDestSize", err)
+	}
+}

@@ -3,7 +3,10 @@
 
 package message
 
-import "errors"
+import (
+	"errors"
+	"fmt"
+)
 
 // Errors of [Header.MarshalPacket].
 var (
@@ -39,6 +42,13 @@ var (
 //
 // [Header.Marshal] stays the unchecked encoder the AAD and the tests use.
 func (h Header) MarshalPacket() ([]byte, error) {
+	// The reserved DSIZ 0b11 has no destination field and every receiver
+	// discards it ([UnmarshalHeader]; matter.js MessageCodec.ts:210-213,
+	// chip MessageHeader.cpp:192-195); matter.js cannot build one, its
+	// flags follow from the fields present.
+	if h.DestSize > DestGroup {
+		return nil, fmt.Errorf("%w: 0b%02b", ErrReservedDestSize, h.DestSize)
+	}
 	if h.HasExtension || len(h.MessageExtension) > 0 {
 		return nil, ErrEncodeExtensions
 	}

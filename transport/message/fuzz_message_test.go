@@ -125,7 +125,7 @@ func FuzzUnmarshalProtocolHeader(f *testing.F) {
 // FuzzMarshalPacket drives the outbound encoder [Header.MarshalPacket]
 // with arbitrary header fields. Asserted: no panic; a header it refuses
 // breaks one of the encode constraints (the two of encodePacket, a unicast
-// header with a group destination); a header it encodes
+// header with a group destination, the reserved DSIZ 0b11); a header it encodes
 // decodes back to the same typed header, and a group header keeps its
 // source node id and group id (matter.js MessageCodec.ts:481-504).
 func FuzzMarshalPacket(f *testing.F) {
@@ -137,7 +137,7 @@ func FuzzMarshalPacket(f *testing.F) {
 	f.Fuzz(func(t *testing.T, session uint16, counter uint32, hasSource bool, source uint64, dsiz uint8, destNode uint64, destGroup uint16, sessionType uint8, privacy, ext bool) {
 		h := Header{
 			SessionID: session, MessageCounter: counter, HasSourceNodeID: hasSource,
-			DestSize: DestSize(dsiz % 3), SessionType: SessionType(sessionType % 2), Privacy: privacy, HasExtension: ext,
+			DestSize: DestSize(dsiz % 4), SessionType: SessionType(sessionType % 2), Privacy: privacy, HasExtension: ext,
 		}
 		if hasSource {
 			h.SourceNodeID = source
@@ -153,7 +153,8 @@ func FuzzMarshalPacket(f *testing.F) {
 		if err != nil {
 			groupBroken := h.SessionType == SessionGroup && (h.DestSize != DestGroup || !h.HasSourceNodeID)
 			unicastGroup := h.SessionType == SessionUnsecured && h.DestSize == DestGroup
-			if !ext && !groupBroken && !unicastGroup {
+			reserved := h.DestSize > DestGroup
+			if !ext && !groupBroken && !unicastGroup && !reserved {
 				t.Fatalf("refused a valid header %+v: %v", h, err)
 			}
 			return
