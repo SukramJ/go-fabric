@@ -376,6 +376,9 @@ func (s *Server) setOnOff(ctx context.Context, st *state, on bool) error {
 		return nil
 	}
 	if err := s.sink.SetOnOff(ctx, on); err != nil {
+		if spec.CarriesStatus(err) { // a host's contract.StatusError or an im.StatusCodeError
+			return err
+		}
 		return spec.Errorf(im.StatusFailure, "OnOff: change to %t refused: %v", on, err)
 	}
 	if now := s.OnOff(); now != st.stored {

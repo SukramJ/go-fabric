@@ -554,6 +554,9 @@ func (s *DimensionServer) setTarget(ctx context.Context, req cd.SetTargetRequest
 		return spec.Errorf(im.StatusInvalidInState, "closure: latched; a position change must unlatch")
 	}
 	if err := s.cfg.Handler.SetTarget(ctx, position, req.Latch, req.Speed); err != nil {
+		if spec.CarriesStatus(err) { // a host's contract.StatusError or an im.StatusCodeError
+			return err
+		}
 		return spec.Errorf(im.StatusFailure, "closure: SetTarget: %v", err)
 	}
 	if err := s.SetTargetState(&target); err != nil {
@@ -612,6 +615,9 @@ func (s *DimensionServer) step(ctx context.Context, req cd.StepRequest) error {
 		pos = min(pos+delta, ceiling)
 	}
 	if err := s.cfg.Handler.Step(ctx, req.Direction, req.NumberOfSteps, req.Speed); err != nil {
+		if spec.CarriesStatus(err) { // a host's contract.StatusError or an im.StatusCodeError
+			return err
+		}
 		return spec.Errorf(im.StatusFailure, "closure: Step: %v", err)
 	}
 	target.Position = &spec.Nullable[uint16]{Value: uint16(pos)} //nolint:gosec // at most the ceiling, 10000
