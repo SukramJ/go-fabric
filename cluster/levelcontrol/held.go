@@ -14,6 +14,7 @@ import (
 
 	"github.com/SukramJ/go-fabric/clock"
 	"github.com/SukramJ/go-fabric/cluster"
+	gddef "github.com/SukramJ/go-fabric/cluster/spec/generaldiagnostics"
 	"github.com/SukramJ/go-fabric/contract"
 )
 
@@ -32,6 +33,21 @@ type HeldConfig struct {
 	// with; a nil level is null (matter.js's default for both).
 	CurrentLevel, OnLevel *uint8
 	Options               uint8
+	// StartUpCurrentLevel is the StartUpCurrentLevel the server starts
+	// with — the host's persisted value (quality N); nil is null. With
+	// [FeatureLighting] it is applied to CurrentLevel at start-up — 0 is
+	// MinLevel, null keeps CurrentLevel, any other value is the level —
+	// unless the boot reason is SoftwareUpdateCompleted or the server is
+	// Bridged (matter.js LevelControlServer.ts:222-245).
+	StartUpCurrentLevel *uint8
+	// BootReason optionally returns the node's GeneralDiagnostics
+	// BootReason; nil applies StartUpCurrentLevel.
+	BootReason func() uint8
+	// Bridged marks a server on an endpoint under the Aggregator, where
+	// matter.js does not apply StartUpCurrentLevel
+	// (`!this.endpoint.ownerOfType(AggregatorEndpoint)`, :224); the device
+	// layer sets it, as it sets onoff.Config.Bridged.
+	Bridged bool
 	// DataVersion is an optional host-owned tracker, as [Config.DataVersion].
 	DataVersion *cluster.DataVersionTracker
 	// ManageTransitions runs the commands as gradual transitions, stepping
@@ -73,6 +89,16 @@ func New(cfg HeldConfig) (*Server, error) {
 	h.onLevel = clonePtr(cfg.OnLevel)
 	s := newServer(h, cfg.DataVersion, cfg.Features)
 	s.held = h
+	if s.lighting {
+		s.startUp = clonePtr(cfg.StartUpCurrentLevel)
+		// Mirrors matter.js
+		// packages/node/src/behaviors/level-control/LevelControlServer.ts:222-245
+		// at 862ad75f (initializeLighting): not after a software update,
+		// not under an Aggregator (W3-clua2-02).
+		if !cfg.Bridged && (cfg.BootReason == nil || cfg.BootReason() != bootReasonSoftwareUpdateCompleted) {
+			s.applyStartUpLevel()
+		}
+	}
 	onOff := cfg.OnOff
 	if cfg.Features&FeatureOnOff == 0 {
 		onOff = nil
@@ -85,6 +111,27 @@ func New(cfg HeldConfig) (*Server, error) {
 		s.followOnOff(n)
 	}
 	return s, nil
+}
+
+// bootReasonSoftwareUpdateCompleted is GeneralDiagnostics
+// BootReasonEnum.SoftwareUpdateCompleted.
+const bootReasonSoftwareUpdateCompleted = uint8(gddef.BootReasonSoftwareUpdateCompleted)
+
+// applyStartUpLevel is the switch of LevelControlServer.ts:229-244: a
+// StartUpCurrentLevel of 0 sets CurrentLevel to MinLevel, null keeps it,
+// any other value sets it. The held level is not reported: the server is
+// being built.
+func (s *Server) applyStartUpLevel() {
+	if s.startUp == nil {
+		return
+	}
+	target := *s.startUp
+	if target == 0 {
+		target = s.minLevel()
+	}
+	s.held.mu.Lock()
+	s.held.level, s.held.levelKnown = target, true
+	s.held.mu.Unlock()
 }
 
 // ErrFeatures is the refusal of a [HeldConfig] feature selection the
