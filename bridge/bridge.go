@@ -865,10 +865,10 @@ func (b *Bridge) Start(ctx context.Context) error {
 	go func() {
 		defer close(done)
 		if err := listener.ServeOrdered(serveCtx, sessionOrderKey, b.handleOrderedDatagram); err != nil {
-			// Closed-listener errors during shutdown are expected; log
-			// at debug level. Real bind / IO errors come through
-			// before serveCancel fires, so they remain at warn.
-			b.logger.Debug("matter.udp.serve.exit", slog.Any("err", err))
+			// The listener's own close ends Serve with nil, so an error
+			// here means the socket is gone or failed every read: the node
+			// no longer receives, which the operator must see.
+			b.logger.Warn("matter.udp.serve.exit", slog.Any("err", err))
 		}
 	}()
 

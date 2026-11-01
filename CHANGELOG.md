@@ -48,6 +48,7 @@ Findings of the whole-codebase review of 2026-11-01 (`notes/review/2026-11/`).
 - `bridge`: a retransmission whose send fails keeps its MRP backoff instead of being retried at the next 50 ms pump tick, so a transient socket error no longer spends the whole retry budget in 200 ms and ends in the peer-loss path; the failed send still counts, as in matter.js (W1-conc-02).
 - `transport/mrp`, `bridge`: an ack obligation that a second reliable message on the same exchange displaces is emitted as a standalone ack at the next pump instead of being dropped — an MRP ack names one counter, as chip and matter.js treat it; the exchange's reply route stays while the newer obligation is pending (W1-conc-03).
 - `transport/btp`: the central sets its sequence state before it starts the send-ack timer, inside the session lock; the timer's callback could read it unsynchronised (W1-conc-04).
+- `transport/udp`, `bridge`: a read error the socket survives is logged at warn and the serve loop keeps reading, as chip's UDP transport does; only a closed descriptor or 100 failed reads in a row end it, and the bridge logs that exit at warn instead of debug (W1-conc-05).
 
 ## [0.15.6] — 2026-11-01
 
