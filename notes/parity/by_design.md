@@ -1858,10 +1858,17 @@ matter.js fills AuxiliaryAccessUpdated.AdminNodeID from the accessing
 fabric's `rootNodeId` — the CaseAdminSubject AddNOC recorded
 (`AccessControlServer.ts #adminDataFromSession`). go-fabric names the CASE
 subject of the request that changed the auxiliary entries
-(`core.adminNodeIDOf`), null for PASE or a change without a request. It does
-not persist the CaseAdminSubject per fabric, and for the usual single
-administrator the two are the same node; the field is nullable, and
-AccessControlEntryChanged here reports null altogether.
+(`core.adminNodeIDOf`), null for PASE or a change without a request, and
+AccessControlEntryChanged.AdminNodeID names the same CASE subject
+(`core.aclAdminFromContext`; null with AdminPasscodeID 0 over PASE, as
+matter.js's `#adminDataFromSession` answers a PASE session,
+`AccessControlServer.ts:274-282` at `862ad75f`). go-fabric does not persist
+the CaseAdminSubject per fabric, so for a second administrator node of the
+same fabric the two differ: matter.js names the fabric's root node, this
+module the node that sent the request. For the usual single administrator
+they are the same node; the field is nullable (review 2026-11 W3-clusec-08
+corrected this paragraph, which said AccessControlEntryChanged reports
+null). Retire by persisting CaseAdminSubject on the fabric record.
 
 ---
 
