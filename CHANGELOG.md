@@ -33,7 +33,7 @@ Findings of the whole-codebase review of 2026-11-01 (`notes/review/2026-11/`).
 
 ### Changed
 
-- The fail-safe port reports its fabric. Migration: `core.OpcredsConfig.IsFailSafeArmed` → `FailSafe` and `OperationalCredentials.SetIsFailSafeArmed` → `SetFailSafe` (bind `GeneralCommissioning.FailSafeFabric`); `threadbr.ManagementConfig.IsFailSafeArmed` → `FailSafe`; `AttachFailSafe` of `threadbr.ManagementServer`, `core.ThreadNetworkCommissioning` and `jointfabric.Administrator` takes `func() (fabricIndex uint8, armed bool)`.
+- The fail-safe port reports its fabric. Migration: `core.OpcredsConfig.IsFailSafeArmed` → `FailSafe` and `OperationalCredentials.SetIsFailSafeArmed` → `SetFailSafe` (bind `GeneralCommissioning.FailSafeFabric`); `threadbr.ManagementConfig.IsFailSafeArmed` → `FailSafe`; `threadbr.ManagementServer.AttachFailSafe`, `core.ThreadNetworkCommissioning.AttachFailSafe` and `jointfabric.Administrator.AttachFailSafe` take `func() (fabricIndex uint8, armed bool)`.
 
 ### Fixed
 
