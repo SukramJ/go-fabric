@@ -75,7 +75,10 @@ func TestTimedCommandsFromTheModel(t *testing.T) {
 		}
 		req := im.InvokeRequest{Invokes: []im.CommandInvocation{inv}}
 		for _, timed := range []bool{false, true} {
-			resp := im.HandleInvokeRequest(im.WithTimedInteraction(context.Background(), timed), d, req)
+			// Over PASE: the ACL gate fails closed for a request without a
+			// fabric, and the gates under test follow it.
+			ctx := im.WithAuthModePASE(im.WithTimedInteraction(context.Background(), timed))
+			resp := im.HandleInvokeRequest(ctx, d, req)
 			if len(resp.Responses) != 1 || !resp.Responses[0].IsStatus {
 				t.Fatalf("%s timed=%v: responses %+v", tc.name, timed, resp.Responses)
 			}
