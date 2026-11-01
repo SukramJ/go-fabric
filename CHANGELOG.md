@@ -40,6 +40,7 @@ Findings of the whole-codebase review of 2026-11-01 (`notes/review/2026-11/`).
 ### Changed
 
 - The fail-safe port reports its fabric. Migration: `core.OpcredsConfig.IsFailSafeArmed` → `FailSafe` and `OperationalCredentials.SetIsFailSafeArmed` → `SetFailSafe` (bind `GeneralCommissioning.FailSafeFabric`); `threadbr.ManagementConfig.IsFailSafeArmed` → `FailSafe`; `threadbr.ManagementServer.AttachFailSafe`, `core.ThreadNetworkCommissioning.AttachFailSafe` and `jointfabric.Administrator.AttachFailSafe` take `func() (fabricIndex uint8, armed bool)`.
+- `bridge`: `Bridge.SetOnFabricAdded` and `Bridge.EmitFabricAdded` are removed — nothing in the module fired the hook, so a host that set it was never called (W2-api-01). Migration: observe a fabric's installation with `node.Config.Observers.OnFabricAdded` (or `Node.Observe`); a host that drives `bridge/` directly sets `core.OpcredsConfig.OnFabricInstalled` on its own OperationalCredentials server.
 
 ### Fixed
 

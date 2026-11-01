@@ -95,7 +95,10 @@ Ports the facade leaves to the host are reached through `Node.Root()` and
 
 - the GeneralDiagnostics TestEventTrigger enable key;
 - the PowerSource endpoints of PowerSourceConfiguration;
-- the bridge's `SetOnReassembled` and `SetOnFabricAdded` hooks.
+- the bridge's `SetOnReassembled` hook.
+
+A fabric's installation (AddNOC) reaches the host through
+`Observers.OnFabricAdded`; the bridge has no hook for it.
 
 Setting a cluster hook that the facade wires itself, such as
 OperationalCredentials `SetOnFabricRemoved`, replaces the facade's wiring.
@@ -163,7 +166,7 @@ the next `Reassemble`.
 | `AttachCaseInitiatorProvider`, `AttachOperationalResolver` (+ `ReestablishFormerSubscriptions`) | former subscriptions are dropped at restart (silent) |
 | `AttachBDXResponder` | BDX exchanges are dropped; an OTA download fails (fails closed) |
 | `AttachDiagnosticEvents` | `Bridge.DiagnosticEvents` stays empty |
-| `SetOnReassembled`, `SetOnFabricAdded`, `SetOnFabricRemoved` | nil-safe observer hooks |
+| `SetOnReassembled`, `SetOnFabricRemoved` | nil-safe observer hooks. A fabric's installation is observed on the node (`node.Observers.OnFabricAdded`) |
 | `SetDeviceTypeValidation` | warn mode: each new violation is logged once; strict refuses what an addition causes; off judges only singleton placement |
 
 Strict refuses only what an addition causes. Each `Start` and `Reassemble`

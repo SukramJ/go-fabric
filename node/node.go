@@ -155,8 +155,8 @@ type Node struct {
 // responder, or Noop under Network.MDNS.Disabled), a nil OTA
 // mounts no OTA requestor. The TestEventTrigger enable key is not armed
 // (Root().GeneralDiagnostics.EnableTestEventTriggers is the host's), and
-// SetOnReassembled / SetOnFabricAdded stay the bridge's nil-safe hooks for
-// the host.
+// SetOnReassembled stays the bridge's nil-safe hook for the host (a
+// fabric's installation is Config.Observers.OnFabricAdded).
 //
 // New starts the subscription engine and the PASE / CASE reapers, as the
 // daemon does before Start; call [Node.Stop] to end them, whether or not

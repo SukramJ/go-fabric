@@ -83,8 +83,8 @@ server and breaks when the device mounts another.
 **Gives.** `Node.Bridge()` returns the `*bridge.Bridge` the node runs on:
 the `Attach…` and `Set…` ports, `Reassemble`, the event log
 (`EventLog`), the controller round-trip statistics (`ControllerRTT`) and
-the hooks the facade leaves to the host (`SetOnReassembled`,
-`SetOnFabricAdded`).
+the hook the facade leaves to the host (`SetOnReassembled`; a fabric's
+installation is `node.Observers.OnFabricAdded`).
 
 **When.** A host that records controller round trips, or needs a port the
 facade does not configure. The served topology and a device's reachability

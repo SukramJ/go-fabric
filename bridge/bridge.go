@@ -173,8 +173,9 @@
 //   - AttachMetrics — silent. Without a port the named counters and
 //     gauges (contract.MetricNames) are recorded nowhere; the bridge's own
 //     readers (DeviceLoad, RecoveredPanics) count on.
-//   - SetOnReassembled, SetOnFabricAdded and SetOnFabricRemoved are
-//     nil-safe observer hooks.
+//   - SetOnReassembled and SetOnFabricRemoved are nil-safe observer
+//     hooks. A fabric's installation is observed on the node
+//     (node.Observers.OnFabricAdded); the bridge installs no fabric.
 //   - SetDeviceTypeValidation — visible either way. Start and every
 //     Reassemble judge the topology against its device types; the
 //     default, matter.js's warn mode, logs each new violation once
@@ -374,7 +375,7 @@ type Bridge struct {
 	// unsubscribe lists, the serve and pump lifecycle (started and the
 	// cancel/done pairs), the PASE lockout and in-flight handshake, the
 	// commissioning window and its instance name, deviceTypes, groupMessaging
-	// and the onReassembled / onFabricAdded / onFabricRemoved hooks. Start
+	// and the onReassembled / onFabricRemoved hooks. Start
 	// takes it only to commit, so readers do not wait for the listener's bind.
 	mu         sync.RWMutex
 	listener   *udp.Listener
@@ -613,12 +614,6 @@ type Bridge struct {
 	// the root). Wired by the daemon to publish
 	// `matter.endpoint_assembled` over the WebSocket hub. Nil safe.
 	onReassembled func(endpointCount int)
-
-	// onFabricAdded, when non-nil, fires after the
-	// OperationalCredentials cluster successfully installs a fabric
-	// (post-AddNOC). Wired by the daemon to publish
-	// `matter.fabric_added` over the WebSocket hub. Nil safe.
-	onFabricAdded func(fabricIndex uint8)
 
 	// onFabricRemoved, when non-nil, fires after the
 	// OperationalCredentials cluster successfully drops a fabric
@@ -1289,33 +1284,7 @@ type matterSwitchPositionReporter interface {
 	WireMatterSwitchPositions(contract.SwitchPositionSink) func()
 }
 
-// SetOnFabricAdded wires the post-AddNOC hook. The bridge does not
-// install fabrics itself — the OperationalCredentials cluster does —
-// but the OpCreds wiring inside the daemon delegates here so a
-// downstream listener (typically the WS event publisher) can fan the
-// event out without taking a direct dependency on the cluster.
-// Pass nil to detach.
-func (b *Bridge) SetOnFabricAdded(fn func(fabricIndex uint8)) {
-	b.mu.Lock()
-	b.onFabricAdded = fn
-	b.mu.Unlock()
-}
-
-// EmitFabricAdded is the bridge-side dispatch helper the
-// OperationalCredentials cluster's `OnFabricInstalled` closure calls
-// on a successful AddNOC. Forwards to whatever closure the daemon
-// wired via [SetOnFabricAdded]; nil-safe.
-func (b *Bridge) EmitFabricAdded(fabricIndex uint8) {
-	b.mu.RLock()
-	hook := b.onFabricAdded
-	b.mu.RUnlock()
-	if hook != nil {
-		hook(fabricIndex)
-	}
-}
-
-// SetOnFabricRemoved wires the post-RemoveFabric hook. Mirrors
-// [SetOnFabricAdded]'s nil-safe semantics. Used by the daemon's
+// SetOnFabricRemoved wires the post-RemoveFabric hook, nil-safe. Used by the daemon's
 // WS-event publisher; the operational + subscription manager
 // cleanup runs separately on [core.OperationalCredentials.SetOnFabricRemoved].
 func (b *Bridge) SetOnFabricRemoved(fn func(fabricIndex uint8)) {

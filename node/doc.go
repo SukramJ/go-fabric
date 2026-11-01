@@ -54,9 +54,9 @@
 // Config.OTAProvider no OTA provider, a nil Config.CommissionerControl no
 // CommissionerControl server. Left to the host:
 // GeneralDiagnostics' TestEventTrigger enable key, the PowerSource
-// endpoints of PowerSourceConfiguration, and the bridge's observer hooks
-// (SetOnReassembled, SetOnFabricAdded) — reachable through [Node.Root] and
-// [Node.Bridge]. The fabric, commissioning-complete and window events reach
+// endpoints of PowerSourceConfiguration, and the bridge's observer hook
+// SetOnReassembled — reachable through [Node.Root] and [Node.Bridge]; a
+// fabric's installation reaches the host through Observers.OnFabricAdded. The fabric, commissioning-complete and window events reach
 // the host through [Config].Observers, chained after the facade's own
 // handlers; a host that set the cluster hooks the facade wires
 // (OperationalCredentials SetOnFabricRemoved / SetOnFabricUpdated,
