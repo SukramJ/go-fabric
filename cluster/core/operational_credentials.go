@@ -1999,6 +1999,7 @@ func (o *OperationalCredentials) handleUpdateNOC(ctx context.Context, fields any
 	priv := o.pendingPrivKey
 	pendingForUpdate := o.pendingCSRForUpdate
 	nocInvoked := o.nocWasInvoked
+	rootSet := o.pendingTrustRoot != nil
 	o.mu.RUnlock()
 	if failSafe != nil {
 		if _, armed := failSafe(); !armed {
@@ -2024,6 +2025,25 @@ func (o *OperationalCredentials) handleUpdateNOC(ctx context.Context, fields any
 	// same failsafe context", Status.ConstraintError)).
 	if !pendingForUpdate {
 		return nil, opcredsConstraintErr{msg: "core: UpdateNOC illegal after CSRRequest for AddNOC in same FailSafe context"}
+	}
+	// A root added in this fail-safe (AddTrustedRootCertificate) belongs
+	// to an AddNOC: in-band MissingCsr, matter.js's certification
+	// work-around for what should be a ConstraintError. Mirrors matter.js
+	// OperationalCredentialsServer.ts:337-345 (`timedOp.rootCertSet`).
+	if rootSet {
+		return NOCResponse{StatusCode: NOCStatusMissingCsr, DebugText: "AddTrustedRootCertificate was invoked in this FailSafe context"}, nil
+	}
+	// The session must belong to the fabric the fail-safe was armed for:
+	// another fabric's window (or one armed over PASE) answers
+	// ConstraintError. Mirrors matter.js
+	// OperationalCredentialsServer.ts:355-360
+	// (`session.associatedFabric.fabricIndex !==
+	// timedOp.associatedFabric?.fabricIndex`).
+	if failSafe != nil {
+		_, sessionFabric := im.FabricFilterFromContext(ctx)
+		if armedFabric, _ := failSafe(); armedFabric != sessionFabric {
+			return nil, opcredsConstraintErr{msg: fmt.Sprintf("core: UpdateNOC: session fabric %d does not match the FailSafe context's fabric %d", sessionFabric, armedFabric)}
+		}
 	}
 	// UpdateNOC is fabric-scoped (Matter §11.18.6.9 — the NOC update
 	// SHALL target the fabric of the invoking session). Read the

@@ -671,3 +671,56 @@ func TestParityOpcreds_FailSafeOfAnotherFabricIsNotArmed(t *testing.T) {
 		}
 	}
 }
+
+// TestParityOpcreds_UpdateNOCFailSafeFabricAndRoot pins two UpdateNOC
+// refusals of matter.js OperationalCredentialsServer.updateNoc: a session
+// of another fabric than the fail-safe's answers ConstraintError
+// (OperationalCredentialsServer.ts:355-360), and a root added by
+// AddTrustedRootCertificate in the same fail-safe answers the in-band
+// MissingCsr (:337-345, the certification work-around).
+func TestParityOpcreds_UpdateNOCFailSafeFabricAndRoot(t *testing.T) {
+	t.Parallel()
+	setup := func(t *testing.T) (*core.OperationalCredentials, context.Context, *uint8, *ecdsa.PrivateKey) {
+		t.Helper()
+		ctx := context.Background()
+		oc, err := core.NewOperationalCredentials(newFakeStore(), core.OpcredsConfig{SupportedFabrics: 5})
+		if err != nil {
+			t.Fatalf("NewOperationalCredentials: %v", err)
+		}
+		_, rootPriv, fabricIndex := commissionTestFabric(ctx, t, oc)
+		armed := fabricIndex
+		oc.SetFailSafe(func() (uint8, bool) { return armed, true })
+		oc.ClearPendingState() // a fresh fail-safe window
+		fabCtx := im.WithFabricFilter(ctx, true, fabricIndex)
+		if _, err := oc.MatterInvoke(fabCtx, 0x04, core.CSRRequest{CSRNonce: make([]byte, 32), IsForUpdateNOC: true}); err != nil {
+			t.Fatalf("CSRRequest (IsForUpdateNOC): %v", err)
+		}
+		return oc, fabCtx, &armed, rootPriv
+	}
+	t.Run("another fabric's fail-safe", func(t *testing.T) {
+		t.Parallel()
+		oc, fabCtx, armed, _ := setup(t)
+		*armed++ // the window now belongs to another fabric
+		_, err := oc.MatterInvoke(fabCtx, 0x07, core.UpdateNOCRequest{NOCValue: []byte{0x15, 0x18}})
+		var sc interface{ MatterStatusCode() im.StatusCode }
+		if !errors.As(err, &sc) || sc.MatterStatusCode() != im.StatusConstraintError {
+			t.Errorf("UpdateNOC under another fabric's fail-safe = %v, want ConstraintError", err)
+		}
+	})
+	t.Run("after AddTrustedRootCertificate", func(t *testing.T) {
+		t.Parallel()
+		oc, fabCtx, _, rootPriv := setup(t)
+		if _, err := oc.MatterInvoke(fabCtx, 0x0B, core.AddTrustedRootCertificateRequest{
+			RootCACertificate: buildCoreSignedCert(t, rootPriv, true, rootPriv),
+		}); err != nil {
+			t.Fatalf("AddTrustedRootCertificate: %v", err)
+		}
+		resp, err := oc.MatterInvoke(fabCtx, 0x07, core.UpdateNOCRequest{NOCValue: []byte{0x15, 0x18}})
+		if err != nil {
+			t.Fatalf("UpdateNOC: %v", err)
+		}
+		if nr, ok := resp.(core.NOCResponse); !ok || nr.StatusCode != core.NOCStatusMissingCsr {
+			t.Errorf("UpdateNOC after AddTrustedRootCertificate = %+v, want MissingCsr", resp)
+		}
+	})
+}
