@@ -83,7 +83,7 @@ these interfaces does not drag the host's dependencies into the module.
 | `Client` | the node's client stack, which the Binding entries reach other nodes through | no client stack. A Binding entry that names a node is dropped |
 | `EndpointPersistence` | scene tables and bridged NodeLabels, kept by the host | the facade's own, in the settings table |
 | `Groups` | the group state, for a host with its own assembler | the facade builds one over the credential store |
-| `Topology` | the host's own `bridge.Snapshotter` | the facade's Aggregator under one scope |
+| `Topology` | the host's own `bridge.Snapshotter`. The topology it returns comes from an `endpoint.Assembler` over the host's `endpoint.Spec`s; `Endpoint` and `Topology` are read-only to a host | the facade's Aggregator under one scope |
 | `AggregatorServers` | extra servers on the Aggregator (an Actions server, say) | none |
 | `Observers` | the host's callbacks on fabric, commissioning and window events; `Node.Observe` registers more on a running node, each after these, in registration order, until its unsubscribe | nothing observes. An observer's error or panic is logged, never returned |
 | `Metrics` | the node's named counters and gauges ([Observability](observability.md)); `node/metrics/expvar` publishes them on expvar | nothing recorded |

@@ -226,12 +226,21 @@ var (
 // walking a device model, deciding which sources are exposed, mapping
 // them onto clusters — is the host's job, and keeping it there is what
 // lets this package stay free of the daemon's model packages. A host
-// closure typically composes its own walk with the topology assembler
-// it owns:
+// closure composes its own walk with the [endpoint.Assembler] it owns:
 //
 //	func(ctx context.Context) (*endpoint.Topology, error) {
-//	    return assembler.AssembleDevices(ctx, walkTheRegistry(ctx))
+//	    return assembler.Assemble(ctx, walkTheRegistry(ctx)) // []endpoint.Snapshot
 //	}
+//
+// The topology must come from an [endpoint.Assembler] over the host's
+// [endpoint.Spec]s: a host's "own assembler" is its own Spec producer, not
+// its own [endpoint.Topology]. [endpoint.Endpoint] and [endpoint.Topology]
+// are read-only to a host. What must survive a [Reassemble] — each
+// cluster's DataVersion, the Identify, Groups and ScenesManagement
+// servers, a written NodeLabel, the Aggregator role — lives in state only
+// the assembler fills, so a hand-built topology hands every cluster a new
+// DataVersion on each Reassemble (every controller re-primes) and loses
+// the rest silently. Review 2026-11 W2-api-04.
 //
 // The bridge calls Snapshotter once at [Start] and on every
 // [Reassemble]; it never caches the result — every call gets a freshly
