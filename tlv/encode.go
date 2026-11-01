@@ -531,7 +531,7 @@ func (e *Encoder) writeControlAndTag(t ElementType, tag Tag) {
 		// caught by the parity/encode tests, not a wire-triggerable path.
 		panic(fmt.Sprintf("tlv: context tag inside Array container (tag=%d); use AnonymousTag()", tag.Number))
 	}
-	// Note: chip TLVReader.cpp:822-827 enforces two strictness rules
+	// Note: chip TLVReader.cpp:865-871 (at 6170af84) enforces two strictness rules
 	// (no context tag at top level; no anonymous tag inside a
 	// Structure except EndOfContainer). Both are READ-side checks in
 	// chip's verifier — Apple's MTRDevice drops the whole IM message

@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-// TestValidate_ContextTagAtTopLevel pins the chip TLVReader.cpp:822-823
+// TestValidate_ContextTagAtTopLevel pins the chip TLVReader.cpp:865-867
 // invariant: a context tag emitted outside any container fails the
 // strict check.
 func TestValidate_ContextTagAtTopLevel(t *testing.T) {
@@ -21,7 +21,7 @@ func TestValidate_ContextTagAtTopLevel(t *testing.T) {
 	}
 }
 
-// TestValidate_AnonymousTagInStructure pins chip TLVReader.cpp:826-827:
+// TestValidate_AnonymousTagInStructure pins chip TLVReader.cpp:869-871:
 // anonymous tags inside a Structure are rejected (except the implicit
 // EndOfContainer).
 func TestValidate_AnonymousTagInStructure(t *testing.T) {
@@ -38,7 +38,7 @@ func TestValidate_AnonymousTagInStructure(t *testing.T) {
 	}
 }
 
-// TestValidate_NonAnonymousTagInArray pins chip TLVReader.cpp:830-831:
+// TestValidate_NonAnonymousTagInArray pins chip TLVReader.cpp:873-875:
 // non-anonymous tags inside an Array are rejected.
 func TestValidate_NonAnonymousTagInArray(t *testing.T) {
 	t.Parallel()

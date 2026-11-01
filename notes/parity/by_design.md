@@ -955,7 +955,9 @@ when Actions or another optional cluster lands.
   (TlvCodec.ts:169-171 at the schema pin; `NotImplementedError` before
   e21a1e72, #4514, which classifies the tag as malformed peer data); chip resolves them against `ImplicitProfileId` and
   returns `CHIP_ERROR_UNKNOWN_IMPLICIT_TLV_TAG` when no profile ID is set
-  (TLVReader.cpp:872-879). go-fabric's `Decoder.readTag` silently surfaces
+  (TLVReader.cpp:916-923 at 6170af84, `ReadTag` returning
+  `UnknownImplicitTag()` at :918 and :922, refused by `VerifyElement` at
+  :861-862). go-fabric's `Decoder.readTag` silently surfaces
   them as `Tag{Kind: TagKindImplicitProfile2/4, Number: n}` without
   resolution. By-design: no commissioner sends ImplicitProfile-tagged TLV to
   a bridge in any known commissioning or interaction flow (verified 60+ pair

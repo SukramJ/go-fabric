@@ -293,14 +293,14 @@ func (d *Decoder) need(n int) error {
 
 // Validate walks buf with chip-strict tag/container rules and
 // returns the first violation. Strict rules enforced (mirroring chip
-// TLVReader.cpp:806-839 + TLVWriter.cpp:WriteElementHead):
+// TLVReader.cpp:850-878 VerifyElement at 6170af84 + TLVWriter.cpp:WriteElementHead):
 //
 //   - Context tag at top level (no enclosing container) →
-//     CHIP_ERROR_INVALID_TLV_TAG (chip TLVReader.cpp:822-823).
+//     CHIP_ERROR_INVALID_TLV_TAG (chip TLVReader.cpp:865-867).
 //   - Anonymous tag inside Structure (except EndOfContainer) →
-//     CHIP_ERROR_INVALID_TLV_TAG (chip TLVReader.cpp:826-827).
+//     CHIP_ERROR_INVALID_TLV_TAG (chip TLVReader.cpp:869-871).
 //   - Non-anonymous tag inside Array →
-//     CHIP_ERROR_INVALID_TLV_TAG (chip TLVReader.cpp:830-831).
+//     CHIP_ERROR_INVALID_TLV_TAG (chip TLVReader.cpp:873-875).
 //
 // Returns nil when buf parses cleanly under the strict rules. Used
 // by [im.WireRoundTripGuard]-style tests + by north-bound code that
