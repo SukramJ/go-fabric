@@ -893,7 +893,7 @@
   },
   {
     "file": "cluster/core/basic_information_test.go",
-    "line": 672,
+    "line": 664,
     "citation": "packages/model/src/standard/elements/basic-information.element.ts:165-169",
     "resolved": "packages/model/src/standard/elements/basic-information.element.ts",
     "identifier": "CapabilityMinima",
@@ -947,7 +947,7 @@
   },
   {
     "file": "cluster/core/general_commissioning.go",
-    "line": 1007,
+    "line": 1009,
     "citation": "packages/node/src/behaviors/general-commissioning/GeneralCommissioningServer.ts:67-82",
     "resolved": "packages/node/src/behaviors/general-commissioning/GeneralCommissioningServer.ts",
     "identifier": "CommissioningComplete",
@@ -1037,7 +1037,7 @@
   },
   {
     "file": "cluster/core/operational_credentials.go",
-    "line": 1921,
+    "line": 1929,
     "citation": "Fabric.ts:557-559",
     "resolved": "packages/protocol/src/fabric/Fabric.ts",
     "identifier": "PublicKeyError",
@@ -1046,7 +1046,7 @@
   },
   {
     "file": "cluster/core/operational_credentials.go",
-    "line": 1973,
+    "line": 1981,
     "citation": "Fabric.ts:557-559",
     "resolved": "packages/protocol/src/fabric/Fabric.ts",
     "identifier": "PublicKeyError",
@@ -1055,7 +1055,7 @@
   },
   {
     "file": "cluster/core/operational_credentials.go",
-    "line": 2119,
+    "line": 2127,
     "citation": "Fabric.ts:548",
     "resolved": "packages/protocol/src/fabric/Fabric.ts",
     "identifier": "nodeId",
@@ -1064,7 +1064,7 @@
   },
   {
     "file": "cluster/core/operational_credentials.go",
-    "line": 2310,
+    "line": 2318,
     "citation": "DeviceAdvertiser.ts:84-86",
     "resolved": "packages/protocol/src/protocol/DeviceAdvertiser.ts",
     "identifier": "cancelAll",

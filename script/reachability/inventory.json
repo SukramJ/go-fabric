@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 7214,
+  "entry_points": 7242,
   "entry_packages": [
     ".",
     "bdx",
@@ -275,9 +275,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 17054,
+    "total_exported": 17063,
     "reachable": 12012,
-    "whitelisted": 5039,
+    "whitelisted": 5048,
     "unreachable": 3
   },
   "by_package": [
@@ -7882,7 +7882,7 @@
       "identifier": "DeviceLoadStruct",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/core/general_diagnostics.go",
-      "line": 560
+      "line": 562
     },
     {
       "package": "cluster/core",
@@ -7903,7 +7903,7 @@
       "identifier": "PayloadTestResponse",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/core/general_diagnostics.go",
-      "line": 695
+      "line": 697
     },
     {
       "package": "cluster/core",
@@ -8106,7 +8106,7 @@
       "identifier": "TestEventTriggerRequest",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/core/general_diagnostics.go",
-      "line": 729
+      "line": 731
     },
     {
       "package": "cluster/core",
@@ -8642,6 +8642,13 @@
     },
     {
       "package": "cluster/core",
+      "identifier": "TestThreadNetworkCommissioningFailSafeOfAnotherFabric",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/network_commissioning_thread_test.go",
+      "line": 381
+    },
+    {
+      "package": "cluster/core",
       "identifier": "TestThreadNetworkCommissioningInterfaceEnabled",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/network_commissioning_thread_test.go",
@@ -8681,6 +8688,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/network_commissioning_wifi_test.go",
       "line": 136
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestWiFiNetworkCommissioningFailSafeOfAnotherFabric",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/network_commissioning_wifi_test.go",
+      "line": 315
     },
     {
       "package": "cluster/core",
@@ -9121,28 +9135,35 @@
       "identifier": "ChangeIndication",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/filter/filter.go",
-      "line": 57
+      "line": 59
     },
     {
       "package": "cluster/filter",
       "identifier": "DegradationDirection",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/filter/filter.go",
-      "line": 59
+      "line": 61
     },
     {
       "package": "cluster/filter",
       "identifier": "Feature",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/filter/filter.go",
-      "line": 55
+      "line": 57
     },
     {
       "package": "cluster/filter",
       "identifier": "ReplacementProduct",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/filter/filter.go",
-      "line": 61
+      "line": 63
+    },
+    {
+      "package": "cluster/filter",
+      "identifier": "TestMatterEpochSeconds",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/filter/epoch_internal_test.go",
+      "line": 13
     },
     {
       "package": "cluster/jointfabric",
@@ -9716,35 +9737,35 @@
       "identifier": "Color",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/light/colorcontrol_server.go",
-      "line": 197
+      "line": 198
     },
     {
       "package": "cluster/light",
       "identifier": "ColorFeature",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/light/colorcontrol_server.go",
-      "line": 73
+      "line": 74
     },
     {
       "package": "cluster/light",
       "identifier": "ColorMode",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/light/colorcontrol_server.go",
-      "line": 88
+      "line": 89
     },
     {
       "package": "cluster/light",
       "identifier": "ColorTemperatureWriter",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/light/colorcontrol_server.go",
-      "line": 188
+      "line": 189
     },
     {
       "package": "cluster/light",
       "identifier": "ColorWriter",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/light/colorcontrol_server.go",
-      "line": 208
+      "line": 209
     },
     {
       "package": "cluster/lock",
@@ -9772,7 +9793,7 @@
       "identifier": "ElectricalReadingsSource",
       "reason": "called from electricalSensorServers in materializers.go:142-150, which reaches it as a function value in the measurement-kind registry map — an indirect call RTA cannot follow",
       "file": "cluster/measurement/measurement.go",
-      "line": 870
+      "line": 884
     },
     {
       "package": "cluster/measurement",
@@ -9786,14 +9807,14 @@
       "identifier": "NewElectricalPowerServerFromReadings",
       "reason": "called from electricalSensorServers in materializers.go:142-150, which reaches it as a function value in the measurement-kind registry map — an indirect call RTA cannot follow",
       "file": "cluster/measurement/measurement.go",
-      "line": 862
+      "line": 876
     },
     {
       "package": "cluster/measurement",
       "identifier": "NewPowerTopologyServer",
       "reason": "called from electricalSensorServers in materializers.go:142-150, which reaches it as a function value in the measurement-kind registry map — an indirect call RTA cannot follow",
       "file": "cluster/measurement/measurement.go",
-      "line": 1602
+      "line": 1626
     },
     {
       "package": "cluster/measurement",
@@ -9807,35 +9828,35 @@
       "identifier": "TestFlowClassMaterialisesTheFlowServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/measurement/flow_test.go",
-      "line": 112
+      "line": 110
     },
     {
       "package": "cluster/measurement",
       "identifier": "TestFlowServerIsReadOnlyAndCommandless",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/measurement/flow_test.go",
-      "line": 101
+      "line": 99
     },
     {
       "package": "cluster/measurement",
       "identifier": "TestFlowServerMeasuredValueScalesAndClamps",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/measurement/flow_test.go",
-      "line": 28
+      "line": 27
     },
     {
       "package": "cluster/measurement",
       "identifier": "TestFlowServerStaticAttributesAndGlobals",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/measurement/flow_test.go",
-      "line": 71
+      "line": 69
     },
     {
       "package": "cluster/measurement",
       "identifier": "TestFlowServerUnobservedAndNilSourceReadNull",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/measurement/flow_test.go",
-      "line": 58
+      "line": 56
     },
     {
       "package": "cluster/measurement",
@@ -9885,6 +9906,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/measurement/parity_matterjs_test.go",
       "line": 114
+    },
+    {
+      "package": "cluster/measurement",
+      "identifier": "TestReadingBoundsParity",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/measurement/reading_bounds_parity_matterjs_test.go",
+      "line": 28
     },
     {
       "package": "cluster/measurement",
@@ -10682,7 +10710,7 @@
       "identifier": "NullDefault",
       "reason": "the Default of a generated attribute whose stated default is null; it is only ever a package-level initializer value, which RTA does not follow",
       "file": "cluster/spec/model.go",
-      "line": 169
+      "line": 193
     },
     {
       "package": "cluster/spec",
@@ -10805,6 +10833,13 @@
     },
     {
       "package": "cluster/spec",
+      "identifier": "TestBoundExpressionParity",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/bound_expr_parity_matterjs_test.go",
+      "line": 15
+    },
+    {
+      "package": "cluster/spec",
       "identifier": "TestBoundQualified",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/dotted_bound_internal_test.go",
@@ -10816,6 +10851,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/field_conformance_internal_test.go",
       "line": 60
+    },
+    {
+      "package": "cluster/spec",
+      "identifier": "TestCpMaxParity",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/cpmax_parity_matterjs_test.go",
+      "line": 16
     },
     {
       "package": "cluster/spec",
@@ -10921,6 +10963,13 @@
       "reason": "generic: every typed write instantiates it, and RTA records the instantiation, not the generic declaration",
       "file": "cluster/spec/value.go",
       "line": 58
+    },
+    {
+      "package": "cluster/spec",
+      "identifier": "UnresolvedDefault",
+      "reason": "the Default of a generated attribute whose stated default is a field value; it is only ever a package-level initializer value, which RTA does not follow",
+      "file": "cluster/spec/model.go",
+      "line": 186
     },
     {
       "package": "cluster/spec",
@@ -21543,6 +21592,13 @@
     },
     {
       "package": "cluster/switch",
+      "identifier": "TestMatterQuiesceStopsTheTimers",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/switch/quiesce_test.go",
+      "line": 17
+    },
+    {
+      "package": "cluster/switch",
       "identifier": "TestNewRefusesWhatTheModelRefuses",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/switch/server_test.go",
@@ -21764,6 +21820,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/thermo/setpoints_internal_test.go",
       "line": 21
+    },
+    {
+      "package": "cluster/thermo",
+      "identifier": "TestParityMatterJS_AtomicCommitIsOneUnit",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/thermo/atomic_rollback_parity_matterjs_test.go",
+      "line": 63
     },
     {
       "package": "cluster/thermo",
