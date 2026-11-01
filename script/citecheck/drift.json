@@ -2303,7 +2303,7 @@
   },
   {
     "file": "transport/mrp/ack_test.go",
-    "line": 238,
+    "line": 242,
     "citation": "MessageExchange.ts:428-433",
     "resolved": "packages/protocol/src/protocol/MessageExchange.ts",
     "identifier": "requiresAck",
