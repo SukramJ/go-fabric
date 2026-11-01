@@ -177,8 +177,8 @@ func TestSinkEchoInTheTimedOffTick(t *testing.T) {
 
 // TestSinkEchoInvalidatesScenes: a Sink that confirms the very change
 // through Set before it returns does not hide the change from the scene
-// invalidation — matter.js judges On and Off on OnOff at command start
-// (packages/node/src/behaviors/on-off/OnOffServer.ts:98-100, :120-122 at
+// invalidation — matter.js judges On and Off on this.state.onOff at
+// command start (packages/node/src/behaviors/on-off/OnOffServer.ts:98-100, :120-122 at
 // 862ad75f; W3-club2-01). A command that changes nothing still
 // invalidates nothing.
 func TestSinkEchoInvalidatesScenes(t *testing.T) {

@@ -19,24 +19,23 @@ import (
 func TestParityMatterJS_StartUpCurrentLevel(t *testing.T) {
 	t.Parallel()
 	u8 := func(v uint8) *uint8 { return &v }
-	softwareUpdate := func() uint8 { return 5 } // BootReasonEnum.SoftwareUpdateCompleted
-	powerOn := func() uint8 { return 1 }
+	const softwareUpdate, powerOn = 5, 1 // BootReasonEnum.SoftwareUpdateCompleted, PowerOnReboot
 	for _, c := range []struct {
 		name     string
 		features uint32
 		current  *uint8
 		startUp  *uint8
 		bridged  bool
-		boot     func() uint8
+		boot     uint8
 		want     any
 	}{
-		{"0 is MinLevel", levelcontrol.FeatureLighting, u8(200), u8(0), false, nil, uint8(1)},
-		{"null keeps CurrentLevel", levelcontrol.FeatureLighting, u8(200), nil, false, nil, uint8(200)},
+		{"0 is MinLevel", levelcontrol.FeatureLighting, u8(200), u8(0), false, 0, uint8(1)},
+		{"null keeps CurrentLevel", levelcontrol.FeatureLighting, u8(200), nil, false, 0, uint8(200)},
 		{"a value is the level", levelcontrol.FeatureLighting, u8(200), u8(77), false, powerOn, uint8(77)},
-		{"a value over a null level", levelcontrol.FeatureLighting, nil, u8(77), false, nil, uint8(77)},
+		{"a value over a null level", levelcontrol.FeatureLighting, nil, u8(77), false, 0, uint8(77)},
 		{"not after a software update", levelcontrol.FeatureLighting, u8(200), u8(77), false, softwareUpdate, uint8(200)},
-		{"not under an Aggregator", levelcontrol.FeatureLighting, u8(200), u8(77), true, nil, uint8(200)},
-		{"not without Lighting", 0, u8(200), u8(77), false, nil, uint8(200)},
+		{"not under an Aggregator", levelcontrol.FeatureLighting, u8(200), u8(77), true, 0, uint8(200)},
+		{"not without Lighting", 0, u8(200), u8(77), false, 0, uint8(200)},
 	} {
 		srv, err := levelcontrol.New(levelcontrol.HeldConfig{
 			Features: c.features, CurrentLevel: c.current, StartUpCurrentLevel: c.startUp, Bridged: c.bridged, BootReason: c.boot,

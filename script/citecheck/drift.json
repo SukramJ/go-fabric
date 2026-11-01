@@ -956,7 +956,7 @@
   },
   {
     "file": "cluster/core/general_diagnostics_test.go",
-    "line": 184,
+    "line": 192,
     "citation": "GeneralDiagnosticsServer.ts:99",
     "resolved": "packages/node/src/behaviors/general-diagnostics/GeneralDiagnosticsServer.ts",
     "identifier": "#validateTestEnabledKey",
@@ -1109,7 +1109,7 @@
   },
   {
     "file": "cluster/core/scenes_management.go",
-    "line": 363,
+    "line": 364,
     "citation": "ScenesManagementServer.ts:77-80",
     "resolved": "packages/node/src/behaviors/scenes-management/ScenesManagementServer.ts",
     "identifier": "OnOff",
@@ -1118,7 +1118,7 @@
   },
   {
     "file": "cluster/core/scenes_management.go",
-    "line": 374,
+    "line": 375,
     "citation": "OnOffServer.ts:114-117",
     "resolved": "packages/node/src/behaviors/on-off/OnOffServer.ts",
     "identifier": "OnOff",
@@ -1182,7 +1182,7 @@
   },
   {
     "file": "cluster/cover/windowcovering_server.go",
-    "line": 250,
+    "line": 279,
     "citation": "window-covering-cluster.element.ts:130-131",
     "resolved": "packages/model/src/standard/elements/window-covering-cluster.element.ts",
     "identifier": "OperationalStatus",
@@ -1191,7 +1191,7 @@
   },
   {
     "file": "cluster/cover/windowcovering_server.go",
-    "line": 799,
+    "line": 834,
     "citation": "window-covering-cluster.element.ts:128-131",
     "resolved": "packages/model/src/standard/elements/window-covering-cluster.element.ts",
     "identifier": "OperationalStatus",
@@ -1263,7 +1263,7 @@
   },
   {
     "file": "cluster/matter_negative_write_parity_test.go",
-    "line": 319,
+    "line": 347,
     "citation": "packages/node/src/behaviors/thermostat/ThermostatServer.ts:594-601",
     "resolved": "packages/node/src/behaviors/thermostat/ThermostatServer.ts",
     "identifier": "occupiedHeatingSetpoint",
@@ -1272,7 +1272,7 @@
   },
   {
     "file": "cluster/matter_negative_write_parity_test.go",
-    "line": 333,
+    "line": 361,
     "citation": "packages/node/src/behaviors/thermostat/ThermostatServer.ts:614",
     "resolved": "packages/node/src/behaviors/thermostat/ThermostatServer.ts",
     "identifier": "systemMode",
@@ -1281,7 +1281,7 @@
   },
   {
     "file": "cluster/matter_negative_write_parity_test.go",
-    "line": 651,
+    "line": 679,
     "citation": "thermostat-cluster.element.ts:511",
     "resolved": "packages/model/src/standard/elements/thermostat-cluster.element.ts",
     "identifier": "SetpointRaiseLowerModeEnum",
@@ -1308,7 +1308,7 @@
   },
   {
     "file": "cluster/onoff/server.go",
-    "line": 621,
+    "line": 629,
     "citation": "OnOffServer.ts:97-100",
     "resolved": "packages/node/src/behaviors/on-off/OnOffServer.ts",
     "identifier": "OnOff",
@@ -1407,7 +1407,7 @@
   },
   {
     "file": "cluster/thermo/thermostat_server.go",
-    "line": 1088,
+    "line": 1100,
     "citation": "ThermostatServer.ts:614",
     "resolved": "packages/node/src/behaviors/thermostat/ThermostatServer.ts",
     "at": "0ceb202d",
@@ -1417,7 +1417,7 @@
   },
   {
     "file": "cluster/thermo/thermostat_server.go",
-    "line": 1349,
+    "line": 1365,
     "citation": "thermostat-cluster.element.ts:510-514",
     "resolved": "packages/model/src/standard/elements/thermostat-cluster.element.ts",
     "identifier": "SetpointRaiseLowerModeEnum",
@@ -1426,7 +1426,7 @@
   },
   {
     "file": "cluster/thermo/thermostat_server.go",
-    "line": 1481,
+    "line": 1504,
     "citation": "ThermostatServer.ts:219-220",
     "resolved": "packages/node/src/behaviors/thermostat/ThermostatServer.ts",
     "at": "0ceb202d",
@@ -1436,7 +1436,7 @@
   },
   {
     "file": "cluster/thermo/thermostat_server.go",
-    "line": 1656,
+    "line": 1679,
     "citation": "thermostat-cluster.element.ts:322-323",
     "resolved": "packages/model/src/standard/elements/thermostat-cluster.element.ts",
     "identifier": "SetpointRaiseLower",

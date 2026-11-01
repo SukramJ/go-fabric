@@ -40,9 +40,10 @@ type HeldConfig struct {
 	// unless the boot reason is SoftwareUpdateCompleted or the server is
 	// Bridged (matter.js LevelControlServer.ts:222-245).
 	StartUpCurrentLevel *uint8
-	// BootReason optionally returns the node's GeneralDiagnostics
-	// BootReason; nil applies StartUpCurrentLevel.
-	BootReason func() uint8
+	// BootReason is the node's GeneralDiagnostics BootReason
+	// (BootReasonEnum); SoftwareUpdateCompleted (5) skips
+	// StartUpCurrentLevel, and the zero value, Unspecified, applies it.
+	BootReason uint8
 	// Bridged marks a server on an endpoint under the Aggregator, where
 	// matter.js does not apply StartUpCurrentLevel
 	// (`!this.endpoint.ownerOfType(AggregatorEndpoint)`, :224); the device
@@ -92,10 +93,10 @@ func New(cfg HeldConfig) (*Server, error) {
 	if s.lighting {
 		s.startUp = clonePtr(cfg.StartUpCurrentLevel)
 		// Mirrors matter.js
-		// packages/node/src/behaviors/level-control/LevelControlServer.ts:222-245
+		// packages/node/src/behaviors/level-control/LevelControlServer.ts:205-245
 		// at 862ad75f (initializeLighting): not after a software update,
 		// not under an Aggregator (W3-clua2-02).
-		if !cfg.Bridged && (cfg.BootReason == nil || cfg.BootReason() != bootReasonSoftwareUpdateCompleted) {
+		if !cfg.Bridged && cfg.BootReason != bootReasonSoftwareUpdateCompleted {
 			s.applyStartUpLevel()
 		}
 	}

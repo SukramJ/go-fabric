@@ -73,8 +73,9 @@ type Identify struct {
 	dataVersion cluster.DataVersionTracker
 
 	// changes tells the bridge of the one change the server makes on its
-	// own: the countdown reaching zero ([Identify.OnAttributeChange]).
-	changes cluster.AttributeChanges
+	// own: the countdown reaching zero ([Identify.OnAttributeChange]). A
+	// pointer, created on first use, so Identify stays comparable.
+	changes atomic.Pointer[cluster.AttributeChanges]
 
 	// Countdown-Timer state. Spec §1.2.5.1: "The IdentifyTime
 	// attribute … SHALL decrement at a rate of 1 per second once
@@ -198,7 +199,16 @@ var (
 // and the Identify command are reported by the bridge's write and invoke
 // paths (W3-clucore-05).
 func (i *Identify) OnAttributeChange(cb func(change contract.Change)) (unsubscribe func()) {
-	return i.changes.OnAttributeChange(cb)
+	return i.attributeChanges().OnAttributeChange(cb)
+}
+
+// attributeChanges is the change listeners, created on first use.
+func (i *Identify) attributeChanges() *cluster.AttributeChanges {
+	if c := i.changes.Load(); c != nil {
+		return c
+	}
+	i.changes.CompareAndSwap(nil, &cluster.AttributeChanges{})
+	return i.changes.Load()
 }
 
 // MatterClusterID implements [contract.ClusterServer].
@@ -365,7 +375,7 @@ func (i *Identify) maybeStartCountdown() {
 				// #stopIdentifying (IdentifyServer.ts:100-114, :121-127
 				// at 862ad75f); 0 is the contract's "stops".
 				i.dataVersion.Bump()
-				i.changes.Notify(identifyAttrTime)
+				i.attributeChanges().Notify(identifyAttrTime)
 				if h := i.hostHandler(); h != nil {
 					_ = h.MatterIdentify(context.Background(), 0) //nolint:errcheck // nothing to refuse: the countdown ended
 				}
