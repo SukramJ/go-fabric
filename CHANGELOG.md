@@ -47,6 +47,7 @@ Findings of the whole-codebase review of 2026-11-01 (`notes/review/2026-11/`).
 - `transport/message`: `UnmarshalHeader` refuses a unicast header with a destination group id (`ErrUnicastGroupDestination`, also refused by `MarshalPacket`) and a group header without a destination or a source node id (`ErrGroupSessionHeader`), as matter.js's decoder does (W1-wire-01).
 - `bridge`: a retransmission whose send fails keeps its MRP backoff instead of being retried at the next 50 ms pump tick, so a transient socket error no longer spends the whole retry budget in 200 ms and ends in the peer-loss path; the failed send still counts, as in matter.js (W1-conc-02).
 - `transport/mrp`, `bridge`: an ack obligation that a second reliable message on the same exchange displaces is emitted as a standalone ack at the next pump instead of being dropped — an MRP ack names one counter, as chip and matter.js treat it; the exchange's reply route stays while the newer obligation is pending (W1-conc-03).
+- `transport/btp`: the central sets its sequence state before it starts the send-ack timer, inside the session lock; the timer's callback could read it unsynchronised (W1-conc-04).
 
 ## [0.15.6] — 2026-11-01
 
