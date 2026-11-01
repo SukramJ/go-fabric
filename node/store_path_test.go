@@ -91,3 +91,27 @@ func TestOpenSQLiteEscapesThePath(t *testing.T) {
 		t.Errorf("journal_mode = %q (%v), want wal", mode, err)
 	}
 }
+
+// A store file OpenSQLite creates, and the -wal and -shm files SQLite
+// creates beside it, are the owner's alone (0600): the file holds the
+// operational keys unencrypted (review W5-ex-05).
+func TestOpenSQLiteCreatesTheFileOwnerOnly(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "keys.db")
+	db, err := node.OpenSQLite(path, "journal_mode(WAL)")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = db.Close() })
+	if _, err := db.Exec("CREATE TABLE t (x INTEGER); INSERT INTO t VALUES (1)"); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	for _, p := range []string{path, path + "-wal", path + "-shm"} {
+		info, err := os.Stat(p)
+		if err != nil {
+			t.Fatalf("%s: %v", p, err)
+		}
+		if perm := info.Mode().Perm(); perm&0o077 != 0 {
+			t.Errorf("%s has mode %v, want no group or other access", filepath.Base(p), perm)
+		}
+	}
+}

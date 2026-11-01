@@ -5,8 +5,11 @@ package node
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
+	"io/fs"
 	"net/url"
+	"os"
 
 	// The pure-Go SQLite driver behind [Store].Path. A host that hands the
 	// node its own handle ([Store].DB) picks its driver itself.
@@ -33,7 +36,18 @@ var sqlitePragmas = []string{"foreign_keys(1)", "busy_timeout(5000)"}
 // file and keeps the pragmas instead of ending the file name early. The
 // caller owns the handle. It is the one opener of the module's SQLite
 // files: [Store].Path, controller.OpenDB, fabrictest and the examples.
+//
+// A file OpenSQLite creates is readable and writable by its owner only
+// (0600): it holds the node's private operational keys (a controller's
+// CA root key too) unencrypted. SQLite creates the -wal and -shm files
+// with the database file's permissions. An existing file keeps the
+// permissions it has.
 func OpenSQLite(path string, pragmas ...string) (*sql.DB, error) {
+	if f, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE|os.O_EXCL, 0o600); err == nil {
+		_ = f.Close()
+	} else if !errors.Is(err, fs.ErrExist) {
+		return nil, fmt.Errorf("node: create sqlite %q: %w", path, err)
+	}
 	dsn := url.URL{
 		Scheme:   "file",
 		Path:     path,
