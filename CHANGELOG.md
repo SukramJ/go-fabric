@@ -1193,7 +1193,7 @@ The findings wave (2026-10-17): every open entry of the findings register worked
 
 ### Fixed
 
-- `transport/udp`: per-session (ordered) dispatch shares the 1024 concurrency budget with the unordered pool — a flood of datagrams with forged session ids no longer opens one queue and goroutine per id without bound.
+- `transport/udp`: per-session (ordered) dispatch is bounded by a 1024-datagram budget of its own beside the unordered pool's (2 × 1024 in flight in all) — a flood of datagrams with forged session ids no longer opens one queue and goroutine per id without bound.
 - `bridge`, `node`: `Stop` waits, bounded by its context, for the handlers the listener dispatched (`udp.Listener.WaitIdle`), so no cluster server or host port runs after it returns.
 - `node`: `Start` opens the own commissioning window only when the fabric table is empty; a node whose stored fabrics fail to load logs `commissioning.no_fabric_loaded` instead of advertising itself as commissionable.
 - `node`: `Aggregator.Add`/`Remove` from several goroutines no longer lose a device (reassembly is serialised).
