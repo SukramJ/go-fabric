@@ -24,12 +24,14 @@ Findings of the whole-codebase review of 2026-11-01 (`notes/review/2026-11/`).
 - `store`, `node`, `controller`, `fabrictest`, examples: the SQLite `file:` URI is built with `net/url`, so a path holding `#` or `?` opens that file with its pragmas (W5-ex-01).
 - `store`, `node`, `controller`: a SQLite file the node or the controller creates is owner-only (`0600`), and so are its `-wal` and `-shm` files (W5-ex-05).
 - `secure/sigma`, `secure/mattercert`: a CASE responder with an identity fails closed when its verifier cannot read the peer NOC's fabric or node id; Sigma1 without initiatorRandom, initiatorSessionId or destinationId is InvalidParam; a NOC or ICAC without an authorityKeyIdentifier, and a NOC whose authorityKeyIdentifier names neither the root nor the ICAC, are refused (W1-sec-01, W1-sec-02, W1-sec-03).
+- `secure/mattercert`, `cluster/core`, `node`, `controller/ca`: a NOC the root signs directly is refused when its authorityKeyIdentifier does not name the root's subjectKeyIdentifier, and an ICAC when its authorityKeyIdentifier does not; AddNOC, UpdateNOC, the CASE peer verifier and the CA build their verifier from the root certificate wherever they hold it (W1-sec-03).
 
 ### Added
 
 - `store.OpenSQLite(path, pragmas...)`: the module's one SQLite opener, behind `node.Store.Path`, `controller.OpenDB`, fabrictest and the examples — escaped `file:` URI, foreign keys and busy timeout on every connection, a new file created `0600`.
 - `core.GeneralCommissioning.FailSafeFabric` and `core.FailSafeArmedFor`: the fail-safe port (armed, and for which fabric) and connectedhomeip's `IsFailSafeArmed(accessingFabricIndex)` over it.
 - `bridge.ErrUnsecuredIM`: the diagnostic error of a dropped IM message on session 0.
+- `mattercert.NewVerifierFromRCAC(rcac, ts)`: a verifier that also knows the root's subjectKeyIdentifier and checks the chain's authorityKeyIdentifiers against it, as matter.js does; `NewVerifier` stays for callers that hold the root's public key only (W1-sec-03).
 - `message.ErrUnicastGroupDestination`, `message.ErrGroupSessionHeader`: the header shapes matter.js's decoder discards (W1-wire-01).
 
 ### Changed

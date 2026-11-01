@@ -1751,7 +1751,7 @@ func (o *OperationalCredentials) handleAddNOC(ctx context.Context, fields any) (
 	//   • chain linkage (ICAC.Issuer == Root.Subject when ICAC present).
 	// Mirrors chip OperationalCredentialsCluster.cpp:496-501 and
 	// matter.js Fabric.create(root, icac, noc) → verifyCredentials().
-	verifier, verr := mattercert.NewVerifier(root, nil)
+	verifier, verr := nocVerifier(rootDER, root)
 	if verr != nil {
 		return NOCResponse{StatusCode: NOCStatusInvalidNOC, DebugText: "trust root invalid: " + verr.Error()}, nil //nolint:nilerr // cluster-command failure encoded in NOCResponse.StatusCode, not via the IM-error channel
 	}
@@ -1946,6 +1946,18 @@ func (o *OperationalCredentials) fabricAlreadyInstalled(ctx context.Context, fab
 	return false
 }
 
+// nocVerifier is the verifier of a NOC chain under the trust root: built
+// from the root certificate when it is held, so a root-signed NOC's
+// authorityKeyIdentifier is checked against the root's
+// subjectKeyIdentifier (matter.js Noc.ts:170-184 at 862ad75f); from the
+// root's public key alone for a legacy fabric row without the certificate.
+func nocVerifier(rcac, rootPublicKey []byte) (*mattercert.Verifier, error) {
+	if len(rcac) > 0 {
+		return mattercert.NewVerifierFromRCAC(rcac, nil)
+	}
+	return mattercert.NewVerifier(rootPublicKey, nil)
+}
+
 // validateUpdateNOCCert verifies an UpdateNOC certificate against the
 // fabric's stored trust root and the pending CSR key pair. Returns the
 // decoded NOC on success, or a non-nil rejection NOCResponse.
@@ -1964,7 +1976,7 @@ func (o *OperationalCredentials) fabricAlreadyInstalled(ctx context.Context, fab
 //   - UpdateNOC SHALL NOT move the fabric to a different FabricID
 //     (Matter §11.18.6.9); chip pins the existing FabricId.
 func validateUpdateNOCCert(fab store.FabricRecord, priv *ecdsa.PrivateKey, nocValue, icacValue []byte) (*mattercert.Certificate, *NOCResponse) {
-	verifier, verr := mattercert.NewVerifier(fab.RootPublicKey, nil)
+	verifier, verr := nocVerifier(fab.RootCert, fab.RootPublicKey)
 	if verr != nil {
 		return nil, &NOCResponse{StatusCode: NOCStatusInvalidNOC, DebugText: "stored trust root invalid: " + verr.Error()}
 	}

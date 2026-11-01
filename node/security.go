@@ -45,6 +45,8 @@ type caseFabric struct {
 	identity      *sigma.Identity
 	verifier      sigma.PeerVerifier
 	rootPublicKey []byte
+	// rootCert is the fabric's root certificate (nil on a legacy row).
+	rootCert []byte
 	// addNOCIPK is the operational IPK derived from AddNOC's IPKValue,
 	// the identity's key until key set 0 is rotated.
 	addNOCIPK [16]byte
@@ -54,6 +56,18 @@ type caseFabric struct {
 	// CASESession.cpp:962-990 tries every IPK epoch key) and addNOCIPK.
 	// identity.IPK is the current one among them (ipkCandidates).
 	ipks [][16]byte
+}
+
+// peerVerifier is the verifier rooted at a fabric's trust anchor: built
+// from the root certificate when the fabric row holds it, so a root-signed
+// NOC's authorityKeyIdentifier is checked against the root's
+// subjectKeyIdentifier (matter.js Noc.ts:170-184 at 862ad75f); from the
+// root's public key alone for a legacy row without it.
+func peerVerifier(rcac, rootPublicKey []byte, ts mattercert.TimeSource) (*mattercert.Verifier, error) {
+	if len(rcac) > 0 {
+		return mattercert.NewVerifierFromRCAC(rcac, ts)
+	}
+	return mattercert.NewVerifier(rootPublicKey, ts)
 }
 
 // caseIdentities holds one [caseFabric] per installed fabric and resolves an
@@ -269,7 +283,7 @@ func (c *caseIdentities) load(ctx context.Context, st fabricIdentities, fabricIn
 	if err != nil {
 		return fmt.Errorf("parse operational key %d: %w", fabricIndex, err)
 	}
-	verifier, err := mattercert.NewVerifier(fabric.RootPublicKey, clock.Or(c.clock))
+	verifier, err := peerVerifier(fabric.RootCert, fabric.RootPublicKey, clock.Or(c.clock))
 	if err != nil {
 		return fmt.Errorf("peer verifier %d: %w", fabricIndex, err)
 	}
@@ -295,6 +309,7 @@ func (c *caseIdentities) load(ctx context.Context, st fabricIdentities, fabricIn
 		},
 		verifier:      verifier,
 		rootPublicKey: append([]byte(nil), fabric.RootPublicKey...),
+		rootCert:      append([]byte(nil), fabric.RootCert...),
 		addNOCIPK:     addNOCIPK,
 		ipks:          ipks,
 	}
