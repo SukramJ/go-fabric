@@ -54,7 +54,12 @@ Follow-ups the guards asked for: ac425c35 (W1-sec-03, `Verifier` stays
 comparable), ea26ba39 (W1-conc-05, the pause on the clock port), 85449d40
 (W1-wire-04, error prefix), 85050162 (W1-conc-09, the test-parity register),
 bee5670b (W1-wire-04, `RawLength` a uint32 so `tlv.Element` keeps its
-size), 94be971d (W1-conc-01, funlen), 07737fc2 (W1-conc-04, test file).
+size), 94be971d (W1-conc-01, funlen), 07737fc2 (W1-conc-04, test file),
+264dabfe (W1-wire-03, the fuzz target found the encoder's replacement
+differing from the decoder's: one U+FFFD per maximal subpart now on both
+sides), 6c916950 (W1-conc-03, `Owes` covered, `transport/mrp` floor 99%),
+a4048ae7 / 603fa84d / c6421db6 / cbf86f3d (citation and reachability
+artefacts; drift 258, unreached 3, both unchanged).
 
 Open notes, no fix in W1: W1-wire-07 (BTP window 0, matter.js parity, owner:
 no change), W1-conc-07, W1-conc-08, W1-wire-09, W1-wire-10, W1-sec-04,
