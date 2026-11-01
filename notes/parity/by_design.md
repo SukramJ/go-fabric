@@ -398,6 +398,12 @@ backlog item (parity audit CHIP L9-01..04), not an interop gap. The crypto
 core (HKDF salts/info/nonces, Sigma TLV tags, status codes, control octets)
 IS byte-verbatim with connectedhomeip HEAD.
 
+The leniency is the absent field only. A present field of the wrong type
+or above its width is refused — INVALID_ACTION and CONSTRAINT_ERROR, as
+matter.js's `TlvNumber.validate` refuses it (`TlvNumber.ts:145-156`,
+`ValidationError.ts:35-38`) — rather than masked into a different, valid
+value (`cluster/wire/field_bounds.go`, W3-clucore-08).
+
 ### BD-Matter-mDNSDeviceType — commissionable DT advertises RootNode, not Aggregator
 
 The commissionable `DT` TXT key + `_T<id>` subtype advertise RootNode

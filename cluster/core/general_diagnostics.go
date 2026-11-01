@@ -463,12 +463,14 @@ func (g *GeneralDiagnostics) MatterRead(attrID uint32) (any, bool) {
 		// GeneralDiagnosticsServer.ts:networkInterfaces.
 		return enumerateNetworkInterfaces(), true
 	case gendiagAttrRebootCount:
-		// Seeded by the daemon via [SetPersistedCounters]; falls back
-		// to 1 (= "first boot") when persistence is not wired.
+		// Seeded by the daemon via [SetPersistedCounters]; 0 when
+		// persistence is not wired, as matter.js starts an unset
+		// RebootCount at 0 and counts the later boots
+		// (GeneralDiagnosticsServer.ts:102-106 at 862ad75f; W3-clucore-11).
 		if g.persistedSeeded {
 			return g.rebootCount, true
 		}
-		return uint16(1), true
+		return uint16(0), true
 	case gendiagAttrUpTime:
 		return uint64(g.upTime().Seconds()), true
 	case gendiagAttrTotalOperationalHours:
@@ -862,9 +864,11 @@ func (g *GeneralDiagnostics) MatterGeneratedCommands() []uint32 {
 	return g.def().MatterGeneratedCommands()
 }
 
-// MatterReportable returns the subscribe-able attributes.
+// MatterReportable returns the attributes that move: UpTime,
+// RebootCount and TotalOperationalHours. BootReason was listed although
+// MatterRead does not serve it (W3-clucore-11).
 func (g *GeneralDiagnostics) MatterReportable() []uint32 {
-	return []uint32{gendiagAttrUpTime, gendiagAttrBootReason}
+	return []uint32{gendiagAttrRebootCount, gendiagAttrUpTime, gendiagAttrTotalOperationalHours}
 }
 
 // MatterAttributes lists every GeneralDiagnostics (0x0033) attribute

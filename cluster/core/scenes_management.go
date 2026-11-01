@@ -333,7 +333,8 @@ type ScenesConfig struct {
 	// GroupKnown reports whether the fabric has a GroupKeyMap entry for
 	// the group — matter.js #groupExistentInFabric. Nil accepts only group 0.
 	GroupKnown func(ctx context.Context, fabric uint8, groupID uint16) bool
-	// Fabrics lists the node's fabrics, for FabricSceneInfo.
+	// Fabrics lists the node's fabrics, for FabricSceneInfo; nil serves the
+	// accessing fabric's entry alone.
 	Fabrics func(ctx context.Context) []uint8
 }
 
@@ -457,6 +458,12 @@ func (s *ScenesManagement) MatterReadFiltered(ctx context.Context, attrID uint32
 		var fabrics []uint8
 		if s.cfg.Fabrics != nil {
 			fabrics = s.cfg.Fabrics(ctx)
+		} else if fabric != 0 {
+			// Without the fabric list the accessing fabric still sees
+			// its own entry, as matter.js's fabric-scoped
+			// fabricSceneInfo holds one for every fabric that reads it
+			// (W3-clucore-14).
+			fabrics = []uint8{fabric}
 		}
 		st.mu.Lock()
 		defer st.mu.Unlock()

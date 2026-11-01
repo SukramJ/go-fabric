@@ -49,6 +49,7 @@ Findings of the whole-codebase review of 2026-11-01 (`notes/review/2026-11/`).
 - `cluster/thermo`: a SystemMode change to Off, Heat or Cool — written or set by the host — sets ThermostatRunningMode to the same mode when it is served and emits RunningModeChange, as matter.js does (W3-clua1-01).
 - `cluster/thermo`: an atomic CommitWrite whose later attribute a host port refuses (`PresetStore.SavePresets`, `SchedulePort.CommitSchedules`) restores the attributes already committed and reports the refusal on every attribute; the earlier commit stayed live (W3-clua1-02).
 - `cluster/levelcontrol`: the held server (`levelcontrol.New`) with Lighting applies `HeldConfig.StartUpCurrentLevel` at start-up (0 MinLevel, null keeps, a value sets it) unless `Bridged` or after a software update (`BootReason`), as matter.js does; the device kit marks its servers bridged (W3-clua2-02).
+- `cluster/core`, `cluster/wire`, `cluster/levelcontrol`: an IdentifyTime write and the hand-written LevelControl, OnOff, WindowCovering and DoorLock command decoders refuse a value above its width with ConstraintError and one of the wrong type with InvalidAction instead of masking it; the Identify countdown reaching zero is reported and advances the DataVersion; GeneralDiagnostics reports RebootCount, UpTime and TotalOperationalHours and an unseeded RebootCount reads 0; ScenesManagement without `Fabrics` serves the accessing fabric its FabricSceneInfo entry (W3-clucore-04, -05, -08, -11, -14).
 
 ## [0.15.6] — 2026-11-01
 

@@ -53,10 +53,11 @@ type GoToTiltValueRequest struct {
 // DecodeGoToLiftValue parses GoToLiftValue payloads.
 func DecodeGoToLiftValue(payload []byte) (GoToLiftValueRequest, error) {
 	var req GoToLiftValueRequest
-	if err := walkContext(payload, ErrWindowCoveringMalformed, func(tag uint32, el tlv.Element) {
+	if err := walkContext(payload, ErrWindowCoveringMalformed, func(tag uint32, el tlv.Element) (err error) {
 		if tag == 0 {
-			req.LiftValue = uint16(el.Uint & 0xFFFF) // 16-bit raw position per spec
+			req.LiftValue, err = fieldUint16(el, ErrWindowCoveringMalformed)
 		}
+		return err
 	}); err != nil {
 		return req, err
 	}
@@ -66,10 +67,11 @@ func DecodeGoToLiftValue(payload []byte) (GoToLiftValueRequest, error) {
 // DecodeGoToTiltValue parses GoToTiltValue payloads.
 func DecodeGoToTiltValue(payload []byte) (GoToTiltValueRequest, error) {
 	var req GoToTiltValueRequest
-	if err := walkContext(payload, ErrWindowCoveringMalformed, func(tag uint32, el tlv.Element) {
+	if err := walkContext(payload, ErrWindowCoveringMalformed, func(tag uint32, el tlv.Element) (err error) {
 		if tag == 0 {
-			req.TiltValue = uint16(el.Uint & 0xFFFF) // 16-bit raw position per spec
+			req.TiltValue, err = fieldUint16(el, ErrWindowCoveringMalformed)
 		}
+		return err
 	}); err != nil {
 		return req, err
 	}

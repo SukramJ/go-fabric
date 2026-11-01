@@ -5,7 +5,6 @@ package wire
 
 import (
 	"errors"
-	"fmt"
 
 	"github.com/SukramJ/go-fabric/tlv"
 )
@@ -39,68 +38,35 @@ type OnWithTimedOffRequest struct {
 	OffWaitTime  uint16 // 1/10s units
 }
 
-// DecodeOffWithEffect parses the OffWithEffect command payload.
+// DecodeOffWithEffect parses the OffWithEffect command payload. A field
+// of the wrong type or outside its width is refused ([fieldUint]).
 func DecodeOffWithEffect(payload []byte) (OffWithEffectRequest, error) {
 	var req OffWithEffectRequest
-	d := tlv.NewDecoder(payload)
-	open, err := d.Next()
-	if err != nil {
-		return req, fmt.Errorf("%w: top: %w", ErrOnOffMalformed, err)
-	}
-	if open.Type != tlv.TypeStructure {
-		return req, fmt.Errorf("%w: top must be Structure", ErrOnOffMalformed)
-	}
-	for {
-		el, err := d.Next()
-		if err != nil {
-			return req, fmt.Errorf("%w: %w", ErrOnOffMalformed, err)
-		}
-		if el.IsEndContainer {
-			break
-		}
-		if el.Tag.Kind != tlv.TagKindContext {
-			continue
-		}
-		switch el.Tag.Number {
+	err := walkContext(payload, ErrOnOffMalformed, func(tag uint32, el tlv.Element) (err error) {
+		switch tag {
 		case 0:
-			req.EffectIdentifier = uint8(el.Uint & 0xFF) // payload field width 1 byte per spec
+			req.EffectIdentifier, err = fieldUint8(el, ErrOnOffMalformed)
 		case 1:
-			req.EffectVariant = uint8(el.Uint & 0xFF) // payload field width 1 byte per spec
+			req.EffectVariant, err = fieldUint8(el, ErrOnOffMalformed)
 		}
-	}
-	return req, nil
+		return err
+	})
+	return req, err
 }
 
 // DecodeOnWithTimedOff parses the OnWithTimedOff command payload.
 func DecodeOnWithTimedOff(payload []byte) (OnWithTimedOffRequest, error) {
 	var req OnWithTimedOffRequest
-	d := tlv.NewDecoder(payload)
-	open, err := d.Next()
-	if err != nil {
-		return req, fmt.Errorf("%w: top: %w", ErrOnOffMalformed, err)
-	}
-	if open.Type != tlv.TypeStructure {
-		return req, fmt.Errorf("%w: top must be Structure", ErrOnOffMalformed)
-	}
-	for {
-		el, err := d.Next()
-		if err != nil {
-			return req, fmt.Errorf("%w: %w", ErrOnOffMalformed, err)
-		}
-		if el.IsEndContainer {
-			break
-		}
-		if el.Tag.Kind != tlv.TagKindContext {
-			continue
-		}
-		switch el.Tag.Number {
+	err := walkContext(payload, ErrOnOffMalformed, func(tag uint32, el tlv.Element) (err error) {
+		switch tag {
 		case 0:
-			req.OnOffControl = uint8(el.Uint & 0xFF) // 8-bit bitmap per spec
+			req.OnOffControl, err = fieldUint8(el, ErrOnOffMalformed)
 		case 1:
-			req.OnTime = uint16(el.Uint & 0xFFFF) // 16-bit field per spec
+			req.OnTime, err = fieldUint16(el, ErrOnOffMalformed)
 		case 2:
-			req.OffWaitTime = uint16(el.Uint & 0xFFFF) // 16-bit field per spec
+			req.OffWaitTime, err = fieldUint16(el, ErrOnOffMalformed)
 		}
-	}
-	return req, nil
+		return err
+	})
+	return req, err
 }

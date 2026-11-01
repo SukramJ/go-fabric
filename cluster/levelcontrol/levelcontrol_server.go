@@ -941,6 +941,11 @@ func moveToLevelRequestFrom(name string, fields any) (wire.MoveToLevelRequest, e
 	case []byte:
 		req, err := wire.DecodeMoveToLevel(v)
 		if err != nil {
+			// A field of the wrong type or out of range carries its
+			// status (INVALID_ACTION / CONSTRAINT_ERROR, W3-clucore-08).
+			if spec.CarriesStatus(err) {
+				return req, err
+			}
 			return req, invalidCommandErr{fmt.Sprintf("levelcontrol: %s: %v", name, err)}
 		}
 		return req, nil
@@ -1024,6 +1029,11 @@ func moveRequestFrom(name string, fields any) (wire.MoveRequest, error) {
 	case []byte:
 		req, err := wire.DecodeMove(v)
 		if err != nil {
+			// A field of the wrong type or out of range carries its
+			// status (INVALID_ACTION / CONSTRAINT_ERROR, W3-clucore-08).
+			if spec.CarriesStatus(err) {
+				return req, err
+			}
 			return req, invalidCommandErr{fmt.Sprintf("levelcontrol: %s: %v", name, err)}
 		}
 		return req, nil

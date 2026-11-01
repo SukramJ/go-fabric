@@ -4,6 +4,7 @@
 package core_test
 
 import (
+	"context"
 	"strings"
 	"testing"
 
@@ -32,5 +33,25 @@ func TestScenesAddSceneNameLengthParity(t *testing.T) {
 	}
 	if v := invoke(t, s, 0x01, core.SceneRef{GroupID: 0x0101, SceneID: 2}).(core.ViewSceneResponse); v.SceneName != name {
 		t.Fatalf("ViewScene name %q, want %q", v.SceneName, name)
+	}
+}
+
+// TestScenesFabricSceneInfoWithoutFabrics: a ScenesManagement built
+// without Fabrics serves the accessing fabric its own FabricSceneInfo
+// entry, as matter.js's fabric-scoped state does; a read without an
+// accessing fabric gets none (W3-clucore-14).
+func TestScenesFabricSceneInfoWithoutFabrics(t *testing.T) {
+	t.Parallel()
+	srv, err := core.NewScenesManagement(core.ScenesConfig{State: core.NewScenesState(nil)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	v, _ := srv.MatterReadFiltered(im.WithFabricFilter(context.Background(), true, 3), 0x0002)
+	if info := v.([]core.SceneInfoStruct); len(info) != 1 || info[0].FabricIndex != 3 {
+		t.Fatalf("FabricSceneInfo for fabric 3: %+v, want its own entry", info)
+	}
+	v, _ = srv.MatterReadFiltered(context.Background(), 0x0002)
+	if info := v.([]core.SceneInfoStruct); len(info) != 0 {
+		t.Fatalf("FabricSceneInfo without an accessing fabric: %+v, want none", info)
 	}
 }
