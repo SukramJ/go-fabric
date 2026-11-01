@@ -118,7 +118,7 @@ func (s *ThermostatServer) SetAttributes(values map[uint32]any) error {
 		if n, isInt := v.(int16); isInt {
 			t = &n
 		}
-		note(thermoAttrLocalTemperature, !equalTemperature(s.localTemp, t))
+		note(thermoAttrLocalTemperature, s.features&ThermostatFeatureLTNE == 0 && !equalTemperature(s.localTemp, t))
 		s.localTemp = t
 	}
 	if n, ok := checked[thermoAttrLocalTemperatureCalibration].(int8); ok {

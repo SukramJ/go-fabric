@@ -87,8 +87,12 @@ type eventState struct {
 
 // eventStateLocked reads the evented state; the caller holds s.mu.
 func (s *ThermostatServer) eventStateLocked() eventState {
+	local := s.localTemp
+	if s.features&ThermostatFeatureLTNE != 0 {
+		local = nil // the attribute stays null under LTNE: no LocalTemperatureChange
+	}
 	return eventState{
-		systemMode: s.systemMode, localTemp: s.localTemp, runningMode: s.runningMode, runningState: s.runningState,
+		systemMode: s.systemMode, localTemp: local, runningMode: s.runningMode, runningState: s.runningState,
 	}
 }
 

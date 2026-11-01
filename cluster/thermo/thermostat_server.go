@@ -660,7 +660,9 @@ func servedOptional(features uint32) []uint32 {
 func (s *ThermostatServer) MatterClusterID() uint32 { return ThermostatClusterID }
 
 // SetLocalTemperature updates the LocalTemperature attribute (quality X —
-// nullable). Pass nil to set null (sensor unavailable). The value is
+// nullable). Pass nil to set null (sensor unavailable). With LTNE the
+// value is kept for the server's own use and the attribute reads null
+// (ThermostatServer.ts:516-519 at 862ad75f). The value is
 // stored as given — no range check, no log — and not announced through
 // the change notifier: LocalTemperature is in [ThermostatServer.MatterReportable].
 // With TEVT a changed value emits LocalTemperatureChange (events.go).
@@ -839,8 +841,13 @@ func (s *ThermostatServer) readLocked(attrID uint32) (any, bool) {
 	}
 	switch attrID {
 	case thermoAttrLocalTemperature:
-		if s.localTemp == nil {
-			return nil, true // nullable quality X: null value, attribute present
+		if s.localTemp == nil || s.features&ThermostatFeatureLTNE != 0 {
+			// nullable quality X: null value, attribute present. With
+			// LTNE the attribute stays null whatever the host reports.
+			// Mirrors matter.js
+			// packages/node/src/behaviors/thermostat/ThermostatServer.ts:516-519
+			// at 862ad75f (W3-clua1-03).
+			return nil, true
 		}
 		return *s.localTemp, true
 	case thermoAttrAbsMinHeatSetpointLimit:
@@ -1339,9 +1346,8 @@ func (s *ThermostatServer) MatterInvoke(ctx context.Context, cmdID uint32, field
 	}
 }
 
-// abs16 returns the absolute value of an int16. Used by the coordinated
-// Both-mode setpoint clamp to pick the more limiting overshoot.
-func abs16(x int16) int16 {
+// absInt is |x|.
+func absInt(x int) int {
 	if x < 0 {
 		return -x
 	}
@@ -1402,26 +1408,30 @@ func (s *ThermostatServer) handleSetpointRaiseLower(ctx context.Context, fields 
 	prevHeat, prevCool := occupHeat, occupCool
 
 	// amount is in 0.1°C steps in the command; setpoints are in 0.01°C units.
-	// matter.js ThermostatServer.ts:200: amount *= 10.
-	delta := int16(amount) * 10
+	// matter.js ThermostatServer.ts:200: amount *= 10. The sums run in int
+	// and are narrowed after the clamp, as matter.js computes in numbers
+	// and crops (cropValueRange, :875-885 at 862ad75f): an int16 sum near
+	// the top wrapped and the clamp then snapped it to the minimum
+	// (W3-clua1-04).
+	delta := int(amount) * 10
 
-	clampHeat := func(v int16) int16 {
-		if v < minHeat {
+	clampHeat := func(v int) int16 {
+		if v < int(minHeat) {
 			return minHeat
 		}
-		if v > maxHeat {
+		if v > int(maxHeat) {
 			return maxHeat
 		}
-		return v
+		return int16(v) //nolint:gosec // within [minHeat, maxHeat], both int16
 	}
-	clampCool := func(v int16) int16 {
-		if v < minCool {
+	clampCool := func(v int) int16 {
+		if v < int(minCool) {
 			return minCool
 		}
-		if v > maxCool {
+		if v > int(maxCool) {
 			return maxCool
 		}
-		return v
+		return int16(v) //nolint:gosec // within [minCool, maxCool], both int16
 	}
 
 	switch mode {
@@ -1435,12 +1445,12 @@ func (s *ThermostatServer) handleSetpointRaiseLower(ctx context.Context, fields 
 			// limiting overshoot from BOTH setpoints so their spacing is
 			// kept. Clamping each independently would skew the deadband.
 			// matter.js ThermostatServer.ts:203-220.
-			desiredCool := occupCool + delta
-			coolLimit := desiredCool - clampCool(desiredCool)
-			desiredHeat := occupHeat + delta
-			heatLimit := desiredHeat - clampHeat(desiredHeat)
+			desiredCool := int(occupCool) + delta
+			coolLimit := desiredCool - int(clampCool(desiredCool))
+			desiredHeat := int(occupHeat) + delta
+			heatLimit := desiredHeat - int(clampHeat(desiredHeat))
 			if coolLimit != 0 || heatLimit != 0 {
-				if abs16(coolLimit) <= abs16(heatLimit) {
+				if absInt(coolLimit) <= absInt(heatLimit) {
 					desiredHeat -= heatLimit
 					desiredCool -= heatLimit
 				} else {
@@ -1448,15 +1458,18 @@ func (s *ThermostatServer) handleSetpointRaiseLower(ctx context.Context, fields 
 					desiredCool -= coolLimit
 				}
 			}
-			occupCool = desiredCool
-			occupHeat = desiredHeat
+			// Both are within their limits after the shift (the more
+			// limiting overshoot moved both back); the clamp only
+			// narrows them to int16.
+			occupCool = clampCool(desiredCool)
+			occupHeat = clampHeat(desiredHeat)
 		case cool:
-			occupCool = clampCool(occupCool + delta)
+			occupCool = clampCool(int(occupCool) + delta)
 		default: // heating-only (matter.js falls through to the heating setpoint)
-			occupHeat = clampHeat(occupHeat + delta)
+			occupHeat = clampHeat(int(occupHeat) + delta)
 		}
 	case wire.ThermostatSetpointModeHeat:
-		occupHeat = clampHeat(occupHeat + delta)
+		occupHeat = clampHeat(int(occupHeat) + delta)
 		// On an AUTO thermostat the cooling setpoint follows to keep the
 		// deadband, or the command is refused. Mirrors matter.js
 		// ThermostatServer.ts:251-269 (0ceb202d). Under the AUTO limit
@@ -1470,7 +1483,7 @@ func (s *ThermostatServer) handleSetpointRaiseLower(ctx context.Context, fields 
 			occupCool = int16(companion) //nolint:gosec // within [minCool, maxCool], checked above
 		}
 	case wire.ThermostatSetpointModeCool:
-		occupCool = clampCool(occupCool + delta)
+		occupCool = clampCool(int(occupCool) + delta)
 		// The heating setpoint follows the same way. Mirrors matter.js
 		// ThermostatServer.ts:229-249 (0ceb202d).
 		if auto && int(occupCool)-int(occupHeat) < deadband {

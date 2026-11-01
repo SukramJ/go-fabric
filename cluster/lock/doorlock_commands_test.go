@@ -426,3 +426,30 @@ func TestLockCommandFields(t *testing.T) {
 		t.Error("LockOperationFailedError.Error")
 	}
 }
+
+// TestDoorStateUnchangedIsNoChange: a repeated SetDoorState emits nothing
+// and counts nothing, as matter.js's doorState$Changed reactor does not
+// fire for an unchanged value (DoorLockServer.ts:179, :1345-1361;
+// Datasource.ts:823-825 at 862ad75f; W3-clua2-03).
+func TestDoorStateUnchangedIsNoChange(t *testing.T) {
+	t.Parallel()
+	srv, em := newLocal(t, nil)
+	for range 3 {
+		if err := srv.SetDoorState(lockdef.DoorStateDoorOpen); err != nil {
+			t.Fatal(err)
+		}
+	}
+	n := 0
+	for _, c := range em.calls {
+		if c.event == lockdef.EventDoorStateChange {
+			n++
+		}
+	}
+	if n != 1 {
+		t.Errorf("%d DoorStateChange events for one change, want 1", n)
+	}
+	if v, ok := srv.MatterRead(lockdef.AttrDoorOpenEvents); ok && v != uint32(1) {
+		t.Errorf("DoorOpenEvents %v, want 1", v)
+	}
+	srv.MatterQuiesce()
+}

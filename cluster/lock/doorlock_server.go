@@ -777,8 +777,14 @@ func (s *DoorLockServer) SetLockState(state lockdef.LockStateEnum) error {
 // SetDoorState records the door's state (DPS) and emits DoorStateChange;
 // DoorOpen and DoorClosed count in DoorOpenEvents and DoorClosedEvents
 // when they are served. Mirrors matter.js DoorLockServer.ts:1345-1361
-// (#handleDoorStateChange, the doorState$Changed reactor :179).
+// (#handleDoorStateChange, the doorState$Changed reactor :179). A state
+// equal to the stored one is no change: matter.js's $Changed does not
+// fire for it (packages/node/src/behavior/state/managed/Datasource.ts:823-825
+// at 862ad75f), so nothing is emitted or counted (W3-clua2-03).
 func (s *DoorLockServer) SetDoorState(state lockdef.DoorStateEnum) error {
+	if v, ok := s.Value(lockdef.AttrDoorState); ok && v == uint8(state) {
+		return nil
+	}
 	if err := s.Set(lockdef.AttrDoorState, uint8(state)); err != nil {
 		return err
 	}
