@@ -43,7 +43,7 @@ var sqlitePragmas = []string{"foreign_keys(1)", "busy_timeout(5000)"}
 // with the database file's permissions. An existing file keeps the
 // permissions it has.
 func OpenSQLite(path string, pragmas ...string) (*sql.DB, error) {
-	if f, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE|os.O_EXCL, 0o600); err == nil {
+	if f, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE|os.O_EXCL, 0o600); err == nil { //nolint:gosec // the caller's own store path
 		_ = f.Close()
 	} else if !errors.Is(err, fs.ErrExist) {
 		return nil, fmt.Errorf("node: create sqlite %q: %w", path, err)

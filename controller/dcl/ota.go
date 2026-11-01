@@ -281,11 +281,12 @@ func (o *OTAVersions) Download(ctx context.Context, u SoftwareVersion, w io.Writ
 		}
 		return nil
 	}
-	n, err := io.Copy(w, io.LimitReader(resp.Body, int64(min(u.OTAFileSize, 1<<62))+1)) //nolint:gosec // bounded above
+	limit := int64(min(u.OTAFileSize, 1<<62)) //nolint:gosec // bounded above
+	n, err := io.Copy(w, io.LimitReader(resp.Body, limit+1))
 	if err != nil {
 		return fail(err)
 	}
-	if uint64(n) > u.OTAFileSize {
+	if n > limit {
 		return &OTAError{Message: fmt.Sprintf("OTA image from %s exceeds its announced size of %d bytes", u.OTAURL, u.OTAFileSize)}
 	}
 	return nil
