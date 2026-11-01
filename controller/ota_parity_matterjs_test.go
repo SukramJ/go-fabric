@@ -201,14 +201,25 @@ func TestOTANoUpdatesWithoutRequestorParity(t *testing.T) {
 // (:1091-1123). As there, no clock moves between the force and the
 // removal: the announcement reaches the device — the site's network
 // delivers without the clock — and the device's query waits for its
-// announcement jitter, which only the steps below let pass. The device
-// was isolated here before, and the announcement's retransmissions could
-// all be spent while it was; the query then never came (#306).
+// announced delay, which Eventually lets pass as MockTime.resolve does
+// (:1108). The device was isolated here before, and the
+// announcement's retransmissions could all be spent while it was; the
+// query then never came (#306). The jitter was then stepped over in
+// 15-minute slices: one Advance fires every timer of the slice in order
+// while the device's query runs beside it uncounted, and under the
+// coverage job's load its 90 s connect deadline fired before the site's
+// resolver had answered — the query failed, the next one was 24 h away
+// (#361, #363: `resolve_failed took=5m0.1s`, `query_scheduled in=24h`).
 func TestOTACancelByRemovingConsentParity(t *testing.T) {
 	t.Parallel()
 	// A requestor that cannot consent, as matter.js's requestUserConsent:
 	// false (outside harness mode, node/ota.go).
-	r := newOTARigWith(t, nil, &node.OtaConfig{Dir: filepath.Join(t.TempDir(), "ota")})
+	// The query one second after the announcement instead of the random
+	// 1-600 s (matter.js's announcedUpdateQueryDelay, the cert requestor's
+	// setting): the clock below walks timer by timer, and the bridge's ack
+	// pump stands every 50 ms of it.
+	announced := time.Second
+	r := newOTARigWith(t, nil, &node.OtaConfig{Dir: filepath.Join(t.TempDir(), "ota"), AnnouncedUpdateQueryDelay: &announced})
 	r.storeImage(t, 2)
 	mgr := r.c.SoftwareUpdates()
 	_, _, provider := r.c.OwnNode()
@@ -234,19 +245,25 @@ func TestOTACancelByRemovingConsentParity(t *testing.T) {
 		q := mgr.QueuedUpdates()
 		return len(q) == 1 && q[0].Status == softwareupdate.PendingInProgress
 	})
-	r.run(t, func(ctx context.Context) error { return r.site.Settle(ctx) })
+	// Settle, not under Run: Run advances the clock to its next deadline
+	// whenever the site is quiet before fn returns (50-250 ms in the
+	// coverage job), and no clock moves here.
+	settleCtx, settleCancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	if err := r.site.Settle(settleCtx); err != nil {
+		t.Fatal(err)
+	}
+	settleCancel()
 	mgr.RemoveConsent(r.peer(t), 0)
 	consentGone.Store(true)
 	r.eventually(t, "the update failed", func() bool { _, _, failed := r.snapshot(); return failed > 0 })
 	if q := mgr.QueuedUpdates(); len(q) != 0 {
 		t.Errorf("queue %+v, want empty", q)
 	}
-	// The requestor queries after its announcement jitter of 1-600 s
-	// (OtaSoftwareUpdateRequestorServer.ts:410); the clock is stepped in
-	// 15-minute slices rather than walked timer by timer.
-	for i := 0; i < 8 && !queried.Load(); i++ {
-		r.run(t, func(ctx context.Context) error { return r.site.Step(ctx, 15*time.Minute) })
-	}
+	// The requestor queries after its announced delay
+	// (OtaSoftwareUpdateRequestorServer.ts:410): the clock walks timer by
+	// timer, each move once the site is quiet, so the device's resolution
+	// and CASE run between the moves rather than against the deadlines
+	// one long step fires — MockTime.resolve(queryImagePromise) (:1108).
 	r.eventually(t, "the device's query", queried.Load)
 	r.eventually(t, "the requestor idle", func() bool {
 		v, _ := r.dev.Node().Root().OTARequestor.MatterRead(otareq.AttrUpdateState)
