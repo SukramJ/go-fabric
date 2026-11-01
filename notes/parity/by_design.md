@@ -1055,13 +1055,23 @@ when Actions or another optional cluster lands.
   (verifiziert `mdns/service.go:408`). Kein drift.
 - TXT-builder: matter.js incremental builder pattern ↔ Go static
   `mdns/txt.go` constants.
-- **L7-D02 (Run #02) Subtype PTR TTL 120 s:** `SubtypeResponder` emits
-  PTR TTL=120 s (`mdns/subtype_responder.go:355`).
-  chip `src/lib/dnssd/minimal_mdns/records/ResourceRecord.h:35`
-  `kDefaultTtl=120` for SRV/PTR — go-fabric matches chip exactly.
-  matter.js offloads TTL to the DNS-SD library (no explicit value set
-  for subtype PTRs). Audit #02 verdict: ✓ No drift against chip.
-  By-design: 120 s is the chip-verified correct PTR TTL for subtype records.
+- **L7-D02 (rewritten 2026-11-01, review W2-wire-06) Record TTLs:**
+  matter.js builds every advertised record with `DEFAULT_MDNS_TTL` = 120 s
+  (`packages/general/src/codec/DnsCodec.ts:20` at `862ad75f`); chip's
+  `src/lib/dnssd/wire/records/ResourceRecord.h:35` `kDefaultTtl` is 120
+  (TXT 4500, `Txt.h:30`, at `6170af84`). What this module emits: the
+  subtype PTRs of `SubtypeResponder` and the host's A/AAAA of
+  `HostResponder` carry 120 s (`mdns/subtype_responder.go` `subtypePTRTTL`,
+  `mdns/host_responder.go`), pinned by `TestSubtypePTRTTLParity`. The
+  primary service PTR, SRV and TXT records come from grandcat/zeroconf
+  v1.0.0 and carry its default 3200 s (`server.go:178`): its only setter,
+  `Server.TTL` (`server.go:207`), writes the field unsynchronised after
+  `RegisterProxy` has started the goroutines that read it (`server.go`
+  `go s.mainloop()` / `go s.probe()`), a data race under `make race`, so it
+  is not called. **Divergence**: a node that vanishes without its goodbyes
+  stays resolvable in a commissioner's cache for up to 53 min instead of
+  2; `Close` sends the goodbyes. Retires when the primary records move to
+  a responder this module owns.
 
 **L8 — Commissioning Window (3):**
 - Window-Timer: chip `CHIP_System_Layer` for cross-platform timer ↔ Go
