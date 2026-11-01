@@ -25,6 +25,7 @@ Findings of the whole-codebase review of 2026-11-01 (`notes/review/2026-11/`).
 - `store`, `node`, `controller`: a SQLite file the node or the controller creates is owner-only (`0600`), and so are its `-wal` and `-shm` files (W5-ex-05).
 - `secure/sigma`, `secure/mattercert`: a CASE responder with an identity fails closed when its verifier cannot read the peer NOC's fabric or node id; Sigma1 without initiatorRandom, initiatorSessionId or destinationId is InvalidParam; a NOC or ICAC without an authorityKeyIdentifier, and a NOC whose authorityKeyIdentifier names neither the root nor the ICAC, are refused (W1-sec-01, W1-sec-02, W1-sec-03).
 - `bridge`, `im`, `endpoint`: fabric 0 is no access grant — only the PASE auth mode carries the commissioning channel's implicit Administer, as matter.js's `FabricAccessControl` keys it; a session whose fabric the bridge cannot name resolves to `FabricIndexUnresolvable` whether or not an ACL lister is attached, and subscription reports, event authorizers and `TopologyDispatcher.CheckACL` deny fabric 0 and the unresolvable fabric (also under `UnenforcedACL`) unless the session is PASE (W2-sec-03).
+- `cluster/core`: ICDManagement compares a Manage caller's VerificationKey with the stored ICDToken in constant time (length checked first); matter.js compares with `Bytes.areEqual` — an ahead-of-matter.js row in `notes/parity/by_design.md` (W2-sec-04).
 
 ### Added
 
