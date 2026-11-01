@@ -2557,7 +2557,13 @@ overlap: a `Set` that lands while the Sink is in flight is adopted and
 then overwritten by the command's own attribute — the command wins,
 where matter.js's waiting write would win. Chosen because the host's
 echo of the very change carries the command's value, and a different
-host value in that window is a race the host created. DEM moved into
+host value in that window is a race the host created. A consequence
+that is not a divergence: the echo must not hide the change itself, so
+OnOff's On and Off judge "a change", which invalidates the current scene,
+on OnOff at command start as matter.js does (`OnOffServer.ts:98-100`,
+`:120-122`) — or on the adopted host value the command overwrites; the
+echo stored while the Sink ran used to suppress the invalidation
+(W3-club2-01, `TestSinkEchoInvalidatesScenes`). DEM moved into
 this shape in phase 20 (brief BX2: an `op` queue held across its hooks,
 `mu` released, so a hook may call the setters); EVSE still keeps chip's
 delegate model (ports called under the state lock, the host must not

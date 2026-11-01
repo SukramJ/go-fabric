@@ -174,3 +174,46 @@ func TestSinkEchoInTheTimedOffTick(t *testing.T) {
 		t.Errorf("%d timers pending after the countdown", n)
 	}
 }
+
+// TestSinkEchoInvalidatesScenes: a Sink that confirms the very change
+// through Set before it returns does not hide the change from the scene
+// invalidation — matter.js judges On and Off on OnOff at command start
+// (packages/node/src/behaviors/on-off/OnOffServer.ts:98-100, :120-122 at
+// 862ad75f; W3-club2-01). A command that changes nothing still
+// invalidates nothing.
+func TestSinkEchoInvalidatesScenes(t *testing.T) {
+	t.Parallel()
+	for _, c := range []struct {
+		name  string
+		start bool
+		cmd   uint32
+		want  int
+	}{
+		{"On from off", false, onoff.CmdOn, 1},
+		{"Off from on", true, onoff.CmdOff, 1},
+		{"On when on", true, onoff.CmdOn, 0},
+		{"Off when off", false, onoff.CmdOff, 0},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+			sc := &recScenes{}
+			var srv *onoff.Server
+			srv, err := onoff.New(onoff.Config{Scenes: sc, Sink: funcSink(func(_ context.Context, on bool) error {
+				srv.Set(on) // the host's echo of the change
+				return nil
+			})})
+			if err != nil {
+				t.Fatalf("New: %v", err)
+			}
+			srv.Set(c.start)
+			within(t, c.name, func() {
+				if _, err := srv.MatterInvoke(context.Background(), c.cmd, nil); err != nil {
+					t.Errorf("%s: %v", c.name, err)
+				}
+			})
+			if len(sc.calls) != c.want {
+				t.Errorf("scenes calls %v, want %d invalidation(s)", sc.calls, c.want)
+			}
+		})
+	}
+}
