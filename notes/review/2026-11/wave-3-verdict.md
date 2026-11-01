@@ -1,6 +1,6 @@
-# W3 verdict (2026-11-01, HEAD 769ea3c2) — interim
+# W3 verdict (2026-11-01, HEAD 769ea3c2) — final
 
-Theme files: `wave-3-clu-sec.md` (done), `wave-3-clu-core.md`, `wave-3-clu-gen.md`, `wave-3-clu-b1.md`, `wave-3-clu-b2.md`, `wave-3-clu-a.md` (pending).
+Theme files (all done): `wave-3-clu-sec.md`, `wave-3-clu-core.md`, `wave-3-clu-gen.md`, `wave-3-clu-b1.md`, `wave-3-clu-b2.md`, `wave-3-clu-a1.md`, `wave-3-clu-a2.md`.
 Model note: clu-sec, clu-core and clu-gen ran on Fable (launched before the owner's model rule of 2026-11-01); b1, b2 and a run on Opus with Sonnet maps (`notes/reads/read-review-w3-cluster-{a,b}.md`).
 
 ## Verified against the pins (Fable re-read, both sides)
@@ -41,4 +41,34 @@ All 15 high/medium findings re-read by Fable against both sides: 14 confirmed, 1
 ## Owner decisions pending (W3)
 
 - Fabric-aware fail-safe port (chip authority; matter.js shares the gap in OpCreds): adopt chip → one port change (`node/failsafe.go:54`) feeding OpCreds CSR/AddNOC/AddTrustedRoot, Thread BR, Joint Fabric.
-- "Ahead of matter.js" register rows for ClosureControl (W3-club1-06) and Joint Fabric where chip is the only authority.
+- "Ahead of matter.js" register rows for ClosureControl (W3-club1-06) and Joint Fabric where chip is the only authority — ClosureControl done in the W3 PR (`BD-chip-ClosureControl-RulesInServer`, d284b510); Joint Fabric open.
+
+## Fixed in PR (W3, branch `review/w3`)
+
+The W3 fix PR's items (`notes/briefs/review-2026-11-w3.md`); item 11
+(ThreadNetworkCommissioning fail-safe) and W3-clusec-04..08 are the
+owner's reviewer's and stay as above. Notes left open are listed below.
+
+| ID | Commit | Change |
+| --- | --- | --- |
+| W3-clugen-01 | 2433875c | `cluster/spec/bound_expr.go`: expression bounds computed (+ − × ÷ ^, maxOf/minOf, dotted references); unit bounds restated in the type's units by the generator; boolcfg hand guard dropped |
+| W3-clucore-01 | c0b1d66a | BDBI NodeLabel over 32 bytes: ConstraintError via `CheckValue` / `refusedWrite` |
+| W3-clucore-02 | 32135158 | IdentifyTime write runs the host's IdentifyHandler; the countdown's end calls it with 0 |
+| W3-clucore-03 | 5a053733 | AddScene: SceneName over 16 is ConstraintError; decoder comment corrected; `BD-chip-ScenesManagement-SceneNameLength` |
+| W3-club2-01 | 9313ce35 | OnOff On/Off invalidate on the state at command start; by_design row corrected |
+| W3-club2-02 | 06875546 | `MatterQuiesce` on Switch, AmbientContextSensing, ServiceArea; `cluster.Quieter.Stop` |
+| W3-club1-01 | d284b510 | ClosureControl MoveTo: InvalidInState outside Moving / WaitingForMotion / Stopped |
+| W3-club1-06 | d284b510 | Ahead row `BD-chip-ClosureControl-RulesInServer` (marker `ClosureControlServer.ts:17`) |
+| W3-clua1-01 | b31dfd65 | SystemMode Off/Heat/Cool sets ThermostatRunningMode, RunningModeChange emitted |
+| W3-clua1-02 | 6e2a8727 | Atomic CommitWrite reverts committed attributes when a later host port refuses; the status stands for every attribute |
+| W3-clua2-02 | 243781c0, 54d5a590 | Held LevelControl applies `HeldConfig.StartUpCurrentLevel` unless `Bridged` or after an OTA boot |
+| W3-clucore-04, -05, -08, -11, -14 | 36a635dd, 54d5a590 | IdentifyTime / wire decoder fields bounded (ConstraintError / InvalidAction); countdown zero reported; GeneralDiagnostics reportables and RebootCount 0; FabricSceneInfo without `Fabrics` |
+| W3-clugen-02, -03, -07, -08 | 102c0770 | `cpMax`; unknown conformance fails generation; `spec.UnresolvedDefault`; revision table reads the constants |
+| W3-club1-03, -04, -05, -07, -08 | 58aa47df | ColorControl scene invalidation; GoTo percentage without PA; ClosureControl target kept; NaN null; Pressure / concentration within Min/Max |
+| W3-club2-03, -04, -05, -06 | 42aaec0d | ResetCondition stamps LastChangedTime; DefaultOpenDuration no-op; `BD-Matter-ModeSelect-HostOwnsTheMode` |
+| W3-clua1-03, -04, W3-clua2-03 | 67688d49 | LocalTemperature null under LTNE; SetpointRaiseLower in int; DoorState only on change |
+
+Not fixed here: W3-clucore-10 (`cluster/core/basic_information.go` is W1's;
+the dead LocalConfigDisabled arm stays for the W1 PR or a follow-up). Notes
+W3-clusec-09/10, clucore-06/07/09/12/13, clugen-04/05/06/09/10, club1-09/10,
+clua2-04 stay open.
