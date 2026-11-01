@@ -73,7 +73,35 @@ func attributeValueReader(path im.ConcreteAttributePath, el tlv.Element, dec *tl
 		// (MatterScheduleConfiguration, brief CO), decodes the same way.
 		return generatedAttributeValue(thermostatdef.Definition, path.Attribute, el, dec, false)
 	}
+	if v, over := overlongBeforeIS1(path, el); over {
+		return v, nil
+	}
 	return primitiveAttributeValue(el, dec)
+}
+
+// overlongBeforeIS1 refuses a character string the decoder cut at its
+// first IS1 when the string as it arrived exceeds the attribute's maximum
+// length: matter.js decodes a write with the attribute's TlvString, which
+// checks `value.length > maxLength` before it slices at the IS1
+// (packages/types/src/tlv/TlvString.ts:57-69 at 862ad75f) and answers the
+// ValidationOutOfBoundsError CONSTRAINT_ERROR. The value is an
+// [undecodedValue], which the server's write check answers
+// CONSTRAINT_ERROR. Attributes of a cluster no registered definition
+// describes, and strings that fit, pass through truncated.
+func overlongBeforeIS1(path im.ConcreteAttributePath, el tlv.Element) (im.AttributeValue, bool) {
+	if el.RawLength == 0 || el.Type < tlv.TypeUTF8Str1 || el.Type > tlv.TypeUTF8Str8 {
+		return im.AttributeValue{}, false
+	}
+	def := spec.Lookup(path.Cluster)
+	if def == nil {
+		return im.AttributeValue{}, false
+	}
+	a := def.Attribute(path.Attribute)
+	if a == nil || !a.Constraint.Max.IsInt() || int64(el.RawLength) <= a.Constraint.Max.Int {
+		return im.AttributeValue{}, false
+	}
+	return im.AttributeValue{Value: undecodedValue{fmt.Errorf("%s: %s is %d long before its IS1, max %d",
+		def.Name, a.Name, el.RawLength, a.Constraint.Max.Int)}}, true
 }
 
 // undecodedValue stands in for a structured write value its generated

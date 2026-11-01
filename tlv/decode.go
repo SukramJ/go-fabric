@@ -217,6 +217,8 @@ func (d *Decoder) readValue(el *Element) error { //nolint:funlen // wire/dispatc
 		// packages/types/src/tlv/TlvString.ts decodeTlvInternalValue (#3977).
 		// Octet strings are left untouched.
 		if i := bytes.IndexByte(body, 0x1F); i >= 0 {
+			// The length a bounded consumer checks first (TlvString.ts:59-63).
+			el.RawLength = utf16Length(decodeUTF8(body))
 			body = body[:i]
 		}
 		// Ill-formed UTF-8 reads as U+FFFD, as matter.js's TextDecoder

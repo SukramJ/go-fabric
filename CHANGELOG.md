@@ -34,6 +34,7 @@ Findings of the whole-codebase review of 2026-11-01 (`notes/review/2026-11/`).
 - `mattercert.NewVerifierFromRCAC(rcac, ts)`: a verifier that also knows the root's subjectKeyIdentifier and checks the chain's authorityKeyIdentifiers against it, as matter.js does; `NewVerifier` stays for callers that hold the root's public key only (W1-sec-03).
 - `message.ErrUnicastGroupDestination`, `message.ErrGroupSessionHeader`: the header shapes matter.js's decoder discards (W1-wire-01).
 - `mrp.AckTracker.Owes`: whether an exchange still owes an ack (W1-conc-03).
+- `tlv.Element.RawLength`: the length, in UTF-16 code units, of a character string the decoder cut at its IS1 (W1-wire-04).
 
 ### Changed
 
@@ -51,6 +52,7 @@ Findings of the whole-codebase review of 2026-11-01 (`notes/review/2026-11/`).
 - `transport/udp`, `bridge`: a read error the socket survives is logged at warn and the serve loop keeps reading, as chip's UDP transport does; only a closed descriptor or 100 failed reads in a row end it, and the bridge logs that exit at warn instead of debug (W1-conc-05).
 - `tlv`: `PutUTF8Bounded` with a maximum of 0 or less writes the string unbounded, as `PutUTF8WithMax`; a negative maximum from a server's `BoundedString` panicked the Read encoder (W1-wire-02).
 - `tlv`: `PutUTF8`, `PutUTF8WithMax` and `PutUTF8Bounded` write each ill-formed UTF-8 sequence as U+FFFD, as matter.js's TextEncoder-based encoder can write nothing else; a bounded string ill-formed from its first byte was trimmed to "" (W1-wire-03).
+- `tlv`, `cluster/spec`, `bridge`, `cluster/core`: a character string that carries an IS1 is bounded by the length it arrived with before it is cut at the IS1, as matter.js's TlvString checks it — a 40-byte NodeLabel whose sixth byte is 0x1F is CONSTRAINT_ERROR instead of the accepted "ABCDE"; `DecodeStringIn` and the bridge's attribute-write decoder check it, and BasicInformation answers a NodeLabel or Location value its schema refused CONSTRAINT_ERROR (W1-wire-04).
 
 ## [0.15.6] — 2026-11-01
 
