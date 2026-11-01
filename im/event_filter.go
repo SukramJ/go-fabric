@@ -90,47 +90,10 @@ func readDataVersionFilterFields(dec *tlv.Decoder) (DataVersionFilter, error) {
 			if !el.IsContainer || el.Type != tlv.TypeList {
 				return DataVersionFilter{}, &FieldError{Status: StatusInvalidAction, Tag: 0, Reason: "ClusterPathIB not a list"}
 			}
-			var hasEndpoint, hasCluster bool
-			for {
-				inner, innerErr := dec.Next()
-				if innerErr != nil {
-					return DataVersionFilter{}, innerErr
-				}
-				if inner.IsEndContainer {
-					if !hasEndpoint {
-						return DataVersionFilter{}, missingField(1, "ClusterPathIB.Endpoint")
-					}
-					if !hasCluster {
-						return DataVersionFilter{}, missingField(2, "ClusterPathIB.Cluster")
-					}
-					hasPath = true
-					break
-				}
-				if inner.Tag.Kind != tlv.TagKindContext {
-					if err := skipField(dec, inner); err != nil {
-						return DataVersionFilter{}, err
-					}
-					continue
-				}
-				// Type- and range-checked, never masked (review
-				// 2026-11 W2-wire-03): matter.js
-				// packages/types/src/protocol/types/TlvClusterPath.ts:16-17
-				// (TlvEndpointNumber, TlvClusterId).
-				var fieldErr error
-				switch uint8(inner.Tag.Number & 0xFF) {
-				case 1: // EndpointID
-					f.Endpoint, fieldErr = uint16Field(inner)
-					hasEndpoint = true
-				case 2: // ClusterID
-					f.Cluster, fieldErr = uint32Field(inner)
-					hasCluster = true
-				default:
-					fieldErr = skipField(dec, inner)
-				}
-				if fieldErr != nil {
-					return DataVersionFilter{}, fieldErr
-				}
+			if f.Endpoint, f.Cluster, err = readClusterPathFields(dec); err != nil {
+				return DataVersionFilter{}, err
 			}
+			hasPath = true
 		case 1: // DataVersion (uint32)
 			v, err := uint32Field(el)
 			if err != nil {
@@ -142,6 +105,49 @@ func readDataVersionFilterFields(dec *tlv.Decoder) (DataVersionFilter, error) {
 			if err := skipField(dec, el); err != nil {
 				return DataVersionFilter{}, err
 			}
+		}
+	}
+}
+
+// readClusterPathFields parses a ClusterPathIB after its list opener has
+// been consumed: endpoint (tag 1) and cluster (tag 2) are mandatory and
+// type- and range-checked (matter.js
+// packages/types/src/protocol/types/TlvClusterPath.ts:16-17; review
+// 2026-11 W2-wire-03, W2-wire-04). Other fields are skipped.
+func readClusterPathFields(dec *tlv.Decoder) (endpoint uint16, cluster uint32, err error) {
+	var hasEndpoint, hasCluster bool
+	for {
+		inner, nextErr := dec.Next()
+		if nextErr != nil {
+			return 0, 0, nextErr
+		}
+		if inner.IsEndContainer {
+			if !hasEndpoint {
+				return 0, 0, missingField(1, "ClusterPathIB.Endpoint")
+			}
+			if !hasCluster {
+				return 0, 0, missingField(2, "ClusterPathIB.Cluster")
+			}
+			return endpoint, cluster, nil
+		}
+		if inner.Tag.Kind != tlv.TagKindContext {
+			if skipErr := skipField(dec, inner); skipErr != nil {
+				return 0, 0, skipErr
+			}
+			continue
+		}
+		switch uint8(inner.Tag.Number & 0xFF) {
+		case 1: // EndpointID
+			endpoint, err = uint16Field(inner)
+			hasEndpoint = true
+		case 2: // ClusterID
+			cluster, err = uint32Field(inner)
+			hasCluster = true
+		default:
+			err = skipField(dec, inner)
+		}
+		if err != nil {
+			return 0, 0, err
 		}
 	}
 }

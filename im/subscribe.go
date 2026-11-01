@@ -126,7 +126,7 @@ func (r SubscribeRequest) MarshalTLV(enc *tlv.Encoder) {
 }
 
 // UnmarshalSubscribeRequestTLV decodes a SubscribeRequestMessage.
-func UnmarshalSubscribeRequestTLV(dec *tlv.Decoder) (SubscribeRequest, error) { //nolint:gocognit,gocyclo // wire/dispatch table over many attribute/opcode cases
+func UnmarshalSubscribeRequestTLV(dec *tlv.Decoder) (SubscribeRequest, error) { //nolint:gocognit,gocyclo,funlen // wire/dispatch table over many attribute/opcode cases
 	open, err := dec.Next()
 	if err != nil {
 		return SubscribeRequest{}, err

@@ -41,8 +41,8 @@ func mkEventFiring(endpoint uint16, cluster, event uint32, priority im.EventPrio
 // newEventManager builds a manager whose event source is a fresh event
 // log, and the function that emits an event the way the bridge does:
 // append to the log, then fan the numbered firing out.
-func newEventManager(cfg subscription.Config) (*subscription.Manager, func(subscription.EventFiring)) {
-	m := subscription.NewManager(cfg, nil, nil)
+func newEventManager(cfg subscription.Config) (m *subscription.Manager, fire func(subscription.EventFiring)) {
+	m = subscription.NewManager(cfg, nil, nil)
 	log := im.NewEventLog()
 	m.SetEventSource(log)
 	return m, func(ev subscription.EventFiring) {

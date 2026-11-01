@@ -97,22 +97,18 @@ type Subscription struct {
 	closed             bool
 }
 
-// markDirty records that an attribute path has a pending change.
-// Returns true on first transition from clean to dirty.
-func (s *Subscription) markDirty(path im.ConcreteAttributePath) (firstDirty bool) {
+// markDirty records that an attribute path has a pending change. The
+// engine's tick finds it; nothing needs waking.
+func (s *Subscription) markDirty(path im.ConcreteAttributePath) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.closed {
-		return false
+		return
 	}
 	if s.pendingDirty == nil {
 		s.pendingDirty = make(map[im.ConcreteAttributePath]struct{})
 	}
-	if _, in := s.pendingDirty[path]; in {
-		return false
-	}
 	s.pendingDirty[path] = struct{}{}
-	return len(s.pendingDirty) == 1
 }
 
 // heartbeatIntervalElapsed reports whether the publisher-initiated
