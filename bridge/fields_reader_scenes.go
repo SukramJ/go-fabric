@@ -12,9 +12,12 @@ import (
 )
 
 // ScenesManagement (0x0062) command payloads (scenes-management.element.ts).
-// The server relaxes SceneId, TransitionTime and SceneName constraints and
-// answers them in its responses (ScenesManagementServer.ts schema
-// extension), so the decoders only check the wire types.
+// The server holds SceneId, TransitionTime and SceneName to their
+// constraints itself and answers a violation with CONSTRAINT_ERROR in its
+// response rather than as the invoke's status (ScenesManagementServer.ts
+// schema extension; the SceneName bound as connectedhomeip's
+// ScenesManagementCluster.cpp:535-541), so the decoders only check the
+// wire types.
 
 // scenesNode is one decoded element of a command payload, with its children
 // when it is a container.

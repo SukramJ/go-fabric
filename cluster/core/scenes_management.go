@@ -682,7 +682,17 @@ func (s *ScenesManagement) groupValid(ctx context.Context, fabric uint8, groupID
 
 func (s *ScenesManagement) addScene(ctx context.Context, fabric uint8, req AddSceneRequest) SceneStatusResponse {
 	resp := SceneStatusResponse{Command: scenesCmdAddScene, GroupID: req.GroupID, SceneID: req.SceneID}
-	if req.SceneID > scenesMaxSceneID || req.TransitionTime > scenesMaxTransition {
+	// A SceneName over 16 is refused with the SceneID and TransitionTime
+	// bounds, as connectedhomeip refuses it
+	// (src/app/clusters/scenes-server/ScenesManagementCluster.cpp:535-541
+	// at 6170af84); it used to be cut to 16 and stored with SUCCESS.
+	// matter.js relaxes the request field so that its behaviour answers
+	// the status (ScenesManagementServer.ts:129-147 at 862ad75f) but then
+	// checks only SceneID and TransitionTime (:283); see
+	// notes/parity/by_design.md BD-chip-ScenesManagement-SceneNameLength.
+	// The length counts UTF-16 units, as matter.js's string constraint
+	// counts them (constraint.ts:199-211).
+	if req.SceneID > scenesMaxSceneID || req.TransitionTime > scenesMaxTransition || len(utf16.Encode([]rune(req.SceneName))) > scenesMaxNameLength {
 		resp.Status = im.StatusConstraintError
 		return resp
 	}
@@ -696,9 +706,6 @@ func (s *ScenesManagement) addScene(ctx context.Context, fabric uint8, req AddSc
 		return resp
 	}
 	name := req.SceneName
-	if len(utf16.Encode([]rune(name))) > scenesMaxNameLength {
-		name = string(utf16.Decode(utf16.Encode([]rune(name))[:scenesMaxNameLength]))
-	}
 	st := s.cfg.State
 	st.mu.Lock()
 	defer st.mu.Unlock()

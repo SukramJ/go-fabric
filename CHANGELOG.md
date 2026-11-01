@@ -42,6 +42,7 @@ Findings of the whole-codebase review of 2026-11-01 (`notes/review/2026-11/`).
 - `cluster/spec`, `script/clustergen`: a constraint bound stated as an expression — arithmetic, `maxOf` / `minOf`, a power such as `2^62` — is computed against the sibling attributes, and a temperature or percentage bound is restated in the type's units; such bounds admitted every value (W3-clugen-01).
 - `cluster/core`: a BridgedDeviceBasicInformation NodeLabel write over 32 bytes answers ConstraintError, as the root BasicInformation does; it answered FAILURE (W3-clucore-01).
 - `cluster/core`: an IdentifyTime write runs the host's `contract.IdentifyHandler` as the Identify command does (a refusal refuses the write), and the countdown reaching zero calls it with 0; only the command reached the host (W3-clucore-02).
+- `cluster/core`: AddScene answers ConstraintError for a SceneName over 16 and stores nothing, as connectedhomeip does; the name was cut to 16 and stored with SUCCESS (W3-clucore-03).
 
 ## [0.15.6] — 2026-11-01
 
