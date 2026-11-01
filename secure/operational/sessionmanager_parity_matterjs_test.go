@@ -163,7 +163,13 @@ func TestSessionManagerWallClockSteps(t *testing.T) {
 		m := NewManager(newMinimalFakeStore())
 		clk := clocktest.New(time.UnixMilli(1_700_000_000_000))
 		m.SetClock(clk)
-		sessionManagerOpen(t, m, 0x0100, 0x1234, 0x0100, false)
+		e := sessionManagerOpen(t, m, 0x0100, 0x1234, 0x0100, false)
+		// A secure session counts its peer active from creation
+		// (NodeSession.ts:120); the matter.js case resets it to model a
+		// peer never heard from (`session.activeTimestamp = 0`).
+		e.mu.Lock()
+		e.lastPeerActivity = time.Time{}
+		e.mu.Unlock()
 		clk.Set(clk.Now().Add(time.Hour)) // the wall clock steps one hour forward
 		infos := m.Sessions()
 		if len(infos) != 1 || !infos[0].LastPeerActivity.IsZero() {

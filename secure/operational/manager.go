@@ -304,10 +304,11 @@ type Entry struct {
 	// Mirrors chip src/transport/SecureSession.h:240-248 MarkActive /
 	// MarkActiveRx.
 	lastActivity time.Time
-	// lastPeerActivity is updated only on inbound decrypts — the
-	// peer-active determination for MRP interval selection needs the
-	// time the PEER last sent, not our own transmissions. Mirrors
-	// chip SecureSession GetLastPeerActivityTime.
+	// lastPeerActivity is set when the session is created and then
+	// updated only on inbound decrypts — the peer-active determination
+	// for MRP interval selection needs the time the PEER last sent, not
+	// our own transmissions. Mirrors chip SecureSession
+	// GetLastPeerActivityTime and matter.js NodeSession.ts:120.
 	lastPeerActivity time.Time
 	// peerIdleIntervalMs / peerActiveIntervalMs / peerActiveThresholdMs
 	// carry the peer's advertised MRP session parameters (Sigma1 /
@@ -581,7 +582,11 @@ func (m *Manager) OpenFromSigma(fabricIndex uint8, localNodeID, peerNodeID uint6
 		// (matter.js NodeSession.ts:82).
 		AttestationChallenge: append([]byte(nil), keys.AttestationChallenge[:]...),
 		createdAt:            m.clk().Now(),
-		clock:                m.clk(),
+		// The peer counts active from the session's creation: matter.js
+		// NodeSession.ts:120 ("We always set the active timestamp for Secure
+		// sessions"), chip SecureSession.h:349 (mLastPeerActivityTime = now).
+		lastPeerActivity: m.clk().Now(),
+		clock:            m.clk(),
 	}
 	m.sessions[id] = entry
 	excess := m.evictExcessPeerSessionsLocked(entry)
@@ -691,7 +696,11 @@ func (m *Manager) openFromSigma(id uint16, fabricIndex uint8, localNodeID, peerN
 		AttestationChallenge: append([]byte(nil), keys.AttestationChallenge[:]...),
 		isInitiator:          initiator,
 		createdAt:            m.clk().Now(),
-		clock:                m.clk(),
+		// The peer counts active from the session's creation: matter.js
+		// NodeSession.ts:120 ("We always set the active timestamp for Secure
+		// sessions"), chip SecureSession.h:349 (mLastPeerActivityTime = now).
+		lastPeerActivity: m.clk().Now(),
+		clock:            m.clk(),
 	}
 	m.mu.Lock()
 	// The pre-allocated id is in m.sessions as a placeholder Entry
@@ -759,7 +768,11 @@ func (m *Manager) OpenFromPase(localNodeID, peerNodeID uint64, peerSessionID uin
 		AttestationChallenge: append([]byte(nil), derived[32:48]...),
 		isPase:               true,
 		createdAt:            m.clk().Now(),
-		clock:                m.clk(),
+		// The peer counts active from the session's creation: matter.js
+		// NodeSession.ts:120 ("We always set the active timestamp for Secure
+		// sessions"), chip SecureSession.h:349 (mLastPeerActivityTime = now).
+		lastPeerActivity: m.clk().Now(),
+		clock:            m.clk(),
 	}
 	m.sessions[id] = entry
 	m.mu.Unlock()
@@ -803,7 +816,11 @@ func (m *Manager) OpenFromPaseWithID(id uint16, localNodeID, peerNodeID uint64, 
 		AttestationChallenge: append([]byte(nil), derived[32:48]...),
 		isPase:               true,
 		createdAt:            m.clk().Now(),
-		clock:                m.clk(),
+		// The peer counts active from the session's creation: matter.js
+		// NodeSession.ts:120 ("We always set the active timestamp for Secure
+		// sessions"), chip SecureSession.h:349 (mLastPeerActivityTime = now).
+		lastPeerActivity: m.clk().Now(),
+		clock:            m.clk(),
 	}
 	m.mu.Lock()
 	displaced := m.installEntryLocked(id, entry)
