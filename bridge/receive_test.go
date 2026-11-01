@@ -458,17 +458,44 @@ func TestDispatch_IMReadRoutes(t *testing.T) {
 }
 
 // TestDispatch_IMResponseOpcodeIsUnsupported verifies that a response
-// opcode (ReportData=0x05) surfaces ErrUnsupportedOpcode because the
-// bridge is never the read initiator in v1.1.
+// opcode (ReportData=0x05) opening an exchange is answered
+// StatusResponse(InvalidAction), and that one sent as the responder on an
+// exchange nothing waits for is dropped with ErrUnsupportedOpcode
+// (matter.js InteractionMessenger.ts:415-419; chip
+// InteractionModelEngine.cpp:1095-1099). Review 2026-11 W2-wire-02.
 func TestDispatch_IMResponseOpcodeIsUnsupported(t *testing.T) {
 	t.Parallel()
+	assertUnsupportedOpcodeAnswered(t, im.OpcodeReportData, 92)
+}
+
+// assertUnsupportedOpcodeAnswered drives opcode from a CASE peer twice: as
+// the initiator of a fresh exchange (answered InvalidAction) and as the
+// responder on an exchange nothing waits for (dropped, no reply).
+func assertUnsupportedOpcodeAnswered(t *testing.T, opcode uint8, sessionID uint16) {
+	t.Helper()
 	b := newStartedBridge(t)
-	proto := buildProtocolHeader(im.InteractionModelProtocolID, im.OpcodeReportData)
-	payload := []byte{0x01}
-	buf := secureTestDatagram(t, b, proto, payload)
-	err := b.dispatch(context.Background(), buf, nil)
-	if !errors.Is(err, ErrUnsupportedOpcode) {
-		t.Errorf("want ErrUnsupportedOpcode for ReportData opcode, got %v", err)
+	peerConn, peerSess, peerAddr := chunkTestPeer(t, b, sessionID)
+	request := encryptIMFromPeer(t, peerSess, sessionID, message.ProtocolHeader{
+		Opcode: opcode, ExchangeID: 0x2300, Initiator: true,
+	}, []byte{0x15, 0x18})
+	if err := b.dispatch(context.Background(), request, peerAddr); err != nil {
+		t.Fatalf("opcode %#x as initiator: dispatch = %v, want nil (answered)", opcode, err)
+	}
+	proto, payload, ok := readOneIMDatagram(t, peerConn, peerSess, 2*time.Second)
+	if !ok || proto.Opcode != im.OpcodeStatusResponse {
+		t.Fatalf("opcode %#x as initiator: no StatusResponse (got %#x, %v)", opcode, proto.Opcode, ok)
+	}
+	if status := decodeStatusResponseCode(t, payload); status != im.StatusInvalidAction {
+		t.Errorf("opcode %#x: status = %v, want InvalidAction", opcode, status)
+	}
+	responder := encryptIMFromPeer(t, peerSess, sessionID, message.ProtocolHeader{
+		Opcode: opcode, ExchangeID: 0x2301, Initiator: false,
+	}, []byte{0x15, 0x18})
+	if err := b.dispatch(context.Background(), responder, peerAddr); !errors.Is(err, ErrUnsupportedOpcode) {
+		t.Errorf("opcode %#x as responder: dispatch = %v, want ErrUnsupportedOpcode", opcode, err)
+	}
+	if proto, _, ok := readOneIMDatagram(t, peerConn, peerSess, 200*time.Millisecond); ok && proto.ProtocolID == im.InteractionModelProtocolID {
+		t.Errorf("opcode %#x as responder: answered with IM opcode %#x, want no reply", opcode, proto.Opcode)
 	}
 }
 
@@ -532,17 +559,11 @@ func TestDispatch_IMSubscribeReplies(t *testing.T) {
 }
 
 // TestDispatch_IMInvalidOpcode verifies that an unknown IM opcode (0xFF)
-// surfaces ErrUnsupportedOpcode.
+// opening an exchange is answered StatusResponse(InvalidAction), as a
+// response opcode is (W2-wire-02).
 func TestDispatch_IMInvalidOpcode(t *testing.T) {
 	t.Parallel()
-	b := newStartedBridge(t)
-	proto := buildProtocolHeader(im.InteractionModelProtocolID, 0xFF)
-	payload := []byte{0x00}
-	buf := secureTestDatagram(t, b, proto, payload)
-	err := b.dispatch(context.Background(), buf, nil)
-	if !errors.Is(err, ErrUnsupportedOpcode) {
-		t.Errorf("want ErrUnsupportedOpcode for opcode 0xFF, got %v", err)
-	}
+	assertUnsupportedOpcodeAnswered(t, 0xFF, 93)
 }
 
 // TestDispatch_NoDispatcherDropsSilently verifies that when the bridge
