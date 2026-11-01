@@ -30,6 +30,10 @@ var (
 //   - :481-488 encodePacketHeader — a group-session header must carry the
 //     destination group id and the source node id and no destination node
 //     id ([ErrGroupHeader]);
+//   - a unicast header naming a destination group id is refused
+//     ([ErrUnicastGroupDestination]): matter.js cannot build one, and its
+//     decoder (MessageCodec.ts:223-225 at 862ad75f) and chip's
+//     (MessageHeader.cpp:209-212 at 6170af84) discard it;
 //   - :489-504 — the bytes are [Header.Marshal]'s: Message Flags, Session
 //     ID, Security Flags, Message Counter, Source Node ID, the destination.
 //
@@ -40,6 +44,9 @@ func (h Header) MarshalPacket() ([]byte, error) {
 	}
 	if h.SessionType == SessionGroup && (h.DestSize != DestGroup || !h.HasSourceNodeID) {
 		return nil, ErrGroupHeader
+	}
+	if h.SessionType == SessionUnsecured && h.DestSize == DestGroup {
+		return nil, ErrUnicastGroupDestination
 	}
 	return h.Marshal(), nil
 }
