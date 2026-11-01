@@ -91,14 +91,14 @@ func TestTopologyDispatcher_CheckACL(t *testing.T) {
 		// line in the composition root whose removal nothing observed.
 		{"nil lister denies operational access", nil, 1, peerA, nil, onOff, privManage, im.StatusUnsupportedAccess},
 		{"nil lister denies even a view read", nil, 1, peerA, nil, onOff, privView, im.StatusUnsupportedAccess},
-		// Commissioning runs over PASE and is decided before the source is
-		// consulted, so a bridge that has never been commissioned can still
-		// be commissioned with no ACL source wired.
-		{"nil lister still admits PASE commissioning", nil, 0, 0, nil, onOff, privManage, im.StatusSuccess},
+		// Fabric 0 is no grant: the implicit Administer is keyed on the
+		// PASE auth mode (TestPASEStillPassesTheAccessCheck), not on a
+		// missing fabric (review 2026-11 W2-sec-03).
+		{"nil lister denies fabric 0 without the PASE auth mode", nil, 0, 0, nil, onOff, privManage, im.StatusUnsupportedAccess},
 		// The deliberate opt-out: a setup that runs without stored entries
 		// says so, and then behaves as an all-granting fabric.
 		{"unenforced lister grants", UnenforcedACL{}, 1, peerA, nil, onOff, privManage, im.StatusSuccess},
-		{"PASE fabric 0 bypass", fakeACLLister{}, 0, 0, nil, onOff, privManage, im.StatusSuccess},
+		{"fabric 0 without the PASE auth mode is denied", fakeACLLister{}, 0, 0, nil, onOff, privManage, im.StatusUnsupportedAccess},
 		{
 			"administer wildcard subjects grants operate",
 			fakeACLLister{entries: []store.ACLEntry{caseEntry(1, store.PrivilegeAdminister, nil)}},

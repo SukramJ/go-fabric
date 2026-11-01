@@ -397,12 +397,19 @@ func (b *Bridge) MatterEmitEvent(endpoint uint16, cluster, event uint32, data an
 func (b *Bridge) readAuthorizedResults(ctx context.Context, dispatcher im.Dispatcher, path im.ConcreteAttributePath) []im.ReadResult {
 	results := dispatcher.Read(ctx, path)
 	_, fabricIndex := im.FabricFilterFromContext(ctx)
-	if fabricIndex == 0 || im.IsPASEFromContext(ctx) {
+	if im.IsPASEFromContext(ctx) {
 		return results // PASE — commissioning channel, implicit Administer
 	}
 	aclChecker, hasACL := dispatcher.(im.ACLChecker)
 	if !hasACL {
 		return results
+	}
+	if fabricIndex == 0 {
+		// No accessing fabric and not PASE: no subject the ACL could grant
+		// anything to (matter.js FabricAccessControl.ts:189-191 keys the
+		// implicit grant on the PASE auth mode only; review 2026-11
+		// W2-sec-03).
+		return nil
 	}
 	subjectNodeID, subjectCATs := im.SubjectFromContext(ctx)
 	privProvider, hasPriv := dispatcher.(im.AttributeReadPrivilegeProvider)
@@ -1520,11 +1527,10 @@ func filterPathsByNotifierCluster(notifier contract.ChangeNotifier, paths []im.C
 
 // resolveSessionFabric maps an active SessionID to its operational
 // FabricIndex via the [SessionFabricResolver] optional capability.
-// Falls back to 0 (pre-fabric / PASE) when:
-//
-//   - sessionID == 0 (unsecured channel),
-//   - the wired SessionLookup does not implement the resolver,
-//   - the resolver reports the session as unknown.
+// Answers 0 for sessionID 0 (the unsecured channel) and for a session
+// the resolver reports as unknown or without a fabric (a PASE session
+// before AddNOC), and [endpointpkg.FabricIndexUnresolvable] when the
+// wired SessionLookup has no working resolver at all.
 //
 // Used by Subscribe to scope per-fabric subscription quotas correctly,
 // and by any other fabric-aware path that doesn't have a richer
@@ -1535,7 +1541,6 @@ func (b *Bridge) resolveSessionFabric(sessionID uint16) uint8 {
 	}
 	b.mu.RLock()
 	sessions := b.sessions
-	acl := b.aclLister
 	b.mu.RUnlock()
 
 	resolver, ok := sessions.(SessionFabricResolver)
@@ -1547,19 +1552,14 @@ func (b *Bridge) resolveSessionFabric(sessionID uint16) uint8 {
 		}
 	}
 	if !ok {
-		// The bridge cannot name this session's fabric. Returning 0 would say
-		// "PASE, still commissioning", and CheckACL answers Success to that —
-		// so an unresolvable CASE session would be waved through with the
-		// access check never applied. Where no ACL is attached that is
-		// harmless (CheckACL denies everything operational anyway); where one
-		// is, it is the whole of the access control silently not happening.
-		//
-		// FabricIndexUnresolvable says "not known" instead, and CheckACL
-		// denies it.
-		if acl != nil {
-			return endpointpkg.FabricIndexUnresolvable
-		}
-		return 0
+		// The bridge cannot name this session's fabric. FabricIndexUnresolvable
+		// says "not known", and the ACL gates deny it — whether or not an ACL
+		// lister is attached (review 2026-11 W2-sec-03): only a PASE session
+		// carries the commissioning channel's implicit Administer, never a
+		// session whose fabric is missing. Mirrors matter.js
+		// packages/protocol/src/interaction/FabricAccessControl.ts:189-191
+		// (`authMode === Pase && isCommissioning`).
+		return endpointpkg.FabricIndexUnresolvable
 	}
 	idx, _ := resolver.FabricFor(sessionID)
 	return idx
@@ -1570,9 +1570,9 @@ func (b *Bridge) resolveSessionFabric(sessionID uint16) uint8 {
 // the lookup does not implement [SessionSubjectResolver] or the
 // session is unknown. Used by the receive pipeline to stamp the
 // subject into the IM dispatcher's context so [TopologyDispatcher.
-// CheckACL] can enforce per-subject ACEs (Matter §9.10.5.6). PASE
-// sessions (sessionID==0) return (0, nil) — the ACL gate's
-// fabricIndex==0 bypass applies.
+// CheckACL] can enforce per-subject ACEs (Matter §9.10.5.6). Session 0
+// returns (0, nil); a PASE session is granted by its auth mode
+// ([Bridge.resolveSessionPASE]), not by its subject.
 func (b *Bridge) resolveSessionSubject(sessionID uint16) (nodeID uint64, cats []uint32) {
 	if sessionID == 0 {
 		return 0, nil
@@ -1597,8 +1597,8 @@ func (b *Bridge) resolveSessionSubject(sessionID uint16) (nodeID uint64, cats []
 // packages/protocol/src/interaction/FabricAccessControl.ts:189-191 keys
 // that grant on the auth mode, not on the fabric.
 //
-// sessionID==0 is the unencrypted / pre-session path, which the
-// fabricIndex==0 bypass already covers.
+// sessionID==0 is the unencrypted path, which carries no IM at all
+// (the receive path drops it before decode).
 func (b *Bridge) resolveSessionPASE(sessionID uint16) bool {
 	if sessionID == 0 {
 		return false

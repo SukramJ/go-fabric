@@ -755,26 +755,32 @@ type EventPathChecker interface {
 
 // Allows reports whether the accessing subject may read the events of
 // (endpoint, cluster): the event read privilege — View, Administer for
-// AccessControl and Groupcast — checked against the ACL. A PASE session, a
-// zero fabric or a missing checker allows, as AuthorizeEventReports does.
+// AccessControl and Groupcast — checked against the ACL. A PASE session or
+// a missing checker allows, as AuthorizeEventReports does; a session
+// without an accessing fabric that is not PASE is denied.
 func (a EventReadAuthorizer) Allows(ctx context.Context, endpoint uint16, cluster uint32) bool {
 	return a.allowsAt(ctx, endpoint, cluster, eventReadPrivilege(cluster))
 }
 
 // allowsAt is Allows at privilege.
 func (a EventReadAuthorizer) allowsAt(ctx context.Context, endpoint uint16, cluster uint32, privilege uint8) bool {
-	if a.FabricIndex == 0 || a.PASE || IsPASEFromContext(ctx) || a.Checker == nil {
+	// PASE is the only implicit grant: matter.js
+	// packages/protocol/src/interaction/FabricAccessControl.ts:189-191
+	// keys it on `authMode === Pase && isCommissioning`, never on a
+	// missing fabric (review 2026-11 W2-sec-03).
+	if a.PASE || IsPASEFromContext(ctx) || a.Checker == nil {
 		return true
 	}
-	return a.Checker.CheckACL(ctx, a.FabricIndex, a.SubjectNodeID, a.SubjectCATs, endpoint, cluster, privilege).IsSuccess()
+	return checkSubjectACL(ctx, a.Checker, a.FabricIndex, a.SubjectNodeID, a.SubjectCATs, endpoint, cluster, privilege).IsSuccess()
 }
 
 // AuthorizeEventReports filters events down to those the accessing subject may
 // read and drops fabric-sensitive records that belong to another fabric.
 // Denied paths/records are SILENTLY OMITTED — a wildcard event read discloses
 // only authorized events (Matter §8.4.3.2), never an error status. A PASE
-// session (FabricIndex==0, or PASE / [IsPASEFromContext] once AddNOC adopted
-// it onto a fabric) or a nil Checker returns every event unchanged.
+// session (PASE / [IsPASEFromContext], also once AddNOC adopted it onto a
+// fabric) or a nil Checker returns every event unchanged; a session
+// without an accessing fabric that is not PASE reads none.
 //
 // (a) ACL gate: each event is gated at its read privilege — View by default,
 //
@@ -789,13 +795,13 @@ func (a EventReadAuthorizer) allowsAt(ctx context.Context, endpoint uint16, clus
 //	accessing fabric is never disclosed. Mirrors EventReadResponse.ts
 //	#readAllowedEvents (payload.fabricIndex !== accessingFabricIndex → skip).
 func AuthorizeEventReports(ctx context.Context, auth EventReadAuthorizer, events []EventReport) []EventReport {
-	if auth.FabricIndex == 0 || auth.PASE || IsPASEFromContext(ctx) || auth.Checker == nil {
+	if auth.PASE || IsPASEFromContext(ctx) || auth.Checker == nil {
 		return append([]EventReport(nil), events...)
 	}
 	out := make([]EventReport, 0, len(events))
 	for _, ev := range events {
 		priv := eventReadPrivilege(ev.Path.Cluster)
-		if status := auth.Checker.CheckACL(ctx, auth.FabricIndex, auth.SubjectNodeID, auth.SubjectCATs, ev.Path.Endpoint, ev.Path.Cluster, priv); !status.IsSuccess() {
+		if status := checkSubjectACL(ctx, auth.Checker, auth.FabricIndex, auth.SubjectNodeID, auth.SubjectCATs, ev.Path.Endpoint, ev.Path.Cluster, priv); !status.IsSuccess() {
 			continue // subject not permitted to read this event — omit
 		}
 		if isFabricSensitiveEventCluster(ev.Path.Cluster) {
