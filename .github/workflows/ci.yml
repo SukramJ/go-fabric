@@ -135,7 +135,17 @@ jobs:
       # which cannot also carry the coverage instrumentation this reads), so
       # it is its own job rather than a step appended to that one.
       - name: coverage floor
-        run: make cover-check
+        run: |
+          # DIAG (temporary): the OTA test under the suite's load, repeated.
+          make cover-check > cover-check.log 2>&1 &
+          pid=$!
+          for i in $(seq 1 12); do
+            echo "=== DIAG iteration $i"
+            go test -count=1 -cover ./controller -run 'TestOTACancelByRemovingConsentParity$' -v 2>&1 | grep -E "DIAG|^(--- |ok|FAIL)|site.go:|ota_parity" | cut -c1-400 || true
+          done
+          wait $pid; rc=$?
+          tail -5 cover-check.log
+          exit $rc
 
   bench:
     name: bench (smoke)
