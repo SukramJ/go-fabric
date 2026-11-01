@@ -210,6 +210,7 @@ type Server struct {
 // Compile-time assertions.
 var (
 	_ contract.ClusterServer                  = (*Server)(nil)
+	_ contract.ClusterQuiescer                = (*Server)(nil)
 	_ contract.ClusterDataVersion             = (*Server)(nil)
 	_ contract.ClusterAttributeLister         = (*Server)(nil)
 	_ contract.ClusterCommandLister           = (*Server)(nil)
@@ -820,3 +821,11 @@ func (s *Server) RemoveSupportedMapsEntry(mapID uint32) {
 
 // The host methods the typed server's Host returns (brief CK-2).
 var _ sa.Host = (*Server)(nil)
+
+// MatterQuiesce implements [contract.ClusterQuiescer]: the bridge calls it
+// when the server leaves the topology or stops, and it disarms the
+// EstimatedEndTime throttle's deferred report ([cluster.Quieter.Stop]), the
+// one timer the server runs, so it does not report after the bridge let
+// the server go. matter.js stops a behaviour's timers on dispose
+// (SwitchServer.ts:379-384 at 862ad75f is the pattern; W3-club2-02).
+func (s *Server) MatterQuiesce() { s.quiet.Stop() }

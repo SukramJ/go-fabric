@@ -44,6 +44,7 @@ Findings of the whole-codebase review of 2026-11-01 (`notes/review/2026-11/`).
 - `cluster/core`: an IdentifyTime write runs the host's `contract.IdentifyHandler` as the Identify command does (a refusal refuses the write), and the countdown reaching zero calls it with 0; only the command reached the host (W3-clucore-02).
 - `cluster/core`: AddScene answers ConstraintError for a SceneName over 16 and stores nothing, as connectedhomeip does; the name was cut to 16 and stored with SUCCESS (W3-clucore-03).
 - `cluster/onoff`: On and Off invalidate the current scene when OnOff at command start differs from the target, so a Sink that echoes the change through `Set` no longer suppresses the invalidation (W3-club2-01).
+- `cluster/switch`, `cluster/sensing`, `cluster/servicearea`: Switch, AmbientContextSensing and ServiceArea implement `contract.ClusterQuiescer`, so the bridge stops their debounce, long-press, multi-press, hold-time and EstimatedEndTime timers when the server leaves the topology or the bridge stops; new `cluster.Quieter.Stop` (W3-club2-02).
 
 ## [0.15.6] — 2026-11-01
 

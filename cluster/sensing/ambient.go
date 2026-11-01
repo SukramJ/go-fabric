@@ -199,6 +199,7 @@ type AmbientContext struct {
 // Compile-time assertions.
 var (
 	_ contract.ClusterServer                  = (*AmbientContext)(nil)
+	_ contract.ClusterQuiescer                = (*AmbientContext)(nil)
 	_ contract.ClusterDataVersion             = (*AmbientContext)(nil)
 	_ contract.ClusterAttributeLister         = (*AmbientContext)(nil)
 	_ contract.ClusterEventLister             = (*AmbientContext)(nil)
@@ -944,8 +945,18 @@ func (c *AmbientContext) SetEndpoint(endpoint uint16) {
 	c.mu.Unlock()
 }
 
-// Close stops the hold-time timer (chip Shutdown, .cpp:90-98).
-func (c *AmbientContext) Close() {
+// Close stops the hold-time timer (chip Shutdown, .cpp:90-98); it is
+// [AmbientContext.MatterQuiesce].
+func (c *AmbientContext) Close() { c.MatterQuiesce() }
+
+// MatterQuiesce implements [contract.ClusterQuiescer]: the bridge calls it
+// when the server leaves the topology or stops, and it cancels the
+// hold-time timer, so no AmbientContextDetectEnded is emitted after the
+// bridge let the server go. Mirrors connectedhomeip
+// src/app/clusters/ambient-context-sensing-server/AmbientContextSensingCluster.cpp:90-98
+// at 6170af84 (Shutdown: mHoldTimeDelegate.CancelTimer); it used to have
+// no caller (W3-club2-02).
+func (c *AmbientContext) MatterQuiesce() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.gen++
