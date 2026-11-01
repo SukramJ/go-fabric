@@ -10,6 +10,8 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+## [0.15.6] — 2026-11-01
+
 ### Added
 
 - `camera.ErrPayloadTooLarge`: the camera's signal refused for not fitting one message of the session to the peer, the value of `bridge.ErrPayloadTooLarge`, so a camera host recognises it with `cluster/camera` alone and imports nothing of `bridge` (#356).
@@ -5168,7 +5170,8 @@ consumer of an older pseudo-version should read.
   earlier than it was. Both fields are gone; the commit holding the file is
   its provenance.
 
-[Unreleased]: https://github.com/SukramJ/go-fabric/compare/v0.15.5...HEAD
+[Unreleased]: https://github.com/SukramJ/go-fabric/compare/v0.15.6...HEAD
+[0.15.6]: https://github.com/SukramJ/go-fabric/compare/v0.15.5...v0.15.6
 [0.15.5]: https://github.com/SukramJ/go-fabric/compare/v0.15.4...v0.15.5
 [0.15.4]: https://github.com/SukramJ/go-fabric/compare/v0.15.3...v0.15.4
 [0.15.3]: https://github.com/SukramJ/go-fabric/compare/v0.15.2...v0.15.3
