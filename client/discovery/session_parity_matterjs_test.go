@@ -16,6 +16,7 @@ package discovery_test
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -851,5 +852,54 @@ func TestSessionDescriptions(t *testing.T) {
 	caps := discovery.CapabilitiesOf(0b101)
 	if !caps.SoftAP || caps.BLE || !caps.OnIPNetwork {
 		t.Fatalf("%+v", caps)
+	}
+}
+
+// syncLog collects log records under a lock.
+type syncLog struct {
+	mu   sync.Mutex
+	msgs []string
+}
+
+func (l *syncLog) Enabled(context.Context, slog.Level) bool { return true }
+func (l *syncLog) Handle(_ context.Context, r slog.Record) error {
+	l.mu.Lock()
+	l.msgs = append(l.msgs, r.Message)
+	l.mu.Unlock()
+	return nil
+}
+func (l *syncLog) WithAttrs([]slog.Attr) slog.Handler { return l }
+func (l *syncLog) WithGroup(string) slog.Handler      { return l }
+
+func (l *syncLog) count() int {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return len(l.msgs)
+}
+
+// TestSessionReleasesTheCallerBeforeTheOutcome pins that a discovery
+// stops listening to its caller's context before its outcome is visible:
+// a cancel after Wait returned reaches nothing of the session and logs
+// nothing (review W6-test-02 — the hook was released only after done
+// closed, and a cancel in between logged "interruption_ignored" into a
+// caller that had moved on, a DATA RACE in the reference controller's
+// test).
+func TestSessionReleasesTheCallerBeforeTheOutcome(t *testing.T) {
+	t.Parallel()
+	for range 50 {
+		log := &syncLog{}
+		ctx, cancel := context.WithCancel(context.Background())
+		tr := newFixed(deviceA)
+		tr.endsAtOnce = true
+		s := discovery.FindInstance(ctx, []discovery.Transport{tr}, discovery.SessionOptions{Timeout: 30 * time.Second, Logger: slog.New(log)})
+		if _, err := s.Wait(context.Background()); err != nil {
+			t.Fatalf("Wait: %v", err)
+		}
+		before := log.count()
+		cancel()
+		time.Sleep(time.Millisecond)
+		if after := log.count(); after != before {
+			t.Fatalf("the session logged %d record(s) after its outcome was delivered", after-before)
+		}
 	}
 }
