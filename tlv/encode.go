@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"log/slog"
 	"math"
-	"strings"
 	"unicode/utf8"
 )
 
@@ -226,12 +225,14 @@ func (e *Encoder) PutFloat64(tag Tag, v float64) {
 // the trim loops below stop on a rune boundary of a valid string. Mirrors
 // matter.js packages/general/src/util/Bytes.ts:125-131 at 862ad75f
 // (Bytes.fromString is `new TextEncoder().encode(string)`, which cannot
-// emit ill-formed UTF-8; TlvString encodes through it).
+// emit ill-formed UTF-8; TlvString encodes through it). The replacement is
+// the decoder's ([decodeUTF8]: one U+FFFD per maximal subpart), so what is
+// written reads back as the decoder would have read the raw bytes.
 func validUTF8(s string) string {
 	if utf8.ValidString(s) {
 		return s
 	}
-	return strings.ToValidUTF8(s, "\uFFFD")
+	return decodeUTF8([]byte(s))
 }
 
 // PutUTF8 writes a UTF-8 string element. The length-prefix width is

@@ -153,7 +153,8 @@ func TestPutUTF8Bounded_NonPositiveMaxIsUnbounded(t *testing.T) {
 // A character string is never emitted ill-formed: each ill-formed byte
 // sequence becomes U+FFFD, as matter.js's TextEncoder-based
 // Bytes.fromString (Bytes.ts:125-131 at 862ad75f) can produce nothing
-// else. The bounded writers trim the sanitised string, so an input that
+// else; each maximal subpart becomes one U+FFFD, as the decoder reads
+// them. The bounded writers trim the sanitised string, so an input that
 // is ill-formed from its first byte no longer trims to "".
 func TestPutUTF8_IllFormedInputIsSanitised(t *testing.T) {
 	t.Parallel()
@@ -176,8 +177,10 @@ func TestPutUTF8_IllFormedInputIsSanitised(t *testing.T) {
 		if err != nil {
 			t.Fatalf("%s: Bytes: %v", name, err)
 		}
-		if want := []byte{0x0C, 0x04, 0xEF, 0xBF, 0xBD, 0x61}; !bytes.Equal(b, want) {
-			t.Errorf("%s = % X, want % X (U+FFFD then \"a\")", name, b, want)
+		// "\xff\xfe" is two maximal subparts: U+FFFD U+FFFD "abc", trimmed
+		// to 4 bytes on a rune boundary.
+		if want := []byte{0x0C, 0x03, 0xEF, 0xBF, 0xBD}; !bytes.Equal(b, want) {
+			t.Errorf("%s = % X, want % X (one U+FFFD)", name, b, want)
 		}
 	}
 }
