@@ -208,8 +208,12 @@ func (i *Identify) MatterRead(attrID uint32) (any, bool) {
 // MatterWrite handles direct writes to IdentifyTime per Matter
 // §1.2.5.1. Spec wording: "The IdentifyTime attribute SHALL be in
 // units of seconds, and SHALL be writable." — clients drive Identify
-// either via the command or by setting the attribute directly.
-func (i *Identify) MatterWrite(_ context.Context, attrID uint32, value any) error {
+// either via the command or by setting the attribute directly, and the
+// host's handler sees both: matter.js reacts to identifyTime$Changed
+// whichever wrote it (IdentifyServer.ts:57-58 at 862ad75f), so the write
+// runs the handler as the Identify command does and a refusal refuses the
+// write with its status.
+func (i *Identify) MatterWrite(ctx context.Context, attrID uint32, value any) error {
 	if attrID != identifyAttrTime {
 		// IdentifyType is "R V": UNSUPPORTED_WRITE; any other id
 		// UNSUPPORTED_ATTRIBUTE, as the definition judges them.
@@ -219,6 +223,14 @@ func (i *Identify) MatterWrite(_ context.Context, attrID uint32, value any) erro
 	t, err := coerceUint16(value)
 	if err != nil {
 		return fmt.Errorf("core: Identify.IdentifyTime: %w", err)
+	}
+	// Mirrors matter.js packages/node/src/behaviors/identify/
+	// IdentifyServer.ts:57-58, :108-114 at 862ad75f: the attribute and the
+	// command reach one reactor (#identifyTimeChangedHandler).
+	if h := i.hostHandler(); h != nil {
+		if err := h.MatterIdentify(ctx, t); err != nil {
+			return err
+		}
 	}
 	i.identifyTime.Store(uint32(t))
 	i.maybeStartCountdown()
@@ -323,7 +335,18 @@ func (i *Identify) maybeStartCountdown() {
 					i.timerMu.Unlock()
 					return
 				}
-				i.identifyTime.Store(v - 1)
+				// A CompareAndSwap, so a write or command landing
+				// between the load and the store is not overwritten.
+				if !i.identifyTime.CompareAndSwap(v, v-1) || v != 1 {
+					continue
+				}
+				// The countdown reached zero: the host is told to stop,
+				// as matter.js's tick drives the reactor to
+				// #stopIdentifying (IdentifyServer.ts:100-114, :121-127
+				// at 862ad75f); 0 is the contract's "stops".
+				if h := i.hostHandler(); h != nil {
+					_ = h.MatterIdentify(context.Background(), 0) //nolint:errcheck // nothing to refuse: the countdown ended
+				}
 			}
 		}
 	}()
