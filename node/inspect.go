@@ -81,8 +81,9 @@ type SessionInfo struct {
 	// Subscriptions counts the subscriptions riding on the session.
 	Subscriptions int
 	// LastActivity is when the session last carried traffic in either
-	// direction, LastPeerActivity when the peer last sent; zero when none
-	// yet.
+	// direction, zero when none yet; LastPeerActivity when the peer last
+	// sent, counted from the session's creation (the peer is active
+	// then: matter.js NodeSession.ts:120, chip SecureSession.h:349).
 	LastActivity, LastPeerActivity time.Time
 	// Idle and PeerIdle are AsOf minus LastActivity and LastPeerActivity;
 	// 0 when the timestamp is zero.
