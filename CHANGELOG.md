@@ -10,6 +10,36 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+### Security
+
+Findings of the whole-codebase review of 2026-11-01 (`notes/review/2026-11/`).
+
+- `bridge`, `im`: an Interaction Model message on the unsecured session 0 is dropped before decode, as matter.js's `InteractionServer` requires a secure session; the IM ACL gate refuses a request without an accessing fabric that is not PASE with UnsupportedAccess instead of skipping the check (W2-wire-01).
+- `cluster/core`: an AccessControl ACL or Extension write without an accessing fabric answers UnsupportedAccess; it was scoped to the entries' own fabric or to fabric 1 (W3-clusec-01).
+- `node`: CommissioningComplete closes the PASE sessions — the one AddNOC adopted onto the fabric included — after the response, and the fail-safe expiry closes them too; they kept their implicit Administer grant (W2-sec-02, W6-reg-01).
+- `cluster/core`: UpdateNOC answers ConstraintError when the session's fabric is not the fail-safe's, and MissingCsr after AddTrustedRootCertificate in the same fail-safe (W3-clusec-02).
+- `cluster/core`, `cluster/threadbr`, `cluster/jointfabric`: CSRRequest, AddNOC, AddTrustedRootCertificate, SetActiveDatasetRequest, ICACCSRRequest and AddICAC answer FailsafeRequired unless the fail-safe is armed for the accessing fabric, as connectedhomeip does (W3-clusec-03, W3-club1-02, W3-clua2-01).
+- `node`: UpdateNOC deletes the fabric's CASE resumption records (W6-reg-02).
+- `controller/dcl`: the CRL DER decoder refuses a nesting deeper than 32 levels (it overflowed the stack), and the CRL and OTA image downloads are bounded by the ledger's stated size (1 MiB for a CRL without one) (W4-ctlint-01, W4-ctlint-02).
+- `node`, `fabrictest`, examples: the SQLite `file:` URI is built with `net/url`, so a path holding `#` or `?` opens that file with its pragmas (W5-ex-01).
+- `node`: a SQLite store file the node creates is owner-only (`0600`), and so are its `-wal` and `-shm` files (W5-ex-05).
+- `secure/sigma`, `secure/mattercert`: a CASE responder with an identity fails closed when its verifier cannot read the peer NOC's fabric or node id; Sigma1 without initiatorRandom, initiatorSessionId or destinationId is InvalidParam; a NOC or ICAC without an authorityKeyIdentifier, and a NOC whose authorityKeyIdentifier names neither the root nor the ICAC, are refused (W1-sec-01, W1-sec-02, W1-sec-03).
+
+### Added
+
+- `node.OpenSQLite(path, pragmas...)`: the node's SQLite opener — escaped `file:` URI, foreign keys and busy timeout on every connection, a new file created `0600`.
+- `core.GeneralCommissioning.FailSafeFabric` and `core.FailSafeArmedFor`: the fail-safe port (armed, and for which fabric) and connectedhomeip's `IsFailSafeArmed(accessingFabricIndex)` over it.
+- `bridge.ErrUnsecuredIM`: the diagnostic error of a dropped IM message on session 0.
+
+### Changed
+
+- The fail-safe port reports its fabric. Migration: `core.OpcredsConfig.IsFailSafeArmed` → `FailSafe` and `OperationalCredentials.SetIsFailSafeArmed` → `SetFailSafe` (bind `GeneralCommissioning.FailSafeFabric`); `threadbr.ManagementConfig.IsFailSafeArmed` → `FailSafe`; `AttachFailSafe` of `threadbr.ManagementServer`, `core.ThreadNetworkCommissioning` and `jointfabric.Administrator` takes `func() (fabricIndex uint8, armed bool)`.
+
+### Fixed
+
+- `client/discovery`: a session releases its caller's context hook before the outcome is visible; a cancel after `Wait` returned logged into a caller that had moved on (the race job's red on `main`, W6-test-02).
+- `cluster/onoff`, `cluster/closure`: a port's `contract.StatusError` answers its status instead of FAILURE, as v0.15.6 made the other kit servers do (W6-doc-01).
+
 ## [0.15.6] — 2026-11-01
 
 ### Added
