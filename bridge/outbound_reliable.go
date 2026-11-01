@@ -310,10 +310,11 @@ func (t *outboundReliableTracker) Ack(sessionID uint16, acked uint32) bool {
 	key := outboundKey{sessionID, acked}
 	t.mu.Lock()
 	if _, ok := t.pending[key]; !ok {
-		// Release the waiter even on stray ACKs — the chunked-send path
-		// always installs a waiter before the datagram leaves, so a fast
-		// Ack from the peer can land before Track() (or after a quirky
-		// retransmit that re-acks an already-cleared counter).
+		// A stray ACK: the duplicate ack of a retransmission after the
+		// entry was cleared. [WaitForAck] installs a waiter only after
+		// [Track], so a waiter found here outlived its entry (one
+		// [Untrack] dropped without waking it); release it rather than
+		// leave it to its deadline.
 		if ch, has := t.waiters[key]; has {
 			delete(t.waiters, key)
 			t.mu.Unlock()
