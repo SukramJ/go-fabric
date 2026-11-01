@@ -39,6 +39,7 @@ Findings of the whole-codebase review of 2026-11-01 (`notes/review/2026-11/`).
 
 - `client/discovery`: a session releases its caller's context hook before the outcome is visible; a cancel after `Wait` returned logged into a caller that had moved on (the race job's red on `main`, W6-test-02).
 - `cluster/onoff`, `cluster/closure`: a port's `contract.StatusError` answers its status instead of FAILURE, as v0.15.6 made the other kit servers do (W6-doc-01).
+- `cluster/spec`, `script/clustergen`: a constraint bound stated as an expression — arithmetic, `maxOf` / `minOf`, a power such as `2^62` — is computed against the sibling attributes, and a temperature or percentage bound is restated in the type's units; such bounds admitted every value (W3-clugen-01).
 
 ## [0.15.6] — 2026-11-01
 

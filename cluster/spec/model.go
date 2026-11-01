@@ -77,8 +77,12 @@ type Quality struct {
 
 // Bound is one side of a constraint: a number, the name of a sibling
 // element whose value bounds this one ("minMeasuredValue"), or an
-// expression the runtime does not evaluate (Expr; such a bound admits every
-// value, as matter.js's does when it cannot compute one).
+// expression tree (Expr, matter.js's Constraint.Expression as JSON) the
+// runtime computes — arithmetic, maxOf / minOf and qualified references
+// over the sibling attributes. An expression naming a value that does not
+// resolve, or a unit value the generator could not restate in the type's
+// units, admits every value, as matter.js's does when it cannot compute
+// one.
 type Bound struct {
 	Int  int64
 	Ref  string

@@ -1717,7 +1717,7 @@ var Definition = &spec.Cluster{
 			Conformance: spec.Conformance{Text: "AUTO", Op: spec.ConfName, Name: "AUTO"},
 			Access:      spec.Access{RW: "R[W]", Read: spec.PrivilegeView, Write: spec.PrivilegeManage},
 			Quality:     spec.Quality{NonVolatile: true},
-			Constraint:  spec.Constraint{Text: "0 to 12.7°C", Min: &spec.Bound{Int: 0}, Max: &spec.Bound{Expr: "{\"type\":\"celsius\",\"value\":12.7}"}},
+			Constraint:  spec.Constraint{Text: "0 to 12.7°C", Min: &spec.Bound{Int: 0}, Max: &spec.Bound{Int: 127}},
 			Default:     float64(20),
 		},
 		{

@@ -2047,9 +2047,11 @@ differences, each a deliberate choice:
 - PeriodStart equal to PeriodEnd is accepted, as chip's checks are
   `periodStart <= periodEnd` (`CommodityPriceCluster.cpp:93`) and
   `periodStart > periodEnd` refused (`electrical-grid-conditions-server.cpp:132`);
-  the definition's `min periodStart + 1` is an expression bound the
-  runtime does not evaluate (`cluster/spec/model.go:80`: such a bound
-  admits every value).
+  the definition's `min periodStart + 1` is a struct field's bound over
+  a sibling field, which the value checks do not resolve
+  (`cluster/spec/write.go` `checkStruct`: a field constraint naming a
+  sibling is not resolved), so the computed bound has no number and
+  admits every value (`cluster/spec/bound_expr.go`).
 - Where chip is undefined: an update without DayPatterns is treated as an
   empty set (chip would dereference null); ClearTariff drops a pending
   delayed update; the tariff test clock is scoped to the server (chip's

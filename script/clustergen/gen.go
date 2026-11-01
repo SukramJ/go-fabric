@@ -1226,7 +1226,7 @@ func (g *generator) writeDefinition(w *writer) {
 			if lit := qualityLiteral(v.Quality); lit != "" {
 				w.p("\t\t\tQuality: %s,", lit)
 			}
-			if lit := constraintLiteral(v.Constraint); lit != "" {
+			if lit := constraintLiteral(v.Constraint, v.Type, v.Metatype); lit != "" {
 				w.p("\t\t\tConstraint: %s,", lit)
 			}
 			if lit := defaultLiteral(v.Default, v.Type, v.Metatype); lit != "" {
@@ -1356,7 +1356,7 @@ func (g *generator) fieldLiteral(f *fieldInfo) string {
 		if lit := qualityLiteral(f.v.Quality); lit != "" {
 			parts = append(parts, "Quality: "+lit)
 		}
-		if lit := constraintLiteral(f.v.Constraint); lit != "" {
+		if lit := constraintLiteral(f.v.Constraint, f.v.Type, f.v.Metatype); lit != "" {
 			parts = append(parts, "Constraint: "+lit)
 		}
 		if f.v.Access != nil && f.v.Access.Fabric == "S" {
@@ -1413,7 +1413,10 @@ func qualityLiteral(q map[string]bool) string {
 	return "spec.Quality{" + strings.Join(parts, ", ") + "}"
 }
 
-func constraintLiteral(c *constraint) string {
+// constraintLiteral renders a constraint whose bounds are in the units of
+// typeName / metatype (the type that carries it; "" scales none — a list
+// entry's constraint, whose entry type the caller does not pass).
+func constraintLiteral(c *constraint, typeName, metatype string) string {
 	if c == nil {
 		return ""
 	}
@@ -1425,7 +1428,7 @@ func constraintLiteral(c *constraint) string {
 		name string
 		raw  json.RawMessage
 	}{{"Value", c.Value}, {"Min", c.Min}, {"Max", c.Max}} {
-		if lit := boundLiteral(b.raw); lit != "" {
+		if lit := boundLiteral(b.raw, typeName, metatype); lit != "" {
 			parts = append(parts, b.name+": "+lit)
 		}
 	}
@@ -1433,14 +1436,14 @@ func constraintLiteral(c *constraint) string {
 		parts = append(parts, fmt.Sprintf("In: %q", ref))
 	}
 	if c.Entry != nil {
-		if lit := constraintLiteral(c.Entry); lit != "" {
+		if lit := constraintLiteral(c.Entry, "", ""); lit != "" {
 			parts = append(parts, "Entry: &"+lit)
 		}
 	}
 	if len(c.Parts) > 0 {
 		ps := make([]string, 0, len(c.Parts))
 		for _, p := range c.Parts {
-			if lit := constraintLiteral(p); lit != "" {
+			if lit := constraintLiteral(p, typeName, metatype); lit != "" {
 				ps = append(ps, strings.TrimPrefix(lit, "spec.Constraint"))
 			}
 		}
@@ -1449,12 +1452,28 @@ func constraintLiteral(c *constraint) string {
 	return "spec.Constraint{" + strings.Join(parts, ", ") + "}"
 }
 
-func boundLiteral(raw json.RawMessage) string {
+// boundLiteral renders one bound: a number, a reference, a temperature or
+// percentage stated with its unit restated in the encoding units of the
+// carrying type — matter.js restates a constraint before it validates
+// (packages/model/src/logic/EncodedConstraint.ts:30-32, convertValue
+// :252-258 → EncodedValue at 862ad75f, applied at
+// packages/node/src/behavior/state/validation/constraint.ts:82) — and any
+// other expression as its JSON tree, which the runtime computes
+// (cluster/spec/bound_expr.go). A unit the type does not scale stays an
+// expression and admits every value, as matter.js's unscaled bound does
+// (EncodedConstraint.ts:56-61).
+func boundLiteral(raw json.RawMessage, typeName, metatype string) string {
 	if len(raw) == 0 {
 		return ""
 	}
 	if n, ok := intOf(raw); ok {
 		return fmt.Sprintf("&spec.Bound{Int: %d}", n)
+	}
+	var fv map[string]any
+	if json.Unmarshal(raw, &fv) == nil {
+		if n, ok := encodedUnit(fv, typeName, metatype); ok && n == math.Trunc(n) && math.Abs(n) <= 1<<53 {
+			return fmt.Sprintf("&spec.Bound{Int: %d}", int64(n))
+		}
 	}
 	if ref := referenceOf(raw); ref != "" {
 		return fmt.Sprintf("&spec.Bound{Ref: %q}", ref)

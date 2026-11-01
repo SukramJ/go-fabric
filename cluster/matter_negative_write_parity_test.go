@@ -32,12 +32,14 @@ import (
 	smokedef "github.com/SukramJ/go-fabric/cluster/spec/smokecoalarm"
 
 	"github.com/SukramJ/go-fabric/cluster/alarm"
+	"github.com/SukramJ/go-fabric/cluster/boolcfg"
 	"github.com/SukramJ/go-fabric/cluster/cover"
 	"github.com/SukramJ/go-fabric/cluster/fan"
 	"github.com/SukramJ/go-fabric/cluster/modebase"
 	"github.com/SukramJ/go-fabric/cluster/opstate"
 	"github.com/SukramJ/go-fabric/cluster/pump"
 	"github.com/SukramJ/go-fabric/cluster/spec"
+	boolcfgdef "github.com/SukramJ/go-fabric/cluster/spec/booleanstateconfiguration"
 	closuredef "github.com/SukramJ/go-fabric/cluster/spec/closurecontrol"
 	dishdef "github.com/SukramJ/go-fabric/cluster/spec/dishwashermode"
 	fandef "github.com/SukramJ/go-fabric/cluster/spec/fancontrol"
@@ -56,6 +58,16 @@ type statusCoder interface {
 }
 
 // ── helpers ──────────────────────────────────────────────────────────────────
+
+// newSensitivityServer is a BooleanStateConfiguration with SENSLVL and
+// three sensitivity levels.
+func newSensitivityServer() *boolcfg.Server {
+	srv, err := boolcfg.New(boolcfg.Config{Features: boolcfg.FeatureSensitivityLevel, SupportedSensitivityLevels: 3})
+	if err != nil {
+		panic(err)
+	}
+	return srv
+}
 
 func newHeatOnlyServer() *thermo.ThermostatServer {
 	return thermo.NewThermostatServer(thermo.ThermostatConfig{
@@ -276,6 +288,22 @@ func TestNegativeWriteParity(t *testing.T) {
 	t.Parallel()
 
 	cases := []negativeWriteCase{
+		{
+			// Mirrors matter.js packages/model/src/aspects/Constraint.ts:969-1096
+			// (evaluate) at 862ad75f: "max supportedSensitivityLevels - 1"
+			// is computed against the served SupportedSensitivityLevels (3)
+			// by the generated checks (W3-clugen-01), as chip's
+			// BooleanStateConfiguration .cpp:324 refuses it.
+			name: "BooleanStateConfiguration/CurrentSensitivityLevel at SupportedSensitivityLevels → ConstraintError",
+			build: func() interface {
+				MatterWrite(context.Context, uint32, any) error
+			} {
+				return newSensitivityServer()
+			},
+			attrID:     boolcfgdef.AttrCurrentSensitivityLevel,
+			value:      uint64(3),
+			wantStatus: im.StatusConstraintError,
+		},
 		{
 			// Mirrors matter.js packages/node/src/behaviors/thermostat/ThermostatServer.ts:890
 			// #assertSetpointWithinLimits — rejects values above MaxHeatSetpointLimit.
@@ -800,6 +828,14 @@ func TestPositiveWriteControl(t *testing.T) {
 		}
 		if v.(int16) != 3000 {
 			t.Errorf("OccupiedHeatingSetpoint = %d, want 3000", v.(int16))
+		}
+	})
+
+	t.Run("BooleanStateConfiguration/CurrentSensitivityLevel == SupportedSensitivityLevels - 1 accepted", func(t *testing.T) {
+		t.Parallel()
+		// "max supportedSensitivityLevels - 1" with 3 levels admits 2.
+		if err := newSensitivityServer().MatterWrite(context.Background(), boolcfgdef.AttrCurrentSensitivityLevel, uint64(2)); err != nil {
+			t.Fatalf("write at the computed bound: %v", err)
 		}
 	})
 
