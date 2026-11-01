@@ -531,6 +531,11 @@ type Bridge struct {
 	// Apple MTRDevice liveness checks) get their answers from here.
 	// Allocated at New time; never nil.
 	eventLog *im.EventLog
+	// emitMu makes an event's append and its subscription fan-out one
+	// step ([Bridge.EmitEvent]), so subscriptions learn of events in
+	// number order: a subscription keeps only the lowest number it owes
+	// and reads the rest from eventLog when its report is due.
+	emitMu sync.Mutex
 
 	// commissioningWindow tracks the live AdministratorCommissioning
 	// (0x003C) window state. Optional; nil means the cluster on the

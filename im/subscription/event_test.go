@@ -38,6 +38,25 @@ func mkEventFiring(endpoint uint16, cluster, event uint32, priority im.EventPrio
 	}
 }
 
+// newEventManager builds a manager whose event source is a fresh event
+// log, and the function that emits an event the way the bridge does:
+// append to the log, then fan the numbered firing out.
+func newEventManager(cfg subscription.Config) (*subscription.Manager, func(subscription.EventFiring)) {
+	m := subscription.NewManager(cfg, nil, nil)
+	log := im.NewEventLog()
+	m.SetEventSource(log)
+	return m, func(ev subscription.EventFiring) {
+		ev.Number = log.Append(im.EventRecord{
+			Priority: ev.Priority,
+			Endpoint: ev.Path.Endpoint,
+			Cluster:  ev.Path.Cluster,
+			EventID:  ev.Path.Event,
+			Payload:  ev.Data.Value,
+		})
+		m.OnEventFired(ev)
+	}
+}
+
 // eventReporterCall captures one EventReporter invocation.
 type eventReporterCall struct {
 	sub    *subscription.Subscription
@@ -72,7 +91,7 @@ func defaultEventArgs() subscription.SubscribeArgs {
 func TestOnEventFired_MatchingPath_ReporterReceivesOne(t *testing.T) {
 	t.Parallel()
 	ch := make(chan eventReporterCall, 4)
-	m := subscription.NewManager(subscription.Config{}, nil, nil)
+	m, fire := newEventManager(subscription.Config{})
 	m.SetEventReporter(chanEventReporter(ch))
 
 	sub, err := m.Subscribe(defaultEventArgs())
@@ -81,7 +100,7 @@ func TestOnEventFired_MatchingPath_ReporterReceivesOne(t *testing.T) {
 	}
 
 	// Fire matching event.
-	m.OnEventFired(mkEventFiring(1, 0x003B, 0x01, im.EventPriorityCritical))
+	fire(mkEventFiring(1, 0x003B, 0x01, im.EventPriorityCritical))
 
 	ctx := context.Background()
 	// Critical priority → bypasses MinIntervalFloor; Tick with t0+0 is enough.
@@ -105,7 +124,7 @@ func TestOnEventFired_MatchingPath_ReporterReceivesOne(t *testing.T) {
 func TestOnEventFired_NonMatchingPath_ReporterSilent(t *testing.T) {
 	t.Parallel()
 	ch := make(chan eventReporterCall, 4)
-	m := subscription.NewManager(subscription.Config{}, nil, nil)
+	m, fire := newEventManager(subscription.Config{})
 	m.SetEventReporter(chanEventReporter(ch))
 
 	// Subscribe for (endpoint=1, cluster=0x003B, event=0x01).
@@ -115,7 +134,7 @@ func TestOnEventFired_NonMatchingPath_ReporterSilent(t *testing.T) {
 	}
 
 	// Fire a different cluster — no match.
-	m.OnEventFired(mkEventFiring(1, 0x0006, 0x01, im.EventPriorityCritical))
+	fire(mkEventFiring(1, 0x0006, 0x01, im.EventPriorityCritical))
 
 	ctx := context.Background()
 	m.Tick(ctx, time.Now())
@@ -130,7 +149,7 @@ func TestOnEventFired_NonMatchingPath_ReporterSilent(t *testing.T) {
 func TestOnEventFired_TwoSubscriptions_BothReceive(t *testing.T) {
 	t.Parallel()
 	ch := make(chan eventReporterCall, 8)
-	m := subscription.NewManager(subscription.Config{}, nil, nil)
+	m, fire := newEventManager(subscription.Config{})
 	m.SetEventReporter(chanEventReporter(ch))
 
 	// Subscription A: wildcard endpoint, concrete cluster+event.
@@ -166,7 +185,7 @@ func TestOnEventFired_TwoSubscriptions_BothReceive(t *testing.T) {
 	}
 
 	// Fire concrete event (endpoint=1, cluster=0x003B, event=0x01). Both must match.
-	m.OnEventFired(mkEventFiring(1, 0x003B, 0x01, im.EventPriorityCritical))
+	fire(mkEventFiring(1, 0x003B, 0x01, im.EventPriorityCritical))
 
 	ctx := context.Background()
 	m.Tick(ctx, time.Now())
@@ -192,7 +211,7 @@ func TestOnEventFired_CriticalPriority_BypassesMinIntervalFloor(t *testing.T) {
 	ch := make(chan eventReporterCall, 4)
 	// Use a large MinIntervalFloor (10 s) that would normally block.
 	cfg := subscription.Config{MinIntervalFloorSeconds: 10}
-	m := subscription.NewManager(cfg, nil, nil)
+	m, fire := newEventManager(cfg)
 	m.SetEventReporter(chanEventReporter(ch))
 
 	args := subscription.SubscribeArgs{
@@ -217,7 +236,7 @@ func TestOnEventFired_CriticalPriority_BypassesMinIntervalFloor(t *testing.T) {
 	}
 
 	// Fire Critical event just 1s after last report (well within the 10s floor).
-	m.OnEventFired(mkEventFiring(1, 0x003B, 0x01, im.EventPriorityCritical))
+	fire(mkEventFiring(1, 0x003B, 0x01, im.EventPriorityCritical))
 	m.Tick(ctx, t0.Add(1*time.Second))
 
 	if len(ch) == 0 {
@@ -231,7 +250,7 @@ func TestOnEventFired_InfoPriority_WaitsForMinIntervalFloor(t *testing.T) {
 	t.Parallel()
 	ch := make(chan eventReporterCall, 4)
 	cfg := subscription.Config{MinIntervalFloorSeconds: 5}
-	m := subscription.NewManager(cfg, nil, nil)
+	m, fire := newEventManager(cfg)
 	m.SetEventReporter(chanEventReporter(ch))
 
 	args := subscription.SubscribeArgs{
@@ -256,7 +275,7 @@ func TestOnEventFired_InfoPriority_WaitsForMinIntervalFloor(t *testing.T) {
 	}
 
 	// Fire Info-priority event.
-	m.OnEventFired(mkEventFiring(1, 0x003B, 0x01, im.EventPriorityInfo))
+	fire(mkEventFiring(1, 0x003B, 0x01, im.EventPriorityInfo))
 
 	// Tick only 2s later — MinIntervalFloor (5s) not yet elapsed.
 	m.Tick(ctx, t0.Add(2*time.Second))
@@ -276,7 +295,7 @@ func TestOnEventFired_InfoPriority_WaitsForMinIntervalFloor(t *testing.T) {
 func TestOnEventFired_NonConcretePath_IsNoOp(t *testing.T) {
 	t.Parallel()
 	ch := make(chan eventReporterCall, 4)
-	m := subscription.NewManager(subscription.Config{}, nil, nil)
+	m, _ := newEventManager(subscription.Config{})
 	m.SetEventReporter(chanEventReporter(ch))
 
 	_, err := m.Subscribe(defaultEventArgs())

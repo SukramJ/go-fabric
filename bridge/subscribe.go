@@ -114,6 +114,10 @@ func (b *Bridge) AttachSubscriptionManager(m *subscription.Manager) {
 		// session stays recorded for re-establishment after a restart
 		// (matter.js SubscriptionsServer.#subscriptionCancelled).
 		m.SetOnSubscriptionTerminated(b.forgetPersistedSubscription)
+		// A subscription owes events as a number; its report reads
+		// them from the bridge's log (matter.js ServerSubscription.ts
+		// :541-542 reads the occurrence store at send time).
+		m.SetEventSource(b.eventLog)
 	}
 }
 
@@ -337,9 +341,14 @@ func (b *Bridge) EmitEvent(endpoint uint16, cluster, event uint32, data any, pri
 		EventID:  event,
 		Payload:  data,
 	}
-	num := b.eventLog.Append(rec)
-
+	// Append and fan-out as one step: subscriptions see numbers in
+	// ascending order, so a report never skips an event that lost the
+	// race to a later one. The manager is read before emitMu is taken,
+	// so emitMu is never held while waiting for b.mu.
 	m := b.subscriptionManagerLocked()
+	b.emitMu.Lock()
+	defer b.emitMu.Unlock()
+	num := b.eventLog.Append(rec)
 	if m == nil {
 		return
 	}

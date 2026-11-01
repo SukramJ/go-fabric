@@ -30,6 +30,7 @@ Findings of the whole-codebase review of 2026-11-01 (`notes/review/2026-11/`).
 - `store.OpenSQLite(path, pragmas...)`: the module's one SQLite opener, behind `node.Store.Path`, `controller.OpenDB`, fabrictest and the examples — escaped `file:` URI, foreign keys and busy timeout on every connection, a new file created `0600`.
 - `core.GeneralCommissioning.FailSafeFabric` and `core.FailSafeArmedFor`: the fail-safe port (armed, and for which fabric) and connectedhomeip's `IsFailSafeArmed(accessingFabricIndex)` over it.
 - `bridge.ErrUnsecuredIM`: the diagnostic error of a dropped IM message on session 0.
+- `subscription.EventSource`, `Manager.SetEventSource`: the log a subscription's owed events are read from when its report is due (the bridge attaches its event log in `AttachSubscriptionManager`); `Subscription.RequeueAttributes`, `Subscription.RequeueEvents`: a reporter whose send failed owes the subscriber the same data again.
 
 ### Changed
 
@@ -39,6 +40,7 @@ Findings of the whole-codebase review of 2026-11-01 (`notes/review/2026-11/`).
 
 - `client/discovery`: a session releases its caller's context hook before the outcome is visible; a cancel after `Wait` returned logged into a caller that had moved on (the race job's red on `main`, W6-test-02).
 - `cluster/onoff`, `cluster/closure`: a port's `contract.StatusError` answers its status instead of FAILURE, as v0.15.6 made the other kit servers do (W6-doc-01).
+- `im/subscription`, `bridge`: a subscription keeps the lowest event number it owes, not a copy of every event — an event burst under a long MinIntervalFloor no longer grows a queue per subscription — and its report reads the events from the event log at drain time, in number order and with the timestamp a Read answers; `EventFiring.Data` and `Timestamp` are no longer read (W2-conc-02, W2-conc-03).
 
 ## [0.15.6] — 2026-11-01
 
