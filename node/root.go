@@ -276,7 +276,7 @@ func buildRoot(ctx context.Context, d rootDeps) (*RootClusters, error) { //nolin
 	var netComm contract.ClusterServer
 	if wc := cfg.Network.WiFiCommissioning; wc.Driver != nil {
 		r.WiFiNetworkCommissioning, err = mattercore.NewWiFiNetworkCommissioning(mattercore.WiFiNetworkCommissioningConfig{
-			Driver: wc.Driver, IsFailSafeArmed: generalCom.FailSafeArmed,
+			Driver: wc.Driver, FailSafe: generalCom.FailSafeFabric,
 			SetBreadcrumb: func(v uint64) {
 				_ = generalCom.MatterWrite(context.WithoutCancel(ctx), gencommdef.AttrBreadcrumb, v)
 			},

@@ -40,6 +40,7 @@ type WiFiNetworkCommissioning struct {
 	dataVersion cluster.DataVersionTracker
 
 	driver        contract.WiFiDriver
+	failSafe      func() (fabricIndex uint8, armed bool)
 	failSafeArmed func() bool
 	setBreadcrumb func(uint64)
 	maxNetworks   uint8
@@ -68,9 +69,16 @@ type wifiNetwork struct {
 type WiFiNetworkCommissioningConfig struct {
 	// Driver scans and connects. Required.
 	Driver contract.WiFiDriver
-	// IsFailSafeArmed reports whether a failsafe is armed
-	// (GeneralCommissioning.FailSafeArmed); the network commands need one
-	// (EnsureFailsafeIsArmed, NetworkCommissioningCluster.cpp:155-162).
+	// FailSafe is the node's fail-safe port — armed, and for which fabric
+	// ([GeneralCommissioning.FailSafeFabric]); the network commands need
+	// the window of their accessing fabric (EnsureFailsafeIsArmed over
+	// IsFailSafeArmed(GetAccessingFabricIndex()),
+	// NetworkCommissioningCluster.cpp:155-172, :380, :568, :609 at
+	// 6170af84; by_design BD-chip-FailSafeOfTheAccessingFabric).
+	FailSafe func() (fabricIndex uint8, armed bool)
+	// IsFailSafeArmed is the fabric-blind port (armed for any fabric,
+	// GeneralCommissioning.FailSafeArmed); consulted only while FailSafe
+	// is nil. Both nil reads as disarmed.
 	IsFailSafeArmed func() bool
 	// SetBreadcrumb writes GeneralCommissioning's Breadcrumb
 	// (UpdateBreadcrumb, :589-593); nil writes none.
@@ -109,7 +117,7 @@ func NewWiFiNetworkCommissioning(cfg WiFiNetworkCommissioningConfig) (*WiFiNetwo
 		return nil, errors.New("core: Wi-Fi NetworkCommissioning needs a driver")
 	}
 	w := &WiFiNetworkCommissioning{
-		driver: cfg.Driver, failSafeArmed: cfg.IsFailSafeArmed, setBreadcrumb: cfg.SetBreadcrumb,
+		driver: cfg.Driver, failSafe: cfg.FailSafe, failSafeArmed: cfg.IsFailSafeArmed, setBreadcrumb: cfg.SetBreadcrumb,
 		maxNetworks: cfg.MaxNetworks, scanMax: cfg.ScanMaxTimeSeconds, connectMax: cfg.ConnectMaxTimeSeconds,
 		interfaceEnabled: true,
 	}
@@ -121,9 +129,6 @@ func NewWiFiNetworkCommissioning(cfg WiFiNetworkCommissioningConfig) (*WiFiNetwo
 	}
 	if w.connectMax == 0 {
 		w.connectMax = 20
-	}
-	if w.failSafeArmed == nil {
-		w.failSafeArmed = func() bool { return false }
 	}
 	w.dataVersion.Bump()
 	return w, nil
@@ -289,13 +294,13 @@ func (w *WiFiNetworkCommissioning) MatterInvoke(ctx context.Context, cmdID uint3
 		if !ok {
 			return nil, netcommStatus(im.StatusInvalidCommand, "core: AddOrUpdateWiFiNetwork fields %T", fields)
 		}
-		return w.addOrUpdate(req)
+		return w.addOrUpdate(ctx, req)
 	case netcommdef.CmdRemoveNetwork:
 		req, ok := fields.(netcommdef.RemoveNetworkRequest)
 		if !ok {
 			return nil, netcommStatus(im.StatusInvalidCommand, "core: RemoveNetwork fields %T", fields)
 		}
-		return w.remove(req)
+		return w.remove(ctx, req)
 	case netcommdef.CmdConnectNetwork:
 		req, ok := fields.(netcommdef.ConnectNetworkRequest)
 		if !ok {
@@ -415,14 +420,28 @@ func validCredentials(c []byte) bool {
 	return false
 }
 
+// armedFor is connectedhomeip's EnsureFailsafeIsArmed(failSafeContext,
+// handler.GetAccessingFabricIndex()) (NetworkCommissioningCluster.cpp:155-172,
+// :380, :568, :609 at 6170af84): the window must be armed, and armed for
+// the accessing fabric (FailSafeContext.h:76-79). A fabric-blind port
+// ([WiFiNetworkCommissioningConfig.IsFailSafeArmed]) answers for any
+// fabric, as before.
+func (w *WiFiNetworkCommissioning) armedFor(ctx context.Context) bool {
+	if w.failSafe != nil {
+		_, accessing := im.FabricFilterFromContext(ctx)
+		return FailSafeArmedFor(w.failSafe, accessing)
+	}
+	return w.failSafeArmed != nil && w.failSafeArmed()
+}
+
 // addOrUpdate is HandleAddOrUpdateWiFiNetwork (:373-451) over the Linux
 // driver's AddOrUpdateNetwork (NetworkCommissioningWiFiDriver.cpp:175-199):
 // a failsafe is required; an empty or overlong SSID and an invalid
 // credential length are ConstraintError; an SSID in the list is updated,
 // a new one appended unless the list is full (BoundsExceeded); success
 // writes the breadcrumb and changes the list.
-func (w *WiFiNetworkCommissioning) addOrUpdate(req netcommdef.AddOrUpdateWiFiNetworkRequest) (any, error) {
-	if !w.failSafeArmed() {
+func (w *WiFiNetworkCommissioning) addOrUpdate(ctx context.Context, req netcommdef.AddOrUpdateWiFiNetworkRequest) (any, error) {
+	if !w.armedFor(ctx) {
 		return nil, netcommStatus(im.StatusFailsafeRequired, "core: AddOrUpdateWiFiNetwork needs an armed failsafe")
 	}
 	if len(req.Ssid) == 0 || len(req.Ssid) > maxWiFiSSIDLength {
@@ -457,8 +476,8 @@ func (w *WiFiNetworkCommissioning) addOrUpdate(req netcommdef.AddOrUpdateWiFiNet
 // RemoveNetwork (:201-210): a failsafe is required; an unknown network
 // is NetworkIDNotFound; with the last network gone the last status,
 // network id and connect error are cleared.
-func (w *WiFiNetworkCommissioning) remove(req netcommdef.RemoveNetworkRequest) (any, error) {
-	if !w.failSafeArmed() {
+func (w *WiFiNetworkCommissioning) remove(ctx context.Context, req netcommdef.RemoveNetworkRequest) (any, error) {
+	if !w.armedFor(ctx) {
 		return nil, netcommStatus(im.StatusFailsafeRequired, "core: RemoveNetwork needs an armed failsafe")
 	}
 	w.mu.Lock()
@@ -507,7 +526,7 @@ func (w *WiFiNetworkCommissioning) connect(ctx context.Context, req netcommdef.C
 	if len(req.NetworkId) > maxNetworkIDLength {
 		return nil, netcommStatus(im.StatusConstraintError, "core: ConnectNetwork network id of %d bytes", len(req.NetworkId))
 	}
-	if !w.failSafeArmed() {
+	if !w.armedFor(ctx) {
 		return nil, netcommStatus(im.StatusFailsafeRequired, "core: ConnectNetwork needs an armed failsafe")
 	}
 	w.mu.Lock()

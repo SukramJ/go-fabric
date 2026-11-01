@@ -46,6 +46,7 @@ type ThreadNetworkCommissioning struct {
 	dataVersion cluster.DataVersionTracker
 
 	br            tbrmdef.BorderRouter
+	failSafe      func() (fabricIndex uint8, armed bool)
 	failSafeArmed func() bool
 	setBreadcrumb func(uint64)
 	scanMax       uint8
@@ -73,9 +74,17 @@ type ThreadNetworkCommissioning struct {
 type ThreadNetworkCommissioningConfig struct {
 	// BorderRouter is the border router; required.
 	BorderRouter tbrmdef.BorderRouter
-	// IsFailSafeArmed reports whether a fail-safe is armed; the network
-	// commands need one (EnsureFailsafeIsArmed, NetworkCommissioningCluster.cpp:
-	// 155-172). Nil reads as disarmed until [ThreadNetworkCommissioning.AttachFailSafe].
+	// FailSafe is the node's fail-safe port — armed, and for which fabric
+	// ([GeneralCommissioning.FailSafeFabric]); the network commands need
+	// the window of their accessing fabric (EnsureFailsafeIsArmed over
+	// IsFailSafeArmed(GetAccessingFabricIndex()),
+	// NetworkCommissioningCluster.cpp:155-172, :380, :568, :609 at
+	// 6170af84; by_design BD-chip-FailSafeOfTheAccessingFabric). Nil reads
+	// as disarmed until [ThreadNetworkCommissioning.AttachFailSafe] wires
+	// it, unless IsFailSafeArmed is set.
+	FailSafe func() (fabricIndex uint8, armed bool)
+	// IsFailSafeArmed is the fabric-blind port (armed for any fabric);
+	// consulted only while FailSafe is nil.
 	IsFailSafeArmed func() bool
 	// SetBreadcrumb writes GeneralCommissioning's Breadcrumb
 	// (UpdateBreadcrumb, :589-593); nil writes none.
@@ -104,7 +113,7 @@ func NewThreadNetworkCommissioning(ctx context.Context, cfg ThreadNetworkCommiss
 		return nil, errors.New("core: Thread NetworkCommissioning needs a border router")
 	}
 	n := &ThreadNetworkCommissioning{
-		br: cfg.BorderRouter, failSafeArmed: cfg.IsFailSafeArmed, setBreadcrumb: cfg.SetBreadcrumb,
+		br: cfg.BorderRouter, failSafe: cfg.FailSafe, failSafeArmed: cfg.IsFailSafeArmed, setBreadcrumb: cfg.SetBreadcrumb,
 		scanMax: cfg.ScanMaxTimeSeconds, connectMax: cfg.ConnectMaxTimeSeconds,
 	}
 	if n.scanMax == 0 {
@@ -135,15 +144,11 @@ var (
 )
 
 // AttachFailSafe wires the node's fail-safe after construction, as
-// [ThreadNetworkCommissioningConfig] does.
+// [ThreadNetworkCommissioningConfig.FailSafe] does.
 func (n *ThreadNetworkCommissioning) AttachFailSafe(failSafe func() (fabricIndex uint8, armed bool), setBreadcrumb func(uint64)) {
-	var armed func() bool
-	if failSafe != nil {
-		armed = func() bool { _, a := failSafe(); return a }
-	}
 	n.mu.Lock()
 	defer n.mu.Unlock()
-	n.failSafeArmed, n.setBreadcrumb = armed, setBreadcrumb
+	n.failSafe, n.setBreadcrumb = failSafe, setBreadcrumb
 }
 
 // Refresh reads the border router's attachment and interface again
@@ -340,13 +345,13 @@ func (n *ThreadNetworkCommissioning) MatterInvoke(ctx context.Context, cmdID uin
 		if !ok {
 			return nil, netcommStatus(im.StatusInvalidCommand, "core: AddOrUpdateThreadNetwork fields %T", fields)
 		}
-		return n.addOrUpdate(req)
+		return n.addOrUpdate(ctx, req)
 	case netcommdef.CmdRemoveNetwork:
 		req, ok := fields.(netcommdef.RemoveNetworkRequest)
 		if !ok {
 			return nil, netcommStatus(im.StatusInvalidCommand, "core: RemoveNetwork fields %T", fields)
 		}
-		return n.remove(req)
+		return n.remove(ctx, req)
 	case netcommdef.CmdConnectNetwork:
 		req, ok := fields.(netcommdef.ConnectNetworkRequest)
 		if !ok {
@@ -363,10 +368,20 @@ func (n *ThreadNetworkCommissioning) MatterInvoke(ctx context.Context, cmdID uin
 	return nil, im.UnsupportedCommandf("core: NetworkCommissioning command 0x%02X not supported (Thread)", cmdID)
 }
 
-func (n *ThreadNetworkCommissioning) armed() bool {
+// armedFor is connectedhomeip's EnsureFailsafeIsArmed(failSafeContext,
+// handler.GetAccessingFabricIndex()) (NetworkCommissioningCluster.cpp:155-172,
+// :380, :568, :609 at 6170af84): the window must be armed, and armed for
+// the accessing fabric (FailSafeContext.h:76-79). A fabric-blind port
+// ([ThreadNetworkCommissioningConfig.IsFailSafeArmed]) answers for any
+// fabric, as before.
+func (n *ThreadNetworkCommissioning) armedFor(ctx context.Context) bool {
 	n.mu.Lock()
-	armed := n.failSafeArmed
+	failSafe, armed := n.failSafe, n.failSafeArmed
 	n.mu.Unlock()
+	if failSafe != nil {
+		_, accessing := im.FabricFilterFromContext(ctx)
+		return FailSafeArmedFor(failSafe, accessing)
+	}
 	return armed != nil && armed()
 }
 
@@ -462,8 +477,8 @@ func scanResult(ds []byte) (netcommdef.ThreadInterfaceScanResultStruct, bool) {
 // OutOfRange; a staged commissioned network of another Extended PAN ID is
 // BoundsExceeded (one network); otherwise the staged network is backed up
 // and replaced, the breadcrumb written and the list changed (:578-582).
-func (n *ThreadNetworkCommissioning) addOrUpdate(req netcommdef.AddOrUpdateThreadNetworkRequest) (any, error) {
-	if !n.armed() {
+func (n *ThreadNetworkCommissioning) addOrUpdate(ctx context.Context, req netcommdef.AddOrUpdateThreadNetworkRequest) (any, error) {
+	if !n.armedFor(ctx) {
 		return nil, netcommStatus(im.StatusFailsafeRequired, "core: AddOrUpdateThreadNetwork needs an armed failsafe")
 	}
 	n.mu.Lock()
@@ -487,8 +502,8 @@ func (n *ThreadNetworkCommissioning) addOrUpdate(req netcommdef.AddOrUpdateThrea
 // RemoveNetwork (GTD :178-191): a failsafe is required; an unknown
 // network is NetworkIDNotFound; the staged network is backed up and
 // cleared, and the last status, network id and connect error with it.
-func (n *ThreadNetworkCommissioning) remove(req netcommdef.RemoveNetworkRequest) (any, error) {
-	if !n.armed() {
+func (n *ThreadNetworkCommissioning) remove(ctx context.Context, req netcommdef.RemoveNetworkRequest) (any, error) {
+	if !n.armedFor(ctx) {
 		return nil, netcommStatus(im.StatusFailsafeRequired, "core: RemoveNetwork needs an armed failsafe")
 	}
 	n.mu.Lock()
@@ -533,7 +548,7 @@ func (n *ThreadNetworkCommissioning) connect(ctx context.Context, req netcommdef
 	if len(req.NetworkId) > maxNetworkIDLength {
 		return nil, netcommStatus(im.StatusConstraintError, "core: ConnectNetwork network id of %d bytes", len(req.NetworkId))
 	}
-	if !n.armed() {
+	if !n.armedFor(ctx) {
 		return nil, netcommStatus(im.StatusFailsafeRequired, "core: ConnectNetwork needs an armed failsafe")
 	}
 	n.mu.Lock()

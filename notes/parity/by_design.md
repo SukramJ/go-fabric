@@ -117,7 +117,7 @@ pin lift confirms by re-reading the row, [`pin-lifts.md`](./pin-lifts.md)).
 | BD-chip-JointFabricAdministrator-RulesInServer | `JointFabricAdministratorServer.ts:14` is the empty subclass (absence: the class line, 14 lines in all) | `packages/node/src/behaviors/joint-fabric-administrator/JointFabricAdministratorServer.ts` | `"export class JointFabricAdministratorServer extends JointFabricAdministratorBehavior {}"` | connectedhomeip `src/app/clusters/joint-fabric-administrator-server/joint-fabric-administrator-server.cpp` at `6170af84` (the handlers :172-449), `JCMCommissionee.{h,cpp}`, `src/app/server/JointFabricAdministrator.h`, `src/credentials/jcm/` (`TrustVerification.cpp`, `VendorIdVerificationClient.cpp`), tests `joint-fabric-administrator-server/tests/TestJCMCommissionee.cpp`, `src/credentials/tests/jcm/` | no |
 | BD-chip-JCM-Commissioner | `ControllerCommissioningFlow.ts:576-583` runs `OperationalCredentials.Certificates` right after `OperationalCredentials.DeviceAttestation`, no Joint Commissioning step between (absence: the two step pushes, :573-585) | `packages/protocol/src/peer/ControllerCommissioningFlow.ts` | `"name: \"OperationalCredentials.DeviceAttestation\",\n            stepLogic: () => this.#deviceAttestation(),\n        });\n\n        this.commissioningSteps.push({\n            stepNumber: 11, // includes 11-13"` | connectedhomeip `src/controller/jcm/DeviceCommissioner.cpp` at `6170af84` (:45-550), `src/controller/jcm/AutoCommissioner.{h,cpp}` (the read paths `.h:56-66`), `src/controller/AutoCommissioner.cpp:522-531` (the stage after attestation), tests `src/controller/tests/jcm/TestJCMCommissioner.cpp` | no |
 | BD-Matter-SurfaceChange-ConfigurationVersion | `BasicInformationServer.ts:35-37` leaves the "when" to the application: the version is "seeded to 1 and constrained to only ever increase", and the application bumps it "with `increaseConfigurationVersion`" (`:132`); the only production caller at the pin is the bridged-to-root coupling, `BridgedDeviceBasicInformationServer.ts:86` | `packages/node/src/behaviors/basic-information/BasicInformationServer.ts` | `"node's configuration changes in a way clients should detect, bump it with {@link increaseConfigurationVersion},"` | this module: concept v11 §C.9, ADR 0030 decision 6, wave S4 — the node persists each endpoint's effective surface next to its ConfigurationVersion and raises the bridged and the root ConfigurationVersion (one change, matter.js's coupling) when the surface of a returning endpoint differs (`node/surface_stability.go`) | no |
-| BD-chip-FailSafeOfTheAccessingFabric | `OperationalCredentialsServer.ts:602-604` reads the one `failsafeContext` without asking for whose fabric it was armed (presence) | `packages/node/src/behaviors/operational-credentials/OperationalCredentialsServer.ts` | `"get #failsafeContext() {\n        return this.env.get(DeviceCommissioner).failsafeContext;\n    }"` | connectedhomeip `src/app/FailSafeContext.h:76-79` at `6170af84` (`IsFailSafeArmed(accessingFabricIndex)`), its callers `OperationalCredentialsCluster.cpp:341, :472, :760`, `ThreadBorderRouterManagementCluster.cpp:212`, `joint-fabric-administrator-server.cpp:325, :369` | no |
+| BD-chip-FailSafeOfTheAccessingFabric | `OperationalCredentialsServer.ts:602-604` reads the one `failsafeContext` without asking for whose fabric it was armed (presence) | `packages/node/src/behaviors/operational-credentials/OperationalCredentialsServer.ts` | `"get #failsafeContext() {\n        return this.env.get(DeviceCommissioner).failsafeContext;\n    }"` | connectedhomeip `src/app/FailSafeContext.h:76-79` at `6170af84` (`IsFailSafeArmed(accessingFabricIndex)`), its callers `OperationalCredentialsCluster.cpp:341, :472, :760`, `ThreadBorderRouterManagementCluster.cpp:212`, `joint-fabric-administrator-server.cpp:325, :369`, `NetworkCommissioningCluster.cpp:155-172, :380, :568, :609` | no |
 | BD-chip-ClosureControl-RulesInServer | `ClosureControlServer.ts:17` is the empty subclass (absence: the class line, 17 lines in all) | `packages/node/src/behaviors/closure-control/ClosureControlServer.ts` | `"export class ClosureControlServer extends ClosureControlBehavior {}"` | connectedhomeip `src/app/clusters/closure-control-server/ClosureControlCluster.cpp` at `6170af84` (`HandleStop` :531-551, `HandleMoveTo` :554-639) | no |
 | BD-chip-ScenesManagement-SceneNameLength | `ScenesManagementServer.ts:147` relaxes the AddScene SceneName constraint for the behaviour to answer, and `addScene` checks only SceneId and TransitionTime (`:283`, presence) | `packages/node/src/behaviors/scenes-management/ScenesManagementServer.ts` | `"transitionTime > 60000000) {"` | connectedhomeip `src/app/clusters/scenes-server/ScenesManagementCluster.cpp:535-541` at `6170af84` | no |
 | BD-Matter-ICDVerificationKeyConstantTime | `IcdManagementServer.ts:761` compares the presented VerificationKey with `Bytes.areEqual`, a data-dependent comparison (presence) | `packages/node/src/behaviors/icd-management/IcdManagementServer.ts` | `"!Bytes.areEqual(verificationKey, stored.key)"` | this module: Go `crypto/subtle.ConstantTimeCompare` (review 2026-11 W2-sec-04); the accept/refuse outcome is matter.js's | no |
@@ -4975,17 +4975,24 @@ over PASE). connectedhomeip asks `IsFailSafeArmed(accessingFabricIndex)` —
 armed and `MatchesFabricIndex` (`FailSafeContext.h:76-79, :92-96` at
 `6170af84`) — and answers FAILSAFE_REQUIRED otherwise
 (`OperationalCredentialsCluster.cpp:341, :472, :760`; Thread Border Router
-Management `:212`; Joint Fabric Administrator `:325, :369`). This module
-follows chip (owner decision 2026-11-01, review W3-clusec-03, W3-club1-02,
-W3-clua2-01): the node's fail-safe port is
+Management `:212`; Joint Fabric Administrator `:325, :369`; Network
+Commissioning's AddOrUpdate, RemoveNetwork and ConnectNetwork through
+`EnsureFailsafeIsArmed`, `NetworkCommissioningCluster.cpp:155-172, :380,
+:568, :609`). This module follows chip (owner decision 2026-11-01, review
+W3-clusec-03, W3-club1-02, W3-clua2-01, and the W3 PR for the Thread and
+Wi-Fi NetworkCommissioning servers): the node's fail-safe port is
 `core.GeneralCommissioning.FailSafeFabric` (armed, and for which fabric), the
-servers test it with `core.FailSafeArmedFor`; UpdateNOC keeps matter.js's own
-answer for another fabric's window, ConstraintError
+servers test it with `core.FailSafeArmedFor`; the two NetworkCommissioning
+servers take it through `AttachFailSafe` / `Config.FailSafe` and keep the
+fabric-blind `IsFailSafeArmed` port for a host without one; UpdateNOC keeps
+matter.js's own answer for another fabric's window, ConstraintError
 (`OperationalCredentialsServer.ts:355-360`). Reasoning: another fabric must
 not consume or roll back the commissioning state of a window it did not arm.
 Pinned by `TestParityOpcreds_FailSafeOfAnotherFabricIsNotArmed`,
-`TestThreadBorderRouterManagementCluster_FailsafeOfAnotherFabric` and
-`TestICACCommandsNeedTheAccessingFabricsFailSafe`.
+`TestThreadBorderRouterManagementCluster_FailsafeOfAnotherFabric`,
+`TestICACCommandsNeedTheAccessingFabricsFailSafe`,
+`TestThreadNetworkCommissioningFailSafeOfAnotherFabric` and
+`TestWiFiNetworkCommissioningFailSafeOfAnotherFabric`.
 
 ### BD-chip-ScenesManagement-SceneNameLength — AddScene refuses a SceneName over 16 with CONSTRAINT_ERROR
 
