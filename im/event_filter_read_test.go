@@ -32,6 +32,7 @@ func buildReadRequestWithEventFilters(t *testing.T, filters []EventMinimumNumber
 	if err := enc.EndContainer(); err != nil {
 		t.Fatalf("EndContainer filters array: %v", err)
 	}
+	enc.PutBool(tlv.ContextTag(tagReadReqFabricFiltered), false) // mandatory
 	if err := enc.EndContainer(); err != nil {
 		t.Fatalf("EndContainer ReadRequest: %v", err)
 	}
@@ -124,12 +125,14 @@ func TestReadEventFilterArray_MultipleFilters(t *testing.T) {
 //	36 02       array, context tag 2         — EventFilters
 //	15          struct, anonymous            — EventFilterIB
 //	24 01 28    uint8, context tag 1, 40     — eventMin
-//	18 18 18    end of struct/array/struct
+//	18 18       end of struct/array
+//	28 03       false, context tag 3         — IsFabricFiltered (mandatory)
+//	18          end of struct
 //
 // Tag layout per matter.js
 // packages/types/src/protocol/types/TlvEventFilter.ts:16-17
 // (`nodeId: TlvOptionalField(0, …)`, `eventMin: TlvField(1, …)`).
-var eventFilterWireFixture = []byte{0x15, 0x36, 0x02, 0x15, 0x24, 0x01, 0x28, 0x18, 0x18, 0x18}
+var eventFilterWireFixture = []byte{0x15, 0x36, 0x02, 0x15, 0x24, 0x01, 0x28, 0x18, 0x18, 0x28, 0x03, 0x18}
 
 // TestReadEventFilterArray_DecodesPeerWireLayout decodes the literal
 // fixture above. Before the tag numbers were corrected, EventMin (real
@@ -307,6 +310,9 @@ func TestUnmarshalSubscribeRequest_ScalarEventFiltersFieldIsSkipped(t *testing.T
 	t.Parallel()
 	enc := tlv.NewEncoder()
 	enc.StartStruct(tlv.AnonymousTag())
+	enc.PutBool(tlv.ContextTag(tagSubReqKeepSubscriptions), false)
+	enc.PutUint(tlv.ContextTag(tagSubReqMinIntervalFloor), 0)
+	enc.PutUint(tlv.ContextTag(tagSubReqMaxIntervalCeiling), 60)
 	enc.PutUint(tlv.ContextTag(tagSubReqEventFilters), 1) // scalar, not an array
 	enc.PutBool(tlv.ContextTag(tagSubReqFabricFiltered), true)
 	if err := enc.EndContainer(); err != nil {

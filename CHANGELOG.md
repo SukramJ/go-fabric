@@ -32,6 +32,7 @@ Findings of the whole-codebase review of 2026-11-01 (`notes/review/2026-11/`).
 - `bridge.ErrUnsecuredIM`: the diagnostic error of a dropped IM message on session 0.
 - `subscription.EventSource`, `Manager.SetEventSource`: the log a subscription's owed events are read from when its report is due (the bridge attaches its event log in `AttachSubscriptionManager`); `Subscription.RequeueAttributes`, `Subscription.RequeueEvents`: a reporter whose send failed owes the subscriber the same data again.
 - `im.FieldError`: a request-decode error naming the IM status it answers (InvalidAction for a wrong TLV type or a missing mandatory field, ConstraintError for an integer out of range).
+- `im.ErrMissingField`: the InvalidAction error a request decoder wraps when a mandatory field is absent.
 
 ### Changed
 
@@ -45,6 +46,7 @@ Findings of the whole-codebase review of 2026-11-01 (`notes/review/2026-11/`).
 - `bridge`: a failed ongoing report marks its attribute paths dirty again and owes its events again, so the next report retries them; the third consecutive failure still reaps the subscription, as matter.js's `ServerSubscription` does (W2-conc-01).
 - `bridge`: a response opcode, an unassigned opcode or a StatusResponse as the first message of an exchange on a unicast session is answered StatusResponse(InvalidAction), as matter.js and connectedhomeip answer it; it was dropped and the peer waited out its exchange (W2-wire-02).
 - `im`: path and header integers (AttributePathIB, CommandPathIB, EventPathIB, the DataVersionFilter cluster path and version, CommandRef, the write DataVersion, the subscribe intervals, the timed timeout, the event filter fields) are type- and range-checked instead of masked: an endpoint of 65536 or -1 read endpoint 0 and a 70000 ms TimedRequest opened a 4464 ms window; such a request is answered ConstraintError (out of range) or InvalidAction (wrong type), and the two AttributePathIB decoders skip a foreign tag alike (W2-wire-03).
+- `im`: the mandatory fields of a ReadRequest (IsFabricFiltered), a SubscribeRequest (KeepSubscriptions, both intervals, IsFabricFiltered), a TimedRequest (Timeout), an EventFilterIB (EventMin) and a DataVersionFilterIB (the path with endpoint and cluster, DataVersion) are required, and their booleans type-checked; a request without one is answered InvalidAction, as matter.js and connectedhomeip answer it (W2-wire-04).
 
 ## [0.15.6] — 2026-11-01
 

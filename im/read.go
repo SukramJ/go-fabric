@@ -109,12 +109,20 @@ func UnmarshalReadRequestTLV(dec *tlv.Decoder) (ReadRequest, error) { //nolint:g
 		return ReadRequest{}, fmt.Errorf("%w: expected struct, got 0x%02X", ErrInvalidReadRequest, open.Type)
 	}
 	var req ReadRequest
+	hasFabricFiltered := false
 	for {
 		el, err := dec.Next()
 		if err != nil {
 			return ReadRequest{}, fmt.Errorf("%w: %w", ErrInvalidReadRequest, err)
 		}
 		if el.IsEndContainer {
+			// IsFabricFiltered is mandatory: matter.js
+			// packages/types/src/protocol/messages/TlvReadRequest.ts:30
+			// (TlvField); chip src/app/ReadHandler.cpp:498. Review
+			// 2026-11 W2-wire-04.
+			if !hasFabricFiltered {
+				return ReadRequest{}, fmt.Errorf("%w: %w", ErrInvalidReadRequest, missingField(tagReadReqFabricFiltered, "IsFabricFiltered"))
+			}
 			return req, nil
 		}
 		if el.Tag.Kind != tlv.TagKindContext {
@@ -165,7 +173,10 @@ func UnmarshalReadRequestTLV(dec *tlv.Decoder) (ReadRequest, error) { //nolint:g
 			}
 			req.EventFilters = filters
 		case tagReadReqFabricFiltered:
-			req.FabricFiltered = el.Bool
+			if req.FabricFiltered, err = boolField(el); err != nil {
+				return ReadRequest{}, fmt.Errorf("%w: %w", ErrInvalidReadRequest, err)
+			}
+			hasFabricFiltered = true
 		case tagReadReqDataVersionFilters:
 			// DataVersionFilters is an Array of structs per Matter §10.6.4.
 			if !el.IsContainer || el.Type != tlv.TypeArray {

@@ -64,6 +64,7 @@ type TimedRequest struct {
 // UnmarshalTimedRequestTLV parses a TimedRequestMessage TLV payload.
 func UnmarshalTimedRequestTLV(dec *tlv.Decoder) (TimedRequest, error) {
 	var req TimedRequest
+	hasTimeout := false
 	open, err := dec.Next()
 	if err != nil {
 		return req, fmt.Errorf("%w: top: %w", ErrInvalidTimedRequest, err)
@@ -84,6 +85,7 @@ func UnmarshalTimedRequestTLV(dec *tlv.Decoder) (TimedRequest, error) {
 		}
 		switch uint8(el.Tag.Number & 0xFF) {
 		case tagTimedReqTimeout:
+			hasTimeout = true
 			// TlvUInt16, never masked: 70000 ms as a uint32 is refused,
 			// not a 4464 ms window (matter.js packages/types/src/protocol/messages/TlvTimedRequest.ts:15; review
 			// 2026-11 W2-wire-03).
@@ -94,6 +96,12 @@ func UnmarshalTimedRequestTLV(dec *tlv.Decoder) (TimedRequest, error) {
 			// Decoded but not retained — the IM-revision field is
 			// informational; we always reply with our own revision.
 		}
+	}
+	// Timeout is mandatory: matter.js
+	// packages/types/src/protocol/messages/TlvTimedRequest.ts:15 (TlvField).
+	// Review 2026-11 W2-wire-04.
+	if !hasTimeout {
+		return TimedRequest{}, fmt.Errorf("%w: %w", ErrInvalidTimedRequest, missingField(tagTimedReqTimeout, "Timeout"))
 	}
 	return req, nil
 }

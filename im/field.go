@@ -32,6 +32,41 @@ func (e *FieldError) Error() string {
 // MatterStatusCode implements [StatusCodeError].
 func (e *FieldError) MatterStatusCode() StatusCode { return e.Status }
 
+// ErrMissingField is the error a request decoder returns, wrapped with
+// the field's name, when a mandatory field is absent; it answers
+// InvalidAction. matter.js packages/types/src/tlv/TlvObject.ts:258
+// throws ValidationMandatoryFieldMissingError (InvalidAction,
+// packages/types/src/common/ValidationError.ts:45-48); chip's parsers
+// return CHIP_END_OF_TLV, which src/app/ReadHandler.cpp:208-214 answers
+// InvalidAction.
+var ErrMissingField StatusCodeError = missingFieldError{}
+
+type missingFieldError struct{}
+
+func (missingFieldError) Error() string                { return "im: mandatory field missing" }
+func (missingFieldError) MatterStatusCode() StatusCode { return StatusInvalidAction }
+
+// Is lets errors.Is match [ErrMissingField] by value.
+func (missingFieldError) Is(target error) bool {
+	_, ok := target.(missingFieldError)
+	return ok
+}
+
+// missingField wraps [ErrMissingField] with the field's name and tag.
+func missingField(tag uint8, name string) error {
+	return fmt.Errorf("%w: %s (tag %d)", ErrMissingField, name, tag)
+}
+
+// boolField returns el's value when el is a boolean, and an InvalidAction
+// [FieldError] otherwise (chip src/app/MessageDef/Parser.h:113-123, as
+// for [uintField]).
+func boolField(el tlv.Element) (bool, error) {
+	if el.Type != tlv.TypeBoolFalse && el.Type != tlv.TypeBoolTrue {
+		return false, &FieldError{Status: StatusInvalidAction, Tag: fieldTag(el), Reason: fmt.Sprintf("TLV type 0x%02X, want a boolean", uint8(el.Type))}
+	}
+	return el.Bool, nil
+}
+
 // uintField returns el's value when el is an unsigned integer of at most
 // maxValue. A path or header integer is never masked into range: an
 // out-of-range value would become a different, valid path.

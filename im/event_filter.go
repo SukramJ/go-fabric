@@ -60,28 +60,50 @@ func readDataVersionFilterArray(dec *tlv.Decoder) ([]DataVersionFilter, error) {
 //	tag 1 = DataVersion (uint32)
 func readDataVersionFilterFields(dec *tlv.Decoder) (DataVersionFilter, error) {
 	var f DataVersionFilter
+	var hasPath, hasVersion bool
 	for {
 		el, err := dec.Next()
 		if err != nil {
 			return DataVersionFilter{}, err
 		}
 		if el.IsEndContainer {
+			// Path and DataVersion are mandatory, and so are the path's
+			// endpoint and cluster: matter.js
+			// packages/types/src/protocol/types/TlvDataVersionFilter.ts:16-17,
+			// TlvClusterPath.ts:16-17 (TlvField). Review 2026-11 W2-wire-04.
+			switch {
+			case !hasPath:
+				return DataVersionFilter{}, missingField(0, "DataVersionFilterIB.Path")
+			case !hasVersion:
+				return DataVersionFilter{}, missingField(1, "DataVersionFilterIB.DataVersion")
+			}
 			return f, nil
 		}
 		if el.Tag.Kind != tlv.TagKindContext {
+			if err := skipField(dec, el); err != nil {
+				return DataVersionFilter{}, err
+			}
 			continue
 		}
 		switch uint8(el.Tag.Number & 0xFF) {
 		case 0: // Path (ClusterPathIB — a List)
-			if !el.IsContainer {
-				continue
+			if !el.IsContainer || el.Type != tlv.TypeList {
+				return DataVersionFilter{}, &FieldError{Status: StatusInvalidAction, Tag: 0, Reason: "ClusterPathIB not a list"}
 			}
+			var hasEndpoint, hasCluster bool
 			for {
 				inner, innerErr := dec.Next()
 				if innerErr != nil {
 					return DataVersionFilter{}, innerErr
 				}
 				if inner.IsEndContainer {
+					if !hasEndpoint {
+						return DataVersionFilter{}, missingField(1, "ClusterPathIB.Endpoint")
+					}
+					if !hasCluster {
+						return DataVersionFilter{}, missingField(2, "ClusterPathIB.Cluster")
+					}
+					hasPath = true
 					break
 				}
 				if inner.Tag.Kind != tlv.TagKindContext {
@@ -98,8 +120,10 @@ func readDataVersionFilterFields(dec *tlv.Decoder) (DataVersionFilter, error) {
 				switch uint8(inner.Tag.Number & 0xFF) {
 				case 1: // EndpointID
 					f.Endpoint, fieldErr = uint16Field(inner)
+					hasEndpoint = true
 				case 2: // ClusterID
 					f.Cluster, fieldErr = uint32Field(inner)
+					hasCluster = true
 				default:
 					fieldErr = skipField(dec, inner)
 				}
@@ -113,6 +137,11 @@ func readDataVersionFilterFields(dec *tlv.Decoder) (DataVersionFilter, error) {
 				return DataVersionFilter{}, err
 			}
 			f.DataVersion = v
+			hasVersion = true
+		default:
+			if err := skipField(dec, el); err != nil {
+				return DataVersionFilter{}, err
+			}
 		}
 	}
 }
@@ -176,12 +205,20 @@ func readEventFilterFields(dec *tlv.Decoder) (EventMinimumNumber, error) {
 	)
 
 	var f EventMinimumNumber
+	hasEventMin := false
 	for {
 		el, err := dec.Next()
 		if err != nil {
 			return EventMinimumNumber{}, err
 		}
 		if el.IsEndContainer {
+			// EventMin is mandatory: matter.js
+			// packages/types/src/protocol/types/TlvEventFilter.ts:17
+			// (TlvField); chip src/app/ReadHandler.cpp:603. Review
+			// 2026-11 W2-wire-04.
+			if !hasEventMin {
+				return EventMinimumNumber{}, missingField(tagEventFilterEventMin, "EventFilterIB.EventMin")
+			}
 			return f, nil
 		}
 		if el.Tag.Kind != tlv.TagKindContext {
@@ -202,6 +239,7 @@ func readEventFilterFields(dec *tlv.Decoder) (EventMinimumNumber, error) {
 			if f.EventMin, err = uint64Field(el); err != nil {
 				return EventMinimumNumber{}, err
 			}
+			hasEventMin = true
 		default:
 			if el.IsContainer {
 				if skipErr := skipContainer(dec); skipErr != nil {
