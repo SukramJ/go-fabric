@@ -234,7 +234,13 @@ func (o *OTAVersions) IsApplicable(v SoftwareVersion, current uint32) bool {
 // Download writes the image of u to w — downloadUpdate's network half
 // (:667-709): an http or https OTA URL only, the GET bounded by
 // [DefaultDownloadTimeout]. The caller verifies the image ([VerifyImage])
-// before it serves it.
+// before it serves it. When the record states the image's size
+// (OTAFileSize), at most that many bytes are copied: a longer answer is an
+// OTAError, not an image held in full. matter.js streams the answer to
+// storage without a bound (DclOtaUpdateService.ts:703, :571) and checks
+// the size on verification (:408, OtaImageReader.file with otaFileSize);
+// the bound keeps that verdict without
+// buffering what an OTA host sends past the announced size.
 func (o *OTAVersions) Download(ctx context.Context, u SoftwareVersion, w io.Writer) error {
 	if strings.TrimSpace(u.OTAURL) == "" {
 		return &OTAError{Message: "No OTA URL provided in update info"}
@@ -269,8 +275,18 @@ func (o *OTAVersions) Download(ctx context.Context, u SoftwareVersion, w io.Writ
 	if resp.StatusCode < 200 || resp.StatusCode > 299 {
 		return &OTAError{Message: fmt.Sprintf("Failed to download OTA image: %d %s", resp.StatusCode, http.StatusText(resp.StatusCode))}
 	}
-	if _, err := io.Copy(w, resp.Body); err != nil {
+	if u.OTAFileSize == 0 {
+		if _, err := io.Copy(w, resp.Body); err != nil {
+			return fail(err)
+		}
+		return nil
+	}
+	n, err := io.Copy(w, io.LimitReader(resp.Body, int64(min(u.OTAFileSize, 1<<62))+1)) //nolint:gosec // bounded above
+	if err != nil {
 		return fail(err)
+	}
+	if uint64(n) > u.OTAFileSize {
+		return &OTAError{Message: fmt.Sprintf("OTA image from %s exceeds its announced size of %d bytes", u.OTAURL, u.OTAFileSize)}
 	}
 	return nil
 }
