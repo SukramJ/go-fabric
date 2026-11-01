@@ -126,8 +126,12 @@ func (s *ThermostatServer) SetAttributes(values map[uint32]any) error {
 		s.localTempCalib = int16(n)
 	}
 	if n, ok := checked[thermoAttrSystemMode].(uint8); ok {
-		note(thermoAttrSystemMode, s.systemMode != n)
+		moved := s.systemMode != n
+		note(thermoAttrSystemMode, moved)
 		s.systemMode = n
+		if moved {
+			note(tdef.AttrThermostatRunningMode, s.followSystemModeLocked(n))
+		}
 	}
 	if n, ok := checked[thermoAttrOccupancy].(uint8); ok {
 		occupied := n&1 != 0

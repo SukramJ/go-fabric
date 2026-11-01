@@ -46,6 +46,7 @@ Findings of the whole-codebase review of 2026-11-01 (`notes/review/2026-11/`).
 - `cluster/onoff`: On and Off invalidate the current scene when OnOff at command start differs from the target, so a Sink that echoes the change through `Set` no longer suppresses the invalidation (W3-club2-01).
 - `cluster/switch`, `cluster/sensing`, `cluster/servicearea`: Switch, AmbientContextSensing and ServiceArea implement `contract.ClusterQuiescer`, so the bridge stops their debounce, long-press, multi-press, hold-time and EstimatedEndTime timers when the server leaves the topology or the bridge stops; new `cluster.Quieter.Stop` (W3-club2-02).
 - `cluster/closure`: ClosureControl MoveTo answers InvalidInState unless MainState is Moving, WaitingForMotion or Stopped, as connectedhomeip does; it overwrote an Error, SetupRequired, Protected, Disengaged or Calibrating state with Moving (W3-club1-01).
+- `cluster/thermo`: a SystemMode change to Off, Heat or Cool — written or set by the host — sets ThermostatRunningMode to the same mode when it is served and emits RunningModeChange, as matter.js does (W3-clua1-01).
 
 ## [0.15.6] — 2026-11-01
 

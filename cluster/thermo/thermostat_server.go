@@ -689,10 +689,15 @@ func (s *ThermostatServer) SetSystemMode(mode uint8) {
 	before := s.eventStateLocked()
 	changed := s.systemMode != mode
 	s.systemMode = mode
+	running := changed && s.followSystemModeLocked(mode)
 	after := s.eventStateLocked()
 	s.mu.Unlock()
 	if changed {
-		s.changes.NotifyFrom(contract.OriginHostSet, thermoAttrSystemMode)
+		ids := []uint32{thermoAttrSystemMode}
+		if running {
+			ids = append(ids, tdef.AttrThermostatRunningMode)
+		}
+		s.changes.NotifyFrom(contract.OriginHostSet, ids...)
 		s.emitChanges(context.Background(), before, after)
 	}
 }
@@ -1109,9 +1114,14 @@ func (s *ThermostatServer) writeSystemMode(ctx context.Context, v uint8) error {
 	s.mu.Lock()
 	before := s.eventStateLocked()
 	s.systemMode = v
+	running := s.followSystemModeLocked(v)
 	after := s.eventStateLocked()
 	s.mu.Unlock()
 	s.changes.NotifyFrom(contract.OriginControllerWrite, thermoAttrSystemMode)
+	if running {
+		// matter.js sets it as a local actor (asLocalActor, :1196).
+		s.changes.NotifyFrom(contract.OriginHostSet, tdef.AttrThermostatRunningMode)
+	}
 	s.emitChanges(ctx, before, after)
 	return nil
 }
