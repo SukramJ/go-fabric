@@ -218,7 +218,11 @@ func (d *Decoder) readValue(el *Element) error { //nolint:funlen // wire/dispatc
 		// Octet strings are left untouched.
 		if i := bytes.IndexByte(body, 0x1F); i >= 0 {
 			// The length a bounded consumer checks first (TlvString.ts:59-63).
-			el.RawLength = utf16Length(decodeUTF8(body))
+			n := utf16Length(decodeUTF8(body))
+			if n > math.MaxUint32 {
+				return fmt.Errorf("%w: character string of %d code units", ErrTruncated, n)
+			}
+			el.RawLength = uint32(n)
 			body = body[:i]
 		}
 		// Ill-formed UTF-8 reads as U+FFFD, as matter.js's TextDecoder

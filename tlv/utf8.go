@@ -71,8 +71,8 @@ func decodeUTF8(body []byte) string {
 
 // utf16Length is the length of s in UTF-16 code units, the unit of a
 // JavaScript string's length; s is well-formed (decodeUTF8's output).
-func utf16Length(s string) int {
-	n := 0
+func utf16Length(s string) uint64 {
+	var n uint64
 	for _, r := range s {
 		if r >= 0x10000 {
 			n += 2

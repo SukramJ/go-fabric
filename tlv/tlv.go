@@ -129,15 +129,6 @@ type Element struct {
 	Octets []byte
 	IsNull bool
 
-	// RawLength is, for a character string the decoder cut at its first
-	// IS1 (0x1F), the length of the whole string as it arrived, in UTF-16
-	// code units — the unit matter.js's TlvString bounds a string in. It
-	// is 0 when nothing was cut. A bounded consumer refuses the element
-	// when RawLength exceeds its maximum, as matter.js checks the length
-	// before it truncates (packages/types/src/tlv/TlvString.ts:57-69 at
-	// 862ad75f).
-	RawLength int
-
 	// IsContainer is true for Structure / Array / List markers; the
 	// caller drives the inner-element loop with successive Next()
 	// calls until the matching End-of-Container.
@@ -145,6 +136,15 @@ type Element struct {
 
 	// IsEndContainer is true for the 0x18 End-of-Container marker.
 	IsEndContainer bool
+
+	// RawLength is, for a character string the decoder cut at its first
+	// IS1 (0x1F), the length of the whole string as it arrived, in UTF-16
+	// code units — the unit matter.js's TlvString bounds a string in. It
+	// is 0 when nothing was cut. A bounded consumer refuses the element
+	// when RawLength exceeds its maximum, as matter.js checks the length
+	// before it truncates (packages/types/src/tlv/TlvString.ts:57-69 at
+	// 862ad75f). A uint32 beside the flags keeps Element at its size.
+	RawLength uint32
 }
 
 // Errors returned by encoder / decoder.

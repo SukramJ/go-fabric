@@ -4,6 +4,7 @@
 package tlv
 
 import (
+	"bytes"
 	"strings"
 	"testing"
 )
@@ -142,7 +143,7 @@ func TestPutUTF8Bounded_NonPositiveMaxIsUnbounded(t *testing.T) {
 				t.Fatalf("Bytes: %v", err)
 			}
 			wantBytes, _ := want.Bytes()
-			if string(got) != string(wantBytes) {
+			if !bytes.Equal(got, wantBytes) {
 				t.Errorf("PutUTF8Bounded(%q, %d) = %x, want PutUTF8's %x", s, maxBytes, got, wantBytes)
 			}
 		}
@@ -162,7 +163,7 @@ func TestPutUTF8_IllFormedInputIsSanitised(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Bytes: %v", err)
 	}
-	if want := []byte{0x0C, 0x05, 0x61, 0xEF, 0xBF, 0xBD, 0x62}; string(got) != string(want) {
+	if want := []byte{0x0C, 0x05, 0x61, 0xEF, 0xBF, 0xBD, 0x62}; !bytes.Equal(got, want) {
 		t.Fatalf("PutUTF8(\"a\\xffb\") = % X, want % X", got, want)
 	}
 	for name, put := range map[string]func(*Encoder){
@@ -175,7 +176,7 @@ func TestPutUTF8_IllFormedInputIsSanitised(t *testing.T) {
 		if err != nil {
 			t.Fatalf("%s: Bytes: %v", name, err)
 		}
-		if want := []byte{0x0C, 0x04, 0xEF, 0xBF, 0xBD, 0x61}; string(b) != string(want) {
+		if want := []byte{0x0C, 0x04, 0xEF, 0xBF, 0xBD, 0x61}; !bytes.Equal(b, want) {
 			t.Errorf("%s = % X, want % X (U+FFFD then \"a\")", name, b, want)
 		}
 	}
