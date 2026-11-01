@@ -311,7 +311,14 @@ func (s *ControlServer) MatterInvoke(
 // ignored rather than refused; with Positioning, an absent Position falls
 // back to OverallTargetState.Position, and with that null too the closure
 // does not change its position; a Position outside the advertised set is
-// CONSTRAINT_ERROR.
+// CONSTRAINT_ERROR. matter.js has no ClosureControl logic
+// (notes/parity/by_design.md BD-chip-ClosureControl-RulesInServer):
+// connectedhomeip's HandleMoveTo is the authority for the state rules — a
+// closure whose MainState is not Moving, WaitingForMotion or Stopped
+// answers INVALID_IN_STATE. chip's other gate, a null
+// OverallCurrentState (ClosureControlCluster.cpp:560-562 at 6170af84),
+// cannot fire here: this server reads OverallCurrentState as a struct
+// whose fields are null until observed, never as null.
 func (s *ControlServer) invokeMoveTo(ctx context.Context, fields any) error {
 	req, err := moveToRequest(fields)
 	if errors.Is(err, wire.ErrClosureControlMalformed) {
@@ -322,6 +329,7 @@ func (s *ControlServer) invokeMoveTo(ctx context.Context, fields any) error {
 	}
 	s.mu.RLock()
 	fallback := s.targetPosition
+	state := s.mainState
 	s.mu.RUnlock()
 	// Position belongs to Positioning, which the server always serves;
 	// Latch and Speed to features it does not (LT, SP): both ignored.
@@ -329,11 +337,25 @@ func (s *ControlServer) invokeMoveTo(ctx context.Context, fields any) error {
 	if target == nil {
 		target = fallback
 	}
+	if target != nil {
+		if err := s.checkPositionSupported(*target); err != nil {
+			return err
+		}
+	}
+	// Mirrors connectedhomeip
+	// src/app/clusters/closure-control-server/ClosureControlCluster.cpp:599-605
+	// at 6170af84: in any MainState other than Moving, WaitingForMotion or
+	// Stopped MoveTo is INVALID_IN_STATE, after the field checks and
+	// before the delegate — so an Error, SetupRequired, Protected,
+	// Disengaged or Calibrating state the host set is not overwritten
+	// with Moving.
+	switch state {
+	case wire.ClosureMainStateMoving, wire.ClosureMainStateWaitingForMotion, wire.ClosureMainStateStopped:
+	default:
+		return spec.Errorf(im.StatusInvalidInState, "closure: MoveTo in MainState %d", state)
+	}
 	if target == nil {
 		return nil
-	}
-	if err := s.checkPositionSupported(*target); err != nil {
-		return err
 	}
 	if s.mover == nil {
 		return errors.New("closure: MoveTo has no mover")

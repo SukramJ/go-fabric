@@ -117,6 +117,7 @@ pin lift confirms by re-reading the row, [`pin-lifts.md`](./pin-lifts.md)).
 | BD-chip-JCM-Commissioner | `ControllerCommissioningFlow.ts:576-583` runs `OperationalCredentials.Certificates` right after `OperationalCredentials.DeviceAttestation`, no Joint Commissioning step between (absence: the two step pushes, :573-585) | `packages/protocol/src/peer/ControllerCommissioningFlow.ts` | `"name: \"OperationalCredentials.DeviceAttestation\",\n            stepLogic: () => this.#deviceAttestation(),\n        });\n\n        this.commissioningSteps.push({\n            stepNumber: 11, // includes 11-13"` | connectedhomeip `src/controller/jcm/DeviceCommissioner.cpp` at `6170af84` (:45-550), `src/controller/jcm/AutoCommissioner.{h,cpp}` (the read paths `.h:56-66`), `src/controller/AutoCommissioner.cpp:522-531` (the stage after attestation), tests `src/controller/tests/jcm/TestJCMCommissioner.cpp` | no |
 | BD-Matter-SurfaceChange-ConfigurationVersion | `BasicInformationServer.ts:35-37` leaves the "when" to the application: the version is "seeded to 1 and constrained to only ever increase", and the application bumps it "with `increaseConfigurationVersion`" (`:132`); the only production caller at the pin is the bridged-to-root coupling, `BridgedDeviceBasicInformationServer.ts:86` | `packages/node/src/behaviors/basic-information/BasicInformationServer.ts` | `"node's configuration changes in a way clients should detect, bump it with {@link increaseConfigurationVersion},"` | this module: concept v11 §C.9, ADR 0030 decision 6, wave S4 — the node persists each endpoint's effective surface next to its ConfigurationVersion and raises the bridged and the root ConfigurationVersion (one change, matter.js's coupling) when the surface of a returning endpoint differs (`node/surface_stability.go`) | no |
 | BD-chip-FailSafeOfTheAccessingFabric | `OperationalCredentialsServer.ts:602-604` reads the one `failsafeContext` without asking for whose fabric it was armed (presence) | `packages/node/src/behaviors/operational-credentials/OperationalCredentialsServer.ts` | `"get #failsafeContext() {\n        return this.env.get(DeviceCommissioner).failsafeContext;\n    }"` | connectedhomeip `src/app/FailSafeContext.h:76-79` at `6170af84` (`IsFailSafeArmed(accessingFabricIndex)`), its callers `OperationalCredentialsCluster.cpp:341, :472, :760`, `ThreadBorderRouterManagementCluster.cpp:212`, `joint-fabric-administrator-server.cpp:325, :369` | no |
+| BD-chip-ClosureControl-RulesInServer | `ClosureControlServer.ts:17` is the empty subclass (absence: the class line, 17 lines in all) | `packages/node/src/behaviors/closure-control/ClosureControlServer.ts` | `"export class ClosureControlServer extends ClosureControlBehavior {}"` | connectedhomeip `src/app/clusters/closure-control-server/ClosureControlCluster.cpp` at `6170af84` (`HandleStop` :531-551, `HandleMoveTo` :554-639) | no |
 | BD-chip-ScenesManagement-SceneNameLength | `ScenesManagementServer.ts:147` relaxes the AddScene SceneName constraint for the behaviour to answer, and `addScene` checks only SceneId and TransitionTime (`:283`, presence) | `packages/node/src/behaviors/scenes-management/ScenesManagementServer.ts` | `"transitionTime > 60000000) {"` | connectedhomeip `src/app/clusters/scenes-server/ScenesManagementCluster.cpp:535-541` at `6170af84` | no |
 
 ---
@@ -4951,6 +4952,27 @@ the name in UTF-16 units as matter.js's string constraint counts them
 `TestScenesAddSceneNameLengthParity` (W3-clucore-03; the server used to cut
 the name to 16 and answer SUCCESS). Retire when matter.js's `addScene`
 checks the name.
+
+### BD-chip-ClosureControl-RulesInServer — the ClosureControl command rules are connectedhomeip's; matter.js has none
+
+matter.js's `ClosureControlServer` is the empty subclass
+(`packages/node/src/behaviors/closure-control/ClosureControlServer.ts:17` at
+`862ad75f`), so `cluster/closure.ControlServer` follows connectedhomeip's
+`ClosureControlCluster.cpp` at `6170af84` behind the `Mover` port. MoveTo
+(`HandleMoveTo` `:554-639`): none of Position, Latch and Speed is
+INVALID_COMMAND (`:558`), a Position outside the advertised set
+CONSTRAINT_ERROR, and in any MainState other than Moving, WaitingForMotion
+or Stopped INVALID_IN_STATE before the mover is called (`:599-605`;
+W3-club1-01, `TestClosureControlMoveToMainStateChip`); the server starts in
+SetupRequired until the host reports a state. chip's null-OverallCurrentState
+gate (`:560-562`) has no counterpart: this server reads OverallCurrentState
+as a struct whose fields are null until observed. Stop (`HandleStop`
+`:531-551`): only Moving, WaitingForMotion and Calibrating stop, SUCCESS
+always (with `BD-Matter-ClosureControl-StopObserver`). The fallback target
+and the ignored Latch and Speed of features the server does not serve are
+the specification text matter.js carries (`closure-control.resource.ts`).
+Reasoning: chip is the only reference with rules (W3-club1-06). Retire when
+matter.js's server gains them.
 
 ### BD-Thread-TBRM-ChipLogic — ThreadBorderRouterManagement follows connectedhomeip behind the `BorderRouter` port
 

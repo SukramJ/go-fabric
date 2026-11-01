@@ -80,7 +80,7 @@ func TestClosureControlMoveToAcceptsEveryPayloadShape(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			h := &recordingHandlers{}
-			srv := closure.NewControlServer(h.config())
+			srv := ready(closure.NewControlServer(h.config()))
 			if _, err := srv.MatterInvoke(
 				context.Background(), clusterwire.ClosureControlCmdMoveTo, fields,
 			); err != nil {
@@ -128,7 +128,7 @@ func TestClosureControlMoveToRejectsAPayloadItCannotRead(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			h := &recordingHandlers{}
-			srv := closure.NewControlServer(h.config())
+			srv := ready(closure.NewControlServer(h.config()))
 			_, err := srv.MatterInvoke(context.Background(), clusterwire.ClosureControlCmdMoveTo, fields)
 			if err == nil {
 				t.Fatal("MoveTo accepted a payload it cannot read")
@@ -154,7 +154,7 @@ func TestClosureControlMoveToRejectsAPayloadItCannotRead(t *testing.T) {
 func TestClosureControlMoveToTagMapCarriesLatchAndSpeed(t *testing.T) {
 	t.Parallel()
 	h := &recordingHandlers{}
-	srv := closure.NewControlServer(h.config())
+	srv := ready(closure.NewControlServer(h.config()))
 
 	_, err := srv.MatterInvoke(context.Background(), clusterwire.ClosureControlCmdMoveTo, map[uint8]any{
 		1: true,
@@ -209,7 +209,7 @@ func TestClosureControlStopReportsADeviceRefusal(t *testing.T) {
 	t.Parallel()
 	sentinel := errors.New("drive is jammed")
 	h := &recordingHandlers{stopErr: sentinel}
-	srv := closure.NewControlServer(h.config())
+	srv := ready(closure.NewControlServer(h.config()))
 	srv.SetMainState(clusterwire.ClosureMainStateMoving) // Stop acts on a closure in motion only
 
 	_, err := srv.MatterInvoke(context.Background(), clusterwire.ClosureControlCmdStop, nil)
@@ -229,7 +229,7 @@ func TestClosureControlStopReportsADeviceRefusal(t *testing.T) {
 func TestClosureControlUnknownCommandIsRefused(t *testing.T) {
 	t.Parallel()
 	h := &recordingHandlers{}
-	srv := closure.NewControlServer(h.config())
+	srv := ready(closure.NewControlServer(h.config()))
 
 	if _, err := srv.MatterInvoke(context.Background(), 0x7F, nil); err == nil {
 		t.Fatal("an unknown command reported success")

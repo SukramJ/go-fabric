@@ -43,7 +43,7 @@ func newEmittingServer(t *testing.T, featureMap uint32) (*closure.ControlServer,
 	h := &recordingHandlers{}
 	cfg := h.config()
 	cfg.FeatureMap = featureMap
-	srv := closure.NewControlServer(cfg)
+	srv := ready(closure.NewControlServer(cfg))
 	rec := &recordingEmitter{}
 	srv.SetMatterEventEmitter(rec)
 	srv.SetEndpoint(7)

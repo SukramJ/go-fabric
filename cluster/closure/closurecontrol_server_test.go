@@ -112,7 +112,7 @@ func TestClosureControlMoveToForwardsAndRecordsTheTarget(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			h := &recordingHandlers{}
-			s := closure.NewControlServer(h.config())
+			s := ready(closure.NewControlServer(h.config()))
 
 			_, err := s.MatterInvoke(context.Background(), clusterwire.ClosureControlCmdMoveTo,
 				closuredef.MoveToRequest{Position: (*closuredef.TargetPositionEnum)(new(tc.target))})
@@ -139,7 +139,7 @@ func TestClosureControlMoveToForwardsAndRecordsTheTarget(t *testing.T) {
 func TestClosureControlMoveToRejectsAPositionOutsideTheFeatureSet(t *testing.T) {
 	t.Parallel()
 	h := &recordingHandlers{}
-	s := closure.NewControlServer(h.config())
+	s := ready(closure.NewControlServer(h.config()))
 
 	_, err := s.MatterInvoke(context.Background(), clusterwire.ClosureControlCmdMoveTo,
 		closuredef.MoveToRequest{Position: (*closuredef.TargetPositionEnum)(new(clusterwire.ClosureTargetPositionMoveToPedestrianPosition))})
@@ -163,7 +163,7 @@ func TestClosureControlMoveToRejectsAPositionOutsideTheFeatureSet(t *testing.T) 
 func TestClosureControlMoveToKeepsTheTargetUnchangedWhenTheDeviceRefuses(t *testing.T) {
 	t.Parallel()
 	h := &recordingHandlers{moveErr: errors.New("ccu unreachable")}
-	s := closure.NewControlServer(h.config())
+	s := ready(closure.NewControlServer(h.config()))
 
 	_, err := s.MatterInvoke(context.Background(), clusterwire.ClosureControlCmdMoveTo,
 		closuredef.MoveToRequest{Position: (*closuredef.TargetPositionEnum)(new(clusterwire.ClosureTargetPositionMoveToFullyOpen))})
@@ -181,7 +181,7 @@ func TestClosureControlMoveToKeepsTheTargetUnchangedWhenTheDeviceRefuses(t *test
 func TestClosureControlMoveToWithoutAPositionIsRefused(t *testing.T) {
 	t.Parallel()
 	h := &recordingHandlers{}
-	s := closure.NewControlServer(h.config())
+	s := ready(closure.NewControlServer(h.config()))
 
 	_, err := s.MatterInvoke(context.Background(), clusterwire.ClosureControlCmdMoveTo,
 		closuredef.MoveToRequest{})
@@ -199,7 +199,7 @@ func TestClosureControlMoveToWithoutAPositionIsRefused(t *testing.T) {
 func TestClosureControlStopClearsTheTarget(t *testing.T) {
 	t.Parallel()
 	h := &recordingHandlers{}
-	s := closure.NewControlServer(h.config())
+	s := ready(closure.NewControlServer(h.config()))
 
 	if _, err := s.MatterInvoke(context.Background(), clusterwire.ClosureControlCmdMoveTo,
 		closuredef.MoveToRequest{Position: (*closuredef.TargetPositionEnum)(new(clusterwire.ClosureTargetPositionMoveToFullyOpen))}); err != nil {
@@ -398,7 +398,7 @@ func TestClosureControlMoveToAcceptsTheBridgeTagMap(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			h := &recordingHandlers{}
-			s := closure.NewControlServer(h.config())
+			s := ready(closure.NewControlServer(h.config()))
 
 			_, err := s.MatterInvoke(context.Background(), clusterwire.ClosureControlCmdMoveTo, tc.fields)
 			if err != nil {
@@ -418,7 +418,7 @@ func TestClosureControlMoveToAcceptsTheBridgeTagMap(t *testing.T) {
 func TestClosureControlMoveToTagMapWithoutAnyFieldIsMalformed(t *testing.T) {
 	t.Parallel()
 	h := &recordingHandlers{}
-	s := closure.NewControlServer(h.config())
+	s := ready(closure.NewControlServer(h.config()))
 
 	var empty map[uint8]any
 	_, err := s.MatterInvoke(context.Background(), clusterwire.ClosureControlCmdMoveTo, empty)
