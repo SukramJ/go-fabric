@@ -1002,6 +1002,16 @@ func (g *generator) writePayload(w *writer, p *payload, what string) {
 		w.p("\treturn spec.DecodeFields(n, %q,", p.what)
 		for _, f := range p.fields {
 			dec := decExpr(f)
+			if p.command != nil && p.response == nil {
+				if at, ok := relaxedRequestFields[g.c.Name+"."+p.what+"."+f.name]; ok {
+					// The server judges the value, as matter.js's server
+					// relaxes the field's constraint (relaxedRequestFields).
+					unbounded := *f
+					unbounded.v = nil
+					dec = decExpr(&unbounded)
+					w.p("\t\t// %s: the constraint %q is the server's to judge, as matter.js %s relaxes it.", f.name, f.v.Constraint.Text, at)
+				}
+			}
 			if !f.mandatory {
 				dec = "spec.DecodeOptional(" + dec + ")"
 			}
