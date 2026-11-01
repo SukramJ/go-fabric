@@ -112,6 +112,10 @@ func TestReadChunkLoopAbortsWhenThePeerNeverAnswers(t *testing.T) {
 	b := newStartedBridgeWithSnapshotter(t, manyTempSensorsSnapshotterForTest())
 	b.chunkStatusResponseTimeoutOverride = 200 * time.Millisecond
 	peerConn, peerSess, peerAddr := chunkTestPeer(t, b, sessionID)
+	// The wildcard read must be authorized to fill more than one chunk:
+	// without a fabric the session has to be PASE (the IM ACL gate fails
+	// closed otherwise, im.checkSubjectACL).
+	markPASE(b, sessionID)
 
 	request := encryptIMFromPeer(t, peerSess, sessionID, message.ProtocolHeader{
 		Opcode: im.OpcodeReadRequest, ExchangeID: 0x2103, Initiator: true,
@@ -135,4 +139,21 @@ func TestReadChunkLoopAbortsWhenThePeerNeverAnswers(t *testing.T) {
 	case <-time.After(2 * time.Second):
 		t.Fatal("read dispatch still running 2 s after the first chunk went unanswered")
 	}
+}
+
+// paseResolvingLookup marks one session of an attached lookup as PASE.
+type paseResolvingLookup struct {
+	SessionLookup
+	id uint16
+}
+
+func (l paseResolvingLookup) IsPASE(id uint16) (pase, ok bool) { return id == l.id, id == l.id }
+
+// markPASE wraps b's session lookup so sessionID resolves as a PASE
+// session.
+func markPASE(b *Bridge, sessionID uint16) {
+	b.mu.RLock()
+	inner := b.sessions
+	b.mu.RUnlock()
+	b.AttachSessionLookup(paseResolvingLookup{SessionLookup: inner, id: sessionID})
 }

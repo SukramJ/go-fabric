@@ -150,6 +150,23 @@ func IsPASEFromContext(ctx context.Context) bool {
 	return ok
 }
 
+// checkSubjectACL is the IM ACL gate for one location once the gate is
+// active (an [ACLChecker] is wired and the session is not PASE). A
+// request without an accessing fabric that is not PASE has no subject
+// the ACL could grant anything to and is refused with UnsupportedAccess
+// — it fails closed instead of skipping the check. Mirrors chip
+// src/transport/UnauthenticatedSessionTable.h:82-85 (an unauthenticated
+// session's SubjectDescriptor is empty: fabric 0, auth mode none) and
+// src/access/AccessControl.cpp:355-372 (Check finds no entry for that
+// subject and denies). matter.js never reaches the gate there:
+// InteractionServer.ts:161 `requiresSecureSession = true`.
+func checkSubjectACL(ctx context.Context, c ACLChecker, fabricIndex uint8, subjectNodeID uint64, subjectCATs []uint32, endpoint uint16, clusterID uint32, privilege uint8) StatusCode {
+	if fabricIndex == 0 {
+		return StatusUnsupportedAccess
+	}
+	return c.CheckACL(ctx, fabricIndex, subjectNodeID, subjectCATs, endpoint, clusterID, privilege)
+}
+
 // timedCtxKey carries whether an Invoke runs inside a valid timed
 // interaction.
 type timedCtxKey struct{}

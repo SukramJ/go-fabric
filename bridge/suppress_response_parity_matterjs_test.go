@@ -52,7 +52,7 @@ func dispatchReply(t *testing.T, b *Bridge, opcode uint8, payload []byte, counte
 		t.Fatalf("ListenUDP: %v", err)
 	}
 	defer peer.Close()
-	buf := buildDatagram(buildHeader(0, counter), buildProtocolHeader(im.InteractionModelProtocolID, opcode), payload)
+	buf := secureTestDatagram(t, b, buildProtocolHeader(im.InteractionModelProtocolID, opcode), payload)
 	_ = b.dispatch(context.Background(), buf, peer.LocalAddr().(*net.UDPAddr))
 	_ = peer.SetReadDeadline(time.Now().Add(400 * time.Millisecond))
 	rbuf := make([]byte, 1500)
@@ -60,7 +60,7 @@ func dispatchReply(t *testing.T, b *Bridge, opcode uint8, payload []byte, counte
 	if err != nil {
 		return nil
 	}
-	return rbuf[:n]
+	return openTestReplyFor(t, b, rbuf[:n])
 }
 
 func TestParityMatterJS_SuppressResponseSuppressesErrorStatuses(t *testing.T) {

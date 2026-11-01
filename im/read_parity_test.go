@@ -496,8 +496,8 @@ func TestHandleReadRequest_ACL_CASEAllowed(t *testing.T) {
 }
 
 // TestHandleReadRequest_ACL_PASEBypass verifies that PASE sessions
-// (fabricIndex==0) bypass the ACL check entirely — commissioning reads
-// must succeed before any ACL entry exists.
+// (fabricIndex==0, auth mode PASE) bypass the ACL check entirely —
+// commissioning reads must succeed before any ACL entry exists.
 func TestHandleReadRequest_ACL_PASEBypass(t *testing.T) {
 	t.Parallel()
 	d := &aclDispatcher{
@@ -510,13 +510,56 @@ func TestHandleReadRequest_ACL_PASEBypass(t *testing.T) {
 			{Endpoint: 0, HasEndpoint: true, Cluster: 0x001F, HasCluster: true, Attribute: 0x0000, HasAttribute: true},
 		},
 	}
-	// fabricIndex==0 → PASE session
-	ctx := WithFabricFilter(context.Background(), true, 0)
+	// fabricIndex==0 and auth mode PASE → PASE session before AddNOC
+	ctx := WithAuthModePASE(WithFabricFilter(context.Background(), true, 0))
 	rd := HandleReadRequest(ctx, d, req)
 	if len(rd.Reports) != 1 {
 		t.Fatalf("reports=%d, want 1", len(rd.Reports))
 	}
 	if rd.Reports[0].IsStatus {
 		t.Fatalf("PASE bypass failed: report IsStatus=%v status=%v", rd.Reports[0].IsStatus, rd.Reports[0].Status.Status)
+	}
+}
+
+// TestIMACLFailsClosedWithoutFabric pins the IM ACL gate's fail-closed
+// term: a request with an ACL source wired, no accessing fabric and no
+// PASE auth mode has no subject the ACL could grant anything to, and
+// Read, Write and Invoke each answer UnsupportedAccess for the concrete
+// path instead of skipping the check. Parity: chip
+// src/transport/UnauthenticatedSessionTable.h:82-85 (an empty subject
+// descriptor) and src/access/AccessControl.cpp:355-372 (Check denies);
+// matter.js InteractionServer.ts:161 never serves such a request
+// (`requiresSecureSession = true`).
+func TestIMACLFailsClosedWithoutFabric(t *testing.T) {
+	t.Parallel()
+	d := &aclDispatcher{
+		fakeDispatcher: fakeDispatcher{readVal: AttributeValue{Value: true}, readStat: StatusSuccess, writeStat: StatusSuccess, invokeStat: StatusSuccess},
+		allowedCluster: 0x0006, // a fabric's subject would pass
+	}
+	attr := ConcreteAttributePath{Endpoint: 1, HasEndpoint: true, Cluster: 0x0006, HasCluster: true, Attribute: 0x0000, HasAttribute: true}
+	cmd := ConcreteCommandPath{Endpoint: 1, HasEndpoint: true, Cluster: 0x0006, HasCluster: true, Command: 0x01, HasCommand: true}
+	noFabric := WithFabricFilter(context.Background(), true, 0)
+
+	rd := HandleReadRequest(noFabric, d, ReadRequest{AttributeRequests: []ConcreteAttributePath{attr}})
+	if len(rd.Reports) != 1 || !rd.Reports[0].IsStatus || rd.Reports[0].Status.Status != StatusUnsupportedAccess {
+		t.Errorf("read without fabric = %+v, want one UnsupportedAccess status", rd.Reports)
+	}
+	wr := HandleWriteRequest(noFabric, d, WriteRequest{Writes: []AttributeWrite{{Path: attr, Value: AttributeValue{Value: true}}}})
+	if len(wr.Responses) != 1 || wr.Responses[0].Status.Status != StatusUnsupportedAccess {
+		t.Errorf("write without fabric = %+v, want one UnsupportedAccess status", wr.Responses)
+	}
+	ir := HandleInvokeRequest(noFabric, d, InvokeRequest{Invokes: []CommandInvocation{{Path: cmd}}})
+	if len(ir.Responses) != 1 || !ir.Responses[0].IsStatus || ir.Responses[0].Status.Status != StatusUnsupportedAccess {
+		t.Errorf("invoke without fabric = %+v, want one UnsupportedAccess status", ir.Responses)
+	}
+
+	// The same requests over PASE keep the commissioning channel's
+	// implicit Administer grant (FabricAccessControl.ts:189-191).
+	pase := WithAuthModePASE(noFabric)
+	if rd := HandleReadRequest(pase, d, ReadRequest{AttributeRequests: []ConcreteAttributePath{attr}}); len(rd.Reports) != 1 || rd.Reports[0].IsStatus {
+		t.Errorf("read over PASE = %+v, want the value", rd.Reports)
+	}
+	if wr := HandleWriteRequest(pase, d, WriteRequest{Writes: []AttributeWrite{{Path: attr, Value: AttributeValue{Value: true}}}}); len(wr.Responses) != 1 || wr.Responses[0].Status.Status != StatusSuccess {
+		t.Errorf("write over PASE = %+v, want Success", wr.Responses)
 	}
 }

@@ -18,6 +18,7 @@ const (
 	imGateAbsorbStatusResp                       // StatusResponse: MRP ack, no dispatch
 	imGateRejectUnsupported                      // non-request opcode
 	imGateRejectGroupSession                     // Read/Subscribe/Timed over a group session (§8.5.7)
+	imGateDropUnsecured                          // any IM message on the unsecured session 0
 )
 
 // classifyIMOpcode returns the pre-dispatch routing decision for an
@@ -35,7 +36,21 @@ const (
 // group sessions"). Without this guard, a malicious group sender
 // could enumerate the bridge's attribute tree via a single
 // multicast Read.
-func classifyIMOpcode(opcode uint8, sessionType message.SessionType) imGateAction {
+//
+// Secure-session guard. The Interaction Model runs on secure sessions
+// only: an IM message on the unsecured session (unicast session type,
+// session id 0) is dropped before decode — no exchange, no reply beyond
+// the MRP standalone ack. Mirrors matter.js
+// packages/node/src/node/server/InteractionServer.ts:161
+// (`requiresSecureSession = true`) and
+// packages/protocol/src/protocol/ExchangeManager.ts:391-412, which logs
+// "Ignore … not matching the security requirements" and opens no
+// exchange for a handler whose requiresSecureSession differs from
+// session.isSecure.
+func classifyIMOpcode(opcode uint8, sessionType message.SessionType, sessionID uint16) imGateAction {
+	if sessionType == message.SessionUnsecured && sessionID == 0 {
+		return imGateDropUnsecured
+	}
 	if opcode == im.OpcodeStatusResponse {
 		return imGateAbsorbStatusResp
 	}

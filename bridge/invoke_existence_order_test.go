@@ -65,7 +65,7 @@ func TestDispatchInvoke_ExistenceBeforePayload(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		buf := buildDatagram(buildHeader(0, 21), buildProtocolHeader(im.InteractionModelProtocolID, im.OpcodeInvokeRequest), payload)
+		buf := secureTestDatagram(t, b, buildProtocolHeader(im.InteractionModelProtocolID, im.OpcodeInvokeRequest), payload)
 		if err := b.dispatch(context.Background(), buf, peerAddr); err != nil {
 			t.Fatalf("dispatch: %v", err)
 		}
@@ -75,7 +75,7 @@ func TestDispatchInvoke_ExistenceBeforePayload(t *testing.T) {
 		if err != nil {
 			t.Fatalf("ReadFromUDP: %v", err)
 		}
-		got := rbuf[:n]
+		got := openTestReplyFor(t, b, rbuf[:n])
 		_, hdrLen, err := message.UnmarshalHeader(got)
 		if err != nil {
 			t.Fatal(err)
