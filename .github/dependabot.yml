@@ -24,7 +24,12 @@ updates:
   # The nested modules (ble/bluez, ble/esphome): their own third-party
   # requires (godbus, flynn/noise, miekg/dns). Their require of go-fabric
   # itself is set by the release (the nested module is tagged with the
-  # release that ships it), so Dependabot leaves it alone.
+  # release that ships it), so Dependabot leaves it alone. Their indirect
+  # requires of the root module's dependencies (modernc.org/sqlite and its
+  # transitive set) follow the root through the replace directive, which
+  # Dependabot does not see: a root-module bump runs `go mod tidy` in both
+  # nested modules on the same PR, or ble/bluez and ble/esphome fail on
+  # `go mod tidy -diff` (#350).
   - package-ecosystem: gomod
     directory: "/ble/bluez"
     schedule:
