@@ -257,6 +257,7 @@ func (e statusError) MatterStatusCode() im.StatusCode { return e.code }
 // Compile-time assertions.
 var (
 	_ contract.ClusterServer          = (*Server)(nil)
+	_ contract.ClusterQuiescer        = (*Server)(nil)
 	_ contract.EventReceiver          = (*Server)(nil)
 	_ contract.ClusterAttributeLister = (*Server)(nil)
 	_ contract.ClusterEventLister     = (*Server)(nil)
@@ -742,6 +743,21 @@ func (s *Server) resetLocked() {
 	s.currentPressReported = false
 	s.endMultiPressSequence()
 	s.setRawPositionLocked(s.currentPosition)
+}
+
+// MatterQuiesce implements [contract.ClusterQuiescer]: the bridge calls it
+// when the server leaves the topology or stops, and it stops the debounce,
+// long-press and multi-press timers, so none fires an event or a position
+// write after the bridge let the server go. The server stays usable; the
+// next input arms them again. Mirrors matter.js
+// packages/node/src/behaviors/switch/SwitchServer.ts:379-384 at 862ad75f
+// ([Symbol.asyncDispose] stops the three timers and nothing else).
+func (s *Server) MatterQuiesce() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.debounceTimer.stop()
+	s.longPressTimer.stop()
+	s.multiPressTimer.stop()
 }
 
 // hold takes matter.js's switch state lock for another transaction: until

@@ -117,7 +117,9 @@ pin lift confirms by re-reading the row, [`pin-lifts.md`](./pin-lifts.md)).
 | BD-chip-JointFabricAdministrator-RulesInServer | `JointFabricAdministratorServer.ts:14` is the empty subclass (absence: the class line, 14 lines in all) | `packages/node/src/behaviors/joint-fabric-administrator/JointFabricAdministratorServer.ts` | `"export class JointFabricAdministratorServer extends JointFabricAdministratorBehavior {}"` | connectedhomeip `src/app/clusters/joint-fabric-administrator-server/joint-fabric-administrator-server.cpp` at `6170af84` (the handlers :172-449), `JCMCommissionee.{h,cpp}`, `src/app/server/JointFabricAdministrator.h`, `src/credentials/jcm/` (`TrustVerification.cpp`, `VendorIdVerificationClient.cpp`), tests `joint-fabric-administrator-server/tests/TestJCMCommissionee.cpp`, `src/credentials/tests/jcm/` | no |
 | BD-chip-JCM-Commissioner | `ControllerCommissioningFlow.ts:576-583` runs `OperationalCredentials.Certificates` right after `OperationalCredentials.DeviceAttestation`, no Joint Commissioning step between (absence: the two step pushes, :573-585) | `packages/protocol/src/peer/ControllerCommissioningFlow.ts` | `"name: \"OperationalCredentials.DeviceAttestation\",\n            stepLogic: () => this.#deviceAttestation(),\n        });\n\n        this.commissioningSteps.push({\n            stepNumber: 11, // includes 11-13"` | connectedhomeip `src/controller/jcm/DeviceCommissioner.cpp` at `6170af84` (:45-550), `src/controller/jcm/AutoCommissioner.{h,cpp}` (the read paths `.h:56-66`), `src/controller/AutoCommissioner.cpp:522-531` (the stage after attestation), tests `src/controller/tests/jcm/TestJCMCommissioner.cpp` | no |
 | BD-Matter-SurfaceChange-ConfigurationVersion | `BasicInformationServer.ts:35-37` leaves the "when" to the application: the version is "seeded to 1 and constrained to only ever increase", and the application bumps it "with `increaseConfigurationVersion`" (`:132`); the only production caller at the pin is the bridged-to-root coupling, `BridgedDeviceBasicInformationServer.ts:86` | `packages/node/src/behaviors/basic-information/BasicInformationServer.ts` | `"node's configuration changes in a way clients should detect, bump it with {@link increaseConfigurationVersion},"` | this module: concept v11 §C.9, ADR 0030 decision 6, wave S4 — the node persists each endpoint's effective surface next to its ConfigurationVersion and raises the bridged and the root ConfigurationVersion (one change, matter.js's coupling) when the surface of a returning endpoint differs (`node/surface_stability.go`) | no |
-| BD-chip-FailSafeOfTheAccessingFabric | `OperationalCredentialsServer.ts:602-604` reads the one `failsafeContext` without asking for whose fabric it was armed (presence) | `packages/node/src/behaviors/operational-credentials/OperationalCredentialsServer.ts` | `"get #failsafeContext() {\n        return this.env.get(DeviceCommissioner).failsafeContext;\n    }"` | connectedhomeip `src/app/FailSafeContext.h:76-79` at `6170af84` (`IsFailSafeArmed(accessingFabricIndex)`), its callers `OperationalCredentialsCluster.cpp:341, :472, :760`, `ThreadBorderRouterManagementCluster.cpp:212`, `joint-fabric-administrator-server.cpp:325, :369` | no |
+| BD-chip-FailSafeOfTheAccessingFabric | `OperationalCredentialsServer.ts:602-604` reads the one `failsafeContext` without asking for whose fabric it was armed (presence) | `packages/node/src/behaviors/operational-credentials/OperationalCredentialsServer.ts` | `"get #failsafeContext() {\n        return this.env.get(DeviceCommissioner).failsafeContext;\n    }"` | connectedhomeip `src/app/FailSafeContext.h:76-79` at `6170af84` (`IsFailSafeArmed(accessingFabricIndex)`), its callers `OperationalCredentialsCluster.cpp:341, :472, :760`, `ThreadBorderRouterManagementCluster.cpp:212`, `joint-fabric-administrator-server.cpp:325, :369`, `NetworkCommissioningCluster.cpp:155-172, :380, :568, :609` | no |
+| BD-chip-ClosureControl-RulesInServer | `ClosureControlServer.ts:17` is the empty subclass (absence: the class line, 17 lines in all) | `packages/node/src/behaviors/closure-control/ClosureControlServer.ts` | `"export class ClosureControlServer extends ClosureControlBehavior {}"` | connectedhomeip `src/app/clusters/closure-control-server/ClosureControlCluster.cpp` at `6170af84` (`HandleStop` :531-551, `HandleMoveTo` :554-639) | no |
+| BD-chip-ScenesManagement-SceneNameLength | `ScenesManagementServer.ts:147` relaxes the AddScene SceneName constraint for the behaviour to answer, and `addScene` checks only SceneId and TransitionTime (`:283`, presence) | `packages/node/src/behaviors/scenes-management/ScenesManagementServer.ts` | `"transitionTime > 60000000) {"` | connectedhomeip `src/app/clusters/scenes-server/ScenesManagementCluster.cpp:535-541` at `6170af84` | no |
 | BD-Matter-ICDVerificationKeyConstantTime | `IcdManagementServer.ts:761` compares the presented VerificationKey with `Bytes.areEqual`, a data-dependent comparison (presence) | `packages/node/src/behaviors/icd-management/IcdManagementServer.ts` | `"!Bytes.areEqual(verificationKey, stored.key)"` | this module: Go `crypto/subtle.ConstantTimeCompare` (review 2026-11 W2-sec-04); the accept/refuse outcome is matter.js's | no |
 
 ---
@@ -255,6 +257,25 @@ host's to apply in its `ModeChanger`, as matter.js leaves it to the device.
 **Rationale.** A bridge cannot accept a mode change on the device's behalf;
 the tag rules are the specification's and the same for every host.
 
+
+### BD-Matter-ModeSelect-HostOwnsTheMode — ModeSelect serves neither StartUpMode nor OnMode, and reads null without a source
+
+matter.js's `ModeSelectServer` applies StartUpMode at start-up (unless the
+boot reason is SoftwareUpdateCompleted) and, with DEPONOFF, OnMode when the
+endpoint's OnOff turns on or its StartUpOnOff is On
+(`packages/node/src/behaviors/mode-select/ModeSelectServer.ts:31-62`,
+`:97-101` at `862ad75f`). `cluster/modeselect.Server` advertises no feature
+and serves neither attribute (`modeselect_server.go` `featureMap`): the mode
+is the host's `ModeSource`'s, so a start-up or on-mode is the device's
+decision, made where the device powers up, and advertising DEPONOFF would
+promise an OnMode the server does not hold. A write to either answers
+UNSUPPORTED_ATTRIBUTE. Without a `ModeSource` the four projected attributes
+read as null (only StandardNamespace carries quality X): `NewServer` returns
+no error, so refusing a nil source would change its signature, and a value
+invented here could not be told apart from one the device confirmed.
+Reasoning: the scope cut keeps the mode in one place (W3-club2-04, -06).
+Retire when a host needs a start-up mode the server applies; then mirror
+`ModeSelectServer.ts:31-62` through the source.
 
 ### BD-Matter-TemperatureControl-RulesInServer — SetTemperature checked as connectedhomeip checks it; matter.js has no server logic
 
@@ -398,6 +419,11 @@ backlog item (parity audit CHIP L9-01..04), not an interop gap. The crypto
 core (HKDF salts/info/nonces, Sigma TLV tags, status codes, control octets)
 IS byte-verbatim with connectedhomeip HEAD.
 
+The leniency is the absent field only. A present field of the wrong type
+or above its width is refused — INVALID_ACTION and CONSTRAINT_ERROR, as
+matter.js's `TlvNumber.validate` refuses it (`TlvNumber.ts:145-156`,
+`ValidationError.ts:35-38`) — rather than masked into a different, valid
+value (`cluster/wire/field_bounds.go`, W3-clucore-08).
 ### BD-Matter-MessageCodec-PrivacyWithExtensions — a header with the privacy flag and message extensions is decoded
 
 matter.js `decodePacket` refuses a packet header that sets both the P and the
@@ -1832,10 +1858,17 @@ matter.js fills AuxiliaryAccessUpdated.AdminNodeID from the accessing
 fabric's `rootNodeId` — the CaseAdminSubject AddNOC recorded
 (`AccessControlServer.ts #adminDataFromSession`). go-fabric names the CASE
 subject of the request that changed the auxiliary entries
-(`core.adminNodeIDOf`), null for PASE or a change without a request. It does
-not persist the CaseAdminSubject per fabric, and for the usual single
-administrator the two are the same node; the field is nullable, and
-AccessControlEntryChanged here reports null altogether.
+(`core.adminNodeIDOf`), null for PASE or a change without a request, and
+AccessControlEntryChanged.AdminNodeID names the same CASE subject
+(`core.aclAdminFromContext`; null with AdminPasscodeID 0 over PASE, as
+matter.js's `#adminDataFromSession` answers a PASE session,
+`AccessControlServer.ts:274-282` at `862ad75f`). go-fabric does not persist
+the CaseAdminSubject per fabric, so for a second administrator node of the
+same fabric the two differ: matter.js names the fabric's root node, this
+module the node that sent the request. For the usual single administrator
+they are the same node; the field is nullable (review 2026-11 W3-clusec-08
+corrected this paragraph, which said AccessControlEntryChanged reports
+null). Retire by persisting CaseAdminSubject on the fabric record.
 
 ---
 
@@ -2074,9 +2107,11 @@ differences, each a deliberate choice:
 - PeriodStart equal to PeriodEnd is accepted, as chip's checks are
   `periodStart <= periodEnd` (`CommodityPriceCluster.cpp:93`) and
   `periodStart > periodEnd` refused (`electrical-grid-conditions-server.cpp:132`);
-  the definition's `min periodStart + 1` is an expression bound the
-  runtime does not evaluate (`cluster/spec/model.go:80`: such a bound
-  admits every value).
+  the definition's `min periodStart + 1` is a struct field's bound over
+  a sibling field, which the value checks do not resolve
+  (`cluster/spec/write.go` `checkStruct`: a field constraint naming a
+  sibling is not resolved), so the computed bound has no number and
+  admits every value (`cluster/spec/bound_expr.go`).
 - Where chip is undefined: an update without DayPatterns is treated as an
   empty set (chip would dereference null); ClearTariff drops a pending
   delayed update; the tariff test clock is scoped to the server (chip's
@@ -2581,7 +2616,13 @@ overlap: a `Set` that lands while the Sink is in flight is adopted and
 then overwritten by the command's own attribute — the command wins,
 where matter.js's waiting write would win. Chosen because the host's
 echo of the very change carries the command's value, and a different
-host value in that window is a race the host created. DEM moved into
+host value in that window is a race the host created. A consequence
+that is not a divergence: the echo must not hide the change itself, so
+OnOff's On and Off judge "a change", which invalidates the current scene,
+on OnOff at command start as matter.js does (`OnOffServer.ts:98-100`,
+`:120-122`) — or on the adopted host value the command overwrites; the
+echo stored while the Sink ran used to suppress the invalidation
+(W3-club2-01, `TestSinkEchoInvalidatesScenes`). DEM moved into
 this shape in phase 20 (brief BX2: an `op` queue held across its hooks,
 `mu` released, so a hook may call the setters); EVSE still keeps chip's
 delegate model (ports called under the state lock, the host must not
@@ -4941,18 +4982,67 @@ over PASE). connectedhomeip asks `IsFailSafeArmed(accessingFabricIndex)` —
 armed and `MatchesFabricIndex` (`FailSafeContext.h:76-79, :92-96` at
 `6170af84`) — and answers FAILSAFE_REQUIRED otherwise
 (`OperationalCredentialsCluster.cpp:341, :472, :760`; Thread Border Router
-Management `:212`; Joint Fabric Administrator `:325, :369`). This module
-follows chip (owner decision 2026-11-01, review W3-clusec-03, W3-club1-02,
-W3-clua2-01): the node's fail-safe port is
+Management `:212`; Joint Fabric Administrator `:325, :369`; Network
+Commissioning's AddOrUpdate, RemoveNetwork and ConnectNetwork through
+`EnsureFailsafeIsArmed`, `NetworkCommissioningCluster.cpp:155-172, :380,
+:568, :609`). This module follows chip (owner decision 2026-11-01, review
+W3-clusec-03, W3-club1-02, W3-clua2-01, and the W3 PR for the Thread and
+Wi-Fi NetworkCommissioning servers): the node's fail-safe port is
 `core.GeneralCommissioning.FailSafeFabric` (armed, and for which fabric), the
-servers test it with `core.FailSafeArmedFor`; UpdateNOC keeps matter.js's own
-answer for another fabric's window, ConstraintError
+servers test it with `core.FailSafeArmedFor`; the two NetworkCommissioning
+servers take it through `AttachFailSafe` / `Config.FailSafe` and keep the
+fabric-blind `IsFailSafeArmed` port for a host without one; UpdateNOC keeps
+matter.js's own answer for another fabric's window, ConstraintError
 (`OperationalCredentialsServer.ts:355-360`). Reasoning: another fabric must
 not consume or roll back the commissioning state of a window it did not arm.
 Pinned by `TestParityOpcreds_FailSafeOfAnotherFabricIsNotArmed`,
-`TestThreadBorderRouterManagementCluster_FailsafeOfAnotherFabric` and
-`TestICACCommandsNeedTheAccessingFabricsFailSafe`.
+`TestThreadBorderRouterManagementCluster_FailsafeOfAnotherFabric`,
+`TestICACCommandsNeedTheAccessingFabricsFailSafe`,
+`TestThreadNetworkCommissioningFailSafeOfAnotherFabric` and
+`TestWiFiNetworkCommissioningFailSafeOfAnotherFabric`.
 
+### BD-chip-ScenesManagement-SceneNameLength — AddScene refuses a SceneName over 16 with CONSTRAINT_ERROR
+
+matter.js relaxes the AddScene request's SceneName constraint "so the
+behavior can validate and return proper Status responses"
+(`packages/node/src/behaviors/scenes-management/ScenesManagementServer.ts:129-147`
+at `862ad75f`), but `addScene` validates only SceneId and TransitionTime
+(`:283`) and stores a longer name as sent — which its own ViewSceneResponse
+("max 16", `scenes-management.element.ts:75`) cannot carry. connectedhomeip
+answers AddSceneResponse CONSTRAINT_ERROR and stores nothing
+(`src/app/clusters/scenes-server/ScenesManagementCluster.cpp:535-541` at
+`6170af84`); `cluster/core.ScenesManagement.addScene` does the same, counting
+the name in UTF-16 units as matter.js's string constraint counts them
+(connectedhomeip counts bytes). Pinned by
+`TestScenesAddSceneNameLengthParity` (W3-clucore-03; the server used to cut
+the name to 16 and answer SUCCESS). Retire when matter.js's `addScene`
+checks the name.
+
+### BD-chip-ClosureControl-RulesInServer — the ClosureControl command rules are connectedhomeip's; matter.js has none
+
+matter.js's `ClosureControlServer` is the empty subclass
+(`packages/node/src/behaviors/closure-control/ClosureControlServer.ts:17` at
+`862ad75f`), so `cluster/closure.ControlServer` follows connectedhomeip's
+`ClosureControlCluster.cpp` at `6170af84` behind the `Mover` port. MoveTo
+(`HandleMoveTo` `:554-639`): none of Position, Latch and Speed is
+INVALID_COMMAND (`:558`), a Position outside the advertised set
+CONSTRAINT_ERROR, and in any MainState other than Moving, WaitingForMotion
+or Stopped INVALID_IN_STATE before the mover is called (`:599-605`;
+W3-club1-01, `TestClosureControlMoveToMainStateChip`); the server starts in
+SetupRequired until the host reports a state. chip's null-OverallCurrentState
+gate (`:560-562`) has no counterpart: this server reads OverallCurrentState
+as a struct whose fields are null until observed. Stop (`HandleStop`
+`:531-551`): only Moving, WaitingForMotion and Calibrating stop, SUCCESS
+always (with `BD-Matter-ClosureControl-StopObserver`), and OverallTargetState
+is left as it was (W3-club1-05). One addition chip does not make — of its command
+handlers only MoveTo writes OverallTargetState (`:637`): a reported CurrentPosition
+that is the target's own position clears the target, a position on the way
+(PartiallyOpened) keeps it, so a target reads only while it is outstanding.
+The fallback target
+and the ignored Latch and Speed of features the server does not serve are
+the specification text matter.js carries (`closure-control.resource.ts`).
+Reasoning: chip is the only reference with rules (W3-club1-06). Retire when
+matter.js's server gains them.
 ### BD-Matter-ICDVerificationKeyConstantTime — the ICD VerificationKey is compared in constant time
 
 matter.js's `IcdManagementServer.ts:756-764` at `862ad75f` (`#assertMayModify`)

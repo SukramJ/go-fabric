@@ -392,13 +392,19 @@ func (s *Server) setOnOff(ctx context.Context, st *state, on bool) error {
 // OnTime 0 the delayed-off timer stops and OffWaitTime is cleared
 // (OffWaitTime is kept during a timed-on phase, :104). The invalidation
 // follows the sink's consent: matter.js would roll it back with the
-// refused command's transaction. "A change to on" compares with OnOff as
-// stored after the sink returned ([Server.setOnOff]).
+// refused command's transaction. "A change to on" is OnOff at command
+// start not on — matter.js tests this.state.onOff before the command
+// changes it (OnOffServer.ts:98-100 at 862ad75f), so the host's synchronous echo of
+// this very change through [Server.Set] does not hide it — or OnOff as
+// stored after the sink returned not on, a host value the command
+// overwrites (notes/parity/by_design.md
+// BD-Matter-HostPort-OutsideTheSetterLock).
 func (s *Server) on(ctx context.Context, st *state) error {
+	before := st.onOff
 	if err := s.setOnOff(ctx, st, true); err != nil {
 		return err
 	}
-	if !st.onOff {
+	if !before || !st.onOff {
 		s.invalidateScenes()
 	}
 	st.onOff = true
@@ -415,13 +421,15 @@ func (s *Server) on(ctx context.Context, st *state) error {
 // off is OnOffServer.ts:119-139: a change to off invalidates the current
 // scene (:120-122); OnOff false; with LT the timed-on timer stops, OnTime
 // is 0, and OffWaitTime in 1..0xFFFE starts the delayed-off timer
-// (:129-137). As in on, the comparison reads OnOff as stored after the
-// sink returned.
+// (:129-137). As in on, the change is judged on OnOff at command start
+// (this.state.onOff, OnOffServer.ts:120-122 at 862ad75f) or as stored
+// after the sink returned.
 func (s *Server) off(ctx context.Context, st *state) error {
+	before := st.onOff
 	if err := s.setOnOff(ctx, st, false); err != nil {
 		return err
 	}
-	if st.onOff {
+	if before || st.onOff {
 		s.invalidateScenes()
 	}
 	st.onOff = false

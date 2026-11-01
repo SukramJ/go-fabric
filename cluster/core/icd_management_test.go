@@ -410,3 +410,43 @@ func TestICDManagementRefusals(t *testing.T) {
 		}
 	}
 }
+
+// TestICDVerificationKeyLengthIsTheHandlersToJudge: a VerificationKey of
+// the wrong length reaches the handler, as matter.js relaxes the field's
+// "16" constraint on RegisterClient and UnregisterClient so that "a
+// malformed key fails #assertMayModify's byte comparison rather than being
+// rejected with ConstraintError before the handler runs"
+// (IcdManagementServer.ts:59-74 at 862ad75f): an Administrator's key is
+// ignored, a Manage caller's mismatch is FAILURE (:756-763). The generated
+// decoder used to answer CONSTRAINT_ERROR for both (W3-clusec-06); the
+// stored Key keeps its bound.
+func TestICDVerificationKeyLengthIsTheHandlersToJudge(t *testing.T) {
+	short := []byte{1, 2, 3, 4, 5}
+	var reg icddef.RegisterClientRequest
+	if err := reg.DecodeTLV(encodeNode(t, icddef.RegisterClientRequest{CheckInNodeId: 1, MonitoredSubject: 1, Key: icdKey(1), VerificationKey: &short})); err != nil {
+		t.Fatalf("RegisterClient with a 5-byte VerificationKey: %v", err)
+	}
+	var unreg icddef.UnregisterClientRequest
+	if err := unreg.DecodeTLV(encodeNode(t, icddef.UnregisterClientRequest{CheckInNodeId: 1, VerificationKey: &short})); err != nil {
+		t.Fatalf("UnregisterClient with a 5-byte VerificationKey: %v", err)
+	}
+	if err := reg.DecodeTLV(encodeNode(t, icddef.RegisterClientRequest{CheckInNodeId: 1, MonitoredSubject: 1, Key: short})); err == nil {
+		t.Fatal("RegisterClient with a 5-byte Key decoded")
+	}
+
+	cfg := core.ICDManagementConfig{
+		IdleModeDuration: 4, MaximumCheckInBackoff: 4, ActiveModeDuration: 2000, ActiveModeThreshold: 1000,
+		ClientsSupportedPerFabric: 2, Store: icdStore(t), Clock: inflight.WithGroup(clocktest.New(icdEpoch), inflight.New("icd-vk-test")),
+	}
+	s := newICDServer(t, cfg)
+	admin, manage := icdInvokeCtx(1, privAdminister), icdInvokeCtx(1, privManage)
+	if _, err := s.MatterInvoke(admin, icddef.CmdRegisterClient, icddef.RegisterClientRequest{CheckInNodeId: 0x10, MonitoredSubject: 0x10, Key: icdKey(1)}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.MatterInvoke(manage, icddef.CmdUnregisterClient, icddef.UnregisterClientRequest{CheckInNodeId: 0x10, VerificationKey: &short}); icdStatus(err) != im.StatusFailure {
+		t.Errorf("Manage with a 5-byte VerificationKey = %v, want FAILURE", err)
+	}
+	if _, err := s.MatterInvoke(admin, icddef.CmdUnregisterClient, icddef.UnregisterClientRequest{CheckInNodeId: 0x10, VerificationKey: &short}); err != nil {
+		t.Errorf("Administer with a 5-byte VerificationKey = %v, want the key ignored", err)
+	}
+}

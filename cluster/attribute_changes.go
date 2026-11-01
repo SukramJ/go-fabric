@@ -238,6 +238,21 @@ func (q *Quieter) flush(gen uint64) {
 	q.Report()
 }
 
+// Stop disarms a deferred report and drops the change it held back,
+// without reporting it: the throttle's part of a server's
+// [contract.ClusterQuiescer]. The throttle stays usable; the next change
+// reports as the rules above say.
+func (q *Quieter) Stop() {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	q.gen++
+	q.pending = false
+	if q.timer != nil {
+		q.timer()
+		q.timer = nil
+	}
+}
+
 func (q *Quieter) emitLocked(now time.Time) {
 	q.lastEmit = now
 	q.pending = false

@@ -12,6 +12,7 @@ import (
 	"strings"
 	"unicode"
 	"unicode/utf16"
+	"unicode/utf8"
 
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
@@ -102,8 +103,11 @@ func hostStatus(err error) (contract.StatusError, bool) {
 }
 
 // Peers resolves the current value of a sibling attribute a constraint
-// names ("minMeasuredValue to maxMeasuredValue"); nil resolves none, and an
-// unresolved bound admits every value, as matter.js's does.
+// names ("minMeasuredValue to maxMeasuredValue", "max numberOfPositions -
+// 1"); nil resolves none. A bound computed from a name that does not
+// resolve admits every value, as matter.js's does (Constraint.ts:193-205
+// at 862ad75f); one computed from literals alone ("max 2^62 - 1") always
+// holds.
 type Peers func(attrID uint32) (any, bool)
 
 // ValidateWrite checks a write the way matter.js answers one
@@ -304,6 +308,15 @@ func (i *Instance) checkLength(t Type, c Constraint, value any, peers Peers) (v 
 	if !i.satisfies(c, float64(n), peers) {
 		return nil, fmt.Sprintf("length %d violates %q", n, c.Text)
 	}
+	// After the length, a string's codepoints against cpMax. Mirrors
+	// matter.js packages/node/src/behavior/state/validation/constraint.ts:213-232
+	// at 862ad75f ([...value].length > cpMax is a ConstraintError;
+	// W3-clugen-02).
+	if s, ok := value.(string); ok && c.CpMax > 0 {
+		if cp := utf8.RuneCountInString(s); cp > c.CpMax {
+			return nil, fmt.Sprintf("%d codepoints violate %q", cp, c.Text)
+		}
+	}
 	return value, ""
 }
 
@@ -463,24 +476,29 @@ func (i *Instance) satisfies(c Constraint, v float64, peers Peers) bool {
 }
 
 func (i *Instance) bound(b *Bound, peers Peers) (float64, bool) {
-	var ref string
 	switch {
 	case b == nil:
 		return 0, false
 	case b.Expr != "":
-		// A dotted reference the generator keeps as its expression tree
-		// ({"type":".","lhs":…,"rhs":…}) is the qualified name it spells;
-		// any other expression stays unresolved.
-		if ref = dottedReference(b.Expr); ref == "" {
-			return 0, false
-		}
+		// An expression the generator keeps as its tree — arithmetic,
+		// maxOf / minOf, a dotted reference or a unit value it could not
+		// restate in the type's units — is computed (bound_expr.go).
+		return i.evalBound(parseBoundExpr(b.Expr), peers)
 	case b.Ref == "":
 		return float64(b.Int), true
-	default:
-		ref = b.Ref
 	}
-	if peers == nil {
+	v, ok := i.resolveName(b.Ref, peers)
+	if !ok {
 		return 0, false
+	}
+	return asFloat(v)
+}
+
+// resolveName is the value of the sibling attribute a reference names, or
+// of a field of it.
+func (i *Instance) resolveName(ref string, peers Peers) (any, bool) {
+	if peers == nil {
+		return nil, false
 	}
 	// A qualified reference ("holdTimeLimits.holdTimeMin") names a sibling
 	// attribute by its first segment and a field of its value by each
@@ -491,18 +509,18 @@ func (i *Instance) bound(b *Bound, peers Peers) (float64, bool) {
 	segments := strings.Split(ref, ".")
 	a := i.def.AttributeByName(segments[0])
 	if a == nil {
-		return 0, false
+		return nil, false
 	}
 	v, ok := peers(a.ID)
 	if !ok || v == nil {
-		return 0, false
+		return nil, false
 	}
 	for _, field := range segments[1:] {
 		if v, ok = structField(v, field); !ok || v == nil {
-			return 0, false
+			return nil, false
 		}
 	}
-	return asFloat(v)
+	return v, true
 }
 
 // dottedReference is the qualified name a "." expression tree of

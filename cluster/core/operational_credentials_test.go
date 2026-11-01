@@ -299,18 +299,51 @@ func TestOpcreds_AddNOC_BadIPK(t *testing.T) {
 	t.Parallel()
 	oc := newOpcreds(t)
 
-	// Provide IPK with wrong length — must get NOCStatusInvalidNOC before
-	// any CSR check.
-	resp, err := oc.MatterInvoke(context.Background(), 0x06, core.AddNOCRequest{
+	// An IPK of the wrong length is CONSTRAINT_ERROR at the IM level, as
+	// matter.js's schema ("octstr, M, 16", operational-credentials.element.ts:98
+	// at 862ad75f) refuses it before addNoc runs; chip answers
+	// INVALID_COMMAND (OperationalCredentialsCluster.cpp:469 at 6170af84).
+	// The server used to answer in-band InvalidNOC (W3-clusec-07).
+	_, err := oc.MatterInvoke(context.Background(), 0x06, core.AddNOCRequest{
 		IPKValue:      make([]byte, 8), // not 16
 		AdminVendorID: 0xFFF1,
 	})
-	if err != nil {
-		t.Fatalf("AddNOC bad IPK: %v", err)
+	var sc interface{ MatterStatusCode() im.StatusCode }
+	if !errors.As(err, &sc) || sc.MatterStatusCode() != im.StatusConstraintError {
+		t.Fatalf("AddNOC bad IPK = %v, want CONSTRAINT_ERROR", err)
 	}
-	nr := resp.(core.NOCResponse)
-	if nr.StatusCode != core.NOCStatusInvalidNOC {
-		t.Fatalf("StatusCode = %d, want NOCStatusInvalidNOC (%d) for bad IPK", nr.StatusCode, core.NOCStatusInvalidNOC)
+}
+
+// TestOpcreds_AddNOC_CSRSessionBindsEvenWhenAddNOCNamesNoSession: a CSR
+// issued on a named session is consumed by that session alone, as
+// matter.js compares csrSessionId with the request's session strictly
+// (OperationalCredentialsServer.ts:240-245 at 862ad75f); the server used to
+// skip the comparison when the AddNOC context named no session
+// (W3-clusec-04).
+func TestOpcreds_AddNOC_CSRSessionBindsEvenWhenAddNOCNamesNoSession(t *testing.T) {
+	t.Parallel()
+	oc := newOpcreds(t)
+	csrCtx := core.WithInvokeSessionID(context.Background(), 7)
+	if _, err := oc.MatterInvoke(csrCtx, 0x04, core.CSRRequest{CSRNonce: make([]byte, 32)}); err != nil {
+		t.Fatalf("CSRRequest: %v", err)
+	}
+	add := core.AddNOCRequest{IPKValue: make([]byte, 16), AdminVendorID: 0xFFF1}
+	for _, tc := range []struct {
+		name string
+		ctx  context.Context
+		want bool // MissingCsr
+	}{
+		{"no session named", context.Background(), true},
+		{"another session", core.WithInvokeSessionID(context.Background(), 8), true},
+		{"the CSR's session", csrCtx, false},
+	} {
+		resp, err := oc.MatterInvoke(tc.ctx, 0x06, add)
+		if err != nil {
+			t.Fatalf("%s: AddNOC: %v", tc.name, err)
+		}
+		if got := resp.(core.NOCResponse).StatusCode == core.NOCStatusMissingCsr; got != tc.want {
+			t.Errorf("%s: MissingCsr = %v, want %v (status %d)", tc.name, got, tc.want, resp.(core.NOCResponse).StatusCode)
+		}
 	}
 }
 

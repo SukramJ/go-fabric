@@ -227,31 +227,48 @@ func TestLiterals(t *testing.T) {
 		{`{"type":"percent","value":0.07}`, "percent100ths", "float64(7)"},
 		{`{"type":"percent","value":50}`, "percent", "float64(50)"},
 		{`{"type":"celsius","value":26}`, "int16", ""},
-		{`{"type":"bytes","value":"00"}`, "octstr", ""},
+		// A field value the runtime does not resolve keeps a marker
+		// (W3-clugen-07).
+		{`{"type":"bytes","value":"00"}`, "octstr", `spec.UnresolvedDefault{Kind: "bytes"}`},
+		{`{"type":"reference","name":"AbsMinHeatSetpointLimit"}`, "temperature", `spec.UnresolvedDefault{Kind: "reference", Name: "AbsMinHeatSetpointLimit"}`},
 		{`[]`, "list", "spec.EmptyListDefault{}"},
-		{`[1]`, "list", ""},
+		{`[1]`, "list", `spec.UnresolvedDefault{Kind: "list"}`},
 	} {
 		if got := defaultLiteral(raw(c.in), c.typ, "integer"); got != c.want {
 			t.Errorf("defaultLiteral(%s, %s) = %q, want %q", c.in, c.typ, got, c.want)
 		}
 	}
-	if got := boundLiteral(raw(`{"type":"-","lhs":1}`)); !strings.Contains(got, "Expr") {
+	if got := boundLiteral(raw(`{"type":"-","lhs":1}`), "", ""); !strings.Contains(got, "Expr") {
 		t.Errorf("boundLiteral expression %q", got)
 	}
-	if got := boundLiteral(raw(`{"type":"reference","name":"x"}`)); got != `&spec.Bound{Ref: "x"}` {
+	if got := boundLiteral(raw(`{"type":"reference","name":"x"}`), "", ""); got != `&spec.Bound{Ref: "x"}` {
 		t.Errorf("boundLiteral reference %q", got)
+	}
+	// A unit bound is restated in the carrying type's encoding units
+	// (EncodedConstraint.ts:252-258 at 862ad75f): "0 to 12.7°C" of a
+	// SignedTemperature is 127, "0.01%" of a percent100ths 1; a type
+	// that scales no unit leaves the expression (W3-clugen-01).
+	for _, c := range []struct{ in, typ, meta, want string }{
+		{`{"type":"celsius","value":12.7}`, "SignedTemperature", "integer", "&spec.Bound{Int: 127}"},
+		{`{"type":"percent","value":0.01}`, "percent100ths", "integer", "&spec.Bound{Int: 1}"},
+		{`{"type":"percent","value":100}`, "percent100ths", "integer", "&spec.Bound{Int: 10000}"},
+		{`{"type":"celsius","value":12.7}`, "uint8", "integer", `&spec.Bound{Expr: "{\"type\":\"celsius\",\"value\":12.7}"}`},
+	} {
+		if got := boundLiteral(raw(c.in), c.typ, c.meta); got != c.want {
+			t.Errorf("boundLiteral(%s, %s) = %s, want %s", c.in, c.typ, got, c.want)
+		}
 	}
 	c := &constraint{
 		Text: "0, 2 to 5", Desc: true, In: raw(`{"type":"reference","name":"list"}`), Entry: &constraint{Text: "max 3", Max: raw("3")},
 		Parts: []*constraint{{Text: "0", Value: raw("0")}, {Text: "2 to 5", Min: raw("2"), Max: raw("5")}},
 	}
-	lit := constraintLiteral(c)
+	lit := constraintLiteral(c, "", "")
 	for _, want := range []string{"Desc: true", `In: "list"`, "Entry: &spec.Constraint", "Parts: []spec.Constraint{{"} {
 		if !strings.Contains(lit, want) {
 			t.Errorf("constraintLiteral %q lacks %q", lit, want)
 		}
 	}
-	if constraintLiteral(nil) != "" || accessLiteral(nil) != "" || accessLiteral(&access{}) != "" || accessText(nil) != "" {
+	if constraintLiteral(nil, "", "") != "" || accessLiteral(nil) != "" || accessLiteral(&access{}) != "" || accessText(nil) != "" {
 		t.Error("empty literals")
 	}
 	if got := accessText(&access{RW: "RW", Fabric: "F", ReadPriv: "V", WritePriv: "M", Timed: true}); got != "RW F VM T" {
@@ -263,9 +280,16 @@ func TestLiterals(t *testing.T) {
 	if confLiteral(nil) != "spec.Conformance{}" || confText(nil) != "O" || confComment(nil) != "" || confField(nil) != "" {
 		t.Error("empty conformance")
 	}
-	if got := confLiteral(&conformance{Text: "?", AST: raw(`{"type":"bogus"}`)}); !strings.Contains(got, "ConfDesc") {
-		t.Errorf("an unknown node renders %q", got)
-	}
+	// An unknown node fails the generation, not a silent "desc"
+	// (W3-clugen-03).
+	func() {
+		defer func() {
+			if _, ok := recover().(confError); !ok {
+				t.Error("confLiteral of an unknown node did not fail")
+			}
+		}()
+		confLiteral(&conformance{Text: "?", AST: raw(`{"type":"bogus"}`)})
+	}()
 	for _, ast := range []string{
 		`[`, `{"type":"name","param":1}`, `{"type":"revision","param":"x"}`, `{"type":"choice","param":1}`,
 		`{"type":"choice","param":{"name":"a","num":1,"expr":{"type":"bogus"}}}`, `{"type":"otherwise","param":1}`,

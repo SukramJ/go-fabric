@@ -87,8 +87,12 @@ type eventState struct {
 
 // eventStateLocked reads the evented state; the caller holds s.mu.
 func (s *ThermostatServer) eventStateLocked() eventState {
+	local := s.localTemp
+	if s.features&ThermostatFeatureLTNE != 0 {
+		local = nil // the attribute stays null under LTNE: no LocalTemperatureChange
+	}
 	return eventState{
-		systemMode: s.systemMode, localTemp: s.localTemp, runningMode: s.runningMode, runningState: s.runningState,
+		systemMode: s.systemMode, localTemp: local, runningMode: s.runningMode, runningState: s.runningState,
 	}
 }
 
@@ -228,6 +232,36 @@ func (s *ThermostatServer) SetThermostatRunningMode(mode uint8) error {
 		s.emitChanges(context.Background(), before, after)
 	}
 	return nil
+}
+
+// followSystemModeLocked sets ThermostatRunningMode from a SystemMode
+// that changed to Off, Heat or Cool, when the attribute is served, and
+// reports whether it moved; the caller holds s.mu and emits the
+// RunningModeChange through emitChanges. Auto and the other modes leave
+// it to the host ([ThermostatServer.SetThermostatRunningMode]). Mirrors
+// matter.js packages/node/src/behaviors/thermostat/ThermostatServer.ts:1185,
+// :1194-1206 at 862ad75f (#handleSystemModeChange on systemMode$Changed;
+// W3-clua1-01).
+func (s *ThermostatServer) followSystemModeLocked(mode uint8) bool {
+	if !s.inst.Serves(tdef.AttrThermostatRunningMode) {
+		return false
+	}
+	var running tdef.ThermostatRunningModeEnum
+	switch tdef.SystemModeEnum(mode) {
+	case tdef.SystemModeOff:
+		running = tdef.ThermostatRunningModeOff
+	case tdef.SystemModeHeat:
+		running = tdef.ThermostatRunningModeHeat
+	case tdef.SystemModeCool:
+		running = tdef.ThermostatRunningModeCool
+	default:
+		return false
+	}
+	if s.runningMode == uint8(running) {
+		return false
+	}
+	s.runningMode = uint8(running)
+	return true
 }
 
 // endpointStamp holds the stamped endpoint ([ThermostatServer.SetEndpoint]).

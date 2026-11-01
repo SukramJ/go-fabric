@@ -142,7 +142,7 @@ func filterServer(build func(filter.Config) (*filter.Server, error)) serverFacto
 		}
 		cfg := filter.Config{
 			Features: filter.Feature(b.opts.Features), Optional: optional, Resetter: resetter, LastChangedTimeWriter: writer,
-			DataVersion: b.cfg.DataVersion,
+			DataVersion: b.cfg.DataVersion, Clock: b.clock,
 		}
 		configFrom(&cfg, b.def, b.initial)
 		// ReplacementProductList is Config.ReplacementProducts.

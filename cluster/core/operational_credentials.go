@@ -1636,8 +1636,14 @@ func (o *OperationalCredentials) handleAddNOC(ctx context.Context, fields any) (
 	if nocInvoked {
 		return nil, opcredsConstraintErr{msg: "core: AddNOC illegal after AddNOC/UpdateNOC in same FailSafe context"}
 	}
+	// IPKValue is "octstr, M, 16" (matter.js
+	// operational-credentials.element.ts:98 at 862ad75f), so a wrong
+	// length is an IM-level CONSTRAINT_ERROR there — the interaction layer
+	// refuses it before addNoc runs; chip answers INVALID_COMMAND
+	// (OperationalCredentialsCluster.cpp:469 at 6170af84). matter.js wins
+	// (review 2026-11 W3-clusec-07); it answered in-band InvalidNOC.
 	if len(req.IPKValue) != 16 {
-		return NOCResponse{StatusCode: NOCStatusInvalidNOC, DebugText: "IPK length"}, nil
+		return nil, opcredsConstraintErr{msg: fmt.Sprintf("core: AddNOC IPKValue of %d bytes, want 16", len(req.IPKValue))}
 	}
 	// NOC and ICAC byte-length caps per Matter §11.18.6.7 and chip
 	// operational-credentials-server.cpp kMaxCHIPCertLength (400 bytes).
@@ -1670,10 +1676,12 @@ func (o *OperationalCredentials) handleAddNOC(ctx context.Context, fields any) (
 	//
 	// chip: operational-credentials-server.cpp CSR failsafe context check.
 	//
-	// NOTE: When the context carries sessionID==0 (PASE / test paths that
-	// have not been migrated to WithInvokeSessionID) we skip the check —
-	// two zero-IDs would always match, so this is safe for existing callers
-	// while still enforcing the guard on CASE sessions (sessionID > 0).
+	// A CSR issued on a session the context did not name (sessionID 0:
+	// a rig without WithInvokeSessionID) binds to none; a CSR issued on a
+	// named session is consumed by that session alone — matter.js compares
+	// the ids strictly (OperationalCredentialsServer.ts:240-245 at
+	// 862ad75f), and a request that names no session does not match one
+	// that did (review 2026-11 W3-clusec-04).
 	addNOCSessionID := InvokeSessionIDFromContext(ctx)
 
 	o.mu.Lock()
@@ -1687,9 +1695,9 @@ func (o *OperationalCredentials) handleAddNOC(ctx context.Context, fields any) (
 	if priv == nil {
 		return NOCResponse{StatusCode: NOCStatusMissingCsr, DebugText: "CSR not issued"}, nil
 	}
-	// Session-ID mismatch: a non-zero AddNOC session must match the CSR
-	// session. Both zero ⇒ PASE / unset context ⇒ skip (backwards compatible).
-	if addNOCSessionID != 0 && pendingCSRSessID != 0 && addNOCSessionID != pendingCSRSessID {
+	// Session-ID mismatch: the AddNOC session must be the CSR's whenever
+	// the CSR named one.
+	if pendingCSRSessID != 0 && addNOCSessionID != pendingCSRSessID {
 		return NOCResponse{StatusCode: NOCStatusMissingCsr, DebugText: "CSR not found in failsafe context"}, nil
 	}
 	// A CSR issued with IsForUpdateNOC=true must NOT be consumed by AddNOC

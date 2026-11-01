@@ -12,6 +12,7 @@ import (
 	"testing/synctest"
 	"time"
 
+	"github.com/SukramJ/go-fabric/clock/clocktest"
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/cluster/core"
 	"github.com/SukramJ/go-fabric/im"
@@ -280,20 +281,37 @@ func TestGencomm_ArmFailSafe_Arms(t *testing.T) {
 	}
 }
 
-func TestGencomm_ArmFailSafe_ExceedsMax_IsValueOutsideRange(t *testing.T) {
+// TestGencomm_ArmFailSafe_AboveMax_ArmsToTheCumulativeLimit: an
+// ExpiryLengthSeconds above FailSafeMaxSeconds arms, as matter.js arms or
+// extends with the value as sent (GeneralCommissioningServer.ts:89-106 at
+// 862ad75f) and chip arms it as given (GeneralCommissioningCluster.cpp:439-441
+// at 6170af84); the cumulative limit's own timer ends the window
+// (FailsafeTimer.ts:33-35, FailSafeContext.cpp:112-119). The server used to
+// answer ValueOutsideRange (W3-clusec-05).
+func TestGencomm_ArmFailSafe_AboveMax_ArmsToTheCumulativeLimit(t *testing.T) {
 	t.Parallel()
+	clk := clocktest.New(time.Date(2026, 11, 1, 12, 0, 0, 0, time.UTC))
 	gc := newGencomm(t, core.GeneralCommissioningConfig{
-		LocationCapability: core.RegulatoryIndoor,
-		FailSafeMaxSeconds: 120,
+		LocationCapability:           core.RegulatoryIndoor,
+		FailSafeMaxSeconds:           900,
+		CumulativeFailSafeMaxSeconds: 1000,
+		Clock:                        clk,
 	})
 	resp, err := gc.MatterInvoke(context.Background(), 0x00,
-		core.ArmFailSafeRequest{ExpiryLengthSeconds: 999, Breadcrumb: 0})
+		core.ArmFailSafeRequest{ExpiryLengthSeconds: 2000, Breadcrumb: 0})
 	if err != nil {
-		t.Fatalf("ArmFailSafe over-max: unexpected error: %v", err)
+		t.Fatalf("ArmFailSafe above max: unexpected error: %v", err)
 	}
-	r := resp.(core.ArmFailSafeResponse)
-	if r.ErrorCode != core.CommissioningErrorValueOutsideRange {
-		t.Fatalf("ErrorCode = %d, want ValueOutsideRange", r.ErrorCode)
+	if r := resp.(core.ArmFailSafeResponse); r.ErrorCode != core.CommissioningErrorOK {
+		t.Fatalf("ErrorCode = %d, want OK", r.ErrorCode)
+	}
+	clk.Advance(999 * time.Second)
+	if !gc.FailSafeArmed() {
+		t.Fatal("the window ended before the cumulative limit")
+	}
+	clk.Advance(2 * time.Second)
+	if gc.FailSafeArmed() {
+		t.Fatal("the window outlived the cumulative limit")
 	}
 }
 

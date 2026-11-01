@@ -1686,6 +1686,7 @@ var Definition = &spec.Cluster{
 			Access:      spec.Access{RW: "RW", Read: spec.PrivilegeView, Write: spec.PrivilegeManage},
 			Quality:     spec.Quality{NonVolatile: true},
 			Constraint:  spec.Constraint{Text: "desc", Desc: true},
+			Default:     spec.UnresolvedDefault{Kind: "reference", Name: "AbsMinHeatSetpointLimit"},
 		},
 		{
 			ID: AttrMaxHeatSetpointLimit, Name: "MaxHeatSetpointLimit",
@@ -1694,6 +1695,7 @@ var Definition = &spec.Cluster{
 			Access:      spec.Access{RW: "RW", Read: spec.PrivilegeView, Write: spec.PrivilegeManage},
 			Quality:     spec.Quality{NonVolatile: true},
 			Constraint:  spec.Constraint{Text: "desc", Desc: true},
+			Default:     spec.UnresolvedDefault{Kind: "reference", Name: "AbsMaxHeatSetpointLimit"},
 		},
 		{
 			ID: AttrMinCoolSetpointLimit, Name: "MinCoolSetpointLimit",
@@ -1702,6 +1704,7 @@ var Definition = &spec.Cluster{
 			Access:      spec.Access{RW: "RW", Read: spec.PrivilegeView, Write: spec.PrivilegeManage},
 			Quality:     spec.Quality{NonVolatile: true},
 			Constraint:  spec.Constraint{Text: "desc", Desc: true},
+			Default:     spec.UnresolvedDefault{Kind: "reference", Name: "AbsMinCoolSetpointLimit"},
 		},
 		{
 			ID: AttrMaxCoolSetpointLimit, Name: "MaxCoolSetpointLimit",
@@ -1710,6 +1713,7 @@ var Definition = &spec.Cluster{
 			Access:      spec.Access{RW: "RW", Read: spec.PrivilegeView, Write: spec.PrivilegeManage},
 			Quality:     spec.Quality{NonVolatile: true},
 			Constraint:  spec.Constraint{Text: "desc", Desc: true},
+			Default:     spec.UnresolvedDefault{Kind: "reference", Name: "AbsMaxCoolSetpointLimit"},
 		},
 		{
 			ID: AttrMinSetpointDeadBand, Name: "MinSetpointDeadBand",
@@ -1717,7 +1721,7 @@ var Definition = &spec.Cluster{
 			Conformance: spec.Conformance{Text: "AUTO", Op: spec.ConfName, Name: "AUTO"},
 			Access:      spec.Access{RW: "R[W]", Read: spec.PrivilegeView, Write: spec.PrivilegeManage},
 			Quality:     spec.Quality{NonVolatile: true},
-			Constraint:  spec.Constraint{Text: "0 to 12.7°C", Min: &spec.Bound{Int: 0}, Max: &spec.Bound{Expr: "{\"type\":\"celsius\",\"value\":12.7}"}},
+			Constraint:  spec.Constraint{Text: "0 to 12.7°C", Min: &spec.Bound{Int: 0}, Max: &spec.Bound{Int: 127}},
 			Default:     float64(20),
 		},
 		{

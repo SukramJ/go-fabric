@@ -365,8 +365,53 @@ func TestThreadNetworkCommissioningInterfaceEnabled(t *testing.T) {
 		t.Errorf("InterfaceEnabled after the border router went down = %v", v)
 	}
 	n.AttachFailSafe(func() (uint8, bool) { return 0, true }, nil)
-	if !n.armed() {
+	if !n.armedFor(ctx) {
 		t.Error("AttachFailSafe did not wire the fail-safe")
 	}
 	n.Refresh(ctx)
+}
+
+// TestThreadNetworkCommissioningFailSafeOfAnotherFabric: the network
+// commands need the fail-safe window of their accessing fabric, as
+// connectedhomeip's EnsureFailsafeIsArmed asks
+// IsFailSafeArmed(GetAccessingFabricIndex())
+// (NetworkCommissioningCluster.cpp:155-172, :380, :568, :609 at 6170af84;
+// by_design BD-chip-FailSafeOfTheAccessingFabric). A window another fabric
+// armed is FAILSAFE_REQUIRED; the fabric-blind port answers for any.
+func TestThreadNetworkCommissioningFailSafeOfAnotherFabric(t *testing.T) {
+	t.Parallel()
+	br := &simBorderRouter{}
+	armed, crumbs := false, []uint64{}
+	n := newThreadNC(t, br, &armed, &crumbs)
+	n.AttachFailSafe(func() (uint8, bool) { return 2, true }, nil)
+	add := netcommdef.AddOrUpdateThreadNetworkRequest{OperationalDataset: threadDataset}
+	for _, cmd := range []struct {
+		name string
+		id   uint32
+		req  any
+	}{
+		{"AddOrUpdateThreadNetwork", netcommdef.CmdAddOrUpdateThreadNetwork, add},
+		{"RemoveNetwork", netcommdef.CmdRemoveNetwork, netcommdef.RemoveNetworkRequest{NetworkId: threadExtPANID}},
+		{"ConnectNetwork", netcommdef.CmdConnectNetwork, netcommdef.ConnectNetworkRequest{NetworkId: threadExtPANID}},
+	} {
+		other := im.WithFabricFilter(context.Background(), false, 1)
+		if _, err := n.MatterInvoke(other, cmd.id, cmd.req); threadStatusOf(t, err) != im.StatusFailsafeRequired {
+			t.Errorf("%s under fabric 2's window from fabric 1 = %v, want FAILSAFE_REQUIRED", cmd.name, err)
+		}
+	}
+	own := im.WithFabricFilter(context.Background(), false, 2)
+	resp, err := n.MatterInvoke(own, netcommdef.CmdAddOrUpdateThreadNetwork, add)
+	if err != nil {
+		t.Fatalf("AddOrUpdateThreadNetwork from the arming fabric: %v", err)
+	}
+	if st := resp.(netcommdef.NetworkConfigResponse).NetworkingStatus; st != netcommdef.NetworkCommissioningStatusSuccess {
+		t.Errorf("AddOrUpdateThreadNetwork from the arming fabric = %v", st)
+	}
+	// The fabric-blind port, armed, answers for every fabric (the config
+	// port of a host without a fabric-aware fail-safe).
+	blind := newThreadNC(t, &simBorderRouter{}, &armed, &crumbs)
+	armed = true
+	if _, err := blind.MatterInvoke(im.WithFabricFilter(context.Background(), false, 1), netcommdef.CmdAddOrUpdateThreadNetwork, add); err != nil {
+		t.Errorf("fabric-blind port: %v", err)
+	}
 }

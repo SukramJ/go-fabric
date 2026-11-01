@@ -71,99 +71,94 @@ type StopRequest struct {
 }
 
 // DecodeMoveToLevel parses MoveToLevel / MoveToLevelWithOnOff payloads.
+// A field of the wrong type or outside its width is refused ([fieldUint]).
 func DecodeMoveToLevel(payload []byte) (MoveToLevelRequest, error) {
 	var req MoveToLevelRequest
-	if err := walkContext(payload, ErrLevelControlMalformed, func(tag uint32, el tlv.Element) {
+	err := walkContext(payload, ErrLevelControlMalformed, func(tag uint32, el tlv.Element) (err error) {
+		s := ErrLevelControlMalformed
 		switch tag {
 		case 0:
-			req.Level = uint8(el.Uint & 0xFF) // 8-bit field per spec
+			req.Level, err = fieldUint8(el, s)
 		case 1:
-			if el.IsNull {
-				return
-			}
-			v := uint16(el.Uint & 0xFFFF) // 16-bit field per spec
-			req.TransitionTime = &v
+			req.TransitionTime, err = nullableUint16(el, s)
 		case 2:
-			req.OptionsMask = uint8(el.Uint & 0xFF) // 8-bit bitmap per spec
+			req.OptionsMask, err = fieldUint8(el, s)
 		case 3:
-			req.OptionsOverride = uint8(el.Uint & 0xFF) // 8-bit bitmap per spec
+			req.OptionsOverride, err = fieldUint8(el, s)
 		}
-	}); err != nil {
-		return req, err
-	}
-	return req, nil
+		return err
+	})
+	return req, err
 }
 
 // DecodeMove parses Move / MoveWithOnOff payloads.
 func DecodeMove(payload []byte) (MoveRequest, error) {
 	var req MoveRequest
-	if err := walkContext(payload, ErrLevelControlMalformed, func(tag uint32, el tlv.Element) {
+	err := walkContext(payload, ErrLevelControlMalformed, func(tag uint32, el tlv.Element) (err error) {
+		s := ErrLevelControlMalformed
 		switch tag {
 		case 0:
-			req.MoveMode = uint8(el.Uint & 0xFF) // 8-bit enum per spec
+			req.MoveMode, err = fieldUint8(el, s)
 		case 1:
 			if el.IsNull {
-				return
+				return nil
 			}
-			v := uint8(el.Uint & 0xFF) // 8-bit rate per spec
+			var v uint8
+			v, err = fieldUint8(el, s)
 			req.Rate = &v
 		case 2:
-			req.OptionsMask = uint8(el.Uint & 0xFF) // 8-bit bitmap per spec
+			req.OptionsMask, err = fieldUint8(el, s)
 		case 3:
-			req.OptionsOverride = uint8(el.Uint & 0xFF) // 8-bit bitmap per spec
+			req.OptionsOverride, err = fieldUint8(el, s)
 		}
-	}); err != nil {
-		return req, err
-	}
-	return req, nil
+		return err
+	})
+	return req, err
 }
 
 // DecodeStep parses Step / StepWithOnOff payloads.
 func DecodeStep(payload []byte) (StepRequest, error) {
 	var req StepRequest
-	if err := walkContext(payload, ErrLevelControlMalformed, func(tag uint32, el tlv.Element) {
+	err := walkContext(payload, ErrLevelControlMalformed, func(tag uint32, el tlv.Element) (err error) {
+		s := ErrLevelControlMalformed
 		switch tag {
 		case 0:
-			req.StepMode = uint8(el.Uint & 0xFF) // 8-bit enum per spec
+			req.StepMode, err = fieldUint8(el, s)
 		case 1:
-			req.StepSize = uint8(el.Uint & 0xFF) // 8-bit field per spec
+			req.StepSize, err = fieldUint8(el, s)
 		case 2:
-			if el.IsNull {
-				return
-			}
-			v := uint16(el.Uint & 0xFFFF) // 16-bit field per spec
-			req.TransitionTime = &v
+			req.TransitionTime, err = nullableUint16(el, s)
 		case 3:
-			req.OptionsMask = uint8(el.Uint & 0xFF) // 8-bit bitmap per spec
+			req.OptionsMask, err = fieldUint8(el, s)
 		case 4:
-			req.OptionsOverride = uint8(el.Uint & 0xFF) // 8-bit bitmap per spec
+			req.OptionsOverride, err = fieldUint8(el, s)
 		}
-	}); err != nil {
-		return req, err
-	}
-	return req, nil
+		return err
+	})
+	return req, err
 }
 
 // DecodeStop parses Stop / StopWithOnOff payloads.
 func DecodeStop(payload []byte) (StopRequest, error) {
 	var req StopRequest
-	if err := walkContext(payload, ErrLevelControlMalformed, func(tag uint32, el tlv.Element) {
+	err := walkContext(payload, ErrLevelControlMalformed, func(tag uint32, el tlv.Element) (err error) {
+		s := ErrLevelControlMalformed
 		switch tag {
 		case 0:
-			req.OptionsMask = uint8(el.Uint & 0xFF) // 8-bit bitmap per spec
+			req.OptionsMask, err = fieldUint8(el, s)
 		case 1:
-			req.OptionsOverride = uint8(el.Uint & 0xFF) // 8-bit bitmap per spec
+			req.OptionsOverride, err = fieldUint8(el, s)
 		}
-	}); err != nil {
-		return req, err
-	}
-	return req, nil
+		return err
+	})
+	return req, err
 }
 
 // walkContext is the common Structure-walker for context-tagged
 // payloads. It opens the top struct, calls visit(tag, element) for
-// each child, and stops at EndContainer.
-func walkContext(payload []byte, sentinel error, visit func(tag uint32, el tlv.Element)) error {
+// each child, and stops at EndContainer or at the first field visit
+// refuses.
+func walkContext(payload []byte, sentinel error, visit func(tag uint32, el tlv.Element) error) error {
 	d := tlv.NewDecoder(payload)
 	open, err := d.Next()
 	if err != nil {
@@ -183,6 +178,8 @@ func walkContext(payload []byte, sentinel error, visit func(tag uint32, el tlv.E
 		if el.Tag.Kind != tlv.TagKindContext {
 			continue
 		}
-		visit(el.Tag.Number, el)
+		if err := visit(el.Tag.Number, el); err != nil {
+			return err
+		}
 	}
 }

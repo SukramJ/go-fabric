@@ -140,7 +140,7 @@ func (v *ActionStruct) DecodeTLV(n spec.Node) error {
 // fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var ActionStructDef = &spec.Struct{Name: "ActionStruct", Fields: []spec.Field{
 	{ID: 0, Name: "ActionId", Type: spec.Type{Name: "uint16", Kind: spec.KindUint, Bits: 16}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
-	{ID: 1, Name: "Name", Type: spec.Type{Name: "string", Kind: spec.KindString}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "max 128{32}", Max: &spec.Bound{Int: 128}}},
+	{ID: 1, Name: "Name", Type: spec.Type{Name: "string", Kind: spec.KindString}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "max 128{32}", Max: &spec.Bound{Int: 128}, CpMax: 32}},
 	{ID: 2, Name: "Type", Type: spec.Type{Name: "ActionTypeEnum", Kind: spec.KindEnum, Bits: 8, Enum: ActionTypeEnumDef}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{ID: 3, Name: "EndpointListId", Type: spec.Type{Name: "uint16", Kind: spec.KindUint, Bits: 16}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{ID: 4, Name: "SupportedCommands", Type: spec.Type{Name: "CommandBits", Kind: spec.KindBitmap, Bits: 16, Bitmap: CommandBitsDef}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "0 to 4095", Min: &spec.Bound{Int: 0}, Max: &spec.Bound{Int: 4095}}},
@@ -248,7 +248,7 @@ func (v *EndpointListStruct) DecodeTLV(n spec.Node) error {
 // fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var EndpointListStructDef = &spec.Struct{Name: "EndpointListStruct", Fields: []spec.Field{
 	{ID: 0, Name: "EndpointListId", Type: spec.Type{Name: "uint16", Kind: spec.KindUint, Bits: 16}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
-	{ID: 1, Name: "Name", Type: spec.Type{Name: "string", Kind: spec.KindString}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "max 128{32}", Max: &spec.Bound{Int: 128}}},
+	{ID: 1, Name: "Name", Type: spec.Type{Name: "string", Kind: spec.KindString}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "max 128{32}", Max: &spec.Bound{Int: 128}, CpMax: 32}},
 	{ID: 2, Name: "Type", Type: spec.Type{Name: "EndpointListTypeEnum", Kind: spec.KindEnum, Bits: 8, Enum: EndpointListTypeEnumDef}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{ID: 3, Name: "Endpoints", Type: spec.Type{Name: "list", Kind: spec.KindList, Entry: &spec.Field{Name: "entry", Type: spec.Type{Name: "endpoint-no", Kind: spec.KindUint, Bits: 16}}}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "max 256", Max: &spec.Bound{Int: 256}}},
 }}

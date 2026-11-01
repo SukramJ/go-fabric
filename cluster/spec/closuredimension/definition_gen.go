@@ -248,7 +248,7 @@ func (v *RangePercent100thsStruct) DecodeTLV(n spec.Node) error {
 // fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var RangePercent100thsStructDef = &spec.Struct{Name: "RangePercent100thsStruct", Fields: []spec.Field{
 	{ID: 0, Name: "Min", Type: spec.Type{Name: "percent100ths", Kind: spec.KindUint, Bits: 16}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "max 10000", Max: &spec.Bound{Int: 10000}}},
-	{ID: 1, Name: "Max", Type: spec.Type{Name: "percent100ths", Kind: spec.KindUint, Bits: 16}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "Min to 100%", Min: &spec.Bound{Ref: "min"}, Max: &spec.Bound{Expr: "{\"type\":\"percent\",\"value\":100}"}}},
+	{ID: 1, Name: "Max", Type: spec.Type{Name: "percent100ths", Kind: spec.KindUint, Bits: 16}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "Min to 100%", Min: &spec.Bound{Ref: "min"}, Max: &spec.Bound{Int: 10000}}},
 }}
 
 // RotationAxisEnum is the RotationAxisEnum enum8.
@@ -495,7 +495,7 @@ var Definition = &spec.Cluster{
 			Conformance: spec.Conformance{Text: "PS", Op: spec.ConfName, Name: "PS"},
 			Access:      spec.Access{RW: "R", Read: spec.PrivilegeView},
 			Quality:     spec.Quality{Fixed: true},
-			Constraint:  spec.Constraint{Text: "0.01% to 10000", Min: &spec.Bound{Expr: "{\"type\":\"percent\",\"value\":0.01}"}, Max: &spec.Bound{Int: 10000}},
+			Constraint:  spec.Constraint{Text: "0.01% to 10000", Min: &spec.Bound{Int: 1}, Max: &spec.Bound{Int: 10000}},
 			Default:     float64(1),
 		},
 		{
@@ -504,7 +504,7 @@ var Definition = &spec.Cluster{
 			Conformance: spec.Conformance{Text: "PS", Op: spec.ConfName, Name: "PS"},
 			Access:      spec.Access{RW: "R", Read: spec.PrivilegeView},
 			Quality:     spec.Quality{Fixed: true},
-			Constraint:  spec.Constraint{Text: "0.01% to 10000", Min: &spec.Bound{Expr: "{\"type\":\"percent\",\"value\":0.01}"}, Max: &spec.Bound{Int: 10000}},
+			Constraint:  spec.Constraint{Text: "0.01% to 10000", Min: &spec.Bound{Int: 1}, Max: &spec.Bound{Int: 10000}},
 			Default:     float64(1),
 		},
 		{

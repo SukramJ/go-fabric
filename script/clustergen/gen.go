@@ -131,7 +131,16 @@ type generator struct {
 }
 
 // generate produces the package of cluster name.
-func generate(snap *snapshot, name string) (*output, error) {
+func generate(snap *snapshot, name string) (out *output, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			ce, ok := r.(confError)
+			if !ok {
+				panic(r)
+			}
+			out, err = nil, fmt.Errorf("%s: %w", name, ce.err)
+		}
+	}()
 	c := snap.cluster(name)
 	if c == nil {
 		return nil, fmt.Errorf("no cluster %s in the snapshot", name)
@@ -993,6 +1002,16 @@ func (g *generator) writePayload(w *writer, p *payload, what string) {
 		w.p("\treturn spec.DecodeFields(n, %q,", p.what)
 		for _, f := range p.fields {
 			dec := decExpr(f)
+			if p.command != nil && p.response == nil {
+				if at, ok := relaxedRequestFields[g.c.Name+"."+p.what+"."+f.name]; ok {
+					// The server judges the value, as matter.js's server
+					// relaxes the field's constraint (relaxedRequestFields).
+					unbounded := *f
+					unbounded.v = nil
+					dec = decExpr(&unbounded)
+					w.p("\t\t// %s: the constraint %q is the server's to judge, as matter.js %s relaxes it.", f.name, f.v.Constraint.Text, at)
+				}
+			}
 			if !f.mandatory {
 				dec = "spec.DecodeOptional(" + dec + ")"
 			}
@@ -1226,7 +1245,7 @@ func (g *generator) writeDefinition(w *writer) {
 			if lit := qualityLiteral(v.Quality); lit != "" {
 				w.p("\t\t\tQuality: %s,", lit)
 			}
-			if lit := constraintLiteral(v.Constraint); lit != "" {
+			if lit := constraintLiteral(v.Constraint, v.Type, v.Metatype); lit != "" {
 				w.p("\t\t\tConstraint: %s,", lit)
 			}
 			if lit := defaultLiteral(v.Default, v.Type, v.Metatype); lit != "" {
@@ -1356,7 +1375,7 @@ func (g *generator) fieldLiteral(f *fieldInfo) string {
 		if lit := qualityLiteral(f.v.Quality); lit != "" {
 			parts = append(parts, "Quality: "+lit)
 		}
-		if lit := constraintLiteral(f.v.Constraint); lit != "" {
+		if lit := constraintLiteral(f.v.Constraint, f.v.Type, f.v.Metatype); lit != "" {
 			parts = append(parts, "Constraint: "+lit)
 		}
 		if f.v.Access != nil && f.v.Access.Fabric == "S" {
@@ -1413,7 +1432,10 @@ func qualityLiteral(q map[string]bool) string {
 	return "spec.Quality{" + strings.Join(parts, ", ") + "}"
 }
 
-func constraintLiteral(c *constraint) string {
+// constraintLiteral renders a constraint whose bounds are in the units of
+// typeName / metatype (the type that carries it; "" scales none — a list
+// entry's constraint, whose entry type the caller does not pass).
+func constraintLiteral(c *constraint, typeName, metatype string) string {
 	if c == nil {
 		return ""
 	}
@@ -1425,22 +1447,25 @@ func constraintLiteral(c *constraint) string {
 		name string
 		raw  json.RawMessage
 	}{{"Value", c.Value}, {"Min", c.Min}, {"Max", c.Max}} {
-		if lit := boundLiteral(b.raw); lit != "" {
+		if lit := boundLiteral(b.raw, typeName, metatype); lit != "" {
 			parts = append(parts, b.name+": "+lit)
 		}
 	}
 	if ref := referenceOf(c.In); ref != "" {
 		parts = append(parts, fmt.Sprintf("In: %q", ref))
 	}
+	if c.CpMax != nil {
+		parts = append(parts, fmt.Sprintf("CpMax: %d", *c.CpMax))
+	}
 	if c.Entry != nil {
-		if lit := constraintLiteral(c.Entry); lit != "" {
+		if lit := constraintLiteral(c.Entry, "", ""); lit != "" {
 			parts = append(parts, "Entry: &"+lit)
 		}
 	}
 	if len(c.Parts) > 0 {
 		ps := make([]string, 0, len(c.Parts))
 		for _, p := range c.Parts {
-			if lit := constraintLiteral(p); lit != "" {
+			if lit := constraintLiteral(p, typeName, metatype); lit != "" {
 				ps = append(ps, strings.TrimPrefix(lit, "spec.Constraint"))
 			}
 		}
@@ -1449,12 +1474,28 @@ func constraintLiteral(c *constraint) string {
 	return "spec.Constraint{" + strings.Join(parts, ", ") + "}"
 }
 
-func boundLiteral(raw json.RawMessage) string {
+// boundLiteral renders one bound: a number, a reference, a temperature or
+// percentage stated with its unit restated in the encoding units of the
+// carrying type — matter.js restates a constraint before it validates
+// (packages/model/src/logic/EncodedConstraint.ts:30-32, convertValue
+// :252-258 → EncodedValue at 862ad75f, applied at
+// packages/node/src/behavior/state/validation/constraint.ts:82) — and any
+// other expression as its JSON tree, which the runtime computes
+// (cluster/spec/bound_expr.go). A unit the type does not scale stays an
+// expression and admits every value, as matter.js's unscaled bound does
+// (EncodedConstraint.ts:56-61).
+func boundLiteral(raw json.RawMessage, typeName, metatype string) string {
 	if len(raw) == 0 {
 		return ""
 	}
 	if n, ok := intOf(raw); ok {
 		return fmt.Sprintf("&spec.Bound{Int: %d}", n)
+	}
+	var fv map[string]any
+	if json.Unmarshal(raw, &fv) == nil {
+		if n, ok := encodedUnit(fv, typeName, metatype); ok && n == math.Trunc(n) && math.Abs(n) <= 1<<53 {
+			return fmt.Sprintf("&spec.Bound{Int: %d}", int64(n))
+		}
 	}
 	if ref := referenceOf(raw); ref != "" {
 		return fmt.Sprintf("&spec.Bound{Ref: %q}", ref)
@@ -1485,8 +1526,9 @@ func referenceOf(raw json.RawMessage) string {
 // carries it, as matter.js restates it (packages/model/src/logic/
 // DefaultValue.ts:37-59 castValue → EncodedValue.ts:21-43 at 862ad75f; the
 // scale per type name is FieldValue.ts:227-256 numericValue); the empty
-// list as spec.EmptyListDefault. A unit the type name does not scale, and
-// every other field value or list, is not rendered.
+// list as spec.EmptyListDefault; a reference, an octet string or a
+// non-empty list as spec.UnresolvedDefault. A unit the type name does not
+// scale, and every other field value, is not rendered.
 func defaultLiteral(raw json.RawMessage, typeName, metatype string) string {
 	if len(raw) == 0 {
 		return ""
@@ -1508,9 +1550,20 @@ func defaultLiteral(raw json.RawMessage, typeName, metatype string) string {
 		if len(x) == 0 {
 			return "spec.EmptyListDefault{}"
 		}
+		return `spec.UnresolvedDefault{Kind: "list"}`
 	case map[string]any:
 		if n, ok := encodedUnit(x, typeName, metatype); ok {
 			return "float64(" + strconv.FormatFloat(n, 'g', -1, 64) + ")"
+		}
+		// A field value the runtime does not resolve keeps a marker, so a
+		// stated default is told apart from none (W3-clugen-07).
+		switch x["type"] {
+		case "reference":
+			if name, ok := x["name"].(string); ok {
+				return fmt.Sprintf("spec.UnresolvedDefault{Kind: %q, Name: %q}", "reference", name)
+			}
+		case "bytes":
+			return `spec.UnresolvedDefault{Kind: "bytes"}`
 		}
 	}
 	return ""
@@ -1553,16 +1606,27 @@ func encodedUnit(fv map[string]any, typeName, metatype string) (float64, bool) {
 }
 
 // confLiteral renders a conformance AST as a spec.Conformance literal.
+//
+// A node it cannot render fails the generation ([confError], recovered
+// into generate's error) rather than degrading to "desc": a pin lift that
+// adds a conformance node must not turn a mandatory or disallowed element
+// into a conditional one unnoticed, as script/generate_matter_schema.go
+// (schemaConformance, "unknown conformance node") refuses it
+// (W3-clugen-03).
 func confLiteral(c *conformance) string {
 	if c == nil {
 		return "spec.Conformance{}"
 	}
 	body, err := astLiteral(c.AST)
 	if err != nil {
-		return fmt.Sprintf("spec.Conformance{Text: %q, Op: spec.ConfDesc}", c.Text)
+		panic(confError{fmt.Errorf("conformance %q: %w", c.Text, err)})
 	}
 	return fmt.Sprintf("spec.Conformance{Text: %q, %s}", c.Text, body)
 }
+
+// confError carries a conformance confLiteral cannot render out of the
+// writers, which return no error, to generate.
+type confError struct{ err error }
 
 var opLiteral = map[string]string{
 	"M": "spec.ConfMandatory", "O": "spec.ConfOptional", "P": "spec.ConfProvisional", "D": "spec.ConfDeprecated",

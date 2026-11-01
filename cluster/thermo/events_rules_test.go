@@ -133,7 +133,10 @@ func TestEventsOfCommandsAndHostSets(t *testing.T) {
 		t.Fatal(err)
 	}
 	got = rec.take()
-	wantIDs(t, got, tdef.EventSystemModeChange, tdef.EventLocalTemperatureChange)
+	// SystemMode Heat sets ThermostatRunningMode Heat (matter.js
+	// ThermostatServer.ts:1194-1206 at 862ad75f; W3-clua1-01), so
+	// RunningModeChange follows in chip's attribute order.
+	wantIDs(t, got, tdef.EventSystemModeChange, tdef.EventLocalTemperatureChange, tdef.EventRunningModeChange)
 	if got[0].endpoint != 3 {
 		t.Errorf("host event on endpoint %d, want the stamped 3", got[0].endpoint)
 	}

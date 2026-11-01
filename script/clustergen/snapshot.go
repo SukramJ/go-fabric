@@ -95,6 +95,7 @@ type constraint struct {
 	Min   json.RawMessage `json:"min"`
 	Max   json.RawMessage `json:"max"`
 	In    json.RawMessage `json:"in"`
+	CpMax *int            `json:"cpMax"`
 	Entry *constraint     `json:"entry"`
 	Parts []*constraint   `json:"parts"`
 }

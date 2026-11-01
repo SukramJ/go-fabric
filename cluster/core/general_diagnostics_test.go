@@ -73,8 +73,16 @@ func TestGenDiag_ReadRebootCount(t *testing.T) {
 	if !ok {
 		t.Fatal("RebootCount: ok=false")
 	}
-	if v.(uint16) != 1 {
-		t.Fatalf("RebootCount = %v, want 1", v)
+	// Unseeded, RebootCount is 0, as matter.js starts an unset count
+	// (GeneralDiagnosticsServer.ts:102-106 at 862ad75f; W3-clucore-11).
+	if v.(uint16) != 0 {
+		t.Fatalf("RebootCount = %v, want 0", v)
+	}
+	// The reportable attributes are served ones.
+	for _, id := range g.MatterReportable() {
+		if _, ok := g.MatterRead(id); !ok {
+			t.Errorf("MatterReportable lists 0x%04X, which MatterRead does not serve", id)
+		}
 	}
 }
 

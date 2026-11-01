@@ -326,17 +326,16 @@ func (s *Server) hasAlarms() bool { return s.HasFeature("VIS") || s.HasFeature("
 // sensitivitySink carries out a controller's CurrentSensitivityLevel write
 // after the definition's checks: chip's SetCurrentSensitivityLevel
 // (.cpp:321-337). The definition's bound "max supportedSensitivityLevels -
-// 1" is an expression the generated checks do not evaluate, so it is
-// held here.
+// 1" (chip .cpp:324) is computed by the generated checks against the
+// served SupportedSensitivityLevels (cluster/spec/bound_expr.go, matter.js
+// Constraint.ts:969-1096 at 862ad75f) and answers CONSTRAINT_ERROR before
+// the sink runs.
 type sensitivitySink struct{ s *Server }
 
 // MatterWriteAttribute implements [spec.Sink].
 func (k sensitivitySink) MatterWriteAttribute(ctx context.Context, _ uint32, value any) error {
 	level, _ := value.(uint8)
 	s := k.s
-	if level >= s.supported { // .cpp:324
-		return statusErr(im.StatusConstraintError, "CurrentSensitivityLevel %d ≥ SupportedSensitivityLevels %d", level, s.supported)
-	}
 	s.mu.Lock()
 	same := s.current == level
 	s.mu.Unlock()

@@ -421,6 +421,7 @@ var Definition = &spec.Cluster{
 			Type:        spec.Type{Name: "RegulatoryLocationTypeEnum", Kind: spec.KindEnum, Bits: 8, Enum: RegulatoryLocationTypeEnumDef},
 			Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory},
 			Access:      spec.Access{RW: "R", Read: spec.PrivilegeView},
+			Default:     spec.UnresolvedDefault{Kind: "reference", Name: "LocationCapability"},
 		},
 		{
 			ID: AttrLocationCapability, Name: "LocationCapability",
@@ -481,6 +482,7 @@ var Definition = &spec.Cluster{
 			Access:      spec.Access{RW: "R", Read: spec.PrivilegeManage, Write: spec.PrivilegeManage},
 			Quality:     spec.Quality{NonVolatile: true},
 			Constraint:  spec.Constraint{Text: "8", Value: &spec.Bound{Int: 8}},
+			Default:     spec.UnresolvedDefault{Kind: "bytes"},
 		},
 		{
 			ID: AttrNetworkRecoveryReason, Name: "NetworkRecoveryReason",

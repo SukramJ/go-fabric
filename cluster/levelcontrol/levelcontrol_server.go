@@ -328,11 +328,13 @@ type Config struct {
 	// Lighting advertises the LT feature: MinLevel 1, RemainingTime,
 	// StartUpCurrentLevel and the CoupleColorTempToLevel option
 	// (level-control.element.ts:25, :33, :68-71, :127-130). A light needs
-	// it — every lighting device type marks LT mandatory. The server keeps
-	// StartUpCurrentLevel itself and reports it, but never applies it: a
-	// bridged endpoint has no power-up of its own, the reason matter.js
-	// skips start-up behaviour on an endpoint an Aggregator owns
-	// (LevelControlServer.ts initializeLighting).
+	// it — every lighting device type marks LT mandatory. This server
+	// keeps StartUpCurrentLevel itself and reports it, but does not apply
+	// it: the level is the host's port's, and a host that powers up its
+	// device applies the value itself. The server that holds its own
+	// level ([New]) applies it at start-up unless it is bridged, as
+	// matter.js skips start-up behaviour only on an endpoint an Aggregator
+	// owns (LevelControlServer.ts:222-245, [HeldConfig.StartUpCurrentLevel]).
 	Lighting bool
 	// Features, with HasFeatures, is the FeatureMap the server advertises
 	// — OO and LT, each optional, so every subset conforms — in place of
@@ -939,6 +941,11 @@ func moveToLevelRequestFrom(name string, fields any) (wire.MoveToLevelRequest, e
 	case []byte:
 		req, err := wire.DecodeMoveToLevel(v)
 		if err != nil {
+			// A field of the wrong type or out of range carries its
+			// status (INVALID_ACTION / CONSTRAINT_ERROR, W3-clucore-08).
+			if spec.CarriesStatus(err) {
+				return req, err
+			}
 			return req, invalidCommandErr{fmt.Sprintf("levelcontrol: %s: %v", name, err)}
 		}
 		return req, nil
@@ -1022,6 +1029,11 @@ func moveRequestFrom(name string, fields any) (wire.MoveRequest, error) {
 	case []byte:
 		req, err := wire.DecodeMove(v)
 		if err != nil {
+			// A field of the wrong type or out of range carries its
+			// status (INVALID_ACTION / CONSTRAINT_ERROR, W3-clucore-08).
+			if spec.CarriesStatus(err) {
+				return req, err
+			}
 			return req, invalidCommandErr{fmt.Sprintf("levelcontrol: %s: %v", name, err)}
 		}
 		return req, nil

@@ -6,7 +6,6 @@ package measurement
 import (
 	"context"
 	"errors"
-	"math"
 	"slices"
 	"testing"
 
@@ -36,7 +35,6 @@ func TestFlowServerMeasuredValueScalesAndClamps(t *testing.T) {
 		{"one decimal", 12.3, 123},
 		{"rounds half up", 0.05, 1},
 		{"negative clamps to min", -4, 0},
-		{"NaN clamps to min", math.NaN(), 0},
 		{"above range clamps below the null sentinel", 1e6, 65534},
 		{"exact max", 6553.4, 65534},
 	}

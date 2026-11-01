@@ -216,7 +216,8 @@ func (v *RegisterClientRequest) DecodeTLV(n spec.Node) error {
 		spec.Bind(0, "CheckInNodeId", true, &v.CheckInNodeId, spec.DecodeUint[uint64](64)),
 		spec.Bind(1, "MonitoredSubject", true, &v.MonitoredSubject, spec.DecodeUint[uint64](64)),
 		spec.Bind(2, "Key", true, &v.Key, spec.DecodeBytesIn(16, 16)),
-		spec.Bind(3, "VerificationKey", false, &v.VerificationKey, spec.DecodeOptional(spec.DecodeBytesIn(16, 16))),
+		// VerificationKey: the constraint "16" is the server's to judge, as matter.js packages/node/src/behaviors/icd-management/IcdManagementServer.ts:66-70 relaxes it.
+		spec.Bind(3, "VerificationKey", false, &v.VerificationKey, spec.DecodeOptional(spec.DecodeBytes)),
 		spec.Bind(4, "ClientType", true, &v.ClientType, spec.DecodeUint[ClientTypeEnum](8)),
 	)
 }
@@ -263,7 +264,8 @@ func (v UnregisterClientRequest) EncodeTLV(enc *tlv.Encoder, tag tlv.Tag) {
 func (v *UnregisterClientRequest) DecodeTLV(n spec.Node) error {
 	return spec.DecodeFields(n, "UnregisterClient",
 		spec.Bind(0, "CheckInNodeId", true, &v.CheckInNodeId, spec.DecodeUint[uint64](64)),
-		spec.Bind(1, "VerificationKey", false, &v.VerificationKey, spec.DecodeOptional(spec.DecodeBytesIn(16, 16))),
+		// VerificationKey: the constraint "16" is the server's to judge, as matter.js packages/node/src/behaviors/icd-management/IcdManagementServer.ts:71-74 relaxes it.
+		spec.Bind(1, "VerificationKey", false, &v.VerificationKey, spec.DecodeOptional(spec.DecodeBytes)),
 	)
 }
 

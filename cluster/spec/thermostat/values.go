@@ -27,7 +27,7 @@ import "math"
 // package.
 func CelsiusToInt16(c float64) int16 {
 	v := math.Round(c * 100)
-	if v > 32766 { // 32767 is the Matter NULL sentinel — must not be emitted as a real value
+	if v > 32766 { // chip kMaxMeasuredValueRange; a nullable int16's null is -32768
 		return 32766
 	}
 	if v < -27315 { // −273.15 °C absolute-zero floor per chip kMinMeasuredValueRange

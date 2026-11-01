@@ -323,7 +323,7 @@ func (s *TemperatureServer) MatterRead(attrID uint32) (any, bool) {
 		// HAP build with HAPErrorDomain Code=24. See climate/matter.go for the
 		// full rationale.
 		v, ok := s.src.MatterFloatValue()
-		if !ok {
+		if !ok || math.IsNaN(v) { // a NaN reading is no reading (W3-club1-07)
 			return nil, true
 		}
 		return celsiusToInt16(v), true
@@ -331,9 +331,9 @@ func (s *TemperatureServer) MatterRead(attrID uint32) (any, bool) {
 		return int16(-27315), true // -273.15 °C — physical absolute zero
 	case attrMaxMeasuredValue:
 		// chip's `TemperatureMeasurementCluster.cpp:27-28` defines
-		// `kMaxMeasuredValueRange = 32766` — 32767 is reserved as the
-		// `NULL` marker per Matter §2.6.4.4 nullable int16. Keep saturated
-		// at the spec ceiling, not the int16 max.
+		// `kMaxMeasuredValueRange = 32766`. Keep saturated at that
+		// ceiling, not the int16 max. (The null of a nullable int16 is
+		// -32768, the bottom of the range, not 32767.)
 		return int16(32766), true
 	case attrTolerance:
 		return uint16(0), true
@@ -403,7 +403,7 @@ func (s *HumidityServer) MatterRead(attrID uint32) (any, bool) {
 	case attrMeasuredValue:
 		// Value temporarily unavailable — return (nil, true); see TemperatureServer.MatterRead.
 		v, ok := s.src.MatterFloatValue()
-		if !ok {
+		if !ok || math.IsNaN(v) { // a NaN reading is no reading (W3-club1-07)
 			return nil, true
 		}
 		return humidityToUint16(v), true
@@ -486,7 +486,7 @@ func (s *IlluminanceServer) MatterRead(attrID uint32) (any, bool) {
 	case attrMeasuredValue:
 		// Value temporarily unavailable — return (nil, true); see TemperatureServer.MatterRead.
 		v, ok := s.src.MatterFloatValue()
-		if !ok {
+		if !ok || math.IsNaN(v) { // a NaN reading is no reading (W3-club1-07)
 			return nil, true
 		}
 		return luxToMatter(v), true
@@ -577,7 +577,7 @@ func (s *PressureServer) MatterRead(attrID uint32) (any, bool) {
 	case attrMeasuredValue:
 		// Value temporarily unavailable — return (nil, true); see TemperatureServer.MatterRead.
 		v, ok := s.src.MatterFloatValue()
-		if !ok {
+		if !ok || math.IsNaN(v) { // a NaN reading is no reading (W3-club1-07)
 			return nil, true
 		}
 		return hPaToMatter(v), true
@@ -592,8 +592,9 @@ func (s *PressureServer) MatterRead(attrID uint32) (any, bool) {
 		// PressureMeasurementCluster.cpp:26` kMinMeasuredValueMax=32766.
 		return int16(0), true
 	case attrMaxMeasuredValue:
-		// 32766 is the highest non-null representable value;
-		// 32767 is the NULL sentinel per Matter §2.4.5.4.
+		// 32766, within MaxMeasuredValue's "minMeasuredValue + 1 to
+		// 32767" (pressure-measurement.element.ts:31-33 at 862ad75f).
+		// The null of a nullable int16 is -32768, not 32767.
 		return int16(32766), true
 	case attrTolerance:
 		return uint16(0), true
@@ -622,16 +623,29 @@ func (s *PressureServer) MatterReportable() []uint32 { return []uint32{attrMeasu
 // dispatcher falls back to MatterReportable's single attribute.
 func (s *PressureServer) MatterAttributes() []uint32 { return pressureInst.MatterAttributes() }
 
+// hPaToMatter converts hPa to the wire unit, held to the
+// [MinMeasuredValue, MaxMeasuredValue] the server advertises (0, 32766):
+// MeasuredValue is "minMeasuredValue to maxMeasuredValue"
+// (pressure-measurement.element.ts:24-25 at 862ad75f), and a value below
+// it used to reach the wire — -32768 is a nullable int16's null
+// (W3-club1-08).
 func hPaToMatter(hpa float64) int16 {
 	v := math.Round(hpa) // 1 hPa = 0.1 kPa = 1 deci-kPa wire unit
-	if v > math.MaxInt16 {
-		return math.MaxInt16
+	if v > pressureMaxMeasured {
+		return pressureMaxMeasured
 	}
-	if v < math.MinInt16 {
-		return math.MinInt16
+	if v < pressureMinMeasured {
+		return pressureMinMeasured
 	}
 	return int16(v)
 }
+
+// pressureMinMeasured and pressureMaxMeasured are the MinMeasuredValue and
+// MaxMeasuredValue the PressureServer advertises.
+const (
+	pressureMinMeasured = 0
+	pressureMaxMeasured = 32766
+)
 
 // --- BooleanState (0x0045) ---------------------------------------------
 
@@ -918,7 +932,7 @@ func (s *ElectricalPowerServer) MatterRead(attrID uint32) (any, bool) {
 	case attrElPwrActivePower:
 		// Value temporarily unavailable — return (nil, true); see TemperatureServer.MatterRead.
 		v, ok := s.src.MatterFloatValue()
-		if !ok {
+		if !ok || math.IsNaN(v) { // a NaN reading is no reading (W3-club1-07)
 			return nil, true
 		}
 		return wattsToMilliWatts(v), true
@@ -1064,7 +1078,7 @@ func (s *ElectricalEnergyServer) MatterRead(attrID uint32) (any, bool) {
 	case attrElEnCumulativeImported:
 		// Value temporarily unavailable — return (nil, true); see TemperatureServer.MatterRead.
 		v, ok := s.src.MatterFloatValue()
-		if !ok {
+		if !ok || math.IsNaN(v) { // a NaN reading is no reading (W3-club1-07)
 			return nil, true
 		}
 		// The attribute type is EnergyMeasurementStruct, NOT a bare
@@ -1209,7 +1223,7 @@ func (s *AirQualityServer) MatterRead(attrID uint32) (any, bool) {
 // level grades the current reading into an AirQualityEnum member.
 func (s *AirQualityServer) level() uint8 {
 	v, ok := s.src.MatterFloatValue()
-	if !ok || !s.graded {
+	if !ok || !s.graded || math.IsNaN(v) {
 		return airQualityUnknown
 	}
 	if v <= s.goodBelow {
@@ -1265,22 +1279,32 @@ func (s *concentrationServer) MatterDataVersion() uint32 { return s.Current() }
 
 func (s *concentrationServer) MatterClusterID() uint32 { return s.clusterID }
 
+// concMinMeasured and concMaxMeasured are the MinMeasuredValue and
+// MaxMeasuredValue a concentration server advertises.
+const (
+	concMinMeasured = 0.0
+	concMaxMeasured = 100000.0
+)
+
 func (s *concentrationServer) MatterRead(attrID uint32) (any, bool) {
 	switch attrID {
 	case attrConcMeasuredValue:
 		// Value temporarily unavailable — return (nil, true); see TemperatureServer.MatterRead.
 		v, ok := s.src.MatterFloatValue()
-		if !ok {
+		if !ok || math.IsNaN(v) { // a NaN reading is no reading (W3-club1-07)
 			return nil, true
 		}
-		return float32(v), true
+		// Held to the advertised [MinMeasuredValue, MaxMeasuredValue]:
+		// MeasuredValue is "minMeasuredValue to maxMeasuredValue"
+		// (concentration-measurement.element.ts at 862ad75f; W3-club1-08).
+		return float32(min(max(v, concMinMeasured), concMaxMeasured)), true
 	case attrConcMinMeasuredValue:
-		return float32(0), true
+		return float32(concMinMeasured), true
 	case attrConcMaxMeasuredValue:
 		// CO2: ≤ 5000 ppm typical (OSHA limit 5000 ppm 8h-TWA);
 		// PM: ≤ 1000 µg/m³ extreme. Cap at a sensible high bound;
 		// real device-specific limits would tighten this when known.
-		return float32(100000), true
+		return float32(concMaxMeasured), true
 	case attrConcMeasurementUnit:
 		return s.unit, true
 	case attrConcMeasurementMedium:
@@ -1488,7 +1512,7 @@ func (s *PowerSourceServer) MatterRead(attrID uint32) (any, bool) {
 			return nil, false
 		}
 		v, ok := s.floatSrc.MatterFloatValue()
-		if !ok {
+		if !ok || math.IsNaN(v) { // a NaN reading is no reading (W3-club1-07)
 			// Present but currently unknown — quality X permits null.
 			return nil, true
 		}

@@ -289,7 +289,10 @@ func newLevelControlServer(b defaultBuild) (contract.ClusterServer, error) {
 	if d.LevelSource != nil {
 		return newLevelControlPortServer(b, d)
 	}
-	cfg := levelcontrol.HeldConfig{Features: b.opts.Features, DataVersion: b.cfg.DataVersion, Clock: b.clock, ManageTransitions: b.transitions}
+	// Bridged as onoff.Config is (newOnOffServer): every device the kit
+	// builds is added under the Aggregator, where matter.js does not apply
+	// StartUpCurrentLevel (LevelControlServer.ts:224).
+	cfg := levelcontrol.HeldConfig{Features: b.opts.Features, DataVersion: b.cfg.DataVersion, Clock: b.clock, ManageTransitions: b.transitions, Bridged: true}
 	if srv := b.sibling(onoffdef.ClusterID); srv != nil {
 		cfg.OnOff = onOffOf(srv)
 	}

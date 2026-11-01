@@ -1,6 +1,6 @@
-# W3 verdict (2026-11-01, HEAD 769ea3c2) — interim
+# W3 verdict (2026-11-01, HEAD 769ea3c2) — final
 
-Theme files: `wave-3-clu-sec.md` (done), `wave-3-clu-core.md`, `wave-3-clu-gen.md`, `wave-3-clu-b1.md`, `wave-3-clu-b2.md`, `wave-3-clu-a.md` (pending).
+Theme files (all done): `wave-3-clu-sec.md`, `wave-3-clu-core.md`, `wave-3-clu-gen.md`, `wave-3-clu-b1.md`, `wave-3-clu-b2.md`, `wave-3-clu-a1.md`, `wave-3-clu-a2.md`.
 Model note: clu-sec, clu-core and clu-gen ran on Fable (launched before the owner's model rule of 2026-11-01); b1, b2 and a run on Opus with Sonnet maps (`notes/reads/read-review-w3-cluster-{a,b}.md`).
 
 ## Verified against the pins (Fable re-read, both sides)
@@ -41,4 +41,49 @@ All 15 high/medium findings re-read by Fable against both sides: 14 confirmed, 1
 ## Owner decisions pending (W3)
 
 - Fabric-aware fail-safe port (chip authority; matter.js shares the gap in OpCreds): adopt chip → one port change (`node/failsafe.go:54`) feeding OpCreds CSR/AddNOC/AddTrustedRoot, Thread BR, Joint Fabric.
-- "Ahead of matter.js" register rows for ClosureControl (W3-club1-06) and Joint Fabric where chip is the only authority.
+- "Ahead of matter.js" register rows for ClosureControl (W3-club1-06) and Joint Fabric where chip is the only authority — ClosureControl done in the W3 PR (`BD-chip-ClosureControl-RulesInServer`, d284b510); Joint Fabric open.
+
+## Fixed in PR (W3, branch `review/w3`)
+
+The W3 fix PR's items (`notes/briefs/review-2026-11-w3.md`); the Opus
+agent's commits first, then the reviewer's (Fable: item 11, the clu-sec
+lows, W3-clucore-10) after the merge of `main` (PRs #360, #361, #364)
+into the branch. Notes left open are listed below.
+
+| ID | Commit | Change |
+| --- | --- | --- |
+| W3-clugen-01 | 2433875c | `cluster/spec/bound_expr.go`: expression bounds computed (+ − × ÷ ^, maxOf/minOf, dotted references); unit bounds restated in the type's units by the generator; boolcfg hand guard dropped |
+| W3-clucore-01 | c0b1d66a | BDBI NodeLabel over 32 bytes: ConstraintError via `CheckValue` / `refusedWrite` |
+| W3-clucore-02 | 32135158 | IdentifyTime write runs the host's IdentifyHandler; the countdown's end calls it with 0 |
+| W3-clucore-03 | 5a053733 | AddScene: SceneName over 16 is ConstraintError; decoder comment corrected; `BD-chip-ScenesManagement-SceneNameLength` |
+| W3-club2-01 | 9313ce35 | OnOff On/Off invalidate on the state at command start; by_design row corrected |
+| W3-club2-02 | 06875546 | `MatterQuiesce` on Switch, AmbientContextSensing, ServiceArea; `cluster.Quieter.Stop` |
+| W3-club1-01 | d284b510 | ClosureControl MoveTo: InvalidInState outside Moving / WaitingForMotion / Stopped |
+| W3-club1-06 | d284b510 | Ahead row `BD-chip-ClosureControl-RulesInServer` (marker `ClosureControlServer.ts:17`) |
+| W3-clua1-01 | b31dfd65 | SystemMode Off/Heat/Cool sets ThermostatRunningMode, RunningModeChange emitted |
+| W3-clua1-02 | 6e2a8727 | Atomic CommitWrite reverts committed attributes when a later host port refuses; the status stands for every attribute |
+| W3-clua2-02 | 243781c0, 54d5a590 | Held LevelControl applies `HeldConfig.StartUpCurrentLevel` unless `Bridged` or after an OTA boot |
+| W3-clucore-04, -05, -08, -11, -14 | 36a635dd, 54d5a590 | IdentifyTime / wire decoder fields bounded (ConstraintError / InvalidAction); countdown zero reported; GeneralDiagnostics reportables and RebootCount 0; FabricSceneInfo without `Fabrics` |
+| W3-clugen-02, -03, -07, -08 | 102c0770 | `cpMax`; unknown conformance fails generation; `spec.UnresolvedDefault`; revision table reads the constants |
+| W3-club1-03, -04, -05, -07, -08 | 58aa47df | ColorControl scene invalidation; GoTo percentage without PA; ClosureControl target kept; NaN null; Pressure / concentration within Min/Max |
+| W3-club2-03, -04, -05, -06 | 42aaec0d | ResetCondition stamps LastChangedTime; DefaultOpenDuration no-op; `BD-Matter-ModeSelect-HostOwnsTheMode` |
+| W3-clua1-03, -04, W3-clua2-03 | 67688d49 | LocalTemperature null under LTNE; SetpointRaiseLower in int; DoorState only on change |
+| item 11 (Thread / Wi-Fi NetworkCommissioning fail-safe) | 377c4072 | AddOrUpdate, RemoveNetwork, ConnectNetwork need the accessing fabric's window (`FailSafeArmedFor`; chip `NetworkCommissioningCluster.cpp:155-172, :380, :568, :609`); `Config.FailSafe` on both servers, `node` wires `FailSafeFabric`; `BD-chip-FailSafeOfTheAccessingFabric` extended |
+| W3-clusec-04, W3-clusec-07 | e468ccba | CSR session binding holds whenever the CSR named a session (`OperationalCredentialsServer.ts:240-245`); wrong-length IPK is CONSTRAINT_ERROR (`operational-credentials.element.ts:98`) |
+| W3-clusec-05 | ec1b239f | ArmFailSafe above FailSafeMaxSeconds arms, the cumulative timer ends it (`GeneralCommissioningServer.ts:89-106`, chip `GeneralCommissioningCluster.cpp:439-441`) |
+| W3-clusec-06 | 78bbde50 | ICD RegisterClient / UnregisterClient VerificationKey unbounded in the decoder (`IcdManagementServer.ts:59-74`); `script/clustergen/relaxed.go` `relaxedRequestFields` |
+| W3-clusec-08, W3-clucore-10 | c1b8ebf1 | `BD-Matter-AuxiliaryAccessAdminNode` corrected (AccessControlEntryChanged names the CASE subject, `AccessControlServer.ts:274-282`); the dead LocalConfigDisabled arm removed |
+
+Notes W3-clusec-09/10, clucore-06/07/09/12/13, clugen-04/05/06/09/10,
+club1-09/10, clua2-04 stay open.
+
+Reviewer's answers to the agent's open questions (2026-11-01): (1) AddScene
+keeps chip's CONSTRAINT_ERROR for a SceneName over 16 — matter.js stores a
+name its own ViewSceneResponse cannot carry, recorded as the Ahead row
+`BD-chip-ScenesManagement-SceneNameLength`; (2) ClosureControl's
+OverallCurrentState keeps its struct-of-nulls shape — reading null until the
+host reports would change the wire for every host, and chip's null gate has
+no observable effect while MainState starts in SetupRequired; (3) Valve
+Open/Close keep their DataVersion bumps — the W3-club2-05 fix covers the
+no-op write; a bump on a command that changes state is correct and a
+command that changes nothing is the host's rare case.

@@ -305,3 +305,45 @@ func TestWiFiNetworkCommissioningScan(t *testing.T) {
 		t.Fatal("not busy")
 	}
 }
+
+// TestWiFiNetworkCommissioningFailSafeOfAnotherFabric: the network commands
+// need the fail-safe window of their accessing fabric, as connectedhomeip's
+// EnsureFailsafeIsArmed asks IsFailSafeArmed(GetAccessingFabricIndex())
+// (NetworkCommissioningCluster.cpp:155-172, :380, :568, :609 at 6170af84;
+// by_design BD-chip-FailSafeOfTheAccessingFabric). A window another fabric
+// armed is FAILSAFE_REQUIRED.
+func TestWiFiNetworkCommissioningFailSafeOfAnotherFabric(t *testing.T) {
+	w, _ := newWiFiNC(t, new(bool), new([]uint64))
+	w.failSafe = func() (uint8, bool) { return 2, true }
+	add := netcommdef.AddOrUpdateWiFiNetworkRequest{Ssid: []byte("home"), Credentials: []byte("secret12")}
+	for _, cmd := range []struct {
+		name string
+		id   uint32
+		req  any
+	}{
+		{"AddOrUpdateWiFiNetwork", netcommdef.CmdAddOrUpdateWiFiNetwork, add},
+		{"RemoveNetwork", netcommdef.CmdRemoveNetwork, netcommdef.RemoveNetworkRequest{NetworkId: []byte("home")}},
+		{"ConnectNetwork", netcommdef.CmdConnectNetwork, netcommdef.ConnectNetworkRequest{NetworkId: []byte("home")}},
+	} {
+		other := im.WithFabricFilter(context.Background(), false, 1)
+		if _, err := w.MatterInvoke(other, cmd.id, cmd.req); wifiStatusOf(t, err) != im.StatusFailsafeRequired {
+			t.Errorf("%s under fabric 2's window from fabric 1 = %v, want FAILSAFE_REQUIRED", cmd.name, err)
+		}
+	}
+	own := im.WithFabricFilter(context.Background(), false, 2)
+	resp, err := w.MatterInvoke(own, netcommdef.CmdAddOrUpdateWiFiNetwork, add)
+	if err != nil {
+		t.Fatalf("AddOrUpdateWiFiNetwork from the arming fabric: %v", err)
+	}
+	if st := resp.(netcommdef.NetworkConfigResponse).NetworkingStatus; st != netcommdef.NetworkCommissioningStatusSuccess {
+		t.Errorf("AddOrUpdateWiFiNetwork from the arming fabric = %v", st)
+	}
+	// Neither port wired: disarmed.
+	bare, err := NewWiFiNetworkCommissioning(WiFiNetworkCommissioningConfig{Driver: &simDriver{}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := bare.MatterInvoke(own, netcommdef.CmdAddOrUpdateWiFiNetwork, add); wifiStatusOf(t, err) != im.StatusFailsafeRequired {
+		t.Errorf("no port = %v, want FAILSAFE_REQUIRED", err)
+	}
+}

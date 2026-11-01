@@ -102,8 +102,8 @@ type BasicInformation struct {
 	emitter  contract.EventEmitter
 
 	// dataVersion tracks the per-cluster monotonic counter (Matter
-	// §10.6.5). Bumped on every successful NodeLabel / Location /
-	// LocalConfigDisabled write so subscribers see the change. Without
+	// §10.6.5). Bumped on every successful NodeLabel / Location write so
+	// subscribers see the change. Without
 	// the bump, controllers that cache via DataVersionFilter never
 	// re-read post-write.
 	dataVersion cluster.DataVersionTracker
@@ -757,8 +757,14 @@ func (b *BasicInformation) uniqueID() string {
 	return DeriveUniqueID(b.vendorID, b.productID, b.identityLabel, b.serialNumber)
 }
 
-// MatterWrite accepts NodeLabel, Location, and LocalConfigDisabled
-// per Matter §11.1.7. Other attributes are read-only.
+// MatterWrite accepts NodeLabel and Location (Matter §11.1.7). Other
+// attributes are read-only, and LocalConfigDisabled is not served (the
+// bridge has no local configuration UI; matter.js's bridge sample leaves
+// the optional attribute off the root as well, BasicInformationServer.ts
+// sets no default for it) — a write answers UNSUPPORTED_ATTRIBUTE through
+// the fall-through below, as the dispatcher answers it for an unlisted
+// attribute before this method runs (review 2026-11 W3-clucore-10: the
+// arm that accepted and discarded the value was unreachable).
 func (b *BasicInformation) MatterWrite(_ context.Context, attrID uint32, value any) error {
 	switch attrID {
 	case basicInfoAttrNodeLabel:
@@ -788,14 +794,6 @@ func (b *BasicInformation) MatterWrite(_ context.Context, attrID uint32, value a
 		b.mu.Unlock()
 		b.dataVersion.Bump()
 		b.firePersistentWrite()
-		return nil
-	case basicInfoAttrLocalConfigDisabled:
-		// Persistent across reboots per Matter §11.1.6.17. go-fabric
-		// has no physical config UI on the bridge, so the attribute is
-		// effectively a no-op; we accept the write but discard the
-		// value. Mirrors how matter.js + chip-tool treat headless
-		// bridges.
-		b.dataVersion.Bump()
 		return nil
 	}
 	// Any other attribute: UNSUPPORTED_WRITE for a served read-only one,
@@ -941,8 +939,8 @@ func (b *BasicInformation) firePersistentWrite() {
 func (b *BasicInformation) MatterEvents() []uint32 { return b.inst().MatterEvents() }
 
 // MatterDataVersion implements [contract.ClusterDataVersion].
-// Bumped on every successful NodeLabel / Location / LocalConfigDisabled
-// write so DataVersionFilter evaluation correctly detects the cluster
+// Bumped on every successful NodeLabel / Location write so
+// DataVersionFilter evaluation correctly detects the cluster
 // changed; controllers cache via this counter and skip the cluster on
 // re-reads when it stays unchanged.
 func (b *BasicInformation) MatterDataVersion() uint32 {

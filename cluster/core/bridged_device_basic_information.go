@@ -458,8 +458,16 @@ func (b *BridgedDeviceBasicInformation) MatterWrite(_ context.Context, attrID ui
 	if !ok {
 		return fmt.Errorf("core: NodeLabel write expected string, got %T", value)
 	}
-	if len(s) > 32 {
-		return errors.New("core: NodeLabel exceeds 32 utf-8 bytes")
+	// NodeLabel is BasicInformation's by reference
+	// (bridged-device-basic-information.element.ts:30 at 862ad75f), "max
+	// 32" (basic-information.element.ts:36); a longer label is refused
+	// with CONSTRAINT_ERROR as the root cluster's checkLabelWrite refuses
+	// it. Mirrors matter.js
+	// packages/node/src/behavior/state/validation/constraint.ts:199-211 at
+	// 862ad75f (ConstraintError, "String length of … is not within
+	// bounds"); the refusal used to surface as FAILURE.
+	if _, err := b.inst().CheckValue(attrID, s, nil); err != nil {
+		return refusedWrite{sentinel: fmt.Errorf("core: BridgedDeviceBasicInformation NodeLabel write of %d bytes", len(s)), status: err}
 	}
 	b.mu.Lock()
 	b.nodeLabel = s

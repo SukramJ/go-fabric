@@ -61,18 +61,21 @@ type DoorLockRequest struct {
 // valid and yields an empty request.
 func DecodeDoorLockRequest(payload []byte) (DoorLockRequest, error) {
 	var req DoorLockRequest
-	if err := walkContext(payload, ErrDoorLockMalformed, func(tag uint32, el tlv.Element) {
-		if tag != 0 {
-			return
+	if err := walkContext(payload, ErrDoorLockMalformed, func(tag uint32, el tlv.Element) error {
+		if tag != 0 || el.IsNull {
+			return nil
 		}
-		if el.IsNull {
-			return
+		// PINCode is an octet string of any length (door-lock-cluster.element.ts:231
+		// at 862ad75f states no constraint); another type is refused.
+		if el.Type != tlv.TypeOctetStr1 && el.Type != tlv.TypeOctetStr2 && el.Type != tlv.TypeOctetStr4 && el.Type != tlv.TypeOctetStr8 {
+			return fieldTypeError(el, ErrDoorLockMalformed, "an octet string")
 		}
 		// Defensive copy: walkContext hands out an Element whose Octets
 		// alias the input buffer, which the caller is free to recycle.
 		buf := make([]byte, len(el.Octets))
 		copy(buf, el.Octets)
 		req.PinCode = buf
+		return nil
 	}); err != nil {
 		return req, err
 	}

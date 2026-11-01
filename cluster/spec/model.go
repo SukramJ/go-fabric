@@ -77,8 +77,12 @@ type Quality struct {
 
 // Bound is one side of a constraint: a number, the name of a sibling
 // element whose value bounds this one ("minMeasuredValue"), or an
-// expression the runtime does not evaluate (Expr; such a bound admits every
-// value, as matter.js's does when it cannot compute one).
+// expression tree (Expr, matter.js's Constraint.Expression as JSON) the
+// runtime computes — arithmetic, maxOf / minOf and qualified references
+// over the sibling attributes. An expression naming a value that does not
+// resolve, or a unit value the generator could not restate in the type's
+// units, admits every value, as matter.js's does when it cannot compute
+// one.
 type Bound struct {
 	Int  int64
 	Ref  string
@@ -101,6 +105,10 @@ type Constraint struct {
 	Value, Min, Max *Bound
 	// In names the element whose entries the value must be one of.
 	In string
+	// CpMax bounds a string's codepoints beside its length ("max
+	// 128{32}"); 0 states none. matter.js Constraint.cpMax
+	// (packages/model/src/aspects/Constraint.ts:60 at 862ad75f).
+	CpMax int
 	// Entry constrains each entry of a list.
 	Entry *Constraint
 	// Parts are alternatives ("0, 2 to 5").
@@ -159,9 +167,25 @@ type Field struct {
 	// Default is the default value matter.js states: a float64, bool or
 	// string (a temperature or percentage in its type's encoding units),
 	// [NullDefault] for a stated null, [EmptyListDefault] for a stated
-	// empty list, nil when none is stated (or when it is a field value the
-	// generator does not render).
+	// empty list, [UnresolvedDefault] for a stated default the runtime
+	// does not resolve, nil when none is stated.
 	Default any
+}
+
+// UnresolvedDefault marks a stated default that is a field value the
+// generator does not render: a reference to a sibling (Kind "reference",
+// Name the sibling — GeneralCommissioning RegulatoryConfig's
+// LocationCapability, the Thermostat user limits' Abs* limits), an octet
+// string ("bytes") or a non-empty list ("list"). matter.js's model leaves
+// a reference to be resolved by the consumer
+// (packages/model/src/logic/SelectDefaultValue.ts:97-100 at 862ad75f);
+// the runtime starts such an element without a value, as it starts one
+// with no stated default, and a hand-written server resolves it. The
+// marker tells the two apart (W3-clugen-07).
+// fabric:reachable:reason="the Default of a generated attribute whose stated default is a field value; it is only ever a package-level initializer value, which RTA does not follow"
+type UnresolvedDefault struct {
+	Kind string
+	Name string
 }
 
 // NullDefault is the default of an element whose stated default is null.

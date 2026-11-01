@@ -4,6 +4,7 @@
 package thermo
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"log/slog"
@@ -14,6 +15,7 @@ import (
 	"github.com/SukramJ/go-fabric/clock"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	tdef "github.com/SukramJ/go-fabric/cluster/spec/thermostat"
+	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
 )
 
@@ -414,8 +416,10 @@ func (s *ThermostatServer) rollbackWrite(ctx context.Context, req tdef.AtomicReq
 // The unit runs in two passes, as chip's CommitWrite does
 // (ThermostatClusterAtomic.cpp:442-447 at 645b267a): every attribute's
 // precommit — the Presets validation and commit checks, chip's
-// PrecommitSchedules — and, only when all passed, every commit. With
-// Presets alone that is the one validate-and-apply matter.js runs.
+// PrecommitSchedules — and, only when all passed, every commit
+// ([ThermostatServer.commitAll], which undoes the committed attributes
+// when a later host port refuses). With Presets alone that is the one
+// validate-and-apply matter.js runs.
 func (s *ThermostatServer) commitWrite(ctx context.Context, req tdef.AtomicRequestRequest) (any, error) {
 	st, err := s.existingAtomicState(ctx, req)
 	if err != nil {
@@ -441,12 +445,84 @@ func (s *ThermostatServer) commitWrite(ctx context.Context, req tdef.AtomicReque
 		return ok
 	}
 	done := run("precommitting", func(attr uint32, v any) error { return s.precommitAtomic(attr, v) }) &&
-		run("committing", func(attr uint32, v any) error { return s.commitAtomic(ctx, attr, v) })
+		s.commitAll(ctx, st, req.AttributeRequests, statuses)
 	command := tdef.StatusSuccess
 	if !done {
 		command = tdef.StatusFailure
 	}
 	return tdef.AtomicResponse{StatusCode: command, AttributeStatus: statuses}, nil
+}
+
+// commitAll commits every staged attribute after all precommits passed,
+// as one unit: a host port that refuses a later attribute (SavePresets,
+// CommitSchedules) undoes the attributes already committed — their
+// previous value is stored and handed to the port again — and its status
+// stands for every attribute. Mirrors matter.js
+// packages/node/src/behaviors/thermostat/AtomicWriteHandler.ts:314-326 at
+// 862ad75f: any failure rolls the one transaction back, and a failure
+// while committing "cannot be traced to one attribute, so it stands for
+// each of them" (AtomicWriteHandlerTest.ts:491-517 "discards a valid
+// Presets write when the Schedules write fails"; W3-clua1-02). The
+// caller holds s.op.
+func (s *ThermostatServer) commitAll(ctx context.Context, st *atomicWriteState, attrs []uint32, statuses []tdef.AtomicResponseAttributeStatusEntry) bool {
+	s.mu.RLock()
+	prevPresets := clonePresets(s.presets)
+	prevSchedules := cloneSchedules(s.schedules)
+	s.mu.RUnlock()
+	var committed []uint32
+	for _, attr := range attrs {
+		v, staged := st.staged(attr)
+		if !staged {
+			continue
+		}
+		if err := s.commitAtomic(ctx, attr, v); err != nil {
+			code := tdef.Status(statusOf(err, "committing attribute "+atomicAttributeName(attr), s.logger()))
+			for i := range statuses {
+				statuses[i].StatusCode = code
+			}
+			for _, done := range committed {
+				s.revertAtomic(ctx, done, prevPresets, prevSchedules)
+			}
+			return false
+		}
+		committed = append(committed, attr)
+	}
+	return true
+}
+
+// revertAtomic restores an attribute commitAll already committed to the
+// value it had before the commit: stored, handed to its host port again
+// and reported. A port that refuses the restore is logged; the stored
+// value is restored regardless, so the attribute reads what the
+// controller was told is still in force.
+func (s *ThermostatServer) revertAtomic(ctx context.Context, attr uint32, presets []Preset, schedules []Schedule) {
+	var err error
+	switch attr {
+	case tdef.AttrPresets:
+		s.mu.RLock()
+		active := bytes.Clone(s.activePresetHandle)
+		s.mu.RUnlock()
+		err = s.savePresets(ctx, presets, active)
+		s.mu.Lock()
+		s.presets = presets
+		s.mu.Unlock()
+		s.changes.NotifyFrom(contract.OriginFrom(ctx), tdef.AttrPresets)
+	case tdef.AttrSchedules:
+		if s.schedulePort != nil {
+			err = s.schedulePort.CommitSchedules(ctx, cloneSchedules(schedules))
+		}
+		s.mu.Lock()
+		changed := !schedulesTLVEqual(s.schedules, schedules)
+		s.schedules = schedules
+		s.mu.Unlock()
+		if changed {
+			s.changes.NotifyFrom(contract.OriginFrom(ctx), tdef.AttrSchedules)
+		}
+	}
+	if err != nil {
+		s.logger().Warn("matter.thermostat.atomic_revert_failed",
+			slog.String("attribute", atomicAttributeName(attr)), slog.String("reason", err.Error()))
+	}
 }
 
 // atomicAttributeName names an atomic attribute for the log.

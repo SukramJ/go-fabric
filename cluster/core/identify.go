@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -70,6 +71,11 @@ type Identify struct {
 	// MatterWrite or MatterInvoke) so DataVersionFilter evaluation works.
 	// Satisfies [contract.ClusterDataVersion].
 	dataVersion cluster.DataVersionTracker
+
+	// changes tells the bridge of the one change the server makes on its
+	// own: the countdown reaching zero ([Identify.OnAttributeChange]). A
+	// pointer, created on first use, so Identify stays comparable.
+	changes atomic.Pointer[cluster.AttributeChanges]
 
 	// Countdown-Timer state. Spec §1.2.5.1: "The IdentifyTime
 	// attribute … SHALL decrement at a rate of 1 per second once
@@ -181,7 +187,29 @@ var (
 	_ contract.ClusterServer        = (*Identify)(nil)
 	_ contract.ClusterDataVersion   = (*Identify)(nil)
 	_ contract.ClusterCommandLister = (*Identify)(nil)
+
+	_ contract.AttributeChangeNotifier = (*Identify)(nil)
 )
+
+// OnAttributeChange implements [contract.AttributeChangeNotifier]: the
+// countdown reaching zero reports IdentifyTime, the one edge of the
+// countdown matter.js reports — its quiet event emits at once for a
+// remote actor and for a change from or to 0, and keeps the per-second
+// ticks quiet (IdentifyServer.ts:41-47 at 862ad75f). A controller's write
+// and the Identify command are reported by the bridge's write and invoke
+// paths (W3-clucore-05).
+func (i *Identify) OnAttributeChange(cb func(change contract.Change)) (unsubscribe func()) {
+	return i.attributeChanges().OnAttributeChange(cb)
+}
+
+// attributeChanges is the change listeners, created on first use.
+func (i *Identify) attributeChanges() *cluster.AttributeChanges {
+	if c := i.changes.Load(); c != nil {
+		return c
+	}
+	i.changes.CompareAndSwap(nil, &cluster.AttributeChanges{})
+	return i.changes.Load()
+}
 
 // MatterClusterID implements [contract.ClusterServer].
 func (i *Identify) MatterClusterID() uint32 { return identifyClusterID }
@@ -208,8 +236,12 @@ func (i *Identify) MatterRead(attrID uint32) (any, bool) {
 // MatterWrite handles direct writes to IdentifyTime per Matter
 // §1.2.5.1. Spec wording: "The IdentifyTime attribute SHALL be in
 // units of seconds, and SHALL be writable." — clients drive Identify
-// either via the command or by setting the attribute directly.
-func (i *Identify) MatterWrite(_ context.Context, attrID uint32, value any) error {
+// either via the command or by setting the attribute directly, and the
+// host's handler sees both: matter.js reacts to identifyTime$Changed
+// whichever wrote it (IdentifyServer.ts:57-58 at 862ad75f), so the write
+// runs the handler as the Identify command does and a refusal refuses the
+// write with its status.
+func (i *Identify) MatterWrite(ctx context.Context, attrID uint32, value any) error {
 	if attrID != identifyAttrTime {
 		// IdentifyType is "R V": UNSUPPORTED_WRITE; any other id
 		// UNSUPPORTED_ATTRIBUTE, as the definition judges them.
@@ -220,8 +252,16 @@ func (i *Identify) MatterWrite(_ context.Context, attrID uint32, value any) erro
 	if err != nil {
 		return fmt.Errorf("core: Identify.IdentifyTime: %w", err)
 	}
+	// Mirrors matter.js packages/node/src/behaviors/identify/
+	// IdentifyServer.ts:57-58, :108-114 at 862ad75f: the attribute and the
+	// command reach one reactor (#identifyTimeChangedHandler).
+	if h := i.hostHandler(); h != nil {
+		if err := h.MatterIdentify(ctx, t); err != nil {
+			return err
+		}
+	}
 	i.identifyTime.Store(uint32(t))
-	i.maybeStartCountdown()
+	i.maybeStartCountdown() //nolint:contextcheck // the countdown outlives the request; its stop call has no request behind it
 	// Bump DataVersion after a successful IdentifyTime write so
 	// DataVersionFilter evaluation correctly detects the cluster changed.
 	i.dataVersion.Bump()
@@ -244,7 +284,7 @@ func (i *Identify) MatterInvoke(ctx context.Context, cmdID uint32, fields any) (
 			}
 		}
 		i.identifyTime.Store(uint32(t))
-		i.maybeStartCountdown()
+		i.maybeStartCountdown() //nolint:contextcheck // the countdown outlives the request; its stop call has no request behind it
 		// Bump DataVersion after a successful Identify command so
 		// DataVersionFilter evaluation correctly detects the cluster changed.
 		i.dataVersion.Bump()
@@ -323,7 +363,22 @@ func (i *Identify) maybeStartCountdown() {
 					i.timerMu.Unlock()
 					return
 				}
-				i.identifyTime.Store(v - 1)
+				// A CompareAndSwap, so a write or command landing
+				// between the load and the store is not overwritten.
+				if !i.identifyTime.CompareAndSwap(v, v-1) || v != 1 {
+					continue
+				}
+				// The countdown reached zero: the edge is reported and
+				// advances the DataVersion (W3-clucore-05), and the host
+				// is told to stop,
+				// as matter.js's tick drives the reactor to
+				// #stopIdentifying (IdentifyServer.ts:100-114, :121-127
+				// at 862ad75f); 0 is the contract's "stops".
+				i.dataVersion.Bump()
+				i.attributeChanges().Notify(identifyAttrTime)
+				if h := i.hostHandler(); h != nil {
+					_ = h.MatterIdentify(context.Background(), 0) //nolint:errcheck // nothing to refuse: the countdown ended
+				}
 			}
 		}
 	}()
@@ -380,15 +435,36 @@ func coerceUint16(v any) (uint16, error) {
 	case uint16:
 		return x, nil
 	case uint32:
-		return uint16(x & 0xFFFF), nil // spec-bound: IdentifyTime fits uint16
+		return boundUint16(uint64(x))
 	case uint64:
-		return uint16(x & 0xFFFF), nil // spec-bound: IdentifyTime fits uint16
+		return boundUint16(x)
 	case int:
-		return uint16(x), nil //nolint:gosec // spec-bound; see #20
+		if x < 0 {
+			return 0, spec.Errorf(im.StatusConstraintError, "core: IdentifyTime %d is below 0", x)
+		}
+		return boundUint16(uint64(x))
 	case int64:
-		return uint16(x), nil //nolint:gosec // spec-bound; see #20
+		if x < 0 {
+			return 0, spec.Errorf(im.StatusConstraintError, "core: IdentifyTime %d is below 0", x)
+		}
+		return boundUint16(uint64(x))
 	case nil:
 		return 0, nil
 	}
-	return 0, fmt.Errorf("core: unsupported IdentifyTime type %T", v)
+	// A value of another type is a datatype mismatch: InvalidAction, as
+	// matter.js's ValidationDatatypeMismatchError answers it
+	// (packages/types/src/common/ValidationError.ts:35-38 at 862ad75f).
+	return 0, spec.Errorf(im.StatusInvalidAction, "core: unsupported IdentifyTime type %T", v)
+}
+
+// boundUint16 refuses a value above the uint16 range with ConstraintError
+// instead of masking it into a different, valid IdentifyTime. Mirrors
+// matter.js packages/types/src/tlv/TlvNumber.ts:151-155 at 862ad75f
+// (ValidationOutOfBoundsError, a ValidationError = ConstraintError;
+// W3-clucore-04).
+func boundUint16(x uint64) (uint16, error) {
+	if x > math.MaxUint16 {
+		return 0, spec.Errorf(im.StatusConstraintError, "core: IdentifyTime %d exceeds 65535", x)
+	}
+	return uint16(x), nil
 }

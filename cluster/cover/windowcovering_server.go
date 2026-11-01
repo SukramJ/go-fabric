@@ -141,6 +141,35 @@ func servedOptional(features uint32) []uint32 {
 	return out
 }
 
+// servedOptionalCommands are the optional commands the server accepts:
+// GoToLiftPercentage on a Lift axis without position awareness ("LF &
+// PA_LF, [LF]") and GoToTiltPercentage likewise, which matter.js's
+// WindowCoveringServer implements for every axis, so its ValidatedElements
+// lists them as supported (WindowCoveringServer.ts:576-618 at 862ad75f;
+// W3-club1-04).
+func servedOptionalCommands(features uint32) []uint32 {
+	var out []uint32
+	if features&uint32(wcdef.FeatureLift) != 0 && features&uint32(wcdef.FeaturePositionAwareLift) == 0 {
+		out = append(out, wcdef.CmdGoToLiftPercentage)
+	}
+	if features&uint32(wcdef.FeatureTilt) != 0 && features&uint32(wcdef.FeaturePositionAwareTilt) == 0 {
+		out = append(out, wcdef.CmdGoToTiltPercentage)
+	}
+	return out
+}
+
+// openOrClose is a GoTo percentage on an axis without position
+// awareness: 0 is UpOrOpen, any other value DownOrClose, each moving every
+// served axis as those commands do. Mirrors matter.js
+// packages/node/src/behaviors/window-covering/WindowCoveringServer.ts:586-590,
+// :608-612 at 862ad75f (W3-club1-04).
+func openOrClose(pct uint16, both func(uint16) command) command {
+	if pct == 0 {
+		return both(0)
+	}
+	return both(10000)
+}
+
 // goToPercentageFieldValue is the LiftPercent100thsValue /
 // TiltPercent100thsValue context tag (window-covering-cluster.element.ts:95,
 // :99, id 0x0).
@@ -333,7 +362,7 @@ func New(cfg Config) (*WindowCoveringServer, error) {
 	}
 	// Each served selection satisfies "O.a+" and "[LF]" / "[TL]", and its
 	// optional attributes are allowed under it, so spec.New cannot refuse it.
-	inst, _ := spec.New(wcdef.Definition, spec.Options{Features: features, Attributes: servedOptional(features)})
+	inst, _ := spec.New(wcdef.Definition, spec.Options{Features: features, Attributes: servedOptional(features), Commands: servedOptionalCommands(features)})
 	// The initial state conforms to the schema or the server is not built:
 	// a TypeEnum or EndProductTypeEnum member whose conformance the features
 	// disallow is refused (window-covering-cluster.element.ts:150-192).
@@ -593,21 +622,27 @@ func (s *WindowCoveringServer) parseCommand(cmdID uint32, fields any) (command, 
 	case wire.WindowCoveringCmdStopMotion:
 		return command{stop: true}, nil
 	case wire.WindowCoveringCmdGoToLiftPercentage:
-		if s.lift == nil || !s.lift.aware {
-			return command{}, spec.Errorf(im.StatusUnsupportedCommand, "cover: GoToLiftPercentage without the Lift and PositionAwareLift features")
+		if s.lift == nil {
+			return command{}, spec.Errorf(im.StatusUnsupportedCommand, "cover: GoToLiftPercentage without the Lift feature")
 		}
 		pct, err := extractPercent100ths(fields, "GoToLiftPercentage")
 		if err != nil {
 			return command{}, err
 		}
+		if !s.lift.aware {
+			return openOrClose(pct, both), nil
+		}
 		return command{lift: &pct}, nil
 	case wire.WindowCoveringCmdGoToTiltPercentage:
-		if s.tilt == nil || !s.tilt.aware {
-			return command{}, spec.Errorf(im.StatusUnsupportedCommand, "cover: GoToTiltPercentage without the Tilt and PositionAwareTilt features")
+		if s.tilt == nil {
+			return command{}, spec.Errorf(im.StatusUnsupportedCommand, "cover: GoToTiltPercentage without the Tilt feature")
 		}
 		pct, err := extractPercent100ths(fields, "GoToTiltPercentage")
 		if err != nil {
 			return command{}, err
+		}
+		if !s.tilt.aware {
+			return openOrClose(pct, both), nil
 		}
 		return command{tilt: &pct}, nil
 	default:

@@ -82,7 +82,7 @@ func TestFeatureMapIsDerivedFromWhatTheServerServes(t *testing.T) {
 func TestMoveToTakesTheGeneratedRequest(t *testing.T) {
 	t.Parallel()
 	h := &recordingHandlers{}
-	srv := closure.NewControlServer(h.config())
+	srv := ready(closure.NewControlServer(h.config()))
 	vent := closuredef.TargetPositionMoveToVentilationPosition
 	if _, err := srv.MatterInvoke(context.Background(), closuredef.CmdMoveTo, closuredef.MoveToRequest{Position: &vent}); err != nil {
 		t.Fatalf("MoveTo: %v", err)

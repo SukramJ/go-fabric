@@ -16,6 +16,7 @@ import (
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/cluster/core"
 	"github.com/SukramJ/go-fabric/contract"
+	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/tlv"
 )
 
@@ -386,15 +387,6 @@ func TestBasicInfo_WriteLocationWrongLength(t *testing.T) {
 		if err == nil {
 			t.Errorf("expected error for Location=%q (len=%d), got nil", s, len(s))
 		}
-	}
-}
-
-func TestBasicInfo_WriteLocalConfigDisabledNoOp(t *testing.T) {
-	t.Parallel()
-	b := newValidBasicInfo(t)
-	err := b.MatterWrite(context.Background(), 0x0010, true)
-	if err != nil {
-		t.Fatalf("MatterWrite LocalConfigDisabled: %v", err)
 	}
 }
 
@@ -854,24 +846,6 @@ func TestBasicInfo_PersistentWriteHook_FiresOnLocationWrite(t *testing.T) {
 	}
 	if gotLabel != "go-fabric-bridge" {
 		t.Errorf("hook nodeLabel = %q, want unchanged default", gotLabel)
-	}
-}
-
-// TestBasicInfo_PersistentWriteHook_NotFiredOnLocalConfigDisabledWrite
-// verifies that a write to LocalConfigDisabled (0x0010) does NOT invoke
-// the persistence hook — only NodeLabel and Location are persisted
-// (Matter §11.1.6 "N" quality attributes the daemon round-trips).
-func TestBasicInfo_PersistentWriteHook_NotFiredOnLocalConfigDisabledWrite(t *testing.T) {
-	t.Parallel()
-	b := newValidBasicInfo(t)
-	var calls int
-	b.SetOnPersistentWrite(func(string, string) { calls++ })
-
-	if err := b.MatterWrite(context.Background(), 0x0010, true); err != nil {
-		t.Fatalf("MatterWrite LocalConfigDisabled: %v", err)
-	}
-	if calls != 0 {
-		t.Fatalf("hook fired %d times for LocalConfigDisabled write, want 0", calls)
 	}
 }
 
@@ -1419,5 +1393,33 @@ func TestCapabilityMinimaRev6Defaults(t *testing.T) {
 	}
 	if cm != want {
 		t.Errorf("CapabilityMinima = %+v, want %+v", cm, want)
+	}
+}
+
+// TestBasicInfo_LocalConfigDisabledWriteIsUnsupportedAttribute: the root
+// BasicInformation does not serve the optional LocalConfigDisabled (matter.js's
+// bridge sample leaves it off the root, basic-information.element.ts:79 at
+// 862ad75f, "O"), so a write answers UNSUPPORTED_ATTRIBUTE, as the
+// dispatcher answers it for an unlisted attribute. The arm that accepted
+// and discarded the value was unreachable (W3-clucore-10).
+func TestBasicInfo_LocalConfigDisabledWriteIsUnsupportedAttribute(t *testing.T) {
+	t.Parallel()
+	b, err := core.NewBasicInformation(validBasicInfoConfig())
+	if err != nil {
+		t.Fatal(err)
+	}
+	var calls int
+	b.SetOnPersistentWrite(func(string, string) { calls++ })
+	before := b.MatterDataVersion()
+	err = b.MatterWrite(context.Background(), 0x0010, true)
+	var sc interface{ MatterStatusCode() im.StatusCode }
+	if !errors.As(err, &sc) || sc.MatterStatusCode() != im.StatusUnsupportedAttribute {
+		t.Fatalf("LocalConfigDisabled write = %v, want UNSUPPORTED_ATTRIBUTE", err)
+	}
+	if b.MatterDataVersion() != before {
+		t.Error("the refused write moved the DataVersion")
+	}
+	if calls != 0 {
+		t.Errorf("the refused write fired the persistence hook %d times", calls)
 	}
 }

@@ -333,7 +333,8 @@ type ScenesConfig struct {
 	// GroupKnown reports whether the fabric has a GroupKeyMap entry for
 	// the group — matter.js #groupExistentInFabric. Nil accepts only group 0.
 	GroupKnown func(ctx context.Context, fabric uint8, groupID uint16) bool
-	// Fabrics lists the node's fabrics, for FabricSceneInfo.
+	// Fabrics lists the node's fabrics, for FabricSceneInfo; nil serves the
+	// accessing fabric's entry alone.
 	Fabrics func(ctx context.Context) []uint8
 }
 
@@ -457,6 +458,12 @@ func (s *ScenesManagement) MatterReadFiltered(ctx context.Context, attrID uint32
 		var fabrics []uint8
 		if s.cfg.Fabrics != nil {
 			fabrics = s.cfg.Fabrics(ctx)
+		} else if fabric != 0 {
+			// Without the fabric list the accessing fabric still sees
+			// its own entry, as matter.js's fabric-scoped
+			// fabricSceneInfo holds one for every fabric that reads it
+			// (W3-clucore-14).
+			fabrics = []uint8{fabric}
 		}
 		st.mu.Lock()
 		defer st.mu.Unlock()
@@ -682,7 +689,17 @@ func (s *ScenesManagement) groupValid(ctx context.Context, fabric uint8, groupID
 
 func (s *ScenesManagement) addScene(ctx context.Context, fabric uint8, req AddSceneRequest) SceneStatusResponse {
 	resp := SceneStatusResponse{Command: scenesCmdAddScene, GroupID: req.GroupID, SceneID: req.SceneID}
-	if req.SceneID > scenesMaxSceneID || req.TransitionTime > scenesMaxTransition {
+	// A SceneName over 16 is refused with the SceneID and TransitionTime
+	// bounds, as connectedhomeip refuses it
+	// (src/app/clusters/scenes-server/ScenesManagementCluster.cpp:535-541
+	// at 6170af84); it used to be cut to 16 and stored with SUCCESS.
+	// matter.js relaxes the request field so that its behaviour answers
+	// the status (ScenesManagementServer.ts:129-147 at 862ad75f) but then
+	// checks only SceneID and TransitionTime (:283); see
+	// notes/parity/by_design.md BD-chip-ScenesManagement-SceneNameLength.
+	// The length counts UTF-16 units, as matter.js's string constraint
+	// counts them (constraint.ts:199-211).
+	if req.SceneID > scenesMaxSceneID || req.TransitionTime > scenesMaxTransition || len(utf16.Encode([]rune(req.SceneName))) > scenesMaxNameLength {
 		resp.Status = im.StatusConstraintError
 		return resp
 	}
@@ -696,9 +713,6 @@ func (s *ScenesManagement) addScene(ctx context.Context, fabric uint8, req AddSc
 		return resp
 	}
 	name := req.SceneName
-	if len(utf16.Encode([]rune(name))) > scenesMaxNameLength {
-		name = string(utf16.Decode(utf16.Encode([]rune(name))[:scenesMaxNameLength]))
-	}
 	st := s.cfg.State
 	st.mu.Lock()
 	defer st.mu.Unlock()
