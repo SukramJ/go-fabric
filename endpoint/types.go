@@ -62,6 +62,18 @@ type Endpoint struct {
 	// ID is the Matter endpoint identifier. 0 = root, 1 = aggregator,
 	// 2..65534 = bridged.
 	ID uint16
+	// Aggregator marks the Aggregator endpoint: the one whose served
+	// clusters are the published set ([Endpoint.PublishClusterServers])
+	// and on which the bridge mounts the Aggregator's servers. The role is
+	// a property of the endpoint, never of its number — the [Assembler]
+	// sets it on the Aggregator it builds (endpoint 1), so a host
+	// endpoint numbered 1 is never taken for it. Mirrors matter.js, which
+	// assigns the Aggregator a number like any endpoint
+	// (packages/node/src/storage/server/ServerEndpointStores.ts:109-130
+	// assignNumber) and keys behaviour on the endpoint's type
+	// (packages/node/src/behaviors/descriptor/DescriptorServer.ts:227-254).
+	// Review 2026-11 W2-api-03.
+	Aggregator bool
 	// DeviceType is the Matter Device Type ID this endpoint
 	// advertises (e.g. 0x010A OnOffPlugInUnit, 0x0301 Thermostat,
 	// 0x000E AggregatorEndpoint for the root).
@@ -608,10 +620,11 @@ func (e *Endpoint) SetNodeLabel(label string) {
 // IsRoot reports whether this is the root bridge endpoint (ID 0).
 func (e *Endpoint) IsRoot() bool { return e.ID == 0 }
 
-// IsAggregator reports whether this is the Aggregator endpoint (ID 1).
-// The aggregator hosts only the Descriptor (mandatory) + optional
-// Identify clusters; its PartsList enumerates every bridged endpoint.
-func (e *Endpoint) IsAggregator() bool { return e.ID == 1 }
+// IsAggregator reports whether this is the Aggregator endpoint
+// ([Endpoint.Aggregator]). The aggregator hosts only the Descriptor
+// (mandatory) + optional Identify clusters; its PartsList enumerates every
+// bridged endpoint.
+func (e *Endpoint) IsAggregator() bool { return e.Aggregator }
 
 // Topology is the assembled output: an ordered list of endpoints
 // and the bridge metadata used to populate the BasicInformation
@@ -638,6 +651,17 @@ type Topology struct {
 func (t *Topology) FindByID(id uint16) *Endpoint {
 	for _, ep := range t.Endpoints {
 		if ep.ID == id {
+			return ep
+		}
+	}
+	return nil
+}
+
+// Aggregator returns the Aggregator endpoint ([Endpoint.Aggregator]), or
+// nil when the topology has none.
+func (t *Topology) Aggregator() *Endpoint {
+	for _, ep := range t.Endpoints {
+		if ep.Aggregator {
 			return ep
 		}
 	}

@@ -55,8 +55,8 @@ type StringKey string
 func (k StringKey) String() string { return string(k) }
 
 // Record is one persisted (source → endpoint id) mapping. EndpointID is
-// in [1, 65534]; endpoint 0 is the root bridge endpoint and is never
-// stored.
+// in [2, 65534]; endpoint 0 (the root) and endpoint 1 (the Aggregator) are
+// never stored.
 type Record struct {
 	Key SourceKey
 	// Scope is the [Snapshot.Scope] the source belongs to. Carried

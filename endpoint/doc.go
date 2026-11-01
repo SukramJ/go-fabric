@@ -26,5 +26,5 @@
 //
 // Endpoint 0 is the root bridge endpoint and is never persisted —
 // the assembler synthesises it from the bridge configuration on every
-// run. Bridged endpoints occupy 1..65534.
+// run, as is the Aggregator at 1. Bridged endpoints occupy 2..65534.
 package endpoint

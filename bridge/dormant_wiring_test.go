@@ -54,8 +54,8 @@ func newReachabilityBridge(t *testing.T, ep *endpointpkg.Endpoint) *Bridge {
 	b.mu.Lock()
 	b.topology = &endpointpkg.Topology{
 		Endpoints: []*endpointpkg.Endpoint{
-			{ID: 0, DeviceType: 0x0016}, // root
-			{ID: 1, DeviceType: 0x000E}, // aggregator
+			{ID: 0, DeviceType: 0x0016},                   // root
+			{ID: 1, Aggregator: true, DeviceType: 0x000E}, // aggregator
 			ep,
 		},
 	}

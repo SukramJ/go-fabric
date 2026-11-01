@@ -146,6 +146,7 @@ func (a *Assembler) Assemble(ctx context.Context, snapshots []Snapshot) (*Topolo
 	}
 	aggregator := &Endpoint{
 		ID:         1,
+		Aggregator: true,
 		DeviceType: deviceTypeAggregator,
 		Reachable:  true,
 	}

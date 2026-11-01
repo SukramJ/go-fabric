@@ -123,8 +123,8 @@ func makeTopology(endpoints ...*Endpoint) *Topology {
 	eps := make([]*Endpoint, 0, 2+len(endpoints))
 	eps = append(
 		eps,
-		&Endpoint{ID: 0},                     // root
-		&Endpoint{ID: 1, DeviceType: 0x000E}, // aggregator — nothing published → UnsupportedCluster on wildcard
+		&Endpoint{ID: 0}, // root
+		&Endpoint{ID: 1, Aggregator: true, DeviceType: 0x000E}, // aggregator — nothing published → UnsupportedCluster on wildcard
 	)
 	eps = append(eps, endpoints...)
 	return &Topology{Endpoints: eps, VendorID: 0xFFF1, ProductID: 0x8000}
@@ -1241,7 +1241,7 @@ func TestCurrentDataVersion_BridgedIgnoresInstanceTracker(t *testing.T) {
 	ep := &Endpoint{ID: 2, Source: dvSource{srv: srv}}
 	top := &Topology{
 		Endpoints: []*Endpoint{
-			{ID: 0}, {ID: 1, DeviceType: 0x000E}, ep,
+			{ID: 0}, {ID: 1, Aggregator: true, DeviceType: 0x000E}, ep,
 		},
 		VendorID: 0xFFF1, ProductID: 0x8000,
 	}
@@ -1267,7 +1267,7 @@ func TestCurrentDataVersion_RootUsesInstanceTracker(t *testing.T) {
 	top := &Topology{
 		Endpoints: []*Endpoint{
 			rootEndpointWith(noIface, zero, seven),
-			{ID: 1, DeviceType: 0x000E},
+			{ID: 1, Aggregator: true, DeviceType: 0x000E},
 		},
 		VendorID: 0xFFF1, ProductID: 0x8000,
 	}

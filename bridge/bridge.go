@@ -966,9 +966,11 @@ func (b *Bridge) reassembleLocked(ctx context.Context) error { //nolint:gocognit
 		root.PublishClusterServers(rootClusters)
 	}
 	// Reattach the daemon-supplied Aggregator cluster servers to the
-	// fresh EP 1 so reads on endpoint 1 (Descriptor) keep resolving
-	// after a Reassemble.
-	if agg := topology.FindByID(1); agg != nil && len(aggregatorClusters) > 0 {
+	// fresh Aggregator so its reads (Descriptor) keep resolving after a
+	// Reassemble. Onto the endpoint with the Aggregator role only: a
+	// topology without one mounts nothing, and a host endpoint numbered 1
+	// keeps its own clusters (review 2026-11 W2-api-03).
+	if agg := topology.Aggregator(); agg != nil && len(aggregatorClusters) > 0 {
 		agg.PublishClusterServers(aggregatorClusters)
 	}
 	if err := b.validateDeviceTypes(topology); err != nil {
@@ -1647,7 +1649,7 @@ func (b *Bridge) AttachAggregatorClusters(servers []contract.ClusterServer) {
 	b.mu.Lock()
 	b.aggregatorClusters = cp
 	if b.topology != nil {
-		if agg := b.topology.FindByID(1); agg != nil {
+		if agg := b.topology.Aggregator(); agg != nil {
 			agg.PublishClusterServers(cp)
 		}
 	}

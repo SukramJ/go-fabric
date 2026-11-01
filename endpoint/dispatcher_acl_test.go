@@ -234,7 +234,7 @@ func TestTopologyDispatcher_ImplementsACLChecker(t *testing.T) {
 func TestEndpointHasDeviceType(t *testing.T) {
 	t.Parallel()
 	root := &Endpoint{ID: 0}
-	agg := &Endpoint{ID: 1}
+	agg := &Endpoint{ID: 1, Aggregator: true}
 	bridged := &Endpoint{ID: 5, DeviceType: 0x0100} // OnOffLight
 
 	cases := []struct {

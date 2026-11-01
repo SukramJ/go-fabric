@@ -404,7 +404,7 @@ func (n *Node) Surface() surface.Report {
 	if n.aggServers != nil {
 		agg := endpoint.SurfaceEndpoint(AggregatorSurfaceKey, n.aggServers)
 		if topo := n.br.Topology(); topo != nil {
-			if ep := topo.FindByID(1); ep != nil && ep.IsAggregator() {
+			if ep := topo.Aggregator(); ep != nil {
 				agg.Number = ep.ID
 			}
 		}

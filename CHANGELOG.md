@@ -36,6 +36,7 @@ Findings of the whole-codebase review of 2026-11-01 (`notes/review/2026-11/`).
 - `im.FieldError`: a request-decode error naming the IM status it answers (InvalidAction for a wrong TLV type or a missing mandatory field, ConstraintError for an integer out of range).
 - `im.ErrMissingField`: the InvalidAction error a request decoder wraps when a mandatory field is absent.
 - `im.EventFiltersFor`: the EventFilterIB that applies to a node — the first without a NodeID or with the node's operational id on the accessing fabric.
+- `endpoint.Endpoint.Aggregator` and `Topology.Aggregator()`: the Aggregator role as a property of the endpoint, which the assembler sets on the Aggregator it builds.
 
 ### Changed
 
@@ -54,6 +55,7 @@ Findings of the whole-codebase review of 2026-11-01 (`notes/review/2026-11/`).
 - `im`: the mandatory fields of a ReadRequest (IsFabricFiltered), a SubscribeRequest (KeepSubscriptions, both intervals, IsFabricFiltered), a TimedRequest (Timeout), an EventFilterIB (EventMin) and a DataVersionFilterIB (the path with endpoint and cluster, DataVersion) are required, and their booleans type-checked; a request without one is answered InvalidAction, as matter.js and connectedhomeip answer it (W2-wire-04).
 - `im`, `bridge`: of a request's EventFilters one applies — the first without a NodeID or with this node's operational node id on the accessing fabric — instead of the minimum over all entries, so a filter addressed to another node no longer replays the whole event buffer (W2-wire-05).
 - `mdns`: the subtype PTR records carry TTL 120 s, as matter.js and connectedhomeip advertise them, instead of 3200 s; the primary PTR, SRV and TXT records keep grandcat/zeroconf's 3200 s, whose setter races with its own goroutines — `notes/parity/by_design.md` L7-D02 now records what the code emits (W2-wire-06).
+- `endpoint`, `bridge`, `node`: the Aggregator is the endpoint with the `Aggregator` role, not endpoint number 1 — `IsAggregator`, `ClusterServers` and the bridge's and the facade's Aggregator lookups read the role, so a host endpoint numbered 1 keeps its own clusters and a topology without an Aggregator gets no Aggregator servers mounted; `endpoint` documents the bridged range as 2..65534 (W2-api-03). A hand-built topology marks its Aggregator with `Aggregator: true`.
 
 ## [0.15.6] — 2026-11-01
 
