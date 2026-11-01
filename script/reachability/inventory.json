@@ -34062,7 +34062,7 @@
       "identifier": "TestPutUTF8_IllFormedInputIsSanitised",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "tlv/encode_utf8_max_test.go",
-      "line": 158
+      "line": 159
     },
     {
       "package": "tlv",
