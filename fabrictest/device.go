@@ -156,7 +156,7 @@ func (s *Site) addDevice(topo Topology, base *node.Config) *Device {
 	} else if s.opts.StoreOnDisk {
 		path := filepath.Join(s.dir, "device"+strconv.Itoa(d.index)+".db")
 		var err error
-		if db, err = node.OpenSQLite(path); err != nil {
+		if db, err = store.OpenSQLite(path); err != nil {
 			s.tb.Fatalf("fabrictest: device store: %v", err)
 		}
 		d.store = node.Store{DB: db}

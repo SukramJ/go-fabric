@@ -328,8 +328,10 @@ func (s *CertificateStore) processRevocationPoint(ctx context.Context, p Revocat
 	return entry, nil
 }
 
-// maxCRLSize bounds a CRL download whose revocation point states no
-// DataFileSize; 1 MiB holds any Matter CRL.
+// maxCRLSize bounds a CRL download: the point's DataFileSize up to it,
+// and the whole body without one; 1 MiB holds any Matter CRL. A point that
+// announces more is rejected before the download, since DataFileSize is
+// the vendor's statement and must not raise the bound.
 const maxCRLSize = 1 << 20
 
 // downloadCRL fetches dataUrl (:1524-1534): a client error is a rejection,
@@ -360,11 +362,14 @@ func (s *CertificateStore) downloadCRL(ctx context.Context, dataURL string, data
 		}
 		return nil, rejected("%s", msg)
 	}
+	if dataFileSize > maxCRLSize {
+		return nil, rejected("CRL from %s announces %d bytes, more than %d", dataURL, dataFileSize, maxCRLSize)
+	}
 	limit := uint64(maxCRLSize)
 	if dataFileSize > 0 {
 		limit = dataFileSize
 	}
-	body, err := io.ReadAll(io.LimitReader(resp.Body, int64(min(limit, 1<<62))+1)) //nolint:gosec // bounded above
+	body, err := io.ReadAll(io.LimitReader(resp.Body, int64(limit)+1)) //nolint:gosec // limit <= maxCRLSize
 	if err != nil {
 		return nil, err
 	}

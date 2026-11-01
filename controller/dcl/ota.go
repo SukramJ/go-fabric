@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"math"
 	"net/http"
 	"net/url"
 	"slices"
@@ -281,7 +282,10 @@ func (o *OTAVersions) Download(ctx context.Context, u SoftwareVersion, w io.Writ
 		}
 		return nil
 	}
-	limit := int64(min(u.OTAFileSize, 1<<62)) //nolint:gosec // bounded above
+	if u.OTAFileSize > math.MaxInt64-1 {
+		return &OTAError{Message: fmt.Sprintf("OTA image from %s announces an impossible size of %d bytes", u.OTAURL, u.OTAFileSize)}
+	}
+	limit := int64(u.OTAFileSize) //nolint:gosec // bounded above
 	n, err := io.Copy(w, io.LimitReader(resp.Body, limit+1))
 	if err != nil {
 		return fail(err)

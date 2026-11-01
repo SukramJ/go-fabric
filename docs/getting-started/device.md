@@ -52,14 +52,13 @@ import (
 	"slices"
 	"syscall"
 
-	_ "modernc.org/sqlite" // the host picks the SQLite driver
-
 	"github.com/SukramJ/go-fabric/cluster/onoff"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/device"
 	"github.com/SukramJ/go-fabric/endpoint"
 	"github.com/SukramJ/go-fabric/mdns"
 	"github.com/SukramJ/go-fabric/node"
+	"github.com/SukramJ/go-fabric/store"
 )
 
 func main() {
@@ -101,11 +100,11 @@ func run(ctx context.Context) error {
 	return n.Run(ctx) // Start, wait for ctx, Stop
 }
 
-// openDB opens the SQLite file with the module's opener (foreign_keys
-// carries the store's cascade-delete on fabric removal). node.New applies
-// the schemas.
+// openDB opens the SQLite file with the module's opener (escaped file:
+// URI, foreign_keys for the store's cascade-delete on fabric removal, a
+// new file created 0600). node.New applies the schemas.
 func openDB(path string) (*sql.DB, error) {
-	return node.OpenSQLite(path)
+	return store.OpenSQLite(path)
 }
 
 // newNode builds the node and adds the light, unstarted.

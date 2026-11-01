@@ -51,3 +51,16 @@ Roughly 6.4 M subagent tokens for the review. The Sonnet map of W3 group A cost 
 - API breaks W5-api-01/02/03 and the five duplicate-shape pairs: all in the W5 PR, migration lines in the CHANGELOG, loom follow-up issue.
 - TimeSynchronization stays mounted by default; the by_design row is corrected to record the real divergence.
 - The review notes are committed with PR 1 (not before: the register describes open vulnerabilities).
+
+## PR 1 verification (Fable, 2026-11-01, PR #359)
+
+Every fix read against the pins (matter.js 862ad75f, chip 6170af84); every new citation checked line by line. All 13 items hold. Read into the W1, W2, W3, W4, W6 verdict files when the wave PRs start.
+
+- Item 1 (W2-wire-01): the request is dropped without a reply — matter.js `ExchangeManager.ts:391-412` opens no exchange; the W2 verdict's StatusResponse(InvalidAction) is withdrawn.
+- Item 2 (W3-clusec-01): a local write without a request context keeps the entries' fabric (ported matter.js test `setStateOf`); the IM path never does.
+- Item 3 (W2-sec-02): sessions closed by ID, not `ClosePASESessions`, so a second commissioning within the 100 ms grace keeps its PASE session; the PASE marker survives `AdoptFabricIndex` (`secure/operational/manager.go:472-485`), so the adopted session goes too.
+- Item 5: the port reports `(fabricIndex, armed)`; UpdateNOC needs the armed state alone for FailsafeRequired and the fabric for ConstraintError. Ahead row BD-chip-FailSafeOfTheAccessingFabric.
+- Item 7: the agent's CRL bound took the vendor's DataFileSize as the limit; a point announcing more than 1 MiB is now rejected before the download. OTA's bound rewritten for CodeQL (`go/incorrect-integer-conversion`).
+- Item 8: the opener moved to `store.OpenSQLite` so `controller.OpenDB` can use it (archcheck: roles must not import the facade); `url.URL.OmitHost` added — without it a relative path became `file://rel.db` and SQLite refused the authority.
+- Item 10 remainder: a NOC without ICAC has no AKID check against the root SKID (the verifier holds the root key only); the signature check against the root key makes it a shape gap, not an authentication gap → W1 PR, additive constructor.
+- Open for the wave PRs: `core.ThreadNetworkCommissioning` fabric-aware (chip `NetworkCommissioningCluster.cpp:157`) → W3; fabric-0 bypasses `im/read.go:731,757`, `bridge/subscribe.go:385`, `endpoint/dispatcher.go:1021` fail closed → W2.

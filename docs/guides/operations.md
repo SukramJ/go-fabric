@@ -36,7 +36,7 @@ So the operator's rules are the persistence guide's
   directory);
 - protect it like a key: it holds the node's private operational keys
   unencrypted. A file the node creates through `Store.Path` (or
-  `node.OpenSQLite`) is created with mode `0600`, and
+  `store.OpenSQLite`) is created with mode `0600`, and
   SQLite gives its `-wal` and `-shm` files the same mode; an existing file
   keeps its mode, and a host that opens its own handle (`Store.DB`) sets the
   mode itself;
@@ -47,7 +47,7 @@ So the operator's rules are the persistence guide's
   copies answer as one node under one identity.
 
 *Source: [`node/config.go`](https://github.com/SukramJ/go-fabric/blob/main/node/config.go) (`Store`),
-[`node/store_path.go`](https://github.com/SukramJ/go-fabric/blob/main/node/store_path.go) (`sqlitePragmas`, `OpenSQLite`, `openStorePath`),
+[`store/sqlite.go`](https://github.com/SukramJ/go-fabric/blob/main/store/sqlite.go) (`sqlitePragmas`, `OpenSQLite`), [`node/store_path.go`](https://github.com/SukramJ/go-fabric/blob/main/node/store_path.go) (`openStorePath`),
 [`node/node.go`](https://github.com/SukramJ/go-fabric/blob/main/node/node.go) (`Start`: the own window of a node without a fabric).*
 
 ## Ports and addresses

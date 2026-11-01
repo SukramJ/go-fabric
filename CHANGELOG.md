@@ -21,13 +21,13 @@ Findings of the whole-codebase review of 2026-11-01 (`notes/review/2026-11/`).
 - `cluster/core`, `cluster/threadbr`, `cluster/jointfabric`: CSRRequest, AddNOC, AddTrustedRootCertificate, SetActiveDatasetRequest, ICACCSRRequest and AddICAC answer FailsafeRequired unless the fail-safe is armed for the accessing fabric, as connectedhomeip does (W3-clusec-03, W3-club1-02, W3-clua2-01).
 - `node`: UpdateNOC deletes the fabric's CASE resumption records (W6-reg-02).
 - `controller/dcl`: the CRL DER decoder refuses a nesting deeper than 32 levels (it overflowed the stack), and the CRL and OTA image downloads are bounded by the ledger's stated size (1 MiB for a CRL without one) (W4-ctlint-01, W4-ctlint-02).
-- `node`, `fabrictest`, examples: the SQLite `file:` URI is built with `net/url`, so a path holding `#` or `?` opens that file with its pragmas (W5-ex-01).
-- `node`: a SQLite store file the node creates is owner-only (`0600`), and so are its `-wal` and `-shm` files (W5-ex-05).
+- `store`, `node`, `controller`, `fabrictest`, examples: the SQLite `file:` URI is built with `net/url`, so a path holding `#` or `?` opens that file with its pragmas (W5-ex-01).
+- `store`, `node`, `controller`: a SQLite file the node or the controller creates is owner-only (`0600`), and so are its `-wal` and `-shm` files (W5-ex-05).
 - `secure/sigma`, `secure/mattercert`: a CASE responder with an identity fails closed when its verifier cannot read the peer NOC's fabric or node id; Sigma1 without initiatorRandom, initiatorSessionId or destinationId is InvalidParam; a NOC or ICAC without an authorityKeyIdentifier, and a NOC whose authorityKeyIdentifier names neither the root nor the ICAC, are refused (W1-sec-01, W1-sec-02, W1-sec-03).
 
 ### Added
 
-- `node.OpenSQLite(path, pragmas...)`: the node's SQLite opener — escaped `file:` URI, foreign keys and busy timeout on every connection, a new file created `0600`.
+- `store.OpenSQLite(path, pragmas...)`: the module's one SQLite opener, behind `node.Store.Path`, `controller.OpenDB`, fabrictest and the examples — escaped `file:` URI, foreign keys and busy timeout on every connection, a new file created `0600`.
 - `core.GeneralCommissioning.FailSafeFabric` and `core.FailSafeArmedFor`: the fail-safe port (armed, and for which fabric) and connectedhomeip's `IsFailSafeArmed(accessingFabricIndex)` over it.
 - `bridge.ErrUnsecuredIM`: the diagnostic error of a dropped IM message on session 0.
 
