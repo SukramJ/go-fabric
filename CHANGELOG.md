@@ -49,6 +49,7 @@ Findings of the whole-codebase review of 2026-11-01 (`notes/review/2026-11/`).
 - `transport/mrp`, `bridge`: an ack obligation that a second reliable message on the same exchange displaces is emitted as a standalone ack at the next pump instead of being dropped — an MRP ack names one counter, as chip and matter.js treat it; the exchange's reply route stays while the newer obligation is pending (W1-conc-03).
 - `transport/btp`: the central sets its sequence state before it starts the send-ack timer, inside the session lock; the timer's callback could read it unsynchronised (W1-conc-04).
 - `transport/udp`, `bridge`: a read error the socket survives is logged at warn and the serve loop keeps reading, as chip's UDP transport does; only a closed descriptor or 100 failed reads in a row end it, and the bridge logs that exit at warn instead of debug (W1-conc-05).
+- `tlv`: `PutUTF8Bounded` with a maximum of 0 or less writes the string unbounded, as `PutUTF8WithMax`; a negative maximum from a server's `BoundedString` panicked the Read encoder (W1-wire-02).
 
 ## [0.15.6] — 2026-11-01
 

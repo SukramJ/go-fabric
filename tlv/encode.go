@@ -312,9 +312,15 @@ func (e *Encoder) EndContainer() error {
 // HardwareVersionString/SoftwareVersionString max=64, Location exact=2).
 // For Location (exact=2) callers validate length separately and should
 // not rely on trimming.
+//
+// maxBytes ≤ 0 imposes no bound, as [Encoder.PutUTF8WithMax]: the value
+// comes from a [BoundedString] any cluster server — a host's behind
+// contract/ included — may return, and a negative one must not panic the
+// encoder. matter.js refuses a negative maxLength once, at schema
+// construction (TlvString.ts:46 at 862ad75f), never per encode.
 func (e *Encoder) PutUTF8Bounded(tag Tag, s string, maxBytes int) {
 	b := []byte(s)
-	if len(b) <= maxBytes {
+	if maxBytes <= 0 || len(b) <= maxBytes {
 		e.writeStringLike(tag, b,
 			TypeUTF8Str1, TypeUTF8Str2, TypeUTF8Str4, TypeUTF8Str8)
 		return

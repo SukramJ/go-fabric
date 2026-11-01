@@ -124,3 +124,27 @@ func TestPutUTF8WithMax_ZeroMaxSkipsValidation(t *testing.T) {
 		t.Errorf("got len %d, want len %d", len(got), len(s))
 	}
 }
+
+// PutUTF8Bounded with maxBytes ≤ 0 imposes no bound, as PutUTF8WithMax: a
+// negative maximum from a host's BoundedString must not panic the encoder
+// (it sliced b[:maxBytes]). matter.js refuses a negative maxLength at
+// schema construction (TlvString.ts:46 at 862ad75f), never per encode.
+func TestPutUTF8Bounded_NonPositiveMaxIsUnbounded(t *testing.T) {
+	t.Parallel()
+	for _, maxBytes := range []int{-1, 0} {
+		for _, s := range []string{"", "go-fabric"} {
+			enc := NewEncoder()
+			enc.PutUTF8Bounded(AnonymousTag(), s, maxBytes)
+			want := NewEncoder()
+			want.PutUTF8(AnonymousTag(), s)
+			got, err := enc.Bytes()
+			if err != nil {
+				t.Fatalf("Bytes: %v", err)
+			}
+			wantBytes, _ := want.Bytes()
+			if string(got) != string(wantBytes) {
+				t.Errorf("PutUTF8Bounded(%q, %d) = %x, want PutUTF8's %x", s, maxBytes, got, wantBytes)
+			}
+		}
+	}
+}
