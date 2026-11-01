@@ -73,16 +73,29 @@ func TestProcessSigma3_FabricIDMismatch_Rejected(t *testing.T) {
 	}
 }
 
-// TestProcessSigma3_FabricIDExtractorAbsent_SkipsCheck confirms that a
-// verifier without the optional [PeerFabricIDExtractor] surface leaves
-// the handshake unaffected — the check is opt-in, matching the
-// PeerNodeID / PeerCATs optional-surface pattern.
-func TestProcessSigma3_FabricIDExtractorAbsent_SkipsCheck(t *testing.T) {
-	err := runSigma3WithResponderVerifier(t, 0x2A, testVerifier{})
-	if err != nil {
-		t.Fatalf("ProcessSigma3 without fabric-id extractor: %v, want nil", err)
+// TestProcessSigma3_FabricIDExtractorAbsent_FailsClosed confirms that a
+// responder with an identity whose verifier offers no
+// [PeerFabricIDExtractor] refuses the handshake instead of skipping the
+// fabric binding, and one without a [PeerNodeIDExtractor] refuses it
+// instead of opening a session with subject 0. matter.js reads both out
+// of the NOC unconditionally (CaseServer.ts:298-307). W1-sec-01.
+func TestProcessSigma3_FabricIDExtractorAbsent_FailsClosed(t *testing.T) {
+	if err := runSigma3WithResponderVerifier(t, 0x2A, bareVerifier{testVerifier{}}); !errors.Is(err, ErrFabricIDMismatch) {
+		t.Fatalf("ProcessSigma3 without fabric-id extractor: %v, want ErrFabricIDMismatch", err)
+	}
+	if err := runSigma3WithResponderVerifier(t, 0x2A, fabricOnlyVerifier{PeerVerifier: testVerifier{}, fabricID: 0x2A}); !errors.Is(err, ErrPeerIdentityMismatch) {
+		t.Fatalf("ProcessSigma3 without node-id extractor: %v, want ErrPeerIdentityMismatch", err)
 	}
 }
+
+// fabricOnlyVerifier exposes the fabric-id surface and nothing of the
+// node id.
+type fabricOnlyVerifier struct {
+	PeerVerifier
+	fabricID uint64
+}
+
+func (f fabricOnlyVerifier) PeerFabricIDFromNOC(_ []byte) (uint64, error) { return f.fabricID, nil }
 
 // TestProcessSigma3_FabricIDExtractorError_Rejected confirms that a
 // verifier which exposes the fabric-id surface but cannot read the

@@ -9,6 +9,7 @@ import (
 	"crypto/rand"
 	"errors"
 	"fmt"
+	"sync"
 	"testing"
 )
 
@@ -25,6 +26,31 @@ func (testVerifier) VerifyAndExtractPubKey(noc, _ []byte) (*ecdsa.PublicKey, err
 		return nil, fmt.Errorf("test verifier: invalid noc fixture: %w", err)
 	}
 	return pub, nil
+}
+
+// testSubjects is the test rig's adapter for the NOC subject: the fixture
+// NOC is a bare public key that carries no node or fabric id, so
+// newTestIdentity records them here and testVerifier answers the
+// [PeerNodeIDExtractor] and [PeerFabricIDExtractor] surfaces from it — a
+// responder with an identity fails closed without them (W1-sec-01).
+var testSubjects sync.Map // string(noc) → testSubject
+
+type testSubject struct{ nodeID, fabricID uint64 }
+
+func (testVerifier) PeerNodeIDFromNOC(noc []byte) (uint64, error) {
+	s, ok := testSubjects.Load(string(noc))
+	if !ok {
+		return 0, errors.New("test verifier: no subject for noc fixture")
+	}
+	return s.(testSubject).nodeID, nil
+}
+
+func (testVerifier) PeerFabricIDFromNOC(noc []byte) (uint64, error) {
+	s, ok := testSubjects.Load(string(noc))
+	if !ok {
+		return 0, errors.New("test verifier: no subject for noc fixture")
+	}
+	return s.(testSubject).fabricID, nil
 }
 
 // newTestIdentity returns a fresh Identity whose NOC is just the
@@ -54,6 +80,7 @@ func newTestIdentity(t *testing.T, nodeID, fabricID uint64, ipk [16]byte) *Ident
 		FabricID:   fabricID,
 		IPK:        ipk,
 	}
+	testSubjects.Store(string(noc), testSubject{nodeID: nodeID, fabricID: fabricID})
 	return id
 }
 

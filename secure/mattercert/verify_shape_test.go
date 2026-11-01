@@ -95,7 +95,12 @@ func TestVerifyAndExtractPubKey_StructuralPredicates(t *testing.T) {
 		{"ICAC carrying CATs", func(o *verifyTestCertOpts) { o.subjectCATs = []uint32{0x00010001} }, nil, mattercert.ErrMalformed},
 		{"ICAC fabric id 0", func(o *verifyTestCertOpts) { o.subjectFabricID = 0 }, nil, mattercert.ErrMalformed},
 		{"ICAC subjectKeyIdentifier not 160 bit", func(o *verifyTestCertOpts) { o.extSKID = []byte{9} }, nil, mattercert.ErrMalformed},
-		{"NOC with a nested CAT-free chain and an oversized ICAC", func(o *verifyTestCertOpts) { o.extSKID = bytes.Repeat([]byte{0xAA}, 20) }, nil, nil},
+		{"NOC with a nested CAT-free chain and an oversized ICAC", func(o *verifyTestCertOpts) { o.extSKID = bytes.Repeat([]byte{0xAA}, 20) }, func(o *verifyTestCertOpts) { o.extAKID = bytes.Repeat([]byte{0xAA}, 20) }, nil},
+		// W1-sec-03: the authority key identifier — Noc.ts:163-184, Icac.ts:151-157.
+		{"NOC without authorityKeyIdentifier", nil, func(o *verifyTestCertOpts) { o.noAKID = true }, mattercert.ErrMalformed},
+		{"NOC authorityKeyIdentifier not 160 bit", nil, func(o *verifyTestCertOpts) { o.extAKID = []byte{1, 2} }, mattercert.ErrMalformed},
+		{"NOC authorityKeyIdentifier names neither root nor ICAC", func(o *verifyTestCertOpts) { o.extSKID = bytes.Repeat([]byte{0xAA}, 20) }, func(o *verifyTestCertOpts) { o.extAKID = bytes.Repeat([]byte{0xBB}, 20) }, mattercert.ErrChainBroken},
+		{"ICAC without authorityKeyIdentifier", func(o *verifyTestCertOpts) { o.noAKID = true }, nil, mattercert.ErrMalformed},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

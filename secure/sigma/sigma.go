@@ -303,6 +303,10 @@ func (s Sigma1) Marshal() []byte {
 // Mirrors matter.js packages/protocol/src/session/case/CaseMessages.ts::TlvCaseSigma1.
 func UnmarshalSigma1(b []byte) (Sigma1, error) {
 	var s Sigma1
+	// Tags 1-4 are TlvField (mandatory) in matter.js
+	// CaseMessages.ts:29-33; a Sigma1 missing one is a decode error, which
+	// the responder answers with InvalidParam (CaseServer.ts:88-95).
+	var hasRandom, hasSessionID, hasDestination bool
 	dec := sigmaTLVDecoder(b)
 	if err := dec.openStruct(); err != nil {
 		return s, fmt.Errorf("%w: %w / first16=%x", ErrSessionState, err, peek(b, 16))
@@ -321,13 +325,16 @@ func UnmarshalSigma1(b []byte) (Sigma1, error) {
 				return s, fmt.Errorf("%w: random length=%d (type=%d) / first32=%x", ErrSessionState, len(val.octets), val.elemType, peek(b, 32))
 			}
 			copy(s.InitiatorRandom[:], val.octets)
+			hasRandom = true
 		case 2:
 			s.InitiatorSessionID = uint16(val.u & 0xFFFF)
+			hasSessionID = true
 		case 3:
 			if len(val.octets) != 32 {
 				return s, fmt.Errorf("%w: destinationID length=%d", ErrSessionState, len(val.octets))
 			}
 			copy(s.DestinationID[:], val.octets)
+			hasDestination = true
 		case 4:
 			if len(val.octets) != EphPubKeySize {
 				return s, fmt.Errorf("%w: ephPub length=%d", ErrSessionState, len(val.octets))
@@ -367,6 +374,10 @@ func UnmarshalSigma1(b []byte) (Sigma1, error) {
 	}
 	if s.InitiatorEphPubKey == nil {
 		return s, fmt.Errorf("%w: sigma1 missing ephPub", ErrSessionState)
+	}
+	if !hasRandom || !hasSessionID || !hasDestination {
+		return s, fmt.Errorf("%w: sigma1 missing a mandatory field (initiatorRandom=%t, initiatorSessionId=%t, destinationId=%t)",
+			ErrSessionState, hasRandom, hasSessionID, hasDestination)
 	}
 	// Resumption-tag all-or-nothing rule (chip CASESession.cpp:2438-2449
 	// `CHIP_ERROR_UNEXPECTED_TLV_ELEMENT`). The Matter spec §4.13.2.2

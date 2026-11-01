@@ -47,6 +47,10 @@ type verifyTestCertOpts struct {
 	extKeyUsage  *uint16
 	extEKU       []uint8
 	extSKID      []byte
+	// extAKID is the authorityKeyIdentifier; nil takes the default SKID
+	// (every fixture key identifier is the same), noAKID omits it.
+	extAKID []byte
+	noAKID  bool
 }
 
 // putTestExtensions writes tag 10 the way a real operational cert carries
@@ -93,6 +97,13 @@ func putTestExtensions(t *testing.T, e *tlv.Encoder, opts verifyTestCertOpts) {
 			skid = bytes.Repeat([]byte{0x5A}, 20)
 		}
 		e.PutOctets(tlv.ContextTag(4), skid)
+		if !opts.noAKID {
+			akid := opts.extAKID
+			if akid == nil {
+				akid = bytes.Repeat([]byte{0x5A}, 20)
+			}
+			e.PutOctets(tlv.ContextTag(5), akid)
+		}
 	}
 	if err := e.EndContainer(); err != nil {
 		t.Fatalf("EndContainer extensions: %v", err)
