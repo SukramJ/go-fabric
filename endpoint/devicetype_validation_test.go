@@ -554,7 +554,7 @@ func TestTopologyFacts(t *testing.T) {
 // without the Lighting feature.
 func TestValidateDeviceTypesAssembledBridge(t *testing.T) {
 	t.Parallel()
-	a, err := New(&oneEndpointStore{}, Config{VendorID: 1, ProductID: 1, NodeLabel: "x", RootDeviceConditions: []string{conditionLanguage}}, nil)
+	a, err := New(&oneEndpointStore{}, Config{VendorID: 1, ProductID: 1, RootDeviceConditions: []string{conditionLanguage}}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

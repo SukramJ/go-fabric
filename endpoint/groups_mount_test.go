@@ -149,7 +149,7 @@ func TestGroupsServerIsMountedWhereTheDeviceTypeMandatesIt(t *testing.T) {
 func TestAssemblerStampsGroupState(t *testing.T) {
 	t.Parallel()
 	mgr, _ := groups.NewManager(nopGroupStore{}, nil)
-	a, err := New(&oneEndpointStore{}, Config{VendorID: 1, ProductID: 1, NodeLabel: "x", Groups: mgr}, nil)
+	a, err := New(&oneEndpointStore{}, Config{VendorID: 1, ProductID: 1, Groups: mgr}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

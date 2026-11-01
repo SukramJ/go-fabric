@@ -49,10 +49,7 @@ func newBenchBridge(tb testing.TB, snap Snapshotter) *Bridge {
 		snap,
 		nil,
 		Config{
-			Listen:    ":0",
-			VendorID:  0x1234,
-			ProductID: 0x5678,
-			NodeLabel: "bench",
+			Listen: ":0",
 		},
 		slog.New(slog.DiscardHandler),
 	)

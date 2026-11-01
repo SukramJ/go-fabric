@@ -10,22 +10,20 @@ import (
 	"log/slog"
 	"slices"
 	"sort"
-	"strings"
 
 	"github.com/SukramJ/go-fabric/clock"
 	"github.com/SukramJ/go-fabric/groups"
 )
 
-// Config tunes the assembler. The zero value is *not* valid — at
-// minimum, a non-zero VendorID + ProductID + non-empty NodeLabel
-// must be supplied (the root BasicInformation cluster mandates them).
+// Config tunes the assembler. The zero value is *not* valid — a non-zero
+// VendorID and ProductID must be supplied: bridged endpoints serve them.
+// The node's own label is not the assembler's: the root's BasicInformation
+// server (cluster/core) serves it.
 type Config struct {
 	// VendorID is the bridge's IANA-assigned vendor identifier.
 	VendorID uint16
 	// ProductID is the bridge's vendor-assigned product identifier.
 	ProductID uint16
-	// NodeLabel is the user-visible bridge label.
-	NodeLabel string
 	// VendorName is the node's own BasicInformation VendorName. A bridged
 	// endpoint whose [Spec.VendorName] is empty serves it as its
 	// BridgedDeviceBasicInformation VendorName, so the vendor fields
@@ -82,9 +80,6 @@ func (c Config) Validate() error {
 	}
 	if c.ProductID == 0 {
 		return errors.New("endpoint: Config.ProductID must be non-zero")
-	}
-	if strings.TrimSpace(c.NodeLabel) == "" {
-		return errors.New("endpoint: Config.NodeLabel must be non-empty")
 	}
 	return nil
 }
@@ -158,7 +153,6 @@ func (a *Assembler) Assemble(ctx context.Context, snapshots []Snapshot) (*Topolo
 		Endpoints:  []*Endpoint{root, aggregator},
 		VendorID:   a.cfg.VendorID,
 		ProductID:  a.cfg.ProductID,
-		NodeLabel:  a.cfg.NodeLabel,
 		VendorName: a.cfg.VendorName,
 	}
 

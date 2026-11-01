@@ -14,7 +14,6 @@ func validEndpointConfig() endpoint.Config {
 	return endpoint.Config{
 		VendorID:  0x1234,
 		ProductID: 0x5678,
-		NodeLabel: "TestBridge",
 	}
 }
 
@@ -33,20 +32,6 @@ func TestConfigValidate_ZeroProductID(t *testing.T) {
 	cfg.ProductID = 0
 	if err := cfg.Validate(); err == nil {
 		t.Error("expected error for zero ProductID, got nil")
-	}
-}
-
-func TestConfigValidate_EmptyNodeLabel(t *testing.T) {
-	t.Parallel()
-	for _, lbl := range []string{"", "   ", "\t"} {
-		t.Run("label="+lbl, func(t *testing.T) {
-			t.Parallel()
-			cfg := validEndpointConfig()
-			cfg.NodeLabel = lbl
-			if err := cfg.Validate(); err == nil {
-				t.Error("expected error for empty NodeLabel, got nil")
-			}
-		})
 	}
 }
 

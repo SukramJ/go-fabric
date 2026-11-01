@@ -627,9 +627,6 @@ type Topology struct {
 	// ProductID is the bridge's vendor-assigned product identifier
 	// (BasicInformation.ProductID, Matter §11.1.5.4).
 	ProductID uint16
-	// NodeLabel is the bridge's user-visible label
-	// (BasicInformation.NodeLabel, Matter §11.1.5.6).
-	NodeLabel string
 	// VendorName is the node's BasicInformation VendorName
 	// ([Config.VendorName]).
 	VendorName string

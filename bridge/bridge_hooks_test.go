@@ -48,10 +48,7 @@ func TestBridge_SetOnReassembled_CalledAfterReassemble(t *testing.T) {
 		emptySnapshotter,
 		mdns.NewNoop(),
 		bridge.Config{
-			Listen:    ":0",
-			VendorID:  0x1234,
-			ProductID: 0x5678,
-			NodeLabel: "hooks-test",
+			Listen: ":0",
 		},
 		nil,
 	)

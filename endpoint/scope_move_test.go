@@ -19,7 +19,7 @@ func TestReusedRecordTakesTheNewScope(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	store := newFakeStore()
-	a, err := endpoint.New(store, endpoint.Config{VendorID: 1, ProductID: 1, NodeLabel: "x"}, slog.New(slog.DiscardHandler))
+	a, err := endpoint.New(store, endpoint.Config{VendorID: 1, ProductID: 1}, slog.New(slog.DiscardHandler))
 	if err != nil {
 		t.Fatal(err)
 	}

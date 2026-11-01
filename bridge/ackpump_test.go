@@ -492,10 +492,7 @@ func TestTickOutboundReliable_NilListener(t *testing.T) {
 		wbEmptySnapshotter,
 		nil,
 		Config{
-			Listen:    ":0",
-			VendorID:  0x1234,
-			ProductID: 0x5678,
-			NodeLabel: "wb-test",
+			Listen: ":0",
 		},
 		nil,
 	)

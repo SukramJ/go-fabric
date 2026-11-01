@@ -81,7 +81,7 @@ func keysOf(vs []DeviceTypeViolation, ep uint16) []string {
 // everything the validator reads.
 func TestDeviceTypeSubjectSameVerdicts(t *testing.T) {
 	t.Parallel()
-	a, err := New(&oneEndpointStore{}, Config{VendorID: 1, ProductID: 1, NodeLabel: "x", RootDeviceConditions: []string{conditionLanguage}}, nil)
+	a, err := New(&oneEndpointStore{}, Config{VendorID: 1, ProductID: 1, RootDeviceConditions: []string{conditionLanguage}}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

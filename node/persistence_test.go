@@ -49,7 +49,6 @@ func hostNode(t *testing.T, db *sql.DB) (*node.Node, node.EndpointPersistence) {
 	cfg := minimalConfig(db)
 	asm, err := endpoint.New(sqlitestore.New(db), endpoint.Config{
 		VendorID: cfg.ProductDescription.VendorID, ProductID: cfg.ProductDescription.ProductID,
-		NodeLabel:          cfg.BasicInformation.NodeLabel,
 		OnNodeLabelWritten: ep.OnNodeLabelWritten,
 		Scenes:             ep,
 	}, logger)

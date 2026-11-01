@@ -39,11 +39,8 @@ func newTCPHarness(t *testing.T) *tcpHarness {
 	fabric := addHarnessFabric(t, st, harnessFabricID, harnessCompressedID)
 	adv := newFakeAdvertiser()
 	b, err := New(wbEmptySnapshotter, adv, Config{
-		Listen:    "127.0.0.1:0",
-		VendorID:  0x1234,
-		ProductID: 0x5678,
-		NodeLabel: "tcp-test",
-		TCP:       TCPConfig{Incoming: true, Outgoing: true},
+		Listen: "127.0.0.1:0",
+		TCP:    TCPConfig{Incoming: true, Outgoing: true},
 	}, nil)
 	if err != nil {
 		t.Fatalf("New: %v", err)

@@ -19,7 +19,7 @@ import (
 func TestSpecClientClustersReadBackInTheDescriptor(t *testing.T) {
 	t.Parallel()
 	const dtDoorbell, dtPowerSource, chime = 0x0148, 0x0011, 0x0556
-	a, err := New(newInternalFakeStore(), Config{VendorID: 1, ProductID: 1, NodeLabel: "x"}, nil)
+	a, err := New(newInternalFakeStore(), Config{VendorID: 1, ProductID: 1}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

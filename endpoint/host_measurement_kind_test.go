@@ -127,7 +127,6 @@ func TestHostRegisteredMeasurementKindMaterialisesAnEndpoint(t *testing.T) {
 	assembler, err := endpoint.New(endpointtest.NewFakeStore(), endpoint.Config{
 		VendorID:  0xFFF1,
 		ProductID: 0x8001,
-		NodeLabel: "Host Bridge",
 	}, nil)
 	if err != nil {
 		t.Fatalf("endpoint.New: %v", err)
@@ -192,7 +191,6 @@ func TestHostRegisteredMeasurementKindReceivesTheEndpointID(t *testing.T) {
 	assembler, err := endpoint.New(endpointtest.NewFakeStore(), endpoint.Config{
 		VendorID:  0xFFF1,
 		ProductID: 0x8001,
-		NodeLabel: "Host Bridge",
 	}, nil)
 	if err != nil {
 		t.Fatalf("endpoint.New: %v", err)

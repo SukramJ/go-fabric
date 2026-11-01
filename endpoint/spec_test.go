@@ -43,7 +43,6 @@ func specAssembler(t *testing.T) *endpoint.Assembler {
 	a, err := endpoint.New(newFakeStore(), endpoint.Config{
 		VendorID:  0x1234,
 		ProductID: 0x5678,
-		NodeLabel: "SpecBridge",
 	}, slog.New(slog.DiscardHandler))
 	if err != nil {
 		t.Fatalf("endpoint.New: %v", err)

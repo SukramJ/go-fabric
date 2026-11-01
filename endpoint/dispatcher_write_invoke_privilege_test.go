@@ -117,7 +117,7 @@ func privilegeTestTopology(t *testing.T) *Topology {
 			rootEndpointWith(acl, opc, gc, plain),
 			{ID: 1, DeviceType: 0x000E}, // aggregator
 		},
-		NodeLabel: "test", VendorID: 0xFFF1, ProductID: 0x8000,
+		VendorID: 0xFFF1, ProductID: 0x8000,
 	}
 }
 
@@ -402,7 +402,7 @@ func TestHandleWriteRequest_RejectsWildcardAttributePath(t *testing.T) {
 			rootEndpointWith(acl),
 			{ID: 1, DeviceType: 0x000E},
 		},
-		NodeLabel: "test", VendorID: 0xFFF1, ProductID: 0x8000,
+		VendorID: 0xFFF1, ProductID: 0x8000,
 	}
 	d := NewTopologyDispatcher(topo)
 	d.SetACLLister(fakeACLLister{entries: []store.ACLEntry{caseEntry(1, store.PrivilegeOperate, nil)}})
@@ -451,7 +451,7 @@ func TestHandleWriteRequest_WildcardEndpointAuthorizesEveryResolvedEndpoint(t *t
 			{ID: 1, DeviceType: 0x000E},
 			{ID: 3, Source: recordingSource{srv: bridgedSrv}},
 		},
-		NodeLabel: "test", VendorID: 0xFFF1, ProductID: 0x8000,
+		VendorID: 0xFFF1, ProductID: 0x8000,
 	}
 	d := NewTopologyDispatcher(topo)
 	onlyRoot := uint16(0)

@@ -34,10 +34,7 @@ func newReachabilityBridge(t *testing.T, ep *endpointpkg.Endpoint) *Bridge {
 		wbEmptySnapshotter,
 		nil,
 		Config{
-			Listen:    ":0",
-			VendorID:  0x1234,
-			ProductID: 0x5678,
-			NodeLabel: "reachable-test",
+			Listen: ":0",
 		},
 		nil,
 	)
@@ -219,7 +216,7 @@ func TestForgetSigma1Replied_ClearsEntry(t *testing.T) {
 	b, err := New(
 		wbEmptySnapshotter,
 		nil,
-		Config{Listen: ":0", VendorID: 0x1, ProductID: 0x1, NodeLabel: "evict-test"},
+		Config{Listen: ":0"},
 		nil,
 	)
 	if err != nil {
@@ -250,7 +247,7 @@ func TestPerExchangeCaseProvider_EvictHookForgetsSigma1(t *testing.T) {
 	b, err := New(
 		wbEmptySnapshotter,
 		nil,
-		Config{Listen: ":0", VendorID: 0x1, ProductID: 0x1, NodeLabel: "evict-hook-test"},
+		Config{Listen: ":0"},
 		nil,
 	)
 	if err != nil {

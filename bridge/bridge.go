@@ -239,8 +239,13 @@ var (
 // programming error and is rejected as one.
 type Snapshotter func(ctx context.Context) (*endpoint.Topology, error)
 
-// Config bundles the bridge's identity and listener parameters. All
-// fields are validated at [New] time.
+// Config bundles the bridge's listener and protocol parameters. The zero
+// value is valid.
+//
+// It carries no node identity: VendorID, ProductID and NodeLabel are
+// served by the root's BasicInformation server (cluster/core), and the
+// commissionable record takes its discriminator, VID, PID and name from
+// the [CommissioningAdvertisement] each window opens with.
 //
 // It carries nothing that governs topology assembly — which sources are
 // exposed, whether measurements become endpoints, how labels are
@@ -260,24 +265,6 @@ type Config struct {
 	// socket's port for Incoming, and the T key of the operational
 	// record for both roles. The zero value is TCP off. See [TCPConfig].
 	TCP TCPConfig
-
-	// VendorID is the bridge's IANA-assigned vendor identifier
-	// (BasicInformation.VendorID, Matter §11.1.5.2). Mandatory.
-	VendorID uint16
-
-	// ProductID is the bridge's vendor-assigned product identifier
-	// (BasicInformation.ProductID, Matter §11.1.5.4). Mandatory.
-	ProductID uint16
-
-	// NodeLabel is the bridge's user-visible label
-	// (BasicInformation.NodeLabel, Matter §11.1.5.6). Mandatory.
-	NodeLabel string
-
-	// Discriminator is the 12-bit Matter commissioning discriminator
-	// (Matter §5.1.3.1). Surfaces in the commissionable mDNS record;
-	// commissioner UIs use it to pre-filter candidates. Bits above
-	// the 12-bit limit are masked off at advertise time.
-	Discriminator uint16
 
 	// AdvertiseTimeout caps the per-call timeout for mDNS publish /
 	// withdraw operations. Defaults to 5 seconds when zero. Each
@@ -312,22 +299,6 @@ type Config struct {
 // SessionIntervals are a node's MRP intervals ([Config.SessionIntervals]).
 type SessionIntervals struct {
 	Idle, Active, ActiveThreshold time.Duration
-}
-
-// validate reports whether the config carries every required field.
-// Mirrors endpoint.Config.Validate so callers see one consistent
-// failure mode.
-func (c Config) validate() error {
-	if c.VendorID == 0 {
-		return errors.New("bridge: Config.VendorID must be non-zero")
-	}
-	if c.ProductID == 0 {
-		return errors.New("bridge: Config.ProductID must be non-zero")
-	}
-	if c.NodeLabel == "" {
-		return errors.New("bridge: Config.NodeLabel must be non-empty")
-	}
-	return nil
 }
 
 // Bridge owns the live Matter runtime: the assembled topology, the
@@ -764,9 +735,6 @@ type Bridge struct {
 func New(snap Snapshotter, advertiser mdns.Advertiser, cfg Config, logger *slog.Logger) (*Bridge, error) {
 	if snap == nil {
 		return nil, errors.New("bridge: snapshotter is required")
-	}
-	if err := cfg.validate(); err != nil {
-		return nil, err
 	}
 	if cfg.AdvertiseTimeout == 0 {
 		cfg.AdvertiseTimeout = 5 * time.Second

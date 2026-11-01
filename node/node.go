@@ -232,7 +232,6 @@ func New(cfg Config) (*Node, error) { //nolint:funlen // the composition root: o
 		n.assembler, err = endpoint.New(n.cfg.Store.Endpoints, endpoint.Config{
 			VendorID:           pd.VendorID,
 			ProductID:          pd.ProductID,
-			NodeLabel:          bi.NodeLabel,
 			VendorName:         bi.VendorName,
 			Groups:             n.groups,
 			OnNodeLabelWritten: n.endpoints.OnNodeLabelWritten,
@@ -255,14 +254,10 @@ func New(cfg Config) (*Node, error) { //nolint:funlen // the composition root: o
 
 	// --- the bridge (main.go:188-228 at b4ea1f96^) -----------------------------------
 	n.br, err = bridge.New(snapshotter, n.advertiser, bridge.Config{
-		Listen:        cfg.Network.Listen,
-		PreferIPv4:    cfg.Network.PreferIPv4,
-		TCP:           cfg.Network.TCP,
-		VendorID:      pd.VendorID,
-		ProductID:     pd.ProductID,
-		NodeLabel:     bi.NodeLabel,
-		Discriminator: cfg.Commissioning.Discriminator,
-		Clock:         n.cfg.Clock,
+		Listen:     cfg.Network.Listen,
+		PreferIPv4: cfg.Network.PreferIPv4,
+		TCP:        cfg.Network.TCP,
+		Clock:      n.cfg.Clock,
 		// The invoke path refuses what BasicInformation does not advertise.
 		MaxPathsPerInvoke: cfg.MaxPathsPerInvoke,
 		// The operational record advertises the reported intervals.

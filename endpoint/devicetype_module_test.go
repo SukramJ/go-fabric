@@ -31,7 +31,7 @@ func bridgedViolations(t *testing.T, spec Spec) []DeviceTypeViolation {
 	if err != nil {
 		t.Fatal(err)
 	}
-	a, err := New(newInternalFakeStore(), Config{VendorID: 1, ProductID: 1, NodeLabel: "x", Groups: mgr}, nil)
+	a, err := New(newInternalFakeStore(), Config{VendorID: 1, ProductID: 1, Groups: mgr}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

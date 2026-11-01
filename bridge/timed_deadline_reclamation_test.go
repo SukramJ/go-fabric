@@ -95,10 +95,7 @@ func TestBridgeStart_AckPumpReclaimsExpiredTimedDeadlines(t *testing.T) {
 		wbEmptySnapshotter,
 		mdns.NewNoop(),
 		Config{
-			Listen:    ":0",
-			VendorID:  0x1234,
-			ProductID: 0x5678,
-			NodeLabel: "timed-sweep-test",
+			Listen: ":0",
 		},
 		nil,
 	)

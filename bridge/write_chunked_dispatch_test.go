@@ -124,7 +124,7 @@ func decodeWriteChunkedStatusResponse(t *testing.T, got []byte) im.StatusCode {
 func TestDispatchWriteRequest_ChunkedSuppressResponse_RejectsSilently(t *testing.T) {
 	t.Parallel()
 	var logs syncBuffer
-	b, err := New(wbEmptySnapshotter, mdns.NewNoop(), Config{Listen: ":0", VendorID: 0x1234, ProductID: 0x5678, NodeLabel: "wb-test"},
+	b, err := New(wbEmptySnapshotter, mdns.NewNoop(), Config{Listen: ":0"},
 		slog.New(slog.NewTextHandler(&logs, &slog.HandlerOptions{Level: slog.LevelDebug})))
 	if err != nil {
 		t.Fatalf("New: %v", err)
