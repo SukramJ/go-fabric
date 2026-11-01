@@ -88,6 +88,14 @@ func (b *Bridge) absorbStatusResponse(src net.Addr, requestHdr *message.Header, 
 	// `ProcessSubscribeResponse` never triggers (Run 19 of the
 	// Apple-pair-diagnose cycle).
 	waited := b.signalStatusResponseRX(requestHdr.SessionID, proto.ExchangeID, !proto.Initiator, status)
+	// A StatusResponse that opens an exchange — the peer speaks as the
+	// initiator and no exchange of ours waits for it — is no answer to
+	// anything: it is answered like any other unsupported opcode.
+	// matter.js InteractionMessenger.ts:347-419 has no case for it in the
+	// request switch, so it reaches the default arm (InvalidAction).
+	if !waited && proto.Initiator {
+		return b.rejectUnsupportedOpcode(src, requestHdr, proto)
+	}
 	// A StatusResponse no chunk loop waits for, on an exchange we
 	// initiated (the peer speaks as the responder), is the last message of
 	// a report exchange: nothing of ours follows to piggyback its ack on,
@@ -118,15 +126,39 @@ func (b *Bridge) absorbStatusResponse(src net.Addr, requestHdr *message.Header, 
 	return nil
 }
 
-// rejectUnsupportedOpcode handles any opcode that is not a request opcode
-// and not StatusResponse. Returns ErrUnsupportedOpcode.
-func (b *Bridge) rejectUnsupportedOpcode(src net.Addr, proto message.ProtocolHeader) error {
+// rejectUnsupportedOpcode handles any opcode that is not a request opcode,
+// and a StatusResponse that opens an exchange. As the first message of an
+// exchange on a unicast session it is answered StatusResponse(InvalidAction)
+// and the owed ack discharged (the shape of [Bridge.rejectGroupSession]),
+// so the peer's exchange closes at once instead of timing out. Mirrors
+// matter.js packages/protocol/src/interaction/InteractionMessenger.ts
+// :415-419 (the default arm throws StatusResponseError InvalidAction) and
+// :431-461 (sendStatus unless the session is a group session); chip
+// src/app/InteractionModelEngine.cpp:1095-1099 ("Msg type %d not
+// supported", InvalidAction) and :1112-1115 (StatusResponse::Send for a
+// non-group exchange). A responder-role message no exchange waits for,
+// and any such message on a group session, is dropped with
+// ErrUnsupportedOpcode.
+func (b *Bridge) rejectUnsupportedOpcode(src net.Addr, requestHdr *message.Header, proto message.ProtocolHeader) error {
 	err := fmt.Errorf("%w: opcode=0x%02X", ErrUnsupportedOpcode, proto.Opcode)
 	b.logger.Debug("matter.rx.im.unsupported",
 		slog.String("src", srcString(src)),
 		slog.Int("opcode", int(proto.Opcode)),
 		slog.Any("err", err))
-	return err
+	if !proto.Initiator || requestHdr.SessionType == message.SessionGroup {
+		return err
+	}
+	body, encErr := EncodeStatusResponse(im.StatusResponse{Status: im.StatusInvalidAction})
+	if encErr != nil {
+		debugReplyError(b.logger, "encode_unsupported_reject", src, encErr)
+		return encErr
+	}
+	if sendErr := b.sendReply(src, requestHdr, proto, im.OpcodeStatusResponse, body); sendErr != nil {
+		debugReplyError(b.logger, "send_unsupported_reject", src, sendErr)
+		return sendErr
+	}
+	b.dischargeOwedAck(requestHdr.SessionID, proto.ExchangeID, !proto.Initiator)
+	return nil
 }
 
 // rejectGroupSession handles Read/Subscribe/Timed request opcodes that
@@ -220,8 +252,12 @@ func (b *Bridge) dispatchReadRequest(ctx context.Context, src net.Addr, requestH
 	// #readAllowedEvents.
 	if len(req.EventRequests) > 0 {
 		auth := b.eventReadAuthorizer(dispatcher, readFabricIndex, readPASE, readSubjectNodeID, readSubjectCATs)
+		// One EventFilterIB applies: the first for this node (matter.js
+		// EventReadResponse.ts:68-77; review 2026-11 W2-wire-05).
+		eventReq := req
+		eventReq.EventFilters = im.EventFiltersFor(req.EventFilters, b.localNodeIDFor(requestHdr.SessionID, readFabricIndex))
 		report.EventReports = append(im.DeniedEventPathStatuses(readCtx, auth, req.EventRequests),
-			im.AuthorizeEventReports(readCtx, auth, im.HandleReadEventRequest(req, b.eventLog))...)
+			im.AuthorizeEventReports(readCtx, auth, im.HandleReadEventRequest(eventReq, b.eventLog))...)
 	}
 	// Diagnostic: show what we returned per path.
 	for i, r := range report.Reports {

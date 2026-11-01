@@ -561,7 +561,7 @@ func (nopResumptionStore) RemoveResumption(context.Context, uint8, uint64) error
 
 func startResumeDevice(t *testing.T, st SubscriptionStore, configure func(*Bridge, *operational.Manager)) *resumeDevice {
 	t.Helper()
-	br, err := New(wbEmptySnapshotter, mdns.NewNoop(), Config{Listen: "127.0.0.1:0", VendorID: 0xFFF1, ProductID: 0x8001, NodeLabel: "resume"}, nil)
+	br, err := New(wbEmptySnapshotter, mdns.NewNoop(), Config{Listen: "127.0.0.1:0"}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

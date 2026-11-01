@@ -8,7 +8,8 @@ import "context"
 // The persistence port. Each interface below is one area of the node's
 // nonvolatile state, named after the Matter concept it holds, with exactly
 // the methods the module's consumers call; [Port] is their sum. A consumer
-// names the area it uses, never the whole port (ADR 0026 principle 1); the
+// names the area it uses, never the whole port (ADR 0026 principle 7,
+// "Persistence is one seam"); the
 // node, which wires every consumer, holds a [Port].
 //
 // Two implementations ship: [Store] on SQLite and store/memstore in

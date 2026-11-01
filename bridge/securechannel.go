@@ -17,6 +17,7 @@ import (
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/diagevent"
 	"github.com/SukramJ/go-fabric/secure/channel"
+	"github.com/SukramJ/go-fabric/secure/sessionparams"
 	"github.com/SukramJ/go-fabric/secure/sigma"
 	"github.com/SukramJ/go-fabric/secure/spake2"
 	"github.com/SukramJ/go-fabric/transport/message"
@@ -715,6 +716,7 @@ func (b *Bridge) handlePase(
 		slog.String("stage", stage),
 		slog.String("src", srcString(src)),
 		slog.Int("exchange_id", int(proto.ExchangeID)))
+	rxAt := b.clk().Now()
 	respOpcode, respPayload, err := process(payload)
 	if stage == "pake3" && err == nil {
 		// The session is established: free the single-active-PASE slot
@@ -804,7 +806,7 @@ func (b *Bridge) handlePase(
 	// makes every non-standalone-ack reply reliable (MessageExchange.ts:602);
 	// the Sigma3/Pake3 piggyback ack (or a standalone ack) stops the
 	// retransmit via the universal inbound Ack path (receive.go).
-	if err := b.sendReplyReliable(src, requestHdr, proto, respOpcode, respPayload); err != nil {
+	if err := b.sendHandshakeReplyReliable(src, requestHdr, proto, respOpcode, respPayload, handshakePeerTimingOf(handler, rxAt)); err != nil {
 		debugReplyError(b.logger, "send_"+stage, src, err)
 		return err
 	}
@@ -821,6 +823,7 @@ func (b *Bridge) handleCase(
 	process func([]byte) (uint8, []byte, error),
 	handler any,
 ) error {
+	rxAt := b.clk().Now()
 	respOpcode, respPayload, err := process(payload)
 	b.settleHandshake(src, proto.ExchangeID, handler, respOpcode, respPayload, err)
 	if err != nil {
@@ -881,12 +884,37 @@ func (b *Bridge) handleCase(
 	// rebroadcast. matter.js makes every non-standalone-ack reply
 	// reliable (MessageExchange.ts:602); the Sigma3 piggyback ack stops
 	// the retransmit via the universal inbound Ack path (receive.go).
-	if err := b.sendReplyReliable(src, requestHdr, proto, respOpcode, respPayload); err != nil {
+	if err := b.sendHandshakeReplyReliable(src, requestHdr, proto, respOpcode, respPayload, handshakePeerTimingOf(handler, rxAt)); err != nil {
 		debugReplyError(b.logger, "send_"+stage, src, err)
 		return err
 	}
 	b.dischargeOwedAck(requestHdr.SessionID, proto.ExchangeID, !proto.Initiator)
 	return nil
+}
+
+// peerSessionParamsSource is the optional capability of a PASE or CASE
+// handler that kept the initiator's SessionParameters from its
+// PBKDFParamRequest / Sigma1 ([PaseAdapter.PeerSessionParams],
+// [CaseAdapter.PeerSessionParams]).
+type peerSessionParamsSource interface {
+	PeerSessionParams() *sessionparams.Parameters
+}
+
+// handshakePeerTimingOf is the initiator's MRP timing for the reply to the
+// request received at rxAt: the intervals the handler kept from the
+// request (the spec defaults when it kept none or lacks the capability),
+// the peer counted active from rxAt. matter.js creates the responder's
+// unsecured session with the peer active (UnsecuredSession.ts:30
+// `setActiveTimestamp: !isInitiator`) and adopts the initiator's
+// parameters before it replies (PaseServer.ts:153-156,
+// CaseServer.ts:120-123), so its PBKDFParamResponse, Pake2 and Sigma2
+// retransmit at the peer's active interval (MRP.ts:181).
+func handshakePeerTimingOf(handler any, rxAt time.Time) *handshakePeerTiming {
+	var params *sessionparams.Parameters
+	if s, ok := handler.(peerSessionParamsSource); ok {
+		params = s.PeerSessionParams()
+	}
+	return newHandshakePeerTiming(params, rxAt)
 }
 
 // markSigma1Replied records that we have produced a Sigma2 reply for

@@ -6,24 +6,29 @@ package operational_test
 import (
 	"testing"
 	"time"
+
+	"github.com/SukramJ/go-fabric/clock/clocktest"
 )
 
-// TestEntry_RetransmitBaseInterval_FreshDefaultsToIdle verifies that a
-// freshly-opened Entry (no peer-advertised MRP hints, no inbound
-// traffic yet) reports the spec SESSION_IDLE_INTERVAL default (500ms)
-// as its retransmit base. Mirrors matter.js MRP.ts:129-135
-// retransmissionIntervalOf / chip GetMRPBaseTimeout — an unknown peer
-// is treated as idle until proven active.
-func TestEntry_RetransmitBaseInterval_FreshDefaultsToIdle(t *testing.T) {
+// A freshly-opened Entry counts its peer active from creation: matter.js
+// sets the active timestamp of every secure session when it is created
+// (NodeSession.ts:120 at 862ad75f, "We always set the active timestamp for
+// Secure sessions") and chip initialises mLastPeerActivityTime to now
+// (SecureSession.h:349 at 6170af84). Without advertised hints the base is
+// the spec SESSION_ACTIVE_INTERVAL default (300ms) within the active
+// threshold, the idle default (500ms) after it.
+func TestEntry_RetransmitBaseInterval_FreshCountsThePeerActive(t *testing.T) {
 	t.Parallel()
 	m, _ := newTestManager()
 	e, err := m.OpenFromSigma(1, 10, 20, testKeys())
 	if err != nil {
 		t.Fatalf("OpenFromSigma: %v", err)
 	}
-	got := e.RetransmitBaseInterval(time.Now())
-	if got != 500*time.Millisecond {
-		t.Errorf("RetransmitBaseInterval (fresh entry) = %v, want 500ms (SessionIdleIntervalDefault)", got)
+	if got := e.RetransmitBaseInterval(time.Now()); got != 300*time.Millisecond {
+		t.Errorf("RetransmitBaseInterval (fresh entry) = %v, want 300ms (SessionActiveIntervalDefault)", got)
+	}
+	if got := e.RetransmitBaseInterval(time.Now().Add(5 * time.Second)); got != 500*time.Millisecond {
+		t.Errorf("RetransmitBaseInterval (past the 4s threshold) = %v, want 500ms (SessionIdleIntervalDefault)", got)
 	}
 }
 
@@ -46,10 +51,9 @@ func TestEntry_RetransmitBaseInterval_ActiveAfterMarkActiveRx(t *testing.T) {
 	}
 }
 
-// TestEntry_RetransmitBaseInterval_IdleWithoutRx verifies that
-// advertised MRP hints alone (without any inbound activity) do NOT
-// switch the entry to the active interval — lastPeerActivity stays
-// the zero time, so "peer active within the threshold" is false.
+// TestEntry_RetransmitBaseInterval_IdleWithoutRx verifies that without
+// inbound activity the peer turns idle once its active threshold has
+// passed since the session's creation.
 func TestEntry_RetransmitBaseInterval_IdleWithoutRx(t *testing.T) {
 	t.Parallel()
 	m, _ := newTestManager()
@@ -58,8 +62,8 @@ func TestEntry_RetransmitBaseInterval_IdleWithoutRx(t *testing.T) {
 		t.Fatalf("OpenFromSigma: %v", err)
 	}
 	e.SetPeerMRPIntervals(5000, 1000, 2000)
-	// No MarkActiveRx call.
-	got := e.RetransmitBaseInterval(time.Now())
+	// No MarkActiveRx call; the 2s threshold has passed since creation.
+	got := e.RetransmitBaseInterval(time.Now().Add(3 * time.Second))
 	if got != 5000*time.Millisecond {
 		t.Errorf("RetransmitBaseInterval (no peer rx yet) = %v, want 5000ms (peer idle interval)", got)
 	}
@@ -74,13 +78,16 @@ func TestEntry_RetransmitBaseInterval_IdleWithoutRx(t *testing.T) {
 func TestEntry_RetransmitBaseInterval_MarkActiveTxDoesNotFlipToActive(t *testing.T) {
 	t.Parallel()
 	m, _ := newTestManager()
+	clk := clocktest.New(time.UnixMilli(1_700_000_000_000))
+	m.SetClock(clk)
 	e, err := m.OpenFromSigma(1, 10, 20, testKeys())
 	if err != nil {
 		t.Fatalf("OpenFromSigma: %v", err)
 	}
 	e.SetPeerMRPIntervals(5000, 1000, 2000)
+	clk.Set(clk.Now().Add(3 * time.Second)) // past the 2s threshold since creation
 	e.MarkActiveTx()
-	got := e.RetransmitBaseInterval(time.Now())
+	got := e.RetransmitBaseInterval(clk.Now())
 	if got != 5000*time.Millisecond {
 		t.Errorf("RetransmitBaseInterval (Tx-only entry) = %v, want 5000ms (idle) — MarkActiveTx must not flip peer-active state", got)
 	}

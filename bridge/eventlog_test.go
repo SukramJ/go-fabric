@@ -27,10 +27,7 @@ func TestBridge_EmitEvent_AppendsToLog(t *testing.T) {
 		wbEmptySnapshotter,
 		nil, // noop advertiser
 		Config{
-			Listen:    ":0",
-			VendorID:  0x1234,
-			ProductID: 0x5678,
-			NodeLabel: "evt-log-test",
+			Listen: ":0",
 		},
 		nil,
 	)
@@ -86,10 +83,7 @@ func TestBridge_EmitEvent_EventLogNumberConsistency(t *testing.T) {
 		wbEmptySnapshotter,
 		nil,
 		Config{
-			Listen:    ":0",
-			VendorID:  0x1234,
-			ProductID: 0x5678,
-			NodeLabel: "evt-num-test",
+			Listen: ":0",
 		},
 		nil,
 	)
@@ -267,11 +261,7 @@ func TestBridge_EventLog_NotNil(t *testing.T) {
 	b, err := New(
 		wbEmptySnapshotter,
 		nil,
-		Config{
-			VendorID:  1,
-			ProductID: 2,
-			NodeLabel: "x",
-		},
+		Config{},
 		nil,
 	)
 	if err != nil {

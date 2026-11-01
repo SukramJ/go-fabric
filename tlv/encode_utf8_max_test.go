@@ -4,6 +4,7 @@
 package tlv
 
 import (
+	"bytes"
 	"strings"
 	"testing"
 )
@@ -122,5 +123,64 @@ func TestPutUTF8WithMax_ZeroMaxSkipsValidation(t *testing.T) {
 	}
 	if got != s {
 		t.Errorf("got len %d, want len %d", len(got), len(s))
+	}
+}
+
+// PutUTF8Bounded with maxBytes ≤ 0 imposes no bound, as PutUTF8WithMax: a
+// negative maximum from a host's BoundedString must not panic the encoder
+// (it sliced b[:maxBytes]). matter.js refuses a negative maxLength at
+// schema construction (TlvString.ts:46 at 862ad75f), never per encode.
+func TestPutUTF8Bounded_NonPositiveMaxIsUnbounded(t *testing.T) {
+	t.Parallel()
+	for _, maxBytes := range []int{-1, 0} {
+		for _, s := range []string{"", "go-fabric"} {
+			enc := NewEncoder()
+			enc.PutUTF8Bounded(AnonymousTag(), s, maxBytes)
+			want := NewEncoder()
+			want.PutUTF8(AnonymousTag(), s)
+			got, err := enc.Bytes()
+			if err != nil {
+				t.Fatalf("Bytes: %v", err)
+			}
+			wantBytes, _ := want.Bytes()
+			if !bytes.Equal(got, wantBytes) {
+				t.Errorf("PutUTF8Bounded(%q, %d) = %x, want PutUTF8's %x", s, maxBytes, got, wantBytes)
+			}
+		}
+	}
+}
+
+// A character string is never emitted ill-formed: each ill-formed byte
+// sequence becomes U+FFFD, as matter.js's TextEncoder-based
+// Bytes.fromString (Bytes.ts:125-131 at 862ad75f) can produce nothing
+// else; each maximal subpart becomes one U+FFFD, as the decoder reads
+// them. The bounded writers trim the sanitised string, so an input that
+// is ill-formed from its first byte no longer trims to "".
+func TestPutUTF8_IllFormedInputIsSanitised(t *testing.T) {
+	t.Parallel()
+	enc := NewEncoder()
+	enc.PutUTF8(AnonymousTag(), "a\xffb")
+	got, err := enc.Bytes()
+	if err != nil {
+		t.Fatalf("Bytes: %v", err)
+	}
+	if want := []byte{0x0C, 0x05, 0x61, 0xEF, 0xBF, 0xBD, 0x62}; !bytes.Equal(got, want) {
+		t.Fatalf("PutUTF8(\"a\\xffb\") = % X, want % X", got, want)
+	}
+	for name, put := range map[string]func(*Encoder){
+		"Bounded": func(e *Encoder) { e.PutUTF8Bounded(AnonymousTag(), "\xff\xfeabc", 4) },
+		"WithMax": func(e *Encoder) { e.PutUTF8WithMax(AnonymousTag(), "\xff\xfeabc", 4) },
+	} {
+		e := NewEncoder()
+		put(e)
+		b, err := e.Bytes()
+		if err != nil {
+			t.Fatalf("%s: Bytes: %v", name, err)
+		}
+		// "\xff\xfe" is two maximal subparts: U+FFFD U+FFFD "abc", trimmed
+		// to 4 bytes on a rune boundary.
+		if want := []byte{0x0C, 0x03, 0xEF, 0xBF, 0xBD}; !bytes.Equal(b, want) {
+			t.Errorf("%s = % X, want % X (one U+FFFD)", name, b, want)
+		}
 	}
 }

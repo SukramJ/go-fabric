@@ -4,6 +4,7 @@
 package bridge
 
 import (
+	"errors"
 	"net"
 	"testing"
 	"time"
@@ -44,5 +45,55 @@ func TestOutboundTrackerMarginJoinsTheBaseInterval(t *testing.T) {
 				t.Fatalf("second wait %v, want %v to %v", w, lo, hi)
 			}
 		})
+	}
+}
+
+// A failed send counts as the transmission and keeps the backoff the
+// sweep scheduled: a socket that fails at every attempt spends the retry
+// budget on the MRP schedule, not on consecutive pump ticks. matter.js
+// counts the retransmission before it sends and, on a send error that is
+// not a closed session, still arms the next one with the computed
+// backoff (MessageExchange.ts:905-906, :975-981 at 862ad75f).
+func TestOutboundTrackerFailedSendFollowsTheBackoffSchedule(t *testing.T) {
+	t.Parallel()
+	const base = 300 * time.Millisecond
+	dest := &net.UDPAddr{IP: net.IPv6loopback, Port: 5540}
+	now := time.Unix(1_000_000, 0)
+	tr := newOutboundReliableTracker(func(uint16, time.Time) time.Duration { return base }, nil)
+	tr.Track(7, 1, 9, []byte{1}, dest, now)
+	p := tr.pending[outboundKey{1, 7}]
+	fail := func(net.Addr, []byte) error { return errors.New("network is unreachable") }
+
+	tick := 50 * time.Millisecond // the pump's cadence
+	first := p.nextSendAt
+	if res := tr.Tick(first, fail); len(res) != 1 || res[0].Err == nil {
+		t.Fatalf("first retransmission: %+v, want one send error", res)
+	}
+	if p.retries != 1 {
+		t.Fatalf("retries = %d, want 1 (the failed send counts)", p.retries)
+	}
+	lo := time.Duration(float64(base) * mrp.MRPBackoffMargin)
+	if w := p.nextSendAt.Sub(first); w < lo {
+		t.Fatalf("next attempt %v after the failure, want the backoff (at least %v)", w, lo)
+	}
+	// Six pump ticks (300 ms) stay inside the backoff: nothing is sent.
+	for i := 1; i <= 6; i++ {
+		if res := tr.Tick(first.Add(time.Duration(i)*tick), fail); len(res) != 0 {
+			t.Fatalf("tick %d after the failure sent again: %+v", i, res)
+		}
+	}
+
+	// The whole budget is spent on the schedule: the entry is abandoned
+	// only after MaxRetransmissions attempts, each at its backoff.
+	abandoned := false
+	for i := 0; i < 100 && !abandoned; i++ {
+		for _, r := range tr.Tick(p.nextSendAt, fail) {
+			if errors.Is(r.Err, mrp.ErrMaxRetransmissionsReached) {
+				abandoned = true
+			}
+		}
+	}
+	if !abandoned {
+		t.Fatal("entry never abandoned")
 	}
 }

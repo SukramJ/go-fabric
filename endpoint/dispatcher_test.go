@@ -123,11 +123,11 @@ func makeTopology(endpoints ...*Endpoint) *Topology {
 	eps := make([]*Endpoint, 0, 2+len(endpoints))
 	eps = append(
 		eps,
-		&Endpoint{ID: 0},                     // root
-		&Endpoint{ID: 1, DeviceType: 0x000E}, // aggregator — nothing published → UnsupportedCluster on wildcard
+		&Endpoint{ID: 0}, // root
+		&Endpoint{ID: 1, Aggregator: true, DeviceType: 0x000E}, // aggregator — nothing published → UnsupportedCluster on wildcard
 	)
 	eps = append(eps, endpoints...)
-	return &Topology{Endpoints: eps, NodeLabel: "test", VendorID: 0xFFF1, ProductID: 0x8000}
+	return &Topology{Endpoints: eps, VendorID: 0xFFF1, ProductID: 0x8000}
 }
 
 // makeEndpointFull returns a bridged Endpoint whose cluster servers are
@@ -1241,9 +1241,9 @@ func TestCurrentDataVersion_BridgedIgnoresInstanceTracker(t *testing.T) {
 	ep := &Endpoint{ID: 2, Source: dvSource{srv: srv}}
 	top := &Topology{
 		Endpoints: []*Endpoint{
-			{ID: 0}, {ID: 1, DeviceType: 0x000E}, ep,
+			{ID: 0}, {ID: 1, Aggregator: true, DeviceType: 0x000E}, ep,
 		},
-		VendorID: 0xFFF1, ProductID: 0x8000, NodeLabel: "t",
+		VendorID: 0xFFF1, ProductID: 0x8000,
 	}
 	d := NewTopologyDispatcher(top)
 	v, ok := d.CurrentDataVersion(context.Background(), 2, 0x0006)
@@ -1267,9 +1267,9 @@ func TestCurrentDataVersion_RootUsesInstanceTracker(t *testing.T) {
 	top := &Topology{
 		Endpoints: []*Endpoint{
 			rootEndpointWith(noIface, zero, seven),
-			{ID: 1, DeviceType: 0x000E},
+			{ID: 1, Aggregator: true, DeviceType: 0x000E},
 		},
-		VendorID: 0xFFF1, ProductID: 0x8000, NodeLabel: "t",
+		VendorID: 0xFFF1, ProductID: 0x8000,
 	}
 	d := NewTopologyDispatcher(top)
 	if v, ok := d.CurrentDataVersion(context.Background(), 0, 0x0006); ok || v != 0 {
@@ -1421,7 +1421,6 @@ func TestAssignOrReuseID_DeviceTypeDrift(t *testing.T) {
 		cfg: Config{
 			VendorID:  0x1234,
 			ProductID: 0x5678,
-			NodeLabel: "test",
 		},
 	}
 	// Call with a new device type — should refresh without error.

@@ -127,7 +127,7 @@
   },
   {
     "file": "bridge/ackpump_test.go",
-    "line": 524,
+    "line": 521,
     "citation": "MessageExchange.ts:428-433",
     "resolved": "packages/protocol/src/protocol/MessageExchange.ts",
     "identifier": "requiresAck",
@@ -136,7 +136,7 @@
   },
   {
     "file": "bridge/bridge.go",
-    "line": 683,
+    "line": 678,
     "citation": "ExchangeManager.ts:425-431",
     "resolved": "packages/protocol/src/protocol/ExchangeManager.ts",
     "identifier": "CloseSession",
@@ -145,7 +145,7 @@
   },
   {
     "file": "bridge/bridge.go",
-    "line": 1420,
+    "line": 1388,
     "citation": "Fabric.ts:408-415",
     "resolved": "packages/protocol/src/fabric/Fabric.ts",
     "identifier": "initiateForceClose",
@@ -154,7 +154,7 @@
   },
   {
     "file": "bridge/bridge.go",
-    "line": 1745,
+    "line": 1713,
     "citation": "Session.ts:248",
     "resolved": "packages/protocol/src/session/Session.ts",
     "identifier": "initiateClose",
@@ -226,7 +226,7 @@
   },
   {
     "file": "bridge/handlers.go",
-    "line": 880,
+    "line": 897,
     "citation": "MRP.ts:129",
     "resolved": "packages/protocol/src/protocol/MRP.ts",
     "identifier": "retransmissionIntervalOf",
@@ -262,7 +262,7 @@
   },
   {
     "file": "bridge/outbound_reliable.go",
-    "line": 26,
+    "line": 27,
     "citation": "InteractionMessenger.ts:721",
     "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
     "identifier": "DataReport",
@@ -298,7 +298,7 @@
   },
   {
     "file": "bridge/receive_dispatch.go",
-    "line": 267,
+    "line": 303,
     "citation": "packages/protocol/src/interaction/InteractionMessenger.ts:679",
     "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
     "identifier": "suppressResponse",
@@ -307,7 +307,7 @@
   },
   {
     "file": "bridge/receive_dispatch.go",
-    "line": 315,
+    "line": 351,
     "citation": "InteractionMessenger.ts:719-721",
     "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
     "identifier": "sendDataReportMessage",
@@ -316,7 +316,7 @@
   },
   {
     "file": "bridge/receive_dispatch.go",
-    "line": 426,
+    "line": 462,
     "citation": "MessageExchange.ts:602",
     "resolved": "packages/protocol/src/protocol/MessageExchange.ts",
     "identifier": "requiresAck",
@@ -325,7 +325,7 @@
   },
   {
     "file": "bridge/receive_dispatch.go",
-    "line": 468,
+    "line": 504,
     "citation": "CommandInvokeResponse.ts:292-295",
     "resolved": "packages/protocol/src/action/server/CommandInvokeResponse.ts",
     "identifier": "InvokeResponse",
@@ -334,7 +334,7 @@
   },
   {
     "file": "bridge/receive_dispatch.go",
-    "line": 545,
+    "line": 581,
     "citation": "packages/node/src/node/server/InteractionServer.ts:1043-1074",
     "resolved": "packages/node/src/node/server/InteractionServer.ts",
     "identifier": "suppressedBuffer",
@@ -343,7 +343,7 @@
   },
   {
     "file": "bridge/receive_test.go",
-    "line": 331,
+    "line": 328,
     "citation": "MessageCodec.ts:377",
     "resolved": "packages/protocol/src/codec/MessageCodec.ts",
     "identifier": "vendorId",
@@ -352,7 +352,7 @@
   },
   {
     "file": "bridge/receive_test.go",
-    "line": 608,
+    "line": 626,
     "citation": "InteractionServer.ts:409-412",
     "resolved": "packages/node/src/node/server/InteractionServer.ts",
     "identifier": "TimedRequest",
@@ -370,7 +370,7 @@
   },
   {
     "file": "bridge/securechannel.go",
-    "line": 1148,
+    "line": 1176,
     "citation": "ExchangeManager.ts:663-671",
     "resolved": "packages/protocol/src/protocol/ExchangeManager.ts",
     "identifier": "#sendCloseSession",
@@ -379,7 +379,7 @@
   },
   {
     "file": "bridge/securechannel.go",
-    "line": 1187,
+    "line": 1215,
     "citation": "ExchangeManager.ts:663-671",
     "resolved": "packages/protocol/src/protocol/ExchangeManager.ts",
     "identifier": "#sendCloseSession",
@@ -406,7 +406,7 @@
   },
   {
     "file": "bridge/subscribe.go",
-    "line": 612,
+    "line": 640,
     "citation": "ServerSubscription.ts:866-876",
     "resolved": "packages/node/src/node/server/ServerSubscription.ts",
     "identifier": "InvalidSubscription",
@@ -415,7 +415,7 @@
   },
   {
     "file": "bridge/subscribe.go",
-    "line": 723,
+    "line": 751,
     "citation": "packages/protocol/src/interaction/InteractionMessenger.ts:347",
     "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
     "identifier": "sendDataReport",
@@ -424,7 +424,7 @@
   },
   {
     "file": "bridge/subscribe.go",
-    "line": 803,
+    "line": 831,
     "citation": "packages/node/src/node/server/ServerSubscription.ts:764",
     "resolved": "packages/node/src/node/server/ServerSubscription.ts",
     "identifier": "#sendUpdateMessage",
@@ -433,7 +433,7 @@
   },
   {
     "file": "bridge/subscribe.go",
-    "line": 1098,
+    "line": 1131,
     "citation": "ServerSubscription.ts:610-614",
     "resolved": "packages/node/src/node/server/ServerSubscription.ts",
     "identifier": "InvalidAction",
@@ -442,7 +442,7 @@
   },
   {
     "file": "bridge/subscribe.go",
-    "line": 1176,
+    "line": 1209,
     "citation": "ThermostatServer.ts:451",
     "resolved": "packages/node/src/behaviors/thermostat/ThermostatServer.ts",
     "identifier": "reactTo",
@@ -451,7 +451,7 @@
   },
   {
     "file": "bridge/subscribe.go",
-    "line": 1263,
+    "line": 1296,
     "citation": "packages/node/src/behavior/state/managed/Datasource.ts:776-796",
     "resolved": "packages/node/src/behavior/state/managed/Datasource.ts",
     "identifier": "onChange",
@@ -487,7 +487,7 @@
   },
   {
     "file": "bridge/subscribe_report_chunking_test.go",
-    "line": 243,
+    "line": 240,
     "citation": "packages/protocol/src/interaction/InteractionMessenger.ts:347",
     "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
     "identifier": "sendDataReport",
@@ -1046,7 +1046,7 @@
   },
   {
     "file": "cluster/core/operational_credentials.go",
-    "line": 1961,
+    "line": 1973,
     "citation": "Fabric.ts:557-559",
     "resolved": "packages/protocol/src/fabric/Fabric.ts",
     "identifier": "PublicKeyError",
@@ -1055,7 +1055,7 @@
   },
   {
     "file": "cluster/core/operational_credentials.go",
-    "line": 2107,
+    "line": 2119,
     "citation": "Fabric.ts:548",
     "resolved": "packages/protocol/src/fabric/Fabric.ts",
     "identifier": "nodeId",
@@ -1064,7 +1064,7 @@
   },
   {
     "file": "cluster/core/operational_credentials.go",
-    "line": 2298,
+    "line": 2310,
     "citation": "DeviceAdvertiser.ts:84-86",
     "resolved": "packages/protocol/src/protocol/DeviceAdvertiser.ts",
     "identifier": "cancelAll",
@@ -1490,7 +1490,7 @@
   },
   {
     "file": "controller/ca/ca.go",
-    "line": 595,
+    "line": 597,
     "citation": "kinds/definitions/operational.ts:109-110",
     "resolved": "packages/protocol/src/certificate/kinds/definitions/operational.ts",
     "at": "0ceb202d",
@@ -1852,7 +1852,7 @@
   },
   {
     "file": "endpoint/types.go",
-    "line": 717,
+    "line": 738,
     "citation": "OnOffServer.ts:97-100",
     "resolved": "packages/node/src/behaviors/on-off/OnOffServer.ts",
     "identifier": "OnOff",
@@ -1907,7 +1907,7 @@
   },
   {
     "file": "im/invoke.go",
-    "line": 425,
+    "line": 442,
     "citation": "packages/node/src/node/server/InteractionServer.ts:1043-1074",
     "resolved": "packages/node/src/node/server/InteractionServer.ts",
     "identifier": "suppressedBuffer",
@@ -1916,7 +1916,7 @@
   },
   {
     "file": "im/invoke.go",
-    "line": 445,
+    "line": 462,
     "citation": "packages/node/src/node/server/InteractionServer.ts:950-955",
     "resolved": "packages/node/src/node/server/InteractionServer.ts",
     "identifier": "invokeRequests",
@@ -1943,7 +1943,7 @@
   },
   {
     "file": "im/read.go",
-    "line": 442,
+    "line": 477,
     "citation": "packages/protocol/src/action/server/AttributeReadResponse.ts:238-274",
     "resolved": "packages/protocol/src/action/server/AttributeReadResponse.ts",
     "identifier": "addConcrete",
@@ -1997,7 +1997,7 @@
   },
   {
     "file": "im/subscription/subscription.go",
-    "line": 246,
+    "line": 249,
     "citation": "packages/node/src/node/server/ServerSubscription.ts:412",
     "resolved": "packages/node/src/node/server/ServerSubscription.ts",
     "identifier": "#sendUpdatesActivated",
@@ -2078,7 +2078,7 @@
   },
   {
     "file": "node/security.go",
-    "line": 674,
+    "line": 689,
     "citation": "CaseServer.ts:210",
     "resolved": "packages/protocol/src/session/case/CaseServer.ts",
     "identifier": "SessionManager",
@@ -2150,7 +2150,7 @@
   },
   {
     "file": "secure/operational/manager.go",
-    "line": 327,
+    "line": 328,
     "citation": "SessionManager.ts:484",
     "resolved": "packages/protocol/src/session/SessionManager.ts",
     "identifier": "getPaseSession",
@@ -2159,7 +2159,7 @@
   },
   {
     "file": "secure/operational/manager.go",
-    "line": 829,
+    "line": 846,
     "citation": "packages/protocol/src/session/SessionManager.ts:490-508",
     "resolved": "packages/protocol/src/session/SessionManager.ts",
     "identifier": "getNextAvailableSessionId",
@@ -2168,7 +2168,7 @@
   },
   {
     "file": "secure/operational/manager.go",
-    "line": 855,
+    "line": 872,
     "citation": "packages/protocol/src/session/SessionManager.ts:513",
     "resolved": "packages/protocol/src/session/SessionManager.ts",
     "identifier": "getSession",
@@ -2177,7 +2177,7 @@
   },
   {
     "file": "secure/operational/manager.go",
-    "line": 958,
+    "line": 975,
     "citation": "Session.ts:248",
     "resolved": "packages/protocol/src/session/Session.ts",
     "identifier": "initiateClose",
@@ -2276,7 +2276,7 @@
   },
   {
     "file": "transport/message/fuzz_message_test.go",
-    "line": 114,
+    "line": 130,
     "citation": "MessageCodec.ts:481-504",
     "resolved": "packages/protocol/src/codec/MessageCodec.ts",
     "identifier": "encodePacket",
@@ -2294,7 +2294,7 @@
   },
   {
     "file": "transport/mrp/ack.go",
-    "line": 226,
+    "line": 240,
     "citation": "MessageExchange.ts:428-433",
     "resolved": "packages/protocol/src/protocol/MessageExchange.ts",
     "identifier": "requiresAck",
@@ -2303,7 +2303,7 @@
   },
   {
     "file": "transport/mrp/ack_test.go",
-    "line": 233,
+    "line": 242,
     "citation": "MessageExchange.ts:428-433",
     "resolved": "packages/protocol/src/protocol/MessageExchange.ts",
     "identifier": "requiresAck",

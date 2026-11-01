@@ -173,8 +173,24 @@
 //   - AttachMetrics — silent. Without a port the named counters and
 //     gauges (contract.MetricNames) are recorded nowhere; the bridge's own
 //     readers (DeviceLoad, RecoveredPanics) count on.
-//   - SetOnReassembled, SetOnFabricAdded and SetOnFabricRemoved are
-//     nil-safe observer hooks.
+//   - SetSubscriptionPersistence — on by default. Off on purpose, nothing
+//     is recorded or loaded and ReestablishFormerSubscriptions does
+//     nothing; controllers recover through their liveness timeout.
+//
+// An ICD (Intermittently Connected Device) wires three more, all silent —
+// skipped, the node's operational record and MRP behave as a non-ICD's:
+//
+//   - SetICDAdvertisement — the ICD part of every operational record
+//     (the ICD key, an LIT's omitted SII, the threshold); without it the
+//     record carries none and a controller treats the node as always on.
+//   - SetLocalFixedMRPBackoff — the fast-poll pad on every retransmission
+//     wait; without it a sleepy node's retransmissions come too early.
+//   - SetOnInboundActivity — feeds every authenticated inbound message to
+//     the ICD's mode machine; without it the active window is not
+//     extended and the node goes idle mid-exchange.
+//   - SetOnReassembled and SetOnFabricRemoved are nil-safe observer
+//     hooks. A fabric's installation is observed on the node
+//     (node.Observers.OnFabricAdded); the bridge installs no fabric.
 //   - SetDeviceTypeValidation — visible either way. Start and every
 //     Reassemble judge the topology against its device types; the
 //     default, matter.js's warn mode, logs each new violation once
@@ -225,12 +241,21 @@ var (
 // walking a device model, deciding which sources are exposed, mapping
 // them onto clusters — is the host's job, and keeping it there is what
 // lets this package stay free of the daemon's model packages. A host
-// closure typically composes its own walk with the topology assembler
-// it owns:
+// closure composes its own walk with the [endpoint.Assembler] it owns:
 //
 //	func(ctx context.Context) (*endpoint.Topology, error) {
-//	    return assembler.AssembleDevices(ctx, walkTheRegistry(ctx))
+//	    return assembler.Assemble(ctx, walkTheRegistry(ctx)) // []endpoint.Snapshot
 //	}
+//
+// The topology must come from an [endpoint.Assembler] over the host's
+// [endpoint.Spec]s: a host's "own assembler" is its own Spec producer, not
+// its own [endpoint.Topology]. [endpoint.Endpoint] and [endpoint.Topology]
+// are read-only to a host. What must survive a [Reassemble] — each
+// cluster's DataVersion, the Identify, Groups and ScenesManagement
+// servers, a written NodeLabel, the Aggregator role — lives in state only
+// the assembler fills, so a hand-built topology hands every cluster a new
+// DataVersion on each Reassemble (every controller re-primes) and loses
+// the rest silently. Review 2026-11 W2-api-04.
 //
 // The bridge calls Snapshotter once at [Start] and on every
 // [Reassemble]; it never caches the result — every call gets a freshly
@@ -238,8 +263,13 @@ var (
 // programming error and is rejected as one.
 type Snapshotter func(ctx context.Context) (*endpoint.Topology, error)
 
-// Config bundles the bridge's identity and listener parameters. All
-// fields are validated at [New] time.
+// Config bundles the bridge's listener and protocol parameters. The zero
+// value is valid.
+//
+// It carries no node identity: VendorID, ProductID and NodeLabel are
+// served by the root's BasicInformation server (cluster/core), and the
+// commissionable record takes its discriminator, VID, PID and name from
+// the [CommissioningAdvertisement] each window opens with.
 //
 // It carries nothing that governs topology assembly — which sources are
 // exposed, whether measurements become endpoints, how labels are
@@ -259,24 +289,6 @@ type Config struct {
 	// socket's port for Incoming, and the T key of the operational
 	// record for both roles. The zero value is TCP off. See [TCPConfig].
 	TCP TCPConfig
-
-	// VendorID is the bridge's IANA-assigned vendor identifier
-	// (BasicInformation.VendorID, Matter §11.1.5.2). Mandatory.
-	VendorID uint16
-
-	// ProductID is the bridge's vendor-assigned product identifier
-	// (BasicInformation.ProductID, Matter §11.1.5.4). Mandatory.
-	ProductID uint16
-
-	// NodeLabel is the bridge's user-visible label
-	// (BasicInformation.NodeLabel, Matter §11.1.5.6). Mandatory.
-	NodeLabel string
-
-	// Discriminator is the 12-bit Matter commissioning discriminator
-	// (Matter §5.1.3.1). Surfaces in the commissionable mDNS record;
-	// commissioner UIs use it to pre-filter candidates. Bits above
-	// the 12-bit limit are masked off at advertise time.
-	Discriminator uint16
 
 	// AdvertiseTimeout caps the per-call timeout for mDNS publish /
 	// withdraw operations. Defaults to 5 seconds when zero. Each
@@ -311,22 +323,6 @@ type Config struct {
 // SessionIntervals are a node's MRP intervals ([Config.SessionIntervals]).
 type SessionIntervals struct {
 	Idle, Active, ActiveThreshold time.Duration
-}
-
-// validate reports whether the config carries every required field.
-// Mirrors endpoint.Config.Validate so callers see one consistent
-// failure mode.
-func (c Config) validate() error {
-	if c.VendorID == 0 {
-		return errors.New("bridge: Config.VendorID must be non-zero")
-	}
-	if c.ProductID == 0 {
-		return errors.New("bridge: Config.ProductID must be non-zero")
-	}
-	if c.NodeLabel == "" {
-		return errors.New("bridge: Config.NodeLabel must be non-empty")
-	}
-	return nil
 }
 
 // Bridge owns the live Matter runtime: the assembled topology, the
@@ -374,7 +370,7 @@ type Bridge struct {
 	// unsubscribe lists, the serve and pump lifecycle (started and the
 	// cancel/done pairs), the PASE lockout and in-flight handshake, the
 	// commissioning window and its instance name, deviceTypes, groupMessaging
-	// and the onReassembled / onFabricAdded / onFabricRemoved hooks. Start
+	// and the onReassembled / onFabricRemoved hooks. Start
 	// takes it only to commit, so readers do not wait for the listener's bind.
 	mu         sync.RWMutex
 	listener   *udp.Listener
@@ -531,6 +527,11 @@ type Bridge struct {
 	// Apple MTRDevice liveness checks) get their answers from here.
 	// Allocated at New time; never nil.
 	eventLog *im.EventLog
+	// emitMu makes an event's append and its subscription fan-out one
+	// step ([Bridge.EmitEvent]), so subscriptions learn of events in
+	// number order: a subscription keeps only the lowest number it owes
+	// and reads the rest from eventLog when its report is due.
+	emitMu sync.Mutex
 
 	// commissioningWindow tracks the live AdministratorCommissioning
 	// (0x003C) window state. Optional; nil means the cluster on the
@@ -608,12 +609,6 @@ type Bridge struct {
 	// the root). Wired by the daemon to publish
 	// `matter.endpoint_assembled` over the WebSocket hub. Nil safe.
 	onReassembled func(endpointCount int)
-
-	// onFabricAdded, when non-nil, fires after the
-	// OperationalCredentials cluster successfully installs a fabric
-	// (post-AddNOC). Wired by the daemon to publish
-	// `matter.fabric_added` over the WebSocket hub. Nil safe.
-	onFabricAdded func(fabricIndex uint8)
 
 	// onFabricRemoved, when non-nil, fires after the
 	// OperationalCredentials cluster successfully drops a fabric
@@ -765,9 +760,6 @@ func New(snap Snapshotter, advertiser mdns.Advertiser, cfg Config, logger *slog.
 	if snap == nil {
 		return nil, errors.New("bridge: snapshotter is required")
 	}
-	if err := cfg.validate(); err != nil {
-		return nil, err
-	}
 	if cfg.AdvertiseTimeout == 0 {
 		cfg.AdvertiseTimeout = 5 * time.Second
 	}
@@ -865,10 +857,10 @@ func (b *Bridge) Start(ctx context.Context) error {
 	go func() {
 		defer close(done)
 		if err := listener.ServeOrdered(serveCtx, sessionOrderKey, b.handleOrderedDatagram); err != nil {
-			// Closed-listener errors during shutdown are expected; log
-			// at debug level. Real bind / IO errors come through
-			// before serveCancel fires, so they remain at warn.
-			b.logger.Debug("matter.udp.serve.exit", slog.Any("err", err))
+			// The listener's own close ends Serve with nil, so an error
+			// here means the socket is gone or failed every read: the node
+			// no longer receives, which the operator must see.
+			b.logger.Warn("matter.udp.serve.exit", slog.Any("err", err))
 		}
 	}()
 
@@ -998,9 +990,11 @@ func (b *Bridge) reassembleLocked(ctx context.Context) error { //nolint:gocognit
 		root.PublishClusterServers(rootClusters)
 	}
 	// Reattach the daemon-supplied Aggregator cluster servers to the
-	// fresh EP 1 so reads on endpoint 1 (Descriptor) keep resolving
-	// after a Reassemble.
-	if agg := topology.FindByID(1); agg != nil && len(aggregatorClusters) > 0 {
+	// fresh Aggregator so its reads (Descriptor) keep resolving after a
+	// Reassemble. Onto the endpoint with the Aggregator role only: a
+	// topology without one mounts nothing, and a host endpoint numbered 1
+	// keeps its own clusters (review 2026-11 W2-api-03).
+	if agg := topology.Aggregator(); agg != nil && len(aggregatorClusters) > 0 {
 		agg.PublishClusterServers(aggregatorClusters)
 	}
 	if err := b.validateDeviceTypes(topology); err != nil {
@@ -1284,33 +1278,7 @@ type matterSwitchPositionReporter interface {
 	WireMatterSwitchPositions(contract.SwitchPositionSink) func()
 }
 
-// SetOnFabricAdded wires the post-AddNOC hook. The bridge does not
-// install fabrics itself — the OperationalCredentials cluster does —
-// but the OpCreds wiring inside the daemon delegates here so a
-// downstream listener (typically the WS event publisher) can fan the
-// event out without taking a direct dependency on the cluster.
-// Pass nil to detach.
-func (b *Bridge) SetOnFabricAdded(fn func(fabricIndex uint8)) {
-	b.mu.Lock()
-	b.onFabricAdded = fn
-	b.mu.Unlock()
-}
-
-// EmitFabricAdded is the bridge-side dispatch helper the
-// OperationalCredentials cluster's `OnFabricInstalled` closure calls
-// on a successful AddNOC. Forwards to whatever closure the daemon
-// wired via [SetOnFabricAdded]; nil-safe.
-func (b *Bridge) EmitFabricAdded(fabricIndex uint8) {
-	b.mu.RLock()
-	hook := b.onFabricAdded
-	b.mu.RUnlock()
-	if hook != nil {
-		hook(fabricIndex)
-	}
-}
-
-// SetOnFabricRemoved wires the post-RemoveFabric hook. Mirrors
-// [SetOnFabricAdded]'s nil-safe semantics. Used by the daemon's
+// SetOnFabricRemoved wires the post-RemoveFabric hook, nil-safe. Used by the daemon's
 // WS-event publisher; the operational + subscription manager
 // cleanup runs separately on [core.OperationalCredentials.SetOnFabricRemoved].
 func (b *Bridge) SetOnFabricRemoved(fn func(fabricIndex uint8)) {
@@ -1705,7 +1673,7 @@ func (b *Bridge) AttachAggregatorClusters(servers []contract.ClusterServer) {
 	b.mu.Lock()
 	b.aggregatorClusters = cp
 	if b.topology != nil {
-		if agg := b.topology.FindByID(1); agg != nil {
+		if agg := b.topology.Aggregator(); agg != nil {
 			agg.PublishClusterServers(cp)
 		}
 	}

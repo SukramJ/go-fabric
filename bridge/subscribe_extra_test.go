@@ -11,6 +11,7 @@ import (
 	"context"
 	"testing"
 
+	endpointpkg "github.com/SukramJ/go-fabric/endpoint"
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/im/subscription"
 	"github.com/SukramJ/go-fabric/secure/channel"
@@ -37,13 +38,17 @@ func TestResolveSessionFabric_ZeroSessionID_ReturnsZero(t *testing.T) {
 	}
 }
 
-func TestResolveSessionFabric_NoResolver_ReturnsZero(t *testing.T) {
+// TestResolveSessionFabric_NoResolver_IsUnresolvable pins review 2026-11
+// W2-sec-03: a session whose fabric the bridge cannot name is
+// FabricIndexUnresolvable — denied by the ACL gates — whether or not an ACL
+// lister is attached, never 0.
+func TestResolveSessionFabric_NoResolver_IsUnresolvable(t *testing.T) {
 	t.Parallel()
 	b := newStartedBridge(t)
 	// noopSessionLookup does not implement SessionFabricResolver.
 	b.AttachSessionLookup(nil) // revert to noop
-	if idx := b.resolveSessionFabric(7); idx != 0 {
-		t.Errorf("noop lookup: want 0, got %d", idx)
+	if idx := b.resolveSessionFabric(7); idx != endpointpkg.FabricIndexUnresolvable {
+		t.Errorf("noop lookup: want FabricIndexUnresolvable, got %d", idx)
 	}
 }
 

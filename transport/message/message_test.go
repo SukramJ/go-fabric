@@ -63,25 +63,28 @@ func TestHeaderWithSourceAndDestNodeID(t *testing.T) {
 	}
 }
 
-// TestHeaderWithGroupDest covers the 16-bit group case
-// (8 + 2 = 10 bytes).
+// TestHeaderWithGroupDest covers the 16-bit group case on a group
+// session (8 + 8 source + 2 = 18 bytes).
 func TestHeaderWithGroupDest(t *testing.T) {
 	in := Header{
-		MessageCounter: 1,
-		DestSize:       DestGroup,
-		DestGroupID:    0xABCD,
+		MessageCounter:  1,
+		SessionType:     SessionGroup,
+		HasSourceNodeID: true,
+		SourceNodeID:    5,
+		DestSize:        DestGroup,
+		DestGroupID:     0xABCD,
 	}
 	wire := in.Marshal()
-	if len(wire) != 10 {
-		t.Fatalf("len(wire)=%d, want 10", len(wire))
+	if len(wire) != 18 {
+		t.Fatalf("len(wire)=%d, want 18", len(wire))
 	}
 	out, n, err := UnmarshalHeader(wire)
 	if err != nil {
 		t.Fatalf("Unmarshal err: %v", err)
 	}
 	out.Raw = nil // decode-only AAD cache; not part of the semantic header
-	if n != 10 || !reflect.DeepEqual(out, in) {
-		t.Errorf("decoded %d/%+v want 10/%+v", n, out, in)
+	if n != 18 || !reflect.DeepEqual(out, in) {
+		t.Errorf("decoded %d/%+v want 18/%+v", n, out, in)
 	}
 }
 
@@ -90,10 +93,12 @@ func TestHeaderWithGroupDest(t *testing.T) {
 // (TestHeaderRejectsControlMessage) because decode rejects it.
 func TestHeaderSecurityFlagsRoundTrip(t *testing.T) {
 	in := Header{
-		MessageCounter: 1,
-		SessionType:    SessionGroup,
-		Privacy:        true,
-		HasExtension:   true,
+		MessageCounter:  1,
+		SessionType:     SessionGroup,
+		HasSourceNodeID: true,
+		DestSize:        DestGroup,
+		Privacy:         true,
+		HasExtension:    true,
 	}
 	wire := in.Marshal()
 	out, _, err := UnmarshalHeader(wire)
@@ -135,7 +140,10 @@ func TestHeaderSecurityFlagsMatchesTheWireByte(t *testing.T) {
 // is why [Header.AAD] rather than this accessor is what binds the exact
 // received bytes.
 func TestHeaderSecurityFlagsAfterDecode(t *testing.T) {
-	wire := Header{MessageCounter: 1, SessionType: SessionGroup, Privacy: true, HasExtension: true}.Marshal()
+	wire := Header{
+		MessageCounter: 1, SessionType: SessionGroup, HasSourceNodeID: true, DestSize: DestGroup,
+		Privacy: true, HasExtension: true,
+	}.Marshal()
 	out, _, err := UnmarshalHeader(wire)
 	if err != nil {
 		t.Fatalf("err: %v", err)
@@ -514,10 +522,14 @@ func TestHeaderTruncatedDestNodeID(t *testing.T) {
 // message.go — the DestGroup truncation path in UnmarshalHeader).
 func TestHeaderTruncatedDestGroup(t *testing.T) {
 	t.Parallel()
-	in := Header{DestSize: DestGroup, DestGroupID: 0xABCD, MessageCounter: 1}
+	in := Header{
+		SessionType: SessionGroup, HasSourceNodeID: true, SourceNodeID: 5,
+		DestSize: DestGroup, DestGroupID: 0xABCD, MessageCounter: 1,
+	}
 	wire := in.Marshal()
-	// wire has 8 (base) + 2 (dest group) = 10 bytes; truncate to 9 (only 1 dest byte).
-	_, _, err := UnmarshalHeader(wire[:9])
+	// wire has 8 (base) + 8 (source) + 2 (dest group) = 18 bytes; truncate
+	// to 17 (only 1 dest byte).
+	_, _, err := UnmarshalHeader(wire[:17])
 	if !errors.Is(err, ErrTruncated) {
 		t.Fatalf("err = %v, want ErrTruncated (dest group); got %v", err, err)
 	}

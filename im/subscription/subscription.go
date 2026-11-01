@@ -64,7 +64,8 @@ type Subscription struct {
 	// (matter.js ServerSubscription `useAsSendInterval`).
 	sendIntervalOverride time.Duration
 
-	// mu guards closed, deferredUntil, lastReport, pendingDirty, pendingEvents and priming.
+	// mu guards closed, deferredUntil, lastReport, pendingDirty, the
+	// events* watermark and priming.
 	mu sync.Mutex
 	// priming is set while the subscription's priming report and
 	// SubscribeResponse are still going out ([SubscribeArgs.Priming]);
@@ -75,37 +76,39 @@ type Subscription struct {
 	// (DelayReportData, [Subscription.DeferReports]).
 	deferredUntil time.Time
 	pendingDirty  map[im.ConcreteAttributePath]struct{}
-	pendingEvents []pendingEvent
-	closed        bool
+	// The events the subscription owes are one number, not a queue: the
+	// lowest unreported event number (eventsMin, valid while
+	// eventsPending) and whether one of them is urgent. The report reads
+	// the occurrences from the event log at drain time, so an event storm
+	// under a long MinIntervalFloor costs a subscription nothing and the
+	// log's own bound bounds it. Mirrors matter.js
+	// packages/node/src/node/server/ServerSubscription.ts:391-394
+	// (#handleAddedEvents keeps #outstandingEventsMinNumber) and :541-542
+	// (#sendUpdate takes it and reads the log).
+	eventsPending bool
+	eventsMin     uint64
+	eventsUrgent  bool
+	// eventsReported is the highest event number a drain has handed out
+	// (valid while eventsHaveReported): a firing at or below it was read
+	// from the log by an earlier drain already — the bridge appends an
+	// event before it fans it out — and is not owed again.
+	eventsReported     uint64
+	eventsHaveReported bool
+	closed             bool
 }
 
-// pendingEvent captures one event firing that has not yet been
-// flushed to the commissioner. The engine drains these on the same
-// MinInterval cadence as attribute reports.
-type pendingEvent struct {
-	Path      im.ConcreteEventPath
-	Number    uint64
-	Priority  im.EventPriority
-	Timestamp uint64
-	Data      im.AttributeValue
-}
-
-// markDirty records that an attribute path has a pending change.
-// Returns true on first transition from clean to dirty.
-func (s *Subscription) markDirty(path im.ConcreteAttributePath) (firstDirty bool) {
+// markDirty records that an attribute path has a pending change. The
+// engine's tick finds it; nothing needs waking.
+func (s *Subscription) markDirty(path im.ConcreteAttributePath) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.closed {
-		return false
+		return
 	}
 	if s.pendingDirty == nil {
 		s.pendingDirty = make(map[im.ConcreteAttributePath]struct{})
 	}
-	if _, in := s.pendingDirty[path]; in {
-		return false
-	}
 	s.pendingDirty[path] = struct{}{}
-	return len(s.pendingDirty) == 1
 }
 
 // heartbeatIntervalElapsed reports whether the publisher-initiated
@@ -291,46 +294,129 @@ func (s *Subscription) drainDirtyIfElapsed(now time.Time) []im.ConcreteAttribute
 	return out
 }
 
-// queueEvent records an event firing that should ride the next
-// report. Returns true on the first queued event for this
-// subscription (so callers can wake the engine).
-func (s *Subscription) queueEvent(ev pendingEvent) (firstQueued bool) {
+// queueEvent records that the event numbered number is owed to the
+// subscriber: it lowers the watermark to number and marks the
+// subscription urgent for a Critical event. Returns true on the first
+// owed event (so callers can wake the engine). Mirrors matter.js
+// ServerSubscription.ts:391-394 #handleAddedEvents; the minimum rather
+// than the first number keeps a firing that lost a race to a later one
+// in the report.
+func (s *Subscription) queueEvent(number uint64, priority im.EventPriority) (firstQueued bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.closed {
 		return false
 	}
-	first := len(s.pendingEvents) == 0
-	s.pendingEvents = append(s.pendingEvents, ev)
+	if s.eventsHaveReported && number <= s.eventsReported {
+		return false
+	}
+	first := !s.eventsPending
+	if first || number < s.eventsMin {
+		s.eventsMin = number
+	}
+	s.eventsPending = true
+	if priority == im.EventPriorityCritical {
+		s.eventsUrgent = true
+	}
 	return first
 }
 
-// drainEventsIfElapsed mirrors drainDirtyIfElapsed for events.
-// Critical-priority events bypass the MinIntervalFloor gate per
-// Matter §10.6.6 — controllers expect immediate delivery.
-func (s *Subscription) drainEventsIfElapsed(now time.Time) []pendingEvent {
+// RequeueEvents owes the subscriber every selected event from number
+// fromNumber on again: the reporter calls it when a report carrying
+// them could not be sent, so the next report retries them. Mirrors
+// matter.js ServerSubscription.ts:578-580 ("newer number are always
+// higher, so we can just set it").
+func (s *Subscription) RequeueEvents(fromNumber uint64) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if s.closed || len(s.pendingEvents) == 0 {
-		return nil
+	if s.closed {
+		return
 	}
-	hasCritical := false
-	for _, ev := range s.pendingEvents {
-		if ev.Priority == im.EventPriorityCritical {
-			hasCritical = true
-			break
+	if !s.eventsPending || fromNumber < s.eventsMin {
+		s.eventsMin = fromNumber
+	}
+	s.eventsPending = true
+	if s.eventsHaveReported && s.eventsReported >= fromNumber {
+		if fromNumber == 0 {
+			s.eventsHaveReported = false
+		} else {
+			s.eventsReported = fromNumber - 1
 		}
 	}
-	if !hasCritical && !s.lastReport.IsZero() && now.Sub(s.lastReport) < time.Duration(s.MinIntervalFloor)*time.Second {
+}
+
+// RequeueAttributes marks paths dirty again: the reporter calls it when
+// a report carrying them could not be sent, so the next report retries
+// them. Mirrors matter.js ServerSubscription.ts:567-577, which puts the
+// attribute filter back with #addOutstandingAttributes.
+func (s *Subscription) RequeueAttributes(paths []im.ConcreteAttributePath) {
+	for _, p := range paths {
+		s.markDirty(p)
+	}
+}
+
+// drainEventsIfElapsed mirrors drainDirtyIfElapsed for events: when the
+// owed events are due it takes the watermark and reads the subscription's
+// events from src. Critical-priority events bypass the MinIntervalFloor
+// gate per Matter §10.6.6 — controllers expect immediate delivery.
+// Number order and timestamps are the log's, the same as a Read answers
+// (matter.js ServerSubscription.ts:537-555 reads the occurrences for
+// both).
+func (s *Subscription) drainEventsIfElapsed(now time.Time, src EventSource) []im.EventReport {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.closed || !s.eventsPending {
 		return nil
 	}
-	if !hasCritical && now.Before(s.deferredUntil) {
+	urgent := s.eventsUrgent
+	if !urgent && !s.lastReport.IsZero() && now.Sub(s.lastReport) < time.Duration(s.MinIntervalFloor)*time.Second {
 		return nil
 	}
-	out := s.pendingEvents
-	s.pendingEvents = nil
+	if !urgent && now.Before(s.deferredUntil) {
+		return nil
+	}
+	minNumber := s.eventsMin
+	s.eventsPending = false
+	s.eventsUrgent = false
 	s.lastReport = now
+	if src == nil {
+		return nil
+	}
+	records := src.Query(0xFFFF, 0xFFFFFFFF, 0xFFFFFFFF, minNumber)
+	if len(records) == 0 {
+		return nil
+	}
+	s.eventsReported = records[len(records)-1].Number
+	s.eventsHaveReported = true
+	out := make([]im.EventReport, 0, len(records))
+	for _, rec := range records {
+		path := im.ConcreteEventPath{
+			HasEndpoint: true, HasCluster: true, HasEvent: true,
+			Endpoint: rec.Endpoint, Cluster: rec.Cluster, Event: rec.EventID,
+		}
+		if !s.selectsEvent(path) {
+			continue
+		}
+		out = append(out, im.EventReport{
+			Path:      path,
+			Number:    rec.Number,
+			Priority:  rec.Priority,
+			Timestamp: rec.EpochMS,
+			Data:      im.AttributeValue{Value: rec.Payload},
+		})
+	}
 	return out
+}
+
+// selectsEvent reports whether one of the subscription's event paths
+// covers path.
+func (s *Subscription) selectsEvent(path im.ConcreteEventPath) bool {
+	for _, p := range s.EventPaths {
+		if p.Matches(path) {
+			return true
+		}
+	}
+	return false
 }
 
 // deferSendSlack is how far before its send interval a deferral ends at

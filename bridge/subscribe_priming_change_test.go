@@ -69,9 +69,10 @@ func TestHandleSubscribeRequest_ChangeDuringPrimingReadIsReported(t *testing.T) 
 		reported <- paths
 	}, nil)
 	b.AttachSubscriptionManager(mgr)
+	attachPASETestPeer(t, b) // the PASE auth mode, not fabric 0, grants (W2-sec-03)
 
 	peerConn, peerAddr := newSubscribeTestPeer(t)
-	hdr := &message.Header{SessionID: 0, MessageCounter: 103}
+	hdr := &message.Header{SessionID: paseTestSessionID, MessageCounter: 103}
 	proto := message.ProtocolHeader{ProtocolID: im.InteractionModelProtocolID, Opcode: im.OpcodeSubscribeRequest, ExchangeID: 1}
 	req := im.SubscribeRequest{
 		AttributeRequests:  []im.ConcreteAttributePath{changingPath()},

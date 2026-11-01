@@ -633,6 +633,23 @@ func (a *CaseAdapter) snapshotResponder() *sigma.Responder {
 // callback signature does not expose directly.
 func (a *CaseAdapter) SnapshotResponder() *sigma.Responder { return a.snapshotResponder() }
 
+// PeerSessionParams returns the initiator's SessionParameters from the
+// Sigma1 the adapter's responder processed, or nil when it stated none or
+// no Sigma1 was processed yet. The bridge paces the Sigma2 /
+// Sigma2_Resume retransmissions by them (matter.js CaseServer.ts:120-123
+// `session.timingParameters = sigma1.initiatorSessionParams`).
+func (a *CaseAdapter) PeerSessionParams() *sessionparams.Parameters {
+	r := a.snapshotResponder()
+	if r == nil {
+		return nil
+	}
+	p, ok := r.PeerSessionParameters()
+	if !ok {
+		return nil
+	}
+	return &p
+}
+
 // establishedSession names the secure session the adapter's handshake
 // established (Sigma3 or a resume), for the bridge to bind it to the
 // connection the handshake ran on.

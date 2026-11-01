@@ -60,9 +60,37 @@ func TestPASEStillPassesTheAccessCheck(t *testing.T) {
 	d := endpoint.NewTopologyDispatcher(nil)
 	d.SetACLLister(emptyACLLister{})
 
-	if got := d.CheckACL(context.Background(), 0, 1, nil, 1, 0x0006, 1); !got.IsSuccess() {
+	pase := im.WithAuthModePASE(context.Background())
+	if got := d.CheckACL(pase, 0, 1, nil, 1, 0x0006, 1); !got.IsSuccess() {
 		t.Fatalf("a PASE session (fabric 0) was denied: %v — commissioning has no fabric to check "+
 			"against", got)
+	}
+	// Without a dispatcher ACL source as well: commissioning needs none.
+	if got := endpoint.NewTopologyDispatcher(nil).CheckACL(pase, 0, 0, nil, 1, 0x0006, 1); !got.IsSuccess() {
+		t.Fatalf("a PASE session was denied without an ACL source: %v", got)
+	}
+}
+
+// TestFabricZeroWithoutPASEIsDenied pins review 2026-11 W2-sec-03: the
+// implicit Administer is the PASE auth mode's, never a missing fabric's —
+// matter.js packages/protocol/src/interaction/FabricAccessControl.ts:189-191
+// grants it on `authMode === Pase && isCommissioning` only. A CASE session
+// whose fabric could not be resolved to a real one is denied.
+func TestFabricZeroWithoutPASEIsDenied(t *testing.T) {
+	t.Parallel()
+
+	d := endpoint.NewTopologyDispatcher(nil)
+	d.SetACLLister(emptyACLLister{})
+	if got := d.CheckACL(context.Background(), 0, 1, nil, 1, 0x0006, 1); got != im.StatusUnsupportedAccess {
+		t.Fatalf("CheckACL(fabric 0, not PASE) = %v, want UnsupportedAccess", got)
+	}
+	// An all-granting ACL grants on a fabric, never on a missing or an
+	// unnamed one.
+	d.SetACLLister(endpoint.UnenforcedACL{})
+	for _, fabric := range []uint8{0, endpoint.FabricIndexUnresolvable} {
+		if got := d.CheckACL(context.Background(), fabric, 1, nil, 1, 0x0006, 1); got != im.StatusUnsupportedAccess {
+			t.Errorf("UnenforcedACL CheckACL(fabric %d, not PASE) = %v, want UnsupportedAccess", fabric, got)
+		}
 	}
 }
 

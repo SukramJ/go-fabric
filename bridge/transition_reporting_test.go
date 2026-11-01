@@ -135,7 +135,7 @@ func TestQuiescedOnRemovalAndStop(t *testing.T) {
 	b.topology.Endpoints = append(b.topology.Endpoints, keptEP)
 	b.snapshotter = func(context.Context) (*endpointpkg.Topology, error) {
 		return &endpointpkg.Topology{Endpoints: []*endpointpkg.Endpoint{
-			{ID: 0, DeviceType: 0x0016}, {ID: 1, DeviceType: 0x000E}, keptEP,
+			{ID: 0, DeviceType: 0x0016}, {ID: 1, Aggregator: true, DeviceType: 0x000E}, keptEP,
 		}}, nil
 	}
 	b.mu.Unlock()

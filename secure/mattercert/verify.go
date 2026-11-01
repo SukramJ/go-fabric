@@ -32,7 +32,14 @@ import (
 // [TimeSource] implementation; production code uses [clock.System].
 type Verifier struct {
 	root *ecdsa.PublicKey
-	now  TimeSource
+	// rootSKID is the root certificate's subjectKeyIdentifier when the
+	// verifier was built from the certificate ([NewVerifierFromRCAC]);
+	// unset (hasRootSKID false) when only the root's public key is known
+	// ([NewVerifier]).
+	// It is an array, not a slice, so the Verifier stays comparable.
+	rootSKID    [20]byte
+	hasRootSKID bool
+	now         TimeSource
 }
 
 // TimeSource returns the current time for NotBefore/NotAfter checks: the
@@ -162,6 +169,12 @@ func bytesEqual(a, b []byte) bool {
 // NewVerifier returns a verifier rooted at rootPubKey. The key must be
 // a P-256 public key in uncompressed (0x04 prefix, 65 bytes) form —
 // the canonical Matter root-CA public-key shape.
+//
+// Without the root certificate the verifier does not know the root's
+// subjectKeyIdentifier, so the authorityKeyIdentifier of a NOC the root
+// signs directly (no ICAC) is not checked against it, and an ICAC's
+// authorityKeyIdentifier is not either; the signature still binds the
+// chain to the root. [NewVerifierFromRCAC] checks both, as matter.js does.
 func NewVerifier(rootPubKey []byte, ts TimeSource) (*Verifier, error) {
 	if len(rootPubKey) != 65 || rootPubKey[0] != 0x04 {
 		return nil, fmt.Errorf("%w: root pub key length=%d prefix=%#x", ErrMalformed, len(rootPubKey), rootPubKey[0])
@@ -177,6 +190,35 @@ func NewVerifier(rootPubKey []byte, ts TimeSource) (*Verifier, error) {
 		root: root,
 		now:  ts,
 	}, nil
+}
+
+// NewVerifierFromRCAC returns a verifier rooted at the root certificate
+// rcac (Matter TLV): its public key, as [NewVerifier], and its
+// subjectKeyIdentifier, which the chain's authorityKeyIdentifiers must
+// name — the NOC's when the root signs it directly, the ICAC's otherwise.
+// Mirrors matter.js packages/protocol/src/certificate/kinds/Noc.ts:170-184
+// and Icac.ts:159-163 at 862ad75f, which compare against
+// `root.cert.extensions.subjectKeyIdentifier`.
+func NewVerifierFromRCAC(rcac []byte, ts TimeSource) (*Verifier, error) {
+	if len(rcac) > MaxOperationalCertTLVBytes {
+		return nil, fmt.Errorf("%w: RCAC is %d bytes, over the %d-byte cap", ErrMalformed, len(rcac), MaxOperationalCertTLVBytes)
+	}
+	root, err := Decode(rcac)
+	if err != nil {
+		return nil, fmt.Errorf("rcac: %w", err)
+	}
+	if !root.IsRoot() {
+		return nil, fmt.Errorf("%w: cert is not a root CA", ErrMalformed)
+	}
+	if !root.Extensions.HasSubjectKeyID || len(root.Extensions.SubjectKeyID) != 20 {
+		return nil, fmt.Errorf("%w: RCAC subjectKeyIdentifier must be 160 bit", ErrMalformed)
+	}
+	v, err := NewVerifier(root.PublicKey, ts)
+	if err != nil {
+		return nil, err
+	}
+	v.rootSKID, v.hasRootSKID = [20]byte(root.Extensions.SubjectKeyID), true
+	return v, nil
 }
 
 // PeerNodeIDFromNOC implements the [sigma.PeerNodeIDExtractor]
@@ -290,6 +332,11 @@ func (v *Verifier) VerifyAndExtractPubKey(noc, icac []byte) (*ecdsa.PublicKey, e
 		if err := checkICACShape(icacCert, nocCert); err != nil {
 			return nil, fmt.Errorf("icac: %w", err)
 		}
+		// The ICAC's authorityKeyIdentifier names the root when the root
+		// certificate is known (matter.js Icac.ts:159-163).
+		if v.hasRootSKID && !bytesEqual(icacCert.Extensions.AuthorityKeyID, v.rootSKID[:]) {
+			return nil, fmt.Errorf("%w: ICAC authorityKeyIdentifier does not name the root", ErrChainBroken)
+		}
 		// ICAC must be signed by the root.
 		if err := verifySignature(icacCert, v.root); err != nil {
 			return nil, fmt.Errorf("icac: %w", err)
@@ -305,9 +352,15 @@ func (v *Verifier) VerifyAndExtractPubKey(noc, icac []byte) (*ecdsa.PublicKey, e
 		// names neither is refused. Mirrors matter.js
 		// packages/protocol/src/certificate/kinds/Noc.ts:170-184 at
 		// 862ad75f. The verifier holds the root's public key, not its
-		// certificate: the root's subjectKeyIdentifier is the one the
-		// root-signed ICAC names as its authorityKeyIdentifier, which
-		// matter.js requires to be equal (Icac.ts:159-163).
+		// certificate unless it was built by [NewVerifierFromRCAC]: without
+		// it, the root's subjectKeyIdentifier is the one the root-signed
+		// ICAC names as its authorityKeyIdentifier, which matter.js
+		// requires to be equal (Icac.ts:159-163) and the check above
+		// enforces when the root certificate is known.
+		rootSKID := icacCert.Extensions.AuthorityKeyID
+		if v.hasRootSKID {
+			rootSKID = v.rootSKID[:]
+		}
 		switch {
 		case bytesEqual(nocCert.Extensions.AuthorityKeyID, icacCert.Extensions.SubjectKeyID):
 			issuerKey = icacPub
@@ -315,13 +368,19 @@ func (v *Verifier) VerifyAndExtractPubKey(noc, icac []byte) (*ecdsa.PublicKey, e
 			if nocCert.Issuer.MatterICACID != icacCert.Subject.MatterICACID || !icacCert.Subject.HasICACID {
 				return nil, fmt.Errorf("%w: NOC issuer ICAC-ID does not match ICAC subject", ErrChainBroken)
 			}
-		case bytesEqual(nocCert.Extensions.AuthorityKeyID, icacCert.Extensions.AuthorityKeyID):
+		case bytesEqual(nocCert.Extensions.AuthorityKeyID, rootSKID):
 			issuerKey = v.root
 		default:
 			return nil, fmt.Errorf("%w: NOC authorityKeyIdentifier names neither the root nor the ICAC", ErrChainBroken)
 		}
 	} else {
-		// NOC is signed directly by the root.
+		// NOC is signed directly by the root: its authorityKeyIdentifier
+		// names the root's subjectKeyIdentifier, checked when the root
+		// certificate is known. Mirrors matter.js Noc.ts:170-184 at
+		// 862ad75f (no ICA: the issuer is the root or the NOC is refused).
+		if v.hasRootSKID && !bytesEqual(nocCert.Extensions.AuthorityKeyID, v.rootSKID[:]) {
+			return nil, fmt.Errorf("%w: NOC authorityKeyIdentifier does not name the root", ErrChainBroken)
+		}
 		issuerKey = v.root
 	}
 

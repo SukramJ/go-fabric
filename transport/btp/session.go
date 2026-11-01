@@ -252,12 +252,16 @@ func newSession(role Role, version, fragmentSize, windowSize int, cb Callbacks, 
 	if role == RolePeripheral {
 		s.prevAckedSeq = s.prevIncomingSeq
 	} else {
+		// matter.js BtpSessionHandler.ts:221-226 assigns these after
+		// sendAckTimer.start() in one synchronous constructor; here the
+		// timer's callback reads them under s.mu on another goroutine, so
+		// they are written first, inside the lock that starts it.
 		s.mu.Lock()
-		s.sendAckTimer.start()
-		s.mu.Unlock()
 		s.prevIncomingSeq = 0
 		s.prevIncomingAck = -1
-		s.seq = -1
+		s.seq = -1 // the first sequence number is 0
+		s.sendAckTimer.start()
+		s.mu.Unlock()
 	}
 	return s, nil
 }

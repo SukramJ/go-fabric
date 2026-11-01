@@ -85,10 +85,7 @@ func newStartedBridgeWithSnapshotter(t *testing.T, snap Snapshotter) *Bridge {
 		snap,
 		nil,
 		Config{
-			Listen:    ":0",
-			VendorID:  0x1234,
-			ProductID: 0x5678,
-			NodeLabel: "chunk-test",
+			Listen: ":0",
 		},
 		nil,
 	)
@@ -262,6 +259,7 @@ func TestReportSubscriptionChunksAnOversizedOngoingReport(t *testing.T) {
 
 	const subID uint32 = 8181
 	b.routing.subTargets.Store(subID, subTarget{
+		pase:                true, // a PASE subscriber: the report is not ACL-gated
 		src:                 peerAddr,
 		hasPeerSourceNodeID: true,
 		peerSourceNodeID:    0xBBBB4444,
@@ -308,6 +306,7 @@ func TestReportSubscriptionEventsChunksAnOversizedReport(t *testing.T) {
 
 	const subID uint32 = 8282
 	b.routing.subTargets.Store(subID, subTarget{
+		pase:                true, // a PASE subscriber: the report is not ACL-gated
 		src:                 peerAddr,
 		hasPeerSourceNodeID: true,
 		peerSourceNodeID:    0xBBBB4444,
@@ -366,7 +365,8 @@ func TestOngoingReportWaitsForEachChunksStatusResponse(t *testing.T) {
 	}
 	const subID uint32 = 8383
 	b.routing.subTargets.Store(subID, subTarget{
-		src: peerAddr, hasPeerSourceNodeID: true, peerSourceNodeID: 0xBBBB4444,
+		pase: true, // a PASE subscriber: the report is not ACL-gated
+		src:  peerAddr, hasPeerSourceNodeID: true, peerSourceNodeID: 0xBBBB4444,
 		exchangeID: 14, sessionID: sessionID, peerInitiator: true,
 	})
 	done := make(chan struct{})
@@ -406,7 +406,8 @@ func TestOngoingReportChunkPiggybacksTheStatusResponseAck(t *testing.T) {
 	}
 	const subID uint32 = 8484
 	b.routing.subTargets.Store(subID, subTarget{
-		src: peerAddr, hasPeerSourceNodeID: true, peerSourceNodeID: 0xBBBB4444,
+		pase: true, // a PASE subscriber: the report is not ACL-gated
+		src:  peerAddr, hasPeerSourceNodeID: true, peerSourceNodeID: 0xBBBB4444,
 		exchangeID: 15, sessionID: sessionID, peerInitiator: true,
 	})
 	var acks []uint32

@@ -762,12 +762,12 @@ func (b *BasicInformation) uniqueID() string {
 func (b *BasicInformation) MatterWrite(_ context.Context, attrID uint32, value any) error {
 	switch attrID {
 	case basicInfoAttrNodeLabel:
+		if err := b.checkLabelWrite(attrID, value); err != nil {
+			return err
+		}
 		s, ok := value.(string)
 		if !ok {
 			return fmt.Errorf("core: NodeLabel write expected string, got %T", value)
-		}
-		if err := b.checkLabelWrite(attrID, s); err != nil {
-			return err
 		}
 		b.mu.Lock()
 		b.nodeLabel = s
@@ -776,12 +776,12 @@ func (b *BasicInformation) MatterWrite(_ context.Context, attrID uint32, value a
 		b.firePersistentWrite()
 		return nil
 	case basicInfoAttrLocation:
+		if err := b.checkLabelWrite(attrID, value); err != nil {
+			return err
+		}
 		s, ok := value.(string)
 		if !ok {
 			return fmt.Errorf("core: Location write expected string, got %T", value)
-		}
-		if err := b.checkLabelWrite(attrID, s); err != nil {
-			return err
 		}
 		b.mu.Lock()
 		b.location = s
@@ -811,10 +811,13 @@ func (b *BasicInformation) MatterWrite(_ context.Context, attrID uint32, value a
 // matter.js's string-length validator does. Mirrors matter.js
 // packages/node/src/behavior/state/validation/constraint.ts:199-211 at
 // 862ad75f (ConstraintError, "String length of … is not within bounds");
-// the refusal used to surface as FAILURE.
-func (b *BasicInformation) checkLabelWrite(attrID uint32, s string) error {
-	if _, err := b.inst().CheckValue(attrID, s, nil); err != nil {
-		return refusedWrite{sentinel: fmt.Errorf("core: BasicInformation 0x%04X write of %d bytes", attrID, len(s)), status: err}
+// the refusal used to surface as FAILURE. A value that is no string — the
+// bridge's stand-in for a string its schema refused, one too long before
+// its IS1 among them — is CONSTRAINT_ERROR as well, the definition's
+// verdict on a value of the wrong Go type.
+func (b *BasicInformation) checkLabelWrite(attrID uint32, value any) error {
+	if _, err := b.inst().CheckValue(attrID, value, nil); err != nil {
+		return refusedWrite{sentinel: fmt.Errorf("core: BasicInformation 0x%04X write of a %T", attrID, value), status: err}
 	}
 	return nil
 }

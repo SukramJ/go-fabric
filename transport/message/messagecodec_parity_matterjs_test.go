@@ -250,3 +250,54 @@ func TestMessageCodecEncode(t *testing.T) {
 		}
 	})
 }
+
+// matter.js decodeFixedHeader refuses three header shapes before it reads
+// the counter (MessageCodec.ts:223-233 at 862ad75f, UnexpectedDataError):
+// a unicast session with a destination group id (chip
+// MessageHeader.cpp:209-212 at 6170af84 agrees), a group session without
+// a destination, and a group session without a source node id. A group
+// session with a destination node id (MCSP) stays accepted.
+func TestMessageCodecDecodeRefusesCrossFieldShapes(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name string
+		hex  string
+		want error
+	}{
+		{"unicast session cannot have destination group id", "0200000001000000cdab", ErrUnicastGroupDestination},
+		{"group session must have destination group id or destination node id", "04000001010000000100000000000000", ErrGroupSessionHeader},
+		{"group session must have source node id", "0200000101000000cdab", ErrGroupSessionHeader},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			if _, _, err := UnmarshalHeader(mcHex(t, tc.hex)); !errors.Is(err, tc.want) {
+				t.Errorf("err = %v, want %v", err, tc.want)
+			}
+		})
+	}
+	t.Run("group session with a destination node id is accepted", func(t *testing.T) {
+		t.Parallel()
+		h, n, err := UnmarshalHeader(mcHex(t, "0500000101000000"+"0100000000000000"+"0200000000000000"))
+		if err != nil || n != 24 || h.DestNodeID != 2 || h.SessionType != SessionGroup {
+			t.Fatalf("UnmarshalHeader = %+v, %d, %v", h, n, err)
+		}
+	})
+	t.Run("a unicast header with a destination group id is not encoded", func(t *testing.T) {
+		t.Parallel()
+		h := Header{MessageCounter: 1, DestSize: DestGroup, DestGroupID: 0xABCD}
+		if _, err := h.MarshalPacket(); !errors.Is(err, ErrUnicastGroupDestination) {
+			t.Errorf("err = %v, want ErrUnicastGroupDestination", err)
+		}
+	})
+}
+
+// The reserved DSIZ 0b11 is never encoded: every decoder discards it
+// (matter.js MessageCodec.ts:210-213 at 862ad75f, chip
+// MessageHeader.cpp:192-195 at 6170af84), and matter.js derives its flags
+// from the fields present, so it cannot build one.
+func TestMessageCodecEncodeRefusesTheReservedDestSize(t *testing.T) {
+	t.Parallel()
+	if _, err := (Header{MessageCounter: 1, DestSize: 3}).MarshalPacket(); !errors.Is(err, ErrReservedDestSize) {
+		t.Fatalf("MarshalPacket(DSIZ 0b11) = %v, want ErrReservedDestSize", err)
+	}
+}

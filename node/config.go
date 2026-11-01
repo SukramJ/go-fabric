@@ -466,6 +466,12 @@ type OtaConfig struct {
 	// Applier carries out an update; nil is the daemon's applier, which
 	// validates the image and keeps it under Dir/applied.
 	Applier OTAApplier
+	// AnnouncedUpdateQueryDelay, when set, replaces the random 1-600 s wait
+	// between an UpdateAvailable or Urgent announcement and the query it
+	// schedules — matter.js's announcedUpdateQueryDelay
+	// (OtaSoftwareUpdateRequestorServer.ts:410, :1323). Harness mode
+	// without it waits 250 ms, as the matter.js cert requestor does.
+	AnnouncedUpdateQueryDelay *time.Duration
 }
 
 // ErrInvalidConfig wraps every [Config.Validate] failure.

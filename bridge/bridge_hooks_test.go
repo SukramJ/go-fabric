@@ -4,7 +4,7 @@
 package bridge_test
 
 // Black-box tests for Bridge hook setters / emitters and attachment methods:
-// SetOnReassembled, SetOnFabricAdded / EmitFabricAdded,
+// SetOnReassembled,
 // SetOnFabricRemoved / EmitFabricRemoved, AttachCommissioningWindow /
 // CommissioningWindow, AttachRootClusters / AttachRootPartsListProvider,
 // AttachAggregatorClusters / AttachAggregatorPartsListProvider.
@@ -19,41 +19,6 @@ import (
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/mdns"
 )
-
-// ─── SetOnFabricAdded / EmitFabricAdded ──────────────────────────────────────
-
-func TestBridge_EmitFabricAdded_CallsHook(t *testing.T) {
-	t.Parallel()
-	b := newTestBridge(t)
-	var got atomic.Uint32
-	b.SetOnFabricAdded(func(idx uint8) { got.Store(uint32(idx)) })
-	b.EmitFabricAdded(3)
-	if got.Load() != 3 {
-		t.Errorf("EmitFabricAdded(3): hook received %d", got.Load())
-	}
-}
-
-func TestBridge_EmitFabricAdded_NilHook_NoPanic(t *testing.T) {
-	t.Parallel()
-	b := newTestBridge(t)
-	b.SetOnFabricAdded(nil) // explicit nil — must not panic
-	b.EmitFabricAdded(1)    // must not panic
-}
-
-func TestBridge_SetOnFabricAdded_Replaces(t *testing.T) {
-	t.Parallel()
-	b := newTestBridge(t)
-	var first, second atomic.Uint32
-	b.SetOnFabricAdded(func(idx uint8) { first.Store(uint32(idx)) })
-	b.SetOnFabricAdded(func(idx uint8) { second.Store(uint32(idx)) })
-	b.EmitFabricAdded(7)
-	if first.Load() != 0 {
-		t.Errorf("first hook should not have been called after replace; got %d", first.Load())
-	}
-	if second.Load() != 7 {
-		t.Errorf("second hook: want 7, got %d", second.Load())
-	}
-}
 
 // ─── SetOnFabricRemoved / EmitFabricRemoved ──────────────────────────────────
 
@@ -83,10 +48,7 @@ func TestBridge_SetOnReassembled_CalledAfterReassemble(t *testing.T) {
 		emptySnapshotter,
 		mdns.NewNoop(),
 		bridge.Config{
-			Listen:    ":0",
-			VendorID:  0x1234,
-			ProductID: 0x5678,
-			NodeLabel: "hooks-test",
+			Listen: ":0",
 		},
 		nil,
 	)

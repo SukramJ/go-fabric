@@ -148,7 +148,7 @@ func (n *Node) Topology() BridgeTopology {
 		return BridgeTopology{}
 	}
 	out := BridgeTopology{}
-	if agg := topo.FindByID(1); agg != nil {
+	if agg := topo.Aggregator(); agg != nil {
 		out.Aggregator = agg.ID
 	}
 	added := map[string]Endpoint{}

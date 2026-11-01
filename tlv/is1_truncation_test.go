@@ -65,3 +65,38 @@ func TestOctetString_IS1BytePreserved(t *testing.T) {
 			}
 		})
 }
+
+// A string cut at its IS1 keeps the length it arrived with, so a bounded
+// consumer can check that first, as matter.js TlvString.ts:57-69 at
+// 862ad75f does (`value.length > this.maxLength` before the slice): a
+// 40-byte NodeLabel whose sixth byte is 0x1F reads as "ABCDE" with
+// RawLength 40, which a "max 32" consumer refuses (cluster/spec
+// DecodeStringIn, the bridge's write path). A string without IS1 has no
+// RawLength.
+func TestUTF8String_IS1KeepsTheRawLength(t *testing.T) {
+	t.Parallel()
+	wire := append([]byte{0x0C, 0x28, 'A', 'B', 'C', 'D', 'E', 0x1F}, bytes.Repeat([]byte{'x'}, 34)...)
+	el, err := NewDecoder(wire).Next()
+	if err != nil {
+		t.Fatalf("Next: %v", err)
+	}
+	if el.String != "ABCDE" || el.RawLength != 40 {
+		t.Fatalf("String %q RawLength %d, want \"ABCDE\" 40", el.String, el.RawLength)
+	}
+	el, err = NewDecoder([]byte{0x0C, 0x03, 'a', 'b', 'c'}).Next()
+	if err != nil {
+		t.Fatalf("Next: %v", err)
+	}
+	if el.RawLength != 0 {
+		t.Fatalf("RawLength %d without an IS1, want 0", el.RawLength)
+	}
+	// Counted in UTF-16 code units, as a JavaScript string's length: an
+	// astral rune counts two.
+	el, err = NewDecoder([]byte{0x0C, 0x06, 'a', 0x1F, 0xF0, 0x9F, 0x98, 0x80}).Next()
+	if err != nil {
+		t.Fatalf("Next: %v", err)
+	}
+	if el.String != "a" || el.RawLength != 4 {
+		t.Fatalf("String %q RawLength %d, want \"a\" 4", el.String, el.RawLength)
+	}
+}

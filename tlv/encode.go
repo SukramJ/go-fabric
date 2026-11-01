@@ -220,9 +220,25 @@ func (e *Encoder) PutFloat64(tag Tag, v float64) {
 	e.buf = binary.LittleEndian.AppendUint64(e.buf, math.Float64bits(v))
 }
 
+// validUTF8 returns s with every ill-formed byte sequence replaced by
+// U+FFFD, so a character-string element never carries ill-formed UTF-8 and
+// the trim loops below stop on a rune boundary of a valid string. Mirrors
+// matter.js packages/general/src/util/Bytes.ts:125-131 at 862ad75f
+// (Bytes.fromString is `new TextEncoder().encode(string)`, which cannot
+// emit ill-formed UTF-8; TlvString encodes through it). The replacement is
+// the decoder's ([decodeUTF8]: one U+FFFD per maximal subpart), so what is
+// written reads back as the decoder would have read the raw bytes.
+func validUTF8(s string) string {
+	if utf8.ValidString(s) {
+		return s
+	}
+	return decodeUTF8([]byte(s))
+}
+
 // PutUTF8 writes a UTF-8 string element. The length-prefix width is
-// chosen by string length.
+// chosen by string length; ill-formed UTF-8 in s is written as U+FFFD.
 func (e *Encoder) PutUTF8(tag Tag, s string) {
+	s = validUTF8(s)
 	e.writeStringLike(tag, []byte(s),
 		TypeUTF8Str1, TypeUTF8Str2, TypeUTF8Str4, TypeUTF8Str8)
 }
@@ -234,6 +250,7 @@ func (e *Encoder) PutUTF8(tag Tag, s string) {
 // without losing the write. maxBytes ≤ 0 skips validation (equivalent to
 // calling PutUTF8 directly).
 func (e *Encoder) PutUTF8WithMax(tag Tag, s string, maxBytes int) {
+	s = validUTF8(s)
 	if maxBytes > 0 && len(s) > maxBytes {
 		// Trim to a valid UTF-8 boundary at or below maxBytes.
 		trimmed := s[:maxBytes]
@@ -312,9 +329,15 @@ func (e *Encoder) EndContainer() error {
 // HardwareVersionString/SoftwareVersionString max=64, Location exact=2).
 // For Location (exact=2) callers validate length separately and should
 // not rely on trimming.
+//
+// maxBytes ≤ 0 imposes no bound, as [Encoder.PutUTF8WithMax]: the value
+// comes from a [BoundedString] any cluster server — a host's behind
+// contract/ included — may return, and a negative one must not panic the
+// encoder. matter.js refuses a negative maxLength once, at schema
+// construction (TlvString.ts:46 at 862ad75f), never per encode.
 func (e *Encoder) PutUTF8Bounded(tag Tag, s string, maxBytes int) {
-	b := []byte(s)
-	if len(b) <= maxBytes {
+	b := []byte(validUTF8(s))
+	if maxBytes <= 0 || len(b) <= maxBytes {
 		e.writeStringLike(tag, b,
 			TypeUTF8Str1, TypeUTF8Str2, TypeUTF8Str4, TypeUTF8Str8)
 		return
@@ -509,7 +532,7 @@ func (e *Encoder) writeControlAndTag(t ElementType, tag Tag) {
 		// caught by the parity/encode tests, not a wire-triggerable path.
 		panic(fmt.Sprintf("tlv: context tag inside Array container (tag=%d); use AnonymousTag()", tag.Number))
 	}
-	// Note: chip TLVReader.cpp:822-827 enforces two strictness rules
+	// Note: chip TLVReader.cpp:865-871 (at 6170af84) enforces two strictness rules
 	// (no context tag at top level; no anonymous tag inside a
 	// Structure except EndOfContainer). Both are READ-side checks in
 	// chip's verifier — Apple's MTRDevice drops the whole IM message

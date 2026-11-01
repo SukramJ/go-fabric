@@ -60,10 +60,9 @@ var (
 // src/app/ReadHandler.cpp:598 ProcessEventFilters stores EventMin
 // from EventFilterIB.EventMin and uses it to gate the event query.
 type EventMinimumNumber struct {
-	// NodeID is the optional node filter from EventFilterIB tag 0.
-	// In a bridge context this is always the bridge's own NodeID or
-	// omitted; go-fabric stores it for completeness but does not
-	// use it in the query — only EventMin is applied.
+	// NodeID is the optional node filter from EventFilterIB tag 0: the
+	// filter applies only to the node with this operational node id
+	// ([EventFiltersFor]).
 	NodeID    uint64
 	HasNodeID bool
 	// EventMin is the minimum event number (INCLUSIVE lower bound): the
@@ -127,7 +126,7 @@ func (r SubscribeRequest) MarshalTLV(enc *tlv.Encoder) {
 }
 
 // UnmarshalSubscribeRequestTLV decodes a SubscribeRequestMessage.
-func UnmarshalSubscribeRequestTLV(dec *tlv.Decoder) (SubscribeRequest, error) { //nolint:gocognit,gocyclo // wire/dispatch table over many attribute/opcode cases
+func UnmarshalSubscribeRequestTLV(dec *tlv.Decoder) (SubscribeRequest, error) { //nolint:gocognit,gocyclo,funlen // wire/dispatch table over many attribute/opcode cases
 	open, err := dec.Next()
 	if err != nil {
 		return SubscribeRequest{}, err
@@ -136,12 +135,31 @@ func UnmarshalSubscribeRequestTLV(dec *tlv.Decoder) (SubscribeRequest, error) { 
 		return SubscribeRequest{}, fmt.Errorf("%w: expected struct, got 0x%02X", ErrInvalidSubscribeRequest, open.Type)
 	}
 	var req SubscribeRequest
+	var hasKeep, hasMin, hasMax, hasFabricFiltered bool
 	for {
 		el, err := dec.Next()
 		if err != nil {
 			return SubscribeRequest{}, fmt.Errorf("%w: %w", ErrInvalidSubscribeRequest, err)
 		}
 		if el.IsEndContainer {
+			// KeepSubscriptions, both intervals and IsFabricFiltered are
+			// mandatory: matter.js
+			// packages/types/src/protocol/messages/TlvSubscribeRequest.ts
+			// :21-27, :39 (TlvField); chip src/app/ReadHandler.cpp:761-762,
+			// :822. Review 2026-11 W2-wire-04.
+			switch {
+			case !hasKeep:
+				err = missingField(tagSubReqKeepSubscriptions, "KeepSubscriptions")
+			case !hasMin:
+				err = missingField(tagSubReqMinIntervalFloor, "MinIntervalFloor")
+			case !hasMax:
+				err = missingField(tagSubReqMaxIntervalCeiling, "MaxIntervalCeiling")
+			case !hasFabricFiltered:
+				err = missingField(tagSubReqFabricFiltered, "IsFabricFiltered")
+			}
+			if err != nil {
+				return SubscribeRequest{}, fmt.Errorf("%w: %w", ErrInvalidSubscribeRequest, err)
+			}
 			return req, nil
 		}
 		if el.Tag.Kind != tlv.TagKindContext {
@@ -149,11 +167,22 @@ func UnmarshalSubscribeRequestTLV(dec *tlv.Decoder) (SubscribeRequest, error) { 
 		}
 		switch uint8(el.Tag.Number & 0xFF) {
 		case tagSubReqKeepSubscriptions:
-			req.KeepSubscriptions = el.Bool
+			if req.KeepSubscriptions, err = boolField(el); err != nil {
+				return SubscribeRequest{}, fmt.Errorf("%w: %w", ErrInvalidSubscribeRequest, err)
+			}
+			hasKeep = true
 		case tagSubReqMinIntervalFloor:
-			req.MinIntervalFloor = uint16(el.Uint & 0xFFFF)
+			// TlvUInt16, never masked (matter.js packages/types/src/protocol/messages/TlvSubscribeRequest.ts:24-27;
+			// review 2026-11 W2-wire-03).
+			if req.MinIntervalFloor, err = uint16Field(el); err != nil {
+				return SubscribeRequest{}, fmt.Errorf("%w: %w", ErrInvalidSubscribeRequest, err)
+			}
+			hasMin = true
 		case tagSubReqMaxIntervalCeiling:
-			req.MaxIntervalCeiling = uint16(el.Uint & 0xFFFF)
+			if req.MaxIntervalCeiling, err = uint16Field(el); err != nil {
+				return SubscribeRequest{}, fmt.Errorf("%w: %w", ErrInvalidSubscribeRequest, err)
+			}
+			hasMax = true
 		case tagSubReqAttributeRequests:
 			if !el.IsContainer || el.Type != tlv.TypeArray {
 				return SubscribeRequest{}, fmt.Errorf("%w: AttributeRequests not array", ErrInvalidSubscribeRequest)
@@ -196,7 +225,10 @@ func UnmarshalSubscribeRequestTLV(dec *tlv.Decoder) (SubscribeRequest, error) { 
 			}
 			req.EventFilters = filters
 		case tagSubReqFabricFiltered:
-			req.FabricFiltered = el.Bool
+			if req.FabricFiltered, err = boolField(el); err != nil {
+				return SubscribeRequest{}, fmt.Errorf("%w: %w", ErrInvalidSubscribeRequest, err)
+			}
+			hasFabricFiltered = true
 		case tagSubReqDataVersionFilters:
 			if !el.IsContainer || el.Type != tlv.TypeArray {
 				return SubscribeRequest{}, fmt.Errorf("%w: DataVersionFilters not array", ErrInvalidSubscribeRequest)

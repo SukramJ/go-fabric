@@ -24,7 +24,7 @@ import (
 func TestBridgedEndpointWithoutNameServesDescriptor(t *testing.T) {
 	t.Parallel()
 	store := endpointtest.NewFakeStore()
-	a, err := endpoint.New(store, endpoint.Config{VendorID: 0xFFF1, ProductID: 0x8001, NodeLabel: "Bridge"}, nil)
+	a, err := endpoint.New(store, endpoint.Config{VendorID: 0xFFF1, ProductID: 0x8001}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

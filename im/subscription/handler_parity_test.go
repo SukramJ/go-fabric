@@ -347,7 +347,7 @@ func TestHandlerParity_DirtyMarkDeduplication_MultipleChanges_SinglePath(t *test
 // already included in the initial report, it is skipped (subscriber already
 // has it). In go-fabric the equivalent invariant is that an attribute change
 // on a *closed* subscription (IsClosed=true) is silently dropped:
-// markDirty returns false and no dirty report fires.
+// markDirty records nothing and no dirty report fires.
 func TestHandlerParity_ClosedSubscription_MarkDirtyIsNoop(t *testing.T) {
 	// Mirrors matter.js packages/node/src/node/server/ServerSubscription.ts:320-322
 	// (if (this.#isClosed ... ) return; guard at top of #handleClusterStateChanges)

@@ -1018,8 +1018,18 @@ const FabricIndexUnresolvable uint8 = 255
 // 0xFFFF'FFFD'0000'0000..0xFFFF'FFFD'FFFF'FFFF) match via
 // [matchesCATSubject] against the requester's CAT set.
 func (d *TopologyDispatcher) CheckACL(ctx context.Context, fabricIndex uint8, subjectNodeID uint64, subjectCATs []uint32, endpoint uint16, clusterID uint32, requiredPrivilege uint8) im.StatusCode {
-	if fabricIndex == 0 || im.IsPASEFromContext(ctx) {
+	if im.IsPASEFromContext(ctx) {
 		return im.StatusSuccess // PASE — commissioning channel, implicit Administer
+	}
+	if fabricIndex == 0 || fabricIndex == FabricIndexUnresolvable {
+		// No accessing fabric, or one the bridge could not name, and not
+		// PASE: fail closed — also before an all-granting [UnenforcedACL],
+		// which grants on a fabric, never on a missing one. The implicit
+		// Administer is keyed on the PASE auth mode alone — matter.js
+		// packages/protocol/src/interaction/FabricAccessControl.ts:189-191
+		// (`authMode === Pase && isCommissioning`); review 2026-11
+		// W2-sec-03.
+		return im.StatusUnsupportedAccess
 	}
 	if d == nil || d.acl == nil {
 		// Fail closed. A dispatcher without an ACL source cannot tell an
