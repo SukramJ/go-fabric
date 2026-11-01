@@ -131,3 +131,28 @@ func TestQuieterEmitNow(t *testing.T) {
 		t.Fatalf("EmitNow did not count as the last report: %d", reports)
 	}
 }
+
+// TestQuieterStop: Stop disarms a held report and drops it without
+// reporting; the throttle stays usable (the quiesce of a server with a
+// quieter attribute, W3-club2-02).
+func TestQuieterStop(t *testing.T) {
+	t.Parallel()
+	clk := clocktest.New(time.Unix(1000, 0))
+	reports := 0
+	q := &cluster.Quieter{Report: func() { reports++ }, Clock: clk}
+	q.Stop() // nothing armed: a no-op
+	q.Changed(true, false)
+	q.Changed(false, false) // held
+	if n := clk.Pending(); n != 1 || reports != 1 {
+		t.Fatalf("held change: %d timers, %d reports", n, reports)
+	}
+	q.Stop()
+	clk.Advance(time.Minute)
+	if n := clk.Pending(); n != 0 || reports != 1 {
+		t.Fatalf("after Stop: %d timers, %d reports; want 0 and 1", n, reports)
+	}
+	q.Changed(false, false) // usable again: a minute later it reports at once
+	if reports != 2 {
+		t.Fatalf("after Stop the next change: %d reports, want 2", reports)
+	}
+}
