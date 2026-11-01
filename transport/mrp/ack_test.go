@@ -119,12 +119,16 @@ func TestAckTrackerOweFlushesTheDisplacedObligation(t *testing.T) {
 			if len(due) != 1 || due[0].AckCounter != counters[0] {
 				t.Fatalf("Due(t0) = %+v, want the displaced counter %d", due, counters[0])
 			}
+			// The exchange still owes the new counter's ack, on its own role only.
+			if !tracker.Owes(0, 1, true) || tracker.Owes(0, 1, false) {
+				t.Fatal("Owes: want the newer obligation pending for the initiator role only")
+			}
 			// The new counter is the pending one: a piggyback takes it.
 			if c, ok := tracker.LookupAndDischarge(0, 1, true); !ok || c != counters[1] {
 				t.Fatalf("LookupAndDischarge = %d, %v, want %d", c, ok, counters[1])
 			}
-			if tracker.Pending() != 0 {
-				t.Fatalf("Pending() = %d, want 0", tracker.Pending())
+			if tracker.Pending() != 0 || tracker.Owes(0, 1, true) {
+				t.Fatalf("Pending() = %d after the piggyback, want 0 and nothing owed", tracker.Pending())
 			}
 		})
 	}
