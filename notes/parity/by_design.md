@@ -396,6 +396,19 @@ backlog item (parity audit CHIP L9-01..04), not an interop gap. The crypto
 core (HKDF salts/info/nonces, Sigma TLV tags, status codes, control octets)
 IS byte-verbatim with connectedhomeip HEAD.
 
+### BD-Matter-MessageCodec-PrivacyWithExtensions — a header with the privacy flag and message extensions is decoded
+
+matter.js `decodePacket` refuses a packet header that sets both the P and the
+MX flag (`packages/protocol/src/codec/MessageCodec.ts:243-245` at 862ad75f,
+`NotImplementedError("Privacy enhancements with message extensions not
+supported.")`); `transport/message.UnmarshalHeader` reads the MX length after
+the destination and skips the block, and the privacy mask
+(`bridge/privacy.go` `privacyHeaderEnd`) stops before it, so nothing is
+mis-parsed. chip skips the MX block whatever the P flag
+(`src/transport/raw/MessageHeader.cpp:224-232` at 6170af84); matter.js's
+refusal is an unimplemented feature, not a rule, so the header is accepted
+as chip accepts it (W1-wire-05).
+
 ### BD-Matter-mDNSDeviceType — commissionable DT advertises RootNode, not Aggregator
 
 The commissionable `DT` TXT key + `_T<id>` subtype advertise RootNode
