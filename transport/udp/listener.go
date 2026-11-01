@@ -16,6 +16,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/SukramJ/go-fabric/clock"
 	"github.com/SukramJ/go-fabric/internal/udpseam"
 )
 
@@ -238,11 +239,13 @@ func (l *Listener) Serve(ctx context.Context, handler Handler) error {
 			}
 			l.logger().Warn("matter.udp.read_error",
 				slog.Any("err", err),
-				slog.Int("consecutive", readErrors))
+				slog.Int("count", readErrors))
+			pause := clock.System{}.NewTimer(readErrorPause)
 			select {
 			case <-ctx.Done():
+				pause.Stop()
 				return nil
-			case <-time.After(readErrorPause):
+			case <-pause.C():
 			}
 			continue
 		}
