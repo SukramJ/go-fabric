@@ -1997,7 +1997,7 @@
   },
   {
     "file": "im/subscription/subscription.go",
-    "line": 253,
+    "line": 249,
     "citation": "packages/node/src/node/server/ServerSubscription.ts:412",
     "resolved": "packages/node/src/node/server/ServerSubscription.ts",
     "identifier": "#sendUpdatesActivated",
