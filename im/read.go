@@ -228,28 +228,52 @@ func readAttributePathFields(dec *tlv.Decoder) (ConcreteAttributePath, error) {
 		if el.IsEndContainer {
 			return p, nil
 		}
-		if el.Tag.Kind != tlv.TagKindContext {
-			continue
-		}
-		switch uint8(el.Tag.Number & 0xFF) {
-		case tagAttrPathNode:
-			p.Node = el.Uint
-			p.HasNode = true
-		case tagAttrPathEndpoint:
-			p.Endpoint = uint16(el.Uint & 0xFFFF)
-			p.HasEndpoint = true
-		case tagAttrPathCluster:
-			p.Cluster = uint32(el.Uint & 0xFFFFFFFF)
-			p.HasCluster = true
-		case tagAttrPathAttribute:
-			p.Attribute = uint32(el.Uint & 0xFFFFFFFF)
-			p.HasAttribute = true
-		case tagAttrPathListIndex:
-			p.ListIndex = uint16(el.Uint & 0xFFFF)
-			p.HasListIndex = true
-			p.ListAppend = el.IsNull
+		if err := readAttributePathField(dec, el, &p); err != nil {
+			return ConcreteAttributePath{}, fmt.Errorf("%w: %w", ErrInvalidPath, err)
 		}
 	}
+}
+
+// readAttributePathField decodes one field of an AttributePathIB into p.
+// Every integer is type- and range-checked, never masked: an endpoint of
+// 65536 or -1 would otherwise read as endpoint 0 (review 2026-11
+// W2-wire-03). Mirrors matter.js
+// packages/types/src/protocol/types/TlvAttributePath.ts:19-26 (bounded
+// TlvEndpointNumber / TlvClusterId / TlvAttributeId, nullable TlvUInt16
+// listIndex) and chip src/app/MessageDef/AttributePathIB.cpp:220-275. A
+// field of a foreign tag is skipped, as TlvObject skips an unknown one.
+func readAttributePathField(dec *tlv.Decoder, el tlv.Element, p *ConcreteAttributePath) error {
+	if el.Tag.Kind != tlv.TagKindContext {
+		return skipField(dec, el)
+	}
+	var err error
+	switch uint8(el.Tag.Number & 0xFF) {
+	case tagAttrPathNode:
+		p.Node, err = uint64Field(el)
+		p.HasNode = true
+	case tagAttrPathEndpoint:
+		p.Endpoint, err = uint16Field(el)
+		p.HasEndpoint = true
+	case tagAttrPathCluster:
+		p.Cluster, err = uint32Field(el)
+		p.HasCluster = true
+	case tagAttrPathAttribute:
+		p.Attribute, err = uint32Field(el)
+		p.HasAttribute = true
+	case tagAttrPathListIndex:
+		p.HasListIndex = true
+		if el.IsNull {
+			p.ListAppend = true
+			return nil
+		}
+		p.ListIndex, err = uint16Field(el)
+	default:
+		// EnableTagCompression and unknown tags: an encoder-side
+		// optimisation a receiver may ignore (§A.7), and forward
+		// compatibility.
+		err = skipField(dec, el)
+	}
+	return err
 }
 
 // skipContainer drains every nested element until a balancing

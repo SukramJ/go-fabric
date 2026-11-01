@@ -84,7 +84,12 @@ func UnmarshalTimedRequestTLV(dec *tlv.Decoder) (TimedRequest, error) {
 		}
 		switch uint8(el.Tag.Number & 0xFF) {
 		case tagTimedReqTimeout:
-			req.TimeoutMs = uint16(el.Uint & 0xFFFF)
+			// TlvUInt16, never masked: 70000 ms as a uint32 is refused,
+			// not a 4464 ms window (matter.js packages/types/src/protocol/messages/TlvTimedRequest.ts:15; review
+			// 2026-11 W2-wire-03).
+			if req.TimeoutMs, err = uint16Field(el); err != nil {
+				return TimedRequest{}, fmt.Errorf("%w: %w", ErrInvalidTimedRequest, err)
+			}
 		case tagTimedReqInteractionModelRevision:
 			// Decoded but not retained — the IM-revision field is
 			// informational; we always reply with our own revision.

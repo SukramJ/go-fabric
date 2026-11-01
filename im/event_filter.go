@@ -85,17 +85,34 @@ func readDataVersionFilterFields(dec *tlv.Decoder) (DataVersionFilter, error) {
 					break
 				}
 				if inner.Tag.Kind != tlv.TagKindContext {
+					if err := skipField(dec, inner); err != nil {
+						return DataVersionFilter{}, err
+					}
 					continue
 				}
+				// Type- and range-checked, never masked (review
+				// 2026-11 W2-wire-03): matter.js
+				// packages/types/src/protocol/types/TlvClusterPath.ts:16-17
+				// (TlvEndpointNumber, TlvClusterId).
+				var fieldErr error
 				switch uint8(inner.Tag.Number & 0xFF) {
 				case 1: // EndpointID
-					f.Endpoint = uint16(inner.Uint & 0xFFFF)
+					f.Endpoint, fieldErr = uint16Field(inner)
 				case 2: // ClusterID
-					f.Cluster = uint32(inner.Uint & 0xFFFFFFFF)
+					f.Cluster, fieldErr = uint32Field(inner)
+				default:
+					fieldErr = skipField(dec, inner)
+				}
+				if fieldErr != nil {
+					return DataVersionFilter{}, fieldErr
 				}
 			}
 		case 1: // DataVersion (uint32)
-			f.DataVersion = uint32(el.Uint & 0xFFFFFFFF)
+			v, err := uint32Field(el)
+			if err != nil {
+				return DataVersionFilter{}, err
+			}
+			f.DataVersion = v
 		}
 	}
 }
@@ -177,10 +194,14 @@ func readEventFilterFields(dec *tlv.Decoder) (EventMinimumNumber, error) {
 		}
 		switch uint8(el.Tag.Number & 0xFF) {
 		case tagEventFilterNodeID:
-			f.NodeID = el.Uint
+			if f.NodeID, err = uint64Field(el); err != nil {
+				return EventMinimumNumber{}, err
+			}
 			f.HasNodeID = true
 		case tagEventFilterEventMin:
-			f.EventMin = el.Uint
+			if f.EventMin, err = uint64Field(el); err != nil {
+				return EventMinimumNumber{}, err
+			}
 		default:
 			if el.IsContainer {
 				if skipErr := skipContainer(dec); skipErr != nil {

@@ -151,9 +151,15 @@ func UnmarshalSubscribeRequestTLV(dec *tlv.Decoder) (SubscribeRequest, error) { 
 		case tagSubReqKeepSubscriptions:
 			req.KeepSubscriptions = el.Bool
 		case tagSubReqMinIntervalFloor:
-			req.MinIntervalFloor = uint16(el.Uint & 0xFFFF)
+			// TlvUInt16, never masked (matter.js packages/types/src/protocol/messages/TlvSubscribeRequest.ts:24-27;
+			// review 2026-11 W2-wire-03).
+			if req.MinIntervalFloor, err = uint16Field(el); err != nil {
+				return SubscribeRequest{}, fmt.Errorf("%w: %w", ErrInvalidSubscribeRequest, err)
+			}
 		case tagSubReqMaxIntervalCeiling:
-			req.MaxIntervalCeiling = uint16(el.Uint & 0xFFFF)
+			if req.MaxIntervalCeiling, err = uint16Field(el); err != nil {
+				return SubscribeRequest{}, fmt.Errorf("%w: %w", ErrInvalidSubscribeRequest, err)
+			}
 		case tagSubReqAttributeRequests:
 			if !el.IsContainer || el.Type != tlv.TypeArray {
 				return SubscribeRequest{}, fmt.Errorf("%w: AttributeRequests not array", ErrInvalidSubscribeRequest)

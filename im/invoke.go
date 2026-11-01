@@ -291,7 +291,11 @@ func readCommandInvocation(dec *tlv.Decoder, fieldsReader CommandFieldsReader) (
 				return CommandInvocation{}, err
 			}
 		case tagCmdDataRef:
-			inv.CommandRef = uint16(el.Uint & 0xFFFF)
+			ref, err := uint16Field(el)
+			if err != nil {
+				return CommandInvocation{}, fmt.Errorf("%w: CommandRef: %w", ErrInvalidInvokeRequest, err)
+			}
+			inv.CommandRef = ref
 			inv.HasCommandRef = true
 		}
 	}
@@ -380,18 +384,31 @@ func readCommandPathFields(dec *tlv.Decoder) (ConcreteCommandPath, error) {
 			return p, nil
 		}
 		if el.Tag.Kind != tlv.TagKindContext {
+			if err := skipField(dec, el); err != nil {
+				return ConcreteCommandPath{}, fmt.Errorf("%w: %w", ErrInvalidPath, err)
+			}
 			continue
 		}
+		// Type- and range-checked, never masked (review 2026-11
+		// W2-wire-03): matter.js
+		// packages/types/src/protocol/types/TlvCommandPath.ts:16-18 (bounded
+		// TlvEndpointNumber / TlvClusterId / TlvCommandId); chip
+		// src/app/MessageDef/CommandPathIB.cpp:119-132 GetConcreteCommandPath.
 		switch uint8(el.Tag.Number & 0xFF) {
 		case tagCmdPathEndpoint:
-			p.Endpoint = uint16(el.Uint & 0xFFFF)
+			p.Endpoint, err = uint16Field(el)
 			p.HasEndpoint = true
 		case tagCmdPathCluster:
-			p.Cluster = uint32(el.Uint & 0xFFFFFFFF)
+			p.Cluster, err = uint32Field(el)
 			p.HasCluster = true
 		case tagCmdPathCommand:
-			p.Command = uint32(el.Uint & 0xFFFFFFFF)
+			p.Command, err = uint32Field(el)
 			p.HasCommand = true
+		default:
+			err = skipField(dec, el)
+		}
+		if err != nil {
+			return ConcreteCommandPath{}, fmt.Errorf("%w: %w", ErrInvalidPath, err)
 		}
 	}
 }

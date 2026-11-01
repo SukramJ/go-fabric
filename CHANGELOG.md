@@ -31,6 +31,7 @@ Findings of the whole-codebase review of 2026-11-01 (`notes/review/2026-11/`).
 - `core.GeneralCommissioning.FailSafeFabric` and `core.FailSafeArmedFor`: the fail-safe port (armed, and for which fabric) and connectedhomeip's `IsFailSafeArmed(accessingFabricIndex)` over it.
 - `bridge.ErrUnsecuredIM`: the diagnostic error of a dropped IM message on session 0.
 - `subscription.EventSource`, `Manager.SetEventSource`: the log a subscription's owed events are read from when its report is due (the bridge attaches its event log in `AttachSubscriptionManager`); `Subscription.RequeueAttributes`, `Subscription.RequeueEvents`: a reporter whose send failed owes the subscriber the same data again.
+- `im.FieldError`: a request-decode error naming the IM status it answers (InvalidAction for a wrong TLV type or a missing mandatory field, ConstraintError for an integer out of range).
 
 ### Changed
 
@@ -43,6 +44,7 @@ Findings of the whole-codebase review of 2026-11-01 (`notes/review/2026-11/`).
 - `im/subscription`, `bridge`: a subscription keeps the lowest event number it owes, not a copy of every event — an event burst under a long MinIntervalFloor no longer grows a queue per subscription — and its report reads the events from the event log at drain time, in number order and with the timestamp a Read answers; `EventFiring.Data` and `Timestamp` are no longer read (W2-conc-02, W2-conc-03).
 - `bridge`: a failed ongoing report marks its attribute paths dirty again and owes its events again, so the next report retries them; the third consecutive failure still reaps the subscription, as matter.js's `ServerSubscription` does (W2-conc-01).
 - `bridge`: a response opcode, an unassigned opcode or a StatusResponse as the first message of an exchange on a unicast session is answered StatusResponse(InvalidAction), as matter.js and connectedhomeip answer it; it was dropped and the peer waited out its exchange (W2-wire-02).
+- `im`: path and header integers (AttributePathIB, CommandPathIB, EventPathIB, the DataVersionFilter cluster path and version, CommandRef, the write DataVersion, the subscribe intervals, the timed timeout, the event filter fields) are type- and range-checked instead of masked: an endpoint of 65536 or -1 read endpoint 0 and a 70000 ms TimedRequest opened a 4464 ms window; such a request is answered ConstraintError (out of range) or InvalidAction (wrong type), and the two AttributePathIB decoders skip a foreign tag alike (W2-wire-03).
 
 ## [0.15.6] — 2026-11-01
 
