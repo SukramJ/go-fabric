@@ -6,10 +6,19 @@ package node
 import (
 	"context"
 	"sync"
+	"time"
 
+	"github.com/SukramJ/go-fabric/clock"
 	gencommdef "github.com/SukramJ/go-fabric/cluster/spec/generalcommissioning"
 	"github.com/SukramJ/go-fabric/endpoint"
+	"github.com/SukramJ/go-fabric/im"
 )
+
+// paseCloseGrace is how long the PASE sessions outlive the
+// CommissioningComplete response: Apple sends the command over the
+// fabric-adopted PASE session, and the peer's ack of the response
+// arrives on it (the delayed teardown RemoveFabric uses too).
+const paseCloseGrace = 100 * time.Millisecond
 
 // failSafeParticipant is a cluster server of an endpoint whose commands
 // run under the node's fail-safe: the Thread Border Router Management
@@ -69,10 +78,38 @@ func (n *Node) failSafeParticipants() []failSafeParticipant {
 }
 
 // failSafeExpired reverts every participant after the root's rollback
-// (kFailSafeTimerExpired).
+// (kFailSafeTimerExpired), then terminates every open PASE session —
+// after the response when the expiry runs inside an interaction
+// (ArmFailSafe with expiry 0). Mirrors matter.js
+// packages/protocol/src/common/FailsafeContext.ts:277-279 (rollback step
+// 1: closePaseSession with the current exchange).
 func (n *Node) failSafeExpired(ctx context.Context, _ uint8) {
 	for _, p := range n.failSafeParticipants() {
 		p.OnFailSafeExpired(ctx)
+	}
+	n.closePASESessions(ctx, 0)
+}
+
+// closePASESessions clears every PASE session, including the ones
+// AddNOC adopted onto a fabric, once the response of the interaction
+// ctx belongs to has been sent (at once without one) and grace has
+// elapsed after it.
+func (n *Node) closePASESessions(ctx context.Context, grace time.Duration) {
+	if n.sec == nil || n.sec.sessions == nil {
+		return
+	}
+	sessions := n.sec.sessions
+	closeNow := func() { sessions.ClosePASESessions() }
+	run := closeNow
+	if grace > 0 {
+		clk := n.cfg.Clock
+		if clk == nil {
+			clk = clock.System{}
+		}
+		run = func() { clk.AfterFunc(grace, closeNow) }
+	}
+	if !im.DeferAfterResponse(ctx, run) {
+		run()
 	}
 }
 

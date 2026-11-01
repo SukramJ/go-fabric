@@ -663,6 +663,12 @@ func (n *Node) observedFabricChanged(ctx context.Context, fabricIndex uint8) {
 // (root.go).
 func (n *Node) commissioningCompleted(ctx context.Context, fabricIndex uint8) {
 	n.failSafeCommitted(ctx)
+	// Matter §11.10.6.6 step 4: the PASE sessions are cleared — after the
+	// response and a grace, since the command itself arrives over the
+	// fabric-adopted PASE session. Mirrors matter.js
+	// packages/protocol/src/common/FailsafeContext.ts:150-153
+	// (completeCommission → closePaseSession).
+	n.closePASESessions(ctx, paseCloseGrace)
 	n.ensureOTAProviderACL(ctx)
 	n.ensureRequestorACL(ctx)
 	for _, o := range n.observerList() {
