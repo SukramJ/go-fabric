@@ -95,8 +95,11 @@ func TestLiftWithoutPositionAwareness(t *testing.T) {
 			t.Errorf("attribute 0x%04X served", a)
 		}
 	}
-	if slices.Contains(srv.MatterAcceptedCommands(), wcdef.CmdGoToLiftPercentage) {
-		t.Error("GoToLiftPercentage accepted")
+	// GoToLiftPercentage is served without position awareness, as
+	// matter.js's server implements it for every axis
+	// (WindowCoveringServer.ts:576-596; W3-club1-04).
+	if !slices.Contains(srv.MatterAcceptedCommands(), wcdef.CmdGoToLiftPercentage) {
+		t.Error("GoToLiftPercentage not accepted")
 	}
 	if st, _ := srv.MatterRead(wcdef.AttrConfigStatus); st.(uint8)&(1<<3) != 0 {
 		t.Errorf("ConfigStatus 0x%02X names LiftPositionAware", st)
@@ -117,6 +120,22 @@ func TestLiftWithoutPositionAwareness(t *testing.T) {
 		}
 		if got := status(); got != c.want {
 			t.Fatalf("after command 0x%02X OperationalStatus 0x%02X, want 0x%02X", c.cmd, got, c.want)
+		}
+	}
+	// GoToLiftPercentage 0 is UpOrOpen, any other value DownOrClose
+	// (WindowCoveringServer.ts:586-590 at 862ad75f; W3-club1-04).
+	for _, c := range []struct {
+		pct  uint16
+		want uint8
+	}{{0, 1 | 1<<2}, {2500, 2 | 2<<2}} {
+		if _, err := srv.MatterInvoke(ctx, wcdef.CmdStopMotion, nil); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := srv.MatterInvoke(ctx, wcdef.CmdGoToLiftPercentage, wcdef.GoToLiftPercentageRequest{LiftPercent100thsValue: c.pct}); err != nil {
+			t.Fatalf("GoToLiftPercentage(%d): %v", c.pct, err)
+		}
+		if got := status(); got != c.want {
+			t.Fatalf("after GoToLiftPercentage(%d) OperationalStatus 0x%02X, want 0x%02X", c.pct, got, c.want)
 		}
 	}
 }

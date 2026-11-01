@@ -169,7 +169,7 @@ var hostCases = map[uint32]hostCase{
 		"SetOccupied", "SetOccupiedCoolingSetpoint", "SetOccupiedHeatingSetpoint", "SetPresets", "SetSchedules",
 		"SetSystemMode", "SetTemperatureSetpointHold", "SetThermostatRunningMode", "SetThermostatRunningState",
 	}},
-	h_color.ClusterID:  {kit: kitOf[*light.ColorControlServer](), covered: []string{"Color", "Set", "SetColorWriter", "SetWriter", "SyncColorTemperatureWithLevel"}},
+	h_color.ClusterID:  {kit: kitOf[*light.ColorControlServer](), covered: []string{"Color", "Set", "SetColorWriter", "SetScenes", "SetWriter", "SyncColorTemperatureWithLevel"}},
 	h_eco.ClusterID:    {kit: kitOf[*core.EcosystemInformation](), host: hostOf[h_eco.Host](h_eco.Wrap)},
 	h_fixed.ClusterID:  {kit: kitOf[*spec.Server]()},
 	h_user.ClusterID:   {kit: kitOf[*spec.Server]()},

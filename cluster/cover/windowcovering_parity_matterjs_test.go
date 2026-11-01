@@ -515,10 +515,12 @@ func TestParityMatterJS_WindowCoveringAcceptedCommands(t *testing.T) {
 	if got, want := lift.MatterAcceptedCommands(), []uint32{0x00, 0x01, 0x02, 0x05}; !slices.Equal(got, want) {
 		t.Errorf("LF|PA_LF AcceptedCommandList = %v, want %v", got, want)
 	}
-	// Lift without position awareness accepts the three movement commands
-	// alone: GoToLiftPercentage is "LF & PA_LF, [LF]".
+	// Lift without position awareness accepts GoToLiftPercentage too: it is
+	// "LF & PA_LF, [LF]", optional there, and matter.js's server implements
+	// it for every axis (WindowCoveringServer.ts:576-596 at 862ad75f;
+	// W3-club1-04).
 	plain := cover.NewWindowCoveringServer(cover.Config{FeatureMap: 1})
-	if got, want := plain.MatterAcceptedCommands(), []uint32{0x00, 0x01, 0x02}; !slices.Equal(got, want) {
+	if got, want := plain.MatterAcceptedCommands(), []uint32{0x00, 0x01, 0x02, 0x05}; !slices.Equal(got, want) {
 		t.Errorf("LF AcceptedCommandList = %v, want %v", got, want)
 	}
 	if got := lift.MatterGeneratedCommands(); len(got) != 0 {

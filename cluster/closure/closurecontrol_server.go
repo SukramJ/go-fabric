@@ -404,12 +404,12 @@ func (s *ControlServer) invokeStop(ctx context.Context) error {
 		return fmt.Errorf("closure: Stop: %w", err)
 	}
 	s.mu.Lock()
-	// The target is dropped, not kept: after a stop the drive is heading
-	// nowhere, and a retained target claims otherwise.
-	s.targetPosition = nil
+	// MainState only: OverallTargetState keeps the target, as
+	// connectedhomeip's HandleStop touches MainState alone
+	// (ClosureControlCluster.cpp:531-551 at 6170af84; W3-club1-05).
 	s.mainState = wire.ClosureMainStateStopped
 	s.mu.Unlock()
-	s.NotifyFrom(contract.OriginCommand, wire.ClosureControlAttrMainState, wire.ClosureControlAttrOverallTargetState)
+	s.NotifyFrom(contract.OriginCommand, wire.ClosureControlAttrMainState)
 	return nil
 }
 
@@ -564,8 +564,31 @@ func (s *ControlServer) SetCurrentPosition(pos *wire.ClosureCurrentPosition) {
 		// report as perpetually in motion.
 		return
 	}
-	// The drive arrived, so nothing is outstanding.
-	s.targetPosition = nil
+	// The drive arrived at the target, so nothing is outstanding; a
+	// position on the way (PartiallyOpened while moving to FullyOpen) keeps
+	// it (W3-club1-05).
+	if s.targetPosition != nil && reachedTarget(*pos, *s.targetPosition) {
+		s.targetPosition = nil
+	}
+}
+
+// reachedTarget reports whether a CurrentPositionEnum is the position a
+// TargetPositionEnum moves to (closure-control.element.ts CurrentPositionEnum
+// and TargetPositionEnum at 862ad75f).
+func reachedTarget(pos wire.ClosureCurrentPosition, target wire.ClosureTargetPosition) bool {
+	switch target {
+	case wire.ClosureTargetPositionMoveToFullyClosed:
+		return pos == wire.ClosureCurrentPositionFullyClosed
+	case wire.ClosureTargetPositionMoveToFullyOpen:
+		return pos == wire.ClosureCurrentPositionFullyOpened
+	case wire.ClosureTargetPositionMoveToPedestrianPosition:
+		return pos == wire.ClosureCurrentPositionOpenedForPedestrian
+	case wire.ClosureTargetPositionMoveToVentilationPosition:
+		return pos == wire.ClosureCurrentPositionOpenedForVentilation
+	case wire.ClosureTargetPositionMoveToSignaturePosition:
+		return pos == wire.ClosureCurrentPositionOpenedAtSignature
+	}
+	return false
 }
 
 // SetMainState overrides the operational state. A motion that ends —

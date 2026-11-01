@@ -61,6 +61,7 @@ import (
 
 	"github.com/SukramJ/go-fabric/clock"
 	"github.com/SukramJ/go-fabric/cluster"
+	"github.com/SukramJ/go-fabric/cluster/onoff"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	ccdef "github.com/SukramJ/go-fabric/cluster/spec/colorcontrol"
 	"github.com/SukramJ/go-fabric/cluster/transition"
@@ -244,6 +245,9 @@ type ColorControlServer struct {
 	inst   *spec.Instance
 	engine *transition.Engine
 	onOff  OnOffState
+	// scenes is the endpoint's ScenesManagement ([ColorControlServer.SetScenes]);
+	// nil leaves the scene invalidation to the endpoint layer.
+	scenes atomic.Pointer[scenesRef]
 	// host, events and veto are the typed server's command handlers,
 	// event path and write veto (colorcontrol_typed.go).
 	host   spec.HostHandlers
@@ -655,4 +659,35 @@ func (s *ColorControlServer) logger() *slog.Logger {
 		return s.cfg.Logger
 	}
 	return slog.Default()
+}
+
+// scenesRef boxes the scenes port for the atomic pointer.
+type scenesRef struct{ sc onoff.Scenes }
+
+// SetScenes sets the endpoint's ScenesManagement port; nil removes it. The
+// endpoint layer calls it, as for the OnOff server, wherever the endpoint
+// mounts ScenesManagement.
+func (s *ColorControlServer) SetScenes(sc onoff.Scenes) {
+	if sc == nil {
+		s.scenes.Store(nil)
+		return
+	}
+	s.scenes.Store(&scenesRef{sc})
+}
+
+// MatterInvalidatesScenes implements cluster/core's SceneInvalidator: with
+// a scenes port the server invalidates the current scene itself, from the
+// five commands matter.js invalidates it from and only after the
+// ExecuteIfOff gate (W3-club1-03).
+func (s *ColorControlServer) MatterInvalidatesScenes() bool { return s.scenes.Load() != nil }
+
+// invalidateScenes is matter.js #invalidateScenes
+// (packages/node/src/behaviors/color-control/ColorControlServer.ts:1913-1916
+// at 862ad75f), called by MoveToSaturation (:597), MoveToHueAndSaturation
+// (:732), MoveToColor (:779), EnhancedMoveToHueAndSaturation (:1079) and
+// ColorLoopSet (:1145), each after #optionsAllowExecution.
+func (s *ColorControlServer) invalidateScenes() {
+	if r := s.scenes.Load(); r != nil {
+		r.sc.MakeAllFabricSceneInfoEntriesInvalid()
+	}
 }

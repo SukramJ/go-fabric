@@ -82,7 +82,7 @@ func (s *FlowServer) MatterRead(attrID uint32) (any, bool) {
 			return nil, true
 		}
 		v, ok := s.src.MatterFloatValue()
-		if !ok {
+		if !ok || math.IsNaN(v) { // a NaN reading is no reading (W3-club1-07)
 			return nil, true
 		}
 		return flowToMatter(v), true

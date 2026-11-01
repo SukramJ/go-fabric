@@ -269,6 +269,7 @@ func (s *ColorControlServer) moveToSaturation(ctx context.Context, fields any) e
 	if !s.executes(uint8(r.OptionsMask), uint8(r.OptionsOverride)) {
 		return nil
 	}
+	s.invalidateScenes()
 	if err := s.setColorMode(ctx, ColorModeHueSaturation); err != nil {
 		return err
 	}
@@ -347,6 +348,7 @@ func (s *ColorControlServer) moveToHueAndSaturation(ctx context.Context, fields 
 	if !s.executes(uint8(r.OptionsMask), uint8(r.OptionsOverride)) {
 		return nil
 	}
+	s.invalidateScenes()
 	if err := s.setColorMode(ctx, ColorModeHueSaturation); err != nil {
 		return err
 	}
@@ -403,6 +405,7 @@ func (s *ColorControlServer) enhancedMoveToHueAndSaturation(ctx context.Context,
 	if !s.executes(uint8(r.OptionsMask), uint8(r.OptionsOverride)) {
 		return nil
 	}
+	s.invalidateScenes()
 	if err := s.setEnhancedColorMode(ctx, ColorModeEnhancedHueSaturation); err != nil {
 		return err
 	}
@@ -419,6 +422,7 @@ func (s *ColorControlServer) moveToColor(ctx context.Context, fields any) error 
 	if !s.executes(uint8(r.OptionsMask), uint8(r.OptionsOverride)) {
 		return nil
 	}
+	s.invalidateScenes()
 	if err := s.setColorMode(ctx, ColorModeXY); err != nil {
 		return err
 	}
@@ -617,6 +621,7 @@ func (s *ColorControlServer) colorLoopSet(ctx context.Context, fields any) error
 	if !s.executes(uint8(r.OptionsMask), uint8(r.OptionsOverride)) {
 		return nil
 	}
+	s.invalidateScenes()
 	changed := false
 	if err := s.update(ctx, func(st *colorState) {
 		if r.UpdateFlags&ccdef.UpdateFlagsUpdateDirection != 0 && st.loopDirection != uint8(r.Direction) {

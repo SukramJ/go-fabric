@@ -4974,7 +4974,12 @@ SetupRequired until the host reports a state. chip's null-OverallCurrentState
 gate (`:560-562`) has no counterpart: this server reads OverallCurrentState
 as a struct whose fields are null until observed. Stop (`HandleStop`
 `:531-551`): only Moving, WaitingForMotion and Calibrating stop, SUCCESS
-always (with `BD-Matter-ClosureControl-StopObserver`). The fallback target
+always (with `BD-Matter-ClosureControl-StopObserver`), and OverallTargetState
+is left as it was (W3-club1-05). One addition chip does not make — of its command
+handlers only MoveTo writes OverallTargetState (`:637`): a reported CurrentPosition
+that is the target's own position clears the target, a position on the way
+(PartiallyOpened) keeps it, so a target reads only while it is outstanding.
+The fallback target
 and the ignored Latch and Speed of features the server does not serve are
 the specification text matter.js carries (`closure-control.resource.ts`).
 Reasoning: chip is the only reference with rules (W3-club1-06). Retire when
