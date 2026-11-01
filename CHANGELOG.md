@@ -57,6 +57,7 @@ Findings of the whole-codebase review of 2026-11-01 (`notes/review/2026-11/`).
 - `im`, `bridge`: of a request's EventFilters one applies — the first without a NodeID or with this node's operational node id on the accessing fabric — instead of the minimum over all entries, so a filter addressed to another node no longer replays the whole event buffer (W2-wire-05).
 - `mdns`: the subtype PTR records carry TTL 120 s, as matter.js and connectedhomeip advertise them, instead of 3200 s; the primary PTR, SRV and TXT records keep grandcat/zeroconf's 3200 s, whose setter races with its own goroutines — `notes/parity/by_design.md` L7-D02 now records what the code emits (W2-wire-06).
 - `endpoint`, `bridge`, `node`: the Aggregator is the endpoint with the `Aggregator` role, not endpoint number 1 — `IsAggregator`, `ClusterServers` and the bridge's and the facade's Aggregator lookups read the role, so a host endpoint numbered 1 keeps its own clusters and a topology without an Aggregator gets no Aggregator servers mounted; `endpoint` documents the bridged range as 2..65534 (W2-api-03). A hand-built topology marks its Aggregator with `Aggregator: true`.
+- `bridge` package doc, `docs/guides/ports.md`: the port list names `AttachMetrics`, `SetSubscriptionPersistence` and the three ICD ports (`SetICDAdvertisement`, `SetLocalFixedMRPBackoff`, `SetOnInboundActivity`) with what a skip costs; `store` cites its own `Apply` / `Migrations` and ADR 0026 principle 7 (W2-api-05, W2-api-08).
 
 ## [0.15.6] — 2026-11-01
 

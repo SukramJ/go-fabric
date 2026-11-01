@@ -166,6 +166,9 @@ the next `Reassemble`.
 | `AttachCaseInitiatorProvider`, `AttachOperationalResolver` (+ `ReestablishFormerSubscriptions`) | former subscriptions are dropped at restart (silent) |
 | `AttachBDXResponder` | BDX exchanges are dropped; an OTA download fails (fails closed) |
 | `AttachDiagnosticEvents` | `Bridge.DiagnosticEvents` stays empty |
+| `AttachMetrics` | silent: the named counters and gauges are recorded nowhere |
+| `SetSubscriptionPersistence` | on by default; off, no subscription is recorded or re-established after a restart |
+| `SetICDAdvertisement`, `SetLocalFixedMRPBackoff`, `SetOnInboundActivity` | an ICD only, silent: the ICD's record and MRP padding stay those of a non-ICD node, and inbound traffic does not extend its active window |
 | `SetOnReassembled`, `SetOnFabricRemoved` | nil-safe observer hooks. A fabric's installation is observed on the node (`node.Observers.OnFabricAdded`) |
 | `SetDeviceTypeValidation` | warn mode: each new violation is logged once; strict refuses what an addition causes; off judges only singleton placement |
 

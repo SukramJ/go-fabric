@@ -173,6 +173,21 @@
 //   - AttachMetrics — silent. Without a port the named counters and
 //     gauges (contract.MetricNames) are recorded nowhere; the bridge's own
 //     readers (DeviceLoad, RecoveredPanics) count on.
+//   - SetSubscriptionPersistence — on by default. Off on purpose, nothing
+//     is recorded or loaded and ReestablishFormerSubscriptions does
+//     nothing; controllers recover through their liveness timeout.
+//
+// An ICD (Intermittently Connected Device) wires three more, all silent —
+// skipped, the node's operational record and MRP behave as a non-ICD's:
+//
+//   - SetICDAdvertisement — the ICD part of every operational record
+//     (the ICD key, an LIT's omitted SII, the threshold); without it the
+//     record carries none and a controller treats the node as always on.
+//   - SetLocalFixedMRPBackoff — the fast-poll pad on every retransmission
+//     wait; without it a sleepy node's retransmissions come too early.
+//   - SetOnInboundActivity — feeds every authenticated inbound message to
+//     the ICD's mode machine; without it the active window is not
+//     extended and the node goes idle mid-exchange.
 //   - SetOnReassembled and SetOnFabricRemoved are nil-safe observer
 //     hooks. A fabric's installation is observed on the node
 //     (node.Observers.OnFabricAdded); the bridge installs no fabric.
