@@ -296,16 +296,9 @@ func (s *ManagementServer) failSafeArmed() bool {
 }
 
 // statusOf is chip's StatusIB(error).mStatus for a port's error: Success
-// for nil, the IM status an error carries, FAILURE otherwise.
-func statusOf(err error) im.StatusCode {
-	if err == nil {
-		return im.StatusSuccess
-	}
-	if sc, ok := errors.AsType[im.StatusCodeError](err); ok {
-		return sc.MatterStatusCode()
-	}
-	return im.StatusFailure
-}
+// for nil, the IM status an error carries (a host's contract.StatusError
+// or an im.StatusCodeError, [spec.StatusOf]), FAILURE otherwise.
+func statusOf(err error) im.StatusCode { return spec.StatusOf(err) }
 
 // answer is a command's error for status, nil for Success.
 func answer(status im.StatusCode, format string, args ...any) error {

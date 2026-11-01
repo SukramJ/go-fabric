@@ -915,8 +915,7 @@ func (s *DoorLockServer) actuate(ctx context.Context, actuation Actuation, pinCo
 		events := s.takeQueueLocked()
 		s.mu.Unlock()
 		s.emit(events)
-		var sc im.StatusCodeError
-		if errors.As(err, &sc) {
+		if spec.CarriesStatus(err) { // a host's contract.StatusError or an im.StatusCodeError
 			return err
 		}
 		return spec.Errorf(im.StatusFailure, "lock: lock hardware failed to %s: %v", actuation, err)

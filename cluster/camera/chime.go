@@ -288,11 +288,11 @@ func (c *Chime) SetEndpoint(endpoint uint16) {
 	c.mu.Unlock()
 }
 
-// portError maps a port's refusal onto the answer: an error carrying an
-// IM status passes through as is, any other answers FAILURE.
+// portError maps a port's refusal onto the answer: an error naming its
+// status by type ([spec.CarriesStatus] — a host's contract.StatusError or
+// an im.StatusCodeError) passes through as is, any other answers FAILURE.
 func portError(what string, err error) error {
-	var sc im.StatusCodeError
-	if errors.As(err, &sc) {
+	if spec.CarriesStatus(err) {
 		return err
 	}
 	return spec.Errorf(im.StatusFailure, "camera: %s refused: %v", what, err)

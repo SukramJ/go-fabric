@@ -603,6 +603,39 @@ func TestBleScannerTimeoutEndsOneDiscovery(t *testing.T) {
 	<-done
 }
 
+// TestBleScannerCloseDuringContinuousCallback: a Close that runs while a
+// continuous discovery is inside its callback still ends the discovery.
+// The waiter for the next advertisement is registered before the callback
+// runs, in the critical section of the closed check (Scanner.nextRound),
+// so the close finds and finishes it; registered after the callback, it
+// was never finished and the discovery waited forever — the stress job's
+// 10-minute hang of TestBleScannerTimeoutEndsOneDiscovery (#306), whose
+// Close follows the callback's send without a pause.
+func TestBleScannerCloseDuringContinuousCallback(t *testing.T) {
+	clock := newFakeClock()
+	c := newListening(clock)
+	s := NewScanner(c, ScannerOptions{Clock: clock})
+	entered, release := make(chan struct{}), make(chan struct{})
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		_, _ = s.FindContinuously(context.Background(), discovery.ByShortDiscriminator(6), func(Device) {
+			close(entered)
+			<-release
+		}, 0)
+	}()
+	settle(t, s, 1)
+	c.discover(addrA, serviceDataA)
+	recv(t, entered)
+	closed := make(chan error, 1)
+	go func() { closed <- s.Close(context.Background()) }()
+	if err := recv(t, closed); err != nil {
+		t.Fatal(err)
+	}
+	close(release)
+	recv(t, done)
+}
+
 func TestBleScannerAnotherTimeoutDoesNotEndDiscovery(t *testing.T) {
 	clock := newFakeClock()
 	c := newListening(clock)

@@ -15,6 +15,7 @@ import (
 
 	"github.com/SukramJ/go-fabric/bdx"
 	"github.com/SukramJ/go-fabric/clock"
+	"github.com/SukramJ/go-fabric/cluster/camera"
 	"github.com/SukramJ/go-fabric/cluster/core"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	"github.com/SukramJ/go-fabric/im"
@@ -24,19 +25,21 @@ import (
 )
 
 // This file generalises the ADR 0008 CASE initiator (case_initiator.go) by
-// exactly what the OTA Software Update Requestor needs (ADR 0019): a
-// session to the provider a commissioner named — its node id on one of this
-// node's fabrics, resolved as ADR 0008 resolves a former subscriber — and on
-// it one Invoke at a time and one BDX exchange. It is still no controller
-// role: the only caller is cluster/core's requestor, and the only peer it
-// reaches is a provider in DefaultOTAProviders or an AnnounceOTAProvider.
+// exactly what a device-side server needs to reach a peer a controller
+// named: a session to a node id on one of this node's fabrics, resolved as
+// ADR 0008 resolves a former subscriber — and on it one Invoke at a time
+// and one BDX exchange. It is still no controller role: the callers are
+// cluster/core's OTA requestor (ADR 0019: a provider in DefaultOTAProviders
+// or an AnnounceOTAProvider) and cluster/camera's WebRTC provider (the
+// requestor that opened a session, issue #351), and no peer is reached
+// that a controller did not name.
 
-// otaProviderConnectTimeout bounds reaching a provider: matter.js
+// peerConnectTimeout bounds reaching a peer: matter.js
 // PeerTimingParameters.defaultConnectionTimeout (packages/protocol/src/peer/
 // PeerTimingParameters.ts:188, Seconds(90)), which Peer.connect applies
-// when the caller names none (Peer.ts:467) — the requestor's
+// when the caller names none (Peer.ts:467) — the OTA requestor's
 // `peers.forAddress` names none.
-const otaProviderConnectTimeout = 90 * time.Second
+const peerConnectTimeout = 90 * time.Second
 
 // exchangeMaxPayloadSize is what one message on a UDP session carries:
 // matter.js MAX_UDP_MESSAGE_SIZE (packages/general/src/net/udp/
@@ -52,26 +55,54 @@ const matterMessageOverhead = 26 + 12 + 16
 // ErrExchangeClosed is a send or receive on an exchange already closed.
 var ErrExchangeClosed = errors.New("bridge: exchange closed")
 
+// ErrPayloadTooLarge is an Invoke whose request does not fit one message
+// of the session it would go over: over UDP [exchangeMaxPayloadSize], over
+// a TCP connection the connection's largest message. connectedhomeip's
+// camera sends its WebRTC signals with TransportPayloadCapability::
+// kLargePayload, which establishes the session over TCP
+// (webrtc-provider-manager.cpp:860-942 at 6170af84); this node initiates
+// CASE over UDP only and reuses the newest live session of the peer, so a
+// large payload reaches the peer when the peer came in over TCP. It is
+// [camera.ErrPayloadTooLarge], the value a camera host — which signals
+// through camera.Provider — recognises with cluster/camera alone.
+var ErrPayloadTooLarge = camera.ErrPayloadTooLarge
+
 // ConnectOtaProvider implements [core.OtaProviderConnector]: it returns a
-// secure session with the provider, reusing the newest live one or
-// establishing one by CASE as this node's initiator (matter.js
+// secure session with the provider (matter.js
 // OtaSoftwareUpdateRequestorServer.ts:553-565 #connectOtaProviderFor →
-// ServerNode.peers.forAddress → Peer.connect). Needs the collaborators ADR
-// 0008 attaches: [Bridge.AttachCaseInitiatorProvider] and
-// [Bridge.AttachOperationalResolver].
+// ServerNode.peers.forAddress → Peer.connect) — [Bridge.ConnectPeer].
 func (b *Bridge) ConnectOtaProvider(ctx context.Context, fabricIndex uint8, providerNodeID uint64) (core.OtaProviderSession, error) {
-	ctx, cancel := clock.WithTimeout(ctx, b.clk(), otaProviderConnectTimeout)
-	defer cancel()
-	link, err := b.connectPeer(ctx, fabricIndex, providerNodeID)
+	s, err := b.ConnectPeer(ctx, fabricIndex, providerNodeID)
 	if err != nil {
 		return nil, err
 	}
-	return &peerSession{b: b, link: link}, nil
+	return s, nil
 }
 
-// peerSession is a secure session with a peer this node reached as the
-// initiator.
-type peerSession struct {
+// ConnectPeer returns a secure session with the node peerNodeID on the
+// fabric fabricIndex, reusing the newest live one or establishing one by
+// CASE as this node's initiator within [peerConnectTimeout] (matter.js
+// ServerNode.peers.forAddress → Peer.connect; connectedhomeip
+// CASESessionManager::FindOrEstablishSession). Needs the collaborators
+// ADR 0008 attaches: [Bridge.AttachCaseInitiatorProvider] and
+// [Bridge.AttachOperationalResolver]. The callers are the device-side
+// servers that answer a controller on a peer the controller named: the OTA
+// requestor ([Bridge.ConnectOtaProvider]) and the camera's
+// WebRtcTransportProvider (node wires it as the camera.PeerConnector).
+func (b *Bridge) ConnectPeer(ctx context.Context, fabricIndex uint8, peerNodeID uint64) (*PeerSession, error) {
+	ctx, cancel := clock.WithTimeout(ctx, b.clk(), peerConnectTimeout)
+	defer cancel()
+	link, err := b.connectPeer(ctx, fabricIndex, peerNodeID)
+	if err != nil {
+		return nil, err
+	}
+	return &PeerSession{b: b, link: link}, nil
+}
+
+// PeerSession is a secure session with a peer this node reached as the
+// initiator ([Bridge.ConnectPeer]). It implements core.OtaProviderSession
+// and camera.PeerSession.
+type PeerSession struct {
 	b    *Bridge
 	link peerLink
 }
@@ -98,8 +129,10 @@ func (e *invokeStatusError) MatterStatusCode() im.StatusCode { return e.status.S
 // waits for a peer's response (MessageExchange.ts:839-850,
 // calculateMaximumPeerResponseTime — [Bridge.chunkStatusResponseTimeout]).
 // A command answered with data returns its fields; one answered with
-// Success returns nil; any other status is an error carrying it.
-func (s *peerSession) Invoke(ctx context.Context, endpoint uint16, clusterID, commandID uint32, fields spec.Encodable) (*spec.Node, error) {
+// Success returns nil; any other status is an error carrying it
+// ([im.StatusCodeError]). A request larger than one message of the
+// session is [ErrPayloadTooLarge] and is not sent.
+func (s *PeerSession) Invoke(ctx context.Context, endpoint uint16, clusterID, commandID uint32, fields spec.Encodable) (*spec.Node, error) {
 	ex, err := s.b.openInitiatedExchange(s.link)
 	if err != nil {
 		return nil, err
@@ -121,6 +154,9 @@ func (s *peerSession) Invoke(ctx context.Context, endpoint uint16, clusterID, co
 	payload, err := enc.Bytes()
 	if err != nil {
 		return nil, err
+	}
+	if limit := ex.MaxPayloadSize(); len(payload) > limit {
+		return nil, fmt.Errorf("%w: command 0x%02x of %d bytes, the session carries %d", ErrPayloadTooLarge, commandID, len(payload), limit)
 	}
 	if err := ex.Send(ctx, im.InteractionModelProtocolID, im.OpcodeInvokeRequest, payload); err != nil {
 		return nil, err
@@ -183,7 +219,7 @@ func decodeInvokeResult(payload []byte, commandID uint32) (*spec.Node, error) {
 // OpenExchange implements [core.OtaProviderSession]: a new exchange this
 // node initiates on the session, for BDX (matter.js
 // ClientNodeInteraction.initBdx → BdxMessenger over a fresh exchange).
-func (s *peerSession) OpenExchange(context.Context) (bdx.Exchange, error) {
+func (s *PeerSession) OpenExchange(context.Context) (bdx.Exchange, error) {
 	return s.b.openInitiatedExchange(s.link)
 }
 

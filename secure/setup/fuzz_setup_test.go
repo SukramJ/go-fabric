@@ -148,16 +148,22 @@ func FuzzIsValidSetupPIN(f *testing.F) {
 }
 
 // FuzzDecodeQRCode: the decoder never panics, and every code it accepts
-// re-encodes to a code that decodes to the same payload. The re-encoding
-// is not byte-identical in general: the header's four padding bits are
-// dropped on decode, as matter.js's QrCodeDataSchema drops them.
+// that the encoder could have produced re-encodes to a code that decodes
+// to the same payload. The re-encoding is not byte-identical in general:
+// the header's four padding bits are dropped on decode, as matter.js's
+// QrCodeDataSchema drops them. A code longer than [MaxQRCodeLength] is
+// decoded — matter.js's decodeInternal reads any length
+// (PairingCodeSchema.ts:330-345), only encodeInternal bounds it
+// (:313-316) — but its payload cannot re-encode within the bound, so the
+// round trip is not asked of it (the extended fuzz run found
+// "MT:" + 320 zeros, nightly 2026-10-31).
 func FuzzDecodeQRCode(f *testing.F) {
-	for _, s := range []string{"MT:YNJV7VSC00CMVH7SR00", "MT:YNJV7VSC00CMVH7E4810AK00", "MT:000004KP00KA0648G00", "MT:", "MT:*"} {
+	for _, s := range []string{"MT:YNJV7VSC00CMVH7SR00", "MT:YNJV7VSC00CMVH7E4810AK00", "MT:000004KP00KA0648G00", "MT:", "MT:*", "MT:" + strings.Repeat("0", 19) + "1" + strings.Repeat("0", 300)} {
 		f.Add(s)
 	}
 	f.Fuzz(func(t *testing.T, s string) {
 		p, err := DecodeQRCode(s)
-		if err != nil {
+		if err != nil || len(s) > MaxQRCodeLength {
 			return
 		}
 		again, err := QRCode(p)

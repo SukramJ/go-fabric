@@ -10,6 +10,36 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+## [0.15.6] — 2026-11-01
+
+### Added
+
+- `camera.ErrPayloadTooLarge`: the camera's signal refused for not fitting one message of the session to the peer, the value of `bridge.ErrPayloadTooLarge`, so a camera host recognises it with `cluster/camera` alone and imports nothing of `bridge` (#356).
+- `spec.CarriesStatus`, `spec.StatusOf`: whether an error names its wire status by type — a host's `contract.StatusError` or an `im.StatusCodeError` — and the IM status it answers, as the dispatcher classifies them.
+
+### Fixed
+
+- A port's `contract.StatusError` answers its status. The kit servers that forward a port's refusal (`cluster/camera`, `cluster/thermo`'s Sink and atomic commit, `cluster/tls`, `cluster/lock`, `cluster/cover`, `cluster/jointfabric`, `cluster/threadbr`, `cluster/core`'s TestEventTrigger handler) passed only an `im.StatusCodeError` through and wrapped the facade's own status type in FAILURE — a `ProviderPort.SolicitOffer` that returned `INVALID_IN_STATE` answered FAILURE (#356).
+- Tests (#306): `client/exchange`'s test clock recorded a timer's duration before the fake had armed it, so a test that waits for the record and advances the clock (`TestNextTimeoutIsMaxPeerResponseTime`, `TestMessageExchangePaddedBDXCap`) could advance past a deadline set only afterwards, and the timer never fired — the stress job's "send did not return" (nightly 2026-10-31, 1 of 50). The record now follows the arm.
+
+## [0.15.5] — 2026-10-31
+
+### Added
+
+- `camera.Provider.Offer`, `Answer`, `IceCandidates`, `End`: the camera's signals to the controller's WebRtcTransportRequestor — the requestor's commands invoked on the session's peer node, fabric and `PeerEndpointId` over a CASE session the node initiates, as connectedhomeip's camera app sends them (`webrtc-provider-manager.cpp` at 6170af84). The node attaches the route (`camera.PeerConnector`, `Provider.AttachPeerConnector`) to every provider it assembles; a provider outside a node answers `camera.ErrNoPeerConnector`. `End` removes the session from `CurrentSessions` whatever the peer answers. New errors `camera.ErrUnknownSession`, `camera.ErrNoICECandidates`; the alias `camera.ProviderICECandidate`. Closes #351.
+- `bridge.Bridge.ConnectPeer` and `bridge.PeerSession`: the device-side CASE initiator's session with a peer a controller named, generalised from `ConnectOtaProvider` (unchanged, now a call of it). An Invoke whose request does not fit one message of the session is `bridge.ErrPayloadTooLarge` and is not sent; the camera's signals carry an SDP, which over UDP (1178 bytes of payload) needs the TCP session a controller leaves.
+
+### Changed
+
+- `bridge`: the operational address resolution of a peer the device-side CASE initiator connects to (`ConnectPeer`, `ConnectOtaProvider`) is logged at Debug — `matter.case.initiator.resolving`, `resolved` with the address count, `resolve_failed` — with its duration; a query that waited on it left no trace before (TC-SU-2.4, #306).
+
+### Fixed
+
+- `controller/ble`: a `Scanner.Close` that ran while a continuous discovery (`FindContinuously`) was inside its callback was missed — the discovery registered its waiter for the next advertisement after the callback, outside the critical section of the closed check, and waited forever. The waiter is now registered with the closed check, before the callbacks run, as matter.js's loop turn is one synchronous step (`BleScanner.ts:617-640`). The stress job's 10-minute hang of `TestBleScannerTimeoutEndsOneDiscovery` (#306, nightly 2026-10-31) is this window: its Close follows the callback's send without a pause; `TestBleScannerCloseDuringContinuousCallback` holds it open.
+- Tests (#306): `TestOTACancelByRemovingConsentParity` no longer isolates the device while the consent comes and goes — the announcement's retransmissions could all be spent while it was, and the query never came (coverage-floor job, 2026-10-30, after #320) — it forces the update with the clock still, as matter.js's test does, and waits for the answered announcement before removing the consent. `TestNextTimeoutIsMaxPeerResponseTime` looks for Next's timer among those started since its mark, not the last one, with the wait bounded as the test's other waits are. `TestICDEndToEnd` reads the subscription id to hold through the idle cycles once the peer granted it — between the auto-registration's two underlying subscriptions it is `NoSubscription` (coverage job of this change). All three, and the new BLE test, are in `STRESS_FLAKES`.
+- `cluster/spec/colorcontrol`: the colour conversions give the same values on every architecture. Each product that feeds a sum is now written `float64(x*y)`, which the Go specification defines as preventing the fusion of a multiply and an add into one rounding; matter.js's `ColorConversionUtils.ts` rounds each product, and on arm64 the fused form made `HSVToRGB(240, 1, 1)` return -2.2e-16 for red where amd64 and matter.js return 0 (the nightly macOS race job, red since the job exists). amd64 results are unchanged.
+- `secure/setup`: `FuzzDecodeQRCode` asks the re-encoding round trip only of codes within `MaxQRCodeLength`: the decoder reads any length, as matter.js's `decodeInternal` does (`PairingCodeSchema.ts:330-345`), and only the encoder bounds the code (:313-316), so a 323-character code decoded but could not re-encode (the extended fuzz job, 2026-10-30 and 2026-10-31). The decoder is unchanged; the found input is a seed.
+
 ## [0.15.4] — 2026-10-30
 
 ### Added
@@ -5140,7 +5170,9 @@ consumer of an older pseudo-version should read.
   earlier than it was. Both fields are gone; the commit holding the file is
   its provenance.
 
-[Unreleased]: https://github.com/SukramJ/go-fabric/compare/v0.15.4...HEAD
+[Unreleased]: https://github.com/SukramJ/go-fabric/compare/v0.15.6...HEAD
+[0.15.6]: https://github.com/SukramJ/go-fabric/compare/v0.15.5...v0.15.6
+[0.15.5]: https://github.com/SukramJ/go-fabric/compare/v0.15.4...v0.15.5
 [0.15.4]: https://github.com/SukramJ/go-fabric/compare/v0.15.3...v0.15.4
 [0.15.3]: https://github.com/SukramJ/go-fabric/compare/v0.15.2...v0.15.3
 [0.15.2]: https://github.com/SukramJ/go-fabric/compare/v0.15.1...v0.15.2

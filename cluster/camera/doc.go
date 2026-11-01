@@ -38,7 +38,12 @@
 //     the push connections, each request checked against the camera's
 //     [StreamSource] and, for a push transport, its [ZoneSource] and the
 //     node's TLS servers (cluster/tls, node.Config.TLS) before the host's [ProviderPort] or
-//     [PushTransportPort] runs it.
+//     [PushTransportPort] runs it. The camera's own signals to the
+//     requestor — [Provider.Offer], [Provider.Answer], [Provider.IceCandidates],
+//     [Provider.End] — follow the camera app's provider manager
+//     (examples/camera-app/linux/src/clusters/webrtc-provider/
+//     webrtc-provider-manager.cpp at 6170af84) over the [PeerConnector] the
+//     node attaches.
 //
 // Each server is built on its generated definition (cluster/spec/…, ADR
 // 0013) and the generated server ([spec.Server]); its port is the

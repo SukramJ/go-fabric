@@ -541,7 +541,7 @@
   },
   {
     "file": "client/exchange/exchange_test.go",
-    "line": 245,
+    "line": 246,
     "citation": "MessageExchange.ts:894-918",
     "resolved": "packages/protocol/src/protocol/MessageExchange.ts",
     "identifier": "PeerUnresponsiveError",
@@ -1191,7 +1191,7 @@
   },
   {
     "file": "cluster/cover/windowcovering_server.go",
-    "line": 800,
+    "line": 799,
     "citation": "window-covering-cluster.element.ts:128-131",
     "resolved": "packages/model/src/standard/elements/window-covering-cluster.element.ts",
     "identifier": "OperationalStatus",

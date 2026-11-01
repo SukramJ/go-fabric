@@ -682,7 +682,7 @@ func (g *GeneralDiagnostics) testEventTrigger(ctx context.Context, fields any) e
 		return gendiagStatusErr{im.StatusConstraintError, "TestEventTrigger: invalid test enable key"}
 	}
 	if err := handler(ctx, trigger); err != nil {
-		if _, ok := errors.AsType[im.StatusCodeError](err); ok {
+		if spec.CarriesStatus(err) { // a host's contract.StatusError or an im.StatusCodeError
 			return err
 		}
 		return gendiagStatusErr{im.StatusInvalidCommand, fmt.Sprintf("TestEventTrigger 0x%016X: %v", trigger, err)}
