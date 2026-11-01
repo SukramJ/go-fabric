@@ -100,7 +100,7 @@ func overlongBeforeIS1(path im.ConcreteAttributePath, el tlv.Element) (im.Attrib
 	if a == nil || !a.Constraint.Max.IsInt() || int64(el.RawLength) <= a.Constraint.Max.Int {
 		return im.AttributeValue{}, false
 	}
-	return im.AttributeValue{Value: undecodedValue{fmt.Errorf("%s: %s is %d long before its IS1, max %d",
+	return im.AttributeValue{Value: undecodedValue{fmt.Errorf("bridge: %s: %s is %d long before its IS1, max %d",
 		def.Name, a.Name, el.RawLength, a.Constraint.Max.Int)}}, true
 }
 
