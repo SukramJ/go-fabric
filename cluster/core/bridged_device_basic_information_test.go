@@ -14,6 +14,7 @@ import (
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/cluster/core"
 	"github.com/SukramJ/go-fabric/contract"
+	"github.com/SukramJ/go-fabric/im"
 )
 
 func validBridgedConfig() core.BridgedConfig {
@@ -157,8 +158,14 @@ func TestBridgedBasicInfo_WriteNodeLabelTooLong(t *testing.T) {
 	t.Parallel()
 	b := newValidBridged(t)
 	err := b.MatterWrite(context.Background(), 0x0005, strings.Repeat("z", 33))
-	if err == nil {
-		t.Fatal("expected error for NodeLabel > 32 bytes, got nil")
+	// CONSTRAINT_ERROR, as matter.js's string-length validator answers it
+	// (constraint.ts:199-211 at 862ad75f) and the root cluster does
+	// (W3-clucore-01); it used to be FAILURE.
+	if sce, ok := errors.AsType[im.StatusCodeError](err); !ok || sce.MatterStatusCode() != im.StatusConstraintError {
+		t.Fatalf("NodeLabel > 32 bytes: %v, want CONSTRAINT_ERROR", err)
+	}
+	if err := b.MatterWrite(context.Background(), 0x0005, strings.Repeat("z", 32)); err != nil {
+		t.Fatalf("NodeLabel of 32 bytes: %v", err)
 	}
 }
 
