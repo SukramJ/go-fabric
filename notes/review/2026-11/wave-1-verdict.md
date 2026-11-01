@@ -50,6 +50,10 @@ W1-sec-01, W1-sec-02 and the ICAC half of W1-sec-03 landed with PR 1
 | W1-wire-06 | 756676e1 | `MarshalPacket` refuses DSIZ 0b11 (`ErrReservedDestSize`) |
 | W1-wire-05 | 3ef37809 | `by_design` entry BD-Matter-MessageCodec-PrivacyWithExtensions (chip `MessageHeader.cpp:224-232` accepts) |
 
+Follow-ups the guards asked for: ac425c35 (W1-sec-03, `Verifier` stays
+comparable), ea26ba39 (W1-conc-05, the pause on the clock port), 85449d40
+(W1-wire-04, error prefix), 85050162 (W1-conc-09, the test-parity register).
+
 Open notes, no fix in W1: W1-wire-07 (BTP window 0, matter.js parity, owner:
 no change), W1-conc-07, W1-conc-08, W1-wire-09, W1-wire-10, W1-sec-04,
 W1-sec-05, W1-sec-06.
