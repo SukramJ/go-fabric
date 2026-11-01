@@ -148,3 +148,35 @@ func TestPutUTF8Bounded_NonPositiveMaxIsUnbounded(t *testing.T) {
 		}
 	}
 }
+
+// A character string is never emitted ill-formed: each ill-formed byte
+// sequence becomes U+FFFD, as matter.js's TextEncoder-based
+// Bytes.fromString (Bytes.ts:125-131 at 862ad75f) can produce nothing
+// else. The bounded writers trim the sanitised string, so an input that
+// is ill-formed from its first byte no longer trims to "".
+func TestPutUTF8_IllFormedInputIsSanitised(t *testing.T) {
+	t.Parallel()
+	enc := NewEncoder()
+	enc.PutUTF8(AnonymousTag(), "a\xffb")
+	got, err := enc.Bytes()
+	if err != nil {
+		t.Fatalf("Bytes: %v", err)
+	}
+	if want := []byte{0x0C, 0x05, 0x61, 0xEF, 0xBF, 0xBD, 0x62}; string(got) != string(want) {
+		t.Fatalf("PutUTF8(\"a\\xffb\") = % X, want % X", got, want)
+	}
+	for name, put := range map[string]func(*Encoder){
+		"Bounded": func(e *Encoder) { e.PutUTF8Bounded(AnonymousTag(), "\xff\xfeabc", 4) },
+		"WithMax": func(e *Encoder) { e.PutUTF8WithMax(AnonymousTag(), "\xff\xfeabc", 4) },
+	} {
+		e := NewEncoder()
+		put(e)
+		b, err := e.Bytes()
+		if err != nil {
+			t.Fatalf("%s: Bytes: %v", name, err)
+		}
+		if want := []byte{0x0C, 0x04, 0xEF, 0xBF, 0xBD, 0x61}; string(b) != string(want) {
+			t.Errorf("%s = % X, want % X (U+FFFD then \"a\")", name, b, want)
+		}
+	}
+}

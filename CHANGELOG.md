@@ -50,6 +50,7 @@ Findings of the whole-codebase review of 2026-11-01 (`notes/review/2026-11/`).
 - `transport/btp`: the central sets its sequence state before it starts the send-ack timer, inside the session lock; the timer's callback could read it unsynchronised (W1-conc-04).
 - `transport/udp`, `bridge`: a read error the socket survives is logged at warn and the serve loop keeps reading, as chip's UDP transport does; only a closed descriptor or 100 failed reads in a row end it, and the bridge logs that exit at warn instead of debug (W1-conc-05).
 - `tlv`: `PutUTF8Bounded` with a maximum of 0 or less writes the string unbounded, as `PutUTF8WithMax`; a negative maximum from a server's `BoundedString` panicked the Read encoder (W1-wire-02).
+- `tlv`: `PutUTF8`, `PutUTF8WithMax` and `PutUTF8Bounded` write each ill-formed UTF-8 sequence as U+FFFD, as matter.js's TextEncoder-based encoder can write nothing else; a bounded string ill-formed from its first byte was trimmed to "" (W1-wire-03).
 
 ## [0.15.6] — 2026-11-01
 

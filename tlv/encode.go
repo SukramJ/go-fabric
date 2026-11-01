@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log/slog"
 	"math"
+	"strings"
 	"unicode/utf8"
 )
 
@@ -220,9 +221,23 @@ func (e *Encoder) PutFloat64(tag Tag, v float64) {
 	e.buf = binary.LittleEndian.AppendUint64(e.buf, math.Float64bits(v))
 }
 
+// validUTF8 returns s with every ill-formed byte sequence replaced by
+// U+FFFD, so a character-string element never carries ill-formed UTF-8 and
+// the trim loops below stop on a rune boundary of a valid string. Mirrors
+// matter.js packages/general/src/util/Bytes.ts:125-131 at 862ad75f
+// (Bytes.fromString is `new TextEncoder().encode(string)`, which cannot
+// emit ill-formed UTF-8; TlvString encodes through it).
+func validUTF8(s string) string {
+	if utf8.ValidString(s) {
+		return s
+	}
+	return strings.ToValidUTF8(s, "\uFFFD")
+}
+
 // PutUTF8 writes a UTF-8 string element. The length-prefix width is
-// chosen by string length.
+// chosen by string length; ill-formed UTF-8 in s is written as U+FFFD.
 func (e *Encoder) PutUTF8(tag Tag, s string) {
+	s = validUTF8(s)
 	e.writeStringLike(tag, []byte(s),
 		TypeUTF8Str1, TypeUTF8Str2, TypeUTF8Str4, TypeUTF8Str8)
 }
@@ -234,6 +249,7 @@ func (e *Encoder) PutUTF8(tag Tag, s string) {
 // without losing the write. maxBytes ≤ 0 skips validation (equivalent to
 // calling PutUTF8 directly).
 func (e *Encoder) PutUTF8WithMax(tag Tag, s string, maxBytes int) {
+	s = validUTF8(s)
 	if maxBytes > 0 && len(s) > maxBytes {
 		// Trim to a valid UTF-8 boundary at or below maxBytes.
 		trimmed := s[:maxBytes]
@@ -319,7 +335,7 @@ func (e *Encoder) EndContainer() error {
 // encoder. matter.js refuses a negative maxLength once, at schema
 // construction (TlvString.ts:46 at 862ad75f), never per encode.
 func (e *Encoder) PutUTF8Bounded(tag Tag, s string, maxBytes int) {
-	b := []byte(s)
+	b := []byte(validUTF8(s))
 	if maxBytes <= 0 || len(b) <= maxBytes {
 		e.writeStringLike(tag, b,
 			TypeUTF8Str1, TypeUTF8Str2, TypeUTF8Str4, TypeUTF8Str8)
