@@ -34,9 +34,12 @@ type Verifier struct {
 	root *ecdsa.PublicKey
 	// rootSKID is the root certificate's subjectKeyIdentifier when the
 	// verifier was built from the certificate ([NewVerifierFromRCAC]);
-	// nil when only the root's public key is known ([NewVerifier]).
-	rootSKID []byte
-	now      TimeSource
+	// unset (hasRootSKID false) when only the root's public key is known
+	// ([NewVerifier]).
+	// It is an array, not a slice, so the Verifier stays comparable.
+	rootSKID    [20]byte
+	hasRootSKID bool
+	now         TimeSource
 }
 
 // TimeSource returns the current time for NotBefore/NotAfter checks: the
@@ -214,7 +217,7 @@ func NewVerifierFromRCAC(rcac []byte, ts TimeSource) (*Verifier, error) {
 	if err != nil {
 		return nil, err
 	}
-	v.rootSKID = append([]byte(nil), root.Extensions.SubjectKeyID...)
+	v.rootSKID, v.hasRootSKID = [20]byte(root.Extensions.SubjectKeyID), true
 	return v, nil
 }
 
@@ -331,7 +334,7 @@ func (v *Verifier) VerifyAndExtractPubKey(noc, icac []byte) (*ecdsa.PublicKey, e
 		}
 		// The ICAC's authorityKeyIdentifier names the root when the root
 		// certificate is known (matter.js Icac.ts:159-163).
-		if v.rootSKID != nil && !bytesEqual(icacCert.Extensions.AuthorityKeyID, v.rootSKID) {
+		if v.hasRootSKID && !bytesEqual(icacCert.Extensions.AuthorityKeyID, v.rootSKID[:]) {
 			return nil, fmt.Errorf("%w: ICAC authorityKeyIdentifier does not name the root", ErrChainBroken)
 		}
 		// ICAC must be signed by the root.
@@ -354,9 +357,9 @@ func (v *Verifier) VerifyAndExtractPubKey(noc, icac []byte) (*ecdsa.PublicKey, e
 		// ICAC names as its authorityKeyIdentifier, which matter.js
 		// requires to be equal (Icac.ts:159-163) and the check above
 		// enforces when the root certificate is known.
-		rootSKID := v.rootSKID
-		if rootSKID == nil {
-			rootSKID = icacCert.Extensions.AuthorityKeyID
+		rootSKID := icacCert.Extensions.AuthorityKeyID
+		if v.hasRootSKID {
+			rootSKID = v.rootSKID[:]
 		}
 		switch {
 		case bytesEqual(nocCert.Extensions.AuthorityKeyID, icacCert.Extensions.SubjectKeyID):
@@ -375,7 +378,7 @@ func (v *Verifier) VerifyAndExtractPubKey(noc, icac []byte) (*ecdsa.PublicKey, e
 		// names the root's subjectKeyIdentifier, checked when the root
 		// certificate is known. Mirrors matter.js Noc.ts:170-184 at
 		// 862ad75f (no ICA: the issuer is the root or the NOC is refused).
-		if v.rootSKID != nil && !bytesEqual(nocCert.Extensions.AuthorityKeyID, v.rootSKID) {
+		if v.hasRootSKID && !bytesEqual(nocCert.Extensions.AuthorityKeyID, v.rootSKID[:]) {
 			return nil, fmt.Errorf("%w: NOC authorityKeyIdentifier does not name the root", ErrChainBroken)
 		}
 		issuerKey = v.root
