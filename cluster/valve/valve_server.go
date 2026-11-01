@@ -306,6 +306,13 @@ func (s *Server) MatterWrite(ctx context.Context, attrID uint32, value any) erro
 	if s.src == nil {
 		return errNoSource("DefaultOpenDuration write")
 	}
+	// An unchanged value is a successful no-op: no host call, no
+	// DataVersion. Mirrors connectedhomeip
+	// src/app/clusters/valve-configuration-and-control-server/ValveConfigurationAndControlCluster.cpp:165-166
+	// at 6170af84 (kWriteSuccessNoOp; W3-club2-05).
+	if cur, known := s.src.DefaultOpenDuration(); (seconds == nil && !known) || (seconds != nil && known && cur == *seconds) {
+		return nil
+	}
 	if err := s.src.SetDefaultOpenDuration(ctx, seconds); err != nil {
 		return fmt.Errorf("valve: DefaultOpenDuration write: %w", err)
 	}

@@ -256,6 +256,25 @@ host's to apply in its `ModeChanger`, as matter.js leaves it to the device.
 the tag rules are the specification's and the same for every host.
 
 
+### BD-Matter-ModeSelect-HostOwnsTheMode — ModeSelect serves neither StartUpMode nor OnMode, and reads null without a source
+
+matter.js's `ModeSelectServer` applies StartUpMode at start-up (unless the
+boot reason is SoftwareUpdateCompleted) and, with DEPONOFF, OnMode when the
+endpoint's OnOff turns on or its StartUpOnOff is On
+(`packages/node/src/behaviors/mode-select/ModeSelectServer.ts:31-62`,
+`:97-101` at `862ad75f`). `cluster/modeselect.Server` advertises no feature
+and serves neither attribute (`modeselect_server.go` `featureMap`): the mode
+is the host's `ModeSource`'s, so a start-up or on-mode is the device's
+decision, made where the device powers up, and advertising DEPONOFF would
+promise an OnMode the server does not hold. A write to either answers
+UNSUPPORTED_ATTRIBUTE. Without a `ModeSource` the four projected attributes
+read as null (only StandardNamespace carries quality X): `NewServer` returns
+no error, so refusing a nil source would change its signature, and a value
+invented here could not be told apart from one the device confirmed.
+Reasoning: the scope cut keeps the mode in one place (W3-club2-04, -06).
+Retire when a host needs a start-up mode the server applies; then mirror
+`ModeSelectServer.ts:31-62` through the source.
+
 ### BD-Matter-TemperatureControl-RulesInServer — SetTemperature checked as connectedhomeip checks it; matter.js has no server logic
 
 matter.js `TemperatureControlServer.ts` adds nothing to the generated

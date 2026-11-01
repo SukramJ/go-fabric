@@ -33,7 +33,9 @@ import (
 	"math"
 	"slices"
 	"sync"
+	"time"
 
+	"github.com/SukramJ/go-fabric/clock"
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	carbon "github.com/SukramJ/go-fabric/cluster/spec/activatedcarbonfiltermonitoring"
@@ -132,6 +134,9 @@ type Config struct {
 	LastChangedTimeWriter LastChangedTimeWriter
 	// DataVersion is an optional host-owned tracker.
 	DataVersion *cluster.DataVersionTracker
+	// Clock stamps LastChangedTime on ResetCondition; nil is
+	// [clock.System].
+	Clock clock.Clock
 }
 
 // Configuration errors.
@@ -386,5 +391,27 @@ func (s *Server) resetCondition(ctx context.Context, _ any) (any, error) {
 		}
 	}
 	st.ChangeIndication = ChangeIndicationOk
+	// A served LastChangedTime takes the time of the reset. Mirrors
+	// connectedhomeip
+	// src/app/clusters/resource-monitoring-server/ResourceMonitoringCluster.cpp:375-385
+	// at 6170af84 (W3-club2-03), in the attribute's epoch-s, seconds since
+	// the Matter epoch 2000-01-01 (chip stores its real-time clock's Unix
+	// seconds there). A clock before the epoch or past the range leaves it.
+	if s.Serves(hepa.AttrLastChangedTime) {
+		if t, ok := matterEpochSeconds(clock.Or(s.cfg.Clock).Now()); ok {
+			st.LastChangedTime = &t
+		}
+	}
 	return nil, s.setState(contract.OriginCommand, st, nil)
+}
+
+// matterEpochSeconds is t in seconds since the Matter epoch, 2000-01-01
+// 00:00:00 UTC; false before it or beyond the non-null uint32 range.
+func matterEpochSeconds(t time.Time) (uint32, bool) {
+	const matterEpochUnix = 946684800
+	secs := t.Unix() - matterEpochUnix
+	if secs < 0 || secs >= math.MaxUint32 {
+		return 0, false
+	}
+	return uint32(secs), true
 }
