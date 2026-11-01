@@ -45,9 +45,10 @@ All 15 high/medium findings re-read by Fable against both sides: 14 confirmed, 1
 
 ## Fixed in PR (W3, branch `review/w3`)
 
-The W3 fix PR's items (`notes/briefs/review-2026-11-w3.md`); item 11
-(ThreadNetworkCommissioning fail-safe) and W3-clusec-04..08 are the
-owner's reviewer's and stay as above. Notes left open are listed below.
+The W3 fix PR's items (`notes/briefs/review-2026-11-w3.md`); the Opus
+agent's commits first, then the reviewer's (Fable: item 11, the clu-sec
+lows, W3-clucore-10) after the merge of `main` (PRs #360, #361, #364)
+into the branch. Notes left open are listed below.
 
 | ID | Commit | Change |
 | --- | --- | --- |
@@ -67,8 +68,22 @@ owner's reviewer's and stay as above. Notes left open are listed below.
 | W3-club1-03, -04, -05, -07, -08 | 58aa47df | ColorControl scene invalidation; GoTo percentage without PA; ClosureControl target kept; NaN null; Pressure / concentration within Min/Max |
 | W3-club2-03, -04, -05, -06 | 42aaec0d | ResetCondition stamps LastChangedTime; DefaultOpenDuration no-op; `BD-Matter-ModeSelect-HostOwnsTheMode` |
 | W3-clua1-03, -04, W3-clua2-03 | 67688d49 | LocalTemperature null under LTNE; SetpointRaiseLower in int; DoorState only on change |
+| item 11 (Thread / Wi-Fi NetworkCommissioning fail-safe) | 377c4072 | AddOrUpdate, RemoveNetwork, ConnectNetwork need the accessing fabric's window (`FailSafeArmedFor`; chip `NetworkCommissioningCluster.cpp:155-172, :380, :568, :609`); `Config.FailSafe` on both servers, `node` wires `FailSafeFabric`; `BD-chip-FailSafeOfTheAccessingFabric` extended |
+| W3-clusec-04, W3-clusec-07 | e468ccba | CSR session binding holds whenever the CSR named a session (`OperationalCredentialsServer.ts:240-245`); wrong-length IPK is CONSTRAINT_ERROR (`operational-credentials.element.ts:98`) |
+| W3-clusec-05 | ec1b239f | ArmFailSafe above FailSafeMaxSeconds arms, the cumulative timer ends it (`GeneralCommissioningServer.ts:89-106`, chip `GeneralCommissioningCluster.cpp:439-441`) |
+| W3-clusec-06 | 78bbde50 | ICD RegisterClient / UnregisterClient VerificationKey unbounded in the decoder (`IcdManagementServer.ts:59-74`); `script/clustergen/relaxed.go` `relaxedRequestFields` |
+| W3-clusec-08, W3-clucore-10 | c1b8ebf1 | `BD-Matter-AuxiliaryAccessAdminNode` corrected (AccessControlEntryChanged names the CASE subject, `AccessControlServer.ts:274-282`); the dead LocalConfigDisabled arm removed |
 
-Not fixed here: W3-clucore-10 (`cluster/core/basic_information.go` is W1's;
-the dead LocalConfigDisabled arm stays for the W1 PR or a follow-up). Notes
-W3-clusec-09/10, clucore-06/07/09/12/13, clugen-04/05/06/09/10, club1-09/10,
-clua2-04 stay open.
+Notes W3-clusec-09/10, clucore-06/07/09/12/13, clugen-04/05/06/09/10,
+club1-09/10, clua2-04 stay open.
+
+Reviewer's answers to the agent's open questions (2026-11-01): (1) AddScene
+keeps chip's CONSTRAINT_ERROR for a SceneName over 16 — matter.js stores a
+name its own ViewSceneResponse cannot carry, recorded as the Ahead row
+`BD-chip-ScenesManagement-SceneNameLength`; (2) ClosureControl's
+OverallCurrentState keeps its struct-of-nulls shape — reading null until the
+host reports would change the wire for every host, and chip's null gate has
+no observable effect while MainState starts in SetupRequired; (3) Valve
+Open/Close keep their DataVersion bumps — the W3-club2-05 fix covers the
+no-op write; a bump on a command that changes state is correct and a
+command that changes nothing is the host's rare case.
