@@ -41,6 +41,7 @@ Findings of the whole-codebase review of 2026-11-01 (`notes/review/2026-11/`).
 - `client/discovery`: a session releases its caller's context hook before the outcome is visible; a cancel after `Wait` returned logged into a caller that had moved on (the race job's red on `main`, W6-test-02).
 - `cluster/onoff`, `cluster/closure`: a port's `contract.StatusError` answers its status instead of FAILURE, as v0.15.6 made the other kit servers do (W6-doc-01).
 - `im/subscription`, `bridge`: a subscription keeps the lowest event number it owes, not a copy of every event — an event burst under a long MinIntervalFloor no longer grows a queue per subscription — and its report reads the events from the event log at drain time, in number order and with the timestamp a Read answers; `EventFiring.Data` and `Timestamp` are no longer read (W2-conc-02, W2-conc-03).
+- `bridge`: a failed ongoing report marks its attribute paths dirty again and owes its events again, so the next report retries them; the third consecutive failure still reaps the subscription, as matter.js's `ServerSubscription` does (W2-conc-01).
 
 ## [0.15.6] — 2026-11-01
 

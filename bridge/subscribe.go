@@ -296,6 +296,12 @@ func (b *Bridge) reportSubscriptionEvents(ctx context.Context, sub *subscription
 	// server-initiated exchanges (ServerSubscription.ts:823).
 	counters, freshExch, err := b.sendInitiatedReport(target, report)
 	if err != nil {
+		// Owe the same events again, so the next report retries them;
+		// the third consecutive failure reaps the subscription. Mirrors
+		// matter.js packages/node/src/node/server/ServerSubscription.ts
+		// :566-581 (restores #outstandingEventsMinNumber while
+		// #sendUpdateErrorCounter <= 2).
+		sub.RequeueEvents(events[0].Number)
 		b.noteSubscriptionSendError(sub.ID, "event_report", err)
 		return
 	}
@@ -468,6 +474,12 @@ func (b *Bridge) reportSubscription(ctx context.Context, sub *subscription.Subsc
 
 	counters, freshExch, err := b.sendInitiatedReport(target, report)
 	if err != nil {
+		// Mark the drained paths dirty again, so the next report
+		// retries them; the third consecutive failure reaps the
+		// subscription. Mirrors matter.js
+		// packages/node/src/node/server/ServerSubscription.ts:566-577
+		// (#addOutstandingAttributes while #sendUpdateErrorCounter <= 2).
+		sub.RequeueAttributes(paths)
 		b.noteSubscriptionSendError(sub.ID, "report", err)
 		return
 	}
