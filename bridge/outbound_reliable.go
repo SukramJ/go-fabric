@@ -101,7 +101,7 @@ type outboundEntry struct {
 	// peer, when set, resolves the base interval of a session-0
 	// (handshake) reply from the initiator's own SessionParameters and its
 	// activity instead of the session resolver, which knows no unsecured
-	// session ([outboundReliableTracker.TrackHandshake]).
+	// session ([outboundReliableTracker.trackUnsecured]).
 	peer *handshakePeerTiming
 	// sentWall is the tracker's clock reading when the datagram first
 	// left, used only to report the peer's round-trip in diagnostics. It is
@@ -220,12 +220,11 @@ func (t *outboundReliableTracker) TrackWithMargin(counter uint32, sessionID, exc
 	t.track(counter, sessionID, exchangeID, datagram, dest, now, margin, nil)
 }
 
-// TrackHandshake is [outboundReliableTracker.Track] for a reply the
-// responder sends on the unsecured session (PBKDFParamResponse, Pake2,
-// Sigma2, Sigma2_Resume): its base interval comes from peer, the
-// initiator's stated intervals and activity, not from the session
+// trackUnsecured tracks a reply on session 0: with the initiator's timing
+// when the reply answers its handshake (peer set), on the idle default
+// otherwise. Its base interval then comes from peer, not from the session
 // resolver, which knows no session 0.
-func (t *outboundReliableTracker) TrackHandshake(counter uint32, exchangeID uint16, datagram []byte, dest net.Addr, now time.Time, peer *handshakePeerTiming) {
+func (t *outboundReliableTracker) trackUnsecured(counter uint32, exchangeID uint16, datagram []byte, dest net.Addr, now time.Time, peer *handshakePeerTiming) {
 	t.track(counter, 0, exchangeID, datagram, dest, now, 0, peer)
 }
 

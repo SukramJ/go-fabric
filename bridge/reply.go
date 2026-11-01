@@ -138,7 +138,7 @@ func (b *Bridge) sendReplyOpts(
 // responder's reply on the unsecured session: peer carries the
 // initiator's stated intervals and activity, which the retransmit
 // schedule uses instead of the idle default
-// ([outboundReliableTracker.TrackHandshake]).
+// ([outboundReliableTracker.trackUnsecured]).
 func (b *Bridge) sendHandshakeReplyReliable(
 	src net.Addr,
 	requestHdr *message.Header,
@@ -249,11 +249,7 @@ func (b *Bridge) sendReplyTimed(
 		// for an untracked message is lost — the message then goes out
 		// again as a spurious retransmission.
 		if needsAck {
-			if peer != nil {
-				tracker.TrackHandshake(counter, requestProto.ExchangeID, datagram, src, b.clk().Now(), peer)
-			} else {
-				tracker.Track(counter, requestHdr.SessionID, requestProto.ExchangeID, datagram, src, b.clk().Now())
-			}
+			tracker.trackUnsecured(counter, requestProto.ExchangeID, datagram, src, b.clk().Now(), peer)
 		}
 		if err := sendVia(listener, src, datagram); err != nil {
 			if needsAck {

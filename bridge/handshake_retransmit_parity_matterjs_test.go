@@ -104,7 +104,7 @@ func TestHandshakeRetransmitFallsBackToIdleAfterTheActiveThreshold(t *testing.T)
 		SessionIdleInterval: 2000, SessionActiveInterval: 100, SessionActiveThreshold: 1000,
 	}, rx)
 	tr := newOutboundReliableTracker(nil, nil)
-	tr.TrackHandshake(7, 9, []byte{1}, &net.UDPAddr{IP: net.IPv6loopback, Port: 5540}, rx, peerTiming)
+	tr.trackUnsecured(7, 9, []byte{1}, &net.UDPAddr{IP: net.IPv6loopback, Port: 5540}, rx, peerTiming)
 	p := tr.pending[outboundKey{0, 7}]
 	lo, hi := firstWaitRange(100 * time.Millisecond)
 	if w := p.nextSendAt.Sub(rx); w < lo || w > hi {
