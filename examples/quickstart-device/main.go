@@ -66,10 +66,11 @@ func run(ctx context.Context) error {
 	return n.Run(ctx) // Start, wait for ctx, Stop
 }
 
-// openDB opens the SQLite file; foreign_keys carries the store's
-// cascade-delete on fabric removal. node.New applies the schemas.
+// openDB opens the SQLite file with the module's opener (foreign_keys
+// carries the store's cascade-delete on fabric removal). node.New applies
+// the schemas.
 func openDB(path string) (*sql.DB, error) {
-	return sql.Open("sqlite", "file:"+path+"?_pragma=foreign_keys(1)&_pragma=busy_timeout(5000)")
+	return node.OpenSQLite(path)
 }
 
 // newNode builds the node and adds the light, unstarted.

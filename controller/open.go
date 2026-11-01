@@ -7,10 +7,9 @@ import (
 	"database/sql"
 	"fmt"
 
-	_ "modernc.org/sqlite" // the module's SQLite driver, registered as "sqlite"
-
 	"github.com/SukramJ/go-fabric/controller/attestation"
 	"github.com/SukramJ/go-fabric/controller/dcl/snapshot"
+	"github.com/SukramJ/go-fabric/node"
 )
 
 // OpenDB opens the SQLite database file at path for [Config].DB with the
@@ -33,7 +32,7 @@ func OpenDB(path string) (*sql.DB, error) {
 	if path == "" {
 		return nil, fmt.Errorf("%w: OpenDB needs a path", ErrConfiguration)
 	}
-	db, err := sql.Open("sqlite", "file:"+path+"?_pragma=foreign_keys(1)&_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)")
+	db, err := node.OpenSQLite(path, "journal_mode(WAL)")
 	if err != nil {
 		return nil, fmt.Errorf("controller: open %q: %w", path, err)
 	}

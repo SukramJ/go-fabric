@@ -6,6 +6,7 @@ package node_test
 import (
 	"context"
 	"errors"
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -57,5 +58,36 @@ func TestStorePathValidate(t *testing.T) {
 	cfg.Store.Path = ""
 	if err := cfg.Validate(); !errors.Is(err, node.ErrInvalidConfig) {
 		t.Fatalf("no store: %v, want ErrInvalidConfig", err)
+	}
+}
+
+// OpenSQLite builds the file: URI with net/url: a path holding '#' and '?'
+// opens that very file, and the pragmas still reach every connection
+// (review W5-ex-01 — concatenated, the '#' or '?' ended the file name and
+// dropped foreign_keys without an error).
+func TestOpenSQLiteEscapesThePath(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "iter#02", "a?b")
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(dir, "store#1?x=y.db")
+	db, err := node.OpenSQLite(path, "journal_mode(WAL)")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = db.Close() })
+	if _, err := db.Exec("CREATE TABLE t (x INTEGER)"); err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	if _, err := os.Stat(path); err != nil {
+		t.Fatalf("the database is not at the path it was opened with: %v", err)
+	}
+	var fk int
+	if err := db.QueryRow("PRAGMA foreign_keys").Scan(&fk); err != nil || fk != 1 {
+		t.Errorf("foreign_keys = %d (%v), want 1", fk, err)
+	}
+	var mode string
+	if err := db.QueryRow("PRAGMA journal_mode").Scan(&mode); err != nil || mode != "wal" {
+		t.Errorf("journal_mode = %q (%v), want wal", mode, err)
 	}
 }
