@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 7208,
+  "entry_points": 7196,
   "entry_packages": [
     ".",
     "bdx",
@@ -275,9 +275,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 17039,
-    "reachable": 12008,
-    "whitelisted": 5028,
+    "total_exported": 17037,
+    "reachable": 12009,
+    "whitelisted": 5025,
     "unreachable": 3
   },
   "by_package": [
@@ -312,7 +312,7 @@
       "package": "secure/mattercert",
       "identifier": "ErrExpired",
       "file": "secure/mattercert/verify.go",
-      "line": 67,
+      "line": 60,
       "kind": "var"
     },
     {
@@ -469,14 +469,14 @@
       "identifier": "BenchmarkBuildInitialReportWildcard",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/bench_test.go",
-      "line": 81
+      "line": 78
     },
     {
       "package": "bridge",
       "identifier": "BenchmarkEncodeReportData",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/bench_test.go",
-      "line": 111
+      "line": 108
     },
     {
       "package": "bridge",
@@ -539,7 +539,7 @@
       "identifier": "TestAckPump_AttachAckTrackerAlsoSetsAckHandler",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/ackpump_test.go",
-      "line": 600
+      "line": 597
     },
     {
       "package": "bridge",
@@ -560,14 +560,14 @@
       "identifier": "TestAckPump_ExpediteDuplicateAck",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/ackpump_test.go",
-      "line": 526
+      "line": 523
     },
     {
       "package": "bridge",
       "identifier": "TestAckPump_ExpediteDuplicateAck_UnknownObligationNoOp",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/ackpump_test.go",
-      "line": 584
+      "line": 581
     },
     {
       "package": "bridge",
@@ -644,14 +644,14 @@
       "identifier": "TestAnnounceCommissioning_NoopAdvertiser_LogsNotAdvertised",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/bridge_helpers_test.go",
-      "line": 364
+      "line": 361
     },
     {
       "package": "bridge",
       "identifier": "TestAnnounceCommissioning_RealAdvertiser_LogsPublished",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/bridge_helpers_test.go",
-      "line": 392
+      "line": 389
     },
     {
       "package": "bridge",
@@ -665,14 +665,14 @@
       "identifier": "TestAnnounceFabric_NoopAdvertiser_LogsNotAdvertised",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/bridge_helpers_test.go",
-      "line": 420
+      "line": 417
     },
     {
       "package": "bridge",
       "identifier": "TestAnnounceFabric_RealAdvertiser_LogsPublished",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/bridge_helpers_test.go",
-      "line": 441
+      "line": 438
     },
     {
       "package": "bridge",
@@ -735,7 +735,7 @@
       "identifier": "TestAttachAggregatorClusters_WithStartedBridge_TopologyPath",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/bridge_helpers_test.go",
-      "line": 570
+      "line": 567
     },
     {
       "package": "bridge",
@@ -770,14 +770,14 @@
       "identifier": "TestAttachRootClusters_WithStartedBridge_TopologyPath",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/bridge_helpers_test.go",
-      "line": 559
+      "line": 556
     },
     {
       "package": "bridge",
       "identifier": "TestAttachSessionLookup_NilRevertsToNoop",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/receive_test.go",
-      "line": 404
+      "line": 401
     },
     {
       "package": "bridge",
@@ -889,7 +889,7 @@
       "identifier": "TestBindSessionRouteNeverSwitchesTransport",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/conn_tcp_test.go",
-      "line": 428
+      "line": 425
     },
     {
       "package": "bridge",
@@ -917,105 +917,105 @@
       "identifier": "TestBridge_EmitEvent_EventLogNumberConsistency",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/eventlog_test.go",
-      "line": 83
+      "line": 80
     },
     {
       "package": "bridge",
       "identifier": "TestBridge_EventLog_NotNil",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/eventlog_test.go",
-      "line": 265
+      "line": 259
     },
     {
       "package": "bridge",
       "identifier": "TestBridge_PaseAbortedByPeerStatusReport",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/securechannel_bruteforce_test.go",
-      "line": 369
+      "line": 366
     },
     {
       "package": "bridge",
       "identifier": "TestBridge_PaseFailures_BelowCapKeepsWindowOpen",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/securechannel_bruteforce_test.go",
-      "line": 92
+      "line": 89
     },
     {
       "package": "bridge",
       "identifier": "TestBridge_PaseFailures_NoWindowIsNilSafe",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/securechannel_bruteforce_test.go",
-      "line": 133
+      "line": 130
     },
     {
       "package": "bridge",
       "identifier": "TestBridge_PaseFailures_ResetGivesFreshBudget",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/securechannel_bruteforce_test.go",
-      "line": 111
+      "line": 108
     },
     {
       "package": "bridge",
       "identifier": "TestBridge_PaseFailures_RevokesWindowAtCap",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/securechannel_bruteforce_test.go",
-      "line": 67
+      "line": 64
     },
     {
       "package": "bridge",
       "identifier": "TestBridge_PaseInFlightSlotReleasedBeforePake3Reply",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/securechannel_bruteforce_test.go",
-      "line": 417
+      "line": 414
     },
     {
       "package": "bridge",
       "identifier": "TestBridge_PaseInFlightSlotReleasedOnPake1Failure",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/securechannel_bruteforce_test.go",
-      "line": 254
+      "line": 251
     },
     {
       "package": "bridge",
       "identifier": "TestBridge_PaseLockedOutAtCap",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/securechannel_bruteforce_test.go",
-      "line": 151
+      "line": 148
     },
     {
       "package": "bridge",
       "identifier": "TestBridge_PaseLockoutBacksOffOnRepeatedCaps",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/securechannel_bruteforce_test.go",
-      "line": 315
+      "line": 312
     },
     {
       "package": "bridge",
       "identifier": "TestBridge_PaseLockoutExpiresOnItsOwn",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/securechannel_bruteforce_test.go",
-      "line": 282
+      "line": 279
     },
     {
       "package": "bridge",
       "identifier": "TestBridge_PaseLockout_SurvivesInternalRestore",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/securechannel_bruteforce_test.go",
-      "line": 208
+      "line": 205
     },
     {
       "package": "bridge",
       "identifier": "TestBridge_ReadEvent_ReturnsBufferedEvents",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/eventlog_test.go",
-      "line": 127
+      "line": 121
     },
     {
       "package": "bridge",
       "identifier": "TestBridge_ReadRequest_ParsesEventRequests",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/eventlog_test.go",
-      "line": 205
+      "line": 199
     },
     {
       "package": "bridge",
@@ -1036,14 +1036,14 @@
       "identifier": "TestBridge_SubscriptionEventReporter_NotNil",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscribe_extra_test.go",
-      "line": 82
+      "line": 87
     },
     {
       "package": "bridge",
       "identifier": "TestBridge_SubscriptionReporter_NotNil",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscribe_extra_test.go",
-      "line": 74
+      "line": 79
     },
     {
       "package": "bridge",
@@ -1071,14 +1071,14 @@
       "identifier": "TestCaptureSubTarget_SkipsZeroOrNil",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/receive_test.go",
-      "line": 745
+      "line": 763
     },
     {
       "package": "bridge",
       "identifier": "TestCaptureSubTarget_StoresMetadata",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/receive_test.go",
-      "line": 703
+      "line": 721
     },
     {
       "package": "bridge",
@@ -1372,35 +1372,35 @@
       "identifier": "TestCheckTimedGate_ExpiredDeadlineRejects",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/receive_test.go",
-      "line": 624
+      "line": 642
     },
     {
       "package": "bridge",
       "identifier": "TestCheckTimedGate_TimedFlagWithoutPriorRejects",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/receive_test.go",
-      "line": 609
+      "line": 627
     },
     {
       "package": "bridge",
       "identifier": "TestCheckTimedGate_UntimedRequestNoPriorProceeds",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/receive_test.go",
-      "line": 574
+      "line": 592
     },
     {
       "package": "bridge",
       "identifier": "TestCheckTimedGate_UntimedRequestWithPriorRejects",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/receive_test.go",
-      "line": 589
+      "line": 607
     },
     {
       "package": "bridge",
       "identifier": "TestCheckTimedGate_ValidDeadlineProceeds",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/receive_test.go",
-      "line": 644
+      "line": 662
     },
     {
       "package": "bridge",
@@ -1554,14 +1554,14 @@
       "identifier": "TestCloseSubscriptionByCounter_WrongType_IsNoop",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscribe_extra_test.go",
-      "line": 145
+      "line": 150
     },
     {
       "package": "bridge",
       "identifier": "TestCloseSubscriptionByCounter_ZeroSubID_IsNoop",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscribe_extra_test.go",
-      "line": 155
+      "line": 160
     },
     {
       "package": "bridge",
@@ -1736,7 +1736,7 @@
       "identifier": "TestConcreteDeniedEventPathIsAnsweredWithAStatus",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/event_acl_test.go",
-      "line": 132
+      "line": 136
     },
     {
       "package": "bridge",
@@ -2786,14 +2786,14 @@
       "identifier": "TestDeviceAdvertiserIcdAdvertisementProvider",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/advertiser_parity_matterjs_test.go",
-      "line": 108
+      "line": 106
     },
     {
       "package": "bridge",
       "identifier": "TestDeviceAdvertiserTcpTKey",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/advertiser_parity_matterjs_test.go",
-      "line": 84
+      "line": 82
     },
     {
       "package": "bridge",
@@ -2807,7 +2807,7 @@
       "identifier": "TestDiagnosticEventsRecordSessionAndDiscoveryKinds",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/securechannel_close_parity_test.go",
-      "line": 540
+      "line": 538
     },
     {
       "package": "bridge",
@@ -3066,14 +3066,14 @@
       "identifier": "TestDispatch_IMInvalidOpcode",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/receive_test.go",
-      "line": 536
+      "line": 561
     },
     {
       "package": "bridge",
       "identifier": "TestDispatch_IMReadRoutes",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/receive_test.go",
-      "line": 429
+      "line": 426
     },
     {
       "package": "bridge",
@@ -3087,63 +3087,63 @@
       "identifier": "TestDispatch_IMSubscribeReplies",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/receive_test.go",
-      "line": 490
+      "line": 514
     },
     {
       "package": "bridge",
       "identifier": "TestDispatch_NilSrcDoesNotPanic",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/receive_test.go",
-      "line": 280
+      "line": 277
     },
     {
       "package": "bridge",
       "identifier": "TestDispatch_NoDispatcherDropsSilently",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/receive_test.go",
-      "line": 552
+      "line": 570
     },
     {
       "package": "bridge",
       "identifier": "TestDispatch_SecureChannelOpcode",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/receive_test.go",
-      "line": 295
+      "line": 292
     },
     {
       "package": "bridge",
       "identifier": "TestDispatch_SessionMissingSurfaces",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/receive_test.go",
-      "line": 387
+      "line": 384
     },
     {
       "package": "bridge",
       "identifier": "TestDispatch_TooShortBuffer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/receive_test.go",
-      "line": 269
+      "line": 266
     },
     {
       "package": "bridge",
       "identifier": "TestDispatch_UnknownProtocolID",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/receive_test.go",
-      "line": 313
+      "line": 310
     },
     {
       "package": "bridge",
       "identifier": "TestDispatch_VendorIDZeroStillRoutesNormally",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/receive_test.go",
-      "line": 366
+      "line": 363
     },
     {
       "package": "bridge",
       "identifier": "TestDispatch_VendorQualifiedProtocolCollisionRejected",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/receive_test.go",
-      "line": 335
+      "line": 332
     },
     {
       "package": "bridge",
@@ -3234,14 +3234,14 @@
       "identifier": "TestEndpointCount_NilTopology_ReturnsZero",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/bridge_helpers_test.go",
-      "line": 473
+      "line": 470
     },
     {
       "package": "bridge",
       "identifier": "TestEndpointCount_StartedBridgeWithoutSources_IsZero",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/bridge_helpers_test.go",
-      "line": 485
+      "line": 482
     },
     {
       "package": "bridge",
@@ -3301,6 +3301,13 @@
     },
     {
       "package": "bridge",
+      "identifier": "TestFailedReportRetriesTheSameDataParity",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/subscribe_send_error_parity_matterjs_test.go",
+      "line": 22
+    },
+    {
+      "package": "bridge",
       "identifier": "TestFanControlOverTheWire",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/application_clusters_wire_test.go",
@@ -3325,7 +3332,7 @@
       "identifier": "TestForgetSigma1Replied_ClearsEntry",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/dormant_wiring_test.go",
-      "line": 217
+      "line": 214
     },
     {
       "package": "bridge",
@@ -3500,7 +3507,7 @@
       "identifier": "TestHandleDatagram_TooShortDoesNotPanic",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/bridge_helpers_test.go",
-      "line": 546
+      "line": 543
     },
     {
       "package": "bridge",
@@ -3528,7 +3535,7 @@
       "identifier": "TestHandleSubscribeRequest_DataVersionFilterFullSuppression_StillEstablishes",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscribe_establish_test.go",
-      "line": 148
+      "line": 160
     },
     {
       "package": "bridge",
@@ -3549,7 +3556,7 @@
       "identifier": "TestHandleSubscribeRequest_MatchingPath_EstablishesAndReplies",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscribe_establish_test.go",
-      "line": 96
+      "line": 107
     },
     {
       "package": "bridge",
@@ -3563,14 +3570,14 @@
       "identifier": "TestHandlerContext_NilCtx_ReturnsBackground",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/bridge_helpers_test.go",
-      "line": 521
+      "line": 518
     },
     {
       "package": "bridge",
       "identifier": "TestHandlerContext_StartedBridge_ReturnsNonNil",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/bridge_helpers_test.go",
-      "line": 532
+      "line": 529
     },
     {
       "package": "bridge",
@@ -3578,13 +3585,6 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/conn_handshake_test.go",
       "line": 142
-    },
-    {
-      "package": "bridge",
-      "identifier": "TestHandshakeRetransmitFallsBackToIdleAfterTheActiveThreshold",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "bridge/handshake_retransmit_parity_matterjs_test.go",
-      "line": 100
     },
     {
       "package": "bridge",
@@ -3612,7 +3612,7 @@
       "identifier": "TestInboundCloseSessionStatusReport_DropsTimedDeadlines",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/timed_deadline_reclamation_test.go",
-      "line": 139
+      "line": 136
     },
     {
       "package": "bridge",
@@ -3717,7 +3717,7 @@
       "identifier": "TestMatterEmitEvent_IsAliasOfEmitEvent",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/bridge_helpers_test.go",
-      "line": 461
+      "line": 458
     },
     {
       "package": "bridge",
@@ -3760,13 +3760,6 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/session_parameters_test.go",
       "line": 21
-    },
-    {
-      "package": "bridge",
-      "identifier": "TestNodeLabelWriteBoundsTheLengthBeforeIS1",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "bridge/is1_write_bound_parity_matterjs_test.go",
-      "line": 24
     },
     {
       "package": "bridge",
@@ -3815,21 +3808,21 @@
       "identifier": "TestNotifyDeviceReachable_DirtiesReachableAttribute",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/dormant_wiring_test.go",
-      "line": 156
+      "line": 153
     },
     {
       "package": "bridge",
       "identifier": "TestNotifyDeviceReachable_FiresReachableChanged",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/dormant_wiring_test.go",
-      "line": 72
+      "line": 69
     },
     {
       "package": "bridge",
       "identifier": "TestNotifyDeviceReachable_IgnoresNonMatchingDevice",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/dormant_wiring_test.go",
-      "line": 110
+      "line": 107
     },
     {
       "package": "bridge",
@@ -3843,14 +3836,14 @@
       "identifier": "TestOngoingReportWaitsForEachChunksStatusResponse",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscribe_report_chunking_test.go",
-      "line": 355
+      "line": 354
     },
     {
       "package": "bridge",
       "identifier": "TestOngoingReportsFollowThePeerAddressOfLaterInboundTraffic",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscribe_report_routing_test.go",
-      "line": 120
+      "line": 121
     },
     {
       "package": "bridge",
@@ -4029,17 +4022,10 @@
     },
     {
       "package": "bridge",
-      "identifier": "TestOutboundTrackerFailedSendFollowsTheBackoffSchedule",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "bridge/outbound_margin_internal_test.go",
-      "line": 57
-    },
-    {
-      "package": "bridge",
       "identifier": "TestOutboundTrackerMarginJoinsTheBaseInterval",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/outbound_margin_internal_test.go",
-      "line": 20
+      "line": 19
     },
     {
       "package": "bridge",
@@ -4270,7 +4256,7 @@
       "identifier": "TestPerExchangeCaseProvider_EvictHookForgetsSigma1",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/dormant_wiring_test.go",
-      "line": 248
+      "line": 245
     },
     {
       "package": "bridge",
@@ -4571,14 +4557,14 @@
       "identifier": "TestReadAuthorizedResults_NoACLChecker_Passthrough",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscribe_acl_test.go",
-      "line": 182
+      "line": 187
     },
     {
       "package": "bridge",
       "identifier": "TestReadAuthorizedResults_PASEBypassesACL",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscribe_acl_test.go",
-      "line": 134
+      "line": 135
     },
     {
       "package": "bridge",
@@ -4613,49 +4599,49 @@
       "identifier": "TestReceiveOverReliableServesUnsecuredDropsGroup",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/conn_tcp_test.go",
-      "line": 401
+      "line": 398
     },
     {
       "package": "bridge",
       "identifier": "TestRegisterSubscription_KeepSubscriptionsTrue_BothSurvive",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscribe_dispatch_test.go",
-      "line": 183
+      "line": 184
     },
     {
       "package": "bridge",
       "identifier": "TestRegisterSubscription_NoManager_ReturnsZeroSubID",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscribe_dispatch_test.go",
-      "line": 148
+      "line": 149
     },
     {
       "package": "bridge",
       "identifier": "TestReleaseReportCounter_NonZeroDeletesEntry",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscribe_extra_test.go",
-      "line": 181
+      "line": 186
     },
     {
       "package": "bridge",
       "identifier": "TestReleaseReportCounter_ZeroIsNoop",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscribe_extra_test.go",
-      "line": 168
+      "line": 173
     },
     {
       "package": "bridge",
       "identifier": "TestReplyTimedStatus_NilSrc_DoesNotPanic",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/bridge_helpers_test.go",
-      "line": 497
+      "line": 494
     },
     {
       "package": "bridge",
       "identifier": "TestReplyTimedStatus_WithSrc_DoesNotPanic",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/bridge_helpers_test.go",
-      "line": 509
+      "line": 506
     },
     {
       "package": "bridge",
@@ -4683,21 +4669,21 @@
       "identifier": "TestReportSubscriptionChunksAnOversizedOngoingReport",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscribe_report_chunking_test.go",
-      "line": 244
+      "line": 241
     },
     {
       "package": "bridge",
       "identifier": "TestReportSubscriptionEventsChunksAnOversizedReport",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscribe_report_chunking_test.go",
-      "line": 303
+      "line": 301
     },
     {
       "package": "bridge",
       "identifier": "TestReportSubscriptionEventsEvictsAfterSendErrorCap",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscribe_send_error_test.go",
-      "line": 85
+      "line": 87
     },
     {
       "package": "bridge",
@@ -4718,21 +4704,21 @@
       "identifier": "TestReportSubscriptionEvents_EmptyEvents_IsNoop",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscribe_extra_test.go",
-      "line": 103
+      "line": 108
     },
     {
       "package": "bridge",
       "identifier": "TestReportSubscriptionEvents_NilSub_IsNoop",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscribe_extra_test.go",
-      "line": 94
+      "line": 99
     },
     {
       "package": "bridge",
       "identifier": "TestReportSubscriptionEvents_UnknownSubID_IsNoop",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscribe_extra_test.go",
-      "line": 112
+      "line": 117
     },
     {
       "package": "bridge",
@@ -4746,14 +4732,14 @@
       "identifier": "TestReportSubscription_NilSub_IsNoop",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscribe_extra_test.go",
-      "line": 125
+      "line": 130
     },
     {
       "package": "bridge",
       "identifier": "TestReportSubscription_UnknownSubID_IsNoop",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscribe_extra_test.go",
-      "line": 133
+      "line": 138
     },
     {
       "package": "bridge",
@@ -4827,31 +4813,31 @@
     },
     {
       "package": "bridge",
-      "identifier": "TestResolveSessionFabric_NoResolver_ReturnsZero",
+      "identifier": "TestResolveSessionFabric_NoResolver_IsUnresolvable",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscribe_extra_test.go",
-      "line": 40
+      "line": 45
     },
     {
       "package": "bridge",
       "identifier": "TestResolveSessionFabric_WithResolver_ReturnsCorrectFabric",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscribe_extra_test.go",
-      "line": 50
+      "line": 55
     },
     {
       "package": "bridge",
       "identifier": "TestResolveSessionFabric_WithResolver_UnknownSession_ReturnsZero",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscribe_extra_test.go",
-      "line": 61
+      "line": 66
     },
     {
       "package": "bridge",
       "identifier": "TestResolveSessionFabric_ZeroSessionID_ReturnsZero",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscribe_extra_test.go",
-      "line": 32
+      "line": 33
     },
     {
       "package": "bridge",
@@ -4949,7 +4935,7 @@
       "identifier": "TestRouteHelpers",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/conn_tcp_test.go",
-      "line": 500
+      "line": 497
     },
     {
       "package": "bridge",
@@ -4998,7 +4984,7 @@
       "identifier": "TestSendCloseSessionReport_ForgetsPeerAddrEvenWhenTheFarewellFails",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/securechannel_close_parity_test.go",
-      "line": 509
+      "line": 507
     },
     {
       "package": "bridge",
@@ -5156,13 +5142,6 @@
     },
     {
       "package": "bridge",
-      "identifier": "TestSigma2FirstRetransmitFollowsTheInitiatorsActiveInterval",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "bridge/handshake_retransmit_parity_matterjs_test.go",
-      "line": 38
-    },
-    {
-      "package": "bridge",
       "identifier": "TestSignalStatusResponseRX_ClosesChannel",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/bridge_helpers_test.go",
@@ -5285,21 +5264,21 @@
       "identifier": "TestStreamInitialReportChunks_ChunkBudgetSplit",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscribe_dispatch_test.go",
-      "line": 274
+      "line": 275
     },
     {
       "package": "bridge",
       "identifier": "TestStreamInitialReportChunks_EmptyReport_NoSend",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscribe_dispatch_test.go",
-      "line": 244
+      "line": 245
     },
     {
       "package": "bridge",
       "identifier": "TestSubscribeRejectsEventPathsTheSubjectMayNotRead",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/event_acl_test.go",
-      "line": 105
+      "line": 109
     },
     {
       "package": "bridge",
@@ -5418,14 +5397,14 @@
       "identifier": "TestTCPConnClosedWhenLastSessionGoes",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/conn_tcp_test.go",
-      "line": 255
+      "line": 252
     },
     {
       "package": "bridge",
       "identifier": "TestTCPConnectionDropEvictsBoundSessions",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/conn_tcp_test.go",
-      "line": 218
+      "line": 215
     },
     {
       "package": "bridge",
@@ -5439,49 +5418,49 @@
       "identifier": "TestTCPInboundCloseSessionClosesConn",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/conn_tcp_test.go",
-      "line": 319
+      "line": 316
     },
     {
       "package": "bridge",
       "identifier": "TestTCPListenerSharesUDPPortAndAdvertisesT",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/conn_tcp_test.go",
-      "line": 357
+      "line": 354
     },
     {
       "package": "bridge",
       "identifier": "TestTCPRequestRepliedOnSameConnWithoutMRP",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/conn_tcp_test.go",
-      "line": 187
+      "line": 184
     },
     {
       "package": "bridge",
       "identifier": "TestTcpSessionBindingChannelTypeDetection",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/conn_tcp_parity_matterjs_test.go",
-      "line": 250
+      "line": 248
     },
     {
       "package": "bridge",
       "identifier": "TestTcpSessionBindingConnectionDropEvictsSessions",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/conn_tcp_parity_matterjs_test.go",
-      "line": 122
+      "line": 120
     },
     {
       "package": "bridge",
       "identifier": "TestTcpSessionBindingConnectionLifecycle",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/conn_tcp_parity_matterjs_test.go",
-      "line": 212
+      "line": 210
     },
     {
       "package": "bridge",
       "identifier": "TestTcpSessionBindingManagerReaction",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/conn_tcp_parity_matterjs_test.go",
-      "line": 168
+      "line": 166
     },
     {
       "package": "bridge",
@@ -5495,7 +5474,7 @@
       "identifier": "TestTimedRequest_SessionScopeIsolation",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/receive_test.go",
-      "line": 665
+      "line": 683
     },
     {
       "package": "bridge",
@@ -5558,7 +5537,14 @@
       "identifier": "TestUnsolicitedReportOverTCPHasNoMRP",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/conn_tcp_test.go",
-      "line": 475
+      "line": 472
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestUnsupportedOpcodeOpeningAnExchangeIsAnsweredInvalidAction",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/decode_error_reply_test.go",
+      "line": 47
     },
     {
       "package": "bridge",
@@ -8117,6 +8103,13 @@
     },
     {
       "package": "cluster/core",
+      "identifier": "TestICDVerificationKeyComparedInConstantTime",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/icd_verification_key_test.go",
+      "line": 13
+    },
+    {
+      "package": "cluster/core",
       "identifier": "TestIdentifyMatchesTheGeneratedDefinition",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/spec_parity_matterjs_test.go",
@@ -10542,7 +10535,7 @@
       "identifier": "Bind",
       "reason": "generic: every generated EncodeTLV / DecodeTLV calls an instantiation of it, and RTA records the instantiation, not the generic declaration",
       "file": "cluster/spec/codec.go",
-      "line": 338
+      "line": 332
     },
     {
       "package": "cluster/spec",
@@ -10563,35 +10556,35 @@
       "identifier": "DecodeList",
       "reason": "generic: every generated EncodeTLV / DecodeTLV calls an instantiation of it, and RTA records the instantiation, not the generic declaration",
       "file": "cluster/spec/codec.go",
-      "line": 251
+      "line": 245
     },
     {
       "package": "cluster/spec",
       "identifier": "DecodeListIn",
       "reason": "generic: every generated EncodeTLV / DecodeTLV calls an instantiation of it, and RTA records the instantiation, not the generic declaration",
       "file": "cluster/spec/codec.go",
-      "line": 255
+      "line": 249
     },
     {
       "package": "cluster/spec",
       "identifier": "DecodeNullable",
       "reason": "generic: every generated EncodeTLV / DecodeTLV calls an instantiation of it, and RTA records the instantiation, not the generic declaration",
       "file": "cluster/spec/codec.go",
-      "line": 314
+      "line": 308
     },
     {
       "package": "cluster/spec",
       "identifier": "DecodeOptional",
       "reason": "generic: every generated EncodeTLV / DecodeTLV calls an instantiation of it, and RTA records the instantiation, not the generic declaration",
       "file": "cluster/spec/codec.go",
-      "line": 278
+      "line": 272
     },
     {
       "package": "cluster/spec",
       "identifier": "DecodeStruct",
       "reason": "generic: every generated EncodeTLV / DecodeTLV calls an instantiation of it, and RTA records the instantiation, not the generic declaration",
       "file": "cluster/spec/codec.go",
-      "line": 240
+      "line": 234
     },
     {
       "package": "cluster/spec",
@@ -10647,7 +10640,7 @@
       "identifier": "List",
       "reason": "generic: every generated EncodeTLV / DecodeTLV calls an instantiation of it, and RTA records the instantiation, not the generic declaration",
       "file": "cluster/spec/codec.go",
-      "line": 405
+      "line": 399
     },
     {
       "package": "cluster/spec",
@@ -10668,14 +10661,14 @@
       "identifier": "NullOf",
       "reason": "generic: every generated EncodeTLV / DecodeTLV calls an instantiation of it, and RTA records the instantiation, not the generic declaration",
       "file": "cluster/spec/codec.go",
-      "line": 306
+      "line": 300
     },
     {
       "package": "cluster/spec",
       "identifier": "Nullable",
       "reason": "generic: every generated EncodeTLV / DecodeTLV calls an instantiation of it, and RTA records the instantiation, not the generic declaration",
       "file": "cluster/spec/codec.go",
-      "line": 293
+      "line": 287
     },
     {
       "package": "cluster/spec",
@@ -10703,49 +10696,49 @@
       "identifier": "Put",
       "reason": "generic: every generated EncodeTLV / DecodeTLV calls an instantiation of it, and RTA records the instantiation, not the generic declaration",
       "file": "cluster/spec/codec.go",
-      "line": 418
+      "line": 412
     },
     {
       "package": "cluster/spec",
       "identifier": "PutInt",
       "reason": "generic: every generated EncodeTLV / DecodeTLV calls an instantiation of it, and RTA records the instantiation, not the generic declaration",
       "file": "cluster/spec/codec.go",
-      "line": 427
+      "line": 421
     },
     {
       "package": "cluster/spec",
       "identifier": "PutList",
       "reason": "generic: every generated EncodeTLV / DecodeTLV calls an instantiation of it, and RTA records the instantiation, not the generic declaration",
       "file": "cluster/spec/codec.go",
-      "line": 450
+      "line": 444
     },
     {
       "package": "cluster/spec",
       "identifier": "PutNullable",
       "reason": "generic: every generated EncodeTLV / DecodeTLV calls an instantiation of it, and RTA records the instantiation, not the generic declaration",
       "file": "cluster/spec/codec.go",
-      "line": 462
+      "line": 456
     },
     {
       "package": "cluster/spec",
       "identifier": "PutOptional",
       "reason": "generic: every generated EncodeTLV / DecodeTLV calls an instantiation of it, and RTA records the instantiation, not the generic declaration",
       "file": "cluster/spec/codec.go",
-      "line": 474
+      "line": 468
     },
     {
       "package": "cluster/spec",
       "identifier": "PutStruct",
       "reason": "generic: every generated EncodeTLV / DecodeTLV calls an instantiation of it, and RTA records the instantiation, not the generic declaration",
       "file": "cluster/spec/codec.go",
-      "line": 446
+      "line": 440
     },
     {
       "package": "cluster/spec",
       "identifier": "PutUint",
       "reason": "generic: every generated EncodeTLV / DecodeTLV calls an instantiation of it, and RTA records the instantiation, not the generic declaration",
       "file": "cluster/spec/codec.go",
-      "line": 423
+      "line": 417
     },
     {
       "package": "cluster/spec",
@@ -10920,7 +10913,7 @@
       "identifier": "ValueOf",
       "reason": "generic: every generated EncodeTLV / DecodeTLV calls an instantiation of it, and RTA records the instantiation, not the generic declaration",
       "file": "cluster/spec/codec.go",
-      "line": 310
+      "line": 304
     },
     {
       "package": "cluster/spec/accesscontrol",
@@ -25281,6 +25274,13 @@
     },
     {
       "package": "endpoint",
+      "identifier": "TestAggregatorRoleParity",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "endpoint/aggregator_role_parity_matterjs_test.go",
+      "line": 20
+    },
+    {
+      "package": "endpoint",
       "identifier": "TestApplicationDeviceTypesMeetTheirDeviceTypeRequirements",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/devicetype_module_test.go",
@@ -25711,7 +25711,7 @@
       "identifier": "TestInvokeUnsupportedCommandMapsTo0x81",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/dispatcher_test.go",
-      "line": 1504
+      "line": 1503
     },
     {
       "package": "endpoint",
@@ -27500,6 +27500,13 @@
     },
     {
       "package": "groups",
+      "identifier": "TestReceptionStateTeardownParity",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "groups/reception_teardown_parity_matterjs_test.go",
+      "line": 28
+    },
+    {
+      "package": "groups",
       "identifier": "TestReplayWindowPerSenderAndKey",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "groups/manager_test.go",
@@ -27636,7 +27643,7 @@
       "identifier": "TestAuthorizeEventReports_AdoptedPASESessionKeepsAdminister",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/event_authorization_test.go",
-      "line": 213
+      "line": 220
     },
     {
       "package": "im",
@@ -27657,14 +27664,14 @@
       "identifier": "TestAuthorizeEventReports_FabricSensitiveUnknownFabricFailsClosed",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/event_authorization_test.go",
-      "line": 166
+      "line": 173
     },
     {
       "package": "im",
       "identifier": "TestAuthorizeEventReports_NilCheckerFailOpen",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/event_authorization_test.go",
-      "line": 153
+      "line": 160
     },
     {
       "package": "im",
@@ -27678,7 +27685,7 @@
       "identifier": "TestAuthorizeEventReports_PASEBypass",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/event_authorization_test.go",
-      "line": 137
+      "line": 139
     },
     {
       "package": "im",
@@ -27755,7 +27762,14 @@
       "identifier": "TestConcreteEventPath_WildcardHelpers",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/event_filter_read_test.go",
-      "line": 187
+      "line": 190
+    },
+    {
+      "package": "im",
+      "identifier": "TestDecodeRangeParity",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "im/decode_range_parity_matterjs_test.go",
+      "line": 19
     },
     {
       "package": "im",
@@ -27777,6 +27791,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/invoke_dispatch_endpoints_test.go",
       "line": 84
+    },
+    {
+      "package": "im",
+      "identifier": "TestEventFiltersForParity",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "im/event_filter_node_parity_matterjs_test.go",
+      "line": 14
     },
     {
       "package": "im",
@@ -27909,7 +27930,7 @@
       "identifier": "TestEventPayloadFabricIndex",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/event_authorization_test.go",
-      "line": 181
+      "line": 188
     },
     {
       "package": "im",
@@ -28049,7 +28070,7 @@
       "identifier": "TestHandleReadEventRequest_AppliesEventMinFromWire",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/event_filter_read_test.go",
-      "line": 160
+      "line": 163
     },
     {
       "package": "im",
@@ -28326,6 +28347,13 @@
     },
     {
       "package": "im",
+      "identifier": "TestMandatoryFieldParity",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "im/mandatory_field_parity_matterjs_test.go",
+      "line": 19
+    },
+    {
+      "package": "im",
       "identifier": "TestMatchDataVersionFilter",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/dataversion_test.go",
@@ -28518,35 +28546,35 @@
       "identifier": "TestReadEventFilterArray_DecodesPeerWireLayout",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/event_filter_read_test.go",
-      "line": 138
+      "line": 141
     },
     {
       "package": "im",
       "identifier": "TestReadEventFilterArray_MultipleFilters",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/event_filter_read_test.go",
-      "line": 99
+      "line": 100
     },
     {
       "package": "im",
       "identifier": "TestReadEventFilterArray_NestedContainerElementIsDrainedNotDesynced",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/event_filter_read_test.go",
-      "line": 258
+      "line": 261
     },
     {
       "package": "im",
       "identifier": "TestReadEventFilterArray_NoNodeID",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/event_filter_read_test.go",
-      "line": 75
+      "line": 76
     },
     {
       "package": "im",
       "identifier": "TestReadEventFilterArray_SingleFilter",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/event_filter_read_test.go",
-      "line": 50
+      "line": 51
     },
     {
       "package": "im",
@@ -28728,7 +28756,7 @@
       "identifier": "TestUnmarshalReadRequest_ScalarEventFiltersFieldIsSkipped",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/event_filter_read_test.go",
-      "line": 223
+      "line": 226
     },
     {
       "package": "im",
@@ -28770,7 +28798,7 @@
       "identifier": "TestUnmarshalSubscribeRequest_ScalarEventFiltersFieldIsSkipped",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/event_filter_read_test.go",
-      "line": 306
+      "line": 309
     },
     {
       "package": "im",
@@ -28967,6 +28995,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/write_parity_test.go",
       "line": 401
+    },
+    {
+      "package": "im/subscription",
+      "identifier": "TestEventWatermarkParity",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "im/subscription/event_watermark_parity_matterjs_test.go",
+      "line": 19
     },
     {
       "package": "im/subscription",
@@ -29975,6 +30010,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "mdns/subtype_responder_live_test.go",
       "line": 485
+    },
+    {
+      "package": "mdns",
+      "identifier": "TestSubtypePTRTTLParity",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "mdns/subtype_ttl_parity_matterjs_test.go",
+      "line": 19
     },
     {
       "package": "mdns",
@@ -34003,13 +34045,6 @@
     },
     {
       "package": "tlv",
-      "identifier": "TestPutUTF8Bounded_NonPositiveMaxIsUnbounded",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "tlv/encode_utf8_max_test.go",
-      "line": 133
-    },
-    {
-      "package": "tlv",
       "identifier": "TestPutUTF8Bounded_OverflowAsciiTrims",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "tlv/tlv_test.go",
@@ -34034,35 +34069,28 @@
       "identifier": "TestPutUTF8WithMax_ExceedsLimit",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "tlv/encode_utf8_max_test.go",
-      "line": 40
+      "line": 39
     },
     {
       "package": "tlv",
       "identifier": "TestPutUTF8WithMax_MultibyteRune",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "tlv/encode_utf8_max_test.go",
-      "line": 68
+      "line": 67
     },
     {
       "package": "tlv",
       "identifier": "TestPutUTF8WithMax_WithinLimit",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "tlv/encode_utf8_max_test.go",
-      "line": 14
+      "line": 13
     },
     {
       "package": "tlv",
       "identifier": "TestPutUTF8WithMax_ZeroMaxSkipsValidation",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "tlv/encode_utf8_max_test.go",
-      "line": 104
-    },
-    {
-      "package": "tlv",
-      "identifier": "TestPutUTF8_IllFormedInputIsSanitised",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "tlv/encode_utf8_max_test.go",
-      "line": 159
+      "line": 103
     },
     {
       "package": "tlv",
@@ -34185,13 +34213,6 @@
     },
     {
       "package": "tlv",
-      "identifier": "TestUTF8String_IS1KeepsTheRawLength",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "tlv/is1_truncation_test.go",
-      "line": 76
-    },
-    {
-      "package": "tlv",
       "identifier": "TestUTF8String_IS1Truncation",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "tlv/is1_truncation_test.go",
@@ -34273,13 +34294,6 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/btp/fuzz_codec_test.go",
       "line": 16
-    },
-    {
-      "package": "transport/btp",
-      "identifier": "TestBtpCentralSendAckTimerSeesTheConstructedState",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "transport/btp/central_timer_parity_matterjs_test.go",
-      "line": 28
     },
     {
       "package": "transport/btp",
@@ -34671,7 +34685,7 @@
       "identifier": "FuzzMarshalPacket",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/message/fuzz_message_test.go",
-      "line": 131
+      "line": 115
     },
     {
       "package": "transport/message",
@@ -34685,70 +34699,70 @@
       "identifier": "FuzzUnmarshalProtocolHeader",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/message/fuzz_message_test.go",
-      "line": 95
+      "line": 80
     },
     {
       "package": "transport/message",
       "identifier": "TestHeaderAADIsRawReceivedBytes",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/message/message_test.go",
-      "line": 185
+      "line": 177
     },
     {
       "package": "transport/message",
       "identifier": "TestHeaderExtensionThenProtocolHeader",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/message/message_test.go",
-      "line": 392
+      "line": 384
     },
     {
       "package": "transport/message",
       "identifier": "TestHeaderMessageExtensionLengthOverflow",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/message/message_test.go",
-      "line": 417
+      "line": 409
     },
     {
       "package": "transport/message",
       "identifier": "TestHeaderMessageExtensionRoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/message/message_test.go",
-      "line": 365
+      "line": 357
     },
     {
       "package": "transport/message",
       "identifier": "TestHeaderMessageExtensionTruncatedLength",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/message/message_test.go",
-      "line": 432
+      "line": 424
     },
     {
       "package": "transport/message",
       "identifier": "TestHeaderRejectsControlMessage",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/message/message_test.go",
-      "line": 159
+      "line": 151
     },
     {
       "package": "transport/message",
       "identifier": "TestHeaderRejectsNonZeroVersion",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/message/message_test.go",
-      "line": 229
+      "line": 221
     },
     {
       "package": "transport/message",
       "identifier": "TestHeaderRejectsReservedDestSize",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/message/message_test.go",
-      "line": 240
+      "line": 232
     },
     {
       "package": "transport/message",
       "identifier": "TestHeaderRejectsUnsupportedSessionType",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/message/message_test.go",
-      "line": 171
+      "line": 163
     },
     {
       "package": "transport/message",
@@ -34762,49 +34776,49 @@
       "identifier": "TestHeaderSecurityFlagsAfterDecode",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/message/message_test.go",
-      "line": 142
+      "line": 137
     },
     {
       "package": "transport/message",
       "identifier": "TestHeaderSecurityFlagsMatchesTheWireByte",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/message/message_test.go",
-      "line": 119
+      "line": 114
     },
     {
       "package": "transport/message",
       "identifier": "TestHeaderSecurityFlagsRoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/message/message_test.go",
-      "line": 94
+      "line": 91
     },
     {
       "package": "transport/message",
       "identifier": "TestHeaderTruncatedDestGroup",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/message/message_test.go",
-      "line": 523
+      "line": 515
     },
     {
       "package": "transport/message",
       "identifier": "TestHeaderTruncatedDestNodeID",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/message/message_test.go",
-      "line": 509
+      "line": 501
     },
     {
       "package": "transport/message",
       "identifier": "TestHeaderTruncatedFlags",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/message/message_test.go",
-      "line": 208
+      "line": 200
     },
     {
       "package": "transport/message",
       "identifier": "TestHeaderTruncatedSourceNodeID",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/message/message_test.go",
-      "line": 217
+      "line": 209
     },
     {
       "package": "transport/message",
@@ -34843,13 +34857,6 @@
     },
     {
       "package": "transport/message",
-      "identifier": "TestMessageCodecDecodeRefusesCrossFieldShapes",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "transport/message/messagecodec_parity_matterjs_test.go",
-      "line": 260
-    },
-    {
-      "package": "transport/message",
       "identifier": "TestMessageCodecEncode",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/message/messagecodec_parity_matterjs_test.go",
@@ -34864,13 +34871,6 @@
     },
     {
       "package": "transport/message",
-      "identifier": "TestMessageCodecEncodeRefusesTheReservedDestSize",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "transport/message/messagecodec_parity_matterjs_test.go",
-      "line": 298
-    },
-    {
-      "package": "transport/message",
       "identifier": "TestNonceSecurityFlagsKeepsReservedWireBits",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/message/nonce_flags_test.go",
@@ -34881,77 +34881,77 @@
       "identifier": "TestProtocolHeaderRoundTripMinimum",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/message/message_test.go",
-      "line": 253
+      "line": 245
     },
     {
       "package": "transport/message",
       "identifier": "TestProtocolHeaderSecuredExtensionLengthOverflow",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/message/message_test.go",
-      "line": 470
+      "line": 462
     },
     {
       "package": "transport/message",
       "identifier": "TestProtocolHeaderSecuredExtensionRoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/message/message_test.go",
-      "line": 443
+      "line": 435
     },
     {
       "package": "transport/message",
       "identifier": "TestProtocolHeaderTruncated",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/message/message_test.go",
-      "line": 341
+      "line": 333
     },
     {
       "package": "transport/message",
       "identifier": "TestProtocolHeaderTruncatedAckCounter",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/message/message_test.go",
-      "line": 350
+      "line": 342
     },
     {
       "package": "transport/message",
       "identifier": "TestProtocolHeaderTruncatedProtocolIDAfterVendor",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/message/message_test.go",
-      "line": 497
+      "line": 489
     },
     {
       "package": "transport/message",
       "identifier": "TestProtocolHeaderTruncatedVendorID",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/message/message_test.go",
-      "line": 485
+      "line": 477
     },
     {
       "package": "transport/message",
       "identifier": "TestProtocolHeaderWithAckRoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/message/message_test.go",
-      "line": 275
+      "line": 267
     },
     {
       "package": "transport/message",
       "identifier": "TestProtocolHeaderWithSecuredExt",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/message/message_test.go",
-      "line": 542
+      "line": 530
     },
     {
       "package": "transport/message",
       "identifier": "TestProtocolHeaderWithVendorDecodesWireOrder",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/message/message_test.go",
-      "line": 327
+      "line": 319
     },
     {
       "package": "transport/message",
       "identifier": "TestProtocolHeaderWithVendorEncodesWireOrder",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/message/message_test.go",
-      "line": 316
+      "line": 308
     },
     {
       "package": "transport/mrp",
@@ -35470,27 +35470,6 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/udp/listener_test.go",
       "line": 142
-    },
-    {
-      "package": "transport/udp",
-      "identifier": "TestServeContinuesAfterATransientReadError",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "transport/udp/serve_read_error_parity_test.go",
-      "line": 65
-    },
-    {
-      "package": "transport/udp",
-      "identifier": "TestServeExitsWhenTheSocketIsGone",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "transport/udp/serve_read_error_parity_test.go",
-      "line": 96
-    },
-    {
-      "package": "transport/udp",
-      "identifier": "TestServeGivesUpOnAPersistentlyFailingSocket",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "transport/udp/serve_read_error_parity_test.go",
-      "line": 107
     },
     {
       "package": "transport/udp",

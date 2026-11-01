@@ -8,7 +8,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/internal/inflight"
 )
 
@@ -117,25 +116,11 @@ func (m *Manager) dueReport(ctx context.Context, sub *Subscription, now time.Tim
 	// 250 ms window regardless of which path produced them.
 	// matter.js ref: ServerSubscription.ts — events and dirty attrs
 	// are merged into a single ReportData per send cycle.
-	if events := sub.drainEventsIfElapsed(now); len(events) > 0 {
+	if events := sub.drainEventsIfElapsed(now, m.eventSourceOf()); len(events) > 0 {
 		if eventReporter == nil {
 			return nil
 		}
-		out := make([]im.EventReport, 0, len(events))
-		for _, ev := range events {
-			ts := ev.Timestamp
-			if ts == 0 {
-				ts = uint64(now.UnixMilli()) //nolint:gosec // millis fit uint64; see #20
-			}
-			out = append(out, im.EventReport{
-				Path:      ev.Path,
-				Number:    ev.Number,
-				Priority:  ev.Priority,
-				Timestamp: ts,
-				Data:      ev.Data,
-			})
-		}
-		return func() { eventReporter(ctx, sub, out) }
+		return func() { eventReporter(ctx, sub, events) }
 	}
 	// Dirty-path report fires when MinInterval has elapsed, but only
 	// when no event report fired in the same tick (returned above).

@@ -57,6 +57,15 @@ type Reporter func(ctx context.Context, sub *Subscription, paths []im.ConcreteAt
 // math alone).
 type EventReporter func(ctx context.Context, sub *Subscription, events []im.EventReport)
 
+// EventSource is where the engine reads a subscription's events when its
+// report is due: the node's event log, which [im.EventLog] is. A
+// subscription keeps only the lowest event number it owes, never the
+// events (matter.js packages/node/src/node/server/ServerSubscription.ts
+// :391-394, :541-542), so without a source no event report is sent.
+type EventSource interface {
+	Query(endpoint uint16, cluster, eventID uint32, minNumber uint64) []im.EventRecord
+}
+
 // The defaults a zero [Config] field takes.
 const (
 	// DefaultMaxSubscriptionsPerFabric is the per-fabric subscription
@@ -111,6 +120,7 @@ type Manager struct {
 	logger        *slog.Logger
 	reporter      Reporter
 	eventReporter EventReporter
+	eventSource   EventSource
 	// inflight counts a tick being walked and every report it started
 	// until the report returned (internal/inflight SubscriptionPending):
 	// the group the clock carries, nil outside a fabrictest site.
@@ -120,7 +130,8 @@ type Manager struct {
 	// seconds; zero for a node that is no such ICD.
 	icdIdleMax atomic.Uint32
 
-	// mu guards byID, eventReporter, nextID, onClosed, onTerminated and perFabric.
+	// mu guards byID, eventReporter, eventSource, nextID, onClosed,
+	// onTerminated and perFabric.
 	mu        sync.RWMutex
 	byID      map[uint32]*Subscription
 	perFabric map[uint8]int
@@ -154,6 +165,21 @@ func (m *Manager) SetEventReporter(r EventReporter) {
 	m.mu.Lock()
 	m.eventReporter = r
 	m.mu.Unlock()
+}
+
+// SetEventSource wires the log the engine reads a subscription's owed
+// events from when its report is due. Pass nil to detach; without a
+// source the owed events are dropped at drain. Safe to call at any time.
+func (m *Manager) SetEventSource(src EventSource) {
+	m.mu.Lock()
+	m.eventSource = src
+	m.mu.Unlock()
+}
+
+func (m *Manager) eventSourceOf() EventSource {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.eventSource
 }
 
 // SetOnSubscriptionClosed registers a callback fired once per
@@ -703,17 +729,20 @@ type EventFiring struct {
 	Number uint64
 	// Priority drives the urgency gate (Critical bypasses MinInterval).
 	Priority im.EventPriority
-	// Timestamp is system-ticks-since-boot in milliseconds; the engine
-	// stamps it when zero.
+	// Timestamp is not read: the report carries the event log's
+	// timestamp for Number (see [EventSource]).
 	Timestamp uint64
-	// Data is the cluster-native event payload (struct, scalar, …).
+	// Data is not read: the report carries the event log's payload for
+	// Number (see [EventSource]).
 	Data im.AttributeValue
 }
 
 // OnEventFired notifies every subscription whose EventPaths cover the
-// event path. The manager queues the event on each matching
-// subscription; the engine drains it on the next tick honoring
-// MinIntervalFloor (with Critical-priority bypass).
+// event path. Each matching subscription records only that it owes
+// events from Number on; the engine reads them from the [EventSource]
+// on the next tick honoring MinIntervalFloor (with Critical-priority
+// bypass), so the event must already be in the source when this is
+// called.
 func (m *Manager) OnEventFired(ev EventFiring) {
 	if !ev.Path.HasEndpoint || !ev.Path.HasCluster || !ev.Path.HasEvent {
 		return
@@ -729,9 +758,8 @@ func (m *Manager) OnEventFired(ev EventFiring) {
 		}
 	}
 	m.mu.RUnlock()
-	pe := pendingEvent(ev)
 	for _, sub := range matches {
-		sub.queueEvent(pe)
+		sub.queueEvent(ev.Number, ev.Priority)
 	}
 }
 

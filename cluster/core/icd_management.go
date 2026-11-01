@@ -4,9 +4,9 @@
 package core
 
 import (
-	"bytes"
 	"cmp"
 	"context"
+	"crypto/subtle"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -1112,10 +1112,23 @@ func assertMayModify(ctx context.Context, stored []byte, verificationKey *[]byte
 	if im.AuthorityAt(ctx, path.Endpoint, ICDManagementClusterID, uint8(spec.PrivilegeAdminister)).IsSuccess() {
 		return nil
 	}
-	if verificationKey == nil || stored == nil || !bytes.Equal(*verificationKey, stored) {
+	if verificationKey == nil || stored == nil || !verificationKeyMatches(*verificationKey, stored) {
 		return spec.Errorf(im.StatusFailure, "core: VerificationKey mismatch")
 	}
 	return nil
+}
+
+// verificationKeyMatches compares the presented VerificationKey with the
+// stored ICDToken in constant time (length checked first): the key is the
+// secret that lets a Manage caller rewrite another client's registration.
+// Ahead of matter.js, which compares with Bytes.areEqual
+// (IcdManagementServer.ts:761); see notes/parity/by_design.md
+// BD-Matter-ICDVerificationKeyConstantTime (review 2026-11 W2-sec-04).
+func verificationKeyMatches(presented, stored []byte) bool {
+	if len(presented) != len(stored) {
+		return false
+	}
+	return subtle.ConstantTimeCompare(presented, stored) == 1
 }
 
 // MatterReportable implements [contract.ClusterServer].

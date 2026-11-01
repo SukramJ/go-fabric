@@ -6,7 +6,6 @@ package bridge_test
 import (
 	"context"
 	"errors"
-	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -50,10 +49,7 @@ func newTestBridge(t *testing.T) *bridge.Bridge {
 		emptySnapshotter,
 		mdns.NewNoop(),
 		bridge.Config{
-			Listen:    ":0",
-			VendorID:  0x1234,
-			ProductID: 0x5678,
-			NodeLabel: "test-bridge",
+			Listen: ":0",
 		},
 		nil,
 	)
@@ -68,55 +64,20 @@ func newTestBridge(t *testing.T) *bridge.Bridge {
 // TestNew_RejectsNilSnapshotter verifies that New returns an error when snap is nil.
 func TestNew_RejectsNilSnapshotter(t *testing.T) {
 	t.Parallel()
-	_, err := bridge.New(nil, mdns.NewNoop(), bridge.Config{
-		VendorID:  1,
-		ProductID: 2,
-		NodeLabel: "x",
-	}, nil)
+	_, err := bridge.New(nil, mdns.NewNoop(), bridge.Config{}, nil)
 	if err == nil {
 		t.Fatal("expected non-nil error for nil snapshotter, got nil")
 	}
 }
 
-// TestNew_RejectsZeroVendorID verifies that New returns an error mentioning VendorID when VendorID is 0.
-func TestNew_RejectsZeroVendorID(t *testing.T) {
+// TestNew_ZeroConfigIsValid pins review 2026-11 W2-api-02: the bridge
+// carries no node identity — VendorID, ProductID and NodeLabel are the root
+// BasicInformation server's, the discriminator the commissioning window's —
+// so a zero Config is accepted.
+func TestNew_ZeroConfigIsValid(t *testing.T) {
 	t.Parallel()
-	_, err := bridge.New(emptySnapshotter, mdns.NewNoop(), bridge.Config{
-		VendorID:  0,
-		ProductID: 2,
-		NodeLabel: "x",
-	}, nil)
-	if err == nil {
-		t.Fatal("expected non-nil error for zero VendorID, got nil")
-	}
-	if !strings.Contains(err.Error(), "VendorID") {
-		t.Errorf("error %q does not mention VendorID", err.Error())
-	}
-}
-
-// TestNew_RejectsZeroProductID verifies that New returns an error when ProductID is 0.
-func TestNew_RejectsZeroProductID(t *testing.T) {
-	t.Parallel()
-	_, err := bridge.New(emptySnapshotter, mdns.NewNoop(), bridge.Config{
-		VendorID:  1,
-		ProductID: 0,
-		NodeLabel: "x",
-	}, nil)
-	if err == nil {
-		t.Fatal("expected non-nil error for zero ProductID, got nil")
-	}
-}
-
-// TestNew_RejectsEmptyNodeLabel verifies that New returns an error when NodeLabel is empty.
-func TestNew_RejectsEmptyNodeLabel(t *testing.T) {
-	t.Parallel()
-	_, err := bridge.New(emptySnapshotter, mdns.NewNoop(), bridge.Config{
-		VendorID:  1,
-		ProductID: 2,
-		NodeLabel: "",
-	}, nil)
-	if err == nil {
-		t.Fatal("expected non-nil error for empty NodeLabel, got nil")
+	if _, err := bridge.New(emptySnapshotter, mdns.NewNoop(), bridge.Config{}, nil); err != nil {
+		t.Fatalf("New(zero Config) = %v, want nil", err)
 	}
 }
 
@@ -124,10 +85,7 @@ func TestNew_RejectsEmptyNodeLabel(t *testing.T) {
 func TestNew_NilAdvertiserOK(t *testing.T) {
 	t.Parallel()
 	b, err := bridge.New(emptySnapshotter, nil, bridge.Config{
-		Listen:    ":0",
-		VendorID:  0x1234,
-		ProductID: 0x5678,
-		NodeLabel: "test-nil-adv",
+		Listen: ":0",
 	}, nil)
 	if err != nil {
 		t.Fatalf("New with nil advertiser: unexpected error: %v", err)
@@ -149,11 +107,7 @@ func TestNew_NilAdvertiserOK(t *testing.T) {
 // TestNew_NilLoggerOK verifies that New succeeds when logger is nil.
 func TestNew_NilLoggerOK(t *testing.T) {
 	t.Parallel()
-	_, err := bridge.New(emptySnapshotter, mdns.NewNoop(), bridge.Config{
-		VendorID:  1,
-		ProductID: 2,
-		NodeLabel: "x",
-	}, nil)
+	_, err := bridge.New(emptySnapshotter, mdns.NewNoop(), bridge.Config{}, nil)
 	if err != nil {
 		t.Fatalf("New with nil logger: unexpected error: %v", err)
 	}
@@ -252,10 +206,7 @@ func TestStart_DefersOperationalRecord(t *testing.T) {
 	t.Parallel()
 	noop := mdns.NewNoop()
 	b, err := bridge.New(emptySnapshotter, noop, bridge.Config{
-		Listen:    ":0",
-		VendorID:  0x1234,
-		ProductID: 0x5678,
-		NodeLabel: "test-mdns",
+		Listen: ":0",
 	}, nil)
 	if err != nil {
 		t.Fatalf("New: unexpected error: %v", err)
@@ -300,10 +251,7 @@ func TestReassemble_InvokesSnapshotterAgain(t *testing.T) {
 	t.Parallel()
 	cs := &countingSnapshotter{}
 	b, err := bridge.New(cs.snap, mdns.NewNoop(), bridge.Config{
-		Listen:    ":0",
-		VendorID:  0x1234,
-		ProductID: 0x5678,
-		NodeLabel: "test-reassemble",
+		Listen: ":0",
 	}, nil)
 	if err != nil {
 		t.Fatalf("New: unexpected error: %v", err)
@@ -349,10 +297,7 @@ func TestStop_IsIdempotent(t *testing.T) {
 	t.Parallel()
 	noop := mdns.NewNoop()
 	b, err := bridge.New(emptySnapshotter, noop, bridge.Config{
-		Listen:    ":0",
-		VendorID:  0x1234,
-		ProductID: 0x5678,
-		NodeLabel: "test-stop-idempotent",
+		Listen: ":0",
 	}, nil)
 	if err != nil {
 		t.Fatalf("New: unexpected error: %v", err)

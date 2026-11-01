@@ -83,8 +83,8 @@ server and breaks when the device mounts another.
 **Gives.** `Node.Bridge()` returns the `*bridge.Bridge` the node runs on:
 the `Attach…` and `Set…` ports, `Reassemble`, the event log
 (`EventLog`), the controller round-trip statistics (`ControllerRTT`) and
-the hooks the facade leaves to the host (`SetOnReassembled`,
-`SetOnFabricAdded`).
+the hook the facade leaves to the host (`SetOnReassembled`; a fabric's
+installation is `node.Observers.OnFabricAdded`).
 
 **When.** A host that records controller round trips, or needs a port the
 facade does not configure. The served topology and a device's reachability
@@ -112,7 +112,11 @@ semantics, the persistence the facade threads through. A host that drives
 `endpoint/sqlitestore`). `ComposeNodeLabel` has the facade route `device.ComposeNodeLabel`.
 
 **When.** A host that assembles its own topology from its own device model
-— its own assembler behind `Config.Topology` (a `node.Snapshotter`) — as
+— its own `Spec` producer feeding an `endpoint.Assembler` behind
+`Config.Topology` (a `node.Snapshotter`); the `Endpoint` and `Topology`
+values the assembler returns are read-only to the host, and a hand-built
+topology loses its DataVersions, Groups and Scenes state, and a written
+NodeLabel, on every `Reassemble` — as
 the existing layer stays for it beside the device kit
 ([ADR 0018](../adr/0018-device-layer-and-node-facade.md)). It hands the
 facade's group state (`Node.Groups`) and endpoint persistence

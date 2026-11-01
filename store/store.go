@@ -8,16 +8,16 @@ import (
 	"errors"
 )
 
-// Store is the typed access surface over the matter_* tables defined
-// in migration 006. The DB connection is supplied by the shared
-// sqlite layer the host owns; this package never opens a database.
+// Store is the typed access surface over the matter_* tables of this
+// package's schema ([Schema]). The *sql.DB comes from the host — or from
+// [OpenSQLite] — and must already carry the schema.
 type Store struct {
 	db *sql.DB
 }
 
 // New returns a Store backed by db. The DB must already have the
-// matter_* tables — typically because [sqlite.Open] applied migration
-// 006 at startup.
+// matter_* tables: [Apply] creates them, or the host's migration tool
+// runs [Migrations].
 func New(db *sql.DB) *Store {
 	return &Store{db: db}
 }

@@ -138,7 +138,6 @@ func AssemblerConfig() endpoint.Config {
 	return endpoint.Config{
 		VendorID:  assemblerVendorID,
 		ProductID: assemblerProductID,
-		NodeLabel: assemblerNodeLabel,
 	}
 }
 

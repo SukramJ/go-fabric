@@ -100,7 +100,7 @@ func (r ReadRequest) MarshalTLV(enc *tlv.Encoder) {
 
 // UnmarshalReadRequestTLV reads a ReadRequestMessage. Skips the
 // optional Event* fields — they're not consumed by v1.1.
-func UnmarshalReadRequestTLV(dec *tlv.Decoder) (ReadRequest, error) { //nolint:gocognit // wire/dispatch table over many attribute/opcode cases
+func UnmarshalReadRequestTLV(dec *tlv.Decoder) (ReadRequest, error) { //nolint:gocognit,gocyclo // wire/dispatch table over many attribute/opcode cases
 	open, err := dec.Next()
 	if err != nil {
 		return ReadRequest{}, err
@@ -109,12 +109,20 @@ func UnmarshalReadRequestTLV(dec *tlv.Decoder) (ReadRequest, error) { //nolint:g
 		return ReadRequest{}, fmt.Errorf("%w: expected struct, got 0x%02X", ErrInvalidReadRequest, open.Type)
 	}
 	var req ReadRequest
+	hasFabricFiltered := false
 	for {
 		el, err := dec.Next()
 		if err != nil {
 			return ReadRequest{}, fmt.Errorf("%w: %w", ErrInvalidReadRequest, err)
 		}
 		if el.IsEndContainer {
+			// IsFabricFiltered is mandatory: matter.js
+			// packages/types/src/protocol/messages/TlvReadRequest.ts:30
+			// (TlvField); chip src/app/ReadHandler.cpp:498. Review
+			// 2026-11 W2-wire-04.
+			if !hasFabricFiltered {
+				return ReadRequest{}, fmt.Errorf("%w: %w", ErrInvalidReadRequest, missingField(tagReadReqFabricFiltered, "IsFabricFiltered"))
+			}
 			return req, nil
 		}
 		if el.Tag.Kind != tlv.TagKindContext {
@@ -165,7 +173,10 @@ func UnmarshalReadRequestTLV(dec *tlv.Decoder) (ReadRequest, error) { //nolint:g
 			}
 			req.EventFilters = filters
 		case tagReadReqFabricFiltered:
-			req.FabricFiltered = el.Bool
+			if req.FabricFiltered, err = boolField(el); err != nil {
+				return ReadRequest{}, fmt.Errorf("%w: %w", ErrInvalidReadRequest, err)
+			}
+			hasFabricFiltered = true
 		case tagReadReqDataVersionFilters:
 			// DataVersionFilters is an Array of structs per Matter §10.6.4.
 			if !el.IsContainer || el.Type != tlv.TypeArray {
@@ -228,28 +239,52 @@ func readAttributePathFields(dec *tlv.Decoder) (ConcreteAttributePath, error) {
 		if el.IsEndContainer {
 			return p, nil
 		}
-		if el.Tag.Kind != tlv.TagKindContext {
-			continue
-		}
-		switch uint8(el.Tag.Number & 0xFF) {
-		case tagAttrPathNode:
-			p.Node = el.Uint
-			p.HasNode = true
-		case tagAttrPathEndpoint:
-			p.Endpoint = uint16(el.Uint & 0xFFFF)
-			p.HasEndpoint = true
-		case tagAttrPathCluster:
-			p.Cluster = uint32(el.Uint & 0xFFFFFFFF)
-			p.HasCluster = true
-		case tagAttrPathAttribute:
-			p.Attribute = uint32(el.Uint & 0xFFFFFFFF)
-			p.HasAttribute = true
-		case tagAttrPathListIndex:
-			p.ListIndex = uint16(el.Uint & 0xFFFF)
-			p.HasListIndex = true
-			p.ListAppend = el.IsNull
+		if err := readAttributePathField(dec, el, &p); err != nil {
+			return ConcreteAttributePath{}, fmt.Errorf("%w: %w", ErrInvalidPath, err)
 		}
 	}
+}
+
+// readAttributePathField decodes one field of an AttributePathIB into p.
+// Every integer is type- and range-checked, never masked: an endpoint of
+// 65536 or -1 would otherwise read as endpoint 0 (review 2026-11
+// W2-wire-03). Mirrors matter.js
+// packages/types/src/protocol/types/TlvAttributePath.ts:19-26 (bounded
+// TlvEndpointNumber / TlvClusterId / TlvAttributeId, nullable TlvUInt16
+// listIndex) and chip src/app/MessageDef/AttributePathIB.cpp:220-275. A
+// field of a foreign tag is skipped, as TlvObject skips an unknown one.
+func readAttributePathField(dec *tlv.Decoder, el tlv.Element, p *ConcreteAttributePath) error {
+	if el.Tag.Kind != tlv.TagKindContext {
+		return skipField(dec, el)
+	}
+	var err error
+	switch uint8(el.Tag.Number & 0xFF) {
+	case tagAttrPathNode:
+		p.Node, err = uint64Field(el)
+		p.HasNode = true
+	case tagAttrPathEndpoint:
+		p.Endpoint, err = uint16Field(el)
+		p.HasEndpoint = true
+	case tagAttrPathCluster:
+		p.Cluster, err = uint32Field(el)
+		p.HasCluster = true
+	case tagAttrPathAttribute:
+		p.Attribute, err = uint32Field(el)
+		p.HasAttribute = true
+	case tagAttrPathListIndex:
+		p.HasListIndex = true
+		if el.IsNull {
+			p.ListAppend = true
+			return nil
+		}
+		p.ListIndex, err = uint16Field(el)
+	default:
+		// EnableTagCompression and unknown tags: an encoder-side
+		// optimisation a receiver may ignore (§A.7), and forward
+		// compatibility.
+		err = skipField(dec, el)
+	}
+	return err
 }
 
 // skipContainer drains every nested element until a balancing
@@ -547,26 +582,38 @@ func HandleReadRequest(ctx context.Context, d Dispatcher, req ReadRequest) Repor
 	return rd
 }
 
-// minEventNumberFromFilters computes the minimum event-number floor from a
-// set of [EventMinimumNumber] filters. Returns 0 (no filtering) when filters
-// is empty. Takes the minimum across all entries — any event whose Number is
-// < the floor is already known to the controller and shall not be re-sent
-// (EventMin is an inclusive lower bound — see [EventLog.Query]).
-//
-// matter.js: EventHandler.ts getEvents → EventFilters passed to EventHandler.
-// chip: src/app/ReadHandler.cpp:598 ProcessEventFilters — stores per-entry
-// mEventMin and applies it in GetScheduledEventInfo.
+// EventFiltersFor returns the one EventFilterIB that applies to the node
+// whose operational node id on the accessing fabric is localNodeID: the
+// first filter without a NodeID or with NodeID == localNodeID, as a
+// one-element slice, or nil when none applies. The rest are ignored. Pass
+// 0 for a session without a fabric. A filter addressed to another node
+// (a controller managing several sends one per node) does not lower the
+// floor. Mirrors matter.js
+// packages/protocol/src/action/server/EventReadResponse.ts:68-77 (the
+// first matching filter sets #eventMinVersion, then break; nodeId is
+// UNSPECIFIED_NODE_ID without a fabric). Review 2026-11 W2-wire-05.
+func EventFiltersFor(filters []EventMinimumNumber, localNodeID uint64) []EventMinimumNumber {
+	for _, f := range filters {
+		if !f.HasNodeID || f.NodeID == localNodeID {
+			return []EventMinimumNumber{f}
+		}
+	}
+	return nil
+}
+
+// minEventNumberFromFilters returns the event-number floor of filters: the
+// EventMin of the first entry, 0 (no filtering) when filters is empty. The
+// caller selects the entry for this node with [EventFiltersFor]; any event
+// whose Number is below the floor is already known to the controller
+// (EventMin is an inclusive lower bound — see [EventLog.Query]). Mirrors
+// matter.js EventReadResponse.ts:68-77 (one filter applies) and
+// packages/protocol/src/events/OccurrenceManager.ts:250-254 (that single
+// value bounds the query).
 func minEventNumberFromFilters(filters []EventMinimumNumber) uint64 {
 	if len(filters) == 0 {
 		return 0
 	}
-	floor := filters[0].EventMin
-	for _, f := range filters[1:] {
-		if f.EventMin < floor {
-			floor = f.EventMin
-		}
-	}
-	return floor
+	return filters[0].EventMin
 }
 
 // BuildEventReports evaluates paths against log and returns a slice of
@@ -584,10 +631,11 @@ func minEventNumberFromFilters(filters []EventMinimumNumber) uint64 {
 // de-duplicated by [EventRecord].Number before returning so a wildcard
 // path that overlaps with a concrete path does not produce duplicates.
 //
-// filters carries the EventFilterIB minimum-event-number constraints the
-// controller sent (Matter §10.6.9). Pass nil to return all buffered events.
-// When filters is non-empty the minimum EventMin across all entries is used
-// as the INCLUSIVE lower bound — events with Number < minNumber are excluded.
+// filters carries the EventFilterIB minimum-event-number constraint for
+// this node (Matter §10.6.9), selected from the request's with
+// [EventFiltersFor]. Pass nil to return all buffered events. The first
+// entry's EventMin is the INCLUSIVE lower bound — events with Number <
+// minNumber are excluded.
 // The returned [EventReport].Timestamp is sourced from
 // [EventRecord].EpochMS (POSIX milliseconds — Matter §10.6.6.1
 // EpochTimestamp, encoded at tag 3), matching the millisecond timestamp
@@ -667,7 +715,8 @@ func BuildEventReports(paths []ConcreteEventPath, log *EventLog, filters []Event
 // (EventReadResponse.process) for the request-level dispatch and
 // matter.js packages/protocol/src/interaction/EventHandler.ts (getEvents)
 // for the per-path log query. Passes req.EventFilters to [BuildEventReports]
-// for minimum-event-number gating.
+// for minimum-event-number gating; the caller selects them for this node
+// with [EventFiltersFor] first.
 func HandleReadEventRequest(req ReadRequest, log *EventLog) []EventReport {
 	return BuildEventReports(req.EventRequests, log, req.EventFilters)
 }
@@ -720,26 +769,32 @@ type EventPathChecker interface {
 
 // Allows reports whether the accessing subject may read the events of
 // (endpoint, cluster): the event read privilege — View, Administer for
-// AccessControl and Groupcast — checked against the ACL. A PASE session, a
-// zero fabric or a missing checker allows, as AuthorizeEventReports does.
+// AccessControl and Groupcast — checked against the ACL. A PASE session or
+// a missing checker allows, as AuthorizeEventReports does; a session
+// without an accessing fabric that is not PASE is denied.
 func (a EventReadAuthorizer) Allows(ctx context.Context, endpoint uint16, cluster uint32) bool {
 	return a.allowsAt(ctx, endpoint, cluster, eventReadPrivilege(cluster))
 }
 
 // allowsAt is Allows at privilege.
 func (a EventReadAuthorizer) allowsAt(ctx context.Context, endpoint uint16, cluster uint32, privilege uint8) bool {
-	if a.FabricIndex == 0 || a.PASE || IsPASEFromContext(ctx) || a.Checker == nil {
+	// PASE is the only implicit grant: matter.js
+	// packages/protocol/src/interaction/FabricAccessControl.ts:189-191
+	// keys it on `authMode === Pase && isCommissioning`, never on a
+	// missing fabric (review 2026-11 W2-sec-03).
+	if a.PASE || IsPASEFromContext(ctx) || a.Checker == nil {
 		return true
 	}
-	return a.Checker.CheckACL(ctx, a.FabricIndex, a.SubjectNodeID, a.SubjectCATs, endpoint, cluster, privilege).IsSuccess()
+	return checkSubjectACL(ctx, a.Checker, a.FabricIndex, a.SubjectNodeID, a.SubjectCATs, endpoint, cluster, privilege).IsSuccess()
 }
 
 // AuthorizeEventReports filters events down to those the accessing subject may
 // read and drops fabric-sensitive records that belong to another fabric.
 // Denied paths/records are SILENTLY OMITTED — a wildcard event read discloses
 // only authorized events (Matter §8.4.3.2), never an error status. A PASE
-// session (FabricIndex==0, or PASE / [IsPASEFromContext] once AddNOC adopted
-// it onto a fabric) or a nil Checker returns every event unchanged.
+// session (PASE / [IsPASEFromContext], also once AddNOC adopted it onto a
+// fabric) or a nil Checker returns every event unchanged; a session
+// without an accessing fabric that is not PASE reads none.
 //
 // (a) ACL gate: each event is gated at its read privilege — View by default,
 //
@@ -754,13 +809,13 @@ func (a EventReadAuthorizer) allowsAt(ctx context.Context, endpoint uint16, clus
 //	accessing fabric is never disclosed. Mirrors EventReadResponse.ts
 //	#readAllowedEvents (payload.fabricIndex !== accessingFabricIndex → skip).
 func AuthorizeEventReports(ctx context.Context, auth EventReadAuthorizer, events []EventReport) []EventReport {
-	if auth.FabricIndex == 0 || auth.PASE || IsPASEFromContext(ctx) || auth.Checker == nil {
+	if auth.PASE || IsPASEFromContext(ctx) || auth.Checker == nil {
 		return append([]EventReport(nil), events...)
 	}
 	out := make([]EventReport, 0, len(events))
 	for _, ev := range events {
 		priv := eventReadPrivilege(ev.Path.Cluster)
-		if status := auth.Checker.CheckACL(ctx, auth.FabricIndex, auth.SubjectNodeID, auth.SubjectCATs, ev.Path.Endpoint, ev.Path.Cluster, priv); !status.IsSuccess() {
+		if status := checkSubjectACL(ctx, auth.Checker, auth.FabricIndex, auth.SubjectNodeID, auth.SubjectCATs, ev.Path.Endpoint, ev.Path.Cluster, priv); !status.IsSuccess() {
 			continue // subject not permitted to read this event — omit
 		}
 		if isFabricSensitiveEventCluster(ev.Path.Cluster) {

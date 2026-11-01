@@ -113,44 +113,7 @@ func UnmarshalAttributePathTLV(dec *tlv.Decoder) (ConcreteAttributePath, error) 
 	if !open.IsContainer || open.Type != tlv.TypeList {
 		return ConcreteAttributePath{}, fmt.Errorf("%w: expected list, got type 0x%02X", ErrInvalidPath, open.Type)
 	}
-	var p ConcreteAttributePath
-	for {
-		el, err := dec.Next()
-		if err != nil {
-			return ConcreteAttributePath{}, fmt.Errorf("%w: %w", ErrInvalidPath, err)
-		}
-		if el.IsEndContainer {
-			return p, nil
-		}
-		if el.Tag.Kind != tlv.TagKindContext {
-			return ConcreteAttributePath{}, fmt.Errorf("%w: non-context tag inside path", ErrInvalidPath)
-		}
-		switch uint8(el.Tag.Number & 0xFF) {
-		case tagAttrPathNode:
-			p.Node = el.Uint
-			p.HasNode = true
-		case tagAttrPathEndpoint:
-			p.Endpoint = uint16(el.Uint & 0xFFFF)
-			p.HasEndpoint = true
-		case tagAttrPathCluster:
-			p.Cluster = uint32(el.Uint & 0xFFFFFFFF)
-			p.HasCluster = true
-		case tagAttrPathAttribute:
-			p.Attribute = uint32(el.Uint & 0xFFFFFFFF)
-			p.HasAttribute = true
-		case tagAttrPathListIndex:
-			p.ListIndex = uint16(el.Uint & 0xFFFF)
-			p.HasListIndex = true
-			p.ListAppend = el.IsNull
-		case tagAttrPathEnableTagCompression:
-			// Tag-compression is an encoder-side optimisation we do
-			// not honour on the decode path; spec §A.7 allows
-			// receivers to ignore it. Skip silently.
-		default:
-			// Unknown context tag — Matter spec tolerates extra fields
-			// for forward compatibility. Skip silently.
-		}
-	}
+	return readAttributePathFields(dec)
 }
 
 // ConcreteCommandPath identifies one cluster command on a specific
@@ -187,33 +150,7 @@ func UnmarshalCommandPathTLV(dec *tlv.Decoder) (ConcreteCommandPath, error) {
 	if !open.IsContainer || open.Type != tlv.TypeList {
 		return ConcreteCommandPath{}, fmt.Errorf("%w: expected list, got type 0x%02X", ErrInvalidPath, open.Type)
 	}
-	var p ConcreteCommandPath
-	for {
-		el, err := dec.Next()
-		if err != nil {
-			return ConcreteCommandPath{}, fmt.Errorf("%w: %w", ErrInvalidPath, err)
-		}
-		if el.IsEndContainer {
-			if !p.HasCluster || !p.HasCommand {
-				return ConcreteCommandPath{}, fmt.Errorf("%w: missing required cluster/command", ErrInvalidPath)
-			}
-			return p, nil
-		}
-		if el.Tag.Kind != tlv.TagKindContext {
-			return ConcreteCommandPath{}, fmt.Errorf("%w: non-context tag", ErrInvalidPath)
-		}
-		switch uint8(el.Tag.Number & 0xFF) {
-		case tagCmdPathEndpoint:
-			p.Endpoint = uint16(el.Uint & 0xFFFF)
-			p.HasEndpoint = true
-		case tagCmdPathCluster:
-			p.Cluster = uint32(el.Uint & 0xFFFFFFFF)
-			p.HasCluster = true
-		case tagCmdPathCommand:
-			p.Command = uint32(el.Uint & 0xFFFFFFFF)
-			p.HasCommand = true
-		}
-	}
+	return readCommandPathFields(dec)
 }
 
 // EOF guard for the decoder helpers above.

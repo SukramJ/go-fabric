@@ -58,7 +58,7 @@ func assembleApplicationDevice(t *testing.T, tc applicationDeviceCase) *Endpoint
 	if err != nil {
 		t.Fatal(err)
 	}
-	a, err := New(&oneEndpointStore{}, Config{VendorID: 1, ProductID: 1, NodeLabel: "x", Groups: mgr}, nil)
+	a, err := New(&oneEndpointStore{}, Config{VendorID: 1, ProductID: 1, Groups: mgr}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

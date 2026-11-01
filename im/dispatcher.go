@@ -58,7 +58,7 @@ type ACLChecker interface {
 	// subjectNodeID + subjectCATs identify the requesting peer for per-
 	// subject ACE matching (Matter §9.10.5.6). For CASE sessions both are
 	// lifted from the peer NOC; for PASE both are zero / nil and the
-	// fabricIndex==0 bypass applies. An ACL entry with an empty Subjects
+	// PASE auth mode ([WithAuthModePASE]) grants. An ACL entry with an empty Subjects
 	// list matches any subject on the fabric.
 	//
 	// requiredPrivilege is the minimum Matter privilege level required:

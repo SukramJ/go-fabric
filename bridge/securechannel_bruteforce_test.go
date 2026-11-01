@@ -32,10 +32,7 @@ import (
 func newUnstartedBridge(t *testing.T) *Bridge {
 	t.Helper()
 	b, err := New(wbEmptySnapshotter, mdns.NewNoop(), Config{
-		Listen:    ":0",
-		VendorID:  0x1234,
-		ProductID: 0x5678,
-		NodeLabel: "wb-test",
+		Listen: ":0",
 	}, nil)
 	if err != nil {
 		t.Fatalf("New: %v", err)

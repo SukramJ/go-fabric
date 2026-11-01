@@ -182,7 +182,7 @@ func TestBridgedNodeRevisionFromSchema(t *testing.T) {
 func TestClusterServersBridgedNodeHostTypeListedOnce(t *testing.T) {
 	t.Parallel()
 	dt := uint16(matterDeviceTypeBridgedNode)
-	a, err := New(newInternalFakeStore(), Config{VendorID: 1, ProductID: 1, NodeLabel: "x"}, nil)
+	a, err := New(newInternalFakeStore(), Config{VendorID: 1, ProductID: 1}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

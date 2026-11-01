@@ -132,18 +132,25 @@ func TestAuthorizeEventReports_PlainEventReturnedToAuthorized(t *testing.T) {
 }
 
 // TestAuthorizeEventReports_PASEBypass verifies that a PASE session
-// (FabricIndex==0) receives every event unchanged — ACL/fabric filtering does
-// not apply before commissioning.
+// receives every event unchanged — ACL/fabric filtering does not apply
+// before commissioning — and that fabric 0 alone is no grant (review
+// 2026-11 W2-sec-03; matter.js FabricAccessControl.ts:189-191 keys the
+// implicit grant on the PASE auth mode).
 func TestAuthorizeEventReports_PASEBypass(t *testing.T) {
 	t.Parallel()
 	auth := EventReadAuthorizer{
 		Checker:     fakeEventACL{allowFabric: 1, maxPriv: 5},
-		FabricIndex: 0, // PASE
+		FabricIndex: 0,
+		PASE:        true,
 	}
 	in := []EventReport{acEventReport(1), plainEventReport()}
 	got := AuthorizeEventReports(context.Background(), auth, in)
 	if len(got) != 2 {
 		t.Fatalf("PASE bypass: want 2 events, got %d", len(got))
+	}
+	auth.PASE = false
+	if got := AuthorizeEventReports(context.Background(), auth, in); len(got) != 0 {
+		t.Fatalf("fabric 0 without PASE: want no events, got %d", len(got))
 	}
 }
 

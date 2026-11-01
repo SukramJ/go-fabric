@@ -127,10 +127,11 @@ func TestReadAuthorizedResults_AuthorizedAttributeKept(t *testing.T) {
 	}
 }
 
-// TestReadAuthorizedResults_PASEBypassesACL verifies that fabricIndex==0
-// (PASE / pre-commissioning) returns the read result unchanged even when
-// the ACL lister would deny every fabric-1 subject — ACL enforcement does
-// not apply before AddNOC.
+// TestReadAuthorizedResults_PASEBypassesACL verifies that a PASE session
+// returns the read result unchanged even when the ACL lister would deny
+// every fabric-1 subject — ACL enforcement does not apply before AddNOC —
+// and that fabric 0 without the PASE auth mode reads nothing (review
+// 2026-11 W2-sec-03; matter.js FabricAccessControl.ts:189-191).
 func TestReadAuthorizedResults_PASEBypassesACL(t *testing.T) {
 	t.Parallel()
 	// A restrictive lister: fabric 1 holds no grant at all, and the
@@ -141,6 +142,10 @@ func TestReadAuthorizedResults_PASEBypassesACL(t *testing.T) {
 
 	ctx := im.WithFabricFilter(context.Background(), false, 0)
 	ctx = im.WithSubject(ctx, 0, nil)
+	if got := b.readAuthorizedResults(ctx, b.Dispatcher(), accessControlACLPath()); len(got) != 0 {
+		t.Fatalf("readAuthorizedResults: fabric 0 without PASE read %d results, want none", len(got))
+	}
+	ctx = im.WithAuthModePASE(ctx)
 
 	got := b.readAuthorizedResults(ctx, b.Dispatcher(), accessControlACLPath())
 	if len(got) != 1 {

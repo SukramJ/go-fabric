@@ -148,7 +148,7 @@ func TestMinEventNumberFromFilters(t *testing.T) {
 	}{
 		{"empty", nil, 0},
 		{"single", []EventMinimumNumber{{EventMin: 7}}, 7},
-		{"multiple_first_is_min", []EventMinimumNumber{{EventMin: 3}, {EventMin: 10}, {EventMin: 1}}, 1},
+		{"multiple_first_applies", []EventMinimumNumber{{EventMin: 3}, {EventMin: 10}, {EventMin: 1}}, 3},
 		{"all_equal", []EventMinimumNumber{{EventMin: 5}, {EventMin: 5}}, 5},
 	}
 	for _, tc := range cases {

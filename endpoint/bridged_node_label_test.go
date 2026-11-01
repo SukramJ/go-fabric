@@ -26,7 +26,7 @@ func TestBridgedNodeLabelWriteSticks(t *testing.T) {
 	t.Parallel()
 	var written []string
 	cfg := endpoint.Config{
-		VendorID: 0xFFF1, ProductID: 0x8001, NodeLabel: "Bridge",
+		VendorID: 0xFFF1, ProductID: 0x8001,
 		OnNodeLabelWritten: func(key endpoint.SourceKey, label string) {
 			written = append(written, string(key.(endpoint.StringKey))+"="+label)
 		},

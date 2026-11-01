@@ -29,7 +29,7 @@ func (o oneServer) MatterClusterServers() []contract.ClusterServer {
 func dispatched(t *testing.T, srv contract.ClusterServer, attrID, cmdID uint32) (write, invoke im.StatusCode) {
 	t.Helper()
 	topo := &endpoint.Topology{Endpoints: []*endpoint.Endpoint{
-		{ID: 0}, {ID: 1, DeviceType: 0x000E}, {ID: 2, Source: oneServer{srv}},
+		{ID: 0}, {ID: 1, Aggregator: true, DeviceType: 0x000E}, {ID: 2, Source: oneServer{srv}},
 	}}
 	d := endpoint.NewTopologyDispatcher(topo)
 	cluster := srv.MatterClusterID()
