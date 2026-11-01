@@ -34,8 +34,8 @@ var sqlitePragmas = []string{"foreign_keys(1)", "busy_timeout(5000)"}
 // `_pragma` values in pragmas (journal_mode(WAL), for one). The `file:`
 // URI is built with net/url, so a path holding `#`, `?` or `%` names that
 // file and keeps the pragmas instead of ending the file name early. The
-// caller owns the handle. It is the one opener of the module's SQLite
-// files: [Store].Path, controller.OpenDB, fabrictest and the examples.
+// caller owns the handle. It opens the node's SQLite files: [Store].Path,
+// fabrictest and the examples.
 //
 // A file OpenSQLite creates is readable and writable by its owner only
 // (0600): it holds the node's private operational keys (a controller's

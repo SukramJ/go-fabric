@@ -36,7 +36,7 @@ So the operator's rules are the persistence guide's
   directory);
 - protect it like a key: it holds the node's private operational keys
   unencrypted. A file the node creates through `Store.Path` (or
-  `node.OpenSQLite`, `controller.OpenDB`) is created with mode `0600`, and
+  `node.OpenSQLite`) is created with mode `0600`, and
   SQLite gives its `-wal` and `-shm` files the same mode; an existing file
   keeps its mode, and a host that opens its own handle (`Store.DB`) sets the
   mode itself;
