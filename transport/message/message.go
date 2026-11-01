@@ -125,7 +125,7 @@ var (
 	// ErrUnicastGroupDestination is returned for a unicast session type
 	// whose DSIZ names a destination group id. Mirrors matter.js
 	// packages/protocol/src/codec/MessageCodec.ts:223-225
-	// (decodeFixedHeader, "Unicast session cannot have destination group
+	// ("Unicast session cannot have destination group
 	// id.") and chip src/transport/raw/MessageHeader.cpp:209-212
 	// (kDestinationGroupIdPresent outside a group session).
 	ErrUnicastGroupDestination = errors.New("message: unicast session cannot have a destination group id")
@@ -133,7 +133,7 @@ var (
 	// ErrGroupSessionHeader is returned for a group session type without
 	// a destination (DSIZ 0b00) or without a source node id. A
 	// destination node id is accepted (MCSP). Mirrors matter.js
-	// MessageCodec.ts:226-233 (decodeFixedHeader, "Group session must have
+	// MessageCodec.ts:226-233 ("Group session must have
 	// destination group id or destination node id." / "Group session must
 	// have source node id.").
 	ErrGroupSessionHeader = errors.New("message: group session must have a destination and a source node id")
@@ -301,7 +301,7 @@ func UnmarshalHeader(buf []byte) (Header, int, error) {
 		return Header{}, 0, ErrControlMessage
 	}
 	// The cross-field rules of matter.js MessageCodec.ts:223-233
-	// (decodeFixedHeader), checked before any variable field is read.
+	// (the fixed-header decode), checked before any variable field is read.
 	if h.SessionType == SessionUnsecured && h.DestSize == DestGroup {
 		return Header{}, 0, ErrUnicastGroupDestination
 	}

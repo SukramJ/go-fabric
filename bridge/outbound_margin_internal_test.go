@@ -52,7 +52,7 @@ func TestOutboundTrackerMarginJoinsTheBaseInterval(t *testing.T) {
 // sweep scheduled: a socket that fails at every attempt spends the retry
 // budget on the MRP schedule, not on consecutive pump ticks. matter.js
 // counts the retransmission before it sends and, on a send error that is
-// not SessionClosedError, still arms the next one with the computed
+// not a closed session, still arms the next one with the computed
 // backoff (MessageExchange.ts:905-906, :975-981 at 862ad75f).
 func TestOutboundTrackerFailedSendFollowsTheBackoffSchedule(t *testing.T) {
 	t.Parallel()

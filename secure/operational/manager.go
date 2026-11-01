@@ -307,8 +307,8 @@ type Entry struct {
 	// lastPeerActivity is set when the session is created and then
 	// updated only on inbound decrypts — the peer-active determination
 	// for MRP interval selection needs the time the PEER last sent, not
-	// our own transmissions. Mirrors chip SecureSession
-	// GetLastPeerActivityTime and matter.js NodeSession.ts:120.
+	// our own transmissions. Mirrors chip GetLastPeerActivityTime and
+	// matter.js NodeSession.ts:120.
 	lastPeerActivity time.Time
 	// peerIdleIntervalMs / peerActiveIntervalMs / peerActiveThresholdMs
 	// carry the peer's advertised MRP session parameters (Sigma1 /

@@ -226,7 +226,7 @@
   },
   {
     "file": "bridge/handlers.go",
-    "line": 880,
+    "line": 897,
     "citation": "MRP.ts:129",
     "resolved": "packages/protocol/src/protocol/MRP.ts",
     "identifier": "retransmissionIntervalOf",
@@ -262,7 +262,7 @@
   },
   {
     "file": "bridge/outbound_reliable.go",
-    "line": 26,
+    "line": 27,
     "citation": "InteractionMessenger.ts:721",
     "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
     "identifier": "DataReport",
@@ -370,7 +370,7 @@
   },
   {
     "file": "bridge/securechannel.go",
-    "line": 1148,
+    "line": 1176,
     "citation": "ExchangeManager.ts:663-671",
     "resolved": "packages/protocol/src/protocol/ExchangeManager.ts",
     "identifier": "#sendCloseSession",
@@ -379,7 +379,7 @@
   },
   {
     "file": "bridge/securechannel.go",
-    "line": 1187,
+    "line": 1215,
     "citation": "ExchangeManager.ts:663-671",
     "resolved": "packages/protocol/src/protocol/ExchangeManager.ts",
     "identifier": "#sendCloseSession",
@@ -1046,7 +1046,7 @@
   },
   {
     "file": "cluster/core/operational_credentials.go",
-    "line": 1961,
+    "line": 1973,
     "citation": "Fabric.ts:557-559",
     "resolved": "packages/protocol/src/fabric/Fabric.ts",
     "identifier": "PublicKeyError",
@@ -1055,7 +1055,7 @@
   },
   {
     "file": "cluster/core/operational_credentials.go",
-    "line": 2107,
+    "line": 2119,
     "citation": "Fabric.ts:548",
     "resolved": "packages/protocol/src/fabric/Fabric.ts",
     "identifier": "nodeId",
@@ -1064,7 +1064,7 @@
   },
   {
     "file": "cluster/core/operational_credentials.go",
-    "line": 2298,
+    "line": 2310,
     "citation": "DeviceAdvertiser.ts:84-86",
     "resolved": "packages/protocol/src/protocol/DeviceAdvertiser.ts",
     "identifier": "cancelAll",
@@ -1490,7 +1490,7 @@
   },
   {
     "file": "controller/ca/ca.go",
-    "line": 595,
+    "line": 597,
     "citation": "kinds/definitions/operational.ts:109-110",
     "resolved": "packages/protocol/src/certificate/kinds/definitions/operational.ts",
     "at": "0ceb202d",
@@ -2078,7 +2078,7 @@
   },
   {
     "file": "node/security.go",
-    "line": 674,
+    "line": 689,
     "citation": "CaseServer.ts:210",
     "resolved": "packages/protocol/src/session/case/CaseServer.ts",
     "identifier": "SessionManager",
@@ -2150,7 +2150,7 @@
   },
   {
     "file": "secure/operational/manager.go",
-    "line": 327,
+    "line": 328,
     "citation": "SessionManager.ts:484",
     "resolved": "packages/protocol/src/session/SessionManager.ts",
     "identifier": "getPaseSession",
@@ -2159,7 +2159,7 @@
   },
   {
     "file": "secure/operational/manager.go",
-    "line": 829,
+    "line": 846,
     "citation": "packages/protocol/src/session/SessionManager.ts:490-508",
     "resolved": "packages/protocol/src/session/SessionManager.ts",
     "identifier": "getNextAvailableSessionId",
@@ -2168,7 +2168,7 @@
   },
   {
     "file": "secure/operational/manager.go",
-    "line": 855,
+    "line": 872,
     "citation": "packages/protocol/src/session/SessionManager.ts:513",
     "resolved": "packages/protocol/src/session/SessionManager.ts",
     "identifier": "getSession",
@@ -2177,7 +2177,7 @@
   },
   {
     "file": "secure/operational/manager.go",
-    "line": 958,
+    "line": 975,
     "citation": "Session.ts:248",
     "resolved": "packages/protocol/src/session/Session.ts",
     "identifier": "initiateClose",
@@ -2276,7 +2276,7 @@
   },
   {
     "file": "transport/message/fuzz_message_test.go",
-    "line": 114,
+    "line": 130,
     "citation": "MessageCodec.ts:481-504",
     "resolved": "packages/protocol/src/codec/MessageCodec.ts",
     "identifier": "encodePacket",
@@ -2294,7 +2294,7 @@
   },
   {
     "file": "transport/mrp/ack.go",
-    "line": 226,
+    "line": 240,
     "citation": "MessageExchange.ts:428-433",
     "resolved": "packages/protocol/src/protocol/MessageExchange.ts",
     "identifier": "requiresAck",
@@ -2303,7 +2303,7 @@
   },
   {
     "file": "transport/mrp/ack_test.go",
-    "line": 233,
+    "line": 238,
     "citation": "MessageExchange.ts:428-433",
     "resolved": "packages/protocol/src/protocol/MessageExchange.ts",
     "identifier": "requiresAck",
