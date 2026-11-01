@@ -126,15 +126,19 @@ type ExchangeKey struct {
 // AckTracker bookkeeps outstanding ACK obligations across exchanges.
 // It is concurrency-safe and I/O-free; the message dispatcher pumps it
 // via [Owe] / [Discharge] / [Due]. One obligation per (session,
-// exchange) is retained at any time — Matter §4.12.4.2 lets the
-// implementation collapse cumulative ACKs (a single ACK for the
-// latest counter implicitly covers earlier counters in the same
-// exchange).
+// exchange, role) is pending at any time. An MRP ack acknowledges one
+// message counter, not every earlier one, so an obligation displaced by
+// a newer message's is not dropped: it is due at once, for the next
+// [Due] to hand out as a standalone ack.
 type AckTracker struct {
-	// mu guards pending.
+	// mu guards pending and displaced.
 	mu      sync.Mutex
 	pending map[ExchangeKey]AckObligation
-	delay   time.Duration
+	// displaced holds obligations a later [AckTracker.Owe] on the same
+	// exchange replaced; [AckTracker.Due] returns them first, whatever
+	// the time.
+	displaced []AckObligation
+	delay     time.Duration
 }
 
 // NewAckTracker returns a tracker with the given piggyback grace
@@ -151,18 +155,28 @@ func NewAckTracker(delay time.Duration) *AckTracker {
 }
 
 // Owe records an obligation to ACK ackCounter on the (session,
-// exchange) pair. If a pending obligation already exists for the
-// pair, it is replaced with the higher counter — only the latest ACK
-// needs to ride the wire (Matter §4.12.4.2 cumulative-ACK semantics).
+// exchange) pair. An obligation already pending for the same counter is
+// kept with its DueAt, so a duplicate does not slide the deadline. One
+// pending for a different counter is not covered by the new ack — an MRP
+// ack names a single counter (chip ReliableMessageMgr.cpp:339-342
+// CheckAndRemRetransTable, matter.js MessageExchange.ts:505-510 compares
+// `ackedMessageId !== sentMessageIdToAck`) — so it is made due at once for the
+// next [AckTracker.Due] to emit as a standalone ack, and the new counter
+// becomes the pending one. Mirrors chip ReliableMessageContext.cpp:158-171
+// ("forcing tx of solitary ack") and matter.js MessageExchange.ts:539-543
+// at 862ad75f, which send the pending ack standalone before taking the
+// new one.
 func (t *AckTracker) Owe(ackCounter uint32, sessionID, exchangeID uint16, initiator bool, now time.Time) {
 	key := ExchangeKey{SessionID: sessionID, ExchangeID: exchangeID, Initiator: initiator}
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	prev, ok := t.pending[key]
-	if ok && counterGE(prev.AckCounter, ackCounter) {
-		// Earlier obligation already covers ackCounter; keep the older
-		// DueAt so we don't continually slide the deadline forward.
+	if ok && prev.AckCounter == ackCounter {
 		return
+	}
+	if ok {
+		prev.DueAt = time.Time{}
+		t.displaced = append(t.displaced, prev)
 	}
 	t.pending[key] = AckObligation{
 		AckCounter: ackCounter,
@@ -239,11 +253,22 @@ func (t *AckTracker) ExpediteDue(sessionID, exchangeID uint16, initiator bool) b
 	return true
 }
 
-// Pending reports the count of in-flight obligations.
+// Owes reports whether an obligation is pending for the (session,
+// exchange, role) triple — a displaced one handed out by [AckTracker.Due]
+// leaves the newer one it gave way to pending.
+func (t *AckTracker) Owes(sessionID, exchangeID uint16, initiator bool) bool {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	_, ok := t.pending[ExchangeKey{SessionID: sessionID, ExchangeID: exchangeID, Initiator: initiator}]
+	return ok
+}
+
+// Pending reports the count of in-flight obligations, displaced ones
+// awaiting their standalone ack included.
 func (t *AckTracker) Pending() int {
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	return len(t.pending)
+	return len(t.pending) + len(t.displaced)
 }
 
 // Due returns every obligation whose DueAt has elapsed and removes
@@ -254,10 +279,11 @@ func (t *AckTracker) Pending() int {
 func (t *AckTracker) Due(now time.Time) []AckObligation {
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	if len(t.pending) == 0 {
+	if len(t.pending) == 0 && len(t.displaced) == 0 {
 		return nil
 	}
-	var out []AckObligation
+	out := t.displaced
+	t.displaced = nil
 	for id, obl := range t.pending {
 		if now.Before(obl.DueAt) {
 			continue
@@ -266,12 +292,4 @@ func (t *AckTracker) Due(now time.Time) []AckObligation {
 		delete(t.pending, id)
 	}
 	return out
-}
-
-// counterGE reports whether a is greater-or-equal to b under Matter's
-// 32-bit message counter monotonicity. This is the same wrap-aware
-// comparison the duplicate-detection [Window] uses; counters wrap at
-// 2^32 but the half-range distance keeps the comparison total.
-func counterGE(a, b uint32) bool {
-	return a == b || (a-b) < (1<<31)
 }

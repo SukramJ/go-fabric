@@ -419,7 +419,19 @@ func (b *Bridge) RunAckPumpOnce(now time.Time) int {
 // pipeline didn't run owedInboundAck — either way we can't route the
 // reply, so log and drop.
 func (b *Bridge) emitStandaloneAck(obl mrp.AckObligation) {
-	raw, ok := b.routing.exchangeSrcs.LoadAndDelete(mrp.ExchangeKey{SessionID: obl.SessionID, ExchangeID: obl.ExchangeID, Initiator: obl.Initiator})
+	key := mrp.ExchangeKey{SessionID: obl.SessionID, ExchangeID: obl.ExchangeID, Initiator: obl.Initiator}
+	raw, ok := b.routing.exchangeSrcs.Load(key)
+	if ok {
+		// The route outlives an obligation that a newer one on the same
+		// exchange displaced ([mrp.AckTracker.Owe]): that newer one is
+		// still pending and is emitted over the same route.
+		b.mu.RLock()
+		tracker := b.ackTracker
+		b.mu.RUnlock()
+		if tracker == nil || !tracker.Owes(obl.SessionID, obl.ExchangeID, obl.Initiator) {
+			b.routing.exchangeSrcs.Delete(key)
+		}
+	}
 	if !ok {
 		b.logger.Debug("matter.tx.ack_pump.no_src",
 			slog.Int("exchange_id", int(obl.ExchangeID)),
