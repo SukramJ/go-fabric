@@ -203,6 +203,8 @@ type Session[T any] struct {
 	err            error
 	description    string
 	callerStopHook func() bool
+	// callerHookDone is closed when the caller's hook has run.
+	callerHookDone chan struct{}
 }
 
 func start[T any](ctx context.Context, k kind[T], transports []Transport, opts SessionOptions, name string) *Session[T] {
@@ -219,7 +221,11 @@ func start[T any](ctx context.Context, k kind[T], transports []Transport, opts S
 	// does (the abort option, :202-205, :496-499), at once when it already
 	// ended.
 	s.caller = ctx
-	s.callerStopHook = context.AfterFunc(ctx, func() { s.Cancel(context.Cause(ctx)) })
+	s.callerHookDone = make(chan struct{})
+	s.callerStopHook = context.AfterFunc(ctx, func() {
+		defer close(s.callerHookDone)
+		s.Cancel(context.Cause(ctx))
+	})
 	s.checkCaller()
 	go s.run(transports)
 	return s
@@ -297,7 +303,6 @@ func (s *Session[T]) isStopped() bool {
 
 // run is #performDiscovery and #afterDiscovery (:263-302, :455-482).
 func (s *Session[T]) run(transports []Transport) {
-	defer s.callerStopHook()
 	selected := SelectTransports(transports, s.opts.Capabilities)
 	s.reportTransports(transports, selected)
 	s.mu.Lock()
@@ -336,6 +341,14 @@ func (s *Session[T]) run(transports []Transport) {
 	s.result, s.err = result, err
 	s.mu.Unlock()
 	s.stopFn()
+	// The caller's hook is released before the outcome is visible: a hook
+	// already running finishes first, so once Wait returns nothing of
+	// this discovery runs or logs any more (review W6-test-02 — the hook
+	// used to be released after done, and logged into a caller that had
+	// moved on).
+	if !s.callerStopHook() {
+		<-s.callerHookDone
+	}
 	close(s.done)
 }
 

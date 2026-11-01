@@ -300,7 +300,7 @@ func (s *CertificateStore) processRevocationPoint(ctx context.Context, p Revocat
 		}
 		return revocationEntry{}, rejectedBy(err, "CRL signer certificate is unusable")
 	}
-	crl, err := s.downloadCRL(ctx, p.DataURL)
+	crl, err := s.downloadCRL(ctx, p.DataURL, p.DataFileSize)
 	if err != nil {
 		return revocationEntry{}, err
 	}
@@ -328,9 +328,22 @@ func (s *CertificateStore) processRevocationPoint(ctx context.Context, p Revocat
 	return entry, nil
 }
 
+// maxCRLSize bounds a CRL download: the point's DataFileSize up to it,
+// and the whole body without one; 1 MiB holds any Matter CRL. A point that
+// announces more is rejected before the download, since DataFileSize is
+// the vendor's statement and must not raise the bound.
+const maxCRLSize = 1 << 20
+
 // downloadCRL fetches dataUrl (:1524-1534): a client error is a rejection,
-// a server error, request timeout or rate limit transient.
-func (s *CertificateStore) downloadCRL(ctx context.Context, dataURL string) ([]byte, error) {
+// a server error, request timeout or rate limit transient. The body is
+// read up to the point's DataFileSize plus one byte — a longer body then
+// fails processRevocationPoint's size check — and, without a
+// DataFileSize, up to maxCRLSize, past which it is a rejection. matter.js
+// reads the whole body (DclCertificateService.ts:1543-1552, fetch +
+// arrayBuffer) and rejects a size mismatch afterwards (:1559); the bound
+// keeps that verdict without buffering what a hostile CRL host sends past
+// it.
+func (s *CertificateStore) downloadCRL(ctx context.Context, dataURL string, dataFileSize uint64) ([]byte, error) {
 	ctx, cancel := context.WithTimeout(ctx, revocationTimeout)
 	defer cancel()
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, dataURL, http.NoBody)
@@ -349,7 +362,21 @@ func (s *CertificateStore) downloadCRL(ctx context.Context, dataURL string) ([]b
 		}
 		return nil, rejected("%s", msg)
 	}
-	return io.ReadAll(resp.Body)
+	if dataFileSize > maxCRLSize {
+		return nil, rejected("CRL from %s announces %d bytes, more than %d", dataURL, dataFileSize, maxCRLSize)
+	}
+	limit := uint64(maxCRLSize)
+	if dataFileSize > 0 {
+		limit = dataFileSize
+	}
+	body, err := io.ReadAll(io.LimitReader(resp.Body, int64(limit)+1)) //nolint:gosec // limit <= maxCRLSize
+	if err != nil {
+		return nil, err
+	}
+	if dataFileSize == 0 && uint64(len(body)) > limit {
+		return nil, rejected("CRL from %s exceeds %d bytes", dataURL, limit)
+	}
+	return body, nil
 }
 
 // crlAuthority is CrlAuthority (:159-163): the validated CRL signer and the

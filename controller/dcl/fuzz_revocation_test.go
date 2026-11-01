@@ -86,6 +86,7 @@ func FuzzParseCRL(f *testing.F) {
 	f.Add(crl, true)
 	f.Add([]byte{0x30, 0x81}, false)
 	f.Add([]byte{0x30, 0x00}, false)
+	f.Add(nestedDER(1000), false) // W4-ctlint-01: deeper than derMaxDepth
 	authority := issuer.RawSubject
 	f.Fuzz(func(t *testing.T, data []byte, withAuthority bool) {
 		if len(data) > 1<<16 {
@@ -103,4 +104,40 @@ func FuzzParseCRL(f *testing.F) {
 			t.Fatalf("parsed %d serials from %d bytes", len(r.serials), len(data))
 		}
 	})
+}
+
+// nestedDER is depth SEQUENCEs, each in long-form length, around a NULL.
+func nestedDER(depth int) []byte {
+	der := []byte{0x05, 0x00}
+	for range depth {
+		n := len(der)
+		der = append([]byte{0x30, 0x84, byte(n >> 24), byte(n >> 16), byte(n >> 8), byte(n)}, der...)
+	}
+	return der
+}
+
+// TestDERDepthIsBounded pins the nesting bound of derDecodeRec: a CRL
+// nested 1000 levels deep is refused as malformed (matter.js's recursive
+// DerCodec.#decodeRec, DerCodec.ts:429-442, throws a RangeError that
+// #processRevocationPoint turns into a rejected point; in Go the stack
+// overflow would be fatal), and a nesting within derMaxDepth still
+// decodes. W4-ctlint-01.
+func TestDERDepthIsBounded(t *testing.T) {
+	t.Parallel()
+	if _, err := derDecode(nestedDER(1000)); err == nil {
+		t.Fatal("a 1000-level nesting decoded; want it refused")
+	}
+	if _, err := parseCRL(nestedDER(1000), nil); err == nil {
+		t.Fatal("parseCRL accepted a 1000-level nesting")
+	}
+	n, err := derDecode(nestedDER(derMaxDepth))
+	if err != nil {
+		t.Fatalf("a %d-level nesting: %v", derMaxDepth, err)
+	}
+	for range derMaxDepth {
+		if len(n.elements) != 1 {
+			t.Fatalf("decoded tree lost a level: %+v", n)
+		}
+		n = n.elements[0]
+	}
 }

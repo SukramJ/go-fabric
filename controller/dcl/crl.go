@@ -6,6 +6,7 @@ package dcl
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"slices"
 	"strconv"
 	"strings"
@@ -49,6 +50,13 @@ const (
 	derKeyIdentifier = 0x80
 	// derMaxLengthBytes is MAX_LENGTH_BYTES (DerCodec.ts:16).
 	derMaxLengthBytes = 6
+	// derMaxDepth bounds the nesting derDecodeRec descends; a CRL nests
+	// four or five levels. matter.js's #decodeRec (DerCodec.ts:429-442) is
+	// unbounded: a nesting deep enough throws a RangeError there, which
+	// #processRevocationPoint's catch turns into a rejected point — in Go
+	// the stack overflow is fatal, so the depth is refused as malformed
+	// before it, with the same outcome for the point.
+	derMaxDepth = 32
 )
 
 // The extensions parseCrl reads, by OID content as hex — KNOWN_CRL_EXTENSIONS
@@ -80,11 +88,14 @@ var errDERTruncated = errors.New(errDERTruncatedDescription)
 // #decodeAsn1 :444-463): the first TLV of data, a constructed one decoded
 // element by element, trailing bytes ignored.
 func derDecode(data []byte) (derNode, error) {
-	n, _, err := derDecodeRec(data)
+	n, _, err := derDecodeRec(data, 0)
 	return n, err
 }
 
-func derDecodeRec(data []byte) (derNode, []byte, error) {
+func derDecodeRec(data []byte, depth int) (derNode, []byte, error) {
+	if depth > derMaxDepth {
+		return derNode{}, nil, fmt.Errorf("dcl: DER nests deeper than %d levels", derMaxDepth)
+	}
 	if len(data) < 2 {
 		return derNode{}, nil, errDERTruncated
 	}
@@ -122,7 +133,7 @@ func derDecodeRec(data []byte) (derNode, []byte, error) {
 	}
 	n := derNode{tag: tag, bytes: content, elements: []derNode{}}
 	for r := content; len(r) > 0; {
-		el, next, err := derDecodeRec(r)
+		el, next, err := derDecodeRec(r, depth+1)
 		if err != nil {
 			return derNode{}, nil, err
 		}

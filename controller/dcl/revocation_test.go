@@ -4,6 +4,8 @@
 package dcl
 
 import (
+	"bytes"
+	"context"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
@@ -451,5 +453,28 @@ func TestSameName(t *testing.T) {
 	}
 	if !strings.HasPrefix(idText(nil), "undefined") || idText(u16(5)) != "5" {
 		t.Fatal("idText")
+	}
+}
+
+// TestDownloadCRLBounded pins the CRL download bound: a body past
+// maxCRLSize without a DataFileSize is a rejection, and one past the
+// point's DataFileSize is read only to DataFileSize+1 bytes (the size
+// check then rejects it, TestRevocationRejectedPoints). W4-ctlint-01.
+func TestDownloadCRLBounded(t *testing.T) {
+	t.Parallel()
+	f := newFakeDCL(t)
+	f.bytes("/big.crl", bytes.Repeat([]byte{0x30}, maxCRLSize+10))
+	f.bytes("/small.crl", bytes.Repeat([]byte{0x30}, 100))
+	s := &CertificateStore{}
+	s.opts.Client = f.client()
+	ctx := context.Background()
+	if _, err := s.downloadCRL(ctx, f.url("/big.crl"), 0); !isRejected(err) {
+		t.Errorf("a body past maxCRLSize: %v, want a rejection", err)
+	}
+	if b, err := s.downloadCRL(ctx, f.url("/small.crl"), 50); err != nil || len(b) != 51 {
+		t.Errorf("a body past DataFileSize: %d bytes, %v; want DataFileSize+1", len(b), err)
+	}
+	if b, err := s.downloadCRL(ctx, f.url("/small.crl"), 100); err != nil || len(b) != 100 {
+		t.Errorf("a body of DataFileSize: %d bytes, %v", len(b), err)
 	}
 }

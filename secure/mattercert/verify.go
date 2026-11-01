@@ -301,18 +301,24 @@ func (v *Verifier) VerifyAndExtractPubKey(noc, icac []byte) (*ecdsa.PublicKey, e
 		}
 		// The NOC's issuer is the certificate whose subjectKeyIdentifier
 		// its authorityKeyIdentifier names: the ICAC, or the root when a
-		// root-signed NOC is presented together with an ICAC. Mirrors
-		// matter.js packages/protocol/src/certificate/kinds/Noc.ts:170-186
-		// at 862ad75f; the ICAC used to be taken as the issuer whenever one
-		// was given, which refused such a NOC.
-		if nocCert.Extensions.HasAuthorityKeyID && !bytesEqual(nocCert.Extensions.AuthorityKeyID, icacCert.Extensions.SubjectKeyID) {
-			issuerKey = v.root
-		} else {
+		// root-signed NOC is presented together with an ICAC; an AKID that
+		// names neither is refused. Mirrors matter.js
+		// packages/protocol/src/certificate/kinds/Noc.ts:170-184 at
+		// 862ad75f. The verifier holds the root's public key, not its
+		// certificate: the root's subjectKeyIdentifier is the one the
+		// root-signed ICAC names as its authorityKeyIdentifier, which
+		// matter.js requires to be equal (Icac.ts:159-163).
+		switch {
+		case bytesEqual(nocCert.Extensions.AuthorityKeyID, icacCert.Extensions.SubjectKeyID):
 			issuerKey = icacPub
 			// Chain link check: NOC.Issuer.MatterICACID == ICAC.Subject.MatterICACID.
 			if nocCert.Issuer.MatterICACID != icacCert.Subject.MatterICACID || !icacCert.Subject.HasICACID {
 				return nil, fmt.Errorf("%w: NOC issuer ICAC-ID does not match ICAC subject", ErrChainBroken)
 			}
+		case bytesEqual(nocCert.Extensions.AuthorityKeyID, icacCert.Extensions.AuthorityKeyID):
+			issuerKey = v.root
+		default:
+			return nil, fmt.Errorf("%w: NOC authorityKeyIdentifier names neither the root nor the ICAC", ErrChainBroken)
 		}
 	} else {
 		// NOC is signed directly by the root.
@@ -391,6 +397,11 @@ func checkNOCShape(c *Certificate) error {
 	if !ext.HasSubjectKeyID || len(ext.SubjectKeyID) != 20 {
 		return fmt.Errorf("%w: NOC subjectKeyIdentifier must be 160 bit", ErrMalformed)
 	}
+	// Mirrors matter.js Noc.ts:163-168: the authority key identifier
+	// SHALL be present and 160 bit long.
+	if !ext.HasAuthorityKeyID || len(ext.AuthorityKeyID) != 20 {
+		return fmt.Errorf("%w: NOC authorityKeyIdentifier must be present and 160 bit", ErrMalformed)
+	}
 	return nil
 }
 
@@ -429,6 +440,11 @@ func checkICACShape(icac, noc *Certificate) error {
 	}
 	if !ext.HasSubjectKeyID || len(ext.SubjectKeyID) != 20 {
 		return fmt.Errorf("%w: ICAC subjectKeyIdentifier must be 160 bit", ErrMalformed)
+	}
+	// Mirrors matter.js Icac.ts:151-157: the authority key identifier
+	// SHALL be present and 160 bit long.
+	if !ext.HasAuthorityKeyID || len(ext.AuthorityKeyID) != 20 {
+		return fmt.Errorf("%w: ICAC authorityKeyIdentifier must be present and 160 bit", ErrMalformed)
 	}
 	return nil
 }

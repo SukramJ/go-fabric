@@ -317,7 +317,7 @@ func (b *Bridge) dispatchGroupMessage(ctx context.Context, buf []byte, src *net.
 			slog.Int("protocol_id", int(proto.ProtocolID)), slog.Int("opcode", int(proto.Opcode)))
 		return nil
 	}
-	if action := classifyIMOpcode(proto.Opcode, message.SessionGroup); action != imGateProceed {
+	if action := classifyIMOpcode(proto.Opcode, message.SessionGroup, 0); action != imGateProceed {
 		// Read, Subscribe and Timed are unicast-only (§8.5.7): matter.js
 		// throws InvalidAction and, on a group session, sends nothing.
 		b.logger.Debug("matter.rx.group.rejected_opcode", slog.Int("opcode", int(proto.Opcode)))

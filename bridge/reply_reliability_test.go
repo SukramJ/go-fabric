@@ -45,12 +45,14 @@ import (
 const unreliabilityTestEndpoint uint16 = 99
 
 // dispatchReliabilityTestRequest wires an ack tracker into a fresh
-// started bridge, ships buf as an unsecured (SessionID=0) datagram
-// through [Bridge.dispatch], and returns the bridge's reply datagram
-// captured on a real loopback UDP socket.
-func dispatchReliabilityTestRequest(t *testing.T, buf []byte) []byte {
+// started bridge, seals proto and payload on its PASE test session,
+// ships the datagram through [Bridge.dispatch], and returns the bridge's
+// reply datagram captured on a real loopback UDP socket, its body
+// decrypted.
+func dispatchReliabilityTestRequest(t *testing.T, proto, payload []byte) []byte {
 	t.Helper()
 	b := newStartedBridge(t)
+	buf := secureTestDatagram(t, b, proto, payload)
 	// Without a tracker, sendReplyOpts silently degrades reliable
 	// replies to best-effort (see reply.go) — wiring one is the
 	// precondition for this test to be able to observe NeedsAck=true
@@ -77,7 +79,7 @@ func dispatchReliabilityTestRequest(t *testing.T, buf []byte) []byte {
 	if err != nil {
 		t.Fatalf("ReadFromUDP: %v", err)
 	}
-	return rbuf[:n]
+	return openTestReplyFor(t, b, rbuf[:n])
 }
 
 // decodeReliabilityTestReply parses the message + protocol headers off
@@ -125,15 +127,12 @@ func encodeReliabilityTestTimedRequest(t *testing.T, timeoutMs uint16) []byte {
 func TestDispatchInvokeRequest_ReplyIsMRPReliable(t *testing.T) {
 	t.Parallel()
 
-	hdr := buildHeader(0, 30)
 	proto := buildProtocolHeader(im.InteractionModelProtocolID, im.OpcodeInvokeRequest)
 	payload := encodeTimedTestInvokeRequest(t, false, im.ConcreteCommandPath{
 		Endpoint: unreliabilityTestEndpoint, Cluster: 0x0006, Command: 0x0, // OnOff.Off — not timed-required.
 		HasEndpoint: true, HasCluster: true, HasCommand: true,
 	})
-	buf := buildDatagram(hdr, proto, payload)
-
-	got := dispatchReliabilityTestRequest(t, buf)
+	got := dispatchReliabilityTestRequest(t, proto, payload)
 	rproto := decodeReliabilityTestReply(t, got, im.OpcodeInvokeResponse)
 
 	if !rproto.NeedsAck {
@@ -150,7 +149,6 @@ func TestDispatchInvokeRequest_ReplyIsMRPReliable(t *testing.T) {
 func TestDispatchWriteRequest_ReplyIsMRPReliable(t *testing.T) {
 	t.Parallel()
 
-	hdr := buildHeader(0, 31)
 	proto := buildProtocolHeader(im.InteractionModelProtocolID, im.OpcodeWriteRequest)
 	writePayload, err := encodeScenarioWriteRequest(im.ConcreteAttributePath{
 		Endpoint: unreliabilityTestEndpoint, Cluster: 0x0006, Attribute: 0x0000, // OnOff.OnOff
@@ -159,9 +157,7 @@ func TestDispatchWriteRequest_ReplyIsMRPReliable(t *testing.T) {
 	if err != nil {
 		t.Fatalf("encodeScenarioWriteRequest: %v", err)
 	}
-	buf := buildDatagram(hdr, proto, writePayload)
-
-	got := dispatchReliabilityTestRequest(t, buf)
+	got := dispatchReliabilityTestRequest(t, proto, writePayload)
 	rproto := decodeReliabilityTestReply(t, got, im.OpcodeWriteResponse)
 
 	if !rproto.NeedsAck {
@@ -178,12 +174,9 @@ func TestDispatchWriteRequest_ReplyIsMRPReliable(t *testing.T) {
 func TestDispatchTimedRequest_ReplyIsMRPReliable(t *testing.T) {
 	t.Parallel()
 
-	hdr := buildHeader(0, 32)
 	proto := buildProtocolHeader(im.InteractionModelProtocolID, im.OpcodeTimedRequest)
 	payload := encodeReliabilityTestTimedRequest(t, 5000)
-	buf := buildDatagram(hdr, proto, payload)
-
-	got := dispatchReliabilityTestRequest(t, buf)
+	got := dispatchReliabilityTestRequest(t, proto, payload)
 	rproto := decodeReliabilityTestReply(t, got, im.OpcodeStatusResponse)
 
 	if !rproto.NeedsAck {

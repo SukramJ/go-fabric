@@ -98,13 +98,12 @@ func TestDispatchInvokeRequest_TimedRequiredWithoutWindow_NeedsTimedInteraction(
 		t.Fatalf("unexpected peer addr type %T", peerConn.LocalAddr())
 	}
 
-	hdr := buildHeader(0, 20)
 	proto := buildProtocolHeader(im.InteractionModelProtocolID, im.OpcodeInvokeRequest)
 	payload := encodeTimedTestInvokeRequest(t, false, im.ConcreteCommandPath{
 		Endpoint: 1, Cluster: 0x003C, Command: 0x0, // AdministratorCommissioning.OpenCommissioningWindow
 		HasEndpoint: true, HasCluster: true, HasCommand: true,
 	})
-	buf := buildDatagram(hdr, proto, payload)
+	buf := secureTestDatagram(t, b, proto, payload)
 
 	if err := b.dispatch(context.Background(), buf, peerAddr); err != nil {
 		t.Fatalf("dispatch: %v", err)
@@ -116,7 +115,7 @@ func TestDispatchInvokeRequest_TimedRequiredWithoutWindow_NeedsTimedInteraction(
 	if err != nil {
 		t.Fatalf("ReadFromUDP: %v", err)
 	}
-	got := rbuf[:n]
+	got := openTestReplyFor(t, b, rbuf[:n])
 
 	_, hdrLen, err := message.UnmarshalHeader(got)
 	if err != nil {

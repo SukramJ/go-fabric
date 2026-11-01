@@ -60,9 +60,10 @@ func encodeWriteChunkedTestRequest(t *testing.T, suppressResponse, timedRequest,
 	return body
 }
 
-// dispatchWriteChunkedTestRequest ships buf as an unsecured
-// (SessionID=0) datagram through [Bridge.dispatch] and returns the
-// bridge's reply datagram captured on a real loopback UDP socket.
+// dispatchWriteChunkedTestRequest ships buf (sealed by
+// secureTestDatagram) through [Bridge.dispatch] and returns the
+// bridge's reply datagram captured on a real loopback UDP socket, its
+// body decrypted.
 func dispatchWriteChunkedTestRequest(t *testing.T, b *Bridge, buf []byte) []byte {
 	t.Helper()
 	peerConn, err := net.ListenUDP("udp", &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 0})
@@ -85,7 +86,7 @@ func dispatchWriteChunkedTestRequest(t *testing.T, b *Bridge, buf []byte) []byte
 	if err != nil {
 		t.Fatalf("ReadFromUDP: %v", err)
 	}
-	return rbuf[:n]
+	return openTestReplyFor(t, b, rbuf[:n])
 }
 
 // decodeWriteChunkedStatusResponse asserts got is a StatusResponse and
@@ -135,13 +136,12 @@ func TestDispatchWriteRequest_ChunkedSuppressResponse_RejectsSilently(t *testing
 	}
 	t.Cleanup(func() { _ = b.Stop(context.Background()) })
 
-	hdr := buildHeader(0, 40)
 	proto := buildProtocolHeader(im.InteractionModelProtocolID, im.OpcodeWriteRequest)
 	payload := encodeWriteChunkedTestRequest(t, true, false, true, im.ConcreteAttributePath{
 		Endpoint: unreliabilityTestEndpoint, Cluster: 0x0006, Attribute: 0x0000,
 		HasEndpoint: true, HasCluster: true, HasAttribute: true,
 	})
-	buf := buildDatagram(hdr, proto, payload)
+	buf := secureTestDatagram(t, b, proto, payload)
 
 	peerConn, err := net.ListenUDP("udp", &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 0})
 	if err != nil {
@@ -172,18 +172,17 @@ func TestDispatchWriteRequest_TimedWithMoreChunked_RejectsInvalidActionAndConsum
 	t.Parallel()
 	b := newStartedBridge(t)
 	const (
-		sessionID  = uint16(0)
+		sessionID  = paseTestSessionID
 		exchangeID = uint16(1) // buildProtocolHeader fixes ExchangeID at 1.
 	)
 	b.routing.timedDeadlines.Store(timedKey{sessionID: sessionID, exchangeID: exchangeID}, time.Now().Add(10*time.Second))
 
-	hdr := buildHeader(sessionID, 41)
 	proto := buildProtocolHeader(im.InteractionModelProtocolID, im.OpcodeWriteRequest)
 	payload := encodeWriteChunkedTestRequest(t, false, true, true, im.ConcreteAttributePath{
 		Endpoint: unreliabilityTestEndpoint, Cluster: 0x0006, Attribute: 0x0000,
 		HasEndpoint: true, HasCluster: true, HasAttribute: true,
 	})
-	buf := buildDatagram(hdr, proto, payload)
+	buf := secureTestDatagram(t, b, proto, payload)
 
 	got := dispatchWriteChunkedTestRequest(t, b, buf)
 	status := decodeWriteChunkedStatusResponse(t, got)
@@ -207,13 +206,12 @@ func TestDispatchWriteRequest_ChunkedUntimedNotSuppressed_DispatchesAndRepliesWr
 	t.Parallel()
 	b := newStartedBridge(t)
 
-	hdr := buildHeader(0, 42)
 	proto := buildProtocolHeader(im.InteractionModelProtocolID, im.OpcodeWriteRequest)
 	payload := encodeWriteChunkedTestRequest(t, false, false, true, im.ConcreteAttributePath{
 		Endpoint: unreliabilityTestEndpoint, Cluster: 0x0006, Attribute: 0x0000,
 		HasEndpoint: true, HasCluster: true, HasAttribute: true,
 	})
-	buf := buildDatagram(hdr, proto, payload)
+	buf := secureTestDatagram(t, b, proto, payload)
 
 	got := dispatchWriteChunkedTestRequest(t, b, buf)
 	decodeReliabilityTestReply(t, got, im.OpcodeWriteResponse)

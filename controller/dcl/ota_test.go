@@ -218,3 +218,26 @@ func TestOTADownload(t *testing.T) {
 		t.Fatalf("unreachable: %v", err)
 	}
 }
+
+// TestOTADownloadBoundedByTheAnnouncedSize pins that Download copies at
+// most OTAFileSize bytes: an OTA host that answers more than the ledger
+// announced gets an OTAError, and an answer of the announced size passes.
+// W4-ctlint-02.
+func TestOTADownloadBoundedByTheAnnouncedSize(t *testing.T) {
+	t.Parallel()
+	f := newFakeDCL(t)
+	f.bytes("/image.ota", bytes.Repeat([]byte{0xAA}, 4096))
+	o := &OTAVersions{Client: f.client()}
+	var buf bytes.Buffer
+	var oe *OTAError
+	if err := o.Download(context.Background(), SoftwareVersion{OTAURL: f.url("/image.ota"), OTAFileSize: 1024}, &buf); !errors.As(err, &oe) || !strings.Contains(err.Error(), "exceeds its announced size") {
+		t.Errorf("an answer past OTAFileSize: %v, want the OTAError", err)
+	}
+	if buf.Len() > 1025 {
+		t.Errorf("copied %d bytes, want at most OTAFileSize+1", buf.Len())
+	}
+	buf.Reset()
+	if err := o.Download(context.Background(), SoftwareVersion{OTAURL: f.url("/image.ota"), OTAFileSize: 4096}, &buf); err != nil || buf.Len() != 4096 {
+		t.Errorf("an answer of the announced size: %d bytes, %v", buf.Len(), err)
+	}
+}

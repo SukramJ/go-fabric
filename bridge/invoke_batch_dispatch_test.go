@@ -108,7 +108,7 @@ func dispatchInvokeCapture(t *testing.T, b *Bridge, buf []byte, timeout time.Dur
 		}
 		t.Fatalf("ReadFromUDP: %v", err)
 	}
-	return rbuf[:n], true
+	return openTestReplyFor(t, b, rbuf[:n]), true
 }
 
 // TestDispatchInvokeRequest_BatchMissingCommandRef_RejectsInvalidAction drives a
@@ -121,7 +121,6 @@ func TestDispatchInvokeRequest_BatchMissingCommandRef_RejectsInvalidAction(t *te
 	t.Parallel()
 	b := newStartedBridge(t)
 
-	hdr := buildHeader(0, 50)
 	proto := buildProtocolHeader(im.InteractionModelProtocolID, im.OpcodeInvokeRequest)
 	// Two OnOff commands (0x0006/On + Off) — not timed-required, so the batch
 	// guard (not the timed gate) is what rejects the request.
@@ -130,7 +129,7 @@ func TestDispatchInvokeRequest_BatchMissingCommandRef_RejectsInvalidAction(t *te
 		im.ConcreteCommandPath{Endpoint: unreliabilityTestEndpoint, Cluster: 0x0006, Command: 0x01, HasEndpoint: true, HasCluster: true, HasCommand: true},
 		im.ConcreteCommandPath{Endpoint: unreliabilityTestEndpoint, Cluster: 0x0006, Command: 0x00, HasEndpoint: true, HasCluster: true, HasCommand: true},
 	)
-	buf := buildDatagram(hdr, proto, payload)
+	buf := secureTestDatagram(t, b, proto, payload)
 
 	got, ok := dispatchInvokeCapture(t, b, buf, 2*time.Second)
 	if !ok {
@@ -155,7 +154,6 @@ func TestDispatchInvokeRequest_BatchExceedsMaxPaths_RejectsInvalidAction(t *test
 	t.Parallel()
 	b := newStartedBridge(t)
 
-	hdr := buildHeader(0, 52)
 	proto := buildProtocolHeader(im.InteractionModelProtocolID, im.OpcodeInvokeRequest)
 
 	paths := make([]im.ConcreteCommandPath, im.DefaultMaxPathsPerInvoke+1)
@@ -170,7 +168,7 @@ func TestDispatchInvokeRequest_BatchExceedsMaxPaths_RejectsInvalidAction(t *test
 	// attributed to the path-count check, not the separate
 	// missing-CommandRef rule (which would also reject this batch).
 	payload := encodeInvokeRequestWithRefs(t, paths...)
-	buf := buildDatagram(hdr, proto, payload)
+	buf := secureTestDatagram(t, b, proto, payload)
 
 	got, ok := dispatchInvokeCapture(t, b, buf, 2*time.Second)
 	if !ok {
@@ -193,13 +191,12 @@ func TestDispatchInvokeRequest_SuppressResponseStatusOnly_SendsNothing(t *testin
 	t.Parallel()
 	b := newStartedBridge(t)
 
-	hdr := buildHeader(0, 51)
 	proto := buildProtocolHeader(im.InteractionModelProtocolID, im.OpcodeInvokeRequest)
 	payload := encodeInvokeRequestSuppress(
 		t, true,
 		im.ConcreteCommandPath{Endpoint: unreliabilityTestEndpoint, Cluster: 0x0006, Command: 0x00, HasEndpoint: true, HasCluster: true, HasCommand: true},
 	)
-	buf := buildDatagram(hdr, proto, payload)
+	buf := secureTestDatagram(t, b, proto, payload)
 
 	if got, ok := dispatchInvokeCapture(t, b, buf, 600*time.Millisecond); ok {
 		t.Fatalf("expected no reply for a suppress-response status-only invoke, got %d-byte datagram", len(got))

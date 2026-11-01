@@ -12,6 +12,7 @@ import (
 
 	"github.com/SukramJ/go-fabric/clock/clocktest"
 	"github.com/SukramJ/go-fabric/cluster/onoff"
+	"github.com/SukramJ/go-fabric/cluster/spec"
 	onoffdef "github.com/SukramJ/go-fabric/cluster/spec/onoff"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
@@ -485,5 +486,24 @@ func TestOnWithTimedOffPayload(t *testing.T) {
 	f := newFixture(t, onoff.FeatureLT, nil)
 	if err := f.invoke(onoff.CmdOnWithTimedOff, nil); statusOf(err) != im.StatusInvalidCommand {
 		t.Errorf("nil payload: %v", err)
+	}
+}
+
+// statusSink refuses every change with a host status.
+type statusSink struct{ err error }
+
+func (s statusSink) SetOnOff(context.Context, bool) error { return s.err }
+
+// TestSinkStatusPassesThrough: a sink's contract.StatusError answers its
+// own status, not FAILURE (docs/guides/device.md, ports.md; review
+// W6-doc-01, as v0.15.6 did for the other kit servers).
+func TestSinkStatusPassesThrough(t *testing.T) {
+	t.Parallel()
+	srv, err := onoff.New(onoff.Config{Sink: statusSink{err: contract.StatusError{Status: uint8(im.StatusBusy), Message: "relay cooling down"}}, TimeSource: newFakeClock()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := srv.MatterInvoke(context.Background(), onoff.CmdOn, nil); spec.StatusOf(err) != im.StatusBusy {
+		t.Errorf("On refused with a host status answered %v, want BUSY", err)
 	}
 }

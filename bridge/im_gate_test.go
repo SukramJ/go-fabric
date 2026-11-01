@@ -65,11 +65,35 @@ func TestClassifyIMOpcode(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			got := classifyIMOpcode(tc.opcode, tc.sessionType)
+			// A secure session id: the unicast rows are secure unicast
+			// sessions (session id 0 is TestClassifyIMOpcode_Unsecured).
+			got := classifyIMOpcode(tc.opcode, tc.sessionType, 1)
 			if got != tc.want {
 				t.Errorf("classifyIMOpcode(0x%02X, %v) = %v, want %v",
 					tc.opcode, tc.sessionType, got, tc.want)
 			}
 		})
+	}
+}
+
+// TestClassifyIMOpcode_Unsecured pins the secure-session guard: every IM
+// opcode on the unsecured session (unicast session type, session id 0)
+// is dropped before decode, the request opcodes included. Parity: matter.js
+// packages/node/src/node/server/InteractionServer.ts:161
+// (`requiresSecureSession = true`) and
+// packages/protocol/src/protocol/ExchangeManager.ts:391-412 (a security
+// mismatch opens no exchange).
+func TestClassifyIMOpcode_Unsecured(t *testing.T) {
+	t.Parallel()
+	opcodes := []uint8{
+		im.OpcodeStatusResponse, im.OpcodeReadRequest, im.OpcodeSubscribeRequest,
+		im.OpcodeSubscribeResponse, im.OpcodeReportData, im.OpcodeWriteRequest,
+		im.OpcodeWriteResponse, im.OpcodeInvokeRequest, im.OpcodeInvokeResponse,
+		im.OpcodeTimedRequest, 0x00, 0xFF,
+	}
+	for _, op := range opcodes {
+		if got := classifyIMOpcode(op, message.SessionUnsecured, 0); got != imGateDropUnsecured {
+			t.Errorf("classifyIMOpcode(0x%02X, unsecured, 0) = %v, want imGateDropUnsecured", op, got)
+		}
 	}
 }

@@ -490,3 +490,23 @@ func TestDimensionSetters(t *testing.T) {
 		t.Error("an unset CurrentState is not null")
 	}
 }
+
+// TestHandlerStatusPassesThrough: a handler's contract.StatusError
+// answers its own status for SetTarget and Step, not FAILURE
+// (docs/guides/device.md, ports.md; review W6-doc-01, as v0.15.6 did for
+// the other kit servers).
+func TestHandlerStatusPassesThrough(t *testing.T) {
+	t.Parallel()
+	p := &panel{failWith: contract.StatusError{Status: uint8(im.StatusBusy), Message: "motor busy"}}
+	cfg := chipPanel(p)
+	// Unlatched, so both commands pass chip's latch gate.
+	cfg.CurrentState.Latch = latch(false)
+	srv := newDimension(t, cfg)
+	ctx := context.Background()
+	if _, err := srv.MatterInvoke(ctx, cd.CmdSetTarget, cd.SetTargetRequest{Position: ptr[uint16](3000)}); spec.StatusOf(err) != im.StatusBusy {
+		t.Errorf("SetTarget refused with a host status answered %v, want BUSY", err)
+	}
+	if _, err := srv.MatterInvoke(ctx, cd.CmdStep, cd.StepRequest{Direction: cd.StepDirectionEnum(0), NumberOfSteps: 1}); spec.StatusOf(err) != im.StatusBusy {
+		t.Errorf("Step refused with a host status answered %v, want BUSY", err)
+	}
+}

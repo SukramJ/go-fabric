@@ -19,6 +19,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"sync"
 	"testing"
 
 	"github.com/SukramJ/go-fabric/secure/sigma"
@@ -46,6 +47,29 @@ func (caseTestVerifier) VerifyAndExtractPubKey(noc, _ []byte) (*ecdsa.PublicKey,
 	return pub, nil
 }
 
+// caseTestSubjects is the rig's adapter for the NOC subject: the fixture
+// NOC is a bare public key, so newCaseIdentity records its node and
+// fabric id here and caseTestVerifier answers the extractor surfaces a
+// responder with an identity requires (it fails closed without them,
+// W1-sec-01).
+var caseTestSubjects sync.Map // string(noc) → [2]uint64{nodeID, fabricID}
+
+func (caseTestVerifier) PeerNodeIDFromNOC(noc []byte) (uint64, error) {
+	s, ok := caseTestSubjects.Load(string(noc))
+	if !ok {
+		return 0, errors.New("caseTestVerifier: no subject for noc fixture")
+	}
+	return s.([2]uint64)[0], nil
+}
+
+func (caseTestVerifier) PeerFabricIDFromNOC(noc []byte) (uint64, error) {
+	s, ok := caseTestSubjects.Load(string(noc))
+	if !ok {
+		return 0, errors.New("caseTestVerifier: no subject for noc fixture")
+	}
+	return s.([2]uint64)[1], nil
+}
+
 func newCaseIdentity(t *testing.T, nodeID, fabricID uint64, ipk [16]byte) *sigma.Identity {
 	t.Helper()
 	priv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
@@ -60,6 +84,7 @@ func newCaseIdentity(t *testing.T, nodeID, fabricID uint64, ipk [16]byte) *sigma
 	if err != nil {
 		t.Fatalf("newCaseIdentity: PublicKey.Bytes: %v", err)
 	}
+	caseTestSubjects.Store(string(noc), [2]uint64{nodeID, fabricID})
 	return &sigma.Identity{NOC: noc, PrivateKey: priv, NodeID: nodeID, FabricID: fabricID, IPK: ipk}
 }
 

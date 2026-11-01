@@ -585,8 +585,15 @@ func (n *Node) reopenWhenIdle() {
 // fabricUpdated is OperationalCredentials' OnFabricUpdated
 // (main.go:387-406 at b4ea1f96^): UpdateNOC moves the CASE identity and the
 // operational record, and ends the fabric's other sessions, each told
-// with a CloseSession (Bridge.CloseFabricSessionsExcept).
+// with a CloseSession (Bridge.CloseFabricSessionsExcept). The fabric's
+// resumption records go with the replaced identity, so no peer resumes a
+// session established under the old NOC. Mirrors matter.js
+// packages/protocol/src/common/FailsafeContext.ts:167-170 (replaceFabric →
+// SessionManager.deleteResumptionRecordsForFabric, SessionManager.ts:491).
 func (n *Node) fabricUpdated(ctx context.Context, fabricIndex uint8) {
+	if err := n.st.RemoveResumptionsByFabric(ctx, fabricIndex); err != nil {
+		n.logger.Warn("case.resumption.remove_failed", slog.Int("fabric_index", int(fabricIndex)), slog.Any("err", err))
+	}
 	oldCompressed, oldNode, hadOld := n.caseIDs.announceIdentity(fabricIndex)
 	if err := n.caseIDs.load(ctx, n.st, fabricIndex); err != nil {
 		n.logger.Warn("case.identity.reload_failed", slog.Any("err", err))
@@ -663,6 +670,12 @@ func (n *Node) observedFabricChanged(ctx context.Context, fabricIndex uint8) {
 // (root.go).
 func (n *Node) commissioningCompleted(ctx context.Context, fabricIndex uint8) {
 	n.failSafeCommitted(ctx)
+	// Matter §11.10.6.6 step 4: the PASE sessions are cleared — after the
+	// response and a grace, since the command itself arrives over the
+	// fabric-adopted PASE session. Mirrors matter.js
+	// packages/protocol/src/common/FailsafeContext.ts:150-153
+	// (completeCommission → closePaseSession).
+	n.closePASESessions(ctx, paseCloseGrace)
 	n.ensureOTAProviderACL(ctx)
 	n.ensureRequestorACL(ctx)
 	for _, o := range n.observerList() {

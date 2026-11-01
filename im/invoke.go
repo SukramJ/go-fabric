@@ -582,13 +582,16 @@ func HandleInvokeRequest(ctx context.Context, d Dispatcher, req InvokeRequest) I
 	// itself passed — PASE holds the implicit Administer, a CASE subject
 	// what the ACL grants, and nothing is granted without an ACL source.
 	ctx = WithAuthority(ctx, func(endpoint uint16, clusterID uint32, privilege uint8) StatusCode {
-		if g.pase || g.fabricIndex == 0 {
+		if g.pase {
 			return StatusSuccess
 		}
 		if !g.hasACL {
+			if g.fabricIndex == 0 {
+				return StatusSuccess
+			}
 			return StatusUnsupportedAccess
 		}
-		return g.aclChecker.CheckACL(g.ctx, g.fabricIndex, g.subjectNodeID, g.subjectCATs, endpoint, clusterID, privilege)
+		return checkSubjectACL(g.ctx, g.aclChecker, g.fabricIndex, g.subjectNodeID, g.subjectCATs, endpoint, clusterID, privilege)
 	})
 
 	var ir InvokeResponse
@@ -735,8 +738,9 @@ func (g *invokeGate) concrete(inv CommandInvocation) StatusCode {
 	// OpenCommissioningWindow, … → Administer) rather than a flat
 	// Operate, so an Operate-only subject cannot invoke an
 	// administrative command.
-	if g.hasACL && !g.pase && g.fabricIndex != 0 {
-		if status := g.aclChecker.CheckACL(g.ctx, g.fabricIndex, g.subjectNodeID, g.subjectCATs, inv.Path.Endpoint, inv.Path.Cluster, g.invokePrivilege(inv.Path)); !status.IsSuccess() {
+	// No fabric and not PASE fails closed (checkSubjectACL).
+	if g.hasACL && !g.pase {
+		if status := checkSubjectACL(g.ctx, g.aclChecker, g.fabricIndex, g.subjectNodeID, g.subjectCATs, inv.Path.Endpoint, inv.Path.Cluster, g.invokePrivilege(inv.Path)); !status.IsSuccess() {
 			return status
 		}
 	}
@@ -776,8 +780,8 @@ func (g *invokeGate) concrete(inv CommandInvocation) StatusCode {
 // CommandInvokeResponse.ts:367-412 at 862ad75f).
 func (g *invokeGate) wildcardTarget(endpoint uint16, clusterID, commandID uint32) StatusCode {
 	at := ConcreteCommandPath{Endpoint: endpoint, Cluster: clusterID, Command: commandID, HasEndpoint: true, HasCluster: true, HasCommand: true}
-	if g.hasACL && !g.pase && g.fabricIndex != 0 {
-		if status := g.aclChecker.CheckACL(g.ctx, g.fabricIndex, g.subjectNodeID, g.subjectCATs, endpoint, clusterID, g.invokePrivilege(at)); !status.IsSuccess() {
+	if g.hasACL && !g.pase {
+		if status := checkSubjectACL(g.ctx, g.aclChecker, g.fabricIndex, g.subjectNodeID, g.subjectCATs, endpoint, clusterID, g.invokePrivilege(at)); !status.IsSuccess() {
 			return status
 		}
 	}

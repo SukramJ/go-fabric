@@ -250,8 +250,10 @@ func HandleWriteRequest(ctx context.Context, d Dispatcher, req WriteRequest) Wri
 	// PASE skips ACL: commissioning writes arrive before the fabric's ACL
 	// entry exists, and the commissioner keeps writing (AccessControl.ACL
 	// above all) over the same PASE channel after AddNOC adopted it onto
-	// the new fabric — hence the auth-mode term alongside fabricIndex==0.
-	aclActive := hasACL && !pase && fabricIndex != 0
+	// the new fabric — hence the auth-mode term. Without a fabric and
+	// without PASE the gate stays active and fails closed
+	// (checkSubjectACL).
+	aclActive := hasACL && !pase
 
 	// writePrivilege returns the minimum privilege needed to write the
 	// given resolved (endpoint, cluster, attribute). Falls back to
@@ -312,7 +314,7 @@ func HandleWriteRequest(ctx context.Context, d Dispatcher, req WriteRequest) Wri
 		}
 		if aclActive && w.Path.HasEndpoint && !sameAsLast {
 			priv := writePrivilege(w.Path.Endpoint, w.Path.Cluster, w.Path.Attribute)
-			if status := aclChecker.CheckACL(ctx, fabricIndex, subjectNodeID, subjectCATs, w.Path.Endpoint, w.Path.Cluster, priv); !status.IsSuccess() {
+			if status := checkSubjectACL(ctx, aclChecker, fabricIndex, subjectNodeID, subjectCATs, w.Path.Endpoint, w.Path.Cluster, priv); !status.IsSuccess() {
 				wr.Responses = append(wr.Responses, AttributeStatus{
 					Path:   w.Path,
 					Status: StatusIB{Status: status},
@@ -356,7 +358,7 @@ func HandleWriteRequest(ctx context.Context, d Dispatcher, req WriteRequest) Wri
 			results = d.Write(ctx, w.Path, w.Value)
 		case hasAuthWriter:
 			results = authWriter.WriteAuthorized(ctx, w.Path, w.Value, func(endpoint uint16, clusterID, attrID uint32) StatusCode {
-				return aclChecker.CheckACL(ctx, fabricIndex, subjectNodeID, subjectCATs, endpoint, clusterID, writePrivilege(endpoint, clusterID, attrID))
+				return checkSubjectACL(ctx, aclChecker, fabricIndex, subjectNodeID, subjectCATs, endpoint, clusterID, writePrivilege(endpoint, clusterID, attrID))
 			})
 		default:
 			// ACL enforcement is on but this dispatcher cannot authorize

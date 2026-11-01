@@ -55,7 +55,9 @@ func TestCommissioningCompleteClearsThePendingCredentialState(t *testing.T) {
 	if err := root.GeneralCommissioning.ArmFailSafeFor(ctx, 60, fabric); err != nil {
 		t.Fatalf("ArmFailSafeFor: %v", err)
 	}
-	if _, err := root.OperationalCredentials.MatterInvoke(ctx, 0x04, mattercore.CSRRequest{CSRNonce: make([]byte, 32)}); err != nil {
+	// The CSR comes from the fabric the window is armed for: a window is
+	// armed for its accessing fabric only (chip FailSafeContext.h:76-79).
+	if _, err := root.OperationalCredentials.MatterInvoke(im.WithFabricFilter(ctx, false, fabric), 0x04, mattercore.CSRRequest{CSRNonce: make([]byte, 32)}); err != nil {
 		t.Fatalf("CSRRequest: %v", err)
 	}
 

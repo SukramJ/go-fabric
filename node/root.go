@@ -197,7 +197,7 @@ func buildRoot(ctx context.Context, d rootDeps) (*RootClusters, error) { //nolin
 		// The CASE identity is rebuilt from the freshly written fabric
 		// (wiring.go:166-170 at b4ea1f96^).
 		OnFabricInstalled: d.onFabricInstalled,
-		IsFailSafeArmed:   generalCom.FailSafeArmed,
+		FailSafe:          generalCom.FailSafeFabric,
 		// A successful AddNOC re-arms the fail-safe onto its fabric, Matter
 		// §11.18.6.16 (wiring.go:172-178 at b4ea1f96^).
 		RearmFailSafeForFabric: generalCom.SetCurrentFabric,

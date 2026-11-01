@@ -975,9 +975,9 @@ func TestAccessControl_MatterWrite_WrongType(t *testing.T) {
 	}
 }
 
-// TestAccessControl_MatterWrite_FabricFallbackFromEntry verifies that when
-// currentFabric==0 and entries[0].FabricIndex>0, the fabric is taken from
-// entries[0].FabricIndex.
+// TestAccessControl_MatterWrite_FabricFallbackFromEntry verifies that a
+// local write (no IM request context, matter.js setStateOf) with
+// currentFabric==0 takes the fabric from entries[0].FabricIndex.
 func TestAccessControl_MatterWrite_FabricFallbackFromEntry(t *testing.T) {
 	t.Parallel()
 	ac, err := core.NewAccessControl(&fakeACLStore{})
@@ -997,16 +997,61 @@ func TestAccessControl_MatterWrite_FabricFallbackFromEntry(t *testing.T) {
 	}
 }
 
-// TestAccessControl_MatterWrite_FabricLastResort verifies the last-resort
-// fabric=1 assignment when currentFabric==0 AND entries is empty.
+// TestAccessControl_MatterWrite_FabricLastResort verifies that a write
+// without any fabric — currentFabric==0 AND an empty entry list — is
+// refused with UnsupportedAccess instead of landing on fabric 1.
 func TestAccessControl_MatterWrite_FabricLastResort(t *testing.T) {
 	t.Parallel()
 	ac, err := core.NewAccessControl(&fakeACLStore{})
 	if err != nil {
 		t.Fatalf("NewAccessControl: %v", err)
 	}
-	if err = writeACL(ac, []core.AccessControlEntryStruct{}); err != nil {
-		t.Fatalf("MatterWrite(ACL, empty): %v", err)
+	if err = writeACL(ac, []core.AccessControlEntryStruct{}); statusOf(err) != im.StatusUnsupportedAccess {
+		t.Fatalf("MatterWrite(ACL, empty, no fabric) = %v, want UnsupportedAccess", err)
+	}
+}
+
+// recordingACLStore counts ReplaceACL calls.
+type recordingACLStore struct {
+	fakeACLStore
+	replaced int
+}
+
+func (r *recordingACLStore) ReplaceACL(_ context.Context, _ uint8, _ []mstore.ACLEntry) error {
+	r.replaced++
+	return nil
+}
+
+// TestAccessControl_MatterWrite_NoAccessingFabricIsUnsupportedAccess pins
+// that an IM write of the fabric-scoped ACL or Extension list without an
+// accessing fabric (a PASE session before AddNOC) answers
+// UnsupportedAccess and stores nothing — whatever FabricIndex the entries
+// carry. Parity: chip src/app/WriteHandler.cpp:805-811 at 6170af84 and
+// matter.js packages/protocol/src/action/server/AccessControl.ts:358-365
+// (authorizeWrite, "No accessing fabric", Status.UnsupportedAccess).
+func TestAccessControl_MatterWrite_NoAccessingFabricIsUnsupportedAccess(t *testing.T) {
+	t.Parallel()
+	st := &recordingACLStore{}
+	ac, err := core.NewAccessControl(st)
+	if err != nil {
+		t.Fatalf("NewAccessControl: %v", err)
+	}
+	ac.SetCurrentFabric(1) // a legacy hook value must not stand in for the request's fabric
+	noFabric := im.WithFabricFilter(context.Background(), false, 0)
+	for _, entries := range [][]core.AccessControlEntryStruct{
+		{},
+		{{Privilege: 5, AuthMode: 2, Subjects: []uint64{1}, FabricIndex: 2}},
+	} {
+		if err := ac.MatterWrite(noFabric, 0x0000, entries); statusOf(err) != im.StatusUnsupportedAccess {
+			t.Errorf("ACL write %+v without accessing fabric = %v, want UnsupportedAccess", entries, err)
+		}
+	}
+	ext := []core.AccessControlExtensionEntry{{Data: []byte{0x17, 0x18}, FabricIndex: 2}}
+	if err := ac.MatterWrite(noFabric, 0x0001, ext); statusOf(err) != im.StatusUnsupportedAccess {
+		t.Errorf("Extension write without accessing fabric = %v, want UnsupportedAccess", err)
+	}
+	if st.replaced != 0 {
+		t.Errorf("ReplaceACL called %d times, want 0", st.replaced)
 	}
 }
 

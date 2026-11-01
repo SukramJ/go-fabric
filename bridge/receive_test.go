@@ -149,6 +149,119 @@ func loopbackSrc() *net.UDPAddr {
 	return &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 65000}
 }
 
+// paseTestSessionID is the secure session the IM routing tests seal their
+// requests on: the Interaction Model runs on secure sessions only
+// (classifyIMOpcode drops session 0), and a PASE session keeps the
+// commissioning channel's implicit Administer grant, so the requests
+// reach the handlers as the former session-0 datagrams did.
+const paseTestSessionID uint16 = 0x0F0F
+
+// paseTestLookup is a [SessionLookup] and [SessionPASEResolver] holding
+// one PASE session; peer is the peer's side of it, which seals the
+// test's requests and opens the bridge's replies.
+type paseTestLookup struct {
+	id   uint16
+	sess *channel.Session
+	peer *channel.Session
+}
+
+func (l paseTestLookup) Lookup(id uint16) (*channel.Session, bool) {
+	if id == l.id {
+		return l.sess, true
+	}
+	return nil, false
+}
+
+func (l paseTestLookup) IsPASE(id uint16) (pase, ok bool) { return id == l.id, id == l.id }
+
+// newPASETestSessions builds the bridge's and the peer's side of a
+// session with fixed keys and returns the bridge's lookup and the peer's
+// session.
+func newPASETestSessions(t *testing.T) (paseTestLookup, *channel.Session) {
+	t.Helper()
+	bridgeKey := []byte("go-fabric-bridge")
+	peerKey := []byte("go-fabric-peer-k")
+	const (
+		bridgeNodeID uint64 = 0xAAAA5555
+		peerNodeID   uint64 = 0xBBBB6666
+	)
+	bridgeSess, err := channel.New(channel.Config{EncryptKey: bridgeKey, DecryptKey: peerKey, LocalNodeID: bridgeNodeID, PeerNodeID: peerNodeID, InitialCounter: 900})
+	if err != nil {
+		t.Fatalf("bridge session: %v", err)
+	}
+	peerSess, err := channel.New(channel.Config{EncryptKey: peerKey, DecryptKey: bridgeKey, LocalNodeID: peerNodeID, PeerNodeID: bridgeNodeID, InitialCounter: 1000})
+	if err != nil {
+		t.Fatalf("peer session: %v", err)
+	}
+	return paseTestLookup{id: paseTestSessionID, sess: bridgeSess, peer: peerSess}, peerSess
+}
+
+// attachPASETestPeer attaches a PASE session to b — or reuses the one
+// already attached — and returns the peer's side of it.
+func attachPASETestPeer(t *testing.T, b *Bridge) *channel.Session {
+	t.Helper()
+	b.mu.RLock()
+	current, ok := b.sessions.(paseTestLookup)
+	b.mu.RUnlock()
+	if ok {
+		return current.peer
+	}
+	lookup, peerSess := newPASETestSessions(t)
+	b.AttachSessionLookup(lookup)
+	return peerSess
+}
+
+// secureTestDatagram seals an IM request for b on its PASE test session,
+// attaching the session on first use.
+func secureTestDatagram(t *testing.T, b *Bridge, proto, payload []byte) []byte {
+	t.Helper()
+	return sealTestDatagram(t, attachPASETestPeer(t, b), proto, payload)
+}
+
+// openTestReplyFor returns the reply datagram got with its body
+// decrypted when b runs the PASE test session, and got unchanged
+// otherwise — the header-then-protocol-header decoders of the tests read
+// either.
+func openTestReplyFor(t *testing.T, b *Bridge, got []byte) []byte {
+	t.Helper()
+	b.mu.RLock()
+	current, ok := b.sessions.(paseTestLookup)
+	b.mu.RUnlock()
+	if !ok {
+		return got
+	}
+	return openTestReply(t, current.peer, got)
+}
+
+// sealTestDatagram seals a protocol header and payload from the peer on
+// the PASE test session and returns the wire datagram.
+func sealTestDatagram(t *testing.T, peerSess *channel.Session, proto, payload []byte) []byte {
+	t.Helper()
+	hdr := message.Header{SessionID: paseTestSessionID}
+	body := append(append([]byte{}, proto...), payload...)
+	enc, err := peerSess.Encrypt(&hdr, securityFlagsByte(&hdr), body)
+	if err != nil {
+		t.Fatalf("peer Encrypt: %v", err)
+	}
+	return append(hdr.Marshal(), enc.Ciphertext...)
+}
+
+// openTestReply decrypts a datagram the bridge sealed for the peer and
+// returns it with the plaintext body: the message header, the protocol
+// header and the payload.
+func openTestReply(t *testing.T, peerSess *channel.Session, got []byte) []byte {
+	t.Helper()
+	hdr, hdrLen, err := message.UnmarshalHeader(got)
+	if err != nil {
+		t.Fatalf("UnmarshalHeader: %v", err)
+	}
+	plain, _, err := peerSess.Decrypt(&hdr, securityFlagsByte(&hdr), got[hdrLen:])
+	if err != nil {
+		t.Fatalf("peer Decrypt: %v", err)
+	}
+	return append(append([]byte{}, got[:hdrLen]...), plain...)
+}
+
 // ─── header decode failures ──────────────────────────────────────────────
 
 // TestDispatch_TooShortBuffer verifies that a 2-byte buffer triggers a
@@ -253,7 +366,6 @@ func TestDispatch_VendorQualifiedProtocolCollisionRejected(t *testing.T) {
 func TestDispatch_VendorIDZeroStillRoutesNormally(t *testing.T) {
 	t.Parallel()
 	b := newStartedBridge(t)
-	hdr := buildHeader(0, 11)
 	proto := message.ProtocolHeader{
 		HasVendorID: true,
 		VendorID:    0,
@@ -262,7 +374,7 @@ func TestDispatch_VendorIDZeroStillRoutesNormally(t *testing.T) {
 		ExchangeID:  1,
 	}.Marshal()
 	payload := buildIMReadRequestPayload(t)
-	buf := buildDatagram(hdr, proto, payload)
+	buf := secureTestDatagram(t, b, proto, payload)
 	if err := b.dispatch(context.Background(), buf, loopbackSrc()); err != nil {
 		t.Errorf("expected nil for VendorID=0 (Common vendor), got %v", err)
 	}
@@ -306,20 +418,42 @@ func TestAttachSessionLookup_NilRevertsToNoop(t *testing.T) {
 	}
 }
 
-// ─── IM opcode routing (SessionID==0, no decryption required) ────────────
+// ─── IM opcode routing (secure PASE session; session 0 is dropped) ──────
 
-// TestDispatch_IMReadRoutes verifies that a valid IM ReadRequest datagram
-// (SessionID=0) is dispatched without error AND that the reply-send path
-// runs (loopbackSrc supplies a non-nil src).
+// TestDispatch_IMReadRoutes verifies that a valid IM ReadRequest on the
+// unsecured session 0 is dropped before decode — ErrUnsecuredIM, no
+// reply — and that the same request on a secure session is dispatched
+// without error and the reply-send path runs. Mirrors matter.js
+// InteractionServer.ts:161 (`requiresSecureSession = true`) and
+// ExchangeManager.ts:391-412 (a security mismatch opens no exchange).
 func TestDispatch_IMReadRoutes(t *testing.T) {
 	t.Parallel()
 	b := newStartedBridge(t)
-	hdr := buildHeader(0, 5)
+	peerConn, err := net.ListenUDP("udp", &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 0})
+	if err != nil {
+		t.Fatalf("ListenUDP: %v", err)
+	}
+	t.Cleanup(func() { _ = peerConn.Close() })
+	peerAddr, ok := peerConn.LocalAddr().(*net.UDPAddr)
+	if !ok {
+		t.Fatalf("unexpected peer addr type %T", peerConn.LocalAddr())
+	}
 	proto := buildProtocolHeader(im.InteractionModelProtocolID, im.OpcodeReadRequest)
 	payload := buildIMReadRequestPayload(t)
-	buf := buildDatagram(hdr, proto, payload)
-	if err := b.dispatch(context.Background(), buf, loopbackSrc()); err != nil {
-		t.Errorf("expected nil for valid IM ReadRequest, got %v", err)
+
+	unsecured := buildDatagram(buildHeader(0, 5), proto, payload)
+	if err := b.dispatch(context.Background(), unsecured, peerAddr); !errors.Is(err, ErrUnsecuredIM) {
+		t.Errorf("ReadRequest on session 0: err = %v, want ErrUnsecuredIM", err)
+	}
+	_ = peerConn.SetReadDeadline(time.Now().Add(300 * time.Millisecond))
+	rbuf := make([]byte, 1500)
+	if n, _, err := peerConn.ReadFromUDP(rbuf); err == nil {
+		t.Errorf("ReadRequest on session 0 was answered (%d-byte datagram); want it dropped", n)
+	}
+
+	secure := secureTestDatagram(t, b, proto, payload)
+	if err := b.dispatch(context.Background(), secure, loopbackSrc()); err != nil {
+		t.Errorf("expected nil for valid IM ReadRequest on a secure session, got %v", err)
 	}
 }
 
@@ -329,10 +463,9 @@ func TestDispatch_IMReadRoutes(t *testing.T) {
 func TestDispatch_IMResponseOpcodeIsUnsupported(t *testing.T) {
 	t.Parallel()
 	b := newStartedBridge(t)
-	hdr := buildHeader(0, 6)
 	proto := buildProtocolHeader(im.InteractionModelProtocolID, im.OpcodeReportData)
 	payload := []byte{0x01}
-	buf := buildDatagram(hdr, proto, payload)
+	buf := secureTestDatagram(t, b, proto, payload)
 	err := b.dispatch(context.Background(), buf, nil)
 	if !errors.Is(err, ErrUnsupportedOpcode) {
 		t.Errorf("want ErrUnsupportedOpcode for ReportData opcode, got %v", err)
@@ -368,10 +501,9 @@ func TestDispatch_IMSubscribeReplies(t *testing.T) {
 		t.Fatalf("unexpected peer addr type %T", peerConn.LocalAddr())
 	}
 
-	hdr := buildHeader(0, 7)
 	proto := buildProtocolHeader(im.InteractionModelProtocolID, im.OpcodeSubscribeRequest)
 	payload := buildIMSubscribeRequestPayload(t)
-	buf := buildDatagram(hdr, proto, payload)
+	buf := secureTestDatagram(t, b, proto, payload)
 	if err := b.dispatch(context.Background(), buf, peerAddr); err != nil {
 		t.Errorf("expected nil for SubscribeRequest, got %v", err)
 	}
@@ -382,7 +514,7 @@ func TestDispatch_IMSubscribeReplies(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ReadFromUDP: %v", err)
 	}
-	got := rbuf[:n]
+	got := openTestReplyFor(t, b, rbuf[:n])
 	_, hdrLen, err := message.UnmarshalHeader(got)
 	if err != nil {
 		t.Fatalf("UnmarshalHeader: %v", err)
@@ -404,10 +536,9 @@ func TestDispatch_IMSubscribeReplies(t *testing.T) {
 func TestDispatch_IMInvalidOpcode(t *testing.T) {
 	t.Parallel()
 	b := newStartedBridge(t)
-	hdr := buildHeader(0, 8)
 	proto := buildProtocolHeader(im.InteractionModelProtocolID, 0xFF)
 	payload := []byte{0x00}
-	buf := buildDatagram(hdr, proto, payload)
+	buf := secureTestDatagram(t, b, proto, payload)
 	err := b.dispatch(context.Background(), buf, nil)
 	if !errors.Is(err, ErrUnsupportedOpcode) {
 		t.Errorf("want ErrUnsupportedOpcode for opcode 0xFF, got %v", err)
@@ -427,10 +558,9 @@ func TestDispatch_NoDispatcherDropsSilently(t *testing.T) {
 		logger:   slog.Default(),
 		sessions: noopSessionLookup{},
 	}
-	hdr := buildHeader(0, 9)
 	proto := buildProtocolHeader(im.InteractionModelProtocolID, im.OpcodeReadRequest)
 	payload := buildIMReadRequestPayload(t)
-	buf := buildDatagram(hdr, proto, payload)
+	buf := secureTestDatagram(t, b, proto, payload)
 	if err := b.dispatch(context.Background(), buf, nil); err != nil {
 		t.Errorf("expected nil when dispatcher is nil, got %v", err)
 	}

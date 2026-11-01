@@ -312,23 +312,29 @@ func (i *Initiator) processSigma2(sigma2 Sigma2, sigma2Bytes []byte) ([]byte, er
 		// matter.js CaseClient.ts:#doPair checks the NOC subject's node id
 		// and fabric id against the peer it set out to reach, after the
 		// signature and before Sigma3.
-		if extractor, ok := i.verifier.(PeerNodeIDExtractor); ok {
-			nodeID, nerr := extractor.PeerNodeIDFromNOC(tbe2.ResponderNOC)
-			if nerr != nil {
-				return fail(fmt.Errorf("%w: node id unreadable: %w", ErrPeerIdentityMismatch, nerr))
-			}
-			if nodeID != i.peerNodeID {
-				return fail(fmt.Errorf("%w: NOC node id 0x%016X, expected 0x%016X", ErrPeerIdentityMismatch, nodeID, i.peerNodeID))
-			}
+		// NewPeerInitiator refuses a verifier without either extractor;
+		// the checks fail closed here as well should one be missing.
+		nodeExtractor, ok := i.verifier.(PeerNodeIDExtractor)
+		if !ok {
+			return fail(fmt.Errorf("%w: the peer verifier exposes no NOC node id", ErrPeerIdentityMismatch))
 		}
-		if extractor, ok := i.verifier.(PeerFabricIDExtractor); ok {
-			fabricID, ferr := extractor.PeerFabricIDFromNOC(tbe2.ResponderNOC)
-			if ferr != nil {
-				return fail(fmt.Errorf("%w: peer NOC fabric-id unreadable: %w", ErrFabricIDMismatch, ferr))
-			}
-			if fabricID != i.identity.FabricID {
-				return fail(fmt.Errorf("%w: NOC fabric-id 0x%016X != fabric-id 0x%016X", ErrFabricIDMismatch, fabricID, i.identity.FabricID))
-			}
+		nodeID, nerr := nodeExtractor.PeerNodeIDFromNOC(tbe2.ResponderNOC)
+		if nerr != nil {
+			return fail(fmt.Errorf("%w: node id unreadable: %w", ErrPeerIdentityMismatch, nerr))
+		}
+		if nodeID != i.peerNodeID {
+			return fail(fmt.Errorf("%w: NOC node id 0x%016X, expected 0x%016X", ErrPeerIdentityMismatch, nodeID, i.peerNodeID))
+		}
+		fabricExtractor, ok := i.verifier.(PeerFabricIDExtractor)
+		if !ok {
+			return fail(fmt.Errorf("%w: the peer verifier exposes no NOC fabric-id", ErrFabricIDMismatch))
+		}
+		fabricID, ferr := fabricExtractor.PeerFabricIDFromNOC(tbe2.ResponderNOC)
+		if ferr != nil {
+			return fail(fmt.Errorf("%w: peer NOC fabric-id unreadable: %w", ErrFabricIDMismatch, ferr))
+		}
+		if fabricID != i.identity.FabricID {
+			return fail(fmt.Errorf("%w: NOC fabric-id 0x%016X != fabric-id 0x%016X", ErrFabricIDMismatch, fabricID, i.identity.FabricID))
 		}
 		// The responder's CATs, lifted from its now-authenticated NOC, are
 		// the subject CATs of requests it sends over this session

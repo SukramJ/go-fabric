@@ -975,13 +975,16 @@ func (r *Responder) verifySigma3Locked(sigma3Bytes []byte) error {
 	// verification above only proves the NOC links to the fabric root,
 	// not that its subject fabric-id equals the fabric we signed Sigma2
 	// under. matter.js checks the two separately and rejects a mismatch
-	// BEFORE the transcript signature check. Verifiers that do not
-	// expose the fabric-id (protocol-layer test rigs) skip the check;
-	// a verifier that exposes it but cannot read the fabric-id out of
-	// a NOC it just accepted describes an anomalous certificate, and
-	// matter.js has no path that proceeds without the comparison.
-	// Mirrors matter.js packages/protocol/src/session/case/CaseServer.ts:299-306.
-	if extractor, ok := r.verifier.(PeerFabricIDExtractor); ok && r.identity != nil {
+	// BEFORE the transcript signature check. A verifier that does not
+	// expose the fabric-id, or cannot read it out of a NOC it just
+	// accepted, fails closed: matter.js has no path that proceeds without
+	// the comparison. Mirrors matter.js
+	// packages/protocol/src/session/case/CaseServer.ts:299-306.
+	if r.identity != nil {
+		extractor, ok := r.verifier.(PeerFabricIDExtractor)
+		if !ok {
+			return fmt.Errorf("%w: the peer verifier exposes no NOC fabric-id", ErrFabricIDMismatch)
+		}
 		peerFabricID, ferr := extractor.PeerFabricIDFromNOC(tbe3.InitiatorNOC)
 		if ferr != nil {
 			return fmt.Errorf("%w: peer NOC fabric-id unreadable: %w", ErrFabricIDMismatch, ferr)
@@ -1003,14 +1006,24 @@ func (r *Responder) verifySigma3Locked(sigma3Bytes []byte) error {
 		return err
 	}
 
-	// Lift the peer's NodeID out of the now-authenticated NOC if the
-	// verifier supports it (PeerNodeIDExtractor). The value rides
-	// into the secure channel's AES-CCM nonce (Matter §4.5.1.4)
-	// so we can authenticate the peer's outbound packets.
+	// Lift the peer's NodeID out of the now-authenticated NOC
+	// (PeerNodeIDExtractor). The value is the session's subject and rides
+	// into the secure channel's AES-CCM nonce (Matter §4.5.1.4) so we can
+	// authenticate the peer's outbound packets. A responder with an
+	// identity fails closed when the verifier exposes no node id or
+	// cannot read it: matter.js reads it from the NOC unconditionally
+	// (CaseServer.ts:298-307), and a session with subject 0 would match no
+	// ACL entry it should.
 	if extractor, ok := r.verifier.(PeerNodeIDExtractor); ok {
-		if pid, perr := extractor.PeerNodeIDFromNOC(tbe3.InitiatorNOC); perr == nil {
+		pid, perr := extractor.PeerNodeIDFromNOC(tbe3.InitiatorNOC)
+		switch {
+		case perr == nil:
 			r.peerNodeID = pid
+		case r.identity != nil:
+			return fmt.Errorf("%w: peer NOC node id unreadable: %w", ErrPeerIdentityMismatch, perr)
 		}
+	} else if r.identity != nil {
+		return fmt.Errorf("%w: the peer verifier exposes no NOC node id", ErrPeerIdentityMismatch)
 	}
 	// Lift CASE Authenticated Tags out of the same NOC subject for the
 	// ACL gate's per-subject match (Matter §9.10.5.6). The tag set is

@@ -129,10 +129,11 @@ type OperationalCredentials struct {
 	changeListeners    map[uint64]func()
 	nextChangeListener uint64
 
-	// isFailSafeArmed is the runtime accessor to [GeneralCommissioning]'s
-	// FailSafe state, wired via [OpcredsConfig.IsFailSafeArmed]. When
-	// nil, the FailsafeRequired guard is skipped (test setups).
-	isFailSafeArmed func() bool
+	// failSafe is the runtime accessor to [GeneralCommissioning]'s
+	// fail-safe — armed, and for which fabric — wired via
+	// [OpcredsConfig.FailSafe]. When nil, the FailsafeRequired guard is
+	// skipped (test setups).
+	failSafe func() (fabricIndex uint8, armed bool)
 
 	// onFabricUpdated fires after a successful UpdateNOC. The daemon
 	// wires this hook to close all CASE sessions for the updated fabric
@@ -405,17 +406,17 @@ type OpcredsConfig struct {
 	// failed`, the chip-tool / Apple Home pair retry chain abort.
 	// May be nil — the cluster works regardless.
 	OnFabricRemoved func(ctx context.Context, fabricIndex uint8)
-	// IsFailSafeArmed reports whether a FailSafe window is currently
-	// active. Bound to [GeneralCommissioning.FailSafeArmed]. Used by
-	// AddNOC, UpdateNOC and AddTrustedRootCertificate to enforce the
-	// Matter §11.18.6.4/.8/.9 FailsafeRequired status code.
-	// Mirrors matter.js OperationalCredentialsServer.ts:224
-	// `#failsafeContext` existence check and chip
-	// operational-credentials-server.cpp:399
-	// `VerifyOrExit(failSafeContext.IsFailSafeArmed(...), errorStatus =
-	// Status::FailsafeRequired)`.
-	// When nil, the guard is skipped (test setups + legacy callers).
-	IsFailSafeArmed func() bool
+	// FailSafe reports whether a fail-safe window is active and the fabric
+	// it is armed for. Bound to [GeneralCommissioning.FailSafeFabric].
+	// CSRRequest, AddNOC and AddTrustedRootCertificate answer
+	// FailsafeRequired unless the window is armed for the accessing
+	// fabric (Matter §11.18.6.4/.5/.8; chip
+	// OperationalCredentialsCluster.cpp:341, :472, :760 at 6170af84
+	// `IsFailSafeArmed(commandObj->GetAccessingFabricIndex())`); UpdateNOC
+	// answers FailsafeRequired when none is armed and ConstraintError for
+	// another fabric's window (matter.js OperationalCredentialsServer.ts:355-360).
+	// When nil, the guard is skipped (test setups).
+	FailSafe func() (fabricIndex uint8, armed bool)
 	// RearmFailSafeForFabric re-stamps the armed fail-safe with the fabric
 	// AddNOC just installed. Bound to
 	// [GeneralCommissioning.SetCurrentFabric].
@@ -493,19 +494,39 @@ func NewOperationalCredentials(s StoreFacade, cfg OpcredsConfig) (*OperationalCr
 		onFabricUpdated:        cfg.OnFabricUpdated,
 		onMDNSReannounce:       cfg.OnMDNSReannounce,
 		onFabricWithdraw:       cfg.OnFabricWithdraw,
-		isFailSafeArmed:        cfg.IsFailSafeArmed,
+		failSafe:               cfg.FailSafe,
 	}, nil
 }
 
-// SetIsFailSafeArmed wires the FailSafe accessor after construction.
-// Mirrors [SetOnFabricRemoved]'s post-construction wiring pattern —
-// [GeneralCommissioning] is built alongside [OperationalCredentials]
-// in the bridge and the back-reference is wired once both are
-// constructed. Idempotent. Pass nil to detach.
-func (o *OperationalCredentials) SetIsFailSafeArmed(fn func() bool) {
+// SetFailSafe wires the fail-safe accessor ([OpcredsConfig.FailSafe])
+// after construction. Mirrors [SetOnFabricRemoved]'s post-construction
+// wiring pattern — [GeneralCommissioning] is built alongside
+// [OperationalCredentials] in the bridge and the back-reference is wired
+// once both are constructed. Idempotent. Pass nil to detach.
+func (o *OperationalCredentials) SetFailSafe(fn func() (fabricIndex uint8, armed bool)) {
 	o.mu.Lock()
-	o.isFailSafeArmed = fn
+	o.failSafe = fn
 	o.mu.Unlock()
+}
+
+// failSafeRequired reports whether a command of the accessing fabric in
+// ctx must answer FailsafeRequired: the fail-safe is not armed for that
+// fabric. A window another fabric armed counts as not armed. Mirrors chip
+// OperationalCredentialsCluster.cpp:341 (CSRRequest), :472 (AddNOC),
+// :760 (AddTrustedRootCertificate) at 6170af84 —
+// `IsFailSafeArmed(commandObj->GetAccessingFabricIndex())`, FailSafeContext.h:76-79.
+// matter.js checks the armed state only (OperationalCredentialsServer.ts:602-604,
+// the DeviceCommissioner's one failsafeContext; Ahead-of-matter.js row
+// in notes/parity/by_design.md). Nil port: never (test setups).
+func (o *OperationalCredentials) failSafeRequired(ctx context.Context) bool {
+	o.mu.RLock()
+	failSafe := o.failSafe
+	o.mu.RUnlock()
+	if failSafe == nil {
+		return false
+	}
+	_, accessing := im.FabricFilterFromContext(ctx)
+	return !FailSafeArmedFor(failSafe, accessing)
 }
 
 // SetOnFabricUpdated wires the fabric-updated hook after construction.
@@ -1214,7 +1235,7 @@ func (o *OperationalCredentials) dispatchCmd(ctx context.Context, cmdID uint32, 
 	case opcredsCmdRemoveFabric:
 		return o.handleRemoveFabric(ctx, fields)
 	case opcredsCmdAddTrustedRootCertificate:
-		return o.handleAddTrustedRootCertificate(fields)
+		return o.handleAddTrustedRootCertificate(ctx, fields)
 	case opcredsCmdSetVidVerificationStatement:
 		return o.handleSetVidVerificationStatement(ctx, fields)
 	case opcredsCmdSignVidVerificationRequest:
@@ -1455,12 +1476,13 @@ func (o *OperationalCredentials) handleCSRRequest(ctx context.Context, fields an
 	// getter calls assertFailsafeArmed → Status::FailsafeRequired, 0xCA) and
 	// chip operational-credentials-server.cpp CSRRequest failsafe assertion.
 	// When the accessor is nil (test setups + legacy callers) the guard is
-	// skipped, matching handleAddNOC / handleAddTrustedRootCertificate.
+	// skipped, matching handleAddNOC / handleAddTrustedRootCertificate. A
+	// window armed for another fabric is not armed for this one (chip
+	// :341, failSafeRequired).
 	o.mu.RLock()
-	checkArmed := o.isFailSafeArmed
 	nocInvoked := o.nocWasInvoked
 	o.mu.RUnlock()
-	if checkArmed != nil && !checkArmed() {
+	if o.failSafeRequired(ctx) {
 		return nil, errOpcredsFailsafeRequired
 	}
 	// A CSRRequest after AddNOC or UpdateNOC has already run in this FailSafe
@@ -1598,12 +1620,12 @@ func (o *OperationalCredentials) handleAddNOC(ctx context.Context, fields any) (
 	// Matter §11.18.6.8 requires Status::FailsafeRequired when AddNOC is
 	// invoked outside an armed FailSafe window. Mirrors chip
 	// operational-credentials-server.cpp:399 and matter.js
-	// OperationalCredentialsServer.ts:224 #failsafeContext check.
+	// OperationalCredentialsServer.ts:224 #failsafeContext check; armed
+	// for the accessing fabric, chip :472 (failSafeRequired).
 	o.mu.RLock()
-	checkArmed := o.isFailSafeArmed
 	nocInvoked := o.nocWasInvoked
 	o.mu.RUnlock()
-	if checkArmed != nil && !checkArmed() {
+	if o.failSafeRequired(ctx) {
 		return nil, errOpcredsFailsafeRequired
 	}
 	// A second AddNOC — or one after UpdateNOC — in the same fail-safe
@@ -1973,13 +1995,16 @@ func (o *OperationalCredentials) handleUpdateNOC(ctx context.Context, fields any
 	// invoked outside an armed FailSafe window. Mirrors chip
 	// operational-credentials-server.cpp:HandleUpdateNOC FailSafe check.
 	o.mu.RLock()
-	checkArmed := o.isFailSafeArmed
+	failSafe := o.failSafe
 	priv := o.pendingPrivKey
 	pendingForUpdate := o.pendingCSRForUpdate
 	nocInvoked := o.nocWasInvoked
+	rootSet := o.pendingTrustRoot != nil
 	o.mu.RUnlock()
-	if checkArmed != nil && !checkArmed() {
-		return nil, errOpcredsFailsafeRequired
+	if failSafe != nil {
+		if _, armed := failSafe(); !armed {
+			return nil, errOpcredsFailsafeRequired
+		}
 	}
 	// matter.js updateNoc: `timedOp.fabricIndex !== undefined` →
 	// ConstraintError, ahead of every other check.
@@ -2000,6 +2025,25 @@ func (o *OperationalCredentials) handleUpdateNOC(ctx context.Context, fields any
 	// same failsafe context", Status.ConstraintError)).
 	if !pendingForUpdate {
 		return nil, opcredsConstraintErr{msg: "core: UpdateNOC illegal after CSRRequest for AddNOC in same FailSafe context"}
+	}
+	// A root added in this fail-safe (AddTrustedRootCertificate) belongs
+	// to an AddNOC: in-band MissingCsr, matter.js's certification
+	// work-around for what should be a ConstraintError. Mirrors matter.js
+	// OperationalCredentialsServer.ts:337-345 (`timedOp.rootCertSet`).
+	if rootSet {
+		return NOCResponse{StatusCode: NOCStatusMissingCsr, DebugText: "AddTrustedRootCertificate was invoked in this FailSafe context"}, nil
+	}
+	// The session must belong to the fabric the fail-safe was armed for:
+	// another fabric's window (or one armed over PASE) answers
+	// ConstraintError. Mirrors matter.js
+	// OperationalCredentialsServer.ts:355-360
+	// (`session.associatedFabric.fabricIndex !==
+	// timedOp.associatedFabric?.fabricIndex`).
+	if failSafe != nil {
+		_, sessionFabric := im.FabricFilterFromContext(ctx)
+		if armedFabric, _ := failSafe(); armedFabric != sessionFabric {
+			return nil, opcredsConstraintErr{msg: fmt.Sprintf("core: UpdateNOC: session fabric %d does not match the FailSafe context's fabric %d", sessionFabric, armedFabric)}
+		}
 	}
 	// UpdateNOC is fabric-scoped (Matter §11.18.6.9 — the NOC update
 	// SHALL target the fabric of the invoking session). Read the
@@ -2263,7 +2307,7 @@ func (o *OperationalCredentials) RemoveFabric(ctx context.Context, fabricIndex u
 	return nil
 }
 
-func (o *OperationalCredentials) handleAddTrustedRootCertificate(fields any) (any, error) {
+func (o *OperationalCredentials) handleAddTrustedRootCertificate(ctx context.Context, fields any) (any, error) {
 	req, ok := fields.(AddTrustedRootCertificateRequest)
 	if !ok {
 		return nil, fmt.Errorf("%w: AddTrustedRootCertificateRequest expected, got %T", errOpcredsInvalidArg, fields)
@@ -2271,11 +2315,9 @@ func (o *OperationalCredentials) handleAddTrustedRootCertificate(fields any) (an
 	// Matter §11.18.6.4 requires Status::FailsafeRequired when the cluster
 	// command is invoked outside an armed FailSafe window. Mirrors chip
 	// operational-credentials-server.cpp ~line 612
-	// (HandleAddTrustedRootCertificate VerifyOrExit on IsFailSafeArmed).
-	o.mu.RLock()
-	checkArmed := o.isFailSafeArmed
-	o.mu.RUnlock()
-	if checkArmed != nil && !checkArmed() {
+	// (HandleAddTrustedRootCertificate VerifyOrExit on IsFailSafeArmed);
+	// armed for the accessing fabric, chip :760 (failSafeRequired).
+	if o.failSafeRequired(ctx) {
 		return nil, errOpcredsFailsafeRequired
 	}
 	// Guards per Matter §11.18.6.4:

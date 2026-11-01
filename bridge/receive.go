@@ -41,6 +41,11 @@ var (
 	// a SessionID that the operational session manager does not know.
 	// Per Matter §4.6 the bridge silently drops the datagram.
 	ErrSessionMissing = errors.New("bridge: session not found")
+	// ErrUnsecuredIM is logged when an Interaction Model message arrives
+	// on the unsecured session 0. The Interaction Model requires a secure
+	// session (matter.js InteractionServer.ts:161), so the datagram is
+	// dropped without a reply.
+	ErrUnsecuredIM = errors.New("bridge: interaction model message on the unsecured session")
 )
 
 // SessionLookup is the narrow operational-session port the receive
@@ -427,7 +432,7 @@ func (b *Bridge) notifySessionActivity(sessionID uint16, rx bool) {
 func (b *Bridge) handleIMOpcode(ctx context.Context, src net.Addr, requestHdr *message.Header, proto message.ProtocolHeader, payload []byte) error {
 	b.load.imReceived.Add(1)
 	b.count(contract.MetricIMReceived)
-	switch classifyIMOpcode(proto.Opcode, requestHdr.SessionType) {
+	switch classifyIMOpcode(proto.Opcode, requestHdr.SessionType, requestHdr.SessionID) {
 	case imGateProceed:
 		// fall through to decode + dispatch below
 	case imGateAbsorbStatusResp:
@@ -436,6 +441,13 @@ func (b *Bridge) handleIMOpcode(ctx context.Context, src net.Addr, requestHdr *m
 		return b.rejectUnsupportedOpcode(src, proto)
 	case imGateRejectGroupSession:
 		return b.rejectGroupSession(src, requestHdr, proto)
+	case imGateDropUnsecured:
+		err := fmt.Errorf("%w: opcode=0x%02X", ErrUnsecuredIM, proto.Opcode)
+		b.logger.Debug("matter.rx.im.unsecured",
+			slog.String("src", srcString(src)),
+			slog.Int("opcode", int(proto.Opcode)),
+			slog.Any("err", err))
+		return err
 	}
 
 	dispatcher := b.Dispatcher()

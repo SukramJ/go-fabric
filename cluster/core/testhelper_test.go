@@ -415,6 +415,9 @@ func putCoreTestExtensions(t *testing.T, e *tlv.Encoder, isRoot bool) {
 		}
 	}
 	e.PutOctets(tlv.ContextTag(4), bytes.Repeat([]byte{0x5A}, 20)) // SKID
+	// AKID: the issuer's SKID — every fixture key identifier is the same.
+	// matter.js Noc.ts:163-168 requires it on a NOC.
+	e.PutOctets(tlv.ContextTag(5), bytes.Repeat([]byte{0x5A}, 20))
 	if err := e.EndContainer(); err != nil {
 		t.Fatalf("EndContainer ext: %v", err)
 	}

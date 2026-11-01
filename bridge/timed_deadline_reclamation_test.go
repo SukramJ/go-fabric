@@ -65,9 +65,7 @@ func TestDispatchTimedRequest_ReclaimsExpiredDeadlines(t *testing.T) {
 		t.Fatalf("unexpected peer addr type %T", peerConn.LocalAddr())
 	}
 
-	buf := buildDatagram(
-		buildHeader(0, 32),
-		buildProtocolHeader(im.InteractionModelProtocolID, im.OpcodeTimedRequest),
+	buf := secureTestDatagram(t, b, buildProtocolHeader(im.InteractionModelProtocolID, im.OpcodeTimedRequest),
 		encodeReliabilityTestTimedRequest(t, 5000),
 	)
 	if err := b.dispatch(context.Background(), buf, peerAddr); err != nil {

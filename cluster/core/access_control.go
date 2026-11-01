@@ -629,6 +629,36 @@ func (a *AccessControl) unfilteredFabrics(ctx context.Context, accessing uint8) 
 	return slices.Compact(out), nil
 }
 
+// writeFabric resolves the accessing fabric of a write to the
+// fabric-scoped ACL or Extension list. An IM write uses the request's
+// fabric, stamped by bridge/receive.go from the inbound session; a write
+// without an accessing fabric (a PASE session before AddNOC) is refused
+// with UnsupportedAccess, and the entries' own FabricIndex is never
+// consulted for it. A local write — MatterWrite without a request
+// context, matter.js setStateOf — uses the [AccessControl.SetCurrentFabric]
+// value, else the fabric its entries carry (entryFabric), and is refused
+// without either. Mirrors chip src/app/WriteHandler.cpp:805-811 at 6170af84
+// ("a fabric-scoped list and there is no accessing fabric →
+// UNSUPPORTED_ACCESS") and matter.js
+// packages/protocol/src/action/server/AccessControl.ts:358-365
+// (authorizeWrite: "Permission denied: No accessing fabric",
+// Status.UnsupportedAccess); Binding.MatterWrite does the same.
+func (a *AccessControl) writeFabric(ctx context.Context, attr string, entryFabric uint8) (uint8, error) {
+	_, fabric, request := im.LookupFabricFilter(ctx)
+	if !request {
+		a.mu.RLock()
+		fabric = a.currentFabric
+		a.mu.RUnlock()
+		if fabric == 0 {
+			fabric = entryFabric
+		}
+	}
+	if fabric == 0 {
+		return 0, aclStatusError{im.StatusUnsupportedAccess, attr + " is fabric-scoped; the write has no accessing fabric"}
+	}
+	return fabric, nil
+}
+
 // MatterWrite handles writes to the cluster's writable attributes.
 // The only writable attribute today is ACL (0x0000) — Apple Home
 // rewrites the entire list ~10 ms after CommissioningComplete to
@@ -643,6 +673,14 @@ func (a *AccessControl) MatterWrite(ctx context.Context, attrID uint32, value an
 		if !ok {
 			return fmt.Errorf("core: AccessControl.ACL write: value type %T not []AccessControlEntryStruct", value)
 		}
+		var entryFabric uint8
+		if len(entries) > 0 {
+			entryFabric = entries[0].FabricIndex
+		}
+		fabric, err := a.writeFabric(ctx, "ACL", entryFabric)
+		if err != nil {
+			return err
+		}
 		// An auxiliary entry is synthesised, never written. Mirrors
 		// matter.js AccessControlServer #validateAccessControlListChanges:
 		// "The spec forbids the field here without naming a status; CHIP
@@ -651,33 +689,6 @@ func (a *AccessControl) MatterWrite(ctx context.Context, attrID uint32, value an
 			if e.AuxiliaryType != nil {
 				return aclStatusError{im.StatusFailure, fmt.Sprintf("ACL[%d] must not include AuxiliaryType", i)}
 			}
-		}
-		// Fabric resolution priority (matches MatterReadFiltered):
-		//   1. ctx-fabric stamped by bridge/receive.go from the inbound
-		//      CASE session — the spec-correct source for every
-		//      fabric-scoped write per Matter §9.10.5.3.
-		//   2. a.currentFabric set via SetCurrentFabric — legacy hook
-		//      retained for tests that pre-date the ctx plumbing.
-		//   3. entries[0].FabricIndex when the caller stamps the entry
-		//      themselves (rare; mostly clients-as-server in tests).
-		//   4. Hard-coded fabric=1 last resort.
-		// Without (1) Apple Home's post-CommissioningComplete ACL
-		// rewrite lands in the wrong fabric, Apple reads its own fabric
-		// on the next Subscribe-Initial, sees the unchanged
-		// case_admin_subject ACL, and tears the pair down with the iOS
-		// "accessory could not be added" dialog.
-		_, ctxFabric := im.FabricFilterFromContext(ctx)
-		a.mu.RLock()
-		fabric := a.currentFabric
-		a.mu.RUnlock()
-		if ctxFabric != 0 {
-			fabric = ctxFabric
-		}
-		if fabric == 0 && len(entries) > 0 && entries[0].FabricIndex != 0 {
-			fabric = entries[0].FabricIndex
-		}
-		if fabric == 0 {
-			fabric = 1 // last-resort: only ever 1 fabric in v1.1.
 		}
 		// Validation — Mirrors chip src/access/AccessControl.cpp:680-764
 		// Entry::IsValid() and matter.js packages/node/src/behaviors/
@@ -894,6 +905,10 @@ func (a *AccessControl) MatterWrite(ctx context.Context, attrID uint32, value an
 		if !ok {
 			return fmt.Errorf("core: AccessControl.Extension write: value type %T not []AccessControlExtensionEntry", value)
 		}
+		fabric, err := a.writeFabric(ctx, "Extension", 0)
+		if err != nil {
+			return err
+		}
 		// Every entry this write stores is re-stamped to the writer's own
 		// fabric below (v1.1 has no cross-fabric write path to begin
 		// with), so more than one entry in a single write always means
@@ -916,16 +931,6 @@ func (a *AccessControl) MatterWrite(ctx context.Context, attrID uint32, value an
 			if err := validateAccessControlExtensionData(e.Data); err != nil {
 				return spec.Errorf(im.StatusConstraintError, "core: AccessControl.Extension[%d] write: constraint error: %w", i, err)
 			}
-		}
-		_, ctxFabric := im.FabricFilterFromContext(ctx)
-		a.mu.RLock()
-		fabric := a.currentFabric
-		a.mu.RUnlock()
-		if ctxFabric != 0 {
-			fabric = ctxFabric
-		}
-		if fabric == 0 {
-			fabric = 1
 		}
 		stamped := make([]AccessControlExtensionEntry, len(entries))
 		for i, e := range entries {

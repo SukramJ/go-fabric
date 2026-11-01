@@ -27,7 +27,7 @@ func TestOpcreds_OnFailSafeExpiry_ClearsPendingTrustRoot(t *testing.T) {
 
 	oc, _ := opcredsWithFakeStore(t)
 	// Allow AddTrustedRootCertificate without a real FailSafe gate.
-	oc.SetIsFailSafeArmed(func() bool { return true })
+	oc.SetFailSafe(func() (uint8, bool) { return 0, true })
 
 	// Install the trusted root.
 	_, err := oc.MatterInvoke(
@@ -73,7 +73,7 @@ func TestOpcreds_OnFailSafeExpiry_ClearsAllPendingFields(t *testing.T) {
 	rootRaw, _, _ := buildTestNOCAndRoot(t)
 
 	oc, _ := opcredsWithFakeStore(t)
-	oc.SetIsFailSafeArmed(func() bool { return true })
+	oc.SetFailSafe(func() (uint8, bool) { return 0, true })
 
 	ctx := context.Background()
 
@@ -142,7 +142,7 @@ func TestOpcreds_OnFailSafeExpiry_WiredViaGeneralCommissioning(t *testing.T) {
 		rootRaw, _, _ := buildTestNOCAndRoot(t)
 
 		oc, _ := opcredsWithFakeStore(t)
-		oc.SetIsFailSafeArmed(func() bool { return true })
+		oc.SetFailSafe(func() (uint8, bool) { return 0, true })
 
 		gc, err := core.NewGeneralCommissioning(core.GeneralCommissioningConfig{
 			LocationCapability: core.RegulatoryIndoorOutdoor,
@@ -206,7 +206,7 @@ func TestOpcreds_OnFailSafeExpiry_AllowsNocCycleAfterExpiry(t *testing.T) {
 	rootRaw, _, _ := buildTestNOCAndRoot(t)
 
 	oc, _ := opcredsWithFakeStore(t)
-	oc.SetIsFailSafeArmed(func() bool { return true })
+	oc.SetFailSafe(func() (uint8, bool) { return 0, true })
 	ctx := core.WithInvokeSessionID(context.Background(), 0) // PASE / session-0 path
 
 	csrNonce := make([]byte, 32)

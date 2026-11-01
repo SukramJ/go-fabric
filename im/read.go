@@ -487,9 +487,10 @@ func HandleReadRequest(ctx context.Context, d Dispatcher, req ReadRequest) Repor
 			// bypasses — commissioning reads must succeed pre-AddNOC, and
 			// after it while the commissioner still drives the same PASE
 			// channel.
-			if hasACL && !pase && fabricIndex != 0 {
+			// No fabric and not PASE fails closed (checkSubjectACL).
+			if hasACL && !pase {
 				priv := readPrivilege(r.Path.Endpoint, r.Path.Cluster, r.Path.Attribute)
-				if status := aclChecker.CheckACL(ctx, fabricIndex, subjectNodeID, subjectCATs, r.Path.Endpoint, r.Path.Cluster, priv); !status.IsSuccess() {
+				if status := checkSubjectACL(ctx, aclChecker, fabricIndex, subjectNodeID, subjectCATs, r.Path.Endpoint, r.Path.Cluster, priv); !status.IsSuccess() {
 					if concretePath {
 						filtered = append(filtered, AttributeReport{
 							Path:     r.Path,

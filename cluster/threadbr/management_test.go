@@ -217,7 +217,7 @@ func TestManagementAttachFailSafeAndSet(t *testing.T) {
 	br.notFound = true
 	s := newManagement(t, br, 0, false, nil)
 	bc := &breadcrumbs{}
-	s.AttachFailSafe(func() bool { return true }, bc.set)
+	s.AttachFailSafe(func() (uint8, bool) { return 1, true }, bc.set)
 	crumb := uint64(3)
 	if _, st := invoke(s, tbrm.CmdSetActiveDatasetRequest, tbrm.SetActiveDatasetRequestRequest{ActiveDataset: chipDataset, Breadcrumb: &crumb}); st != im.StatusSuccess {
 		t.Errorf("SetActiveDatasetRequest = %v", st)

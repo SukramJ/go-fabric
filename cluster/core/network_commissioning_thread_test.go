@@ -364,7 +364,7 @@ func TestThreadNetworkCommissioningInterfaceEnabled(t *testing.T) {
 	if v, _ := n.MatterRead(netcommAttrInterfaceEnabled); v != false || n.MatterDataVersion() == v0 {
 		t.Errorf("InterfaceEnabled after the border router went down = %v", v)
 	}
-	n.AttachFailSafe(func() bool { return true }, nil)
+	n.AttachFailSafe(func() (uint8, bool) { return 0, true }, nil)
 	if !n.armed() {
 		t.Error("AttachFailSafe did not wire the fail-safe")
 	}

@@ -717,3 +717,34 @@ func TestUnmarshalAppleSigma1Stub(t *testing.T) {
 	t.Logf("destID=%x", s.DestinationID)
 	t.Logf("ephPub len=%d", len(s.InitiatorEphPubKey))
 }
+
+// TestUnmarshalSigma1_MandatoryFieldsMissing pins tags 1-3 as mandatory:
+// a Sigma1 without initiatorRandom, initiatorSessionId or destinationId is
+// a decode error (ErrSessionState), which the responder answers with
+// InvalidParam. Mirrors matter.js CaseMessages.ts:29-32 (TlvField 1-3) and
+// CaseServer.ts:88-95. W1-sec-02.
+func TestUnmarshalSigma1_MandatoryFieldsMissing(t *testing.T) {
+	t.Parallel()
+	ephPriv, err := newECDHKey(t)
+	if err != nil {
+		t.Fatalf("ecdh key: %v", err)
+	}
+	for _, missing := range []int{1, 2, 3} {
+		enc := sigmaTLVEncoder()
+		enc.startStruct()
+		if missing != 1 {
+			enc.putOctets(1, make([]byte, RandomSize))
+		}
+		if missing != 2 {
+			enc.putUint16(2, 0x1234)
+		}
+		if missing != 3 {
+			enc.putOctets(3, make([]byte, 32))
+		}
+		enc.putOctets(4, ephPriv)
+		enc.endContainer()
+		if _, err := UnmarshalSigma1(enc.bytes()); !errors.Is(err, ErrSessionState) {
+			t.Errorf("Sigma1 without tag %d: err = %v, want ErrSessionState", missing, err)
+		}
+	}
+}

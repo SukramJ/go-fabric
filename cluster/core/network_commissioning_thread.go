@@ -136,7 +136,11 @@ var (
 
 // AttachFailSafe wires the node's fail-safe after construction, as
 // [ThreadNetworkCommissioningConfig] does.
-func (n *ThreadNetworkCommissioning) AttachFailSafe(armed func() bool, setBreadcrumb func(uint64)) {
+func (n *ThreadNetworkCommissioning) AttachFailSafe(failSafe func() (fabricIndex uint8, armed bool), setBreadcrumb func(uint64)) {
+	var armed func() bool
+	if failSafe != nil {
+		armed = func() bool { _, a := failSafe(); return a }
+	}
 	n.mu.Lock()
 	defer n.mu.Unlock()
 	n.failSafeArmed, n.setBreadcrumb = armed, setBreadcrumb

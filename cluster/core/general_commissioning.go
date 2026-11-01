@@ -965,6 +965,35 @@ func (g *GeneralCommissioning) FailSafeArmed() bool {
 	return g.failSafeArmed && g.failSafeExpiresAt.After(g.clock.Now())
 }
 
+// FailSafeFabric reports whether a fail-safe window is active and, when
+// it is, the fabric it is armed for — 0 for a window armed over PASE
+// before AddNOC re-stamped it. It is the node's fail-safe port: a server
+// answers connectedhomeip's IsFailSafeArmed(accessingFabricIndex) with
+// [FailSafeArmedFor] over it (src/app/FailSafeContext.h:76-79 at
+// 6170af84), and a check that needs the armed state alone reads armed.
+func (g *GeneralCommissioning) FailSafeFabric() (fabricIndex uint8, armed bool) {
+	g.mu.RLock()
+	defer g.mu.RUnlock()
+	if !g.failSafeArmed || !g.failSafeExpiresAt.After(g.clock.Now()) {
+		return 0, false
+	}
+	return g.failSafeFabricIndex, true
+}
+
+// FailSafeArmedFor is connectedhomeip's
+// FailSafeContext::IsFailSafeArmed(accessingFabricIndex)
+// (src/app/FailSafeContext.h:76-79, :92-96 at 6170af84) over a fail-safe
+// port: armed, and armed for the accessing fabric (0 is a PASE session
+// before AddNOC, which matches a window armed over PASE). A nil port is
+// disarmed.
+func FailSafeArmedFor(failSafe func() (fabricIndex uint8, armed bool), accessingFabricIndex uint8) bool {
+	if failSafe == nil {
+		return false
+	}
+	fabric, armed := failSafe()
+	return armed && fabric == accessingFabricIndex
+}
+
 // PaseSessionAutoArmSeconds is the default fail-safe window duration
 // the bridge arms automatically when a new PASE session is established
 // and no ArmFailSafe has been sent yet.

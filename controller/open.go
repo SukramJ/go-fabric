@@ -7,18 +7,18 @@ import (
 	"database/sql"
 	"fmt"
 
-	_ "modernc.org/sqlite" // the module's SQLite driver, registered as "sqlite"
-
 	"github.com/SukramJ/go-fabric/controller/attestation"
 	"github.com/SukramJ/go-fabric/controller/dcl/snapshot"
+	"github.com/SukramJ/go-fabric/store"
 )
 
 // OpenDB opens the SQLite database file at path for [Config].DB with the
-// module's own driver (modernc.org/sqlite, pure Go), so a controller
-// program imports no driver of its own: foreign keys on (the schemas'
-// cascades need them on every pooled connection), a busy timeout of 5 s
-// and the write-ahead log, the reference controller's settings. The file
-// is created when it does not exist; the schemas are [New]'s to apply.
+// module's opener ([store.OpenSQLite]: the pure-Go driver, so a controller
+// program imports no driver of its own; an escaped `file:` URI; foreign
+// keys on, as the schemas' cascades need them on every pooled connection;
+// a busy timeout of 5 s) plus the write-ahead log, the reference
+// controller's settings. A file it creates is owner-only (0600): it holds
+// the CA's root key unencrypted. The schemas are [New]'s to apply.
 //
 // The file is opened on first use — [New]'s schemas, which report a path
 // that cannot be opened. The caller closes the database after the
@@ -33,7 +33,7 @@ func OpenDB(path string) (*sql.DB, error) {
 	if path == "" {
 		return nil, fmt.Errorf("%w: OpenDB needs a path", ErrConfiguration)
 	}
-	db, err := sql.Open("sqlite", "file:"+path+"?_pragma=foreign_keys(1)&_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)")
+	db, err := store.OpenSQLite(path, "journal_mode(WAL)")
 	if err != nil {
 		return nil, fmt.Errorf("controller: open %q: %w", path, err)
 	}

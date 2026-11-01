@@ -235,7 +235,7 @@
   },
   {
     "file": "bridge/im_gate.go",
-    "line": 32,
+    "line": 33,
     "citation": "packages/protocol/src/interaction/InteractionMessenger.ts:240",
     "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
     "identifier": "ReadRequest",
@@ -253,7 +253,7 @@
   },
   {
     "file": "bridge/invoke_batch_dispatch_test.go",
-    "line": 151,
+    "line": 150,
     "citation": "InteractionServer.ts:950-955",
     "resolved": "packages/node/src/node/server/InteractionServer.ts",
     "identifier": "invokeRequests",
@@ -280,7 +280,7 @@
   },
   {
     "file": "bridge/receive.go",
-    "line": 198,
+    "line": 203,
     "citation": "MessageExchange.ts:428-433",
     "resolved": "packages/protocol/src/protocol/MessageExchange.ts",
     "identifier": "requiresAck",
@@ -289,7 +289,7 @@
   },
   {
     "file": "bridge/receive.go",
-    "line": 243,
+    "line": 248,
     "citation": "MessageCodec.ts:377",
     "resolved": "packages/protocol/src/codec/MessageCodec.ts",
     "identifier": "protocolId",
@@ -343,7 +343,7 @@
   },
   {
     "file": "bridge/receive_test.go",
-    "line": 218,
+    "line": 331,
     "citation": "MessageCodec.ts:377",
     "resolved": "packages/protocol/src/codec/MessageCodec.ts",
     "identifier": "vendorId",
@@ -352,7 +352,7 @@
   },
   {
     "file": "bridge/receive_test.go",
-    "line": 478,
+    "line": 608,
     "citation": "InteractionServer.ts:409-412",
     "resolved": "packages/node/src/node/server/InteractionServer.ts",
     "identifier": "TimedRequest",
@@ -514,7 +514,7 @@
   },
   {
     "file": "bridge/write_chunked_dispatch_test.go",
-    "line": 203,
+    "line": 202,
     "citation": "InteractionServer.ts:521-532",
     "resolved": "packages/node/src/node/server/InteractionServer.ts",
     "identifier": "WriteResponse",
@@ -875,7 +875,7 @@
   },
   {
     "file": "cluster/core/access_control.go",
-    "line": 1085,
+    "line": 1090,
     "citation": "packages/types/src/datatype/CaseAuthenticatedTag.ts:31-33",
     "resolved": "packages/types/src/datatype/CaseAuthenticatedTag.ts",
     "identifier": "getVersion",
@@ -947,7 +947,7 @@
   },
   {
     "file": "cluster/core/general_commissioning.go",
-    "line": 978,
+    "line": 1007,
     "citation": "packages/node/src/behaviors/general-commissioning/GeneralCommissioningServer.ts:67-82",
     "resolved": "packages/node/src/behaviors/general-commissioning/GeneralCommissioningServer.ts",
     "identifier": "CommissioningComplete",
@@ -1010,7 +1010,7 @@
   },
   {
     "file": "cluster/core/operational_credentials.go",
-    "line": 259,
+    "line": 260,
     "citation": "Fabric.ts:548",
     "resolved": "packages/protocol/src/fabric/Fabric.ts",
     "identifier": "UpdateNOC",
@@ -1019,7 +1019,7 @@
   },
   {
     "file": "cluster/core/operational_credentials.go",
-    "line": 355,
+    "line": 356,
     "citation": "OperationalCredentialsServer.ts:247-252",
     "resolved": "packages/node/src/behaviors/operational-credentials/OperationalCredentialsServer.ts",
     "identifier": "addNoc",
@@ -1028,7 +1028,7 @@
   },
   {
     "file": "cluster/core/operational_credentials.go",
-    "line": 1355,
+    "line": 1376,
     "citation": "OperationalCredentialsServer.ts:110",
     "resolved": "packages/node/src/behaviors/operational-credentials/OperationalCredentialsServer.ts",
     "identifier": "AttestationNonce",
@@ -1037,7 +1037,7 @@
   },
   {
     "file": "cluster/core/operational_credentials.go",
-    "line": 1899,
+    "line": 1921,
     "citation": "Fabric.ts:557-559",
     "resolved": "packages/protocol/src/fabric/Fabric.ts",
     "identifier": "PublicKeyError",
@@ -1046,7 +1046,7 @@
   },
   {
     "file": "cluster/core/operational_credentials.go",
-    "line": 1939,
+    "line": 1961,
     "citation": "Fabric.ts:557-559",
     "resolved": "packages/protocol/src/fabric/Fabric.ts",
     "identifier": "PublicKeyError",
@@ -1055,7 +1055,7 @@
   },
   {
     "file": "cluster/core/operational_credentials.go",
-    "line": 2063,
+    "line": 2107,
     "citation": "Fabric.ts:548",
     "resolved": "packages/protocol/src/fabric/Fabric.ts",
     "identifier": "nodeId",
@@ -1064,7 +1064,7 @@
   },
   {
     "file": "cluster/core/operational_credentials.go",
-    "line": 2254,
+    "line": 2298,
     "citation": "DeviceAdvertiser.ts:84-86",
     "resolved": "packages/protocol/src/protocol/DeviceAdvertiser.ts",
     "identifier": "cancelAll",
@@ -1308,7 +1308,7 @@
   },
   {
     "file": "cluster/onoff/server.go",
-    "line": 618,
+    "line": 621,
     "citation": "OnOffServer.ts:97-100",
     "resolved": "packages/node/src/behaviors/on-off/OnOffServer.ts",
     "identifier": "OnOff",
@@ -1789,7 +1789,7 @@
   },
   {
     "file": "controller/dcl/crl.go",
-    "line": 55,
+    "line": 63,
     "citation": "DclCertificateService.ts:235-241",
     "resolved": "packages/protocol/src/dcl/DclCertificateService.ts",
     "identifier": "parseCrl",

@@ -20,7 +20,7 @@ import (
 // src/app/clusters/thread-border-router-management-server/tests/
 // TestThreadBorderRouterManagementCluster.cpp at 6170af84, ported by
 // meaning, one test per TEST_F (all 22): chip's MockDelegate is
-// fakeBorderRouter, its FailSafeContext the IsFailSafeArmed function, its
+// fakeBorderRouter, its FailSafeContext the FailSafe function (armed for the CASE fabric 1), its
 // BreadCrumbTracker breadcrumbs, and the platform events the server's
 // OnFailSafeExpired and OnCommissioningComplete. A delegate that defers
 // its completion is an activation the fake keeps waiting.
@@ -29,7 +29,7 @@ const waitFor = 5 * time.Second
 
 func newManagement(t *testing.T, br *fakeBorderRouter, features tbrm.Feature, armed bool, bc *breadcrumbs) *threadbr.ManagementServer {
 	t.Helper()
-	cfg := threadbr.ManagementConfig{BorderRouter: br, Features: features, IsFailSafeArmed: func() bool { return armed }}
+	cfg := threadbr.ManagementConfig{BorderRouter: br, Features: features, FailSafe: func() (uint8, bool) { return 1, armed }}
 	if bc != nil {
 		cfg.SetBreadcrumb = bc.set
 	}
@@ -358,5 +358,19 @@ func TestThreadBorderRouterManagementCluster_TestCommissioningComplete(t *testin
 	s.OnCommissioningComplete(context.Background())
 	if !br.commitCalled {
 		t.Error("CommitActiveDataset not called")
+	}
+}
+
+// TestThreadBorderRouterManagementCluster_FailsafeOfAnotherFabric pins
+// SetActiveDatasetRequest under a fail-safe armed for another fabric:
+// FAILSAFE_REQUIRED, as chip ThreadBorderRouterManagementCluster.cpp:212
+// at 6170af84 asks `IsFailSafeArmed(ctx->GetAccessingFabricIndex())`.
+func TestThreadBorderRouterManagementCluster_FailsafeOfAnotherFabric(t *testing.T) {
+	t.Parallel()
+	s := newManagement(t, newFake(), 0, false, nil)
+	s.AttachFailSafe(func() (uint8, bool) { return 2, true }, nil) // caseCtx is fabric 1
+	one := uint64(1)
+	if _, st := invoke(s, tbrm.CmdSetActiveDatasetRequest, tbrm.SetActiveDatasetRequestRequest{Breadcrumb: &one}); st != im.StatusFailsafeRequired {
+		t.Errorf("SetActiveDatasetRequest under fabric 2's fail-safe = %v, want FAILSAFE_REQUIRED", st)
 	}
 }
