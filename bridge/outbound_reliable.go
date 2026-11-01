@@ -425,16 +425,19 @@ type outboundTickResult struct {
 // The due entries are taken and rescheduled under the tracker's lock and
 // `send` is called after it is released (ADR 0026 P6): an Ack arriving
 // meanwhile removes its entry without waiting for the socket. A send
-// error is surfaced via the result slice and puts the entry's next
-// attempt back to when it was due, so the next tick retries it, as
-// before.
+// error is surfaced via the result slice and counts as the transmission:
+// the entry keeps the backoff the sweep scheduled, so a failing socket
+// spends the retry budget on the MRP schedule, not at the pump's cadence.
+// Mirrors matter.js MessageExchange.ts:905-906 and :975-981 at 862ad75f
+// (#retransmitMessage counts the retransmission before it sends, and a
+// failed send that is not SessionClosedError still runs
+// #initializeResubmission with the computed backoff).
 func (t *outboundReliableTracker) Tick(now time.Time, send func(net.Addr, []byte) error) []outboundTickResult {
 	type resend struct {
 		key      outboundKey
 		p        *outboundEntry
 		dest     net.Addr
 		datagram []byte
-		due      time.Time
 	}
 	var (
 		out  []outboundTickResult
@@ -456,7 +459,6 @@ func (t *outboundReliableTracker) Tick(now time.Time, send func(net.Addr, []byte
 			continue
 		}
 		p.retries++
-		due := p.nextSendAt
 		// Full spec backoff per Matter §4.12.2.1: peer-appropriate
 		// base interval (re-evaluated per retransmission — the peer
 		// may have gone idle since the last attempt), margin,
@@ -464,7 +466,7 @@ func (t *outboundReliableTracker) Tick(now time.Time, send func(net.Addr, []byte
 		// matter.js MRP.ts:125-146 retransmissionIntervalOf.
 		delay := mrp.BackoffDuration(t.entryBase(p.sessionID, p.peer, now)+p.margin, p.retries, rand.Float64) + time.Duration(t.fixedBackoff.Load())
 		p.nextSendAt = now.Add(delay)
-		todo = append(todo, resend{key: key, p: p, dest: p.dest, datagram: p.datagram, due: due})
+		todo = append(todo, resend{key: key, p: p, dest: p.dest, datagram: p.datagram})
 	}
 	t.mu.Unlock()
 	for _, r := range todo {
@@ -477,11 +479,6 @@ func (t *outboundReliableTracker) Tick(now time.Time, send func(net.Addr, []byte
 			continue
 		}
 		if err := send(r.dest, r.datagram); err != nil {
-			t.mu.Lock()
-			if t.pending[r.key] == r.p {
-				r.p.nextSendAt = r.due
-			}
-			t.mu.Unlock()
 			out = append(out, outboundTickResult{SessionID: r.key.sessionID, ExchangeID: r.p.exchangeID, Counter: r.key.counter, Err: err})
 			continue
 		}

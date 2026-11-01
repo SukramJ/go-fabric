@@ -44,6 +44,7 @@ Findings of the whole-codebase review of 2026-11-01 (`notes/review/2026-11/`).
 - `cluster/onoff`, `cluster/closure`: a port's `contract.StatusError` answers its status instead of FAILURE, as v0.15.6 made the other kit servers do (W6-doc-01).
 - `bridge`: the responder's PBKDFParamResponse, Pake2, Sigma2 and Sigma2_Resume retransmit at the initiator's active interval — the one its PBKDFParamRequest or Sigma1 stated, else the 300 ms default — while it was heard within its active threshold, as matter.js does; they waited out the 500 ms idle default (W1-conc-01).
 - `transport/message`: `UnmarshalHeader` refuses a unicast header with a destination group id (`ErrUnicastGroupDestination`, also refused by `MarshalPacket`) and a group header without a destination or a source node id (`ErrGroupSessionHeader`), as matter.js's decoder does (W1-wire-01).
+- `bridge`: a retransmission whose send fails keeps its MRP backoff instead of being retried at the next 50 ms pump tick, so a transient socket error no longer spends the whole retry budget in 200 ms and ends in the peer-loss path; the failed send still counts, as in matter.js (W1-conc-02).
 
 ## [0.15.6] — 2026-11-01
 
