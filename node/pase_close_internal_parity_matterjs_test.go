@@ -62,9 +62,14 @@ func TestPASEClosedOnCommissioningCompleteParity(t *testing.T) {
 	if got := paseCount(mgr); got != 1 {
 		t.Fatalf("PASE sessions right after the response = %d, want 1 until the grace elapses", got)
 	}
+	// A new commissioning's PASE session established within the grace is
+	// not this fail-safe context's and survives it.
+	if _, err := mgr.OpenFromPase(1, 3, 8, []byte("next-pase-secret")); err != nil {
+		t.Fatalf("OpenFromPase: %v", err)
+	}
 	clk.Advance(paseCloseGrace)
-	if got := paseCount(mgr); got != 0 {
-		t.Errorf("PASE sessions after CommissioningComplete = %d, want 0", got)
+	if got := paseCount(mgr); got != 1 {
+		t.Errorf("PASE sessions after CommissioningComplete = %d, want 1 (only the new commissioning's)", got)
 	}
 }
 

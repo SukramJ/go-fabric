@@ -95,16 +95,32 @@ func (n *Node) failSafeExpired(ctx context.Context, _ uint8) {
 	n.closePASESessions(ctx, 0)
 }
 
-// closePASESessions clears every PASE session, including the ones
-// AddNOC adopted onto a fabric, once the response of the interaction
+// closePASESessions clears the PASE sessions open now, including the
+// ones AddNOC adopted onto a fabric, once the response of the interaction
 // ctx belongs to has been sent (at once without one) and grace has
-// elapsed after it.
+// elapsed after it. Only the sessions of this fail-safe context go: a
+// PASE session a new commissioning establishes within the grace is not
+// this context's (matter.js closes the PASE session it finds when the
+// hook runs, FailsafeContext.ts:187-192 closePaseSession).
 func (n *Node) closePASESessions(ctx context.Context, grace time.Duration) {
 	if n.sec == nil || n.sec.sessions == nil {
 		return
 	}
 	sessions := n.sec.sessions
-	closeNow := func() { sessions.ClosePASESessions() }
+	var ids []uint16
+	for _, s := range sessions.Sessions() {
+		if s.IsPASE {
+			ids = append(ids, s.SessionID)
+		}
+	}
+	if len(ids) == 0 {
+		return
+	}
+	closeNow := func() {
+		for _, id := range ids {
+			_ = sessions.Close(id) // gone already: nothing to clear
+		}
+	}
 	run := closeNow
 	if grace > 0 {
 		clk := n.cfg.Clock
