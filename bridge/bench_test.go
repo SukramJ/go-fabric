@@ -84,7 +84,10 @@ func BenchmarkBuildInitialReportWildcard(b *testing.B) {
 	req := im.SubscribeRequest{
 		AttributeRequests: []im.ConcreteAttributePath{{}}, // no Has* flag set = wildcard on every level
 	}
-	ctx := context.Background()
+	// A PASE subscriber: the commissioning channel's implicit Administer
+	// reads every attribute; fabric 0 without PASE is denied since review
+	// 2026-11 W2-sec-03, and the benchmark measures assembly, not the ACL.
+	ctx := im.WithAuthModePASE(context.Background())
 	// One warm-up outside the timed region: the first call populates the
 	// per-endpoint DataVersion trackers the dispatcher lazily creates, and
 	// a running bridge answers its second subscribe against warm ones.
@@ -111,7 +114,8 @@ func BenchmarkEncodeReportData(b *testing.B) {
 	if dispatcher == nil {
 		b.Fatal("dispatcher nil after Start — topology not assembled")
 	}
-	report, matched := br.buildInitialReport(context.Background(), dispatcher, im.SubscribeRequest{
+	// A PASE subscriber, as BenchmarkBuildInitialReportWildcard.
+	report, matched := br.buildInitialReport(im.WithAuthModePASE(context.Background()), dispatcher, im.SubscribeRequest{
 		AttributeRequests: []im.ConcreteAttributePath{{}},
 	})
 	if matched == 0 {
