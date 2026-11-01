@@ -82,7 +82,7 @@ func TestPin_AddNOC_LengthCap(t *testing.T) {
 			// AddNOC outside an armed FailSafe window is refused before
 			// the length gate is reached (Matter §11.18.6.8), so the
 			// window must be armed for this test to measure the cap.
-			oc.SetIsFailSafeArmed(func() bool { return true })
+			oc.SetFailSafe(func() (uint8, bool) { return 0, true })
 
 			resp, err := oc.MatterInvoke(context.Background(), 0x06, core.AddNOCRequest{
 				NOCValue:         tc.noc,

@@ -78,10 +78,11 @@ type ManagementConfig struct {
 	// SetPendingDatasetRequest (chip reads GetPanChangeSupported,
 	// :122-125, :253-256).
 	Features tbrm.Feature
-	// IsFailSafeArmed reports whether the node's fail-safe is armed
-	// (GeneralCommissioning.FailSafeArmed); SetActiveDatasetRequest needs
-	// it (:212-215). Nil reads as disarmed until [ManagementServer.AttachFailSafe].
-	IsFailSafeArmed func() bool
+	// FailSafe reports whether the node's fail-safe is armed and for which
+	// fabric (GeneralCommissioning.FailSafeFabric);
+	// SetActiveDatasetRequest needs it armed for the accessing fabric
+	// (:212-215). Nil reads as disarmed until [ManagementServer.AttachFailSafe].
+	FailSafe func() (fabricIndex uint8, armed bool)
 	// SetBreadcrumb writes GeneralCommissioning's Breadcrumb once an
 	// activation completed (:286-289); nil writes none.
 	SetBreadcrumb func(uint64)
@@ -123,7 +124,7 @@ type ManagementServer struct {
 
 	// mu guards armed, setBreadcrumb, seq, pending and running.
 	mu            sync.Mutex
-	armed         func() bool
+	failSafe      func() (fabricIndex uint8, armed bool)
 	setBreadcrumb func(uint64)
 	// seq is mSetActiveDatasetSequenceNumber (:239, :306).
 	seq uint32
@@ -158,7 +159,7 @@ func NewManagement(ctx context.Context, cfg ManagementConfig) (*ManagementServer
 	}
 	s := &ManagementServer{
 		br: cfg.BorderRouter, panChange: cfg.Features&tbrm.FeaturePanChange != 0, logger: cfg.Logger,
-		armed: cfg.IsFailSafeArmed, setBreadcrumb: cfg.SetBreadcrumb,
+		failSafe: cfg.FailSafe, setBreadcrumb: cfg.SetBreadcrumb,
 	}
 	if s.logger == nil {
 		s.logger = slog.Default()
@@ -192,14 +193,15 @@ func NewManagement(ctx context.Context, cfg ManagementConfig) (*ManagementServer
 // border router read it too (ADR 0027 decision 3).
 func (s *ManagementServer) BorderRouter() BorderRouter { return s.br }
 
-// AttachFailSafe wires the node's fail-safe: whether it is armed
-// (FailSafeContext::IsFailSafeArmed, :212) and the Breadcrumb an
-// activation writes (BreadCrumbTracker::SetBreadCrumb, :288). The node
-// calls it as the endpoint joins its topology.
-func (s *ManagementServer) AttachFailSafe(armed func() bool, setBreadcrumb func(uint64)) {
+// AttachFailSafe wires the node's fail-safe: whether it is armed and for
+// which fabric (FailSafeContext::IsFailSafeArmed(accessingFabricIndex),
+// :212) and the Breadcrumb an activation writes
+// (BreadCrumbTracker::SetBreadCrumb, :288). The node calls it as the
+// endpoint joins its topology.
+func (s *ManagementServer) AttachFailSafe(failSafe func() (fabricIndex uint8, armed bool), setBreadcrumb func(uint64)) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.armed, s.setBreadcrumb = armed, setBreadcrumb
+	s.failSafe, s.setBreadcrumb = failSafe, setBreadcrumb
 }
 
 // read is the attribute values the border router serves now (ReadAttribute,
@@ -287,12 +289,20 @@ func (s *ManagementServer) refreshAfter(ctx context.Context) {
 	}
 }
 
-// failSafeArmed reports the node's fail-safe.
-func (s *ManagementServer) failSafeArmed() bool {
+// failSafeArmedFor reports whether the node's fail-safe is armed for the
+// accessing fabric of ctx. Mirrors chip
+// ThreadBorderRouterManagementCluster.cpp:212 at 6170af84
+// (`mFailSafeContext.IsFailSafeArmed(ctx->GetAccessingFabricIndex())`).
+func (s *ManagementServer) failSafeArmedFor(ctx context.Context) bool {
 	s.mu.Lock()
-	armed := s.armed
+	failSafe := s.failSafe
 	s.mu.Unlock()
-	return armed != nil && armed()
+	if failSafe == nil {
+		return false
+	}
+	_, accessing := im.FabricFilterFromContext(ctx)
+	fabric, armed := failSafe()
+	return armed && fabric == accessing
 }
 
 // statusOf is chip's StatusIB(error).mStatus for a port's error: Success
@@ -346,8 +356,8 @@ func (s *ManagementServer) setActiveDataset(ctx context.Context, fields any) (an
 	if !ok {
 		return nil, spec.Errorf(im.StatusInvalidCommand, "threadbr: SetActiveDatasetRequest payload")
 	}
-	if !s.failSafeArmed() {
-		return nil, spec.Errorf(im.StatusFailsafeRequired, "threadbr: SetActiveDatasetRequest needs an armed fail-safe")
+	if !s.failSafeArmedFor(ctx) {
+		return nil, spec.Errorf(im.StatusFailsafeRequired, "threadbr: SetActiveDatasetRequest needs the accessing fabric's armed fail-safe")
 	}
 	if !thread.ValidDataset(req.ActiveDataset) {
 		return nil, spec.Errorf(im.StatusInvalidCommand, "threadbr: SetActiveDatasetRequest: not an operational dataset")

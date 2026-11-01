@@ -80,7 +80,7 @@ func TestPin_RevertAddNOC_ACLCleanup(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewOperationalCredentials: %v", err)
 	}
-	oc.SetIsFailSafeArmed(func() bool { return true })
+	oc.SetFailSafe(func() (uint8, bool) { return 0, true })
 
 	rootPriv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {

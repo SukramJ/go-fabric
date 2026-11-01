@@ -29,7 +29,12 @@ const paseCloseGrace = 100 * time.Millisecond
 // :117-136, :297-323 at 6170af84). The node wires each as its endpoint
 // joins the topology and calls it after the root's own fail-safe hooks.
 type failSafeParticipant interface {
-	AttachFailSafe(armed func() bool, setBreadcrumb func(uint64))
+	// AttachFailSafe hands the participant the node's fail-safe port —
+	// armed, and for which fabric ([core.GeneralCommissioning.FailSafeFabric])
+	// — so a command can require the window of its accessing fabric
+	// (connectedhomeip FailSafeContext::IsFailSafeArmed(accessingFabricIndex),
+	// src/app/FailSafeContext.h:76-79 at 6170af84).
+	AttachFailSafe(failSafe func() (fabricIndex uint8, armed bool), setBreadcrumb func(uint64))
 	OnFailSafeExpired(ctx context.Context)
 	OnCommissioningComplete(ctx context.Context)
 }
@@ -60,7 +65,7 @@ func (n *Node) attachFailSafe(ctx context.Context, t *endpoint.Topology) {
 			if !ok {
 				continue
 			}
-			p.AttachFailSafe(gc.FailSafeArmed, func(v uint64) {
+			p.AttachFailSafe(gc.FailSafeFabric, func(v uint64) {
 				_ = gc.MatterWrite(context.WithoutCancel(ctx), gencommdef.AttrBreadcrumb, v)
 			})
 			participants = append(participants, p)

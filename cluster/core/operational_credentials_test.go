@@ -1149,13 +1149,13 @@ func TestOpcreds_SetOnFabricUpdatedNoOp(t *testing.T) {
 	oc.SetOnFabricUpdated(nil)
 }
 
-// TestOpcreds_SetIsFailSafeArmedNoOp verifies SetIsFailSafeArmed accepts
+// TestOpcreds_SetFailSafeNoOp verifies SetFailSafe accepts
 // a non-nil function and nil without panicking.
-func TestOpcreds_SetIsFailSafeArmedNoOp(t *testing.T) {
+func TestOpcreds_SetFailSafeNoOp(t *testing.T) {
 	t.Parallel()
 	oc := newOpcreds(t)
-	oc.SetIsFailSafeArmed(func() bool { return true })
-	oc.SetIsFailSafeArmed(nil)
+	oc.SetFailSafe(func() (uint8, bool) { return 0, true })
+	oc.SetFailSafe(nil)
 }
 
 // TestOpcreds_UpdateFabricLabelInvalidArgType verifies that UpdateFabricLabel
@@ -1274,7 +1274,7 @@ func TestOpcreds_CSRRequestRequiresArmedFailSafe(t *testing.T) {
 	t.Parallel()
 	oc, err := core.NewOperationalCredentials(newFakeStore(), core.OpcredsConfig{
 		SupportedFabrics: 5,
-		IsFailSafeArmed:  func() bool { return false }, // FailSafe NOT armed
+		FailSafe:         func() (uint8, bool) { return 0, false }, // FailSafe NOT armed
 	})
 	if err != nil {
 		t.Fatalf("NewOperationalCredentials: %v", err)

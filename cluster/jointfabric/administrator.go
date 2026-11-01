@@ -128,10 +128,10 @@ type Administrator struct {
 	// mu guards what follows.
 	mu sync.Mutex
 	// fabrics and window are the node's, attached as the topology is
-	// assembled; armed reports the node's fail-safe.
-	fabrics FabricTable
-	window  wire.WindowController
-	armed   func() bool
+	// assembled; failSafe reports the node's fail-safe and its fabric.
+	fabrics  FabricTable
+	window   wire.WindowController
+	failSafe func() (fabricIndex uint8, armed bool)
 	// vidVerified is the fabric whose VID verification succeeded
 	// (JointFabricAdministrator.h:54-70), 0 none.
 	vidVerified uint8
@@ -209,10 +209,25 @@ func (a *Administrator) reachPort() CommissionerReach {
 // AttachFailSafe hands the administrator the node's fail-safe state; the
 // node calls it as the endpoint joins the topology. The Breadcrumb is not
 // the administrator's to write.
-func (a *Administrator) AttachFailSafe(armed func() bool, _ func(uint64)) {
+func (a *Administrator) AttachFailSafe(failSafe func() (fabricIndex uint8, armed bool), _ func(uint64)) {
 	a.mu.Lock()
-	a.armed = armed
+	a.failSafe = failSafe
 	a.mu.Unlock()
+}
+
+// armedFor reports whether the node's fail-safe is armed for the
+// accessing fabric. Mirrors joint-fabric-administrator-server.cpp:325,
+// :369 at 6170af84
+// (`failSafeContext.IsFailSafeArmed(ctx.mCommandHandler.GetAccessingFabricIndex())`).
+func (a *Administrator) armedFor(fabricIndex uint8) bool {
+	a.mu.Lock()
+	failSafe := a.failSafe
+	a.mu.Unlock()
+	if failSafe == nil {
+		return false
+	}
+	fabric, armed := failSafe()
+	return armed && fabric == fabricIndex
 }
 
 // OnFailSafeExpired ends an AnnounceJointFabricAdministrator in progress
@@ -340,7 +355,10 @@ func accessing(ctx context.Context) (fabricIndex uint8, isCASE bool) {
 func (a *Administrator) node() (FabricTable, wire.WindowController, bool) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	armed := a.armed != nil && a.armed()
+	armed := false
+	if a.failSafe != nil {
+		_, armed = a.failSafe()
+	}
 	return a.fabrics, a.window, armed
 }
 
@@ -459,7 +477,7 @@ func (a *Administrator) announceJointFabricAdministrator(ctx context.Context, fi
 // (:305-354).
 func (a *Administrator) icacCSRRequest(ctx context.Context, _ any) (any, error) {
 	fabricIndex, isCASE := accessing(ctx)
-	_, _, armed := a.node()
+	armed := a.armedFor(fabricIndex)
 	a.mu.Lock()
 	invoked, verified := a.addICACInvoked, a.vidVerified == fabricIndex && fabricIndex != 0
 	a.mu.Unlock()
@@ -498,7 +516,8 @@ func (a *Administrator) addICAC(ctx context.Context, fields any) (any, error) {
 		return nil, statusErr(im.StatusInvalidCommand, "AddICAC payload %T", fields)
 	}
 	fabricIndex, isCASE := accessing(ctx)
-	fabrics, _, armed := a.node()
+	fabrics, _, _ := a.node()
+	armed := a.armedFor(fabricIndex)
 	switch {
 	case !isCASE: // :366-367
 		return nil, statusErr(im.StatusInvalidCommand, "AddICAC outside CASE")

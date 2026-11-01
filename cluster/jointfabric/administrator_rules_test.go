@@ -260,3 +260,19 @@ func TestAnchorOnCommissioningComplete(t *testing.T) {
 		t.Fatal("the anchor fabric's removal left the datastore")
 	}
 }
+
+// TestICACCommandsNeedTheAccessingFabricsFailSafe pins ICACCSRRequest and
+// AddICAC under a fail-safe armed for another fabric: FAILSAFE_REQUIRED,
+// as joint-fabric-administrator-server.cpp:325-326, :369-370 at 6170af84
+// ask `IsFailSafeArmed(ctx.mCommandHandler.GetAccessingFabricIndex())`.
+func TestICACCommandsNeedTheAccessingFabricsFailSafe(t *testing.T) {
+	fx := newAdminFixture(t, AdministratorConfig{})
+	fx.a.AttachFailSafe(func() (uint8, bool) { return 5, true }, nil) // the fixture's CASE fabric is 3
+	ctx := caseCtx(t.Context(), 3)
+	if _, err := fx.a.MatterInvoke(ctx, jfadef.CmdIcaccsrRequest, jfadef.IcaccsrRequestRequest{}); statusOf(err) != im.StatusFailsafeRequired {
+		t.Errorf("ICACCSRRequest under fabric 5's fail-safe = %v, want FailsafeRequired", err)
+	}
+	if _, err := fx.a.MatterInvoke(ctx, jfadef.CmdAddIcac, jfadef.AddIcacRequest{IcacValue: fx.f.icac}); statusOf(err) != im.StatusFailsafeRequired {
+		t.Errorf("AddICAC under fabric 5's fail-safe = %v, want FailsafeRequired", err)
+	}
+}

@@ -252,7 +252,8 @@ func newAdminFixture(t *testing.T, cfg AdministratorConfig) *adminFixture {
 	}
 	fx.a = a
 	a.AttachNode(&fakeFabrics{fabrics: []store.FabricRecord{fx.f.record()}, ids: map[uint8]store.IdentityRecord{3: {FabricIndex: 3, NOC: fx.f.noc, ICAC: fx.f.icac}}}, fx.window)
-	a.AttachFailSafe(func() bool { fx.mu.Lock(); defer fx.mu.Unlock(); return fx.armed }, func(uint64) {})
+	// The fixture's fail-safe is armed for its CASE fabric 3.
+	a.AttachFailSafe(func() (uint8, bool) { fx.mu.Lock(); defer fx.mu.Unlock(); return 3, fx.armed }, func(uint64) {})
 	return fx
 }
 
