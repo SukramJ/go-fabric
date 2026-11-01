@@ -4,6 +4,7 @@
 package thermo
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"sync"
@@ -24,7 +25,7 @@ type refusingPorts struct {
 	committed       [][]Schedule
 }
 
-func (p *refusingPorts) LoadPresets(context.Context) ([]byte, []byte, bool, error) {
+func (p *refusingPorts) LoadPresets(context.Context) (presets, activeHandle []byte, ok bool, err error) {
 	return nil, nil, false, nil
 }
 
@@ -86,7 +87,7 @@ func TestParityMatterJS_AtomicCommitIsOneUnit(t *testing.T) {
 		}
 		ports.mu.Lock()
 		defer ports.mu.Unlock()
-		if n := len(ports.savedPresets) - base; n != 2 || string(ports.savedPresets[len(ports.savedPresets)-1]) != string(EncodePresets(before)) {
+		if n := len(ports.savedPresets) - base; n != 2 || !bytes.Equal(ports.savedPresets[len(ports.savedPresets)-1], EncodePresets(before)) {
 			t.Errorf("the PresetStore saw %d saves, want the commit and the restore of the previous presets", n)
 		}
 	})

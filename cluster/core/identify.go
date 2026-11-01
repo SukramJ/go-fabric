@@ -261,7 +261,7 @@ func (i *Identify) MatterWrite(ctx context.Context, attrID uint32, value any) er
 		}
 	}
 	i.identifyTime.Store(uint32(t))
-	i.maybeStartCountdown()
+	i.maybeStartCountdown() //nolint:contextcheck // the countdown outlives the request; its stop call has no request behind it
 	// Bump DataVersion after a successful IdentifyTime write so
 	// DataVersionFilter evaluation correctly detects the cluster changed.
 	i.dataVersion.Bump()
@@ -284,7 +284,7 @@ func (i *Identify) MatterInvoke(ctx context.Context, cmdID uint32, fields any) (
 			}
 		}
 		i.identifyTime.Store(uint32(t))
-		i.maybeStartCountdown()
+		i.maybeStartCountdown() //nolint:contextcheck // the countdown outlives the request; its stop call has no request behind it
 		// Bump DataVersion after a successful Identify command so
 		// DataVersionFilter evaluation correctly detects the cluster changed.
 		i.dataVersion.Bump()

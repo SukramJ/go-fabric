@@ -29,7 +29,9 @@ var boundExprs sync.Map // string → *boundExpr
 // JSON; text that is no JSON is opaque.
 func parseBoundExpr(text string) *boundExpr {
 	if e, ok := boundExprs.Load(text); ok {
-		return e.(*boundExpr) //nolint:forcetypeassert // the map holds *boundExpr only
+		if b, isExpr := e.(*boundExpr); isExpr {
+			return b
+		}
 	}
 	e := parseBoundNode(json.RawMessage(text))
 	boundExprs.Store(text, e)
