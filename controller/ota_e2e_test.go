@@ -6,6 +6,7 @@ package controller_test
 import (
 	"bytes"
 	"context"
+	"log/slog"
 	"path/filepath"
 	"slices"
 	"sync"
@@ -34,6 +35,7 @@ type otaRig struct {
 	n      *client.Node
 	images *softwareupdate.Images
 
+	logBuf   diagBuffer // DIAG
 	mu       sync.Mutex
 	statuses []mattercore.OTAUpdateStatus
 	done     []softwareupdate.Peer
@@ -51,7 +53,8 @@ func newOTARig(t *testing.T, edit func(*controller.OTAConfig)) *otaRig {
 // by devOTA; nil runs the device without one.
 func newOTARigWith(t *testing.T, edit func(*controller.OTAConfig), devOTA *node.OtaConfig) *otaRig {
 	t.Helper()
-	r := &otaRig{site: fabrictest.NewSite(t, fabrictest.Options{}), images: softwareupdate.NewImages(softwareupdate.ImagesConfig{})}
+	r := &otaRig{images: softwareupdate.NewImages(softwareupdate.ImagesConfig{})}
+	r.site = fabrictest.NewSite(t, fabrictest.Options{Logger: slog.New(slog.NewTextHandler(&r.logBuf, &slog.HandlerOptions{Level: slog.LevelDebug}))}) // DIAG
 	r.dev = r.site.AddDevice(fabrictest.Topology{Configure: func(cfg *node.Config) { cfg.OTA = devOTA }})
 	ota := &controller.OTAConfig{
 		Images: r.images, AllowTestImages: true,
@@ -189,4 +192,22 @@ func TestOTAPushFromTheController(t *testing.T) {
 	if q := mgr.QueuedUpdates(); len(q) != 0 {
 		t.Errorf("queue %v after the update", q)
 	}
+}
+
+// diagBuffer is a goroutine-safe bytes.Buffer (DIAG, temporary).
+type diagBuffer struct {
+	mu  sync.Mutex
+	buf bytes.Buffer
+}
+
+func (b *diagBuffer) Write(p []byte) (int, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buf.Write(p)
+}
+
+func (b *diagBuffer) String() string {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buf.String()
 }
