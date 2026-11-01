@@ -217,6 +217,12 @@ func (d *Decoder) readValue(el *Element) error { //nolint:funlen // wire/dispatc
 		// packages/types/src/tlv/TlvString.ts decodeTlvInternalValue (#3977).
 		// Octet strings are left untouched.
 		if i := bytes.IndexByte(body, 0x1F); i >= 0 {
+			// The length a bounded consumer checks first (TlvString.ts:59-63).
+			n := utf16Length(decodeUTF8(body))
+			if n > math.MaxUint32 {
+				return fmt.Errorf("%w: character string of %d code units", ErrTruncated, n)
+			}
+			el.RawLength = uint32(n)
 			body = body[:i]
 		}
 		// Ill-formed UTF-8 reads as U+FFFD, as matter.js's TextDecoder
@@ -291,14 +297,14 @@ func (d *Decoder) need(n int) error {
 
 // Validate walks buf with chip-strict tag/container rules and
 // returns the first violation. Strict rules enforced (mirroring chip
-// TLVReader.cpp:806-839 + TLVWriter.cpp:WriteElementHead):
+// TLVReader.cpp:850-878 VerifyElement at 6170af84 + TLVWriter.cpp:WriteElementHead):
 //
 //   - Context tag at top level (no enclosing container) →
-//     CHIP_ERROR_INVALID_TLV_TAG (chip TLVReader.cpp:822-823).
+//     CHIP_ERROR_INVALID_TLV_TAG (chip TLVReader.cpp:865-867).
 //   - Anonymous tag inside Structure (except EndOfContainer) →
-//     CHIP_ERROR_INVALID_TLV_TAG (chip TLVReader.cpp:826-827).
+//     CHIP_ERROR_INVALID_TLV_TAG (chip TLVReader.cpp:869-871).
 //   - Non-anonymous tag inside Array →
-//     CHIP_ERROR_INVALID_TLV_TAG (chip TLVReader.cpp:830-831).
+//     CHIP_ERROR_INVALID_TLV_TAG (chip TLVReader.cpp:873-875).
 //
 // Returns nil when buf parses cleanly under the strict rules. Used
 // by [im.WireRoundTripGuard]-style tests + by north-bound code that

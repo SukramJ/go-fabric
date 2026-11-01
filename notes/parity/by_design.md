@@ -97,6 +97,7 @@ pin lift confirms by re-reading the row, [`pin-lifts.md`](./pin-lifts.md)).
 | BD-chip-ClosureDimension-RulesInServer | `ClosureDimensionServer.ts:17` is the empty subclass (absence: the class line, 17 lines in all) | `packages/node/src/behaviors/closure-dimension/ClosureDimensionServer.ts` | `"export class ClosureDimensionServer extends ClosureDimensionBehavior {}"` | connectedhomeip | no |
 | BD-chip-Thermostat-Schedules | `ThermostatServer.ts:82`, the class doc lists the feature unimplemented (presence; :126-128 warns when it is enabled) | `packages/node/src/behaviors/thermostat/ThermostatServer.ts` | `"MatterScheduleConfiguration: This feature is not implemented yet."` | connectedhomeip `src/app/clusters/thermostat-server/ThermostatClusterSchedules.cpp` at `645b267a` (`SetActiveSchedule` :741, `AppendPendingSchedule` :795, `ValidateScheduleTransitions` :292, `ValidateTransitionsPerDay` :457, the atomic hooks :620-663, `PrecommitSchedules` :1000) | yes |
 | BD-chip-Chime-RulesInServer | `ChimeServer.ts:14` is the empty subclass (absence: the class body, 14 lines in all) | `packages/node/src/behaviors/chime/ChimeServer.ts` | `class ChimeServer` | connectedhomeip `src/app/clusters/chime-server/ChimeCluster.cpp` at `6170af84` (`IsSupportedChimeID` :176, `SetSelectedChime` :215, `SetEnabled` :228, `HandlePlayChimeSound` :258, `GenerateChimeStartedPlayingEvent` :291), tests `tests/TestChimeCluster.cpp` | no |
+| BD-Matter-MessageCodec-PrivacyWithExtensions | `MessageCodec.ts:243-245` refuses a header with both the P and the MX flag (presence: the `NotImplementedError`) | `packages/protocol/src/codec/MessageCodec.ts` | `"Privacy enhancements with message extensions not supported."` | connectedhomeip `src/transport/raw/MessageHeader.cpp:224-232` at `6170af84` (the MX block is skipped whatever the P flag); `transport/message.UnmarshalHeader`, `bridge/privacy.go` `privacyHeaderEnd` (review 2026-11 W1-wire-05) | no |
 | BD-chip-CameraAvSettings-RulesInServer | `CameraAvSettingsUserLevelManagementServer.ts:18` is the empty subclass (absence: the class body, 18 lines in all) | `packages/node/src/behaviors/camera-av-settings-user-level-management/CameraAvSettingsUserLevelManagementServer.ts` | `class CameraAvSettingsUserLevelManagementServer` | connectedhomeip `src/app/clusters/camera-av-settings-user-level-management-server/CameraAvSettingsUserLevelManagementLogic.cpp` at `6170af84` (the handlers :721-1261, `OnPhysicalMovementComplete` :1265, the limit setters :339-407, the DPTZ streams :469-591), tests `tests/TestCameraAvSettingsUserLevelManagementCluster.cpp` | no |
 | BD-chip-CameraAvStreamManagement-RulesInServer | `CameraAvStreamManagementServer.ts:18` is the empty subclass (absence: the class body, 18 lines in all) | `packages/node/src/behaviors/camera-av-stream-management/CameraAvStreamManagementServer.ts` | `class CameraAvStreamManagementServer` | connectedhomeip `src/app/clusters/camera-av-stream-management-server/CameraAVStreamManagementCluster.cpp` at `6170af84` (`Init` :76, the reference counts :486-557, `SetViewport` :1137, the handlers :2065-2669, `IsResourceAvailableForStreamAllocation` :2717), `CameraAVStreamManagementCluster.h` (the delegate :159-372, `ValidateStreamForModifyOrDeallocateImpl` :794), tests `tests/TestCameraAVStreamManagementCluster.cpp` | no |
 | BD-chip-ZoneManagement-RulesInServer | `ZoneManagementServer.ts:14` is the empty subclass (absence: the class body, 14 lines in all) | `packages/node/src/behaviors/zone-management/ZoneManagementServer.ts` | `class ZoneManagementServer` | connectedhomeip `src/app/clusters/zone-management-server/ZoneManagementCluster.cpp` at `6170af84` (`ValidateConfiguration` :85, the Sensitivity write :259-284, the handlers :462-659, the events :701-733), `zone-geometry.h` (`IsZoneSelfIntersecting` :158), tests `tests/TestZoneManagementCluster.cpp`, `tests/TestZonePolygon.cpp` | no |
@@ -396,6 +397,19 @@ dimming. Sigma/PASE container/tag strictness remains a fuzz/robustness
 backlog item (parity audit CHIP L9-01..04), not an interop gap. The crypto
 core (HKDF salts/info/nonces, Sigma TLV tags, status codes, control octets)
 IS byte-verbatim with connectedhomeip HEAD.
+
+### BD-Matter-MessageCodec-PrivacyWithExtensions — a header with the privacy flag and message extensions is decoded
+
+matter.js `decodePacket` refuses a packet header that sets both the P and the
+MX flag (`packages/protocol/src/codec/MessageCodec.ts:243-245` at 862ad75f,
+`NotImplementedError("Privacy enhancements with message extensions not
+supported.")`); `transport/message.UnmarshalHeader` reads the MX length after
+the destination and skips the block, and the privacy mask
+(`bridge/privacy.go` `privacyHeaderEnd`) stops before it, so nothing is
+mis-parsed. chip skips the MX block whatever the P flag
+(`src/transport/raw/MessageHeader.cpp:224-232` at 6170af84); matter.js's
+refusal is an unimplemented feature, not a rule, so the header is accepted
+as chip accepts it (W1-wire-05).
 
 ### BD-Matter-mDNSDeviceType — commissionable DT advertises RootNode, not Aggregator
 
@@ -956,7 +970,9 @@ when Actions or another optional cluster lands.
   (TlvCodec.ts:169-171 at the schema pin; `NotImplementedError` before
   e21a1e72, #4514, which classifies the tag as malformed peer data); chip resolves them against `ImplicitProfileId` and
   returns `CHIP_ERROR_UNKNOWN_IMPLICIT_TLV_TAG` when no profile ID is set
-  (TLVReader.cpp:872-879). go-fabric's `Decoder.readTag` silently surfaces
+  (TLVReader.cpp:916-923 at 6170af84, `ReadTag` returning
+  `UnknownImplicitTag()` at :918 and :922, refused by `VerifyElement` at
+  :861-862). go-fabric's `Decoder.readTag` silently surfaces
   them as `Tag{Kind: TagKindImplicitProfile2/4, Number: n}` without
   resolution. By-design: no commissioner sends ImplicitProfile-tagged TLV to
   a bridge in any known commissioning or interaction flow (verified 60+ pair

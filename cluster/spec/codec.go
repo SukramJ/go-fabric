@@ -206,6 +206,12 @@ func DecodeStringIn(lo, hi int) Decoder[string] {
 		if !utf8.ValidString(n.El.String) {
 			return "", invalid("string is not valid UTF-8")
 		}
+		// A string the decoder cut at an IS1 is bounded by the length it
+		// arrived with first, as matter.js TlvString.ts:57-69 at 862ad75f
+		// checks `value.length > maxLength` before it slices.
+		if int64(n.El.RawLength) > int64(hi) {
+			return "", outOfRange("string length %d before its IS1 exceeds %d", n.El.RawLength, hi)
+		}
 		if l := StringLength(n.El.String); l < lo || l > hi {
 			return "", outOfRange("string length %d outside %d..%d", l, lo, hi)
 		}

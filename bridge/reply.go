@@ -131,6 +131,36 @@ func (b *Bridge) sendReplyOpts(
 	responsePayload []byte,
 	reliable bool,
 ) error {
+	return b.sendReplyTimed(src, requestHdr, requestProto, responseOpcode, responsePayload, reliable, nil)
+}
+
+// sendHandshakeReplyReliable is [Bridge.sendReplyReliable] for a
+// responder's reply on the unsecured session: peer carries the
+// initiator's stated intervals and activity, which the retransmit
+// schedule uses instead of the idle default
+// ([outboundReliableTracker.trackUnsecured]).
+func (b *Bridge) sendHandshakeReplyReliable(
+	src net.Addr,
+	requestHdr *message.Header,
+	requestProto message.ProtocolHeader,
+	responseOpcode uint8,
+	responsePayload []byte,
+	peer *handshakePeerTiming,
+) error {
+	return b.sendReplyTimed(src, requestHdr, requestProto, responseOpcode, responsePayload, true, peer)
+}
+
+// sendReplyTimed is [Bridge.sendReplyOpts] with the handshake peer timing
+// a session-0 reply's retransmissions follow; nil keeps the idle default.
+func (b *Bridge) sendReplyTimed(
+	src net.Addr,
+	requestHdr *message.Header,
+	requestProto message.ProtocolHeader,
+	responseOpcode uint8,
+	responsePayload []byte,
+	reliable bool,
+	peer *handshakePeerTiming,
+) error {
 	if requestProto.ProtocolID == im.InteractionModelProtocolID {
 		b.load.imSent.Add(1)
 		b.count(contract.MetricIMSent)
@@ -219,7 +249,7 @@ func (b *Bridge) sendReplyOpts(
 		// for an untracked message is lost — the message then goes out
 		// again as a spurious retransmission.
 		if needsAck {
-			tracker.Track(counter, requestHdr.SessionID, requestProto.ExchangeID, datagram, src, b.clk().Now())
+			tracker.trackUnsecured(counter, requestProto.ExchangeID, datagram, src, b.clk().Now(), peer)
 		}
 		if err := sendVia(listener, src, datagram); err != nil {
 			if needsAck {

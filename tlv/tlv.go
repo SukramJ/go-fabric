@@ -136,6 +136,15 @@ type Element struct {
 
 	// IsEndContainer is true for the 0x18 End-of-Container marker.
 	IsEndContainer bool
+
+	// RawLength is, for a character string the decoder cut at its first
+	// IS1 (0x1F), the length of the whole string as it arrived, in UTF-16
+	// code units — the unit matter.js's TlvString bounds a string in. It
+	// is 0 when nothing was cut. A bounded consumer refuses the element
+	// when RawLength exceeds its maximum, as matter.js checks the length
+	// before it truncates (packages/types/src/tlv/TlvString.ts:57-69 at
+	// 862ad75f). A uint32 beside the flags keeps Element at its size.
+	RawLength uint32
 }
 
 // Errors returned by encoder / decoder.
@@ -153,7 +162,7 @@ var (
 	ErrInvalidTagKind = errors.New("tlv: invalid tag kind")
 
 	// ErrStrictTagViolation is returned by [Validate] when a TLV
-	// stream violates one of the chip TLVReader.cpp:806-839 strictness
+	// stream violates one of the chip TLVReader.cpp:850-878 (VerifyElement, at 6170af84) strictness
 	// rules — context tag at top level, anonymous tag inside Structure
 	// (except EndOfContainer), or non-anonymous tag inside Array.
 	// Apple's verifier drops the whole IM message on these patterns,

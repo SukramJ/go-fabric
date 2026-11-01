@@ -3,7 +3,10 @@
 
 package message
 
-import "errors"
+import (
+	"errors"
+	"fmt"
+)
 
 // Errors of [Header.MarshalPacket].
 var (
@@ -30,16 +33,30 @@ var (
 //   - :481-488 encodePacketHeader — a group-session header must carry the
 //     destination group id and the source node id and no destination node
 //     id ([ErrGroupHeader]);
+//   - a unicast header naming a destination group id is refused
+//     ([ErrUnicastGroupDestination]): matter.js cannot build one, and its
+//     decoder (MessageCodec.ts:223-225 at 862ad75f) and chip's
+//     (MessageHeader.cpp:209-212 at 6170af84) discard it;
 //   - :489-504 — the bytes are [Header.Marshal]'s: Message Flags, Session
 //     ID, Security Flags, Message Counter, Source Node ID, the destination.
 //
 // [Header.Marshal] stays the unchecked encoder the AAD and the tests use.
 func (h Header) MarshalPacket() ([]byte, error) {
+	// The reserved DSIZ 0b11 has no destination field and every receiver
+	// discards it ([UnmarshalHeader]; matter.js MessageCodec.ts:210-213,
+	// chip MessageHeader.cpp:192-195); matter.js cannot build one, its
+	// flags follow from the fields present.
+	if h.DestSize > DestGroup {
+		return nil, fmt.Errorf("%w: 0b%02b", ErrReservedDestSize, h.DestSize)
+	}
 	if h.HasExtension || len(h.MessageExtension) > 0 {
 		return nil, ErrEncodeExtensions
 	}
 	if h.SessionType == SessionGroup && (h.DestSize != DestGroup || !h.HasSourceNodeID) {
 		return nil, ErrGroupHeader
+	}
+	if h.SessionType == SessionUnsecured && h.DestSize == DestGroup {
+		return nil, ErrUnicastGroupDestination
 	}
 	return h.Marshal(), nil
 }

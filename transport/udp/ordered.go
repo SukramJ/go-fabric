@@ -56,11 +56,13 @@ type orderedDispatch struct {
 	mu     sync.Mutex
 	queues map[uint32]*orderedQueue
 	// pending counts the datagrams of every stream that are queued or
-	// being handled. It shares [maxConcurrentDispatch] with the unordered
-	// pool: a stream key is read from the datagram before any session
-	// lookup, so a flood of forged session ids would otherwise open one
-	// queue, one drain goroutine and up to [maxOrderedBacklog] buffers per
-	// id without any overall bound.
+	// being handled, bounded by [maxConcurrentDispatch] of its own — a
+	// second budget beside the unordered pool's semaphore, so at most
+	// 2 × [maxConcurrentDispatch] datagrams are in flight in all. A stream
+	// key is read from the datagram before any session lookup, so a flood
+	// of forged session ids would otherwise open one queue, one drain
+	// goroutine and up to [maxOrderedBacklog] buffers per id without any
+	// overall bound.
 	pending int
 }
 

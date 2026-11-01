@@ -334,11 +334,13 @@ func New(cfg Config) (*CA, error) {
 	return c, nil
 }
 
-// initVerifier builds the verifier over the root.
+// initVerifier builds the verifier over the root certificate, so a NOC's
+// authorityKeyIdentifier is checked against the root's
+// subjectKeyIdentifier (matter.js Noc.ts:170-184 at 862ad75f).
 func (c *CA) initVerifier() error {
-	v, err := mattercert.NewVerifier(c.rootPub, c.cfg.Clock)
+	v, err := mattercert.NewVerifierFromRCAC(c.rootCert, c.cfg.Clock)
 	if err != nil {
-		return fmt.Errorf("ca: root public key: %w", err)
+		return fmt.Errorf("ca: root certificate: %w", err)
 	}
 	c.verifier = v
 	return nil

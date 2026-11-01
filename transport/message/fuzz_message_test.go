@@ -34,26 +34,41 @@ func FuzzUnmarshalHeader(f *testing.F) {
 		HasSourceNodeID: true, SourceNodeID: 0x0011223344556677,
 		DestSize: DestNodeID, DestNodeID: 0x8899AABBCCDDEEFF,
 	}.Marshal())
-	f.Add(Header{MessageCounter: 1, DestSize: DestGroup, DestGroupID: 0xABCD}.Marshal())
+	f.Add(Header{
+		MessageCounter: 1, SessionType: SessionGroup, HasSourceNodeID: true, SourceNodeID: 5,
+		DestSize: DestGroup, DestGroupID: 0xABCD,
+	}.Marshal())
 	f.Add(Header{
 		SessionID: 7, MessageCounter: 9, Privacy: true, SessionType: SessionGroup,
+		HasSourceNodeID: true, SourceNodeID: 5, DestSize: DestGroup, DestGroupID: 1,
 		HasExtension: true, MessageExtension: []byte{0xDE, 0xAD, 0xBE, 0xEF},
 	}.Marshal())
 
 	// Deliberately malformed.
 	f.Add([]byte{})
-	f.Add([]byte{0x00, 0x00, 0x00, 0x00})                      // shorter than the 8-byte fixed part
-	f.Add([]byte{0x10, 0, 0, 0, 0, 0, 0, 0})                   // non-zero version nibble
-	f.Add([]byte{0x03, 0, 0, 0, 0, 0, 0, 0})                   // reserved DSIZ 0b11
-	f.Add([]byte{0x00, 0, 0, 0x40, 0, 0, 0, 0})                // control-message bit
-	f.Add([]byte{0x00, 0, 0, 0x02, 0, 0, 0, 0})                // session type 2
-	f.Add([]byte{0x00, 0, 0, 0x20, 0, 0, 0, 0, 0xFF, 0xFF})    // extension length past the buffer
-	f.Add([]byte{0x01, 0, 0, 0, 0, 0, 0, 0, 0x01, 0x02, 0x03}) // dest node id truncated
+	f.Add([]byte{0x00, 0x00, 0x00, 0x00})                                                // shorter than the 8-byte fixed part
+	f.Add([]byte{0x10, 0, 0, 0, 0, 0, 0, 0})                                             // non-zero version nibble
+	f.Add([]byte{0x03, 0, 0, 0, 0, 0, 0, 0})                                             // reserved DSIZ 0b11
+	f.Add([]byte{0x00, 0, 0, 0x40, 0, 0, 0, 0})                                          // control-message bit
+	f.Add([]byte{0x00, 0, 0, 0x02, 0, 0, 0, 0})                                          // session type 2
+	f.Add([]byte{0x00, 0, 0, 0x20, 0, 0, 0, 0, 0xFF, 0xFF})                              // extension length past the buffer
+	f.Add([]byte{0x01, 0, 0, 0, 0, 0, 0, 0, 0x01, 0x02, 0x03})                           // dest node id truncated
+	f.Add(Header{MessageCounter: 1, DestSize: DestGroup, DestGroupID: 0xABCD}.Marshal()) // unicast with a group destination
+	f.Add([]byte{0x04, 0, 0, 0x01, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0})                  // group without a destination
+	f.Add([]byte{0x02, 0, 0, 0x01, 0, 0, 0, 0, 0xCD, 0xAB})                              // group without a source node id
 
 	f.Fuzz(func(t *testing.T, buf []byte) {
 		h, n, err := UnmarshalHeader(buf)
 		if err != nil {
 			return
+		}
+		// What it accepts keeps matter.js's cross-field rules
+		// (MessageCodec.ts:223-233).
+		if h.SessionType == SessionUnsecured && h.DestSize == DestGroup {
+			t.Fatalf("accepted a unicast header with a group destination: %+v", h)
+		}
+		if h.SessionType == SessionGroup && (h.DestSize == DestNone || !h.HasSourceNodeID) {
+			t.Fatalf("accepted a group header without a destination or a source: %+v", h)
 		}
 		if n < 0 || n > len(buf) {
 			t.Fatalf("UnmarshalHeader consumed %d of %d bytes", n, len(buf))
@@ -109,7 +124,8 @@ func FuzzUnmarshalProtocolHeader(f *testing.F) {
 
 // FuzzMarshalPacket drives the outbound encoder [Header.MarshalPacket]
 // with arbitrary header fields. Asserted: no panic; a header it refuses
-// breaks one of the two encodePacket constraints; a header it encodes
+// breaks one of the encode constraints (the two of encodePacket, a unicast
+// header with a group destination, the reserved DSIZ 0b11); a header it encodes
 // decodes back to the same typed header, and a group header keeps its
 // source node id and group id (matter.js MessageCodec.ts:481-504).
 func FuzzMarshalPacket(f *testing.F) {
@@ -121,7 +137,7 @@ func FuzzMarshalPacket(f *testing.F) {
 	f.Fuzz(func(t *testing.T, session uint16, counter uint32, hasSource bool, source uint64, dsiz uint8, destNode uint64, destGroup uint16, sessionType uint8, privacy, ext bool) {
 		h := Header{
 			SessionID: session, MessageCounter: counter, HasSourceNodeID: hasSource,
-			DestSize: DestSize(dsiz % 3), SessionType: SessionType(sessionType % 2), Privacy: privacy, HasExtension: ext,
+			DestSize: DestSize(dsiz % 4), SessionType: SessionType(sessionType % 2), Privacy: privacy, HasExtension: ext,
 		}
 		if hasSource {
 			h.SourceNodeID = source
@@ -136,7 +152,9 @@ func FuzzMarshalPacket(f *testing.F) {
 		b, err := h.MarshalPacket()
 		if err != nil {
 			groupBroken := h.SessionType == SessionGroup && (h.DestSize != DestGroup || !h.HasSourceNodeID)
-			if !ext && !groupBroken {
+			unicastGroup := h.SessionType == SessionUnsecured && h.DestSize == DestGroup
+			reserved := h.DestSize > DestGroup
+			if !ext && !groupBroken && !unicastGroup && !reserved {
 				t.Fatalf("refused a valid header %+v: %v", h, err)
 			}
 			return

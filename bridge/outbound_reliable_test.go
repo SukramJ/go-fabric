@@ -421,7 +421,7 @@ func TestOutboundReliable_AckStrayWithWaiter(t *testing.T) {
 
 // TestOutboundReliable_TickSendError verifies that a send error is reported
 // in the result slice but the entry is NOT removed from the pending map
-// (it will be retried on the next tick).
+// (it is retried at its backoff).
 func TestOutboundReliable_TickSendError(t *testing.T) {
 	t.Parallel()
 	tr := newOutboundReliableTracker(nil, nil)

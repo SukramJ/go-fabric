@@ -4534,7 +4534,7 @@
         "client/exchange:TestMRPRetransmissionIntervalOf",
         "client/exchange:TestMRPRetransmissionIntervalPadded",
         "secure/operational:TestEntry_RetransmitBaseInterval_ActiveAfterMarkActiveRx",
-        "secure/operational:TestEntry_RetransmitBaseInterval_FreshDefaultsToIdle",
+        "secure/operational:TestEntry_RetransmitBaseInterval_FreshCountsThePeerActive",
         "transport/mrp:TestBackoffDuration_TransmissionExponent"
       ],
       "reason": "The retransmission interval with and without its pad (RetransmissionInterval, RetransmissionIntervalPadded with Pad{Additional, Fixed}), its maximum, MarginFor and the peer response time of the udp (with the padded local leg), tcp and ble channels, against client/exchange.",

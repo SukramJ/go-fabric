@@ -97,47 +97,56 @@ func TestAckTrackerDueRemovesEntries(t *testing.T) {
 	}
 }
 
-// TestAckTrackerOweUpgradeKeepsLatest verifies that owing a higher counter
-// on the same exchange replaces the previous entry (cumulative-ACK collapse);
-// Pending stays at 1 and Due returns the latest counter.
-func TestAckTrackerOweUpgradeKeepsLatest(t *testing.T) {
-	tracker := mrp.NewAckTracker(0)
-	tracker.Owe(100, 0, 1, true, t0)
-	tracker.Owe(150, 0, 1, true, t0)
-
-	if tracker.Pending() != 1 {
-		t.Fatalf("Pending() = %d after two Owes on same exchange, want 1", tracker.Pending())
-	}
-	obligations := tracker.Due(t0)
-	if len(obligations) != 1 {
-		t.Fatalf("Due: got %d obligations, want 1", len(obligations))
-	}
-	if obligations[0].AckCounter != 150 {
-		t.Errorf("AckCounter = %d, want 150 (latest counter)", obligations[0].AckCounter)
+// An MRP ack acknowledges one message counter, so an obligation a newer
+// message on the same exchange displaces is not dropped: it is due at once
+// as a standalone ack, and the new counter becomes the pending one — in
+// either counter order. Mirrors chip ReliableMessageContext.cpp:158-171 at
+// 6170af84 ("forcing tx of solitary ack") and matter.js
+// MessageExchange.ts:539-543 at 862ad75f (sendStandaloneAckForMessage for
+// the old one before taking the new one).
+func TestAckTrackerOweFlushesTheDisplacedObligation(t *testing.T) {
+	const delay = 50 * time.Millisecond
+	for name, counters := range map[string][2]uint32{"newer": {100, 150}, "older": {150, 100}} {
+		t.Run(name, func(t *testing.T) {
+			tracker := mrp.NewAckTracker(delay)
+			tracker.Owe(counters[0], 0, 1, true, t0)
+			tracker.Owe(counters[1], 0, 1, true, t0)
+			if tracker.Pending() != 2 {
+				t.Fatalf("Pending() = %d, want 2 (the displaced one awaits its standalone ack)", tracker.Pending())
+			}
+			// Before the grace window ends only the displaced obligation is due.
+			due := tracker.Due(t0)
+			if len(due) != 1 || due[0].AckCounter != counters[0] {
+				t.Fatalf("Due(t0) = %+v, want the displaced counter %d", due, counters[0])
+			}
+			// The exchange still owes the new counter's ack, on its own role only.
+			if !tracker.Owes(0, 1, true) || tracker.Owes(0, 1, false) {
+				t.Fatal("Owes: want the newer obligation pending for the initiator role only")
+			}
+			// The new counter is the pending one: a piggyback takes it.
+			if c, ok := tracker.LookupAndDischarge(0, 1, true); !ok || c != counters[1] {
+				t.Fatalf("LookupAndDischarge = %d, %v, want %d", c, ok, counters[1])
+			}
+			if tracker.Pending() != 0 || tracker.Owes(0, 1, true) {
+				t.Fatalf("Pending() = %d after the piggyback, want 0 and nothing owed", tracker.Pending())
+			}
+		})
 	}
 }
 
-// TestAckTrackerOweOlderCounterIsIgnored confirms that owing an older
-// counter on an existing exchange is a no-op: the higher counter and its
-// original DueAt are preserved.
-func TestAckTrackerOweOlderCounterIsIgnored(t *testing.T) {
+// Owing the counter already pending (a duplicate) keeps the obligation and
+// its DueAt, so the deadline does not slide forward.
+func TestAckTrackerOweSameCounterKeepsTheDeadline(t *testing.T) {
 	const delay = 50 * time.Millisecond
 	tracker := mrp.NewAckTracker(delay)
 	tracker.Owe(150, 0, 1, true, t0)
-	// Attempt to overwrite with a lower counter at a later time.
-	tracker.Owe(100, 0, 1, true, t0.Add(50*time.Millisecond))
-
+	tracker.Owe(150, 0, 1, true, t0.Add(40*time.Millisecond))
 	if tracker.Pending() != 1 {
 		t.Fatalf("Pending() = %d, want 1", tracker.Pending())
 	}
-	// DueAt was set to t0+delay by the first Owe; the second Owe must not
-	// slide it forward. Draining at t0+delay should yield the original counter.
 	obligations := tracker.Due(t0.Add(delay))
-	if len(obligations) != 1 {
-		t.Fatalf("Due: got %d obligations, want 1", len(obligations))
-	}
-	if obligations[0].AckCounter != 150 {
-		t.Errorf("AckCounter = %d, want 150 (older counter rejected)", obligations[0].AckCounter)
+	if len(obligations) != 1 || obligations[0].AckCounter != 150 {
+		t.Fatalf("Due = %+v, want counter 150 at the original deadline", obligations)
 	}
 }
 

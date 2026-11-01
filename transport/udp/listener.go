@@ -13,7 +13,10 @@ import (
 	"runtime/debug"
 	"sync"
 	"sync/atomic"
+	"syscall"
+	"time"
 
+	"github.com/SukramJ/go-fabric/clock"
 	"github.com/SukramJ/go-fabric/internal/udpseam"
 )
 
@@ -217,14 +220,36 @@ func (l *Listener) Serve(ctx context.Context, handler Handler) error {
 	}()
 
 	buf := make([]byte, MaxDatagramSize+64) // small headroom for diagnostics
+	readErrors := 0
 	for {
 		n, src, err := l.conn.ReadFromUDP(buf)
 		if err != nil {
 			if l.isClosed() || errors.Is(err, net.ErrClosed) {
 				return nil
 			}
-			return fmt.Errorf("udp: read: %w", err)
+			// A receive error is logged and the endpoint keeps listening,
+			// as chip's UDP transport does (src/transport/raw/UDP.cpp:130-133
+			// at 6170af84, OnUdpError logs "Failed to receive UDP
+			// message"). Only a socket that is gone, or one that fails
+			// every read for maxConsecutiveReadErrors in a row, ends the
+			// loop — the caller then sees the error.
+			readErrors++
+			if socketGone(err) || readErrors >= maxConsecutiveReadErrors {
+				return fmt.Errorf("udp: read: %w", err)
+			}
+			l.logger().Warn("matter.udp.read_error",
+				slog.Any("err", err),
+				slog.Int("count", readErrors))
+			pause := clock.System{}.NewTimer(readErrorPause)
+			select {
+			case <-ctx.Done():
+				pause.Stop()
+				return nil
+			case <-pause.C():
+			}
+			continue
 		}
+		readErrors = 0
 		// Per-datagram goroutine + copy. Earlier code dispatched
 		// synchronously on the same goroutine that owned the UDP read,
 		// which serialised the whole receive pipeline behind whatever
@@ -378,6 +403,20 @@ func (l *Listener) isClosed() bool {
 
 // logger is the Listener's logger; a value built without its constructor
 // logs through slog.Default().
+// maxConsecutiveReadErrors bounds how many reads in a row may fail before
+// [Listener.Serve] gives up on the socket; readErrorPause spaces them so a
+// failing socket does not spin.
+const (
+	maxConsecutiveReadErrors = 100
+	readErrorPause           = 10 * time.Millisecond
+)
+
+// socketGone reports a read error that no later read can recover from:
+// the descriptor is closed or is no socket.
+func socketGone(err error) bool {
+	return errors.Is(err, syscall.EBADF) || errors.Is(err, syscall.ENOTSOCK)
+}
+
 func (l *Listener) logger() *slog.Logger {
 	if l.log != nil {
 		return l.log
