@@ -39,6 +39,7 @@ Findings of the whole-codebase review of 2026-11-01 (`notes/review/2026-11/`).
 
 - `client/discovery`: a session releases its caller's context hook before the outcome is visible; a cancel after `Wait` returned logged into a caller that had moved on (the race job's red on `main`, W6-test-02).
 - `cluster/onoff`, `cluster/closure`: a port's `contract.StatusError` answers its status instead of FAILURE, as v0.15.6 made the other kit servers do (W6-doc-01).
+- `bridge`: the responder's PBKDFParamResponse, Pake2, Sigma2 and Sigma2_Resume retransmit at the initiator's active interval — the one its PBKDFParamRequest or Sigma1 stated, else the 300 ms default — while it was heard within its active threshold, as matter.js does; they waited out the 500 ms idle default (W1-conc-01).
 
 ## [0.15.6] — 2026-11-01
 

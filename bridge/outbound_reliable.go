@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/SukramJ/go-fabric/clock"
+	"github.com/SukramJ/go-fabric/secure/sessionparams"
 	"github.com/SukramJ/go-fabric/transport/mrp"
 )
 
@@ -97,6 +98,11 @@ type outboundEntry struct {
 	// MRP.ts retransmissionIntervalOf, `additionalDelay`). Zero for every
 	// exchange but a BDX responder's that set one ([TrackWithMargin]).
 	margin time.Duration
+	// peer, when set, resolves the base interval of a session-0
+	// (handshake) reply from the initiator's own SessionParameters and its
+	// activity instead of the session resolver, which knows no unsecured
+	// session ([outboundReliableTracker.TrackHandshake]).
+	peer *handshakePeerTiming
 	// sentWall is the tracker's clock reading when the datagram first
 	// left, used only to report the peer's round-trip in diagnostics. It is
 	// deliberately NOT the injected `now` the retransmit schedule runs on:
@@ -130,6 +136,70 @@ func (t *outboundReliableTracker) baseInterval(sessionID uint16, now time.Time) 
 	return mrp.SessionIdleIntervalDefault
 }
 
+// handshakePeerTiming is what the responder knows about the initiator's
+// MRP timing while a handshake runs on the unsecured session: the
+// intervals the initiator stated in its PBKDFParamRequest / Sigma1
+// (spec defaults for the fields it left out) and when it was last heard.
+//
+// Mirrors matter.js: the responder's UnsecuredSession is created with
+// `setActiveTimestamp: !isInitiator` (packages/protocol/src/session/
+// UnsecuredSession.ts:30, "When we are the initiator we assume the node
+// is in idle mode" — the responder counts its peer active), its timing
+// parameters are replaced by the initiator's (PaseServer.ts:153-156,
+// CaseServer.ts:120-123 `session.timingParameters =
+// initiatorSessionParams`; Session.ts:108-121 stores them), every
+// received message refreshes the active timestamp (Session.ts:141-147
+// notifyActivity) and retransmissionIntervalOf picks activeInterval while
+// the peer is active (MRP.ts:181, isPeerActive: Session.ts:149-151).
+type handshakePeerTiming struct {
+	idle, active, threshold time.Duration
+	// activeAt is when the request this reply answers was received.
+	activeAt time.Time
+}
+
+// newHandshakePeerTiming resolves the initiator's intervals from params
+// (nil when it stated none) with the spec defaults for each field it left
+// out; rxAt is when its request arrived.
+func newHandshakePeerTiming(params *sessionparams.Parameters, rxAt time.Time) *handshakePeerTiming {
+	p := &handshakePeerTiming{
+		idle:      mrp.SessionIdleIntervalDefault,
+		active:    mrp.SessionActiveIntervalDefault,
+		threshold: mrp.SessionActiveThresholdDefault,
+		activeAt:  rxAt,
+	}
+	if params == nil {
+		return p
+	}
+	if params.SessionIdleInterval != 0 {
+		p.idle = time.Duration(params.SessionIdleInterval) * time.Millisecond
+	}
+	if params.SessionActiveInterval != 0 {
+		p.active = time.Duration(params.SessionActiveInterval) * time.Millisecond
+	}
+	if params.SessionActiveThreshold != 0 {
+		p.threshold = time.Duration(params.SessionActiveThreshold) * time.Millisecond
+	}
+	return p
+}
+
+// base is the MRP base interval for a (re)transmission at now: the active
+// interval while the peer was heard within its active threshold, the idle
+// interval after (matter.js MRP.ts:181, re-evaluated per transmission).
+func (p *handshakePeerTiming) base(now time.Time) time.Duration {
+	if now.Sub(p.activeAt) < p.threshold {
+		return p.active
+	}
+	return p.idle
+}
+
+// entryBase is the base interval for the entry's next transmission.
+func (t *outboundReliableTracker) entryBase(sessionID uint16, peer *handshakePeerTiming, now time.Time) time.Duration {
+	if peer != nil {
+		return peer.base(now)
+	}
+	return t.baseInterval(sessionID, now)
+}
+
 // Track records a freshly-sent reliable datagram. counter is the
 // MessageCounter we stamped into the message header; dest is the UDP
 // peer; datagram is the wire bytes we shipped (defensive-copied so
@@ -147,13 +217,26 @@ func (t *outboundReliableTracker) Track(counter uint32, sessionID, exchangeID ui
 // retransmissionIntervalOf's additionalDelay (MRP.ts, `baseInterval =
 // (isPeerActive ? activeInterval : idleInterval) + additionalDelay`).
 func (t *outboundReliableTracker) TrackWithMargin(counter uint32, sessionID, exchangeID uint16, datagram []byte, dest net.Addr, now time.Time, margin time.Duration) {
+	t.track(counter, sessionID, exchangeID, datagram, dest, now, margin, nil)
+}
+
+// TrackHandshake is [outboundReliableTracker.Track] for a reply the
+// responder sends on the unsecured session (PBKDFParamResponse, Pake2,
+// Sigma2, Sigma2_Resume): its base interval comes from peer, the
+// initiator's stated intervals and activity, not from the session
+// resolver, which knows no session 0.
+func (t *outboundReliableTracker) TrackHandshake(counter uint32, exchangeID uint16, datagram []byte, dest net.Addr, now time.Time, peer *handshakePeerTiming) {
+	t.track(counter, 0, exchangeID, datagram, dest, now, 0, peer)
+}
+
+func (t *outboundReliableTracker) track(counter uint32, sessionID, exchangeID uint16, datagram []byte, dest net.Addr, now time.Time, margin time.Duration, peer *handshakePeerTiming) {
 	cp := make([]byte, len(datagram))
 	copy(cp, datagram)
 	// The initial wait before the first retransmit uses the full spec
 	// formula at transmission 0 — matter.js MRP.ts:129 evaluates the
 	// peer-appropriate base interval for every transmission including
 	// the first.
-	delay := mrp.BackoffDuration(t.baseInterval(sessionID, now)+margin, 0, rand.Float64) + time.Duration(t.fixedBackoff.Load())
+	delay := mrp.BackoffDuration(t.entryBase(sessionID, peer, now)+margin, 0, rand.Float64) + time.Duration(t.fixedBackoff.Load())
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	t.pending[outboundKey{sessionID, counter}] = &outboundEntry{
@@ -164,6 +247,7 @@ func (t *outboundReliableTracker) TrackWithMargin(counter uint32, sessionID, exc
 		dest:       dest,
 		nextSendAt: now.Add(delay),
 		margin:     margin,
+		peer:       peer,
 		sentWall:   t.clock.Now(),
 	}
 }
@@ -378,7 +462,7 @@ func (t *outboundReliableTracker) Tick(now time.Time, send func(net.Addr, []byte
 		// may have gone idle since the last attempt), margin,
 		// exponential growth past the threshold, and jitter. Mirrors
 		// matter.js MRP.ts:125-146 retransmissionIntervalOf.
-		delay := mrp.BackoffDuration(t.baseInterval(p.sessionID, now)+p.margin, p.retries, rand.Float64) + time.Duration(t.fixedBackoff.Load())
+		delay := mrp.BackoffDuration(t.entryBase(p.sessionID, p.peer, now)+p.margin, p.retries, rand.Float64) + time.Duration(t.fixedBackoff.Load())
 		p.nextSendAt = now.Add(delay)
 		todo = append(todo, resend{key: key, p: p, dest: p.dest, datagram: p.datagram, due: due})
 	}
