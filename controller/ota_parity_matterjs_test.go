@@ -214,12 +214,25 @@ func TestOTACancelByRemovingConsentParity(t *testing.T) {
 	_, _, provider := r.c.OwnNode()
 	dev := r.dev.Addr().String()
 	var consentGone, queried atomic.Bool
+	fakeNow := func() time.Duration { return r.site.Fake().Now().Sub(r.site.Fake().Now().Truncate(24 * time.Hour)) }
+	phase := func(what string) {
+		q := mgr.QueuedUpdates()
+		v, _ := r.dev.Node().Root().OTARequestor.MatterRead(otareq.AttrUpdateState)
+		t.Logf("DIAG %s: fake=%v consentGone=%v queried=%v queue=%+v state=%v", what, fakeNow(), consentGone.Load(), queried.Load(), q, v)
+	}
 	r.site.Net().Filter(func(d fabrictest.Datagram) bool {
+		if d.From.String() == dev && d.To.String() == provider.String() {
+			t.Logf("DIAG dev->provider fake=%v consentGone=%v len=%d", fakeNow(), consentGone.Load(), len(d.Payload))
+		}
+		if d.From.String() == provider.String() && d.To.String() == dev {
+			t.Logf("DIAG provider->dev fake=%v consentGone=%v len=%d", fakeNow(), consentGone.Load(), len(d.Payload))
+		}
 		if consentGone.Load() && d.From.String() == dev && d.To.String() == provider.String() {
 			queried.Store(true)
 		}
 		return true
 	})
+	phase("start")
 	tg := softwareupdate.Target{VendorID: 0xFFF1, ProductID: 0x8001, TargetSoftwareVersion: 2}
 	// ForceUpdate consents and returns; the manager announces from its
 	// own goroutine, as matter.js's forceUpdate leaves the only queued
@@ -234,10 +247,14 @@ func TestOTACancelByRemovingConsentParity(t *testing.T) {
 		q := mgr.QueuedUpdates()
 		return len(q) == 1 && q[0].Status == softwareupdate.PendingInProgress
 	})
+	phase("announcement answered")
 	r.run(t, func(ctx context.Context) error { return r.site.Settle(ctx) })
+	phase("settled")
 	mgr.RemoveConsent(r.peer(t), 0)
 	consentGone.Store(true)
+	phase("consent removed")
 	r.eventually(t, "the update failed", func() bool { _, _, failed := r.snapshot(); return failed > 0 })
+	phase("update failed")
 	if q := mgr.QueuedUpdates(); len(q) != 0 {
 		t.Errorf("queue %+v, want empty", q)
 	}
@@ -246,6 +263,7 @@ func TestOTACancelByRemovingConsentParity(t *testing.T) {
 	// 15-minute slices rather than walked timer by timer.
 	for i := 0; i < 8 && !queried.Load(); i++ {
 		r.run(t, func(ctx context.Context) error { return r.site.Step(ctx, 15*time.Minute) })
+		phase(fmt.Sprintf("step %d", i))
 	}
 	r.eventually(t, "the device's query", queried.Load)
 	r.eventually(t, "the requestor idle", func() bool {
