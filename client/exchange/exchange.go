@@ -537,8 +537,13 @@ func (x *Exchange) awaitAck(ctx context.Context, p *pending, expectAckOnly bool,
 		}
 		return nil
 	case <-ctx.Done():
+		// The ack wait ends with the timer: a retransmission already past
+		// its unlock does not re-arm after the caller gave up
+		// (W4-ctlnet-03). Mirrors matter.js MessageExchange.ts:812-818
+		// (#endAckWait, then the timer stopped; the message stays pending
+		// for close()).
 		x.mu.Lock()
-		x.stopRetransTimerLocked()
+		x.endAckWaitLocked(p)
 		x.mu.Unlock()
 		return ctx.Err()
 	}
@@ -654,7 +659,10 @@ func (x *Exchange) retransmit(p *pending, expectedProcessingTime time.Duration) 
 	if limit == 0 {
 		limit = MaxTransmissions
 	}
-	closing := x.closed || x.closing
+	// Mirrors matter.js MessageExchange.ts:907-910 with considerClosed
+	// (:390-392): closed, or an initiator closing — a responder exchange
+	// keeps retransmitting within its close wait (W4-ctlnet-06).
+	closing := x.closed || (x.initiator && x.closing)
 	if closing || (limit > 0 && x.retransCount >= limit) {
 		if expectedProcessingTime > 0 && !closing {
 			final := MaxPeerResponseTimePadded(nil, false, IntervalsOf(x.m.local), expectedProcessingTime, x.sendPad()) - x.retransInterval
