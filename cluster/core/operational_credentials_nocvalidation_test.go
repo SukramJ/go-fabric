@@ -304,14 +304,14 @@ func TestUpdateNOC_NewNodeIDUpdatesStoreAndFiresWithdraw(t *testing.T) {
 	}
 }
 
-// TestRemoveFabric_FiresWithdrawBeforeMDNSReannounce verifies that
-// RemoveFabric fires onFabricWithdraw with the removed fabric's
-// (CompressedID, NodeID) BEFORE firing onMDNSReannounce — a plain
-// republish cannot retire the stale operational record, so the
-// withdraw must land first. Mirrors matter.js DeviceAdvertiser.ts:
-// 84-86 (fabrics.events.deleting → Advertisement.cancelAll, ahead of
-// the reannounce triggered by Fabric.remove()).
-func TestRemoveFabric_FiresWithdrawBeforeMDNSReannounce(t *testing.T) {
+// TestRemoveFabric_WithdrawsTheRemovedFabricOnly verifies that
+// RemoveFabric fires onFabricWithdraw once, with the removed fabric's
+// (CompressedID, NodeID), and republishes nothing else. Mirrors matter.js
+// DeviceAdvertiser.ts:109-111 at 862ad75f (fabrics.events.deleting →
+// Advertisement.cancelAll of that fabric's operational advertisements;
+// no reannounce of the remaining set — review 2026-11 W6-reg-08 retired
+// the OnMDNSReannounce hook that did one).
+func TestRemoveFabric_WithdrawsTheRemovedFabricOnly(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 
@@ -326,9 +326,6 @@ func TestRemoveFabric_FiresWithdrawBeforeMDNSReannounce(t *testing.T) {
 			order = append(order, "withdraw")
 			withdrawnCompressedID = compressedID
 			withdrawnNodeID = nodeID
-		},
-		OnMDNSReannounce: func(_ context.Context) {
-			order = append(order, "reannounce")
 		},
 	})
 	if err != nil {
@@ -351,8 +348,8 @@ func TestRemoveFabric_FiresWithdrawBeforeMDNSReannounce(t *testing.T) {
 		t.Fatalf("RemoveFabric StatusCode = %d, want OK", nr.StatusCode)
 	}
 
-	if len(order) != 2 || order[0] != "withdraw" || order[1] != "reannounce" {
-		t.Fatalf("hook fire order = %v, want [withdraw reannounce]", order)
+	if len(order) != 1 || order[0] != "withdraw" {
+		t.Fatalf("hooks fired = %v, want exactly one withdraw and no reannounce", order)
 	}
 	if withdrawnNodeID != fabBefore.NodeID {
 		t.Errorf("OnFabricWithdraw nodeID = 0x%016X, want 0x%016X", withdrawnNodeID, fabBefore.NodeID)
