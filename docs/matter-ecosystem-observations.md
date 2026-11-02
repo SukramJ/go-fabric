@@ -19,11 +19,10 @@ here has reproduced says so in those words. Nothing on this page is inferred
 from how a controller "probably" behaves — when the mechanism is unknown, the
 entry records the observation and stops.
 
-A source path beginning `internal/` is
-[OpenCCU-Loom](https://github.com/SukramJ/openccu-loom)'s: the observation was
-made against that daemon while this module still lived inside it, and the
-device projection it names is still the host's. Everything else is a path in
-this repository.
+A source path beginning `internal/`, and every path marked "OpenCCU-Loom",
+is [OpenCCU-Loom](https://github.com/SukramJ/openccu-loom)'s: the
+observation was made against that daemon while this module still lived
+inside it, and the device projection it names is still the host's.
 
 ---
 
@@ -79,9 +78,9 @@ new device types. Two of its constraints shape the bridge's topology.
 | Power-source information belongs at the bridged-node level, not on an endpoint whose device type does not specify it. | `PowerSource` rides on one of the device's own endpoints, where BridgedNode specifies it. | Inherited | matter.js `docs/ECOSYSTEMS` |
 | Devices are discovered only on UDP port 5540. | 5540 is the default; nothing special is done for Alexa. | Inherited | matter.js `docs/ECOSYSTEMS` and `KNOWN_ISSUES` |
 | An Endpoint 1 must exist beside the root endpoint, either as the main device or an aggregator. | Endpoint 1 is always the Aggregator. | Inherited | matter.js `docs/ECOSYSTEMS` |
-| Device types introduced after Alexa's bridge support — the Matter 1.3 Water Leak Detector (0x0043) among them — can render an entire bridge unresponsive: every accessory on it stops reacting. | The leak measurement class materialises as Contact Sensor (0x0015) instead. | Reported | `pkg/interfaces/matter.go`; third-party report via `docs/user/matter.md` |
-| A bridge exposing too many accessories cannot be paired; the practical ceiling is reported around 80–100. | Nothing enforced; operators trim the exposure selection. | Reported | `docs/user/matter.md` |
-| The WaterValve device type is unsupported. | The irrigation valve is exposed as a plain on/off endpoint (ADR 0049). | Reported | `docs/user/matter.md` |
+| Device types introduced after Alexa's bridge support — the Matter 1.3 Water Leak Detector (0x0043) among them — can render an entire bridge unresponsive: every accessory on it stops reacting. | The leak measurement class materialises as Contact Sensor (0x0015) instead. | Reported | OpenCCU-Loom `pkg/interfaces/matter.go`; third-party report via Loom's `docs/user/matter.md` |
+| A bridge exposing too many accessories cannot be paired; the practical ceiling is reported around 80–100. | Nothing enforced; operators trim the exposure selection. | Reported | OpenCCU-Loom `docs/user/matter.md` |
+| The WaterValve device type is unsupported. | The irrigation valve is exposed as a plain on/off endpoint (OpenCCU-Loom ADR 0049). | Reported | OpenCCU-Loom `docs/user/matter.md` |
 
 ## Google Home
 
@@ -103,25 +102,27 @@ new device types. Two of its constraints shape the bridge's topology.
 
 ## The guards that hold this
 
-Ecosystem behaviour is not testable from here — no controller is in the loop.
-What *is* testable is conformance to the specification those controllers read,
-and that is where the guards sit:
+Ecosystem behaviour is not testable from here — no ecosystem controller is
+in the loop. What *is* testable is conformance to the specification those
+controllers read, and that is where this module's guards sit
+([ADR 0016](./adr/0016-device-type-validation.md)):
 
 | Guard | What it holds |
 | --- | --- |
-| `TestBridgedEndpointClustersConformToTheirDeviceType` | Every endpoint source's clusters against its own device type, over the whole hydrated fleet. |
-| `TestEveryMandatoryAttributeIsAnswered` | Every conformance-`M` attribute of every mounted cluster answers a read. |
-| `TestFeatureGatedAttributesAreAnsweredWhenAdvertised` | An attribute gated on a feature answers a read when the server advertises that feature's bit. |
-| `TestEveryMandatoryCommandIsAccepted` | Every conformance-`M` command appears in `AcceptedCommandList`. |
-| `TestMeasurementClassProjectsOntoAConformantDeviceType` | Every measurement class names a device type whose definition permits its cluster. |
+| `TestBridgedEndpointsMeetTheirDeviceTypeConformance` ([`examples/reference-bridge`](https://github.com/SukramJ/go-fabric/blob/main/examples/reference-bridge/conformance_test.go)) | Every bridged endpoint of the reference daemon serves what its device type mandates: clusters, features, attributes, commands and events. |
+| `TestApplicationDeviceTypesMountTheirMandatoryClusterSet` ([`endpoint`](https://github.com/SukramJ/go-fabric/blob/main/endpoint/application_device_types_test.go)) | Each application device type, assembled, mounts its mandatory cluster set. |
+| `TestApplicationDeviceTypesMeetTheirDeviceTypeRequirements` ([`endpoint`](https://github.com/SukramJ/go-fabric/blob/main/endpoint/devicetype_module_test.go)) | Each application device type meets its device type's requirements, element by element. |
+| `endpointtest.AssertDeviceTypeConformance` | The same judgement for a host's own topology, from the host's tests: every endpoint its projection produces is one its device types allow, with every mandatory element in place. |
 
-All five read the same oracle: the matter.js HEAD schema snapshot, which the
-go-fabric module generates and this repo pins (`make sync-matter-schema`). They
-live under `tests/integration/` and `tests/contract/`.
+All of them read the same oracle: the matter.js schema snapshot this module
+embeds (`parity/schema.json`, regenerated by `make generate-matter-schema`).
 
-The one thing they cannot do is confirm a real controller's reaction. That
-needs the chip-tool suite (`.github/workflows/chiptool.yml`, `needs-chiptool`
-label), which is the only place a real commissioner is in the loop.
+They cannot confirm a real controller's reaction. Two real commissioners are
+in the loop: connectedhomeip's chip-tool and its certification cases
+(`make chiptool-test`, `make chiptool-families`;
+`.github/workflows/chiptool.yml`, [Certifiability](./certifiability.md)), and
+this module's own controller ([ADR 0020](./adr/0020-commissioner-and-controller-role.md)),
+which commissions the module's node in-process on `fabrictest`.
 
 ## Adding to this page
 
