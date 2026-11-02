@@ -447,6 +447,35 @@ func TestNativeSourceOnOffCoupling(t *testing.T) {
 	})
 }
 
+// TestNativeSourceOwedOffAfterHostSwitchedOff: a "with On/Off" ramp to the
+// minimum owes a switch-off, which the device's arrival and the ramp's
+// deadline both try to pay at the same instant; when the host has switched
+// the device off meanwhile, neither switches it again. The test makes the
+// coverage of NativeSource.pay's early return deterministic: whichever of
+// the two runs first finds the device off, the other finds the debt paid
+// (review 2026-11 W6-test-13).
+func TestNativeSourceOwedOffAfterHostSwitchedOff(t *testing.T) {
+	t.Parallel()
+	synctest.Test(t, func(t *testing.T) {
+		ctx := context.Background()
+		srv, d := nativeServer(100, true, true, levelcontrol.NativeConfig{})
+		if _, err := srv.MatterInvoke(ctx, levelcontrol.CmdMoveToLevelWithOnOff,
+			wire.MoveToLevelRequest{Level: 1, TransitionTime: u16(10)}); err != nil {
+			t.Fatal(err)
+		}
+		wantLog(t, d, "ramp 1 1s true")
+		if err := d.SetOnOff(ctx, false); err != nil {
+			t.Fatal(err)
+		}
+		wantLog(t, d, "off")
+		sleep(2 * time.Second)
+		wantLog(t, d)
+		if d.OnOff() {
+			t.Error("the device is on after the ramp")
+		}
+	})
+}
+
 // TestNativeSourceAttributesAndRefusals covers the attribute storage, the
 // Persist hook, a null level and a device refusal.
 func TestNativeSourceAttributesAndRefusals(t *testing.T) {
