@@ -41,7 +41,7 @@ func TestServerSubscriptionParity(t *testing.T) {
 		t.Parallel()
 		m := NewManager(Config{}, nil, nil)
 		terminated := map[uint32]bool{}
-		m.SetOnSubscriptionTerminated(func(id uint32) { terminated[id] = true })
+		m.SetOnSubscriptionTerminated(func(id uint32, _ uint8) { terminated[id] = true })
 		args := SubscribeArgs{FabricIndex: 1, PeerNodeID: 1, SessionID: 1, MaxIntervalCeiling: 60, KeepSubscriptions: true}
 		closed, err := m.Subscribe(args)
 		if err != nil {

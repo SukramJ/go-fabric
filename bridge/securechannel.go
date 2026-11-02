@@ -1319,7 +1319,9 @@ type serviceRetransmitter interface {
 // advertiser without the events re-announces every active record as
 // before — the commissionable one among them, which for a PASE session
 // stands in for matter.js's commissioning re-advertisement
-// (DeviceAdvertiser.ts:152-161).
+// (DeviceAdvertiser.ts:152-161). A terminated subscription takes the same
+// path for its fabric (DeviceAdvertiser.ts:174-179; see
+// [Bridge.AttachSubscriptionManager]).
 //
 // The republish runs on its own goroutine bounded by the advertise
 // timeout, because the trigger fires from the reaper / receive paths
@@ -1382,7 +1384,7 @@ func (b *Bridge) triggerSessionReannounce(fabricIndex uint8) {
 	b.diagRing().Record(diagevent.Event{
 		Kind:     diagevent.KindDiscovery,
 		Severity: diagevent.SeverityInfo,
-		Message:  "The bridge re-announced itself on the network after a controller's last session ended.",
+		Message:  "The bridge re-announced itself on the network after a controller's last session or a subscription ended.",
 	})
 }
 
