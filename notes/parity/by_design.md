@@ -5110,6 +5110,22 @@ would otherwise pay whatever a hostile prefix claims; every header this
 module or chip's tooling writes stays far below the cap. Pinned by
 `TestReadHeaderRefusesOversizeHeader` and the `FuzzReadHeader` seed.
 
+### BD-Matter-OtaImageDigestAtStore — `Images.Store` verifies the header's payload digest when the ledger carries no checksum
+
+matter.js's `DclOtaUpdateService.#verifyUpdate` (`DclOtaUpdateService.ts:388-408`
+at `862ad75f`) passes checksum options to `OtaImageReader.file` only when the
+DCL record carries `otaChecksum`; without them `calculateFullChecksum`
+defaults to true (`OtaImageReader.ts:70`), the reader takes the full-checksum
+branch and verifies the payload size only (`:246-260`); the header's payload
+digest is checked later, at extraction (`:262-278`,
+`#extractAndValidatePayload`). `controller/softwareupdate.Images.Store` runs
+`otaimage.ValidateFile` with the payload digest in both cases
+(`storeValidation`), so a corrupted local image is refused when it is stored,
+not when it is first served over BDX (review 2026-11 W4-ctlint-03; owner
+decision 2026-11-02). Reasoning: the store is the one place that reads the
+whole file once; a digest failure at serve time would surface as a device's
+failed download. Pinned by `TestImagesStoreValidatesFileParity`.
+
 ### BD-Thread-TBRM-ChipLogic — ThreadBorderRouterManagement follows connectedhomeip behind the `BorderRouter` port
 
 matter.js's `ThreadBorderRouterManagementServer.ts:14` at `862ad75f` is the

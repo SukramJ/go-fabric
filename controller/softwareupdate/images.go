@@ -238,9 +238,10 @@ func (i *Images) Store(ctx context.Context, image []byte, mode Mode, info *Updat
 // the ledger's checksum and file size when the record carries them, as
 // matter.js #verifyUpdate passes them to OtaImageReader.file
 // (DclOtaUpdateService.ts:388-408, :573-574; OtaImageReader.ts:65-110);
-// otherwise the payload size and the header's payload digest
-// (OtaImageReader.ts:261-278), so a truncated or corrupted local image is
-// refused before it is offered over BDX (W4-ctlint-03).
+// otherwise the payload size (OtaImageReader.ts:246-260) and, ahead of
+// matter.js, which checks it only at extraction (:262-278), the header's
+// payload digest, so a truncated or corrupted local image is refused before
+// it is offered over BDX (W4-ctlint-03, BD-Matter-OtaImageDigestAtStore).
 func storeValidation(info *UpdateInfo) otaimage.FileOptions {
 	opts := otaimage.FileOptions{SkipFullChecksum: true}
 	if info == nil || info.ledger == nil {
