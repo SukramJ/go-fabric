@@ -36,8 +36,8 @@ func main() {
 
 func run(ctx context.Context) error {
 	// The zero Network listens on :5540 and advertises over DNS-SD: a nil
-	// Config.Advertiser is the node's own Zeroconf with the subtype
-	// responder every commissioner's discriminator browse needs.
+	// Config.Advertiser is the node's own mDNS responder, which answers
+	// every commissioner's discriminator browse.
 	n, err := newNode(ctx, "quickstart-device.db", node.Network{})
 	if err != nil {
 		return err

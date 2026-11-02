@@ -58,7 +58,7 @@ const (
 	// record set on one interface (RFC 6762 §6; matter.js
 	// MdnsServer.ts:167-173 at 862ad75f).
 	multicastRateLimit = 900 * time.Millisecond
-	// maxMessageSize is the largest mDNS message the responder sends,
+	// maxMessageSize is the largest message the responder sends,
 	// matter.js MAX_MDNS_MESSAGE_SIZE (packages/general/src/codec/
 	// DnsCodec.ts:26 at 862ad75f): the IPv6 minimum MTU less the IPv6 and
 	// UDP headers.

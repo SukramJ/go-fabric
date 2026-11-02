@@ -117,7 +117,7 @@ func recordSet(svc Service, names serviceNames, txt []string, addrs []net.IP) []
 	out = append(out, &dns.SRV{Hdr: unique(names.instance, dns.TypeSRV), Priority: 0, Weight: 0, Port: svc.Port, Target: names.host})
 	if len(txt) == 0 {
 		// RFC 6763 §6.1: an empty TXT record is a single zero byte
-		// (matter.js MdnsTest.ts:782-789 expects [""]).
+		// (matter.js MdnsTest.ts:782-783 expects [""]).
 		txt = []string{""}
 	}
 	out = append(out, &dns.TXT{Hdr: unique(names.instance, dns.TypeTXT), Txt: txt})

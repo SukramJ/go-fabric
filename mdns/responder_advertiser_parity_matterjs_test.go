@@ -233,7 +233,7 @@ func TestMdnsAdvertisementParity(t *testing.T) {
 					}
 				}
 				// The operational record with an empty TXT carries one
-				// zero byte (RFC 6763 §6.1, :782-789).
+				// zero byte (RFC 6763 §6.1, :782-783).
 				empty := operationalFixture(port1)
 				empty.TXT = nil
 				r2, w2, _ := newWiredResponder(serverAddrs(withIPv4))

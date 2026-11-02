@@ -11,10 +11,9 @@ import (
 	"github.com/SukramJ/go-fabric/clock"
 )
 
-// Announcements, the broadcast schedule and goodbyes. matter.js does not
-// probe (no probe in packages/protocol/src/mdns/MdnsServer.ts; the claim is
-// made without one, MdnsAdvertisement.ts:179-180 at 862ad75f), and neither
-// does chip; the responder announces at once.
+// Announcements, the broadcast schedule and goodbyes. matter.js claims the
+// names without probing first (MdnsAdvertisement.ts:179-180 at 862ad75f),
+// and chip does not probe either; the responder announces at once.
 
 // broadcastEvent is what started a broadcast run, matter.js
 // Advertiser.BroadcastEvent (packages/protocol/src/advertisement/
@@ -149,8 +148,8 @@ func (r *Responder) startLocked(e *entry, event broadcastEvent) {
 
 // stepLocked is one turn of the run loop (MdnsAdvertisement.ts:67-79):
 // the next interval, the stop check, the broadcast, the sleep. A run whose
-// schedule is exhausted ends after its last sleep, as matter.js's
-// isBroadcasting stays set through it (Advertisement.ts:278-290). Caller
+// schedule is exhausted ends after its last sleep, as matter.js keeps the
+// run's broadcasting flag set through it (Advertisement.ts:278-290). Caller
 // holds r.mu.
 func (r *Responder) stepLocked(e *entry, run *broadcastRun) {
 	if r.closed || e.run != run {

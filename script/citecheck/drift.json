@@ -370,7 +370,7 @@
   },
   {
     "file": "bridge/securechannel_close_parity_test.go",
-    "line": 168,
+    "line": 169,
     "citation": "ExchangeManager.ts:716-726",
     "resolved": "packages/protocol/src/protocol/ExchangeManager.ts",
     "identifier": "requiresAck",

@@ -7,7 +7,7 @@ loop replaced by the broadcast schedule (#362)". No release with this PR:
 the owner's manual Apple Home / Google Home test is mandatory before the
 tag (concept v12 §E.2; the reviewer writes that test plan, not the agent).
 
-The concept is `docs/concept-v12-mdns-responder.md` (German; §C.2 is the
+The concept is `docs/history/concept-v12-mdns-responder.md` (moved there by the P1 PR once executed) (German; §C.2 is the
 shape, §D the decisions, §E the owner's decisions). Read it first. Pins:
 matter.js `../matter.js` at 862ad75f, chip via
 `git -C ../connectedhomeip show 6170af84:<path>`, grandcat v1.0.0 in
