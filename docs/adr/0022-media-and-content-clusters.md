@@ -1,7 +1,7 @@
 # ADR 0022 — The media and content clusters and the three media device types enter the scope
 
 - **Status**: Accepted (2026-10-14; concept v2 phase 9,
-  [`../concept-v2-scope-extension.md`](../history/concept-v2-scope-extension.md) §B.3, decision 0.2)
+  [`../concept-v2-scope-extension.md`](https://github.com/SukramJ/go-fabric/blob/main/docs/history/concept-v2-scope-extension.md) §B.3, decision 0.2)
 - **Date**: 2026-10-14
 - **Related**:
   [ADR 0013 — generated cluster definitions](./0013-generated-cluster-definitions.md),

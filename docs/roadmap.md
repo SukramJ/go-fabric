@@ -29,7 +29,7 @@ a paired, working Matter node. The consumers that set that bar:
 
 | Consumer | State | What it needs from this module |
 | --- | --- | --- |
-| [OpenCCU-Loom](https://github.com/SukramJ/openccu-loom) | in production; imports 32 packages of this module in its product code (45 with tests) at its `v0.6.0` pin; the target after milestone 4 is the facade plus the cluster packages of the servers it customises ([concept v6](./history/concept-v6-embedding-layer.md), decision 0.4) | a complete `node/` + `device/` + `contract/` surface so that a bridge needs nothing below it; depth in the clusters HomeMatic devices map to (Switch, Thermostat, DoorLock, WindowCovering) |
+| [OpenCCU-Loom](https://github.com/SukramJ/openccu-loom) | in production; imports 32 packages of this module in its product code (45 with tests) at its `v0.6.0` pin; the target after milestone 4 is the facade plus the cluster packages of the servers it customises ([concept v6](https://github.com/SukramJ/go-fabric/blob/main/docs/history/concept-v6-embedding-layer.md), decision 0.4) | a complete `node/` + `device/` + `contract/` surface so that a bridge needs nothing below it; depth in the clusters HomeMatic devices map to (Switch, Thermostat, DoorLock, WindowCovering) |
 | [go-ha2fabric](https://github.com/SukramJ/go-ha2fabric) (Home Assistant entities as a bridge for Matter controllers) | concept, not started: its `CONCEPT.md` was written 2026-10-24 (wave CF) on the owner's decisions of that day — a thin client between the Home Assistant WebSocket API and `go-fabric-server`, the stand-alone node with a remote protocol planned after milestone 4 | `go-fabric-server` and its protocol; the mapping table of go-hamapping |
 | the `go-*2mqtt` family (daikin, homeconnect, mtec, unifi, zendure) via [go-hamapping](https://github.com/SukramJ/go-hamapping) (`go-hamqtt`'s Home-Assistant vocabulary → the device kit's declarations; lives outside this module, so `contract/` stays stdlib-only) | concept, not started: `CONCEPT.md` written 2026-10-24 (wave CF); go-zendure2mqtt embeds the kit directly in the phase-22 cookbook (wave CE) | the declarative device kit, the in-process test pair; energy and appliance device types, which already exist |
 | `examples/reference-controller` and a host acting as commissioner | shipped, controller stages 1–6b | the field features (milestone 1), ICD peers and the rest of OTA push (milestone 5) |
@@ -100,7 +100,7 @@ one none uses, and both come before completeness for its own sake.
 | 4 | [The embedding layer](#milestone-4-the-embedding-layer) | `v0.11.0` | 20–22 | a bridge is `node/` + `device/` + `contract/`; a new consumer is a day's work, not a port |
 | 5 | [ICD and the controller remainder](#milestone-5-icd-and-the-controller-remainder) | `v0.12.0` (23–24), `v0.13.0` (25) | 23–25 | battery devices stay reachable; the controller pushes firmware and uses TCP |
 | 6 | [Completeness](#milestone-6-completeness) | `v0.14.0` | 26–27 | 135/135 clusters, 91/91 device types, every matter.js row of the comparison closed |
-| 7 | [BLE on the device side](#milestone-7-ble-on-the-device-side) | `v0.15.0` | 28 | a node of this module without a network is commissioned over BLE, as matter.js's `nodejs-ble` node is |
+| 7 | [BLE on the device side](#milestone-7-ble-on-the-device-side) | not yet assigned | 28 | a node of this module without a network is commissioned over BLE, as matter.js's `nodejs-ble` node is |
 
 Milestones 2 and 3 are the owner's order of 2026-10-17: the test
 foundation first, because milestones 3–7 are proved on it; the behaviour
@@ -185,7 +185,7 @@ for a cluster with a hand-written matter.js server.
 
 ### Milestone 4: The embedding layer
 
-**Detail:** [concept v6](./history/concept-v6-embedding-layer.md) (German), written
+**Detail:** [concept v6](https://github.com/SukramJ/go-fabric/blob/main/docs/history/concept-v6-embedding-layer.md) (German), written
 2026-10-20 when the milestone opened, with the owner's decisions 0.1–0.4 and
 the drafts of the go-ha-matter-bridge and adapter-module concepts (Teil B/C),
 because the three shape each other; the two drafts move to their own
@@ -320,6 +320,15 @@ outlived their milestone tags, and the owner's hand tests (group multicast
 against a real controller, the ESPHome proxy live test, the Apple Home
 camera pairing) and the CSA Test Harness spot check of phase 27, which
 stay open. **Milestone 6 is closed with `v0.14.0`.**
+
+**Status 2026-11-02, the `v0.15` line.** `v0.15.0` to `v0.15.6`
+(2026-10-30 to 2026-11-01) shipped no milestone: the surface policies of
+[concept v11](https://github.com/SukramJ/go-fabric/blob/main/docs/history/concept-v11-surface.md)
+(the *Ahead of matter.js* elements composed only when their register ID is
+enabled, the surface snapshot and its digest, the specification level) and
+fixes. The whole-codebase review of 2026-11 followed in six fix pull
+requests (`notes/review/2026-11/`). Milestone 7 keeps its content; its
+version is assigned when it is planned.
 
 ### Milestone 7: BLE on the device side
 

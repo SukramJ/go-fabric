@@ -110,7 +110,7 @@ have waved through.
 5. **Record deliberate divergences** in
    [`notes/parity/by_design.md`](../notes/parity/by_design.md) (the living
    catalogue). A non-trivial divergence also gets an ADR under
-   [`docs/adr/`](./adr/). Valid divergences are TypeScript-only optimisations
+   [`docs/adr/`](./adr/README.md). Valid divergences are TypeScript-only optimisations
    that fight Go's GC, or decorator patterns with no Go equivalent. Invalid
    divergences are hand-coding cluster revisions, attribute IDs, constraint
    defaults, status codes, or Apple-required tag patterns — those go verbatim
