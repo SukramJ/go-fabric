@@ -40,6 +40,25 @@ import (
 // node/test/behaviors share.
 const testparityPlannedRatchet = 2
 
+// testparityPortedRatchet is the number of ported entries, and
+// testparityMissingRatchet the number of matter.js it cases the partial
+// entries name as missing, summed (W6-test-07). The planned ratchet alone
+// let a file leave planned for partial with one Go test, a ported entry
+// drop to partial and a missing list grow without a guard firing; these two
+// close that. Both are exact, in both directions, as the planned one is: a
+// port that removes a missing case or completes a file lowers the missing
+// count or raises the ported count in the same commit; a pin lift that adds
+// upstream cases, or a re-check that finds a case not covered after all,
+// raises the missing count and says why.
+//
+// Set at the W6 fix PR (review 2026-11) to 113 ported and 1140 missing
+// (the review counted 1136; W6-test-08 moved four cases of FixMe-skipped
+// anchors into the missing lists).
+const (
+	testparityPortedRatchet  = 113
+	testparityMissingRatchet = 1140
+)
+
 // moduleRoot is where the committed artefacts live, seen from this package.
 const moduleRoot = "../.."
 
@@ -160,6 +179,31 @@ func TestTestparityPlannedRatchet(t *testing.T) {
 		t.Fatalf("%d planned files, ratchet %d: a file went back to planned, or new upstream test files arrived — justify it and raise testparityPlannedRatchet in the same commit", got, testparityPlannedRatchet)
 	case got < testparityPlannedRatchet:
 		t.Fatalf("%d planned files, ratchet %d: lock the gain in by lowering testparityPlannedRatchet to %d", got, testparityPlannedRatchet, got)
+	}
+}
+
+func TestTestparityPortedRatchet(t *testing.T) {
+	_, reg := mustLoad(t)
+	got := reg.count()[StatusPorted]
+	switch {
+	case got < testparityPortedRatchet:
+		t.Fatalf("%d ported files, ratchet %d: a ported file went back to partial, planned or excluded — justify it and lower testparityPortedRatchet in the same commit", got, testparityPortedRatchet)
+	case got > testparityPortedRatchet:
+		t.Fatalf("%d ported files, ratchet %d: lock the gain in by raising testparityPortedRatchet to %d", got, testparityPortedRatchet, got)
+	}
+}
+
+func TestTestparityMissingRatchet(t *testing.T) {
+	_, reg := mustLoad(t)
+	got := 0
+	for _, e := range reg.Entries {
+		got += len(e.Missing)
+	}
+	switch {
+	case got > testparityMissingRatchet:
+		t.Fatalf("%d missing it cases, ratchet %d: a missing list grew — justify it (a pin lift, a case found uncovered) and raise testparityMissingRatchet in the same commit", got, testparityMissingRatchet)
+	case got < testparityMissingRatchet:
+		t.Fatalf("%d missing it cases, ratchet %d: lock the gain in by lowering testparityMissingRatchet to %d", got, testparityMissingRatchet, got)
 	}
 }
 

@@ -70,8 +70,10 @@
 // an excluded one too ("re-check the exclusion": its reason may no longer
 // hold),
 // every FixMe-skipped Go test in the module is a skips row and every row
-// such a test, the committed page is what rendering produces, and the number of planned
-// entries sits exactly on testparityPlannedRatchet. It needs no matter.js
+// such a test, the committed page is what rendering produces, and three
+// exact ratchets hold: the planned entries (testparityPlannedRatchet), the
+// ported entries (testparityPortedRatchet) and the missing it cases summed
+// over the partial entries (testparityMissingRatchet). It needs no matter.js
 // clone: the snapshot is committed.
 package main
 

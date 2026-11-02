@@ -239,7 +239,7 @@ testparity-snapshot: ## refresh script/testparity/matterjs_tests.json from $(MAT
 	MATTERJS_DIR=$(MATTERJS_DIR) $(GO) run ./script/testparity -snapshot
 
 .PHONY: testparity-check
-testparity-check: ## fail if the test register and the snapshot disagree, a Go test it names is gone, the page is stale or planned is off its ratchet
+testparity-check: ## fail if the test register and the snapshot disagree, a Go test it names is gone, the page is stale, a FixMe skip is unregistered, or planned, ported or missing is off its ratchet
 	$(GO) test -count=1 -run 'Testparity' ./script/testparity/
 
 .PHONY: ahead-check
