@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"sync"
 	"time"
 
@@ -36,6 +37,9 @@ type BorderRouterConfig struct {
 	PollInterval time.Duration
 	// Clock paces the poll; the system clock when nil.
 	Clock clock.Clock
+	// Logger receives the diagnostics' translation notes (a field of a
+	// /diagnostics entry skipped for its shape); slog.Default when nil.
+	Logger *slog.Logger
 }
 
 // ErrNoThreadVersion is a border router whose diagnostics carry no
@@ -77,6 +81,9 @@ func NewBorderRouter(c *Client, cfg BorderRouterConfig) (*BorderRouter, error) {
 		cfg.PollInterval = DefaultPollInterval
 	}
 	cfg.Clock = clock.Or(cfg.Clock)
+	if cfg.Logger == nil {
+		cfg.Logger = slog.Default()
+	}
 	return &BorderRouter{c: c, cfg: cfg, configured: true}, nil
 }
 
@@ -261,7 +268,7 @@ func (b *BorderRouter) Diagnostics(ctx context.Context) (thread.NodeDiagnostics,
 		return out, nil //nolint:nilerr // a border router without /diagnostics still reports its node
 	}
 	for _, e := range entries {
-		r, err := Translate(e)
+		r, err := translateEntry(e, b.cfg.Logger)
 		if err != nil {
 			continue
 		}

@@ -20,7 +20,7 @@ import (
 
 func probe(t *testing.T, s *stub, timeout time.Duration) *Capability {
 	t.Helper()
-	c, err := Probe(context.Background(), "br.example", 8081, timeout, &http.Client{Transport: s})
+	c, err := Probe(context.Background(), Config{Host: "br.example", Port: 8081, Timeout: timeout, HTTPClient: &http.Client{Transport: s}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -93,7 +93,7 @@ func TestOtbrRestProbeMisses(t *testing.T) {
 			t.Errorf("%s: capability %+v, want none", name, c)
 		}
 	}
-	if _, err := Probe(context.Background(), "", 0, 0, nil); err == nil {
+	if _, err := Probe(context.Background(), Config{}); err == nil {
 		t.Error("a probe without a host")
 	}
 }

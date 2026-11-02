@@ -65,6 +65,7 @@ facade one shape. Each row names what a host writes now.
 | `node.Config.Topology`, `node.OtaConfig`, `surface.Origin` (`OriginClusterMandatory`, `OriginDeviceType`, `OriginHostDeclared`, `OriginKitDefault`, `Element.Origin`) | `node.Config.Snapshotter`, `node.OTAConfig`, `surface.Provenance` (`Provenance…`, `Element.Provenance`) |
 | `device.<Name>Type` (the 91 generated variables) | `device.<Name>Type()`, a `*device.Type`; copy with `*` before modifying |
 | `device.Options.Surface *surface.Policies` | `device.Options.Surface surface.Policies` (the zero value is no policy) |
+| `otbr.Probe(ctx, host, port, timeout, httpClient)`, `esphome.Discover(ctx, browser, keys, timeout)` | `otbr.Probe(ctx, otbr.Config{Host, Port, Timeout, HTTPClient, Clock})`; `esphome.Discover(ctx, esphome.Options{Logger, Clock, Discover: &esphome.DiscoverOptions{Browser, Keys, Timeout}})` |
 
 ## Changed in the next release: `CommissionerReach` takes the peer
 

@@ -183,20 +183,25 @@ func skip(log *slog.Logger, c candidate, reason error) {
 // a central can commission through: those with ACTIVE_CONNECTIONS and
 // REMOTE_CACHING. A device's key comes from keys (by name or by the TXT
 // mac); a device without one is used only when it answers plaintext.
-// Every device left out is logged on slog.Default as
+// o.Discover names the browser, the keys and the browse Timeout (0 is
+// DefaultBrowseTimeout; Rescan is unused); o.Clock paces the browse and
+// the connections, o.Dial opens them. Every device left out is logged on
+// o.Logger — slog.Default when nil, unlike a central's — as
 // ble.esphome.proxy_skipped with the reason. NewCentral with
 // Options.Discover runs the same discovery and keeps it current.
-func Discover(ctx context.Context, browser Browser, keys Keys, timeout time.Duration) ([]Proxy, error) {
-	if browser == nil {
+func Discover(ctx context.Context, o Options) ([]Proxy, error) {
+	if o.Discover == nil {
 		return nil, ErrNoBrowser
 	}
-	if timeout <= 0 {
-		timeout = DefaultBrowseTimeout
+	disc, err := o.Discover.normalized()
+	if err != nil {
+		return nil, err
 	}
-	var o Options
-	o.Logger = slog.Default()
+	if o.Logger == nil {
+		o.Logger = slog.Default()
+	}
 	o.normalize()
-	cs, err := candidates(ctx, browser, keys, timeout, o.Clock, o.Logger)
+	cs, err := candidates(ctx, disc.Browser, disc.Keys, disc.Timeout, o.Clock, o.Logger)
 	if err != nil {
 		return nil, err
 	}

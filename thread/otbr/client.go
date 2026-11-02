@@ -16,6 +16,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/SukramJ/go-fabric/clock"
 	"github.com/SukramJ/go-fabric/thread"
 )
 
@@ -39,6 +40,9 @@ type Config struct {
 	// HTTPClient sends the requests; http.DefaultClient's transport when
 	// nil.
 	HTTPClient *http.Client
+	// Clock stamps a [Probe]'s Capability.ProbedAt; the system clock when
+	// nil.
+	Clock clock.Clock
 }
 
 // Client is a thin HTTP client for the OTBR REST API, matter.js's

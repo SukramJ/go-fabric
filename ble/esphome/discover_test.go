@@ -106,11 +106,15 @@ func TestDiscover(t *testing.T) {
 		n.Advertise(f)
 	}
 	log := &capture{}
-	prev := slog.Default()
-	slog.SetDefault(slog.New(log))
-	t.Cleanup(func() { slog.SetDefault(prev) })
 	keys := esphome.Keys{"Named-Proxy": testKey, "aa-bb-cc-dd-ee-03": testKey}
-	got, err := esphome.Discover(t.Context(), names(t, n), keys, browseWindow)
+	// The skipped devices go to Options.Logger (W4-ctlint-14).
+	discover := func(keys esphome.Keys) ([]esphome.Proxy, error) {
+		return esphome.Discover(t.Context(), esphome.Options{
+			Logger:   slog.New(log),
+			Discover: &esphome.DiscoverOptions{Browser: names(t, n), Keys: keys, Timeout: browseWindow},
+		})
+	}
+	got, err := discover(keys)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -138,7 +142,7 @@ func TestDiscover(t *testing.T) {
 	eventually(t, "the probes to end", func() bool { return plain.Clients() == 0 && byName.Clients() == 0 })
 
 	// A wrong key is a refusal, not a proxy.
-	got, err = esphome.Discover(t.Context(), names(t, n), esphome.Keys{"named-proxy": base64Key(9)}, browseWindow)
+	got, err = discover(esphome.Keys{"named-proxy": base64Key(9)})
 	if err != nil || slices.Contains(proxyNames(got), "named-proxy") {
 		t.Fatalf("wrong key: %v, %v", proxyNames(got), err)
 	}
@@ -148,7 +152,10 @@ func TestDiscover(t *testing.T) {
 }
 
 func TestDiscoverRefusals(t *testing.T) {
-	if _, err := esphome.Discover(t.Context(), nil, nil, 0); !errors.Is(err, esphome.ErrNoBrowser) {
+	if _, err := esphome.Discover(t.Context(), esphome.Options{}); !errors.Is(err, esphome.ErrNoBrowser) {
+		t.Fatalf("no discovery options: %v", err)
+	}
+	if _, err := esphome.Discover(t.Context(), esphome.Options{Discover: &esphome.DiscoverOptions{}}); !errors.Is(err, esphome.ErrNoBrowser) {
 		t.Fatalf("no browser: %v", err)
 	}
 	if _, err := esphome.NewCentral(nil, esphome.Options{Discover: &esphome.DiscoverOptions{}}); !errors.Is(err, esphome.ErrNoBrowser) {

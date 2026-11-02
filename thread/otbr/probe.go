@@ -6,7 +6,6 @@ package otbr
 import (
 	"context"
 	"errors"
-	"net/http"
 	"time"
 
 	"github.com/SukramJ/go-fabric/clock"
@@ -27,18 +26,19 @@ type Capability struct {
 	DiagnosticsAPI DiagnosticsAPI
 }
 
-// Probe probes host:port for an OTBR REST surface (OtbrRestProbe.probe,
-// OtbrRestProbe.ts:18-51): GET /node confirms the endpoint is an OTBR and
-// reveals its key casing, then the diagnostics endpoints' statuses its
-// flavour. A port of 0 is [DefaultPort], a timeout of 0
-// [DefaultProbeTimeout]. An endpoint that is not an OTBR or does not
-// answer is (nil, nil); an error that is not the REST surface's is
-// returned. httpClient may be nil.
-func Probe(ctx context.Context, host string, port int, timeout time.Duration, httpClient *http.Client) (*Capability, error) {
-	if timeout == 0 {
-		timeout = DefaultProbeTimeout
+// Probe probes the border router cfg names for an OTBR REST surface
+// (OtbrRestProbe.probe, OtbrRestProbe.ts:18-51): GET /node confirms the
+// endpoint is an OTBR and reveals its key casing, then the diagnostics
+// endpoints' statuses its flavour. A Port of 0 is [DefaultPort], a
+// Timeout of 0 [DefaultProbeTimeout] (the probe's, not the client's
+// default); cfg.Clock stamps ProbedAt. An endpoint that is not an OTBR or
+// does not answer is (nil, nil); an error that is not the REST surface's
+// is returned.
+func Probe(ctx context.Context, cfg Config) (*Capability, error) {
+	if cfg.Timeout == 0 {
+		cfg.Timeout = DefaultProbeTimeout
 	}
-	c, err := NewClient(Config{Host: host, Port: port, Timeout: timeout, HTTPClient: httpClient})
+	c, err := NewClient(cfg)
 	if err != nil {
 		return nil, err
 	}
@@ -46,7 +46,7 @@ func Probe(ctx context.Context, host string, port int, timeout time.Duration, ht
 	if err == nil {
 		var api DiagnosticsAPI
 		if api, err = c.DetectDiagnosticsAPI(ctx); err == nil {
-			return &Capability{BaseURL: c.BaseURL(), KeyFormat: format, ProbedAt: clock.System{}.Now(), NetworkName: name, ExtPANID: xp, DiagnosticsAPI: api}, nil
+			return &Capability{BaseURL: c.BaseURL(), KeyFormat: format, ProbedAt: clock.Or(cfg.Clock).Now(), NetworkName: name, ExtPANID: xp, DiagnosticsAPI: api}, nil
 		}
 	}
 	if _, ok := errors.AsType[*Error](err); ok {
