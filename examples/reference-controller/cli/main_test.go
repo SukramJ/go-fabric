@@ -24,6 +24,7 @@ import (
 	"github.com/SukramJ/go-fabric/bdx/otaimage"
 	"github.com/SukramJ/go-fabric/client/discovery"
 	"github.com/SukramJ/go-fabric/cluster/onoff"
+	groupcastdef "github.com/SukramJ/go-fabric/cluster/spec/groupcast"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/device"
 	"github.com/SukramJ/go-fabric/endpoint"
@@ -463,7 +464,7 @@ func hideGroupcast(t *testing.T, n *node.Node) {
 	}
 	var kept []uint32
 	for _, id := range ids {
-		if id != clusterGroupcast {
+		if id != groupcastdef.ClusterID {
 			kept = append(kept, id)
 		}
 	}
