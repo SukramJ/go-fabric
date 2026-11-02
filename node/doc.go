@@ -45,12 +45,15 @@
 // A host that assembles its own topology — its own endpoint.Assembler
 // over its own device model — hands the bridge its Snapshotter through
 // Config.Snapshotter and gets no [Aggregator]; everything else stays the
-// facade's, the group state included (Config.Groups, [Node.Groups]). Its operator surface reads [Node.Sessions] and
-// [Node.Subscriptions], and removes a fabric without a commissioner
-// through [Node.RemoveFabric] (issue #87).
+// facade's, the group state included (Config.Groups, [Node.Groups]). Its
+// operator surface reads [Node.SessionDiagnostics] (the read-only view;
+// [Node.Sessions] and [Node.Subscriptions] are the advanced seams below
+// it) and removes a fabric without a commissioner through
+// [Node.RemoveFabric] (issue #87).
 //
-// Left to the configuration on purpose: a nil Config.Advertiser publishes
-// nothing, a nil Config.OTA mounts no OTA requestor, a nil
+// Left to the configuration on purpose: a nil Config.Advertiser is the
+// node's own Zeroconf with the subtype responder (Network.MDNS.Off
+// publishes nothing), a nil Config.OTA mounts no OTA requestor, a nil
 // Config.OTAProvider no OTA provider, a nil Config.CommissionerControl no
 // CommissionerControl server. Left to the host:
 // GeneralDiagnostics' TestEventTrigger enable key, the PowerSource
