@@ -9,6 +9,7 @@ import (
 
 	"github.com/SukramJ/go-fabric/cluster/measurement"
 	"github.com/SukramJ/go-fabric/contract"
+	"github.com/SukramJ/go-fabric/schema"
 )
 
 // TestBuiltinMaterializersAreInstalled pins which built-in classes carry
@@ -116,3 +117,23 @@ func (s *recordingServer) MatterInvoke(context.Context, uint32, any) (any, error
 }
 
 func (s *recordingServer) MatterReportable() []uint32 { return nil }
+
+// TestEveryMeasurementDeviceTypeHasASchemaName: every device type a
+// built-in measurement class advertises is named by schema.DeviceTypeName,
+// the module's one device-type name (W5-api-15) — the guard
+// contract.DeviceTypeName's test held for issue #57 (SoilSensor, 0x0045).
+func TestEveryMeasurementDeviceTypeHasASchemaName(t *testing.T) {
+	t.Parallel()
+	for class := contract.MeasurementNone + 1; class <= contract.MeasurementSoilMoisture; class++ {
+		dt := contract.MeasurementClassDeviceType(class)
+		if dt == 0 {
+			continue
+		}
+		if name, ok := schema.DeviceTypeName(schema.DeviceTypeID(dt)); !ok || name == "" {
+			t.Errorf("measurement class %d advertises 0x%04X, which schema does not name", class, dt)
+		}
+	}
+	if name, _ := schema.DeviceTypeName(0x0045); name != "SoilSensor" {
+		t.Errorf("schema.DeviceTypeName(0x0045) = %q, want SoilSensor", name)
+	}
+}

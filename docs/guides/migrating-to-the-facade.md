@@ -61,6 +61,7 @@ facade one shape. Each row names what a host writes now.
 | `node.OtaConfig.Harness`, `node.Network.WiFiCommissioning`, `node.WiFiCommissioning`, `node.Config.BootID`, `node.BootID` | not public (`internal/nodeseam`); `fabrictest.UseWiFiCommissioning(cfg, driver)` in a test; `bootid.EnableRotation()` before `node.New` |
 | `contract.InitialDataVersion`, `contract.SetMeasurementMaterializer` | none: unexported; a host kind is `contract.RegisterMeasurementKind` |
 | `device.AheadRows` | `node.AheadRows()` (the root's and the devices' rows) |
+| `contract.DeviceTypeName` | `schema.DeviceTypeName(schema.DeviceTypeID(id))`; operator labels are the host's |
 
 ## Changed in the next release: `CommissionerReach` takes the peer
 

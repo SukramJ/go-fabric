@@ -14,9 +14,6 @@ import (
 	"strings"
 	"sync"
 	"testing"
-
-	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/schema"
 )
 
 var update = flag.Bool("update", false, "rewrite the golden files")
@@ -157,13 +154,6 @@ func TestRun(t *testing.T) {
 	out.Reset()
 	if err := run([]string{"-out", dir}, &out); err != nil || out.Len() != 0 {
 		t.Errorf("a second run rewrote files: %q %v", out.String(), err)
-	}
-	cdir := filepath.Join(dir, "contract")
-	if err := run([]string{"-out", dir, "-contract-out", cdir}, &out); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := os.Stat(filepath.Join(cdir, contractNamesFile)); err != nil {
-		t.Errorf("-contract-out: %v", err)
 	}
 	if err := run([]string{"-nope"}, &out); err == nil {
 		t.Error("an unknown flag was accepted")
@@ -443,67 +433,5 @@ func TestReferenceIsCurrent(t *testing.T) {
 	got, err := os.ReadFile(path) //nolint:gosec // a committed file of this module
 	if err != nil || !bytes.Equal(got, o.Source) {
 		t.Errorf("%s is stale: run go run ./script/devicegen", path)
-	}
-}
-
-// TestContractNamesAreCurrent fails when contract/devicetype_names_gen.go
-// is not what the generator makes of parity/schema.json now.
-func TestContractNamesAreCurrent(t *testing.T) {
-	t.Parallel()
-	g := testGenerator(t)
-	root, err := moduleRoot()
-	if err != nil {
-		t.Fatal(err)
-	}
-	o, err := g.generateContractNames()
-	if err != nil {
-		t.Fatal(err)
-	}
-	path := filepath.Join(root, contractDir, o.File)
-	got, err := os.ReadFile(path) //nolint:gosec // a committed file of this module
-	if err != nil || !bytes.Equal(got, o.Source) {
-		t.Errorf("%s is stale: run go run ./script/devicegen", path)
-	}
-}
-
-// TestLabelOverrides: every override names a snapshot device type and
-// differs from its matter.js name — an override equal to the name, or for
-// a type the snapshot dropped, is dead and goes.
-func TestLabelOverrides(t *testing.T) {
-	t.Parallel()
-	g := testGenerator(t)
-	names := map[uint32]string{}
-	for _, dt := range g.snap.DeviceTypes {
-		if dt.ID != nil {
-			names[*dt.ID] = dt.Name
-		}
-	}
-	for id, label := range labelOverrides {
-		name, ok := names[id]
-		switch {
-		case !ok:
-			t.Errorf("override 0x%04X (%q) names no snapshot device type", id, label)
-		case name == label:
-			t.Errorf("override 0x%04X equals the matter.js name %q", id, name)
-		}
-	}
-}
-
-// TestContractDeviceTypeNameCoversEverySchemaType: every device type of
-// schema/devicetypes.go has a contract label — its matter.js name, or its
-// override — never the hex fallback (issue #57).
-func TestContractDeviceTypeNameCoversEverySchemaType(t *testing.T) {
-	t.Parallel()
-	if len(schema.DeviceTypeNames) == 0 {
-		t.Fatal("schema.DeviceTypeNames is empty")
-	}
-	for id, name := range schema.DeviceTypeNames {
-		want := name
-		if o, ok := labelOverrides[uint32(id)]; ok {
-			want = o
-		}
-		if got := contract.DeviceTypeName(uint16(id)); got != want { //nolint:gosec // generateContractNames refuses an id above uint16
-			t.Errorf("contract.DeviceTypeName(0x%04X) = %q, want %q", id, got, want)
-		}
 	}
 }

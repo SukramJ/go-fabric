@@ -10,9 +10,9 @@
 // type, device/types_gen_test.go, which calls every constructor and
 // accessor, device/doc_gen.go, the package doc with the lists of typed
 // cluster packages and device types, docs/reference/device-types.md, the
-// requirement tables of every type (docs.go), and
-// contract/devicetype_names_gen.go, the label table of
-// contract.DeviceTypeName over every snapshot device type (labels.go).
+// requirement tables of every type (docs.go). The device-type name is
+// schema.DeviceTypeName's; the module keeps no second label table
+// (review 2026-11 W5-api-15).
 //
 // It is matter.js's support/codegen/src/endpoints translated: matter.js
 // generates packages/node/src/devices and packages/node/src/endpoints from
@@ -25,9 +25,7 @@
 //
 //	go run ./script/devicegen            # regenerate device/*_gen.go
 //	go run ./script/devicegen -out DIR   # into DIR instead (the reference
-//	                                     # page and the contract label
-//	                                     # table too, unless -contract-out
-//	                                     # names another for the latter)
+//	                                     # page too)
 //
 // The committed set is the device types in scope (committed in
 // devicetypes.go): since wave 27-C2 every snapshot device type, 91/91.
@@ -64,7 +62,6 @@ func run(args []string, stdout io.Writer) error {
 	fs := flag.NewFlagSet("devicegen", flag.ContinueOnError)
 	fs.SetOutput(stdout)
 	out := fs.String("out", "", "output directory (default: device of this module)")
-	contractOut := fs.String("contract-out", "", "output directory of the contract label table (default: -out if given, else contract of this module)")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -80,19 +77,7 @@ func run(args []string, stdout io.Writer) error {
 	if dir == "" {
 		dir = filepath.Join(root, outDir)
 	}
-	cdir := *contractOut
-	switch {
-	case cdir != "":
-	case *out != "":
-		cdir = *out
-	default:
-		cdir = filepath.Join(root, contractDir)
-	}
 	files, err := g.all()
-	if err != nil {
-		return err
-	}
-	names, err := g.generateContractNames()
 	if err != nil {
 		return err
 	}
@@ -107,10 +92,7 @@ func run(args []string, stdout io.Writer) error {
 	if err := writeAll(stdout, dir, files...); err != nil {
 		return err
 	}
-	if err := writeAll(stdout, rdir, ref); err != nil {
-		return err
-	}
-	return writeAll(stdout, cdir, names)
+	return writeAll(stdout, rdir, ref)
 }
 
 // writeAll creates dir and writes every file into it, naming each one it
