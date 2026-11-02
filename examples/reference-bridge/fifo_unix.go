@@ -13,6 +13,15 @@ import (
 	"syscall"
 )
 
+// fifoMode is the app pipe's mode: owner and group, never the world — a
+// local user must not inject test commands (W5-ex-14). The writer is not
+// always the daemon's user: the chip-tool harness's Python cases write it
+// from the CHIP image's container, which runs as root
+// (internal/chiptool/harness_test.go, docker run without --user) and
+// needs no mode bit; a harness run under another account of the daemon's
+// group needs the group's write bit.
+const fifoMode = 0o660
+
 // makeFIFO creates the named pipe at path unless one is already there.
 func makeFIFO(path string) error {
 	if st, err := os.Stat(path); err == nil {
@@ -23,12 +32,11 @@ func makeFIFO(path string) error {
 	} else if !errors.Is(err, fs.ErrNotExist) {
 		return err
 	}
-	if err := syscall.Mkfifo(path, 0o666); err != nil {
+	if err := syscall.Mkfifo(path, fifoMode); err != nil {
 		return fmt.Errorf("--app-pipe %s: %w", path, err)
 	}
-	// The pipe is written by a test harness that may run as another user
-	// (a container's root); mkfifo honours the umask, so widen it here.
-	return os.Chmod(path, 0o666) //nolint:gosec // a test-only control pipe, off by default
+	// mkfifo honours the umask; the mode is set as stated.
+	return os.Chmod(path, fifoMode)
 }
 
 // unblockFIFO opens and closes the write end once, so a reader blocked in

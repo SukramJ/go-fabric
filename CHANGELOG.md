@@ -151,6 +151,7 @@ Findings of the whole-codebase review of 2026-11-01 (`notes/review/2026-11/`).
 - examples: quickstart-device names only the facade — `Store.Path`, the node's own advertiser, `device.StringKey`, the typed `OnOff().OnChanged` — and an import guard holds it, host-view and quickstart-controller to their lists; quickstart-controller uses the node `Pair` returned instead of the first registered one, and its test injects `controller.Config.Names` instead of a package seam (W5-ex-02, W5-ex-03, W5-ex-13).
 - `node/controllernode`: `Config` makes the own node's socket IPv4-only for an IPv4 listen address and `Start` answers the IPv4 loopback for an unspecified IPv4 one, so the reference controller's copy of `Start` is gone; it keeps only its test hooks (W5-ex-09).
 - examples: the reference controller provisions groups and bindings with the generated `cluster/spec` types (`groupkeymanagement.KeySetWriteRequest`, `groupcast.JoinGroupRequest`, `binding.TargetStruct`, `accesscontrol.AccessControlEntryStruct`, `groupkeymanagement.GroupKeyMapStruct`) instead of hand-built TLV trees with magic field numbers (W5-ex-07).
+- examples: the reference bridge's test app pipe (`--app-pipe`) is created `0660`, owner and group, instead of world-writable `0666`; the chip-tool harness writes it as the container's root (W5-ex-14).
 
 ## [0.15.6] — 2026-11-01
 
