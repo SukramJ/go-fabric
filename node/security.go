@@ -387,6 +387,7 @@ func wireSecurity(
 	responderParams *sessionparams.Parameters,
 	limits Limits,
 	logger *slog.Logger,
+	events *sessionEvents,
 ) *security {
 	sessions := operational.NewManager(st)
 	sessions.SetClock(br.Clock())
@@ -452,7 +453,9 @@ func wireSecurity(
 	sessions.SetOnSessionClose(func(id uint16) {
 		subs.CloseSession(id)
 		br.SessionClosed(id)
+		events.closed(id)
 	})
+	subs.SetOnSessionSubscriptionsChanged(events.subscriptionsChanged)
 	br.AttachSessionRegistry(sessions)
 
 	// PASE, one adapter per exchange. The session id has to be allocated
@@ -477,7 +480,7 @@ func wireSecurity(
 	// CASE, likewise per exchange. A single responder lands in `Finished`
 	// after the first Sigma3 and rejects every later Sigma1.
 	caseProvider := bridge.NewPerExchangeCaseProvider(func() *bridge.CaseAdapter { //nolint:contextcheck // the adapter outlives this call; its callbacks run per handshake
-		adapter, err := buildCaseAdapter(sessions, ids, responderParams, logger)
+		adapter, err := buildCaseAdapter(sessions, ids, responderParams, logger, events.opened)
 		if err != nil {
 			logger.Warn("case.build_failed", slog.Any("err", err))
 			return nil
@@ -497,7 +500,7 @@ func wireSecurity(
 	// liveness timeout before it re-subscribes.
 	br.AttachSubscriptionStore(st)
 	br.AttachOperationalResolver(operationalResolver(logger, br.Clock()))
-	br.AttachCaseInitiatorProvider(caseInitiatorProvider(st, sessions, ids, logger))
+	br.AttachCaseInitiatorProvider(caseInitiatorProvider(st, sessions, ids, logger, events.opened))
 
 	return &security{sessions: sessions, subs: subs, pase: paseProvider, casep: caseProvider, responderParams: responderParams}
 }
@@ -519,7 +522,10 @@ func (s *security) start(ctx context.Context) {
 // resumption record, which matter.js CaseClient offers whenever it holds
 // one. A completed handshake registers the session and stores the new
 // resumption record, as matter.js does after every pair.
-func caseInitiatorProvider(st store.Resumption, sessions *operational.Manager, ids *caseIdentities, logger *slog.Logger) bridge.CaseInitiatorProvider {
+//
+// onOpened, when set, learns the session id of every session a handshake
+// opened (the node's OnSessionOpened).
+func caseInitiatorProvider(st store.Resumption, sessions *operational.Manager, ids *caseIdentities, logger *slog.Logger, onOpened func(sessionID uint16)) bridge.CaseInitiatorProvider {
 	return func(ctx context.Context, fabricIndex uint8, peerNodeID uint64) (*bridge.CaseInitiation, error) {
 		fabric, ok := ids.forFabric(fabricIndex)
 		if !ok {
@@ -563,6 +569,9 @@ func caseInitiatorProvider(st store.Resumption, sessions *operational.Manager, i
 				if p := res.PeerSessionParams; p != nil {
 					entry.SetPeerMRPIntervals(p.SessionIdleInterval, p.SessionActiveInterval, uint32(p.SessionActiveThreshold))
 					entry.SetPeerTransportParameters(p.EffectiveTransports(), p.EffectiveMaxTCPMessageSize())
+				}
+				if onOpened != nil {
+					onOpened(entry.SessionID)
 				}
 				if err := sessions.PersistResumption(ctx, fabricIndex, res.PeerNodeID, res.ResumptionID, res.SharedSecret, res.PeerCATs); err != nil {
 					logger.Debug("case.initiator.resumption_persist", slog.Any("err", err))
@@ -653,7 +662,10 @@ func buildPaseAdapterFromContext(life context.Context, sessions *operational.Man
 // current operational identity, the multi-fabric destination resolver, and on
 // success an operational session registered under whichever id the
 // handshake ended up using.
-func buildCaseAdapter(sessions *operational.Manager, ids *caseIdentities, responderParams *sessionparams.Parameters, logger *slog.Logger) (*bridge.CaseAdapter, error) {
+//
+// onOpened, when set, learns the id of the session the handshake opened
+// (the node's OnSessionOpened).
+func buildCaseAdapter(sessions *operational.Manager, ids *caseIdentities, responderParams *sessionparams.Parameters, logger *slog.Logger, onOpened func(sessionID uint16)) (*bridge.CaseAdapter, error) {
 	current := ids.current()
 	sessionID, err := sessions.AllocateID()
 	if err != nil {
@@ -740,6 +752,9 @@ func buildCaseAdapter(sessions *operational.Manager, ids *caseIdentities, respon
 			slog.Int("session_id", int(entry.SessionID)),
 			slog.Int("fabric_index", int(fabricIndex)),
 			slog.Uint64("node_id", peerNodeID))
+		if onOpened != nil {
+			onOpened(entry.SessionID)
+		}
 		// The record the peer resumes from next time: the id this
 		// handshake issued (Sigma2's, or the fresh one Sigma2_Resume
 		// carried) with the session's shared secret.

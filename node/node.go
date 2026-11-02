@@ -99,6 +99,9 @@ type Node struct {
 	// ownsAdvertiser is set when New built the advertiser (a nil
 	// Config.Advertiser), so a failed New closes it.
 	ownsAdvertiser bool
+	// sessionEvents turns session and subscription changes into the
+	// Observers' session hooks (sessions_events.go).
+	sessionEvents sessionEvents
 	// healthListeners and otaStatusListeners are the host's On…
 	// callbacks of the health probe and the OTA provider.
 	healthListeners    listeners[HealthSample]
@@ -355,7 +358,8 @@ func New(ctx context.Context, cfg Config) (*Node, error) { //nolint:funlen // th
 	cm := cfg.Commissioning
 	n.sec = wireSecurity(n.br, n.st, n.root, n.caseIDs, paseParams{
 		passcode: cm.Passcode, salt: cm.Salt, iterations: int(cm.PBKDFIterations), life: n.life,
-	}, responderSessionParams(cfg.Network.TCP, cfg.MaxPathsPerInvoke, cfg.Sessions), cfg.Limits, n.logger)
+	}, responderSessionParams(cfg.Network.TCP, cfg.MaxPathsPerInvoke, cfg.Sessions), cfg.Limits, n.logger, &n.sessionEvents)
+	n.sessionEvents.n = n
 	n.wireICD()
 
 	// --- the commissioning window (main.go:329-360 at b4ea1f96^) ---------------------

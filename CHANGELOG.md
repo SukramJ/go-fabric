@@ -51,6 +51,7 @@ Findings of the whole-codebase review of 2026-11-01 (`notes/review/2026-11/`).
 - `otaimage.MaxHeaderSize`: the largest OTA header TLV `ReadHeader` accepts (1024, connectedhomeip's `kMaxHeaderSize`) (W4-ctlint-07).
 - `exchange.Manager.LocalFixedMrpBackoff` and `exchange.Manager.LocalPad`: the manager's sender-side fixed backoff and the pad `MaxPeerResponseTimePadded` takes (W4-ctlim-07).
 - `interaction.InvokeOptions.TimedOff` and `fabrictest.InvokeUntimed`: an invoke sent untimed although the command's model is timed-required — matter.js `options.timed === false` — for a test of the device's NEEDS_TIMED_INTERACTION answer; such an invoke goes on its own, outside the automatic batch (W4-ctlim-02).
+- `node.Observers.OnSessionOpened`, `OnSessionClosed` and `OnSubscriptionsChanged`: a CASE session's open and close and every change of its subscriptions, each with the session's `SessionInfo`, as matter.js's `SessionsBehavior` events `opened`, `closed` and `subscriptionsChanged` (PASE sessions are not reported); `subscription.Manager.SetOnSessionSubscriptionsChanged` is the engine's hook behind the third (W5-api-19).
 
 ### Changed
 

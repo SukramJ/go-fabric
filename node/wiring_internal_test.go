@@ -26,7 +26,7 @@ func TestCaseInitiatorProviderNeedsALoadedIdentity(t *testing.T) {
 	st := testStore(t)
 	sessions := operational.NewManager(st)
 	before := sessions.Occupancy()
-	provider := caseInitiatorProvider(st, sessions, newCaseIdentities(slog.Default(), nil), slog.Default())
+	provider := caseInitiatorProvider(st, sessions, newCaseIdentities(slog.Default(), nil), slog.Default(), nil)
 	if init, err := provider(ctx, 1, 0xC0FFEE); err == nil || init != nil {
 		t.Fatalf("provider(unknown fabric) = %v, %v; want an error", init, err)
 	}

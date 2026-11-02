@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/SukramJ/go-fabric/clock"
+	"github.com/SukramJ/go-fabric/secure/operational"
 )
 
 // SetupPayload is the node's configured commissioning secret with the
@@ -133,26 +134,32 @@ func (n *Node) SessionDiagnostics() SessionDiagnostics {
 		subs = n.sec.subs.CountBySession()
 	}
 	for _, s := range n.sec.sessions.Sessions() {
-		out.Sessions = append(out.Sessions, SessionInfo{
-			ID:               s.SessionID,
-			FabricIndex:      s.FabricIndex,
-			PeerNodeID:       s.PeerNodeID,
-			LocalNodeID:      s.LocalNodeID,
-			PASE:             s.IsPASE,
-			Subscriptions:    subs[s.SessionID],
-			LastActivity:     s.LastActivity,
-			LastPeerActivity: s.LastPeerActivity,
-			Idle:             ageAt(now, s.LastActivity),
-			PeerIdle:         ageAt(now, s.LastPeerActivity),
-
-			PeerIdleInterval:    time.Duration(s.PeerIdleIntervalMs) * time.Millisecond,
-			PeerActiveInterval:  time.Duration(s.PeerActiveIntervalMs) * time.Millisecond,
-			PeerActiveThreshold: time.Duration(s.PeerActiveThresholdMs) * time.Millisecond,
-		})
+		out.Sessions = append(out.Sessions, sessionInfoOf(s, subs[s.SessionID], now))
 	}
 	occ := n.sec.sessions.Occupancy()
 	out.Occupancy = Occupancy{Live: occ.Live, Reserved: occ.Reserved, Capacity: occ.Capacity, Free: occ.Free()}
 	return out
+}
+
+// sessionInfoOf is one session of the table as the facade reports it,
+// with subs subscriptions, its ages at now.
+func sessionInfoOf(s operational.SessionInfo, subs int, now time.Time) SessionInfo {
+	return SessionInfo{
+		ID:               s.SessionID,
+		FabricIndex:      s.FabricIndex,
+		PeerNodeID:       s.PeerNodeID,
+		LocalNodeID:      s.LocalNodeID,
+		PASE:             s.IsPASE,
+		Subscriptions:    subs,
+		LastActivity:     s.LastActivity,
+		LastPeerActivity: s.LastPeerActivity,
+		Idle:             ageAt(now, s.LastActivity),
+		PeerIdle:         ageAt(now, s.LastPeerActivity),
+
+		PeerIdleInterval:    time.Duration(s.PeerIdleIntervalMs) * time.Millisecond,
+		PeerActiveInterval:  time.Duration(s.PeerActiveIntervalMs) * time.Millisecond,
+		PeerActiveThreshold: time.Duration(s.PeerActiveThresholdMs) * time.Millisecond,
+	}
 }
 
 // ageAt is now minus t, 0 for a zero t or a t after now.

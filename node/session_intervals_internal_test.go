@@ -45,7 +45,7 @@ func TestResponderSessionParamsCarryIntervals(t *testing.T) {
 			}
 
 			sessions := operational.NewManager(testStore(t))
-			ca, err := buildCaseAdapter(sessions, newCaseIdentities(slog.Default(), nil), p, slog.New(slog.DiscardHandler))
+			ca, err := buildCaseAdapter(sessions, newCaseIdentities(slog.Default(), nil), p, slog.New(slog.DiscardHandler), nil)
 			if err != nil {
 				t.Fatal(err)
 			}

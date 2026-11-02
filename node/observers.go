@@ -82,6 +82,22 @@ type Observers struct {
 	// versions and has no event for it, so a host that mirrors a change
 	// to its own pages (a stream event) observes it here.
 	OnSurfaceChanged func(surface.SurfaceChange)
+	// OnSessionOpened runs after a CASE session was established — by a
+	// controller (the node as responder) or by the node re-establishing a
+	// controller's subscription — with the session as [Node.SessionDiagnostics]
+	// lists it. A PASE session is not reported. Mirrors matter.js
+	// SessionsBehavior's `opened` event (packages/node/src/behavior/system/
+	// sessions/SessionsBehavior.ts:57-64, declared at :124).
+	OnSessionOpened func(SessionInfo)
+	// OnSessionClosed runs after a session OnSessionOpened reported closed,
+	// with its last state. Mirrors SessionsBehavior's `closed` event
+	// (SessionsBehavior.ts:66-73, :125).
+	OnSessionClosed func(SessionInfo)
+	// OnSubscriptionsChanged runs after a subscription was added to or
+	// closed on a session OnSessionOpened reported, with the session and
+	// its new Subscriptions count. Mirrors SessionsBehavior's
+	// `subscriptionsChanged` event (SessionsBehavior.ts:75-93, :126).
+	OnSubscriptionsChanged func(SessionInfo)
 }
 
 // FabricInfo names one fabric, as OperationalCredentials' AddNOC hook
@@ -276,6 +292,9 @@ func (o Observers) queuedOn(n *Node) Observers {
 	o.OnCommissioningComplete = queuedHook(n, "commissioning_complete", o.OnCommissioningComplete)
 	o.OnWindowTransition = queuedHook(n, "window_transition", o.OnWindowTransition)
 	o.OnSurfaceChanged = queuedHook(n, "surface_changed", o.OnSurfaceChanged)
+	o.OnSessionOpened = queuedHook(n, "session_opened", o.OnSessionOpened)
+	o.OnSessionClosed = queuedHook(n, "session_closed", o.OnSessionClosed)
+	o.OnSubscriptionsChanged = queuedHook(n, "subscriptions_changed", o.OnSubscriptionsChanged)
 	return o
 }
 
