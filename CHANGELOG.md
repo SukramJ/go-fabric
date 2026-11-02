@@ -142,6 +142,7 @@ Findings of the whole-codebase review of 2026-11-01 (`notes/review/2026-11/`).
 - `controller/client`: cache flushes are serialised across snapshot and store write, and a direct flush stops the armed timer, so an older flush can no longer land after a newer one (W4-ctlim-06).
 - `client/interaction`: the subscription liveness timeout pads our own retransmissions with the manager's local MRP margin and fixed backoff, as matter.js does (W4-ctlim-07); a write is chunked, and a Read or Subscribe request fitted, for the session its exchange goes on, not the provider's newest session (W4-ctlim-08, W4-ctlim-11); a sustained subscription announces going live again when it is re-established while live (W4-ctlim-10).
 - `controller/client`: a `Stop` during a newly commissioned node's initial read leaves the node without a default subscription; one was established on the stopped node (W4-ctlim-09).
+- `node`: a `Start` that fails runs the stop path before it returns — the store `Store.Path` opened is closed and the node is stopped (a retry is `ErrStopped`) — and the node counts as started only once `Start` completed; an Aggregator change (`Add`, `Replace`, `Remove`, `Forget`, `Batch`, `RetirePartition`) on a stopped node answers `node.ErrStopped` instead of binding nothing and failing in the bridge (W5-api-06, W5-ex-08).
 
 ## [0.15.6] — 2026-11-01
 

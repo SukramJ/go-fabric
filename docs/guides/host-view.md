@@ -228,8 +228,10 @@ it only changes the set, after `Start` it reassembles the running bridge.
 A stored endpoint number is never dropped because its device is absent:
 a device a previous run served keeps its number until it returns, and a
 device the host removes keeps it too (`Remove`). `Forget` frees it, for a
-device that is gone for good. On an error path the node is stopped: `New`
-opened the store.
+device that is gone for good. A `Start` that fails runs the stop path
+itself — the store `New` opened is closed, the node is stopped — so the
+program returns its error; on a later error path the program calls
+`Stop`.
 
 A host whose devices come from several sources that load on their own
 gives each a partition: `Aggregator().Partition(name)` has the same

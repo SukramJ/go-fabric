@@ -717,6 +717,14 @@ func (n *Node) notifyFabricUpdated(ctx context.Context, fabricIndex uint8) {
 // the OTA requestor, their operational records, and the node's own
 // commissioning window when no fabric exists. Start is idempotent, as
 // matter.js Node.start (Node.ts:114-132); after Stop it is [ErrStopped].
+// The node counts as started once Start completed. A Start that fails
+// runs the stop path before it returns, so it releases what New and the
+// partial start began (the store file, the goroutines) and the node is
+// stopped: a later Start is [ErrStopped], a Stop a no-op, and a host
+// builds a new node on the same store. matter.js's Node.start sets its
+// target state back to "offline" on an error and rethrows
+// (Node.ts:113-128), so its node may be started again; this node, like
+// one after Stop, is not restarted.
 func (n *Node) Start(ctx context.Context) error {
 	n.mu.Lock()
 	defer n.mu.Unlock()
@@ -726,6 +734,18 @@ func (n *Node) Start(ctx context.Context) error {
 	case n.started.Load():
 		return nil
 	}
+	if err := n.startLocked(ctx); err != nil {
+		if stopErr := n.stopLocked(context.WithoutCancel(ctx)); stopErr != nil {
+			n.logger.Warn("node.start_failed.stop", slog.Any("err", stopErr))
+		}
+		return err
+	}
+	n.started.Store(true)
+	return nil
+}
+
+// startLocked is Start's work; n.mu is held.
+func (n *Node) startLocked(ctx context.Context) error {
 	// The start is work in hand of the node's in-flight group but for its
 	// wait on the controllers of re-established subscriptions: a
 	// fabrictest site does not move its clock under the start's own work,
@@ -754,7 +774,6 @@ func (n *Node) Start(ctx context.Context) error {
 	// The assembled surface against the one a previous run persisted: a
 	// change raises the ConfigurationVersions (surface_stability.go).
 	n.announceSurface(ctx)
-	n.started.Store(true)
 	n.callbacks.Start()
 	if n.agg != nil {
 		n.agg.setStarted()
@@ -844,6 +863,11 @@ func (n *Node) Start(ctx context.Context) error {
 func (n *Node) Stop(ctx context.Context) error {
 	n.mu.Lock()
 	defer n.mu.Unlock()
+	return n.stopLocked(ctx)
+}
+
+// stopLocked is Stop's work; n.mu is held.
+func (n *Node) stopLocked(ctx context.Context) error {
 	if n.stopped {
 		return nil
 	}

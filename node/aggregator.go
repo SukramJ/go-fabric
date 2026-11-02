@@ -217,6 +217,10 @@ func (a *Aggregator) RetirePartition(ctx context.Context, name string) error {
 		return ErrRetireDefault
 	}
 	a.mu.Lock()
+	if a.closed {
+		a.mu.Unlock()
+		return ErrStopped
+	}
 	for i, p := range a.parts {
 		if p.scope != scope {
 			continue
@@ -341,6 +345,15 @@ type Batch struct {
 // during fn reassembles on its own, and that assembly shows the changes
 // the batch has applied so far.
 func (p *Partition) Batch(ctx context.Context, fn func(b *Batch) error) error {
+	// A stopped node takes no change: [Node.Start] after Stop is
+	// ErrStopped, and so is every change of its set — the device would
+	// bind to nothing and the reassembly fail on a stopped bridge.
+	p.a.mu.Lock()
+	closed := p.a.closed
+	p.a.mu.Unlock()
+	if closed {
+		return ErrStopped
+	}
 	b := &Batch{a: p.a, scope: p.scope, ctx: ctx}
 	fnErr := fn(b)
 	// The reservations first, so the reassembly keeps a removed key's

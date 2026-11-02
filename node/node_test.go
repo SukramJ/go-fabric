@@ -656,3 +656,54 @@ func TestAggregatorConcurrentAdds(t *testing.T) {
 		}
 	}
 }
+
+// TestStartFailureRunsTheStopPath: a Start that fails releases what New
+// began — the node is stopped, a retry is ErrStopped, Stop a no-op — and
+// an Aggregator change after it answers ErrStopped (W5-api-06, W5-ex-08).
+func TestStartFailureRunsTheStopPath(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	cfg := minimalConfig(openDB(t, filepath.Join(t.TempDir(), "n.db")))
+	// A listen address that cannot bind fails the bridge's start.
+	cfg.Network.Listen = "127.0.0.1:99999"
+	n := newNode(t, cfg)
+	if err := n.Start(ctx); err == nil {
+		t.Fatal("Start on an unbindable address succeeded")
+	}
+	if err := n.Start(ctx); !errors.Is(err, node.ErrStopped) {
+		t.Errorf("Start after a failed Start: %v, want ErrStopped", err)
+	}
+	if err := n.Aggregator().Add(ctx, newPlug(t, "late")); !errors.Is(err, node.ErrStopped) {
+		t.Errorf("Add after a failed Start: %v, want ErrStopped", err)
+	}
+	if err := n.Stop(ctx); err != nil {
+		t.Errorf("Stop after a failed Start: %v", err)
+	}
+}
+
+// TestAggregatorAfterStop: an Add, a Remove and a RetirePartition on a
+// stopped node answer ErrStopped, as Start does (W5-api-06).
+func TestAggregatorAfterStop(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	n := newNode(t, minimalConfig(openDB(t, filepath.Join(t.TempDir(), "n.db"))))
+	if err := n.Aggregator().Add(ctx, newPlug(t, "p")); err != nil {
+		t.Fatal(err)
+	}
+	if err := n.Start(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if err := n.Stop(ctx); err != nil {
+		t.Fatal(err)
+	}
+	agg := n.Aggregator()
+	if err := agg.Add(ctx, newPlug(t, "q")); !errors.Is(err, node.ErrStopped) {
+		t.Errorf("Add after Stop: %v, want ErrStopped", err)
+	}
+	if err := agg.Remove(ctx, endpoint.StringKey("p")); !errors.Is(err, node.ErrStopped) {
+		t.Errorf("Remove after Stop: %v, want ErrStopped", err)
+	}
+	if err := agg.RetirePartition(ctx, "gone"); !errors.Is(err, node.ErrStopped) {
+		t.Errorf("RetirePartition after Stop: %v, want ErrStopped", err)
+	}
+}
