@@ -178,20 +178,20 @@ exportierten Signatur (`zeroconf.go:71` ist unexportiert).
    und die Familien der Commissioning-Gruppe; dazu der manuelle
    Ökosystem-Test (Owner-Entscheidung 2).
 
-## E. Owner-Entscheidungen
+## E. Owner-Entscheidungen (2026-11-02)
 
-Offen, Wizard 2026-11-02:
-
-1. Option (a) eigener Responder — oder (b) Fork, wenn der Aufwand von (a)
-   nicht in diese Runde passt.
-2. Manueller Ökosystem-Test (Apple Home, Google Home: Commissioning,
-   Neustart des Knotens ohne Goodbye, Wiederfinden nach 2 min) vor dem Tag
-   der Release, die den Responder enthält — Pflicht oder optional.
-3. Die periodische Re-Announce-Schleife (`node.Config.Network.Reannounce`):
-   entfernen zugunsten des matter.js-Announce-Plans, oder als Option
-   behalten (Default aus).
-4. `NewZeroconf` → `NewResponder` in derselben PR (Regel "entfernen, nicht
-   deprecaten", Migrationszeile) — oder Name behalten.
+1. **Option (a)**, der eigene Responder.
+2. **Manueller Ökosystem-Test ist Pflicht** vor dem Tag der Release, die
+   den Responder enthält: Apple Home und Google Home — Commissioning,
+   Neustart des Knotens ohne Goodbye, Wiederfinden nach 2 min. Der Reviewer
+   liefert den Testplan mit der P1-PR; der Owner testet auf seiner Hardware.
+3. **Die Re-Announce-Schleife wird entfernt** zugunsten des
+   matter.js-Announce-Plans: `node.Config.Network.Reannounce`, das
+   `Reannouncer`-Interface und `StartReannounceLoop` gehen mit
+   Migrationszeile; `TriggerReannounce` bleibt als On-Demand-Ankündigung
+   (`Node.TriggerReannounce`).
+4. **`NewZeroconf` wird `NewResponder`** in derselben PR, Migrationszeile im
+   Guide (loom: nur der Paritätstest `internal/netutil/gofabric_parity_test.go:69`).
 
 ## F. Phasen
 
