@@ -83,6 +83,13 @@ func (n *Node) syncAutoSubscribe(ctx context.Context) error {
 		n.dropDefaultSubscription()
 		return nil
 	}
+	return n.establishDefaultSubscription(ctx, req, didRead)
+}
+
+// establishDefaultSubscription establishes the default subscription of
+// req, sustained, and adopts it while it is still current — the tail of
+// NetworkClient.#syncAutoSubscribe (NetworkClient.ts:149-236).
+func (n *Node) establishDefaultSubscription(ctx context.Context, req SubscribePaths, didRead bool) error {
 	sreq := req
 	sreq.Sustain = true
 	n.mu.RLock()
@@ -119,23 +126,7 @@ func (n *Node) syncAutoSubscribe(ctx context.Context) error {
 		}
 		n.mu.Unlock()
 	}
-	sreq.ActiveChanged = func(active bool) {
-		if h := n.cfg.Hooks.SubscriptionStatusChanged; h != nil {
-			h(active)
-		}
-		if n.icd != nil {
-			n.icd.onSubscriptionActive(active)
-		}
-		if active {
-			if h := n.cfg.Hooks.SubscriptionAlive; h != nil {
-				h()
-			}
-			if n.cfg.FlushInterval > 0 {
-				n.persist.flush()
-			}
-		}
-		n.recompute()
-	}
+	sreq.ActiveChanged = n.defaultActiveChanged
 	// A Stop (or Close) that ran during the initial read leaves the node
 	// stopped: no default subscription is established on it. Mirrors
 	// matter.js NetworkClient.ts:113-131 (each sync re-reads the node's
@@ -163,6 +154,27 @@ func (n *Node) syncAutoSubscribe(ctx context.Context) error {
 		s.Close()
 	}
 	return nil
+}
+
+// defaultActiveChanged is the default subscription's ActiveChanged
+// (NetworkClient.ts:226-235): the status hook, the ICD client, and on going
+// live the alive hook and a flush of the cache.
+func (n *Node) defaultActiveChanged(active bool) {
+	if h := n.cfg.Hooks.SubscriptionStatusChanged; h != nil {
+		h(active)
+	}
+	if n.icd != nil {
+		n.icd.onSubscriptionActive(active)
+	}
+	if active {
+		if h := n.cfg.Hooks.SubscriptionAlive; h != nil {
+			h()
+		}
+		if n.cfg.FlushInterval > 0 {
+			n.persist.flush()
+		}
+	}
+	n.recompute()
 }
 
 // subscriptionOwner is the identity of one default subscription; not

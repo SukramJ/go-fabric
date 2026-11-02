@@ -260,7 +260,7 @@ func TestOTAVersionWithoutMaximum(t *testing.T) {
 	f.json("/dcl/model/versions/65521/32768/3", 200, map[string]any{"modelVersion": r})
 	o := &OTAVersions{Client: f.client()}
 	u, ok := o.CheckForUpdate(context.Background(), 0xFFF1, 0x8000, 2, nil)
-	if !ok || u.SoftwareVersion.SoftwareVersion != 3 || u.SoftwareVersion.MaxApplicableSoftwareVersion != math.MaxUint32 {
+	if !ok || u.SoftwareVersion.SoftwareVersion != 3 || u.MaxApplicableSoftwareVersion != math.MaxUint32 {
 		t.Fatalf("CheckForUpdate %+v %v, want version 3 with an unbounded maximum", u, ok)
 	}
 	if !o.IsApplicable(SoftwareVersion{SoftwareVersionValid: true, OTAURL: "https://x", MaxApplicableSoftwareVersion: 1}, 2) {

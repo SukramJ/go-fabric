@@ -290,7 +290,7 @@ func TestWriteChunksForTheExchangeSession(t *testing.T) {
 		t.Fatal("the TCP session takes no larger payload")
 	}
 	c := interaction.Bind(newestTCP{Provider: interaction.SessionProvider(s.mgr, s.session), tcp: tcp}, interaction.Config{})
-	var writes []interaction.WriteRequest
+	writes := make([]interaction.WriteRequest, 0, 40)
 	for i := range 40 {
 		writes = append(writes, interaction.WriteRequest{
 			Path:  attrPath(1, 0xFFF1FC00, uint32(i)),

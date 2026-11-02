@@ -235,9 +235,11 @@ func TestClientConnectivityParity(t *testing.T) {
 		default:
 		}
 		cp.pair.Controller.Registry().Erase(parityCtx(t))
+		// A sustained subscription's Done closes once its retry loop has
+		// ended, after Close returned.
 		select {
 		case <-sub.Done():
-		default:
+		case <-time.After(10 * time.Second):
 			t.Fatal("the sustained subscription survived the delete")
 		}
 	})
