@@ -108,6 +108,18 @@ func secret(flagName, value, env string) (string, error) {
 	return strings.TrimRight(string(b), "\r\n"), nil
 }
 
+// networkSecrets is networkOptions over the secrets' sources ([secret]).
+func networkSecrets(ssid, credentials, dataset string) (*commissioner.WiFiNetwork, *commissioner.ThreadNetwork, error) {
+	credentials, err := secret("--wifi-credentials", credentials, wifiCredentialsEnv)
+	if err != nil {
+		return nil, nil, err
+	}
+	if dataset, err = secret("--thread-dataset", dataset, threadDatasetEnv); err != nil {
+		return nil, nil, err
+	}
+	return networkOptions(ssid, credentials, dataset)
+}
+
 // errNoBLE is pair --ble in a build without a BLE central.
 var errNoBLE = errors.New("this build has no BLE; build ble/bluez/cmd/reference-controller")
 
@@ -181,13 +193,7 @@ func cmdPair(e *env, args []string) error { //nolint:funlen // one flag per line
 	default:
 		return fmt.Errorf("usage: %s", commands["pair"].usage)
 	}
-	if wifiCredentials, err = secret("--wifi-credentials", wifiCredentials, wifiCredentialsEnv); err != nil {
-		return err
-	}
-	if threadDataset, err = secret("--thread-dataset", threadDataset, threadDatasetEnv); err != nil {
-		return err
-	}
-	wifi, thread, err := networkOptions(wifiSSID, wifiCredentials, threadDataset)
+	wifi, thread, err := networkSecrets(wifiSSID, wifiCredentials, threadDataset)
 	if err != nil {
 		return err
 	}

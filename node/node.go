@@ -293,7 +293,7 @@ func New(ctx context.Context, cfg Config) (*Node, error) { //nolint:funlen // th
 	if err := n.groups.Load(ctx); err != nil {
 		return nil, fmt.Errorf("node: group state: %w", err)
 	}
-	n.br.AttachGroupMessaging(n.groups)
+	n.br.AttachGroupMessaging(n.groups) //nolint:contextcheck // the reconcile hook runs per group change, for the node's lifetime, not New's call
 	n.br.AttachAuxiliaryACL(n.groups)
 	// A bounded trace of the moments that explain a failed pairing
 	// (main.go:247-251 at b4ea1f96^).
@@ -356,7 +356,7 @@ func New(ctx context.Context, cfg Config) (*Node, error) { //nolint:funlen // th
 
 	// --- sessions, PASE, CASE (main.go:323-328 at b4ea1f96^) -------------------------
 	cm := cfg.Commissioning
-	n.sec = wireSecurity(n.br, n.st, n.root, n.caseIDs, paseParams{
+	n.sec = wireSecurity(n.br, n.st, n.root, n.caseIDs, paseParams{ //nolint:contextcheck // the handshake hooks run per session, for the node's lifetime, not New's call
 		passcode: cm.Passcode, salt: cm.Salt, iterations: int(cm.PBKDFIterations), life: n.life,
 	}, responderSessionParams(cfg.Network.TCP, cfg.MaxPathsPerInvoke, cfg.Sessions), cfg.Limits, n.logger, &n.sessionEvents)
 	n.sessionEvents.n = n
@@ -372,7 +372,7 @@ func New(ctx context.Context, cfg Config) (*Node, error) { //nolint:funlen // th
 		baseline: n.sec.pase, advert: advert, observers: n.observerList,
 		responderParams: n.sec.responderParams, life: n.life,
 	}
-	wireCommissioningWindow(n.life, n.window, n.st)
+	wireCommissioningWindow(n.life, n.window, n.st) //nolint:contextcheck // the window lives as long as the node: n.life, not New's ctx
 
 	// --- fabric hooks (main.go:362-414 at b4ea1f96^) ---------------------------------
 	// The host's observers run after each (observers.go).
@@ -384,7 +384,7 @@ func New(ctx context.Context, cfg Config) (*Node, error) { //nolint:funlen // th
 	if ceiling, found, cErr := n.st.GetMetadataCounter(ctx, store.MetadataKeyEventNumber); cErr == nil && found {
 		n.br.EventLog().SeedNumber(ceiling)
 	}
-	n.br.EventLog().SetCounterPersistence(func(ceiling uint64) {
+	n.br.EventLog().SetCounterPersistence(func(ceiling uint64) { //nolint:contextcheck // runs per event-number ceiling, for the node's lifetime
 		if err := n.st.SetMetadataCounter(context.Background(), store.MetadataKeyEventNumber, ceiling); err != nil {
 			n.logger.Warn("eventlog.persist_ceiling", slog.Any("err", err))
 		}
@@ -392,7 +392,7 @@ func New(ctx context.Context, cfg Config) (*Node, error) { //nolint:funlen // th
 
 	// --- the client stack and the binding manager (brief AO) -------------
 	if cfg.Client != nil {
-		if n.client, err = n.newClientStack(); err != nil {
+		if n.client, err = n.newClientStack(); err != nil { //nolint:contextcheck // the client stack runs for the node's lifetime, not New's call
 			return nil, err
 		}
 	}

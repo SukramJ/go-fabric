@@ -577,6 +577,17 @@ func (c *Config) Validate() error {
 	} else if at.Files == nil && at.BlockCommissioningOnError {
 		errs = append(errs, errors.New("node: Attestation.BlockCommissioningOnError needs Files"))
 	}
+	errs = append(errs, c.optionalErrors()...)
+	if err := errors.Join(errs...); err != nil {
+		return fmt.Errorf("%w: %w", ErrInvalidConfig, err)
+	}
+	return nil
+}
+
+// optionalErrors checks the optional sub-systems a Config turns on: each
+// one's own required fields.
+func (c *Config) optionalErrors() []error {
+	var errs []error
 	if c.Health != nil && c.Health.Interval < 0 {
 		errs = append(errs, fmt.Errorf("node: Health.Interval %v is negative", c.Health.Interval))
 	}
@@ -597,10 +608,7 @@ func (c *Config) Validate() error {
 			errs = append(errs, err)
 		}
 	}
-	if err := errors.Join(errs...); err != nil {
-		return fmt.Errorf("%w: %w", ErrInvalidConfig, err)
-	}
-	return nil
+	return errs
 }
 
 // timeSynchronizationErrors refuses a TimeSynchronization Config beside

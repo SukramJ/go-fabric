@@ -386,7 +386,7 @@ func assemble(ctx context.Context, devices *fleet, cfg node.Config, applier *ota
 	}
 	// The app pipe's SimulateConfigurationVersionChange raises every
 	// bridged device's ConfigurationVersion, persisted by the node.
-	devices.configChange = func() error {
+	devices.configChange = func() error { //nolint:contextcheck // an app-pipe command, long after the assembly's ctx
 		keys := make([]device.SourceKey, 0, len(eps))
 		for _, ep := range eps {
 			keys = append(keys, ep.Spec().StableKey)

@@ -43,13 +43,6 @@ func (l *listeners[T]) add(fn func(T)) (unsubscribe func()) {
 	}
 }
 
-// empty reports whether no callback is registered.
-func (l *listeners[T]) empty() bool {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	return len(l.list) == 0
-}
-
 // emit runs every registered callback with v, each guarded by
 // [contain]: a panic is logged under event and the rest still run.
 func (l *listeners[T]) emit(logger *slog.Logger, event string, v T) {
