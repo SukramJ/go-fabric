@@ -694,6 +694,11 @@
       "steps": 7,
       "stepsSkipped": 8
     },
+    "EEM/2.2": {
+      "tests": 1,
+      "steps": 8,
+      "stepsSkipped": 0
+    },
     "EEVSE/2.1": {
       "steps": 27,
       "stepsSkipped": 0
@@ -766,6 +771,11 @@
       "tests": 1,
       "steps": 20,
       "stepsSkipped": 24
+    },
+    "EPM/2.2": {
+      "tests": 1,
+      "steps": 12,
+      "stepsSkipped": 0
     },
     "EPREF/2.1": {
       "tests": 1,
