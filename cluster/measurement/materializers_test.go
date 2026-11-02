@@ -59,8 +59,13 @@ func TestBuiltinMaterializersAreInstalled(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			if _, ok := contract.MeasurementMaterializerFor(tc.class); ok != tc.installed {
-				t.Errorf("MeasurementMaterializerFor(%s) installed = %v, want %v", tc.name, ok, tc.installed)
+			if ok := measurement.HasBuiltinMaterializer(tc.class); ok != tc.installed {
+				t.Errorf("built-in materializer of %s installed = %v, want %v", tc.name, ok, tc.installed)
+			}
+			// The built-ins are this package's: contract, which names no
+			// server type, reports none for them (W5-api-12).
+			if _, ok := contract.MeasurementMaterializerFor(tc.class); ok {
+				t.Errorf("contract.MeasurementMaterializerFor(%s) answers a built-in", tc.name)
 			}
 		})
 	}

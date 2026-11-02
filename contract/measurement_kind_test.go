@@ -228,21 +228,3 @@ func TestRegisterMeasurementKindRefusesAKindItCannotBuild(t *testing.T) {
 		ClusterID:  0x0402,
 	})
 }
-
-// TestSetMeasurementMaterializerRejectsANonBuiltinClass holds the seam
-// to its stated scope: it completes the classes this library declares as
-// constants, and a host kind carries its materialiser through
-// RegisterMeasurementKind instead.
-func TestSetMeasurementMaterializerRejectsANonBuiltinClass(t *testing.T) {
-	t.Parallel()
-
-	defer func() {
-		if recover() == nil {
-			t.Fatal("SetMeasurementMaterializer accepted a class outside the built-in range")
-		}
-	}()
-	contract.SetMeasurementMaterializer(
-		contract.MeasurementClass(1<<20),
-		func(any, contract.MeasurementContext) []contract.ClusterServer { return nil },
-	)
-}

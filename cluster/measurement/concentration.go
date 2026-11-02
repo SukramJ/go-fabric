@@ -149,6 +149,6 @@ func concentrationMaterializers() {
 		contract.MeasurementTVOC:  func(f contract.FloatMeasurementSource) contract.ClusterServer { return NewTVOCConcentrationServer(f) },
 		contract.MeasurementRadon: func(f contract.FloatMeasurementSource) contract.ClusterServer { return NewRadonConcentrationServer(f) },
 	} {
-		contract.SetMeasurementMaterializer(class, airQualityServers(class, build))
+		setMaterializer(class, airQualityServers(class, build))
 	}
 }

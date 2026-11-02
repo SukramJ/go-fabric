@@ -431,50 +431,18 @@ func MeasurementKindFor(class MeasurementClass) (kind MeasurementKind, ok bool) 
 	return kind, ok
 }
 
-// MeasurementMaterializerFor returns the materialiser registered for a
-// class. ok is false for an unregistered class and for a built-in that
-// has no cluster surface of its own — see
-// [SetMeasurementMaterializer] for which three those are — and the
-// cluster layer turns that into "mount nothing".
+// MeasurementMaterializerFor returns the materialiser a host registered
+// for its class ([RegisterMeasurementKind]). ok is false for an
+// unregistered class and for every built-in class: the built-ins'
+// clusters are built by cluster/measurement (FromMeasurementClass),
+// which owns their constructors — this package names no server type, so
+// the boundary stays the standard library's alone (W5-api-12).
 func MeasurementMaterializerFor(class MeasurementClass) (m MeasurementMaterializer, ok bool) {
 	kind, found := MeasurementKindFor(class)
 	if !found || kind.Materialize == nil {
 		return nil, false
 	}
 	return kind.Materialize, true
-}
-
-// SetMeasurementMaterializer completes one of the built-in classes
-// declared above with the function that builds its clusters.
-//
-// It exists because the dependency runs one way: the constructors for
-// those clusters live in
-// [github.com/SukramJ/go-fabric/cluster/measurement], which imports this
-// package, so the built-in half of the registry is filled in from there
-// at init time instead of being declared here. Host-defined kinds never
-// need it — they carry their materialiser into
-// [RegisterMeasurementKind].
-//
-// Three built-ins are deliberately left without one, and the lookups
-// report them as having none: MeasurementNone has no Matter projection
-// by design, and MeasurementPower / MeasurementEnergy are folded into
-// one MeasurementElectrical group before an endpoint is built.
-//
-// Panics for a nil materialiser and for a class outside the built-in
-// range: both mean the caller is wiring something this seam does not
-// describe, and both are decidable at the call site.
-func SetMeasurementMaterializer(class MeasurementClass, m MeasurementMaterializer) {
-	if m == nil {
-		panic("contract: SetMeasurementMaterializer: nil materializer")
-	}
-	if class < 0 || class >= measurementClassBuiltinEnd {
-		panic(fmt.Sprintf("contract: SetMeasurementMaterializer: class %d is not a built-in; host kinds carry their materializer through RegisterMeasurementKind", class))
-	}
-	measurementKindsMu.Lock()
-	defer measurementKindsMu.Unlock()
-	kind := measurementKinds[class]
-	kind.Materialize = m
-	measurementKinds[class] = kind
 }
 
 // builtinMeasurementKinds is the library's own half of the registry:

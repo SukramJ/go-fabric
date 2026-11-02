@@ -136,7 +136,7 @@ func TestSoilMeasurementIsReadOnlyAndHasNoCommands(t *testing.T) {
 // limits mounts SoilMeasurement, a plain float source mounts nothing.
 func TestSoilMoistureMaterializes(t *testing.T) {
 	t.Parallel()
-	m, ok := contract.MeasurementMaterializerFor(contract.MeasurementSoilMoisture)
+	m, ok := builtinMaterializers[contract.MeasurementSoilMoisture]
 	if !ok {
 		t.Fatal("no materialiser for MeasurementSoilMoisture")
 	}
