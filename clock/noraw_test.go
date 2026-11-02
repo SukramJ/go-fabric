@@ -32,7 +32,7 @@ type rawTimeException struct {
 // rawTimeExceptions are keyed "path/to/file.go:Func". The goal is an
 // empty list; every entry names the reason a clock.Clock cannot stand in.
 var rawTimeExceptions = map[string]rawTimeException{
-	"mdns/subtype_responder.go:Now": {2, "the two receive loops' socket read deadlines " +
+	"mdns/socket.go:Now": {2, "the two receive loops' socket read deadlines " +
 		"(SetReadDeadline): the kernel judges a deadline against the wall clock, so a " +
 		"fake clock's instant would expire it at once and spin the loop; the deadline " +
 		"only bounds a blocking read so the loop can see its done channel"},

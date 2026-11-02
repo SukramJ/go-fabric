@@ -41,7 +41,7 @@ var virtualIfacePrefixes = []string{
 
 // isVirtualInterfaceName reports whether name looks like a container /
 // virtualisation bridge whose addresses are not routable from peers. It is
-// the default [Zeroconf.InterfaceFilter].
+// the default [Responder.InterfaceFilter].
 func isVirtualInterfaceName(name string) bool {
 	n := strings.ToLower(name)
 	for _, p := range virtualIfacePrefixes {

@@ -756,21 +756,6 @@ func TestBuildCommissionableService_EmptyHostName_UsesDefault(t *testing.T) {
 	}
 }
 
-// ---- SubtypeResponder nil-receiver guard ----
-
-// TestSubtypeResponder_NilReceiver_AddRemove_NoOp verifies that calling methods on a
-// nil *SubtypeResponder is safe (nil guards).
-func TestSubtypeResponder_NilReceiver_AddRemove_NoOp(t *testing.T) {
-	t.Parallel()
-	var r *mdns.SubtypeResponder
-	// Should not panic.
-	r.AddSubtype("_L1._sub._matterc._udp.local.", "inst._matterc._udp.local.")
-	r.RemoveSubtype("_L1._sub._matterc._udp.local.")
-	if err := r.Close(); err != nil {
-		t.Fatalf("nil Close: %v", err)
-	}
-}
-
 // TestEnsureTrailingDot_Via_SubtypeHelpers verifies ensureTrailingDot is exercised
 // when a non-dotted string is passed to AddSubtype/RemoveSubtype, through
 // the exported constructor path. We use the Noop advertiser — no socket.

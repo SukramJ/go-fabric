@@ -31,9 +31,10 @@ import (
 // host name so it is stable across restarts.
 //
 // On macOS the OS host name is kept: there mDNSResponder owns the host's
-// address records, and a separate name published through the zeroconf
-// library was observed to lose its A/AAAA records, so Apple Home tore the
-// fabric down after CommissioningComplete (see zeroconf.go Publish). That
+// address records, and a separately published name was observed to lose
+// its A/AAAA records, so Apple Home tore the fabric down after
+// CommissioningComplete; the [Responder] leaves the address records of
+// the OS host name to the OS responder. That
 // is a recorded divergence (notes/parity/by_design.md, mDNS host name on
 // macOS); a product certifies on its own platform.
 func defaultHostName() string {
