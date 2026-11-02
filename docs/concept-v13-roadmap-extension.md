@@ -144,16 +144,20 @@ Milestone; §E.1 ordnet ihn ein.
    Register; Fuzz-Ziele kommen dort hinzu, wo eine Tranche einen Decoder
    berührt.
 
-## E. Owner-Entscheidungen
+## E. Owner-Entscheidungen (2026-11-02)
 
-Offen, Wizard 2026-11-02:
-
-1. Reihenfolge der Milestones 7 (BLE-Geräteseite), 8, 9, 10.
-2. Phase 29: Go-Controller im Harness als Treiber der matter.js-Fälle
-   (Empfehlung) — oder chip-tool-Schritte überall.
-3. Phase 37: welche Konsumenten-Features.
-4. U3: Graph-Bibliothek `@xyflow/svelte` (MIT, das Svelte-Pendant zu
-   matter-hubs ReactFlow) — oder eigenes SVG.
+1. **Reihenfolge: M8 → M10 → M9 → M7.** Erst die Beweise, dann die
+   Feature-Reste auf der gesicherten Basis, dann die UI mit Vertrag 0.3.0,
+   die BLE-Geräteseite zuletzt (kein Konsument).
+2. **Phase 29 treibt die matter.js-Fälle mit dem Go-Controller** im Harness
+   (die TH-Rolle wie matter.js' `certTest`); chip-tool nur dort, wo
+   matter.js es selbst nutzt.
+3. **Phase 37 nimmt alle vier Gruppen:** Descriptor TAGLIST; Konzentrations-
+   LEV/MED/CRI/PEA/AVG und AirQuality-Stufen; ClosureControl LT/IS/SP/CL und
+   Valve LVL/TS; Thermostat TSUGGEST, GeneralCommissioning TC, LevelControl
+   FQ, ColorControl-Primaries — jede als Ahead-Zeile mit chip-Quelle.
+4. **U3 mit eigenem SVG**, ohne Graph-Bibliothek (passt zum Kit; eine
+   Welle mehr, keine Abhängigkeit).
 
 ## F. Was das Konzept nicht tut
 

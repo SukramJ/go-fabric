@@ -101,6 +101,14 @@ one none uses, and both come before completeness for its own sake.
 | 5 | [ICD and the controller remainder](#milestone-5-icd-and-the-controller-remainder) | `v0.12.0` (23–24), `v0.13.0` (25) | 23–25 | battery devices stay reachable; the controller pushes firmware and uses TCP |
 | 6 | [Completeness](#milestone-6-completeness) | `v0.14.0` | 26–27 | 135/135 clusters, 91/91 device types, every matter.js row of the comparison closed |
 | 7 | [BLE on the device side](#milestone-7-ble-on-the-device-side) | not yet assigned | 28 | a node of this module without a network is commissioned over BLE, as matter.js's `nodejs-ble` node is |
+| 8 | [Proof](#milestone-8-proof) | `v0.17.0` | 29–35 | what is automatable runs: the 68 certification cases matter.js automated, the four defects, 644 more matter.js cases, the families without a run, no sleep-driven test |
+| 9 | [View](#milestone-9-view) | go-fabric-ui `0.3.0`, contract `0.3.0` | U3–U5 | topology, live device details and an operator's diagnostics in the UI, from data the module already has |
+| 10 | [The rest of the standard](#milestone-10-the-rest-of-the-standard) | `v0.18.0` | 36–39 | the features matter.js serves and we refuse; the consumer features after chip; the 1.7 pin when matter.js moves |
+
+Milestones 8–10 are [concept v13](https://github.com/SukramJ/go-fabric/blob/main/docs/concept-v13-roadmap-extension.md)
+(2026-11-02, German while current); the owner's order of the same day is
+**8 → 10 → 9 → 7**: the proof first, the feature remainder on that base,
+the UI with its contract, the BLE device side last.
 
 Milestones 2 and 3 are the owner's order of 2026-10-17: the test
 foundation first, because milestones 3–7 are proved on it; the behaviour
@@ -327,8 +335,9 @@ stay open. **Milestone 6 is closed with `v0.14.0`.**
 (the *Ahead of matter.js* elements composed only when their register ID is
 enabled, the surface snapshot and its digest, the specification level) and
 fixes. The whole-codebase review of 2026-11 followed in six fix pull
-requests (`notes/review/2026-11/`). Milestone 7 keeps its content; its
-version is assigned when it is planned.
+requests (`notes/review/2026-11/`) and closed with `v0.16.0` (2026-11-02).
+Milestone 7 keeps its content; its version is assigned when it is planned,
+after milestones 8–10 (owner order 2026-11-02).
 
 ### Milestone 7: BLE on the device side
 
@@ -343,6 +352,43 @@ without a network at first boot — none of the current bridges.
 
 **Done when.** The comparison's BLE row is ✅ for both roles; the DD and
 SC BLE cases run.
+
+### Milestone 8: Proof
+
+| Phase | Content | Proof |
+| --- | --- | --- |
+| 29 | the 68 certification cases matter.js automated in `support/chip-testing/test/cert/` (862ad75f) ported by meaning into the harness, the Go controller in the TH role (`internal/chiptool/gocontroller_test.go`), chip-tool only where matter.js uses it; 45 of them are "manual" rows of the status page today | harness-class cases 167 → ≤ 120; each ported case cites its TS source |
+| 30 | the four class-(a) defects (TC-CNET-4.1/4.4/4.9: committed Wi-Fi networks persist; TC-EEVSE-2.3: the list decoder's RESOURCE_EXHAUSTED before CONSTRAINT_ERROR) and the three real-controller proofs the comparison still owes: group messaging (chip-tool `groupcast` leg), subscription re-establishment after a chip-tool restart, per-attribute timed writes (`schema/timed.go`) | 0 class (a); comparison rows ✅ or `by_design` |
+| 31 | the server tranche of the matter.js port: `ServerNodeTest`, `InteractionProtocolTest`, `ServerSubscriptionTest`, `SuppressResponseTest`, the validation family (`DeviceTypeConformance*`, `RuntimeValidation`, `StandardDeviceTypeCorpus`, `ValueValidator`, `constraint`, `ValidatedElements`) — 332 cases | missing ratchet 1140 → ≤ 810 |
+| 32 | the controller and protocol tranche: `ClientNodeTest`, `ClientSubscribeTest`, `ClientEventNotificationTest`, `IcdClientTest`, `DclOtaUpdateServiceTest`, `CertificatesTest` and `PqcAttestationCertificatesTest`, `SessionManagerTest`, `OtaTest` — 312 cases (the certificate and session files on the security path) | missing ≤ 500 |
+| 33 | new register roots: `packages/types/test/tlv`, `packages/general/test/net`, `packages/general/test/codec`, `packages/model/test/aspects`, `packages/types/test/schema`, `packages/general/test/crypto`; the rest of `general`, `model` and `nodejs` excluded with a reason | roots in `matterjs_tests.json`, ratchets set |
+| 34 | a second composition profile of the reference daemon so the families without a run can run: WEBRTCP, AVSM, PAVST, AVANALY, TLSCERT, ZONEMGMT, CHIME, JFADMIN, JFDS, TBRM (against the virtual OTBR), DGTHREAD, THNETDIR | 31 prefixes without a family → ≤ 8, the rest classified |
+| 35 | determinism: `time.Sleep` outside `synctest` moves to clock seams, the stress-flake list empties, the `err == nil`-only refusals get status assertions, the mdns and endpoint skips are justified or gone | nightly `stress-flakes` empty; a sleep ratchet |
+
+**Value.** The status page stops calling automatable cases manual; the in-process proofs get their real-controller counterpart; the port backlog halves. Every later milestone is proved on this.
+
+### Milestone 9: View
+
+Planned in go-fabric-ui (concept U3 there, like U1 and U2); this page records the module side and the contract.
+
+| Phase | Content | Proof |
+| --- | --- | --- |
+| U3 | topology: the node family's graph aggregator → bridged devices → parts with fabrics and their sessions and subscriptions (data: `Topology()`, `FabricInfos`, `SessionDiagnostics`, `Subscriptions()`), the controller family's network graph from the server's `get_network_topology` (Thread role, RLOC16, LQI/RSSI; Wi-Fi SSID/BSSID), own SVG, no graph library | contract 0.3.0 (additive), golden fixtures |
+| U4 | device details: per endpoint the device type with revision, clusters with revision and feature map, the attribute inventory with live values, events, parts, tags, reachability, the host's surface decision; on the controller side an inventory tab, an event log, decoded feature maps | contract 0.3.0; the two detail pages |
+| U5 | operation: live status, a diagnostics page with log level, log stream and `ping_node`, the camera QR scan in commissioning, ecosystem hints in pairing, node pages for every node on the server, Playwright end-to-end per page | e2e green; README and contract version current |
+
+**Value.** The data the module and the server already hold becomes an operator's view: who is connected to whom, what a device does now.
+
+### Milestone 10: The rest of the standard
+
+| Phase | Content | Proof |
+| --- | --- | --- |
+| 36 | the parity features (matter.js serves them, this module refuses them): DoorLock FACE, AdministratorCommissioning BC, OccupancySensing beyond PIR with `OccupancyChanged`, PowerSource WIRED/RECHG/REPLC | comparison rows ✅; DRLK, CADMIN, OCC, PS families |
+| 37 | the consumer features after chip (owner decision 2026-11-02, all four groups): Descriptor TAGLIST; concentration LEV/MED/CRI/PEA/AVG and the AirQuality levels; ClosureControl LT/IS/SP/CL and Valve LVL/TS; Thermostat TSUGGEST, GeneralCommissioning TC, LevelControl FQ, ColorControl primaries — each an *Ahead of matter.js* row | Ahead rows, chip families green |
+| 38 | the protocol remainder, consumer-driven: the OTA requestor over HTTPS, the BTP renegotiation after a stall, the trusted-time-source client, the Fabric Sync remainder; ARL and NFC stay non-goals | comparison rows |
+| 39 | the 1.7 pin when matter.js's snapshot moves (chip's `data_model/1.7`: 12 clusters, 13 device types beyond the snapshot): pin lift, generators, `chipdm-check` 1.7; nothing before | the weekly `matterjs-pin` job reports the jump |
+
+**Value.** The premise's remainder, in the premise's order: matter.js's features first, the consumers' features with chip as the authority, the next revision when the gold standard moves.
 
 ## Standing work, outside the milestones
 
