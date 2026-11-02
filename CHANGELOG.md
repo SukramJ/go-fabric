@@ -113,6 +113,9 @@ Findings of the whole-codebase review of 2026-11-01 (`notes/review/2026-11/`).
 - `controller/dcl`: a ledger version record without `maxApplicableSoftwareVersion` has no upper bound (`MaxApplicableSoftwareVersion` is `math.MaxUint32`), as matter.js skips an undefined maximum; it read as 0 and the update was never offered (W4-ctlint-06).
 - `bdx/otaimage`: `ReadHeader` refuses a header over `MaxHeaderSize` (1024 bytes, connectedhomeip's `kMaxHeaderSize`) as `ErrInvalid` before reading it — an ahead-of-matter.js row in `notes/parity/by_design.md` (W4-ctlint-07); a short or failing read wraps the underlying error, so `errors.Is` sees `io.ErrUnexpectedEOF` or the transport's error (W4-ctlint-14).
 - `controller/softwareupdate`: an OTA file designator is matched case-insensitively, as matter.js's `OTA_FILENAME_REGEX` is, and an upper-case mode reads as its `Mode` (W4-ctlint-08).
+- `controller/dcl`, `thread/otbr`: the ledger, GitHub and border-router answers are read through a 16 MiB bound and a paginated ledger listing stops after 1000 pages; a misbehaving endpoint was buffered whole (W4-ctlint-10).
+- `controller/dcl`: `CertificateStore.Close` cancels a running periodic update before it waits for it; a shutdown during the daily update waited for every remaining root to be fetched or time out (W4-ctlint-12).
+- Docs: ADR 0027, the `thread/otbr` package doc and the Thread Border Router guide state that the OTBR REST link is plaintext and belongs on a trusted LAN (W4-ctlint-11); the `ble/esphome` package doc, the BLE proxies guide and `BD-Controller-BleOverEsphomeProxies` name the silence watch's false positive in a BLE-quiet place and its remedy, a longer `Options.SilenceTimeout` (W4-ctlint-13).
 
 ## [0.15.6] — 2026-11-01
 

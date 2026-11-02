@@ -8,6 +8,9 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"net/http/httptest"
+	"net/url"
+	"strconv"
 	"testing"
 	"time"
 
@@ -241,5 +244,28 @@ func TestBorderRouterVersionFromItsRecord(t *testing.T) {
 	d, _ := br.Diagnostics(context.Background())
 	if len(d.Mesh) != 2 {
 		t.Errorf("mesh %+v", d.Mesh)
+	}
+}
+
+// TestResponseBodyBounded (W4-ctlint-10): an answer over maxResponseBody
+// fails the request instead of being buffered whole; matter.js reads the
+// whole answer (OtbrRestClient.ts:757-788).
+func TestResponseBodyBounded(t *testing.T) {
+	t.Parallel()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"State":"`))
+		_, _ = w.Write(bytes.Repeat([]byte("x"), maxResponseBody))
+		_, _ = w.Write([]byte(`"}`))
+	}))
+	t.Cleanup(srv.Close)
+	u, _ := url.Parse(srv.URL)
+	port, _ := strconv.Atoi(u.Port())
+	c, err := NewClient(Config{Host: u.Hostname(), Port: port, Timeout: 5 * time.Second})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := c.Node(context.Background()); err == nil {
+		t.Fatal("an answer over maxResponseBody was read")
 	}
 }

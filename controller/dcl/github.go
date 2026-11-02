@@ -197,5 +197,6 @@ func (d *githubDir) fetch(ctx context.Context, url string) ([]byte, error) {
 	if resp.StatusCode != http.StatusOK {
 		return nil, &gitHubHTTPError{msg: fmt.Sprintf("HTTP error %s (%d) from %s", http.StatusText(resp.StatusCode), resp.StatusCode, url), status: resp.StatusCode}
 	}
-	return io.ReadAll(resp.Body)
+	// Bounded as the ledger's answers are (maxResponseBody, W4-ctlint-10).
+	return io.ReadAll(http.MaxBytesReader(nil, resp.Body, maxResponseBody))
 }

@@ -3678,7 +3678,12 @@ the raw advertisement bytes, takes the ATT MTU from
 from the proxies' free connection slots. A proxy has one API subscriber;
 the central logs `ble.esphome.proxy_taken`, reconnects once after 30 s of
 silence and reports `ErrProxyBusy` on a second silence, cleared by the
-next fresh scan. Reasoning: a host without a Bluetooth adapter commissions
+next fresh scan. The silence counts advertisements of any kind, so in a
+BLE-quiet environment (a shielded lab, a remote site) a proxy nobody else
+uses is presumed taken too — a false positive the host answers by raising
+`Options.SilenceTimeout` (`ble/esphome/central.go`, `DefaultSilenceTimeout`;
+documented in the package doc and `docs/guides/ble-proxies.md`,
+W4-ctlint-13). Reasoning: a host without a Bluetooth adapter commissions
 through the proxies a Home Assistant site already has; neither reference
 offers this, so there is no behaviour to mirror and no marker to watch.
 
