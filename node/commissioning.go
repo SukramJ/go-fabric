@@ -56,6 +56,9 @@ type commissioningHost struct {
 	// observers lists the host's observers, Config.Observers first
 	// (Node.observerList); nil: none.
 	observers func() []Observers
+	// life is the node's lifetime (Node.life), the context of a window
+	// PASE session's auto-armed fail-safe.
+	life context.Context
 
 	// basicMu guards basic.
 	basicMu sync.Mutex
@@ -351,7 +354,7 @@ func (h *commissioningHost) InstallVerifier(verifier []byte, iterations uint32, 
 // (InstallVerifier) and [Node.OpenBasicWindow]'s credentials take.
 func (h *commissioningHost) installVerifierContext(vc *spake2.VerifierContext, iterations uint32, salt []byte) (restore func()) {
 	provider := bridge.NewPerExchangePaseProvider(func() *bridge.PaseAdapter {
-		adapter, err := buildPaseAdapterFromContext(h.sessions, h.root, vc, salt, int(iterations), h.responderParams)
+		adapter, err := buildPaseAdapterFromContext(h.life, h.sessions, h.root, vc, salt, int(iterations), h.responderParams)
 		if err != nil {
 			h.logger.Warn("pase.window.build_failed", slog.Any("err", err))
 			return nil

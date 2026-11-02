@@ -354,7 +354,7 @@ func New(ctx context.Context, cfg Config) (*Node, error) { //nolint:funlen // th
 	// --- sessions, PASE, CASE (main.go:323-328 at b4ea1f96^) -------------------------
 	cm := cfg.Commissioning
 	n.sec = wireSecurity(n.br, n.st, n.root, n.caseIDs, paseParams{
-		passcode: cm.Passcode, salt: cm.Salt, iterations: int(cm.PBKDFIterations),
+		passcode: cm.Passcode, salt: cm.Salt, iterations: int(cm.PBKDFIterations), life: n.life,
 	}, responderSessionParams(cfg.Network.TCP, cfg.MaxPathsPerInvoke, cfg.Sessions), cfg.Limits, n.logger)
 	n.wireICD()
 
@@ -366,7 +366,7 @@ func New(ctx context.Context, cfg Config) (*Node, error) { //nolint:funlen // th
 	n.window = &commissioningHost{
 		br: n.br, sessions: n.sec.sessions, root: n.root, logger: n.logger,
 		baseline: n.sec.pase, advert: advert, observers: n.observerList,
-		responderParams: n.sec.responderParams,
+		responderParams: n.sec.responderParams, life: n.life,
 	}
 	wireCommissioningWindow(n.life, n.window, n.st)
 

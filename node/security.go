@@ -580,6 +580,9 @@ type paseParams struct {
 	passcode   uint32
 	salt       []byte
 	iterations int
+	// life is the node's lifetime: the fail-safe a PASE session arms
+	// lives under it, so Stop ends its watcher.
+	life context.Context
 }
 
 // buildPaseAdapter wires one PASE exchange end to end: PBKDF parameters out,
@@ -594,13 +597,18 @@ func buildPaseAdapter(sessions *operational.Manager, root *RootClusters, p paseP
 	if err != nil {
 		return nil, fmt.Errorf("spake2 verifier context: %w", err)
 	}
-	return buildPaseAdapterFromContext(sessions, root, vc, p.salt, p.iterations, responderParams)
+	return buildPaseAdapterFromContext(p.life, sessions, root, vc, p.salt, p.iterations, responderParams)
 }
 
 // buildPaseAdapterFromContext is the passcode-independent half of
 // buildPaseAdapter, shared with the enhanced commissioning window, whose
 // verifier arrives precomputed from the commissioner (commissioning.go).
-func buildPaseAdapterFromContext(sessions *operational.Manager, root *RootClusters, vc *spake2.VerifierContext, salt []byte, iterations int, responderParams *sessionparams.Parameters) (*bridge.PaseAdapter, error) {
+//
+// life is the node's lifetime, under which the PASE auto-armed fail-safe's
+// expiry watcher runs (cluster/core GeneralCommissioning
+// watchFailSafeExpiry): [Node.Stop] cancels it, so a stopped node leaves
+// no watcher behind (W5-ex-06).
+func buildPaseAdapterFromContext(life context.Context, sessions *operational.Manager, root *RootClusters, vc *spake2.VerifierContext, salt []byte, iterations int, responderParams *sessionparams.Parameters) (*bridge.PaseAdapter, error) {
 	sessionID, err := sessions.AllocateID()
 	if err != nil {
 		return nil, fmt.Errorf("allocate PASE session id: %w", err)
@@ -635,7 +643,7 @@ func buildPaseAdapterFromContext(sessions *operational.Manager, root *RootCluste
 		root.OperationalCredentials.SetAttestationChallenge(entry.AttestationChallenge)
 		// Matter §11.10.5.2 floor: arm a fail-safe if the commissioner has
 		// not, so an abandoned attempt still rolls back.
-		root.GeneralCommissioning.AutoArmOnPaseEstablished(context.Background())
+		root.GeneralCommissioning.AutoArmOnPaseEstablished(life)
 		return nil
 	})
 	return adapter, nil

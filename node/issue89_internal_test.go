@@ -9,6 +9,7 @@ package node
 // them on the SessionManager.
 
 import (
+	"context"
 	"log/slog"
 	"testing"
 
@@ -68,7 +69,7 @@ func TestResponderSessionParamsCarryTCP(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			pa, err := buildPaseAdapterFromContext(sessions, &RootClusters{}, vc, []byte("SPAKE2P Key Salt"), 1000, p)
+			pa, err := buildPaseAdapterFromContext(context.Background(), sessions, &RootClusters{}, vc, []byte("SPAKE2P Key Salt"), 1000, p)
 			if err != nil {
 				t.Fatal(err)
 			}
