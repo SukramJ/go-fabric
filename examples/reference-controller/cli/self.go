@@ -74,7 +74,7 @@ func (s *stack) ownNodeConfig() *controller.OTAConfig {
 func startSelf(ctx context.Context, spec controller.OwnNodeSpec) (controller.OwnNode, *net.UDPAddr, error) {
 	cfg := controllernode.Config(spec)
 	cfg.Network.PreferIPv4 = isIPv4Listen(cfg.Network.Listen)
-	n, err := node.New(cfg) //nolint:contextcheck // node.New takes no context
+	n, err := node.New(ctx, cfg)
 	if err != nil {
 		return nil, nil, err
 	}

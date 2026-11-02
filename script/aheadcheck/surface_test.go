@@ -212,7 +212,7 @@ func measureTimeSynchronization(t *testing.T, row string, with bool) surface.Clu
 	if with {
 		cfg.TimeSynchronization = &node.TimeSynchronizationConfig{Features: tsdef.Feature(core.TimeSynchronizationAhead[row].Features)}
 	}
-	n, err := node.New(cfg)
+	n, err := node.New(context.Background(), cfg)
 	if err != nil {
 		t.Fatalf("%s: %v", row, err)
 	}

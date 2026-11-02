@@ -78,7 +78,7 @@ func (b *bridge) doorMoved(closed bool) error {
 
 // newNode builds the node with both devices under its Aggregator.
 func newNode(ctx context.Context, cfg node.Config, b *bridge) (*node.Node, error) {
-	n, err := node.New(cfg) //nolint:contextcheck // the node's constructor takes no context
+	n, err := node.New(ctx, cfg)
 	if err != nil {
 		return nil, err
 	}
@@ -219,7 +219,7 @@ A stored endpoint number is never dropped because its device is absent:
 a device a previous run served keeps its number until it returns, and a
 device the host removes keeps it too (`Remove`). `Forget` frees it, for a
 device that is gone for good. On an error path the node is stopped: `New`
-already started its engine.
+opened the store.
 
 A host whose devices come from several sources that load on their own
 gives each a partition: `Aggregator().Partition(name)` has the same

@@ -54,8 +54,9 @@ func (n *Node) defaultAdvertiser() mdns.Advertiser {
 			slog.String("hint", "discriminator-filtered browse will find nothing"))
 		return zc
 	}
-	responder.Start(n.life)
-	// Zeroconf.Close closes the attached responder.
+	// Started by Node.Start, so New starts no goroutine; Zeroconf.Close
+	// closes the attached responder, started or not.
+	n.subtypeResponder = responder
 	zc.AttachSubtypeResponder(responder)
 	return zc
 }

@@ -109,7 +109,7 @@ func groupLiveNode(t *testing.T, name string) (*node.Node, *onoff.Server) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = db.Close() })
-	n, err := node.New(node.Config{
+	n, err := node.New(context.Background(), node.Config{
 		Network:            node.Network{Listen: "127.0.0.1:0", PreferIPv4: true},
 		Commissioning:      node.Commissioning{Passcode: groupLivePasscode, Discriminator: 3840, PBKDFIterations: 1000, Salt: []byte("SPAKE2P Key Salt")},
 		ProductDescription: node.ProductDescription{VendorID: 0xFFF1, ProductID: 0x8001},

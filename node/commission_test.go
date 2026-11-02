@@ -218,7 +218,7 @@ func TestSubscriptionSurvivesRestart(t *testing.T) {
 		t.Fatalf("Stop: %v", err)
 	}
 
-	second, err := node.New(minimalConfig(openDB(t, path)))
+	second, err := node.New(ctx, minimalConfig(openDB(t, path)))
 	if err != nil {
 		t.Fatalf("New on the same database: %v", err)
 	}

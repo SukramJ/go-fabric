@@ -168,7 +168,7 @@ func liveNode(t *testing.T, name string, edit func(*node.Config)) *node.Node {
 	if edit != nil {
 		edit(&cfg)
 	}
-	n, err := node.New(cfg)
+	n, err := node.New(context.Background(), cfg)
 	if err != nil {
 		t.Fatal(err)
 	}

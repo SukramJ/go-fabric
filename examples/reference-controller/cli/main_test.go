@@ -96,7 +96,7 @@ func startHarness(t *testing.T, edit func(*node.Config)) *harness {
 	if edit != nil {
 		edit(&cfg)
 	}
-	n, err := node.New(cfg)
+	n, err := node.New(context.Background(), cfg)
 	if err != nil {
 		t.Fatal(err)
 	}

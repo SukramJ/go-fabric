@@ -346,7 +346,7 @@ func compose(ctx context.Context, f flags, logger *slog.Logger, passcode uint32,
 // the app pipe's configuration-version change, and the node-level
 // providers that name endpoints by StableKey.
 func assemble(ctx context.Context, devices *fleet, cfg node.Config, applier *otaApplier) (*node.Node, error) {
-	n, err := node.New(cfg) //nolint:contextcheck // the node's constructor takes no context; it loads the stores once
+	n, err := node.New(ctx, cfg)
 	if err != nil {
 		return nil, err
 	}

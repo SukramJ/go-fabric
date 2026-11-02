@@ -114,7 +114,7 @@ func TestNodeClientStack(t *testing.T) {
 
 	bad := minimalConfig(openDB(t, filepath.Join(t.TempDir(), "bad.db")))
 	bad.Client = node.Client{Enabled: true, Listen: "not an address", Names: silentNames(t)}
-	if _, err := node.New(bad); err == nil {
+	if _, err := node.New(ctx, bad); err == nil {
 		t.Fatal("New accepted an unusable client address")
 	}
 }

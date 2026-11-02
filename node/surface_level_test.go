@@ -34,7 +34,7 @@ const groupcastID uint32 = 0x0065
 func TestNodeRejectsAnUnknownLevel(t *testing.T) {
 	cfg := minimalConfig(openDB(t, filepath.Join(t.TempDir(), "level.db")))
 	cfg.Surface = surface.Policies{Level: "1.5"}
-	if _, err := node.New(cfg); !errors.Is(err, surface.ErrUnknownLevel) {
+	if _, err := node.New(context.Background(), cfg); !errors.Is(err, surface.ErrUnknownLevel) {
 		t.Fatalf("node.New at level 1.5: %v", err)
 	}
 }

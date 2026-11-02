@@ -211,7 +211,7 @@ func (d *Device) Start(ctx context.Context) error {
 		}
 	}()
 	cfg := d.config()
-	n, err := node.New(cfg) //nolint:contextcheck // node.New takes no context; the node's own work runs on its own
+	n, err := node.New(ctx, cfg)
 	if err != nil {
 		return fmt.Errorf("node: %w", err)
 	}

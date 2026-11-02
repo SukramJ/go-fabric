@@ -379,7 +379,6 @@ func responderSessionParams(tcp bridge.TCPConfig, maxPathsPerInvoke uint16, inte
 // drops every PBKDFParamRequest at debug level and the commissioner just
 // times out.
 func wireSecurity(
-	ctx context.Context,
 	br *bridge.Bridge,
 	st store.Port,
 	root *RootClusters,
@@ -445,7 +444,6 @@ func wireSecurity(
 	br.AttachAckTracker(mrp.NewAckTracker(mrp.DefaultStandaloneAckDelay))
 
 	subs := subscription.NewManager(limits.subscriptionConfig(br.Clock()), br.SubscriptionReporter(), logger)
-	subs.Start(ctx)
 	subs.SetEventReporter(br.SubscriptionEventReporter())
 	br.AttachSubscriptionManager(subs)
 	// One close hook, two observers: the session's subscriptions fall
@@ -456,7 +454,6 @@ func wireSecurity(
 		br.SessionClosed(id)
 	})
 	br.AttachSessionRegistry(sessions)
-	sessions.StartReaper(ctx, operational.SessionIdleTimeout, time.Minute)
 
 	// PASE, one adapter per exchange. The session id has to be allocated
 	// before the adapter is built: it rides out in PBKDFParamResponse and
@@ -473,7 +470,6 @@ func wireSecurity(
 		return adapter
 	})
 	paseProvider.SetClock(br.Clock())
-	paseProvider.StartReaper(ctx, 30*time.Second, time.Minute)
 	// Not attached here: it accepts PASE only while the node's own
 	// commissioning window is open (commissioning.go), as matter.js sets
 	// its PASE commissioner per window (DeviceCommissioner).
@@ -490,7 +486,6 @@ func wireSecurity(
 	})
 	caseProvider.SetOnEvict(br.ForgetSigma1Replied)
 	caseProvider.SetClock(br.Clock())
-	caseProvider.StartReaper(ctx, 30*time.Second, time.Minute)
 	br.AttachCaseHandlerProvider(caseProvider.Resolve)
 
 	// Subscription persistence and re-establishment (docs/adr/0008). The
@@ -505,6 +500,17 @@ func wireSecurity(
 	br.AttachCaseInitiatorProvider(caseInitiatorProvider(st, sessions, ids, logger))
 
 	return &security{sessions: sessions, subs: subs, pase: paseProvider, casep: caseProvider, responderParams: responderParams}
+}
+
+// start runs the subscription engine and the session, PASE and CASE
+// reapers until ctx — the node's lifetime — ends or [Node.Stop] stops
+// them. [Node.Start] calls it, so [New] starts none of them (ADR 0026
+// principle 5).
+func (s *security) start(ctx context.Context) {
+	s.subs.Start(ctx)
+	s.sessions.StartReaper(ctx, operational.SessionIdleTimeout, time.Minute)
+	s.pase.StartReaper(ctx, 30*time.Second, time.Minute)
+	s.casep.StartReaper(ctx, 30*time.Second, time.Minute)
 }
 
 // caseInitiatorProvider prepares the CASE handshakes the bridge opens to

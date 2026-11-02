@@ -49,7 +49,7 @@ func startNode(t *testing.T, adv mdns.Advertiser, listen string) (*node.Node, *n
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = db.Close() })
-	n, err := node.New(node.Config{
+	n, err := node.New(context.Background(), node.Config{
 		Network:            node.Network{Listen: listen, PreferIPv4: listen == "127.0.0.1:0"},
 		Advertiser:         adv,
 		Commissioning:      node.Commissioning{Passcode: nodePasscode, Discriminator: nodeDiscriminator, PBKDFIterations: 1000, Salt: []byte("SPAKE2P Key Salt")},

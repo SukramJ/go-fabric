@@ -59,7 +59,7 @@ func minimalConfig(db *sql.DB) node.Config {
 
 func newNode(t *testing.T, cfg node.Config) *node.Node {
 	t.Helper()
-	n, err := node.New(cfg)
+	n, err := node.New(context.Background(), cfg)
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
@@ -503,7 +503,7 @@ func TestConfigValidate(t *testing.T) {
 		if err := cfg.Validate(); !errors.Is(err, node.ErrInvalidConfig) {
 			t.Errorf("%s: %v", c.name, err)
 		}
-		if _, err := node.New(cfg); !errors.Is(err, node.ErrInvalidConfig) {
+		if _, err := node.New(context.Background(), cfg); !errors.Is(err, node.ErrInvalidConfig) {
 			t.Errorf("%s: New accepted it (%v)", c.name, err)
 		}
 	}

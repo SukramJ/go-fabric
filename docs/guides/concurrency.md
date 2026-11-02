@@ -15,20 +15,22 @@ gate for these paths.
 | Datagram handlers | the read loop | one per datagram, or per session (below) | returns; `bridge.Stop` waits for them, bounded by its context |
 | TCP accept loop and one reader per connection | `bridge.Start` with `Network.TCP` | per message | `bridge.Stop` (readers and their handler calls waited for, bounded by its context) |
 | ACK pump | `bridge.Start`, when an ACK tracker is attached | every 50 ms | `bridge.Stop` |
-| Subscription engine tick | `node.New` | every 250 ms | `Node.Stop` |
+| Subscription engine tick | `Node.Start` | every 250 ms | `Node.Stop` |
 | One report per due subscription | the engine tick | at most one at a time per subscription | returns |
-| Session reaper | `node.New` | sweep every minute; evicts sessions idle for 5 minutes | `Node.Stop` (and waited for) |
-| PASE and CASE handler reapers | `node.New` | sweep every minute; evict handlers idle for 30 s | `Node.Stop` |
+| Session reaper | `Node.Start` | sweep every minute; evicts sessions idle for 5 minutes | `Node.Stop` (and waited for) |
+| PASE and CASE handler reapers | `Node.Start` | sweep every minute; evict handlers idle for 30 s | `Node.Stop` |
 | Operational-time keeper | `Node.Start` | every minute | `Node.Stop` (and waited for) |
 | DNS-SD re-announce loop | `Node.Start`, when the advertiser is an `mdns.Reannouncer` | 30 minutes by default | `Node.Stop` |
 | Session-triggered re-announce | a session event | once, bounded by the advertise timeout | `bridge.Stop` (cancelled and waited for) |
 | BDX transfer | a peer's BDX init on a secure session | one per exchange | `bridge.Stop` (cancelled and waited for, bounded by its context) |
 | BDX log transfer | a RetrieveLogsRequest answered over BDX | one at a time | `bridge.Stop` (DiagnosticLogs' `MatterQuiesce` cancels it and waits) |
-| Binding manager | `node.New` | on change | `Node.Stop` |
+| Binding manager | the first binding work (`Node.Start` registers the entries) | on change | `Node.Stop` |
 | Client stack socket | `node.New` with `Config.Client.Enabled` | per datagram | `Node.Stop` |
 
-`node.New` starts the engine and the reapers before `Start`. Call `Stop`
-on every node `New` returned, even one you never started.
+`node.New` starts no goroutine of its own (only the opt-in client stack
+opens its socket there): a node built and dropped leaks nothing it began.
+Call `Stop` on every node `New` returned all the same, even one you never
+started — it closes the store file `Store.Path` opened.
 
 Every cadence in the table runs on one clock: `node.Config.Clock`
 (`bridge.Config.Clock` for a host that builds the bridge itself), a
@@ -153,7 +155,7 @@ on every `Reassemble`, and its result is never cached.
 
 | Call | Context use |
 | --- | --- |
-| `node.New` | takes none. Its goroutines run under the node's lifetime, which `Stop` cancels |
+| `node.New(ctx, cfg)` | bounds the store open and migration, the group load and the store reads. The node's lifetime is its own: a `ctx` that ends after `New` returned ends nothing, `Stop` does |
 | `Node.Start(ctx)` | used for the start-up work (assembly, loading the stored fabrics). A cancelled `ctx` fails `Start` |
 | `Node.Run(ctx)` | starts, waits for `ctx` to end, then stops with a fresh 5-second budget |
 | `Node.Stop(ctx)` | bounds the bridge's wait for its read loop. It closes the sessions with a CloseSession each, stops the engine and reapers, withdraws the mDNS records and closes the advertiser |

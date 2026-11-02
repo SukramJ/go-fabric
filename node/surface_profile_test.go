@@ -20,7 +20,7 @@ import (
 func TestNodeRejectsAnUnknownProfile(t *testing.T) {
 	cfg := minimalConfig(openDB(t, filepath.Join(t.TempDir(), "profile.db")))
 	cfg.Surface = surface.Policies{Profiles: []string{"nope"}}
-	if _, err := node.New(cfg); !errors.Is(err, surface.ErrUnknownProfile) {
+	if _, err := node.New(context.Background(), cfg); !errors.Is(err, surface.ErrUnknownProfile) {
 		t.Fatalf("node.New with an unknown profile: %v", err)
 	}
 }

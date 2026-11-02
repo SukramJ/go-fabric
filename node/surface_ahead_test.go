@@ -37,7 +37,7 @@ func aheadNode(t *testing.T, ts *node.TimeSynchronizationConfig, p surface.Polic
 	t.Helper()
 	cfg := minimalConfig(openDB(t, filepath.Join(t.TempDir(), "ahead.db")))
 	cfg.TimeSynchronization, cfg.Surface = ts, p
-	n, err := node.New(cfg)
+	n, err := node.New(context.Background(), cfg)
 	if err == nil {
 		t.Cleanup(func() { _ = n.Stop(context.Background()) })
 	}

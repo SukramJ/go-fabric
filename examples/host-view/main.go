@@ -64,7 +64,7 @@ func (b *bridge) doorMoved(closed bool) error {
 
 // newNode builds the node with both devices under its Aggregator.
 func newNode(ctx context.Context, cfg node.Config, b *bridge) (*node.Node, error) {
-	n, err := node.New(cfg) //nolint:contextcheck // the node's constructor takes no context
+	n, err := node.New(ctx, cfg)
 	if err != nil {
 		return nil, err
 	}

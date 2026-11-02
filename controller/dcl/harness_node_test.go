@@ -30,7 +30,7 @@ func startNode(t *testing.T, chain *secattestation.Chain) *net.UDPAddr {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = db.Close() })
-	n, err := node.New(node.Config{
+	n, err := node.New(context.Background(), node.Config{
 		Network:            node.Network{Listen: "127.0.0.1:0", PreferIPv4: true},
 		Advertiser:         mdns.NewNoop(),
 		Commissioning:      node.Commissioning{Passcode: 20202021, Discriminator: 3840, PBKDFIterations: 1000, Salt: []byte("SPAKE2P Key Salt")},

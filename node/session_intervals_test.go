@@ -4,6 +4,7 @@
 package node_test
 
 import (
+	"context"
 	"errors"
 	"path/filepath"
 	"testing"
@@ -27,7 +28,7 @@ func TestNodeReportsConfiguredSessionIntervals(t *testing.T) {
 
 	bad := minimalConfig(openDB(t, filepath.Join(t.TempDir(), "b.db")))
 	bad.Sessions = &node.SessionIntervals{ActiveThreshold: 70 * time.Second}
-	if _, err := node.New(bad); !errors.Is(err, node.ErrInvalidConfig) {
+	if _, err := node.New(context.Background(), bad); !errors.Is(err, node.ErrInvalidConfig) {
 		t.Fatalf("New with a 70 s threshold: %v, want ErrInvalidConfig", err)
 	}
 }

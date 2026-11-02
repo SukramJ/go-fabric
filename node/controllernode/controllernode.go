@@ -53,7 +53,7 @@ func Config(spec controller.OwnNodeSpec) node.Config {
 // Start is node.New and Start over [Config]; the address is the node's
 // socket, loopback for an unspecified one.
 func Start(ctx context.Context, spec controller.OwnNodeSpec) (controller.OwnNode, *net.UDPAddr, error) {
-	n, err := node.New(Config(spec)) //nolint:contextcheck // node.New takes no context; the node's own work runs on its own
+	n, err := node.New(ctx, Config(spec))
 	if err != nil {
 		return nil, nil, err
 	}

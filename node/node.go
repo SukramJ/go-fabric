@@ -94,6 +94,9 @@ type Node struct {
 	// ownsAdvertiser is set when New built the advertiser (a nil
 	// Config.Advertiser), so a failed New closes it.
 	ownsAdvertiser bool
+	// subtypeResponder is the DNS-SD subtype responder of the node's own
+	// advertiser, started by Start; nil with a host's advertiser.
+	subtypeResponder *mdns.SubtypeResponder
 	// attestationErr is the load error of Attestation.Files under
 	// BlockCommissioningOnError (attestation.go).
 	attestationErr error
@@ -158,10 +161,18 @@ type Node struct {
 // SetOnReassembled stays the bridge's nil-safe hook for the host (a
 // fabric's installation is Config.Observers.OnFabricAdded).
 //
-// New starts the subscription engine and the PASE / CASE reapers, as the
-// daemon does before Start; call [Node.Stop] to end them, whether or not
-// the node was started.
-func New(cfg Config) (*Node, error) { //nolint:funlen // the composition root: one sequential wiring pass, as main.go
+// New opens and migrates the store, loads the group state and reads the
+// store under ctx, so a host bounds or cancels the construction; it
+// starts no goroutine of its own. The subscription engine, the session,
+// PASE and CASE reapers and the DNS-SD subtype responder start in
+// [Node.Start], so a node that is built and dropped leaks nothing but
+// what the host handed it (ADR 0026 principle 5). The one exception is
+// the opt-in client stack ([Config].Client), whose socket and discovery
+// cache open here. [Node.Stop] releases what New opened, whether or not
+// the node was started. ctx bounds New only: the node's lifetime is its
+// own, ended by Stop. Mirrors matter.js ServerNode.create, the awaited
+// construction (packages/node/src/node/ServerNode.ts:107-127).
+func New(ctx context.Context, cfg Config) (*Node, error) { //nolint:funlen // the composition root: one sequential wiring pass, as main.go
 	// The root's surface is decided before anything is opened or built.
 	rootDecisions, rootCandidates, err := validateAndComposeRoot(&cfg)
 	if err != nil {
@@ -179,13 +190,12 @@ func New(cfg Config) (*Node, error) { //nolint:funlen // the composition root: o
 	if cfg.Logger == nil {
 		cfg.Logger = slog.Default()
 	}
-	ctx := context.Background()
 	cfg.Clock = clock.Or(cfg.Clock)
 	n := &Node{
 		cfg: cfg, logger: cfg.Logger, advertiser: cfg.Advertiser, callbacks: newCallbackQueue(cfg.Clock), bootReason: mattercore.BootReasonPowerOnReboot,
 		attestationErr: attestationErr,
 	}
-	n.life, n.cancel = context.WithCancel(ctx)
+	n.life, n.cancel = context.WithCancel(context.WithoutCancel(ctx))
 	n.surfaceDigest = cfg.Surface.Digest()
 	n.rootDecisions, n.rootCandidates = rootDecisions, rootCandidates
 	ok := false
@@ -339,7 +349,7 @@ func New(cfg Config) (*Node, error) { //nolint:funlen // the composition root: o
 
 	// --- sessions, PASE, CASE (main.go:323-328 at b4ea1f96^) -------------------------
 	cm := cfg.Commissioning
-	n.sec = wireSecurity(n.life, n.br, n.st, n.root, n.caseIDs, paseParams{
+	n.sec = wireSecurity(n.br, n.st, n.root, n.caseIDs, paseParams{
 		passcode: cm.Passcode, salt: cm.Salt, iterations: cm.PBKDFIterations,
 	}, responderSessionParams(cfg.Network.TCP, cfg.MaxPathsPerInvoke, cfg.Sessions), cfg.Limits, n.logger)
 	n.wireICD()
@@ -726,6 +736,13 @@ func (n *Node) Start(ctx context.Context) error {
 	// one is logged.
 	if err := n.checkDataModelTest(); err != nil {
 		return err
+	}
+	// The goroutines New leaves unstarted (ADR 0026 principle 5): the
+	// subscription engine, the session, PASE and CASE reapers, the subtype
+	// responder — all bounded by the node's lifetime.
+	n.sec.start(n.life) //nolint:contextcheck // the engine and the reapers run for the node's lifetime, not the call's
+	if n.subtypeResponder != nil {
+		n.subtypeResponder.Start(n.life) //nolint:contextcheck // as above
 	}
 	if err := n.br.Start(ctx); err != nil {
 		return fmt.Errorf("node: bridge start: %w", err)

@@ -115,7 +115,7 @@ func openDB(path string) (*sql.DB, error) {
 
 // newNode builds the node and adds the light, unstarted.
 func newNode(ctx context.Context, db *sql.DB, network node.Network, adv mdns.Advertiser) (*node.Node, error) {
-	n, err := node.New(node.Config{ //nolint:contextcheck // the node's constructor takes no context
+	n, err := node.New(ctx, node.Config{
 		Network: network,
 		Commissioning: node.Commissioning{ // change all four for anything real
 			Passcode: 20202021, Discriminator: 3840,

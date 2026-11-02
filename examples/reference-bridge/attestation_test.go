@@ -55,7 +55,7 @@ func TestAttestationConfig(t *testing.T) {
 			20202021, 3840, node.TCPConfig{}, &otaApplier{dir: t.TempDir()}, nil, slog.New(slog.DiscardHandler))
 		cfg.OTA, cfg.AggregatorServers = nil, nil
 		cfg.Attestation = attestationConfig(dir)
-		n, err := node.New(cfg)
+		n, err := node.New(context.Background(), cfg)
 		if err == nil {
 			_ = n.Stop(context.Background())
 		}

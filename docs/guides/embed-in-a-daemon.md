@@ -62,7 +62,7 @@ Two fields are easy to forget:
 - `BasicInformation.SoftwareVersion` and `.SoftwareVersionString` carry the
   daemon's version, not go-fabric's.
 
-`node.New(cfg)` builds the node and binds nothing yet.
+`node.New(ctx, cfg)` builds the node and binds nothing yet; ctx bounds the store work, and none of the node's goroutines runs before `Start` (the opt-in `Config.Client` stack excepted).
 
 Commits: [`3cfa56c`](https://github.com/SukramJ/go-zendure2mqtt/commit/3cfa56c7d53387fdf83b11367964a76c378f1d29)
 (the block), [`6de3e76`](https://github.com/SukramJ/go-zendure2mqtt/commit/6de3e768459e99250cf83693451665588872567d)

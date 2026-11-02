@@ -120,7 +120,7 @@ func TestLimitsValidate(t *testing.T) {
 	} {
 		cfg := minimalConfig(openDB(t, filepath.Join(t.TempDir(), "node.db")))
 		cfg.Limits = limits
-		_, err := node.New(cfg)
+		_, err := node.New(context.Background(), cfg)
 		if !errors.Is(err, node.ErrInvalidConfig) || !strings.Contains(err.Error(), "Limits."+strings.TrimSuffix(name, "/")) {
 			t.Errorf("New with %+v = %v, want ErrInvalidConfig naming Limits.%s", limits, err, strings.TrimSuffix(name, "/"))
 		}

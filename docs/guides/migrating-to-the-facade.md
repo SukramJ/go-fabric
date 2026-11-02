@@ -52,6 +52,7 @@ facade one shape. Each row names what a host writes now.
 | `subscription.EventFiring.Timestamp`, `subscription.EventFiring.Data` | drop them: the report reads the timestamp and payload from the `EventSource` by `Number` |
 | `Node.CommissioningWindow()`, `node.CommissioningWindow` | `Node.OpenOwnWindow(ctx, timeout)`, `Node.CloseWindow(ctx)`, `Node.Window()`; the bridge type stays behind `Node.Bridge().CommissioningWindow()` |
 | `device.Options.Reachable`, `device.HostStatement.Reachable`, `device.AvailabilityProbe` | `Device.SetReachable(ctx, reachable)` on every change of the source's availability |
+| `node.New(cfg)` | `node.New(ctx, cfg)`: ctx bounds the store work; nothing runs before `Start` |
 
 ## Changed in the next release: `CommissionerReach` takes the peer
 

@@ -28,7 +28,7 @@ func mdnsTestConfig(t *testing.T) Config {
 
 func newMDNSTestNode(t *testing.T, cfg Config) *Node {
 	t.Helper()
-	n, err := New(cfg)
+	n, err := New(context.Background(), cfg)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -19,7 +19,7 @@ func TestStorePathOpensAndCloses(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "path.db")
 	cfg := minimalConfig(nil)
 	cfg.Store = node.Store{Path: path}
-	n, err := node.New(cfg)
+	n, err := node.New(ctx, cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
