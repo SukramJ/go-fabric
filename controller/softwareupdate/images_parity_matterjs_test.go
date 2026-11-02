@@ -205,3 +205,23 @@ func TestImagesStoreValidatesFileParity(t *testing.T) {
 		t.Fatalf("a valid image refused: %v", err)
 	}
 }
+
+// TestImagesFilenameCaseParity (W4-ctlint-08): a designator in upper case
+// is valid — matter.js's OTA_FILENAME_REGEX carries the `i` flag
+// (DclOtaUpdateService.ts:55) — and its mode reads as the lower-case Mode.
+func TestImagesFilenameCaseParity(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	blobs := &softwareupdate.MemoryBlobs{}
+	if err := blobs.Put(ctx, "FFF1.8000.PROD.3", image(t, 0xfff1, 0x8000, 3)); err != nil {
+		t.Fatal(err)
+	}
+	imgs := softwareupdate.NewImages(softwareupdate.ImagesConfig{Blobs: blobs})
+	found := imgs.Find(ctx, softwareupdate.FindOptions{Mode: softwareupdate.ModeProd})
+	if len(found) != 1 || found[0].Filename != "FFF1.8000.PROD.3" || found[0].Mode != softwareupdate.ModeProd {
+		t.Fatalf("Find %+v, want the upper-case prod image", found)
+	}
+	if err := imgs.Delete(ctx, "FFF1.8000.PROD.3"); err != nil {
+		t.Fatalf("Delete of an upper-case designator: %v", err)
+	}
+}

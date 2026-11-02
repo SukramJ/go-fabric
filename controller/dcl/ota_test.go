@@ -11,6 +11,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
 	"testing"
@@ -240,4 +241,30 @@ func TestOTADownloadBoundedByTheAnnouncedSize(t *testing.T) {
 	if err := o.Download(context.Background(), SoftwareVersion{OTAURL: f.url("/image.ota"), OTAFileSize: 4096}, &buf); err != nil || buf.Len() != 4096 {
 		t.Errorf("an answer of the announced size: %d bytes, %v", buf.Len(), err)
 	}
+}
+
+// TestOTAVersionWithoutMaximum (W4-ctlint-06): a ledger record without
+// maxApplicableSoftwareVersion has no upper bound — matter.js checks the
+// maximum only when it is defined (DclOtaUpdateService.ts:811-816); a
+// stated maximum still applies.
+func TestOTAVersionWithoutMaximum(t *testing.T) {
+	t.Parallel()
+	f := newFakeDCL(t)
+	img := otaImage(t, 3)
+	f.json("/dcl/model/versions/65521/32768", 200, map[string]any{"modelVersions": map[string]any{
+		"vid": 65521, "pid": 32768, "softwareVersions": []int{3}, "schemaVersion": 0,
+	}})
+	r := versionRecord(3, "https://ota.invalid/3", strconv.Itoa(len(img)), sum256(img), 1)
+	r["softwareVersionValid"], r["minApplicableSoftwareVersion"] = true, 1
+	delete(r, "maxApplicableSoftwareVersion")
+	f.json("/dcl/model/versions/65521/32768/3", 200, map[string]any{"modelVersion": r})
+	o := &OTAVersions{Client: f.client()}
+	u, ok := o.CheckForUpdate(context.Background(), 0xFFF1, 0x8000, 2, nil)
+	if !ok || u.SoftwareVersion.SoftwareVersion != 3 || u.SoftwareVersion.MaxApplicableSoftwareVersion != math.MaxUint32 {
+		t.Fatalf("CheckForUpdate %+v %v, want version 3 with an unbounded maximum", u, ok)
+	}
+	if !o.IsApplicable(SoftwareVersion{SoftwareVersionValid: true, OTAURL: "https://x", MaxApplicableSoftwareVersion: 1}, 2) {
+		return
+	}
+	t.Fatal("a stated maximum of 1 applied to version 2")
 }

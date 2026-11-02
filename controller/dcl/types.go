@@ -4,6 +4,7 @@
 package dcl
 
 import (
+	"math"
 	"regexp"
 	"strconv"
 )
@@ -117,6 +118,8 @@ type SoftwareVersion struct {
 	OTAChecksum                  string
 	OTAChecksumType              uint8
 	MinApplicableSoftwareVersion uint32
+	// MaxApplicableSoftwareVersion is math.MaxUint32 when the record
+	// states no maximum (unbounded).
 	MaxApplicableSoftwareVersion uint32
 	ReleaseNotesURL              string
 	SpecificationVersion         uint32
@@ -126,40 +129,49 @@ type SoftwareVersion struct {
 // rawSoftwareVersion is DclDeviceSoftwareVersionModelRaw
 // (DclRestApiTypes.ts:144-148): the uint64 otaFileSize as a decimal string.
 type rawSoftwareVersion struct {
-	VID                          uint16 `json:"vid"`
-	PID                          uint16 `json:"pid"`
-	SoftwareVersion              uint32 `json:"softwareVersion"`
-	SoftwareVersionString        string `json:"softwareVersionString"`
-	CDVersionNumber              uint32 `json:"cdVersionNumber"`
-	Creator                      string `json:"creator"`
-	FirmwareInformation          string `json:"firmwareInformation"`
-	SoftwareVersionValid         bool   `json:"softwareVersionValid"`
-	OTAURL                       string `json:"otaUrl"`
-	OTAFileSize                  string `json:"otaFileSize"`
-	OTAChecksum                  string `json:"otaChecksum"`
-	OTAChecksumType              uint8  `json:"otaChecksumType"`
-	MinApplicableSoftwareVersion uint32 `json:"minApplicableSoftwareVersion"`
-	MaxApplicableSoftwareVersion uint32 `json:"maxApplicableSoftwareVersion"`
-	ReleaseNotesURL              string `json:"releaseNotesUrl"`
-	SpecificationVersion         uint32 `json:"specificationVersion"`
-	SchemaVersion                int    `json:"schemaVersion"`
+	VID                          uint16  `json:"vid"`
+	PID                          uint16  `json:"pid"`
+	SoftwareVersion              uint32  `json:"softwareVersion"`
+	SoftwareVersionString        string  `json:"softwareVersionString"`
+	CDVersionNumber              uint32  `json:"cdVersionNumber"`
+	Creator                      string  `json:"creator"`
+	FirmwareInformation          string  `json:"firmwareInformation"`
+	SoftwareVersionValid         bool    `json:"softwareVersionValid"`
+	OTAURL                       string  `json:"otaUrl"`
+	OTAFileSize                  string  `json:"otaFileSize"`
+	OTAChecksum                  string  `json:"otaChecksum"`
+	OTAChecksumType              uint8   `json:"otaChecksumType"`
+	MinApplicableSoftwareVersion uint32  `json:"minApplicableSoftwareVersion"`
+	MaxApplicableSoftwareVersion *uint32 `json:"maxApplicableSoftwareVersion"`
+	ReleaseNotesURL              string  `json:"releaseNotesUrl"`
+	SpecificationVersion         uint32  `json:"specificationVersion"`
+	SchemaVersion                int     `json:"schemaVersion"`
 }
 
 var decimal = regexp.MustCompile(`^\d+$`)
 
 // mapped is mapRawModelVersion (DclClient.ts:387-399): a file size that is
 // not a decimal number, or 0, is unknown.
+//
+// A record without maxApplicableSoftwareVersion has no upper bound: it maps
+// to math.MaxUint32, as matter.js skips the check for an undefined maximum
+// (DclOtaUpdateService.ts:811-816); it read as 0 and the update was never
+// offered (W4-ctlint-06). An absent minimum is 0, unbounded as well.
 func (r rawSoftwareVersion) mapped() SoftwareVersion {
 	var size uint64
 	if decimal.MatchString(r.OTAFileSize) {
 		size, _ = strconv.ParseUint(r.OTAFileSize, 10, 64)
+	}
+	maxApplicable := uint32(math.MaxUint32)
+	if r.MaxApplicableSoftwareVersion != nil {
+		maxApplicable = *r.MaxApplicableSoftwareVersion
 	}
 	return SoftwareVersion{
 		VID: r.VID, PID: r.PID, SoftwareVersion: r.SoftwareVersion, SoftwareVersionString: r.SoftwareVersionString,
 		CDVersionNumber: r.CDVersionNumber, Creator: r.Creator, FirmwareInformation: r.FirmwareInformation,
 		SoftwareVersionValid: r.SoftwareVersionValid, OTAURL: r.OTAURL, OTAFileSize: size,
 		OTAChecksum: r.OTAChecksum, OTAChecksumType: r.OTAChecksumType,
-		MinApplicableSoftwareVersion: r.MinApplicableSoftwareVersion, MaxApplicableSoftwareVersion: r.MaxApplicableSoftwareVersion,
+		MinApplicableSoftwareVersion: r.MinApplicableSoftwareVersion, MaxApplicableSoftwareVersion: maxApplicable,
 		ReleaseNotesURL: r.ReleaseNotesURL, SpecificationVersion: r.SpecificationVersion, SchemaVersion: r.SchemaVersion,
 	}
 }

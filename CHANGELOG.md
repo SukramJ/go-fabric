@@ -45,6 +45,7 @@ Findings of the whole-codebase review of 2026-11-01 (`notes/review/2026-11/`).
 - `endpoint.Endpoint.Aggregator` and `Topology.Aggregator()`: the Aggregator role as a property of the endpoint, which the assembler sets on the Aggregator it builds.
 - `exchange.Session.OnAddressChanged`: the observer of a session's address moves — matter.js `MessageChannel.networkAddressChanged`; the peer follows it into its operational address (W4-ctlnet-02).
 - `schema.IsTimedWrite(cluster, attribute)`: whether an attribute carries the timed access quality, generated from the snapshot next to `IsTimedInvoke` (empty at the pin) (W4-ctlim-02).
+- `otaimage.MaxHeaderSize`: the largest OTA header TLV `ReadHeader` accepts (1024, connectedhomeip's `kMaxHeaderSize`) (W4-ctlint-07).
 
 ### Changed
 
@@ -107,6 +108,11 @@ Findings of the whole-codebase review of 2026-11-01 (`notes/review/2026-11/`).
 - `client/exchange`: a `Send` whose context ends while it waits for the ack ends the message's ack wait, so a retransmission racing the cancel no longer re-arms and keeps sending (W4-ctlnet-03); a closing responder exchange keeps retransmitting its pending message within the close wait, as matter.js's `considerClosed` decides (W4-ctlnet-06).
 - `client/peer`: `Peer.Connect` racing a just-completed connection process returns the adopted session instead of starting a second CASE handshake (W4-ctlnet-04); `Peer.Close` sweeps the peer's sessions again after its workers ended, so a session established while it closed is not left open (W4-ctlnet-05).
 - `controller/client`: a subscription report's store writes and host hooks (`Changed`, the structure hooks, `Event`, `ConfigurationVersionChanged`) now run off the report exchange, on a per-node ordered queue bounded at 100 pending jobs, so the final StatusResponse no longer waits for them, as matter.js defers its persist/emit jobs; the image changes before the subscription's `Updated` sees the report, and `Node.Stop`/`Close` drain the queue. A host that read a hook's effect right after `Subscribe` returned waits for it now (W4-ctlim-04).
+- `ble/bluez`: a C1 `WriteValue` BlueZ never answers ends after 30 s as `btp.ErrDisconnected`, as `ble/esphome` bounds its GATT operations; the BTP session's send path blocked for good (W4-ctlint-04).
+- `ble/esphome`: a GATT operation whose context ends while its reply is outstanding ends the connection, as an overrun does, so the late reply is not taken for the next operation's on the same handle (W4-ctlint-05).
+- `controller/dcl`: a ledger version record without `maxApplicableSoftwareVersion` has no upper bound (`MaxApplicableSoftwareVersion` is `math.MaxUint32`), as matter.js skips an undefined maximum; it read as 0 and the update was never offered (W4-ctlint-06).
+- `bdx/otaimage`: `ReadHeader` refuses a header over `MaxHeaderSize` (1024 bytes, connectedhomeip's `kMaxHeaderSize`) as `ErrInvalid` before reading it — an ahead-of-matter.js row in `notes/parity/by_design.md` (W4-ctlint-07); a short or failing read wraps the underlying error, so `errors.Is` sees `io.ErrUnexpectedEOF` or the transport's error (W4-ctlint-14).
+- `controller/softwareupdate`: an OTA file designator is matched case-insensitively, as matter.js's `OTA_FILENAME_REGEX` is, and an upper-case mode reads as its `Mode` (W4-ctlint-08).
 
 ## [0.15.6] — 2026-11-01
 

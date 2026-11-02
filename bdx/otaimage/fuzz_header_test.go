@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
+	"io"
 	"reflect"
 	"runtime"
 	"testing"
@@ -33,6 +34,7 @@ func FuzzReadHeader(f *testing.F) {
 		f.Add(img)
 	}
 	f.Add(hugeHeaderPrefix())
+	f.Add(oversizeHeader())
 	f.Add([]byte{})
 	f.Fuzz(func(t *testing.T, b []byte) {
 		if len(b) > 1<<16 {
@@ -96,3 +98,38 @@ func TestReadHeaderClaimedSizeIsNotAllocated(t *testing.T) {
 		t.Fatalf("ReadHeader allocated %d bytes for a header that never arrived", grew)
 	}
 }
+
+// oversizeHeader is a prefix claiming a header one byte over
+// MaxHeaderSize, followed by that many bytes.
+func oversizeHeader() []byte {
+	b := make([]byte, 16+otaimage.MaxHeaderSize+1)
+	binary.LittleEndian.PutUint32(b[0:4], otaimage.FileIdentifier)
+	binary.LittleEndian.PutUint64(b[4:12], uint64(len(b)))
+	binary.LittleEndian.PutUint32(b[12:16], otaimage.MaxHeaderSize+1)
+	return b
+}
+
+// TestReadHeaderRefusesOversizeHeader (W4-ctlint-07): a header TLV over
+// MaxHeaderSize is ErrInvalid before it is read — chip's kMaxHeaderSize
+// (src/lib/core/OTAImageHeader.cpp:53, :128); matter.js has no cap
+// (OtaImageReader.ts:157-191), so this is ahead of it. A short image's
+// error wraps the read error (W4-ctlint-14).
+func TestReadHeaderRefusesOversizeHeader(t *testing.T) {
+	t.Parallel()
+	if _, _, _, err := otaimage.ReadHeader(bytes.NewReader(oversizeHeader())); !errors.Is(err, otaimage.ErrInvalid) {
+		t.Fatalf("ReadHeader = %v, want ErrInvalid", err)
+	}
+	if _, _, _, err := otaimage.ReadHeader(bytes.NewReader([]byte{1, 2})); !errors.Is(err, otaimage.ErrInvalid) || !errors.Is(err, io.ErrUnexpectedEOF) {
+		t.Fatalf("short prefix: %v, want ErrInvalid wrapping io.ErrUnexpectedEOF", err)
+	}
+	transport := errors.New("link down")
+	ok := oversizeHeader()[:16]
+	binary.LittleEndian.PutUint32(ok[12:16], 8)
+	if _, _, _, err := otaimage.ReadHeader(io.MultiReader(bytes.NewReader(ok), errReader{transport})); !errors.Is(err, transport) {
+		t.Fatalf("transport error hidden: %v", err)
+	}
+}
+
+type errReader struct{ err error }
+
+func (r errReader) Read([]byte) (int, error) { return 0, r.err }

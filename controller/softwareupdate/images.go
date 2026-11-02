@@ -156,8 +156,9 @@ func (m *MemoryBlobs) List(context.Context) ([]string, error) {
 	return out, nil
 }
 
-// filenamePattern is OTA_FILENAME_REGEX (DclOtaUpdateService.ts:55).
-var filenamePattern = regexp.MustCompile(`^[0-9a-f]+[./][0-9a-f]+[./](?:prod|test|local)[./]\d+$`)
+// filenamePattern is OTA_FILENAME_REGEX (DclOtaUpdateService.ts:55),
+// case-insensitive as its `i` flag makes it (W4-ctlint-08).
+var filenamePattern = regexp.MustCompile(`(?i)^[0-9a-f]+[./][0-9a-f]+[./](?:prod|test|local)[./]\d+$`)
 
 // metaSuffix names an image's recorded specification version (the
 // "meta" context of :61-66).
@@ -290,7 +291,9 @@ func (i *Images) entry(ctx context.Context, name string) (StoredImage, bool) {
 	st := StoredImage{
 		Filename: name, VendorID: h.VendorID, ProductID: h.ProductID, SoftwareVersion: h.SoftwareVersion,
 		SoftwareVersionString: h.SoftwareVersionString, MinApplicable: h.MinApplicableSoftwareVersion,
-		MaxApplicable: h.MaxApplicableSoftwareVersion, Mode: Mode(parts[2]), Size: len(b),
+		// A host-chosen "FFF1.8000.PROD.3" is the prod image: the pattern
+		// admits any case (:55), the Mode constants are lower case.
+		MaxApplicable: h.MaxApplicableSoftwareVersion, Mode: Mode(strings.ToLower(parts[2])), Size: len(b),
 	}
 	if m, err := i.blobs.Get(ctx, name+metaSuffix); err == nil {
 		if v, err := strconv.ParseUint(string(m), 10, 32); err == nil && v > 0 {

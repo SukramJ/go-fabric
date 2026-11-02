@@ -249,6 +249,13 @@ func NewDigest(digestType uint8) hash.Hash {
 	return nil
 }
 
+// MaxHeaderSize is the largest header TLV ReadHeader accepts — chip's
+// kMaxHeaderSize (src/lib/core/OTAImageHeader.cpp:53 at 6170af84, checked
+// at :128 "Safety check against malicious headers"). matter.js has no cap
+// (OtaImageReader.ts:157-191 at 862ad75f); an ahead-of-matter.js row in
+// notes/parity/by_design.md (W4-ctlint-07).
+const MaxHeaderSize = 1024
+
 // Prefix is the fixed prefix of an image.
 type Prefix struct {
 	TotalSize  uint64
@@ -260,24 +267,33 @@ type Prefix struct {
 //
 // Mirrors OtaImageReader.#processHeader (OtaImageReader.ts:149-206): an
 // image that ends before its header is complete is "OTA file ended
-// unexpectedly"; a wrong identifier is refused.
+// unexpectedly"; a wrong identifier is refused. A header larger than
+// [MaxHeaderSize] is refused before it is read, as chip refuses it. A read
+// error is wrapped, so errors.Is sees the cause (a transport error, or
+// io.ErrUnexpectedEOF for a short image).
 func ReadHeader(r io.Reader) (Header, Prefix, []byte, error) {
 	var prefix [prefixSize]byte
 	if _, err := io.ReadFull(r, prefix[:]); err != nil {
-		return Header{}, Prefix{}, nil, invalid("OTA file ended unexpectedly")
+		return Header{}, Prefix{}, nil, fmt.Errorf("%w: %w", invalid("OTA file ended unexpectedly"), err)
 	}
 	if binary.LittleEndian.Uint32(prefix[0:4]) != FileIdentifier {
 		return Header{}, Prefix{}, nil, invalid("Invalid OTA file identifier")
 	}
 	p := Prefix{TotalSize: binary.LittleEndian.Uint64(prefix[4:12]), HeaderSize: binary.LittleEndian.Uint32(prefix[12:16])}
+	if p.HeaderSize > MaxHeaderSize {
+		return Header{}, Prefix{}, nil, invalid("OTA header size %d exceeds the maximum of %d", p.HeaderSize, MaxHeaderSize)
+	}
 	// The header is collected as it arrives, never allocated at the size
 	// the prefix claims: matter.js #processHeader appends each chunk until
 	// remainingBytesCount reaches headerSize
 	// (packages/protocol/src/ota/OtaImageReader.ts:157-191 at 862ad75f), so
 	// a prefix claiming 4 GiB costs what the stream delivers.
 	headerTLV, err := io.ReadAll(io.LimitReader(r, int64(p.HeaderSize)))
-	if err != nil || len(headerTLV) != int(p.HeaderSize) {
-		return Header{}, Prefix{}, nil, invalid("OTA file ended unexpectedly")
+	if err != nil {
+		return Header{}, Prefix{}, nil, fmt.Errorf("%w: %w", invalid("OTA file ended unexpectedly"), err)
+	}
+	if len(headerTLV) != int(p.HeaderSize) {
+		return Header{}, Prefix{}, nil, fmt.Errorf("%w: %w", invalid("OTA file ended unexpectedly"), io.ErrUnexpectedEOF)
 	}
 	h, err := DecodeHeader(headerTLV)
 	if err != nil {
