@@ -26,6 +26,7 @@ Theme files: `wave-5-ex.md` (Opus, done), `wave-5-api.md` (Opus, done).
 
 - 2026-11-01: loom is the only consumer, so replaced API goes at once with a migration line (README §API stability, "remove, do not deprecate"); W5-api-01/02/03 are API breaks; W5-api-03 becomes `node.New(ctx, cfg)` with the goroutine starts moved to `Start`; W5-api-02 keeps `SetReachable` as the one input and removes the probe; TimeSynchronization stays mounted by default; the `EventFiring` fields and the tracked `clustergen` binary go.
 - 2026-11-02: every API finding of `wave-5-api.md` is in the one W5 PR (one break wave for the consumer); W4-ctlint-14 (clock and logger for `otbr.Probe`/`Translate`, `esphome.Discover`) is carried into it as fields of the existing option structs. The owner's reviewer files the host's follow-up issue after the merge.
+- 2026-11-02: W5-api-06 — a failed `Node.Start` leaves the node startable, as matter.js `Node.start` does (`packages/node/src/node/Node.ts:113-128` at 862ad75f: target state back to "offline", the error rethrown, a later start allowed); an explicit `Stop` still makes a later `Start` `ErrStopped`. W5-ex-12 — the fabrictest seam accessors move to an internal seam in W6.
 
 ## Fixed in PR (W5, branch `review/w5`)
 
@@ -36,7 +37,7 @@ Theme files: `wave-5-ex.md` (Opus, done), `wave-5-api.md` (Opus, done).
 | W5-api-03 | 36811c34 | `node.New(ctx, cfg)`; engine, reapers, subtype responder start in `Start`; binding worker lazy |
 | W5-api-04 | 4cf5845d | `ObserveAsync`, `OnHealthSample`/`…Async`, `OnOTAProviderStatus`/`…Async`; observer hooks return nothing |
 | W5-api-05 | e966c90f | `device.Options.Logger`; `device.Logger` removed |
-| W5-api-06, W5-ex-08 | 378a9975 | failed `Start` runs the stop path; Aggregator changes after `Stop` answer `ErrStopped` |
+| W5-api-06, W5-ex-08 | 378a9975, 0b66456d | Aggregator changes after `Stop` answer `ErrStopped`; a failed `Start` leaves the node startable (every fallible step before the goroutine starts; `Run` stops after it) — 378a9975's stop-on-failure replaced by owner decision 2026-11-02 |
 | W5-api-07 | c7a78abb | `node.SessionParameters`, `OTAProviderServer`, `BDXResponder`, `CommissionerControlServer`, `DiscoveryNames` |
 | W5-api-08 | be73b65c | `device.WithServer`, `device.Option`, `device.TypeByID` removed |
 | W5-api-09 | 7fad2075 | `PairingCodes` removed; `IncreaseConfigurationVersions(ctx, …)` with `ErrNotStarted`; `PBKDFIterations uint32` on both structs |
@@ -66,4 +67,4 @@ Theme files: `wave-5-ex.md` (Opus, done), `wave-5-api.md` (Opus, done).
 
 - W5-ex-10, three facade gaps the reference bridge still reaches below the facade for: a listing of every endpoint with its device types (`printTopology` through `Node.Bridge`; `Node.Topology` lists the bridged devices only), a facade for the thermostat's preset persistence (`store.NewThermostatPresetStore`), and a host port on the device kit's default EnergyEvse (the charger mounts `cluster/energy.NewEnergyEvse` as `HostServer`).
 - W5-ex-07, a facade candidate: a `controller/client` helper for "provision a group on these nodes" and "bind A to B with the ACL entry"; the reference controller's ~150 lines are now on the generated types but every host would still copy them.
-- W5-ex-12: whether fabrictest's seam accessors (`Device.Bridge`, `Endpoints`, `Controller.Exchanges`, …) stay in the public harness is not decided here; they are listed as seams in `advanced-seams.md`.
+- W5-ex-12: closed here — owner decision 2026-11-02: fabrictest's seam accessors (`Device.Bridge`, `Endpoints`, `Controller.Exchanges`, …) move to an internal seam in W6.
