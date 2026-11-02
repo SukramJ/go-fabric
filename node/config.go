@@ -58,7 +58,7 @@ type Config struct {
 	// subscriptions, settings and endpoint numbers.
 	Store Store
 	// Advertiser publishes the node over DNS-SD. nil is the node's own:
-	// mdns.Zeroconf with the subtype responder, configured by
+	// the module's mDNS responder (mdns.NewResponder), configured by
 	// [Network].MDNS, or mdns.NewNoop() with [MDNS].Disabled. [Node.Stop]
 	// closes it, the host's as the node's.
 	Advertiser Advertiser
@@ -211,7 +211,7 @@ type Config struct {
 	// MRP, subscriptions' timers, the commissioning window, PASE lockout),
 	// the session table, the subscription engine, the PASE and CASE
 	// providers, the operational resolver, an advertiser that takes a
-	// clock ([mdns.Zeroconf]), the group sender, the root's cluster
+	// clock ([mdns.Responder]), the group sender, the root's cluster
 	// servers, OTA, the store's persist loop and the reopen poll. A test
 	// passes a [github.com/SukramJ/go-fabric/clock/clocktest.Fake].
 	Clock clock.Clock
@@ -247,28 +247,10 @@ type Network struct {
 	// module's nodes are Ethernet-attached; the reference daemon's
 	// --wifi-sim and the module's tests are its users.
 	wifiCommissioning wifiCommissioning
-	// Reannounce is the loop that re-publishes the node's DNS-SD records
-	// ([Reannounce]); the zero value runs it every
-	// [DefaultReannounceInterval].
-	Reannounce Reannounce
 	// MDNS configures the advertiser the node builds when
-	// [Config].Advertiser is nil; the zero value advertises (Zeroconf with
-	// the subtype responder).
+	// [Config].Advertiser is nil; the zero value advertises (the module's
+	// mDNS responder, which announces on matter.js's broadcast schedule).
 	MDNS MDNS
-}
-
-// Reannounce is the re-announce loop: while the node's Advertiser is an
-// mdns.Reannouncer (mdns.Zeroconf is) it re-publishes the DNS-SD records
-// every Interval from [Node.Start] to [Node.Stop]. The loop is this
-// module's own device, not matter.js's (mdns.Reannouncer). A default-on
-// sub-system: its switch is Off, inside its own configuration (ADR 0025
-// principle 2).
-type Reannounce struct {
-	// Interval is the cadence; 0 is [DefaultReannounceInterval].
-	Interval time.Duration
-	// Off keeps the loop off; [Node.TriggerReannounce] still re-publishes
-	// on demand.
-	Off bool
 }
 
 // TimeSynchronization is the root TimeSynchronization cluster (0x0038),
@@ -291,12 +273,6 @@ type TimeSynchronization struct {
 	// it.
 	Config *TimeSynchronizationConfig
 }
-
-// DefaultReannounceInterval is the re-announce cadence a zero
-// [Reannounce].Interval selects: 30 minutes, under half the
-// 75-minute TTL Apple's mDNSResponder caches the records for, so a cache
-// sees the records again before they expire.
-const DefaultReannounceInterval = 30 * time.Minute
 
 // wifiCommissioning is the Wi-Fi NetworkCommissioning configuration
 // (mattercore.WiFiNetworkCommissioningConfig): the network list of one,
@@ -590,9 +566,6 @@ func (c *Config) optionalErrors() []error {
 	var errs []error
 	if c.Health != nil && c.Health.Interval < 0 {
 		errs = append(errs, fmt.Errorf("node: Health.Interval %v is negative", c.Health.Interval))
-	}
-	if c.Network.Reannounce.Interval < 0 {
-		errs = append(errs, fmt.Errorf("node: Network.Reannounce.Interval %v is negative", c.Network.Reannounce.Interval))
 	}
 	if c.Network.WiFi != nil && c.Network.WiFi.Reporter == nil {
 		errs = append(errs, errors.New("node: Network.WiFi needs its Reporter"))

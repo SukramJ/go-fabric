@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright (C) 2026 SukramJ.
 
-//go:build !race
-
 package commissioner
 
 import (
@@ -15,17 +13,15 @@ import (
 )
 
 // TestCommissionLiveThroughMulticast: the node advertises with
-// mdns.Zeroconf on the host's multicast; the scanner finds its
-// commissionable record, Commission commissions it, and the operational
-// CASE connection finds the node's operational record through the same
-// cache. Built without -race, as the discovery, mdns and peer live tests
-// are (zeroconf's upstream Shutdown/recv race); skipped where the host
-// gives no multicast.
+// the module's mDNS responder on the host's multicast; the scanner finds
+// its commissionable record, Commission commissions it, and the
+// operational CASE connection finds the node's operational record through
+// the same cache. Skipped where the host gives no multicast.
 func TestCommissionLiveThroughMulticast(t *testing.T) {
 	if testing.Short() {
 		t.Skip("multicast; skipped under -short")
 	}
-	z := mdns.NewZeroconf()
+	z := mdns.NewResponder()
 	defer func() { _ = z.Close() }()
 	n, _ := startNode(t, z, "[::]:0")
 	names, err := discovery.Open(nil)

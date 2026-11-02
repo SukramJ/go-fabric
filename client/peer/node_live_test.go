@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright (C) 2026 SukramJ.
 
-//go:build !race
-
 package peer_test
 
 import (
@@ -16,16 +14,14 @@ import (
 )
 
 // TestConnectLiveThroughMulticast: the node advertises its operational
-// record with mdns.Zeroconf on the host's multicast; the peer's process
-// finds it through a real DNS-SD cache and establishes CASE. Built
-// without -race, as the discovery and mdns live tests are (zeroconf's
-// upstream Shutdown/recv race); skipped where the host gives no
-// multicast.
+// record with the module's mDNS responder on the host's multicast; the
+// peer's process finds it through a real DNS-SD cache and establishes
+// CASE. Skipped where the host gives no multicast.
 func TestConnectLiveThroughMulticast(t *testing.T) {
 	if testing.Short() {
 		t.Skip("multicast; skipped under -short")
 	}
-	z := mdns.NewZeroconf()
+	z := mdns.NewResponder()
 	defer func() { _ = z.Close() }()
 	_, _, fabric := commissioned(t, z, "[::]:0")
 	names, err := discovery.Open(nil)

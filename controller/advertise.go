@@ -36,13 +36,13 @@ type Advertise struct {
 }
 
 // advertise publishes the commissioner record of a on the controller's UDP
-// port, through adv (mdns.NewZeroconf when nil, then closed by
+// port, through adv (mdns.NewResponder when nil, then closed by
 // [Controller.Close]). The instance id is 8 random bytes, as matter.js's
 // MdnsAdvertiser.createInstanceId (MdnsAdvertiser.ts:102-104).
 func (c *Controller) advertise(ctx context.Context, a Advertise, adv mdns.Advertiser, vendor uint16) error {
 	own := adv == nil
 	if own {
-		adv = mdns.NewZeroconf()
+		adv = mdns.NewResponder()
 	}
 	if a.VendorID == 0 {
 		a.VendorID = vendor

@@ -176,7 +176,7 @@ type Config struct {
 	// own node its provider runs on ([OTAConfig]); nil runs neither.
 	OTA *OTAConfig
 	// Advertiser publishes the Advertise record; nil is
-	// mdns.NewZeroconf(), which Close closes. A test passes
+	// mdns.NewResponder(), which Close closes. A test passes
 	// mdns.NewNoop().
 	Advertiser mdns.Advertiser
 	// DCL configures the controller's ledger services ([DCLConfig]); the

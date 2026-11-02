@@ -22,12 +22,10 @@ import (
 // network. It replaces the DNS answers client/interaction's and
 // controller/client's live tests injected by hand, and multicast with it.
 
-// TTLs of the answers: the host and SRV records 120 s, the PTR and TXT
-// records 4500 s, as controller/commissioner's node test announces them.
-const (
-	ttlHost    uint32 = 120
-	ttlService uint32 = 4500
-)
+// ttlRecord is the TTL of every answer, 120 s, as the module's mDNS
+// responder announces each record (mdns.Responder, after matter.js
+// DEFAULT_MDNS_TTL).
+const ttlRecord uint32 = 120
 
 // queryConn is a controller's mdns.QueryConn on the site: Send answers at
 // once on Responses.
@@ -126,22 +124,22 @@ func serviceRecords(svc *mdns.Service, host string, ip net.IP) (rrs []dns.RR, na
 		}
 		return dns.RR_Header{Name: name, Rrtype: typ, Class: class, Ttl: ttl}
 	}
-	rrs = []dns.RR{&dns.PTR{Hdr: hdr(typeName, dns.TypePTR, ttlService, false), Ptr: instance}}
+	rrs = []dns.RR{&dns.PTR{Hdr: hdr(typeName, dns.TypePTR, ttlRecord, false), Ptr: instance}}
 	names = make([]string, 0, 3+len(svc.Subtypes))
 	names = append(names, strings.ToLower(typeName), strings.ToLower(instance), strings.ToLower(host))
 	for _, sub := range svc.Subtypes {
 		subName := sub + "._sub." + typeName
-		rrs = append(rrs, &dns.PTR{Hdr: hdr(subName, dns.TypePTR, ttlService, false), Ptr: instance})
+		rrs = append(rrs, &dns.PTR{Hdr: hdr(subName, dns.TypePTR, ttlRecord, false), Ptr: instance})
 		names = append(names, strings.ToLower(subName))
 	}
 	rrs = append(rrs,
-		&dns.SRV{Hdr: hdr(instance, dns.TypeSRV, ttlHost, true), Target: host, Port: svc.Port},
-		&dns.TXT{Hdr: hdr(instance, dns.TypeTXT, ttlService, true), Txt: svc.MarshalTXT()},
+		&dns.SRV{Hdr: hdr(instance, dns.TypeSRV, ttlRecord, true), Target: host, Port: svc.Port},
+		&dns.TXT{Hdr: hdr(instance, dns.TypeTXT, ttlRecord, true), Txt: svc.MarshalTXT()},
 	)
 	if ip4 := ip.To4(); ip4 != nil {
-		rrs = append(rrs, &dns.A{Hdr: hdr(host, dns.TypeA, ttlHost, true), A: ip4})
+		rrs = append(rrs, &dns.A{Hdr: hdr(host, dns.TypeA, ttlRecord, true), A: ip4})
 	} else {
-		rrs = append(rrs, &dns.AAAA{Hdr: hdr(host, dns.TypeAAAA, ttlHost, true), AAAA: ip.To16()})
+		rrs = append(rrs, &dns.AAAA{Hdr: hdr(host, dns.TypeAAAA, ttlRecord, true), AAAA: ip.To16()})
 	}
 	return rrs, names
 }

@@ -4,8 +4,6 @@
 package node
 
 import (
-	"log/slog"
-
 	"github.com/SukramJ/go-fabric/mdns"
 )
 
@@ -16,8 +14,10 @@ type MDNS struct {
 	// node, which a controller then reaches by address alone.
 	Off bool
 	// HostName, when set, is the SRV target of every record
-	// (mdns.Zeroconf.HostName, without ".local"); empty is the name the
-	// advertiser derives from the interface's MAC.
+	// (mdns.Responder.HostName, without ".local"): a host name the OS
+	// responder owns and publishes the address records of. Empty is the
+	// name the advertiser derives from the interface's MAC, whose address
+	// records it publishes itself.
 	HostName string
 }
 
@@ -28,12 +28,12 @@ type MDNSFinding = mdns.Finding
 // mdns.Service).
 type MDNSService = mdns.Service
 
-// defaultAdvertiser is the advertiser of a nil Config.Advertiser: Zeroconf
-// with the subtype responder, or Noop when Network.MDNS.Off. The
-// subtype responder is what answers the `_L<discriminator>._sub` browse
-// every commissioner filtering by discriminator sends (chip-tool's
-// `pairing onnetwork-long`, Apple Home, Google Home); a responder that
-// cannot bind leaves the primary records publishing and is logged.
+// defaultAdvertiser is the advertiser of a nil Config.Advertiser: the
+// module's mDNS responder, or Noop when Network.MDNS.Off. The responder
+// publishes every record of a service — the subtype PTRs the
+// `_L<discriminator>._sub` browse of chip-tool, Apple Home and Google Home
+// asks for included — and binds its sockets on the first Publish, so New
+// starts nothing.
 //
 // Mirrors matter.js packages/node/src/behavior/system/network/NetworkServer.ts:207-209
 // (discoveryCapabilities defaults to onIpNetwork) and
@@ -45,20 +45,10 @@ func (n *Node) defaultAdvertiser() mdns.Advertiser {
 	if m.Off {
 		return mdns.NewNoop()
 	}
-	zc := mdns.NewZeroconf()
-	zc.SetLogger(n.logger)
-	zc.HostName = m.HostName
-	responder, err := mdns.NewSubtypeResponder(n.logger)
-	if err != nil {
-		n.logger.Warn("mdns.subtype_responder", slog.Any("err", err),
-			slog.String("hint", "discriminator-filtered browse will find nothing"))
-		return zc
-	}
-	// Started by Node.Start, so New starts no goroutine; Zeroconf.Close
-	// closes the attached responder, started or not.
-	n.subtypeResponder = responder
-	zc.AttachSubtypeResponder(responder)
-	return zc
+	r := mdns.NewResponder()
+	r.SetLogger(n.logger)
+	r.HostName = m.HostName
+	return r
 }
 
 // resolveAdvertiser builds the node's own advertiser for a nil
