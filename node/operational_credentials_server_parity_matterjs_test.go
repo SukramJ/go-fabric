@@ -439,7 +439,7 @@ func updateNOC(t *testing.T, p *fabrictest.Pair, fabricID, nodeID uint64) uint64
 // identity is the fabric's operational credentials as the device holds them.
 func identity(t *testing.T, d *fabrictest.Device, fabric uint8) store.IdentityRecord {
 	t.Helper()
-	id, err := d.Store().GetIdentity(context.Background(), fabric)
+	id, err := d.Node().Store().GetIdentity(context.Background(), fabric)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -30,6 +30,7 @@ import (
 	"github.com/SukramJ/go-fabric/controller/client"
 	"github.com/SukramJ/go-fabric/fabrictest"
 	"github.com/SukramJ/go-fabric/im"
+	"github.com/SukramJ/go-fabric/internal/fabrictestseam"
 )
 
 // toggle invokes OnOff Toggle on the pair's light through the node.
@@ -48,7 +49,7 @@ func (cp *clientPair) toggle(t *testing.T, n *client.Node) error {
 // subscriptionID is the id of the controller's underlying subscription of
 // the pair's peer, 0 (NoSubscription) without one.
 func (cp *clientPair) subscriptionID() uint32 {
-	for _, s := range cp.pair.Controller.Subscriptions().Active() {
+	for _, s := range fabrictestseam.Subscriptions(cp.pair.Controller).Active() {
 		return s.ID()
 	}
 	return interaction.NoSubscription
@@ -123,7 +124,7 @@ func TestClientConnectivityParity(t *testing.T) {
 			t.Fatal(err)
 		}
 		// toggle(undefined, { connectionTimeout: Minutes(5) })
-		cp.pair.Controller.Peers().SetTiming(peer.Timing{DefaultConnectionTimeout: 5 * time.Minute})
+		fabrictestseam.Peers(cp.pair.Controller).SetTiming(peer.Timing{DefaultConnectionTimeout: 5 * time.Minute})
 		if err := cp.toggle(t, cp.node); err != nil {
 			t.Fatalf("the command after the device came back: %v", err)
 		}

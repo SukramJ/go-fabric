@@ -53,6 +53,7 @@ import (
 	"github.com/SukramJ/go-fabric/endpoint"
 	"github.com/SukramJ/go-fabric/fabrictest"
 	"github.com/SukramJ/go-fabric/im"
+	"github.com/SukramJ/go-fabric/internal/fabrictestseam"
 	"github.com/SukramJ/go-fabric/node"
 	"github.com/SukramJ/go-fabric/tlv"
 )
@@ -467,7 +468,7 @@ func TestClientNodeParity(t *testing.T) {
 		if f, _ := cp.pair.Device.Node().FabricInfos(parityCtx(t)); len(f) != 0 {
 			t.Fatal("the device is still commissioned")
 		}
-		if cp.pair.Controller.Peers().Get(addr) != nil {
+		if fabrictestseam.Peers(cp.pair.Controller).Get(addr) != nil {
 			t.Fatal("the peer set still has the peer")
 		}
 		id := cp.node.ID()
@@ -484,17 +485,17 @@ func TestClientNodeParity(t *testing.T) {
 		cp := newClientPair(t, clientPairOptions{})
 		addr, _ := cp.node.PeerAddress()
 		c := cp.pair.Controller
-		if c.Peers().Get(addr) == nil {
+		if fabrictestseam.Peers(c).Get(addr) == nil {
 			t.Fatal("no protocol peer")
 		}
-		if _, ok := c.Resumption().FindResumptionRecord(addr); !ok {
+		if _, ok := fabrictestseam.Resumption(c).FindResumptionRecord(addr); !ok {
 			t.Fatal("no resumption record")
 		}
 		cp.run(t, func(ctx context.Context) error { return c.Registry().Decommission(ctx, cp.node) })
-		if c.Peers().Get(addr) != nil {
+		if fabrictestseam.Peers(c).Get(addr) != nil {
 			t.Fatal("the protocol peer is still in the peer set")
 		}
-		if _, ok := c.Resumption().FindResumptionRecord(addr); ok {
+		if _, ok := fabrictestseam.Resumption(c).FindResumptionRecord(addr); ok {
 			t.Fatal("the resumption record survived the decommission")
 		}
 	})

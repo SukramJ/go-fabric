@@ -135,7 +135,7 @@ func TestEndpointNumberConflictParityMatterJS(t *testing.T) {
 			if _, ok := d.EndpointOf("failing"); ok {
 				t.Error("the refused endpoint is installed")
 			}
-			if ep := d.Bridge().Topology().FindByID(number); ep != nil {
+			if ep := d.Node().Bridge().Topology().FindByID(number); ep != nil {
 				t.Errorf("endpoint %d is held by %v", number, ep.SourceKey)
 			}
 		})

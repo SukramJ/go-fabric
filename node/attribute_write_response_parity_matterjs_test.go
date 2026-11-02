@@ -31,6 +31,7 @@ import (
 	"github.com/SukramJ/go-fabric/client/interaction"
 	basicinfo "github.com/SukramJ/go-fabric/cluster/spec/basicinformation"
 	"github.com/SukramJ/go-fabric/im"
+	"github.com/SukramJ/go-fabric/internal/fabrictestseam"
 	"github.com/SukramJ/go-fabric/store"
 )
 
@@ -139,7 +140,7 @@ func writeStatuses(ctx context.Context, t *testing.T, m *mockPair, writes ...int
 	var got interaction.WriteStatuses
 	if err := m.site.Run(ctx, func(ctx context.Context) error {
 		var err error
-		got, err = m.pair.Interaction.Write(ctx, writes, interaction.WriteOptions{})
+		got, err = fabrictestseam.Interaction(m.pair).Write(ctx, writes, interaction.WriteOptions{})
 		return err
 	}); err != nil {
 		t.Fatal(err)

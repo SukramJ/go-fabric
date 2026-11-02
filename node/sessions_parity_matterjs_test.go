@@ -19,6 +19,7 @@ import (
 	"testing"
 
 	"github.com/SukramJ/go-fabric/fabrictest"
+	"github.com/SukramJ/go-fabric/internal/fabrictestseam"
 )
 
 // SessionIntervals.defaults (SessionIntervals.ts:45-49): idle 500 ms,
@@ -36,7 +37,7 @@ func TestSessionsBehaviorParityMatterJS(t *testing.T) {
 	// :27-37.
 	t.Run("retains defaults for intervals left unset", func(t *testing.T) {
 		p := quietSite(t).CommissionedPair(fabrictest.PairOptions{})
-		got := p.Peer.SessionParameters()
+		got := fabrictestseam.Peer(p).SessionParameters()
 		if got.SessionActiveInterval != defaultActiveIntervalMs {
 			t.Errorf("activeInterval %d ms, want the default %d ms", got.SessionActiveInterval, defaultActiveIntervalMs)
 		}

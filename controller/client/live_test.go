@@ -21,6 +21,7 @@ import (
 	"github.com/SukramJ/go-fabric/controller/commissioner"
 	"github.com/SukramJ/go-fabric/endpoint"
 	"github.com/SukramJ/go-fabric/fabrictest"
+	"github.com/SukramJ/go-fabric/internal/fabrictestseam"
 	"github.com/SukramJ/go-fabric/node"
 )
 
@@ -57,7 +58,7 @@ func newPairLive(t *testing.T) *pairLive {
 		Controller: fabrictest.ControllerOptions{FabricID: liveFabricID, NodeID: liveController, Label: "live"},
 		Commission: fabrictest.CommissionOptions{NodeID: liveNode, Edit: func(o *commissioner.Options) { o.OnAttestationFailure = attestation.Accept() }},
 	})
-	lv := &pairLive{site: site, dev: pair.Device, srv: srv, reg: pair.Controller.Subscriptions(), peer: pair.Peer, c: pair.Interaction}
+	lv := &pairLive{site: site, dev: pair.Device, srv: srv, reg: fabrictestseam.Subscriptions(pair.Controller), peer: fabrictestseam.Peer(pair), c: fabrictestseam.Interaction(pair)}
 	ep, ok := pair.Device.EndpointOf("plug:1")
 	if !ok {
 		t.Fatal("the plug has no endpoint")

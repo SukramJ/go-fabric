@@ -381,7 +381,7 @@ func TestIcdManagementServer(t *testing.T) {
 			if after := icdState(t.Context(), t, pair).IcdCounter; after != before+1 {
 				t.Fatalf("counter %d after %d", after, before)
 			}
-			if v, ok, err := pair.Device.Store().LoadICDCounter(t.Context()); err != nil || !ok || v != before+1 {
+			if v, ok, err := pair.Device.Node().Store().LoadICDCounter(t.Context()); err != nil || !ok || v != before+1 {
 				t.Fatalf("persisted %d %v %v", v, ok, err)
 			}
 		})
@@ -392,7 +392,7 @@ func TestIcdManagementServer(t *testing.T) {
 		t.Run("pads localFixedMrpBackoff by the ICD fast-poll interval while operating as an ICD", func(t *testing.T) {
 			t.Parallel()
 			_, pair := icdPair(t, icdSetup{})
-			if got := pair.Device.Bridge().LocalFixedMRPBackoff(); got != 200*time.Millisecond {
+			if got := pair.Device.Node().Bridge().LocalFixedMRPBackoff(); got != 200*time.Millisecond {
 				t.Fatalf("pad %v", got)
 			}
 		})
@@ -403,7 +403,7 @@ func TestIcdManagementServer(t *testing.T) {
 		t.Run("disables subscription persistence on an ICD node", func(t *testing.T) {
 			t.Parallel()
 			_, pair := icdPair(t, icdSetup{})
-			if pair.Device.Bridge().SubscriptionPersistenceEnabled() {
+			if pair.Device.Node().Bridge().SubscriptionPersistenceEnabled() {
 				t.Fatal("persistence enabled")
 			}
 		})
@@ -484,7 +484,7 @@ func TestIcdManagementServer(t *testing.T) {
 				t.Fatalf("fabric registrations %+v", regs)
 			}
 			// The persisted ICDToken is dropped too.
-			if regs, err := pair.Device.Store().ListICDRegistrations(ctx); err != nil || len(regs) != 0 {
+			if regs, err := pair.Device.Node().Store().ListICDRegistrations(ctx); err != nil || len(regs) != 0 {
 				t.Fatalf("persisted %+v %v", regs, err)
 			}
 		})
@@ -654,14 +654,14 @@ func TestIcdManagementServer(t *testing.T) {
 			if _, err := registerClient(ctx, pair, permanent(pair.Address.NodeID, icdKeyA)); err != nil {
 				t.Fatal(err)
 			}
-			if regs, _ := pair.Device.Store().ListICDRegistrations(ctx); len(regs) != 1 {
+			if regs, _ := pair.Device.Node().Store().ListICDRegistrations(ctx); len(regs) != 1 {
 				t.Fatalf("persisted %+v", regs)
 			}
 			fabric := pairFabric(ctx, t, pair)
 			if err := pair.Device.Node().RemoveFabric(ctx, fabric); err != nil {
 				t.Fatal(err)
 			}
-			if regs, _ := pair.Device.Store().ListICDRegistrations(ctx); len(regs) != 0 {
+			if regs, _ := pair.Device.Node().Store().ListICDRegistrations(ctx); len(regs) != 0 {
 				t.Fatalf("persisted after removal %+v", regs)
 			}
 			if regs := icdServer(pair).Registrations(fabric); len(regs) != 0 {
@@ -1055,7 +1055,7 @@ func TestIcdManagementServer(t *testing.T) {
 				t.Fatal(err)
 			}
 			defer sub.Close()
-			subjects := pair.Device.Bridge().ActiveSubscriptionSubjects(pairFabric(ctx, t, pair))
+			subjects := pair.Device.Node().Bridge().ActiveSubscriptionSubjects(pairFabric(ctx, t, pair))
 			if len(subjects) == 0 {
 				t.Fatal("no subscription subject")
 			}

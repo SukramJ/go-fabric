@@ -18,6 +18,7 @@ import (
 	mattercore "github.com/SukramJ/go-fabric/cluster/core"
 	provdef "github.com/SukramJ/go-fabric/cluster/spec/otasoftwareupdateprovider"
 	"github.com/SukramJ/go-fabric/fabrictest"
+	"github.com/SukramJ/go-fabric/internal/fabrictestseam"
 	"github.com/SukramJ/go-fabric/node"
 	"github.com/SukramJ/go-fabric/transport/mrp"
 )
@@ -115,11 +116,11 @@ func blockRetransmissionGap(t *testing.T, margin time.Duration) time.Duration {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 	err := site.Run(ctx, func(ctx context.Context) error {
-		s, err := pair.Peer.Connect(ctx, peer.ConnectOptions{})
+		s, err := fabrictestseam.Peer(pair).Connect(ctx, peer.ConnectOptions{})
 		if err != nil {
 			return err
 		}
-		x, err := ctl.Exchanges().Initiate(s, bdx.ProtocolID, exchange.Options{})
+		x, err := fabrictestseam.Exchanges(ctl).Initiate(s, bdx.ProtocolID, exchange.Options{})
 		if err != nil {
 			return err
 		}

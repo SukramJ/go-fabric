@@ -16,6 +16,7 @@ import (
 	"github.com/SukramJ/go-fabric/controller/ble/bletest"
 	"github.com/SukramJ/go-fabric/controller/client"
 	"github.com/SukramJ/go-fabric/fabrictest"
+	"github.com/SukramJ/go-fabric/internal/fabrictestseam"
 )
 
 // TestPairByAddress: a device whose DNS-SD records are withdrawn is not
@@ -26,7 +27,7 @@ func TestPairByAddress(t *testing.T) {
 	site, dev, c := siteController(t, fabrictest.Topology{}, nil)
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
-	adv := dev.Advertiser()
+	adv := fabrictestseam.Advertiser(dev)
 	for _, svc := range adv.Active() {
 		if err := adv.Withdraw(ctx, svc.InstanceName, svc.ServiceType); err != nil {
 			t.Fatal(err)

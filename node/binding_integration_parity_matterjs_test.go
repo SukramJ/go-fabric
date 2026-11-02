@@ -387,7 +387,7 @@ func boundLight(t *testing.T) *boundLightSite {
 	}
 	lf := fabrics[0]
 	// "grant-operate": any CASE subject of the fabric operates the light.
-	if err := s.lightDev.Store().ReplaceACL(parityCtx(t), lf.FabricIndex, []store.ACLEntry{
+	if err := s.lightDev.Node().Store().ReplaceACL(parityCtx(t), lf.FabricIndex, []store.ACLEntry{
 		{FabricIndex: lf.FabricIndex, Privilege: store.PrivilegeAdminister, AuthMode: store.AuthModeCASE, Subjects: []uint64{bridgetest.DefaultControllerNodeID}},
 		{FabricIndex: lf.FabricIndex, Privilege: store.PrivilegeOperate, AuthMode: store.AuthModeCASE},
 	}); err != nil {
@@ -510,7 +510,7 @@ func TestBindingDefaultSubscriptionParityMatterJS(t *testing.T) {
 		if !s.res.Peer.HasSession() {
 			t.Error("the bound peer holds no session")
 		}
-		if n := s.sw.dev.Peers().Size(); n != 1 {
+		if n := s.sw.dev.Node().Peers().Size(); n != 1 {
 			t.Errorf("the switch knows %d peers, want 1", n)
 		}
 		if p := s.sw.log.problemsSince(mark); len(p) != 0 {
@@ -541,7 +541,7 @@ func TestBindingDefaultSubscriptionParityMatterJS(t *testing.T) {
 			t.Errorf("statuses %v after the return, want [false true]", got)
 		}
 		s.switchLight(t, false)
-		if n := s.sw.dev.Peers().Size(); n != 1 {
+		if n := s.sw.dev.Node().Peers().Size(); n != 1 {
 			t.Errorf("the switch knows %d peers, want 1", n)
 		}
 		if p := s.sw.log.problemsSince(mark); len(p) != 0 {
@@ -571,7 +571,7 @@ func TestBindingDefaultSubscriptionParityMatterJS(t *testing.T) {
 		}
 		s.sw.eventually(t, "the subscription active again", sub.Active)
 		s.switchLight(t, false)
-		if n := s.sw.dev.Peers().Size(); n != 1 {
+		if n := s.sw.dev.Node().Peers().Size(); n != 1 {
 			t.Errorf("the switch knows %d peers, want 1", n)
 		}
 		if p := s.sw.log.problemsSince(mark); len(p) != 0 {

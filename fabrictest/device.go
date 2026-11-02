@@ -17,8 +17,6 @@ import (
 
 	"github.com/SukramJ/go-fabric/bridge"
 	"github.com/SukramJ/go-fabric/client/discovery"
-	"github.com/SukramJ/go-fabric/client/peer"
-	"github.com/SukramJ/go-fabric/endpoint"
 	epmem "github.com/SukramJ/go-fabric/endpoint/memstore"
 	"github.com/SukramJ/go-fabric/internal/bridgeseam"
 	"github.com/SukramJ/go-fabric/internal/inflight"
@@ -360,11 +358,6 @@ func (d *Device) siteClient(cfg *node.Config) {
 	nodeseam.UseClientListener(cfg, func() (*udp.Listener, error) { return nw.listen(addr, d.group) })
 }
 
-// Peers is the node's client stack ([node.Node.Peers]): the nodes of its
-// fabrics it reaches as a client, on the site. Nil unless the topology's
-// Configure set a non-nil node.Config.Client.
-func (d *Device) Peers() *peer.Set { return d.Node().Peers() }
-
 // Stop stops the node; its store and address stay the device's. A
 // stopped device is not an error.
 func (d *Device) Stop(ctx context.Context) error {
@@ -407,14 +400,6 @@ func (d *Device) Node() *node.Node {
 	return d.n
 }
 
-// Bridge is the node's bridge.
-func (d *Device) Bridge() *bridge.Bridge { return d.Node().Bridge() }
-
-// Store is the node's credential store: fabrics, ACL, groups,
-// subscriptions and settings — a store/memstore, or with
-// Options.StoreOnDisk SQLite's store.Store.
-func (d *Device) Store() store.Port { return d.Node().Store() }
-
 // Addr is the device's UDP address: its host address on the in-memory
 // network, its socket's on loopback.
 func (d *Device) Addr() *net.UDPAddr {
@@ -437,27 +422,10 @@ func (d *Device) Discriminator() uint16 {
 	return d.cfg.Commissioning.Discriminator
 }
 
-// Advertiser is the node's DNS-SD advertiser — the records the site
-// answers queries with.
-func (d *Device) Advertiser() mdns.Advertiser {
-	d.mu.Lock()
-	defer d.mu.Unlock()
-	return d.adv
-}
-
-// Endpoints are the endpoints the node serves: the root, the Aggregator
-// and the bridged ones.
-func (d *Device) Endpoints() []*endpoint.Endpoint {
-	if t := d.Bridge().Topology(); t != nil {
-		return t.Endpoints
-	}
-	return nil
-}
-
 // EndpointOf is the number of the bridged endpoint whose StableKey renders
 // as key; false when the node serves none.
 func (d *Device) EndpointOf(key string) (uint16, bool) {
-	t := d.Bridge().Topology()
+	t := d.Node().Bridge().Topology()
 	if t == nil {
 		return 0, false
 	}

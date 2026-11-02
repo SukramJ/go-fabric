@@ -22,6 +22,7 @@ import (
 	"github.com/SukramJ/go-fabric/endpoint"
 	"github.com/SukramJ/go-fabric/fabrictest"
 	"github.com/SukramJ/go-fabric/im"
+	"github.com/SukramJ/go-fabric/internal/fabrictestseam"
 	"github.com/SukramJ/go-fabric/node"
 	"github.com/SukramJ/go-fabric/tlv"
 )
@@ -108,7 +109,7 @@ func newLiveOn(t *testing.T, regLog *slog.Logger, opts fabrictest.Options) *live
 		Controller: fabrictest.ControllerOptions{FabricID: liveFabricID, NodeID: liveController, Label: "live", Logger: regLog},
 		Commission: fabrictest.CommissionOptions{NodeID: liveNode, Edit: func(o *commissioner.Options) { o.OnAttestationFailure = attestation.Accept() }},
 	})
-	lv := &live{site: site, pair: pair, reg: pair.Controller.Subscriptions(), peer: pair.Peer, c: pair.Interaction}
+	lv := &live{site: site, pair: pair, reg: fabrictestseam.Subscriptions(pair.Controller), peer: fabrictestseam.Peer(pair), c: fabrictestseam.Interaction(pair)}
 	ep, ok := pair.Device.EndpointOf("plug:1")
 	if !ok {
 		t.Fatal("the plug has no endpoint")
@@ -356,7 +357,7 @@ func TestLiveSustainedSurvivesRestart(t *testing.T) {
 	}
 	waitOnOff(t, lv, reports, false)
 	s := lv.peer.NewestSession()
-	if s == nil || s.Addr().String() != lv.pair.Device.Bridge().LocalAddr() {
+	if s == nil || s.Addr().String() != lv.pair.Device.Node().Bridge().LocalAddr() {
 		t.Fatalf("the peer's newest session is not the node's inbound one: %v", s)
 	}
 	if sub.ID() != id || !sub.Active() {
@@ -402,7 +403,7 @@ func waitPersisted(t *testing.T, lv *live, want int) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	if werr := lv.site.Eventually(ctx, fmt.Sprintf("%d persisted subscriptions", want), func() bool {
-		stored, lerr := lv.pair.Device.Store().LoadServerSubscriptions(context.Background())
+		stored, lerr := lv.pair.Device.Node().Store().LoadServerSubscriptions(context.Background())
 		rows, err = len(stored), lerr
 		return err == nil && rows == want
 	}); werr != nil {

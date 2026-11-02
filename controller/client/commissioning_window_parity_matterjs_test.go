@@ -79,7 +79,7 @@ func (wp *windowPair) openEnhanced(t *testing.T, timeout time.Duration) client.C
 
 // adminFabric is the device window's AdminFabricIndex, false for null.
 func (wp *windowPair) adminFabric() (uint8, bool) {
-	snap := wp.pair.Device.Bridge().CommissioningWindow().CurrentWindow()
+	snap := wp.pair.Device.Node().Bridge().CommissioningWindow().CurrentWindow()
 	return snap.AdminFabricIndex, !snap.AdminFabricIsNull
 }
 
@@ -123,7 +123,7 @@ func TestCommissioningWindowParityMatterJS(t *testing.T) {
 		if w.Timeout != client.DefaultWindowTimeout {
 			t.Errorf("timeout %v, want %v", w.Timeout, client.DefaultWindowTimeout)
 		}
-		win := wp.pair.Device.Bridge().CommissioningWindow()
+		win := wp.pair.Device.Node().Bridge().CommissioningWindow()
 		if !win.IsOpen() || !win.HasSuppliedVerifier() {
 			t.Fatalf("window open %v, supplied verifier %v", win.IsOpen(), win.HasSuppliedVerifier())
 		}
@@ -142,7 +142,7 @@ func TestCommissioningWindowParityMatterJS(t *testing.T) {
 	t.Run("returns the values it sent to the device and encoded in the pairing codes", func(t *testing.T) {
 		wp := newWindowPair(t)
 		w := wp.openEnhanced(t, 300500*time.Millisecond)
-		win := wp.pair.Device.Bridge().CommissioningWindow()
+		win := wp.pair.Device.Node().Bridge().CommissioningWindow()
 		if w.Discriminator != win.Discriminator() {
 			t.Errorf("discriminator %d, the window advertises %d", w.Discriminator, win.Discriminator())
 		}
@@ -193,7 +193,7 @@ func TestCommissioningWindowParityMatterJS(t *testing.T) {
 		if !errors.Is(err, client.ErrNoBasicWindow) {
 			t.Fatalf("a basic window on a device without the Basic feature: %v, want ErrNoBasicWindow", err)
 		}
-		if wp.pair.Device.Bridge().CommissioningWindow().IsOpen() {
+		if wp.pair.Device.Node().Bridge().CommissioningWindow().IsOpen() {
 			t.Error("a window opened")
 		}
 	})
@@ -224,7 +224,7 @@ func TestCommissioningWindowParityMatterJS(t *testing.T) {
 		if got, ok := wp.adminFabric(); ok {
 			t.Errorf("AdminFabricIndex %d, want null", got)
 		}
-		if !wp.pair.Device.Bridge().CommissioningWindow().IsOpen() {
+		if !wp.pair.Device.Node().Bridge().CommissioningWindow().IsOpen() {
 			t.Error("the window closed with the admin fabric")
 		}
 	})

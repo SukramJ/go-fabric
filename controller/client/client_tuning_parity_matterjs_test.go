@@ -15,12 +15,13 @@ import (
 
 	"github.com/SukramJ/go-fabric/client/peer"
 	"github.com/SukramJ/go-fabric/fabrictest"
+	"github.com/SukramJ/go-fabric/internal/fabrictestseam"
 )
 
 // onlyPeer is [...controller.env.get(PeerSet)][0].
 func onlyPeer(t *testing.T, cp *clientPair) *peer.Peer {
 	t.Helper()
-	ps := cp.pair.Controller.Peers().Peers()
+	ps := fabrictestseam.Peers(cp.pair.Controller).Peers()
 	if len(ps) != 1 {
 		t.Fatalf("%d peers, want 1", len(ps))
 	}
@@ -50,14 +51,14 @@ func TestClientTuningParity(t *testing.T) {
 	t.Run("ownNetworkProfileId sets the sender-side MRP margin", func(t *testing.T) {
 		t.Parallel()
 		cp := newClientPair(t, clientPairOptions{controller: fabrictest.ControllerOptions{OwnNetworkProfile: peer.NetworkThread}})
-		if d := cp.pair.Controller.Exchanges().LocalAdditionalMrpDelay(); d != 1500*time.Millisecond {
+		if d := fabrictestseam.Exchanges(cp.pair.Controller).LocalAdditionalMrpDelay(); d != 1500*time.Millisecond {
 			t.Errorf("local margin %v, want 1.5s", d)
 		}
 	})
 	t.Run("ownNetworkProfileId defaults to fast (no sender-side margin)", func(t *testing.T) {
 		t.Parallel()
 		cp := newClientPair(t, clientPairOptions{})
-		if d := cp.pair.Controller.Exchanges().LocalAdditionalMrpDelay(); d != 0 {
+		if d := fabrictestseam.Exchanges(cp.pair.Controller).LocalAdditionalMrpDelay(); d != 0 {
 			t.Errorf("local margin %v, want 0", d)
 		}
 	})
@@ -69,7 +70,7 @@ func TestClientTuningParity(t *testing.T) {
 			Conservative: &peer.PartialLimits{Connect: &peer.PartialConcreteLimits{Exchanges: &one, Timeout: &five}},
 			Fast:         &peer.PartialLimits{PartialConcreteLimits: peer.PartialConcreteLimits{Exchanges: &hundred}, Connect: &peer.PartialConcreteLimits{Exchanges: &three}},
 		}}})
-		profiles := cp.pair.Controller.Peers().Networks()
+		profiles := fabrictestseam.Peers(cp.pair.Controller).Networks()
 		conservative, _ := profiles.Get(peer.NetworkConservative)
 		fast, _ := profiles.Get(peer.NetworkFast)
 		if conservative.Connect == nil || conservative.Connect.ID != "conservative:connect" {
@@ -89,7 +90,7 @@ func TestClientTuningParity(t *testing.T) {
 			Thread: &peer.PartialLimits{BDXAdditionalMrpDelay: &three},
 			WiFi:   &peer.PartialLimits{BDXAdditionalMrpDelay: &two},
 		}}})
-		profiles := cp.pair.Controller.Peers().Networks()
+		profiles := fabrictestseam.Peers(cp.pair.Controller).Networks()
 		thread, _ := profiles.Get(peer.NetworkThread)
 		wifi, _ := profiles.Get(peer.NetworkWiFi)
 		conservative, _ := profiles.Get(peer.NetworkConservative)
@@ -111,7 +112,7 @@ func TestClientTuningParity(t *testing.T) {
 		cp := newClientPair(t, clientPairOptions{controller: fabrictest.ControllerOptions{Networks: &peer.ProfilesConfig{
 			Fast: limit, Conservative: limit, Thread: limit,
 		}}})
-		profiles := cp.pair.Controller.Peers().Networks()
+		profiles := fabrictestseam.Peers(cp.pair.Controller).Networks()
 		for _, name := range []string{peer.NetworkFast, peer.NetworkConservative, peer.NetworkThread} {
 			p, _ := profiles.Get(name)
 			if p.Connect == nil || p.Connect.ID != name+":connect" {

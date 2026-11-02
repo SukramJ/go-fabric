@@ -9,9 +9,10 @@
 // It follows matter.js's testing support at the pinned commit
 // (packages/node/src/testing): [Site] is MockSite (mock-site.ts) — devices
 // and controllers on one simulated network, closed with the site; [Device]
-// exposes what MockServerNode does (mock-server-node.ts) — the node, its
-// store, its endpoints, local server access ([Device.Act]); the wire
-// helpers [Read], [Write], [Invoke], [Subscribe] and [Connect] follow the
+// exposes what MockServerNode does (mock-server-node.ts) — the node (its
+// store and endpoints through [Device.Node]), local server access
+// ([Device.Act]); the wire helpers [Read], [Write], [Invoke] and
+// [Subscribe] follow the
 // `interaction` namespace of node-helpers.ts; and the site's default clock
 // is a [github.com/SukramJ/go-fabric/clock/clocktest.Fake], matter.js's
 // MockTime (packages/testing/src/mocks/time.ts).

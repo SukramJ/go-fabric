@@ -22,6 +22,7 @@ import (
 	"github.com/SukramJ/go-fabric/client/exchange"
 	"github.com/SukramJ/go-fabric/controller/commissioner"
 	"github.com/SukramJ/go-fabric/fabrictest"
+	"github.com/SukramJ/go-fabric/internal/fabrictestseam"
 )
 
 // openSessions are the secure sessions of mgr, by local id.
@@ -41,12 +42,12 @@ func TestCommissioningPaseLifetimeParity(t *testing.T) {
 		t.Parallel()
 		site := quietSite(t)
 		u := site.UncommissionedPair(fabrictest.PairOptions{})
-		before := openSessions(u.Controller.Exchanges())
+		before := openSessions(fabrictestseam.Exchanges(u.Controller))
 		claimed := false
 		var during map[uint16]*exchange.Session
 		_, err := u.Controller.Commission(parityCtx(t), u.Device, fabrictest.CommissionOptions{Edit: func(o *commissioner.Options) {
 			o.ClaimNodeIDAfterPASE = func() (uint64, bool) {
-				claimed, during = true, openSessions(u.Controller.Exchanges())
+				claimed, during = true, openSessions(fabrictestseam.Exchanges(u.Controller))
 				return 0, false
 			}
 		}})
@@ -56,7 +57,7 @@ func TestCommissioningPaseLifetimeParity(t *testing.T) {
 		if !claimed || len(during) <= len(before) {
 			t.Fatalf("no PASE session open at the refusal (%d sessions, %d before)", len(during), len(before))
 		}
-		for id, s := range openSessions(u.Controller.Exchanges()) {
+		for id, s := range openSessions(fabrictestseam.Exchanges(u.Controller)) {
 			if before[id] == nil {
 				t.Fatalf("session %d (peer node %d) left open after the refusal", id, s.PeerNodeID())
 			}

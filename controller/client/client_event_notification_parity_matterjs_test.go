@@ -18,6 +18,7 @@ import (
 	"testing"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
+	"github.com/SukramJ/go-fabric/internal/fabrictestseam"
 
 	"github.com/SukramJ/go-fabric/client/interaction"
 	basicinfo "github.com/SukramJ/go-fabric/cluster/spec/basicinformation"
@@ -244,7 +245,7 @@ func TestClientEventNotificationEventNumbersParity(t *testing.T) {
 		})
 		// matter.js closes the device's sessions; the port loses the
 		// underlying subscription on the controller (as TestLiveClientNode).
-		subs := sp.pair.Controller.Subscriptions()
+		subs := fabrictestseam.Subscriptions(sp.pair.Controller)
 		subs.CloseForPeer(subs.Active()[0].Peer())
 		if err := sp.site.Eventually(parityCtx(t), "the replacement subscription", func() bool {
 			mu.Lock()

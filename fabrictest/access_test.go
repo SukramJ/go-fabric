@@ -11,6 +11,7 @@ import (
 	basicinfo "github.com/SukramJ/go-fabric/cluster/spec/basicinformation"
 	"github.com/SukramJ/go-fabric/fabrictest"
 	"github.com/SukramJ/go-fabric/im"
+	"github.com/SukramJ/go-fabric/internal/fabrictestseam"
 	"github.com/SukramJ/go-fabric/store"
 	"github.com/SukramJ/go-fabric/tlv"
 )
@@ -55,11 +56,11 @@ func TestExchange(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := fabrictest.Exchange(ctx, site.UncommissionedPair(fabrictest.PairOptions{}), im.OpcodeReadRequest, payload); !errors.Is(err, fabrictest.ErrNotCommissioned) {
+	if _, err := fabrictestseam.Exchange(ctx, site.UncommissionedPair(fabrictest.PairOptions{}), im.OpcodeReadRequest, payload); !errors.Is(err, fabrictest.ErrNotCommissioned) {
 		t.Fatalf("Exchange on an uncommissioned pair: %v", err)
 	}
 	p := site.CommissionedPair(fabrictest.PairOptions{})
-	msg, err := fabrictest.Exchange(ctx, p, im.OpcodeReadRequest, payload)
+	msg, err := fabrictestseam.Exchange(ctx, p, im.OpcodeReadRequest, payload)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -67,7 +68,7 @@ func TestExchange(t *testing.T) {
 		t.Fatalf("answer opcode 0x%02x, %d bytes", msg.Opcode, len(msg.Payload))
 	}
 	// A message the device cannot decode is answered with a StatusResponse.
-	msg, err = fabrictest.Exchange(ctx, p, im.OpcodeReadRequest, []byte{0xAB})
+	msg, err = fabrictestseam.Exchange(ctx, p, im.OpcodeReadRequest, []byte{0xAB})
 	if err != nil || msg.Opcode != im.OpcodeStatusResponse {
 		t.Fatalf("answer to garbage: %+v, %v", msg, err)
 	}
@@ -82,13 +83,13 @@ func TestControllerPASE(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if p.Commissioned() || p.PASESession == nil || p.Interaction == nil {
+	if p.Commissioned() || fabrictestseam.PASESession(p) == nil || fabrictestseam.Interaction(p) == nil {
 		t.Fatalf("PASE pair %+v", p)
 	}
 	if d, err := fabrictest.Read(ctx, p, rootAttr(basicinfo.ClusterID, basicinfo.AttrNodeLabel)); err != nil || d.Value.El.String == "" {
 		t.Fatalf("read over PASE: %+v, %v", d, err)
 	}
-	if ix, err := fabrictest.Connect(ctx, p); err != nil || ix != p.Interaction {
+	if ix, err := fabrictestseam.Connect(ctx, p); err != nil || ix != fabrictestseam.Interaction(p) {
 		t.Fatalf("Connect over PASE: %v", err)
 	}
 }

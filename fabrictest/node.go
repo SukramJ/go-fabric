@@ -20,7 +20,10 @@ import (
 // result goes. With a fake site clock it runs under [Site.Run]; a search
 // that finds nothing returns an empty slice.
 func (c *Controller) Discover(ctx context.Context, id discovery.Identifier, timeout time.Duration) ([]client.Device, error) {
-	s := discovery.NewScanner(c.Names())
+	c.mu.RLock()
+	names := c.names
+	c.mu.RUnlock()
+	s := discovery.NewScanner(names)
 	defer s.Close()
 	var found []client.Device
 	err := c.site.Run(ctx, func(ctx context.Context) error {

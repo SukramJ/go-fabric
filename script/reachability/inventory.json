@@ -276,9 +276,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 17091,
-    "reachable": 12015,
-    "whitelisted": 5076,
+    "total_exported": 17097,
+    "reachable": 12025,
+    "whitelisted": 5072,
     "unreachable": 0
   },
   "by_package": [],
@@ -27155,119 +27155,91 @@
       "identifier": "AttributeData",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "fabrictest/surface.go",
-      "line": 43
+      "line": 40
     },
     {
       "package": "fabrictest",
       "identifier": "AttributePath",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "fabrictest/surface.go",
-      "line": 22
+      "line": 19
     },
     {
       "package": "fabrictest",
       "identifier": "CommandPath",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "fabrictest/surface.go",
-      "line": 24
+      "line": 21
     },
     {
       "package": "fabrictest",
       "identifier": "EventData",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "fabrictest/surface.go",
-      "line": 45
+      "line": 42
     },
     {
       "package": "fabrictest",
       "identifier": "EventPath",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "fabrictest/surface.go",
-      "line": 26
-    },
-    {
-      "package": "fabrictest",
-      "identifier": "Interaction",
-      "reason": "auto-whitelist:pattern=type-alias",
-      "file": "fabrictest/surface.go",
-      "line": 56
-    },
-    {
-      "package": "fabrictest",
-      "identifier": "Message",
-      "reason": "auto-whitelist:pattern=type-alias",
-      "file": "fabrictest/surface.go",
-      "line": 63
-    },
-    {
-      "package": "fabrictest",
-      "identifier": "Peer",
-      "reason": "auto-whitelist:pattern=type-alias",
-      "file": "fabrictest/surface.go",
-      "line": 59
+      "line": 23
     },
     {
       "package": "fabrictest",
       "identifier": "PeerAddress",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "fabrictest/surface.go",
-      "line": 51
+      "line": 48
     },
     {
       "package": "fabrictest",
       "identifier": "Privilege",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "fabrictest/surface.go",
-      "line": 66
+      "line": 51
     },
     {
       "package": "fabrictest",
       "identifier": "ReadRequest",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "fabrictest/surface.go",
-      "line": 30
+      "line": 27
     },
     {
       "package": "fabrictest",
       "identifier": "Report",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "fabrictest/surface.go",
-      "line": 41
+      "line": 38
     },
     {
       "package": "fabrictest",
       "identifier": "Result",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "fabrictest/surface.go",
-      "line": 47
-    },
-    {
-      "package": "fabrictest",
-      "identifier": "Session",
-      "reason": "auto-whitelist:pattern=type-alias",
-      "file": "fabrictest/surface.go",
-      "line": 61
+      "line": 44
     },
     {
       "package": "fabrictest",
       "identifier": "StatusError",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "fabrictest/surface.go",
-      "line": 49
+      "line": 46
     },
     {
       "package": "fabrictest",
       "identifier": "SubscribeRequest",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "fabrictest/surface.go",
-      "line": 34
+      "line": 31
     },
     {
       "package": "fabrictest",
       "identifier": "Subscription",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "fabrictest/surface.go",
-      "line": 37
+      "line": 34
     },
     {
       "package": "fabrictest",

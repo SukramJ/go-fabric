@@ -43,7 +43,7 @@ const operationalTimeSetting = "gendiag.operational_ms"
 // node.stateOf(GeneralDiagnosticsServer) reads.
 func genDiagOf(t *testing.T, d *fabrictest.Device) *core.GeneralDiagnostics {
 	t.Helper()
-	root := d.Bridge().Topology().FindByID(0)
+	root := d.Node().Bridge().Topology().FindByID(0)
 	if root == nil {
 		t.Fatal("no root endpoint")
 	}
@@ -82,7 +82,7 @@ func totalOperationalHoursOf(t *testing.T, g *core.GeneralDiagnostics) uint32 {
 // unsigned integer node reads back at the next boot.
 func persistedOperationalMs(t *testing.T, d *fabrictest.Device) uint64 {
 	t.Helper()
-	raw, ok, err := d.Store().GetSetting(context.Background(), operationalTimeSetting)
+	raw, ok, err := d.Node().Store().GetSetting(context.Background(), operationalTimeSetting)
 	if err != nil || !ok {
 		t.Fatalf("persisted operational time: %q, %v, %v", raw, ok, err)
 	}

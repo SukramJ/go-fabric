@@ -28,6 +28,7 @@ import (
 	"github.com/SukramJ/go-fabric/endpoint"
 	"github.com/SukramJ/go-fabric/fabrictest"
 	"github.com/SukramJ/go-fabric/im"
+	"github.com/SukramJ/go-fabric/internal/fabrictestseam"
 	"github.com/SukramJ/go-fabric/node"
 	"github.com/SukramJ/go-fabric/tlv"
 )
@@ -136,7 +137,7 @@ func TestMaxPathsPerInvokeIsEnforced(t *testing.T) {
 			{Path: cmdPath(ep, 0x0006, 0x00), CommandRef: 1, HasCommandRef: true},
 			{Path: cmdPath(ep, 0x0006, 0x01), CommandRef: 2, HasCommandRef: true},
 		}})
-		msg, err := fabrictest.Exchange(parityCtx(t), p, im.OpcodeInvokeRequest, batch)
+		msg, err := fabrictestseam.Exchange(parityCtx(t), p, im.OpcodeInvokeRequest, batch)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -196,7 +197,7 @@ func TestAggregatorIncreaseConfigurationVersions(t *testing.T) {
 		if !ok {
 			t.Fatalf("no endpoint %q", key)
 		}
-		return d.Bridge().Topology().FindByID(id).ConfigurationVersion()
+		return d.Node().Bridge().Topology().FindByID(id).ConfigurationVersion()
 	}
 	root, va, vb := rootVersion(), bridgedVersion("light:a"), bridgedVersion("light:b")
 

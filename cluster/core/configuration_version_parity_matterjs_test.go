@@ -49,7 +49,7 @@ func configVersionDevice(t *testing.T, keys ...string) *fabrictest.Device {
 // rootBasicInformation is the device's root BasicInformation server.
 func rootBasicInformation(t *testing.T, d *fabrictest.Device) *core.BasicInformation {
 	t.Helper()
-	root := d.Bridge().Topology().FindByID(0)
+	root := d.Node().Bridge().Topology().FindByID(0)
 	if root == nil {
 		t.Fatal("no root endpoint")
 	}
@@ -81,7 +81,7 @@ func bridgedConfigVersion(t *testing.T, d *fabrictest.Device, key string) uint32
 	if !ok {
 		t.Fatalf("no endpoint %q", key)
 	}
-	return d.Bridge().Topology().FindByID(id).ConfigurationVersion()
+	return d.Node().Bridge().Topology().FindByID(id).ConfigurationVersion()
 }
 
 // TestConfigurationVersionRunsTheChangeThenIncrements ports "runs the change
@@ -94,7 +94,7 @@ func TestConfigurationVersionRunsTheChangeThenIncrements(t *testing.T) {
 	before := configVersion(t, d)
 
 	ran := false
-	d.Bridge().IncreaseNodeConfigurationVersionWith(func(*bridge.ConfigurationChange) {
+	d.Node().Bridge().IncreaseNodeConfigurationVersionWith(func(*bridge.ConfigurationChange) {
 		ran = true
 		if got := configVersion(t, d); got != before {
 			t.Errorf("version inside the change = %d, want %d (raised afterwards)", got, before)
@@ -119,7 +119,7 @@ func TestConfigurationVersionRunsTheChangeThenIncrements(t *testing.T) {
 func TestConfigurationVersionRefusesADecrease(t *testing.T) {
 	t.Parallel()
 	d := configVersionDevice(t)
-	d.Bridge().IncreaseNodeConfigurationVersionWith(nil)
+	d.Node().Bridge().IncreaseNodeConfigurationVersionWith(nil)
 	raised := configVersion(t, d)
 	if raised != 2 {
 		t.Fatalf("after one increase ConfigurationVersion = %d, want 2", raised)
@@ -142,7 +142,7 @@ func TestConfigurationVersionGroupsBridgedChanges(t *testing.T) {
 	d := configVersionDevice(t, "lightA", "lightB")
 	before := configVersion(t, d)
 
-	d.Bridge().IncreaseNodeConfigurationVersionWith(func(c *bridge.ConfigurationChange) {
+	d.Node().Bridge().IncreaseNodeConfigurationVersionWith(func(c *bridge.ConfigurationChange) {
 		c.IncreaseConfigurationVersion(node.Scope, "lightA")
 		c.IncreaseConfigurationVersion(node.Scope, "lightB")
 	})

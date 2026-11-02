@@ -17,6 +17,7 @@ import (
 	basicinfo "github.com/SukramJ/go-fabric/cluster/spec/basicinformation"
 	"github.com/SukramJ/go-fabric/controller/client"
 	"github.com/SukramJ/go-fabric/fabrictest"
+	"github.com/SukramJ/go-fabric/internal/fabrictestseam"
 	"github.com/SukramJ/go-fabric/node"
 )
 
@@ -36,7 +37,7 @@ func TestClientStartUpParity(t *testing.T) {
 			}
 		}}})
 		addr, _ := cp.node.PeerAddress()
-		live := cp.pair.Controller.Peers().Get(addr).NewestSession()
+		live := fabrictestseam.Peers(cp.pair.Controller).Get(addr).NewestSession()
 		if live == nil {
 			t.Fatal("no live session")
 		}
@@ -58,7 +59,7 @@ func TestClientStartUpParity(t *testing.T) {
 			t.Fatal(err)
 		}
 		kept := false
-		for _, s := range cp.pair.Controller.Exchanges().SessionsFor(addr) {
+		for _, s := range fabrictestseam.Exchanges(cp.pair.Controller).SessionsFor(addr) {
 			kept = kept || s == live
 		}
 		if !kept || live.IsPeerLost() {

@@ -34,7 +34,7 @@ func TestBridgedPowerSourceConfiguration(t *testing.T) {
 	}
 	site := fabrictest.NewSite(t, fabrictest.Options{})
 	pair := site.CommissionedPair(fabrictest.PairOptions{Device: fabrictest.Topology{Bridged: []node.Endpoint{light}}})
-	if v := pair.Device.Bridge().DeviceTypeViolations(); len(v) != 0 {
+	if v := pair.Device.Node().Bridge().DeviceTypeViolations(); len(v) != 0 {
 		t.Fatalf("device-type violations: %+v", v)
 	}
 	ep, _ := light.EndpointNumber()

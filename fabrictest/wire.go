@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/SukramJ/go-fabric/client/interaction"
 	"github.com/SukramJ/go-fabric/client/peer"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	"github.com/SukramJ/go-fabric/controller/client"
@@ -33,28 +34,29 @@ var ErrNotCommissioned = errors.New("fabrictest: the pair is not commissioned")
 
 // run runs fn under the pair's site's clock.
 func run(ctx context.Context, p *Pair, fn func(ctx context.Context) error) error {
-	if p == nil || (!p.Commissioned() && p.PASESession == nil) {
+	if p == nil || (!p.Commissioned() && p.paseSession == nil) {
 		return ErrNotCommissioned
 	}
 	return p.Controller.site.Run(ctx, fn)
 }
 
-// Connect returns the controller's interaction with the pair's device,
+// connect returns the controller's interaction with the pair's device
+// (internal/fabrictestseam.Connect),
 // opening a CASE session first when the peer holds none —
 // node-helpers.ts interaction.connect (:370), which creates a secure
 // session on the node.
-func Connect(ctx context.Context, p *Pair) (*Interaction, error) {
+func connect(ctx context.Context, p *Pair) (*interaction.Interaction, error) {
 	err := run(ctx, p, func(ctx context.Context) error {
-		if p.Peer == nil || p.Peer.HasSession() {
+		if p.peer == nil || p.peer.HasSession() {
 			return nil
 		}
-		_, err := p.Peer.Connect(ctx, peer.ConnectOptions{})
+		_, err := p.peer.Connect(ctx, peer.ConnectOptions{})
 		return err
 	})
 	if err != nil {
 		return nil, err
 	}
-	return p.Interaction, nil
+	return p.interaction, nil
 }
 
 // Read reads one attribute and returns its data — node-helpers.ts
@@ -84,7 +86,7 @@ func ReadWith(ctx context.Context, p *Pair, req ReadRequest) (*Report, error) {
 	var r *Report
 	err := run(ctx, p, func(ctx context.Context) error {
 		var err error
-		r, err = p.Interaction.ReadWith(ctx, req)
+		r, err = p.interaction.ReadWith(ctx, req)
 		return err
 	})
 	return r, err
@@ -160,7 +162,7 @@ func WriteTimed(ctx context.Context, p *Pair, path AttributePath, value spec.Enc
 
 func write(ctx context.Context, p *Pair, path AttributePath, value spec.Encodable, opts client.WriteOptions) error {
 	return run(ctx, p, func(ctx context.Context) error {
-		res, err := p.Interaction.Write(ctx, []client.WriteRequest{{Path: path, Value: value}}, opts)
+		res, err := p.interaction.Write(ctx, []client.WriteRequest{{Path: path, Value: value}}, opts)
 		if err != nil {
 			return err
 		}
@@ -195,7 +197,7 @@ func invoke(ctx context.Context, p *Pair, path CommandPath, fields spec.Encodabl
 	var res Result
 	err := run(ctx, p, func(ctx context.Context) error {
 		var err error
-		res, err = p.Interaction.Invoke(ctx, path, fields, opts)
+		res, err = p.interaction.Invoke(ctx, path, fields, opts)
 		return err
 	})
 	return res, err
@@ -209,7 +211,7 @@ func Subscribe(ctx context.Context, p *Pair, req SubscribeRequest) (*Subscriptio
 	var sub *Subscription
 	err := run(ctx, p, func(ctx context.Context) error {
 		var err error
-		sub, err = p.Interaction.Subscribe(ctx, req)
+		sub, err = p.interaction.Subscribe(ctx, req)
 		return err
 	})
 	return sub, err

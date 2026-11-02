@@ -49,7 +49,7 @@ func TestControllerConfigOnTheSite(t *testing.T) {
 	if found != 1 {
 		t.Fatalf("found %d devices", found)
 	}
-	if dev.Peers() == nil {
+	if dev.Node().Peers() == nil {
 		t.Fatal("the daemon's client stack is not on the site")
 	}
 }

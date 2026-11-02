@@ -180,7 +180,7 @@ func TestGroupKeyManagementMulticastPolicy(t *testing.T) {
 			t.Fatalf("fabrics %v, %v", fabrics, err)
 		}
 		// The stored key set: store.GroupKeySet has no policy field.
-		stored, err := p.Device.Store().GetGroupKeySet(context.Background(), fabrics[0].FabricIndex, 1)
+		stored, err := p.Device.Node().Store().GetGroupKeySet(context.Background(), fabrics[0].FabricIndex, 1)
 		if err != nil {
 			t.Fatalf("stored key set 1: %v", err)
 		}

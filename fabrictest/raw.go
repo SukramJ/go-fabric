@@ -11,7 +11,7 @@ import (
 	"github.com/SukramJ/go-fabric/im"
 )
 
-// Exchange sends one Interaction Model message — opcode and its TLV
+// rawExchange (internal/fabrictestseam.Exchange) sends one Interaction Model message — opcode and its TLV
 // payload — on a new exchange over the pair's session and returns the
 // device's first answer. It is for the request the controller's own
 // formulation refuses to send: a wildcard write carrying a DataVersion, a
@@ -21,10 +21,10 @@ import (
 // readAttrRaw in read-helpers.ts). The exchange is closed when the answer
 // has arrived; an answer that is itself a request for more (a chunked
 // report) is the caller's to read no further.
-func Exchange(ctx context.Context, p *Pair, opcode uint8, payload []byte) (*Message, error) {
-	var msg *Message
+func rawExchange(ctx context.Context, p *Pair, opcode uint8, payload []byte) (*exchange.Message, error) {
+	var msg *exchange.Message
 	err := run(ctx, p, func(ctx context.Context) error {
-		x, err := p.Interaction.Provider().InitiateExchange(ctx, interaction.ExchangeOptions{})
+		x, err := p.interaction.Provider().InitiateExchange(ctx, interaction.ExchangeOptions{})
 		if err != nil {
 			return err
 		}
@@ -52,7 +52,7 @@ func Exchange(ctx context.Context, p *Pair, opcode uint8, payload []byte) (*Mess
 // (exchange.Exchange.Close).
 func Send(ctx context.Context, p *Pair, opcode uint8, payload []byte) error {
 	return run(ctx, p, func(ctx context.Context) error {
-		x, err := p.Interaction.Provider().InitiateExchange(ctx, interaction.ExchangeOptions{})
+		x, err := p.interaction.Provider().InitiateExchange(ctx, interaction.ExchangeOptions{})
 		if err != nil {
 			return err
 		}

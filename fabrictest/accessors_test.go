@@ -12,6 +12,7 @@ import (
 	"github.com/SukramJ/go-fabric/endpoint/endpointtest"
 	"github.com/SukramJ/go-fabric/fabrictest"
 	"github.com/SukramJ/go-fabric/im"
+	"github.com/SukramJ/go-fabric/internal/fabrictestseam"
 	"github.com/SukramJ/go-fabric/mdns"
 )
 
@@ -33,14 +34,14 @@ func TestAccessors(t *testing.T) {
 	if d.Passcode() != fabrictest.DefaultPasscode || d.Discriminator() != fabrictest.DefaultDiscriminator {
 		t.Fatalf("passcode %d discriminator %d", d.Passcode(), d.Discriminator())
 	}
-	if d.Node().Aggregator() != nil || len(d.Endpoints()) < 2 {
-		t.Fatalf("host topology: aggregator %v, %d endpoints", d.Node().Aggregator(), len(d.Endpoints()))
+	if d.Node().Aggregator() != nil || len(fabrictestseam.Endpoints(d)) < 2 {
+		t.Fatalf("host topology: aggregator %v, %d endpoints", d.Node().Aggregator(), len(fabrictestseam.Endpoints(d)))
 	}
 	if _, ok := d.EndpointOf("nothing"); ok {
 		t.Fatal("an endpoint for an unknown key")
 	}
 	ops := 0
-	for _, svc := range d.Advertiser().Active() {
+	for _, svc := range fabrictestseam.Advertiser(d).Active() {
 		if svc.ServiceType == mdns.ServiceTypeOperational {
 			ops++
 		}
@@ -48,11 +49,11 @@ func TestAccessors(t *testing.T) {
 	if ops != 1 {
 		t.Fatalf("%d operational records", ops)
 	}
-	if d.Store() == nil || d.Bridge() == nil {
+	if d.Node().Store() == nil || d.Node().Bridge() == nil {
 		t.Fatal("no store or bridge")
 	}
-	if c.Exchanges() == nil || c.Names() == nil || c.CA() == nil || c.Peers() == nil || c.Resumption() == nil ||
-		c.Commissioner() == nil || c.Registry() == nil || c.Subscriptions() == nil || c.Addr() == nil {
+	if fabrictestseam.Exchanges(c) == nil || fabrictestseam.Names(c) == nil || c.CA() == nil || fabrictestseam.Peers(c) == nil || fabrictestseam.Resumption(c) == nil ||
+		c.Commissioner() == nil || c.Registry() == nil || fabrictestseam.Subscriptions(c) == nil || c.Addr() == nil {
 		t.Fatal("a controller part is missing")
 	}
 	if c.Fabric().FabricID != fabrictest.DefaultFabricID {

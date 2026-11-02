@@ -43,6 +43,7 @@ import (
 	"github.com/SukramJ/go-fabric/cluster/thermo"
 	"github.com/SukramJ/go-fabric/fabrictest"
 	"github.com/SukramJ/go-fabric/im"
+	"github.com/SukramJ/go-fabric/internal/fabrictestseam"
 )
 
 var schedulesOnly = []uint32{tdef.AttrSchedules}
@@ -99,7 +100,7 @@ func (p *thermostatPair) endSchedules(t *testing.T, requestType uint8, attrs ...
 func (p *thermostatPair) writeSchedules(t *testing.T, q *fabrictest.Pair, list []thermo.Schedule) im.StatusCode {
 	t.Helper()
 	ctx := parityCtx(t)
-	ia, err := fabrictest.Connect(ctx, q)
+	ia, err := fabrictestseam.Connect(ctx, q)
 	if err != nil {
 		t.Fatal(err)
 	}
