@@ -668,8 +668,10 @@ func (g *GeneralCommissioning) handleArmFailSafe(ctx context.Context, fields any
 	g.mu.Unlock()
 	unlocked = true
 	if armedHook != nil && !extending {
-		// Mirrors matter.js OperationalCredentialsServer.ts:
-		// FailSafeContext is recreated on every ArmFailSafe, surfacing a
+		// Mirrors matter.js GeneralCommissioningServer.ts:90-100 at
+		// 862ad75f: an ArmFailSafe while armed extends the fail-safe
+		// context, one while disarmed creates a new
+		// ServerNodeFailsafeContext (the hook runs only then), surfacing a
 		// fresh `rootCertSet` / `fabricIndex` set so multi-admin pairing
 		// (Apple's SystemCommissioner adds the iCloud-Heim fabric after
 		// the iPhone fabric is installed) can run a clean CSRRequest +
@@ -1006,7 +1008,7 @@ const PaseSessionAutoArmSeconds uint16 = 60
 // armed. This mirrors the defensive safety-net that matter.js's
 // GeneralCommissioningServer.ts applies on every new PASE session
 // (packages/node/src/behaviors/general-commissioning/
-// GeneralCommissioningServer.ts:67-82): the window ensures that any
+// GeneralCommissioningServer.ts:55-66 at 862ad75f): the window ensures that any
 // uncommitted configuration state is rolled back via the expiry hook
 // if the commissioner disappears without calling CommissioningComplete.
 //

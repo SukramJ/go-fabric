@@ -162,8 +162,9 @@ var (
 // that implement [contract.FabricScopedReader] receive MatterReadFiltered
 // instead of MatterRead so they can project fabric-sensitive list
 // attributes (OperationalCredentials.Fabrics, AccessControl.ACL) down
-// to the requesting fabric. Mirrors matter.js InteractionServer.ts:
-// startReadInteraction → OnlineContext.forFabricFilteredRead.
+// to the requesting fabric. Mirrors matter.js InteractionServer.ts
+// #executeReadInteraction → #prepareOnlineContext(…, isFabricFiltered)
+// (:306-326 at 862ad75f).
 func (d *TopologyDispatcher) Read(ctx context.Context, path im.ConcreteAttributePath) []im.ReadResult {
 	endpoints := d.resolveEndpoints(path)
 	if len(endpoints) == 0 {
@@ -646,8 +647,9 @@ func (d *TopologyDispatcher) attributesFor(srv contract.ClusterServer, path im.C
 // implements [contract.FabricScopedReader], MatterReadFiltered is
 // called in preference to MatterRead so the server can project
 // fabric-sensitive lists (e.g. OperationalCredentials.Fabrics) to
-// the requesting fabric. Mirrors matter.js InteractionServer.ts:
-// startReadInteraction → OnlineContext.forFabricFilteredRead.
+// the requesting fabric. Mirrors matter.js InteractionServer.ts
+// #executeReadInteraction → #prepareOnlineContext(…, isFabricFiltered)
+// (:306-326 at 862ad75f).
 //
 // DataVersion: when srv implements [contract.ClusterDataVersion]
 // its current DataVersion is stamped on the ReadResult. The IM layer
