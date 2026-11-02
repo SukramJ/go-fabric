@@ -281,7 +281,7 @@ func (s *otaSite) announce(t *testing.T, reason otadef.AnnouncementReasonEnum) e
 // run.
 func (s *otaSite) transitions() []otadef.StateTransitionEvent {
 	var out []otadef.StateTransitionEvent
-	for _, rec := range s.req.Bridge().EventLog().Query(0, otadef.ClusterID, otadef.EventStateTransition, 0) {
+	for _, rec := range s.req.Node().Bridge().EventLog().Query(0, otadef.ClusterID, otadef.EventStateTransition, 0) {
 		if ev, ok := rec.Payload.(otadef.StateTransitionEvent); ok {
 			out = append(out, ev)
 		}
@@ -292,7 +292,7 @@ func (s *otaSite) transitions() []otadef.StateTransitionEvent {
 // versionsApplied are the requestor's VersionApplied events of its run.
 func (s *otaSite) versionsApplied() []uint32 {
 	var out []uint32
-	for _, rec := range s.req.Bridge().EventLog().Query(0, otadef.ClusterID, otadef.EventVersionApplied, 0) {
+	for _, rec := range s.req.Node().Bridge().EventLog().Query(0, otadef.ClusterID, otadef.EventVersionApplied, 0) {
 		if ev, ok := rec.Payload.(otadef.VersionAppliedEvent); ok {
 			out = append(out, ev.SoftwareVersion)
 		}
@@ -316,7 +316,7 @@ func (s *otaSite) updateState() otadef.UpdateStateEnum {
 // update in progress (storageFor(device)[…].updateInProgressDetails).
 func (s *otaSite) storedInProgress(t *testing.T, d *fabrictest.Device) bool {
 	t.Helper()
-	b, ok, err := d.Store().LoadOTARequestorState(context.Background())
+	b, ok, err := d.Node().Store().LoadOTARequestorState(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}

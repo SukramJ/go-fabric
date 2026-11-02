@@ -23,6 +23,7 @@ import (
 	"github.com/SukramJ/go-fabric/controller/client"
 	"github.com/SukramJ/go-fabric/controller/commissioner"
 	"github.com/SukramJ/go-fabric/fabrictest"
+	"github.com/SukramJ/go-fabric/internal/fabrictestseam"
 	"github.com/SukramJ/go-fabric/transport/message"
 )
 
@@ -68,7 +69,7 @@ func TestCaseConnectionTimeoutParity(t *testing.T) {
 		if !errors.As(err, &ue) || !strings.Contains(ue.Error(), budget.String()) {
 			t.Fatalf("commission: %v, want an UnreachableError naming %v", err, budget)
 		}
-		if n := p.Controller.Peers().Size(); n != 0 {
+		if n := fabrictestseam.Peers(p.Controller).Size(); n != 0 {
 			t.Fatalf("peer set size %d, want 0", n)
 		}
 	})

@@ -37,7 +37,7 @@ func (p *Pair) Grant(ctx context.Context, privilege Privilege) error {
 		if f.NodeID != p.Address.NodeID {
 			continue
 		}
-		return p.Device.Store().ReplaceACL(ctx, f.FabricIndex, []store.ACLEntry{{
+		return p.Device.Node().Store().ReplaceACL(ctx, f.FabricIndex, []store.ACLEntry{{
 			FabricIndex: f.FabricIndex, Privilege: privilege, AuthMode: store.AuthModeCASE,
 			Subjects: []uint64{p.Controller.opts.NodeID},
 		}})

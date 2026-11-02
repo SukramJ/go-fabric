@@ -41,6 +41,7 @@ import (
 	onoffdef "github.com/SukramJ/go-fabric/cluster/spec/onoff"
 	"github.com/SukramJ/go-fabric/controller/client"
 	"github.com/SukramJ/go-fabric/im"
+	"github.com/SukramJ/go-fabric/internal/fabrictestseam"
 )
 
 // accessControlCluster is the AccessControl cluster id.
@@ -153,7 +154,7 @@ func resubscribedClustersOf(t *testing.T, req client.SubscribeRequest) map[uint3
 	mu.Lock()
 	got = map[uint32]uint32{}
 	mu.Unlock()
-	subs := cp.pair.Controller.Subscriptions()
+	subs := fabrictestseam.Subscriptions(cp.pair.Controller)
 	subs.CloseForPeer(subs.Active()[0].Peer())
 	cp.eventually(t, "the replacement subscription", func() bool {
 		mu.Lock()

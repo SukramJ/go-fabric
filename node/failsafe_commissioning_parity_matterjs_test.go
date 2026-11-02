@@ -100,7 +100,12 @@ func TestFailsafeCommissioningParity(t *testing.T) {
 		return len(f)
 	}
 
-	t.Run("re-announces after failsafe expiry with PASE session active (before addNOC)", func(t *testing.T) {
+	// matter.js's two cases are titled "re-announces after failsafe expiry
+	// …"; these assert the rollback and the commissionable record only.
+	// The re-announcement itself is missing (notes/parity/matterjs_tests.md,
+	// FailsafeCommissioningTest.ts), so the subtests are named for what they
+	// check (W6-reg-17).
+	t.Run("rolls back and stays commissionable after failsafe expiry with PASE session active (before addNOC)", func(t *testing.T) {
 		t.Parallel()
 		site, u, spy := newDevice(t)
 		ctx := parityCtx(t)
@@ -126,7 +131,7 @@ func TestFailsafeCommissioningParity(t *testing.T) {
 		}
 	})
 
-	t.Run("re-announces after failsafe expiry with CASE session after addNOC (before CommissioningComplete)", func(t *testing.T) {
+	t.Run("rolls back the fabric and stays commissionable after failsafe expiry with CASE session after addNOC (before CommissioningComplete)", func(t *testing.T) {
 		t.Parallel()
 		site, u, spy := newDevice(t)
 		ctx := parityCtx(t)

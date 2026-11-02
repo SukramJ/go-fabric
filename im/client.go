@@ -101,7 +101,7 @@ func marshalDataVersionFilter(enc *tlv.Encoder, f DataVersionFilter) {
 // DataVersionFilterSize is the encoded size of f as one member of the
 // DataVersionFilters array — what matter.js's #shortenDataVersionFilters
 // measures with TlvDataVersionFilter.encode
-// (interaction/InteractionMessenger.ts:1036-1037).
+// (interaction/InteractionMessenger.ts:1181 at 862ad75f).
 func DataVersionFilterSize(f DataVersionFilter) int {
 	enc := tlv.NewEncoder()
 	marshalDataVersionFilter(enc, f)
@@ -114,7 +114,8 @@ func DataVersionFilterSize(f DataVersionFilter) int {
 // 0ceb202d with the request action/request/Write.ts:56-184 builds:
 // SuppressResponse (0) only when set, TimedRequest (1), WriteRequests (2)
 // of AttributeDataIB — DataVersion (0) when set, Path (1), Data (2)
-// through valueWriter (TlvAttributeData.ts) — MoreChunkedMessages (3),
+// through valueWriter (the attribute's own TLV schema, Write.ts:165-186
+// at 862ad75f) — MoreChunkedMessages (3),
 // which a client sends false (Write.ts:77), and InteractionModelRevision
 // (0xFF).
 func (w WriteRequest) MarshalTLV(enc *tlv.Encoder, valueWriter AttributeValueWriter) {
@@ -143,7 +144,7 @@ func (w WriteRequest) MarshalTLV(enc *tlv.Encoder, valueWriter AttributeValueWri
 // packages/types/src/protocol/messages/TlvTimedRequest.ts:13-17 (Timeout
 // (0) in milliseconds, InteractionModelRevision (0xFF)), as
 // InteractionClientMessenger.sendTimedRequest fills it
-// (interaction/InteractionMessenger.ts:1124-1136).
+// (interaction/InteractionMessenger.ts:1440-1452 at 862ad75f).
 func (r TimedRequest) MarshalTLV(enc *tlv.Encoder) {
 	enc.StartStruct(tlv.AnonymousTag())
 	enc.PutUint(tlv.ContextTag(tagTimedReqTimeout), uint64(r.TimeoutMs))

@@ -313,8 +313,11 @@ const (
 	// DeviceTypeValidationWarn, the default: a new violation is reported
 	// for logging; only a misplaced singleton is refused.
 	DeviceTypeValidationWarn DeviceTypeValidationMode = iota
-	// DeviceTypeValidationStrict: any new violation is refused — for tests
-	// and for a host that must not run a non-conforming topology.
+	// DeviceTypeValidationStrict: a new violation is refused where an
+	// addition may have caused it (the added endpoint and its subtree, its
+	// ancestors and its siblings), as matter.js refuses only at
+	// construction; any other new violation is reported — for tests and
+	// for a host that must not run a non-conforming topology.
 	DeviceTypeValidationStrict
 	// DeviceTypeValidationOff: nothing is judged or recorded but singleton
 	// placement, which is still refused.

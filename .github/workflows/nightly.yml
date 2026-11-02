@@ -34,6 +34,17 @@ jobs:
       # spurious deadline failure.
       - name: extended fuzz
         run: make fuzz FUZZTIME=2000000x FUZZ_TIMEOUT=600s
+      # A crasher's input is written under the target's testdata/fuzz/ on
+      # the runner; keep it, so the failing input can be committed as a
+      # regression seed (W6-test-11).
+      - name: keep the fuzz corpus of a failing run
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: fuzz-crashers
+          path: "**/testdata/fuzz/**"
+          if-no-files-found: warn
+          retention-days: 30
 
   flakes:
     # The tests the flake sweep fixed at their root (brief CG), each under

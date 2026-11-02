@@ -38,7 +38,7 @@ these interfaces does not drag the host's dependencies into the module.
 | `ClusterAttributeLister` | a server | the attribute set, for wildcard reads and AttributeList | a wildcard read returns only the global attributes |
 | `ClusterCommandLister` | a server | AcceptedCommandList and GeneratedCommandList | both lists are empty |
 | `ClusterEventLister` | a server | EventList | EventList is empty |
-| `ClusterDataVersion` | a server | the cluster's DataVersion | the IM layer stamps a constant 1 |
+| `ClusterDataVersion` | a server | the cluster's DataVersion on the root and the Aggregator | on the root and the Aggregator the IM layer stamps a constant 1; a bridged endpoint's DataVersion is the endpoint's own, kept per cluster, whatever the server implements (`endpoint/dispatcher.go`, `clusterDataVersionFor`) |
 | `ClusterAttributeReadPrivilege` | a server | a read privilege above View | View |
 | `ClusterAttributeWritePrivilege` | a server | a write privilege above Operate | Operate |
 | `ClusterCommandInvokePrivilege` | a server | an invoke privilege above Operate | Operate |
@@ -278,13 +278,12 @@ Host ports of the root servers, reached through `node.Config` or
 | `core.LogProvider` | DiagnosticLogs content. The facade serves its diagnostic event ring |
 
 Clusters the generated server serves with no hand-written logic — among
-them the camera, Thread and TLS clusters, as matter.js serves
-them with its generated behaviour stubs — have no port beyond their
-`Declare`: its command handler fields (`<cluster>def.Declare{…}`, or the
+them WaterTankLevelMonitoring, as matter.js serves it with its generated
+behaviour stub — have no port beyond their `Declare`: its command handler fields (`<cluster>def.Declare{…}`, or the
 typed server's setters at run time) are the host's part, and a mandatory
 command without a handler is unimplemented, absent from
 AcceptedCommandList. AccessControl, OperationalCredentials and
 GroupKeyManagement have a definition but no `Declare`: their servers are
 the hand-written `cluster/core` ones the node mounts.
 
-*Source: `cluster/levelcontrol/native.go:18-73`, `mdns/reannounce.go:15-55`, `node/reannounce.go:15-50`, `node/config.go:237-256`, `cluster/onoff/server.go:55-73`, `cluster/thermo/thermostat_server.go:261-288`, `cluster/core/wifi_network_diagnostics.go:26-28`, `cluster/core/ota_software_update_requestor.go:180`, `cluster/core/ota_provider.go:96-138`, `cluster/core/commissioner_control.go:73-111`, `cluster/core/actions.go:63`, `cluster/core/diagnostic_logs.go:62-67`, `node/node.go:909-915`.*
+*Source: `cluster/levelcontrol/native.go:18-73`, `mdns/reannounce.go:15-55`, `node/reannounce.go:15-50`, `node/config.go:237-256`, `cluster/onoff/server.go:55-73`, `cluster/thermo/thermostat_server.go:261-288`, `cluster/core/wifi_network_diagnostics.go:26-28`, `cluster/core/ota_software_update_requestor.go:180`, `cluster/core/ota_provider.go:96-138`, `cluster/core/commissioner_control.go:73-111`, `cluster/core/actions.go:63`, `cluster/core/diagnostic_logs.go:62-67`, `node/node.go` (`ringLogs`).*

@@ -50,6 +50,7 @@ import (
 	"github.com/SukramJ/go-fabric/cluster/wire"
 	"github.com/SukramJ/go-fabric/fabrictest"
 	"github.com/SukramJ/go-fabric/im"
+	"github.com/SukramJ/go-fabric/internal/fabrictestseam"
 	"github.com/SukramJ/go-fabric/node"
 	"github.com/SukramJ/go-fabric/secure/spake2"
 	"github.com/SukramJ/go-fabric/tlv"
@@ -199,7 +200,7 @@ func TestCommissioningWindowLifetime(t *testing.T) {
 				wg.Add(1)
 				go func() {
 					defer wg.Done()
-					_, results[i] = p.Interaction.Invoke(ctx, openCommissioningWindowPath, newOpenWindowRequest(t), interaction.InvokeOptions{Timed: true})
+					_, results[i] = fabrictestseam.Interaction(p).Invoke(ctx, openCommissioningWindowPath, newOpenWindowRequest(t), interaction.InvokeOptions{Timed: true})
 				}()
 			}
 			wg.Wait()

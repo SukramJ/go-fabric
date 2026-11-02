@@ -1,6 +1,15 @@
 # ADR 0016 — Assembled topologies are validated against their device types, as matter.js validates a server node
 
-- **Status**: Accepted
+- **Status**: Accepted. Note (2026-11-02, review 2026-11 W6-doc-24): since
+  brief CT, `strict` refuses a new violation only where an addition may
+  have caused it — the added endpoint and its descendants, its ancestors
+  and its siblings — as matter.js refuses only at construction
+  (`DeviceTypeConformanceService.ts:295`, `:525-619` at `862ad75f`); a new
+  violation elsewhere is reported, not refused. The Decision's "`strict`
+  refuses any new violation" reads with that scope;
+  [Host ports](../guides/ports.md) has the current rule, and
+  `endpoint/devicetype_validation.go` (`DeviceTypeValidationStrict`) is the
+  authority.
 - **Date**: 2026-10-06
 - **Related**:
   [ADR 0011 — certifiability is a goal](./0011-certifiability-is-a-goal.md),

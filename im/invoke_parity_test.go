@@ -184,31 +184,6 @@ func TestInvokeParity_HandlerEmptyDataMsg_TimedMismatch(t *testing.T) {
 	})
 }
 
-// TestInvokeParity_HandlerRejectMultipleIdenticalCommands_FUTURE is a
-// tracked gap against chip src/app/tests/TestCommandInteraction.cpp:1826
-// (TestCommandHandler_RejectMultipleIdenticalCommands).
-//
-// chip behaviour: when an InvokeRequestMessage contains two
-// CommandDataIB entries with identical (endpoint, cluster, command) paths
-// the handler rejects the entire request — onResponse=0, onError=1,
-// isCommandDispatched=false (chip sees duplicate paths before dispatch).
-//
-// go-fabric behaviour: HandleInvokeRequest iterates all CommandInvocation
-// entries and dispatches each to the Dispatcher independently, producing
-// one InvokeResponseEntry per entry. Duplicate-path detection is not
-// implemented at the IM dispatcher layer; enforcement is the session-layer
-// caller's responsibility (mirrors the per-entry routing model).
-//
-// This is a documented L4-INVOKE-DUP-FUTURE drift: go-fabric accepts
-// duplicates where chip rejects. The test is kept as a skip-annotated
-// anchor so that when duplicate-rejection is implemented (session layer or
-// dispatcher pre-check) the failing assertion is already in place.
-func TestInvokeParity_HandlerRejectMultipleIdenticalCommands_FUTURE(t *testing.T) {
-	t.Skip("FixMe: go-fabric accepts duplicate identical commands (dispatches each independently); " +
-		"chip rejects the whole InvokeRequest with onError=1, isCommandDispatched=false. " +
-		"Tracked as L4-INVOKE-DUP-FUTURE.")
-}
-
 // TestInvokeParity_CommandSender_InvalidMessage mirrors
 // chip src/app/tests/TestCommandInteraction.cpp:819
 // (TestCommandInvalidMessage1).
@@ -264,19 +239,6 @@ func TestInvokeParity_CommandSender_ExtendableCallbackBatchCommandRefEcho(t *tes
 	if ir.Responses[1].CommandRef != ref2 {
 		t.Errorf("response[1]: CommandRef=%d, want %d", ir.Responses[1].CommandRef, ref2)
 	}
-}
-
-// TestInvokeParity_CommandSender_DuplicateCommandRefFails mirrors
-// chip src/app/tests/TestCommandInteraction.cpp:1573
-// (TestCommandSender_ExtendableCallbackBuildingBatchDuplicateCommandRefFails).
-//
-// chip rejects a batch that contains two invocations with the same
-// CommandRef value. In our Go model the validation is the caller's
-// responsibility (the dispatcher layer does not enforce it). We verify
-// the invariant as a semantic-only test that documents the expected
-// caller behaviour.
-func TestInvokeParity_CommandSender_DuplicateCommandRefFails(t *testing.T) {
-	t.Skip("FixMe: duplicate-CommandRef validation lives in the CommandSender layer (caller), not the IM dispatcher; enforcement is the bridge's session-layer responsibility")
 }
 
 // TestInvokeParity_CommandSender_CommandRefAbsent mirrors the implicit

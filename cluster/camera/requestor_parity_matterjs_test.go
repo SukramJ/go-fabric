@@ -495,11 +495,11 @@ func wireCtx(t *testing.T) context.Context {
 func requestorEntries(t *testing.T, pair *fabrictest.Pair, ep uint16) int {
 	t.Helper()
 	ctx := wireCtx(t)
-	fabs, err := pair.Device.Store().ListFabrics(ctx)
+	fabs, err := pair.Device.Node().Store().ListFabrics(ctx)
 	if err != nil || len(fabs) == 0 {
 		t.Fatalf("fabrics %v, %v", fabs, err)
 	}
-	acl, err := pair.Device.Store().ListACL(ctx, fabs[0].FabricIndex)
+	acl, err := pair.Device.Node().Store().ListACL(ctx, fabs[0].FabricIndex)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -545,7 +545,7 @@ func TestRequestorSignallingOverTheWire(t *testing.T) {
 	r := newRequestor(t, rec)
 	_, pair, ep := cameraPair(t, r)
 	ctx := wireCtx(t)
-	fabs, err := pair.Device.Store().ListFabrics(ctx)
+	fabs, err := pair.Device.Node().Store().ListFabrics(ctx)
 	if err != nil || len(fabs) == 0 {
 		t.Fatalf("fabrics %v, %v", fabs, err)
 	}

@@ -360,8 +360,9 @@ func BuildOperationalService(cfg OperationalServiceConfig) Service {
 
 // CommissionableServiceConfig drives [BuildCommissionableService].
 type CommissionableServiceConfig struct {
-	// InstanceID is the 16-byte randomly-generated identifier the
-	// bridge advertises while the commissioning window is open.
+	// InstanceID is the 8-byte randomly-generated identifier (16 hex
+	// digits on the wire) the bridge advertises while the commissioning
+	// window is open.
 	// Caller is responsible for cycling it on every window-open.
 	InstanceID [8]byte
 	// Discriminator is the 12-bit short discriminator (Matter

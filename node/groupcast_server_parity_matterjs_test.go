@@ -140,7 +140,7 @@ func (g *gcNode) member(t *testing.T, groupID uint16) (core.GroupcastMembershipS
 // fabric, as the store holds it.
 func (g *gcNode) groupProperties(t *testing.T, fabric uint8) []uint16 {
 	t.Helper()
-	rows, err := g.dev.Store().ListGroupcastGroups(context.Background(), fabric)
+	rows, err := g.dev.Node().Store().ListGroupcastGroups(context.Background(), fabric)
 	if err != nil {
 		t.Fatal(err)
 	}

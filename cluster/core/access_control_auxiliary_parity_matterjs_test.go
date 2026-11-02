@@ -247,7 +247,7 @@ func joinAuxiliary(t *testing.T, p *fabrictest.Pair, fabric uint8) {
 // group message of auxGroup may Operate endpoint ep.
 func auxAccess(t *testing.T, p *fabrictest.Pair, fabric uint8, ep uint16) bool {
 	t.Helper()
-	checker, ok := p.Device.Bridge().Dispatcher().(im.ACLChecker)
+	checker, ok := p.Device.Node().Bridge().Dispatcher().(im.ACLChecker)
 	if !ok {
 		t.Fatal("the dispatcher checks no ACL")
 	}
@@ -259,7 +259,7 @@ func auxAccess(t *testing.T, p *fabrictest.Pair, fabric uint8, ep uint16) bool {
 // on the root.
 func viewAccess(t *testing.T, p *fabrictest.Pair, fabric uint8) bool {
 	t.Helper()
-	checker := p.Device.Bridge().Dispatcher().(im.ACLChecker)
+	checker := p.Device.Node().Bridge().Dispatcher().(im.ACLChecker)
 	return checker.CheckACL(context.Background(), fabric, auxViewSubject, nil, 0, 0x0028, 1) == im.StatusSuccess
 }
 

@@ -110,7 +110,7 @@ have waved through.
 5. **Record deliberate divergences** in
    [`notes/parity/by_design.md`](../notes/parity/by_design.md) (the living
    catalogue). A non-trivial divergence also gets an ADR under
-   [`docs/adr/`](./adr/). Valid divergences are TypeScript-only optimisations
+   [`docs/adr/`](./adr/README.md). Valid divergences are TypeScript-only optimisations
    that fight Go's GC, or decorator patterns with no Go equivalent. Invalid
    divergences are hand-coding cluster revisions, attribute IDs, constraint
    defaults, status codes, or Apple-required tag patterns — those go verbatim
@@ -137,7 +137,7 @@ them with every change:
 | **One time port** | [`clock/noraw_test.go`](https://github.com/SukramJ/go-fabric/blob/main/clock/noraw_test.go), part of `make test` | no production `.go` file outside `clock/`, `examples/` and `script/` calls or references `time.Now`, `time.AfterFunc`, `time.NewTimer`, `time.NewTicker`, `time.Sleep`, `time.After`, `time.Tick`, `time.Since` or `time.Until`; every interval runs on a `clock.Clock`, so a test drives matter.js's timings with `clocktest.Fake` (after matter.js `MockTime`) instead of the wall clock. Exceptions are listed in the test with a reason and an exact count (one: the socket read deadlines of `mdns/subtype_responder.go`). |
 | **Divergence catalogue** | [`notes/parity/by_design.md`](../notes/parity/by_design.md) | every intentional deviation, with rationale and what pins it |
 | **Open-gap register** | [`notes/parity/matter_behaviour_findings.md`](../notes/parity/matter_behaviour_findings.md) | known behaviour gaps that are *not* by design, as scoped fix packages |
-| **Test-porting register** | [`script/testparity/`](https://github.com/SukramJ/go-fabric/tree/main/script/testparity) (`register.json` against the committed snapshot `matterjs_tests.json`), rendered to [`notes/parity/matterjs_tests.md`](https://github.com/SukramJ/go-fabric/blob/main/notes/parity/matterjs_tests.md); `make testparity-check` and the CI job `testparity` | every `*Test.ts` under matter.js's `packages/node/test` and `packages/protocol/test` at the pin is `ported`, `partial` (naming the `it` cases not covered), `planned` or `excluded` with one of five classes; every Go test an entry names exists; a `ported`, `partial` or `excluded` verdict fails once its matter.js file changes; the number of `planned` files sits exactly on `testparityPlannedRatchet` |
+| **Test-porting register** | [`script/testparity/`](https://github.com/SukramJ/go-fabric/tree/main/script/testparity) (`register.json` against the committed snapshot `matterjs_tests.json`), rendered to [`notes/parity/matterjs_tests.md`](https://github.com/SukramJ/go-fabric/blob/main/notes/parity/matterjs_tests.md); `make testparity-check` and the CI job `testparity` | every `*Test.ts` under matter.js's `packages/node/test` and `packages/protocol/test` at the pin is `ported`, `partial` (naming the `it` cases not covered), `planned` or `excluded` with one of five classes; every Go test an entry names exists; a `ported`, `partial` or `excluded` verdict fails once its matter.js file changes; the number of `planned` files, of `ported` files and of missing `it` cases summed over the `partial` entries sit exactly on `testparityPlannedRatchet`, `testparityPortedRatchet` and `testparityMissingRatchet`; every Go test whose body is a `t.Skip("FixMe: …")` is a row of the register's `skips` |
 
 When a parity sweep is genuinely warranted, prefer extending these guards over
 producing a throw-away report: a guard catches the *next* regression, a report

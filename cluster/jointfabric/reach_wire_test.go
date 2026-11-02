@@ -71,7 +71,7 @@ func TestAnnounceThroughTheNodesCommissionerReach(t *testing.T) {
 	}
 	grant := func(d *fabrictest.Device, subjects ...uint64) {
 		t.Helper()
-		if err := d.Store().ReplaceACL(ctx, 1, []store.ACLEntry{{
+		if err := d.Node().Store().ReplaceACL(ctx, 1, []store.ACLEntry{{
 			FabricIndex: 1, Privilege: store.PrivilegeAdminister, AuthMode: store.AuthModeCASE,
 			Subjects: append([]uint64{b.Fabric().RootNodeID}, subjects...),
 		}}); err != nil {
@@ -90,7 +90,7 @@ func TestAnnounceThroughTheNodesCommissionerReach(t *testing.T) {
 		t.Helper()
 		var status im.StatusCode
 		err := site.Run(ctx, func(ctx context.Context) error {
-			p, err := announcer.Peers().For(handshake.PeerAddress{FabricIndex: 1, NodeID: pairT.Address.NodeID})
+			p, err := announcer.Node().Peers().For(handshake.PeerAddress{FabricIndex: 1, NodeID: pairT.Address.NodeID})
 			if err != nil {
 				return err
 			}

@@ -87,11 +87,6 @@ var (
 	// material is generated — mirrors matter.js CaseServer.ts:88-90 and
 	// :239 (FabricNotFoundError thrown ahead of createKeyPair).
 	ErrNoSharedTrustRoots = errors.New("sigma: no shared trust roots for the addressed fabric")
-	// ErrResumptionMICInvalid is returned when the initiatorResumeMIC in
-	// Sigma1 fails AES-CCM verification against the KDFSR1 key derived
-	// from the resumption record's shared secret. The responder MUST
-	// fall back to Full Sigma per matter.js CaseServer.ts::#resume.
-	ErrResumptionMICInvalid = errors.New("sigma: initiator resume MIC verification failed")
 )
 
 // SessionKeys is the final key material both sides derive after

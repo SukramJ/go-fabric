@@ -41,10 +41,20 @@
 //	      "reason":      "<one sentence>", // every entry
 //	      "snapshotSha": "<40 hex>"       // the blob the mapping was checked against
 //	    }
+//	  ],
+//	  "skips": [
+//	    {
+//	      "test":   "<module-relative package dir>:<TestFunc>",
+//	      "source": "<the matter.js or chip case it would mirror>",
+//	      "reason": "<why it does not run>"
+//	    }
 //	  ]
 //	}
 //
-// Entries are sorted by path. ported means the Go tests cover the file's it
+// Entries are sorted by path, skips by test. A skip is a Go test whose body
+// is an unconditional t.Skip("FixMe: …"): it names a gap and tests nothing,
+// so it is listed here, rendered on the page and reviewed with the register
+// instead of being read later as a fact. ported means the Go tests cover the file's it
 // cases semantically; partial names the it cases they do not cover. The
 // classes: controller-stage — controller behaviour this module does not have
 // yet; js-runtime-only — tests of JavaScript runtime concerns (observables,
@@ -59,8 +69,11 @@
 // whose snapshotSha differs from the snapshot fails ("re-check the mapping"),
 // an excluded one too ("re-check the exclusion": its reason may no longer
 // hold),
-// the committed page is what rendering produces, and the number of planned
-// entries sits exactly on testparityPlannedRatchet. It needs no matter.js
+// every FixMe-skipped Go test in the module is a skips row and every row
+// such a test, the committed page is what rendering produces, and three
+// exact ratchets hold: the planned entries (testparityPlannedRatchet), the
+// ported entries (testparityPortedRatchet) and the missing it cases summed
+// over the partial entries (testparityMissingRatchet). It needs no matter.js
 // clone: the snapshot is committed.
 package main
 

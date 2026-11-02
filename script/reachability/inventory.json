@@ -1,6 +1,6 @@
 {
-  "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 7277,
+  "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library; its example programs are one host's composition, not a production root set)",
+  "entry_points": 7271,
   "entry_packages": [
     ".",
     "bdx",
@@ -276,54 +276,13 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 17090,
-    "reachable": 12015,
+    "total_exported": 17097,
+    "reachable": 12025,
     "whitelisted": 5072,
-    "unreachable": 3
+    "unreachable": 0
   },
-  "by_package": [
-    {
-      "package": "secure/channel",
-      "unreachable_funcs": 0,
-      "unreachable_types": 0,
-      "unreachable_other": 1
-    },
-    {
-      "package": "secure/mattercert",
-      "unreachable_funcs": 0,
-      "unreachable_types": 0,
-      "unreachable_other": 1
-    },
-    {
-      "package": "secure/sigma",
-      "unreachable_funcs": 0,
-      "unreachable_types": 0,
-      "unreachable_other": 1
-    }
-  ],
-  "unreachable": [
-    {
-      "package": "secure/channel",
-      "identifier": "ErrCounterReplayed",
-      "file": "secure/channel/session.go",
-      "line": 23,
-      "kind": "var"
-    },
-    {
-      "package": "secure/mattercert",
-      "identifier": "ErrExpired",
-      "file": "secure/mattercert/verify.go",
-      "line": 67,
-      "kind": "var"
-    },
-    {
-      "package": "secure/sigma",
-      "identifier": "ErrResumptionMICInvalid",
-      "file": "secure/sigma/sigma.go",
-      "line": 94,
-      "kind": "var"
-    }
-  ],
+  "by_package": [],
+  "unreachable": null,
   "whitelisted": [
     {
       "package": "bdx",
@@ -688,27 +647,6 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/application_clusters_wire_test.go",
       "line": 270
-    },
-    {
-      "package": "bridge",
-      "identifier": "TestApplyOutboundPrivacy_ClosedSession_ReturnsError",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "bridge/privacy_test.go",
-      "line": 295
-    },
-    {
-      "package": "bridge",
-      "identifier": "TestApplyOutboundPrivacy_NoPrivacyBit_NonNilSession",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "bridge/privacy_test.go",
-      "line": 266
-    },
-    {
-      "package": "bridge",
-      "identifier": "TestApplyOutboundPrivacy_TooShortForMIC",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "bridge/privacy_test.go",
-      "line": 241
     },
     {
       "package": "bridge",
@@ -3732,14 +3670,14 @@
       "identifier": "TestMaybeUnmaskPrivacy_ClosedSession_ReturnsError",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/privacy_test.go",
-      "line": 321
+      "line": 236
     },
     {
       "package": "bridge",
       "identifier": "TestMaybeUnmaskPrivacy_TooShortForMIC_AfterSessionResolve",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/privacy_test.go",
-      "line": 358
+      "line": 273
     },
     {
       "package": "bridge",
@@ -4411,49 +4349,49 @@
       "identifier": "TestPrivacyHeaderEnd_ClampedToLength",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/privacy_test.go",
-      "line": 227
+      "line": 223
     },
     {
       "package": "bridge",
       "identifier": "TestPrivacyHeaderEnd_Dest16bit",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/privacy_test.go",
-      "line": 215
+      "line": 211
     },
     {
       "package": "bridge",
       "identifier": "TestPrivacyHeaderEnd_Dest64bit",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/privacy_test.go",
-      "line": 204
+      "line": 200
     },
     {
       "package": "bridge",
       "identifier": "TestPrivacyHeaderEnd_NoNodeIDs",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/privacy_test.go",
-      "line": 182
+      "line": 178
     },
     {
       "package": "bridge",
       "identifier": "TestPrivacyHeaderEnd_TooShort",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/privacy_test.go",
-      "line": 171
+      "line": 167
     },
     {
       "package": "bridge",
       "identifier": "TestPrivacyHeaderEnd_WithSourceNodeID",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/privacy_test.go",
-      "line": 193
+      "line": 189
     },
     {
       "package": "bridge",
       "identifier": "TestPrivacy_NoSessionLookup_ReturnsError",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/privacy_test.go",
-      "line": 122
+      "line": 118
     },
     {
       "package": "bridge",
@@ -4467,42 +4405,42 @@
       "identifier": "TestPrivacy_OutboundInboundRoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/privacy_test.go",
-      "line": 43
+      "line": 39
     },
     {
       "package": "bridge",
       "identifier": "TestPrivacy_PASESessionIDRejected",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/privacy_test.go",
-      "line": 153
+      "line": 149
     },
     {
       "package": "bridge",
       "identifier": "TestPrivacy_RoundTripCoversSourceAndDestinationNodeIDs",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/privacy_test.go",
-      "line": 494
+      "line": 391
     },
     {
       "package": "bridge",
       "identifier": "TestPrivacy_SessionNotFound_ReturnsError",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/privacy_test.go",
-      "line": 136
+      "line": 132
     },
     {
       "package": "bridge",
       "identifier": "TestPrivacy_TooShortBuffer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/privacy_test.go",
-      "line": 112
+      "line": 108
     },
     {
       "package": "bridge",
       "identifier": "TestPrivacy_UnicastWithPBitIsDropped",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/privacy_test.go",
-      "line": 470
+      "line": 367
     },
     {
       "package": "bridge",
@@ -5052,17 +4990,17 @@
     },
     {
       "package": "bridge",
+      "identifier": "TestSendReply_NeverSetsThePrivacyFlag",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/privacy_test.go",
+      "line": 314
+    },
+    {
+      "package": "bridge",
       "identifier": "TestSendReply_NilSrcReturnsErr",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/reply_test.go",
       "line": 317
-    },
-    {
-      "package": "bridge",
-      "identifier": "TestSendReply_PrivacyFlaggedRequestGetsMaskedReply",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "bridge/privacy_test.go",
-      "line": 397
     },
     {
       "package": "bridge",
@@ -8496,10 +8434,10 @@
     },
     {
       "package": "cluster/core",
-      "identifier": "TestParityMatterJS_ClusterIDsAndRevisions",
+      "identifier": "TestParityMatterJS_ClusterIDs",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/parity_matterjs_test.go",
-      "line": 329
+      "line": 303
     },
     {
       "package": "cluster/core",
@@ -8527,7 +8465,7 @@
       "identifier": "TestParityMatterJS_DeviceTypeRevisions",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/parity_matterjs_test.go",
-      "line": 445
+      "line": 415
     },
     {
       "package": "cluster/core",
@@ -8555,14 +8493,14 @@
       "identifier": "TestParityMatterJS_MandatoryAttributeCoverage",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/parity_matterjs_test.go",
-      "line": 358
+      "line": 328
     },
     {
       "package": "cluster/core",
       "identifier": "TestParityMatterJS_NoSpuriousAttributes",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/parity_matterjs_test.go",
-      "line": 412
+      "line": 382
     },
     {
       "package": "cluster/core",
@@ -9948,7 +9886,7 @@
       "identifier": "TestParityMatterJS_FlowMeasurementConstraints",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/measurement/flow_parity_matterjs_test.go",
-      "line": 114
+      "line": 108
     },
     {
       "package": "cluster/measurement",
@@ -9962,7 +9900,7 @@
       "identifier": "TestParityMatterJS_FlowSensorDeviceType",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/measurement/flow_parity_matterjs_test.go",
-      "line": 156
+      "line": 150
     },
     {
       "package": "cluster/measurement",
@@ -27217,119 +27155,91 @@
       "identifier": "AttributeData",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "fabrictest/surface.go",
-      "line": 43
+      "line": 40
     },
     {
       "package": "fabrictest",
       "identifier": "AttributePath",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "fabrictest/surface.go",
-      "line": 22
+      "line": 19
     },
     {
       "package": "fabrictest",
       "identifier": "CommandPath",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "fabrictest/surface.go",
-      "line": 24
+      "line": 21
     },
     {
       "package": "fabrictest",
       "identifier": "EventData",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "fabrictest/surface.go",
-      "line": 45
+      "line": 42
     },
     {
       "package": "fabrictest",
       "identifier": "EventPath",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "fabrictest/surface.go",
-      "line": 26
-    },
-    {
-      "package": "fabrictest",
-      "identifier": "Interaction",
-      "reason": "auto-whitelist:pattern=type-alias",
-      "file": "fabrictest/surface.go",
-      "line": 56
-    },
-    {
-      "package": "fabrictest",
-      "identifier": "Message",
-      "reason": "auto-whitelist:pattern=type-alias",
-      "file": "fabrictest/surface.go",
-      "line": 63
-    },
-    {
-      "package": "fabrictest",
-      "identifier": "Peer",
-      "reason": "auto-whitelist:pattern=type-alias",
-      "file": "fabrictest/surface.go",
-      "line": 59
+      "line": 23
     },
     {
       "package": "fabrictest",
       "identifier": "PeerAddress",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "fabrictest/surface.go",
-      "line": 51
+      "line": 48
     },
     {
       "package": "fabrictest",
       "identifier": "Privilege",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "fabrictest/surface.go",
-      "line": 66
+      "line": 51
     },
     {
       "package": "fabrictest",
       "identifier": "ReadRequest",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "fabrictest/surface.go",
-      "line": 30
+      "line": 27
     },
     {
       "package": "fabrictest",
       "identifier": "Report",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "fabrictest/surface.go",
-      "line": 41
+      "line": 38
     },
     {
       "package": "fabrictest",
       "identifier": "Result",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "fabrictest/surface.go",
-      "line": 47
-    },
-    {
-      "package": "fabrictest",
-      "identifier": "Session",
-      "reason": "auto-whitelist:pattern=type-alias",
-      "file": "fabrictest/surface.go",
-      "line": 61
+      "line": 44
     },
     {
       "package": "fabrictest",
       "identifier": "StatusError",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "fabrictest/surface.go",
-      "line": 49
+      "line": 46
     },
     {
       "package": "fabrictest",
       "identifier": "SubscribeRequest",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "fabrictest/surface.go",
-      "line": 34
+      "line": 31
     },
     {
       "package": "fabrictest",
       "identifier": "Subscription",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "fabrictest/surface.go",
-      "line": 37
+      "line": 34
     },
     {
       "package": "fabrictest",
@@ -27799,6 +27709,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "groups/manager_test.go",
       "line": 439
+    },
+    {
+      "package": "icd/checkin",
+      "identifier": "FuzzCheckinDecode",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "icd/checkin/fuzz_checkin_test.go",
+      "line": 15
     },
     {
       "package": "icd/checkin",
@@ -28428,35 +28345,28 @@
       "identifier": "TestInvokeParity_CommandHandler_FillsUpResponse",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/invoke_parity_test.go",
-      "line": 322
+      "line": 284
     },
     {
       "package": "im",
       "identifier": "TestInvokeParity_CommandSender_CommandRefAbsent",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/invoke_parity_test.go",
-      "line": 290
-    },
-    {
-      "package": "im",
-      "identifier": "TestInvokeParity_CommandSender_DuplicateCommandRefFails",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "im/invoke_parity_test.go",
-      "line": 278
+      "line": 252
     },
     {
       "package": "im",
       "identifier": "TestInvokeParity_CommandSender_ExtendableCallbackBatchCommandRefEcho",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/invoke_parity_test.go",
-      "line": 234
+      "line": 209
     },
     {
       "package": "im",
       "identifier": "TestInvokeParity_CommandSender_InvalidMessage",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/invoke_parity_test.go",
-      "line": 217
+      "line": 192
     },
     {
       "package": "im",
@@ -28485,13 +28395,6 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/invoke_parity_test.go",
       "line": 92
-    },
-    {
-      "package": "im",
-      "identifier": "TestInvokeParity_HandlerRejectMultipleIdenticalCommands_FUTURE",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "im/invoke_parity_test.go",
-      "line": 206
     },
     {
       "package": "im",
@@ -29559,6 +29462,13 @@
     },
     {
       "package": "internal/chiptool",
+      "identifier": "TestServedClustersHaveAFamily",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "internal/chiptool/surface_families_test.go",
+      "line": 103
+    },
+    {
+      "package": "internal/chiptool",
       "identifier": "TestWorkflowRunsEveryFamily",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "internal/chiptool/certifiability_doc_test.go",
@@ -29577,6 +29487,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "internal/paritytest/paritytest_test.go",
       "line": 8
+    },
+    {
+      "package": "internal/paritytest",
+      "identifier": "TestConformanceFailsOnUnmodelledForms",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "internal/paritytest/paritytest_test.go",
+      "line": 89
     },
     {
       "package": "internal/paritytest",
@@ -32212,10 +32129,24 @@
     },
     {
       "package": "secure/sigma",
+      "identifier": "FuzzUnmarshalSigma1",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/sigma/fuzz_sigma_test.go",
+      "line": 19
+    },
+    {
+      "package": "secure/sigma",
+      "identifier": "FuzzUnmarshalSigma3",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/sigma/fuzz_sigma_test.go",
+      "line": 52
+    },
+    {
+      "package": "secure/sigma",
       "identifier": "SessionParameters",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "secure/sigma/sigma.go",
-      "line": 440
+      "line": 435
     },
     {
       "package": "secure/sigma",
@@ -32965,6 +32896,27 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/sigma/sigma_test.go",
       "line": 371
+    },
+    {
+      "package": "secure/spake2",
+      "identifier": "FuzzDecodePBKDFParamRequest",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/spake2/fuzz_wire_test.go",
+      "line": 38
+    },
+    {
+      "package": "secure/spake2",
+      "identifier": "FuzzDecodePake1",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/spake2/fuzz_wire_test.go",
+      "line": 57
+    },
+    {
+      "package": "secure/spake2",
+      "identifier": "FuzzDecodePake3",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/spake2/fuzz_wire_test.go",
+      "line": 74
     },
     {
       "package": "secure/spake2",
@@ -34581,7 +34533,14 @@
       "identifier": "FuzzDecodePacket",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/btp/fuzz_codec_test.go",
-      "line": 16
+      "line": 17
+    },
+    {
+      "package": "transport/btp",
+      "identifier": "FuzzSessionPackets",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "transport/btp/fuzz_codec_test.go",
+      "line": 64
     },
     {
       "package": "transport/btp",

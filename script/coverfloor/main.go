@@ -70,12 +70,15 @@ import (
 // to carry a percentage cannot be mistaken for a measurement.
 const modulePath = "github.com/SukramJ/go-fabric"
 
-// staleFloorSlack is how far a measurement may sit above its floor before
-// the tool advises raising it. It is advice, never a failure: a package that
-// gained coverage must not turn the gate red, but a floor that trails the
-// truth by a wide margin has stopped detecting anything and should be
-// pulled up with the next change that touches the package.
-const staleFloorSlack = 5.0
+// staleFloorSlack is how far a measurement may sit above its floor. Beyond
+// it the floor has stopped detecting anything — a regression of that many
+// points passes — so the check fails and names the floor to raise it to
+// (review 2026-11 W6-test-05: fourteen floors trailed by 5 to 13 points
+// under the advice-only rule this replaced). Three points leave room for
+// the run-to-run spread of a package whose coverage depends on goroutine
+// scheduling, which a floor at the whole percent below its lowest
+// measurement absorbs.
+const staleFloorSlack = 3.0
 
 // coverageRe matches the percentage in a `go test -cover` summary line.
 var coverageRe = regexp.MustCompile(`coverage: (\d+(?:\.\d+)?)% of statements`)
@@ -131,9 +134,6 @@ func run() int {
 
 	report := check(measurements, floors)
 	fmt.Print(report.table())
-	for _, line := range report.advisories {
-		fmt.Println("advice:", line)
-	}
 	if len(report.problems) == 0 {
 		fmt.Printf("coverfloor: %d package(s) at or above their floor\n", len(measurements))
 		return 0
@@ -211,12 +211,10 @@ func packageOf(line string) string {
 	return ""
 }
 
-// result is what check produced: the rows to print, the failures, and the
-// non-fatal advice.
+// result is what check produced: the rows to print and the failures.
 type result struct {
-	rows       []row
-	problems   []string
-	advisories []string
+	rows     []row
+	problems []string
 }
 
 // row is one line of the printed table.
@@ -263,10 +261,10 @@ func check(measurements []measurement, table []packageFloor) result {
 			))
 		default:
 			res.rows = append(res.rows, row{pkg: m.pkg, measured: pctString(m), floor: floorString(f.min), status: "ok"})
-			if f.min > 0 && m.pct-f.min >= staleFloorSlack {
-				res.advisories = append(res.advisories, fmt.Sprintf(
-					"%s is %.1f points above its floor — raise it to %.1f%% to keep the ratchet biting",
-					m.pkg, m.pct-f.min, math.Floor(m.pct),
+			if f.min > 0 && m.pct-f.min > staleFloorSlack {
+				res.problems = append(res.problems, fmt.Sprintf(
+					"%s is %.1f points above its floor (more than %.0f) — raise it to %.1f%% in script/coverfloor/floors.go to keep the ratchet biting",
+					m.pkg, m.pct-f.min, staleFloorSlack, math.Floor(m.pct),
 				))
 			}
 		}

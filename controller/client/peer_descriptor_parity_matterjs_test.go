@@ -17,6 +17,7 @@ import (
 
 	"github.com/SukramJ/go-fabric/client/exchange"
 	"github.com/SukramJ/go-fabric/controller/client"
+	"github.com/SukramJ/go-fabric/internal/fabrictestseam"
 	"github.com/SukramJ/go-fabric/secure/sessionparams"
 )
 
@@ -51,7 +52,7 @@ func TestPeerDescriptorParity(t *testing.T) {
 		}
 		expect("the restored record", *restored.Record().ReportedSessionParameters)
 		// The reported parameters win over the advertised 500/300.
-		expect("the restored peer", cp.pair.Controller.Peers().Get(addr).SessionParameters())
+		expect("the restored peer", fabrictestseam.Peers(cp.pair.Controller).Get(addr).SessionParameters())
 	})
 
 	t.Run("restores the stored session parameters into the peer before its first session after a restart", func(t *testing.T) {
@@ -65,7 +66,7 @@ func TestPeerDescriptorParity(t *testing.T) {
 		if err := cp.pair.Controller.Restart(parityCtx(t)); err != nil {
 			t.Fatal(err)
 		}
-		p := cp.pair.Controller.Peers().Get(addr)
+		p := fabrictestseam.Peers(cp.pair.Controller).Get(addr)
 		if p == nil || p.HasSession() {
 			t.Fatal("the restored peer has a session")
 		}
@@ -80,7 +81,7 @@ func TestPeerDescriptorParity(t *testing.T) {
 		t.Parallel()
 		cp := newClientPair(t, clientPairOptions{})
 		addr, _ := cp.node.PeerAddress()
-		d := cp.pair.Controller.Peers().Get(addr).Descriptor()
+		d := fabrictestseam.Peers(cp.pair.Controller).Get(addr).Descriptor()
 		if d.ReportedSessionParameters == nil || d.ReportedSessionParameters.MaxTCPMessageSize != 0 {
 			t.Fatalf("reported parameters %+v", d.ReportedSessionParameters)
 		}

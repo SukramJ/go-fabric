@@ -145,20 +145,17 @@ func TestCheckFailsOnAnUnreachableFloor(t *testing.T) {
 	}
 }
 
-// TestCheckAdvisesRaisingAStaleFloor pins the non-fatal half: coverage well
-// above its floor is reported as advice and never as a failure, so a change
-// that improves a package cannot turn the gate red.
-func TestCheckAdvisesRaisingAStaleFloor(t *testing.T) {
+// TestCheckFailsAStaleFloor: coverage more than staleFloorSlack points
+// above its floor fails and names the floor to raise it to (W6-test-05);
+// within the slack it passes.
+func TestCheckFailsAStaleFloor(t *testing.T) {
 	t.Parallel()
 	res := check(
-		[]measurement{{pkg: "a", pct: 92.5, measurable: true}},
-		[]packageFloor{{pkg: "a", min: 80}},
+		[]measurement{{pkg: "a", pct: 92.5, measurable: true}, {pkg: "b", pct: 82.9, measurable: true}},
+		[]packageFloor{{pkg: "a", min: 80}, {pkg: "b", min: 80}},
 	)
-	if len(res.problems) != 0 {
-		t.Fatalf("problems = %v, want none — improved coverage must not fail the gate", res.problems)
-	}
-	if len(res.advisories) != 1 || !strings.Contains(res.advisories[0], "92.0") {
-		t.Fatalf("advisories = %v, want one suggesting 92.0%%", res.advisories)
+	if len(res.problems) != 1 || !strings.Contains(res.problems[0], "a is") || !strings.Contains(res.problems[0], "92.0") {
+		t.Fatalf("problems = %v, want one for a suggesting 92.0%%", res.problems)
 	}
 }
 

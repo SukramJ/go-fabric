@@ -120,8 +120,8 @@ func TestParityMatterJS_OperationalStateCommandConformance(t *testing.T) {
 			names := commandNames(set)
 			legal := true
 			for _, name := range []string{"Pause", "Stop", "Start", "Resume", "GoHome"} {
-				_, allowed := paritytest.Conformance(conformanceOf(name), names)
-				required, _ := paritytest.Conformance(conformanceOf(name), names)
+				_, allowed := paritytest.Conformance(t, conformanceOf(name), names)
+				required, _ := paritytest.Conformance(t, conformanceOf(name), names)
 				if names[name] && !allowed || !names[name] && required {
 					legal = false
 				}
@@ -145,7 +145,7 @@ func TestParityMatterJS_OperationalStateCommandConformance(t *testing.T) {
 				t.Errorf("0x%04X commands %05b: AcceptedCommandList %v, want %v", c.id, set, got, accepted)
 			}
 			response := conformanceOf("OperationalCommandResponse")
-			required, _ := paritytest.Conformance(response, names)
+			required, _ := paritytest.Conformance(t, response, names)
 			if got := len(srv.MatterGeneratedCommands()) == 1; got != (required || set&opstate.CommandGoHome != 0) {
 				t.Errorf("0x%04X commands %05b: GeneratedCommandList %v (%q)", c.id, set, srv.MatterGeneratedCommands(), response)
 			}
@@ -168,7 +168,7 @@ func TestParityMatterJS_OperationalStateAttributeConformance(t *testing.T) {
 			if a.ID >= 0xFFF0 {
 				continue
 			}
-			required, allowed := paritytest.Conformance(a.Conformance, nil)
+			required, allowed := paritytest.Conformance(t, a.Conformance, nil)
 			has := slices.Contains(srv.MatterAttributes(), a.ID)
 			if required && !has || has && !allowed {
 				t.Errorf("countdown=%v: %s (%q) served=%v", countdown, a.Name, a.Conformance, has)
@@ -203,7 +203,7 @@ func TestParityMatterJS_OperationalStateEventsAndPriorities(t *testing.T) {
 				t.Errorf("%s priority %d, matter.js %q", e.Name, got.priority, e.Priority)
 			}
 		}
-		if required, _ := paritytest.Conformance(e.Conformance, nil); required && !slices.Contains(newWasher(t, &device{}, nil).MatterEvents(), e.ID) {
+		if required, _ := paritytest.Conformance(t, e.Conformance, nil); required && !slices.Contains(newWasher(t, &device{}, nil).MatterEvents(), e.ID) {
 			t.Errorf("mandatory event %s missing from EventList", e.Name)
 		}
 	}

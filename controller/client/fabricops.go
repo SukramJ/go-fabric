@@ -118,7 +118,8 @@ type CommissionOptions struct {
 	// fabric; Addresses nil are the node's known addresses; DiscoveryData
 	// nil is the node's record; CASEConnectionTiming nil is the tighter
 	// timing matter.js applies after a commissioning
-	// (CommissioningClient.ts:775-779).
+	// (defaultCaseConnectionTiming, CommissioningClient.ts:798-811 at
+	// 862ad75f).
 	commissioner.Options
 	// CaseAuthenticatedTags are our CATs for CASE sessions to the node
 	// (CommissioningClient.ts:304-306); nil keeps the peer's.
@@ -184,8 +185,8 @@ func (r *Registry) commission(ctx context.Context, n *Node, o CommissionOptions)
 	}
 	// A node found over BLE is located by its commissioning channel. In
 	// matter.js its addresses hold the peripheral as a NetworkAddress of
-	// type "ble" (CommissioningClient.ts:883-895), which passes the check
-	// above (:220-223); a Record's NetworkAddress is IP only, so the
+	// type "ble" (CommissioningClient.ts:910-945 at 862ad75f), which passes
+	// the check above (:254-257); a Record's NetworkAddress is IP only, so the
 	// channel stands for it.
 	if len(opts.Addresses) == 0 && opts.Channel == nil {
 		return fmt.Errorf("%w: cannot commission %s", ErrNotLocated, n.ID())
@@ -204,7 +205,7 @@ func (r *Registry) commission(ctx context.Context, n *Node, o CommissionOptions)
 	p := r.cfg.Peers.Get(res.Address)
 	if o.CaseAuthenticatedTags != nil || p == nil {
 		// The CATs reach the peer as #catsChanged gives them
-		// (CommissioningClient.ts:664-680).
+		// (CommissioningClient.ts:696-712 at 862ad75f).
 		//nolint:contextcheck // the peer's service resolves under the DNS-SD cache's context
 		if p, err = r.cfg.Peers.AddKnownPeer(peer.Descriptor{Address: res.Address, CaseAuthenticatedTags: o.CaseAuthenticatedTags}); err != nil {
 			return err
@@ -383,7 +384,7 @@ func (r *Registry) decommission(ctx context.Context, n *Node) (PeerAddress, erro
 // removalConfirmedBy reports whether an error of RemoveFabric means the
 // command was delivered: matter.js causedBy(PeerMessageMissingError,
 // PeerLeftError, FabricRemovedError, PeerInitiatedCloseError)
-// (CommissioningClient.ts:406-408). PeerMessageMissingError and
+// (CommissioningClient.ts:437-440 at 862ad75f). PeerMessageMissingError and
 // PeerInitiatedCloseError are client/exchange's
 // [*exchange.PeerMessageMissingError] and [*exchange.PeerInitiatedCloseError];
 // PeerLeftError is [ErrPeerLeft]; FabricRemovedError is [ErrFabricRemoved].

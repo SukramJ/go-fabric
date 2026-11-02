@@ -20,6 +20,7 @@ import (
 	"github.com/SukramJ/go-fabric/controller"
 	"github.com/SukramJ/go-fabric/fabrictest"
 	"github.com/SukramJ/go-fabric/im"
+	"github.com/SukramJ/go-fabric/internal/fabrictestseam"
 	"github.com/SukramJ/go-fabric/node"
 )
 
@@ -81,7 +82,7 @@ func TestReportedSessionParametersParityMatterJS(t *testing.T) {
 		t.Fatal(err)
 	}
 	wantAll(t, "device PASE", deviceReportedIdle(paseDev.Node(), true), rspControllerIdle)
-	if rp := pase.PASESession.ReportedParameters(); rp == nil || time.Duration(rp.SessionIdleInterval)*time.Millisecond != rspDeviceIdle {
+	if rp := fabrictestseam.PASESession(pase).ReportedParameters(); rp == nil || time.Duration(rp.SessionIdleInterval)*time.Millisecond != rspDeviceIdle {
 		t.Errorf("controller PASE: reported %+v, want idle %v", rp, rspDeviceIdle)
 	}
 
@@ -93,7 +94,7 @@ func TestReportedSessionParametersParityMatterJS(t *testing.T) {
 	}
 	wantAll(t, "device CASE", deviceReportedIdle(dev.Node(), false), rspControllerIdle)
 	var ctrlIdle []time.Duration
-	for _, s := range pair.Peer.Sessions() {
+	for _, s := range fabrictestseam.Peer(pair).Sessions() {
 		if rp := s.ReportedParameters(); rp != nil {
 			ctrlIdle = append(ctrlIdle, time.Duration(rp.SessionIdleInterval)*time.Millisecond)
 		}
@@ -114,15 +115,15 @@ func TestReportedSessionParametersResumedParityMatterJS(t *testing.T) {
 	path := im.ConcreteAttributePath{Endpoint: 0, Cluster: 0x0028, Attribute: 0x0001} // BasicInformation.VendorName
 	// Under Site.Run: the reconnect's timers run on the site's clock.
 	err := site.Run(ctx, func(ctx context.Context) error {
-		p.Peer.Disconnect(ctx, errors.New("test: drop the session for a resume"))
-		_, err := p.Interaction.Read(ctx, path)
+		fabrictestseam.Peer(p).Disconnect(ctx, errors.New("test: drop the session for a resume"))
+		_, err := fabrictestseam.Interaction(p).Read(ctx, path)
 		return err
 	})
 	if err != nil {
 		t.Fatalf("read after the drop: %v", err)
 	}
 	resumed := false
-	for _, s := range p.Peer.Sessions() {
+	for _, s := range fabrictestseam.Peer(p).Sessions() {
 		if !s.Resumed() {
 			continue
 		}

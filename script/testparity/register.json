@@ -4004,24 +4004,24 @@
       "status": "partial",
       "go": [
         "cluster/core:TestParityFabricManager_AddFabricNotPersistedDirectly",
-        "cluster/core:TestParityFabricManager_AddDuplicateIndexFails",
         "cluster/core:TestParityFabricManager_PersistAndRestore",
         "cluster/core:TestParityFabricManager_RemoveFabric",
         "cluster/core:TestParityFabricManager_AllocateIndexInitially",
         "cluster/core:TestParityFabricManager_AllocateIndexAfterAdd",
         "cluster/core:TestParityFabricManager_AllocateIndexMonotonicAfterRemove",
         "cluster/core:TestParityFabricManager_AllocateIndexSkipsAfterMultiRemove",
-        "cluster/core:TestParityFabricManager_AllocateTableFull",
         "cluster/core:TestFabricManagerReplacingFabrics",
-        "store:TestFabricManagerDetermineNextFabricIndex"
+        "store:TestFabricManagerDetermineNextFabricIndex",
+        "store:TestFabric_AddExhausted"
       ],
       "missing": [
+        "adding a fabric with same index twice throws error",
         "forwards the events of a replaced and restored fabric once and those of a replaced object never",
         "releases the ICD state only when the fabric in the table is deleted",
         "releases the ICD state when the fabrics are cleared",
         "refuses a replacement with another IPK"
       ],
-      "reason": "Adding, persistence, removal, all eight index-allocation cases on the SQLite fabric table, and the UpdateNOC replacement keeping group and ACL state, keeping group changes across the fail-safe restore and refusing another root are ported; the event forwarding between replaced Fabric objects has no Go counterpart (a Go fabric is a store row), this module holds no ICD client registrations, and UpdateNOC carries no IPK, so a replacement with another IPK cannot be expressed.",
+      "reason": "Adding, persistence, removal, all eight index-allocation cases on the SQLite fabric table, and the UpdateNOC replacement keeping group and ACL state, keeping group changes across the fail-safe restore and refusing another root are ported; the event forwarding between replaced Fabric objects has no Go counterpart (a Go fabric is a store row), this module holds no ICD client registrations, and UpdateNOC carries no IPK, so a replacement with another IPK cannot be expressed. The table-full case is store.AddFabric's (TestFabric_AddExhausted); no test adds a fabric twice at one explicit index.",
       "snapshotSha": "f3219676eb1a53723a29154f45b19c411c2c256a"
     },
     {
@@ -4249,9 +4249,11 @@
         "logs at debug level when expiring announcements while the server closes",
         "chooses the name on a network that reports interface details asynchronously",
         "names each interface by its own MAC when the interfaces cannot be listed",
-        "names each interface by its own MAC when none has a usable one"
+        "names each interface by its own MAC when none has a usable one",
+        "server responds to an SRV query",
+        "split answers into multiple responses and add additional records in last one"
       ],
-      "reason": "The cache-flush, known-answer, duplicate, unicast and case cases are ported against the host-name answerer (the go-fabric code that answers queries; the service records are grandcat/zeroconf's) and the host-name choice against hostNameChooser; missing stay the PTR answer with SRV/TXT additionals and the packet split (grandcat/zeroconf builds those responses), the 1 s duplicate case (its matter.js assertion runs before the async handler, MdnsServerTest.ts:707-724, and at 1000 ms MdnsServer.ts's 999 ms window has expired, so the vector proves nothing), the TC-continuation merge (the answerer does not hold truncated queries; MdnsServer.ts:446-503 is a timer-backed cache beyond a small fix), the two Close cases (no go-fabric broadcast fails and logs on close; TriggerReannounce after Close is a silent no-op), the asynchronous-network case (JS promise mechanics) and the two per-interface-MAC fallbacks (go-fabric publishes one host name for all interfaces and hashes the OS host name when no MAC is usable, by_design L7-D03). The t.Skip anchors of mdns/parity_mdns_server_test.go were dropped from the go list (owner review of PR #164).",
+      "reason": "The cache-flush, known-answer, duplicate, unicast and case cases are ported against the host-name answerer (the go-fabric code that answers queries; the service records are grandcat/zeroconf's) and the host-name choice against hostNameChooser; missing stay the PTR answer with SRV/TXT additionals and the packet split (grandcat/zeroconf builds those responses), the 1 s duplicate case (its matter.js assertion runs before the async handler, MdnsServerTest.ts:707-724, and at 1000 ms MdnsServer.ts's 999 ms window has expired, so the vector proves nothing), the TC-continuation merge (the answerer does not hold truncated queries; MdnsServer.ts:446-503 is a timer-backed cache beyond a small fix), the two Close cases (no go-fabric broadcast fails and logs on close; TriggerReannounce after Close is a silent no-op), the asynchronous-network case (JS promise mechanics) and the two per-interface-MAC fallbacks (go-fabric publishes one host name for all interfaces and hashes the OS host name when no MAC is usable, by_design L7-D03). The t.Skip anchors of mdns/parity_mdns_server_test.go were dropped from the go list (owner review of PR #164) and deleted (W6-test-08): the SRV answer and the multi-packet split are grandcat/zeroconf's responses and stay missing.",
       "snapshotSha": "9d109578a8f28b656872292d2e6b039badf1c2a7"
     },
     {
@@ -4827,8 +4829,9 @@
       "path": "packages/protocol/test/session/secure/PasePairingTest.ts",
       "status": "partial",
       "go": [
-        "secure:TestParityMatterJS_PasePairing_PasscodeRange",
-        "secure:TestParityMatterJS_PasePairing_PasscodeGeneratorExhaustion",
+        "secure/setup:TestValidate_Passcode",
+        "secure/setup:TestDecode_EveryInvalidPasscode",
+        "bridge:TestRandomPasscode_NotInvalidSet",
         "secure:TestParityMatterJS_PasePairing_IterationsValidation",
         "secure:TestParityMatterJS_PasePairing_LeadingZeroW0_PBKDF",
         "secure:TestParityMatterJS_PasePairing_SuccessfulProcess_PBKDF",
@@ -4837,9 +4840,10 @@
       ],
       "missing": [
         "does not throw when sending the error status report fails",
-        "does not attempt to send the error status report when a sent message is still unacked"
+        "does not attempt to send the error status report when a sent message is still unacked",
+        "fails after too many invalid candidates"
       ],
-      "reason": "Passcode generation, the PBKDF iteration bounds, the PBKDF vectors, the full special PASE process (w0, L, context hash, Y and hBX with the fixed y) and the onPbkdfParamResponse callback are ported; PaseServer.cancelPairing's counterpart is the bridge's datagram PASE handler (bridge/securechannel.go), which has no messenger or unacked-message guard to drive.",
+      "reason": "Passcode generation, the PBKDF iteration bounds, the PBKDF vectors, the full special PASE process (w0, L, context hash, Y and hBX with the fixed y) and the onPbkdfParamResponse callback are ported; PaseServer.cancelPairing's counterpart is the bridge's datagram PASE handler (bridge/securechannel.go), which has no messenger or unacked-message guard to drive. bridge.RandomPasscode re-rolls an invalid candidate as PaseClient.generateRandomPasscode does but has no attempt limit, so the exhaustion case stays missing.",
       "snapshotSha": "410e318e6523e044afa1711a0a250461c8225547"
     },
     {
@@ -5479,6 +5483,88 @@
       "class": "device-ble-thread",
       "reason": "The DiagnosticSource abstraction over MeshCoP and REST (and its collection/action machinery): otbr.BorderRouter reads /node and /diagnostics directly, and MeshCoP stays out (ADR 0027 decision 5).",
       "snapshotSha": "82724a5e679277f9d7cc1630171b09d533fbf466"
+    }
+  ],
+  "skips": [
+    {
+      "test": "cluster/core:TestParityMatterJS_BasicInfoServer_AsyncObserverMechanism_Unsupported",
+      "source": "matter.js packages/node/src/behaviors/basic-information/",
+      "reason": "The `$Changed` observer API has no cluster-layer counterpart; change notification is the node's (contract.Change, OnChanged)."
+    },
+    {
+      "test": "cluster/core:TestParityMatterJS_DescriptorServer_AsyncPartsListUnsupported",
+      "source": "matter.js packages/node/test/behaviors/descriptor/",
+      "reason": "The asynchronous MockServerNode lifecycle has no unit-level counterpart; the PartsList lifecycle is ported in the DescriptorServer tests the register names."
+    },
+    {
+      "test": "cluster/core:TestParityOpcreds_PendingRootAppearsInTrustedRoots",
+      "source": "chip operational-credentials-server.cpp",
+      "reason": "Needs a valid RCAC TLV fixture from a test-key generator to drive AddTrustedRootCertificate."
+    },
+    {
+      "test": "im/subscription:TestHandlerParity_SKIP_SendAlreadyInProgress_Deferred",
+      "source": "matter.js packages/node/src/node/server/ServerSubscription.ts:429-437",
+      "reason": "The engine's Tick is synchronous and holds no in-flight send state; concurrent sends are exercised by the engine's race test."
+    },
+    {
+      "test": "im/subscription:TestHandlerParity_SKIP_SendUpdateRetryCount",
+      "source": "matter.js packages/node/src/node/server/ServerSubscription.ts:460-521",
+      "reason": "The send-error retry count lives in the layer that sends the report, above the engine's Reporter callback."
+    },
+    {
+      "test": "im:TestMessengerParity_ReportDataSuppressResponseFlag",
+      "source": "matter.js InteractionClientMessengerTest.ts:230",
+      "reason": "The close/status-ack ordering is Promise sequencing; the flag encoding is covered by TestReadRequestRoundTrip."
+    },
+    {
+      "test": "im:TestPathParity_InvalidAttributePathMissingBothClusterAndAttribute",
+      "source": "matter.js AttributePathValidator",
+      "reason": "The path validation is the request handler's, not the TLV decoder's, which accepts the path."
+    },
+    {
+      "test": "im:TestReadParity_ChunkingSessionNotRequired",
+      "source": "chip src/app/tests/TestReadInteraction.cpp:1536 (TestReadChunking)",
+      "reason": "End-to-end chunking needs the secure-session send layer; the MoreChunkedMessages encoding is covered by TestReadRequestRoundTrip."
+    },
+    {
+      "test": "im:TestReadParity_PerChunkStatusResponseWait",
+      "source": "chip src/app/tests/TestReadInteraction.cpp (derived invariant)",
+      "reason": "The per-chunk StatusResponse wait lives in the session layer, not in the im package's encoders."
+    },
+    {
+      "test": "store:TestParityChip_AddFabric_ChipStagedCommit_NotApplicable",
+      "source": "chip src/credentials/tests/TestFabricTable.cpp:1800",
+      "reason": "chip's pending/commit/rollback fabric table has no store counterpart: a store write is durable per transaction."
+    },
+    {
+      "test": "store:TestParityChip_FabricLabel_TooLongFails",
+      "source": "chip src/credentials/tests/TestFabricTable.cpp:2470",
+      "reason": "The label-length limit is enforced by the OperationalCredentials server (UpdateFabricLabel), not by the store."
+    },
+    {
+      "test": "tlv:TestObjectParity_ChunkedArray_NotImplemented",
+      "source": "matter.js packages/types/test/tlv/TlvArrayTest.ts:39-54",
+      "reason": "Chunked arrays are encoded and decoded in im, not in tlv."
+    },
+    {
+      "test": "tlv:TestObjectParity_InjectField_NotImplemented",
+      "source": "matter.js packages/types/test/tlv/TlvObjectTest.ts:203-264",
+      "reason": "No TlvObject.injectField counterpart: the caller builds the struct."
+    },
+    {
+      "test": "tlv:TestObjectParity_RemoveField_NotImplemented",
+      "source": "matter.js packages/types/test/tlv/TlvObjectTest.ts:286-325",
+      "reason": "No TlvObject.removeField counterpart."
+    },
+    {
+      "test": "tlv:TestObjectParity_TaggedList_ProtocolSpecificTags_NotImplemented",
+      "source": "matter.js packages/types/test/tlv/TlvObjectTest.ts:478-495",
+      "reason": "No allowProtocolSpecificTags check: the decoder passes non-context tags through."
+    },
+    {
+      "test": "tlv:TestObjectParity_ValidationError_NotImplemented",
+      "source": "matter.js packages/types/test/tlv/TlvObjectTest.ts:266-284",
+      "reason": "No schema validation layer in tlv: validation is the cluster definitions' (cluster/spec)."
     }
   ]
 }

@@ -1,9 +1,10 @@
 # Persistence
 
 A node keeps its state behind a port, `store.Port`. The shipped backend is
-SQLite: the host opens the database, picks the driver, and owns the
-handle; the module embeds the DDL its queries are written against, applies
-it, and never opens a database itself. The second backend, `store/memstore`,
+SQLite: the `store` package works on a `*sql.DB` it is handed — the host
+opens the database, picks the driver and owns the handle, or the node opens
+it for `Config.Store.Path` — and embeds the DDL its queries are written
+against and applies it; it never opens a database itself. The second backend, `store/memstore`,
 keeps the same state in memory. This page describes the port and what a
 backend of a host's own must guarantee, then lists what SQLite stores
 where, what survives a restart, and how schema changes reach a host.
@@ -57,7 +58,7 @@ cfg.Store = node.Store{Credentials: memstore.New(), Endpoints: epmem.New()} // e
   consumers do not need one.
 - **The fabric cascade.** `RemoveFabric` removes everything the fabric
   owns: its identity, key sets, key map, group table, Groupcast groups,
-  ACL, resumption records and default OTA providers. Server
+  ACL, resumption records, default OTA providers and ICD registrations. Server
   subscriptions, presets, lock records, settings and counters stay; the
   bridge deletes a removed fabric's subscriptions itself. A row naming a
   fabric the store does not hold is refused.
@@ -159,7 +160,7 @@ idempotent.
 The stable key's string form is the primary key. If a host changes how its
 key renders, the row is orphaned and the source gets a new endpoint number.
 
-*Source: `store/schema.sql:18-349`, `store/migrations.go:43-54`, `store/migrations/v1.up.sql:4-6`, `store/metadata.go:15`, `store/settings.go:37-42`, `endpoint/sqlitestore/schema.sql:13-60`.*
+*Source: `store/schema.sql:18-349`, `store/migrations.go:43-54`, `store/migrations/v1.up.sql:4-6`, `store/metadata.go:15`, `store/settings.go:37-42`, `endpoint/sqlitestore/schema.sql:13-58`.*
 
 ### Settings keys
 
@@ -185,6 +186,10 @@ facade's own state.
 | `door_lock.saved:<key>` | `store` | a lock endpoint's records were saved at least once |
 | `access_control.extension.<fabric>` | `cluster/core` | AccessControl's Extension list per fabric |
 | `matter.fabric.<fabric>.vid.statement`, `.vvsc` | `cluster/core` | the VID verification statement and VVSC per fabric |
+| `basic_information.surface_digest` | the facade | the root's effective surface digest, against which a surface change raises ConfigurationVersion |
+| `bridged_surface_digest.<key>`, `bridged_surface_digest.@<endpoint>` | the facade | a bridged endpoint's (or an unkeyed endpoint's) effective surface digest |
+| `endpoint_number_reserved.<key>` | the facade | a removed endpoint's reservation: the stable keys of its tree, whose numbers stay held until `Forget` |
+| `timesync.trusted_time_source`, `timesync.default_ntp`, `timesync.time_zone`, `timesync.dst_offset` | `cluster/core` | TimeSynchronization's TrustedTimeSource, DefaultNTP, TimeZone and DSTOffset, under connectedhomeip's key names |
 
 `<key>` is the endpoint's stable key in `String()` form, the same identity
 endpoint numbers are kept under. A host that keeps scenes and labels
@@ -195,7 +200,7 @@ A host may use the settings table for its own state, as the reference
 daemon does with `blind.position`. Pick a prefix that none of the keys
 above use.
 
-*Source: `store/settings.go:13-35`, `node/persist.go:24-38`, `node/persist.go:57-77`, `node/persist.go:244-299`, `node/persist.go:317-326`, `node/root.go:42-43`, `store/ota.go:25`, `store/doorlock.go:13-24`, `store/icd.go`, `cluster/core/access_control.go:295-297`, `cluster/core/vid_verification.go:65-67`, `examples/reference-bridge/persist.go:21-44`.*
+*Source: `store/settings.go:13-35`, `node/persist.go:24-38`, `node/persist.go:57-77`, `node/persist.go:244-299`, `node/persist.go:317-326`, `node/root.go:42-43`, `store/ota.go:25`, `store/doorlock.go:13-24`, `store/icd.go`, `cluster/core/access_control.go:295-297`, `cluster/core/vid_verification.go:65-67`, `node/surface_stability.go:18-29`, `node/reserve.go:32-35`, `cluster/core/time_synchronization_features.go:90-95`, `examples/reference-bridge/persist.go:21-44`.*
 
 ## What survives a restart
 
@@ -212,7 +217,7 @@ above use.
 A restart does not re-identify the node: UniqueID is pinned, and fabrics
 and endpoint numbers are the same.
 
-*Source: `node/node.go:326-335`, `node/node.go:665-712`, `store/schema.sql:250-256`, `node/security.go:372`, `node/security.go:483`, `bridge/bridge.go:85-94`, `node/config.go:347-360`.*
+*Source: `node/node.go` (`New`), `node/node.go` (`Node.Start`), `store/schema.sql:250-256`, `node/security.go:372`, `node/security.go:483`, `bridge/bridge.go:85-94`, `node/config.go:347-360`.*
 
 ## The controller database
 

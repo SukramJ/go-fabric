@@ -1,6 +1,14 @@
 # ADR 0026 — Architecture principles of the module
 
-- **Status**: Accepted (2026-10-20; owner decision of the same day)
+- **Status**: Accepted (2026-10-20; owner decision of the same day).
+  Note (2026-11-02, review 2026-11 W6-doc-24): principle 4's "three remain
+  today" is past — `clock/noraw_test.go` fails on any raw time call in
+  non-test code outside its exception list (one entry, the DNS-SD
+  responder's socket read deadlines). Principle 8's "no second status type"
+  holds inside the module; at the host boundary `contract.StatusError`
+  (`contract/status.go`) is a second, host-facing status type, needed
+  because `contract` imports the standard library only, and the servers
+  map it to the wire status (`spec.CarriesStatus`).
 - **Date**: 2026-10-20
 - **Related**: [ADR 0025 — design principles of the facade](./0025-facade-design-principles.md),
   [ADR 0018 — the device layer and the node facade](./0018-device-layer-and-node-facade.md),

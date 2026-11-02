@@ -35,6 +35,7 @@ import (
 	"github.com/SukramJ/go-fabric/controller/commissioner"
 	"github.com/SukramJ/go-fabric/fabrictest"
 	"github.com/SukramJ/go-fabric/im"
+	"github.com/SukramJ/go-fabric/internal/fabrictestseam"
 	"github.com/SukramJ/go-fabric/node"
 	"github.com/SukramJ/go-fabric/secure/sessionparams"
 	"github.com/SukramJ/go-fabric/tlv"
@@ -314,7 +315,7 @@ func TestServerNodeParity(t *testing.T) {
 		if err := p.Device.Restart(ctx); err != nil {
 			t.Fatal(err)
 		}
-		if _, err := fabrictest.Connect(ctx, p); err != nil {
+		if _, err := fabrictestseam.Connect(ctx, p); err != nil {
 			t.Fatal(err)
 		}
 		got, err := fabrictest.Read(ctx, p, label)

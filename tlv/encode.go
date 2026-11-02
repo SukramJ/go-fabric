@@ -423,9 +423,9 @@ func (e *Encoder) PutInt32Bounded(tag Tag, v int32) error {
 // passing 0xFF as a regular value would cause the commissioner to
 // interpret the field as null on read.
 //
-// Mirrors matter.js packages/types/src/tlv/TlvNullable.ts:28-31 —
-// NullableSchema shrinks max from baseTypeMax to baseTypeMax-1 for
-// nullable unsigned types.
+// Mirrors matter.js packages/types/src/tlv/TlvNullable.ts:37-44 at
+// 862ad75f — NullableSchema shrinks max from baseTypeMax to
+// baseTypeMax-1 for nullable unsigned types.
 func (e *Encoder) PutUint8Bounded(tag Tag, v uint8) error {
 	if v == 0xFF {
 		return fmt.Errorf("%w: uint8 sentinel 0xFF must be encoded as null, not as a value", ErrUint8NullableSentinel)
@@ -442,8 +442,8 @@ func (e *Encoder) PutUint8Bounded(tag Tag, v uint8) error {
 // §6.6.4.5 Table 26 nullable-uint16 sentinel. See
 // [Encoder.PutUint8Bounded] for the encoding rationale.
 //
-// Mirrors matter.js packages/types/src/tlv/TlvNullable.ts TlvUInt16
-// nullable sentinel.
+// Mirrors matter.js packages/types/src/tlv/TlvNullable.ts:37-44 at
+// 862ad75f (the nullable uint16's max is 0xFFFE).
 func (e *Encoder) PutUint16Bounded(tag Tag, v uint16) error {
 	if v == 0xFFFF {
 		return fmt.Errorf("%w: uint16 sentinel 0xFFFF must be encoded as null", ErrUint16NullableSentinel)
@@ -460,8 +460,8 @@ func (e *Encoder) PutUint16Bounded(tag Tag, v uint16) error {
 // §6.6.4.5 Table 26 nullable-uint32 sentinel. See
 // [Encoder.PutUint8Bounded] for the encoding rationale.
 //
-// Mirrors matter.js packages/types/src/tlv/TlvNullable.ts TlvUInt32
-// nullable sentinel.
+// Mirrors matter.js packages/types/src/tlv/TlvNullable.ts:37-44 at
+// 862ad75f (the nullable uint32's max is 0xFFFFFFFE).
 func (e *Encoder) PutUint32Bounded(tag Tag, v uint32) error {
 	if v == 0xFFFFFFFF {
 		return fmt.Errorf("%w: uint32 sentinel 0xFFFFFFFF must be encoded as null", ErrUint32NullableSentinel)
@@ -478,8 +478,8 @@ func (e *Encoder) PutUint32Bounded(tag Tag, v uint32) error {
 // Matter §6.6.4.5 Table 26 nullable-uint64 sentinel. See
 // [Encoder.PutUint8Bounded] for the encoding rationale.
 //
-// Mirrors matter.js packages/types/src/tlv/TlvNullable.ts TlvUInt64
-// nullable sentinel.
+// Mirrors matter.js packages/types/src/tlv/TlvNullable.ts:37-44 at
+// 862ad75f (the nullable uint64's max is 0xFFFFFFFFFFFFFFFE).
 func (e *Encoder) PutUint64Bounded(tag Tag, v uint64) error {
 	if v == 0xFFFFFFFFFFFFFFFF {
 		return fmt.Errorf("%w: uint64 sentinel 0xFFFFFFFFFFFFFFFF must be encoded as null", ErrUint64NullableSentinel)

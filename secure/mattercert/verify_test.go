@@ -577,7 +577,7 @@ func TestVerifyAndExtractPubKey_Expired(t *testing.T) {
 	}
 	_, err = v.VerifyAndExtractPubKey(nocRaw, nil)
 	if err != nil {
-		t.Fatalf("an expired NOC must be accepted — matter.js never checks notAfter (OperationalBase.ts:82-89, LKGT pending): %v", err)
+		t.Fatalf("an expired NOC must be accepted — matter.js never checks notAfter (OperationalBase.ts:95-102, LKGT pending): %v", err)
 	}
 }
 
@@ -1514,7 +1514,7 @@ func TestBuildDN_FallbackOrder(t *testing.T) {
 
 // TestCheckValidity_NotYetValid pins the gold standard's tolerance: a cert
 // whose NotBefore lies in the future is accepted, because matter.js
-// OperationalBase.ts:82-89 only warns on it (its CA backdates NOCs by a
+// OperationalBase.ts:95-102 only warns on it (its CA backdates NOCs by a
 // year for exactly the clock-skew case) and never checks notAfter. A
 // bridge whose clock is behind the commissioner's must not refuse AddNOC
 // and every later CASE until the clock catches up.
@@ -2221,8 +2221,9 @@ func TestVerifyAndExtractPubKey_ICAC_DecodeError(t *testing.T) {
 }
 
 // TestVerifyAndExtractPubKey_ICAC_Expired verifies that an expired ICAC
-// cert (NotAfter in the past) causes VerifyAndExtractPubKey to return
-// ErrExpired. This exercises the checkValidity error path for the ICAC.
+// cert (NotAfter in the past) is accepted: matter.js never checks notAfter
+// (OperationalBase.ts:95-102), so checkValidity only checks that the ICAC's
+// NotBefore/NotAfter name representable times.
 func TestVerifyAndExtractPubKey_ICAC_Expired(t *testing.T) {
 	t.Parallel()
 	rootPriv, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
@@ -2273,7 +2274,7 @@ func TestVerifyAndExtractPubKey_ICAC_Expired(t *testing.T) {
 	}
 	_, err = v.VerifyAndExtractPubKey(nocRaw, icacRaw)
 	if err != nil {
-		t.Fatalf("an expired ICAC must be accepted — matter.js never checks notAfter (OperationalBase.ts:82-89, LKGT pending): %v", err)
+		t.Fatalf("an expired ICAC must be accepted — matter.js never checks notAfter (OperationalBase.ts:95-102, LKGT pending): %v", err)
 	}
 }
 

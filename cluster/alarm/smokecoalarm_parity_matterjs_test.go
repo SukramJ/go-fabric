@@ -140,7 +140,7 @@ func TestParityMatterJS_SmokeCoAlarmConformance(t *testing.T) {
 					if e.ID >= 0xFFF0 {
 						continue
 					}
-					required, allowed := conformance(e.Conformance, names)
+					required, allowed := conformance(t, e.Conformance, names)
 					has := slices.Contains(served, e.ID)
 					if required && !has {
 						t.Errorf("features %d optionals 0x%X: mandatory %s %s (%q) not published", features, opt, kind, e.Name, e.Conformance)

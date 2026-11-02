@@ -33,6 +33,7 @@ import (
 	"github.com/SukramJ/go-fabric/controller/client"
 	"github.com/SukramJ/go-fabric/fabrictest"
 	"github.com/SukramJ/go-fabric/im"
+	"github.com/SukramJ/go-fabric/internal/fabrictestseam"
 	"github.com/SukramJ/go-fabric/node"
 )
 
@@ -162,7 +163,7 @@ func TestDecommissionParity(t *testing.T) {
 			t.Fatalf("decommission: %v, want PeerUnresponsiveError", err)
 		}
 		addr, _ := cp.node.PeerAddress()
-		if cp.pair.Controller.Registry().Size() != 1 || cp.pair.Controller.Peers().Get(addr) == nil || !cp.node.IsCommissioned() {
+		if cp.pair.Controller.Registry().Size() != 1 || fabrictestseam.Peers(cp.pair.Controller).Get(addr) == nil || !cp.node.IsCommissioned() {
 			t.Fatal("the node or its peer was not kept")
 		}
 	}

@@ -111,10 +111,10 @@ func (d *dsTree) assemble(specs ...endpoint.Spec) *endpoint.Topology {
 	if d.dev == nil {
 		site := fabrictest.NewSite(d.t, fabrictest.Options{})
 		d.dev = site.AddDevice(fabrictest.Topology{Snapshotter: d.snapshot})
-	} else if err := d.dev.Bridge().Reassemble(context.Background()); err != nil {
+	} else if err := d.dev.Node().Bridge().Reassemble(context.Background()); err != nil {
 		d.t.Fatal(err)
 	}
-	return d.dev.Bridge().Topology()
+	return d.dev.Node().Bridge().Topology()
 }
 
 // dsSpec is an endpoint of deviceType with parts.

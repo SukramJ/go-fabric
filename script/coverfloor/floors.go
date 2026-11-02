@@ -16,10 +16,11 @@ type packageFloor struct {
 	why string
 }
 
-// floors is the per-package ratchet. Each entry was set at, or at the whole
-// percent just below, what the package measured when the floor was
-// introduced — so the gate is green on the day it lands and only ever
-// reacts to a package getting worse.
+// floors is the per-package ratchet. Each entry is the whole percent at or
+// below what the package measured when the floor was set or last raised —
+// so the gate is green on the day it lands and reacts to a package getting
+// worse. A floor more than staleFloorSlack points below the measurement
+// fails the check (review 2026-11 W6-test-05 raised the 32 that trailed).
 //
 // Adding a package to the module means adding it here; the check fails on a
 // package it has no entry for, because a silently unguarded package is worse
@@ -28,15 +29,16 @@ type packageFloor struct {
 // and it belongs in the change that caused it, with the reason in the commit
 // message.
 //
-// The floors are NOT a statement about what these packages deserve. One of
-// them — contract, at 52 % — is conspicuously low for a module this heavily
-// tested, and raising it means deciding what to test, which is a change of
-// its own and not something to fold into a ratchet.
+// The floors are NOT a statement about what these packages deserve. A few
+// are conspicuously low for a module this heavily tested —
+// controller/softwareupdate and contract, each with its reason on the entry
+// — and raising them means deciding what to test, which is a change of its
+// own and not something to fold into a ratchet.
 var floors = []packageFloor{
 	{pkg: "github.com/SukramJ/go-fabric", min: 0, why: "module doc only, no statements to cover"},
-	{pkg: "github.com/SukramJ/go-fabric/bdx", min: 75},
-	{pkg: "github.com/SukramJ/go-fabric/binding", min: 85},
-	{pkg: "github.com/SukramJ/go-fabric/bdx/otaimage", min: 76},
+	{pkg: "github.com/SukramJ/go-fabric/bdx", min: 84},
+	{pkg: "github.com/SukramJ/go-fabric/binding", min: 93},
+	{pkg: "github.com/SukramJ/go-fabric/bdx/otaimage", min: 86},
 	{pkg: "github.com/SukramJ/go-fabric/bootid", min: 89},
 	{
 		pkg: "github.com/SukramJ/go-fabric/bridge",
@@ -46,26 +48,27 @@ var floors = []packageFloor{
 	{pkg: "github.com/SukramJ/go-fabric/bridge/bridgetest", min: 92},
 	{pkg: "github.com/SukramJ/go-fabric/clock", min: 100},
 	{pkg: "github.com/SukramJ/go-fabric/clock/clocktest", min: 95},
-	{pkg: "github.com/SukramJ/go-fabric/cluster", min: 96},
+	{pkg: "github.com/SukramJ/go-fabric/cluster", min: 99},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/alarm", min: 98},
-	{pkg: "github.com/SukramJ/go-fabric/cluster/alarmbase", min: 90},
+	{pkg: "github.com/SukramJ/go-fabric/cluster/alarmbase", min: 94},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/appliance", min: 98},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/closure", min: 96},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/core", min: 90},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/cover", min: 98},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/energy", min: 93},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/fan", min: 98},
-	// 85, not 86: NativeSource's owed switch-off is paid by whichever of
-	// the device's notification and the ramp's deadline timer gets there
-	// first (native.go settle/pay), so a run covers one branch or the
-	// other — CI measured 85.9 where a local run measured 86.1.
-	{pkg: "github.com/SukramJ/go-fabric/cluster/levelcontrol", min: 85},
+	// NativeSource's owed switch-off is paid by whichever of the device's
+	// notification and the ramp's deadline timer gets there first
+	// (native.go settle/pay); TestNativeSourceOwedOffAfterHostSwitchedOff
+	// covers pay's early return whatever the order, so the package measures
+	// 86.1 every run (review 2026-11 W6-test-13; the floor was 85 for it).
+	{pkg: "github.com/SukramJ/go-fabric/cluster/levelcontrol", min: 86},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/light", min: 94},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/lock", min: 90},
-	{pkg: "github.com/SukramJ/go-fabric/cluster/measurement", min: 86},
-	{pkg: "github.com/SukramJ/go-fabric/cluster/media", min: 85},
+	{pkg: "github.com/SukramJ/go-fabric/cluster/measurement", min: 89},
+	{pkg: "github.com/SukramJ/go-fabric/cluster/media", min: 93},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/modebase", min: 98},
-	{pkg: "github.com/SukramJ/go-fabric/cluster/modeselect", min: 86},
+	{pkg: "github.com/SukramJ/go-fabric/cluster/modeselect", min: 97},
 	// Pinned at full coverage. A package that reaches 100 % has no
 	// uncovered branch to lose, so anything less is a new untested
 	// statement — which is exactly the moment to notice it, while the
@@ -85,35 +88,40 @@ var floors = []packageFloor{
 		why: "Go 1.27.2 counts statements per cover block differently: against 1.27.1 the profile has the same blocks and the same covered/uncovered set, only fewer statements per block, so the percentage fell without any test or code change (94.2 % to 93.8 %)",
 	},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/valve", min: 98},
-	{pkg: "github.com/SukramJ/go-fabric/cluster/wire", min: 91},
+	{pkg: "github.com/SukramJ/go-fabric/cluster/wire", min: 94},
 	{pkg: "github.com/SukramJ/go-fabric/commissioning", min: 88},
 	{pkg: "github.com/SukramJ/go-fabric/conformance", min: 93},
-	{pkg: "github.com/SukramJ/go-fabric/controller", min: 72, why: "the composition root: New, Close and the refusals of Pair are tested here; the commissioning Pair hands to Registry.Commission is covered in controller/client"},
+	{pkg: "github.com/SukramJ/go-fabric/controller", min: 80, why: "the composition root: New, Close and the refusals of Pair are tested here; the commissioning Pair hands to Registry.Commission is covered in controller/client"},
 	{pkg: "github.com/SukramJ/go-fabric/controller/attestation", min: 89},
 	{pkg: "github.com/SukramJ/go-fabric/controller/ble", min: 90},
-	{pkg: "github.com/SukramJ/go-fabric/controller/ble/bletest", min: 90},
+	{pkg: "github.com/SukramJ/go-fabric/controller/ble/bletest", min: 95},
 	{pkg: "github.com/SukramJ/go-fabric/controller/ca", min: 88},
 	{pkg: "github.com/SukramJ/go-fabric/controller/ca/keyfile", min: 73},
-	{pkg: "github.com/SukramJ/go-fabric/controller/client", min: 85},
-	{pkg: "github.com/SukramJ/go-fabric/controller/client/sqlstore", min: 85},
+	{pkg: "github.com/SukramJ/go-fabric/controller/client", min: 90},
+	{pkg: "github.com/SukramJ/go-fabric/controller/client/sqlstore", min: 89},
 	{pkg: "github.com/SukramJ/go-fabric/controller/commissioner", min: 85},
-	{pkg: "github.com/SukramJ/go-fabric/controller/dcl", min: 85},
+	{pkg: "github.com/SukramJ/go-fabric/controller/dcl", min: 92},
 	{
 		pkg: "github.com/SukramJ/go-fabric/controller/softwareupdate",
-		min: 29,
-		why: "brief CM §1: measured 29.4. The manager runs against a controller and a device: its end-to-end and OtaTest cases are the controller package's (controller:TestOTA*), which a per-package profile does not count; the package's own tests set the queue's state as matter.js's do",
+		min: 40,
+		why: "brief CM §1: measured 29.4; review 2026-11 W6-test-05: 40.3. The manager runs against a controller and a device: its end-to-end and OtaTest cases are the controller package's (controller:TestOTA*), which a per-package profile does not count; the package's own tests set the queue's state as matter.js's do",
 	},
 	{pkg: "github.com/SukramJ/go-fabric/controller/dcl/snapshot", min: 83},
-	{pkg: "github.com/SukramJ/go-fabric/client/discovery", min: 94}, // 95.1-95.2 locally, 94.8 in CI: the race and cancel paths of the discovery sessions (27-A) are timing-dependent; one point of margin
+	// 94.9-95.3 over six local runs, 94.8 in CI: eleven one-statement
+	// blocks of browse.go, loop.go, operational.go and service.go are the
+	// cache loop's close and select-order races (a caller's ctx against the
+	// loop's done, a change against a restart), which no clock drives, so a
+	// fake clock cannot pin them (review 2026-11 W6-test-13). The floor is
+	// the whole percent below the lowest measurement.
+	{pkg: "github.com/SukramJ/go-fabric/client/discovery", min: 94},
 	{pkg: "github.com/SukramJ/go-fabric/client/jcm", min: 83},
 	{pkg: "github.com/SukramJ/go-fabric/groups", min: 93},
-	// The module's lowest measured package (76.7 when last raised).
 	// contract is the host-facing interface vocabulary, and much of what is uncovered
 	// are the default implementations and kind-registry helpers a host
 	// exercises rather than this module's own tests. The floor records
 	// where it stands; whether it should be raised is a separate decision
 	// about what deserves a test, not a ratchet setting.
-	{pkg: "github.com/SukramJ/go-fabric/contract", min: 76, why: "lowest in the module; see the note above this entry"},
+	{pkg: "github.com/SukramJ/go-fabric/contract", min: 87, why: "the host-facing vocabulary; see the note above this entry"},
 	{pkg: "github.com/SukramJ/go-fabric/client/exchange", min: 93},
 	{pkg: "github.com/SukramJ/go-fabric/client/interaction", min: 91},
 	{pkg: "github.com/SukramJ/go-fabric/client/handshake", min: 86},
@@ -125,21 +133,21 @@ var floors = []packageFloor{
 	{pkg: "github.com/SukramJ/go-fabric/thread", min: 97},
 	{pkg: "github.com/SukramJ/go-fabric/thread/otbr", min: 98},
 	{pkg: "github.com/SukramJ/go-fabric/thread/otbr/otbrtest", min: 97},
-	{pkg: "github.com/SukramJ/go-fabric/diagevent", min: 96},
+	{pkg: "github.com/SukramJ/go-fabric/diagevent", min: 100},
 	{pkg: "github.com/SukramJ/go-fabric/eligibility", min: 90},
 	{pkg: "github.com/SukramJ/go-fabric/examples", min: 0, why: "test only, no statements to cover: the small examples' import guard (review 2026-11 W5-ex-02)"},
 	{pkg: "github.com/SukramJ/go-fabric/device", min: 97},
-	{pkg: "github.com/SukramJ/go-fabric/endpoint", min: 86},
+	{pkg: "github.com/SukramJ/go-fabric/endpoint", min: 93},
 	// Brief BG: measured 86.9; the uncovered part is the error paths of a
 	// host that fails to build or listen, which fail the test through tb.
 	{pkg: "github.com/SukramJ/go-fabric/fabrictest", min: 85},
 	{
 		pkg: "github.com/SukramJ/go-fabric/endpoint/endpointtest",
-		min: 0,
-		why: "test scaffolding, exercised through the packages that import it, and go credits that coverage to them; only the device type conformance helper has a test of its own",
+		min: 54,
+		why: "review 2026-11 W6-test-13: measured 54.1. Test scaffolding: most of it is exercised through the packages that import it, and go credits that coverage to them; the floor holds what its own tests (the device type conformance helper) reach",
 	},
 	{pkg: "github.com/SukramJ/go-fabric/endpoint/memstore", min: 99},
-	{pkg: "github.com/SukramJ/go-fabric/endpoint/sqlitestore", min: 77},
+	{pkg: "github.com/SukramJ/go-fabric/endpoint/sqlitestore", min: 80},
 	{
 		pkg: "github.com/SukramJ/go-fabric/examples/host-view",
 		min: 32,
@@ -147,8 +155,8 @@ var floors = []packageFloor{
 	},
 	{
 		pkg: "github.com/SukramJ/go-fabric/examples/reference-bridge",
-		min: 0,
-		why: "example daemon, exercised end to end by the chip-tool suite, which runs the built binary rather than its statements. It does have statement-level tests now — fleet_test.go drives a subscription through a mounted endpoint — but the floor stays at 0 because the daemon's value is the end-to-end run, and a number here would ratchet on the fake devices rather than on anything a consumer depends on",
+		min: 75,
+		why: "review 2026-11 W6-test-13: measured 75.1. The reference daemon is the DUT of every chip-tool case, which runs the built binary; its own tests (fleet_test.go and the control tests) drive the fleet through mounted endpoints, and this floor holds what they reach",
 	},
 	{
 		pkg: "github.com/SukramJ/go-fabric/examples/reference-controller",
@@ -158,16 +166,16 @@ var floors = []packageFloor{
 	// Brief AT §4: the floor the brief set; measured 74.0 with
 	// TestReferenceController and TestReferenceControllerOTA alone (then
 	// package main, moved to cli by brief BB item 2).
-	{pkg: "github.com/SukramJ/go-fabric/examples/reference-controller/cli", min: 70},
+	{pkg: "github.com/SukramJ/go-fabric/examples/reference-controller/cli", min: 83},
 	// Brief AW: measured 59.3-60.2; the uncovered part is main and the
 	// paired-node path, which needs a device on the network.
-	{pkg: "github.com/SukramJ/go-fabric/examples/quickstart-controller", min: 35, why: "brief BV-a: the stack moved into controller.New (covered in controller); what remains is main and use, which need a paired node"},
+	{pkg: "github.com/SukramJ/go-fabric/examples/quickstart-controller", min: 39, why: "brief BV-a: the stack moved into controller.New (covered in controller); what remains is main and use, which need a paired node"},
 	{
 		pkg: "github.com/SukramJ/go-fabric/examples/quickstart-device",
-		min: 20,
+		min: 28,
 		why: "brief AW: measured 24.4. The test drives newNode, the program's substance; main and run bind :5540 and the mDNS groups, which a unit test does not",
 	},
-	{pkg: "github.com/SukramJ/go-fabric/icd", min: 90},
+	{pkg: "github.com/SukramJ/go-fabric/icd", min: 93},
 	{pkg: "github.com/SukramJ/go-fabric/icd/checkin", min: 94},
 	{pkg: "github.com/SukramJ/go-fabric/im", min: 82},
 	// Measured 91.7-92.7 across six runs at varying GOMAXPROCS: this
@@ -192,6 +200,7 @@ var floors = []packageFloor{
 		why: "declaration-only seam: function variables another package installs from its init, so the package holds no statement a test could execute",
 	},
 	{pkg: "github.com/SukramJ/go-fabric/internal/clockvar", min: 100},
+	{pkg: "github.com/SukramJ/go-fabric/internal/fabrictestseam", min: 0, why: "function variables only: fabrictest installs them, the module's tests call them (review 2026-11 W5-ex-12)"},
 	{pkg: "github.com/SukramJ/go-fabric/internal/forward", min: 100},
 	{pkg: "github.com/SukramJ/go-fabric/internal/inflight", min: 100},
 	{pkg: "github.com/SukramJ/go-fabric/internal/serialqueue", min: 97},
@@ -224,15 +233,15 @@ var floors = []packageFloor{
 	},
 	{
 		pkg: "github.com/SukramJ/go-fabric/node/controllernode",
-		min: 67,
+		min: 70,
 		why: "brief CM §1: measured 67.9; Start's failure paths (node.New refusing the spec, a socket address that does not resolve) have no test",
 	},
 	{pkg: "github.com/SukramJ/go-fabric/node/metrics/expvar", min: 100},
 	{pkg: "github.com/SukramJ/go-fabric/parity", min: 100},
 	{pkg: "github.com/SukramJ/go-fabric/schema", min: 100},
-	{pkg: "github.com/SukramJ/go-fabric/script/aheadcheck", min: 90, why: "the parser, the check and run against a fixture git repository built in the test; main (flags, the exit) is exercised by make ahead-check"},
+	{pkg: "github.com/SukramJ/go-fabric/script/aheadcheck", min: 93, why: "the parser, the check and run against a fixture git repository built in the test; main (flags, the exit) is exercised by make ahead-check"},
 	{pkg: "github.com/SukramJ/go-fabric/script/archcheck", min: 0, why: "doc and test only, no statements to cover"},
-	{pkg: "github.com/SukramJ/go-fabric/script/apidiff", min: 35, why: "the report parsing and the CHANGELOG match are tested; run, which drives the version control and the apidiff tool, is exercised by make apidiff-check"},
+	{pkg: "github.com/SukramJ/go-fabric/script/apidiff", min: 39, why: "the report parsing and the CHANGELOG match are tested; run, which drives the version control and the apidiff tool, is exercised by make apidiff-check"},
 	// BX4's forward generator; main() only writes the files its test compares.
 	{
 		pkg: "github.com/SukramJ/go-fabric/script/citecheck",
@@ -243,14 +252,14 @@ var floors = []packageFloor{
 	// parsing, file opening, printing, the exit codes — is not, because
 	// covering it would mean a test that runs the gate over the module the
 	// gate is part of.
-	{pkg: "github.com/SukramJ/go-fabric/script/coverfloor", min: 52},
+	{pkg: "github.com/SukramJ/go-fabric/script/coverfloor", min: 55},
 	{pkg: "github.com/SukramJ/go-fabric/script/docscheck", min: 0, why: "test only, no statements to cover: the guard is the test"},
 	{pkg: "github.com/SukramJ/go-fabric/script/errprefix", min: 0, why: "test only, no statements to cover: the guard is the test"},
 	{pkg: "github.com/SukramJ/go-fabric/script/slogkeys", min: 0, why: "test only, no statements to cover: the guard is the test"},
 	{pkg: "github.com/SukramJ/go-fabric/script/levelgen", min: 40, why: "the dump parser, the writer and the table half of run are tested (measured 41.0); measureInternal builds and runs the reference daemon, which make generate-levels exercises and TestSpecLevelsDocIsCurrent regenerates in memory"},
 	{pkg: "github.com/SukramJ/go-fabric/script/levelgen/leveltable", min: 97},
 	{pkg: "github.com/SukramJ/go-fabric/script/profilegen", min: 95},
-	{pkg: "github.com/SukramJ/go-fabric/script/surfacecheck", min: 50, why: "the summary and the committed snapshot are tested (measured 50.9); run, which builds and runs the reference daemon, is exercised by make surface-check"},
+	{pkg: "github.com/SukramJ/go-fabric/script/surfacecheck", min: 54, why: "the summary and the committed snapshot are tested (measured 50.9); run, which builds and runs the reference daemon, is exercised by make surface-check"},
 	{
 		pkg: "github.com/SukramJ/go-fabric/script/dclsnapshot",
 		min: 0,
@@ -284,8 +293,8 @@ var floors = []packageFloor{
 	// package's own tests. Re-measure and raise them once the fuzz corpus
 	// has settled; `make cover-check` says by how much.
 	{pkg: "github.com/SukramJ/go-fabric/secure/mattercert", min: 90},
-	{pkg: "github.com/SukramJ/go-fabric/secure/operational", min: 92},
-	{pkg: "github.com/SukramJ/go-fabric/secure/setup", min: 84},
+	{pkg: "github.com/SukramJ/go-fabric/secure/operational", min: 95},
+	{pkg: "github.com/SukramJ/go-fabric/secure/setup", min: 97},
 	{
 		pkg: "github.com/SukramJ/go-fabric/secure/sigma",
 		min: 86,
@@ -305,14 +314,14 @@ var floors = []packageFloor{
 		why: "the contract table, exercised by store's and store/memstore's tests, and go credits that coverage to them (80.8 % of it run against memstore)",
 	},
 	// Brief S1: measured 98.4 and 91.7.
-	{pkg: "github.com/SukramJ/go-fabric/surface", min: 95},
-	{pkg: "github.com/SukramJ/go-fabric/surface/surfacetest", min: 90},
+	{pkg: "github.com/SukramJ/go-fabric/surface", min: 98},
+	{pkg: "github.com/SukramJ/go-fabric/surface/surfacetest", min: 94},
 	{pkg: "github.com/SukramJ/go-fabric/tlv", min: 91},
 	{pkg: "github.com/SukramJ/go-fabric/transport", min: 0, why: "the Conn interface only, no statements to cover"},
 	{pkg: "github.com/SukramJ/go-fabric/transport/btp", min: 93},
 	{pkg: "github.com/SukramJ/go-fabric/transport/message", min: 100},
 	{pkg: "github.com/SukramJ/go-fabric/transport/mrp", min: 99},
-	{pkg: "github.com/SukramJ/go-fabric/transport/tcp", min: 89},
+	{pkg: "github.com/SukramJ/go-fabric/transport/tcp", min: 92},
 	{pkg: "github.com/SukramJ/go-fabric/transport/udp", min: 93},
 	// ADR 0013: the cluster-definition runtime, its test support, the
 	// generator, the first server built on it, and the committed generated

@@ -4,6 +4,12 @@
 > recorded as ADR 0048 while the Matter stack still lived in that
 > repository as `internal/north/matter/`. Paths have been rewritten to this
 > module's root; the decision itself is unchanged.
+>
+> **Note (2026-11-02, review 2026-11 W6-doc-25).** The suite this ADR
+> decides — `MockCCU.FireDeviceEvent`, `harness.AwaitProactiveReport`,
+> `tests/chiptool/` — lives in the host (OpenCCU-Loom), not in this
+> module. This module's chip-tool suite is `internal/chiptool`
+> ([Certifiability](../certifiability.md)).
 
 
 - **Status**: Accepted

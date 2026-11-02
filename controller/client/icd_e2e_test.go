@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/SukramJ/go-fabric/client/interaction"
+	"github.com/SukramJ/go-fabric/internal/fabrictestseam"
 
 	icddef "github.com/SukramJ/go-fabric/cluster/spec/icdmanagement"
 	"github.com/SukramJ/go-fabric/controller/client"
@@ -56,7 +57,7 @@ func TestICDEndToEnd(t *testing.T) {
 		}
 	})()
 	subID := func() uint32 {
-		active := p.pair.Controller.Subscriptions().Active()
+		active := fabrictestseam.Subscriptions(p.pair.Controller).Active()
 		if len(active) != 1 {
 			t.Fatalf("%d active subscriptions", len(active))
 		}
@@ -67,7 +68,7 @@ func TestICDEndToEnd(t *testing.T) {
 	// (ClientSubscription.ts:34, :104), so the id to hold through the
 	// cycles is read once the peer granted it (#306, coverage job).
 	p.eventually(t, "the subscription granted", func() bool {
-		active := p.pair.Controller.Subscriptions().Active()
+		active := fabrictestseam.Subscriptions(p.pair.Controller).Active()
 		return len(active) == 1 && active[0].ID() != interaction.NoSubscription
 	})
 	before := subID()

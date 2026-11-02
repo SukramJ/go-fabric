@@ -64,3 +64,21 @@ Every fix read against the pins (matter.js 862ad75f, chip 6170af84); every new c
 - Item 8: the opener moved to `store.OpenSQLite` so `controller.OpenDB` can use it (archcheck: roles must not import the facade); `url.URL.OmitHost` added — without it a relative path became `file://rel.db` and SQLite refused the authority.
 - Item 10 remainder: a NOC without ICAC has no AKID check against the root SKID (the verifier holds the root key only); the signature check against the root key makes it a shape gap, not an authentication gap → W1 PR, additive constructor.
 - Open for the wave PRs: `core.ThreadNetworkCommissioning` fabric-aware (chip `NetworkCommissioningCluster.cpp:157`) → W3; fabric-0 bypasses `im/read.go:731,757`, `bridge/subscribe.go:385`, `endpoint/dispatcher.go:1021` fail closed → W2.
+
+## Closing (2026-11-02, after the W6 fix PR)
+
+The review's fixes landed in seven pull requests: PR 1, the security
+bundle (#359); W2 (#360); W1 (#361); W3 (#365); W4 (#366); W5 (#367); W6
+(this wave's PR, `review/w6`). #364 fixed a flake between them. One tag
+follows them all (owner 2026-11-01).
+
+What stayed open, per wave (the verdict files have the detail):
+
+| Wave | Open |
+| --- | --- |
+| W1 | the `note` entries, among them the BTP window 0 accepted (matter.js parity; chip rejects) |
+| W2 | the lows and notes outside the W2 PR's scope (`wave-2-verdict.md`); W2-wire-06 partly (grandcat's PTR/SRV/TXT TTL stays 3200, L7-D02) |
+| W3 | notes W3-clusec-09/10, clucore-06/07/09/12/13, clugen-04/05/06/09/10, club1-09/10, clua2-04 |
+| W4 | parity notes W4-ctlnet-07, W4-ctlsec-08; W4-ctlsec-03 (DAC/PAI notAfter) stays with matter.js |
+| W5 | W5-ex-10 (three facade gaps the reference bridge still reaches below the facade for), W5-ex-07 (a group/bind provisioning helper as a facade candidate) |
+| W6 | notes W6-test-14, -15, -17; the four chip cases item 1 excluded (none a module defect); 251 citation drifts on their ratchet; W6-reg-08 is the reviewer's |

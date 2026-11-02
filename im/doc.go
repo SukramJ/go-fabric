@@ -33,9 +33,9 @@
 //
 //   - Cluster-attribute encoding — lives in
 //     cluster/*.
-//   - Subscription state across a daemon restart — the SQLite store
-//     lives in store; cross-restart resumption is
-//     deferred by design (notes/parity/by_design.md).
+//   - Subscription state across a restart — the records live in store,
+//     and the re-establishment after a restart is im/subscription's and
+//     the bridge's (ADR 0008, im/subscription/persistence.go).
 //
 // This package DOES own the Timed Request / Timed Action handshake
 // (timed.go: TimedRequest, UnmarshalTimedRequestTLV, StatusResponse per

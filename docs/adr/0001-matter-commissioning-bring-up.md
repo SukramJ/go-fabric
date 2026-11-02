@@ -4,6 +4,11 @@
 > recorded as ADR 0013 while the Matter stack still lived in that
 > repository as `internal/north/matter/`. Paths have been rewritten to this
 > module's root; the decision itself is unchanged.
+>
+> **Note (2026-11-02, review 2026-11 W6-doc-25).** §5's attach surface is
+> superseded by the current API: there is no `Endpoint.RootClusterServers`;
+> `Bridge.AttachRootClusters` remains, and the node facade builds and
+> attaches the root's servers itself (`node/root.go`, `Node.Root`).
 
 
 - **Status:** accepted

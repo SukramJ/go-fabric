@@ -24,8 +24,9 @@ type AttributeValue struct {
 // implements this interface, [HandleWriteRequest] calls CurrentDataVersion
 // before applying each write that carries a DataVersion field.
 //
-// Mirrors matter.js packages/node/src/node/server/InteractionServer.ts
-// DataVersion mismatch check before cluster write dispatch, and chip
+// Mirrors matter.js packages/protocol/src/action/server/AttributeWriteResponse.ts:254-257
+// at 862ad75f (a write whose DataVersion differs from the cluster's answers
+// DataVersionMismatch before the write is dispatched), and chip
 // src/app/WriteHandler.cpp AttributeAccessInterface DataVersion verification.
 type DataVersionReader interface {
 	// CurrentDataVersion returns the current DataVersion for the cluster at

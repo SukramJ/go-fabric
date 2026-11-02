@@ -13,16 +13,17 @@
 // Interaction Model requests into it.
 //
 // The assembler is non-reactive: it consumes a snapshot and produces a
-// topology, then is done. Re-running on model changes is the caller's
-// responsibility (the bridge core subscribes to the event bus and
-// triggers re-assembly when devices are added, removed, or change
-// reachability).
+// topology, then is done. Re-running it on a change is the caller's:
+// bridge.Bridge.Reassemble assembles again, and the node facade calls it
+// when the host adds, removes or replaces a device (node.Aggregator Add,
+// Remove, Replace).
 //
-// Endpoint identity is NOT persisted here. What a source identity is
-// made of is the owner's business, so [Spec.StableKey] carries an
-// opaque [SourceKey] and the owner implements [Store] over its own
-// table. The same source must produce the same key, and therefore the
-// same Matter endpoint ID, across restarts.
+// What a source identity is made of is the owner's business, so
+// [Spec.StableKey] carries an opaque [SourceKey], and the endpoint number
+// it maps to is kept by a [Store]: the module ships endpoint/sqlitestore
+// (the node's SQLite database) and endpoint/memstore, and a host may
+// implement [Store] over its own table. The same source must produce the
+// same key, and therefore the same Matter endpoint ID, across restarts.
 //
 // Endpoint 0 is the root bridge endpoint and is never persisted —
 // the assembler synthesises it from the bridge configuration on every

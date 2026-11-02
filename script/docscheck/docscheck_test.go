@@ -98,7 +98,7 @@ func TestInlinePrograms(t *testing.T) {
 }
 
 // citation is a path:line or path:first-last reference.
-var citation = regexp.MustCompile(`(?:^|[^\w/.-])((?:[\w.-]+/)*[\w.-]+\.(?:go|md|json|yml|yaml|py|sh)):(\d+)(?:-(\d+))?`)
+var citation = regexp.MustCompile(`(?:^|[^\w/.-])((?:[\w.-]+/)*[\w.-]+\.(?:go|md|json|yml|yaml|py|sh|sql)):(\d+)(?:-(\d+))?`)
 
 // TestCitationsResolve: every file:line citation in the published docs
 // (docs/ but its ADRs and history, which record the tree as it was when

@@ -345,7 +345,7 @@ func (c *Controller) Close() {
 // resumption records and the client node registry's store survive; the
 // exchange manager, DNS-SD cache, peer set, subscriptions, commissioner
 // and registry are new, the registry restoring the stored nodes. A pair's
-// Peer and Interaction belong to the stopped stack; use the registry's
+// transport belongs to the stopped stack; use the registry's
 // nodes after a restart. A site on loopback sockets gives the controller a
 // new port.
 func (c *Controller) Restart(ctx context.Context) error {
@@ -413,20 +413,6 @@ func (c *Controller) Index() int { return c.index }
 // Addr is the controller's UDP address.
 func (c *Controller) Addr() *net.UDPAddr { return c.listener.LocalAddr() }
 
-// Exchanges is the controller's exchange manager.
-func (c *Controller) Exchanges() *exchange.Manager {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-	return c.mgr
-}
-
-// Names is the controller's DNS-SD cache, answered by the site.
-func (c *Controller) Names() *discovery.Names {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-	return c.names
-}
-
 // CA is the controller's certificate authority.
 func (c *Controller) CA() *ca.CA {
 	c.mu.RLock()
@@ -439,27 +425,6 @@ func (c *Controller) Fabric() *commissioner.Fabric {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	return c.fabric
-}
-
-// Peers is the controller's peer set.
-func (c *Controller) Peers() *peer.Set {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-	return c.set
-}
-
-// Resumption is the peer set's CASE resumption store.
-func (c *Controller) Resumption() *peer.MemoryResumptionStore {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-	return c.resume
-}
-
-// Subscriptions is the controller's subscription registry.
-func (c *Controller) Subscriptions() *interaction.Subscriptions {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-	return c.subs
 }
 
 // Commissioner is the controller's commissioner.
@@ -519,7 +484,7 @@ func (c *Controller) Commission(ctx context.Context, d *Device, opts CommissionO
 	if p == nil {
 		return nil, errors.New("fabrictest: the commissioned device has no peer")
 	}
-	return &Pair{Controller: c, Device: d, Address: res.Address, Peer: p, Interaction: c.com.Interaction(p)}, nil
+	return &Pair{Controller: c, Device: d, Address: res.Address, peer: p, interaction: c.com.Interaction(p)}, nil
 }
 
 // Pair is a controller and a device of one site: commissioned
@@ -531,20 +496,18 @@ type Pair struct {
 	// Address is the device's peer address on the controller's fabric;
 	// zero before commissioning.
 	Address PeerAddress
-	// Peer is the controller's peer of the device, holding the CASE
-	// session; nil before commissioning.
-	Peer *Peer
-	// Interaction is the controller's interaction with the device over
-	// Peer; nil before commissioning. A pair of [Controller.PASE] speaks
-	// over PASESession instead.
-	Interaction *Interaction
-	// PASESession is the PASE session of a pair of [Controller.PASE]; nil
-	// otherwise.
-	PASESession *Session
+
+	// The pair's transport — the client machinery's peer, interaction and
+	// PASE session — is the module's seam (internal/fabrictestseam), not
+	// the harness's API: a host's test reaches the device through the
+	// wire helpers and [Pair.Node].
+	peer        *peer.Peer
+	interaction *interaction.Interaction
+	paseSession *exchange.Session
 }
 
 // Commissioned reports whether the pair's device is commissioned.
-func (p *Pair) Commissioned() bool { return p.Peer != nil }
+func (p *Pair) Commissioned() bool { return p.peer != nil }
 
 // Node is the controller's client node of the device — the registry's
 // node for its peer address, created bound to the peer, neither started

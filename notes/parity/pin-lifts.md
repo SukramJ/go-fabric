@@ -27,8 +27,9 @@ row); the reading map behind each section is a Sonnet `read-*.md` under
 ## Milestone 6 (2026-10-28, wave 27-C) — what the next lift re-reads
 
 No lift; the pin stays `862ad75f`. Milestone 6 added 18 rows to the
-*Ahead of matter.js* register (12 before wave 26-B, 30 now; `make
-ahead-check` holds every marker at the pin and at HEAD). The next lift
+*Ahead of matter.js* register (12 before wave 26-B, 30 after it; 39 at
+the review of 2026-11, `make ahead-check` holding every marker at the pin
+and at HEAD). The next lift
 re-reads each of their markers first, because each names a matter.js
 server that was the generated stub at the pin:
 
@@ -51,10 +52,10 @@ server that was the generated stub at the pin:
   `BD-chip-JointFabricAdministrator-RulesInServer`, `BD-chip-JCM-Commissioner`;
 - phase 27 (wave 27-B): `BD-chip-TimeSynchronization-Features`.
 
-The Thermostat events (TEVT, wave 27-B) are described inside
-`BD-chip-Thermostat-Schedules` but have no register row of their own; its
-marker (`ThermostatServer.ts:82`) is the schedules', so a lift re-reads the
-events in `ThermostatServer.ts` by hand until a row is added.
+The Thermostat events (TEVT, wave 27-B) have their own register row since
+2026-10-29, `BD-chip-Thermostat-Events` (its marker: `ThermostatServer.ts:525`
+is the server's only `events.` emit), so a lift re-reads them with the
+other markers.
 WebRtcTransportRequestor mirrors matter.js and is no register row.
 
 ## 0ceb202d → 862ad75f (2026-10-18, milestone 2 phase 14)
@@ -78,8 +79,8 @@ revision moved. Snapshot regenerated in commit `9a6c2fb` (brief BD's branch).
 | #4745 | a utility component the composing endpoint lists itself counts that endpoint as a candidate (`DeviceTypeConformance.ts:596-614`, Core § 9.2.1) | **gap → register** | `endpoint/devicetype_conformance.go:842-850` iterates the composition scope only |
 | #4746 | a condition true only by a `Root` assertion never refuses; the violation is marked `assertedAtRoot` and logged (`DeviceTypeConformance.ts:65-76`, `ConditionAssertions.ts:63-68`) | **gap → register** | `endpoint/devicetype_conformance.go:503-526` adds Root-asserted conditions; `devicetype_validation.go:333-339` refuses the resulting violations like any other |
 | #4779 | a replaced Fabric shares groups, ACL and ICD state with its replacement | **have it** (by construction) | `handleUpdateNOC` updates the NOC of the session's fabric index in place; ACL, groups and ICD state are keyed by fabric index and untouched |
-| #4778 | only a change of the fabric the armed fail-safe owns is deferred; UpdateFabricLabel / SetVIDVerificationStatement under a fail-safe without AddNOC/UpdateNOC are final | **open** — no deferred commissioned-state update exists here, so a label change takes effect at once; whether a `SetVIDVerificationStatement` under an ownerless fail-safe is kept (ours drops it with the pending update, `operational_credentials.go:522-528`) is settled by the OperationalCredentialsServerTest port (phase 16) |
-| #4777 | client answers the priming report of a cancelled subscribe with INVALID_SUBSCRIPTION; the server drops it | **open** (server side) — `bridge/subscribe.go:721-780` waits for the peer's status per chunk; that a non-success status on the priming report ends the subscription is settled by the ServerSubscriptionTest port (phase 16) |
+| #4778 | only a change of the fabric the armed fail-safe owns is deferred; UpdateFabricLabel / SetVIDVerificationStatement under a fail-safe without AddNOC/UpdateNOC are final | **have it** — settled by the OperationalCredentialsServerTest port (ported): `node:TestOperationalCredentialsFinalFabricChange` treats UpdateFabricLabel and SetVIDVerificationStatement under a fail-safe without AddNOC/UpdateNOC as final fabric changes, reported to `Observers.OnFabricUpdated` (review 2026-11 W6-reg-11) |
+| #4777 | client answers the priming report of a cancelled subscribe with INVALID_SUBSCRIPTION; the server drops it | **have it, untested** — the priming report's chunk loop waits for the peer's status and aborts the Subscribe on an error status (`bridge/subscribe_dispatch.go`, `awaitChunkStatusResponse`, as matter.js's waitForSuccess); the ServerSubscriptionTest port (partial) has no case that answers a priming report with INVALID_SUBSCRIPTION, so the server side is a test gap (review 2026-11 W6-reg-11) |
 | #4765 | an out-of-range vendor ID in a manual code is an invalid payload | **have it** — `secure/setup/decode.go:96-107` validates through `assertValidPayloadIdentity`, which returns the invalid-payload error |
 | #4759 | AtomicRequest: request-wide checks before per-attribute statuses | **not applicable** — no atomic-write handler here (thermostat presets, milestone 3; chipdm acknowledges the command) |
 | #4737 | WebRTC requestor sessions keyed per peer | **not applicable** — no WebRTC server (milestone 6 stubs) |
@@ -97,11 +98,11 @@ revision moved. Snapshot regenerated in commit `9a6c2fb` (brief BD's branch).
 | #4770 | a client node is seeded once BasicInformation and every endpoint of the root's PartsList are in; a root-only peer qualifies (`ClientNodeLifecycle.ts:52-56`) | **gap → register** | `controller/client/config.go:116-118`, `node.go` `evaluateSeeded` keep "more than the root endpoint" |
 | #4747 | discovery error kinds (`DeviceNotDiscoveredError`, `DiscoveryIncompleteError`, `NoDiscoveryTransportError`) and an abort that stops every attempt | **gap → register** (API) | `controller/discovery`, `controller/commissioner`: one error, no abort option |
 | #4750 | a status the peer sent is told from one produced locally (`ResultStatus.received`) | **gap → register** (API, low) | `controller/interaction/interaction.go:56` `StatusError` has no origin |
-| #4752 | a closed sustained subscription never reports itself active | **open** — `controller/interaction/sustained.go:122-225` gates `setActive` on close in three places; the in-flight-then-success case is settled by the SustainedSubscriptionTest port (phase 16) |
-| #4751 | one owner for a client node's event number and data versions | **open** — `controller/client/network.go:78-259`; settled by the ClientEventNotificationTest port (phase 16) |
+| #4752 | a closed sustained subscription never reports itself active | **have it** — settled by the SustainedSubscriptionTest port: `client/interaction:TestSustainedSubscriptionNonICD` "never reports active when closed while the subscribe is in flight and then succeeds" (review 2026-11 W6-reg-11) |
+| #4751 | one owner for a client node's event number and data versions | **have it** for the event number — settled by the ClientEventNotificationTest port (partial): `controller/client:TestClientEventNotificationEventNumbersParity` holds one stored event number, never lowered, asked above by a replacement subscription and after a restart; the data versions are the client image's own (the version filters it injects); the per-subscription event number stays `missing` there (review 2026-11 W6-reg-11) |
 | #4760 | every ClientNode write reaches the device, the cache follows the device | **have it** — no local cache write exists; the image changes when the peer reports (`controller/client/interact.go:100-110`) |
 | #4767 | invoke batching per request options | **not ported** (documented, `controller/interaction/interaction.go:12`); unchanged |
 | #4769 | ICD Check-In key refresh kept in step | **not applicable** until milestone 5 (no ICD client) |
 | #4733 | controller-side OTA: an update applied without restart fails | **not applicable** until milestone 5 (no controller OTA manager) |
-| #4788 | `caseConnectionTimeout` commissioning budget | **open** — no such budget in `controller/commissioner`; settled by the CaseConnectionTimeoutTest port (phase 16) |
+| #4788 | `caseConnectionTimeout` commissioning budget | **have it** — settled by the CaseConnectionTimeoutTest port (ported): `controller/client:TestCaseConnectionTimeoutParity` fails a commissioning whose CASE connection outlasts the budget and refuses a non-finite budget (review 2026-11 W6-reg-11) |
 | #4743 | `PeerDescriptor.dataModelRevision` removed | **not applicable** (type only) |

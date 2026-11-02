@@ -81,7 +81,7 @@ device side uses them too (`binding` sends to bound peers through them,
 model-and-protocol layer and `binding` and `node` import them downward
 ([ADR 0026](adr/0026-architecture-principles.md) principles 1 and 12).
 They lived under `controller/` before v0.10.0; the old import paths
-forward to them until v0.12.0.
+forwarded to them until v0.12.0, which removed them.
 
 The order of [`examples/reference-controller`](https://github.com/SukramJ/go-fabric/tree/main/examples/reference-controller)'s
 `open()` is the canonical construction order.
@@ -186,7 +186,7 @@ The layers and their allowed direction are held by `script/archcheck`
 | --- | --- | --- |
 | Thread radio | needs hardware and a border router; a commissioner can still hand a device a Thread dataset; an existing OpenThread Border Router is managed over its REST API instead (`thread/otbr`, `cluster/threadbr`) | concept v3, [ADR 0027](adr/0027-thread-border-router-over-otbr-rest.md) |
 | Bluetooth on the device side | a LAN-attached node has no use for it; the commissioner's BLE is decided | [ADR 0024](adr/0024-ble-commissioning-in-the-controller.md) |
-| Camera and WebRTC clusters | need a media path in the host | [matter.js comparison](matterjs-comparison.md) |
+| The camera's media path | the module serves the camera and WebRTC clusters (milestone 6); capturing, encoding and streaming the media are the host's, behind `camera.*Port` ([camera guide](guides/camera.md)) | [matter.js comparison](matterjs-comparison.md) |
 | CSA certification | not pursued; certifiability is the goal | [ADR 0011](adr/0011-certifiability-is-a-goal.md) |
 
 The facade is the host's boundary too: a host configures and observes a

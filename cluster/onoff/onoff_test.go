@@ -6,26 +6,22 @@ package onoff_test
 import (
 	"testing"
 
+	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/cluster/onoff"
-	"github.com/SukramJ/go-fabric/schema"
 )
 
-// TestRevisionComesFromTheGeneratedSnapshot pins that the revision is read
-// from the generated matter.js schema rather than restated.
-//
-// Four projections carried their own `= 6`. A regeneration that moved the
-// revision would have left all four behind, and a controller reading a
-// revision the cluster does not implement is exactly the drift the project
-// forbids hand-coding Matter constants for.
-func TestRevisionComesFromTheGeneratedSnapshot(t *testing.T) {
+// TestRevisionIsWhatTheServerAnswers: the exported Revision is the
+// ClusterRevision the server answers. That the answer is matter.js's is
+// node's TestServedClusterRevisionAndFeatureMap (W6-test-10), which reads
+// it off every constructed server.
+func TestRevisionIsWhatTheServerAnswers(t *testing.T) {
 	t.Parallel()
-
-	want, ok := schema.ClusterRevisions[onoff.ClusterID]
-	if !ok {
-		t.Fatalf("cluster %#04x missing from the generated schema", onoff.ClusterID)
+	srv, err := onoff.New(onoff.Config{})
+	if err != nil {
+		t.Fatal(err)
 	}
-	if got := onoff.Revision(); got != want {
-		t.Errorf("Revision() = %d, want %d from the snapshot", got, want)
+	if got, _ := srv.MatterRead(cluster.AttrGlobalClusterRevision); got != onoff.Revision() {
+		t.Errorf("the server answers ClusterRevision %v, Revision() is %d", got, onoff.Revision())
 	}
 }
 

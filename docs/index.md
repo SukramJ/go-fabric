@@ -24,10 +24,11 @@ Alliance, and nothing built on it may be described as certified.
 - **One module, five runtime dependencies, no cgo.** (`golang.org/x/tools` in `go.mod` serves only the repository's own tooling.) It builds with
   `CGO_ENABLED=0`; SQLite is the pure-Go `modernc.org/sqlite`.
 - **Matter 1.6.1** data model, extracted from matter.js at a pinned commit
-  and embedded; 118 served clusters and 79 generated device types.
+  and embedded; all 135 clusters of the snapshot served and all 91 device
+  types generated.
 - **Transports:** IPv6 (and IPv4) UDP with MRP, TCP for large payloads,
   DNS-SD. No Thread radio, no Bluetooth on the device side; the
-  commissioner's BLE support is decided and in progress
+  commissioner commissions over BLE
   ([ADR 0024](adr/0024-ble-commissioning-in-the-controller.md)).
 - **Proof:** connectedhomeip's own certification cases run against the
   reference daemon in CI, and the module's controller commissions the

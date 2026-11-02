@@ -487,19 +487,6 @@ func TestHandlerParity_KeepSubscriptionsFalse_ClosePeerFreesQuota(t *testing.T) 
 	}
 }
 
-// ---- Case 13 --------------------------------------------------------------
-// Mirrors matter.js packages/node/test/node/AttributeSubscriptionResponseTest.ts:16-41
-// (case "reads concrete attribute when in filter")
-//
-// Untranslatable: AttributeSubscriptionResponse is an IM-layer object that
-// requires a live MockServerNode + protocol stack. The go-fabric equivalent
-// lives in the REST handler layer (attribute read with a dirty-state filter),
-// not in the subscription engine itself.
-func TestHandlerParity_SKIP_AttrSubResponse_ConcreteInFilter(t *testing.T) {
-	// Mirrors matter.js packages/node/test/node/AttributeSubscriptionResponseTest.ts:16-41
-	t.Skip("ported over the wire: node/attribute_subscription_response_parity_matterjs_test.go (TestAttributeSubscriptionResponseParity)")
-}
-
 // ---- Case 14 --------------------------------------------------------------
 // Mirrors matter.js packages/node/src/node/server/ServerSubscription.ts:399-427
 // (#prepareDataUpdate — MinIntervalFloor respected: second change within floor

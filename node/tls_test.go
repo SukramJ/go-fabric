@@ -19,6 +19,7 @@ import (
 	"github.com/SukramJ/go-fabric/endpoint"
 	"github.com/SukramJ/go-fabric/fabrictest"
 	"github.com/SukramJ/go-fabric/im"
+	"github.com/SukramJ/go-fabric/internal/fabrictestseam"
 	"github.com/SukramJ/go-fabric/node"
 )
 
@@ -85,7 +86,7 @@ func TestNodeServesTheTLSServers(t *testing.T) {
 		Configure: func(cfg *node.Config) { cfg.TLS = &node.TLSConfig{CertificatePort: tlsKeys{}} },
 	})
 	var root *endpoint.Endpoint
-	for _, ep := range d.Endpoints() {
+	for _, ep := range fabrictestseam.Endpoints(d) {
 		if ep.IsRoot() {
 			root = ep
 		}
@@ -131,7 +132,7 @@ func TestNodeServesTheTLSServers(t *testing.T) {
 		t.Fatal("the camera is not served")
 	}
 	var push *camera.PushTransport
-	for _, ep := range d.Endpoints() {
+	for _, ep := range fabrictestseam.Endpoints(d) {
 		if ep.ID == num {
 			push, _ = serverOn(ep, padef.ClusterID).(*camera.PushTransport)
 		}

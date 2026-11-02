@@ -6,8 +6,9 @@
 // connection a request arrived on, so the reply goes back on it.
 //
 // The concrete transports live in the sub-packages: transport/udp
-// (datagrams, MRP on top) and transport/tcp (length-framed stream,
-// reliable). Mirrors matter.js's split between the channel abstraction
+// (datagrams, MRP on top), transport/tcp (length-framed stream,
+// reliable) and transport/btp (the Bluetooth Transport Protocol, a BLE
+// connection's session). Mirrors matter.js's split between the channel abstraction
 // and its UDP / TCP implementations, of which the TCP one declares
 // itself reliable
 // (packages/protocol/src/transport/tcp/TcpChannel.ts:44

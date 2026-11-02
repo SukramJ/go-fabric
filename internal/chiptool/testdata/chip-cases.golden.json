@@ -680,10 +680,19 @@
       "steps": 54,
       "stepsSkipped": 28
     },
+    "DRYERCTRL/2.1": {
+      "steps": 7,
+      "stepsSkipped": 2
+    },
     "DT/1.1": {
       "tests": 1,
       "steps": 3,
       "stepsSkipped": 0
+    },
+    "EEM/2.1": {
+      "tests": 1,
+      "steps": 7,
+      "stepsSkipped": 8
     },
     "EEVSE/2.1": {
       "steps": 27,
@@ -752,6 +761,11 @@
       "tests": 1,
       "steps": 4,
       "stepsSkipped": 0
+    },
+    "EPM/2.1": {
+      "tests": 1,
+      "steps": 20,
+      "stepsSkipped": 24
     },
     "EPREF/2.1": {
       "tests": 1,
@@ -1550,6 +1564,11 @@
       "steps": 2,
       "stepsSkipped": 0
     },
+    "PWRTL/2.1": {
+      "tests": 1,
+      "steps": 3,
+      "stepsSkipped": 4
+    },
     "REFALM/2.1": {
       "steps": 4,
       "stepsSkipped": 1
@@ -1747,6 +1766,16 @@
     "SEAR/1.6": {
       "tests": 1,
       "steps": 9,
+      "stepsSkipped": 0
+    },
+    "SEPR/2.1": {
+      "tests": 1,
+      "steps": 5,
+      "stepsSkipped": 0
+    },
+    "SEPR/2.2": {
+      "tests": 1,
+      "steps": 10,
       "stepsSkipped": 0
     },
     "SETRF/2.1": {
@@ -1974,6 +2003,11 @@
     "WAKEONLAN/4.1": {
       "steps": 3,
       "stepsSkipped": 1
+    },
+    "WASHERCTRL/2.1": {
+      "tests": 1,
+      "steps": 5,
+      "stepsSkipped": 0
     },
     "WHM/1.2": {
       "tests": 1,
@@ -2451,12 +2485,22 @@
       "2.13",
       "3.2"
     ],
+    "DRYERCTRL": [
+      "2.1"
+    ],
     "DT": [
       "1.1"
     ],
     "ECOINFO": [
       "2.1",
       "2.2"
+    ],
+    "EEM": [
+      "2.1",
+      "2.2",
+      "2.3",
+      "2.4",
+      "2.5"
     ],
     "EEVSE": [
       "2.1",
@@ -2478,6 +2522,10 @@
       "2.1",
       "2.2",
       "2.3"
+    ],
+    "EPM": [
+      "2.1",
+      "2.2"
     ],
     "EPREF": [
       "2.1"
@@ -2745,6 +2793,10 @@
       "2.1",
       "2.2"
     ],
+    "PWRTL": [
+      "2.1",
+      "2.2"
+    ],
     "REFALM": [
       "2.1",
       "2.2",
@@ -2827,6 +2879,11 @@
       "1.4",
       "1.5",
       "1.6"
+    ],
+    "SEPR": [
+      "2.1",
+      "2.2",
+      "2.3"
     ],
     "SETRF": [
       "2.1",
@@ -2944,6 +3001,10 @@
     "WAKEONLAN": [
       "4.1"
     ],
+    "WASHERCTRL": [
+      "2.1",
+      "2.2"
+    ],
     "WHM": [
       "1.2",
       "2.1"
@@ -3039,6 +3100,9 @@
     "DGWIFI/3.2.Simulated": "DGWIFI.C",
     "DRLK/2.11": "DRLK.S \u0026 DRLK.S.F00 \u0026 DRLK.S.F01 \u0026 DRLK.S.F02",
     "DRLK/2.13": "DRLK.S.F0d",
+    "EEM/2.3": "EEM.S \u0026 EEM.S.F02 \u0026 EEM.S.F01",
+    "EEM/2.4": "EEM.S \u0026 EEM.S.F03 \u0026 EEM.S.F00",
+    "EEM/2.5": "EEM.S \u0026 EEM.S.F03 \u0026 EEM.S.F01",
     "FAN/2.3": "FAN.S.F02",
     "FAN/2.4": "FAN.S.F03",
     "FAN/2.5": "FAN.S \u0026 FAN.S.F05",
@@ -3069,6 +3133,7 @@
     "SC/3.5": "MCORE.ROLE.COMMISSIONER",
     "SC/4.6": "MCORE.ROLE.COMMISSIONER \u0026 MCORE.DD.COMM_DISCOVERY",
     "SC/4.7": "MCORE.ROLE.COMMISSIONEE \u0026 MCORE.DD.COMM_DISCOVERY",
+    "SEPR/2.3": "SEPR.S \u0026 SEPR.F00",
     "TCTL/2.3": "TCTL.S \u0026 TCTL.S.F01",
     "TCTL/3.3": "TCTL.S \u0026 TCTL.S.F01",
     "TIMESYNC/2.10": "TIMESYNC.S.F00",

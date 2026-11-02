@@ -22,26 +22,6 @@ import (
 // Passcode generation (PasePairingTest.ts:14-48)
 // ---------------------------------------------------------------------------
 
-// TestParityMatterJS_PasePairing_PasscodeRange documents the passcode range
-// (Matter §5.1.1.6) and skips because enforcement lives in PaseMessenger, not
-// in spake2.NewVerifierContext.
-//
-// Mirrors matter.js packages/protocol/test/session/secure/PasePairingTest.ts:15
-// (case "uses 27-bit candidates and rejects out-of-range and forbidden values").
-func TestParityMatterJS_PasePairing_PasscodeRange(t *testing.T) {
-	t.Skip("FixMe: passcode range enforcement (0 / >=100_000_000 / forbidden) lives in PaseMessenger commissioning layer — port when PaseClient.generateRandomPasscode is exposed")
-}
-
-// TestParityMatterJS_PasePairing_PasscodeGeneratorExhaustion documents the
-// PasePairingTest.ts:37 "fails after too many invalid candidates" case. Skipped
-// because the entropy-injection seam is not in the exported API.
-//
-// Mirrors matter.js packages/protocol/test/session/secure/PasePairingTest.ts:37
-// (case "fails after too many invalid candidates").
-func TestParityMatterJS_PasePairing_PasscodeGeneratorExhaustion(t *testing.T) {
-	t.Skip("FixMe: PaseClient.generateRandomPasscode entropy injection not exported — port when the seam is surfaced")
-}
-
 // ---------------------------------------------------------------------------
 // SPAKE2+ process vectors (PasePairingTest.ts:50-159)
 // ---------------------------------------------------------------------------

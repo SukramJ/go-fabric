@@ -14,6 +14,7 @@ import (
 	"testing"
 
 	"github.com/SukramJ/go-fabric/client/peer"
+	"github.com/SukramJ/go-fabric/internal/fabrictestseam"
 )
 
 func TestClientNodeInteractionIcdLitRouting(t *testing.T) {
@@ -24,7 +25,7 @@ func TestClientNodeInteractionIcdLitRouting(t *testing.T) {
 		if p.wakefulness(t).Awake() {
 			t.Fatal("awake")
 		}
-		lit, err := p.pair.Controller.Peers().Networks().Get(peer.NetworkICDLit)
+		lit, err := fabrictestseam.Peers(p.pair.Controller).Networks().Get(peer.NetworkICDLit)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -50,7 +51,7 @@ func TestClientNodeInteractionIcdLitRouting(t *testing.T) {
 	t.Run("keeps a non-LIT peer on its medium profile", func(t *testing.T) {
 		t.Parallel()
 		p := newICDPair(t, icdPairOptions{})
-		lit, _ := p.pair.Controller.Peers().Networks().Get(peer.NetworkICDLit)
+		lit, _ := fabrictestseam.Peers(p.pair.Controller).Networks().Get(peer.NetworkICDLit)
 		before := lit.Semaphore.Granted()
 		if _, err := p.node.Read(parityCtx(t), descriptorRead); err != nil {
 			t.Fatal(err)

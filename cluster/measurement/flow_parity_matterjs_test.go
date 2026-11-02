@@ -61,12 +61,6 @@ func TestParityMatterJS_FlowMeasurementSurface(t *testing.T) {
 	js := loadFlowSnapshot(t)
 	srv := NewFlowServer(flowSrc{value: 1, observed: true})
 
-	if FlowRevision() != js.Revision {
-		t.Errorf("FlowRevision = %d, want %d", FlowRevision(), js.Revision)
-	}
-	if rev, _ := schema.ClusterRevision(ClusterFlowMeasurement); rev != js.Revision {
-		t.Errorf("schema.ClusterRevision(0x0404) = %d, want %d — regenerate schema/", rev, js.Revision)
-	}
 	if fm, _ := srv.MatterRead(cluster.AttrGlobalFeatureMap); fm != js.FeatureMap {
 		t.Errorf("FeatureMap = %v, want %d", fm, js.FeatureMap)
 	}

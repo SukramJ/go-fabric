@@ -41,12 +41,12 @@ func TestDeviceClientStackOnTheSite(t *testing.T) {
 	if _, err := c.Commission(ctx, b, fabrictest.CommissionOptions{}); err != nil {
 		t.Fatal(err)
 	}
-	if b.Peers() != nil {
+	if b.Node().Peers() != nil {
 		t.Fatal("device B has a client stack without node.Config.Client")
 	}
 	fa := onlyFabric(ctx, t, a)
 	fb := onlyFabric(ctx, t, b)
-	if err := b.Store().ReplaceACL(ctx, fb.FabricIndex, []store.ACLEntry{
+	if err := b.Node().Store().ReplaceACL(ctx, fb.FabricIndex, []store.ACLEntry{
 		{FabricIndex: fb.FabricIndex, Privilege: store.PrivilegeAdminister, AuthMode: store.AuthModeCASE, Subjects: []uint64{bridgetest.DefaultControllerNodeID}},
 		{FabricIndex: fb.FabricIndex, Privilege: store.PrivilegeOperate, AuthMode: store.AuthModeCASE, Subjects: []uint64{fa.NodeID}},
 	}); err != nil {
@@ -56,7 +56,7 @@ func TestDeviceClientStackOnTheSite(t *testing.T) {
 	if !ok {
 		t.Fatal("the light has no endpoint")
 	}
-	p, err := a.Peers().For(handshake.PeerAddress{FabricIndex: fa.FabricIndex, NodeID: fb.NodeID})
+	p, err := a.Node().Peers().For(handshake.PeerAddress{FabricIndex: fa.FabricIndex, NodeID: fb.NodeID})
 	if err != nil {
 		t.Fatal(err)
 	}

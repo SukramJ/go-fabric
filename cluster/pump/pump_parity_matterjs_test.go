@@ -138,7 +138,7 @@ func TestParityMatterJS_PumpConformance(t *testing.T) {
 				if a.ID >= 0xFFF0 {
 					continue
 				}
-				required, allowed := conformance(a.Conformance, names)
+				required, allowed := conformance(t, a.Conformance, names)
 				has := slices.Contains(srv.MatterAttributes(), a.ID)
 				if required && !has {
 					t.Errorf("features 0x%02X opt 0x%X: mandatory %s (%q) missing", f, opt, a.Name, a.Conformance)

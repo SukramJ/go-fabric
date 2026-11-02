@@ -59,6 +59,19 @@ func renderPage(snap *Snapshot, reg *Register) []byte {
 		b.WriteString("\n")
 	}
 
+	b.WriteString("## FixMe skips\n\n")
+	b.WriteString("Go tests whose body is an unconditional `t.Skip(\"FixMe: …\")`: each names a case it would mirror and\n")
+	b.WriteString("does not test. They count as passes in `go test`; this list is where they are recorded.\n\n")
+	if len(reg.Skips) == 0 {
+		b.WriteString("None.\n\n")
+	} else {
+		b.WriteString("| Go test | mirrors | why it skips |\n| --- | --- | --- |\n")
+		for _, s := range reg.Skips {
+			fmt.Fprintf(&b, "| `%s` | %s | %s |\n", s.Test, cell(s.Source), cell(s.Reason))
+		}
+		b.WriteString("\n")
+	}
+
 	b.WriteString("## Planned\n\n")
 	if counts[StatusPlanned] == 0 {
 		b.WriteString("None.\n")

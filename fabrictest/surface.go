@@ -4,9 +4,6 @@
 package fabrictest
 
 import (
-	"github.com/SukramJ/go-fabric/client/exchange"
-	"github.com/SukramJ/go-fabric/client/interaction"
-	"github.com/SukramJ/go-fabric/client/peer"
 	"github.com/SukramJ/go-fabric/controller/client"
 	"github.com/SukramJ/go-fabric/store"
 )
@@ -49,18 +46,6 @@ type (
 	StatusError = client.StatusError
 	// PeerAddress is a node on a fabric (client.PeerAddress).
 	PeerAddress = client.PeerAddress
-
-	// Interaction is the controller's interaction with a pair's device
-	// ([Connect], [Pair].Interaction): the client machinery's own,
-	// client/interaction.
-	Interaction = interaction.Interaction
-	// Peer is the controller's peer of a pair's device, holding its CASE
-	// session (client/peer).
-	Peer = peer.Peer
-	// Session is a secure session (client/exchange): a pair's PASE session.
-	Session = exchange.Session
-	// Message is one received message of [Exchange] (client/exchange).
-	Message = exchange.Message
 
 	// Privilege is an access privilege [Pair.Grant] gives the controller.
 	Privilege = store.Privilege

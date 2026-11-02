@@ -22,6 +22,7 @@ import (
 	"github.com/SukramJ/go-fabric/endpoint"
 	"github.com/SukramJ/go-fabric/fabrictest"
 	"github.com/SukramJ/go-fabric/im"
+	"github.com/SukramJ/go-fabric/internal/fabrictestseam"
 	"github.com/SukramJ/go-fabric/node"
 	"github.com/SukramJ/go-fabric/tlv"
 )
@@ -211,7 +212,7 @@ func rawWrite(t *testing.T, m *mockPair, req im.WriteRequest) rawAnswer[im.Write
 	if err != nil {
 		t.Fatal(err)
 	}
-	msg, err := fabrictest.Exchange(parityCtx(t), m.pair, im.OpcodeWriteRequest, b)
+	msg, err := fabrictestseam.Exchange(parityCtx(t), m.pair, im.OpcodeWriteRequest, b)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -280,7 +281,7 @@ func encodeInvoke(t *testing.T, req im.InvokeRequest) []byte {
 // InvokeResponse or the status of a StatusResponse in its place.
 func rawInvoke(t *testing.T, p *fabrictest.Pair, req im.InvokeRequest) rawAnswer[im.InvokeResponse] {
 	t.Helper()
-	msg, err := fabrictest.Exchange(parityCtx(t), p, im.OpcodeInvokeRequest, encodeInvoke(t, req))
+	msg, err := fabrictestseam.Exchange(parityCtx(t), p, im.OpcodeInvokeRequest, encodeInvoke(t, req))
 	if err != nil {
 		t.Fatal(err)
 	}

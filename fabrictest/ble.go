@@ -37,7 +37,7 @@ func (d *Device) BLE() *bletest.Peripheral {
 		VendorID:      pd.VendorID,
 		ProductID:     pd.ProductID,
 		Serve: func(conn *btp.Conn) (func([]byte), func()) {
-			srv, err := bridgetest.ServeConn(d.Bridge(), conn)
+			srv, err := bridgetest.ServeConn(d.Node().Bridge(), conn)
 			if err != nil {
 				d.site.log.Warn("fabrictest.ble_serve_failed", slog.String("address", address), slog.Any("err", err))
 				return nil, nil

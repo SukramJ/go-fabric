@@ -29,6 +29,7 @@ import (
 
 	"github.com/SukramJ/go-fabric/controller/client"
 	"github.com/SukramJ/go-fabric/fabrictest"
+	"github.com/SukramJ/go-fabric/internal/fabrictestseam"
 )
 
 // stateLog records every connection state transition of the registry's
@@ -209,7 +210,7 @@ func TestConnectionStateParityMatterJS(t *testing.T) {
 		mark := log.mark()
 		cp.run(t, func(ctx context.Context) error {
 			addr, _ := cp.node.PeerAddress()
-			cp.pair.Controller.Peers().Get(addr).Disconnect(ctx, context.Canceled)
+			fabrictestseam.Peers(cp.pair.Controller).Get(addr).Disconnect(ctx, context.Canceled)
 			return nil
 		})
 		cp.eventually(t, "a transition", func() bool { return len(log.since(mark)) > 0 })

@@ -369,24 +369,6 @@
     "occurrences": 4
   },
   {
-    "file": "bridge/securechannel.go",
-    "line": 1176,
-    "citation": "ExchangeManager.ts:663-671",
-    "resolved": "packages/protocol/src/protocol/ExchangeManager.ts",
-    "identifier": "#sendCloseSession",
-    "nearest": 693,
-    "occurrences": 2
-  },
-  {
-    "file": "bridge/securechannel.go",
-    "line": 1215,
-    "citation": "ExchangeManager.ts:663-671",
-    "resolved": "packages/protocol/src/protocol/ExchangeManager.ts",
-    "identifier": "#sendCloseSession",
-    "nearest": 693,
-    "occurrences": 2
-  },
-  {
     "file": "bridge/securechannel_close_parity_test.go",
     "line": 168,
     "citation": "ExchangeManager.ts:716-726",
@@ -947,9 +929,10 @@
   },
   {
     "file": "cluster/core/general_commissioning.go",
-    "line": 1009,
-    "citation": "packages/node/src/behaviors/general-commissioning/GeneralCommissioningServer.ts:67-82",
+    "line": 1011,
+    "citation": "packages/node/src/behaviors/general-commissioning/GeneralCommissioningServer.ts:55-66",
     "resolved": "packages/node/src/behaviors/general-commissioning/GeneralCommissioningServer.ts",
+    "at": "862ad75f",
     "identifier": "CommissioningComplete",
     "nearest": 247,
     "occurrences": 1
@@ -1236,7 +1219,7 @@
   },
   {
     "file": "cluster/levelcontrol/native_parity_matterjs_test.go",
-    "line": 741,
+    "line": 770,
     "citation": "LevelControlServer.ts:624-627",
     "resolved": "packages/node/src/behaviors/level-control/LevelControlServer.ts",
     "identifier": "preCommit",
@@ -1598,42 +1581,6 @@
     "occurrences": 17
   },
   {
-    "file": "controller/client/fabricops.go",
-    "line": 121,
-    "citation": "CommissioningClient.ts:775-779",
-    "resolved": "packages/node/src/behavior/system/commissioning/CommissioningClient.ts",
-    "identifier": "DiscoveryData",
-    "nearest": 591,
-    "occurrences": 3
-  },
-  {
-    "file": "controller/client/fabricops.go",
-    "line": 187,
-    "citation": "CommissioningClient.ts:883-895",
-    "resolved": "packages/node/src/behavior/system/commissioning/CommissioningClient.ts",
-    "identifier": "NetworkAddress",
-    "nearest": 915,
-    "occurrences": 3
-  },
-  {
-    "file": "controller/client/fabricops.go",
-    "line": 207,
-    "citation": "CommissioningClient.ts:664-680",
-    "resolved": "packages/node/src/behavior/system/commissioning/CommissioningClient.ts",
-    "identifier": "#catsChanged",
-    "nearest": 696,
-    "occurrences": 2
-  },
-  {
-    "file": "controller/client/fabricops.go",
-    "line": 386,
-    "citation": "CommissioningClient.ts:406-408",
-    "resolved": "packages/node/src/behavior/system/commissioning/CommissioningClient.ts",
-    "identifier": "PeerInitiatedCloseError",
-    "nearest": 440,
-    "occurrences": 2
-  },
-  {
     "file": "controller/client/label.go",
     "line": 34,
     "citation": "NetworkClient.ts:259-307",
@@ -1834,7 +1781,7 @@
   },
   {
     "file": "endpoint/dispatcher.go",
-    "line": 271,
+    "line": 272,
     "citation": "AttributeWriteResponse.ts:329-331",
     "resolved": "packages/protocol/src/action/server/AttributeWriteResponse.ts",
     "identifier": "UnsupportedWrite",
@@ -1880,21 +1827,23 @@
   },
   {
     "file": "im/client.go",
-    "line": 104,
-    "citation": "interaction/InteractionMessenger.ts:1036-1037",
-    "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
-    "identifier": "TlvDataVersionFilter",
-    "nearest": 1171,
-    "occurrences": 4
+    "line": 114,
+    "citation": "action/request/Write.ts:56-184",
+    "resolved": "packages/protocol/src/action/request/Write.ts",
+    "at": "0ceb202d",
+    "identifier": "TimedRequest",
+    "nearest": 24,
+    "occurrences": 1
   },
   {
     "file": "im/client.go",
-    "line": 146,
-    "citation": "interaction/InteractionMessenger.ts:1124-1136",
-    "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
-    "identifier": "sendTimedRequest",
-    "nearest": 1440,
-    "occurrences": 1
+    "line": 117,
+    "citation": "Write.ts:165-186",
+    "resolved": "packages/protocol/src/action/request/Write.ts",
+    "at": "862ad75f",
+    "identifier": "DataVersion",
+    "nearest": 136,
+    "occurrences": 4
   },
   {
     "file": "im/invoke.go",
@@ -2096,7 +2045,7 @@
   },
   {
     "file": "secure/channel/session.go",
-    "line": 313,
+    "line": 308,
     "citation": "Session.ts:248",
     "resolved": "packages/protocol/src/session/Session.ts",
     "identifier": "initiateClose",
@@ -2213,7 +2162,7 @@
   },
   {
     "file": "secure/sigma/protocol.go",
-    "line": 292,
+    "line": 291,
     "citation": "MRP.ts:129",
     "resolved": "packages/protocol/src/protocol/MRP.ts",
     "identifier": "retransmissionIntervalOf",
@@ -2222,7 +2171,7 @@
   },
   {
     "file": "secure/sigma/sigma.go",
-    "line": 250,
+    "line": 245,
     "citation": "MRP.ts:129",
     "resolved": "packages/protocol/src/protocol/MRP.ts",
     "identifier": "retransmissionIntervalOf",

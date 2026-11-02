@@ -139,9 +139,8 @@ type ResumptionRecord struct {
 // ResumptionStore is the read side the Responder requires during
 // ProcessSigma1 to attempt Sigma2_Resume. GetByID must return a
 // ResumptionRecord and nil when the id is known; it must return nil
-// record and non-nil error (wrap [ErrResumptionMICInvalid] or any
-// sentinel) when the id is unknown so the responder can fall through to
-// Full Sigma. Implementations must be safe for concurrent use.
+// record and a non-nil error when the id is unknown so the responder can
+// fall through to Full Sigma. Implementations must be safe for concurrent use.
 type ResumptionStore interface {
 	GetByID(resumptionID []byte) (*ResumptionRecord, error)
 }

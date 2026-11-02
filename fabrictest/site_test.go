@@ -18,6 +18,7 @@ import (
 	"github.com/SukramJ/go-fabric/endpoint"
 	"github.com/SukramJ/go-fabric/fabrictest"
 	"github.com/SukramJ/go-fabric/im"
+	"github.com/SukramJ/go-fabric/internal/fabrictestseam"
 	"github.com/SukramJ/go-fabric/node"
 	"github.com/SukramJ/go-fabric/tlv"
 )
@@ -91,7 +92,7 @@ func TestCommissionedPair(t *testing.T) {
 	if site.Fake() == nil || site.Net() == nil || site.Loopback() {
 		t.Fatal("the default site is not in memory on a fake clock")
 	}
-	if !p.Commissioned() || !p.Peer.HasSession() {
+	if !p.Commissioned() || !fabrictestseam.Peer(p).HasSession() {
 		t.Fatal("no CASE session after commissioning")
 	}
 	fabrics, err := p.Device.Node().FabricInfos(ctx)
@@ -135,7 +136,7 @@ func TestCommissionedPair(t *testing.T) {
 	if _, err := fabrictest.Invoke(ctx, p, im.ConcreteCommandPath{Endpoint: ep, Cluster: onoff.ClusterID, Command: 0x77}, nil); !errors.As(err, &se) {
 		t.Fatalf("unknown command: %v", err)
 	}
-	if ix, err := fabrictest.Connect(ctx, p); err != nil || ix != p.Interaction {
+	if ix, err := fabrictestseam.Connect(ctx, p); err != nil || ix != fabrictestseam.Interaction(p) {
 		t.Fatalf("Connect: %v", err)
 	}
 }
@@ -206,7 +207,7 @@ func TestNetworkLossAndDelay(t *testing.T) {
 	if got := site.Net().Options(); got.Delay != 300*time.Millisecond || got.Seed != 3 {
 		t.Fatalf("options %+v", got)
 	}
-	if _, err := fabrictest.Connect(ctx, p); err != nil {
+	if _, err := fabrictestseam.Connect(ctx, p); err != nil {
 		t.Fatalf("Connect after the loss: %v", err)
 	}
 	if _, err := fabrictest.Read(ctx, p, label); err != nil {
@@ -304,7 +305,7 @@ func testDeviceRestart(t *testing.T, opts fabrictest.Options) {
 	if err := p.Device.Start(ctx); err == nil {
 		t.Fatal("a running device started again")
 	}
-	if _, err := fabrictest.Connect(ctx, p); err != nil {
+	if _, err := fabrictestseam.Connect(ctx, p); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := fabrictest.Read(ctx, p, onOffPath(ep)); err != nil {

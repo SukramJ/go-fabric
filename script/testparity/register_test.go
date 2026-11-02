@@ -15,6 +15,7 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"slices"
@@ -38,6 +39,25 @@ import (
 // the protocol/test and node/test/node share of it to zero, milestone 3 the
 // node/test/behaviors share.
 const testparityPlannedRatchet = 2
+
+// testparityPortedRatchet is the number of ported entries, and
+// testparityMissingRatchet the number of matter.js it cases the partial
+// entries name as missing, summed (W6-test-07). The planned ratchet alone
+// let a file leave planned for partial with one Go test, a ported entry
+// drop to partial and a missing list grow without a guard firing; these two
+// close that. Both are exact, in both directions, as the planned one is: a
+// port that removes a missing case or completes a file lowers the missing
+// count or raises the ported count in the same commit; a pin lift that adds
+// upstream cases, or a re-check that finds a case not covered after all,
+// raises the missing count and says why.
+//
+// Set at the W6 fix PR (review 2026-11) to 113 ported and 1140 missing
+// (the review counted 1136; W6-test-08 moved four cases of FixMe-skipped
+// anchors into the missing lists).
+const (
+	testparityPortedRatchet  = 113
+	testparityMissingRatchet = 1140
+)
 
 // moduleRoot is where the committed artefacts live, seen from this package.
 const moduleRoot = "../.."
@@ -162,6 +182,31 @@ func TestTestparityPlannedRatchet(t *testing.T) {
 	}
 }
 
+func TestTestparityPortedRatchet(t *testing.T) {
+	_, reg := mustLoad(t)
+	got := reg.count()[StatusPorted]
+	switch {
+	case got < testparityPortedRatchet:
+		t.Fatalf("%d ported files, ratchet %d: a ported file went back to partial, planned or excluded — justify it and lower testparityPortedRatchet in the same commit", got, testparityPortedRatchet)
+	case got > testparityPortedRatchet:
+		t.Fatalf("%d ported files, ratchet %d: lock the gain in by raising testparityPortedRatchet to %d", got, testparityPortedRatchet, got)
+	}
+}
+
+func TestTestparityMissingRatchet(t *testing.T) {
+	_, reg := mustLoad(t)
+	got := 0
+	for _, e := range reg.Entries {
+		got += len(e.Missing)
+	}
+	switch {
+	case got > testparityMissingRatchet:
+		t.Fatalf("%d missing it cases, ratchet %d: a missing list grew — justify it (a pin lift, a case found uncovered) and raise testparityMissingRatchet in the same commit", got, testparityMissingRatchet)
+	case got < testparityMissingRatchet:
+		t.Fatalf("%d missing it cases, ratchet %d: lock the gain in by lowering testparityMissingRatchet to %d", got, testparityMissingRatchet, got)
+	}
+}
+
 func TestTestparityEntryValidation(t *testing.T) {
 	sha := strings.Repeat("a", 40)
 	ok := []Entry{
@@ -268,4 +313,92 @@ func TestTestparitySnapshotParsing(t *testing.T) {
 			t.Errorf("countLines(%q) = %d, want %d", in, got, n)
 		}
 	}
+}
+
+// TestTestparityFixMeSkipsRegistered holds register.json's skips to the
+// tree: every Go test whose body calls t.Skip with a "FixMe" message is
+// listed, and every listed one still is such a test (W6-test-08). A skip
+// that names a gap is read later as a fact; the register is where it is
+// reviewed.
+func TestTestparityFixMeSkipsRegistered(t *testing.T) {
+	_, reg := mustLoad(t)
+	listed := map[string]bool{}
+	for _, s := range reg.Skips {
+		listed[s.Test] = true
+	}
+	found := fixMeSkips(t, moduleRoot)
+	for ref := range found {
+		if !listed[ref] {
+			t.Errorf("%s skips with a FixMe message but is not in %s skips: port it, delete it, or register it", ref, registerFile)
+		}
+	}
+	for ref := range listed {
+		if !found[ref] {
+			t.Errorf("%s is in %s skips but is no FixMe-skipped test: remove the row", ref, registerFile)
+		}
+	}
+}
+
+// fixMeSkips walks the module's _test.go files and returns
+// "<package dir>:<TestFunc>" for every top-level function that calls
+// t.Skip (or Skipf) with a string literal starting "FixMe".
+func fixMeSkips(t *testing.T, root string) map[string]bool {
+	t.Helper()
+	out := map[string]bool{}
+	fset := token.NewFileSet()
+	err := filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() {
+			if n := d.Name(); p != root && (n == "testdata" || n == "node_modules" || n == "bin" || strings.HasPrefix(n, ".")) {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if !strings.HasSuffix(p, "_test.go") {
+			return nil
+		}
+		f, err := parser.ParseFile(fset, p, nil, parser.SkipObjectResolution)
+		if err != nil {
+			return err
+		}
+		rel, err := filepath.Rel(root, filepath.Dir(p))
+		if err != nil {
+			return err
+		}
+		for _, decl := range f.Decls {
+			fn, ok := decl.(*ast.FuncDecl)
+			if !ok || fn.Recv != nil || fn.Body == nil {
+				continue
+			}
+			ast.Inspect(fn.Body, func(n ast.Node) bool {
+				call, ok := n.(*ast.CallExpr)
+				if !ok || len(call.Args) == 0 {
+					return true
+				}
+				sel, ok := call.Fun.(*ast.SelectorExpr)
+				if !ok || (sel.Sel.Name != "Skip" && sel.Sel.Name != "Skipf") {
+					return true
+				}
+				arg := call.Args[0]
+				for {
+					bin, ok := arg.(*ast.BinaryExpr)
+					if !ok {
+						break
+					}
+					arg = bin.X
+				}
+				if lit, ok := arg.(*ast.BasicLit); ok && lit.Kind == token.STRING && strings.HasPrefix(strings.Trim(lit.Value, "\"`"), "FixMe") {
+					out[filepath.ToSlash(rel)+":"+fn.Name.Name] = true
+				}
+				return true
+			})
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return out
 }

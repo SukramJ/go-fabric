@@ -177,13 +177,13 @@ extraction — give both to one agent. C2 and H7 are the same defect.
 > `peerNodeID`/`peerCATs`/`shared` from the (extended) `sigma.ResumptionRecord`
 > (new fields FabricIndex/PeerNodeID/PeerCATs, mapped through
 > `caseResumptionStoreAdapter`), fresh `resumptionID` + derived keys retained
-> so the daemon's onEstablished persist path updates the store row
+> so the node facade's onEstablished persist path (`node/security.go`) updates the store row
 > (CaseServer.ts:212). The responder identity is resolved by the record's
 > FabricIndex via the new optional `sigma.FabricIndexResolver` (implemented on
 > `caseDestinationResolver`); a miss falls through to Full Sigma. The bridge
 > resume branch passes the initiator's session id to onEstablished
 > (CaseServer.ts:179) instead of the responder's own. `PersistResumption` now
-> persists the peer CATs (both daemon call sites) — previously every persist
+> persists the peer CATs (both node-facade call sites, `node/security.go`) — previously every persist
 > wiped the CATs column, so resumed sessions lost CAT-scoped ACL privilege.
 > Tests: resume adopts-state / fabric-resolver hit + miss / baseline-identity,
 > bridge peer-session-id, adapter field mapping, CAT round-trip.
@@ -199,20 +199,21 @@ extraction — give both to one agent. C2 and H7 are the same defect.
 > - **(a) verifier install.** `spake2.NewVerifierFromValue(w0[32], L[65])`
 >   reconstructs the device verifier (mirrors matter.js
 >   `PaseServer.fromVerificationValue`, on-curve L validation). A new
->   `PaseVerifierInstaller` hook (bridge interface, daemon
->   `matterVerifierInstaller`) builds a `PaseAdapter` via
+>   `PaseVerifierInstaller` hook (bridge interface; the node facade installs
+>   it, `node/commissioning.go` `SetPaseVerifierInstaller`) builds a `PaseAdapter` via
 >   `buildPaseAdapterFromVerifier` and installs it as the window-lifetime PASE
 >   acceptor in `CommissioningWindow.OpenWindow`, restoring the configured
 >   acceptor on close via `setRestore`. Only the Matter cluster path (supplied
 >   verifier) installs it; the REST opener keeps its own passcode.
 > - **(b) ECM mDNS.** The window transition hook advertises a verifier-backed
->   Enhanced window with `CM=2` + its discriminator (`matterWindowTransitionHook`),
+>   Enhanced window with `CM=2` + its discriminator (the node facade's window
+>   transition hook, `node/commissioning.go`),
 >   gated on a new `HasSuppliedVerifier()` flag so the REST path's CM=1 announce
 >   is untouched. Mirrors matter.js `DeviceCommissioner.ts:166`.
 >
 > Tests: spake2 round-trip (verifier-from-value ↔ prover-with-passcode → same
 > Ke) + wrong-passcode/off-curve negatives; bridge wiring
-> (install/restore/basic-skip/error-revoke); daemon `buildPaseAdapterFromVerifier`
+> (install/restore/basic-skip/error-revoke); the then host daemon's `buildPaseAdapterFromVerifier`
 > smoke + wrong-length. **Interop confirmation** (real Apple + Google multi-admin,
 > or chip-tool on Linux — NOT required on macOS) is decoupled and pending; the
 > Matter bridge is opt-in/default-off so this lands behind that gate.
@@ -242,7 +243,7 @@ extraction — give both to one agent. C2 and H7 are the same defect.
 
 - **H1 (CASE) — UpdateNOC persists an unvalidated NOC**, never updates the fabric record or mDNS, never invalidates resumption. `cluster/core/operational_credentials.go:1484` vs `OperationalCredentialsServer.ts:366`, `Fabric.ts:557-558`. **FIXED (0.31.0–0.33.0):** handleUpdateNOC verifies the chain against the fabric's STORED root (`Fabric.ts:541-579`, chip `FabricTable.cpp:854-882`), rejects a NOC over a key ≠ the pending update-CSR key with InvalidPublicKey (`Fabric.ts:557-558`, chip `:890`), pins the FabricID (spec §11.18.6.9, chip `fabricIdToValidate`), tracks a NodeID change onto the fabric row (`UpdateFabricNodeID`) with old-instance mDNS withdraw + re-announce + CASE-identity refresh (DeviceAdvertiser.ts:65-76), and the fabric-updated hook drops the fabric's resumption records (`FailsafeContext.ts:167-170` replaceFabric). **Corrected 2026-11-01 (review W6-reg-02):** the resumption half was a host-daemon claim; in the module `store.RemoveResumptionsByFabric` had no caller until the security bundle, which calls it from `node.fabricUpdated` (`node/node.go`). Guard: `TestUpdateNOCDropsResumptionRecordsParity`.
 - **H2 (CASE) — AddNOC has no FabricConflict detection**; the NOC-pubkey-vs-CSR check is missing so `InvalidPublicKey` is unreachable. `cluster/core/operational_credentials.go:1377` vs `FailsafeContext.ts:246`, `Fabric.ts:557-558`. **FIXED (0.31.0–0.33.0):** the extracted NOC pubkey is compared against the pending CSR key → InvalidPublicKey; a proactive `(FabricID, RootPublicKey)` scan over the installed set rejects a duplicate install with FabricConflict before the store INSERT (mirrors the matter.js globalId check).
-- **H3 (MRP) — peer MRP intervals parsed then discarded**; a fixed 300 ms base is used and the spec-correct backoff is dead code. `secure/spake2/wire.go:41`, `bridge/outbound_reliable.go:88` / `:258` vs `MRP.ts:134` / `:140`. **FIXED (0.31.0–0.33.0, CASE):** Sigma1 tag 5 (initiatorSessionParams) is parsed (`parseSessionParameters`) and retained on the `sigma.Responder` (`PeerSessionParameters()`); both daemon CASE session-open sites stamp them onto `operational.Entry` (`SetPeerMRPIntervals`). `Entry.RetransmitBaseInterval(now)` selects active vs idle by Rx-only peer activity (`lastPeerActivity`, chip `GetLastPeerActivityTime`) against the peer's active threshold, with spec-default fallbacks 500/300/4000 ms (`SessionIntervals.ts:45-49`). The outbound tracker resolves the base per (re)transmission through the new `SessionRetransmitIntervalResolver` lookup capability and applies the shared exported `mrp.BackoffDuration` (base × 1.1 × 1.6^max(0,n-1) × jitter — `MRP.ts:125-146`); `mrp.Retransmitter.backoff` delegates to the same formula. **PASE note:** PBKDFParamRequest tag-5 params are still skipped — unsecured-session (session 0) retransmits use the spec idle default (500 ms), which is what chip-tool advertises anyway; plumbing them through the ephemeral PASE provider is deferred.
+- **H3 (MRP) — peer MRP intervals parsed then discarded**; a fixed 300 ms base is used and the spec-correct backoff is dead code. `secure/spake2/wire.go:41`, `bridge/outbound_reliable.go:88` / `:258` vs `MRP.ts:134` / `:140`. **FIXED (0.31.0–0.33.0, CASE):** Sigma1 tag 5 (initiatorSessionParams) is parsed (`parseSessionParameters`) and retained on the `sigma.Responder` (`PeerSessionParameters()`); both daemon CASE session-open sites stamp them onto `operational.Entry` (`SetPeerMRPIntervals`). `Entry.RetransmitBaseInterval(now)` selects active vs idle by Rx-only peer activity (`lastPeerActivity`, chip `GetLastPeerActivityTime`) against the peer's active threshold, with spec-default fallbacks 500/300/4000 ms (`SessionIntervals.ts:45-49`). The outbound tracker resolves the base per (re)transmission through the new `SessionRetransmitIntervalResolver` lookup capability and applies the shared exported `mrp.BackoffDuration` (base × 1.1 × 1.6^max(0,n-1) × jitter — `MRP.ts:125-146`); `mrp.Retransmitter.backoff` delegates to the same formula.
 - **H4 (MRP) — ack obligations and reply targets keyed on bare ExchangeID** across all sessions. `transport/mrp/ack.go:97`, `bridge/ackpump.go:94` vs `ExchangeManager.ts:340`. **FIXED (0.31.0–0.33.0, core):** `mrp.ExchangeKey{SessionID, ExchangeID}` now keys the `AckTracker` pending map (Owe/Discharge/LookupAndDischarge take the session), the `exchangeSrcs` standalone-ack reply routes, and the `statusResponseWaits` chunk rendezvous (arm/disarm/signal); the `AckHandler` port carries the session. Mirrors matter.js session-scoped exchange resolution (`ExchangeManager.ts:340`). Two-session collision tests added. **Deferred remainder:** `outboundReliable` stays keyed on the outbound message counter (collision needs two sessions to hit the same 32-bit random-init counter — rare; fold into the MRP counter-init/rollover item) and `sigma1Replied` stays exchange-keyed (Sigma1 always rides session 0; the payload-hash equality already prevents wrong dedup).
 - **H5 (PASE) — no brute-force / error cap**; the window stays open under attack (up to 48 h uncommissioned). `bridge/handlers.go` (no counter) vs `PaseServer.ts:34` (max 20). **FIXED (0.31.0–0.33.0):** `bridge.recordPaseFailure` (called from the handlePase error path for genuine failures) increments a per-bridge `paseFailures` counter and calls `RevokeWindow` at `paseMaxErrors=20`; `resetPaseFailures` (wired into `AttachPaseHandler`/`AttachPaseHandlerProvider`, a window boundary) gives each window a fresh budget. Mirrors matter.js `PaseServer.ts:95-110` + `DeviceCommissioner.ts:70-72`. Tests: cap-revokes / below-cap-open / reset-fresh-budget / nil-window-safe.
 - **H6 (mDNS) — RemoveFabric leaves the operational record advertised forever** (only re-announce, never withdraw). `cluster/core/operational_credentials.go:1682`, `mdns/zeroconf.go:340` vs `DeviceAdvertiser.ts:84`. **FIXED (0.31.0–0.33.0):** handleRemoveFabric snapshots the doomed fabric's (CompressedID, NodeID) before deletion and fires the new `OnFabricWithdraw` hook → `Bridge.WithdrawFabric` retracts the `<compressedID>-<nodeID>` operational instance (DeviceAdvertiser.ts:84-86 `Advertisement.cancelAll` on deleting) before the republish; the earlier fix had only re-published (`TriggerReannounce` → `republishAll`), which cannot retire a record the advertiser still holds. UpdateNOC's NodeID change reuses the same withdraw path.
@@ -304,9 +305,9 @@ extraction — give both to one agent. C2 and H7 are the same defect.
 
 **Core clusters**
 - CommissioningComplete / expiry skip PASE cleanup. `cluster/core/general_commissioning.go:657` vs `FailsafeContext.ts:152`. **FIXED (0.31.0–0.33.0):** `operational.Entry` carries an `isPase` marker (survives `AdoptFabricIndex` — matter.js identifies the PASE session by type, `SessionManager.ts:484`); `Manager.ClosePASESessions` tears them down. **Corrected 2026-11-01 (review W2-sec-02 / W6-reg-01):** the closer lived in the host daemon and was lost when the node facade took the wiring — `ClosePASESessions` had no caller in the module until the security bundle. Now the node's CommissioningComplete hook (`node/node.go` `commissioningCompleted` → `node/failsafe.go` `closePASESessions`) closes the PASE sessions open when the hook runs — not one a new commissioning establishes within the grace — after the response and a 100 ms grace (Apple sends the command over the fabric-adopted PASE session; the peer's ack arrives on it), and the fail-safe-expiry hook (`failSafeExpired`) closes them at once, or after the response when the expiry runs inside an interaction (`FailsafeContext.ts:150-153` / `:277-279` at 862ad75f). Guard: `node/pase_close_internal_parity_matterjs_test.go`.
-- SetRegulatoryConfig ignores CountryCode (Location stays "XX"). `cluster/core/general_commissioning.go:629` vs `GeneralCommissioningServer.ts:210`. **Still open (2026-10-13):** deferred by batch 1 with its reason (Apple Home sent RemoveFabric after a non-empty Location); `bridge/fields_reader.go:466-479` reads the field as octets while a UTF-8 string lands in `el.String`, so CountryCode is always empty, and `general_commissioning.go:688-692` checks only the length. Fix package: decode the string, store it as Location, and verify against Apple Home in concept v2 phase 5 before it ships.
+- SetRegulatoryConfig ignores CountryCode (Location stays "XX"). `cluster/core/general_commissioning.go:629` vs `GeneralCommissioningServer.ts:210`. **Still open (2026-10-13):** deferred by batch 1 with its reason (Apple Home sent RemoveFabric after a non-empty Location); `bridge/fields_reader.go` (`decodeSetRegulatoryConfigRequest`) reads the field as octets while a UTF-8 string lands in `el.String`, so CountryCode is always empty, and `general_commissioning.go` (`handleSetRegulatoryConfig`) checks only the length. Fix package: decode the string, store it as Location, and verify against Apple Home in concept v2 phase 5 before it ships.
 - GroupKeyManagement: KeySetRemove/Read of a missing id returns Success not NotFound; no `maxGroupKeysPerFabric` cap. `store/groupkeys.go:120` vs `GroupKeyManagementServer.ts:420` / `:367`. **FIXED (0.31.0–0.33.0):** NotFound half shipped in Tier-2 batch 4; the cap half now too — `enforceKeySetBudget` rejects a KeySetWrite that would ADD a new id at `len(existing) >= MaxGroupKeysPerFabric` with typed ResourceExhausted (`GroupKeyManagementServer.ts:386-394`; the store list already carries the implicit IPK key set 0, so the plain length matches matter.js's `count+1` formula). Updates of an existing id stay exempt; per-fabric isolation tested.
-- NodeLabel/Location writes not persisted across restart. `cluster/core/basic_information.go:500`. **FIXED (0.31.0–0.33.0):** a Matter write to NodeLabel/Location (both "N" quality, §11.1.6) fires `BasicInformation.SetOnPersistentWrite`; the daemon persists them to the new `matter_settings` table (migration 025, `store.SetSetting`) and restores them at boot via `SetNodeLabel`/`SetLocation` before the first Subscribe. matter.js persists them through its behavior state.
+- NodeLabel/Location writes not persisted across restart. `cluster/core/basic_information.go:500`. **FIXED (0.31.0–0.33.0):** a Matter write to NodeLabel/Location (both "N" quality, §11.1.6) fires `BasicInformation.SetOnPersistentWrite`; the node facade persists them in the store's settings (`node/persist.go`, keys `basic_information.node_label` / `.location`) and restores them at start before the first Subscribe. matter.js persists them through its behavior state.
 
 **CASE**
 - Unresolvable destinationId falls back to a wrong identity instead of `NO_SHARED_TRUST_ROOTS`. `secure/sigma/protocol.go:705` vs `CaseServer.ts:238`. **FIXED (verified 2026-10-13):** `secure/sigma/protocol.go:806-811` returns `ErrNoSharedTrustRoots` on a resolver miss and `bridge/handlers.go:804` answers it; resolvers at `node/security.go:66` and, for the controller, `client/handshake.FabricList` (`bridge/bridgetest` resolves through it since brief AJ). Without a resolver (test path) the single constructor identity remains.
@@ -317,7 +318,7 @@ extraction — give both to one agent. C2 and H7 are the same defect.
 
 **PASE**
 - Single-active-PASE invariant not enforced (in-flight verifier overwritten). `bridge/handlers.go:269` vs `PaseServer.ts:80`. **FIXED (0.31.0–0.33.0):** the SecureChannel dispatch claims a single-active-PASE slot on PBKDFParamRequest (`claimPaseInFlight`) and drops a second commissioner's request while a handshake is in progress (matter.js `PaseServer.ts:80-86` onNewExchange "Pairing already in progress"). The claim releases on Pake3 (success or failure) and self-expires after `pasePairingTimeout` (60 s, `PaseServer.ts:33`) so a crashed commissioner cannot lock the window; a fresh acceptor (window boundary) resets it.
-- SessionParameters (tag 5) neither honoured nor emitted. `secure/spake2/wire.go:41` vs `PaseServer.ts:151`. **FIXED (0.31.0–0.33.0):** `DecodePBKDFParamRequest` now decodes InitiatorMRPParams (tag 5) into `PBKDFParamRequest.InitiatorMRPParams`; the PASE session opener stamps them onto the operational entry (`SetPeerMRPIntervals`, matter.js `PaseServer.ts:155-157`). The bridge emits its own ResponderMRPParams (tag 5) in PBKDFParamResponse via `PaseAdapter.SetResponderMRPParams` — the same idle/active/threshold triplet Sigma2 tag 5 and mDNS SII/SAI carry (`PaseServer.ts:151`).
+- SessionParameters (tag 5) neither honoured nor emitted. `secure/spake2/wire.go:41` vs `PaseServer.ts:151`. **FIXED (0.31.0–0.33.0):** `DecodePBKDFParamRequest` now decodes InitiatorMRPParams (tag 5) into `PBKDFParamRequest.InitiatorMRPParams`; the PASE session opener stamps them onto the operational entry (`SetPeerMRPIntervals`, matter.js `PaseServer.ts:155-157`). The bridge emits its own ResponderMRPParams (tag 5) in PBKDFParamResponse via `PaseAdapter.SetResponderSessionParams` — the same idle/active/threshold triplet Sigma2 tag 5 and mDNS SII/SAI carry (`PaseServer.ts:151`).
 
 **MRP**
 - Duplicate ack not immediate (200 ms delay). `bridge/receive.go:160` vs `MessageExchange.ts:409`. **FIXED (0.31.0–0.33.0):** the duplicate branch's pump flush was a no-op — the just-registered obligation carried the piggyback grace (DueAt=now+200 ms), so `RunAckPumpOnce(now)` skipped it and the ack waited for the next pump due-pass. New `AckTracker.ExpediteDue(session, exchange)` rewrites the obligation to due-now before the flush, so the StandaloneAck for an authentic duplicate hits the wire immediately (`MessageExchange.ts:428-433`: duplicate + requiresAck → sendStandaloneAckForMessage without delay).
@@ -375,7 +376,7 @@ Device side:. (Triage 2026-10-29: owner's hand test (manual test list C5), no wa
 
 - **Keep-alive reports suppress the response.** An empty max-interval
   DataReport goes out with `SuppressResponse = true`
-  (`bridge/subscribe.go:447-453`); matter.js now sends it with
+  (`bridge/subscribe.go`, `reportSubscription`); matter.js now sends it with
   `suppressResponse: false` so the peer's INVALID_SUBSCRIPTION (Core § 8.5)
   is read on every transport (`ServerSubscription.ts:913-914` at `862ad75f`,
   #4766; ServerSubscriptionTest "keep-alive status"). Fix: send
@@ -383,7 +384,7 @@ Device side:. (Triage 2026-10-29: owner's hand test (manual test list C5), no wa
   INVALID_SUBSCRIPTION as `closeSubscriptionByExchange` already does for data
   reports. (Triage 2026-10-29: wave H1, the device IM and write path.)
 - **A subscription that ends while the node runs stays persisted.**
-  `im/subscription/manager.go:128-149` keeps the former matter.js line: closed
+  `im/subscription/manager.go` (`Manager.Release`, `finishClose`) keeps the former matter.js line: closed
   on session close = not terminated = re-established after a restart.
   matter.js #4742 drops the stored subscription whenever it ends while the
   node runs; only `closeForShutdown` leaves it for re-establishment
@@ -509,7 +510,7 @@ Device side:. (Triage 2026-10-29: wave H2, commissioning and security (Fable), o
   cache survives a device restart where this side sends every cluster
   again. (Triage 2026-10-29: wave H1, the device IM and write path.)
 - **SetRegulatoryConfig's CountryCode never reaches Location.**
-  `bridge/fields_reader.go:466-479` drops the field on decode, a deliberate
+  `bridge/fields_reader.go` (`decodeSetRegulatoryConfigRequest`) drops the field on decode, a deliberate
   revert after an Apple Home regression; matter.js writes it to
   BasicInformation.Location (`GeneralCommissioningServer.ts:146-170`,
   `:206-208`). Open: the revert's reason is outside matter.js and needs a
@@ -605,25 +606,6 @@ Line numbers at `862ad75f`. (Triage 2026-10-29: wave H3, node options and the em
 Found by the phase-18a system-set port (brief BN, PR #182, 2026-10-19).
 Line numbers at `862ad75f`. (Triage 2026-10-29: wave H1, the device IM and write path.)
 
-- **The node does not run matter.js's DataModelTest check when it comes
-  online.** `GeneralDiagnosticsServer.ts` `#online` (`:352`) runs
-  `#assertDataModelTest` (`:125-143`): without the feature a
-  MaxPathsPerInvoke above one is an error, with it a limit of one is
-  logged. `cluster/core` has the check (`CheckDataModelTest`) and the
-  feature selection (`NewGeneralDiagnosticsWith`), but `node.Config`
-  carries neither a feature selection nor MaxPathsPerInvoke, so nothing
-  calls it at `Node.Start`. (Triage 2026-10-29: wave H1, the device IM and write path.)
-- **A grouped ConfigurationVersion change is not persisted as one.**
-  `Bridge.IncreaseNodeConfigurationVersionWith` raises the node's version
-  once for a change across several bridged devices
-  (`BasicInformationServer.ts:132-138`,
-  `BridgedDeviceBasicInformationServer.ts:72-90`); the node facade
-  (`Aggregator.IncreaseConfigurationVersion`) still takes one device key
-  and persists per call. (Triage 2026-10-29: wave H1, the device IM and write path.)
-- **CapabilityMinima is not a node option.** matter.js lets the
-  application override the Matter 1.6 defaults
-  (`CapabilityMinimaTest.ts`, "caller-provided values win"); the Go port
-  runs on `core.Config`, `node.Config` has no field. (Triage 2026-10-29: wave H3, node options and the embedding layer.)
 - **A bridged endpoint cannot opt into TagList.** `Descriptor.EnableTagList`
   / `AddTags` exist on the server (`DescriptorServer.ts:122-147`), but
   `endpoint.Spec` carries no tags, so a host's device model cannot set
@@ -705,12 +687,6 @@ Found by the phase-17a port of the OnOff, LevelControl, ColorControl,
 Identify, WindowCovering and ServiceArea tests (brief BJ, PR #170,
 2026-10-19). Line numbers at `862ad75f`. (Triage 2026-10-29: harness note, the next CHIP image lift (not a parity gap).)
 
-- **TriggerEffect has no host hook.** `cluster/core/identify.go:49-52`
-  answers Success and does nothing; matter.js emits
-  `events.effectTriggered` with the request so the host performs the
-  effect (`behaviors/identify/IdentifyServer.ts:26`, `:134`, `:150`). The
-  acceptance on every endpoint is `BD-Matter-Identify-TriggerEffectEverywhere`;
-  the missing hook is this item. (Triage 2026-10-29: wave H3, node options and the embedding layer.)
 - **ColorControl serves no primaries.** Primary1X … Primary6Intensity and
   NumberOfPrimaries are absent from `cluster/light`, so a light cannot
   supply one (ColorControlServerTest "accepts a primary a light supplies

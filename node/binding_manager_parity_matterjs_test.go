@@ -41,6 +41,7 @@ import (
 	"github.com/SukramJ/go-fabric/endpoint"
 	"github.com/SukramJ/go-fabric/fabrictest"
 	"github.com/SukramJ/go-fabric/im"
+	"github.com/SukramJ/go-fabric/internal/fabrictestseam"
 	"github.com/SukramJ/go-fabric/node"
 )
 
@@ -388,7 +389,7 @@ func TestBindingManagerNodeParityMatterJS(t *testing.T) {
 		if got := updateNOC(t, b.pair, b.pair.Controller.Fabric().FabricID, b.nodeID); got != uint64(core.NOCStatusOK) {
 			t.Fatalf("UpdateNOC StatusCode %d, want Ok", got)
 		}
-		b.pair.Peer.Disconnect(parityCtx(t), errors.New("UpdateNOC closed the fabric's sessions"))
+		fabrictestseam.Peer(b.pair).Disconnect(parityCtx(t), errors.New("UpdateNOC closed the fabric's sessions"))
 		res, err := fabrictest.Invoke(parityCtx(t), b.pair, im.ConcreteCommandPath{Endpoint: 0, Cluster: 0x0030, Command: 0x04}, nil)
 		if err != nil {
 			t.Fatalf("CommissioningComplete: %v", err)

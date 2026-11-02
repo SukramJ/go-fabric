@@ -46,7 +46,13 @@ import (
 // 262 after brief BV-1: the NativeSwitcher doc moved into the generator
 // (levelcontroldef) and its LevelControlServer.ts:529-550 citation now names
 // transition there and #turnOnForLevel at :597.
-const citecheckDriftRatchet = 257
+//
+// 251 after review 2026-11 W6-reg-13: the drifted citations of
+// bridge/securechannel.go (ExchangeManager.ts #sendCloseSession),
+// cluster/core/general_commissioning.go (the PASE auto-arm),
+// controller/client/fabricops.go (CommissioningClient.ts) and im/client.go
+// (InteractionMessenger.ts) re-read and re-cited at the pin.
+const citecheckDriftRatchet = 251
 
 func readDrift(t *testing.T) []driftEntry {
 	t.Helper()

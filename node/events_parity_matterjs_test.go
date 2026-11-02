@@ -23,7 +23,7 @@ import (
 // basicInformationEvents is basicInformationEvents (:12-24): the root's
 // BasicInformation (0x0028) StartUp (0x00) or ShutDown (0x01) records.
 func basicInformationEvents(d *fabrictest.Device, eventID uint32) []im.EventRecord {
-	return d.Bridge().EventLog().Query(0, 0x0028, eventID, 0)
+	return d.Node().Bridge().EventLog().Query(0, 0x0028, eventID, 0)
 }
 
 const (

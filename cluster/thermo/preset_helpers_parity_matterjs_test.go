@@ -23,6 +23,7 @@ import (
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/fabrictest"
 	"github.com/SukramJ/go-fabric/im"
+	"github.com/SukramJ/go-fabric/internal/fabrictestseam"
 	"github.com/SukramJ/go-fabric/node"
 )
 
@@ -251,7 +252,7 @@ func wantStatus(t *testing.T, err error, status im.StatusCode) {
 // assignment, REPLACE-ALL and one append per preset (interaction.Write
 // chunks lists by default).
 func (p *thermostatPair) writePresets(ctx context.Context, q *fabrictest.Pair, presets []thermo.Preset) (interaction.WriteStatuses, error) {
-	ia, err := fabrictest.Connect(ctx, q)
+	ia, err := fabrictestseam.Connect(ctx, q)
 	if err != nil {
 		return nil, err
 	}
