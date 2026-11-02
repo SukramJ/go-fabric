@@ -264,7 +264,7 @@ func ovenCavityStates() *[]ovendef.OperationalStateStruct {
 }
 
 // declarations declare the cavity's clusters.
-func (c *demoOvenCavity) declarations() []device.Option {
+func (c *demoOvenCavity) declarations() []device.Declaration {
 	mode := func(label string, m uint8, tag ovenmdef.ModeTag) ovenmdef.ModeOptionStruct {
 		return ovenmdef.ModeOptionStruct{Label: label, Mode: m, ModeTags: []ovenmdef.ModeTagStruct{{Value: tag}}}
 	}
@@ -272,7 +272,7 @@ func (c *demoOvenCavity) declarations() []device.Option {
 	bake, stopped, phase := ovenBake, ovendef.OperationalStateStopped, uint8(0)
 	phases := ovenCavityPhases
 	lo, hi, setpoint := ovenMin, ovenMax, ovenSetpoint
-	return []device.Option{
+	return []device.Declaration{
 		ovenmdef.Declare{ModeChanger: c, Initial: ovenmdef.Patch{SupportedModes: &modes, CurrentMode: &bake}},
 		ovendef.Declare{
 			CommandHandler: ovenCycle{c.cycle()},

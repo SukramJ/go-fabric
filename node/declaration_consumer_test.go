@@ -24,7 +24,7 @@ import (
 // on the declaration (brief BU §1, the acceptance test in spirit): a
 // dimmable light whose level a simulated wall switch moves and a contact
 // sensor, declared once, observed by origin — no Underlying, no
-// WithServer, no Options.Clock, no copy of the host's own last value to
+// HostServer, no Options.Clock, no copy of the host's own last value to
 // tell its changes from a controller's.
 
 // consumerEvent is one change a controller made to the light.

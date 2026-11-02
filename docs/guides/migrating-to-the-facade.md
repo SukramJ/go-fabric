@@ -55,6 +55,7 @@ facade one shape. Each row names what a host writes now.
 | `node.New(cfg)` | `node.New(ctx, cfg)`: ctx bounds the store work; nothing runs before `Start` |
 | `node.Health.OnSample`, `node.OTAProviderConfig.OnStatusChange`, the `error` result of every `node.Observers` hook | `Node.OnHealthSample` / `OnHealthSampleAsync`, `Node.OnOTAProviderStatus` / `OnOTAProviderStatusAsync`; hooks return nothing; `Node.ObserveAsync` for the queued form |
 | `device.Logger` | `device.Options.Logger` per device (nil is `slog.Default()`) |
+| `device.WithServer`, `device.Option`, `device.TypeByID` | `device.HostServer(srv)`; `device.Declaration`; `device.Lookup(uint32(id))` |
 
 ## Changed in the next release: `CommissionerReach` takes the peer
 
@@ -248,7 +249,7 @@ deprecated, while loom is the only consumer.
 | `device.WithFeatures(id, f)` | `<cluster>def.Declare{Features: …}` — `wcdef.Declare{Features: wcdef.FeatureLift \| wcdef.FeaturePositionAwareLift}` |
 | `device.WithInitial(id, map[uint32]any{…})` | `<cluster>def.Declare{Initial: <cluster>def.Patch{…}}` — `onoffdef.Declare{Initial: onoffdef.Patch{GlobalSceneControl: new(true)}}` |
 | `device.WithElements(id, spec.Options{Attributes: …, Commands: …})` | an optional attribute is served by its value in `Initial`, an optional command by its `Handle<Command>` field |
-| `device.WithServer(srv)` (a cluster with a generated package) | `<cluster>def.Declare{HostServer: srv}`; `WithServer` stays for a cluster without one (a manufacturer-specific cluster) and refuses the others; a host whose servers are a list (`[]contract.ClusterServer`) writes `device.HostServer(srv)` for each, which resolves the server's cluster id to its `Declare{HostServer: srv}` and mounts a cluster without a package as `WithServer` does (since `v0.10.1`) |
+| `device.WithServer(srv)` (a cluster with a generated package) | `<cluster>def.Declare{HostServer: srv}`; a host whose servers are a list (`[]contract.ClusterServer`) writes `device.HostServer(srv)` for each, which resolves the server's cluster id to its `Declare{HostServer: srv}` and mounts a cluster without a package (a manufacturer-specific one) after the type's clusters. `WithServer` itself is removed in the facade review (the section above) |
 | `device.WithOptional(id)` | a cluster with a generated package: `<cluster>def.Declare{}` — `levelcontroldef.Declare{}`, `groupsdef.Declare{}` for the Groups opt-in; a cluster without one: `WithServer(srv)` alone, the one form, which mounts the host's server |
 | `device.Options.Clock` | none: a device takes `node.Config.Clock` when the Aggregator adds it |
 | `levelcontrol.LevelSource` over `cluster/wire` requests, `levelcontrol.MoveToLevelRequest`, `MoveRequest`, `StepRequest`, `StopRequest` | `levelcontrol.LevelSource` is `levelcontroldef.LevelSource`, over the generated requests: `MoveToLevel(ctx, req levelcontroldef.MoveToLevelRequest) error`, `MoveToLevelWithOnOff(ctx, req levelcontroldef.MoveToLevelWithOnOffRequest) error`, …, `Options() levelcontroldef.OptionsBitmap`; a nullable field is `spec.Nullable` (`req.TransitionTime.Null`, `.Value`); declared as `levelcontroldef.Declare{LevelSource: …}` |

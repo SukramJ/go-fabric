@@ -374,11 +374,11 @@ func newDemoPump(name string) *demoPump {
 // declarations declare the pump's clusters: PumpConfigurationAndControl
 // at constant speed with PumpStatus, its limits and the two fault events,
 // the pump as the kit's server's StateSource; and the flow it moves.
-func (p *demoPump) declarations() []device.Option {
+func (p *demoPump) declarations() []device.Declaration {
 	maxPressure, maxSpeed, maxFlow := int16(3000), uint16(3200), uint16(60)
 	minSpeed, maxConstSpeed := uint16(500), uint16(3200)
 	var status pumpdef.PumpStatusBitmap
-	return []device.Option{
+	return []device.Declaration{
 		pumpdef.Declare{
 			Features:    pumpdef.FeatureConstantSpeed,
 			StateSource: p,
@@ -491,13 +491,13 @@ func newDemoAirPurifier(name string) *demoAirPurifier {
 }
 
 // declarations declare the purifier's fan and its two filters.
-func (p *demoAirPurifier) declarations() []device.Option {
+func (p *demoAirPurifier) declarations() []device.Declaration {
 	condition, inPlace := uint8(20), true
 	hepaDown, carbonDown := hepadef.DegradationDirectionDown, acfdef.DegradationDirectionDown
 	hepaWarning, carbonCritical := hepadef.ChangeIndicationWarning, acfdef.ChangeIndicationCritical
 	hepaProducts := []hepadef.ReplacementProductStruct{{ProductIdentifierType: hepadef.ProductIdentifierTypeEan, ProductIdentifierValue: "1234567890123"}}
 	carbonProducts := []acfdef.ReplacementProductStruct{{ProductIdentifierType: acfdef.ProductIdentifierTypeEan, ProductIdentifierValue: "1234567890123"}}
-	return []device.Option{
+	return []device.Declaration{
 		p.declaration(),
 		hepadef.Declare{
 			Features: hepadef.FeatureCondition | hepadef.FeatureWarning | hepadef.FeatureReplacementProductList,

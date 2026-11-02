@@ -119,7 +119,7 @@ func TestServerChangesReachASubscriberWithoutWithChangeNotifier(t *testing.T) {
 	t.Cleanup(func() { _ = n.Stop(context.Background()) })
 
 	knob := &dial{}
-	lamp, err := device.NewOnOffLight(device.Options{StableKey: endpoint.StringKey("lamp"), Name: "Lamp"}, device.WithServer(knob))
+	lamp, err := device.NewOnOffLight(device.Options{StableKey: endpoint.StringKey("lamp"), Name: "Lamp"}, device.HostServer(knob))
 	if err != nil {
 		t.Fatal(err)
 	}

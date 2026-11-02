@@ -8,7 +8,7 @@
 //
 // matter.js adds RoboticVacuumCleanerDevice.with(ServiceAreaServer.with(…))
 // to a MockServerNode; the port builds the Go device of that type with the
-// servicearea server (device.WithServer) and starts it as a fabrictest
+// servicearea server (device.HostServer) and starts it as a fabrictest
 // device under the Aggregator. matter.js's node.add rejecting with
 // "Behaviors have errors" is servicearea.New returning ErrInvalidState:
 // the Go server checks its initial state when it is built, before a node

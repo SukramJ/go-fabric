@@ -138,7 +138,7 @@ func TestControllerDeviceTypesParity(t *testing.T) {
 			if uint16(ty.ID) != c.id || ty.Revision != c.revision {
 				t.Errorf("identity 0x%04X r%d, want 0x%04X r%d", ty.ID, ty.Revision, c.id, c.revision)
 			}
-			if got, ok := TypeByID(schema.DeviceTypeID(c.id)); !ok || got != ty {
+			if got, ok := Lookup(uint32(schema.DeviceTypeID(c.id))); !ok || got != ty {
 				t.Error("not in the registry")
 			}
 			sm, so := splitNames(ty.Servers)

@@ -42,7 +42,7 @@ func TestWithServerMountsAClusterTheTypeDoesNotList(t *testing.T) {
 	if got := serverIDs(d.Servers()); !slices.Equal(got, []uint32{0x0006, 0x0750, 0x0045}) || d.Server(0x0750) != other {
 		t.Errorf("servers %#04x after a replacing WithServer", got)
 	}
-	for name, with := range map[string][]Option{
+	for name, with := range map[string][]Declaration{
 		"opt-in":      {withServer(fixed), withOptional(0x0045)},
 		"initial":     {withServer(fixed), withInitial(0x0045, map[uint32]any{0: true})},
 		"no server":   {withOptional(0x0045)},

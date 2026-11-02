@@ -38,9 +38,9 @@ func TestRootNodeAccessorsWrapTheMountedServers(t *testing.T) {
 		gcdef.Declare{HostServer: hostServerOf(gcdef.ClusterID)},
 		gddef.Declare{HostServer: hostServerOf(gddef.ClusterID)},
 		acdef.Declare{HostServer: hostServerOf(acdef.ClusterID)},
-		WithServer(hostServerOf(accessControlID)),
-		WithServer(hostServerOf(operationalCredentialsID)),
-		WithServer(hostServerOf(groupKeyManagementID)),
+		mountServer(hostServerOf(accessControlID)),
+		mountServer(hostServerOf(operationalCredentialsID)),
+		mountServer(hostServerOf(groupKeyManagementID)),
 	)
 	if err != nil {
 		t.Fatalf("NewRootNode: %v", err)

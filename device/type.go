@@ -143,16 +143,6 @@ func Types() []*Type {
 	return slices.Clone(committedTypes)
 }
 
-// TypeByID returns the generated device type id, or (nil, false).
-func TypeByID(id schema.DeviceTypeID) (*Type, bool) {
-	for _, t := range committedTypes {
-		if t.ID == id {
-			return t, true
-		}
-	}
-	return nil, false
-}
-
 // Lookup returns the generated device type of a device type id as the
 // Descriptor's DeviceTypeList carries it (a 32-bit devtype-id), or
 // (nil, false) for an id device/ does not generate: an id above 0xFFFF, a

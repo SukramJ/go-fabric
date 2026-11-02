@@ -68,7 +68,7 @@ against the original keeps compiling.
 
 Every typed server's `Underlying()` returns the `contract.ClusterServer`
 it wraps. It is a seam for two cases: a host that mounts its own server
-type (`Declare.HostServer`, `device.WithServer`) and wants it back, and a
+type (`Declare.HostServer`, `device.HostServer`) and wants it back, and a
 host or test that needs the contract value itself (`MatterRead`,
 `MatterInvoke`). A host that stays on the facade does not type-assert it:
 `Set`, `Get` and the typed handlers reach the server's state, and `Host()`

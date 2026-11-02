@@ -64,7 +64,7 @@ type StringKey = endpoint.StringKey
 // cluster packages (cluster/spec/<cluster>, imported as <cluster>def), the
 // one form of a cluster's initial state, feature selection, write veto,
 // command handlers and host ports — or one of the kit's own options
-// ([WithServer], [WithChangeNotifier], [WithClientClusters]). It is the
+// ([HostServer], [WithChangeNotifier], [WithClientClusters]). It is the
 // Go form of what matter.js states on an endpoint type and its behaviors
 // (`Endpoint.with(…)`, the behaviors' initial state, a behavior subclass
 // overriding a command; packages/node/src/devices/on-off-light.ts:103-135,
@@ -78,13 +78,10 @@ type Declaration interface {
 	ClusterDeclaration() spec.ClusterDeclaration
 }
 
-// Option is the kit's own [Declaration], what the With… functions return.
-type Option = Declaration
-
-// clusterOption is a per-cluster option of the kit's own ([WithServer], and
+// clusterOption is a per-cluster option of the kit's own ([HostServer], and
 // the tests' untyped forms): a declaration that mounts the cluster when
-// mount is set; undeclared marks a WithServer, which takes only a cluster
-// without a generated declaration.
+// mount is set; undeclared marks [HostServer]'s mount (mountServer), which
+// takes only a cluster without a generated declaration.
 type clusterOption struct {
 	decl       spec.ClusterDeclaration
 	mount      bool
@@ -172,7 +169,7 @@ func (s *settings) declare(d Declaration) error {
 	case clusterOption:
 		if o.undeclared {
 			if o.decl.Server == nil {
-				return fmt.Errorf("%w: WithServer(nil)", ErrConfiguration)
+				return fmt.Errorf("%w: HostServer(nil)", ErrConfiguration)
 			}
 			// Refused only for a cluster with a generated Declare
 			// (hostServers): a definition-only cluster — AccessControl,
@@ -181,7 +178,7 @@ func (s *settings) declare(d Declaration) error {
 			// a definition but nothing to declare it through.
 			if _, declarable := hostServers[o.decl.Cluster]; declarable {
 				def := spec.Lookup(o.decl.Cluster)
-				return fmt.Errorf("%w: WithServer for %s (0x%04X): declare it, %sdef.Declare{HostServer: …} or device.HostServer(srv)",
+				return fmt.Errorf("%w: a mounted server for %s (0x%04X): declare it, %sdef.Declare{HostServer: …} or device.HostServer(srv)",
 					ErrConfiguration, def.Name, o.decl.Cluster, strings.ToLower(def.Name))
 			}
 		}
@@ -284,7 +281,7 @@ func (s *settings) merge(decl spec.ClusterDeclaration, mount bool) {
 	}
 }
 
-// WithServer mounts the host's own server for a cluster without a
+// mountServer mounts the host's own server for a cluster without a
 // generated package — a manufacturer-specific cluster, which the device
 // type does not list — after the type's clusters, in the order of the
 // calls: matter.js's MutableEndpoint.with adds any behavior to the type's
@@ -292,8 +289,9 @@ func (s *settings) merge(decl spec.ClusterDeclaration, mount bool) {
 // SupportedBehaviors.extend). A cluster with a generated package is
 // declared, its own server as the declaration's HostServer
 // (<cluster>def.Declare{HostServer: srv}, or [HostServer] for a server
-// known only as a [contract.ClusterServer]); WithServer refuses it.
-func WithServer(srv contract.ClusterServer) Option {
+// known only as a [contract.ClusterServer]); mountServer refuses it.
+// [HostServer] is its public form.
+func mountServer(srv contract.ClusterServer) Declaration {
 	if srv == nil {
 		return clusterOption{undeclared: true}
 	}
@@ -305,7 +303,9 @@ func WithServer(srv contract.ClusterServer) Option {
 // list: for a cluster with a generated package it is that package's
 // <cluster>def.Declare{HostServer: srv}, resolved through the table
 // script/devicegen writes (hostserver_gen.go); for any other cluster — a
-// manufacturer-specific one — it is [WithServer]'s mount. A host that
+// manufacturer-specific one — it mounts the server after the type's
+// clusters, in the order of the calls (matter.js MutableEndpoint.with,
+// packages/node/src/endpoint/type/MutableEndpoint.ts:95-110). A host that
 // states more about the cluster than its server — a host port, an
 // Initial patch, a feature selection, a command handler or a write veto —
 // writes the typed <cluster>def.Declare instead, whose fields say so; a
@@ -313,12 +313,12 @@ func WithServer(srv contract.ClusterServer) Option {
 // device is built.
 func HostServer(srv contract.ClusterServer) Declaration {
 	if srv == nil {
-		return WithServer(nil)
+		return mountServer(nil)
 	}
 	if declare, ok := hostServers[srv.MatterClusterID()]; ok {
 		return declare(srv)
 	}
-	return WithServer(srv)
+	return mountServer(srv)
 }
 
 // WithChangeNotifier makes the device's endpoint source a
@@ -334,7 +334,7 @@ func HostServer(srv contract.ClusterServer) Declaration {
 // the relay is for a host model whose servers do not forward its
 // notifications. A later call replaces an earlier one; nil leaves the
 // source without one.
-func WithChangeNotifier(n contract.ChangeNotifier) Option {
+func WithChangeNotifier(n contract.ChangeNotifier) Declaration {
 	return deviceOption(func(s *settings) { s.notifier = n })
 }
 
@@ -347,6 +347,6 @@ func WithChangeNotifier(n contract.ChangeNotifier) Option {
 // #selectClientClusters reads the type's clientClusters). A declared
 // bindable application client makes Base mandate Binding, which the
 // assembler then mounts where the type does not ([endpoint.Spec.ClientClusters]).
-func WithClientClusters(clusterIDs ...uint32) Option {
+func WithClientClusters(clusterIDs ...uint32) Declaration {
 	return deviceOption(func(s *settings) { s.clients = append(s.clients, clusterIDs...) })
 }

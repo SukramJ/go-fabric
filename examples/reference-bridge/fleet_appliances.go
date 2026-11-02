@@ -403,7 +403,7 @@ func newDemoVacuum(name string) *demoVacuum { return &demoVacuum{name: name} }
 // declarations declare the robot's RvcOperationalState — Pause, Resume and
 // GoHome; matter.js's RVC test node starts Stopped, in run mode Idle
 // (support/chip-testing/src/RvcTestInstance.ts) — and its two modes.
-func (v *demoVacuum) declarations() []device.Option {
+func (v *demoVacuum) declarations() []device.Declaration {
 	state := func(id rvcopdef.OperationalStateEnum) rvcopdef.OperationalStateStruct {
 		return rvcopdef.OperationalStateStruct{OperationalStateId: id}
 	}
@@ -425,7 +425,7 @@ func (v *demoVacuum) declarations() []device.Option {
 	}
 	cleanModes := []rvccdef.ModeOptionStruct{clean("Vacuum", rvcVacuum, rvccdef.ModeTagVacuum), clean("Mop", rvcMop, rvccdef.ModeTagMop)}
 	idle, vacuum := rvcIdle, rvcVacuum
-	return []device.Option{
+	return []device.Declaration{
 		rvcopdef.Declare{
 			CommandHandler: v,
 			Commands:       []uint32{rvcopdef.CmdPause, rvcopdef.CmdResume, rvcopdef.CmdGoHome},
@@ -743,9 +743,9 @@ var (
 )
 
 // declarations declare the cabinet's clusters.
-func (c *demoCabinet) declarations() []device.Option {
+func (c *demoCabinet) declarations() []device.Declaration {
 	lo, hi, step, setpoint, auto := cabinetMin, cabinetMax, cabinetStep, cabinetSetpoint, fridgeAuto
-	return []device.Option{
+	return []device.Declaration{
 		tcdef.Declare{
 			Features:          tcdef.FeatureTemperatureNumber | tcdef.FeatureTemperatureStep,
 			TemperatureSetter: c,

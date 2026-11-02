@@ -170,7 +170,7 @@ func TestDeviceClockAndQueue(t *testing.T) {
 // LevelSource and a declared mode changer reach their servers.
 func TestKitOptionsAndPorts(t *testing.T) {
 	t.Parallel()
-	for _, o := range []Option{withOptional(6), WithServer(&hostServer{id: 0xFFF1_FC00}), WithChangeNotifier(nil)} {
+	for _, o := range []Declaration{withOptional(6), mountServer(&hostServer{id: 0xFFF1_FC00}), WithChangeNotifier(nil)} {
 		_ = o.ClusterID()
 		_ = o.ClusterDeclaration()
 	}
