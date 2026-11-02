@@ -200,6 +200,7 @@ var floors = []packageFloor{
 		why: "declaration-only seam: function variables another package installs from its init, so the package holds no statement a test could execute",
 	},
 	{pkg: "github.com/SukramJ/go-fabric/internal/clockvar", min: 100},
+	{pkg: "github.com/SukramJ/go-fabric/internal/fabrictestseam", min: 0, why: "function variables only: fabrictest installs them, the module's tests call them (review 2026-11 W5-ex-12)"},
 	{pkg: "github.com/SukramJ/go-fabric/internal/forward", min: 100},
 	{pkg: "github.com/SukramJ/go-fabric/internal/inflight", min: 100},
 	{pkg: "github.com/SukramJ/go-fabric/internal/serialqueue", min: 97},
@@ -251,7 +252,7 @@ var floors = []packageFloor{
 	// parsing, file opening, printing, the exit codes — is not, because
 	// covering it would mean a test that runs the gate over the module the
 	// gate is part of.
-	{pkg: "github.com/SukramJ/go-fabric/script/coverfloor", min: 52},
+	{pkg: "github.com/SukramJ/go-fabric/script/coverfloor", min: 55},
 	{pkg: "github.com/SukramJ/go-fabric/script/docscheck", min: 0, why: "test only, no statements to cover: the guard is the test"},
 	{pkg: "github.com/SukramJ/go-fabric/script/errprefix", min: 0, why: "test only, no statements to cover: the guard is the test"},
 	{pkg: "github.com/SukramJ/go-fabric/script/slogkeys", min: 0, why: "test only, no statements to cover: the guard is the test"},

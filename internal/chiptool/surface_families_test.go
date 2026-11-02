@@ -82,7 +82,7 @@ func notRunFamilies(t *testing.T) []string {
 	if j := strings.Index(section, "\n## "); j >= 0 {
 		section = section[:j]
 	}
-	code := regexp.MustCompile(`\b[A-Z][A-Z0-9_]{1,}\b`)
+	code := regexp.MustCompile(`\b[A-Z][A-Z0-9_]+\b`)
 	var out []string
 	for line := range strings.SplitSeq(section, "\n") {
 		if !strings.HasPrefix(line, "| ") || strings.HasPrefix(line, "| Family") || strings.HasPrefix(line, "| ---") {
