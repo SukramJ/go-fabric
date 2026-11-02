@@ -214,7 +214,7 @@ func (r *Responder) goodbyeLocked(e *entry) {
 		if len(rrs) == 0 {
 			continue
 		}
-		r.sendLocked(splitResponse(0, withTTL(rrs, 0), nil), ifIndex, nil)
+		r.sendLocked(splitResponse(0, goodbyeRecords(rrs), nil), ifIndex, nil)
 	}
 }
 

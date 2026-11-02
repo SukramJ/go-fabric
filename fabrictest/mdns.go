@@ -117,29 +117,29 @@ func serviceRecords(svc *mdns.Service, host string, ip net.IP) (rrs []dns.RR, na
 	}
 	typeName := svc.ServiceType + "." + domain + "."
 	instance := svc.FQDN()
-	hdr := func(name string, typ uint16, ttl uint32, unique bool) dns.RR_Header {
+	hdr := func(name string, typ uint16, unique bool) dns.RR_Header {
 		class := uint16(dns.ClassINET)
 		if unique {
 			class |= 0x8000 // cache-flush: a unique record (RFC 6762 §10.2)
 		}
-		return dns.RR_Header{Name: name, Rrtype: typ, Class: class, Ttl: ttl}
+		return dns.RR_Header{Name: name, Rrtype: typ, Class: class, Ttl: ttlRecord}
 	}
-	rrs = []dns.RR{&dns.PTR{Hdr: hdr(typeName, dns.TypePTR, ttlRecord, false), Ptr: instance}}
+	rrs = []dns.RR{&dns.PTR{Hdr: hdr(typeName, dns.TypePTR, false), Ptr: instance}}
 	names = make([]string, 0, 3+len(svc.Subtypes))
 	names = append(names, strings.ToLower(typeName), strings.ToLower(instance), strings.ToLower(host))
 	for _, sub := range svc.Subtypes {
 		subName := sub + "._sub." + typeName
-		rrs = append(rrs, &dns.PTR{Hdr: hdr(subName, dns.TypePTR, ttlRecord, false), Ptr: instance})
+		rrs = append(rrs, &dns.PTR{Hdr: hdr(subName, dns.TypePTR, false), Ptr: instance})
 		names = append(names, strings.ToLower(subName))
 	}
 	rrs = append(rrs,
-		&dns.SRV{Hdr: hdr(instance, dns.TypeSRV, ttlRecord, true), Target: host, Port: svc.Port},
-		&dns.TXT{Hdr: hdr(instance, dns.TypeTXT, ttlRecord, true), Txt: svc.MarshalTXT()},
+		&dns.SRV{Hdr: hdr(instance, dns.TypeSRV, true), Target: host, Port: svc.Port},
+		&dns.TXT{Hdr: hdr(instance, dns.TypeTXT, true), Txt: svc.MarshalTXT()},
 	)
 	if ip4 := ip.To4(); ip4 != nil {
-		rrs = append(rrs, &dns.A{Hdr: hdr(host, dns.TypeA, ttlRecord, true), A: ip4})
+		rrs = append(rrs, &dns.A{Hdr: hdr(host, dns.TypeA, true), A: ip4})
 	} else {
-		rrs = append(rrs, &dns.AAAA{Hdr: hdr(host, dns.TypeAAAA, ttlRecord, true), AAAA: ip.To16()})
+		rrs = append(rrs, &dns.AAAA{Hdr: hdr(host, dns.TypeAAAA, true), AAAA: ip.To16()})
 	}
 	return rrs, names
 }

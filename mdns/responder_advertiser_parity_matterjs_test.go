@@ -158,7 +158,7 @@ func TestMdnsAdvertisementParity(t *testing.T) {
 				}
 				got = w.take()
 				expectSent(t, got, 1)
-				expectAnnouncement(t, got[0], withTTL(want, 0))
+				expectAnnouncement(t, got[0], goodbyeRecords(want))
 			})
 			t.Run("it broadcasts the device commissionable info on one port", func(t *testing.T) {
 				t.Parallel()
@@ -168,7 +168,7 @@ func TestMdnsAdvertisementParity(t *testing.T) {
 					t.Fatal(err)
 				}
 				instance := "8080808080808080._matterc._udp"
-				var ptrs [][2]string
+				ptrs := make([][2]string, 0, 12)
 				for _, s := range []string{
 					"_matterc._udp", "_V1._sub._matterc._udp", "_T1._sub._matterc._udp",
 					"_S4._sub._matterc._udp", "_L1234._sub._matterc._udp", "_CM._sub._matterc._udp",
@@ -183,7 +183,7 @@ func TestMdnsAdvertisementParity(t *testing.T) {
 				}
 				got = w.take()
 				expectSent(t, got, 1)
-				expectAnnouncement(t, got[0], withTTL(expectedRecords(svc, withIPv4, ptrs...), 0))
+				expectAnnouncement(t, got[0], goodbyeRecords(expectedRecords(svc, withIPv4, ptrs...)))
 			})
 			for _, masked := range []bool{false, true} {
 				name := "it broadcasts the controller commissioner on one port"
@@ -202,7 +202,7 @@ func TestMdnsAdvertisementParity(t *testing.T) {
 					if !masked {
 						subs = append(subs, "_V1._sub._matterd._udp")
 					}
-					var ptrs [][2]string
+					ptrs := make([][2]string, 0, 2*len(subs))
 					for _, s := range subs {
 						ptrs = append(ptrs, [2]string{"_services._dns-sd._udp", s}, [2]string{s, instance})
 					}
@@ -269,7 +269,7 @@ func TestMdnsAnnouncementOverflow(t *testing.T) {
 		t.Parallel()
 		// Enough AAAA records to push the announcement past the
 		// maximum message size (:1002-1006).
-		var ula []string
+		ula := make([]string, 0, 16)
 		for i := range 16 {
 			ula = append(ula, fmt.Sprintf("fd54:23a1:c6de:1::%d", i+1))
 		}

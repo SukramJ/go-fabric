@@ -415,9 +415,10 @@ func (b *Bridge) retransmissionBroadcast() {
 	if !ok {
 		return
 	}
-	for _, svc := range advertiser.Active() {
-		if svc.ServiceType == mdns.ServiceTypeOperational {
-			ev.ServiceRetransmission(svc.InstanceName, svc.ServiceType)
+	active := advertiser.Active()
+	for i := range active {
+		if active[i].ServiceType == mdns.ServiceTypeOperational {
+			ev.ServiceRetransmission(active[i].InstanceName, active[i].ServiceType)
 		}
 	}
 }

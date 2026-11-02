@@ -1347,15 +1347,17 @@ func (b *Bridge) triggerSessionReannounce() {
 		// with only an on-demand trigger announces once; the rest
 		// degrade to a per-record re-publish, which the
 		// [mdns.Advertiser] contract defines as a re-announce.
-		if ev, ok := advertiser.(serviceDisconnecter); ok {
-			for _, svc := range advertiser.Active() {
-				if svc.ServiceType == mdns.ServiceTypeOperational {
-					ev.ServiceDisconnected(svc.InstanceName, svc.ServiceType)
+		switch ev := advertiser.(type) {
+		case serviceDisconnecter:
+			active := advertiser.Active()
+			for i := range active {
+				if active[i].ServiceType == mdns.ServiceTypeOperational {
+					ev.ServiceDisconnected(active[i].InstanceName, active[i].ServiceType)
 				}
 			}
-		} else if fast, ok := advertiser.(interface{ TriggerReannounce(context.Context) }); ok {
-			fast.TriggerReannounce(ctx)
-		} else {
+		case interface{ TriggerReannounce(context.Context) }:
+			ev.TriggerReannounce(ctx)
+		default:
 			active := advertiser.Active()
 			for i := range active {
 				if err := advertiser.Publish(ctx, active[i]); err != nil {

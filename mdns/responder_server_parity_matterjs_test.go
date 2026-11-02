@@ -504,7 +504,7 @@ func TestMdnsServerClose(t *testing.T) {
 		// The goodbye of "foo": its records with TTL 0.
 		got := w.take()
 		expectSent(t, got, 1)
-		expectResponse(t, got[0], 1, nil, withTTL([]dns.RR{fooPTR(), fooSRV(), fooTXT(), fooA()}, 0), nil)
+		expectResponse(t, got[0], 1, nil, goodbyeRecords([]dns.RR{fooPTR(), fooSRV(), fooTXT(), fooA()}), nil)
 		expectQuiet(t, levels)
 	})
 }

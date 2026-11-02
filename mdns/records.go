@@ -141,7 +141,8 @@ func addressRecords(host string, addrs []net.IP) []dns.RR {
 			v6 = append(v6, a)
 		}
 	}
-	all := append(v6, v4...)
+	v6 = append(v6, v4...)
+	all := v6
 	slices.SortStableFunc(all, func(a, b netip.Addr) int { return SelectionPreference(a) - SelectionPreference(b) })
 	out := make([]dns.RR, 0, len(all))
 	for _, a := range all {
@@ -157,15 +158,15 @@ func addressRecords(host string, addrs []net.IP) []dns.RR {
 	return out
 }
 
-// withTTL returns copies of rrs carrying ttl — a goodbye is the record set
-// with TTL 0, the cache-flush bits kept (matter.js
+// goodbyeRecords returns copies of rrs with TTL 0 — a goodbye is the record
+// set with TTL 0, the cache-flush bits kept (matter.js
 // packages/protocol/src/mdns/MdnsServer.ts:253-256 at 862ad75f;
 // MdnsTest.ts:354-410 expects the bits on the expiry).
-func withTTL(rrs []dns.RR, ttl uint32) []dns.RR {
+func goodbyeRecords(rrs []dns.RR) []dns.RR {
 	out := make([]dns.RR, len(rrs))
 	for i, rr := range rrs {
 		c := dns.Copy(rr)
-		c.Header().Ttl = ttl
+		c.Header().Ttl = 0
 		out[i] = c
 	}
 	return out

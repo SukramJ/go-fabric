@@ -204,7 +204,7 @@ func (r *Responder) Publish(_ context.Context, svc Service) error {
 	if r.closed {
 		return errors.New("mdns: responder is closed")
 	}
-	if err := r.ensureWireLocked(); err != nil {
+	if err := r.ensureWireLocked(); err != nil { //nolint:contextcheck // the sockets live until Close, not for the Publish call
 		return fmt.Errorf("mdns: responder %s/%s: %w", svc.InstanceName, svc.ServiceType, err)
 	}
 	key := noopKey(svc.InstanceName, svc.ServiceType)

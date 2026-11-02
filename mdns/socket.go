@@ -111,20 +111,18 @@ func (s *sockets) close() error {
 // responder winds down without a packet to wake it. Raw time.Now: the
 // kernel judges a socket deadline against the wall clock, so no injected
 // clock can stand in (clock/noraw_test.go).
-func (s *sockets) read4(buf []byte) (int, int, net.Addr, error) {
+func (s *sockets) read4(buf []byte) (n, ifIndex int, src net.Addr, err error) {
 	_ = s.pc4.SetReadDeadline(time.Now().Add(time.Second))
 	n, cm, src, err := s.pc4.ReadFrom(buf)
-	ifIndex := 0
 	if cm != nil {
 		ifIndex = cm.IfIndex
 	}
 	return n, ifIndex, src, err
 }
 
-func (s *sockets) read6(buf []byte) (int, int, net.Addr, error) {
+func (s *sockets) read6(buf []byte) (n, ifIndex int, src net.Addr, err error) {
 	_ = s.pc6.SetReadDeadline(time.Now().Add(time.Second))
 	n, cm, src, err := s.pc6.ReadFrom(buf)
-	ifIndex := 0
 	if cm != nil {
 		ifIndex = cm.IfIndex
 	}

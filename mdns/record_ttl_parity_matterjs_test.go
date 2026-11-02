@@ -31,6 +31,11 @@ func TestSubtypePTRTTLParity(t *testing.T) {
 	deliver(t, r, queryMsg([]dns.Question{question("_L1234._sub._matterc._udp.local", dns.TypePTR, false)}), 1, dummySource)
 	answer := w.take()
 	expectSent(t, answer, 1)
+	if err := r.Withdraw(ctx, svc.InstanceName, svc.ServiceType); err != nil {
+		t.Fatal(err)
+	}
+	goodbye := w.take()
+	expectSent(t, goodbye, 1)
 
 	kinds := map[string]func(dns.RR) bool{
 		"PTR": func(rr dns.RR) bool {
@@ -61,6 +66,7 @@ func TestSubtypePTRTTLParity(t *testing.T) {
 	}
 	for name, match := range kinds {
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
 			check(t, "announcement", announcement[0].msg.Answer, want, match)
 			if name == "subtype PTR" {
 				check(t, "query answer", answer[0].msg.Answer, want, match)
@@ -70,11 +76,7 @@ func TestSubtypePTRTTLParity(t *testing.T) {
 		})
 	}
 	t.Run("goodbye", func(t *testing.T) {
-		if err := r.Withdraw(ctx, svc.InstanceName, svc.ServiceType); err != nil {
-			t.Fatal(err)
-		}
-		goodbye := w.take()
-		expectSent(t, goodbye, 1)
+		t.Parallel()
 		for name, match := range kinds {
 			check(t, name, goodbye[0].msg.Answer, 0, match)
 		}
