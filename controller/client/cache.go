@@ -137,6 +137,9 @@ type persister struct {
 	log      *slog.Logger
 	// image is the node's lock, which guards the caches.
 	image sync.Locker
+	// collect, set under the node's lock while a subscription report is
+	// applied, gathers the unbuffered writes for the job queue.
+	collect *[]saveJob
 
 	// mu guards dirty, flushing, stopped and timer.
 	mu      sync.Mutex
@@ -149,15 +152,53 @@ type persister struct {
 	flushing sync.WaitGroup
 }
 
-// save writes keys of c and its version now; a store error is logged, never
-// raised (DatasourceCache.ts:297-303). The caller holds the node's lock.
+// saveJob is one unbuffered write, encoded under the node's lock.
+type saveJob struct {
+	c      *cache
+	values map[uint32][]byte
+	ver    *uint32
+}
+
+// save writes keys of c and its version now — or, while collect is set (a
+// subscription report applied inside its exchange), encodes them and
+// collects the write for the node's job queue; a store error is logged,
+// never raised (DatasourceCache.ts:297-303). The caller holds the node's
+// lock.
 func (p *persister) save(c *cache, keys []uint32) {
 	values, err := c.encode(keys)
-	if err == nil {
-		err = p.store.Save(p.nodeID, c.ep, c.cluster, values, c.versionPtr())
-	}
 	if err != nil {
 		p.log.Warn("matter.controller.client.store_write_failed", slog.Int("endpoint", int(c.ep)), slog.Uint64("cluster", uint64(c.cluster)), slog.Any("err", err))
+		return
+	}
+	j := saveJob{c: c, values: values, ver: c.versionPtr()}
+	if p.collect != nil {
+		*p.collect = append(*p.collect, j)
+		return
+	}
+	p.writeLocked([]saveJob{j})
+}
+
+// write performs collected writes in order under the node's lock, so an
+// erase (which runs under it) cannot slip between a write's check and the
+// store; a write of a cache erased since it was collected is skipped.
+func (p *persister) write(jobs []saveJob) {
+	if len(jobs) == 0 {
+		return
+	}
+	p.image.Lock()
+	defer p.image.Unlock()
+	p.writeLocked(jobs)
+}
+
+// writeLocked is write; the caller holds the node's lock.
+func (p *persister) writeLocked(jobs []saveJob) {
+	for _, j := range jobs {
+		if j.c.erased {
+			continue
+		}
+		if err := p.store.Save(p.nodeID, j.c.ep, j.c.cluster, j.values, j.ver); err != nil {
+			p.log.Warn("matter.controller.client.store_write_failed", slog.Int("endpoint", int(j.c.ep)), slog.Uint64("cluster", uint64(j.c.cluster)), slog.Any("err", err))
+		}
 	}
 }
 

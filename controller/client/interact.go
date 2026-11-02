@@ -122,7 +122,9 @@ func (n *Node) noteICDActive() {
 // for a cluster the caller filters and none with the other fabric filter
 // than the cache's ([structure.withKnownVersions]); the interval bounds
 // are the node's for the request's (:129-133); each report is applied to
-// the image before req.Updated sees it (:139-146); a sustained
+// the image before req.Updated sees it (:139-146), its store writes and
+// hooks on the node's job queue, off the report's exchange
+// (ClientStructure.ts:417-439); a sustained
 // subscription's re-subscriptions send the versions then current and the
 // event minimum past the highest event seen (:148-155).
 //
@@ -170,7 +172,12 @@ func (n *Node) subscribe(ctx context.Context, sr SubscribeRequest, emitEvents fu
 		sentMu.Lock()
 		sc := sent
 		sentMu.Unlock()
-		n.apply(sc, rep, emitEvents != nil && emitEvents())
+		// The image changes now and the caller's Updated sees it; the
+		// store writes and the hooks run on the node's job queue, so the
+		// report's final StatusResponse waits for neither (W4-ctlim-04,
+		// ClientStructure.ts:417-439; the caller's updated iterates the
+		// mutate inline, ClientNodeInteraction.ts:146-158).
+		n.applyDeferred(sc, rep, emitEvents != nil && emitEvents())
 		if req.Updated != nil {
 			req.Updated(rep)
 		}

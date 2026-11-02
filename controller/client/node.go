@@ -28,7 +28,10 @@ type Node struct {
 	rand    func() float64
 	store   Store
 	persist *persister
-	s       *structure
+	// jobs runs subscription reports' store writes and hooks off their
+	// exchanges, in order (applyDeferred).
+	jobs *jobQueue
+	s    *structure
 	// subSync serialises the default subscription's synchronisation
 	// ([Node.syncAutoSubscribe]) — matter.js's subscriptionChanges queue
 	// (NetworkClient.ts:113-115 at 862ad75f) — so Start and
@@ -123,6 +126,7 @@ func newNode(cfg Config) (*Node, error) {
 	if n.store == nil {
 		n.store = &MemoryStore{}
 	}
+	n.jobs = newJobQueue()
 	n.persist = &persister{store: n.store, nodeID: cfg.ID, interval: cfg.FlushInterval, clock: n.clock, log: n.log, image: &n.mu}
 	stored, err := n.store.Load(cfg.ID)
 	if err != nil {
@@ -168,15 +172,35 @@ func newNode(cfg Config) (*Node, error) {
 }
 
 // apply applies a report to the image under the lock and delivers what it
-// produced after — ClientStructure.mutate (D8 of the brief: no job queue,
-// the callbacks after the lock). emitEvents is mutate's options.emitEvents
-// (ClientStructure.ts:412): the report's events reach Hooks.Event and the
-// cursor only when it is set.
+// produced after — ClientStructure.mutate. emitEvents is mutate's
+// options.emitEvents (ClientStructure.ts:412): the report's events reach
+// Hooks.Event and the cursor only when it is set. A read applies after
+// its exchange ended, so it writes and delivers on the caller's goroutine.
 func (n *Node) apply(sc scope, r *Report, emitEvents bool) {
+	n.applyWith(sc, r, emitEvents, false)
+}
+
+// applyDeferred is apply for a subscription report, inside its exchange:
+// the image changes under the lock now, so the caller's Updated sees it;
+// the store writes and the hooks run on the node's ordered job queue, so
+// the report's final StatusResponse waits for neither. Mirrors matter.js
+// ClientStructure.ts:417-439 (the deferred persist/emit queue, bounded at
+// :57, :469-471) and InteractionMessenger.ts:1020-1045 (the status sent
+// once the consumer took the chunk) (W4-ctlim-04).
+func (n *Node) applyDeferred(sc scope, r *Report, emitEvents bool) {
+	n.applyWith(sc, r, emitEvents, true)
+}
+
+func (n *Node) applyWith(sc scope, r *Report, emitEvents, deferred bool) {
 	n.mu.Lock()
 	before := n.configurationVersionsLocked()
 	icdBefore := n.icdModeLocked()
+	var saves []saveJob
+	if deferred {
+		n.persist.collect = &saves
+	}
 	n.s.mutate(sc, r, emitEvents)
+	n.persist.collect = nil
 	em := n.s.takeEmissions()
 	if !n.frozen {
 		n.props = nil
@@ -184,9 +208,23 @@ func (n *Node) apply(sc scope, r *Report, emitEvents bool) {
 	changed := n.changedConfigurationVersionsLocked(before)
 	icdAfter := n.icdModeLocked()
 	n.mu.Unlock()
+	if !deferred {
+		n.deliverApplied(em, icdBefore != icdAfter, changed)
+		return
+	}
+	n.jobs.enqueue(func() {
+		n.persist.write(saves)
+		n.deliverApplied(em, icdBefore != icdAfter, changed)
+	})
+}
+
+// deliverApplied runs the hooks of one applied report: the structure's
+// emissions, the ICD operating-mode change and the endpoints whose
+// ConfigurationVersion moved.
+func (n *Node) deliverApplied(em []emission, icdChanged bool, changed []*Endpoint) {
 	n.deliver(em)
 	// IcdManagementClient.operatingMode$Changed (IcdClient.ts:118-123).
-	if n.icd != nil && icdBefore != icdAfter {
+	if n.icd != nil && icdChanged {
 		n.icd.onOperatingModeChanged()
 	}
 	if h := n.cfg.Hooks.ConfigurationVersionChanged; h != nil {
@@ -419,6 +457,10 @@ func (n *Node) Stop(ctx context.Context) error {
 			err = ctx.Err()
 		}
 	}
+	// The deferred report jobs drain before the store's final flush, so
+	// none lands after a stop (or the erase that follows a delete) —
+	// ClientStructure.ts:482-486 drains its queue on every exit path.
+	n.jobs.wait()
 	n.persist.stop()
 	n.recompute()
 	return err
