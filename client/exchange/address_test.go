@@ -11,6 +11,7 @@ import (
 
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/transport/message"
+	"github.com/SukramJ/go-fabric/transport/mrp"
 )
 
 // TestAddressOverrideAndSetAddr: an exchange with an address override
@@ -83,5 +84,49 @@ func TestActiveTimestamp(t *testing.T) {
 	up.reply(0x4242, 0, 0x40, false, nil, nil)
 	if u.ActiveTimestamp().IsZero() {
 		t.Fatal("receipt did not stamp the unsecured session")
+	}
+}
+
+// TestNewExchangeMovesSessionToSource (W4-ctlnet-02): a message that opens
+// a new exchange on a secure session from another address moves the
+// session there — the report is acked at the new address and the observer
+// learns of it; a message inside an existing exchange moves nothing.
+// Mirrors matter.js ExchangeManager.ts:425-431.
+func TestNewExchangeMovesSessionToSource(t *testing.T) {
+	t.Parallel()
+	m, conn, _ := newTestManager(t, Config{})
+	s, p := newSecurePair(t, m, 0x0323, false)
+	moved := make(chan *net.UDPAddr, 4)
+	s.OnAddressChanged(func(a *net.UDPAddr) { moved <- a })
+	h, calls := recordingHandler(nil)
+	m.SetProtocolHandler(im.InteractionModelProtocolID, h)
+	other := &net.UDPAddr{IP: net.ParseIP("fd00::7"), Port: 5540}
+
+	// Inside an existing exchange: no move.
+	x, _ := m.Initiate(s, im.InteractionModelProtocolID, Options{})
+	p.sendFrom(t, other, s.ID(), message.ProtocolHeader{Opcode: im.OpcodeReportData, ExchangeID: x.ID(), ProtocolID: im.InteractionModelProtocolID}, nil)
+	if s.Addr() != peerAddr {
+		t.Fatalf("a message inside an existing exchange moved the session to %v", s.Addr())
+	}
+
+	p.sendFrom(t, other, s.ID(), peerOpens(0x6101, im.InteractionModelProtocolID, im.OpcodeReportData, true), []byte{0x15, 0x18})
+	waitHandled(t, calls)
+	if got := s.Addr(); !sameAddr(got, other) {
+		t.Fatalf("session at %v, want %v", got, other)
+	}
+	select {
+	case a := <-moved:
+		if !sameAddr(a, other) {
+			t.Fatalf("observer told %v", a)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("observer not told of the move")
+	}
+	d := conn.next(t)
+	if ack := p.decode(t, d.bytes); ack.proto.Opcode != mrp.StandaloneAckOpcode || ack.proto.ExchangeID != 0x6101 {
+		t.Fatalf("ack %+v", ack.proto)
+	}
+	if !sameAddr(d.to, other) {
+		t.Fatalf("ack went to %v, want the new address %v", d.to, other)
 	}
 }

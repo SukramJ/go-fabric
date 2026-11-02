@@ -43,6 +43,7 @@ Findings of the whole-codebase review of 2026-11-01 (`notes/review/2026-11/`).
 - `im.ErrMissingField`: the InvalidAction error a request decoder wraps when a mandatory field is absent.
 - `im.EventFiltersFor`: the EventFilterIB that applies to a node — the first without a NodeID or with the node's operational id on the accessing fabric.
 - `endpoint.Endpoint.Aggregator` and `Topology.Aggregator()`: the Aggregator role as a property of the endpoint, which the assembler sets on the Aggregator it builds.
+- `exchange.Session.OnAddressChanged`: the observer of a session's address moves — matter.js `MessageChannel.networkAddressChanged`; the peer follows it into its operational address (W4-ctlnet-02).
 
 ### Changed
 
@@ -97,6 +98,7 @@ Findings of the whole-codebase review of 2026-11-01 (`notes/review/2026-11/`).
 - `endpoint`, `bridge`, `node`: the Aggregator is the endpoint with the `Aggregator` role, not endpoint number 1 — `IsAggregator`, `ClusterServers` and the bridge's and the facade's Aggregator lookups read the role, so a host endpoint numbered 1 keeps its own clusters and a topology without an Aggregator gets no Aggregator servers mounted; `endpoint` documents the bridged range as 2..65534 (W2-api-03). A hand-built topology marks its Aggregator with `Aggregator: true`.
 - `bridge` package doc, `docs/guides/ports.md`: the port list names `AttachMetrics`, `SetSubscriptionPersistence` and the three ICD ports (`SetICDAdvertisement`, `SetLocalFixedMRPBackoff`, `SetOnInboundActivity`) with what a skip costs; `store` cites its own `Apply` / `Migrations` and ADR 0026 principle 7 (W2-api-05, W2-api-08).
 - `client/exchange`: a saturated MRP backoff plus the fixed local backoff or a fallback's `InitialRetransmissionTime` saturates instead of wrapping to a negative wait, under which an unbounded CASE fallback attempt retransmitted Sigma1 in a tight loop after ~51 transmissions (W4-ctlnet-01).
+- `client/exchange`, `client/peer`: a message that opens a new exchange on a secure UDP session from another address moves the session there, and the peer's operational address follows, as matter.js's `ExchangeManager` does; acks and responses went to the old address until the subscription failed (W4-ctlnet-02).
 
 ## [0.15.6] — 2026-11-01
 

@@ -340,6 +340,12 @@ func (p *Peer) addSession(s *exchange.Session) {
 	}
 	p.sessions = append(p.sessions, s)
 	p.followAddressLocked(s)
+	// A later move of the session — a migration, or a new exchange the
+	// node opened from another address — carries the operational address
+	// with it: matter.js Peer.ts:161-163 observes
+	// MessageChannel.networkAddressChanged, which the socket swap of
+	// ExchangeManager.ts:425-431 emits (W4-ctlnet-02).
+	s.OnAddressChanged(func(*net.UDPAddr) { p.followAddress(s) })
 	// Only a known medium pads the session's exchanges: the unknown
 	// fallback would inflate every exchange of a peer never characterised
 	// (Peer.ts:182-186).

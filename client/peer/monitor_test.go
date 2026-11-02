@@ -237,3 +237,16 @@ func TestMonitorScheduledByAServiceChange(t *testing.T) {
 		return m.fibCurr == 10*time.Minute
 	})
 }
+
+// TestSessionMoveCarriesOperationalAddress (W4-ctlnet-02): a session the
+// exchange manager moves to a new address — here through SetAddr, the
+// path a node-opened exchange from another address takes — carries the
+// descriptor's operational address with it (Peer.ts:161-163).
+func TestSessionMoveCarriesOperationalAddress(t *testing.T) {
+	t.Parallel()
+	_, p, n := monitored(t)
+	n.s.SetAddr(udpAddr(addr2))
+	if got := p.Descriptor().OperationalAddress; !sameUDPAddr(got, udpAddr(addr2)) {
+		t.Fatalf("operational address %v, want %v", got, udpAddr(addr2))
+	}
+}

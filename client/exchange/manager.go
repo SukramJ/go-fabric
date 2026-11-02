@@ -696,7 +696,7 @@ func (m *Manager) HandleDatagram(buf []byte, src *net.UDPAddr) {
 	if msg.RequiresAck && !s.UsesMRP() {
 		msg.RequiresAck = false
 	}
-	m.route(s, msg, duplicate)
+	m.route(s, msg, duplicate, src)
 }
 
 // openSession resolves the session of a received message and decrypts
@@ -790,7 +790,7 @@ func (m *Manager) releaseInbound(s *Session) {
 // route hands msg to the exchange it belongs to — its index sets the
 // exchanges we initiated apart (ExchangeManager.ts:331-343) — or treats it
 // as unsolicited.
-func (m *Manager) route(s *Session, msg *Message, duplicate bool) {
+func (m *Manager) route(s *Session, msg *Message, duplicate bool, src *net.UDPAddr) {
 	idx := uint32(msg.ExchangeID)
 	if !msg.Initiator {
 		idx |= initiatedExchangeFlag
@@ -826,6 +826,7 @@ func (m *Manager) route(s *Session, msg *Message, duplicate bool) {
 			return
 		}
 		x := m.accept(s, msg)
+		s.adoptSource(src)
 		x.onMessageReceived(msg, false)
 		m.handleSecureChannel(x, msg)
 		return
@@ -835,6 +836,9 @@ func (m *Manager) route(s *Session, msg *Message, duplicate bool) {
 	// PBKDFParamRequest, on a secure session any other protocol's message.
 	if msg.Initiator && !duplicate {
 		if h := m.handlerFor(s, msg); h != nil {
+			if s.secure != nil {
+				s.adoptSource(src)
+			}
 			m.dispatch(s, msg, h)
 			return
 		}
