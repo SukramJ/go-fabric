@@ -192,8 +192,9 @@ vuln: ## report known vulnerabilities on code paths this module actually calls
 .PHONY: reachability
 reachability: ## regenerate script/reachability/inventory.json — which exported API no test reaches
 	@# The root set is this module's own tests, not a production main: go-fabric
-	@# is a library and has none. See the package doc of script/reachability for
-	@# why a production-only run here would measure nothing.
+	@# is a library, and its example programs are one host's composition. See
+	@# the package doc of script/reachability for why a production-only run
+	@# here would measure the wrong thing.
 	$(GO) run ./script/reachability
 
 .PHONY: reachability-check

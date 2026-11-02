@@ -14,14 +14,14 @@
 // cmd/ binaries and the question is "which exported API does the running daemon
 // never reach".
 //
-// That question is not askable here, and asking it anyway would produce a tool
-// that measures nothing. go-fabric is a library module: it has no cmd/ tree and
-// no package named main outside this analyzer and the //go:build ignore schema
-// generator. A production-only run would therefore start from an EMPTY root set,
-// RTA would reach nothing at all, and every exported identifier in the module
-// would be reported unreachable. The count would be a restatement of the module's
-// size, and would move only when the exported surface changed — never in response
-// to anything the analysis is supposed to detect.
+// That question is not the useful one here. go-fabric is a library module with
+// no cmd/ tree: its main packages are this analyzer, the generators under
+// script/ and the two reference programs under examples/. A production-only run
+// would report as unreachable every exported identifier those programs do not
+// call — most of the library, by design (see below) — so the count would restate
+// the module's size minus one host's composition, and would move with the API
+// and the programs' flags, never in response to anything the analysis is
+// supposed to detect.
 //
 // So the root set here is the module's TEST entry points: every Test*, Benchmark*,
 // Fuzz* and Example* function in a test package. The question that answers is
@@ -41,16 +41,21 @@
 // roots in its non-production mode (its `-production-only=false` path); here that
 // mode is the only mode, and it is the default.
 //
-// # When this changes
+// # Why the example binaries do not seed a production mode
 //
-// If a reference application is ever added to this module — an example binary
-// that drives the library end to end — that binary becomes a genuine production
-// entry point, and the loom-style question ("which exported API does the reference
-// app not reach") becomes answerable. At that point a production-only mode is
-// worth adding back, seeded from that binary's main and init. Until such a binary
-// exists there is nothing to seed it from, so -production-only is a documented
-// error rather than a silent empty run. Do not "fix" it back by pointing it at an
-// empty pattern list.
+// The module now has two reference applications, examples/reference-bridge
+// and examples/reference-controller, whose main functions drive the library
+// end to end. A production-only mode seeded from them would answer "which
+// exported API do the two reference programs not reach" — and for a library
+// that answer is most of its surface by design: each program is one host's
+// composition (one device fleet, one controller CLI), and every exported
+// identifier a different host would call is "unreachable" from them. The
+// count would grow with every addition to the API and shrink with every
+// flag the daemon gained, so a ratchet on it would measure the reference
+// programs' scope, not a defect. The test-seeded root set stays the only
+// mode; -production-only stays a documented error rather than a silent run
+// that measures the wrong thing. Which exported API the reference daemon
+// serves is held instead by the surface snapshot (script/surfacecheck).
 //
 // # Output
 //
@@ -185,15 +190,15 @@ const (
 // rootSetDescription is copied into the inventory so a reader of the JSON alone
 // knows what the numbers were measured against.
 const rootSetDescription = "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package " +
-	"(this module is a library and has no production main to seed from)"
+	"(this module is a library; its example programs are one host's composition, not a production root set)"
 
 // errNoProductionRoots is returned for -production-only. It is an error rather
 // than an empty run on purpose; the package doc explains why.
 var errNoProductionRoots = errors.New(
-	"-production-only is not available in this module: go-fabric is a library with no cmd/ tree, " +
-		"so a production-only run would start from an empty root set and report every exported " +
-		"identifier as unreachable. The default (test-seeded) mode is the meaningful one here. " +
-		"See the package doc of script/reachability for the reasoning and for when this changes",
+	"-production-only is not available in this module: go-fabric is a library, and a run seeded " +
+		"from its example programs would report every exported identifier those programs do not call " +
+		"as unreachable. The default (test-seeded) mode is the meaningful one here. " +
+		"See the package doc of script/reachability for the reasoning",
 )
 
 func main() {

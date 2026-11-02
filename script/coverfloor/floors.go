@@ -28,10 +28,11 @@ type packageFloor struct {
 // and it belongs in the change that caused it, with the reason in the commit
 // message.
 //
-// The floors are NOT a statement about what these packages deserve. One of
-// them — contract, at 52 % — is conspicuously low for a module this heavily
-// tested, and raising it means deciding what to test, which is a change of
-// its own and not something to fold into a ratchet.
+// The floors are NOT a statement about what these packages deserve. A few
+// are conspicuously low for a module this heavily tested —
+// controller/softwareupdate and contract, each with its reason on the entry
+// — and raising them means deciding what to test, which is a change of its
+// own and not something to fold into a ratchet.
 var floors = []packageFloor{
 	{pkg: "github.com/SukramJ/go-fabric", min: 0, why: "module doc only, no statements to cover"},
 	{pkg: "github.com/SukramJ/go-fabric/bdx", min: 75},
@@ -107,13 +108,12 @@ var floors = []packageFloor{
 	{pkg: "github.com/SukramJ/go-fabric/client/discovery", min: 94}, // 95.1-95.2 locally, 94.8 in CI: the race and cancel paths of the discovery sessions (27-A) are timing-dependent; one point of margin
 	{pkg: "github.com/SukramJ/go-fabric/client/jcm", min: 83},
 	{pkg: "github.com/SukramJ/go-fabric/groups", min: 93},
-	// The module's lowest measured package (76.7 when last raised).
 	// contract is the host-facing interface vocabulary, and much of what is uncovered
 	// are the default implementations and kind-registry helpers a host
 	// exercises rather than this module's own tests. The floor records
 	// where it stands; whether it should be raised is a separate decision
 	// about what deserves a test, not a ratchet setting.
-	{pkg: "github.com/SukramJ/go-fabric/contract", min: 76, why: "lowest in the module; see the note above this entry"},
+	{pkg: "github.com/SukramJ/go-fabric/contract", min: 76, why: "the host-facing vocabulary; see the note above this entry"},
 	{pkg: "github.com/SukramJ/go-fabric/client/exchange", min: 93},
 	{pkg: "github.com/SukramJ/go-fabric/client/interaction", min: 91},
 	{pkg: "github.com/SukramJ/go-fabric/client/handshake", min: 86},

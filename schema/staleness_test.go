@@ -20,55 +20,6 @@ import (
 	"github.com/SukramJ/go-fabric/schema"
 )
 
-// loomUsedClusters is the set of Matter cluster IDs go-fabric advertises on
-// its root, aggregator, or bridged endpoints. The staleness guard below only
-// diffs these against a live matter.js checkout — a revision bump on a cluster
-// the bridge never exposes is not actionable for us. The application entries
-// mirror the cluster sets a host's device projections emit; the infrastructure
-// entries are the root/aggregator/bridged-node clusters wired in
-// cluster/core and endpoint.
-var loomUsedClusters = map[uint32]string{
-	// Root / Aggregator / BridgedNode infrastructure.
-	0x0003: "Identify",
-	0x0004: "Groups",
-	0x001D: "Descriptor",
-	0x001E: "Binding",
-	0x001F: "AccessControl",
-	0x0028: "BasicInformation",
-	0x002A: "OtaSoftwareUpdateRequestor",
-	0x0030: "GeneralCommissioning",
-	0x0031: "NetworkCommissioning",
-	0x0032: "DiagnosticLogs",
-	0x0033: "GeneralDiagnostics",
-	0x0038: "TimeSynchronization",
-	0x0039: "BridgedDeviceBasicInformation",
-	0x003B: "Switch",
-	0x003C: "AdministratorCommissioning",
-	0x003E: "OperationalCredentials",
-	0x003F: "GroupKeyManagement",
-	0x0046: "IcdManagement",
-	0x0062: "ScenesManagement",
-
-	// Application-cluster projections mounted by a host.
-	0x0006: "OnOff",                                // switch, light, siren
-	0x0008: "LevelControl",                         // dimmable light
-	0x002F: "PowerSource",                          // switch (metering)
-	0x0045: "BooleanState",                         // contact / boolean sensors
-	0x005C: "SmokeCoAlarm",                         // siren (smoke)
-	0x0090: "ElectricalPowerMeasurement",           // switch (metering)
-	0x0091: "ElectricalEnergyMeasurement",          // switch (metering)
-	0x0101: "DoorLock",                             // lock
-	0x0102: "WindowCovering",                       // cover / blind / garage
-	0x0201: "Thermostat",                           // climate
-	0x0204: "ThermostatUserInterfaceConfiguration", // climate
-	0x0300: "ColorControl",                         // color light
-	0x0400: "IlluminanceMeasurement",               // light sensor
-	0x0402: "TemperatureMeasurement",               // temperature sensor / climate
-	0x0403: "PressureMeasurement",                  // pressure sensor
-	0x0405: "RelativeHumidityMeasurement",          // humidity sensor / climate
-	0x0406: "OccupancySensing",                     // occupancy sensor
-}
-
 // matterJSElementsDir returns the standard-elements directory of a sibling
 // matter.js checkout (../matter.js relative to the module root) and whether
 // it exists. The extractor that produced the pinned snapshot walks the same
@@ -113,8 +64,8 @@ var (
 // parseLiveClusterRevisions reads every *.element.ts in dir and returns the
 // live ClusterRevision default per cluster ID. Type-inheriting clusters that
 // declare no inline ClusterRevision (a handful in the ConcentrationMeasurement /
-// ResourceMonitoring families) are skipped — none are in loomUsedClusters, so
-// the staleness diff is unaffected.
+// ResourceMonitoring families) are skipped: their revision cannot be read
+// from the element source, so the diff covers the clusters that state one.
 func parseLiveClusterRevisions(dir string) (map[uint32]uint16, error) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
@@ -193,22 +144,24 @@ func shortCommit(c string) string {
 
 // TestMatterJSSchemaStalenessAgainstLiveCheckout makes upstream schema
 // staleness visible. It compares the pinned per-cluster ClusterRevision
-// (schema.ClusterRevisions, generated from parity/schema.json) against a live
-// ../matter.js checkout's element sources and reports every loom-used cluster whose
-// revision has increased upstream — the drift the pin would otherwise hide.
+// (schema.ClusterRevisions, generated from parity/schema.json) of every
+// cluster of the snapshot — the module serves all of them — against a live
+// ../matter.js checkout's element sources and reports every cluster whose
+// revision has increased upstream: the drift the pin would otherwise hide.
 //
-// The snapshot bump (e.g. Matter 1.5.x -> 1.6.x) is a MANUAL decision: a
-// revision increment can carry attribute, constraint, or command changes that
-// need code review, so this guard only surfaces the drift, it does not perform
-// the bump. Behaviour:
+// The snapshot bump is a MANUAL decision (CLAUDE.md, "Regenerate the Matter
+// schema"): a revision increment can carry attribute, constraint, or command
+// changes that need review, so this guard only surfaces the drift, it does
+// not perform the bump. Behaviour:
 //
-//   - ../matter.js absent -> Skip (this is a local / scheduled tooling check;
-//     CI has no live checkout, only the pinned snapshot).
-//   - No loom-used cluster drifted -> Pass (the pin is current).
-//   - Drift found -> advisory Skip listing exactly which clusters drifted,
-//     UNLESS OPENCCU_LOOM_MATTERJS_STALENESS_STRICT=1 is set, in which case it
-//     is a hard Fail. The strict mode is the shape a dedicated scheduled job
-//     that checks out matter.js HEAD would run to raise a signal.
+//   - ../matter.js absent -> Skip (a local tooling check; CI has no live
+//     checkout, only the pinned snapshot).
+//   - No cluster drifted -> Pass (the checkout is at the pin, or upstream
+//     moved no revision).
+//   - Drift found -> an advisory Skip listing exactly which clusters
+//     drifted. A checkout ahead of the pin is the ordinary state between
+//     two pin lifts, so it is not a failure; the pin lift reads this list
+//     (notes/parity/pin-lifts.md).
 //
 // Mirrors the extraction the parity snapshot performs in
 // script/extract-from-matter-js.ts: the ClusterRevision (attribute
@@ -239,8 +192,8 @@ func TestMatterJSSchemaStalenessAgainstLiveCheckout(t *testing.T) {
 		pinned, upsts uint16
 	}
 	var drifts []drift
-	ids := make([]uint32, 0, len(loomUsedClusters))
-	for id := range loomUsedClusters {
+	ids := make([]uint32, 0, len(schema.ClusterRevisions))
+	for id := range schema.ClusterRevisions {
 		ids = append(ids, id)
 	}
 	sort.Slice(ids, func(i, j int) bool { return ids[i] < ids[j] })
@@ -248,42 +201,31 @@ func TestMatterJSSchemaStalenessAgainstLiveCheckout(t *testing.T) {
 	for _, id := range ids {
 		liveRev, present := live[id]
 		if !present {
-			// Cluster inherits its revision from a base type (not inline) —
-			// cannot be compared from the element source. None of these are
-			// revision-drifting loom-used clusters today.
+			// The cluster inherits its revision from a base type (not
+			// inline): it cannot be compared from the element source.
 			continue
 		}
-		pinnedR, known := schema.ClusterRevisions[id]
-		if !known {
-			t.Errorf("loom-used cluster 0x%04X (%s) is missing from the pinned schema.ClusterRevisions map", id, loomUsedClusters[id])
-			continue
-		}
-		if liveRev > pinnedR {
-			drifts = append(drifts, drift{id: id, name: loomUsedClusters[id], pinned: pinnedR, upsts: liveRev})
+		if pinnedR := schema.ClusterRevisions[id]; liveRev > pinnedR {
+			name, _ := schema.ClusterName(id)
+			drifts = append(drifts, drift{id: id, name: name, pinned: pinnedR, upsts: liveRev})
 		}
 	}
 
 	if len(drifts) == 0 {
-		t.Logf("matter.js schema pin is current for all %d loom-used clusters (pinned matter %s, commit %s)",
-			len(loomUsedClusters), pinnedRev, shortCommit(pinnedCommit))
+		t.Logf("matter.js schema pin is current for all %d clusters (pinned matter %s, commit %s)",
+			len(ids), pinnedRev, shortCommit(pinnedCommit))
 		return
 	}
 
 	var b strings.Builder
-	fmt.Fprintf(&b, "matter.js HEAD advanced %d loom-used cluster revision(s) past the pinned snapshot\n", len(drifts))
+	fmt.Fprintf(&b, "matter.js HEAD advanced %d cluster revision(s) past the pinned snapshot\n", len(drifts))
 	fmt.Fprintf(&b, "  pinned snapshot: matter %s (commit %s)\n", pinnedRev, shortCommit(pinnedCommit))
 	fmt.Fprintf(&b, "  live checkout:   %s (commit %s)\n", dir, shortCommit(liveCommit))
 	for _, d := range drifts {
 		fmt.Fprintf(&b, "  0x%04X %-40s pinned=%d  upstream=%d\n", d.id, d.name, d.pinned, d.upsts)
 	}
-	b.WriteString("Adopting the newer schema is a manual review: refresh parity/schema.json and run " +
-		"`go generate ./schema/...` after deciding to bump, then reconcile the per-cluster revision " +
-		"constants and re-run the parity tests.")
-
-	if strings.TrimSpace(os.Getenv("OPENCCU_LOOM_MATTERJS_STALENESS_STRICT")) == "1" {
-		t.Fatalf("%s", b.String())
-	}
+	b.WriteString("Adopting the newer schema is a manual review (a pin lift): `make generate-matter-schema` " +
+		"after deciding to bump, then reconcile the hand-stated revision constants and re-run the parity tests.")
 	t.Log(b.String())
-	t.Skipf("matter.js schema pin is stale: %d loom-used cluster(s) drifted upstream "+
-		"(set OPENCCU_LOOM_MATTERJS_STALENESS_STRICT=1 to fail)", len(drifts))
+	t.Skipf("matter.js schema pin is behind the checkout: %d cluster(s) drifted upstream", len(drifts))
 }
