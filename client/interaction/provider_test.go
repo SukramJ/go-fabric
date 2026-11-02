@@ -148,3 +148,37 @@ func TestPeerProvider(t *testing.T) {
 		t.Fatalf("without a session: %v", err)
 	}
 }
+
+// TestMaximumPeerResponseTimeCarriesLocalPad (W4-ctlim-07): with a local
+// MRP margin configured, the provider's MaximumPeerResponseTime — the
+// subscription liveness timeout's term — pads our own retransmissions,
+// as matter.js passes localAdditionalMrpDelay and localFixedMrpBackoff
+// (PeerExchangeProvider.ts:152-161, ExchangeManager.ts:533-545).
+func TestMaximumPeerResponseTimeCarriesLocalPad(t *testing.T) {
+	t.Parallel()
+	m, err := exchange.NewManager(&fakeConn{ch: make(chan []byte, 16)}, exchange.Config{
+		Clock: newFakeClock(), LocalAdditionalMrpDelay: time.Second, LocalFixedMrpBackoff: 200 * time.Millisecond,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(m.Close)
+	key := bytes.Repeat([]byte{0x11}, 16)
+	s, err := m.NewSecureSession(exchange.SecureSessionConfig{
+		ID: 0x0102, Addr: peerAddr, FabricIndex: 1,
+		Channel: channel.Config{EncryptKey: key, DecryptKey: key, LocalNodeID: 0x1111, PeerNodeID: 0x2222, PeerSessionID: 0x7102},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	c := interaction.Bind(interaction.SessionProvider(m, s), interaction.Config{})
+	local := exchange.IntervalsOf(m.LocalParameters())
+	pad := exchange.Pad{Additional: time.Second, Fixed: 200 * time.Millisecond}
+	got := c.MaximumPeerResponseTime(interaction.SubscriptionProcessingTime, false)
+	if want := exchange.MaxPeerResponseTimePadded(nil, false, local, interaction.SubscriptionProcessingTime, pad); got != want {
+		t.Fatalf("MaximumPeerResponseTime = %v, want the padded %v", got, want)
+	}
+	if got <= exchange.MaxPeerResponseTime(nil, false, local, interaction.SubscriptionProcessingTime) {
+		t.Fatal("the local pad does not lengthen the wait")
+	}
+}

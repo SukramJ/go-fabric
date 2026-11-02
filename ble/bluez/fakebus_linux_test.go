@@ -7,6 +7,7 @@ package bluez
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"maps"
 	"strings"
@@ -101,6 +102,9 @@ func (b *fakeBus) lastArgs(method string) []any {
 	return b.args[method]
 }
 
+// errHang, given to failWith, makes the call block until its context ends.
+var errHang = errors.New("fakebus: hang")
+
 func (b *fakeBus) failWith(key string, err error) {
 	b.mu.Lock()
 	b.errs[key] = err
@@ -128,6 +132,10 @@ func (b *fakeBus) Call(ctx context.Context, path dbus.ObjectPath, method string,
 	}
 	b.mu.Unlock()
 	if ok {
+		if errors.Is(err, errHang) {
+			<-ctx.Done() // a call the daemon never answers
+			return nil, ctx.Err()
+		}
 		return nil, err
 	}
 	switch method {

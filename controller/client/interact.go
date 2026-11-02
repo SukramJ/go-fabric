@@ -44,7 +44,17 @@ type SubscribeRequest struct {
 // for a cluster with a changes-omitted attribute (:107) and none for a
 // cluster the caller filters ([structure.withKnownVersions]). The caller
 // gets the report as the peer sent it, its chunks merged.
+//
+// A host's read returns its events in the Report only: they reach neither
+// Hooks.Event nor the persisted event cursor — matter.js
+// ClientNodeInteraction.ts:97-98 passes the request's own emitEvents,
+// which a plain read leaves unset (ClientStructure.ts:412).
 func (n *Node) Read(ctx context.Context, req ReadRequest) (*Report, error) {
+	return n.read(ctx, req, false)
+}
+
+// read is Read with mutate's emitEvents (ClientStructure.ts:412).
+func (n *Node) read(ctx context.Context, req ReadRequest, emitEvents bool) (*Report, error) {
 	r := req.ReadRequest
 	n.routeICD(&r.ClientRequest)
 	sc := newScope(r.Attributes, r.NoFabricFilter)
@@ -65,7 +75,7 @@ func (n *Node) Read(ctx context.Context, req ReadRequest) (*Report, error) {
 		return nil, err
 	}
 	n.noteICDActive()
-	n.apply(sc, rep)
+	n.apply(sc, rep, emitEvents)
 	return rep, nil
 }
 
@@ -112,9 +122,12 @@ func (n *Node) noteICDActive() {
 // for a cluster the caller filters and none with the other fabric filter
 // than the cache's ([structure.withKnownVersions]); the interval bounds
 // are the node's for the request's (:129-133); each report is applied to
-// the image before req.Updated sees it (:139-146); a sustained
+// the image before req.Updated sees it (:139-146), its store writes and
+// hooks on the node's job queue, off the report's exchange
+// (ClientStructure.ts:417-439); a sustained
 // subscription's re-subscriptions send the versions then current and the
-// event minimum past the highest event seen (:148-155).
+// event minimum past the highest event it delivered itself, the
+// request's own event filters until then (:148-155, :162-168).
 //
 // A sustained subscription's re-subscription starts from the caller's own
 // filters, runs the caller's RefreshRequest on them, then injects the
@@ -124,7 +137,16 @@ func (n *Node) noteICDActive() {
 // 862ad75f (callerRefresh :125, sent :129-132, refreshRequest :162-168).
 // With IncludeKnownVersions no version goes along, in the first request
 // nor in a re-subscription's (withKnownVersions, :123-124).
+//
+// A host's subscription returns its events in its reports only (see Read);
+// only the default subscription emits them.
 func (n *Node) Subscribe(ctx context.Context, sr SubscribeRequest) (*Subscription, error) {
+	return n.subscribe(ctx, sr, nil)
+}
+
+// subscribe is Subscribe with mutate's emitEvents, evaluated per report
+// (NetworkClient.ts:171, emitEvents: isCurrent); nil emits nothing.
+func (n *Node) subscribe(ctx context.Context, sr SubscribeRequest, emitEvents func() bool) (*Subscription, error) {
 	req := sr.SubscribeRequest
 	withKnownVersions := func(sc scope, filters []DataVersionFilter) []DataVersionFilter {
 		if sr.IncludeKnownVersions {
@@ -151,7 +173,12 @@ func (n *Node) Subscribe(ctx context.Context, sr SubscribeRequest) (*Subscriptio
 		sentMu.Lock()
 		sc := sent
 		sentMu.Unlock()
-		n.apply(sc, rep)
+		// The image changes now and the caller's Updated sees it; the
+		// store writes and the hooks run on the node's job queue, so the
+		// report's final StatusResponse waits for neither (W4-ctlim-04,
+		// ClientStructure.ts:417-439; the caller's updated iterates the
+		// mutate inline, ClientNodeInteraction.ts:146-158).
+		n.applyDeferred(sc, rep, emitEvents != nil && emitEvents())
 		if req.Updated != nil {
 			req.Updated(rep)
 		}
@@ -162,8 +189,14 @@ func (n *Node) Subscribe(ctx context.Context, sr SubscribeRequest) (*Subscriptio
 			x = callerRefresh(x)
 		}
 		sc := newScope(x.Attributes, x.NoFabricFilter)
+		// The event filters stay the request's: the sustained
+		// subscription raises them past the highest event it delivered
+		// itself (requestNewEvents). Mirrors matter.js
+		// ClientNodeInteraction.ts:162-168 (refresh touches the version
+		// filters only) and SustainedSubscription.ts:379-384; the
+		// node-wide cursor here replaced a host's own filters
+		// (W4-ctlim-05).
 		n.mu.RLock()
-		x.EventFilters = []EventMinimumNumber{{EventMin: n.settings.maxEventNumber + 1}}
 		x.DataVersionFilters = withKnownVersions(sc, x.DataVersionFilters)
 		n.mu.RUnlock()
 		sentMu.Lock()

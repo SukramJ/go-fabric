@@ -151,7 +151,13 @@ type Options struct {
 	// RegulatoryCountryCode is the country; "" is
 	// [DefaultRegulatoryCountryCode].
 	RegulatoryCountryCode string
-	// OnAttestationFailure is the attestation policy (DAV:156).
+	// OnAttestationFailure is the attestation policy (DAV:156). The zero
+	// value accepts every finding: a device whose attestation failed is
+	// commissioned and the findings are logged, as matter.js's flow does
+	// without a callback (ControllerCommissioningFlow.ts:1352-1367 at
+	// 862ad75f); the controller facade sets attestation.Reject() by
+	// default. notes/parity/by_design.md BD-Matter-AttestationPolicy-ZeroProceeds
+	// and BD-Matter-Controller-PairRejectsFailedAttestation.
 	OnAttestationFailure attestation.Policy
 	// FinalizeCommissioning, when set, replaces the built-in operational
 	// CASE connection; the flow then stops before CommissioningComplete

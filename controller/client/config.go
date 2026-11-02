@@ -84,6 +84,11 @@ type SubscribeOptions struct {
 // (events delivered at once, the structure events, Changed, then the
 // delayed events — ClientStructure.ts:375-379). A panic in a structure
 // hook is logged, never raised (ClientStructureEvents.ts:138-144).
+//
+// The hooks of a subscription report run on the node's ordered job queue,
+// after the report's StatusResponse (ClientStructure.ts:417-439): a hook
+// may block without holding the peer's exchange, but it must not call
+// Node.Stop or Node.Close, which drain that queue.
 type Hooks struct {
 	// EndpointInstalled: an endpoint joined the image under its owner. Its
 	// clusters come with it; no ClusterInstalled follows for them
@@ -110,7 +115,11 @@ type Hooks struct {
 	SubscriptionAlive func()
 	// Event: an event the peer reported, for every cluster. value is the
 	// payload decoded through the event's definition, the raw [spec.Node]
-	// when there is none, nil without a payload.
+	// when there is none, nil without a payload. Only the default
+	// subscription while it is current, its bootstrap read and the
+	// newly-commissioned read deliver here (and raise the event cursor); a
+	// host's own Read or Subscribe returns its events in its Report only
+	// (matter.js ClientStructure.ts:412, NetworkClient.ts:171-173).
 	Event func(endpoint uint16, cluster, event uint32, e EventData, value any)
 	// Seeded: the structure is known, once — BasicInformation is present
 	// and every endpoint the root's PartsList names is installed, more than

@@ -177,7 +177,14 @@ func (k *connection) do(ctx context.Context, o *op, m wire.Message, d time.Durat
 		k.markGone()
 		return reply{}, fmt.Errorf("esphome: %s %s: %w: %w", o.name, k.address, ErrTimeout, btp.ErrDisconnected)
 	case <-ctx.Done():
+		// The request is in flight and the API carries no request id: its
+		// late reply would be taken for the next operation's on the same
+		// (type, handle). A cancelled operation therefore ends the
+		// connection as an overrun does (W4-ctlint-05); aioesphomeapi
+		// matches replies by address and handle alone (client.py:1215-1244).
 		unpend()
+		k.log.Info("ble.esphome.gatt_cancelled", slog.String("proxy", k.p.name), slog.String("address", k.address), slog.String("op", o.name))
+		k.markGone()
 		return reply{}, ctx.Err()
 	}
 }

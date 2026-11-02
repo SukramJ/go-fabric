@@ -242,7 +242,11 @@ func (s *Subscription) setActive(active bool) {
 	changed := st.active != active
 	st.active = active
 	st.mu.Unlock()
-	if changed && s.request.ActiveChanged != nil {
+	// Going live announces even when already live, so a re-established
+	// subscription (a mode-flip recreate keeps it live) is announced
+	// again; going not live announces a change only. Mirrors matter.js
+	// SustainedSubscription.ts:395-419 (#setLive) (W4-ctlim-10).
+	if (active || changed) && s.request.ActiveChanged != nil {
 		s.request.ActiveChanged(active)
 	}
 }

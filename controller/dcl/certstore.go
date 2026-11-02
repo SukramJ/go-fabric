@@ -127,6 +127,11 @@ type CertificateStore struct {
 	githubRateLimited bool
 
 	revocations *revocationCache
+
+	// periodic is the context of the timer's updates, cancelled by Close
+	// so a shutdown does not wait out a multi-minute update (W4-ctlint-12).
+	periodic       context.Context
+	cancelPeriodic context.CancelFunc
 }
 
 var (
@@ -140,6 +145,7 @@ var (
 // returned (update :952-972); a store that cannot be read is an error.
 func OpenCertificateStore(ctx context.Context, opts CertificateOptions) (*CertificateStore, error) {
 	s := &CertificateStore{opts: opts, clock: opts.Clock, log: opts.Logger, store: opts.Store, index: map[string]storedCertificate{}}
+	s.periodic, s.cancelPeriodic = context.WithCancel(context.Background())
 	if s.clock == nil {
 		s.clock = exchange.SystemClock{}
 	}
@@ -190,13 +196,16 @@ func (s *CertificateStore) scheduleUpdate() {
 		return
 	}
 	s.timer = s.clock.AfterFunc(s.interval(), func() {
-		s.Update(context.Background(), false)
+		s.Update(s.periodic, false)
 		s.scheduleUpdate()
 	})
 }
 
 // Close stops the periodic update and waits for a running one — close
-// (:896-906).
+// (:896-906), which awaits #fetchPromise. A running periodic update is
+// cancelled first, so Close waits for its fetches to return, not for
+// every remaining root to be fetched or time out (W4-ctlint-12); an
+// update a caller started runs under the caller's context.
 func (s *CertificateStore) Close() {
 	s.mu.Lock()
 	s.closed = true
@@ -205,6 +214,9 @@ func (s *CertificateStore) Close() {
 		s.timer = nil
 	}
 	s.mu.Unlock()
+	if s.cancelPeriodic != nil {
+		s.cancelPeriodic()
+	}
 	s.awaitUpdate()
 	s.revocations.close()
 }

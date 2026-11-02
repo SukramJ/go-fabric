@@ -31,7 +31,7 @@ func peerImage(t *testing.T, st Store) (*Node, *recorder, *logRecorder) {
 	b := &report{}
 	b.endpoint(0, []uint64{dtRootNode}, []uint32{descriptor.ClusterID, clBasicInfo}, 1)
 	b.endpoint(1, []uint64{dtOnOffLight}, ep1ServerList)
-	n.apply(wildcard, &b.r)
+	n.apply(wildcard, &b.r, true)
 	rec.take()
 	return n, rec, logs
 }
@@ -73,7 +73,7 @@ func TestClientNodeChangesOmittedVersionFiltersParity(t *testing.T) {
 		b.attr(0, timeSync, spec.AttrAcceptedCommandList, listNode(), 7)
 		b.attr(0, timeSync, spec.AttrGeneratedCommandList, listNode(), 7)
 		b.attr(0, timeSync, timesynchronization.AttrGranularity, uintNode(0), 7)
-		n.apply(wildcard, &b.r)
+		n.apply(wildcard, &b.r, true)
 		if !slices.Contains(filteredOn(n, 0, false), timeSync) {
 			t.Fatalf("filters %v lack TimeSynchronization", filteredOn(n, 0, false))
 		}
@@ -112,7 +112,7 @@ func levelControlImage(t *testing.T, st Store, withOnOffTransition bool) (*Node,
 	b := &report{}
 	b.endpoint(0, []uint64{dtRootNode}, []uint32{descriptor.ClusterID, clBasicInfo}, 1)
 	b.endpoint(1, []uint64{dtOnOffLight}, []uint32{descriptor.ClusterID, 6})
-	n.apply(wildcard, &b.r)
+	n.apply(wildcard, &b.r, true)
 	b = &report{}
 	b.attr(1, descriptor.ClusterID, descriptor.AttrServerList, listNode(uint64(descriptor.ClusterID), 6, uint64(levelcontrol.ClusterID)), 2)
 	list := levelControlList()
@@ -132,7 +132,7 @@ func levelControlImage(t *testing.T, st Store, withOnOffTransition bool) (*Node,
 	}
 	b.attr(1, lc, levelcontrol.AttrOnTransitionTime, uintNode(10), 1)
 	b.attr(1, lc, levelcontrol.AttrOffTransitionTime, uintNode(20), 1)
-	n.apply(wildcard, &b.r)
+	n.apply(wildcard, &b.r, true)
 	rec.take()
 	return n, rec
 }
@@ -156,7 +156,7 @@ func reportLevelControl(n *Node, list []uint64, values map[uint32]uint64) {
 	for id, v := range values {
 		b.attr(1, levelcontrol.ClusterID, id, uintNode(v), 0x1234)
 	}
-	n.apply(wildcard, &b.r)
+	n.apply(wildcard, &b.r, true)
 }
 
 // expectNoOnOffTransition is ClientNodeTest.ts:3675-3680.
@@ -187,7 +187,7 @@ func TestClientNodeDropsOptionalAttributeParity(t *testing.T) {
 		// seedPeerCache: the value as if reported, without a list.
 		b := &report{}
 		b.attr(1, levelcontrol.ClusterID, levelcontrol.AttrOnOffTransitionTime, uintNode(5), 1)
-		n.apply(wildcard, &b.r)
+		n.apply(wildcard, &b.r, true)
 		if v, ok := levelValue(n, levelcontrol.AttrOnOffTransitionTime); !ok || v != 5 {
 			t.Fatalf("seeded OnOffTransitionTime %d %v, want 5", v, ok)
 		}
@@ -283,11 +283,11 @@ func TestClientNodeSchrodingersClusterParity(t *testing.T) {
 	t.Run("survives a re-interview where the descriptor precedes the absent cluster's data", func(t *testing.T) {
 		t.Parallel()
 		n, _, _ := peerImage(t, &MemoryStore{})
-		n.apply(wildcard, &serverList(neoReports(&report{}, 10, 1, false), 10, false).r)
+		n.apply(wildcard, &serverList(neoReports(&report{}, 10, 1, false), 10, false).r, true)
 		if neoCluster(n) == nil {
 			t.Fatal("NEO should be active after the initial interaction")
 		}
-		n.apply(wildcard, &neoReports(serverList(&report{}, 11, false), 11, 1, false).r)
+		n.apply(wildcard, &neoReports(serverList(&report{}, 11, false), 11, 1, false).r, true)
 		if neoCluster(n) == nil {
 			t.Fatal("NEO must survive a re-interview that serves its data")
 		}
@@ -297,11 +297,11 @@ func TestClientNodeSchrodingersClusterParity(t *testing.T) {
 		t.Parallel()
 		st := &MemoryStore{}
 		n, _, _ := peerImage(t, st)
-		n.apply(wildcard, &serverList(neoReports(&report{}, 10, 1, false), 10, false).r)
+		n.apply(wildcard, &serverList(neoReports(&report{}, 10, 1, false), 10, false).r, true)
 		if _, _, ok := stored(t, st, 1, neo); neoCluster(n) == nil || !ok {
 			t.Fatalf("NEO active %v, stored %v", neoCluster(n) != nil, ok)
 		}
-		n.apply(wildcard, &serverList(&report{}, 11, false).r)
+		n.apply(wildcard, &serverList(&report{}, 11, false).r, true)
 		if neoCluster(n) != nil {
 			t.Fatal("NEO kept though the descriptor alone dropped it")
 		}
@@ -313,15 +313,15 @@ func TestClientNodeSchrodingersClusterParity(t *testing.T) {
 	t.Run("re-installs a cluster the peer drops and later serves again", func(t *testing.T) {
 		t.Parallel()
 		n, _, _ := peerImage(t, &MemoryStore{})
-		n.apply(wildcard, &neoReports(serverList(&report{}, 10, true), 10, 1, false).r)
+		n.apply(wildcard, &neoReports(serverList(&report{}, 10, true), 10, 1, false).r, true)
 		if neoCluster(n) == nil {
 			t.Fatal("NEO not installed")
 		}
-		n.apply(wildcard, &serverList(&report{}, 11, false).r)
+		n.apply(wildcard, &serverList(&report{}, 11, false).r, true)
 		if neoCluster(n) != nil {
 			t.Fatal("NEO not dropped")
 		}
-		n.apply(wildcard, &neoReports(serverList(&report{}, 12, true), 12, 1, false).r)
+		n.apply(wildcard, &neoReports(serverList(&report{}, 12, true), 12, 1, false).r, true)
 		if neoCluster(n) == nil {
 			t.Fatal("NEO not installed again")
 		}
@@ -332,14 +332,14 @@ func TestClientNodeSchrodingersClusterParity(t *testing.T) {
 	rebuilt := func(t *testing.T, change func(b *report)) (*Node, []string) {
 		t.Helper()
 		n, rec, _ := peerImage(t, &MemoryStore{})
-		n.apply(wildcard, &neoReports(serverList(&report{}, 10, true), 10, 1, false).r)
+		n.apply(wildcard, &neoReports(serverList(&report{}, 10, true), 10, 1, false).r, true)
 		if neoCluster(n) == nil {
 			t.Fatal("NEO not installed")
 		}
 		rec.take()
 		b := serverList(&report{}, 11, true)
 		change(b)
-		n.apply(wildcard, &b.r)
+		n.apply(wildcard, &b.r, true)
 		return n, rec.take()
 	}
 	replacedNeo := "replaced 1/Cluster$125dfc11"

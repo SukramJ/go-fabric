@@ -150,12 +150,16 @@ func (p *sessionProvider) MaximumPeerResponseTime(ept time.Duration, includeSend
 		// A reliable channel (BTP) waits the channel's time (MRP.ts:111-113).
 		return exchange.ReliableMaxPeerResponseTime(ept)
 	}
+	// Our own retransmissions carry the manager's local pad — matter.js
+	// ExchangeManager.ts:533-545 passes localAdditionalMrpDelay and
+	// localFixedMrpBackoff (W4-ctlim-07).
 	local := exchange.IntervalsOf(p.mgr.LocalParameters())
+	pad := p.mgr.LocalPad()
 	if !includeSending {
-		return exchange.MaxPeerResponseTime(nil, false, local, ept)
+		return exchange.MaxPeerResponseTimePadded(nil, false, local, ept, pad)
 	}
 	peerIntervals := exchange.IntervalsOf(p.s.Parameters())
-	return exchange.MaxPeerResponseTime(&peerIntervals, p.s.IsPeerActive(), local, ept)
+	return exchange.MaxPeerResponseTimePadded(&peerIntervals, p.s.IsPeerActive(), local, ept, pad)
 }
 
 func (p *sessionProvider) VerifyReachability(context.Context) bool { return true }
@@ -254,12 +258,16 @@ func (p *peerProvider) MaximumPeerResponseTime(ept time.Duration, includeSending
 	if s := p.p.NewestSession(); s != nil && !s.UsesMRP() {
 		return exchange.ReliableMaxPeerResponseTime(ept)
 	}
-	local := exchange.IntervalsOf(p.p.Exchanges().LocalParameters())
+	// Our own retransmissions carry the manager's local pad — matter.js
+	// PeerExchangeProvider.ts:152-161 (W4-ctlim-07).
+	mgr := p.p.Exchanges()
+	local := exchange.IntervalsOf(mgr.LocalParameters())
+	pad := mgr.LocalPad()
 	if !includeSending {
-		return exchange.MaxPeerResponseTime(nil, true, local, ept)
+		return exchange.MaxPeerResponseTimePadded(nil, true, local, ept, pad)
 	}
 	peerIntervals := exchange.IntervalsOf(p.p.SessionParameters())
-	return exchange.MaxPeerResponseTime(&peerIntervals, true, local, ept)
+	return exchange.MaxPeerResponseTimePadded(&peerIntervals, true, local, ept, pad)
 }
 
 // VerifyReachability is Peer.verifyReachability with reason

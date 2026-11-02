@@ -52,10 +52,15 @@ func (c *Interaction) maxPathsPerInvoke() int {
 // BatchDuration disabled, a timed or suppressed invoke, an expected
 // processing time, the extended fail-safe timeout, an MRP delay, the
 // Large Message quality — goes on its own. Network does not block: it
-// picks the batch's lane.
+// picks the batch's lane. A command timed-required in the snapshot is a
+// timed invoke even with zero options: matter.js's isBatchable reads the
+// timedRequest Invoke() inferred from the model (ClientInteraction.ts:200,
+// Invoke.ts:136-139) (W4-ctlim-02). TimedOff goes on its own as well: the
+// batch request infers timed from the model again, so the caller's opt-out
+// survives only outside a batch.
 func batchable(path im.ConcreteCommandPath, opts InvokeOptions) bool {
-	return path.Endpoint != 0 && !opts.NoBatch && !opts.SuppressResponse &&
-		!opts.Timed && opts.TimedTimeout == 0 && opts.ExpectedProcessingTime == 0 &&
+	return path.Endpoint != 0 && !opts.NoBatch && !opts.SuppressResponse && !opts.TimedOff &&
+		!opts.timedFor(im.CommandInvocation{Path: path}) && opts.ExpectedProcessingTime == 0 &&
 		!opts.ExtendedFailSafeTimeout && opts.AdditionalMrpDelay == nil && !opts.large()
 }
 
