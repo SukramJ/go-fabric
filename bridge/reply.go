@@ -211,7 +211,12 @@ func (b *Bridge) sendReplyTimed(
 		// can resolve it. Stamping our own local id (which is what
 		// requestHdr.SessionID carries — peer sent that to address
 		// us) results in chip-tool dropping the reply silently.
-		Privacy:      requestHdr.Privacy,
+		// No P bit: a unicast message never carries privacy
+		// enhancements. Mirrors matter.js MessageExchange.ts:718
+		// (`hasPrivacyEnhancements: false, // Privacy is only defined for
+		// group messages`) at 862ad75f; a request that carried the bit was
+		// dropped before it reached here (bridge/privacy.go
+		// maybeUnmaskPrivacy, as matter.js ExchangeManager.ts:230-235).
 		Control:      requestHdr.Control,
 		HasExtension: false,
 		SessionType:  requestHdr.SessionType,
@@ -288,18 +293,6 @@ func (b *Bridge) sendReplyTimed(
 	datagram := make([]byte, 0, len(hdrBytes)+len(enc.Ciphertext))
 	datagram = append(datagram, hdrBytes...)
 	datagram = append(datagram, enc.Ciphertext...)
-	// The response header echoes the request's Privacy flag, so when the
-	// peer sent a privacy-protected message our reply announces the P bit
-	// too — and a header that announces the mask MUST carry it. Without
-	// this the peer XOR-unmasks an unmasked counter / DestNodeID, derives
-	// the wrong nonce, and drops every reply on the exchange. No-op on
-	// the ordinary path: applyOutboundPrivacy returns immediately when
-	// the P bit is clear. Mirrors matter.js
-	// packages/protocol/src/codec/MessageCodec.ts encodeMessage, which
-	// applies the privacy transform whenever the session negotiated it.
-	if err := applyOutboundPrivacy(sess, respHdr.SessionID, datagram); err != nil {
-		return fmt.Errorf("%w: %w", ErrReplyEncrypt, err)
-	}
 	// Tracked before it is sent, for the reason above.
 	if needsAck {
 		tracker.Track(counter, requestHdr.SessionID, requestProto.ExchangeID, datagram, src, b.clk().Now())

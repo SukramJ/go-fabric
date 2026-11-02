@@ -5,6 +5,7 @@ package bridge
 
 import (
 	"bytes"
+	"fmt"
 	"testing"
 	"time"
 
@@ -14,9 +15,8 @@ import (
 )
 
 // TestPrivacy_NonPrivacyDatagramPassthrough verifies that a header
-// without the P bit is left untouched. Both maybeUnmaskPrivacy
-// (inbound) and applyOutboundPrivacy must skip non-privacy frames
-// even when no session is wired.
+// without the P bit is left untouched: maybeUnmaskPrivacy skips a
+// non-privacy frame even when no session is wired.
 func TestPrivacy_NonPrivacyDatagramPassthrough(t *testing.T) {
 	t.Parallel()
 	hdr := message.Header{SessionID: 7, MessageCounter: 0xCAFE}
@@ -29,10 +29,6 @@ func TestPrivacy_NonPrivacyDatagramPassthrough(t *testing.T) {
 	}
 	if !bytes.Equal(buf, orig) {
 		t.Errorf("non-privacy buffer mutated: got %x want %x", buf, orig)
-	}
-
-	if err := applyOutboundPrivacy(nil, 7, buf); err != nil {
-		t.Errorf("applyOutboundPrivacy on non-privacy frame: %v", err)
 	}
 }
 
@@ -82,7 +78,7 @@ func TestPrivacy_OutboundInboundRoundTrip(t *testing.T) {
 	// mask so we can verify XOR-symmetry after a roundtrip.
 	originalProtected := append([]byte(nil), datagram[4:8]...)
 
-	if err := applyOutboundPrivacy(bridgeSess, sessionID, datagram); err != nil {
+	if err := maskGroupDatagram(bridgeSess, sessionID, datagram); err != nil {
 		t.Fatalf("applyOutboundPrivacy: %v", err)
 	}
 	if bytes.Equal(datagram[4:8], originalProtected) {
@@ -234,87 +230,6 @@ func TestPrivacyHeaderEnd_ClampedToLength(t *testing.T) {
 	}
 }
 
-// ─── applyOutboundPrivacy additional branches ────────────────────────────────
-
-// TestApplyOutboundPrivacy_TooShortForMIC verifies that a Privacy-flagged
-// datagram shorter than header+privacyMICSuffix bytes returns an error.
-func TestApplyOutboundPrivacy_TooShortForMIC(t *testing.T) {
-	t.Parallel()
-	bridgeKey := bytes.Repeat([]byte{0xAA}, 16)
-	peerKey := bytes.Repeat([]byte{0xBB}, 16)
-	sess, err := channel.New(channel.Config{
-		EncryptKey:  bridgeKey,
-		DecryptKey:  peerKey,
-		LocalNodeID: 1,
-		PeerNodeID:  2,
-	})
-	if err != nil {
-		t.Fatalf("channel.New: %v", err)
-	}
-	// Build a Privacy-flagged datagram that is too short to hold the MIC.
-	hdr := message.Header{SessionID: 0x0001, Privacy: true}
-	buf := hdr.Marshal() // only 4 bytes — too short for privacyMICSuffix (16)
-	if err := applyOutboundPrivacy(sess, 0x0001, buf); err == nil {
-		t.Error("applyOutboundPrivacy with too-short datagram: want error, got nil")
-	}
-}
-
-// TestApplyOutboundPrivacy_NoPrivacyBit_NonNilSession verifies that a
-// datagram WITHOUT the Privacy bit set is left untouched even when a
-// non-nil session is provided. Exercises the `datagram[3]&secFlagPrivacyBit==0`
-// early-return on line 137.
-func TestApplyOutboundPrivacy_NoPrivacyBit_NonNilSession(t *testing.T) {
-	t.Parallel()
-	bridgeKey := bytes.Repeat([]byte{0xCC}, 16)
-	peerKey := bytes.Repeat([]byte{0xDD}, 16)
-	sess, err := channel.New(channel.Config{
-		EncryptKey:  bridgeKey,
-		DecryptKey:  peerKey,
-		LocalNodeID: 3,
-		PeerNodeID:  4,
-	})
-	if err != nil {
-		t.Fatalf("channel.New: %v", err)
-	}
-	// Build a datagram WITHOUT the Privacy bit — Privacy field is false (default).
-	hdr := message.Header{SessionID: 0x0002}
-	buf := append(hdr.Marshal(), make([]byte, 32)...)
-	orig := append([]byte(nil), buf...)
-
-	if err := applyOutboundPrivacy(sess, 0x0002, buf); err != nil {
-		t.Errorf("applyOutboundPrivacy no P-bit: unexpected error: %v", err)
-	}
-	if !bytes.Equal(buf, orig) {
-		t.Errorf("applyOutboundPrivacy no P-bit: buffer mutated unexpectedly")
-	}
-}
-
-// TestApplyOutboundPrivacy_ClosedSession_ReturnsError verifies that a
-// Privacy-flagged datagram passed to a closed session returns an error
-// from PrivacyKey. Exercises lines 143-146.
-func TestApplyOutboundPrivacy_ClosedSession_ReturnsError(t *testing.T) {
-	t.Parallel()
-	bridgeKey := bytes.Repeat([]byte{0xEE}, 16)
-	peerKey := bytes.Repeat([]byte{0xFF}, 16)
-	sess, err := channel.New(channel.Config{
-		EncryptKey:  bridgeKey,
-		DecryptKey:  peerKey,
-		LocalNodeID: 5,
-		PeerNodeID:  6,
-	})
-	if err != nil {
-		t.Fatalf("channel.New: %v", err)
-	}
-	sess.Close()
-
-	// Privacy-flagged datagram with enough bytes for the MIC tail check.
-	hdr := message.Header{SessionID: 0x0003, Privacy: true}
-	buf := append(hdr.Marshal(), make([]byte, 32)...)
-	if err := applyOutboundPrivacy(sess, 0x0003, buf); err == nil {
-		t.Error("applyOutboundPrivacy with closed session: want error, got nil")
-	}
-}
-
 // TestMaybeUnmaskPrivacy_ClosedSession_ReturnsError verifies that a
 // Privacy-flagged inbound datagram whose session has been closed
 // surfaces an error from PeerPrivacyKey. Exercises lines 67-70.
@@ -388,13 +303,15 @@ func TestMaybeUnmaskPrivacy_TooShortForMIC_AfterSessionResolve(t *testing.T) {
 	}
 }
 
-// TestSendReply_PrivacyFlaggedRequestGetsMaskedReply pins the outbound
-// half of Matter §4.7.3.1 on the production reply path: the response
-// header echoes the request's Privacy flag, so the header suffix it
-// announces as masked MUST actually be masked. Shipping the P bit over
-// an unmasked counter makes the peer XOR-unmask valid bytes, derive the
-// wrong nonce, and drop every reply on the exchange until MRP gives up.
-func TestSendReply_PrivacyFlaggedRequestGetsMaskedReply(t *testing.T) {
+// TestSendReply_NeverSetsThePrivacyFlag: the unicast reply carries no P
+// bit, whatever the request header says, and the peer decrypts it as it
+// is. matter.js sends unicast with hasPrivacyEnhancements false
+// (MessageExchange.ts:718 at 862ad75f) and drops a unicast message that
+// carries the flag (ExchangeManager.ts:230-235), as the bridge's inbound
+// gate does, so a P-flagged request never reaches the reply path; the
+// test calls sendReply directly to pin that the echo is gone
+// (review 2026-11 W6-reg-07).
+func TestSendReply_NeverSetsThePrivacyFlag(t *testing.T) {
 	t.Parallel()
 	b := newStartedBridge(t)
 	const (
@@ -431,35 +348,15 @@ func TestSendReply_PrivacyFlaggedRequestGetsMaskedReply(t *testing.T) {
 		t.Fatalf("ReadFromUDP: %v", err)
 	}
 	datagram := rbuf[:n]
-	if datagram[3]&secFlagPrivacyBit == 0 {
-		t.Fatal("reply did not carry the P bit — precondition for this test")
-	}
-
-	// The peer unmasks with its own view of the session, then decrypts.
-	// Both only work when the bridge applied the mask. The unmask uses
-	// the channel primitives directly: the bridge's inbound gate drops
-	// unicast frames carrying P (matter.js ExchangeManager.ts:230-235),
-	// so this reply is only ever decodable by a peer that unmasks below
-	// the gate — which is what makes the P echo on unicast dead code in
-	// practice, and what this test pins about the masking itself.
-	peerPrivacyKey, err := peerSess.PeerPrivacyKey()
-	if err != nil {
-		t.Fatalf("PeerPrivacyKey: %v", err)
-	}
-	protectedEnd := privacyHeaderEnd(datagram)
-	mask, err := channel.PrivacyKeystream(peerPrivacyKey, peerSessionID, datagram[len(datagram)-16:], protectedEnd-4)
-	if err != nil {
-		t.Fatalf("PrivacyKeystream: %v", err)
-	}
-	if err := channel.ApplyPrivacyMask(mask, datagram[4:protectedEnd]); err != nil {
-		t.Fatalf("ApplyPrivacyMask: %v", err)
+	if datagram[3]&secFlagPrivacyBit != 0 {
+		t.Fatal("the unicast reply carries the P bit")
 	}
 	hdr, hdrLen, err := message.UnmarshalHeader(datagram)
 	if err != nil {
-		t.Fatalf("UnmarshalHeader after unmask: %v", err)
+		t.Fatalf("UnmarshalHeader: %v", err)
 	}
 	if _, _, err := peerSess.Decrypt(&hdr, datagram[3], datagram[hdrLen:]); err != nil {
-		t.Fatalf("peer Decrypt of the privacy-protected reply: %v", err)
+		t.Fatalf("peer Decrypt of the reply: %v", err)
 	}
 }
 
@@ -520,7 +417,7 @@ func TestPrivacy_RoundTripCoversSourceAndDestinationNodeIDs(t *testing.T) {
 	}
 	original := append([]byte(nil), datagram[4:24]...)
 
-	if err := applyOutboundPrivacy(bridgeSess, sessionID, datagram); err != nil {
+	if err := maskGroupDatagram(bridgeSess, sessionID, datagram); err != nil {
 		t.Fatalf("applyOutboundPrivacy: %v", err)
 	}
 	if bytes.Equal(datagram[20:24], original[16:20]) {
@@ -535,4 +432,34 @@ func TestPrivacy_RoundTripCoversSourceAndDestinationNodeIDs(t *testing.T) {
 	if !bytes.Equal(datagram[4:24], original) {
 		t.Fatalf("20-byte region did not round-trip:\n got=%x\nwant=%x", datagram[4:24], original)
 	}
+}
+
+// maskGroupDatagram applies the Matter §4.7.3.1 privacy mask to a
+// privacy-flagged datagram (header || ciphertext || MIC) in place, as the
+// sender of a group message does: the inverse of maybeUnmaskPrivacy, for
+// the round-trip tests of the group path. The bridge sends no unicast
+// message with the P bit (review 2026-11 W6-reg-07), so the masking lives
+// here and not in the reply path.
+func maskGroupDatagram(sess *channel.Session, sessionID uint16, datagram []byte) error {
+	if sess == nil || len(datagram) < 4 || datagram[3]&secFlagPrivacyBit == 0 {
+		return nil
+	}
+	if len(datagram) < 4+privacyMICSuffix {
+		return fmt.Errorf("privacy outbound: datagram too short (%d bytes) for MIC tail", len(datagram))
+	}
+	privacyKey, err := sess.PrivacyKey()
+	if err != nil {
+		return fmt.Errorf("privacy outbound: derive key: %w", err)
+	}
+	mic := datagram[len(datagram)-16:]
+	hdrEnd := privacyHeaderEnd(datagram)
+	if hdrEnd <= 4 {
+		return nil
+	}
+	protected := datagram[4:hdrEnd]
+	mask, err := channel.PrivacyKeystream(privacyKey, sessionID, mic, len(protected))
+	if err != nil {
+		return fmt.Errorf("privacy outbound: mask derive: %w", err)
+	}
+	return channel.ApplyPrivacyMask(mask, protected)
 }
