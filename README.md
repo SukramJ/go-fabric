@@ -26,15 +26,15 @@ element model ships embedded so parity is a test, not a claim.
 
 ## Status
 
-As of `v0.15.6` (2026-11-01); the numbers are [the roadmap's baseline](./docs/roadmap.md#baseline-2026-10-17-v060).
+As of `v0.15.6` (2026-11-01); the starting point of the milestones is [the roadmap's baseline](./docs/roadmap.md#baseline-2026-10-17-v060) of 2026-10-17.
 
 | Area | State |
 | --- | --- |
-| Device side | 118 of 135 clusters served, 79 of 91 device types generated ([comparison](./docs/matterjs-comparison.md), [roadmap](./docs/roadmap.md)) |
+| Device side | all 135 clusters of the matter.js snapshot served, all 91 device types generated ([comparison](./docs/matterjs-comparison.md), [roadmap](./docs/roadmap.md)) |
 | Controller side | full commissioner (BLE, Wi-Fi and Thread network steps, keys behind `crypto.Signer`, the embedded DCL snapshot), controller role stages 1–6c, Joint Commissioning after connectedhomeip ([comparison](./docs/matterjs-comparison.md)) |
 | BLE | controller: done with [milestone 1](./docs/roadmap.md#milestone-1-the-commissioner-in-the-field) — `ble/bluez` on Linux, `ble/esphome` through ESPHome Bluetooth proxies, `pair --ble`, proven against a matter.js node over virtual controllers; device: [milestone 7](./docs/roadmap.md#milestone-7-ble-on-the-device-side) |
-| Thread | dataset provisioning only, by the commissioner ([milestone 1](./docs/roadmap.md#milestone-1-the-commissioner-in-the-field), phase 12); no Thread radio ([comparison](./docs/matterjs-comparison.md)) |
-| ICD | [milestone 5](./docs/roadmap.md#milestone-5-icd-and-the-controller-remainder) |
+| Thread | a Thread Border Router over an OTBR and ThreadNetworkDirectory on the device side ([guide](./docs/guides/thread-border-router.md)); the commissioner provisions datasets; no Thread radio ([comparison](./docs/matterjs-comparison.md)) |
+| ICD | shipped with [milestone 5](./docs/roadmap.md#milestone-5-icd-and-the-controller-remainder): the device side (`node.Config.ICD`, Check-In) and the controller's ICD client ([guide](./docs/guides/icd.md)) |
 | Certification | not pursued; certifiability is a goal ([certifiability](./docs/certifiability.md)) |
 | Verified ecosystems | Apple Home, Home Assistant; Google Home and Alexa pending ([roadmap](./docs/roadmap.md#baseline-2026-10-17-v060)) |
 
@@ -118,26 +118,27 @@ it.
 ### What "public API" means here
 
 **Every exported identifier outside `internal/` is public API.** The module
-already draws that line for itself: `internal/` holds the one-way seams
-through which the facade, the test-support packages and the reference
-programs reach package internals (`bridgeseam`, `channelseam`,
-`deviceseam`, `nodeseam`, `surfaceseam`, `udpseam`, `inflight`, `clockvar`),
-the shared helpers behind them (`serialqueue`, `forward`), the parity-test
-support and the chip-tool suite, and Go makes those unimportable from
-outside. Nothing else is private by convention, so nothing
+already draws that line for itself: `internal/` holds three kinds of
+package, and Go makes all of them unimportable from outside — the one-way
+seams through which the facade, the test-support packages, the reference
+programs and the module's own tests reach package internals (`bridgeseam`,
+`channelseam`, `deviceseam`, `fabrictestseam`, `nodeseam`, `surfaceseam`,
+`udpseam`, `inflight`, `clockvar`); shared internals behind them
+(`serialqueue`, `forward`); and test support (`paritytest`, `chipdm`, the
+chip-tool suite `chiptool`). Nothing else is private by convention, so nothing
 else may be changed as if it were.
 
-Depend freely on `bdx/`, `binding/`, `bootid/`, `bridge/`, `client/…`, `cluster/…`,
+Depend freely on `bdx/`, `binding/`, `bootid/`, `bridge/`, `client/…`, `clock/`, `cluster/…`,
 `commissioning/`, `contract/`, `controller/…`, `device/`, `diagevent/`,
 `eligibility/`, `endpoint/` (including `endpoint/sqlitestore`), `groups/`,
-`im/`, `im/subscription`, `mdns/`, `node/`,
-`parity/`, `schema/`, `secure/…`, `store/`, `surface/`, `tlv/` and `transport/…`. The
+`icd/`, `im/`, `im/subscription`, `mdns/`, `node/`,
+`parity/`, `schema/`, `secure/…`, `store/`, `surface/`, `thread/`, `tlv/` and `transport/…`. The
 device layer `device/` and the node facade `node/` are public API since
 `v0.3.0`; that release freezes nothing, and the `v1.0.0` freeze is still
 ahead.
 
 `bridge/bridgetest`, `endpoint/endpointtest`, `controller/ble/bletest`,
-`clock/clocktest` and `fabrictest` are public API on the same terms as the
+`clock/clocktest`, `surface/surfacetest`, `store/storetest` and `fabrictest` are public API on the same terms as the
 rest, not a lower tier. They exist for the reason
 `net/http/httptest` exists — a consumer's tests need to place a bridge in a
 state the production API is not shaped to reach — and a consumer's test suite
