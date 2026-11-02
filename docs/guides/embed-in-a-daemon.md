@@ -75,7 +75,7 @@ device type of its measurement. A device with a battery declares
 PowerSource, which BridgedNode allows on every bridged device under the
 condition `BridgedPowerSourceInfo`. A Zendure unit measures AC power and
 carries a battery, so it is an **ElectricalSensor** with a PowerSource. In
-the typed form (the release after v0.10.8; the daemon's v0.10.8 form follows
+the typed form (since `v0.10.9`; the daemon's v0.10.8 form follows
 below) the declaration is:
 
 ```go
@@ -113,16 +113,17 @@ uses for its MQTT topics. Under it the unit keeps its endpoint number
 across restarts.
 
 **v0.10.8 and the battery.** `powersourcedef.Declare` on an ElectricalSensor
-needs the release after v0.10.8, which carries this cookbook's facade fix
-(CHANGELOG, Unreleased). At v0.10.8 the kit refuses the declaration because
+needs `v0.10.9`, which carries this cookbook's facade fix (CHANGELOG
+0.10.9, Added). At v0.10.8 the kit refuses the declaration because
 the type does not list the cluster. The daemon therefore takes the route
 v0.10.8 has for a battery beside a measurement: `device.Measurement(src)`
 with a source of class `contract.MeasurementBattery`. The kit serves that
 source as the device's PowerSource, with BatPercentRemaining from the
 percentage. At v0.10.8 that battery's changes reach a subscriber only
 through `device.WithChangeNotifier(src)`; the second fix of this page's
-pull request makes the kit's server forward them itself. The daemon moves
-to the typed declaration when a release carries both fixes.
+pull request (CHANGELOG 0.10.9, Fixed) makes the kit's server forward them
+itself. `v0.10.9` carries both fixes, so a daemon on it or later uses the
+typed declaration.
 
 Commit: [`0bac952`](https://github.com/SukramJ/go-zendure2mqtt/commit/0bac9524e35d232fc077b339372b19ac83dfa8a1)
 ([`internal/fabric/projection.go`](https://github.com/SukramJ/go-zendure2mqtt/blob/1d552bf10c895a270780bf5c946cab55dc9fd777/internal/fabric/projection.go) `newUnit`,
