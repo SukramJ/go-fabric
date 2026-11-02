@@ -180,7 +180,17 @@ func drainReportDataChunks(t *testing.T, peerConn *net.UDPConn, peerSess *channe
 	t.Helper()
 	buf := make([]byte, udp.MaxDatagramSize)
 	for {
-		if err := peerConn.SetReadDeadline(time.Now().Add(300 * time.Millisecond)); err != nil {
+		// The first chunk gets a generous bound: the reporter runs on
+		// its own goroutine, and a race-instrumented run under load has
+		// taken more than 300 ms to deliver it. Every chunk after it
+		// has to follow within the quiet gap, which stays above the
+		// 200 ms per-chunk StatusResponse bound the tests pin, so an
+		// unanswered chunk still proves the sender stopped.
+		wait := 300 * time.Millisecond
+		if len(reportCounts) == 0 {
+			wait = 5 * time.Second
+		}
+		if err := peerConn.SetReadDeadline(time.Now().Add(wait)); err != nil {
 			t.Fatalf("SetReadDeadline: %v", err)
 		}
 		n, _, err := peerConn.ReadFromUDP(buf)
