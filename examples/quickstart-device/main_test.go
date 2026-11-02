@@ -12,40 +12,33 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/mdns"
 	"github.com/SukramJ/go-fabric/node"
 )
 
 // lightEndpoint returns the endpoint number the running node gave the
 // light, false when the topology has none.
 func lightEndpoint(n *node.Node) (uint16, bool) {
-	topo := n.Bridge().Topology()
-	if topo == nil {
-		return 0, false
-	}
-	for _, ep := range topo.Bridged() {
-		if ep.SourceKey != nil && ep.SourceKey.String() == "light-1" {
-			return ep.ID, true
+	for _, d := range n.Topology().Devices {
+		if d.Key.String() == "light-1" {
+			return d.Endpoint, true
 		}
 	}
 	return 0, false
 }
+
+// loopback is the test's network: loopback only, nothing published.
+var loopback = node.Network{Listen: "127.0.0.1:0", PreferIPv4: true, MDNS: node.MDNS{Off: true}}
 
 // TestQuickstartDevice builds the program's node on loopback, starts it,
 // finds the light and the pairing codes, stops it, and starts a second
 // node on the same database: the light keeps its endpoint number.
 func TestQuickstartDevice(t *testing.T) {
 	ctx := context.Background()
-	db, err := openDB(filepath.Join(t.TempDir(), "quickstart.db"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = db.Close() })
-	loopback := node.Network{Listen: "127.0.0.1:0", PreferIPv4: true}
+	path := filepath.Join(t.TempDir(), "quickstart.db")
 
 	var first uint16
 	for run := range 2 {
-		n, err := newNode(ctx, db, loopback, mdns.NewNoop())
+		n, err := newNode(ctx, path, loopback)
 		if err != nil {
 			t.Fatalf("run %d: newNode: %v", run, err)
 		}
@@ -77,12 +70,7 @@ func TestQuickstartDevice(t *testing.T) {
 func TestQuickstartDeviceRunStops(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	db, err := openDB(filepath.Join(t.TempDir(), "quickstart.db"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = db.Close() })
-	n, err := newNode(ctx, db, node.Network{Listen: "127.0.0.1:0", PreferIPv4: true}, mdns.NewNoop())
+	n, err := newNode(ctx, filepath.Join(t.TempDir(), "quickstart.db"), loopback)
 	if err != nil {
 		t.Fatal(err)
 	}

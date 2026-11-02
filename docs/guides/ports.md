@@ -66,7 +66,7 @@ these interfaces does not drag the host's dependencies into the module.
 | `SwitchEventEmitter` | the module (`cluster/switch.Server`) | the press gestures a host narrates (InitialPress, ShortRelease, LongPress, LongRelease); handed to a source with `WireMatterSwitchHandler` | — |
 | `SwitchPositionSink` | the module (`cluster/switch.Server`) | the positions a host reports (`SetRawPosition` debounced, `SetCurrentPosition`); the server derives every Switch event, multi press included, as matter.js `SwitchServer.ts` does; handed to a source with `WireMatterSwitchPositions` | a source without either method reports no press |
 
-*Source: `contract/doc.go:4-18`, `contract/matter.go:21-260`, `contract/matter.go:299-441`, `contract/matter.go:573-871`, `contract/switchevents.go:26`, `contract/switchevents.go:54`.*
+*Source: `contract/doc.go:4-18`, `contract/matter.go:21-260`, `contract/matter.go:298-440`, `contract/matter.go:540-837`, `contract/switchevents.go:26`, `contract/switchevents.go:54`.*
 
 ## `node.Config`: the facade's ports
 

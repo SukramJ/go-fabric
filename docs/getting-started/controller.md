@@ -95,7 +95,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/SukramJ/go-fabric/client/discovery"
 	basicinfo "github.com/SukramJ/go-fabric/cluster/spec/basicinformation"
 	onoffdef "github.com/SukramJ/go-fabric/cluster/spec/onoff"
 	"github.com/SukramJ/go-fabric/controller"
@@ -103,15 +102,12 @@ import (
 	"github.com/SukramJ/go-fabric/controller/client"
 )
 
-// openNames opens the DNS-SD cache; a test replaces it.
-var openNames = discovery.Open
-
 func main() {
 	dbPath := flag.String("db", "quickstart-controller.db", "the SQLite file holding the fabric and the paired nodes")
 	code := flag.String("code", "", "pair the node with this QR (MT:…) or manual code first")
 	flag.Parse()
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	err := run(ctx, *dbPath, *code)
+	err := run(ctx, *dbPath, *code, nil)
 	stop()
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
@@ -119,27 +115,34 @@ func main() {
 	}
 }
 
-func run(ctx context.Context, dbPath, code string) error {
+// run opens the controller, pairs the node code names — and then uses
+// that node — or, without a code, uses the first node an earlier run
+// paired. edit, when set, changes the controller's configuration (a test
+// injects its DNS-SD cache); the program passes nil.
+func run(ctx context.Context, dbPath, code string, edit func(*controller.Config)) error {
 	db, err := openDB(dbPath)
 	if err != nil {
 		return err
 	}
 	defer func() { _ = db.Close() }()
-	c, err := open(ctx, db, "[::]:0", slog.Default())
+	c, err := open(ctx, db, "[::]:0", slog.Default(), edit)
 	if err != nil {
 		return err
 	}
 	defer func() { _ = c.Close(context.WithoutCancel(ctx)) }()
 	if code != "" {
 		noSubscribe := false // this program exits; a resident host keeps the default subscription
-		if _, err := c.Pair(ctx, code, controller.PairOptions{AutoSubscribe: &noSubscribe}); err != nil {
+		paired, err := c.Pair(ctx, code, controller.PairOptions{AutoSubscribe: &noSubscribe})
+		if err != nil {
 			return err
 		}
+		return use(ctx, paired)
 	}
 	nodes := c.Nodes()
 	if len(nodes) == 0 {
 		return errors.New("no paired node: pass -code")
 	}
+	fmt.Printf("Using node %s, the first one paired before\n", nodes[0].ID())
 	return use(ctx, nodes[0])
 }
 
@@ -151,16 +154,21 @@ func openDB(path string) (*sql.DB, error) { return controller.OpenDB(path) }
 // first run, loaded afterwards), the socket, DNS-SD, peers, commissioner,
 // registry — one call. The trust store is the CSA's test PAAs, for
 // development devices; a production controller passes a DCL-backed one.
-func open(ctx context.Context, db *sql.DB, listen string, log *slog.Logger) (*controller.Controller, error) {
-	return controller.New(ctx, controller.Config{
+// A nil Config.Names opens the DNS-SD cache on the network; edit, when
+// set, changes the configuration first.
+func open(ctx context.Context, db *sql.DB, listen string, log *slog.Logger, edit func(*controller.Config)) (*controller.Controller, error) {
+	cfg := controller.Config{
 		DB:          db,
 		Attestation: attestation.TestStore(),
 		Listen:      listen,
 		Label:       "quickstart",
 		Logger:      log,
-		Names:       openNames,
 		ManualStart: true, // the program reads and subscribes itself
-	})
+	}
+	if edit != nil {
+		edit(&cfg)
+	}
+	return controller.New(ctx, cfg)
 }
 
 // use reads, invokes and subscribes through the node's client image.
@@ -205,10 +213,17 @@ go run ./examples/quickstart-controller -code MT:-24J0AFN00KA0648G00
 go run ./examples/quickstart-controller          # the same node, next run
 ```
 
+With `-code` the program uses the node `Pair` returned — on a database
+that already holds nodes too, so a second device is not mistaken for the
+first; without it, it uses the first node an earlier run paired and says
+which.
+
 The test opens the controller twice on one database and checks that the
 second run is the same fabric. It also checks that a malformed code is
 refused and that a valid code that no device answers ends at the deadline
-with `controller.ErrNoDevice`.
+with `controller.ErrNoDevice`. It hands the controller a DNS-SD cache on
+which nothing answers through `controller.Config.Names`, the field a nil
+value of which opens the cache on the network.
 
 *Source: `examples/quickstart-controller/main_test.go`.*
 

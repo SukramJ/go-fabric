@@ -27,10 +27,15 @@ func (c silentConn) Close() error                         { return nil }
 
 func TestMain(m *testing.M) {
 	slog.SetDefault(slog.New(slog.DiscardHandler))
-	openNames = func(log *slog.Logger) (*discovery.Names, error) {
+	os.Exit(m.Run())
+}
+
+// silent puts a DNS-SD cache on which nothing answers into the
+// controller's configuration, through controller.Config.Names.
+func silent(cfg *controller.Config) {
+	cfg.Names = func(log *slog.Logger) (*discovery.Names, error) {
 		return discovery.NewNames(silentConn{out: make(chan mdns.QueryResponse)}, log), nil
 	}
-	os.Exit(m.Run())
 }
 
 // TestQuickstartControllerStack opens the controller twice on one
@@ -46,7 +51,7 @@ func TestQuickstartControllerStack(t *testing.T) {
 	defer func() { _ = db.Close() }()
 	var fabricID, nodeID uint64
 	for run := range 2 {
-		c, err := open(ctx, db, "127.0.0.1:0", slog.Default())
+		c, err := open(ctx, db, "127.0.0.1:0", slog.Default(), silent)
 		if err != nil {
 			t.Fatalf("run %d: open: %v", run, err)
 		}
@@ -61,7 +66,7 @@ func TestQuickstartControllerStack(t *testing.T) {
 		}
 		_ = c.Close(ctx)
 	}
-	if err := run(ctx, filepath.Join(t.TempDir(), "empty.db"), ""); err == nil || !strings.Contains(err.Error(), "no paired node") {
+	if err := run(ctx, filepath.Join(t.TempDir(), "empty.db"), "", silent); err == nil || !strings.Contains(err.Error(), "no paired node") {
 		t.Errorf("run without a node = %v, want the no-paired-node error", err)
 	}
 }
@@ -70,7 +75,7 @@ func TestQuickstartControllerStack(t *testing.T) {
 // one that no device answers ends at the deadline.
 func TestQuickstartControllerPairErrors(t *testing.T) {
 	ctx := context.Background()
-	if err := run(ctx, filepath.Join(t.TempDir(), "controller.db"), "not a code"); err == nil {
+	if err := run(ctx, filepath.Join(t.TempDir(), "controller.db"), "not a code", silent); err == nil {
 		t.Error("run accepted a malformed code")
 	}
 	// The stack opens on a context of its own; only the pairing is bounded
@@ -80,7 +85,7 @@ func TestQuickstartControllerPairErrors(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer func() { _ = db.Close() }()
-	c, err := open(ctx, db, "127.0.0.1:0", slog.Default())
+	c, err := open(ctx, db, "127.0.0.1:0", slog.Default(), silent)
 	if err != nil {
 		t.Fatal(err)
 	}
