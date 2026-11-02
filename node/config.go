@@ -147,23 +147,10 @@ type Config struct {
 	// defaults it to 254 when unset (OperationalCredentialsServer.ts:
 	// 84-88 initialize), which cluster/core does too; the facade keeps 5.
 	SupportedFabrics uint8
-	// DisableTimeSynchronization leaves the TimeSynchronization cluster
-	// (0x0038) off the root; the zero value mounts it, as the facade
-	// always did. RootNode carries it under an optional conformance
-	// (device/root_node_gen.go, generated from the snapshot).
-	// Without it GeneralDiagnostics has no UTC clock: TimeSnapshot
-	// answers SystemTimeMs alone and PosixTimeMs null, as matter.js
-	// GeneralDiagnosticsServer.timeSnapshot does without a
-	// TimeSynchronizationBehavior (GeneralDiagnosticsServer.ts:168-182).
-	DisableTimeSynchronization bool
-	// TimeSynchronization selects the root TimeSynchronization's features
-	// TZ, NTPC, NTPS and TSC after connectedhomeip
-	// ([TimeSynchronizationConfig]); nil serves UTCTime and Granularity
-	// alone, as before. The node persists their state in its store and
-	// clears a removed fabric's trusted time source; the config's Store is
-	// the node's. UTCTime stays the node's clock. It excludes
-	// DisableTimeSynchronization.
-	TimeSynchronization *TimeSynchronizationConfig
+	// TimeSynchronization is the root TimeSynchronization cluster
+	// (0x0038), mounted by default ([TimeSynchronization]); its Off
+	// leaves it off the root.
+	TimeSynchronization TimeSynchronization
 	// GeneralDiagnosticsFeatures selects the root GeneralDiagnostics'
 	// features (mattercore.NewGeneralDiagnosticsWith); nil keeps
 	// matter.js's default selection, DataModelTest
@@ -196,16 +183,17 @@ type Config struct {
 	// Limits are the capacity limits a host may set ([Limits]); the zero
 	// value keeps every default.
 	Limits Limits
-	// Client is the node's client stack ([Client]): the socket, exchanges
-	// and peers its Binding entries reach other nodes through. The zero
-	// value runs without one.
-	Client Client
+	// Client is the node's client stack ([ClientConfig]): the socket,
+	// exchanges and peers its Binding entries reach other nodes through.
+	// nil runs without one ([Node.Peers] is nil, a node Binding entry is
+	// dropped).
+	Client *ClientConfig
 	// BootID selects the development rotation of UniqueIDs ([BootID]); the
 	// zero value keeps every UniqueID stable across restarts.
 	BootID BootID
-	// Health runs the node's health probe ([Health], [Node.Health]); the
-	// zero value runs none.
-	Health Health
+	// Health runs the node's health probe ([Health], [Node.Health]); nil
+	// runs none.
+	Health *Health
 	// Observers are the host's callbacks on fabric and commissioning
 	// events, each chained after the facade's own handler (observers.go);
 	// the zero value observes nothing.
@@ -263,14 +251,14 @@ type Network struct {
 	// ServerNetworkRuntime.ts:355-363.
 	TCP TCPConfig
 	// WiFi mounts WiFiNetworkDiagnostics (0x0036) on the root for a node on
-	// Wi-Fi; the zero value (no Reporter) mounts none. NetworkCommissioning
+	// Wi-Fi. NetworkCommissioning
 	// stays Ethernet-only either way (concept v2 §B.4): the node states the
 	// RootNode device-type condition WiFi, under which RootNode lists the
 	// cluster ("[WiFi]", device/root_node_gen.go), through the assembler's
 	// RootDeviceConditions — with [Config].Topology the host's own
 	// assembler states it. EthernetNetworkDiagnostics stays mounted beside
-	// it.
-	WiFi WiFi
+	// it. nil mounts none; a non-nil WiFi needs its Reporter.
+	WiFi *WiFi
 	// WiFiCommissioning mounts NetworkCommissioning with the Wi-Fi feature
 	// instead of Ethernet, its scan and connect done by Driver — what the
 	// commissioner's network steps configure. TESTING ONLY: the module's
@@ -278,23 +266,53 @@ type Network struct {
 	// the one user. The zero value (no Driver) keeps the Ethernet-only
 	// server, and the composition is unchanged.
 	WiFiCommissioning WiFiCommissioning
-	// ReannounceInterval is the cadence at which the node re-publishes its
-	// DNS-SD records when its Advertiser is an mdns.Reannouncer
-	// (mdns.Zeroconf is): the loop starts on [Node.Start] and stops on
-	// [Node.Stop]. 0 is [DefaultReannounceInterval]. The loop is this
-	// module's own device, not matter.js's (mdns.Reannouncer).
-	ReannounceInterval time.Duration
-	// DisableReannounce keeps the re-announce loop off; [Node.TriggerReannounce]
-	// still re-publishes on demand.
-	DisableReannounce bool
+	// Reannounce is the loop that re-publishes the node's DNS-SD records
+	// ([Reannounce]); the zero value runs it every
+	// [DefaultReannounceInterval].
+	Reannounce Reannounce
 	// MDNS configures the advertiser the node builds when
 	// [Config].Advertiser is nil; the zero value advertises (Zeroconf with
 	// the subtype responder).
 	MDNS MDNS
 }
 
+// Reannounce is the re-announce loop: while the node's Advertiser is an
+// mdns.Reannouncer (mdns.Zeroconf is) it re-publishes the DNS-SD records
+// every Interval from [Node.Start] to [Node.Stop]. The loop is this
+// module's own device, not matter.js's (mdns.Reannouncer). A default-on
+// sub-system: its switch is Off, inside its own configuration (ADR 0025
+// principle 2).
+type Reannounce struct {
+	// Interval is the cadence; 0 is [DefaultReannounceInterval].
+	Interval time.Duration
+	// Off keeps the loop off; [Node.TriggerReannounce] still re-publishes
+	// on demand.
+	Off bool
+}
+
+// TimeSynchronization is the root TimeSynchronization cluster (0x0038),
+// mounted by default as the facade always did; RootNode carries it under
+// an optional conformance (device/root_node_gen.go, generated from the
+// snapshot). A default-on sub-system: its switch is Off, inside its own
+// configuration (ADR 0025 principle 2).
+type TimeSynchronization struct {
+	// Off leaves the cluster off the root. Without it GeneralDiagnostics
+	// has no UTC clock: TimeSnapshot answers SystemTimeMs alone and
+	// PosixTimeMs null, as matter.js GeneralDiagnosticsServer.timeSnapshot
+	// does without a TimeSynchronizationBehavior
+	// (GeneralDiagnosticsServer.ts:168-182).
+	Off bool
+	// Config selects the features TZ, NTPC, NTPS and TSC after
+	// connectedhomeip ([TimeSynchronizationConfig]); nil serves UTCTime
+	// and Granularity alone. The node persists their state in its store
+	// and clears a removed fabric's trusted time source; the config's
+	// Store is the node's. UTCTime stays the node's clock. Off excludes
+	// it.
+	Config *TimeSynchronizationConfig
+}
+
 // DefaultReannounceInterval is the re-announce cadence a zero
-// [Network].ReannounceInterval selects: 30 minutes, under half the
+// [Reannounce].Interval selects: 30 minutes, under half the
 // 75-minute TTL Apple's mDNSResponder caches the records for, so a cache
 // sees the records again before they expire.
 const DefaultReannounceInterval = 30 * time.Minute
@@ -338,7 +356,7 @@ func (c *Config) rootDeviceConditions() []string {
 	// unknownEthernet), so it states the Base condition "Ethernet" its
 	// `[Ethernet]` requirement names; a Wi-Fi reporter adds "WiFi".
 	out := []string{conditionEthernet}
-	if c.Network.WiFi.Reporter != nil {
+	if c.Network.WiFi != nil && c.Network.WiFi.Reporter != nil {
 		out = append(out, conditionWiFi)
 	}
 	// An ICD states the condition RootNode's IcdManagement requirement
@@ -580,11 +598,14 @@ func (c *Config) Validate() error {
 	} else if at.Files == nil && at.BlockCommissioningOnError {
 		errs = append(errs, errors.New("node: Attestation.BlockCommissioningOnError needs Files"))
 	}
-	if c.Health.Interval < 0 {
+	if c.Health != nil && c.Health.Interval < 0 {
 		errs = append(errs, fmt.Errorf("node: Health.Interval %v is negative", c.Health.Interval))
 	}
-	if c.Network.ReannounceInterval < 0 {
-		errs = append(errs, fmt.Errorf("node: Network.ReannounceInterval %v is negative", c.Network.ReannounceInterval))
+	if c.Network.Reannounce.Interval < 0 {
+		errs = append(errs, fmt.Errorf("node: Network.Reannounce.Interval %v is negative", c.Network.Reannounce.Interval))
+	}
+	if c.Network.WiFi != nil && c.Network.WiFi.Reporter == nil {
+		errs = append(errs, errors.New("node: Network.WiFi needs its Reporter"))
 	}
 	if c.TLS != nil && c.TLS.CertificatePort == nil {
 		errs = append(errs, errNoCertificatePort)
@@ -603,11 +624,11 @@ func (c *Config) Validate() error {
 	return nil
 }
 
-// timeSynchronizationErrors refuses TimeSynchronization beside
-// DisableTimeSynchronization.
+// timeSynchronizationErrors refuses a TimeSynchronization Config beside
+// its Off.
 func (c *Config) timeSynchronizationErrors() []error {
-	if c.DisableTimeSynchronization && c.TimeSynchronization != nil {
-		return []error{errors.New("node: TimeSynchronization excludes DisableTimeSynchronization")}
+	if c.TimeSynchronization.Off && c.TimeSynchronization.Config != nil {
+		return []error{errors.New("node: TimeSynchronization.Config excludes TimeSynchronization.Off")}
 	}
 	return nil
 }

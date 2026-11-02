@@ -12,9 +12,9 @@ import (
 // MDNS configures the DNS-SD advertiser the node builds when
 // [Config].Advertiser is nil. The zero value advertises on the network.
 type MDNS struct {
-	// Disabled publishes nothing (mdns.NewNoop): no commissioner discovers
-	// the node, which a controller then reaches by address alone.
-	Disabled bool
+	// Off publishes nothing (mdns.NewNoop): no commissioner discovers the
+	// node, which a controller then reaches by address alone.
+	Off bool
 	// HostName, when set, is the SRV target of every record
 	// (mdns.Zeroconf.HostName, without ".local"); empty is the name the
 	// advertiser derives from the interface's MAC.
@@ -29,7 +29,7 @@ type MDNSFinding = mdns.Finding
 type MDNSService = mdns.Service
 
 // defaultAdvertiser is the advertiser of a nil Config.Advertiser: Zeroconf
-// with the subtype responder, or Noop when Network.MDNS.Disabled. The
+// with the subtype responder, or Noop when Network.MDNS.Off. The
 // subtype responder is what answers the `_L<discriminator>._sub` browse
 // every commissioner filtering by discriminator sends (chip-tool's
 // `pairing onnetwork-long`, Apple Home, Google Home); a responder that
@@ -42,7 +42,7 @@ type MDNSService = mdns.Service
 // advertises through it unless the host configures otherwise.
 func (n *Node) defaultAdvertiser() mdns.Advertiser {
 	m := n.cfg.Network.MDNS
-	if m.Disabled {
+	if m.Off {
 		return mdns.NewNoop()
 	}
 	zc := mdns.NewZeroconf()

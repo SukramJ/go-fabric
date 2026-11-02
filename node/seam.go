@@ -14,6 +14,9 @@ func init() {
 		if !ok || c == nil || open == nil {
 			return false
 		}
+		if c.Client == nil {
+			c.Client = &ClientConfig{}
+		}
 		c.Client.open = open
 		return true
 	}

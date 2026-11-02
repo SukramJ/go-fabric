@@ -22,7 +22,7 @@ func TestControllerConfigOnTheSite(t *testing.T) {
 	t.Parallel()
 	site := fabrictest.NewSite(t, fabrictest.Options{})
 	cfg := daemonConfig()
-	cfg.Client = node.Client{Enabled: true, Listen: "[::]:5541"}
+	cfg.Client = &node.ClientConfig{Listen: "[::]:5541"}
 	dev := site.AddNode(cfg)
 	ccfg := site.ControllerConfig(fabrictest.ControllerOptions{Label: "site", Attestation: attestation.TestStore()})
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)

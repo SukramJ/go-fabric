@@ -36,7 +36,7 @@ const timeSyncFeatures = tsdef.FeatureTimeZone | tsdef.FeatureNtpClient | tsdef.
 func aheadNode(t *testing.T, ts *node.TimeSynchronizationConfig, p surface.Policies) (*node.Node, error) {
 	t.Helper()
 	cfg := minimalConfig(openDB(t, filepath.Join(t.TempDir(), "ahead.db")))
-	cfg.TimeSynchronization, cfg.Surface = ts, p
+	cfg.TimeSynchronization.Config, cfg.Surface = ts, p
 	n, err := node.New(context.Background(), cfg)
 	if err == nil {
 		t.Cleanup(func() { _ = n.Stop(context.Background()) })

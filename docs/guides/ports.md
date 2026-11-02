@@ -73,7 +73,7 @@ these interfaces does not drag the host's dependencies into the module.
 | Field | What it does | When nil or zero |
 | --- | --- | --- |
 | `Store` | `Path` (a SQLite file the node opens and closes), `DB`, or both `Credentials` and `Endpoints` | `New` refuses the configuration |
-| `Advertiser` | publishes the node over DNS-SD | the node's own `mdns.Zeroconf` with the subtype responder, shaped by `Network.MDNS`; with `Network.MDNS.Disabled` it is `mdns.NewNoop()`: nothing is discoverable, and the bridge logs `matter.mdns.commissioning_not_advertised` |
+| `Advertiser` | publishes the node over DNS-SD | the node's own `mdns.Zeroconf` with the subtype responder, shaped by `Network.MDNS`; with `Network.MDNS.Off` it is `mdns.NewNoop()`: nothing is discoverable, and the bridge logs `matter.mdns.commissioning_not_advertised` |
 | `Attestation` | DAC, PAI and Certification Declaration; `Files` names them on disk and `New` loads them | the CSA test chain and test CD: pairable everywhere, not shippable |
 | `Health` | the listener probe on the node's clock; `Node.Health` returns the last verdict | no probe |
 | `OTA` (`OtaConfig`) | mounts the OTA Software Update Requestor; `Applier` carries out an update | no requestor. A nil `Applier` is the facade's own, which validates the image and keeps it under `Dir/applied` |

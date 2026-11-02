@@ -83,7 +83,7 @@ func TestTimeSynchronizationOptional(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			cfg := minimalConfig(openDB(t, filepath.Join(t.TempDir(), "node.db")))
-			cfg.DisableTimeSynchronization = disable
+			cfg.TimeSynchronization.Off = disable
 			n := newNode(t, cfg)
 			if (n.Root().TimeSynchronization == nil) != disable {
 				t.Errorf("Root().TimeSynchronization = %v with DisableTimeSynchronization %v", n.Root().TimeSynchronization, disable)

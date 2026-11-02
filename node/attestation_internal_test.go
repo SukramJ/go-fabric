@@ -92,7 +92,7 @@ func TestAttestationBlocksCommissioning(t *testing.T) {
 	files, _, _ := writeChainFiles(t)
 	files.CDPath = filepath.Join(t.TempDir(), "missing.der")
 	cfg := mdnsTestConfig(t)
-	cfg.Network.MDNS.Disabled = true
+	cfg.Network.MDNS.Off = true
 	cfg.Attestation = Attestation{Files: &files, BlockCommissioningOnError: true}
 	n := newMDNSTestNode(t, cfg)
 	if n.AttestationError() == nil {

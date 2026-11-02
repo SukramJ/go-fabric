@@ -54,7 +54,7 @@ func TestHealthProbeSamplesOnTheNodesClock(t *testing.T) {
 	log := &sampleLog{}
 	cfg := minimalConfig(openDB(t, filepath.Join(t.TempDir(), "n.db")))
 	cfg.Clock = fake
-	cfg.Health = node.Health{Interval: 10 * time.Second}
+	cfg.Health = &node.Health{Interval: 10 * time.Second}
 	n := newNode(t, cfg)
 	n.OnHealthSample(log.add)
 	// The queued variant of the one callback rule (ADR 0025 principle 8)
@@ -105,7 +105,7 @@ func TestHealthProbeOff(t *testing.T) {
 		t.Fatal("a sample without a probe")
 	}
 	cfg := minimalConfig(openDB(t, filepath.Join(t.TempDir(), "m.db")))
-	cfg.Health.Interval = -time.Second
+	cfg.Health = &node.Health{Interval: -time.Second}
 	if err := cfg.Validate(); err == nil {
 		t.Fatal("a negative Health.Interval validated")
 	}

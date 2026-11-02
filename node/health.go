@@ -23,14 +23,12 @@ const DefaultProbeInterval = bridge.DefaultProbeInterval
 // from [Node.Start] to [Node.Stop] the node checks its operational
 // listener on [Config].Clock and hands each verdict to the callbacks
 // [Node.OnHealthSample] registered; [Node.Health] returns the last one.
-// The probe runs when Interval is positive; the zero value runs none.
+// A non-nil [Config].Health runs the probe, an optional sub-system (ADR
+// 0025 principle 2).
 type Health struct {
-	// Interval is the probe cadence.
+	// Interval is the probe cadence; 0 is [DefaultProbeInterval].
 	Interval time.Duration
 }
-
-// enabled reports whether the configuration asks for a probe.
-func (h Health) enabled() bool { return h.Interval > 0 }
 
 // healthProbe is the node's probe: the last sample and the host's
 // callbacks, behind the bridge's HealthRecorder.
@@ -63,7 +61,7 @@ func (p *healthProbe) record(s HealthSample) {
 // it once the bridge's listener is bound.
 func (n *Node) startHealthProbe() {
 	h := n.cfg.Health
-	if !h.enabled() {
+	if h == nil {
 		return
 	}
 	p := &healthProbe{onSample: func(s HealthSample) { n.healthListeners.emit(n.logger, "health_sample", s) }}

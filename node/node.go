@@ -164,7 +164,7 @@ type Node struct {
 //
 // Nothing is left as a noop except what the configuration omits on
 // purpose: a nil Advertiser is the node's own (Zeroconf with the subtype
-// responder, or Noop under Network.MDNS.Disabled), a nil OTA
+// responder, or Noop under Network.MDNS.Off), a nil OTA
 // mounts no OTA requestor. The TestEventTrigger enable key is not armed
 // (Root().GeneralDiagnostics.EnableTestEventTriggers is the host's), and
 // SetOnReassembled stays the bridge's nil-safe hook for the host (a
@@ -392,7 +392,7 @@ func New(ctx context.Context, cfg Config) (*Node, error) { //nolint:funlen // th
 	}, 0)
 
 	// --- the client stack and the binding manager (brief AO) -------------
-	if cfg.Client.Enabled {
+	if cfg.Client != nil {
 		if n.client, err = n.newClientStack(); err != nil {
 			return nil, err
 		}

@@ -206,11 +206,11 @@ func measureTimeSynchronization(t *testing.T, row string, with bool) surface.Clu
 		},
 		Store:   node.Store{DB: db},
 		Logger:  slog.New(slog.DiscardHandler),
-		Network: node.Network{Listen: "127.0.0.1:0", PreferIPv4: true, MDNS: node.MDNS{Disabled: true}},
+		Network: node.Network{Listen: "127.0.0.1:0", PreferIPv4: true, MDNS: node.MDNS{Off: true}},
 		Surface: surface.Policies{Extensions: surface.NewExtensions(row)},
 	}
 	if with {
-		cfg.TimeSynchronization = &node.TimeSynchronizationConfig{Features: tsdef.Feature(core.TimeSynchronizationAhead[row].Features)}
+		cfg.TimeSynchronization.Config = &node.TimeSynchronizationConfig{Features: tsdef.Feature(core.TimeSynchronizationAhead[row].Features)}
 	}
 	n, err := node.New(context.Background(), cfg)
 	if err != nil {

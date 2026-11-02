@@ -102,7 +102,7 @@ type Device struct {
 	cfg     node.Config
 	running bool
 	// names is the client stack's DNS-SD cache, answered by the site;
-	// built at the first start with node.Client.Enabled, kept across
+	// built at the first start with a non-nil node.Config.Client, kept across
 	// restarts and closed with the site.
 	names *discovery.Names
 	// group counts the work in hand of every node the device runs
@@ -131,7 +131,7 @@ func (s *Site) AddDevice(topo Topology) *Device {
 // one its daemon composes for node.New — starts it and returns it, so the
 // test runs the program's composition on the site. The site puts its own
 // parts in: its network (the node's listen address and, with
-// cfg.Client.Enabled, its client socket and DNS-SD cache), its clock with
+// a non-nil cfg.Client, its client socket and DNS-SD cache), its clock with
 // the host's in-flight counters, an advertiser whose records the site
 // answers DNS-SD with, the site's logger when cfg has none, and a store of
 // its own when cfg.Store states none (the program's store, a Path or a
@@ -278,7 +278,7 @@ func (d *Device) config() node.Config {
 	}
 	i := strconv.Itoa(d.index)
 	cfg := node.Config{
-		Network: node.Network{Listen: "[::1]:0", DisableReannounce: true},
+		Network: node.Network{Listen: "[::1]:0", Reannounce: node.Reannounce{Off: true}},
 		Commissioning: node.Commissioning{
 			Passcode: DefaultPasscode, Discriminator: DefaultDiscriminator,
 			PBKDFIterations: DefaultPBKDFIterations, Salt: defaultSalt,
@@ -300,7 +300,7 @@ func (d *Device) config() node.Config {
 	if cfg.Advertiser == nil {
 		cfg.Advertiser = mdns.NewNoop()
 	}
-	if cfg.Client.Enabled {
+	if cfg.Client != nil {
 		d.siteClient(&cfg)
 	}
 	return cfg
@@ -312,15 +312,17 @@ func (d *Device) programConfig() node.Config {
 	cfg := *d.base
 	cfg.Store = d.store
 	cfg.Network.Listen = "[::1]:0"
-	cfg.Network.DisableReannounce = true
+	cfg.Network.Reannounce.Off = true
 	cfg.Network.TCP = node.TCPConfig{}
 	cfg.Advertiser = mdns.NewNoop()
 	if cfg.Logger == nil {
 		cfg.Logger = d.site.log
 	}
 	cfg.Clock = d.site.hostClock(d.group)
-	if cfg.Client.Enabled {
-		cfg.Client.Names, cfg.Client.Listen = nil, ""
+	if cfg.Client != nil {
+		c := *cfg.Client
+		c.Names, c.Listen = nil, ""
+		cfg.Client = &c
 		d.siteClient(&cfg)
 	}
 	return cfg
@@ -332,6 +334,10 @@ func (d *Device) programConfig() node.Config {
 // clientPort (on loopback a real socket on [::1]). A Names the topology
 // set stays the topology's.
 func (d *Device) siteClient(cfg *node.Config) {
+	// The site's settings go into a copy: the topology's ClientConfig
+	// stays as it set it.
+	c := *cfg.Client
+	cfg.Client = &c
 	if cfg.Client.Names == nil {
 		d.mu.Lock()
 		if d.names == nil {
@@ -356,7 +362,7 @@ func (d *Device) siteClient(cfg *node.Config) {
 
 // Peers is the node's client stack ([node.Node.Peers]): the nodes of its
 // fabrics it reaches as a client, on the site. Nil unless the topology's
-// Configure set node.Client.Enabled.
+// Configure set a non-nil node.Config.Client.
 func (d *Device) Peers() *peer.Set { return d.Node().Peers() }
 
 // Stop stops the node; its store and address stay the device's. A

@@ -306,7 +306,7 @@ func TestLiveBinding(t *testing.T) {
 	var sw *device.OnOffLightSwitch
 	dutLog := &reasonLog{}
 	dut := startBindNode(t, "dut", func(c *node.Config) {
-		c.Client = node.Client{Enabled: true, Listen: "127.0.0.1:0", Names: dutNames}
+		c.Client = &node.ClientConfig{Listen: "127.0.0.1:0", Names: dutNames}
 		c.Logger = slog.New(dutLog)
 	}, func(n *node.Node) error {
 		var err error

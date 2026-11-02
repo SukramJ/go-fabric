@@ -283,7 +283,7 @@ func compose(ctx context.Context, f flags, logger *slog.Logger, passcode uint32,
 	cfg.Surface = policies
 	// The listener's verdict every probe interval (node.Config.Health),
 	// logged when it fails (Node.OnHealthSample, registered after New).
-	cfg.Health.Interval = node.DefaultProbeInterval
+	cfg.Health = &node.Health{Interval: node.DefaultProbeInterval}
 	applyTestWiFi(&cfg, f, devices)
 	applyMetrics(&cfg, f.metricsExpvar)
 	if dump != nil {
@@ -293,7 +293,7 @@ func compose(ctx context.Context, f flags, logger *slog.Logger, passcode uint32,
 		// path installs a topology), on a loopback port the system
 		// assigns.
 		cfg.Store = node.Store{DB: dump.db}
-		cfg.Network.MDNS = node.MDNS{Disabled: true}
+		cfg.Network.MDNS = node.MDNS{Off: true}
 		cfg.Network.Listen, cfg.Network.PreferIPv4 = "127.0.0.1:0", true
 	}
 	if f.otaProvider {
@@ -438,7 +438,7 @@ func nodeConfig(f flags, passcode uint32, discriminator uint16, tcp node.TCPConf
 // --advertise=false, the OS host name as SRV target under
 // --mdns-os-hostname.
 func mdnsConfig(f flags) node.MDNS {
-	m := node.MDNS{Disabled: !f.advertise}
+	m := node.MDNS{Off: !f.advertise}
 	if f.osHostName {
 		if h, err := os.Hostname(); err == nil && h != "" {
 			m.HostName = strings.TrimSuffix(h, ".local")

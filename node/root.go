@@ -71,7 +71,7 @@ type RootClusters struct {
 	WiFiNetworkCommissioning *mattercore.WiFiNetworkCommissioning
 	GeneralDiagnostics       *mattercore.GeneralDiagnostics
 	DiagnosticLogs           *mattercore.DiagnosticLogs
-	// TimeSynchronization is nil when [Config].DisableTimeSynchronization
+	// TimeSynchronization is nil when [Config].TimeSynchronization.Off
 	// is set.
 	TimeSynchronization    *mattercore.TimeSynchronization
 	OperationalCredentials *mattercore.OperationalCredentials
@@ -320,7 +320,7 @@ func buildRoot(ctx context.Context, d rootDeps) (*RootClusters, error) { //nolin
 		}
 	}
 
-	if wifi := cfg.Network.WiFi; wifi.Reporter != nil {
+	if wifi := cfg.Network.WiFi; wifi != nil && wifi.Reporter != nil {
 		r.WiFiNetworkDiagnostics, err = mattercore.NewWiFiNetworkDiagnostics(mattercore.WiFiNetworkDiagnosticsConfig{
 			Reporter: wifi.Reporter, Features: wifi.Features, Attributes: wifi.Attributes,
 		})
@@ -590,15 +590,15 @@ func (unknownEthernet) CarrierDetect() (carrier, ok bool)       { return false, 
 func (unknownEthernet) TimeSinceReset() (uint64, bool)          { return 0, false }
 
 // timeSynchronization builds the root TimeSynchronization: without
-// features, or with [Config].TimeSynchronization's on the node's store;
-// nil with DisableTimeSynchronization.
+// features, or with [Config].TimeSynchronization.Config's on the node's store;
+// nil with TimeSynchronization.Off.
 // GeneralDiagnostics takes its UTC clock.
 func (d rootDeps) timeSynchronization(cfg *Config, gd *mattercore.GeneralDiagnostics) (*mattercore.TimeSynchronization, error) {
-	if cfg.DisableTimeSynchronization {
+	if cfg.TimeSynchronization.Off {
 		return nil, nil
 	}
 	ts := mattercore.NewTimeSynchronization()
-	if tc := cfg.TimeSynchronization; tc != nil {
+	if tc := cfg.TimeSynchronization.Config; tc != nil {
 		c := *tc
 		c.Store, c.Logger = d.st, cmp.Or(c.Logger, d.logger)
 		var err error

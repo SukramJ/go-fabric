@@ -71,10 +71,10 @@ func AheadRows() []string {
 // [Network].WiFiCommissioning, Ethernet otherwise.
 func rootFeatures(cfg *Config) map[uint32]uint32 {
 	out := map[uint32]uint32{}
-	if !cfg.DisableTimeSynchronization {
+	if !cfg.TimeSynchronization.Off {
 		var f uint32
-		if cfg.TimeSynchronization != nil {
-			f = uint32(cfg.TimeSynchronization.Features)
+		if tc := cfg.TimeSynchronization.Config; tc != nil {
+			f = uint32(tc.Features)
 		}
 		out[tsdef.ClusterID] = f
 	}
@@ -148,9 +148,9 @@ func composeRoot(cfg *Config) ([]surface.Decision, []surface.Element, error) {
 			// TimeSynchronization can lose a feature here.
 			continue
 		}
-		ts := *cfg.TimeSynchronization
+		ts := *cfg.TimeSynchronization.Config
 		ts.Features &^= tsdef.Feature(e.ID)
-		cfg.TimeSynchronization = &ts
+		cfg.TimeSynchronization.Config = &ts
 	}
 	return decisions, cands, nil
 }

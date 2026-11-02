@@ -36,12 +36,12 @@ func newMDNSTestNode(t *testing.T, cfg Config) *Node {
 	return n
 }
 
-// A nil Advertiser is Zeroconf, Noop under Network.MDNS.Disabled; a host's
+// A nil Advertiser is Zeroconf, Noop under Network.MDNS.Off; a host's
 // advertiser stays the host's. The nodes are never started: nothing is
 // published.
 func TestDefaultAdvertiser(t *testing.T) {
 	cfg := mdnsTestConfig(t)
-	cfg.Network.MDNS.Disabled = true
+	cfg.Network.MDNS.Off = true
 	n := newMDNSTestNode(t, cfg)
 	if _, ok := n.advertiser.(*mdns.Noop); !ok || !n.ownsAdvertiser {
 		t.Fatalf("Disabled: advertiser %T, want the node's *mdns.Noop", n.advertiser)

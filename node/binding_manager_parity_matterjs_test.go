@@ -220,7 +220,9 @@ func newBQSwitch(t *testing.T, o bqOptions) *bqSwitch {
 		Bridged: bridged,
 		Configure: func(cfg *node.Config) {
 			cfg.Logger = slog.New(&bqHandler{log: b.log})
-			cfg.Client.Enabled = o.client
+			if o.client {
+				cfg.Client = &node.ClientConfig{}
+			}
 		},
 		Prepare: o.prepare,
 	}})

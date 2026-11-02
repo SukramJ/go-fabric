@@ -240,7 +240,7 @@ func testNodeWith(t *testing.T, f *fleet, path string, edit func(*node.Config)) 
 	if err != nil {
 		t.Fatalf("NewActions: %v", err)
 	}
-	// advertise is false: the node publishes nothing (Network.MDNS.Disabled).
+	// advertise is false: the node publishes nothing (Network.MDNS.Off).
 	cfg := nodeConfig(flags{dbPath: path, listen: "127.0.0.1:0", label: "fleet-test", salt: "go-fabric-ref-salt", iterations: 1000},
 		20202021, 3840, node.TCPConfig{}, applier, actions, logger)
 	if edit != nil {

@@ -299,7 +299,7 @@ func TestSurfaceRootChangeRaisesTheRootAlone(t *testing.T) {
 	startRun(t, db, surface.Policies{}, nil, light(t, "light", nil)).stop(t)
 	p := surface.Policies{Extensions: surface.NewExtensions(timeSyncRow)}
 	run := startRun(t, db, p, func(c *node.Config) {
-		c.TimeSynchronization = &node.TimeSynchronizationConfig{Features: timeSyncFeatures}
+		c.TimeSynchronization.Config = &node.TimeSynchronizationConfig{Features: timeSyncFeatures}
 	}, light(t, "light", &p))
 	if got := rootVersion(t, run.n); got != 2 {
 		t.Errorf("root ConfigurationVersion %d, want 2", got)

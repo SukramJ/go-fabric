@@ -181,7 +181,7 @@ with `node.ErrInvalidConfig` when any check fails. It checks:
 - `SupportedFabrics` is at most 254;
 - `UniqueID` is at most 32 bytes;
 - `LocationCapability` is a valid regulatory location;
-- `Network.ReannounceInterval` is not negative;
+- `Network.Reannounce.Interval` is not negative;
 - `OTA.Dir` is set when `OTA` is;
 - `TLS.CertificatePort` is set when `TLS` is.
 
@@ -196,11 +196,11 @@ Defaults worth knowing:
 | Field | Zero value means |
 | --- | --- |
 | `Network.Listen` | `:5540` |
-| `Advertiser` | the node's own `mdns.Zeroconf` with the subtype responder; `Network.MDNS.Disabled` makes it `mdns.NewNoop()`, and nothing can discover the node |
-| `Network.MDNS` | Zeroconf with the subtype responder, SRV target from the interface's MAC; `Disabled` publishes nothing, `HostName` sets the SRV target |
+| `Advertiser` | the node's own `mdns.Zeroconf` with the subtype responder; `Network.MDNS.Off` makes it `mdns.NewNoop()`, and nothing can discover the node |
+| `Network.MDNS` | Zeroconf with the subtype responder, SRV target from the interface's MAC; `Off` publishes nothing, `HostName` sets the SRV target |
 | `Store.Path` | unused; set, the node opens that SQLite file (modernc.org/sqlite, foreign keys on, 5 s busy timeout) and `Stop` closes it |
 | `Attestation.Files` | unused; set, `New` loads the vendor chain and fails when it does not load (files naming nothing keep the test chain); with `BlockCommissioningOnError` it runs on the test chain instead, commissioning refused, the error in `Node.AttestationError` |
-| `Health` | no probe; a positive `Interval` runs it from `Start` to `Stop`, `Node.OnHealthSample` receives every verdict, `Node.Health` returns the last one |
+| `Health` | nil runs no probe; set, it runs from `Start` to `Stop` every `Interval` (0 is 30 s), `Node.OnHealthSample` receives every verdict, `Node.Health` returns the last one |
 | `BootID.RotateUniqueIDs` | stable UniqueIDs; set, every UniqueID rotates per process (development only, process-wide) |
 | `DeviceTypeValidation` | matter.js's warn mode |
 | `SupportedFabrics` | 5 (matter.js defaults to 254) |
@@ -209,9 +209,12 @@ Defaults worth knowing:
 | `BasicInformation.UniqueID` | derived on the first boot and pinned in the store |
 | `Locales` | `en-US` alone |
 | `Logger` | `slog.Default()` |
+| `Client` | nil runs no client stack; set, the node opens its client socket and peers for its Binding entries |
+| `Network.Reannounce` | the DNS-SD records re-published every 30 min while the advertiser is Zeroconf; `Off` stops the loop, `Interval` sets the cadence |
+| `Network.WiFi` | nil mounts no WiFiNetworkDiagnostics; set, its `Reporter` (required) serves it |
 | `Sessions` | the Matter MRP intervals (500 ms idle, 300 ms active, 4000 ms active threshold); set, the PASE and CASE session parameters and the operational record carry the node's own (`node.SessionIntervals`, whole milliseconds, the threshold at most 65535 ms); `Node.SessionParameters` returns what the node reports ([Limits](../guides/limits.md#transport-and-reliability)) |
 | `Limits.BDXAdditionalMrpDelay` | no margin; set, the exchange of every inbound BDX transfer (an OTA requestor's download) adds it to the peer's MRP base interval, as matter.js's `bdxAdditionalMrpDelay` does |
-| `TimeSynchronization` | UTCTime and Granularity alone; set, the root TimeSynchronization serves the TZ, NTPC, NTPS and TSC features it names, after connectedhomeip ([Time synchronization](#time-synchronization)) |
+| `TimeSynchronization` | mounted, UTCTime and Granularity alone; `Off` leaves it off the root, `Config` serves the TZ, NTPC, NTPS and TSC features it names, after connectedhomeip ([Time synchronization](#time-synchronization)) |
 | `TLS` | no TLS servers; set, TlsCertificateManagement and TlsClientManagement mount on endpoint 0 (`node.TLSConfig`: the `CertificatePort`, per-fabric maxima defaulting to chip's 5, the stores defaulting to the node's) and every camera's PushAvStreamTransport without its own TLS lookups validates against them ([Camera](../guides/camera.md#the-transport-model)) |
 
 *Source: `node/config.go:37-205`, `node/config.go:303-365`, `node/config.go:466-524`, `node/node.go:131-148`.*
@@ -410,7 +413,7 @@ its configured attestation chain.
 ## Time synchronization
 
 The root's TimeSynchronization serves UTCTime from the node's clock and
-Granularity. `Config.TimeSynchronization` adds the features after
+Granularity. `Config.TimeSynchronization.Config` adds the features after
 connectedhomeip (`TimeSynchronizationCluster.cpp` at `6170af84`;
 matter.js's server is the generated behaviour):
 

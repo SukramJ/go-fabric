@@ -30,7 +30,7 @@ still held there. Each row names the facade route, or the section of
 | `secure/operational` | `Manager` (`daemon_matter.go:153`, `:1193`) | `node.SessionManager` (the same type) |
 | `im/subscription` | `Manager` (`daemon_matter.go:154`, `:1194`) | `node.SubscriptionManager` (the same type); [`im/subscription`](advanced-seams.md#imsubscription) |
 | `secure/attestation` | `LoadChainFiles`, `ChainFiles`, `ErrNoChainConfigured` (`daemon_matter.go:318`, `:329`) | `Config.Attestation.Files` (`node.AttestationFiles`); loom starts on a chain that does not load and blocks commissioning (`daemon_matter.go:480-491`, `:552-554`): `Attestation.BlockCommissioningOnError`, the error in `Node.AttestationError`. Files naming nothing keep the test chain, so `ErrNoChainConfigured` has no counterpart |
-| `mdns` | `NewZeroconf`, `NewSubtypeResponder`, `NewNoop`, `Advertiser` (`daemon_matter.go:81-121`) | a nil `Config.Advertiser`; `Network.MDNS{Disabled}` for loom's `noop` |
+| `mdns` | `NewZeroconf`, `NewSubtypeResponder`, `NewNoop`, `Advertiser` (`daemon_matter.go:81-121`) | a nil `Config.Advertiser`; `Network.MDNS{Off}` for loom's `noop` |
 | `mdns` | `IsEnabled` (`daemon_matter.go:1263`), `Diagnose` (`:1289`), `Advertiser.Active` (`:1265`) | `Node.MDNSEnabled`, `Node.DiagnoseMDNS`, `Node.MDNSServices` (`node.MDNSFinding`, `node.MDNSService`) |
 | `endpoint` | `SourceKey` (`internal/store/matterendpoint/sourcekey.go:68`), `Topology` (`daemon_matter.go:916`) | `device.SourceKey`, `node.Topology`; a source's availability (`assembler.go:861`) is `Device.SetReachable` |
 | `endpoint` | `Assembler`, `New`, `Spec` (`assembler.go:155`, `:184`, `:627`); `endpoint/sqlitestore` (`internal/store/matterendpoint/store.go:10`) | the node's Aggregator with partitions (`Aggregator.Partition`, `Batch`) and the device kit; a host with an assembler of its own stays on [`endpoint`](advanced-seams.md#endpoint) |
@@ -57,6 +57,7 @@ facade one shape. Each row names what a host writes now.
 | `device.Logger` | `device.Options.Logger` per device (nil is `slog.Default()`) |
 | `device.WithServer`, `device.Option`, `device.TypeByID` | `device.HostServer(srv)`; `device.Declaration`; `device.Lookup(uint32(id))` |
 | `Node.PairingCodes`, `Aggregator.IncreaseConfigurationVersion`, `WindowCredentials.Iterations`, `Commissioning.PBKDFIterations int` | `Node.SetupPayload()` (`.QR`, `.Manual`); `Aggregator.IncreaseConfigurationVersions(ctx, keys...)` (`node.ErrNotStarted` before `Start`); `WindowCredentials.PBKDFIterations`; `Commissioning.PBKDFIterations uint32` |
+| `node.Client` (`Enabled`), `Config.DisableTimeSynchronization`, `Config.TimeSynchronization *TimeSynchronizationConfig`, `Network.ReannounceInterval`, `Network.DisableReannounce`, `MDNS.Disabled`, `Config.Health Health`, `Network.WiFi WiFi` | `Config.Client *ClientConfig` (nil off); `Config.TimeSynchronization{Off, Config}`; `Network.Reannounce{Interval, Off}`; `MDNS.Off`; `Config.Health *Health` (nil off); `Network.WiFi *WiFi` (nil off) |
 
 ## Changed in the next release: `CommissionerReach` takes the peer
 
@@ -356,7 +357,7 @@ groups follow the deprecation table the README carried until `v0.9.x`.
 2. **A nil `Config.Advertiser` advertises.** Up to `v0.9.0` it was
    `mdns.NewNoop()`; now the node builds Zeroconf with the subtype
    responder. A host that relied on the old default sets
-   `Network.MDNS.Disabled`.
+   `Network.MDNS.Off`.
 3. **Accessor return types** of the typed cluster layer change, landing in
    `v0.10.0`.
 4. **A DoorLock without a feature selection has none** ([Changed](#changed-in-v0100-one-shape-gate-2)):

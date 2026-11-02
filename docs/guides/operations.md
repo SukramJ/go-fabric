@@ -79,7 +79,7 @@ on UDP 5353, which is how it shares the port.
 
 A host that already runs avahi-daemon keeps it: this project's own
 chip-tool harness runs the node on hosts with a running avahi-daemon. A
-host that must not answer mDNS sets `Network.MDNS.Disabled`; no controller
+host that must not answer mDNS sets `Network.MDNS.Off`; no controller
 then discovers the node, and a controller reaches it by address alone.
 `Node.MDNSServices()` lists what the node advertises now, and
 `Node.DiagnoseMDNS()` reports what would keep a controller from finding or

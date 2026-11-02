@@ -25,7 +25,7 @@ gate for these paths.
 | BDX transfer | a peer's BDX init on a secure session | one per exchange | `bridge.Stop` (cancelled and waited for, bounded by its context) |
 | BDX log transfer | a RetrieveLogsRequest answered over BDX | one at a time | `bridge.Stop` (DiagnosticLogs' `MatterQuiesce` cancels it and waits) |
 | Binding manager | the first binding work (`Node.Start` registers the entries) | on change | `Node.Stop` |
-| Client stack socket | `node.New` with `Config.Client.Enabled` | per datagram | `Node.Stop` |
+| Client stack socket | `node.New` with a non-nil `Config.Client` | per datagram | `Node.Stop` |
 
 `node.New` starts no goroutine of its own (only the opt-in client stack
 opens its socket there): a node built and dropped leaks nothing it began.

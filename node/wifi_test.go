@@ -57,7 +57,7 @@ func TestWiFiDiagnostics(t *testing.T) {
 			t.Parallel()
 			cfg := minimalConfig(openDB(t, filepath.Join(t.TempDir(), "node.db")))
 			if wifi {
-				cfg.Network.WiFi = node.WiFi{Reporter: wifiLink{}, Features: wifidiagdef.FeaturePacketCounts | wifidiagdef.FeatureErrorCounts}
+				cfg.Network.WiFi = &node.WiFi{Reporter: wifiLink{}, Features: wifidiagdef.FeaturePacketCounts | wifidiagdef.FeatureErrorCounts}
 			}
 			n := newNode(t, cfg)
 			if (n.Root().WiFiNetworkDiagnostics != nil) != wifi {

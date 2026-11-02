@@ -20,7 +20,7 @@ func TestBootIDRotation(t *testing.T) {
 		calls := 0
 		enableBootIDRotation = func() { calls++ }
 		cfg := mdnsTestConfig(t)
-		cfg.Network.MDNS.Disabled = true
+		cfg.Network.MDNS.Off = true
 		cfg.BootID.RotateUniqueIDs = rotate
 		n := newMDNSTestNode(t, cfg)
 		want := 0
