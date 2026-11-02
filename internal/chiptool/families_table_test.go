@@ -229,6 +229,15 @@ const (
 	// and CommodityMetering.
 	dtElectricalEnergyTariff = 0x0513
 	dtElectricalMeter        = 0x0514
+	// dtElectricalSensor is the ElectricalSensor part of the reference
+	// EV charger (examples/reference-bridge/fleet_evse.go) and of the grid
+	// meter (fleet_energy_market.go): ElectricalPowerMeasurement,
+	// ElectricalEnergyMeasurement and PowerTopology. The charger's is the
+	// first endpoint advertising it.
+	dtElectricalSensor = 0x0510
+	// dtLaundryDryer is the reference dryer
+	// (examples/reference-bridge/fleet_kitchen.go): LaundryDryerControls.
+	dtLaundryDryer = 0x007C
 	// dtClosurePanel is the reference daemon's closure panel
 	// (examples/reference-bridge/fleet_closure.go): ClosureDimension.
 	dtClosurePanel = 0x0231
@@ -254,7 +263,7 @@ var endpointDeviceTypes = []uint32{
 	dtSmokeCOAlarm, dtPump, dtFlowSensor, dtLaundryWasher, dtRVC, dtThermostat, dtWindowCovering,
 	dtDoorLock, dtHumiditySensor, dtOccupancySensor, dtContactSensor, dtGenericSwitch, dtAirPurifier, dtClosure,
 	dtTempControlledCabinet, dtAirQualitySensor, dtWaterHeater, dtElectricalUtilityMeter, dtRefrigerator, dtDishwasher, dtMicrowaveOven, dtOven, dtEnergyEvse, dtDeviceEnergyManagement, dtClosurePanel, dtSoilSensor, dtElectricalEnergyTariff, dtElectricalMeter,
-	dtCastingVideoPlayer, dtContentApp,
+	dtCastingVideoPlayer, dtContentApp, dtElectricalSensor, dtLaundryDryer,
 }
 
 // pseudoEndpoints are the keys that name an endpoint by its position: the
@@ -636,7 +645,26 @@ var chipFamilies = []family{
 	// energy-gateway app does (examples/reference-bridge/
 	// fleet_energy_market.go).
 	{name: "SETRF", deviceType: dtElectricalEnergyTariff},
+	{name: "SEPR", deviceType: dtElectricalEnergyTariff},
 	{name: "COMMTR", deviceType: dtElectricalMeter},
+	{
+		name: "EEM", deviceType: dtElectricalMeter,
+		exclude: map[string]gap{
+			"2.2": {classHarness, "TC-EEM-2.2 starts a fake 1 kW load with the EnergyReporting test event trigger 0x0091000000000001 and stops it with 0x0091000000000000 (connectedhomeip EnergyReportingTestEventTriggerHandler.h:47-51 at 6170af84); the reference daemon offers no fake-readings trigger (examples/reference-bridge/control.go testEventTrigger), so the case's TestEventTrigger answers INVALID_COMMAND before any measurement is read", false},
+		},
+	},
+	{
+		name: "EPM", deviceType: dtElectricalMeter,
+		exclude: map[string]gap{
+			"2.2": {classHarness, "TC-EPM-2.2 starts a fake 1 kW load with the EnergyReporting test event trigger 0x0091000000000001 (connectedhomeip EnergyReportingTestEventTriggerHandler.h:47-51 at 6170af84); the reference daemon offers no fake-readings trigger (examples/reference-bridge/control.go testEventTrigger), so the case's TestEventTrigger answers INVALID_COMMAND before any measurement is read", false},
+		},
+	},
+	{
+		name: "PWRTL", deviceType: dtElectricalSensor,
+		exclude: map[string]gap{
+			"2.2": {classNotSupported, "TC-PWRTL-2.2 needs PowerTopology's ElectricalCircuit feature (has_feature(kElectricalCircuit), TC_PWRTL_2_2.py:76 at 6170af84), which the model at the matter.js pin does not define (parity/schema.json PowerTopology: NODE, TREE, SET, DYPF); the case skips itself (matter.js test/core/PWRTL.test.ts excludes it for the same reason)", true},
+		},
+	},
 	// EGC: ElectricalGridConditions on the energy tariff
 	// (fleet_energy_market.go, FORE); TC_EGC_2_2/2_3 drive it through the
 	// 0x00A0... triggers (TC_EGCTestBase.py:36-37 at the harness pin),
@@ -701,6 +729,13 @@ var chipFamilies = []family{
 	},
 	{name: "LVL", deviceType: dtColorTempLight},
 	{name: "LWM", deviceType: dtLaundryWasher},
+	{
+		name: "WASHERCTRL", deviceType: dtLaundryWasher,
+		exclude: map[string]gap{
+			"2.2": {classHarness, "TC-WASHERCTRL-2.2 step 6 writes NumberOfRinses 4, a value NumberOfRinsesEnum does not define, and expects INVALID_IN_STATE: chip decodes it to kUnknownEnumValue and refuses it as not a supported rinse (LaundryWasherControlsCluster.cpp:132-145 at 6170af84). matter.js refuses an undefined enum value as CONSTRAINT_ERROR before any server logic (UnknownEnumValueError, packages/protocol/src/action/errors.ts:99-103, thrown by conformance-compiler.ts:859-862 at 862ad75f), and this module answers as matter.js does", false},
+		},
+	},
+	{name: "DRYERCTRL", deviceType: dtLaundryDryer},
 	{
 		name: "MOD", deviceType: dtModeSelect,
 		edits: map[string][]edit{

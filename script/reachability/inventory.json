@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 7277,
+  "entry_points": 7262,
   "entry_packages": [
     ".",
     "bdx",
@@ -28428,35 +28428,28 @@
       "identifier": "TestInvokeParity_CommandHandler_FillsUpResponse",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/invoke_parity_test.go",
-      "line": 322
+      "line": 284
     },
     {
       "package": "im",
       "identifier": "TestInvokeParity_CommandSender_CommandRefAbsent",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/invoke_parity_test.go",
-      "line": 290
-    },
-    {
-      "package": "im",
-      "identifier": "TestInvokeParity_CommandSender_DuplicateCommandRefFails",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "im/invoke_parity_test.go",
-      "line": 278
+      "line": 252
     },
     {
       "package": "im",
       "identifier": "TestInvokeParity_CommandSender_ExtendableCallbackBatchCommandRefEcho",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/invoke_parity_test.go",
-      "line": 234
+      "line": 209
     },
     {
       "package": "im",
       "identifier": "TestInvokeParity_CommandSender_InvalidMessage",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/invoke_parity_test.go",
-      "line": 217
+      "line": 192
     },
     {
       "package": "im",
@@ -28485,13 +28478,6 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/invoke_parity_test.go",
       "line": 92
-    },
-    {
-      "package": "im",
-      "identifier": "TestInvokeParity_HandlerRejectMultipleIdenticalCommands_FUTURE",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "im/invoke_parity_test.go",
-      "line": 206
     },
     {
       "package": "im",
@@ -29559,6 +29545,13 @@
     },
     {
       "package": "internal/chiptool",
+      "identifier": "TestServedClustersHaveAFamily",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "internal/chiptool/surface_families_test.go",
+      "line": 103
+    },
+    {
+      "package": "internal/chiptool",
       "identifier": "TestWorkflowRunsEveryFamily",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "internal/chiptool/certifiability_doc_test.go",
@@ -29577,6 +29570,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "internal/paritytest/paritytest_test.go",
       "line": 8
+    },
+    {
+      "package": "internal/paritytest",
+      "identifier": "TestConformanceFailsOnUnmodelledForms",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "internal/paritytest/paritytest_test.go",
+      "line": 89
     },
     {
       "package": "internal/paritytest",

@@ -182,7 +182,11 @@ Harness image: `ghcr.io/matter-js/chip@sha256:d6f1de89d714309beb621543d451a98996
 | EWATERHTR | 3 | 3 | 0 | 0 | 0 | 0 | 0 |
 | MTRID | 2 | 2 | 0 | 0 | 0 | 0 | 0 |
 | SETRF | 4 | 4 | 0 | 0 | 0 | 0 | 0 |
+| SEPR | 3 | 2 | 0 | 0 | 1 | 0 | 0 |
 | COMMTR | 2 | 2 | 0 | 0 | 0 | 0 | 0 |
+| EEM | 5 | 1 | 0 | 0 | 3 | 1 | 0 |
+| EPM | 2 | 1 | 0 | 0 | 0 | 1 | 0 |
+| PWRTL | 2 | 1 | 0 | 0 | 1 | 0 | 0 |
 | EGC | 3 | 3 | 0 | 0 | 0 | 0 | 0 |
 | DEM | 11 | 9 | 0 | 0 | 2 | 0 | 0 |
 | DEMM | 2 | 2 | 0 | 0 | 0 | 0 | 0 |
@@ -194,6 +198,8 @@ Harness image: `ghcr.io/matter-js/chip@sha256:d6f1de89d714309beb621543d451a98996
 | I | 5 | 3 | 0 | 0 | 0 | 2 | 0 |
 | LVL | 10 | 8 | 0 | 0 | 1 | 1 | 0 |
 | LWM | 2 | 2 | 0 | 0 | 0 | 0 | 0 |
+| WASHERCTRL | 2 | 1 | 0 | 0 | 0 | 1 | 0 |
+| DRYERCTRL | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
 | MOD | 8 | 2 | 0 | 0 | 5 | 1 | 0 |
 | OCC | 5 | 5 | 0 | 0 | 0 | 0 | 0 |
 | OO | 8 | 4 | 0 | 0 | 2 | 2 | 0 |
@@ -235,7 +241,7 @@ Harness image: `ghcr.io/matter-js/chip@sha256:d6f1de89d714309beb621543d451a98996
 | MEDIAPLAYBACK | 11 | 5 | 0 | 0 | 2 | 4 | 0 |
 | TGTNAV | 2 | 1 | 0 | 0 | 0 | 1 | 0 |
 | WAKEONLAN | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
-| **all** | **692** | **391** | **0** | **4** | **126** | **166** | **5** |
+| **all** | **707** | **398** | **0** | **4** | **131** | **169** | **5** |
 
 ### Cases not run
 
@@ -420,7 +426,12 @@ Harness image: `ghcr.io/matter-js/chip@sha256:d6f1de89d714309beb621543d451a98996
 | DRLK/3.2 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | ECOINFO/2.1 | (c) harness | TC_ECOINFO_2_1.py runs against the fabric-sync app it starts itself (CI arguments, header lines 24-27: app: examples/fabric-admin/scripts/fabric-sync-app.py), not against a commissioned DUT |
 | ECOINFO/2.2 | (c) harness | TC_ECOINFO_2_2.py runs against the fabric-sync app it starts itself (CI arguments, header lines 24-27: app: examples/fabric-admin/scripts/fabric-sync-app.py), not against a commissioned DUT |
+| EEM/2.2 | (c) harness | TC-EEM-2.2 starts a fake 1 kW load with the EnergyReporting test event trigger 0x0091000000000001 and stops it with 0x0091000000000000 (connectedhomeip EnergyReportingTestEventTriggerHandler.h:47-51 at 6170af84); the reference daemon offers no fake-readings trigger (examples/reference-bridge/control.go testEventTrigger), so the case's TestEventTrigger answers INVALID_COMMAND before any measurement is read |
+| EEM/2.3 | (b) not supported | not applicable: the case's PICS `EEM.S & EEM.S.F02 & EEM.S.F01` is false for the reference DUT |
+| EEM/2.4 | (b) not supported | not applicable: the case's PICS `EEM.S & EEM.S.F03 & EEM.S.F00` is false for the reference DUT |
+| EEM/2.5 | (b) not supported | not applicable: the case's PICS `EEM.S & EEM.S.F03 & EEM.S.F01` is false for the reference DUT |
 | EEVSE/2.3 | (a) defect | TC-EEVSE-2.3 step 19 (eleven ChargingTargets in one day) expects RESOURCE_EXHAUSTED; the generated SetTargets decoder refuses the list at its `max 10` constraint with CONSTRAINT_ERROR before the server's own check (cluster/energy/evse.go, evseMaxTargetsPerDay) can answer, as matter.js does (CommandInvokeResponse.ts requestTlv.validate). notes/parity/matter_behaviour_findings.md, Certification harness, TC-EEVSE-2.3 |
+| EPM/2.2 | (c) harness | TC-EPM-2.2 starts a fake 1 kW load with the EnergyReporting test event trigger 0x0091000000000001 (connectedhomeip EnergyReportingTestEventTriggerHandler.h:47-51 at 6170af84); the reference daemon offers no fake-readings trigger (examples/reference-bridge/control.go testEventTrigger), so the case's TestEventTrigger answers INVALID_COMMAND before any measurement is read |
 | FAN/2.3 | (b) not supported | not applicable: the case's PICS `FAN.S.F02` is false for the reference DUT |
 | FAN/2.4 | (b) not supported | not applicable: the case's PICS `FAN.S.F03` is false for the reference DUT |
 | FAN/2.5 | (b) not supported | not applicable: the case's PICS `FAN.S & FAN.S.F05` is false for the reference DUT |
@@ -484,6 +495,7 @@ Harness image: `ghcr.io/matter-js/chip@sha256:d6f1de89d714309beb621543d451a98996
 | PS/2.2 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | PS/2.3 | (b) not supported | not applicable: the case's PICS `PWRTL.S` is false for the reference DUT |
 | PSCFG/2.2 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
+| PWRTL/2.2 | (b) not supported | TC-PWRTL-2.2 needs PowerTopology's ElectricalCircuit feature (has_feature(kElectricalCircuit), TC_PWRTL_2_2.py:76 at 6170af84), which the model at the matter.js pin does not define (parity/schema.json PowerTopology: NODE, TREE, SET, DYPF); the case skips itself (matter.js test/core/PWRTL.test.ts excludes it for the same reason) (runs, and skips itself) |
 | REFALM/2.3 | (b) not supported | not applicable: the case's PICS `REFALM.S & REFALM.S.M.LocalSuppress` is false for the reference DUT |
 | RH/2.2 | (c) harness | TC-RH-2.2 has an operator change the measured value between two reads (a UserPrompt under RH.M.ManuallyControlled); an unattended run has no operator, and the YAML case has no app-pipe step that would stand in |
 | S/2.3 | (b) not supported | not applicable: the case's PICS `S` is false for the reference DUT |
@@ -506,6 +518,7 @@ Harness image: `ghcr.io/matter-js/chip@sha256:d6f1de89d714309beb621543d451a98996
 | SC/4.9 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | SC/5.3 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | SC/6.1 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
+| SEPR/2.3 | (b) not supported | not applicable: the case's PICS `SEPR.S & SEPR.F00` is false for the reference DUT |
 | SU/1.1 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | SU/2.1 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | SU/2.3 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
@@ -540,6 +553,7 @@ Harness image: `ghcr.io/matter-js/chip@sha256:d6f1de89d714309beb621543d451a98996
 | TSTAT/4.4 | (b) not supported | not applicable: the case's PICS `TSTAT.S & TSTAT.S.F0b` is false for the reference DUT |
 | VALCC/3.2 | (b) not supported | TC-VALCC-3.2 runs only with the Level feature (PICS VALCC.S.F01=0: the daemon's valve is open/closed) (runs, and skips itself) |
 | VALCC/3.3 | (b) not supported | TC-VALCC-3.3 runs only with DefaultOpenLevel (PICS VALCC.S.A0006=0) (runs, and skips itself) |
+| WASHERCTRL/2.2 | (c) harness | TC-WASHERCTRL-2.2 step 6 writes NumberOfRinses 4, a value NumberOfRinsesEnum does not define, and expects INVALID_IN_STATE: chip decodes it to kUnknownEnumValue and refuses it as not a supported rinse (LaundryWasherControlsCluster.cpp:132-145 at 6170af84). matter.js refuses an undefined enum value as CONSTRAINT_ERROR before any server logic (UnknownEnumValueError, packages/protocol/src/action/errors.ts:99-103, thrown by conformance-compiler.ts:859-862 at 862ad75f), and this module answers as matter.js does |
 | WNCV/6.1.Simulated | (b) not supported | not applicable: the case's PICS `WNCV.C` is false for the reference DUT |
 | WNCV/7.1.Simulated | (b) not supported | not applicable: the case's PICS `WNCV.C` is false for the reference DUT |
 
@@ -563,13 +577,12 @@ whose family is not in that list is "not yet run", not "not supported".
 
 | Family | Why not | Class |
 | --- | --- | --- |
-| PWRTL, ILL, PRS, DISHM | the module serves the cluster (`cluster/measurement` PowerTopology, Illuminance and Pressure; `cluster/modebase` DishwasherMode), but the reference daemon exposes no endpoint with it and the harness does not run the family | (c) not yet run |
-| EEM, EPM | the module serves both clusters (`cluster/measurement`) and the reference daemon's ElectricalMeter carries them, but the harness does not run the families | (c) not yet run |
+| ILL, PRS, DISHM | the module serves the cluster (`cluster/measurement` Illuminance and Pressure; `cluster/modebase` DishwasherMode), but the reference daemon exposes no endpoint with it and the harness does not run the family | (c) not yet run |
 | CONCON, MESSAGES | the module serves ContentControl (`cluster/media`) and Messages (`cluster/core`), but chip has no case of either family at the harness pin | (c) no case |
 | ICDM, ICDB | not applicable to the reference daemon: it is mains-powered and sets no `node.Config.ICD`, so it serves no ICD Management (`ICDM.S` is false in its generated PICS). Applicable to a host that sets `Config.ICD`: the module then serves ICD Management and the Check-In protocol after matter.js ([ICD guide](./guides/icd.md)); the harness does not run the families against such a node | (b) not supported |
 | SC_TC, the BLE and Thread cases of DD and SC | Bluetooth, Thread | (d) out of scope |
 | CNET Thread cases | the device side has no Thread radio; the Thread NetworkCommissioning variant over a border router (`core.ThreadNetworkCommissioning`, ADR 0027) is not on the reference daemon | (c) not yet run |
-| TBRM | the module serves ThreadBorderRouterManagement over an OTBR (`cluster/threadbr`, ADR 0027) and the reference daemon's `--otbr` adds the endpoint, but the harness does not run the family against a daemon with a virtual OTBR yet (`.github/workflows/otbr-virtual.yml` builds one, dispatch-only) | (c) not yet run |
+| TBRM | the module serves ThreadBorderRouterManagement over an OTBR (`cluster/threadbr`, ADR 0027) and the reference daemon's `--otbr` adds the endpoint, but the harness does not run the family against a daemon with a virtual OTBR yet (`.github/workflows/otbr-virtual.yml` builds one, weekly and on dispatch) | (c) not yet run |
 | JFADMIN, JFDS | the module serves JointFabricAdministrator and JointFabricDatastore after connectedhomeip (`cluster/jointfabric`, wave 26-D; report 26-D cites `TC_JFDS_2_2` and `TC_JFADMIN_2_2`), but the reference daemon composes neither and the harness does not run the families | (c) not yet run |
 | TSTAT 4.5 (MatterScheduleConfiguration) | the module serves MSCH behind `surface.Policies.Extensions("BD-chip-Thermostat-Schedules")` and the reference daemon enables it with `--thermostat-schedules`, but `TC_TSTAT_4_5.py` is absent at the harness commit `6170af84` (present in connectedhomeip from 2026-10-23); lifting `CHIP_TEST_IMAGE` is a separate owner decision | (c) not yet run |
 | the camera, TLS, network-infrastructure and AmbientContextSensing families | the module serves the seven camera clusters, the two TLS clusters (`cluster/camera`, `cluster/tls`, waves 26-A1 to 26-A3), WiFiNetworkManagement and ThreadNetworkDirectory (`cluster/netinfra`, wave 26-B) and AmbientContextSensing (`cluster/sensing`, wave 26-C), but the reference daemon composes none of them and the harness does not run their families | (c) not yet run |
