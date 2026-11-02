@@ -386,3 +386,32 @@ func (s *mapSettings) GetSetting(_ context.Context, k string) (value string, ok 
 }
 
 func (s *mapSettings) SetSetting(_ context.Context, k, v string) error { s.m[k] = v; return nil }
+
+// TestCertificateStoreCloseCancelsPeriodicUpdate (W4-ctlint-12): Close
+// during the periodic update cancels it, so the host's shutdown does not
+// wait for every remaining fetch to answer or time out.
+func TestCertificateStoreCloseCancelsPeriodicUpdate(t *testing.T) {
+	t.Parallel()
+	f := newFakeDCL(t)
+	pki := newTestPKI(t)
+	f.addRoot(pki.paa)
+	clock := newManualClock()
+	s := openStore(t, CertificateOptions{Client: f.client(), Clock: clock})
+	before := f.hit("/dcl/pki/root-certificates")
+	f.mu.Lock()
+	f.delay = time.Hour
+	f.mu.Unlock()
+	go clock.advance(DefaultUpdateInterval)
+	deadline := time.Now().Add(10 * time.Second)
+	for f.hit("/dcl/pki/root-certificates") == before {
+		if time.Now().After(deadline) {
+			t.Fatal("the periodic update did not start")
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	start := time.Now()
+	s.Close()
+	if took := time.Since(start); took > 2*time.Second {
+		t.Fatalf("Close waited %v for the periodic update", took)
+	}
+}

@@ -66,3 +66,8 @@ var timedInvokePaths = map[uint32]map[uint32]struct{}{
 		0x04: {}, // Disable
 	},
 }
+
+// timedWritePaths lists every attribute whose effective access in
+// parity/schema.json carries the timed quality ("T"): a client writes
+// it inside a timed interaction.
+var timedWritePaths = map[uint32]map[uint32]struct{}{}

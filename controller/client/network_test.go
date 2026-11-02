@@ -18,6 +18,7 @@ import (
 	"github.com/SukramJ/go-fabric/controller/client"
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/tlv"
+	"github.com/SukramJ/go-fabric/transport/message"
 )
 
 func encode(t *testing.T, f func(e *tlv.Encoder)) []byte {
@@ -248,6 +249,13 @@ func TestDefaultSubscription(t *testing.T) {
 	if v, _ := sn.node.Endpoint(1).Cluster(onoff.ClusterID).Decoded(onoff.AttrOnOff); v != true {
 		t.Fatal("the priming report was not applied")
 	}
+	// The report's hooks run on the node's job queue, off its exchange
+	// (W4-ctlim-04): the event arrives after the image changed.
+	waitUntil(t, "the priming report's event", func() bool {
+		hl.mu.Lock()
+		defer hl.mu.Unlock()
+		return len(hl.events) > 0
+	})
 	hl.mu.Lock()
 	if len(hl.events) != 1 || hl.events[0].(basicinfo.StartUpEvent).SoftwareVersion != 3 || hl.seeded != 1 || hl.alive == 0 || !slices.Equal(hl.status, []bool{true}) {
 		t.Fatalf("events %v seeded %d alive %d status %v", hl.events, hl.seeded, hl.alive, hl.status)
@@ -266,7 +274,11 @@ func TestDefaultSubscription(t *testing.T) {
 	sn.reply(t, again, im.InteractionModelProtocolID, im.OpcodeSubscribeResponse, subscribeResponse(t, 34))
 	hl.wait(t, client.Connected)
 	mu.Lock()
-	if len(observed) != 2 || len(observed[1].EventFilters) != 1 || observed[1].EventFilters[0].EventMin != 8 {
+	// The refreshed request keeps the default subscription's own event
+	// filter; the sustained subscription raises it past the event it
+	// delivered on the wire (ar above) — ClientNodeInteraction.ts:162-168,
+	// SustainedSubscription.ts:379-384 (W4-ctlim-05).
+	if len(observed) != 2 || len(observed[1].EventFilters) != 1 || observed[1].EventFilters[0].EventMin != 1 {
 		t.Fatalf("observed requests %d", len(observed))
 	}
 	mu.Unlock()
@@ -398,5 +410,128 @@ func TestWriteAndInvokeForward(t *testing.T) {
 	}
 	if len(sn.node.Endpoints()) != 1 {
 		t.Fatal("the image changed")
+	}
+}
+
+// TestSustainedHostSubscriptionKeepsEventFilters (W4-ctlim-05): a host's
+// sustained subscription re-subscribes with its own event filters until it
+// delivered an event itself; the node-wide event cursor does not replace
+// them. Mirrors matter.js ClientNodeInteraction.ts:162-168 (refresh touches
+// the version filters only) and SustainedSubscription.ts:379-384.
+func TestSustainedHostSubscriptionKeepsEventFilters(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	sn := newScriptedNode(t, client.Config{ID: "peer1", Store: &client.MemoryStore{}})
+	client.DeliverEvent(sn.node, interaction.EventData{Number: 41}) // the node-wide cursor at 41
+	var mu sync.Mutex
+	var observed []interaction.SubscribeRequest
+	client.ObserveRequests(sn.node, func(r interaction.SubscribeRequest) {
+		mu.Lock()
+		observed = append(observed, r)
+		mu.Unlock()
+	})
+	type result struct {
+		sub *client.Subscription
+		err error
+	}
+	done := make(chan result, 1)
+	go func() {
+		s, err := sn.node.Subscribe(ctx, client.SubscribeRequest{SubscribeRequest: interaction.SubscribeRequest{
+			Events: []im.ConcreteEventPath{{}}, EventFilters: []im.EventMinimumNumber{{EventMin: 0}}, Sustain: true,
+		}})
+		done <- result{s, err}
+	}()
+	sub := sn.next(t)
+	sn.reply(t, sub, im.InteractionModelProtocolID, im.OpcodeReportData, dataReport(t, 61, nil))
+	sn.reply(t, sub, im.InteractionModelProtocolID, im.OpcodeSubscribeResponse, subscribeResponse(t, 61))
+	r := <-done
+	if r.err != nil {
+		t.Fatal(r.err)
+	}
+	t.Cleanup(r.sub.Close)
+	sn.reg.CloseForPeer(sn.reg.Active()[0].Peer())
+	// The re-subscription waits on timers; their timing is not the subject.
+	again := subscribeRequestOf(t, sn.nextAdvancing(t))
+	if len(again.EventFilters) != 1 || again.EventFilters[0].EventMin != 0 {
+		t.Fatalf("re-subscription event filters %+v, want the host's EventMin 0", again.EventFilters)
+	}
+}
+
+// within returns the next message the manager sends within d, skipping
+// standalone acknowledgements; false when none came.
+func (s *scripted) within(t *testing.T, d time.Duration) (msg, bool) {
+	t.Helper()
+	deadline := time.After(d)
+	for {
+		select {
+		case b := <-s.conn.ch:
+			hdr, hl, err := message.UnmarshalHeader(b)
+			if err != nil {
+				t.Fatal(err)
+			}
+			plain, _, err := s.peer.Decrypt(&hdr, hdr.NonceSecurityFlags(), b[hl:])
+			if err != nil {
+				t.Fatal(err)
+			}
+			proto, pl, err := message.UnmarshalProtocolHeader(plain)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if proto.ProtocolID == 0 && proto.Opcode == 0x10 {
+				continue
+			}
+			return msg{hdr: hdr, proto: proto, payload: plain[pl:]}, true
+		case <-deadline:
+			return msg{}, false
+		}
+	}
+}
+
+// quiet fails the test when the manager sends anything but a standalone
+// acknowledgement within d.
+func (s *scripted) quiet(t *testing.T, d time.Duration) {
+	t.Helper()
+	if m, ok := s.within(t, d); ok {
+		t.Fatalf("the manager sent opcode 0x%02X of protocol 0x%04X", m.proto.Opcode, m.proto.ProtocolID)
+	}
+}
+
+// nextAdvancing is next with the clock walked a minute at a time while
+// the manager stays silent, for a message that waits on timers.
+func (s *scripted) nextAdvancing(t *testing.T) msg {
+	t.Helper()
+	for range 600 {
+		if m, ok := s.within(t, 20*time.Millisecond); ok {
+			return m
+		}
+		s.clock.Advance(time.Minute)
+	}
+	t.Fatal("the manager sent nothing")
+	return msg{}
+}
+
+// TestStopDuringInitialReadEstablishesNothing (W4-ctlim-09): a Stop while
+// a newly commissioned node's initial read runs leaves the node without a
+// default subscription — the sync re-checks the node after the read, and
+// a subscription that completes after the Stop closes. Mirrors matter.js
+// NetworkClient.ts:113-131 and :207-221 (isCurrent after subscribe).
+func TestStopDuringInitialReadEstablishesNothing(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	sn := newScriptedNode(t, client.Config{ID: "peer1", Store: &client.MemoryStore{}, AutoSubscribe: true, NewlyCommissioned: true})
+	started := make(chan error, 1)
+	go func() { started <- sn.node.Start(ctx) }()
+	read := sn.next(t)
+	readRequestOf(t, read)
+	if err := sn.node.Stop(ctx); err != nil {
+		t.Fatal(err)
+	}
+	sn.reply(t, read, im.InteractionModelProtocolID, im.OpcodeReportData, dataReport(t, 0, image(5)))
+	if err := <-started; err != nil {
+		t.Fatal(err)
+	}
+	sn.quiet(t, 200*time.Millisecond)
+	if sn.node.SubscriptionActive() || len(sn.reg.Active()) != 0 {
+		t.Fatal("a default subscription on a stopped node")
 	}
 }

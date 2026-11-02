@@ -131,12 +131,18 @@ func (c *Client) do(ctx context.Context, method, path, accept, contentType strin
 		return response{}, &Error{Code: CodeUnreachable, Message: fmt.Sprintf("%s %s failed", method, path), Cause: err}
 	}
 	defer func() { _ = resp.Body.Close() }()
-	text, err := io.ReadAll(resp.Body)
+	// A misbehaving border router costs bounded memory (W4-ctlint-10);
+	// matter.js reads the whole answer (OtbrRestClient.ts:757-788).
+	text, err := io.ReadAll(http.MaxBytesReader(nil, resp.Body, maxResponseBody))
 	if err != nil {
 		return response{}, &Error{Code: CodeUnreachable, Message: fmt.Sprintf("%s %s failed", method, path), Cause: err}
 	}
 	return response{status: resp.StatusCode, body: text}, nil
 }
+
+// maxResponseBody bounds a border router's answer; the REST API's largest,
+// the dataset and the diagnostics, are a few KiB.
+const maxResponseBody = 16 << 20
 
 // statusError is a non-2xx answer (OtbrRestClient.ts:762-766).
 func statusError(method, path string, status int) *Error {

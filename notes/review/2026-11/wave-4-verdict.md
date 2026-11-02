@@ -25,3 +25,48 @@ Theme files: `wave-4-ctl-net.md` (Opus, done), `wave-4-ctl-sec.md` (Fable), `wav
 | ctl-net (Opus) | 0 | 2 | 3 | 2 |
 | ctl-int (Opus) | 1 | 2 | 5 | 6 |
 | **W4** | **1** | **8** | **15** | **16** |
+
+## Fixed in PR (branch `review/w4`, 2026-11-02)
+
+The register lines are at `769ea3c2`; each fix relocated them on `main`
+2278b129 with `grep -n` and re-read the cited lines on both sides at the
+pins (matter.js `862ad75f`, connectedhomeip `6170af84`).
+
+| ID | Commit | Note |
+| --- | --- | --- |
+| W4-ctlnet-01 | 8959f20b | `satAdd` in `client/exchange/margins.go`, used for the fixed pad and `InitialRetransmissionTime` |
+| W4-ctlnet-02 | 2befacbe | `route` adopts the source of a message that opens a new exchange; `Session.OnAddressChanged` carries the peer's operational address |
+| W4-ctlnet-03 | a10d6b76 | ctx cancel ends the ack wait (`endAckWaitLocked`) |
+| W4-ctlnet-04 | a10d6b76 | `initiateConnection` completes at once next to a live session |
+| W4-ctlnet-05 | a10d6b76 | `Peer.Close` sweeps the sessions again after `workers.Wait()` |
+| W4-ctlnet-06 | a10d6b76 | `considerClosed` semantics in `retransmit` |
+| W4-ctlnet-07 | — | open note (parity), unchanged |
+| W4-ctlim-01 | 8aac8e76 | `emitEvents` through `apply`/`mutate`; the default subscription's owner token |
+| W4-ctlim-02 | b05adad8, 94140f5e | `schema.IsTimedInvoke` / new generated `schema.IsTimedWrite` (empty at the pin); `InvokeOptions.TimedOff` + `fabrictest.InvokeUntimed` for the two NEEDS_TIMED wire tests |
+| W4-ctlim-03 | 0466b6b2 | `deleteNode` closes the node interaction's subscriptions |
+| W4-ctlim-04 | 0dc4ad84 | per-node ordered job queue (bound 100) for a subscription report's store writes and hooks; the caller's `Updated` stays inline |
+| W4-ctlim-05 | f0d69498 | refresh keeps the request's event filters |
+| W4-ctlim-06 | f0d69498 | flush mutex; a direct flush stops the armed timer |
+| W4-ctlim-07 | f0d69498 | both providers pad with `Manager.LocalPad()` |
+| W4-ctlim-08 | f0d69498 | `chunkWrite` after `begin`, the exchange's session |
+| W4-ctlim-09 | f0d69498 | re-check `started && !closing` before subscribing; adopt only while the owner is current |
+| W4-ctlim-10 | f0d69498 | `setActive(true)` always announces |
+| W4-ctlim-11 | f0d69498 | Read/Subscribe fitted after `begin` |
+| W4-ctlint-03 | af994d4e | `Images.Store` runs `otaimage.ValidateFile` |
+| W4-ctlint-04 | c9ca2bcd | BlueZ `WriteC1` bounded by 30 s → `btp.ErrDisconnected` |
+| W4-ctlint-05 | c9ca2bcd | a cancelled ESPHome GATT op ends the connection |
+| W4-ctlint-06 | c9ca2bcd | an absent maximum maps to `math.MaxUint32` (no API change) |
+| W4-ctlint-07 | c9ca2bcd | `otaimage.MaxHeaderSize` = 1024; Ahead-of-matter.js row `BD-Matter-OtaImageHeaderSizeCap` |
+| W4-ctlint-08 | c9ca2bcd | `(?i)` pattern, lower-case `Mode` |
+| W4-ctlint-10 | 49f05b93 | 16 MiB `http.MaxBytesReader` on the three fetchers; 1000-page cap |
+| W4-ctlint-11 | 49f05b93 | ADR 0027, `thread/otbr` doc, Thread Border Router guide |
+| W4-ctlint-12 | 49f05b93 | cancellable periodic-update context, cancelled in `Close` |
+| W4-ctlint-13 | 49f05b93 | package doc, BLE proxies guide, `BD-Controller-BleOverEsphomeProxies` |
+| W4-ctlint-14 | c9ca2bcd (part) | `ReadHeader` wraps the read error; the clock/logger threading of `Probe`/`Translate`/`Discover` is left open — it needs an API addition (owner question) |
+| W4-ctlsec-*, W4-ctlint-09 | — | the owner's reviewer, on this branch after the handback |
+
+Follow-up commits on the branch: c4ea63ed (lint: `syncAutoSubscribe` split under
+funlen; a race-proof wait in the W4-ctlim-03 test), 7dafb05a (coverage of the
+new `client/exchange` helpers and `schema.IsTimedWrite`, floors held),
+46e8a664 (citation and reachability snapshots; ratchets unchanged at drift 258
+and 3 unreached).

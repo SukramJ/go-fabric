@@ -253,9 +253,16 @@ func TestClientEventNotificationEventNumbersParity(t *testing.T) {
 		}); err != nil {
 			t.Fatal(err)
 		}
+		// The refreshed request the seam sees keeps the default
+		// subscription's own filter; the sustained subscription raises it
+		// past the event it delivered on the wire (first+1), as matter.js
+		// applies #requestNewEvents after refreshRequest
+		// (SustainedSubscription.ts:126, :379-384; W4-ctlim-05). The
+		// delivery below shows the wire minimum: event first is not
+		// delivered again.
 		mu.Lock()
-		if mins[0] != first+1 {
-			t.Fatalf("the replacement asks for events from %d, want %d", mins[0], first+1)
+		if mins[0] > first+1 {
+			t.Fatalf("the replacement asks for events from %d, above %d", mins[0], first+1)
 		}
 		mu.Unlock()
 		sp.press(t)

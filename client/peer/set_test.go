@@ -247,3 +247,57 @@ func TestCloseDeleteAndDisconnect(t *testing.T) {
 		t.Fatal("Set.Disconnect")
 	}
 }
+
+// TestInitiateConnectionWithLiveSession (W4-ctlnet-04): a connection
+// requested while the peer already holds a live session — one a process
+// adopted after the caller looked — completes at once and starts no
+// second process (no second CASE handshake). Mirrors matter.js
+// Peer.ts:438-462, which checks newestSession() and starts the process in
+// one turn of the event loop.
+func TestInitiateConnectionWithLiveSession(t *testing.T) {
+	t.Parallel()
+	h := newHarness(t, nil)
+	p := h.set.Adopt(h.secureSession(t, 0x12, udpAddr("[fd00::1]:5540")))
+	c := p.initiateConnection(ConnectOptions{})
+	if c == nil || c.fatal != nil || !isDone(c.done) {
+		t.Fatalf("connection %+v: want a completed one without error", c)
+	}
+	p.mu.Lock()
+	running := p.connecting
+	p.mu.Unlock()
+	if running != nil {
+		t.Fatal("a connection process started next to a live session")
+	}
+}
+
+func isDone(c <-chan struct{}) bool {
+	select {
+	case <-c:
+		return true
+	default:
+		return false
+	}
+}
+
+// TestCloseSweepsSessionsAfterWorkers (W4-ctlnet-05): a CASE session an
+// attempt registers while Close runs — after Close's first sweep, before
+// the workers are done — is closed too, not left owned by nobody. Mirrors
+// the close order of matter.js Peer.close (Peer.ts:546-565).
+func TestCloseSweepsSessionsAfterWorkers(t *testing.T) {
+	t.Parallel()
+	h := newHarness(t, nil)
+	p, _ := h.set.For(testAddr)
+	late := make(chan *exchange.Session, 1)
+	p.workers.Add(1)
+	go func() {
+		defer p.workers.Done()
+		<-p.ctx.Done() // the attempt's handshake returns as Close cancels
+		s := h.secureSession(t, 0x22, udpAddr("[fd00::1]:5540"))
+		h.set.Adopt(s) // the closing peer declines it
+		late <- s
+	}()
+	p.Close(context.Background())
+	if s := <-late; !s.IsClosed() {
+		t.Fatal("a session established during Close stayed open")
+	}
+}

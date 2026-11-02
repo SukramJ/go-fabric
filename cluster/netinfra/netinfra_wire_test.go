@@ -58,7 +58,7 @@ func TestNetinfraOverTheWire(t *testing.T) {
 	}
 
 	add := client.CommandAt(ep, tdir.ClusterID, tdir.CmdAddNetwork)
-	_, err = fabrictest.Invoke(ctx, pair, add, tdir.AddNetworkRequest{OperationalDataset: dataset1})
+	_, err = fabrictest.InvokeUntimed(ctx, pair, add, tdir.AddNetworkRequest{OperationalDataset: dataset1})
 	var se *fabrictest.StatusError
 	if !errors.As(err, &se) || se.Status != im.StatusNeedsTimedInteraction {
 		t.Errorf("untimed AddNetwork: %v, want NEEDS_TIMED_INTERACTION", err)

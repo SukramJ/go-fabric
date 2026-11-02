@@ -19,6 +19,10 @@ import (
 	"github.com/SukramJ/go-fabric/transport/btp"
 )
 
+// writeTimeout bounds one C1 WriteValue — the 30 s ble/esphome bounds each
+// GATT operation by (bleTimeout); a variable for the test.
+var writeTimeout = 30 * time.Second
+
 // The bounds matter.js puts on noble's operations
 // (packages/nodejs-ble/src/NobleBleChannel.ts at 0ceb202d).
 const (
@@ -573,11 +577,22 @@ func (k *connection) ATTMTU() int { return k.mtu }
 // (org.bluez.GattCharacteristic.rst, Methods, "void WriteValue(array{byte}
 // value, dict options)", option type "request"). A write to a peripheral
 // that is gone wraps btp.ErrDisconnected (NobleBleChannel.ts:770-781).
+//
+// The write is bounded by writeTimeout, as ble/esphome bounds its GATT
+// operations: the BTP session writes under a context that is never
+// cancelled (controller/ble/channel.go), so a WriteValue BlueZ never
+// answers would block its send path for good. An overrun is a lost link:
+// it wraps btp.ErrDisconnected and the session closes (W4-ctlint-04).
 func (k *connection) WriteC1(ctx context.Context, data []byte) error {
 	if k.isGone() {
 		return fmt.Errorf("bluez: write C1: %w", btp.ErrDisconnected)
 	}
-	_, err := call(ctx, k.c.bus, k.c1, ifaceGattChar+".WriteValue", data, map[string]dbus.Variant{"type": dbus.MakeVariant("request")})
+	wctx, cancel := context.WithTimeout(ctx, writeTimeout)
+	defer cancel()
+	_, err := call(wctx, k.c.bus, k.c1, ifaceGattChar+".WriteValue", data, map[string]dbus.Variant{"type": dbus.MakeVariant("request")})
+	if err != nil && ctx.Err() == nil && errors.Is(wctx.Err(), context.DeadlineExceeded) {
+		return fmt.Errorf("bluez: write C1 unanswered after %v: %w: %w", writeTimeout, btp.ErrDisconnected, err)
+	}
 	if err != nil && (k.isGone() || dbusName(err) == "org.bluez.Error.NotConnected") {
 		return fmt.Errorf("%w: %w", btp.ErrDisconnected, err)
 	}

@@ -5,6 +5,9 @@ form or join a Thread network through a border router the host already
 runs: an OpenThread Border Router (`ot-br-posix`), typically a Raspberry
 Pi with a radio co-processor. The module never joins the Thread mesh
 itself ([ADR 0027](https://github.com/SukramJ/go-fabric/blob/main/docs/adr/0027-thread-border-router-over-otbr-rest.md)).
+The REST link is plaintext HTTP, as ot-br-posix serves it: the operational
+dataset, network key included, crosses it in clear, so keep the border
+router on the host's own trusted LAN segment.
 It manages the border router over its REST API, by default on port 8081.
 
 Three servers serve the endpoint, all over one border router:

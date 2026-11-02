@@ -17,3 +17,12 @@ func QueuedInvokes(c *Interaction) int {
 
 // FlushingBatches is the number of batch flushes still running on c.
 func FlushingBatches(c *Interaction) int { return int(c.flushing.Load()) }
+
+// SetTimedWrite makes isTimedWrite name (cluster, attribute) timed and
+// returns the restore; for a sequential test only (no attribute of the
+// snapshot carries the timed quality at the pin).
+func SetTimedWrite(cluster, attribute uint32) (restore func()) {
+	prev := isTimedWrite
+	isTimedWrite = func(c, a uint32) bool { return (c == cluster && a == attribute) || prev(c, a) }
+	return func() { isTimedWrite = prev }
+}

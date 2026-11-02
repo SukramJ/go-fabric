@@ -197,4 +197,33 @@ func TestEncodeFitting(t *testing.T) {
 	if _, err := encodeReadingRequest(im.ReadRequest{AttributeRequests: paths, DataVersionFilters: filters}); err == nil {
 		t.Fatal("a request too large without filters encoded")
 	}
+	// W4-ctlim-11: fitted to the exchange's session, a TCP exchange's
+	// larger payload keeps every filter (InteractionMessenger.ts:1145-1165,
+	// this.exchange.maxPayloadSize).
+	req.DataVersionFilters = filters
+	b, err = encodeFitting(readRequest(req), 64000)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if parsed, err := im.UnmarshalReadRequestTLV(tlv.NewDecoder(b)); err != nil || len(parsed.DataVersionFilters) != len(filters) {
+		t.Fatalf("a TCP-sized request kept %d of %d filters (%v)", len(parsed.DataVersionFilters), len(filters), err)
+	}
+}
+
+// TestSetActiveAnnouncesGoingLiveAgain (W4-ctlim-10): going live
+// announces even when already live, so a re-established subscription
+// (a mode-flip recreate keeps it live) is announced again; going not
+// live announces a change only. Mirrors matter.js
+// SustainedSubscription.ts:395-419 (#setLive).
+func TestSetActiveAnnouncesGoingLiveAgain(t *testing.T) {
+	t.Parallel()
+	var got []bool
+	s := &Subscription{sustained: &sustainedState{}, request: SubscribeRequest{ActiveChanged: func(a bool) { got = append(got, a) }}}
+	s.setActive(true)
+	s.setActive(true)
+	s.setActive(false)
+	s.setActive(false)
+	if len(got) != 3 || !got[0] || !got[1] || got[2] {
+		t.Fatalf("announced %v, want [true true false]", got)
+	}
 }

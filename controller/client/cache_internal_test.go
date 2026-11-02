@@ -367,3 +367,59 @@ func TestSettingsRoundTrip(t *testing.T) {
 		t.Fatal("a truncated setting decoded")
 	}
 }
+
+// gatedStore holds Save until release is closed, counting the calls.
+type gatedStore struct {
+	MemoryStore
+	entered chan struct{}
+	release chan struct{}
+}
+
+func (b *gatedStore) Save(node string, ep uint16, cluster uint32, values map[uint32][]byte, version *uint32) error {
+	b.entered <- struct{}{}
+	<-b.release
+	return b.MemoryStore.Save(node, ep, cluster, values, version)
+}
+
+// TestFlushesAreSerialised (W4-ctlim-06): a direct flush stops the armed
+// timer instead of leaving a second one next to it, and a flush waits for
+// one that is writing, so an older snapshot cannot land after a newer
+// one. Mirrors matter.js ClientCacheBuffer.ts:24, :79-80, :174-175 (one
+// mutex for every flush).
+func TestFlushesAreSerialised(t *testing.T) {
+	t.Parallel()
+	st := &gatedStore{entered: make(chan struct{}, 4), release: make(chan struct{})}
+	clock := newManualClock()
+	p, image := newTestPersister(st, time.Minute, clock)
+	image.Lock()
+	c := newCache(p, 1, 6, nil, nil)
+	c.externalSet(map[uint32]*spec.Node{0: ptr(boolNode(true))}, nil)
+	image.Unlock()
+	if clock.Pending() != 1 {
+		t.Fatalf("%d timers armed, want 1", clock.Pending())
+	}
+	first := make(chan struct{})
+	go func() { p.flush(); close(first) }()
+	<-st.entered // the first flush is writing v1
+	if clock.Pending() != 0 {
+		t.Fatalf("%d timers armed after the direct flush, want 0", clock.Pending())
+	}
+	image.Lock()
+	c.externalSet(map[uint32]*spec.Node{0: ptr(boolNode(false))}, nil)
+	image.Unlock()
+	second := make(chan struct{})
+	go func() { p.flush(); close(second) }()
+	select {
+	case <-st.entered:
+		t.Fatal("a second flush wrote while the first was writing")
+	case <-time.After(50 * time.Millisecond):
+	}
+	close(st.release)
+	<-first
+	<-second
+	values, _, _ := stored(t, &st.MemoryStore, 1, 6)
+	if values[0].El.Bool {
+		t.Fatal("the older flush landed last")
+	}
+	p.stop()
+}

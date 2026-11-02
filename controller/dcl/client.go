@@ -162,7 +162,7 @@ func (c *Client) fetchJSON(ctx context.Context, path string, out any) error {
 		return wrap(err)
 	}
 	defer func() { _ = resp.Body.Close() }()
-	body, err := io.ReadAll(resp.Body)
+	body, err := io.ReadAll(http.MaxBytesReader(nil, resp.Body, maxResponseBody))
 	if err != nil {
 		return wrap(err)
 	}
@@ -183,13 +183,28 @@ func (c *Client) fetchJSON(ctx context.Context, path string, out any) error {
 	return nil
 }
 
+// maxResponseBody bounds a ledger or GitHub answer the client reads, and
+// maxPages the pages of one paginated listing: a misbehaving endpoint
+// costs bounded memory (W4-ctlint-10). matter.js reads the whole answer
+// (DclClient.ts:91-121, Github.ts:120-141) and follows next_key without a
+// bound (:62-89); both bounds sit far above the production ledger's
+// answers.
+const (
+	maxResponseBody = 16 << 20
+	maxPages        = 1000
+)
+
 // fetchPaginated is DclClient.#fetchPaginatedJson (DclClient.ts:62-89):
 // the items of field, page after page while the answer names a
-// pagination.next_key, which the next request carries as pagination.key.
+// pagination.next_key, which the next request carries as pagination.key —
+// at most maxPages pages.
 func fetchPaginated[T any](ctx context.Context, c *Client, path, field string) ([]T, error) {
 	var all []T
 	nextKey := ""
-	for first := true; first || nextKey != ""; first = false {
+	for page := 0; page == 0 || nextKey != ""; page++ {
+		if page == maxPages {
+			return nil, fmt.Errorf("dcl: %s: more than %d pages", path, maxPages)
+		}
 		current := path
 		if nextKey != "" {
 			sep := "?"
@@ -198,19 +213,19 @@ func fetchPaginated[T any](ctx context.Context, c *Client, path, field string) (
 			}
 			current = path + sep + "pagination.key=" + encodeURIComponent(nextKey)
 		}
-		var page map[string]json.RawMessage
-		if err := c.fetchJSON(ctx, current, &page); err != nil {
+		var answer map[string]json.RawMessage
+		if err := c.fetchJSON(ctx, current, &answer); err != nil {
 			return nil, err
 		}
 		// Items that are not an array are skipped (:79-82).
-		if raw, ok := page[field]; ok {
+		if raw, ok := answer[field]; ok {
 			var items []T
 			if json.Unmarshal(raw, &items) == nil {
 				all = append(all, items...)
 			}
 		}
 		nextKey = ""
-		if raw, ok := page["pagination"]; ok {
+		if raw, ok := answer["pagination"]; ok {
 			var p struct {
 				NextKey *string `json:"next_key"`
 			}

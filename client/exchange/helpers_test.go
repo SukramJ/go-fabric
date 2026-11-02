@@ -242,13 +242,19 @@ func (p *securePeer) decode(t *testing.T, b []byte) decoded {
 // send delivers the peer's message to the manager and returns its bytes.
 func (p *securePeer) send(t *testing.T, sessionID uint16, proto message.ProtocolHeader, payload []byte) []byte {
 	t.Helper()
+	return p.sendFrom(t, peerAddr, sessionID, proto, payload)
+}
+
+// sendFrom is send from the source address src.
+func (p *securePeer) sendFrom(t *testing.T, src *net.UDPAddr, sessionID uint16, proto message.ProtocolHeader, payload []byte) []byte {
+	t.Helper()
 	hdr := message.Header{SessionID: sessionID}
 	sealed, err := p.ch.Encrypt(&hdr, hdr.SecurityFlags(), append(proto.Marshal(), payload...))
 	if err != nil {
 		t.Fatal(err)
 	}
 	b := append(hdr.Marshal(), sealed.Ciphertext...)
-	p.m.HandleDatagram(b, peerAddr)
+	p.m.HandleDatagram(b, src)
 	return b
 }
 

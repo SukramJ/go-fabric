@@ -118,7 +118,7 @@
   },
   {
     "file": "ble/bluez/central_linux.go",
-    "line": 420,
+    "line": 424,
     "citation": "NobleBleChannel.ts:299-440",
     "resolved": "packages/nodejs-ble/src/NobleBleChannel.ts",
     "identifier": "openChannel",
@@ -550,7 +550,7 @@
   },
   {
     "file": "client/exchange/manager.go",
-    "line": 230,
+    "line": 241,
     "citation": "ExchangeManager.ts:391-440",
     "resolved": "packages/protocol/src/protocol/ExchangeManager.ts",
     "identifier": "addProtocolHandler",
@@ -559,7 +559,7 @@
   },
   {
     "file": "client/exchange/manager.go",
-    "line": 237,
+    "line": 248,
     "citation": "SecureChannelProtocol.ts:146-148",
     "resolved": "packages/protocol/src/securechannel/SecureChannelProtocol.ts",
     "identifier": "CaseServer",
@@ -649,7 +649,7 @@
   },
   {
     "file": "client/interaction/invoke.go",
-    "line": 84,
+    "line": 91,
     "citation": "InteractionMessenger.ts:1082-1105",
     "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
     "identifier": "StatusResponse",
@@ -667,7 +667,7 @@
   },
   {
     "file": "client/interaction/provider.go",
-    "line": 266,
+    "line": 274,
     "citation": "ClientInteraction.ts:1112",
     "resolved": "packages/protocol/src/action/client/ClientInteraction.ts",
     "identifier": "verifyReachability",
@@ -685,7 +685,7 @@
   },
   {
     "file": "client/interaction/read.go",
-    "line": 113,
+    "line": 115,
     "citation": "InteractionMessenger.ts:1006-1009",
     "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
     "identifier": "dataVersionFilters",
@@ -694,7 +694,7 @@
   },
   {
     "file": "client/interaction/read.go",
-    "line": 118,
+    "line": 120,
     "citation": "InteractionMessenger.ts:998-1050",
     "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
     "identifier": "#shortenDataVersionFilters",
@@ -766,7 +766,7 @@
   },
   {
     "file": "client/interaction/subscribe.go",
-    "line": 314,
+    "line": 316,
     "citation": "InteractionMessenger.ts:1052-1055",
     "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
     "identifier": "#encodeReadingRequest",
@@ -784,7 +784,7 @@
   },
   {
     "file": "client/interaction/write.go",
-    "line": 25,
+    "line": 26,
     "citation": "Write.ts:204-218",
     "resolved": "packages/protocol/src/action/request/Write.ts",
     "identifier": "WriteRequest",
@@ -793,7 +793,7 @@
   },
   {
     "file": "client/interaction/write.go",
-    "line": 48,
+    "line": 49,
     "citation": "ClientInteraction.ts:369-371",
     "resolved": "packages/protocol/src/action/client/ClientInteraction.ts",
     "identifier": "TimedRequest",
@@ -802,7 +802,7 @@
   },
   {
     "file": "client/interaction/write_test.go",
-    "line": 114,
+    "line": 118,
     "citation": "Write.ts:74",
     "resolved": "packages/protocol/src/action/request/Write.ts",
     "identifier": "AccessControl",
@@ -811,7 +811,7 @@
   },
   {
     "file": "client/interaction/write_test.go",
-    "line": 167,
+    "line": 171,
     "citation": "InteractionMessenger.ts:1138-1162",
     "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
     "identifier": "StatusResponse",
@@ -829,7 +829,7 @@
   },
   {
     "file": "client/peer/connection.go",
-    "line": 1024,
+    "line": 1034,
     "citation": "PeerConnection.ts:674-696",
     "resolved": "packages/protocol/src/peer/PeerConnection.ts",
     "identifier": "handleConnectionError",
@@ -1644,7 +1644,7 @@
   },
   {
     "file": "controller/client/network.go",
-    "line": 211,
+    "line": 266,
     "citation": "NetworkClient.ts:215-238",
     "resolved": "packages/node/src/behavior/system/network/NetworkClient.ts",
     "identifier": "#recomputeConnectionState",
@@ -1653,7 +1653,7 @@
   },
   {
     "file": "controller/client/node.go",
-    "line": 71,
+    "line": 74,
     "citation": "NetworkClient.ts:385-391",
     "resolved": "packages/node/src/behavior/system/network/NetworkClient.ts",
     "identifier": "isNewlyCommissioned",
@@ -1662,7 +1662,7 @@
   },
   {
     "file": "controller/client/node.go",
-    "line": 79,
+    "line": 87,
     "citation": "NetworkClient.ts:268-273",
     "resolved": "packages/node/src/behavior/system/network/NetworkClient.ts",
     "identifier": "fabricLabelReconciled",
@@ -1671,7 +1671,7 @@
   },
   {
     "file": "controller/client/node.go",
-    "line": 348,
+    "line": 393,
     "citation": "NetworkClient.ts:60-102",
     "resolved": "packages/node/src/behavior/system/network/NetworkClient.ts",
     "identifier": "ClientNode",
@@ -1698,7 +1698,7 @@
   },
   {
     "file": "controller/client/reactions_test.go",
-    "line": 65,
+    "line": 64,
     "citation": "Peers.ts:812-824",
     "resolved": "packages/node/src/node/client/Peers.ts",
     "identifier": "startUp",

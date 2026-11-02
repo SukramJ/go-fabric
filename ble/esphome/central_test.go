@@ -203,6 +203,44 @@ func TestConnectAndGATT(t *testing.T) {
 	}
 }
 
+// TestCancelledWriteEndsTheConnection (W4-ctlint-05): a GATT write whose
+// context ends while its reply is outstanding ends the connection, so the
+// late reply — the API carries no request id — cannot be taken for the
+// next write's on the same handle.
+func TestCancelledWriteEndsTheConnection(t *testing.T) {
+	p := peripheral("C0:FF:EE:00:0B:1E")
+	f := fake(t, esphometest.Options{}, p)
+	c := central(t, esphome.Options{}, esphome.Proxy{Addr: f.Addr(), Name: "lab"})
+	scanFor(t, c, p.Address)
+	for range 20 {
+		conn, err := c.Connect(context.Background(), ble.Peripheral{Address: p.Address})
+		if err != nil {
+			t.Fatal(err)
+		}
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+		err = conn.WriteC1(ctx, []byte{1})
+		if err == nil { // the reply won the race with the cancel: try again
+			_ = conn.Disconnect()
+			continue
+		}
+		if !errors.Is(err, context.Canceled) {
+			t.Fatalf("WriteC1: %v", err)
+		}
+		select {
+		case <-conn.Disconnected():
+		case <-time.After(5 * time.Second):
+			t.Fatal("a cancelled write left the connection up")
+		}
+		if err := conn.WriteC1(context.Background(), []byte{1}); !errors.Is(err, btp.ErrDisconnected) {
+			t.Fatalf("write after the cancel: %v", err)
+		}
+		_ = conn.Disconnect()
+		return
+	}
+	t.Skip("every reply beat the cancel")
+}
+
 func TestConnectErrors(t *testing.T) {
 	p := peripheral("C0:FF:EE:00:0B:1E")
 	f := fake(t, esphometest.Options{Slots: 1}, p)

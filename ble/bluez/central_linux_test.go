@@ -318,6 +318,24 @@ func TestWriteToANotConnectedDeviceIsADisconnect(t *testing.T) {
 	}
 }
 
+// TestUnansweredWriteIsADisconnect (W4-ctlint-04): a WriteValue BlueZ
+// never answers ends after writeTimeout as btp.ErrDisconnected — the BTP
+// session writes under a context that is never cancelled, so the bound is
+// the only one. ble/esphome bounds its GATT operations the same way.
+func TestUnansweredWriteIsADisconnect(t *testing.T) {
+	prev := writeTimeout
+	writeTimeout = 50 * time.Millisecond
+	defer func() { writeTimeout = prev }()
+	b, d, _, conn, err := connectTo(t, 0, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b.failWith(string(d.char(0x0b))+" "+ifaceGattChar+".WriteValue", errHang)
+	if err := conn.WriteC1(context.Background(), []byte{1}); !errors.Is(err, btp.ErrDisconnected) {
+		t.Fatalf("WriteC1: %v, want btp.ErrDisconnected", err)
+	}
+}
+
 func TestDeviceRemovedAndBusClosedEndConnections(t *testing.T) {
 	b, d, c, conn, err := connectTo(t, 0, false)
 	if err != nil {

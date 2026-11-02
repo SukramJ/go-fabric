@@ -34,3 +34,15 @@ func IsTimedInvoke(clusterID, commandID uint32) bool {
 	_, ok = cmds[commandID]
 	return ok
 }
+
+// IsTimedWrite reports whether the (cluster, attribute) pair carries the
+// timed access quality ("T") in its effective access — a client writes it
+// inside a Timed interaction. Mirrors matter.js Write.ts:188
+// (`result.timedRequest ||= attribute.schema.effectiveAccess.timed`);
+// timedWritePaths (timed_gen.go) is generated from parity/schema.json the
+// same way as timedInvokePaths. No attribute of the snapshot at the pin
+// carries the quality, so the table is empty until one does.
+func IsTimedWrite(clusterID, attributeID uint32) bool {
+	_, ok := timedWritePaths[clusterID][attributeID]
+	return ok
+}

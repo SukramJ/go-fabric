@@ -51,7 +51,7 @@ func TestClientNodeSemanticTagParity(t *testing.T) {
 			b.attr(1, descriptor.ClusterID, spec.AttrFeatureMap, uintNode(uint64(descriptor.FeatureTagList)), version)
 			b.attr(1, descriptor.ClusterID, spec.AttrAttributeList, listNode(0, 1, 2, 3, uint64(descriptor.AttrTagList), 65528, 65529, 65531, 65532, 65533), version)
 			b.attr(1, descriptor.ClusterID, descriptor.AttrTagList, tagList(t, tags...), version)
-			n.apply(wildcard, &b.r)
+			n.apply(wildcard, &b.r, true)
 		}
 		decoded := func() []descriptor.Semtag {
 			v, err := n.Endpoint(1).Cluster(descriptor.ClusterID).Decoded(descriptor.AttrTagList)

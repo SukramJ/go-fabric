@@ -15,7 +15,8 @@
 //     layer of the snapshot), baseDeviceTypeDefinitions, clusterFeatures,
 //     clusterClassifications, unbindableClusters
 //   - timed_gen.go — timedInvokePaths (every request command whose
-//     effective access carries "T", the timed-interaction quality)
+//     effective access carries "T", the timed-interaction quality) and
+//     timedWritePaths (every attribute whose effective access carries it)
 //   - large_message_gen.go — largeMessageCommands (every request command
 //     whose effective quality carries "L", the Large Message quality)
 //   - schema_provenance_gen.go — SchemaSnapshotSHA256
@@ -115,6 +116,13 @@ type snapshotAttribute struct {
 	Name    string `json:"name"`
 	Access  string `json:"access"`
 	Quality string `json:"quality"`
+	// Effective carries the timed quality ("T") as access.timed, as for a
+	// command.
+	Effective *struct {
+		Access struct {
+			Timed bool `json:"timed"`
+		} `json:"access"`
+	} `json:"effective"`
 }
 
 // snapshotCommand mirrors one command of a cluster in parity/schema.json:
@@ -587,6 +595,32 @@ func writeTimedFile(clusters []snapshotCluster) error {
 				continue
 			}
 			rows = append(rows, fmt.Sprintf("\t\t0x%02X: {}, // %s\n", m.ID, m.Name))
+		}
+		if len(rows) == 0 {
+			continue
+		}
+		fmt.Fprintf(&buf, "\t0x%04X: { // %s\n", c.ID, c.Name)
+		for _, r := range rows {
+			buf.WriteString(r)
+		}
+		buf.WriteString("\t},\n")
+	}
+	buf.WriteString("}\n\n")
+	// timedWritePaths: matter.js Write.ts:188 makes a write timed when an
+	// attribute's effective access carries the timed quality.
+	buf.WriteString("// timedWritePaths lists every attribute whose effective access in\n")
+	buf.WriteString("// parity/schema.json carries the timed quality (\"T\"): a client writes\n")
+	buf.WriteString("// it inside a timed interaction.\n")
+	buf.WriteString("var timedWritePaths = map[uint32]map[uint32]struct{}{\n")
+	for _, c := range clusters {
+		attrs := slices.Clone(c.Attributes)
+		sort.Slice(attrs, func(i, j int) bool { return attrs[i].ID < attrs[j].ID })
+		var rows []string
+		for _, a := range attrs {
+			if a.Effective == nil || !a.Effective.Access.Timed {
+				continue
+			}
+			rows = append(rows, fmt.Sprintf("\t\t0x%04X: {}, // %s\n", a.ID, a.Name))
 		}
 		if len(rows) == 0 {
 			continue

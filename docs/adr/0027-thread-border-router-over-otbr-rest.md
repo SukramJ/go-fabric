@@ -171,6 +171,10 @@ optional feature `PC` (:22). The REST contract needs `net/http` only, which
    through the cluster's fail-safe-guarded path; `factoryReset` and
    `setCommissionerState` are not wrapped (the thread-br-client README's
    own warning: they "can silently partition or brick a network").
+   The REST link is plaintext HTTP, as ot-br-posix serves it and as
+   matter.js's `OtbrRestClient` builds its URLs: the operational dataset
+   with its network key and PSKc crosses it in clear, so the border router
+   belongs on the host's own trusted LAN segment.
 
 5. **MeshCoP stays out of this ADR.** CoAP over DTLS with EC-JPAKE
    (`dtls/`, `coap/`, `commissioner/`, `diagnostic/MeshCopDiagnosticSource.ts`,

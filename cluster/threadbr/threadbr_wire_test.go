@@ -72,7 +72,7 @@ func TestThreadBorderRouterOverTheWire(t *testing.T) {
 	crumb := uint64(7)
 	req := tbrm.SetActiveDatasetRequestRequest{ActiveDataset: chipDataset, Breadcrumb: &crumb}
 	var se *fabrictest.StatusError
-	if _, err := fabrictest.Invoke(ctx, pair, set, req); !errors.As(err, &se) || se.Status != im.StatusNeedsTimedInteraction {
+	if _, err := fabrictest.InvokeUntimed(ctx, pair, set, req); !errors.As(err, &se) || se.Status != im.StatusNeedsTimedInteraction {
 		t.Errorf("untimed SetActiveDatasetRequest: %v, want NEEDS_TIMED_INTERACTION", err)
 	}
 	if _, err := fabrictest.InvokeTimed(ctx, pair, set, req); !errors.As(err, &se) || se.Status != im.StatusFailsafeRequired {
