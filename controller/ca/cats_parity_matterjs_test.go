@@ -36,6 +36,7 @@ func TestGenerateNOCValidatesTheCATList(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			noc, err := c.GenerateNOC(pub, 7, 0x42, tc.cats)
 			switch {
 			case tc.ok && err != nil:
