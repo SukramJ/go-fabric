@@ -23,7 +23,8 @@ import "context"
 //     before it or after it.
 //   - Removing a fabric removes everything that fabric owns: its identity,
 //     group key sets and key map, group table, groupcast groups, ACL,
-//     resumption records and default OTA providers. Server subscriptions,
+//     resumption records, default OTA providers and ICD registrations.
+//     Server subscriptions,
 //     thermostat presets, door-lock records, settings and counters are not
 //     fabric-owned rows and stay (the bridge deletes a fabric's
 //     subscriptions itself).
