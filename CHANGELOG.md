@@ -147,6 +147,7 @@ Findings of the whole-codebase review of 2026-11-01 (`notes/review/2026-11/`).
 - `node`: a `Start` that fails runs the stop path before it returns — the store `Store.Path` opened is closed and the node is stopped (a retry is `ErrStopped`) — and the node counts as started only once `Start` completed; an Aggregator change (`Add`, `Replace`, `Remove`, `Forget`, `Batch`, `RetirePartition`) on a stopped node answers `node.ErrStopped` instead of binding nothing and failing in the bridge (W5-api-06, W5-ex-08).
 - `node`: the fail-safe a PASE session arms on its own runs under the node's lifetime, so `Stop` ends its expiry watcher; every commissioned fabrictest site leaked one goroutine past `Close` (W5-ex-06).
 - `node`, `device`: doc comments say what the code does — a nil `Config.Advertiser` is the node's own Zeroconf, the operator view is `Node.SessionDiagnostics`, and `Lookup`'s excluded list is empty (W5-api-16; the `SetOnFabricAdded` passage went with W2-api-01).
+- `eligibility`: the package doc names the module's interfaces (`contract.EndpointSource`, `contract.MeasurementSource`) and no host's vocabulary or repository; `Compat` reads its device-type ids from the schema snapshot by name, and each of its four rules is a row with its confidence (Reported) in `notes/parity/controller_profiles.md` (W5-api-13).
 
 ## [0.15.6] — 2026-11-01
 

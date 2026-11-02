@@ -6,24 +6,24 @@
 // of this source, and what will the ecosystem on the other end of the
 // fabric make of the result.
 //
-// It does *not* classify sources itself — every DP exposes its verdict
-// via [contract.EligibilitySource]. This package delegates and
-// composes; the model is the single source of truth. Nothing here walks
-// a device tree or reads a host enum: the walk that turns a model into
-// candidate rows lives host-side, in
-// [github.com/SukramJ/go-fabricadapter].
+// It does *not* classify sources itself: a host source states its own
+// verdict through [contract.EligibilitySource], and this package
+// delegates and composes. Nothing here walks a device tree or reads a
+// host's model; the walk that turns a host's model into candidate
+// sources is the host's.
 //
-// Default verdict for sources that don't override
-// [contract.EligibilitySource]: derived structurally from
-// [contract.EndpointSource] / [contract.MeasurementSource]
-// via [DeriveMatterEligibility]. Custom DPs with caveats (Siren tones,
-// Effect light effect dispatch, FixedColorLight palette quantisation)
-// implement the interface explicitly to surface
-// MatterEligibilityPartial + a UX-readable reason.
+// A source that does not implement [contract.EligibilitySource] gets the
+// verdict [DeriveMatterEligibility] derives from the structural surface
+// it implements: [contract.EndpointSource] (a device type and its
+// cluster servers) or [contract.MeasurementSource] (a measurement class
+// and the device type and cluster it projects to). A source whose
+// projection is lossy implements [contract.EligibilitySource] itself and
+// reports [StatePartial] with a reason an operator reads.
 //
 // The second half — [Compat], [EcosystemForVendor] and [VendorName] —
 // is CSA vendor-id knowledge: which controller commissioned a fabric,
-// and which device types that controller silently drops.
+// and which device types that controller is reported to drop (the rows
+// of notes/parity/controller_profiles.md, "eligibility.Compat rules").
 package eligibility
 
 import (
@@ -69,18 +69,16 @@ func Classify(src any) Verdict {
 }
 
 // DeriveMatterEligibility computes the default verdict for a source
-// from the structural surface it already implements. Custom DPs that
-// implement MatterEndpointSource get a Mappable verdict with the
-// declared device type + cluster IDs. Generic / Calculated DPs that
-// implement MatterMeasurementSource get a Mappable verdict with the
-// measurement-class-derived device type + cluster ID. Anything else
-// is Unmappable.
+// from the structural surface it already implements. A
+// [contract.EndpointSource] gets a Mappable verdict with its declared
+// device type and cluster ids; a [contract.MeasurementSource] gets a
+// Mappable verdict with the device type and cluster id its measurement
+// class projects to. Anything else is Unmappable.
 //
-// Custom DPs with caveats (Siren tones, Effect dispatch,
-// FixedColorLight palette quantisation) implement
-// [contract.EligibilitySource] directly and override the
-// derivation; they typically call DeriveMatterEligibility for the
-// base verdict and then patch in `State = Partial` plus a reason.
+// A source whose projection is lossy implements
+// [contract.EligibilitySource] and overrides the derivation; it
+// typically calls DeriveMatterEligibility for the base verdict and then
+// reports [StatePartial] with a reason.
 func DeriveMatterEligibility(src any) Verdict {
 	if ep, ok := src.(contract.EndpointSource); ok {
 		dt := ep.MatterDeviceType()

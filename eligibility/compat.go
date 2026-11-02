@@ -6,6 +6,8 @@ package eligibility
 import (
 	"fmt"
 	"sort"
+
+	"github.com/SukramJ/go-fabric/schema"
 )
 
 // Ecosystem names the controller vendor a fabric belongs to. The
@@ -68,18 +70,33 @@ type CompatFinding struct {
 	DeviceType uint16
 }
 
-// Device types whose ecosystem support is known to be uneven. Each entry
-// below is field-verified rather than read off a compatibility matrix:
-// the failure mode is always the same shape — the bridge exposes the
-// endpoint correctly and the ecosystem silently omits it.
-const (
-	deviceTypeWaterValve        = 0x0042
-	deviceTypeWaterLeakDetector = 0x0043
+// Device types whose ecosystem support is reported to be uneven, their
+// ids read from the schema snapshot by name. Each rule of [Compat] is a
+// row of notes/parity/controller_profiles.md ("eligibility.Compat
+// rules") with its confidence — Reported: an operator's report, not
+// reproduced here. The failure mode is always the same shape: the bridge
+// exposes the endpoint correctly and the ecosystem omits it.
+var (
+	deviceTypeWaterValve        = deviceTypeNamed("WaterValve")
+	deviceTypeWaterLeakDetector = deviceTypeNamed("WaterLeakDetector")
 )
 
+// deviceTypeNamed is the id the schema snapshot gives the device type
+// name; it panics at init for a name the snapshot does not list, a
+// mistake of this file.
+func deviceTypeNamed(name string) uint16 {
+	for id, n := range schema.DeviceTypeNames {
+		if n == name {
+			return uint16(id)
+		}
+	}
+	panic("eligibility: the schema names no device type " + name)
+}
+
 // amazonEndpointCeiling is the number of bridged endpoints beyond which
-// Amazon's bridge support becomes unreliable. It is not a documented
-// limit; it is where field reports put the wall.
+// Amazon's bridge support is reported to become unreliable. It is not a
+// documented limit; it is where field reports put the wall (Reported,
+// notes/parity/controller_profiles.md).
 const amazonEndpointCeiling = 90
 
 // Compat reports what each commissioned ecosystem will do with the
