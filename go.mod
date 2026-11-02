@@ -4,7 +4,6 @@ go 1.27.3
 
 require (
 	filippo.io/nistec v0.0.4
-	github.com/grandcat/zeroconf v1.0.0
 	github.com/miekg/dns v1.1.73
 	golang.org/x/net v0.61.0
 	golang.org/x/tools v0.52.0
@@ -12,7 +11,6 @@ require (
 )
 
 require (
-	github.com/cenkalti/backoff v2.2.1+incompatible // indirect
 	github.com/dustin/go-humanize v1.1.0 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/mattn/go-isatty v0.0.24 // indirect
