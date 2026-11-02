@@ -43,10 +43,6 @@ func IsTimedInvoke(clusterID, commandID uint32) bool {
 // same way as timedInvokePaths. No attribute of the snapshot at the pin
 // carries the quality, so the table is empty until one does.
 func IsTimedWrite(clusterID, attributeID uint32) bool {
-	attrs, ok := timedWritePaths[clusterID]
-	if !ok {
-		return false
-	}
-	_, ok = attrs[attributeID]
+	_, ok := timedWritePaths[clusterID][attributeID]
 	return ok
 }

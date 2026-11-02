@@ -5,6 +5,7 @@ package exchange
 
 import (
 	"context"
+	"math"
 	"net"
 	"testing"
 	"time"
@@ -128,5 +129,35 @@ func TestNewExchangeMovesSessionToSource(t *testing.T) {
 	}
 	if !sameAddr(d.to, other) {
 		t.Fatalf("ack went to %v, want the new address %v", d.to, other)
+	}
+}
+
+// TestAddressHelpers: satAdd saturates at both Duration bounds; the
+// address observer can be removed; sameAddr compares nil and zone; an
+// unsecured session or a TCP-carried source moves nothing (W4-ctlnet-01,
+// W4-ctlnet-02).
+func TestAddressHelpers(t *testing.T) {
+	t.Parallel()
+	if satAdd(math.MaxInt64, time.Second) != math.MaxInt64 || satAdd(math.MinInt64, -time.Second) != math.MinInt64 || satAdd(time.Second, time.Second) != 2*time.Second {
+		t.Fatal("satAdd")
+	}
+	a := &net.UDPAddr{IP: net.ParseIP("fe80::1"), Port: 5540, Zone: "eth0"}
+	if !sameAddr(nil, nil) || sameAddr(a, nil) || sameAddr(a, &net.UDPAddr{IP: a.IP, Port: a.Port, Zone: "eth1"}) {
+		t.Fatal("sameAddr")
+	}
+	m, _, _ := newTestManager(t, Config{})
+	s, _ := newSecurePair(t, m, 0x0324, false)
+	called := false
+	s.OnAddressChanged(func(*net.UDPAddr) { called = true })
+	s.OnAddressChanged(nil)
+	s.SetAddr(a)
+	if called || !sameAddr(s.Addr(), a) {
+		t.Fatal("a removed observer was called, or SetAddr did not move")
+	}
+	u, _ := newUnsecured(t, m)
+	before := u.Addr()
+	u.adoptSource(&net.UDPAddr{IP: net.ParseIP("fd00::5"), Port: 5540})
+	if u.Addr() != before {
+		t.Fatal("an unsecured session moved")
 	}
 }
