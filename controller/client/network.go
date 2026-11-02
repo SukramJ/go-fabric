@@ -136,7 +136,15 @@ func (n *Node) syncAutoSubscribe(ctx context.Context) error {
 		}
 		n.recompute()
 	}
+	// A Stop (or Close) that ran during the initial read leaves the node
+	// stopped: no default subscription is established on it. Mirrors
+	// matter.js NetworkClient.ts:113-131 (each sync re-reads the node's
+	// runtime) (W4-ctlim-09).
 	n.mu.Lock()
+	if !n.started || n.closing {
+		n.mu.Unlock()
+		return nil
+	}
 	n.subOwner = owner
 	n.mu.Unlock()
 	s, err := n.subscribe(ctx, SubscribeRequest{SubscribeRequest: sreq}, isCurrent)
@@ -148,7 +156,12 @@ func (n *Node) syncAutoSubscribe(ctx context.Context) error {
 		n.mu.Unlock()
 		return err
 	}
-	n.adoptDefaultSubscription(s, &sub)
+	// Ended or replaced while it was being established — Stop cleared the
+	// owner: the new subscription closes instead of running on a stopped
+	// node (NetworkClient.ts:217-221, W4-ctlim-09).
+	if !n.adoptDefaultSubscription(s, &sub, owner) {
+		s.Close()
+	}
 	return nil
 }
 
@@ -161,13 +174,21 @@ type subscriptionOwner struct{ _ byte }
 // active before n.sub names it, and an ICD trigger that ran then read
 // SubscriptionActive false: the ICD client gets the edge again now that it
 // can see it (a duplicate trigger is absorbed by its own guards).
-func (n *Node) adoptDefaultSubscription(s *Subscription, own **Subscription) {
+//
+// It adopts s only while owner is current, checked under the lock that
+// Stop clears the owner under, and reports whether it did.
+func (n *Node) adoptDefaultSubscription(s *Subscription, own **Subscription, owner *subscriptionOwner) bool {
 	n.mu.Lock()
+	if n.subOwner != owner {
+		n.mu.Unlock()
+		return false
+	}
 	*own, n.sub = s, s
 	n.mu.Unlock()
 	if s.Active() && n.icd != nil {
 		n.icd.onSubscriptionActive(true)
 	}
+	return true
 }
 
 // bootstrapRead is the read a sustained default subscription performs

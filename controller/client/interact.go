@@ -126,7 +126,8 @@ func (n *Node) noteICDActive() {
 // hooks on the node's job queue, off the report's exchange
 // (ClientStructure.ts:417-439); a sustained
 // subscription's re-subscriptions send the versions then current and the
-// event minimum past the highest event seen (:148-155).
+// event minimum past the highest event it delivered itself, the
+// request's own event filters until then (:148-155, :162-168).
 //
 // A sustained subscription's re-subscription starts from the caller's own
 // filters, runs the caller's RefreshRequest on them, then injects the
@@ -188,8 +189,14 @@ func (n *Node) subscribe(ctx context.Context, sr SubscribeRequest, emitEvents fu
 			x = callerRefresh(x)
 		}
 		sc := newScope(x.Attributes, x.NoFabricFilter)
+		// The event filters stay the request's: the sustained
+		// subscription raises them past the highest event it delivered
+		// itself (requestNewEvents). Mirrors matter.js
+		// ClientNodeInteraction.ts:162-168 (refresh touches the version
+		// filters only) and SustainedSubscription.ts:379-384; the
+		// node-wide cursor here replaced a host's own filters
+		// (W4-ctlim-05).
 		n.mu.RLock()
-		x.EventFilters = []EventMinimumNumber{{EventMin: n.settings.maxEventNumber + 1}}
 		x.DataVersionFilters = withKnownVersions(sc, x.DataVersionFilters)
 		n.mu.RUnlock()
 		sentMu.Lock()

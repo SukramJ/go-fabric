@@ -4,14 +4,18 @@
 package interaction_test
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"net"
 	"testing"
 	"time"
 
+	"github.com/SukramJ/go-fabric/client/exchange"
 	"github.com/SukramJ/go-fabric/client/interaction"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	"github.com/SukramJ/go-fabric/im"
+	"github.com/SukramJ/go-fabric/secure/channel"
 	"github.com/SukramJ/go-fabric/tlv"
 )
 
@@ -241,4 +245,73 @@ func TestRawRoundTrip(t *testing.T) {
 		c[5].El.String != "s" || len(c[6].El.Octets) != 2 || !c[7].El.IsNull || c[8].El.Type != tlv.TypeList || c[8].Children[0].El.Uint != 1 {
 		t.Fatalf("round trip %+v", c)
 	}
+}
+
+// tcpChannel is a reliable channel with TCP's message size; it only
+// collects what is sent.
+type tcpChannel struct{ closed chan struct{} }
+
+func (c *tcpChannel) Send([]byte) error       { return nil }
+func (c *tcpChannel) Reliable() bool          { return true }
+func (c *tcpChannel) MaxMessageSize() int     { return 64000 }
+func (c *tcpChannel) Remote() net.Addr        { return &net.TCPAddr{IP: net.ParseIP("fd00::9"), Port: 5540} }
+func (c *tcpChannel) Close() error            { return nil }
+func (c *tcpChannel) Closed() <-chan struct{} { return c.closed }
+
+// newestTCP is a provider whose newest session is a TCP one while its
+// exchanges go over the UDP session of the embedded provider — the
+// transport resolution picking UDP next to a newer TCP session.
+type newestTCP struct {
+	interaction.Provider
+	tcp *exchange.Session
+}
+
+func (p newestTCP) Session() *exchange.Session { return p.tcp }
+
+// TestWriteChunksForTheExchangeSession (W4-ctlim-08): a write's chunks are
+// sized for the session its exchange goes on, not for the provider's
+// newest session: with a TCP session newest and the exchange on UDP, a
+// write larger than one UDP message is split. Mirrors matter.js
+// InteractionMessenger.ts:1333 (`const { maxPayloadSize } = this.exchange`).
+func TestWriteChunksForTheExchangeSession(t *testing.T) {
+	t.Parallel()
+	s := newScripted(t)
+	key := bytes.Repeat([]byte{0x33}, 16)
+	ch := &tcpChannel{closed: make(chan struct{})}
+	t.Cleanup(func() { close(ch.closed) }) // before the manager's Close, which waits for the channel
+	tcp, err := s.mgr.NewSecureSession(exchange.SecureSessionConfig{
+		ID: 0x0105, Addr: s.mgr.AttachChannel(ch), FabricIndex: 1,
+		Channel: channel.Config{EncryptKey: key, DecryptKey: key, LocalNodeID: 0x1111, PeerNodeID: 0x2222, PeerSessionID: 0x7105},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if tcp.MaxPayloadSize() <= exchange.MaxPayloadSize {
+		t.Fatal("the TCP session takes no larger payload")
+	}
+	c := interaction.Bind(newestTCP{Provider: interaction.SessionProvider(s.mgr, s.session), tcp: tcp}, interaction.Config{})
+	var writes []interaction.WriteRequest
+	for i := range 40 {
+		writes = append(writes, interaction.WriteRequest{
+			Path:  attrPath(1, 0xFFF1FC00, uint32(i)),
+			Value: interaction.Raw(spec.Node{El: tlv.Element{Type: tlv.TypeOctetStr1, Octets: bytes.Repeat([]byte{0xAB}, 64)}}),
+		})
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		_, _ = c.Write(ctx, writes, interaction.WriteOptions{})
+	}()
+	first := s.next(t)
+	req, err := im.UnmarshalWriteRequestTLV(tlv.NewDecoder(first.payload), nodeReader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !req.MoreChunkedMessages || len(first.payload) > exchange.MaxPayloadSize {
+		t.Fatalf("first chunk %d bytes, more %v: want a UDP-sized chunk with more to come", len(first.payload), req.MoreChunkedMessages)
+	}
+	cancel()
+	<-done
 }

@@ -132,21 +132,20 @@ func (c *Interaction) Write(ctx context.Context, writes []WriteRequest, opts Wri
 	if err != nil {
 		return nil, err
 	}
-	// The chunks fit the payload of the session the write goes on: a TCP
-	// session takes larger messages (MessageExchange.maxPayloadSize).
-	maxPayload := exchange.MaxPayloadSize
-	if s := c.provider.Session(); s != nil {
-		maxPayload = s.MaxPayloadSize()
-	}
-	chunks, err := chunkWrite(req, maxPayload)
-	if err != nil {
-		return nil, err
-	}
 	m, ctx, err := c.begin(ctx, opts.exchangeOptions())
 	if err != nil {
 		return nil, err
 	}
 	defer m.close()
+	// The chunks fit the payload of the session the exchange goes on — a
+	// TCP session takes larger messages — chosen by the exchange, not the
+	// provider's newest session. Mirrors matter.js
+	// InteractionMessenger.ts:1333 (`const { maxPayloadSize } =
+	// this.exchange`) (W4-ctlim-08).
+	chunks, err := chunkWrite(req, m.x.Session().MaxPayloadSize())
+	if err != nil {
+		return nil, err
+	}
 	if req.TimedRequest {
 		timeout := opts.TimedTimeout
 		if timeout == 0 {

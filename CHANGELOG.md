@@ -46,6 +46,7 @@ Findings of the whole-codebase review of 2026-11-01 (`notes/review/2026-11/`).
 - `exchange.Session.OnAddressChanged`: the observer of a session's address moves — matter.js `MessageChannel.networkAddressChanged`; the peer follows it into its operational address (W4-ctlnet-02).
 - `schema.IsTimedWrite(cluster, attribute)`: whether an attribute carries the timed access quality, generated from the snapshot next to `IsTimedInvoke` (empty at the pin) (W4-ctlim-02).
 - `otaimage.MaxHeaderSize`: the largest OTA header TLV `ReadHeader` accepts (1024, connectedhomeip's `kMaxHeaderSize`) (W4-ctlint-07).
+- `exchange.Manager.LocalFixedMrpBackoff` and `exchange.Manager.LocalPad`: the manager's sender-side fixed backoff and the pad `MaxPeerResponseTimePadded` takes (W4-ctlim-07).
 
 ### Changed
 
@@ -116,6 +117,10 @@ Findings of the whole-codebase review of 2026-11-01 (`notes/review/2026-11/`).
 - `controller/dcl`, `thread/otbr`: the ledger, GitHub and border-router answers are read through a 16 MiB bound and a paginated ledger listing stops after 1000 pages; a misbehaving endpoint was buffered whole (W4-ctlint-10).
 - `controller/dcl`: `CertificateStore.Close` cancels a running periodic update before it waits for it; a shutdown during the daily update waited for every remaining root to be fetched or time out (W4-ctlint-12).
 - Docs: ADR 0027, the `thread/otbr` package doc and the Thread Border Router guide state that the OTBR REST link is plaintext and belongs on a trusted LAN (W4-ctlint-11); the `ble/esphome` package doc, the BLE proxies guide and `BD-Controller-BleOverEsphomeProxies` name the silence watch's false positive in a BLE-quiet place and its remedy, a longer `Options.SilenceTimeout` (W4-ctlint-13).
+- `controller/client`: a host's sustained subscription re-subscribes with its own event filters until it delivered an event itself; the node-wide event cursor replaced them on every re-subscription (W4-ctlim-05).
+- `controller/client`: cache flushes are serialised across snapshot and store write, and a direct flush stops the armed timer, so an older flush can no longer land after a newer one (W4-ctlim-06).
+- `client/interaction`: the subscription liveness timeout pads our own retransmissions with the manager's local MRP margin and fixed backoff, as matter.js does (W4-ctlim-07); a write is chunked, and a Read or Subscribe request fitted, for the session its exchange goes on, not the provider's newest session (W4-ctlim-08, W4-ctlim-11); a sustained subscription announces going live again when it is re-established while live (W4-ctlim-10).
+- `controller/client`: a `Stop` during a newly commissioned node's initial read leaves the node without a default subscription; one was established on the stopped node (W4-ctlim-09).
 
 ## [0.15.6] — 2026-11-01
 

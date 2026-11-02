@@ -209,6 +209,17 @@ func NewManager(conn Conn, cfg Config) (*Manager, error) {
 // SessionManager.localAdditionalMrpDelay.
 func (m *Manager) LocalAdditionalMrpDelay() time.Duration { return m.localAdditional }
 
+// LocalFixedMrpBackoff is our sender-side fixed MRP backoff
+// ([Config].LocalFixedMrpBackoff) — matter.js
+// SessionManager.localFixedMrpBackoff.
+func (m *Manager) LocalFixedMrpBackoff() time.Duration { return m.localFixed }
+
+// LocalPad is the pad our own retransmissions carry: the local additional
+// delay and the fixed backoff, as [MaxPeerResponseTimePadded] takes them.
+func (m *Manager) LocalPad() Pad {
+	return Pad{Additional: m.localAdditional, Fixed: m.localFixed}
+}
+
 // LocalParameters is our session parameters.
 func (m *Manager) LocalParameters() sessionparams.Parameters { return m.local }
 

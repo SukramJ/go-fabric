@@ -59,18 +59,20 @@ func (c *Interaction) ReadWith(ctx context.Context, r ReadRequest) (*Report, err
 	if n := len(r.Attributes) + len(r.Events); n > c.provider.ReadPathsSupported() {
 		c.log.Info("matter.controller.interaction.read_paths", slog.Int("paths", n), slog.Int("supported", c.provider.ReadPathsSupported()))
 	}
-	req, err := encodeReadingRequest(im.ReadRequest{
-		AttributeRequests: r.Attributes, EventRequests: r.Events, EventFilters: r.EventFilters,
-		FabricFiltered: !r.NoFabricFilter, DataVersionFilters: r.DataVersionFilters,
-	})
-	if err != nil {
-		return nil, err
-	}
 	m, ctx, err := c.begin(ctx, r.exchangeOptions())
 	if err != nil {
 		return nil, err
 	}
 	defer m.close()
+	// Fitted to the exchange's session, after the exchange chose it
+	// (InteractionMessenger.ts:1145-1165, W4-ctlim-11).
+	req, err := encodeFitting(readRequest(im.ReadRequest{
+		AttributeRequests: r.Attributes, EventRequests: r.Events, EventFilters: r.EventFilters,
+		FabricFiltered: !r.NoFabricFilter, DataVersionFilters: r.DataVersionFilters,
+	}), m.x.Session().MaxPayloadSize())
+	if err != nil {
+		return nil, err
+	}
 	if err := m.send(ctx, im.OpcodeReadRequest, req, 0); err != nil {
 		return nil, err
 	}
@@ -104,9 +106,9 @@ func (r readRequest) encode(filters []im.DataVersionFilter) ([]byte, error) {
 
 func (r readRequest) filters() []im.DataVersionFilter { return r.DataVersionFilters }
 
-// encodeReadingRequest encodes a ReadRequest to fit one message.
+// encodeReadingRequest encodes a ReadRequest to fit one UDP message.
 func encodeReadingRequest(r im.ReadRequest) ([]byte, error) {
-	return encodeFitting(readRequest(r))
+	return encodeFitting(readRequest(r), exchange.MaxPayloadSize)
 }
 
 // emptyArraySize is what matter.js's `dataVersionFilters: []` adds to the
@@ -116,12 +118,14 @@ const emptyArraySize = 3
 
 // encodeFitting is #encodeReadingRequest and #shortenDataVersionFilters
 // (InteractionMessenger.ts:998-1050): the request as it is when it fits
-// exchange.MaxPayloadSize; otherwise without filters, an error when even
-// that does not fit; otherwise with as many filters, in order, as fit the
-// space left, the first that does not fit ending the list.
-func encodeFitting(r readingRequest) ([]byte, error) {
+// maxPayload — the exchange's session's, this.exchange.maxPayloadSize
+// (:1145-1165), larger on TCP (W4-ctlim-11); otherwise without filters,
+// an error when even that does not fit; otherwise with as many filters,
+// in order, as fit the space left, the first that does not fit ending the
+// list.
+func encodeFitting(r readingRequest, maxPayload int) ([]byte, error) {
 	b, err := r.encode(r.filters())
-	if err != nil || len(b) <= exchange.MaxPayloadSize {
+	if err != nil || len(b) <= maxPayload {
 		return b, err
 	}
 	without, err := r.encode(nil)
@@ -129,10 +133,10 @@ func encodeFitting(r readingRequest) ([]byte, error) {
 		return nil, err
 	}
 	base := len(without) + emptyArraySize
-	if base > exchange.MaxPayloadSize {
+	if base > maxPayload {
 		return nil, fmt.Errorf("%w: %d bytes without DataVersionFilters", ErrRequestTooLarge, len(without))
 	}
-	available := exchange.MaxPayloadSize - base
+	available := maxPayload - base
 	var kept []im.DataVersionFilter
 	for _, f := range r.filters() {
 		size := im.DataVersionFilterSize(f)

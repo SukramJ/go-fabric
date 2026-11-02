@@ -194,19 +194,6 @@ func (c *Interaction) Subscribe(ctx context.Context, req SubscribeRequest) (*Sub
 
 // subscribeOnce is the attempt of CI:1023-1078.
 func (c *Interaction) subscribeOnce(ctx context.Context, peer exchange.PeerAddress, req SubscribeRequest, floor, ceiling time.Duration, opts ExchangeOptions) (*Subscription, error) {
-	payload, err := encodeFitting(subscribeRequest(im.SubscribeRequest{
-		KeepSubscriptions:  !req.ReplaceSubscriptions,
-		MinIntervalFloor:   uint16(floor / time.Second),   //nolint:gosec // bounded to 65535 s by Subscribe
-		MaxIntervalCeiling: uint16(ceiling / time.Second), //nolint:gosec // bounded to 65535 s by Subscribe
-		AttributeRequests:  req.Attributes,
-		EventRequests:      req.Events,
-		EventFilters:       req.EventFilters,
-		FabricFiltered:     !req.NoFabricFilter,
-		DataVersionFilters: req.DataVersionFilters,
-	}))
-	if err != nil {
-		return nil, err
-	}
 	m, ctx, err := c.begin(ctx, opts)
 	if err != nil {
 		return nil, err
@@ -217,6 +204,21 @@ func (c *Interaction) subscribeOnce(ctx context.Context, peer exchange.PeerAddre
 			m.close()
 		}
 	}()
+	// Fitted to the exchange's session, after the exchange chose it
+	// (InteractionMessenger.ts:1145-1165, W4-ctlim-11).
+	payload, err := encodeFitting(subscribeRequest(im.SubscribeRequest{
+		KeepSubscriptions:  !req.ReplaceSubscriptions,
+		MinIntervalFloor:   uint16(floor / time.Second),   //nolint:gosec // bounded to 65535 s by Subscribe
+		MaxIntervalCeiling: uint16(ceiling / time.Second), //nolint:gosec // bounded to 65535 s by Subscribe
+		AttributeRequests:  req.Attributes,
+		EventRequests:      req.Events,
+		EventFilters:       req.EventFilters,
+		FabricFiltered:     !req.NoFabricFilter,
+		DataVersionFilters: req.DataVersionFilters,
+	}), m.x.Session().MaxPayloadSize())
+	if err != nil {
+		return nil, err
+	}
 	// A failed establishment is abandoned, not dropped: the request may
 	// have reached the peer, which may hold the subscription and send its
 	// report — unless the peer or the session ended it (ClientInteraction.ts:1084-1097

@@ -141,6 +141,11 @@ type persister struct {
 	// applied, gathers the unbuffered writes for the job queue.
 	collect *[]saveJob
 
+	// flushMu serialises the flushes, snapshot and store writes together,
+	// so an older flush cannot land after a newer one — matter.js runs
+	// every flush through one mutex (ClientCacheBuffer.ts:24, :79-80,
+	// :174-175) (W4-ctlim-06). It is taken before the node's lock.
+	flushMu sync.Mutex
 	// mu guards dirty, flushing, stopped and timer.
 	mu      sync.Mutex
 	dirty   []*cache
@@ -258,10 +263,18 @@ type flushJob struct {
 // cache that fails keeps its dirty keys and is retried next cycle
 // (:297-303, ClientCacheBuffer.ts:122-130).
 func (p *persister) flush() {
+	p.flushMu.Lock()
+	defer p.flushMu.Unlock()
 	p.image.Lock()
 	p.mu.Lock()
 	snapshot := p.dirty
 	p.dirty = nil
+	// A direct flush takes the armed timer's work: the timer stops, so no
+	// second timer is armed next to it (the timer's own flush finds its
+	// timer fired and Stop false).
+	if p.timer != nil && p.timer.Stop() {
+		p.flushing.Done()
+	}
 	p.timer = nil
 	p.mu.Unlock()
 	var jobs []flushJob
