@@ -25,8 +25,9 @@
 #     (docs/adr/0011-certifiability-is-a-goal.md): the families run with PICS
 #     generated from the device, every excluded case carries its class and
 #     reason, and docs/certifiability.md is the status. An unlabelled pull
-#     request runs the core groups (core-su, core-idm, core-ace, core-rest,
-#     in parallel); the `needs-chiptool` label adds the application groups;
+#     request runs the core groups (core-su, core-idm, core-ace, core-rest)
+#     and the commissioning group, in parallel; the `needs-chiptool` label
+#     adds the application groups;
 #     the nightly run and a manual dispatch run all of them, including
 #     `long`, the families whose one case waits for hours by design
 #     (TC-DGGEN-2.1 sits through 3 h 10 min of literal waits for
@@ -129,8 +130,11 @@ jobs:
       # One place for the split (TestWorkflowRunsEveryFamily holds it to the
       # family table): the groups divide internal/chiptool's family table so
       # no job exceeds the runner's six hours. An unlabelled pull request runs
-      # the core-* groups only; the `needs-chiptool` label adds every group
-      # but `long`; the nightly run and a manual dispatch run every group.
+      # the core-* groups and `commissioning` (TC-SC, TC-DA, TC-CADMIN and the
+      # rest: a change under secure/, commissioning/, bridge/ or transport/
+      # must not merge before they ran, W6-test-04); the `needs-chiptool`
+      # label adds every group but `long`; the nightly run and a manual
+      # dispatch run every group.
       # `long` holds the families whose case budget is hours (the family
       # table's timeout: TC-DGGEN-2.1 waits 3 h 10 min by design,
       # connectedhomeip#29580), so a pull request's chip run ends in under
@@ -163,13 +167,13 @@ jobs:
             "app-media=ALOGIN,APBSC,APPLAUNCHER,APPOBSERVER,AUDIOOUTPUT,CHANNEL,CONTENTLAUNCHER,KEYPADINPUT,LOWPOWER,MEDIAINPUT,MEDIAPLAYBACK,TGTNAV,WAKEONLAN"
             "long=DGGEN"
           )
-          # core-*: every event. long: never a pull request. The rest:
-          # every event but an unlabelled pull request.
+          # core-* and commissioning: every event. long: never a pull
+          # request. The rest: every event but an unlabelled pull request.
           include="[]"
           for entry in "${groups[@]}"; do
             group="${entry%%=*}"; families="${entry#*=}"
             runs=false
-            if [[ "$group" == core-* ]]; then
+            if [[ "$group" == core-* ]] || [ "$group" = commissioning ]; then
               runs=true
             elif [ "$group" = long ]; then
               if [ "$EVENT" != "pull_request" ]; then runs=true; fi
