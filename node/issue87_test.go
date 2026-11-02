@@ -39,7 +39,7 @@ type centralKey struct{ central, device string }
 
 func (k centralKey) String() string { return k.central + "/" + k.device }
 
-// TestHostTopology: with Config.Topology the bridge serves the host's own
+// TestHostTopology: with Config.Snapshotter the bridge serves the host's own
 // snapshotter — two scopes, each with its own completeness, host key
 // types — the facade builds no Aggregator, and the root's and Aggregator's
 // PartsList providers still see the host's endpoints.
@@ -67,7 +67,7 @@ func TestHostTopology(t *testing.T) {
 		spec.StableKey = key
 		return spec
 	}
-	cfg.Topology = func(ctx context.Context) (*endpoint.Topology, error) {
+	cfg.Snapshotter = func(ctx context.Context) (*endpoint.Topology, error) {
 		mu.Lock()
 		calls++
 		mu.Unlock()

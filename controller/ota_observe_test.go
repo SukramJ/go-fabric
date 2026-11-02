@@ -90,7 +90,7 @@ func TestOTAObserveAppliedUpdate(t *testing.T) {
 // → #cancelUpdate, SoftwareUpdateManager.ts:1217-1232, :1091-1123).
 func TestOTAObserveRemovedConsent(t *testing.T) {
 	t.Parallel()
-	r := newOTARigWith(t, nil, &node.OtaConfig{Dir: filepath.Join(t.TempDir(), "ota")})
+	r := newOTARigWith(t, nil, &node.OTAConfig{Dir: filepath.Join(t.TempDir(), "ota")})
 	r.storeImage(t, 2)
 	mgr := r.c.SoftwareUpdates()
 	u := &updateEvents{}

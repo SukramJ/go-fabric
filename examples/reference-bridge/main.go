@@ -422,7 +422,7 @@ func nodeConfig(f flags, passcode uint32, discriminator uint16, tcp node.TCPConf
 		Store: node.Store{Path: f.dbPath},
 		// The OTA Software Update Requestor (ADR 0019) on the root, with
 		// the daemon's applier (ota.go).
-		OTA: &node.OtaConfig{Dir: applier.dir, Applier: applier},
+		OTA: &node.OTAConfig{Dir: applier.dir, Applier: applier},
 		FixedLabels: []fixedlabeldef.LabelStruct{
 			{Label: "role", Value: "bridge"},
 			{Label: "example", Value: "reference"},

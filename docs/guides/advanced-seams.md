@@ -91,7 +91,7 @@ facade does not configure. The served topology and a device's reachability
 have facade routes (`Node.Topology`, `Device.SetReachable`; see the table
 above); the bridge's `Topology` stays for the whole endpoint tree with its
 cluster servers, `NotifyDeviceReachable` for a host that assembles its own
-endpoints behind `Config.Topology`. The facade's own ports are listed in
+endpoints behind `Config.Snapshotter`. The facade's own ports are listed in
 [Host ports](ports.md); the bridge's package doc lists every port in call
 order with what a skip costs
 ([`bridge/bridge.go`](https://github.com/SukramJ/go-fabric/blob/main/bridge/bridge.go)).
@@ -113,7 +113,7 @@ semantics, the persistence the facade threads through. A host that drives
 
 **When.** A host that assembles its own topology from its own device model
 — its own `Spec` producer feeding an `endpoint.Assembler` behind
-`Config.Topology` (a `node.Snapshotter`); the `Endpoint` and `Topology`
+`Config.Snapshotter` (a `node.Snapshotter`); the `Endpoint` and `Topology`
 values the assembler returns are read-only to the host, and a hand-built
 topology loses its DataVersions, Groups and Scenes state, and a written
 NodeLabel, on every `Reassemble` — as
@@ -124,13 +124,13 @@ facade's group state (`Node.Groups`) and endpoint persistence
 A sensor built from a classified measurement source does not need the
 seam: `device.Measurement(src)` mounts it on a device of the kit.
 
-**Costs.** With `Config.Topology` the node builds no assembler and no
+**Costs.** With `Config.Snapshotter` the node builds no assembler and no
 `Aggregator` (`Node.Aggregator` is nil). Endpoint numbering, erasing
 the numbers of devices that are gone (`Store.RemoveEndpoint`), device-type
 validation of the bridged endpoints and the bridged NodeLabel and scene
 persistence are the host assembler's to get right.
 
-*Source: `node/config.go` (`Config.Topology`, `Config.EndpointPersistence`), `node/node.go` (`New`: the assembler only without `Topology`), `node/persist.go` (`NewEndpointPersistence`).*
+*Source: `node/config.go` (`Config.Snapshotter`, `Config.EndpointPersistence`), `node/node.go` (`New`: the assembler only without `Topology`), `node/persist.go` (`NewEndpointPersistence`).*
 
 ## `store`
 

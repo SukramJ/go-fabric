@@ -20,7 +20,7 @@ err = n.Run(ctx)                                // Start, wait for ctx, Stop
 root's labels and locales, the Aggregator's Actions server) and the steps
 the facade leaves to the host on its accessors: the test event triggers
 (`Root().GeneralDiagnostics`), the OTA applier (`ota.go`, handed over as
-`node.OtaConfig.Applier`), the mDNS subtype responder, the providers that
+`node.OTAConfig.Applier`), the mDNS subtype responder, the providers that
 name endpoints by StableKey (`fleet_node.go`), the banner and the topology
 listing. `fleet.go` `endpoints` builds the devices:
 

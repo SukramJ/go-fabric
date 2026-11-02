@@ -496,7 +496,7 @@ func TestConfigValidate(t *testing.T) {
 		{"vendor", func(c *node.Config) { c.ProductDescription.VendorID = 0 }},
 		{"label", func(c *node.Config) { c.BasicInformation.NodeLabel = " " }},
 		{"store", func(c *node.Config) { c.Store = node.Store{} }},
-		{"ota dir", func(c *node.Config) { c.OTA = &node.OtaConfig{} }},
+		{"ota dir", func(c *node.Config) { c.OTA = &node.OTAConfig{} }},
 	}
 	for _, c := range cases {
 		cfg := minimalConfig(db)
@@ -519,7 +519,7 @@ func TestConfigValidate(t *testing.T) {
 func TestOTARequestorMounted(t *testing.T) {
 	t.Parallel()
 	cfg := minimalConfig(openDB(t, filepath.Join(t.TempDir(), "node.db")))
-	cfg.OTA = &node.OtaConfig{Dir: filepath.Join(t.TempDir(), "ota")}
+	cfg.OTA = &node.OTAConfig{Dir: filepath.Join(t.TempDir(), "ota")}
 	n := newNode(t, cfg)
 	if n.Root().OTARequestor == nil {
 		t.Fatal("no OTA requestor")

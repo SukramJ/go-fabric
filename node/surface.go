@@ -105,7 +105,7 @@ func rootCandidates(cfg *Config) []surface.Element {
 			}
 			out = append(out, surface.Element{
 				Cluster: cid, Kind: surface.KindFeature, ID: bit,
-				Origin: surface.OriginHostDeclared, Reference: surface.Reference{Ahead: row},
+				Provenance: surface.ProvenanceHostDeclared, Reference: surface.Reference{Ahead: row},
 			})
 		}
 	}
@@ -218,12 +218,12 @@ func (n *Node) levelRootClusters() error {
 	cands := make([]surface.Element, 0, len(n.root.servers))
 	for _, s := range n.root.servers {
 		id := s.MatterClusterID()
-		el := surface.Element{Cluster: id, Kind: surface.KindCluster, ID: id, Origin: surface.OriginKitDefault}
+		el := surface.Element{Cluster: id, Kind: surface.KindCluster, ID: id, Provenance: surface.ProvenanceKitDefault}
 		switch {
 		case rootMandatory(id):
-			el.Origin, el.Mandatory = surface.OriginDeviceType, true
+			el.Provenance, el.Mandatory = surface.ProvenanceDeviceType, true
 		case configured[id]:
-			el.Origin = surface.OriginHostDeclared
+			el.Provenance = surface.ProvenanceHostDeclared
 		default:
 		}
 		el.Levels = surface.ElementLevels(el)

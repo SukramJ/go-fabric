@@ -487,7 +487,7 @@ func (s staticOperational) ResolveOperational(context.Context, [8]byte, uint64) 
 // console grants the consent. Not parallel.
 func TestReferenceControllerOTA(t *testing.T) {
 	h := startHarness(t, func(c *node.Config) {
-		c.OTA = &node.OtaConfig{Dir: filepath.Join(t.TempDir(), "ota")}
+		c.OTA = &node.OTAConfig{Dir: filepath.Join(t.TempDir(), "ota")}
 		nodeseam.UseOTAHarness(c)
 	})
 	tl := newTool(t, h)

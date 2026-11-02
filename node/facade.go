@@ -26,7 +26,7 @@ import (
 // original keeps compiling. docs/guides/advanced-seams.md lists what stays
 // reachable only below the facade.
 
-// Snapshotter is the type of [Config].Topology: a host that assembles its
+// Snapshotter is the type of [Config].Snapshotter: a host that assembles its
 // own endpoints returns one [Topology] per call ([bridge.Snapshotter]).
 type Snapshotter = bridge.Snapshotter
 
@@ -142,7 +142,7 @@ type OTAPeer = mattercore.OTAPeer
 // OTAUpdateStatus is the status [Node.OnOTAProviderStatus] reports for a requestor ([mattercore.OTAUpdateStatus]).
 type OTAUpdateStatus = mattercore.OTAUpdateStatus
 
-// OTAApplier is the type of [OtaConfig].Applier: the requestor's consent and apply hooks ([mattercore.OtaApplier]).
+// OTAApplier is the type of [OTAConfig].Applier: the requestor's consent and apply hooks ([mattercore.OtaApplier]).
 type OTAApplier = mattercore.OtaApplier
 
 // WiFiReporter is the type of [WiFi].Reporter: the live Wi-Fi diagnostics the host reports ([mattercore.WiFiReporter]).

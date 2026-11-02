@@ -16,12 +16,12 @@ import (
 
 func candidates() []surface.Element {
 	return []surface.Element{
-		{Endpoint: "light", Kind: surface.KindDeviceType, ID: 0x0100, Origin: surface.OriginDeviceType, Mandatory: true},
-		{Endpoint: "light", Cluster: 6, Kind: surface.KindCluster, ID: 6, Origin: surface.OriginDeviceType, Mandatory: true},
-		{Endpoint: "light", Cluster: 6, Kind: surface.KindFeature, ID: 0x1, Origin: surface.OriginDeviceType, Mandatory: true},
-		{Endpoint: "light", Cluster: 6, Kind: surface.KindFeature, ID: 0x4, Origin: surface.OriginHostDeclared},
-		{Endpoint: "light", Cluster: 6, Kind: surface.KindAttribute, ID: 0x4001, Origin: surface.OriginHostDeclared},
-		{Endpoint: "light", Cluster: 0x0300, Kind: surface.KindCluster, ID: 0x0300, Origin: surface.OriginHostDeclared},
+		{Endpoint: "light", Kind: surface.KindDeviceType, ID: 0x0100, Provenance: surface.ProvenanceDeviceType, Mandatory: true},
+		{Endpoint: "light", Cluster: 6, Kind: surface.KindCluster, ID: 6, Provenance: surface.ProvenanceDeviceType, Mandatory: true},
+		{Endpoint: "light", Cluster: 6, Kind: surface.KindFeature, ID: 0x1, Provenance: surface.ProvenanceDeviceType, Mandatory: true},
+		{Endpoint: "light", Cluster: 6, Kind: surface.KindFeature, ID: 0x4, Provenance: surface.ProvenanceHostDeclared},
+		{Endpoint: "light", Cluster: 6, Kind: surface.KindAttribute, ID: 0x4001, Provenance: surface.ProvenanceHostDeclared},
+		{Endpoint: "light", Cluster: 0x0300, Kind: surface.KindCluster, ID: 0x0300, Provenance: surface.ProvenanceHostDeclared},
 	}
 }
 
@@ -249,14 +249,14 @@ func TestReportJSON(t *testing.T) {
 }
 
 func TestEnumNames(t *testing.T) {
-	if surface.KindEvent.String() != "event" || surface.OriginKitDefault.String() != "kit-default" || surface.Refuse.String() != "refuse" {
+	if surface.KindEvent.String() != "event" || surface.ProvenanceKitDefault.String() != "kit-default" || surface.Refuse.String() != "refuse" {
 		t.Fatal("enum names")
 	}
-	if surface.Kind(0).String() != "0" || surface.Origin(77).String() != "77" {
+	if surface.Kind(0).String() != "0" || surface.Provenance(77).String() != "77" {
 		t.Fatal("an unnamed value renders as its number")
 	}
-	var o surface.Origin
-	if err := o.UnmarshalText([]byte("cluster-mandatory")); err != nil || o != surface.OriginClusterMandatory {
+	var o surface.Provenance
+	if err := o.UnmarshalText([]byte("cluster-mandatory")); err != nil || o != surface.ProvenanceClusterMandatory {
 		t.Fatalf("origin %v %v", o, err)
 	}
 	var v surface.Verdict

@@ -361,39 +361,39 @@ type (
 		Withheld    []wireElement       `json:"withheld"`
 	}
 	wireElement struct {
-		Cluster   id32   `json:"cluster"`
-		Endpoint  string `json:"endpoint"`
-		ID        kindID `json:"id"`
-		Kind      Kind   `json:"kind"`
-		Mandatory bool   `json:"mandatory"`
-		Origin    Origin `json:"origin"`
-		Reference string `json:"reference"`
+		Cluster    id32       `json:"cluster"`
+		Endpoint   string     `json:"endpoint"`
+		ID         kindID     `json:"id"`
+		Kind       Kind       `json:"kind"`
+		Mandatory  bool       `json:"mandatory"`
+		Provenance Provenance `json:"origin"`
+		Reference  string     `json:"reference"`
 	}
 	wireDecision struct {
-		Cluster   id32    `json:"cluster"`
-		Endpoint  string  `json:"endpoint"`
-		ID        kindID  `json:"id"`
-		Kind      Kind    `json:"kind"`
-		Mandatory bool    `json:"mandatory"`
-		Origin    Origin  `json:"origin"`
-		Policy    string  `json:"policy"`
-		Reason    string  `json:"reason"`
-		Reference string  `json:"reference"`
-		Verdict   Verdict `json:"verdict"`
+		Cluster    id32       `json:"cluster"`
+		Endpoint   string     `json:"endpoint"`
+		ID         kindID     `json:"id"`
+		Kind       Kind       `json:"kind"`
+		Mandatory  bool       `json:"mandatory"`
+		Provenance Provenance `json:"origin"`
+		Policy     string     `json:"policy"`
+		Reason     string     `json:"reason"`
+		Reference  string     `json:"reference"`
+		Verdict    Verdict    `json:"verdict"`
 	}
 )
 
 func elementWire(e Element) wireElement {
 	return wireElement{
 		Cluster: id32(e.Cluster), Endpoint: e.Endpoint, ID: idOf(e.Kind, e.ID), Kind: e.Kind,
-		Mandatory: e.Mandatory, Origin: e.Origin, Reference: e.Reference.Ahead,
+		Mandatory: e.Mandatory, Provenance: e.Provenance, Reference: e.Reference.Ahead,
 	}
 }
 
 func (w wireElement) value() Element {
 	return Element{
 		Endpoint: w.Endpoint, Cluster: uint32(w.Cluster), Kind: w.Kind, ID: w.ID.v,
-		Origin: w.Origin, Reference: Reference{Ahead: w.Reference}, Mandatory: w.Mandatory,
+		Provenance: w.Provenance, Reference: Reference{Ahead: w.Reference}, Mandatory: w.Mandatory,
 	}
 }
 
@@ -420,7 +420,7 @@ func (r Report) MarshalJSON() ([]byte, error) {
 		e := elementWire(d.Element)
 		w.Decisions = append(w.Decisions, wireDecision{
 			Cluster: e.Cluster, Endpoint: e.Endpoint, ID: e.ID, Kind: e.Kind, Mandatory: e.Mandatory,
-			Origin: e.Origin, Policy: d.Policy, Reason: d.Reason, Reference: e.Reference, Verdict: d.Verdict,
+			Provenance: e.Provenance, Policy: d.Policy, Reason: d.Reason, Reference: e.Reference, Verdict: d.Verdict,
 		})
 	}
 	for _, e := range r.Withheld {
@@ -464,7 +464,7 @@ func (r *Report) UnmarshalJSON(b []byte) error {
 	for _, d := range w.Decisions {
 		el := wireElement{
 			Cluster: d.Cluster, Endpoint: d.Endpoint, ID: d.ID, Kind: d.Kind,
-			Mandatory: d.Mandatory, Origin: d.Origin, Reference: d.Reference,
+			Mandatory: d.Mandatory, Provenance: d.Provenance, Reference: d.Reference,
 		}.value()
 		out.Decisions = append(out.Decisions, Decision{Element: el, Policy: d.Policy, Verdict: d.Verdict, Reason: d.Reason})
 	}

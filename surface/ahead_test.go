@@ -24,10 +24,10 @@ const (
 // rowB, and an ahead attribute of rowA that is mandatory.
 func aheadCandidates() []surface.Element {
 	return []surface.Element{
-		{Endpoint: "t", Cluster: 0x0201, Kind: surface.KindFeature, ID: 1, Origin: surface.OriginHostDeclared},
-		{Endpoint: "t", Cluster: 0x0201, Kind: surface.KindFeature, ID: 0x80, Origin: surface.OriginHostDeclared, Reference: surface.Reference{Ahead: rowA}},
-		{Endpoint: "t", Cluster: 0x0201, Kind: surface.KindFeature, ID: 0x200, Origin: surface.OriginHostDeclared, Reference: surface.Reference{Ahead: rowB}},
-		{Endpoint: "t", Cluster: 0x0201, Kind: surface.KindAttribute, ID: 0x51, Origin: surface.OriginDeviceType, Mandatory: true, Reference: surface.Reference{Ahead: rowA}},
+		{Endpoint: "t", Cluster: 0x0201, Kind: surface.KindFeature, ID: 1, Provenance: surface.ProvenanceHostDeclared},
+		{Endpoint: "t", Cluster: 0x0201, Kind: surface.KindFeature, ID: 0x80, Provenance: surface.ProvenanceHostDeclared, Reference: surface.Reference{Ahead: rowA}},
+		{Endpoint: "t", Cluster: 0x0201, Kind: surface.KindFeature, ID: 0x200, Provenance: surface.ProvenanceHostDeclared, Reference: surface.Reference{Ahead: rowB}},
+		{Endpoint: "t", Cluster: 0x0201, Kind: surface.KindAttribute, ID: 0x51, Provenance: surface.ProvenanceDeviceType, Mandatory: true, Reference: surface.Reference{Ahead: rowA}},
 	}
 }
 

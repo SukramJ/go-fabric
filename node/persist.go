@@ -56,7 +56,7 @@ type persisted struct {
 
 // EndpointPersistence is the endpoint-level stack state the facade keeps
 // for its own assembler, exported for a host that assembles its endpoints
-// itself ([Config].Topology, issue #117): a bridged endpoint's scene table
+// itself ([Config].Snapshotter, issue #117): a bridged endpoint's scene table
 // (endpoint.Config.Scenes, under "scenes.<key>") and the per-endpoint
 // NodeLabel a commissioner wrote (endpoint.Config.OnNodeLabelWritten,
 // under "bridged_node_label.<key>"), each keyed by the endpoint's stable

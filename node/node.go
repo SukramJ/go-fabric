@@ -239,9 +239,9 @@ func New(ctx context.Context, cfg Config) (*Node, error) { //nolint:funlen // th
 
 	// --- the topology assembler and the Aggregator (main.go:167-186 at b4ea1f96^) ----
 	// A host with its own assembler supplies the bridge's Snapshotter
-	// instead (Config.Topology), as the daemon did before the facade.
+	// instead (Config.Snapshotter), as the daemon did before the facade.
 	pd, bi := cfg.ProductDescription, cfg.BasicInformation
-	snapshotter := cfg.Topology
+	snapshotter := cfg.Snapshotter
 	if snapshotter == nil {
 		n.assembler, err = endpoint.New(n.cfg.Store.Endpoints, endpoint.Config{
 			VendorID:           pd.VendorID,
@@ -973,7 +973,7 @@ func (n *Node) LocalAddr() string { return n.br.LocalAddr() }
 func (n *Node) Root() *RootClusters { return n.root }
 
 // Aggregator returns the Aggregator endpoint's bridged-device set — nil
-// when the host assembles its own topology ([Config].Topology).
+// when the host assembles its own topology ([Config].Snapshotter).
 func (n *Node) Aggregator() *Aggregator { return n.agg }
 
 // Sessions returns the secure-session manager, for a host's diagnostics
@@ -1057,7 +1057,7 @@ func (n *Node) Store() store.Port { return n.st }
 // Persistence is the endpoint-level persistence (scene tables, bridged
 // NodeLabels) the facade's assembler uses: [Config].EndpointPersistence
 // when set, else the facade's own over [Node.Store] — what a host with its
-// own assembler ([Config].Topology) hands that assembler (issue #117).
+// own assembler ([Config].Snapshotter) hands that assembler (issue #117).
 func (n *Node) Persistence() EndpointPersistence { return n.endpoints }
 
 // Groups returns the group state the node runs on — [Config].Groups, or

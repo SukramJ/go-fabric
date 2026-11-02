@@ -58,10 +58,11 @@ facade one shape. Each row names what a host writes now.
 | `device.WithServer`, `device.Option`, `device.TypeByID` | `device.HostServer(srv)`; `device.Declaration`; `device.Lookup(uint32(id))` |
 | `Node.PairingCodes`, `Aggregator.IncreaseConfigurationVersion`, `WindowCredentials.Iterations`, `Commissioning.PBKDFIterations int` | `Node.SetupPayload()` (`.QR`, `.Manual`); `Aggregator.IncreaseConfigurationVersions(ctx, keys...)` (`node.ErrNotStarted` before `Start`); `WindowCredentials.PBKDFIterations`; `Commissioning.PBKDFIterations uint32` |
 | `node.Client` (`Enabled`), `Config.DisableTimeSynchronization`, `Config.TimeSynchronization *TimeSynchronizationConfig`, `Network.ReannounceInterval`, `Network.DisableReannounce`, `MDNS.Disabled`, `Config.Health Health`, `Network.WiFi WiFi` | `Config.Client *ClientConfig` (nil off); `Config.TimeSynchronization{Off, Config}`; `Network.Reannounce{Interval, Off}`; `MDNS.Off`; `Config.Health *Health` (nil off); `Network.WiFi *WiFi` (nil off) |
-| `node.OtaConfig.Harness`, `node.Network.WiFiCommissioning`, `node.WiFiCommissioning`, `node.Config.BootID`, `node.BootID` | not public (`internal/nodeseam`); `fabrictest.UseWiFiCommissioning(cfg, driver)` in a test; `bootid.EnableRotation()` before `node.New` |
+| `node.OTAConfig.Harness`, `node.Network.WiFiCommissioning`, `node.WiFiCommissioning`, `node.Config.BootID`, `node.BootID` | not public (`internal/nodeseam`); `fabrictest.UseWiFiCommissioning(cfg, driver)` in a test; `bootid.EnableRotation()` before `node.New` |
 | `contract.InitialDataVersion`, `contract.SetMeasurementMaterializer` | none: unexported; a host kind is `contract.RegisterMeasurementKind` |
 | `device.AheadRows` | `node.AheadRows()` (the root's and the devices' rows) |
 | `contract.DeviceTypeName` | `schema.DeviceTypeName(schema.DeviceTypeID(id))`; operator labels are the host's |
+| `node.Config.Topology`, `node.OtaConfig`, `surface.Origin` (`OriginClusterMandatory`, `OriginDeviceType`, `OriginHostDeclared`, `OriginKitDefault`, `Element.Origin`) | `node.Config.Snapshotter`, `node.OTAConfig`, `surface.Provenance` (`Provenance…`, `Element.Provenance`) |
 
 ## Changed in the next release: `CommissionerReach` takes the peer
 

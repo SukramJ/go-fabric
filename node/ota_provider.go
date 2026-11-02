@@ -131,7 +131,7 @@ func (n *Node) OnOTAProviderStatusAsync(fn func(peer OTAPeer, status OTAUpdateSt
 
 // OTAProvider returns the OTA Software Update Provider — nil unless
 // [Config].OTAProvider names an image source. A host that assembles its
-// own topology ([Config].Topology) mounts it on an endpoint of its own;
+// own topology ([Config].Snapshotter) mounts it on an endpoint of its own;
 // with the facade's Aggregator the node mounts it.
 func (n *Node) OTAProvider() *mattercore.OTAProvider { return n.otaProvider }
 

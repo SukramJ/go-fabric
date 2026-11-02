@@ -282,7 +282,7 @@ func TestSurfaceRemoveFeature(t *testing.T) {
 	found := false
 	for _, dec := range rep.Decisions {
 		if dec.Kind == surface.KindFeature && dec.Cluster == onOffID && dec.ID == bit {
-			found = dec.Verdict == surface.Remove && dec.Origin == surface.OriginHostDeclared && !dec.Mandatory
+			found = dec.Verdict == surface.Remove && dec.Provenance == surface.ProvenanceHostDeclared && !dec.Mandatory
 		}
 	}
 	if !found {
@@ -309,7 +309,7 @@ func TestSurfaceMandatoryFeatureKept(t *testing.T) {
 		if dec.Kind != surface.KindFeature || dec.ID != bit {
 			continue
 		}
-		if dec.Verdict != surface.Keep || dec.Origin != surface.OriginDeviceType || !dec.Mandatory ||
+		if dec.Verdict != surface.Keep || dec.Provenance != surface.ProvenanceDeviceType || !dec.Mandatory ||
 			!strings.HasPrefix(dec.Reason, "kept: mandatory at pin (surfacetest.Remove") {
 			t.Fatalf("decision %+v", dec)
 		}
@@ -517,7 +517,7 @@ func TestSurfaceTypeMandatedElementDeclared(t *testing.T) {
 				for _, dec := range d.Surface().Decisions {
 					if dec.Kind == surface.KindAttribute && dec.Cluster == r.ID && dec.ID == e.ID {
 						n++
-						if dec.Origin != surface.OriginDeviceType || !dec.Mandatory {
+						if dec.Provenance != surface.ProvenanceDeviceType || !dec.Mandatory {
 							t.Errorf("%s 0x%04X/0x%04X: %+v", typ.Name, r.ID, e.ID, dec)
 						}
 					}

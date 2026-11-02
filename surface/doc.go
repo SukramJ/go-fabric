@@ -14,7 +14,7 @@
 //
 // The surface is decided before any server is built. The device layer
 // states what it would compose as candidate [Element]s, each with its
-// [Origin] — why it exists — and whether it is mandatory at the pin. The
+// [Provenance] — why it exists — and whether it is mandatory at the pin. The
 // [Policies] judge every candidate ([Evaluate]): every policy judges every
 // element, the verdicts merge with Refuse over Remove over Warn over Keep, a Remove
 // of a mandatory element is kept (an operator-side policy never removes
@@ -40,8 +40,8 @@
 // root feature its configuration selects that a root server declares as
 // ahead of matter.js (concept v11 S2), and one per root cluster it mounts
 // (concept v11 S3): mandatory for the RootNode device type's mandatory
-// set, [OriginHostDeclared] for a server its configuration adds,
-// [OriginKitDefault] for one it mounts by default.
+// set, [ProvenanceHostDeclared] for a server its configuration adds,
+// [ProvenanceKitDefault] for one it mounts by default.
 //
 // One policy is built in and judges first: the reference policy. A server
 // declares which of its elements implement which row of the "Ahead of

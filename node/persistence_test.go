@@ -32,7 +32,7 @@ func putLabel(s string) func(e *tlv.Encoder, tag tlv.Tag) {
 	return func(e *tlv.Encoder, tag tlv.Tag) { e.PutUTF8(tag, s) }
 }
 
-// hostNode is a node with Config.Topology over a host assembler built on
+// hostNode is a node with Config.Snapshotter over a host assembler built on
 // node.NewEndpointPersistence before node.New, its one plug's Spec
 // NodeLabel restored from the persistence as the facade's Aggregator does.
 func hostNode(t *testing.T, db *sql.DB) (*node.Node, node.EndpointPersistence) {
@@ -56,7 +56,7 @@ func hostNode(t *testing.T, db *sql.DB) (*node.Node, node.EndpointPersistence) {
 		t.Fatal(err)
 	}
 	p := newPlug(t, "plug:1")
-	cfg.Topology = func(ctx context.Context) (*endpoint.Topology, error) {
+	cfg.Snapshotter = func(ctx context.Context) (*endpoint.Topology, error) {
 		spec := p.Spec()
 		if label := ep.NodeLabel(ctx, spec.StableKey); label != "" {
 			spec.NodeLabel = label

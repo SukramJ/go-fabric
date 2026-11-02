@@ -74,7 +74,7 @@ type Config struct {
 	Attestation Attestation
 	// OTA mounts the OTA Software Update Requestor on the root when set;
 	// nil leaves it out (and the OtaRequestor device type with it).
-	OTA *OtaConfig
+	OTA *OTAConfig
 	// ICD makes the node an intermittently connected device: ICD
 	// Management on the root, Check-Ins to its registered clients, the
 	// ICD advertisement ([ICDConfig], [Node.ICD]). nil, the default, is a
@@ -104,7 +104,7 @@ type Config struct {
 	// states its own, as the reference daemon does (en-US, de-DE).
 	Locales []string
 	// Groups, when set, is the group state the node runs on, for a host
-	// whose own assembler ([Config].Topology) mounts the stack's Groups and
+	// whose own assembler ([Config].Snapshotter) mounts the stack's Groups and
 	// ScenesManagement servers over it (endpoint.Config.Groups): one
 	// manager serves the endpoints' servers, the bridge's group-message
 	// routing and the root's GroupKeyManagement and Groupcast, as matter.js
@@ -115,7 +115,7 @@ type Config struct {
 	// An advanced seam (docs/guides/advanced-seams.md): a host with the
 	// facade's own assembler leaves it nil.
 	Groups *Groups
-	// Topology, when set, is the host's own topology — a host that
+	// Snapshotter, when set, is the host's own topology — a host that
 	// assembles its endpoints itself (its own endpoint.Assembler over its
 	// own device model, one endpoint.Snapshot per scope, its own label and
 	// scene persistence) hands the bridge its Snapshotter here, as the
@@ -124,7 +124,7 @@ type Config struct {
 	// [Aggregator] ([Node.Aggregator] is nil); the root and Aggregator
 	// endpoints' servers, the PartsList providers and every port stay the
 	// facade's. nil is the facade's [Aggregator] under one scope.
-	Topology Snapshotter
+	Snapshotter Snapshotter
 	// EndpointPersistence, when set, replaces the facade's own scene and
 	// bridged-NodeLabel persistence ([NewEndpointPersistence] over the
 	// node's store) in the facade's assembler and [Aggregator], for a host
@@ -236,7 +236,7 @@ type Network struct {
 	// stays Ethernet-only either way (concept v2 §B.4): the node states the
 	// RootNode device-type condition WiFi, under which RootNode lists the
 	// cluster ("[WiFi]", device/root_node_gen.go), through the assembler's
-	// RootDeviceConditions — with [Config].Topology the host's own
+	// RootDeviceConditions — with [Config].Snapshotter the host's own
 	// assembler states it. EthernetNetworkDiagnostics stays mounted beside
 	// it. nil mounts none; a non-nil WiFi needs its Reporter.
 	WiFi *WiFi
@@ -452,8 +452,8 @@ type Attestation struct {
 	CertificationDeclaration []byte
 }
 
-// OtaConfig mounts the OTA Software Update Requestor (ADR 0019).
-type OtaConfig struct {
+// OTAConfig mounts the OTA Software Update Requestor (ADR 0019).
+type OTAConfig struct {
 	// Dir receives the downloads; mandatory.
 	Dir string
 	// harness applies an image in place, reporting its version as running

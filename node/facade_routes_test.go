@@ -197,8 +197,8 @@ func TestFacadeAliases(t *testing.T) {
 		t.Fatal("an accessor returned nil")
 	}
 	var snap bridge.Snapshotter
-	cfg := node.Config{Topology: snap, Network: node.Network{TCP: bridge.TCPConfig{Incoming: true}}}
-	if cfg.Topology != nil || !cfg.Network.TCP.Incoming {
+	cfg := node.Config{Snapshotter: snap, Network: node.Network{TCP: bridge.TCPConfig{Incoming: true}}}
+	if cfg.Snapshotter != nil || !cfg.Network.TCP.Incoming {
 		t.Fatal("Config fields did not take the bridge's types")
 	}
 	if endpointTopology(&node.Topology{}) == nil || len(diagEvent(node.DiagnosticEvent{Message: "m"}).Message) != 1 {

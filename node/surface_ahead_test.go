@@ -140,7 +140,7 @@ func TestNodeAheadTimeSynchronizationEnabled(t *testing.T) {
 	}
 	for _, d := range featureDecisions(rep.Decisions) {
 		if d.Endpoint != "" || d.Cluster != tsdef.ClusterID || d.Kind != surface.KindFeature ||
-			d.Reference.Ahead != timeSyncRow || d.Verdict != surface.Keep || d.Mandatory || d.Origin != surface.OriginHostDeclared {
+			d.Reference.Ahead != timeSyncRow || d.Verdict != surface.Keep || d.Mandatory || d.Provenance != surface.ProvenanceHostDeclared {
 			t.Errorf("decision %+v", d)
 		}
 	}

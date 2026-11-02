@@ -312,7 +312,7 @@ func (p Policies) ServerInternal(ep Endpoint, decided []Element) []Decision {
 			return
 		}
 		known[key{cluster, kind, id}] = true
-		el := Element{Endpoint: ep.Key, Cluster: cluster, Kind: kind, ID: id, Origin: OriginKitDefault, Levels: levels}
+		el := Element{Endpoint: ep.Key, Cluster: cluster, Kind: kind, ID: id, Provenance: ProvenanceKitDefault, Levels: levels}
 		reason := ReasonServerInternal
 		if kind == KindAttribute && cluster == bdbiCluster && id == configurationVersion {
 			reason = ReasonSurfaceChangeSignal

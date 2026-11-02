@@ -15,7 +15,7 @@ documented order. You configure it with one `node.Config` and add devices to
 its Aggregator.
 
 Use the facade with your own topology when you already map your own device
-model onto endpoints: set `Config.Topology` to your `bridge.Snapshotter`. The
+model onto endpoints: set `Config.Snapshotter` to your `bridge.Snapshotter`. The
 facade then builds no assembler of its own, and everything else (stores,
 root servers, sessions, group state) stays the facade's. The topology your
 snapshotter returns must come from an `endpoint.Assembler` over your

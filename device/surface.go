@@ -134,20 +134,20 @@ func (s *settings) composes(r *ClusterRequirement) bool {
 func candidatesOf(t *Type, s *settings, key string) []surface.Element {
 	out := []surface.Element{{
 		Endpoint: key, Kind: surface.KindDeviceType, ID: uint32(t.ID),
-		Origin: surface.OriginDeviceType, Mandatory: true,
+		Provenance: surface.ProvenanceDeviceType, Mandatory: true,
 	}}
 	for i := range t.Servers {
 		r := &t.Servers[i]
 		if !s.composes(r) {
 			continue
 		}
-		origin := surface.OriginHostDeclared
+		origin := surface.ProvenanceHostDeclared
 		if r.Mandatory {
-			origin = surface.OriginDeviceType
+			origin = surface.ProvenanceDeviceType
 		}
 		out = append(out, surface.Element{
 			Endpoint: key, Cluster: r.ID, Kind: surface.KindCluster, ID: r.ID,
-			Origin: origin, Mandatory: r.Mandatory,
+			Provenance: origin, Mandatory: r.Mandatory,
 		})
 		if _, host := s.servers[r.ID]; host || r.Definition == nil {
 			// A host's server decides its own features and elements; a
@@ -160,7 +160,7 @@ func candidatesOf(t *Type, s *settings, key string) []surface.Element {
 		if _, listed := t.Server(id); !listed {
 			out = append(out, surface.Element{
 				Endpoint: key, Cluster: id, Kind: surface.KindCluster, ID: id,
-				Origin: surface.OriginHostDeclared,
+				Provenance: surface.ProvenanceHostDeclared,
 			})
 		}
 	}
@@ -208,14 +208,14 @@ func defaultCandidates(r *ClusterRequirement, s *settings, key string) []surface
 	for x := features; x != 0; x &= x - 1 {
 		bit := uint32(1) << bits.TrailingZeros32(x)
 		el := surface.Element{
-			Endpoint: key, Cluster: r.ID, Kind: surface.KindFeature, ID: bit, Origin: surface.OriginHostDeclared,
+			Endpoint: key, Cluster: r.ID, Kind: surface.KindFeature, ID: bit, Provenance: surface.ProvenanceHostDeclared,
 			Reference: surface.Reference{Ahead: ahead.Row(surface.KindFeature, bit)},
 		}
 		switch {
 		case r.Features&bit != 0:
-			el.Origin, el.Mandatory = surface.OriginDeviceType, true
+			el.Provenance, el.Mandatory = surface.ProvenanceDeviceType, true
 		case mandated&bit != 0:
-			el.Origin, el.Mandatory = surface.OriginClusterMandatory, true
+			el.Provenance, el.Mandatory = surface.ProvenanceClusterMandatory, true
 		default:
 			el.Mandatory = spec.CheckFeatures(def, features&^bit) != nil
 		}
@@ -233,7 +233,7 @@ func defaultCandidates(r *ClusterRequirement, s *settings, key string) []surface
 			continue
 		}
 		elements[elementID{kind, e.ID}] = surface.Element{
-			Endpoint: key, Cluster: r.ID, Kind: kind, ID: e.ID, Origin: surface.OriginDeviceType, Mandatory: true,
+			Endpoint: key, Cluster: r.ID, Kind: kind, ID: e.ID, Provenance: surface.ProvenanceDeviceType, Mandatory: true,
 		}
 	}
 	declared := func(kind surface.Kind, ids []uint32) {
@@ -241,9 +241,9 @@ func defaultCandidates(r *ClusterRequirement, s *settings, key string) []surface
 			if _, ok := elements[elementID{kind, id}]; ok {
 				continue
 			}
-			el := surface.Element{Endpoint: key, Cluster: r.ID, Kind: kind, ID: id, Origin: surface.OriginHostDeclared}
+			el := surface.Element{Endpoint: key, Cluster: r.ID, Kind: kind, ID: id, Provenance: surface.ProvenanceHostDeclared}
 			if c, ok := conformanceOf(def, kind, id); ok && c.Applicability(ctx) == spec.ApplicabilityMandatory {
-				el.Origin, el.Mandatory = surface.OriginClusterMandatory, true
+				el.Provenance, el.Mandatory = surface.ProvenanceClusterMandatory, true
 			}
 			elements[elementID{kind, id}] = el
 		}

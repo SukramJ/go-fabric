@@ -229,7 +229,7 @@ func newOTASite(t *testing.T, o otaSiteOptions) *otaSite {
 		// The string is derived from the number (BasicInformationServer.ts:71);
 		// a "0" would be read as a build string and floored at 1.
 		cfg.BasicInformation.SoftwareVersion, cfg.BasicInformation.SoftwareVersionString = v, ""
-		cfg.OTA = &node.OtaConfig{Dir: dir, Applier: s.applier}
+		cfg.OTA = &node.OTAConfig{Dir: dir, Applier: s.applier}
 	}})
 	// The requestor was built at version 1 by AddDevice's start; it runs
 	// version 0, as the matter.js device does (BasicInformation default).

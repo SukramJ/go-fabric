@@ -54,7 +54,7 @@ type Topology struct {
 	// same servers again.
 	Bridged []node.Endpoint
 	// Snapshotter, when set, is the host topology the node serves in place
-	// of its Aggregator (node.Config.Topology): a host test hands its own
+	// of its Aggregator (node.Config.Snapshotter): a host test hands its own
 	// assembler here — endpointtest.NewEmptySnapshotter is the empty one.
 	// Bridged must then be empty.
 	Snapshotter bridge.Snapshotter
@@ -136,7 +136,7 @@ func (s *Site) AddDevice(topo Topology) *Device {
 // answers DNS-SD with, the site's logger when cfg has none, and a store of
 // its own when cfg.Store states none (the program's store, a Path or a
 // DB, stays the program's). TCP and the re-announcement are off on the
-// site. The device serves cfg.Topology or the node's Aggregator, empty
+// site. The device serves cfg.Snapshotter or the node's Aggregator, empty
 // until the test adds to it ([Device.Act]); a restart builds the node from
 // cfg again. matter.js's MockSite.addNode builds a plain ServerNode from the
 // test's own options in the site's environment (mock-site.ts:59-106 at
@@ -288,11 +288,11 @@ func (d *Device) config() node.Config {
 			VendorName: "go-fabric", ProductName: "fabrictest device", NodeLabel: "device" + i, SerialNumber: "FT-" + i,
 			HardwareVersion: 1, HardwareVersionString: "1", SoftwareVersion: 1, SoftwareVersionString: "1",
 		},
-		Store:      d.store,
-		Advertiser: mdns.NewNoop(),
-		Topology:   d.topo.Snapshotter,
-		Logger:     d.site.log,
-		Clock:      d.site.hostClock(d.group),
+		Store:       d.store,
+		Advertiser:  mdns.NewNoop(),
+		Snapshotter: d.topo.Snapshotter,
+		Logger:      d.site.log,
+		Clock:       d.site.hostClock(d.group),
 	}
 	if d.topo.Configure != nil {
 		d.topo.Configure(&cfg)
