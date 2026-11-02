@@ -58,3 +58,15 @@ func TestStartRunsTheOwnNode(t *testing.T) {
 		t.Errorf("HoldsFabric = %v, %v; want false on a fresh node", held, err)
 	}
 }
+
+// TestConfigPrefersIPv4ForAnIPv4Listen: an IPv4 listen address makes the
+// node's socket IPv4-only, an IPv6 or unspecified one does not (W5-ex-09:
+// a host on an IPv4 lab network needs no copy of Start).
+func TestConfigPrefersIPv4ForAnIPv4Listen(t *testing.T) {
+	t.Parallel()
+	for listen, want := range map[string]bool{"127.0.0.1:0": true, "0.0.0.0:5541": true, "[::1]:0": false, "[::]:0": false, "": false} {
+		if got := controllernode.Config(controller.OwnNodeSpec{Listen: listen}).Network.PreferIPv4; got != want {
+			t.Errorf("Listen %q: PreferIPv4 %v, want %v", listen, got, want)
+		}
+	}
+}

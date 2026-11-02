@@ -149,6 +149,7 @@ Findings of the whole-codebase review of 2026-11-01 (`notes/review/2026-11/`).
 - `node`, `device`: doc comments say what the code does — a nil `Config.Advertiser` is the node's own Zeroconf, the operator view is `Node.SessionDiagnostics`, and `Lookup`'s excluded list is empty (W5-api-16; the `SetOnFabricAdded` passage went with W2-api-01).
 - `eligibility`: the package doc names the module's interfaces (`contract.EndpointSource`, `contract.MeasurementSource`) and no host's vocabulary or repository; `Compat` reads its device-type ids from the schema snapshot by name, and each of its four rules is a row with its confidence (Reported) in `notes/parity/controller_profiles.md` (W5-api-13).
 - examples: quickstart-device names only the facade — `Store.Path`, the node's own advertiser, `device.StringKey`, the typed `OnOff().OnChanged` — and an import guard holds it, host-view and quickstart-controller to their lists; quickstart-controller uses the node `Pair` returned instead of the first registered one, and its test injects `controller.Config.Names` instead of a package seam (W5-ex-02, W5-ex-03, W5-ex-13).
+- `node/controllernode`: `Config` makes the own node's socket IPv4-only for an IPv4 listen address and `Start` answers the IPv4 loopback for an unspecified IPv4 one, so the reference controller's copy of `Start` is gone; it keeps only its test hooks (W5-ex-09).
 
 ## [0.15.6] — 2026-11-01
 

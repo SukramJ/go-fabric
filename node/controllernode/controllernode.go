@@ -24,14 +24,16 @@ import (
 	"github.com/SukramJ/go-fabric/node"
 )
 
-// Config is the node configuration of spec: its socket, commissioning
+// Config is the node configuration of spec: its socket (IPv4 only when
+// spec.Listen names an IPv4 host, as a lab network without IPv6 needs),
+// commissioning
 // window, product, database and OTA provider, the controller's logger
 // and clock. The provider's status observer is a node callback, not
 // configuration: [Observe] registers it on the node New built.
 func Config(spec controller.OwnNodeSpec) node.Config {
 	p := spec.Provider
 	return node.Config{
-		Network:    node.Network{Listen: spec.Listen},
+		Network:    node.Network{Listen: spec.Listen, PreferIPv4: isIPv4Listen(spec.Listen)},
 		Advertiser: spec.Advertiser,
 		Commissioning: node.Commissioning{
 			Passcode: spec.Passcode, Discriminator: spec.Discriminator, PBKDFIterations: pbkdfIterations(spec.Iterations), Salt: spec.Salt,
@@ -61,8 +63,18 @@ func pbkdfIterations(v int) uint32 {
 	return uint32(v)
 }
 
+// isIPv4Listen reports whether a listen address names an IPv4 host.
+func isIPv4Listen(addr string) bool {
+	host, _, err := net.SplitHostPort(addr)
+	if err != nil {
+		return false
+	}
+	ip := net.ParseIP(host)
+	return ip != nil && ip.To4() != nil
+}
+
 // Start is node.New and Start over [Config]; the address is the node's
-// socket, loopback for an unspecified one.
+// socket, the loopback of its family for an unspecified one.
 func Start(ctx context.Context, spec controller.OwnNodeSpec) (controller.OwnNode, *net.UDPAddr, error) {
 	n, err := node.New(ctx, Config(spec))
 	if err != nil {
@@ -79,6 +91,9 @@ func Start(ctx context.Context, spec controller.OwnNodeSpec) (controller.OwnNode
 	}
 	if addr.IP.IsUnspecified() {
 		addr.IP = net.IPv6loopback
+		if isIPv4Listen(spec.Listen) {
+			addr.IP = net.IPv4(127, 0, 0, 1)
+		}
 	}
 	return Wrap(n), addr, nil
 }
