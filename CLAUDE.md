@@ -336,11 +336,11 @@ Refreshing the snapshot is a **review decision** — it changes what upstream
 says. Propagating it into Go is mechanical. Run the two consciously, not as
 one habit.
 
-Then `go test ./schema/...`. `TestMatterSchemaSnapshotHashMatchesEmbedded`
-fails when the generation half was skipped, and
-`TestParityCodeMatchesGeneratedSchema` flags every cluster whose hand-coded
-revision constant has drifted from the new schema. Update those constants to
-match. `go test ./script/clustergen/...` fails when a committed cluster
+Then `go test ./schema/... ./node/...`. `TestMatterSchemaSnapshotHashMatchesEmbedded`
+fails when the generation half was skipped, and node's
+`TestServedClusterRevisionAndFeatureMap` flags every constructed server whose
+ClusterRevision or FeatureMap no longer matches the new snapshot. Update a
+hand-stated revision constant to match. `go test ./script/clustergen/...` fails when a committed cluster
 definition is stale, and generates and compiles every cluster of the new
 snapshot. `go test ./script/devicegen/...` fails when a committed device file
 is stale or a new snapshot device type is in neither of its lists.

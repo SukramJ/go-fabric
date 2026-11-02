@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 7271,
+  "entry_points": 7273,
   "entry_packages": [
     ".",
     "bdx",
@@ -8455,10 +8455,10 @@
     },
     {
       "package": "cluster/core",
-      "identifier": "TestParityMatterJS_ClusterIDsAndRevisions",
+      "identifier": "TestParityMatterJS_ClusterIDs",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/parity_matterjs_test.go",
-      "line": 329
+      "line": 303
     },
     {
       "package": "cluster/core",
@@ -8486,7 +8486,7 @@
       "identifier": "TestParityMatterJS_DeviceTypeRevisions",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/parity_matterjs_test.go",
-      "line": 445
+      "line": 415
     },
     {
       "package": "cluster/core",
@@ -8514,14 +8514,14 @@
       "identifier": "TestParityMatterJS_MandatoryAttributeCoverage",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/parity_matterjs_test.go",
-      "line": 358
+      "line": 328
     },
     {
       "package": "cluster/core",
       "identifier": "TestParityMatterJS_NoSpuriousAttributes",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/parity_matterjs_test.go",
-      "line": 412
+      "line": 382
     },
     {
       "package": "cluster/core",
@@ -9907,7 +9907,7 @@
       "identifier": "TestParityMatterJS_FlowMeasurementConstraints",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/measurement/flow_parity_matterjs_test.go",
-      "line": 114
+      "line": 108
     },
     {
       "package": "cluster/measurement",
@@ -9921,7 +9921,7 @@
       "identifier": "TestParityMatterJS_FlowSensorDeviceType",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/measurement/flow_parity_matterjs_test.go",
-      "line": 156
+      "line": 150
     },
     {
       "package": "cluster/measurement",

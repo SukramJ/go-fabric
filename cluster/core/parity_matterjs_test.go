@@ -5,13 +5,10 @@ package core
 
 import (
 	"encoding/json"
-	"fmt"
 	"slices"
 	"testing"
 
-	icddef "github.com/SukramJ/go-fabric/cluster/spec/icdmanagement"
 	matterparity "github.com/SukramJ/go-fabric/parity"
-	gschema "github.com/SukramJ/go-fabric/schema"
 )
 
 // matter.js's MatterDefinition tree is the de-facto reference Matter
@@ -73,16 +70,6 @@ func loadMatterSchemaT(t *testing.T) *matterSchema {
 	return &s
 }
 
-// mustClusterRevision is the revision a server serves through
-// schema.ClusterRevision rather than a constant of its own.
-func mustClusterRevision(id uint32) uint16 {
-	rev, ok := gschema.ClusterRevision(id)
-	if !ok {
-		panic(fmt.Sprintf("cluster 0x%04X not in the generated schema", id))
-	}
-	return rev
-}
-
 func clusterByID(s *matterSchema, id uint32) (matterCluster, bool) {
 	for _, c := range s.Clusters {
 		if c.ID == id {
@@ -114,12 +101,13 @@ func mandatoryAttrIDs(c matterCluster) []uint32 {
 }
 
 // parityCase pairs a cluster's in-tree constants with the matter.js
-// id we are claiming to implement, so the test can assert ID + revision
-// + mandatory-attribute coverage in one sweep.
+// id we are claiming to implement, so the test can assert the ID and the
+// mandatory-attribute coverage in one sweep. The revision a server answers
+// is read off the constructed server by node's
+// TestServedClusterRevisionAndFeatureMap (W6-test-10).
 type parityCase struct {
 	jsID             uint32
 	codeClusterID    uint32
-	codeRevision     uint16
 	codeAttrIDs      []uint32 // attribute IDs implemented in MatterRead
 	skipMandatoryIDs []uint32 // matter.js IDs we explicitly do not expose
 	rationale        string
@@ -135,7 +123,6 @@ func parityCases() []parityCase {
 		{
 			jsID:          basicInfoClusterID, // 0x0028
 			codeClusterID: basicInfoClusterID,
-			codeRevision:  basicInfoClusterRevision,
 			codeAttrIDs: []uint32{
 				basicInfoAttrDataModelRevision, basicInfoAttrVendorName, basicInfoAttrVendorID,
 				basicInfoAttrProductName, basicInfoAttrProductID, basicInfoAttrNodeLabel,
@@ -152,7 +139,6 @@ func parityCases() []parityCase {
 		{
 			jsID:          bridgedBasicInfoClusterID, // 0x0039
 			codeClusterID: bridgedBasicInfoClusterID,
-			codeRevision:  bridgedBasicInfoClusterRevision,
 			// bridgedBasicInfoAttrConfigurationVersion (0x0018) verifies
 			// parity with matter.js
 			// bridged-device-basic-information.element.ts:48 (conformance
@@ -173,7 +159,6 @@ func parityCases() []parityCase {
 		{
 			jsID:          descriptorClusterID, // 0x001D
 			codeClusterID: descriptorClusterID,
-			codeRevision:  descriptorClusterRevision,
 			codeAttrIDs: []uint32{
 				descriptorAttrDeviceTypeList, descriptorAttrServerList,
 				descriptorAttrClientList, descriptorAttrPartsList,
@@ -190,7 +175,6 @@ func parityCases() []parityCase {
 		{
 			jsID:          gencommClusterID, // 0x0030
 			codeClusterID: gencommClusterID,
-			codeRevision:  gencommClusterRevision,
 			codeAttrIDs: []uint32{
 				gencommAttrBreadcrumb, gencommAttrBasicCommissioningInfo,
 				gencommAttrRegulatoryConfig, gencommAttrLocationCapability,
@@ -200,7 +184,6 @@ func parityCases() []parityCase {
 		{
 			jsID:          opcredsClusterID, // 0x003E
 			codeClusterID: opcredsClusterID,
-			codeRevision:  opcredsClusterRevision,
 			codeAttrIDs: []uint32{
 				opcredsAttrNOCs, opcredsAttrFabrics, opcredsAttrSupportedFabrics,
 				opcredsAttrCommissionedFabrics, opcredsAttrTrustedRootCertificates,
@@ -210,7 +193,6 @@ func parityCases() []parityCase {
 		{
 			jsID:          accessControlClusterID, // 0x001F
 			codeClusterID: accessControlClusterID,
-			codeRevision:  accessControlClusterRevision,
 			codeAttrIDs: []uint32{
 				accessControlAttrACL, accessControlAttrExtension,
 				accessControlAttrSubjectsPerAccessControl,
@@ -222,7 +204,6 @@ func parityCases() []parityCase {
 		{
 			jsID:          GroupcastClusterID, // 0x0065
 			codeClusterID: GroupcastClusterID,
-			codeRevision:  mustClusterRevision(GroupcastClusterID),
 			codeAttrIDs: []uint32{
 				groupcastAttrMembership, groupcastAttrMaxMembershipCount, groupcastAttrMaxMcastAddrCount,
 				groupcastAttrUsedMcastAddrCount, groupcastAttrFabricUnderTest,
@@ -231,7 +212,6 @@ func parityCases() []parityCase {
 		{
 			jsID:          identifyClusterID, // 0x0003
 			codeClusterID: identifyClusterID,
-			codeRevision:  identifyClusterRevision,
 			codeAttrIDs: []uint32{
 				identifyAttrTime, identifyAttrType,
 			},
@@ -239,7 +219,6 @@ func parityCases() []parityCase {
 		{
 			jsID:          groupKeyMgmtClusterID, // 0x003F
 			codeClusterID: groupKeyMgmtClusterID,
-			codeRevision:  groupKeyMgmtClusterRevision,
 			codeAttrIDs: []uint32{
 				groupKeyMgmtAttrGroupKeyMap, groupKeyMgmtAttrGroupTable,
 				groupKeyMgmtAttrMaxGroupsPerFabric, groupKeyMgmtAttrMaxGroupKeysPerFabric,
@@ -248,7 +227,6 @@ func parityCases() []parityCase {
 		{
 			jsID:          netcommClusterID, // 0x0031
 			codeClusterID: netcommClusterID,
-			codeRevision:  netcommClusterRevision,
 			// ScanMaxTimeSeconds (0x0002) and ConnectMaxTimeSeconds (0x0003) have
 			// conformance "WI | TH" — feature-conditional; bridge is Ethernet-only.
 			codeAttrIDs: []uint32{
@@ -260,7 +238,6 @@ func parityCases() []parityCase {
 		{
 			jsID:          gendiagClusterID, // 0x0033
 			codeClusterID: gendiagClusterID,
-			codeRevision:  gendiagClusterRevision,
 			// TotalOperationalHours (0x0003), BootReason (0x0004) and fault
 			// list attrs (0x0005–0x0007) are conformance "O" in matter.js HEAD;
 			// only NetworkInterfaces, RebootCount, UpTime and
@@ -278,14 +255,12 @@ func parityCases() []parityCase {
 			// non-nil codeAttrIDs signals "checked, no mandatory cluster attrs".
 			jsID:             diaglogsClusterID, // 0x0032
 			codeClusterID:    diaglogsClusterID,
-			codeRevision:     diaglogsClusterRevision,
 			skipMandatoryIDs: []uint32{},
 			rationale:        "DiagnosticLogs has no cluster-specific mandatory attributes; all are commands only.",
 		},
 		{
 			jsID:          timeSyncClusterID, // 0x0038
 			codeClusterID: timeSyncClusterID,
-			codeRevision:  timeSyncClusterRevision,
 			// All other attrs (TimeSource, TrustedTimeSource, DefaultNtp, etc.)
 			// are conformance "O", "TSC", "NTPC", "TZ" or "NTPS" — feature-conditional.
 			codeAttrIDs: []uint32{
@@ -295,7 +270,6 @@ func parityCases() []parityCase {
 		{
 			jsID:          ICDManagementClusterID, // 0x0046
 			codeClusterID: ICDManagementClusterID,
-			codeRevision:  icddef.Revision,
 			// All other attrs (RegisteredClients, IcdCounter, etc.) are
 			// conformance "CIP", "UAT" or "LITS" — feature-conditional.
 			codeAttrIDs: []uint32{
@@ -305,7 +279,6 @@ func parityCases() []parityCase {
 		{
 			jsID:          otaRequestorClusterID, // 0x002A — matter.js HEAD ota-software-update-requestor.element.ts:20
 			codeClusterID: otaRequestorClusterID,
-			codeRevision:  otaRequestorClusterRevision,
 			codeAttrIDs: []uint32{
 				otaRequestorAttrDefaultOTAProviders, otaRequestorAttrUpdatePossible,
 				otaRequestorAttrUpdateState, otaRequestorAttrUpdateStateProgress,
@@ -314,7 +287,6 @@ func parityCases() []parityCase {
 		{
 			jsID:          bindingClusterID, // 0x001E
 			codeClusterID: bindingClusterID,
-			codeRevision:  bindingClusterRevision,
 			codeAttrIDs: []uint32{
 				bindingAttrBinding,
 			},
@@ -322,11 +294,13 @@ func parityCases() []parityCase {
 	}
 }
 
-// TestParityMatterJS_ClusterIDsAndRevisions asserts the bridge advertises
-// the same cluster ID + revision matter.js HEAD ships in
-// `MatterDefinition`. A revision drift here is exactly the class of bug
-// that produced the Apple Home pair-abort from revision drift.
-func TestParityMatterJS_ClusterIDsAndRevisions(t *testing.T) {
+// TestParityMatterJS_ClusterIDs asserts the bridge advertises the same
+// cluster ID matter.js HEAD ships in `MatterDefinition`. The revision is
+// read off the constructed servers by node's
+// TestServedClusterRevisionAndFeatureMap (W6-test-10); comparing a
+// revision constant with the snapshot it was generated from tested
+// nothing.
+func TestParityMatterJS_ClusterIDs(t *testing.T) {
 	t.Parallel()
 	schema := loadMatterSchemaT(t)
 	for _, p := range parityCases() {
@@ -339,10 +313,6 @@ func TestParityMatterJS_ClusterIDsAndRevisions(t *testing.T) {
 			t.Parallel()
 			if p.codeClusterID != p.jsID {
 				t.Errorf("code cluster ID 0x%04X != matter.js 0x%04X", p.codeClusterID, p.jsID)
-			}
-			if p.codeRevision != js.Revision {
-				t.Errorf("code revision %d != matter.js revision %d for %s (0x%04X)",
-					p.codeRevision, js.Revision, js.Name, js.ID)
 			}
 		})
 	}
