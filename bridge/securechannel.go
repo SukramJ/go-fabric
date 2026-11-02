@@ -1008,10 +1008,12 @@ type gracefulCloseNotifierSetter interface {
 
 // reannounceTriggerSetter is the optional capability a
 // [SessionRegistry] implements to receive the bridge's mDNS
-// broadcast-resume trigger, fired after a reap / eviction leaves a
-// peer with zero live sessions (matter.js DeviceAdvertiser.ts:132-149).
+// broadcast-resume trigger, fired with the fabric index after a reap /
+// eviction leaves a (fabric, peer) pair with zero live sessions
+// (matter.js packages/protocol/src/protocol/DeviceAdvertiser.ts:131-150
+// at 862ad75f).
 type reannounceTriggerSetter interface {
-	SetReannounceTrigger(fn func())
+	SetReannounceTrigger(fn func(fabricIndex uint8))
 }
 
 // AttachSessionRegistry wires the operational session manager into the
@@ -1041,7 +1043,7 @@ func (b *Bridge) AttachSessionRegistry(reg SessionRegistry) {
 		setter.SetGracefulCloseNotifier(b.sendCloseSessionReport)
 	}
 	if setter, ok := reg.(reannounceTriggerSetter); ok {
-		setter.SetReannounceTrigger(b.triggerSessionReannounce)
+		setter.SetReannounceTrigger(func(uint8) { b.triggerSessionReannounce() })
 	}
 }
 

@@ -44,7 +44,7 @@ type fakeSessionRegistry struct {
 	mu           sync.Mutex
 	closed       []uint16
 	notifier     func(sessionID uint16, sess *channel.Session)
-	reannounce   func()
+	reannounce   func(fabricIndex uint8)
 	closeAll     func(deadline time.Time) int // optional override
 	closeAllRuns int
 }
@@ -73,7 +73,7 @@ func (f *fakeSessionRegistry) SetGracefulCloseNotifier(fn func(sessionID uint16,
 	f.mu.Unlock()
 }
 
-func (f *fakeSessionRegistry) SetReannounceTrigger(fn func()) {
+func (f *fakeSessionRegistry) SetReannounceTrigger(fn func(fabricIndex uint8)) {
 	f.mu.Lock()
 	f.reannounce = fn
 	f.mu.Unlock()

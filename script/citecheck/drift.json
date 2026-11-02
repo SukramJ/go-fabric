@@ -2072,7 +2072,7 @@
   },
   {
     "file": "secure/operational/manager.go",
-    "line": 118,
+    "line": 125,
     "citation": "NodeSession.ts:368",
     "resolved": "packages/protocol/src/session/NodeSession.ts",
     "identifier": "gracefulClose",
@@ -2081,7 +2081,7 @@
   },
   {
     "file": "secure/operational/manager.go",
-    "line": 328,
+    "line": 349,
     "citation": "SessionManager.ts:484",
     "resolved": "packages/protocol/src/session/SessionManager.ts",
     "identifier": "getPaseSession",
@@ -2090,7 +2090,7 @@
   },
   {
     "file": "secure/operational/manager.go",
-    "line": 846,
+    "line": 867,
     "citation": "packages/protocol/src/session/SessionManager.ts:490-508",
     "resolved": "packages/protocol/src/session/SessionManager.ts",
     "identifier": "getNextAvailableSessionId",
@@ -2099,7 +2099,7 @@
   },
   {
     "file": "secure/operational/manager.go",
-    "line": 872,
+    "line": 893,
     "citation": "packages/protocol/src/session/SessionManager.ts:513",
     "resolved": "packages/protocol/src/session/SessionManager.ts",
     "identifier": "getSession",
@@ -2108,7 +2108,7 @@
   },
   {
     "file": "secure/operational/manager.go",
-    "line": 975,
+    "line": 996,
     "citation": "Session.ts:248",
     "resolved": "packages/protocol/src/session/Session.ts",
     "identifier": "initiateClose",
