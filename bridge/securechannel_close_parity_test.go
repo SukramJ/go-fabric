@@ -477,7 +477,7 @@ func TestTriggerSessionReannounce_RepublishesActiveRecords(t *testing.T) {
 	}
 	before := adv.publishes()
 
-	b.triggerSessionReannounce()
+	b.triggerSessionReannounce(1)
 	deadline := time.Now().Add(time.Second)
 	for adv.publishes() == before && time.Now().Before(deadline) {
 		time.Sleep(5 * time.Millisecond)
@@ -492,7 +492,7 @@ func TestTriggerSessionReannounce_RepublishesActiveRecords(t *testing.T) {
 		t.Fatalf("Stop: %v", err)
 	}
 	after := adv.publishes()
-	b.triggerSessionReannounce()
+	b.triggerSessionReannounce(1)
 	time.Sleep(50 * time.Millisecond)
 	if adv.publishes() != after {
 		t.Errorf("trigger after Stop re-published records — must be a no-op during teardown")
@@ -558,7 +558,7 @@ func TestDiagnosticEventsRecordSessionAndDiscoveryKinds(t *testing.T) {
 	}
 
 	// The mDNS re-announce that follows a teardown records KindDiscovery.
-	b.triggerSessionReannounce()
+	b.triggerSessionReannounce(1)
 
 	kinds := map[diagevent.Kind]bool{}
 	for _, ev := range b.DiagnosticEvents() {
@@ -597,13 +597,12 @@ func (a *eventAdvertiser) events() (disconnected, retransmission []string) {
 	return slices.Clone(a.disconnected), slices.Clone(a.retransmission)
 }
 
-// TestTriggerSessionReannounce_ReconnectEvent: on an advertiser with the
-// broadcast events (mdns.Responder) the session-teardown trigger is
-// matter.js's "reconnect" event and a retransmission the "retransmit"
-// event, each for the operational services only (DeviceAdvertiser.ts:131-172).
-func TestTriggerSessionReannounce_ReconnectEvent(t *testing.T) {
-	t.Parallel()
-	adv := &eventAdvertiser{Noop: mdns.NewNoop()}
+// startedEventBridge starts a bridge on an eventAdvertiser with two
+// fabrics' operational services announced and one commissionable
+// service published; it returns the two operational instance names.
+func startedEventBridge(t *testing.T) (b *Bridge, adv *eventAdvertiser, op1, op2 string) {
+	t.Helper()
+	adv = &eventAdvertiser{Noop: mdns.NewNoop()}
 	b, err := New(wbEmptySnapshotter, adv, Config{Listen: ":0"}, nil)
 	if err != nil {
 		t.Fatalf("New: %v", err)
@@ -614,23 +613,40 @@ func TestTriggerSessionReannounce_ReconnectEvent(t *testing.T) {
 		t.Fatalf("Start: %v", err)
 	}
 	t.Cleanup(func() { _ = b.Stop(context.Background()) })
-	for _, svc := range []mdns.Service{
-		{InstanceName: "op", ServiceType: mdns.ServiceTypeOperational, HostName: "h", Port: 5540},
-		{InstanceName: "co", ServiceType: mdns.ServiceTypeCommissionable, HostName: "h", Port: 5540},
-	} {
-		if err := adv.Publish(ctx, svc); err != nil {
-			t.Fatal(err)
-		}
+	b.AnnounceFabric(ctx, 1, [8]byte{0x01}, 0x11)
+	b.AnnounceFabric(ctx, 2, [8]byte{0x02}, 0x22)
+	if err := adv.Publish(ctx, mdns.Service{InstanceName: "co", ServiceType: mdns.ServiceTypeCommissionable, HostName: "h", Port: 5540}); err != nil {
+		t.Fatal(err)
 	}
-	b.triggerSessionReannounce()
-	deadline := time.Now().Add(2 * time.Second)
-	for d, _ := adv.events(); len(d) == 0 && time.Now().Before(deadline); d, _ = adv.events() {
-		time.Sleep(5 * time.Millisecond)
+	op1, _ = b.operationalInstanceFor(1)
+	op2, _ = b.operationalInstanceFor(2)
+	if op1 == "" || op2 == "" || op1 == op2 {
+		t.Fatalf("operational instances %q, %q: want two distinct", op1, op2)
 	}
-	b.retransmissionBroadcast()
+	return b, adv, op1, op2
+}
+
+// TestTriggerSessionReannounce_ReconnectEvent: on an advertiser with the
+// broadcast events (mdns.Responder) the session-teardown trigger is
+// matter.js's "reconnect" event for the session's fabric's operational
+// service only — packages/protocol/src/protocol/DeviceAdvertiser.ts:131-150
+// at 862ad75f, advertisementForFabric(fabric).serviceDisconnected()
+// (Advertiser.ts:69-75). Index 0 (no fabric) and a fabric without an
+// announced service reach nothing.
+func TestTriggerSessionReannounce_ReconnectEvent(t *testing.T) {
+	t.Parallel()
+	b, adv, _, op2 := startedEventBridge(t)
+
+	b.triggerSessionReannounce(2)
+	b.triggerSessionReannounce(0)
+	b.triggerSessionReannounce(9)
+	b.reannounces.Wait()
+
 	d, r := adv.events()
-	want := []string{"op|" + mdns.ServiceTypeOperational}
-	if !slices.Equal(d, want) || !slices.Equal(r, want) {
-		t.Errorf("events: disconnected %v, retransmission %v, want %v each", d, r, want)
+	if want := []string{op2 + "|" + mdns.ServiceTypeOperational}; !slices.Equal(d, want) {
+		t.Errorf("disconnected events %v, want %v — fabric 2's service only", d, want)
+	}
+	if len(r) != 0 {
+		t.Errorf("retransmission events %v, want none", r)
 	}
 }

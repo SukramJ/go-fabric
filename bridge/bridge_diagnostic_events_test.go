@@ -30,7 +30,7 @@ func TestDiagnosticRingAttachIsSafeWhileTheReceivePathRecords(t *testing.T) {
 	go func() {
 		defer wg.Done()
 		for range rounds {
-			b.triggerSessionReannounce()
+			b.triggerSessionReannounce(1)
 		}
 	}()
 	// The operator path: attaching and detaching a ring at runtime.
@@ -57,7 +57,7 @@ func TestDiagnosticRingAttachIsSafeWhileTheReceivePathRecords(t *testing.T) {
 	// a detach must not leave the record sites pointing at a dead ring.
 	ring := diagevent.NewRing(16)
 	b.AttachDiagnosticEvents(ring)
-	b.triggerSessionReannounce()
+	b.triggerSessionReannounce(1)
 	if got := b.DiagnosticEvents(); len(got) == 0 {
 		t.Fatal("no event recorded into the freshly attached ring")
 	}
