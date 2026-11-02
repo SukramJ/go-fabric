@@ -107,6 +107,6 @@ func (s *SessionIntervals) apply(p *sessionparams.Parameters) {
 // responderSessionParams): the intervals of [Config.Sessions], the node's
 // MaxPathsPerInvoke and its TCP roles. Mirrors matter.js
 // SessionManager.sessionParameters (SessionManager.ts:351-360).
-func (n *Node) SessionParameters() sessionparams.Parameters {
+func (n *Node) SessionParameters() SessionParameters {
 	return *n.sec.responderParams
 }

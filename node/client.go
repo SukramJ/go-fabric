@@ -42,7 +42,7 @@ type ClientConfig struct {
 	// Names is the DNS-SD cache the peers' operational records are looked
 	// up in; nil opens one on the mDNS groups (discovery.Open), which the
 	// node closes on Stop. A Names the host supplies stays the host's.
-	Names *discovery.Names
+	Names *DiscoveryNames
 
 	// open, set through internal/nodeseam by fabrictest, opens the client
 	// socket in place of udp.New: a socket of the site's in-memory network.

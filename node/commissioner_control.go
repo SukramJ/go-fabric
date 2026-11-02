@@ -53,4 +53,4 @@ func (n *Node) buildCommissionerControl() (*mattercore.CommissionerControl, erro
 
 // CommissionerControl returns the CommissionerControl server — nil unless
 // [Config].CommissionerControl mounts one on the Aggregator.
-func (n *Node) CommissionerControl() *mattercore.CommissionerControl { return n.commissionerControl }
+func (n *Node) CommissionerControl() *CommissionerControlServer { return n.commissionerControl }

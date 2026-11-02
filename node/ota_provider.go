@@ -133,7 +133,7 @@ func (n *Node) OnOTAProviderStatusAsync(fn func(peer OTAPeer, status OTAUpdateSt
 // [Config].OTAProvider names an image source. A host that assembles its
 // own topology ([Config].Snapshotter) mounts it on an endpoint of its own;
 // with the facade's Aggregator the node mounts it.
-func (n *Node) OTAProvider() *mattercore.OTAProvider { return n.otaProvider }
+func (n *Node) OTAProvider() *OTAProviderServer { return n.otaProvider }
 
 // OTAProviderEndpoint is the provider endpoint's number, false without a
 // provider or before Start's assembly.
@@ -148,7 +148,7 @@ func (n *Node) OTAProviderEndpoint() (uint16, bool) {
 // transfers a controller's update manager reads the liveness of and
 // closes (matter.js SoftwareUpdateManager.#bdxSessionFor,
 // SoftwareUpdateManager.ts:322-328 at 862ad75f); nil without a provider.
-func (n *Node) BDX() *bdx.Responder { return n.bdx }
+func (n *Node) BDX() *BDXResponder { return n.bdx }
 
 // placeOTAProvider turns the provider's assembled endpoint from a bridged
 // one into a child of the root, the Aggregator's sibling: matter.js adds
