@@ -4229,31 +4229,24 @@
         "mdns:TestParityMdnsServer_NoResponseForUnknownName",
         "mdns:TestParityMdnsServer_RespondsToHostARecordByHostname",
         "mdns:TestParityMdnsServer_RecordsGeneratorReplacement",
-        "mdns:TestHostAnswer_KnownAnswerNeedsMoreThanHalfTTL",
-        "mdns:TestHostAnswer_UnicastOnlyAfterRecentMulticast",
         "mdns:TestMdnsServerRespondsToStandardQueries",
         "mdns:TestMdnsServerCacheFlushBit",
         "mdns:TestMdnsServerAnswerSuppression",
         "mdns:TestMdnsServerHandleDuplicateMessages",
         "mdns:TestMdnsServerRespondsAsUnicast",
+        "mdns:TestMdnsServerSplitsResponse",
+        "mdns:TestMdnsServerDuplicateQuestionSuppression",
         "mdns:TestMdnsServerUnknownNameQueryRejection",
+        "mdns:TestMdnsServerClose",
         "mdns:TestMdnsServerHostName"
       ],
       "missing": [
-        "server responds to an PTR query",
         "server suppress response to same ANY query when up to 1s delay",
-        "include as many answers as possible and spill remaining additionalRecords into a follow-up packet",
-        "lets zero-query continuation packets merge known-answers into a cached TC fragment",
-        "merges known-answers from a TC continuation that carries unrelated queries",
-        "sends nothing and logs at debug level for a broadcast after close",
-        "logs at debug level when expiring announcements while the server closes",
         "chooses the name on a network that reports interface details asynchronously",
         "names each interface by its own MAC when the interfaces cannot be listed",
-        "names each interface by its own MAC when none has a usable one",
-        "server responds to an SRV query",
-        "split answers into multiple responses and add additional records in last one"
+        "names each interface by its own MAC when none has a usable one"
       ],
-      "reason": "The cache-flush, known-answer, duplicate, unicast and case cases are ported against the host-name answerer (the go-fabric code that answers queries; the service records are grandcat/zeroconf's) and the host-name choice against hostNameChooser; missing stay the PTR answer with SRV/TXT additionals and the packet split (grandcat/zeroconf builds those responses), the 1 s duplicate case (its matter.js assertion runs before the async handler, MdnsServerTest.ts:707-724, and at 1000 ms MdnsServer.ts's 999 ms window has expired, so the vector proves nothing), the TC-continuation merge (the answerer does not hold truncated queries; MdnsServer.ts:446-503 is a timer-backed cache beyond a small fix), the two Close cases (no go-fabric broadcast fails and logs on close; TriggerReannounce after Close is a silent no-op), the asynchronous-network case (JS promise mechanics) and the two per-interface-MAC fallbacks (go-fabric publishes one host name for all interfaces and hashes the OS host name when no MAC is usable, by_design L7-D03). The t.Skip anchors of mdns/parity_mdns_server_test.go were dropped from the go list (owner review of PR #164) and deleted (W6-test-08): the SRV answer and the multi-packet split are grandcat/zeroconf's responses and stay missing.",
+      "reason": "Ported against the module's own responder (issue #362): its answer engine runs over a fake transport and the fake clock with matter.js's record-generator fixtures, so the standard, cache-flush, known-answer, duplicate, unicast, split, TC-continuation, unknown-name and Close cases assert the same responses; the host-name choice runs against hostNameChooser. Missing stay the 1 s duplicate case (its matter.js assertion runs before the async handler, MdnsServerTest.ts:707-724, and at 1000 ms MdnsServer.ts's 999 ms window has expired, so the vector proves nothing), the asynchronous-network case (JS promise mechanics) and the two per-interface-MAC fallbacks (go-fabric publishes one host name for all interfaces and hashes the OS host name when no MAC is usable, by_design L7-D03).",
       "snapshotSha": "9d109578a8f28b656872292d2e6b039badf1c2a7"
     },
     {
@@ -4263,14 +4256,14 @@
         "controller:TestControllerAdvertisesItsCommissionerRecord",
         "mdns:TestCommissionerAdvertisementParity",
         "mdns:TestParityMdnsServer_CommissionableTXTSchemaLock",
-        "mdns:TestParityMdnsServer_OperationalSIIFloor500ms"
+        "mdns:TestParityMdnsServer_OperationalSIIFloor500ms",
+        "mdns:TestMdnsAdvertisementParity",
+        "mdns:TestMdnsAnnouncementOverflow"
       ],
       "missing": [
-        "has correct crypto installed",
-        "it broadcasts the device fabric on one port and expires",
-        "splits oversized announcements into multiple packets with all records in the answer section"
+        "has correct crypto installed"
       ],
-      "reason": "The commissionable, operational and commissioner (_matterd._udp, BuildCommissionerService, controller.Config.Advertise) record content go-fabric builds is covered, the commissioner cases at the record level; the rest stays missing: the crypto case checks matter.js's MockCrypto itself, and the announcement and TTL-0 expiry packets (record order, _services._dns-sd PTRs, cache-flush bits, overflow splitting) are assembled by grandcat/zeroconf's RegisterProxy/Shutdown, not by go-fabric code a unit test can drive; the operational TXT also differs by design (SAT always emitted, notes/parity/by_design.md BD-mDNS-SAT-AlwaysEmitted).",
+      "reason": "The announcement and TTL-0 expiry packets of the operational, commissionable and commissioner services, the multi-service announcement and the oversized-announcement split are ported against the module's own responder (issue #362) and compared as sets, as matter.js's expectMessage does; the TXT values are the builders' (the operational SAT is always emitted, notes/parity/by_design.md BD-mDNS-SAT-AlwaysEmitted). The crypto case checks matter.js's MockCrypto itself and stays missing.",
       "snapshotSha": "1457c02635be7e2e331f32fe7f36473952a60e54"
     },
     {

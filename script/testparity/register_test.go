@@ -53,10 +53,12 @@ const testparityPlannedRatchet = 2
 //
 // Set at the W6 fix PR (review 2026-11) to 113 ported and 1140 missing
 // (the review counted 1136; W6-test-08 moved four cases of FixMe-skipped
-// anchors into the missing lists).
+// anchors into the missing lists). Issue #362 lowered missing to 1130:
+// the module's own mDNS responder made ten MdnsServerTest.ts and
+// MdnsTest.ts cases portable.
 const (
 	testparityPortedRatchet  = 113
-	testparityMissingRatchet = 1140
+	testparityMissingRatchet = 1130
 )
 
 // moduleRoot is where the committed artefacts live, seen from this package.
