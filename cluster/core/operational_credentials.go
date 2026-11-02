@@ -158,26 +158,16 @@ type OperationalCredentials struct {
 	// CommissioningServer.ts:118-141).
 	onFabricChanged func(ctx context.Context, fabricIndex uint8)
 
-	// onMDNSReannounce, when non-nil, is called after a successful
-	// RemoveFabric so the mDNS advertiser withdraws the per-fabric
-	// _matter._tcp record and republishes without the removed fabric.
-	// Without this, the operational record keeps advertising a
-	// CompressedFabricID that no longer exists; chip-tool and Apple Home
-	// then resolve a stale identity and fail CASE with
-	// CHIP_ERROR_NOT_FOUND. Mirrors matter.js Fabric.remove() which calls
-	// FabricManager.removeFabric, triggering a
-	// MdnsServer.reannounceInstance call for the updated fabric set.
-	onMDNSReannounce func(ctx context.Context)
-
 	// onFabricWithdraw, when non-nil, receives the operational identity
 	// (compressedID, nodeID) of an mDNS instance that must be withdrawn:
 	// the removed fabric on RemoveFabric, or the OLD NodeID on an
-	// UpdateNOC that changed the NodeID. A plain republish cannot do
-	// this — the advertiser only re-announces the records it still
-	// holds, so the stale <compressedID>-<nodeID> instance would keep
-	// answering until its TTL. Mirrors matter.js DeviceAdvertiser.ts:76-86
-	// (close the fabric's advertisements on update/delete before
-	// re-advertising). May be nil.
+	// UpdateNOC that changed the NodeID. The advertiser only re-announces
+	// the records it still holds, so the stale <compressedID>-<nodeID>
+	// instance would keep answering until its TTL. Mirrors matter.js
+	// packages/protocol/src/protocol/DeviceAdvertiser.ts:109-111 at
+	// 862ad75f (fabrics.events.deleting → Advertisement.cancelAll of the
+	// fabric's operational advertisements); matter.js republishes nothing
+	// else on a removal. May be nil.
 	onFabricWithdraw func(ctx context.Context, compressedID [8]byte, nodeID uint64)
 
 	// dataVersion tracks the per-cluster monotonic counter per Matter
@@ -444,14 +434,6 @@ type OpcredsConfig struct {
 	// SessionManager and chip operational-credentials-server.cpp
 	// FabricTable::AbortAllOtherCommunicationOnFabric. May be nil.
 	OnFabricUpdated func(ctx context.Context, fabricIndex uint8)
-	// OnMDNSReannounce, when non-nil, is called after RemoveFabric
-	// removes a fabric so the mDNS advertiser withdraws the stale
-	// per-fabric _matter._tcp record and republishes the remaining
-	// fabric set. Mirrors matter.js Fabric.remove() which calls
-	// FabricManager.removeFabric, triggering MdnsServer.reannounceInstance.
-	// May be nil — the cluster functions without it; the mDNS record
-	// will be stale until the next AddNOC or daemon restart.
-	OnMDNSReannounce func(ctx context.Context)
 	// OnFabricWithdraw, when non-nil, receives the (compressedID,
 	// nodeID) of an operational mDNS instance that must be withdrawn —
 	// see the field doc on [OperationalCredentials]. May be nil.
@@ -492,7 +474,6 @@ func NewOperationalCredentials(s StoreFacade, cfg OpcredsConfig) (*OperationalCr
 		rearmFailSafeForFabric: cfg.RearmFailSafeForFabric,
 		onFabricRemoved:        cfg.OnFabricRemoved,
 		onFabricUpdated:        cfg.OnFabricUpdated,
-		onMDNSReannounce:       cfg.OnMDNSReannounce,
 		onFabricWithdraw:       cfg.OnFabricWithdraw,
 		failSafe:               cfg.FailSafe,
 	}, nil
@@ -2292,37 +2273,30 @@ func (o *OperationalCredentials) RemoveFabric(ctx context.Context, fabricIndex u
 
 	o.mu.Lock()
 	hook := o.onFabricRemoved
-	mdnsHook := o.onMDNSReannounce
 	withdrawHook := o.onFabricWithdraw
 	o.mu.Unlock()
 
 	if hook != nil {
 		// Fires AFTER fabric persistence is gone but BEFORE we return
-		// NOCResponse to the controller. The daemon wires this hook to
-		// evict all operational sessions, subscriptions, and resumption
-		// records bound to the removed fabric — without the eviction
-		// stale state survives the fabric's death and a subsequent pair
-		// retry collides on session-id 1. Mirrors matter.js
-		// packages/protocol/src/fabric/FabricManager.ts:removeFabric
-		// (which fans out to SessionManager + InteractionServer).
-		// Concrete daemon-side fan-out: opMgr.CloseFabric + subMgr.CloseFabric
-		// + store.RemoveResumptionsByFabric.
+		// NOCResponse to the controller. The node facade wires this hook
+		// (node.observedFabricRemoved) to evict the operational sessions,
+		// subscriptions and resumption records bound to the removed
+		// fabric — without the eviction stale state survives the fabric's
+		// death and a subsequent pair retry collides on session-id 1.
+		// Mirrors matter.js packages/protocol/src/fabric/FabricManager.ts
+		// removeFabric (which fans out to SessionManager + InteractionServer).
 		hook(ctx, fabricIndex)
 	}
 	if withdrawHook != nil && gerr == nil {
 		// Withdraw the removed fabric's operational _matter._tcp
-		// instance. A republish alone is not enough — the advertiser
-		// re-announces the records it still holds, so the stale
-		// <compressedID>-<nodeID> record would keep answering until
-		// its TTL and commissioners resolve an identity that no longer
-		// exists. Mirrors matter.js DeviceAdvertiser.ts:84-86
-		// (fabrics.events.deleting → Advertisement.cancelAll).
+		// instance; the stale <compressedID>-<nodeID> record would
+		// otherwise keep answering until its TTL and commissioners
+		// resolve an identity that no longer exists. Mirrors matter.js
+		// DeviceAdvertiser.ts:109-111 at 862ad75f (fabrics.events.deleting
+		// → Advertisement.cancelAll); matter.js republishes no other
+		// fabric on a removal, and neither does this server (the
+		// remaining fabrics' records are untouched).
 		withdrawHook(ctx, removedFab.CompressedID, removedFab.NodeID)
-	}
-	if mdnsHook != nil {
-		// Republish the remaining fabric set. Mirrors matter.js
-		// Fabric.remove() triggering MdnsServer.reannounceInstance.
-		mdnsHook(ctx)
 	}
 	return nil
 }

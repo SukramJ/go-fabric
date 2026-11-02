@@ -26,7 +26,7 @@ Theme files: `wave-6-test.md` (Opus, done), `wave-6-reg.md` (Opus, done; 926 reg
 | doc (Opus) | 0 | 2 | 23 | 2 |
 | **W6** | **2** | **15** | **36** | **9** |
 
-## Fixed in PR (W6, branch `review/w6`)
+## Fixed in PR (W6: #368 the agent's branch `review/w6`, #369 the reviewer's)
 
 | ID | Commit | What |
 | --- | --- | --- |
@@ -47,7 +47,7 @@ Theme files: `wave-6-test.md` (Opus, done), `wave-6-reg.md` (Opus, done; 926 reg
 | W6-reg-01, W6-reg-02 | — (PR 1) | |
 | W6-reg-03, -04, -05, -06, -15, -16 | f7f208b1 | sixteen by_design entries retired (Retired entries table), two audit rows resolved, seven entries rewritten to their residue, the TimeSync row per the owner decision, the detached paragraph moved |
 | W6-reg-07 | 0135d864 | the unicast reply carries no P bit; the unreachable outbound masking removed |
-| W6-reg-08 | — | the reviewer's (security server) |
+| W6-reg-08 | 1e4c94b4 (#369) | RemoveFabric withdraws the removed fabric's operational record and republishes nothing else (matter.js `DeviceAdvertiser.ts:109-111`); `OpcredsConfig.OnMDNSReannounce` removed (CHANGELOG Changed, migration line); `TestRemoveFabric_WithdrawsTheRemovedFabricOnly`; the file's drifted citations fixed, drift ratchet 250 |
 | W6-reg-09, W6-reg-10 | b9967fd5 | findings register: four fixed bullets removed, the wording and drifted lines |
 | W6-reg-11 | bb167e70 | pin-lifts: the five verdicts, 39 Ahead rows, the TEVT row |
 | W6-reg-12 | d2504e48 | by_design refresh from the four maps, every matter.js line re-read at 862ad75f |
@@ -70,4 +70,11 @@ Theme files: `wave-6-test.md` (Opus, done), `wave-6-reg.md` (Opus, done; 926 reg
 - The cases item 1 excluded, none a module defect: TC-WASHERCTRL-2.2 (c; an undefined enum value answers CONSTRAINT_ERROR as matter.js does, chip expects INVALID_IN_STATE), TC-EEM-2.2 and TC-EPM-2.2 (c; the reference daemon has no EnergyReporting fake-readings test event trigger, 0x0091…), TC-PWRTL-2.2 (b; ElectricalCircuit is not in the model at the pin).
 - `client/discovery` coverage stays at floor 94: its spread is goroutine scheduling in the cache loop, which no clock drives.
 - pin-lifts #4777: the priming-report abort on an error status has no test (have it, untested).
-- 251 drifted citations remain on the ratchet (`script/citecheck`); this PR fixed the touched files' only.
+- 250 drifted citations remain on the ratchet (`script/citecheck`); the two PRs fixed the touched files' only.
+
+## Reviewer (Fable), after the handback
+
+- Every matter.js and chip citation of #368 was re-read at the pins (matter.js 862ad75f, connectedhomeip 6170af84): the Go `Mirrors` comments (among them `OperationalBase.ts:95-102`, `TlvNullable.ts:37-44`, `ExchangeManager.ts:230-235`, `GeneralCommissioningServer.ts:55-66`, chip `LaundryWasherControlsCluster.cpp:132-145`, `EnergyReportingTestEventTriggerHandler.h:47-51`, `TC_PWRTL_2_2.py:76`), the by_design rewrites and retirements, the findings-register and pin-lifts lines, the docs. All hold; the four follow-up commits after the verdict add none.
+- #368 merged the agent's branch at 80217ced before the reviewer's commits were pushed; #369 carries them: W6-reg-08 (1e4c94b4), the verdict and citation artefacts (drift 251 → 250), and two follow-ups the handback surfaced — `bridge`'s `drainReportDataChunks` waits up to 5 s for the first chunk (the race-load flake "sent 0 chunks"; the 300 ms quiet gap between chunks stays above the 200 ms per-chunk bound), and `script/coverfloor` gains a per-entry `spread` for a scheduling-dependent measurement (`controller/ble/bletest` measures 92.6 or 95.9: the virtual central's fire-and-forget teardown goroutines; floor 92, spread 3.3), because the three-point stale-floor rule of W6-test-05 cannot hold a 3.3-point spread at any floor.
+- Owner decisions 2026-11-02: the bridge chunking flake fixed in #369; the EnergyReporting fake-readings trigger for the reference daemon (TC-EEM-2.2, TC-EPM-2.2) is a follow-up issue, not review scope; TC-WASHERCTRL-2.2 stays a not-run-table record with no by_design row (the module follows matter.js, so there is no divergence from matter.js to record); the one tag after the last wave is v0.16.0.
+- Guards (reviewer runs): on d8ef848b — `make race` per package (root skipped) clean, cite-check, reachability-check, apidiff-check, ahead-check, testparity-check pass; `make ci` failed only on the bletest floor above. On 1d69eb54 — `make ci` (build, vet, test, lint, cover-check: 282 packages at or above their floor), race for `bridge`, `controller/ble/bletest`, `script/coverfloor`, `cluster/core`, apidiff-check, ahead-check, testparity-check pass; cite-check and reachability-check moved by line numbers of the bridge test file and were regenerated in the verdict commit. chip-tool runs: skipped locally (the reference daemon's composition did not move); CI's required jobs are the gate.

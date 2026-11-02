@@ -469,7 +469,7 @@
   },
   {
     "file": "bridge/subscribe_report_chunking_test.go",
-    "line": 240,
+    "line": 250,
     "citation": "packages/protocol/src/interaction/InteractionMessenger.ts:347",
     "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
     "identifier": "sendDataReport",
@@ -993,7 +993,7 @@
   },
   {
     "file": "cluster/core/operational_credentials.go",
-    "line": 260,
+    "line": 250,
     "citation": "Fabric.ts:548",
     "resolved": "packages/protocol/src/fabric/Fabric.ts",
     "identifier": "UpdateNOC",
@@ -1002,7 +1002,7 @@
   },
   {
     "file": "cluster/core/operational_credentials.go",
-    "line": 356,
+    "line": 346,
     "citation": "OperationalCredentialsServer.ts:247-252",
     "resolved": "packages/node/src/behaviors/operational-credentials/OperationalCredentialsServer.ts",
     "identifier": "addNoc",
@@ -1011,7 +1011,7 @@
   },
   {
     "file": "cluster/core/operational_credentials.go",
-    "line": 1376,
+    "line": 1357,
     "citation": "OperationalCredentialsServer.ts:110",
     "resolved": "packages/node/src/behaviors/operational-credentials/OperationalCredentialsServer.ts",
     "identifier": "AttestationNonce",
@@ -1020,7 +1020,7 @@
   },
   {
     "file": "cluster/core/operational_credentials.go",
-    "line": 1929,
+    "line": 1910,
     "citation": "Fabric.ts:557-559",
     "resolved": "packages/protocol/src/fabric/Fabric.ts",
     "identifier": "PublicKeyError",
@@ -1029,7 +1029,7 @@
   },
   {
     "file": "cluster/core/operational_credentials.go",
-    "line": 1981,
+    "line": 1962,
     "citation": "Fabric.ts:557-559",
     "resolved": "packages/protocol/src/fabric/Fabric.ts",
     "identifier": "PublicKeyError",
@@ -1038,21 +1038,12 @@
   },
   {
     "file": "cluster/core/operational_credentials.go",
-    "line": 2127,
+    "line": 2108,
     "citation": "Fabric.ts:548",
     "resolved": "packages/protocol/src/fabric/Fabric.ts",
     "identifier": "nodeId",
     "nearest": 512,
     "occurrences": 24
-  },
-  {
-    "file": "cluster/core/operational_credentials.go",
-    "line": 2318,
-    "citation": "DeviceAdvertiser.ts:84-86",
-    "resolved": "packages/protocol/src/protocol/DeviceAdvertiser.ts",
-    "identifier": "cancelAll",
-    "nearest": 111,
-    "occurrences": 2
   },
   {
     "file": "cluster/core/operational_credentials_nocvalidation_test.go",

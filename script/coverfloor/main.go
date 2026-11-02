@@ -261,10 +261,10 @@ func check(measurements []measurement, table []packageFloor) result {
 			))
 		default:
 			res.rows = append(res.rows, row{pkg: m.pkg, measured: pctString(m), floor: floorString(f.min), status: "ok"})
-			if f.min > 0 && m.pct-f.min > staleFloorSlack {
+			if f.min > 0 && m.pct-f.min > staleFloorSlack+f.spread {
 				res.problems = append(res.problems, fmt.Sprintf(
-					"%s is %.1f points above its floor (more than %.0f) — raise it to %.1f%% in script/coverfloor/floors.go to keep the ratchet biting",
-					m.pkg, m.pct-f.min, staleFloorSlack, math.Floor(m.pct),
+					"%s is %.1f points above its floor (more than %.1f) — raise it to %.1f%% in script/coverfloor/floors.go to keep the ratchet biting",
+					m.pkg, m.pct-f.min, staleFloorSlack+f.spread, math.Floor(m.pct),
 				))
 			}
 		}
