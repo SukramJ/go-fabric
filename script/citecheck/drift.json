@@ -1490,7 +1490,7 @@
   },
   {
     "file": "controller/ca/ca.go",
-    "line": 597,
+    "line": 631,
     "citation": "kinds/definitions/operational.ts:109-110",
     "resolved": "packages/protocol/src/certificate/kinds/definitions/operational.ts",
     "at": "0ceb202d",
