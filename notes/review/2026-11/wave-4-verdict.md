@@ -64,3 +64,9 @@ pins (matter.js `862ad75f`, connectedhomeip `6170af84`).
 | W4-ctlint-13 | 49f05b93 | package doc, BLE proxies guide, `BD-Controller-BleOverEsphomeProxies` |
 | W4-ctlint-14 | c9ca2bcd (part) | `ReadHeader` wraps the read error; the clock/logger threading of `Probe`/`Translate`/`Discover` is left open — it needs an API addition (owner question) |
 | W4-ctlsec-*, W4-ctlint-09 | — | the owner's reviewer, on this branch after the handback |
+
+Follow-up commits on the branch: c4ea63ed (lint: `syncAutoSubscribe` split under
+funlen; a race-proof wait in the W4-ctlim-03 test), 7dafb05a (coverage of the
+new `client/exchange` helpers and `schema.IsTimedWrite`, floors held),
+46e8a664 (citation and reachability snapshots; ratchets unchanged at drift 258
+and 3 unreached).
