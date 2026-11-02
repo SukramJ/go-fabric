@@ -28,7 +28,8 @@ type InvokeOptions struct {
 	// [DefaultMinimumResponseTimeoutWithFailsafe] (:466-474).
 	ExtendedFailSafeTimeout bool
 	// Timed sends a TimedRequest first (:438-440) and marks the invoke as
-	// timed.
+	// timed. A command [schema.IsTimedInvoke] names is timed without it
+	// (Invoke.ts:136-139).
 	Timed bool
 	// TimedTimeout is the TimedRequest's timeout; 0 is
 	// [DefaultTimedRequestTimeout] (:439).
@@ -151,6 +152,23 @@ func (o InvokeOptions) inferLargeMessage(paths ...im.ConcreteCommandPath) Invoke
 	return o
 }
 
+// timedFor reports whether an invoke of invokes with o is timed: the
+// caller asked for it (Timed or a TimedTimeout), or any command is
+// timed-required in the snapshot ([schema.IsTimedInvoke]) — matter.js
+// Invoke.ts:114, :136-139, :237. A path the snapshot does not model (a
+// custom cluster) infers nothing.
+func (o InvokeOptions) timedFor(invokes ...im.CommandInvocation) bool {
+	if o.Timed || o.TimedTimeout > 0 {
+		return true
+	}
+	for _, inv := range invokes {
+		if schema.IsTimedInvoke(inv.Path.Cluster, inv.Path.Command) {
+			return true
+		}
+	}
+	return false
+}
+
 // exchangeInvoke sends one InvokeRequest of invokes on a fresh exchange —
 // the TimedRequest first for a timed invoke, the commands with their
 // fields (each invocation's Fields a spec.Encodable, nil for an empty
@@ -165,10 +183,13 @@ func (c *Interaction) exchangeInvoke(ctx context.Context, invokes []im.CommandIn
 		return nil, err
 	}
 	defer m.close()
-	// A timeout alone marks the invoke timed, as a write's does. Mirrors
+	// A timeout alone marks the invoke timed, as a write's does, and so
+	// does a command whose model carries the timed quality. Mirrors
 	// matter.js packages/protocol/src/action/request/Invoke.ts:114
-	// (timedRequest = !!options.timed || !!timeout).
-	timed := opts.Timed || opts.TimedTimeout > 0
+	// (timedRequest = !!options.timed || !!timeout) and :136-139
+	// (timedRequest ||= !!cmdData.timed, cmdData.timed from
+	// effectiveAccess.timed, :237) (W4-ctlim-02).
+	timed := opts.timedFor(invokes...)
 	if timed {
 		timeout := opts.TimedTimeout
 		if timeout == 0 {

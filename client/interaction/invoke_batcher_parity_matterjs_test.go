@@ -240,6 +240,29 @@ func TestInvokeBatcherParity(t *testing.T) {
 		ciRefLess(t, s, s.next(t))
 		wantSuccess(t, plain)
 	})
+	t.Run("infers a timed invoke from the model and keeps it out of the batch", func(t *testing.T) {
+		t.Parallel()
+		// W4-ctlim-02: DoorLock LockDoor (endpoint 1) is timed in the
+		// model; with zero options it goes alone after a TimedRequest, as
+		// matter.js Invoke.ts:136-139 infers and ClientInteraction.ts:200
+		// keeps it out of the batch.
+		s, c := batchingPair(t, 10)
+		lock := im.ConcreteCommandPath{Endpoint: 1, Cluster: 0x0101, Command: 0x00}
+		done := ciInvoke(context.Background(), c, lock, batched())
+		tr := s.next(t)
+		if tr.proto.Opcode != im.OpcodeTimedRequest {
+			t.Fatalf("opcode 0x%02X, want TimedRequest", tr.proto.Opcode)
+		}
+		s.reply(t, tr, im.InteractionModelProtocolID, im.OpcodeStatusResponse, statusResponse(t, im.StatusSuccess))
+		req := ciRefLess(t, s, s.next(t))
+		if !req.TimedRequest || len(req.Invokes) != 1 || req.Invokes[0].Path.Cluster != 0x0101 {
+			t.Fatalf("timed request %+v", req)
+		}
+		wantSuccess(t, done)
+		if n := interaction.QueuedInvokes(c); n != 0 {
+			t.Fatalf("%d commands queued", n)
+		}
+	})
 	t.Run("per-request options never join a batch", func(t *testing.T) {
 		t.Parallel()
 		// :543-576 (sendDirect), "command with suppressResponse goes out

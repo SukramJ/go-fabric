@@ -57,3 +57,43 @@ func TestTimedInvokeMatchesSnapshot(t *testing.T) {
 		t.Fatal("snapshot carries no timed request command: the extractor lost access.timed")
 	}
 }
+
+// TestTimedWriteMatchesSnapshot holds IsTimedWrite against the snapshot:
+// true for exactly the attributes whose effective access carries "timed"
+// (matter.js Write.ts:188), across every cluster. None does at the pin, so
+// this also fails when the extractor starts recording one and timed_gen.go
+// was not regenerated.
+func TestTimedWriteMatchesSnapshot(t *testing.T) {
+	t.Parallel()
+	var snap struct {
+		Clusters []struct {
+			ID         uint32 `json:"id"`
+			Name       string `json:"name"`
+			Attributes []struct {
+				ID        uint32 `json:"id"`
+				Name      string `json:"name"`
+				Effective *struct {
+					Access struct {
+						Timed bool `json:"timed"`
+					} `json:"access"`
+				} `json:"effective"`
+			} `json:"attributes"`
+		} `json:"clusters"`
+	}
+	if err := json.Unmarshal(parity.SchemaJSON(), &snap); err != nil {
+		t.Fatalf("parse snapshot: %v", err)
+	}
+	for _, c := range snap.Clusters {
+		want := map[uint32]bool{}
+		for _, a := range c.Attributes {
+			if a.Effective != nil && a.Effective.Access.Timed {
+				want[a.ID] = true
+			}
+		}
+		for _, a := range c.Attributes {
+			if got := schema.IsTimedWrite(c.ID, a.ID); got != want[a.ID] {
+				t.Errorf("%s (0x%04X) attribute 0x%04X %s: IsTimedWrite = %v, snapshot timed = %v", c.Name, c.ID, a.ID, a.Name, got, want[a.ID])
+			}
+		}
+	}
+}

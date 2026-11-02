@@ -44,6 +44,7 @@ Findings of the whole-codebase review of 2026-11-01 (`notes/review/2026-11/`).
 - `im.EventFiltersFor`: the EventFilterIB that applies to a node — the first without a NodeID or with the node's operational id on the accessing fabric.
 - `endpoint.Endpoint.Aggregator` and `Topology.Aggregator()`: the Aggregator role as a property of the endpoint, which the assembler sets on the Aggregator it builds.
 - `exchange.Session.OnAddressChanged`: the observer of a session's address moves — matter.js `MessageChannel.networkAddressChanged`; the peer follows it into its operational address (W4-ctlnet-02).
+- `schema.IsTimedWrite(cluster, attribute)`: whether an attribute carries the timed access quality, generated from the snapshot next to `IsTimedInvoke` (empty at the pin) (W4-ctlim-02).
 
 ### Changed
 
@@ -100,6 +101,7 @@ Findings of the whole-codebase review of 2026-11-01 (`notes/review/2026-11/`).
 - `client/exchange`: a saturated MRP backoff plus the fixed local backoff or a fallback's `InitialRetransmissionTime` saturates instead of wrapping to a negative wait, under which an unbounded CASE fallback attempt retransmitted Sigma1 in a tight loop after ~51 transmissions (W4-ctlnet-01).
 - `client/exchange`, `client/peer`: a message that opens a new exchange on a secure UDP session from another address moves the session there, and the peer's operational address follows, as matter.js's `ExchangeManager` does; acks and responses went to the old address until the subscription failed (W4-ctlnet-02).
 - `controller/client`: `Hooks.Event` and the persisted event cursor move only for the default subscription's reports while it is current, its bootstrap read and the newly-commissioned read, as matter.js gates them on `emitEvents`; a host's own `Node.Read` or `Node.Subscribe` returns its events in its `Report` only — it raised the cursor past events the default subscription then never asked for (W4-ctlim-01).
+- `client/interaction`: an invoke of a command whose model is timed-required (DoorLock LockDoor, AdministratorCommissioning, …) sends a TimedRequest first and stays out of the automatic batch with zero options, and a write of an attribute with the timed quality is timed, as matter.js infers both from the model; such a command went into a batch untimed and drew NEEDS_TIMED_INTERACTION (W4-ctlim-02).
 
 ## [0.15.6] — 2026-11-01
 
