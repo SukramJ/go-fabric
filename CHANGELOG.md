@@ -10,6 +10,14 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+### Added
+
+- The reference daemon's grid meter answers connectedhomeip's EnergyReporting test event triggers (`0x0091000000000000`–`02`): a fake 1 kW load at 2 s or 3 kW generator at 5 s updates ActivePower, Voltage, ActiveCurrent and CumulativeEnergyImported on the meter and its sensor part, the stop trigger ends the updates, as connectedhomeip's energy-management app's FakeReadings does; matter.js has none (`notes/parity/by_design.md`, BD-chip-EnergyReporting-FakeReadings) (#370).
+
+### Changed
+
+- The chip-tool families run TC-EEM-2.2 and TC-EPM-2.2; they were excluded as harness gaps while the daemon answered the EnergyReporting trigger with INVALID_COMMAND (#370).
+
 ## [0.16.0] — 2026-11-02
 
 ### Security
