@@ -20,7 +20,7 @@
 // family table by TestCertifiabilityDocument — is the status.
 //
 // The `chiptool` build tag keeps the harness-driven tests out of
-// `make test`, `make race` and the default `go test ./...`. Three entry
+// `make test`, `make race` and the default `go test ./...`. Four entry
 // points:
 //
 //   - TestChipToolCommissionsReferenceBridge — commission, read, invoke,
@@ -31,7 +31,9 @@
 //     by family the way matter.js runs them (`make chiptool-families`,
 //     narrowed with GOFABRIC_CHIP_FAMILIES=IDM,ACL,…, further to single
 //     cases with GOFABRIC_CHIP_CASES=FAN/3.1,… and repeated with
-//     GOFABRIC_CHIP_REPEAT=20 — a narrowed run cannot -update-chip-cases).
+//     GOFABRIC_CHIP_REPEAT=20 — a narrowed run cannot -update-chip-cases);
+//   - TestGoCertificationCases — the Go-TH leg below (`make chiptool-gocert`,
+//     part of `make chiptool-test`, narrowed with GOFABRIC_GOCERT=IDM,SC/4.2).
 //
 // # The harness
 //
@@ -84,6 +86,43 @@
 // --media, a video player and a content app after chip's tv-app for the
 // media families: the PICS slices are generated from one daemon, so every
 // case runs against the same device.
+//
+// # The Go-TH leg
+//
+// matter.js automated 68 certification cases in
+// support/chip-testing/test/cert/TC-*.test.ts, and in most of them its own
+// controller is the DUT and a device app the TH
+// (support/chip-testing/README.md:112-118): the controller halves of the
+// CHIP test plans, which CHIP's harness has as manual cases and the
+// families therefore leave as "manual" rows. gocert_test.go reads those
+// files mirrored: the reference daemon is the DUT, the module's own
+// controller (controller.New, one per TS controller role) performs the
+// TS file's controller actions as TH, and the TS file's TH-side
+// expectations — what the device answers, reports, advertises and does —
+// are what the daemon has to satisfy. Matter is symmetric enough that a
+// plan's controller step ("the DUT sends a Read Request with these
+// paths") is a device step when read from the other side ("the device
+// answers exactly these paths"); where the TS checks the TH's log for what
+// arrived, the mirrored step checks the daemon's answer and its effect (a
+// read-back, a report, a DNS-SD record).
+//
+// Each case (goCertCase) cites its TS file and every step the line of its
+// .step( call; every step records pass, fail or skipped with its reason,
+// as matter.js's StepVerdict does. A step's PICS is the TS's, mirrored
+// onto the server side (mirrorPICS: X.C.Cnn.Tx → X.S.Cnn.Rsp, X.C → X.S,
+// MCORE.IDM.C… → MCORE.IDM.S, MCORE.ROLE.COMMISSIONER → COMMISSIONEE) and
+// evaluated against the committed PICS of the daemon (the hand
+// declarations and the generated slices, held to the daemon's endpoints by
+// checkTopology); a step whose PICS is false is recorded skipped with the
+// expression, never passed. The TS addresses its all-clusters app's
+// endpoint 1; the mirrored step addresses the daemon's first endpoint whose
+// PICS hold, and a substitution of an attribute the daemon does not serve
+// is named at the step. The out-of-band controls of the TS (matter.js's
+// backchannel) are the daemon's app pipe. The leg needs no harness image;
+// its counts are pinned in testdata/chip-cases.golden.json under goCert,
+// and TestCertifiabilityDocument renders those cases as passed, "Go
+// controller as TH, after matter.js TC-X.test.ts". The opposite direction —
+// matter.js's own reading, the Go controller as the DUT — is phase 29b.
 //
 // Nothing is skipped silently on a machine that has the prerequisites: a
 // missing harness skips with the command that provides it, and a missing
