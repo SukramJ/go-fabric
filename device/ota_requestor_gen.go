@@ -16,9 +16,11 @@ const (
 	OtaRequestorRevision uint16              = 1
 )
 
-// OtaRequestorType is the OtaRequestor device type, matter.js's packages/node/src/endpoints/ota-requestor.ts;
-// its cluster requirements are listed in docs/reference/device-types.md#otarequestor.
-var OtaRequestorType = typeOtaRequestor
+// OtaRequestorType returns the OtaRequestor device type, matter.js's packages/node/src/endpoints/ota-requestor.ts;
+// its cluster requirements are listed in docs/reference/device-types.md#otarequestor. It is the registry's
+// value, the one [Lookup] and [FromSpec] return: a caller reads it and
+// does not modify it.
+func OtaRequestorType() *Type { return &typeOtaRequestor }
 
 // typeOtaRequestor holds [OtaRequestorType]'s cluster requirements.
 var typeOtaRequestor = Type{

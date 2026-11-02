@@ -20,9 +20,11 @@ const (
 	DimmablePlugInUnitRevision uint16              = 6
 )
 
-// DimmablePlugInUnitType is the DimmablePlugInUnit device type, matter.js's packages/node/src/devices/dimmable-plug-in-unit.ts;
-// its cluster requirements are listed in docs/reference/device-types.md#dimmablepluginunit.
-var DimmablePlugInUnitType = typeDimmablePlugInUnit
+// DimmablePlugInUnitType returns the DimmablePlugInUnit device type, matter.js's packages/node/src/devices/dimmable-plug-in-unit.ts;
+// its cluster requirements are listed in docs/reference/device-types.md#dimmablepluginunit. It is the registry's
+// value, the one [Lookup] and [FromSpec] return: a caller reads it and
+// does not modify it.
+func DimmablePlugInUnitType() *Type { return &typeDimmablePlugInUnit }
 
 // typeDimmablePlugInUnit holds [DimmablePlugInUnitType]'s cluster requirements.
 var typeDimmablePlugInUnit = Type{

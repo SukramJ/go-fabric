@@ -16,9 +16,11 @@ const (
 	OtaProviderRevision uint16              = 1
 )
 
-// OtaProviderType is the OtaProvider device type, matter.js's packages/node/src/endpoints/ota-provider.ts;
-// its cluster requirements are listed in docs/reference/device-types.md#otaprovider.
-var OtaProviderType = typeOtaProvider
+// OtaProviderType returns the OtaProvider device type, matter.js's packages/node/src/endpoints/ota-provider.ts;
+// its cluster requirements are listed in docs/reference/device-types.md#otaprovider. It is the registry's
+// value, the one [Lookup] and [FromSpec] return: a caller reads it and
+// does not modify it.
+func OtaProviderType() *Type { return &typeOtaProvider }
 
 // typeOtaProvider holds [OtaProviderType]'s cluster requirements.
 var typeOtaProvider = Type{

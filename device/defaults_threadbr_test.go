@@ -30,7 +30,7 @@ func threadbrCases() (cases []struct {
 		if err != nil {
 			return nil, err
 		}
-		return New(&ThreadBorderRouterType, testOptions("tbr"), tbrmdef.Declare{BorderRouter: br})
+		return New(ThreadBorderRouterType(), testOptions("tbr"), tbrmdef.Declare{BorderRouter: br})
 	}
 	return []struct {
 		cluster uint32

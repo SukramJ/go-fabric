@@ -16,9 +16,11 @@ const (
 	ClosureControllerRevision uint16              = 2
 )
 
-// ClosureControllerType is the ClosureController device type, matter.js's packages/node/src/devices/closure-controller.ts;
-// its cluster requirements are listed in docs/reference/device-types.md#closurecontroller.
-var ClosureControllerType = typeClosureController
+// ClosureControllerType returns the ClosureController device type, matter.js's packages/node/src/devices/closure-controller.ts;
+// its cluster requirements are listed in docs/reference/device-types.md#closurecontroller. It is the registry's
+// value, the one [Lookup] and [FromSpec] return: a caller reads it and
+// does not modify it.
+func ClosureControllerType() *Type { return &typeClosureController }
 
 // typeClosureController holds [ClosureControllerType]'s cluster requirements.
 var typeClosureController = Type{

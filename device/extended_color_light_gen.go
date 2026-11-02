@@ -21,9 +21,11 @@ const (
 	ExtendedColorLightRevision uint16              = 5
 )
 
-// ExtendedColorLightType is the ExtendedColorLight device type, matter.js's packages/node/src/devices/extended-color-light.ts;
-// its cluster requirements are listed in docs/reference/device-types.md#extendedcolorlight.
-var ExtendedColorLightType = typeExtendedColorLight
+// ExtendedColorLightType returns the ExtendedColorLight device type, matter.js's packages/node/src/devices/extended-color-light.ts;
+// its cluster requirements are listed in docs/reference/device-types.md#extendedcolorlight. It is the registry's
+// value, the one [Lookup] and [FromSpec] return: a caller reads it and
+// does not modify it.
+func ExtendedColorLightType() *Type { return &typeExtendedColorLight }
 
 // typeExtendedColorLight holds [ExtendedColorLightType]'s cluster requirements.
 var typeExtendedColorLight = Type{

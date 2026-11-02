@@ -18,9 +18,11 @@ const (
 	DoorbellRevision uint16              = 2
 )
 
-// DoorbellType is the Doorbell device type, matter.js's packages/node/src/devices/doorbell.ts;
-// its cluster requirements are listed in docs/reference/device-types.md#doorbell.
-var DoorbellType = typeDoorbell
+// DoorbellType returns the Doorbell device type, matter.js's packages/node/src/devices/doorbell.ts;
+// its cluster requirements are listed in docs/reference/device-types.md#doorbell. It is the registry's
+// value, the one [Lookup] and [FromSpec] return: a caller reads it and
+// does not modify it.
+func DoorbellType() *Type { return &typeDoorbell }
 
 // typeDoorbell holds [DoorbellType]'s cluster requirements.
 var typeDoorbell = Type{

@@ -20,9 +20,11 @@ const (
 	OnOffPlugInUnitRevision uint16              = 5
 )
 
-// OnOffPlugInUnitType is the OnOffPlugInUnit device type, matter.js's packages/node/src/devices/on-off-plug-in-unit.ts;
-// its cluster requirements are listed in docs/reference/device-types.md#onoffpluginunit.
-var OnOffPlugInUnitType = typeOnOffPlugInUnit
+// OnOffPlugInUnitType returns the OnOffPlugInUnit device type, matter.js's packages/node/src/devices/on-off-plug-in-unit.ts;
+// its cluster requirements are listed in docs/reference/device-types.md#onoffpluginunit. It is the registry's
+// value, the one [Lookup] and [FromSpec] return: a caller reads it and
+// does not modify it.
+func OnOffPlugInUnitType() *Type { return &typeOnOffPlugInUnit }
 
 // typeOnOffPlugInUnit holds [OnOffPlugInUnitType]'s cluster requirements.
 var typeOnOffPlugInUnit = Type{

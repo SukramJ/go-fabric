@@ -18,9 +18,11 @@ const (
 	AggregatorRevision uint16              = 2
 )
 
-// AggregatorType is the Aggregator device type, matter.js's packages/node/src/endpoints/aggregator.ts;
-// its cluster requirements are listed in docs/reference/device-types.md#aggregator.
-var AggregatorType = typeAggregator
+// AggregatorType returns the Aggregator device type, matter.js's packages/node/src/endpoints/aggregator.ts;
+// its cluster requirements are listed in docs/reference/device-types.md#aggregator. It is the registry's
+// value, the one [Lookup] and [FromSpec] return: a caller reads it and
+// does not modify it.
+func AggregatorType() *Type { return &typeAggregator }
 
 // typeAggregator holds [AggregatorType]'s cluster requirements.
 var typeAggregator = Type{

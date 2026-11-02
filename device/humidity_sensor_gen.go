@@ -17,9 +17,11 @@ const (
 	HumiditySensorRevision uint16              = 3
 )
 
-// HumiditySensorType is the HumiditySensor device type, matter.js's packages/node/src/devices/humidity-sensor.ts;
-// its cluster requirements are listed in docs/reference/device-types.md#humiditysensor.
-var HumiditySensorType = typeHumiditySensor
+// HumiditySensorType returns the HumiditySensor device type, matter.js's packages/node/src/devices/humidity-sensor.ts;
+// its cluster requirements are listed in docs/reference/device-types.md#humiditysensor. It is the registry's
+// value, the one [Lookup] and [FromSpec] return: a caller reads it and
+// does not modify it.
+func HumiditySensorType() *Type { return &typeHumiditySensor }
 
 // typeHumiditySensor holds [HumiditySensorType]'s cluster requirements.
 var typeHumiditySensor = Type{

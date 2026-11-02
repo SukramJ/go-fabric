@@ -449,9 +449,10 @@ func (g *generator) body(m *typeModel, imports map[string]string) ([]byte, error
 	var w bytes.Buffer
 	fmt.Fprintf(&w, "// %s device type identity: 0x%04X, revision %d.\n", dt.Name, *dt.ID, dt.Revision)
 	fmt.Fprintf(&w, "const (\n\t%sID schema.DeviceTypeID = 0x%04X\n\t%sRevision uint16 = %d\n)\n\n", n, *dt.ID, n, dt.Revision)
-	fmt.Fprintf(&w, "// %sType is the %s device type, matter.js's %s;\n", n, dt.Name, matterjsPath(dt))
-	fmt.Fprintf(&w, "// its cluster requirements are listed in %s.\n", referenceLink(dt.Name))
-	fmt.Fprintf(&w, "var %sType = %s\n\n", n, typeVar(n))
+	fmt.Fprintf(&w, "// %sType returns the %s device type, matter.js's %s;\n", n, dt.Name, matterjsPath(dt))
+	fmt.Fprintf(&w, "// its cluster requirements are listed in %s. It is the registry's\n", referenceLink(dt.Name))
+	w.WriteString("// value, the one [Lookup] and [FromSpec] return: a caller reads it and\n// does not modify it.\n")
+	fmt.Fprintf(&w, "func %sType() *Type { return &%s }\n\n", n, typeVar(n))
 	fmt.Fprintf(&w, "// %s holds [%sType]'s cluster requirements.\n", typeVar(n), n)
 	fmt.Fprintf(&w, "var %s = Type{\n", typeVar(n))
 	fmt.Fprintf(&w, "\tID: %sID, Name: %q, Revision: %sRevision,\n", n, dt.Name, n)
@@ -577,7 +578,7 @@ func writeCompositeTest(w *bytes.Buffer, n, name string, components []string) {
 	args := strings.Join(vars, ", ")
 	fmt.Fprintf(w, "\t\tif _, err := New%s(Options{}, %s); err == nil {\n\t\t\tt.Error(\"%s: constructed without a StableKey\")\n\t\t}\n", n, args, name)
 	fmt.Fprintf(w, "\t\td, err := New%s(testOptions(%q), %s, testWith(t, %q)...)\n\t\tif err != nil {\n\t\t\tt.Fatalf(\"%s: %%v\", err)\n\t\t}\n", n, name, args, name, name)
-	fmt.Fprintf(w, "\t\tif d.Type() != &%sType {\n\t\t\tt.Errorf(\"%s: type %%v\", d.Type().Name)\n\t\t}\n", n, name)
+	fmt.Fprintf(w, "\t\tif d.Type() != %sType() {\n\t\t\tt.Errorf(\"%s: type %%v\", d.Type().Name)\n\t\t}\n", n, name)
 	fmt.Fprintf(w, "\t\tif parts := d.Parts(); len(parts) != %d", len(components))
 	for i, v := range vars {
 		fmt.Fprintf(w, " || parts[%d] != %s.Device", i, v)
@@ -721,7 +722,7 @@ func (g *generator) generateRegistry(names []string) (*output, error) {
 	w.WriteString("// committedTypes are the generated device types, by id.\n")
 	w.WriteString("var committedTypes = []*Type{\n")
 	for _, e := range entries {
-		fmt.Fprintf(&w, "\t&%sType,\n", e.name)
+		fmt.Fprintf(&w, "\t&%s,\n", typeVar(e.name))
 	}
 	w.WriteString("}\n")
 	out, err := format.Source(w.Bytes())
@@ -762,7 +763,7 @@ func (g *generator) generateTest(names []string) (*output, error) {
 		}
 		fmt.Fprintf(&w, "\tif _, err := New%s(Options{}); err == nil {\n\t\tt.Error(\"%s: constructed without a StableKey\")\n\t}\n", n, name)
 		fmt.Fprintf(&w, "\tif d, err := New%s(testOptions(%q), testWith(t, %q)...); err == nil {\n", n, name, name)
-		fmt.Fprintf(&w, "\t\tif d.Type() != &%sType {\n\t\t\tt.Errorf(\"%s: type %%v\", d.Type().Name)\n\t\t}\n", n, name)
+		fmt.Fprintf(&w, "\t\tif d.Type() != %sType() {\n\t\t\tt.Errorf(\"%s: type %%v\", d.Type().Name)\n\t\t}\n", n, name)
 		for _, cr := range m.servers {
 			if _, ok := g.accessor(cr); !ok {
 				continue

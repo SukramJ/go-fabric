@@ -18,9 +18,11 @@ const (
 	RainSensorRevision uint16              = 2
 )
 
-// RainSensorType is the RainSensor device type, matter.js's packages/node/src/devices/rain-sensor.ts;
-// its cluster requirements are listed in docs/reference/device-types.md#rainsensor.
-var RainSensorType = typeRainSensor
+// RainSensorType returns the RainSensor device type, matter.js's packages/node/src/devices/rain-sensor.ts;
+// its cluster requirements are listed in docs/reference/device-types.md#rainsensor. It is the registry's
+// value, the one [Lookup] and [FromSpec] return: a caller reads it and
+// does not modify it.
+func RainSensorType() *Type { return &typeRainSensor }
 
 // typeRainSensor holds [RainSensorType]'s cluster requirements.
 var typeRainSensor = Type{

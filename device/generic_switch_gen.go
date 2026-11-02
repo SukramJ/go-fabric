@@ -17,9 +17,11 @@ const (
 	GenericSwitchRevision uint16              = 3
 )
 
-// GenericSwitchType is the GenericSwitch device type, matter.js's packages/node/src/devices/generic-switch.ts;
-// its cluster requirements are listed in docs/reference/device-types.md#genericswitch.
-var GenericSwitchType = typeGenericSwitch
+// GenericSwitchType returns the GenericSwitch device type, matter.js's packages/node/src/devices/generic-switch.ts;
+// its cluster requirements are listed in docs/reference/device-types.md#genericswitch. It is the registry's
+// value, the one [Lookup] and [FromSpec] return: a caller reads it and
+// does not modify it.
+func GenericSwitchType() *Type { return &typeGenericSwitch }
 
 // typeGenericSwitch holds [GenericSwitchType]'s cluster requirements.
 var typeGenericSwitch = Type{

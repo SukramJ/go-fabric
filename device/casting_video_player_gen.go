@@ -29,9 +29,11 @@ const (
 	CastingVideoPlayerRevision uint16              = 2
 )
 
-// CastingVideoPlayerType is the CastingVideoPlayer device type, matter.js's packages/node/src/devices/casting-video-player.ts;
-// its cluster requirements are listed in docs/reference/device-types.md#castingvideoplayer.
-var CastingVideoPlayerType = typeCastingVideoPlayer
+// CastingVideoPlayerType returns the CastingVideoPlayer device type, matter.js's packages/node/src/devices/casting-video-player.ts;
+// its cluster requirements are listed in docs/reference/device-types.md#castingvideoplayer. It is the registry's
+// value, the one [Lookup] and [FromSpec] return: a caller reads it and
+// does not modify it.
+func CastingVideoPlayerType() *Type { return &typeCastingVideoPlayer }
 
 // typeCastingVideoPlayer holds [CastingVideoPlayerType]'s cluster requirements.
 var typeCastingVideoPlayer = Type{

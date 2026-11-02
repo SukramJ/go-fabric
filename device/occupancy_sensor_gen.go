@@ -18,9 +18,11 @@ const (
 	OccupancySensorRevision uint16              = 4
 )
 
-// OccupancySensorType is the OccupancySensor device type, matter.js's packages/node/src/devices/occupancy-sensor.ts;
-// its cluster requirements are listed in docs/reference/device-types.md#occupancysensor.
-var OccupancySensorType = typeOccupancySensor
+// OccupancySensorType returns the OccupancySensor device type, matter.js's packages/node/src/devices/occupancy-sensor.ts;
+// its cluster requirements are listed in docs/reference/device-types.md#occupancysensor. It is the registry's
+// value, the one [Lookup] and [FromSpec] return: a caller reads it and
+// does not modify it.
+func OccupancySensorType() *Type { return &typeOccupancySensor }
 
 // typeOccupancySensor holds [OccupancySensorType]'s cluster requirements.
 var typeOccupancySensor = Type{

@@ -17,9 +17,11 @@ const (
 	PressureSensorRevision uint16              = 3
 )
 
-// PressureSensorType is the PressureSensor device type, matter.js's packages/node/src/devices/pressure-sensor.ts;
-// its cluster requirements are listed in docs/reference/device-types.md#pressuresensor.
-var PressureSensorType = typePressureSensor
+// PressureSensorType returns the PressureSensor device type, matter.js's packages/node/src/devices/pressure-sensor.ts;
+// its cluster requirements are listed in docs/reference/device-types.md#pressuresensor. It is the registry's
+// value, the one [Lookup] and [FromSpec] return: a caller reads it and
+// does not modify it.
+func PressureSensorType() *Type { return &typePressureSensor }
 
 // typePressureSensor holds [PressureSensorType]'s cluster requirements.
 var typePressureSensor = Type{

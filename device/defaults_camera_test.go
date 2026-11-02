@@ -106,27 +106,27 @@ func cameraCases() []struct {
 		build   func() (*Device, error)
 		want    any
 	}{
-		{wrdef.ClusterID, func() (*Device, error) { return New(&CameraControllerType, testOptions("cc")) }, (*camera.Requestor)(nil)},
+		{wrdef.ClusterID, func() (*Device, error) { return New(CameraControllerType(), testOptions("cc")) }, (*camera.Requestor)(nil)},
 		{chimedef.ClusterID, func() (*Device, error) {
-			return New(&ChimeType, testOptions("chime"), chimedef.Declare{ChimePort: fakeChime{}})
+			return New(ChimeType(), testOptions("chime"), chimedef.Declare{ChimePort: fakeChime{}})
 		}, (*camera.Chime)(nil)},
 		{avdef.ClusterID, func() (*Device, error) {
-			return New(&CameraType, testOptions("ptz"), avdef.Declare{Features: avdef.FeatureMechanicalPan, MechanicalPTZ: fakePTZ{}})
+			return New(CameraType(), testOptions("ptz"), avdef.Declare{Features: avdef.FeatureMechanicalPan, MechanicalPTZ: fakePTZ{}})
 		}, (*camera.AvSettings)(nil)},
 		{csdef.ClusterID, func() (*Device, error) {
-			return New(&IntercomType, testOptions("intercom"), csdef.Declare{AudioStreamPort: fakeAudio{}})
+			return New(IntercomType(), testOptions("intercom"), csdef.Declare{AudioStreamPort: fakeAudio{}})
 		}, (*camera.AvStream)(nil)},
 		{zmdef.ClusterID, func() (*Device, error) {
 			maxZones, sensMax := uint8(4), uint8(5)
-			return New(&CameraType, testOptions("zones"), zmdef.Declare{
+			return New(CameraType(), testOptions("zones"), zmdef.Declare{
 				Initial: zmdef.Patch{MaxZones: &maxZones, SensitivityMax: &sensMax}, ZonePort: fakeZones{},
 			})
 		}, (*camera.Zones)(nil)},
 		{wpdef.ClusterID, func() (*Device, error) {
-			return New(&CameraType, testOptions("provider"), wpdef.Declare{ProviderPort: fakeProvider{}})
+			return New(CameraType(), testOptions("provider"), wpdef.Declare{ProviderPort: fakeProvider{}})
 		}, (*camera.Provider)(nil)},
 		{padef.ClusterID, func() (*Device, error) {
-			return New(&CameraType, testOptions("push"), padef.Declare{PushTransportPort: fakePush{}})
+			return New(CameraType(), testOptions("push"), padef.Declare{PushTransportPort: fakePush{}})
 		}, (*camera.PushTransport)(nil)},
 	}
 }

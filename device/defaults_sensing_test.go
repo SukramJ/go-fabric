@@ -15,7 +15,7 @@ import (
 // server: no device type at the pin lists the cluster, so the kit's
 // default is exercised on a type that does.
 func acsType() *Type {
-	t := ContactSensorType
+	t := *ContactSensorType()
 	t.Servers = append(slices.Clone(t.Servers), ClusterRequirement{
 		ID: acsdef.ClusterID, Name: acsdef.Name, Conformance: "O", Definition: acsdef.Definition,
 	})
@@ -77,7 +77,7 @@ func TestAmbientContextKit(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(own.Close)
-	d, err = New(&ContactSensorType, testOptions("acs-host"), acsdef.Declare{HostServer: own})
+	d, err = New(ContactSensorType(), testOptions("acs-host"), acsdef.Declare{HostServer: own})
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -18,9 +18,11 @@ const (
 	WaterLeakDetectorRevision uint16              = 2
 )
 
-// WaterLeakDetectorType is the WaterLeakDetector device type, matter.js's packages/node/src/devices/water-leak-detector.ts;
-// its cluster requirements are listed in docs/reference/device-types.md#waterleakdetector.
-var WaterLeakDetectorType = typeWaterLeakDetector
+// WaterLeakDetectorType returns the WaterLeakDetector device type, matter.js's packages/node/src/devices/water-leak-detector.ts;
+// its cluster requirements are listed in docs/reference/device-types.md#waterleakdetector. It is the registry's
+// value, the one [Lookup] and [FromSpec] return: a caller reads it and
+// does not modify it.
+func WaterLeakDetectorType() *Type { return &typeWaterLeakDetector }
 
 // typeWaterLeakDetector holds [WaterLeakDetectorType]'s cluster requirements.
 var typeWaterLeakDetector = Type{

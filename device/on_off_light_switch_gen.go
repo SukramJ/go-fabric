@@ -17,9 +17,11 @@ const (
 	OnOffLightSwitchRevision uint16              = 4
 )
 
-// OnOffLightSwitchType is the OnOffLightSwitch device type, matter.js's packages/node/src/devices/on-off-light-switch.ts;
-// its cluster requirements are listed in docs/reference/device-types.md#onofflightswitch.
-var OnOffLightSwitchType = typeOnOffLightSwitch
+// OnOffLightSwitchType returns the OnOffLightSwitch device type, matter.js's packages/node/src/devices/on-off-light-switch.ts;
+// its cluster requirements are listed in docs/reference/device-types.md#onofflightswitch. It is the registry's
+// value, the one [Lookup] and [FromSpec] return: a caller reads it and
+// does not modify it.
+func OnOffLightSwitchType() *Type { return &typeOnOffLightSwitch }
 
 // typeOnOffLightSwitch holds [OnOffLightSwitchType]'s cluster requirements.
 var typeOnOffLightSwitch = Type{

@@ -17,9 +17,11 @@ const (
 	DoorLockRevision uint16              = 4
 )
 
-// DoorLockType is the DoorLock device type, matter.js's packages/node/src/devices/door-lock.ts;
-// its cluster requirements are listed in docs/reference/device-types.md#doorlock.
-var DoorLockType = typeDoorLock
+// DoorLockType returns the DoorLock device type, matter.js's packages/node/src/devices/door-lock.ts;
+// its cluster requirements are listed in docs/reference/device-types.md#doorlock. It is the registry's
+// value, the one [Lookup] and [FromSpec] return: a caller reads it and
+// does not modify it.
+func DoorLockType() *Type { return &typeDoorLock }
 
 // typeDoorLock holds [DoorLockType]'s cluster requirements.
 var typeDoorLock = Type{

@@ -20,9 +20,11 @@ const (
 	DimmableLightRevision uint16              = 4
 )
 
-// DimmableLightType is the DimmableLight device type, matter.js's packages/node/src/devices/dimmable-light.ts;
-// its cluster requirements are listed in docs/reference/device-types.md#dimmablelight.
-var DimmableLightType = typeDimmableLight
+// DimmableLightType returns the DimmableLight device type, matter.js's packages/node/src/devices/dimmable-light.ts;
+// its cluster requirements are listed in docs/reference/device-types.md#dimmablelight. It is the registry's
+// value, the one [Lookup] and [FromSpec] return: a caller reads it and
+// does not modify it.
+func DimmableLightType() *Type { return &typeDimmableLight }
 
 // typeDimmableLight holds [DimmableLightType]'s cluster requirements.
 var typeDimmableLight = Type{

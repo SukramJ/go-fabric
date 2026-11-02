@@ -63,6 +63,7 @@ facade one shape. Each row names what a host writes now.
 | `device.AheadRows` | `node.AheadRows()` (the root's and the devices' rows) |
 | `contract.DeviceTypeName` | `schema.DeviceTypeName(schema.DeviceTypeID(id))`; operator labels are the host's |
 | `node.Config.Topology`, `node.OtaConfig`, `surface.Origin` (`OriginClusterMandatory`, `OriginDeviceType`, `OriginHostDeclared`, `OriginKitDefault`, `Element.Origin`) | `node.Config.Snapshotter`, `node.OTAConfig`, `surface.Provenance` (`Provenance…`, `Element.Provenance`) |
+| `device.<Name>Type` (the 91 generated variables) | `device.<Name>Type()`, a `*device.Type`; copy with `*` before modifying |
 
 ## Changed in the next release: `CommissionerReach` takes the peer
 

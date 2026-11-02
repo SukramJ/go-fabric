@@ -16,9 +16,11 @@ const (
 	ModeSelectRevision uint16              = 1
 )
 
-// ModeSelectType is the ModeSelect device type, matter.js's packages/node/src/devices/mode-select.ts;
-// its cluster requirements are listed in docs/reference/device-types.md#modeselect.
-var ModeSelectType = typeModeSelect
+// ModeSelectType returns the ModeSelect device type, matter.js's packages/node/src/devices/mode-select.ts;
+// its cluster requirements are listed in docs/reference/device-types.md#modeselect. It is the registry's
+// value, the one [Lookup] and [FromSpec] return: a caller reads it and
+// does not modify it.
+func ModeSelectType() *Type { return &typeModeSelect }
 
 // typeModeSelect holds [ModeSelectType]'s cluster requirements.
 var typeModeSelect = Type{

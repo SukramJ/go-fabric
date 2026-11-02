@@ -16,9 +16,11 @@ const (
 	PowerSourceRevision uint16              = 1
 )
 
-// PowerSourceType is the PowerSource device type, matter.js's packages/node/src/endpoints/power-source.ts;
-// its cluster requirements are listed in docs/reference/device-types.md#powersource.
-var PowerSourceType = typePowerSource
+// PowerSourceType returns the PowerSource device type, matter.js's packages/node/src/endpoints/power-source.ts;
+// its cluster requirements are listed in docs/reference/device-types.md#powersource. It is the registry's
+// value, the one [Lookup] and [FromSpec] return: a caller reads it and
+// does not modify it.
+func PowerSourceType() *Type { return &typePowerSource }
 
 // typePowerSource holds [PowerSourceType]'s cluster requirements.
 var typePowerSource = Type{

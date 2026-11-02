@@ -16,9 +16,11 @@ const (
 	VideoRemoteControlRevision uint16              = 2
 )
 
-// VideoRemoteControlType is the VideoRemoteControl device type, matter.js's packages/node/src/devices/video-remote-control.ts;
-// its cluster requirements are listed in docs/reference/device-types.md#videoremotecontrol.
-var VideoRemoteControlType = typeVideoRemoteControl
+// VideoRemoteControlType returns the VideoRemoteControl device type, matter.js's packages/node/src/devices/video-remote-control.ts;
+// its cluster requirements are listed in docs/reference/device-types.md#videoremotecontrol. It is the registry's
+// value, the one [Lookup] and [FromSpec] return: a caller reads it and
+// does not modify it.
+func VideoRemoteControlType() *Type { return &typeVideoRemoteControl }
 
 // typeVideoRemoteControl holds [VideoRemoteControlType]'s cluster requirements.
 var typeVideoRemoteControl = Type{

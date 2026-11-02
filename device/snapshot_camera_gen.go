@@ -20,9 +20,11 @@ const (
 	SnapshotCameraRevision uint16              = 1
 )
 
-// SnapshotCameraType is the SnapshotCamera device type, matter.js's packages/node/src/devices/snapshot-camera.ts;
-// its cluster requirements are listed in docs/reference/device-types.md#snapshotcamera.
-var SnapshotCameraType = typeSnapshotCamera
+// SnapshotCameraType returns the SnapshotCamera device type, matter.js's packages/node/src/devices/snapshot-camera.ts;
+// its cluster requirements are listed in docs/reference/device-types.md#snapshotcamera. It is the registry's
+// value, the one [Lookup] and [FromSpec] return: a caller reads it and
+// does not modify it.
+func SnapshotCameraType() *Type { return &typeSnapshotCamera }
 
 // typeSnapshotCamera holds [SnapshotCameraType]'s cluster requirements.
 var typeSnapshotCamera = Type{

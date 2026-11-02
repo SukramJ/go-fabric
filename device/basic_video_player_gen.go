@@ -26,9 +26,11 @@ const (
 	BasicVideoPlayerRevision uint16              = 2
 )
 
-// BasicVideoPlayerType is the BasicVideoPlayer device type, matter.js's packages/node/src/devices/basic-video-player.ts;
-// its cluster requirements are listed in docs/reference/device-types.md#basicvideoplayer.
-var BasicVideoPlayerType = typeBasicVideoPlayer
+// BasicVideoPlayerType returns the BasicVideoPlayer device type, matter.js's packages/node/src/devices/basic-video-player.ts;
+// its cluster requirements are listed in docs/reference/device-types.md#basicvideoplayer. It is the registry's
+// value, the one [Lookup] and [FromSpec] return: a caller reads it and
+// does not modify it.
+func BasicVideoPlayerType() *Type { return &typeBasicVideoPlayer }
 
 // typeBasicVideoPlayer holds [BasicVideoPlayerType]'s cluster requirements.
 var typeBasicVideoPlayer = Type{

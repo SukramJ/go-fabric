@@ -18,9 +18,11 @@ const (
 	SoilSensorRevision uint16              = 1
 )
 
-// SoilSensorType is the SoilSensor device type, matter.js's packages/node/src/devices/soil-sensor.ts;
-// its cluster requirements are listed in docs/reference/device-types.md#soilsensor.
-var SoilSensorType = typeSoilSensor
+// SoilSensorType returns the SoilSensor device type, matter.js's packages/node/src/devices/soil-sensor.ts;
+// its cluster requirements are listed in docs/reference/device-types.md#soilsensor. It is the registry's
+// value, the one [Lookup] and [FromSpec] return: a caller reads it and
+// does not modify it.
+func SoilSensorType() *Type { return &typeSoilSensor }
 
 // typeSoilSensor holds [SoilSensorType]'s cluster requirements.
 var typeSoilSensor = Type{

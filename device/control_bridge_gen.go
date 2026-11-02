@@ -17,9 +17,11 @@ const (
 	ControlBridgeRevision uint16              = 4
 )
 
-// ControlBridgeType is the ControlBridge device type, matter.js's packages/node/src/devices/control-bridge.ts;
-// its cluster requirements are listed in docs/reference/device-types.md#controlbridge.
-var ControlBridgeType = typeControlBridge
+// ControlBridgeType returns the ControlBridge device type, matter.js's packages/node/src/devices/control-bridge.ts;
+// its cluster requirements are listed in docs/reference/device-types.md#controlbridge. It is the registry's
+// value, the one [Lookup] and [FromSpec] return: a caller reads it and
+// does not modify it.
+func ControlBridgeType() *Type { return &typeControlBridge }
 
 // typeControlBridge holds [ControlBridgeType]'s cluster requirements.
 var typeControlBridge = Type{

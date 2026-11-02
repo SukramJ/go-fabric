@@ -18,9 +18,11 @@ const (
 	ElectricalSensorRevision uint16              = 1
 )
 
-// ElectricalSensorType is the ElectricalSensor device type, matter.js's packages/node/src/endpoints/electrical-sensor.ts;
-// its cluster requirements are listed in docs/reference/device-types.md#electricalsensor.
-var ElectricalSensorType = typeElectricalSensor
+// ElectricalSensorType returns the ElectricalSensor device type, matter.js's packages/node/src/endpoints/electrical-sensor.ts;
+// its cluster requirements are listed in docs/reference/device-types.md#electricalsensor. It is the registry's
+// value, the one [Lookup] and [FromSpec] return: a caller reads it and
+// does not modify it.
+func ElectricalSensorType() *Type { return &typeElectricalSensor }
 
 // typeElectricalSensor holds [ElectricalSensorType]'s cluster requirements.
 var typeElectricalSensor = Type{

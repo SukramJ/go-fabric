@@ -45,7 +45,7 @@ func TestRootNodeAccessorsWrapTheMountedServers(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewRootNode: %v", err)
 	}
-	if root.Type() != &RootNodeType {
+	if root.Type() != RootNodeType() {
 		t.Errorf("type %v", root.Type().Name)
 	}
 	for name, got := range map[string]struct {

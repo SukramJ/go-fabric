@@ -16,9 +16,11 @@ const (
 	BatteryStorageRevision uint16              = 2
 )
 
-// BatteryStorageType is the BatteryStorage device type, matter.js's packages/node/src/devices/battery-storage.ts;
-// its cluster requirements are listed in docs/reference/device-types.md#batterystorage.
-var BatteryStorageType = typeBatteryStorage
+// BatteryStorageType returns the BatteryStorage device type, matter.js's packages/node/src/devices/battery-storage.ts;
+// its cluster requirements are listed in docs/reference/device-types.md#batterystorage. It is the registry's
+// value, the one [Lookup] and [FromSpec] return: a caller reads it and
+// does not modify it.
+func BatteryStorageType() *Type { return &typeBatteryStorage }
 
 // typeBatteryStorage holds [BatteryStorageType]'s cluster requirements.
 var typeBatteryStorage = Type{

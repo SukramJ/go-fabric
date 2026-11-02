@@ -24,9 +24,11 @@ const (
 	PumpRevision uint16              = 4
 )
 
-// PumpType is the Pump device type, matter.js's packages/node/src/devices/pump.ts;
-// its cluster requirements are listed in docs/reference/device-types.md#pump.
-var PumpType = typePump
+// PumpType returns the Pump device type, matter.js's packages/node/src/devices/pump.ts;
+// its cluster requirements are listed in docs/reference/device-types.md#pump. It is the registry's
+// value, the one [Lookup] and [FromSpec] return: a caller reads it and
+// does not modify it.
+func PumpType() *Type { return &typePump }
 
 // typePump holds [PumpType]'s cluster requirements.
 var typePump = Type{

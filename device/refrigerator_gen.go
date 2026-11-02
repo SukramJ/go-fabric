@@ -19,9 +19,11 @@ const (
 	RefrigeratorRevision uint16              = 3
 )
 
-// RefrigeratorType is the Refrigerator device type, matter.js's packages/node/src/devices/refrigerator.ts;
-// its cluster requirements are listed in docs/reference/device-types.md#refrigerator.
-var RefrigeratorType = typeRefrigerator
+// RefrigeratorType returns the Refrigerator device type, matter.js's packages/node/src/devices/refrigerator.ts;
+// its cluster requirements are listed in docs/reference/device-types.md#refrigerator. It is the registry's
+// value, the one [Lookup] and [FromSpec] return: a caller reads it and
+// does not modify it.
+func RefrigeratorType() *Type { return &typeRefrigerator }
 
 // typeRefrigerator holds [RefrigeratorType]'s cluster requirements.
 var typeRefrigerator = Type{

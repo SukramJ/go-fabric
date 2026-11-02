@@ -18,9 +18,11 @@ const (
 	CookSurfaceRevision uint16              = 2
 )
 
-// CookSurfaceType is the CookSurface device type, matter.js's packages/node/src/devices/cook-surface.ts;
-// its cluster requirements are listed in docs/reference/device-types.md#cooksurface.
-var CookSurfaceType = typeCookSurface
+// CookSurfaceType returns the CookSurface device type, matter.js's packages/node/src/devices/cook-surface.ts;
+// its cluster requirements are listed in docs/reference/device-types.md#cooksurface. It is the registry's
+// value, the one [Lookup] and [FromSpec] return: a caller reads it and
+// does not modify it.
+func CookSurfaceType() *Type { return &typeCookSurface }
 
 // typeCookSurface holds [CookSurfaceType]'s cluster requirements.
 var typeCookSurface = Type{
