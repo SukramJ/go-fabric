@@ -53,7 +53,7 @@ no host holds counted work in hand and no goroutine of the process is
 working — the
 [Testing in process](testing-in-process.md) guide.
 
-*Source: `transport/udp/listener.go:158-229`, `bridge/bridge.go:808-864`, `bridge/ackpump.go:18-24`, `bridge/ackpump.go:291-314`, `im/subscription/manager.go:185-186`, `im/subscription/manager.go:230-236`, `im/subscription/engine.go:74-95`, `secure/operational/manager.go:231-235`, `secure/operational/manager.go:1157-1172`, `node/security.go:421-468`, `node/node.go:37-39`, `node/node.go:567-575`, `node/reannounce.go:15-31`, `node/config.go:231-235`, `bridge/securechannel.go:1265-1299`, `bridge/bdx_responder.go:141-158`, `binding/manager.go:255-261`, `node/client.go:115-125`, `node/node.go:111-125`, `clock/clock.go`, `node/config.go` (`Config.Clock`), `endpoint/assembler.go` (`Config.Clock`), `node/root.go` (`buildAggregatorClusters`), `device/options.go` (`Options.Clock`), `fabrictest/site.go` (`Run`).*
+*Source: `transport/udp/listener.go:158-229`, `bridge/bridge.go:808-864`, `bridge/ackpump.go:18-24`, `bridge/ackpump.go:291-314`, `im/subscription/manager.go:185-186`, `im/subscription/manager.go:230-236`, `im/subscription/engine.go:74-95`, `secure/operational/manager.go:231-235`, `secure/operational/manager.go:1157-1172`, `node/security.go:421-468`, `node/node.go` (`ErrStopped`), `node/node.go` (`Node.observedFabricRemoved`), `node/reannounce.go:15-31`, `node/config.go:231-235`, `bridge/securechannel.go:1265-1299`, `bridge/bdx_responder.go:141-158`, `binding/manager.go:255-261`, `node/client.go:115-125`, `node/node.go` (the `Node` struct), `clock/clock.go`, `node/config.go` (`Config.Clock`), `endpoint/assembler.go` (`Config.Clock`), `node/root.go` (`buildAggregatorClusters`), `device/options.go` (`Options.Clock`), `fabrictest/site.go` (`Run`).*
 
 ## Dispatch and ordering
 
@@ -176,4 +176,4 @@ stop budget — runs on the node's clock (`clock.WithTimeout`): on the system
 clock it is `context.WithTimeout`, under a test's fake clock it expires when
 the fake is advanced.
 
-*Source: `node/node.go:131-148`, `node/node.go:616-712`, `node/node.go:723-788`, `bridge/bridge.go:1695-1801`, `bridge/bridge.go:1995-2002`, `transport/udp/listener.go:178-251`.*
+*Source: `node/node.go` (`New`), `node/node.go` (`Node.Start`), `node/node.go` (`Node.Stop`), `bridge/bridge.go:1695-1801`, `bridge/bridge.go:1995-2002`, `transport/udp/listener.go:178-251`.*

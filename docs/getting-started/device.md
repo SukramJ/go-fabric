@@ -33,7 +33,7 @@ every port, what skipping it costs, and whether the failure is visible.
 `Node.Bridge()` gives you the bridge for a port the facade does not cover
 without leaving the facade.
 
-*Source: `node/doc.go:4-43`, `node/config.go:107-116`, `bridge/bridge.go:29-47`, `node/node.go:790-792`.*
+*Source: `node/doc.go:4-43`, `node/config.go:107-116`, `bridge/bridge.go:29-47`, `node/node.go` (`Node.Bridge`).*
 
 ## The program
 
@@ -157,16 +157,26 @@ with `node.ErrInvalidConfig` when any check fails. It checks:
 - the passcode is in range and not on the trivially-guessable list;
 - the PBKDF iteration count and salt length are what SPAKE2+ accepts;
 - `VendorID`, `ProductID` and `NodeLabel` are set;
-- a store is given (see below), and not both `Store.Path` and `Store.DB`;
+- a store is given — `Store.Path`, `Store.DB`, or both `Store.Credentials`
+  and `Store.Endpoints` (see below) — and not both `Store.Path` and `Store.DB`;
 - `Attestation.Files` is not combined with `Chain` or the CD, and
   `BlockCommissioningOnError` comes with `Files`;
 - `Health.Interval` is not negative;
 - `SupportedFabrics` is at most 254;
 - `UniqueID` is at most 32 bytes;
 - `LocationCapability` is a valid regulatory location;
-- `Network.Reannounce.Interval` is not negative;
+- `Network.Reannounce.Interval` is not negative, and `Network.WiFi` comes
+  with its `Reporter`;
 - `OTA.Dir` is set when `OTA` is;
-- `TLS.CertificatePort` is set when `TLS` is.
+- `TLS.CertificatePort` is set when `TLS` is;
+- `DeviceTypeValidation` is one of warn, strict and off;
+- every `Limits` field is inside its bound and the `Sessions` intervals
+  are valid;
+- `TimeSynchronization.Config` is not combined with `TimeSynchronization.Off`;
+- `ICD`, when set, is a valid ICD configuration.
+
+`Config.Validate` in `node/config.go` is the authority; this list follows
+it.
 
 The quickstart uses the CSA test vendor `0xFFF1`. With no `Attestation` set,
 the node serves the CSA test attestation chain and test Certification
@@ -199,7 +209,7 @@ Defaults worth knowing:
 | `TimeSynchronization` | mounted, UTCTime and Granularity alone; `Off` leaves it off the root, `Config` serves the TZ, NTPC, NTPS and TSC features it names, after connectedhomeip ([Time synchronization](#time-synchronization)) |
 | `TLS` | no TLS servers; set, TlsCertificateManagement and TlsClientManagement mount on endpoint 0 (`node.TLSConfig`: the `CertificatePort`, per-fabric maxima defaulting to chip's 5, the stores defaulting to the node's) and every camera's PushAvStreamTransport without its own TLS lookups validates against them ([Camera](../guides/camera.md#the-transport-model)) |
 
-*Source: `node/config.go:37-205`, `node/config.go:303-365`, `node/config.go:466-524`, `node/node.go:131-148`.*
+*Source: `node/config.go:37-205`, `node/config.go:303-365`, `node/config.go:466-524`, `node/node.go` (`New`).*
 
 ## Devices
 
@@ -390,7 +400,7 @@ while `err` is non-nil, and controllers that are already paired keep
 working. A host calls it before `Start` when, for example, it cannot serve
 its configured attestation chain.
 
-*Source: `node/node.go:900-907`, `node/node.go:692-711`, `node/commissioning.go:424-452`, `node/node.go:835-855`.*
+*Source: `node/inspect.go` (`Node.SetupPayload`), `node/node.go` (`Node.Start`), `node/commissioning.go:424-452`, `node/node.go` (`Node.SetCommissioningBlocked`).*
 
 ## Time synchronization
 
@@ -458,7 +468,7 @@ new node on the same store.
 `Stop` on every node that `New` returned, including one you never started.
 The quickstart does this on its error paths.
 
-*Source: `node/node.go:35-37`, `node/node.go:715-788`, `node/node.go:116-130`, `bridge/bridge.go:1695-1710`.*
+*Source: `node/node.go` (`ErrStopped`), `node/node.go` (`Node.Stop`, `Node.Run`), `node/node.go` (the `Node` struct), `bridge/bridge.go:1695-1710`.*
 
 ## What the reference daemon adds
 
