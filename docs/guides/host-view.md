@@ -228,10 +228,10 @@ it only changes the set, after `Start` it reassembles the running bridge.
 A stored endpoint number is never dropped because its device is absent:
 a device a previous run served keeps its number until it returns, and a
 device the host removes keeps it too (`Remove`). `Forget` frees it, for a
-device that is gone for good. A `Start` that fails runs the stop path
-itself — the store `New` opened is closed, the node is stopped — so the
-program returns its error; on a later error path the program calls
-`Stop`.
+device that is gone for good. A `Start` that fails leaves the node
+startable, as matter.js's `Node.start` does, with the store `New` opened
+still open; the program gives up, so it calls `Stop` on that path and on
+every later one.
 
 A host whose devices come from several sources that load on their own
 gives each a partition: `Aggregator().Partition(name)` has the same

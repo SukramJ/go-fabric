@@ -721,14 +721,18 @@ func (n *Node) notifyFabricUpdated(ctx context.Context, fabricIndex uint8) {
 // the OTA requestor, their operational records, and the node's own
 // commissioning window when no fabric exists. Start is idempotent, as
 // matter.js Node.start (Node.ts:114-132); after Stop it is [ErrStopped].
+//
 // The node counts as started once Start completed. A Start that fails
-// runs the stop path before it returns, so it releases what New and the
-// partial start began (the store file, the goroutines) and the node is
-// stopped: a later Start is [ErrStopped], a Stop a no-op, and a host
-// builds a new node on the same store. matter.js's Node.start sets its
-// target state back to "offline" on an error and rethrows
-// (Node.ts:113-128), so its node may be started again; this node, like
-// one after Stop, is not restarted.
+// leaves the node startable, as matter.js's Node.start does — it sets the
+// target state back to "offline" and rethrows (Node.ts:113-128): the node
+// is not started, a later Start runs the whole start path again, and
+// what New opened (the store file of Store.Path) stays open until Stop.
+// Every step that can fail — the DataModelTest check, the PartsList
+// providers, the bridge's start (topology, sockets) — runs before
+// anything is started, and the bridge's start undoes its own partial
+// work (bridge.Bridge.Start), so a failed Start leaves no goroutine, no
+// socket and no open window behind. A host that gives up calls Stop;
+// [Node.Run] does.
 func (n *Node) Start(ctx context.Context) error {
 	n.mu.Lock()
 	defer n.mu.Unlock()
@@ -739,16 +743,14 @@ func (n *Node) Start(ctx context.Context) error {
 		return nil
 	}
 	if err := n.startLocked(ctx); err != nil {
-		if stopErr := n.stopLocked(context.WithoutCancel(ctx)); stopErr != nil {
-			n.logger.Warn("node.start_failed.stop", slog.Any("err", stopErr))
-		}
 		return err
 	}
 	n.started.Store(true)
 	return nil
 }
 
-// startLocked is Start's work; n.mu is held.
+// startLocked is Start's work; n.mu is held. It fails only before it has
+// started anything (see Start): every fallible step comes first.
 func (n *Node) startLocked(ctx context.Context) error {
 	// The start is work in hand of the node's in-flight group but for its
 	// wait on the controllers of re-established subscriptions: a
@@ -765,15 +767,25 @@ func (n *Node) startLocked(ctx context.Context) error {
 	if err := n.checkDataModelTest(); err != nil {
 		return err
 	}
+	// The root's and the Aggregator's PartsList providers read the live
+	// topology on each read; attaching them needs only the root servers,
+	// so it is checked before anything starts.
+	if err := attachPartsListProviders(n.br); err != nil {
+		return err
+	}
+	// The bridge's start is the last step that can fail; it leaves
+	// nothing bound or published when it does (bridge.Bridge.Start).
+	if err := n.br.Start(ctx); err != nil {
+		return fmt.Errorf("node: bridge start: %w", err)
+	}
 	// The goroutines New leaves unstarted (ADR 0026 principle 5): the
 	// subscription engine, the session, PASE and CASE reapers, the subtype
-	// responder — all bounded by the node's lifetime.
+	// responder — all bounded by the node's lifetime, and started only
+	// once the start can no longer fail, so a failed Start leaves none
+	// running (the engine cannot be restarted once stopped).
 	n.sec.start(n.life) //nolint:contextcheck // the engine and the reapers run for the node's lifetime, not the call's
 	if n.subtypeResponder != nil {
 		n.subtypeResponder.Start(n.life) //nolint:contextcheck // as above
-	}
-	if err := n.br.Start(ctx); err != nil {
-		return fmt.Errorf("node: bridge start: %w", err)
 	}
 	// The assembled surface against the one a previous run persisted: a
 	// change raises the ConfigurationVersions (surface_stability.go).
@@ -797,9 +809,6 @@ func (n *Node) startLocked(ctx context.Context) error {
 		keepOperationalTime(n.life, n.cfg.Clock, n.st, n.root.GeneralDiagnostics, operationalTimeInterval, n.logger)
 	}()
 
-	if err := attachPartsListProviders(n.br); err != nil {
-		return err
-	}
 	n.ensureOTAProviderACL(ctx)
 	n.camerasOnline(ctx)
 
@@ -977,10 +986,11 @@ func newCallbackQueue(clk clock.Clock) *serialqueue.Queue {
 }
 
 // Run starts the node, waits for ctx to end and stops it — matter.js
-// Node.run (Node.ts:183-186).
+// Node.run (Node.ts:183-186). A Start that fails is followed by Stop, so
+// Run releases what New opened either way.
 func (n *Node) Run(ctx context.Context) error {
 	if err := n.Start(ctx); err != nil {
-		return err
+		return errors.Join(err, n.Stop(context.WithoutCancel(ctx)))
 	}
 	<-ctx.Done()
 	stopCtx, cancel := clock.WithTimeout(context.WithoutCancel(ctx), n.cfg.Clock, stopTimeout)

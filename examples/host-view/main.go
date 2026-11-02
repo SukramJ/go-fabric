@@ -104,6 +104,7 @@ func run(ctx context.Context) error {
 		return err
 	}
 	if err := n.Start(ctx); err != nil {
+		_ = n.Stop(context.WithoutCancel(ctx)) // a failed Start leaves the node startable and its store open
 		return err
 	}
 	for _, d := range n.Topology().Devices {

@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net"
 	"path/filepath"
 	"slices"
 	"sync"
@@ -657,27 +658,57 @@ func TestAggregatorConcurrentAdds(t *testing.T) {
 	}
 }
 
-// TestStartFailureRunsTheStopPath: a Start that fails releases what New
-// began — the node is stopped, a retry is ErrStopped, Stop a no-op — and
-// an Aggregator change after it answers ErrStopped (W5-api-06, W5-ex-08).
-func TestStartFailureRunsTheStopPath(t *testing.T) {
+// TestStartFailureLeavesTheNodeStartable: a Start that fails — its UDP
+// port held by another socket — leaves the node startable, as matter.js's
+// Node.start does (packages/node/src/node/Node.ts:113-128 at 862ad75f:
+// the target state back to "offline", the error rethrown): the store New
+// opened stays usable, the Aggregator takes a device, and once the port
+// is free the second Start succeeds; an explicit Stop then makes a later
+// Start ErrStopped (W5-api-06, owner decision 2026-11-02).
+func TestStartFailureLeavesTheNodeStartable(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
-	cfg := minimalConfig(openDB(t, filepath.Join(t.TempDir(), "n.db")))
-	// A listen address that cannot bind fails the bridge's start.
-	cfg.Network.Listen = "127.0.0.1:99999"
+	held, err := net.ListenPacket("udp4", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg := minimalConfig(nil)
+	cfg.Store = node.Store{Path: filepath.Join(t.TempDir(), "n.db")}
+	cfg.Network.Listen = held.LocalAddr().String()
 	n := newNode(t, cfg)
 	if err := n.Start(ctx); err == nil {
-		t.Fatal("Start on an unbindable address succeeded")
+		_ = held.Close()
+		t.Fatal("Start on a held port succeeded")
 	}
-	if err := n.Start(ctx); !errors.Is(err, node.ErrStopped) {
-		t.Errorf("Start after a failed Start: %v, want ErrStopped", err)
+	if n.LocalAddr() != "" {
+		t.Errorf("a failed Start left the listener at %s", n.LocalAddr())
 	}
-	if err := n.Aggregator().Add(ctx, newPlug(t, "late")); !errors.Is(err, node.ErrStopped) {
-		t.Errorf("Add after a failed Start: %v, want ErrStopped", err)
+	if err := n.Aggregator().Add(ctx, newPlug(t, "after-failure")); err != nil {
+		t.Errorf("Add after a failed Start: %v", err)
+	}
+	if err := held.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := n.Start(ctx); err != nil {
+		t.Fatalf("the second Start: %v", err)
+	}
+	if n.LocalAddr() == "" {
+		t.Error("the second Start bound no listener")
+	}
+	if fabrics, err := n.FabricInfos(ctx); err != nil || len(fabrics) != 0 {
+		t.Errorf("the store after the retry: %v, %v", fabrics, err)
+	}
+	if err := n.Start(ctx); err != nil {
+		t.Errorf("Start of a started node: %v, want nil (idempotent)", err)
 	}
 	if err := n.Stop(ctx); err != nil {
-		t.Errorf("Stop after a failed Start: %v", err)
+		t.Fatal(err)
+	}
+	if err := n.Start(ctx); !errors.Is(err, node.ErrStopped) {
+		t.Errorf("Start after Stop: %v, want ErrStopped", err)
+	}
+	if err := n.Aggregator().Add(ctx, newPlug(t, "late")); !errors.Is(err, node.ErrStopped) {
+		t.Errorf("Add after Stop: %v, want ErrStopped", err)
 	}
 }
 

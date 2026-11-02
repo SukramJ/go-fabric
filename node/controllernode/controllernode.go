@@ -82,6 +82,7 @@ func Start(ctx context.Context, spec controller.OwnNodeSpec) (controller.OwnNode
 	}
 	Observe(n, spec)
 	if err := n.Start(ctx); err != nil {
+		_ = n.Stop(context.WithoutCancel(ctx)) // a failed Start leaves the node startable and its store open
 		return nil, nil, err
 	}
 	addr, err := net.ResolveUDPAddr("udp", n.Bridge().LocalAddr())
