@@ -259,7 +259,7 @@ func compose(ctx context.Context, f flags, logger *slog.Logger, passcode uint32,
 		return nil, nil, err
 	}
 	devices := newFleet()
-	devices.surface = &policies
+	devices.surface = policies
 	otaDownloads := f.otaDir
 	if otaDownloads == "" {
 		otaDownloads = filepath.Join(filepath.Dir(f.dbPath), "ota")
@@ -318,13 +318,13 @@ func compose(ctx context.Context, f flags, logger *slog.Logger, passcode uint32,
 	}
 	if f.media {
 		// The video player and content app (media.go), TESTING ONLY.
-		if devices.media, err = newDemoMedia(&policies, logger); err != nil {
+		if devices.media, err = newDemoMedia(policies, logger); err != nil {
 			return nil, nil, err
 		}
 	}
 	if f.otbr != "" {
 		// The ThreadBorderRouter endpoint (otbr.go), off by default.
-		if devices.otbr, err = newDemoBorderRouter(f.otbr, &policies, logger); err != nil {
+		if devices.otbr, err = newDemoBorderRouter(f.otbr, policies, logger); err != nil {
 			return nil, nil, err
 		}
 		if dump == nil {

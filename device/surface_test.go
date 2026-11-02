@@ -263,7 +263,7 @@ func TestSurfaceRemoveFeature(t *testing.T) {
 	if fm := featureMapOf(t, plain); fm&bit == 0 {
 		t.Fatalf("FeatureMap 0x%X lacks the selected 0x%X", fm, bit)
 	}
-	policies := &surface.Policies{Custom: []surface.Policy{surfacetest.Remove(surface.KindFeature, surfacetest.Match{Cluster: onOffID, ID: bit})}}
+	policies := surface.Policies{Custom: []surface.Policy{surfacetest.Remove(surface.KindFeature, surfacetest.Match{Cluster: onOffID, ID: bit})}}
 	opts.Surface = policies
 	d, err := New(OnOffLightType(), opts, withFeatures(onOffID, base|bit))
 	if err != nil {
@@ -297,7 +297,7 @@ func TestSurfaceMandatoryFeatureKept(t *testing.T) {
 	}
 	bit := uint32(1) << bits.TrailingZeros32(r.Features)
 	opts := testOptions("light")
-	opts.Surface = &surface.Policies{Custom: []surface.Policy{surfacetest.Remove(surface.KindFeature, surfacetest.Match{Cluster: onOffID})}}
+	opts.Surface = surface.Policies{Custom: []surface.Policy{surfacetest.Remove(surface.KindFeature, surfacetest.Match{Cluster: onOffID})}}
 	d, err := New(OnOffLightType(), opts)
 	if err != nil {
 		t.Fatal(err)
@@ -329,7 +329,7 @@ func TestSurfaceRemoveElementAndCluster(t *testing.T) {
 		t.Fatalf("the declared attribute 0x%04X is not served (control)", attr)
 	}
 	opts := testOptions("light")
-	opts.Surface = &surface.Policies{Custom: []surface.Policy{surfacetest.Remove(surface.KindAttribute, surfacetest.Match{Cluster: cid, ID: attr})}}
+	opts.Surface = surface.Policies{Custom: []surface.Policy{surfacetest.Remove(surface.KindAttribute, surfacetest.Match{Cluster: cid, ID: attr})}}
 	d, err := New(OnOffLightType(), opts, decl)
 	if err != nil {
 		t.Fatal(err)
@@ -355,7 +355,7 @@ func TestSurfaceRemoveElementAndCluster(t *testing.T) {
 	if optional == 0 {
 		t.Skip("OnOffLight has no buildable optional cluster")
 	}
-	opts.Surface = &surface.Policies{Custom: []surface.Policy{surfacetest.Remove(surface.KindCluster, surfacetest.Match{ID: optional})}}
+	opts.Surface = surface.Policies{Custom: []surface.Policy{surfacetest.Remove(surface.KindCluster, surfacetest.Match{ID: optional})}}
 	d, err = New(OnOffLightType(), opts, withOptional(optional))
 	if err != nil {
 		t.Fatal(err)
@@ -367,7 +367,7 @@ func TestSurfaceRemoveElementAndCluster(t *testing.T) {
 
 func TestSurfaceRefuse(t *testing.T) {
 	opts := testOptions("light")
-	opts.Surface = &surface.Policies{Custom: []surface.Policy{surfacetest.Refuse(surface.KindCluster, surfacetest.Match{ID: onOffID})}}
+	opts.Surface = surface.Policies{Custom: []surface.Policy{surfacetest.Refuse(surface.KindCluster, surfacetest.Match{ID: onOffID})}}
 	_, err := New(OnOffLightType(), opts)
 	if !errors.Is(err, surface.ErrRefused) {
 		t.Fatalf("err = %v, want ErrRefused", err)
@@ -377,7 +377,7 @@ func TestSurfaceRefuse(t *testing.T) {
 			t.Errorf("error %q lacks %q", err, want)
 		}
 	}
-	opts.Surface = &surface.Policies{Custom: []surface.Policy{nil}}
+	opts.Surface = surface.Policies{Custom: []surface.Policy{nil}}
 	if _, err := New(OnOffLightType(), opts); err == nil {
 		t.Fatal("a nil policy composed")
 	}

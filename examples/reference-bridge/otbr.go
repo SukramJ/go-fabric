@@ -66,7 +66,7 @@ func parseOTBRURL(raw string) (host string, port int, err error) {
 // newDemoBorderRouter builds the ThreadBorderRouter endpoint on the
 // border router at raw under the daemon's surface policies; the border
 // router must answer (its agent id and name are read at construction).
-func newDemoBorderRouter(raw string, policies *surface.Policies, logger *slog.Logger) (*demoBorderRouter, error) {
+func newDemoBorderRouter(raw string, policies surface.Policies, logger *slog.Logger) (*demoBorderRouter, error) {
 	host, port, err := parseOTBRURL(raw)
 	if err != nil {
 		return nil, err

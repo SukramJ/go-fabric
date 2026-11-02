@@ -108,7 +108,7 @@ server cluster its revision, FeatureMap, AttributeList, AcceptedCommandList,
 GeneratedCommandList and events — is a value: [`surface`](https://github.com/SukramJ/go-fabric/tree/main/surface)'s
 `Surface`, canonically ordered, hashable and diffable. The device layer
 decides it before it builds a server: it lists the candidate elements with
-their origin (device type, cluster conformance, host declaration), the
+their provenance (device type, cluster conformance, host declaration), the
 node's policies (`node.Config.Surface`, the same for every device;
 `device.Options.Surface` must match or `Add` refuses the device) judge
 each one — Refuse over Remove over Warn over Keep, a mandatory element

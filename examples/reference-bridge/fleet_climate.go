@@ -255,7 +255,7 @@ func (t *demoThermostat) device(opts device.Options) (*device.Thermostat, error)
 			TemperatureSetpointHold: &hold, ThermostatRunningState: &idle,
 		},
 	}
-	if opts.Surface != nil && opts.Surface.Extensions.Has(schedulesRow) {
+	if opts.Surface.Extensions.Has(schedulesRow) {
 		t.declareSchedules(&decl)
 	}
 	d, err := device.NewThermostat(opts,

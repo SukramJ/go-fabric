@@ -58,10 +58,7 @@ func (d *Device) effective() surface.Surface {
 // candidate is kept and the servers are the ones the device layer has
 // always built.
 func compose(t *Type, s *settings, opts Options) ([]contract.ClusterServer, surface.Report, error) {
-	var policies surface.Policies
-	if opts.Surface != nil {
-		policies = *opts.Surface
-	}
+	policies := opts.Surface
 	rep := policies.Report()
 	candidates := candidatesOf(t, s, endpoint.RenderSourceKey(opts.StableKey))
 	for i := range candidates {

@@ -938,7 +938,7 @@ func (s *dimmer) moveTarget(moveMode uint8) uint8 {
 type fleet struct {
 	// surface are the daemon's surface policies (surface.go), the node's
 	// and every device's; nil is the zero value.
-	surface *surface.Policies
+	surface surface.Policies
 
 	light    *demoLight
 	valve    *demoValve

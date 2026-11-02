@@ -176,7 +176,7 @@ func measureThermostat(t *testing.T, row string, with bool) surface.Cluster {
 	}
 	decl.Features = features
 	p := surface.Policies{Extensions: surface.NewExtensions(thermo.Ahead.IDs()...)}
-	d, err := device.NewThermostat(device.Options{StableKey: endpoint.StringKey("t"), Name: "t", Surface: &p}, decl)
+	d, err := device.NewThermostat(device.Options{StableKey: endpoint.StringKey("t"), Name: "t", Surface: p}, decl)
 	if err != nil {
 		t.Fatalf("%s: %v", row, err)
 	}

@@ -4,6 +4,7 @@
 package node_test
 
 import (
+	"cmp"
 	"context"
 	"database/sql"
 	"errors"
@@ -136,7 +137,7 @@ func thermostat(t *testing.T, key string, withSchedules bool, p *surface.Policie
 		one, transitions := uint8(1), uint8(4)
 		decl.Initial = thermostatdef.Patch{ScheduleTypes: &types, NumberOfSchedules: &one, NumberOfScheduleTransitions: &transitions}
 	}
-	d, err := device.NewThermostat(device.Options{StableKey: endpoint.StringKey(key), Name: key, Surface: p}, decl)
+	d, err := device.NewThermostat(device.Options{StableKey: endpoint.StringKey(key), Name: key, Surface: *cmp.Or(p, &surface.Policies{})}, decl)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -324,7 +325,7 @@ func TestSurfaceRootChangeRaisesTheRootAlone(t *testing.T) {
 func TestSurfaceWithheldIsAFirstAssembly(t *testing.T) {
 	db := openDB(t, filepath.Join(t.TempDir(), "withheld.db"))
 	closure := func(p *surface.Policies, label string) node.Endpoint {
-		d, err := device.NewClosure(device.Options{StableKey: endpoint.StringKey("closure"), Name: label, Surface: p},
+		d, err := device.NewClosure(device.Options{StableKey: endpoint.StringKey("closure"), Name: label, Surface: *cmp.Or(p, &surface.Policies{})},
 			closurecontroldef.Declare{Features: closurecontroldef.FeaturePositioning})
 		if d == nil {
 			t.Fatalf("closure: %v", err)

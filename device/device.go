@@ -134,10 +134,8 @@ func New(t *Type, opts Options, decls ...Declaration) (*Device, error) {
 	if opts.StableKey == nil {
 		return nil, fmt.Errorf("%w: %s needs a StableKey", ErrConfiguration, t.Name)
 	}
-	if opts.Surface != nil {
-		if err := opts.Surface.Validate(); err != nil {
-			return nil, fmt.Errorf("%s: %w", t.Name, err)
-		}
+	if err := opts.Surface.Validate(); err != nil {
+		return nil, fmt.Errorf("%s: %w", t.Name, err)
 	}
 	s := newSettings()
 	if opts.StableKey != nil {
@@ -207,9 +205,7 @@ func New(t *Type, opts Options, decls ...Declaration) (*Device, error) {
 		return nil, fmt.Errorf("%s: %w", t.Name, err)
 	}
 	d.report.Effective = d.effective()
-	if opts.Surface != nil {
-		d.report.Decisions = append(d.report.Decisions, opts.Surface.ServerInternal(d.report.Effective.Endpoints[0], s.candidates)...)
-	}
+	d.report.Decisions = append(d.report.Decisions, opts.Surface.ServerInternal(d.report.Effective.Endpoints[0], s.candidates)...)
 	return d, nil
 }
 

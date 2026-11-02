@@ -76,13 +76,13 @@ const (
 type demoMedia struct {
 	logger *slog.Logger
 	// surface are the daemon's surface policies (surface.go).
-	surface *surface.Policies
+	surface surface.Policies
 
 	player *device.CastingVideoPlayer
 	app    *device.ContentApp
 }
 
-func newDemoMedia(policies *surface.Policies, logger *slog.Logger) (*demoMedia, error) {
+func newDemoMedia(policies surface.Policies, logger *slog.Logger) (*demoMedia, error) {
 	m := &demoMedia{logger: logger, surface: policies}
 	var err error
 	if m.player, err = m.newPlayer(); err != nil {

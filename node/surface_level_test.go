@@ -95,7 +95,7 @@ func TestAddRecordsAWithheldDevice(t *testing.T) {
 	ctx := context.Background()
 	p := surface.Policies{Level: "1.4.2"}
 	n := surfaceNode(t, p)
-	d, err := device.NewClosure(device.Options{StableKey: endpoint.StringKey("garage"), Name: "garage", Surface: &p})
+	d, err := device.NewClosure(device.Options{StableKey: endpoint.StringKey("garage"), Name: "garage", Surface: p})
 	var w *surface.WithheldError
 	if !errors.As(err, &w) || d == nil {
 		t.Fatalf("NewClosure at 1.4.2: %v, %v", d, err)

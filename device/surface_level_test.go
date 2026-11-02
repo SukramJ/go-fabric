@@ -75,7 +75,7 @@ func wireCluster(t *testing.T, r surface.Report, id uint32) surface.Cluster {
 // device with a WithheldError, the typed constructor too.
 func TestLevelWithholdsAnUnknownType(t *testing.T) {
 	p := surface.Policies{Level: "1.4.2"}
-	d, err := NewClosure(Options{StableKey: endpoint.StringKey("c"), Name: "c", Surface: &p})
+	d, err := NewClosure(Options{StableKey: endpoint.StringKey("c"), Name: "c", Surface: p})
 	var w *surface.WithheldError
 	if !errors.As(err, &w) || d == nil || !strings.Contains(err.Error(), "Closure") {
 		t.Fatalf("NewClosure: %v, %v", d, err)
@@ -86,7 +86,7 @@ func TestLevelWithholdsAnUnknownType(t *testing.T) {
 	if rep := d.Surface(); len(rep.Withheld) != len(w.Elements) || len(rep.Effective.Endpoints) != 0 || d.Server(0x0104) != nil {
 		t.Errorf("withheld device %+v", rep)
 	}
-	if _, err := NewClosure(Options{StableKey: endpoint.StringKey("c"), Name: "c", Surface: &surface.Policies{Level: "1.5"}}); !errors.Is(err, surface.ErrUnknownLevel) {
+	if _, err := NewClosure(Options{StableKey: endpoint.StringKey("c"), Name: "c", Surface: surface.Policies{Level: "1.5"}}); !errors.Is(err, surface.ErrUnknownLevel) {
 		t.Errorf("unknown level: %v", err)
 	}
 }

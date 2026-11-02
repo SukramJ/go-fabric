@@ -30,7 +30,7 @@ func TestSurfaceProfile(t *testing.T) {
 	}}
 	policies := surfacetest.WithProfiles(surface.Policies{}, prof)
 	opts := testOptions("light")
-	opts.Surface = &policies
+	opts.Surface = policies
 	d, err := New(OnOffLightType(), opts, withFeatures(onOffID, base|bit))
 	if err != nil {
 		t.Fatal(err)

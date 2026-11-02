@@ -45,10 +45,11 @@ type Options struct {
 	// Conditions are the device-type conditions the host states for the
 	// endpoint ([endpoint.Spec.DeviceConditions]).
 	Conditions []string
-	// Surface are the surface policies the device is composed under; nil
-	// is the zero value, no policy. A node refuses a device composed under
-	// policies other than its own (node.Config.Surface).
-	Surface *surface.Policies
+	// Surface are the surface policies the device is composed under; the
+	// zero value is no policy — the same form as node.Config.Surface,
+	// which a node compares it with: it refuses a device composed under
+	// policies other than its own (ADR 0025 principle 2).
+	Surface surface.Policies
 }
 
 // SourceKey is the type of [Options].StableKey ([endpoint.SourceKey]).
