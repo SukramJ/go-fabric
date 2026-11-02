@@ -51,6 +51,12 @@ const (
 	triggerTariffTimeShiftDisable   uint64 = 0x0700_0000_0000_0004 // :54
 	triggerMeteringAttributesUpdate uint64 = 0x0b07_0000_0000_0000 // CommodityMeteringTestEventTriggerHandler.h:48
 	triggerMeteringAttributesClear  uint64 = 0x0b07_0000_0000_0001 // :50
+	// The EnergyReporting triggers (src/app/clusters/
+	// electrical-energy-measurement-server/EnergyReportingTestEventTriggerHandler.h
+	// at 6170af84), in the ElectricalEnergyMeasurement cluster id's space.
+	triggerFakeReadingsStop      uint64 = 0x0091_0000_0000_0000 // EnergyReportingTestEventTriggerHandler.h:47
+	triggerFakeReadingsLoadStart uint64 = 0x0091_0000_0000_0001 // :49, 1 kW load, 2 s updates
+	triggerFakeReadingsGenStart  uint64 = 0x0091_0000_0000_0002 // :51, 3 kW generator, 5 s updates
 )
 
 // --- the tariff's test clock ---------------------------------------------------
@@ -477,8 +483,14 @@ func tariffSample2() ct.Patch {
 // app's test data. Every CommodityMetering attribute starts null
 // (commodity-metering-server.cpp:150-158), so the first
 // AttributesValueUpdate changes all four (TC_COMMTR_3_1.py steps 9-12).
+// The EnergyReporting triggers start and stop fake readings on the two
+// measurement clusters (fakeReadings).
 type demoElectricalMeter struct {
 	name string
+
+	// readings are the fake readings the EnergyReporting triggers drive;
+	// they lock themselves.
+	readings fakeReadings
 
 	// The trigger file's TestDataManager (commodity-metering/src/
 	// CommodityMeteringEventTriggers.cpp:62-256): whether it has read the
@@ -567,13 +579,32 @@ func (m *demoElectricalMeter) log(err error) {
 }
 
 // testEventTrigger handles the CommodityMetering triggers as
-// HandleCommodityMeteringTestEventTrigger does (:261-280).
+// HandleCommodityMeteringTestEventTrigger does (:261-280), and the
+// EnergyReporting triggers as HandleEnergyReportingTestEventTrigger does
+// (examples/energy-management/energy-management-triggers/
+// EnergyReportingEventTriggers.cpp:61-85 at 6170af84) with the values
+// SetTestEventTrigger_FakeReadingsLoadStart and _GeneratorStart pass
+// (:28-54): 1 kW ± 20 W, 230 V ± 1 V, 4.348 A ± 500 mA every 2 s; and
+// -3 kW ± 20 W, 230 V ± 1 V, -13.043 A ± 500 mA every 5 s; both reset
+// the energy totals.
 func (m *demoElectricalMeter) testEventTrigger(trigger uint64) bool {
 	switch trigger & smokeTriggerMask {
 	case triggerMeteringAttributesUpdate:
 		m.update()
 	case triggerMeteringAttributesClear:
 		m.clear()
+	case triggerFakeReadingsStop:
+		m.readings.stop()
+	case triggerFakeReadingsLoadStart:
+		m.readings.start(fakeLoad{
+			power: 1_000_000, powerRandomness: 20_000, voltage: 230_000, voltageRandomness: 1_000,
+			current: 4_348, currentRandomness: 500, interval: 2 * time.Second,
+		})
+	case triggerFakeReadingsGenStart:
+		m.readings.start(fakeLoad{
+			power: -3_000_000, powerRandomness: 20_000, voltage: 230_000, voltageRandomness: 1_000,
+			current: -13_043, currentRandomness: 500, interval: 5 * time.Second,
+		})
 	default:
 		return false
 	}
@@ -599,7 +630,181 @@ func (m *demoElectricalMeter) device(opts device.Options) (*device.ElectricalMet
 	m.mu.Lock()
 	m.metering = commtr.WrapOn(meter.Server(commtr.ClusterID), nil)
 	m.mu.Unlock()
+	// The fake readings land on both endpoints that carry the measurement
+	// clusters: the meter's, which TC-EEM-2.2 and TC-EPM-2.2 read, and its
+	// sensor part's (chip's app has the one electrical-sensor endpoint 1,
+	// EnergyReportingEventTriggers.cpp:38).
+	m.readings.attach(
+		measurementTarget{dev: meter.Device, power: meter.ElectricalPowerMeasurement(), energy: meter.ElectricalEnergyMeasurement()},
+		measurementTarget{dev: sensor.Device, power: sensor.ElectricalPowerMeasurement(), energy: sensor.ElectricalEnergyMeasurement()},
+	)
 	return meter, nil
+}
+
+// --- the EnergyReporting fake readings ---------------------------------------
+
+// fakeLoad is one StartFakeReadings call's arguments
+// (energy-management-triggers/FakeReadings.cpp:73-75 at 6170af84): the
+// mean power, voltage and current with their randomness, and the update
+// interval. A positive power is a load (imported energy), a negative one
+// a generator (exported energy).
+type fakeLoad struct {
+	power, voltage, current                               int64 // mW, mV, mA
+	powerRandomness, voltageRandomness, currentRandomness int64 // mW, mV, mA
+	interval                                              time.Duration
+}
+
+// measurementTarget is one endpoint's two measurement servers.
+type measurementTarget struct {
+	dev    *device.Device
+	power  *epmdef.Server
+	energy *eemdef.Server
+}
+
+// fakeReadings is connectedhomeip's FakeReadings
+// (energy-management-triggers/FakeReadings.cpp at 6170af84): start sets
+// the load, resets the energy totals and the random source, and updates
+// at once; each update re-arms a timer for the next; stop ends the
+// updates and the last readings stay (StopFakeReadings, :106-109).
+//
+// chip seeds rand() with 1 on every reset (:87-97) so that its CI's
+// "the value changed" checks do not flake; here the source is a PCG
+// seeded with (1, 0) on every start, so the sequence is fixed too —
+// not glibc's, but every value stays within the mean ± the randomness,
+// which is inside TC_EPM_2_2.py's ranges (steps 4a-4c, 5a-5c at
+// 6170af84), and TestEnergyReportingFakeReadings pins that the first
+// readings differ from one another, as the case's steps 5a-5c require.
+type fakeReadings struct {
+	mu      sync.Mutex
+	targets []measurementTarget
+	load    fakeLoad
+	rng     *rand.Rand
+	timer   func()
+	enabled bool
+	// gen counts starts and stops, so an update a stopped or restarted
+	// run's timer still delivers is dropped.
+	gen uint64
+	// The energy totals in mWh (mTotalEnergyImported/Exported, :95-96).
+	imported, exported int64
+	// schedule arms the next update and returns its cancel; time.AfterFunc
+	// unless a test replaces it.
+	schedule func(d time.Duration, fn func()) (cancel func())
+}
+
+// afterFunc is fakeReadings' default schedule.
+func afterFunc(d time.Duration, fn func()) func() {
+	t := time.AfterFunc(d, fn)
+	return func() { t.Stop() }
+}
+
+func (r *fakeReadings) attach(targets ...measurementTarget) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.targets = targets
+}
+
+// start is StartFakeReadings (:73-101) with bReset true, the value both
+// start triggers pass (EnergyReportingEventTriggers.cpp:37, :51).
+func (r *fakeReadings) start(load fakeLoad) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.cancelLocked()
+	r.load, r.enabled = load, true
+	r.rng = rand.New(rand.NewPCG(1, 0)) //nolint:gosec // fake readings, a fixed seed by design (FakeReadings.cpp:89-93)
+	r.imported, r.exported = 0, 0
+	r.updateLocked()
+}
+
+// stop is StopFakeReadings (:106-109): no further update; the readings
+// stay as they are.
+func (r *fakeReadings) stop() {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.cancelLocked()
+	r.enabled = false
+}
+
+func (r *fakeReadings) cancelLocked() {
+	r.gen++
+	if r.timer != nil {
+		r.timer()
+		r.timer = nil
+	}
+}
+
+// around is a value in [mean - randomness, mean + randomness), as
+// FakeReadingsUpdate draws it: rand() % (2 × randomness) − randomness +
+// mean (:125-139).
+func (r *fakeReadings) around(mean, randomness int64) int64 {
+	return mean + r.rng.Int64N(2*randomness) - randomness
+}
+
+// updateLocked is FakeReadingsUpdate (:114-175): draw power, voltage and
+// current; send them as ActivePower, Voltage and ActiveCurrent
+// (ElectricalSensorManager.cpp:76-84); take the power as constant over
+// the interval, so the periodic energy is power × interval / 3600 in mWh,
+// imported for a load and exported for a generator (:147-161), and add it
+// to the totals; then snapshot the energy (GenerateEEMReport, :163-170)
+// and re-arm the timer.
+func (r *fakeReadings) updateLocked() {
+	if !r.enabled {
+		return
+	}
+	power := r.around(r.load.power, r.load.powerRandomness)
+	voltage := r.around(r.load.voltage, r.load.voltageRandomness)
+	current := r.around(r.load.current, r.load.currentRandomness)
+	seconds := int64(r.load.interval / time.Second)
+	if r.load.power > 0 {
+		r.imported += power * seconds / 3600
+	} else {
+		r.exported += -power * seconds / 3600
+	}
+	now := matterEpochOf(time.Now())
+	for _, t := range r.targets {
+		if err := t.power.Set(epmdef.Patch{ActivePower: &power, Voltage: &voltage, ActiveCurrent: &current}); err != nil {
+			slog.Warn("meter.fakereadings", slog.String("cluster", "power"), slog.Any("err", err))
+		}
+		r.snapshot(t, now)
+	}
+	gen := r.gen
+	schedule := r.schedule
+	if schedule == nil {
+		schedule = afterFunc
+	}
+	r.timer = schedule(r.load.interval, func() {
+		r.mu.Lock()
+		defer r.mu.Unlock()
+		if r.gen == gen {
+			r.updateLocked()
+		}
+	})
+}
+
+// snapshot is the cluster's GenerateSnapshots for the cumulative energy
+// (ElectricalEnergyMeasurementCluster.cpp:158-174 at 6170af84): the
+// features gate what is set, and the meter declares ImportedEnergy and
+// CumulativeEnergy only (electricalDeclarations), so CumulativeEnergyImported
+// takes the imported total and the exported total has no attribute. A
+// cumulative measurement carries its end timestamp (BuildMeasurement,
+// :122-156). The changed value goes out as a CumulativeEnergyMeasured
+// event (CumulativeEnergySnapshot, :442-469), as matter.js's
+// setMeasurement emits one with the value it sets
+// (packages/node/src/behaviors/electrical-energy-measurement/
+// ElectricalEnergyMeasurementServer.ts:44-62).
+func (r *fakeReadings) snapshot(t measurementTarget, now uint32) {
+	if prev := t.energy.Get().CumulativeEnergyImported; prev != nil && prev.Energy == r.imported {
+		return
+	}
+	imported := eemdef.EnergyMeasurementStruct{Energy: r.imported, EndTimestamp: &now}
+	if err := t.energy.Set(eemdef.Patch{CumulativeEnergyImported: &imported}); err != nil {
+		slog.Warn("meter.fakereadings", slog.String("cluster", "energy"), slog.Any("err", err))
+		return
+	}
+	if ep, ok := t.dev.EndpointNumber(); ok {
+		if err := t.energy.EmitCumulativeEnergyMeasured(ep, eemdef.CumulativeEnergyMeasuredEvent{EnergyImported: &imported}); err != nil {
+			slog.Warn("meter.fakereadings", slog.String("event", "CumulativeEnergyMeasured"), slog.Any("err", err))
+		}
+	}
 }
 
 // --- the electrical readings -------------------------------------------------

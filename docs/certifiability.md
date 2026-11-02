@@ -184,8 +184,8 @@ Harness image: `ghcr.io/matter-js/chip@sha256:d6f1de89d714309beb621543d451a98996
 | SETRF | 4 | 4 | 0 | 0 | 0 | 0 | 0 |
 | SEPR | 3 | 2 | 0 | 0 | 1 | 0 | 0 |
 | COMMTR | 2 | 2 | 0 | 0 | 0 | 0 | 0 |
-| EEM | 5 | 1 | 0 | 0 | 3 | 1 | 0 |
-| EPM | 2 | 1 | 0 | 0 | 0 | 1 | 0 |
+| EEM | 5 | 2 | 0 | 0 | 3 | 0 | 0 |
+| EPM | 2 | 2 | 0 | 0 | 0 | 0 | 0 |
 | PWRTL | 2 | 1 | 0 | 0 | 1 | 0 | 0 |
 | EGC | 3 | 3 | 0 | 0 | 0 | 0 | 0 |
 | DEM | 11 | 9 | 0 | 0 | 2 | 0 | 0 |
@@ -241,7 +241,7 @@ Harness image: `ghcr.io/matter-js/chip@sha256:d6f1de89d714309beb621543d451a98996
 | MEDIAPLAYBACK | 11 | 5 | 0 | 0 | 2 | 4 | 0 |
 | TGTNAV | 2 | 1 | 0 | 0 | 0 | 1 | 0 |
 | WAKEONLAN | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
-| **all** | **707** | **398** | **0** | **4** | **131** | **169** | **5** |
+| **all** | **707** | **400** | **0** | **4** | **131** | **167** | **5** |
 
 ### Cases not run
 
@@ -426,12 +426,10 @@ Harness image: `ghcr.io/matter-js/chip@sha256:d6f1de89d714309beb621543d451a98996
 | DRLK/3.2 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | ECOINFO/2.1 | (c) harness | TC_ECOINFO_2_1.py runs against the fabric-sync app it starts itself (CI arguments, header lines 24-27: app: examples/fabric-admin/scripts/fabric-sync-app.py), not against a commissioned DUT |
 | ECOINFO/2.2 | (c) harness | TC_ECOINFO_2_2.py runs against the fabric-sync app it starts itself (CI arguments, header lines 24-27: app: examples/fabric-admin/scripts/fabric-sync-app.py), not against a commissioned DUT |
-| EEM/2.2 | (c) harness | TC-EEM-2.2 starts a fake 1 kW load with the EnergyReporting test event trigger 0x0091000000000001 and stops it with 0x0091000000000000 (connectedhomeip EnergyReportingTestEventTriggerHandler.h:47-51 at 6170af84); the reference daemon offers no fake-readings trigger (examples/reference-bridge/control.go testEventTrigger), so the case's TestEventTrigger answers INVALID_COMMAND before any measurement is read |
 | EEM/2.3 | (b) not supported | not applicable: the case's PICS `EEM.S & EEM.S.F02 & EEM.S.F01` is false for the reference DUT |
 | EEM/2.4 | (b) not supported | not applicable: the case's PICS `EEM.S & EEM.S.F03 & EEM.S.F00` is false for the reference DUT |
 | EEM/2.5 | (b) not supported | not applicable: the case's PICS `EEM.S & EEM.S.F03 & EEM.S.F01` is false for the reference DUT |
 | EEVSE/2.3 | (a) defect | TC-EEVSE-2.3 step 19 (eleven ChargingTargets in one day) expects RESOURCE_EXHAUSTED; the generated SetTargets decoder refuses the list at its `max 10` constraint with CONSTRAINT_ERROR before the server's own check (cluster/energy/evse.go, evseMaxTargetsPerDay) can answer, as matter.js does (CommandInvokeResponse.ts requestTlv.validate). notes/parity/matter_behaviour_findings.md, Certification harness, TC-EEVSE-2.3 |
-| EPM/2.2 | (c) harness | TC-EPM-2.2 starts a fake 1 kW load with the EnergyReporting test event trigger 0x0091000000000001 (connectedhomeip EnergyReportingTestEventTriggerHandler.h:47-51 at 6170af84); the reference daemon offers no fake-readings trigger (examples/reference-bridge/control.go testEventTrigger), so the case's TestEventTrigger answers INVALID_COMMAND before any measurement is read |
 | FAN/2.3 | (b) not supported | not applicable: the case's PICS `FAN.S.F02` is false for the reference DUT |
 | FAN/2.4 | (b) not supported | not applicable: the case's PICS `FAN.S.F03` is false for the reference DUT |
 | FAN/2.5 | (b) not supported | not applicable: the case's PICS `FAN.S & FAN.S.F05` is false for the reference DUT |

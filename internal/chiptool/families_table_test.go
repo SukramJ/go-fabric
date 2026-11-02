@@ -647,18 +647,13 @@ var chipFamilies = []family{
 	{name: "SETRF", deviceType: dtElectricalEnergyTariff},
 	{name: "SEPR", deviceType: dtElectricalEnergyTariff},
 	{name: "COMMTR", deviceType: dtElectricalMeter},
-	{
-		name: "EEM", deviceType: dtElectricalMeter,
-		exclude: map[string]gap{
-			"2.2": {classHarness, "TC-EEM-2.2 starts a fake 1 kW load with the EnergyReporting test event trigger 0x0091000000000001 and stops it with 0x0091000000000000 (connectedhomeip EnergyReportingTestEventTriggerHandler.h:47-51 at 6170af84); the reference daemon offers no fake-readings trigger (examples/reference-bridge/control.go testEventTrigger), so the case's TestEventTrigger answers INVALID_COMMAND before any measurement is read", false},
-		},
-	},
-	{
-		name: "EPM", deviceType: dtElectricalMeter,
-		exclude: map[string]gap{
-			"2.2": {classHarness, "TC-EPM-2.2 starts a fake 1 kW load with the EnergyReporting test event trigger 0x0091000000000001 (connectedhomeip EnergyReportingTestEventTriggerHandler.h:47-51 at 6170af84); the reference daemon offers no fake-readings trigger (examples/reference-bridge/control.go testEventTrigger), so the case's TestEventTrigger answers INVALID_COMMAND before any measurement is read", false},
-		},
-	},
+	// EEM and EPM run on the grid meter too; TC_EEM_2_2 and TC_EPM_2_2
+	// drive its readings through the EnergyReporting (0x0091...) test
+	// event triggers, which the meter answers as connectedhomeip's
+	// energy-management app's FakeReadings does
+	// (examples/reference-bridge/fleet_energy_market.go).
+	{name: "EEM", deviceType: dtElectricalMeter},
+	{name: "EPM", deviceType: dtElectricalMeter},
 	{
 		name: "PWRTL", deviceType: dtElectricalSensor,
 		exclude: map[string]gap{

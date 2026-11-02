@@ -123,6 +123,7 @@ pin lift confirms by re-reading the row, [`pin-lifts.md`](./pin-lifts.md)).
 | BD-Matter-ICDVerificationKeyConstantTime | `IcdManagementServer.ts:761` compares the presented VerificationKey with `Bytes.areEqual`, a data-dependent comparison (presence) | `packages/node/src/behaviors/icd-management/IcdManagementServer.ts` | `"!Bytes.areEqual(verificationKey, stored.key)"` | this module: Go `crypto/subtle.ConstantTimeCompare` (review 2026-11 W2-sec-04); the accept/refuse outcome is matter.js's | no |
 | BD-Matter-OtaImageHeaderSizeCap | `OtaImageReader.ts:181-183` reads the prefix's header size and collects that many bytes with no bound (absence: the line that would take the check, followed by the closing brace) | `packages/protocol/src/ota/OtaImageReader.ts` | `"this.#headerSize = headerReader.readUInt32();\n            }"` | connectedhomeip `src/lib/core/OTAImageHeader.cpp:53` (`kMaxHeaderSize = 1024`), checked at `:128` (review 2026-11 W4-ctlint-07) | no |
 | BD-chip-Commissioner-CsrNonceEchoed | `ControllerCommissioningFlow.ts:1395` draws the CSR nonce and the flow never reads the echoed one back (presence) | `packages/protocol/src/peer/ControllerCommissioningFlow.ts` | `"fields: { csrNonce: this.fabric.crypto.randomBytes(32) },"` | connectedhomeip `src/credentials/attestation_verifier/DefaultDeviceAttestationVerifier.cpp:847-870` at `6170af84` (`VerifyNodeOperationalCSRInformation`) | no |
+| BD-chip-EnergyReporting-FakeReadings | `GeneralDiagnosticsServer.ts:164-166` answers every test event trigger with INVALID_COMMAND, and the chip-testing node's `TestGeneralDiagnosticsServer.ts:15-22` accepts only the generic trigger; a grep for `0x0091`, `FakeReadings` and `EnergyReporting` over `packages/` and `support/chip-testing/` at the pin finds only the cluster id in `packages/types/src/clusters/electrical-energy-measurement.d.ts:25` (presence: the two rejections) | `packages/node/src/behaviors/general-diagnostics/GeneralDiagnosticsServer.ts`<br>`support/chip-testing/src/cluster/TestGeneralDiagnosticsServer.ts` | `"Unsupported test event trigger "`<br>`"} else if (testEvent !== 0x0000000000000003) {\n            throw new StatusResponseError(\"Wrong test event\", Status.InvalidCommand);"` | connectedhomeip `src/app/clusters/electrical-energy-measurement-server/EnergyReportingTestEventTriggerHandler.h:47-51`, `examples/energy-management/energy-management-triggers/EnergyReportingEventTriggers.cpp:28-85` and `FakeReadings.cpp:73-175` at `6170af84` | no |
 
 ---
 
@@ -1884,6 +1885,31 @@ PowerRangeAdjustment (DEM feature bit 7) is not served: it exists at the
 chip pin but not in the matter.js snapshot nor the 1.6.1 data model
 (DEM/2.11 stays class (b)). Families DEM, DEMM, EEVSE, EEVSEM pass or are
 classified (#46, #47; TC-EEVSE-2.3 is a findings entry).
+
+### BD-chip-EnergyReporting-FakeReadings — the reference daemon's grid meter answers the EnergyReporting test event triggers
+
+matter.js has no EnergyReporting trigger and no fake readings: its
+`GeneralDiagnosticsServer.triggerTestEvent` answers every trigger with
+INVALID_COMMAND (`GeneralDiagnosticsServer.ts:164-166` at `862ad75f`) and the
+chip-testing node accepts only the generic one
+(`support/chip-testing/src/cluster/TestGeneralDiagnosticsServer.ts:15-22`).
+The reference daemon's grid meter (`examples/reference-bridge/
+fleet_energy_market.go`, `fakeReadings`) follows connectedhomeip at
+`6170af84`: the three triggers (`EnergyReportingTestEventTriggerHandler.h:47-51`),
+the load and generator values (`EnergyReportingEventTriggers.cpp:28-54`) and
+the update model (`FakeReadings.cpp:73-175`) — ActivePower, Voltage and
+ActiveCurrent drawn around the mean, the cumulative energy accumulated over
+each interval, written where the features allow
+(`ElectricalEnergyMeasurementCluster.cpp:158-174`) with a
+CumulativeEnergyMeasured event as matter.js's `setMeasurement` emits one
+(`ElectricalEnergyMeasurementServer.ts:44-62`); the readings land on the
+meter and on its ElectricalSensor part. The random source is a PCG seeded
+(1, 0) on every start where chip seeds `rand()` with 1, so the sequence is
+fixed but not glibc's; the unit test pins that its first readings stay in
+TC_EPM_2_2.py's ranges and differ from one another. Only the daemon is
+affected; the module's servers are unchanged. TC-EEM-2.2 and TC-EPM-2.2
+join the families (#370). Retire when matter.js's test node answers the
+triggers.
 
 ### BD-chip-ClosureDimension-RulesInServer — the command rules are connectedhomeip's; the feature check is matter.js's stricter one
 
