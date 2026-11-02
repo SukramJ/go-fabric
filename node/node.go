@@ -191,11 +191,6 @@ func New(ctx context.Context, cfg Config) (*Node, error) { //nolint:funlen // th
 	if err != nil {
 		return nil, err
 	}
-	// Before anything derives a UniqueID (persist.go uniqueID, the
-	// assembler's bridged endpoints).
-	if cfg.BootID.RotateUniqueIDs {
-		enableBootIDRotation()
-	}
 	if cfg.Logger == nil {
 		cfg.Logger = slog.Default()
 	}
@@ -1046,8 +1041,8 @@ func (n *Node) FabricInfos(ctx context.Context) ([]FabricInfo, error) {
 
 // UniqueID returns the BasicInformation UniqueID the node serves: the
 // host's [BasicInformation].UniqueID, else the value the node pinned in
-// its store at the first boot (or, with [BootID].RotateUniqueIDs, this
-// boot's value).
+// its store at the first boot (or, once bootid.EnableRotation ran in the
+// process, this boot's value).
 func (n *Node) UniqueID() string { return n.cfg.BasicInformation.UniqueID }
 
 // BootReason returns the GeneralDiagnostics BootReason the node was built

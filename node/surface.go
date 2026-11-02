@@ -68,7 +68,7 @@ func AheadRows() []string {
 // [aheadByCluster] names: TimeSynchronization's features
 // ([Config].TimeSynchronization; none without it, no entry when it is
 // disabled) and NetworkCommissioning's network interface — Wi-Fi with
-// [Network].WiFiCommissioning, Ethernet otherwise.
+// the Wi-Fi commissioning seam, Ethernet otherwise.
 func rootFeatures(cfg *Config) map[uint32]uint32 {
 	out := map[uint32]uint32{}
 	if !cfg.TimeSynchronization.Off {
@@ -78,7 +78,7 @@ func rootFeatures(cfg *Config) map[uint32]uint32 {
 		}
 		out[tsdef.ClusterID] = f
 	}
-	if cfg.Network.WiFiCommissioning.Driver != nil {
+	if cfg.Network.wifiCommissioning.Driver != nil {
 		out[netcommdef.ClusterID] = mattercore.NetworkCommFeatureWiFi
 	} else {
 		out[netcommdef.ClusterID] = mattercore.NetworkCommFeatureEthernet

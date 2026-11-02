@@ -23,6 +23,7 @@ import (
 	"github.com/SukramJ/go-fabric/controller/ble/bletest"
 	"github.com/SukramJ/go-fabric/controller/commissioner"
 	"github.com/SukramJ/go-fabric/im"
+	"github.com/SukramJ/go-fabric/internal/nodeseam"
 	"github.com/SukramJ/go-fabric/node"
 )
 
@@ -51,7 +52,7 @@ func (w *liveWiFi) ConnectNetwork(_ context.Context, ssid, credentials []byte) (
 func wifiNode(t *testing.T, name string, drv *liveWiFi) *node.Node {
 	t.Helper()
 	return liveNode(t, name, func(c *node.Config) {
-		c.Network.WiFiCommissioning = node.WiFiCommissioning{Driver: drv}
+		nodeseam.UseWiFiCommissioning(c, drv)
 	})
 }
 

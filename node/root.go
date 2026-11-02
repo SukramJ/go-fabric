@@ -64,10 +64,10 @@ type RootClusters struct {
 	GeneralCommissioning       *mattercore.GeneralCommissioning
 	AdministratorCommissioning *wire.AdministratorCommissioning
 	// NetworkCommissioning is the Ethernet server; nil when
-	// [Network].WiFiCommissioning has a Driver.
+	// the Wi-Fi commissioning seam (internal/nodeseam.UseWiFiCommissioning) set a Driver.
 	NetworkCommissioning *mattercore.NetworkCommissioning
 	// WiFiNetworkCommissioning is the Wi-Fi server, nil unless
-	// [Network].WiFiCommissioning has a Driver (TESTING ONLY).
+	// the Wi-Fi commissioning seam (internal/nodeseam.UseWiFiCommissioning) set a Driver (TESTING ONLY).
 	WiFiNetworkCommissioning *mattercore.WiFiNetworkCommissioning
 	GeneralDiagnostics       *mattercore.GeneralDiagnostics
 	DiagnosticLogs           *mattercore.DiagnosticLogs
@@ -274,13 +274,12 @@ func buildRoot(ctx context.Context, d rootDeps) (*RootClusters, error) { //nolin
 	r.DiagnosticLogs = mattercore.NewDiagnosticLogs()
 	r.DiagnosticLogs.SetClock(cfg.Clock)
 	var netComm contract.ClusterServer
-	if wc := cfg.Network.WiFiCommissioning; wc.Driver != nil {
+	if wc := cfg.Network.wifiCommissioning; wc.Driver != nil {
 		r.WiFiNetworkCommissioning, err = mattercore.NewWiFiNetworkCommissioning(mattercore.WiFiNetworkCommissioningConfig{
 			Driver: wc.Driver, FailSafe: generalCom.FailSafeFabric,
 			SetBreadcrumb: func(v uint64) {
 				_ = generalCom.MatterWrite(context.WithoutCancel(ctx), gencommdef.AttrBreadcrumb, v)
 			},
-			MaxNetworks: wc.MaxNetworks, ScanMaxTimeSeconds: wc.ScanMaxTimeSeconds, ConnectMaxTimeSeconds: wc.ConnectMaxTimeSeconds,
 		})
 		if err != nil {
 			return nil, fmt.Errorf("wi-fi network commissioning: %w", err)

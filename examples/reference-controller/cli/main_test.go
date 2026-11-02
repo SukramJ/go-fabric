@@ -28,6 +28,7 @@ import (
 	"github.com/SukramJ/go-fabric/device"
 	"github.com/SukramJ/go-fabric/endpoint"
 	"github.com/SukramJ/go-fabric/groups"
+	"github.com/SukramJ/go-fabric/internal/nodeseam"
 	"github.com/SukramJ/go-fabric/mdns"
 	"github.com/SukramJ/go-fabric/node"
 	"github.com/SukramJ/go-fabric/secure/setup"
@@ -486,7 +487,8 @@ func (s staticOperational) ResolveOperational(context.Context, [8]byte, uint64) 
 // console grants the consent. Not parallel.
 func TestReferenceControllerOTA(t *testing.T) {
 	h := startHarness(t, func(c *node.Config) {
-		c.OTA = &node.OtaConfig{Dir: filepath.Join(t.TempDir(), "ota"), Harness: true}
+		c.OTA = &node.OtaConfig{Dir: filepath.Join(t.TempDir(), "ota")}
+		nodeseam.UseOTAHarness(c)
 	})
 	tl := newTool(t, h)
 	started := selfHooks.started

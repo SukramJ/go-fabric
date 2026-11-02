@@ -16,6 +16,7 @@ import (
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/controller/ble"
 	"github.com/SukramJ/go-fabric/controller/ble/bletest"
+	"github.com/SukramJ/go-fabric/internal/nodeseam"
 	"github.com/SukramJ/go-fabric/node"
 	"github.com/SukramJ/go-fabric/secure/setup"
 	"github.com/SukramJ/go-fabric/transport/btp"
@@ -101,7 +102,7 @@ func TestPairBluetoothProxyFlag(t *testing.T) {
 // over IP found by DNS-SD, and a read over it.
 func TestPairOverBLE(t *testing.T) {
 	drv := &testWiFi{}
-	h := startHarness(t, func(c *node.Config) { c.Network.WiFiCommissioning = node.WiFiCommissioning{Driver: drv} })
+	h := startHarness(t, func(c *node.Config) { nodeseam.UseWiFiCommissioning(c, drv) })
 	tl := newTool(t, h)
 	p := &bletest.Peripheral{
 		Address: "C0:FF:EE:00:0B:1E", Discriminator: harnessDiscriminator, VendorID: 0xFFF1, ProductID: 0x8001,

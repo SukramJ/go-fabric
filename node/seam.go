@@ -4,6 +4,7 @@
 package node
 
 import (
+	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/internal/nodeseam"
 	"github.com/SukramJ/go-fabric/transport/udp"
 )
@@ -18,6 +19,24 @@ func init() {
 			c.Client = &ClientConfig{}
 		}
 		c.Client.open = open
+		return true
+	}
+	nodeseam.UseOTAHarness = func(cfg any) bool {
+		c, ok := cfg.(*Config)
+		if !ok || c == nil || c.OTA == nil {
+			return false
+		}
+		ota := *c.OTA
+		ota.harness = true
+		c.OTA = &ota
+		return true
+	}
+	nodeseam.UseWiFiCommissioning = func(cfg any, driver contract.WiFiDriver) bool {
+		c, ok := cfg.(*Config)
+		if !ok || c == nil || driver == nil {
+			return false
+		}
+		c.Network.wifiCommissioning = wifiCommissioning{Driver: driver}
 		return true
 	}
 }

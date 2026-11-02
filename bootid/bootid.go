@@ -66,10 +66,16 @@ func Salt() [16]byte {
 	return salt
 }
 
-// EnableRotation flips on the per-boot salt mixing. Intended for tests
-// that exercise the dev-mode rotation path and for a future config
-// knob `matter.dev_rotate_unique_ids` that the daemon can flip in
-// dev/debug builds.
+// EnableRotation flips on the per-boot salt mixing, a development aid:
+// every UniqueID the module derives from then on — a node's root
+// BasicInformation UniqueID and every bridged endpoint's — mixes in a
+// salt drawn once per process, so a controller sees a new bridge on every
+// start. It is process-wide and permanent: it applies to every node in
+// the process, for the life of the process, so a host calls it once,
+// before node.New. A boot under rotation pins nothing in the store, so
+// the next boot without it serves the UniqueID pinned before. Never call
+// it in production: Apple Home and Google Home recognise a bridge's
+// accessories by their UniqueIDs across restarts.
 func EnableRotation() {
 	rotationGuard.Lock()
 	rotationEnabled = true

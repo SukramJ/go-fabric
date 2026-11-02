@@ -50,6 +50,7 @@ import (
 	fixedlabeldef "github.com/SukramJ/go-fabric/cluster/spec/fixedlabel"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/device"
+	"github.com/SukramJ/go-fabric/internal/nodeseam"
 	"github.com/SukramJ/go-fabric/node"
 	"github.com/SukramJ/go-fabric/schema"
 	"github.com/SukramJ/go-fabric/store"
@@ -399,7 +400,7 @@ func assemble(ctx context.Context, devices *fleet, cfg node.Config, applier *ota
 func nodeConfig(f flags, passcode uint32, discriminator uint16, tcp node.TCPConfig,
 	applier *otaApplier, actions contract.ClusterServer, logger *slog.Logger,
 ) node.Config {
-	return node.Config{
+	cfg := node.Config{
 		Network: node.Network{Listen: f.listen, TCP: tcp, MDNS: mdnsConfig(f)},
 		Commissioning: node.Commissioning{
 			Passcode: passcode, Discriminator: discriminator,
@@ -421,7 +422,7 @@ func nodeConfig(f flags, passcode uint32, discriminator uint16, tcp node.TCPConf
 		Store: node.Store{Path: f.dbPath},
 		// The OTA Software Update Requestor (ADR 0019) on the root, with
 		// the daemon's applier (ota.go).
-		OTA: &node.OtaConfig{Dir: applier.dir, Harness: applier.harness, Applier: applier},
+		OTA: &node.OtaConfig{Dir: applier.dir, Applier: applier},
 		FixedLabels: []fixedlabeldef.LabelStruct{
 			{Label: "role", Value: "bridge"},
 			{Label: "example", Value: "reference"},
@@ -432,6 +433,11 @@ func nodeConfig(f flags, passcode uint32, discriminator uint16, tcp node.TCPConf
 		AggregatorServers: []contract.ClusterServer{actions},
 		Logger:            logger,
 	}
+	if applier.harness {
+		// TESTING ONLY: the image applied in place (ota.go).
+		nodeseam.UseOTAHarness(&cfg)
+	}
+	return cfg
 }
 
 // mdnsConfig is the advertiser the node builds: none under

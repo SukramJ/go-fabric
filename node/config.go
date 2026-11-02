@@ -188,9 +188,6 @@ type Config struct {
 	// nil runs without one ([Node.Peers] is nil, a node Binding entry is
 	// dropped).
 	Client *ClientConfig
-	// BootID selects the development rotation of UniqueIDs ([BootID]); the
-	// zero value keeps every UniqueID stable across restarts.
-	BootID BootID
 	// Health runs the node's health probe ([Health], [Node.Health]); nil
 	// runs none.
 	Health *Health
@@ -220,22 +217,6 @@ type Config struct {
 	Clock clock.Clock
 }
 
-// BootID is the per-boot UniqueID rotation of package bootid, a
-// development aid: with RotateUniqueIDs every UniqueID the module derives
-// — the root's BasicInformation UniqueID and every bridged endpoint's —
-// mixes in a salt drawn once per process, so a controller sees a new
-// bridge on every start (bootid.EnableRotation). Rotation is process-wide
-// and stays on for the life of the process, for every node in it; a boot
-// under rotation pins nothing in the store, so the next boot without it
-// serves the UniqueID pinned before. Never set it in production: Apple
-// Home and Google Home recognise a bridge's accessories by their
-// UniqueIDs across restarts.
-type BootID struct {
-	// RotateUniqueIDs enables the rotation; [New] enables it before it
-	// derives the root's UniqueID.
-	RotateUniqueIDs bool
-}
-
 // Network is matter.js `network` for the keys the daemon uses
 // (NetworkServer.ts:202-222: port and listening address, ipv4, tcp).
 type Network struct {
@@ -259,13 +240,13 @@ type Network struct {
 	// assembler states it. EthernetNetworkDiagnostics stays mounted beside
 	// it. nil mounts none; a non-nil WiFi needs its Reporter.
 	WiFi *WiFi
-	// WiFiCommissioning mounts NetworkCommissioning with the Wi-Fi feature
-	// instead of Ethernet, its scan and connect done by Driver — what the
-	// commissioner's network steps configure. TESTING ONLY: the module's
-	// nodes are Ethernet-attached; the reference daemon's --wifi-sim is
-	// the one user. The zero value (no Driver) keeps the Ethernet-only
-	// server, and the composition is unchanged.
-	WiFiCommissioning WiFiCommissioning
+	// wifiCommissioning mounts NetworkCommissioning with the Wi-Fi
+	// feature instead of Ethernet, its scan and connect done by its
+	// Driver — what the commissioner's network steps configure. TESTING
+	// ONLY, set through internal/nodeseam.UseWiFiCommissioning: the
+	// module's nodes are Ethernet-attached; the reference daemon's
+	// --wifi-sim and the module's tests are its users.
+	wifiCommissioning wifiCommissioning
 	// Reannounce is the loop that re-publishes the node's DNS-SD records
 	// ([Reannounce]); the zero value runs it every
 	// [DefaultReannounceInterval].
@@ -317,15 +298,12 @@ type TimeSynchronization struct {
 // sees the records again before they expire.
 const DefaultReannounceInterval = 30 * time.Minute
 
-// WiFiCommissioning is the Wi-Fi NetworkCommissioning configuration
-// (mattercore.WiFiNetworkCommissioningConfig).
-type WiFiCommissioning struct {
+// wifiCommissioning is the Wi-Fi NetworkCommissioning configuration
+// (mattercore.WiFiNetworkCommissioningConfig): the network list of one,
+// the 10 s scan and 20 s connect maxima.
+type wifiCommissioning struct {
 	// Driver scans and connects; nil mounts the Ethernet-only server.
 	Driver contract.WiFiDriver
-	// MaxNetworks is the size of the network list; 0 is 1.
-	MaxNetworks uint8
-	// ScanMaxTimeSeconds and ConnectMaxTimeSeconds; 0 are 10 and 20.
-	ScanMaxTimeSeconds, ConnectMaxTimeSeconds uint8
 }
 
 // WiFi is a Wi-Fi node's WiFiNetworkDiagnostics configuration.
@@ -478,16 +456,17 @@ type Attestation struct {
 type OtaConfig struct {
 	// Dir receives the downloads; mandatory.
 	Dir string
-	// Harness applies an image in place, reporting its version as running
-	// without a restart. TESTING ONLY — see the daemon's otaApplier.
-	Harness bool
+	// harness applies an image in place, reporting its version as running
+	// without a restart. TESTING ONLY, set through
+	// internal/nodeseam.UseOTAHarness — see the daemon's otaApplier.
+	harness bool
 	// Applier carries out an update; nil is the daemon's applier, which
 	// validates the image and keeps it under Dir/applied.
 	Applier OTAApplier
 	// AnnouncedUpdateQueryDelay, when set, replaces the random 1-600 s wait
 	// between an UpdateAvailable or Urgent announcement and the query it
 	// schedules — matter.js's announcedUpdateQueryDelay
-	// (OtaSoftwareUpdateRequestorServer.ts:410, :1323). Harness mode
+	// (OtaSoftwareUpdateRequestorServer.ts:410, :1323). Harness mode (a test's)
 	// without it waits 250 ms, as the matter.js cert requestor does.
 	AnnouncedUpdateQueryDelay *time.Duration
 }

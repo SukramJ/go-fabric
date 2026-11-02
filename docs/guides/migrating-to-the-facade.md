@@ -37,7 +37,7 @@ still held there. Each row names the facade route, or the section of
 | `endpoint` | `ComposeNodeLabel` (`assembler.go:641`) | `device.ComposeNodeLabel(base, suffix)` (#239); `device.New`, `Device.Rename` and `Device.Update` cap a name at the NodeLabel maximum themselves |
 | a type with a `Spec()` of its own, replaced under the same key when the host's name changed (loom's step 2) | `Device.Update(ctx, func(*device.HostStatement){…})`: the host's name and addresses change on the bound device (reachability is `Device.SetReachable`); the name is served at once and persisted nowhere, a controller-written label wins (#238) |
 | `groups` | `NewManager` (`daemon_matter.go:388`, `Config.Groups` at `:534`) | a nil `Config.Groups` builds the manager; `Node.Groups` returns it. With an own assembler it stays [`groups`](advanced-seams.md#groups) |
-| `bootid` | `EnableRotation` (`daemon_matter.go:409`) | `Config.BootID.RotateUniqueIDs` |
+| `bootid` | `EnableRotation` (`daemon_matter.go:409`) | stays: `bootid.EnableRotation()`, process-wide, once before `node.New` |
 | `diagevent` | `Event` (`internal/north/rest/handlers/matter.go:556`) | `node.DiagnosticEvent`; [`diagevent`](advanced-seams.md#diagevent) |
 | `cluster/core` | `SoftwareVersionFromString` (`daemon_matter.go:527`) | `node.SoftwareVersionFromString` |
 | `cluster/core` | `RegulatoryIndoorOutdoor` (`daemon_matter.go:506`) | `node.RegulatoryIndoorOutdoor` for `Commissioning.LocationCapability` |
@@ -58,6 +58,7 @@ facade one shape. Each row names what a host writes now.
 | `device.WithServer`, `device.Option`, `device.TypeByID` | `device.HostServer(srv)`; `device.Declaration`; `device.Lookup(uint32(id))` |
 | `Node.PairingCodes`, `Aggregator.IncreaseConfigurationVersion`, `WindowCredentials.Iterations`, `Commissioning.PBKDFIterations int` | `Node.SetupPayload()` (`.QR`, `.Manual`); `Aggregator.IncreaseConfigurationVersions(ctx, keys...)` (`node.ErrNotStarted` before `Start`); `WindowCredentials.PBKDFIterations`; `Commissioning.PBKDFIterations uint32` |
 | `node.Client` (`Enabled`), `Config.DisableTimeSynchronization`, `Config.TimeSynchronization *TimeSynchronizationConfig`, `Network.ReannounceInterval`, `Network.DisableReannounce`, `MDNS.Disabled`, `Config.Health Health`, `Network.WiFi WiFi` | `Config.Client *ClientConfig` (nil off); `Config.TimeSynchronization{Off, Config}`; `Network.Reannounce{Interval, Off}`; `MDNS.Off`; `Config.Health *Health` (nil off); `Network.WiFi *WiFi` (nil off) |
+| `node.OtaConfig.Harness`, `node.Network.WiFiCommissioning`, `node.WiFiCommissioning`, `node.Config.BootID`, `node.BootID` | not public (`internal/nodeseam`); `fabrictest.UseWiFiCommissioning(cfg, driver)` in a test; `bootid.EnableRotation()` before `node.New` |
 
 ## Changed in the next release: `CommissionerReach` takes the peer
 

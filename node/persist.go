@@ -215,11 +215,6 @@ func (p persisted) SaveScenes(key device.SourceKey, table []byte) {
 // per-boot value and neither reads nor writes the store, so the value a
 // boot without rotation pinned before is served again once rotation is
 // off.
-// enableBootIDRotation is bootid.EnableRotation, a variable so a test of
-// Config.BootID observes the call without turning rotation on for its
-// whole process.
-var enableBootIDRotation = bootid.EnableRotation
-
 func (p persisted) uniqueID(ctx context.Context, derive func() string) (string, error) {
 	salt := p.salt
 	if salt == nil {

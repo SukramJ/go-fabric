@@ -40,6 +40,7 @@ import (
 	"github.com/SukramJ/go-fabric/controller/ca"
 	"github.com/SukramJ/go-fabric/controller/commissioner"
 	"github.com/SukramJ/go-fabric/im"
+	"github.com/SukramJ/go-fabric/internal/nodeseam"
 	"github.com/SukramJ/go-fabric/mdns"
 	"github.com/SukramJ/go-fabric/node"
 	"github.com/SukramJ/go-fabric/transport/udp"
@@ -239,7 +240,8 @@ func TestLiveOTAProvider(t *testing.T) {
 	requestor := liveNode(t, "requestor", func(c *node.Config) {
 		// Harness mode applies in place and reports the update as after a
 		// restart (node/ota.go otaApplier).
-		c.OTA = &node.OtaConfig{Dir: filepath.Join(t.TempDir(), "ota"), Harness: true}
+		c.OTA = &node.OtaConfig{Dir: filepath.Join(t.TempDir(), "ota")}
+		nodeseam.UseOTAHarness(c)
 	})
 
 	f := newLiveFabric(t)

@@ -38,7 +38,7 @@ func TestDeviceBLE(t *testing.T) {
 	t.Parallel()
 	site := fabrictest.NewSite(t, fabrictest.Options{})
 	dev := site.AddDevice(fabrictest.Topology{Configure: func(cfg *node.Config) {
-		cfg.Network.WiFiCommissioning = node.WiFiCommissioning{Driver: joinAll{}}
+		fabrictest.UseWiFiCommissioning(cfg, joinAll{})
 	}})
 	p := dev.BLE()
 	if p.Address != fmt.Sprintf("C0:FF:EE:00:00:%02X", dev.Index()) || p.Discriminator != dev.Discriminator() || p.VendorID != 0xFFF1 || p.ProductID != 0x8001 {

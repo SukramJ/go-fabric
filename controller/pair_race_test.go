@@ -30,7 +30,7 @@ func TestPairRaceOverBLEAndIP(t *testing.T) {
 	t.Parallel()
 	drv := &wifiDriver{}
 	site, dev, c := siteController(t, fabrictest.Topology{Configure: func(cfg *node.Config) {
-		cfg.Network.WiFiCommissioning = node.WiFiCommissioning{Driver: drv}
+		fabrictest.UseWiFiCommissioning(cfg, drv)
 	}}, nil)
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
