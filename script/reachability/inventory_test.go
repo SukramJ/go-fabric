@@ -58,7 +58,12 @@ import (
 // Lowered 5 -> 4 when CelsiusToInt16 moved to cluster/spec/thermostat
 // (brief BV-1): the TemperatureMeasurement server calls it there, so the
 // tests that read a temperature reach it.
-const reachabilityUnreachedRatchet = 3
+// Lowered 3 -> 0 (W6-test-09): the three left were sentinel errors no code
+// returned — secure/channel.ErrCounterReplayed, secure/mattercert.ErrExpired
+// and secure/sigma.ErrResumptionMICInvalid — whose docs promised behaviour
+// the module does not have. They were deleted, not tested: a test naming a
+// dead sentinel would have "reached" it and protected nothing.
+const reachabilityUnreachedRatchet = 0
 
 // inventoryWhitelistEntry mirrors one whitelist row of inventory.json.
 type inventoryWhitelistEntry struct {

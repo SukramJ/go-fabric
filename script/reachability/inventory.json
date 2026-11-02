@@ -276,54 +276,13 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 17090,
+    "total_exported": 17087,
     "reachable": 12015,
     "whitelisted": 5072,
-    "unreachable": 3
+    "unreachable": 0
   },
-  "by_package": [
-    {
-      "package": "secure/channel",
-      "unreachable_funcs": 0,
-      "unreachable_types": 0,
-      "unreachable_other": 1
-    },
-    {
-      "package": "secure/mattercert",
-      "unreachable_funcs": 0,
-      "unreachable_types": 0,
-      "unreachable_other": 1
-    },
-    {
-      "package": "secure/sigma",
-      "unreachable_funcs": 0,
-      "unreachable_types": 0,
-      "unreachable_other": 1
-    }
-  ],
-  "unreachable": [
-    {
-      "package": "secure/channel",
-      "identifier": "ErrCounterReplayed",
-      "file": "secure/channel/session.go",
-      "line": 23,
-      "kind": "var"
-    },
-    {
-      "package": "secure/mattercert",
-      "identifier": "ErrExpired",
-      "file": "secure/mattercert/verify.go",
-      "line": 67,
-      "kind": "var"
-    },
-    {
-      "package": "secure/sigma",
-      "identifier": "ErrResumptionMICInvalid",
-      "file": "secure/sigma/sigma.go",
-      "line": 94,
-      "kind": "var"
-    }
-  ],
+  "by_package": [],
+  "unreachable": null,
   "whitelisted": [
     {
       "package": "bdx",
@@ -32215,7 +32174,7 @@
       "identifier": "SessionParameters",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "secure/sigma/sigma.go",
-      "line": 440
+      "line": 435
     },
     {
       "package": "secure/sigma",

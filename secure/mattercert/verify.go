@@ -62,9 +62,6 @@ var (
 	// ErrChainBroken is returned when the chain does not link up
 	// (e.g. NOC issuer != ICAC subject, or ICAC issuer != Root subject).
 	ErrChainBroken = errors.New("mattercert: certificate chain broken")
-	// ErrExpired is returned when the certificate's validity window
-	// excludes the current time.
-	ErrExpired = errors.New("mattercert: certificate expired or not yet valid")
 	// ErrInvalidRCAC is returned when a Root CA certificate fails the
 	// structural checks that go beyond signature verification.
 	ErrInvalidRCAC = errors.New("mattercert: RCAC structural validation failed")
@@ -519,7 +516,7 @@ func hasEKU(list []uint8, wanted ...uint8) bool {
 
 // checkValidity confirms the certificate's NotBefore/NotAfter fields name
 // representable times. It does NOT reject on the wall clock: matter.js
-// OperationalBase.ts:82-89 only warns when notBefore lies in the future
+// OperationalBase.ts:95-102 only warns when notBefore lies in the future
 // and never checks notAfter ("TODO: implement real checks when we add
 // Last known Good UTC time"), and its own CA backdates every NOC by a
 // year for the same reason — a bridge whose clock is behind the

@@ -30,7 +30,14 @@
 //
 // which is the meaningful one for a module whose entire purpose is to be consumed
 // from outside: untested exported surface is exactly the surface a host consumer
-// can break without this module noticing. The reference daemon seeds the same
+// can break without this module noticing.
+//
+// "Reached" means referenced from a test's call graph, not tested: one test
+// that merely names an identifier — passes a sentinel to errors.Is, takes a
+// function's address — marks it reached, whether or not any assertion depends
+// on it. The measure finds exported API no test so much as mentions; it says
+// nothing about how well the mentioned API is tested (that is coverage's and
+// the parity tests' job). The reference daemon seeds the same
 // roots in its non-production mode (its `-production-only=false` path); here that
 // mode is the only mode, and it is the default.
 //

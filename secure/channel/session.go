@@ -17,11 +17,6 @@ import (
 
 // Errors.
 var (
-	// ErrCounterReplayed is returned by [Session.Decrypt] when the
-	// received Message Counter has already been consumed (sliding-
-	// window duplicate detection per Matter §4.6.6).
-	ErrCounterReplayed = errors.New("channel: message counter replayed or out-of-window")
-
 	// ErrUnauthenticated is returned when the AES-CCM authentication
 	// tag does not validate. Indicates either a wrong key or
 	// tampering — the caller MUST drop the message.
