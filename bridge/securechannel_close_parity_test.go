@@ -650,3 +650,37 @@ func TestTriggerSessionReannounce_ReconnectEvent(t *testing.T) {
 		t.Errorf("retransmission events %v, want none", r)
 	}
 }
+
+// TestTickOutboundReliable_RetransmitEvent: each re-sent message of a
+// secure session with a fabric starts matter.js's "retransmit" event for
+// that fabric's operational service — once per fabric and tick, however
+// many of its sessions retransmitted; a session without a resolvable
+// fabric starts none (packages/protocol/src/protocol/DeviceAdvertiser.ts:164-172
+// at 862ad75f).
+func TestTickOutboundReliable_RetransmitEvent(t *testing.T) {
+	t.Parallel()
+	b, adv, op1, op2 := startedEventBridge(t)
+	b.AttachSessionLookup(fabricResolvingLookup{fabricMap: map[uint16]uint8{
+		0x10: 1, 0x11: 1, 0x20: 2,
+	}})
+	peerConn, peerAddr := openPeerSocket(t)
+	defer peerConn.Close()
+
+	outbound := newOutboundReliableTracker(nil, nil)
+	now := time.Now()
+	for i, sid := range []uint16{0x10, 0x11, 0x20, 0x30} {
+		outbound.Track(uint32(100+i), sid, uint16(i+1), []byte{0x00}, peerAddr, now)
+	}
+	b.tickOutboundReliable(outbound, now.Add(time.Hour))
+
+	d, r := adv.events()
+	slices.Sort(r)
+	want := []string{op1 + "|" + mdns.ServiceTypeOperational, op2 + "|" + mdns.ServiceTypeOperational}
+	slices.Sort(want)
+	if !slices.Equal(r, want) {
+		t.Errorf("retransmission events %v, want %v — one per fabric", r, want)
+	}
+	if len(d) != 0 {
+		t.Errorf("disconnected events %v, want none", d)
+	}
+}
