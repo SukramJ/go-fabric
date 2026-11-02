@@ -88,7 +88,7 @@ func (n *Node) syncAutoSubscribe(ctx context.Context) error {
 
 // establishDefaultSubscription establishes the default subscription of
 // req, sustained, and adopts it while it is still current — the tail of
-// NetworkClient.#syncAutoSubscribe (NetworkClient.ts:149-236).
+// NetworkClient.#syncAutoSubscribe (NetworkClient.ts:130-236).
 func (n *Node) establishDefaultSubscription(ctx context.Context, req SubscribePaths, didRead bool) error {
 	sreq := req
 	sreq.Sustain = true

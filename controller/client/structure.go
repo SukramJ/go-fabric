@@ -306,8 +306,8 @@ func (s *structure) mutateAttribute(a *AttributeData, sc scope, cur *batch, q *m
 // the endpoint is unknown or not installed, received data in this report or
 // has a structural change pending (:518-524), else delivered now (:526).
 func (s *structure) emitEvent(e *EventData, q *mutateContext) {
-	// Mirrors matter.js ClientStructure.ts:1757-1758: no emit without
-	// emitEvents (W4-ctlim-01).
+	// Mirrors matter.js ClientStructure.ts:1757-1758: no emit unless
+	// q.emitsEvents() (W4-ctlim-01).
 	if !q.emitsEvents {
 		return
 	}
