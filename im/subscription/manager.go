@@ -729,12 +729,8 @@ type EventFiring struct {
 	Number uint64
 	// Priority drives the urgency gate (Critical bypasses MinInterval).
 	Priority im.EventPriority
-	// Timestamp is not read: the report carries the event log's
-	// timestamp for Number (see [EventSource]).
-	Timestamp uint64
-	// Data is not read: the report carries the event log's payload for
-	// Number (see [EventSource]).
-	Data im.AttributeValue
+	// The timestamp and the payload are not carried: the report reads
+	// the event log's record for Number (see [EventSource]).
 }
 
 // OnEventFired notifies every subscription whose EventPaths cover the

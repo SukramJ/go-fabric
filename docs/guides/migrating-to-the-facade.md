@@ -42,6 +42,15 @@ still held there. Each row names the facade route, or the section of
 | `cluster/core` | `SoftwareVersionFromString` (`daemon_matter.go:527`) | `node.SoftwareVersionFromString` |
 | `cluster/core` | `RegulatoryIndoorOutdoor` (`daemon_matter.go:506`) | `node.RegulatoryIndoorOutdoor` for `Commissioning.LocationCapability` |
 
+## Removed or changed in the next release: the facade review
+
+The review of 2026-11 (`notes/review/2026-11/wave-5-api.md`) made the
+facade one shape. Each row names what a host writes now.
+
+| Symbol | Route |
+| --- | --- |
+| `subscription.EventFiring.Timestamp`, `subscription.EventFiring.Data` | drop them: the report reads the timestamp and payload from the `EventSource` by `Number` |
+
 ## Changed in the next release: `CommissionerReach` takes the peer
 
 Every method of `jfadef.CommissionerReach` (`jointfabric.CommissionerReach`)

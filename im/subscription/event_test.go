@@ -34,7 +34,6 @@ func mkEventFiring(endpoint uint16, cluster, event uint32, priority im.EventPrio
 		Path:     mkEventPath(endpoint, cluster, event),
 		Number:   1,
 		Priority: priority,
-		Data:     im.AttributeValue{Value: uint8(1)},
 	}
 }
 
@@ -51,7 +50,7 @@ func newEventManager(cfg subscription.Config) (m *subscription.Manager, fire fun
 			Endpoint: ev.Path.Endpoint,
 			Cluster:  ev.Path.Cluster,
 			EventID:  ev.Path.Event,
-			Payload:  ev.Data.Value,
+			Payload:  uint8(1),
 		})
 		m.OnEventFired(ev)
 	}
