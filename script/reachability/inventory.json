@@ -3782,14 +3782,14 @@
       "identifier": "TestOngoingReportChunkPiggybacksTheStatusResponseAck",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscribe_report_chunking_test.go",
-      "line": 393
+      "line": 403
     },
     {
       "package": "bridge",
       "identifier": "TestOngoingReportWaitsForEachChunksStatusResponse",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscribe_report_chunking_test.go",
-      "line": 354
+      "line": 364
     },
     {
       "package": "bridge",
@@ -4629,14 +4629,14 @@
       "identifier": "TestReportSubscriptionChunksAnOversizedOngoingReport",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscribe_report_chunking_test.go",
-      "line": 241
+      "line": 251
     },
     {
       "package": "bridge",
       "identifier": "TestReportSubscriptionEventsChunksAnOversizedReport",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscribe_report_chunking_test.go",
-      "line": 301
+      "line": 311
     },
     {
       "package": "bridge",

@@ -469,7 +469,7 @@
   },
   {
     "file": "bridge/subscribe_report_chunking_test.go",
-    "line": 240,
+    "line": 250,
     "citation": "packages/protocol/src/interaction/InteractionMessenger.ts:347",
     "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
     "identifier": "sendDataReport",
