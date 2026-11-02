@@ -31,6 +31,12 @@ type InvokeOptions struct {
 	// timed. A command [schema.IsTimedInvoke] names is timed without it
 	// (Invoke.ts:136-139).
 	Timed bool
+	// TimedOff sends the invoke untimed even when a command's model is
+	// timed-required — matter.js `options.timed === false`, which Invoke()
+	// respects "even if we know it better" (Invoke.ts:136-139); a
+	// TimedTimeout still makes it timed (:114). A test of the device's
+	// NEEDS_TIMED_INTERACTION answer needs it.
+	TimedOff bool
 	// TimedTimeout is the TimedRequest's timeout; 0 is
 	// [DefaultTimedRequestTimeout] (:439).
 	TimedTimeout time.Duration
@@ -158,6 +164,9 @@ func (o InvokeOptions) inferLargeMessage(paths ...im.ConcreteCommandPath) Invoke
 // Invoke.ts:114, :136-139, :237. A path the snapshot does not model (a
 // custom cluster) infers nothing.
 func (o InvokeOptions) timedFor(invokes ...im.CommandInvocation) bool {
+	if o.TimedOff {
+		return o.TimedTimeout > 0
+	}
 	if o.Timed || o.TimedTimeout > 0 {
 		return true
 	}

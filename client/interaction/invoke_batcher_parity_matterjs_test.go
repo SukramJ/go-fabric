@@ -263,6 +263,22 @@ func TestInvokeBatcherParity(t *testing.T) {
 			t.Fatalf("%d commands queued", n)
 		}
 	})
+	t.Run("respects TimedOff for a timed command", func(t *testing.T) {
+		t.Parallel()
+		// matter.js `options.timed === false` is respected "even if we know
+		// it better" (Invoke.ts:136-139): no TimedRequest. The command goes
+		// on its own, as the batch request would infer timed again.
+		s, c := batchingPair(t, 10)
+		lock := im.ConcreteCommandPath{Endpoint: 1, Cluster: 0x0101, Command: 0x00}
+		opts := batched()
+		opts.TimedOff = true
+		done := ciInvoke(context.Background(), c, lock, opts)
+		req := ciRefLess(t, s, s.next(t))
+		if req.TimedRequest {
+			t.Fatalf("request %+v: want untimed", req)
+		}
+		wantSuccess(t, done)
+	})
 	t.Run("per-request options never join a batch", func(t *testing.T) {
 		t.Parallel()
 		// :543-576 (sendDirect), "command with suppressResponse goes out
