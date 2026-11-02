@@ -9,11 +9,10 @@
 //   - `_matter._tcp` — operational service. The bridge advertises
 //     this once any commissioner has paired and at least one fabric
 //     is active. Service instance name is
-//     `<compressed-fabric-id>-<node-id>` in 16+16 lowercase hex.
+//     `<compressed-fabric-id>-<node-id>` in 16+16 upper-case hex.
 //   - `_matterc._udp` — commissionable service. Active only when the
-//     bridge has an open commissioning window (see ADR 0012 on the
-//     pairing UI). Service instance name is a 16-byte random
-//     identifier in lowercase hex.
+//     bridge has an open commissioning window. Service instance name is
+//     an 8-byte random identifier as 16 upper-case hex digits.
 //
 // TXT records carry the discovery metadata the commissioner uses to
 // pre-screen candidates (discriminator, vendor / product, pairing

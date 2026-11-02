@@ -35,6 +35,10 @@
 // Cascade-delete on fabric removal is handled at the schema level
 // (FOREIGN KEY ... ON DELETE CASCADE).
 //
-// The private key persists raw. File-system level protection is the
-// operator's responsibility; the module does not encrypt at rest.
+// The operational private key and the fabric records persist in clear;
+// file-system level protection is the operator's responsibility. Two
+// kinds of secret are sealed at rest: the keys of the ICD registrations,
+// which the store seals under SettingICDKey (icd_cipher.go, ADR 0029),
+// and DoorLock credential data, which cluster/lock encrypts before the
+// store sees it.
 package store
