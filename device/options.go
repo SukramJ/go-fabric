@@ -37,11 +37,6 @@ type Options struct {
 	// verbatim.
 	DeviceAddress  string
 	ChannelAddress string
-	// Reachable probes the device's live reachability
-	// ([endpoint.Spec.Availability]); nil reads as always reachable. The
-	// device is reachable while the probe says so and [Device.SetReachable]
-	// has not set it unreachable.
-	Reachable AvailabilityProbe
 	// Conditions are the device-type conditions the host states for the
 	// endpoint ([endpoint.Spec.DeviceConditions]).
 	Conditions []string
@@ -57,10 +52,6 @@ type SourceKey = endpoint.SourceKey
 // StringKey is the [SourceKey] of a host whose device identity is one
 // string ([endpoint.StringKey]).
 type StringKey = endpoint.StringKey
-
-// AvailabilityProbe is the type of [Options].Reachable
-// ([endpoint.AvailabilityProbe]).
-type AvailabilityProbe = endpoint.AvailabilityProbe
 
 // Declaration is one statement about a device beside its [Options], which
 // [New], [FromSpec] and every generated constructor (NewDimmableLight, …)

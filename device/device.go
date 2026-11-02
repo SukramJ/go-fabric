@@ -68,7 +68,7 @@ type Device struct {
 	reachable atomic.Bool
 
 	// mu guards parts, host and the host statements of opts (Name,
-	// DeviceAddress, ChannelAddress, Reachable: Rename, Update).
+	// DeviceAddress, ChannelAddress: Rename, Update).
 	mu    sync.Mutex
 	parts []*Device
 	host  deviceseam.Host

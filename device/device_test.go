@@ -335,14 +335,14 @@ func TestParts(t *testing.T) {
 // endpoint's source.
 func TestSpec(t *testing.T) {
 	t.Parallel()
-	reach := func() bool { return false }
 	d, err := NewOnOffPlugInUnit(Options{
 		StableKey: endpoint.StringKey("k"), Name: "Plug", Vendor: "ACME", DeviceAddress: "dev-1",
-		ChannelAddress: "dev-1:3", Reachable: reach, Conditions: []string{"Active"},
+		ChannelAddress: "dev-1:3", Conditions: []string{"Active"},
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
+	d.SetReachable(context.Background(), false)
 	s := d.Spec()
 	if s.StableKey != endpoint.StringKey("k") || s.FriendlyName != "Plug" || s.VendorName != "ACME" ||
 		s.DeviceAddress != "dev-1" || s.ChannelAddress != "dev-1:3" || s.Availability() || s.NodeLabel != "" ||

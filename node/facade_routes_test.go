@@ -203,9 +203,8 @@ func TestFacadeAliases(t *testing.T) {
 	if endpointTopology(&node.Topology{}) == nil || len(diagEvent(node.DiagnosticEvent{Message: "m"}).Message) != 1 {
 		t.Fatal("Topology or DiagnosticEvent did not pass as the original")
 	}
-	var probe endpoint.AvailabilityProbe = func() bool { return true }
-	opts := device.Options{StableKey: endpoint.StringKey("plug"), Reachable: probe}
-	if deviceKey(opts.StableKey).String() != "plug" || !deviceProbe(opts.Reachable)() {
+	opts := device.Options{StableKey: endpoint.StringKey("plug")}
+	if deviceKey(opts.StableKey).String() != "plug" {
 		t.Fatal("device.Options did not take the endpoint types")
 	}
 }
@@ -216,4 +215,3 @@ func subscriptionManager(m *subscription.Manager) bool         { return m != nil
 func endpointTopology(t *endpoint.Topology) *endpoint.Topology { return t }
 func diagEvent(e diagevent.Event) diagevent.Event              { return e }
 func deviceKey(k device.SourceKey) endpoint.SourceKey          { return k }
-func deviceProbe(p device.AvailabilityProbe) func() bool       { return p }

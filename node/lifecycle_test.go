@@ -178,3 +178,45 @@ func TestAggregatorReplaceAndTopology(t *testing.T) {
 		t.Errorf("Topology's device %+v, want the replacement", d)
 	}
 }
+
+// TestDeviceReachableReachesSubscription: SetReachable, the one
+// reachability input (W5-api-02), reaches an active subscription to the
+// Reachable attribute without a re-read — matter.js's server reacts to
+// the reachable state's change (BridgedDeviceBasicInformationServer.ts:37,
+// :100-102).
+func TestDeviceReachableReachesSubscription(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	site := fabrictest.NewSite(t, fabrictest.Options{})
+	lamp, err := device.NewOnOffLight(device.Options{StableKey: endpoint.StringKey("lamp"), Name: "Lamp"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	pair := site.CommissionedPair(fabrictest.PairOptions{Device: fabrictest.Topology{Bridged: []node.Endpoint{lamp}}})
+	ep, _ := lamp.EndpointNumber()
+	reachable := lifecycleAttr(ep, bdbidef.ClusterID, bdbidef.AttrReachable)
+	reports := make(chan *interaction.Report, 8)
+	sub, err := fabrictest.Subscribe(ctx, pair, interaction.SubscribeRequest{
+		Attributes: []im.ConcreteAttributePath{reachable},
+		Updated:    func(r *interaction.Report) { reports <- r },
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer sub.Close()
+
+	if err := pair.Device.Act(func(*node.Node) error { lamp.SetReachable(ctx, false); return nil }); err != nil {
+		t.Fatal(err)
+	}
+	if err := site.Eventually(ctx, "the Reachable report", func() bool {
+		select {
+		case r := <-reports:
+			v, ok := r.Value(ep, bdbidef.ClusterID, bdbidef.AttrReachable)
+			return ok && !v.El.Bool
+		default:
+			return false
+		}
+	}); err != nil {
+		t.Fatal(err)
+	}
+}

@@ -106,32 +106,26 @@ func (d *Device) EndpointNumber() (uint16, bool) {
 // host sets the state and the server emits the event
 // (BridgedDeviceBasicInformationServer.ts:37 reactTo, :100-102
 // #emitReachableChange). A device starts reachable, as matter.js's State
-// does (BridgedDeviceBasicInformationServer.ts:129-132). [Options].Reachable, when set, still decides as
-// well: the device is reachable while both say so. Before the device is
-// added only the value changes.
+// does (BridgedDeviceBasicInformationServer.ts:129-132). It is the one
+// reachability input: a host whose source goes away calls it, as a
+// matter.js host sets the one reachable state (ADR 0025 principle 2).
+// Before the device is added only the value changes.
 func (d *Device) SetReachable(ctx context.Context, reachable bool) {
 	if d.reachable.Swap(reachable) == reachable {
 		return
 	}
 	if h := d.hostOf(); h != nil {
-		h.NotifyReachable(ctx, d.opts.StableKey, d.available())
+		h.NotifyReachable(ctx, d.opts.StableKey, reachable)
 	}
 }
 
-// Reachable reports whether the device is reachable: what [Device.SetReachable]
-// set, and [Options].Reachable when it is set.
+// Reachable reports whether the device is reachable: what
+// [Device.SetReachable] set last, true before the first call.
 func (d *Device) Reachable() bool { return d.available() }
 
-// available is the device's availability probe.
-func (d *Device) available() bool {
-	if !d.reachable.Load() {
-		return false
-	}
-	d.mu.Lock()
-	probe := d.opts.Reachable
-	d.mu.Unlock()
-	return probe == nil || probe()
-}
+// available is what the endpoint's availability probe reads at each
+// dispatch: the state [Device.SetReachable] set.
+func (d *Device) available() bool { return d.reachable.Load() }
 
 // Rename names the device name: its BridgedDeviceBasicInformation
 // NodeLabel, reported to a subscribed controller and persisted by the node
@@ -160,7 +154,8 @@ func (d *Device) Rename(ctx context.Context, name string) {
 //     persist a label that wins over it, across restarts.
 //   - DeviceAddress, ChannelAddress: the host's addresses of the physical
 //     device and of this function of it.
-//   - Reachable: the availability probe.
+//
+// Reachability is not a statement: [Device.SetReachable] is its one input.
 //
 // StableKey, Vendor and Conditions are the device's identity and type and
 // do not change while it is bound; a host that changes them replaces the
@@ -168,7 +163,6 @@ func (d *Device) Rename(ctx context.Context, name string) {
 type HostStatement struct {
 	Name                          string
 	DeviceAddress, ChannelAddress string
-	Reachable                     AvailabilityProbe
 }
 
 // Update applies a change of the host's statements: fn gets the current
@@ -176,8 +170,7 @@ type HostStatement struct {
 // maximum, [ComposeNodeLabel]) is served at once to a subscribed
 // controller unless a written label wins, and persisted nowhere, so the
 // next restart starts from the host's statement again. The addresses
-// reach the endpoint at the node's next reassembly, the probe at its next
-// read. The device stays bound: [Device.EndpointNumber] and
+// reach the endpoint at the node's next reassembly. The device stays bound: [Device.EndpointNumber] and
 // [Device.SetReachable] keep working. Before the device is added only the
 // statements change.
 //
@@ -194,12 +187,12 @@ func (d *Device) Update(ctx context.Context, fn func(*HostStatement)) {
 	d.mu.Lock()
 	st := HostStatement{
 		Name: d.opts.Name, DeviceAddress: d.opts.DeviceAddress,
-		ChannelAddress: d.opts.ChannelAddress, Reachable: d.opts.Reachable,
+		ChannelAddress: d.opts.ChannelAddress,
 	}
 	fn(&st)
 	st.Name = ComposeNodeLabel(st.Name, "")
 	renamed := st.Name != d.opts.Name
-	d.opts.Name, d.opts.DeviceAddress, d.opts.ChannelAddress, d.opts.Reachable = st.Name, st.DeviceAddress, st.ChannelAddress, st.Reachable
+	d.opts.Name, d.opts.DeviceAddress, d.opts.ChannelAddress = st.Name, st.DeviceAddress, st.ChannelAddress
 	h := d.host
 	d.mu.Unlock()
 	if h != nil && renamed {

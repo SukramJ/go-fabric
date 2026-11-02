@@ -32,10 +32,10 @@ still held there. Each row names the facade route, or the section of
 | `secure/attestation` | `LoadChainFiles`, `ChainFiles`, `ErrNoChainConfigured` (`daemon_matter.go:318`, `:329`) | `Config.Attestation.Files` (`node.AttestationFiles`); loom starts on a chain that does not load and blocks commissioning (`daemon_matter.go:480-491`, `:552-554`): `Attestation.BlockCommissioningOnError`, the error in `Node.AttestationError`. Files naming nothing keep the test chain, so `ErrNoChainConfigured` has no counterpart |
 | `mdns` | `NewZeroconf`, `NewSubtypeResponder`, `NewNoop`, `Advertiser` (`daemon_matter.go:81-121`) | a nil `Config.Advertiser`; `Network.MDNS{Disabled}` for loom's `noop` |
 | `mdns` | `IsEnabled` (`daemon_matter.go:1263`), `Diagnose` (`:1289`), `Advertiser.Active` (`:1265`) | `Node.MDNSEnabled`, `Node.DiagnoseMDNS`, `Node.MDNSServices` (`node.MDNSFinding`, `node.MDNSService`) |
-| `endpoint` | `SourceKey` (`internal/store/matterendpoint/sourcekey.go:68`), `Topology` (`daemon_matter.go:916`) | `device.SourceKey`, `node.Topology`; `device.AvailabilityProbe` for `Options.Reachable` (`assembler.go:861`) |
+| `endpoint` | `SourceKey` (`internal/store/matterendpoint/sourcekey.go:68`), `Topology` (`daemon_matter.go:916`) | `device.SourceKey`, `node.Topology`; a source's availability (`assembler.go:861`) is `Device.SetReachable` |
 | `endpoint` | `Assembler`, `New`, `Spec` (`assembler.go:155`, `:184`, `:627`); `endpoint/sqlitestore` (`internal/store/matterendpoint/store.go:10`) | the node's Aggregator with partitions (`Aggregator.Partition`, `Batch`) and the device kit; a host with an assembler of its own stays on [`endpoint`](advanced-seams.md#endpoint) |
 | `endpoint` | `ComposeNodeLabel` (`assembler.go:641`) | `device.ComposeNodeLabel(base, suffix)` (#239); `device.New`, `Device.Rename` and `Device.Update` cap a name at the NodeLabel maximum themselves |
-| a type with a `Spec()` of its own, replaced under the same key when the host's name changed (loom's step 2) | `Device.Update(ctx, func(*device.HostStatement){…})`: the host's name, addresses and availability probe change on the bound device; the name is served at once and persisted nowhere, a controller-written label wins (#238) |
+| a type with a `Spec()` of its own, replaced under the same key when the host's name changed (loom's step 2) | `Device.Update(ctx, func(*device.HostStatement){…})`: the host's name and addresses change on the bound device (reachability is `Device.SetReachable`); the name is served at once and persisted nowhere, a controller-written label wins (#238) |
 | `groups` | `NewManager` (`daemon_matter.go:388`, `Config.Groups` at `:534`) | a nil `Config.Groups` builds the manager; `Node.Groups` returns it. With an own assembler it stays [`groups`](advanced-seams.md#groups) |
 | `bootid` | `EnableRotation` (`daemon_matter.go:409`) | `Config.BootID.RotateUniqueIDs` |
 | `diagevent` | `Event` (`internal/north/rest/handlers/matter.go:556`) | `node.DiagnosticEvent`; [`diagevent`](advanced-seams.md#diagevent) |
@@ -51,6 +51,7 @@ facade one shape. Each row names what a host writes now.
 | --- | --- |
 | `subscription.EventFiring.Timestamp`, `subscription.EventFiring.Data` | drop them: the report reads the timestamp and payload from the `EventSource` by `Number` |
 | `Node.CommissioningWindow()`, `node.CommissioningWindow` | `Node.OpenOwnWindow(ctx, timeout)`, `Node.CloseWindow(ctx)`, `Node.Window()`; the bridge type stays behind `Node.Bridge().CommissioningWindow()` |
+| `device.Options.Reachable`, `device.HostStatement.Reachable`, `device.AvailabilityProbe` | `Device.SetReachable(ctx, reachable)` on every change of the source's availability |
 
 ## Changed in the next release: `CommissionerReach` takes the peer
 
