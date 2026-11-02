@@ -216,7 +216,7 @@ the site puts in its network (the listen address and, with
 a non-nil `Client`, the client socket and DNS-SD cache), its clock, an
 advertiser whose records it answers DNS-SD with, its logger when the
 configuration has none, and a store of its own when the configuration
-states none; TCP and the re-announcement are off. Everything else — the
+states none; TCP is off. Everything else — the
 passcode and discriminator, the product, the labels, the ICD or OTA
 configuration, the host topology — is the daemon's. The device serves
 `cfg.Snapshotter` or the node's Aggregator, empty until the test adds to it
@@ -270,8 +270,8 @@ ticker (Identify) is stepped one period at a time. A site given
 the work.
 
 The controller's DNS-SD cache (`discovery.Names`) keeps its record TTLs on
-the wall clock; the site's answers carry 120 s and 4500 s, longer than a
-test.
+the wall clock; the site's answers carry 120 s, as the module's mDNS
+responder announces every record, longer than a test.
 
 ### The pacing model
 

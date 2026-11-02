@@ -17,6 +17,19 @@ pseudo-version of `main`.
 ### Changed
 
 - The chip-tool families run TC-EEM-2.2 and TC-EPM-2.2; they were excluded as harness gaps while the daemon answered the EnergyReporting trigger with INVALID_COMMAND (#370).
+- `mdns`: the module answers DNS-SD with its own responder, modelled on matter.js's `MdnsServer` and `MdnsAdvertisement` (issue #362, concept v12). Every record it publishes — the service-type enumeration, service and subtype PTRs, SRV, TXT, A and AAAA — carries 120 s, matter.js's `DEFAULT_MDNS_TTL`, where the primary PTR, SRV and TXT records carried grandcat/zeroconf's 3200 s: a node that vanishes without its goodbyes leaves a controller's cache within two minutes. The responder answers per interface with known-answer suppression, unicast responses, truncated queries, the 900 ms rate limit and duplicate-question suppression, splits responses at 1232 bytes, says goodbye with TTL 0 on `Withdraw` and `Close`, and does not probe, as matter.js does not.
+- `mdns`: `NewZeroconf` is `NewResponder`, `Zeroconf` is `Responder` (`HostName`, `InterfaceFilter`, `SetLogger`, `SetClock` unchanged). Migration: replace the constructor; drop `NewSubtypeResponder` and `AttachSubtypeResponder` — the responder publishes the subtype records itself. The address records of a host name the OS responder owns (`HostName`, the macOS host name) are left to the OS responder.
+- `node`, `mdns`, `bridge`: the periodic re-announce loop is replaced by matter.js's broadcast schedule — an announcement on publish, then 1 s, 2 s, 4 s … at most 90 s apart, until a CASE connection on the fabric ends the operational run or two days pass; a session teardown that leaves a peer without sessions starts it again, and an MRP retransmission broadcasts once (`Responder.ServiceConnected`, `ServiceDisconnected`, `ServiceRetransmission`). Migration: drop `node.Network.Reannounce`; `Node.TriggerReannounce` stays, one announcement of every service now.
+- `fabrictest`: the site answers DNS-SD with 120 s on every record, as the responder announces them.
+
+### Removed
+
+- `mdns.NewZeroconf`, `mdns.Zeroconf`, `mdns.NewSubtypeResponder`, `mdns.SubtypeResponder`, `mdns.Reannouncer` (`StartReannounceLoop`), `node.Network.Reannounce`, `node.Reannounce`, `node.DefaultReannounceInterval` (issue #362; routes in `docs/guides/migrating-to-the-facade.md`).
+- The dependencies `github.com/grandcat/zeroconf` and its transitive `github.com/cenkalti/backoff` (`THIRD-PARTY-NOTICES.md`).
+
+### Fixed
+
+- `mdns`: the package's tests run under `-race`; `mdns/race_skip_test.go`, which skipped the whole test binary for grandcat/zeroconf's `Shutdown` race, is gone, and the discovery, peer and commissioner live tests no longer build without the race detector only (issue #362).
 
 ## [0.16.0] — 2026-11-02
 

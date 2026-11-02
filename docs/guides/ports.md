@@ -73,7 +73,7 @@ these interfaces does not drag the host's dependencies into the module.
 | Field | What it does | When nil or zero |
 | --- | --- | --- |
 | `Store` | `Path` (a SQLite file the node opens and closes), `DB`, or both `Credentials` and `Endpoints` | `New` refuses the configuration |
-| `Advertiser` | publishes the node over DNS-SD | the node's own `mdns.Zeroconf` with the subtype responder, shaped by `Network.MDNS`; with `Network.MDNS.Off` it is `mdns.NewNoop()`: nothing is discoverable, and the bridge logs `matter.mdns.commissioning_not_advertised` |
+| `Advertiser` | publishes the node over DNS-SD | the node's own `mdns.Responder`, shaped by `Network.MDNS`; with `Network.MDNS.Off` it is `mdns.NewNoop()`: nothing is discoverable, and the bridge logs `matter.mdns.commissioning_not_advertised` |
 | `Attestation` | DAC, PAI and Certification Declaration; `Files` names them on disk and `New` loads them | the CSA test chain and test CD: pairable everywhere, not shippable |
 | `Health` | the listener probe on the node's clock; `Node.Health` returns the last verdict | no probe |
 | `OTA` (`OTAConfig`) | mounts the OTA Software Update Requestor; `Applier` carries out an update | no requestor. A nil `Applier` is the facade's own, which validates the image and keeps it under `Dir/applied` |
@@ -115,7 +115,7 @@ Use `Observers` instead.
 | `TCP` (`controller.TCPConfig{Incoming, Outgoing}`) | a TCP listener (`Controller.TCPAddr`) and the TCP initiator | UDP only |
 | `TransportPreference` | the transport each peer prefers | UDP |
 | `Networks`, `OwnNetworkProfile` | the network profiles' defaults and the profile our own MRP margin comes from | matter.js's defaults (`peer.DefaultTemplates`); `fast` |
-| `Advertise`, `Advertiser` | the `_matterd._udp` commissioner record and the advertiser publishing it | no record; `mdns.NewZeroconf()` when `Advertise` is set |
+| `Advertise`, `Advertiser` | the `_matterd._udp` commissioner record and the advertiser publishing it | no record; `mdns.NewResponder()` when `Advertise` is set |
 
 `controller/commissioner.Context.Scanners` (`CommissionedScanner`) are the
 scanners told to forget a device once it is commissioned; nil is none.
@@ -257,7 +257,8 @@ by type assertion.
 | `tls.CertificatePort` (`tlscertificatemanagementdef.CertificatePort`) | `tls.CertificateManagementConfig.Port` | make a client key and its CSR, judge a certificate's validity and key, drop a removed key ([Camera](camera.md#the-transport-model)) | — (required) |
 | `tls.Store` (`tlscertificatemanagementdef.CertificateStore`, `tlsclientmanagementdef.EndpointStore`) | `tls.CertificateManagementConfig.Store`, `tls.ClientManagementConfig.Store` (any `store.Settings`) | persist the certificate and endpoint tables | the tables stay in memory |
 | `closurecontroldef.StopObserver` | a `closurecontroldef.Mover` | hears of a Stop the server ignores because the closure is not in motion (`StopIgnored`); an error answers FAILURE | the idle Stop is a SUCCESS no-op |
-| `mdns.Reannouncer` | the `Advertiser` | the periodic re-announce loop (30 min default) and `Node.TriggerReannounce` | no loop; `TriggerReannounce` is a no-op |
+| `TriggerReannounce(ctx)` | the `Advertiser` (`mdns.Responder` has it) | `Node.TriggerReannounce`: one announcement of every service now | `TriggerReannounce` is a no-op |
+| `ServiceConnected`, `ServiceDisconnected`, `ServiceRetransmission` | the `Advertiser` (`mdns.Responder` has them) | matter.js's broadcast events: a CASE session ends the operational broadcast, a session teardown and an MRP retransmission resume it | the advertiser's own announcements only |
 | `mdns.Enabled` | the `Advertiser` | says whether it publishes at all | `mdns.IsEnabled` takes the advertiser at its word |
 | `onoff.Sink` | `onoff.Config.Sink` | consents to every OnOff change before it is stored; an error answers FAILURE | changes are stored without asking |
 | `thermo.SchedulePort` (`thermostatdef.SchedulePort`) | `thermostatdef.Declare{SchedulePort: …}`, `thermo.ThermostatConfig.SchedulePort` | with MatterScheduleConfiguration: switches the device to the schedule a SetActiveScheduleRequest named, and stores the schedules an atomic write committed; an error answers with its status, FAILURE without one ([Thermostat](thermostat.md#week-programs-msch)) | schedules live in memory |
@@ -286,4 +287,4 @@ AcceptedCommandList. AccessControl, OperationalCredentials and
 GroupKeyManagement have a definition but no `Declare`: their servers are
 the hand-written `cluster/core` ones the node mounts.
 
-*Source: `cluster/levelcontrol/native.go:18-73`, `mdns/reannounce.go:15-55`, `node/reannounce.go:15-50`, `node/config.go:237-256`, `cluster/onoff/server.go:55-73`, `cluster/thermo/thermostat_server.go:261-288`, `cluster/core/wifi_network_diagnostics.go:26-28`, `cluster/core/ota_software_update_requestor.go:180`, `cluster/core/ota_provider.go:96-138`, `cluster/core/commissioner_control.go:73-111`, `cluster/core/actions.go:63`, `cluster/core/diagnostic_logs.go:62-67`, `node/node.go` (`ringLogs`).*
+*Source: `cluster/levelcontrol/native.go:18-73`, `mdns/responder.go` (`TriggerReannounce`, `ServiceConnected`), `node/reannounce.go`, `cluster/onoff/server.go:55-73`, `cluster/thermo/thermostat_server.go:261-288`, `cluster/core/wifi_network_diagnostics.go:26-28`, `cluster/core/ota_software_update_requestor.go:180`, `cluster/core/ota_provider.go:96-138`, `cluster/core/commissioner_control.go:73-111`, `cluster/core/actions.go:63`, `cluster/core/diagnostic_logs.go:62-67`, `node/node.go` (`ringLogs`).*

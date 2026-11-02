@@ -77,8 +77,8 @@ func main() {
 
 func run(ctx context.Context) error {
 	// The zero Network listens on :5540 and advertises over DNS-SD: a nil
-	// Config.Advertiser is the node's own Zeroconf with the subtype
-	// responder every commissioner's discriminator browse needs.
+	// Config.Advertiser is the node's own mDNS responder, which answers
+	// every commissioner's discriminator browse.
 	n, err := newNode(ctx, "quickstart-device.db", node.Network{})
 	if err != nil {
 		return err
@@ -139,10 +139,11 @@ go run ./examples/quickstart-device
 It listens on UDP port 5540 and needs IPv6 and multicast on the LAN, like
 any Matter device. A commissioner that filters by discriminator, which is
 what Apple Home, Google Home and chip-tool do for a QR or manual code, finds
-the device only through the subtype responder, which the node builds with
-its own advertiser when `Config.Advertiser` is nil. Without the responder,
-`_matterc._udp` lists the instance, but the discriminator subtype query
-gets no answer. The program names no package below the facade: the node
+the device through the `_L<discriminator>._sub` subtype record, which the
+node's own mDNS responder publishes with the rest of the record set when
+`Config.Advertiser` is nil. A host's advertiser without subtype records
+lists the instance under `_matterc._udp`, but the discriminator subtype
+query gets no answer. The program names no package below the facade: the node
 opens the SQLite file (`Store.Path`), the key is `device.StringKey`, and
 the light's changes arrive typed through `OnOff().OnChanged`.
 
@@ -165,8 +166,7 @@ with `node.ErrInvalidConfig` when any check fails. It checks:
 - `SupportedFabrics` is at most 254;
 - `UniqueID` is at most 32 bytes;
 - `LocationCapability` is a valid regulatory location;
-- `Network.Reannounce.Interval` is not negative, and `Network.WiFi` comes
-  with its `Reporter`;
+- `Network.WiFi` comes with its `Reporter`;
 - `OTA.Dir` is set when `OTA` is;
 - `TLS.CertificatePort` is set when `TLS` is;
 - `DeviceTypeValidation` is one of warn, strict and off;
@@ -189,8 +189,8 @@ Defaults worth knowing:
 | Field | Zero value means |
 | --- | --- |
 | `Network.Listen` | `:5540` |
-| `Advertiser` | the node's own `mdns.Zeroconf` with the subtype responder; `Network.MDNS.Off` makes it `mdns.NewNoop()`, and nothing can discover the node |
-| `Network.MDNS` | Zeroconf with the subtype responder, SRV target from the interface's MAC; `Off` publishes nothing, `HostName` sets the SRV target |
+| `Advertiser` | the node's own `mdns.Responder` (`mdns.NewResponder`); `Network.MDNS.Off` makes it `mdns.NewNoop()`, and nothing can discover the node |
+| `Network.MDNS` | the mDNS responder, SRV target from the interface's MAC, every record 120 s, announced on matter.js's broadcast schedule (1 s doubling to 90 s, until a CASE connection or two days); `Off` publishes nothing, `HostName` sets an SRV target whose address records the OS responder publishes |
 | `Store.Path` | unused; set, the node opens that SQLite file (modernc.org/sqlite, foreign keys on, 5 s busy timeout) and `Stop` closes it |
 | `Attestation.Files` | unused; set, `New` loads the vendor chain and fails when it does not load (files naming nothing keep the test chain); with `BlockCommissioningOnError` it runs on the test chain instead, commissioning refused, the error in `Node.AttestationError` |
 | `Health` | nil runs no probe; set, it runs from `Start` to `Stop` every `Interval` (0 is 30 s), `Node.OnHealthSample` receives every verdict, `Node.Health` returns the last one |
@@ -202,7 +202,6 @@ Defaults worth knowing:
 | `Locales` | `en-US` alone |
 | `Logger` | `slog.Default()` |
 | `Client` | nil runs no client stack; set, the node opens its client socket and peers for its Binding entries |
-| `Network.Reannounce` | the DNS-SD records re-published every 30 min while the advertiser is Zeroconf; `Off` stops the loop, `Interval` sets the cadence |
 | `Network.WiFi` | nil mounts no WiFiNetworkDiagnostics; set, its `Reporter` (required) serves it |
 | `Sessions` | the Matter MRP intervals (500 ms idle, 300 ms active, 4000 ms active threshold); set, the PASE and CASE session parameters and the operational record carry the node's own (`node.SessionIntervals`, whole milliseconds, the threshold at most 65535 ms); `Node.SessionParameters` returns what the node reports ([Limits](../guides/limits.md#transport-and-reliability)) |
 | `Limits.BDXAdditionalMrpDelay` | no margin; set, the exchange of every inbound BDX transfer (an OTA requestor's download) adds it to the peer's MRP base interval, as matter.js's `bdxAdditionalMrpDelay` does |
@@ -453,8 +452,8 @@ settings key.
 2. the operational time is stored and the ShutDown event is emitted;
 3. the bindings and client stack close;
 4. PASE, the commissioning window and the CASE reaper stop;
-5. the subscription engine, the group sender, BDX, the re-announce
-   loop and the health probe stop;
+5. the subscription engine, the group sender, BDX and the health probe
+   stop;
 6. the bridge stops (sessions are closed with a CloseSession to each
    peer, then the socket closes and the mDNS records are withdrawn);
 7. the advertiser closes, and the store the node opened for
