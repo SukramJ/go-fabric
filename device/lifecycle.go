@@ -30,6 +30,7 @@ import (
 var ErrAddedElsewhere = errors.New("device: the device is added to a node already")
 
 func init() {
+	deviceseam.AheadRows = aheadRows
 	deviceseam.Attach = func(ep any, h deviceseam.Host) (func(), bool, error) {
 		owner, ok := ep.(interface{ base() *Device })
 		if !ok {

@@ -17,6 +17,7 @@ import (
 	tsdef "github.com/SukramJ/go-fabric/cluster/spec/timesynchronization"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/endpoint"
+	"github.com/SukramJ/go-fabric/internal/deviceseam"
 	"github.com/SukramJ/go-fabric/schema"
 	"github.com/SukramJ/go-fabric/surface"
 )
@@ -48,20 +49,20 @@ var aheadByCluster = map[uint32]surface.AheadSet{
 	netcommdef.ClusterID: mattercore.NetworkCommissioningAhead,
 }
 
-// AheadRows returns the "Ahead of matter.js" register IDs the root
-// servers' declarations name, sorted: the rows a host enables in
-// [Config].Surface's Extensions to select their elements on the root.
+// AheadRows returns every "Ahead of matter.js" register ID the module's
+// server declarations name — the root servers' and the device layer's —
+// sorted and once each: the rows a host enables in [Config].Surface's
+// Extensions (surface.Policies.Extensions) to select their elements on
+// the root and on a device. The one answer to "which extensions exist"
+// (ADR 0030 Consequences; ADR 0025 principle 2).
 func AheadRows() []string {
 	var out []string
 	for _, s := range aheadByCluster {
-		for _, id := range s.IDs() {
-			if !slices.Contains(out, id) {
-				out = append(out, id)
-			}
-		}
+		out = append(out, s.IDs()...)
 	}
+	out = append(out, deviceseam.AheadRows()...)
 	slices.Sort(out)
-	return out
+	return slices.Compact(out)
 }
 
 // rootFeatures is the FeatureMap selection cfg makes for each root server

@@ -15,6 +15,7 @@ import (
 	mattercore "github.com/SukramJ/go-fabric/cluster/core"
 	netcommdef "github.com/SukramJ/go-fabric/cluster/spec/networkcommissioning"
 	tsdef "github.com/SukramJ/go-fabric/cluster/spec/timesynchronization"
+	"github.com/SukramJ/go-fabric/cluster/thermo"
 	"github.com/SukramJ/go-fabric/device"
 	"github.com/SukramJ/go-fabric/endpoint"
 	"github.com/SukramJ/go-fabric/node"
@@ -53,9 +54,13 @@ func rootCluster(r surface.Report, id uint32) surface.Cluster {
 	return surface.Cluster{}
 }
 
+// TestNodeAheadRows: node.AheadRows is the one answer — the root
+// servers' rows and the device layer's (the Thermostat's), sorted, each
+// once (W5-api-14).
 func TestNodeAheadRows(t *testing.T) {
-	want := []string{threadRow, timeSyncRow}
+	want := append([]string{threadRow, timeSyncRow}, thermo.Ahead.IDs()...)
 	slices.Sort(want)
+	want = slices.Compact(want)
 	if got := node.AheadRows(); !slices.Equal(got, want) {
 		t.Errorf("AheadRows() = %v, want %v", got, want)
 	}

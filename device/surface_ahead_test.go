@@ -48,8 +48,8 @@ func TestAheadDeclarationsAreThermo(t *testing.T) {
 			t.Errorf("thermo.Ahead names feature 0x%X as %q, want %q", uint32(r.feature), got, r.row)
 		}
 	}
-	if !slices.Equal(AheadRows(), thermo.Ahead.IDs()) {
-		t.Errorf("AheadRows() = %v, want %v", AheadRows(), thermo.Ahead.IDs())
+	if !slices.Equal(aheadRows(), thermo.Ahead.IDs()) {
+		t.Errorf("aheadRows() = %v, want %v", aheadRows(), thermo.Ahead.IDs())
 	}
 }
 

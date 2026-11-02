@@ -60,6 +60,7 @@ facade one shape. Each row names what a host writes now.
 | `node.Client` (`Enabled`), `Config.DisableTimeSynchronization`, `Config.TimeSynchronization *TimeSynchronizationConfig`, `Network.ReannounceInterval`, `Network.DisableReannounce`, `MDNS.Disabled`, `Config.Health Health`, `Network.WiFi WiFi` | `Config.Client *ClientConfig` (nil off); `Config.TimeSynchronization{Off, Config}`; `Network.Reannounce{Interval, Off}`; `MDNS.Off`; `Config.Health *Health` (nil off); `Network.WiFi *WiFi` (nil off) |
 | `node.OtaConfig.Harness`, `node.Network.WiFiCommissioning`, `node.WiFiCommissioning`, `node.Config.BootID`, `node.BootID` | not public (`internal/nodeseam`); `fabrictest.UseWiFiCommissioning(cfg, driver)` in a test; `bootid.EnableRotation()` before `node.New` |
 | `contract.InitialDataVersion`, `contract.SetMeasurementMaterializer` | none: unexported; a host kind is `contract.RegisterMeasurementKind` |
+| `device.AheadRows` | `node.AheadRows()` (the root's and the devices' rows) |
 
 ## Changed in the next release: `CommissionerReach` takes the peer
 

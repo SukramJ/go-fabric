@@ -175,23 +175,16 @@ var aheadByCluster = map[uint32]surface.AheadSet{
 	thermostatdef.ClusterID: thermo.Ahead,
 }
 
-// AheadRows returns the "Ahead of matter.js" register IDs the device
-// layer's server declarations name, sorted: the rows a host enables in
-// surface.Policies.Extensions to select their elements on a device.
-func AheadRows() []string { return aheadRows(aheadByCluster) }
-
-// aheadRows is the sorted union of the register IDs of sets.
-func aheadRows(sets map[uint32]surface.AheadSet) []string {
+// aheadRows returns the "Ahead of matter.js" register IDs the device
+// layer's server declarations name, sorted — what node.AheadRows unions
+// with the root's through deviceseam.AheadRows.
+func aheadRows() []string {
 	var out []string
-	for _, s := range sets {
-		for _, id := range s.IDs() {
-			if !slices.Contains(out, id) {
-				out = append(out, id)
-			}
-		}
+	for _, s := range aheadByCluster {
+		out = append(out, s.IDs()...)
 	}
 	slices.Sort(out)
-	return out
+	return slices.Compact(out)
 }
 
 // defaultCandidates are the feature and element candidates of the default

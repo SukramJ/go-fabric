@@ -47,7 +47,7 @@
 // The column "surface" is measured, not read: the test in surface_test.go
 // (go test, not this program) builds each cluster a server declares an
 // ahead-of-matter.js row for (surface.AheadSet, collected by
-// device.AheadRows and node.AheadRows) with and without the row's
+// node.AheadRows) with and without the row's
 // elements and compares FeatureMap and the four lists; every declared row
 // must measure yes. It holds the column against the declarations in both
 // directions: a "yes" row without a declaration, a declaration that is no

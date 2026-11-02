@@ -80,7 +80,8 @@ type Policies struct {
 	// Extensions are the "Ahead of matter.js" register rows the host
 	// enables. The built-in reference policy, judged first, refuses a
 	// candidate tagged with a row ([Reference].Ahead) not in it
-	// ([ErrExtensionNotEnabled]).
+	// ([ErrExtensionNotEnabled]). node.AheadRows lists every row the
+	// module's servers declare.
 	Extensions Extensions
 	// Level is the specification level the node composes at ([Level]):
 	// the built-in level policy, judged after the reference policy,

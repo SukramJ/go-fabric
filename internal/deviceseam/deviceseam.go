@@ -6,9 +6,10 @@
 // (endpoint number, reachable, rename, the device's queue and clock)
 // reaches the node without a second exported way to add a device.
 //
-// Direction of the edge: package device installs [Attach] from its init;
-// package node calls it from Aggregator.Add and Replace, and the detach it
-// returns from Remove, Replace and Node.Stop.
+// Direction of the edge: package device installs [Attach] and
+// [AheadRows] from its init; package node calls Attach from
+// Aggregator.Add and Replace, and the detach it returns from Remove,
+// Replace and Node.Stop, and AheadRows from node.AheadRows.
 package deviceseam
 
 import (
@@ -47,3 +48,9 @@ type Host interface {
 // and unbinds; ok false when ep is no device (any other node.Endpoint),
 // and an error when the device is bound to a node already.
 var Attach func(ep any, h Host) (detach func(), ok bool, err error)
+
+// AheadRows returns the "Ahead of matter.js" register IDs the device
+// layer's server declarations name, sorted; node.AheadRows unions them
+// with the root servers' rows, the one answer a host reads (review
+// 2026-11 W5-api-14).
+var AheadRows func() []string
