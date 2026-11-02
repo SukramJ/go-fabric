@@ -55,14 +55,14 @@ func TestDeviceRequirementsParityMatterJS(t *testing.T) {
 	t.Parallel()
 	for _, want := range []lightParity{
 		{
-			ty: &DimmableLightType, id: 0x101, revision: 4,
+			ty: DimmableLightType(), id: 0x101, revision: 4,
 			mandatory:      []string{"Identify", "Groups", "OnOff", "LevelControl", "ScenesManagement"},
 			clientOptional: []string{"OccupancySensing"},
 			defaults:       []string{"Identify", "Groups", "OnOff", "LevelControl", "ScenesManagement"},
 			features:       map[string][]string{"OnOff": {"LT"}, "LevelControl": {"LT", "OO"}},
 		},
 		{
-			ty: &OnOffLightType, id: 0x100, revision: 4,
+			ty: OnOffLightType(), id: 0x100, revision: 4,
 			mandatory:      []string{"Identify", "Groups", "OnOff", "ScenesManagement"},
 			optional:       []string{"LevelControl"},
 			clientOptional: []string{"OccupancySensing"},

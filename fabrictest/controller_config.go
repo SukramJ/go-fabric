@@ -86,5 +86,6 @@ func (s *Site) ControllerConfig(opts ControllerOptions) controller.Config {
 // The node is node/controllernode's.
 func (s *Site) startOwnNode(_ context.Context, spec controller.OwnNodeSpec) (controller.OwnNode, *net.UDPAddr, error) {
 	d := s.AddNode(controllernode.Config(spec)) //nolint:contextcheck // as AddController: the node's services run under contexts of their own
+	controllernode.Observe(d.Node(), spec)
 	return controllernode.Wrap(d.Node()), d.Addr(), nil
 }

@@ -18,9 +18,11 @@ const (
 	WindowCoveringRevision uint16              = 7
 )
 
-// WindowCoveringType is the WindowCovering device type, matter.js's packages/node/src/devices/window-covering.ts;
-// its cluster requirements are listed in docs/reference/device-types.md#windowcovering.
-var WindowCoveringType = typeWindowCovering
+// WindowCoveringType returns the WindowCovering device type, matter.js's packages/node/src/devices/window-covering.ts;
+// its cluster requirements are listed in docs/reference/device-types.md#windowcovering. It is the registry's
+// value, the one [Lookup] and [FromSpec] return: a caller reads it and
+// does not modify it.
+func WindowCoveringType() *Type { return &typeWindowCovering }
 
 // typeWindowCovering holds [WindowCoveringType]'s cluster requirements.
 var typeWindowCovering = Type{

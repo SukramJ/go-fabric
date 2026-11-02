@@ -54,8 +54,16 @@ func TestHealthProbeSamplesOnTheNodesClock(t *testing.T) {
 	log := &sampleLog{}
 	cfg := minimalConfig(openDB(t, filepath.Join(t.TempDir(), "n.db")))
 	cfg.Clock = fake
-	cfg.Health = node.Health{Interval: 10 * time.Second, OnSample: log.add}
+	cfg.Health = &node.Health{Interval: 10 * time.Second}
 	n := newNode(t, cfg)
+	n.OnHealthSample(log.add)
+	// The queued variant of the one callback rule (ADR 0025 principle 8)
+	// sees the same verdicts on the node's callback goroutine; an
+	// unsubscribed callback sees none.
+	queued := &sampleLog{}
+	n.OnHealthSampleAsync(queued.add)
+	gone := &sampleLog{}
+	n.OnHealthSample(gone.add)()
 	if _, ok := n.Health(); ok {
 		t.Fatal("a sample before Start")
 	}
@@ -69,6 +77,10 @@ func TestHealthProbeSamplesOnTheNodesClock(t *testing.T) {
 	}
 	fake.Advance(10 * time.Second)
 	waitSamples(t, log, 2)
+	waitSamples(t, queued, 2)
+	if gone.len() != 0 {
+		t.Errorf("an unsubscribed callback saw %d samples", gone.len())
+	}
 	if err := n.Stop(ctx); err != nil {
 		t.Fatal(err)
 	}
@@ -93,7 +105,7 @@ func TestHealthProbeOff(t *testing.T) {
 		t.Fatal("a sample without a probe")
 	}
 	cfg := minimalConfig(openDB(t, filepath.Join(t.TempDir(), "m.db")))
-	cfg.Health.Interval = -time.Second
+	cfg.Health = &node.Health{Interval: -time.Second}
 	if err := cfg.Validate(); err == nil {
 		t.Fatal("a negative Health.Interval validated")
 	}

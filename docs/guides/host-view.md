@@ -78,7 +78,7 @@ func (b *bridge) doorMoved(closed bool) error {
 
 // newNode builds the node with both devices under its Aggregator.
 func newNode(ctx context.Context, cfg node.Config, b *bridge) (*node.Node, error) {
-	n, err := node.New(cfg) //nolint:contextcheck // the node's constructor takes no context
+	n, err := node.New(ctx, cfg)
 	if err != nil {
 		return nil, err
 	}
@@ -118,6 +118,7 @@ func run(ctx context.Context) error {
 		return err
 	}
 	if err := n.Start(ctx); err != nil {
+		_ = n.Stop(context.WithoutCancel(ctx)) // a failed Start leaves the node startable and its store open
 		return err
 	}
 	for _, d := range n.Topology().Devices {
@@ -128,9 +129,12 @@ func run(ctx context.Context) error {
 	if err := b.doorMoved(false); err != nil {
 		slog.Warn("door", slog.Any("err", err))
 	}
-	if qr, manual, err := n.PairingCodes(); err == nil {
-		fmt.Printf("QR code: %s\nManual code: %s\n", qr, manual)
+	payload, err := n.SetupPayload()
+	if err != nil {
+		_ = n.Stop(context.WithoutCancel(ctx))
+		return err
 	}
+	fmt.Printf("QR code: %s\nManual code: %s\n", payload.QR, payload.Manual)
 	<-ctx.Done()
 	return n.Stop(context.WithoutCancel(ctx))
 }
@@ -197,6 +201,13 @@ subscribers are reported at most once a second. `Change.Origin` says who made it
 `OriginCommand` for a command (On, Off, Toggle, …). The program forwards only what did not come from the
 host, so its own `Set` does not echo back to the lamp.
 
+Every callback of the facade follows one rule: the plain form
+(`OnChanged`, `Observe`, `OnHealthSample`, `OnOTAProviderStatus`,
+`OnDiagnosticEvent`, `ICD.OnModeChange`) runs inline on the event's
+goroutine and must not block, the `…Async` form queues it on the
+device's or node's own goroutine, one call after the other, and both
+return the unsubscribe function.
+
 `OnChanged` runs inline, after the change is stored and before the
 command that made it answers. A callback that may block uses
 `OnChangedAsync`, which runs on the device's own goroutine, one call
@@ -218,8 +229,10 @@ it only changes the set, after `Start` it reassembles the running bridge.
 A stored endpoint number is never dropped because its device is absent:
 a device a previous run served keeps its number until it returns, and a
 device the host removes keeps it too (`Remove`). `Forget` frees it, for a
-device that is gone for good. On an error path the node is stopped: `New`
-already started its engine.
+device that is gone for good. A `Start` that fails leaves the node
+startable, as matter.js's `Node.start` does, with the store `New` opened
+still open; the program gives up, so it calls `Stop` on that path and on
+every later one.
 
 A host whose devices come from several sources that load on their own
 gives each a partition: `Aggregator().Partition(name)` has the same
@@ -256,7 +269,7 @@ sets the bridged device's Reachable attribute and its ReachableChanged
 event. A device starts reachable. `EndpointNumber` (used by the test)
 returns the endpoint the node gave the device.
 
-`PairingCodes` returns the QR payload and the manual code for the
+`SetupPayload` returns the QR payload and the manual code for the
 configured passcode and discriminator. The program then serves until the
 signal context ends and stops the node.
 

@@ -17,9 +17,11 @@ const (
 	ColorDimmerSwitchRevision uint16              = 4
 )
 
-// ColorDimmerSwitchType is the ColorDimmerSwitch device type, matter.js's packages/node/src/devices/color-dimmer-switch.ts;
-// its cluster requirements are listed in docs/reference/device-types.md#colordimmerswitch.
-var ColorDimmerSwitchType = typeColorDimmerSwitch
+// ColorDimmerSwitchType returns the ColorDimmerSwitch device type, matter.js's packages/node/src/devices/color-dimmer-switch.ts;
+// its cluster requirements are listed in docs/reference/device-types.md#colordimmerswitch. It is the registry's
+// value, the one [Lookup] and [FromSpec] return: a caller reads it and
+// does not modify it.
+func ColorDimmerSwitchType() *Type { return &typeColorDimmerSwitch }
 
 // typeColorDimmerSwitch holds [ColorDimmerSwitchType]'s cluster requirements.
 var typeColorDimmerSwitch = Type{

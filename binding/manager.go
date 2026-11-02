@@ -210,6 +210,8 @@ type Manager struct {
 	life   context.Context //nolint:containedctx // the manager's lifetime, cancelled by Close
 	cancel context.CancelFunc
 	wg     sync.WaitGroup
+	// workerOnce starts the worker with the first queued work (startWorker).
+	workerOnce sync.Once
 
 	// mu guards the queue, the handlers, the attachments, the registered
 	// group entries and closed.
@@ -238,8 +240,9 @@ type Manager struct {
 	records map[uint16]*record
 }
 
-// New returns a manager over cfg and starts its worker; [Manager.Close]
-// ends it.
+// New returns a manager over cfg. Its worker starts with the first work
+// queued for it, so a manager built and dropped runs no goroutine (ADR
+// 0026 principle 5); [Manager.Close] ends it.
 func New(cfg Config) (*Manager, error) {
 	if cfg.Topology == nil {
 		return nil, ErrNoTopology
@@ -256,9 +259,15 @@ func New(cfg Config) (*Manager, error) {
 		m.cfg.Interaction.Logger = m.log
 	}
 	m.life, m.cancel = context.WithCancel(context.Background())
-	m.wg.Add(1)
-	go m.run()
 	return m, nil
+}
+
+// startWorker starts the worker once.
+func (m *Manager) startWorker() {
+	m.workerOnce.Do(func() {
+		m.wg.Add(1)
+		go m.run()
+	})
 }
 
 // run is the worker: it runs the queued work in order until Close.
@@ -292,6 +301,7 @@ func (m *Manager) post(fn func()) {
 	}
 	m.queue = append(m.queue, fn)
 	m.mu.Unlock()
+	m.startWorker()
 	m.signal()
 }
 
@@ -555,6 +565,7 @@ func (m *Manager) Close() {
 	for _, a := range atts {
 		a.stop()
 	}
+	m.startWorker() // the disposal runs on the worker, started or not
 	m.signal()
 	m.wg.Wait()
 }

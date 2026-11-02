@@ -219,7 +219,7 @@ func TestOTACancelByRemovingConsentParity(t *testing.T) {
 	// setting): the clock below walks timer by timer, and the bridge's ack
 	// pump stands every 50 ms of it.
 	announced := time.Second
-	r := newOTARigWith(t, nil, &node.OtaConfig{Dir: filepath.Join(t.TempDir(), "ota"), AnnouncedUpdateQueryDelay: &announced})
+	r := newOTARigWith(t, nil, &node.OTAConfig{Dir: filepath.Join(t.TempDir(), "ota"), AnnouncedUpdateQueryDelay: &announced})
 	r.storeImage(t, 2)
 	mgr := r.c.SoftwareUpdates()
 	_, _, provider := r.c.OwnNode()

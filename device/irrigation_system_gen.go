@@ -18,9 +18,11 @@ const (
 	IrrigationSystemRevision uint16              = 1
 )
 
-// IrrigationSystemType is the IrrigationSystem device type, matter.js's packages/node/src/devices/irrigation-system.ts;
-// its cluster requirements are listed in docs/reference/device-types.md#irrigationsystem.
-var IrrigationSystemType = typeIrrigationSystem
+// IrrigationSystemType returns the IrrigationSystem device type, matter.js's packages/node/src/devices/irrigation-system.ts;
+// its cluster requirements are listed in docs/reference/device-types.md#irrigationsystem. It is the registry's
+// value, the one [Lookup] and [FromSpec] return: a caller reads it and
+// does not modify it.
+func IrrigationSystemType() *Type { return &typeIrrigationSystem }
 
 // typeIrrigationSystem holds [IrrigationSystemType]'s cluster requirements.
 var typeIrrigationSystem = Type{

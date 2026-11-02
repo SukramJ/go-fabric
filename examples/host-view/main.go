@@ -64,7 +64,7 @@ func (b *bridge) doorMoved(closed bool) error {
 
 // newNode builds the node with both devices under its Aggregator.
 func newNode(ctx context.Context, cfg node.Config, b *bridge) (*node.Node, error) {
-	n, err := node.New(cfg) //nolint:contextcheck // the node's constructor takes no context
+	n, err := node.New(ctx, cfg)
 	if err != nil {
 		return nil, err
 	}
@@ -104,6 +104,7 @@ func run(ctx context.Context) error {
 		return err
 	}
 	if err := n.Start(ctx); err != nil {
+		_ = n.Stop(context.WithoutCancel(ctx)) // a failed Start leaves the node startable and its store open
 		return err
 	}
 	for _, d := range n.Topology().Devices {
@@ -114,9 +115,12 @@ func run(ctx context.Context) error {
 	if err := b.doorMoved(false); err != nil {
 		slog.Warn("door", slog.Any("err", err))
 	}
-	if qr, manual, err := n.PairingCodes(); err == nil {
-		fmt.Printf("QR code: %s\nManual code: %s\n", qr, manual)
+	payload, err := n.SetupPayload()
+	if err != nil {
+		_ = n.Stop(context.WithoutCancel(ctx))
+		return err
 	}
+	fmt.Printf("QR code: %s\nManual code: %s\n", payload.QR, payload.Manual)
 	<-ctx.Done()
 	return n.Stop(context.WithoutCancel(ctx))
 }

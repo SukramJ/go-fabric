@@ -18,9 +18,11 @@ const (
 	WaterValveRevision uint16              = 1
 )
 
-// WaterValveType is the WaterValve device type, matter.js's packages/node/src/devices/water-valve.ts;
-// its cluster requirements are listed in docs/reference/device-types.md#watervalve.
-var WaterValveType = typeWaterValve
+// WaterValveType returns the WaterValve device type, matter.js's packages/node/src/devices/water-valve.ts;
+// its cluster requirements are listed in docs/reference/device-types.md#watervalve. It is the registry's
+// value, the one [Lookup] and [FromSpec] return: a caller reads it and
+// does not modify it.
+func WaterValveType() *Type { return &typeWaterValve }
 
 // typeWaterValve holds [WaterValveType]'s cluster requirements.
 var typeWaterValve = Type{

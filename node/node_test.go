@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net"
 	"path/filepath"
 	"slices"
 	"sync"
@@ -53,13 +54,13 @@ func minimalConfig(db *sql.DB) node.Config {
 		Store:  node.Store{DB: db},
 		Logger: slog.New(slog.DiscardHandler),
 		// A unit test publishes nothing on the network.
-		Network: node.Network{Listen: "127.0.0.1:0", PreferIPv4: true, MDNS: node.MDNS{Disabled: true}},
+		Network: node.Network{Listen: "127.0.0.1:0", PreferIPv4: true, MDNS: node.MDNS{Off: true}},
 	}
 }
 
 func newNode(t *testing.T, cfg node.Config) *node.Node {
 	t.Helper()
-	n, err := node.New(cfg)
+	n, err := node.New(context.Background(), cfg)
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
@@ -143,7 +144,7 @@ func TestNodeServesPASEReadAndSubscription(t *testing.T) {
 	if err := n.Start(ctx); err != nil {
 		t.Fatalf("Start: %v", err)
 	}
-	if !n.CommissioningWindow().IsOpen() {
+	if !n.Bridge().CommissioningWindow().IsOpen() {
 		t.Fatal("an uncommissioned node did not open its own window")
 	}
 	plugEP, ok := endpointOf(t, n, "plug:1")
@@ -383,8 +384,8 @@ func TestAggregatorRefusals(t *testing.T) {
 	if err := agg.Remove(ctx, endpoint.StringKey("p")); err != nil {
 		t.Errorf("Remove before Start: %v", err)
 	}
-	if err := agg.IncreaseConfigurationVersion(endpoint.StringKey("p")); err == nil {
-		t.Error("IncreaseConfigurationVersion before Start succeeded")
+	if err := agg.IncreaseConfigurationVersions(context.Background(), endpoint.StringKey("p")); !errors.Is(err, node.ErrNotStarted) {
+		t.Errorf("IncreaseConfigurationVersions before Start: %v, want ErrNotStarted", err)
 	}
 }
 
@@ -415,10 +416,10 @@ func TestPersistedLabelAndConfigurationVersion(t *testing.T) {
 		t.Errorf("bridged NodeLabel %q", label)
 	}
 	before := n.Bridge().Topology().FindByID(ep).ConfigurationVersion()
-	if err := n.Aggregator().IncreaseConfigurationVersion(endpoint.StringKey("plug:1")); err != nil {
+	if err := n.Aggregator().IncreaseConfigurationVersions(ctx, endpoint.StringKey("plug:1")); err != nil {
 		t.Fatal(err)
 	}
-	if err := n.Aggregator().IncreaseConfigurationVersion(endpoint.StringKey("nope")); !errors.Is(err, node.ErrUnknownKey) {
+	if err := n.Aggregator().IncreaseConfigurationVersions(ctx, endpoint.StringKey("nope")); !errors.Is(err, node.ErrUnknownKey) {
 		t.Errorf("unknown key: %v", err)
 	}
 	raised := n.Bridge().Topology().FindByID(ep).ConfigurationVersion()
@@ -463,7 +464,8 @@ func readAttr(t *testing.T, topo *endpoint.Topology, ep uint16, cluster, attr ui
 func TestPairingCodes(t *testing.T) {
 	t.Parallel()
 	n := newNode(t, minimalConfig(openDB(t, filepath.Join(t.TempDir(), "node.db"))))
-	qr, manual, err := n.PairingCodes()
+	p, err := n.SetupPayload()
+	qr, manual := p.QR, p.Manual
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -495,7 +497,7 @@ func TestConfigValidate(t *testing.T) {
 		{"vendor", func(c *node.Config) { c.ProductDescription.VendorID = 0 }},
 		{"label", func(c *node.Config) { c.BasicInformation.NodeLabel = " " }},
 		{"store", func(c *node.Config) { c.Store = node.Store{} }},
-		{"ota dir", func(c *node.Config) { c.OTA = &node.OtaConfig{} }},
+		{"ota dir", func(c *node.Config) { c.OTA = &node.OTAConfig{} }},
 	}
 	for _, c := range cases {
 		cfg := minimalConfig(db)
@@ -503,7 +505,7 @@ func TestConfigValidate(t *testing.T) {
 		if err := cfg.Validate(); !errors.Is(err, node.ErrInvalidConfig) {
 			t.Errorf("%s: %v", c.name, err)
 		}
-		if _, err := node.New(cfg); !errors.Is(err, node.ErrInvalidConfig) {
+		if _, err := node.New(context.Background(), cfg); !errors.Is(err, node.ErrInvalidConfig) {
 			t.Errorf("%s: New accepted it (%v)", c.name, err)
 		}
 	}
@@ -518,7 +520,7 @@ func TestConfigValidate(t *testing.T) {
 func TestOTARequestorMounted(t *testing.T) {
 	t.Parallel()
 	cfg := minimalConfig(openDB(t, filepath.Join(t.TempDir(), "node.db")))
-	cfg.OTA = &node.OtaConfig{Dir: filepath.Join(t.TempDir(), "ota")}
+	cfg.OTA = &node.OTAConfig{Dir: filepath.Join(t.TempDir(), "ota")}
 	n := newNode(t, cfg)
 	if n.Root().OTARequestor == nil {
 		t.Fatal("no OTA requestor")
@@ -653,5 +655,86 @@ func TestAggregatorConcurrentAdds(t *testing.T) {
 		if _, ok := endpointOf(t, n, fmt.Sprintf("plug:%02d", i)); !ok {
 			t.Errorf("plug:%02d missing from the topology after concurrent adds", i)
 		}
+	}
+}
+
+// TestStartFailureLeavesTheNodeStartable: a Start that fails — its UDP
+// port held by another socket — leaves the node startable, as matter.js's
+// Node.start does (packages/node/src/node/Node.ts:113-128 at 862ad75f:
+// the target state back to "offline", the error rethrown): the store New
+// opened stays usable, the Aggregator takes a device, and once the port
+// is free the second Start succeeds; an explicit Stop then makes a later
+// Start ErrStopped (W5-api-06, owner decision 2026-11-02).
+func TestStartFailureLeavesTheNodeStartable(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	held, err := net.ListenPacket("udp4", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg := minimalConfig(nil)
+	cfg.Store = node.Store{Path: filepath.Join(t.TempDir(), "n.db")}
+	cfg.Network.Listen = held.LocalAddr().String()
+	n := newNode(t, cfg)
+	if err := n.Start(ctx); err == nil {
+		_ = held.Close()
+		t.Fatal("Start on a held port succeeded")
+	}
+	if n.LocalAddr() != "" {
+		t.Errorf("a failed Start left the listener at %s", n.LocalAddr())
+	}
+	if err := n.Aggregator().Add(ctx, newPlug(t, "after-failure")); err != nil {
+		t.Errorf("Add after a failed Start: %v", err)
+	}
+	if err := held.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := n.Start(ctx); err != nil {
+		t.Fatalf("the second Start: %v", err)
+	}
+	if n.LocalAddr() == "" {
+		t.Error("the second Start bound no listener")
+	}
+	if fabrics, err := n.FabricInfos(ctx); err != nil || len(fabrics) != 0 {
+		t.Errorf("the store after the retry: %v, %v", fabrics, err)
+	}
+	if err := n.Start(ctx); err != nil {
+		t.Errorf("Start of a started node: %v, want nil (idempotent)", err)
+	}
+	if err := n.Stop(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if err := n.Start(ctx); !errors.Is(err, node.ErrStopped) {
+		t.Errorf("Start after Stop: %v, want ErrStopped", err)
+	}
+	if err := n.Aggregator().Add(ctx, newPlug(t, "late")); !errors.Is(err, node.ErrStopped) {
+		t.Errorf("Add after Stop: %v, want ErrStopped", err)
+	}
+}
+
+// TestAggregatorAfterStop: an Add, a Remove and a RetirePartition on a
+// stopped node answer ErrStopped, as Start does (W5-api-06).
+func TestAggregatorAfterStop(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	n := newNode(t, minimalConfig(openDB(t, filepath.Join(t.TempDir(), "n.db"))))
+	if err := n.Aggregator().Add(ctx, newPlug(t, "p")); err != nil {
+		t.Fatal(err)
+	}
+	if err := n.Start(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if err := n.Stop(ctx); err != nil {
+		t.Fatal(err)
+	}
+	agg := n.Aggregator()
+	if err := agg.Add(ctx, newPlug(t, "q")); !errors.Is(err, node.ErrStopped) {
+		t.Errorf("Add after Stop: %v, want ErrStopped", err)
+	}
+	if err := agg.Remove(ctx, endpoint.StringKey("p")); !errors.Is(err, node.ErrStopped) {
+		t.Errorf("Remove after Stop: %v, want ErrStopped", err)
+	}
+	if err := agg.RetirePartition(ctx, "gone"); !errors.Is(err, node.ErrStopped) {
+		t.Errorf("RetirePartition after Stop: %v, want ErrStopped", err)
 	}
 }

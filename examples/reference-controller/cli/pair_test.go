@@ -5,6 +5,8 @@ package cli
 
 import (
 	"bytes"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -28,5 +30,30 @@ func TestPairNetworkOptions(t *testing.T) {
 	stderr = &bytes.Buffer{}
 	if err := run([]string{"--db", t.TempDir() + "/x.db", "pair", "--passcode", "20202021", "--wifi-credentials", "x"}, strings.NewReader(""), &bytes.Buffer{}); err == nil || !strings.Contains(err.Error(), "--wifi-ssid") {
 		t.Fatalf("pair: %v", err)
+	}
+}
+
+// TestNetworkSecretSources: a network secret comes from its flag, from the
+// file an "@" flag names, or from the environment when the flag is empty,
+// so it need not be on the command line (W5-ex-15).
+//
+//nolint:paralleltest // sets the environment
+func TestNetworkSecretSources(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "psk")
+	if err := os.WriteFile(path, []byte("from-a-file\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv(wifiCredentialsEnv, "from-the-env")
+	for _, c := range []struct{ value, want string }{
+		{"on-the-line", "on-the-line"},
+		{"@" + path, "from-a-file"},
+		{"", "from-the-env"},
+	} {
+		if got, err := secret("--wifi-credentials", c.value, wifiCredentialsEnv); err != nil || got != c.want {
+			t.Errorf("secret(%q) = %q, %v; want %q", c.value, got, err, c.want)
+		}
+	}
+	if _, err := secret("--thread-dataset", "@"+filepath.Join(t.TempDir(), "missing"), threadDatasetEnv); err == nil || !strings.Contains(err.Error(), "--thread-dataset") {
+		t.Errorf("a missing file: %v, want the flag named", err)
 	}
 }

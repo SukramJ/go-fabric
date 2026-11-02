@@ -17,9 +17,11 @@ const (
 	ClosurePanelRevision uint16              = 1
 )
 
-// ClosurePanelType is the ClosurePanel device type, matter.js's packages/node/src/devices/closure-panel.ts;
-// its cluster requirements are listed in docs/reference/device-types.md#closurepanel.
-var ClosurePanelType = typeClosurePanel
+// ClosurePanelType returns the ClosurePanel device type, matter.js's packages/node/src/devices/closure-panel.ts;
+// its cluster requirements are listed in docs/reference/device-types.md#closurepanel. It is the registry's
+// value, the one [Lookup] and [FromSpec] return: a caller reads it and
+// does not modify it.
+func ClosurePanelType() *Type { return &typeClosurePanel }
 
 // typeClosurePanel holds [ClosurePanelType]'s cluster requirements.
 var typeClosurePanel = Type{

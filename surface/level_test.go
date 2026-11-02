@@ -82,17 +82,17 @@ func TestPoliciesDigestLevel(t *testing.T) {
 func levelCandidates() []surface.Element {
 	recent := set("1.5.1", "1.6.0", "1.6.1")
 	return []surface.Element{
-		{Endpoint: "t", Kind: surface.KindDeviceType, ID: 0x0301, Origin: surface.OriginDeviceType, Mandatory: true, Levels: all()},
-		{Endpoint: "t", Cluster: 0x0201, Kind: surface.KindCluster, ID: 0x0201, Origin: surface.OriginDeviceType, Mandatory: true, Levels: all()},
-		{Endpoint: "t", Cluster: 0x0201, Kind: surface.KindFeature, ID: 0x1, Origin: surface.OriginHostDeclared, Mandatory: true, Levels: all()},
-		{Endpoint: "t", Cluster: 0x0201, Kind: surface.KindFeature, ID: 0x200, Origin: surface.OriginHostDeclared, Levels: recent},
-		{Endpoint: "t", Cluster: 0x0201, Kind: surface.KindAttribute, ID: 0x48, Origin: surface.OriginHostDeclared, Levels: recent},
-		{Endpoint: "t", Cluster: 0x0201, Kind: surface.KindAttribute, ID: 0x49, Origin: surface.OriginClusterMandatory, Mandatory: true, Levels: recent},
-		{Endpoint: "t", Cluster: 0x0201, Kind: surface.KindCommand, ID: 0x07, Origin: surface.OriginHostDeclared, Levels: recent},
-		{Endpoint: "t", Cluster: 0x0201, Kind: surface.KindEvent, ID: 0x00, Origin: surface.OriginHostDeclared, Levels: recent},
-		{Endpoint: "t", Cluster: 0x0039, Kind: surface.KindAttribute, ID: 0x0018, Origin: surface.OriginHostDeclared, Levels: set("1.4.2", "1.5.1", "1.6.0", "1.6.1")},
-		{Endpoint: "t", Cluster: 0x0408, Kind: surface.KindCluster, ID: 0x0408, Origin: surface.OriginHostDeclared, Levels: recent},
-		{Endpoint: "t", Cluster: 0xFFF1_FC00, Kind: surface.KindCluster, ID: 0xFFF1_FC00, Origin: surface.OriginHostDeclared},
+		{Endpoint: "t", Kind: surface.KindDeviceType, ID: 0x0301, Provenance: surface.ProvenanceDeviceType, Mandatory: true, Levels: all()},
+		{Endpoint: "t", Cluster: 0x0201, Kind: surface.KindCluster, ID: 0x0201, Provenance: surface.ProvenanceDeviceType, Mandatory: true, Levels: all()},
+		{Endpoint: "t", Cluster: 0x0201, Kind: surface.KindFeature, ID: 0x1, Provenance: surface.ProvenanceHostDeclared, Mandatory: true, Levels: all()},
+		{Endpoint: "t", Cluster: 0x0201, Kind: surface.KindFeature, ID: 0x200, Provenance: surface.ProvenanceHostDeclared, Levels: recent},
+		{Endpoint: "t", Cluster: 0x0201, Kind: surface.KindAttribute, ID: 0x48, Provenance: surface.ProvenanceHostDeclared, Levels: recent},
+		{Endpoint: "t", Cluster: 0x0201, Kind: surface.KindAttribute, ID: 0x49, Provenance: surface.ProvenanceClusterMandatory, Mandatory: true, Levels: recent},
+		{Endpoint: "t", Cluster: 0x0201, Kind: surface.KindCommand, ID: 0x07, Provenance: surface.ProvenanceHostDeclared, Levels: recent},
+		{Endpoint: "t", Cluster: 0x0201, Kind: surface.KindEvent, ID: 0x00, Provenance: surface.ProvenanceHostDeclared, Levels: recent},
+		{Endpoint: "t", Cluster: 0x0039, Kind: surface.KindAttribute, ID: 0x0018, Provenance: surface.ProvenanceHostDeclared, Levels: set("1.4.2", "1.5.1", "1.6.0", "1.6.1")},
+		{Endpoint: "t", Cluster: 0x0408, Kind: surface.KindCluster, ID: 0x0408, Provenance: surface.ProvenanceHostDeclared, Levels: recent},
+		{Endpoint: "t", Cluster: 0xFFF1_FC00, Kind: surface.KindCluster, ID: 0xFFF1_FC00, Provenance: surface.ProvenanceHostDeclared},
 	}
 }
 
@@ -161,7 +161,7 @@ func TestLevelPolicyWithholds(t *testing.T) {
 		t.Errorf("error text %q", err)
 	}
 	// The root is never withheld: its mandated cluster is kept.
-	root := surface.Element{Cluster: 0x0065, Kind: surface.KindCluster, ID: 0x0065, Origin: surface.OriginDeviceType, Mandatory: true, Levels: set("1.6.0", "1.6.1")}
+	root := surface.Element{Cluster: 0x0065, Kind: surface.KindCluster, ID: 0x0065, Provenance: surface.ProvenanceDeviceType, Mandatory: true, Levels: set("1.6.0", "1.6.1")}
 	kept, ds, err = surface.Evaluate([]surface.Element{root}, surface.Policies{Level: "1.4"})
 	if err != nil || len(kept) != 1 {
 		t.Fatalf("root: kept %v, %v", kept, err)
@@ -183,8 +183,8 @@ func TestLevelPolicyFeatureSet(t *testing.T) {
 	t.Parallel()
 	_ = thermostatdef.ClusterID // registers the definition
 	recent := set("1.6.1")
-	heat := surface.Element{Endpoint: "t", Cluster: 0x0201, Kind: surface.KindFeature, ID: 0x1, Origin: surface.OriginHostDeclared, Levels: recent}
-	cool := surface.Element{Endpoint: "t", Cluster: 0x0201, Kind: surface.KindFeature, ID: 0x2, Origin: surface.OriginHostDeclared, Levels: recent}
+	heat := surface.Element{Endpoint: "t", Cluster: 0x0201, Kind: surface.KindFeature, ID: 0x1, Provenance: surface.ProvenanceHostDeclared, Levels: recent}
+	cool := surface.Element{Endpoint: "t", Cluster: 0x0201, Kind: surface.KindFeature, ID: 0x2, Provenance: surface.ProvenanceHostDeclared, Levels: recent}
 	kept, ds, err := surface.Evaluate([]surface.Element{heat, cool}, surface.Policies{Level: "1.4"})
 	if err != nil {
 		t.Fatal(err)
@@ -202,7 +202,7 @@ func TestLevelPolicyFeatureSet(t *testing.T) {
 		{Name: "A", Bit: 0, Conformance: spec.Conformance{Op: spec.ConfMandatory}},
 		{Name: "B", Bit: 1, Conformance: spec.Conformance{Op: spec.ConfOptional}},
 	}})
-	b := surface.Element{Endpoint: "s", Cluster: id, Kind: surface.KindFeature, ID: 0x2, Origin: surface.OriginHostDeclared, Levels: recent}
+	b := surface.Element{Endpoint: "s", Cluster: id, Kind: surface.KindFeature, ID: 0x2, Provenance: surface.ProvenanceHostDeclared, Levels: recent}
 	_, _, err = surface.Evaluate([]surface.Element{b}, surface.Policies{Level: "1.4"})
 	var w *surface.WithheldError
 	if !errors.As(err, &w) || len(w.Elements) != 1 || w.Elements[0].Kind != surface.KindCluster || w.Elements[0].ID != id {

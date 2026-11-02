@@ -16,9 +16,11 @@ const (
 	VideoDoorbellRevision uint16              = 1
 )
 
-// VideoDoorbellType is the VideoDoorbell device type, matter.js's packages/node/src/devices/video-doorbell.ts;
-// its cluster requirements are listed in docs/reference/device-types.md#videodoorbell.
-var VideoDoorbellType = typeVideoDoorbell
+// VideoDoorbellType returns the VideoDoorbell device type, matter.js's packages/node/src/devices/video-doorbell.ts;
+// its cluster requirements are listed in docs/reference/device-types.md#videodoorbell. It is the registry's
+// value, the one [Lookup] and [FromSpec] return: a caller reads it and
+// does not modify it.
+func VideoDoorbellType() *Type { return &typeVideoDoorbell }
 
 // typeVideoDoorbell holds [VideoDoorbellType]'s cluster requirements.
 var typeVideoDoorbell = Type{

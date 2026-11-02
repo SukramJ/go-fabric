@@ -93,7 +93,7 @@ func TestAddNOCCommissionsFreshNode(t *testing.T) {
 	if fabrics[0].CompressedFabricID != c.CompressedFabricID() {
 		t.Errorf("compressed fabric id %X, commissioner derived %X", fabrics[0].CompressedFabricID, c.CompressedFabricID())
 	}
-	if n.CommissioningWindow().IsOpen() {
+	if n.Bridge().CommissioningWindow().IsOpen() {
 		t.Error("the commissioning window is still open after CommissioningComplete")
 	}
 	if got := s.PeerNodeID(); got != testNodeID {
@@ -218,7 +218,7 @@ func TestSubscriptionSurvivesRestart(t *testing.T) {
 		t.Fatalf("Stop: %v", err)
 	}
 
-	second, err := node.New(minimalConfig(openDB(t, path)))
+	second, err := node.New(ctx, minimalConfig(openDB(t, path)))
 	if err != nil {
 		t.Fatalf("New on the same database: %v", err)
 	}
@@ -287,7 +287,7 @@ func TestRemoveFabricDropsSession(t *testing.T) {
 	if _, err := s.Read(short, attr(0, clusterBasicInformation, attrNodeLabel)); !errors.Is(err, context.DeadlineExceeded) && !errors.Is(err, bridgetest.ErrSessionClosed) {
 		t.Errorf("read on the removed fabric's session = %v, want no answer", err)
 	}
-	if !n.CommissioningWindow().IsOpen() {
+	if !n.Bridge().CommissioningWindow().IsOpen() {
 		t.Error("the node did not reopen its window after its last fabric was removed")
 	}
 }

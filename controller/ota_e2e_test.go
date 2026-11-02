@@ -19,6 +19,7 @@ import (
 	"github.com/SukramJ/go-fabric/controller/client"
 	"github.com/SukramJ/go-fabric/controller/softwareupdate"
 	"github.com/SukramJ/go-fabric/fabrictest"
+	"github.com/SukramJ/go-fabric/internal/nodeseam"
 	"github.com/SukramJ/go-fabric/node"
 )
 
@@ -44,15 +45,27 @@ type otaRig struct {
 
 func newOTARig(t *testing.T, edit func(*controller.OTAConfig)) *otaRig {
 	t.Helper()
-	return newOTARigWith(t, edit, &node.OtaConfig{Dir: filepath.Join(t.TempDir(), "ota"), Harness: true})
+	return newOTARigHarness(t, edit, &node.OTAConfig{Dir: filepath.Join(t.TempDir(), "ota")}, true)
 }
 
 // newOTARigWith is newOTARig with the device's OTA requestor configured
-// by devOTA; nil runs the device without one.
-func newOTARigWith(t *testing.T, edit func(*controller.OTAConfig), devOTA *node.OtaConfig) *otaRig {
+// by devOTA, outside harness mode; nil runs the device without one.
+func newOTARigWith(t *testing.T, edit func(*controller.OTAConfig), devOTA *node.OTAConfig) *otaRig {
+	t.Helper()
+	return newOTARigHarness(t, edit, devOTA, false)
+}
+
+// newOTARigHarness is newOTARigWith with the requestor in harness mode
+// (internal/nodeseam.UseOTAHarness) when harness is set.
+func newOTARigHarness(t *testing.T, edit func(*controller.OTAConfig), devOTA *node.OTAConfig, harness bool) *otaRig {
 	t.Helper()
 	r := &otaRig{site: fabrictest.NewSite(t, fabrictest.Options{}), images: softwareupdate.NewImages(softwareupdate.ImagesConfig{})}
-	r.dev = r.site.AddDevice(fabrictest.Topology{Configure: func(cfg *node.Config) { cfg.OTA = devOTA }})
+	r.dev = r.site.AddDevice(fabrictest.Topology{Configure: func(cfg *node.Config) {
+		cfg.OTA = devOTA
+		if harness {
+			nodeseam.UseOTAHarness(cfg)
+		}
+	}})
 	ota := &controller.OTAConfig{
 		Images: r.images, AllowTestImages: true,
 		OnStatus: func(_ softwareupdate.Peer, s softwareupdate.Status, _ uint32) {

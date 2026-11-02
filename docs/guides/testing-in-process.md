@@ -64,7 +64,7 @@ host when the test ends.
 
 | Part | What it is | Accessors |
 | --- | --- | --- |
-| Device | a `node.Node` serving the `Topology`: its `Bridged` endpoints under the node's own Aggregator, or a host `Snapshotter` (`node.Config.Topology`). Its credential and endpoint stores are in memory (`store/memstore`, `endpoint/memstore`), or with `Options.StoreOnDisk` SQLite files in the test's temporary directory; its advertiser is an `mdns.Noop` unless `Configure` sets one. Passcode 20202021, discriminator 3840 | `Node`, `Bridge`, `Store`, `Endpoints`, `EndpointOf`, `Addr`, `Advertiser`, `Act` |
+| Device | a `node.Node` serving the `Topology`: its `Bridged` endpoints under the node's own Aggregator, or a host `Snapshotter` (`node.Config.Snapshotter`). Its credential and endpoint stores are in memory (`store/memstore`, `endpoint/memstore`), or with `Options.StoreOnDisk` SQLite files in the test's temporary directory; its advertiser is an `mdns.Noop` unless `Configure` sets one. Passcode 20202021, discriminator 3840 | `Node`, `Bridge`, `Store`, `Endpoints`, `EndpointOf`, `Addr`, `Advertiser`, `Act` |
 | Controller | the module's controller stack: exchange manager, DNS-SD cache, certificate authority, one fabric (id 1 and node id 112233 unless `ControllerOptions` say otherwise), peer set, subscription registry, commissioner with its CASE responder, client node registry | `Exchanges`, `Names`, `CA`, `Fabric`, `Peers`, `Subscriptions`, `Commissioner`, `Registry` |
 | Network | datagrams between the hosts over channels, addressed like UDP: host *n* (counted from 1 in the order the site adds them) is `[fe80::n]:5540`, *n* in hex | `Site.Net` |
 | DNS-SD | the site answers each controller's queries from every running device's advertiser — the commissionable record while a window is open, an operational record per fabric — with the device's address | — |
@@ -164,7 +164,7 @@ the site's network — with no BTP peripheral built by hand:
 ```go
 site := fabrictest.NewSite(t, fabrictest.Options{})
 dev := site.AddDevice(fabrictest.Topology{Configure: func(cfg *node.Config) {
-	cfg.Network.WiFiCommissioning = node.WiFiCommissioning{Driver: wifi}
+	fabrictest.UseWiFiCommissioning(cfg, wifi)
 }})
 err := site.Run(ctx, func(ctx context.Context) error {
 	_, err := ctl.Pair(ctx, code, controller.PairOptions{
@@ -213,13 +213,13 @@ _ = site.Run(ctx, func(ctx context.Context) error {
 The device side has the same route. `Site.AddNode(cfg)` takes the
 `node.Config` a daemon composes for `node.New` and runs it on the site:
 the site puts in its network (the listen address and, with
-`Client.Enabled`, the client socket and DNS-SD cache), its clock, an
+a non-nil `Client`, the client socket and DNS-SD cache), its clock, an
 advertiser whose records it answers DNS-SD with, its logger when the
 configuration has none, and a store of its own when the configuration
 states none; TCP and the re-announcement are off. Everything else — the
 passcode and discriminator, the product, the labels, the ICD or OTA
 configuration, the host topology — is the daemon's. The device serves
-`cfg.Topology` or the node's Aggregator, empty until the test adds to it
+`cfg.Snapshotter` or the node's Aggregator, empty until the test adds to it
 through `Device.Act`; `Device.Restart` builds the node from the same
 configuration again.
 

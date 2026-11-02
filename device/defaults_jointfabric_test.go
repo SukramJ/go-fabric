@@ -73,7 +73,7 @@ type fakeAdministratorPort struct{}
 func (fakeAdministratorPort) IcacCsr(context.Context) ([]byte, error) { return nil, nil }
 
 func jointFabricDevice() (*Device, error) {
-	return New(&JointFabricAdministratorType, testOptions("jfa"),
+	return New(JointFabricAdministratorType(), testOptions("jfa"),
 		dsdef.Declare{Sync: fakeDatastoreSync{}}, jfadef.Declare{AdministratorPort: fakeAdministratorPort{}})
 }
 
@@ -95,7 +95,7 @@ func jointFabricCases() []struct {
 // TestJointFabricKit: without the ports the generated servers stay; with
 // them the kit's, the Administrator on the endpoint's Datastore.
 func TestJointFabricKit(t *testing.T) {
-	plain, err := New(&JointFabricAdministratorType, testOptions("jfa-plain"))
+	plain, err := New(JointFabricAdministratorType(), testOptions("jfa-plain"))
 	if err != nil {
 		t.Fatal(err)
 	}

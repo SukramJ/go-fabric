@@ -22,7 +22,7 @@ import (
 // at 862ad75f). A host mounts it on another type as the declaration's
 // HostServer (acsdef.Declare{HostServer: srv} with
 // [sensing.NewAmbientContext]), the route for a cluster a type does not
-// list ([WithServer]).
+// list ([HostServer]).
 
 func init() {
 	selfHeldDefaults[acsdef.ClusterID] = newAmbientContextServer

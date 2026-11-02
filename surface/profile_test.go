@@ -18,7 +18,7 @@ import (
 
 // msch is the Thermostat's MatterScheduleConfiguration feature as a
 // candidate: the register's one row names it.
-var msch = surface.Element{Endpoint: "tstat", Cluster: 0x0201, Kind: surface.KindFeature, ID: 0x80, Origin: surface.OriginHostDeclared}
+var msch = surface.Element{Endpoint: "tstat", Cluster: 0x0201, Kind: surface.KindFeature, ID: 0x80, Provenance: surface.ProvenanceHostDeclared}
 
 func TestProfilesFromTheRegister(t *testing.T) {
 	ps := surface.Profiles()

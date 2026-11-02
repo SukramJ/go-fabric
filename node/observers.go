@@ -19,26 +19,26 @@ import (
 // commissioning events (issue #58). Each is optional, and each is chained
 // after the facade's own handler for the same event: the facade's wiring
 // runs first and unchanged, the observer runs once it has returned, and
-// an observer's error (or panic) is logged, never returned to the
-// handler — the event has already happened.
+// an observer's panic is logged, never returned to the handler — the
+// event has already happened, so an observer returns nothing.
 //
 // The name follows matter.js, whose node events are Observables that
 // observers attach to (packages/protocol/src/fabric/FabricManager.ts:
-// 41-48 `#events`); an observer of an error-guarded event is logged and
-// the remaining observers still run (FabricManager.ts:381-386
-// `unhandled`, "Log unhandled errors but do not abort deletion").
+// 41-48 `#events`); a failing observer is logged and the remaining
+// observers still run (FabricManager.ts:404-410 `unhandled`, "Log
+// unhandled errors but do not abort deletion").
 //
-// Observers run synchronously on the goroutine of the event — for the
-// fabric events, inside the command that caused it and before its
-// response is sent — so an observer that blocks delays the response. A
-// host that fans an event out over the network hands it to its own
-// goroutine.
+// They follow the node's one callback rule (ADR 0025 principle 8):
+// [Config].Observers and [Node.Observe] run on the goroutine of the event
+// — for the fabric events, inside the command that caused it and before
+// its response is sent — so an observer that may block registers with
+// [Node.ObserveAsync], which queues it on the node's callback goroutine.
 type Observers struct {
 	// OnFabricAdded runs after an AddNOC installed a fabric and the
 	// facade rebuilt the fabric's CASE identity and announced its
 	// operational record. Mirrors matter.js FabricManager `events.added`
 	// (FabricManager.ts:209).
-	OnFabricAdded func(FabricInfo) error
+	OnFabricAdded func(FabricInfo)
 	// OnFabricRemoved runs after RemoveFabric (or the fail-safe rollback
 	// of an AddNOC) deleted a fabric and the facade's cleanup ran: the
 	// fabric, its ACL and its keys are gone from the store, its CASE
@@ -48,7 +48,7 @@ type Observers struct {
 	// node is idle — no fail-safe armed and no session left (matter.js
 	// #resetWhenIdle); OnWindowTransition reports that. Mirrors
 	// matter.js FabricManager `events.deleted` (FabricManager.ts:253).
-	OnFabricRemoved func(FabricInfo) error
+	OnFabricRemoved func(FabricInfo)
 	// OnFabricUpdated runs after an UpdateNOC (or the fail-safe rollback
 	// of one) changed a fabric's operational identity and the facade
 	// moved the CASE identity and the operational record and closed the
@@ -58,7 +58,7 @@ type Observers struct {
 	// FabricManager `events.replaced` (FabricManager.ts:236-246, :377),
 	// which a fabric's persist emits too, and CommissioningServer's
 	// fabricsChanged(index, "updated") (CommissioningServer.ts:118-141).
-	OnFabricUpdated func(FabricInfo) error
+	OnFabricUpdated func(FabricInfo)
 	// OnCommissioningComplete runs after a successful
 	// CommissioningComplete and the facade's own handling of it (pending
 	// OperationalCredentials state cleared, the OTA requestor's query
@@ -66,12 +66,12 @@ type Observers struct {
 	// fires on every CommissioningComplete, whereas matter.js's
 	// `commissioned` event fires when the fabric count crosses zero
 	// (CommissioningServer.ts:143-157 #syncCommissioned).
-	OnCommissioningComplete func(fabricIndex uint8) error
+	OnCommissioningComplete func(fabricIndex uint8)
 	// OnWindowTransition runs on every commissioning-window transition
 	// (open, close, an administrator's AdminFabricIndex cleared), after
 	// the facade switched the PASE acceptor and published or withdrew
 	// the commissionable record.
-	OnWindowTransition func(WindowSnapshot) error
+	OnWindowTransition func(WindowSnapshot)
 	// OnSurfaceChanged runs after an assembly changed an endpoint's served
 	// surface against the one persisted for its key — once the node has
 	// raised the ConfigurationVersions, bumped the DataVersions, stored
@@ -81,7 +81,23 @@ type Observers struct {
 	// BD-Matter-SurfaceChange-ConfigurationVersion); matter.js raises the
 	// versions and has no event for it, so a host that mirrors a change
 	// to its own pages (a stream event) observes it here.
-	OnSurfaceChanged func(surface.SurfaceChange) error
+	OnSurfaceChanged func(surface.SurfaceChange)
+	// OnSessionOpened runs after a CASE session was established — by a
+	// controller (the node as responder) or by the node re-establishing a
+	// controller's subscription — with the session as [Node.SessionDiagnostics]
+	// lists it. A PASE session is not reported. Mirrors matter.js
+	// SessionsBehavior's `opened` event (packages/node/src/behavior/system/
+	// sessions/SessionsBehavior.ts:57-64, declared at :124).
+	OnSessionOpened func(SessionInfo)
+	// OnSessionClosed runs after a session OnSessionOpened reported closed,
+	// with its last state. Mirrors SessionsBehavior's `closed` event
+	// (SessionsBehavior.ts:66-73, :125).
+	OnSessionClosed func(SessionInfo)
+	// OnSubscriptionsChanged runs after a subscription was added to or
+	// closed on a session OnSessionOpened reported, with the session and
+	// its new Subscriptions count. Mirrors SessionsBehavior's
+	// `subscriptionsChanged` event (SessionsBehavior.ts:75-93, :126).
+	OnSubscriptionsChanged func(SessionInfo)
 }
 
 // FabricInfo names one fabric, as OperationalCredentials' AddNOC hook
@@ -253,17 +269,41 @@ func (n *Node) Observe(o Observers) (unsubscribe func()) {
 	}
 }
 
-// observe runs one observer after the facade's handler: a nil observer is
-// skipped, an error or a panic is logged under event.
-func observe(logger *slog.Logger, event string, fn func() error) {
-	defer func() {
-		if r := recover(); r != nil {
-			logger.Error("node.observer.panic", slog.String("event", event), slog.String("panic", fmt.Sprint(r)))
-		}
-	}()
-	if err := fn(); err != nil {
-		logger.Warn("node.observer.failed", slog.String("event", event), slog.Any("err", err))
+// observe runs one observer after the facade's handler, a panic logged
+// under event.
+func observe(logger *slog.Logger, event string, fn func()) { contain(logger, event, fn) }
+
+// ObserveAsync is [Node.Observe] with every hook of o queued on the node's
+// callback goroutine: the event's value is taken when it happens, and the
+// hook runs later, one call after the other and in event order, while the
+// node runs (between [Node.Start] and [Node.Stop]; Stop returns once every
+// queued call ran). An event while the node does not run is not
+// delivered. A hook must not stop the node. The one callback rule of the
+// facade (ADR 0025 principle 8), as [Node.OnDiagnosticEventAsync].
+func (n *Node) ObserveAsync(o Observers) (unsubscribe func()) {
+	return n.Observe(o.queuedOn(n))
+}
+
+// queuedOn returns o with each hook queued on n's callback goroutine.
+func (o Observers) queuedOn(n *Node) Observers {
+	o.OnFabricAdded = queuedHook(n, "fabric_added", o.OnFabricAdded)
+	o.OnFabricRemoved = queuedHook(n, "fabric_removed", o.OnFabricRemoved)
+	o.OnFabricUpdated = queuedHook(n, "fabric_updated", o.OnFabricUpdated)
+	o.OnCommissioningComplete = queuedHook(n, "commissioning_complete", o.OnCommissioningComplete)
+	o.OnWindowTransition = queuedHook(n, "window_transition", o.OnWindowTransition)
+	o.OnSurfaceChanged = queuedHook(n, "surface_changed", o.OnSurfaceChanged)
+	o.OnSessionOpened = queuedHook(n, "session_opened", o.OnSessionOpened)
+	o.OnSessionClosed = queuedHook(n, "session_closed", o.OnSessionClosed)
+	o.OnSubscriptionsChanged = queuedHook(n, "subscriptions_changed", o.OnSubscriptionsChanged)
+	return o
+}
+
+// queuedHook wraps one hook to run on n's callback goroutine; nil stays nil.
+func queuedHook[T any](n *Node, event string, fn func(T)) func(T) {
+	if fn == nil {
+		return nil
 	}
+	return func(v T) { n.queued(event, func() { fn(v) }) }
 }
 
 // fabricInfo reads a fabric's identity from the store; ok is false when

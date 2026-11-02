@@ -19,9 +19,11 @@ const (
 	ElectricalEnergyTariffRevision uint16              = 1
 )
 
-// ElectricalEnergyTariffType is the ElectricalEnergyTariff device type, matter.js's packages/node/src/devices/electrical-energy-tariff.ts;
-// its cluster requirements are listed in docs/reference/device-types.md#electricalenergytariff.
-var ElectricalEnergyTariffType = typeElectricalEnergyTariff
+// ElectricalEnergyTariffType returns the ElectricalEnergyTariff device type, matter.js's packages/node/src/devices/electrical-energy-tariff.ts;
+// its cluster requirements are listed in docs/reference/device-types.md#electricalenergytariff. It is the registry's
+// value, the one [Lookup] and [FromSpec] return: a caller reads it and
+// does not modify it.
+func ElectricalEnergyTariffType() *Type { return &typeElectricalEnergyTariff }
 
 // typeElectricalEnergyTariff holds [ElectricalEnergyTariffType]'s cluster requirements.
 var typeElectricalEnergyTariff = Type{

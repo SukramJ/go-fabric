@@ -16,9 +16,11 @@ const (
 	FloodlightCameraRevision uint16              = 1
 )
 
-// FloodlightCameraType is the FloodlightCamera device type, matter.js's packages/node/src/devices/floodlight-camera.ts;
-// its cluster requirements are listed in docs/reference/device-types.md#floodlightcamera.
-var FloodlightCameraType = typeFloodlightCamera
+// FloodlightCameraType returns the FloodlightCamera device type, matter.js's packages/node/src/devices/floodlight-camera.ts;
+// its cluster requirements are listed in docs/reference/device-types.md#floodlightcamera. It is the registry's
+// value, the one [Lookup] and [FromSpec] return: a caller reads it and
+// does not modify it.
+func FloodlightCameraType() *Type { return &typeFloodlightCamera }
 
 // typeFloodlightCamera holds [FloodlightCameraType]'s cluster requirements.
 var typeFloodlightCamera = Type{

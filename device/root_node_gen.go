@@ -34,9 +34,11 @@ const (
 	RootNodeRevision uint16              = 5
 )
 
-// RootNodeType is the RootNode device type, matter.js's packages/node/src/endpoints/root.ts;
-// its cluster requirements are listed in docs/reference/device-types.md#rootnode.
-var RootNodeType = typeRootNode
+// RootNodeType returns the RootNode device type, matter.js's packages/node/src/endpoints/root.ts;
+// its cluster requirements are listed in docs/reference/device-types.md#rootnode. It is the registry's
+// value, the one [Lookup] and [FromSpec] return: a caller reads it and
+// does not modify it.
+func RootNodeType() *Type { return &typeRootNode }
 
 // typeRootNode holds [RootNodeType]'s cluster requirements.
 var typeRootNode = Type{

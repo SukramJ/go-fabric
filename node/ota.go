@@ -229,7 +229,7 @@ func buildOtaRequestor(cfg *Config, connector mattercore.OtaProviderConnector, b
 	if applier == nil {
 		own = (&otaApplier{
 			vendorID: cfg.ProductDescription.VendorID, productID: cfg.ProductDescription.ProductID, basicInfo: basicInfo,
-			dir: ota.Dir, harness: ota.Harness, logger: cfg.Logger, clock: cfg.Clock,
+			dir: ota.Dir, harness: ota.harness, logger: cfg.Logger, clock: cfg.Clock,
 			requestor: func() *mattercore.OTASoftwareUpdateRequestor { return requestor },
 		}).started()
 		applier = own
@@ -240,7 +240,7 @@ func buildOtaRequestor(cfg *Config, connector mattercore.OtaProviderConnector, b
 		Applier:         applier,
 		Store:           cfg.Store.Credentials,
 		DownloadDir:     ota.Dir,
-		CanConsent:      ota.Harness,
+		CanConsent:      ota.harness,
 		Logger:          cfg.Logger,
 		TimeSource:      cfg.Clock,
 	}
@@ -248,7 +248,7 @@ func buildOtaRequestor(cfg *Config, connector mattercore.OtaProviderConnector, b
 	case ota.AnnouncedUpdateQueryDelay != nil:
 		d := *ota.AnnouncedUpdateQueryDelay
 		rcfg.AnnouncedUpdateQueryDelay = &d
-	case ota.Harness:
+	case ota.harness:
 		// The matter.js cert requestor's wait after an announcement
 		// (OtaRequestorTestInstance.ts:65, :327-335), as the daemon's.
 		quick := 250 * time.Millisecond

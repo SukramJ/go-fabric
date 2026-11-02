@@ -17,7 +17,7 @@ import (
 // kit's options, as in code.
 type Spec struct {
 	// Type is the device type id (DimmableLightID, …): a generated type
-	// ([TypeByID]).
+	// ([Lookup]).
 	Type schema.DeviceTypeID
 	// Options are the host's statements about the device.
 	Options Options
@@ -31,7 +31,7 @@ type Spec struct {
 // so FromSpec(Spec{Type: DimmableLightID, Options: o, Declarations: d})
 // and NewDimmableLight(o, d...) build the same device.
 func FromSpec(s Spec) (*Device, error) {
-	t, ok := TypeByID(s.Type)
+	t, ok := Lookup(uint32(s.Type))
 	if !ok {
 		return nil, fmt.Errorf("%w: no generated device type 0x%04X", ErrConfiguration, s.Type)
 	}

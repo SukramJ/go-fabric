@@ -21,9 +21,11 @@ const (
 	DishwasherRevision uint16              = 2
 )
 
-// DishwasherType is the Dishwasher device type, matter.js's packages/node/src/devices/dishwasher.ts;
-// its cluster requirements are listed in docs/reference/device-types.md#dishwasher.
-var DishwasherType = typeDishwasher
+// DishwasherType returns the Dishwasher device type, matter.js's packages/node/src/devices/dishwasher.ts;
+// its cluster requirements are listed in docs/reference/device-types.md#dishwasher. It is the registry's
+// value, the one [Lookup] and [FromSpec] return: a caller reads it and
+// does not modify it.
+func DishwasherType() *Type { return &typeDishwasher }
 
 // typeDishwasher holds [DishwasherType]'s cluster requirements.
 var typeDishwasher = Type{

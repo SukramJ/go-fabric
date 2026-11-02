@@ -100,8 +100,8 @@ func TestServerChangesReachASubscriberWithoutWithChangeNotifier(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = db.Close() })
-	n, err := node.New(node.Config{
-		Network:       node.Network{Listen: "127.0.0.1:0", PreferIPv4: true, MDNS: node.MDNS{Disabled: true}},
+	n, err := node.New(context.Background(), node.Config{
+		Network:       node.Network{Listen: "127.0.0.1:0", PreferIPv4: true, MDNS: node.MDNS{Off: true}},
 		Commissioning: node.Commissioning{Passcode: 20202021, Discriminator: 3840, PBKDFIterations: 1000, Salt: []byte("SPAKE2P Key Salt")},
 		ProductDescription: node.ProductDescription{
 			VendorID: 0xFFF1, ProductID: 0x8001,
@@ -119,7 +119,7 @@ func TestServerChangesReachASubscriberWithoutWithChangeNotifier(t *testing.T) {
 	t.Cleanup(func() { _ = n.Stop(context.Background()) })
 
 	knob := &dial{}
-	lamp, err := device.NewOnOffLight(device.Options{StableKey: endpoint.StringKey("lamp"), Name: "Lamp"}, device.WithServer(knob))
+	lamp, err := device.NewOnOffLight(device.Options{StableKey: endpoint.StringKey("lamp"), Name: "Lamp"}, device.HostServer(knob))
 	if err != nil {
 		t.Fatal(err)
 	}

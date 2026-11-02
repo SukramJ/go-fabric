@@ -19,9 +19,11 @@ const (
 	FanRevision uint16              = 5
 )
 
-// FanType is the Fan device type, matter.js's packages/node/src/devices/fan.ts;
-// its cluster requirements are listed in docs/reference/device-types.md#fan.
-var FanType = typeFan
+// FanType returns the Fan device type, matter.js's packages/node/src/devices/fan.ts;
+// its cluster requirements are listed in docs/reference/device-types.md#fan. It is the registry's
+// value, the one [Lookup] and [FromSpec] return: a caller reads it and
+// does not modify it.
+func FanType() *Type { return &typeFan }
 
 // typeFan holds [FanType]'s cluster requirements.
 var typeFan = Type{

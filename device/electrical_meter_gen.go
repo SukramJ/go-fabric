@@ -18,9 +18,11 @@ const (
 	ElectricalMeterRevision uint16              = 1
 )
 
-// ElectricalMeterType is the ElectricalMeter device type, matter.js's packages/node/src/devices/electrical-meter.ts;
-// its cluster requirements are listed in docs/reference/device-types.md#electricalmeter.
-var ElectricalMeterType = typeElectricalMeter
+// ElectricalMeterType returns the ElectricalMeter device type, matter.js's packages/node/src/devices/electrical-meter.ts;
+// its cluster requirements are listed in docs/reference/device-types.md#electricalmeter. It is the registry's
+// value, the one [Lookup] and [FromSpec] return: a caller reads it and
+// does not modify it.
+func ElectricalMeterType() *Type { return &typeElectricalMeter }
 
 // typeElectricalMeter holds [ElectricalMeterType]'s cluster requirements.
 var typeElectricalMeter = Type{

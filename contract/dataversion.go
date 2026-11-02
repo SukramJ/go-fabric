@@ -46,9 +46,11 @@ type DataVersionTracker struct {
 	v atomic.Uint32
 }
 
-// InitialDataVersion returns a uniformly-random non-zero uint32. It
-// is a package-level var for test-side override.
-var InitialDataVersion = func() uint32 {
+// initialDataVersion returns a uniformly-random non-zero uint32, the
+// first DataVersion of every tracker. Unexported (review 2026-11
+// W5-api-12): a host that replaced it changed every server's first
+// DataVersion process-wide.
+func initialDataVersion() uint32 {
 	var b [4]byte
 	if _, err := rand.Read(b[:]); err != nil {
 		// crypto/rand failure on this platform is fatal — the daemon
@@ -74,7 +76,7 @@ func (d *DataVersionTracker) Current() uint32 {
 	}
 	// Race-tolerant init: only the first CAS wins, every other caller
 	// reloads and observes the installed value.
-	d.v.CompareAndSwap(0, InitialDataVersion())
+	d.v.CompareAndSwap(0, initialDataVersion())
 	return d.v.Load()
 }
 

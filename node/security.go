@@ -379,7 +379,6 @@ func responderSessionParams(tcp bridge.TCPConfig, maxPathsPerInvoke uint16, inte
 // drops every PBKDFParamRequest at debug level and the commissioner just
 // times out.
 func wireSecurity(
-	ctx context.Context,
 	br *bridge.Bridge,
 	st store.Port,
 	root *RootClusters,
@@ -388,6 +387,7 @@ func wireSecurity(
 	responderParams *sessionparams.Parameters,
 	limits Limits,
 	logger *slog.Logger,
+	events *sessionEvents,
 ) *security {
 	sessions := operational.NewManager(st)
 	sessions.SetClock(br.Clock())
@@ -445,7 +445,6 @@ func wireSecurity(
 	br.AttachAckTracker(mrp.NewAckTracker(mrp.DefaultStandaloneAckDelay))
 
 	subs := subscription.NewManager(limits.subscriptionConfig(br.Clock()), br.SubscriptionReporter(), logger)
-	subs.Start(ctx)
 	subs.SetEventReporter(br.SubscriptionEventReporter())
 	br.AttachSubscriptionManager(subs)
 	// One close hook, two observers: the session's subscriptions fall
@@ -454,9 +453,10 @@ func wireSecurity(
 	sessions.SetOnSessionClose(func(id uint16) {
 		subs.CloseSession(id)
 		br.SessionClosed(id)
+		events.closed(id)
 	})
+	subs.SetOnSessionSubscriptionsChanged(events.subscriptionsChanged)
 	br.AttachSessionRegistry(sessions)
-	sessions.StartReaper(ctx, operational.SessionIdleTimeout, time.Minute)
 
 	// PASE, one adapter per exchange. The session id has to be allocated
 	// before the adapter is built: it rides out in PBKDFParamResponse and
@@ -473,7 +473,6 @@ func wireSecurity(
 		return adapter
 	})
 	paseProvider.SetClock(br.Clock())
-	paseProvider.StartReaper(ctx, 30*time.Second, time.Minute)
 	// Not attached here: it accepts PASE only while the node's own
 	// commissioning window is open (commissioning.go), as matter.js sets
 	// its PASE commissioner per window (DeviceCommissioner).
@@ -481,7 +480,7 @@ func wireSecurity(
 	// CASE, likewise per exchange. A single responder lands in `Finished`
 	// after the first Sigma3 and rejects every later Sigma1.
 	caseProvider := bridge.NewPerExchangeCaseProvider(func() *bridge.CaseAdapter { //nolint:contextcheck // the adapter outlives this call; its callbacks run per handshake
-		adapter, err := buildCaseAdapter(sessions, ids, responderParams, logger)
+		adapter, err := buildCaseAdapter(sessions, ids, responderParams, logger, events.opened)
 		if err != nil {
 			logger.Warn("case.build_failed", slog.Any("err", err))
 			return nil
@@ -490,7 +489,6 @@ func wireSecurity(
 	})
 	caseProvider.SetOnEvict(br.ForgetSigma1Replied)
 	caseProvider.SetClock(br.Clock())
-	caseProvider.StartReaper(ctx, 30*time.Second, time.Minute)
 	br.AttachCaseHandlerProvider(caseProvider.Resolve)
 
 	// Subscription persistence and re-establishment (docs/adr/0008). The
@@ -502,9 +500,20 @@ func wireSecurity(
 	// liveness timeout before it re-subscribes.
 	br.AttachSubscriptionStore(st)
 	br.AttachOperationalResolver(operationalResolver(logger, br.Clock()))
-	br.AttachCaseInitiatorProvider(caseInitiatorProvider(st, sessions, ids, logger))
+	br.AttachCaseInitiatorProvider(caseInitiatorProvider(st, sessions, ids, logger, events.opened))
 
 	return &security{sessions: sessions, subs: subs, pase: paseProvider, casep: caseProvider, responderParams: responderParams}
+}
+
+// start runs the subscription engine and the session, PASE and CASE
+// reapers until ctx — the node's lifetime — ends or [Node.Stop] stops
+// them. [Node.Start] calls it, so [New] starts none of them (ADR 0026
+// principle 5).
+func (s *security) start(ctx context.Context) {
+	s.subs.Start(ctx)
+	s.sessions.StartReaper(ctx, operational.SessionIdleTimeout, time.Minute)
+	s.pase.StartReaper(ctx, 30*time.Second, time.Minute)
+	s.casep.StartReaper(ctx, 30*time.Second, time.Minute)
 }
 
 // caseInitiatorProvider prepares the CASE handshakes the bridge opens to
@@ -513,7 +522,10 @@ func wireSecurity(
 // resumption record, which matter.js CaseClient offers whenever it holds
 // one. A completed handshake registers the session and stores the new
 // resumption record, as matter.js does after every pair.
-func caseInitiatorProvider(st store.Resumption, sessions *operational.Manager, ids *caseIdentities, logger *slog.Logger) bridge.CaseInitiatorProvider {
+//
+// onOpened, when set, learns the session id of every session a handshake
+// opened (the node's OnSessionOpened).
+func caseInitiatorProvider(st store.Resumption, sessions *operational.Manager, ids *caseIdentities, logger *slog.Logger, onOpened func(sessionID uint16)) bridge.CaseInitiatorProvider {
 	return func(ctx context.Context, fabricIndex uint8, peerNodeID uint64) (*bridge.CaseInitiation, error) {
 		fabric, ok := ids.forFabric(fabricIndex)
 		if !ok {
@@ -558,6 +570,9 @@ func caseInitiatorProvider(st store.Resumption, sessions *operational.Manager, i
 					entry.SetPeerMRPIntervals(p.SessionIdleInterval, p.SessionActiveInterval, uint32(p.SessionActiveThreshold))
 					entry.SetPeerTransportParameters(p.EffectiveTransports(), p.EffectiveMaxTCPMessageSize())
 				}
+				if onOpened != nil {
+					onOpened(entry.SessionID)
+				}
 				if err := sessions.PersistResumption(ctx, fabricIndex, res.PeerNodeID, res.ResumptionID, res.SharedSecret, res.PeerCATs); err != nil {
 					logger.Debug("case.initiator.resumption_persist", slog.Any("err", err))
 				}
@@ -574,6 +589,9 @@ type paseParams struct {
 	passcode   uint32
 	salt       []byte
 	iterations int
+	// life is the node's lifetime: the fail-safe a PASE session arms
+	// lives under it, so Stop ends its watcher.
+	life context.Context
 }
 
 // buildPaseAdapter wires one PASE exchange end to end: PBKDF parameters out,
@@ -588,13 +606,18 @@ func buildPaseAdapter(sessions *operational.Manager, root *RootClusters, p paseP
 	if err != nil {
 		return nil, fmt.Errorf("spake2 verifier context: %w", err)
 	}
-	return buildPaseAdapterFromContext(sessions, root, vc, p.salt, p.iterations, responderParams)
+	return buildPaseAdapterFromContext(p.life, sessions, root, vc, p.salt, p.iterations, responderParams)
 }
 
 // buildPaseAdapterFromContext is the passcode-independent half of
 // buildPaseAdapter, shared with the enhanced commissioning window, whose
 // verifier arrives precomputed from the commissioner (commissioning.go).
-func buildPaseAdapterFromContext(sessions *operational.Manager, root *RootClusters, vc *spake2.VerifierContext, salt []byte, iterations int, responderParams *sessionparams.Parameters) (*bridge.PaseAdapter, error) {
+//
+// life is the node's lifetime, under which the PASE auto-armed fail-safe's
+// expiry watcher runs (cluster/core GeneralCommissioning
+// watchFailSafeExpiry): [Node.Stop] cancels it, so a stopped node leaves
+// no watcher behind (W5-ex-06).
+func buildPaseAdapterFromContext(life context.Context, sessions *operational.Manager, root *RootClusters, vc *spake2.VerifierContext, salt []byte, iterations int, responderParams *sessionparams.Parameters) (*bridge.PaseAdapter, error) {
 	sessionID, err := sessions.AllocateID()
 	if err != nil {
 		return nil, fmt.Errorf("allocate PASE session id: %w", err)
@@ -629,7 +652,7 @@ func buildPaseAdapterFromContext(sessions *operational.Manager, root *RootCluste
 		root.OperationalCredentials.SetAttestationChallenge(entry.AttestationChallenge)
 		// Matter §11.10.5.2 floor: arm a fail-safe if the commissioner has
 		// not, so an abandoned attempt still rolls back.
-		root.GeneralCommissioning.AutoArmOnPaseEstablished(context.Background())
+		root.GeneralCommissioning.AutoArmOnPaseEstablished(life)
 		return nil
 	})
 	return adapter, nil
@@ -639,7 +662,10 @@ func buildPaseAdapterFromContext(sessions *operational.Manager, root *RootCluste
 // current operational identity, the multi-fabric destination resolver, and on
 // success an operational session registered under whichever id the
 // handshake ended up using.
-func buildCaseAdapter(sessions *operational.Manager, ids *caseIdentities, responderParams *sessionparams.Parameters, logger *slog.Logger) (*bridge.CaseAdapter, error) {
+//
+// onOpened, when set, learns the id of the session the handshake opened
+// (the node's OnSessionOpened).
+func buildCaseAdapter(sessions *operational.Manager, ids *caseIdentities, responderParams *sessionparams.Parameters, logger *slog.Logger, onOpened func(sessionID uint16)) (*bridge.CaseAdapter, error) {
 	current := ids.current()
 	sessionID, err := sessions.AllocateID()
 	if err != nil {
@@ -726,6 +752,9 @@ func buildCaseAdapter(sessions *operational.Manager, ids *caseIdentities, respon
 			slog.Int("session_id", int(entry.SessionID)),
 			slog.Int("fabric_index", int(fabricIndex)),
 			slog.Uint64("node_id", peerNodeID))
+		if onOpened != nil {
+			onOpened(entry.SessionID)
+		}
 		// The record the peer resumes from next time: the id this
 		// handshake issued (Sigma2's, or the fresh one Sigma2_Resume
 		// carried) with the session's shared secret.

@@ -79,6 +79,8 @@ type defaultBuild struct {
 	// the ones it consumes as configuration, and the rest are set through
 	// the server's SetAttributes.
 	initial map[uint32]any
+	// logger receives the server's diagnostics ([Options].Logger).
+	logger *slog.Logger
 }
 
 // serverFactory builds a cluster's default server.
@@ -92,10 +94,6 @@ type serverFactory func(b defaultBuild) (contract.ClusterServer, error)
 // keeps the generated server and the kit logs one Info line
 // (device.default_server.generated).
 var ErrSelectionNotServed = errors.New("device: the self-held server does not serve the selection")
-
-// Logger receives the device kit's diagnostics (a cluster that keeps the
-// generated server); replace it once, before building devices.
-var Logger = slog.Default()
 
 // notServed wraps a self-held server's refusal of the selection.
 func notServed(err error) error { return fmt.Errorf("%w: %w", ErrSelectionNotServed, err) }

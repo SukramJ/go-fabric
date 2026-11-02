@@ -24,7 +24,7 @@ import (
 func TestTimeSynchronizationFeaturesOnTheWire(t *testing.T) {
 	site := fabrictest.NewSite(t, fabrictest.Options{})
 	pair := site.CommissionedPair(fabrictest.PairOptions{Device: fabrictest.Topology{Configure: func(cfg *node.Config) {
-		cfg.TimeSynchronization = &node.TimeSynchronizationConfig{Features: tsdef.FeatureTimeZone | tsdef.FeatureTimeSyncClient}
+		cfg.TimeSynchronization.Config = &node.TimeSynchronizationConfig{Features: tsdef.FeatureTimeZone | tsdef.FeatureTimeSyncClient}
 		// The features are ahead of matter.js (core.TimeSynchronizationAhead).
 		cfg.Surface.Extensions = surface.NewExtensions("BD-chip-TimeSynchronization-Features")
 	}}})

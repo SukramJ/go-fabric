@@ -54,7 +54,7 @@ type Topology struct {
 	// same servers again.
 	Bridged []node.Endpoint
 	// Snapshotter, when set, is the host topology the node serves in place
-	// of its Aggregator (node.Config.Topology): a host test hands its own
+	// of its Aggregator (node.Config.Snapshotter): a host test hands its own
 	// assembler here — endpointtest.NewEmptySnapshotter is the empty one.
 	// Bridged must then be empty.
 	Snapshotter bridge.Snapshotter
@@ -102,7 +102,7 @@ type Device struct {
 	cfg     node.Config
 	running bool
 	// names is the client stack's DNS-SD cache, answered by the site;
-	// built at the first start with node.Client.Enabled, kept across
+	// built at the first start with a non-nil node.Config.Client, kept across
 	// restarts and closed with the site.
 	names *discovery.Names
 	// group counts the work in hand of every node the device runs
@@ -131,12 +131,12 @@ func (s *Site) AddDevice(topo Topology) *Device {
 // one its daemon composes for node.New — starts it and returns it, so the
 // test runs the program's composition on the site. The site puts its own
 // parts in: its network (the node's listen address and, with
-// cfg.Client.Enabled, its client socket and DNS-SD cache), its clock with
+// a non-nil cfg.Client, its client socket and DNS-SD cache), its clock with
 // the host's in-flight counters, an advertiser whose records the site
 // answers DNS-SD with, the site's logger when cfg has none, and a store of
 // its own when cfg.Store states none (the program's store, a Path or a
 // DB, stays the program's). TCP and the re-announcement are off on the
-// site. The device serves cfg.Topology or the node's Aggregator, empty
+// site. The device serves cfg.Snapshotter or the node's Aggregator, empty
 // until the test adds to it ([Device.Act]); a restart builds the node from
 // cfg again. matter.js's MockSite.addNode builds a plain ServerNode from the
 // test's own options in the site's environment (mock-site.ts:59-106 at
@@ -211,7 +211,7 @@ func (d *Device) Start(ctx context.Context) error {
 		}
 	}()
 	cfg := d.config()
-	n, err := node.New(cfg) //nolint:contextcheck // node.New takes no context; the node's own work runs on its own
+	n, err := node.New(ctx, cfg)
 	if err != nil {
 		return fmt.Errorf("node: %w", err)
 	}
@@ -278,7 +278,7 @@ func (d *Device) config() node.Config {
 	}
 	i := strconv.Itoa(d.index)
 	cfg := node.Config{
-		Network: node.Network{Listen: "[::1]:0", DisableReannounce: true},
+		Network: node.Network{Listen: "[::1]:0", Reannounce: node.Reannounce{Off: true}},
 		Commissioning: node.Commissioning{
 			Passcode: DefaultPasscode, Discriminator: DefaultDiscriminator,
 			PBKDFIterations: DefaultPBKDFIterations, Salt: defaultSalt,
@@ -288,11 +288,11 @@ func (d *Device) config() node.Config {
 			VendorName: "go-fabric", ProductName: "fabrictest device", NodeLabel: "device" + i, SerialNumber: "FT-" + i,
 			HardwareVersion: 1, HardwareVersionString: "1", SoftwareVersion: 1, SoftwareVersionString: "1",
 		},
-		Store:      d.store,
-		Advertiser: mdns.NewNoop(),
-		Topology:   d.topo.Snapshotter,
-		Logger:     d.site.log,
-		Clock:      d.site.hostClock(d.group),
+		Store:       d.store,
+		Advertiser:  mdns.NewNoop(),
+		Snapshotter: d.topo.Snapshotter,
+		Logger:      d.site.log,
+		Clock:       d.site.hostClock(d.group),
 	}
 	if d.topo.Configure != nil {
 		d.topo.Configure(&cfg)
@@ -300,7 +300,7 @@ func (d *Device) config() node.Config {
 	if cfg.Advertiser == nil {
 		cfg.Advertiser = mdns.NewNoop()
 	}
-	if cfg.Client.Enabled {
+	if cfg.Client != nil {
 		d.siteClient(&cfg)
 	}
 	return cfg
@@ -312,15 +312,17 @@ func (d *Device) programConfig() node.Config {
 	cfg := *d.base
 	cfg.Store = d.store
 	cfg.Network.Listen = "[::1]:0"
-	cfg.Network.DisableReannounce = true
+	cfg.Network.Reannounce.Off = true
 	cfg.Network.TCP = node.TCPConfig{}
 	cfg.Advertiser = mdns.NewNoop()
 	if cfg.Logger == nil {
 		cfg.Logger = d.site.log
 	}
 	cfg.Clock = d.site.hostClock(d.group)
-	if cfg.Client.Enabled {
-		cfg.Client.Names, cfg.Client.Listen = nil, ""
+	if cfg.Client != nil {
+		c := *cfg.Client
+		c.Names, c.Listen = nil, ""
+		cfg.Client = &c
 		d.siteClient(&cfg)
 	}
 	return cfg
@@ -332,6 +334,10 @@ func (d *Device) programConfig() node.Config {
 // clientPort (on loopback a real socket on [::1]). A Names the topology
 // set stays the topology's.
 func (d *Device) siteClient(cfg *node.Config) {
+	// The site's settings go into a copy: the topology's ClientConfig
+	// stays as it set it.
+	c := *cfg.Client
+	cfg.Client = &c
 	if cfg.Client.Names == nil {
 		d.mu.Lock()
 		if d.names == nil {
@@ -356,7 +362,7 @@ func (d *Device) siteClient(cfg *node.Config) {
 
 // Peers is the node's client stack ([node.Node.Peers]): the nodes of its
 // fabrics it reaches as a client, on the site. Nil unless the topology's
-// Configure set node.Client.Enabled.
+// Configure set a non-nil node.Config.Client.
 func (d *Device) Peers() *peer.Set { return d.Node().Peers() }
 
 // Stop stops the node; its store and address stay the device's. A

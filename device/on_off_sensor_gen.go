@@ -17,9 +17,11 @@ const (
 	OnOffSensorRevision uint16              = 4
 )
 
-// OnOffSensorType is the OnOffSensor device type, matter.js's packages/node/src/devices/on-off-sensor.ts;
-// its cluster requirements are listed in docs/reference/device-types.md#onoffsensor.
-var OnOffSensorType = typeOnOffSensor
+// OnOffSensorType returns the OnOffSensor device type, matter.js's packages/node/src/devices/on-off-sensor.ts;
+// its cluster requirements are listed in docs/reference/device-types.md#onoffsensor. It is the registry's
+// value, the one [Lookup] and [FromSpec] return: a caller reads it and
+// does not modify it.
+func OnOffSensorType() *Type { return &typeOnOffSensor }
 
 // typeOnOffSensor holds [OnOffSensorType]'s cluster requirements.
 var typeOnOffSensor = Type{

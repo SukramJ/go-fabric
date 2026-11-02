@@ -21,9 +21,11 @@ const (
 	SmokeCoAlarmRevision uint16              = 2
 )
 
-// SmokeCoAlarmType is the SmokeCoAlarm device type, matter.js's packages/node/src/devices/smoke-co-alarm.ts;
-// its cluster requirements are listed in docs/reference/device-types.md#smokecoalarm.
-var SmokeCoAlarmType = typeSmokeCoAlarm
+// SmokeCoAlarmType returns the SmokeCoAlarm device type, matter.js's packages/node/src/devices/smoke-co-alarm.ts;
+// its cluster requirements are listed in docs/reference/device-types.md#smokecoalarm. It is the registry's
+// value, the one [Lookup] and [FromSpec] return: a caller reads it and
+// does not modify it.
+func SmokeCoAlarmType() *Type { return &typeSmokeCoAlarm }
 
 // typeSmokeCoAlarm holds [SmokeCoAlarmType]'s cluster requirements.
 var typeSmokeCoAlarm = Type{

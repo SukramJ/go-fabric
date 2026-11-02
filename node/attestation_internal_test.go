@@ -92,13 +92,13 @@ func TestAttestationBlocksCommissioning(t *testing.T) {
 	files, _, _ := writeChainFiles(t)
 	files.CDPath = filepath.Join(t.TempDir(), "missing.der")
 	cfg := mdnsTestConfig(t)
-	cfg.Network.MDNS.Disabled = true
+	cfg.Network.MDNS.Off = true
 	cfg.Attestation = Attestation{Files: &files, BlockCommissioningOnError: true}
 	n := newMDNSTestNode(t, cfg)
 	if n.AttestationError() == nil {
 		t.Fatal("AttestationError is nil for a chain that did not load")
 	}
-	if err := n.CommissioningWindow().OpenOwnWindow(context.Background(), 0); !errors.Is(err, ErrCommissioningBlocked) {
+	if err := n.Bridge().CommissioningWindow().OpenOwnWindow(context.Background(), 0); !errors.Is(err, ErrCommissioningBlocked) {
 		t.Fatalf("own window: %v, want ErrCommissioningBlocked", err)
 	}
 }

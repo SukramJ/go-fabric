@@ -38,7 +38,7 @@ func TestSetCommissioningBlockedDuringStart(t *testing.T) {
 		n      atomic.Pointer[node.Node]
 		called atomic.Bool
 	)
-	cfg.Topology = func(ctx context.Context) (*endpoint.Topology, error) {
+	cfg.Snapshotter = func(ctx context.Context) (*endpoint.Topology, error) {
 		if nn := n.Load(); nn != nil && called.CompareAndSwap(false, true) {
 			nn.SetCommissioningBlocked(ctx, nil)
 		}

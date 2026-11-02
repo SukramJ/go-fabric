@@ -104,7 +104,8 @@ func TestFacadeCommissioningCredentials(t *testing.T) {
 	}
 
 	n := newNode(t, cfg)
-	qr, manual, err := n.PairingCodes()
+	p, err := n.SetupPayload()
+	qr, manual := p.QR, p.Manual
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -139,7 +140,7 @@ func TestFacadeCommissioningCredentials(t *testing.T) {
 		t.Fatal(err)
 	}
 	w := fresh.WindowCredentials(time.Minute)
-	if w.Passcode != fresh.Passcode || w.Discriminator != fresh.Discriminator || w.Iterations != uint32(fresh.PBKDFIterations) ||
+	if w.Passcode != fresh.Passcode || w.Discriminator != fresh.Discriminator || w.PBKDFIterations != fresh.PBKDFIterations ||
 		!bytes.Equal(w.Salt, fresh.Salt) || w.Timeout != time.Minute {
 		t.Fatalf("WindowCredentials = %+v from %+v", w, fresh)
 	}
@@ -150,9 +151,9 @@ func TestFacadeCommissioningCredentials(t *testing.T) {
 	if err := n.OpenBasicWindow(ctx, w); err != nil {
 		t.Fatalf("OpenBasicWindow with fresh credentials: %v", err)
 	}
-	bad := node.Commissioning{Passcode: fresh.Passcode, PBKDFIterations: -1, Salt: fresh.Salt}
+	bad := node.Commissioning{Passcode: fresh.Passcode, PBKDFIterations: node.PBKDFIterationsMax + 1, Salt: fresh.Salt}
 	if err := n.OpenBasicWindow(ctx, bad.WindowCredentials(0)); !errors.Is(err, node.ErrInvalidWindowCredentials) {
-		t.Fatalf("negative iterations: %v, want ErrInvalidWindowCredentials", err)
+		t.Fatalf("iterations above the maximum: %v, want ErrInvalidWindowCredentials", err)
 	}
 }
 
@@ -192,20 +193,19 @@ func TestFacadeFabricInfosAndUniqueID(t *testing.T) {
 // Config fields pass to code written against the originals unconverted.
 func TestFacadeAliases(t *testing.T) {
 	n := newNode(t, minimalConfig(openDB(t, filepath.Join(t.TempDir(), "n.db"))))
-	if !bridgeWindow(n.CommissioningWindow()) || !operationalManager(n.Sessions()) || !subscriptionManager(n.Subscriptions()) {
+	if !bridgeWindow(n.Bridge().CommissioningWindow()) || !operationalManager(n.Sessions()) || !subscriptionManager(n.Subscriptions()) {
 		t.Fatal("an accessor returned nil")
 	}
 	var snap bridge.Snapshotter
-	cfg := node.Config{Topology: snap, Network: node.Network{TCP: bridge.TCPConfig{Incoming: true}}}
-	if cfg.Topology != nil || !cfg.Network.TCP.Incoming {
+	cfg := node.Config{Snapshotter: snap, Network: node.Network{TCP: bridge.TCPConfig{Incoming: true}}}
+	if cfg.Snapshotter != nil || !cfg.Network.TCP.Incoming {
 		t.Fatal("Config fields did not take the bridge's types")
 	}
 	if endpointTopology(&node.Topology{}) == nil || len(diagEvent(node.DiagnosticEvent{Message: "m"}).Message) != 1 {
 		t.Fatal("Topology or DiagnosticEvent did not pass as the original")
 	}
-	var probe endpoint.AvailabilityProbe = func() bool { return true }
-	opts := device.Options{StableKey: endpoint.StringKey("plug"), Reachable: probe}
-	if deviceKey(opts.StableKey).String() != "plug" || !deviceProbe(opts.Reachable)() {
+	opts := device.Options{StableKey: endpoint.StringKey("plug")}
+	if deviceKey(opts.StableKey).String() != "plug" {
 		t.Fatal("device.Options did not take the endpoint types")
 	}
 }
@@ -216,4 +216,3 @@ func subscriptionManager(m *subscription.Manager) bool         { return m != nil
 func endpointTopology(t *endpoint.Topology) *endpoint.Topology { return t }
 func diagEvent(e diagevent.Event) diagevent.Event              { return e }
 func deviceKey(k device.SourceKey) endpoint.SourceKey          { return k }
-func deviceProbe(p device.AvailabilityProbe) func() bool       { return p }

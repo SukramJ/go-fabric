@@ -10,7 +10,7 @@ session that follows. It is also the device the chip-tool suite
 It is built the way a host is meant to build one (ADR 0018):
 
 ```go
-n, err := node.New(cfg)                         // the node: root, Aggregator, sessions, PASE/CASE, window
+n, err := node.New(ctx, cfg)                       // the node: root, Aggregator, sessions, PASE/CASE, window
 lamp, err := device.NewOnOffLight(opts, ...)    // one device.New<Type> per device
 err = n.Aggregator().Add(ctx, lamp)             // … for each device of the fleet
 err = n.Run(ctx)                                // Start, wait for ctx, Stop
@@ -20,26 +20,31 @@ err = n.Run(ctx)                                // Start, wait for ctx, Stop
 root's labels and locales, the Aggregator's Actions server) and the steps
 the facade leaves to the host on its accessors: the test event triggers
 (`Root().GeneralDiagnostics`), the OTA applier (`ota.go`, handed over as
-`node.OtaConfig.Applier`), the mDNS subtype responder, the providers that
-name endpoints by StableKey (`fleet_node.go`), the banner and the topology
-listing. `fleet.go` `endpoints` builds the devices:
+`node.OTAConfig.Applier`), the providers that name endpoints by StableKey
+(`fleet_node.go`), the banner and the topology listing. The node builds
+its own DNS-SD advertiser with the subtype responder (a nil
+`node.Config.Advertiser`). `fleet.go` `endpoints` builds the devices:
 
-- a device type's **default servers** where the module holds the state —
-  the lights, the speaker and the pump take `cluster/onoff.Server` as
-  their OnOff cluster and follow it through `Device.OnChanged`, and switch
-  it with `onoff.Server.Set` when the device switches itself;
-- **the host's own server** through `device.WithServer` where the cluster's
-  rules need a host port (`cluster/valve`, `cluster/levelcontrol`,
-  `cluster/fan`, `cluster/lock`, `cluster/thermo`, `cluster/opstate`, …),
-  with `device.WithChangeNotifier` when the host model notifies its own
-  changes;
+- a device type's **default servers** where the module holds the state,
+  declared through each cluster's typed `Declare` (`onoffdef.Declare{Initial}`,
+  `thermostatdef.Declare{Features}`, …): the device follows a
+  controller's change through `Device.OnChanged` and switches itself
+  through the typed server's `Set` (`onoffdef.Patch{OnOff: …}`);
+- **host ports** where the cluster's rules need the host's state, as the
+  `Declare`'s port field (`valvedef.Declare{StateSource}`,
+  `levelcontroldef.Declare{LevelSource}`, the mode clusters' `ModeChanger`,
+  `tbrmdef.Declare{BorderRouter}`, …), with `device.WithChangeNotifier`
+  when the host model notifies its own changes; a host's whole server is
+  the `Declare`'s `HostServer` (the charger's `cluster/energy.NewEnergyEvse`
+  with its `EvseHost`, `fleet_evse.go`; the EcosystemInformation server,
+  `fleet_sensors.go`);
 - **parts** through `AddPart` (the fridge's and the oven's cabinets, the
   charger's PowerSource, DeviceEnergyManagement and ElectricalSensor, the
   grid meter's ElectricalSensor, the smoke alarm's battery);
-- **measurement-backed sensors** through `device.WithMeasurement` (the
-  thermometer, flow, humidity, occupancy, soil sensors, the button, the
-  battery and the electrical sensors): the assembler materialises their
-  clusters from the host's live reading by its measurement class.
+- **sensors** with their readings as the `Initial` of their measurement
+  clusters' `Declare` (`tmdef`, `rhdef`, `fmdef`, the air-quality
+  concentrations, `fleet_sensors.go`), set again through the typed `Set`
+  when the simulated reading moves.
 
 It exists as the module's *second* consumer. The first is the daemon
 go-fabric was extracted from, which remembers how the code used to be
@@ -228,41 +233,29 @@ a restart — every commissioned controller loses every accessory, or worse,
 silently rebinds an accessory to a different device that inherited its
 number.
 
-So this example persists, and after the first version of it was written by
-hand, both halves it had to hand-write moved into the module:
+So this example persists, and it does so with one setting: `node.Store.Path`
+names the SQLite file (`--db`), and the node does the rest.
 
-- **`endpoint/sqlitestore` is the production `endpoint.Store`.**
-  `endpointtest.NewFakeStore` remains in-memory test scaffolding;
-  `sqlitestore.New(db)` is what a bridge runs on. Neither package imports a
-  driver — they take an already-open `*sql.DB` — so the host picks the
-  driver and the DSN. This one uses `modernc.org/sqlite`, already a direct
-  requirement of `go-fabric`, so persisting adds no new dependency.
-- **The module owns the DDL.** `store.Schema()` and `sqlitestore.Schema()`
-  return the embedded text each package's own queries are written against;
-  `Apply` runs it. The node opens this example's file itself
-  (`node.Store.Path`, `modernc.org/sqlite` with foreign keys and a busy
-  timeout) and applies both on every boot, so a schema change arrives
-  with the dependency bump and this example writes no SQL. A host with a
-  migration tool feeds the two scripts through that instead and hands the
-  node its own handle (`node.Store.DB`).
-- **Numbers only ever advance.** The high-water mark lives in
-  `matter_endpoint_allocation`, and `RemoveEndpoint` never returns a number
-  to the pool.
-- **Keys are plain strings here.** The fleet's `StableKey`s are
-  `endpoint.StringKey`, so the store's default decoding is correct. A host
-  with a composite key type must pass `sqlitestore.WithKeyDecoder`: without
-  it the assembler's garbage collection cannot match a listed key against a
-  live one and deletes every endpoint number on the first model-complete
-  assembly.
-
-Subscriptions persist too (`docs/adr/0008`, as matter.js does): each CASE
-subscription is recorded in `matter_server_subscriptions` while it is active.
-After a restart the node (`node.Start`) loads the CASE identities, then
-calls `Bridge.ReestablishFormerSubscriptions`: the bridge resolves each controller
-over mDNS, opens CASE to it as the initiator and re-sends the priming report
-under the old subscription id, so the controller carries on without
-re-subscribing. A controller it cannot reach within two seconds recovers on
-its own. CASE sessions themselves stay volatile — Matter treats them so.
+- **The node opens the file** (`modernc.org/sqlite`, already a direct
+  requirement of `go-fabric`, foreign keys and a busy timeout on, a new
+  file created `0600` — it holds the operational private keys) and closes
+  it on `Stop`. A host with its own handle or migration tool hands the node
+  that instead (`node.Store.DB`).
+- **The module owns the DDL.** The node applies the device store's and the
+  endpoint store's embedded schemas on every boot, so a schema change
+  arrives with the dependency bump and this example writes no SQL.
+- **Endpoint numbers only ever advance**, kept under each device's
+  `StableKey` (`device.StringKey` here): a device that is removed keeps
+  its number for its return, and the Aggregator's `Forget` frees it.
+- **Subscriptions persist** (`docs/adr/0008`, as matter.js does): each CASE
+  subscription is recorded while it is active, and after a restart
+  `node.Start` re-establishes it — it resolves the controller over mDNS,
+  opens CASE to it and re-sends the priming report under the old
+  subscription id, so the controller carries on without re-subscribing. A
+  controller it cannot reach within two seconds recovers on its own.
+- **CASE resumption records** persist too, so a controller that reconnects
+  after a restart resumes in one round trip; CASE sessions themselves stay
+  volatile — Matter treats them so.
 
 Delete `reference-bridge.db` to factory-reset.
 
@@ -271,14 +264,6 @@ Delete `reference-bridge.db` to factory-reset.
 Each of these is real production wiring that the loom daemon carries and this
 one omits, listed so the omission is not mistaken for "not needed":
 
-- **IPK rotation.** The CASE identity is derived from `IdentityRecord.IPK`
-  only. A `KeySetWrite` that rotates the IPK carries up to three epoch keys in
-  `GroupKeySetID=0`, and a correct bridge tries every one when matching an
-  inbound `Sigma1.DestinationID`.
-- **CASE resumption as responder.** `sigma.Responder.SetResumptionStore` is
-  not wired, so every controller reconnect runs a full Sigma1–3 handshake
-  instead of the one-round-trip resume. (The initiator that re-establishes
-  subscriptions does offer a stored record and stores the new one.)
 - **Reassembly.** The fleet is fixed: every device is added before the
   node starts, and none is added or removed while it runs (a running
   node's `Aggregator().Add` / `Remove` reassemble).

@@ -24,10 +24,12 @@ import (
 	"github.com/SukramJ/go-fabric/bdx/otaimage"
 	"github.com/SukramJ/go-fabric/client/discovery"
 	"github.com/SukramJ/go-fabric/cluster/onoff"
+	groupcastdef "github.com/SukramJ/go-fabric/cluster/spec/groupcast"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/device"
 	"github.com/SukramJ/go-fabric/endpoint"
 	"github.com/SukramJ/go-fabric/groups"
+	"github.com/SukramJ/go-fabric/internal/nodeseam"
 	"github.com/SukramJ/go-fabric/mdns"
 	"github.com/SukramJ/go-fabric/node"
 	"github.com/SukramJ/go-fabric/secure/setup"
@@ -96,7 +98,7 @@ func startHarness(t *testing.T, edit func(*node.Config)) *harness {
 	if edit != nil {
 		edit(&cfg)
 	}
-	n, err := node.New(cfg)
+	n, err := node.New(context.Background(), cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -462,7 +464,7 @@ func hideGroupcast(t *testing.T, n *node.Node) {
 	}
 	var kept []uint32
 	for _, id := range ids {
-		if id != clusterGroupcast {
+		if id != groupcastdef.ClusterID {
 			kept = append(kept, id)
 		}
 	}
@@ -486,7 +488,8 @@ func (s staticOperational) ResolveOperational(context.Context, [8]byte, uint64) 
 // console grants the consent. Not parallel.
 func TestReferenceControllerOTA(t *testing.T) {
 	h := startHarness(t, func(c *node.Config) {
-		c.OTA = &node.OtaConfig{Dir: filepath.Join(t.TempDir(), "ota"), Harness: true}
+		c.OTA = &node.OTAConfig{Dir: filepath.Join(t.TempDir(), "ota")}
+		nodeseam.UseOTAHarness(c)
 	})
 	tl := newTool(t, h)
 	started := selfHooks.started

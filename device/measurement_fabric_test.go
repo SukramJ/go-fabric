@@ -141,7 +141,7 @@ func TestMeasurementServesEveryBuiltinClassOverTheWire(t *testing.T) {
 	bridged := make([]node.Endpoint, 0, len(cases)+1)
 	devices := make([]*device.Device, len(cases))
 	for i, c := range cases {
-		typ, ok := device.TypeByID(schema.DeviceTypeID(contract.MeasurementClassDeviceType(c.src.MatterMeasurementClass())))
+		typ, ok := device.Lookup(uint32(schema.DeviceTypeID(contract.MeasurementClassDeviceType(c.src.MatterMeasurementClass()))))
 		if !ok {
 			t.Fatalf("%s: no device type", c.name)
 		}

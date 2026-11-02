@@ -68,7 +68,7 @@ type Device struct {
 	reachable atomic.Bool
 
 	// mu guards parts, host and the host statements of opts (Name,
-	// DeviceAddress, ChannelAddress, Reachable: Rename, Update).
+	// DeviceAddress, ChannelAddress: Rename, Update).
 	mu    sync.Mutex
 	parts []*Device
 	host  deviceseam.Host
@@ -134,14 +134,16 @@ func New(t *Type, opts Options, decls ...Declaration) (*Device, error) {
 	if opts.StableKey == nil {
 		return nil, fmt.Errorf("%w: %s needs a StableKey", ErrConfiguration, t.Name)
 	}
-	if opts.Surface != nil {
-		if err := opts.Surface.Validate(); err != nil {
-			return nil, fmt.Errorf("%s: %w", t.Name, err)
-		}
+	if err := opts.Surface.Validate(); err != nil {
+		return nil, fmt.Errorf("%s: %w", t.Name, err)
 	}
 	s := newSettings()
 	if opts.StableKey != nil {
 		s.key = opts.StableKey.String()
+	}
+	s.logger = opts.Logger
+	if s.logger == nil {
+		s.logger = slog.Default()
 	}
 	for _, decl := range decls {
 		if err := s.declare(decl); err != nil {
@@ -203,9 +205,7 @@ func New(t *Type, opts Options, decls ...Declaration) (*Device, error) {
 		return nil, fmt.Errorf("%s: %w", t.Name, err)
 	}
 	d.report.Effective = d.effective()
-	if opts.Surface != nil {
-		d.report.Decisions = append(d.report.Decisions, opts.Surface.ServerInternal(d.report.Effective.Endpoints[0], s.candidates)...)
-	}
+	d.report.Decisions = append(d.report.Decisions, opts.Surface.ServerInternal(d.report.Effective.Endpoints[0], s.candidates)...)
 	return d, nil
 }
 
@@ -378,7 +378,7 @@ func defaultServer(t *Type, r *ClusterRequirement, s *settings, sibling func(uin
 	maps.Copy(initial, s.cut.initial(r.ID, s.initial[r.ID]))
 	if factory, held := selfHeldDefaults[r.ID]; held {
 		srv, err := factory(defaultBuild{
-			def: def, opts: opts, clock: s.clock, sibling: sibling, deviceType: uint16(t.ID), key: s.key,
+			def: def, opts: opts, clock: s.clock, sibling: sibling, deviceType: uint16(t.ID), key: s.key, logger: s.logger,
 			ports: s.ports[r.ID], transitions: s.transitions[r.ID], initial: initial,
 		})
 		if err == nil {
@@ -402,7 +402,7 @@ func defaultServer(t *Type, r *ClusterRequirement, s *settings, sibling func(uin
 		// The device type's default selection the self-held server does
 		// not serve keeps the generated server (by_design
 		// BD-Matter-SelfHeldDefault-SelectionNotServed).
-		Logger.Info("device.default_server.generated",
+		s.logger.Info("device.default_server.generated",
 			slog.String("device_type", t.Name), slog.String("cluster", r.Name),
 			slog.String("features", fmt.Sprintf("0x%X", opts.Features)), slog.String("reason", err.Error()))
 	}

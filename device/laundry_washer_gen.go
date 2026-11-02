@@ -21,9 +21,11 @@ const (
 	LaundryWasherRevision uint16              = 2
 )
 
-// LaundryWasherType is the LaundryWasher device type, matter.js's packages/node/src/devices/laundry-washer.ts;
-// its cluster requirements are listed in docs/reference/device-types.md#laundrywasher.
-var LaundryWasherType = typeLaundryWasher
+// LaundryWasherType returns the LaundryWasher device type, matter.js's packages/node/src/devices/laundry-washer.ts;
+// its cluster requirements are listed in docs/reference/device-types.md#laundrywasher. It is the registry's
+// value, the one [Lookup] and [FromSpec] return: a caller reads it and
+// does not modify it.
+func LaundryWasherType() *Type { return &typeLaundryWasher }
 
 // typeLaundryWasher holds [LaundryWasherType]'s cluster requirements.
 var typeLaundryWasher = Type{

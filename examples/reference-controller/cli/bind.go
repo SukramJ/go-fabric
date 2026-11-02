@@ -8,31 +8,50 @@ import (
 	"encoding/hex"
 	"flag"
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 
 	"github.com/SukramJ/go-fabric/client/interaction"
 	"github.com/SukramJ/go-fabric/cluster/spec"
+	acldef "github.com/SukramJ/go-fabric/cluster/spec/accesscontrol"
+	bindingdef "github.com/SukramJ/go-fabric/cluster/spec/binding"
+	gkmdef "github.com/SukramJ/go-fabric/cluster/spec/groupkeymanagement"
 	"github.com/SukramJ/go-fabric/controller/client"
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/tlv"
 )
 
-// TLV node builders for the list entries bind appends.
-func uintNode(tag uint8, v uint64) spec.Node {
-	return spec.Node{El: tlv.Element{Tag: tlv.ContextTag(tag), Type: tlv.TypeUnsignedInt8, Uint: v}}
+// entryNode is v, an entry of a fabric-scoped list in its generated
+// type, as the TLV node appendToList adds: its FabricIndex (254) left out,
+// which the device fills in from the accessing fabric.
+func entryNode(v spec.Encodable) (spec.Node, error) {
+	enc := tlv.NewEncoder()
+	v.EncodeTLV(enc, tlv.AnonymousTag())
+	b, err := enc.Bytes()
+	if err != nil {
+		return spec.Node{}, err
+	}
+	n, err := spec.ReadElement(tlv.NewDecoder(b))
+	if err != nil {
+		return spec.Node{}, err
+	}
+	n.Children = slices.DeleteFunc(n.Children, func(c spec.Node) bool {
+		return c.El.Tag.Kind == tlv.TagKindContext && c.El.Tag.Number == fabricIndexTag
+	})
+	return n, nil
 }
 
-func nullNode(tag uint8) spec.Node {
-	return spec.Node{El: tlv.Element{Tag: tlv.ContextTag(tag), Type: tlv.TypeNull, IsNull: true}}
-}
+// fabricIndexTag is the field of a fabric-scoped struct the device sets.
+const fabricIndexTag = 254
 
-func structNode(tag tlv.Tag, fields ...spec.Node) spec.Node {
-	return spec.Node{El: tlv.Element{Tag: tag, Type: tlv.TypeStructure, IsContainer: true}, Children: fields}
-}
-
-func arrayNode(tag tlv.Tag, entries ...spec.Node) spec.Node {
-	return spec.Node{El: tlv.Element{Tag: tag, Type: tlv.TypeArray, IsContainer: true}, Children: entries}
+// appendEntry is appendToList of v in its generated type.
+func appendEntry(ctx context.Context, n *client.Node, path im.ConcreteAttributePath, v spec.Encodable, present func(spec.Node) bool) error {
+	entry, err := entryNode(v)
+	if err != nil {
+		return err
+	}
+	return appendToList(ctx, n, path, entry, present)
 }
 
 // listPath is the path of a list attribute 0x0000 (Binding, ACL,
@@ -52,7 +71,7 @@ func appendToList(ctx context.Context, n *client.Node, path im.ConcreteAttribute
 	if err != nil {
 		return err
 	}
-	list := arrayNode(tlv.AnonymousTag())
+	list := spec.Node{El: tlv.Element{Tag: tlv.AnonymousTag(), Type: tlv.TypeArray, IsContainer: true}}
 	if v, ok := rep.Value(path.Endpoint, path.Cluster, path.Attribute); ok && v.El.IsContainer {
 		list.Children = append(list.Children, v.Children...)
 	} else if len(rep.Statuses) > 0 {
@@ -121,29 +140,27 @@ func cmdBind(e *env, args []string) error {
 		if err != nil {
 			return fmt.Errorf("--to endpoint %q", parts[1])
 		}
-		// TargetStruct (binding.element.ts): Node 1, Endpoint 3, Cluster 4.
-		target := structNode(tlv.AnonymousTag(), uintNode(1, dstID), uintNode(3, uint64(dstEP)))
-		// AccessControlTargetStruct: Cluster 0, Endpoint 1, DeviceType 2.
-		aclTarget := structNode(tlv.AnonymousTag(), nullNode(0), uintNode(1, uint64(dstEP)), nullNode(2))
+		target := bindingdef.TargetStruct{Node: &dstID, Endpoint: &dstEP}
+		aclTarget := acldef.AccessControlTargetStruct{
+			Cluster: spec.NullOf[uint32](), Endpoint: spec.ValueOf(dstEP), DeviceType: spec.NullOf[uint32](),
+		}
 		if len(parts) == 3 {
 			cid, _, err := lookupCluster(parts[2])
 			if err != nil {
 				return err
 			}
-			target.Children = append(target.Children, uintNode(4, uint64(cid)))
-			aclTarget.Children[0] = uintNode(0, uint64(cid))
+			target.Cluster, aclTarget.Cluster = &cid, spec.ValueOf(cid)
 		}
-		if err := appendToList(ctx, src, listPath(srcEP, clusterBinding), target, nil); err != nil {
+		if err := appendEntry(ctx, src, listPath(srcEP, bindingdef.ClusterID), target, nil); err != nil {
 			return fmt.Errorf("the Binding on node %d: %w", srcID, err)
 		}
-		// AccessControlEntryStruct: Privilege 1 (Operate 3), AuthMode 2
-		// (CASE 2), Subjects 3, Targets 4 — the operator entry of
-		// node/binding_live_test.go's aclList.
-		entry := structNode(tlv.AnonymousTag(),
-			uintNode(1, 3), uintNode(2, 2),
-			arrayNode(tlv.ContextTag(3), spec.Node{El: tlv.Element{Tag: tlv.AnonymousTag(), Type: tlv.TypeUnsignedInt8, Uint: srcID}}),
-			arrayNode(tlv.ContextTag(4), aclTarget))
-		if err := appendToList(ctx, dst, listPath(0, clusterAccessControl), entry, nil); err != nil {
+		// The operator entry of node/binding_live_test.go's aclList: the
+		// source node may Operate the target endpoint over CASE.
+		entry := acldef.AccessControlEntryStruct{
+			Privilege: acldef.AccessControlEntryPrivilegeOperate, AuthMode: acldef.AccessControlEntryAuthModeCase,
+			Subjects: spec.ValueOf([]uint64{srcID}), Targets: spec.ValueOf([]acldef.AccessControlTargetStruct{aclTarget}),
+		}
+		if err := appendEntry(ctx, dst, listPath(0, acldef.ClusterID), entry, nil); err != nil {
 			return fmt.Errorf("ACL on node %d: %w", dstID, err)
 		}
 		e.printf("bound node %d endpoint %d to node %d endpoint %d\n", srcID, srcEP, dstID, dstEP)
@@ -164,15 +181,13 @@ func bindGroup(ctx context.Context, e *env, s *stack, src *client.Node, srcEP ui
 	if err != nil {
 		return err
 	}
-	if err := invokeOK(ctx, src, clusterGroupKeyManagement, keySetWrite(g.KeySetID, key)); err != nil {
+	if err := invokeOK(ctx, src, gkmdef.ClusterID, keySetWrite(g.KeySetID, key)); err != nil {
 		return fmt.Errorf("KeySetWrite: %w", err)
 	}
-	// GroupKeyMapStruct: GroupId 1, GroupKeySetID 2.
-	if err := appendToList(ctx, src, listPath(0, clusterGroupKeyManagement), structNode(tlv.AnonymousTag(), uintNode(1, uint64(gid)), uintNode(2, uint64(g.KeySetID))), mapsGroup(uint64(gid))); err != nil {
+	if err := appendEntry(ctx, src, listPath(0, gkmdef.ClusterID), gkmdef.GroupKeyMapStruct{GroupId: gid, GroupKeySetId: g.KeySetID}, mapsGroup(uint64(gid))); err != nil {
 		return fmt.Errorf("GroupKeyMap: %w", err)
 	}
-	// TargetStruct: Group 2.
-	if err := appendToList(ctx, src, listPath(srcEP, clusterBinding), structNode(tlv.AnonymousTag(), uintNode(2, uint64(gid))), nil); err != nil {
+	if err := appendEntry(ctx, src, listPath(srcEP, bindingdef.ClusterID), bindingdef.TargetStruct{Group: &gid}, nil); err != nil {
 		return fmt.Errorf("the Binding: %w", err)
 	}
 	addr, _ := src.PeerAddress()

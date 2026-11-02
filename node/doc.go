@@ -44,13 +44,16 @@
 //
 // A host that assembles its own topology — its own endpoint.Assembler
 // over its own device model — hands the bridge its Snapshotter through
-// Config.Topology and gets no [Aggregator]; everything else stays the
-// facade's, the group state included (Config.Groups, [Node.Groups]). Its operator surface reads [Node.Sessions] and
-// [Node.Subscriptions], and removes a fabric without a commissioner
-// through [Node.RemoveFabric] (issue #87).
+// Config.Snapshotter and gets no [Aggregator]; everything else stays the
+// facade's, the group state included (Config.Groups, [Node.Groups]). Its
+// operator surface reads [Node.SessionDiagnostics] (the read-only view;
+// [Node.Sessions] and [Node.Subscriptions] are the advanced seams below
+// it) and removes a fabric without a commissioner through
+// [Node.RemoveFabric] (issue #87).
 //
-// Left to the configuration on purpose: a nil Config.Advertiser publishes
-// nothing, a nil Config.OTA mounts no OTA requestor, a nil
+// Left to the configuration on purpose: a nil Config.Advertiser is the
+// node's own Zeroconf with the subtype responder (Network.MDNS.Off
+// publishes nothing), a nil Config.OTA mounts no OTA requestor, a nil
 // Config.OTAProvider no OTA provider, a nil Config.CommissionerControl no
 // CommissionerControl server. Left to the host:
 // GeneralDiagnostics' TestEventTrigger enable key, the PowerSource
@@ -61,6 +64,10 @@
 // handlers; a host that set the cluster hooks the facade wires
 // (OperationalCredentials SetOnFabricRemoved / SetOnFabricUpdated,
 // GeneralCommissioning SetOnCommissioningComplete, the window's
-// SetTransitionHook) would replace the facade's wiring. A window with
-// credentials other than the configured ones is [Node.OpenBasicWindow].
+// SetTransitionHook, reached only through [Node.Bridge]) would replace the
+// facade's wiring. The window itself is the facade's: [Node.OpenOwnWindow]
+// opens the node's own window with the configured credentials,
+// [Node.OpenBasicWindow] one with other credentials, [Node.CloseWindow]
+// closes the open window whoever opened it, [Node.Window] reads it and
+// [Node.SetCommissioningBlocked] refuses every new one.
 package node

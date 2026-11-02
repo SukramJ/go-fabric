@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"testing"
 
+	"github.com/SukramJ/go-fabric/surface"
 	"github.com/SukramJ/go-fabric/thread/otbr/otbrtest"
 )
 
@@ -33,7 +34,7 @@ func TestOTBRFlag(t *testing.T) {
 	}
 	srv := otbrtest.New(otbrtest.Options{})
 	defer srv.Close()
-	b, err := newDemoBorderRouter(fmt.Sprintf("http://%s:%d", srv.Host(), srv.Port()), nil, slog.Default())
+	b, err := newDemoBorderRouter(fmt.Sprintf("http://%s:%d", srv.Host(), srv.Port()), surface.Policies{}, slog.Default())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -49,10 +50,10 @@ func TestOTBRFlag(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	b.watch(ctx)
-	if _, err := newDemoBorderRouter("http://127.0.0.1:1", nil, slog.Default()); err == nil {
+	if _, err := newDemoBorderRouter("http://127.0.0.1:1", surface.Policies{}, slog.Default()); err == nil {
 		t.Error("an unreachable border router was accepted")
 	}
-	if _, err := newDemoBorderRouter("ftp://x", nil, slog.Default()); err == nil {
+	if _, err := newDemoBorderRouter("ftp://x", surface.Policies{}, slog.Default()); err == nil {
 		t.Error("a non-http URL was accepted")
 	}
 }

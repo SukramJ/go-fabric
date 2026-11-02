@@ -92,13 +92,13 @@ func portCases() (cases []struct {
 		want    any
 	}{
 		{fandef.ClusterID, func() (*Device, error) {
-			return New(&FanType, testOptions("fan"), fandef.Declare{StateSource: &fakeFan{}})
+			return New(FanType(), testOptions("fan"), fandef.Declare{StateSource: &fakeFan{}})
 		}, (*fan.Server)(nil)},
 		{opdef.ClusterID, func() (*Device, error) {
 			mk := func(id uint8) opdef.OperationalStateStruct {
 				return opdef.OperationalStateStruct{OperationalStateId: opdef.OperationalStateEnum(id)}
 			}
-			return New(&LaundryWasherType, testOptions("ops"), opdef.Declare{
+			return New(LaundryWasherType(), testOptions("ops"), opdef.Declare{
 				CommandHandler: &fakeOps[opdef.ErrorStateStruct]{},
 				Commands:       []uint32{opdef.CmdPause, opdef.CmdResume},
 				Initial:        opdef.Patch{OperationalStateList: opStates(mk, 0, 1, 2, 3)},
@@ -108,7 +108,7 @@ func portCases() (cases []struct {
 			mk := func(id uint8) rvcopdef.OperationalStateStruct {
 				return rvcopdef.OperationalStateStruct{OperationalStateId: rvcopdef.OperationalStateEnum(id)}
 			}
-			return New(&RoboticVacuumCleanerType, testOptions("rvcops"), rvcopdef.Declare{
+			return New(RoboticVacuumCleanerType(), testOptions("rvcops"), rvcopdef.Declare{
 				CommandHandler: &fakeOps[rvcopdef.ErrorStateStruct]{},
 				Initial:        rvcopdef.Patch{OperationalStateList: opStates(mk, 0, 1, 2, 3, 0x40, 0x41, 0x42)},
 			})
@@ -119,7 +119,7 @@ func portCases() (cases []struct {
 			}
 			opts := testOptions("ovenops")
 			opts.Conditions = []string{"Heater"}
-			return New(&TemperatureControlledCabinetType, opts, ovendef.Declare{
+			return New(TemperatureControlledCabinetType(), opts, ovendef.Declare{
 				CommandHandler: &fakeOps[ovendef.ErrorStateStruct]{},
 				Initial:        ovendef.Patch{OperationalStateList: opStates(mk, 0, 1, 3)},
 			})
@@ -128,7 +128,7 @@ func portCases() (cases []struct {
 			mk := func(l string, m uint8, tag uint16) lwmdef.ModeOptionStruct {
 				return lwmdef.ModeOptionStruct{Label: l, Mode: m, ModeTags: []lwmdef.ModeTagStruct{{Value: lwmdef.ModeTag(tag)}}}
 			}
-			return New(&LaundryWasherType, testOptions("lwm"), lwmdef.Declare{
+			return New(LaundryWasherType(), testOptions("lwm"), lwmdef.Declare{
 				ModeChanger: ch,
 				Initial:     lwmdef.Patch{SupportedModes: modes(mk, modebase.LaundryTagNormal, modebase.LaundryTagHeavy)},
 			})
@@ -137,7 +137,7 @@ func portCases() (cases []struct {
 			mk := func(l string, m uint8, tag uint16) dwmdef.ModeOptionStruct {
 				return dwmdef.ModeOptionStruct{Label: l, Mode: m, ModeTags: []dwmdef.ModeTagStruct{{Value: dwmdef.ModeTag(tag)}}}
 			}
-			return New(&DishwasherType, testOptions("dwm"), dwmdef.Declare{
+			return New(DishwasherType(), testOptions("dwm"), dwmdef.Declare{
 				ModeChanger: ch,
 				Initial:     dwmdef.Patch{SupportedModes: modes(mk, modebase.DishwasherTagNormal, modebase.DishwasherTagHeavy)},
 			})
@@ -146,7 +146,7 @@ func portCases() (cases []struct {
 			mk := func(l string, m uint8, tag uint16) rvcrdef.ModeOptionStruct {
 				return rvcrdef.ModeOptionStruct{Label: l, Mode: m, ModeTags: []rvcrdef.ModeTagStruct{{Value: rvcrdef.ModeTag(tag)}}}
 			}
-			return New(&RoboticVacuumCleanerType, testOptions("rvcr"), rvcrdef.Declare{
+			return New(RoboticVacuumCleanerType(), testOptions("rvcr"), rvcrdef.Declare{
 				ModeChanger: ch,
 				Initial:     rvcrdef.Patch{SupportedModes: modes(mk, modebase.RvcRunTagIdle, modebase.RvcRunTagCleaning)},
 			})
@@ -155,7 +155,7 @@ func portCases() (cases []struct {
 			mk := func(l string, m uint8, tag uint16) rvccdef.ModeOptionStruct {
 				return rvccdef.ModeOptionStruct{Label: l, Mode: m, ModeTags: []rvccdef.ModeTagStruct{{Value: rvccdef.ModeTag(tag)}}}
 			}
-			return New(&RoboticVacuumCleanerType, testOptions("rvcc"), rvccdef.Declare{
+			return New(RoboticVacuumCleanerType(), testOptions("rvcc"), rvccdef.Declare{
 				ModeChanger: ch,
 				Initial:     rvccdef.Patch{SupportedModes: modes(mk, modebase.RvcCleanTagVacuum, modebase.RvcCleanTagMop)},
 			})
@@ -166,7 +166,7 @@ func portCases() (cases []struct {
 			}
 			opts := testOptions("ovenm")
 			opts.Conditions = []string{"Heater"}
-			return New(&TemperatureControlledCabinetType, opts, ovenmdef.Declare{
+			return New(TemperatureControlledCabinetType(), opts, ovenmdef.Declare{
 				ModeChanger: ch,
 				Initial:     ovenmdef.Patch{SupportedModes: modes(mk, modebase.OvenTagBake, modebase.OvenTagGrill)},
 			})
@@ -175,7 +175,7 @@ func portCases() (cases []struct {
 			mk := func(l string, m uint8, tag uint16) rtccdef.ModeOptionStruct {
 				return rtccdef.ModeOptionStruct{Label: l, Mode: m, ModeTags: []rtccdef.ModeTagStruct{{Value: rtccdef.ModeTag(tag)}}}
 			}
-			return New(&RefrigeratorType, testOptions("rtcc"), rtccdef.Declare{
+			return New(RefrigeratorType(), testOptions("rtcc"), rtccdef.Declare{
 				ModeChanger: ch,
 				Initial:     rtccdef.Patch{SupportedModes: modes(mk, uint16(rtccdef.ModeTagAuto), uint16(rtccdef.ModeTagQuick))},
 			})
@@ -184,7 +184,7 @@ func portCases() (cases []struct {
 			mk := func(l string, m uint8, tag uint16) evsemdef.ModeOptionStruct {
 				return evsemdef.ModeOptionStruct{Label: l, Mode: m, ModeTags: []evsemdef.ModeTagStruct{{Value: evsemdef.ModeTag(tag)}}}
 			}
-			return New(&EnergyEvseType, testOptions("evsem"), evsemdef.Declare{
+			return New(EnergyEvseType(), testOptions("evsem"), evsemdef.Declare{
 				ModeChanger: ch,
 				Initial:     evsemdef.Patch{SupportedModes: modes(mk, modebase.EvseTagManual, modebase.EvseTagTimeOfUse)},
 			})
@@ -193,7 +193,7 @@ func portCases() (cases []struct {
 			mk := func(l string, m uint8, tag uint16) whmdef.ModeOptionStruct {
 				return whmdef.ModeOptionStruct{Label: l, Mode: m, ModeTags: []whmdef.ModeTagStruct{{Value: whmdef.ModeTag(tag)}}}
 			}
-			return New(&WaterHeaterType, testOptions("whm"), withFeatures(0x0201, 1), whmdef.Declare{
+			return New(WaterHeaterType(), testOptions("whm"), withFeatures(0x0201, 1), whmdef.Declare{
 				ModeChanger: ch,
 				Initial:     whmdef.Patch{SupportedModes: modes(mk, modebase.WaterHeaterTagManual, modebase.WaterHeaterTagOff)},
 			})
@@ -202,7 +202,7 @@ func portCases() (cases []struct {
 			mk := func(l string, m uint8, tag uint16) demmdef.ModeOptionStruct {
 				return demmdef.ModeOptionStruct{Label: l, Mode: m, ModeTags: []demmdef.ModeTagStruct{{Value: demmdef.ModeTag(tag)}}}
 			}
-			return New(&DeviceEnergyManagementType, testOptions("demm"),
+			return New(DeviceEnergyManagementType(), testOptions("demm"),
 				demdef.Declare{Features: demdef.FeaturePowerForecastReporting}, demmdef.Declare{
 					ModeChanger: ch,
 					Initial:     demmdef.Patch{SupportedModes: modes(mk, modebase.DemTagNoOptimization, modebase.DemTagLocalOptimization, modebase.DemTagGridOptimization)},
@@ -215,7 +215,7 @@ func portCases() (cases []struct {
 // clusters keeps the generated server, as before the declaration.
 func TestPortServersNeedTheirPort(t *testing.T) {
 	t.Parallel()
-	d, err := New(&FanType, testOptions("fan"))
+	d, err := New(FanType(), testOptions("fan"))
 	if err != nil {
 		t.Fatal(err)
 	}

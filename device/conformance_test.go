@@ -68,13 +68,13 @@ var refusedDefaults = map[string]string{
 // mandates; tolerate lists the violations that remain, each with the
 // reason no device-layer option can remove it.
 type fixture struct {
-	with     func(t *testing.T) []Option
+	with     func(t *testing.T) []Declaration
 	parts    func(t *testing.T, d *Device)
 	tolerate map[string]string // "<kind> <requirement>" → reason
 }
 
 // testWith returns the options a host gives a device of the named type.
-func testWith(t *testing.T, name string) []Option {
+func testWith(t *testing.T, name string) []Declaration {
 	t.Helper()
 	if f, ok := fixtures[name]; ok && f.with != nil {
 		return f.with(t)
@@ -103,7 +103,7 @@ func build(t *testing.T, ty *Type) *Device {
 }
 
 // part adds a part of the named type to owner, with a unique key.
-func part(t *testing.T, owner *Device, name string, conds []string, with ...Option) {
+func part(t *testing.T, owner *Device, name string, conds []string, with ...Declaration) {
 	t.Helper()
 	ty := typeByName(name)
 	opts := testOptions(fmt.Sprintf("%s/%s#%d", owner.Type().Name, name, len(owner.Parts())))
@@ -117,9 +117,11 @@ func part(t *testing.T, owner *Device, name string, conds []string, with ...Opti
 	}
 }
 
-func opts(o ...Option) func(*testing.T) []Option { return func(*testing.T) []Option { return o } }
+func opts(o ...Declaration) func(*testing.T) []Declaration {
+	return func(*testing.T) []Declaration { return o }
+}
 
-func feat[F ~uint32](clusterID uint32, f F) Option { return withFeatures(clusterID, uint32(f)) }
+func feat[F ~uint32](clusterID uint32, f F) Declaration { return withFeatures(clusterID, uint32(f)) }
 
 var (
 	wired    = feat(0x002F, psdef.FeatureWired)
@@ -136,9 +138,9 @@ var (
 // meteredSensor is an ElectricalSensor part as an ESA's composition asks
 // for it: power with Voltage and ActiveCurrent, and imported and exported
 // cumulative energy.
-func meteredSensor(t *testing.T, features uint32) []Option {
+func meteredSensor(t *testing.T, features uint32) []Declaration {
 	t.Helper()
-	return []Option{
+	return []Declaration{
 		nodeTopo,
 		withFeatures(0x0090, features),
 		withElements(0x0090, spec.Options{Attributes: []uint32{epmdef.AttrVoltage, epmdef.AttrActiveCurrent}}),

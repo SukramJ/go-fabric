@@ -4,6 +4,7 @@
 package node_test
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
@@ -29,7 +30,7 @@ func surfaceNode(t *testing.T, p surface.Policies) *node.Node {
 
 func light(t *testing.T, key string, p *surface.Policies) *device.OnOffLight {
 	t.Helper()
-	d, err := device.NewOnOffLight(device.Options{StableKey: endpoint.StringKey(key), Name: key, Surface: p})
+	d, err := device.NewOnOffLight(device.Options{StableKey: endpoint.StringKey(key), Name: key, Surface: *cmp.Or(p, &surface.Policies{})})
 	if err != nil {
 		t.Fatal(err)
 	}

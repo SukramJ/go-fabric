@@ -17,9 +17,11 @@ const (
 	PumpControllerRevision uint16              = 5
 )
 
-// PumpControllerType is the PumpController device type, matter.js's packages/node/src/devices/pump-controller.ts;
-// its cluster requirements are listed in docs/reference/device-types.md#pumpcontroller.
-var PumpControllerType = typePumpController
+// PumpControllerType returns the PumpController device type, matter.js's packages/node/src/devices/pump-controller.ts;
+// its cluster requirements are listed in docs/reference/device-types.md#pumpcontroller. It is the registry's
+// value, the one [Lookup] and [FromSpec] return: a caller reads it and
+// does not modify it.
+func PumpControllerType() *Type { return &typePumpController }
 
 // typePumpController holds [PumpControllerType]'s cluster requirements.
 var typePumpController = Type{

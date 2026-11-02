@@ -12,12 +12,12 @@ still held there. Each row names the facade route, or the section of
 
 | Package | Symbol (loom) | Route |
 | --- | --- | --- |
-| `bridge` | `StartHealthProbe`, `DefaultProbeInterval` (`cmd/openccu-loom/daemon_matter.go:571`) | `Config.Health{Interval, OnSample}`; `node.DefaultProbeInterval` |
-| `bridge` | `HealthSample` (`daemon_matter.go:1433`, `:1437`) | `node.HealthSample`; `Node.Health` returns the last one. `OnSample` gets every verdict; an unhealthy one is what `RecordUnhealthy` received |
+| `bridge` | `StartHealthProbe`, `DefaultProbeInterval` (`cmd/openccu-loom/daemon_matter.go:571`) | `Config.Health{Interval}` with `Node.OnHealthSample`; `node.DefaultProbeInterval` |
+| `bridge` | `HealthSample` (`daemon_matter.go:1433`, `:1437`) | `node.HealthSample`; `Node.Health` returns the last one. `Node.OnHealthSample` gets every verdict; an unhealthy one is what `RecordUnhealthy` received |
 | `bridge` | `RandomPasscode`, `RandomSalt` (`daemon_matter.go:282`, `:297`; `matter_window_adapter.go:153`, `:157`), `RandomDiscriminator` (`matter_window_adapter.go:149`) | `node.NewCommissioningCredentials`; `Commissioning.WindowCredentials(timeout)` for the ephemeral window (`matter_window_adapter.go:165-171`) |
 | `bridge` | `ErrAdministratorWindowOpen`, `ErrCommissioningWindowAlreadyOpen` (`matter_window_adapter.go:208`), `ErrCommissioningWindowNotConfigured` (`matter_status_adapter.go:105`) | `node.ErrAdministratorWindowOpen`, `node.ErrCommissioningWindowAlreadyOpen`, `node.ErrCommissioningWindowNotConfigured` (the same values); `node.ErrCommissioningBlocked` |
 | `bridge` | `Snapshotter` (`daemon_matter.go:915`), `TCPConfig` (`daemon_matter.go:56`) | `node.Snapshotter`, `node.TCPConfig` |
-| `bridge` | `*CommissioningWindow` (`matter_status_adapter.go:33`, `matter_window_adapter.go:71`) | `node.CommissioningWindow`, the type `Node.CommissioningWindow` returns |
+| `bridge` | `*CommissioningWindow` (`matter_status_adapter.go:33`, `matter_window_adapter.go:71`) | `Node.Window()` to read it, `Node.OpenOwnWindow`, `Node.OpenBasicWindow`, `Node.CloseWindow`, `Node.SetCommissioningBlocked` to act on it |
 | `bridge` | `LocalAddr` (`daemon_matter.go:562`, `matter_status_adapter.go:47`) | `Node.LocalAddr` |
 | `bridge` | `*Bridge` with `Topology` (`daemon_matter.go:1315`, `matter_window_adapter.go:98`), `NotifyDeviceReachable` (`daemon_matter.go:974`), `ControllerRTT` (`daemon_matter.go:584`) | stays: [`bridge`](advanced-seams.md#bridge) through `Node.Bridge` |
 | `store` | `New`, `*Store` (`daemon_matter.go:373`, `:137`) | `Config.Store.Path` for a file the node opens; a shared handle stays [`store`](advanced-seams.md#store) (`Store.Credentials`) |
@@ -30,17 +30,42 @@ still held there. Each row names the facade route, or the section of
 | `secure/operational` | `Manager` (`daemon_matter.go:153`, `:1193`) | `node.SessionManager` (the same type) |
 | `im/subscription` | `Manager` (`daemon_matter.go:154`, `:1194`) | `node.SubscriptionManager` (the same type); [`im/subscription`](advanced-seams.md#imsubscription) |
 | `secure/attestation` | `LoadChainFiles`, `ChainFiles`, `ErrNoChainConfigured` (`daemon_matter.go:318`, `:329`) | `Config.Attestation.Files` (`node.AttestationFiles`); loom starts on a chain that does not load and blocks commissioning (`daemon_matter.go:480-491`, `:552-554`): `Attestation.BlockCommissioningOnError`, the error in `Node.AttestationError`. Files naming nothing keep the test chain, so `ErrNoChainConfigured` has no counterpart |
-| `mdns` | `NewZeroconf`, `NewSubtypeResponder`, `NewNoop`, `Advertiser` (`daemon_matter.go:81-121`) | a nil `Config.Advertiser`; `Network.MDNS{Disabled}` for loom's `noop` |
+| `mdns` | `NewZeroconf`, `NewSubtypeResponder`, `NewNoop`, `Advertiser` (`daemon_matter.go:81-121`) | a nil `Config.Advertiser`; `Network.MDNS{Off}` for loom's `noop` |
 | `mdns` | `IsEnabled` (`daemon_matter.go:1263`), `Diagnose` (`:1289`), `Advertiser.Active` (`:1265`) | `Node.MDNSEnabled`, `Node.DiagnoseMDNS`, `Node.MDNSServices` (`node.MDNSFinding`, `node.MDNSService`) |
-| `endpoint` | `SourceKey` (`internal/store/matterendpoint/sourcekey.go:68`), `Topology` (`daemon_matter.go:916`) | `device.SourceKey`, `node.Topology`; `device.AvailabilityProbe` for `Options.Reachable` (`assembler.go:861`) |
+| `endpoint` | `SourceKey` (`internal/store/matterendpoint/sourcekey.go:68`), `Topology` (`daemon_matter.go:916`) | `device.SourceKey`, `node.Topology`; a source's availability (`assembler.go:861`) is `Device.SetReachable` |
 | `endpoint` | `Assembler`, `New`, `Spec` (`assembler.go:155`, `:184`, `:627`); `endpoint/sqlitestore` (`internal/store/matterendpoint/store.go:10`) | the node's Aggregator with partitions (`Aggregator.Partition`, `Batch`) and the device kit; a host with an assembler of its own stays on [`endpoint`](advanced-seams.md#endpoint) |
 | `endpoint` | `ComposeNodeLabel` (`assembler.go:641`) | `device.ComposeNodeLabel(base, suffix)` (#239); `device.New`, `Device.Rename` and `Device.Update` cap a name at the NodeLabel maximum themselves |
-| a type with a `Spec()` of its own, replaced under the same key when the host's name changed (loom's step 2) | `Device.Update(ctx, func(*device.HostStatement){…})`: the host's name, addresses and availability probe change on the bound device; the name is served at once and persisted nowhere, a controller-written label wins (#238) |
+| a type with a `Spec()` of its own, replaced under the same key when the host's name changed (loom's step 2) | `Device.Update(ctx, func(*device.HostStatement){…})`: the host's name and addresses change on the bound device (reachability is `Device.SetReachable`); the name is served at once and persisted nowhere, a controller-written label wins (#238) |
 | `groups` | `NewManager` (`daemon_matter.go:388`, `Config.Groups` at `:534`) | a nil `Config.Groups` builds the manager; `Node.Groups` returns it. With an own assembler it stays [`groups`](advanced-seams.md#groups) |
-| `bootid` | `EnableRotation` (`daemon_matter.go:409`) | `Config.BootID.RotateUniqueIDs` |
+| `bootid` | `EnableRotation` (`daemon_matter.go:409`) | stays: `bootid.EnableRotation()`, process-wide, once before `node.New` |
 | `diagevent` | `Event` (`internal/north/rest/handlers/matter.go:556`) | `node.DiagnosticEvent`; [`diagevent`](advanced-seams.md#diagevent) |
 | `cluster/core` | `SoftwareVersionFromString` (`daemon_matter.go:527`) | `node.SoftwareVersionFromString` |
 | `cluster/core` | `RegulatoryIndoorOutdoor` (`daemon_matter.go:506`) | `node.RegulatoryIndoorOutdoor` for `Commissioning.LocationCapability` |
+
+## Removed or changed in the next release: the facade review
+
+The review of 2026-11 (`notes/review/2026-11/wave-5-api.md`) made the
+facade one shape. Each row names what a host writes now.
+
+| Symbol | Route |
+| --- | --- |
+| `subscription.EventFiring.Timestamp`, `subscription.EventFiring.Data` | drop them: the report reads the timestamp and payload from the `EventSource` by `Number` |
+| `Node.CommissioningWindow()`, `node.CommissioningWindow` | `Node.OpenOwnWindow(ctx, timeout)`, `Node.CloseWindow(ctx)`, `Node.Window()`; the bridge type stays behind `Node.Bridge().CommissioningWindow()` |
+| `device.Options.Reachable`, `device.HostStatement.Reachable`, `device.AvailabilityProbe` | `Device.SetReachable(ctx, reachable)` on every change of the source's availability |
+| `node.New(cfg)` | `node.New(ctx, cfg)`: ctx bounds the store work; nothing runs before `Start` |
+| `node.Health.OnSample`, `node.OTAProviderConfig.OnStatusChange`, the `error` result of every `node.Observers` hook | `Node.OnHealthSample` / `OnHealthSampleAsync`, `Node.OnOTAProviderStatus` / `OnOTAProviderStatusAsync`; hooks return nothing; `Node.ObserveAsync` for the queued form |
+| `device.Logger` | `device.Options.Logger` per device (nil is `slog.Default()`) |
+| `device.WithServer`, `device.Option`, `device.TypeByID` | `device.HostServer(srv)`; `device.Declaration`; `device.Lookup(uint32(id))` |
+| `Node.PairingCodes`, `Aggregator.IncreaseConfigurationVersion`, `WindowCredentials.Iterations`, `Commissioning.PBKDFIterations int` | `Node.SetupPayload()` (`.QR`, `.Manual`); `Aggregator.IncreaseConfigurationVersions(ctx, keys...)` (`node.ErrNotStarted` before `Start`); `WindowCredentials.PBKDFIterations`; `Commissioning.PBKDFIterations uint32` |
+| `node.Client` (`Enabled`), `Config.DisableTimeSynchronization`, `Config.TimeSynchronization *TimeSynchronizationConfig`, `Network.ReannounceInterval`, `Network.DisableReannounce`, `MDNS.Disabled`, `Config.Health Health`, `Network.WiFi WiFi` | `Config.Client *ClientConfig` (nil off); `Config.TimeSynchronization{Off, Config}`; `Network.Reannounce{Interval, Off}`; `MDNS.Off`; `Config.Health *Health` (nil off); `Network.WiFi *WiFi` (nil off) |
+| `node.OTAConfig.Harness`, `node.Network.WiFiCommissioning`, `node.WiFiCommissioning`, `node.Config.BootID`, `node.BootID` | not public (`internal/nodeseam`); `fabrictest.UseWiFiCommissioning(cfg, driver)` in a test; `bootid.EnableRotation()` before `node.New` |
+| `contract.InitialDataVersion`, `contract.SetMeasurementMaterializer` | none: unexported; a host kind is `contract.RegisterMeasurementKind` |
+| `device.AheadRows` | `node.AheadRows()` (the root's and the devices' rows) |
+| `contract.DeviceTypeName` | `schema.DeviceTypeName(schema.DeviceTypeID(id))`; operator labels are the host's |
+| `node.Config.Topology`, `node.OtaConfig`, `surface.Origin` (`OriginClusterMandatory`, `OriginDeviceType`, `OriginHostDeclared`, `OriginKitDefault`, `Element.Origin`) | `node.Config.Snapshotter`, `node.OTAConfig`, `surface.Provenance` (`Provenance…`, `Element.Provenance`) |
+| `device.<Name>Type` (the 91 generated variables) | `device.<Name>Type()`, a `*device.Type`; copy with `*` before modifying |
+| `device.Options.Surface *surface.Policies` | `device.Options.Surface surface.Policies` (the zero value is no policy) |
+| `otbr.Probe(ctx, host, port, timeout, httpClient)`, `esphome.Discover(ctx, browser, keys, timeout)` | `otbr.Probe(ctx, otbr.Config{Host, Port, Timeout, HTTPClient, Clock})`; `esphome.Discover(ctx, esphome.Options{Logger, Clock, Discover: &esphome.DiscoverOptions{Browser, Keys, Timeout}})` |
 
 ## Changed in the next release: `CommissionerReach` takes the peer
 
@@ -234,7 +259,7 @@ deprecated, while loom is the only consumer.
 | `device.WithFeatures(id, f)` | `<cluster>def.Declare{Features: …}` — `wcdef.Declare{Features: wcdef.FeatureLift \| wcdef.FeaturePositionAwareLift}` |
 | `device.WithInitial(id, map[uint32]any{…})` | `<cluster>def.Declare{Initial: <cluster>def.Patch{…}}` — `onoffdef.Declare{Initial: onoffdef.Patch{GlobalSceneControl: new(true)}}` |
 | `device.WithElements(id, spec.Options{Attributes: …, Commands: …})` | an optional attribute is served by its value in `Initial`, an optional command by its `Handle<Command>` field |
-| `device.WithServer(srv)` (a cluster with a generated package) | `<cluster>def.Declare{HostServer: srv}`; `WithServer` stays for a cluster without one (a manufacturer-specific cluster) and refuses the others; a host whose servers are a list (`[]contract.ClusterServer`) writes `device.HostServer(srv)` for each, which resolves the server's cluster id to its `Declare{HostServer: srv}` and mounts a cluster without a package as `WithServer` does (since `v0.10.1`) |
+| `device.WithServer(srv)` (a cluster with a generated package) | `<cluster>def.Declare{HostServer: srv}`; a host whose servers are a list (`[]contract.ClusterServer`) writes `device.HostServer(srv)` for each, which resolves the server's cluster id to its `Declare{HostServer: srv}` and mounts a cluster without a package (a manufacturer-specific one) after the type's clusters. `WithServer` itself is removed in the facade review (the section above) |
 | `device.WithOptional(id)` | a cluster with a generated package: `<cluster>def.Declare{}` — `levelcontroldef.Declare{}`, `groupsdef.Declare{}` for the Groups opt-in; a cluster without one: `WithServer(srv)` alone, the one form, which mounts the host's server |
 | `device.Options.Clock` | none: a device takes `node.Config.Clock` when the Aggregator adds it |
 | `levelcontrol.LevelSource` over `cluster/wire` requests, `levelcontrol.MoveToLevelRequest`, `MoveRequest`, `StepRequest`, `StopRequest` | `levelcontrol.LevelSource` is `levelcontroldef.LevelSource`, over the generated requests: `MoveToLevel(ctx, req levelcontroldef.MoveToLevelRequest) error`, `MoveToLevelWithOnOff(ctx, req levelcontroldef.MoveToLevelWithOnOffRequest) error`, …, `Options() levelcontroldef.OptionsBitmap`; a nullable field is `spec.Nullable` (`req.TransitionTime.Null`, `.Value`); declared as `levelcontroldef.Declare{LevelSource: …}` |
@@ -340,7 +365,7 @@ groups follow the deprecation table the README carried until `v0.9.x`.
 2. **A nil `Config.Advertiser` advertises.** Up to `v0.9.0` it was
    `mdns.NewNoop()`; now the node builds Zeroconf with the subtype
    responder. A host that relied on the old default sets
-   `Network.MDNS.Disabled`.
+   `Network.MDNS.Off`.
 3. **Accessor return types** of the typed cluster layer change, landing in
    `v0.10.0`.
 4. **A DoorLock without a feature selection has none** ([Changed](#changed-in-v0100-one-shape-gate-2)):

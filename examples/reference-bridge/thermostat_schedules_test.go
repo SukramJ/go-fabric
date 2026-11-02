@@ -35,7 +35,7 @@ func TestDemoThermostatSchedulesAreGated(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	opts.Surface = &policies
+	opts.Surface = policies
 	d, err := newDemoThermostat("Thermostat").device(opts)
 	if err != nil {
 		t.Fatal(err)

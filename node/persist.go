@@ -56,7 +56,7 @@ type persisted struct {
 
 // EndpointPersistence is the endpoint-level stack state the facade keeps
 // for its own assembler, exported for a host that assembles its endpoints
-// itself ([Config].Topology, issue #117): a bridged endpoint's scene table
+// itself ([Config].Snapshotter, issue #117): a bridged endpoint's scene table
 // (endpoint.Config.Scenes, under "scenes.<key>") and the per-endpoint
 // NodeLabel a commissioner wrote (endpoint.Config.OnNodeLabelWritten,
 // under "bridged_node_label.<key>"), each keyed by the endpoint's stable
@@ -215,11 +215,6 @@ func (p persisted) SaveScenes(key device.SourceKey, table []byte) {
 // per-boot value and neither reads nor writes the store, so the value a
 // boot without rotation pinned before is served again once rotation is
 // off.
-// enableBootIDRotation is bootid.EnableRotation, a variable so a test of
-// Config.BootID observes the call without turning rotation on for its
-// whole process.
-var enableBootIDRotation = bootid.EnableRotation
-
 func (p persisted) uniqueID(ctx context.Context, derive func() string) (string, error) {
 	salt := p.salt
 	if salt == nil {

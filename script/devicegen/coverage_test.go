@@ -37,18 +37,6 @@ func TestDocsRefuseADeviceTypeTheSnapshotLacks(t *testing.T) {
 	}
 }
 
-// TestContractNamesRefuseAnIDBeyondUint16: the contract's table is keyed by
-// a uint16.
-func TestContractNamesRefuseAnIDBeyondUint16(t *testing.T) {
-	t.Parallel()
-
-	id := uint32(0x10000)
-	g := &generator{snap: &snapshot{DeviceTypes: []*deviceType{{ID: &id, Name: "TooBig"}}}}
-	if _, err := g.generateContractNames(); err == nil {
-		t.Error("generateContractNames accepted an id beyond uint16")
-	}
-}
-
 // TestElementOfAnUnknownKind: a requirement names an attribute, a command
 // or an event; any other kind finds nothing.
 func TestElementOfAnUnknownKind(t *testing.T) {

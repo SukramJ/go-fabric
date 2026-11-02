@@ -22,9 +22,11 @@ const (
 	AudioDoorbellRevision uint16              = 2
 )
 
-// AudioDoorbellType is the AudioDoorbell device type, matter.js's packages/node/src/devices/audio-doorbell.ts;
-// its cluster requirements are listed in docs/reference/device-types.md#audiodoorbell.
-var AudioDoorbellType = typeAudioDoorbell
+// AudioDoorbellType returns the AudioDoorbell device type, matter.js's packages/node/src/devices/audio-doorbell.ts;
+// its cluster requirements are listed in docs/reference/device-types.md#audiodoorbell. It is the registry's
+// value, the one [Lookup] and [FromSpec] return: a caller reads it and
+// does not modify it.
+func AudioDoorbellType() *Type { return &typeAudioDoorbell }
 
 // typeAudioDoorbell holds [AudioDoorbellType]'s cluster requirements.
 var typeAudioDoorbell = Type{

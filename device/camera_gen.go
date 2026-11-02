@@ -23,9 +23,11 @@ const (
 	CameraRevision uint16              = 1
 )
 
-// CameraType is the Camera device type, matter.js's packages/node/src/devices/camera.ts;
-// its cluster requirements are listed in docs/reference/device-types.md#camera.
-var CameraType = typeCamera
+// CameraType returns the Camera device type, matter.js's packages/node/src/devices/camera.ts;
+// its cluster requirements are listed in docs/reference/device-types.md#camera. It is the registry's
+// value, the one [Lookup] and [FromSpec] return: a caller reads it and
+// does not modify it.
+func CameraType() *Type { return &typeCamera }
 
 // typeCamera holds [CameraType]'s cluster requirements.
 var typeCamera = Type{

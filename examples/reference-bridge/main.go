@@ -24,8 +24,14 @@
 // node opens its SQLite file (node.Store.Path), builds its DNS-SD
 // advertiser (a nil node.Config.Advertiser, shaped by Network.MDNS),
 // loads a vendor attestation chain (node.Attestation.Files) and runs the
-// health probe (node.Config.Health); the daemon names none of bridge,
-// mdns, secure/* or store for them.
+// health probe (node.Config.Health); it names none of mdns, secure/* or
+// bridge for them. Three things still reach below the facade, each a gap
+// the facade does not cover yet (review 2026-11 W5-ex-10): the listing of
+// every endpoint with its device types (printTopology and the banner
+// through Node.Bridge — Node.Topology lists the bridged devices only),
+// the thermostat's preset store (store.NewThermostatPresetStore over
+// Node.Store) and the charger's EnergyEvse with its host port
+// (cluster/energy.NewEnergyEvse as the Declare's HostServer).
 //
 // It is not a product. The identity it advertises is the CSA *test*
 // vendor/product pair and the attestation chain is the CSA *test* chain; see
@@ -37,7 +43,6 @@ import (
 	"context"
 	"database/sql"
 	"encoding/hex"
-	"errors"
 	"flag"
 	"fmt"
 	"log/slog"
@@ -50,6 +55,8 @@ import (
 
 	fixedlabeldef "github.com/SukramJ/go-fabric/cluster/spec/fixedlabel"
 	"github.com/SukramJ/go-fabric/contract"
+	"github.com/SukramJ/go-fabric/device"
+	"github.com/SukramJ/go-fabric/internal/nodeseam"
 	"github.com/SukramJ/go-fabric/node"
 	"github.com/SukramJ/go-fabric/schema"
 	"github.com/SukramJ/go-fabric/store"
@@ -150,8 +157,8 @@ func checkFlags(f flags) (passcode uint32, discriminator uint16, err error) {
 	if err := node.ValidateSetupPIN(passcode); err != nil {
 		return 0, 0, fmt.Errorf("--passcode: %w", err)
 	}
-	if f.iterations < 0 {
-		return 0, 0, fmt.Errorf("--pbkdf-iterations %d must be positive", f.iterations)
+	if f.iterations < node.PBKDFIterationsMin || f.iterations > node.PBKDFIterationsMax {
+		return 0, 0, fmt.Errorf("--pbkdf-iterations %d is outside [%d, %d]", f.iterations, node.PBKDFIterationsMin, node.PBKDFIterationsMax)
 	}
 	if _, err := dclClient(f.dcl); err != nil {
 		return 0, 0, err
@@ -258,7 +265,7 @@ func compose(ctx context.Context, f flags, logger *slog.Logger, passcode uint32,
 		return nil, nil, err
 	}
 	devices := newFleet()
-	devices.surface = &policies
+	devices.surface = policies
 	otaDownloads := f.otaDir
 	if otaDownloads == "" {
 		otaDownloads = filepath.Join(filepath.Dir(f.dbPath), "ota")
@@ -281,12 +288,9 @@ func compose(ctx context.Context, f flags, logger *slog.Logger, passcode uint32,
 	cfg := nodeConfig(f, passcode, discriminator, tcpConfig, applier, actions, logger)
 	cfg.Attestation = attestationConfig(f.attestationDir)
 	cfg.Surface = policies
-	// The listener's verdict, logged when it fails (node.Config.Health).
-	cfg.Health.OnSample = func(s node.HealthSample) {
-		if !s.Healthy {
-			logger.Warn("health.listener", slog.String("note", s.Note))
-		}
-	}
+	// The listener's verdict every probe interval (node.Config.Health),
+	// logged when it fails (Node.OnHealthSample, registered after New).
+	cfg.Health = &node.Health{Interval: node.DefaultProbeInterval}
 	applyTestWiFi(&cfg, f, devices)
 	applyMetrics(&cfg, f.metricsExpvar)
 	if dump != nil {
@@ -296,7 +300,7 @@ func compose(ctx context.Context, f flags, logger *slog.Logger, passcode uint32,
 		// path installs a topology), on a loopback port the system
 		// assigns.
 		cfg.Store = node.Store{DB: dump.db}
-		cfg.Network.MDNS = node.MDNS{Disabled: true}
+		cfg.Network.MDNS = node.MDNS{Off: true}
 		cfg.Network.Listen, cfg.Network.PreferIPv4 = "127.0.0.1:0", true
 	}
 	if f.otaProvider {
@@ -320,13 +324,13 @@ func compose(ctx context.Context, f flags, logger *slog.Logger, passcode uint32,
 	}
 	if f.media {
 		// The video player and content app (media.go), TESTING ONLY.
-		if devices.media, err = newDemoMedia(&policies, logger); err != nil {
+		if devices.media, err = newDemoMedia(policies, logger); err != nil {
 			return nil, nil, err
 		}
 	}
 	if f.otbr != "" {
 		// The ThreadBorderRouter endpoint (otbr.go), off by default.
-		if devices.otbr, err = newDemoBorderRouter(f.otbr, &policies, logger); err != nil {
+		if devices.otbr, err = newDemoBorderRouter(f.otbr, policies, logger); err != nil {
 			return nil, nil, err
 		}
 		if dump == nil {
@@ -346,10 +350,15 @@ func compose(ctx context.Context, f flags, logger *slog.Logger, passcode uint32,
 // the app pipe's configuration-version change, and the node-level
 // providers that name endpoints by StableKey.
 func assemble(ctx context.Context, devices *fleet, cfg node.Config, applier *otaApplier) (*node.Node, error) {
-	n, err := node.New(cfg) //nolint:contextcheck // the node's constructor takes no context; it loads the stores once
+	n, err := node.New(ctx, cfg)
 	if err != nil {
 		return nil, err
 	}
+	n.OnHealthSample(func(s node.HealthSample) {
+		if !s.Healthy {
+			cfg.Logger.Warn("health.listener", slog.String("note", s.Note))
+		}
+	})
 	ok := false
 	defer func() {
 		if !ok {
@@ -377,12 +386,13 @@ func assemble(ctx context.Context, devices *fleet, cfg node.Config, applier *ota
 	}
 	// The app pipe's SimulateConfigurationVersionChange raises every
 	// bridged device's ConfigurationVersion, persisted by the node.
-	devices.configChange = func() error { //nolint:contextcheck // the app pipe's command carries no context; the node persists with its own
-		errs := make([]error, 0, len(eps))
+	devices.configChange = func() error { //nolint:contextcheck // an app-pipe command, long after the assembly's ctx
+		keys := make([]device.SourceKey, 0, len(eps))
 		for _, ep := range eps {
-			errs = append(errs, agg.IncreaseConfigurationVersion(ep.Spec().StableKey))
+			keys = append(keys, ep.Spec().StableKey)
 		}
-		return errors.Join(errs...)
+		// One change of the node: each device once, the node once.
+		return agg.IncreaseConfigurationVersions(context.Background(), keys...)
 	}
 	// PowerSourceConfiguration and the demo actions name endpoints by
 	// their StableKey, resolved through the live topology.
@@ -396,11 +406,11 @@ func assemble(ctx context.Context, devices *fleet, cfg node.Config, applier *ota
 func nodeConfig(f flags, passcode uint32, discriminator uint16, tcp node.TCPConfig,
 	applier *otaApplier, actions contract.ClusterServer, logger *slog.Logger,
 ) node.Config {
-	return node.Config{
+	cfg := node.Config{
 		Network: node.Network{Listen: f.listen, TCP: tcp, MDNS: mdnsConfig(f)},
 		Commissioning: node.Commissioning{
 			Passcode: passcode, Discriminator: discriminator,
-			PBKDFIterations: f.iterations, Salt: []byte(f.salt),
+			PBKDFIterations: pbkdfIterations(f.iterations), Salt: []byte(f.salt),
 		},
 		ProductDescription: node.ProductDescription{VendorID: testVendorID, ProductID: testProductID},
 		BasicInformation: node.BasicInformation{
@@ -418,7 +428,7 @@ func nodeConfig(f flags, passcode uint32, discriminator uint16, tcp node.TCPConf
 		Store: node.Store{Path: f.dbPath},
 		// The OTA Software Update Requestor (ADR 0019) on the root, with
 		// the daemon's applier (ota.go).
-		OTA: &node.OtaConfig{Dir: applier.dir, Harness: applier.harness, Applier: applier},
+		OTA: &node.OTAConfig{Dir: applier.dir, Applier: applier},
 		FixedLabels: []fixedlabeldef.LabelStruct{
 			{Label: "role", Value: "bridge"},
 			{Label: "example", Value: "reference"},
@@ -429,13 +439,18 @@ func nodeConfig(f flags, passcode uint32, discriminator uint16, tcp node.TCPConf
 		AggregatorServers: []contract.ClusterServer{actions},
 		Logger:            logger,
 	}
+	if applier.harness {
+		// TESTING ONLY: the image applied in place (ota.go).
+		nodeseam.UseOTAHarness(&cfg)
+	}
+	return cfg
 }
 
 // mdnsConfig is the advertiser the node builds: none under
 // --advertise=false, the OS host name as SRV target under
 // --mdns-os-hostname.
 func mdnsConfig(f flags) node.MDNS {
-	m := node.MDNS{Disabled: !f.advertise}
+	m := node.MDNS{Off: !f.advertise}
 	if f.osHostName {
 		if h, err := os.Hostname(); err == nil && h != "" {
 			m.HostName = strings.TrimSuffix(h, ".local")
@@ -444,13 +459,25 @@ func mdnsConfig(f flags) node.MDNS {
 	return m
 }
 
+// pbkdfIterations is the --pbkdf-iterations count as the node's field;
+// checkFlags refused a count outside [node.PBKDFIterationsMin,
+// node.PBKDFIterationsMax], and one is 0 here, which node.Config.Validate
+// refuses by name.
+func pbkdfIterations(v int) uint32 {
+	if v < node.PBKDFIterationsMin || v > node.PBKDFIterationsMax {
+		return 0
+	}
+	return uint32(v)
+}
+
 // printPairingInfo writes the onboarding payload to stdout. It goes to stdout
 // rather than the log because it is the one thing an operator has to copy.
 func printPairingInfo(n *node.Node, discriminator uint16, passcode uint32) error {
-	qr, manual, err := n.PairingCodes()
+	payload, err := n.SetupPayload()
 	if err != nil {
 		return err
 	}
+	qr, manual := payload.QR, payload.Manual
 	br := n.Bridge()
 	topology := br.Topology()
 	bridged := 0

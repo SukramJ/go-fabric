@@ -127,6 +127,7 @@ var floors = []packageFloor{
 	{pkg: "github.com/SukramJ/go-fabric/thread/otbr/otbrtest", min: 97},
 	{pkg: "github.com/SukramJ/go-fabric/diagevent", min: 96},
 	{pkg: "github.com/SukramJ/go-fabric/eligibility", min: 90},
+	{pkg: "github.com/SukramJ/go-fabric/examples", min: 0, why: "test only, no statements to cover: the small examples' import guard (review 2026-11 W5-ex-02)"},
 	{pkg: "github.com/SukramJ/go-fabric/device", min: 97},
 	{pkg: "github.com/SukramJ/go-fabric/endpoint", min: 86},
 	// Brief BG: measured 86.9; the uncovered part is the error paths of a
@@ -141,8 +142,8 @@ var floors = []packageFloor{
 	{pkg: "github.com/SukramJ/go-fabric/endpoint/sqlitestore", min: 77},
 	{
 		pkg: "github.com/SukramJ/go-fabric/examples/host-view",
-		min: 34,
-		why: "brief CM §6: measured 34.8 once MarkComplete went (brief BU: 36.2). The tests drive the declared devices over the wire and on a node; run and main bind the network, which a unit test does not",
+		min: 32,
+		why: "brief CM §6: measured 34.8 once MarkComplete went (brief BU: 36.2); review 2026-11 W5: 32.7, run's new SetupPayload error path stops the node, and run binds the network, which a unit test does not. The tests drive the declared devices over the wire and on a node",
 	},
 	{
 		pkg: "github.com/SukramJ/go-fabric/examples/reference-bridge",

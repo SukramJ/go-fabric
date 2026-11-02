@@ -20,9 +20,11 @@ const (
 	ThermostatRevision uint16              = 7
 )
 
-// ThermostatType is the Thermostat device type, matter.js's packages/node/src/devices/thermostat.ts;
-// its cluster requirements are listed in docs/reference/device-types.md#thermostat.
-var ThermostatType = typeThermostat
+// ThermostatType returns the Thermostat device type, matter.js's packages/node/src/devices/thermostat.ts;
+// its cluster requirements are listed in docs/reference/device-types.md#thermostat. It is the registry's
+// value, the one [Lookup] and [FromSpec] return: a caller reads it and
+// does not modify it.
+func ThermostatType() *Type { return &typeThermostat }
 
 // typeThermostat holds [ThermostatType]'s cluster requirements.
 var typeThermostat = Type{

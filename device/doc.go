@@ -17,7 +17,7 @@
 // the write veto, the command handlers, the host port the module's server
 // runs on, or the host's own server (HostServer) — as a matter.js host
 // sets state and overrides a behavior. Declaring an optional cluster
-// mounts it. [WithServer] mounts the host's own server for a cluster
+// mounts it. [HostServer] mounts the host's own server for a cluster
 // without a typed package. [FromSpec] builds the same device from data.
 //
 // A device's typed accessors (DimmableLight.OnOff, …) wrap the server the

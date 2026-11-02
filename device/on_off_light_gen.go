@@ -20,9 +20,11 @@ const (
 	OnOffLightRevision uint16              = 4
 )
 
-// OnOffLightType is the OnOffLight device type, matter.js's packages/node/src/devices/on-off-light.ts;
-// its cluster requirements are listed in docs/reference/device-types.md#onofflight.
-var OnOffLightType = typeOnOffLight
+// OnOffLightType returns the OnOffLight device type, matter.js's packages/node/src/devices/on-off-light.ts;
+// its cluster requirements are listed in docs/reference/device-types.md#onofflight. It is the registry's
+// value, the one [Lookup] and [FromSpec] return: a caller reads it and
+// does not modify it.
+func OnOffLightType() *Type { return &typeOnOffLight }
 
 // typeOnOffLight holds [OnOffLightType]'s cluster requirements.
 var typeOnOffLight = Type{

@@ -143,23 +143,13 @@ func Types() []*Type {
 	return slices.Clone(committedTypes)
 }
 
-// TypeByID returns the generated device type id, or (nil, false).
-func TypeByID(id schema.DeviceTypeID) (*Type, bool) {
-	for _, t := range committedTypes {
-		if t.ID == id {
-			return t, true
-		}
-	}
-	return nil, false
-}
-
 // Lookup returns the generated device type of a device type id as the
 // Descriptor's DeviceTypeList carries it (a 32-bit devtype-id), or
 // (nil, false) for an id device/ does not generate: an id above 0xFFFF, a
-// manufacturer-specific or unknown one, and the snapshot device types
-// script/devicegen excludes (its excluded list: the media client
-// CastingVideoClient). It reads the generated registry (types_gen.go), so a
-// regeneration that commits a type makes Lookup find it.
+// manufacturer-specific or unknown one, and a snapshot device type
+// script/devicegen excludes (its excluded list, empty since wave 27-C2).
+// It reads the generated registry (types_gen.go), so a regeneration that
+// commits a type makes Lookup find it.
 //
 // A client view resolves a remote endpoint's device type through it, as
 // matter.js's ClientStructure resolves it through the model

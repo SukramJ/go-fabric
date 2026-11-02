@@ -39,7 +39,7 @@ type centralKey struct{ central, device string }
 
 func (k centralKey) String() string { return k.central + "/" + k.device }
 
-// TestHostTopology: with Config.Topology the bridge serves the host's own
+// TestHostTopology: with Config.Snapshotter the bridge serves the host's own
 // snapshotter — two scopes, each with its own completeness, host key
 // types — the facade builds no Aggregator, and the root's and Aggregator's
 // PartsList providers still see the host's endpoints.
@@ -67,7 +67,7 @@ func TestHostTopology(t *testing.T) {
 		spec.StableKey = key
 		return spec
 	}
-	cfg.Topology = func(ctx context.Context) (*endpoint.Topology, error) {
+	cfg.Snapshotter = func(ctx context.Context) (*endpoint.Topology, error) {
 		mu.Lock()
 		calls++
 		mu.Unlock()
@@ -211,18 +211,17 @@ func TestRemoveFabricFromHost(t *testing.T) {
 		removed  []node.FabricInfo
 		recAtObs bool
 	)
-	cfg.Observers.OnFabricRemoved = func(info node.FabricInfo) error {
+	cfg.Observers.OnFabricRemoved = func(info node.FabricInfo) {
 		mu.Lock()
 		defer mu.Unlock()
 		removed = append(removed, info)
 		recAtObs = hasOperationalRecord(adv)
-		return nil
 	}
 	n, c, _ := commissioned(t, cfg)
 	if !hasOperationalRecord(adv) {
 		t.Fatal("no operational record after commissioning")
 	}
-	if n.CommissioningWindow().IsOpen() {
+	if n.Bridge().CommissioningWindow().IsOpen() {
 		t.Fatal("the window is still open after commissioning")
 	}
 
@@ -239,7 +238,7 @@ func TestRemoveFabricFromHost(t *testing.T) {
 	// The own window reopens once the node is idle (no fail-safe, no
 	// session left), as matter.js #resetWhenIdle waits.
 	waitRecord(t, adv, "own window after the last fabric", func(_, mode uint64, ok bool) bool { return ok && mode == 1 })
-	if !n.CommissioningWindow().IsOpen() {
+	if !n.Bridge().CommissioningWindow().IsOpen() {
 		t.Error("the node's own window did not reopen")
 	}
 	mu.Lock()
@@ -399,7 +398,7 @@ func TestLastFabricReopenWaitsForTheFailSafe(t *testing.T) {
 		t.Fatalf("RemoveFabric: %v", err)
 	}
 	time.Sleep(4 * 250 * time.Millisecond)
-	if n.CommissioningWindow().IsOpen() {
+	if n.Bridge().CommissioningWindow().IsOpen() {
 		t.Fatal("the own window reopened while a fail-safe was armed")
 	}
 	n.Root().GeneralCommissioning.ExpireFailSafe(ctx)

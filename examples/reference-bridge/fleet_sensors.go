@@ -413,14 +413,14 @@ const (
 // declarations declare the sensor's clusters: AirQuality, the ten
 // concentrations, and EcosystemInformation (BridgedNode: optional) with
 // the demo directory that names this sensor (fleet_node.go).
-func (a *demoAirQualitySensor) declarations() []device.Option {
+func (a *demoAirQualitySensor) declarations() []device.Declaration {
 	quality := aqdef.AirQualityPoor
 	if co2PPM <= co2GoodBelow {
 		quality = aqdef.AirQualityGood
 	}
 	v := func(f float32) *float32 { return &f }
 	lo, hi := v(concentrationMin), v(concentrationMax)
-	return []device.Option{
+	return []device.Declaration{
 		aqdef.Declare{Initial: aqdef.Patch{AirQuality: &quality}},
 		co2def.Declare{Features: co2def.FeatureNumericMeasurement, Initial: co2def.Patch{
 			MeasuredValue: v(co2PPM), MinMeasuredValue: lo, MaxMeasuredValue: hi,

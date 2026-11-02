@@ -76,7 +76,7 @@ func mediaCases() []struct {
 } {
 	p := mediaPort{}
 	player := func(key string, decls ...Declaration) func() (*Device, error) {
-		return func() (*Device, error) { return New(&CastingVideoPlayerType, testOptions(key), decls...) }
+		return func() (*Device, error) { return New(CastingVideoPlayerType(), testOptions(key), decls...) }
 	}
 	inputs := []inputdef.InputInfoStruct{{Index: 1, InputType: inputdef.InputTypeHdmi, Name: "HDMI"}}
 	outputs := []outputdef.OutputInfoStruct{{Index: 1, OutputType: outputdef.OutputTypeHdmi, Name: "HDMI"}}
@@ -103,7 +103,7 @@ func mediaCases() []struct {
 		{woldef.ClusterID, player("wol", woldef.Declare{}), (*media.WakeOnLanServer)(nil)},
 		{ccdef.ClusterID, player("cc", ccdef.Declare{ContentControl: p}), (*media.ContentControlServer)(nil)},
 		{basicdef.ClusterID, func() (*Device, error) {
-			return New(&ContentAppType, testOptions("ab"), basicdef.Declare{Initial: basicdef.Patch{
+			return New(ContentAppType(), testOptions("ab"), basicdef.Declare{Initial: basicdef.Patch{
 				Application: &basicdef.ApplicationStruct{CatalogVendorId: 123, ApplicationId: "exampleid"}, AllowedVendorList: &vendors,
 			}})
 		}, (*media.AppBasicServer)(nil)},

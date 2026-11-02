@@ -17,6 +17,7 @@ import (
 	tsdef "github.com/SukramJ/go-fabric/cluster/spec/timesynchronization"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/endpoint"
+	"github.com/SukramJ/go-fabric/internal/deviceseam"
 	"github.com/SukramJ/go-fabric/schema"
 	"github.com/SukramJ/go-fabric/surface"
 )
@@ -48,37 +49,37 @@ var aheadByCluster = map[uint32]surface.AheadSet{
 	netcommdef.ClusterID: mattercore.NetworkCommissioningAhead,
 }
 
-// AheadRows returns the "Ahead of matter.js" register IDs the root
-// servers' declarations name, sorted: the rows a host enables in
-// [Config].Surface's Extensions to select their elements on the root.
+// AheadRows returns every "Ahead of matter.js" register ID the module's
+// server declarations name — the root servers' and the device layer's —
+// sorted and once each: the rows a host enables in [Config].Surface's
+// Extensions (surface.Policies.Extensions) to select their elements on
+// the root and on a device. The one answer to "which extensions exist"
+// (ADR 0030 Consequences; ADR 0025 principle 2).
 func AheadRows() []string {
 	var out []string
 	for _, s := range aheadByCluster {
-		for _, id := range s.IDs() {
-			if !slices.Contains(out, id) {
-				out = append(out, id)
-			}
-		}
+		out = append(out, s.IDs()...)
 	}
+	out = append(out, deviceseam.AheadRows()...)
 	slices.Sort(out)
-	return out
+	return slices.Compact(out)
 }
 
 // rootFeatures is the FeatureMap selection cfg makes for each root server
 // [aheadByCluster] names: TimeSynchronization's features
 // ([Config].TimeSynchronization; none without it, no entry when it is
 // disabled) and NetworkCommissioning's network interface — Wi-Fi with
-// [Network].WiFiCommissioning, Ethernet otherwise.
+// the Wi-Fi commissioning seam, Ethernet otherwise.
 func rootFeatures(cfg *Config) map[uint32]uint32 {
 	out := map[uint32]uint32{}
-	if !cfg.DisableTimeSynchronization {
+	if !cfg.TimeSynchronization.Off {
 		var f uint32
-		if cfg.TimeSynchronization != nil {
-			f = uint32(cfg.TimeSynchronization.Features)
+		if tc := cfg.TimeSynchronization.Config; tc != nil {
+			f = uint32(tc.Features)
 		}
 		out[tsdef.ClusterID] = f
 	}
-	if cfg.Network.WiFiCommissioning.Driver != nil {
+	if cfg.Network.wifiCommissioning.Driver != nil {
 		out[netcommdef.ClusterID] = mattercore.NetworkCommFeatureWiFi
 	} else {
 		out[netcommdef.ClusterID] = mattercore.NetworkCommFeatureEthernet
@@ -104,7 +105,7 @@ func rootCandidates(cfg *Config) []surface.Element {
 			}
 			out = append(out, surface.Element{
 				Cluster: cid, Kind: surface.KindFeature, ID: bit,
-				Origin: surface.OriginHostDeclared, Reference: surface.Reference{Ahead: row},
+				Provenance: surface.ProvenanceHostDeclared, Reference: surface.Reference{Ahead: row},
 			})
 		}
 	}
@@ -148,9 +149,9 @@ func composeRoot(cfg *Config) ([]surface.Decision, []surface.Element, error) {
 			// TimeSynchronization can lose a feature here.
 			continue
 		}
-		ts := *cfg.TimeSynchronization
+		ts := *cfg.TimeSynchronization.Config
 		ts.Features &^= tsdef.Feature(e.ID)
-		cfg.TimeSynchronization = &ts
+		cfg.TimeSynchronization.Config = &ts
 	}
 	return decisions, cands, nil
 }
@@ -217,12 +218,12 @@ func (n *Node) levelRootClusters() error {
 	cands := make([]surface.Element, 0, len(n.root.servers))
 	for _, s := range n.root.servers {
 		id := s.MatterClusterID()
-		el := surface.Element{Cluster: id, Kind: surface.KindCluster, ID: id, Origin: surface.OriginKitDefault}
+		el := surface.Element{Cluster: id, Kind: surface.KindCluster, ID: id, Provenance: surface.ProvenanceKitDefault}
 		switch {
 		case rootMandatory(id):
-			el.Origin, el.Mandatory = surface.OriginDeviceType, true
+			el.Provenance, el.Mandatory = surface.ProvenanceDeviceType, true
 		case configured[id]:
-			el.Origin = surface.OriginHostDeclared
+			el.Provenance = surface.ProvenanceHostDeclared
 		default:
 		}
 		el.Levels = surface.ElementLevels(el)

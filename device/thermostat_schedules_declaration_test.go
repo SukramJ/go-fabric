@@ -45,7 +45,7 @@ func TestThermostatDeclaresSchedules(t *testing.T) {
 	port := &switchingPort{}
 	// MSCH is ahead of matter.js (thermo.Ahead): the row is enabled.
 	schedulesOn := surface.Policies{Extensions: surface.NewExtensions("BD-chip-Thermostat-Schedules")}
-	d, err := device.NewThermostat(device.Options{StableKey: device.StringKey("thermo-msch"), Name: "thermo", Surface: &schedulesOn}, thermostatdef.Declare{
+	d, err := device.NewThermostat(device.Options{StableKey: device.StringKey("thermo-msch"), Name: "thermo", Surface: schedulesOn}, thermostatdef.Declare{
 		Features: thermostatdef.FeatureHeating | thermostatdef.FeatureMatterScheduleConfiguration,
 		Initial: thermostatdef.Patch{
 			ScheduleTypes: &types, NumberOfSchedules: &one, NumberOfScheduleTransitions: &transitions, Schedules: &schedules,

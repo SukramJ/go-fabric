@@ -10,6 +10,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"os"
 	"sort"
 	"strings"
 	"time"
@@ -81,6 +82,44 @@ func networkOptions(ssid, credentials, dataset string) (*commissioner.WiFiNetwor
 	return wifi, thread, nil
 }
 
+// The environment variables the network secrets come from when their flag
+// is not given, so the passphrase and the dataset need not be on the
+// command line, where ps and the shell history show them.
+const (
+	wifiCredentialsEnv = "GOFABRIC_WIFI_CREDENTIALS" //nolint:gosec // G101: the variable's name, not a credential
+	threadDatasetEnv   = "GOFABRIC_THREAD_DATASET"
+)
+
+// secret is a network secret's value: the flag's, read from the file it
+// names when it starts with "@" (a trailing newline dropped), or the
+// environment variable env when the flag is empty.
+func secret(flagName, value, env string) (string, error) {
+	if value == "" {
+		return os.Getenv(env), nil
+	}
+	path, ok := strings.CutPrefix(value, "@")
+	if !ok {
+		return value, nil
+	}
+	b, err := os.ReadFile(path) //nolint:gosec // the operator names the file
+	if err != nil {
+		return "", fmt.Errorf("%s: %w", flagName, err)
+	}
+	return strings.TrimRight(string(b), "\r\n"), nil
+}
+
+// networkSecrets is networkOptions over the secrets' sources ([secret]).
+func networkSecrets(ssid, credentials, dataset string) (*commissioner.WiFiNetwork, *commissioner.ThreadNetwork, error) {
+	credentials, err := secret("--wifi-credentials", credentials, wifiCredentialsEnv)
+	if err != nil {
+		return nil, nil, err
+	}
+	if dataset, err = secret("--thread-dataset", dataset, threadDatasetEnv); err != nil {
+		return nil, nil, err
+	}
+	return networkOptions(ssid, credentials, dataset)
+}
+
 // errNoBLE is pair --ble in a build without a BLE central.
 var errNoBLE = errors.New("this build has no BLE; build ble/bluez/cmd/reference-controller")
 
@@ -121,8 +160,8 @@ func cmdPair(e *env, args []string) error { //nolint:funlen // one flag per line
 		fs.BoolVar(&discoverProxies, "bluetooth-proxy-discover", false, "find ESPHome Bluetooth proxies over DNS-SD for --ble, beside any --bluetooth-proxy (needs the ESPHome build)")
 		fs.Var(&proxyKeys, "bluetooth-proxy-key", "the API key of a discovered proxy: name=key, the name its device name or MAC; repeatable (with --bluetooth-proxy-discover)")
 		fs.StringVar(&wifiSSID, "wifi-ssid", "", "the SSID of the Wi-Fi network the device is to join")
-		fs.StringVar(&wifiCredentials, "wifi-credentials", "", "the Wi-Fi network's passphrase (with --wifi-ssid)")
-		fs.StringVar(&threadDataset, "thread-dataset", "", "the Thread operational dataset the device is to join, as hex")
+		fs.StringVar(&wifiCredentials, "wifi-credentials", "", "the Wi-Fi network's passphrase (with --wifi-ssid), or @file; default $"+wifiCredentialsEnv)
+		fs.StringVar(&threadDataset, "thread-dataset", "", "the Thread operational dataset the device is to join, as hex, or @file; default $"+threadDatasetEnv)
 		fs.StringVar(&code, "code", "", "the QR code (MT:…) or the manual code (11 or 21 digits)")
 		fs.UintVar(&passcode, "passcode", 0, "the setup passcode (with --discriminator, instead of --code)")
 		fs.UintVar(&discriminator, "discriminator", 0, "the 12-bit long discriminator")
@@ -154,7 +193,7 @@ func cmdPair(e *env, args []string) error { //nolint:funlen // one flag per line
 	default:
 		return fmt.Errorf("usage: %s", commands["pair"].usage)
 	}
-	wifi, thread, err := networkOptions(wifiSSID, wifiCredentials, threadDataset)
+	wifi, thread, err := networkSecrets(wifiSSID, wifiCredentials, threadDataset)
 	if err != nil {
 		return err
 	}

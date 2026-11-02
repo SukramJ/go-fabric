@@ -34,7 +34,7 @@ const groupcastID uint32 = 0x0065
 func TestNodeRejectsAnUnknownLevel(t *testing.T) {
 	cfg := minimalConfig(openDB(t, filepath.Join(t.TempDir(), "level.db")))
 	cfg.Surface = surface.Policies{Level: "1.5"}
-	if _, err := node.New(cfg); !errors.Is(err, surface.ErrUnknownLevel) {
+	if _, err := node.New(context.Background(), cfg); !errors.Is(err, surface.ErrUnknownLevel) {
 		t.Fatalf("node.New at level 1.5: %v", err)
 	}
 }
@@ -95,7 +95,7 @@ func TestAddRecordsAWithheldDevice(t *testing.T) {
 	ctx := context.Background()
 	p := surface.Policies{Level: "1.4.2"}
 	n := surfaceNode(t, p)
-	d, err := device.NewClosure(device.Options{StableKey: endpoint.StringKey("garage"), Name: "garage", Surface: &p})
+	d, err := device.NewClosure(device.Options{StableKey: endpoint.StringKey("garage"), Name: "garage", Surface: p})
 	var w *surface.WithheldError
 	if !errors.As(err, &w) || d == nil {
 		t.Fatalf("NewClosure at 1.4.2: %v, %v", d, err)

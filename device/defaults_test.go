@@ -50,47 +50,47 @@ func TestSelfHeldDefaults(t *testing.T) {
 		build   func() (*Device, error)
 		want    any
 	}{
-		{0x0006, func() (*Device, error) { return New(&OnOffLightType, testOptions("oo")) }, (*onoff.Server)(nil)},
-		{0x0008, func() (*Device, error) { return New(&DimmableLightType, testOptions("lvl")) }, (*levelcontrol.Server)(nil)},
-		{0x0300, func() (*Device, error) { return New(&ColorTemperatureLightType, testOptions("cc")) }, (*light.ColorControlServer)(nil)},
-		{0x001E, func() (*Device, error) { return New(&OnOffLightSwitchType, testOptions("bind")) }, (*core.Binding)(nil)},
-		{0x0750, func() (*Device, error) { return New(&BridgedNodeType, testOptions("eco"), withOptional(0x0750)) }, (*core.EcosystemInformation)(nil)},
+		{0x0006, func() (*Device, error) { return New(OnOffLightType(), testOptions("oo")) }, (*onoff.Server)(nil)},
+		{0x0008, func() (*Device, error) { return New(DimmableLightType(), testOptions("lvl")) }, (*levelcontrol.Server)(nil)},
+		{0x0300, func() (*Device, error) { return New(ColorTemperatureLightType(), testOptions("cc")) }, (*light.ColorControlServer)(nil)},
+		{0x001E, func() (*Device, error) { return New(OnOffLightSwitchType(), testOptions("bind")) }, (*core.Binding)(nil)},
+		{0x0750, func() (*Device, error) { return New(BridgedNodeType(), testOptions("eco"), withOptional(0x0750)) }, (*core.EcosystemInformation)(nil)},
 		// The Base device type's optional clusters, on a type that does not
 		// list them (base.go).
-		{0x0040, func() (*Device, error) { return New(&OnOffLightType, testOptions("fl"), withOptional(0x0040)) }, (*spec.Server)(nil)},
-		{0x0041, func() (*Device, error) { return New(&OnOffLightType, testOptions("ul"), withOptional(0x0041)) }, (*spec.Server)(nil)},
+		{0x0040, func() (*Device, error) { return New(OnOffLightType(), testOptions("fl"), withOptional(0x0040)) }, (*spec.Server)(nil)},
+		{0x0041, func() (*Device, error) { return New(OnOffLightType(), testOptions("ul"), withOptional(0x0041)) }, (*spec.Server)(nil)},
 		{0x003B, func() (*Device, error) {
-			return New(&GenericSwitchType, testOptions("sw"), withFeatures(0x003B, uint32(swdef.FeatureMomentarySwitch)))
+			return New(GenericSwitchType(), testOptions("sw"), withFeatures(0x003B, uint32(swdef.FeatureMomentarySwitch)))
 		}, (*switchserver.Server)(nil)},
 		{0x0101, func() (*Device, error) {
-			return New(&DoorLockType, testOptions("dl"), withFeatures(0x0101, uint32(lockdef.FeatureUnbolting)))
+			return New(DoorLockType(), testOptions("dl"), withFeatures(0x0101, uint32(lockdef.FeatureUnbolting)))
 		}, (*lock.DoorLockServer)(nil)},
 		{0x0102, func() (*Device, error) {
-			return New(&WindowCoveringType, testOptions("wc"), withFeatures(0x0102, cover.ServedFeatureMap))
+			return New(WindowCoveringType(), testOptions("wc"), withFeatures(0x0102, cover.ServedFeatureMap))
 		}, (*cover.WindowCoveringServer)(nil)},
 		{0x0201, func() (*Device, error) {
-			return New(&ThermostatType, testOptions("th"), withFeatures(0x0201, thermo.ThermostatFeatureHEAT))
+			return New(ThermostatType(), testOptions("th"), withFeatures(0x0201, thermo.ThermostatFeatureHEAT))
 		}, (*thermo.ThermostatServer)(nil)},
 		{0x0053, func() (*Device, error) {
-			return New(&LaundryWasherType, testOptions("lw"), withOptional(0x0053), withFeatures(0x0053, uint32(lwcdef.FeatureSpin)))
+			return New(LaundryWasherType(), testOptions("lw"), withOptional(0x0053), withFeatures(0x0053, uint32(lwcdef.FeatureSpin)))
 		}, (*appliance.WasherServer)(nil)},
-		{0x0057, optIn(&RefrigeratorType, 0x0057), (*alarmbase.Server)(nil)},
-		{0x005D, optIn(&DishwasherType, 0x005D), (*alarmbase.Server)(nil)},
-		{0x0071, optIn(&AirPurifierType, 0x0071), (*filter.Server)(nil)},
-		{0x0072, optIn(&AirPurifierType, 0x0072), (*filter.Server)(nil)},
-		{0x0080, optIn(&ContactSensorType, 0x0080), (*boolcfg.Server)(nil)},
-		{0x0095, optIn(&ElectricalEnergyTariffType, 0x0095), (*energy.CommodityPriceServer)(nil)},
-		{0x0099, func() (*Device, error) { return New(&EnergyEvseType, testOptions("evse")) }, (*energy.EvseServer)(nil)},
-		{0x00A0, optIn(&ElectricalEnergyTariffType, 0x00A0), (*energy.GridConditionsServer)(nil)},
+		{0x0057, optIn(RefrigeratorType(), 0x0057), (*alarmbase.Server)(nil)},
+		{0x005D, optIn(DishwasherType(), 0x005D), (*alarmbase.Server)(nil)},
+		{0x0071, optIn(AirPurifierType(), 0x0071), (*filter.Server)(nil)},
+		{0x0072, optIn(AirPurifierType(), 0x0072), (*filter.Server)(nil)},
+		{0x0080, optIn(ContactSensorType(), 0x0080), (*boolcfg.Server)(nil)},
+		{0x0095, optIn(ElectricalEnergyTariffType(), 0x0095), (*energy.CommodityPriceServer)(nil)},
+		{0x0099, func() (*Device, error) { return New(EnergyEvseType(), testOptions("evse")) }, (*energy.EvseServer)(nil)},
+		{0x00A0, optIn(ElectricalEnergyTariffType(), 0x00A0), (*energy.GridConditionsServer)(nil)},
 		{0x0204, func() (*Device, error) {
-			return New(&ThermostatType, testOptions("tui"), withFeatures(0x0201, thermo.ThermostatFeatureHEAT), withOptional(0x0204))
+			return New(ThermostatType(), testOptions("tui"), withFeatures(0x0201, thermo.ThermostatFeatureHEAT), withOptional(0x0204))
 		}, (*thermo.ThermostatUIServer)(nil)},
 		{0x0B07, func() (*Device, error) {
-			return New(&ElectricalMeterType, testOptions("meter"), withOptional(0x0B07), withFeatures(0x0090, uint32(epmdef.FeatureAlternatingCurrent)),
+			return New(ElectricalMeterType(), testOptions("meter"), withOptional(0x0B07), withFeatures(0x0090, uint32(epmdef.FeatureAlternatingCurrent)),
 				withFeatures(0x0091, uint32(eemdef.FeatureImportedEnergy|eemdef.FeatureCumulativeEnergy)))
 		}, (*energy.CommodityMeteringServer)(nil)},
-		{0x0451, func() (*Device, error) { return New(&NetworkInfrastructureManagerType, testOptions("nim")) }, (*netinfra.WiFiManagementServer)(nil)},
-		{0x0453, func() (*Device, error) { return New(&NetworkInfrastructureManagerType, testOptions("nim-tnd")) }, (*netinfra.ThreadDirectoryServer)(nil)},
+		{0x0451, func() (*Device, error) { return New(NetworkInfrastructureManagerType(), testOptions("nim")) }, (*netinfra.WiFiManagementServer)(nil)},
+		{0x0453, func() (*Device, error) { return New(NetworkInfrastructureManagerType(), testOptions("nim-tnd")) }, (*netinfra.ThreadDirectoryServer)(nil)},
 	}
 	covered := map[uint32]bool{}
 	for _, tc := range slices.Concat(cases, portCases(), declaredCases(), mediaCases(), cameraCases(), threadbrCases(), sensingCases(), jointFabricCases()) {
@@ -142,14 +142,14 @@ func TestSelfHeldDefaults(t *testing.T) {
 // (TestSelfHeldFactoriesRefuseASelectionTheyDoNotServe).
 func TestADeclaredSelectionTheServerDoesNotServeIsRefused(t *testing.T) {
 	t.Parallel()
-	wc, err := New(&WindowCoveringType, testOptions("wc2"), wcdef.Declare{Features: wcdef.FeatureLift})
+	wc, err := New(WindowCoveringType(), testOptions("wc2"), wcdef.Declare{Features: wcdef.FeatureLift})
 	if err != nil {
 		t.Fatalf("WindowCovering Lift alone: %v", err)
 	}
 	if _, ok := wc.Server(wcdef.ClusterID).(*cover.WindowCoveringServer); !ok {
 		t.Errorf("WindowCovering Lift alone: %T, want the self-held cover", wc.Server(wcdef.ClusterID))
 	}
-	dl, err := New(&DoorLockType, testOptions("dl"))
+	dl, err := New(DoorLockType(), testOptions("dl"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -164,12 +164,12 @@ func TestADeclaredSelectionTheServerDoesNotServeIsRefused(t *testing.T) {
 // for — keeps the generated server (by_design
 // BD-Matter-SelfHeldDefault-SelectionNotServed), and the kit logs one Info
 // line naming the cluster, the selection and the reason.
-func TestADefaultSelectionKeepsTheGeneratedServer(t *testing.T) { //nolint:paralleltest // swaps the package Logger
+func TestADefaultSelectionKeepsTheGeneratedServer(t *testing.T) {
+	t.Parallel()
 	var logs bytes.Buffer
-	saved := Logger
-	Logger = slog.New(slog.NewTextHandler(&logs, nil))
-	t.Cleanup(func() { Logger = saved })
-	d, err := New(&PumpType, testOptions("pump"), pumpdef.Declare{Features: pumpdef.FeatureConstantSpeed})
+	opts := testOptions("pump")
+	opts.Logger = slog.New(slog.NewTextHandler(&logs, nil))
+	d, err := New(PumpType(), opts, pumpdef.Declare{Features: pumpdef.FeatureConstantSpeed})
 	if err != nil {
 		t.Fatal(err)
 	}

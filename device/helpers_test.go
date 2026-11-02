@@ -102,12 +102,12 @@ func violationsOf(topo *endpoint.Topology) []endpoint.DeviceTypeViolation {
 // There is no public form of these: a host declares the cluster.
 
 // withFeatures states the FeatureMap selection of a cluster.
-func withFeatures(clusterID, features uint32) Option {
+func withFeatures(clusterID, features uint32) Declaration {
 	return clusterOption{decl: spec.ClusterDeclaration{Cluster: clusterID, Features: features, HasFeatures: true}, mount: true}
 }
 
 // withInitial states initial attribute values of a cluster.
-func withInitial(clusterID uint32, values map[uint32]any) Option {
+func withInitial(clusterID uint32, values map[uint32]any) Declaration {
 	initial := maps.Clone(values)
 	if initial == nil {
 		initial = map[uint32]any{}
@@ -116,16 +116,16 @@ func withInitial(clusterID uint32, values map[uint32]any) Option {
 }
 
 // withElements states optional elements of a cluster.
-func withElements(clusterID uint32, opts spec.Options) Option {
+func withElements(clusterID uint32, opts spec.Options) Declaration {
 	return clusterOption{decl: spec.ClusterDeclaration{Cluster: clusterID, Elements: opts}, mount: true}
 }
 
 // withOptional mounts an optional cluster with its default server.
-func withOptional(clusterID uint32) Option {
+func withOptional(clusterID uint32) Declaration {
 	return clusterOption{decl: spec.ClusterDeclaration{Cluster: clusterID}, mount: true}
 }
 
 // withServer states the host's own server of a cluster.
-func withServer(srv contract.ClusterServer) Option {
+func withServer(srv contract.ClusterServer) Declaration {
 	return clusterOption{decl: spec.ClusterDeclaration{Cluster: srv.MatterClusterID(), Server: srv}}
 }

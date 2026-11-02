@@ -19,9 +19,11 @@ const (
 	WaterHeaterRevision uint16              = 1
 )
 
-// WaterHeaterType is the WaterHeater device type, matter.js's packages/node/src/devices/water-heater.ts;
-// its cluster requirements are listed in docs/reference/device-types.md#waterheater.
-var WaterHeaterType = typeWaterHeater
+// WaterHeaterType returns the WaterHeater device type, matter.js's packages/node/src/devices/water-heater.ts;
+// its cluster requirements are listed in docs/reference/device-types.md#waterheater. It is the registry's
+// value, the one [Lookup] and [FromSpec] return: a caller reads it and
+// does not modify it.
+func WaterHeaterType() *Type { return &typeWaterHeater }
 
 // typeWaterHeater holds [WaterHeaterType]'s cluster requirements.
 var typeWaterHeater = Type{

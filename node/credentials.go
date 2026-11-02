@@ -5,7 +5,6 @@ package node
 
 import (
 	"fmt"
-	"math"
 	"time"
 
 	"github.com/SukramJ/go-fabric/bridge"
@@ -74,31 +73,20 @@ func NewWindowCredentials(timeout time.Duration) (WindowCredentials, error) {
 // node's own window default) — a fresh window secret is
 // NewCommissioningCredentials().WindowCredentials(timeout).
 func (c Commissioning) WindowCredentials(timeout time.Duration) WindowCredentials {
-	// Clamped to uint32's range through int64, so the bound is a valid
-	// constant on a 32-bit int too; OpenBasicWindow refuses what lies
-	// outside [PBKDFIterationsMin, PBKDFIterationsMax].
-	v := int64(c.PBKDFIterations)
-	if v < 0 {
-		v = 0
-	}
-	if v > math.MaxUint32 {
-		v = math.MaxUint32
-	}
-	iterations := uint32(v)
 	return WindowCredentials{
-		Discriminator: c.Discriminator,
-		Passcode:      c.Passcode,
-		Iterations:    iterations,
-		Salt:          append([]byte(nil), c.Salt...),
-		Timeout:       timeout,
+		Discriminator:   c.Discriminator,
+		Passcode:        c.Passcode,
+		PBKDFIterations: c.PBKDFIterations,
+		Salt:            append([]byte(nil), c.Salt...),
+		Timeout:         timeout,
 	}
 }
 
 // PairingCodesFor returns the QR code payload and the manual pairing code
 // of a window the host opens with its own credentials
 // ([Node.OpenBasicWindow]): creds' passcode and discriminator under the
-// node's vendor and product, on-network discovery — what [Node.PairingCodes]
-// returns for the configured secret.
+// node's vendor and product, on-network discovery — what
+// [Node.SetupPayload] returns for the configured secret.
 func (n *Node) PairingCodesFor(creds WindowCredentials) (qr, manual string, err error) {
 	return pairingCodes(n.cfg.ProductDescription, creds.Discriminator, creds.Passcode)
 }

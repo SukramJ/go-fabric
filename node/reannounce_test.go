@@ -72,8 +72,8 @@ func TestReannounceLoop(t *testing.T) {
 			adv := &reannouncer{Noop: mdns.NewNoop()}
 			cfg := minimalConfig(openDB(t, filepath.Join(t.TempDir(), "node.db")))
 			cfg.Advertiser = adv
-			cfg.Network.ReannounceInterval = tc.interval
-			cfg.Network.DisableReannounce = tc.disable
+			cfg.Network.Reannounce.Interval = tc.interval
+			cfg.Network.Reannounce.Off = tc.disable
 			n := newNode(t, cfg)
 			if got, _, _ := adv.state(); len(got) != 0 {
 				t.Fatalf("loop started by New: %v", got)
@@ -122,7 +122,7 @@ func TestReannounceLoop(t *testing.T) {
 	}
 
 	cfg := minimalConfig(openDB(t, filepath.Join(t.TempDir(), "bad.db")))
-	cfg.Network.ReannounceInterval = -time.Second
+	cfg.Network.Reannounce.Interval = -time.Second
 	if err := cfg.Validate(); !errors.Is(err, node.ErrInvalidConfig) {
 		t.Errorf("negative interval: %v", err)
 	}

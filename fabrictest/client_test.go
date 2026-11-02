@@ -29,7 +29,7 @@ func TestDeviceClientStackOnTheSite(t *testing.T) {
 	site := fabrictest.NewSite(t, fabrictest.Options{})
 	ctx := testContext(t)
 	c := site.AddController(fabrictest.ControllerOptions{})
-	a := site.AddDevice(fabrictest.Topology{Configure: func(cfg *node.Config) { cfg.Client.Enabled = true }})
+	a := site.AddDevice(fabrictest.Topology{Configure: func(cfg *node.Config) { cfg.Client = &node.ClientConfig{} }})
 	light, err := device.NewOnOffLight(device.Options{StableKey: endpoint.StringKey("light:1"), Name: "light"})
 	if err != nil {
 		t.Fatal(err)
@@ -42,7 +42,7 @@ func TestDeviceClientStackOnTheSite(t *testing.T) {
 		t.Fatal(err)
 	}
 	if b.Peers() != nil {
-		t.Fatal("device B has a client stack without node.Client.Enabled")
+		t.Fatal("device B has a client stack without node.Config.Client")
 	}
 	fa := onlyFabric(ctx, t, a)
 	fb := onlyFabric(ctx, t, b)

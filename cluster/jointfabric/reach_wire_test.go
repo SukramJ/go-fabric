@@ -44,7 +44,7 @@ func TestAnnounceThroughTheNodesCommissionerReach(t *testing.T) {
 		admin, _ := jfa.Server(jfadef.ClusterID).(*jointfabric.Administrator)
 		return jfa, admin
 	}
-	withClient := func(cfg *node.Config) { cfg.Client.Enabled = true }
+	withClient := func(cfg *node.Config) { cfg.Client = &node.ClientConfig{} }
 	site := fabrictest.NewSite(t, fabrictest.Options{Clock: clock.System{}})
 	announcerKit, announcerAdmin := kit("announcer")
 	targetKit, targetAdmin := kit("target")

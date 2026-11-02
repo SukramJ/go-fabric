@@ -17,9 +17,11 @@ const (
 	SpeakerRevision uint16              = 1
 )
 
-// SpeakerType is the Speaker device type, matter.js's packages/node/src/devices/speaker.ts;
-// its cluster requirements are listed in docs/reference/device-types.md#speaker.
-var SpeakerType = typeSpeaker
+// SpeakerType returns the Speaker device type, matter.js's packages/node/src/devices/speaker.ts;
+// its cluster requirements are listed in docs/reference/device-types.md#speaker. It is the registry's
+// value, the one [Lookup] and [FromSpec] return: a caller reads it and
+// does not modify it.
+func SpeakerType() *Type { return &typeSpeaker }
 
 // typeSpeaker holds [SpeakerType]'s cluster requirements.
 var typeSpeaker = Type{

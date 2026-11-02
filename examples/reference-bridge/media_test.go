@@ -25,13 +25,14 @@ import (
 	targetdef "github.com/SukramJ/go-fabric/cluster/spec/targetnavigator"
 	woldef "github.com/SukramJ/go-fabric/cluster/spec/wakeonlan"
 	"github.com/SukramJ/go-fabric/endpoint"
+	"github.com/SukramJ/go-fabric/surface"
 )
 
 // startMediaFleet is a fleet with --media on a started node.
 func startMediaFleet(t *testing.T) (f *fleet, player, app *endpoint.Endpoint, br *matterbridge.Bridge) {
 	t.Helper()
 	f = newFleet()
-	m, err := newDemoMedia(nil, slog.New(slog.DiscardHandler))
+	m, err := newDemoMedia(surface.Policies{}, slog.New(slog.DiscardHandler))
 	if err != nil {
 		t.Fatal(err)
 	}

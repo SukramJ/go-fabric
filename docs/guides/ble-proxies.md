@@ -99,15 +99,19 @@ keys := esphome.Keys{
 	"kitchen-proxy":     kitchenKey, // by the device's name …
 	"AA:BB:CC:DD:EE:FF": hallKey,    // … or by its MAC
 }
-proxies, err := esphome.Discover(ctx, names, keys, 3*time.Second)
+proxies, err := esphome.Discover(ctx, esphome.Options{
+	Logger:   log, // nil is slog.Default
+	Discover: &esphome.DiscoverOptions{Browser: names, Keys: keys, Timeout: 3 * time.Second},
+})
 ```
 
 Keys are per device, by name or by MAC (any spelling; a name matches first).
 A device without a key is used only when it answers plaintext; one that
 advertises `api_encryption` without a key in `Keys` is not dialled at all.
 Every device left out — no key, a wrong key, no `bluetooth_proxy: active:
-true`, unreachable — is logged as `ble.esphome.proxy_skipped` with the
-reason.
+true`, unreachable — is logged on `Options.Logger` as
+`ble.esphome.proxy_skipped` with the reason; `Options.Clock` paces the
+browse and the connections.
 
 A central keeps the discovered set current when `Options.Discover` is set:
 

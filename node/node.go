@@ -40,6 +40,11 @@ import (
 // restarted; a host builds a new one on the same store.
 var ErrStopped = errors.New("node: stopped")
 
+// ErrNotStarted is returned by a call that needs the running node's
+// assembled topology before [Node.Start] assembled it
+// ([Aggregator.IncreaseConfigurationVersions]).
+var ErrNotStarted = errors.New("node: not started")
+
 // operationalTimeInterval is how often the operational time is persisted
 // while the node runs (the daemon's time.Minute, main.go:430 at b4ea1f96^).
 const operationalTimeInterval = time.Minute
@@ -94,6 +99,16 @@ type Node struct {
 	// ownsAdvertiser is set when New built the advertiser (a nil
 	// Config.Advertiser), so a failed New closes it.
 	ownsAdvertiser bool
+	// sessionEvents turns session and subscription changes into the
+	// Observers' session hooks (sessions_events.go).
+	sessionEvents sessionEvents
+	// healthListeners and otaStatusListeners are the host's On…
+	// callbacks of the health probe and the OTA provider.
+	healthListeners    listeners[HealthSample]
+	otaStatusListeners listeners[otaProviderStatus]
+	// subtypeResponder is the DNS-SD subtype responder of the node's own
+	// advertiser, started by Start; nil with a host's advertiser.
+	subtypeResponder *mdns.SubtypeResponder
 	// attestationErr is the load error of Attestation.Files under
 	// BlockCommissioningOnError (attestation.go).
 	attestationErr error
@@ -152,16 +167,24 @@ type Node struct {
 //
 // Nothing is left as a noop except what the configuration omits on
 // purpose: a nil Advertiser is the node's own (Zeroconf with the subtype
-// responder, or Noop under Network.MDNS.Disabled), a nil OTA
+// responder, or Noop under Network.MDNS.Off), a nil OTA
 // mounts no OTA requestor. The TestEventTrigger enable key is not armed
 // (Root().GeneralDiagnostics.EnableTestEventTriggers is the host's), and
 // SetOnReassembled stays the bridge's nil-safe hook for the host (a
 // fabric's installation is Config.Observers.OnFabricAdded).
 //
-// New starts the subscription engine and the PASE / CASE reapers, as the
-// daemon does before Start; call [Node.Stop] to end them, whether or not
-// the node was started.
-func New(cfg Config) (*Node, error) { //nolint:funlen // the composition root: one sequential wiring pass, as main.go
+// New opens and migrates the store, loads the group state and reads the
+// store under ctx, so a host bounds or cancels the construction; it
+// starts no goroutine of its own. The subscription engine, the session,
+// PASE and CASE reapers and the DNS-SD subtype responder start in
+// [Node.Start], so a node that is built and dropped leaks nothing but
+// what the host handed it (ADR 0026 principle 5). The one exception is
+// the opt-in client stack ([Config].Client), whose socket and discovery
+// cache open here. [Node.Stop] releases what New opened, whether or not
+// the node was started. ctx bounds New only: the node's lifetime is its
+// own, ended by Stop. Mirrors matter.js ServerNode.create, the awaited
+// construction (packages/node/src/node/ServerNode.ts:107-127).
+func New(ctx context.Context, cfg Config) (*Node, error) { //nolint:funlen // the composition root: one sequential wiring pass, as main.go
 	// The root's surface is decided before anything is opened or built.
 	rootDecisions, rootCandidates, err := validateAndComposeRoot(&cfg)
 	if err != nil {
@@ -171,21 +194,15 @@ func New(cfg Config) (*Node, error) { //nolint:funlen // the composition root: o
 	if err != nil {
 		return nil, err
 	}
-	// Before anything derives a UniqueID (persist.go uniqueID, the
-	// assembler's bridged endpoints).
-	if cfg.BootID.RotateUniqueIDs {
-		enableBootIDRotation()
-	}
 	if cfg.Logger == nil {
 		cfg.Logger = slog.Default()
 	}
-	ctx := context.Background()
 	cfg.Clock = clock.Or(cfg.Clock)
 	n := &Node{
 		cfg: cfg, logger: cfg.Logger, advertiser: cfg.Advertiser, callbacks: newCallbackQueue(cfg.Clock), bootReason: mattercore.BootReasonPowerOnReboot,
 		attestationErr: attestationErr,
 	}
-	n.life, n.cancel = context.WithCancel(ctx)
+	n.life, n.cancel = context.WithCancel(context.WithoutCancel(ctx))
 	n.surfaceDigest = cfg.Surface.Digest()
 	n.rootDecisions, n.rootCandidates = rootDecisions, rootCandidates
 	ok := false
@@ -225,9 +242,9 @@ func New(cfg Config) (*Node, error) { //nolint:funlen // the composition root: o
 
 	// --- the topology assembler and the Aggregator (main.go:167-186 at b4ea1f96^) ----
 	// A host with its own assembler supplies the bridge's Snapshotter
-	// instead (Config.Topology), as the daemon did before the facade.
+	// instead (Config.Snapshotter), as the daemon did before the facade.
 	pd, bi := cfg.ProductDescription, cfg.BasicInformation
-	snapshotter := cfg.Topology
+	snapshotter := cfg.Snapshotter
 	if snapshotter == nil {
 		n.assembler, err = endpoint.New(n.cfg.Store.Endpoints, endpoint.Config{
 			VendorID:           pd.VendorID,
@@ -276,7 +293,7 @@ func New(cfg Config) (*Node, error) { //nolint:funlen // the composition root: o
 	if err := n.groups.Load(ctx); err != nil {
 		return nil, fmt.Errorf("node: group state: %w", err)
 	}
-	n.br.AttachGroupMessaging(n.groups)
+	n.br.AttachGroupMessaging(n.groups) //nolint:contextcheck // the reconcile hook runs per group change, for the node's lifetime, not New's call
 	n.br.AttachAuxiliaryACL(n.groups)
 	// A bounded trace of the moments that explain a failed pairing
 	// (main.go:247-251 at b4ea1f96^).
@@ -339,9 +356,10 @@ func New(cfg Config) (*Node, error) { //nolint:funlen // the composition root: o
 
 	// --- sessions, PASE, CASE (main.go:323-328 at b4ea1f96^) -------------------------
 	cm := cfg.Commissioning
-	n.sec = wireSecurity(n.life, n.br, n.st, n.root, n.caseIDs, paseParams{
-		passcode: cm.Passcode, salt: cm.Salt, iterations: cm.PBKDFIterations,
-	}, responderSessionParams(cfg.Network.TCP, cfg.MaxPathsPerInvoke, cfg.Sessions), cfg.Limits, n.logger)
+	n.sec = wireSecurity(n.br, n.st, n.root, n.caseIDs, paseParams{ //nolint:contextcheck // the handshake hooks run per session, for the node's lifetime, not New's call
+		passcode: cm.Passcode, salt: cm.Salt, iterations: int(cm.PBKDFIterations), life: n.life,
+	}, responderSessionParams(cfg.Network.TCP, cfg.MaxPathsPerInvoke, cfg.Sessions), cfg.Limits, n.logger, &n.sessionEvents)
+	n.sessionEvents.n = n
 	n.wireICD()
 
 	// --- the commissioning window (main.go:329-360 at b4ea1f96^) ---------------------
@@ -352,9 +370,9 @@ func New(cfg Config) (*Node, error) { //nolint:funlen // the composition root: o
 	n.window = &commissioningHost{
 		br: n.br, sessions: n.sec.sessions, root: n.root, logger: n.logger,
 		baseline: n.sec.pase, advert: advert, observers: n.observerList,
-		responderParams: n.sec.responderParams,
+		responderParams: n.sec.responderParams, life: n.life,
 	}
-	wireCommissioningWindow(n.life, n.window, n.st)
+	wireCommissioningWindow(n.life, n.window, n.st) //nolint:contextcheck // the window lives as long as the node: n.life, not New's ctx
 
 	// --- fabric hooks (main.go:362-414 at b4ea1f96^) ---------------------------------
 	// The host's observers run after each (observers.go).
@@ -366,15 +384,15 @@ func New(cfg Config) (*Node, error) { //nolint:funlen // the composition root: o
 	if ceiling, found, cErr := n.st.GetMetadataCounter(ctx, store.MetadataKeyEventNumber); cErr == nil && found {
 		n.br.EventLog().SeedNumber(ceiling)
 	}
-	n.br.EventLog().SetCounterPersistence(func(ceiling uint64) {
+	n.br.EventLog().SetCounterPersistence(func(ceiling uint64) { //nolint:contextcheck // runs per event-number ceiling, for the node's lifetime
 		if err := n.st.SetMetadataCounter(context.Background(), store.MetadataKeyEventNumber, ceiling); err != nil {
 			n.logger.Warn("eventlog.persist_ceiling", slog.Any("err", err))
 		}
 	}, 0)
 
 	// --- the client stack and the binding manager (brief AO) -------------
-	if cfg.Client.Enabled {
-		if n.client, err = n.newClientStack(); err != nil {
+	if cfg.Client != nil {
+		if n.client, err = n.newClientStack(); err != nil { //nolint:contextcheck // the client stack runs for the node's lifetime, not New's call
 			return nil, err
 		}
 	}
@@ -617,7 +635,7 @@ func (n *Node) observedFabricInstalled(ctx context.Context, fabricIndex uint8, f
 	}
 	for _, o := range obs {
 		if fn := o.OnFabricAdded; fn != nil {
-			observe(n.logger, "fabric_added", func() error { return fn(info) })
+			observe(n.logger, "fabric_added", func() { fn(info) })
 		}
 	}
 }
@@ -637,7 +655,7 @@ func (n *Node) observedFabricRemoved(ctx context.Context, fabricIndex uint8) {
 	n.fabricRemoved(ctx, fabricIndex)
 	for _, o := range n.observerList() {
 		if fn := o.OnFabricRemoved; fn != nil {
-			observe(n.logger, "fabric_removed", func() error { return fn(info) })
+			observe(n.logger, "fabric_removed", func() { fn(info) })
 		}
 	}
 }
@@ -675,7 +693,7 @@ func (n *Node) commissioningCompleted(ctx context.Context, fabricIndex uint8) {
 	n.ensureRequestorACL(ctx)
 	for _, o := range n.observerList() {
 		if fn := o.OnCommissioningComplete; fn != nil {
-			observe(n.logger, "commissioning_complete", func() error { return fn(fabricIndex) })
+			observe(n.logger, "commissioning_complete", func() { fn(fabricIndex) })
 		}
 	}
 }
@@ -690,7 +708,7 @@ func (n *Node) notifyFabricUpdated(ctx context.Context, fabricIndex uint8) {
 	info, _ := n.fabricInfo(ctx, fabricIndex)
 	for _, o := range obs {
 		if fn := o.OnFabricUpdated; fn != nil {
-			observe(n.logger, "fabric_updated", func() error { return fn(info) })
+			observe(n.logger, "fabric_updated", func() { fn(info) })
 		}
 	}
 }
@@ -703,6 +721,18 @@ func (n *Node) notifyFabricUpdated(ctx context.Context, fabricIndex uint8) {
 // the OTA requestor, their operational records, and the node's own
 // commissioning window when no fabric exists. Start is idempotent, as
 // matter.js Node.start (Node.ts:114-132); after Stop it is [ErrStopped].
+//
+// The node counts as started once Start completed. A Start that fails
+// leaves the node startable, as matter.js's Node.start does — it sets the
+// target state back to "offline" and rethrows (Node.ts:113-128): the node
+// is not started, a later Start runs the whole start path again, and
+// what New opened (the store file of Store.Path) stays open until Stop.
+// Every step that can fail — the DataModelTest check, the PartsList
+// providers, the bridge's start (topology, sockets) — runs before
+// anything is started, and the bridge's start undoes its own partial
+// work (bridge.Bridge.Start), so a failed Start leaves no goroutine, no
+// socket and no open window behind. A host that gives up calls Stop;
+// [Node.Run] does.
 func (n *Node) Start(ctx context.Context) error {
 	n.mu.Lock()
 	defer n.mu.Unlock()
@@ -712,6 +742,16 @@ func (n *Node) Start(ctx context.Context) error {
 	case n.started.Load():
 		return nil
 	}
+	if err := n.startLocked(ctx); err != nil {
+		return err
+	}
+	n.started.Store(true)
+	return nil
+}
+
+// startLocked is Start's work; n.mu is held. It fails only before it has
+// started anything (see Start): every fallible step comes first.
+func (n *Node) startLocked(ctx context.Context) error {
 	// The start is work in hand of the node's in-flight group but for its
 	// wait on the controllers of re-established subscriptions: a
 	// fabrictest site does not move its clock under the start's own work,
@@ -727,13 +767,29 @@ func (n *Node) Start(ctx context.Context) error {
 	if err := n.checkDataModelTest(); err != nil {
 		return err
 	}
+	// The root's and the Aggregator's PartsList providers read the live
+	// topology on each read; attaching them needs only the root servers,
+	// so it is checked before anything starts.
+	if err := attachPartsListProviders(n.br); err != nil {
+		return err
+	}
+	// The bridge's start is the last step that can fail; it leaves
+	// nothing bound or published when it does (bridge.Bridge.Start).
 	if err := n.br.Start(ctx); err != nil {
 		return fmt.Errorf("node: bridge start: %w", err)
+	}
+	// The goroutines New leaves unstarted (ADR 0026 principle 5): the
+	// subscription engine, the session, PASE and CASE reapers, the subtype
+	// responder — all bounded by the node's lifetime, and started only
+	// once the start can no longer fail, so a failed Start leaves none
+	// running (the engine cannot be restarted once stopped).
+	n.sec.start(n.life) //nolint:contextcheck // the engine and the reapers run for the node's lifetime, not the call's
+	if n.subtypeResponder != nil {
+		n.subtypeResponder.Start(n.life) //nolint:contextcheck // as above
 	}
 	// The assembled surface against the one a previous run persisted: a
 	// change raises the ConfigurationVersions (surface_stability.go).
 	n.announceSurface(ctx)
-	n.started.Store(true)
 	n.callbacks.Start()
 	if n.agg != nil {
 		n.agg.setStarted()
@@ -753,9 +809,6 @@ func (n *Node) Start(ctx context.Context) error {
 		keepOperationalTime(n.life, n.cfg.Clock, n.st, n.root.GeneralDiagnostics, operationalTimeInterval, n.logger)
 	}()
 
-	if err := attachPartsListProviders(n.br); err != nil {
-		return err
-	}
 	n.ensureOTAProviderACL(ctx)
 	n.camerasOnline(ctx)
 
@@ -823,6 +876,11 @@ func (n *Node) Start(ctx context.Context) error {
 func (n *Node) Stop(ctx context.Context) error {
 	n.mu.Lock()
 	defer n.mu.Unlock()
+	return n.stopLocked(ctx)
+}
+
+// stopLocked is Stop's work; n.mu is held.
+func (n *Node) stopLocked(ctx context.Context) error {
 	if n.stopped {
 		return nil
 	}
@@ -928,10 +986,11 @@ func newCallbackQueue(clk clock.Clock) *serialqueue.Queue {
 }
 
 // Run starts the node, waits for ctx to end and stops it — matter.js
-// Node.run (Node.ts:183-186).
+// Node.run (Node.ts:183-186). A Start that fails is followed by Stop, so
+// Run releases what New opened either way.
 func (n *Node) Run(ctx context.Context) error {
 	if err := n.Start(ctx); err != nil {
-		return err
+		return errors.Join(err, n.Stop(context.WithoutCancel(ctx)))
 	}
 	<-ctx.Done()
 	stopCtx, cancel := clock.WithTimeout(context.WithoutCancel(ctx), n.cfg.Clock, stopTimeout)
@@ -952,7 +1011,7 @@ func (n *Node) LocalAddr() string { return n.br.LocalAddr() }
 func (n *Node) Root() *RootClusters { return n.root }
 
 // Aggregator returns the Aggregator endpoint's bridged-device set — nil
-// when the host assembles its own topology ([Config].Topology).
+// when the host assembles its own topology ([Config].Snapshotter).
 func (n *Node) Aggregator() *Aggregator { return n.agg }
 
 // Sessions returns the secure-session manager, for a host's diagnostics
@@ -980,9 +1039,6 @@ func (n *Node) Subscriptions() *SubscriptionManager { return n.sec.subs }
 func (n *Node) RemoveFabric(ctx context.Context, fabricIndex uint8) error {
 	return n.root.OperationalCredentials.RemoveFabric(ctx, fabricIndex)
 }
-
-// CommissioningWindow returns the commissioning window.
-func (n *Node) CommissioningWindow() *CommissioningWindow { return n.br.CommissioningWindow() }
 
 // SetCommissioningBlocked refuses every new commissioning while err is
 // non-nil — the node's own window (at Start and after the last fabric is
@@ -1023,8 +1079,8 @@ func (n *Node) FabricInfos(ctx context.Context) ([]FabricInfo, error) {
 
 // UniqueID returns the BasicInformation UniqueID the node serves: the
 // host's [BasicInformation].UniqueID, else the value the node pinned in
-// its store at the first boot (or, with [BootID].RotateUniqueIDs, this
-// boot's value).
+// its store at the first boot (or, once bootid.EnableRotation ran in the
+// process, this boot's value).
 func (n *Node) UniqueID() string { return n.cfg.BasicInformation.UniqueID }
 
 // BootReason returns the GeneralDiagnostics BootReason the node was built
@@ -1039,7 +1095,7 @@ func (n *Node) Store() store.Port { return n.st }
 // Persistence is the endpoint-level persistence (scene tables, bridged
 // NodeLabels) the facade's assembler uses: [Config].EndpointPersistence
 // when set, else the facade's own over [Node.Store] — what a host with its
-// own assembler ([Config].Topology) hands that assembler (issue #117).
+// own assembler ([Config].Snapshotter) hands that assembler (issue #117).
 func (n *Node) Persistence() EndpointPersistence { return n.endpoints }
 
 // Groups returns the group state the node runs on — [Config].Groups, or
@@ -1048,15 +1104,6 @@ func (n *Node) Persistence() EndpointPersistence { return n.endpoints }
 // Groups servers, the bridge's group-message routing and the root's
 // GroupKeyManagement share one state.
 func (n *Node) Groups() *Groups { return n.groups }
-
-// PairingCodes returns the QR code payload and the manual pairing code of
-// the configured passcode and discriminator — matter.js
-// `commissioning.pairingCodes` (CommissioningServer.ts:400-410), as the
-// daemon prints them (main.go:504-518 at b4ea1f96^).
-func (n *Node) PairingCodes() (qr, manual string, err error) {
-	cm := n.cfg.Commissioning
-	return pairingCodes(n.cfg.ProductDescription, cm.Discriminator, cm.Passcode)
-}
 
 // ringLogs serves DiagnosticLogs RetrieveLogsRequest from the diagnostic
 // event ring, one line per event (the daemon's ringLogs, wiring.go:

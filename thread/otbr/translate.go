@@ -205,10 +205,10 @@ func translateChildTable(list []any) ([]thread.ChildTableEntry, error) {
 // optional runs a field's translation and keeps the field only when it
 // succeeds — one node's malformed record must not abort the mesh view
 // (optionalField, translation.ts:26-38).
-func optional[T any](field string, fn func() (T, error)) *T {
+func optional[T any](log *slog.Logger, field string, fn func() (T, error)) *T {
 	v, err := fn()
 	if err != nil {
-		slog.Debug("otbr.diagnostics.field_skipped", slog.String("field", field), slog.Any("err", err))
+		log.Debug("otbr.diagnostics.field_skipped", slog.String("field", field), slog.Any("err", err))
 		return nil
 	}
 	return &v
@@ -216,16 +216,23 @@ func optional[T any](field string, fn func() (T, error)) *T {
 
 // Translate types one /diagnostics entry, keys already normalized
 // (translateNodeJson, translation.ts:264-377): a field the entry does not
-// carry, or carries in an unexpected shape, stays nil. An entry that is
-// not an object is [CodeProtocol].
+// carry, or carries in an unexpected shape, stays nil, logged at debug
+// level on slog.Default (a [BorderRouter] logs on its
+// [BorderRouterConfig].Logger). An entry that is not an object is
+// [CodeProtocol].
 func Translate(entry any) (thread.DiagnosticResponse, error) {
+	return translateEntry(entry, slog.Default())
+}
+
+// translateEntry is [Translate] with the logger of the skipped fields.
+func translateEntry(entry any, log *slog.Logger) (thread.DiagnosticResponse, error) {
 	rec, ok := entry.(map[string]any)
 	if !ok {
 		return thread.DiagnosticResponse{}, protocolError("translateNodeJson: input is not an object")
 	}
 	var out thread.DiagnosticResponse
 	if s, ok := rec["extAddress"].(string); ok { // :276-279
-		if b := optional("extAddress", func() ([]byte, error) { return parseHexBytes(s, "extAddress", 8) }); b != nil {
+		if b := optional(log, "extAddress", func() ([]byte, error) { return parseHexBytes(s, "extAddress", 8) }); b != nil {
 			out.ExtMACAddress = *b
 		}
 	}
@@ -233,22 +240,22 @@ func Translate(entry any) (thread.DiagnosticResponse, error) {
 		out.Rloc16 = &r
 	}
 	if m, ok := rec["mode"].(map[string]any); ok { // :284-285
-		out.Mode = optional("mode", func() (thread.Mode, error) { return translateMode(m) })
+		out.Mode = optional(log, "mode", func() (thread.Mode, error) { return translateMode(m) })
 	}
 	if r, ok := rec["route"].(map[string]any); ok { // :295-296
-		out.Route64 = optional("route", func() (thread.Route64, error) { return translateRoute(r) })
+		out.Route64 = optional(log, "route", func() (thread.Route64, error) { return translateRoute(r) })
 	}
 	if l, ok := rec["leaderData"].(map[string]any); ok { // :298-300
-		out.LeaderData = optional("leaderData", func() (thread.LeaderData, error) { return leaderData(l, "leaderData") })
+		out.LeaderData = optional(log, "leaderData", func() (thread.LeaderData, error) { return leaderData(l, "leaderData") })
 	}
 	if m, ok := rec["macCounters"].(map[string]any); ok { // :327-329
-		out.MacCounters = optional("macCounters", func() (thread.MacCounters, error) { return translateMacCounters(m) })
+		out.MacCounters = optional(log, "macCounters", func() (thread.MacCounters, error) { return translateMacCounters(m) })
 	}
 	if m, ok := rec["mleCounters"].(map[string]any); ok { // :331-333
-		out.MleCounters = optional("mleCounters", func() (thread.MleCounters, error) { return translateMleCounters(m) })
+		out.MleCounters = optional(log, "mleCounters", func() (thread.MleCounters, error) { return translateMleCounters(m) })
 	}
 	if l, ok := rec["childTable"].([]any); ok { // :335-337
-		if t := optional("childTable", func() ([]thread.ChildTableEntry, error) { return translateChildTable(l) }); t != nil {
+		if t := optional(log, "childTable", func() ([]thread.ChildTableEntry, error) { return translateChildTable(l) }); t != nil {
 			out.ChildTable = *t
 		}
 	}

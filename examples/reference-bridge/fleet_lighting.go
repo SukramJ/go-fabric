@@ -91,7 +91,7 @@ func newDemoColorLight(name string) *dimmer {
 // against it (TC-CC-3.x to 9.x). ScenesManagement is the assembler's: the
 // device type mandates it, and the assembler mounts the stack's server
 // there.
-func (s *dimmer) lightingDeclarations() []device.Option {
+func (s *dimmer) lightingDeclarations() []device.Declaration {
 	minMireds, maxMireds, mireds := lightMinMireds, lightMaxMireds, lightInitialMireds
 	color := colorcontroldef.Declare{
 		Transitions:            true,
@@ -104,7 +104,7 @@ func (s *dimmer) lightingDeclarations() []device.Option {
 		color.Features = extendedColorFeatures
 		color.ColorWriter = lampColorWriter{name: s.name}
 	}
-	return []device.Option{levelcontroldef.Declare{LevelSource: s, Transitions: true}, color}
+	return []device.Declaration{levelcontroldef.Declare{LevelSource: s, Transitions: true}, color}
 }
 
 // ceilingColorWriter is where a real host would push the colour

@@ -24,16 +24,19 @@ import (
 	"github.com/SukramJ/go-fabric/node"
 )
 
-// Config is the node configuration of spec: its socket, commissioning
+// Config is the node configuration of spec: its socket (IPv4 only when
+// spec.Listen names an IPv4 host, as a lab network without IPv6 needs),
+// commissioning
 // window, product, database and OTA provider, the controller's logger
-// and clock.
+// and clock. The provider's status observer is a node callback, not
+// configuration: [Observe] registers it on the node New built.
 func Config(spec controller.OwnNodeSpec) node.Config {
 	p := spec.Provider
 	return node.Config{
-		Network:    node.Network{Listen: spec.Listen},
+		Network:    node.Network{Listen: spec.Listen, PreferIPv4: isIPv4Listen(spec.Listen)},
 		Advertiser: spec.Advertiser,
 		Commissioning: node.Commissioning{
-			Passcode: spec.Passcode, Discriminator: spec.Discriminator, PBKDFIterations: spec.Iterations, Salt: spec.Salt,
+			Passcode: spec.Passcode, Discriminator: spec.Discriminator, PBKDFIterations: pbkdfIterations(spec.Iterations), Salt: spec.Salt,
 		},
 		ProductDescription: node.ProductDescription{VendorID: spec.VendorID, ProductID: spec.ProductID},
 		BasicInformation: node.BasicInformation{
@@ -43,21 +46,43 @@ func Config(spec controller.OwnNodeSpec) node.Config {
 		Store: node.Store{DB: spec.DB},
 		OTAProvider: &node.OTAProviderConfig{
 			ImageSource: p.ImageSource, Consent: p.Consent, ApplyPolicy: p.ApplyPolicy, BDXMaxBlockSize: p.BDXMaxBlockSize,
-			OnStatusChange: p.OnStatusChange, RebootQuery: p.RebootQuery, TransferBlockSize: p.TransferBlockSize,
+			RebootQuery: p.RebootQuery, TransferBlockSize: p.TransferBlockSize,
 		},
 		Logger: spec.Logger,
 		Clock:  spec.Clock,
 	}
 }
 
+// pbkdfIterations is the controller's iteration count as the node's
+// field; a count outside [node.PBKDFIterationsMin, node.PBKDFIterationsMax]
+// is 0, which node.Config.Validate refuses by name.
+func pbkdfIterations(v int) uint32 {
+	if v < node.PBKDFIterationsMin || v > node.PBKDFIterationsMax {
+		return 0
+	}
+	return uint32(v)
+}
+
+// isIPv4Listen reports whether a listen address names an IPv4 host.
+func isIPv4Listen(addr string) bool {
+	host, _, err := net.SplitHostPort(addr)
+	if err != nil {
+		return false
+	}
+	ip := net.ParseIP(host)
+	return ip != nil && ip.To4() != nil
+}
+
 // Start is node.New and Start over [Config]; the address is the node's
-// socket, loopback for an unspecified one.
+// socket, the loopback of its family for an unspecified one.
 func Start(ctx context.Context, spec controller.OwnNodeSpec) (controller.OwnNode, *net.UDPAddr, error) {
-	n, err := node.New(Config(spec)) //nolint:contextcheck // node.New takes no context; the node's own work runs on its own
+	n, err := node.New(ctx, Config(spec))
 	if err != nil {
 		return nil, nil, err
 	}
+	Observe(n, spec)
 	if err := n.Start(ctx); err != nil {
+		_ = n.Stop(context.WithoutCancel(ctx)) // a failed Start leaves the node startable and its store open
 		return nil, nil, err
 	}
 	addr, err := net.ResolveUDPAddr("udp", n.Bridge().LocalAddr())
@@ -67,8 +92,19 @@ func Start(ctx context.Context, spec controller.OwnNodeSpec) (controller.OwnNode
 	}
 	if addr.IP.IsUnspecified() {
 		addr.IP = net.IPv6loopback
+		if isIPv4Listen(spec.Listen) {
+			addr.IP = net.IPv4(127, 0, 0, 1)
+		}
 	}
 	return Wrap(n), addr, nil
+}
+
+// Observe registers spec's callbacks on n, the node built from [Config]:
+// the provider's status observer ([node.Node.OnOTAProviderStatus]).
+// [Start] calls it; a host that builds the node from Config itself calls
+// it once after node.New. It returns the unsubscribe function.
+func Observe(n *node.Node, spec controller.OwnNodeSpec) (unsubscribe func()) {
+	return n.OnOTAProviderStatus(spec.Provider.OnStatusChange)
 }
 
 // Wrap is n as the controller's own node.

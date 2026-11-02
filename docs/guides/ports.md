@@ -66,17 +66,17 @@ these interfaces does not drag the host's dependencies into the module.
 | `SwitchEventEmitter` | the module (`cluster/switch.Server`) | the press gestures a host narrates (InitialPress, ShortRelease, LongPress, LongRelease); handed to a source with `WireMatterSwitchHandler` | — |
 | `SwitchPositionSink` | the module (`cluster/switch.Server`) | the positions a host reports (`SetRawPosition` debounced, `SetCurrentPosition`); the server derives every Switch event, multi press included, as matter.js `SwitchServer.ts` does; handed to a source with `WireMatterSwitchPositions` | a source without either method reports no press |
 
-*Source: `contract/doc.go:4-18`, `contract/matter.go:21-260`, `contract/matter.go:299-441`, `contract/matter.go:573-871`, `contract/switchevents.go:26`, `contract/switchevents.go:54`.*
+*Source: `contract/doc.go:4-18`, `contract/matter.go:21-260`, `contract/matter.go:298-440`, `contract/matter.go:540-837`, `contract/switchevents.go:26`, `contract/switchevents.go:54`.*
 
 ## `node.Config`: the facade's ports
 
 | Field | What it does | When nil or zero |
 | --- | --- | --- |
 | `Store` | `Path` (a SQLite file the node opens and closes), `DB`, or both `Credentials` and `Endpoints` | `New` refuses the configuration |
-| `Advertiser` | publishes the node over DNS-SD | the node's own `mdns.Zeroconf` with the subtype responder, shaped by `Network.MDNS`; with `Network.MDNS.Disabled` it is `mdns.NewNoop()`: nothing is discoverable, and the bridge logs `matter.mdns.commissioning_not_advertised` |
+| `Advertiser` | publishes the node over DNS-SD | the node's own `mdns.Zeroconf` with the subtype responder, shaped by `Network.MDNS`; with `Network.MDNS.Off` it is `mdns.NewNoop()`: nothing is discoverable, and the bridge logs `matter.mdns.commissioning_not_advertised` |
 | `Attestation` | DAC, PAI and Certification Declaration; `Files` names them on disk and `New` loads them | the CSA test chain and test CD: pairable everywhere, not shippable |
 | `Health` | the listener probe on the node's clock; `Node.Health` returns the last verdict | no probe |
-| `OTA` (`OtaConfig`) | mounts the OTA Software Update Requestor; `Applier` carries out an update | no requestor. A nil `Applier` is the facade's own, which validates the image and keeps it under `Dir/applied` |
+| `OTA` (`OTAConfig`) | mounts the OTA Software Update Requestor; `Applier` carries out an update | no requestor. A nil `Applier` is the facade's own, which validates the image and keeps it under `Dir/applied` |
 | `OTAProvider` | serves OTA images over BDX from an OtaProvider endpoint | no provider (also with a nil `ImageSource`). A nil `Consent` declines an image that needs consent; a nil `ApplyPolicy` proceeds at once |
 | `CommissionerControl` | mounts CommissionerControl on the Aggregator; `Approver` and `Commissioner` are required | no server |
 | `Network.WiFi.Reporter` | mounts WiFiNetworkDiagnostics and states the RootNode condition WiFi | no Wi-Fi diagnostics. EthernetNetworkDiagnostics is always mounted, with every link value null |
@@ -85,7 +85,7 @@ these interfaces does not drag the host's dependencies into the module.
 | `Groups` | the group state, for a host with its own assembler | the facade builds one over the credential store |
 | `Topology` | the host's own `bridge.Snapshotter`. The topology it returns comes from an `endpoint.Assembler` over the host's `endpoint.Spec`s; `Endpoint` and `Topology` are read-only to a host | the facade's Aggregator under one scope |
 | `AggregatorServers` | extra servers on the Aggregator (an Actions server, say) | none |
-| `Observers` | the host's callbacks on fabric, commissioning and window events; `Node.Observe` registers more on a running node, each after these, in registration order, until its unsubscribe | nothing observes. An observer's error or panic is logged, never returned |
+| `Observers` | the host's callbacks on fabric, commissioning and window events; `Node.Observe` (inline) and `Node.ObserveAsync` (queued) register more on a running node, each after these, in registration order, until its unsubscribe | nothing observes. An observer's panic is logged, never returned |
 | `Metrics` | the node's named counters and gauges ([Observability](observability.md)); `node/metrics/expvar` publishes them on expvar | nothing recorded |
 | `Diagnostics` | the capacity of the diagnostic trace (`Node.DiagnosticEvents`) | 256 events |
 | `Logger` | the node's logger; the attribute keys and event names are in [Observability](observability.md) | `slog.Default()` |

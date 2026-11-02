@@ -6,7 +6,9 @@ package node
 import (
 	"fmt"
 
+	"github.com/SukramJ/go-fabric/bdx"
 	"github.com/SukramJ/go-fabric/bridge"
+	"github.com/SukramJ/go-fabric/client/discovery"
 	mattercore "github.com/SukramJ/go-fabric/cluster/core"
 	"github.com/SukramJ/go-fabric/cluster/wire"
 	"github.com/SukramJ/go-fabric/diagevent"
@@ -14,6 +16,7 @@ import (
 	"github.com/SukramJ/go-fabric/im/subscription"
 	"github.com/SukramJ/go-fabric/secure/attestation"
 	"github.com/SukramJ/go-fabric/secure/operational"
+	"github.com/SukramJ/go-fabric/secure/sessionparams"
 	"github.com/SukramJ/go-fabric/secure/setup"
 	"github.com/SukramJ/go-fabric/secure/spake2"
 )
@@ -26,7 +29,7 @@ import (
 // original keeps compiling. docs/guides/advanced-seams.md lists what stays
 // reachable only below the facade.
 
-// Snapshotter is the type of [Config].Topology: a host that assembles its
+// Snapshotter is the type of [Config].Snapshotter: a host that assembles its
 // own endpoints returns one [Topology] per call ([bridge.Snapshotter]).
 type Snapshotter = bridge.Snapshotter
 
@@ -37,10 +40,6 @@ type Topology = endpoint.Topology
 // TCPConfig is the type of [Network].TCP: the Matter TCP roles
 // ([bridge.TCPConfig]).
 type TCPConfig = bridge.TCPConfig
-
-// CommissioningWindow is the commissioning window [Node.CommissioningWindow]
-// returns ([bridge.CommissioningWindow]).
-type CommissioningWindow = bridge.CommissioningWindow
 
 // SessionManager is the secure-session table [Node.Sessions] returns
 // ([operational.Manager]): Sessions lists the PASE and CASE sessions,
@@ -62,7 +61,7 @@ type DiagnosticEvent = diagevent.Event
 var (
 	// ErrAdministratorWindowOpen refuses the node's own window while an
 	// administrator's window is open ([Node.OpenBasicWindow],
-	// CommissioningWindow().OpenOwnWindow).
+	// [Node.OpenOwnWindow]).
 	ErrAdministratorWindowOpen = bridge.ErrAdministratorWindowOpen
 	// ErrCommissioningBlocked is wrapped by every window open refused
 	// while [Node.SetCommissioningBlocked] holds an error.
@@ -143,10 +142,10 @@ type OTAApplyPolicy = mattercore.OTAApplyPolicy
 // OTAPeer names the requestor an [OTAProviderConfig] callback is about ([mattercore.OTAPeer]).
 type OTAPeer = mattercore.OTAPeer
 
-// OTAUpdateStatus is the status [OTAProviderConfig].OnStatusChange reports for a requestor ([mattercore.OTAUpdateStatus]).
+// OTAUpdateStatus is the status [Node.OnOTAProviderStatus] reports for a requestor ([mattercore.OTAUpdateStatus]).
 type OTAUpdateStatus = mattercore.OTAUpdateStatus
 
-// OTAApplier is the type of [OtaConfig].Applier: the requestor's consent and apply hooks ([mattercore.OtaApplier]).
+// OTAApplier is the type of [OTAConfig].Applier: the requestor's consent and apply hooks ([mattercore.OtaApplier]).
 type OTAApplier = mattercore.OtaApplier
 
 // WiFiReporter is the type of [WiFi].Reporter: the live Wi-Fi diagnostics the host reports ([mattercore.WiFiReporter]).
@@ -172,3 +171,26 @@ type WindowStatus = wire.WindowStatusSnapshot
 
 // AttestationChain is the type of [Attestation].Chain: the DAC, its key and the PAI ([attestation.Chain]).
 type AttestationChain = attestation.Chain
+
+// The lower-layer types the advanced seams return, under names the facade
+// owns (ADR 0025 principle 3): a host names them without importing the
+// package below, and code written against the originals keeps compiling.
+type (
+	// SessionParameters is what [Node.SessionParameters] returns: the
+	// session parameters the node's PASE and CASE responders advertise
+	// ([sessionparams.Parameters], controller/client.SessionParameters on
+	// the controller side).
+	SessionParameters = sessionparams.Parameters
+	// OTAProviderServer is the OTA Software Update Provider
+	// [Node.OTAProvider] returns ([mattercore.OTAProvider]).
+	OTAProviderServer = mattercore.OTAProvider
+	// BDXResponder is the BDX responder [Node.BDX] returns
+	// ([bdx.Responder]).
+	BDXResponder = bdx.Responder
+	// CommissionerControlServer is the CommissionerControl server
+	// [Node.CommissionerControl] returns ([mattercore.CommissionerControl]).
+	CommissionerControlServer = mattercore.CommissionerControl
+	// DiscoveryNames is the DNS-SD cache of [ClientConfig].Names
+	// ([discovery.Names]).
+	DiscoveryNames = discovery.Names
+)

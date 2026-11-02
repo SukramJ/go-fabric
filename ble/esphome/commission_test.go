@@ -140,7 +140,7 @@ func pairOverBLE(t *testing.T, key string, discover bool) {
 	t.Helper()
 	drv := &wifiDriver{}
 	site, dev, c := siteController(t, fabrictest.Topology{Configure: func(cfg *node.Config) {
-		cfg.Network.WiFiCommissioning = node.WiFiCommissioning{Driver: drv}
+		fabrictest.UseWiFiCommissioning(cfg, drv)
 	}})
 	p := dev.BLE()
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)

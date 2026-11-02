@@ -40,6 +40,7 @@ import (
 	"github.com/SukramJ/go-fabric/controller/ca"
 	"github.com/SukramJ/go-fabric/controller/commissioner"
 	"github.com/SukramJ/go-fabric/im"
+	"github.com/SukramJ/go-fabric/internal/nodeseam"
 	"github.com/SukramJ/go-fabric/mdns"
 	"github.com/SukramJ/go-fabric/node"
 	"github.com/SukramJ/go-fabric/transport/udp"
@@ -168,7 +169,7 @@ func liveNode(t *testing.T, name string, edit func(*node.Config)) *node.Node {
 	if edit != nil {
 		edit(&cfg)
 	}
-	n, err := node.New(cfg)
+	n, err := node.New(context.Background(), cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -233,13 +234,14 @@ func TestLiveOTAProvider(t *testing.T) {
 				img:   mattercore.OTAImage{FileDesignator: bdx.FileDesignator("fff1-8001-v2.ota"), SoftwareVersion: 2, SoftwareVersionString: "2"},
 				bytes: image,
 			},
-			OnStatusChange: statuses.add,
 		}
 	})
+	provider.OnOTAProviderStatus(statuses.add)
 	requestor := liveNode(t, "requestor", func(c *node.Config) {
 		// Harness mode applies in place and reports the update as after a
 		// restart (node/ota.go otaApplier).
-		c.OTA = &node.OtaConfig{Dir: filepath.Join(t.TempDir(), "ota"), Harness: true}
+		c.OTA = &node.OTAConfig{Dir: filepath.Join(t.TempDir(), "ota")}
+		nodeseam.UseOTAHarness(c)
 	})
 
 	f := newLiveFabric(t)

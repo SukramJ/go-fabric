@@ -83,8 +83,8 @@ func (w *demoWiFi) seed() {
 
 // nodeConfig is the node's Network.WiFi for the simulated link: PKTCNT and
 // ERRCNT, and CurrentMaxRate.
-func (w *demoWiFi) nodeConfig() node.WiFi {
-	return node.WiFi{
+func (w *demoWiFi) nodeConfig() *node.WiFi {
+	return &node.WiFi{
 		Reporter:   w,
 		Features:   wifidiagdef.FeaturePacketCounts | wifidiagdef.FeatureErrorCounts,
 		Attributes: []uint32{wifidiagdef.AttrCurrentMaxRate},

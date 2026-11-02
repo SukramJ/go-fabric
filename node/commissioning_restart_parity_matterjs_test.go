@@ -74,7 +74,7 @@ func TestCommissioningRestart(t *testing.T) {
 
 		var status wire.CommissioningWindowStatus
 		if err := p.Device.Act(func(n *node.Node) error {
-			status = n.CommissioningWindow().CurrentWindow().Status
+			status = n.Bridge().CommissioningWindow().CurrentWindow().Status
 			return nil
 		}); err != nil {
 			t.Fatal(err)

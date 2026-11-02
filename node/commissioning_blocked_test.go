@@ -37,16 +37,16 @@ func TestCommissioningBlockedUncommissioned(t *testing.T) {
 		t.Fatalf("Start: %v", err)
 	}
 	time.Sleep(200 * time.Millisecond)
-	if _, _, ok := commissionableRecord(adv); ok || n.CommissioningWindow().IsOpen() {
+	if _, _, ok := commissionableRecord(adv); ok || n.Bridge().CommissioningWindow().IsOpen() {
 		t.Fatal("a blocked uncommissioned node opened its own window / advertised CM")
 	}
 	if err := n.OpenBasicWindow(ctx, randomCredentials(t, time.Minute)); !errors.Is(err, bridge.ErrCommissioningBlocked) || !errors.Is(err, errChainNotLoaded) {
 		t.Errorf("OpenBasicWindow: %v, want ErrCommissioningBlocked wrapping the host's cause", err)
 	}
-	if err := n.CommissioningWindow().OpenOwnWindow(ctx, time.Minute); !errors.Is(err, bridge.ErrCommissioningBlocked) {
+	if err := n.Bridge().CommissioningWindow().OpenOwnWindow(ctx, time.Minute); !errors.Is(err, bridge.ErrCommissioningBlocked) {
 		t.Errorf("OpenOwnWindow: %v, want ErrCommissioningBlocked", err)
 	}
-	if err := n.CommissioningWindow().OpenWindow(ctx, wire.OpenWindowParams{CommissioningTimeoutSeconds: 180}); !errors.Is(err, bridge.ErrCommissioningBlocked) {
+	if err := n.Bridge().CommissioningWindow().OpenWindow(ctx, wire.OpenWindowParams{CommissioningTimeoutSeconds: 180}); !errors.Is(err, bridge.ErrCommissioningBlocked) {
 		t.Errorf("OpenWindow: %v, want ErrCommissioningBlocked", err)
 	}
 
@@ -74,7 +74,7 @@ func TestCommissioningBlockedRefusesAdministrator(t *testing.T) {
 		t.Fatalf("OpenBasicWindow before the block: %v", err)
 	}
 	n.SetCommissioningBlocked(ctx, errChainNotLoaded)
-	if n.CommissioningWindow().IsOpen() {
+	if n.Bridge().CommissioningWindow().IsOpen() {
 		t.Fatal("the open window survived the block")
 	}
 
@@ -90,7 +90,7 @@ func TestCommissioningBlockedRefusesAdministrator(t *testing.T) {
 	if !errors.As(err, &se) || se.Status != im.StatusFailure || se.ClusterStatus != nil {
 		t.Fatalf("OpenCommissioningWindow while blocked: %v, want FAILURE without a cluster status", err)
 	}
-	if n.CommissioningWindow().IsOpen() {
+	if n.Bridge().CommissioningWindow().IsOpen() {
 		t.Error("OpenCommissioningWindow opened a window while blocked")
 	}
 
@@ -127,7 +127,7 @@ func TestStartDoesNotOpenWindowWhenStoredFabricsFailToLoad(t *testing.T) {
 		t.Fatalf("Start: %v", err)
 	}
 	time.Sleep(200 * time.Millisecond)
-	if _, _, ok := commissionableRecord(adv); ok || n.CommissioningWindow().IsOpen() {
+	if _, _, ok := commissionableRecord(adv); ok || n.Bridge().CommissioningWindow().IsOpen() {
 		t.Fatal("a node whose stored fabric failed to load opened its commissioning window")
 	}
 }

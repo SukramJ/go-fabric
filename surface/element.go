@@ -38,40 +38,42 @@ func (k Kind) MarshalText() ([]byte, error) { return marshalEnum(kindNames, k) }
 // UnmarshalText implements [encoding.TextUnmarshaler].
 func (k *Kind) UnmarshalText(b []byte) error { return unmarshalEnum(kindNames, k, b) }
 
-// Origin is why a candidate [Element] exists.
-type Origin uint8
+// Provenance is why a candidate [Element] exists.
+type Provenance uint8
 
-// Origins. The zero value is no origin.
+// Provenances. The zero value is no provenance. The text form keeps
+// the JSON key "origin" of a persisted surface, so a stored surface reads
+// back unchanged (review 2026-11 W5-api-17).
 const (
-	// OriginClusterMandatory: the cluster's own conformance makes the
+	// ProvenanceClusterMandatory: the cluster's own conformance makes the
 	// feature or element mandatory for the selected features.
-	OriginClusterMandatory Origin = iota + 1
-	// OriginDeviceType: the device type mandates the cluster, the feature
+	ProvenanceClusterMandatory Provenance = iota + 1
+	// ProvenanceDeviceType: the device type mandates the cluster, the feature
 	// or the element — or is the element.
-	OriginDeviceType
-	// OriginHostDeclared: the host declared it — a feature selection, an
+	ProvenanceDeviceType
+	// ProvenanceHostDeclared: the host declared it — a feature selection, an
 	// optional element or initial value, an opted-in optional cluster, a
 	// host's own server.
-	OriginHostDeclared
-	// OriginKitDefault: a server's own optional choice — an optional root
+	ProvenanceHostDeclared
+	// ProvenanceKitDefault: a server's own optional choice — an optional root
 	// cluster the node mounts by default, an element a hand-written server
 	// serves on its own (the level policy's server-internal decisions).
-	OriginKitDefault
+	ProvenanceKitDefault
 )
 
-var originNames = map[Origin]string{
-	OriginClusterMandatory: "cluster-mandatory", OriginDeviceType: "device-type",
-	OriginHostDeclared: "host-declared", OriginKitDefault: "kit-default",
+var provenanceNames = map[Provenance]string{
+	ProvenanceClusterMandatory: "cluster-mandatory", ProvenanceDeviceType: "device-type",
+	ProvenanceHostDeclared: "host-declared", ProvenanceKitDefault: "kit-default",
 }
 
-// String returns the origin's name.
-func (o Origin) String() string { return enumName(originNames, o) }
+// String returns the provenance's name.
+func (o Provenance) String() string { return enumName(provenanceNames, o) }
 
 // MarshalText implements [encoding.TextMarshaler].
-func (o Origin) MarshalText() ([]byte, error) { return marshalEnum(originNames, o) }
+func (o Provenance) MarshalText() ([]byte, error) { return marshalEnum(provenanceNames, o) }
 
 // UnmarshalText implements [encoding.TextUnmarshaler].
-func (o *Origin) UnmarshalText(b []byte) error { return unmarshalEnum(originNames, o, b) }
+func (o *Provenance) UnmarshalText(b []byte) error { return unmarshalEnum(provenanceNames, o, b) }
 
 // Reference is the reference an element is served against: matter.js's
 // baseline, or an entry of the "Ahead of matter.js" register.
@@ -92,9 +94,9 @@ type Element struct {
 	Kind    Kind
 	// ID is the device type id, the cluster id, the feature's one-bit
 	// mask, or the attribute, command or event id.
-	ID        uint32
-	Origin    Origin
-	Reference Reference
+	ID         uint32
+	Provenance Provenance
+	Reference  Reference
 	// Mandatory: removing the element would make the composition invalid
 	// at the pin — the device type mandates it, or the cluster's
 	// conformance does for the selected features.

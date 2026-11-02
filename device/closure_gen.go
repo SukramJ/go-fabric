@@ -18,9 +18,11 @@ const (
 	ClosureRevision uint16              = 1
 )
 
-// ClosureType is the Closure device type, matter.js's packages/node/src/devices/closure.ts;
-// its cluster requirements are listed in docs/reference/device-types.md#closure.
-var ClosureType = typeClosure
+// ClosureType returns the Closure device type, matter.js's packages/node/src/devices/closure.ts;
+// its cluster requirements are listed in docs/reference/device-types.md#closure. It is the registry's
+// value, the one [Lookup] and [FromSpec] return: a caller reads it and
+// does not modify it.
+func ClosureType() *Type { return &typeClosure }
 
 // typeClosure holds [ClosureType]'s cluster requirements.
 var typeClosure = Type{

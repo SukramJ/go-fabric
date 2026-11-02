@@ -15,7 +15,7 @@ documented order. You configure it with one `node.Config` and add devices to
 its Aggregator.
 
 Use the facade with your own topology when you already map your own device
-model onto endpoints: set `Config.Topology` to your `bridge.Snapshotter`. The
+model onto endpoints: set `Config.Snapshotter` to your `bridge.Snapshotter`. The
 facade then builds no assembler of its own, and everything else (stores,
 root servers, sessions, group state) stays the facade's. The topology your
 snapshotter returns must come from an `endpoint.Assembler` over your
@@ -44,13 +44,14 @@ without leaving the facade.
 
 // Command quickstart-device is the smallest Matter bridge on go-fabric: one
 // on/off light under the node's Aggregator, its state in one SQLite file,
-// advertised over DNS-SD. docs/getting-started/device.md walks through it.
-// It pairs with the CSA test identity and is not a product.
+// advertised over DNS-SD. It names the facade only — node, device,
+// contract and the light's cluster definition; the node opens the store
+// and builds its own advertiser. docs/getting-started/device.md walks
+// through it. It pairs with the CSA test identity and is not a product.
 package main
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"log/slog"
 	"os"
@@ -58,13 +59,10 @@ import (
 	"slices"
 	"syscall"
 
-	"github.com/SukramJ/go-fabric/cluster/onoff"
+	onoffdef "github.com/SukramJ/go-fabric/cluster/spec/onoff"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/device"
-	"github.com/SukramJ/go-fabric/endpoint"
-	"github.com/SukramJ/go-fabric/mdns"
 	"github.com/SukramJ/go-fabric/node"
-	"github.com/SukramJ/go-fabric/store"
 )
 
 func main() {
@@ -78,44 +76,27 @@ func main() {
 }
 
 func run(ctx context.Context) error {
-	db, err := openDB("quickstart-device.db")
+	// The zero Network listens on :5540 and advertises over DNS-SD: a nil
+	// Config.Advertiser is the node's own Zeroconf with the subtype
+	// responder every commissioner's discriminator browse needs.
+	n, err := newNode(ctx, "quickstart-device.db", node.Network{})
 	if err != nil {
 		return err
 	}
-	defer func() { _ = db.Close() }()
-
-	// DNS-SD: the subtype responder answers the discriminator-filtered
-	// browse every commissioner sends for a QR or manual code.
-	zc := mdns.NewZeroconf()
-	if r, err := mdns.NewSubtypeResponder(slog.Default()); err == nil {
-		r.Start(ctx)
-		zc.AttachSubtypeResponder(r)
-		defer func() { _ = r.Close() }()
-	}
-
-	n, err := newNode(ctx, db, node.Network{}, zc)
-	if err != nil {
-		return err
-	}
-	qr, manual, err := n.PairingCodes()
+	payload, err := n.SetupPayload()
 	if err != nil {
 		_ = n.Stop(context.WithoutCancel(ctx))
 		return err
 	}
-	fmt.Printf("QR code: %s\nManual code: %s\n", qr, manual)
+	fmt.Printf("QR code: %s\nManual code: %s\n", payload.QR, payload.Manual)
 	return n.Run(ctx) // Start, wait for ctx, Stop
 }
 
-// openDB opens the SQLite file with the module's opener (escaped file:
-// URI, foreign_keys for the store's cascade-delete on fabric removal, a
-// new file created 0600). node.New applies the schemas.
-func openDB(path string) (*sql.DB, error) {
-	return store.OpenSQLite(path)
-}
-
-// newNode builds the node and adds the light, unstarted.
-func newNode(ctx context.Context, db *sql.DB, network node.Network, adv mdns.Advertiser) (*node.Node, error) {
-	n, err := node.New(node.Config{ //nolint:contextcheck // the node's constructor takes no context
+// newNode builds the node on the SQLite file at path — the node opens it
+// (foreign keys on, a new file created 0600), applies the schemas and
+// closes it on Stop — and adds the light, unstarted.
+func newNode(ctx context.Context, path string, network node.Network) (*node.Node, error) {
+	n, err := node.New(ctx, node.Config{
 		Network: network,
 		Commissioning: node.Commissioning{ // change all four for anything real
 			Passcode: 20202021, Discriminator: 3840,
@@ -126,17 +107,16 @@ func newNode(ctx context.Context, db *sql.DB, network node.Network, adv mdns.Adv
 			VendorName: "quickstart", ProductName: "quickstart-device",
 			NodeLabel: "Quickstart bridge", SerialNumber: "QUICKSTART-0001",
 		},
-		Store:      node.Store{DB: db},
-		Advertiser: adv,
+		Store: node.Store{Path: path},
 	})
 	if err != nil {
 		return nil, err
 	}
-	light, err := device.NewOnOffLight(device.Options{StableKey: endpoint.StringKey("light-1"), Name: "Desk lamp"})
+	light, err := device.NewOnOffLight(device.Options{StableKey: device.StringKey("light-1"), Name: "Desk lamp"})
 	if err == nil {
-		light.OnChanged(onoff.ClusterID, func(c contract.Change) {
-			if slices.Contains(c.Attributes, onoff.AttrOnOff) {
-				slog.Info("light", slog.Bool("on", light.OnOff().Get().OnOff)) // drive the real lamp here
+		light.OnOff().OnChanged(func(s onoffdef.State, c contract.Change) {
+			if slices.Contains(c.Attributes, onoffdef.AttrOnOff) {
+				slog.Info("light", slog.Bool("on", s.OnOff)) // drive the real lamp here
 			}
 		})
 		err = n.Aggregator().Add(ctx, light)
@@ -159,11 +139,14 @@ go run ./examples/quickstart-device
 It listens on UDP port 5540 and needs IPv6 and multicast on the LAN, like
 any Matter device. A commissioner that filters by discriminator, which is
 what Apple Home, Google Home and chip-tool do for a QR or manual code, finds
-the device only through the subtype responder. Without the responder,
+the device only through the subtype responder, which the node builds with
+its own advertiser when `Config.Advertiser` is nil. Without the responder,
 `_matterc._udp` lists the instance, but the discriminator subtype query
-gets no answer.
+gets no answer. The program names no package below the facade: the node
+opens the SQLite file (`Store.Path`), the key is `device.StringKey`, and
+the light's changes arrive typed through `OnOff().OnChanged`.
 
-*Source: `examples/quickstart-device/main.go`, `examples/quickstart-device/main_test.go`, `examples/reference-bridge/main.go:170-174`, `node/config.go:210-211`.*
+*Source: `examples/quickstart-device/main.go`, `examples/quickstart-device/main_test.go`, `node/mdns.go` (`defaultAdvertiser`), `node/store_path.go`.*
 
 ## Configuration
 
@@ -181,7 +164,7 @@ with `node.ErrInvalidConfig` when any check fails. It checks:
 - `SupportedFabrics` is at most 254;
 - `UniqueID` is at most 32 bytes;
 - `LocationCapability` is a valid regulatory location;
-- `Network.ReannounceInterval` is not negative;
+- `Network.Reannounce.Interval` is not negative;
 - `OTA.Dir` is set when `OTA` is;
 - `TLS.CertificatePort` is set when `TLS` is.
 
@@ -196,12 +179,11 @@ Defaults worth knowing:
 | Field | Zero value means |
 | --- | --- |
 | `Network.Listen` | `:5540` |
-| `Advertiser` | the node's own `mdns.Zeroconf` with the subtype responder; `Network.MDNS.Disabled` makes it `mdns.NewNoop()`, and nothing can discover the node |
-| `Network.MDNS` | Zeroconf with the subtype responder, SRV target from the interface's MAC; `Disabled` publishes nothing, `HostName` sets the SRV target |
+| `Advertiser` | the node's own `mdns.Zeroconf` with the subtype responder; `Network.MDNS.Off` makes it `mdns.NewNoop()`, and nothing can discover the node |
+| `Network.MDNS` | Zeroconf with the subtype responder, SRV target from the interface's MAC; `Off` publishes nothing, `HostName` sets the SRV target |
 | `Store.Path` | unused; set, the node opens that SQLite file (modernc.org/sqlite, foreign keys on, 5 s busy timeout) and `Stop` closes it |
 | `Attestation.Files` | unused; set, `New` loads the vendor chain and fails when it does not load (files naming nothing keep the test chain); with `BlockCommissioningOnError` it runs on the test chain instead, commissioning refused, the error in `Node.AttestationError` |
-| `Health` | no probe; `Interval` (0 is 30 s) or `OnSample` runs it from `Start` to `Stop`, `Node.Health` returns the last verdict |
-| `BootID.RotateUniqueIDs` | stable UniqueIDs; set, every UniqueID rotates per process (development only, process-wide) |
+| `Health` | nil runs no probe; set, it runs from `Start` to `Stop` every `Interval` (0 is 30 s), `Node.OnHealthSample` receives every verdict, `Node.Health` returns the last one |
 | `DeviceTypeValidation` | matter.js's warn mode |
 | `SupportedFabrics` | 5 (matter.js defaults to 254) |
 | `ProductDescription.Name` | `BasicInformation.NodeLabel` |
@@ -209,9 +191,12 @@ Defaults worth knowing:
 | `BasicInformation.UniqueID` | derived on the first boot and pinned in the store |
 | `Locales` | `en-US` alone |
 | `Logger` | `slog.Default()` |
+| `Client` | nil runs no client stack; set, the node opens its client socket and peers for its Binding entries |
+| `Network.Reannounce` | the DNS-SD records re-published every 30 min while the advertiser is Zeroconf; `Off` stops the loop, `Interval` sets the cadence |
+| `Network.WiFi` | nil mounts no WiFiNetworkDiagnostics; set, its `Reporter` (required) serves it |
 | `Sessions` | the Matter MRP intervals (500 ms idle, 300 ms active, 4000 ms active threshold); set, the PASE and CASE session parameters and the operational record carry the node's own (`node.SessionIntervals`, whole milliseconds, the threshold at most 65535 ms); `Node.SessionParameters` returns what the node reports ([Limits](../guides/limits.md#transport-and-reliability)) |
 | `Limits.BDXAdditionalMrpDelay` | no margin; set, the exchange of every inbound BDX transfer (an OTA requestor's download) adds it to the peer's MRP base interval, as matter.js's `bdxAdditionalMrpDelay` does |
-| `TimeSynchronization` | UTCTime and Granularity alone; set, the root TimeSynchronization serves the TZ, NTPC, NTPS and TSC features it names, after connectedhomeip ([Time synchronization](#time-synchronization)) |
+| `TimeSynchronization` | mounted, UTCTime and Granularity alone; `Off` leaves it off the root, `Config` serves the TZ, NTPC, NTPS and TSC features it names, after connectedhomeip ([Time synchronization](#time-synchronization)) |
 | `TLS` | no TLS servers; set, TlsCertificateManagement and TlsClientManagement mount on endpoint 0 (`node.TLSConfig`: the `CertificatePort`, per-fabric maxima defaulting to chip's 5, the stores defaulting to the node's) and every camera's PushAvStreamTransport without its own TLS lookups validates against them ([Camera](../guides/camera.md#the-transport-model)) |
 
 *Source: `node/config.go:37-205`, `node/config.go:303-365`, `node/config.go:466-524`, `node/node.go:131-148`.*
@@ -291,8 +276,7 @@ The device's other options:
 
 | Option | Effect |
 | --- | --- |
-| `WithServer(srv)` | your own server for a cluster without a generated package (a manufacturer-specific one); a cluster with a package takes its `Declare` |
-| `HostServer(srv)` | your own server for any cluster, when your servers are a list: the cluster's `Declare{HostServer: srv}` where it has a package, `WithServer`'s mount where it has none; a port, an `Initial` or a feature selection still takes the typed `Declare` |
+| `HostServer(srv)` | your own server for any cluster, when your servers are a list: the cluster's `Declare{HostServer: srv}` where it has a package, the mount where it has none; a port, an `Initial` or a feature selection still takes the typed `Declare` |
 | `Measurement(src)` | the clusters a classified host source materialises (`contract.MeasurementSource`, one class per data point; a battery rides as the device's PowerSource), for a host whose sensors are data rather than per-type code |
 | `WithChangeNotifier(n)` | tells the bridge your model changed state its servers read |
 | `WithClientClusters(ids...)` | client clusters beyond the mandatory ones |
@@ -333,7 +317,7 @@ calls:
   `OnChanged` see every change at once. `Set` is safe from any goroutine,
   including from inside the sink.
 
-*Source: `device/doc_gen.go`, `device/defaults.go`, `device/options.go` (`Options`, `WithServer`, `HostServer`, `WithChangeNotifier`, `WithClientClusters`), `device/hostserver_gen.go`, `device/measurement.go` (`Measurement`), `device/device.go`, `cluster/spec/onoff/server_gen.go` (`Declare`, `OnChanged`, `OnChangedAsync`), `contract/` (`Change`, `Origin`), `cluster/onoff/server.go` (`Set`, `SetAttributes`, `Handle`).*
+*Source: `device/doc_gen.go`, `device/defaults.go`, `device/options.go` (`Options`, `HostServer`, `WithChangeNotifier`, `WithClientClusters`), `device/hostserver_gen.go`, `device/measurement.go` (`Measurement`), `device/device.go`, `cluster/spec/onoff/server_gen.go` (`Declare`, `OnChanged`, `OnChangedAsync`), `contract/` (`Change`, `Origin`), `cluster/onoff/server.go` (`Set`, `SetAttributes`, `Handle`).*
 
 ### Composite device types
 
@@ -394,7 +378,7 @@ program that uses each.
 
 ## Commissioning
 
-`Node.PairingCodes` returns the QR payload and the 11-digit manual code for
+`Node.SetupPayload` returns the QR payload and the 11-digit manual code for
 the configured passcode and discriminator. When `Start` loads no fabric from
 the store, it opens the node's own commissioning window. A commissioned node opens
 a window only when a controller asks for one through
@@ -411,7 +395,7 @@ its configured attestation chain.
 ## Time synchronization
 
 The root's TimeSynchronization serves UTCTime from the node's clock and
-Granularity. `Config.TimeSynchronization` adds the features after
+Granularity. `Config.TimeSynchronization.Config` adds the features after
 connectedhomeip (`TimeSynchronizationCluster.cpp` at `6170af84`;
 matter.js's server is the generated behaviour):
 

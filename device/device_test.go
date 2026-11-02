@@ -119,27 +119,27 @@ func TestOptionsRefused(t *testing.T) {
 	for name, tc := range map[string]struct {
 		ty   *Type
 		opts Options
-		with []Option
+		with []Declaration
 		want string
 	}{
 		"nil type":         {nil, opts, nil, "no device type"},
-		"no key":           {&OnOffLightType, Options{}, nil, "needs a StableKey"},
-		"nil server":       {&OnOffLightType, opts, []Option{WithServer(nil)}, "WithServer(nil)"},
-		"declared cluster": {&OnOffLightType, opts, []Option{WithServer(&hostServer{id: 6})}, "declare it, onoffdef.Declare{HostServer"},
-		"foreign cluster":  {&OnOffLightType, opts, []Option{withOptional(0x0201)}, "no server cluster requirement for cluster 0x0201"},
-		"assembler's":      {&OnOffLightType, opts, []Option{withServer(&hostServer{id: 0x0003})}, "mounts Identify (0x0003) itself"},
-		"features of host": {&OnOffLightType, opts, []Option{withServer(&hostServer{id: 6}), withFeatures(6, 1)}, "Features for cluster 0x0006"},
-		"initial of host":  {&OnOffLightType, opts, []Option{withServer(&hostServer{id: 6}), withInitial(6, nil)}, "Initial for cluster 0x0006"},
-		"bad initial":      {&OnOffLightType, opts, []Option{withInitial(6, map[uint32]any{0: uint8(7)})}, "OnOff"},
-		"no definition":    {&RootNodeType, opts, nil, "no generated definition"},
+		"no key":           {OnOffLightType(), Options{}, nil, "needs a StableKey"},
+		"nil server":       {OnOffLightType(), opts, []Declaration{mountServer(nil)}, "HostServer(nil)"},
+		"declared cluster": {OnOffLightType(), opts, []Declaration{mountServer(&hostServer{id: 6})}, "declare it, onoffdef.Declare{HostServer"},
+		"foreign cluster":  {OnOffLightType(), opts, []Declaration{withOptional(0x0201)}, "no server cluster requirement for cluster 0x0201"},
+		"assembler's":      {OnOffLightType(), opts, []Declaration{withServer(&hostServer{id: 0x0003})}, "mounts Identify (0x0003) itself"},
+		"features of host": {OnOffLightType(), opts, []Declaration{withServer(&hostServer{id: 6}), withFeatures(6, 1)}, "Features for cluster 0x0006"},
+		"initial of host":  {OnOffLightType(), opts, []Declaration{withServer(&hostServer{id: 6}), withInitial(6, nil)}, "Initial for cluster 0x0006"},
+		"bad initial":      {OnOffLightType(), opts, []Declaration{withInitial(6, map[uint32]any{0: uint8(7)})}, "OnOff"},
+		"no definition":    {RootNodeType(), opts, nil, "no generated definition"},
 	} {
 		_, err := New(tc.ty, tc.opts, tc.with...)
 		if err == nil || !strings.Contains(err.Error(), tc.want) {
 			t.Errorf("%s: %v, want %q", name, err, tc.want)
 		}
 	}
-	// A nil Option is ignored.
-	if _, err := New(&OnOffLightType, opts, nil); err != nil {
+	// A nil Declaration is ignored.
+	if _, err := New(OnOffLightType(), opts, nil); err != nil {
 		t.Error(err)
 	}
 }
@@ -335,14 +335,14 @@ func TestParts(t *testing.T) {
 // endpoint's source.
 func TestSpec(t *testing.T) {
 	t.Parallel()
-	reach := func() bool { return false }
 	d, err := NewOnOffPlugInUnit(Options{
 		StableKey: endpoint.StringKey("k"), Name: "Plug", Vendor: "ACME", DeviceAddress: "dev-1",
-		ChannelAddress: "dev-1:3", Reachable: reach, Conditions: []string{"Active"},
+		ChannelAddress: "dev-1:3", Conditions: []string{"Active"},
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
+	d.SetReachable(context.Background(), false)
 	s := d.Spec()
 	if s.StableKey != endpoint.StringKey("k") || s.FriendlyName != "Plug" || s.VendorName != "ACME" ||
 		s.DeviceAddress != "dev-1" || s.ChannelAddress != "dev-1:3" || s.Availability() || s.NodeLabel != "" ||
@@ -367,20 +367,20 @@ func TestSpec(t *testing.T) {
 // TestTypeLookups covers the registry and the requirement lookups.
 func TestTypeLookups(t *testing.T) {
 	t.Parallel()
-	if ty, ok := TypeByID(DimmableLightID); !ok || ty != &DimmableLightType {
-		t.Error("TypeByID(DimmableLight)")
+	if ty, ok := Lookup(uint32(DimmableLightID)); !ok || ty != DimmableLightType() {
+		t.Error("Lookup(uint32(DimmableLight))")
 	}
-	if _, ok := TypeByID(0xFFFF); ok {
-		t.Error("TypeByID(0xFFFF)")
+	if _, ok := Lookup(uint32(0xFFFF)); ok {
+		t.Error("Lookup(uint32(0xFFFF))")
 	}
 	if typeByName("Nope") != nil {
 		t.Error("typeByName(Nope)")
 	}
-	r, ok := DimmableLightType.Server(levelcontroldef.ClusterID)
+	r, ok := DimmableLightType().Server(levelcontroldef.ClusterID)
 	if !ok {
 		t.Fatal("no LevelControl requirement")
 	}
-	if _, ok := DimmableLightType.Server(0x0201); ok {
+	if _, ok := DimmableLightType().Server(0x0201); ok {
 		t.Error("Thermostat requirement on a light")
 	}
 	if e, ok := r.Element(schema.RequirementAttribute, levelcontroldef.AttrMinLevel); !ok || e.Default != 1 {

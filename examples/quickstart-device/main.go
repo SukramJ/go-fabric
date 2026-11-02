@@ -3,13 +3,14 @@
 
 // Command quickstart-device is the smallest Matter bridge on go-fabric: one
 // on/off light under the node's Aggregator, its state in one SQLite file,
-// advertised over DNS-SD. docs/getting-started/device.md walks through it.
-// It pairs with the CSA test identity and is not a product.
+// advertised over DNS-SD. It names the facade only — node, device,
+// contract and the light's cluster definition; the node opens the store
+// and builds its own advertiser. docs/getting-started/device.md walks
+// through it. It pairs with the CSA test identity and is not a product.
 package main
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"log/slog"
 	"os"
@@ -17,13 +18,10 @@ import (
 	"slices"
 	"syscall"
 
-	"github.com/SukramJ/go-fabric/cluster/onoff"
+	onoffdef "github.com/SukramJ/go-fabric/cluster/spec/onoff"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/device"
-	"github.com/SukramJ/go-fabric/endpoint"
-	"github.com/SukramJ/go-fabric/mdns"
 	"github.com/SukramJ/go-fabric/node"
-	"github.com/SukramJ/go-fabric/store"
 )
 
 func main() {
@@ -37,44 +35,27 @@ func main() {
 }
 
 func run(ctx context.Context) error {
-	db, err := openDB("quickstart-device.db")
+	// The zero Network listens on :5540 and advertises over DNS-SD: a nil
+	// Config.Advertiser is the node's own Zeroconf with the subtype
+	// responder every commissioner's discriminator browse needs.
+	n, err := newNode(ctx, "quickstart-device.db", node.Network{})
 	if err != nil {
 		return err
 	}
-	defer func() { _ = db.Close() }()
-
-	// DNS-SD: the subtype responder answers the discriminator-filtered
-	// browse every commissioner sends for a QR or manual code.
-	zc := mdns.NewZeroconf()
-	if r, err := mdns.NewSubtypeResponder(slog.Default()); err == nil {
-		r.Start(ctx)
-		zc.AttachSubtypeResponder(r)
-		defer func() { _ = r.Close() }()
-	}
-
-	n, err := newNode(ctx, db, node.Network{}, zc)
-	if err != nil {
-		return err
-	}
-	qr, manual, err := n.PairingCodes()
+	payload, err := n.SetupPayload()
 	if err != nil {
 		_ = n.Stop(context.WithoutCancel(ctx))
 		return err
 	}
-	fmt.Printf("QR code: %s\nManual code: %s\n", qr, manual)
+	fmt.Printf("QR code: %s\nManual code: %s\n", payload.QR, payload.Manual)
 	return n.Run(ctx) // Start, wait for ctx, Stop
 }
 
-// openDB opens the SQLite file with the module's opener (escaped file:
-// URI, foreign_keys for the store's cascade-delete on fabric removal, a
-// new file created 0600). node.New applies the schemas.
-func openDB(path string) (*sql.DB, error) {
-	return store.OpenSQLite(path)
-}
-
-// newNode builds the node and adds the light, unstarted.
-func newNode(ctx context.Context, db *sql.DB, network node.Network, adv mdns.Advertiser) (*node.Node, error) {
-	n, err := node.New(node.Config{ //nolint:contextcheck // the node's constructor takes no context
+// newNode builds the node on the SQLite file at path — the node opens it
+// (foreign keys on, a new file created 0600), applies the schemas and
+// closes it on Stop — and adds the light, unstarted.
+func newNode(ctx context.Context, path string, network node.Network) (*node.Node, error) {
+	n, err := node.New(ctx, node.Config{
 		Network: network,
 		Commissioning: node.Commissioning{ // change all four for anything real
 			Passcode: 20202021, Discriminator: 3840,
@@ -85,17 +66,16 @@ func newNode(ctx context.Context, db *sql.DB, network node.Network, adv mdns.Adv
 			VendorName: "quickstart", ProductName: "quickstart-device",
 			NodeLabel: "Quickstart bridge", SerialNumber: "QUICKSTART-0001",
 		},
-		Store:      node.Store{DB: db},
-		Advertiser: adv,
+		Store: node.Store{Path: path},
 	})
 	if err != nil {
 		return nil, err
 	}
-	light, err := device.NewOnOffLight(device.Options{StableKey: endpoint.StringKey("light-1"), Name: "Desk lamp"})
+	light, err := device.NewOnOffLight(device.Options{StableKey: device.StringKey("light-1"), Name: "Desk lamp"})
 	if err == nil {
-		light.OnChanged(onoff.ClusterID, func(c contract.Change) {
-			if slices.Contains(c.Attributes, onoff.AttrOnOff) {
-				slog.Info("light", slog.Bool("on", light.OnOff().Get().OnOff)) // drive the real lamp here
+		light.OnOff().OnChanged(func(s onoffdef.State, c contract.Change) {
+			if slices.Contains(c.Attributes, onoffdef.AttrOnOff) {
+				slog.Info("light", slog.Bool("on", s.OnOff)) // drive the real lamp here
 			}
 		})
 		err = n.Aggregator().Add(ctx, light)

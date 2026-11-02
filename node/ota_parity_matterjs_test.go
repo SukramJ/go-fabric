@@ -220,15 +220,16 @@ func newOTASite(t *testing.T, o otaSiteOptions) *otaSite {
 	}
 	s.c = s.site.AddController(fabrictest.ControllerOptions{})
 	s.prov = s.site.AddDevice(fabrictest.Topology{Configure: func(cfg *node.Config) {
-		cfg.OTAProvider = &node.OTAProviderConfig{ImageSource: s.src, Consent: s.consent, OnStatusChange: s.statuses.add}
+		cfg.OTAProvider = &node.OTAProviderConfig{ImageSource: s.src, Consent: s.consent}
 	}})
+	s.prov.Node().OnOTAProviderStatus(s.statuses.add)
 	dir := filepath.Join(t.TempDir(), "ota")
 	s.req = s.site.AddDevice(fabrictest.Topology{Configure: func(cfg *node.Config) {
 		v := s.version.Load()
 		// The string is derived from the number (BasicInformationServer.ts:71);
 		// a "0" would be read as a build string and floored at 1.
 		cfg.BasicInformation.SoftwareVersion, cfg.BasicInformation.SoftwareVersionString = v, ""
-		cfg.OTA = &node.OtaConfig{Dir: dir, Applier: s.applier}
+		cfg.OTA = &node.OTAConfig{Dir: dir, Applier: s.applier}
 	}})
 	// The requestor was built at version 1 by AddDevice's start; it runs
 	// version 0, as the matter.js device does (BasicInformation default).

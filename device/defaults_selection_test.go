@@ -70,7 +70,7 @@ func TestALevelSourceServesTheSelection(t *testing.T) {
 // not AUTO's optional group.
 func TestPumpSpeedLimitsWithoutAuto(t *testing.T) {
 	lo, hi := uint16(500), uint16(3200)
-	d, err := New(&PumpType, testOptions("pump"), pumpdef.Declare{
+	d, err := New(PumpType(), testOptions("pump"), pumpdef.Declare{
 		Features: pumpdef.FeatureConstantSpeed, StateSource: fakePump{},
 		Initial: pumpdef.Patch{MinConstSpeed: &lo, MaxConstSpeed: &hi},
 	})

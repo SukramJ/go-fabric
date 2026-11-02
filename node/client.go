@@ -26,14 +26,13 @@ import (
 	"github.com/SukramJ/go-fabric/transport/udp"
 )
 
-// Client is the node's client stack: what a server node needs to reach
-// other nodes of its fabrics — the peers its Binding entries direct.
-// matter.js gives every ServerNode its peers (`node.peers`, the PeerSet
-// BindingManager.ts:333 and :600 use); here the stack is opt-in.
-type Client struct {
-	// Enabled builds the client stack; the zero value runs the node
-	// without one ([Node.Peers] is nil, a node Binding entry is dropped).
-	Enabled bool
+// ClientConfig is the node's client stack: what a server node needs to
+// reach other nodes of its fabrics — the peers its Binding entries
+// direct. matter.js gives every ServerNode its peers (`node.peers`, the
+// PeerSet BindingManager.ts:317 and :445 use); here the stack is opt-in,
+// an optional sub-system a non-nil [Config].Client builds (ADR 0025
+// principle 2).
+type ClientConfig struct {
 	// Listen is the client socket's bind address; empty is an ephemeral
 	// port on every address ("[::]:0", "0.0.0.0:0" with
 	// Network.PreferIPv4). The client stack initiates from its own socket:
@@ -43,7 +42,7 @@ type Client struct {
 	// Names is the DNS-SD cache the peers' operational records are looked
 	// up in; nil opens one on the mDNS groups (discovery.Open), which the
 	// node closes on Stop. A Names the host supplies stays the host's.
-	Names *discovery.Names
+	Names *DiscoveryNames
 
 	// open, set through internal/nodeseam by fabrictest, opens the client
 	// socket in place of udp.New: a socket of the site's in-memory network.
@@ -67,7 +66,7 @@ type clientStack struct {
 // newClientStack opens the client socket, its exchange manager and the
 // peer set whose fabrics are the node's CASE identities.
 func (n *Node) newClientStack() (*clientStack, error) {
-	cfg := n.cfg.Client
+	cfg := *n.cfg.Client
 	listen := cfg.Listen
 	if listen == "" {
 		listen = "[::]:0"

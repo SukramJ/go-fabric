@@ -7,11 +7,12 @@ import (
 	"time"
 
 	"github.com/SukramJ/go-fabric/clock"
+	"github.com/SukramJ/go-fabric/secure/operational"
 )
 
 // SetupPayload is the node's configured commissioning secret with the
 // identity it is encoded under — the fields of the setup payload and the
-// two codes [Node.PairingCodes] returns for it.
+// two codes encoded from them.
 type SetupPayload struct {
 	// Discriminator is the configured 12-bit discriminator
 	// ([Config].Commissioning).
@@ -23,13 +24,13 @@ type SetupPayload struct {
 	// VendorID and ProductID are the node's ([Config].ProductDescription).
 	VendorID, ProductID uint16
 	// QR is the QR code payload ("MT:…"), Manual the manual pairing code;
-	// both what [Node.PairingCodes] returns.
+	// both encoded from Discriminator and Passcode.
 	QR, Manual string
 }
 
 // SetupPayload returns the configured setup payload: passcode,
 // discriminator, vendor and product id, and the QR and manual codes
-// [Node.PairingCodes] encodes from them. It carries the passcode (see
+// encoded from them. It carries the passcode (see
 // [SetupPayload].Passcode). A window opened with other credentials
 // ([Node.OpenBasicWindow]) has its codes from [Node.PairingCodesFor].
 //
@@ -133,26 +134,32 @@ func (n *Node) SessionDiagnostics() SessionDiagnostics {
 		subs = n.sec.subs.CountBySession()
 	}
 	for _, s := range n.sec.sessions.Sessions() {
-		out.Sessions = append(out.Sessions, SessionInfo{
-			ID:               s.SessionID,
-			FabricIndex:      s.FabricIndex,
-			PeerNodeID:       s.PeerNodeID,
-			LocalNodeID:      s.LocalNodeID,
-			PASE:             s.IsPASE,
-			Subscriptions:    subs[s.SessionID],
-			LastActivity:     s.LastActivity,
-			LastPeerActivity: s.LastPeerActivity,
-			Idle:             ageAt(now, s.LastActivity),
-			PeerIdle:         ageAt(now, s.LastPeerActivity),
-
-			PeerIdleInterval:    time.Duration(s.PeerIdleIntervalMs) * time.Millisecond,
-			PeerActiveInterval:  time.Duration(s.PeerActiveIntervalMs) * time.Millisecond,
-			PeerActiveThreshold: time.Duration(s.PeerActiveThresholdMs) * time.Millisecond,
-		})
+		out.Sessions = append(out.Sessions, sessionInfoOf(s, subs[s.SessionID], now))
 	}
 	occ := n.sec.sessions.Occupancy()
 	out.Occupancy = Occupancy{Live: occ.Live, Reserved: occ.Reserved, Capacity: occ.Capacity, Free: occ.Free()}
 	return out
+}
+
+// sessionInfoOf is one session of the table as the facade reports it,
+// with subs subscriptions, its ages at now.
+func sessionInfoOf(s operational.SessionInfo, subs int, now time.Time) SessionInfo {
+	return SessionInfo{
+		ID:               s.SessionID,
+		FabricIndex:      s.FabricIndex,
+		PeerNodeID:       s.PeerNodeID,
+		LocalNodeID:      s.LocalNodeID,
+		PASE:             s.IsPASE,
+		Subscriptions:    subs,
+		LastActivity:     s.LastActivity,
+		LastPeerActivity: s.LastPeerActivity,
+		Idle:             ageAt(now, s.LastActivity),
+		PeerIdle:         ageAt(now, s.LastPeerActivity),
+
+		PeerIdleInterval:    time.Duration(s.PeerIdleIntervalMs) * time.Millisecond,
+		PeerActiveInterval:  time.Duration(s.PeerActiveIntervalMs) * time.Millisecond,
+		PeerActiveThreshold: time.Duration(s.PeerActiveThresholdMs) * time.Millisecond,
+	}
 }
 
 // ageAt is now minus t, 0 for a zero t or a t after now.

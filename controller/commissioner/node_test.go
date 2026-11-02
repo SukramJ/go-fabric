@@ -49,7 +49,7 @@ func startNode(t *testing.T, adv mdns.Advertiser, listen string) (*node.Node, *n
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = db.Close() })
-	n, err := node.New(node.Config{
+	n, err := node.New(context.Background(), node.Config{
 		Network:            node.Network{Listen: listen, PreferIPv4: listen == "127.0.0.1:0"},
 		Advertiser:         adv,
 		Commissioning:      node.Commissioning{Passcode: nodePasscode, Discriminator: nodeDiscriminator, PBKDFIterations: 1000, Salt: []byte("SPAKE2P Key Salt")},
@@ -270,7 +270,7 @@ func TestCommissionTheNode(t *testing.T) {
 
 	// A second commissioning into the same fabric: AddNOC answers
 	// FabricConflict, the flow disarms the failsafe, the peer is deleted.
-	if err := n.OpenBasicWindow(ctx, node.WindowCredentials{Discriminator: nodeDiscriminator, Passcode: nodePasscode, Iterations: 1000, Salt: []byte("SPAKE2P Key Salt")}); err != nil {
+	if err := n.OpenBasicWindow(ctx, node.WindowCredentials{Discriminator: nodeDiscriminator, Passcode: nodePasscode, PBKDFIterations: 1000, Salt: []byte("SPAKE2P Key Salt")}); err != nil {
 		t.Fatalf("OpenBasicWindow: %v", err)
 	}
 	_, err = c.com.Commission(ctx, Options{Fabric: c.fabric, Passcode: nodePasscode, Addresses: []*net.UDPAddr{addr}})

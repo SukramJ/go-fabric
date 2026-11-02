@@ -97,7 +97,7 @@ func TestEndpointDevice(t *testing.T) {
 	t.Parallel()
 	n := cleanPlug().node(t)
 	plug := n.Endpoint(1)
-	if d := plug.Device(); d != &fabricdevice.OnOffPlugInUnitType || d.Name != "OnOffPlugInUnit" {
+	if d := plug.Device(); d != fabricdevice.OnOffPlugInUnitType() || d.Name != "OnOffPlugInUnit" {
 		t.Fatalf("Device() = %v", d)
 	}
 	if rev, ok := plug.DeviceRevision(); !ok || rev != 1 || plug.Device().Revision != fabricdevice.OnOffPlugInUnitRevision {
@@ -112,7 +112,7 @@ func TestEndpointDevice(t *testing.T) {
 	}
 	cvc := cleanPlug()
 	cvc.dt = 0x0029
-	if d := cvc.node(t).Endpoint(1).Device(); d != &fabricdevice.CastingVideoClientType {
+	if d := cvc.node(t).Endpoint(1).Device(); d != fabricdevice.CastingVideoClientType() {
 		t.Errorf("device type 0x29: Device() = %v", d)
 	}
 	if d := newEndpoint(&n.mu, 7).Device(); d != nil {

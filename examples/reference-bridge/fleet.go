@@ -657,11 +657,11 @@ func effectiveOptions(attribute, mask, override uint8) uint8 {
 // device layer's default: the speaker's LevelControl on the dimmer as its
 // LevelSource; the ceiling light adds the Lighting surface
 // (fleet_lighting.go).
-func (s *dimmer) declarations() []device.Option {
+func (s *dimmer) declarations() []device.Declaration {
 	if s.lighting != nil {
 		return s.lightingDeclarations()
 	}
-	return []device.Option{levelcontroldef.Declare{LevelSource: s}}
+	return []device.Declaration{levelcontroldef.Declare{LevelSource: s}}
 }
 
 // device builds the dimmer's device: a Speaker, a ColorTemperatureLight or
@@ -938,7 +938,7 @@ func (s *dimmer) moveTarget(moveMode uint8) uint8 {
 type fleet struct {
 	// surface are the daemon's surface policies (surface.go), the node's
 	// and every device's; nil is the zero value.
-	surface *surface.Policies
+	surface surface.Policies
 
 	light    *demoLight
 	valve    *demoValve

@@ -33,7 +33,7 @@ func newWiFiManagementServer(b defaultBuild) (contract.ClusterServer, error) {
 // store saved none (netinfra.ThreadDirectoryConfig); it must
 // name a stored network.
 func newThreadDirectoryServer(b defaultBuild) (contract.ClusterServer, error) {
-	cfg := netinfra.ThreadDirectoryConfig{DataVersion: b.cfg.DataVersion, Logger: Logger}
+	cfg := netinfra.ThreadDirectoryConfig{DataVersion: b.cfg.DataVersion, Logger: b.logger}
 	if d, ok := b.ports.(tdirdef.Declare); ok && d.ThreadNetworkStore != nil {
 		cfg.Store = d.ThreadNetworkStore
 	}

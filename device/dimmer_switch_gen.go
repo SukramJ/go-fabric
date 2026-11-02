@@ -17,9 +17,11 @@ const (
 	DimmerSwitchRevision uint16              = 4
 )
 
-// DimmerSwitchType is the DimmerSwitch device type, matter.js's packages/node/src/devices/dimmer-switch.ts;
-// its cluster requirements are listed in docs/reference/device-types.md#dimmerswitch.
-var DimmerSwitchType = typeDimmerSwitch
+// DimmerSwitchType returns the DimmerSwitch device type, matter.js's packages/node/src/devices/dimmer-switch.ts;
+// its cluster requirements are listed in docs/reference/device-types.md#dimmerswitch. It is the registry's
+// value, the one [Lookup] and [FromSpec] return: a caller reads it and
+// does not modify it.
+func DimmerSwitchType() *Type { return &typeDimmerSwitch }
 
 // typeDimmerSwitch holds [DimmerSwitchType]'s cluster requirements.
 var typeDimmerSwitch = Type{

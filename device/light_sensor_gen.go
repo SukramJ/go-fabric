@@ -17,9 +17,11 @@ const (
 	LightSensorRevision uint16              = 4
 )
 
-// LightSensorType is the LightSensor device type, matter.js's packages/node/src/devices/light-sensor.ts;
-// its cluster requirements are listed in docs/reference/device-types.md#lightsensor.
-var LightSensorType = typeLightSensor
+// LightSensorType returns the LightSensor device type, matter.js's packages/node/src/devices/light-sensor.ts;
+// its cluster requirements are listed in docs/reference/device-types.md#lightsensor. It is the registry's
+// value, the one [Lookup] and [FromSpec] return: a caller reads it and
+// does not modify it.
+func LightSensorType() *Type { return &typeLightSensor }
 
 // typeLightSensor holds [LightSensorType]'s cluster requirements.
 var typeLightSensor = Type{

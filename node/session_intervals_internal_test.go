@@ -10,6 +10,7 @@ package node
 // (SessionManager.ts:58-67, assertActiveThreshold).
 
 import (
+	"context"
 	"log/slog"
 	"strings"
 	"testing"
@@ -44,7 +45,7 @@ func TestResponderSessionParamsCarryIntervals(t *testing.T) {
 			}
 
 			sessions := operational.NewManager(testStore(t))
-			ca, err := buildCaseAdapter(sessions, newCaseIdentities(slog.Default(), nil), p, slog.New(slog.DiscardHandler))
+			ca, err := buildCaseAdapter(sessions, newCaseIdentities(slog.Default(), nil), p, slog.New(slog.DiscardHandler), nil)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -55,7 +56,7 @@ func TestResponderSessionParamsCarryIntervals(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			pa, err := buildPaseAdapterFromContext(sessions, &RootClusters{}, vc, []byte("SPAKE2P Key Salt"), 1000, p)
+			pa, err := buildPaseAdapterFromContext(context.Background(), sessions, &RootClusters{}, vc, []byte("SPAKE2P Key Salt"), 1000, p)
 			if err != nil {
 				t.Fatal(err)
 			}

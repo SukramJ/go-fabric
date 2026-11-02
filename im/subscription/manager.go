@@ -137,6 +137,9 @@ type Manager struct {
 	perFabric map[uint8]int
 	nextID    uint32
 	onClosed  func(subID uint32)
+	// onSessionChanged observes a change of one session's subscription
+	// set: a subscription added to it or closed on it.
+	onSessionChanged func(sessionID uint16)
 	// onTerminated observes the subset of closes that end a subscription
 	// for good — see [Manager.SetOnSubscriptionTerminated].
 	onTerminated func(subID uint32)
@@ -219,6 +222,18 @@ func (m *Manager) SetOnSubscriptionTerminated(fn func(subID uint32)) {
 	m.mu.Unlock()
 }
 
+// SetOnSessionSubscriptionsChanged registers a callback fired after a
+// session's set of subscriptions changed — a subscription added on it, or
+// one closed on it by any close path — with the session's id, outside the
+// manager's lock. matter.js's SessionManager raises subscriptionsChanged
+// for both (packages/node/src/behavior/system/sessions/
+// SessionsBehavior.ts:53, :75-93 at 862ad75f). Pass nil to detach.
+func (m *Manager) SetOnSessionSubscriptionsChanged(fn func(sessionID uint16)) {
+	m.mu.Lock()
+	m.onSessionChanged = fn
+	m.mu.Unlock()
+}
+
 // finishClose runs the per-subscription teardown for every victim a
 // close path removed from the tables. Callers must have released m.mu:
 // the observer reaches back into the transport layer. terminated says
@@ -228,6 +243,7 @@ func (m *Manager) finishClose(victims []*Subscription, terminated bool) {
 	m.mu.RLock()
 	hook := m.onClosed
 	termHook := m.onTerminated
+	changed := m.onSessionChanged
 	m.mu.RUnlock()
 	for _, sub := range victims {
 		sub.Close()
@@ -236,6 +252,9 @@ func (m *Manager) finishClose(victims []*Subscription, terminated bool) {
 		}
 		if terminated && termHook != nil {
 			termHook(sub.ID)
+		}
+		if changed != nil {
+			changed(sub.SessionID)
 		}
 	}
 }
@@ -403,7 +422,11 @@ func (m *Manager) Subscribe(req SubscribeArgs) (*Subscription, error) {
 	}
 	m.byID[id] = sub
 	m.perFabric[req.FabricIndex]++
+	changed := m.onSessionChanged
 	m.mu.Unlock()
+	if changed != nil {
+		changed(req.SessionID)
+	}
 
 	m.logger.Debug(
 		"im.subscription.added",
@@ -729,12 +752,8 @@ type EventFiring struct {
 	Number uint64
 	// Priority drives the urgency gate (Critical bypasses MinInterval).
 	Priority im.EventPriority
-	// Timestamp is not read: the report carries the event log's
-	// timestamp for Number (see [EventSource]).
-	Timestamp uint64
-	// Data is not read: the report carries the event log's payload for
-	// Number (see [EventSource]).
-	Data im.AttributeValue
+	// The timestamp and the payload are not carried: the report reads
+	// the event log's record for Number (see [EventSource]).
 }
 
 // OnEventFired notifies every subscription whose EventPaths cover the

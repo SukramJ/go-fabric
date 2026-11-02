@@ -64,14 +64,14 @@ type RootClusters struct {
 	GeneralCommissioning       *mattercore.GeneralCommissioning
 	AdministratorCommissioning *wire.AdministratorCommissioning
 	// NetworkCommissioning is the Ethernet server; nil when
-	// [Network].WiFiCommissioning has a Driver.
+	// the Wi-Fi commissioning seam (internal/nodeseam.UseWiFiCommissioning) set a Driver.
 	NetworkCommissioning *mattercore.NetworkCommissioning
 	// WiFiNetworkCommissioning is the Wi-Fi server, nil unless
-	// [Network].WiFiCommissioning has a Driver (TESTING ONLY).
+	// the Wi-Fi commissioning seam (internal/nodeseam.UseWiFiCommissioning) set a Driver (TESTING ONLY).
 	WiFiNetworkCommissioning *mattercore.WiFiNetworkCommissioning
 	GeneralDiagnostics       *mattercore.GeneralDiagnostics
 	DiagnosticLogs           *mattercore.DiagnosticLogs
-	// TimeSynchronization is nil when [Config].DisableTimeSynchronization
+	// TimeSynchronization is nil when [Config].TimeSynchronization.Off
 	// is set.
 	TimeSynchronization    *mattercore.TimeSynchronization
 	OperationalCredentials *mattercore.OperationalCredentials
@@ -274,13 +274,12 @@ func buildRoot(ctx context.Context, d rootDeps) (*RootClusters, error) { //nolin
 	r.DiagnosticLogs = mattercore.NewDiagnosticLogs()
 	r.DiagnosticLogs.SetClock(cfg.Clock)
 	var netComm contract.ClusterServer
-	if wc := cfg.Network.WiFiCommissioning; wc.Driver != nil {
+	if wc := cfg.Network.wifiCommissioning; wc.Driver != nil {
 		r.WiFiNetworkCommissioning, err = mattercore.NewWiFiNetworkCommissioning(mattercore.WiFiNetworkCommissioningConfig{
 			Driver: wc.Driver, FailSafe: generalCom.FailSafeFabric,
 			SetBreadcrumb: func(v uint64) {
 				_ = generalCom.MatterWrite(context.WithoutCancel(ctx), gencommdef.AttrBreadcrumb, v)
 			},
-			MaxNetworks: wc.MaxNetworks, ScanMaxTimeSeconds: wc.ScanMaxTimeSeconds, ConnectMaxTimeSeconds: wc.ConnectMaxTimeSeconds,
 		})
 		if err != nil {
 			return nil, fmt.Errorf("wi-fi network commissioning: %w", err)
@@ -320,13 +319,8 @@ func buildRoot(ctx context.Context, d rootDeps) (*RootClusters, error) { //nolin
 		}
 	}
 
-	if wifi := cfg.Network.WiFi; wifi.Reporter != nil {
-		r.WiFiNetworkDiagnostics, err = mattercore.NewWiFiNetworkDiagnostics(mattercore.WiFiNetworkDiagnosticsConfig{
-			Reporter: wifi.Reporter, Features: wifi.Features, Attributes: wifi.Attributes,
-		})
-		if err != nil {
-			return nil, fmt.Errorf("root wifi diagnostics: %w", err)
-		}
+	if r.WiFiNetworkDiagnostics, err = buildWiFiDiagnostics(cfg.Network.WiFi); err != nil {
+		return nil, err
 	}
 	optional, err := buildRootOptional(ctx, d.st, cfg.FixedLabels, cfg.Locales, r.WiFiNetworkDiagnostics)
 	if err != nil {
@@ -590,15 +584,15 @@ func (unknownEthernet) CarrierDetect() (carrier, ok bool)       { return false, 
 func (unknownEthernet) TimeSinceReset() (uint64, bool)          { return 0, false }
 
 // timeSynchronization builds the root TimeSynchronization: without
-// features, or with [Config].TimeSynchronization's on the node's store;
-// nil with DisableTimeSynchronization.
+// features, or with [Config].TimeSynchronization.Config's on the node's store;
+// nil with TimeSynchronization.Off.
 // GeneralDiagnostics takes its UTC clock.
 func (d rootDeps) timeSynchronization(cfg *Config, gd *mattercore.GeneralDiagnostics) (*mattercore.TimeSynchronization, error) {
-	if cfg.DisableTimeSynchronization {
+	if cfg.TimeSynchronization.Off {
 		return nil, nil
 	}
 	ts := mattercore.NewTimeSynchronization()
-	if tc := cfg.TimeSynchronization; tc != nil {
+	if tc := cfg.TimeSynchronization.Config; tc != nil {
 		c := *tc
 		c.Store, c.Logger = d.st, cmp.Or(c.Logger, d.logger)
 		var err error
@@ -609,4 +603,19 @@ func (d rootDeps) timeSynchronization(cfg *Config, gd *mattercore.GeneralDiagnos
 	ts.SetClock(cfg.Clock)
 	gd.SetUTCClock(ts.UTC)
 	return ts, nil
+}
+
+// buildWiFiDiagnostics is the root's WiFiNetworkDiagnostics server of
+// [Network].WiFi; nil without one.
+func buildWiFiDiagnostics(wifi *WiFi) (*mattercore.WiFiNetworkDiagnostics, error) {
+	if wifi == nil || wifi.Reporter == nil {
+		return nil, nil //nolint:nilnil // no Wi-Fi interface, no server
+	}
+	srv, err := mattercore.NewWiFiNetworkDiagnostics(mattercore.WiFiNetworkDiagnosticsConfig{
+		Reporter: wifi.Reporter, Features: wifi.Features, Attributes: wifi.Attributes,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("root wifi diagnostics: %w", err)
+	}
+	return srv, nil
 }

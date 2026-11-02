@@ -68,37 +68,21 @@ func (s *stack) ownNodeConfig() *controller.OTAConfig {
 	}
 }
 
-// startSelf starts the own node — node/controllernode's configuration,
-// node.New and Start, its socket on loopback when it is unspecified — and
+// startSelf starts the own node — node/controllernode.Start, its socket
+// IPv4 for an IPv4 --node-listen and on loopback when unspecified — and
 // runs the test seams.
 func startSelf(ctx context.Context, spec controller.OwnNodeSpec) (controller.OwnNode, *net.UDPAddr, error) {
-	cfg := controllernode.Config(spec)
-	cfg.Network.PreferIPv4 = isIPv4Listen(cfg.Network.Listen)
-	n, err := node.New(cfg) //nolint:contextcheck // node.New takes no context
+	own, addr, err := controllernode.Start(ctx, spec)
 	if err != nil {
 		return nil, nil, err
-	}
-	if err := n.Start(ctx); err != nil {
-		return nil, nil, err
-	}
-	addr, err := net.ResolveUDPAddr("udp", n.Bridge().LocalAddr())
-	if err != nil {
-		_ = n.Stop(context.WithoutCancel(ctx))
-		return nil, nil, err
-	}
-	if addr.IP.IsUnspecified() {
-		addr.IP = net.IPv6loopback
-		if cfg.Network.PreferIPv4 {
-			addr.IP = net.IPv4(127, 0, 0, 1)
-		}
 	}
 	if selfHooks.transport != nil {
-		n.Groups().SetTransport(selfHooks.transport())
+		controllernode.Node(own).Groups().SetTransport(selfHooks.transport())
 	}
 	if selfHooks.started != nil {
 		selfHooks.started(spec.NodeID, addr)
 	}
-	return controllernode.Wrap(n), addr, nil
+	return own, addr, nil
 }
 
 // migrateSelfRecord moves the own node's record of an earlier version

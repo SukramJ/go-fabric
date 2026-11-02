@@ -17,7 +17,7 @@ import (
 // type-mandated one with the rewritten reason; a warn rule keeps an
 // element with its warning row.
 func TestSurfaceProfile(t *testing.T) {
-	r, _ := OnOffLightType.Server(onOffID)
+	r, _ := OnOffLightType().Server(onOffID)
 	base, bit := optionalFeature(t, r)
 	mandated := uint32(1) << bits.TrailingZeros32(r.Features)
 	feature := func(id uint32) surface.ElementPattern {
@@ -26,12 +26,12 @@ func TestSurfaceProfile(t *testing.T) {
 	prof := surface.Profile{Name: "synthetic", Rules: []surface.ProfileRule{
 		{Element: feature(bit), Effect: surface.EffectRemove, Confidence: surface.Reproduced, Source: "src-opt", Reason: "optional"},
 		{Element: feature(mandated), Effect: surface.EffectRemove, Confidence: surface.Reproduced, Source: "src-man", Reason: "mandated"},
-		{Element: surface.ElementPattern{Kind: surface.KindDeviceType, ID: uint32(OnOffLightType.ID)}, Effect: surface.EffectWarn, Confidence: surface.Inherited, Source: "src-dt", Reason: "type"},
+		{Element: surface.ElementPattern{Kind: surface.KindDeviceType, ID: uint32(OnOffLightType().ID)}, Effect: surface.EffectWarn, Confidence: surface.Inherited, Source: "src-dt", Reason: "type"},
 	}}
 	policies := surfacetest.WithProfiles(surface.Policies{}, prof)
 	opts := testOptions("light")
-	opts.Surface = &policies
-	d, err := New(&OnOffLightType, opts, withFeatures(onOffID, base|bit))
+	opts.Surface = policies
+	d, err := New(OnOffLightType(), opts, withFeatures(onOffID, base|bit))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -51,7 +51,7 @@ func TestSurfaceProfile(t *testing.T) {
 			mandated: {surface.Keep, "kept: mandatory at pin (removed by profile synthetic: mandated (src-man))"},
 		},
 		surface.KindDeviceType: {
-			uint32(OnOffLightType.ID): {surface.Warn, "warning (Inherited) profile synthetic: type (src-dt)"},
+			uint32(OnOffLightType().ID): {surface.Warn, "warning (Inherited) profile synthetic: type (src-dt)"},
 		},
 	}
 	n := 0

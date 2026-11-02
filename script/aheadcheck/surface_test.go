@@ -38,7 +38,7 @@ import (
 // declaredRows are the register IDs the servers declare: the device
 // layer's and the node's, sorted and unique.
 func declaredRows() []string {
-	out := slices.Concat(device.AheadRows(), node.AheadRows())
+	out := node.AheadRows()
 	slices.Sort(out)
 	return slices.Compact(out)
 }
@@ -57,7 +57,7 @@ func completeness(rows []row, declared []string) []string {
 		case r.surface == "":
 			out = append(out, fmt.Sprintf("%s (by_design.md:%d): no surface value", r.entry, r.line))
 		case r.surface == "yes" && !isDeclared:
-			out = append(out, fmt.Sprintf("%s (by_design.md:%d): surface yes, but no server declares it (device.AheadRows, node.AheadRows)", r.entry, r.line))
+			out = append(out, fmt.Sprintf("%s (by_design.md:%d): surface yes, but no server declares it (node.AheadRows)", r.entry, r.line))
 		case r.surface == "no" && isDeclared:
 			out = append(out, fmt.Sprintf("%s (by_design.md:%d): a server declares it, but surface is no", r.entry, r.line))
 		}
@@ -176,7 +176,7 @@ func measureThermostat(t *testing.T, row string, with bool) surface.Cluster {
 	}
 	decl.Features = features
 	p := surface.Policies{Extensions: surface.NewExtensions(thermo.Ahead.IDs()...)}
-	d, err := device.NewThermostat(device.Options{StableKey: endpoint.StringKey("t"), Name: "t", Surface: &p}, decl)
+	d, err := device.NewThermostat(device.Options{StableKey: endpoint.StringKey("t"), Name: "t", Surface: p}, decl)
 	if err != nil {
 		t.Fatalf("%s: %v", row, err)
 	}
@@ -206,13 +206,13 @@ func measureTimeSynchronization(t *testing.T, row string, with bool) surface.Clu
 		},
 		Store:   node.Store{DB: db},
 		Logger:  slog.New(slog.DiscardHandler),
-		Network: node.Network{Listen: "127.0.0.1:0", PreferIPv4: true, MDNS: node.MDNS{Disabled: true}},
+		Network: node.Network{Listen: "127.0.0.1:0", PreferIPv4: true, MDNS: node.MDNS{Off: true}},
 		Surface: surface.Policies{Extensions: surface.NewExtensions(row)},
 	}
 	if with {
-		cfg.TimeSynchronization = &node.TimeSynchronizationConfig{Features: tsdef.Feature(core.TimeSynchronizationAhead[row].Features)}
+		cfg.TimeSynchronization.Config = &node.TimeSynchronizationConfig{Features: tsdef.Feature(core.TimeSynchronizationAhead[row].Features)}
 	}
-	n, err := node.New(cfg)
+	n, err := node.New(context.Background(), cfg)
 	if err != nil {
 		t.Fatalf("%s: %v", row, err)
 	}

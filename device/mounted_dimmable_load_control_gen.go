@@ -20,9 +20,11 @@ const (
 	MountedDimmableLoadControlRevision uint16              = 3
 )
 
-// MountedDimmableLoadControlType is the MountedDimmableLoadControl device type, matter.js's packages/node/src/devices/mounted-dimmable-load-control.ts;
-// its cluster requirements are listed in docs/reference/device-types.md#mounteddimmableloadcontrol.
-var MountedDimmableLoadControlType = typeMountedDimmableLoadControl
+// MountedDimmableLoadControlType returns the MountedDimmableLoadControl device type, matter.js's packages/node/src/devices/mounted-dimmable-load-control.ts;
+// its cluster requirements are listed in docs/reference/device-types.md#mounteddimmableloadcontrol. It is the registry's
+// value, the one [Lookup] and [FromSpec] return: a caller reads it and
+// does not modify it.
+func MountedDimmableLoadControlType() *Type { return &typeMountedDimmableLoadControl }
 
 // typeMountedDimmableLoadControl holds [MountedDimmableLoadControlType]'s cluster requirements.
 var typeMountedDimmableLoadControl = Type{

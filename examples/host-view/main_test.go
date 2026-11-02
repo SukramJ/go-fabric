@@ -76,7 +76,7 @@ func TestHostViewNode(t *testing.T) {
 		t.Fatal(err)
 	}
 	cfg := config(filepath.Join(t.TempDir(), "host-view.db"))
-	cfg.Network = node.Network{Listen: "127.0.0.1:0", PreferIPv4: true, MDNS: node.MDNS{Disabled: true}}
+	cfg.Network = node.Network{Listen: "127.0.0.1:0", PreferIPv4: true, MDNS: node.MDNS{Off: true}}
 	n, err := newNode(ctx, cfg, b)
 	if err != nil {
 		t.Fatal(err)

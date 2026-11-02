@@ -45,20 +45,20 @@ func TestObserveAfterStart(t *testing.T) {
 		events = append(events, s)
 		mu.Unlock()
 	}
-	cfg.Observers.OnFabricAdded = func(node.FabricInfo) error { record("config:added"); return nil }
+	cfg.Observers.OnFabricAdded = func(node.FabricInfo) { record("config:added") }
 	n := newNode(t, cfg)
 	if err := n.Start(context.Background()); err != nil {
 		t.Fatalf("Start: %v", err)
 	}
 	removed := make(chan node.FabricInfo, 1)
 	unsubscribe := n.Observe(node.Observers{
-		OnFabricAdded:           func(node.FabricInfo) error { record("first:added"); return nil },
-		OnCommissioningComplete: func(uint8) error { record("first:complete"); return nil },
-		OnFabricRemoved:         func(info node.FabricInfo) error { record("first:removed"); removed <- info; return nil },
+		OnFabricAdded:           func(node.FabricInfo) { record("first:added") },
+		OnCommissioningComplete: func(uint8) { record("first:complete") },
+		OnFabricRemoved:         func(info node.FabricInfo) { record("first:removed"); removed <- info },
 	})
 	defer unsubscribe()
-	n.Observe(node.Observers{OnFabricAdded: func(node.FabricInfo) error { record("second:added"); return nil }})
-	gone := n.Observe(node.Observers{OnFabricAdded: func(node.FabricInfo) error { record("gone:added"); return nil }})
+	n.Observe(node.Observers{OnFabricAdded: func(node.FabricInfo) { record("second:added") }})
+	gone := n.Observe(node.Observers{OnFabricAdded: func(node.FabricInfo) { record("gone:added") }})
 	gone()
 	gone()
 
@@ -97,7 +97,7 @@ func TestWindowSnapshot(t *testing.T) {
 	ctx := context.Background()
 	cfg := minimalConfig(openDB(t, filepath.Join(t.TempDir(), "node.db")))
 	seen := make(chan node.WindowSnapshot, 8)
-	cfg.Observers.OnWindowTransition = func(s node.WindowSnapshot) error { seen <- s; return nil }
+	cfg.Observers.OnWindowTransition = func(s node.WindowSnapshot) { seen <- s }
 	n := newNode(t, cfg)
 	if got := n.Window(); got.Kind != node.WindowNone || got.Open {
 		t.Errorf("Window before Start = %+v, want none", got)
@@ -127,7 +127,7 @@ func TestWindowSnapshot(t *testing.T) {
 	if !basic.Open || basic.Kind != node.WindowBasic || basic.Discriminator != creds.Discriminator || basic.Timeout != time.Minute {
 		t.Errorf("basic window %+v, want basic, discriminator %d, 1 min", basic, creds.Discriminator)
 	}
-	if err := n.CommissioningWindow().RevokeWindow(ctx); err != nil {
+	if err := n.Bridge().CommissioningWindow().RevokeWindow(ctx); err != nil {
 		t.Fatalf("RevokeWindow: %v", err)
 	}
 	// The node has no fabric, so its own window reopens after the basic
@@ -135,7 +135,7 @@ func TestWindowSnapshot(t *testing.T) {
 	if got := n.Window(); got.Kind != node.WindowOwn {
 		t.Fatalf("after closing the basic window = %+v, want the own window back", got)
 	}
-	if err := n.CommissioningWindow().RevokeWindow(ctx); err != nil {
+	if err := n.Bridge().CommissioningWindow().RevokeWindow(ctx); err != nil {
 		t.Fatalf("RevokeWindow: %v", err)
 	}
 	if got := n.Window(); got != (node.WindowSnapshot{Administrator: got.Administrator}) || got.Kind.String() != "none" {
@@ -153,7 +153,7 @@ func TestSetupPayload(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	qr, manual, err := n.PairingCodes()
+	qr, manual, err := n.PairingCodesFor(cfg.Commissioning.WindowCredentials(0))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -176,7 +176,7 @@ func TestNewWindowCredentials(t *testing.T) {
 		if err := node.ValidateSetupPIN(c.Passcode); err != nil {
 			t.Fatalf("draw %d: %v", i, err)
 		}
-		if c.Discriminator > node.MaxDiscriminator || c.Iterations != node.PBKDFIterationsMin || len(c.Salt) != node.PBKDFSaltMax || c.Timeout != 30*time.Second {
+		if c.Discriminator > node.MaxDiscriminator || c.PBKDFIterations != node.PBKDFIterationsMin || len(c.Salt) != node.PBKDFSaltMax || c.Timeout != 30*time.Second {
 			t.Fatalf("draw %d = %+v", i, c)
 		}
 		if i > 0 && c.Passcode == prev.Passcode && slices.Equal(c.Salt, prev.Salt) {

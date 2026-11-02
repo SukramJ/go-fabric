@@ -1,8 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright (C) 2026 SukramJ.
 
-// Package nodeseam carries the one-way seam through which fabrictest puts
-// a node's client stack onto its in-memory network.
+// Package nodeseam carries the one-way seams to a node's configuration
+// that are not public API: fabrictest puts a node's client stack onto its
+// in-memory network, and the reference daemon and the module's tests set
+// the two TESTING ONLY knobs — the OTA requestor's harness mode and the
+// Wi-Fi NetworkCommissioning driver (review 2026-11 W5-api-11).
 //
 // Direction of the edge: package node installs [UseClientListener] from
 // its init; fabrictest reads it. node.Client names a bind address and a
@@ -13,7 +16,10 @@
 // exported way to build the stack.
 package nodeseam
 
-import "github.com/SukramJ/go-fabric/transport/udp"
+import (
+	"github.com/SukramJ/go-fabric/contract"
+	"github.com/SukramJ/go-fabric/transport/udp"
+)
 
 // UseClientListener makes the node built from cfg (a *node.Config, as any:
 // node imports this package to install the hook) open its client socket
@@ -21,3 +27,17 @@ import "github.com/SukramJ/go-fabric/transport/udp"
 // node.New; the client stack closes what it returns on Stop. Reports false
 // when cfg is not a *node.Config or open is nil.
 var UseClientListener func(cfg any, open func() (*udp.Listener, error)) bool
+
+// UseOTAHarness puts the OTA requestor of cfg (a *node.Config whose OTA is
+// set) into harness mode: an image is applied in place and its version
+// reported as running without a restart, with the user consent the
+// harness gives. TESTING ONLY. Reports false when cfg is not a
+// *node.Config or has no OTA.
+var UseOTAHarness func(cfg any) bool
+
+// UseWiFiCommissioning mounts NetworkCommissioning with the Wi-Fi feature
+// instead of Ethernet on the node built from cfg (a *node.Config), its
+// scan and connect done by driver — what a commissioner's network steps
+// configure. TESTING ONLY: the module's nodes are Ethernet-attached.
+// Reports false when cfg is not a *node.Config or driver is nil.
+var UseWiFiCommissioning func(cfg any, driver contract.WiFiDriver) bool

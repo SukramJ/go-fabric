@@ -38,3 +38,17 @@ matter.js path at the pin, or an issue); `Reason` is one sentence.
 
 Rows are added only with their evidence. An empty register ships every
 profile as a name with no removals.
+
+## eligibility.Compat rules
+
+The warnings `eligibility.Compat` gives a host for the ecosystems that
+commissioned a fabric (`eligibility/compat.go`). Not machine-read: they
+are warnings to an operator, never a removal, and the 90-endpoint ceiling
+has no element to name. Same confidence levels as above.
+
+| Ecosystem | Element | Effect | Confidence | Source | Reason |
+| --- | --- | --- | --- | --- | --- |
+| google-home | device-type 0x0042 (WaterValve) | warn (`device_type_unsupported`) | Reported | `eligibility/compat.go`, carried over from the host's field notes; no hand-test record here | Google Home is reported not to show a water-valve endpoint that Apple Home and Aqara show. |
+| alexa | device-type 0x0042 (WaterValve) | warn (`device_type_unsupported`) | Reported | as above | Alexa is reported not to show a water-valve endpoint. |
+| alexa | device-type 0x0043 (WaterLeakDetector) | warn (`device_type_breaks_bridge`) | Reported | as above | Alexa is reported to become unresponsive for the whole bridge when it meets this device type; the mechanism is not observed. |
+| alexa | more than 90 bridged endpoints | warn (`endpoint_count_near_ceiling`) | Reported | as above | Alexa is reported to drop devices without an error beyond roughly 90 endpoints; not a documented limit. |

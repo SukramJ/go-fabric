@@ -3,19 +3,19 @@
 
 package measurement
 
-// This file installs the built-in half of the measurement-kind
-// registry. It lives here rather than in package contract because the
-// dependency runs one way: contract declares the classes and owns the
-// registry, this package owns the constructors that turn a source into
-// cluster servers, and contract must not learn about them. The same
-// shape as the module's other cross-package installs — an init that
-// fills a seam the lower package declared.
+// This file holds the built-in materialisers of the measurement classes.
+// They live here, unexported, rather than in package contract because
+// the dependency runs one way: contract declares the classes and keeps
+// the host kinds' registry, this package owns the constructors that turn
+// a source into cluster servers, and contract must not learn about them.
+// A host cannot replace a built-in projection (review 2026-11
+// W5-api-12); it registers a kind of its own.
 //
 // Each entry below is the arm the FromMeasurementClass switch used to
 // carry, moved verbatim so a built-in class materialises exactly what it
 // always did. Three classes get no entry at all, and
-// [contract.MeasurementMaterializerFor] then reports them as having
-// none, which the assembler renders as "mount nothing":
+// [FromMeasurementClass] then returns nothing for them, which the
+// assembler renders as "mount nothing":
 //
 //   - MeasurementNone has no Matter projection by design.
 //   - MeasurementPower / MeasurementEnergy are per-parameter classes
@@ -30,25 +30,27 @@ package measurement
 // the same seam.
 
 import (
+	"fmt"
+
 	switchserver "github.com/SukramJ/go-fabric/cluster/switch"
 	"github.com/SukramJ/go-fabric/cluster/wire"
 	"github.com/SukramJ/go-fabric/contract"
 )
 
 func init() {
-	contract.SetMeasurementMaterializer(contract.MeasurementTemperature, floatServer(
+	setMaterializer(contract.MeasurementTemperature, floatServer(
 		func(f contract.FloatMeasurementSource) contract.ClusterServer { return NewTemperatureServer(f) },
 	))
-	contract.SetMeasurementMaterializer(contract.MeasurementHumidity, floatServer(
+	setMaterializer(contract.MeasurementHumidity, floatServer(
 		func(f contract.FloatMeasurementSource) contract.ClusterServer { return NewHumidityServer(f) },
 	))
-	contract.SetMeasurementMaterializer(contract.MeasurementIlluminance, floatServer(
+	setMaterializer(contract.MeasurementIlluminance, floatServer(
 		func(f contract.FloatMeasurementSource) contract.ClusterServer { return NewIlluminanceServer(f) },
 	))
-	contract.SetMeasurementMaterializer(contract.MeasurementPressure, floatServer(
+	setMaterializer(contract.MeasurementPressure, floatServer(
 		func(f contract.FloatMeasurementSource) contract.ClusterServer { return NewPressureServer(f) },
 	))
-	contract.SetMeasurementMaterializer(contract.MeasurementFlow, floatServer(
+	setMaterializer(contract.MeasurementFlow, floatServer(
 		func(f contract.FloatMeasurementSource) contract.ClusterServer { return NewFlowServer(f) },
 	))
 
@@ -57,15 +59,15 @@ func init() {
 	// type mandates while listing every concentration cluster as
 	// optional. The class is closed over because AirQualityServer derives
 	// its rating thresholds from which pollutant it reports on.
-	contract.SetMeasurementMaterializer(contract.MeasurementCO2, airQualityServers(
+	setMaterializer(contract.MeasurementCO2, airQualityServers(
 		contract.MeasurementCO2,
 		func(f contract.FloatMeasurementSource) contract.ClusterServer { return NewCO2ConcentrationServer(f) },
 	))
-	contract.SetMeasurementMaterializer(contract.MeasurementPM25, airQualityServers(
+	setMaterializer(contract.MeasurementPM25, airQualityServers(
 		contract.MeasurementPM25,
 		func(f contract.FloatMeasurementSource) contract.ClusterServer { return NewPM25ConcentrationServer(f) },
 	))
-	contract.SetMeasurementMaterializer(contract.MeasurementPM10, airQualityServers(
+	setMaterializer(contract.MeasurementPM10, airQualityServers(
 		contract.MeasurementPM10,
 		func(f contract.FloatMeasurementSource) contract.ClusterServer { return NewPM10ConcentrationServer(f) },
 	))
@@ -74,16 +76,16 @@ func init() {
 	booleanState := boolServer(
 		func(b contract.BoolMeasurementSource) contract.ClusterServer { return NewBooleanStateServer(b) },
 	)
-	contract.SetMeasurementMaterializer(contract.MeasurementContact, booleanState)
-	contract.SetMeasurementMaterializer(contract.MeasurementLeak, booleanState)
-	contract.SetMeasurementMaterializer(contract.MeasurementOccupancy, boolServer(
+	setMaterializer(contract.MeasurementContact, booleanState)
+	setMaterializer(contract.MeasurementLeak, booleanState)
+	setMaterializer(contract.MeasurementOccupancy, boolServer(
 		func(b contract.BoolMeasurementSource) contract.ClusterServer { return NewOccupancySensingServer(b) },
 	))
 
-	contract.SetMeasurementMaterializer(contract.MeasurementBattery, powerSourceServers)
-	contract.SetMeasurementMaterializer(contract.MeasurementElectrical, electricalSensorServers)
-	contract.SetMeasurementMaterializer(contract.MeasurementMomentarySwitch, genericSwitchServers)
-	contract.SetMeasurementMaterializer(contract.MeasurementSoilMoisture, soilServer) // soil.go
+	setMaterializer(contract.MeasurementBattery, powerSourceServers)
+	setMaterializer(contract.MeasurementElectrical, electricalSensorServers)
+	setMaterializer(contract.MeasurementMomentarySwitch, genericSwitchServers)
+	setMaterializer(contract.MeasurementSoilMoisture, soilServer) // soil.go
 }
 
 // floatServer adapts a single-server constructor over
@@ -233,4 +235,20 @@ func electricalSensorServers(src any, _ contract.MeasurementContext) []contract.
 		servers = append(servers, NewElectricalEnergyServer(energyOf{r}))
 	}
 	return servers
+}
+
+// builtinMaterializers are the built-in classes' materialisers, filled by
+// this package's init; read-only afterwards.
+var builtinMaterializers = map[contract.MeasurementClass]contract.MeasurementMaterializer{}
+
+// setMaterializer installs one built-in class's materialiser; a nil one
+// and a class a host registered are wiring mistakes of this package.
+func setMaterializer(class contract.MeasurementClass, m contract.MeasurementMaterializer) {
+	if m == nil {
+		panic(fmt.Sprintf("measurement: nil materializer for class %d", class))
+	}
+	if kind, ok := contract.MeasurementKindFor(class); !ok || kind.Materialize != nil {
+		panic(fmt.Sprintf("measurement: class %d is not a built-in", class))
+	}
+	builtinMaterializers[class] = m
 }

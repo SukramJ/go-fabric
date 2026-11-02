@@ -10,7 +10,7 @@ import (
 )
 
 // startReannounce starts the advertiser's re-announce loop when it has one
-// (mdns.Reannouncer) and Network.DisableReannounce is not set (issue
+// (mdns.Reannouncer) and Network.Reannounce.Off is not set (issue
 // #119). The loop is this module's own device, not a matter.js port:
 // matter.js re-sends answers on a query, never unsolicited
 // (mdns.Reannouncer's doc, MdnsServer.ts:158-164 at 0ceb202d). It runs
@@ -18,10 +18,10 @@ import (
 // Called with n.mu held.
 func (n *Node) startReannounce() {
 	r, ok := n.advertiser.(mdns.Reannouncer)
-	if !ok || n.cfg.Network.DisableReannounce {
+	if !ok || n.cfg.Network.Reannounce.Off {
 		return
 	}
-	interval := n.cfg.Network.ReannounceInterval
+	interval := n.cfg.Network.Reannounce.Interval
 	if interval == 0 {
 		interval = DefaultReannounceInterval
 	}

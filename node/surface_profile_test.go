@@ -20,7 +20,7 @@ import (
 func TestNodeRejectsAnUnknownProfile(t *testing.T) {
 	cfg := minimalConfig(openDB(t, filepath.Join(t.TempDir(), "profile.db")))
 	cfg.Surface = surface.Policies{Profiles: []string{"nope"}}
-	if _, err := node.New(cfg); !errors.Is(err, surface.ErrUnknownProfile) {
+	if _, err := node.New(context.Background(), cfg); !errors.Is(err, surface.ErrUnknownProfile) {
 		t.Fatalf("node.New with an unknown profile: %v", err)
 	}
 }
@@ -32,11 +32,11 @@ func TestNodeRejectsAnUnknownProfile(t *testing.T) {
 // refused.
 func TestNodeProfile(t *testing.T) {
 	ctx := context.Background()
-	r, _ := device.OnOffLightType.Server(onoffdef.ClusterID)
+	r, _ := device.OnOffLightType().Server(onoffdef.ClusterID)
 	mandated := r.Features & -r.Features
 	prof := surface.Profile{Name: "synthetic", Rules: []surface.ProfileRule{
 		{Element: surface.ElementPattern{Kind: surface.KindFeature, Cluster: onoffdef.ClusterID, ID: mandated}, Effect: surface.EffectRemove, Confidence: surface.Reproduced, Source: "s1", Reason: "r1"},
-		{Element: surface.ElementPattern{Kind: surface.KindDeviceType, ID: uint32(device.OnOffLightType.ID)}, Effect: surface.EffectWarn, Confidence: surface.Reported, Source: "s2", Reason: "r2"},
+		{Element: surface.ElementPattern{Kind: surface.KindDeviceType, ID: uint32(device.OnOffLightType().ID)}, Effect: surface.EffectWarn, Confidence: surface.Reported, Source: "s2", Reason: "r2"},
 	}}
 	p := surfacetest.WithProfiles(surface.Policies{}, prof)
 	n := surfaceNode(t, p)

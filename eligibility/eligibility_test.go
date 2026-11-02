@@ -55,7 +55,7 @@ func (f *fakeMeasurementSource) MatterMeasurementClass() contract.MeasurementCla
 	return f.class
 }
 
-// fakeEligibilitySource implements both MatterEndpointSource AND
+// fakeEligibilitySource implements both contract.EndpointSource AND
 // MatterEligibilitySource. The latter overrides Classify's decision.
 type fakeEligibilitySource struct {
 	fakeEndpointSource
@@ -164,7 +164,7 @@ func TestClassify_OpaqueSource_Returns_Unmappable_NoProjection(t *testing.T) {
 
 func TestClassify_EligibilitySourceOverride_Partial(t *testing.T) {
 	t.Parallel()
-	// The source implements BOTH MatterEndpointSource (which would give
+	// The source implements BOTH contract.EndpointSource (which would give
 	// Mappable) AND MatterEligibilitySource (which returns Partial).
 	// MatterEligibilitySource must win.
 	src := &fakeEligibilitySource{

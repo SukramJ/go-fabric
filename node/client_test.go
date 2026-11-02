@@ -96,7 +96,7 @@ func TestNodeClientStack(t *testing.T) {
 	t.Parallel()
 	db := openDB(t, filepath.Join(t.TempDir(), "node.db"))
 	cfg := minimalConfig(db)
-	cfg.Client = node.Client{Enabled: true, Listen: "127.0.0.1:0", Names: silentNames(t)}
+	cfg.Client = &node.ClientConfig{Listen: "127.0.0.1:0", Names: silentNames(t)}
 	n := newNode(t, cfg)
 	if n.Peers() == nil {
 		t.Fatal("no peer set")
@@ -113,8 +113,8 @@ func TestNodeClientStack(t *testing.T) {
 	}
 
 	bad := minimalConfig(openDB(t, filepath.Join(t.TempDir(), "bad.db")))
-	bad.Client = node.Client{Enabled: true, Listen: "not an address", Names: silentNames(t)}
-	if _, err := node.New(bad); err == nil {
+	bad.Client = &node.ClientConfig{Listen: "not an address", Names: silentNames(t)}
+	if _, err := node.New(ctx, bad); err == nil {
 		t.Fatal("New accepted an unusable client address")
 	}
 }

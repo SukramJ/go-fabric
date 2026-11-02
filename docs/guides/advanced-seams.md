@@ -20,20 +20,20 @@ A host names none of the packages below for these:
 | Need | Facade route |
 | --- | --- |
 | The store | `Config.Store.Path` (the node opens and closes the SQLite file), or `Store.DB` for the host's own handle |
-| DNS-SD | a nil `Config.Advertiser`: Zeroconf with the subtype responder, shaped by `Network.MDNS` (`Disabled`, `HostName`); `Node.MDNSEnabled`, `MDNSServices`, `DiagnoseMDNS` |
+| DNS-SD | a nil `Config.Advertiser`: Zeroconf with the subtype responder, shaped by `Network.MDNS` (`Off`, `HostName`); `Node.MDNSEnabled`, `MDNSServices`, `DiagnoseMDNS` |
 | Attestation | `Config.Attestation.Files`; `Attestation.BlockCommissioningOnError` and `Node.AttestationError` for a host that keeps running on a broken chain |
-| Credentials | `node.NewCommissioningCredentials`, `node.NewWindowCredentials(timeout)`, `Commissioning.WindowCredentials`, `node.ValidateSetupPIN`, `node.MaxDiscriminator`, `node.PBKDFIterationsMin`/`Max`, `node.PBKDFSaltMin`/`Max`; `Node.PairingCodes`, `Node.PairingCodesFor`, `Node.SetupPayload` (the configured passcode, discriminator, vendor and product id with both codes) |
-| The commissioning window | `Node.Window()`: open, kind (`WindowOwn`, `WindowBasic`, `WindowEnhanced`), advertised discriminator and mode, opened-at, deadline and timeout on the node's clock — the value `OnWindowTransition` receives; `Node.OpenBasicWindow` |
-| Health | `Config.Health{Interval, OnSample}`, `Node.Health`, `Node.LocalAddr` |
-| Fabrics | `Node.FabricInfos`, `Node.RemoveFabric`, `Config.Observers`, and `Node.Observe` for hooks registered on a running node |
+| Credentials | `node.NewCommissioningCredentials`, `node.NewWindowCredentials(timeout)`, `Commissioning.WindowCredentials`, `node.ValidateSetupPIN`, `node.MaxDiscriminator`, `node.PBKDFIterationsMin`/`Max`, `node.PBKDFSaltMin`/`Max`; `Node.PairingCodesFor`, `Node.SetupPayload` (the configured passcode, discriminator, vendor and product id with both codes) |
+| The commissioning window | `Node.Window()`: open, kind (`WindowOwn`, `WindowBasic`, `WindowEnhanced`), advertised discriminator and mode, opened-at, deadline and timeout on the node's clock — the value `OnWindowTransition` receives; `Node.OpenOwnWindow` (the configured credentials), `Node.OpenBasicWindow` (the host's), `Node.CloseWindow` (whoever opened it), `Node.SetCommissioningBlocked`. The bridge's window type with its `Set…` wiring is reached only through `Node.Bridge()`: its `SetTransitionHook` replaces the facade's own hook |
+| Health | `Config.Health{Interval}`, `Node.OnHealthSample` / `OnHealthSampleAsync`, `Node.Health`, `Node.LocalAddr` |
+| Fabrics | `Node.FabricInfos`, `Node.RemoveFabric`, `Config.Observers`, and `Node.Observe` / `Node.ObserveAsync` for hooks registered on a running node |
 | The served surface | `Node.Surface()`: the policies' digest, level, profiles, extensions, the effective surface, every decision, the withheld elements and the announced changes; `Observers.OnSurfaceChanged` for each change as it is announced |
-| Sessions | `Node.SessionDiagnostics()`: each session's id, fabric, peer and local node id, PASE or CASE, subscription count, last activity and idle ages, the session intervals the peer reported in its handshake (`PeerIdleInterval`, `PeerActiveInterval`, `PeerActiveThreshold`), and the session table's occupancy — read-only; `Node.Clock()` for ages a host computes itself |
-| UniqueID | `Node.UniqueID`; `Config.BootID.RotateUniqueIDs` for the development rotation |
+| Sessions | `Node.SessionDiagnostics()`: each session's id, fabric, peer and local node id, PASE or CASE, subscription count, last activity and idle ages, the session intervals the peer reported in its handshake (`PeerIdleInterval`, `PeerActiveInterval`, `PeerActiveThreshold`), and the session table's occupancy — read-only; `Node.Clock()` for ages a host computes itself; `Observers.OnSessionOpened`, `OnSessionClosed`, `OnSubscriptionsChanged` report each change with the session's `SessionInfo` (CASE sessions; matter.js `SessionsBehavior` events) |
+| UniqueID | `Node.UniqueID`; `bootid.EnableRotation()` for the development rotation (process-wide, called once before `node.New`) |
 | The served topology | `Node.Topology()`: the Aggregator's endpoint and each bridged device's key, endpoint, device type and its revision, name, reachability, mounted clusters (id, schema name, revision: `node.ClusterInfo`) and parts (`node.BridgeTopology`, `node.BridgedDevice`) |
-| A device's lifecycle | `Device.SetReachable`, `Device.Rename` (a persisted label, as a controller writes it), `Device.Update` (the host's statements: name, addresses, availability probe — persisted nowhere, a written label wins), `Device.EndpointNumber`; `Aggregator.Add`, `Remove` (the key keeps its endpoint number for its return), `Replace`, `Forget` (frees it) |
+| A device's lifecycle | `Device.SetReachable`, `Device.Rename` (a persisted label, as a controller writes it), `Device.Update` (the host's statements: name, addresses — persisted nowhere, a written label wins), `Device.EndpointNumber`; `Aggregator.Add`, `Remove` (the key keeps its endpoint number for its return), `Replace`, `Forget` (frees it) |
 | A bridged NodeLabel | `device.ComposeNodeLabel(base, suffix)`: the parameter suffix and the 32-byte cap of the generated definition; `device.New`, `Rename` and `Update` cap a name with it |
 | Who changed an attribute | `contract.Change.Origin` in every `OnChanged` callback (`OriginHostSet`, `OriginControllerWrite`, `OriginCommand`) |
-| Field and return types | the aliases `node.Groups` (`Config.Groups`, `Node.Groups`), `node.Advertiser` (`Config.Advertiser`), `node.Snapshotter`, `Topology`, `TCPConfig`, `CommissioningWindow`, `DiagnosticEvent`, `HealthSample`, `MDNSFinding`, `MDNSService`, `AttestationFiles`, `AttestationChain`, `WindowStatus`, `DeviceTypeValidationMode`, `CapabilityMinimaStruct`, `GeneralDiagnosticsFeatures`; the host ports `node.OTAImageSource`, `OTAConsent`, `OTAConsentState`, `OTAApplyPolicy`, `OTAPeer`, `OTAUpdateStatus`, `OTAApplier`, `WiFiReporter`, `CommissioningApprover`, `ReverseCommissioner`; `device.SourceKey`, `device.AvailabilityProbe` |
+| Field and return types | the aliases `node.Groups` (`Config.Groups`, `Node.Groups`), `node.Advertiser` (`Config.Advertiser`), `node.Snapshotter`, `Topology`, `TCPConfig`, `DiagnosticEvent`, `HealthSample`, `MDNSFinding`, `MDNSService`, `AttestationFiles`, `AttestationChain`, `WindowStatus`, `DeviceTypeValidationMode`, `CapabilityMinimaStruct`, `GeneralDiagnosticsFeatures`; the host ports `node.OTAImageSource`, `OTAConsent`, `OTAConsentState`, `OTAApplyPolicy`, `OTAPeer`, `OTAUpdateStatus`, `OTAApplier`, `WiFiReporter`, `CommissioningApprover`, `ReverseCommissioner`; `device.SourceKey` |
 | The camera's signals to a requestor | `camera.Provider.Offer`, `Answer`, `IceCandidates`, `End`: the requestor's commands invoked on the session's peer node, fabric and endpoint over a CASE session the node initiates; the node attaches the route (`camera.PeerConnector`) to every provider it assembles |
 | Peers (seam) | `Node.Peers()` returns the client stack's `*peer.Set` (nil without `Config.Client`); no facade route yet, the type stays the controller package's |
 | Bindings (seam) | `Node.Bindings()` returns the `*binding.Manager` that resolves the Binding servers' entries into peers; no facade route yet |
@@ -43,7 +43,7 @@ A host names none of the packages below for these:
 | The controller's reads and writes | the role's own types in `controller/client` (`AttributePath`, `ReadRequest`, `SubscribeRequest`, `Report`, `WriteRequest`, `Result`, `StatusError`, `PeerAddress`, `Device`, `Timing`, …, with `AttributeAt`, `ClusterAt`, `CommandAt`, `EventAt`); a written scalar is a `spec.Value` (`spec.Int16(2250)`, `spec.Null[uint16]()`); a typed read is the generated `<cluster>def.StateFrom` over a client cluster or `Report.Values` |
 | The device of a test (seam) | `fabrictest.Device.Bridge()`, `Store()`, `Advertiser()`, `Endpoints()`: the node's bridge, store, advertiser and assembled endpoints, for a test of a layer below the facade; a test of a host's mapping reads over the wire instead (`fabrictest.ReadCluster`) |
 | A pair's transport (seam) | `fabrictest.Pair.Peer`, `Interaction`, `PASESession` (aliased `fabrictest.Peer`, `Interaction`, `Session`) and `fabrictest.Exchange`'s `Message`: the client machinery a pair speaks over, for a test that sends what the controller would refuse to formulate |
-| What Matter and the ecosystems make of a source | `eligibility` (`Classify`, `DeriveMatterEligibility`, `EcosystemForVendor`, `VendorName`, `Compat`): a package of the typed surface beside `schema`, not a seam — it imports only `contract` and reaches nothing below the facade, so it needs no route |
+| What Matter and the ecosystems make of a source | `eligibility` (`Classify`, `DeriveMatterEligibility`, `EcosystemForVendor`, `VendorName`, `Compat`): a package of the typed surface beside `schema`, not a seam — it imports only `contract` and `schema` and reaches nothing below the facade, so it needs no route |
 | OTA provider values and image files | `node.OTAImage`, `node.OTAFileDesignator`, `node.OTABlob` (what an `OTAImageSource` returns), `node.OTAConsentGranted` … `OTAConsentUnknown`; `node.CreateOTAImage(node.OTAImageOptions)` and `node.ReadOTAImage` (the image file format, `node.OTAImageHeader`) |
 | The ledger's software versions | `node.NewDCLClient(node.DCLProductionURL)`, `node.DCLOTAVersions` (Lookup, CheckForUpdate, Download), `node.VerifyOTAImage`, `node.DCLSoftwareVersion` |
 | Aggregator Actions, EcosystemInformation | `node.NewActions(node.ActionsConfig{Host})` for `Config.AggregatorServers` (`node.ActionsHost`, `ActionRequest`); `node.NewEcosystemInformation(dir)` over a `node.EcosystemDirectory`, declared with `ecosysteminformationdef.Declare{HostServer: …}` |
@@ -56,6 +56,7 @@ A host names none of the packages below for these:
 | The EV charger | the kit's `energy.EvseServer` is the EnergyEvse default: a state machine whose hardware inputs (`SetHardwareState`, `SetFault`, the hardware limits, `ReportRFID`, `DiagnosticsComplete`) and `Close` are `energyevsedef.Server.Host()`, the attributes it computes refused by `Set`; a charger with an `EvseHost` is `cluster/energy.NewEnergyEvse` mounted with `energyevsedef.Declare{HostServer: …}` (seam), and `Host()` reaches it too, since it is the kit's type |
 | A kit server's own methods | `<cluster>def.Server.Host()`: the methods of the kit's server that `Set`, `Get` and the typed handlers do not reach, as the cluster's `Host` interface ([Host ports](ports.md#clusterdefhost-the-kit-servers-host-methods)); nil over a server that does not implement it |
 | ContentAppObserver (seam) | `cluster/media.NewContentAppObserver` through `device.HostServer`: no device type serves the cluster (matter.js's ContentApp lists it as a client, `ObserverClient`), so it has no declaration |
+| Lower-layer types on `Node` (seams) | `Node.SessionParameters()` (`node.SessionParameters`), `Node.OTAProvider()` (`node.OTAProviderServer`), `Node.BDX()` (`node.BDXResponder`), `Node.CommissionerControl()` (`node.CommissionerControlServer`), `ClientConfig.Names` (`node.DiscoveryNames`): the lower packages' types under names the facade owns, for a host that drives the provider's transfers, the commissioner control or its own DNS-SD cache |
 | Window errors | `node.ErrAdministratorWindowOpen`, `ErrCommissioningBlocked`, `ErrCommissioningWindowAlreadyOpen`, `ErrCommissioningWindowNotConfigured` (the bridge's values, for `errors.Is`) |
 
 An alias is the type of the lower package under a second name, not a new
@@ -68,7 +69,7 @@ against the original keeps compiling.
 
 Every typed server's `Underlying()` returns the `contract.ClusterServer`
 it wraps. It is a seam for two cases: a host that mounts its own server
-type (`Declare.HostServer`, `device.WithServer`) and wants it back, and a
+type (`Declare.HostServer`, `device.HostServer`) and wants it back, and a
 host or test that needs the contract value itself (`MatterRead`,
 `MatterInvoke`). A host that stays on the facade does not type-assert it:
 `Set`, `Get` and the typed handlers reach the server's state, and `Host()`
@@ -91,7 +92,7 @@ facade does not configure. The served topology and a device's reachability
 have facade routes (`Node.Topology`, `Device.SetReachable`; see the table
 above); the bridge's `Topology` stays for the whole endpoint tree with its
 cluster servers, `NotifyDeviceReachable` for a host that assembles its own
-endpoints behind `Config.Topology`. The facade's own ports are listed in
+endpoints behind `Config.Snapshotter`. The facade's own ports are listed in
 [Host ports](ports.md); the bridge's package doc lists every port in call
 order with what a skip costs
 ([`bridge/bridge.go`](https://github.com/SukramJ/go-fabric/blob/main/bridge/bridge.go)).
@@ -113,7 +114,7 @@ semantics, the persistence the facade threads through. A host that drives
 
 **When.** A host that assembles its own topology from its own device model
 — its own `Spec` producer feeding an `endpoint.Assembler` behind
-`Config.Topology` (a `node.Snapshotter`); the `Endpoint` and `Topology`
+`Config.Snapshotter` (a `node.Snapshotter`); the `Endpoint` and `Topology`
 values the assembler returns are read-only to the host, and a hand-built
 topology loses its DataVersions, Groups and Scenes state, and a written
 NodeLabel, on every `Reassemble` — as
@@ -124,13 +125,13 @@ facade's group state (`Node.Groups`) and endpoint persistence
 A sensor built from a classified measurement source does not need the
 seam: `device.Measurement(src)` mounts it on a device of the kit.
 
-**Costs.** With `Config.Topology` the node builds no assembler and no
+**Costs.** With `Config.Snapshotter` the node builds no assembler and no
 `Aggregator` (`Node.Aggregator` is nil). Endpoint numbering, erasing
 the numbers of devices that are gone (`Store.RemoveEndpoint`), device-type
 validation of the bridged endpoints and the bridged NodeLabel and scene
 persistence are the host assembler's to get right.
 
-*Source: `node/config.go` (`Config.Topology`, `Config.EndpointPersistence`), `node/node.go` (`New`: the assembler only without `Topology`), `node/persist.go` (`NewEndpointPersistence`).*
+*Source: `node/config.go` (`Config.Snapshotter`, `Config.EndpointPersistence`), `node/node.go` (`New`: the assembler only without `Topology`), `node/persist.go` (`NewEndpointPersistence`).*
 
 ## `store`
 

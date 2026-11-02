@@ -19,9 +19,11 @@ const (
 	SecondaryNetworkInterfaceRevision uint16              = 1
 )
 
-// SecondaryNetworkInterfaceType is the SecondaryNetworkInterface device type, matter.js's packages/node/src/endpoints/secondary-network-interface.ts;
-// its cluster requirements are listed in docs/reference/device-types.md#secondarynetworkinterface.
-var SecondaryNetworkInterfaceType = typeSecondaryNetworkInterface
+// SecondaryNetworkInterfaceType returns the SecondaryNetworkInterface device type, matter.js's packages/node/src/endpoints/secondary-network-interface.ts;
+// its cluster requirements are listed in docs/reference/device-types.md#secondarynetworkinterface. It is the registry's
+// value, the one [Lookup] and [FromSpec] return: a caller reads it and
+// does not modify it.
+func SecondaryNetworkInterfaceType() *Type { return &typeSecondaryNetworkInterface }
 
 // typeSecondaryNetworkInterface holds [SecondaryNetworkInterfaceType]'s cluster requirements.
 var typeSecondaryNetworkInterface = Type{

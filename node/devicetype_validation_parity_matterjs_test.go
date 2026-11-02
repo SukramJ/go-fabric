@@ -76,7 +76,7 @@ func TestDeviceTypeValidationNodeParityMatterJS(t *testing.T) {
 		t.Run("fails the node's construction for an unknown mode", func(t *testing.T) {
 			cfg := minimalConfig(openDB(t, t.TempDir()+"/node.db"))
 			cfg.DeviceTypeValidation = node.DeviceTypeValidationMode(7)
-			if _, err := node.New(cfg); err == nil || !strings.Contains(err.Error(), "DeviceTypeValidation 7 is not a mode") {
+			if _, err := node.New(ctx, cfg); err == nil || !strings.Contains(err.Error(), "DeviceTypeValidation 7 is not a mode") {
 				t.Fatalf("New = %v, want the unknown mode refused", err)
 			}
 		})

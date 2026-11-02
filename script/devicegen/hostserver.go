@@ -14,8 +14,8 @@ import (
 // device.HostServer resolves a server's cluster id through, one line per
 // committed cluster definition under cluster/spec — its Declare with the
 // host's server as HostServer. A cluster of the snapshot without a
-// committed package has no line; HostServer mounts its server as
-// WithServer does.
+// committed package has no line; HostServer mounts its server after the
+// type's clusters.
 func (g *generator) generateHostServers() (*output, error) {
 	type entry struct {
 		id  uint32

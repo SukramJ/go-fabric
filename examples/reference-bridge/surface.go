@@ -16,7 +16,6 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/SukramJ/go-fabric/device"
 	"github.com/SukramJ/go-fabric/node"
 	"github.com/SukramJ/go-fabric/schema"
 	"github.com/SukramJ/go-fabric/surface"
@@ -27,11 +26,11 @@ import (
 // "Ahead of matter.js" register rows --extensions names, and
 // BD-chip-Thermostat-Schedules with --thermostat-schedules; the level
 // --spec-level names; the controller profiles --profile names. Every ID
-// must be one the module declares (device.AheadRows, node.AheadRows), the
+// must be one the module declares (node.AheadRows), the
 // level one of schema.Levels and every profile one of surface.Profiles; a
 // typo stops the daemon with the list of the known ones.
 func surfacePolicies(f flags) (surface.Policies, error) {
-	known := slices.Concat(device.AheadRows(), node.AheadRows())
+	known := node.AheadRows()
 	slices.Sort(known)
 	known = slices.Compact(known)
 	var ids []string

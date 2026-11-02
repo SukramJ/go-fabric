@@ -200,14 +200,14 @@ func TestAggregatorIncreaseConfigurationVersions(t *testing.T) {
 	}
 	root, va, vb := rootVersion(), bridgedVersion("light:a"), bridgedVersion("light:b")
 
-	if err := d.Node().Aggregator().IncreaseConfigurationVersions(endpoint.StringKey("light:a"), endpoint.StringKey("nope")); !errors.Is(err, node.ErrUnknownKey) {
+	if err := d.Node().Aggregator().IncreaseConfigurationVersions(context.Background(), endpoint.StringKey("light:a"), endpoint.StringKey("nope")); !errors.Is(err, node.ErrUnknownKey) {
 		t.Fatalf("an unknown key: %v, want ErrUnknownKey", err)
 	}
 	if rootVersion() != root || bridgedVersion("light:a") != va {
 		t.Fatal("a refused change raised a version")
 	}
 
-	if err := d.Node().Aggregator().IncreaseConfigurationVersions(endpoint.StringKey("light:a"), endpoint.StringKey("light:b"), endpoint.StringKey("light:a")); err != nil {
+	if err := d.Node().Aggregator().IncreaseConfigurationVersions(context.Background(), endpoint.StringKey("light:a"), endpoint.StringKey("light:b"), endpoint.StringKey("light:a")); err != nil {
 		t.Fatal(err)
 	}
 	want := [3]uint32{root + 1, va + 1, vb + 1}

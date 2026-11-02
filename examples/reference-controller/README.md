@@ -62,6 +62,10 @@ its error on stderr.
   (`AddOrUpdateWiFiNetwork` / `AddOrUpdateThreadNetwork`, `ConnectNetwork`),
   which matter.js runs only on a BLE channel; here they also run over IP
   when the credentials are given (`BD-Controller-NetworkStepsOverIP`).
+  The passphrase and the dataset need not be on the command line, where
+  `ps` and the shell history show them: `--wifi-credentials @file` and
+  `--thread-dataset @file` read the file, and without the flag they come
+  from `GOFABRIC_WIFI_CREDENTIALS` and `GOFABRIC_THREAD_DATASET`.
 
   ```sh
   reference-controller pair --code 34970112332 --node-id 0x4321 --label kitchen

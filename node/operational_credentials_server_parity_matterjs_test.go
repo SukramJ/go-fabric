@@ -372,18 +372,16 @@ func newGroupDevice(t *testing.T) *groupDevice {
 	g.pair = g.site.CommissionedPair(fabrictest.PairOptions{Device: fabrictest.Topology{
 		Bridged: []node.Endpoint{light},
 		Configure: func(cfg *node.Config) {
-			cfg.Observers.OnFabricUpdated = func(f node.FabricInfo) error {
+			cfg.Observers.OnFabricUpdated = func(f node.FabricInfo) {
 				gs := groupStateOf(t, dev.Node(), f.FabricIndex, g.ep)
 				g.mu.Lock()
 				g.updated = append(g.updated, gs)
 				g.mu.Unlock()
-				return nil
 			}
-			cfg.Observers.OnFabricRemoved = func(f node.FabricInfo) error {
+			cfg.Observers.OnFabricRemoved = func(f node.FabricInfo) {
 				g.mu.Lock()
 				g.removed = append(g.removed, f.FabricIndex)
 				g.mu.Unlock()
-				return nil
 			}
 		},
 	}})
@@ -591,11 +589,10 @@ func TestOperationalCredentialsFinalFabricChange(t *testing.T) {
 		errLog := &bqLog{}
 		p := quietSite(t).CommissionedPair(fabrictest.PairOptions{Device: fabrictest.Topology{Configure: func(cfg *node.Config) {
 			cfg.Logger = slog.New(&bqHandler{log: errLog})
-			cfg.Observers.OnFabricUpdated = func(f node.FabricInfo) error {
+			cfg.Observers.OnFabricUpdated = func(f node.FabricInfo) {
 				mu.Lock()
 				changes = append(changes, f.FabricIndex)
 				mu.Unlock()
-				return nil
 			}
 		}}})
 		armFailSafe(t, p)

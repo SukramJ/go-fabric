@@ -21,9 +21,11 @@ const (
 	ColorTemperatureLightRevision uint16              = 5
 )
 
-// ColorTemperatureLightType is the ColorTemperatureLight device type, matter.js's packages/node/src/devices/color-temperature-light.ts;
-// its cluster requirements are listed in docs/reference/device-types.md#colortemperaturelight.
-var ColorTemperatureLightType = typeColorTemperatureLight
+// ColorTemperatureLightType returns the ColorTemperatureLight device type, matter.js's packages/node/src/devices/color-temperature-light.ts;
+// its cluster requirements are listed in docs/reference/device-types.md#colortemperaturelight. It is the registry's
+// value, the one [Lookup] and [FromSpec] return: a caller reads it and
+// does not modify it.
+func ColorTemperatureLightType() *Type { return &typeColorTemperatureLight }
 
 // typeColorTemperatureLight holds [ColorTemperatureLightType]'s cluster requirements.
 var typeColorTemperatureLight = Type{

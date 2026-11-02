@@ -46,7 +46,7 @@ func TestLiveOTBR(t *testing.T) {
 	port, _ := strconv.Atoi(u.Port())
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
 	defer cancel()
-	capability, err := otbr.Probe(ctx, u.Hostname(), port, 5*time.Second, nil)
+	capability, err := otbr.Probe(ctx, otbr.Config{Host: u.Hostname(), Port: port, Timeout: 5 * time.Second})
 	if err != nil || capability == nil {
 		t.Fatalf("probe: %+v, %v", capability, err)
 	}

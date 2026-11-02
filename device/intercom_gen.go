@@ -20,9 +20,11 @@ const (
 	IntercomRevision uint16              = 2
 )
 
-// IntercomType is the Intercom device type, matter.js's packages/node/src/devices/intercom.ts;
-// its cluster requirements are listed in docs/reference/device-types.md#intercom.
-var IntercomType = typeIntercom
+// IntercomType returns the Intercom device type, matter.js's packages/node/src/devices/intercom.ts;
+// its cluster requirements are listed in docs/reference/device-types.md#intercom. It is the registry's
+// value, the one [Lookup] and [FromSpec] return: a caller reads it and
+// does not modify it.
+func IntercomType() *Type { return &typeIntercom }
 
 // typeIntercom holds [IntercomType]'s cluster requirements.
 var typeIntercom = Type{

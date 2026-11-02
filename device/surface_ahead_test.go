@@ -4,6 +4,7 @@
 package device
 
 import (
+	"cmp"
 	"errors"
 	"reflect"
 	"slices"
@@ -36,7 +37,7 @@ func aheadThermostat(key string, features thermostatdef.Feature, p *surface.Poli
 		one, transitions := uint8(1), uint8(4)
 		decl.Initial = thermostatdef.Patch{ScheduleTypes: &types, NumberOfSchedules: &one, NumberOfScheduleTransitions: &transitions}
 	}
-	return NewThermostat(Options{StableKey: endpoint.StringKey(key), Name: key, Surface: p}, decl)
+	return NewThermostat(Options{StableKey: endpoint.StringKey(key), Name: key, Surface: *cmp.Or(p, &surface.Policies{})}, decl)
 }
 
 func TestAheadDeclarationsAreThermo(t *testing.T) {
@@ -48,8 +49,8 @@ func TestAheadDeclarationsAreThermo(t *testing.T) {
 			t.Errorf("thermo.Ahead names feature 0x%X as %q, want %q", uint32(r.feature), got, r.row)
 		}
 	}
-	if !slices.Equal(AheadRows(), thermo.Ahead.IDs()) {
-		t.Errorf("AheadRows() = %v, want %v", AheadRows(), thermo.Ahead.IDs())
+	if !slices.Equal(aheadRows(), thermo.Ahead.IDs()) {
+		t.Errorf("aheadRows() = %v, want %v", aheadRows(), thermo.Ahead.IDs())
 	}
 }
 

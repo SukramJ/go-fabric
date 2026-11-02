@@ -16,22 +16,14 @@ import (
 
 	"github.com/SukramJ/go-fabric/client/interaction"
 	"github.com/SukramJ/go-fabric/cluster/spec"
+	acldef "github.com/SukramJ/go-fabric/cluster/spec/accesscontrol"
 	descdef "github.com/SukramJ/go-fabric/cluster/spec/descriptor"
+	groupcastdef "github.com/SukramJ/go-fabric/cluster/spec/groupcast"
+	gkmdef "github.com/SukramJ/go-fabric/cluster/spec/groupkeymanagement"
 	groupsdef "github.com/SukramJ/go-fabric/cluster/spec/groups"
 	"github.com/SukramJ/go-fabric/controller/client"
 	"github.com/SukramJ/go-fabric/groups"
 	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/tlv"
-)
-
-// Cluster and command ids the group and binding commands write by hand:
-// GroupKeyManagement, AccessControl and Groupcast have no generated
-// definition (ADR 0013 skips the core servers).
-const (
-	clusterGroupKeyManagement uint32 = 0x003F
-	clusterGroupcast          uint32 = 0x0065
-	clusterAccessControl      uint32 = 0x001F
-	clusterBinding            uint32 = 0x001E
 )
 
 // epochStartTime0 is the key set's EpochStartTime0, the value of
@@ -62,47 +54,35 @@ func loadGroup(ctx context.Context, s *stack, id uint16) (groupRecord, error) {
 	return g, err
 }
 
-// encodable writes a payload through a function, as the live tests do.
-type encodable func(enc *tlv.Encoder, tag tlv.Tag)
-
-func (f encodable) EncodeTLV(enc *tlv.Encoder, tag tlv.Tag) { f(enc, tag) }
-
 // keySetWrite is GroupKeyManagement KeySetWrite (§11.2.7.1) of one epoch
-// key — node/groupsend_live_test.go's keySetWrite.
-func keySetWrite(keySet uint16, key []byte) encodable {
-	return func(enc *tlv.Encoder, tag tlv.Tag) {
-		enc.StartStruct(tag)
-		enc.StartStruct(tlv.ContextTag(0))
-		enc.PutUint(tlv.ContextTag(0), uint64(keySet))
-		enc.PutUint(tlv.ContextTag(1), 0) // TrustFirst
-		enc.PutOctets(tlv.ContextTag(2), key)
-		enc.PutUint(tlv.ContextTag(3), epochStartTime0)
-		for i := uint8(4); i <= 7; i++ {
-			enc.PutNull(tlv.ContextTag(i))
-		}
-		_ = enc.EndContainer()
-		_ = enc.EndContainer()
-	}
+// key — node/groupsend_live_test.go's keySetWrite, in the generated
+// request type.
+func keySetWrite(keySet uint16, key []byte) gkmdef.KeySetWriteRequest {
+	return gkmdef.KeySetWriteRequest{GroupKeySet: gkmdef.GroupKeySetStruct{
+		GroupKeySetId:          keySet,
+		GroupKeySecurityPolicy: gkmdef.GroupKeySecurityPolicyTrustFirst,
+		EpochKey0:              spec.ValueOf(key),
+		EpochStartTime0:        spec.ValueOf(uint64(epochStartTime0)),
+		EpochKey1:              spec.NullOf[[]byte](),
+		EpochStartTime1:        spec.NullOf[uint64](),
+		EpochKey2:              spec.NullOf[[]byte](),
+		EpochStartTime2:        spec.NullOf[uint64](),
+	}}
 }
 
 // joinGroup is Groupcast JoinGroup: the group on endpoints under the key
-// set, with the auxiliary ACL entry for a member (field 4) — none for a
-// sender-only node. node/groupsend_live_test.go's joinGroup.
-func joinGroup(group, keySet uint16, endpoints []uint16, aux bool) encodable {
-	return func(enc *tlv.Encoder, tag tlv.Tag) {
-		enc.StartStruct(tag)
-		enc.PutUint(tlv.ContextTag(0), uint64(group))
-		enc.StartArray(tlv.ContextTag(1))
-		for _, ep := range endpoints {
-			enc.PutUint(tlv.AnonymousTag(), uint64(ep))
-		}
-		_ = enc.EndContainer()
-		enc.PutUint(tlv.ContextTag(2), uint64(keySet))
-		if aux {
-			enc.PutBool(tlv.ContextTag(4), true)
-		}
-		_ = enc.EndContainer()
+// set, with the auxiliary ACL entry for a member — none for a sender-only
+// node. node/groupsend_live_test.go's joinGroup, in the generated request
+// type.
+func joinGroup(group, keySet uint16, endpoints []uint16, aux bool) groupcastdef.JoinGroupRequest {
+	req := groupcastdef.JoinGroupRequest{GroupId: group, Endpoints: endpoints, KeySetId: keySet}
+	if req.Endpoints == nil {
+		req.Endpoints = []uint16{}
 	}
+	if aux {
+		req.UseAuxiliaryAcl = new(true)
+	}
+	return req
 }
 
 // invoker is a node or the own node's interaction.
@@ -206,7 +186,7 @@ func cmdGroupCreate(e *env, args []string) error {
 			if err != nil {
 				return err
 			}
-			if err := invokeOK(ctx, n, clusterGroupKeyManagement, keySetWrite(g.KeySetID, key)); err != nil {
+			if err := invokeOK(ctx, n, gkmdef.ClusterID, keySetWrite(g.KeySetID, key)); err != nil {
 				return fmt.Errorf("node %d KeySetWrite: %w", id, err)
 			}
 			hasGroupcast, err := servesGroupcast(ctx, n)
@@ -215,7 +195,7 @@ func cmdGroupCreate(e *env, args []string) error {
 			}
 			how := "Groupcast"
 			if hasGroupcast {
-				if err := invokeOK(ctx, n, clusterGroupcast, joinGroup(g.GroupID, g.KeySetID, g.Endpoints, true)); err != nil {
+				if err := invokeOK(ctx, n, groupcastdef.ClusterID, joinGroup(g.GroupID, g.KeySetID, g.Endpoints, true)); err != nil {
 					return fmt.Errorf("node %d JoinGroup: %w", id, err)
 				}
 			} else {
@@ -230,10 +210,10 @@ func cmdGroupCreate(e *env, args []string) error {
 		if err != nil {
 			return err
 		}
-		if err := invokeOK(ctx, self.ia, clusterGroupKeyManagement, keySetWrite(g.KeySetID, key)); err != nil {
+		if err := invokeOK(ctx, self.ia, gkmdef.ClusterID, keySetWrite(g.KeySetID, key)); err != nil {
 			return fmt.Errorf("own node KeySetWrite: %w", err)
 		}
-		if err := invokeOK(ctx, self.ia, clusterGroupcast, joinGroup(g.GroupID, g.KeySetID, nil, false)); err != nil {
+		if err := invokeOK(ctx, self.ia, groupcastdef.ClusterID, joinGroup(g.GroupID, g.KeySetID, nil, false)); err != nil {
 			return fmt.Errorf("own node JoinGroup: %w", err)
 		}
 		b, err := json.Marshal(g)
@@ -314,7 +294,7 @@ func servesGroupcast(ctx context.Context, n *client.Node) (bool, error) {
 		return false, errors.New("no ServerList")
 	}
 	for _, c := range v.Children {
-		if c.El.Uint == uint64(clusterGroupcast) {
+		if c.El.Uint == uint64(groupcastdef.ClusterID) {
 			return true, nil
 		}
 	}
@@ -334,12 +314,12 @@ func servesGroupcast(ctx context.Context, n *client.Node) (bool, error) {
 // the one cluster/core's AccessControl accepts (0x0001..0xFFFF).
 func legacyJoin(ctx context.Context, n *client.Node, g groupRecord) error {
 	gid := uint64(g.GroupID)
-	if err := appendToList(ctx, n, listPath(0, clusterGroupKeyManagement),
-		structNode(tlv.AnonymousTag(), uintNode(1, gid), uintNode(2, uint64(g.KeySetID))), mapsGroup(gid)); err != nil {
+	if err := appendEntry(ctx, n, listPath(0, gkmdef.ClusterID),
+		gkmdef.GroupKeyMapStruct{GroupId: g.GroupID, GroupKeySetId: g.KeySetID}, mapsGroup(gid)); err != nil {
 		return fmt.Errorf("GroupKeyMap: %w", err)
 	}
 	name := "group " + strconv.Itoa(int(g.GroupID))
-	targets := make([]spec.Node, 0, len(g.Endpoints))
+	targets := make([]acldef.AccessControlTargetStruct, 0, len(g.Endpoints))
 	for _, ep := range g.Endpoints {
 		res, err := n.Invoke(ctx, im.ConcreteCommandPath{Endpoint: ep, Cluster: groupsdef.ClusterID, Command: groupsdef.CmdAddGroup, HasEndpoint: true, HasCluster: true, HasCommand: true},
 			groupsdef.AddGroupRequest{GroupId: g.GroupID, GroupName: name}, interaction.InvokeOptions{})
@@ -350,14 +330,15 @@ func legacyJoin(ctx context.Context, n *client.Node, g groupRecord) error {
 		if len(res.Fields.Children) == 0 || res.Fields.Children[0].El.Uint != 0 {
 			return fmt.Errorf("AddGroup on endpoint %d: status %s", ep, valueJSON(nil, res.Fields))
 		}
-		targets = append(targets, structNode(tlv.AnonymousTag(), nullNode(0), uintNode(1, uint64(ep)), nullNode(2)))
+		targets = append(targets, acldef.AccessControlTargetStruct{
+			Cluster: spec.NullOf[uint32](), Endpoint: spec.ValueOf(ep), DeviceType: spec.NullOf[uint32](),
+		})
 	}
-	// AccessControlEntryStruct: Privilege 1 (Operate 3), AuthMode 2
-	// (Group 3), Subjects 3, Targets 4.
-	entry := structNode(tlv.AnonymousTag(), uintNode(1, 3), uintNode(2, 3),
-		arrayNode(tlv.ContextTag(3), spec.Node{El: tlv.Element{Tag: tlv.AnonymousTag(), Type: tlv.TypeUnsignedInt8, Uint: gid}}),
-		arrayNode(tlv.ContextTag(4), targets...))
-	if err := appendToList(ctx, n, listPath(0, clusterAccessControl), entry, nil); err != nil {
+	entry := acldef.AccessControlEntryStruct{
+		Privilege: acldef.AccessControlEntryPrivilegeOperate, AuthMode: acldef.AccessControlEntryAuthModeGroup,
+		Subjects: spec.ValueOf([]uint64{gid}), Targets: spec.ValueOf(targets),
+	}
+	if err := appendEntry(ctx, n, listPath(0, acldef.ClusterID), entry, nil); err != nil {
 		return fmt.Errorf("ACL: %w", err)
 	}
 	return nil

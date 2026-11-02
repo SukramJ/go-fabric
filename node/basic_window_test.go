@@ -28,7 +28,7 @@ import (
 // salt.
 func randomCredentials(t *testing.T, timeout time.Duration) node.WindowCredentials {
 	t.Helper()
-	creds := node.WindowCredentials{Iterations: 1000, Timeout: timeout}
+	creds := node.WindowCredentials{PBKDFIterations: 1000, Timeout: timeout}
 	var err error
 	for creds.Discriminator == 0 || creds.Discriminator == 3840 {
 		if creds.Discriminator, err = bridge.RandomDiscriminator(); err != nil {
@@ -88,7 +88,7 @@ func TestOpenBasicWindowPairsWithItsCredentials(t *testing.T) {
 	if d, m, ok := commissionableRecord(adv); !ok || d != uint64(creds.Discriminator) || m != 1 {
 		t.Fatalf("commissionable record D=%d CM=%d present=%v; want D=%d CM=1", d, m, ok, creds.Discriminator)
 	}
-	if !n.CommissioningWindow().IsOwnWindow() {
+	if !n.Bridge().CommissioningWindow().IsOwnWindow() {
 		t.Error("the basic window is not the node's own window")
 	}
 	opts := commissionerOptions()
@@ -104,7 +104,7 @@ func TestOpenBasicWindowPairsWithItsCredentials(t *testing.T) {
 	// CommissioningComplete closed the window; the node has a fabric, so
 	// nothing is commissionable any more.
 	waitRecord(t, adv, "none after the commissioning", func(_, _ uint64, ok bool) bool { return !ok })
-	if n.CommissioningWindow().IsOpen() {
+	if n.Bridge().CommissioningWindow().IsOpen() {
 		t.Error("the window is still open after CommissioningComplete")
 	}
 }
@@ -128,7 +128,7 @@ func TestOpenBasicWindowTimeoutRestoresConfigured(t *testing.T) {
 		t.Fatalf("basic window record D=%d CM=%d present=%v; want D=%d CM=1", d, m, ok, creds.Discriminator)
 	}
 	waitRecord(t, adv, "the configured D=3840 CM=1 after the timeout", func(d, m uint64, ok bool) bool { return ok && d == 3840 && m == 1 })
-	if !n.CommissioningWindow().IsOwnWindow() {
+	if !n.Bridge().CommissioningWindow().IsOwnWindow() {
 		t.Error("the node's own window is not open after the basic window's timeout")
 	}
 	opts := commissionerOptions()
@@ -153,14 +153,13 @@ func TestOpenBasicWindowOnCommissionedNode(t *testing.T) {
 		recording   bool
 	)
 	done := make(chan struct{}, 8)
-	cfg.Observers.OnWindowTransition = func(s node.WindowSnapshot) error {
+	cfg.Observers.OnWindowTransition = func(s node.WindowSnapshot) {
 		mu.Lock()
 		defer mu.Unlock()
 		if recording {
 			transitions = append(transitions, s)
 			done <- struct{}{}
 		}
-		return nil
 	}
 	n, _, _ := commissioned(t, cfg)
 	waitRecord(t, adv, "none after the commissioning", func(_, _ uint64, ok bool) bool { return !ok })
@@ -201,7 +200,7 @@ func TestOpenBasicWindowRefusals(t *testing.T) {
 	for name, mutate := range map[string]func(*node.WindowCredentials){
 		"discriminator": func(c *node.WindowCredentials) { c.Discriminator = 0x1000 },
 		"passcode":      func(c *node.WindowCredentials) { c.Passcode = 11111111 },
-		"iterations":    func(c *node.WindowCredentials) { c.Iterations = 999 },
+		"iterations":    func(c *node.WindowCredentials) { c.PBKDFIterations = 999 },
 		"salt":          func(c *node.WindowCredentials) { c.Salt = c.Salt[:15] },
 		"timeout":       func(c *node.WindowCredentials) { c.Timeout = -time.Second },
 	} {
@@ -215,7 +214,7 @@ func TestOpenBasicWindowRefusals(t *testing.T) {
 		t.Errorf("record after refused opens D=%d present=%v; want the configured 3840", d, ok)
 	}
 
-	if err := n.CommissioningWindow().OpenWindow(ctx, wire.OpenWindowParams{CommissioningTimeoutSeconds: 180, Discriminator: 100, IsUncommissioned: true}); err != nil {
+	if err := n.Bridge().CommissioningWindow().OpenWindow(ctx, wire.OpenWindowParams{CommissioningTimeoutSeconds: 180, Discriminator: 100, IsUncommissioned: true}); err != nil {
 		t.Fatalf("administrator OpenWindow: %v", err)
 	}
 	if err := n.OpenBasicWindow(ctx, randomCredentials(t, 0)); !errors.Is(err, bridge.ErrAdministratorWindowOpen) {
@@ -239,7 +238,7 @@ func TestOwnWindowOpenEndsBasicWindow(t *testing.T) {
 	if d, _, ok := commissionableRecord(adv); !ok || d != uint64(creds.Discriminator) {
 		t.Fatalf("basic window record D=%d present=%v; want D=%d", d, ok, creds.Discriminator)
 	}
-	if err := n.CommissioningWindow().OpenOwnWindow(ctx, 0); err != nil {
+	if err := n.Bridge().CommissioningWindow().OpenOwnWindow(ctx, 0); err != nil {
 		t.Fatalf("OpenOwnWindow: %v", err)
 	}
 	if d, m, ok := commissionableRecord(adv); !ok || d != 3840 || m != 1 {

@@ -365,7 +365,6 @@ func (b *Bridge) EmitEvent(endpoint uint16, cluster, event uint32, data any, pri
 		},
 		Number:   num,
 		Priority: im.EventPriority(priority),
-		Data:     im.AttributeValue{Value: data},
 	})
 }
 

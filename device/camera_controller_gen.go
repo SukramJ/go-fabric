@@ -16,9 +16,11 @@ const (
 	CameraControllerRevision uint16              = 1
 )
 
-// CameraControllerType is the CameraController device type, matter.js's packages/node/src/devices/camera-controller.ts;
-// its cluster requirements are listed in docs/reference/device-types.md#cameracontroller.
-var CameraControllerType = typeCameraController
+// CameraControllerType returns the CameraController device type, matter.js's packages/node/src/devices/camera-controller.ts;
+// its cluster requirements are listed in docs/reference/device-types.md#cameracontroller. It is the registry's
+// value, the one [Lookup] and [FromSpec] return: a caller reads it and
+// does not modify it.
+func CameraControllerType() *Type { return &typeCameraController }
 
 // typeCameraController holds [CameraControllerType]'s cluster requirements.
 var typeCameraController = Type{

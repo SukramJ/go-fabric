@@ -410,7 +410,7 @@ func TestComposesWithoutADefinition(t *testing.T) {
 	t.Parallel()
 
 	unknown := &Type{ID: 0xFFFF, Name: "NoSuchType"}
-	if composes(unknown, &OnOffLightType) {
+	if composes(unknown, OnOffLightType()) {
 		t.Error("a type without a definition composes a part")
 	}
 }

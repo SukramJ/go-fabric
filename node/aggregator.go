@@ -217,6 +217,10 @@ func (a *Aggregator) RetirePartition(ctx context.Context, name string) error {
 		return ErrRetireDefault
 	}
 	a.mu.Lock()
+	if a.closed {
+		a.mu.Unlock()
+		return ErrStopped
+	}
 	for i, p := range a.parts {
 		if p.scope != scope {
 			continue
@@ -341,6 +345,15 @@ type Batch struct {
 // during fn reassembles on its own, and that assembly shows the changes
 // the batch has applied so far.
 func (p *Partition) Batch(ctx context.Context, fn func(b *Batch) error) error {
+	// A stopped node takes no change: [Node.Start] after Stop is
+	// ErrStopped, and so is every change of its set — the device would
+	// bind to nothing and the reassembly fail on a stopped bridge.
+	p.a.mu.Lock()
+	closed := p.a.closed
+	p.a.mu.Unlock()
+	if closed {
+		return ErrStopped
+	}
 	b := &Batch{a: p.a, scope: p.scope, ctx: ctx}
 	fnErr := fn(b)
 	// The reservations first, so the reassembly keeps a removed key's
@@ -516,38 +529,23 @@ func (a *Aggregator) detachAll() {
 	}
 }
 
-// IncreaseConfigurationVersion raises the ConfigurationVersion of the
-// bridged endpoint with key (and the node's, as the bridge does) and
-// persists both, so the version never decreases across a restart — the
-// daemon's configChange (main.go:299-313 at b4ea1f96^).
-func (a *Aggregator) IncreaseConfigurationVersion(key device.SourceKey) error {
-	topo := a.n.br.Topology()
-	if topo == nil {
-		return errors.New("node: no topology yet")
-	}
-	for _, ep := range topo.Bridged() {
-		if ep.SourceKey != nil && key != nil && ep.SourceKey.String() == key.String() {
-			a.n.persisted.storeConfigVersions(context.Background(), topo, a.n.br.IncreaseConfigurationVersion(ep.Scope, ep.DeviceAddress))
-			return nil
-		}
-	}
-	return fmt.Errorf("%w: %v", ErrUnknownKey, key)
-}
-
 // IncreaseConfigurationVersions raises, as one change of the node, the
 // ConfigurationVersion of the bridged endpoints with keys — each physical
 // device once — and the node's own once, after them, and persists every
-// version raised in one pass. With no key it raises the node's alone. An
-// unknown key fails with [ErrUnknownKey] before anything is raised. Mirrors
+// version raised in one pass under ctx, so a version never decreases
+// across a restart. With no key it raises the node's alone. Before the
+// node assembled its topology ([Node.Start]) it fails with
+// [ErrNotStarted]; an unknown key fails with [ErrUnknownKey] before
+// anything is raised. Mirrors
 // matter.js BasicInformationServer.increaseConfigurationVersion(change)
 // (BasicInformationServer.ts:132-138: the change first, one increment
 // afterwards) with the bridged devices raised under the shared context
 // (BridgedDeviceBasicInformationServer.ts:72-90); the bridge's
 // IncreaseNodeConfigurationVersionWith does the raising.
-func (a *Aggregator) IncreaseConfigurationVersions(keys ...device.SourceKey) error {
+func (a *Aggregator) IncreaseConfigurationVersions(ctx context.Context, keys ...device.SourceKey) error {
 	topo := a.n.br.Topology()
 	if topo == nil {
-		return errors.New("node: no topology yet")
+		return ErrNotStarted
 	}
 	type device struct{ scope, address string }
 	var devices []device
@@ -573,7 +571,7 @@ func (a *Aggregator) IncreaseConfigurationVersions(keys ...device.SourceKey) err
 			c.IncreaseConfigurationVersion(d.scope, d.address)
 		}
 	})
-	a.n.persisted.storeConfigVersions(context.Background(), topo, versions)
+	a.n.persisted.storeConfigVersions(ctx, topo, versions)
 	return nil
 }
 

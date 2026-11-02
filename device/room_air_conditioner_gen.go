@@ -26,9 +26,11 @@ const (
 	RoomAirConditionerRevision uint16              = 4
 )
 
-// RoomAirConditionerType is the RoomAirConditioner device type, matter.js's packages/node/src/devices/room-air-conditioner.ts;
-// its cluster requirements are listed in docs/reference/device-types.md#roomairconditioner.
-var RoomAirConditionerType = typeRoomAirConditioner
+// RoomAirConditionerType returns the RoomAirConditioner device type, matter.js's packages/node/src/devices/room-air-conditioner.ts;
+// its cluster requirements are listed in docs/reference/device-types.md#roomairconditioner. It is the registry's
+// value, the one [Lookup] and [FromSpec] return: a caller reads it and
+// does not modify it.
+func RoomAirConditionerType() *Type { return &typeRoomAirConditioner }
 
 // typeRoomAirConditioner holds [RoomAirConditionerType]'s cluster requirements.
 var typeRoomAirConditioner = Type{

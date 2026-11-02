@@ -19,9 +19,11 @@ const (
 	NetworkInfrastructureManagerRevision uint16              = 2
 )
 
-// NetworkInfrastructureManagerType is the NetworkInfrastructureManager device type, matter.js's packages/node/src/devices/network-infrastructure-manager.ts;
-// its cluster requirements are listed in docs/reference/device-types.md#networkinfrastructuremanager.
-var NetworkInfrastructureManagerType = typeNetworkInfrastructureManager
+// NetworkInfrastructureManagerType returns the NetworkInfrastructureManager device type, matter.js's packages/node/src/devices/network-infrastructure-manager.ts;
+// its cluster requirements are listed in docs/reference/device-types.md#networkinfrastructuremanager. It is the registry's
+// value, the one [Lookup] and [FromSpec] return: a caller reads it and
+// does not modify it.
+func NetworkInfrastructureManagerType() *Type { return &typeNetworkInfrastructureManager }
 
 // typeNetworkInfrastructureManager holds [NetworkInfrastructureManagerType]'s cluster requirements.
 var typeNetworkInfrastructureManager = Type{

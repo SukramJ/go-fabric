@@ -17,9 +17,11 @@ const (
 	DeviceEnergyManagementRevision uint16              = 3
 )
 
-// DeviceEnergyManagementType is the DeviceEnergyManagement device type, matter.js's packages/node/src/endpoints/device-energy-management.ts;
-// its cluster requirements are listed in docs/reference/device-types.md#deviceenergymanagement.
-var DeviceEnergyManagementType = typeDeviceEnergyManagement
+// DeviceEnergyManagementType returns the DeviceEnergyManagement device type, matter.js's packages/node/src/endpoints/device-energy-management.ts;
+// its cluster requirements are listed in docs/reference/device-types.md#deviceenergymanagement. It is the registry's
+// value, the one [Lookup] and [FromSpec] return: a caller reads it and
+// does not modify it.
+func DeviceEnergyManagementType() *Type { return &typeDeviceEnergyManagement }
 
 // typeDeviceEnergyManagement holds [DeviceEnergyManagementType]'s cluster requirements.
 var typeDeviceEnergyManagement = Type{

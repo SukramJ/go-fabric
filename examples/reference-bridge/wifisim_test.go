@@ -5,6 +5,7 @@ package main
 
 import (
 	"context"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -27,9 +28,10 @@ func TestWiFiSim(t *testing.T) {
 	if st, _, _ := (wifiSim{delay: time.Hour}).ConnectNetwork(ctx, []byte("lab"), nil); st != 12 {
 		t.Fatalf("canceled connect %d", st)
 	}
-	var cfg node.Config
-	applyTestWiFi(&cfg, flags{wifiSim: true}, nil)
-	if cfg.Network.WiFiCommissioning.Driver == nil {
-		t.Fatal("--wifi-sim mounts no driver")
+	n := testNodeWith(t, newFleet(), filepath.Join(t.TempDir(), "wifisim.db"), func(cfg *node.Config) {
+		applyTestWiFi(cfg, flags{wifiSim: true}, nil)
+	})
+	if n.Root().WiFiNetworkCommissioning == nil {
+		t.Fatal("--wifi-sim mounts no Wi-Fi NetworkCommissioning")
 	}
 }

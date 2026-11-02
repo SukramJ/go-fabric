@@ -274,7 +274,7 @@ type endpointSpec struct {
 	onOff *atomic.Pointer[onoff.Server]
 }
 
-func lightSpec(key string, with ...device.Option) endpointSpec {
+func lightSpec(key string, with ...device.Declaration) endpointSpec {
 	return endpointSpec{key: key, build: func(site *fabrictest.Site) (node.Endpoint, error) {
 		return device.NewOnOffLight(device.Options{StableKey: endpoint.StringKey(key), Name: key}, with...)
 	}}

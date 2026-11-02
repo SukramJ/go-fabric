@@ -22,7 +22,7 @@ import (
 func TestSurfaceWithheldRecordClearedByRemoveAndForget(t *testing.T) {
 	low := surface.Policies{Level: "1.4.2"}
 	closure := func() node.Endpoint {
-		d, err := device.NewClosure(device.Options{StableKey: endpoint.StringKey("closure"), Name: "closure", Surface: &low},
+		d, err := device.NewClosure(device.Options{StableKey: endpoint.StringKey("closure"), Name: "closure", Surface: low},
 			closurecontroldef.Declare{Features: closurecontroldef.FeaturePositioning})
 		if d == nil {
 			t.Fatalf("closure: %v", err)

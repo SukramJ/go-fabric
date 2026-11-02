@@ -311,7 +311,7 @@ func icdConfigInvalid(t *testing.T, c node.ICDConfig) bool {
 		t.Fatalf("Validate = %v, not ErrInvalidConfig", err)
 	}
 	if err != nil {
-		if _, nerr := node.New(cfg); nerr == nil {
+		if _, nerr := node.New(context.Background(), cfg); nerr == nil {
 			t.Fatal("New accepted what Validate refused")
 		}
 	}
