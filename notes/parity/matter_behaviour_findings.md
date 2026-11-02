@@ -383,6 +383,16 @@ Device side:. (Triage 2026-10-29: owner's hand test (manual test list C5), no wa
   `SuppressResponse = false`, wait for the status, end the subscription on
   INVALID_SUBSCRIPTION as `closeSubscriptionByExchange` already does for data
   reports. (Triage 2026-10-29: wave H1, the device IM and write path.)
+- **No "reconnect" broadcast when a subscription ends.** matter.js
+  starts the fabric's operational broadcast again when a subscription
+  terminates on an operational node (`DeviceAdvertiser.ts:174-179` at
+  `862ad75f`, `subscriptionsChanged` → `#advertiseFabric(fabric, "reconnect")`),
+  so a controller that lost its subscription rediscovers the node at once.
+  The node has no hook from `im/subscription` to the advertiser; only a
+  session teardown and an MRP retry reach `Responder.ServiceDisconnected`
+  / `ServiceRetransmission` (issue #362). Fix: an observer on the
+  subscription manager's termination that calls `ServiceDisconnected` for
+  the session's fabric.
 - **A subscription that ends while the node runs stays persisted.**
   `im/subscription/manager.go` (`Manager.Release`, `finishClose`) keeps the former matter.js line: closed
   on session close = not terminated = re-established after a restart.

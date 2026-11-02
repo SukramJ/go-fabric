@@ -256,10 +256,11 @@ type dumpEnv struct {
 // replaces the store and the OTA directory and disables mDNS.
 func compose(ctx context.Context, f flags, logger *slog.Logger, passcode uint32, discriminator uint16, tcpConfig node.TCPConfig, dump *dumpEnv) (*node.Node, *fleet, error) { //nolint:funlen // the composition root: one sequential pass, readable top to bottom
 	// The node opens --db itself (node.Store.Path) and builds its
-	// advertiser: Zeroconf with the subtype responder, which answers the
+	// advertiser: the module's mDNS responder (mdns.NewResponder), which
+	// publishes and answers the subtype records too — the
 	// `_L<discriminator>._sub` browse every commissioner filtering by
 	// discriminator sends (chip-tool's `pairing onnetwork-long`, Apple
-	// Home, Google Home), or nothing under --advertise=false.
+	// Home, Google Home) — or nothing under --advertise=false.
 	policies, err := surfacePolicies(f)
 	if err != nil {
 		return nil, nil, err
