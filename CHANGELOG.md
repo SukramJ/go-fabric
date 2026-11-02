@@ -153,6 +153,7 @@ Findings of the whole-codebase review of 2026-11-01 (`notes/review/2026-11/`).
 - examples: the reference controller provisions groups and bindings with the generated `cluster/spec` types (`groupkeymanagement.KeySetWriteRequest`, `groupcast.JoinGroupRequest`, `binding.TargetStruct`, `accesscontrol.AccessControlEntryStruct`, `groupkeymanagement.GroupKeyMapStruct`) instead of hand-built TLV trees with magic field numbers (W5-ex-07).
 - examples: the reference bridge's test app pipe (`--app-pipe`) is created `0660`, owner and group, instead of world-writable `0666`; the chip-tool harness writes it as the container's root (W5-ex-14).
 - examples: the reference controller reads `--wifi-credentials` and `--thread-dataset` from a file (`@path`) or, without the flag, from `GOFABRIC_WIFI_CREDENTIALS` / `GOFABRIC_THREAD_DATASET`, so the secret need not appear in `ps` or the shell history (W5-ex-15).
+- docs: the reference bridge's package doc names the three places it still reaches below the facade, and its README describes the wiring it has (the node's own subtype responder, typed `Declare`s and host ports, `Store.Path` persistence, IPK rotation and CASE resumption no longer listed as missing); `fabrictest`'s doc states the in-memory default and its example uses `client.CommandAt`; the README's `internal/` list names every seam (W5-ex-04, W5-ex-10, W5-ex-11, W5-ex-12).
 
 ## [0.15.6] — 2026-11-01
 

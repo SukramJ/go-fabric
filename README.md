@@ -118,10 +118,13 @@ it.
 ### What "public API" means here
 
 **Every exported identifier outside `internal/` is public API.** The module
-already draws that line for itself: `internal/` holds the two one-way seams
-through which the test-support packages reach package internals
-(`bridgeseam`, `channelseam`) and the chip-tool suite, and Go makes those
-unimportable from outside. Nothing else is private by convention, so nothing
+already draws that line for itself: `internal/` holds the one-way seams
+through which the facade, the test-support packages and the reference
+programs reach package internals (`bridgeseam`, `channelseam`,
+`deviceseam`, `nodeseam`, `surfaceseam`, `udpseam`, `inflight`, `clockvar`),
+the shared helpers behind them (`serialqueue`, `forward`), the parity-test
+support and the chip-tool suite, and Go makes those unimportable from
+outside. Nothing else is private by convention, so nothing
 else may be changed as if it were.
 
 Depend freely on `bdx/`, `binding/`, `bootid/`, `bridge/`, `client/…`, `cluster/…`,

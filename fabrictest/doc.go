@@ -23,14 +23,16 @@
 //		Device: fabrictest.Topology{Bridged: []node.Endpoint{myPlug}},
 //	})
 //	ep, _ := pair.Device.EndpointOf("plug:1")
-//	// onoffdef is github.com/SukramJ/go-fabric/cluster/spec/onoff
-//	res, err := fabrictest.Invoke(ctx, pair, im.ConcreteCommandPath{Endpoint: ep, Cluster: onoffdef.ClusterID, Command: onoffdef.CmdToggle}, nil)
+//	// onoffdef is github.com/SukramJ/go-fabric/cluster/spec/onoff, client
+//	// github.com/SukramJ/go-fabric/controller/client
+//	res, err := fabrictest.Invoke(ctx, pair, client.CommandAt(ep, onoffdef.ClusterID, onoffdef.CmdToggle), nil)
 //
 // What runs:
 //
-//   - A device is a node.Node ([Site.AddDevice]) with its own SQLite
-//     stores in the test's temporary directory, an mdns.Noop advertiser and
-//     the site's clock (node.Config.Clock). Its bridge serves the
+//   - A device is a node.Node ([Site.AddDevice]) with its own in-memory
+//     stores (store/memstore and endpoint/memstore; on SQLite in the
+//     test's temporary directory with [Options].StoreOnDisk), an
+//     mdns.Noop advertiser and the site's clock (node.Config.Clock). Its bridge serves the
 //     production transport/udp.Listener over a socket of the in-memory
 //     network, so every datagram it receives, answers or initiates takes
 //     the production UDP path. [Device.Restart] starts a new node on the

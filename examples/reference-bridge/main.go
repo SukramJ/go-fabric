@@ -24,8 +24,14 @@
 // node opens its SQLite file (node.Store.Path), builds its DNS-SD
 // advertiser (a nil node.Config.Advertiser, shaped by Network.MDNS),
 // loads a vendor attestation chain (node.Attestation.Files) and runs the
-// health probe (node.Config.Health); the daemon names none of bridge,
-// mdns, secure/* or store for them.
+// health probe (node.Config.Health); it names none of mdns, secure/* or
+// bridge for them. Three things still reach below the facade, each a gap
+// the facade does not cover yet (review 2026-11 W5-ex-10): the listing of
+// every endpoint with its device types (printTopology and the banner
+// through Node.Bridge — Node.Topology lists the bridged devices only),
+// the thermostat's preset store (store.NewThermostatPresetStore over
+// Node.Store) and the charger's EnergyEvse with its host port
+// (cluster/energy.NewEnergyEvse as the Declare's HostServer).
 //
 // It is not a product. The identity it advertises is the CSA *test*
 // vendor/product pair and the attestation chain is the CSA *test* chain; see
