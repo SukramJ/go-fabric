@@ -153,7 +153,7 @@ func TestSetupPayload(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	qr, manual, err := n.PairingCodes()
+	qr, manual, err := n.PairingCodesFor(cfg.Commissioning.WindowCredentials(0))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -176,7 +176,7 @@ func TestNewWindowCredentials(t *testing.T) {
 		if err := node.ValidateSetupPIN(c.Passcode); err != nil {
 			t.Fatalf("draw %d: %v", i, err)
 		}
-		if c.Discriminator > node.MaxDiscriminator || c.Iterations != node.PBKDFIterationsMin || len(c.Salt) != node.PBKDFSaltMax || c.Timeout != 30*time.Second {
+		if c.Discriminator > node.MaxDiscriminator || c.PBKDFIterations != node.PBKDFIterationsMin || len(c.Salt) != node.PBKDFSaltMax || c.Timeout != 30*time.Second {
 			t.Fatalf("draw %d = %+v", i, c)
 		}
 		if i > 0 && c.Passcode == prev.Passcode && slices.Equal(c.Salt, prev.Salt) {

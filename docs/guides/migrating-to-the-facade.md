@@ -56,6 +56,7 @@ facade one shape. Each row names what a host writes now.
 | `node.Health.OnSample`, `node.OTAProviderConfig.OnStatusChange`, the `error` result of every `node.Observers` hook | `Node.OnHealthSample` / `OnHealthSampleAsync`, `Node.OnOTAProviderStatus` / `OnOTAProviderStatusAsync`; hooks return nothing; `Node.ObserveAsync` for the queued form |
 | `device.Logger` | `device.Options.Logger` per device (nil is `slog.Default()`) |
 | `device.WithServer`, `device.Option`, `device.TypeByID` | `device.HostServer(srv)`; `device.Declaration`; `device.Lookup(uint32(id))` |
+| `Node.PairingCodes`, `Aggregator.IncreaseConfigurationVersion`, `WindowCredentials.Iterations`, `Commissioning.PBKDFIterations int` | `Node.SetupPayload()` (`.QR`, `.Manual`); `Aggregator.IncreaseConfigurationVersions(ctx, keys...)` (`node.ErrNotStarted` before `Start`); `WindowCredentials.PBKDFIterations`; `Commissioning.PBKDFIterations uint32` |
 
 ## Changed in the next release: `CommissionerReach` takes the peer
 

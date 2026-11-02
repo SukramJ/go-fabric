@@ -114,9 +114,12 @@ func run(ctx context.Context) error {
 	if err := b.doorMoved(false); err != nil {
 		slog.Warn("door", slog.Any("err", err))
 	}
-	if qr, manual, err := n.PairingCodes(); err == nil {
-		fmt.Printf("QR code: %s\nManual code: %s\n", qr, manual)
+	payload, err := n.SetupPayload()
+	if err != nil {
+		_ = n.Stop(context.WithoutCancel(ctx))
+		return err
 	}
+	fmt.Printf("QR code: %s\nManual code: %s\n", payload.QR, payload.Manual)
 	<-ctx.Done()
 	return n.Stop(context.WithoutCancel(ctx))
 }

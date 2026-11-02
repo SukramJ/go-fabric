@@ -21,7 +21,7 @@ func (d *Device) OpenWindow(ctx context.Context, timeout time.Duration) error {
 	return d.Act(func(n *node.Node) error {
 		return n.OpenBasicWindow(ctx, node.WindowCredentials{
 			Discriminator: d.Discriminator(), Passcode: d.Passcode(),
-			Iterations: DefaultPBKDFIterations, Salt: defaultSalt, Timeout: timeout,
+			PBKDFIterations: DefaultPBKDFIterations, Salt: defaultSalt, Timeout: timeout,
 		})
 	})
 }

@@ -97,12 +97,12 @@ func run(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	qr, manual, err := n.PairingCodes()
+	payload, err := n.SetupPayload()
 	if err != nil {
 		_ = n.Stop(context.WithoutCancel(ctx))
 		return err
 	}
-	fmt.Printf("QR code: %s\nManual code: %s\n", qr, manual)
+	fmt.Printf("QR code: %s\nManual code: %s\n", payload.QR, payload.Manual)
 	return n.Run(ctx) // Start, wait for ctx, Stop
 }
 
@@ -393,7 +393,7 @@ program that uses each.
 
 ## Commissioning
 
-`Node.PairingCodes` returns the QR payload and the 11-digit manual code for
+`Node.SetupPayload` returns the QR payload and the 11-digit manual code for
 the configured passcode and discriminator. When `Start` loads no fabric from
 the store, it opens the node's own commissioning window. A commissioned node opens
 a window only when a controller asks for one through

@@ -11,7 +11,7 @@ import (
 
 // SetupPayload is the node's configured commissioning secret with the
 // identity it is encoded under — the fields of the setup payload and the
-// two codes [Node.PairingCodes] returns for it.
+// two codes encoded from them.
 type SetupPayload struct {
 	// Discriminator is the configured 12-bit discriminator
 	// ([Config].Commissioning).
@@ -23,13 +23,13 @@ type SetupPayload struct {
 	// VendorID and ProductID are the node's ([Config].ProductDescription).
 	VendorID, ProductID uint16
 	// QR is the QR code payload ("MT:…"), Manual the manual pairing code;
-	// both what [Node.PairingCodes] returns.
+	// both encoded from Discriminator and Passcode.
 	QR, Manual string
 }
 
 // SetupPayload returns the configured setup payload: passcode,
 // discriminator, vendor and product id, and the QR and manual codes
-// [Node.PairingCodes] encodes from them. It carries the passcode (see
+// encoded from them. It carries the passcode (see
 // [SetupPayload].Passcode). A window opened with other credentials
 // ([Node.OpenBasicWindow]) has its codes from [Node.PairingCodesFor].
 //

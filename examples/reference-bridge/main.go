@@ -37,7 +37,6 @@ import (
 	"context"
 	"database/sql"
 	"encoding/hex"
-	"errors"
 	"flag"
 	"fmt"
 	"log/slog"
@@ -50,6 +49,7 @@ import (
 
 	fixedlabeldef "github.com/SukramJ/go-fabric/cluster/spec/fixedlabel"
 	"github.com/SukramJ/go-fabric/contract"
+	"github.com/SukramJ/go-fabric/device"
 	"github.com/SukramJ/go-fabric/node"
 	"github.com/SukramJ/go-fabric/schema"
 	"github.com/SukramJ/go-fabric/store"
@@ -150,8 +150,8 @@ func checkFlags(f flags) (passcode uint32, discriminator uint16, err error) {
 	if err := node.ValidateSetupPIN(passcode); err != nil {
 		return 0, 0, fmt.Errorf("--passcode: %w", err)
 	}
-	if f.iterations < 0 {
-		return 0, 0, fmt.Errorf("--pbkdf-iterations %d must be positive", f.iterations)
+	if f.iterations < node.PBKDFIterationsMin || f.iterations > node.PBKDFIterationsMax {
+		return 0, 0, fmt.Errorf("--pbkdf-iterations %d is outside [%d, %d]", f.iterations, node.PBKDFIterationsMin, node.PBKDFIterationsMax)
 	}
 	if _, err := dclClient(f.dcl); err != nil {
 		return 0, 0, err
@@ -379,12 +379,13 @@ func assemble(ctx context.Context, devices *fleet, cfg node.Config, applier *ota
 	}
 	// The app pipe's SimulateConfigurationVersionChange raises every
 	// bridged device's ConfigurationVersion, persisted by the node.
-	devices.configChange = func() error { //nolint:contextcheck // the app pipe's command carries no context; the node persists with its own
-		errs := make([]error, 0, len(eps))
+	devices.configChange = func() error {
+		keys := make([]device.SourceKey, 0, len(eps))
 		for _, ep := range eps {
-			errs = append(errs, agg.IncreaseConfigurationVersion(ep.Spec().StableKey))
+			keys = append(keys, ep.Spec().StableKey)
 		}
-		return errors.Join(errs...)
+		// One change of the node: each device once, the node once.
+		return agg.IncreaseConfigurationVersions(context.Background(), keys...)
 	}
 	// PowerSourceConfiguration and the demo actions name endpoints by
 	// their StableKey, resolved through the live topology.
@@ -402,7 +403,7 @@ func nodeConfig(f flags, passcode uint32, discriminator uint16, tcp node.TCPConf
 		Network: node.Network{Listen: f.listen, TCP: tcp, MDNS: mdnsConfig(f)},
 		Commissioning: node.Commissioning{
 			Passcode: passcode, Discriminator: discriminator,
-			PBKDFIterations: f.iterations, Salt: []byte(f.salt),
+			PBKDFIterations: pbkdfIterations(f.iterations), Salt: []byte(f.salt),
 		},
 		ProductDescription: node.ProductDescription{VendorID: testVendorID, ProductID: testProductID},
 		BasicInformation: node.BasicInformation{
@@ -446,13 +447,25 @@ func mdnsConfig(f flags) node.MDNS {
 	return m
 }
 
+// pbkdfIterations is the --pbkdf-iterations count as the node's field;
+// checkFlags refused a count outside [node.PBKDFIterationsMin,
+// node.PBKDFIterationsMax], and one is 0 here, which node.Config.Validate
+// refuses by name.
+func pbkdfIterations(v int) uint32 {
+	if v < node.PBKDFIterationsMin || v > node.PBKDFIterationsMax {
+		return 0
+	}
+	return uint32(v)
+}
+
 // printPairingInfo writes the onboarding payload to stdout. It goes to stdout
 // rather than the log because it is the one thing an operator has to copy.
 func printPairingInfo(n *node.Node, discriminator uint16, passcode uint32) error {
-	qr, manual, err := n.PairingCodes()
+	payload, err := n.SetupPayload()
 	if err != nil {
 		return err
 	}
+	qr, manual := payload.QR, payload.Manual
 	br := n.Bridge()
 	topology := br.Topology()
 	bridged := 0

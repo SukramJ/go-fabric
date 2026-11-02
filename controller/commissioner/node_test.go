@@ -270,7 +270,7 @@ func TestCommissionTheNode(t *testing.T) {
 
 	// A second commissioning into the same fabric: AddNOC answers
 	// FabricConflict, the flow disarms the failsafe, the peer is deleted.
-	if err := n.OpenBasicWindow(ctx, node.WindowCredentials{Discriminator: nodeDiscriminator, Passcode: nodePasscode, Iterations: 1000, Salt: []byte("SPAKE2P Key Salt")}); err != nil {
+	if err := n.OpenBasicWindow(ctx, node.WindowCredentials{Discriminator: nodeDiscriminator, Passcode: nodePasscode, PBKDFIterations: 1000, Salt: []byte("SPAKE2P Key Salt")}); err != nil {
 		t.Fatalf("OpenBasicWindow: %v", err)
 	}
 	_, err = c.com.Commission(ctx, Options{Fabric: c.fabric, Passcode: nodePasscode, Addresses: []*net.UDPAddr{addr}})

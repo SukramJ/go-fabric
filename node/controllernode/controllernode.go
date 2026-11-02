@@ -34,7 +34,7 @@ func Config(spec controller.OwnNodeSpec) node.Config {
 		Network:    node.Network{Listen: spec.Listen},
 		Advertiser: spec.Advertiser,
 		Commissioning: node.Commissioning{
-			Passcode: spec.Passcode, Discriminator: spec.Discriminator, PBKDFIterations: spec.Iterations, Salt: spec.Salt,
+			Passcode: spec.Passcode, Discriminator: spec.Discriminator, PBKDFIterations: pbkdfIterations(spec.Iterations), Salt: spec.Salt,
 		},
 		ProductDescription: node.ProductDescription{VendorID: spec.VendorID, ProductID: spec.ProductID},
 		BasicInformation: node.BasicInformation{
@@ -49,6 +49,16 @@ func Config(spec controller.OwnNodeSpec) node.Config {
 		Logger: spec.Logger,
 		Clock:  spec.Clock,
 	}
+}
+
+// pbkdfIterations is the controller's iteration count as the node's
+// field; a count outside [node.PBKDFIterationsMin, node.PBKDFIterationsMax]
+// is 0, which node.Config.Validate refuses by name.
+func pbkdfIterations(v int) uint32 {
+	if v < node.PBKDFIterationsMin || v > node.PBKDFIterationsMax {
+		return 0
+	}
+	return uint32(v)
 }
 
 // Start is node.New and Start over [Config]; the address is the node's

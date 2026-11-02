@@ -201,7 +201,7 @@ Commit: [`c687e7e`](https://github.com/SukramJ/go-zendure2mqtt/commit/c687e7e9c6
 
 ## 7. The pairing code into the UI and MQTT
 
-`Node.PairingCodes()` returns the QR payload and the manual code for the
+`Node.SetupPayload()` returns the QR payload and the manual code for the
 configured passcode and discriminator, before and after `Start`. The daemon
 puts them in three places:
 
@@ -278,4 +278,4 @@ step, and this page does not claim it.
 `node/config.go` (`Config`, `Commissioning`, `Store`), `node/aggregator.go`
 (`Add`), `device/electrical_sensor_gen.go`,
 `device/base.go` (`withBridgedPowerSource`, `Device.PowerSource`),
-`device/lifecycle.go` (`SetReachable`), `node/node.go` (`PairingCodes`).*
+`device/lifecycle.go` (`SetReachable`), `node/inspect.go` (`SetupPayload`).*

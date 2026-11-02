@@ -104,7 +104,8 @@ func TestFacadeCommissioningCredentials(t *testing.T) {
 	}
 
 	n := newNode(t, cfg)
-	qr, manual, err := n.PairingCodes()
+	p, err := n.SetupPayload()
+	qr, manual := p.QR, p.Manual
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -139,7 +140,7 @@ func TestFacadeCommissioningCredentials(t *testing.T) {
 		t.Fatal(err)
 	}
 	w := fresh.WindowCredentials(time.Minute)
-	if w.Passcode != fresh.Passcode || w.Discriminator != fresh.Discriminator || w.Iterations != uint32(fresh.PBKDFIterations) ||
+	if w.Passcode != fresh.Passcode || w.Discriminator != fresh.Discriminator || w.PBKDFIterations != fresh.PBKDFIterations ||
 		!bytes.Equal(w.Salt, fresh.Salt) || w.Timeout != time.Minute {
 		t.Fatalf("WindowCredentials = %+v from %+v", w, fresh)
 	}
@@ -150,9 +151,9 @@ func TestFacadeCommissioningCredentials(t *testing.T) {
 	if err := n.OpenBasicWindow(ctx, w); err != nil {
 		t.Fatalf("OpenBasicWindow with fresh credentials: %v", err)
 	}
-	bad := node.Commissioning{Passcode: fresh.Passcode, PBKDFIterations: -1, Salt: fresh.Salt}
+	bad := node.Commissioning{Passcode: fresh.Passcode, PBKDFIterations: node.PBKDFIterationsMax + 1, Salt: fresh.Salt}
 	if err := n.OpenBasicWindow(ctx, bad.WindowCredentials(0)); !errors.Is(err, node.ErrInvalidWindowCredentials) {
-		t.Fatalf("negative iterations: %v, want ErrInvalidWindowCredentials", err)
+		t.Fatalf("iterations above the maximum: %v, want ErrInvalidWindowCredentials", err)
 	}
 }
 

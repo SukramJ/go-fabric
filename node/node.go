@@ -40,6 +40,11 @@ import (
 // restarted; a host builds a new one on the same store.
 var ErrStopped = errors.New("node: stopped")
 
+// ErrNotStarted is returned by a call that needs the running node's
+// assembled topology before [Node.Start] assembled it
+// ([Aggregator.IncreaseConfigurationVersions]).
+var ErrNotStarted = errors.New("node: not started")
+
 // operationalTimeInterval is how often the operational time is persisted
 // while the node runs (the daemon's time.Minute, main.go:430 at b4ea1f96^).
 const operationalTimeInterval = time.Minute
@@ -354,7 +359,7 @@ func New(ctx context.Context, cfg Config) (*Node, error) { //nolint:funlen // th
 	// --- sessions, PASE, CASE (main.go:323-328 at b4ea1f96^) -------------------------
 	cm := cfg.Commissioning
 	n.sec = wireSecurity(n.br, n.st, n.root, n.caseIDs, paseParams{
-		passcode: cm.Passcode, salt: cm.Salt, iterations: cm.PBKDFIterations,
+		passcode: cm.Passcode, salt: cm.Salt, iterations: int(cm.PBKDFIterations),
 	}, responderSessionParams(cfg.Network.TCP, cfg.MaxPathsPerInvoke, cfg.Sessions), cfg.Limits, n.logger)
 	n.wireICD()
 
@@ -1066,15 +1071,6 @@ func (n *Node) Persistence() EndpointPersistence { return n.endpoints }
 // Groups servers, the bridge's group-message routing and the root's
 // GroupKeyManagement share one state.
 func (n *Node) Groups() *Groups { return n.groups }
-
-// PairingCodes returns the QR code payload and the manual pairing code of
-// the configured passcode and discriminator — matter.js
-// `commissioning.pairingCodes` (CommissioningServer.ts:400-410), as the
-// daemon prints them (main.go:504-518 at b4ea1f96^).
-func (n *Node) PairingCodes() (qr, manual string, err error) {
-	cm := n.cfg.Commissioning
-	return pairingCodes(n.cfg.ProductDescription, cm.Discriminator, cm.Passcode)
-}
 
 // ringLogs serves DiagnosticLogs RetrieveLogsRequest from the diagnostic
 // event ring, one line per event (the daemon's ringLogs, wiring.go:

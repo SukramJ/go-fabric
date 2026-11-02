@@ -364,7 +364,7 @@ type Commissioning struct {
 	Discriminator uint16
 	// PBKDFIterations is the SPAKE2+ PBKDF2 iteration count, within
 	// [spake2.IterationsMin, spake2.IterationsMax].
-	PBKDFIterations int
+	PBKDFIterations uint32
 	// Salt is the SPAKE2+ salt, spake2.PBKDFMinSaltSize to
 	// spake2.PBKDFMaxSaltSize bytes.
 	Salt []byte

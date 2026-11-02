@@ -383,8 +383,8 @@ func TestAggregatorRefusals(t *testing.T) {
 	if err := agg.Remove(ctx, endpoint.StringKey("p")); err != nil {
 		t.Errorf("Remove before Start: %v", err)
 	}
-	if err := agg.IncreaseConfigurationVersion(endpoint.StringKey("p")); err == nil {
-		t.Error("IncreaseConfigurationVersion before Start succeeded")
+	if err := agg.IncreaseConfigurationVersions(context.Background(), endpoint.StringKey("p")); !errors.Is(err, node.ErrNotStarted) {
+		t.Errorf("IncreaseConfigurationVersions before Start: %v, want ErrNotStarted", err)
 	}
 }
 
@@ -415,10 +415,10 @@ func TestPersistedLabelAndConfigurationVersion(t *testing.T) {
 		t.Errorf("bridged NodeLabel %q", label)
 	}
 	before := n.Bridge().Topology().FindByID(ep).ConfigurationVersion()
-	if err := n.Aggregator().IncreaseConfigurationVersion(endpoint.StringKey("plug:1")); err != nil {
+	if err := n.Aggregator().IncreaseConfigurationVersions(ctx, endpoint.StringKey("plug:1")); err != nil {
 		t.Fatal(err)
 	}
-	if err := n.Aggregator().IncreaseConfigurationVersion(endpoint.StringKey("nope")); !errors.Is(err, node.ErrUnknownKey) {
+	if err := n.Aggregator().IncreaseConfigurationVersions(ctx, endpoint.StringKey("nope")); !errors.Is(err, node.ErrUnknownKey) {
 		t.Errorf("unknown key: %v", err)
 	}
 	raised := n.Bridge().Topology().FindByID(ep).ConfigurationVersion()
@@ -463,7 +463,8 @@ func readAttr(t *testing.T, topo *endpoint.Topology, ep uint16, cluster, attr ui
 func TestPairingCodes(t *testing.T) {
 	t.Parallel()
 	n := newNode(t, minimalConfig(openDB(t, filepath.Join(t.TempDir(), "node.db"))))
-	qr, manual, err := n.PairingCodes()
+	p, err := n.SetupPayload()
+	qr, manual := p.QR, p.Manual
 	if err != nil {
 		t.Fatal(err)
 	}

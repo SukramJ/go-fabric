@@ -28,7 +28,7 @@ import (
 // salt.
 func randomCredentials(t *testing.T, timeout time.Duration) node.WindowCredentials {
 	t.Helper()
-	creds := node.WindowCredentials{Iterations: 1000, Timeout: timeout}
+	creds := node.WindowCredentials{PBKDFIterations: 1000, Timeout: timeout}
 	var err error
 	for creds.Discriminator == 0 || creds.Discriminator == 3840 {
 		if creds.Discriminator, err = bridge.RandomDiscriminator(); err != nil {
@@ -200,7 +200,7 @@ func TestOpenBasicWindowRefusals(t *testing.T) {
 	for name, mutate := range map[string]func(*node.WindowCredentials){
 		"discriminator": func(c *node.WindowCredentials) { c.Discriminator = 0x1000 },
 		"passcode":      func(c *node.WindowCredentials) { c.Passcode = 11111111 },
-		"iterations":    func(c *node.WindowCredentials) { c.Iterations = 999 },
+		"iterations":    func(c *node.WindowCredentials) { c.PBKDFIterations = 999 },
 		"salt":          func(c *node.WindowCredentials) { c.Salt = c.Salt[:15] },
 		"timeout":       func(c *node.WindowCredentials) { c.Timeout = -time.Second },
 	} {

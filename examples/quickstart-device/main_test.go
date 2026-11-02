@@ -61,9 +61,10 @@ func TestQuickstartDevice(t *testing.T) {
 		} else if id != first {
 			t.Errorf("run %d: the light moved from endpoint %d to %d", run, first, id)
 		}
-		qr, manual, err := n.PairingCodes()
+		p, err := n.SetupPayload()
+		qr, manual := p.QR, p.Manual
 		if err != nil || !strings.HasPrefix(qr, "MT:") || len(manual) != 11 {
-			t.Errorf("run %d: PairingCodes() = %q, %q, %v", run, qr, manual, err)
+			t.Errorf("run %d: SetupPayload() = %q, %q, %v", run, qr, manual, err)
 		}
 		if err := n.Stop(ctx); err != nil {
 			t.Fatalf("run %d: Stop: %v", run, err)

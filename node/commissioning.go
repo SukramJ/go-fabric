@@ -416,9 +416,10 @@ type WindowCredentials struct {
 	// Passcode is the window's setup passcode; it must pass
 	// setup.IsValidSetupPIN.
 	Passcode uint32
-	// Iterations is the SPAKE2+ PBKDF2 iteration count, within
-	// [spake2.IterationsMin, spake2.IterationsMax].
-	Iterations uint32
+	// PBKDFIterations is the SPAKE2+ PBKDF2 iteration count, within
+	// [spake2.IterationsMin, spake2.IterationsMax] — the name and type of
+	// [Commissioning].PBKDFIterations.
+	PBKDFIterations uint32
 	// Salt is the SPAKE2+ salt, spake2.PBKDFMinSaltSize to
 	// spake2.PBKDFMaxSaltSize bytes.
 	Salt []byte
@@ -442,7 +443,7 @@ func (c *WindowCredentials) validate() error {
 	if !validSetupPIN(c.Passcode) {
 		errs = append(errs, errSetupPIN(c.Passcode))
 	}
-	errs = append(errs, checkPBKDF(int64(c.Iterations), len(c.Salt))...)
+	errs = append(errs, checkPBKDF(int64(c.PBKDFIterations), len(c.Salt))...)
 	if c.Timeout < 0 {
 		errs = append(errs, fmt.Errorf("node: timeout %s is negative", c.Timeout))
 	}
@@ -484,11 +485,11 @@ func (n *Node) OpenBasicWindow(ctx context.Context, creds WindowCredentials) err
 	if err := creds.validate(); err != nil {
 		return err
 	}
-	vc, err := spake2.NewVerifierContext(creds.Passcode, creds.Salt, int(creds.Iterations))
+	vc, err := spake2.NewVerifierContext(creds.Passcode, creds.Salt, int(creds.PBKDFIterations))
 	if err != nil {
 		return fmt.Errorf("%w: %w", ErrInvalidWindowCredentials, err)
 	}
-	return n.window.openBasic(ctx, vc, creds.Iterations, append([]byte(nil), creds.Salt...), creds.Discriminator, creds.Timeout)
+	return n.window.openBasic(ctx, vc, creds.PBKDFIterations, append([]byte(nil), creds.Salt...), creds.Discriminator, creds.Timeout)
 }
 
 // OpenOwnWindow opens the node's own commissioning window with the

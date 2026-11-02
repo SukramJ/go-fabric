@@ -128,9 +128,12 @@ func run(ctx context.Context) error {
 	if err := b.doorMoved(false); err != nil {
 		slog.Warn("door", slog.Any("err", err))
 	}
-	if qr, manual, err := n.PairingCodes(); err == nil {
-		fmt.Printf("QR code: %s\nManual code: %s\n", qr, manual)
+	payload, err := n.SetupPayload()
+	if err != nil {
+		_ = n.Stop(context.WithoutCancel(ctx))
+		return err
 	}
+	fmt.Printf("QR code: %s\nManual code: %s\n", payload.QR, payload.Manual)
 	<-ctx.Done()
 	return n.Stop(context.WithoutCancel(ctx))
 }
@@ -263,7 +266,7 @@ sets the bridged device's Reachable attribute and its ReachableChanged
 event. A device starts reachable. `EndpointNumber` (used by the test)
 returns the endpoint the node gave the device.
 
-`PairingCodes` returns the QR payload and the manual code for the
+`SetupPayload` returns the QR payload and the manual code for the
 configured passcode and discriminator. The program then serves until the
 signal context ends and stops the node.
 

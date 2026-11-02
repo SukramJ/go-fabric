@@ -56,12 +56,12 @@ func run(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	qr, manual, err := n.PairingCodes()
+	payload, err := n.SetupPayload()
 	if err != nil {
 		_ = n.Stop(context.WithoutCancel(ctx))
 		return err
 	}
-	fmt.Printf("QR code: %s\nManual code: %s\n", qr, manual)
+	fmt.Printf("QR code: %s\nManual code: %s\n", payload.QR, payload.Manual)
 	return n.Run(ctx) // Start, wait for ctx, Stop
 }
 
