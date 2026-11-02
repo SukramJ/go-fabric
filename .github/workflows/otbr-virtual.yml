@@ -4,8 +4,9 @@
 # test (TestLiveOTBR) against it: the probe, an activation of chip's test
 # dataset that attaches, the diagnostics, the revert.
 #
-# Manual only, like ble-virtual.yml: the build takes long and is unverified
-# until a dispatched run has passed (ADR 0027: "that the simulation RCP runs
+# Manual and weekly, like ble-virtual.yml (the weekly run since W6-test-12;
+# a scheduled run builds ot-br-posix main): the build takes long and is
+# unverified until a dispatched run has passed (ADR 0027: "that the simulation RCP runs
 # on the ubuntu-24.04 runner"). The harness's TBRM family against the
 # reference daemon's --otbr endpoint on this agent is the next step once
 # this job is green. The steps are script/otbr-virtual-test.sh, the same as
@@ -13,6 +14,8 @@
 name: otbr-virtual
 
 on:
+  schedule:
+    - cron: "53 4 * * 1"
   workflow_dispatch:
     inputs:
       otbr_ref:
@@ -40,7 +43,7 @@ jobs:
           cache: true
       - name: build the agent and the RCP, run the live test
         env:
-          OTBR_REF: ${{ inputs.otbr_ref }}
+          OTBR_REF: ${{ inputs.otbr_ref || 'main' }}
           OTBR_LOG_DIR: ${{ runner.temp }}/otbr-virtual-logs
         run: make otbr-virtual-test
       - name: upload logs

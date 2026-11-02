@@ -6,9 +6,10 @@
 # user channel) advertises on the second; `pair --ble` commissions it with
 # Wi-Fi credentials, then a read runs over the operational session.
 #
-# Manual only (owner decision 2026-10-18): btvirt needs root and the
-# kernel's vhci module, and a GitHub-hosted runner is the one place both
-# are at hand. The steps are script/ble-virtual-test.sh, the same as
+# Manual and weekly (owner decision 2026-10-18; the weekly run since
+# W6-test-12, so a regression does not wait for someone to dispatch):
+# btvirt needs root and the kernel's vhci module, and a GitHub-hosted runner
+# is the one place both are at hand. Not a required check. The steps are script/ble-virtual-test.sh, the same as
 # `make ble-virtual-test` locally.
 #
 # The summary separates the ENVIRONMENT (btvirt, BlueZ, the vhci module,
@@ -19,6 +20,8 @@
 name: ble-virtual
 
 on:
+  schedule:
+    - cron: "41 4 * * 1"
   workflow_dispatch:
 
 permissions:
