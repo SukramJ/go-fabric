@@ -102,6 +102,7 @@ Findings of the whole-codebase review of 2026-11-01 (`notes/review/2026-11/`).
 - `client/exchange`, `client/peer`: a message that opens a new exchange on a secure UDP session from another address moves the session there, and the peer's operational address follows, as matter.js's `ExchangeManager` does; acks and responses went to the old address until the subscription failed (W4-ctlnet-02).
 - `controller/client`: `Hooks.Event` and the persisted event cursor move only for the default subscription's reports while it is current, its bootstrap read and the newly-commissioned read, as matter.js gates them on `emitEvents`; a host's own `Node.Read` or `Node.Subscribe` returns its events in its `Report` only — it raised the cursor past events the default subscription then never asked for (W4-ctlim-01).
 - `client/interaction`: an invoke of a command whose model is timed-required (DoorLock LockDoor, AdministratorCommissioning, …) sends a TimedRequest first and stays out of the automatic batch with zero options, and a write of an attribute with the timed quality is timed, as matter.js infers both from the model; such a command went into a batch untimed and drew NEEDS_TIMED_INTERACTION (W4-ctlim-02).
+- `controller/client`: deleting a node (`Registry.Erase`, `Decommission`, a leave) closes the host's subscriptions to it, a sustained one included, as matter.js closes the node's interaction; the sustained one was re-established and retried `Peer.Connect` on the deleted peer every 15 s to 1 h until the controller closed (W4-ctlim-03).
 
 ## [0.15.6] — 2026-11-01
 

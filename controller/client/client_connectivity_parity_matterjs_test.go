@@ -218,6 +218,30 @@ func TestClientConnectivityParity(t *testing.T) {
 		}
 	})
 
+	// W4-ctlim-03: deleting the node closes the host's sustained
+	// subscription instead of re-establishing it against the deleted peer
+	// (ClientNode.ts:291-300, ClientInteraction.ts:264-282).
+	t.Run("closes a host's sustained subscription when the node is deleted", func(t *testing.T) {
+		t.Parallel()
+		cp := newClientPair(t, clientPairOptions{})
+		var sub *interaction.Subscription
+		cp.run(t, func(ctx context.Context) (err error) {
+			sub, err = cp.node.Subscribe(ctx, client.SubscribeRequest{SubscribeRequest: interaction.SubscribeRequest{Attributes: []im.ConcreteAttributePath{{}}, Sustain: true}})
+			return err
+		})
+		select {
+		case <-sub.Done():
+			t.Fatal("closed before the delete")
+		default:
+		}
+		cp.pair.Controller.Registry().Erase(parityCtx(t))
+		select {
+		case <-sub.Done():
+		default:
+			t.Fatal("the sustained subscription survived the delete")
+		}
+	})
+
 	t.Run("establishes a fresh sustained subscription after disable/enable", func(t *testing.T) {
 		t.Parallel()
 		cp := newClientPair(t, clientPairOptions{})
