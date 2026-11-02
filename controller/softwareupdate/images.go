@@ -210,7 +210,7 @@ func fileName(vid, pid uint16, mode Mode, version uint32) string {
 // version when given), the specification version recorded; a failed check
 // removes it.
 func (i *Images) Store(ctx context.Context, image []byte, mode Mode, info *UpdateInfo) (StoredImage, error) {
-	h, _, _, err := otaimage.ReadHeader(bytes.NewReader(image))
+	h, err := otaimage.ValidateFile(bytes.NewReader(image), storeValidation(info))
 	if err != nil {
 		return StoredImage{}, fmt.Errorf("%w: %w", ErrOTA, err)
 	}
@@ -231,6 +231,31 @@ func (i *Images) Store(ctx context.Context, image []byte, mode Mode, info *Updat
 	i.log.Debug("ota.images.stored", slog.String("file", name))
 	st, _ := i.entry(ctx, name)
 	return st, nil
+}
+
+// storeValidation is how Store verifies the whole file before it is kept:
+// the ledger's checksum and file size when the record carries them, as
+// matter.js #verifyUpdate passes them to OtaImageReader.file
+// (DclOtaUpdateService.ts:388-408, :573-574; OtaImageReader.ts:65-110);
+// otherwise the payload size and the header's payload digest
+// (OtaImageReader.ts:261-278), so a truncated or corrupted local image is
+// refused before it is offered over BDX (W4-ctlint-03).
+func storeValidation(info *UpdateInfo) otaimage.FileOptions {
+	opts := otaimage.FileOptions{SkipFullChecksum: true}
+	if info == nil || info.ledger == nil {
+		return opts
+	}
+	l := info.ledger
+	if l.OTAFileSize > 0 {
+		size := l.OTAFileSize
+		opts.ExpectedTotalSize = &size
+	}
+	if l.OTAChecksum != "" {
+		opts.SkipFullChecksum = false
+		opts.ExpectedChecksum = l.OTAChecksum
+		opts.ChecksumType = l.OTAChecksumType
+	}
+	return opts
 }
 
 // verifyHeader is #verifyUpdate's header check (:388-431).
