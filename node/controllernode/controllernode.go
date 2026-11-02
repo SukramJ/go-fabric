@@ -26,7 +26,8 @@ import (
 
 // Config is the node configuration of spec: its socket, commissioning
 // window, product, database and OTA provider, the controller's logger
-// and clock.
+// and clock. The provider's status observer is a node callback, not
+// configuration: [Observe] registers it on the node New built.
 func Config(spec controller.OwnNodeSpec) node.Config {
 	p := spec.Provider
 	return node.Config{
@@ -43,7 +44,7 @@ func Config(spec controller.OwnNodeSpec) node.Config {
 		Store: node.Store{DB: spec.DB},
 		OTAProvider: &node.OTAProviderConfig{
 			ImageSource: p.ImageSource, Consent: p.Consent, ApplyPolicy: p.ApplyPolicy, BDXMaxBlockSize: p.BDXMaxBlockSize,
-			OnStatusChange: p.OnStatusChange, RebootQuery: p.RebootQuery, TransferBlockSize: p.TransferBlockSize,
+			RebootQuery: p.RebootQuery, TransferBlockSize: p.TransferBlockSize,
 		},
 		Logger: spec.Logger,
 		Clock:  spec.Clock,
@@ -57,6 +58,7 @@ func Start(ctx context.Context, spec controller.OwnNodeSpec) (controller.OwnNode
 	if err != nil {
 		return nil, nil, err
 	}
+	Observe(n, spec)
 	if err := n.Start(ctx); err != nil {
 		return nil, nil, err
 	}
@@ -69,6 +71,14 @@ func Start(ctx context.Context, spec controller.OwnNodeSpec) (controller.OwnNode
 		addr.IP = net.IPv6loopback
 	}
 	return Wrap(n), addr, nil
+}
+
+// Observe registers spec's callbacks on n, the node built from [Config]:
+// the provider's status observer ([node.Node.OnOTAProviderStatus]).
+// [Start] calls it; a host that builds the node from Config itself calls
+// it once after node.New. It returns the unsubscribe function.
+func Observe(n *node.Node, spec controller.OwnNodeSpec) (unsubscribe func()) {
+	return n.OnOTAProviderStatus(spec.Provider.OnStatusChange)
 }
 
 // Wrap is n as the controller's own node.

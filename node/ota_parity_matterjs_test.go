@@ -220,8 +220,9 @@ func newOTASite(t *testing.T, o otaSiteOptions) *otaSite {
 	}
 	s.c = s.site.AddController(fabrictest.ControllerOptions{})
 	s.prov = s.site.AddDevice(fabrictest.Topology{Configure: func(cfg *node.Config) {
-		cfg.OTAProvider = &node.OTAProviderConfig{ImageSource: s.src, Consent: s.consent, OnStatusChange: s.statuses.add}
+		cfg.OTAProvider = &node.OTAProviderConfig{ImageSource: s.src, Consent: s.consent}
 	}})
+	s.prov.Node().OnOTAProviderStatus(s.statuses.add)
 	dir := filepath.Join(t.TempDir(), "ota")
 	s.req = s.site.AddDevice(fabrictest.Topology{Configure: func(cfg *node.Config) {
 		v := s.version.Load()

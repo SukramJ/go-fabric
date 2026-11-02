@@ -246,9 +246,8 @@ func TestSurfaceChangeInProcess(t *testing.T) {
 	const identify uint32 = 0x0003
 	desc, therm, ident := ep.ClusterDataVersion(0x001D), ep.ClusterDataVersion(thermostatdef.ClusterID), ep.ClusterDataVersion(identify)
 	var observed []surface.SurfaceChange
-	unobserve := run.n.Observe(node.Observers{OnSurfaceChanged: func(c surface.SurfaceChange) error {
+	unobserve := run.n.Observe(node.Observers{OnSurfaceChanged: func(c surface.SurfaceChange) {
 		observed = append(observed, c)
-		return nil
 	}})
 	defer unobserve()
 	if err := run.n.Aggregator().Replace(context.Background(), endpoint.StringKey("thermo"), thermostat(t, "thermo", true, &p)); err != nil {

@@ -33,9 +33,6 @@ type OTAProviderConfig struct {
 	// BDXMaxBlockSize, when set, caps the block size of the image
 	// transfers.
 	BDXMaxBlockSize uint16
-	// OnStatusChange observes the requestors' update states; nil observes
-	// nothing.
-	OnStatusChange func(peer OTAPeer, status OTAUpdateStatus, version uint32)
 	// RebootQuery learns a QueryImage taken for the requestor's restart
 	// (mattercore.OTAProviderConfig.RebootQuery); nil ignores it.
 	RebootQuery func(peer OTAPeer, sessionID uint16)
@@ -79,7 +76,10 @@ func (n *Node) buildOTAProvider() error {
 	}
 	p, err := mattercore.NewOTAProvider(mattercore.OTAProviderConfig{
 		ImageSource: cfg.ImageSource, Consent: cfg.Consent, ApplyPolicy: cfg.ApplyPolicy,
-		BDX: n.bdx, BDXMaxBlockSize: cfg.BDXMaxBlockSize, OnStatusChange: cfg.OnStatusChange,
+		BDX: n.bdx, BDXMaxBlockSize: cfg.BDXMaxBlockSize,
+		OnStatusChange: func(peer OTAPeer, status OTAUpdateStatus, version uint32) {
+			n.otaStatusListeners.emit(n.logger, "ota_provider_status", otaProviderStatus{peer, status, version})
+		},
 		RebootQuery: cfg.RebootQuery, TransferBlockSize: cfg.TransferBlockSize,
 		// The URI names this node on the requestor's fabric (OP:381).
 		NodeID: func(fabricIndex uint8) (uint64, bool) {
@@ -95,6 +95,38 @@ func (n *Node) buildOTAProvider() error {
 	n.otaProvider = p
 	n.br.AttachBDXResponder(n.bdx)
 	return nil
+}
+
+// otaProviderStatus is one requestor's update state, as the provider
+// reports it.
+type otaProviderStatus struct {
+	peer    OTAPeer
+	status  OTAUpdateStatus
+	version uint32
+}
+
+// OnOTAProviderStatus registers fn for every update state a requestor of
+// the node's OTA provider ([Config].OTAProvider) reports: the peer, its
+// status and the version it concerns. fn runs inline on the provider's
+// goroutine and must not block; [Node.OnOTAProviderStatusAsync] queues it
+// instead. It returns the unsubscribe function (ADR 0025 principle 8).
+func (n *Node) OnOTAProviderStatus(fn func(peer OTAPeer, status OTAUpdateStatus, version uint32)) (unsubscribe func()) {
+	if fn == nil {
+		return func() {}
+	}
+	return n.otaStatusListeners.add(func(s otaProviderStatus) { fn(s.peer, s.status, s.version) })
+}
+
+// OnOTAProviderStatusAsync is [Node.OnOTAProviderStatus] with fn queued on
+// the node's callback goroutine, one call after the other, while the node
+// runs; Stop returns once every queued call ran.
+func (n *Node) OnOTAProviderStatusAsync(fn func(peer OTAPeer, status OTAUpdateStatus, version uint32)) (unsubscribe func()) {
+	if fn == nil {
+		return func() {}
+	}
+	return n.otaStatusListeners.add(func(s otaProviderStatus) {
+		n.queued("ota_provider_status", func() { fn(s.peer, s.status, s.version) })
+	})
 }
 
 // OTAProvider returns the OTA Software Update Provider — nil unless

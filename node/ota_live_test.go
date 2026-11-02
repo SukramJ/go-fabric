@@ -233,9 +233,9 @@ func TestLiveOTAProvider(t *testing.T) {
 				img:   mattercore.OTAImage{FileDesignator: bdx.FileDesignator("fff1-8001-v2.ota"), SoftwareVersion: 2, SoftwareVersionString: "2"},
 				bytes: image,
 			},
-			OnStatusChange: statuses.add,
 		}
 	})
+	provider.OnOTAProviderStatus(statuses.add)
 	requestor := liveNode(t, "requestor", func(c *node.Config) {
 		// Harness mode applies in place and reports the update as after a
 		// restart (node/ota.go otaApplier).

@@ -45,20 +45,20 @@ func TestObserveAfterStart(t *testing.T) {
 		events = append(events, s)
 		mu.Unlock()
 	}
-	cfg.Observers.OnFabricAdded = func(node.FabricInfo) error { record("config:added"); return nil }
+	cfg.Observers.OnFabricAdded = func(node.FabricInfo) { record("config:added") }
 	n := newNode(t, cfg)
 	if err := n.Start(context.Background()); err != nil {
 		t.Fatalf("Start: %v", err)
 	}
 	removed := make(chan node.FabricInfo, 1)
 	unsubscribe := n.Observe(node.Observers{
-		OnFabricAdded:           func(node.FabricInfo) error { record("first:added"); return nil },
-		OnCommissioningComplete: func(uint8) error { record("first:complete"); return nil },
-		OnFabricRemoved:         func(info node.FabricInfo) error { record("first:removed"); removed <- info; return nil },
+		OnFabricAdded:           func(node.FabricInfo) { record("first:added") },
+		OnCommissioningComplete: func(uint8) { record("first:complete") },
+		OnFabricRemoved:         func(info node.FabricInfo) { record("first:removed"); removed <- info },
 	})
 	defer unsubscribe()
-	n.Observe(node.Observers{OnFabricAdded: func(node.FabricInfo) error { record("second:added"); return nil }})
-	gone := n.Observe(node.Observers{OnFabricAdded: func(node.FabricInfo) error { record("gone:added"); return nil }})
+	n.Observe(node.Observers{OnFabricAdded: func(node.FabricInfo) { record("second:added") }})
+	gone := n.Observe(node.Observers{OnFabricAdded: func(node.FabricInfo) { record("gone:added") }})
 	gone()
 	gone()
 
@@ -97,7 +97,7 @@ func TestWindowSnapshot(t *testing.T) {
 	ctx := context.Background()
 	cfg := minimalConfig(openDB(t, filepath.Join(t.TempDir(), "node.db")))
 	seen := make(chan node.WindowSnapshot, 8)
-	cfg.Observers.OnWindowTransition = func(s node.WindowSnapshot) error { seen <- s; return nil }
+	cfg.Observers.OnWindowTransition = func(s node.WindowSnapshot) { seen <- s }
 	n := newNode(t, cfg)
 	if got := n.Window(); got.Kind != node.WindowNone || got.Open {
 		t.Errorf("Window before Start = %+v, want none", got)

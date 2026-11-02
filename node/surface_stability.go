@@ -249,7 +249,7 @@ func (n *Node) announceSurface(ctx context.Context) {
 		c := &announced[i]
 		for _, o := range obs {
 			if fn := o.OnSurfaceChanged; fn != nil {
-				observe(n.logger, "surface_changed", func() error { return fn(*c) })
+				observe(n.logger, "surface_changed", func() { fn(*c) })
 			}
 		}
 	}

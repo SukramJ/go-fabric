@@ -234,12 +234,12 @@ func TestCommissioningWindowLifetime(t *testing.T) {
 		p := site.CommissionedPair(fabrictest.PairOptions{Device: fabrictest.Topology{Configure: func(cfg *node.Config) {
 			// The window's onClose: the first close opens the next window
 			// (endCommissioning, then allowBasicCommissioning).
-			cfg.Observers.OnWindowTransition = func(s node.WindowSnapshot) error {
+			cfg.Observers.OnWindowTransition = func(s node.WindowSnapshot) {
 				mu.Lock()
 				armed := dev != nil
 				mu.Unlock()
 				if !armed || s.Open {
-					return nil
+					return
 				}
 				mu.Lock()
 				first := reopens == 0
@@ -248,9 +248,11 @@ func TestCommissioningWindowLifetime(t *testing.T) {
 				}
 				mu.Unlock()
 				if !first {
-					return nil
+					return
 				}
-				return dev.Node().Bridge().CommissioningWindow().OpenOwnWindow(context.Background(), 0)
+				if err := dev.Node().OpenOwnWindow(context.Background(), 0); err != nil {
+					t.Error(err)
+				}
 			}
 		}}})
 		w := p.Device.Node().Bridge().CommissioningWindow()

@@ -271,7 +271,7 @@ func (h *commissioningHost) notifyTransition(window *bridge.CommissioningWindow)
 	snap := h.snapshot(window)
 	for _, o := range obs {
 		if fn := o.OnWindowTransition; fn != nil {
-			observe(h.logger, "window_transition", func() error { return fn(snap) })
+			observe(h.logger, "window_transition", func() { fn(snap) })
 		}
 	}
 }

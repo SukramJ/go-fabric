@@ -153,14 +153,13 @@ func TestOpenBasicWindowOnCommissionedNode(t *testing.T) {
 		recording   bool
 	)
 	done := make(chan struct{}, 8)
-	cfg.Observers.OnWindowTransition = func(s node.WindowSnapshot) error {
+	cfg.Observers.OnWindowTransition = func(s node.WindowSnapshot) {
 		mu.Lock()
 		defer mu.Unlock()
 		if recording {
 			transitions = append(transitions, s)
 			done <- struct{}{}
 		}
-		return nil
 	}
 	n, _, _ := commissioned(t, cfg)
 	waitRecord(t, adv, "none after the commissioning", func(_, _ uint64, ok bool) bool { return !ok })

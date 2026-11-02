@@ -130,9 +130,9 @@ func startWithFabric(t *testing.T) *fabricBeforeStart {
 		f.spy = spy
 		f.mu.Unlock()
 		cfg.Advertiser = spy
-		cfg.Observers.OnFabricAdded = func(node.FabricInfo) error { record("added"); return nil }
-		cfg.Observers.OnFabricRemoved = func(node.FabricInfo) error { record("deleted"); return nil }
-		cfg.Observers.OnFabricUpdated = func(node.FabricInfo) error { record("updated"); return nil }
+		cfg.Observers.OnFabricAdded = func(node.FabricInfo) { record("added") }
+		cfg.Observers.OnFabricRemoved = func(node.FabricInfo) { record("deleted") }
+		cfg.Observers.OnFabricUpdated = func(node.FabricInfo) { record("updated") }
 	}}})
 	f.device = p.Device
 	if err := f.device.Stop(parityCtx(t)); err != nil {

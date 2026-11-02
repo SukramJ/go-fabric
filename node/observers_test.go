@@ -9,7 +9,6 @@ package node_test
 
 import (
 	"context"
-	"errors"
 	"path/filepath"
 	"strconv"
 	"sync"
@@ -72,22 +71,18 @@ func TestObserversOnCommissioning(t *testing.T) {
 		recAt  bool
 		doneAt uint8
 	)
-	cfg.Observers.OnFabricAdded = func(info node.FabricInfo) error {
+	cfg.Observers.OnFabricAdded = func(info node.FabricInfo) {
 		mu.Lock()
 		defer mu.Unlock()
 		events = append(events, "added")
 		added = info
 		recAt = hasOperationalRecord(adv)
-		return nil
 	}
-	cfg.Observers.OnCommissioningComplete = func(fabricIndex uint8) error {
+	cfg.Observers.OnCommissioningComplete = func(fabricIndex uint8) {
 		mu.Lock()
 		defer mu.Unlock()
 		events = append(events, "complete")
 		doneAt = fabricIndex
-		// An observer's error is logged, not returned: the commissioning
-		// still completes.
-		return errors.New("observer failure")
 	}
 	n := newNode(t, cfg)
 	if err := n.Start(context.Background()); err != nil {
@@ -140,13 +135,12 @@ func TestObserverOnFabricRemoved(t *testing.T) {
 		record  bool
 	}
 	removed := make(chan seen, 1)
-	cfg.Observers.OnFabricRemoved = func(info node.FabricInfo) error {
+	cfg.Observers.OnFabricRemoved = func(info node.FabricInfo) {
 		n := ref.Load()
 		ctx := context.Background()
 		fabrics, _ := n.FabricInfos(ctx)
 		acl, _ := n.Store().ListACL(ctx, info.FabricIndex)
 		removed <- seen{info: info, fabrics: len(fabrics), acl: len(acl), record: hasOperationalRecord(adv)}
-		return nil
 	}
 	n := newNode(t, cfg)
 	ref.Store(n)
@@ -202,13 +196,12 @@ func TestObserverOnWindowTransition(t *testing.T) {
 	}
 	var calls atomic.Int32
 	transitions := make(chan seen, 4)
-	cfg.Observers.OnWindowTransition = func(snap node.WindowSnapshot) error {
+	cfg.Observers.OnWindowTransition = func(snap node.WindowSnapshot) {
 		_, _, record := commissionableRecord(adv)
 		transitions <- seen{snap: snap, record: record}
 		if calls.Add(1) == 1 {
 			panic("observer panic")
 		}
-		return nil
 	}
 	n := newNode(t, cfg)
 	if err := n.Start(context.Background()); err != nil {
@@ -249,5 +242,42 @@ func TestObserverOnWindowTransition(t *testing.T) {
 	case s := <-transitions:
 		t.Errorf("a third transition %+v", s.snap)
 	case <-time.After(100 * time.Millisecond):
+	}
+}
+
+// ObserveAsync queues every hook on the node's callback goroutine, in
+// event order (W5-api-04, ADR 0025 principle 8): a hook that blocks holds
+// up neither the window transition nor the next event's dispatch.
+func TestObserveAsyncQueuesInOrder(t *testing.T) {
+	t.Parallel()
+	n := newNode(t, minimalConfig(openDB(t, filepath.Join(t.TempDir(), "n.db"))))
+	ctx := context.Background()
+	if err := n.Start(ctx); err != nil {
+		t.Fatal(err)
+	}
+	release := make(chan struct{})
+	seen := make(chan bool, 4)
+	unsubscribe := n.ObserveAsync(node.Observers{OnWindowTransition: func(s node.WindowSnapshot) {
+		<-release
+		seen <- s.Open
+	}})
+	defer unsubscribe()
+	// Both transitions return while the first hook still blocks.
+	if err := n.CloseWindow(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if err := n.OpenOwnWindow(ctx, time.Minute); err != nil {
+		t.Fatal(err)
+	}
+	close(release)
+	for i, want := range []bool{false, true} {
+		select {
+		case got := <-seen:
+			if got != want {
+				t.Fatalf("transition %d open=%v, want %v", i, got, want)
+			}
+		case <-time.After(5 * time.Second):
+			t.Fatalf("transition %d not delivered", i)
+		}
 	}
 }

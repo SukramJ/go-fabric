@@ -12,8 +12,8 @@ still held there. Each row names the facade route, or the section of
 
 | Package | Symbol (loom) | Route |
 | --- | --- | --- |
-| `bridge` | `StartHealthProbe`, `DefaultProbeInterval` (`cmd/openccu-loom/daemon_matter.go:571`) | `Config.Health{Interval, OnSample}`; `node.DefaultProbeInterval` |
-| `bridge` | `HealthSample` (`daemon_matter.go:1433`, `:1437`) | `node.HealthSample`; `Node.Health` returns the last one. `OnSample` gets every verdict; an unhealthy one is what `RecordUnhealthy` received |
+| `bridge` | `StartHealthProbe`, `DefaultProbeInterval` (`cmd/openccu-loom/daemon_matter.go:571`) | `Config.Health{Interval}` with `Node.OnHealthSample`; `node.DefaultProbeInterval` |
+| `bridge` | `HealthSample` (`daemon_matter.go:1433`, `:1437`) | `node.HealthSample`; `Node.Health` returns the last one. `Node.OnHealthSample` gets every verdict; an unhealthy one is what `RecordUnhealthy` received |
 | `bridge` | `RandomPasscode`, `RandomSalt` (`daemon_matter.go:282`, `:297`; `matter_window_adapter.go:153`, `:157`), `RandomDiscriminator` (`matter_window_adapter.go:149`) | `node.NewCommissioningCredentials`; `Commissioning.WindowCredentials(timeout)` for the ephemeral window (`matter_window_adapter.go:165-171`) |
 | `bridge` | `ErrAdministratorWindowOpen`, `ErrCommissioningWindowAlreadyOpen` (`matter_window_adapter.go:208`), `ErrCommissioningWindowNotConfigured` (`matter_status_adapter.go:105`) | `node.ErrAdministratorWindowOpen`, `node.ErrCommissioningWindowAlreadyOpen`, `node.ErrCommissioningWindowNotConfigured` (the same values); `node.ErrCommissioningBlocked` |
 | `bridge` | `Snapshotter` (`daemon_matter.go:915`), `TCPConfig` (`daemon_matter.go:56`) | `node.Snapshotter`, `node.TCPConfig` |
@@ -53,6 +53,7 @@ facade one shape. Each row names what a host writes now.
 | `Node.CommissioningWindow()`, `node.CommissioningWindow` | `Node.OpenOwnWindow(ctx, timeout)`, `Node.CloseWindow(ctx)`, `Node.Window()`; the bridge type stays behind `Node.Bridge().CommissioningWindow()` |
 | `device.Options.Reachable`, `device.HostStatement.Reachable`, `device.AvailabilityProbe` | `Device.SetReachable(ctx, reachable)` on every change of the source's availability |
 | `node.New(cfg)` | `node.New(ctx, cfg)`: ctx bounds the store work; nothing runs before `Start` |
+| `node.Health.OnSample`, `node.OTAProviderConfig.OnStatusChange`, the `error` result of every `node.Observers` hook | `Node.OnHealthSample` / `OnHealthSampleAsync`, `Node.OnOTAProviderStatus` / `OnOTAProviderStatusAsync`; hooks return nothing; `Node.ObserveAsync` for the queued form |
 
 ## Changed in the next release: `CommissionerReach` takes the peer
 

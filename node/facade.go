@@ -139,7 +139,7 @@ type OTAApplyPolicy = mattercore.OTAApplyPolicy
 // OTAPeer names the requestor an [OTAProviderConfig] callback is about ([mattercore.OTAPeer]).
 type OTAPeer = mattercore.OTAPeer
 
-// OTAUpdateStatus is the status [OTAProviderConfig].OnStatusChange reports for a requestor ([mattercore.OTAUpdateStatus]).
+// OTAUpdateStatus is the status [Node.OnOTAProviderStatus] reports for a requestor ([mattercore.OTAUpdateStatus]).
 type OTAUpdateStatus = mattercore.OTAUpdateStatus
 
 // OTAApplier is the type of [OtaConfig].Applier: the requestor's consent and apply hooks ([mattercore.OtaApplier]).

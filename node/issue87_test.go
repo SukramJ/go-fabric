@@ -211,12 +211,11 @@ func TestRemoveFabricFromHost(t *testing.T) {
 		removed  []node.FabricInfo
 		recAtObs bool
 	)
-	cfg.Observers.OnFabricRemoved = func(info node.FabricInfo) error {
+	cfg.Observers.OnFabricRemoved = func(info node.FabricInfo) {
 		mu.Lock()
 		defer mu.Unlock()
 		removed = append(removed, info)
 		recAtObs = hasOperationalRecord(adv)
-		return nil
 	}
 	n, c, _ := commissioned(t, cfg)
 	if !hasOperationalRecord(adv) {

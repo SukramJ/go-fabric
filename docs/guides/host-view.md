@@ -197,6 +197,13 @@ subscribers are reported at most once a second. `Change.Origin` says who made it
 `OriginCommand` for a command (On, Off, Toggle, …). The program forwards only what did not come from the
 host, so its own `Set` does not echo back to the lamp.
 
+Every callback of the facade follows one rule: the plain form
+(`OnChanged`, `Observe`, `OnHealthSample`, `OnOTAProviderStatus`,
+`OnDiagnosticEvent`, `ICD.OnModeChange`) runs inline on the event's
+goroutine and must not block, the `…Async` form queues it on the
+device's or node's own goroutine, one call after the other, and both
+return the unsubscribe function.
+
 `OnChanged` runs inline, after the change is stored and before the
 command that made it answers. A callback that may block uses
 `OnChangedAsync`, which runs on the device's own goroutine, one call

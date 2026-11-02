@@ -281,12 +281,9 @@ func compose(ctx context.Context, f flags, logger *slog.Logger, passcode uint32,
 	cfg := nodeConfig(f, passcode, discriminator, tcpConfig, applier, actions, logger)
 	cfg.Attestation = attestationConfig(f.attestationDir)
 	cfg.Surface = policies
-	// The listener's verdict, logged when it fails (node.Config.Health).
-	cfg.Health.OnSample = func(s node.HealthSample) {
-		if !s.Healthy {
-			logger.Warn("health.listener", slog.String("note", s.Note))
-		}
-	}
+	// The listener's verdict every probe interval (node.Config.Health),
+	// logged when it fails (Node.OnHealthSample, registered after New).
+	cfg.Health.Interval = node.DefaultProbeInterval
 	applyTestWiFi(&cfg, f, devices)
 	applyMetrics(&cfg, f.metricsExpvar)
 	if dump != nil {
@@ -350,6 +347,11 @@ func assemble(ctx context.Context, devices *fleet, cfg node.Config, applier *ota
 	if err != nil {
 		return nil, err
 	}
+	n.OnHealthSample(func(s node.HealthSample) {
+		if !s.Healthy {
+			cfg.Logger.Warn("health.listener", slog.String("note", s.Note))
+		}
+	})
 	ok := false
 	defer func() {
 		if !ok {

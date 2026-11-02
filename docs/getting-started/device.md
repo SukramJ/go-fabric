@@ -200,7 +200,7 @@ Defaults worth knowing:
 | `Network.MDNS` | Zeroconf with the subtype responder, SRV target from the interface's MAC; `Disabled` publishes nothing, `HostName` sets the SRV target |
 | `Store.Path` | unused; set, the node opens that SQLite file (modernc.org/sqlite, foreign keys on, 5 s busy timeout) and `Stop` closes it |
 | `Attestation.Files` | unused; set, `New` loads the vendor chain and fails when it does not load (files naming nothing keep the test chain); with `BlockCommissioningOnError` it runs on the test chain instead, commissioning refused, the error in `Node.AttestationError` |
-| `Health` | no probe; `Interval` (0 is 30 s) or `OnSample` runs it from `Start` to `Stop`, `Node.Health` returns the last verdict |
+| `Health` | no probe; a positive `Interval` runs it from `Start` to `Stop`, `Node.OnHealthSample` receives every verdict, `Node.Health` returns the last one |
 | `BootID.RotateUniqueIDs` | stable UniqueIDs; set, every UniqueID rotates per process (development only, process-wide) |
 | `DeviceTypeValidation` | matter.js's warn mode |
 | `SupportedFabrics` | 5 (matter.js defaults to 254) |

@@ -94,6 +94,10 @@ type Node struct {
 	// ownsAdvertiser is set when New built the advertiser (a nil
 	// Config.Advertiser), so a failed New closes it.
 	ownsAdvertiser bool
+	// healthListeners and otaStatusListeners are the host's On…
+	// callbacks of the health probe and the OTA provider.
+	healthListeners    listeners[HealthSample]
+	otaStatusListeners listeners[otaProviderStatus]
 	// subtypeResponder is the DNS-SD subtype responder of the node's own
 	// advertiser, started by Start; nil with a host's advertiser.
 	subtypeResponder *mdns.SubtypeResponder
@@ -627,7 +631,7 @@ func (n *Node) observedFabricInstalled(ctx context.Context, fabricIndex uint8, f
 	}
 	for _, o := range obs {
 		if fn := o.OnFabricAdded; fn != nil {
-			observe(n.logger, "fabric_added", func() error { return fn(info) })
+			observe(n.logger, "fabric_added", func() { fn(info) })
 		}
 	}
 }
@@ -647,7 +651,7 @@ func (n *Node) observedFabricRemoved(ctx context.Context, fabricIndex uint8) {
 	n.fabricRemoved(ctx, fabricIndex)
 	for _, o := range n.observerList() {
 		if fn := o.OnFabricRemoved; fn != nil {
-			observe(n.logger, "fabric_removed", func() error { return fn(info) })
+			observe(n.logger, "fabric_removed", func() { fn(info) })
 		}
 	}
 }
@@ -685,7 +689,7 @@ func (n *Node) commissioningCompleted(ctx context.Context, fabricIndex uint8) {
 	n.ensureRequestorACL(ctx)
 	for _, o := range n.observerList() {
 		if fn := o.OnCommissioningComplete; fn != nil {
-			observe(n.logger, "commissioning_complete", func() error { return fn(fabricIndex) })
+			observe(n.logger, "commissioning_complete", func() { fn(fabricIndex) })
 		}
 	}
 }
@@ -700,7 +704,7 @@ func (n *Node) notifyFabricUpdated(ctx context.Context, fabricIndex uint8) {
 	info, _ := n.fabricInfo(ctx, fabricIndex)
 	for _, o := range obs {
 		if fn := o.OnFabricUpdated; fn != nil {
-			observe(n.logger, "fabric_updated", func() error { return fn(info) })
+			observe(n.logger, "fabric_updated", func() { fn(info) })
 		}
 	}
 }

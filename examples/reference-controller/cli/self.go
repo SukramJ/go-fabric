@@ -78,6 +78,7 @@ func startSelf(ctx context.Context, spec controller.OwnNodeSpec) (controller.Own
 	if err != nil {
 		return nil, nil, err
 	}
+	controllernode.Observe(n, spec)
 	if err := n.Start(ctx); err != nil {
 		return nil, nil, err
 	}

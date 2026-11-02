@@ -21,25 +21,19 @@ const DefaultProbeInterval = bridge.DefaultProbeInterval
 
 // Health configures the node's health probe (bridge.StartHealthProbe):
 // from [Node.Start] to [Node.Stop] the node checks its operational
-// listener on [Config].Clock and hands each verdict to OnSample;
-// [Node.Health] returns the last one. The probe runs when OnSample is set
-// or Interval is positive; the zero value runs none.
+// listener on [Config].Clock and hands each verdict to the callbacks
+// [Node.OnHealthSample] registered; [Node.Health] returns the last one.
+// The probe runs when Interval is positive; the zero value runs none.
 type Health struct {
-	// Interval is the probe cadence; 0 is [DefaultProbeInterval].
+	// Interval is the probe cadence.
 	Interval time.Duration
-	// OnSample receives every verdict, the first at [Node.Start]. An
-	// unhealthy one (Healthy false) is a condition the probe states, not a
-	// sample — what bridge.HealthRecorder.RecordUnhealthy receives — so a
-	// host that damps flapping samples records it at once. It runs on the
-	// probe's goroutine and must not block.
-	OnSample func(HealthSample)
 }
 
 // enabled reports whether the configuration asks for a probe.
-func (h Health) enabled() bool { return h.OnSample != nil || h.Interval > 0 }
+func (h Health) enabled() bool { return h.Interval > 0 }
 
 // healthProbe is the node's probe: the last sample and the host's
-// callback, behind the bridge's HealthRecorder.
+// callbacks, behind the bridge's HealthRecorder.
 type healthProbe struct {
 	onSample func(HealthSample)
 	stop     func()
@@ -72,7 +66,7 @@ func (n *Node) startHealthProbe() {
 	if !h.enabled() {
 		return
 	}
-	p := &healthProbe{onSample: h.OnSample}
+	p := &healthProbe{onSample: func(s HealthSample) { n.healthListeners.emit(n.logger, "health_sample", s) }}
 	p.stop = bridge.StartHealthProbeWithClock(n.life, n.cfg.Clock, n.br, p, h.Interval)
 	n.healthMu.Lock()
 	n.health = p
@@ -89,6 +83,27 @@ func (n *Node) stopHealthProbe() {
 	if p != nil {
 		p.stop()
 	}
+}
+
+// OnHealthSample registers fn for every verdict of the health probe
+// ([Config].Health), the first at [Node.Start]. An unhealthy one (Healthy
+// false) is a condition the probe states, not a sample — what
+// bridge.HealthRecorder.RecordUnhealthy receives — so a host that damps
+// flapping samples records it at once. fn runs inline on the probe's
+// goroutine and must not block; [Node.OnHealthSampleAsync] queues it
+// instead. It returns the unsubscribe function (ADR 0025 principle 8).
+func (n *Node) OnHealthSample(fn func(HealthSample)) (unsubscribe func()) {
+	return n.healthListeners.add(fn)
+}
+
+// OnHealthSampleAsync is [Node.OnHealthSample] with fn queued on the
+// node's callback goroutine, one call after the other, while the node
+// runs; Stop returns once every queued call ran.
+func (n *Node) OnHealthSampleAsync(fn func(HealthSample)) (unsubscribe func()) {
+	if fn == nil {
+		return func() {}
+	}
+	return n.healthListeners.add(func(s HealthSample) { n.queued("health_sample", func() { fn(s) }) })
 }
 
 // Health returns the health probe's last verdict; false before the first

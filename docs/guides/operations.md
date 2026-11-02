@@ -121,8 +121,9 @@ PASE failures and lockouts for a dashboard.
 
 `node.Config.Health` runs the node's health probe from `Start` to `Stop`:
 every `Interval` (default 30 s) it checks that the operational UDP listener
-is bound and hands the verdict to `OnSample`; `Node.Health()` returns the
-last one. A liveness probe of the daemon asks `Node.Health()` and treats
+is bound and hands the verdict to the callbacks `Node.OnHealthSample`
+(inline) and `Node.OnHealthSampleAsync` (queued) registered;
+`Node.Health()` returns the last one. A liveness probe of the daemon asks `Node.Health()` and treats
 `Healthy == false`, or no sample at all with the probe configured, as
 failing. The zero value runs no probe.
 

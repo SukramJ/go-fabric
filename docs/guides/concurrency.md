@@ -117,9 +117,9 @@ command queue alike.
 **`node.Config.Observers`**, and the hooks `Node.Observe` registers after
 them, run synchronously on the event's goroutine. For
 fabric events, that is inside the command that caused the event, before
-its response is sent, so a blocking observer delays the response. Hand
-network work to your own goroutine. An observer's error or panic is logged
-and never returned.
+its response is sent, so a blocking observer delays the response.
+`Node.ObserveAsync` queues the same hooks on the node's callback
+goroutine instead. An observer returns nothing; its panic is logged.
 
 **`device.Device.OnChanged` callbacks** run on the server's own change
 notification, with the change's origin (`contract.Change.Origin`: the
