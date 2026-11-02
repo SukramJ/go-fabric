@@ -8,9 +8,11 @@ import (
 	"errors"
 	"log/slog"
 	"net"
+	"slices"
 	"time"
 
 	"github.com/SukramJ/go-fabric/contract"
+	endpointpkg "github.com/SukramJ/go-fabric/endpoint"
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/mdns"
 	"github.com/SukramJ/go-fabric/transport/message"
@@ -373,12 +375,17 @@ func (b *Bridge) tickOutboundReliable(outbound *outboundReliableTracker, now tim
 	results := outbound.Tick(now, func(dest net.Addr, datagram []byte) error {
 		return sendVia(listener, dest, datagram)
 	})
-	retransmitted := false
+	var retransmitted []uint8 // the distinct fabrics of the re-sent sessions
 	for _, r := range results {
 		if r.Err == nil {
 			// A retransmission sent.
 			b.count(contract.MetricMRPRetransmits)
-			retransmitted = retransmitted || r.SessionID != 0
+			if r.SessionID != 0 {
+				fabricIndex := b.resolveSessionFabric(r.SessionID)
+				if fabricIndex != 0 && fabricIndex != endpointpkg.FabricIndexUnresolvable && !slices.Contains(retransmitted, fabricIndex) {
+					retransmitted = append(retransmitted, fabricIndex)
+				}
+			}
 			continue
 		}
 		if errors.Is(r.Err, mrp.ErrMaxRetransmissionsReached) {
@@ -395,19 +402,21 @@ func (b *Bridge) tickOutboundReliable(outbound *outboundReliableTracker, now tim
 			slog.Int("counter", int(r.Counter)),
 			slog.Any("err", r.Err))
 	}
-	if retransmitted {
-		b.retransmissionBroadcast()
+	if len(retransmitted) > 0 {
+		b.retransmissionBroadcast(retransmitted)
 	}
 }
 
 // retransmissionBroadcast is matter.js's "retransmit" broadcast event: each
-// retransmission on a secure session triggers one broadcast of the
-// session's fabric's operational advertisement, unless it is broadcasting
-// already (DeviceAdvertiser.ts:164-172, MdnsAdvertiser.ts:234-242 at
-// 862ad75f). The tracker names the session, not its fabric, so every
-// operational service takes the event; an advertiser without it
-// (mdns.Noop, a custom Advertiser) is left alone.
-func (b *Bridge) retransmissionBroadcast() {
+// retransmission on a secure session with a fabric triggers one broadcast
+// of that fabric's operational advertisement, unless it is broadcasting
+// already (packages/protocol/src/protocol/DeviceAdvertiser.ts:164-172 at
+// 862ad75f, MdnsAdvertiser.ts:234-242 at 862ad75f). fabrics are the
+// distinct fabrics of one tick's re-sent sessions; each fabric's announced
+// service takes the event once, a fabric without one is skipped. An
+// advertiser without the event (mdns.Noop, a custom Advertiser) is left
+// alone.
+func (b *Bridge) retransmissionBroadcast(fabrics []uint8) {
 	b.mu.RLock()
 	advertiser := b.advertiser
 	b.mu.RUnlock()
@@ -415,10 +424,9 @@ func (b *Bridge) retransmissionBroadcast() {
 	if !ok {
 		return
 	}
-	active := advertiser.Active()
-	for i := range active {
-		if active[i].ServiceType == mdns.ServiceTypeOperational {
-			ev.ServiceRetransmission(active[i].InstanceName, active[i].ServiceType)
+	for _, fabricIndex := range fabrics {
+		if instance, ok := b.operationalInstanceFor(fabricIndex); ok {
+			ev.ServiceRetransmission(instance, mdns.ServiceTypeOperational)
 		}
 	}
 }

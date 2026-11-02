@@ -56,7 +56,7 @@ func TestWithdrawFabric_RemovesAnnouncedOperationalRecord(t *testing.T) {
 	compressedID := [8]byte{0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88}
 	nodeID := uint64(0x0102030405060708)
 
-	b.AnnounceFabric(ctx, compressedID, nodeID)
+	b.AnnounceFabric(ctx, 1, compressedID, nodeID)
 	svc := mdns.BuildOperationalService(mdns.OperationalServiceConfig{
 		CompressedFabricID: compressedID,
 		NodeID:             nodeID,
@@ -65,7 +65,7 @@ func TestWithdrawFabric_RemovesAnnouncedOperationalRecord(t *testing.T) {
 		t.Fatalf("AnnounceFabric: instance %q not found in Active() after publish", svc.InstanceName)
 	}
 
-	b.WithdrawFabric(ctx, compressedID, nodeID)
+	b.WithdrawFabric(ctx, 1, compressedID, nodeID)
 	if activeOperationalInstances(noop)[svc.InstanceName] {
 		t.Errorf("WithdrawFabric: instance %q still present in Active() after withdraw", svc.InstanceName)
 	}
@@ -98,5 +98,5 @@ func TestWithdrawFabric_NeverAnnounced_NoPanic(t *testing.T) {
 	})
 
 	// No AnnounceFabric call preceded this — must not panic.
-	b.WithdrawFabric(ctx, [8]byte{0xAA, 0xBB}, 0xDEADBEEF)
+	b.WithdrawFabric(ctx, 1, [8]byte{0xAA, 0xBB}, 0xDEADBEEF)
 }

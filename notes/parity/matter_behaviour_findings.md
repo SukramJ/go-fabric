@@ -383,16 +383,29 @@ Device side:. (Triage 2026-10-29: owner's hand test (manual test list C5), no wa
   `SuppressResponse = false`, wait for the status, end the subscription on
   INVALID_SUBSCRIPTION as `closeSubscriptionByExchange` already does for data
   reports. (Triage 2026-10-29: wave H1, the device IM and write path.)
-- **No "reconnect" broadcast when a subscription ends.** matter.js
-  starts the fabric's operational broadcast again when a subscription
-  terminates on an operational node (`DeviceAdvertiser.ts:174-179` at
-  `862ad75f`, `subscriptionsChanged` → `#advertiseFabric(fabric, "reconnect")`),
-  so a controller that lost its subscription rediscovers the node at once.
-  The node has no hook from `im/subscription` to the advertiser; only a
-  session teardown and an MRP retry reach `Responder.ServiceDisconnected`
-  / `ServiceRetransmission` (issue #362). Fix: an observer on the
-  subscription manager's termination that calls `ServiceDisconnected` for
-  the session's fabric.
+- **A "startup" advertisement is not turned into "retransmit" when the
+  fabric holds a subscription.** matter.js's `#advertiseFabric` converts a
+  "startup" event into "retransmit" — one broadcast instead of the full
+  schedule — when any session of the fabric holds a subscription, and
+  advertises nothing while the advertiser closes
+  (`DeviceAdvertiser.ts:356-380` at `862ad75f`). `bridge.Bridge.AnnounceFabric`
+  publishes the operational service, and the responder starts the full
+  "startup" schedule on every publish (`mdns/responder.go`, `Publish`);
+  `mdns.Advertiser.Publish` carries no event. Fix: an event on the publish
+  (or a `Publish` variant the bridge calls with "retransmit" when the
+  subscription manager holds a subscription of the fabric), with a parity
+  case for a restart that re-establishes subscriptions (issue #362).
+- **A closed PASE session does not resume the commissionable broadcast on
+  the responder.** matter.js's `sessions.deleted` observer restarts the
+  commissioning advertisement with "startup" when a PASE session closes
+  while the node is in commissioning mode (`DeviceAdvertiser.ts:152-161`,
+  `:248-260` at `862ad75f`). The operational manager fires its reannounce
+  trigger with fabric index 0 for a PASE victim; on an advertiser with the
+  broadcast events (`mdns.Responder`) the bridge starts no event for it
+  (`bridge/securechannel.go`, `triggerSessionReannounce`), and only the
+  `TriggerReannounce` and per-record fallbacks re-announce the
+  commissionable record. Fix: on index 0, start the responder's
+  "startup" schedule for the active commissionable service (issue #362).
 - **A subscription that ends while the node runs stays persisted.**
   `im/subscription/manager.go` (`Manager.Release`, `finishClose`) keeps the former matter.js line: closed
   on session close = not terminated = re-established after a restart.

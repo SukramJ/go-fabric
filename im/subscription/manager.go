@@ -142,7 +142,7 @@ type Manager struct {
 	onSessionChanged func(sessionID uint16)
 	// onTerminated observes the subset of closes that end a subscription
 	// for good — see [Manager.SetOnSubscriptionTerminated].
-	onTerminated func(subID uint32)
+	onTerminated func(subID uint32, fabricIndex uint8)
 
 	startOnce sync.Once
 	stopOnce  sync.Once
@@ -215,8 +215,15 @@ func (m *Manager) SetOnSubscriptionClosed(fn func(subID uint32)) {
 // SubscriptionsServer.#subscriptionCancelled
 // (packages/node/src/behavior/system/subscriptions/SubscriptionsServer.ts)
 // keys persistence on: a terminated subscription is forgotten, a closed
-// one is re-established after a restart. Pass nil to detach.
-func (m *Manager) SetOnSubscriptionTerminated(fn func(subID uint32)) {
+// one is re-established after a restart.
+//
+// The second argument is the subscription's accessing fabric
+// ([Subscription.FabricIndex]). The host starts that fabric's
+// "reconnect" broadcast with it, as matter.js's subscriptionsChanged
+// observer does when the subscription isTerminated
+// (packages/protocol/src/protocol/DeviceAdvertiser.ts:174-179 at
+// 862ad75f). Pass nil to detach.
+func (m *Manager) SetOnSubscriptionTerminated(fn func(subID uint32, fabricIndex uint8)) {
 	m.mu.Lock()
 	m.onTerminated = fn
 	m.mu.Unlock()
@@ -251,7 +258,7 @@ func (m *Manager) finishClose(victims []*Subscription, terminated bool) {
 			hook(sub.ID)
 		}
 		if terminated && termHook != nil {
-			termHook(sub.ID)
+			termHook(sub.ID, sub.FabricIndex)
 		}
 		if changed != nil {
 			changed(sub.SessionID)

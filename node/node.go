@@ -508,7 +508,7 @@ func (n *Node) fabricInstalled(ctx context.Context, fabricIndex uint8, _, _ uint
 		n.logger.Warn("case.identity.announce_skipped", slog.Int("fabric_index", int(fabricIndex)))
 		return
 	}
-	n.br.AnnounceFabric(ctx, compressedID, nodeID)
+	n.br.AnnounceFabric(ctx, fabricIndex, compressedID, nodeID)
 }
 
 // fabricRemoved is OperationalCredentials' OnFabricRemoved
@@ -521,7 +521,7 @@ func (n *Node) fabricRemoved(ctx context.Context, fabricIndex uint8) {
 		n.root.OTARequestor.FabricRemoved(fabricIndex)
 	}
 	if compressedID, nodeID, ok := n.caseIDs.forget(fabricIndex); ok {
-		n.br.WithdrawFabric(ctx, compressedID, nodeID)
+		n.br.WithdrawFabric(ctx, fabricIndex, compressedID, nodeID)
 	}
 	n.br.EmitFabricRemovedContext(ctx, fabricIndex)
 	// The removed fabric's fabric-sensitive events leave the log
@@ -608,9 +608,9 @@ func (n *Node) fabricUpdated(ctx context.Context, fabricIndex uint8) {
 	}
 	if newCompressed, newNode, ok := n.caseIDs.announceIdentity(fabricIndex); ok && (!hadOld || newCompressed != oldCompressed || newNode != oldNode) {
 		if hadOld {
-			n.br.WithdrawFabric(ctx, oldCompressed, oldNode)
+			n.br.WithdrawFabric(ctx, fabricIndex, oldCompressed, oldNode)
 		}
-		n.br.AnnounceFabric(ctx, newCompressed, newNode)
+		n.br.AnnounceFabric(ctx, fabricIndex, newCompressed, newNode)
 	}
 	n.br.CloseFabricSessionsAfterUpdate(ctx, fabricIndex)
 }
@@ -827,7 +827,7 @@ func (n *Node) startLocked(ctx context.Context) error {
 		}
 	}
 	for _, fabric := range loaded {
-		n.br.AnnounceFabric(ctx, fabric.CompressedID, fabric.NodeID)
+		n.br.AnnounceFabric(ctx, fabric.FabricIndex, fabric.CompressedID, fabric.NodeID)
 	}
 	n.startICD(ctx)
 	// The Binding servers register their entries once the node is online

@@ -45,7 +45,7 @@ func TestStopWaitsForTheSessionReannounce(t *testing.T) {
 	if err := b.Start(ctx); err != nil {
 		t.Fatal(err)
 	}
-	b.triggerSessionReannounce()
+	b.triggerSessionReannounce(1)
 	<-adv.entered
 	if err := b.Stop(ctx); err != nil {
 		t.Fatal(err)
@@ -53,5 +53,5 @@ func TestStopWaitsForTheSessionReannounce(t *testing.T) {
 	if !adv.returned.Load() {
 		t.Fatal("Stop returned while the session re-announce still ran")
 	}
-	b.triggerSessionReannounce() // stopped: starts nothing
+	b.triggerSessionReannounce(1) // stopped: starts nothing
 }

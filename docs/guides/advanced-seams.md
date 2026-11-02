@@ -175,11 +175,12 @@ machine, a test spy — sets `Config.Advertiser`.
 discriminator need), the broadcast schedule, the clock the node hands it,
 the end of the operational broadcast at a CASE connection and the on-demand
 announcement work only if the host's advertiser provides them (`SetClock`,
-`ServiceConnected`, `TriggerReannounce`; the bridge's session-teardown and
-retransmission events take `ServiceDisconnected` and
-`ServiceRetransmission`). `Node.Stop` closes it either way.
+`ServiceConnected`, `TriggerReannounce`; the bridge's session-teardown,
+subscription-end and retransmission events take `ServiceDisconnected` and
+`ServiceRetransmission`, for the session's fabric's operational service
+only). `Node.Stop` closes it either way.
 
-*Source: `node/mdns.go`, `node/node.go` (`New`: `SetClock`), `node/reannounce.go`, `mdns/advertiser.go`, `mdns/responder.go` (`NewResponder`, `ServiceConnected`), `bridge/securechannel.go` (`triggerSessionReannounce`), `bridge/ackpump.go` (`retransmissionBroadcast`).*
+*Source: `node/mdns.go`, `node/node.go` (`New`: `SetClock`), `node/reannounce.go`, `mdns/advertiser.go`, `mdns/responder.go` (`NewResponder`, `ServiceConnected`), `bridge/securechannel.go` (`triggerSessionReannounce`), `bridge/ackpump.go` (`retransmissionBroadcast`), `bridge/subscribe.go` (`AttachSubscriptionManager`).*
 
 ## `secure/…`
 

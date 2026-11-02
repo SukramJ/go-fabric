@@ -71,19 +71,25 @@ type Manager struct {
 	// consequence of a command the peer itself issued.
 	onGracefulClose func(sessionID uint16, sess *channel.Session)
 
-	// onReannounce, when non-nil, fires once per teardown sweep when at
-	// least one closed session's (fabric, peer) pair has no remaining
-	// live session — the peer is fully disconnected and mDNS broadcast
-	// should resume so the controller can rediscover + re-CASE the
-	// bridge instead of showing it unresponsive. Mirrors matter.js
-	// packages/protocol/src/protocol/DeviceAdvertiser.ts:132-149
-	// (sessions.deleted → skip when `fabric.hasSessionForPeer(...)`,
-	// otherwise `ad.serviceDisconnected()` resumes broadcasting). Not
+	// onReannounce, when non-nil, fires once per distinct (fabric, peer)
+	// pair of a teardown sweep that has no remaining live session, with
+	// that pair's fabric index — the peer is fully disconnected and the
+	// fabric's operational mDNS broadcast should resume so the controller
+	// can rediscover + re-CASE the bridge instead of showing it
+	// unresponsive. A PASE victim has no fabric and fires index 0: the
+	// receiver advertises no operational service for it (matter.js
+	// resumes the commissionable advertisement there instead,
+	// DeviceAdvertiser.ts:152-161). Mirrors matter.js
+	// packages/protocol/src/protocol/DeviceAdvertiser.ts:131-150 at
+	// 862ad75f (sessions.deleted, per deleted session: skip when
+	// `fabric.hasSessionForPeer(...)`, Fabric.ts:414-420, otherwise
+	// `advertisementForFabric(fabric).serviceDisconnected()` for that
+	// fabric only, Advertiser.ts:69-75). Not
 	// fired by [Manager.CloseAllGraceful]: matter.js kicks off the
 	// advertiser shutdown before removing sessions precisely to prevent
 	// re-announces during teardown (packages/node/src/behavior/system/
 	// network/ServerNetworkRuntime.ts:427).
-	onReannounce func()
+	onReannounce func(fabricIndex uint8)
 }
 
 // SetGracefulCloseNotifier registers the wire-layer callback invoked
@@ -99,12 +105,13 @@ func (m *Manager) SetGracefulCloseNotifier(fn func(sessionID uint16, sess *chann
 	m.mu.Unlock()
 }
 
-// SetReannounceTrigger registers the callback fired after a teardown
-// sweep leaves a peer with zero live sessions — see the
-// [Manager.onReannounce] field docs. Passing nil clears the hook. The
-// callback runs outside the manager's lock; implementations should be
-// non-blocking (fire-and-forget into the mDNS layer).
-func (m *Manager) SetReannounceTrigger(fn func()) {
+// SetReannounceTrigger registers the callback fired, with the fabric
+// index, after a teardown sweep leaves a (fabric, peer) pair with zero
+// live sessions — see the [Manager.onReannounce] field docs. Passing
+// nil clears the hook. The callback runs outside the manager's lock;
+// implementations should be non-blocking (fire-and-forget into the
+// mDNS layer).
+func (m *Manager) SetReannounceTrigger(fn func(fabricIndex uint8)) {
 	m.mu.Lock()
 	m.onReannounce = fn
 	m.mu.Unlock()
@@ -156,11 +163,14 @@ func (m *Manager) hasSessionForPeer(fabricIndex uint8, peerNodeID uint64) bool {
 	return false
 }
 
-// fireReannounceIfPeerGone fires the reannounce trigger once when at
-// least one victim's peer has no remaining live session. Called after
-// the victims are removed from the table, so a same-peer replacement
-// session installed by a CASE re-establishment naturally suppresses
-// the trigger — matter.js semantics (DeviceAdvertiser.ts:132-149).
+// fireReannounceIfPeerGone fires the reannounce trigger once per
+// distinct (fabric, peer) pair among the victims that has no remaining
+// live session, passing the pair's fabric index (0 for a PASE victim,
+// which has no fabric). Called after the victims are removed from the
+// table, so a same-peer replacement session installed by a CASE
+// re-establishment naturally suppresses the trigger. Mirrors
+// matter.js packages/protocol/src/protocol/DeviceAdvertiser.ts:131-150
+// at 862ad75f, which runs the check per deleted session.
 func (m *Manager) fireReannounceIfPeerGone(victims []*Entry) {
 	m.mu.RLock()
 	hook := m.onReannounce
@@ -168,14 +178,25 @@ func (m *Manager) fireReannounceIfPeerGone(victims []*Entry) {
 	if hook == nil {
 		return
 	}
+	type fabricPeer struct {
+		fabricIndex uint8
+		peerNodeID  uint64
+	}
+	var gone []fabricPeer
 	for _, e := range victims {
 		if e == nil || e.Session == nil {
 			continue
 		}
-		if !m.hasSessionForPeer(e.FabricIndex(), e.Session.PeerNodeID()) {
-			hook()
-			return
+		p := fabricPeer{e.FabricIndex(), e.Session.PeerNodeID()}
+		if slices.Contains(gone, p) {
+			continue
 		}
+		if !m.hasSessionForPeer(p.fabricIndex, p.peerNodeID) {
+			gone = append(gone, p)
+		}
+	}
+	for _, p := range gone {
+		hook(p.fabricIndex)
 	}
 }
 

@@ -1008,10 +1008,12 @@ type gracefulCloseNotifierSetter interface {
 
 // reannounceTriggerSetter is the optional capability a
 // [SessionRegistry] implements to receive the bridge's mDNS
-// broadcast-resume trigger, fired after a reap / eviction leaves a
-// peer with zero live sessions (matter.js DeviceAdvertiser.ts:132-149).
+// broadcast-resume trigger, fired with the fabric index after a reap /
+// eviction leaves a (fabric, peer) pair with zero live sessions
+// (matter.js packages/protocol/src/protocol/DeviceAdvertiser.ts:131-150
+// at 862ad75f).
 type reannounceTriggerSetter interface {
-	SetReannounceTrigger(fn func())
+	SetReannounceTrigger(fn func(fabricIndex uint8))
 }
 
 // AttachSessionRegistry wires the operational session manager into the
@@ -1302,16 +1304,24 @@ type serviceRetransmitter interface {
 	ServiceRetransmission(instanceName, serviceType string)
 }
 
-// triggerSessionReannounce resumes mDNS broadcast after a session
-// teardown left a peer with zero live sessions, so the controller
-// rediscovers the bridge and re-establishes CASE instead of showing it
-// unresponsive. Mirrors matter.js DeviceAdvertiser.ts:131-150 at 862ad75f
-// (sessions.deleted → serviceDisconnected, which starts the "reconnect"
-// broadcast event, MdnsAdvertisement.ts:132-134): an advertiser with
-// ServiceDisconnected (mdns.Responder) runs its broadcast schedule again
-// for the operational services. The trigger names no fabric
-// (operational.Manager.SetReannounceTrigger), so every operational
-// service is resumed where matter.js resumes the peer's fabric's.
+// triggerSessionReannounce resumes mDNS broadcast for fabricIndex after
+// a session teardown left a peer of that fabric with zero live sessions,
+// so the controller rediscovers the bridge and re-establishes CASE
+// instead of showing it unresponsive. Mirrors matter.js
+// packages/protocol/src/protocol/DeviceAdvertiser.ts:131-150 at 862ad75f
+// (sessions.deleted → advertisementForFabric(fabric).serviceDisconnected(),
+// Advertiser.ts:69-75, which starts the "reconnect" broadcast event,
+// MdnsAdvertisement.ts:132-134; a running schedule is not reset,
+// Advertisement.ts:78-91): an advertiser with ServiceDisconnected
+// (mdns.Responder) runs the broadcast schedule again for that fabric's
+// operational service only. Index 0 (a PASE session, no fabric) and a
+// fabric without an announced service reach no service there. An
+// advertiser without the events re-announces every active record as
+// before — the commissionable one among them, which for a PASE session
+// stands in for matter.js's commissioning re-advertisement
+// (DeviceAdvertiser.ts:152-161). A terminated subscription takes the same
+// path for its fabric (DeviceAdvertiser.ts:174-179; see
+// [Bridge.AttachSubscriptionManager]).
 //
 // The republish runs on its own goroutine bounded by the advertise
 // timeout, because the trigger fires from the reaper / receive paths
@@ -1321,19 +1331,22 @@ type serviceRetransmitter interface {
 // stopped — matter.js shuts the advertiser down before removing
 // sessions to prevent exactly this re-announce
 // (ServerNetworkRuntime.ts:427).
-func (b *Bridge) triggerSessionReannounce() {
+func (b *Bridge) triggerSessionReannounce(fabricIndex uint8) {
+	instance, scoped := b.operationalInstanceFor(fabricIndex)
 	b.mu.RLock()
 	started := b.started
 	advertiser := b.advertiser
 	timeout := b.cfg.AdvertiseTimeout
 	base := b.handlerCtx
-	if started && advertiser != nil {
+	_, events := advertiser.(serviceDisconnecter)
+	run := started && advertiser != nil && (scoped || !events)
+	if run {
 		// Added under mu while started: Stop's Wait follows its
 		// started=false under the write lock, so no Add races it.
 		b.reannounces.Add(1)
 	}
 	b.mu.RUnlock()
-	if !started || advertiser == nil {
+	if !run {
 		return
 	}
 	if base == nil {
@@ -1349,12 +1362,7 @@ func (b *Bridge) triggerSessionReannounce() {
 		// [mdns.Advertiser] contract defines as a re-announce.
 		switch ev := advertiser.(type) {
 		case serviceDisconnecter:
-			active := advertiser.Active()
-			for i := range active {
-				if active[i].ServiceType == mdns.ServiceTypeOperational {
-					ev.ServiceDisconnected(active[i].InstanceName, active[i].ServiceType)
-				}
-			}
+			ev.ServiceDisconnected(instance, mdns.ServiceTypeOperational)
 		case interface{ TriggerReannounce(context.Context) }:
 			ev.TriggerReannounce(ctx)
 		default:
@@ -1376,7 +1384,7 @@ func (b *Bridge) triggerSessionReannounce() {
 	b.diagRing().Record(diagevent.Event{
 		Kind:     diagevent.KindDiscovery,
 		Severity: diagevent.SeverityInfo,
-		Message:  "The bridge re-announced itself on the network after a controller's last session ended.",
+		Message:  "The bridge re-announced itself on the network after a controller's last session or a subscription ended.",
 	})
 }
 

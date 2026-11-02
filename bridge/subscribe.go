@@ -112,8 +112,21 @@ func (b *Bridge) AttachSubscriptionManager(m *subscription.Manager) {
 		})
 		// A terminated subscription is forgotten; one closed with its
 		// session stays recorded for re-establishment after a restart
-		// (matter.js SubscriptionsServer.#subscriptionCancelled).
-		m.SetOnSubscriptionTerminated(b.forgetPersistedSubscription)
+		// (matter.js SubscriptionsServer.#subscriptionCancelled). It
+		// also starts its fabric's "reconnect" broadcast so the
+		// controller finds the bridge again: matter.js
+		// packages/protocol/src/protocol/DeviceAdvertiser.ts:174-179 at
+		// 862ad75f (subscriptionsChanged: operational, isTerminated and a
+		// fabric → #advertiseFabric(session.fabric, "reconnect"), whose
+		// Advertiser.advertise starts the fabric's advertisement,
+		// Advertiser.ts:32-43, without resetting a running schedule,
+		// Advertisement.ts:78-91). The session-teardown path carries it,
+		// so a stopping bridge starts nothing; a fabric being removed
+		// has no announced service left and starts nothing either.
+		m.SetOnSubscriptionTerminated(func(subID uint32, fabricIndex uint8) {
+			b.forgetPersistedSubscription(subID)
+			b.triggerSessionReannounce(fabricIndex)
+		})
 		// A subscription owes events as a number; its report reads
 		// them from the bridge's log (matter.js ServerSubscription.ts
 		// :541-542 reads the occurrence store at send time).

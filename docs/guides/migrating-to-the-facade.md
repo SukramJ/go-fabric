@@ -81,6 +81,9 @@ schedule instead of a periodic re-announce loop.
 | `mdns.NewSubtypeResponder`, `mdns.SubtypeResponder`, `Zeroconf.AttachSubtypeResponder` | drop them: the responder publishes and answers the subtype records itself |
 | `node.Network.Reannounce` (`Interval`, `Off`), `node.Reannounce`, `node.DefaultReannounceInterval` | drop them: the responder announces on matter.js's broadcast schedule (1 s doubling to 90 s, until a CASE connection or two days) |
 | `mdns.Reannouncer`, `Zeroconf.StartReannounceLoop` | drop them; `Node.TriggerReannounce(ctx)` and `Responder.TriggerReannounce(ctx)` stay, one announcement of every service now |
+| `bridge.Bridge.AnnounceFabric(ctx, compressedFabricID, nodeID)`, `bridge.Bridge.WithdrawFabric(ctx, compressedFabricID, nodeID)` | `AnnounceFabric(ctx, fabricIndex, compressedFabricID, nodeID)`, `WithdrawFabric(ctx, fabricIndex, compressedFabricID, nodeID)`: the fabric the identity belongs to, so the broadcast events reach its service only |
+| `operational.Manager.SetReannounceTrigger(func())` | `SetReannounceTrigger(func(fabricIndex uint8))`: fired once per (fabric, peer) pair a sweep leaves without a session, 0 for a PASE session |
+| `subscription.Manager.SetOnSubscriptionTerminated(func(subID uint32))` | `SetOnSubscriptionTerminated(func(subID uint32, fabricIndex uint8))`: the subscription's fabric |
 
 ## Changed in the next release: `CommissionerReach` takes the peer
 

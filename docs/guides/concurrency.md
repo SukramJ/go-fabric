@@ -21,7 +21,7 @@ gate for these paths.
 | PASE and CASE handler reapers | `Node.Start` | sweep every minute; evict handlers idle for 30 s | `Node.Stop` |
 | Operational-time keeper | `Node.Start` | every minute | `Node.Stop` (and waited for) |
 | DNS-SD broadcast schedule | the first `Publish` of the node's `mdns.Responder` (timers, no goroutine; the two receive loops start with the sockets) | 1 s doubling to 90 s, until a CASE connection or two days | `Node.Stop` (the advertiser's `Close`) |
-| Session-triggered re-announce | a session event | once, bounded by the advertise timeout | `bridge.Stop` (cancelled and waited for) |
+| Session-triggered re-announce | a session teardown or a terminated subscription | once, bounded by the advertise timeout | `bridge.Stop` (cancelled and waited for) |
 | BDX transfer | a peer's BDX init on a secure session | one per exchange | `bridge.Stop` (cancelled and waited for, bounded by its context) |
 | BDX log transfer | a RetrieveLogsRequest answered over BDX | one at a time | `bridge.Stop` (DiagnosticLogs' `MatterQuiesce` cancels it and waits) |
 | Binding manager | the first binding work (`Node.Start` registers the entries) | on change | `Node.Stop` |

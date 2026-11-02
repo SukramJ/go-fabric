@@ -134,15 +134,18 @@ func TestRestore_Refusals(t *testing.T) {
 	}
 }
 
-// terminationRecorder counts the terminated hook per subscription id.
+// terminationRecorder counts the terminated hook per subscription id
+// and records the fabric index each call carried.
 type terminationRecorder struct {
-	mu  sync.Mutex
-	ids []uint32
+	mu      sync.Mutex
+	ids     []uint32
+	fabrics []uint8
 }
 
-func (r *terminationRecorder) record(id uint32) {
+func (r *terminationRecorder) record(id uint32, fabricIndex uint8) {
 	r.mu.Lock()
 	r.ids = append(r.ids, id)
+	r.fabrics = append(r.fabrics, fabricIndex)
 	r.mu.Unlock()
 }
 
@@ -205,6 +208,13 @@ func TestTerminatedHook_SeparatesTerminationFromClose(t *testing.T) {
 			}
 			if got := rec.count(); got != want {
 				t.Fatalf("terminated hook fired %d times, want %d", got, want)
+			}
+			rec.mu.Lock()
+			defer rec.mu.Unlock()
+			for _, f := range rec.fabrics {
+				if f != 1 {
+					t.Errorf("terminated hook carried fabric %d, want the subscription's fabric 1", f)
+				}
 			}
 		})
 	}

@@ -23,6 +23,7 @@ package operational
 // directly via reapIdle.
 
 import (
+	"slices"
 	"sync"
 	"testing"
 	"time"
@@ -40,6 +41,7 @@ type closeRecorder struct {
 	encryptOK  []bool   // whether the session could still encrypt inside the notifier
 	closed     []uint16 // sessionIDs passed to the onSessionClose hook
 	reannounce int
+	fabrics    []uint8 // fabric index of every reannounce-trigger invocation
 }
 
 // wire installs all three hooks on m.
@@ -56,9 +58,10 @@ func (r *closeRecorder) wire(m *Manager) {
 		r.closed = append(r.closed, sessionID)
 		r.mu.Unlock()
 	})
-	m.SetReannounceTrigger(func() {
+	m.SetReannounceTrigger(func(fabricIndex uint8) {
 		r.mu.Lock()
 		r.reannounce++
+		r.fabrics = append(r.fabrics, fabricIndex)
 		r.mu.Unlock()
 	})
 }
@@ -70,6 +73,12 @@ func (r *closeRecorder) snapshot() (graceful, closed []uint16, encryptOK []bool,
 		append([]uint16(nil), r.closed...),
 		append([]bool(nil), r.encryptOK...),
 		r.reannounce
+}
+
+func (r *closeRecorder) reannouncedFabrics() []uint8 {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return append([]uint8(nil), r.fabrics...)
 }
 
 func closeParityKeys(seed byte) sigma.SessionKeys {
@@ -253,6 +262,47 @@ func TestClosePeer_NotifiesAndResumesBroadcast(t *testing.T) {
 	}
 	if reannounce != 1 {
 		t.Errorf("reannounce fired %d times, want 1", reannounce)
+	}
+	if got := rec.reannouncedFabrics(); len(got) != 1 || got[0] != 3 {
+		t.Errorf("reannounce fabrics = %v, want [3] — the closed session's fabric", got)
+	}
+}
+
+// TestReapIdle_ReannouncePerFabricPeerPair verifies the trigger fires
+// once per (fabric, peer) pair the sweep leaves without a session, with
+// that pair's fabric: matter.js runs the sessions.deleted check per
+// deleted session and resumes only the session's fabric's advertisement
+// (packages/protocol/src/protocol/DeviceAdvertiser.ts:131-150 at
+// 862ad75f). Two fabrics losing their peer in one sweep fire twice, one
+// each; two sessions of one pair fire once.
+func TestReapIdle_ReannouncePerFabricPeerPair(t *testing.T) {
+	t.Parallel()
+	m := NewManager(newMinimalFakeStore())
+	rec := &closeRecorder{}
+	rec.wire(m)
+
+	opened := make([]*Entry, 0, 3)
+	for i, fabricIndex := range []uint8{1, 2, 2} {
+		e, err := m.OpenFromSigma(fabricIndex, 0xB0B, 0xA11, closeParityKeys(byte(i)))
+		if err != nil {
+			t.Fatalf("OpenFromSigma (fabric %d): %v", fabricIndex, err)
+		}
+		opened = append(opened, e)
+	}
+	for _, e := range opened {
+		e.MarkActiveRx()
+	}
+	time.Sleep(2 * time.Millisecond)
+
+	m.reapIdle(time.Millisecond)
+
+	got := rec.reannouncedFabrics()
+	slices.Sort(got)
+	if !slices.Equal(got, []uint8{1, 2}) {
+		t.Errorf("reannounce fabrics = %v, want [1 2] — one trigger per fabric whose peer is gone", got)
+	}
+	if n := m.Active(); n != 0 {
+		t.Errorf("Active() = %d, want 0 after reap", n)
 	}
 }
 

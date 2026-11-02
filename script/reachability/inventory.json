@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 7196,
+  "entry_points": 7200,
   "entry_packages": [
     ".",
     "bdx",
@@ -276,9 +276,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 17032,
+    "total_exported": 17036,
     "reachable": 12020,
-    "whitelisted": 5012,
+    "whitelisted": 5016,
     "unreachable": 0
   },
   "by_package": [],
@@ -3800,6 +3800,13 @@
     },
     {
       "package": "bridge",
+      "identifier": "TestOperationalInstanceFor_TracksEachFabricsService",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/operational_by_fabric_test.go",
+      "line": 20
+    },
+    {
+      "package": "bridge",
       "identifier": "TestOperationalRecordCarriesSessionIntervals",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/advertised_intervals_test.go",
@@ -5326,6 +5333,13 @@
     },
     {
       "package": "bridge",
+      "identifier": "TestSubscriptionTerminated_StartsTheFabricsReconnect",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/subscription_end_reconnect_test.go",
+      "line": 38
+    },
+    {
+      "package": "bridge",
       "identifier": "TestSubscription_AutoCloseOnMaxRetries",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/outbound_reliable_test.go",
@@ -5438,6 +5452,13 @@
     },
     {
       "package": "bridge",
+      "identifier": "TestTickOutboundReliable_RetransmitEvent",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/securechannel_close_parity_test.go",
+      "line": 660
+    },
+    {
+      "package": "bridge",
       "identifier": "TestTimedRequest_SessionScopeIsolation",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/receive_test.go",
@@ -5448,7 +5469,7 @@
       "identifier": "TestTriggerSessionReannounce_ReconnectEvent",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/securechannel_close_parity_test.go",
-      "line": 604
+      "line": 636
     },
     {
       "package": "bridge",
@@ -29199,7 +29220,7 @@
       "identifier": "TestTerminatedHook_SeparatesTerminationFromClose",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/subscription/persistence_test.go",
-      "line": 158
+      "line": 161
     },
     {
       "package": "im/subscription",
@@ -31250,42 +31271,42 @@
       "identifier": "TestCloseAllGraceful_DeadlinePastSkipsNotifications",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/operational/manager_close_parity_test.go",
-      "line": 352
+      "line": 402
     },
     {
       "package": "secure/operational",
       "identifier": "TestCloseAllGraceful_NotifiesEveryPeerWithoutReannounce",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/operational/manager_close_parity_test.go",
-      "line": 298
+      "line": 348
     },
     {
       "package": "secure/operational",
       "identifier": "TestClosePeerLost_ForceClosesWithoutCloseSession",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/operational/manager_close_parity_test.go",
-      "line": 388
+      "line": 438
     },
     {
       "package": "secure/operational",
       "identifier": "TestClosePeer_NotifiesAndResumesBroadcast",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/operational/manager_close_parity_test.go",
-      "line": 233
+      "line": 242
     },
     {
       "package": "secure/operational",
       "identifier": "TestClose_PeerInitiated_DoesNotEchoGracefulClose",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/operational/manager_close_parity_test.go",
-      "line": 265
+      "line": 315
     },
     {
       "package": "secure/operational",
       "identifier": "TestDeviceAdvertiserSessionDeletedHandler",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/operational/reannounce_parity_matterjs_test.go",
-      "line": 22
+      "line": 23
     },
     {
       "package": "secure/operational",
@@ -31341,7 +31362,7 @@
       "identifier": "TestPeerCapEviction_ForceClosesWithoutCloseSessionOrReannounce",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/operational/manager_close_parity_test.go",
-      "line": 173
+      "line": 182
     },
     {
       "package": "secure/operational",
@@ -31355,14 +31376,21 @@
       "identifier": "TestReapIdle_NotifiesPeerBeforeKeyZeroise",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/operational/manager_close_parity_test.go",
-      "line": 91
+      "line": 100
+    },
+    {
+      "package": "secure/operational",
+      "identifier": "TestReapIdle_ReannouncePerFabricPeerPair",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/operational/manager_close_parity_test.go",
+      "line": 278
     },
     {
       "package": "secure/operational",
       "identifier": "TestReapIdle_ReannounceSkippedWhilePeerKeepsAnotherSession",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/operational/manager_close_parity_test.go",
-      "line": 131
+      "line": 140
     },
     {
       "package": "secure/operational",
