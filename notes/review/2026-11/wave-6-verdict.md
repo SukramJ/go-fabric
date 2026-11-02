@@ -47,7 +47,7 @@ Theme files: `wave-6-test.md` (Opus, done), `wave-6-reg.md` (Opus, done; 926 reg
 | W6-reg-01, W6-reg-02 | — (PR 1) | |
 | W6-reg-03, -04, -05, -06, -15, -16 | f7f208b1 | sixteen by_design entries retired (Retired entries table), two audit rows resolved, seven entries rewritten to their residue, the TimeSync row per the owner decision, the detached paragraph moved |
 | W6-reg-07 | 0135d864 | the unicast reply carries no P bit; the unreachable outbound masking removed |
-| W6-reg-08 | — | the reviewer's (security server) |
+| W6-reg-08 | e19e6467 | RemoveFabric withdraws the removed fabric's operational record and republishes nothing else (matter.js `DeviceAdvertiser.ts:109-111`); `OpcredsConfig.OnMDNSReannounce` removed (CHANGELOG Changed, migration line); `TestRemoveFabric_WithdrawsTheRemovedFabricOnly`; the file's drifted citations fixed, drift ratchet 250 |
 | W6-reg-09, W6-reg-10 | b9967fd5 | findings register: four fixed bullets removed, the wording and drifted lines |
 | W6-reg-11 | bb167e70 | pin-lifts: the five verdicts, 39 Ahead rows, the TEVT row |
 | W6-reg-12 | d2504e48 | by_design refresh from the four maps, every matter.js line re-read at 862ad75f |

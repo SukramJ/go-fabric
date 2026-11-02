@@ -81,4 +81,4 @@ What stayed open, per wave (the verdict files have the detail):
 | W3 | notes W3-clusec-09/10, clucore-06/07/09/12/13, clugen-04/05/06/09/10, club1-09/10, clua2-04 |
 | W4 | parity notes W4-ctlnet-07, W4-ctlsec-08; W4-ctlsec-03 (DAC/PAI notAfter) stays with matter.js |
 | W5 | W5-ex-10 (three facade gaps the reference bridge still reaches below the facade for), W5-ex-07 (a group/bind provisioning helper as a facade candidate) |
-| W6 | notes W6-test-14, -15, -17; the four chip cases item 1 excluded (none a module defect); 251 citation drifts on their ratchet; W6-reg-08 is the reviewer's |
+| W6 | notes W6-test-14, -15, -17; the four chip cases item 1 excluded (none a module defect); 250 citation drifts on their ratchet |
