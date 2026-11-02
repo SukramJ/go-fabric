@@ -377,6 +377,13 @@ type Bridge struct {
 	topology   *endpoint.Topology
 	dispatcher *endpoint.TopologyDispatcher
 
+	// operationalByFabric maps a fabric index to the instance name of the
+	// operational `_matter._tcp` service [Bridge.AnnounceFabric] published
+	// for it, so the broadcast events reach the session's fabric only
+	// (matter.js packages/protocol/src/advertisement/Advertiser.ts:69-75 at
+	// 862ad75f, advertisementForFabric). Guarded by mu.
+	operationalByFabric map[uint8]string
+
 	// rootClusters carry the cluster servers the daemon attached to
 	// endpoint 0 (BasicInformation, GeneralCommissioning, …). Held on
 	// the bridge so [Bridge.Reassemble] can re-stamp them onto each
@@ -1798,6 +1805,9 @@ func (b *Bridge) Stop(ctx context.Context) error {
 	// don't block teardown — an mDNS that cannot be reached on shutdown
 	// is no worse than one that was never published.
 	if b.advertiser != nil {
+		b.mu.Lock()
+		b.operationalByFabric = nil
+		b.mu.Unlock()
 		active := b.advertiser.Active()
 		for i := range active {
 			svc := &active[i]
@@ -2033,10 +2043,15 @@ func (b *Bridge) publishOperationalRecord(ctx context.Context) error { //nolint:
 // the bridge to its post-commissioning Matter identity (chip-tool's
 // `FindOperationalForStayActive` queries `<compressed>-<node>._matter._tcp.local`).
 //
+// fabricIndex is the fabric the identity belongs to: the bridge records
+// the published instance under it, and the "reconnect" and
+// "retransmit" broadcast events of a session on that fabric reach this
+// instance only.
+//
 // Idempotent — calling with the same values overwrites the prior
 // publish. Errors fall back to a debug log; the advertiser itself
 // reports its failure modes.
-func (b *Bridge) AnnounceFabric(ctx context.Context, compressedFabricID [8]byte, nodeID uint64) {
+func (b *Bridge) AnnounceFabric(ctx context.Context, fabricIndex uint8, compressedFabricID [8]byte, nodeID uint64) {
 	if b.advertiser == nil {
 		return
 	}
@@ -2077,6 +2092,7 @@ func (b *Bridge) AnnounceFabric(ctx context.Context, compressedFabricID [8]byte,
 			slog.Any("err", err))
 		return
 	}
+	b.setOperationalInstance(fabricIndex, svc.InstanceName)
 	if b.advertiserIsNoop() {
 		b.logger.Warn("matter.mdns.fabric_not_advertised",
 			slog.String("instance", svc.InstanceName),
@@ -2095,8 +2111,10 @@ func (b *Bridge) AnnounceFabric(ctx context.Context, compressedFabricID [8]byte,
 // <compressedID>-<nodeID> instance keeps answering until its TTL and
 // commissioners resolve an identity that no longer exists. Mirrors
 // matter.js DeviceAdvertiser.ts:76-86 (close the fabric's
-// advertisements on update/delete before re-advertising).
-func (b *Bridge) WithdrawFabric(ctx context.Context, compressedFabricID [8]byte, nodeID uint64) {
+// advertisements on update/delete before re-advertising). fabricIndex
+// is the fabric the identity belonged to: the bridge forgets the
+// instance it recorded for it, so no broadcast event reaches it again.
+func (b *Bridge) WithdrawFabric(ctx context.Context, fabricIndex uint8, compressedFabricID [8]byte, nodeID uint64) {
 	if b.advertiser == nil {
 		return
 	}
@@ -2111,6 +2129,7 @@ func (b *Bridge) WithdrawFabric(ctx context.Context, compressedFabricID [8]byte,
 		TCPClient:          b.cfg.TCP.Outgoing,
 		TCPServer:          b.cfg.TCP.Incoming,
 	})
+	b.forgetOperationalInstance(fabricIndex, svc.InstanceName)
 	if err := b.advertiser.Withdraw(wCtx, svc.InstanceName, svc.ServiceType); err != nil {
 		b.logger.Debug("matter.mdns.fabric_withdraw",
 			slog.String("instance", svc.InstanceName),
@@ -2119,6 +2138,51 @@ func (b *Bridge) WithdrawFabric(ctx context.Context, compressedFabricID [8]byte,
 	}
 	b.logger.Info("matter.mdns.fabric_withdrawn",
 		slog.String("instance", svc.InstanceName))
+}
+
+// setOperationalInstance records instance as fabricIndex's operational
+// service; index 0 (no fabric) records nothing.
+func (b *Bridge) setOperationalInstance(fabricIndex uint8, instance string) {
+	if fabricIndex == 0 {
+		return
+	}
+	b.mu.Lock()
+	if b.operationalByFabric == nil {
+		b.operationalByFabric = make(map[uint8]string)
+	}
+	b.operationalByFabric[fabricIndex] = instance
+	b.mu.Unlock()
+}
+
+// forgetOperationalInstance drops fabricIndex's record when it still
+// names instance — a later AnnounceFabric for the same fabric (an
+// UpdateNOC that changed the identity) is not undone by the withdraw of
+// the old one.
+func (b *Bridge) forgetOperationalInstance(fabricIndex uint8, instance string) {
+	b.mu.Lock()
+	if b.operationalByFabric[fabricIndex] == instance {
+		delete(b.operationalByFabric, fabricIndex)
+	}
+	b.mu.Unlock()
+}
+
+// operationalInstanceFor is the one lookup the broadcast events use: the
+// instance name of fabricIndex's operational service. Index 0 (a session
+// without a fabric) and an index with no announced service report false,
+// and the event does nothing — matter.js
+// packages/protocol/src/protocol/DeviceAdvertiser.ts:164-179 at 862ad75f
+// returns when the session has no fabric, and
+// packages/protocol/src/advertisement/Advertiser.ts:69-75 at 862ad75f
+// (advertisementForFabric) finds no advertisement for a fabric that has
+// none.
+func (b *Bridge) operationalInstanceFor(fabricIndex uint8) (string, bool) {
+	if fabricIndex == 0 {
+		return "", false
+	}
+	b.mu.RLock()
+	instance, ok := b.operationalByFabric[fabricIndex]
+	b.mu.RUnlock()
+	return instance, ok
 }
 
 // CommissioningAdvertisement describes the parameters the bridge

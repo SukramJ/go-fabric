@@ -247,7 +247,7 @@ func (n *Node) reannounceFabrics(ctx context.Context) {
 		return
 	}
 	for _, f := range fabrics {
-		n.br.AnnounceFabric(ctx, f.CompressedID, f.NodeID)
+		n.br.AnnounceFabric(ctx, f.FabricIndex, f.CompressedID, f.NodeID)
 	}
 }
 

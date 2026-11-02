@@ -360,7 +360,7 @@ func TestTCPListenerSharesUDPPortAndAdvertisesT(t *testing.T) {
 	if udpPort != tcpPort {
 		t.Fatalf("TCP port %d, UDP port %d", tcpPort, udpPort)
 	}
-	h.bridge.AnnounceFabric(context.Background(), harnessCompressedID, 0x1234)
+	h.bridge.AnnounceFabric(context.Background(), 1, harnessCompressedID, 0x1234)
 	var tVal string
 	for _, svc := range h.adv.Active() {
 		for _, r := range svc.TXT {

@@ -62,7 +62,7 @@ func deviceAdvertiserBridge(t *testing.T, tcp TCPConfig) (*Bridge, *deviceAdvert
 // tests' fabrics.events.added emit does.
 func deviceAdvertiserFabric(t *testing.T, b *Bridge, rec *deviceAdvertiserRecorder) mdns.Service {
 	t.Helper()
-	b.AnnounceFabric(context.Background(), [8]byte{0, 0, 0, 0, 0, 0, 0, 1}, 1)
+	b.AnnounceFabric(context.Background(), 1, [8]byte{0, 0, 0, 0, 0, 0, 0, 1}, 1)
 	ops := rec.operational()
 	if len(ops) == 0 {
 		t.Fatal("no operational advertisement")
@@ -114,7 +114,7 @@ func TestDeviceAdvertiserIcdAdvertisementProvider(t *testing.T) {
 		b, rec := deviceAdvertiserBridge(t, TCPConfig{})
 		first := deviceAdvertiserFabric(t, b, rec)
 		before := len(rec.operational())
-		b.AnnounceFabric(context.Background(), [8]byte{0, 0, 0, 0, 0, 0, 0, 1}, 1)
+		b.AnnounceFabric(context.Background(), 1, [8]byte{0, 0, 0, 0, 0, 0, 0, 1}, 1)
 		ops := rec.operational()
 		if len(ops) <= before || ops[len(ops)-1].InstanceName != first.InstanceName {
 			t.Fatalf("operational advertisements %d after the refresh, want more than %d for %s", len(ops), before, first.InstanceName)

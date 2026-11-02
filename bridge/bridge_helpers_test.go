@@ -256,7 +256,7 @@ func TestAnnounceFabric_NilAdvertiser_NoPanic(t *testing.T) {
 	// Call should not panic.
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
-	b.AnnounceFabric(ctx, [8]byte{}, 0xDEAD)
+	b.AnnounceFabric(ctx, 1, [8]byte{}, 0xDEAD)
 }
 
 func TestAnnounceCommissioning_NilBridge_NoPanic(t *testing.T) {
@@ -421,7 +421,7 @@ func TestAnnounceFabric_NoopAdvertiser_LogsNotAdvertised(t *testing.T) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
-	b.AnnounceFabric(ctx, [8]byte{0x01}, 0xDEAD)
+	b.AnnounceFabric(ctx, 1, [8]byte{0x01}, 0xDEAD)
 
 	out := buf.String()
 	if !strings.Contains(out, "matter.mdns.fabric_not_advertised") {
@@ -442,7 +442,7 @@ func TestAnnounceFabric_RealAdvertiser_LogsPublished(t *testing.T) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
-	b.AnnounceFabric(ctx, [8]byte{0x01}, 0xDEAD)
+	b.AnnounceFabric(ctx, 1, [8]byte{0x01}, 0xDEAD)
 
 	out := buf.String()
 	if !strings.Contains(out, "matter.mdns.fabric_published") {

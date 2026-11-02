@@ -113,7 +113,7 @@ func TestAnnounceFabric_AdvertisesBoundPort(t *testing.T) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	b.AnnounceFabric(ctx, [8]byte{0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88}, 0x0102030405060708)
+	b.AnnounceFabric(ctx, 1, [8]byte{0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88}, 0x0102030405060708)
 
 	want := boundPort(t, b)
 	if got := advertisedPort(t, noop, mdns.ServiceTypeOperational); got != want {
