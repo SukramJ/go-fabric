@@ -112,7 +112,7 @@ func FuzzDecodeCertSigningRequest(f *testing.F) {
 		if len(b) > 1<<16 {
 			return
 		}
-		_, _ = decodeCertSigningRequest(b)
+		_, _, _ = decodeCertSigningRequest(b)
 	})
 }
 

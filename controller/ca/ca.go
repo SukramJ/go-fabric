@@ -45,6 +45,40 @@ const (
 // (CertificateAuthority.ts:367-373, :382-387).
 var ErrConfig = errors.New("ca: stored credentials do not match the configuration")
 
+// ErrInvalidCATs is a CASE Authenticated Tag list GenerateNOC refuses to
+// sign: more than three tags, two tags with the same identifier (the upper
+// 16 bits), or a tag with version 0 (the lower 16 bits). matter.js applies
+// the same rules when it turns the subject into ASN.1
+// (kinds/Certificate.ts:989 → CaseAuthenticatedTag.validateNocTagList,
+// datatype/CaseAuthenticatedTag.ts:96-105; version 0 refused at :32-33),
+// so a NOC the device would refuse at AddNOC (InvalidNOC) is never issued.
+var ErrInvalidCATs = errors.New("ca: invalid CASE Authenticated Tag list")
+
+// maxNOCCATs is the subject DN's bound on matter-noc-cat attributes
+// (CaseAuthenticatedTag.ts:97).
+const maxNOCCATs = 3
+
+// validateCATs is CaseAuthenticatedTag.validateNocTagList
+// (CaseAuthenticatedTag.ts:96-105) plus the constructor's version rule
+// (:32-33): at most three tags, identifiers unique, no version 0.
+func validateCATs(cats []uint32) error {
+	if len(cats) > maxNOCCATs {
+		return fmt.Errorf("%w: %d tags, at most %d allowed", ErrInvalidCATs, len(cats), maxNOCCATs)
+	}
+	seen := make(map[uint32]struct{}, len(cats))
+	for _, cat := range cats {
+		if cat&0xFFFF == 0 {
+			return fmt.Errorf("%w: tag 0x%08X has version 0", ErrInvalidCATs, cat)
+		}
+		id := cat >> 16
+		if _, dup := seen[id]; dup {
+			return fmt.Errorf("%w: identifier 0x%04X appears twice", ErrInvalidCATs, id)
+		}
+		seen[id] = struct{}{}
+	}
+	return nil
+}
+
 // KeyPair is a P-256 key pair as the store keeps it: the 65-byte
 // uncompressed public key and the 32-byte private scalar — matter.js
 // BinaryKeyPair.
@@ -605,6 +639,9 @@ func (c *CA) Verifier() *mattercert.Verifier { return c.verifier }
 func (c *CA) GenerateNOC(pub []byte, fabricID, nodeID uint64, cats []uint32) ([]byte, error) {
 	if _, err := ecdh.P256().NewPublicKey(pub); err != nil {
 		return nil, fmt.Errorf("ca: NOC subject key: %w", err)
+	}
+	if err := validateCATs(cats); err != nil {
+		return nil, err
 	}
 	c.issue.Lock()
 	defer c.issue.Unlock()

@@ -122,6 +122,7 @@ pin lift confirms by re-reading the row, [`pin-lifts.md`](./pin-lifts.md)).
 | BD-chip-ScenesManagement-SceneNameLength | `ScenesManagementServer.ts:147` relaxes the AddScene SceneName constraint for the behaviour to answer, and `addScene` checks only SceneId and TransitionTime (`:283`, presence) | `packages/node/src/behaviors/scenes-management/ScenesManagementServer.ts` | `"transitionTime > 60000000) {"` | connectedhomeip `src/app/clusters/scenes-server/ScenesManagementCluster.cpp:535-541` at `6170af84` | no |
 | BD-Matter-ICDVerificationKeyConstantTime | `IcdManagementServer.ts:761` compares the presented VerificationKey with `Bytes.areEqual`, a data-dependent comparison (presence) | `packages/node/src/behaviors/icd-management/IcdManagementServer.ts` | `"!Bytes.areEqual(verificationKey, stored.key)"` | this module: Go `crypto/subtle.ConstantTimeCompare` (review 2026-11 W2-sec-04); the accept/refuse outcome is matter.js's | no |
 | BD-Matter-OtaImageHeaderSizeCap | `OtaImageReader.ts:181-183` reads the prefix's header size and collects that many bytes with no bound (absence: the line that would take the check, followed by the closing brace) | `packages/protocol/src/ota/OtaImageReader.ts` | `"this.#headerSize = headerReader.readUInt32();\n            }"` | connectedhomeip `src/lib/core/OTAImageHeader.cpp:53` (`kMaxHeaderSize = 1024`), checked at `:128` (review 2026-11 W4-ctlint-07) | no |
+| BD-chip-Commissioner-CsrNonceEchoed | `ControllerCommissioningFlow.ts:1395` draws the CSR nonce and the flow never reads the echoed one back (presence) | `packages/protocol/src/peer/ControllerCommissioningFlow.ts` | `"fields: { csrNonce: this.fabric.crypto.randomBytes(32) },"` | connectedhomeip `src/credentials/attestation_verifier/DefaultDeviceAttestationVerifier.cpp:847-870` at `6170af84` (`VerifyNodeOperationalCSRInformation`) | no |
 
 ---
 
@@ -3547,6 +3548,21 @@ snapshot (`TestSnapshotIsNoRevocationSource`; Matter PKI CP §1.4.5,
 §4.9.6). Concept v3 §A.2, report AZ §3,
 `notes/reference/dcl-data-terms-2026-10-17.md`.
 
+A CD signer the snapshot does not name is fetched from the ledger by
+subject key id and trusted as fetched: `dcl.CertificateStore.CDSigner`
+stores the first certificate of `/dcl/pki/all-certificates?subjectKeyId=`
+as a production CD signer, without a chain check, exactly as matter.js's
+`getOrFetchCdSigner` does (`DclCertificateService.ts:864-891` at `862ad75f`,
+`certs[0]`, `addCertificate(…, "CDSigner", { isProduction: true })`). The
+SKID is a free field of the certificate's author, so this is a trust
+decision on the ledger's approval, not on the CSA CD root; chip accepts CD
+signers from its fixed set only (`DefaultDeviceAttestationVerifier.cpp:146-256`).
+Only an unknown SKID reaches the fetch (the snapshot answers the five known
+signers first), and without any signer the CD signature is skipped with a
+`CdSignerVerificationSkipped` warning the policy judges
+(`controller/attestation/validate.go`). Owner decision 2026-11-02 (review
+W4-ctlint-09): parity, no tightening.
+
 By design. Same trust decision as matter.js's seed, a different place in
 the graph; the named signer set is chip's own.
 
@@ -5023,6 +5039,24 @@ the name in UTF-16 units as matter.js's string constraint counts them
 `TestScenesAddSceneNameLengthParity` (W3-clucore-03; the server used to cut
 the name to 16 and answer SUCCESS). Retire when matter.js's `addScene`
 checks the name.
+
+### BD-chip-Commissioner-CsrNonceEchoed — the commissioner refuses NOCSRElements whose csrNonce is not the one it sent
+
+matter.js draws the 32-byte CSR nonce
+(`packages/protocol/src/peer/ControllerCommissioningFlow.ts:1395` at
+`862ad75f`) and reads only the CSR out of the signed elements
+(`Certificate.ts:782-807`, `getPublicKeyFromCsr`); the echoed nonce is
+decoded by the schema and discarded. connectedhomeip compares it with the
+one sent and fails the step on a mismatch
+(`src/credentials/attestation_verifier/DefaultDeviceAttestationVerifier.cpp:847-870`
+at `6170af84`, `VerifyNodeOperationalCSRInformation`,
+`csrNonceSpan.data_equal(csrNonce)`). `controller/commissioner.flow.certificates`
+does the same, after the signature check and before the CSR is parsed; a
+mismatch is `ErrCommissioning`. The signature over `elements ‖ challenge`
+already binds the elements to the PASE session, so what the comparison adds
+is the per-request freshness the nonce exists for. Pinned by
+`TestCertificatesCsrNonceEchoed` (review 2026-11 W4-ctlsec-01). Retire when
+matter.js compares the nonce.
 
 ### BD-chip-ClosureControl-RulesInServer — the ClosureControl command rules are connectedhomeip's; matter.js has none
 

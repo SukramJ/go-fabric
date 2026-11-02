@@ -4,6 +4,7 @@
 package commissioner
 
 import (
+	"bytes"
 	"context"
 	"crypto/ecdsa"
 	"crypto/elliptic"
@@ -813,8 +814,8 @@ func dacKeyOf(der []byte) (*ecdsa.PublicKey, error) {
 // certificates is step 11.1 (:1388-1468): the CSRRequest with a 32-byte
 // nonce; empty elements or signature is unexpected data (:1401-1403); the
 // signature over elements ‖ challenge against the DAC key (:1405-1416);
-// the CSR's key (:1418-1419; the echoed nonce is not compared, as matter.js
-// does not); AddTrustedRootCertificate, its answer unused (:1421-1433); the
+// the CSR's key (:1418-1419); AddTrustedRootCertificate, its answer unused
+// (:1421-1433); the
 // NOC (:1435-1439); AddNOC (:1441-1457) checked (:1459); the fabric index
 // kept (:1461-1462).
 func (f *flow) certificates(ctx context.Context) (stepResult, error) {
@@ -839,9 +840,18 @@ func (f *flow) certificates(ctx context.Context) (stepResult, error) {
 	if f.dacKey != nil && !verifyRaw(f.dacKey, slices.Concat(csr.elements, f.challenge), csr.signature) {
 		return 0, newError(ErrCommissioning, "CSR signature verification failed against DAC public key", nil)
 	}
-	der, err := decodeCertSigningRequest(csr.elements)
+	der, echoed, err := decodeCertSigningRequest(csr.elements)
 	if err != nil {
 		return 0, fmt.Errorf("%w: NOCSRElements: %w", errUnexpectedResponse, err)
+	}
+	// Ahead of matter.js: the echoed nonce must be the one sent. matter.js
+	// draws the nonce (ControllerCommissioningFlow.ts:1395 at 862ad75f)
+	// and never reads it back; connectedhomeip refuses a mismatch
+	// (DefaultDeviceAttestationVerifier.cpp:868-870 at 6170af84,
+	// VerifyNodeOperationalCSRInformation). See notes/parity/by_design.md
+	// BD-chip-Commissioner-CsrNonceEchoed.
+	if !bytes.Equal(echoed, nonce) {
+		return 0, newError(ErrCommissioning, "CSR nonce mismatch: the device echoed a nonce other than the one sent", nil)
 	}
 	operationalKey, err := publicKeyFromCSR(der)
 	if err != nil {
