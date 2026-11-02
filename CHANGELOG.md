@@ -152,6 +152,7 @@ Findings of the whole-codebase review of 2026-11-01 (`notes/review/2026-11/`).
 - `node/controllernode`: `Config` makes the own node's socket IPv4-only for an IPv4 listen address and `Start` answers the IPv4 loopback for an unspecified IPv4 one, so the reference controller's copy of `Start` is gone; it keeps only its test hooks (W5-ex-09).
 - examples: the reference controller provisions groups and bindings with the generated `cluster/spec` types (`groupkeymanagement.KeySetWriteRequest`, `groupcast.JoinGroupRequest`, `binding.TargetStruct`, `accesscontrol.AccessControlEntryStruct`, `groupkeymanagement.GroupKeyMapStruct`) instead of hand-built TLV trees with magic field numbers (W5-ex-07).
 - examples: the reference bridge's test app pipe (`--app-pipe`) is created `0660`, owner and group, instead of world-writable `0666`; the chip-tool harness writes it as the container's root (W5-ex-14).
+- examples: the reference controller reads `--wifi-credentials` and `--thread-dataset` from a file (`@path`) or, without the flag, from `GOFABRIC_WIFI_CREDENTIALS` / `GOFABRIC_THREAD_DATASET`, so the secret need not appear in `ps` or the shell history (W5-ex-15).
 
 ## [0.15.6] — 2026-11-01
 
