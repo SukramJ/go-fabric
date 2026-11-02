@@ -456,4 +456,6 @@ same pull request.
   must travel); `go mod tidy -diff` in `make lint` keeps the list honest.
 - User-visible changes get a `CHANGELOG.md` entry under `[Unreleased]`. A
   break that appears only in a commit message has not been announced — see
-  `README.md` §"How a consumer learns about a break".
+  `README.md` §"How a consumer learns about a break". A direct-dependency
+  version bump (dependabot's included) is user-visible — it raises the
+  version in every consumer's build list — and gets a `### Changed` line.
