@@ -233,6 +233,9 @@ type batch struct {
 type mutateContext struct {
 	endpointsWithData map[uint16]bool
 	clustersWithData  map[*Cluster]bool
+	// emitsEvents: the interaction's events reach the node's observers
+	// and its cursor — options.emitEvents (:412, default false).
+	emitsEvents bool
 }
 
 // mutate applies a report — ClientStructure.mutate (:295-380) over a merged
@@ -240,8 +243,14 @@ type mutateContext struct {
 // and cluster (:462-504), the events (:506-528), the statuses logged
 // (:338-346), the last batch (:357-361), the structural changes (:375),
 // the structure events (:378) and the delayed events (:379).
-func (s *structure) mutate(sc scope, r *Report) {
-	q := &mutateContext{endpointsWithData: map[uint16]bool{}, clustersWithData: map[*Cluster]bool{}}
+//
+// emitEvents is matter.js's options.emitEvents (:412, default false): only
+// an interaction that sets it — the default subscription while it is
+// current, its bootstrap read and the newly-commissioned read — hands its
+// events to the Event hook and raises the event cursor; every other
+// returns them in its Report only (#emitOccurrence, :1757-1770).
+func (s *structure) mutate(sc scope, r *Report, emitEvents bool) {
+	q := &mutateContext{endpointsWithData: map[uint16]bool{}, clustersWithData: map[*Cluster]bool{}, emitsEvents: emitEvents}
 	var cur *batch
 	for i := range r.Attributes {
 		cur = s.mutateAttribute(&r.Attributes[i], sc, cur, q)
@@ -297,6 +306,11 @@ func (s *structure) mutateAttribute(a *AttributeData, sc scope, cur *batch, q *m
 // the endpoint is unknown or not installed, received data in this report or
 // has a structural change pending (:518-524), else delivered now (:526).
 func (s *structure) emitEvent(e *EventData, q *mutateContext) {
+	// Mirrors matter.js ClientStructure.ts:1757-1758: no emit without
+	// emitEvents (W4-ctlim-01).
+	if !q.emitsEvents {
+		return
+	}
 	ep := s.endpoints[e.Path.Endpoint]
 	if ep == nil || !ep.installed || q.endpointsWithData[e.Path.Endpoint] || s.pending[ep] != nil {
 		s.delayed = append(s.delayed, *e)

@@ -44,7 +44,17 @@ type SubscribeRequest struct {
 // for a cluster with a changes-omitted attribute (:107) and none for a
 // cluster the caller filters ([structure.withKnownVersions]). The caller
 // gets the report as the peer sent it, its chunks merged.
+//
+// A host's read returns its events in the Report only: they reach neither
+// Hooks.Event nor the persisted event cursor — matter.js
+// ClientNodeInteraction.ts:97-98 passes the request's own emitEvents,
+// which a plain read leaves unset (ClientStructure.ts:412).
 func (n *Node) Read(ctx context.Context, req ReadRequest) (*Report, error) {
+	return n.read(ctx, req, false)
+}
+
+// read is Read with mutate's emitEvents (ClientStructure.ts:412).
+func (n *Node) read(ctx context.Context, req ReadRequest, emitEvents bool) (*Report, error) {
 	r := req.ReadRequest
 	n.routeICD(&r.ClientRequest)
 	sc := newScope(r.Attributes, r.NoFabricFilter)
@@ -65,7 +75,7 @@ func (n *Node) Read(ctx context.Context, req ReadRequest) (*Report, error) {
 		return nil, err
 	}
 	n.noteICDActive()
-	n.apply(sc, rep)
+	n.apply(sc, rep, emitEvents)
 	return rep, nil
 }
 
@@ -124,7 +134,16 @@ func (n *Node) noteICDActive() {
 // 862ad75f (callerRefresh :125, sent :129-132, refreshRequest :162-168).
 // With IncludeKnownVersions no version goes along, in the first request
 // nor in a re-subscription's (withKnownVersions, :123-124).
+//
+// A host's subscription returns its events in its reports only (see Read);
+// only the default subscription emits them.
 func (n *Node) Subscribe(ctx context.Context, sr SubscribeRequest) (*Subscription, error) {
+	return n.subscribe(ctx, sr, nil)
+}
+
+// subscribe is Subscribe with mutate's emitEvents, evaluated per report
+// (NetworkClient.ts:171, emitEvents: isCurrent); nil emits nothing.
+func (n *Node) subscribe(ctx context.Context, sr SubscribeRequest, emitEvents func() bool) (*Subscription, error) {
 	req := sr.SubscribeRequest
 	withKnownVersions := func(sc scope, filters []DataVersionFilter) []DataVersionFilter {
 		if sr.IncludeKnownVersions {
@@ -151,7 +170,7 @@ func (n *Node) Subscribe(ctx context.Context, sr SubscribeRequest) (*Subscriptio
 		sentMu.Lock()
 		sc := sent
 		sentMu.Unlock()
-		n.apply(sc, rep)
+		n.apply(sc, rep, emitEvents != nil && emitEvents())
 		if req.Updated != nil {
 			req.Updated(rep)
 		}

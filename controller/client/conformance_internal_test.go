@@ -74,7 +74,7 @@ func (f *plugFixture) report() *report {
 func (f *plugFixture) node(t *testing.T) *Node {
 	t.Helper()
 	n, _, _ := testNode(t, &MemoryStore{})
-	n.apply(wildcard, &f.report().r)
+	n.apply(wildcard, &f.report().r, true)
 	if n.Endpoint(1) == nil {
 		t.Fatalf("no plug endpoint: %s", tree(n))
 	}
@@ -222,7 +222,7 @@ func TestEndpointConformanceUnknown(t *testing.T) {
 	b.r.Attributes = slices.DeleteFunc(b.r.Attributes, func(a interaction.AttributeData) bool {
 		return a.Path.Endpoint == 1 && a.Path.Cluster == onoff.ClusterID && a.Path.Attribute == spec.AttrFeatureMap
 	})
-	n.apply(wildcard, &b.r)
+	n.apply(wildcard, &b.r, true)
 	if r := n.Endpoint(1).Conformance(); r.Status != ConformanceIncomplete || !slices.Equal(r.Unjudged, []uint32{onoff.ClusterID}) {
 		t.Fatalf("OnOff without FeatureMap: %v %v unjudged %v", r.Status, keys(r.Violations), r.Unjudged)
 	}
@@ -233,7 +233,7 @@ func TestEndpointConformanceUnknown(t *testing.T) {
 	b.r.Attributes = slices.DeleteFunc(b.r.Attributes, func(a interaction.AttributeData) bool {
 		return a.Path.Endpoint == 1 && a.Path.Cluster == descriptor.ClusterID && a.Path.Attribute == descriptor.AttrServerList
 	})
-	n.apply(wildcard, &b.r)
+	n.apply(wildcard, &b.r, true)
 	if ep := n.Endpoint(1); ep != nil {
 		if r := ep.Conformance(); r.Status != ConformanceUnknown {
 			t.Fatalf("no ServerList: %+v", r)
@@ -254,7 +254,7 @@ func TestNodeConditionsOfTheImage(t *testing.T) {
 		}
 		b.endpoint(0, []uint64{dtRootNode}, servers)
 		n, _, _ := testNode(t, &MemoryStore{})
-		n.apply(wildcard, &b.r)
+		n.apply(wildcard, &b.r, true)
 		r := n.Endpoint(0).Conformance()
 		if slices.Contains(keys(r.Violations), "missing NetworkCommissioning") {
 			t.Errorf("NetworkCommissioning %v: %v", withNC, keys(r.Violations))

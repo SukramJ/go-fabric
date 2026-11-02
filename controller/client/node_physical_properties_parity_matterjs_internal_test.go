@@ -87,7 +87,7 @@ func physicalNode(t *testing.T, at placement, utility uint64, clusters ...physic
 		put(2)
 	}
 	b.cluster(0, basicinformation.ClusterID, 0, map[uint32]spec.Node{basicinformation.AttrSpecificationVersion: uintNode(0x0103_0000)})
-	n.apply(wildcard, &b.r)
+	n.apply(wildcard, &b.r, true)
 	return n
 }
 
@@ -171,7 +171,7 @@ func TestNodePhysicalPropertiesParity(t *testing.T) {
 		b.cluster(1, powersource.ClusterID, uint64(powersource.FeatureWired), active)
 		b.endpoint(2, []uint64{dtPowerSourceEndpoint}, []uint32{descriptor.ClusterID, powersource.ClusterID})
 		b.cluster(2, powersource.ClusterID, uint64(powersource.FeatureBattery), active)
-		n.apply(wildcard, &b.r)
+		n.apply(wildcard, &b.r, true)
 		expectParams(t, n, 0, time.Minute, nil, nil)
 	})
 

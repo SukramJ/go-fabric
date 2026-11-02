@@ -114,7 +114,7 @@ func TestProperties(t *testing.T) {
 	b.endpoint(2, []uint64{dtBridged, dtPlug}, []uint32{descriptor.ClusterID, powersource.ClusterID, threadDiagnostics})
 	b.cluster(2, powersource.ClusterID, uint64(powersource.FeatureBattery), map[uint32]spec.Node{powersource.AttrStatus: uintNode(1)})
 	b.cluster(2, threadDiagnostics, 0, map[uint32]spec.Node{threadAttrRoutingRole: uintNode(2), threadAttrExtendedPanID: uintNode(7)})
-	n.apply(wildcard, &b.r)
+	n.apply(wildcard, &b.r, true)
 	p := n.Properties()
 	if !p.IntermittentlyConnected || !p.LongIdleTimeOperating || p.IdleModeDuration == nil || *p.IdleModeDuration != 2*time.Minute ||
 		p.SpecificationVersion == nil || *p.SpecificationVersion != 0x0104_0000 || !p.SupportsWifi || p.SupportsThread ||
@@ -135,7 +135,7 @@ func TestProperties(t *testing.T) {
 	if err := n.Stop(ctx); err != nil {
 		t.Fatal(err)
 	}
-	n.apply(wildcard, &(&report{}).attr(0, powersource.ClusterID, powersource.AttrStatus, uintNode(2), 2).r)
+	n.apply(wildcard, &(&report{}).attr(0, powersource.ClusterID, powersource.AttrStatus, uintNode(2), 2).r, true)
 	if !n.Properties().MainsPowered {
 		t.Fatal("the properties changed while stopped")
 	}
@@ -157,7 +157,7 @@ func TestPropertiesFromDiagnostics(t *testing.T) {
 	b.endpoint(0, []uint64{dtRootNode}, []uint32{descriptor.ClusterID, threadDiagnostics, powersource.ClusterID})
 	b.cluster(0, threadDiagnostics, 0, map[uint32]spec.Node{threadAttrChannel: uintNode(15), threadAttrExtendedPanID: nullNode, threadAttrRoutingRole: uintNode(2)})
 	b.cluster(0, powersource.ClusterID, 0, map[uint32]spec.Node{powersource.AttrStatus: uintNode(0)})
-	n.apply(wildcard, &b.r)
+	n.apply(wildcard, &b.r, true)
 	p := n.Properties()
 	if !p.SupportsThread || p.ThreadActive == nil || !*p.ThreadActive || p.ThreadChannel == nil || *p.ThreadChannel != 15 ||
 		!p.ThreadSleepyEndDevice || !p.BatteryPowered || p.ThreadPan != nil {
@@ -168,7 +168,7 @@ func TestPropertiesFromDiagnostics(t *testing.T) {
 	b.endpoint(0, []uint64{dtRootNode}, []uint32{descriptor.ClusterID, wifiDiagnostics, threadDiagnostics})
 	b.cluster(0, wifiDiagnostics, 0, map[uint32]spec.Node{wifiAttrBssid: {El: tlv.Element{Type: tlv.TypeOctetStr1, Octets: make([]byte, 6)}}})
 	b.cluster(0, threadDiagnostics, 0, map[uint32]spec.Node{threadAttrNetworkName: {El: tlv.Element{Type: tlv.TypeUTF8Str1, String: "mesh"}}, threadAttrExtendedPanID: uintNode(9), threadAttrChannel: uintNode(20)})
-	n2.apply(wildcard, &b.r)
+	n2.apply(wildcard, &b.r, true)
 	p = n2.Properties()
 	if !p.SupportsWifi || !p.SupportsThread || p.ThreadPan == nil || *p.ThreadPan != 9 || *p.ThreadChannel != 20 || !*p.ThreadActive {
 		t.Fatalf("properties %+v", p)

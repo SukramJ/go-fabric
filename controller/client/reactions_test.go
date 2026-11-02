@@ -13,7 +13,6 @@ import (
 	"time"
 
 	"github.com/SukramJ/go-fabric/client/exchange"
-	"github.com/SukramJ/go-fabric/client/interaction"
 	basicinfo "github.com/SukramJ/go-fabric/cluster/spec/basicinformation"
 	"github.com/SukramJ/go-fabric/controller/client"
 	"github.com/SukramJ/go-fabric/im"
@@ -62,20 +61,18 @@ func eventReport(event, number uint64) im.EventReport {
 
 // TestReactionsNeedSubscription: a leave, shutDown or startUp delivered
 // without an active default subscription may be stale and is ignored
-// (Peers.ts:812-824, :842-851, :872-881).
+// (Peers.ts:812-824, :842-851, :872-881). The events come from the
+// newly-commissioned read, which emits them (NetworkClient.ts:303-308)
+// with no default subscription active; a host read would not emit them
+// at all (W4-ctlim-01).
 func TestReactionsNeedSubscription(t *testing.T) {
 	t.Parallel()
 	logs := &msgLog{}
 	sr := newScriptedRegistry(t, seedCommissioned(3), func(c *client.RegistryConfig) { c.Logger = slog.New(logs) })
 	n := sr.reg.Get("peer1")
-	if err := n.Start(context.Background()); err != nil { // no autoSubscribe: started, unsubscribed
-		t.Fatal(err)
-	}
+	client.SetNewlyCommissioned(n)
 	read := make(chan error, 1)
-	go func() {
-		_, err := n.Read(context.Background(), client.ReadRequest{ReadRequest: interaction.ReadRequest{Attributes: []im.ConcreteAttributePath{{}}, Events: []im.ConcreteEventPath{{}}}})
-		read <- err
-	}()
+	go func() { read <- n.Start(context.Background()) }() // no autoSubscribe: started, unsubscribed
 	m := sr.next(t)
 	reports := sr.imageWithOpCreds("ours")
 	sr.reply(t, m, im.InteractionModelProtocolID, im.OpcodeReportData, dataReport(t, 0, reports,

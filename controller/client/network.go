@@ -46,7 +46,7 @@ func (n *Node) defaultRequest() SubscribePaths {
 func (n *Node) dropDefaultSubscription() {
 	n.mu.Lock()
 	s := n.sub
-	n.sub = nil
+	n.sub, n.subOwner = nil, nil
 	n.mu.Unlock()
 	s.Close()
 }
@@ -69,7 +69,9 @@ func (n *Node) syncAutoSubscribe(ctx context.Context) error {
 	n.mu.Unlock()
 	didRead := false
 	if newly && !n.cfg.NoInitialRead {
-		if _, err := n.Read(ctx, ReadRequest{ReadRequest: ReadPaths{Attributes: req.Attributes, Events: req.Events, NoFabricFilter: req.NoFabricFilter}}); err != nil {
+		// The newly-commissioned read emits its events and raises the
+		// cursor (NetworkClient.ts:303-308, emitEvents: true).
+		if _, err := n.read(ctx, ReadRequest{ReadRequest: ReadPaths{Attributes: req.Attributes, Events: req.Events, NoFabricFilter: req.NoFabricFilter}}, true); err != nil {
 			return err
 		}
 		didRead = true
@@ -86,8 +88,16 @@ func (n *Node) syncAutoSubscribe(ctx context.Context) error {
 	n.mu.RLock()
 	sreq.EventFilters = []EventMinimumNumber{{EventMin: n.settings.maxEventNumber + 1}}
 	n.mu.RUnlock()
+	// Mirrors matter.js NetworkClient.ts:164-173: the default subscription
+	// emits events (and raises the cursor) only while it is current.
+	owner := &subscriptionOwner{}
+	isCurrent := func() bool {
+		n.mu.RLock()
+		defer n.mu.RUnlock()
+		return n.subOwner == owner
+	}
 	if !didRead {
-		sreq.BootstrapRead = func(ctx context.Context) error { return n.bootstrapRead(ctx, req) }
+		sreq.BootstrapRead = func(ctx context.Context) error { return n.bootstrapRead(ctx, req, isCurrent()) }
 	}
 	var sub *Subscription
 	alive := func() {
@@ -104,8 +114,8 @@ func (n *Node) syncAutoSubscribe(ctx context.Context) error {
 	sreq.KeepaliveReceived = alive
 	sreq.Closed = func() {
 		n.mu.Lock()
-		if n.sub == sub {
-			n.sub = nil
+		if n.subOwner == owner {
+			n.sub, n.subOwner = nil, nil
 		}
 		n.mu.Unlock()
 	}
@@ -126,13 +136,25 @@ func (n *Node) syncAutoSubscribe(ctx context.Context) error {
 		}
 		n.recompute()
 	}
-	s, err := n.Subscribe(ctx, SubscribeRequest{SubscribeRequest: sreq})
+	n.mu.Lock()
+	n.subOwner = owner
+	n.mu.Unlock()
+	s, err := n.subscribe(ctx, SubscribeRequest{SubscribeRequest: sreq}, isCurrent)
 	if err != nil {
+		n.mu.Lock()
+		if n.subOwner == owner {
+			n.subOwner = nil
+		}
+		n.mu.Unlock()
 		return err
 	}
 	n.adoptDefaultSubscription(s, &sub)
 	return nil
 }
+
+// subscriptionOwner is the identity of one default subscription; not
+// zero-sized, so two owners never share an address.
+type subscriptionOwner struct{ _ byte }
 
 // adoptDefaultSubscription makes s the default subscription, also in the
 // caller's own variable its callbacks compare against. s can go
@@ -152,7 +174,7 @@ func (n *Node) adoptDefaultSubscription(s *Subscription, own **Subscription) {
 // before its first attempt — SustainedSubscription.ts:187-204 reading the
 // subscription's request, its version filters and event minimum, and
 // handing the result to the request's updated (here: the image).
-func (n *Node) bootstrapRead(ctx context.Context, req SubscribePaths) error {
+func (n *Node) bootstrapRead(ctx context.Context, req SubscribePaths, emitEvents bool) error {
 	sc := newScope(req.Attributes, req.NoFabricFilter)
 	n.mu.RLock()
 	r := ReadPaths{
@@ -169,7 +191,7 @@ func (n *Node) bootstrapRead(ctx context.Context, req SubscribePaths) error {
 	if err != nil {
 		return err
 	}
-	n.apply(sc, rep)
+	n.apply(sc, rep, emitEvents)
 	return nil
 }
 

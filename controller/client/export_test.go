@@ -136,3 +136,11 @@ func SetICDFedOffset(n *Node, lastOffset uint32) {
 		t.AddPeer(e, h)
 	}
 }
+
+// SetNewlyCommissioned marks n newly commissioned, so its next Start runs
+// the initial read that emits events (NetworkClient.ts:303-308).
+func SetNewlyCommissioned(n *Node) {
+	n.mu.Lock()
+	n.newlyCommissioned = true
+	n.mu.Unlock()
+}

@@ -101,7 +101,7 @@ func (s *seededNode) warnings() int {
 	return n
 }
 
-func (s *seededNode) apply(b *report) { s.n.apply(wildcard, &b.r) }
+func (s *seededNode) apply(b *report) { s.n.apply(wildcard, &b.r, true) }
 
 func TestNodeLifecycleSeededParity(t *testing.T) {
 	t.Parallel()

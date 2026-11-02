@@ -110,7 +110,11 @@ type Hooks struct {
 	SubscriptionAlive func()
 	// Event: an event the peer reported, for every cluster. value is the
 	// payload decoded through the event's definition, the raw [spec.Node]
-	// when there is none, nil without a payload.
+	// when there is none, nil without a payload. Only the default
+	// subscription while it is current, its bootstrap read and the
+	// newly-commissioned read deliver here (and raise the event cursor); a
+	// host's own Read or Subscribe returns its events in its Report only
+	// (matter.js ClientStructure.ts:412, NetworkClient.ts:171-173).
 	Event func(endpoint uint16, cluster, event uint32, e EventData, value any)
 	// Seeded: the structure is known, once — BasicInformation is present
 	// and every endpoint the root's PartsList names is installed, more than

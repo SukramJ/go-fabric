@@ -99,6 +99,7 @@ Findings of the whole-codebase review of 2026-11-01 (`notes/review/2026-11/`).
 - `bridge` package doc, `docs/guides/ports.md`: the port list names `AttachMetrics`, `SetSubscriptionPersistence` and the three ICD ports (`SetICDAdvertisement`, `SetLocalFixedMRPBackoff`, `SetOnInboundActivity`) with what a skip costs; `store` cites its own `Apply` / `Migrations` and ADR 0026 principle 7 (W2-api-05, W2-api-08).
 - `client/exchange`: a saturated MRP backoff plus the fixed local backoff or a fallback's `InitialRetransmissionTime` saturates instead of wrapping to a negative wait, under which an unbounded CASE fallback attempt retransmitted Sigma1 in a tight loop after ~51 transmissions (W4-ctlnet-01).
 - `client/exchange`, `client/peer`: a message that opens a new exchange on a secure UDP session from another address moves the session there, and the peer's operational address follows, as matter.js's `ExchangeManager` does; acks and responses went to the old address until the subscription failed (W4-ctlnet-02).
+- `controller/client`: `Hooks.Event` and the persisted event cursor move only for the default subscription's reports while it is current, its bootstrap read and the newly-commissioned read, as matter.js gates them on `emitEvents`; a host's own `Node.Read` or `Node.Subscribe` returns its events in its `Report` only — it raised the cursor past events the default subscription then never asked for (W4-ctlim-01).
 
 ## [0.15.6] — 2026-11-01
 

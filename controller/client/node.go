@@ -72,6 +72,11 @@ type Node struct {
 	newlyCommissioned bool
 	// sub is the default subscription, activeSubscription (:380-382).
 	sub *Subscription
+	// subOwner names the default subscription being established or held —
+	// matter.js internal.subscriptionOwner (NetworkClient.ts:164-166,
+	// :207, :245): its callbacks and event emits act only while it is
+	// current, so a replaced or ended one never acts for its successor.
+	subOwner *subscriptionOwner
 	// likelyOffline is the latch of :393-398.
 	likelyOffline bool
 	seeded        bool
@@ -164,12 +169,14 @@ func newNode(cfg Config) (*Node, error) {
 
 // apply applies a report to the image under the lock and delivers what it
 // produced after — ClientStructure.mutate (D8 of the brief: no job queue,
-// the callbacks after the lock).
-func (n *Node) apply(sc scope, r *Report) {
+// the callbacks after the lock). emitEvents is mutate's options.emitEvents
+// (ClientStructure.ts:412): the report's events reach Hooks.Event and the
+// cursor only when it is set.
+func (n *Node) apply(sc scope, r *Report, emitEvents bool) {
 	n.mu.Lock()
 	before := n.configurationVersionsLocked()
 	icdBefore := n.icdModeLocked()
-	n.s.mutate(sc, r)
+	n.s.mutate(sc, r, emitEvents)
 	em := n.s.takeEmissions()
 	if !n.frozen {
 		n.props = nil
@@ -394,7 +401,7 @@ func (n *Node) Stop(ctx context.Context) error {
 	n.started = false
 	n.labelReconciled = false
 	sub, stop := n.sub, n.stopObserve
-	n.sub, n.stopObserve = nil, nil
+	n.sub, n.stopObserve, n.subOwner = nil, nil, nil
 	if !n.frozen {
 		n.propertiesLocked()
 		n.frozen = true
