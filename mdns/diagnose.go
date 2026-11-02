@@ -207,7 +207,7 @@ func diagnoseAddresses(svc *Service, name string) []Finding {
 // and office LANs (a bridge on 172.18.x.x is an ordinary deployment), and
 // the same pool also spans 192.168.0.0/16, which this check has never
 // flagged. An address alone cannot tell the two apart; the interface-name
-// filter ([Zeroconf.InterfaceFilter]) is what keeps user-network bridges
+// filter ([Responder.InterfaceFilter]) is what keeps user-network bridges
 // out of the announcement, and it works by name, not by range.
 func isContainerInternal(ip net.IP) bool {
 	v4 := ip.To4()

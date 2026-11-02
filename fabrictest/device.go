@@ -133,8 +133,7 @@ func (s *Site) AddDevice(topo Topology) *Device {
 // the host's in-flight counters, an advertiser whose records the site
 // answers DNS-SD with, the site's logger when cfg has none, and a store of
 // its own when cfg.Store states none (the program's store, a Path or a
-// DB, stays the program's). TCP and the re-announcement are off on the
-// site. The device serves cfg.Snapshotter or the node's Aggregator, empty
+// DB, stays the program's). TCP is off on the site. The device serves cfg.Snapshotter or the node's Aggregator, empty
 // until the test adds to it ([Device.Act]); a restart builds the node from
 // cfg again. matter.js's MockSite.addNode builds a plain ServerNode from the
 // test's own options in the site's environment (mock-site.ts:59-106 at
@@ -276,7 +275,7 @@ func (d *Device) config() node.Config {
 	}
 	i := strconv.Itoa(d.index)
 	cfg := node.Config{
-		Network: node.Network{Listen: "[::1]:0", Reannounce: node.Reannounce{Off: true}},
+		Network: node.Network{Listen: "[::1]:0"},
 		Commissioning: node.Commissioning{
 			Passcode: DefaultPasscode, Discriminator: DefaultDiscriminator,
 			PBKDFIterations: DefaultPBKDFIterations, Salt: defaultSalt,
@@ -310,7 +309,6 @@ func (d *Device) programConfig() node.Config {
 	cfg := *d.base
 	cfg.Store = d.store
 	cfg.Network.Listen = "[::1]:0"
-	cfg.Network.Reannounce.Off = true
 	cfg.Network.TCP = node.TCPConfig{}
 	cfg.Advertiser = mdns.NewNoop()
 	if cfg.Logger == nil {

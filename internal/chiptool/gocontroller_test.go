@@ -223,7 +223,7 @@ func TestGoControllerSubscribesReferenceBridge(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Our operational record: the restarted daemon resolves us by it.
-	adv := mdns.NewZeroconf()
+	adv := mdns.NewResponder()
 	t.Cleanup(func() {
 		_ = reg.Close(context.Background())
 		com.Close()

@@ -86,7 +86,7 @@ then discovers the node, and a controller reaches it by address alone.
 commissioning it.
 
 *Source: [`mdns/doc.go`](https://github.com/SukramJ/go-fabric/blob/main/mdns/doc.go),
-[`mdns/subtype_responder.go`](https://github.com/SukramJ/go-fabric/blob/main/mdns/subtype_responder.go) (`SubtypeResponder`),
+[`mdns/responder.go`](https://github.com/SukramJ/go-fabric/blob/main/mdns/responder.go) (`Responder`),
 [`node/mdns.go`](https://github.com/SukramJ/go-fabric/blob/main/node/mdns.go) (`MDNS`, `MDNSServices`, `DiagnoseMDNS`),
 [`internal/chiptool/doc.go`](https://github.com/SukramJ/go-fabric/blob/main/internal/chiptool/doc.go) (the harness).*
 

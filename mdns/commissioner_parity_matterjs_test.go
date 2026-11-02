@@ -6,9 +6,8 @@ package mdns_test
 // The commissioner cases of matter.js packages/protocol/test/mdns/
 // MdnsTest.ts at 862ad75f (:546, :637, :714): the `_matterd._udp` record
 // BuildCommissionerService yields carries the instance, the PTR subtypes
-// and the TXT values CommissionerMdnsAdvertisement broadcasts. The packet
-// itself (record order, cache-flush bits, the _services._dns-sd PTRs) is
-// grandcat/zeroconf's, as for the other two record kinds.
+// and the TXT values CommissionerMdnsAdvertisement broadcasts. The packets
+// the responder builds from it are pinned by TestMdnsAdvertisementParity.
 
 import (
 	"context"

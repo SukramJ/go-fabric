@@ -106,15 +106,9 @@ type Node struct {
 	// callbacks of the health probe and the OTA provider.
 	healthListeners    listeners[HealthSample]
 	otaStatusListeners listeners[otaProviderStatus]
-	// subtypeResponder is the DNS-SD subtype responder of the node's own
-	// advertiser, started by Start; nil with a host's advertiser.
-	subtypeResponder *mdns.SubtypeResponder
 	// attestationErr is the load error of Attestation.Files under
 	// BlockCommissioningOnError (attestation.go).
 	attestationErr error
-	// stopReannounce ends the re-announce loop Start began; nil when none
-	// runs (reannounce.go).
-	stopReannounce func()
 	// health is the probe Start began (Config.Health); nil when none runs
 	// (health.go).
 	healthMu   sync.Mutex
@@ -214,7 +208,7 @@ func New(ctx context.Context, cfg Config) (*Node, error) { //nolint:funlen // th
 	// A nil advertiser is the node's own (mdns.go).
 	n.resolveAdvertiser()
 
-	// An advertiser that paces its own timers (mdns.Zeroconf) runs them on
+	// An advertiser that paces its own timers (mdns.Responder) runs them on
 	// the node's clock.
 	if a, ok := n.advertiser.(interface{ SetClock(clock.Clock) }); ok {
 		a.SetClock(n.cfg.Clock)
@@ -779,14 +773,11 @@ func (n *Node) startLocked(ctx context.Context) error {
 		return fmt.Errorf("node: bridge start: %w", err)
 	}
 	// The goroutines New leaves unstarted (ADR 0026 principle 5): the
-	// subscription engine, the session, PASE and CASE reapers, the subtype
-	// responder — all bounded by the node's lifetime, and started only
+	// subscription engine, the session, PASE and CASE reapers — all
+	// bounded by the node's lifetime, and started only
 	// once the start can no longer fail, so a failed Start leaves none
 	// running (the engine cannot be restarted once stopped).
 	n.sec.start(n.life) //nolint:contextcheck // the engine and the reapers run for the node's lifetime, not the call's
-	if n.subtypeResponder != nil {
-		n.subtypeResponder.Start(n.life) //nolint:contextcheck // as above
-	}
 	// The assembled surface against the one a previous run persisted: a
 	// change raises the ConfigurationVersions (surface_stability.go).
 	n.announceSurface(ctx)
@@ -795,7 +786,6 @@ func (n *Node) startLocked(ctx context.Context) error {
 		n.agg.setStarted()
 	}
 	n.startGroupSender()
-	n.startReannounce()
 	n.startHealthProbe()
 
 	n.root.DiagnosticLogs.AttachProvider(ringLogs{n.diagRing})
@@ -921,7 +911,6 @@ func (n *Node) stopLocked(ctx context.Context) error {
 	if n.commissionerControl != nil {
 		n.commissionerControl.Close()
 	}
-	n.stopReannounceLoop()
 	n.stopHealthProbe()
 	if srv := n.root.ICDManagement; srv != nil {
 		srv.Stop()

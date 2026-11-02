@@ -12,6 +12,7 @@ import (
 
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
+	"github.com/SukramJ/go-fabric/mdns"
 	"github.com/SukramJ/go-fabric/transport/message"
 	"github.com/SukramJ/go-fabric/transport/mrp"
 )
@@ -372,10 +373,12 @@ func (b *Bridge) tickOutboundReliable(outbound *outboundReliableTracker, now tim
 	results := outbound.Tick(now, func(dest net.Addr, datagram []byte) error {
 		return sendVia(listener, dest, datagram)
 	})
+	retransmitted := false
 	for _, r := range results {
 		if r.Err == nil {
 			// A retransmission sent.
 			b.count(contract.MetricMRPRetransmits)
+			retransmitted = retransmitted || r.SessionID != 0
 			continue
 		}
 		if errors.Is(r.Err, mrp.ErrMaxRetransmissionsReached) {
@@ -391,6 +394,32 @@ func (b *Bridge) tickOutboundReliable(outbound *outboundReliableTracker, now tim
 		b.logger.Debug("matter.tx.reliable.retransmit",
 			slog.Int("counter", int(r.Counter)),
 			slog.Any("err", r.Err))
+	}
+	if retransmitted {
+		b.retransmissionBroadcast()
+	}
+}
+
+// retransmissionBroadcast is matter.js's "retransmit" broadcast event: each
+// retransmission on a secure session triggers one broadcast of the
+// session's fabric's operational advertisement, unless it is broadcasting
+// already (DeviceAdvertiser.ts:164-172, MdnsAdvertiser.ts:234-242 at
+// 862ad75f). The tracker names the session, not its fabric, so every
+// operational service takes the event; an advertiser without it
+// (mdns.Noop, a custom Advertiser) is left alone.
+func (b *Bridge) retransmissionBroadcast() {
+	b.mu.RLock()
+	advertiser := b.advertiser
+	b.mu.RUnlock()
+	ev, ok := advertiser.(serviceRetransmitter)
+	if !ok {
+		return
+	}
+	active := advertiser.Active()
+	for i := range active {
+		if active[i].ServiceType == mdns.ServiceTypeOperational {
+			ev.ServiceRetransmission(active[i].InstanceName, active[i].ServiceType)
+		}
 	}
 }
 

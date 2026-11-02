@@ -446,8 +446,8 @@ var chipFamilies = []family{
 		name:      "SC",
 		multicast: map[string]bool{"5.2": true, "5.3": true},
 		// TC-SC-4.1 and TC-SC-4.3 follow the SRV target with a bare
-		// host-name AAAA query; the daemon's mDNS side-car answers it
-		// (mdns/host_responder.go). Both run unconditionally: they failed
+		// host-name AAAA query; the daemon's mDNS responder answers it
+		// (mdns/answer.go). Both run unconditionally: they failed
 		// on an IPv6-capable runner because that answer was missing, not
 		// because of the host.
 		// TC_SC_7_1 checks the commissionable advertisement of a factory-new

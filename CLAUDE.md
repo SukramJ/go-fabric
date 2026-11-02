@@ -449,7 +449,7 @@ same pull request.
   ```
 - **No cgo.** The module builds with `CGO_ENABLED=0`; only the race-enabled
   test run turns it on.
-- Six direct dependencies and one tool (`golang.org/x/exp/cmd/apidiff`,
+- Five direct dependencies and one tool (`golang.org/x/exp/cmd/apidiff`,
   the API-break guard, concept v6 decision 0.2). Every further dependency
   is a decision, not a convenience: MIT / Apache-2.0 / BSD only, and it
   updates `THIRD-PARTY-NOTICES.md` (plus `licenses/` when the licence text

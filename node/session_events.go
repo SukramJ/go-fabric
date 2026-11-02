@@ -55,6 +55,9 @@ func (e *sessionEvents) opened(id uint16) {
 	}
 	e.known[id] = info
 	e.mu.Unlock()
+	if n := e.n; n != nil {
+		n.operationalConnected(info.FabricIndex)
+	}
 	e.emit("session_opened", info, func(o Observers) func(SessionInfo) { return o.OnSessionOpened })
 }
 

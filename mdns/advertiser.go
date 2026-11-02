@@ -19,10 +19,10 @@ var (
 
 // Advertiser is the runtime surface a bridge component holds onto.
 // Implementations vary in how they push records onto the wire — the
-// production [Zeroconf] registers each service with a responder that
-// probes, announces and answers on UDP/5353; [Noop] only records the
-// services in memory and puts nothing on the network, which is what
-// tests and the boot phase before the network stack is up want.
+// production [Responder] announces each service's records and answers
+// for them on UDP/5353; [Noop] only records the services in memory and
+// puts nothing on the network, which is what tests and the boot phase
+// before the network stack is up want.
 type Advertiser interface {
 	// Publish announces (or re-announces) svc. Replaces an existing
 	// record with the same InstanceName + ServiceType.
@@ -93,3 +93,29 @@ func (n *Noop) Close() error { return nil }
 func noopKey(instance, serviceType string) string {
 	return instance + "|" + serviceType
 }
+
+// Enabled is an [Advertiser] that states whether it puts records on the
+// network, so a diagnostic need not assert the concrete type. It is
+// optional; [IsEnabled] reads it.
+type Enabled interface {
+	// Enabled is true when the advertiser publishes on the network.
+	Enabled() bool
+}
+
+// IsEnabled reports whether a publishes on the network: its Enabled()
+// when it implements [Enabled], true otherwise (an advertiser that does
+// not say is taken at its word that it advertises), false for nil.
+func IsEnabled(a Advertiser) bool {
+	if a == nil {
+		return false
+	}
+	if e, ok := a.(Enabled); ok {
+		return e.Enabled()
+	}
+	return true
+}
+
+// Enabled implements [Enabled]: a Noop advertiser publishes nothing.
+func (n *Noop) Enabled() bool { return false }
+
+var _ Enabled = (*Noop)(nil)

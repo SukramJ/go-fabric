@@ -2197,7 +2197,7 @@ func (b *Bridge) AnnounceCommissioning(ctx context.Context, params Commissioning
 		b.logger.Warn("matter.mdns.commissioning_not_advertised",
 			slog.String("instance", svc.InstanceName),
 			slog.Int("discriminator", int(params.Discriminator)),
-			slog.String("hint", "mdns_advertise=noop suppresses the commissionable record — commissioners cannot discover the bridge; set the host's mDNS advertiser (node.Config.Advertiser or Bridge.New's advertiser)=zeroconf (or leave it unset) for pairing"))
+			slog.String("hint", "mdns_advertise=noop suppresses the commissionable record — commissioners cannot discover the bridge; set the host's mDNS advertiser (node.Config.Advertiser or Bridge.New's advertiser) to the mDNS responder (or leave it unset) for pairing"))
 		return nil
 	}
 	b.logger.Info("matter.mdns.commissioning_published",

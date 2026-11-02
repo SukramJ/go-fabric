@@ -16,6 +16,7 @@ import (
 	"github.com/SukramJ/go-fabric/clock"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/diagevent"
+	"github.com/SukramJ/go-fabric/mdns"
 	"github.com/SukramJ/go-fabric/secure/channel"
 	"github.com/SukramJ/go-fabric/secure/sessionparams"
 	"github.com/SukramJ/go-fabric/secure/sigma"
@@ -1289,16 +1290,32 @@ func (b *Bridge) sendCloseSessionReport(sessionID uint16, sess *channel.Session)
 		slog.Int("session_id", int(sessionID)))
 }
 
+// serviceDisconnecter is the advertiser capability of the "reconnect"
+// broadcast event (mdns.Responder.ServiceDisconnected).
+type serviceDisconnecter interface {
+	ServiceDisconnected(instanceName, serviceType string)
+}
+
+// serviceRetransmitter is the advertiser capability of the "retransmit"
+// broadcast event (mdns.Responder.ServiceRetransmission).
+type serviceRetransmitter interface {
+	ServiceRetransmission(instanceName, serviceType string)
+}
+
 // triggerSessionReannounce resumes mDNS broadcast after a session
 // teardown left a peer with zero live sessions, so the controller
 // rediscovers the bridge and re-establishes CASE instead of showing it
-// unresponsive until the next periodic re-announce tick. Mirrors
-// matter.js DeviceAdvertiser.ts:132-149 (sessions.deleted →
-// serviceDisconnected resumes broadcasting).
+// unresponsive. Mirrors matter.js DeviceAdvertiser.ts:131-150 at 862ad75f
+// (sessions.deleted → serviceDisconnected, which starts the "reconnect"
+// broadcast event, MdnsAdvertisement.ts:132-134): an advertiser with
+// ServiceDisconnected (mdns.Responder) runs its broadcast schedule again
+// for the operational services. The trigger names no fabric
+// (operational.Manager.SetReannounceTrigger), so every operational
+// service is resumed where matter.js resumes the peer's fabric's.
 //
 // The republish runs on its own goroutine bounded by the advertise
 // timeout, because the trigger fires from the reaper / receive paths
-// which must not block on mDNS probe/announce rounds. The bridge owns
+// which must not block on the advertiser. The bridge owns
 // it: it runs under the serve context, which Stop cancels, and Stop
 // waits for it before the advertiser closes. No-op once the bridge
 // stopped — matter.js shuts the advertiser down before removing
@@ -1326,12 +1343,21 @@ func (b *Bridge) triggerSessionReannounce() {
 		defer b.reannounces.Done()
 		ctx, cancel := clock.WithTimeout(base, b.clk(), timeout)
 		defer cancel()
-		// Zeroconf exposes a direct republish trigger; other
-		// advertisers degrade to a per-record re-publish, which the
+		// The responder takes the "reconnect" event; an advertiser
+		// with only an on-demand trigger announces once; the rest
+		// degrade to a per-record re-publish, which the
 		// [mdns.Advertiser] contract defines as a re-announce.
-		if fast, ok := advertiser.(interface{ TriggerReannounce(context.Context) }); ok {
-			fast.TriggerReannounce(ctx)
-		} else {
+		switch ev := advertiser.(type) {
+		case serviceDisconnecter:
+			active := advertiser.Active()
+			for i := range active {
+				if active[i].ServiceType == mdns.ServiceTypeOperational {
+					ev.ServiceDisconnected(active[i].InstanceName, active[i].ServiceType)
+				}
+			}
+		case interface{ TriggerReannounce(context.Context) }:
+			ev.TriggerReannounce(ctx)
+		default:
 			active := advertiser.Active()
 			for i := range active {
 				if err := advertiser.Publish(ctx, active[i]); err != nil {

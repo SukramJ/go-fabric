@@ -68,7 +68,7 @@ type OTAConfig struct {
 	// Listen is the own node's UDP address; "" is "[::]:0".
 	Listen string
 	// Advertiser publishes the own node's operational record, which a
-	// requestor finds the provider by; nil is mdns.NewZeroconf().
+	// requestor finds the provider by; nil is mdns.NewResponder().
 	Advertiser mdns.Advertiser
 	// ProductID is the own node's product id; 0 is 0x8000.
 	ProductID uint16
@@ -203,7 +203,7 @@ func (c *Controller) startOTA(ctx context.Context, cfg Config) error {
 	}
 	adv := o.Advertiser
 	if adv == nil {
-		adv = mdns.NewZeroconf()
+		adv = mdns.NewResponder()
 	}
 	product := o.ProductID
 	if product == 0 {

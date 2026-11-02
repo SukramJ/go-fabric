@@ -25,6 +25,7 @@ import (
 	"crypto/hkdf"
 	"crypto/sha256"
 	"encoding/binary"
+	"slices"
 	"sync"
 	"testing"
 	"time"
@@ -567,5 +568,69 @@ func TestDiagnosticEventsRecordSessionAndDiscoveryKinds(t *testing.T) {
 		if !kinds[want] {
 			t.Errorf("no %q event recorded; the kind is declared and surfaced but never produced", want)
 		}
+	}
+}
+
+// eventAdvertiser records the responder's broadcast events.
+type eventAdvertiser struct {
+	*mdns.Noop
+	mu             sync.Mutex
+	disconnected   []string
+	retransmission []string
+}
+
+func (a *eventAdvertiser) ServiceDisconnected(instance, serviceType string) {
+	a.mu.Lock()
+	a.disconnected = append(a.disconnected, instance+"|"+serviceType)
+	a.mu.Unlock()
+}
+
+func (a *eventAdvertiser) ServiceRetransmission(instance, serviceType string) {
+	a.mu.Lock()
+	a.retransmission = append(a.retransmission, instance+"|"+serviceType)
+	a.mu.Unlock()
+}
+
+func (a *eventAdvertiser) events() (disconnected, retransmission []string) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return slices.Clone(a.disconnected), slices.Clone(a.retransmission)
+}
+
+// TestTriggerSessionReannounce_ReconnectEvent: on an advertiser with the
+// broadcast events (mdns.Responder) the session-teardown trigger is
+// matter.js's "reconnect" event and a retransmission the "retransmit"
+// event, each for the operational services only (DeviceAdvertiser.ts:131-172).
+func TestTriggerSessionReannounce_ReconnectEvent(t *testing.T) {
+	t.Parallel()
+	adv := &eventAdvertiser{Noop: mdns.NewNoop()}
+	b, err := New(wbEmptySnapshotter, adv, Config{Listen: ":0"}, nil)
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := b.Start(ctx); err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+	t.Cleanup(func() { _ = b.Stop(context.Background()) })
+	for _, svc := range []mdns.Service{
+		{InstanceName: "op", ServiceType: mdns.ServiceTypeOperational, HostName: "h", Port: 5540},
+		{InstanceName: "co", ServiceType: mdns.ServiceTypeCommissionable, HostName: "h", Port: 5540},
+	} {
+		if err := adv.Publish(ctx, svc); err != nil {
+			t.Fatal(err)
+		}
+	}
+	b.triggerSessionReannounce()
+	deadline := time.Now().Add(2 * time.Second)
+	for d, _ := adv.events(); len(d) == 0 && time.Now().Before(deadline); d, _ = adv.events() {
+		time.Sleep(5 * time.Millisecond)
+	}
+	b.retransmissionBroadcast()
+	d, r := adv.events()
+	want := []string{"op|" + mdns.ServiceTypeOperational}
+	if !slices.Equal(d, want) || !slices.Equal(r, want) {
+		t.Errorf("events: disconnected %v, retransmission %v, want %v each", d, r, want)
 	}
 }

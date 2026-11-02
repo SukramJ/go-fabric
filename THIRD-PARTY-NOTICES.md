@@ -96,8 +96,6 @@ each copyright line is quoted verbatim from it.
 | Module | License |
 | --- | --- |
 | `filippo.io/nistec` | BSD-3-Clause |
-| `github.com/cenkalti/backoff` | MIT |
-| `github.com/grandcat/zeroconf` | MIT |
 | `github.com/miekg/dns` | BSD-3-Clause |
 | `golang.org/x/net` | BSD-3-Clause |
 | `golang.org/x/sys` | BSD-3-Clause |
@@ -141,10 +139,8 @@ To regenerate an exhaustive, machine-verified list, run a tool such as
 
 ```
 filippo.io/nistec                  Copyright 2009 The Go Authors.
-github.com/cenkalti/backoff        Copyright (c) 2014 Cenk Altı
 github.com/dustin/go-humanize      Copyright (c) 2005-2008  Dustin Sallings <dustin@spy.net>
 github.com/google/uuid             Copyright (c) 2009,2014 Google Inc. All rights reserved.
-github.com/grandcat/zeroconf       Copyright (c) 2016 Stefan Smarzly
 github.com/mattn/go-isatty         Copyright (c) Yasuhiro MATSUMOTO <mattn.jp@gmail.com>
 github.com/miekg/dns               Copyright (c) 2009, The Go Authors. Extensions copyright (c) 2011, Miek Gieben.
 github.com/ncruces/go-strftime     Copyright (c) 2022 Nuno Cruces

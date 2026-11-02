@@ -20,7 +20,7 @@ gate for these paths.
 | Session reaper | `Node.Start` | sweep every minute; evicts sessions idle for 5 minutes | `Node.Stop` (and waited for) |
 | PASE and CASE handler reapers | `Node.Start` | sweep every minute; evict handlers idle for 30 s | `Node.Stop` |
 | Operational-time keeper | `Node.Start` | every minute | `Node.Stop` (and waited for) |
-| DNS-SD re-announce loop | `Node.Start`, when the advertiser is an `mdns.Reannouncer` | 30 minutes by default | `Node.Stop` |
+| DNS-SD broadcast schedule | the first `Publish` of the node's `mdns.Responder` (timers, no goroutine; the two receive loops start with the sockets) | 1 s doubling to 90 s, until a CASE connection or two days | `Node.Stop` (the advertiser's `Close`) |
 | Session-triggered re-announce | a session event | once, bounded by the advertise timeout | `bridge.Stop` (cancelled and waited for) |
 | BDX transfer | a peer's BDX init on a secure session | one per exchange | `bridge.Stop` (cancelled and waited for, bounded by its context) |
 | BDX log transfer | a RetrieveLogsRequest answered over BDX | one at a time | `bridge.Stop` (DiagnosticLogs' `MatterQuiesce` cancels it and waits) |
@@ -53,7 +53,7 @@ no host holds counted work in hand and no goroutine of the process is
 working — the
 [Testing in process](testing-in-process.md) guide.
 
-*Source: `transport/udp/listener.go:158-229`, `bridge/bridge.go:808-864`, `bridge/ackpump.go:18-24`, `bridge/ackpump.go:291-314`, `im/subscription/manager.go:185-186`, `im/subscription/manager.go:230-236`, `im/subscription/engine.go:74-95`, `secure/operational/manager.go:231-235`, `secure/operational/manager.go:1157-1172`, `node/security.go:421-468`, `node/node.go` (`ErrStopped`), `node/node.go` (`Node.observedFabricRemoved`), `node/reannounce.go:15-31`, `node/config.go:231-235`, `bridge/securechannel.go:1265-1299`, `bridge/bdx_responder.go:141-158`, `binding/manager.go:255-261`, `node/client.go:115-125`, `node/node.go` (the `Node` struct), `clock/clock.go`, `node/config.go` (`Config.Clock`), `endpoint/assembler.go` (`Config.Clock`), `node/root.go` (`buildAggregatorClusters`), `device/options.go` (`Options.Clock`), `fabrictest/site.go` (`Run`).*
+*Source: `transport/udp/listener.go:158-229`, `bridge/bridge.go:808-864`, `bridge/ackpump.go:18-24`, `bridge/ackpump.go:291-314`, `im/subscription/manager.go:185-186`, `im/subscription/manager.go:230-236`, `im/subscription/engine.go:74-95`, `secure/operational/manager.go:231-235`, `secure/operational/manager.go:1157-1172`, `node/security.go:421-468`, `node/node.go` (`ErrStopped`), `node/node.go` (`Node.observedFabricRemoved`), `node/reannounce.go`, `mdns/announce.go`, `bridge/securechannel.go:1265-1299`, `bridge/bdx_responder.go:141-158`, `binding/manager.go:255-261`, `node/client.go:115-125`, `node/node.go` (the `Node` struct), `clock/clock.go`, `node/config.go` (`Config.Clock`), `endpoint/assembler.go` (`Config.Clock`), `node/root.go` (`buildAggregatorClusters`), `device/options.go` (`Options.Clock`), `fabrictest/site.go` (`Run`).*
 
 ## Dispatch and ordering
 

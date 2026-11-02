@@ -23,14 +23,12 @@
 //   - [Service] is the typed record bundle.
 //   - [BuildOperationalService] / [BuildCommissionableService] map
 //     the bridge state to a [Service].
-//   - [Advertiser] is the runtime surface; [NewZeroconf] returns the
-//     implementation that announces and responds via UDP multicast on
-//     5353. [NewNoop] is a stub for tests.
-//   - Subtype PTRs (`_L<discriminator>._sub._matterc._udp` and the
-//     rest of Matter §4.3.1.4) are not part of that registration. They
-//     require a [SubtypeResponder] attached to the advertiser before
-//     the first Publish — see [Zeroconf] for the call order and for
-//     what a caller that skips it loses.
+//   - [Advertiser] is the runtime surface; [NewResponder] returns the
+//     module's own mDNS responder, which announces each service's full
+//     record set (the service-type enumeration, service and subtype PTRs,
+//     SRV, TXT, A/AAAA — every record 120 s, as matter.js) and answers
+//     for it on UDP/5353, modelled on matter.js's MdnsServer. [NewNoop]
+//     is a stub for tests.
 //
 // The implementation does *not* aim to be a general-purpose mDNS
 // stack. It services the Matter discovery requirements only.

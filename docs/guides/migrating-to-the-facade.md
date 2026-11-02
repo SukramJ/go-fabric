@@ -30,7 +30,7 @@ still held there. Each row names the facade route, or the section of
 | `secure/operational` | `Manager` (`daemon_matter.go:153`, `:1193`) | `node.SessionManager` (the same type) |
 | `im/subscription` | `Manager` (`daemon_matter.go:154`, `:1194`) | `node.SubscriptionManager` (the same type); [`im/subscription`](advanced-seams.md#imsubscription) |
 | `secure/attestation` | `LoadChainFiles`, `ChainFiles`, `ErrNoChainConfigured` (`daemon_matter.go:318`, `:329`) | `Config.Attestation.Files` (`node.AttestationFiles`); loom starts on a chain that does not load and blocks commissioning (`daemon_matter.go:480-491`, `:552-554`): `Attestation.BlockCommissioningOnError`, the error in `Node.AttestationError`. Files naming nothing keep the test chain, so `ErrNoChainConfigured` has no counterpart |
-| `mdns` | `NewZeroconf`, `NewSubtypeResponder`, `NewNoop`, `Advertiser` (`daemon_matter.go:81-121`) | a nil `Config.Advertiser`; `Network.MDNS{Off}` for loom's `noop` |
+| `mdns` | `NewZeroconf`, `NewSubtypeResponder`, `NewNoop`, `Advertiser` (`daemon_matter.go:81-121`) | a nil `Config.Advertiser`; `Network.MDNS{Off}` for loom's `noop`; a host that builds the advertiser itself calls `mdns.NewResponder()` ([the mDNS responder](#removed-or-changed-in-the-next-release-the-mdns-responder)) |
 | `mdns` | `IsEnabled` (`daemon_matter.go:1263`), `Diagnose` (`:1289`), `Advertiser.Active` (`:1265`) | `Node.MDNSEnabled`, `Node.DiagnoseMDNS`, `Node.MDNSServices` (`node.MDNSFinding`, `node.MDNSService`) |
 | `endpoint` | `SourceKey` (`internal/store/matterendpoint/sourcekey.go:68`), `Topology` (`daemon_matter.go:916`) | `device.SourceKey`, `node.Topology`; a source's availability (`assembler.go:861`) is `Device.SetReachable` |
 | `endpoint` | `Assembler`, `New`, `Spec` (`assembler.go:155`, `:184`, `:627`); `endpoint/sqlitestore` (`internal/store/matterendpoint/store.go:10`) | the node's Aggregator with partitions (`Aggregator.Partition`, `Batch`) and the device kit; a host with an assembler of its own stays on [`endpoint`](advanced-seams.md#endpoint) |
@@ -57,7 +57,7 @@ facade one shape. Each row names what a host writes now.
 | `device.Logger` | `device.Options.Logger` per device (nil is `slog.Default()`) |
 | `device.WithServer`, `device.Option`, `device.TypeByID` | `device.HostServer(srv)`; `device.Declaration`; `device.Lookup(uint32(id))` |
 | `Node.PairingCodes`, `Aggregator.IncreaseConfigurationVersion`, `WindowCredentials.Iterations`, `Commissioning.PBKDFIterations int` | `Node.SetupPayload()` (`.QR`, `.Manual`); `Aggregator.IncreaseConfigurationVersions(ctx, keys...)` (`node.ErrNotStarted` before `Start`); `WindowCredentials.PBKDFIterations`; `Commissioning.PBKDFIterations uint32` |
-| `node.Client` (`Enabled`), `Config.DisableTimeSynchronization`, `Config.TimeSynchronization *TimeSynchronizationConfig`, `Network.ReannounceInterval`, `Network.DisableReannounce`, `MDNS.Disabled`, `Config.Health Health`, `Network.WiFi WiFi` | `Config.Client *ClientConfig` (nil off); `Config.TimeSynchronization{Off, Config}`; `Network.Reannounce{Interval, Off}`; `MDNS.Off`; `Config.Health *Health` (nil off); `Network.WiFi *WiFi` (nil off) |
+| `node.Client` (`Enabled`), `Config.DisableTimeSynchronization`, `Config.TimeSynchronization *TimeSynchronizationConfig`, `Network.ReannounceInterval`, `Network.DisableReannounce`, `MDNS.Disabled`, `Config.Health Health`, `Network.WiFi WiFi` | `Config.Client *ClientConfig` (nil off); `Config.TimeSynchronization{Off, Config}`; drop the re-announce settings (`Network.Reannounce` is gone too, [the mDNS responder](#removed-or-changed-in-the-next-release-the-mdns-responder)); `MDNS.Off`; `Config.Health *Health` (nil off); `Network.WiFi *WiFi` (nil off) |
 | `node.OTAConfig.Harness`, `node.Network.WiFiCommissioning`, `node.WiFiCommissioning`, `node.Config.BootID`, `node.BootID` | not public (`internal/nodeseam`); `fabrictest.UseWiFiCommissioning(cfg, driver)` in a test; `bootid.EnableRotation()` before `node.New` |
 | `contract.InitialDataVersion`, `contract.SetMeasurementMaterializer` | none: unexported; a host kind is `contract.RegisterMeasurementKind` |
 | `device.AheadRows` | `node.AheadRows()` (the root's and the devices' rows) |
@@ -67,6 +67,20 @@ facade one shape. Each row names what a host writes now.
 | `device.Options.Surface *surface.Policies` | `device.Options.Surface surface.Policies` (the zero value is no policy) |
 | `fabrictest.Device.Bridge`, `.Store`, `.Peers`, `.Advertiser`, `.Endpoints`; `fabrictest.Controller.Exchanges`, `.Names`, `.Peers`, `.Resumption`, `.Subscriptions`; the fields `fabrictest.Pair.Peer`, `.Interaction`, `.PASESession`; `fabrictest.Connect`, `fabrictest.Exchange`; the aliases `fabrictest.Peer`, `Interaction`, `Session`, `Message` | a host's test drives the facade: `pair.Device.Node()` (its `Bridge()`, `Store()` and `Peers()` are the node's own seams), the wire helpers (`fabrictest.Read`, `Write`, `Invoke`, `Subscribe`, `Send`) and the pair's client node `pair.Node()`; the client machinery below `controller/client` and a pair's transport have no public route — they are the module's own test seam (`internal/fabrictestseam`) |
 | `otbr.Probe(ctx, host, port, timeout, httpClient)`, `esphome.Discover(ctx, browser, keys, timeout)` | `otbr.Probe(ctx, otbr.Config{Host, Port, Timeout, HTTPClient, Clock})`; `esphome.Discover(ctx, esphome.Options{Logger, Clock, Discover: &esphome.DiscoverOptions{Browser, Keys, Timeout}})` |
+
+## Removed or changed in the next release: the mDNS responder
+
+The module answers DNS-SD with its own responder, modelled on matter.js's
+`MdnsServer`, in place of `github.com/grandcat/zeroconf` (issue #362). Every
+record carries 120 s; the records are announced on matter.js's broadcast
+schedule instead of a periodic re-announce loop.
+
+| Symbol | Route |
+| --- | --- |
+| `mdns.NewZeroconf()`, `mdns.Zeroconf` (`HostName`, `InterfaceFilter`, `SetLogger`, `SetClock`) | `mdns.NewResponder()`, `mdns.Responder` with the same fields and setters |
+| `mdns.NewSubtypeResponder`, `mdns.SubtypeResponder`, `Zeroconf.AttachSubtypeResponder` | drop them: the responder publishes and answers the subtype records itself |
+| `node.Network.Reannounce` (`Interval`, `Off`), `node.Reannounce`, `node.DefaultReannounceInterval` | drop them: the responder announces on matter.js's broadcast schedule (1 s doubling to 90 s, until a CASE connection or two days) |
+| `mdns.Reannouncer`, `Zeroconf.StartReannounceLoop` | drop them; `Node.TriggerReannounce(ctx)` and `Responder.TriggerReannounce(ctx)` stay, one announcement of every service now |
 
 ## Changed in the next release: `CommissionerReach` takes the peer
 
@@ -364,8 +378,8 @@ groups follow the deprecation table the README carried until `v0.9.x`.
 1. **`Node.Fabrics` is gone** ([Others](#others)): `Node.FabricInfos`
    returns `[]node.FabricInfo`.
 2. **A nil `Config.Advertiser` advertises.** Up to `v0.9.0` it was
-   `mdns.NewNoop()`; now the node builds Zeroconf with the subtype
-   responder. A host that relied on the old default sets
+   `mdns.NewNoop()`; now the node builds its mDNS responder
+   (`mdns.NewResponder`). A host that relied on the old default sets
    `Network.MDNS.Off`.
 3. **Accessor return types** of the typed cluster layer change, landing in
    `v0.10.0`.

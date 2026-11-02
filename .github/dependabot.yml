@@ -1,8 +1,8 @@
 version: 2
 updates:
-  # The module's own Go dependencies. Five direct requires (filippo.io/nistec,
-  # github.com/grandcat/zeroconf, github.com/miekg/dns, golang.org/x/net,
-  # modernc.org/sqlite) plus their transitive set — see go.mod.
+  # The module's own Go dependencies. Four direct requires (filippo.io/nistec,
+  # github.com/miekg/dns, golang.org/x/net, modernc.org/sqlite) plus their
+  # transitive set — see go.mod.
   #
   # Two of them are load-bearing for the licence position recorded in
   # THIRD-PARTY-NOTICES.md, so a major bump gets its own PR rather than

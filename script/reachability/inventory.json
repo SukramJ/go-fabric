@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 7272,
+  "entry_points": 7196,
   "entry_packages": [
     ".",
     "bdx",
@@ -276,9 +276,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 17098,
-    "reachable": 12025,
-    "whitelisted": 5073,
+    "total_exported": 17032,
+    "reachable": 12020,
+    "whitelisted": 5012,
     "unreachable": 0
   },
   "by_package": [],
@@ -723,7 +723,7 @@
       "identifier": "TestAttachSessionRegistry_SelfWiresManagerHooks",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/securechannel_close_parity_test.go",
-      "line": 103
+      "line": 104
     },
     {
       "package": "bridge",
@@ -2746,7 +2746,7 @@
       "identifier": "TestDiagnosticEventsRecordSessionAndDiscoveryKinds",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/securechannel_close_parity_test.go",
-      "line": 538
+      "line": 539
     },
     {
       "package": "bridge",
@@ -3551,7 +3551,7 @@
       "identifier": "TestInboundCloseSessionStatusReport_ClosesSession",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/securechannel_close_parity_test.go",
-      "line": 124
+      "line": 125
     },
     {
       "package": "bridge",
@@ -4804,7 +4804,7 @@
       "identifier": "TestResolveSessionPeerAddr_FallbackChain",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/securechannel_close_parity_test.go",
-      "line": 271
+      "line": 272
     },
     {
       "package": "bridge",
@@ -4944,14 +4944,14 @@
       "identifier": "TestSendCloseSessionReport_ForgetsPeerAddrEvenWhenTheFarewellFails",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/securechannel_close_parity_test.go",
-      "line": 507
+      "line": 508
     },
     {
       "package": "bridge",
       "identifier": "TestSendCloseSessionReport_WireShapeMatchesMatterJS",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/securechannel_close_parity_test.go",
-      "line": 169
+      "line": 170
     },
     {
       "package": "bridge",
@@ -5217,14 +5217,14 @@
       "identifier": "TestStop_DrainsSessionsGracefully",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/securechannel_close_parity_test.go",
-      "line": 309
+      "line": 310
     },
     {
       "package": "bridge",
       "identifier": "TestStop_SessionCloseBudgetCapsShutdown",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/securechannel_close_parity_test.go",
-      "line": 395
+      "line": 396
     },
     {
       "package": "bridge",
@@ -5445,10 +5445,17 @@
     },
     {
       "package": "bridge",
+      "identifier": "TestTriggerSessionReannounce_ReconnectEvent",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/securechannel_close_parity_test.go",
+      "line": 604
+    },
+    {
+      "package": "bridge",
       "identifier": "TestTriggerSessionReannounce_RepublishesActiveRecords",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/securechannel_close_parity_test.go",
-      "line": 451
+      "line": 452
     },
     {
       "package": "bridge",
@@ -23312,7 +23319,7 @@
       "identifier": "TestCommissionLiveThroughMulticast",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/node_live_test.go",
-      "line": 24
+      "line": 20
     },
     {
       "package": "controller/commissioner",
@@ -29511,62 +29518,6 @@
     },
     {
       "package": "mdns",
-      "identifier": "TestAddSubtype_EmptySubType_NoOp",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "mdns/subtype_internal_test.go",
-      "line": 405
-    },
-    {
-      "package": "mdns",
-      "identifier": "TestAddSubtype_EmptyTarget_NoOp",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "mdns/subtype_internal_test.go",
-      "line": 415
-    },
-    {
-      "package": "mdns",
-      "identifier": "TestBuildReply_GarbageInput",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "mdns/subtype_internal_test.go",
-      "line": 145
-    },
-    {
-      "package": "mdns",
-      "identifier": "TestBuildReply_MatchingPTR_ReturnsReply",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "mdns/subtype_internal_test.go",
-      "line": 183
-    },
-    {
-      "package": "mdns",
-      "identifier": "TestBuildReply_NoMappings_ReturnsFalse",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "mdns/subtype_internal_test.go",
-      "line": 169
-    },
-    {
-      "package": "mdns",
-      "identifier": "TestBuildReply_ResponsePacket_Ignored",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "mdns/subtype_internal_test.go",
-      "line": 154
-    },
-    {
-      "package": "mdns",
-      "identifier": "TestBuildReply_TypeANY_AlsoMatches",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "mdns/subtype_internal_test.go",
-      "line": 234
-    },
-    {
-      "package": "mdns",
-      "identifier": "TestBuildReply_WrongQtype_ReturnsFalse",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "mdns/subtype_internal_test.go",
-      "line": 251
-    },
-    {
-      "package": "mdns",
       "identifier": "TestDeriveUniqueIDFromIdentityIsStableAndDistinct",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "mdns/diagnose_identity_test.go",
@@ -29616,31 +29567,10 @@
     },
     {
       "package": "mdns",
-      "identifier": "TestEnsureTrailingDot_AlreadyHasDot",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "mdns/subtype_internal_test.go",
-      "line": 21
-    },
-    {
-      "package": "mdns",
-      "identifier": "TestEnsureTrailingDot_Empty",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "mdns/subtype_internal_test.go",
-      "line": 35
-    },
-    {
-      "package": "mdns",
-      "identifier": "TestEnsureTrailingDot_Missing",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "mdns/subtype_internal_test.go",
-      "line": 28
-    },
-    {
-      "package": "mdns",
       "identifier": "TestFilterPrimaryHostIPs",
       "reason": "auto-whitelist:pattern=test-file",
-      "file": "mdns/zeroconf_internal_test.go",
-      "line": 47
+      "file": "mdns/socket_internal_test.go",
+      "line": 177
     },
     {
       "package": "mdns",
@@ -29679,318 +29609,185 @@
     },
     {
       "package": "mdns",
-      "identifier": "TestHandleV4_Match_WriteMulticast",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "mdns/subtype_responder_live_test.go",
-      "line": 313
-    },
-    {
-      "package": "mdns",
-      "identifier": "TestHandleV4_NoMatch_NilSend",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "mdns/subtype_responder_live_test.go",
-      "line": 293
-    },
-    {
-      "package": "mdns",
-      "identifier": "TestHandleV6_Match_WriteMulticast",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "mdns/subtype_responder_live_test.go",
-      "line": 349
-    },
-    {
-      "package": "mdns",
-      "identifier": "TestHandleV6_NoMatch_NilSend",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "mdns/subtype_responder_live_test.go",
-      "line": 302
-    },
-    {
-      "package": "mdns",
       "identifier": "TestHostAddrsFor_Policy",
       "reason": "auto-whitelist:pattern=test-file",
-      "file": "mdns/host_responder_parity_matterjs_test.go",
-      "line": 360
-    },
-    {
-      "package": "mdns",
-      "identifier": "TestHostAnswer_AAAAQueryInSelectionPreferenceOrder",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "mdns/host_responder_parity_matterjs_test.go",
-      "line": 128
-    },
-    {
-      "package": "mdns",
-      "identifier": "TestHostAnswer_ANYQueryAnswersAll",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "mdns/host_responder_parity_matterjs_test.go",
-      "line": 137
-    },
-    {
-      "package": "mdns",
-      "identifier": "TestHostAnswer_AQueryAnswersARecordsOnly",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "mdns/host_responder_parity_matterjs_test.go",
-      "line": 112
-    },
-    {
-      "package": "mdns",
-      "identifier": "TestHostAnswer_DuplicateQuestionSuppression",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "mdns/host_responder_parity_matterjs_test.go",
-      "line": 243
-    },
-    {
-      "package": "mdns",
-      "identifier": "TestHostAnswer_KnownAnswerNeedsMoreThanHalfTTL",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "mdns/host_responder_parity_matterjs_test.go",
-      "line": 198
-    },
-    {
-      "package": "mdns",
-      "identifier": "TestHostAnswer_KnownAnswerSuppressionAndCacheFlush",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "mdns/host_responder_parity_matterjs_test.go",
-      "line": 183
-    },
-    {
-      "package": "mdns",
-      "identifier": "TestHostAnswer_MixedQueryAddsTheRestAsAdditionals",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "mdns/host_responder_parity_matterjs_test.go",
-      "line": 146
-    },
-    {
-      "package": "mdns",
-      "identifier": "TestHostAnswer_QUThenQMGetsOneMulticast",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "mdns/host_responder_parity_matterjs_test.go",
-      "line": 262
-    },
-    {
-      "package": "mdns",
-      "identifier": "TestHostAnswer_UnicastOnlyAfterRecentMulticast",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "mdns/host_responder_parity_matterjs_test.go",
-      "line": 215
-    },
-    {
-      "package": "mdns",
-      "identifier": "TestHostAnswer_UnknownNameOtherInterfaceOrStopped",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "mdns/host_responder_parity_matterjs_test.go",
-      "line": 158
-    },
-    {
-      "package": "mdns",
-      "identifier": "TestHostResponder_LiveMulticastV4",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "mdns/host_responder_live_test.go",
-      "line": 67
-    },
-    {
-      "package": "mdns",
-      "identifier": "TestHostResponder_LiveMulticastV6",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "mdns/host_responder_live_test.go",
-      "line": 103
+      "file": "mdns/socket_internal_test.go",
+      "line": 283
     },
     {
       "package": "mdns",
       "identifier": "TestIsPrimaryV4_AllSystemInterfaces",
       "reason": "auto-whitelist:pattern=test-file",
-      "file": "mdns/subtype_internal_test.go",
-      "line": 354
+      "file": "mdns/socket_internal_test.go",
+      "line": 97
     },
     {
       "package": "mdns",
       "identifier": "TestIsPrimaryV4_Loopback",
       "reason": "auto-whitelist:pattern=test-file",
-      "file": "mdns/subtype_internal_test.go",
-      "line": 62
+      "file": "mdns/socket_internal_test.go",
+      "line": 37
     },
     {
       "package": "mdns",
       "identifier": "TestIsPrimaryV4_PointToPoint",
       "reason": "auto-whitelist:pattern=test-file",
-      "file": "mdns/subtype_internal_test.go",
-      "line": 72
-    },
-    {
-      "package": "mdns",
-      "identifier": "TestIsPrimaryV4_ReturnsTrue",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "mdns/subtype_responder_live_test.go",
-      "line": 786
-    },
-    {
-      "package": "mdns",
-      "identifier": "TestIsPrimaryV4_WithRealInterface",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "mdns/subtype_internal_test.go",
-      "line": 376
+      "file": "mdns/socket_internal_test.go",
+      "line": 47
     },
     {
       "package": "mdns",
       "identifier": "TestIsPrimaryV6_AllSystemInterfaces",
       "reason": "auto-whitelist:pattern=test-file",
-      "file": "mdns/subtype_internal_test.go",
-      "line": 364
+      "file": "mdns/socket_internal_test.go",
+      "line": 107
     },
     {
       "package": "mdns",
       "identifier": "TestIsPrimaryV6_Loopback",
       "reason": "auto-whitelist:pattern=test-file",
-      "file": "mdns/subtype_internal_test.go",
-      "line": 84
+      "file": "mdns/socket_internal_test.go",
+      "line": 57
     },
     {
       "package": "mdns",
       "identifier": "TestIsPrimaryV6_PointToPoint",
       "reason": "auto-whitelist:pattern=test-file",
-      "file": "mdns/subtype_internal_test.go",
-      "line": 94
-    },
-    {
-      "package": "mdns",
-      "identifier": "TestIsPrimaryV6_ReturnsTrue",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "mdns/subtype_responder_live_test.go",
-      "line": 815
-    },
-    {
-      "package": "mdns",
-      "identifier": "TestIsPrimaryV6_WithRealInterface",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "mdns/subtype_internal_test.go",
-      "line": 390
+      "file": "mdns/socket_internal_test.go",
+      "line": 67
     },
     {
       "package": "mdns",
       "identifier": "TestIsTimeout_Nil",
       "reason": "auto-whitelist:pattern=test-file",
-      "file": "mdns/subtype_internal_test.go",
-      "line": 45
+      "file": "mdns/socket_internal_test.go",
+      "line": 22
     },
     {
       "package": "mdns",
       "identifier": "TestIsTimeout_NonNetError",
       "reason": "auto-whitelist:pattern=test-file",
-      "file": "mdns/subtype_internal_test.go",
-      "line": 52
-    },
-    {
-      "package": "mdns",
-      "identifier": "TestJoinMcast4_PrimaryIfaceSet",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "mdns/subtype_responder_live_test.go",
-      "line": 847
+      "file": "mdns/socket_internal_test.go",
+      "line": 29
     },
     {
       "package": "mdns",
       "identifier": "TestJoinMcast4_Success",
       "reason": "auto-whitelist:pattern=test-file",
-      "file": "mdns/subtype_responder_live_test.go",
-      "line": 88
-    },
-    {
-      "package": "mdns",
-      "identifier": "TestJoinMcast6_PrimaryIfaceSet",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "mdns/subtype_responder_live_test.go",
-      "line": 864
+      "file": "mdns/socket_live_test.go",
+      "line": 48
     },
     {
       "package": "mdns",
       "identifier": "TestJoinMcast6_ProbeAndClose",
       "reason": "auto-whitelist:pattern=test-file",
-      "file": "mdns/subtype_responder_live_test.go",
-      "line": 116
+      "file": "mdns/socket_live_test.go",
+      "line": 61
     },
     {
       "package": "mdns",
       "identifier": "TestListMulticastInterfaces_ReturnsNonNilOnAnyOS",
       "reason": "auto-whitelist:pattern=test-file",
-      "file": "mdns/subtype_internal_test.go",
-      "line": 106
+      "file": "mdns/socket_internal_test.go",
+      "line": 77
     },
     {
       "package": "mdns",
-      "identifier": "TestManualSubtypeRepro",
+      "identifier": "TestMdnsAdvertisementHostOwnedByOS",
       "reason": "auto-whitelist:pattern=test-file",
-      "file": "mdns/subtype_responder_manual_test.go",
-      "line": 18
+      "file": "mdns/responder_advertiser_parity_matterjs_test.go",
+      "line": 312
     },
     {
       "package": "mdns",
-      "identifier": "TestMatchAnswers_CaseInsensitiveLookup",
+      "identifier": "TestMdnsAdvertisementInterfaceScope",
       "reason": "auto-whitelist:pattern=test-file",
-      "file": "mdns/subtype_internal_test.go",
-      "line": 276
+      "file": "mdns/responder_advertiser_parity_matterjs_test.go",
+      "line": 339
     },
     {
       "package": "mdns",
-      "identifier": "TestMatchAnswers_Empty_ReturnsNil",
+      "identifier": "TestMdnsAdvertisementParity",
       "reason": "auto-whitelist:pattern=test-file",
-      "file": "mdns/subtype_internal_test.go",
-      "line": 267
+      "file": "mdns/responder_advertiser_parity_matterjs_test.go",
+      "line": 130
     },
     {
       "package": "mdns",
-      "identifier": "TestMatchAnswers_ZeroQuestions",
+      "identifier": "TestMdnsAnnouncementOverflow",
       "reason": "auto-whitelist:pattern=test-file",
-      "file": "mdns/subtype_internal_test.go",
-      "line": 433
+      "file": "mdns/responder_advertiser_parity_matterjs_test.go",
+      "line": 266
     },
     {
       "package": "mdns",
       "identifier": "TestMdnsServerAnswerSuppression",
       "reason": "auto-whitelist:pattern=test-file",
-      "file": "mdns/host_responder_parity_matterjs_test.go",
-      "line": 457
+      "file": "mdns/responder_server_parity_matterjs_test.go",
+      "line": 191
     },
     {
       "package": "mdns",
       "identifier": "TestMdnsServerCacheFlushBit",
       "reason": "auto-whitelist:pattern=test-file",
-      "file": "mdns/host_responder_parity_matterjs_test.go",
-      "line": 413
+      "file": "mdns/responder_server_parity_matterjs_test.go",
+      "line": 105
+    },
+    {
+      "package": "mdns",
+      "identifier": "TestMdnsServerClose",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "mdns/responder_server_parity_matterjs_test.go",
+      "line": 470
+    },
+    {
+      "package": "mdns",
+      "identifier": "TestMdnsServerDuplicateQuestionSuppression",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "mdns/responder_server_parity_matterjs_test.go",
+      "line": 359
     },
     {
       "package": "mdns",
       "identifier": "TestMdnsServerHandleDuplicateMessages",
       "reason": "auto-whitelist:pattern=test-file",
-      "file": "mdns/host_responder_parity_matterjs_test.go",
-      "line": 473
+      "file": "mdns/responder_server_parity_matterjs_test.go",
+      "line": 223
     },
     {
       "package": "mdns",
       "identifier": "TestMdnsServerHostName",
       "reason": "auto-whitelist:pattern=test-file",
-      "file": "mdns/host_responder_parity_matterjs_test.go",
-      "line": 564
+      "file": "mdns/responder_server_parity_matterjs_test.go",
+      "line": 516
     },
     {
       "package": "mdns",
       "identifier": "TestMdnsServerRespondsAsUnicast",
       "reason": "auto-whitelist:pattern=test-file",
-      "file": "mdns/host_responder_parity_matterjs_test.go",
-      "line": 508
+      "file": "mdns/responder_server_parity_matterjs_test.go",
+      "line": 267
     },
     {
       "package": "mdns",
       "identifier": "TestMdnsServerRespondsToStandardQueries",
       "reason": "auto-whitelist:pattern=test-file",
-      "file": "mdns/host_responder_parity_matterjs_test.go",
-      "line": 399
+      "file": "mdns/responder_server_parity_matterjs_test.go",
+      "line": 50
+    },
+    {
+      "package": "mdns",
+      "identifier": "TestMdnsServerSplitsResponse",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "mdns/responder_server_parity_matterjs_test.go",
+      "line": 332
     },
     {
       "package": "mdns",
       "identifier": "TestMdnsServerUnknownNameQueryRejection",
       "reason": "auto-whitelist:pattern=test-file",
-      "file": "mdns/host_responder_parity_matterjs_test.go",
-      "line": 548
+      "file": "mdns/responder_server_parity_matterjs_test.go",
+      "line": 381
     },
     {
       "package": "mdns",
@@ -30005,34 +29802,6 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "mdns/rotating_id_test.go",
       "line": 95
-    },
-    {
-      "package": "mdns",
-      "identifier": "TestNewSubtypeResponder_AddRemove_DuringRun",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "mdns/subtype_responder_live_test.go",
-      "line": 188
-    },
-    {
-      "package": "mdns",
-      "identifier": "TestNewSubtypeResponder_LifecycleSuccess",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "mdns/subtype_responder_live_test.go",
-      "line": 138
-    },
-    {
-      "package": "mdns",
-      "identifier": "TestNewSubtypeResponder_NilLogger_UsesDefault",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "mdns/subtype_responder_live_test.go",
-      "line": 612
-    },
-    {
-      "package": "mdns",
-      "identifier": "TestNewSubtypeResponder_Start_Idempotent",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "mdns/subtype_responder_live_test.go",
-      "line": 168
     },
     {
       "package": "mdns",
@@ -30078,45 +29847,10 @@
     },
     {
       "package": "mdns",
-      "identifier": "TestPackSubtypePTRs_AnnouncementShape",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "mdns/subtype_internal_test.go",
-      "line": 452
-    },
-    {
-      "package": "mdns",
-      "identifier": "TestPackSubtypePTRs_GoodbyeTTLZero",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "mdns/subtype_internal_test.go",
-      "line": 494
-    },
-    {
-      "package": "mdns",
       "identifier": "TestPrimaryHostIPs_ReturnsNonNilSlice",
       "reason": "auto-whitelist:pattern=test-file",
-      "file": "mdns/zeroconf_internal_test.go",
-      "line": 28
-    },
-    {
-      "package": "mdns",
-      "identifier": "TestPrimaryHostInterfaces",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "mdns/zeroconf_internal_test.go",
-      "line": 650
-    },
-    {
-      "package": "mdns",
-      "identifier": "TestRemoveSubtype_ClearsMapping",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "mdns/subtype_internal_test.go",
-      "line": 293
-    },
-    {
-      "package": "mdns",
-      "identifier": "TestRemoveSubtype_Empty_NoOp",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "mdns/subtype_internal_test.go",
-      "line": 424
+      "file": "mdns/socket_internal_test.go",
+      "line": 160
     },
     {
       "package": "mdns",
@@ -30127,276 +29861,108 @@
     },
     {
       "package": "mdns",
-      "identifier": "TestServeV4_ContextCancel",
+      "identifier": "TestResponder_BroadcastSchedule",
       "reason": "auto-whitelist:pattern=test-file",
-      "file": "mdns/subtype_responder_live_test.go",
-      "line": 223
+      "file": "mdns/responder_test.go",
+      "line": 87
     },
     {
       "package": "mdns",
-      "identifier": "TestServeV4_PacketReceived_DispatchesHandle",
+      "identifier": "TestResponder_CloseIsIdempotentAndFinal",
       "reason": "auto-whitelist:pattern=test-file",
-      "file": "mdns/subtype_responder_live_test.go",
-      "line": 514
+      "file": "mdns/responder_test.go",
+      "line": 52
     },
     {
       "package": "mdns",
-      "identifier": "TestServeV4_SocketClose_Exits",
+      "identifier": "TestResponder_ConcurrentUse",
       "reason": "auto-whitelist:pattern=test-file",
-      "file": "mdns/subtype_responder_live_test.go",
-      "line": 459
+      "file": "mdns/responder_test.go",
+      "line": 284
     },
     {
       "package": "mdns",
-      "identifier": "TestServeV6_ContextCancel",
+      "identifier": "TestResponder_HostQuestions",
       "reason": "auto-whitelist:pattern=test-file",
-      "file": "mdns/subtype_responder_live_test.go",
-      "line": 261
+      "file": "mdns/responder_test.go",
+      "line": 232
     },
     {
       "package": "mdns",
-      "identifier": "TestServeV6_PacketReceived_DispatchesHandle",
+      "identifier": "TestResponder_LiveHostAnswerV4",
       "reason": "auto-whitelist:pattern=test-file",
-      "file": "mdns/subtype_responder_live_test.go",
-      "line": 566
+      "file": "mdns/socket_live_test.go",
+      "line": 165
     },
     {
       "package": "mdns",
-      "identifier": "TestServeV6_SocketClose_Exits",
+      "identifier": "TestResponder_LiveHostAnswerV6",
       "reason": "auto-whitelist:pattern=test-file",
-      "file": "mdns/subtype_responder_live_test.go",
-      "line": 485
+      "file": "mdns/socket_live_test.go",
+      "line": 206
+    },
+    {
+      "package": "mdns",
+      "identifier": "TestResponder_LiveOperationalRoundTrip",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "mdns/socket_live_test.go",
+      "line": 252
+    },
+    {
+      "package": "mdns",
+      "identifier": "TestResponder_PublishWithdrawActive",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "mdns/responder_test.go",
+      "line": 19
+    },
+    {
+      "package": "mdns",
+      "identifier": "TestResponder_QUThenQMGetsOneMulticast",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "mdns/responder_test.go",
+      "line": 263
+    },
+    {
+      "package": "mdns",
+      "identifier": "TestResponder_RepublishChangedSaysGoodbyeFirst",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "mdns/responder_test.go",
+      "line": 179
+    },
+    {
+      "package": "mdns",
+      "identifier": "TestResponder_ScheduleEndsAtTheCommissioningTimeout",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "mdns/responder_test.go",
+      "line": 141
+    },
+    {
+      "package": "mdns",
+      "identifier": "TestResponder_TriggerReannounce",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "mdns/responder_test.go",
+      "line": 211
+    },
+    {
+      "package": "mdns",
+      "identifier": "TestSockets_Lifecycle",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "mdns/socket_live_test.go",
+      "line": 80
     },
     {
       "package": "mdns",
       "identifier": "TestSubtypePTRTTLParity",
       "reason": "auto-whitelist:pattern=test-file",
-      "file": "mdns/subtype_ttl_parity_matterjs_test.go",
-      "line": 19
-    },
-    {
-      "package": "mdns",
-      "identifier": "TestSubtypeResponderAnnounceDuringCloseIsSynchronised",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "mdns/subtype_announce_close_test.go",
-      "line": 33
-    },
-    {
-      "package": "mdns",
-      "identifier": "TestSubtypeResponder_AnnounceEmptyMappings",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "mdns/subtype_internal_test.go",
-      "line": 513
-    },
-    {
-      "package": "mdns",
-      "identifier": "TestSubtypeResponder_AnswersHostThroughTransport",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "mdns/host_responder_parity_matterjs_test.go",
-      "line": 300
-    },
-    {
-      "package": "mdns",
-      "identifier": "TestSubtypeResponder_Close_Idempotent",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "mdns/subtype_internal_test.go",
-      "line": 333
-    },
-    {
-      "package": "mdns",
-      "identifier": "TestSubtypeResponder_Close_WithRealSockets",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "mdns/subtype_responder_live_test.go",
-      "line": 877
-    },
-    {
-      "package": "mdns",
-      "identifier": "TestSubtypeResponder_Close_WithoutStart",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "mdns/subtype_internal_test.go",
-      "line": 324
-    },
-    {
-      "package": "mdns",
-      "identifier": "TestSubtypeResponder_NilReceiver",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "mdns/subtype_internal_test.go",
-      "line": 123
-    },
-    {
-      "package": "mdns",
-      "identifier": "TestSubtypeResponder_Start_NoPCSockets_NoGoroutines",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "mdns/subtype_internal_test.go",
-      "line": 309
+      "file": "mdns/record_ttl_parity_matterjs_test.go",
+      "line": 20
     },
     {
       "package": "mdns",
       "identifier": "TestSurvivesReadError",
       "reason": "auto-whitelist:pattern=test-file",
-      "file": "mdns/subtype_internal_test.go",
-      "line": 528
-    },
-    {
-      "package": "mdns",
-      "identifier": "TestWriteMulticastV4_FanOut_Success",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "mdns/subtype_responder_live_test.go",
-      "line": 631
-    },
-    {
-      "package": "mdns",
-      "identifier": "TestWriteMulticastV4_IfIndexHint_BadIndex",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "mdns/subtype_responder_live_test.go",
-      "line": 419
-    },
-    {
-      "package": "mdns",
-      "identifier": "TestWriteMulticastV4_IfIndexHint_Success",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "mdns/subtype_responder_live_test.go",
-      "line": 682
-    },
-    {
-      "package": "mdns",
-      "identifier": "TestWriteMulticastV4_NoMatchingIface_NoWrite",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "mdns/subtype_responder_live_test.go",
-      "line": 384
-    },
-    {
-      "package": "mdns",
-      "identifier": "TestWriteMulticastV6_FanOut_Success",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "mdns/subtype_responder_live_test.go",
-      "line": 732
-    },
-    {
-      "package": "mdns",
-      "identifier": "TestWriteMulticastV6_IfIndexHint_BadIndex",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "mdns/subtype_responder_live_test.go",
-      "line": 439
-    },
-    {
-      "package": "mdns",
-      "identifier": "TestWriteMulticastV6_IfIndexHint_Success",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "mdns/subtype_responder_live_test.go",
-      "line": 750
-    },
-    {
-      "package": "mdns",
-      "identifier": "TestWriteMulticastV6_NoMatchingIface_NoWrite",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "mdns/subtype_responder_live_test.go",
-      "line": 402
-    },
-    {
-      "package": "mdns",
-      "identifier": "TestZeroconfInternal_CloseClosesAttachedResponder",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "mdns/zeroconf_internal_test.go",
-      "line": 566
-    },
-    {
-      "package": "mdns",
-      "identifier": "TestZeroconfInternal_Close_WithResponder_SubFQDNs",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "mdns/zeroconf_internal_test.go",
-      "line": 314
-    },
-    {
-      "package": "mdns",
-      "identifier": "TestZeroconfInternal_NewSubtypeResponder_Logger_NonNil",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "mdns/zeroconf_internal_test.go",
-      "line": 432
-    },
-    {
-      "package": "mdns",
-      "identifier": "TestZeroconfInternal_Publish_HostNameOverride",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "mdns/zeroconf_internal_test.go",
-      "line": 630
-    },
-    {
-      "package": "mdns",
-      "identifier": "TestZeroconfInternal_Publish_HostName_Empty_FallsBack",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "mdns/zeroconf_internal_test.go",
-      "line": 411
-    },
-    {
-      "package": "mdns",
-      "identifier": "TestZeroconfInternal_Publish_RecordsAdvertisedAddresses",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "mdns/zeroconf_internal_test.go",
-      "line": 453
-    },
-    {
-      "package": "mdns",
-      "identifier": "TestZeroconfInternal_Publish_UnchangedSkipsReRegister",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "mdns/zeroconf_internal_test.go",
-      "line": 253
-    },
-    {
-      "package": "mdns",
-      "identifier": "TestZeroconfInternal_Publish_WithResponder",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "mdns/zeroconf_internal_test.go",
-      "line": 157
-    },
-    {
-      "package": "mdns",
-      "identifier": "TestZeroconfInternal_Publish_WithResponder_Domain",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "mdns/zeroconf_internal_test.go",
-      "line": 224
-    },
-    {
-      "package": "mdns",
-      "identifier": "TestZeroconfInternal_Publish_WithResponder_EmptySubtype",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "mdns/zeroconf_internal_test.go",
-      "line": 197
-    },
-    {
-      "package": "mdns",
-      "identifier": "TestZeroconfInternal_RepublishAllDoesNotResurrectWithdrawn",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "mdns/zeroconf_internal_test.go",
-      "line": 503
-    },
-    {
-      "package": "mdns",
-      "identifier": "TestZeroconfInternal_RepublishAll_WithItems",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "mdns/zeroconf_internal_test.go",
-      "line": 380
-    },
-    {
-      "package": "mdns",
-      "identifier": "TestZeroconfInternal_ResponderCloseIsIdempotentUnderTwoOwners",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "mdns/zeroconf_internal_test.go",
-      "line": 592
-    },
-    {
-      "package": "mdns",
-      "identifier": "TestZeroconfInternal_Withdraw_WithResponder_SubFQDNs",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "mdns/zeroconf_internal_test.go",
-      "line": 346
-    },
-    {
-      "package": "mdns",
-      "identifier": "TestZeroconf_HandsHostNameToResponder",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "mdns/host_responder_parity_matterjs_test.go",
-      "line": 335
+      "file": "mdns/socket_internal_test.go",
+      "line": 122
     },
     {
       "package": "node",
@@ -30788,7 +30354,14 @@
       "identifier": "TestDefaultAdvertiser",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "node/mdns_internal_test.go",
-      "line": 42
+      "line": 45
+    },
+    {
+      "package": "node",
+      "identifier": "TestOperationalConnectedEndsTheBroadcast",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "node/mdns_internal_test.go",
+      "line": 97
     },
     {
       "package": "node",

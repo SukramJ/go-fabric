@@ -7,9 +7,12 @@ import (
 	"context"
 	"log/slog"
 	"path/filepath"
+	"slices"
+	"sync"
 	"testing"
 
 	"github.com/SukramJ/go-fabric/mdns"
+	"github.com/SukramJ/go-fabric/secure/sigma"
 )
 
 // mdnsTestConfig is the smallest configuration New accepts, on its own
@@ -36,7 +39,7 @@ func newMDNSTestNode(t *testing.T, cfg Config) *Node {
 	return n
 }
 
-// A nil Advertiser is Zeroconf, Noop under Network.MDNS.Off; a host's
+// A nil Advertiser is the mDNS responder, Noop under Network.MDNS.Off; a host's
 // advertiser stays the host's. The nodes are never started: nothing is
 // published.
 func TestDefaultAdvertiser(t *testing.T) {
@@ -53,12 +56,12 @@ func TestDefaultAdvertiser(t *testing.T) {
 	cfg = mdnsTestConfig(t)
 	cfg.Network.MDNS.HostName = "bs-host"
 	n = newMDNSTestNode(t, cfg)
-	zc, ok := n.advertiser.(*mdns.Zeroconf)
-	if !ok || !n.ownsAdvertiser || zc.HostName != "bs-host" {
-		t.Fatalf("nil Advertiser: %T, want the node's *mdns.Zeroconf with the host name", n.advertiser)
+	r, ok := n.advertiser.(*mdns.Responder)
+	if !ok || !n.ownsAdvertiser || r.HostName != "bs-host" {
+		t.Fatalf("nil Advertiser: %T, want the node's *mdns.Responder with the host name", n.advertiser)
 	}
 	if !n.MDNSEnabled() {
-		t.Fatal("Zeroconf reads as not advertising")
+		t.Fatal("the responder reads as not advertising")
 	}
 	// Unstarted, it publishes nothing, which the diagnosis reports.
 	if f := n.DiagnoseMDNS(); len(f) == 0 || f[0].Code != "no_services" {
@@ -71,5 +74,40 @@ func TestDefaultAdvertiser(t *testing.T) {
 	n = newMDNSTestNode(t, cfg)
 	if n.advertiser != mdns.Advertiser(host) || n.ownsAdvertiser {
 		t.Fatal("the host's advertiser was replaced")
+	}
+}
+
+// connectedAdvertiser records the ServiceConnected calls.
+type connectedAdvertiser struct {
+	*mdns.Noop
+	mu        sync.Mutex
+	connected []string
+}
+
+func (a *connectedAdvertiser) ServiceConnected(instance, serviceType string) {
+	a.mu.Lock()
+	a.connected = append(a.connected, instance+"|"+serviceType)
+	a.mu.Unlock()
+}
+
+// TestOperationalConnectedEndsTheBroadcast: a CASE session on a fabric
+// tells the advertiser that fabric's operational service is connected
+// (matter.js DeviceAdvertiser.ts:114-129); a session without a loaded
+// identity, or a PASE session's fabric index 0, tells it nothing.
+func TestOperationalConnectedEndsTheBroadcast(t *testing.T) {
+	adv := &connectedAdvertiser{Noop: mdns.NewNoop()}
+	cfg := mdnsTestConfig(t)
+	cfg.Advertiser = adv
+	n := newMDNSTestNode(t, cfg)
+	n.caseIDs.mu.Lock()
+	n.caseIDs.byIdx[3] = &caseFabric{identity: &sigma.Identity{CompressedFabricID: [8]byte{0, 0, 0, 0, 0, 0, 0, 0x18}, NodeID: 1}}
+	n.caseIDs.mu.Unlock()
+	n.operationalConnected(0)
+	n.operationalConnected(2)
+	n.operationalConnected(3)
+	adv.mu.Lock()
+	defer adv.mu.Unlock()
+	if want := []string{"0000000000000018-0000000000000001|_matter._tcp"}; !slices.Equal(adv.connected, want) {
+		t.Errorf("ServiceConnected calls %v, want %v", adv.connected, want)
 	}
 }

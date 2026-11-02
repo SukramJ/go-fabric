@@ -11,14 +11,13 @@
 // go-fabric mapping:
 //   [Noop] advertiser implements Withdraw via in-memory delete only
 //   (no multicast TTL=0 packets — Noop is test / boot-phase only).
-//   [Zeroconf] calls grandcat/zeroconf's server.Shutdown(), which sends
-//   mDNS goodbye packets (TTL=0) before dismantling the DNS responder.
-//   The production goodbye contract is validated end-to-end via the
-//   commissioning integration tests. This file covers the structural
-//   contract that [Advertiser.Withdraw] removes the record from the
-//   active set so subsequent [Advertiser.Active] no longer lists it —
-//   the semantic invariant that any goodbye-capable advertiser must
-//   satisfy.
+//   [Responder] sends the record set with TTL 0 on Withdraw and Close
+//   (announce.go goodbyeLocked; the packets are pinned by
+//   TestMdnsAdvertisementParity and TestSubtypePTRTTLParity). This file
+//   covers the structural contract that [Advertiser.Withdraw] removes the
+//   record from the active set so subsequent [Advertiser.Active] no longer
+//   lists it — the semantic invariant that any goodbye-capable advertiser
+//   must satisfy.
 
 package mdns_test
 
@@ -83,9 +82,8 @@ func TestParityMatterJS_Goodbye_WithdrawUnknownReturnsError(t *testing.T) {
 // live advertiser returns nil.
 //
 // Mirrors matter.js MdnsServer.ts::close — close() resolves without error.
-// The production [Zeroconf] advertiser additionally sends goodbye packets
-// (TTL=0) for all active records via grandcat/zeroconf's Shutdown path,
-// which clears the active set. The [Noop] advertiser is test / boot-phase
+// The production [Responder] additionally sends goodbye packets (TTL=0)
+// for all active records and clears the active set. The [Noop] advertiser is test / boot-phase
 // only and does not perform multicast — the no-TTL-0 divergence is
 // documented in notes/parity/by_design.md.
 func TestParityMatterJS_Goodbye_CloseDoesNotError(t *testing.T) {

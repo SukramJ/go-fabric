@@ -50,7 +50,7 @@ type selfNode struct {
 // statuses to the serving command.
 func (s *stack) ownNodeConfig() *controller.OTAConfig {
 	s.images = softwareupdate.NewImages(softwareupdate.ImagesConfig{Logger: s.e.log})
-	adv := func() mdns.Advertiser { return mdns.NewZeroconf() }
+	adv := func() mdns.Advertiser { return mdns.NewResponder() }
 	if selfHooks.advertiser != nil {
 		adv = selfHooks.advertiser
 	}

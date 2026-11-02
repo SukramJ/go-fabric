@@ -6,18 +6,12 @@
 // matter.js reference: packages/protocol/test/mdns/MdnsServerTest.ts
 //
 // go-fabric mapping:
-//   The go-fabric mDNS stack is split between:
-//     - [Noop] advertiser — in-memory; used for unit / boot tests.
-//     - [Zeroconf] advertiser — production; backed by grandcat/zeroconf.
-//     - [Advertiser] interface — common contract (Publish/Withdraw/Active/Close).
-//   The matter.js MdnsServer tests exercise a wire-level DNS query/response
-//   simulator that has no direct equivalent in the go-fabric API surface.
-//   The structural invariants (record set management, query-scoped response,
-//   duplicate suppression) are captured here as skip-annotated anchors so
-//   that future integration-level implementations can fill them in.
-//
-// Build status: all cases either pass on the go-fabric surface or are
-// t.Skip-annotated with a gap label.
+//   The wire-level cases of MdnsServerTest.ts run against the
+//   [Responder]'s answer engine in responder_server_parity_matterjs_test.go.
+//   This file keeps the structural anchors on the [Advertiser] contract
+//   (the record is in the Active set, an unknown name is not, the record
+//   content the builders produce) that hold for every advertiser, [Noop]
+//   included.
 
 package mdns_test
 

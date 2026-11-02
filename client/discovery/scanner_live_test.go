@@ -1,14 +1,10 @@
-//go:build !race
-
 // SPDX-License-Identifier: Apache-2.0
 // Copyright (C) 2026 SukramJ.
 
 package discovery_test
 
 // The live test runs the production transport against the module's own
-// advertiser. It is built without the race detector only: the advertiser
-// is grandcat/zeroconf, whose Shutdown/recv race is the reason the mdns
-// package's tests skip under -race (mdns/race_skip_test.go).
+// advertiser, the mDNS responder.
 
 import (
 	"context"
@@ -20,20 +16,14 @@ import (
 )
 
 // TestScanner_LiveFindsAnAdvertisedNode advertises a commissionable record
-// with mdns.Zeroconf (plus its subtype responder) on the host's multicast
+// with the module's mDNS responder on the host's multicast
 // interfaces and finds it by long discriminator, by short discriminator
 // and with "any". Skipped where the host gives no multicast.
 func TestScanner_LiveFindsAnAdvertisedNode(t *testing.T) {
 	if testing.Short() {
 		t.Skip("multicast; skipped under -short")
 	}
-	responder, err := mdns.NewSubtypeResponder(nil)
-	if err != nil {
-		t.Skipf("no multicast here: %v", err)
-	}
-	responder.Start(t.Context())
-	z := mdns.NewZeroconf()
-	z.AttachSubtypeResponder(responder)
+	z := mdns.NewResponder()
 	defer func() { _ = z.Close() }()
 
 	const discriminator = 0xA5C // short discriminator 0xA

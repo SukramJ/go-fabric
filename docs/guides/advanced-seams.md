@@ -20,7 +20,7 @@ A host names none of the packages below for these:
 | Need | Facade route |
 | --- | --- |
 | The store | `Config.Store.Path` (the node opens and closes the SQLite file), or `Store.DB` for the host's own handle |
-| DNS-SD | a nil `Config.Advertiser`: Zeroconf with the subtype responder, shaped by `Network.MDNS` (`Off`, `HostName`); `Node.MDNSEnabled`, `MDNSServices`, `DiagnoseMDNS` |
+| DNS-SD | a nil `Config.Advertiser`: the module's mDNS responder, shaped by `Network.MDNS` (`Off`, `HostName`); `Node.MDNSEnabled`, `MDNSServices`, `DiagnoseMDNS`, `TriggerReannounce` |
 | Attestation | `Config.Attestation.Files`; `Attestation.BlockCommissioningOnError` and `Node.AttestationError` for a host that keeps running on a broken chain |
 | Credentials | `node.NewCommissioningCredentials`, `node.NewWindowCredentials(timeout)`, `Commissioning.WindowCredentials`, `node.ValidateSetupPIN`, `node.MaxDiscriminator`, `node.PBKDFIterationsMin`/`Max`, `node.PBKDFSaltMin`/`Max`; `Node.PairingCodesFor`, `Node.SetupPayload` (the configured passcode, discriminator, vendor and product id with both codes) |
 | The commissioning window | `Node.Window()`: open, kind (`WindowOwn`, `WindowBasic`, `WindowEnhanced`), advertised discriminator and mode, opened-at, deadline and timeout on the node's clock — the value `OnWindowTransition` receives; `Node.OpenOwnWindow` (the configured credentials), `Node.OpenBasicWindow` (the host's), `Node.CloseWindow` (whoever opened it), `Node.SetCommissioningBlocked`. The bridge's window type with its `Set…` wiring is reached only through `Node.Bridge()`: its `SetTransitionHook` replaces the facade's own hook |
@@ -164,20 +164,22 @@ settings of the host's own.
 
 ## `mdns`
 
-**Gives.** The advertisers (`mdns.Zeroconf`, `mdns.Noop`), the subtype
-responder, `mdns.Diagnose`, the optional interfaces `mdns.Reannouncer` and
-`mdns.Enabled`.
+**Gives.** The advertisers (`mdns.Responder`, `mdns.Noop`),
+`mdns.Diagnose`, the optional interface `mdns.Enabled`.
 
 **When.** A host with its own advertiser — another mDNS stack on the
 machine, a test spy — sets `Config.Advertiser`.
 
-**Costs.** A host's advertiser replaces the node's: the subtype responder
+**Costs.** A host's advertiser replaces the node's: the subtype records
 (the `_L<discriminator>._sub` answers commissioners filtering by
-discriminator need), the clock the node hands it and the re-announce loop
-work only if the host's advertiser provides them (`SetClock`,
-`mdns.Reannouncer`). `Node.Stop` closes it either way.
+discriminator need), the broadcast schedule, the clock the node hands it,
+the end of the operational broadcast at a CASE connection and the on-demand
+announcement work only if the host's advertiser provides them (`SetClock`,
+`ServiceConnected`, `TriggerReannounce`; the bridge's session-teardown and
+retransmission events take `ServiceDisconnected` and
+`ServiceRetransmission`). `Node.Stop` closes it either way.
 
-*Source: `node/mdns.go`, `node/node.go` (`New`: `SetClock`), `node/reannounce.go`, `mdns/advertiser.go:40-61`, `mdns/zeroconf.go:137-164`.*
+*Source: `node/mdns.go`, `node/node.go` (`New`: `SetClock`), `node/reannounce.go`, `mdns/advertiser.go`, `mdns/responder.go` (`NewResponder`, `ServiceConnected`), `bridge/securechannel.go` (`triggerSessionReannounce`), `bridge/ackpump.go` (`retransmissionBroadcast`).*
 
 ## `secure/…`
 
