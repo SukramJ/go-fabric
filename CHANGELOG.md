@@ -10,6 +10,8 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+## [0.16.0] — 2026-11-02
+
 ### Security
 
 Findings of the whole-codebase review of 2026-11-01 (`notes/review/2026-11/`).
@@ -5322,7 +5324,8 @@ consumer of an older pseudo-version should read.
   earlier than it was. Both fields are gone; the commit holding the file is
   its provenance.
 
-[Unreleased]: https://github.com/SukramJ/go-fabric/compare/v0.15.6...HEAD
+[Unreleased]: https://github.com/SukramJ/go-fabric/compare/v0.16.0...HEAD
+[0.16.0]: https://github.com/SukramJ/go-fabric/compare/v0.15.6...v0.16.0
 [0.15.6]: https://github.com/SukramJ/go-fabric/compare/v0.15.5...v0.15.6
 [0.15.5]: https://github.com/SukramJ/go-fabric/compare/v0.15.4...v0.15.5
 [0.15.4]: https://github.com/SukramJ/go-fabric/compare/v0.15.3...v0.15.4
