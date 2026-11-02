@@ -29,7 +29,7 @@ import (
 // ClientConfig is the node's client stack: what a server node needs to
 // reach other nodes of its fabrics — the peers its Binding entries
 // direct. matter.js gives every ServerNode its peers (`node.peers`, the
-// PeerSet BindingManager.ts:333 and :600 use); here the stack is opt-in,
+// PeerSet BindingManager.ts:317 and :445 use); here the stack is opt-in,
 // an optional sub-system a non-nil [Config].Client builds (ADR 0025
 // principle 2).
 type ClientConfig struct {

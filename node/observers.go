@@ -25,7 +25,7 @@ import (
 // The name follows matter.js, whose node events are Observables that
 // observers attach to (packages/protocol/src/fabric/FabricManager.ts:
 // 41-48 `#events`); a failing observer is logged and the remaining
-// observers still run (FabricManager.ts:381-386 `unhandled`, "Log
+// observers still run (FabricManager.ts:404-410 `unhandled`, "Log
 // unhandled errors but do not abort deletion").
 //
 // They follow the node's one callback rule (ADR 0025 principle 8):

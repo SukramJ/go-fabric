@@ -2023,15 +2023,6 @@
     "occurrences": 10
   },
   {
-    "file": "node/client.go",
-    "line": 32,
-    "citation": "BindingManager.ts:333",
-    "resolved": "packages/node/src/behaviors/binding/BindingManager.ts",
-    "identifier": "PeerSet",
-    "nearest": 584,
-    "occurrences": 3
-  },
-  {
     "file": "node/config.go",
     "line": 41,
     "citation": "packages/node/src/node/ServerNode.ts:107-127",
