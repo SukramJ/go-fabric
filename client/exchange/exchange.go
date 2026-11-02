@@ -604,7 +604,9 @@ func (x *Exchange) sendAdditionalDelay() time.Duration {
 func (x *Exchange) backoffLocked(n int) time.Duration {
 	iv, active := x.session.timing()
 	d := RetransmissionIntervalPadded(n, iv, active, x.m.rand(), x.sendPad())
-	d += x.sendOpts.InitialRetransmissionTime
+	// Saturating: d is MaxInt64 once the unbounded fallback's backoff
+	// saturated (W4-ctlnet-01); matter.js MessageExchange.ts:1242-1250.
+	d = satAdd(d, x.sendOpts.InitialRetransmissionTime)
 	if x.sendOpts.MaxRetransmissionTime > 0 {
 		d = min(d, max(x.sendOpts.MaxRetransmissionTime, iv.Idle))
 	}

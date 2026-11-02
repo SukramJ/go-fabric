@@ -4,6 +4,7 @@
 package exchange
 
 import (
+	"math"
 	"time"
 
 	"github.com/SukramJ/go-fabric/transport/mrp"
@@ -56,7 +57,25 @@ func RetransmissionIntervalPadded(n int, p Intervals, peerActive bool, rand01 fl
 		base = p.Active
 	}
 	d := mrp.BackoffDuration(base+pad.Additional, n, func() float64 { return rand01 })
-	return (d + pad.Fixed).Truncate(time.Millisecond)
+	return satAdd(d, pad.Fixed).Truncate(time.Millisecond)
+}
+
+// satAdd is a + b saturating at the Duration bounds. [mrp.BackoffDuration]
+// saturates at MaxInt64 for an unbounded attempt, and the pads added after
+// it — the fixed backoff here, InitialRetransmissionTime in backoffLocked —
+// would wrap that to a negative wait the timer fires at once. JavaScript
+// numbers grow to Infinity instead and the cap then applies: mirrors
+// matter.js MRP.ts:182-190 (backoff += fixedBackoff) and
+// MessageExchange.ts:1242-1250 (+ initialRetransmissionTime, then
+// Duration.min with the cap).
+func satAdd(a, b time.Duration) time.Duration {
+	if b > 0 && a > math.MaxInt64-b {
+		return math.MaxInt64
+	}
+	if b < 0 && a < math.MinInt64-b {
+		return math.MinInt64
+	}
+	return a + b
 }
 
 // maxResponseTimePadded is maxResponseTime with the sender-side pad on
