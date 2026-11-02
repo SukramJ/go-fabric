@@ -55,101 +55,11 @@ func TestParityMdnsServer_RespondsToANYQuery(t *testing.T) {
 	}
 }
 
-// TestParityMdnsServer_TruncatedQueryDelaysResponse verifies that after a
-// truncated (TC-bit) query the server waits before responding.
-//
-// Mirrors matter.js packages/protocol/test/mdns/MdnsServerTest.ts:118
-// (case "server responds to an ANY query with different Query messageTypes (Truncated Query)").
-//
-// go-fabric gap: the Advertiser interface does not expose the TC-bit delay
-// logic; that lives in the grandcat/zeroconf layer.
-func TestParityMdnsServer_TruncatedQueryDelaysResponse(t *testing.T) {
-	t.Skip("FixMe: go-fabric gap — drift L7-TruncatedTC; Advertiser surface does not expose TC-bit delay")
-}
-
-// TestParityMdnsServer_RespondsToSRVQuery verifies that a SRV query returns
-// the SRV record in answers and TXT + A in additionalRecords.
-//
-// Mirrors matter.js packages/protocol/test/mdns/MdnsServerTest.ts:207
-// (case "server responds to an SRV query").
-//
-// go-fabric gap: wire-level DNS query/response dispatch is internal to the
-// grandcat/zeroconf library and not directly testable via the Advertiser API.
-func TestParityMdnsServer_RespondsToSRVQuery(t *testing.T) {
-	t.Skip("FixMe: go-fabric gap — wire-level SRV query response not exposed via Advertiser interface")
-}
-
-// TestParityMdnsServer_RespondsToAQuery verifies that an A-record query for
-// the host name returns the A record only.
-//
-// Mirrors matter.js packages/protocol/test/mdns/MdnsServerTest.ts:246
-// (case "server responds to an A query with A record only").
-//
-// go-fabric gap: wire-level DNS query/response dispatch is internal to the
-// grandcat/zeroconf library and not directly testable via the Advertiser API.
-func TestParityMdnsServer_RespondsToAQuery(t *testing.T) {
-	t.Skip("FixMe: go-fabric gap — wire-level A query response not exposed via Advertiser interface")
-}
-
 // ─── Answer suppression ───────────────────────────────────────────────────────
-
-// TestParityMdnsServer_SuppressKnownAnswer verifies that the mDNS server
-// omits a record from the response when the querier already supplied it as
-// a known-answer in the query.
-//
-// Mirrors matter.js packages/protocol/test/mdns/MdnsServerTest.ts:287
-// (case "suppress one answers in an ANY query").
-//
-// go-fabric gap: known-answer suppression is internal to grandcat/zeroconf.
-func TestParityMdnsServer_SuppressKnownAnswer(t *testing.T) {
-	t.Skip("FixMe: go-fabric gap — known-answer suppression not exposed via Advertiser interface")
-}
-
-// TestParityMdnsServer_SuppressFullAnswer verifies that no response is sent
-// when every record is present in the known-answer section.
-//
-// Mirrors matter.js packages/protocol/test/mdns/MdnsServerTest.ts:370
-// (case "suppress full answer in an ANY query").
-//
-// go-fabric gap: full-answer suppression is internal to grandcat/zeroconf.
-func TestParityMdnsServer_SuppressFullAnswer(t *testing.T) {
-	t.Skip("FixMe: go-fabric gap — full-answer suppression not exposed via Advertiser interface")
-}
 
 // ─── Duplicate question suppression ──────────────────────────────────────────
 
-// TestParityMdnsServer_DuplicateQuestionSuppression verifies that the server
-// does not respond to the same query twice within the suppression window
-// (QUESTION_SUPPRESSION_WINDOW = 999 ms per matter.js).
-//
-// Mirrors matter.js packages/protocol/test/mdns/MdnsServerTest.ts:427
-// (case "server suppress response to same ANY query when 0ms delay").
-//
-// go-fabric gap: duplicate-question suppression is internal to grandcat/zeroconf.
-func TestParityMdnsServer_DuplicateQuestionSuppression(t *testing.T) {
-	t.Skip("FixMe: go-fabric gap — duplicate-question suppression not exposed via Advertiser interface")
-}
-
-// TestParityMdnsServer_DuplicateSuppressionWindowExpires verifies that after
-// the suppression window (999 ms) expires, the same query does get a response.
-//
-// Mirrors matter.js packages/protocol/test/mdns/MdnsServerTest.ts:1061
-// (case "responds after suppression window expires").
-//
-// go-fabric gap: suppression-window timer is internal to grandcat/zeroconf.
-func TestParityMdnsServer_DuplicateSuppressionWindowExpires(t *testing.T) {
-	t.Skip("FixMe: go-fabric gap — suppression-window timer not exposed via Advertiser interface")
-}
-
 // ─── Unicast response mode ────────────────────────────────────────────────────
-
-// TestParityMdnsServer_UnicastAndSplitResponse documents gaps in the
-// go-fabric Advertiser surface: unicast/multicast TTL-based decisions
-// (matter.js MdnsServerTest.ts:801) and large-response UDP packet splitting
-// (matter.js MdnsServerTest.ts:937) are both internal to grandcat/zeroconf.
-func TestParityMdnsServer_UnicastAndSplitResponse(t *testing.T) {
-	t.Skip("FixMe: go-fabric gap — unicast/multicast TTL decision (L7-D04) and UDP packet splitting not exposed via Advertiser interface")
-}
 
 // ─── Unknown-name query rejection ────────────────────────────────────────────
 
@@ -207,18 +117,6 @@ func TestParityMdnsServer_RespondsToHostARecordByHostname(t *testing.T) {
 	}
 }
 
-// TestParityMdnsServer_MixedQueryRespondsForKnownNames verifies that when a
-// query contains both known and unknown names, the server still responds for
-// the known name.
-//
-// Mirrors matter.js packages/protocol/test/mdns/MdnsServerTest.ts:1168
-// (case "still responds when a known-name query is mixed with unknown-name queries").
-//
-// go-fabric gap: per-query filtering is internal to grandcat/zeroconf.
-func TestParityMdnsServer_MixedQueryRespondsForKnownNames(t *testing.T) {
-	t.Skip("FixMe: go-fabric gap — per-query name filtering not exposed via Advertiser interface")
-}
-
 // TestParityMdnsServer_RecordsGeneratorReplacement verifies that after
 // replacing the records generator, queries for the old name no longer match
 // and queries for the new name do.
@@ -258,25 +156,6 @@ func TestParityMdnsServer_RecordsGeneratorReplacement(t *testing.T) {
 }
 
 // ─── RFC 6762 §16 case-insensitive matching ────────────────────────────────
-
-// TestParityMdnsServer_CaseInsensitiveNameMatch verifies that queries using
-// uppercase names match lowercase published records per RFC 6762 §16.
-//
-// Mirrors matter.js packages/protocol/test/mdns/MdnsServerTest.ts:1198
-// (case "matches uppercase query names against lowercase records (RFC 6762 §16)").
-//
-// go-fabric gap: case-insensitive DNS matching is internal to grandcat/zeroconf.
-func TestParityMdnsServer_CaseInsensitiveNameMatch(t *testing.T) {
-	t.Skip("FixMe: go-fabric gap — RFC 6762 §16 case-insensitive name matching not exposed via Advertiser interface")
-}
-
-// TestParityMdnsServer_RFC6762Gaps documents remaining RFC 6762 §16
-// parity gaps: TC-continuation fragment merging (MdnsServerTest.ts:1223) and
-// case-insensitive known-answer suppression (MdnsServerTest.ts:1388) are both
-// internal to grandcat/zeroconf and not exposed via the Advertiser interface.
-func TestParityMdnsServer_RFC6762Gaps(t *testing.T) {
-	t.Skip("FixMe: go-fabric gap — RFC 6762 §16 TC-continuation fragment merging + case-insensitive known-answer suppression not exposed via Advertiser interface")
-}
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 

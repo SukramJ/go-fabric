@@ -47,6 +47,19 @@ var classes = map[string]bool{
 // Register is register.json.
 type Register struct {
 	Entries []Entry `json:"entries"`
+	// Skips are the Go tests whose body is an unconditional
+	// t.Skip("FixMe: …"): a gap a test names without testing it. Every such
+	// test in the module is listed here and on the page, and nowhere else
+	// (TestTestparityFixMeSkipsRegistered, W6-test-08).
+	Skips []Skip `json:"skips,omitempty"`
+}
+
+// Skip is one FixMe-skipped Go test: what it would mirror and why it does
+// not run.
+type Skip struct {
+	Test   string `json:"test"`
+	Source string `json:"source"`
+	Reason string `json:"reason"`
 }
 
 // Entry is the register's verdict on one snapshot path. The package doc
@@ -102,6 +115,17 @@ func (r *Register) validate() error {
 		}
 		if i > 0 && r.Entries[i-1].Path >= e.Path {
 			errs = append(errs, fmt.Errorf("entry %d (%s): not sorted after %s, or a duplicate", i, e.Path, r.Entries[i-1].Path))
+		}
+	}
+	for i, s := range r.Skips {
+		if !goRefPattern.MatchString(s.Test) {
+			errs = append(errs, fmt.Errorf("skip %d: test %q is not <package dir>:<TestFunc>", i, s.Test))
+		}
+		if strings.TrimSpace(s.Source) == "" || strings.TrimSpace(s.Reason) == "" {
+			errs = append(errs, fmt.Errorf("skip %d (%s): no source or no reason", i, s.Test))
+		}
+		if i > 0 && r.Skips[i-1].Test >= s.Test {
+			errs = append(errs, fmt.Errorf("skip %d (%s): not sorted after %s, or a duplicate", i, s.Test, r.Skips[i-1].Test))
 		}
 	}
 	return errors.Join(errs...)

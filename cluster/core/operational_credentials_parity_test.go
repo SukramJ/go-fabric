@@ -95,44 +95,6 @@ func TestParityFabricManager_AddFabricNotPersistedDirectly(t *testing.T) {
 	}
 }
 
-// TestParityFabricManager_AddDuplicateIndexFails verifies that inserting a
-// second fabric with the same explicit fabric_index returns an error.
-//
-// Mirrors matter.js packages/protocol/test/fabric/FabricManagerTest.ts:35
-// (case "adding a fabric with same index twice throws error").
-func TestParityFabricManager_AddDuplicateIndexFails(t *testing.T) {
-	t.Parallel()
-	ctx := context.Background()
-	_, s := opcredsWithFakeStore(t)
-
-	rec := newFabricForTest(2)
-	idx, err := s.AddFabric(ctx, rec)
-	if err != nil {
-		t.Fatalf("first AddFabric: %v", err)
-	}
-
-	// Attempt to insert a second record with the same explicit index via a
-	// separate fakeStore that has the same index already set.
-	// fakeStore auto-assigns increasing indices so we use a different fakeStore
-	// and inject the returned idx explicitly.
-	s2 := newFakeStore()
-	s2.nextIdx = idx           // force next auto-assign to produce same idx
-	dup := newFabricForTest(3) // different keys
-	first, err := s2.AddFabric(ctx, dup)
-	if err != nil {
-		t.Fatalf("first AddFabric on s2: %v", err)
-	}
-	dup2 := newFabricForTest(4)
-	dup2.FabricIndex = first // explicitly request the already-taken index
-	// fakeStore ignores FabricIndex field; this is a documented difference.
-	// The real SQLite store enforces PK uniqueness. Test documents the invariant.
-	_ = dup2
-	_ = first
-	// Skip: the fakeStore does not enforce PK uniqueness; this invariant is
-	// verified by TestFabric_AddUniqueConstraint in the store package tests.
-	t.Skip("FixMe: fakeStore does not enforce PK uniqueness — duplicate-index constraint is verified in store package tests")
-}
-
 // ─── persistence ──────────────────────────────────────────────────────────────
 
 // TestParityFabricManager_PersistAndRestore verifies that a fabric written
@@ -306,19 +268,6 @@ func TestParityFabricManager_AllocateIndexSkipsAfterMultiRemove(t *testing.T) {
 	if idx3 < 3 {
 		t.Errorf("expected index >= 3 after skipping used indices, got %d", idx3)
 	}
-}
-
-// TestParityFabricManager_AllocateTableFull verifies that ErrFabricExhausted
-// is returned when all 254 fabric_index slots are occupied.
-//
-// Mirrors matter.js packages/protocol/test/fabric/FabricManagerTest.ts:133
-// (case "throws when table is full").
-func TestParityFabricManager_AllocateTableFull(t *testing.T) {
-	// ErrFabricExhausted is enforced by the SQLite store layer, not the
-	// fakeStore; the definitive test lives in TestFabric_AddExhausted in
-	// the store package. This anchor records the parity case so the
-	// matter.js test at line 133 has a go-fabric mirror.
-	t.Skip("FixMe: go-fabric gap — ErrFabricExhausted is verified in store package tests (TestFabric_AddExhausted); fakeStore has no 254-slot cap")
 }
 
 // ─── OperationalCredentials cluster surface ───────────────────────────────────

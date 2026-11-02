@@ -15,6 +15,7 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"slices"
@@ -268,4 +269,92 @@ func TestTestparitySnapshotParsing(t *testing.T) {
 			t.Errorf("countLines(%q) = %d, want %d", in, got, n)
 		}
 	}
+}
+
+// TestTestparityFixMeSkipsRegistered holds register.json's skips to the
+// tree: every Go test whose body calls t.Skip with a "FixMe" message is
+// listed, and every listed one still is such a test (W6-test-08). A skip
+// that names a gap is read later as a fact; the register is where it is
+// reviewed.
+func TestTestparityFixMeSkipsRegistered(t *testing.T) {
+	_, reg := mustLoad(t)
+	listed := map[string]bool{}
+	for _, s := range reg.Skips {
+		listed[s.Test] = true
+	}
+	found := fixMeSkips(t, moduleRoot)
+	for ref := range found {
+		if !listed[ref] {
+			t.Errorf("%s skips with a FixMe message but is not in %s skips: port it, delete it, or register it", ref, registerFile)
+		}
+	}
+	for ref := range listed {
+		if !found[ref] {
+			t.Errorf("%s is in %s skips but is no FixMe-skipped test: remove the row", ref, registerFile)
+		}
+	}
+}
+
+// fixMeSkips walks the module's _test.go files and returns
+// "<package dir>:<TestFunc>" for every top-level function that calls
+// t.Skip (or Skipf) with a string literal starting "FixMe".
+func fixMeSkips(t *testing.T, root string) map[string]bool {
+	t.Helper()
+	out := map[string]bool{}
+	fset := token.NewFileSet()
+	err := filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() {
+			if n := d.Name(); p != root && (n == "testdata" || n == "node_modules" || n == "bin" || strings.HasPrefix(n, ".")) {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if !strings.HasSuffix(p, "_test.go") {
+			return nil
+		}
+		f, err := parser.ParseFile(fset, p, nil, parser.SkipObjectResolution)
+		if err != nil {
+			return err
+		}
+		rel, err := filepath.Rel(root, filepath.Dir(p))
+		if err != nil {
+			return err
+		}
+		for _, decl := range f.Decls {
+			fn, ok := decl.(*ast.FuncDecl)
+			if !ok || fn.Recv != nil || fn.Body == nil {
+				continue
+			}
+			ast.Inspect(fn.Body, func(n ast.Node) bool {
+				call, ok := n.(*ast.CallExpr)
+				if !ok || len(call.Args) == 0 {
+					return true
+				}
+				sel, ok := call.Fun.(*ast.SelectorExpr)
+				if !ok || (sel.Sel.Name != "Skip" && sel.Sel.Name != "Skipf") {
+					return true
+				}
+				arg := call.Args[0]
+				for {
+					bin, ok := arg.(*ast.BinaryExpr)
+					if !ok {
+						break
+					}
+					arg = bin.X
+				}
+				if lit, ok := arg.(*ast.BasicLit); ok && lit.Kind == token.STRING && strings.HasPrefix(strings.Trim(lit.Value, "\"`"), "FixMe") {
+					out[filepath.ToSlash(rel)+":"+fn.Name.Name] = true
+				}
+				return true
+			})
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return out
 }
