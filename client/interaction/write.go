@@ -13,6 +13,7 @@ import (
 	"github.com/SukramJ/go-fabric/client/exchange"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	"github.com/SukramJ/go-fabric/im"
+	"github.com/SukramJ/go-fabric/schema"
 	"github.com/SukramJ/go-fabric/tlv"
 )
 
@@ -45,7 +46,9 @@ func (n rawNode) EncodeTLV(enc *tlv.Encoder, tag tlv.Tag) { spec.Node(n).EncodeT
 // WriteOptions configures [Interaction.Write] — matter.js Write.Options
 // (Write.ts:188-199).
 type WriteOptions struct {
-	// Timed sends a TimedRequest first (ClientInteraction.ts:369-371).
+	// Timed sends a TimedRequest first (ClientInteraction.ts:369-371). An
+	// attribute [schema.IsTimedWrite] names is written timed without it
+	// (Write.ts:188).
 	Timed bool
 	// TimedTimeout is the TimedRequest's timeout; 0 is
 	// [DefaultTimedRequestTimeout]. A timeout marks the write timed
@@ -129,21 +132,20 @@ func (c *Interaction) Write(ctx context.Context, writes []WriteRequest, opts Wri
 	if err != nil {
 		return nil, err
 	}
-	// The chunks fit the payload of the session the write goes on: a TCP
-	// session takes larger messages (MessageExchange.maxPayloadSize).
-	maxPayload := exchange.MaxPayloadSize
-	if s := c.provider.Session(); s != nil {
-		maxPayload = s.MaxPayloadSize()
-	}
-	chunks, err := chunkWrite(req, maxPayload)
-	if err != nil {
-		return nil, err
-	}
 	m, ctx, err := c.begin(ctx, opts.exchangeOptions())
 	if err != nil {
 		return nil, err
 	}
 	defer m.close()
+	// The chunks fit the payload of the session the exchange goes on — a
+	// TCP session takes larger messages — chosen by the exchange, not the
+	// provider's newest session. Mirrors matter.js
+	// InteractionMessenger.ts:1333 (`const { maxPayloadSize } =
+	// this.exchange`) (W4-ctlim-08).
+	chunks, err := chunkWrite(req, m.x.Session().MaxPayloadSize())
+	if err != nil {
+		return nil, err
+	}
 	if req.TimedRequest {
 		timeout := opts.TimedTimeout
 		if timeout == 0 {
@@ -219,6 +221,10 @@ func statusOf(msg *exchange.Message) error {
 	return nil
 }
 
+// isTimedWrite is [schema.IsTimedWrite], a variable so a test can name a
+// timed attribute: none of the snapshot at the pin carries the quality.
+var isTimedWrite = schema.IsTimedWrite
+
 // formulateWrite is Write() (Write.ts:43-185) over numeric paths.
 func formulateWrite(writes []WriteRequest, opts WriteOptions) (im.WriteRequest, error) {
 	req := im.WriteRequest{
@@ -228,6 +234,12 @@ func formulateWrite(writes []WriteRequest, opts WriteOptions) (im.WriteRequest, 
 	for _, w := range writes {
 		if !w.Path.HasCluster || !w.Path.HasAttribute {
 			return im.WriteRequest{}, fmt.Errorf("%w: a write must name the cluster and the attribute", ErrMalformedRequest)
+		}
+		// An attribute with the timed access quality makes the write timed.
+		// Mirrors matter.js Write.ts:188 (result.timedRequest ||=
+		// attribute.schema.effectiveAccess.timed === true) (W4-ctlim-02).
+		if isTimedWrite(w.Path.Cluster, w.Path.Attribute) {
+			req.TimedRequest = true
 		}
 		if w.DataVersion != nil && !w.Path.HasEndpoint {
 			return im.WriteRequest{}, fmt.Errorf("%w: a write with a DataVersion must target a concrete endpoint", ErrMalformedRequest)

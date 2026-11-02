@@ -437,12 +437,16 @@ func (r *Registry) deleteNode(ctx context.Context, n *Node, addr *PeerAddress) e
 	}
 	r.unbindPeer(n)
 	err := n.Close(ctx)
-	// The node's interaction closes with it (ClientNode.ts:288-302,
-	// cancelWithMutex: interaction.close()): every client subscription the
-	// registry still holds for the peer goes — the default one closed with
-	// Stop, the host's own with it.
-	if r.cfg.Subscriptions != nil && addr != nil {
-		r.cfg.Subscriptions.CloseForPeer(*addr)
+	// The node's interaction closes with it (ClientNode.ts:291-300,
+	// cancelWithMutex: interaction.close()): every subscription of the peer
+	// goes — the default one closed with Stop, the host's own here, a
+	// sustained one included. ClientInteraction.close closes the active,
+	// user-facing set (ClientInteraction.ts:264-282, "a sustained
+	// subscription would otherwise retry forever"); CloseForPeer would only
+	// close the inner subscriptions so they are re-established
+	// (ClientSubscriptions.ts:160-171) (W4-ctlim-03).
+	if ia, ierr := n.interaction(); ierr == nil {
+		ia.CloseSubscriptions()
 	}
 	if err == nil {
 		err = n.Erase(ctx)

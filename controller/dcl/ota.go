@@ -217,8 +217,9 @@ func (o *OTAVersions) specificationVersionOf(ctx context.Context, c *Client, vid
 }
 
 // IsApplicable is #isVersionApplicable (:786-819): a valid version with an
-// https OTA URL whose applicable range holds current. The ledger states
-// both bounds on every record, so a maximum of 0 applies to version 0
+// https OTA URL whose applicable range holds current. A record without a
+// maximum maps to math.MaxUint32 (rawSoftwareVersion.mapped), unbounded as
+// in matter.js (:811-816); a stated maximum of 0 applies to version 0
 // only.
 func (o *OTAVersions) IsApplicable(v SoftwareVersion, current uint32) bool {
 	if !v.SoftwareVersionValid || strings.TrimSpace(v.OTAURL) == "" {

@@ -34,7 +34,7 @@ func litImage(t *testing.T, version uint64, icd bool, features icddef.Feature) *
 	if icd {
 		b.cluster(0, icddef.ClusterID, uint64(features), map[uint32]spec.Node{icddef.AttrIdleModeDuration: uintNode(3600)})
 	}
-	n.apply(wildcard, &b.r)
+	n.apply(wildcard, &b.r, true)
 	return n
 }
 

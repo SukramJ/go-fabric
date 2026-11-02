@@ -106,6 +106,19 @@ func TestWriteRequestBuildBasic(t *testing.T) {
 	})
 }
 
+// TestWriteRequestTimedFromModel (W4-ctlim-02): a write of an attribute
+// with the timed access quality is timed without the option — matter.js
+// Write.ts:188. No attribute of the snapshot at the pin carries it, so the
+// test names one; sequential, because it swaps the package's lookup.
+func TestWriteRequestTimedFromModel(t *testing.T) {
+	restore := interaction.SetTimedWrite(writeOnOff[0].Path.Cluster, writeOnOff[0].Path.Attribute)
+	defer restore()
+	req, _, timedMs := writeCaptured(t, writeOnOff, interaction.WriteOptions{})
+	if !req.TimedRequest || timedMs != uint32(interaction.DefaultTimedRequestTimeout/time.Millisecond) {
+		t.Fatalf("timedRequest %v, TimedRequest timeout %d ms", req.TimedRequest, timedMs)
+	}
+}
+
 func TestWriteRequestBuildTimed(t *testing.T) {
 	t.Parallel()
 	t.Run("creates timed write request", func(t *testing.T) {

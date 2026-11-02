@@ -44,6 +44,12 @@ once after the backoff, and when the proxy falls silent again it is busy —
 dedicated to commissioning, or accept that Home Assistant's use of it
 flaps while a device is paired.
 
+The silence counts advertisements of any kind, so a proxy in a BLE-quiet
+place — a shielded lab, a remote site with no other Bluetooth devices — is
+presumed taken even when nobody else uses it. When the log shows
+`ble.esphome.proxy_busy` and no other client holds the proxy, raise
+`Options.SilenceTimeout`.
+
 ## Wiring
 
 ```go

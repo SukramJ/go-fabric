@@ -17,6 +17,11 @@
 // and [Translate] the subset of translation.ts the diagnostics server
 // reads. Standard library only (net/http).
 //
+// The REST link is plaintext HTTP — ot-br-posix serves no TLS, and
+// matter.js builds http:// URLs the same way — so the operational dataset
+// a dataset write carries, network key and PSKc included, crosses it in
+// clear: the border router belongs on the host's own trusted LAN segment.
+//
 // The client's mutating operations — the Thread interface's state, the
 // active and pending datasets — are unexported: the one way to them is
 // [BorderRouter], whose activation the Thread Border Router Management

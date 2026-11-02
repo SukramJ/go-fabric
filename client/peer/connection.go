@@ -191,6 +191,7 @@ func (p *Peer) initiateConnection(opts ConnectOptions) *connection {
 	// (Peer.SetMedium), which may take the host's own lock: it runs before
 	// the peer's lock, as the host's fabric lookup does (ADR 0026 P6).
 	network, margin, netErr := p.connectNetwork(opts)
+	transports := p.ResolveTransports(opts.RequiredTransport, opts.PreferredTransport)
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	if c := p.connecting; c != nil {
@@ -201,6 +202,15 @@ func (p *Peer) initiateConnection(opts ConnectOptions) *connection {
 	}
 	if p.closed {
 		return nil
+	}
+	// A session that a process adopted since the caller looked — the
+	// process has already ended — answers at once: no second CASE
+	// handshake. matter.js checks newestSession() and starts the process in
+	// one turn of the event loop (Peer.ts:438-462), so no session can
+	// appear in between; here the check runs under the lock that adopting
+	// a session takes (W4-ctlnet-04).
+	if p.liveSessionLocked(transports) {
+		return &connection{p: p, done: closedDone}
 	}
 	setTiming := p.set.Timing()
 	timing := setTiming

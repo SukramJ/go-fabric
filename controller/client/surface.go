@@ -99,8 +99,8 @@ type (
 	// CommandRequest is one command of [Node.InvokeBatch]: its Path and
 	// its request Fields (a generated request's value, nil for none).
 	CommandRequest = interaction.CommandRequest
-	// InvokeOptions are an invoke's options: Timed (a TimedRequest first —
-	// schema.IsTimedInvoke says which commands need one), TimedTimeout,
+	// InvokeOptions are an invoke's options: Timed (a TimedRequest first;
+	// a command schema.IsTimedInvoke names is timed without it), TimedTimeout,
 	// ExpectedProcessingTime, ExtendedFailSafeTimeout, SuppressResponse.
 	InvokeOptions = interaction.InvokeOptions
 	// Result is a command's answer: the response Command and its Fields

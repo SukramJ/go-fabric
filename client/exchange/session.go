@@ -41,6 +41,8 @@ type Session struct {
 	// peerMargins resolves the MRP margins of the peer's network medium
 	// (SetPeerMargins).
 	peerMargins atomic.Pointer[func() *Margins]
+	// addrChanged observes SetAddr's moves (OnAddressChanged).
+	addrChanged atomic.Pointer[func(*net.UDPAddr)]
 
 	// Unsecured session state: the initiator's ephemeral node id — ours,
 	// or the peer's on an inbound session — and the reception window of
@@ -94,13 +96,60 @@ func (s *Session) Addr() *net.UDPAddr {
 // A session bound to a TCP connection stays on it: its address names the
 // connection (matter.js probes and migrates UDP sessions only,
 // PeerAddressMonitor.ts:138-139 at 862ad75f).
+//
+// A move to a different address notifies the observer OnAddressChanged
+// installed — matter.js MessageChannel's networkAddressChanged, which the
+// peer follows into its operational address (Peer.ts:161-163).
 func (s *Session) SetAddr(addr *net.UDPAddr) {
 	if addr == nil || s.channel != nil {
 		return
 	}
 	s.mu.Lock()
+	changed := !sameAddr(s.addr, addr)
 	s.addr = addr
 	s.mu.Unlock()
+	if changed {
+		if fn := s.addrChanged.Load(); fn != nil {
+			(*fn)(addr)
+		}
+	}
+}
+
+// OnAddressChanged installs the observer SetAddr calls after it moved the
+// session to a different address — the migration of the address monitor,
+// or the source of a message that opened a new exchange (matter.js
+// ExchangeManager.ts:425-431). It runs on the caller's goroutine, outside
+// the session's lock; nil removes it. Mirrors matter.js
+// MessageChannel.networkAddressChanged (MessageChannel.ts:125-127, emitted
+// by the socket setter at :140-161), which survives the socket swap.
+func (s *Session) OnAddressChanged(fn func(addr *net.UDPAddr)) {
+	if fn == nil {
+		s.addrChanged.Store(nil)
+		return
+	}
+	s.addrChanged.Store(&fn)
+}
+
+// adoptSource moves a secure, UDP-bound session to the source of a
+// message that opened a new exchange on it: the newest address wins.
+// Mirrors matter.js ExchangeManager.ts:425-431 (session.channel.socket =
+// channel for a secure, open session); a message inside an existing
+// exchange moves nothing (the "inter exchange" changes matter.js ignores).
+// The device side does the same in bridge/receive.go.
+func (s *Session) adoptSource(src *net.UDPAddr) {
+	// Only a UDP move: a message carried by a TCP channel names the
+	// connection, not a socket address (MessageChannel.ts:140-147).
+	if s.secure == nil || s.m.reliable || s.m.channelOf(src) != nil {
+		return
+	}
+	s.SetAddr(src)
+}
+
+func sameAddr(a, b *net.UDPAddr) bool {
+	if a == nil || b == nil {
+		return a == b
+	}
+	return a.IP.Equal(b.IP) && a.Port == b.Port && a.Zone == b.Zone
 }
 
 // IsSecure reports whether the session is encrypted (PASE or CASE).

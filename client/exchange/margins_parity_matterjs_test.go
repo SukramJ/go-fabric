@@ -185,6 +185,37 @@ func TestMessageExchangeMRPBackoffMargin(t *testing.T) {
 			t.Errorf("pad %+v", pad)
 		}
 	})
+	// W4-ctlnet-01: from transmission ~52 on mrp.BackoffDuration saturates;
+	// the pads added after it must not wrap the wait negative. matter.js
+	// grows to Infinity and caps (MRP.ts:182-190, MessageExchange.ts:1242-1250).
+	t.Run("caps a saturated backoff plus initialRetransmissionTime instead of wrapping", func(t *testing.T) {
+		t.Parallel()
+		x := marginExchange(t, 0, nil, nil, false, mrp.SecureChannelProtocolID)
+		x.sendOpts.InitialRetransmissionTime = 2 * time.Minute
+		x.sendOpts.MaxRetransmissionTime = 2 * time.Minute
+		x.mu.Lock()
+		got := x.backoffLocked(60)
+		x.mu.Unlock()
+		iv, _ := x.session.timing()
+		if want := max(2*time.Minute, iv.Idle); got != want {
+			t.Errorf("backoff at transmission 60 %v, want the cap %v", got, want)
+		}
+	})
+	t.Run("a saturated backoff plus localFixedMrpBackoff stays positive", func(t *testing.T) {
+		t.Parallel()
+		x := marginExchange(t, 0, nil, nil, false, mrp.SecureChannelProtocolID)
+		x.m.localFixed = 200 * time.Millisecond
+		x.mu.Lock()
+		got := x.backoffLocked(60)
+		x.mu.Unlock()
+		if got <= 0 {
+			t.Errorf("backoff at transmission 60 %v, want positive", got)
+		}
+		iv, active := x.session.timing()
+		if d := RetransmissionIntervalPadded(60, iv, active, 1, Pad{Fixed: 200 * time.Millisecond}); d <= 0 {
+			t.Errorf("padded interval at transmission 60 %v, want positive", d)
+		}
+	})
 	t.Run("pads the scheduled backoff", func(t *testing.T) {
 		t.Parallel()
 		x := marginExchange(t, 0, nil, ptr(sec(1.5)), false, mrp.SecureChannelProtocolID)

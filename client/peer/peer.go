@@ -340,6 +340,12 @@ func (p *Peer) addSession(s *exchange.Session) {
 	}
 	p.sessions = append(p.sessions, s)
 	p.followAddressLocked(s)
+	// A later move of the session — a migration, or a new exchange the
+	// node opened from another address — carries the operational address
+	// with it: matter.js Peer.ts:161-163 observes
+	// MessageChannel.networkAddressChanged, which the socket swap of
+	// ExchangeManager.ts:425-431 emits (W4-ctlnet-02).
+	s.OnAddressChanged(func(*net.UDPAddr) { p.followAddress(s) })
 	// Only a known medium pads the session's exchanges: the unknown
 	// fallback would inflate every exchange of a peer never characterised
 	// (Peer.ts:182-186).
@@ -488,6 +494,20 @@ func (p *Peer) sessionFor(transports []exchange.Transport) *exchange.Session {
 	return nil
 }
 
+// liveSessionLocked reports whether the peer holds a live session over
+// one of transports, any transport for nil. The caller holds p.mu.
+func (p *Peer) liveSessionLocked(transports []exchange.Transport) bool {
+	for _, s := range p.sessions {
+		if s.IsClosed() || s.IsPeerLost() {
+			continue
+		}
+		if transports == nil || slices.Contains(transports, s.Transport()) {
+			return true
+		}
+	}
+	return false
+}
+
 func (p *Peer) newestOn(t *exchange.Transport) *exchange.Session {
 	var found *exchange.Session
 	var at time.Time
@@ -579,6 +599,16 @@ func (p *Peer) Close(ctx context.Context) {
 		mgr.CloseSession(ctx, s)
 	}
 	p.workers.Wait()
+	// A CASE session an attempt established after the sweep above (its
+	// handshake returned as the context ended) is owned by nobody — the
+	// closed peer declined to adopt it — so the sweep runs again once the
+	// workers are done (W4-ctlnet-05). matter.js Peer.close has the same
+	// order (Peer.ts:546-565: initiateClose at :556-558 before awaiting
+	// the workers at :560); its single thread narrows the window that Go's
+	// goroutines widen.
+	for _, s := range mgr.SessionsFor(p.address) {
+		mgr.CloseSession(ctx, s)
+	}
 	p.service.Close()
 	p.set.remove(p)
 }

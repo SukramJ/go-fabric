@@ -177,6 +177,14 @@ func Invoke(ctx context.Context, p *Pair, path CommandPath, fields spec.Encodabl
 	return invoke(ctx, p, path, fields, client.InvokeOptions{})
 }
 
+// InvokeUntimed is [Invoke] sent untimed even for a command whose model is
+// timed-required — interaction.invoke with options.timed false
+// (Invoke.ts:136-139), the request a device answers
+// NEEDS_TIMED_INTERACTION.
+func InvokeUntimed(ctx context.Context, p *Pair, path CommandPath, fields spec.Encodable) (Result, error) {
+	return invoke(ctx, p, path, fields, client.InvokeOptions{TimedOff: true})
+}
+
 // InvokeTimed is [Invoke] as a timed invoke — interaction.invoke with
 // options.timed (:427).
 func InvokeTimed(ctx context.Context, p *Pair, path CommandPath, fields spec.Encodable) (Result, error) {

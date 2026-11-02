@@ -41,7 +41,11 @@
 // is presumed taken; the central reconnects once after the backoff, and when
 // the proxy is taken again it marks it busy — [ErrProxyBusy] — until the next
 // scan starts. A proxy dedicated to commissioning, or a Home Assistant whose
-// use of it may flap during a pairing, is the deployment this assumes.
+// use of it may flap during a pairing, is the deployment this assumes. The
+// silence watch counts advertisements of any kind, so in a BLE-quiet place
+// (a shielded lab, a remote site) a proxy that nobody else uses is presumed
+// taken as well: a host that sees ble.esphome.proxy_busy with no other
+// client on the proxy raises Options.SilenceTimeout.
 //
 // # Discovery
 //

@@ -228,7 +228,7 @@ func tree(n *Node) string {
 func TestStructureBridge(t *testing.T) {
 	t.Parallel()
 	n, rec, _ := testNode(t, &MemoryStore{})
-	n.apply(wildcard, &bridge(2).r)
+	n.apply(wildcard, &bridge(2).r, true)
 	if got := tree(n); got != "0:0x16:- 1:0xe:0 2:0x10a:1 3:0x10a:1" {
 		t.Fatalf("tree %s", got)
 	}
@@ -264,7 +264,7 @@ func TestStructureTree(t *testing.T) {
 	b.endpoint(2, []uint64{dtOnOffLight}, []uint32{descriptor.ClusterID}, 3)
 	b.endpoint(3, []uint64{dtOnOffLight}, []uint32{descriptor.ClusterID})
 	b.endpoint(4, []uint64{dtAggregator}, []uint32{descriptor.ClusterID}, 3)
-	n.apply(wildcard, &b.r)
+	n.apply(wildcard, &b.r, true)
 	if got := tree(n); got != "0:0x16:- 1:0x100:0 2:0x100:0 3:0x100:1 4:0xe:0" {
 		t.Fatalf("tree %s", got)
 	}
@@ -282,12 +282,12 @@ func TestStructureUnknownCompositionWaits(t *testing.T) {
 	b.endpoint(0, []uint64{dtRootNode}, []uint32{descriptor.ClusterID}, 1, 2)
 	b.endpoint(1, nil, []uint32{descriptor.ClusterID}, 2)
 	b.endpoint(2, []uint64{dtOnOffLight}, []uint32{descriptor.ClusterID})
-	n.apply(wildcard, &b.r)
+	n.apply(wildcard, &b.r, true)
 	if got := tree(n); got != "0:0x16:- 1:0xffffffff:0" {
 		t.Fatalf("tree %s", got)
 	}
 	rec.take()
-	n.apply(wildcard, &(&report{}).attr(1, descriptor.ClusterID, descriptor.AttrDeviceTypeList, deviceTypes(dtOnOffLight), 2).r)
+	n.apply(wildcard, &(&report{}).attr(1, descriptor.ClusterID, descriptor.AttrDeviceTypeList, deviceTypes(dtOnOffLight), 2).r, true)
 	if got := tree(n); got != "0:0x16:- 1:0x100:0 2:0x100:1" {
 		t.Fatalf("tree after the device types %s", got)
 	}
@@ -303,12 +303,12 @@ func TestStructureRootListErases(t *testing.T) {
 	t.Parallel()
 	st := &MemoryStore{}
 	n, rec, logs := testNode(t, st)
-	n.apply(wildcard, &bridge(2).r)
+	n.apply(wildcard, &bridge(2).r, true)
 	rec.take()
 	b := &report{}
 	b.attr(0, descriptor.ClusterID, descriptor.AttrPartsList, listNode(1, 2), 2)
 	b.attr(1, descriptor.ClusterID, descriptor.AttrPartsList, listNode(2), 2)
-	n.apply(wildcard, &b.r)
+	n.apply(wildcard, &b.r, true)
 	if got := tree(n); got != "0:0x16:- 1:0xe:0 2:0x10a:1" {
 		t.Fatalf("tree %s", got)
 	}
@@ -322,12 +322,12 @@ func TestStructureRootListErases(t *testing.T) {
 		}
 	}
 	// The root drops the aggregator but still names its plug: kept.
-	n.apply(wildcard, &(&report{}).attr(0, descriptor.ClusterID, descriptor.AttrPartsList, listNode(2), 3).r)
+	n.apply(wildcard, &(&report{}).attr(0, descriptor.ClusterID, descriptor.AttrPartsList, listNode(2), 3).r, true)
 	if got := tree(n); got != "0:0x16:- 1:0xe:0 2:0x10a:1" || !logs.has("matter.controller.client.endpoint_kept") {
 		t.Fatalf("tree %s", got)
 	}
 	// Both gone: the aggregator is erased with its plug.
-	n.apply(wildcard, &(&report{}).attr(0, descriptor.ClusterID, descriptor.AttrPartsList, listNode(), 4).r)
+	n.apply(wildcard, &(&report{}).attr(0, descriptor.ClusterID, descriptor.AttrPartsList, listNode(), 4).r, true)
 	if got := tree(n); got != "0:0x16:-" {
 		t.Fatalf("tree %s", got)
 	}
@@ -340,13 +340,13 @@ func TestStructureServerList(t *testing.T) {
 	t.Parallel()
 	st := &MemoryStore{}
 	n, rec, logs := testNode(t, st)
-	n.apply(wildcard, &bridge(2).r)
+	n.apply(wildcard, &bridge(2).r, true)
 	rec.take()
 	b := &report{}
 	b.attr(2, onoff.ClusterID, onoff.AttrOnOff, boolNode(true), 2)
 	b.attr(2, descriptor.ClusterID, descriptor.AttrServerList, listNode(uint64(descriptor.ClusterID), clBridgedBI), 2)
 	b.attr(3, descriptor.ClusterID, descriptor.AttrServerList, listNode(uint64(descriptor.ClusterID), clBridgedBI), 2)
-	n.apply(wildcard, &b.r)
+	n.apply(wildcard, &b.r, true)
 	if got := rec.take(); !slices.Equal(got, []string{"deleted 3/OnOff", "changed"}) {
 		t.Fatalf("hooks %v", got)
 	}
@@ -360,12 +360,12 @@ func TestStructureServerList(t *testing.T) {
 	b = &report{}
 	b.attr(2, descriptor.ClusterID, descriptor.AttrServerList, listNode(uint64(descriptor.ClusterID), clBridgedBI), 3)
 	b.attr(2, onoff.ClusterID, onoff.AttrOnOff, boolNode(false), 3)
-	n.apply(wildcard, &b.r)
+	n.apply(wildcard, &b.r, true)
 	if n.Endpoint(2).Cluster(onoff.ClusterID) == nil || !logs.has("matter.controller.client.cluster_kept") {
 		t.Fatal("a cluster with data in the report was deleted")
 	}
 	// A cluster that comes back is installed afresh.
-	n.apply(wildcard, &(&report{}).cluster(3, onoff.ClusterID, 0, map[uint32]spec.Node{0: boolNode(true)}).r)
+	n.apply(wildcard, &(&report{}).cluster(3, onoff.ClusterID, 0, map[uint32]spec.Node{0: boolNode(true)}).r, true)
 	if got := rec.take(); !slices.Equal(got, []string{"changed", "cluster 3/OnOff", "changed"}) {
 		t.Fatalf("hooks %v", got)
 	}
@@ -380,7 +380,7 @@ func TestStructureAttributeListAndFeatures(t *testing.T) {
 	n, rec, _ := testNode(t, st)
 	b := bridge(1)
 	b.cluster(2, onoff.ClusterID, 0, map[uint32]spec.Node{onoff.AttrOnOff: boolNode(true), onoff.AttrOnTime: uintNode(5)})
-	n.apply(wildcard, &b.r)
+	n.apply(wildcard, &b.r, true)
 	rec.take()
 	c := n.Endpoint(2).Cluster(onoff.ClusterID)
 	if _, ok := c.Value(onoff.AttrOnTime); !ok {
@@ -389,7 +389,7 @@ func TestStructureAttributeListAndFeatures(t *testing.T) {
 	b = &report{}
 	b.attr(2, onoff.ClusterID, spec.AttrFeatureMap, uintNode(uint64(onoff.FeatureLighting)), 2)
 	b.attr(2, onoff.ClusterID, spec.AttrAttributeList, listNode(0, 0xFFF8, 0xFFF9, 0xFFFB, 0xFFFC, 0xFFFD), 2)
-	n.apply(wildcard, &b.r)
+	n.apply(wildcard, &b.r, true)
 	if got := rec.take(); !slices.Equal(got, []string{"replaced 2/OnOff", "changed"}) {
 		t.Fatalf("hooks %v", got)
 	}
@@ -400,7 +400,7 @@ func TestStructureAttributeListAndFeatures(t *testing.T) {
 		t.Fatalf("stored %d values", len(values))
 	}
 	// A report that changes nothing of the definition keeps the shape.
-	n.apply(wildcard, &(&report{}).attr(2, onoff.ClusterID, spec.AttrClusterRevision, uintNode(1), 3).r)
+	n.apply(wildcard, &(&report{}).attr(2, onoff.ClusterID, spec.AttrClusterRevision, uintNode(1), 3).r, true)
 	if got := rec.take(); !slices.Equal(got, []string{"changed"}) {
 		t.Fatalf("hooks %v", got)
 	}
@@ -412,21 +412,21 @@ func TestStructureAttributeListAndFeatures(t *testing.T) {
 func TestStructureVersionAndFabricFilter(t *testing.T) {
 	t.Parallel()
 	n, _, _ := testNode(t, &MemoryStore{})
-	n.apply(wildcard, &bridge(1).r)
+	n.apply(wildcard, &bridge(1).r, true)
 	c := n.Endpoint(2).Cluster(onoff.ClusterID)
 	specific := newScope([]im.ConcreteAttributePath{{Endpoint: 2, Cluster: onoff.ClusterID, Attribute: 0, HasEndpoint: true, HasCluster: true, HasAttribute: true}}, false)
-	n.apply(specific, &(&report{}).attr(2, onoff.ClusterID, 0, boolNode(true), 9).r)
+	n.apply(specific, &(&report{}).attr(2, onoff.ClusterID, 0, boolNode(true), 9).r, true)
 	if v, _ := c.Version(); v != 1 {
 		t.Fatalf("a specific read set version %d", v)
 	}
 	if v, _ := c.Value(0); !v.El.Bool {
 		t.Fatal("value not applied")
 	}
-	n.apply(newScope([]im.ConcreteAttributePath{{}}, true), &(&report{}).attr(2, onoff.ClusterID, 0, boolNode(false), 10).r)
+	n.apply(newScope([]im.ConcreteAttributePath{{}}, true), &(&report{}).attr(2, onoff.ClusterID, 0, boolNode(false), 10).r, true)
 	if v, _ := c.Value(0); !v.El.Bool {
 		t.Fatal("an unfiltered read was stored")
 	}
-	n.apply(wildcard, &(&report{}).attr(2, onoff.ClusterID, 0, boolNode(false), 11).r)
+	n.apply(wildcard, &(&report{}).attr(2, onoff.ClusterID, 0, boolNode(false), 11).r, true)
 	if v, _ := c.Version(); v != 11 {
 		t.Fatalf("version %d after a wildcard read", v)
 	}
@@ -439,7 +439,7 @@ func TestStructureReload(t *testing.T) {
 	t.Parallel()
 	st := &MemoryStore{}
 	first, _, _ := testNode(t, st)
-	first.apply(wildcard, &bridge(2).r)
+	first.apply(wildcard, &bridge(2).r, true)
 	want := tree(first)
 	_ = st.Save("n", 3, onoff.ClusterID, map[uint32][]byte{0x7777: mustEncode(t, uintNode(1))}, ptr(uint32(5)))
 	second, rec, _ := loadedNode(t, st)
@@ -485,7 +485,7 @@ func mustEncode(t *testing.T, n spec.Node) []byte {
 func TestStructureEvents(t *testing.T) {
 	t.Parallel()
 	n, _, _ := testNode(t, &MemoryStore{})
-	n.apply(wildcard, &bridge(2).r)
+	n.apply(wildcard, &bridge(2).r, true)
 	ev := func(ep uint16) interaction.EventData {
 		return interaction.EventData{Path: im.ConcreteEventPath{Endpoint: ep, Cluster: onoff.ClusterID, HasEndpoint: true, HasCluster: true, HasEvent: true}}
 	}
@@ -493,7 +493,7 @@ func TestStructureEvents(t *testing.T) {
 	b.attr(2, onoff.ClusterID, 0, boolNode(true), 3)
 	b.r.Events = []interaction.EventData{ev(2), ev(3), ev(9)}
 	n.mu.Lock()
-	n.s.mutate(wildcard, &b.r)
+	n.s.mutate(wildcard, &b.r, true)
 	em := n.s.takeEmissions()
 	n.mu.Unlock()
 	var got []string
@@ -524,9 +524,9 @@ func TestStructureHookPanics(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	n.apply(wildcard, &bridge(1).r)
-	n.apply(wildcard, &(&report{}).attr(2, descriptor.ClusterID, descriptor.AttrServerList, listNode(uint64(descriptor.ClusterID)), 2).r)
-	n.apply(wildcard, &(&report{}).attr(0, descriptor.ClusterID, spec.AttrFeatureMap, uintNode(1), 2).r)
+	n.apply(wildcard, &bridge(1).r, true)
+	n.apply(wildcard, &(&report{}).attr(2, descriptor.ClusterID, descriptor.AttrServerList, listNode(uint64(descriptor.ClusterID)), 2).r, true)
+	n.apply(wildcard, &(&report{}).attr(0, descriptor.ClusterID, spec.AttrFeatureMap, uintNode(1), 2).r, true)
 	if !logs.has("matter.controller.client.hook_failed") {
 		t.Fatal("no log")
 	}
@@ -542,7 +542,7 @@ func TestStructureVersionFilters(t *testing.T) {
 	b := bridge(1)
 	b.cluster(2, powerSource, 0, map[uint32]spec.Node{0: uintNode(1), 0x000B: uintNode(3300)})
 	b.cluster(1, powerSource, 0, map[uint32]spec.Node{0: uintNode(1)})
-	n.apply(wildcard, &b.r)
+	n.apply(wildcard, &b.r, true)
 	n.mu.Lock()
 	all := n.s.injectVersionFilters(wildcard, false)
 	refreshed := n.s.injectVersionFilters(wildcard, true)
@@ -562,7 +562,7 @@ func TestStructureVersionFilters(t *testing.T) {
 	}
 	// Without the peer's AttributeList every changes-omitted attribute of
 	// the definition counts (:1691).
-	n.apply(wildcard, &(&report{}).attr(1, powerSource, spec.AttrAttributeList, listNode(), 2).r)
+	n.apply(wildcard, &(&report{}).attr(1, powerSource, spec.AttrAttributeList, listNode(), 2).r, true)
 	n.mu.Lock()
 	refreshed = n.s.injectVersionFilters(wildcard, true)
 	n.mu.Unlock()
@@ -571,8 +571,8 @@ func TestStructureVersionFilters(t *testing.T) {
 	}
 	// A named cluster (AccessControl has no generated definition) is judged
 	// by the schema's table: AuxiliaryAcl (0x0007) is "C".
-	n.apply(wildcard, &(&report{}).cluster(0, 0x001F, 0, map[uint32]spec.Node{0: listNode(), 0x0007: listNode()}).r)
-	n.apply(wildcard, &(&report{}).cluster(1, 0x001F, 0, map[uint32]spec.Node{0: listNode()}).r)
+	n.apply(wildcard, &(&report{}).cluster(0, 0x001F, 0, map[uint32]spec.Node{0: listNode(), 0x0007: listNode()}).r, true)
+	n.apply(wildcard, &(&report{}).cluster(1, 0x001F, 0, map[uint32]spec.Node{0: listNode()}).r, true)
 	n.mu.Lock()
 	refreshed = n.s.injectVersionFilters(wildcard, true)
 	n.mu.Unlock()
@@ -592,8 +592,8 @@ func TestStructureRetractedClaim(t *testing.T) {
 	b.endpoint(0, []uint64{dtRootNode}, []uint32{descriptor.ClusterID}, 1, 2)
 	b.endpoint(1, nil, []uint32{descriptor.ClusterID}, 2)
 	b.endpoint(2, []uint64{dtOnOffLight}, []uint32{descriptor.ClusterID})
-	n.apply(wildcard, &b.r)
-	n.apply(wildcard, &(&report{}).attr(1, descriptor.ClusterID, descriptor.AttrPartsList, listNode(), 2).r)
+	n.apply(wildcard, &b.r, true)
+	n.apply(wildcard, &(&report{}).attr(1, descriptor.ClusterID, descriptor.AttrPartsList, listNode(), 2).r, true)
 	if got := tree(n); got != "0:0x16:- 1:0xffffffff:0 2:0x100:0" {
 		t.Fatalf("tree %s", got)
 	}

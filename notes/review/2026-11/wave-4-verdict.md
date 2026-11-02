@@ -25,3 +25,75 @@ Theme files: `wave-4-ctl-net.md` (Opus, done), `wave-4-ctl-sec.md` (Fable), `wav
 | ctl-net (Opus) | 0 | 2 | 3 | 2 |
 | ctl-int (Opus) | 1 | 2 | 5 | 6 |
 | **W4** | **1** | **8** | **15** | **16** |
+
+## Fixed in PR (branch `review/w4`, 2026-11-02)
+
+The register lines are at `769ea3c2`; each fix relocated them on `main`
+2278b129 with `grep -n` and re-read the cited lines on both sides at the
+pins (matter.js `862ad75f`, connectedhomeip `6170af84`).
+
+| ID | Commit | Note |
+| --- | --- | --- |
+| W4-ctlnet-01 | 8959f20b | `satAdd` in `client/exchange/margins.go`, used for the fixed pad and `InitialRetransmissionTime` |
+| W4-ctlnet-02 | 2befacbe | `route` adopts the source of a message that opens a new exchange; `Session.OnAddressChanged` carries the peer's operational address |
+| W4-ctlnet-03 | a10d6b76 | ctx cancel ends the ack wait (`endAckWaitLocked`) |
+| W4-ctlnet-04 | a10d6b76 | `initiateConnection` completes at once next to a live session |
+| W4-ctlnet-05 | a10d6b76 | `Peer.Close` sweeps the sessions again after `workers.Wait()` |
+| W4-ctlnet-06 | a10d6b76 | `considerClosed` semantics in `retransmit` |
+| W4-ctlnet-07 | — | open note (parity), unchanged |
+| W4-ctlim-01 | 8aac8e76 | `emitEvents` through `apply`/`mutate`; the default subscription's owner token |
+| W4-ctlim-02 | b05adad8, 94140f5e | `schema.IsTimedInvoke` / new generated `schema.IsTimedWrite` (empty at the pin); `InvokeOptions.TimedOff` + `fabrictest.InvokeUntimed` for the two NEEDS_TIMED wire tests |
+| W4-ctlim-03 | 0466b6b2 | `deleteNode` closes the node interaction's subscriptions |
+| W4-ctlim-04 | 0dc4ad84 | per-node ordered job queue (bound 100) for a subscription report's store writes and hooks; the caller's `Updated` stays inline |
+| W4-ctlim-05 | f0d69498 | refresh keeps the request's event filters |
+| W4-ctlim-06 | f0d69498 | flush mutex; a direct flush stops the armed timer |
+| W4-ctlim-07 | f0d69498 | both providers pad with `Manager.LocalPad()` |
+| W4-ctlim-08 | f0d69498 | `chunkWrite` after `begin`, the exchange's session |
+| W4-ctlim-09 | f0d69498 | re-check `started && !closing` before subscribing; adopt only while the owner is current |
+| W4-ctlim-10 | f0d69498 | `setActive(true)` always announces |
+| W4-ctlim-11 | f0d69498 | Read/Subscribe fitted after `begin` |
+| W4-ctlint-03 | af994d4e | `Images.Store` runs `otaimage.ValidateFile` |
+| W4-ctlint-04 | c9ca2bcd | BlueZ `WriteC1` bounded by 30 s → `btp.ErrDisconnected` |
+| W4-ctlint-05 | c9ca2bcd | a cancelled ESPHome GATT op ends the connection |
+| W4-ctlint-06 | c9ca2bcd | an absent maximum maps to `math.MaxUint32` (no API change) |
+| W4-ctlint-07 | c9ca2bcd | `otaimage.MaxHeaderSize` = 1024; Ahead-of-matter.js row `BD-Matter-OtaImageHeaderSizeCap` |
+| W4-ctlint-08 | c9ca2bcd | `(?i)` pattern, lower-case `Mode` |
+| W4-ctlint-10 | 49f05b93 | 16 MiB `http.MaxBytesReader` on the three fetchers; 1000-page cap |
+| W4-ctlint-11 | 49f05b93 | ADR 0027, `thread/otbr` doc, Thread Border Router guide |
+| W4-ctlint-12 | 49f05b93 | cancellable periodic-update context, cancelled in `Close` |
+| W4-ctlint-13 | 49f05b93 | package doc, BLE proxies guide, `BD-Controller-BleOverEsphomeProxies` |
+| W4-ctlint-14 | c9ca2bcd (part) | `ReadHeader` wraps the read error; the clock/logger threading of `Probe`/`Translate`/`Discover` goes to the W5 brief as fields of the existing option structs (owner decision 2026-11-02) |
+| W4-ctlsec-*, W4-ctlint-09 | — | the owner's reviewer, on this branch after the handback |
+
+Follow-up commits on the branch: c4ea63ed (lint: `syncAutoSubscribe` split under
+funlen; a race-proof wait in the W4-ctlim-03 test), 7dafb05a (coverage of the
+new `client/exchange` helpers and `schema.IsTimedWrite`, floors held),
+46e8a664 (citation and reachability snapshots; ratchets unchanged at drift 258
+and 3 unreached).
+
+
+## Owner decisions 2026-11-02 (W4)
+
+- W4-ctlsec-01 (CSR nonce compared, chip) and W4-ctlsec-02 (CAT list validated in the CA, matter.js `validateNocTagList`): both implemented in the W4 PR.
+- W4-ctlsec-03 (DAC/PAI notAfter): stay with matter.js (validity at the DAC's notBefore, `DeviceAttestationValidator.ts:305-331`); open note, no Ahead row.
+- W4-ctlint-09 (CD signer fetched by SKID trusted as fetched): parity with matter.js `getOrFetchCdSigner`, recorded as a paragraph in `BD-Controller-DclSnapshotLayered`; no tightening.
+- W4-ctlsec-07: already stated at `docs/security.md:46-47` (root key in the fabric record unless a signer is given; resumption in memory); no change.
+- W4-ctlsec-08, W4-ctlnet-07: parity, open notes.
+- W4-ctlint-14 (clock/logger for `otbr.Probe`/`Translate`, `esphome.Discover`): a W5 item — fields on the existing option structs, no `…With` variants.
+- W4-ctlint-03: `Images.Store` keeps the payload-digest check without a ledger checksum; recorded as `BD-Matter-OtaImageDigestAtStore`.
+
+## Fixed in PR (reviewer's part, Fable)
+
+| ID | Commit | What |
+| --- | --- | --- |
+| W4-ctlsec-01 | 0a368832 | `controller/commissioner`: `decodeCertSigningRequest` returns the echoed nonce; `certificates` refuses a mismatch with `ErrCommissioning` (chip `DefaultDeviceAttestationVerifier.cpp:847-870`); Ahead row `BD-chip-Commissioner-CsrNonceEchoed` (marker `ControllerCommissioningFlow.ts:1395`); `TestCertificatesCsrNonceEchoed`. |
+| W4-ctlsec-02 | 0a368832 | `controller/ca`: `validateCATs` before signing (`CaseAuthenticatedTag.ts:96-105`, `:32-33`), `ca.ErrInvalidCATs`; `TestGenerateNOCValidatesTheCATList`. |
+| W4-ctlsec-06 | 0a368832 | `commissioner.Options.OnAttestationFailure` doc names the zero value's behaviour (`ControllerCommissioningFlow.ts:1352-1367`) and the two register rows. |
+| W4-ctlint-09 | 0a368832 | paragraph in `BD-Controller-DclSnapshotLayered` (`DclCertificateService.ts:864-891`). |
+
+## Reviewer verification (Fable, after the handback)
+
+Every matter.js and chip line the agent's commits cite was re-read at the pins (862ad75f / 6170af84) and holds: `MRP.ts:182-190`, `MessageExchange.ts:1242-1250`, `ExchangeManager.ts:425-431`, `MessageChannel.ts:125-127, :140-161`, `Peer.ts:161-163` (ctlnet-01/02); `ClientStructure.ts:412, :1757-1770`, `NetworkClient.ts:164-173, :207, :245, :303-308`, `ClientNodeInteraction.ts:97-98` (ctlim-01); `Invoke.ts:114, :136-139, :237`, `Write.ts:188`, `ClientInteraction.ts:200` (ctlim-02; no attribute of the snapshot carries the timed quality, so `timedWritePaths` is empty at the pin); `ClientNode.ts:291-300`, `ClientInteraction.ts:264-282`, `ClientSubscriptions.ts:160-171` (ctlim-03). Second pass over the remaining commits (0dc4ad84, af994d4e, a10d6b76, c9ca2bcd, 49f05b93, f0d69498, 94140f5e): `MessageExchange.ts:812-818, :907-910, :390-392`, `ExchangeManager.ts:533-545`, `PeerExchangeProvider.ts:152-161`, `Peer.ts:438-462, :546-565` (ctlnet-03..06, ctlim-07); `InteractionMessenger.ts:1020-1045, :1145-1165, :1333`, `SustainedSubscription.ts:126, :379-384, :395-419`, `ClientCacheBuffer.ts:24, :79-80, :174-175`, `DatasourceCache.ts:297-303`, `ClientStructure.ts:57, :417-439, :469-471, :482-486`, `ClientNodeInteraction.ts:146-168`, `NetworkClient.ts:113-131, :207-236` (ctlim-04..06, -08..11); `DclClient.ts:62-121`, `Github.ts:120-141`, `DclOtaUpdateService.ts:55, :388-408, :573-574, :811-816`, `OtaImageReader.ts:65-110, :157-191, :181-183, :246-278`, `OtbrRestClient.ts:757-788`, chip `OTAImageHeader.cpp:53, :128` (ctlint-03..08, -10..14). The Ahead row `BD-Matter-OtaImageHeaderSizeCap` holds (`make ahead-check` 39/39 with the reviewer's row).
+
+W4-ctlint-03 note: at Store time matter.js's `#verifyUpdate` passes no checksum options when the ledger has none, so `OtaImageReader.file` takes the `calculateFullChecksum` branch (`OtaImageReader.ts:246-260`) and verifies the payload size only; the internal payload digest is checked later at extraction (`:262-278`, `#extractAndValidatePayload`). `images.Store` checks the digest at Store time as well — kept, `BD-Matter-OtaImageDigestAtStore`.
+

@@ -121,6 +121,8 @@ pin lift confirms by re-reading the row, [`pin-lifts.md`](./pin-lifts.md)).
 | BD-chip-ClosureControl-RulesInServer | `ClosureControlServer.ts:17` is the empty subclass (absence: the class line, 17 lines in all) | `packages/node/src/behaviors/closure-control/ClosureControlServer.ts` | `"export class ClosureControlServer extends ClosureControlBehavior {}"` | connectedhomeip `src/app/clusters/closure-control-server/ClosureControlCluster.cpp` at `6170af84` (`HandleStop` :531-551, `HandleMoveTo` :554-639) | no |
 | BD-chip-ScenesManagement-SceneNameLength | `ScenesManagementServer.ts:147` relaxes the AddScene SceneName constraint for the behaviour to answer, and `addScene` checks only SceneId and TransitionTime (`:283`, presence) | `packages/node/src/behaviors/scenes-management/ScenesManagementServer.ts` | `"transitionTime > 60000000) {"` | connectedhomeip `src/app/clusters/scenes-server/ScenesManagementCluster.cpp:535-541` at `6170af84` | no |
 | BD-Matter-ICDVerificationKeyConstantTime | `IcdManagementServer.ts:761` compares the presented VerificationKey with `Bytes.areEqual`, a data-dependent comparison (presence) | `packages/node/src/behaviors/icd-management/IcdManagementServer.ts` | `"!Bytes.areEqual(verificationKey, stored.key)"` | this module: Go `crypto/subtle.ConstantTimeCompare` (review 2026-11 W2-sec-04); the accept/refuse outcome is matter.js's | no |
+| BD-Matter-OtaImageHeaderSizeCap | `OtaImageReader.ts:181-183` reads the prefix's header size and collects that many bytes with no bound (absence: the line that would take the check, followed by the closing brace) | `packages/protocol/src/ota/OtaImageReader.ts` | `"this.#headerSize = headerReader.readUInt32();\n            }"` | connectedhomeip `src/lib/core/OTAImageHeader.cpp:53` (`kMaxHeaderSize = 1024`), checked at `:128` (review 2026-11 W4-ctlint-07) | no |
+| BD-chip-Commissioner-CsrNonceEchoed | `ControllerCommissioningFlow.ts:1395` draws the CSR nonce and the flow never reads the echoed one back (presence) | `packages/protocol/src/peer/ControllerCommissioningFlow.ts` | `"fields: { csrNonce: this.fabric.crypto.randomBytes(32) },"` | connectedhomeip `src/credentials/attestation_verifier/DefaultDeviceAttestationVerifier.cpp:847-870` at `6170af84` (`VerifyNodeOperationalCSRInformation`) | no |
 
 ---
 
@@ -3546,6 +3548,21 @@ snapshot (`TestSnapshotIsNoRevocationSource`; Matter PKI CP §1.4.5,
 §4.9.6). Concept v3 §A.2, report AZ §3,
 `notes/reference/dcl-data-terms-2026-10-17.md`.
 
+A CD signer the snapshot does not name is fetched from the ledger by
+subject key id and trusted as fetched: `dcl.CertificateStore.CDSigner`
+stores the first certificate of `/dcl/pki/all-certificates?subjectKeyId=`
+as a production CD signer, without a chain check, exactly as matter.js's
+`getOrFetchCdSigner` does (`DclCertificateService.ts:864-891` at `862ad75f`,
+`certs[0]`, `addCertificate(…, "CDSigner", { isProduction: true })`). The
+SKID is a free field of the certificate's author, so this is a trust
+decision on the ledger's approval, not on the CSA CD root; chip accepts CD
+signers from its fixed set only (`DefaultDeviceAttestationVerifier.cpp:146-256`).
+Only an unknown SKID reaches the fetch (the snapshot answers the five known
+signers first), and without any signer the CD signature is skipped with a
+`CdSignerVerificationSkipped` warning the policy judges
+(`controller/attestation/validate.go`). Owner decision 2026-11-02 (review
+W4-ctlint-09): parity, no tightening.
+
 By design. Same trust decision as matter.js's seed, a different place in
 the graph; the named signer set is chip's own.
 
@@ -3677,7 +3694,12 @@ the raw advertisement bytes, takes the ATT MTU from
 from the proxies' free connection slots. A proxy has one API subscriber;
 the central logs `ble.esphome.proxy_taken`, reconnects once after 30 s of
 silence and reports `ErrProxyBusy` on a second silence, cleared by the
-next fresh scan. Reasoning: a host without a Bluetooth adapter commissions
+next fresh scan. The silence counts advertisements of any kind, so in a
+BLE-quiet environment (a shielded lab, a remote site) a proxy nobody else
+uses is presumed taken too — a false positive the host answers by raising
+`Options.SilenceTimeout` (`ble/esphome/central.go`, `DefaultSilenceTimeout`;
+documented in the package doc and `docs/guides/ble-proxies.md`,
+W4-ctlint-13). Reasoning: a host without a Bluetooth adapter commissions
 through the proxies a Home Assistant site already has; neither reference
 offers this, so there is no behaviour to mirror and no marker to watch.
 
@@ -5018,6 +5040,24 @@ the name in UTF-16 units as matter.js's string constraint counts them
 the name to 16 and answer SUCCESS). Retire when matter.js's `addScene`
 checks the name.
 
+### BD-chip-Commissioner-CsrNonceEchoed — the commissioner refuses NOCSRElements whose csrNonce is not the one it sent
+
+matter.js draws the 32-byte CSR nonce
+(`packages/protocol/src/peer/ControllerCommissioningFlow.ts:1395` at
+`862ad75f`) and reads only the CSR out of the signed elements
+(`Certificate.ts:782-807`, `getPublicKeyFromCsr`); the echoed nonce is
+decoded by the schema and discarded. connectedhomeip compares it with the
+one sent and fails the step on a mismatch
+(`src/credentials/attestation_verifier/DefaultDeviceAttestationVerifier.cpp:847-870`
+at `6170af84`, `VerifyNodeOperationalCSRInformation`,
+`csrNonceSpan.data_equal(csrNonce)`). `controller/commissioner.flow.certificates`
+does the same, after the signature check and before the CSR is parsed; a
+mismatch is `ErrCommissioning`. The signature over `elements ‖ challenge`
+already binds the elements to the PASE session, so what the comparison adds
+is the per-request freshness the nonce exists for. Pinned by
+`TestCertificatesCsrNonceEchoed` (review 2026-11 W4-ctlsec-01). Retire when
+matter.js compares the nonce.
+
 ### BD-chip-ClosureControl-RulesInServer — the ClosureControl command rules are connectedhomeip's; matter.js has none
 
 matter.js's `ClosureControlServer` is the empty subclass
@@ -5055,6 +5095,36 @@ after a length check (review 2026-11 W2-sec-04). Reasoning: the key is a
 shared secret that gates rewriting another client's registration, and a
 constant-time compare costs nothing. Pinned by
 `TestICDVerificationKeyComparedInConstantTime`.
+
+### BD-Matter-OtaImageHeaderSizeCap — an OTA image header over 1024 bytes is refused before it is read
+
+matter.js's `OtaImageReader.#processHeader` (`OtaImageReader.ts:157-191` at
+`862ad75f`) takes the header size the 16-byte prefix states (`:182`) and
+collects that many bytes as the stream delivers them, without a bound.
+`bdx/otaimage.ReadHeader` refuses a stated size over `MaxHeaderSize` (1024)
+as `ErrInvalid` before it reads the header, as connectedhomeip does
+(`src/lib/core/OTAImageHeader.cpp:53` `kMaxHeaderSize`, checked at `:128`,
+"Safety check against malicious headers", at `6170af84`) (review 2026-11
+W4-ctlint-07). Reasoning: a consumer streaming an image from the network
+would otherwise pay whatever a hostile prefix claims; every header this
+module or chip's tooling writes stays far below the cap. Pinned by
+`TestReadHeaderRefusesOversizeHeader` and the `FuzzReadHeader` seed.
+
+### BD-Matter-OtaImageDigestAtStore — `Images.Store` verifies the header's payload digest when the ledger carries no checksum
+
+matter.js's `DclOtaUpdateService.#verifyUpdate` (`DclOtaUpdateService.ts:388-408`
+at `862ad75f`) passes checksum options to `OtaImageReader.file` only when the
+DCL record carries `otaChecksum`; without them `calculateFullChecksum`
+defaults to true (`OtaImageReader.ts:70`), the reader takes the full-checksum
+branch and verifies the payload size only (`:246-260`); the header's payload
+digest is checked later, at extraction (`:262-278`,
+`#extractAndValidatePayload`). `controller/softwareupdate.Images.Store` runs
+`otaimage.ValidateFile` with the payload digest in both cases
+(`storeValidation`), so a corrupted local image is refused when it is stored,
+not when it is first served over BDX (review 2026-11 W4-ctlint-03; owner
+decision 2026-11-02). Reasoning: the store is the one place that reads the
+whole file once; a digest failure at serve time would surface as a device's
+failed download. Pinned by `TestImagesStoreValidatesFileParity`.
 
 ### BD-Thread-TBRM-ChipLogic — ThreadBorderRouterManagement follows connectedhomeip behind the `BorderRouter` port
 

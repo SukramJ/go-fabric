@@ -114,7 +114,7 @@ func bridgePeer(t *testing.T) (*Node, *recorder, *warnRecorder) {
 	}
 	b := &report{}
 	b.endpoint(0, []uint64{dtRootNode}, []uint32{descriptor.ClusterID, clBasicInfo})
-	n.apply(wildcard, &b.r)
+	n.apply(wildcard, &b.r, true)
 	rec.take()
 	return n, rec, logs
 }
@@ -213,18 +213,19 @@ func TestClientBridgeStructureTwoInteractionsParity(t *testing.T) {
 	t.Run("waits for the lists that say who owns what rather than reading the root's as parenthood", func(t *testing.T) {
 		t.Parallel()
 		n, _, _ := bridgePeer(t)
-		n.apply(wildcard, &partsAttr(0, 10, all...).r)
+		n.apply(wildcard, &partsAttr(0, 10, all...).r, true)
 		n.apply(wildcard, &oneInteraction(append([]*report{
 			bsDescriptor(bsAggregator, one(dtAggregator, 3), append([]uint16{bsComposed}, bsSensors...), 11),
 			bsDescriptor(bsComposed, one(dtBridged, 1), bsSensors, 11),
-		}, sensors(11)...)...).r)
+		}, sensors(11)...)...).r, true)
+
 		treeIs(t, n, "/ep20", "/ep20/ep21", "/ep20/ep21/ep22", "/ep20/ep21/ep23")
 	})
 
 	t.Run("does not install a part the root has stopped naming while its owner was unknown", func(t *testing.T) {
 		t.Parallel()
 		n, _, _ := bridgePeer(t)
-		n.apply(wildcard, &partsAttr(0, 10, all...).r)
+		n.apply(wildcard, &partsAttr(0, 10, all...).r, true)
 		kept, dropped := bsSensors[0], bsSensors[1]
 		n.apply(wildcard, &oneInteraction(
 			partsAttr(0, 11, bsAggregator, bsComposed, kept),
@@ -232,15 +233,16 @@ func TestClientBridgeStructureTwoInteractionsParity(t *testing.T) {
 			bsDescriptor(bsComposed, one(dtBridged, 1), []uint16{kept, dropped}, 11),
 			bsDescriptor(kept, one(dtTemperature, 2), nil, 11),
 			bsDescriptor(dropped, one(dtTemperature, 2), nil, 11),
-		).r)
+		).r, true)
+
 		treeIs(t, n, "/ep20", "/ep20/ep21", "/ep20/ep21/ep22")
 	})
 
 	t.Run("takes the device types of an endpoint that has only utility ones", func(t *testing.T) {
 		t.Parallel()
 		n, _, _ := bridgePeer(t)
-		n.apply(wildcard, &partsAttr(0, 10, bsComposed).r)
-		n.apply(wildcard, &bsDescriptor(bsComposed, []dtRev{{dtBridged, 1}, {dtPowerSource, 1}}, nil, 11).r)
+		n.apply(wildcard, &partsAttr(0, 10, bsComposed).r, true)
+		n.apply(wildcard, &bsDescriptor(bsComposed, []dtRev{{dtBridged, 1}, {dtPowerSource, 1}}, nil, 11).r, true)
 		if ep := n.Endpoint(bsComposed); ep == nil || ep.DeviceType() != dtBridged {
 			t.Fatalf("composed endpoint %v", treeOf(n))
 		}
@@ -249,7 +251,7 @@ func TestClientBridgeStructureTwoInteractionsParity(t *testing.T) {
 	t.Run("installs nothing from a full-family list alone", func(t *testing.T) {
 		t.Parallel()
 		n, _, _ := bridgePeer(t)
-		n.apply(wildcard, &partsAttr(0, 10, all...).r)
+		n.apply(wildcard, &partsAttr(0, 10, all...).r, true)
 		treeIs(t, n)
 	})
 }
@@ -276,7 +278,7 @@ func TestClientBridgeStructureRootOmitsParity(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			t.Parallel()
 			n, _, _ := bridgePeer(t)
-			n.apply(wildcard, &reports(c.rootFirst).r)
+			n.apply(wildcard, &reports(c.rootFirst).r, true)
 			treeIs(t, n, "/ep2", "/ep3")
 		})
 	}
@@ -298,11 +300,12 @@ func TestClientBridgeStructureChangesParity(t *testing.T) {
 		n.apply(wildcard, &oneInteraction(append([]*report{
 			partsAttr(0, 10, append([]uint16{bsAggregator}, bsSensors...)...),
 			bsDescriptor(bsAggregator, one(dtAggregator, 3), bsSensors, 10),
-		}, sensors(10, bsSensors...)...)...).r)
+		}, sensors(10, bsSensors...)...)...).r, true)
+
 		treeIs(t, n, "/ep20", "/ep20/ep22", "/ep20/ep23")
-		n.apply(wildcard, &partsAttr(0, 11, bsSensors...).r)
+		n.apply(wildcard, &partsAttr(0, 11, bsSensors...).r, true)
 		treeIs(t, n, "/ep20", "/ep20/ep22", "/ep20/ep23")
-		n.apply(wildcard, &partsAttr(0, 12).r)
+		n.apply(wildcard, &partsAttr(0, 12).r, true)
 		treeIs(t, n)
 	})
 
@@ -312,7 +315,8 @@ func TestClientBridgeStructureChangesParity(t *testing.T) {
 		n.apply(wildcard, &oneInteraction(append([]*report{
 			partsAttr(0, 10, 40, 41, 50),
 			bsDescriptor(50, one(dtAggregator, 3), []uint16{40, 41}, 10),
-		}, sensors(10, 40, 41)...)...).r)
+		}, sensors(10, 40, 41)...)...).r, true)
+
 		treeIs(t, n, "/ep50", "/ep50/ep40", "/ep50/ep41")
 	})
 
@@ -323,12 +327,14 @@ func TestClientBridgeStructureChangesParity(t *testing.T) {
 			partsAttr(0, 10, bsAggregator, bsComposed, 22, 23),
 			partsAttr(bsAggregator, 10, bsComposed, 22, 23),
 			partsAttr(bsComposed, 10, bsSensors...),
-		}, sensors(10, bsSensors...)...)...).r)
+		}, sensors(10, bsSensors...)...)...).r, true)
+
 		treeIs(t, n, "/ep20")
 		n.apply(wildcard, &oneInteraction(
 			bsDescriptor(bsAggregator, one(dtAggregator, 3), []uint16{bsComposed, 22, 23}, 11),
 			bsDescriptor(bsComposed, one(dtBridged, 1), bsSensors, 11),
-		).r)
+		).r, true)
+
 		treeIs(t, n, "/ep20", "/ep20/ep21", "/ep20/ep21/ep22", "/ep20/ep21/ep23")
 	})
 
@@ -339,7 +345,8 @@ func TestClientBridgeStructureChangesParity(t *testing.T) {
 			partsAttr(0, 10, bsAggregator, bsComposed, 22, 23),
 			bsDescriptor(bsAggregator, []dtRev{{dtOnOffLight, 3}, {dtAggregator, 3}}, []uint16{bsComposed, 22, 23}, 10),
 			bsDescriptor(bsComposed, one(dtBridged, 1), bsSensors, 10),
-		}, sensors(10, bsSensors...)...)...).r)
+		}, sensors(10, bsSensors...)...)...).r, true)
+
 		treeIs(t, n, "/ep20", "/ep20/ep21", "/ep20/ep21/ep22", "/ep20/ep21/ep23")
 	})
 
@@ -350,9 +357,10 @@ func TestClientBridgeStructureChangesParity(t *testing.T) {
 		n.apply(wildcard, &oneInteraction(append([]*report{
 			partsAttr(0, 10, bsComposed, 22, 23),
 			partsAttr(bsComposed, 10, bsSensors...),
-		}, sensors(10, bsSensors...)...)...).r)
+		}, sensors(10, bsSensors...)...)...).r, true)
+
 		treeIs(t, n, "/ep21")
-		n.apply(wildcard, &bsDescriptor(bsComposed, one(dtBridged, 1), []uint16{kept}, 11).r)
+		n.apply(wildcard, &bsDescriptor(bsComposed, one(dtBridged, 1), []uint16{kept}, 11).r, true)
 		parentsAre(t, n, map[uint16]uint16{bsComposed: 0, kept: bsComposed, moved: 0})
 	})
 }
@@ -436,18 +444,18 @@ func TestClientBridgeStructureNestedAggregatorParity(t *testing.T) {
 	t.Run("gives each aggregator the endpoints it alone names", func(t *testing.T) {
 		t.Parallel()
 		n, _, _ := bridgePeer(t)
-		n.apply(wildcard, &nestedInteraction(nil).r)
+		n.apply(wildcard, &nestedInteraction(nil).r, true)
 		treeIs(t, n, nestedTree...)
 	})
 
 	t.Run("places the DALI lights once the nested aggregator says what it is", func(t *testing.T) {
 		t.Parallel()
 		n, _, _ := bridgePeer(t)
-		n.apply(wildcard, &nestedInteraction(func(ep uint16) bool { return ep == daliAggregator }, partsAttr(daliAggregator, 10, daliLights...)).r)
+		n.apply(wildcard, &nestedInteraction(func(ep uint16) bool { return ep == daliAggregator }, partsAttr(daliAggregator, 10, daliLights...)).r, true)
 		treeIs(t, n, without(nestedTree, "/ep21", "/ep22", "/ep23")...)
 		for _, it := range nestedBridgeReports(10) {
 			if it.ep == daliAggregator {
-				n.apply(wildcard, &it.r.r)
+				n.apply(wildcard, &it.r.r, true)
 			}
 		}
 		treeIs(t, n, nestedTree...)
@@ -458,9 +466,9 @@ func TestClientBridgeStructureNestedAggregatorParity(t *testing.T) {
 	t.Run("waits for a silent DALI light before placing any of the bridge", func(t *testing.T) {
 		t.Parallel()
 		n, _, _ := bridgePeer(t)
-		n.apply(wildcard, &nestedInteraction(func(ep uint16) bool { return ep == silent }).r)
+		n.apply(wildcard, &nestedInteraction(func(ep uint16) bool { return ep == silent }).r, true)
 		treeIs(t, n)
-		n.apply(wildcard, &bsDescriptor(silent, bridgedLight, nil, 10).r)
+		n.apply(wildcard, &bsDescriptor(silent, bridgedLight, nil, 10).r, true)
 		treeIs(t, n, nestedTree...)
 	})
 
@@ -497,13 +505,13 @@ func TestClientBridgeStructureNestedAggregatorParity(t *testing.T) {
 				detached = append(detached, ep.Number())
 			}
 		}
-		n.apply(wildcard, &nestedInteraction(func(ep uint16) bool { return ep == silent }).r)
+		n.apply(wildcard, &nestedInteraction(func(ep uint16) bool { return ep == silent }).r, true)
 		mu.Lock()
 		if len(announced) != 0 {
 			t.Fatalf("announced %v while an endpoint said nothing", announced)
 		}
 		mu.Unlock()
-		n.apply(wildcard, &bsDescriptor(silent, bridgedLight, nil, 10).r)
+		n.apply(wildcard, &bsDescriptor(silent, bridgedLight, nil, 10).r, true)
 		mu.Lock()
 		defer mu.Unlock()
 		slices.Sort(announced)
@@ -515,7 +523,7 @@ func TestClientBridgeStructureNestedAggregatorParity(t *testing.T) {
 	t.Run("takes the aggregator device type of an endpoint that is also a bridged node", func(t *testing.T) {
 		t.Parallel()
 		n, _, _ := bridgePeer(t)
-		n.apply(wildcard, &nestedInteraction(nil).r)
+		n.apply(wildcard, &nestedInteraction(nil).r, true)
 		if dali := n.Endpoint(daliAggregator); dali == nil || dali.DeviceType() != dtAggregator || dali.Owner() == nil || dali.Owner().Number() != zigbeeAggregator {
 			t.Fatalf("DALI aggregator %v", treeOf(n))
 		}
@@ -524,25 +532,26 @@ func TestClientBridgeStructureNestedAggregatorParity(t *testing.T) {
 	t.Run("keeps an endpoint the nested aggregator drops while the peer still names it", func(t *testing.T) {
 		t.Parallel()
 		n, _, _ := bridgePeer(t)
-		n.apply(wildcard, &nestedInteraction(nil).r)
+		n.apply(wildcard, &nestedInteraction(nil).r, true)
 		treeIs(t, n, nestedTree...)
 		dropped, kept := daliLights[0], daliLights[1:]
-		n.apply(wildcard, &partsAttr(daliAggregator, 11, kept...).r)
+		n.apply(wildcard, &partsAttr(daliAggregator, 11, kept...).r, true)
 		treeIs(t, n, nestedTree...)
 		root := slices.DeleteFunc(slices.Clone(rootParts), func(e uint16) bool { return e == dropped })
 		n.apply(wildcard, &oneInteraction(
 			partsAttr(0, 12, root...),
 			partsAttr(zigbeeAggregator, 12, append(append(slices.Clone(zigbeeLights), daliAggregator), kept...)...),
-		).r)
+		).r, true)
+
 		treeIs(t, n, without(nestedTree, "/ep21")...)
 	})
 
 	t.Run("drops an endpoint the root stops naming while the nested aggregator still does", func(t *testing.T) {
 		t.Parallel()
 		n, _, _ := bridgePeer(t)
-		n.apply(wildcard, &nestedInteraction(nil).r)
+		n.apply(wildcard, &nestedInteraction(nil).r, true)
 		dropped := daliLights[0]
-		n.apply(wildcard, &partsAttr(0, 11, slices.DeleteFunc(slices.Clone(rootParts), func(e uint16) bool { return e == dropped })...).r)
+		n.apply(wildcard, &partsAttr(0, 11, slices.DeleteFunc(slices.Clone(rootParts), func(e uint16) bool { return e == dropped })...).r, true)
 		treeIs(t, n, without(nestedTree, "/ep21")...)
 	})
 }
@@ -552,7 +561,7 @@ func TestClientBridgeStructureSeveralEndpointsParity(t *testing.T) {
 	parentsAfter := func(t *testing.T, chunks ...*report) (map[uint16]uint16, *warnRecorder) {
 		t.Helper()
 		n, _, logs := bridgePeer(t)
-		n.apply(wildcard, &oneInteraction(chunks...).r)
+		n.apply(wildcard, &oneInteraction(chunks...).r, true)
 		return parentsOf(n), logs
 	}
 	expect := func(t *testing.T, want map[uint16]uint16, chunks ...*report) {

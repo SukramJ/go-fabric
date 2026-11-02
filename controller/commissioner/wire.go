@@ -142,15 +142,19 @@ func decodeNOCResponse(n spec.Node) (nocResponse, error) {
 
 // certSigningRequest is TlvCertSigningRequest
 // (common/OperationalCredentialsTypes.ts:18-24): [1] certSigningRequest,
-// [2] csrNonce (32 bytes), [3]-[5] vendor reserved.
-func decodeCertSigningRequest(b []byte) ([]byte, error) {
+// [2] csrNonce (32 bytes), [3]-[5] vendor reserved. The nonce is returned
+// so the flow can compare it with the one it sent (connectedhomeip
+// DefaultDeviceAttestationVerifier.cpp:868-870 at 6170af84).
+func decodeCertSigningRequest(b []byte) (csr, nonce []byte, err error) {
 	n, err := spec.ReadElement(tlv.NewDecoder(b))
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	var csr, nonce []byte
 	err = spec.DecodeFields(n, "CertSigningRequest",
 		spec.Bind(1, "certSigningRequest", true, &csr, spec.DecodeBytesIn(0, math.MaxInt)),
 		spec.Bind(2, "csrNonce", true, &nonce, spec.DecodeBytesIn(32, 32)))
-	return csr, err
+	if err != nil {
+		return nil, nil, err
+	}
+	return csr, nonce, nil
 }
