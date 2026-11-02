@@ -189,7 +189,7 @@ func TestServerNodeParity(t *testing.T) {
 		// The node opens its own window again once the last fabric left
 		// (node.reopenIfDecommissioned), so a controller commissions it
 		// anew.
-		window := p.Device.Node().CommissioningWindow()
+		window := p.Device.Node().Bridge().CommissioningWindow()
 		if err := site.Eventually(ctx, "the node's window open again", window.IsOpen); err != nil {
 			t.Fatal(err)
 		}

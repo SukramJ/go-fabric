@@ -981,9 +981,6 @@ func (n *Node) RemoveFabric(ctx context.Context, fabricIndex uint8) error {
 	return n.root.OperationalCredentials.RemoveFabric(ctx, fabricIndex)
 }
 
-// CommissioningWindow returns the commissioning window.
-func (n *Node) CommissioningWindow() *CommissioningWindow { return n.br.CommissioningWindow() }
-
 // SetCommissioningBlocked refuses every new commissioning while err is
 // non-nil — the node's own window (at Start and after the last fabric is
 // removed), [Node.OpenBasicWindow], the host's opener and both

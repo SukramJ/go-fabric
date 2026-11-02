@@ -128,7 +128,7 @@ func (h *commissioningHost) transition(ctx context.Context, window *bridge.Commi
 	if window.IsOwnWindow() {
 		if basic != nil && !h.consumeOpening(basic) {
 			// The own window was (re)opened directly
-			// (CommissioningWindow().OpenOwnWindow) while a basic window
+			// ([Node.OpenOwnWindow]) while a basic window
 			// was open: the basic window ends, and the restarted window
 			// runs with the configured credentials and discriminator.
 			h.endBasic(basic)
@@ -457,14 +457,14 @@ func (c *WindowCredentials) validate() error {
 // (spake2.NewVerifierContext, the function commissioning/ uses) and
 // installed through the path an administrator's verifier takes, and the
 // node is advertised with CM=1 under creds.Discriminator. The window is
-// the node's own (CommissioningWindow().IsOwnWindow): it reads WindowNotOpen
+// the node's own (Window().Kind is WindowBasic): it reads WindowNotOpen
 // on the AdministratorCommissioning cluster, an administrator's
 // OpenCommissioningWindow replaces it, and it closes on its timeout, on
 // CommissioningComplete and on RevokeCommissioning. Opened while a basic
 // window or the node's own window is open, it replaces that window; while
 // an administrator's window is open it returns
-// bridge.ErrAdministratorWindowOpen. A direct
-// CommissioningWindow().OpenOwnWindow while it is open ends it: the
+// bridge.ErrAdministratorWindowOpen. [Node.OpenOwnWindow] while it is open
+// ends it: the
 // restarted window runs with the configured credentials and is advertised
 // under the configured discriminator. Once it closes, the configured
 // credentials are back: a node without a fabric reopens its own window
@@ -489,4 +489,44 @@ func (n *Node) OpenBasicWindow(ctx context.Context, creds WindowCredentials) err
 		return fmt.Errorf("%w: %w", ErrInvalidWindowCredentials, err)
 	}
 	return n.window.openBasic(ctx, vc, creds.Iterations, append([]byte(nil), creds.Salt...), creds.Discriminator, creds.Timeout)
+}
+
+// OpenOwnWindow opens the node's own commissioning window with the
+// configured credentials ([Config].Commissioning) and advertises it with
+// CM=1 under the configured discriminator — the window an uncommissioned
+// node opens at Start. timeout 0 is 48 h while the node has no fabric and
+// 15 min once it has one. Invoked while the node's own or a basic window
+// is open, it restarts the own window; while an administrator's window is
+// open it returns [ErrAdministratorWindowOpen]; while
+// [Node.SetCommissioningBlocked] holds an error it wraps
+// [ErrCommissioningBlocked].
+//
+// Mirrors matter.js DeviceCommissioner.allowBasicCommissioning
+// (packages/protocol/src/protocol/DeviceCommissioner.ts:130-137), which
+// opens the window with the node's configured passcode; ADR 0025 principle
+// 3 (the window's wiring stays behind [Node.Bridge]).
+func (n *Node) OpenOwnWindow(ctx context.Context, timeout time.Duration) error {
+	return n.br.CommissioningWindow().OpenOwnWindow(ctx, timeout)
+}
+
+// CloseWindow closes the open commissioning window, whoever opened it —
+// the node's own, a [Node.OpenBasicWindow] window or an administrator's:
+// the PASE acceptor goes and the commissionable record is withdrawn, while
+// a PASE session already established and an armed fail-safe are left to
+// their commissioner. Without an open window it does nothing. A node
+// without a fabric that closes a basic window reopens its own window, as
+// when that window closes on its timeout. It returns ctx.Err() when ctx
+// is done before the call.
+//
+// Mirrors matter.js DeviceCommissioner.endCommissioning ("Close the open
+// commissioning window, whoever opened it",
+// packages/protocol/src/protocol/DeviceCommissioner.ts:315-325), whose
+// #closeWindow removes the PASE commissioner and exits commissioning mode
+// (:283-297); ADR 0025 principle 3.
+func (n *Node) CloseWindow(ctx context.Context) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	n.br.CommissioningWindow().EndCommissioning()
+	return nil
 }

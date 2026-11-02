@@ -98,7 +98,7 @@ func TestAttestationBlocksCommissioning(t *testing.T) {
 	if n.AttestationError() == nil {
 		t.Fatal("AttestationError is nil for a chain that did not load")
 	}
-	if err := n.CommissioningWindow().OpenOwnWindow(context.Background(), 0); !errors.Is(err, ErrCommissioningBlocked) {
+	if err := n.Bridge().CommissioningWindow().OpenOwnWindow(context.Background(), 0); !errors.Is(err, ErrCommissioningBlocked) {
 		t.Fatalf("own window: %v, want ErrCommissioningBlocked", err)
 	}
 }

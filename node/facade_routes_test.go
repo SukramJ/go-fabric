@@ -192,7 +192,7 @@ func TestFacadeFabricInfosAndUniqueID(t *testing.T) {
 // Config fields pass to code written against the originals unconverted.
 func TestFacadeAliases(t *testing.T) {
 	n := newNode(t, minimalConfig(openDB(t, filepath.Join(t.TempDir(), "n.db"))))
-	if !bridgeWindow(n.CommissioningWindow()) || !operationalManager(n.Sessions()) || !subscriptionManager(n.Subscriptions()) {
+	if !bridgeWindow(n.Bridge().CommissioningWindow()) || !operationalManager(n.Sessions()) || !subscriptionManager(n.Subscriptions()) {
 		t.Fatal("an accessor returned nil")
 	}
 	var snap bridge.Snapshotter

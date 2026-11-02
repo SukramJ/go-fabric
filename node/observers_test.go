@@ -214,7 +214,7 @@ func TestObserverOnWindowTransition(t *testing.T) {
 	if err := n.Start(context.Background()); err != nil {
 		t.Fatalf("Start: %v", err)
 	}
-	if err := n.CommissioningWindow().RevokeWindow(context.Background()); err != nil {
+	if err := n.Bridge().CommissioningWindow().RevokeWindow(context.Background()); err != nil {
 		t.Fatalf("RevokeWindow: %v", err)
 	}
 

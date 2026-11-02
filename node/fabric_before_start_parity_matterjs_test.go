@@ -174,7 +174,7 @@ func (f *fabricBeforeStart) commissioned(t *testing.T) bool {
 			return false
 		}
 	}
-	return len(fabrics) == 1 && !f.device.Node().CommissioningWindow().IsOpen()
+	return len(fabrics) == 1 && !f.device.Node().Bridge().CommissioningWindow().IsOpen()
 }
 
 // TestFabricBeforeStart ports the describe "A fabric created before the

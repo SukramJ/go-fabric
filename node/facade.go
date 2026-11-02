@@ -38,10 +38,6 @@ type Topology = endpoint.Topology
 // ([bridge.TCPConfig]).
 type TCPConfig = bridge.TCPConfig
 
-// CommissioningWindow is the commissioning window [Node.CommissioningWindow]
-// returns ([bridge.CommissioningWindow]).
-type CommissioningWindow = bridge.CommissioningWindow
-
 // SessionManager is the secure-session table [Node.Sessions] returns
 // ([operational.Manager]): Sessions lists the PASE and CASE sessions,
 // Occupancy the session-id space.
@@ -62,7 +58,7 @@ type DiagnosticEvent = diagevent.Event
 var (
 	// ErrAdministratorWindowOpen refuses the node's own window while an
 	// administrator's window is open ([Node.OpenBasicWindow],
-	// CommissioningWindow().OpenOwnWindow).
+	// [Node.OpenOwnWindow]).
 	ErrAdministratorWindowOpen = bridge.ErrAdministratorWindowOpen
 	// ErrCommissioningBlocked is wrapped by every window open refused
 	// while [Node.SetCommissioningBlocked] holds an error.

@@ -17,7 +17,7 @@ still held there. Each row names the facade route, or the section of
 | `bridge` | `RandomPasscode`, `RandomSalt` (`daemon_matter.go:282`, `:297`; `matter_window_adapter.go:153`, `:157`), `RandomDiscriminator` (`matter_window_adapter.go:149`) | `node.NewCommissioningCredentials`; `Commissioning.WindowCredentials(timeout)` for the ephemeral window (`matter_window_adapter.go:165-171`) |
 | `bridge` | `ErrAdministratorWindowOpen`, `ErrCommissioningWindowAlreadyOpen` (`matter_window_adapter.go:208`), `ErrCommissioningWindowNotConfigured` (`matter_status_adapter.go:105`) | `node.ErrAdministratorWindowOpen`, `node.ErrCommissioningWindowAlreadyOpen`, `node.ErrCommissioningWindowNotConfigured` (the same values); `node.ErrCommissioningBlocked` |
 | `bridge` | `Snapshotter` (`daemon_matter.go:915`), `TCPConfig` (`daemon_matter.go:56`) | `node.Snapshotter`, `node.TCPConfig` |
-| `bridge` | `*CommissioningWindow` (`matter_status_adapter.go:33`, `matter_window_adapter.go:71`) | `node.CommissioningWindow`, the type `Node.CommissioningWindow` returns |
+| `bridge` | `*CommissioningWindow` (`matter_status_adapter.go:33`, `matter_window_adapter.go:71`) | `Node.Window()` to read it, `Node.OpenOwnWindow`, `Node.OpenBasicWindow`, `Node.CloseWindow`, `Node.SetCommissioningBlocked` to act on it |
 | `bridge` | `LocalAddr` (`daemon_matter.go:562`, `matter_status_adapter.go:47`) | `Node.LocalAddr` |
 | `bridge` | `*Bridge` with `Topology` (`daemon_matter.go:1315`, `matter_window_adapter.go:98`), `NotifyDeviceReachable` (`daemon_matter.go:974`), `ControllerRTT` (`daemon_matter.go:584`) | stays: [`bridge`](advanced-seams.md#bridge) through `Node.Bridge` |
 | `store` | `New`, `*Store` (`daemon_matter.go:373`, `:137`) | `Config.Store.Path` for a file the node opens; a shared handle stays [`store`](advanced-seams.md#store) (`Store.Credentials`) |
@@ -50,6 +50,7 @@ facade one shape. Each row names what a host writes now.
 | Symbol | Route |
 | --- | --- |
 | `subscription.EventFiring.Timestamp`, `subscription.EventFiring.Data` | drop them: the report reads the timestamp and payload from the `EventSource` by `Number` |
+| `Node.CommissioningWindow()`, `node.CommissioningWindow` | `Node.OpenOwnWindow(ctx, timeout)`, `Node.CloseWindow(ctx)`, `Node.Window()`; the bridge type stays behind `Node.Bridge().CommissioningWindow()` |
 
 ## Changed in the next release: `CommissionerReach` takes the peer
 

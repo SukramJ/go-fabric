@@ -127,7 +127,7 @@ func TestWindowSnapshot(t *testing.T) {
 	if !basic.Open || basic.Kind != node.WindowBasic || basic.Discriminator != creds.Discriminator || basic.Timeout != time.Minute {
 		t.Errorf("basic window %+v, want basic, discriminator %d, 1 min", basic, creds.Discriminator)
 	}
-	if err := n.CommissioningWindow().RevokeWindow(ctx); err != nil {
+	if err := n.Bridge().CommissioningWindow().RevokeWindow(ctx); err != nil {
 		t.Fatalf("RevokeWindow: %v", err)
 	}
 	// The node has no fabric, so its own window reopens after the basic
@@ -135,7 +135,7 @@ func TestWindowSnapshot(t *testing.T) {
 	if got := n.Window(); got.Kind != node.WindowOwn {
 		t.Fatalf("after closing the basic window = %+v, want the own window back", got)
 	}
-	if err := n.CommissioningWindow().RevokeWindow(ctx); err != nil {
+	if err := n.Bridge().CommissioningWindow().RevokeWindow(ctx); err != nil {
 		t.Fatalf("RevokeWindow: %v", err)
 	}
 	if got := n.Window(); got != (node.WindowSnapshot{Administrator: got.Administrator}) || got.Kind.String() != "none" {

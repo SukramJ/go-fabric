@@ -59,7 +59,7 @@ import (
 // EnhancedWindowOpen or BasicWindowOpen, the node's own window reading
 // BasicWindowOpen.
 func windowStatusOf(d *fabrictest.Device) wire.CommissioningWindowStatus {
-	w := d.Node().CommissioningWindow()
+	w := d.Node().Bridge().CommissioningWindow()
 	switch {
 	case !w.IsOpen():
 		return wire.WindowStatusClosed
@@ -73,7 +73,9 @@ func windowStatusOf(d *fabrictest.Device) wire.CommissioningWindowStatus {
 // openOwnWindow is CommissioningServer.enterCommissionableMode.
 func openOwnWindow(t *testing.T, d *fabrictest.Device) {
 	t.Helper()
-	if err := d.Act(func(n *node.Node) error { return n.CommissioningWindow().OpenOwnWindow(context.Background(), 0) }); err != nil {
+	if err := d.Act(func(n *node.Node) error {
+		return n.Bridge().CommissioningWindow().OpenOwnWindow(context.Background(), 0)
+	}); err != nil {
 		t.Fatalf("enterCommissionableMode: %v", err)
 	}
 }
@@ -169,7 +171,9 @@ func TestCommissioningWindowLifetime(t *testing.T) {
 		// deadline.
 		restarted := make(chan error, 1)
 		go func() {
-			restarted <- p.Device.Act(func(n *node.Node) error { return n.CommissioningWindow().OpenOwnWindow(context.Background(), 0) })
+			restarted <- p.Device.Act(func(n *node.Node) error {
+				return n.Bridge().CommissioningWindow().OpenOwnWindow(context.Background(), 0)
+			})
 		}()
 		site.Fake().Advance(100 * time.Millisecond)
 		if err := <-restarted; err != nil {
@@ -246,10 +250,10 @@ func TestCommissioningWindowLifetime(t *testing.T) {
 				if !first {
 					return nil
 				}
-				return dev.Node().CommissioningWindow().OpenOwnWindow(context.Background(), 0)
+				return dev.Node().Bridge().CommissioningWindow().OpenOwnWindow(context.Background(), 0)
 			}
 		}}})
-		w := p.Device.Node().CommissioningWindow()
+		w := p.Device.Node().Bridge().CommissioningWindow()
 		if err := w.OpenOwnWindow(context.Background(), 3*time.Minute); err != nil {
 			t.Fatal(err)
 		}
@@ -276,7 +280,9 @@ func TestCommissioningWindowLifetime(t *testing.T) {
 			t.Fatalf("OpenCommissioningWindow: %v", err)
 		}
 
-		err := p.Device.Act(func(n *node.Node) error { return n.CommissioningWindow().OpenOwnWindow(context.Background(), 0) })
+		err := p.Device.Act(func(n *node.Node) error {
+			return n.Bridge().CommissioningWindow().OpenOwnWindow(context.Background(), 0)
+		})
 
 		if !errors.Is(err, bridge.ErrAdministratorWindowOpen) {
 			t.Errorf("the node's own open = %v, want ErrAdministratorWindowOpen", err)

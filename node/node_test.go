@@ -143,7 +143,7 @@ func TestNodeServesPASEReadAndSubscription(t *testing.T) {
 	if err := n.Start(ctx); err != nil {
 		t.Fatalf("Start: %v", err)
 	}
-	if !n.CommissioningWindow().IsOpen() {
+	if !n.Bridge().CommissioningWindow().IsOpen() {
 		t.Fatal("an uncommissioned node did not open its own window")
 	}
 	plugEP, ok := endpointOf(t, n, "plug:1")
