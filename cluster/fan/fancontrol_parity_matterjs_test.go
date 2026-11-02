@@ -110,7 +110,7 @@ func TestParityMatterJS_FanControlConformance(t *testing.T) {
 				if e.ID >= 0xFFF0 {
 					continue
 				}
-				required, allowed := conformance(e.Conformance, names)
+				required, allowed := conformance(t, e.Conformance, names)
 				has := slices.Contains(served, e.ID)
 				if required && !has {
 					t.Errorf("features 0x%02X: mandatory %s %s (%q) missing", f, kind, e.Name, e.Conformance)

@@ -103,7 +103,7 @@ func TestParityMatterJS_ModeBaseDerivations(t *testing.T) {
 			if conformance == "" {
 				conformance = base.conformance
 			}
-			required, allowed := paritytest.Conformance(conformance, features)
+			required, allowed := paritytest.Conformance(t, conformance, features)
 			has := slices.Contains(d.srv.MatterAttributes(), a.ID)
 			if required && !has || has && !allowed {
 				t.Errorf("%s %s (%q) served=%v", d.name, a.Name, conformance, has)
@@ -123,7 +123,7 @@ func TestParityMatterJS_ModeBaseDerivations(t *testing.T) {
 			if conformance == "" {
 				conformance = base.conformance
 			}
-			if required, _ := paritytest.Conformance(conformance, features); !required {
+			if required, _ := paritytest.Conformance(t, conformance, features); !required {
 				continue
 			}
 			if cmd.Name == "ChangeToMode" {

@@ -299,7 +299,7 @@ func TestParityMatterJS_TemperatureControl(t *testing.T) {
 			if a.ID >= 0xFFF0 {
 				continue
 			}
-			required, allowed := paritytest.Conformance(a.Conformance, sel.features)
+			required, allowed := paritytest.Conformance(t, a.Conformance, sel.features)
 			has := slices.Contains(sel.srv.MatterAttributes(), a.ID)
 			if required && !has || has && !allowed {
 				t.Errorf("%v: %s (%q) served=%v", sel.features, a.Name, a.Conformance, has)

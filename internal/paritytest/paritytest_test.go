@@ -31,7 +31,7 @@ func TestConformance(t *testing.T) {
 		{"", false, false},
 	}
 	for _, tc := range cases {
-		if r, a := Conformance(tc.expr, names); r != tc.required || a != tc.allowed {
+		if r, a := Conformance(t, tc.expr, names); r != tc.required || a != tc.allowed {
 			t.Errorf("Conformance(%q) = (%v, %v), want (%v, %v)", tc.expr, r, a, tc.required, tc.allowed)
 		}
 	}
@@ -79,6 +79,20 @@ func TestLookupsFailOnUnknownNames(t *testing.T) {
 		lookup(rec)
 		if !rec.failed {
 			t.Errorf("unknown %s did not fail", name)
+		}
+	}
+}
+
+// TestConformanceFailsOnUnmodelledForms: a negation, a conjunction, a group
+// or a comparison fails the caller instead of reading as "not allowed"
+// (W6-test-16).
+func TestConformanceFailsOnUnmodelledForms(t *testing.T) {
+	t.Parallel()
+	for _, expr := range []string{"!OFFONLY", "[MS & !AS]", "(LT | DF)", "O, MaxPresets > 0", "[!LT]"} {
+		rec := &fatalRecorder{TB: t}
+		Conformance(rec, expr, map[string]bool{"OFFONLY": true, "MS": true})
+		if !rec.failed {
+			t.Errorf("Conformance(%q) did not fail", expr)
 		}
 	}
 }

@@ -167,7 +167,21 @@ var clusterIndex = sync.OnceValue(func() map[uint32]json.RawMessage {
 // (disallowed, deprecated) never hold; a name holds when names says so;
 // "A | B" holds when either side does; a choice suffix ("O.a+") is
 // dropped; "Rev >= vN" holds as optional at the shipped revision.
-func Conformance(expr string, names map[string]bool) (required, allowed bool) {
+//
+// A form it does not model — negation ("!OFFONLY"), conjunction
+// ("MS & !AS"), a group in parentheses or a comparison other than the
+// revision's — fails the test (tb.Fatalf) rather than answering "not
+// allowed": a caller computing the mandatory set would otherwise drop a
+// mandatory element silently (W6-test-16).
+func Conformance(tb testing.TB, expr string, names map[string]bool) (required, allowed bool) {
+	tb.Helper()
+	// Every term is checked before any is evaluated: an unmodelled form
+	// behind a term that holds still fails.
+	for term := range strings.SplitSeq(expr, ",") {
+		if term = strings.Trim(strings.TrimSpace(term), "[]"); !strings.HasPrefix(term, "Rev") && strings.ContainsAny(term, "!&()<>=") {
+			tb.Fatalf("paritytest.Conformance: %q uses a form it does not model (term %q); extend it before relying on the answer", expr, term)
+		}
+	}
 	for term := range strings.SplitSeq(expr, ",") {
 		term = strings.TrimSpace(term)
 		optional := strings.HasPrefix(term, "[") && strings.HasSuffix(term, "]")
