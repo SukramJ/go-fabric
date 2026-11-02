@@ -70,3 +70,28 @@ funlen; a race-proof wait in the W4-ctlim-03 test), 7dafb05a (coverage of the
 new `client/exchange` helpers and `schema.IsTimedWrite`, floors held),
 46e8a664 (citation and reachability snapshots; ratchets unchanged at drift 258
 and 3 unreached).
+
+
+## Owner decisions 2026-11-02 (W4)
+
+- W4-ctlsec-01 (CSR nonce compared, chip) and W4-ctlsec-02 (CAT list validated in the CA, matter.js `validateNocTagList`): both implemented in the W4 PR.
+- W4-ctlsec-03 (DAC/PAI notAfter): stay with matter.js (validity at the DAC's notBefore, `DeviceAttestationValidator.ts:305-331`); open note, no Ahead row.
+- W4-ctlint-09 (CD signer fetched by SKID trusted as fetched): parity with matter.js `getOrFetchCdSigner`, recorded as a paragraph in `BD-Controller-DclSnapshotLayered`; no tightening.
+- W4-ctlsec-07: already stated at `docs/security.md:46-47` (root key in the fabric record unless a signer is given; resumption in memory); no change.
+- W4-ctlsec-08, W4-ctlnet-07: parity, open notes.
+
+## Fixed in PR (reviewer's part, Fable)
+
+| ID | Commit | What |
+| --- | --- | --- |
+| W4-ctlsec-01 | 0a368832 | `controller/commissioner`: `decodeCertSigningRequest` returns the echoed nonce; `certificates` refuses a mismatch with `ErrCommissioning` (chip `DefaultDeviceAttestationVerifier.cpp:847-870`); Ahead row `BD-chip-Commissioner-CsrNonceEchoed` (marker `ControllerCommissioningFlow.ts:1395`); `TestCertificatesCsrNonceEchoed`. |
+| W4-ctlsec-02 | 0a368832 | `controller/ca`: `validateCATs` before signing (`CaseAuthenticatedTag.ts:96-105`, `:32-33`), `ca.ErrInvalidCATs`; `TestGenerateNOCValidatesTheCATList`. |
+| W4-ctlsec-06 | 0a368832 | `commissioner.Options.OnAttestationFailure` doc names the zero value's behaviour (`ControllerCommissioningFlow.ts:1352-1367`) and the two register rows. |
+| W4-ctlint-09 | 0a368832 | paragraph in `BD-Controller-DclSnapshotLayered` (`DclCertificateService.ts:864-891`). |
+
+## Reviewer verification (Fable, after the handback)
+
+Every matter.js and chip line the agent's commits cite was re-read at the pins (862ad75f / 6170af84) and holds: `MRP.ts:182-190`, `MessageExchange.ts:1242-1250`, `ExchangeManager.ts:425-431`, `MessageChannel.ts:125-127, :140-161`, `Peer.ts:161-163` (ctlnet-01/02); `ClientStructure.ts:412, :1757-1770`, `NetworkClient.ts:164-173, :207, :245, :303-308`, `ClientNodeInteraction.ts:97-98` (ctlim-01); `Invoke.ts:114, :136-139, :237`, `Write.ts:188`, `ClientInteraction.ts:200` (ctlim-02; no attribute of the snapshot carries the timed quality, so `timedWritePaths` is empty at the pin); `ClientNode.ts:291-300`, `ClientInteraction.ts:264-282`, `ClientSubscriptions.ts:160-171` (ctlim-03). Second pass over the remaining commits (0dc4ad84, af994d4e, a10d6b76, c9ca2bcd, 49f05b93, f0d69498, 94140f5e): `MessageExchange.ts:812-818, :907-910, :390-392`, `ExchangeManager.ts:533-545`, `PeerExchangeProvider.ts:152-161`, `Peer.ts:438-462, :546-565` (ctlnet-03..06, ctlim-07); `InteractionMessenger.ts:1020-1045, :1145-1165, :1333`, `SustainedSubscription.ts:126, :379-384, :395-419`, `ClientCacheBuffer.ts:24, :79-80, :174-175`, `DatasourceCache.ts:297-303`, `ClientStructure.ts:57, :417-439, :469-471, :482-486`, `ClientNodeInteraction.ts:146-168`, `NetworkClient.ts:113-131, :207-236` (ctlim-04..06, -08..11); `DclClient.ts:62-121`, `Github.ts:120-141`, `DclOtaUpdateService.ts:55, :388-408, :573-574, :811-816`, `OtaImageReader.ts:65-110, :157-191, :181-183, :246-278`, `OtbrRestClient.ts:757-788`, chip `OTAImageHeader.cpp:53, :128` (ctlint-03..08, -10..14). The Ahead row `BD-Matter-OtaImageHeaderSizeCap` holds (`make ahead-check` 39/39 with the reviewer's row).
+
+W4-ctlint-03 note: at Store time matter.js's `#verifyUpdate` passes no checksum options when the ledger has none, so `OtaImageReader.file` takes the `calculateFullChecksum` branch (`OtaImageReader.ts:246-260`) and verifies the payload size only; the internal payload digest is checked later at extraction (`:262-278`, `#extractAndValidatePayload`). `images.Store` checks the digest at Store time as well.
+
