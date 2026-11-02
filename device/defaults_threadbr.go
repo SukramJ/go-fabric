@@ -39,7 +39,7 @@ func newThreadBorderRouterManagementServer(b defaultBuild) (contract.ClusterServ
 	}
 	return threadbr.NewManagement(context.Background(), threadbr.ManagementConfig{
 		BorderRouter: d.BorderRouter, Features: tbrmdef.Feature(b.opts.Features),
-		DataVersion: b.cfg.DataVersion, Logger: Logger,
+		DataVersion: b.cfg.DataVersion, Logger: b.logger,
 	})
 }
 
@@ -61,6 +61,6 @@ func newThreadNetworkDiagnosticsServer(b defaultBuild) (contract.ClusterServer, 
 	}
 	clear(b.initial)
 	return threadbr.NewDiagnostics(context.Background(), threadbr.DiagnosticsConfig{
-		BorderRouter: m.BorderRouter(), Features: features, DataVersion: b.cfg.DataVersion, Logger: Logger,
+		BorderRouter: m.BorderRouter(), Features: features, DataVersion: b.cfg.DataVersion, Logger: b.logger,
 	})
 }

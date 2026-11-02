@@ -54,6 +54,7 @@ facade one shape. Each row names what a host writes now.
 | `device.Options.Reachable`, `device.HostStatement.Reachable`, `device.AvailabilityProbe` | `Device.SetReachable(ctx, reachable)` on every change of the source's availability |
 | `node.New(cfg)` | `node.New(ctx, cfg)`: ctx bounds the store work; nothing runs before `Start` |
 | `node.Health.OnSample`, `node.OTAProviderConfig.OnStatusChange`, the `error` result of every `node.Observers` hook | `Node.OnHealthSample` / `OnHealthSampleAsync`, `Node.OnOTAProviderStatus` / `OnOTAProviderStatusAsync`; hooks return nothing; `Node.ObserveAsync` for the queued form |
+| `device.Logger` | `device.Options.Logger` per device (nil is `slog.Default()`) |
 
 ## Changed in the next release: `CommissionerReach` takes the peer
 

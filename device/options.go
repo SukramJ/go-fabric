@@ -5,6 +5,7 @@ package device
 
 import (
 	"fmt"
+	"log/slog"
 	"maps"
 	"reflect"
 	"slices"
@@ -37,6 +38,10 @@ type Options struct {
 	// verbatim.
 	DeviceAddress  string
 	ChannelAddress string
+	// Logger receives the device kit's diagnostics — a default selection
+	// that keeps the generated server, the Thread servers' logs; nil is
+	// slog.Default() at the time of the call (ADR 0026 principle 9).
+	Logger *slog.Logger
 	// Conditions are the device-type conditions the host states for the
 	// endpoint ([endpoint.Spec.DeviceConditions]).
 	Conditions []string
@@ -102,6 +107,8 @@ type settings struct {
 	candidates []surface.Element
 	// key is the device's StableKey ([defaultBuild] key).
 	key string
+	// logger is [Options].Logger, slog.Default() for nil.
+	logger *slog.Logger
 	// self is the device's endpoint number once assembled
 	// ([Device.EndpointNumber]): a default PowerSource names it in its
 	// EndpointList.

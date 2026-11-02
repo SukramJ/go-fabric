@@ -164,12 +164,12 @@ func TestADeclaredSelectionTheServerDoesNotServeIsRefused(t *testing.T) {
 // for — keeps the generated server (by_design
 // BD-Matter-SelfHeldDefault-SelectionNotServed), and the kit logs one Info
 // line naming the cluster, the selection and the reason.
-func TestADefaultSelectionKeepsTheGeneratedServer(t *testing.T) { //nolint:paralleltest // swaps the package Logger
+func TestADefaultSelectionKeepsTheGeneratedServer(t *testing.T) {
+	t.Parallel()
 	var logs bytes.Buffer
-	saved := Logger
-	Logger = slog.New(slog.NewTextHandler(&logs, nil))
-	t.Cleanup(func() { Logger = saved })
-	d, err := New(&PumpType, testOptions("pump"), pumpdef.Declare{Features: pumpdef.FeatureConstantSpeed})
+	opts := testOptions("pump")
+	opts.Logger = slog.New(slog.NewTextHandler(&logs, nil))
+	d, err := New(&PumpType, opts, pumpdef.Declare{Features: pumpdef.FeatureConstantSpeed})
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -143,6 +143,10 @@ func New(t *Type, opts Options, decls ...Declaration) (*Device, error) {
 	if opts.StableKey != nil {
 		s.key = opts.StableKey.String()
 	}
+	s.logger = opts.Logger
+	if s.logger == nil {
+		s.logger = slog.Default()
+	}
 	for _, decl := range decls {
 		if err := s.declare(decl); err != nil {
 			return nil, fmt.Errorf("%s: %w", t.Name, err)
@@ -378,7 +382,7 @@ func defaultServer(t *Type, r *ClusterRequirement, s *settings, sibling func(uin
 	maps.Copy(initial, s.cut.initial(r.ID, s.initial[r.ID]))
 	if factory, held := selfHeldDefaults[r.ID]; held {
 		srv, err := factory(defaultBuild{
-			def: def, opts: opts, clock: s.clock, sibling: sibling, deviceType: uint16(t.ID), key: s.key,
+			def: def, opts: opts, clock: s.clock, sibling: sibling, deviceType: uint16(t.ID), key: s.key, logger: s.logger,
 			ports: s.ports[r.ID], transitions: s.transitions[r.ID], initial: initial,
 		})
 		if err == nil {
@@ -402,7 +406,7 @@ func defaultServer(t *Type, r *ClusterRequirement, s *settings, sibling func(uin
 		// The device type's default selection the self-held server does
 		// not serve keeps the generated server (by_design
 		// BD-Matter-SelfHeldDefault-SelectionNotServed).
-		Logger.Info("device.default_server.generated",
+		s.logger.Info("device.default_server.generated",
 			slog.String("device_type", t.Name), slog.String("cluster", r.Name),
 			slog.String("features", fmt.Sprintf("0x%X", opts.Features)), slog.String("reason", err.Error()))
 	}
