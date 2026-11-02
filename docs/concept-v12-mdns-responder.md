@@ -32,7 +32,7 @@ Die Folgen dieser Teilung:
    gestartet hat (`server.go:135-136`) — der Race, den L7-D02 nennt.
 2. **Race-Gate.** grandcats `Shutdown` hat einen eigenen Data Race; das
    gesamte mdns-Testbinary überspringt sich unter `-race`
-   (`mdns/race_skip_test.go:14-45`). `make race` ist Release-Gate, und
+   (`mdns/race_skip_test.go:14-42`). `make race` ist Release-Gate, und
    ausgerechnet das Discovery-Paket ist davon ausgenommen.
 3. **Parität.** Das Verhalten der primären Records ist nicht das von
    matter.js: grandcat probt zweimal und kündigt zweimal an (+1 s, +2 s),
