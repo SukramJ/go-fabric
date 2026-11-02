@@ -147,12 +147,17 @@ func TestCheckFailsOnAnUnreachableFloor(t *testing.T) {
 
 // TestCheckFailsAStaleFloor: coverage more than staleFloorSlack points
 // above its floor fails and names the floor to raise it to (W6-test-05);
-// within the slack it passes.
+// within the slack it passes, and so does a measurement within the slack
+// plus the entry's declared spread.
 func TestCheckFailsAStaleFloor(t *testing.T) {
 	t.Parallel()
 	res := check(
-		[]measurement{{pkg: "a", pct: 92.5, measurable: true}, {pkg: "b", pct: 82.9, measurable: true}},
-		[]packageFloor{{pkg: "a", min: 80}, {pkg: "b", min: 80}},
+		[]measurement{
+			{pkg: "a", pct: 92.5, measurable: true},
+			{pkg: "b", pct: 82.9, measurable: true},
+			{pkg: "c", pct: 95.9, measurable: true},
+		},
+		[]packageFloor{{pkg: "a", min: 80}, {pkg: "b", min: 80}, {pkg: "c", min: 92, spread: 3.3, why: "scheduling"}},
 	)
 	if len(res.problems) != 1 || !strings.Contains(res.problems[0], "a is") || !strings.Contains(res.problems[0], "92.0") {
 		t.Fatalf("problems = %v, want one for a suggesting 92.0%%", res.problems)
@@ -177,6 +182,12 @@ func TestFloorsTableIsWellFormed(t *testing.T) {
 		}
 		if f.min < 0 || f.min > 100 {
 			t.Errorf("%s: floor %.1f is outside 0..100", f.pkg, f.min)
+		}
+		if f.spread < 0 || f.spread > 100 {
+			t.Errorf("%s: spread %.1f is outside 0..100", f.pkg, f.spread)
+		}
+		if f.spread > 0 && strings.TrimSpace(f.why) == "" {
+			t.Errorf("%s: a spread needs a why — say what makes the measurement vary", f.pkg)
 		}
 		if f.min == 0 && strings.TrimSpace(f.why) == "" {
 			t.Errorf("%s: a zero floor needs a why — say what makes the package unmeasurable", f.pkg)
