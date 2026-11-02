@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 7262,
+  "entry_points": 7271,
   "entry_packages": [
     ".",
     "bdx",
@@ -276,9 +276,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 17087,
+    "total_exported": 17094,
     "reachable": 12015,
-    "whitelisted": 5072,
+    "whitelisted": 5079,
     "unreachable": 0
   },
   "by_package": [],
@@ -27761,6 +27761,13 @@
     },
     {
       "package": "icd/checkin",
+      "identifier": "FuzzCheckinDecode",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "icd/checkin/fuzz_checkin_test.go",
+      "line": 15
+    },
+    {
+      "package": "icd/checkin",
       "identifier": "TestCheckInMessage",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "icd/checkin/checkin_parity_matterjs_test.go",
@@ -32171,6 +32178,20 @@
     },
     {
       "package": "secure/sigma",
+      "identifier": "FuzzUnmarshalSigma1",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/sigma/fuzz_sigma_test.go",
+      "line": 19
+    },
+    {
+      "package": "secure/sigma",
+      "identifier": "FuzzUnmarshalSigma3",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/sigma/fuzz_sigma_test.go",
+      "line": 52
+    },
+    {
+      "package": "secure/sigma",
       "identifier": "SessionParameters",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "secure/sigma/sigma.go",
@@ -32924,6 +32945,27 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/sigma/sigma_test.go",
       "line": 371
+    },
+    {
+      "package": "secure/spake2",
+      "identifier": "FuzzDecodePBKDFParamRequest",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/spake2/fuzz_wire_test.go",
+      "line": 38
+    },
+    {
+      "package": "secure/spake2",
+      "identifier": "FuzzDecodePake1",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/spake2/fuzz_wire_test.go",
+      "line": 57
+    },
+    {
+      "package": "secure/spake2",
+      "identifier": "FuzzDecodePake3",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/spake2/fuzz_wire_test.go",
+      "line": 74
     },
     {
       "package": "secure/spake2",
@@ -34540,7 +34582,14 @@
       "identifier": "FuzzDecodePacket",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/btp/fuzz_codec_test.go",
-      "line": 16
+      "line": 17
+    },
+    {
+      "package": "transport/btp",
+      "identifier": "FuzzSessionPackets",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "transport/btp/fuzz_codec_test.go",
+      "line": 64
     },
     {
       "package": "transport/btp",
