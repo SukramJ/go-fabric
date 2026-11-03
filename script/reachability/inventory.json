@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 7237,
+  "entry_points": 7238,
   "entry_packages": [
     ".",
     "bdx",
@@ -277,9 +277,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 17116,
+    "total_exported": 17117,
     "reachable": 12069,
-    "whitelisted": 5047,
+    "whitelisted": 5048,
     "unreachable": 0
   },
   "by_package": [],
@@ -26680,21 +26680,21 @@
       "identifier": "TestMain",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/quickstart-device/main_test.go",
-      "line": 100
+      "line": 101
     },
     {
       "package": "examples/quickstart-device",
       "identifier": "TestQuickstartDevice",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/quickstart-device/main_test.go",
-      "line": 35
+      "line": 36
     },
     {
       "package": "examples/quickstart-device",
       "identifier": "TestQuickstartDeviceRunStops",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/quickstart-device/main_test.go",
-      "line": 70
+      "line": 71
     },
     {
       "package": "examples/reference-bridge",
@@ -29411,6 +29411,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/subscription/session_changed_test.go",
       "line": 17
+    },
+    {
+      "package": "im/subscription",
+      "identifier": "TestSnapshot",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "im/subscription/snapshot_test.go",
+      "line": 15
     },
     {
       "package": "im/subscription",
