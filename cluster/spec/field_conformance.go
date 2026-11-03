@@ -145,7 +145,7 @@ type confLocation struct {
 // sets ([Instance.CheckValue], [Instance.CheckSet], a [Server]'s initial
 // values) is held to it, a controller's write ([Instance.ValidateWrite])
 // is not — matter.js enforces it only where no remote subject authored
-// the value (ValueValidator.ts:284-305 at 862ad75f, hasLocalActor).
+// the value (state/validation/ValueValidator.ts:284-305 at 862ad75f, hasLocalActor).
 type nameScope struct {
 	peers       Peers
 	outer       func(name string) (any, bool)

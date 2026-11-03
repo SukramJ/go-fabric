@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 7253,
+  "entry_points": 7278,
   "entry_packages": [
     ".",
     "bdx",
@@ -277,9 +277,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 17132,
-    "reachable": 12070,
-    "whitelisted": 5062,
+    "total_exported": 17166,
+    "reachable": 12090,
+    "whitelisted": 5076,
     "unreachable": 0
   },
   "by_package": [],
@@ -1453,6 +1453,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/peer_loss_test.go",
       "line": 494
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestChunkedWriteAcrossMessagesParityMatterJS",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/interaction_protocol_parity_matterjs_test.go",
+      "line": 293
     },
     {
       "package": "bridge",
@@ -3612,6 +3619,13 @@
     },
     {
       "package": "bridge",
+      "identifier": "TestInteractionProtocolBridgeParityMatterJS",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/interaction_protocol_parity_matterjs_test.go",
+      "line": 181
+    },
+    {
+      "package": "bridge",
       "identifier": "TestInvokeDelayReportDataDefersSubscriptions",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/delay_report_data_test.go",
@@ -3819,6 +3833,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/operational_by_fabric_test.go",
       "line": 20
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestOperationalPortParityMatterJS",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/operational_port_parity_matterjs_test.go",
+      "line": 19
     },
     {
       "package": "bridge",
@@ -5383,6 +5404,13 @@
     },
     {
       "package": "bridge",
+      "identifier": "TestSuppressResponseErrorPathsParityMatterJS",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/suppress_response_parity_matterjs_test.go",
+      "line": 195
+    },
+    {
+      "package": "bridge",
       "identifier": "TestSwitchPositionsReachTheWire",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/switch_positions_wire_test.go",
@@ -5604,6 +5632,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/write_transaction_test.go",
       "line": 17
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestWriteTransactionsShareHolds",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/write_hold_routing_test.go",
+      "line": 33
     },
     {
       "package": "bridge",
@@ -22154,6 +22189,13 @@
       "line": 551
     },
     {
+      "package": "controller",
+      "identifier": "TestOperationalPortParityMatterJS",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/operational_port_parity_matterjs_test.go",
+      "line": 20
+    },
+    {
       "package": "controller/attestation",
       "identifier": "FuzzDecodeAttestationElements",
       "reason": "auto-whitelist:pattern=test-file",
@@ -24769,21 +24811,21 @@
       "identifier": "SemanticTag",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "device/options.go",
-      "line": 73
+      "line": 74
     },
     {
       "package": "device",
       "identifier": "SourceKey",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "device/options.go",
-      "line": 76
+      "line": 77
     },
     {
       "package": "device",
       "identifier": "StringKey",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "device/options.go",
-      "line": 80
+      "line": 81
     },
     {
       "package": "device",
@@ -25091,7 +25133,7 @@
       "identifier": "TestEveryTypeConstructsAndConforms",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/conformance_test.go",
-      "line": 287
+      "line": 297
     },
     {
       "package": "device",
@@ -25357,7 +25399,7 @@
       "identifier": "TestRefusalsWrapTheirSentinel",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/conformance_test.go",
-      "line": 343
+      "line": 353
     },
     {
       "package": "device",
@@ -25406,7 +25448,7 @@
       "identifier": "TestStandardDeviceTypeCorpusParityMatterJS",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/standard_device_type_corpus_parity_matterjs_test.go",
-      "line": 148
+      "line": 149
     },
     {
       "package": "device",
@@ -25512,6 +25554,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/device_test.go",
       "line": 399
+    },
+    {
+      "package": "device",
+      "identifier": "TestValidatedElementsHostedParityMatterJS",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "device/validated_elements_parity_matterjs_test.go",
+      "line": 29
     },
     {
       "package": "device",
@@ -25728,7 +25777,14 @@
       "identifier": "TestBaseMandatesBinding",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/binding_mount_test.go",
-      "line": 94
+      "line": 104
+    },
+    {
+      "package": "endpoint",
+      "identifier": "TestBindingMountParityMatterJS",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "endpoint/binding_mount_test.go",
+      "line": 184
     },
     {
       "package": "endpoint",
@@ -25896,7 +25952,7 @@
       "identifier": "TestDeclaredClientMountsBinding",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/binding_mount_test.go",
-      "line": 24
+      "line": 34
     },
     {
       "package": "endpoint",
@@ -25953,6 +26009,20 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/devicetype_validation_test.go",
       "line": 198
+    },
+    {
+      "package": "endpoint",
+      "identifier": "TestDeviceTypeConformanceNodeParityMatterJS",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "endpoint/devicetype_node_parity_matterjs_test.go",
+      "line": 124
+    },
+    {
+      "package": "endpoint",
+      "identifier": "TestDeviceTypeConformanceServiceParityMatterJS",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "endpoint/devicetype_service_parity_matterjs_test.go",
+      "line": 63
     },
     {
       "package": "endpoint",
@@ -28182,6 +28252,13 @@
     },
     {
       "package": "im",
+      "identifier": "TestChunkedWriteHoldParityMatterJS",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "im/write_hold_parity_matterjs_test.go",
+      "line": 108
+    },
+    {
+      "package": "im",
       "identifier": "TestChunkedWriteIsAuthorizedOnce",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/write_chunked_acl_test.go",
@@ -29505,10 +29582,24 @@
     },
     {
       "package": "im/subscription",
+      "identifier": "TestSessionShutdownParityMatterJS",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "im/subscription/slow_report_parity_matterjs_test.go",
+      "line": 307
+    },
+    {
+      "package": "im/subscription",
       "identifier": "TestSessionSubscriptionsChangedHook",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/subscription/session_changed_test.go",
       "line": 17
+    },
+    {
+      "package": "im/subscription",
+      "identifier": "TestSlowReportParityMatterJS",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "im/subscription/slow_report_parity_matterjs_test.go",
+      "line": 145
     },
     {
       "package": "im/subscription",
@@ -30320,7 +30411,7 @@
       "identifier": "Advertiser",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/config.go",
-      "line": 30
+      "line": 31
     },
     {
       "package": "node",
@@ -30439,7 +30530,7 @@
       "identifier": "Groups",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/config.go",
-      "line": 36
+      "line": 37
     },
     {
       "package": "node",
@@ -33086,6 +33177,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/spake2/spake2_test.go",
       "line": 69
+    },
+    {
+      "package": "store",
+      "identifier": "Eraser",
+      "reason": "the method set store.Port embeds; node and controller call Erase through Port, so no call edge names the interface itself",
+      "file": "store/port.go",
+      "line": 208
     },
     {
       "package": "surface",

@@ -24,7 +24,7 @@ import (
 // attribute the conformance does not allow is not served and answers
 // UNSUPPORTED_ATTRIBUTE.
 
-// bitConformanceCluster is ValueValidatorTest.ts:136-162 bitmapCluster: a
+// bitConformanceCluster is state/validation/ValueValidatorTest.ts:136-162 bitmapCluster: a
 // map16 Modes whose bits are gated on the feature LT (Latching, bit 0)
 // by every conformance form the bitmap validator meets.
 func bitConformanceCluster(t *testing.T) *spec.Cluster {
@@ -52,7 +52,7 @@ func bitConformanceCluster(t *testing.T) *spec.Cluster {
 	}
 }
 
-// reservedBitmapCluster is ValueValidatorTest.ts:47-52: a map8 whose
+// reservedBitmapCluster is state/validation/ValueValidatorTest.ts:47-52: a map8 whose
 // multiA occupies bits 0–2 and multiB bits 4–6; bits 3 and 7 are
 // reserved.
 var reservedBitmapCluster = &spec.Cluster{

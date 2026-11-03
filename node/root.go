@@ -399,8 +399,8 @@ func withAttestation(cfg *Config, opcredsCfg *mattercore.OpcredsConfig) error {
 }
 
 // attestationMaterialOf returns chain and cd, the CSA test material for
-// the vendor and product in place of a nil one (wiring.go:132-163 at
-// b4ea1f96^).
+// the vendor and product in place of a nil one, as the node's former
+// wiring did before b4ea1f96.
 func attestationMaterialOf(cfg *Config, chain *attestation.Chain, cd []byte) (mattercore.OpcredsAttestation, error) {
 	pd := cfg.ProductDescription
 	if chain == nil {

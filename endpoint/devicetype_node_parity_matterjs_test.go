@@ -48,7 +48,7 @@ func rainSensor(f *fakeTree, parent *fakeEP, name string, withStateChange bool) 
 }
 
 // lightSwitch is an OnOffLightSwitch carrying Descriptor, the given
-// servers and clients (DeviceTypeConformanceTest.ts:91-98 switchWith).
+// servers and clients (validation/DeviceTypeConformanceTest.ts:91-98 switchWith).
 func lightSwitch(f *fakeTree, parent *fakeEP, name string, servers, clients []uint32) *fakeEP {
 	ep := f.add(name, parent, dtOnOffLightSwch).server(clDescriptor)
 	for _, s := range servers {
@@ -60,7 +60,7 @@ func lightSwitch(f *fakeTree, parent *fakeEP, name string, servers, clients []ui
 	return ep.client(clients...)
 }
 
-// lightingFeatureModel is DeviceTypeConformanceTest.ts:183-205: OnOffLight
+// lightingFeatureModel is validation/DeviceTypeConformanceTest.ts:183-205: OnOffLight
 // requires OnOff with its Lighting feature under conformance, which may
 // name OnOff's OFFONLY and OnOffLight's condition Wanted.
 func lightingFeatureModel(c schema.Conformance) *dtLookups {
@@ -73,7 +73,7 @@ func lightingFeatureModel(c schema.Conformance) *dtLookups {
 	)
 }
 
-// singletonModel is DeviceTypeConformanceTest.ts:146-171: RootNode
+// singletonModel is validation/DeviceTypeConformanceTest.ts:146-171: RootNode
 // (classified node unless rootIsNode is false) declares GroupKeyManagement
 // a singleton; BridgedNode (classified node when bridgedNodeIsNode)
 // declares Identify one; OnOffLight lists nothing.
@@ -97,7 +97,7 @@ func singletonModel(rootIsNode, bridgedNodeIsNode bool) *dtLookups {
 	)
 }
 
-// singletonsOf is DeviceTypeConformanceTest.ts:173-177
+// singletonsOf is validation/DeviceTypeConformanceTest.ts:173-177
 // singletonViolationsOf: the misplaced singletons as [deviceType,
 // requirement].
 func singletonsOf(vs []DeviceTypeViolation) []string {
@@ -125,7 +125,7 @@ func TestDeviceTypeConformanceNodeParityMatterJS(t *testing.T) {
 	t.Parallel()
 	std := deviceTypeLookups()
 
-	// DeviceTypeConformanceTest.ts:288-297: lightWithoutScenes lacks
+	// validation/DeviceTypeConformanceTest.ts:288-297: lightWithoutScenes lacks
 	// ScenesManagement, whose nested CopyScene is mandatory.
 	t.Run("reports a missing cluster once, not again for its nested requirements", func(t *testing.T) {
 		t.Parallel()
@@ -135,7 +135,7 @@ func TestDeviceTypeConformanceNodeParityMatterJS(t *testing.T) {
 		wantKinds(t, f.check(std, ep), "missing ScenesManagement")
 	})
 
-	// DeviceTypeConformanceTest.ts:299-307: DoorLock states Groups X.
+	// validation/DeviceTypeConformanceTest.ts:299-307: DoorLock states Groups X.
 	t.Run("reports a disallowed cluster the endpoint carries", func(t *testing.T) {
 		t.Parallel()
 		f, root := standardTree()
@@ -144,7 +144,7 @@ func TestDeviceTypeConformanceNodeParityMatterJS(t *testing.T) {
 		wantKinds(t, f.check(std, lock), "disallowed Groups")
 	})
 
-	// DeviceTypeConformanceTest.ts:309-318.
+	// validation/DeviceTypeConformanceTest.ts:309-318.
 	t.Run("accepts a disallowed cluster the endpoint does not carry", func(t *testing.T) {
 		t.Parallel()
 		f, root := standardTree()
@@ -153,7 +153,7 @@ func TestDeviceTypeConformanceNodeParityMatterJS(t *testing.T) {
 		wantKinds(t, f.check(std, lock))
 	})
 
-	// DeviceTypeConformanceTest.ts:342-354: a feature term disallows in a
+	// validation/DeviceTypeConformanceTest.ts:342-354: a feature term disallows in a
 	// conjunction with a condition, not in a disjunction.
 	t.Run("disallows by a feature term whatever condition it is combined with", func(t *testing.T) {
 		t.Parallel()
@@ -165,7 +165,7 @@ func TestDeviceTypeConformanceNodeParityMatterJS(t *testing.T) {
 		wantKinds(t, f.check(lightingFeatureModel(or), ep))
 	})
 
-	// DeviceTypeConformanceTest.ts:356-366: OnOff without Lighting, which
+	// validation/DeviceTypeConformanceTest.ts:356-366: OnOff without Lighting, which
 	// OnOffLight names by its code LT.
 	t.Run("reports a mandatory feature by the feature's code", func(t *testing.T) {
 		t.Parallel()
@@ -174,7 +174,7 @@ func TestDeviceTypeConformanceNodeParityMatterJS(t *testing.T) {
 		wantKinds(t, f.check(std, ep), "missing OnOff.LT")
 	})
 
-	// DeviceTypeConformanceTest.ts:368-377: lightWithoutTriggerEffect.
+	// validation/DeviceTypeConformanceTest.ts:368-377: lightWithoutTriggerEffect.
 	t.Run("reports a mandatory command the cluster does not implement", func(t *testing.T) {
 		t.Parallel()
 		f, root := standardTree()
@@ -183,7 +183,7 @@ func TestDeviceTypeConformanceNodeParityMatterJS(t *testing.T) {
 		wantKinds(t, f.check(std, ep), "missing Identify.TriggerEffect")
 	})
 
-	// DeviceTypeConformanceTest.ts:388-399 with ownConformanceModel("O")
+	// validation/DeviceTypeConformanceTest.ts:388-399 with ownConformanceModel("O")
 	// (:212-246): OnOff's own definition marks DF, Pending and Pend
 	// optional, not provisional, so OnOffLight's M stands.
 	t.Run("reports a mandatory element its own definition marks optional but not provisional as missing", func(t *testing.T) {
@@ -201,7 +201,7 @@ func TestDeviceTypeConformanceNodeParityMatterJS(t *testing.T) {
 		wantKinds(t, f.check(l, ep), "missing OnOff.DF", "missing OnOff.Pending", "missing OnOff.Pend")
 	})
 
-	// DeviceTypeConformanceTest.ts:401-411: RainSensor states CHGEVENT
+	// validation/DeviceTypeConformanceTest.ts:401-411: RainSensor states CHGEVENT
 	// "Rev >= v2", which the endpoint's facts cannot decide.
 	t.Run("does not report a requirement whose conformance it cannot decide", func(t *testing.T) {
 		t.Parallel()
@@ -214,14 +214,14 @@ func TestDeviceTypeConformanceNodeParityMatterJS(t *testing.T) {
 		}
 	})
 
-	// DeviceTypeConformanceTest.ts:413-420.
+	// validation/DeviceTypeConformanceTest.ts:413-420.
 	t.Run("accepts a mandatory event the cluster emits", func(t *testing.T) {
 		t.Parallel()
 		f, root := standardTree()
 		wantKinds(t, f.check(std, rainSensor(f, root, "rain", true)))
 	})
 
-	// DeviceTypeConformanceTest.ts:422-431 and :433-442: matter.js tells an
+	// validation/DeviceTypeConformanceTest.ts:422-431 and :433-442: matter.js tells an
 	// emitter inherited from a base with the feature on from no emitter at
 	// all; a Go server lists the events it emits (MatterEvents), so both are
 	// a BooleanState that does not list StateChange.
@@ -238,29 +238,29 @@ func TestDeviceTypeConformanceNodeParityMatterJS(t *testing.T) {
 		wantKinds(t, f.check(std, ep), "missing BooleanState.StateChange")
 	})
 
-	// DeviceTypeConformanceTest.ts:444-451: completeSwitch (:101).
+	// validation/DeviceTypeConformanceTest.ts:444-451: completeSwitch (:101).
 	t.Run("accepts mandatory client clusters in the client list", func(t *testing.T) {
 		t.Parallel()
 		f, root := standardTree()
 		wantKinds(t, f.check(std, lightSwitch(f, root, "switch", []uint32{clIdentify, clBinding}, []uint32{clIdentify, clOnOff})))
 	})
 
-	// DeviceTypeConformanceTest.ts:453-460: switchWithoutOnOffClient (:103).
+	// validation/DeviceTypeConformanceTest.ts:453-460: switchWithoutOnOffClient (:103).
 	t.Run("reports a mandatory client cluster missing from the client list", func(t *testing.T) {
 		t.Parallel()
 		f, root := standardTree()
 		wantKinds(t, f.check(std, lightSwitch(f, root, "switch", []uint32{clIdentify, clBinding}, []uint32{clIdentify})), "missing client:OnOff")
 	})
 
-	// DeviceTypeConformanceTest.ts:462-472: switchWithoutIdentify (:105-111).
+	// validation/DeviceTypeConformanceTest.ts:462-472: switchWithoutIdentify (:105-111).
 	t.Run("reports a cluster missing on both sides once per side", func(t *testing.T) {
 		t.Parallel()
 		f, root := standardTree()
 		wantKinds(t, f.check(std, lightSwitch(f, root, "switch", []uint32{clBinding}, []uint32{clOnOff})), "missing Identify", "missing client:Identify")
 	})
 
-	// DeviceTypeConformanceTest.ts:474-486: a light lacking Identify whose
-	// DeviceTypeList names only a manufacturer-specific device type.
+	// validation/DeviceTypeConformanceTest.ts:474-486: a light lacking Identify whose
+	// device type list names only a manufacturer-specific device type.
 	t.Run("skips a device type the model does not know", func(t *testing.T) {
 		t.Parallel()
 		f, root := standardTree()
@@ -269,7 +269,7 @@ func TestDeviceTypeConformanceNodeParityMatterJS(t *testing.T) {
 		wantKinds(t, f.check(std, ep))
 	})
 
-	// DeviceTypeConformanceTest.ts:488-504: a light listing BatteryStorage,
+	// validation/DeviceTypeConformanceTest.ts:488-504: a light listing BatteryStorage,
 	// whose ElectricalSensor component requires ElectricalPowerMeasurement;
 	// the missing components are reported by count only.
 	t.Run("does not report a component's requirements against the composing endpoint", func(t *testing.T) {
@@ -283,14 +283,14 @@ func TestDeviceTypeConformanceNodeParityMatterJS(t *testing.T) {
 		}
 	})
 
-	// DeviceTypeConformanceTest.ts:690-697.
+	// validation/DeviceTypeConformanceTest.ts:690-697.
 	t.Run("does not report Binding on an endpoint Base does not require it of", func(t *testing.T) {
 		t.Parallel()
 		f, root := standardTree()
 		wantKinds(t, f.check(std, light(f, root, "light").server(clBinding)))
 	})
 
-	// DeviceTypeConformanceTest.ts:699-711: two sibling OnOffLights hold
+	// validation/DeviceTypeConformanceTest.ts:699-711: two sibling OnOffLights hold
 	// Base's Duplicate condition, under which Descriptor.TAGLIST is required.
 	t.Run("requires TagList of endpoints that duplicate a sibling's device type", func(t *testing.T) {
 		t.Parallel()
@@ -308,9 +308,9 @@ func TestDeviceTypeConformanceNodeParityMatterJS(t *testing.T) {
 		wantKinds(t, f.check(std, first))
 	})
 
-	// DeviceTypeConformanceTest.ts:713-748: an Aggregator's children that
-	// list BridgedNode are told apart by NodeLabel (matter.js
-	// DeviceTypeConformance.ts:1189-1215, AGGREGATED and its waiver);
+	// validation/DeviceTypeConformanceTest.ts:713-748: an Aggregator's children that
+	// list the bridged node device type are told apart by NodeLabel.
+	// matter.js DeviceTypeConformance.ts:1189-1214 (AGGREGATED and its waiver):
 	// duplicates that do not list it, under the Aggregator or under a
 	// composing parent, owe TagList to Base.
 	t.Run("requires no TagList of an aggregator's bridged devices, which disambiguate by NodeLabel", func(t *testing.T) {
@@ -349,7 +349,7 @@ func TestDeviceTypeConformanceNodeParityMatterJS(t *testing.T) {
 		}
 	})
 
-	// DeviceTypeConformanceTest.ts:761-781: two siblings listing
+	// validation/DeviceTypeConformanceTest.ts:761-781: two siblings listing
 	// ClosurePanel, which requires TAGLIST itself; reported once, as
 	// ClosurePanel's (matter.js DeviceTypeConformance.ts: a requirement the
 	// device type states is judged before Base's of the same path).
@@ -363,7 +363,7 @@ func TestDeviceTypeConformanceNodeParityMatterJS(t *testing.T) {
 		}
 	})
 
-	// DeviceTypeConformanceTest.ts:750-759: the node endpoint, with a
+	// validation/DeviceTypeConformanceTest.ts:750-759: the node endpoint, with a
 	// completeSwitch below it, owes neither.
 	t.Run("requires neither Binding nor TagList of the node endpoint", func(t *testing.T) {
 		t.Parallel()
@@ -376,7 +376,7 @@ func TestDeviceTypeConformanceNodeParityMatterJS(t *testing.T) {
 		}
 	})
 
-	// DeviceTypeConformanceTest.ts:785-791: this module never commissions
+	// validation/DeviceTypeConformanceTest.ts:785-791: this module never commissions
 	// over BLE, so CustomNetworkConfig holds and RootNode's
 	// NetworkCommissioning ("!CustomNetworkConfig") is not required.
 	t.Run("does not require NetworkCommissioning of a node that does not commission over BLE", func(t *testing.T) {
@@ -385,7 +385,7 @@ func TestDeviceTypeConformanceNodeParityMatterJS(t *testing.T) {
 		wantKinds(t, f.check(std, root))
 	})
 
-	// DeviceTypeConformanceTest.ts:813-819: RootNode states
+	// validation/DeviceTypeConformanceTest.ts:813-819: RootNode states
 	// WiFiNetworkDiagnostics "[WiFi]", optional under its condition.
 	t.Run("does not require the diagnostics cluster of a supported network interface", func(t *testing.T) {
 		t.Parallel()
@@ -398,7 +398,7 @@ func TestDeviceTypeConformanceNodeParityMatterJS(t *testing.T) {
 		}
 	})
 
-	// DeviceTypeConformanceTest.ts:823-829.
+	// validation/DeviceTypeConformanceTest.ts:823-829.
 	t.Run("accepts the singletons on the endpoint that declares them", func(t *testing.T) {
 		t.Parallel()
 		f, root := nodeTree()
@@ -407,7 +407,7 @@ func TestDeviceTypeConformanceNodeParityMatterJS(t *testing.T) {
 		}
 	})
 
-	// DeviceTypeConformanceTest.ts:845-855: BridgedNode lists
+	// validation/DeviceTypeConformanceTest.ts:845-855: BridgedNode lists
 	// AdministratorCommissioning, a RootNode singleton.
 	t.Run("accepts a RootNode singleton on a bridged node whose device type lists it", func(t *testing.T) {
 		t.Parallel()
@@ -418,7 +418,7 @@ func TestDeviceTypeConformanceNodeParityMatterJS(t *testing.T) {
 		}
 	})
 
-	// DeviceTypeConformanceTest.ts:857-867: RainSensor does not list OnOff,
+	// validation/DeviceTypeConformanceTest.ts:857-867: RainSensor does not list OnOff,
 	// OnOffLight lists it without the singleton quality.
 	t.Run("accepts a cluster that another device type lists as no singleton", func(t *testing.T) {
 		t.Parallel()
@@ -430,7 +430,7 @@ func TestDeviceTypeConformanceNodeParityMatterJS(t *testing.T) {
 		}
 	})
 
-	// DeviceTypeConformanceTest.ts:869-878.
+	// validation/DeviceTypeConformanceTest.ts:869-878.
 	t.Run("judges no singleton outside a node scope", func(t *testing.T) {
 		t.Parallel()
 		f, root := syntheticNode()
@@ -443,7 +443,7 @@ func TestDeviceTypeConformanceNodeParityMatterJS(t *testing.T) {
 		}
 	})
 
-	// DeviceTypeConformanceTest.ts:880-895.
+	// validation/DeviceTypeConformanceTest.ts:880-895.
 	t.Run("keeps a nested node scope's singletons to itself", func(t *testing.T) {
 		t.Parallel()
 		f, root := syntheticNode()
@@ -457,7 +457,7 @@ func TestDeviceTypeConformanceNodeParityMatterJS(t *testing.T) {
 		}
 	})
 
-	// DeviceTypeConformanceTest.ts:898-912: strict mode constructs a light
+	// validation/DeviceTypeConformanceTest.ts:898-912: strict mode constructs a light
 	// carrying GroupKeyManagement below a BridgedNode that is a node.
 	t.Run("constructs an endpoint carrying an outer singleton below a nested node endpoint", func(t *testing.T) {
 		t.Parallel()
@@ -470,7 +470,7 @@ func TestDeviceTypeConformanceNodeParityMatterJS(t *testing.T) {
 		}
 	})
 
-	// DeviceTypeConformanceTest.ts:914-939: no device type is a node;
+	// validation/DeviceTypeConformanceTest.ts:914-939: no device type is a node;
 	// Asserter asserts Rooted on the root, under which Identify is required.
 	t.Run("takes the conditions of the whole tree for an endpoint in no node scope", func(t *testing.T) {
 		t.Parallel()
@@ -487,7 +487,7 @@ func TestDeviceTypeConformanceNodeParityMatterJS(t *testing.T) {
 		wantKinds(t, f.check(l, asserter))
 	})
 
-	// DeviceTypeConformanceTest.ts:941-966: OnOffLight's Groups requirement
+	// validation/DeviceTypeConformanceTest.ts:941-966: OnOffLight's Groups requirement
 	// names a condition only Foreigner declares; undecided, not disallowed.
 	t.Run("does not treat another device type's condition as known to a requirement", func(t *testing.T) {
 		t.Parallel()
@@ -502,7 +502,7 @@ func TestDeviceTypeConformanceNodeParityMatterJS(t *testing.T) {
 		wantKinds(t, f.check(l, light(f, root, "light")))
 	})
 
-	// DeviceTypeConformanceTest.ts:968-987: the refusal names the endpoint
+	// validation/DeviceTypeConformanceTest.ts:968-987: the refusal names the endpoint
 	// and words each violation "<deviceType> <requirement>: <detail>". The
 	// MatterAggregateError/ImplementationError class checks have no Go
 	// counterpart; errors.As finds the one error type.

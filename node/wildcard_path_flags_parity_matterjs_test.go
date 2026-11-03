@@ -26,7 +26,7 @@ import (
 	"github.com/SukramJ/go-fabric/node"
 )
 
-func TestWildcardPathFlagsParityMatterJS(t *testing.T) {
+func TestWildcardPathFlagsParityMatterJS(t *testing.T) { //nolint:tparallel // the subtests share the site this test holds; parallel ones would wait for a parallel slot that tests blocked on the site slot hold
 	t.Parallel()
 
 	m := newMockPair(t, mockOptions{configure: func(cfg *node.Config) {
@@ -66,7 +66,6 @@ func TestWildcardPathFlagsParityMatterJS(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run("replies with attributes with "+c.name+" wildcard Filter", func(t *testing.T) {
-			t.Parallel()
 			if got := read(t, wildcardEndpoint(c.cluster, c.flags)); got != c.count {
 				t.Fatalf("%d attributes, want %d", got, c.count)
 			}
@@ -82,7 +81,6 @@ func TestWildcardPathFlagsParityMatterJS(t *testing.T) {
 		return p
 	}
 	t.Run("applies WildcardPathFlags when the filter version is current", func(t *testing.T) {
-		t.Parallel()
 		if got := read(t, withVersion(0, false)); got != 20 { // omitted == current
 			t.Fatalf("omitted filter version: %d attributes, want 20", got)
 		}
@@ -91,7 +89,6 @@ func TestWildcardPathFlagsParityMatterJS(t *testing.T) {
 		}
 	})
 	t.Run("ignores WildcardPathFlags when the configuration changed past the filter version", func(t *testing.T) {
-		t.Parallel()
 		if got := read(t, withVersion(0, true)); got != 23 { // stale filter -> flags do not apply
 			t.Fatalf("stale filter version: %d attributes, want 23", got)
 		}

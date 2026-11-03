@@ -197,7 +197,7 @@ func (i *Instance) CheckValue(attrID uint32, value any, peers Peers) (any, error
 		return nil, Errorf(im.StatusUnsupportedAttribute, "%s: attribute 0x%04X is not defined", i.def.Name, attrID)
 	}
 	// The bits of a feature map are the feature selection itself, which a
-	// bit's conformance is judged against (ValueValidator.ts:227-231 at
+	// bit's conformance is judged against (state/validation/ValueValidator.ts:227-231 at
 	// 862ad75f).
 	scope := nameScope{peers: peers, bits: attrID != featureMapAttributeID}
 	return i.checkValueIn(a.Name, a.Type, a.Quality.Nullable, a.Constraint, underlying(value), peers, scope)
@@ -306,7 +306,7 @@ func (i *Instance) checkBitConformance(name string, b *Bitmap, n uint64) error {
 		if c.unreadable {
 			// A conformance the compiler cannot read is one matter.js
 			// cannot enforce; it leaves the bit unjudged rather than
-			// refuse to supervise the cluster (ValueValidator.ts:235-243).
+			// refuse to supervise the cluster (state/validation/ValueValidator.ts:235-243).
 			continue
 		}
 		refused := false
