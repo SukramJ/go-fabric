@@ -17,7 +17,7 @@ func TestSnapshot(t *testing.T) {
 	path := im.ConcreteAttributePath{HasEndpoint: true, HasCluster: true, HasAttribute: true, Endpoint: 1, Cluster: 0x0006, Attribute: 0x0000}
 	event := im.ConcreteEventPath{HasEndpoint: true, HasCluster: true, HasEvent: true, Endpoint: 0, Cluster: 0x0028, Event: 0x00}
 	m := NewManager(Config{}, nil, nil)
-	var subs []*Subscription
+	subs := make([]*Subscription, 0, 3)
 	for i := range 3 {
 		sub, err := m.Subscribe(SubscribeArgs{
 			FabricIndex: 1, PeerNodeID: 7, SessionID: uint16(10 + i),
