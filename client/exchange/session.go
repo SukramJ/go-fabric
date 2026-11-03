@@ -9,6 +9,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/SukramJ/go-fabric/clock"
 	"github.com/SukramJ/go-fabric/secure/channel"
 	"github.com/SukramJ/go-fabric/secure/sessionparams"
 	"github.com/SukramJ/go-fabric/transport/mrp"
@@ -67,10 +68,15 @@ type Session struct {
 	params          sessionparams.Parameters
 	timestamp       time.Time
 	activeTimestamp time.Time
-	exchanges       map[*Exchange]struct{}
-	closed          bool
-	peerLost        bool
-	deferredClose   bool
+	// activeMono is activeTimestamp on the clock's monotonic reading
+	// (clock.MonotonicOf): what the active threshold and the newest-session
+	// order are judged on, so a wall-clock step cannot flip them — matter.js
+	// keeps the stamps on Time.nowUs (Session.ts:141-151 at 862ad75f).
+	activeMono    time.Duration
+	exchanges     map[*Exchange]struct{}
+	closed        bool
+	peerLost      bool
+	deferredClose bool
 }
 
 // ID is the local session id: [UnsecuredSessionID] for the unsecured
@@ -256,25 +262,27 @@ func (s *Session) CreatedAt() time.Time { return s.createdAt }
 func (s *Session) IsPeerActive() bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return s.isPeerActiveLocked(s.m.clock.Now())
+	return s.isPeerActiveLocked(clock.MonotonicOf(s.m.clock))
 }
 
-func (s *Session) isPeerActiveLocked(now time.Time) bool {
+// isPeerActiveLocked judges the active threshold on the monotonic reading
+// nowMono (Session.ts:149-151 on Time.nowUs).
+func (s *Session) isPeerActiveLocked(nowMono time.Duration) bool {
 	if s.activeTimestamp.IsZero() {
 		return false
 	}
-	return now.Sub(s.activeTimestamp) < IntervalsOf(s.params).ActiveThreshold
+	return nowMono-s.activeMono < IntervalsOf(s.params).ActiveThreshold
 }
 
 // notifyActivity records traffic: every message sent or received updates
 // the session's timestamp, a received one also its active timestamp —
 // matter.js Session.ts:141-147.
 func (s *Session) notifyActivity(received bool) {
-	now := s.m.clock.Now()
+	now, mono := s.m.clock.Now(), clock.MonotonicOf(s.m.clock)
 	s.mu.Lock()
 	s.timestamp = now
 	if received {
-		s.activeTimestamp = now
+		s.activeTimestamp, s.activeMono = now, mono
 	}
 	s.mu.Unlock()
 }
@@ -296,6 +304,15 @@ func (s *Session) ActiveTimestamp() time.Time {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.activeTimestamp
+}
+
+// ActiveMonotonic is [Session.ActiveTimestamp] on the clock's monotonic
+// reading, the order [github.com/SukramJ/go-fabric/client/peer.Peer.NewestSession]
+// sorts by; false while the peer has not been heard from.
+func (s *Session) ActiveMonotonic() (time.Duration, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.activeMono, !s.activeTimestamp.IsZero()
 }
 
 // SetPeerMargins sets the resolver of the MRP margins of the peer's
@@ -328,10 +345,10 @@ func (s *Session) peerMarginsNow() *Margins {
 
 // timing is the peer's intervals and whether the peer is active now.
 func (s *Session) timing() (Intervals, bool) {
-	now := s.m.clock.Now()
+	nowMono := clock.MonotonicOf(s.m.clock)
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return IntervalsOf(s.params), s.isPeerActiveLocked(now)
+	return IntervalsOf(s.params), s.isPeerActiveLocked(nowMono)
 }
 
 // IsClosed reports whether the session was closed.

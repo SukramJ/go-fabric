@@ -13,6 +13,7 @@ import (
 	"github.com/SukramJ/go-fabric/client/discovery"
 	"github.com/SukramJ/go-fabric/client/exchange"
 	"github.com/SukramJ/go-fabric/client/handshake"
+	"github.com/SukramJ/go-fabric/internal/exchangeseam"
 	"github.com/SukramJ/go-fabric/secure/sessionparams"
 )
 
@@ -300,4 +301,46 @@ func TestCloseSweepsSessionsAfterWorkers(t *testing.T) {
 	if s := <-late; !s.IsClosed() {
 		t.Fatal("a session established during Close stayed open")
 	}
+}
+
+// TestNewestSessionActivityParityMatterJS ports two SessionManagerTest.ts
+// cases of matter.js's maybeSessionFor (862ad75f), whose Go twin is
+// Peer.NewestSession: "returns session with most recent activeTimestamp,
+// not timestamp" (:243-281 — a session's own sends move its timestamp,
+// only a message from the peer moves the active stamp the order sorts by)
+// and "prefers the session heard from last when the clock stepped back
+// between them" (:844-854 — the order is monotonic, so a backward
+// wall-clock step between two sessions' traffic does not reverse it).
+func TestNewestSessionActivityParityMatterJS(t *testing.T) {
+	t.Parallel()
+	t.Run("returns the session with the most recent active stamp, not the last sent on", func(t *testing.T) {
+		t.Parallel()
+		h := newHarness(t, nil)
+		s1 := h.secureSession(t, 0x0100, udpAddr("[fd00::1]:5540"))
+		p := h.set.Adopt(s1)
+		h.clock.Advance(time.Second)
+		s2 := h.secureSession(t, 0x0200, udpAddr("[fd00::1]:5540"))
+		h.set.Adopt(s2)
+		h.clock.Advance(time.Second)
+		exchangeseam.NotifyActivity(s1, false) // sent on s1: its timestamp moves, its active stamp does not
+		if got := p.NewestSession(); got != s2 {
+			t.Fatalf("NewestSession = %#x, want s2 (the peer was heard from on it last)", got.ID())
+		}
+	})
+	t.Run("prefers the session heard from last when the clock stepped back between them", func(t *testing.T) {
+		t.Parallel()
+		h := newHarness(t, nil)
+		s1 := h.secureSession(t, 0x0100, udpAddr("[fd00::1]:5540"))
+		p := h.set.Adopt(s1)
+		s2 := h.secureSession(t, 0x0200, udpAddr("[fd00::1]:5540"))
+		h.set.Adopt(s2)
+		h.clock.Advance(time.Second)
+		exchangeseam.NotifyActivity(s1, true)
+		h.clock.StepWall(-time.Hour)
+		h.clock.Advance(time.Second)
+		exchangeseam.NotifyActivity(s2, true)
+		if got := p.NewestSession(); got != s2 {
+			t.Fatalf("NewestSession = %#x, want s2 (heard from last, on the wall clock an hour earlier)", got.ID())
+		}
+	})
 }

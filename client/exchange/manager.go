@@ -16,6 +16,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/SukramJ/go-fabric/clock"
 	"github.com/SukramJ/go-fabric/internal/inflight"
 	"github.com/SukramJ/go-fabric/secure/channel"
 	"github.com/SukramJ/go-fabric/secure/sessionparams"
@@ -456,6 +457,7 @@ func (m *Manager) NewSecureSession(cfg SecureSessionConfig) (*Session, error) {
 		params:               cfg.PeerParameters,
 		timestamp:            now,
 		activeTimestamp:      now,
+		activeMono:           clock.MonotonicOf(m.clock),
 		exchanges:            make(map[*Exchange]struct{}),
 	}
 	if cfg.ReportedParameters != nil {

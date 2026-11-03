@@ -509,8 +509,12 @@ func (p *Peer) liveSessionLocked(transports []exchange.Transport) bool {
 }
 
 func (p *Peer) newestOn(t *exchange.Transport) *exchange.Session {
+	// The order is the monotonic reading of the last message heard
+	// (exchange.Session.ActiveMonotonic), so a wall-clock step between
+	// two sessions' traffic does not reverse it — matter.js keeps
+	// activeTimestamp on Time.nowUs (Session.ts:141-151 at 862ad75f).
 	var found *exchange.Session
-	var at time.Time
+	var at time.Duration
 	for _, s := range p.Sessions() {
 		if s.IsClosed() || s.IsPeerLost() {
 			continue
@@ -518,8 +522,8 @@ func (p *Peer) newestOn(t *exchange.Transport) *exchange.Session {
 		if t != nil && s.Transport() != *t {
 			continue
 		}
-		if t := s.ActiveTimestamp(); found == nil || at.Before(t) {
-			found, at = s, t
+		if mono, ok := s.ActiveMonotonic(); found == nil || (ok && at < mono) {
+			found, at = s, mono
 		}
 	}
 	return found
