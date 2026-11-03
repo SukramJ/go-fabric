@@ -243,8 +243,8 @@ var floors = []packageFloor{
 	},
 	{
 		pkg: "github.com/SukramJ/go-fabric/node/controllernode",
-		min: 70,
-		why: "brief CM §1: measured 67.9; Start's failure paths (node.New refusing the spec, a socket address that does not resolve) have no test",
+		min: 81,
+		why: "brief CM §1: measured 67.9; phase 29a-2 (the scripted-provider wrappers, wrap_commands_test.go): 81.2. Start's failure paths (node.New refusing the spec, a socket address that does not resolve) have no test",
 	},
 	{pkg: "github.com/SukramJ/go-fabric/node/metrics/expvar", min: 100},
 	{pkg: "github.com/SukramJ/go-fabric/parity", min: 100},
