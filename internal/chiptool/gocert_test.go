@@ -13,8 +13,10 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"maps"
 	"os"
 	"path/filepath"
+	"reflect"
 	"regexp"
 	"slices"
 	"sort"
@@ -60,6 +62,20 @@ import (
 // goCertEnv narrows the leg to families or case ids ("IDM,SC/4.2").
 const goCertEnv = "GOFABRIC_GOCERT"
 
+// goCertLongEnv runs the steps matter.js marks longRunning, which cost
+// minutes of real time each: matter.js skips them unless
+// MATTER_CERT_LONG_RUNNING is set (packages/testing/src/chip/cert/
+// cert-test.ts:318-322, longRunningEnabled :728-731). A run with it set
+// checks no golden counts and writes none: the golden records the default
+// run.
+const goCertLongEnv = "GOFABRIC_GOCERT_LONG"
+
+// goCertLong reports whether the run includes the long-running steps.
+func goCertLong() bool {
+	v := strings.ToLower(os.Getenv(goCertLongEnv))
+	return v != "" && v != "0" && v != "false"
+}
+
 // goCertCase is one matter.js case file read mirrored.
 type goCertCase struct {
 	// tc is the matter.js case id ("TC-IDM-1.1"); its file is
@@ -81,6 +97,21 @@ type goCertCase struct {
 	// engine runs a case's finalizer in its finally block
 	// (packages/testing/src/chip/cert/cert-test.ts:498-502).
 	finalize func(th *goTH)
+	// native marks a case whose DUT is a device in matter.js too (the
+	// BDX receiver, SU requestor, BIND switch cases): its PICS are the
+	// device's as stated and are not mirrored onto the server side.
+	native bool
+	// daemonArgs are the DUT daemon's further flags (bridgeOptions.extraArgs:
+	// --light-switch for BIND); its endpoints beyond the committed slices'
+	// are the flagged composition's.
+	daemonArgs []string
+	// listen is the DUT daemon's --listen; "" is the Matter port. A case
+	// whose TH device receives group messages leaves the port to it.
+	listen string
+	// declare are PICS codes of the composition daemonArgs adds, which the
+	// committed slices (generated from the default composition) do not
+	// describe; each case states where its values come from.
+	declare map[string]string
 }
 
 // goStep is one TS step.
@@ -97,8 +128,16 @@ type goStep struct {
 	// at overrides the case's endpoint code for this step.
 	at string
 	// na is the TS's notApplicable reason: the step is recorded skipped.
-	na  string
-	run func(th *goTH) error
+	na string
+	// long is the TS's longRunning reason: the step is skipped unless
+	// GOFABRIC_GOCERT_LONG is set ([goCertLongEnv]).
+	long string
+	// finding is the id of a findings-register bullet
+	// (notes/parity/matter_behaviour_findings.md): the step fails with that
+	// daemon defect, and the case passes with it recorded. A step that
+	// then passes fails the run: the finding is closed and its id goes.
+	finding string
+	run     func(th *goTH) error
 }
 
 // goVerdict is a step's verdict: matter.js StepVerdict's pass | fail |
@@ -132,6 +171,9 @@ type goCertCounts struct {
 	Steps        int    `json:"steps"`
 	StepsSkipped int    `json:"stepsSkipped"`
 	Source       string `json:"source"`
+	// Findings are the steps that fail with a recorded daemon defect,
+	// "<step>: <finding id>".
+	Findings []string `json:"findings,omitempty"`
 }
 
 // goCertCases is the leg's case registry, keyed by the family runner's
@@ -176,6 +218,9 @@ func TestGoCertificationCases(t *testing.T) {
 	if v := os.Getenv(goCertEnv); v != "" {
 		only = strings.Split(v, ",")
 	}
+	if goCertLong() {
+		t.Logf("%s is set: the long-running steps run, and the golden counts are neither checked nor written", goCertLongEnv)
+	}
 	ids := make([]string, 0, len(goCertCases))
 	for id := range goCertCases {
 		ids = append(ids, id)
@@ -191,6 +236,10 @@ func TestGoCertificationCases(t *testing.T) {
 			c := goCertCases[id]()
 			counts, ok := runGoCertCase(t, bin, flags, pics, c)
 			if !ok {
+				return
+			}
+			if goCertLong() {
+				t.Logf("%s ran %+v (long-running steps included)", id, counts)
 				return
 			}
 			ran[id] = counts
@@ -213,23 +262,32 @@ func runGoCertCase(t *testing.T, bin string, flags map[string]bool, pics *commit
 	defer th.close()
 	t.Logf("%s: support/chip-testing/test/cert/%s:%d at matter.js 862ad75f, read mirrored (the daemon is the DUT)", c.tc, c.source(), c.line)
 	if expr := strings.Join(c.pics, " & "); expr != "" {
-		m := mirrorPICS(expr)
+		m := th.casePICS(expr)
 		if ok, err := th.picsHolds(m, th.caseEP()); err != nil || !ok {
 			t.Fatalf("%s: the case's PICS %q (mirrored %q) is false for the reference daemon (%v): the case does not apply", c.tc, expr, m, err)
 		}
 	}
 	counts := goCertCounts{Source: c.source()}
 	failed := false
-	for _, s := range c.steps {
-		r := th.runStep(s)
+	for i := range c.steps {
+		s := &c.steps[i]
+		r := th.runStep(*s)
 		where := fmt.Sprintf("%s step %s (%s:%d)", c.tc, r.step.n, c.source(), r.step.line)
-		switch r.verdict {
-		case goPass:
+		switch {
+		case r.verdict == goPass && s.finding != "":
+			failed = true
+			t.Errorf("%s: passed, but it is recorded as failing with finding %s — the defect is fixed: drop the "+
+				"finding from the step and from notes/parity/matter_behaviour_findings.md (%s)", where, s.finding, r.detail)
+		case r.verdict == goPass:
 			counts.Steps++
 			t.Logf("%s: pass — %s", where, r.detail)
-		case goSkipped:
+		case r.verdict == goSkipped:
 			counts.StepsSkipped++
 			t.Logf("%s: skipped — %s", where, r.detail)
+		case s.finding != "":
+			counts.Steps++
+			counts.Findings = append(counts.Findings, s.n+": "+s.finding)
+			t.Logf("%s: fail, recorded as finding %s — %s", where, s.finding, r.detail)
 		default:
 			failed = true
 			t.Errorf("%s: fail — %s", where, r.detail)
@@ -266,6 +324,8 @@ type goTH struct {
 	ctrls []*gocontroller.Controller
 	extra []*bridgeProcess
 	logs  syncBuffer
+	// extraEPs are the DUT's endpoints its daemonArgs add.
+	extraEPs []uint16
 }
 
 // syncBuffer is a log sink the controllers write to concurrently.
@@ -312,7 +372,7 @@ func (th *goTH) runStep(s goStep) goStepRecord {
 	}
 	var gate []string
 	if s.pics != "" {
-		gate = append(gate, "("+mirrorPICS(s.pics)+")")
+		gate = append(gate, "("+th.casePICS(s.pics)+")")
 	}
 	if s.need != "" {
 		gate = append(gate, "("+s.need+")")
@@ -328,10 +388,16 @@ func (th *goTH) runStep(s goStep) goStepRecord {
 			rec.verdict = goSkipped
 			rec.detail = fmt.Sprintf("PICS %q not met on endpoint %d", expr, ep)
 			if s.pics != "" {
-				rec.detail += fmt.Sprintf(" (the TS step's %q, mirrored)", s.pics)
+				rec.detail += fmt.Sprintf(" (the TS step's %q)", s.pics)
 			}
 			return rec
 		}
+	}
+	// matter.js's next gate: a longRunning step is skipped unless the run
+	// asked for them (cert-test.ts:318-322).
+	if s.long != "" && !goCertLong() {
+		rec.verdict, rec.detail = goSkipped, fmt.Sprintf("long-running: %s; set %s=1 to run it", s.long, goCertLongEnv)
+		return rec
 	}
 	th.ep = ep
 	th.notes = th.notes[:0]
@@ -364,7 +430,11 @@ func newGoTH(ctx context.Context, t *testing.T, bin string, flags map[string]boo
 	pipe := filepath.Join(t.TempDir(), "app-pipe")
 	// The Matter port: a group message goes to it (groups/sender.go
 	// groupPort, GroupSession.ts:150-153), and the cases run one at a time.
-	dut := startBridgeWith(t, bin, flags, bridgeOptions{appPipe: pipe, listen: fmt.Sprintf(":%d", matterPort)})
+	listen := c.listen
+	if listen == "" {
+		listen = fmt.Sprintf(":%d", matterPort)
+	}
+	dut := startBridgeWith(t, bin, flags, bridgeOptions{appPipe: pipe, listen: listen, extraArgs: c.daemonArgs})
 	th := &goTH{t: t, ctx: ctx, c: c, bin: bin, flags: flags, pics: pics, dut: dut}
 	// The controllers' log, kept for a failing case's dump.
 	th.log = slog.New(slog.NewTextHandler(&th.logs, &slog.HandlerOptions{Level: slog.LevelDebug}))
@@ -386,6 +456,12 @@ func (th *goTH) checkTopology() {
 				eps = append(eps, uint16(n)) //nolint:gosec // an endpoint number
 			}
 			slices.Sort(eps)
+			if len(th.c.daemonArgs) > 0 && len(eps) > len(th.pics.sorted) && slices.Equal(eps[:len(th.pics.sorted)], th.pics.sorted) {
+				// The flagged composition's endpoints come after every
+				// committed one (light_switch.go: the switch comes last).
+				th.extraEPs = eps[len(th.pics.sorted):]
+				return
+			}
 			if !slices.Equal(eps, th.pics.sorted) {
 				th.t.Fatalf("the daemon serves endpoints %v, the committed PICS slices describe %v: regenerate them "+
 					"(make chiptool-families-update) before the Go-TH leg can gate on them", eps, th.pics.sorted)
@@ -411,6 +487,28 @@ func (th *goTH) close() {
 // note adds to the running step's evidence.
 func (th *goTH) note(format string, args ...any) {
 	th.notes = append(th.notes, fmt.Sprintf(format, args...))
+}
+
+// device starts the run's index-th further device as matter.js's
+// identityFor gives it its identity (packages/testing/src/chip/cert/
+// cert-dsl.ts:297-312): the primary's discriminator and passcode plus the
+// index, with the daemon's further flags (bridgeOptions.extraArgs), on a
+// port of its own.
+func (th *goTH) device(index int, args ...string) *bridgeProcess {
+	return th.deviceOn(index, ":0", args...)
+}
+
+// deviceOn is device on a given --listen: the Matter port for a device
+// that receives group messages, which go to it (groups/sender.go
+// groupPort).
+func (th *goTH) deviceOn(index int, listen string, args ...string) *bridgeProcess {
+	extra := append([]string{
+		"--discriminator", strconv.Itoa(int(th.dut.info.discriminator) + index),
+		"--passcode", strconv.Itoa(20202021 + index),
+	}, args...)
+	b := startBridgeWith(th.t, th.bin, th.flags, bridgeOptions{listen: listen, extraArgs: extra})
+	th.extra = append(th.extra, b)
+	return b
 }
 
 // caseEP is the case's endpoint (0 when its code names none).
@@ -460,7 +558,45 @@ func (th *goTH) picsHolds(expr string, ep uint16) (bool, error) {
 			}
 		}
 	}
+	// The Go TH's own declarations and the flagged composition's win over
+	// the daemon's files, as a controller's PICS overlay the device file in
+	// matter.js's runs (packages/testing/src/chip/cert/cert-app-pics.ts:
+	// 70-80, picsWithOverrides).
+	for _, src := range []map[string]string{goTHPICS, th.c.declare} {
+		maps.Copy(values, src)
+	}
 	return ast.evaluate(values), nil
+}
+
+// casePICS is a TS PICS expression as the leg evaluates it: as stated for
+// a native case, mirrored onto the server side otherwise.
+func (th *goTH) casePICS(expr string) string {
+	if th.c.native {
+		return expr
+	}
+	return mirrorPICS(expr)
+}
+
+// goTHPICS is what the Go controller as TH declares about itself: the
+// codes of the roles it takes in these cases — OTA provider and BDX sender
+// and responder, the administrator that announces a provider, the
+// commissioner that scans a QR code — after matter.js's declarations for
+// its own controller (support/chip-testing/src/cert/
+// InProcessControllerAdapter.ts:177-308, MATTERJS_CONTROLLER_PICS). The
+// reference daemon is none of these in any case of the leg, so the codes
+// name the TH in either reading and are not mirrored.
+var goTHPICS = map[string]string{
+	"MCORE.DD.QR_COMMISSIONING":    "1", // :180
+	"MCORE.DD.SCAN_QR_CODE":        "1", // :184
+	"MCORE.BDX.Sender":             "1", // :262
+	"MCORE.BDX.Responder":          "1", // :263
+	"MCORE.BDX.SynchronousSender":  "1", // :264
+	"MCORE.OTA.Provider":           "1", // :276
+	"MCORE.OTA.HTTPS":              "0", // :281
+	"MCORE.ACL.Administrator":      "1", // :286
+	"OTAR.C.M.AnnounceOTAProvider": "1", // :287
+	"OTAP.S.M.DelayedActionTime":   "1", // :296
+	"OTAP.S.M.UserConsentNeeded":   "1", // :297
 }
 
 // declares is picsHolds for one code on the step's endpoint.
@@ -772,6 +908,9 @@ func mirrorPICS(expr string) string {
 }
 
 func mirrorPICSCode(code string) string {
+	if _, ok := goTHPICS[code]; ok {
+		return code
+	}
 	if m, ok := picsSpecial[code]; ok {
 		return m
 	}
@@ -805,7 +944,7 @@ func checkGoCertCounts(t *testing.T, id string, got goCertCounts) {
 		t.Fatalf("%s passed with %+v but has no goCert entry in testdata/%s; run with -update-chip-cases, read the diff, commit it",
 			id, got, chipCasesGoldenFile)
 	}
-	if got != want {
+	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("%s ran %+v, golden file says %+v: the case or the PICS moved; read the step lines and regenerate with "+
 			"-update-chip-cases only once you know which steps changed and why", id, got, want)
 	}

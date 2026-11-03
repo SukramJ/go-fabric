@@ -7,7 +7,11 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"io/fs"
+	"slices"
+	"strconv"
+	"sync"
 	"testing"
 	"time"
 
@@ -176,5 +180,78 @@ func TestResponder_Refusals(t *testing.T) {
 			r.HandleExchange(ctx, tc.peer, tc.first, b)
 			expectStatus(t, a, tc.code)
 		})
+	}
+}
+
+// TestServerSession_OnMessage: an observer sees every message after the
+// Init, sent and received, in order — the ReceiveAccept, each BlockQuery
+// and the Block it draws, the BlockEOF and the BlockAckEOF — which is what
+// the Go-TH leg reads a transfer's counters from, as the cert suite reads
+// them from matter.js's message log (tc-bdx-support.ts:273-296).
+func TestServerSession_OnMessage(t *testing.T) {
+	t.Parallel()
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	r := bdx.NewResponder(nil)
+	if !r.EnablePeerForScope(testPeer, "ota", memStorage{"img": testData(2000)}, bdx.ScopeConfig{PreferredDriverModes: []bdx.DriverMode{bdx.ReceiverDrive}, MessageTimeout: time.Minute}) {
+		t.Fatal("enable refused")
+	}
+	var mu sync.Mutex
+	var seen []string
+	done := make(chan struct{})
+	r.OnSessionStarted(func(s *bdx.ServerSession, _ string) {
+		s.OnMessage(func(e bdx.MessageEvent) {
+			dir := "in"
+			if e.Sent {
+				dir = "out"
+			}
+			v, err := bdx.Decode(bdx.MessageType(e.Opcode), e.Payload)
+			if err != nil {
+				t.Errorf("decode %v: %v", bdx.MessageType(e.Opcode), err)
+			}
+			n := ""
+			switch m := v.(type) {
+			case bdx.CounterOnly:
+				n = strconv.FormatUint(uint64(m.BlockCounter), 10)
+			case bdx.Block:
+				n = fmt.Sprintf("%d/%d", m.BlockCounter, len(m.Data))
+			}
+			mu.Lock()
+			seen = append(seen, fmt.Sprintf("%s %v %s", dir, bdx.MessageType(e.Opcode), n))
+			mu.Unlock()
+		})
+		s.OnClosed(func() { close(done) })
+	})
+	a, b := newPipe(1178)
+	init := bdx.Init{TransferControl: bdx.TransferControl{ReceiverDrive: true}, MaxBlockSize: 1024, FileDesignator: []byte("ota/img")}
+	payload, _ := init.Encode()
+	go r.HandleExchange(ctx, testPeer, bdx.Message{ProtocolID: bdx.ProtocolID, Opcode: uint8(bdx.MessageReceiveInit), Payload: payload}, b)
+	m := bdx.NewMessenger(a, time.Second)
+	if _, _, err := m.Next(ctx, bdx.MessageReceiveAccept); err != nil {
+		t.Fatal(err)
+	}
+	for c := uint32(0); ; c++ {
+		_ = m.SendBlockQuery(ctx, c)
+		typ, _, err := m.ReadBlock(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if typ == bdx.MessageBlockEOF {
+			_ = m.SendBlockAckEOF(ctx, c)
+			break
+		}
+	}
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("the session never closed")
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	want := []string{
+		"out ReceiveAccept ", "in BlockQuery 0", "out Block 0/1024", "in BlockQuery 1", "out BlockEof 1/976", "in BlockAckEof 1",
+	}
+	if !slices.Equal(seen, want) {
+		t.Fatalf("messages %q, want %q", seen, want)
 	}
 }

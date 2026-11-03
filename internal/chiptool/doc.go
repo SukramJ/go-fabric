@@ -124,6 +124,26 @@
 // controller as TH, after matter.js TC-X.test.ts". The opposite direction —
 // matter.js's own reading, the Go controller as the DUT — is phase 29b.
 //
+// Some of the cases run the device as DUT in matter.js too (goCertCase
+// native): the BDX receiver and SU requestor cases (gocert_bdx_test.go,
+// gocert_su_test.go), where the TS's TH is a controller serving an OTA
+// image, and the BIND cases (gocert_bind_test.go), whose DUT is a light
+// switch — the daemon with --light-switch, triggered through the app pipe's
+// SendOnOffToBindings. Their PICS are evaluated as stated. The Go TH serves
+// OTA images from its own node (controller.OTAConfig) and scripts the
+// provider's answers as matter.js's cert adapter does
+// (softwareupdate.Config ScriptQueryImage, ScriptApplyUpdate,
+// OnProviderExchange); it reads each BDX message off its end of the
+// transfer (bdx.ServerSession.OnMessage). The codes of the roles the Go TH
+// takes (provider, BDX sender, administrator, QR commissioner) are its own
+// declarations (goTHPICS), as matter.js declares its controller's, and a
+// flagged composition's codes are the case's (goCertCase.declare). A step
+// matter.js marks longRunning is skipped unless GOFABRIC_GOCERT_LONG=1; such
+// a run checks no golden counts. A step that fails with a daemon defect
+// recorded in notes/parity/matter_behaviour_findings.md carries its id
+// (goStep.finding): the case passes with the finding listed, and fails once
+// the step passes.
+//
 // Nothing is skipped silently on a machine that has the prerequisites: a
 // missing harness skips with the command that provides it, and a missing
 // reference-daemon binary fails loudly with the command to run. The

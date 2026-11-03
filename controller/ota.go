@@ -19,6 +19,7 @@ import (
 	"github.com/SukramJ/go-fabric/client/exchange"
 	"github.com/SukramJ/go-fabric/client/peer"
 	"github.com/SukramJ/go-fabric/clock"
+	provdef "github.com/SukramJ/go-fabric/cluster/spec/otasoftwareupdateprovider"
 	"github.com/SukramJ/go-fabric/controller/attestation"
 	"github.com/SukramJ/go-fabric/controller/client"
 	"github.com/SukramJ/go-fabric/controller/commissioner"
@@ -64,6 +65,12 @@ type OTAConfig struct {
 	OnUpdateAvailable                              func(p softwareupdate.Peer, info softwareupdate.SoftwareUpdateInfo)
 	OnUpdateApplying, OnUpdateDone, OnUpdateFailed func(p softwareupdate.Peer)
 	OnStatus                                       func(p softwareupdate.Peer, status softwareupdate.Status, version uint32)
+	// ScriptQueryImage, ScriptApplyUpdate and OnProviderExchange are the
+	// manager's test-harness seam: they script the provider's answers and
+	// report what it answered ([softwareupdate.Config]).
+	ScriptQueryImage   func(p softwareupdate.Peer, req softwareupdate.QueryImageRequest) (softwareupdate.QueryImageScript, bool)
+	ScriptApplyUpdate  func(p softwareupdate.Peer, req provdef.ApplyUpdateRequestRequest) (softwareupdate.ApplyUpdateScript, bool)
+	OnProviderExchange func(x softwareupdate.ProviderExchange)
 
 	// Listen is the own node's UDP address; "" is "[::]:0".
 	Listen string
@@ -191,6 +198,7 @@ func (c *Controller) startOTA(ctx context.Context, cfg Config) error {
 		MaxBDXBlockSize: o.MaxBDXBlockSize, BDXAdditionalMrpDelay: o.BDXAdditionalMrpDelay, ApplyDelay: o.ApplyDelay,
 		RequestConsent: o.RequestConsent, OnUpdateAvailable: o.OnUpdateAvailable, OnUpdateApplying: o.OnUpdateApplying,
 		OnUpdateDone: o.OnUpdateDone, OnUpdateFailed: o.OnUpdateFailed, OnStatus: o.OnStatus,
+		ScriptQueryImage: o.ScriptQueryImage, ScriptApplyUpdate: o.ScriptApplyUpdate, OnProviderExchange: o.OnProviderExchange,
 		Clock: c.clock, Logger: c.log,
 	})
 	if err != nil {

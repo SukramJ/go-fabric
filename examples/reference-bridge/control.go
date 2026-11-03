@@ -79,6 +79,9 @@ type pipeCommand struct {
 	AssociationFailureCause *uint8  `json:"AssociationFailureCause"`
 	Status                  *uint16 `json:"Status"`
 	ConnectionStatus        *uint8  `json:"ConnectionStatus"`
+	// Command is SendOnOffToBindings' "on" or "off" (light_switch.go;
+	// matter.js backchannel.ts:161-165).
+	Command string `json:"Command"`
 }
 
 // serveAppPipe creates the FIFO (when absent) and applies every command
@@ -270,6 +273,11 @@ func (f *fleet) applyPipeCommand(cmd pipeCommand) error {
 			return errors.New("MediaPlaybackState: the daemon runs without --media")
 		}
 		return f.media.setPlaybackState(cmd.Operation)
+	case "SendOnOffToBindings":
+		// The light switch of --light-switch (light_switch.go).
+		ctx, cancel := context.WithTimeout(context.Background(), 2*lightSwitchResolutionTimeout)
+		defer cancel()
+		return f.lightSwitch.sendOnOff(ctx, cmd.EndpointID, cmd.Command)
 	case "OtaProviderConsent":
 		// The test OTA provider of --ota-provider (ota_provider.go).
 		return f.otaImages.pipeCommand(cmd)

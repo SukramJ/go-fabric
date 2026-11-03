@@ -191,6 +191,15 @@ the same two mechanisms CHIP's own example apps take (`control.go`):
   "Playing"|"Paused"|"NotPlaying"|"Buffering"}` moves the transport.
   Nothing plays: a product's host implements the `cluster/media` ports
   over its own player.
+- `--light-switch` (TESTING ONLY) bridges an On/Off Light Switch after
+  every other device (`light_switch.go`), for the binding certification
+  cases the Go controller runs as TH (TC-BIND-2.1, TC-BIND-2.3): its Binding
+  server's entries are resolved by the node's binding manager, over the
+  client stack the flag turns on, and the app pipe's `{"Name":
+  "SendOnOffToBindings", "EndpointId": <switch>, "Command": "on"|"off"}`
+  sends OnOff On or Off to every target the entries name, unicast or
+  group — matter.js's cert light switch and its `sendOnOffToBindings`
+  backchannel. The daemon's default composition does not change.
 - `--dcl prod|testnet|off` (default `off`) looks the image `--ota-provider`
   offers up in the CSA Distributed Compliance Ledger (`dcl.go`,
   `controller/dcl`): is the version listed for the requestor's vendor and

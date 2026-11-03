@@ -149,7 +149,12 @@ func (a *otaApplier) verify(version uint32, file string) (node.OTAImageHeader, e
 }
 
 // restartedWhenIdle waits for the requestor to leave Applying, then runs
-// its start-up path.
+// the start-up path a restart into the new version runs: BasicInformation
+// StartUp with the version now running — the event a node emits on every
+// start (node.Node.Start), which the matter.js cert requestor's restart
+// into its applied image emits too and TC-SU-2.5 waits for
+// (support/chip-testing/test/cert/TC-SU-2.5.test.ts:89-107 at 862ad75f) —
+// then the requestor's own.
 func (a *otaApplier) restartedWhenIdle(ctx context.Context) {
 	r := a.requestor()
 	if r == nil {
@@ -161,6 +166,9 @@ func (a *otaApplier) restartedWhenIdle(ctx context.Context) {
 			break
 		}
 		time.Sleep(10 * time.Millisecond)
+	}
+	if a.basicInfo != nil {
+		a.basicInfo.EmitStartUp()
 	}
 	r.Restarted(ctx)
 }

@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 7200,
+  "entry_points": 7210,
   "entry_packages": [
     ".",
     "bdx",
@@ -276,9 +276,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 17036,
-    "reachable": 12020,
-    "whitelisted": 5016,
+    "total_exported": 17050,
+    "reachable": 12027,
+    "whitelisted": 5023,
     "unreachable": 0
   },
   "by_package": [],
@@ -752,6 +752,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/attribute_value_reader_test.go",
       "line": 656
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestAttributeValueReader_BindingAppend",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/attribute_value_reader_binding_test.go",
+      "line": 26
     },
     {
       "package": "bridge",
@@ -24425,7 +24432,7 @@
       "identifier": "QueryImageRequest",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "controller/softwareupdate/manager.go",
-      "line": 473
+      "line": 485
     },
     {
       "package": "controller/softwareupdate",
@@ -24524,6 +24531,27 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/softwareupdate/observe_test.go",
       "line": 199
+    },
+    {
+      "package": "controller/softwareupdate",
+      "identifier": "TestScriptedApplyUpdate",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/softwareupdate/script_parity_matterjs_test.go",
+      "line": 140
+    },
+    {
+      "package": "controller/softwareupdate",
+      "identifier": "TestScriptedProviderWithoutHooksIsUnwrapped",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/softwareupdate/script_parity_matterjs_test.go",
+      "line": 89
+    },
+    {
+      "package": "controller/softwareupdate",
+      "identifier": "TestScriptedQueryImage",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/softwareupdate/script_parity_matterjs_test.go",
+      "line": 101
     },
     {
       "package": "controller/softwareupdate",
@@ -26778,6 +26806,27 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/conformance_test.go",
       "line": 314
+    },
+    {
+      "package": "examples/reference-bridge",
+      "identifier": "TestLightSwitchEntryKeys",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-bridge/light_switch_keys_test.go",
+      "line": 23
+    },
+    {
+      "package": "examples/reference-bridge",
+      "identifier": "TestLightSwitchFlag",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-bridge/light_switch_test.go",
+      "line": 22
+    },
+    {
+      "package": "examples/reference-bridge",
+      "identifier": "TestLightSwitchSendRefusals",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-bridge/light_switch_keys_test.go",
+      "line": 59
     },
     {
       "package": "examples/reference-bridge",
@@ -29465,7 +29514,7 @@
       "identifier": "TestCertifiabilityDocument",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "internal/chiptool/certifiability_doc_test.go",
-      "line": 59
+      "line": 60
     },
     {
       "package": "internal/chiptool",
@@ -29479,7 +29528,7 @@
       "identifier": "TestFamilyDeviceTypesResolve",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "internal/chiptool/certifiability_doc_test.go",
-      "line": 339
+      "line": 350
     },
     {
       "package": "internal/chiptool",
@@ -29507,7 +29556,7 @@
       "identifier": "TestWorkflowRunsEveryFamily",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "internal/chiptool/certifiability_doc_test.go",
-      "line": 284
+      "line": 295
     },
     {
       "package": "internal/paritytest",

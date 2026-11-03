@@ -47,9 +47,10 @@ type docGolden struct {
 // docGoCert is a case of the Go-TH leg (gocert_test.go): its counts and the
 // matter.js case file it mirrors.
 type docGoCert struct {
-	Steps        int    `json:"steps"`
-	StepsSkipped int    `json:"stepsSkipped"`
-	Source       string `json:"source"`
+	Steps        int      `json:"steps"`
+	StepsSkipped int      `json:"stepsSkipped"`
+	Source       string   `json:"source"`
+	Findings     []string `json:"findings"`
 }
 
 // TestCertifiabilityDocument holds docs/certifiability.md's generated block
@@ -214,6 +215,12 @@ func renderCertifiability(g docGolden) string {
 				if kp, ok := fam.knownProblems[n]; ok {
 					known++
 					r.known = append(r.known, fmt.Sprintf("| %s | %s | %s |", id, kp.class, mdCell(kp.reason)))
+				} else if gc, ok := g.GoCert[id]; ok && len(gc.Findings) > 0 {
+					// A Go-TH case whose step fails with a recorded daemon
+					// defect (gocert_test.go goStep.finding).
+					known++
+					r.known = append(r.known, fmt.Sprintf("| %s | %s | Go controller as TH: step %s (notes/parity/matter_behaviour_findings.md) |",
+						id, classDefect, mdCell(strings.Join(gc.Findings, "; step "))))
 				}
 			}
 		}
@@ -254,7 +261,11 @@ func renderCertifiability(g docGolden) string {
 	slices.Sort(goIDs)
 	for _, id := range goIDs {
 		c := g.GoCert[id]
-		fmt.Fprintf(&b, "| %s | %d | %d | Go controller as TH, after matter.js `%s` |\n", id, c.Steps, c.StepsSkipped, mdCell(c.Source))
+		also := ""
+		if _, ok := g.Cases[id]; ok {
+			also = "; passes with chip-tool as TH too"
+		}
+		fmt.Fprintf(&b, "| %s | %d | %d | Go controller as TH, after matter.js `%s`%s |\n", id, c.Steps, c.StepsSkipped, mdCell(c.Source), also)
 	}
 	b.WriteString("\n### Cases that pass with a recorded gap\n\n")
 	b.WriteString("The CHIP checker reports exactly the recorded problems and nothing else; the case fails as soon as\n")

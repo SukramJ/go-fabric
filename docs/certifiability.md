@@ -80,7 +80,15 @@ GOFABRIC_CHIP_FAMILIES=IDM,ACL make chiptool-families   # a selection
   the expression. The leg needs the daemon and the host's multicast, not the
   harness image; its cases appear below as passed, with their step counts and
   the TS file they follow. matter.js's own reading, the Go controller as the
-  DUT, is a later wave (roadmap phase 29b).
+  DUT, is a later wave (roadmap phase 29b). The BDX receiver, SU requestor
+  and BIND cases run the device as DUT in matter.js too: their PICS are
+  evaluated as stated, the Go TH serves the OTA image from its own node and
+  scripts its provider's answers as matter.js's cert harness does, and the
+  BIND cases run the daemon with `--light-switch`. A step matter.js marks
+  long-running (minutes of real time each) runs with
+  `GOFABRIC_GOCERT_LONG=1`; the counts below are the default run's. The DD
+  cases whose substance is the commissioner's alone stay rows below, named
+  "controller role (phase 29b)".
 - **What a passing case executed** is pinned per case (steps run and steps
   skipped), so a PICS change that quietly turns a case into a no-op fails it.
 - **A case that passes with a recorded gap** is one whose CHIP spec checker
@@ -146,7 +154,7 @@ Harness image: `ghcr.io/matter-js/chip@sha256:d6f1de89d714309beb621543d451a98996
 | CNET | 23 | 2 | 0 | 0 | 12 | 4 | 5 |
 | CNETWIFI | 23 | 3 | 0 | 3 | 11 | 6 | 0 |
 | DA | 13 | 4 | 0 | 0 | 5 | 4 | 0 |
-| DD | 30 | 2 | 0 | 0 | 1 | 27 | 0 |
+| DD | 30 | 5 | 0 | 0 | 1 | 24 | 0 |
 | DESC | 3 | 2 | 0 | 0 | 0 | 1 | 0 |
 | DGGEN | 7 | 6 | 0 | 0 | 0 | 1 | 0 |
 | DT | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
@@ -161,9 +169,9 @@ Harness image: `ghcr.io/matter-js/chip@sha256:d6f1de89d714309beb621543d451a98996
 | TIMESYNC | 14 | 3 | 0 | 0 | 11 | 0 | 0 |
 | DLOG | 1 | 0 | 0 | 0 | 0 | 1 | 0 |
 | ICDM | 7 | 0 | 0 | 0 | 7 | 0 | 0 |
-| SU | 13 | 3 | 0 | 0 | 0 | 10 | 0 |
-| BDX | 11 | 0 | 0 | 0 | 0 | 11 | 0 |
-| BIND | 3 | 0 | 0 | 0 | 0 | 3 | 0 |
+| SU | 13 | 13 | 0 | 0 | 0 | 0 | 0 |
+| BDX | 11 | 4 | 0 | 0 | 0 | 7 | 0 |
+| BIND | 3 | 2 | 0 | 0 | 0 | 1 | 0 |
 | FLABEL | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
 | ULABEL | 4 | 4 | 0 | 0 | 0 | 0 | 0 |
 | LCFG | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
@@ -257,7 +265,7 @@ Harness image: `ghcr.io/matter-js/chip@sha256:d6f1de89d714309beb621543d451a98996
 | MEDIAPLAYBACK | 11 | 5 | 0 | 0 | 2 | 4 | 0 |
 | TGTNAV | 2 | 1 | 0 | 0 | 0 | 1 | 0 |
 | WAKEONLAN | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
-| **all** | **707** | **418** | **0** | **4** | **131** | **149** | **5** |
+| **all** | **707** | **437** | **0** | **4** | **131** | **130** | **5** |
 
 ### Cases not run
 
@@ -272,19 +280,13 @@ Harness image: `ghcr.io/matter-js/chip@sha256:d6f1de89d714309beb621543d451a98996
 | AUDIOOUTPUT/7.3 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | AUDIOOUTPUT/7.4 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | BDX/1.1 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
-| BDX/1.2 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | BDX/1.3 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
-| BDX/1.4 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | BDX/1.5 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | BDX/1.6 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
-| BDX/2.1 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
-| BDX/2.2 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | BDX/2.3 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | BDX/2.4 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | BDX/2.5 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
-| BIND/2.1 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | BIND/2.2 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
-| BIND/2.3 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | BINFO/3.1 | (b) not supported | not applicable: the case's PICS `BINFO.S.A0014` is false for the reference DUT |
 | BINFO/3.2 | (b) not supported | not applicable: the case's PICS `BINFO.S & BINFO.S.M.DeviceConfigurationChange` is false for the reference DUT |
 | BRBINFO/2.2 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
@@ -393,22 +395,19 @@ Harness image: `ghcr.io/matter-js/chip@sha256:d6f1de89d714309beb621543d451a98996
 | DD/1.11 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | DD/1.6 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | DD/1.7 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
-| DD/1.8 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
+| DD/1.8 | (c) harness | controller role (phase 29b): matter.js automates it with its controller as DUT (support/chip-testing/test/cert/TC-DD-1.8.test.ts), and its substance is the commissioner's |
 | DD/1.9 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | DD/2.1 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | DD/2.2 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | DD/3.10 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | DD/3.11 | (b) not supported | not applicable: the case's PICS `MCORE.ROLE.COMMISSIONER & MCORE.DD.QR_COMMISSIONING & MCORE.DD.STANDARD_COMM_FLOW` is false for the reference DUT |
-| DD/3.12 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
-| DD/3.13 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
-| DD/3.14 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
-| DD/3.15 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
-| DD/3.16 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
-| DD/3.17 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
-| DD/3.18 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
+| DD/3.12 | (c) harness | controller role (phase 29b): matter.js automates it with its controller as DUT (support/chip-testing/test/cert/TC-DD-3.12.test.ts), and its substance is the commissioner's |
+| DD/3.13 | (c) harness | controller role (phase 29b): matter.js automates it with its controller as DUT (support/chip-testing/test/cert/TC-DD-3.13.test.ts), and its substance is the commissioner's |
+| DD/3.14 | (c) harness | controller role (phase 29b): matter.js automates it with its controller as DUT (support/chip-testing/test/cert/TC-DD-3.14.test.ts), and its substance is the commissioner's |
+| DD/3.15 | (c) harness | controller role (phase 29b): matter.js automates it with its controller as DUT (support/chip-testing/test/cert/TC-DD-3.15.test.ts), and its substance is the commissioner's |
+| DD/3.16 | (c) harness | controller role (phase 29b): matter.js automates it with its controller as DUT (support/chip-testing/test/cert/TC-DD-3.16.test.ts), and its substance is the commissioner's |
+| DD/3.17 | (c) harness | controller role (phase 29b): matter.js automates it with its controller as DUT (support/chip-testing/test/cert/TC-DD-3.17.test.ts), and its substance is the commissioner's |
 | DD/3.19 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
-| DD/3.20 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
-| DD/3.21 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | DD/3.22 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | DD/3.3 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | DD/3.4 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
@@ -516,16 +515,6 @@ Harness image: `ghcr.io/matter-js/chip@sha256:d6f1de89d714309beb621543d451a98996
 | SC/4.7 | (b) not supported | not applicable: the case's PICS `MCORE.ROLE.COMMISSIONEE & MCORE.DD.COMM_DISCOVERY` is false for the reference DUT |
 | SC/4.9 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | SEPR/2.3 | (b) not supported | not applicable: the case's PICS `SEPR.S & SEPR.F00` is false for the reference DUT |
-| SU/1.1 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
-| SU/2.1 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
-| SU/2.3 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
-| SU/2.5 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
-| SU/2.6 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
-| SU/2.7 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
-| SU/3.1 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
-| SU/3.2 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
-| SU/3.3 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
-| SU/3.4 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | SWTCH/2.2 | (b) not supported | TC-SWTCH-2.2 runs only on a latching switch (PICS SWTCH.S.F00=0: the daemon's switch is momentary) (runs, and skips itself) |
 | SWTCH/2.6 | (b) not supported | TC-SWTCH-2.6 runs only with ActionSwitch (PICS SWTCH.S.F05=0): the daemon's button serves MomentarySwitchRelease, which ActionSwitch excludes (MSR conformance "[MS & !AS]", switch.element.ts) (runs, and skips itself) |
 | TCCM/2.1 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
@@ -562,7 +551,16 @@ expectations are what the daemon has to satisfy (`internal/chiptool` TestGoCerti
 | Case | Steps run | Steps skipped | Source |
 | --- | ---: | ---: | --- |
 | ACT/3.2 | 12 | 0 | Go controller as TH, after matter.js `TC-ACT-3.2.test.ts` |
+| BDX/1.2 | 2 | 0 | Go controller as TH, after matter.js `TC-BDX-1.2.test.ts` |
+| BDX/1.4 | 2 | 0 | Go controller as TH, after matter.js `TC-BDX-1.4.test.ts` |
+| BDX/2.1 | 4 | 0 | Go controller as TH, after matter.js `TC-BDX-2.1.test.ts` |
+| BDX/2.2 | 5 | 1 | Go controller as TH, after matter.js `TC-BDX-2.2.test.ts` |
+| BIND/2.1 | 12 | 0 | Go controller as TH, after matter.js `TC-BIND-2.1.test.ts` |
+| BIND/2.3 | 16 | 5 | Go controller as TH, after matter.js `TC-BIND-2.3.test.ts` |
 | CADMIN/1.17 | 13 | 0 | Go controller as TH, after matter.js `TC-CADMIN-1.17.test.ts` |
+| DD/3.18 | 9 | 0 | Go controller as TH, after matter.js `TC-DD-3.18.test.ts` |
+| DD/3.20 | 8 | 0 | Go controller as TH, after matter.js `TC-DD-3.20.test.ts` |
+| DD/3.21 | 5 | 0 | Go controller as TH, after matter.js `TC-DD-3.21.test.ts` |
 | G/3.2 | 5 | 0 | Go controller as TH, after matter.js `TC-G-3.2.test.ts` |
 | IDM/1.1 | 2 | 1 | Go controller as TH, after matter.js `TC-IDM-1.1.test.ts` |
 | IDM/1.3 | 3 | 4 | Go controller as TH, after matter.js `TC-IDM-1.3.test.ts` |
@@ -578,6 +576,19 @@ expectations are what the daemon has to satisfy (`internal/chiptool` TestGoCerti
 | SC/4.8 | 4 | 0 | Go controller as TH, after matter.js `TC-SC-4.8.test.ts` |
 | SC/5.3 | 5 | 3 | Go controller as TH, after matter.js `TC-SC-5.3.test.ts` |
 | SC/6.1 | 8 | 3 | Go controller as TH, after matter.js `TC-SC-6.1.test.ts` |
+| SU/1.1 | 2 | 0 | Go controller as TH, after matter.js `TC-SU-1.1.test.ts` |
+| SU/2.1 | 3 | 1 | Go controller as TH, after matter.js `TC-SU-2.1.test.ts` |
+| SU/2.2 | 4 | 4 | Go controller as TH, after matter.js `TC-SU-2.2.test.ts`; passes with chip-tool as TH too |
+| SU/2.3 | 3 | 3 | Go controller as TH, after matter.js `TC-SU-2.3.test.ts` |
+| SU/2.4 | 2 | 0 | Go controller as TH, after matter.js `TC-SU-2.4.test.ts`; passes with chip-tool as TH too |
+| SU/2.5 | 3 | 3 | Go controller as TH, after matter.js `TC-SU-2.5.test.ts` |
+| SU/2.6 | 2 | 1 | Go controller as TH, after matter.js `TC-SU-2.6.test.ts` |
+| SU/2.7 | 6 | 2 | Go controller as TH, after matter.js `TC-SU-2.7.test.ts` |
+| SU/3.1 | 2 | 0 | Go controller as TH, after matter.js `TC-SU-3.1.test.ts` |
+| SU/3.2 | 5 | 2 | Go controller as TH, after matter.js `TC-SU-3.2.test.ts` |
+| SU/3.3 | 4 | 2 | Go controller as TH, after matter.js `TC-SU-3.3.test.ts` |
+| SU/3.4 | 3 | 1 | Go controller as TH, after matter.js `TC-SU-3.4.test.ts` |
+| SU/4.1 | 9 | 0 | Go controller as TH, after matter.js `TC-SU-4.1.test.ts`; passes with chip-tool as TH too |
 | SWTCH/3.2 | 16 | 7 | Go controller as TH, after matter.js `TC-SWTCH-3.2.test.ts` |
 
 ### Cases that pass with a recorded gap

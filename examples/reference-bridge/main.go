@@ -99,7 +99,7 @@ type flags struct {
 	iterations                                 int
 	advertise, osHostName, otaHarness, wifi    bool
 	wifiSim                                    bool
-	otaProvider, media                         bool
+	otaProvider, media, lightSwitch            bool
 	thermostatSchedules                        bool
 	dumpSurface                                bool
 	extensions                                 string
@@ -134,6 +134,7 @@ func parseFlags() flags {
 	flag.StringVar(&f.extensions, "extensions", "", "comma-separated \"Ahead of matter.js\" register IDs to enable (surface.Policies.Extensions, notes/parity/by_design.md), on the node and every device; an unknown ID stops the daemon with the list of known ones; see surface.go")
 	flag.StringVar(&f.otbr, "otbr", "", "add a ThreadBorderRouter endpoint over the OpenThread Border Router's REST API at this URL (\"http://[fd00::1]:8081\"); off when empty; see otbr.go")
 	flag.BoolVar(&f.media, "media", false, "TESTING ONLY: add a simulated video player (CastingVideoPlayer) and content app (ContentApp) after chip's tv-app, for the media certification families; see media.go")
+	flag.BoolVar(&f.lightSwitch, "light-switch", false, "TESTING ONLY: add an On/Off Light Switch whose Binding entries the node resolves, and the app-pipe command SendOnOffToBindings that has it send OnOff On or Off to them, for the binding certification cases; turns on the node's client stack; see light_switch.go")
 	flag.StringVar(&f.specLevel, "spec-level", "", "the Matter specification level to compose at (surface.Policies.Level): one of the revisions matter.js has shipped, "+levelList()+"; the default is the pin's. Optional elements the level does not know are removed, devices whose type it does not know are withheld and logged, behaviour and ClusterRevision stay the pin's; an unknown level stops the daemon with the list; see surface.go")
 	flag.StringVar(&f.profiles, "profile", "", "comma-separated controller profiles to compose for (surface.Policies.Profiles): "+profileList()+". A profile removes only what a Reproduced row of notes/parity/controller_profiles.md names and logs every other row that names a served element as a warning decision; a profile's level applies when --spec-level is not set; an unknown profile stops the daemon with the list; see surface.go")
 	flag.BoolVar(&f.dumpSurface, "dump-surface", false, "print the node's served surface — the assembled effective surface of the root, the Aggregator and every endpoint, the clusters the endpoint assembler mounts included, the surface policies' digest, the selected profiles, the effective level and its origin (explicit, profile <name> or pin) and every decision (package surface) — as JSON on stdout and exit, composed as the other flags say on an in-memory store and assembled by starting the node on a loopback UDP port the system assigns, then stopping it: no mDNS record is published and the --db store is not opened; see surface.go")
@@ -329,6 +330,14 @@ func compose(ctx context.Context, f flags, logger *slog.Logger, passcode uint32,
 			return nil, nil, err
 		}
 	}
+	if f.lightSwitch {
+		// The light switch and its client stack (light_switch.go), TESTING
+		// ONLY.
+		if devices.lightSwitch, err = newDemoLightSwitch(devices, logger); err != nil {
+			return nil, nil, err
+		}
+		cfg.Client = &node.ClientConfig{}
+	}
 	if f.otbr != "" {
 		// The ThreadBorderRouter endpoint (otbr.go), off by default.
 		if devices.otbr, err = newDemoBorderRouter(f.otbr, policies, logger); err != nil {
@@ -369,6 +378,7 @@ func assemble(ctx context.Context, devices *fleet, cfg node.Config, applier *ota
 	// The simulated Wi-Fi link raises its events on the root's server
 	// (nil without --wifi).
 	devices.wifi.attach(n.Root().WiFiNetworkDiagnostics)
+	attachLightSwitch(devices.lightSwitch, n)
 	if applier != nil {
 		applier.basicInfo = n.Root().BasicInformation
 		applier.requestor = func() *node.OTARequestorServer { return n.Root().OTARequestor }

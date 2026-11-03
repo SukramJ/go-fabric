@@ -121,14 +121,26 @@ MCORE.SC.ADV=1
 MCORE.SC.LWIP=0
 
 # --- OTA, BDX, file system ---------------------------------------------------
-# The reference daemon mounts no OTA Software Update Requestor or Provider and
-# no Diagnostic Logs, so it speaks no BDX.
+# The daemon's OTA Software Update Requestor (the root's, MCORE.OTA.Requestor
+# in the generated slice) downloads over synchronous BDX as initiator and
+# receiver, and drives the transfer (BlockQuery); it sends no
+# BlockQueryWithSkip. Every daemon the harness starts runs --ota-harness,
+# whose requestor declares it can consent (examples/reference-bridge/ota.go)
+# and sends NotifyUpdateApplied after the in-place apply. Only BDX: no https.
+# The same declarations as matter.js's for its cert requestor
+# (support/chip-testing/src/cert/index.ts:259-297 at 862ad75f); the Go-TH
+# leg's BDX and SU cases gate on them, and every CHIP case that names one is
+# a manual case of the chip-tool leg.
 MCORE.OTA.HTTPS=0
-MCORE.OTA.RequestorConsent=0
+MCORE.OTA.RequestorConsent=1
 MCORE.OTA.Resume=0
 MCORE.OTA.VendorSpecific=0
 MCORE.OTA.Retry=0
-MCORE.BDX.Driver=0
+OTAR.C.M.NotifyUpdateApplied=1
+MCORE.BDX.Initiator=1
+MCORE.BDX.Receiver=1
+MCORE.BDX.SynchronousReceiver=1
+MCORE.BDX.Driver=1
 MCORE.BDX.BlockQueryWithSkip=0
 MCORE.FS=0
 MCORE.UI.FACTORYRESET=0

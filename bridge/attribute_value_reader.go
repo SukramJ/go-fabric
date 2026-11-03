@@ -545,7 +545,20 @@ func listItemValue(path im.ConcreteAttributePath, el tlv.Element, dec *tlv.Decod
 	case path.Cluster == userlabeldef.ClusterID && path.Attribute == userlabeldef.AttrLabelList && el.IsContainer:
 		return generatedAttributeValue(userlabeldef.Definition, path.Attribute, el, dec, true)
 	case path.Cluster == bindingdef.ClusterID && path.Attribute == bindingdef.AttrBinding && el.IsContainer:
-		return generatedAttributeValue(bindingdef.Definition, path.Attribute, el, dec, true)
+		// The appended entry in the element type of the Binding server's
+		// own list (mattercore.TargetStruct, Binding.MatterReadFiltered):
+		// the dispatcher appends it to that list (appendListValue), as
+		// matter.js applies a ListIndex-null write to the current value
+		// (AttributeWriteResponse.ts). The generated decoder judged it.
+		v, err := generatedAttributeValue(bindingdef.Definition, path.Attribute, el, dec, true)
+		if l, ok := v.Value.(spec.List[bindingdef.TargetStruct]); ok && err == nil {
+			out := make([]mattercore.TargetStruct, 0, len(l))
+			for _, t := range l {
+				out = append(out, mattercore.TargetFromDef(t))
+			}
+			v.Value = out
+		}
+		return v, err
 	case path.Cluster == otadef.ClusterID && path.Attribute == otadef.AttrDefaultOtaProviders && el.IsContainer:
 		v, err := mattercore.DecodeDefaultOTAProvidersWrite(dec, el, true)
 		return im.AttributeValue{Value: v}, err

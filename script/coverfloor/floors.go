@@ -113,8 +113,8 @@ var floors = []packageFloor{
 	{pkg: "github.com/SukramJ/go-fabric/controller/dcl", min: 92},
 	{
 		pkg: "github.com/SukramJ/go-fabric/controller/softwareupdate",
-		min: 40,
-		why: "brief CM §1: measured 29.4; review 2026-11 W6-test-05: 40.3. The manager runs against a controller and a device: its end-to-end and OtaTest cases are the controller package's (controller:TestOTA*), which a per-package profile does not count; the package's own tests set the queue's state as matter.js's do",
+		min: 44,
+		why: "brief CM §1: measured 29.4; review 2026-11 W6-test-05: 40.3; phase 29a-2 (the scripted provider, script_parity_matterjs_test.go): 44.2. The manager runs against a controller and a device: its end-to-end and OtaTest cases are the controller package's (controller:TestOTA*), which a per-package profile does not count; the package's own tests set the queue's state as matter.js's do",
 	},
 	{pkg: "github.com/SukramJ/go-fabric/controller/dcl/snapshot", min: 83},
 	// 94.9-95.3 over six local runs, 94.8 in CI: eleven one-statement
@@ -243,8 +243,8 @@ var floors = []packageFloor{
 	},
 	{
 		pkg: "github.com/SukramJ/go-fabric/node/controllernode",
-		min: 70,
-		why: "brief CM §1: measured 67.9; Start's failure paths (node.New refusing the spec, a socket address that does not resolve) have no test",
+		min: 81,
+		why: "brief CM §1: measured 67.9; phase 29a-2 (the scripted-provider wrappers, wrap_commands_test.go): 81.2. Start's failure paths (node.New refusing the spec, a socket address that does not resolve) have no test",
 	},
 	{pkg: "github.com/SukramJ/go-fabric/node/metrics/expvar", min: 100},
 	{pkg: "github.com/SukramJ/go-fabric/parity", min: 100},
