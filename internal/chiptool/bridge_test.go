@@ -196,6 +196,9 @@ type bridgeOptions struct {
 	// thermostat leg; the certification families' daemons leave it off,
 	// as a host does by default (issue #273).
 	thermostatSchedules bool
+	// extraArgs are further daemon flags (a second device's
+	// --discriminator, for the Go-TH leg's TC-SC-4.8).
+	extraArgs []string
 }
 
 // chipTestEnableKey is the test enable key CHIP's apps and certification
@@ -287,6 +290,7 @@ func startBridgeWith(t *testing.T, bin string, flags map[string]bool, opts bridg
 	// A family row's variant composition (familyrun_test.go
 	// daemonVariants: --wifi-sim for CNETWIFI).
 	args = append(args, daemonVariants[daemonVariant]...)
+	args = append(args, opts.extraArgs...)
 	// On a host whose LAN interfaces have no IPv6, the MAC-derived SRV
 	// target carries only IPv4 address records, and the image's chip-tool
 	// resolves operational nodes over IPv6 only. The OS host name's

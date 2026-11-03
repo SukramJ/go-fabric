@@ -12,6 +12,7 @@ pseudo-version of `main`.
 
 ### Added
 
+- `internal/chiptool`: the Go-TH certification leg (`make chiptool-gocert`, part of `make chiptool-test` and the CI `chiptool` job; `GOFABRIC_GOCERT=IDM,SC` narrows). The certification cases matter.js automated for the controller side (`support/chip-testing/test/cert/TC-*.test.ts` at 862ad75f) run read mirrored, with the module's own controller as TH and the reference daemon as DUT: TC-IDM-1.1, 1.3, 2.1, 3.1, 4.1, 5.1, 6.3, 6.4, TC-SC-4.2, 4.8, 5.3, 6.1, TC-CADMIN-1.17, TC-ACT-3.2, TC-G-3.2, TC-LVL-8.1, TC-S-3.1 and TC-SWTCH-3.2. Each step cites its TS line and records pass, fail or skipped with the mirrored PICS; the status page lists the cases as passed and drops their "manual" rows (phase 29a-1).
 - The reference daemon's grid meter answers connectedhomeip's EnergyReporting test event triggers (`0x0091000000000000`–`02`): a fake 1 kW load at 2 s or 3 kW generator at 5 s updates ActivePower, Voltage, ActiveCurrent and CumulativeEnergyImported on the meter and its sensor part, the stop trigger ends the updates, as connectedhomeip's energy-management app's FakeReadings does; matter.js has none (`notes/parity/by_design.md`, BD-chip-EnergyReporting-FakeReadings) (#370).
 
 ### Changed

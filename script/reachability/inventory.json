@@ -29465,7 +29465,7 @@
       "identifier": "TestCertifiabilityDocument",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "internal/chiptool/certifiability_doc_test.go",
-      "line": 50
+      "line": 59
     },
     {
       "package": "internal/chiptool",
@@ -29479,7 +29479,7 @@
       "identifier": "TestFamilyDeviceTypesResolve",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "internal/chiptool/certifiability_doc_test.go",
-      "line": 299
+      "line": 339
     },
     {
       "package": "internal/chiptool",
@@ -29507,7 +29507,7 @@
       "identifier": "TestWorkflowRunsEveryFamily",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "internal/chiptool/certifiability_doc_test.go",
-      "line": 244
+      "line": 284
     },
     {
       "package": "internal/paritytest",

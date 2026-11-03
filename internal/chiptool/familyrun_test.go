@@ -420,6 +420,9 @@ func runFamily(ctx context.Context, t *testing.T, h *harness, fam family, cases 
 		}
 		t.Run(c.Name, func(t *testing.T) {
 			if c.Kind == "manual" {
+				if _, ok := goCertCases[c.ID]; ok {
+					t.Skipf("a manual case of the CHIP harness, run by the Go-TH leg instead (TestGoCertificationCases, %s)", goCertEnv)
+				}
 				goldenMu.Lock()
 				envUpdates[c.ID] = "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate"
 				goldenMu.Unlock()

@@ -265,6 +265,14 @@ jobs:
             echo "::error::the matter.js controller leg skipped itself; matter.js was not built"
             exit 1
           fi
+          # The Go-TH leg (TestGoCertificationCases, `make chiptool-gocert`)
+          # runs inside chiptool-test: matter.js's controller-side cert
+          # cases, read mirrored, against the reference daemon. A skip of
+          # the whole leg means the runner had no multicast.
+          if grep -q -- "--- SKIP: TestGoCertificationCases " /tmp/chiptool.log; then
+            echo "::error::the Go-TH certification leg skipped itself; the runner has no multicast"
+            exit 1
+          fi
 
       - name: upload logs
         if: failure()

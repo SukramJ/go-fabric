@@ -228,6 +228,11 @@ type goldenFile struct {
 	// one the host that took the counts cannot carry (no IPv6 multicast):
 	// class (c).
 	HostSkipped map[string]string `json:"hostSkipped,omitempty"`
+	// GoCert holds the cases the Go-TH leg runs (gocert_test.go): the
+	// matter.js case files read mirrored, the reference daemon as DUT and
+	// the module's own controller as TH. A manual case of the families
+	// that the leg runs is here and not in HostSkipped.
+	GoCert map[string]goCertCounts `json:"goCert,omitempty"`
 }
 
 var (
@@ -343,6 +348,12 @@ func writeGolden(t *testing.T, h *harness) {
 	for id, c := range goldenUpdates {
 		g.Cases[id] = c
 	}
+	saveGolden(t, g)
+}
+
+// saveGolden writes g to testdata/chip-cases.golden.json.
+func saveGolden(t *testing.T, g *goldenFile) {
+	t.Helper()
 	data, err := json.MarshalIndent(g, "", "  ")
 	if err != nil {
 		t.Fatal(err)

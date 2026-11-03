@@ -41,6 +41,15 @@ type docGolden struct {
 	Families      map[string][]string        `json:"families"`
 	NotApplicable map[string]string          `json:"notApplicable"`
 	HostSkipped   map[string]string          `json:"hostSkipped"`
+	GoCert        map[string]docGoCert       `json:"goCert"`
+}
+
+// docGoCert is a case of the Go-TH leg (gocert_test.go): its counts and the
+// matter.js case file it mirrors.
+type docGoCert struct {
+	Steps        int    `json:"steps"`
+	StepsSkipped int    `json:"stepsSkipped"`
+	Source       string `json:"source"`
 }
 
 // TestCertifiabilityDocument holds docs/certifiability.md's generated block
@@ -58,6 +67,20 @@ func TestCertifiabilityDocument(t *testing.T) {
 	}
 
 	var unclassified []string
+	inFamily := map[string]bool{}
+	for _, fam := range chipFamilies {
+		for _, n := range g.Families[fam.name] {
+			inFamily[fam.name+"/"+n] = true
+		}
+	}
+	for id := range g.GoCert {
+		if !inFamily[id] {
+			t.Errorf("Go-TH case %s is in no declared family's case list", id)
+		}
+		if _, hs := g.HostSkipped[id]; hs {
+			t.Errorf("Go-TH case %s also has a host-skipped row: a case the leg runs is not one nobody automates", id)
+		}
+	}
 	for _, fam := range chipFamilies {
 		names, ok := g.Families[fam.name]
 		if !ok {
@@ -130,6 +153,9 @@ func (f family) gapFor(name string) (gap, bool) {
 // of its endpoint runs) has golden counts.
 func passedIn(g docGolden, id string) bool {
 	if _, ok := g.Cases[id]; ok {
+		return true
+	}
+	if _, ok := g.GoCert[id]; ok {
 		return true
 	}
 	n := 0
@@ -215,6 +241,20 @@ func renderCertifiability(g docGolden) string {
 	slices.Sort(all)
 	for _, l := range all {
 		b.WriteString(l + "\n")
+	}
+	b.WriteString("\n### Cases run with the Go controller as TH\n\n")
+	b.WriteString("matter.js's certification cases for the controller side, read mirrored: the reference daemon is the DUT,\n")
+	b.WriteString("the module's own controller performs the TS file's controller actions, and the TS file's TH-side\n")
+	b.WriteString("expectations are what the daemon has to satisfy (`internal/chiptool` TestGoCertificationCases).\n\n")
+	b.WriteString("| Case | Steps run | Steps skipped | Source |\n| --- | ---: | ---: | --- |\n")
+	goIDs := make([]string, 0, len(g.GoCert))
+	for id := range g.GoCert {
+		goIDs = append(goIDs, id)
+	}
+	slices.Sort(goIDs)
+	for _, id := range goIDs {
+		c := g.GoCert[id]
+		fmt.Fprintf(&b, "| %s | %d | %d | Go controller as TH, after matter.js `%s` |\n", id, c.Steps, c.StepsSkipped, mdCell(c.Source))
 	}
 	b.WriteString("\n### Cases that pass with a recorded gap\n\n")
 	b.WriteString("The CHIP checker reports exactly the recorded problems and nothing else; the case fails as soon as\n")

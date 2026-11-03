@@ -65,6 +65,22 @@ GOFABRIC_CHIP_FAMILIES=IDM,ACL make chiptool-families   # a selection
   second fabric and subscription resumption across a restart. CI builds
   matter.js at the commit the schema snapshot pins
   (`parity/schema.json` `matter.sourceCommit`) and fails if the leg skips.
+- **The Go controller as TH** (`make chiptool-gocert`, part of
+  `make chiptool-test`, `GOFABRIC_GOCERT=IDM,SC` narrows): matter.js automated
+  68 certification cases in `support/chip-testing/test/cert/TC-*.test.ts`, and
+  in most of them its own controller is the DUT and a device app the TH. Those
+  are the controller halves of the CHIP test plans, which CHIP's harness runs
+  as manual cases — the "manual" rows below. The Go-TH leg reads the TS files
+  mirrored: the reference daemon is the DUT, the module's own controller
+  performs the TS file's controller actions, and the TS file's TH-side
+  expectations are what the daemon has to satisfy. Each case cites its TS
+  file and the line of every step; a step's PICS is the TS's mirrored onto the
+  server side (`ACT.C.C00.Tx` → `ACT.S.C00.Rsp`) and evaluated against the
+  daemon's own PICS, and a step whose PICS is false is recorded skipped with
+  the expression. The leg needs the daemon and the host's multicast, not the
+  harness image; its cases appear below as passed, with their step counts and
+  the TS file they follow. matter.js's own reading, the Go controller as the
+  DUT, is a later wave (roadmap phase 29b).
 - **What a passing case executed** is pinned per case (steps run and steps
   skipped), so a PICS change that quietly turns a case into a no-op fails it.
 - **A case that passes with a recorded gap** is one whose CHIP spec checker
@@ -125,7 +141,7 @@ Harness image: `ghcr.io/matter-js/chip@sha256:d6f1de89d714309beb621543d451a98996
 | ACL | 11 | 10 | 0 | 0 | 1 | 0 | 0 |
 | BINFO | 4 | 2 | 0 | 0 | 2 | 0 | 0 |
 | BRBINFO | 5 | 1 | 0 | 0 | 3 | 1 | 0 |
-| CADMIN | 21 | 9 | 0 | 0 | 3 | 9 | 0 |
+| CADMIN | 21 | 10 | 0 | 0 | 3 | 8 | 0 |
 | CGEN | 10 | 3 | 0 | 0 | 7 | 0 | 0 |
 | CNET | 23 | 2 | 0 | 0 | 12 | 4 | 5 |
 | CNETWIFI | 23 | 3 | 0 | 3 | 11 | 6 | 0 |
@@ -134,13 +150,13 @@ Harness image: `ghcr.io/matter-js/chip@sha256:d6f1de89d714309beb621543d451a98996
 | DESC | 3 | 2 | 0 | 0 | 0 | 1 | 0 |
 | DGGEN | 7 | 6 | 0 | 0 | 0 | 1 | 0 |
 | DT | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
-| G | 5 | 2 | 0 | 0 | 0 | 3 | 0 |
+| G | 5 | 3 | 0 | 0 | 0 | 2 | 0 |
 | GC | 8 | 8 | 0 | 0 | 0 | 0 | 0 |
 | GRPKEY | 3 | 2 | 0 | 0 | 0 | 1 | 0 |
-| IDM | 33 | 20 | 0 | 0 | 0 | 13 | 0 |
+| IDM | 33 | 28 | 0 | 0 | 0 | 5 | 0 |
 | OPCREDS | 9 | 6 | 0 | 0 | 1 | 2 | 0 |
 | RR | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
-| SC | 34 | 16 | 0 | 0 | 3 | 15 | 0 |
+| SC | 34 | 20 | 0 | 0 | 3 | 11 | 0 |
 | SM | 2 | 2 | 0 | 0 | 0 | 0 | 0 |
 | TIMESYNC | 14 | 3 | 0 | 0 | 11 | 0 | 0 |
 | DLOG | 1 | 0 | 0 | 0 | 0 | 1 | 0 |
@@ -156,7 +172,7 @@ Harness image: `ghcr.io/matter-js/chip@sha256:d6f1de89d714309beb621543d451a98996
 | DGSW | 4 | 1 | 0 | 0 | 2 | 1 | 0 |
 | DGETH | 3 | 2 | 0 | 0 | 1 | 0 | 0 |
 | DGWIFI | 4 | 2 | 0 | 0 | 1 | 1 | 0 |
-| ACT | 3 | 0 | 0 | 0 | 0 | 3 | 0 |
+| ACT | 3 | 1 | 0 | 0 | 0 | 2 | 0 |
 | PSCFG | 2 | 1 | 0 | 0 | 0 | 1 | 0 |
 | ECOINFO | 2 | 0 | 0 | 0 | 0 | 2 | 0 |
 | ACFREMON | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
@@ -196,7 +212,7 @@ Harness image: `ghcr.io/matter-js/chip@sha256:d6f1de89d714309beb621543d451a98996
 | HEPAFREMON | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
 | FLW | 2 | 1 | 0 | 0 | 0 | 1 | 0 |
 | I | 5 | 3 | 0 | 0 | 0 | 2 | 0 |
-| LVL | 10 | 8 | 0 | 0 | 1 | 1 | 0 |
+| LVL | 10 | 9 | 0 | 0 | 1 | 0 | 0 |
 | LWM | 2 | 2 | 0 | 0 | 0 | 0 | 0 |
 | WASHERCTRL | 2 | 1 | 0 | 0 | 0 | 1 | 0 |
 | DRYERCTRL | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
@@ -218,10 +234,10 @@ Harness image: `ghcr.io/matter-js/chip@sha256:d6f1de89d714309beb621543d451a98996
 | MWOCTRL | 4 | 4 | 0 | 0 | 0 | 0 | 0 |
 | MWOM | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
 | RVCRUNM | 3 | 3 | 0 | 0 | 0 | 0 | 0 |
-| S | 7 | 5 | 0 | 0 | 1 | 1 | 0 |
+| S | 7 | 6 | 0 | 0 | 1 | 0 | 0 |
 | SEAR | 5 | 5 | 0 | 0 | 0 | 0 | 0 |
 | SMOKECO | 7 | 7 | 0 | 0 | 0 | 0 | 0 |
-| SWTCH | 5 | 2 | 0 | 0 | 2 | 1 | 0 |
+| SWTCH | 5 | 3 | 0 | 0 | 2 | 0 | 0 |
 | TMP | 2 | 1 | 0 | 0 | 0 | 1 | 0 |
 | TSTAT | 6 | 3 | 0 | 0 | 2 | 1 | 0 |
 | TSUIC | 2 | 2 | 0 | 0 | 0 | 0 | 0 |
@@ -241,7 +257,7 @@ Harness image: `ghcr.io/matter-js/chip@sha256:d6f1de89d714309beb621543d451a98996
 | MEDIAPLAYBACK | 11 | 5 | 0 | 0 | 2 | 4 | 0 |
 | TGTNAV | 2 | 1 | 0 | 0 | 0 | 1 | 0 |
 | WAKEONLAN | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
-| **all** | **707** | **400** | **0** | **4** | **131** | **167** | **5** |
+| **all** | **707** | **418** | **0** | **4** | **131** | **149** | **5** |
 
 ### Cases not run
 
@@ -250,7 +266,6 @@ Harness image: `ghcr.io/matter-js/chip@sha256:d6f1de89d714309beb621543d451a98996
 | ACL/2.11 | (b) not supported | not applicable: the case's PICS `ACL.S.F01` is false for the reference DUT |
 | ACT/2.1 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | ACT/2.2 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
-| ACT/3.2 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | ALOGIN/12.2 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | ALOGIN/12.3 | (b) not supported | not applicable: the case's PICS `ALOGIN.S & ALOGIN.S.F00` is false for the reference DUT |
 | APPOBSERVER/13.1 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
@@ -281,7 +296,6 @@ Harness image: `ghcr.io/matter-js/chip@sha256:d6f1de89d714309beb621543d451a98996
 | CADMIN/1.13 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | CADMIN/1.14 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | CADMIN/1.16 | (b) not supported | not applicable: the case's PICS `CADMIN.S & CADMIN.S.F00` is false for the reference DUT |
-| CADMIN/1.17 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | CADMIN/1.18 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | CADMIN/1.2 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | CADMIN/1.4 | (b) not supported | not applicable: the case's PICS `CADMIN.S.F00` is false for the reference DUT |
@@ -438,7 +452,6 @@ Harness image: `ghcr.io/matter-js/chip@sha256:d6f1de89d714309beb621543d451a98996
 | FLW/2.2 | (c) harness | TC-FLW-2.2 has an operator change the measured value between two reads (a UserPrompt under FLW.M.FlowChange); an unattended run has no operator, and the YAML case has no app-pipe step that would stand in |
 | G/2.2 | (c) harness | TC-G-2.2 step 7a (the Groups revision 4 path) writes MaxGroupsPerFabric+1 GroupKeyMap entries and expects Success; chip's own GroupDataProviderImpl::SetGroupKeyAt refuses the entry beyond MaxGroupsPerFabric at the image commit (src/credentials/GroupDataProviderImpl.cpp:1492, CHIP_ERROR_INVALID_LIST_LENGTH), as does matter.js GroupKeyManagementServer #validateGroupKeyMap (ResourceExhausted) and this module |
 | G/2.3 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
-| G/3.2 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | GRPKEY/5.4 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | I/2.4 | (c) harness | TC-I-2.4 checks the Q-quality reporting of IdentifyTime added in Matter 1.4.2 against an expectation chip has not merged yet (connectedhomeip#42128); matter.js excludes it until then (test/app-slow/I.test.ts) |
 | I/3.2 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
@@ -449,23 +462,14 @@ Harness image: `ghcr.io/matter-js/chip@sha256:d6f1de89d714309beb621543d451a98996
 | ICDM/3.4 | (b) not supported | not applicable: the case's PICS `ICDM.S & ICDM.S.F00` is false for the reference DUT |
 | ICDM/4.1 | (b) not supported | not applicable: the case's PICS `ICDM.S & ICDM.S.F02` is false for the reference DUT |
 | ICDM/5.1 | (b) not supported | not applicable: the case's PICS `ICDM.S & ICDM.S.F02` is false for the reference DUT |
-| IDM/1.1 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
-| IDM/1.3 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
-| IDM/2.1 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
-| IDM/3.1 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
-| IDM/4.1 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | IDM/4.4 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
-| IDM/5.1 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | IDM/6.1 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | IDM/6.2 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
-| IDM/6.3 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
-| IDM/6.4 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | IDM/7.1 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | IDM/8.1 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | KEYPADINPUT/3.1 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | LOWPOWER/2.2 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | LVL/7.1 | (b) not supported | not applicable: the case's PICS `LVL.S & LVL.S.F02` is false for the reference DUT |
-| LVL/8.1 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | MEDIAINPUT/3.14 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | MEDIAINPUT/3.15 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | MEDIAINPUT/3.16 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
@@ -497,7 +501,6 @@ Harness image: `ghcr.io/matter-js/chip@sha256:d6f1de89d714309beb621543d451a98996
 | REFALM/2.3 | (b) not supported | not applicable: the case's PICS `REFALM.S & REFALM.S.M.LocalSuppress` is false for the reference DUT |
 | RH/2.2 | (c) harness | TC-RH-2.2 has an operator change the measured value between two reads (a UserPrompt under RH.M.ManuallyControlled); an unattended run has no operator, and the YAML case has no app-pipe step that would stand in |
 | S/2.3 | (b) not supported | not applicable: the case's PICS `S` is false for the reference DUT |
-| S/3.1 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | SC/1.1 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | SC/1.2 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | SC/1.3 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
@@ -508,14 +511,10 @@ Harness image: `ghcr.io/matter-js/chip@sha256:d6f1de89d714309beb621543d451a98996
 | SC/2.4 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | SC/3.3 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | SC/3.5 | (b) not supported | not applicable: the case's PICS `MCORE.ROLE.COMMISSIONER` is false for the reference DUT |
-| SC/4.2 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | SC/4.4 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | SC/4.6 | (b) not supported | not applicable: the case's PICS `MCORE.ROLE.COMMISSIONER & MCORE.DD.COMM_DISCOVERY` is false for the reference DUT |
 | SC/4.7 | (b) not supported | not applicable: the case's PICS `MCORE.ROLE.COMMISSIONEE & MCORE.DD.COMM_DISCOVERY` is false for the reference DUT |
-| SC/4.8 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | SC/4.9 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
-| SC/5.3 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
-| SC/6.1 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | SEPR/2.3 | (b) not supported | not applicable: the case's PICS `SEPR.S & SEPR.F00` is false for the reference DUT |
 | SU/1.1 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | SU/2.1 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
@@ -529,7 +528,6 @@ Harness image: `ghcr.io/matter-js/chip@sha256:d6f1de89d714309beb621543d451a98996
 | SU/3.4 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | SWTCH/2.2 | (b) not supported | TC-SWTCH-2.2 runs only on a latching switch (PICS SWTCH.S.F00=0: the daemon's switch is momentary) (runs, and skips itself) |
 | SWTCH/2.6 | (b) not supported | TC-SWTCH-2.6 runs only with ActionSwitch (PICS SWTCH.S.F05=0): the daemon's button serves MomentarySwitchRelease, which ActionSwitch excludes (MSR conformance "[MS & !AS]", switch.element.ts) (runs, and skips itself) |
-| SWTCH/3.2 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | TCCM/2.1 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | TCTL/2.3 | (b) not supported | not applicable: the case's PICS `TCTL.S & TCTL.S.F01` is false for the reference DUT |
 | TCTL/3.3 | (b) not supported | not applicable: the case's PICS `TCTL.S & TCTL.S.F01` is false for the reference DUT |
@@ -554,6 +552,33 @@ Harness image: `ghcr.io/matter-js/chip@sha256:d6f1de89d714309beb621543d451a98996
 | WASHERCTRL/2.2 | (c) harness | TC-WASHERCTRL-2.2 step 6 writes NumberOfRinses 4, a value NumberOfRinsesEnum does not define, and expects INVALID_IN_STATE: chip decodes it to kUnknownEnumValue and refuses it as not a supported rinse (LaundryWasherControlsCluster.cpp:132-145 at 6170af84). matter.js refuses an undefined enum value as CONSTRAINT_ERROR before any server logic (UnknownEnumValueError, packages/protocol/src/action/errors.ts:99-103, thrown by conformance-compiler.ts:859-862 at 862ad75f), and this module answers as matter.js does |
 | WNCV/6.1.Simulated | (b) not supported | not applicable: the case's PICS `WNCV.C` is false for the reference DUT |
 | WNCV/7.1.Simulated | (b) not supported | not applicable: the case's PICS `WNCV.C` is false for the reference DUT |
+
+### Cases run with the Go controller as TH
+
+matter.js's certification cases for the controller side, read mirrored: the reference daemon is the DUT,
+the module's own controller performs the TS file's controller actions, and the TS file's TH-side
+expectations are what the daemon has to satisfy (`internal/chiptool` TestGoCertificationCases).
+
+| Case | Steps run | Steps skipped | Source |
+| --- | ---: | ---: | --- |
+| ACT/3.2 | 12 | 0 | Go controller as TH, after matter.js `TC-ACT-3.2.test.ts` |
+| CADMIN/1.17 | 13 | 0 | Go controller as TH, after matter.js `TC-CADMIN-1.17.test.ts` |
+| G/3.2 | 5 | 0 | Go controller as TH, after matter.js `TC-G-3.2.test.ts` |
+| IDM/1.1 | 2 | 1 | Go controller as TH, after matter.js `TC-IDM-1.1.test.ts` |
+| IDM/1.3 | 3 | 4 | Go controller as TH, after matter.js `TC-IDM-1.3.test.ts` |
+| IDM/2.1 | 20 | 1 | Go controller as TH, after matter.js `TC-IDM-2.1.test.ts` |
+| IDM/3.1 | 10 | 5 | Go controller as TH, after matter.js `TC-IDM-3.1.test.ts` |
+| IDM/4.1 | 7 | 3 | Go controller as TH, after matter.js `TC-IDM-4.1.test.ts` |
+| IDM/5.1 | 2 | 1 | Go controller as TH, after matter.js `TC-IDM-5.1.test.ts` |
+| IDM/6.3 | 1 | 0 | Go controller as TH, after matter.js `TC-IDM-6.3.test.ts` |
+| IDM/6.4 | 2 | 4 | Go controller as TH, after matter.js `TC-IDM-6.4.test.ts` |
+| LVL/8.1 | 2 | 0 | Go controller as TH, after matter.js `TC-LVL-8.1.test.ts` |
+| S/3.1 | 9 | 0 | Go controller as TH, after matter.js `TC-S-3.1.test.ts` |
+| SC/4.2 | 3 | 0 | Go controller as TH, after matter.js `TC-SC-4.2.test.ts` |
+| SC/4.8 | 4 | 0 | Go controller as TH, after matter.js `TC-SC-4.8.test.ts` |
+| SC/5.3 | 5 | 3 | Go controller as TH, after matter.js `TC-SC-5.3.test.ts` |
+| SC/6.1 | 8 | 3 | Go controller as TH, after matter.js `TC-SC-6.1.test.ts` |
+| SWTCH/3.2 | 16 | 7 | Go controller as TH, after matter.js `TC-SWTCH-3.2.test.ts` |
 
 ### Cases that pass with a recorded gap
 
