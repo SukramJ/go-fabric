@@ -164,7 +164,7 @@ Harness image: `ghcr.io/matter-js/chip@sha256:d6f1de89d714309beb621543d451a98996
 | CNET | 23 | 2 | 0 | 0 | 12 | 4 | 5 |
 | CNETWIFI | 23 | 3 | 0 | 3 | 11 | 6 | 0 |
 | DA | 13 | 4 | 0 | 0 | 5 | 4 | 0 |
-| DD | 30 | 5 | 0 | 0 | 1 | 24 | 0 |
+| DD | 30 | 13 | 0 | 0 | 0 | 17 | 0 |
 | DESC | 3 | 2 | 0 | 0 | 0 | 1 | 0 |
 | DGGEN | 7 | 6 | 0 | 0 | 0 | 1 | 0 |
 | DT | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
@@ -275,7 +275,7 @@ Harness image: `ghcr.io/matter-js/chip@sha256:d6f1de89d714309beb621543d451a98996
 | MEDIAPLAYBACK | 11 | 5 | 0 | 0 | 2 | 4 | 0 |
 | TGTNAV | 2 | 1 | 0 | 0 | 0 | 1 | 0 |
 | WAKEONLAN | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
-| **all** | **707** | **437** | **0** | **4** | **131** | **130** | **5** |
+| **all** | **707** | **445** | **0** | **4** | **130** | **123** | **5** |
 
 ### Cases not run
 
@@ -405,18 +405,10 @@ Harness image: `ghcr.io/matter-js/chip@sha256:d6f1de89d714309beb621543d451a98996
 | DD/1.11 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | DD/1.6 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | DD/1.7 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
-| DD/1.8 | (c) harness | controller role (phase 29b): matter.js automates it with its controller as DUT (support/chip-testing/test/cert/TC-DD-1.8.test.ts), and its substance is the commissioner's |
 | DD/1.9 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | DD/2.1 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | DD/2.2 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | DD/3.10 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
-| DD/3.11 | (b) not supported | not applicable: the case's PICS `MCORE.ROLE.COMMISSIONER & MCORE.DD.QR_COMMISSIONING & MCORE.DD.STANDARD_COMM_FLOW` is false for the reference DUT |
-| DD/3.12 | (c) harness | controller role (phase 29b): matter.js automates it with its controller as DUT (support/chip-testing/test/cert/TC-DD-3.12.test.ts), and its substance is the commissioner's |
-| DD/3.13 | (c) harness | controller role (phase 29b): matter.js automates it with its controller as DUT (support/chip-testing/test/cert/TC-DD-3.13.test.ts), and its substance is the commissioner's |
-| DD/3.14 | (c) harness | controller role (phase 29b): matter.js automates it with its controller as DUT (support/chip-testing/test/cert/TC-DD-3.14.test.ts), and its substance is the commissioner's |
-| DD/3.15 | (c) harness | controller role (phase 29b): matter.js automates it with its controller as DUT (support/chip-testing/test/cert/TC-DD-3.15.test.ts), and its substance is the commissioner's |
-| DD/3.16 | (c) harness | controller role (phase 29b): matter.js automates it with its controller as DUT (support/chip-testing/test/cert/TC-DD-3.16.test.ts), and its substance is the commissioner's |
-| DD/3.17 | (c) harness | controller role (phase 29b): matter.js automates it with its controller as DUT (support/chip-testing/test/cert/TC-DD-3.17.test.ts), and its substance is the commissioner's |
 | DD/3.19 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | DD/3.22 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | DD/3.3 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
@@ -611,6 +603,14 @@ case counts as passed in its family; one no family of the harness image lists is
 
 | Case | Steps run | Steps skipped | Source |
 | --- | ---: | ---: | --- |
+| DD/1.8 | 7 | 0 | Go controller as DUT, after matter.js `TC-DD-1.8.test.ts` |
+| DD/3.11 | 6 | 4 | Go controller as DUT, after matter.js `TC-DD-3.11.test.ts` |
+| DD/3.12 | 8 | 5 | Go controller as DUT, after matter.js `TC-DD-3.12.test.ts` |
+| DD/3.13 | 8 | 5 | Go controller as DUT, after matter.js `TC-DD-3.13.test.ts` |
+| DD/3.14 | 10 | 2 | Go controller as DUT, after matter.js `TC-DD-3.14.test.ts` |
+| DD/3.15 | 4 | 0 | Go controller as DUT, after matter.js `TC-DD-3.15.test.ts` |
+| DD/3.16 | 11 | 0 | Go controller as DUT, after matter.js `TC-DD-3.16.test.ts` |
+| DD/3.17 | 15 | 0 | Go controller as DUT, after matter.js `TC-DD-3.17.test.ts` |
 
 ### Cases that pass with a recorded gap
 

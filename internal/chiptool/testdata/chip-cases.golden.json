@@ -3207,17 +3207,10 @@
     "DD/1.11": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
     "DD/1.6": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
     "DD/1.7": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
-    "DD/1.8": "controller role (phase 29b): matter.js automates it with its controller as DUT (support/chip-testing/test/cert/TC-DD-1.8.test.ts), and its substance is the commissioner's",
     "DD/1.9": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
     "DD/2.1": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
     "DD/2.2": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
     "DD/3.10": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
-    "DD/3.12": "controller role (phase 29b): matter.js automates it with its controller as DUT (support/chip-testing/test/cert/TC-DD-3.12.test.ts), and its substance is the commissioner's",
-    "DD/3.13": "controller role (phase 29b): matter.js automates it with its controller as DUT (support/chip-testing/test/cert/TC-DD-3.13.test.ts), and its substance is the commissioner's",
-    "DD/3.14": "controller role (phase 29b): matter.js automates it with its controller as DUT (support/chip-testing/test/cert/TC-DD-3.14.test.ts), and its substance is the commissioner's",
-    "DD/3.15": "controller role (phase 29b): matter.js automates it with its controller as DUT (support/chip-testing/test/cert/TC-DD-3.15.test.ts), and its substance is the commissioner's",
-    "DD/3.16": "controller role (phase 29b): matter.js automates it with its controller as DUT (support/chip-testing/test/cert/TC-DD-3.16.test.ts), and its substance is the commissioner's",
-    "DD/3.17": "controller role (phase 29b): matter.js automates it with its controller as DUT (support/chip-testing/test/cert/TC-DD-3.17.test.ts), and its substance is the commissioner's",
     "DD/3.19": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
     "DD/3.22": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
     "DD/3.3": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
@@ -3317,6 +3310,54 @@
       "steps": 13,
       "stepsSkipped": 0,
       "source": "TC-CADMIN-1.17.test.ts"
+    },
+    "DD/1.8": {
+      "steps": 7,
+      "stepsSkipped": 0,
+      "source": "TC-DD-1.8.test.ts",
+      "role": "dut"
+    },
+    "DD/3.11": {
+      "steps": 6,
+      "stepsSkipped": 4,
+      "source": "TC-DD-3.11.test.ts",
+      "role": "dut"
+    },
+    "DD/3.12": {
+      "steps": 8,
+      "stepsSkipped": 5,
+      "source": "TC-DD-3.12.test.ts",
+      "role": "dut"
+    },
+    "DD/3.13": {
+      "steps": 8,
+      "stepsSkipped": 5,
+      "source": "TC-DD-3.13.test.ts",
+      "role": "dut"
+    },
+    "DD/3.14": {
+      "steps": 10,
+      "stepsSkipped": 2,
+      "source": "TC-DD-3.14.test.ts",
+      "role": "dut"
+    },
+    "DD/3.15": {
+      "steps": 4,
+      "stepsSkipped": 0,
+      "source": "TC-DD-3.15.test.ts",
+      "role": "dut"
+    },
+    "DD/3.16": {
+      "steps": 11,
+      "stepsSkipped": 0,
+      "source": "TC-DD-3.16.test.ts",
+      "role": "dut"
+    },
+    "DD/3.17": {
+      "steps": 15,
+      "stepsSkipped": 0,
+      "source": "TC-DD-3.17.test.ts",
+      "role": "dut"
     },
     "DD/3.18": {
       "steps": 9,

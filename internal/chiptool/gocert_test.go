@@ -141,8 +141,12 @@ type goCertCase struct {
 
 // goStep is one TS step.
 type goStep struct {
-	n     string // the TS step number ("1", "0a")
-	line  int    // the line of the TS file's .step( call
+	n    string // the TS step number ("1", "0a")
+	line int    // the line of the TS file's .step( call
+	// file is the TS file of the .step( call where it is not the case's
+	// own — a support file that defines the steps of several cases
+	// (tc-dd-flow-support.ts); "" is the case's file.
+	file  string
 	title string
 	// pics is the TS step's PICS expression, client side; the runner
 	// mirrors it onto the server side.
@@ -310,7 +314,11 @@ func runGoCertCase(t *testing.T, bin string, flags map[string]bool, pics *commit
 	for i := range c.steps {
 		s := &c.steps[i]
 		r := th.runStep(*s)
-		where := fmt.Sprintf("%s step %s (%s:%d)", c.tc, r.step.n, c.source(), r.step.line)
+		file := c.source()
+		if s.file != "" {
+			file = s.file
+		}
+		where := fmt.Sprintf("%s step %s (%s:%d)", c.tc, r.step.n, file, r.step.line)
 		switch {
 		case r.verdict == goPass && s.finding != "":
 			failed = true
@@ -376,6 +384,13 @@ func (b *syncBuffer) Write(p []byte) (int, error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	return b.buf.Write(p)
+}
+
+// String is everything written so far.
+func (b *syncBuffer) String() string {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buf.String()
 }
 
 // tail is the last n lines.
