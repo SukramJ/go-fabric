@@ -273,6 +273,13 @@ jobs:
             echo "::error::the Go-TH certification leg skipped itself; the runner has no multicast"
             exit 1
           fi
+          # The chip-tool group leg (TestChipToolSuite/groups) sends a
+          # multicast OnOff Toggle; a skip means the runner had no IPv6
+          # multicast and the proof did not run.
+          if grep -q -- "--- SKIP: TestChipToolSuite/groups " /tmp/chiptool.log; then
+            echo "::error::the chip-tool group leg skipped itself; the runner has no IPv6 multicast"
+            exit 1
+          fi
 
       - name: upload logs
         if: failure()
