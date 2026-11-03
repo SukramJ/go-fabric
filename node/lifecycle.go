@@ -5,8 +5,13 @@ package node
 
 import (
 	"context"
+	"slices"
 
 	"github.com/SukramJ/go-fabric/clock"
+	"github.com/SukramJ/go-fabric/cluster/spec"
+	descdef "github.com/SukramJ/go-fabric/cluster/spec/descriptor"
+	fixedlabeldef "github.com/SukramJ/go-fabric/cluster/spec/fixedlabel"
+	userlabeldef "github.com/SukramJ/go-fabric/cluster/spec/userlabel"
 	"github.com/SukramJ/go-fabric/device"
 	"github.com/SukramJ/go-fabric/endpoint"
 	"github.com/SukramJ/go-fabric/internal/deviceseam"
@@ -116,12 +121,35 @@ type BridgedDevice struct {
 	Name string
 	// Reachable is its Reachable as a controller reads it now.
 	Reachable bool
+	// Scope is the snapshot scope the endpoint was assembled from
+	// (endpoint.Endpoint.Scope): the name of the Aggregator partition that
+	// holds it — [Scope] for the default one, so [Aggregator.Partition]
+	// takes it back — or the scope of a host's own [Snapshotter].
+	Scope string
+	// Tags are the semantic tags its Descriptor serves in TagList, as a
+	// controller reads them; nil while the Descriptor serves no TagList —
+	// the default, and today every bridged endpoint's case: the assembler
+	// builds its Descriptor without the feature, which Apple's Matter
+	// stack refuses (cluster/core Descriptor.MatterRead).
+	Tags []SemanticTag
+	// Labels are the entries of its FixedLabel LabelList, then of its
+	// UserLabel LabelList, each when the endpoint serves the cluster.
+	Labels []Label
 	// Added is what the host added to the Aggregator under Key (a
 	// device.Device, the generated type around one, or any [Endpoint]);
 	// nil for a part and for an endpoint of a host's own [Snapshotter].
 	Added Endpoint
 	// Parts are its parts, by endpoint number.
 	Parts []BridgedDevice
+}
+
+// Label is one entry of a FixedLabel or UserLabel LabelList a
+// [BridgedDevice] serves.
+type Label struct {
+	Label, Value string
+	// User marks an entry of UserLabel, which a controller may write;
+	// FixedLabel's otherwise.
+	User bool
 }
 
 // ClusterInfo names one cluster server a [BridgedDevice] serves.
@@ -153,7 +181,7 @@ func (n *Node) Topology() BridgeTopology {
 	}
 	added := map[string]Endpoint{}
 	if n.agg != nil {
-		for _, ep := range n.agg.Endpoints() {
+		for _, ep := range n.agg.allEndpoints() {
 			if key, err := keyOf(ep.Spec()); err == nil {
 				added[key] = ep
 			}
@@ -201,13 +229,49 @@ func mountedClusters(ep *endpoint.Endpoint) []ClusterInfo {
 	return out
 }
 
+// tagsAndLabels are the TagList the endpoint's Descriptor serves (none
+// while the feature is off: MatterRead answers no value) and the
+// LabelLists of its FixedLabel and UserLabel servers, read as a
+// controller would.
+func tagsAndLabels(ep *endpoint.Endpoint) (tags []SemanticTag, labels []Label) {
+	var fixed, user []Label
+	for _, srv := range endpoint.ClusterServers(ep) {
+		if srv == nil {
+			continue
+		}
+		switch srv.MatterClusterID() {
+		case descdef.ClusterID:
+			if v, ok := srv.MatterRead(descdef.AttrTagList); ok {
+				spec.Assign(&tags, v)
+			}
+		case fixedlabeldef.ClusterID:
+			var st fixedlabeldef.State
+			st.FromAttributeValues(srv.MatterRead)
+			for _, l := range st.LabelList {
+				fixed = append(fixed, Label{Label: l.Label, Value: l.Value})
+			}
+		case userlabeldef.ClusterID:
+			var st userlabeldef.State
+			st.FromAttributeValues(srv.MatterRead)
+			for _, l := range st.LabelList {
+				user = append(user, Label{Label: l.Label, Value: l.Value, User: true})
+			}
+		}
+	}
+	if len(fixed)+len(user) > 0 {
+		labels = slices.Concat(fixed, user)
+	}
+	return tags, labels
+}
+
 // bridgedDevice is ep with its parts, recursively.
 func bridgedDevice(topo *endpoint.Topology, ep *endpoint.Endpoint) BridgedDevice {
 	d := BridgedDevice{
 		Key: ep.SourceKey, Endpoint: ep.ID, DeviceType: ep.DeviceType,
 		Name: ep.NodeLabel(), Reachable: ep.Availability == nil || ep.Availability(),
-		Clusters: mountedClusters(ep),
+		Scope: ep.Scope, Clusters: mountedClusters(ep),
 	}
+	d.Tags, d.Labels = tagsAndLabels(ep)
 	if id, ok := schema.DeviceTypeIDOf(uint32(ep.DeviceType)); ok {
 		d.DeviceTypeRevision, _ = schema.DeviceTypeRevision(id)
 	}

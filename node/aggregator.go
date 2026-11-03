@@ -306,6 +306,30 @@ func (p *Partition) Remove(ctx context.Context, key device.SourceKey) error {
 	return p.Batch(ctx, func(b *Batch) error { return b.Remove(key) })
 }
 
+// Partitions are the names of the partitions, the default ([Scope])
+// first, then in creation order; a retired one is gone.
+func (a *Aggregator) Partitions() []string {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.partLocked(Scope)
+	out := make([]string, len(a.parts))
+	for i, p := range a.parts {
+		out[i] = p.scope
+	}
+	return out
+}
+
+// allEndpoints is the set of every partition, partition by partition.
+func (a *Aggregator) allEndpoints() []Endpoint {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	var out []Endpoint
+	for _, p := range a.parts {
+		out = append(out, p.eps...)
+	}
+	return out
+}
+
 // Endpoints returns the partition's set, in insertion order.
 func (p *Partition) Endpoints() []Endpoint {
 	p.a.mu.Lock()

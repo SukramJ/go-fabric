@@ -124,6 +124,7 @@ pin lift confirms by re-reading the row, [`pin-lifts.md`](./pin-lifts.md)).
 | BD-Matter-OtaImageHeaderSizeCap | `OtaImageReader.ts:181-183` reads the prefix's header size and collects that many bytes with no bound (absence: the line that would take the check, followed by the closing brace) | `packages/protocol/src/ota/OtaImageReader.ts` | `"this.#headerSize = headerReader.readUInt32();\n            }"` | connectedhomeip `src/lib/core/OTAImageHeader.cpp:53` (`kMaxHeaderSize = 1024`), checked at `:128` (review 2026-11 W4-ctlint-07) | no |
 | BD-chip-Commissioner-CsrNonceEchoed | `ControllerCommissioningFlow.ts:1395` draws the CSR nonce and the flow never reads the echoed one back (presence) | `packages/protocol/src/peer/ControllerCommissioningFlow.ts` | `"fields: { csrNonce: this.fabric.crypto.randomBytes(32) },"` | connectedhomeip `src/credentials/attestation_verifier/DefaultDeviceAttestationVerifier.cpp:847-870` at `6170af84` (`VerifyNodeOperationalCSRInformation`) | no |
 | BD-chip-EnergyReporting-FakeReadings | `GeneralDiagnosticsServer.ts:164-166` answers every test event trigger with INVALID_COMMAND, and the chip-testing node's `TestGeneralDiagnosticsServer.ts:15-22` accepts only the generic trigger; a grep for `0x0091`, `FakeReadings` and `EnergyReporting` over `packages/` and `support/chip-testing/` at the pin finds only the cluster id in `packages/types/src/clusters/electrical-energy-measurement.d.ts:25` (presence: the two rejections) | `packages/node/src/behaviors/general-diagnostics/GeneralDiagnosticsServer.ts`<br>`support/chip-testing/src/cluster/TestGeneralDiagnosticsServer.ts` | `"Unsupported test event trigger "`<br>`"} else if (testEvent !== 0x0000000000000003) {\n            throw new StatusResponseError(\"Wrong test event\", Status.InvalidCommand);"` | connectedhomeip `src/app/clusters/electrical-energy-measurement-server/EnergyReportingTestEventTriggerHandler.h:47-51`, `examples/energy-management/energy-management-triggers/EnergyReportingEventTriggers.cpp:28-85` and `FakeReadings.cpp:73-175` at `6170af84` | no |
+| BD-matterjs-server-NetworkTopology | `NetworkClient.ts:35` declares the controller's network behaviour, which holds the subscription state only; matter.js at the pin has no topology service (absence: no neighbour-table or graph code under `packages/`) | `packages/node/src/behavior/system/network/NetworkClient.ts` | `class NetworkClient` | matterjs-server `packages/ws-controller/src/controller/NetworkTopologyService.ts` and `packages/ws-client/src/topology/topology-utils.ts` at `0bd06f22` | no |
 
 ---
 
@@ -1893,6 +1894,37 @@ TC_EPM_2_2.py's ranges and differ from one another. Only the daemon is
 affected; the module's servers are unchanged. TC-EEM-2.2 and TC-EPM-2.2
 join the families (#370). Retire when matter.js's test node answers the
 triggers.
+
+### BD-matterjs-server-NetworkTopology — the controller's network graph after matterjs-server's NetworkTopologyService
+
+matter.js at `862ad75f` builds no network topology: the controller's
+network behaviour (`packages/node/src/behavior/system/network/NetworkClient.ts:35`,
+`class NetworkClient`) keeps the subscription state of a peer, and no code
+under `packages/` reads ThreadNetworkDiagnostics neighbour tables into a
+graph. matterjs-server, matter.js's own server on top of it, does:
+`NetworkTopologyService` in `packages/ws-controller/src/controller/` and the
+derivation it shares with its dashboard in
+`packages/ws-client/src/topology/topology-utils.ts`, at `0bd06f22`.
+`controller/topology` ports both (issue #380, brief M9-module §2): `Build`
+over typed images of the root endpoint's NetworkCommissioning,
+GeneralDiagnostics, ThreadNetworkDiagnostics and WiFiNetworkDiagnostics,
+the same node and connection rules, thresholds and ids; `Service` with the
+2 s trailing debounce, the 60 s periodic rebuild, the shared refresh with
+its 30 s deadline and concurrency 4, and the hash gate. Left out as
+go-fabric-server's port leaves them out: the border-router registry (a
+`_meshcop` browse this module does not have; ADR 0027 decision 1) and the
+route-table supplement. Differences in the Go form: the node-change hook
+(`client.Hooks.Changed`) carries no path, so every applied report schedules
+a debounced rebuild where matterjs-server filters to clusters 49/51/53/54;
+the network type falls back to `client.Properties` while the root's
+NetworkCommissioning is not in the image; a refresh's reads in flight are
+cancelled by `Service.Close`. Parity cases: matterjs-server's
+`NetworkTopologyServiceTest.ts` (getTopology, change-driven emission,
+refresh, stop; the border-router and host-name cases adapted or missing)
+and the `TopologyUtilsTest.ts` cases of the ported functions, in
+`controller/topology/*_test.go`. Reason: the UI and go-fabric-server need
+one implementation of Matter knowledge (neighbour matching, LQI/RSSI
+buckets) that matter.js does not hold.
 
 ### BD-chip-ClosureDimension-RulesInServer — the command rules are connectedhomeip's; the feature check is matter.js's stricter one
 

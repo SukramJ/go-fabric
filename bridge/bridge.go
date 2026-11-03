@@ -188,8 +188,8 @@
 //   - SetOnInboundActivity — feeds every authenticated inbound message to
 //     the ICD's mode machine; without it the active window is not
 //     extended and the node goes idle mid-exchange.
-//   - SetOnReassembled and SetOnFabricRemoved are nil-safe observer
-//     hooks. A fabric's installation is observed on the node
+//   - SetOnReassembled, SetOnFabricRemoved and SetOnAttributeChange are
+//     nil-safe observer hooks. A fabric's installation is observed on the node
 //     (node.Observers.OnFabricAdded); the bridge installs no fabric.
 //   - SetDeviceTypeValidation — visible either way. Start and every
 //     Reassemble judge the topology against its device types; the
@@ -622,6 +622,11 @@ type Bridge struct {
 	// (post-RemoveFabric). Wired by the daemon to publish
 	// `matter.fabric_removed` over the WebSocket hub. Nil safe.
 	onFabricRemoved func(fabricIndex uint8)
+
+	// onAttributeChange, when set, hears every change a cluster server's
+	// AttributeChangeNotifier reports (wireAttributeNotifiersLocked).
+	// Atomic: a change fires on its own goroutine, b.mu possibly held.
+	onAttributeChange atomic.Pointer[func(endpoint uint16, cluster uint32, change contract.Change)]
 
 	// unsecuredCounter generates monotonic MessageCounter values for
 	// SessionID==0 replies (PASE / commissioning chatter pre-CASE).
@@ -1237,6 +1242,21 @@ func (b *Bridge) SetOnReassembled(fn func(endpointCount int)) {
 	b.mu.Lock()
 	b.onReassembled = fn
 	b.mu.Unlock()
+}
+
+// SetOnAttributeChange wires the attribute-change hook: fn hears every
+// change a mounted cluster server reports through its
+// [contract.AttributeChangeNotifier] (or its report view,
+// [contract.AttributeReportNotifier]) on any endpoint, with the endpoint,
+// the cluster and the change as reported — its attribute ids and
+// origin, no value — after the subscriptions marked it dirty. It runs
+// on the goroutine of the change; nil detaches.
+func (b *Bridge) SetOnAttributeChange(fn func(endpoint uint16, cluster uint32, change contract.Change)) {
+	if fn == nil {
+		b.onAttributeChange.Store(nil)
+		return
+	}
+	b.onAttributeChange.Store(&fn)
 }
 
 // matterEndpointReceiver is the optional capability a cluster server

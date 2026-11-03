@@ -36,6 +36,10 @@ type citation struct {
 	// since a sentence may name a chip commit too.
 	Sha  string
 	Shas []string
+	// Server is set when the sentence names matterjs-server: the
+	// citation is then checked against MATTERJS_SERVER_DIR at the
+	// sentence's `at <sha>`, never against matter.js (brief M9-module §1).
+	Server bool
 	// Idents are the names of the sentence nearer to this citation than
 	// to any other reference of the sentence, nearest first; the stems of
 	// the files the sentence cites are not among them. Attached are those
@@ -58,6 +62,11 @@ var (
 	bareLineRE  = regexp.MustCompile(`(?:^|[\s(,;])(:\d+(?:[-–]\d+)?)\b`)
 	otherCiteRE = regexp.MustCompile(`[A-Za-z0-9_-]\.(?:go|cpp|h|py|yaml|json|md|js|mts):\d+(?:[-–]\d+)?`)
 )
+
+// serverName routes a citation to the second tree: a sentence that names
+// it cites matterjs-server (github.com/matter-js/matterjs-server), whose
+// packages/ layout a matter.js path could otherwise collide with.
+const serverName = "matterjs-server"
 
 // shaRE matches an `at <sha>` or an `at` followed by a backticked sha.
 var shaRE = regexp.MustCompile("\\bat\\s+`?([0-9a-f]{7,40})`?(?:[^0-9A-Za-z]|$)")
@@ -407,6 +416,7 @@ func collectSentence(file string, seg segment, s, e int, matches [][]int) []cita
 		for _, sm := range ordered {
 			c.Shas = append(c.Shas, sentence[sm[2]:sm[3]])
 		}
+		c.Server = strings.Contains(sentence, serverName)
 		out = append(out, c)
 	}
 	sort.SliceStable(out, func(a, b int) bool { return out[a].Line < out[b].Line })

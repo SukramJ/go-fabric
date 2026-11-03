@@ -117,6 +117,7 @@ var floors = []packageFloor{
 		why: "brief CM §1: measured 29.4; review 2026-11 W6-test-05: 40.3; phase 29a-2 (the scripted provider, script_parity_matterjs_test.go): 44.2. The manager runs against a controller and a device: its end-to-end and OtaTest cases are the controller package's (controller:TestOTA*), which a per-package profile does not count; the package's own tests set the queue's state as matter.js's do",
 	},
 	{pkg: "github.com/SukramJ/go-fabric/controller/dcl/snapshot", min: 83},
+	{pkg: "github.com/SukramJ/go-fabric/controller/topology", min: 95},
 	// 94.9-95.3 over six local runs, 94.8 in CI: eleven one-statement
 	// blocks of browse.go, loop.go, operational.go and service.go are the
 	// cache loop's close and select-order races (a caller's ctx against the
@@ -160,8 +161,8 @@ var floors = []packageFloor{
 	{pkg: "github.com/SukramJ/go-fabric/endpoint/sqlitestore", min: 80},
 	{
 		pkg: "github.com/SukramJ/go-fabric/examples/host-view",
-		min: 32,
-		why: "brief CM §6: measured 34.8 once MarkComplete went (brief BU: 36.2); review 2026-11 W5: 32.7, run's new SetupPayload error path stops the node, and run binds the network, which a unit test does not. The tests drive the declared devices over the wire and on a node",
+		min: 31,
+		why: "brief CM §6: measured 34.8 once MarkComplete went (brief BU: 36.2); review 2026-11 W5: 32.7, run's new SetupPayload error path stops the node, and run binds the network, which a unit test does not; brief M9-module: 31.4, run's log loop indexes the devices now that BridgedDevice is too large to copy per iteration — one more statement in run. The tests drive the declared devices over the wire and on a node",
 	},
 	{
 		pkg: "github.com/SukramJ/go-fabric/examples/reference-bridge",
@@ -255,8 +256,8 @@ var floors = []packageFloor{
 	// BX4's forward generator; main() only writes the files its test compares.
 	{
 		pkg: "github.com/SukramJ/go-fabric/script/citecheck",
-		min: 68,
-		why: "the collector, resolver, checker, summary and the derived corrections run against testdata and an in-memory tree; the git plumbing (rev-parse, ls-tree, cat-file --batch) and main need the matter.js clone, which make cite-check and its CI job provide",
+		min: 85,
+		why: "the collector, resolver, checker, summary and the derived corrections run against testdata and an in-memory tree, and since brief M9-module the git plumbing and run against two temporary repositories (TestCitecheckSecondTree); main needs the clones, which make cite-check and its CI job provide",
 	},
 	// This tool. Its parser and comparison are covered; main() — flag
 	// parsing, file opening, printing, the exit codes — is not, because

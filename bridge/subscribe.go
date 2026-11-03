@@ -1440,6 +1440,9 @@ func (b *Bridge) wireAttributeNotifiersLocked(mgr *subscription.Manager) {
 						HasEndpoint: true, HasCluster: true, HasAttribute: true,
 					})
 				}
+				if hook := b.onAttributeChange.Load(); hook != nil {
+					(*hook)(ep.ID, clusterID, change)
+				}
 			})
 			if unsub == nil {
 				unsub = func() {}

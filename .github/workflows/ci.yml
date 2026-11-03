@@ -233,8 +233,19 @@ jobs:
           git clone -q --filter=blob:none --no-checkout https://github.com/matter-js/matter.js.git "$MATTERJS_DIR"
           git -C "$MATTERJS_DIR" sparse-checkout set examples packages support
           git -C "$MATTERJS_DIR" -c advice.detachedHead=false checkout -q "$PIN"
+      # The second tree (brief M9-module §1): a sentence naming matterjs-server
+      # is checked against it at its own `at <sha>` (controller/topology cites
+      # 0bd06f22). The same blob-filtered sparse clone, on the two packages
+      # cited; the sha is the one the Go code names.
+      - name: clone matterjs-server
+        env:
+          MATTERJS_SERVER_DIR: ${{ runner.temp }}/matterjs-server
+        run: |
+          git clone -q --filter=blob:none --no-checkout https://github.com/matter-js/matterjs-server.git "$MATTERJS_SERVER_DIR"
+          git -C "$MATTERJS_SERVER_DIR" sparse-checkout set packages/ws-controller packages/ws-client
+          git -C "$MATTERJS_SERVER_DIR" -c advice.detachedHead=false checkout -q 0bd06f22
       - name: cite-check
-        run: make cite-check MATTERJS_DIR="${{ runner.temp }}/matter.js"
+        run: make cite-check MATTERJS_DIR="${{ runner.temp }}/matter.js" MATTERJS_SERVER_DIR="${{ runner.temp }}/matterjs-server"
 
   chipdm:
     name: chip data model cross-check

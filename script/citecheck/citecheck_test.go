@@ -316,11 +316,104 @@ func TestOccurrencesLooseAndStrict(t *testing.T) {
 }
 
 func TestRunWithoutTheClone(t *testing.T) {
-	code, err := run(filepath.Join("..", ".."), filepath.Join(t.TempDir(), "none"), t.TempDir(), "")
+	code, err := run(filepath.Join("..", ".."), filepath.Join(t.TempDir(), "none"), filepath.Join(t.TempDir(), "none"), t.TempDir(), "")
 	if code != 2 || err == nil {
 		t.Errorf("run without a clone = %d, %v; want exit 2", code, err)
 	}
-	if code, _ := run(t.TempDir(), t.TempDir(), t.TempDir(), ""); code != 2 {
+	if code, _ := run(t.TempDir(), t.TempDir(), t.TempDir(), t.TempDir(), ""); code != 2 {
 		t.Errorf("run without parity/schema.json = %d, want 2", code)
+	}
+}
+
+// gitInit makes a one-commit repository in a temporary directory holding
+// files and returns it with the commit id.
+func gitInit(t *testing.T, files map[string]string) (dir, sha string) {
+	t.Helper()
+	dir = t.TempDir()
+	for name, body := range files {
+		p := filepath.Join(dir, filepath.FromSlash(name))
+		if err := os.MkdirAll(filepath.Dir(p), 0o750); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(p, []byte(body), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	r := &gitRepo{dir: dir}
+	for _, args := range [][]string{
+		{"init", "-q"},
+		{"add", "-A"},
+		{"-c", "user.name=t", "-c", "user.email=t@example.invalid", "-c", "commit.gpgsign=false", "commit", "-q", "-m", "fixture"},
+	} {
+		if _, err := r.git(args...); err != nil {
+			t.Fatal(err)
+		}
+	}
+	out, err := r.git("rev-parse", "HEAD")
+	if err != nil {
+		t.Fatal(err)
+	}
+	return dir, strings.TrimSpace(string(out))
+}
+
+// TestCitecheckSecondTree pins the routing of brief M9-module §1: a
+// sentence naming matterjs-server is checked against the second clone at
+// its own `at <sha>` (a file matter.js lacks resolves), never at the
+// matter.js pin; one naming no commit of it is a hard error; and without
+// the clone the run is exit 2, as without matter.js.
+func TestCitecheckSecondTree(t *testing.T) {
+	// The fixture's citations are spelt in pieces: written whole, this
+	// file's literals would be citations of the module itself.
+	const ts = ".t" + "s"
+	body := strings.Repeat("// line\n", 20)
+	matter, pin := gitInit(t, map[string]string{"packages/a/src/Bar" + ts: body})
+	server, sha := gitInit(t, map[string]string{"packages/ws-controller/src/Foo" + ts: body})
+
+	module := func(src string) string {
+		root := t.TempDir()
+		if err := os.MkdirAll(filepath.Join(root, "parity"), 0o750); err != nil {
+			t.Fatal(err)
+		}
+		schema := fmt.Sprintf(`{"matter": {"sourceCommit": %q}}`, pin)
+		if err := os.WriteFile(filepath.Join(root, "parity", "schema.json"), []byte(schema), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(root, "a.go"), []byte(src), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		return root
+	}
+	good := fmt.Sprintf("package a\n\n// Mirrors matter.js Bar"+ts+":3.\n\n// After matterjs-server at %s, packages/ws-controller/src/Foo"+ts+":5.\n", sha[:8])
+	root := module(good)
+	out := t.TempDir()
+	if code, err := run(root, matter, server, out, ""); code != 0 {
+		t.Fatalf("run = %d, %v; want 0", code, err)
+	}
+	sum, err := os.ReadFile(filepath.Join(out, "summary.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"| Citations | 2 |", "| Checked against matterjs-server (`MATTERJS_SERVER_DIR`) at their `at <sha>` | 1 |", "| **Hard errors** | 0 |"} {
+		if !strings.Contains(string(sum), want) {
+			t.Errorf("summary.md lacks %q:\n%s", want, sum)
+		}
+	}
+
+	if code, err := run(root, matter, filepath.Join(t.TempDir(), "none"), t.TempDir(), ""); code != 2 || err == nil {
+		t.Errorf("run without the matterjs-server clone = %d, %v; want exit 2", code, err)
+	}
+
+	noSha := module("package a\n\n// After matterjs-server, packages/ws-controller/src/Foo" + ts + ":5.\n")
+	out = t.TempDir()
+	if code, _ := run(noSha, matter, server, out, ""); code != 1 {
+		t.Errorf("run with a matterjs-server citation naming no commit = %d, want 1", code)
+	}
+	if sum, _ := os.ReadFile(filepath.Join(out, "summary.md")); !strings.Contains(string(sum), errNoServerCommit) {
+		t.Errorf("summary.md does not name %q:\n%s", errNoServerCommit, sum)
+	}
+
+	wrongTree := module(fmt.Sprintf("package a\n\n// After matterjs-server at %s, packages/a/src/Bar"+ts+":3.\n", sha[:8]))
+	if code, _ := run(wrongTree, matter, server, t.TempDir(), ""); code != 1 {
+		t.Errorf("a matter.js path cited as matterjs-server's = %d, want 1 (not found in the second tree)", code)
 	}
 }

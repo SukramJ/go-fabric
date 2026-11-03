@@ -161,6 +161,28 @@ trace answers GeneralDiagnostics' DiagnosticLogs RetrieveLogs.
 | `Node.OnDiagnosticEventAsync(fn)` | `fn` is queued on the node's callback goroutine and runs one call after the other while the node runs. `Stop` returns once every queued call ran. An event recorded while the node does not run is not delivered. |
 
 The two observers follow the callback rule the device kit's
-`OnChanged`/`OnChangedAsync` follow. The bridge-level seam
+`OnChanged`/`OnChangedAsync` follow.
+
+## Attribute changes
+
+`node.Observers.OnAttributeChanged` hears every attribute change a cluster
+server reports, on any endpoint: `node.AttributeChange{Endpoint, Cluster,
+Change}`, where `Change` is the `contract.Change` the server reported — the
+attribute ids and the origin (`OriginControllerWrite` for a controller's
+write, `OriginCommand`, `OriginHostSet`, `OriginUnknown`). It runs after the
+subscriptions marked the attributes for their next report, inline on the
+change's goroutine through `Config.Observers` or `Node.Observe`, or queued
+on the node's callback goroutine through `Node.ObserveAsync`. It carries no
+value: a device's typed `OnChanged` and a server's `Get` are the value
+route. It hears the servers that notify their own changes (every generated
+server among them); a host port that only signals
+`contract.ChangeNotifier` is the host's own and is not repeated. matter.js
+has no node-wide event — it emits `$Changed` per endpoint and behavior —
+so a UI that shows every change reads this hook.
+
+`Node.Subscriptions().Snapshot()` lists the active subscriptions, each as a
+copy (`node.SubscriptionInfo`: id, fabric, peer, session, the requested
+intervals, the attribute and event paths, the send interval), and
+`SessionDiagnostics` gives each session its `SubscriptionIDs`. The bridge-level seam
 (`Bridge.AttachDiagnosticEvents`, `Bridge.DiagnosticEvents`) stays for a
 host that runs the bridge without the facade.

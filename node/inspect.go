@@ -81,6 +81,9 @@ type SessionInfo struct {
 	PASE bool
 	// Subscriptions counts the subscriptions riding on the session.
 	Subscriptions int
+	// SubscriptionIDs are their ids, ascending; nil for none. The
+	// subscriptions themselves are listed by Node.Subscriptions().Snapshot.
+	SubscriptionIDs []uint32
 	// LastActivity is when the session last carried traffic in either
 	// direction, zero when none yet; LastPeerActivity when the peer last
 	// sent, counted from the session's creation (the peer is active
@@ -114,7 +117,8 @@ type Occupancy struct {
 // table's occupancy — the read-only view of what [Node.Sessions] and
 // [Node.Subscriptions] hold, through which a host neither closes a
 // session nor a subscription. It reads operational.Manager.Sessions and
-// Occupancy and subscription.Manager.CountBySession.
+// Occupancy and subscription.Manager.Snapshot, whose ids it groups by
+// session.
 //
 // matter.js exposes the same per-session facts on its sessions
 // (packages/protocol/src/session/NodeSession.ts:183 `subscriptions`,
@@ -129,10 +133,7 @@ func (n *Node) SessionDiagnostics() SessionDiagnostics {
 	if n.sec == nil || n.sec.sessions == nil {
 		return out
 	}
-	var subs map[uint16]int
-	if n.sec.subs != nil {
-		subs = n.sec.subs.CountBySession()
-	}
+	subs := n.subscriptionIDs()
 	for _, s := range n.sec.sessions.Sessions() {
 		out.Sessions = append(out.Sessions, sessionInfoOf(s, subs[s.SessionID], now))
 	}
@@ -141,16 +142,30 @@ func (n *Node) SessionDiagnostics() SessionDiagnostics {
 	return out
 }
 
+// subscriptionIDs are the ids of the node's subscriptions by session,
+// each list ascending (Snapshot lists by id).
+func (n *Node) subscriptionIDs() map[uint16][]uint32 {
+	if n.sec == nil || n.sec.subs == nil {
+		return nil
+	}
+	out := map[uint16][]uint32{}
+	for _, sub := range n.sec.subs.Snapshot() {
+		out[sub.SessionID] = append(out[sub.SessionID], sub.ID)
+	}
+	return out
+}
+
 // sessionInfoOf is one session of the table as the facade reports it,
-// with subs subscriptions, its ages at now.
-func sessionInfoOf(s operational.SessionInfo, subs int, now time.Time) SessionInfo {
+// with the subscriptions subs riding on it, its ages at now.
+func sessionInfoOf(s operational.SessionInfo, subs []uint32, now time.Time) SessionInfo {
 	return SessionInfo{
 		ID:               s.SessionID,
 		FabricIndex:      s.FabricIndex,
 		PeerNodeID:       s.PeerNodeID,
 		LocalNodeID:      s.LocalNodeID,
 		PASE:             s.IsPASE,
-		Subscriptions:    subs,
+		Subscriptions:    len(subs),
+		SubscriptionIDs:  subs,
 		LastActivity:     s.LastActivity,
 		LastPeerActivity: s.LastPeerActivity,
 		Idle:             ageAt(now, s.LastActivity),

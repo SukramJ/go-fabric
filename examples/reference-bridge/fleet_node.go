@@ -40,7 +40,8 @@ func endpointByKey(topology node.BridgeTopology, key device.StringKey) (uint16, 
 }
 
 func findByKey(devices []node.BridgedDevice, key device.StringKey) (uint16, bool) {
-	for _, d := range devices {
+	for i := range devices {
+		d := &devices[i]
 		if d.Key == key {
 			return d.Endpoint, true
 		}
