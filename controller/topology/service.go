@@ -129,6 +129,7 @@ type Service struct {
 	inflight  *flight
 	observers map[int]func(Topology)
 	nextObs   int
+	sources   []Source
 	life      context.Context //nolint:containedctx // the service's lifetime, cancelled by Close: a refresh's reads outlive their caller
 	cancel    context.CancelFunc
 }
@@ -197,6 +198,9 @@ func (s *Service) Topology() Topology {
 	return Build(s.images(), s.clk.Now())
 }
 
+// images lists the members' images, then every source's in registration
+// order — matterjs-server's #build at 0bd06f22
+// (NetworkTopologyService.ts:307).
 func (s *Service) images() []Image {
 	var out []Image
 	for _, m := range s.members() {
@@ -204,8 +208,57 @@ func (s *Service) images() []Image {
 			out = append(out, img)
 		}
 	}
+	s.mu.Lock()
+	sources := slices.Clone(s.sources)
+	s.mu.Unlock()
+	for _, src := range sources {
+		out = append(out, src.Images()...)
+	}
 	return out
 }
+
+// Source is an additional provider of graph nodes — matterjs-server's
+// TopologyNodeSource at 0bd06f22 (NetworkTopologyService.ts:72-81): its
+// images are derivation inputs only, [Service.Refresh] never reads them.
+// go-fabric-server's imported test nodes are one.
+type Source interface {
+	// Images lists the source's nodes as they stand.
+	Images() []Image
+}
+
+// AddSource registers src; it returns the function that removes it
+// again. Registering schedules a rebuild; a source already registered
+// is not added twice — the second registration's remove does nothing
+// (NetworkTopologyService.ts:188-194, matterjs-server at 0bd06f22).
+// Registrations are compared with ==, so src is a comparable value, a
+// pointer as a rule. The host calls [Service.Changed] when its source's
+// node set changes — the rebuild is debounced like any other
+// (nodeAdded/nodeRemoved → #scheduleRebuild). Removing schedules a
+// rebuild too. A closed service, or a nil src, registers nothing.
+func (s *Service) AddSource(src Source) (remove func()) {
+	s.mu.Lock()
+	if s.closed || src == nil || slices.Contains(s.sources, src) {
+		s.mu.Unlock()
+		return func() {}
+	}
+	s.sources = append(s.sources, src)
+	s.mu.Unlock()
+	s.changed()
+	var once sync.Once
+	return func() {
+		once.Do(func() {
+			s.mu.Lock()
+			s.sources = slices.DeleteFunc(s.sources, func(x Source) bool { return x == src })
+			s.mu.Unlock()
+			s.changed()
+		})
+	}
+}
+
+// Changed schedules a debounced rebuild — what a [Source]'s host calls
+// when a node of its source was added or removed. A closed service
+// ignores it.
+func (s *Service) Changed() { s.changed() }
 
 // OnChanged calls fn with every snapshot that differs from the one before
 // it — the first included — until the returned function is called. fn
@@ -235,8 +288,9 @@ func (s *Service) OnChanged(fn func(Topology)) (unsubscribe func()) {
 // skipped. Once [Config].RefreshTimeout passed no further read starts and
 // the refresh builds from what it has; the reads in flight run on (until
 // [Service.Close]) and their reports reach the next rebuild
-// (:196-203, :287-303). ctx bounds the caller's wait only. After Close
-// it returns a snapshot without reading or telling anyone.
+// (:196-203, :287-303). A [Source]'s nodes are never read, only built
+// from (:196-198). ctx bounds the caller's wait only. After Close it
+// returns a snapshot without reading or telling anyone.
 func (s *Service) Refresh(ctx context.Context) (Topology, error) {
 	s.mu.Lock()
 	if s.closed {
@@ -382,8 +436,8 @@ func sortedKeys(m map[int]func(Topology)) []int {
 	return keys
 }
 
-// Close stops the timers, cancels the reads of a refresh in flight and
-// detaches from [Config].Changes; nothing is told afterwards
+// Close stops the timers, cancels the reads of a refresh in flight, drops
+// the sources and detaches from [Config].Changes; nothing is told afterwards
 // (NetworkTopologyService.ts:247-258, matterjs-server at 0bd06f22). It
 // is idempotent.
 func (s *Service) Close() {
@@ -393,6 +447,7 @@ func (s *Service) Close() {
 		return
 	}
 	s.closed = true
+	s.sources = nil
 	if s.debounce != nil {
 		s.debounce.Stop()
 	}

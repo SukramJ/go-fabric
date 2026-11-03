@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/SukramJ/go-fabric/clock/clocktest"
+	threaddiagdef "github.com/SukramJ/go-fabric/cluster/spec/threadnetworkdiagnostics"
 	"github.com/SukramJ/go-fabric/controller"
 	"github.com/SukramJ/go-fabric/controller/client"
 )
@@ -475,4 +476,133 @@ func TestChangesInstall(t *testing.T) {
 	bare.ConnectionStateChanged(client.Connected)
 	bare.Commissioned()
 	bare.Decommissioned()
+}
+
+// fakeSource is a Source whose images the test swaps.
+type fakeSource struct {
+	mu   sync.Mutex
+	imgs []Image
+}
+
+func (f *fakeSource) Images() []Image {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return slices.Clone(f.imgs)
+}
+
+func (f *fakeSource) set(imgs ...Image) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.imgs = imgs
+}
+
+func nodeIDs(t Topology) []string {
+	ids := make([]string, len(t.Nodes))
+	for i := range t.Nodes {
+		ids[i] = t.Nodes[i].ID
+	}
+	slices.Sort(ids)
+	return ids
+}
+
+// TestServiceSourceMerges ports "merges aux-source nodes into the graph,
+// with edges resolving across sources" (NetworkTopologyServiceTest.ts:584-602,
+// matterjs-server at 0bd06f22): a primary node's neighbour matched by
+// RLOC16 to a source's node gives a strong link, and registering
+// schedules the rebuild.
+func TestServiceSourceMerges(t *testing.T) {
+	primary := mkThread(1, threadOpts{role: role(5), rloc16: ptr[uint16](1024), neighbours: []threaddiagdef.NeighborTableStruct{
+		neighbour(0, 1025, 3, ptr[int8](-40), false),
+	}})
+	h := newHarness(t, Config{}, primary)
+	h.svc.AddSource(&fakeSource{imgs: []Image{mkThread(2, threadOpts{role: role(3), rloc16: ptr[uint16](1025)})}})
+	h.fake.Advance(5 * time.Millisecond)
+	h.want(1, "a registration")
+	topo := h.last()
+	if got := nodeIDs(topo); !slices.Equal(got, []string{"1", "2"}) {
+		t.Fatalf("nodes = %v", got)
+	}
+	i := slices.IndexFunc(topo.Connections, func(c Connection) bool { return c.Source == "1" && c.Target == "2" })
+	if i < 0 || topo.Connections[i].Strength != StrengthStrong {
+		t.Errorf("connections = %+v", topo.Connections)
+	}
+}
+
+// TestServiceSourceChanged ports "rebuilds when the aux source reports a
+// node added" (NetworkTopologyServiceTest.ts:604-618, matterjs-server at
+// 0bd06f22): the host's Changed is the source's nodeAdded.
+func TestServiceSourceChanged(t *testing.T) {
+	h := newHarness(t, Config{})
+	src := &fakeSource{imgs: []Image{router(2, 1025)}}
+	h.svc.AddSource(src)
+	h.fake.Advance(5 * time.Millisecond)
+	h.want(1, "a registration")
+	src.set(router(2, 1025), router(3, 1026))
+	h.svc.Changed()
+	h.fake.Advance(5 * time.Millisecond)
+	h.want(2, "a source's change")
+	if n := len(h.last().Nodes); n != 2 {
+		t.Errorf("nodes = %d, want 2", n)
+	}
+}
+
+// TestServiceSourceNotRead ports "never issues refresh() reads to
+// aux-source nodes and is idempotent per source"
+// (NetworkTopologyServiceTest.ts:620-633, matterjs-server at 0bd06f22).
+func TestServiceSourceNotRead(t *testing.T) {
+	h := newHarness(t, Config{})
+	var mu sync.Mutex
+	var reads []uint64
+	m := &fakeMember{img: router(1, 1024)}
+	m.onRead = func(context.Context, []client.AttributePath) {
+		mu.Lock()
+		defer mu.Unlock()
+		reads = append(reads, m.img.NodeID)
+	}
+	h.setMembers(m)
+	src := &fakeSource{imgs: []Image{router(2, 1025)}}
+	h.svc.AddSource(src)
+	h.svc.AddSource(src)()
+	topo, err := h.svc.Refresh(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(topo.Nodes) != 2 {
+		t.Errorf("nodes = %v, want 2: a duplicate source merged twice", nodeIDs(topo))
+	}
+	if !slices.Equal(reads, []uint64{1}) {
+		t.Errorf("reads = %v, want [1]", reads)
+	}
+}
+
+// TestServiceSourceRemove: the remove function drops the source once and
+// schedules the rebuild that emits the graph without its node.
+func TestServiceSourceRemove(t *testing.T) {
+	h := newHarness(t, Config{}, router(1, 1024))
+	remove := h.svc.AddSource(&fakeSource{imgs: []Image{router(2, 1025)}})
+	h.fake.Advance(5 * time.Millisecond)
+	h.want(1, "a registration")
+	remove()
+	remove()
+	h.fake.Advance(5 * time.Millisecond)
+	h.want(2, "a removal")
+	if got := nodeIDs(h.last()); !slices.Equal(got, []string{"1"}) {
+		t.Errorf("nodes after removal = %v", got)
+	}
+}
+
+// TestServiceSourceClosed: a closed service registers nothing, ignores
+// Changed and drops the sources it had.
+func TestServiceSourceClosed(t *testing.T) {
+	h := newHarness(t, Config{}, router(1, 1024))
+	h.svc.AddSource(&fakeSource{imgs: []Image{router(2, 1025)}})
+	h.svc.Close()
+	h.svc.AddSource(&fakeSource{imgs: []Image{router(3, 1026)}})()
+	h.svc.AddSource(nil)
+	h.svc.Changed()
+	h.fake.Advance(time.Hour)
+	h.want(0, "a closed service")
+	if got := nodeIDs(h.svc.Topology()); !slices.Equal(got, []string{"1"}) {
+		t.Errorf("nodes after Close = %v", got)
+	}
 }

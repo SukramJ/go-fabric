@@ -26,6 +26,8 @@
 // [Service.OnChanged] observers called only when the graph moved.
 // [Changes] carries the nodes' hooks to the service; it is installed on
 // the controller.Config before controller.New.
+// [Service.AddSource] merges nodes the controller has not commissioned —
+// a [Source] the service builds from but never reads.
 //
 // Left out, as go-fabric-server's port leaves them out: the border-router
 // registry (matterjs-server's kind border_router, its br_ ids and the

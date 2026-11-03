@@ -322,4 +322,19 @@ from the observers. The border-router registry and the route-table edges
 of matterjs-server are not built (no `_meshcop` browse, ADR 0027); a
 neighbouring border router is a `thread_unknown` node.
 
+**Further sources.** Nodes the controller has not commissioned join the
+graph through `Service.AddSource`, matterjs-server's `addNodeSource`: a
+`topology.Source` lists its `Image`s, which the service builds from but
+never reads on `Refresh`; a neighbour matched by RLOC16 links across
+sources. go-fabric-server registers its imported test nodes
+(`import_test_node`) this way, so the graph matches what `get_nodes`
+serves, and calls `Service.Changed` when one is added or removed:
+
+```go
+remove := svc.AddSource(testNodes) // a pointer; registering it twice adds it once
+defer remove()
+// on import or removal of a test node:
+svc.Changed() // a debounced rebuild
+```
+
 *Source: `controller/topology/build.go`, `controller/topology/thread.go`, `controller/topology/service.go`.*
