@@ -94,6 +94,7 @@ pin lift confirms by re-reading the row, [`pin-lifts.md`](./pin-lifts.md)).
 | BD-chip-AlarmBase-RulesInServer | `DishwasherAlarmServer.ts:14`, `RefrigeratorAlarmServer.ts:14`, `TemperatureAlarmServer.ts:17` are empty subclasses (absence: the class lines) | `packages/node/src/behaviors/dishwasher-alarm/DishwasherAlarmServer.ts`<br>`packages/node/src/behaviors/refrigerator-alarm/RefrigeratorAlarmServer.ts`<br>`packages/node/src/behaviors/temperature-alarm/TemperatureAlarmServer.ts` | `"export class DishwasherAlarmServer extends DishwasherAlarmBehavior {}"`<br>`"export class RefrigeratorAlarmServer extends RefrigeratorAlarmBehavior {}"`<br>`"export class TemperatureAlarmServer extends TemperatureAlarmBehavior {}"` | connectedhomeip | no |
 | BD-chip-Appliance-RulesInServer | `MicrowaveOvenControlServer.ts:18`, `LaundryWasherControlsServer.ts:18`, `LaundryDryerControlsServer.ts:14` are empty subclasses (absence: the class lines); the oven cavity has logic (`OvenCavityOperationalStateServer.ts:21-107`) and is not a marker | `packages/node/src/behaviors/microwave-oven-control/MicrowaveOvenControlServer.ts`<br>`packages/node/src/behaviors/laundry-washer-controls/LaundryWasherControlsServer.ts`<br>`packages/node/src/behaviors/laundry-dryer-controls/LaundryDryerControlsServer.ts` | `"export class MicrowaveOvenControlServer extends MicrowaveOvenControlBehavior {}"`<br>`"export class LaundryWasherControlsServer extends LaundryWasherControlsBehavior {}"`<br>`"export class LaundryDryerControlsServer extends LaundryDryerControlsBehavior {}"` | connectedhomeip | no |
 | BD-chip-DeviceEnergyManagement-EnergyEvse-RulesInServer | `DeviceEnergyManagementServer.ts:18`, `EnergyEvseServer.ts:14` are empty subclasses (absence: the class lines) | `packages/node/src/behaviors/device-energy-management/DeviceEnergyManagementServer.ts`<br>`packages/node/src/behaviors/energy-evse/EnergyEvseServer.ts` | `"export class DeviceEnergyManagementServer extends DeviceEnergyManagementBehavior {}"`<br>`"export class EnergyEvseServer extends EnergyEvseBehavior {}"` | connectedhomeip | no |
+| BD-chip-EVSE-TargetsServerHeld | `CommandInvokeResponse.ts:484-487` validates the request against the model before the invoker (presence), and `EnergyEvseServer.ts:14` is the empty subclass (absence: the class line) | `packages/protocol/src/action/server/CommandInvokeResponse.ts`<br>`packages/node/src/behaviors/energy-evse/EnergyEvseServer.ts` | `"            if (!skipValidation) {\n                requestTlv.validate(request);\n            }"`<br>`"export class EnergyEvseServer extends EnergyEvseBehavior {}"` | connectedhomeip `src/app/clusters/energy-evse-server/EnergyEvseCluster.cpp` at `6170af84` (`ValidateTargets` :564-565), case `src/python_testing/TC_EEVSE_2_3.py` step 19 (:411-439) | no |
 | BD-chip-ClosureDimension-RulesInServer | `ClosureDimensionServer.ts:17` is the empty subclass (absence: the class line, 17 lines in all) | `packages/node/src/behaviors/closure-dimension/ClosureDimensionServer.ts` | `"export class ClosureDimensionServer extends ClosureDimensionBehavior {}"` | connectedhomeip | no |
 | BD-chip-Thermostat-Schedules | `ThermostatServer.ts:82`, the class doc lists the feature unimplemented (presence; :126-128 warns when it is enabled) | `packages/node/src/behaviors/thermostat/ThermostatServer.ts` | `"MatterScheduleConfiguration: This feature is not implemented yet."` | connectedhomeip `src/app/clusters/thermostat-server/ThermostatClusterSchedules.cpp` at `645b267a` (`SetActiveSchedule` :741, `AppendPendingSchedule` :795, `ValidateScheduleTransitions` :292, `ValidateTransitionsPerDay` :457, the atomic hooks :620-663, `PrecommitSchedules` :1000) | yes |
 | BD-chip-Chime-RulesInServer | `ChimeServer.ts:14` is the empty subclass (absence: the class body, 14 lines in all) | `packages/node/src/behaviors/chime/ChimeServer.ts` | `class ChimeServer` | connectedhomeip `src/app/clusters/chime-server/ChimeCluster.cpp` at `6170af84` (`IsSupportedChimeID` :176, `SetSelectedChime` :215, `SetEnabled` :228, `HandlePlayChimeSound` :258, `GenerateChimeStartedPlayingEvent` :291), tests `tests/TestChimeCluster.cpp` | no |
@@ -1868,7 +1869,8 @@ as chip does); `evse.go:363`, `:380-382`, `:786`, `:857`, `:1266-1271`.
 PowerRangeAdjustment (DEM feature bit 7) is not served: it exists at the
 chip pin but not in the matter.js snapshot nor the 1.6.1 data model
 (DEM/2.11 stays class (b)). Families DEM, DEMM, EEVSE, EEVSEM pass or are
-classified (#46, #47; TC-EEVSE-2.3 is a findings entry).
+classified (#46, #47); TC-EEVSE-2.3 runs since phase 30
+(`BD-chip-EVSE-TargetsServerHeld`).
 
 ### BD-chip-EnergyReporting-FakeReadings — the reference daemon's grid meter answers the EnergyReporting test event triggers
 
@@ -3416,15 +3418,31 @@ whose start is in the past in either reading counts as started.
 By design. Controllers write current values, which read as started either
 way; a fix belongs upstream.
 
-### BD-chip-Harness-ModelOverCase — CountdownTime, TC-EEVSE-2.3 and two chipdm (ii) entries follow the model, not chip's case or XML
+### BD-chip-EVSE-TargetsServerHeld — an eleventh ChargingTarget in a day is the EnergyEvse server's RESOURCE_EXHAUSTED, not the decoder's CONSTRAINT_ERROR
+
+matter.js validates a SetTargets request against the model before the
+invoker runs (`CommandInvokeResponse.ts:484-487`) and refuses an eleventh
+ChargingTarget of a day at `ChargingTargets`' `max 10`
+(`energy-evse-cluster.element.ts:254`, `TlvArray.ts:111-113`) with
+CONSTRAINT_ERROR; its `EnergyEvseServer.ts:14` has no logic. chip's
+generated decoder does not enforce the list bound and its handler counts
+the targets: `EnergyEvseCluster.cpp:564-565` answers RESOURCE_EXHAUSTED,
+which TC-EEVSE-2.3 step 19 expects (`TC_EEVSE_2_3.py:411-439`). The
+generated `ChargingTargetScheduleStruct` decoder drops the bound
+(`script/clustergen/relaxed.go` `serverJudgedStructFields`; the definition
+keeps `max 10` verbatim), so `cluster/energy/evse.go`'s
+`evseMaxTargetsPerDay` check answers on the wire; pinned by
+`bridge/fields_evse_targets_test.go`.
+
+By design (owner decision 2026-11-03): the CSA case expects chip's status
+and matter.js serves no EnergyEvse logic of its own to mirror.
+
+### BD-chip-Harness-ModelOverCase — CountdownTime and two chipdm (ii) entries follow the model, not chip's case or XML
 
 CountdownTime is reported as matter.js reports it (QuietEvent), not by the
 specification's list, which matter.js does not implement either.
-TC-EEVSE-2.3 step 19 expects RESOURCE_EXHAUSTED for eleven
-ChargingTargets; matter.js validates the request against the model's
-"max 10" first (`CommandInvokeResponse.ts:485-487`,
-`energy-evse-cluster.element.ts:254`) and answers CONSTRAINT_ERROR, as the
-module does. GroupKeyMulticastPolicy stays as the snapshot gates it, and
+TC-EEVSE-2.3 left this entry for `BD-chip-EVSE-TargetsServerHeld`
+(owner decision 2026-11-03). GroupKeyMulticastPolicy stays as the snapshot gates it, and
 ColorControl's XY → HS conversion stays mirrored
 (`BD-Matter-ColorControl-XYToHS`). chip's 33/66 FanMode split
 (`FanControlCluster.cpp:84-166`) is not ported; matter.js's mapping is.

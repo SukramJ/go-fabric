@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 7244,
+  "entry_points": 7245,
   "entry_packages": [
     ".",
     "bdx",
@@ -277,9 +277,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 17124,
+    "total_exported": 17125,
     "reachable": 12070,
-    "whitelisted": 5054,
+    "whitelisted": 5055,
     "unreachable": 0
   },
   "by_package": [],
@@ -5100,6 +5100,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/pase_session_params_test.go",
       "line": 52
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestSetTargetsEleventhTargetIsServerJudged",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/fields_evse_targets_test.go",
+      "line": 26
     },
     {
       "package": "bridge",
@@ -14913,42 +14920,42 @@
       "identifier": "ChargingTargetScheduleStructDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/energyevse/definition_gen.go",
-      "line": 116
+      "line": 117
     },
     {
       "package": "cluster/spec/energyevse",
       "identifier": "ChargingTargetStructDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/energyevse/definition_gen.go",
-      "line": 178
+      "line": 179
     },
     {
       "package": "cluster/spec/energyevse",
       "identifier": "EnergyTransferStoppedReasonEnum",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/energyevse/definition_gen.go",
-      "line": 187
+      "line": 188
     },
     {
       "package": "cluster/spec/energyevse",
       "identifier": "EnergyTransferStoppedReasonEnumDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/energyevse/definition_gen.go",
-      "line": 199
+      "line": 200
     },
     {
       "package": "cluster/spec/energyevse",
       "identifier": "FaultStateEnum",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/energyevse/definition_gen.go",
-      "line": 208
+      "line": 209
     },
     {
       "package": "cluster/spec/energyevse",
       "identifier": "FaultStateEnumDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/energyevse/definition_gen.go",
-      "line": 234
+      "line": 235
     },
     {
       "package": "cluster/spec/energyevse",
@@ -14962,42 +14969,42 @@
       "identifier": "StateEnum",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/energyevse/definition_gen.go",
-      "line": 257
+      "line": 258
     },
     {
       "package": "cluster/spec/energyevse",
       "identifier": "StateEnumDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/energyevse/definition_gen.go",
-      "line": 273
+      "line": 274
     },
     {
       "package": "cluster/spec/energyevse",
       "identifier": "SupplyStateEnum",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/energyevse/definition_gen.go",
-      "line": 286
+      "line": 287
     },
     {
       "package": "cluster/spec/energyevse",
       "identifier": "SupplyStateEnumDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/energyevse/definition_gen.go",
-      "line": 301
+      "line": 302
     },
     {
       "package": "cluster/spec/energyevse",
       "identifier": "TargetDayOfWeekBitmap",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/energyevse/definition_gen.go",
-      "line": 124
+      "line": 125
     },
     {
       "package": "cluster/spec/energyevse",
       "identifier": "TargetDayOfWeekBitmapDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/energyevse/definition_gen.go",
-      "line": 140
+      "line": 141
     },
     {
       "package": "cluster/spec/energyevse",

@@ -229,7 +229,7 @@ Harness image: `ghcr.io/matter-js/chip@sha256:d6f1de89d714309beb621543d451a98996
 | EGC | 3 | 3 | 0 | 0 | 0 | 0 | 0 |
 | DEM | 11 | 9 | 0 | 0 | 2 | 0 | 0 |
 | DEMM | 2 | 2 | 0 | 0 | 0 | 0 | 0 |
-| EEVSE | 10 | 9 | 0 | 1 | 0 | 0 | 0 |
+| EEVSE | 10 | 10 | 0 | 0 | 0 | 0 | 0 |
 | EEVSEM | 2 | 2 | 0 | 0 | 0 | 0 | 0 |
 | FAN | 12 | 7 | 0 | 0 | 5 | 0 | 0 |
 | HEPAFREMON | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
@@ -280,7 +280,7 @@ Harness image: `ghcr.io/matter-js/chip@sha256:d6f1de89d714309beb621543d451a98996
 | MEDIAPLAYBACK | 11 | 5 | 0 | 0 | 2 | 4 | 0 |
 | TGTNAV | 2 | 1 | 0 | 0 | 0 | 1 | 0 |
 | WAKEONLAN | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
-| **all** | **707** | **445** | **0** | **4** | **130** | **123** | **5** |
+| **all** | **707** | **446** | **0** | **3** | **130** | **123** | **5** |
 
 ### Cases not run
 
@@ -449,7 +449,6 @@ Harness image: `ghcr.io/matter-js/chip@sha256:d6f1de89d714309beb621543d451a98996
 | EEM/2.3 | (b) not supported | not applicable: the case's PICS `EEM.S & EEM.S.F02 & EEM.S.F01` is false for the reference DUT |
 | EEM/2.4 | (b) not supported | not applicable: the case's PICS `EEM.S & EEM.S.F03 & EEM.S.F00` is false for the reference DUT |
 | EEM/2.5 | (b) not supported | not applicable: the case's PICS `EEM.S & EEM.S.F03 & EEM.S.F01` is false for the reference DUT |
-| EEVSE/2.3 | (a) defect | TC-EEVSE-2.3 step 19 (eleven ChargingTargets in one day) expects RESOURCE_EXHAUSTED; the generated SetTargets decoder refuses the list at its `max 10` constraint with CONSTRAINT_ERROR before the server's own check (cluster/energy/evse.go, evseMaxTargetsPerDay) can answer, as matter.js does (CommandInvokeResponse.ts requestTlv.validate). notes/parity/matter_behaviour_findings.md, Certification harness, TC-EEVSE-2.3 |
 | FAN/2.3 | (b) not supported | not applicable: the case's PICS `FAN.S.F02` is false for the reference DUT |
 | FAN/2.4 | (b) not supported | not applicable: the case's PICS `FAN.S.F03` is false for the reference DUT |
 | FAN/2.5 | (b) not supported | not applicable: the case's PICS `FAN.S & FAN.S.F05` is false for the reference DUT |

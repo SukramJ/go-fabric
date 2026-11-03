@@ -795,7 +795,8 @@ both need a real ecosystem run (phase 5).
 - **Now by design:** see `by_design.md` — the reopen without erase, the
   OTA provider ACL on every fabric, the mirrored OTA consent quirks and
   TC-SU-2.7, the DCL's expired CRL and unported parts, the group
-  epochStartTime units, CountdownTime reportability, TC-EEVSE-2.3,
+  epochStartTime units, CountdownTime reportability, TC-EEVSE-2.3
+  (since phase 30 `BD-chip-EVSE-TargetsServerHeld`, chip's status),
   GroupKeyMulticastPolicy and ColorControl's `hsvToXy`, RvcRunMode's
   InvalidInMode, the unported chip FanMode split, the `matter_diagnostics`
   API (Deprecated).

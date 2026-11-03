@@ -734,9 +734,6 @@ var chipFamilies = []family{
 			// chip-testing does not run the EEVSE family.
 			"2.2": {{"self.write_user_max_charge(1, user_max_charge_current)", "self.write_user_max_charge(self.get_endpoint(), user_max_charge_current)", "TC-EEVSE-2.2 step 9 hard-codes endpoint 1 for the UserMaximumChargeCurrent write (TC_EEVSE_2_2.py:298); the case's own endpoint is the EVSE"}},
 		},
-		exclude: map[string]gap{
-			"2.3": {classDefect, "TC-EEVSE-2.3 step 19 (eleven ChargingTargets in one day) expects RESOURCE_EXHAUSTED; the generated SetTargets decoder refuses the list at its `max 10` constraint with CONSTRAINT_ERROR before the server's own check (cluster/energy/evse.go, evseMaxTargetsPerDay) can answer, as matter.js does (CommandInvokeResponse.ts requestTlv.validate). notes/parity/matter_behaviour_findings.md, Certification harness, TC-EEVSE-2.3", false},
-		},
 	},
 	{name: "EEVSEM", deviceType: dtEnergyEvse},
 	{name: "FAN", deviceType: dtFan},

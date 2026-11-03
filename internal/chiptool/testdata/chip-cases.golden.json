@@ -713,6 +713,11 @@
       "steps": 46,
       "stepsSkipped": 0
     },
+    "EEVSE/2.3": {
+      "tests": 1,
+      "steps": 43,
+      "stepsSkipped": 18
+    },
     "EEVSE/2.4": {
       "tests": 1,
       "steps": 25,
