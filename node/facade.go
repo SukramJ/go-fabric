@@ -56,8 +56,8 @@ type SubscriptionManager = subscription.Manager
 type SemanticTag = mattercore.SemanticTag
 
 // SubscriptionInfo is one subscription as [SubscriptionManager]'s
-// Snapshot lists it, a copy ([subscription.SubscriptionInfo]).
-type SubscriptionInfo = subscription.SubscriptionInfo
+// Snapshot lists it, a copy ([subscription.Info]).
+type SubscriptionInfo = subscription.Info
 
 // DiagnosticEvent is one entry of the node's diagnostic trace
 // ([diagevent.Event]): the moments that explain a failed pairing.

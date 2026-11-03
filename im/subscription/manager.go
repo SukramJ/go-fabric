@@ -855,14 +855,14 @@ func (m *Manager) snapshot() []*Subscription {
 	return out
 }
 
-// SubscriptionInfo is one active subscription as [Manager.Snapshot]
+// Info is one active subscription as [Manager.Snapshot]
 // lists it: a copy of the [Subscription]'s request and identity, which a
 // host reads without reaching the subscription itself (it cannot close
 // it). matter.js persists the same record per subscription in
 // SubscriptionsServer's state (packages/node/src/behavior/system/subscriptions/SubscriptionsServer.ts:149-159
 // at 862ad75f: subscriptionId, peerAddress, minIntervalFloor,
 // maxIntervalCeiling, attributeRequests, eventRequests, sendInterval).
-type SubscriptionInfo struct {
+type Info struct {
 	ID          uint32
 	FabricIndex uint8
 	PeerNodeID  uint64
@@ -884,14 +884,14 @@ type SubscriptionInfo struct {
 // closed, by ID: a read-only view for a host's diagnostics. matter.js
 // keeps the list as SubscriptionsServer.state.subscriptions
 // (SubscriptionsServer.ts:345-354 at 862ad75f) and exposes no live one.
-func (m *Manager) Snapshot() []SubscriptionInfo {
+func (m *Manager) Snapshot() []Info {
 	subs := m.snapshot()
-	out := make([]SubscriptionInfo, 0, len(subs))
+	out := make([]Info, 0, len(subs))
 	for _, sub := range subs {
 		if sub == nil || sub.IsClosed() {
 			continue
 		}
-		out = append(out, SubscriptionInfo{
+		out = append(out, Info{
 			ID: sub.ID, FabricIndex: sub.FabricIndex, PeerNodeID: sub.PeerNodeID, SessionID: sub.SessionID,
 			MinIntervalFloor: sub.MinIntervalFloor, MaxIntervalCeiling: sub.MaxIntervalCeiling,
 			KeepSubscriptions: sub.KeepSubscriptions,
@@ -899,7 +899,7 @@ func (m *Manager) Snapshot() []SubscriptionInfo {
 			SendInterval: sub.SendInterval(),
 		})
 	}
-	slices.SortFunc(out, func(a, b SubscriptionInfo) int { return cmp.Compare(a.ID, b.ID) })
+	slices.SortFunc(out, func(a, b Info) int { return cmp.Compare(a.ID, b.ID) })
 	return out
 }
 

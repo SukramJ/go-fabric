@@ -5,6 +5,7 @@ package node
 
 import (
 	"context"
+	"slices"
 
 	"github.com/SukramJ/go-fabric/clock"
 	"github.com/SukramJ/go-fabric/cluster/spec"
@@ -258,7 +259,7 @@ func tagsAndLabels(ep *endpoint.Endpoint) (tags []SemanticTag, labels []Label) {
 		}
 	}
 	if len(fixed)+len(user) > 0 {
-		labels = append(fixed, user...)
+		labels = slices.Concat(fixed, user)
 	}
 	return tags, labels
 }
