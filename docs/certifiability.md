@@ -98,7 +98,12 @@ GOFABRIC_CHIP_FAMILIES=IDM,ACL make chiptool-families   # a selection
   passed in this role counts as passed in its family — the page states the
   module in both roles since ADR 0020 — and is listed under "Controller role"
   below; a case no family of the harness image lists is listed there and
-  counted in none.
+  counted in none. The bridge client case TC-BR-4 runs the daemon with
+  `--bridge-sim`, the bridge matter.js's bridge test instance simulates after
+  chip's bridge-app, whose lights, sensors and composed device the case finds
+  by their names (the daemon numbers its endpoints itself); each "the DUT
+  took the change in" check reads the controller's own image of the bridge,
+  kept by its subscription alone, before any read.
 - **What a passing case executed** is pinned per case (steps run and steps
   skipped), so a PICS change that quietly turns a case into a no-op fails it.
 - **A case that passes with a recorded gap** is one whose CHIP spec checker
@@ -610,6 +615,7 @@ case counts as passed in its family; one no family of the harness image lists is
 
 | Case | Steps run | Steps skipped | Source |
 | --- | ---: | ---: | --- |
+| BR/4 | 15 | 0 | Go controller as DUT, after matter.js `TC-BR-4.test.ts`; in no family of the harness image |
 | DD/1.8 | 7 | 0 | Go controller as DUT, after matter.js `TC-DD-1.8.test.ts` |
 | DD/3.11 | 6 | 4 | Go controller as DUT, after matter.js `TC-DD-3.11.test.ts` |
 | DD/3.12 | 8 | 5 | Go controller as DUT, after matter.js `TC-DD-3.12.test.ts` |
@@ -628,7 +634,6 @@ the harness image lists; those a family lists carry the same reason on their row
 
 | Case | Class | Reason |
 | --- | --- | --- |
-| BR/4 | (c) harness | controller role (phase 29b-2): matter.js runs it with its controller as DUT against a bridge TH it drives through bridge-simulation app-pipe commands (TC-BR-4.test.ts:234) |
 | TBRM/3.1 | (b) not supported | controller role: the TH is a Thread border router (`--otbr` needs a live OTBR REST API; matter.js runs it against chip's network-manager app only, TC-TBRM-3.1.test.ts:133-140) |
 | WEBRTCR/2.1 | (b) not supported | controller role: matter.js drives chip's python script (prompt-driven-python-test.ts:41), the DUT answering its prompts — not ported (TC-WEBRTCR-2.1.test.ts:18 TC_WEBRTCR_2_1.py) |
 | WEBRTCR/2.2 | (b) not supported | controller role: matter.js drives chip's python script (prompt-driven-python-test.ts:41), the DUT answering its prompts — not ported (TC-WEBRTCR-2.2.test.ts:18 TC_WEBRTCR_2_2.py) |
