@@ -278,6 +278,7 @@ func New(ctx context.Context, cfg Config) (*Node, error) { //nolint:funlen // th
 		return nil, fmt.Errorf("node: bridge: %w", err)
 	}
 	n.br.SetDeviceTypeValidation(cfg.DeviceTypeValidation)
+	n.br.SetOnAttributeChange(n.attributeChanged)
 
 	// Access control fails closed without a lister; the stored ACL is what
 	// a commissioner writes (main.go:230-233 at b4ea1f96^).
@@ -1011,9 +1012,10 @@ func (n *Node) Aggregator() *Aggregator { return n.agg }
 func (n *Node) Sessions() *SessionManager { return n.sec.sessions }
 
 // Subscriptions returns the subscription manager, for a host's
-// diagnostics (subscription.Manager.CountBySession, Active): the
-// subscriptions riding on each session. The facade owns its lifecycle;
-// a host reads it and leaves closing to the node.
+// diagnostics: Snapshot lists every active subscription with its paths
+// and intervals as copies ([SubscriptionInfo]), CountBySession and Active
+// count them. The facade owns its lifecycle; a host reads it and leaves
+// closing to the node.
 func (n *Node) Subscriptions() *SubscriptionManager { return n.sec.subs }
 
 // RemoveFabric removes a fabric without a commissioner — a host's revoke

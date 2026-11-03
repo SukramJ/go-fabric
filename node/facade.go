@@ -48,8 +48,16 @@ type SessionManager = operational.Manager
 
 // SubscriptionManager is the subscription table [Node.Subscriptions]
 // returns ([subscription.Manager]): Active counts the subscriptions,
-// CountBySession groups them by session.
+// CountBySession groups them by session, Snapshot lists them.
 type SubscriptionManager = subscription.Manager
+
+// SemanticTag is one entry of a Descriptor's TagList, as
+// [BridgedDevice].Tags lists it ([mattercore.SemanticTag]).
+type SemanticTag = mattercore.SemanticTag
+
+// SubscriptionInfo is one subscription as [SubscriptionManager]'s
+// Snapshot lists it, a copy ([subscription.SubscriptionInfo]).
+type SubscriptionInfo = subscription.SubscriptionInfo
 
 // DiagnosticEvent is one entry of the node's diagnostic trace
 // ([diagevent.Event]): the moments that explain a failed pairing.

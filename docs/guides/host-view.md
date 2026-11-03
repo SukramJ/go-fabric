@@ -259,7 +259,15 @@ what `Config.Validate` checks and what each zero value means.
 fabric is stored. `n.Topology()` is what the node now serves: the
 Aggregator's endpoint and each bridged device with its key, endpoint,
 device type, name and reachability. The program logs each device's name
-and endpoint.
+and endpoint. A device also carries its `Scope` — the name of the
+Aggregator partition that holds it (`node.Scope`, `"node"`, for the
+default one, so `n.Aggregator().Partition(d.Scope)` gives the partition
+back; `Aggregator.Partitions()` lists them) — its `Tags`, the semantic
+tags its Descriptor serves as a controller reads them (none while the
+Descriptor serves no TagList — today every bridged endpoint's case, the
+feature Apple's stack refuses), and its `Labels`, the FixedLabel entries
+then the UserLabel entries (`User` set) it serves, as a controller reads
+them. `Added` is found in every partition.
 
 Then the device's lifecycle, each a single call on the device:
 `Rename` changes the NodeLabel every controller sees and is persisted, so

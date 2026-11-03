@@ -30,13 +30,10 @@ func (e *sessionEvents) info(id uint16) (SessionInfo, bool) {
 	if n == nil || n.sec == nil {
 		return SessionInfo{}, false
 	}
-	subs := 0
-	if n.sec.subs != nil {
-		subs = n.sec.subs.CountBySession()[id]
-	}
+	subs := n.subscriptionIDs()
 	for _, s := range n.sec.sessions.Sessions() {
 		if s.SessionID == id {
-			return sessionInfoOf(s, subs, n.Clock().Now()), true
+			return sessionInfoOf(s, subs[id], n.Clock().Now()), true
 		}
 	}
 	return SessionInfo{}, false
@@ -86,7 +83,8 @@ func (e *sessionEvents) subscriptionsChanged(id uint16) {
 	if now, live := e.info(id); live {
 		info = now
 	} else if n := e.n; n != nil && n.sec != nil && n.sec.subs != nil {
-		info.Subscriptions = n.sec.subs.CountBySession()[id]
+		ids := n.subscriptionIDs()[id]
+		info.Subscriptions, info.SubscriptionIDs = len(ids), ids
 	}
 	e.mu.Lock()
 	if _, still := e.known[id]; still {

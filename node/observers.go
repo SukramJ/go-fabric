@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/store"
 	"github.com/SukramJ/go-fabric/surface"
 )
@@ -98,6 +99,30 @@ type Observers struct {
 	// its new Subscriptions count. Mirrors SessionsBehavior's
 	// `subscriptionsChanged` event (SessionsBehavior.ts:75-93, :126).
 	OnSubscriptionsChanged func(SessionInfo)
+	// OnAttributeChanged runs after a cluster server on any endpoint —
+	// the root, the Aggregator, a bridged device or a part — reported an
+	// attribute change and the subscriptions marked it for their next
+	// report: a controller's write (contract.OriginControllerWrite), a
+	// command's effect, a host's set. It says what moved, not the value;
+	// the typed Device.OnChanged of a device and the servers' own Get
+	// give values. It hears the servers that notify their own changes
+	// (contract.AttributeChangeNotifier, every generated server among
+	// them); a host port that only signals contract.ChangeNotifier is the
+	// host's own and is not repeated here. matter.js has no node-wide
+	// event: it emits per endpoint and behavior, `<attribute>$Changed`
+	// and `stateChanged` (packages/node/src/behavior/Events.ts:52-56,
+	// emitted by Datasource.ts:1444-1446 at 862ad75f) — this hook is
+	// their union for a host that shows every change.
+	OnAttributeChanged func(AttributeChange)
+}
+
+// AttributeChange is one change [Observers].OnAttributeChanged reports:
+// the endpoint and cluster, and the change's attribute ids and origin
+// (contract.Change).
+type AttributeChange struct {
+	Endpoint uint16
+	Cluster  uint32
+	Change   contract.Change
 }
 
 // FabricInfo names one fabric, as OperationalCredentials' AddNOC hook
@@ -240,6 +265,18 @@ func (n *Node) observerList() []Observers {
 	return out
 }
 
+// attributeChanged runs every observer's OnAttributeChanged for one
+// change the bridge heard (bridge.Bridge.SetOnAttributeChange), on the
+// change's goroutine.
+func (n *Node) attributeChanged(endpoint uint16, cluster uint32, change contract.Change) {
+	ac := AttributeChange{Endpoint: endpoint, Cluster: cluster, Change: change}
+	for _, o := range n.observerList() {
+		if fn := o.OnAttributeChanged; fn != nil {
+			observe(n.logger, "attribute_changed", func() { fn(ac) })
+		}
+	}
+}
+
 // Observe registers o's hooks on a running (or not yet started) node:
 // each hook o sets runs after [Config].Observers' hook for the same event
 // and after the hooks registered before it, under the same rules — on
@@ -295,6 +332,7 @@ func (o Observers) queuedOn(n *Node) Observers {
 	o.OnSessionOpened = queuedHook(n, "session_opened", o.OnSessionOpened)
 	o.OnSessionClosed = queuedHook(n, "session_closed", o.OnSessionClosed)
 	o.OnSubscriptionsChanged = queuedHook(n, "subscriptions_changed", o.OnSubscriptionsChanged)
+	o.OnAttributeChanged = queuedHook(n, "attribute_changed", o.OnAttributeChanged)
 	return o
 }
 

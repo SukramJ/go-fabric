@@ -236,17 +236,19 @@ the one manager.
 ## `im/subscription`
 
 **Gives.** `*subscription.Manager` (`Node.Subscriptions`, the alias
-`node.SubscriptionManager`): `Active`, `CountBySession`.
+`node.SubscriptionManager`): `Active`, `CountBySession`, and `Snapshot`,
+every active subscription as a copy (`node.SubscriptionInfo`).
 
 **When.** Rarely: the subscriptions riding on each session are in
-`Node.SessionDiagnostics` (`SessionInfo.Subscriptions`); the manager is for
-a host that needs more than the count.
+`Node.SessionDiagnostics` (`SessionInfo.Subscriptions` and
+`SubscriptionIDs`); the manager is for a host that lists them with their
+paths.
 
 **Costs.** The manager's lifecycle is the node's; a host that closes
 subscriptions itself ends a controller's view without the controller's
 request.
 
-*Source: `node/node.go` (`Subscriptions`), `im/subscription/manager.go:534`.*
+*Source: `node/node.go` (`Subscriptions`), `im/subscription/manager.go` (`Snapshot`).*
 
 ## `diagevent`
 
