@@ -121,21 +121,39 @@
 // backchannel) are the daemon's app pipe. The leg needs no harness image;
 // its counts are pinned in testdata/chip-cases.golden.json under goCert,
 // and TestCertifiabilityDocument renders those cases as passed, "Go
-// controller as TH, after matter.js TC-X.test.ts". The opposite direction —
-// matter.js's own reading, the Go controller as the DUT — is phase 29b.
+// controller as TH, after matter.js TC-X.test.ts".
+//
+// The same leg runs cases in matter.js's own direction (goCertCase role
+// roleDUT, phase 29b): the module's controller is the DUT and the daemon
+// the TH device the TS file names, with the flags and app-pipe commands
+// matter.js's TH apps have (--icd-lit for its lit-icd app). A DUT case's
+// PICS are the controller's own declarations (goTHPICS), evaluated as
+// stated, and a code the controller declares nothing about fails the step
+// rather than reading the daemon's value. matter.js proves its DUT by the
+// TH device's log; a DUT step names its evidence instead — the DUT
+// controller's return value or error, a state read on the daemon, or a
+// daemon log line. The onboarding-payload DD cases (gocert_dddut_test.go,
+// payloads built bit by bit in gocert_payload_test.go as matter.js's
+// harness builds them) and the ICD client cases (gocert_icd_test.go) run
+// this way; their counts carry role "dut" in the golden file, and
+// TestCertifiabilityDocument renders them under "Controller role", "Go
+// controller as DUT, after matter.js TC-X.test.ts", passed in their family.
+// The cases 29b does not run carry their reason there (controllerRoleCases).
 //
 // Some of the cases run the device as DUT in matter.js too (goCertCase
 // native): the BDX receiver and SU requestor cases (gocert_bdx_test.go,
 // gocert_su_test.go), where the TS's TH is a controller serving an OTA
-// image, and the BIND cases (gocert_bind_test.go), whose DUT is a light
+// image, the BIND cases (gocert_bind_test.go), whose DUT is a light
 // switch — the daemon with --light-switch, triggered through the app pipe's
-// SendOnOffToBindings. Their PICS are evaluated as stated. The Go TH serves
+// SendOnOffToBindings —, and the TCP cases (gocert_tcp_test.go), where the
+// Go TH holds a session over TCP with the daemon and severs it
+// (exchange.Session.Channel). Their PICS are evaluated as stated. The Go TH serves
 // OTA images from its own node (controller.OTAConfig) and scripts the
 // provider's answers as matter.js's cert adapter does
 // (softwareupdate.Config ScriptQueryImage, ScriptApplyUpdate,
 // OnProviderExchange); it reads each BDX message off its end of the
 // transfer (bdx.ServerSession.OnMessage). The codes of the roles the Go TH
-// takes (provider, BDX sender, administrator, QR commissioner) are its own
+// takes (provider, BDX sender, administrator, QR commissioner, ICD client) are its own
 // declarations (goTHPICS), as matter.js declares its controller's, and a
 // flagged composition's codes are the case's (goCertCase.declare). A step
 // matter.js marks longRunning is skipped unless GOFABRIC_GOCERT_LONG=1; such

@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 7210,
+  "entry_points": 7212,
   "entry_packages": [
     ".",
     "bdx",
@@ -276,9 +276,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 17050,
+    "total_exported": 17052,
     "reachable": 12027,
-    "whitelisted": 5023,
+    "whitelisted": 5025,
     "unreachable": 0
   },
   "by_package": [],
@@ -26788,6 +26788,20 @@
     },
     {
       "package": "examples/reference-bridge",
+      "identifier": "TestICDFlagsNeedICDLIT",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-bridge/icd_test.go",
+      "line": 88
+    },
+    {
+      "package": "examples/reference-bridge",
+      "identifier": "TestICDLITFlag",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-bridge/icd_test.go",
+      "line": 22
+    },
+    {
+      "package": "examples/reference-bridge",
       "identifier": "TestKitchenAlarmsAndControls",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/kitchen_test.go",
@@ -29514,7 +29528,7 @@
       "identifier": "TestCertifiabilityDocument",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "internal/chiptool/certifiability_doc_test.go",
-      "line": 60
+      "line": 65
     },
     {
       "package": "internal/chiptool",
@@ -29528,7 +29542,7 @@
       "identifier": "TestFamilyDeviceTypesResolve",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "internal/chiptool/certifiability_doc_test.go",
-      "line": 350
+      "line": 419
     },
     {
       "package": "internal/chiptool",
@@ -29556,7 +29570,7 @@
       "identifier": "TestWorkflowRunsEveryFamily",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "internal/chiptool/certifiability_doc_test.go",
-      "line": 295
+      "line": 364
     },
     {
       "package": "internal/paritytest",
