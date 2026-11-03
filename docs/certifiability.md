@@ -611,6 +611,8 @@ case counts as passed in its family; one no family of the harness image lists is
 | DD/3.15 | 4 | 0 | Go controller as DUT, after matter.js `TC-DD-3.15.test.ts` |
 | DD/3.16 | 11 | 0 | Go controller as DUT, after matter.js `TC-DD-3.16.test.ts` |
 | DD/3.17 | 15 | 0 | Go controller as DUT, after matter.js `TC-DD-3.17.test.ts` |
+| ICDB/1.3 | 5 | 0 | Go controller as DUT, after matter.js `TC-ICDB-1.3.test.ts`; in no family of the harness image |
+| ICDM/6.1 | 4 | 0 | Go controller as DUT, after matter.js `TC-ICDM-6.1.test.ts`; in no family of the harness image |
 
 ### Cases that pass with a recorded gap
 
@@ -634,7 +636,7 @@ whose family is not in that list is "not yet run", not "not supported".
 | --- | --- | --- |
 | ILL, PRS, DISHM | the module serves the cluster (`cluster/measurement` Illuminance and Pressure; `cluster/modebase` DishwasherMode), but the reference daemon exposes no endpoint with it and the harness does not run the family | (c) not yet run |
 | CONCON, MESSAGES | the module serves ContentControl (`cluster/media`) and Messages (`cluster/core`), but chip has no case of either family at the harness pin | (c) no case |
-| ICDM, ICDB | not applicable to the reference daemon: it is mains-powered and sets no `node.Config.ICD`, so it serves no ICD Management (`ICDM.S` is false in its generated PICS). Applicable to a host that sets `Config.ICD`: the module then serves ICD Management and the Check-In protocol after matter.js ([ICD guide](./guides/icd.md)); the harness does not run the families against such a node | (b) not supported |
+| ICDM, ICDB | not applicable to the reference daemon: it is mains-powered and sets no `node.Config.ICD`, so it serves no ICD Management (`ICDM.S` is false in its generated PICS). Applicable to a host that sets `Config.ICD`: the module then serves ICD Management and the Check-In protocol after matter.js ([ICD guide](./guides/icd.md)); the harness does not run the families against such a node. The daemon's `--icd-lit` (TESTING ONLY) is such a node for the ICD client cases the Go controller runs as the DUT (TC-ICDM-6.1, TC-ICDB-1.3, under "Controller role" above) | (b) not supported |
 | SC_TC, the BLE and Thread cases of DD and SC | Bluetooth, Thread | (d) out of scope |
 | CNET Thread cases | the device side has no Thread radio; the Thread NetworkCommissioning variant over a border router (`core.ThreadNetworkCommissioning`, ADR 0027) is not on the reference daemon | (c) not yet run |
 | TBRM | the module serves ThreadBorderRouterManagement over an OTBR (`cluster/threadbr`, ADR 0027) and the reference daemon's `--otbr` adds the endpoint, but the harness does not run the family against a daemon with a virtual OTBR yet (`.github/workflows/otbr-virtual.yml` builds one, weekly and on dispatch) | (c) not yet run |

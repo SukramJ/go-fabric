@@ -3379,6 +3379,18 @@
       "stepsSkipped": 0,
       "source": "TC-G-3.2.test.ts"
     },
+    "ICDB/1.3": {
+      "steps": 5,
+      "stepsSkipped": 0,
+      "source": "TC-ICDB-1.3.test.ts",
+      "role": "dut"
+    },
+    "ICDM/6.1": {
+      "steps": 4,
+      "stepsSkipped": 0,
+      "source": "TC-ICDM-6.1.test.ts",
+      "role": "dut"
+    },
     "IDM/1.1": {
       "steps": 2,
       "stepsSkipped": 1,
