@@ -228,24 +228,21 @@ func (e *Entry) validateGo(fail func(string, ...any)) {
 }
 
 // validateLeft checks the left rows of a ported or partial entry: each has an
-// it, a known class and a reason, names no case twice and no case that is
-// also missing.
+// it, a known class and a reason, and names no case that is also missing.
+// An it name may repeat, where the file repeats it in another describe (as
+// a missing list may).
 func (e *Entry) validateLeft(fail func(string, ...any)) {
 	missing := make(map[string]bool, len(e.Missing))
 	for _, m := range e.Missing {
 		missing[m] = true
 	}
-	seen := make(map[string]bool, len(e.Left))
 	for i, l := range e.Left {
 		switch {
 		case strings.TrimSpace(l.It) == "":
 			fail("left %d: no it", i)
 		case missing[l.It]:
 			fail("left %d (%s): also missing; a case is missing or left, not both", i, l.It)
-		case seen[l.It]:
-			fail("left %d (%s): a duplicate", i, l.It)
 		}
-		seen[l.It] = true
 		if !leftClasses[l.Class] {
 			fail("left %d (%s): unknown class %q", i, l.It, l.Class)
 		}

@@ -55,10 +55,15 @@ const testparityPlannedRatchet = 2
 // (the review counted 1136; W6-test-08 moved four cases of FixMe-skipped
 // anchors into the missing lists). Issue #362 lowered missing to 1130:
 // the module's own mDNS responder made ten MdnsServerTest.ts and
-// MdnsTest.ts cases portable.
+// MdnsTest.ts cases portable. Phase 31 (the server tranche) took the 332
+// cases of eleven entries out of missing — ported or left — and one
+// ProtocolServiceTest.ts case; 16 stay missing with a named reason (the
+// failing report sender, the no-MRP session and the mDNS scanner seams,
+// the multi-message invoke response, gaps in the findings register):
+// 121 ported, 813 missing.
 const (
-	testparityPortedRatchet  = 113
-	testparityMissingRatchet = 1130
+	testparityPortedRatchet  = 121
+	testparityMissingRatchet = 813
 )
 
 // testparityLeftRatchet is the number of left it cases summed over the
@@ -66,8 +71,9 @@ const (
 // each with its class and reason (phase 31). Exact in both directions like
 // the others: a case moved from missing to left, or a left case ported
 // after all, moves it in the same commit, so a missing list cannot shrink
-// into left unseen.
-const testparityLeftRatchet = 0
+// into left unseen. Set to 127 by phase 31: the left rows of the eleven
+// server-tranche entries.
+const testparityLeftRatchet = 127
 
 // moduleRoot is where the committed artefacts live, seen from this package.
 const moduleRoot = "../.."
@@ -273,7 +279,6 @@ func TestTestparityEntryValidation(t *testing.T) {
 		"left unknown class":    {Path: "p", Status: StatusPorted, Go: []string{"im:TestX"}, Left: []Left{{It: "l", Class: "later", Reason: "r"}}, Reason: "r", SnapshotSHA: sha},
 		"left without reason":   {Path: "p", Status: StatusPorted, Go: []string{"im:TestX"}, Left: []Left{{It: "l", Class: ClassSkip, Reason: " "}}, Reason: "r", SnapshotSHA: sha},
 		"left without it":       {Path: "p", Status: StatusPorted, Go: []string{"im:TestX"}, Left: []Left{{Class: ClassSkip, Reason: "r"}}, Reason: "r", SnapshotSHA: sha},
-		"left twice":            {Path: "p", Status: StatusPorted, Go: []string{"im:TestX"}, Left: []Left{{It: "l", Class: ClassSkip, Reason: "r"}, {It: "l", Class: ClassSkip, Reason: "r"}}, Reason: "r", SnapshotSHA: sha},
 		"left on planned":       {Path: "p", Status: StatusPlanned, Left: []Left{{It: "l", Class: ClassSkip, Reason: "r"}}, Reason: "r", SnapshotSHA: sha},
 		"left on excluded":      {Path: "p", Status: StatusExcluded, Class: ClassJointFabric, Left: []Left{{It: "l", Class: ClassSkip, Reason: "r"}}, Reason: "r", SnapshotSHA: sha},
 	}
