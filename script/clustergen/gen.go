@@ -1012,6 +1012,16 @@ func (g *generator) writePayload(w *writer, p *payload, what string) {
 					w.p("\t\t// %s: the constraint %q is the server's to judge, as matter.js %s relaxes it.", f.name, f.v.Constraint.Text, at)
 				}
 			}
+			if p.command == nil && p.response == nil {
+				if sj, ok := serverJudgedStructFields[g.c.Name+"."+p.what+"."+f.name]; ok {
+					// The server judges the value, as chip's handler does
+					// (serverJudgedStructFields).
+					unbounded := *f
+					unbounded.v = nil
+					dec = decExpr(&unbounded)
+					w.p("\t\t// %s: the constraint %q is the server's to judge, as chip %s does (%s).", f.name, f.v.Constraint.Text, sj.at, sj.why)
+				}
+			}
 			if !f.mandatory {
 				dec = "spec.DecodeOptional(" + dec + ")"
 			}

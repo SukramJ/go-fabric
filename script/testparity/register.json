@@ -1730,7 +1730,7 @@
     {
       "path": "packages/node/test/endpoint/type/SemanticNamespaceTest.ts",
       "status": "planned",
-      "reason": "Semantic tag namespaces as values (standard tags, custom namespaces): no subject exists in the module (schema and device carry no namespace table, the device kit no TagList declaration); the port waits until a consumer asks for one (owner decision 2026-10-29).",
+      "reason": "Semantic tag namespaces as values (standard tags, custom namespaces): no subject exists in the module (schema and device carry no namespace table; the device kit declares TagList entries as values since phase 30, device.Options.Tags); the port waits until a consumer asks for one (owner decision 2026-10-29).",
       "snapshotSha": "bf9c7994abef9eb3e7b6cd8775458ff982bdd910"
     },
     {

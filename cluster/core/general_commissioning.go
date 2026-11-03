@@ -43,6 +43,10 @@ type GeneralCommissioning struct {
 	// regulatory values); clock and log are set once.
 	mu sync.RWMutex
 
+	// changes are the listeners [GeneralCommissioning.OnAttributeChange]
+	// registers; a Breadcrumb another server writes is reported through it.
+	changes cluster.AttributeChanges
+
 	clock clock.Clock
 	// log is [GeneralCommissioningConfig.Logger]; slog.Default() when nil.
 	log *slog.Logger
@@ -328,6 +332,7 @@ var (
 	_ contract.ClusterDataVersion             = (*GeneralCommissioning)(nil)
 	_ contract.ClusterCommandInvokePrivilege  = (*GeneralCommissioning)(nil)
 	_ contract.ClusterAttributeWritePrivilege = (*GeneralCommissioning)(nil)
+	_ contract.AttributeChangeNotifier        = (*GeneralCommissioning)(nil)
 )
 
 // MatterDataVersion implements [contract.ClusterDataVersion].
@@ -386,7 +391,7 @@ func (g *GeneralCommissioning) MatterRead(attrID uint32) (any, bool) {
 
 // MatterWrite handles Breadcrumb writes (Matter §11.10.6.1). Other
 // attributes are read-only.
-func (g *GeneralCommissioning) MatterWrite(_ context.Context, attrID uint32, value any) error {
+func (g *GeneralCommissioning) MatterWrite(ctx context.Context, attrID uint32, value any) error {
 	if attrID != gencommAttrBreadcrumb {
 		// UNSUPPORTED_WRITE for a served read-only attribute,
 		// UNSUPPORTED_ATTRIBUTE otherwise, as the definition judges them.
@@ -398,9 +403,27 @@ func (g *GeneralCommissioning) MatterWrite(_ context.Context, attrID uint32, val
 		return fmt.Errorf("%w: Breadcrumb expected uint64, got %T", errGencommInvalidArg, value)
 	}
 	g.mu.Lock()
+	changed := g.breadcrumb != v
 	g.breadcrumb = v
 	g.mu.Unlock()
+	if changed {
+		g.changes.NotifyFrom(contract.OriginFrom(ctx), gencommAttrBreadcrumb)
+	}
 	return nil
+}
+
+// OnAttributeChange implements [contract.AttributeChangeNotifier]: a
+// Breadcrumb written through [GeneralCommissioning.MatterWrite] is
+// reported. That is how another cluster's command moves it — the Wi-Fi
+// NetworkCommissioning commands write their Breadcrumb here (chip
+// UpdateBreadcrumb, NetworkCommissioningCluster.cpp:589-593 at 6170af84) —
+// and the bridge's invoke comparison sees only the invoked cluster; in
+// matter.js the commissioning state is one behavior's Datasource, which
+// reports every committed change (Datasource.ts:1473-1476). Found by
+// TC-CNET-4.4 and 4.9, whose subscription cache missed the Breadcrumb a
+// ScanNetworks wrote.
+func (g *GeneralCommissioning) OnAttributeChange(cb func(change contract.Change)) (unsubscribe func()) {
+	return g.changes.OnAttributeChange(cb)
 }
 
 // ArmFailSafeRequest mirrors Matter §11.10.6.2.

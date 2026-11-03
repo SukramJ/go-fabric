@@ -33,6 +33,8 @@ func TestChipToolSuite(t *testing.T) {
 	}{
 		{"datamodel", testDataModelSweep},
 		{"thermostat", testThermostatHold},
+		{"groups", testGroupMessaging},
+		{"subscription-restart", testSubscriptionAcrossRestart},
 	}
 	for _, leg := range legs {
 		start := time.Now()

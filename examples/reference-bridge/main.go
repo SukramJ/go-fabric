@@ -95,6 +95,7 @@ type flags struct {
 	dbPath, listen, tcp, label, salt, logLevel string
 	appPipe, enableKey, otaDir, dcl            string
 	attestationDir, metricsExpvar              string
+	wifiSimSSIDs                               string
 	otbr                                       string
 	passcode, discriminator                    uint
 	iterations                                 int
@@ -131,7 +132,8 @@ func parseFlags() flags {
 	flag.StringVar(&f.attestationDir, "attestation-dir", "", "directory with a vendor attestation chain — dac.pem, dac-key.pem, pai.pem, cd.der (PEM or DER each, the key PKCS#8 or SEC1) — served instead of the CSA test chain; see attestation.go")
 	flag.StringVar(&f.dcl, "dcl", "off", "prod, testnet or off: look the --ota-provider image up in the CSA Distributed Compliance Ledger (sends the requestor's vendor/product id and the offered version to the ledger); see dcl.go")
 	flag.BoolVar(&f.wifi, "wifi", false, "TESTING ONLY: serve WiFiNetworkDiagnostics on the root from a simulated Wi-Fi link (fixed values, counters the app pipe steps), stating the RootNode condition WiFi; see wifi.go")
-	flag.BoolVar(&f.wifiSim, "wifi-sim", false, "TESTING ONLY: NetworkCommissioning with the Wi-Fi feature instead of Ethernet, over a simulated driver that connects to any SSID after a short delay and stays on the Ethernet address; see wifisim.go")
+	flag.BoolVar(&f.wifiSim, "wifi-sim", false, "TESTING ONLY: NetworkCommissioning with the Wi-Fi feature instead of Ethernet, over a simulated driver that knows the --wifi-sim-ssid networks, connects to one after a short delay and stays on the Ethernet address; see wifisim.go")
+	flag.StringVar(&f.wifiSimSSIDs, "wifi-sim-ssid", defaultWiFiSimSSIDs, "TESTING ONLY, with --wifi-sim: the networks the simulated driver finds and joins, comma-separated ssid:passphrase (an entry without a passphrase takes any); see wifisim.go")
 	flag.StringVar(&f.metricsExpvar, "metrics-expvar", "", "address (\"127.0.0.1:9090\") to serve the node's metrics on as expvar's /debug/vars; off when empty; see metrics.go")
 	flag.BoolVar(&f.thermostatSchedules, "thermostat-schedules", false, "serve MatterScheduleConfiguration (week programs) on the demo thermostat — enables the extension BD-chip-Thermostat-Schedules; off by default until a live ecosystem pairing is verified (issue #273); see fleet_climate.go")
 	flag.StringVar(&f.extensions, "extensions", "", "comma-separated \"Ahead of matter.js\" register IDs to enable (surface.Policies.Extensions, notes/parity/by_design.md), on the node and every device; an unknown ID stops the daemon with the list of known ones; see surface.go")

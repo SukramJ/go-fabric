@@ -106,7 +106,8 @@ func (v ChargingTargetScheduleStruct) EncodeTLV(enc *tlv.Encoder, tag tlv.Tag) {
 func (v *ChargingTargetScheduleStruct) DecodeTLV(n spec.Node) error {
 	return spec.DecodeFields(n, "ChargingTargetScheduleStruct",
 		spec.Bind(0, "DayOfWeekForSequence", true, &v.DayOfWeekForSequence, spec.DecodeUint[TargetDayOfWeekBitmap](8)),
-		spec.Bind(1, "ChargingTargets", true, &v.ChargingTargets, spec.DecodeListIn(spec.DecodeStruct[ChargingTargetStruct], 0, 10)),
+		// ChargingTargets: the constraint "max 10" is the server's to judge, as chip src/app/clusters/energy-evse-server/EnergyEvseCluster.cpp:564-565 does (owner decision 2026-11-03, BD-chip-EVSE-TargetsServerHeld).
+		spec.Bind(1, "ChargingTargets", true, &v.ChargingTargets, spec.DecodeList(spec.DecodeStruct[ChargingTargetStruct])),
 	)
 }
 

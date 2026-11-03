@@ -6,6 +6,7 @@ package endpoint
 import (
 	"strings"
 
+	mattercore "github.com/SukramJ/go-fabric/cluster/core"
 	bdbidef "github.com/SukramJ/go-fabric/cluster/spec/bridgeddevicebasicinformation"
 
 	"github.com/SukramJ/go-fabric/contract"
@@ -96,6 +97,13 @@ type Spec struct {
 	// DeviceConditions are the device-type conditions the host states for
 	// the endpoint ([Endpoint.DeviceConditions]); nil states none.
 	DeviceConditions []string
+	// DeviceTypes are further device types the endpoint lists in its
+	// Descriptor DeviceTypeList after DeviceType and before BridgedNode
+	// ([Endpoint.DeviceTypes]); nil lists none.
+	DeviceTypes []uint16
+	// Tags are the semantic tags the endpoint's Descriptor serves in
+	// TagList ([Endpoint.Tags]); nil leaves the TagList feature off.
+	Tags []mattercore.SemanticTag
 	// ClientClusters are the client clusters the endpoint declares: the
 	// Descriptor's ClientList, as matter.js MutableEndpoint.ts:53-61
 	// registers a type's mandatory client clusters and

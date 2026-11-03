@@ -57,6 +57,24 @@ type TopologyDispatcher struct {
 	topology *Topology
 	acl      ACLLister
 	aux      AuxiliaryACLLister
+	// timedWrite reports an attribute with the timed access quality; nil
+	// is [schema.IsTimedWrite]. A test sets it: no attribute of the
+	// snapshot at the pin carries the quality. A pointer keeps the
+	// dispatcher comparable.
+	timedWrite *timedWriteTable
+}
+
+// timedWriteTable is a stand-in for the schema's timed-write table.
+type timedWriteTable struct {
+	isTimed func(clusterID, attributeID uint32) bool
+}
+
+// isTimedWrite is [TopologyDispatcher.timedWrite] or the schema's table.
+func (d *TopologyDispatcher) isTimedWrite(clusterID, attributeID uint32) bool {
+	if d.timedWrite != nil {
+		return d.timedWrite.isTimed(clusterID, attributeID)
+	}
+	return schema.IsTimedWrite(clusterID, attributeID)
 }
 
 // AuxiliaryACLLister supplies the auxiliary access control entries of the
@@ -231,6 +249,10 @@ func (d *TopologyDispatcher) WriteAuthorized(ctx context.Context, path im.Concre
 		return []im.WriteResult{{Path: path, Status: im.StatusUnsupportedEndpoint}}
 	}
 	wildcardEndpoint := !path.HasEndpoint
+	// Whether the write runs inside a valid timed interaction; known is
+	// false for a caller that stamped nothing (im.WithTimedInteraction),
+	// whose per-attribute timed check is its own.
+	timed, timedKnown := im.TimedInteractionFromContext(ctx)
 	var results []im.WriteResult
 	for _, ep := range endpoints {
 		ePath := path
@@ -330,6 +352,21 @@ func (d *TopologyDispatcher) WriteAuthorized(ctx context.Context, path im.Concre
 						}
 						continue
 					}
+				}
+
+				// An attribute with the timed access quality outside a
+				// timed interaction, after the access gate: a concrete path
+				// answers NEEDS_TIMED_INTERACTION, a wildcard one skips the
+				// attribute. Mirrors matter.js
+				// packages/protocol/src/action/server/AttributeWriteResponse.ts:243-247
+				// (`if (limits.timed && !this.session.timed) … Status.NeedsTimedInteraction`)
+				// and :343-345 for the wildcard path; chip
+				// src/app/WriteHandler.cpp:798-802.
+				if timedKnown && !timed && d.isTimedWrite(aPath.Cluster, aPath.Attribute) {
+					if !wildcardEndpoint && path.HasAttribute {
+						results = append(results, im.WriteResult{Path: aPath, Status: im.StatusNeedsTimedInteraction})
+					}
+					continue
 				}
 
 				writeCtx := ctx

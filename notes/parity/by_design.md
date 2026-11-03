@@ -94,6 +94,7 @@ pin lift confirms by re-reading the row, [`pin-lifts.md`](./pin-lifts.md)).
 | BD-chip-AlarmBase-RulesInServer | `DishwasherAlarmServer.ts:14`, `RefrigeratorAlarmServer.ts:14`, `TemperatureAlarmServer.ts:17` are empty subclasses (absence: the class lines) | `packages/node/src/behaviors/dishwasher-alarm/DishwasherAlarmServer.ts`<br>`packages/node/src/behaviors/refrigerator-alarm/RefrigeratorAlarmServer.ts`<br>`packages/node/src/behaviors/temperature-alarm/TemperatureAlarmServer.ts` | `"export class DishwasherAlarmServer extends DishwasherAlarmBehavior {}"`<br>`"export class RefrigeratorAlarmServer extends RefrigeratorAlarmBehavior {}"`<br>`"export class TemperatureAlarmServer extends TemperatureAlarmBehavior {}"` | connectedhomeip | no |
 | BD-chip-Appliance-RulesInServer | `MicrowaveOvenControlServer.ts:18`, `LaundryWasherControlsServer.ts:18`, `LaundryDryerControlsServer.ts:14` are empty subclasses (absence: the class lines); the oven cavity has logic (`OvenCavityOperationalStateServer.ts:21-107`) and is not a marker | `packages/node/src/behaviors/microwave-oven-control/MicrowaveOvenControlServer.ts`<br>`packages/node/src/behaviors/laundry-washer-controls/LaundryWasherControlsServer.ts`<br>`packages/node/src/behaviors/laundry-dryer-controls/LaundryDryerControlsServer.ts` | `"export class MicrowaveOvenControlServer extends MicrowaveOvenControlBehavior {}"`<br>`"export class LaundryWasherControlsServer extends LaundryWasherControlsBehavior {}"`<br>`"export class LaundryDryerControlsServer extends LaundryDryerControlsBehavior {}"` | connectedhomeip | no |
 | BD-chip-DeviceEnergyManagement-EnergyEvse-RulesInServer | `DeviceEnergyManagementServer.ts:18`, `EnergyEvseServer.ts:14` are empty subclasses (absence: the class lines) | `packages/node/src/behaviors/device-energy-management/DeviceEnergyManagementServer.ts`<br>`packages/node/src/behaviors/energy-evse/EnergyEvseServer.ts` | `"export class DeviceEnergyManagementServer extends DeviceEnergyManagementBehavior {}"`<br>`"export class EnergyEvseServer extends EnergyEvseBehavior {}"` | connectedhomeip | no |
+| BD-chip-EVSE-TargetsServerHeld | `CommandInvokeResponse.ts:484-487` validates the request against the model before the invoker (presence), and `EnergyEvseServer.ts:14` is the empty subclass (absence: the class line) | `packages/protocol/src/action/server/CommandInvokeResponse.ts`<br>`packages/node/src/behaviors/energy-evse/EnergyEvseServer.ts` | `"            if (!skipValidation) {\n                requestTlv.validate(request);\n            }"`<br>`"export class EnergyEvseServer extends EnergyEvseBehavior {}"` | connectedhomeip `src/app/clusters/energy-evse-server/EnergyEvseCluster.cpp` at `6170af84` (`ValidateTargets` :564-565), case `src/python_testing/TC_EEVSE_2_3.py` step 19 (:411-439) | no |
 | BD-chip-ClosureDimension-RulesInServer | `ClosureDimensionServer.ts:17` is the empty subclass (absence: the class line, 17 lines in all) | `packages/node/src/behaviors/closure-dimension/ClosureDimensionServer.ts` | `"export class ClosureDimensionServer extends ClosureDimensionBehavior {}"` | connectedhomeip | no |
 | BD-chip-Thermostat-Schedules | `ThermostatServer.ts:82`, the class doc lists the feature unimplemented (presence; :126-128 warns when it is enabled) | `packages/node/src/behaviors/thermostat/ThermostatServer.ts` | `"MatterScheduleConfiguration: This feature is not implemented yet."` | connectedhomeip `src/app/clusters/thermostat-server/ThermostatClusterSchedules.cpp` at `645b267a` (`SetActiveSchedule` :741, `AppendPendingSchedule` :795, `ValidateScheduleTransitions` :292, `ValidateTransitionsPerDay` :457, the atomic hooks :620-663, `PrecommitSchedules` :1000) | yes |
 | BD-chip-Chime-RulesInServer | `ChimeServer.ts:14` is the empty subclass (absence: the class body, 14 lines in all) | `packages/node/src/behaviors/chime/ChimeServer.ts` | `class ChimeServer` | connectedhomeip `src/app/clusters/chime-server/ChimeCluster.cpp` at `6170af84` (`IsSupportedChimeID` :176, `SetSelectedChime` :215, `SetEnabled` :228, `HandlePlayChimeSound` :258, `GenerateChimeStartedPlayingEvent` :291), tests `tests/TestChimeCluster.cpp` | no |
@@ -106,6 +107,7 @@ pin lift confirms by re-reading the row, [`pin-lifts.md`](./pin-lifts.md)).
 | BD-chip-TlsCertificateManagement-RulesInServer | `TlsCertificateManagementServer.ts:14` is the empty subclass (absence: the class body, 14 lines in all) | `packages/node/src/behaviors/tls-certificate-management/TlsCertificateManagementServer.ts` | `class TlsCertificateManagementServer` | connectedhomeip `src/app/clusters/tls-certificate-management-server/TLSCertificateManagementCluster.cpp` at `6170af84` (the constructor :61-73, the handlers :230-553, `OnFabricRemoved` :571-575), `CertificateTableImpl.cpp`, `IncrementingIdHelper.h`, the example delegate `examples/all-clusters-app/all-clusters-common/src/tls-certificate-management-instance.cpp`, tests `tests/TestTLSCertificateManagementCluster.cpp`, `tests/FuzzTLSCertificateManagementPW.cpp` | no |
 | BD-chip-TlsClientManagement-RulesInServer | `TlsClientManagementServer.ts:14` is the empty subclass (absence: the class body, 14 lines in all) | `packages/node/src/behaviors/tls-client-management/TlsClientManagementServer.ts` | `class TlsClientManagementServer` | connectedhomeip `src/app/clusters/tls-client-management-server/TLSClientManagementCluster.cpp` at `6170af84` (the constructor :53-63, the handlers :177-271, `OnFabricRemoved` :272-275), the example delegate `examples/all-clusters-app/all-clusters-common/src/tls-client-management-instance.cpp`, tests `tests/TestTLSClientManagementCluster.cpp` | no |
 | BD-chip-WiFiNetworkManagement-RulesInServer | `WiFiNetworkManagementServer.ts:14` is the empty subclass (absence: the class line, 14 lines in all) | `packages/node/src/behaviors/wi-fi-network-management/WiFiNetworkManagementServer.ts` | `"export class WiFiNetworkManagementServer extends WiFiNetworkManagementBehavior {}"` | connectedhomeip `src/app/clusters/wifi-network-management-server/WiFiNetworkManagementCluster.cpp` at `6170af84` (`ClearNetworkCredentials` :62, `SetNetworkCredentials` :74, `ReadAttribute` :105, `InvokeCommand` :123) | no |
+| BD-chip-WiFiNetworkCommissioningServer | `NetworkCommissioningServer.ts:18` is the generated empty subclass (absence: the class line, 18 lines in all) | `packages/node/src/behaviors/network-commissioning/NetworkCommissioningServer.ts` | `"export class NetworkCommissioningServer extends NetworkCommissioningBehavior {}"` | connectedhomeip `src/app/clusters/network-commissioning/NetworkCommissioningCluster.cpp` at `6170af84` (the handlers, `Init` :200-214, `OnNetworkingStatusChange` :283-307, `OnCommissioningComplete` :984-990), `src/platform/Linux/NetworkCommissioningWiFiDriver.cpp` (`Init` :77-128, `CommitConfiguration` :135-167) | no |
 | BD-chip-ThreadNetworkDirectory-RulesInServer | `ThreadNetworkDirectoryServer.ts:14` is the empty subclass (absence: the class line, 14 lines in all) | `packages/node/src/behaviors/thread-network-directory/ThreadNetworkDirectoryServer.ts` | `"export class ThreadNetworkDirectoryServer extends ThreadNetworkDirectoryBehavior {}"` | connectedhomeip `src/app/clusters/thread-network-directory-server/ThreadNetworkDirectoryCluster.cpp` at `6170af84` (`WritePreferredExtendedPanId` :139, `ReadThreadNetworks` :153, `HandleAddNetworkRequest` :214, `HandleRemoveNetworkRequest` :278, `HandleOperationalDatasetRequest` :309; `ThreadNetworkDirectoryStorage.h`) | no |
 | BD-Thread-TBRM-ChipLogic | `ThreadBorderRouterManagementServer.ts:14` is the empty subclass (absence: the class line, 14 lines in all) | `packages/node/src/behaviors/thread-border-router-management/ThreadBorderRouterManagementServer.ts` | `"export class ThreadBorderRouterManagementServer extends ThreadBorderRouterManagementBehavior {}"` | connectedhomeip `src/app/clusters/thread-border-router-management-server/ThreadBorderRouterManagementCluster.cpp` at `6170af84` (`ReadAttribute` :32, `InvokeCommand` :148, `OnActivateDatasetComplete` :272, `OnPlatformEventHandler` :297; `ThreadBorderRouterManagementDelegate.h:63-106`), tests `tests/TestThreadBorderRouterManagementCluster.cpp` | no |
 | BD-Thread-TND-FromBorderRouter | `ThreadNetworkDiagnosticsServer.ts:14` is the empty subclass (absence: the class line, 14 lines in all) | `packages/node/src/behaviors/thread-network-diagnostics/ThreadNetworkDiagnosticsServer.ts` | `"export class ThreadNetworkDiagnosticsServer extends ThreadNetworkDiagnosticsBehavior {}"` | connectedhomeip `src/app/clusters/thread-network-diagnostics-server/DirectThreadNetworkDiagnosticsProvider.cpp` at `6170af84` (`ReadAttribute` :59, the unconfigured nulls :65-92, `RoutingRole` :104-145, the tables :184-293, the counts :325-571, the dataset attributes :577-689), `ThreadNetworkDiagnosticsCluster.cpp` | no |
@@ -1451,7 +1453,7 @@ on a 36-device central produced enough events to evict the BasicInformation
 StartUp and GeneralDiagnostics BootReason events that a controller reads
 out-of-band right after CASE.
 
-### BD-Matter-TimedAndQuotaDeferred — per-attribute timed-write enforcement is unbuilt; subscribe-quota eviction mirrors matter.js
+### BD-Matter-TimedAndQuotaDeferred — subscribe-quota eviction mirrors matter.js (the timed halves are closed)
 
 Status 2026-10-11 (#47): the command half of this entry is closed. A request
 command marked "T" in the model answers NEEDS_TIMED_INTERACTION outside a
@@ -1464,14 +1466,18 @@ Mirrors matter.js `CommandInvokeResponse.ts` (`limits.timed`).
 
 What stays:
 
-- **Per-attribute timed-write enforcement.** matter.js refuses an untimed
-  write to an attribute with the `timed` access quality
-  (`AttributeWriteResponse.ts:241-244`, `AccessControl.ts:290-300`). No
-  attribute of any cluster this module serves carries that quality in the
-  snapshot (`grep 'Timed: true' cluster/spec/*/definition_gen.go` lists
-  commands only), so the write path has nothing to enforce yet. Retire when
-  a served cluster ships a timed attribute: enforce it in `cluster/spec`'s
-  write path the way the invoke path does, with a parity test.
+- **Per-attribute timed-write enforcement — retired in phase 30.** The
+  write path now enforces it as matter.js does
+  (`AttributeWriteResponse.ts:243-247`, wildcard skip `:343-345`): the
+  transport stamps the timed window on the write context
+  (`im.WithTimedInteraction`) and `endpoint.TopologyDispatcher` answers an
+  attribute `schema.IsTimedWrite` marks with NEEDS_TIMED_INTERACTION
+  outside one, after the writability verdict and the access check
+  (`endpoint/timed_write_parity_matterjs_test.go`, with a synthetic timed
+  attribute: the snapshot at the pin still has none). Built ahead of the
+  retire condition (a served timed attribute) by owner decision
+  2026-11-03, so the next regeneration that adds one is enforced without
+  a code change.
 - **Subscribe per-fabric quota eviction.** chip evicts an existing
   subscription to guarantee the per-fabric minimum
   (`InteractionModelEngine.cpp:1263`). matter.js has no per-fabric
@@ -1868,7 +1874,8 @@ as chip does); `evse.go:363`, `:380-382`, `:786`, `:857`, `:1266-1271`.
 PowerRangeAdjustment (DEM feature bit 7) is not served: it exists at the
 chip pin but not in the matter.js snapshot nor the 1.6.1 data model
 (DEM/2.11 stays class (b)). Families DEM, DEMM, EEVSE, EEVSEM pass or are
-classified (#46, #47; TC-EEVSE-2.3 is a findings entry).
+classified (#46, #47); TC-EEVSE-2.3 runs since phase 30
+(`BD-chip-EVSE-TargetsServerHeld`).
 
 ### BD-chip-EnergyReporting-FakeReadings — the reference daemon's grid meter answers the EnergyReporting test event triggers
 
@@ -3416,15 +3423,31 @@ whose start is in the past in either reading counts as started.
 By design. Controllers write current values, which read as started either
 way; a fix belongs upstream.
 
-### BD-chip-Harness-ModelOverCase — CountdownTime, TC-EEVSE-2.3 and two chipdm (ii) entries follow the model, not chip's case or XML
+### BD-chip-EVSE-TargetsServerHeld — an eleventh ChargingTarget in a day is the EnergyEvse server's RESOURCE_EXHAUSTED, not the decoder's CONSTRAINT_ERROR
+
+matter.js validates a SetTargets request against the model before the
+invoker runs (`CommandInvokeResponse.ts:484-487`) and refuses an eleventh
+ChargingTarget of a day at `ChargingTargets`' `max 10`
+(`energy-evse-cluster.element.ts:254`, `TlvArray.ts:111-113`) with
+CONSTRAINT_ERROR; its `EnergyEvseServer.ts:14` has no logic. chip's
+generated decoder does not enforce the list bound and its handler counts
+the targets: `EnergyEvseCluster.cpp:564-565` answers RESOURCE_EXHAUSTED,
+which TC-EEVSE-2.3 step 19 expects (`TC_EEVSE_2_3.py:411-439`). The
+generated `ChargingTargetScheduleStruct` decoder drops the bound
+(`script/clustergen/relaxed.go` `serverJudgedStructFields`; the definition
+keeps `max 10` verbatim), so `cluster/energy/evse.go`'s
+`evseMaxTargetsPerDay` check answers on the wire; pinned by
+`bridge/fields_evse_targets_test.go`.
+
+By design (owner decision 2026-11-03): the CSA case expects chip's status
+and matter.js serves no EnergyEvse logic of its own to mirror.
+
+### BD-chip-Harness-ModelOverCase — CountdownTime and two chipdm (ii) entries follow the model, not chip's case or XML
 
 CountdownTime is reported as matter.js reports it (QuietEvent), not by the
 specification's list, which matter.js does not implement either.
-TC-EEVSE-2.3 step 19 expects RESOURCE_EXHAUSTED for eleven
-ChargingTargets; matter.js validates the request against the model's
-"max 10" first (`CommandInvokeResponse.ts:485-487`,
-`energy-evse-cluster.element.ts:254`) and answers CONSTRAINT_ERROR, as the
-module does. GroupKeyMulticastPolicy stays as the snapshot gates it, and
+TC-EEVSE-2.3 left this entry for `BD-chip-EVSE-TargetsServerHeld`
+(owner decision 2026-11-03). GroupKeyMulticastPolicy stays as the snapshot gates it, and
 ColorControl's XY → HS conversion stays mirrored
 (`BD-Matter-ColorControl-XYToHS`). chip's 33/66 FanMode split
 (`FanControlCluster.cpp:84-166`) is not ported; matter.js's mapping is.
@@ -3526,7 +3549,20 @@ taken from chip's
 no behaviour. `core.WiFiNetworkCommissioning` sits behind
 `contract.WiFiDriver` and `node.Network.WiFiCommissioning`; the reference
 daemon mounts it only with `--wifi-sim`, so the FeatureMap and the
-composition the harness certifies do not move. Report BA §4.
+composition the harness certifies do not move. Report BA §4. The
+committed networks — SSID and credentials — are kept in the node's
+`store.Settings` (`WiFiNetworkCommissioningConfig.Store`), as the Linux
+driver keeps its network in the KVS (`NetworkCommissioningWiFiDriver.cpp`
+`CommitConfiguration` :135-167, `Init` :77-128), and `Start` rejoins the
+first one when the node starts, recording the result as chip's
+`OnNetworkingStatusChange` does when the link returns
+(`NetworkCommissioningCluster.cpp:283-307`); a network is connected while
+the link is on it (`WiFiNetworkIterator::Next`, driver :275-310), so a
+failsafe revert restores it connected. The revert and the rejoin are
+reported to subscriptions (`OnAttributeChange`), and a Breadcrumb a
+NetworkCommissioning command writes is reported by GeneralCommissioning's
+own notifier, as chip marks both dirty where they change. TC-CNET-4.1, 4.4
+and 4.9 run on the restarted daemon since phase 30.
 
 By design. A real Wi-Fi driver is roadmap milestone 7.
 

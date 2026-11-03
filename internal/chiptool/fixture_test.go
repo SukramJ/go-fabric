@@ -53,6 +53,11 @@ func newFixture(ctx context.Context, t *testing.T) *fixture {
 	// The FIFO and the database live in the controller's directory, which
 	// in the image harness is the directory the container shares.
 	br := startBridgeWith(t, bridgeBin, flags, bridgeOptions{
+		// The Matter port: a group message goes to the multicast address
+		// on CHIP_PORT, whatever port the node advertises
+		// (src/transport/raw/PeerAddress.h:288 at the harness pin), so the
+		// groups leg needs the daemon on 5540.
+		listen:    fmt.Sprintf(":%d", matterPort),
 		dbPath:    filepath.Join(ctl.storageDir, "dut.db"),
 		appPipe:   filepath.Join(ctl.storageDir, "app.fifo"),
 		enableKey: chipTestEnableKey,

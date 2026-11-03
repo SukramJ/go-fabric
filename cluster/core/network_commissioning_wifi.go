@@ -6,16 +6,20 @@ package core
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"slices"
 	"sync"
+	"time"
 
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	netcommdef "github.com/SukramJ/go-fabric/cluster/spec/networkcommissioning"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
+	"github.com/SukramJ/go-fabric/store"
 	"github.com/SukramJ/go-fabric/tlv"
 )
 
@@ -38,6 +42,10 @@ type WiFiNetworkCommissioning struct {
 	// mu guards busy, committed, interfaceEnabled, lastConnectErr, lastNetworkID, lastStatus and networks.
 	mu          sync.Mutex
 	dataVersion cluster.DataVersionTracker
+	// changes reports what moves outside the cluster's own commands — the
+	// failsafe revert, the rejoin at Start
+	// ([WiFiNetworkCommissioning.OnAttributeChange]).
+	changes cluster.AttributeChanges
 
 	driver        contract.WiFiDriver
 	failSafe      func() (fabricIndex uint8, armed bool)
@@ -46,6 +54,8 @@ type WiFiNetworkCommissioning struct {
 	maxNetworks   uint8
 	scanMax       uint8
 	connectMax    uint8
+	store         store.Settings
+	logger        *slog.Logger
 
 	interfaceEnabled bool
 	// networks is the staged list, committed the list a CommissioningComplete
@@ -54,6 +64,10 @@ type WiFiNetworkCommissioning struct {
 	networks  []wifiNetwork
 	committed []wifiNetwork
 	busy      bool
+	// link is the SSID the driver last joined; a network's connected flag
+	// is derived from it, as chip's Linux driver reports the network the
+	// link is on (WiFiNetworkIterator::Next, NetworkCommissioningWiFiDriver.cpp:275-310).
+	link []byte
 
 	lastStatus     *uint8
 	lastNetworkID  []byte // empty reads as null (ReadAttribute :1087-1092)
@@ -89,6 +103,25 @@ type WiFiNetworkCommissioningConfig struct {
 	// ScanMaxTimeSeconds and ConnectMaxTimeSeconds; 0 are the Linux
 	// driver's 10 and 20 (NetworkCommissioningDriver.h:86-87).
 	ScanMaxTimeSeconds, ConnectMaxTimeSeconds uint8
+	// Store keeps the committed networks — SSID and credentials — across
+	// restarts, as chip's Linux driver keeps its network in the KVS
+	// (CommitConfiguration, Init: src/platform/Linux/
+	// NetworkCommissioningWiFiDriver.cpp:135-167, :77-128 at 6170af84);
+	// nil keeps them in memory.
+	Store store.Settings
+	// Logger logs a store failure; nil is slog.Default().
+	Logger *slog.Logger
+}
+
+// wifiNetworksKey is the setting the committed networks are stored under.
+const wifiNetworksKey = "netcomm.wifi.networks"
+
+// storedWiFiNetwork is one committed network as stored: chip's KVS keeps
+// the SSID and the credentials (kWiFiSSIDKeyName, kWiFiCredentialsKeyName);
+// whether it is connected comes from the link, not the store.
+type storedWiFiNetwork struct {
+	SSID        []byte `json:"ssid"`
+	Credentials []byte `json:"credentials"`
 }
 
 // wifiNetcommInst is the definition bound to the Wi-Fi feature.
@@ -110,8 +143,10 @@ const (
 )
 
 // NewWiFiNetworkCommissioning returns the Wi-Fi NetworkCommissioning
-// server: an empty network list, the interface enabled, the last
-// networking status, network id and connect error null.
+// server: the committed networks the Store holds (none without one), not
+// connected, the interface enabled, the last networking status, network
+// id and connect error null (NetworkCommissioningCluster.cpp:200-214 at
+// 6170af84). [WiFiNetworkCommissioning.Start] reconnects.
 func NewWiFiNetworkCommissioning(cfg WiFiNetworkCommissioningConfig) (*WiFiNetworkCommissioning, error) {
 	if cfg.Driver == nil {
 		return nil, errors.New("core: Wi-Fi NetworkCommissioning needs a driver")
@@ -119,7 +154,7 @@ func NewWiFiNetworkCommissioning(cfg WiFiNetworkCommissioningConfig) (*WiFiNetwo
 	w := &WiFiNetworkCommissioning{
 		driver: cfg.Driver, failSafe: cfg.FailSafe, failSafeArmed: cfg.IsFailSafeArmed, setBreadcrumb: cfg.SetBreadcrumb,
 		maxNetworks: cfg.MaxNetworks, scanMax: cfg.ScanMaxTimeSeconds, connectMax: cfg.ConnectMaxTimeSeconds,
-		interfaceEnabled: true,
+		store: cfg.Store, logger: cfg.Logger, interfaceEnabled: true,
 	}
 	if w.maxNetworks == 0 {
 		w.maxNetworks = 1
@@ -130,8 +165,105 @@ func NewWiFiNetworkCommissioning(cfg WiFiNetworkCommissioningConfig) (*WiFiNetwo
 	if w.connectMax == 0 {
 		w.connectMax = 20
 	}
+	w.committed = w.loadCommitted(context.Background()) //nolint:contextcheck // the constructor takes no context; it reads the store once
+	w.networks = slices.Clone(w.committed)
 	w.dataVersion.Bump()
 	return w, nil
+}
+
+// loadCommitted reads the stored committed networks (Init, :77-128): none
+// without a store, a stored value or one that decodes; at most
+// MaxNetworks of them.
+func (w *WiFiNetworkCommissioning) loadCommitted(ctx context.Context) []wifiNetwork {
+	if w.store == nil {
+		return nil
+	}
+	raw, ok, err := w.store.GetSetting(ctx, wifiNetworksKey)
+	if err != nil || !ok {
+		if err != nil {
+			w.log().Warn("netcomm.wifi.load_failed", slog.Any("err", err))
+		}
+		return nil
+	}
+	var stored []storedWiFiNetwork
+	if err := json.Unmarshal([]byte(raw), &stored); err != nil {
+		w.log().Warn("netcomm.wifi.load_failed", slog.Any("err", err))
+		return nil
+	}
+	var list []wifiNetwork
+	for _, n := range stored {
+		if len(n.SSID) == 0 || len(n.SSID) > maxWiFiSSIDLength || len(list) == int(w.maxNetworks) {
+			continue
+		}
+		list = append(list, wifiNetwork{ssid: n.SSID, credentials: n.Credentials})
+	}
+	return list
+}
+
+// saveCommittedLocked stores the committed networks (CommitConfiguration,
+// :135-167); w.mu is held.
+func (w *WiFiNetworkCommissioning) saveCommittedLocked(ctx context.Context) {
+	if w.store == nil {
+		return
+	}
+	stored := make([]storedWiFiNetwork, 0, len(w.committed))
+	for _, n := range w.committed {
+		stored = append(stored, storedWiFiNetwork{SSID: n.ssid, Credentials: n.credentials})
+	}
+	raw, err := json.Marshal(stored)
+	if err == nil {
+		err = w.store.SetSetting(ctx, wifiNetworksKey, string(raw))
+	}
+	if err != nil {
+		w.log().Warn("netcomm.wifi.save_failed", slog.Any("err", err))
+	}
+}
+
+func (w *WiFiNetworkCommissioning) log() *slog.Logger {
+	if w.logger != nil {
+		return w.logger
+	}
+	return slog.Default()
+}
+
+// Start reconnects to the first committed network when the node starts.
+// chip's Linux driver loads its network at Init (:77-128) and the link,
+// which the committed configuration brings back up (CommitConfig, :164),
+// reports itself through OnNetworkingStatusChange
+// (NetworkCommissioningCluster.cpp:283-307 at 6170af84): the network id
+// becomes LastNetworkID and the status LastNetworkingStatus. Here the
+// driver's ConnectNetwork is re-issued, bounded by ConnectMaxTimeSeconds,
+// and its result recorded the same way, the network marked connected on
+// success. Without a committed network Start does nothing; no breadcrumb
+// is written.
+func (w *WiFiNetworkCommissioning) Start(ctx context.Context) {
+	w.mu.Lock()
+	if len(w.committed) == 0 {
+		w.mu.Unlock()
+		return
+	}
+	target := w.committed[0]
+	w.mu.Unlock()
+	ctx, cancel := context.WithTimeout(ctx, time.Duration(w.connectMax)*time.Second)
+	defer cancel()
+	code, _, errValue := w.driver.ConnectNetwork(ctx, target.ssid, target.credentials)
+	status := netcommdef.NetworkCommissioningStatusEnum(code)
+	w.mu.Lock()
+	if statusOK(status) {
+		w.lastConnectErr = nil
+		w.link = bytes.Clone(target.ssid)
+		for j := range w.networks {
+			w.networks[j].connected = bytes.Equal(w.networks[j].ssid, target.ssid)
+		}
+	} else {
+		v := errValue
+		w.lastConnectErr = &v
+	}
+	w.lastNetworkID = bytes.Clone(target.ssid)
+	w.setStatusLocked(status)
+	w.dataVersion.Bump()
+	w.mu.Unlock()
+	w.changes.Notify(netcommAttrNetworks, netcommAttrLastNetworkingStatus, netcommAttrLastNetworkID, netcommAttrLastConnectErrorValue)
 }
 
 var (
@@ -142,7 +274,21 @@ var (
 	_ contract.ClusterAttributeWritePrivilege = (*WiFiNetworkCommissioning)(nil)
 	_ contract.ClusterCommandLister           = (*WiFiNetworkCommissioning)(nil)
 	_ contract.ClusterCommandInvokePrivilege  = (*WiFiNetworkCommissioning)(nil)
+	_ contract.AttributeChangeNotifier        = (*WiFiNetworkCommissioning)(nil)
 )
+
+// OnAttributeChange implements [contract.AttributeChangeNotifier]: the
+// failsafe revert and the rejoin at [WiFiNetworkCommissioning.Start]
+// change Networks and the last-connect attributes outside a command of
+// this cluster (the bridge reports a command's effect on the cluster it
+// invoked); chip marks them dirty where they change
+// (NetworkCommissioningCluster.cpp ReportNetworksListChanged in
+// OnFailSafeTimerExpired :992-1014, the Set… of OnNetworkingStatusChange
+// :283-307). Found by TC-CNET-4.9, whose subscription cache missed the
+// Networks an ArmFailSafe(0) restored.
+func (w *WiFiNetworkCommissioning) OnAttributeChange(cb func(change contract.Change)) (unsubscribe func()) {
+	return w.changes.OnAttributeChange(cb)
+}
 
 // MatterClusterID implements [contract.ClusterServer].
 func (w *WiFiNetworkCommissioning) MatterClusterID() uint32 { return netcommClusterID }
@@ -551,6 +697,7 @@ func (w *WiFiNetworkCommissioning) connect(ctx context.Context, req netcommdef.C
 	resp := netcommdef.ConnectNetworkResponse{NetworkingStatus: status, DebugText: debugText(text), ErrorValue: spec.Nullable[int32]{Null: true}}
 	if statusOK(status) {
 		w.lastConnectErr = nil
+		w.link = bytes.Clone(req.NetworkId)
 		for j := range w.networks {
 			w.networks[j].connected = bytes.Equal(w.networks[j].ssid, req.NetworkId)
 		}
@@ -568,24 +715,31 @@ func (w *WiFiNetworkCommissioning) connect(ctx context.Context, req netcommdef.C
 	return resp, nil
 }
 
-// OnCommissioningComplete keeps the staged networks (CommitConfiguration,
-// NetworkCommissioningCluster.cpp:984-990).
+// OnCommissioningComplete keeps the staged networks and stores them
+// (CommitConfiguration, NetworkCommissioningCluster.cpp:984-990; the Linux
+// driver's KVS put, NetworkCommissioningWiFiDriver.cpp:135-167).
 func (w *WiFiNetworkCommissioning) OnCommissioningComplete() {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	w.committed = slices.Clone(w.networks)
+	w.saveCommittedLocked(context.Background())
 }
 
 // OnFailSafeExpired restores the committed networks (RevertConfiguration,
-// :992-1014); with none left the last status, network id and connect
-// error are cleared.
+// :992-1014), each connected when the link is on it; with none left the
+// last status, network id and connect error are cleared. The change is
+// reported ([WiFiNetworkCommissioning.OnAttributeChange]).
 func (w *WiFiNetworkCommissioning) OnFailSafeExpired() {
 	w.mu.Lock()
-	defer w.mu.Unlock()
 	w.networks = slices.Clone(w.committed)
+	for j := range w.networks {
+		w.networks[j].connected = len(w.link) > 0 && bytes.Equal(w.networks[j].ssid, w.link)
+	}
 	w.busy = false
 	if len(w.networks) == 0 {
 		w.lastNetworkID, w.lastConnectErr, w.lastStatus = nil, nil, nil
 	}
 	w.dataVersion.Bump()
+	w.mu.Unlock()
+	w.changes.Notify(netcommAttrNetworks, netcommAttrLastNetworkingStatus, netcommAttrLastNetworkID, netcommAttrLastConnectErrorValue)
 }

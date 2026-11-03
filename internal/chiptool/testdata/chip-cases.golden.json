@@ -453,13 +453,28 @@
       "steps": 6,
       "stepsSkipped": 4
     },
+    "CNETWIFI/4.1": {
+      "tests": 1,
+      "steps": 10,
+      "stepsSkipped": 0
+    },
     "CNETWIFI/4.15": {
       "tests": 1,
       "steps": 4,
       "stepsSkipped": 0
     },
+    "CNETWIFI/4.4": {
+      "tests": 1,
+      "steps": 9,
+      "stepsSkipped": 0
+    },
     "CNETWIFI/4.5": {
       "steps": 4,
+      "stepsSkipped": 0
+    },
+    "CNETWIFI/4.9": {
+      "tests": 1,
+      "steps": 23,
       "stepsSkipped": 0
     },
     "COMMTR/2.1": {
@@ -712,6 +727,11 @@
       "tests": 1,
       "steps": 46,
       "stepsSkipped": 0
+    },
+    "EEVSE/2.3": {
+      "tests": 1,
+      "steps": 43,
+      "stepsSkipped": 18
     },
     "EEVSE/2.4": {
       "tests": 1,

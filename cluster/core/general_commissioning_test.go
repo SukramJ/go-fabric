@@ -15,6 +15,7 @@ import (
 	"github.com/SukramJ/go-fabric/clock/clocktest"
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/cluster/core"
+	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
 )
 
@@ -1273,5 +1274,29 @@ func TestGencomm_ArmFailSafeZeroLeavesTheBreadcrumb(t *testing.T) {
 	}
 	if gc.FailSafeArmed() {
 		t.Error("the fail-safe is still armed")
+	}
+}
+
+// TestGeneralCommissioningReportsAWrittenBreadcrumb: a Breadcrumb another
+// server writes (the Wi-Fi NetworkCommissioning commands, chip
+// UpdateBreadcrumb) reaches the subscription engine through
+// OnAttributeChange; an unchanged value reports nothing (TC-CNET-4.4,
+// 4.9).
+func TestGeneralCommissioningReportsAWrittenBreadcrumb(t *testing.T) {
+	gc := newGencomm(t, core.GeneralCommissioningConfig{})
+	var got [][]uint32
+	unsub := gc.OnAttributeChange(func(c contract.Change) { got = append(got, c.Attributes) })
+	ctx := context.Background()
+	for _, v := range []uint64{6, 6, 0} {
+		if err := gc.MatterWrite(ctx, 0x0000, v); err != nil {
+			t.Fatal(err)
+		}
+	}
+	unsub()
+	if err := gc.MatterWrite(ctx, 0x0000, uint64(9)); err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 2 || !slices.Equal(got[0], []uint32{0x0000}) || !slices.Equal(got[1], []uint32{0x0000}) {
+		t.Fatalf("reported %v, want Breadcrumb twice (6, then 0)", got)
 	}
 }

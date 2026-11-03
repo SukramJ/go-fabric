@@ -802,6 +802,14 @@ func (n *Node) startLocked(ctx context.Context) error {
 
 	n.ensureOTAProviderACL(ctx)
 	n.camerasOnline(ctx)
+	// The committed Wi-Fi network is rejoined before the fabrics'
+	// subscriptions and records go out (TESTING ONLY, --wifi-sim): chip's
+	// link comes back with the device (WiFiNetworkCommissioning.Start).
+	if wifi := n.root.WiFiNetworkCommissioning; wifi != nil {
+		work.pause()
+		wifi.Start(ctx)
+		work.resume()
+	}
 
 	// Fabrics of a previous run: their CASE identities, the subscriptions
 	// their controllers held, then their operational records — matter.js

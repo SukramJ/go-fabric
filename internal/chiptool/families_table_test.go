@@ -368,17 +368,13 @@ var chipFamilies = []family{
 		name: "CNETWIFI", cases: "CNET", variant: variantWiFiSim,
 		exclude: map[string]gap{
 			// The harness starts each case's daemon from the commissioned
-			// snapshot, so the network the snapshot configured must
-			// survive a restart. chip's Linux driver keeps it in its KVS
-			// (CommitConfiguration, Init: src/platform/Linux/
-			// NetworkCommissioningWiFiDriver.cpp:77-118, :135-138 at the
-			// harness pin) and reports it connected from the link; the
-			// module's Wi-Fi server keeps its list in memory only.
-			"4.1":  {classDefect, "TC-CNET-4.1 reads Networks for the one connected network the DUT was commissioned onto; cluster/core's WiFiNetworkCommissioning does not persist its committed networks, so a restarted daemon reports none (chip persists it: NetworkCommissioningWiFiDriver.cpp:77-118, :135-138)", false},
-			"4.4":  {classDefect, "TC-CNET-4.4 scans for the connected network's SSID; after a restart the daemon has no network (WiFiNetworkCommissioning does not persist its committed networks, as for 4.1)", false},
-			"4.9":  {classDefect, "TC-CNET-4.9 removes and re-adds the connected network; after a restart the daemon has none (WiFiNetworkCommissioning does not persist its committed networks, as for 4.1)", false},
+			// snapshot; the network the snapshot configured survives the
+			// restart and is rejoined (WiFiNetworkCommissioning.Start, as
+			// chip's Linux driver keeps it: NetworkCommissioningWiFiDriver.cpp
+			// :77-128, :135-167 at the harness pin), so 4.1, 4.4 and 4.9 run;
+			// the simulated driver knows only --wifi-sim-ssid's network.
 			"4.11": {classHarness, "TC-CNET-4.11 moves the DUT between two real access points and switches the TH host's own Wi-Fi with them (PIXIT.CNET.WIFI_2ND_ACCESSPOINT_SSID/_CREDENTIALS, TC_CNET_4_11.py:1107-1112, and its host connect steps); the simulated driver has no second network and the harness host no Wi-Fi to switch", false},
-			"4.23": {classHarness, "TC-CNET-4.23 expects ConnectNetwork to an incorrect SSID or passphrase to fail; the TESTING-ONLY simulated driver connects to any SSID (examples/reference-bridge/wifisim.go ConnectNetwork), so only a real driver can answer it", false},
+			"4.23": {classHarness, "TC-CNET-4.23 steps 0-15 pass on the simulated driver (a wrong SSID is NetworkNotFound, a wrong passphrase AuthFailure, examples/reference-bridge/wifisim.go); step 16 calls the TH's CloseBLEConnection (TC_CNET_4_23.py:498) before its CASE CommissioningComplete, which the harness image's controller, built without BLE, refuses (CHIP_ERROR_UNSUPPORTED_CHIP_FEATURE without CONFIG_NETWORK_LAYER_BLE, src/controller/python/ChipDeviceController-ScriptBinding.cpp:1520-1528): the case assumes a BLE-commissioned DUT", false},
 			"4.25": {classNotSupported, "TC-CNET-4.25 verifies Wi-Fi per-device credentials (NetworkCommissioning PDC); the module serves no PDC, and the case skips itself on an endpoint without it", true},
 			"4.26": {classNotSupported, "TC-CNET-4.26 verifies QueryIdentity (per-device credentials); no PDC, the case skips itself", true},
 			"4.27": {classNotSupported, "TC-CNET-4.27 verifies Wi-Fi network client identities (per-device credentials); no PDC, the case skips itself", true},
@@ -733,9 +729,6 @@ var chipFamilies = []family{
 			// without the cluster (UNSUPPORTED_CLUSTER). matter.js's
 			// chip-testing does not run the EEVSE family.
 			"2.2": {{"self.write_user_max_charge(1, user_max_charge_current)", "self.write_user_max_charge(self.get_endpoint(), user_max_charge_current)", "TC-EEVSE-2.2 step 9 hard-codes endpoint 1 for the UserMaximumChargeCurrent write (TC_EEVSE_2_2.py:298); the case's own endpoint is the EVSE"}},
-		},
-		exclude: map[string]gap{
-			"2.3": {classDefect, "TC-EEVSE-2.3 step 19 (eleven ChargingTargets in one day) expects RESOURCE_EXHAUSTED; the generated SetTargets decoder refuses the list at its `max 10` constraint with CONSTRAINT_ERROR before the server's own check (cluster/energy/evse.go, evseMaxTargetsPerDay) can answer, as matter.js does (CommandInvokeResponse.ts requestTlv.validate). notes/parity/matter_behaviour_findings.md, Certification harness, TC-EEVSE-2.3", false},
 		},
 	},
 	{name: "EEVSEM", deviceType: dtEnergyEvse},

@@ -167,7 +167,7 @@ Harness image: `ghcr.io/matter-js/chip@sha256:d6f1de89d714309beb621543d451a98996
 | CADMIN | 21 | 10 | 0 | 0 | 3 | 8 | 0 |
 | CGEN | 10 | 3 | 0 | 0 | 7 | 0 | 0 |
 | CNET | 23 | 2 | 0 | 0 | 12 | 4 | 5 |
-| CNETWIFI | 23 | 3 | 0 | 3 | 11 | 6 | 0 |
+| CNETWIFI | 23 | 6 | 0 | 0 | 11 | 6 | 0 |
 | DA | 13 | 4 | 0 | 0 | 5 | 4 | 0 |
 | DD | 30 | 13 | 0 | 0 | 0 | 17 | 0 |
 | DESC | 3 | 2 | 0 | 0 | 0 | 1 | 0 |
@@ -229,7 +229,7 @@ Harness image: `ghcr.io/matter-js/chip@sha256:d6f1de89d714309beb621543d451a98996
 | EGC | 3 | 3 | 0 | 0 | 0 | 0 | 0 |
 | DEM | 11 | 9 | 0 | 0 | 2 | 0 | 0 |
 | DEMM | 2 | 2 | 0 | 0 | 0 | 0 | 0 |
-| EEVSE | 10 | 9 | 0 | 1 | 0 | 0 | 0 |
+| EEVSE | 10 | 10 | 0 | 0 | 0 | 0 | 0 |
 | EEVSEM | 2 | 2 | 0 | 0 | 0 | 0 | 0 |
 | FAN | 12 | 7 | 0 | 0 | 5 | 0 | 0 |
 | HEPAFREMON | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
@@ -280,7 +280,7 @@ Harness image: `ghcr.io/matter-js/chip@sha256:d6f1de89d714309beb621543d451a98996
 | MEDIAPLAYBACK | 11 | 5 | 0 | 0 | 2 | 4 | 0 |
 | TGTNAV | 2 | 1 | 0 | 0 | 0 | 1 | 0 |
 | WAKEONLAN | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
-| **all** | **707** | **445** | **0** | **4** | **130** | **123** | **5** |
+| **all** | **707** | **449** | **0** | **0** | **130** | **123** | **5** |
 
 ### Cases not run
 
@@ -372,7 +372,6 @@ Harness image: `ghcr.io/matter-js/chip@sha256:d6f1de89d714309beb621543d451a98996
 | CNET/4.5 | (b) not supported | not applicable: the case's PICS `CNET.S.F00` is false for the reference DUT |
 | CNET/4.6 | (b) not supported | not applicable: the case's PICS `CNET.S.F01` is false for the reference DUT |
 | CNET/4.9 | (b) not supported | not applicable: the case's PICS `CNET.S.F00` is false for the reference DUT |
-| CNETWIFI/4.1 | (a) defect | TC-CNET-4.1 reads Networks for the one connected network the DUT was commissioned onto; cluster/core's WiFiNetworkCommissioning does not persist its committed networks, so a restarted daemon reports none (chip persists it: NetworkCommissioningWiFiDriver.cpp:77-118, :135-138) |
 | CNETWIFI/4.10 | (b) not supported | not applicable: the case's PICS `CNET.S & CNET.S.F01` is false for the reference DUT |
 | CNETWIFI/4.11 | (c) harness | TC-CNET-4.11 moves the DUT between two real access points and switches the TH host's own Wi-Fi with them (PIXIT.CNET.WIFI_2ND_ACCESSPOINT_SSID/_CREDENTIALS, TC_CNET_4_11.py:1107-1112, and its host connect steps); the simulated driver has no second network and the harness host no Wi-Fi to switch |
 | CNETWIFI/4.12 | (b) not supported | not applicable: the case's PICS `CNET.S.F01` is false for the reference DUT |
@@ -383,15 +382,13 @@ Harness image: `ghcr.io/matter-js/chip@sha256:d6f1de89d714309beb621543d451a98996
 | CNETWIFI/4.20 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | CNETWIFI/4.21 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | CNETWIFI/4.22 | (b) not supported | not applicable: the case's PICS `CNET.S.F01` is false for the reference DUT |
-| CNETWIFI/4.23 | (c) harness | TC-CNET-4.23 expects ConnectNetwork to an incorrect SSID or passphrase to fail; the TESTING-ONLY simulated driver connects to any SSID (examples/reference-bridge/wifisim.go ConnectNetwork), so only a real driver can answer it |
+| CNETWIFI/4.23 | (c) harness | TC-CNET-4.23 steps 0-15 pass on the simulated driver (a wrong SSID is NetworkNotFound, a wrong passphrase AuthFailure, examples/reference-bridge/wifisim.go); step 16 calls the TH's CloseBLEConnection (TC_CNET_4_23.py:498) before its CASE CommissioningComplete, which the harness image's controller, built without BLE, refuses (CHIP_ERROR_UNSUPPORTED_CHIP_FEATURE without CONFIG_NETWORK_LAYER_BLE, src/controller/python/ChipDeviceController-ScriptBinding.cpp:1520-1528): the case assumes a BLE-commissioned DUT |
 | CNETWIFI/4.25 | (b) not supported | TC-CNET-4.25 verifies Wi-Fi per-device credentials (NetworkCommissioning PDC); the module serves no PDC, and the case skips itself on an endpoint without it (runs, and skips itself) |
 | CNETWIFI/4.26 | (b) not supported | TC-CNET-4.26 verifies QueryIdentity (per-device credentials); no PDC, the case skips itself (runs, and skips itself) |
 | CNETWIFI/4.27 | (b) not supported | TC-CNET-4.27 verifies Wi-Fi network client identities (per-device credentials); no PDC, the case skips itself (runs, and skips itself) |
 | CNETWIFI/4.29 | (b) not supported | TC-CNET-4.29 verifies ConnectNetwork with per-device credentials; no PDC, the case skips itself (runs, and skips itself) |
 | CNETWIFI/4.3 | (b) not supported | not applicable: the case's PICS `CNET.S.F02` is false for the reference DUT |
-| CNETWIFI/4.4 | (a) defect | TC-CNET-4.4 scans for the connected network's SSID; after a restart the daemon has no network (WiFiNetworkCommissioning does not persist its committed networks, as for 4.1) |
 | CNETWIFI/4.6 | (b) not supported | not applicable: the case's PICS `CNET.S.F01` is false for the reference DUT |
-| CNETWIFI/4.9 | (a) defect | TC-CNET-4.9 removes and re-adds the connected network; after a restart the daemon has none (WiFiNetworkCommissioning does not persist its committed networks, as for 4.1) |
 | CONTENTLAUNCHER/10.10 | (b) not supported | not applicable: the case's PICS `CONTENTLAUNCHER.S & CONTENTLAUNCHER.S.A0003` is false for the reference DUT |
 | CONTENTLAUNCHER/10.4 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | CONTENTLAUNCHER/10.6 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
@@ -449,7 +446,6 @@ Harness image: `ghcr.io/matter-js/chip@sha256:d6f1de89d714309beb621543d451a98996
 | EEM/2.3 | (b) not supported | not applicable: the case's PICS `EEM.S & EEM.S.F02 & EEM.S.F01` is false for the reference DUT |
 | EEM/2.4 | (b) not supported | not applicable: the case's PICS `EEM.S & EEM.S.F03 & EEM.S.F00` is false for the reference DUT |
 | EEM/2.5 | (b) not supported | not applicable: the case's PICS `EEM.S & EEM.S.F03 & EEM.S.F01` is false for the reference DUT |
-| EEVSE/2.3 | (a) defect | TC-EEVSE-2.3 step 19 (eleven ChargingTargets in one day) expects RESOURCE_EXHAUSTED; the generated SetTargets decoder refuses the list at its `max 10` constraint with CONSTRAINT_ERROR before the server's own check (cluster/energy/evse.go, evseMaxTargetsPerDay) can answer, as matter.js does (CommandInvokeResponse.ts requestTlv.validate). notes/parity/matter_behaviour_findings.md, Certification harness, TC-EEVSE-2.3 |
 | FAN/2.3 | (b) not supported | not applicable: the case's PICS `FAN.S.F02` is false for the reference DUT |
 | FAN/2.4 | (b) not supported | not applicable: the case's PICS `FAN.S.F03` is false for the reference DUT |
 | FAN/2.5 | (b) not supported | not applicable: the case's PICS `FAN.S & FAN.S.F05` is false for the reference DUT |
@@ -681,8 +677,15 @@ daemon with `--wifi-sim`: NetworkCommissioning with the Wi-Fi feature
 (`CNET.S.F00=1`) over a simulated driver (TESTING ONLY), with PICS generated
 from that daemon (`internal/chiptool/testdata/pics-wifi-sim/`). Its
 commissioned snapshots carry the Wi-Fi network a test harness commissioning
-over BLE-Wi-Fi would have configured. Cases that need a real driver, a second
-access point or per-device credentials stay classified in the table above.
+over BLE-Wi-Fi would have configured; since phase 30 the daemon keeps that
+committed network in its database and rejoins it when it starts, as chip's
+Linux driver does, so TC-CNET-4.1, 4.4 and 4.9 run on the restarted daemon,
+and the simulated driver knows only the `--wifi-sim-ssid` networks. Cases
+that need a real driver, a second access point, a BLE-commissioning TH or
+per-device credentials stay classified in the table above. TC-EEVSE-2.3
+runs too: its eleventh ChargingTarget is the server's RESOURCE_EXHAUSTED,
+as chip answers (`BD-chip-EVSE-TargetsServerHeld`). No class (a) case is
+left.
 
 Some families run but have nothing the daemon can be tested on. The root's
 IcdManagement is not mounted (`node/root.go` buildRoot says why), so the

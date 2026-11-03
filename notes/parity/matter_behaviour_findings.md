@@ -724,19 +724,6 @@ Identify, WindowCovering and ServiceArea tests (brief BJ, PR #170,
 
 ## Application cluster servers — open items. (Triage 2026-10-29: wave H1, the device IM and write path.)
 
-- **Wi-Fi NetworkCommissioning (TESTING ONLY) does not persist its
-  committed networks across a restart.** TC-CNET-4.1, 4.4 and 4.9 find no
-  connected network after the daemon restarts; chip's Linux driver stores
-  the committed network and reconnects at `Init`
-  (`src/platform/Linux/NetworkCommissioningWiFiDriver.cpp:77-118, :135-138`
-  at the harness pin). Fix: persist the committed `Networks` entry through
-  the node's store and re-issue `Connect` on start; class (a) in the
-  CNETWIFI row of `docs/certifiability.md`. (Triage 2026-10-29: wave H2, commissioning and security (Fable), before milestone 7 makes the Wi-Fi server real.)
-- **The simulated Wi-Fi driver connects to any SSID.** TC-CNET-4.23
-  expects a wrong SSID to fail; `--wifi-sim` accepts every network.
-  Fix: a configurable SSID list for the simulated driver
-  (`--wifi-sim-ssid`), so 4.23 moves from class (c) to a pass. (Triage 2026-10-29: wave H2, commissioning and security (Fable), before milestone 7 makes the Wi-Fi server real.)
-
 - **Wi-Fi NetworkCommissioning: the fail-safe check is not bound to the
   accessing fabric.** `core.WiFiNetworkCommissioning` gates its commands
   on `GeneralCommissioning.FailSafeArmed()` (any fabric), chip on
@@ -795,7 +782,8 @@ both need a real ecosystem run (phase 5).
 - **Now by design:** see `by_design.md` — the reopen without erase, the
   OTA provider ACL on every fabric, the mirrored OTA consent quirks and
   TC-SU-2.7, the DCL's expired CRL and unported parts, the group
-  epochStartTime units, CountdownTime reportability, TC-EEVSE-2.3,
+  epochStartTime units, CountdownTime reportability, TC-EEVSE-2.3
+  (since phase 30 `BD-chip-EVSE-TargetsServerHeld`, chip's status),
   GroupKeyMulticastPolicy and ColorControl's `hsvToXy`, RvcRunMode's
   InvalidInMode, the unported chip FanMode split, the `matter_diagnostics`
   API (Deprecated).

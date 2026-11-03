@@ -29,9 +29,9 @@ var bridgeSimCommands = []string{
 // TestBridgeSimFlag: with --bridge-sim the node bridges matter.js's bridge
 // test instance's devices after every other device
 // (BridgeTestInstance.ts:148-172 at 862ad75f). They mount free of
-// device-type violations but the composed sensors' tag list (:306-317),
-// which the device kit cannot declare; the composed
-// device lists Power Source beside Bridged Node, its sensors are its own
+// device-type violations — the composed sensors tell each other apart by
+// their CommonNumberTag (:306-317); the composed
+// device lists Bridged Node and then Power Source (:330-335), its sensors are its own
 // PartsList and carry no BridgedDeviceBasicInformation, its PowerSource
 // names the three endpoints; each app-pipe command moves the state it
 // names (:205-261), add and remove are no-ops when already done, and every
@@ -91,14 +91,6 @@ func TestBridgeSimFlag(t *testing.T) {
 		if v.Endpoint < light1.ID {
 			continue
 		}
-		// The composed device's sensors share a device type, so Base
-		// requires a TagList of each (matter.js gives them
-		// CommonNumberTag One and Two, BridgeTestInstance.ts:306-317); the
-		// device kit has no TagList declaration (notes/parity/
-		// matterjs_tests.md, SemanticNamespaceTest.ts row).
-		if slices.Contains(partNos, v.Endpoint) && strings.Contains(v.String(), "Descriptor.TAGLIST") {
-			continue
-		}
 		t.Errorf("device type violation: %s", v)
 	}
 	types := readMounted(t, composed, descriptordef.ClusterID, descriptordef.AttrDeviceTypeList).([]mattercore.DeviceTypeStruct)
@@ -106,8 +98,8 @@ func TestBridgeSimFlag(t *testing.T) {
 	for _, dt := range types {
 		ids = append(ids, dt.DeviceType)
 	}
-	if !slices.Contains(ids, uint32(device.PowerSourceID)) || !slices.Contains(ids, uint32(device.BridgedNodeID)) {
-		t.Errorf("composed DeviceTypeList %v, want Power Source 0x0011 and Bridged Node 0x0013 (:330-335)", ids)
+	if !slices.Equal(ids, []uint32{uint32(device.BridgedNodeID), uint32(device.PowerSourceID)}) || types[0].Revision != 3 || types[1].Revision != 1 {
+		t.Errorf("composed DeviceTypeList %+v, want Bridged Node 0x0013 rev 3 and Power Source 0x0011 rev 1 (:330-335)", types)
 	}
 	if parts := readMounted(t, composed, descriptordef.ClusterID, descriptordef.AttrPartsList); !slices.Equal(parts.([]uint16), partNos) {
 		t.Errorf("composed PartsList %v, want its two sensors %v", parts, partNos)
@@ -121,6 +113,12 @@ func TestBridgeSimFlag(t *testing.T) {
 			if srv.MatterClusterID() == bdbidef.ClusterID {
 				t.Errorf("composed part %d serves BridgedDeviceBasicInformation (:159-161)", no)
 			}
+		}
+	}
+	for i, no := range partNos {
+		tags, _ := readMounted(t, byID(no), descriptordef.ClusterID, descriptordef.AttrTagList).([]mattercore.SemanticTag)
+		if len(tags) != 1 || tags[0].NamespaceId != descriptordef.NamespaceCommonNumber || tags[0].Tag != uint8(i+1) || !tags[0].MfgCode.Null {
+			t.Errorf("composed part %d TagList %+v, want CommonNumberTag %d (:306-317)", no, tags, i+1)
 		}
 	}
 	if got := readMounted(t, composed, psdef.ClusterID, psdef.AttrEndpointList); !slices.Equal(got.([]uint16), append([]uint16{composed.ID}, partNos...)) {

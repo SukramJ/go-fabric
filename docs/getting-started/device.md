@@ -253,6 +253,19 @@ takes these two handlers only; the assembler keeps IdentifyTime.
   manufacturer.
 - `Reachable` is a probe for the device's reachability; nil means always
   reachable.
+- `Conditions` are the device-type conditions you state for the endpoint.
+- `DeviceTypes` lists further device types in the endpoint's Descriptor
+  DeviceTypeList, after the device's own and before Bridged Node, each
+  once and with the schema's revision — matter.js's bridge test instance
+  lists Power Source on its composed device this way. A listed type's
+  mandatory clusters are then required of the endpoint, and an id the
+  schema does not know is refused.
+- `Tags` are the semantic tags the endpoint's Descriptor serves in
+  TagList (`device.SemanticTag`); they tell sibling parts of one device
+  type apart, as `CommonNumberTag` One and Two do on matter.js's composed
+  device. Without tags the Descriptor serves no TagList and its FeatureMap
+  no TAGLIST bit — the default, because Apple Home rejects a Descriptor
+  that serves it.
 
 Declarations passed after `Options` change what the device serves. A
 cluster is declared with `<cluster>def.Declare` of its generated package
@@ -344,7 +357,8 @@ door, err := device.NewVideoDoorbell(device.Options{StableKey: endpoint.StringKe
 // door.Camera(), door.Doorbell(); err wraps device.ErrComposition without a component
 ```
 
-Each endpoint keeps one device type in its DeviceTypeList; the node's
+Each endpoint keeps one device type in its DeviceTypeList unless
+`Options.DeviceTypes` lists more; the node's
 device-type validation accepts the composition with its parts and reports
 the two `instanceCount` violations matter.js pins for a composite without
 them.

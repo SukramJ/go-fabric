@@ -536,7 +536,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 | EndpointTypeTest.ts | 44 | excluded | `js-runtime-only` | The TypeScript EndpointType.is guard. |
 | MutableEndpointClientClustersTest.ts | 187 | partial | `device:TestClientListCarriesTheMandatoryClientClusters` | The TypeScript endpoint builder's client slot; its one Matter-visible case, the mandatory client clusters a device type adds, is covered. Missing: “defaults clientClusters to empty when not provided”; “accepts an explicit clientClusters slot”; “compiles type-level checks”; “withClientClusters extends the clientClusters slot at runtime”; “routes server-only args to behaviors slot”; “routes client-only args to clientClusters slot”; “routes mixed args correctly”; “routes same cluster server + client in one call to separate slots”; “idempotent on duplicate args”; “type-level: explicit .withClientClusters(...) narrows clientClusters key”; “does not auto-register optional client clusters (on-off-light)”; “auto-registers mandatory and leaves optional un-registered (camera-controller)”; “does not double-add when .with() supplies a mandatory client”. |
 | MutableEndpointTest.ts | 160 | excluded | `js-runtime-only` | The TypeScript MutableEndpoint builder (fields, behaviors, defaults). |
-| SemanticNamespaceTest.ts | 89 | planned | — | Semantic tag namespaces as values (standard tags, custom namespaces): no subject exists in the module (schema and device carry no namespace table, the device kit no TagList declaration); the port waits until a consumer asks for one (owner decision 2026-10-29). |
+| SemanticNamespaceTest.ts | 89 | planned | — | Semantic tag namespaces as values (standard tags, custom namespaces): no subject exists in the module (schema and device carry no namespace table; the device kit declares TagList entries as values since phase 30, device.Options.Tags); the port waits until a consumer asks for one (owner decision 2026-10-29). |
 
 ## node/test/endpoint/validation
 
@@ -1031,4 +1031,4 @@ does not test. They count as passes in `go test`; this list is where they are re
 
 ### node/test/endpoint/type
 
-- `SemanticNamespaceTest.ts` — Semantic tag namespaces as values (standard tags, custom namespaces): no subject exists in the module (schema and device carry no namespace table, the device kit no TagList declaration); the port waits until a consumer asks for one (owner decision 2026-10-29).
+- `SemanticNamespaceTest.ts` — Semantic tag namespaces as values (standard tags, custom namespaces): no subject exists in the module (schema and device carry no namespace table; the device kit declares TagList entries as values since phase 30, device.Options.Tags); the port waits until a consumer asks for one (owner decision 2026-10-29).

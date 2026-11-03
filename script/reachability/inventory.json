@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 7244,
+  "entry_points": 7252,
   "entry_packages": [
     ".",
     "bdx",
@@ -277,9 +277,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 17124,
+    "total_exported": 17132,
     "reachable": 12070,
-    "whitelisted": 5054,
+    "whitelisted": 5062,
     "unreachable": 0
   },
   "by_package": [],
@@ -2989,6 +2989,13 @@
     },
     {
       "package": "bridge",
+      "identifier": "TestDispatchWriteRequest_StampsTheTimedWindow",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/write_timed_stamp_test.go",
+      "line": 37
+    },
+    {
+      "package": "bridge",
       "identifier": "TestDispatchWriteRequest_TimedWithMoreChunked_RejectsInvalidActionAndConsumesWindow",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/write_chunked_dispatch_test.go",
@@ -5100,6 +5107,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/pase_session_params_test.go",
       "line": 52
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestSetTargetsEleventhTargetIsServerJudged",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/fields_evse_targets_test.go",
+      "line": 26
     },
     {
       "package": "bridge",
@@ -8736,10 +8750,31 @@
     },
     {
       "package": "cluster/core",
+      "identifier": "TestWiFiNetworkCommissioningPersistsAndReconnects",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/network_commissioning_wifi_persist_test.go",
+      "line": 54
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestWiFiNetworkCommissioningReconnectFails",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/network_commissioning_wifi_persist_test.go",
+      "line": 131
+    },
+    {
+      "package": "cluster/core",
       "identifier": "TestWiFiNetworkCommissioningScan",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/network_commissioning_wifi_test.go",
       "line": 259
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestWiFiNetworkCommissioningStoredValueRules",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/network_commissioning_wifi_persist_test.go",
+      "line": 150
     },
     {
       "package": "cluster/energy",
@@ -14913,42 +14948,42 @@
       "identifier": "ChargingTargetScheduleStructDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/energyevse/definition_gen.go",
-      "line": 116
+      "line": 117
     },
     {
       "package": "cluster/spec/energyevse",
       "identifier": "ChargingTargetStructDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/energyevse/definition_gen.go",
-      "line": 178
+      "line": 179
     },
     {
       "package": "cluster/spec/energyevse",
       "identifier": "EnergyTransferStoppedReasonEnum",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/energyevse/definition_gen.go",
-      "line": 187
+      "line": 188
     },
     {
       "package": "cluster/spec/energyevse",
       "identifier": "EnergyTransferStoppedReasonEnumDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/energyevse/definition_gen.go",
-      "line": 199
+      "line": 200
     },
     {
       "package": "cluster/spec/energyevse",
       "identifier": "FaultStateEnum",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/energyevse/definition_gen.go",
-      "line": 208
+      "line": 209
     },
     {
       "package": "cluster/spec/energyevse",
       "identifier": "FaultStateEnumDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/energyevse/definition_gen.go",
-      "line": 234
+      "line": 235
     },
     {
       "package": "cluster/spec/energyevse",
@@ -14962,42 +14997,42 @@
       "identifier": "StateEnum",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/energyevse/definition_gen.go",
-      "line": 257
+      "line": 258
     },
     {
       "package": "cluster/spec/energyevse",
       "identifier": "StateEnumDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/energyevse/definition_gen.go",
-      "line": 273
+      "line": 274
     },
     {
       "package": "cluster/spec/energyevse",
       "identifier": "SupplyStateEnum",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/energyevse/definition_gen.go",
-      "line": 286
+      "line": 287
     },
     {
       "package": "cluster/spec/energyevse",
       "identifier": "SupplyStateEnumDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/energyevse/definition_gen.go",
-      "line": 301
+      "line": 302
     },
     {
       "package": "cluster/spec/energyevse",
       "identifier": "TargetDayOfWeekBitmap",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/energyevse/definition_gen.go",
-      "line": 124
+      "line": 125
     },
     {
       "package": "cluster/spec/energyevse",
       "identifier": "TargetDayOfWeekBitmapDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/energyevse/definition_gen.go",
-      "line": 140
+      "line": 141
     },
     {
       "package": "cluster/spec/energyevse",
@@ -24731,17 +24766,24 @@
     },
     {
       "package": "device",
+      "identifier": "SemanticTag",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "device/options.go",
+      "line": 73
+    },
+    {
+      "package": "device",
       "identifier": "SourceKey",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "device/options.go",
-      "line": 56
+      "line": 76
     },
     {
       "package": "device",
       "identifier": "StringKey",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "device/options.go",
-      "line": 60
+      "line": 80
     },
     {
       "package": "device",
@@ -24973,6 +25015,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/unimplemented_commands_test.go",
       "line": 23
+    },
+    {
+      "package": "device",
+      "identifier": "TestDescriptorDeviceTypesAndTagsParity",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "device/descriptor_device_types_tags_parity_matterjs_test.go",
+      "line": 66
     },
     {
       "package": "device",
@@ -26460,6 +26509,13 @@
     },
     {
       "package": "endpoint",
+      "identifier": "TestTimedWriteParity",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "endpoint/timed_write_parity_matterjs_test.go",
+      "line": 24
+    },
+    {
+      "package": "endpoint",
       "identifier": "TestTopologyDispatcher_CheckACL",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/dispatcher_acl_test.go",
@@ -27331,7 +27387,7 @@
       "identifier": "TestWiFiSim",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/wifisim_test.go",
-      "line": 15
+      "line": 18
     },
     {
       "package": "examples/reference-controller/cli",

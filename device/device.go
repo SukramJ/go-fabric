@@ -165,6 +165,13 @@ func New(t *Type, opts Options, decls ...Declaration) (*Device, error) {
 		return nil, err
 	}
 	opts.Name = endpoint.ComposeNodeLabel(opts.Name, "")
+	for _, id := range opts.DeviceTypes {
+		if _, ok := schema.DeviceTypeRevision(id); !ok {
+			return nil, fmt.Errorf("device: %s: Options.DeviceTypes: device type 0x%04X is not in the schema", t.Name, uint32(id))
+		}
+	}
+	opts.DeviceTypes = slices.Clone(opts.DeviceTypes)
+	opts.Tags = slices.Clone(opts.Tags)
 	if bridgedPS && !slices.Contains(opts.Conditions, ConditionBridgedPowerSourceInfo) {
 		opts.Conditions = append(slices.Clone(opts.Conditions), ConditionBridgedPowerSourceInfo)
 	}
@@ -698,6 +705,8 @@ func (d *Device) Spec() endpoint.Spec {
 		Availability:     d.available,
 		Source:           d.source,
 		DeviceConditions: slices.Clone(d.opts.Conditions),
+		DeviceTypes:      d.deviceTypes(),
+		Tags:             slices.Clone(d.opts.Tags),
 		ClientClusters:   d.clientClusters(),
 		OptIn:            slices.Clone(d.optIn),
 		Measurement:      d.measured.source,
@@ -707,6 +716,18 @@ func (d *Device) Spec() endpoint.Spec {
 		s.Parts = append(s.Parts, p.Spec())
 	}
 	return s
+}
+
+// deviceTypes are [Options].DeviceTypes as [endpoint.Spec.DeviceTypes].
+func (d *Device) deviceTypes() []uint16 {
+	if len(d.opts.DeviceTypes) == 0 {
+		return nil
+	}
+	out := make([]uint16, 0, len(d.opts.DeviceTypes))
+	for _, id := range d.opts.DeviceTypes {
+		out = append(out, uint16(id))
+	}
+	return out
 }
 
 // clientClusters are the client clusters the device type mandates — what
