@@ -415,12 +415,6 @@ Device side:. (Triage 2026-10-29: owner's hand test (manual test list C5), no wa
   SubscriptionsServerTest "drops the stored subscription when the peer closes
   its session while the node keeps running"). Fix: terminate on every close
   except the one `Stop` performs. (Triage 2026-10-29: wave H1, the device IM and write path.)
-- **No BUSY for a write that races a chunked write.** A chunked write holds
-  its attribute (`bridge/exchange_routing.go:62` `writeTxs`); another
-  exchange writing the same attribute is not answered BUSY as matter.js does
-  (`InteractionServer.ts:507,526` at `862ad75f`, #4768; InteractionProtocolTest
-  "answers BUSY to another exchange's write of an attribute while a chunked
-  write holds it"). (Triage 2026-10-29: wave H1, the device IM and write path.)
 - **Utility component on the composing endpoint is not a candidate.**
   `endpoint/devicetype_conformance.go:842-850` `candidatesOf` iterates the
   composition scope; matter.js #4745 prepends the composing endpoint when it

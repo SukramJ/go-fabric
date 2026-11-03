@@ -348,6 +348,7 @@ func (b *Bridge) dispatchGroupMessage(ctx context.Context, buf []byte, src *net.
 			return fmt.Errorf("group write: %w", err)
 		}
 		gctx := im.WithGroupSubject(im.WithFabricFilter(ctx, true, msg.FabricIndex), subject)
+		gctx = im.WithWriteTransaction(gctx, im.NewWriteTransaction(&b.routing.writeHolds))
 		status = im.HandleGroupWriteRequest(gctx, dispatcher, req)
 	default:
 		return nil

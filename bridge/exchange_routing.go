@@ -69,6 +69,12 @@ type exchangeRouting struct {
 	// map[mrp.ExchangeKey]*writeTx
 	writeTxs sync.Map
 
+	// writeHolds are the attributes chunked writes hold: another
+	// exchange's concrete write of one is answered BUSY, a wildcard or
+	// group write skips it (matter.js InteractionServer.ts:180
+	// #writingExchanges).
+	writeHolds im.WriteHolds
+
 	// timedDeadlines maps a (sessionID, exchangeID) pair to the
 	// wall-clock deadline a TimedRequest established. The follow-up
 	// Write / Invoke (req.TimedRequest=true) must arrive before the
@@ -200,6 +206,7 @@ func (r *exchangeRouting) writeTransaction(key mrp.ExchangeKey, more bool, now t
 	r.writeTxs.Range(func(k, v any) bool {
 		if w, ok := v.(*writeTx); ok && now.Sub(w.started) > writeTxTTL {
 			r.writeTxs.Delete(k)
+			w.tx.Release()
 		}
 		return true
 	})
@@ -209,11 +216,11 @@ func (r *exchangeRouting) writeTransaction(key mrp.ExchangeKey, more bool, now t
 				return w.tx
 			}
 		}
-		return &im.WriteTransaction{}
+		return im.NewWriteTransaction(&r.writeHolds)
 	}
-	v, _ := r.writeTxs.LoadOrStore(key, &writeTx{tx: &im.WriteTransaction{}, started: now})
+	v, _ := r.writeTxs.LoadOrStore(key, &writeTx{tx: im.NewWriteTransaction(&r.writeHolds), started: now})
 	if w, isTx := v.(*writeTx); isTx {
 		return w.tx
 	}
-	return &im.WriteTransaction{}
+	return im.NewWriteTransaction(&r.writeHolds)
 }
