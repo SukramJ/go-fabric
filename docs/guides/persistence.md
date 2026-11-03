@@ -29,6 +29,7 @@ module's consumers call:
 | `store.ThermostatPresets` | a Thermostat endpoint's presets | the Thermostat server (`store.NewThermostatPresetStore`) |
 | `store.DoorLocks` | a lock endpoint's users, credentials and schedules | the DoorLock server |
 | `store.ICD` | the ICD Management server's registered Check-In clients with their keys, and the ICDCounter | ICD Management (`node.Config.ICD`) |
+| `store.Eraser` | `Erase`: every row of every area, the next fabric index back at 1 | the factory reset (`node.Node.FactoryReset`, `controller.Controller.Erase`) |
 
 A consumer names the areas it uses, never the whole port; the node, which
 wires every consumer, holds a `store.Port`.
