@@ -231,7 +231,7 @@ func TestSessionManagerWallClockSteps(t *testing.T) {
 		m := NewManager(newMinimalFakeStore())
 		clk := clocktest.New(time.UnixMilli(1_700_000_000_000))
 		m.SetClock(clk)
-		var sessions []*Entry
+		sessions := make([]*Entry, 0, MaxSessionsPerPeer)
 		for i := range uint16(MaxSessionsPerPeer) {
 			e := open(t, m, 0x0100+i)
 			sessionManagerStamp(clk, e)

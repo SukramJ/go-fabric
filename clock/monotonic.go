@@ -49,4 +49,4 @@ var systemStart = time.Now()
 
 // Monotonic implements [Monotonic] on the monotonic reading time.Now
 // carries (time.Time.Sub uses it when both operands have one).
-func (System) Monotonic() time.Duration { return time.Now().Sub(systemStart) }
+func (System) Monotonic() time.Duration { return time.Since(systemStart) }

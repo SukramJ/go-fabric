@@ -6,7 +6,9 @@ package mattercert
 import (
 	"bytes"
 	"encoding/asn1"
+	"errors"
 	"fmt"
+	"math"
 	"math/big"
 	"strconv"
 	"time"
@@ -247,6 +249,9 @@ func derDN(name asn1.RawValue) (DistinguishedName, error) {
 				v, err := id(32)
 				if err != nil {
 					return dn, err
+				}
+				if v > math.MaxUint32 {
+					return dn, errors.New("mattercert: CASE authenticated tag exceeds 32 bits")
 				}
 				dn.CASEAuthTags = append(dn.CASEAuthTags, uint32(v))
 				dn.Order = append(dn.Order, dnTagMatterCASEAuth)

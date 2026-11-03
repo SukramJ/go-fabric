@@ -61,4 +61,3 @@ func (n *Node) AttestationError() error { return n.attestationErr }
 func validateProduct(chain *attestation.Chain, pd ProductDescription) error {
 	return attestation.ValidateProduct(chain, pd.VendorID, pd.ProductID)
 }
-

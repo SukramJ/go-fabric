@@ -170,7 +170,7 @@ func certificatesWithExtension(t *testing.T, der, extension []byte) []byte {
 		}
 		return out
 	}
-	var tbsOut [][]byte
+	tbsOut := make([][]byte, 0, len(tbs))
 	for _, f := range tbs {
 		if f.Class == asn1.ClassContextSpecific && f.Tag == 3 {
 			inner, err := derChildren(f.Bytes)
