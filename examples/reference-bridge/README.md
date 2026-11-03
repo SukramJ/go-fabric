@@ -158,13 +158,20 @@ the same two mechanisms CHIP's own example apps take (`control.go`):
 
 - `--wifi-sim` (TESTING ONLY) gives the root's NetworkCommissioning the
   Wi-Fi feature instead of Ethernet, over a simulated driver
-  (`wifisim.go`): a directed scan finds the network, ConnectNetwork
-  "connects" to any SSID after 200 ms, and the daemon stays on its
-  Ethernet address. It lets the commissioner's network steps run without a
-  radio: `reference-controller pair --passcode 20202021 --discriminator 3840
-  --wifi-ssid lab --wifi-credentials secret12`. The list rules and statuses
-  are connectedhomeip's (credentials of 0, 5, 8–63 bytes or 64 hex digits;
-  one network). Without the flag the composition is unchanged.
+  (`wifisim.go`) that knows the `--wifi-sim-ssid` networks
+  (comma-separated `ssid:passphrase`, an entry without a passphrase takes
+  any; default `zigbeehome:password123`, the CHIP harness's network). A
+  scan without an SSID finds them all, a scan for another SSID is
+  NetworkNotFound; ConnectNetwork joins a known network after 200 ms with
+  its passphrase, answers AuthFailure with another and NetworkNotFound for
+  an unknown SSID; the daemon stays on its Ethernet address. It lets the
+  commissioner's network steps run without a radio: `reference-controller
+  pair --passcode 20202021 --discriminator 3840 --wifi-ssid zigbeehome
+  --wifi-credentials password123`. The list rules and statuses are
+  connectedhomeip's (credentials of 0, 5, 8–63 bytes or 64 hex digits; one
+  network). The committed network is kept in the database and rejoined
+  when the daemon starts, as chip's Linux driver does. Without the flag
+  the composition is unchanged.
 
 - `--ota-provider` (TESTING ONLY) serves one embedded test OTA image
   (`ota_provider.go`) through the node's OTA Software Update Provider

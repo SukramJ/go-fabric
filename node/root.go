@@ -275,8 +275,12 @@ func buildRoot(ctx context.Context, d rootDeps) (*RootClusters, error) { //nolin
 	r.DiagnosticLogs.SetClock(cfg.Clock)
 	var netComm contract.ClusterServer
 	if wc := cfg.Network.wifiCommissioning; wc.Driver != nil {
-		r.WiFiNetworkCommissioning, err = mattercore.NewWiFiNetworkCommissioning(mattercore.WiFiNetworkCommissioningConfig{
+		r.WiFiNetworkCommissioning, err = mattercore.NewWiFiNetworkCommissioning(mattercore.WiFiNetworkCommissioningConfig{ //nolint:contextcheck // the constructor takes no context; it reads the store once
 			Driver: wc.Driver, FailSafe: generalCom.FailSafeFabric,
+			// The committed network survives a restart, as chip's driver
+			// keeps it (NetworkCommissioningWiFiDriver.cpp:135-167);
+			// Node.Start reconnects to it.
+			Store: d.st, Logger: d.logger,
 			SetBreadcrumb: func(v uint64) {
 				_ = generalCom.MatterWrite(context.WithoutCancel(ctx), gencommdef.AttrBreadcrumb, v)
 			},
@@ -292,7 +296,7 @@ func buildRoot(ctx context.Context, d rootDeps) (*RootClusters, error) { //nolin
 			wifiNC.OnFailSafeExpired()
 		})
 		generalCom.SetOnCommissioningComplete(func(ctx context.Context, fi uint8) {
-			wifiNC.OnCommissioningComplete()
+			wifiNC.OnCommissioningComplete() //nolint:contextcheck // the commit outlives the CommissioningComplete request; the store write takes no request context
 			commissioned(ctx, fi)
 		})
 		netComm = wifiNC

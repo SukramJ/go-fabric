@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 7248,
+  "entry_points": 7252,
   "entry_packages": [
     ".",
     "bdx",
@@ -277,9 +277,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 17129,
+    "total_exported": 17132,
     "reachable": 12070,
-    "whitelisted": 5059,
+    "whitelisted": 5062,
     "unreachable": 0
   },
   "by_package": [],
@@ -8750,10 +8750,31 @@
     },
     {
       "package": "cluster/core",
+      "identifier": "TestWiFiNetworkCommissioningPersistsAndReconnects",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/network_commissioning_wifi_persist_test.go",
+      "line": 54
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestWiFiNetworkCommissioningReconnectFails",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/network_commissioning_wifi_persist_test.go",
+      "line": 131
+    },
+    {
+      "package": "cluster/core",
       "identifier": "TestWiFiNetworkCommissioningScan",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/network_commissioning_wifi_test.go",
       "line": 259
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestWiFiNetworkCommissioningStoredValueRules",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/network_commissioning_wifi_persist_test.go",
+      "line": 150
     },
     {
       "package": "cluster/energy",
@@ -27366,7 +27387,7 @@
       "identifier": "TestWiFiSim",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/wifisim_test.go",
-      "line": 15
+      "line": 18
     },
     {
       "package": "examples/reference-controller/cli",
