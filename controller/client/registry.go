@@ -102,7 +102,8 @@ const idPrefix = "peer"
 // [ErrAlreadyCommissioned] until the node is erased — as matter.js at
 // 862ad75f: a leave event without an active subscription is ignored
 // (Peers.ts:855-862), Peers.forDescriptor hands out the node the
-// descriptor matches (Peers.ts:371-389, ClientNodeFactory.find :981-991),
+// descriptor matches (Peers.ts:371-389; its `find` is Peers.ts:981-991,
+// the ClientNodeFactory implementation),
 // and CommissioningClient.commission refuses a node with a peer address
 // (CommissioningClient.ts:204-209).
 type Registry struct {
