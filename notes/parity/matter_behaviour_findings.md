@@ -421,13 +421,6 @@ Device side:. (Triage 2026-10-29: owner's hand test (manual test list C5), no wa
   lists the utility component itself (`DeviceTypeConformance.ts:596-614`,
   Core § 9.2.1; Heat Pump and Solar Power examples). A composed product that
   carries its Power Source on the composing endpoint is refused here. (Triage 2026-10-29: wave H3, node options and the embedding layer.)
-- **A Root-asserted condition can refuse.** Conditions true for the node
-  endpoint only because a device type asserts them at `Root`
-  (`devicetype_conformance.go:503-526`) produce violations that
-  `devicetype_validation.go:333-339` refuses like any other; matter.js #4746
-  marks them `assertedAtRoot`, never refuses, logs at debug
-  (`DeviceTypeConformance.ts:65-76`, `ConditionAssertions.ts:63-68`).
-  (With the previous item.)
 
 
 Controller side:. (Triage 2026-10-29: wave H3, node options and the embedding layer.)
