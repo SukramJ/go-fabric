@@ -75,6 +75,10 @@ type OperationalCredentials struct {
 	paiBytes            []byte            // Product Attestation Intermediate (X.509 DER)
 	cdBytes             []byte            // Certification Declaration (CMS-signed)
 	attestationChalleng []byte            // current session AttestationChallenge for sig binding
+	// attestationMu serialises the first-use resolution of the
+	// attestation material; attestationProvider is nil once resolved.
+	attestationMu       sync.Mutex
+	attestationProvider func(ctx context.Context) (OpcredsAttestation, error)
 	onFabricInstalled   func(ctx context.Context, fabricIndex uint8, fabricID, nodeID uint64, rootPublicKey []byte)
 	// rearmFailSafeForFabric re-stamps the armed fail-safe with the fabric
 	// AddNOC installed; see [OpcredsConfig.RearmFailSafeForFabric].
@@ -378,6 +382,17 @@ type OpcredsConfig struct {
 	// CertificationDeclaration is the Matter Certification Declaration
 	// (CMS-signed CD per Matter §6.3).
 	CertificationDeclaration []byte
+	// AttestationProvider, when set, supplies the attestation material on
+	// its first use — the first AttestationRequest, CertificateChainRequest
+	// or CSRRequest — in place of DACPrivateKey, DAC, PAI and
+	// CertificationDeclaration, which it excludes. A failed call answers
+	// that request with an error and is retried on the next. Mirrors
+	// matter.js packages/node/src/behaviors/operational-credentials/
+	// OperationalCredentialsServer.ts:560-572 (getCertification builds the
+	// DeviceCertification on first use) and packages/protocol/src/
+	// certificate/DeviceCertification.ts:42-50 (a Definition may be an
+	// async provider).
+	AttestationProvider func(ctx context.Context) (OpcredsAttestation, error)
 	// OnFabricInstalled fires after a successful AddNOC has persisted
 	// a new fabric. The daemon uses this to re-publish the operational
 	// mDNS record with the just-installed CompressedFabricID + NodeID
@@ -470,6 +485,7 @@ func NewOperationalCredentials(s StoreFacade, cfg OpcredsConfig) (*OperationalCr
 		dacBytes:               append([]byte(nil), cfg.DAC...),
 		paiBytes:               append([]byte(nil), cfg.PAI...),
 		cdBytes:                append([]byte(nil), cfg.CertificationDeclaration...),
+		attestationProvider:    cfg.AttestationProvider,
 		onFabricInstalled:      cfg.OnFabricInstalled,
 		rearmFailSafeForFabric: cfg.RearmFailSafeForFabric,
 		onFabricRemoved:        cfg.OnFabricRemoved,
@@ -1204,7 +1220,7 @@ func (o *OperationalCredentials) dispatchCmd(ctx context.Context, cmdID uint32, 
 	case opcredsCmdAttestationRequest:
 		return o.handleAttestationRequest(ctx, fields)
 	case opcredsCmdCertificateChainRequest:
-		return o.handleCertificateChainRequest(fields)
+		return o.handleCertificateChainRequest(ctx, fields)
 	case opcredsCmdCSRRequest:
 		return o.handleCSRRequest(ctx, fields)
 	case opcredsCmdAddNOC:
@@ -1326,6 +1342,9 @@ func (o *OperationalCredentials) handleAttestationRequest(ctx context.Context, f
 	if len(req.AttestationNonce) != 32 {
 		return nil, fmt.Errorf("%w: AttestationNonce length=%d (want 32)", errOpcredsInvalidArg, len(req.AttestationNonce))
 	}
+	if err := o.resolveAttestation(ctx); err != nil {
+		return nil, err
+	}
 	o.mu.RLock()
 	cd := o.cdBytes
 	dacKey := o.devAttestKey
@@ -1415,10 +1434,49 @@ func rawSignature(r, s *big.Int) []byte {
 	return out
 }
 
-func (o *OperationalCredentials) handleCertificateChainRequest(fields any) (any, error) {
+// OpcredsAttestation is the device attestation material
+// [OpcredsConfig.AttestationProvider] supplies: the DAC's private key, the
+// DAC and PAI (X.509 DER) and the CMS-signed Certification Declaration.
+type OpcredsAttestation struct {
+	DACPrivateKey            *ecdsa.PrivateKey
+	DAC                      []byte
+	PAI                      []byte
+	CertificationDeclaration []byte
+}
+
+// resolveAttestation reads the attestation material through
+// [OpcredsConfig.AttestationProvider] on its first use and keeps it; with
+// no provider, or once resolved, it does nothing (matter.js
+// OperationalCredentialsServer.ts:560-572 getCertification, called by
+// attestationRequest :102, csrRequest :140 and certificateChainRequest
+// :153).
+func (o *OperationalCredentials) resolveAttestation(ctx context.Context) error {
+	o.attestationMu.Lock()
+	defer o.attestationMu.Unlock()
+	if o.attestationProvider == nil {
+		return nil
+	}
+	m, err := o.attestationProvider(ctx)
+	if err != nil {
+		return fmt.Errorf("core: attestation material: %w", err)
+	}
+	o.mu.Lock()
+	o.devAttestKey = m.DACPrivateKey
+	o.dacBytes = append([]byte(nil), m.DAC...)
+	o.paiBytes = append([]byte(nil), m.PAI...)
+	o.cdBytes = append([]byte(nil), m.CertificationDeclaration...)
+	o.mu.Unlock()
+	o.attestationProvider = nil
+	return nil
+}
+
+func (o *OperationalCredentials) handleCertificateChainRequest(ctx context.Context, fields any) (any, error) {
 	req, ok := fields.(CertificateChainRequest)
 	if !ok {
 		return nil, fmt.Errorf("%w: CertificateChainRequest expected, got %T", errOpcredsInvalidArg, fields)
+	}
+	if err := o.resolveAttestation(ctx); err != nil {
+		return nil, err
 	}
 	o.mu.RLock()
 	dac := o.dacBytes
@@ -1473,6 +1531,9 @@ func (o *OperationalCredentials) handleCSRRequest(ctx context.Context, fields an
 	// !== undefined) throw ConstraintError`). Matter §11.18.6.5.
 	if nocInvoked {
 		return nil, opcredsConstraintErr{msg: "core: CSRRequest illegal after AddNOC/UpdateNOC in same FailSafe context"}
+	}
+	if err := o.resolveAttestation(ctx); err != nil {
+		return nil, err
 	}
 	priv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {

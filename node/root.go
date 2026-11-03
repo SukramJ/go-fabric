@@ -183,17 +183,9 @@ func buildRoot(ctx context.Context, d rootDeps) (*RootClusters, error) { //nolin
 	if supportedFabrics == 0 {
 		supportedFabrics = defaultSupportedFabrics
 	}
-	chain, cd, err := attestationMaterial(cfg)
-	if err != nil {
-		return nil, err
-	}
-	r.OperationalCredentials, err = mattercore.NewOperationalCredentials(d.st, mattercore.OpcredsConfig{
-		Logger:                   d.logger,
-		SupportedFabrics:         supportedFabrics,
-		DACPrivateKey:            chain.DACKey,
-		DAC:                      chain.DAC,
-		PAI:                      chain.PAI,
-		CertificationDeclaration: cd,
+	opcredsCfg := mattercore.OpcredsConfig{
+		Logger:           d.logger,
+		SupportedFabrics: supportedFabrics,
 		// The CASE identity is rebuilt from the freshly written fabric
 		// (wiring.go:166-170 at b4ea1f96^).
 		OnFabricInstalled: d.onFabricInstalled,
@@ -201,7 +193,11 @@ func buildRoot(ctx context.Context, d rootDeps) (*RootClusters, error) { //nolin
 		// A successful AddNOC re-arms the fail-safe onto its fabric, Matter
 		// §11.18.6.16 (wiring.go:172-178 at b4ea1f96^).
 		RearmFailSafeForFabric: generalCom.SetCurrentFabric,
-	})
+	}
+	if err := withAttestation(cfg, &opcredsCfg); err != nil {
+		return nil, err
+	}
+	r.OperationalCredentials, err = mattercore.NewOperationalCredentials(d.st, opcredsCfg)
 	if err != nil {
 		return nil, fmt.Errorf("operational credentials: %w", err)
 	}
@@ -378,25 +374,48 @@ func (r *RootClusters) configured() []contract.ClusterServer {
 	return out
 }
 
-// attestationMaterial returns the configured chain and CD, or the CSA
-// test material for the vendor and product (wiring.go:132-163 at b4ea1f96^).
-func attestationMaterial(cfg *Config) (*attestation.Chain, []byte, error) {
+// withAttestation puts the attestation material into opcredsCfg: with
+// Attestation.Provider a provider the server calls on the commissioner's
+// first ask, never here (OperationalCredentialsServer.ts:560-572), else the
+// configured or test material.
+func withAttestation(cfg *Config, opcredsCfg *mattercore.OpcredsConfig) error {
+	if provider := cfg.Attestation.Provider; provider != nil {
+		opcredsCfg.AttestationProvider = func(ctx context.Context) (mattercore.OpcredsAttestation, error) {
+			chain, cd, err := provider(ctx)
+			if err != nil {
+				return mattercore.OpcredsAttestation{}, err
+			}
+			return attestationMaterialOf(cfg, chain, cd)
+		}
+		return nil
+	}
+	m, err := attestationMaterialOf(cfg, cfg.Attestation.Chain, cfg.Attestation.CertificationDeclaration)
+	if err != nil {
+		return err
+	}
+	opcredsCfg.DACPrivateKey, opcredsCfg.DAC, opcredsCfg.PAI = m.DACPrivateKey, m.DAC, m.PAI
+	opcredsCfg.CertificationDeclaration = m.CertificationDeclaration
+	return nil
+}
+
+// attestationMaterialOf returns chain and cd, the CSA test material for
+// the vendor and product in place of a nil one (wiring.go:132-163 at
+// b4ea1f96^).
+func attestationMaterialOf(cfg *Config, chain *attestation.Chain, cd []byte) (mattercore.OpcredsAttestation, error) {
 	pd := cfg.ProductDescription
-	chain := cfg.Attestation.Chain
 	if chain == nil {
 		var err error
 		if chain, err = attestation.BuildTestChainAt(pd.VendorID, pd.ProductID, clock.Or(cfg.Clock).Now()); err != nil {
-			return nil, nil, fmt.Errorf("attestation chain: %w", err)
+			return mattercore.OpcredsAttestation{}, fmt.Errorf("attestation chain: %w", err)
 		}
 	}
-	cd := cfg.Attestation.CertificationDeclaration
 	if cd == nil {
 		var err error
 		if cd, err = attestation.BuildTestCertificationDeclaration(pd.VendorID, pd.ProductID); err != nil {
-			return nil, nil, fmt.Errorf("certification declaration: %w", err)
+			return mattercore.OpcredsAttestation{}, fmt.Errorf("certification declaration: %w", err)
 		}
 	}
-	return chain, cd, nil
+	return mattercore.OpcredsAttestation{DACPrivateKey: chain.DACKey, DAC: chain.DAC, PAI: chain.PAI, CertificationDeclaration: cd}, nil
 }
 
 // buildRootOptional constructs the root's optional label, localization
