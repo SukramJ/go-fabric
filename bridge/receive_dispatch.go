@@ -431,6 +431,11 @@ func (b *Bridge) dispatchWriteRequest(ctx context.Context, src net.Addr, request
 	if b.resolveSessionPASE(requestHdr.SessionID) {
 		writeCtx = im.WithAuthModePASE(writeCtx)
 	}
+	// The gate above passed, so a set TimedRequest flag means a valid
+	// window; the dispatcher answers an attribute with the timed quality
+	// outside one with NeedsTimedInteraction (endpoint.TopologyDispatcher,
+	// matter.js AttributeWriteResponse.ts:243-247).
+	writeCtx = im.WithTimedInteraction(writeCtx, req.TimedRequest)
 	// The chunks of one chunked write share a transaction, as chip's
 	// WriteHandler serves the whole interaction (TC-ACL-2.6, 2.8).
 	writeCtx = im.WithWriteTransaction(writeCtx, b.routing.writeTransaction(

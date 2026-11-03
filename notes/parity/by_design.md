@@ -1452,7 +1452,7 @@ on a 36-device central produced enough events to evict the BasicInformation
 StartUp and GeneralDiagnostics BootReason events that a controller reads
 out-of-band right after CASE.
 
-### BD-Matter-TimedAndQuotaDeferred — per-attribute timed-write enforcement is unbuilt; subscribe-quota eviction mirrors matter.js
+### BD-Matter-TimedAndQuotaDeferred — subscribe-quota eviction mirrors matter.js (the timed halves are closed)
 
 Status 2026-10-11 (#47): the command half of this entry is closed. A request
 command marked "T" in the model answers NEEDS_TIMED_INTERACTION outside a
@@ -1465,14 +1465,18 @@ Mirrors matter.js `CommandInvokeResponse.ts` (`limits.timed`).
 
 What stays:
 
-- **Per-attribute timed-write enforcement.** matter.js refuses an untimed
-  write to an attribute with the `timed` access quality
-  (`AttributeWriteResponse.ts:241-244`, `AccessControl.ts:290-300`). No
-  attribute of any cluster this module serves carries that quality in the
-  snapshot (`grep 'Timed: true' cluster/spec/*/definition_gen.go` lists
-  commands only), so the write path has nothing to enforce yet. Retire when
-  a served cluster ships a timed attribute: enforce it in `cluster/spec`'s
-  write path the way the invoke path does, with a parity test.
+- **Per-attribute timed-write enforcement — retired in phase 30.** The
+  write path now enforces it as matter.js does
+  (`AttributeWriteResponse.ts:243-247`, wildcard skip `:343-345`): the
+  transport stamps the timed window on the write context
+  (`im.WithTimedInteraction`) and `endpoint.TopologyDispatcher` answers an
+  attribute `schema.IsTimedWrite` marks with NEEDS_TIMED_INTERACTION
+  outside one, after the writability verdict and the access check
+  (`endpoint/timed_write_parity_matterjs_test.go`, with a synthetic timed
+  attribute: the snapshot at the pin still has none). Built ahead of the
+  retire condition (a served timed attribute) by owner decision
+  2026-11-03, so the next regeneration that adds one is enforced without
+  a code change.
 - **Subscribe per-fabric quota eviction.** chip evicts an existing
   subscription to guarantee the per-fabric minimum
   (`InteractionModelEngine.cpp:1263`). matter.js has no per-fabric

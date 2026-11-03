@@ -316,7 +316,7 @@
   },
   {
     "file": "bridge/receive_dispatch.go",
-    "line": 462,
+    "line": 467,
     "citation": "MessageExchange.ts:602",
     "resolved": "packages/protocol/src/protocol/MessageExchange.ts",
     "identifier": "requiresAck",
@@ -325,7 +325,7 @@
   },
   {
     "file": "bridge/receive_dispatch.go",
-    "line": 504,
+    "line": 509,
     "citation": "CommandInvokeResponse.ts:292-295",
     "resolved": "packages/protocol/src/action/server/CommandInvokeResponse.ts",
     "identifier": "InvokeResponse",
@@ -334,7 +334,7 @@
   },
   {
     "file": "bridge/receive_dispatch.go",
-    "line": 581,
+    "line": 586,
     "citation": "packages/node/src/node/server/InteractionServer.ts:1043-1074",
     "resolved": "packages/node/src/node/server/InteractionServer.ts",
     "identifier": "suppressedBuffer",
@@ -1772,7 +1772,7 @@
   },
   {
     "file": "endpoint/dispatcher.go",
-    "line": 272,
+    "line": 294,
     "citation": "AttributeWriteResponse.ts:329-331",
     "resolved": "packages/protocol/src/action/server/AttributeWriteResponse.ts",
     "identifier": "UnsupportedWrite",

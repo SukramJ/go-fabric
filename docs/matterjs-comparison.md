@@ -87,7 +87,7 @@ it — a `by_design` entry, an ADR or a later milestone of the
 | --- | --- | --- | --- | --- |
 | Read / Write / Invoke / Subscribe, wildcards, fabric filtering | `im/` | ✅ | — | Byte-pinned against matter.js fixtures. |
 | Chunked reports, report cadence, min/max interval negotiation | `im/subscription` | ✅ | — | |
-| Timed Request / Timed Action | `im/timed.go` + the gate in `bridge/receive.go`; timed commands from the model (`contract.TimedCommander`, `schema/timed_gen.go`) | ✅ | — | The handshake, the request-level gate and the per-command rule from the snapshot (#47). Per-attribute timed writes have nothing to enforce: no served attribute carries the quality (`BD-Matter-TimedAndQuotaDeferred`, which names the condition that reopens it). |
+| Timed Request / Timed Action | `im/timed.go` + the gate in `bridge/receive.go`; timed commands from the model (`contract.TimedCommander`, `schema/timed_gen.go`) | ✅ | — | The handshake, the request-level gate and the per-command rule from the snapshot (#47). Per-attribute timed writes are enforced in `endpoint.TopologyDispatcher` as matter.js's `AttributeWriteResponse` does (NEEDS_TIMED_INTERACTION on a concrete path, a wildcard path skips the attribute), pinned by a parity test with a synthetic timed attribute: no attribute of the snapshot carries the quality yet (phase 30). |
 | Data-version filtering | `cluster/dataversion.go`, `im/` | ✅ | — | |
 | Event log, event filters, fabric-scoped events | `im/eventlog.go`, `im/event_filter.go` | ✅ | — | Buffer is sized at a tenth of matter.js's, deliberately (`BD-Matter-EventBufferSizing`). |
 | Batched invoke | `im/invoke.go`; the client side `client/interaction` (`InvokeBatch`, and the batcher of `Invoke`) | ✅ | — | The client splits by the peer's MaxPathsPerInvoke as matter.js does, and joins single commands of one batch window into one InvokeRequest per network lane (`ClientInteraction.#invokeWithBatching`, wave 27-A). |
@@ -218,9 +218,8 @@ work and keep their reasoning:
    controller-side assumptions (JoinGroup with UseAuxiliaryAcl, FF05::FA,
    privacy on, ACL group subjects) the in-process tests rest on
    ([ADR 0010](./adr/0010-groupcast-and-auxiliary-acl.md)).
-2. **Per-attribute timed-write enforcement** (§4) — the schema already knows
-   which attributes require it (`schema/timed.go`); the enforcement point is
-   the missing half.
+2. ~~**Per-attribute timed-write enforcement** (§4)~~ — done in phase 30:
+   `endpoint.TopologyDispatcher` enforces what `schema/timed.go` knows.
 3. **Prove subscription re-establishment against a real controller** (§4) —
    built and tested in-process ([ADR 0008](./adr/0008-subscription-resumption.md));
    a chip-tool restart leg in `internal/chiptool` would pin the

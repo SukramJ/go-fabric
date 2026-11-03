@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 7245,
+  "entry_points": 7247,
   "entry_packages": [
     ".",
     "bdx",
@@ -277,9 +277,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 17125,
+    "total_exported": 17127,
     "reachable": 12070,
-    "whitelisted": 5055,
+    "whitelisted": 5057,
     "unreachable": 0
   },
   "by_package": [],
@@ -2986,6 +2986,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/reply_reliability_test.go",
       "line": 149
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestDispatchWriteRequest_StampsTheTimedWindow",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/write_timed_stamp_test.go",
+      "line": 37
     },
     {
       "package": "bridge",
@@ -26464,6 +26471,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/dispatcher_test.go",
       "line": 999
+    },
+    {
+      "package": "endpoint",
+      "identifier": "TestTimedWriteParity",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "endpoint/timed_write_parity_matterjs_test.go",
+      "line": 24
     },
     {
       "package": "endpoint",

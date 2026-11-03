@@ -167,7 +167,7 @@ func checkSubjectACL(ctx context.Context, c ACLChecker, fabricIndex uint8, subje
 	return c.CheckACL(ctx, fabricIndex, subjectNodeID, subjectCATs, endpoint, clusterID, privilege)
 }
 
-// timedCtxKey carries whether an Invoke runs inside a valid timed
+// timedCtxKey carries whether an Invoke or a Write runs inside a valid timed
 // interaction.
 type timedCtxKey struct{}
 
@@ -176,7 +176,9 @@ type timedCtxKey struct{}
 // window has not expired). The transport stamps it once the timed gate has
 // passed; [HandleInvokeRequest] then answers a timed-required command
 // outside one with NeedsTimedInteraction for that path — matter.js
-// CommandInvokeResponse.ts:291 `limits.timed && !this.session.timed`.
+// CommandInvokeResponse.ts:291 `limits.timed && !this.session.timed`;
+// the dispatcher's write path answers an attribute with the timed quality
+// the same way (AttributeWriteResponse.ts:243-247).
 func WithTimedInteraction(ctx context.Context, timed bool) context.Context {
 	return context.WithValue(ctx, timedCtxKey{}, timed)
 }
