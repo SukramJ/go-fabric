@@ -91,7 +91,7 @@ it — a `by_design` entry, an ADR or a later milestone of the
 | Data-version filtering | `cluster/dataversion.go`, `im/` | ✅ | — | |
 | Event log, event filters, fabric-scoped events | `im/eventlog.go`, `im/event_filter.go` | ✅ | — | Buffer is sized at a tenth of matter.js's, deliberately (`BD-Matter-EventBufferSizing`). |
 | Batched invoke | `im/invoke.go`; the client side `client/interaction` (`InvokeBatch`, and the batcher of `Invoke`) | ✅ | — | The client splits by the peer's MaxPathsPerInvoke as matter.js does, and joins single commands of one batch window into one InvokeRequest per network lane (`ClientInteraction.#invokeWithBatching`, wave 27-A). |
-| Subscription persistence + re-establishment after restart (`SubscriptionsServer`, `InteractionServer.establishFormerSubscription`) | `bridge` (`AttachSubscriptionStore`, `ReestablishFormerSubscriptions`), `im/subscription` (`PeerSubscription`, `Manager.Restore`), `store/server_subscriptions.go`, `secure/sigma` initiator, `mdns.OperationalResolver` | ✅ | — | [ADR 0008](./adr/0008-subscription-resumption.md). Mirrors matter.js: CASE subscriptions recorded while active, forgotten when terminated, re-established after a restart under their old id over a CASE session the device opens (2 s per peer, block-list for peers that subscribe meanwhile). On by default; `SetSubscriptionPersistence(false)` is `persistenceEnabled = false`. Not yet exercised against a real controller in CI. |
+| Subscription persistence + re-establishment after restart (`SubscriptionsServer`, `InteractionServer.establishFormerSubscription`) | `bridge` (`AttachSubscriptionStore`, `ReestablishFormerSubscriptions`), `im/subscription` (`PeerSubscription`, `Manager.Restore`), `store/server_subscriptions.go`, `secure/sigma` initiator, `mdns.OperationalResolver` | ✅ | — | [ADR 0008](./adr/0008-subscription-resumption.md). Mirrors matter.js: CASE subscriptions recorded while active, forgotten when terminated, re-established after a restart under their old id over a CASE session the device opens (2 s per peer, block-list for peers that subscribe meanwhile). On by default; `SetSubscriptionPersistence(false)` is `persistenceEnabled = false`. Proven in CI against three controllers that stay up while the daemon restarts: matter.js's, the Go controller and chip-tool (the suite's `subscription-restart` leg, phase 30). |
 | Subscription quota / eviction per fabric | 16 per fabric in `bridge/subscribe.go`, no eviction | ✅ | — | matter.js has no per-fabric subscription quota and no eviction either (measured 2026-10-11, `BD-Matter-TimedAndQuotaDeferred`); the cap is a chip behaviour a home LAN never reaches. |
 
 ## 5. Clusters
@@ -220,7 +220,8 @@ work and keep their reasoning:
    ([ADR 0010](./adr/0010-groupcast-and-auxiliary-acl.md)).
 2. ~~**Per-attribute timed-write enforcement** (§4)~~ — done in phase 30:
    `endpoint.TopologyDispatcher` enforces what `schema/timed.go` knows.
-3. **Prove subscription re-establishment against a real controller** (§4) —
+3. ~~**Prove subscription re-establishment against a real controller** (§4)~~ —
+   done in phase 30 (the chip-tool `subscription-restart` leg); before that:
    built and tested in-process ([ADR 0008](./adr/0008-subscription-resumption.md));
    a chip-tool restart leg in `internal/chiptool` would pin the
    controller-side assumptions it rests on.
