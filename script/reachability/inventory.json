@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 7207,
+  "entry_points": 7210,
   "entry_packages": [
     ".",
     "bdx",
@@ -276,9 +276,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 17048,
+    "total_exported": 17050,
     "reachable": 12027,
-    "whitelisted": 5021,
+    "whitelisted": 5023,
     "unreachable": 0
   },
   "by_package": [],
@@ -26809,10 +26809,24 @@
     },
     {
       "package": "examples/reference-bridge",
+      "identifier": "TestLightSwitchEntryKeys",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-bridge/light_switch_keys_test.go",
+      "line": 23
+    },
+    {
+      "package": "examples/reference-bridge",
       "identifier": "TestLightSwitchFlag",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/light_switch_test.go",
       "line": 22
+    },
+    {
+      "package": "examples/reference-bridge",
+      "identifier": "TestLightSwitchSendRefusals",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-bridge/light_switch_keys_test.go",
+      "line": 59
     },
     {
       "package": "examples/reference-bridge",
