@@ -1001,6 +1001,9 @@ type fleet struct {
 	// otbr is the ThreadBorderRouter endpoint (otbr.go), served with
 	// --otbr; nil without.
 	otbr *demoBorderRouter
+	// lightSwitch is the On/Off Light Switch of --light-switch
+	// (light_switch.go); nil without.
+	lightSwitch *demoLightSwitch
 
 	// configChange raises the ConfigurationVersion of every bridged device
 	// (the app pipe's SimulateConfigurationVersionChange); wired by main.
@@ -1222,6 +1225,10 @@ func (f *fleet) endpoints() ([]node.Endpoint, error) { //nolint:funlen // the fl
 	// The border router (--otbr) comes after it, for the same reason.
 	if f.otbr != nil {
 		out = append(out, f.otbr.device)
+	}
+	// The light switch (--light-switch, TESTING ONLY) comes last.
+	if f.lightSwitch != nil {
+		out = append(out, f.lightSwitch.dev)
 	}
 	if err := errors.Join(errs...); err != nil {
 		return nil, fmt.Errorf("fleet: %w", err)
