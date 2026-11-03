@@ -12,9 +12,11 @@ import (
 	"strings"
 
 	"github.com/SukramJ/go-fabric/clock"
+	mattercore "github.com/SukramJ/go-fabric/cluster/core"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/endpoint"
+	"github.com/SukramJ/go-fabric/schema"
 	"github.com/SukramJ/go-fabric/surface"
 )
 
@@ -45,12 +47,30 @@ type Options struct {
 	// Conditions are the device-type conditions the host states for the
 	// endpoint ([endpoint.Spec.DeviceConditions]).
 	Conditions []string
+	// DeviceTypes are further device types the endpoint lists in its
+	// Descriptor DeviceTypeList after its own and before Bridged Node,
+	// each once, with the revision the schema gives it
+	// ([endpoint.Spec.DeviceTypes]) — matter.js's bridge test instance
+	// lists Power Source on its composed device
+	// (support/chip-testing/src/BridgeTestInstance.ts:323-335). A listed
+	// device type's mandatory clusters are required of the endpoint as its
+	// own type's are; an id the schema does not know is refused.
+	DeviceTypes []schema.DeviceTypeID
+	// Tags are the semantic tags the endpoint's Descriptor serves in
+	// TagList ([endpoint.Spec.Tags]); they tell sibling parts of one
+	// device type apart (BridgeTestInstance.ts:306-317, CommonNumberTag).
+	// Nil leaves the TagList feature off, the default.
+	Tags []SemanticTag
 	// Surface are the surface policies the device is composed under; the
 	// zero value is no policy — the same form as node.Config.Surface,
 	// which a node compares it with: it refuses a device composed under
 	// policies other than its own (ADR 0025 principle 2).
 	Surface surface.Policies
 }
+
+// SemanticTag is one entry of a Descriptor's TagList, as [Options].Tags
+// declares it ([mattercore.SemanticTag]).
+type SemanticTag = mattercore.SemanticTag
 
 // SourceKey is the type of [Options].StableKey ([endpoint.SourceKey]).
 type SourceKey = endpoint.SourceKey

@@ -9,11 +9,13 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/SukramJ/go-fabric/cluster/spec"
+	descriptordef "github.com/SukramJ/go-fabric/cluster/spec/descriptor"
 	psdef "github.com/SukramJ/go-fabric/cluster/spec/powersource"
 	tmdef "github.com/SukramJ/go-fabric/cluster/spec/temperaturemeasurement"
 	"github.com/SukramJ/go-fabric/device"
-	"github.com/SukramJ/go-fabric/endpoint"
 	"github.com/SukramJ/go-fabric/node"
+	"github.com/SukramJ/go-fabric/schema"
 )
 
 // --bridge-sim (TESTING ONLY): the bridge the bridge-client certification
@@ -73,7 +75,7 @@ type demoBridgeSim struct {
 	// two parts, in the order #warmTemperatureSensors names them
 	// (:218-223).
 	sensors  []*device.TemperatureSensor
-	composed bridgeSimComposed
+	composed *device.BridgedNode
 
 	mu  sync.Mutex
 	agg *node.Aggregator
@@ -86,25 +88,14 @@ type bridgeSimLight struct {
 	added bool
 }
 
-// bridgeSimComposed is the composed device: a Bridged Node with the
-// PowerSource server's Battery feature, two Temperature Sensors as its own
-// parts (#composedDevice, :323-351).
-//
-// matter.js declares the endpoint's DeviceTypeList outright — Bridged Node
-// and Power Source (0x0011) (:330-335) — where the device kit derives it
-// from one device type, to which the endpoint assembler adds Bridged Node
-// on a bridged endpoint (endpoint listedDeviceTypes). Spec states Power
-// Source as the endpoint's device type, so the list is the same two
-// device types; the device itself stays the Bridged Node the kit built,
-// whose composition hosts any device type on its parts
-// (packages/node/src/endpoints/bridged-node.ts:39-73).
-type bridgeSimComposed struct{ *device.BridgedNode }
-
-// Spec is the Bridged Node's, with Power Source as its device type.
-func (c bridgeSimComposed) Spec() endpoint.Spec {
-	s := c.BridgedNode.Spec()
-	s.DeviceType = uint16(device.PowerSourceID)
-	return s
+// bridgeSimNumberTag is the CommonNumberTag (namespace 0x07) tag n with
+// its label, as matter.js's SemanticNamespace builds it
+// (packages/node/src/tags/CommonNumberTag.ts, SemanticNamespace.ts:21-31).
+func bridgeSimNumberTag(n uint8, label string) device.SemanticTag {
+	return device.SemanticTag{
+		MfgCode: spec.Nullable[uint16]{Null: true}, NamespaceId: descriptordef.NamespaceCommonNumber,
+		Tag: n, Label: &spec.Nullable[string]{Value: label},
+	}
 }
 
 func newDemoBridgeSim(f *fleet) (*demoBridgeSim, error) {
@@ -121,6 +112,12 @@ func newDemoBridgeSim(f *fleet) (*demoBridgeSim, error) {
 		errs = append(errs, err)
 		return d
 	}
+	// The composed device's sensors share a device type, so each carries a
+	// number tag that tells them apart (#temperatureSensor, :306-317).
+	tagged := func(opts device.Options, tag device.SemanticTag) device.Options {
+		opts.Tags = []device.SemanticTag{tag}
+		return opts
+	}
 	s.light1 = light("bridgesim-light1", bridgeSimLight1Label)
 	s.light2 = light("bridgesim-light2", bridgeSimLight2Label)
 	s.sensors = []*device.TemperatureSensor{
@@ -128,15 +125,21 @@ func newDemoBridgeSim(f *fleet) (*demoBridgeSim, error) {
 		sensor(f.bridged("bridgesim-temp2", "TempSensor 2")),
 		// The composed device's sensors are its parts and carry no
 		// BridgedDeviceBasicInformation of their own (:159-167).
-		sensor(f.part("demo:bridgesim-composed:temp1")),
-		sensor(f.part("demo:bridgesim-composed:temp2")),
+		sensor(tagged(f.part("demo:bridgesim-composed:temp1"), bridgeSimNumberTag(1, "One"))),
+		sensor(tagged(f.part("demo:bridgesim-composed:temp2"), bridgeSimNumberTag(2, "Two"))),
 	}
 	for i := range 4 {
 		label := fmt.Sprintf("Action Light %d", i+1)
 		l := light(fmt.Sprintf("bridgesim-actionlight%d", i+1), label)
 		s.actionLights = append(s.actionLights, l.dev)
 	}
-	composed, err := device.NewBridgedNode(f.bridged("bridgesim-composed", bridgeSimComposedLabel), bridgeSimBattery())
+	// The composed device: a Bridged Node with the PowerSource server's
+	// Battery feature and two Temperature Sensors as its own parts, listing
+	// Power Source beside Bridged Node (#composedDevice, :323-351;
+	// deviceTypeList :330-335).
+	composedOpts := f.bridged("bridgesim-composed", bridgeSimComposedLabel)
+	composedOpts.DeviceTypes = []schema.DeviceTypeID{device.PowerSourceID}
+	composed, err := device.NewBridgedNode(composedOpts, bridgeSimBattery())
 	errs = append(errs, err)
 	if err := errors.Join(errs...); err != nil {
 		return nil, fmt.Errorf("bridge simulation: %w", err)
@@ -146,7 +149,7 @@ func newDemoBridgeSim(f *fleet) (*demoBridgeSim, error) {
 			return nil, fmt.Errorf("bridge simulation: %w", err)
 		}
 	}
-	s.composed = bridgeSimComposed{composed}
+	s.composed = composed
 	return s, nil
 }
 

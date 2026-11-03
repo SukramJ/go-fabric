@@ -312,6 +312,7 @@ func ClusterServers(ep *Endpoint) []contract.ClusterServer { //nolint:funlen // 
 		}
 		return append(clusters, bridged)
 	}
+	enableTags(descriptor, ep)
 
 	out := make([]contract.ClusterServer, 0, len(clusters)+2)
 	out = append(out, clusters...)
@@ -338,6 +339,7 @@ func partClusterServers(ep *Endpoint, inner []contract.ClusterServer) []contract
 	if err != nil {
 		return out
 	}
+	enableTags(descriptor, ep)
 	out = append(out, descriptor)
 	installServerList(descriptor, out)
 	return out
@@ -564,6 +566,16 @@ func bridgedVendorName(ep *Endpoint) string {
 
 // identifyClusterID is the Identify cluster (identify.element.ts, 0x0003).
 const identifyClusterID uint32 = 0x0003
+
+// enableTags opts the Descriptor into TagList with ep's [Endpoint.Tags]
+// — matter.js DescriptorServer.with("TagList") and its tagList state
+// (support/chip-testing/src/BridgeTestInstance.ts:310-317); without tags
+// TagList stays off (Descriptor.EnableTagList).
+func enableTags(descriptor *mattercore.Descriptor, ep *Endpoint) {
+	if len(ep.Tags) > 0 {
+		descriptor.EnableTagList(ep.Tags...)
+	}
+}
 
 // descriptorDeviceTypes is ep's DeviceTypeList: [listedDeviceTypes], each
 // with the revision [deviceTypeRevision] advertises for it.

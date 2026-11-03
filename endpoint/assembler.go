@@ -12,6 +12,7 @@ import (
 	"sort"
 
 	"github.com/SukramJ/go-fabric/clock"
+	mattercore "github.com/SukramJ/go-fabric/cluster/core"
 	"github.com/SukramJ/go-fabric/groups"
 )
 
@@ -290,6 +291,8 @@ func (a *Assembler) buildEndpoint(ctx context.Context, scope string, spec *Spec)
 		ParentEndpointID:    1,
 		HasParentEndpointID: true,
 		DeviceConditions:    append([]string(nil), spec.DeviceConditions...),
+		DeviceTypes:         append([]uint16(nil), spec.DeviceTypes...),
+		Tags:                append([]mattercore.SemanticTag(nil), spec.Tags...),
 		ClientClusters:      append([]uint32(nil), spec.ClientClusters...),
 		OptIn:               append([]uint32(nil), spec.OptIn...),
 		groups:              a.cfg.Groups,

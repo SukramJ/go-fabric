@@ -5,24 +5,39 @@ package endpoint
 
 import (
 	"errors"
+	"slices"
 
 	"github.com/SukramJ/go-fabric/schema"
 )
 
 // listedDeviceTypes returns the device-type ids ep's Descriptor
-// DeviceTypeList carries, in its order: a part lists its own device type
-// alone, a bridged endpoint its primary device type (when it has one) and
-// BridgedNode. [ClusterServers] builds the list from it, and the assembly
-// reads its composition from it, so the two cannot disagree.
+// DeviceTypeList carries, in its order: a part lists its own device type,
+// a bridged endpoint its primary device type (when it has one); then the
+// further [Endpoint.DeviceTypes]; a bridged endpoint BridgedNode last.
+// Each id is listed once, as matter.js DescriptorServer.addDeviceTypes
+// skips a listed one (DescriptorServer.ts:105-109). [ClusterServers]
+// builds the list from it, and the assembly reads its composition from
+// it, so the two cannot disagree.
 func listedDeviceTypes(ep *Endpoint) []uint16 {
 	const bridgedNode = uint16(matterDeviceTypeBridgedNode)
-	if ep.Part {
-		return []uint16{ep.DeviceType}
+	out := make([]uint16, 0, len(ep.DeviceTypes)+2)
+	add := func(id uint16) {
+		if !slices.Contains(out, id) {
+			out = append(out, id)
+		}
 	}
-	if ep.DeviceType == 0 {
-		return []uint16{bridgedNode}
+	if ep.Part || ep.DeviceType != 0 {
+		add(ep.DeviceType)
 	}
-	return []uint16{ep.DeviceType, bridgedNode}
+	for _, id := range ep.DeviceTypes {
+		if id != 0 {
+			add(id)
+		}
+	}
+	if !ep.Part {
+		add(bridgedNode)
+	}
+	return out
 }
 
 // composesFullFamily reports whether one of ep's listed device types

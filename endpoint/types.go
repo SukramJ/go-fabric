@@ -185,6 +185,23 @@ type Endpoint struct {
 	// Endpoint.Options.deviceConditions.
 	DeviceConditions []string
 
+	// DeviceTypes are further device types the endpoint lists in its
+	// Descriptor DeviceTypeList, after DeviceType and before BridgedNode,
+	// each once and with the revision the schema advertises — matter.js
+	// DescriptorServer.addDeviceTypes
+	// (packages/node/src/behaviors/descriptor/DescriptorServer.ts:91-110),
+	// as BridgeTestInstance.ts:323-335 lists Power Source on its composed
+	// device. The device-type validator reads the composition from the
+	// same list. Carried from [Spec.DeviceTypes].
+	DeviceTypes []uint16
+
+	// Tags are the semantic tags the endpoint's Descriptor serves in
+	// TagList; non-empty opts the Descriptor into the TagList feature
+	// (matter.js DescriptorServer.with("TagList") with a tagList state,
+	// BridgeTestInstance.ts:306-317). Nil leaves it off, the default
+	// (cluster/core Descriptor.EnableTagList). Carried from [Spec.Tags].
+	Tags []mattercore.SemanticTag
+
 	// ClientClusters are the client clusters the endpoint declares, served
 	// as its Descriptor ClientList. Carried from [Spec.ClientClusters].
 	ClientClusters []uint32
