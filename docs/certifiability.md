@@ -79,16 +79,26 @@ GOFABRIC_CHIP_FAMILIES=IDM,ACL make chiptool-families   # a selection
   daemon's own PICS, and a step whose PICS is false is recorded skipped with
   the expression. The leg needs the daemon and the host's multicast, not the
   harness image; its cases appear below as passed, with their step counts and
-  the TS file they follow. matter.js's own reading, the Go controller as the
-  DUT, is a later wave (roadmap phase 29b). The BDX receiver, SU requestor
+  the TS file they follow. The BDX receiver, SU requestor
   and BIND cases run the device as DUT in matter.js too: their PICS are
   evaluated as stated, the Go TH serves the OTA image from its own node and
   scripts its provider's answers as matter.js's cert harness does, and the
   BIND cases run the daemon with `--light-switch`. A step matter.js marks
   long-running (minutes of real time each) runs with
-  `GOFABRIC_GOCERT_LONG=1`; the counts below are the default run's. The DD
-  cases whose substance is the commissioner's alone stay rows below, named
-  "controller role (phase 29b)".
+  `GOFABRIC_GOCERT_LONG=1`; the counts below are the default run's.
+- **The Go controller as DUT** (the same leg, roadmap phase 29b): the TS files
+  in matter.js's own direction. The module's controller is the DUT and the
+  reference daemon the TH device the TS file names, with the flags and app-pipe
+  commands matter.js's TH apps have. Such a case's PICS are the controller's
+  own declarations (matter.js's for its controller where it states them, the
+  module's own where matter.js leaves the code to CHIP's PICS file), evaluated
+  as stated. matter.js proves its DUT controller by the TH device's log; here
+  each step names its evidence instead: the DUT controller's return value or
+  error, a state read on the daemon, or a line of the daemon's log. A case
+  passed in this role counts as passed in its family — the page states the
+  module in both roles since ADR 0020 — and is listed under "Controller role"
+  below; a case no family of the harness image lists is listed there and
+  counted in none.
 - **What a passing case executed** is pinned per case (steps run and steps
   skipped), so a PICS change that quietly turns a case into a no-op fails it.
 - **A case that passes with a recorded gap** is one whose CHIP spec checker
@@ -590,6 +600,17 @@ expectations are what the daemon has to satisfy (`internal/chiptool` TestGoCerti
 | SU/3.4 | 3 | 1 | Go controller as TH, after matter.js `TC-SU-3.4.test.ts` |
 | SU/4.1 | 9 | 0 | Go controller as TH, after matter.js `TC-SU-4.1.test.ts`; passes with chip-tool as TH too |
 | SWTCH/3.2 | 16 | 7 | Go controller as TH, after matter.js `TC-SWTCH-3.2.test.ts` |
+
+### Controller role
+
+matter.js's certification cases in their own direction: the module's controller is the DUT and the
+reference daemon the TH device the TS file names (`internal/chiptool` TestGoCertificationCases). Such a
+case counts as passed in its family; one no family of the harness image lists is counted in none.
+
+#### Cases run with the Go controller as DUT
+
+| Case | Steps run | Steps skipped | Source |
+| --- | ---: | ---: | --- |
 
 ### Cases that pass with a recorded gap
 
