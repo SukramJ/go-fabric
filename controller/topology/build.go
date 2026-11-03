@@ -34,46 +34,67 @@ func Build(images []Image, now time.Time) Topology {
 
 	t := Topology{CollectedAt: now, Nodes: []Node{}, Connections: []Connection{}}
 	var thread []*Image
-	type radio struct {
-		id, ssid, bssid string
-		rssi            *int8
-	}
 	var radios []radio
 	for i := range imgs {
-		img := &imgs[i]
-		n := Node{
-			ID: strconv.FormatUint(img.NodeID, 10), Kind: KindMatter, NodeID: img.NodeID,
-			NetworkType: networkType(img.NetworkFeatures), Available: img.Available, IsBridge: img.IsBridge,
-			Addresses: slices.Clone(img.Addresses),
-		}
+		n := matterNode(&imgs[i])
 		switch n.NetworkType {
 		case NetworkThread:
-			thread = append(thread, img)
-			td := &img.ThreadNetworkDiagnostics
-			n.Role = threadRole(td.RoutingRole)
-			n.ExtAddress = threadExtAddress(img.GeneralDiagnostics.NetworkInterfaces)
-			if td.Rloc16 != nil {
-				r := *td.Rloc16
-				n.Rloc16 = &r
-			}
-			if td.ExtendedPanId != nil {
-				n.ExtPanID = *td.ExtendedPanId
-			}
-			if td.NetworkName != nil {
-				n.NetworkName = *td.NetworkName
-			}
+			thread = append(thread, &imgs[i])
 		case NetworkWiFi:
-			n.Role = RoleStation
-			n.SSID = wifiSSID(img.NetworkCommissioning.Networks)
-			n.BSSID = formatBSSID(img.WiFiNetworkDiagnostics.Bssid)
-			radios = append(radios, radio{id: n.ID, ssid: n.SSID, bssid: n.BSSID, rssi: img.WiFiNetworkDiagnostics.Rssi})
+			radios = append(radios, radio{id: n.ID, ssid: n.SSID, bssid: n.BSSID, rssi: imgs[i].WiFiNetworkDiagnostics.Rssi})
+		case NetworkEthernet, NetworkUnknown:
 		}
 		t.Nodes = append(t.Nodes, n)
 	}
+	addThread(&t, thread)
+	addWiFi(&t, radios)
+	return t
+}
 
-	// Thread: the externals, then one connection per kept pair; an
-	// external is published only when a kept pair links it
-	// (NetworkTopologyService.ts:377-395, matterjs-server at 0bd06f22).
+// radio is a Wi-Fi station's link to its access point.
+type radio struct {
+	id, ssid, bssid string
+	rssi            *int8
+}
+
+// matterNode is the node of a commissioned image — matterjs-server's node
+// build at 0bd06f22 (NetworkTopologyService.ts:325-375): a Thread node with
+// its role, extended address, RLOC16, extended PAN id and network name, a
+// Wi-Fi station with its SSID and BSSID, any other node bare.
+func matterNode(img *Image) Node {
+	n := Node{
+		ID: strconv.FormatUint(img.NodeID, 10), Kind: KindMatter, NodeID: img.NodeID,
+		NetworkType: networkType(img.NetworkFeatures), Available: img.Available, IsBridge: img.IsBridge,
+		Addresses: slices.Clone(img.Addresses),
+	}
+	switch n.NetworkType {
+	case NetworkThread:
+		td := &img.ThreadNetworkDiagnostics
+		n.Role = threadRole(td.RoutingRole)
+		n.ExtAddress = threadExtAddress(img.GeneralDiagnostics.NetworkInterfaces)
+		if td.Rloc16 != nil {
+			r := *td.Rloc16
+			n.Rloc16 = &r
+		}
+		if td.ExtendedPanId != nil {
+			n.ExtPanID = *td.ExtendedPanId
+		}
+		if td.NetworkName != nil {
+			n.NetworkName = *td.NetworkName
+		}
+	case NetworkWiFi:
+		n.Role = RoleStation
+		n.SSID = wifiSSID(img.NetworkCommissioning.Networks)
+		n.BSSID = formatBSSID(img.WiFiNetworkDiagnostics.Bssid)
+	case NetworkEthernet, NetworkUnknown:
+	}
+	return n
+}
+
+// addThread adds the Thread externals and one connection per kept pair;
+// an external is published only when a kept pair links it
+// (NetworkTopologyService.ts:377-395, matterjs-server at 0bd06f22).
+func addThread(t *Topology, thread []*Image) {
 	m := newThreadMaps(thread)
 	externals := m.unknowns(thread)
 	linked := map[string]bool{}
@@ -95,11 +116,13 @@ func Build(images []Image, now time.Time) Topology {
 		}
 		t.Nodes = append(t.Nodes, n)
 	}
+}
 
-	// Wi-Fi: one access point per BSSID and a link from each station
-	// (NetworkTopologyService.ts:397-428, matterjs-server at 0bd06f22). The
-	// AP takes the first SSID a station reports — the SSID names the
-	// network, so a station without one does not settle it (:417-418).
+// addWiFi adds one access point per BSSID and a link from each station
+// (NetworkTopologyService.ts:397-428, matterjs-server at 0bd06f22). The
+// AP takes the first SSID a station reports — the SSID names the
+// network, so a station without one does not settle it (:417-418).
+func addWiFi(t *Topology, radios []radio) {
 	aps := map[string]int{}
 	for _, r := range radios {
 		if r.bssid == "" {
@@ -123,7 +146,6 @@ func Build(images []Image, now time.Time) Topology {
 		}
 		t.Connections = append(t.Connections, c)
 	}
-	return t
 }
 
 // networkType decides a node's network from its root NetworkCommissioning
@@ -161,6 +183,7 @@ func threadRole(r *threaddiagdef.RoutingRoleEnum) Role {
 		return RoleSleepyEndDevice
 	case threaddiagdef.RoutingRoleUnassigned:
 		return RoleUnassigned
+	case threaddiagdef.RoutingRoleUnspecified:
 	}
 	return ""
 }

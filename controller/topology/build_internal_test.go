@@ -110,8 +110,8 @@ var at = time.UnixMilli(1735689600000)
 
 func byID(t Topology) map[string]Node {
 	m := map[string]Node{}
-	for _, n := range t.Nodes {
-		m[n.ID] = n
+	for i := range t.Nodes {
+		m[t.Nodes[i].ID] = t.Nodes[i]
 	}
 	return m
 }

@@ -50,11 +50,11 @@ func (link) ResetCounts()                           {}
 // joinAll is a Wi-Fi driver that joins every network.
 type joinAll struct{}
 
-func (joinAll) ScanNetworks(context.Context, []byte) (uint8, string, []contract.WiFiScanResult) {
+func (joinAll) ScanNetworks(context.Context, []byte) (status uint8, debugText string, results []contract.WiFiScanResult) {
 	return 0, "", nil
 }
 
-func (joinAll) ConnectNetwork(context.Context, []byte, []byte) (uint8, string, int32) {
+func (joinAll) ConnectNetwork(context.Context, []byte, []byte) (status uint8, debugText string, errorValue int32) {
 	return 0, "", 0
 }
 

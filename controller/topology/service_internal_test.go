@@ -266,7 +266,7 @@ func recv(t *testing.T, ch chan uint64) uint64 {
 func TestServiceRefreshConcurrency(t *testing.T) {
 	h := newHarness(t, Config{RefreshConcurrency: 2})
 	b := newBlocking()
-	var ms []member
+	ms := make([]member, 0, 5)
 	for i := range uint64(5) {
 		ms = append(ms, b.member(router(i+1, uint16(1024+i))))
 	}
