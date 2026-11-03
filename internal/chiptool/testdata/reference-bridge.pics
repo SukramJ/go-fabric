@@ -34,7 +34,7 @@ PICS_SKIP_SAMPLE_APP=0
 
 # --- Transport and roles (examples/reference-bridge/main.go, transport/udp) --
 # IPv6 UDP over Ethernet/IP only; no Bluetooth, Thread or Wi-Fi commissioning
-# (scope decision, CLAUDE.md), no TCP transport (mdns/service.go advertises T=0).
+# (scope decision, CLAUDE.md); TCP on the Matter port (--tcp, default on: tcp.go).
 MCORE.COM.ETH=1
 MCORE.COM.WIFI=0
 MCORE.COM.THR=0

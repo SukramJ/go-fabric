@@ -212,15 +212,16 @@ func TestTCPSessionBindingParity(t *testing.T) {
 		t.Parallel()
 		t.Run("TCP channels have type TCP", func(t *testing.T) {
 			m := bindingManager(t)
-			if s := sessionOn(t, m, 1, newFakeChannel(5540)); s.Transport() != TransportTCP || s.UsesMRP() {
-				t.Errorf("transport %v, MRP %v", s.Transport(), s.UsesMRP())
+			ch := newFakeChannel(5540)
+			if s := sessionOn(t, m, 1, ch); s.Transport() != TransportTCP || s.UsesMRP() || s.Channel() != ch {
+				t.Errorf("transport %v, MRP %v, channel %v", s.Transport(), s.UsesMRP(), s.Channel())
 			}
 		})
 		t.Run("UDP channels have type UDP", func(t *testing.T) {
 			m := bindingManager(t)
 			s, _ := newSecurePair(t, m, 1, false)
-			if s.Transport() != TransportUDP || !s.UsesMRP() {
-				t.Errorf("transport %v, MRP %v", s.Transport(), s.UsesMRP())
+			if s.Transport() != TransportUDP || !s.UsesMRP() || s.Channel() != nil {
+				t.Errorf("transport %v, MRP %v, channel %v", s.Transport(), s.UsesMRP(), s.Channel())
 			}
 		})
 	})

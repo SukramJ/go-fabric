@@ -3461,6 +3461,41 @@
       "stepsSkipped": 3,
       "source": "TC-SC-6.1.test.ts"
     },
+    "SC/8.1": {
+      "steps": 1,
+      "stepsSkipped": 0,
+      "source": "TC-SC-8.1.test.ts"
+    },
+    "SC/8.2": {
+      "steps": 1,
+      "stepsSkipped": 0,
+      "source": "TC-SC-8.2.test.ts"
+    },
+    "SC/8.3": {
+      "steps": 2,
+      "stepsSkipped": 0,
+      "source": "TC-SC-8.3.test.ts"
+    },
+    "SC/8.4": {
+      "steps": 3,
+      "stepsSkipped": 0,
+      "source": "TC-SC-8.4.test.ts"
+    },
+    "SC/8.5": {
+      "steps": 2,
+      "stepsSkipped": 0,
+      "source": "TC-SC-8.5.test.ts"
+    },
+    "SC/8.6": {
+      "steps": 2,
+      "stepsSkipped": 0,
+      "source": "TC-SC-8.6.test.ts"
+    },
+    "SC/8.7": {
+      "steps": 2,
+      "stepsSkipped": 0,
+      "source": "TC-SC-8.7.test.ts"
+    },
     "SU/1.1": {
       "steps": 2,
       "stepsSkipped": 0,

@@ -578,6 +578,13 @@ expectations are what the daemon has to satisfy (`internal/chiptool` TestGoCerti
 | SC/4.8 | 4 | 0 | Go controller as TH, after matter.js `TC-SC-4.8.test.ts` |
 | SC/5.3 | 5 | 3 | Go controller as TH, after matter.js `TC-SC-5.3.test.ts` |
 | SC/6.1 | 8 | 3 | Go controller as TH, after matter.js `TC-SC-6.1.test.ts` |
+| SC/8.1 | 1 | 0 | Go controller as TH, after matter.js `TC-SC-8.1.test.ts`; passes with chip-tool as TH too |
+| SC/8.2 | 1 | 0 | Go controller as TH, after matter.js `TC-SC-8.2.test.ts`; passes with chip-tool as TH too |
+| SC/8.3 | 2 | 0 | Go controller as TH, after matter.js `TC-SC-8.3.test.ts`; passes with chip-tool as TH too |
+| SC/8.4 | 3 | 0 | Go controller as TH, after matter.js `TC-SC-8.4.test.ts`; passes with chip-tool as TH too |
+| SC/8.5 | 2 | 0 | Go controller as TH, after matter.js `TC-SC-8.5.test.ts`; passes with chip-tool as TH too |
+| SC/8.6 | 2 | 0 | Go controller as TH, after matter.js `TC-SC-8.6.test.ts`; passes with chip-tool as TH too |
+| SC/8.7 | 2 | 0 | Go controller as TH, after matter.js `TC-SC-8.7.test.ts`; passes with chip-tool as TH too |
 | SU/1.1 | 2 | 0 | Go controller as TH, after matter.js `TC-SU-1.1.test.ts` |
 | SU/2.1 | 3 | 1 | Go controller as TH, after matter.js `TC-SU-2.1.test.ts` |
 | SU/2.2 | 4 | 4 | Go controller as TH, after matter.js `TC-SU-2.2.test.ts`; passes with chip-tool as TH too |

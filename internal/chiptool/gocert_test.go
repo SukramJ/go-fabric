@@ -712,14 +712,22 @@ func (th *goTH) declares(code string) bool {
 // controller builds a Go controller with its own fabric — one per TS
 // controller role (dut, th_cr2, …).
 func (th *goTH) controller(label string) (*gocontroller.Controller, error) {
+	return th.controllerWith(label, nil)
+}
+
+// controllerWith is controller with the configuration amended by edit
+// (nil: none) — the TCP roles of the TCP cases.
+func (th *goTH) controllerWith(label string, edit func(*gocontroller.Config)) (*gocontroller.Controller, error) {
 	db, err := gocontroller.OpenDB(filepath.Join(th.t.TempDir(), label+".db"))
 	if err != nil {
 		return nil, err
 	}
 	th.t.Cleanup(func() { _ = db.Close() })
-	c, err := gocontroller.New(th.ctx, gocontroller.Config{
-		DB: db, Attestation: attestation.TestStore(), Label: label, Logger: th.log,
-	})
+	cfg := gocontroller.Config{DB: db, Attestation: attestation.TestStore(), Label: label, Logger: th.log}
+	if edit != nil {
+		edit(&cfg)
+	}
+	c, err := gocontroller.New(th.ctx, cfg)
 	if err != nil {
 		return nil, err
 	}
