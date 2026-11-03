@@ -226,8 +226,8 @@ func (i *Instance) checkValueIn(name string, t Type, nullable bool, c Constraint
 	switch t.Kind {
 	case KindUint, KindEnum, KindBitmap:
 		v, why = i.checkUnsigned(t, nullable, c, value, peers)
-		if why == "" && scope.bits && t.Kind == KindBitmap && t.Bitmap != nil {
-			if err := i.checkBitConformance(name, t.Bitmap, v.(uint64)); err != nil {
+		if n, ok := v.(uint64); ok && why == "" && scope.bits && t.Kind == KindBitmap && t.Bitmap != nil {
+			if err := i.checkBitConformance(name, t.Bitmap, n); err != nil {
 				return nil, err
 			}
 		}
@@ -296,7 +296,8 @@ func (i *Instance) checkUnsigned(t Type, nullable bool, c Constraint, value any,
 // conformance-compiler.ts:74-185 (refusalOnly) at 862ad75f.
 func (i *Instance) checkBitConformance(name string, b *Bitmap, n uint64) error {
 	c := &confCompiler{inst: i}
-	for _, m := range b.Members {
+	for mi := range b.Members {
+		m := &b.Members[mi]
 		if n&m.Mask() == 0 || m.Conformance.Op == "" {
 			continue
 		}

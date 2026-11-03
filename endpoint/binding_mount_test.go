@@ -163,8 +163,9 @@ func assembleOne(t *testing.T, spec Spec) (*Topology, *Endpoint) {
 // bindingViolations are the Binding violations of ep in topo.
 func bindingViolations(topo *Topology, ep *Endpoint) []DeviceTypeViolation {
 	var out []DeviceTypeViolation
-	for _, v := range ValidateDeviceTypes(topo) {
-		if v.Endpoint == ep.ID && v.Requirement == "Binding" {
+	all := ValidateDeviceTypes(topo)
+	for i := range all {
+		if v := all[i]; v.Endpoint == ep.ID && v.Requirement == "Binding" {
 			out = append(out, v)
 		}
 	}
@@ -197,6 +198,7 @@ func TestBindingMountParityMatterJS(t *testing.T) {
 	// second is mounted; the "missing Binding" verdict over a non-cluster
 	// behavior has no Go subject.
 	t.Run("is not added over a behavior with the Binding server's id", func(t *testing.T) {
+		t.Parallel()
 		own := &dtServer{id: bindingClusterID}
 		_, ep := assembleOne(t, Spec{StableKey: StringKey("sw"), DeviceType: onOffSwitch, FriendlyName: "sw", ClientClusters: []uint32{identify, onOff}, Source: switchSource(own)})
 		n := 0
@@ -215,6 +217,7 @@ func TestBindingMountParityMatterJS(t *testing.T) {
 
 	// :558-566: OnOffLightDevice.withClientClusters(OnOffClient).
 	t.Run("is added for an application client the developer adds", func(t *testing.T) {
+		t.Parallel()
 		topo, ep := assembleOne(t, Spec{
 			StableKey: StringKey("light"), DeviceType: onOffLight, FriendlyName: "light", ClientClusters: []uint32{onOff},
 			Source: deviceTypeSource{dt: onOffLight, servers: []contract.ClusterServer{lightingOnOff()}},
@@ -232,6 +235,7 @@ func TestBindingMountParityMatterJS(t *testing.T) {
 	// :578-586 with matter.js's CameraControllerDevice: its application
 	// clients (WebRtcTransportProvider M) are ones a binding never directs.
 	t.Run("is neither added nor required where every application client is one a binding never directs", func(t *testing.T) {
+		t.Parallel()
 		topo, ep := assembleOne(t, Spec{
 			StableKey: StringKey("cc"), DeviceType: cameraController, FriendlyName: "cc", ClientClusters: []uint32{0x0553},
 			Source: deviceTypeSource{dt: cameraController, servers: []contract.ClusterServer{dtServer{id: webRTCRequestor}}},
@@ -247,6 +251,7 @@ func TestBindingMountParityMatterJS(t *testing.T) {
 	// :588-597: PowerSourceEndpoint.withClientClusters(OnOffClient), a
 	// utility endpoint.
 	t.Run("is not added to a utility endpoint with an application client", func(t *testing.T) {
+		t.Parallel()
 		topo, ep := assembleOne(t, Spec{
 			StableKey: StringKey("ps"), DeviceType: powerSource, FriendlyName: "ps", ClientClusters: []uint32{onOff},
 			Source: deviceTypeSource{dt: powerSource, servers: []contract.ClusterServer{dtServer{id: powerSourceCl}}},
@@ -262,6 +267,7 @@ func TestBindingMountParityMatterJS(t *testing.T) {
 	// :599-609: the node endpoint with an OnOff client. The root is the
 	// assembler's and declares no clients; the predicate is RootNode's.
 	t.Run("is not added to a node endpoint with an application client", func(t *testing.T) {
+		t.Parallel()
 		if baseMandatesBinding([]uint16{0x0016}, []uint32{onOff}) {
 			t.Error("Base mandates Binding of the node endpoint")
 		}
@@ -275,6 +281,7 @@ func TestBindingMountParityMatterJS(t *testing.T) {
 
 	// :611-622: a Binding server the source declares is kept.
 	t.Run("keeps the Binding server the developer declares", func(t *testing.T) {
+		t.Parallel()
 		own := mattercore.NewBinding()
 		_, ep := assembleOne(t, Spec{StableKey: StringKey("sw"), DeviceType: onOffSwitch, FriendlyName: "sw", ClientClusters: []uint32{identify, onOff}, Source: switchSource(own)})
 		if got := bindingOf(ep); got != contract.ClusterServer(own) {
@@ -285,6 +292,7 @@ func TestBindingMountParityMatterJS(t *testing.T) {
 	// :624-633: a simple device type the model does not define is not
 	// judged and gets no Binding.
 	t.Run("is not added to an endpoint of a device type the model does not define, which is not judged", func(t *testing.T) {
+		t.Parallel()
 		topo, ep := assembleOne(t, Spec{
 			StableKey: StringKey("custom"), DeviceType: customSimple, FriendlyName: "custom", ClientClusters: []uint32{onOff},
 			Source: deviceTypeSource{dt: customSimple},
@@ -302,6 +310,7 @@ func TestBindingMountParityMatterJS(t *testing.T) {
 	// :635-646: the DeviceTypeList states OnOffLightSwitch beside a
 	// manufacturer-specific primary type.
 	t.Run("is added where the DeviceTypeList states a simple device type the endpoint type does not", func(t *testing.T) {
+		t.Parallel()
 		topo, ep := assembleOne(t, Spec{
 			StableKey: StringKey("custom"), DeviceType: customSimple, DeviceTypes: []uint16{onOffSwitch}, FriendlyName: "custom", ClientClusters: []uint32{onOff},
 			Source: deviceTypeSource{dt: customSimple},
@@ -318,6 +327,7 @@ func TestBindingMountParityMatterJS(t *testing.T) {
 	// assembler has none — and an off-mode validator over the topology
 	// changes nothing.
 	t.Run("is added with validation off", func(t *testing.T) {
+		t.Parallel()
 		topo, ep := assembleOne(t, Spec{StableKey: StringKey("sw"), DeviceType: onOffSwitch, FriendlyName: "sw", ClientClusters: []uint32{identify, onOff}, Source: switchSource()})
 		if _, err := NewDeviceTypeValidator(DeviceTypeValidationOff).Validate(topo); err != nil {
 			t.Fatal(err)

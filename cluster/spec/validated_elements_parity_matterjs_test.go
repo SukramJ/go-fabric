@@ -78,15 +78,18 @@ func TestValidatedElementsParityMatterJS(t *testing.T) {
 
 	// :217-251: CmdB "CmdA, O" with CmdA disallowed falls back to O.
 	fallback := func(t *testing.T) *spec.Cluster {
+		t.Helper()
 		return veCluster(t, map[string]veElement{"CmdA": {id: cmdA, conformance: "X"}, "CmdB": {id: cmdB, conformance: "CmdA, O"}}, nil)
 	}
 	t.Run("optional fallback when dep absent and element implemented", func(t *testing.T) {
+		t.Parallel()
 		inst, err := spec.New(fallback(t), spec.Options{Commands: []uint32{cmdB}})
 		if err != nil || !inst.Accepts(cmdB) {
 			t.Fatalf("Accepts(CmdB) = %v, err %v", err == nil && inst.Accepts(cmdB), err)
 		}
 	})
 	t.Run("optional fallback when dep absent and element not implemented", func(t *testing.T) {
+		t.Parallel()
 		inst, err := spec.New(fallback(t), spec.Options{})
 		if err != nil || inst.Accepts(cmdB) {
 			t.Fatalf("CmdB present or err %v", err)
@@ -95,15 +98,18 @@ func TestValidatedElementsParityMatterJS(t *testing.T) {
 
 	// :253-289: a cyclic pair "CmdB, O" / "CmdA, O".
 	cyclic := func(t *testing.T) *spec.Cluster {
+		t.Helper()
 		return veCluster(t, map[string]veElement{"CmdA": {id: cmdA, conformance: "CmdB, O"}, "CmdB": {id: cmdB, conformance: "CmdA, O"}}, nil)
 	}
 	t.Run("cyclic pair both implemented", func(t *testing.T) {
+		t.Parallel()
 		inst, err := spec.New(cyclic(t), spec.Options{Commands: []uint32{cmdA, cmdB}})
 		if err != nil || !inst.Accepts(cmdA) || !inst.Accepts(cmdB) {
 			t.Fatalf("pair not both present (err %v)", err)
 		}
 	})
 	t.Run("cyclic pair neither implemented", func(t *testing.T) {
+		t.Parallel()
 		inst, err := spec.New(cyclic(t), spec.Options{})
 		if err != nil || inst.Accepts(cmdA) || inst.Accepts(cmdB) {
 			t.Fatalf("pair present (err %v)", err)
@@ -113,6 +119,7 @@ func TestValidatedElementsParityMatterJS(t *testing.T) {
 	// :329-355: OperationalState's Pause/Resume/Stop/Start, every one
 	// implemented.
 	t.Run("OperationalState-like scenario", func(t *testing.T) {
+		t.Parallel()
 		def := veCluster(t, map[string]veElement{
 			"Pause": {id: 1, conformance: "Resume, O"}, "Resume": {id: 2, conformance: "Pause, O"},
 			"Stop": {id: 3, conformance: "M"}, "Start": {id: 4, conformance: "Stop"},
@@ -133,6 +140,7 @@ func TestValidatedElementsParityMatterJS(t *testing.T) {
 	// UnimplementedMandatoryCommands names and the device-type validator
 	// reports (ViolationUnimplemented).
 	t.Run("errors when mandatory element not implemented", func(t *testing.T) {
+		t.Parallel()
 		def := veCluster(t, map[string]veElement{"CmdA": {id: cmdA, conformance: "M"}, "CmdB": {id: cmdB, conformance: "M"}}, nil)
 		srv, err := spec.NewServer(def, spec.Options{}, spec.ServerConfig{Unimplemented: true, Handlers: map[uint32]spec.CommandHandler{cmdA: noop}})
 		if err != nil {
@@ -145,6 +153,7 @@ func TestValidatedElementsParityMatterJS(t *testing.T) {
 
 	// :430-446: "Z, CmdA" reads as "X, CmdA" and is not fatal.
 	t.Run("reads a misplaced obsolete term in an otherwise list as it reads a disallowed one", func(t *testing.T) {
+		t.Parallel()
 		resultFor := func(flag string) (bool, error) {
 			def := veCluster(t, map[string]veElement{"CmdA": {id: cmdA, conformance: "O"}, "CmdB": {id: cmdB, conformance: flag + ", CmdA"}}, nil)
 			inst, err := spec.New(def, spec.Options{Commands: []uint32{cmdA, cmdB}})
@@ -165,6 +174,7 @@ func TestValidatedElementsParityMatterJS(t *testing.T) {
 
 	// :448-464: AttrB "AttrA" beside a mandatory AttrA.
 	t.Run("handles attributes with element references", func(t *testing.T) {
+		t.Parallel()
 		def := veCluster(t, nil, map[string]veElement{"AttrA": {id: 1, conformance: "M"}, "AttrB": {id: 2, conformance: "AttrA"}})
 		inst, err := spec.New(def, spec.Options{Attributes: []uint32{2}})
 		if err != nil || !inst.Serves(1) || !inst.Serves(2) {
@@ -175,6 +185,7 @@ func TestValidatedElementsParityMatterJS(t *testing.T) {
 	// "unimplemented mandatory commands" (:496-592): CmdA M, CmdB FT
 	// (supported), CmdC OT, CmdD "CmdA".
 	mandatory := func(t *testing.T) *spec.Cluster {
+		t.Helper()
 		return veCluster(t, map[string]veElement{
 			"CmdA": {id: cmdA, conformance: "M"}, "CmdB": {id: cmdB, conformance: "FT"},
 			"CmdC": {id: cmdC, conformance: "OT"}, "CmdD": {id: cmdD, conformance: "CmdA"},
@@ -188,6 +199,7 @@ func TestValidatedElementsParityMatterJS(t *testing.T) {
 	// requires CmdD once CmdA is implemented; a Go element whose
 	// conformance names another is optional when declared.
 	t.Run("is fatal for each mandatory command that throws unimplemented in strict mode", func(t *testing.T) {
+		t.Parallel()
 		_, err := spec.NewServer(mandatory(t), ft, spec.ServerConfig{})
 		if !errors.Is(err, spec.ErrMissingHandler) {
 			t.Fatalf("err = %v, want ErrMissingHandler", err)
@@ -204,6 +216,7 @@ func TestValidatedElementsParityMatterJS(t *testing.T) {
 
 	// :557-566: CmdB, required by the supported feature FT.
 	t.Run("is fatal for a conditionally required command without implementation", func(t *testing.T) {
+		t.Parallel()
 		_, err := spec.NewServer(mandatory(t), ft, spec.ServerConfig{Handlers: map[uint32]spec.CommandHandler{cmdA: noop}})
 		if !errors.Is(err, spec.ErrMissingHandler) || !strings.Contains(err.Error(), "CmdB") {
 			t.Fatalf("err = %v, want ErrMissingHandler naming CmdB", err)
@@ -213,6 +226,7 @@ func TestValidatedElementsParityMatterJS(t *testing.T) {
 	// :580-582: the default Groups, ScenesManagement and GroupKeyManagement
 	// servers — here their definitions — are accepted as they stand.
 	t.Run("accepts the default ${server.name} in strict mode", func(t *testing.T) {
+		t.Parallel()
 		for _, def := range []*spec.Cluster{groupsdef.Definition, scenesdef.Definition, gkmdef.Definition} {
 			if _, err := spec.New(def, spec.Options{}); err != nil {
 				t.Errorf("%s: %v", def.Name, err)
@@ -222,6 +236,7 @@ func TestValidatedElementsParityMatterJS(t *testing.T) {
 
 	// :585-592.
 	t.Run("accepts a cluster that implements its mandatory commands in strict mode", func(t *testing.T) {
+		t.Parallel()
 		srv, err := spec.NewServer(mandatory(t), ft, spec.ServerConfig{Handlers: map[uint32]spec.CommandHandler{cmdA: noop, cmdB: noop, cmdD: noop}})
 		if err != nil {
 			t.Fatal(err)
@@ -233,6 +248,7 @@ func TestValidatedElementsParityMatterJS(t *testing.T) {
 
 	// "element IDs" (:594-668).
 	t.Run("refuses illegal attribute, command and event IDs together", func(t *testing.T) { // :596-611
+		t.Parallel()
 		def := veCluster(t, map[string]veElement{"IllegalCommand": {id: 0xFFF1_0100, conformance: "O"}},
 			map[string]veElement{"IllegalAttribute": {id: 0xFFF1_5000, conformance: "O"}})
 		def.Events = []spec.Event{{ID: 0xFFF1_0100, Name: "IllegalEvent", Priority: spec.PriorityInfo, Conformance: op(spec.ConfOptional)}}
@@ -251,6 +267,7 @@ func TestValidatedElementsParityMatterJS(t *testing.T) {
 		}
 	})
 	t.Run("refuses an illegal cluster ID", func(t *testing.T) { // :613-621
+		t.Parallel()
 		_, err := spec.New(&spec.Cluster{ID: 0xFFF1_0001, Name: "IllegalMei", Revision: 1}, spec.Options{})
 		if !errors.Is(err, spec.ErrIllegalID) || !strings.Contains(err.Error(), "IllegalMei.cluster") || !strings.Contains(err.Error(), "invalid cluster ID 0xfff10001") {
 			t.Fatalf("err = %v", err)

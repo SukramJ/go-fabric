@@ -528,7 +528,7 @@ func (s *dtScopeConditions) rootAssertedOf(ep uint16) map[string]bool {
 // itself at Self, by the composers whose composition covers it at
 // Descendant, and, for the node endpoint, by any endpoint of the scope at
 // Root. Chains are not followed. A name only a Root assertion makes true
-// is recorded for rootAssertedOf (ConditionAssertions.ts:455-468 at
+// is recorded for rootAssertedOf (ConditionAssertions.ts:449-471 at
 // 862ad75f, #assertedOn).
 func (s *dtScopeConditions) assertedOn(ep uint16) map[string]bool {
 	conds := map[string]bool{}
@@ -660,8 +660,9 @@ func (p *dtPass) check(ep uint16) []DeviceTypeViolation {
 			}
 		}
 		binding := map[string]bool{}
-		for _, v := range p.checkDeviceTypes(facts, unasserted, collection, false) {
-			binding[v.Key()] = true
+		unassertedViolations := p.checkDeviceTypes(facts, unasserted, collection, false)
+		for i := range unassertedViolations {
+			binding[unassertedViolations[i].Key()] = true
 		}
 		for i := range judged {
 			if !binding[judged[i].Key()] {

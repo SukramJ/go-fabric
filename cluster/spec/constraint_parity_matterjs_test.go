@@ -32,7 +32,8 @@ func constraintCluster(t spec.Type, c spec.Constraint, siblings ...spec.Attribut
 }
 
 func withSiblings(def *spec.Cluster, siblings ...spec.Attribute) *spec.Cluster {
-	for n, s := range siblings {
+	for n := range siblings {
+		s := siblings[n]
 		s.ID = uint32(n + 1)
 		if s.Type.Kind == 0 {
 			s.Type = spec.Type{Kind: spec.KindUint, Bits: 16}
@@ -82,6 +83,7 @@ func TestConstraintParityMatterJS(t *testing.T) {
 	// in the encoded unit (1 to 10000) as it does ClosureDimension's
 	// Resolution.
 	t.Run("percentage bound", func(t *testing.T) {
+		t.Parallel()
 		resolution := cddef.Definition.Attribute(cddef.AttrResolution)
 		if resolution == nil || resolution.Constraint.Min == nil || resolution.Constraint.Min.Int != 1 || resolution.Constraint.Max.Int != 10000 {
 			t.Fatalf("generated percent bound %+v", resolution)
@@ -95,6 +97,7 @@ func TestConstraintParityMatterJS(t *testing.T) {
 
 	// :38-56: the entry constraint of a list of percent100ths.
 	t.Run("percentage bound of a list entry", func(t *testing.T) {
+		t.Parallel()
 		entry := spec.Constraint{Text: "0% to 100%", Min: &spec.Bound{Int: 0}, Max: &spec.Bound{Int: 10000}}
 		c := spec.Constraint{Text: "max 4[0% to 100%]", Max: &spec.Bound{Int: 4}, Entry: &entry}
 		list := spec.Type{Kind: spec.KindList, Entry: &spec.Field{Name: "entry", Type: spec.Type{Name: "percent100ths", Kind: spec.KindUint, Bits: 16}}}
@@ -106,6 +109,7 @@ func TestConstraintParityMatterJS(t *testing.T) {
 
 	// :57-70: "min MinVal", MinVal nullable.
 	t.Run("min with reference", func(t *testing.T) {
+		t.Parallel()
 		c := spec.Constraint{Text: "min minVal", Min: &spec.Bound{Ref: "minVal"}}
 		run(t, constraintCluster(uint16Type, c, spec.Attribute{Name: "MinVal"}), c.Text, []check{
 			{"accepts if over", uint64(5), record{1: uint16(4)}, true},
@@ -117,6 +121,7 @@ func TestConstraintParityMatterJS(t *testing.T) {
 
 	// :71-84: "min (MinVal + 1)".
 	t.Run("min with expression", func(t *testing.T) {
+		t.Parallel()
 		c := spec.Constraint{Text: "min minVal + 1", Min: &spec.Bound{Expr: `{"type":"+","lhs":` + ref("minVal") + `,"rhs":1}`}}
 		run(t, constraintCluster(uint16Type, c, spec.Attribute{Name: "MinVal"}), c.Text, []check{
 			{"accepts if over", uint64(6), record{1: uint16(4)}, true},
@@ -128,6 +133,7 @@ func TestConstraintParityMatterJS(t *testing.T) {
 
 	// :99-114: "max MaxVal".
 	t.Run("max with reference", func(t *testing.T) {
+		t.Parallel()
 		c := spec.Constraint{Text: "max maxVal", Max: &spec.Bound{Ref: "maxVal"}}
 		run(t, constraintCluster(uint16Type, c, spec.Attribute{Name: "MaxVal"}), c.Text, []check{
 			{"rejects if over", uint64(5), record{1: uint16(4)}, false},
@@ -139,6 +145,7 @@ func TestConstraintParityMatterJS(t *testing.T) {
 
 	// :182-197: "0 to NumberOfPositions-1".
 	t.Run("range with expression", func(t *testing.T) {
+		t.Parallel()
 		c := spec.Constraint{Text: "0 to numberOfPositions - 1", Min: &spec.Bound{Int: 0}, Max: &spec.Bound{Expr: `{"type":"-","lhs":` + ref("numberOfPositions") + `,"rhs":1}`}}
 		run(t, constraintCluster(uint16Type, c, spec.Attribute{Name: "NumberOfPositions"}), c.Text, []check{
 			{"accepts if under", uint64(1), record{1: uint16(2)}, true},
@@ -149,6 +156,7 @@ func TestConstraintParityMatterJS(t *testing.T) {
 	// :198-262: "Limits.HoldTimeMin to Limits.HoldTimeMax", the dotted
 	// reference the generator keeps as a qualified Ref.
 	t.Run("range with dot-qualified reference", func(t *testing.T) {
+		t.Parallel()
 		type limits struct{ HoldTimeMin, HoldTimeMax *uint16 }
 		u16 := func(v uint16) *uint16 { return &v }
 		both := record{1: limits{HoldTimeMin: u16(10), HoldTimeMax: u16(100)}}
@@ -169,6 +177,7 @@ func TestConstraintParityMatterJS(t *testing.T) {
 
 	// :555-565: "max 8{1}", one codepoint at most.
 	t.Run("string length with codepoints", func(t *testing.T) {
+		t.Parallel()
 		c := spec.Constraint{Text: "max 8{1}", Max: &spec.Bound{Int: 8}, CpMax: 1}
 		run(t, constraintCluster(spec.Type{Kind: spec.KindString}, c), c.Text, []check{
 			{"accepts if under", "𩸽", nil, true},

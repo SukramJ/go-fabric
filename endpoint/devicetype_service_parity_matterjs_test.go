@@ -66,6 +66,7 @@ func TestDeviceTypeConformanceServiceParityMatterJS(t *testing.T) {
 
 	// :63-77: one line for the endpoint, naming each violation.
 	t.Run("logs one warning listing every violation of an endpoint", func(t *testing.T) {
+		t.Parallel()
 		f, root := nodeTree()
 		light := lightWithoutIdentifyAndScenes(f, root, "light")
 		s := newService(t, DeviceTypeValidationWarn, std, f)
@@ -81,6 +82,7 @@ func TestDeviceTypeConformanceServiceParityMatterJS(t *testing.T) {
 
 	// :102-117: DimmableLight adds the LevelControl the light lacks.
 	t.Run("logs only the new violation of an endpoint it reported before", func(t *testing.T) {
+		t.Parallel()
 		f, root := nodeTree()
 		light := lightWithoutIdentify(f, root, "light")
 		s := newService(t, DeviceTypeValidationWarn, std, f)
@@ -94,6 +96,7 @@ func TestDeviceTypeConformanceServiceParityMatterJS(t *testing.T) {
 
 	// :119-134: without a device type the endpoint violates nothing.
 	t.Run("logs a violation again once it disappeared and returned", func(t *testing.T) {
+		t.Parallel()
 		f, root := nodeTree()
 		light := lightWithoutIdentify(f, root, "light")
 		s := newService(t, DeviceTypeValidationWarn, std, f)
@@ -113,6 +116,7 @@ func TestDeviceTypeConformanceServiceParityMatterJS(t *testing.T) {
 	// zero DeviceTypeValidationMode (node.Config.DeviceTypeValidation,
 	// Bridge's default validator).
 	t.Run("is in warn mode unless the environment says otherwise", func(t *testing.T) {
+		t.Parallel()
 		var unset DeviceTypeValidationMode
 		if unset != DeviceTypeValidationWarn || unset.String() != "warn" {
 			t.Fatalf("zero mode = %v", unset)
@@ -128,6 +132,7 @@ func TestDeviceTypeConformanceServiceParityMatterJS(t *testing.T) {
 	// service's verdictOf), which records nothing in any mode; an off-mode
 	// validator records nothing either, and judging again finds the same.
 	t.Run("judges on request in off mode, like warn mode, but records nothing", func(t *testing.T) {
+		t.Parallel()
 		f, root := nodeTree()
 		light := lightWithoutIdentify(f, root, "light")
 		s := newService(t, DeviceTypeValidationOff, std, f)
@@ -146,6 +151,7 @@ func TestDeviceTypeConformanceServiceParityMatterJS(t *testing.T) {
 	// :186-200: the verdict holds every current violation; only the
 	// unreported ones are fresh.
 	t.Run("returns every violation of each judged endpoint, reported before or not", func(t *testing.T) {
+		t.Parallel()
 		f, root := nodeTree()
 		light := lightWithoutIdentify(f, root, "light")
 		s := newService(t, DeviceTypeValidationWarn, std, f)
@@ -168,6 +174,7 @@ func TestDeviceTypeConformanceServiceParityMatterJS(t *testing.T) {
 	// TlsCertificateManagement; flagged, apart from the warnings, never
 	// refused even when strict.
 	t.Run("logs at debug and never refuses what only a Root assertion requires, even when strict", func(t *testing.T) {
+		t.Parallel()
 		f, root := cameraNode()
 		s := newService(t, DeviceTypeValidationStrict, std, f)
 		all := onlyAt(s.verdictOf(), root)
@@ -195,6 +202,7 @@ func TestDeviceTypeConformanceServiceParityMatterJS(t *testing.T) {
 	// :249-266: BatteryStorage requires PowerSource components whatever
 	// holds, so device:PowerSource binds once the root lists it.
 	t.Run("warns of a violation once it no longer only follows from a Root assertion", func(t *testing.T) {
+		t.Parallel()
 		f, root := cameraNode()
 		s := newService(t, DeviceTypeValidationWarn, std, f)
 		verdict, err := s.v.judge(onlyAt(s.verdictOf(), root), shapeOf(f))
@@ -220,6 +228,7 @@ func TestDeviceTypeConformanceServiceParityMatterJS(t *testing.T) {
 	// :268-287: OnOffLight on the root adds the OnOff it lacks — warned;
 	// TlsCertificateManagement apart.
 	t.Run("logs the violations a Root assertion explains apart from the others", func(t *testing.T) {
+		t.Parallel()
 		f, root := cameraNode()
 		root.deviceTypes = []uint32{dtRootNode, dtOnOffLight}
 		s := newService(t, DeviceTypeValidationWarn, std, f)
@@ -238,6 +247,7 @@ func TestDeviceTypeConformanceServiceParityMatterJS(t *testing.T) {
 
 	// :289-312.
 	t.Run("refuses an endpoint only for the violations no Root assertion explains", func(t *testing.T) {
+		t.Parallel()
 		f, root := cameraNode()
 		root.deviceTypes = []uint32{dtRootNode, dtOnOffLight}
 		s := newService(t, DeviceTypeValidationStrict, std, f)
@@ -246,7 +256,7 @@ func TestDeviceTypeConformanceServiceParityMatterJS(t *testing.T) {
 		if !errors.As(err, &refusal) {
 			t.Fatalf("err = %v", err)
 		}
-		var requirements []string
+		requirements := make([]string, 0, len(refusal.Violations))
 		for _, v := range refusal.Violations {
 			requirements = append(requirements, v.Requirement)
 		}
@@ -257,6 +267,7 @@ func TestDeviceTypeConformanceServiceParityMatterJS(t *testing.T) {
 
 	// :314-324.
 	t.Run("refuses an endpoint again until it conforms", func(t *testing.T) {
+		t.Parallel()
 		f, root := nodeTree()
 		light := lightWithoutIdentify(f, root, "light")
 		s := newService(t, DeviceTypeValidationStrict, std, f)
@@ -274,6 +285,7 @@ func TestDeviceTypeConformanceServiceParityMatterJS(t *testing.T) {
 	// endpoint the same way — a strict validator reports what it violates
 	// rather than refusing it.
 	t.Run("logs rather than throws in strict mode when told not to refuse", func(t *testing.T) {
+		t.Parallel()
 		f, root := nodeTree()
 		lt := light(f, root, "light")
 		s := newService(t, DeviceTypeValidationStrict, std, f)
@@ -291,6 +303,7 @@ func TestDeviceTypeConformanceServiceParityMatterJS(t *testing.T) {
 
 	// :365-374: GroupKeyManagement, a RootNode singleton, on a light.
 	t.Run("throws a misplaced singleton when validation is not strict", func(t *testing.T) {
+		t.Parallel()
 		f, root := nodeTree()
 		light(f, root, "light").server(clGroupKeyMgmt)
 		s := newService(t, DeviceTypeValidationWarn, std, f)
@@ -302,6 +315,7 @@ func TestDeviceTypeConformanceServiceParityMatterJS(t *testing.T) {
 	// :376-407: both lights in the refusal, the first first, nothing
 	// recorded, each refused again.
 	t.Run("throws the first refused endpoint carrying the others and logs none", func(t *testing.T) {
+		t.Parallel()
 		f, root := nodeTree()
 		first, second := lightWithoutIdentify(f, root, "first"), lightWithoutIdentify(f, root, "second")
 		s := newService(t, DeviceTypeValidationStrict, std, f)
@@ -330,6 +344,7 @@ func TestDeviceTypeConformanceServiceParityMatterJS(t *testing.T) {
 	// :409-420: a refused addition of a child leaves its parent's record
 	// empty.
 	t.Run("records nothing for an addition it refuses", func(t *testing.T) {
+		t.Parallel()
 		f, root := nodeTree()
 		parent := lightWithoutIdentify(f, root, "parent")
 		lightWithoutIdentify(f, parent, "child")
@@ -342,6 +357,7 @@ func TestDeviceTypeConformanceServiceParityMatterJS(t *testing.T) {
 
 	// :422-435.
 	t.Run("validates every endpoint of a node scope", func(t *testing.T) {
+		t.Parallel()
 		f, root := nodeTree()
 		first, second := lightWithoutIdentify(f, root, "first"), lightWithoutIdentify(f, root, "second")
 		s := newService(t, DeviceTypeValidationWarn, std, f)
@@ -357,6 +373,7 @@ func TestDeviceTypeConformanceServiceParityMatterJS(t *testing.T) {
 	// :437-447 with modelWithoutNodes (:41-55): RootNode is simple, so no
 	// endpoint is in a node scope.
 	t.Run("does not judge an endpoint in no node scope", func(t *testing.T) {
+		t.Parallel()
 		l := syntheticModel(
 			&schema.DeviceTypeDefinition{Name: "Base", Classification: "base"},
 			&schema.DeviceTypeDefinition{ID: rootID, Name: "RootNode", Classification: "simple"},
@@ -376,6 +393,7 @@ func TestDeviceTypeConformanceServiceParityMatterJS(t *testing.T) {
 	// :460-472: an endpoint the tree loses is forgotten; added back, its
 	// violations are reported again.
 	t.Run("reports an endpoint's violations again once it is forgotten", func(t *testing.T) {
+		t.Parallel()
 		f, root := nodeTree()
 		light := lightWithoutIdentify(f, root, "light")
 		s := newService(t, DeviceTypeValidationWarn, std, f)
@@ -394,6 +412,7 @@ func TestDeviceTypeConformanceServiceParityMatterJS(t *testing.T) {
 	// (Bridge.SetDeviceTypeValidation, NewDeviceTypeValidator), so every
 	// endpoint is reported again — once.
 	t.Run("reports every endpoint again after a factory reset", func(t *testing.T) {
+		t.Parallel()
 		f, root := nodeTree()
 		light := lightWithoutIdentify(f, root, "light")
 		s := newService(t, DeviceTypeValidationWarn, std, f)

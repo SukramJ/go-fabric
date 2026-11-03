@@ -8,7 +8,7 @@ import (
 	"fmt"
 )
 
-// ErrIllegalID: a cluster, attribute, command or event id outside the
+// ErrIllegalID is a cluster, attribute, command or event id outside the
 // ranges the specification reserves for it (Core § 7.10, § 7.19.2.31-34).
 // [New] refuses a definition with one, naming each.
 var ErrIllegalID = errors.New("spec: illegal element id")
@@ -16,7 +16,7 @@ var ErrIllegalID = errors.New("spec: illegal element id")
 // fromMei splits a Manufacturer Extensible Identifier into its vendor
 // prefix and type suffix, refusing a prefix above 0xfff4 and the suffix
 // 0xffff. Mirrors matter.js
-// packages/types/src/datatype/ManufacturerExtensibleIdentifier.ts:33-55
+// packages/types/src/datatype/ManufacturerExtensibleIdentifier.ts:29-52
 // at 862ad75f (Mei.fromMei).
 func fromMei(mei uint32) (prefix, suffix uint32, why string) {
 	prefix, suffix = mei>>16, mei&0xffff
@@ -31,7 +31,7 @@ func fromMei(mei uint32) (prefix, suffix uint32, why string) {
 
 // CheckClusterID refuses an illegal cluster id: a standard cluster's
 // suffix is 0x0000 - 0x7fff, a vendor-specific one's 0xfc00 - 0xfffe.
-// Mirrors matter.js packages/types/src/datatype/ClusterId.ts:23-41 at
+// Mirrors matter.js packages/types/src/datatype/ClusterId.ts:22-41 at
 // 862ad75f.
 func CheckClusterID(id uint32) error {
 	prefix, suffix, why := fromMei(id)
@@ -47,7 +47,7 @@ func CheckClusterID(id uint32) error {
 
 // CheckAttributeID refuses an illegal attribute id: a global one is
 // 0xf000 - 0xfffe, any other's suffix 0x0000 - 0x4fff. Mirrors matter.js
-// packages/types/src/datatype/AttributeId.ts:20-35 at 862ad75f.
+// packages/types/src/datatype/AttributeId.ts:20-34 at 862ad75f.
 func CheckAttributeID(id uint32) error {
 	if id >= 0xf000 && id <= 0xfffe {
 		return nil
@@ -60,7 +60,7 @@ func CheckAttributeID(id uint32) error {
 }
 
 // CheckCommandID refuses an illegal command id: its suffix is 0x00 -
-// 0xff. Mirrors matter.js packages/types/src/datatype/CommandId.ts:20-32
+// 0xff. Mirrors matter.js packages/types/src/datatype/CommandId.ts:21-32
 // at 862ad75f.
 func CheckCommandID(id uint32) error {
 	_, suffix, why := fromMei(id)
@@ -71,7 +71,7 @@ func CheckCommandID(id uint32) error {
 }
 
 // CheckEventID refuses an illegal event id: its suffix is 0x00 - 0xff.
-// Mirrors matter.js packages/types/src/datatype/EventId.ts:20-30 at
+// Mirrors matter.js packages/types/src/datatype/EventId.ts:20-29 at
 // 862ad75f.
 func CheckEventID(id uint32) error {
 	_, suffix, why := fromMei(id)
