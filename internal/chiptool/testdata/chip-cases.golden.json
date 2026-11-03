@@ -3306,6 +3306,12 @@
       "stepsSkipped": 5,
       "source": "TC-BIND-2.3.test.ts"
     },
+    "BR/4": {
+      "steps": 15,
+      "stepsSkipped": 0,
+      "source": "TC-BR-4.test.ts",
+      "role": "dut"
+    },
     "CADMIN/1.17": {
       "steps": 13,
       "stepsSkipped": 0,
