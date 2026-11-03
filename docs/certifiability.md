@@ -400,7 +400,7 @@ Harness image: `ghcr.io/matter-js/chip@sha256:d6f1de89d714309beb621543d451a98996
 | DA/1.4 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | DA/1.6 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | DA/1.8 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
-| DA/1.9 | (b) not supported | not applicable: the case's PICS `MCORE.ROLE.COMMISSIONER` is false for the reference DUT |
+| DA/1.9 | (b) not supported | not applicable: the case's PICS `MCORE.ROLE.COMMISSIONER` is false for the reference DUT; controller role: matter.js drives chip's python script (prompt-driven-python-test.ts:41), the DUT answering its prompts — not ported (TC-DA-1.9.test.ts:32 TC_DA_1_9.py) |
 | DD/1.10 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | DD/1.11 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | DD/1.6 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
@@ -511,7 +511,7 @@ Harness image: `ghcr.io/matter-js/chip@sha256:d6f1de89d714309beb621543d451a98996
 | SC/2.3 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | SC/2.4 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | SC/3.3 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
-| SC/3.5 | (b) not supported | not applicable: the case's PICS `MCORE.ROLE.COMMISSIONER` is false for the reference DUT |
+| SC/3.5 | (b) not supported | not applicable: the case's PICS `MCORE.ROLE.COMMISSIONER` is false for the reference DUT; controller role: matter.js drives chip's python script (prompt-driven-python-test.ts:41), the DUT answering its prompts — not ported (TC-SC-3.5.test.ts:43 TC_SC_3_5.py) |
 | SC/4.4 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | SC/4.6 | (b) not supported | not applicable: the case's PICS `MCORE.ROLE.COMMISSIONER & MCORE.DD.COMM_DISCOVERY` is false for the reference DUT |
 | SC/4.7 | (b) not supported | not applicable: the case's PICS `MCORE.ROLE.COMMISSIONEE & MCORE.DD.COMM_DISCOVERY` is false for the reference DUT |
@@ -620,6 +620,23 @@ case counts as passed in its family; one no family of the harness image lists is
 | DD/3.17 | 15 | 0 | Go controller as DUT, after matter.js `TC-DD-3.17.test.ts` |
 | ICDB/1.3 | 5 | 0 | Go controller as DUT, after matter.js `TC-ICDB-1.3.test.ts`; in no family of the harness image |
 | ICDM/6.1 | 4 | 0 | Go controller as DUT, after matter.js `TC-ICDM-6.1.test.ts`; in no family of the harness image |
+
+#### Controller-role cases not run
+
+matter.js's cases with its controller as DUT that the Go controller does not run as the DUT and no family of
+the harness image lists; those a family lists carry the same reason on their row above.
+
+| Case | Class | Reason |
+| --- | --- | --- |
+| BR/4 | (c) harness | controller role (phase 29b-2): matter.js runs it with its controller as DUT against a bridge TH it drives through bridge-simulation app-pipe commands (TC-BR-4.test.ts:234) |
+| TBRM/3.1 | (b) not supported | controller role: the TH is a Thread border router (`--otbr` needs a live OTBR REST API; matter.js runs it against chip's network-manager app only, TC-TBRM-3.1.test.ts:133-140) |
+| WEBRTCR/2.1 | (b) not supported | controller role: matter.js drives chip's python script (prompt-driven-python-test.ts:41), the DUT answering its prompts — not ported (TC-WEBRTCR-2.1.test.ts:18 TC_WEBRTCR_2_1.py) |
+| WEBRTCR/2.2 | (b) not supported | controller role: matter.js drives chip's python script (prompt-driven-python-test.ts:41), the DUT answering its prompts — not ported (TC-WEBRTCR-2.2.test.ts:18 TC_WEBRTCR_2_2.py) |
+| WEBRTCR/2.3 | (b) not supported | controller role: matter.js drives chip's python script (prompt-driven-python-test.ts:41), the DUT answering its prompts — not ported (TC-WEBRTCR-2.3.test.ts:11 TC_WEBRTCR_2_3.py) |
+| WEBRTCR/2.4 | (b) not supported | controller role: matter.js drives chip's python script (prompt-driven-python-test.ts:41), the DUT answering its prompts — not ported (TC-WEBRTCR-2.4.test.ts:11 TC_WEBRTCR_2_4.py) |
+| WEBRTCR/2.5 | (b) not supported | controller role: matter.js drives chip's python script (prompt-driven-python-test.ts:41), the DUT answering its prompts — not ported (TC-WEBRTCR-2.5.test.ts:30 TC_WEBRTCR_2_5.py) |
+| WEBRTCR/2.6 | (b) not supported | controller role: matter.js drives chip's python script (prompt-driven-python-test.ts:41), the DUT answering its prompts — not ported (TC-WEBRTCR-2.6.test.ts:19 TC_WEBRTCR_2_6.py) |
+| WEBRTCR/2.7 | (b) not supported | controller role: matter.js drives chip's python script (prompt-driven-python-test.ts:41), the DUT answering its prompts — not ported (TC-WEBRTCR-2.7.test.ts:18 TC_WEBRTCR_2_7.py) |
 
 ### Cases that pass with a recorded gap
 

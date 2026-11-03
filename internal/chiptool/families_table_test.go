@@ -32,6 +32,39 @@ const (
 	classOutOfScope gapClass = "(d) out of scope"
 )
 
+// controllerRoleCases are matter.js's certification cases with its
+// controller as the DUT (support/chip-testing/test/cert, 862ad75f) that the
+// Go controller does not run as the DUT, each with its class and reason;
+// the DD onboarding-payload cases, TC-ICDM-6.1, TC-ICDB-1.3 run since phase
+// 29b-1 (gocert_dddut_test.go, gocert_icd_test.go). A case the harness
+// image lists in a family gets the reason on its row — a manual one
+// through manualReason, a not-applicable one beside its PICS —; one no
+// family lists is a row of the status page's "Controller role" section.
+var controllerRoleCases = map[string]gap{
+	// TC-BR-4.test.ts:234: the bridge TH's simulated changes through
+	// app-pipe commands the daemon does not have yet.
+	"BR/4": {class: classHarness, reason: "controller role (phase 29b-2): matter.js runs it with its controller as DUT against a bridge TH it drives through bridge-simulation app-pipe commands (TC-BR-4.test.ts:234)"},
+	// TC-TBRM-3.1.test.ts:133-140: chip's network-manager app as the TH.
+	"TBRM/3.1":    {class: classNotSupported, reason: "controller role: the TH is a Thread border router (`--otbr` needs a live OTBR REST API; matter.js runs it against chip's network-manager app only, TC-TBRM-3.1.test.ts:133-140)"},
+	"DA/1.9":      pythonDriven("TC-DA-1.9.test.ts:32 TC_DA_1_9.py"),
+	"SC/3.5":      pythonDriven("TC-SC-3.5.test.ts:43 TC_SC_3_5.py"),
+	"WEBRTCR/2.1": pythonDriven("TC-WEBRTCR-2.1.test.ts:18 TC_WEBRTCR_2_1.py"),
+	"WEBRTCR/2.2": pythonDriven("TC-WEBRTCR-2.2.test.ts:18 TC_WEBRTCR_2_2.py"),
+	"WEBRTCR/2.3": pythonDriven("TC-WEBRTCR-2.3.test.ts:11 TC_WEBRTCR_2_3.py"),
+	"WEBRTCR/2.4": pythonDriven("TC-WEBRTCR-2.4.test.ts:11 TC_WEBRTCR_2_4.py"),
+	"WEBRTCR/2.5": pythonDriven("TC-WEBRTCR-2.5.test.ts:30 TC_WEBRTCR_2_5.py"),
+	"WEBRTCR/2.6": pythonDriven("TC-WEBRTCR-2.6.test.ts:19 TC_WEBRTCR_2_6.py"),
+	"WEBRTCR/2.7": pythonDriven("TC-WEBRTCR-2.7.test.ts:18 TC_WEBRTCR_2_7.py"),
+}
+
+// pythonDriven is the row of a case matter.js runs as chip's own Python
+// script, its controller answering the script's prompts
+// (packages/testing/src/chip/cert/prompt-driven-python-test.ts:41,
+// PromptDrivenPythonTest); script names the TS line and the script.
+func pythonDriven(script string) gap {
+	return gap{class: classNotSupported, reason: "controller role: matter.js drives chip's python script (prompt-driven-python-test.ts:41), the DUT answering its prompts — not ported (" + script + ")"}
+}
+
 // gap is one case of a family that is not run, with its class and reason.
 type gap struct {
 	class  gapClass

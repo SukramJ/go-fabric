@@ -211,7 +211,11 @@ func renderCertifiability(g docGolden) string {
 			if expr, na := g.NotApplicable[id]; na {
 				if _, ex := fam.gapFor(n); !ex {
 					counts[classNotSupported]++
-					r.gaps = append(r.gaps, fmt.Sprintf("| %s | %s | not applicable: the case's PICS %s%s%s is false for the reference DUT |", id, classNotSupported, "`", mdCell(expr), "`"))
+					why := ""
+					if g, ok := controllerRoleCases[id]; ok {
+						why = "; " + g.reason
+					}
+					r.gaps = append(r.gaps, fmt.Sprintf("| %s | %s | not applicable: the case's PICS %s%s%s is false for the reference DUT%s |", id, classNotSupported, "`", mdCell(expr), "`", mdCell(why)))
 					continue
 				}
 			}
@@ -309,6 +313,21 @@ func renderCertifiability(g docGolden) string {
 			also = "; in no family of the harness image"
 		}
 		fmt.Fprintf(&b, "| %s | %d | %d | Go controller as DUT, after matter.js `%s`%s |\n", id, c.Steps, c.StepsSkipped, mdCell(c.Source), also)
+	}
+	b.WriteString("\n#### Controller-role cases not run\n\n")
+	b.WriteString("matter.js's cases with its controller as DUT that the Go controller does not run as the DUT and no family of\n")
+	b.WriteString("the harness image lists; those a family lists carry the same reason on their row above.\n\n")
+	b.WriteString("| Case | Class | Reason |\n| --- | --- | --- |\n")
+	roleIDs := make([]string, 0, len(controllerRoleCases))
+	for id := range controllerRoleCases {
+		if _, run := g.GoCert[id]; !run && !inFamilies(g, id) {
+			roleIDs = append(roleIDs, id)
+		}
+	}
+	slices.Sort(roleIDs)
+	for _, id := range roleIDs {
+		gp := controllerRoleCases[id]
+		fmt.Fprintf(&b, "| %s | %s | %s |\n", id, gp.class, mdCell(gp.reason))
 	}
 	b.WriteString("\n### Cases that pass with a recorded gap\n\n")
 	b.WriteString("The CHIP checker reports exactly the recorded problems and nothing else; the case fails as soon as\n")
