@@ -284,3 +284,40 @@ starter that changes its commissioning window or store breaks the
 controller's commissioning of it on the next start.
 
 *Source: `node/controllernode/controllernode.go`, `controller/ota.go`, `controller/softwareupdate/manager.go`, `controller/softwareupdate/provider.go`.*
+
+## `controller/topology`
+
+**Gives.** The network graph of the controller's commissioned nodes, a
+port of matterjs-server's `NetworkTopologyService`: `topology.Build`, a
+pure function over one `topology.Image` per node (the root endpoint's
+NetworkCommissioning, GeneralDiagnostics, ThreadNetworkDiagnostics and
+WiFiNetworkDiagnostics, read by `topology.ImageOf`), and `topology.Service`,
+which keeps it current — a 2 s debounce after a node's change, a 60 s
+periodic rebuild, `Refresh` re-reading the diagnostics of every online
+Thread and Wi-Fi node (four at a time, 30 s at most, concurrent callers
+sharing one run) — and calls `OnChanged` observers only when the graph
+moved. Nodes carry matterjs-server's ids (`"<node id>"`,
+`unknown_<EXTADDR>`, `ap_<BSSID>`), kinds, roles and strengths, so a JSON
+mapping is one field per field.
+
+**When.** A host that shows the mesh — the UI's topology page, a server's
+`get_network_topology`:
+
+```go
+var changes topology.Changes
+changes.Install(&cfg) // before controller.New: the nodes' hooks reach the service
+ctrl, err := controller.New(ctx, cfg)
+// …
+svc := topology.New(ctrl, topology.Config{Changes: &changes, Clock: cfg.Clock})
+defer svc.Close()
+svc.OnChanged(func(t topology.Topology) { /* push it */ })
+```
+
+**Costs.** A node's change hook says that a report applied, not which
+cluster: every report schedules a debounced rebuild (matterjs-server
+filters to the four network clusters); the hash keeps an unchanged graph
+from the observers. The border-router registry and the route-table edges
+of matterjs-server are not built (no `_meshcop` browse, ADR 0027); a
+neighbouring border router is a `thread_unknown` node.
+
+*Source: `controller/topology/build.go`, `controller/topology/thread.go`, `controller/topology/service.go`.*

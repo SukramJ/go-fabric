@@ -117,6 +117,7 @@ var floors = []packageFloor{
 		why: "brief CM §1: measured 29.4; review 2026-11 W6-test-05: 40.3; phase 29a-2 (the scripted provider, script_parity_matterjs_test.go): 44.2. The manager runs against a controller and a device: its end-to-end and OtaTest cases are the controller package's (controller:TestOTA*), which a per-package profile does not count; the package's own tests set the queue's state as matter.js's do",
 	},
 	{pkg: "github.com/SukramJ/go-fabric/controller/dcl/snapshot", min: 83},
+	{pkg: "github.com/SukramJ/go-fabric/controller/topology", min: 95},
 	// 94.9-95.3 over six local runs, 94.8 in CI: eleven one-statement
 	// blocks of browse.go, loop.go, operational.go and service.go are the
 	// cache loop's close and select-order races (a caller's ctx against the
