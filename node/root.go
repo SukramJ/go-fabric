@@ -296,7 +296,7 @@ func buildRoot(ctx context.Context, d rootDeps) (*RootClusters, error) { //nolin
 			wifiNC.OnFailSafeExpired()
 		})
 		generalCom.SetOnCommissioningComplete(func(ctx context.Context, fi uint8) {
-			wifiNC.OnCommissioningComplete() //nolint:contextcheck // the commit outlives the CommissioningComplete request; the store write takes no request context
+			wifiNC.OnCommissioningComplete(ctx)
 			commissioned(ctx, fi)
 		})
 		netComm = wifiNC

@@ -66,7 +66,7 @@ func TestWiFiNetworkCommissioningPersistsAndReconnects(t *testing.T) {
 	if _, err := first.MatterInvoke(ctx, netcommdef.CmdConnectNetwork, netcommdef.ConnectNetworkRequest{NetworkId: []byte("lab")}); err != nil {
 		t.Fatal(err)
 	}
-	first.OnCommissioningComplete()
+	first.OnCommissioningComplete(ctx)
 
 	// The restart: the network is back, not connected, the last values
 	// null (Init :200-214); Start rejoins it with the stored credentials.
@@ -116,7 +116,7 @@ func TestWiFiNetworkCommissioningPersistsAndReconnects(t *testing.T) {
 	if _, err := w.MatterInvoke(ctx, netcommdef.CmdRemoveNetwork, netcommdef.RemoveNetworkRequest{NetworkId: []byte("lab")}); err != nil {
 		t.Fatal(err)
 	}
-	w.OnCommissioningComplete()
+	w.OnCommissioningComplete(t.Context())
 	empty := &simDriver{}
 	none := wifiOn(t, st, empty)
 	none.Start(ctx)

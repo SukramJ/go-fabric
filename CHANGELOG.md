@@ -32,6 +32,7 @@ pseudo-version of `main`.
 
 ### Changed
 
+- **Breaking:** `cluster/core`: `WiFiNetworkCommissioning.OnCommissioningComplete` takes the CommissioningComplete request's `context.Context` and stores the committed networks under it; `node` hands the GeneralCommissioning hook's context through. Phase 31.
 - `endpoint`: a write to an attribute with the timed access quality outside a timed interaction answers NEEDS_TIMED_INTERACTION on a concrete path and is skipped on a wildcard one, after the access check (matter.js `AttributeWriteResponse.ts:243-247`); the transport stamps the write's timed window as it does an invoke's. No attribute of the snapshot carries the quality yet. Phase 30.
 - The generated EnergyEvse `ChargingTargetScheduleStruct` decoder no longer refuses an eleventh ChargingTarget at the model's `max 10`: the EnergyEvse server answers RESOURCE_EXHAUSTED, as chip's handler and TC-EEVSE-2.3 do — a deliberate divergence from matter.js's CONSTRAINT_ERROR (`BD-chip-EVSE-TargetsServerHeld`). Phase 30.
 - The chip-tool families run TC-CNET-4.1, 4.4 and 4.9 on the `--wifi-sim` daemon and TC-EEVSE-2.3; the status page has no class (a) case left. Phase 30.
