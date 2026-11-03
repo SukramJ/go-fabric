@@ -14,9 +14,8 @@
 // registered where matter.js overrides a method, the rest left
 // unimplemented); the synthetic TestCluster of the command-validation
 // cases is a definition registered for the test. What has no Go subject
-// is skipped with its reason: wildcard path flags, the protocol state
-// read with and without a transaction, and the request TLV schema's
-// constraint.
+// is skipped with its reason: the protocol state read with and without a
+// transaction, and the request TLV schema's constraint.
 package node_test
 
 import (
@@ -393,7 +392,27 @@ func TestProtocolServiceParityMatterJS(t *testing.T) {
 		})
 
 		t.Run("tags manufacturer-specific attributes in a standard cluster with skipCustomElements", func(t *testing.T) {
-			t.Skip("ProtocolServiceTest.ts:379: wildcard path flags (Core §8.2.1.7.1 WildcardPathFlags) have no Go subject: the Go IM expands a wildcard without them")
+			// ProtocolServiceTest.ts:379-414: an attribute with an MEI prefix
+			// in a standard-range cluster (0x1234) is skipped by
+			// skipCustomElements and not by skipGlobalAttributes — the
+			// per-attribute branch of im.ApplyWildcardPathFlags (matter.js
+			// ProtocolService.ts:491-493).
+			mei := im.ConcreteAttributePath{Endpoint: 1, Cluster: 0x1234, Attribute: 0xFFF1_0001, HasEndpoint: true, HasCluster: true, HasAttribute: true}
+			standard := mei
+			standard.Attribute = 0
+			wild := func(flags uint32) im.ConcreteAttributePath {
+				return im.ConcreteAttributePath{Cluster: 0x1234, HasCluster: true, WildcardPathFlags: flags}
+			}
+			ctx := t.Context()
+			if !im.WildcardPathFlagsSkip(ctx, nil, wild(im.WildcardSkipCustomElements), mei) {
+				t.Error("MEI attribute must be flagged skipCustomElements")
+			}
+			if im.WildcardPathFlagsSkip(ctx, nil, wild(im.WildcardSkipGlobalAttributes), mei) {
+				t.Error("MEI attribute must not be flagged skipGlobalAttributes")
+			}
+			if im.WildcardPathFlagsSkip(ctx, nil, wild(im.WildcardSkipCustomElements), standard) {
+				t.Error("the standard attribute of the standard-range cluster is not custom")
+			}
 		})
 		t.Run("shares one state reference between local reads without a transaction", func(t *testing.T) {
 			t.Skip("ProtocolServiceTest.ts:416: the protocol state read with or without a transaction has no Go subject: a Go server answers each read from its own state, there is no transaction model")

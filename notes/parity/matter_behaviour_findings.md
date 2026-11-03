@@ -501,19 +501,12 @@ Found by the phase-16 port of `packages/node/test/node` (brief BI, PR #168,
 
 Device side:. (Triage 2026-10-29: wave H2, commissioning and security (Fable), once matter.js ships the forward feature for the device side.)
 
-- **AttributePathIB `WildcardPathFlags` (tag 7) is not decoded.** The
-  decoder in `im/` reads tags 0–5; a read that asks to skip the global
-  lists reads them all (AttributeReadResponseTest "skipAttributeList"). (Triage 2026-10-29: wave H1, the device IM and write path.)
 - **A write path without cluster or attribute is answered per path.**
   `im/write.go:292-298` appends an AttributeStatus of INVALID_ACTION for
   the path and goes on; matter.js and chip refuse the whole interaction
   with a StatusResponse of INVALID_ACTION
   (`action/server/AttributeWriteResponse.ts:278-285`, `:305-312`; chip
   `WriteHandler.cpp` `GetConcreteAttributePath` → `SuccessOrExit`). (Triage 2026-10-29: wave H1, the device IM and write path.)
-- **No `isHeldByOtherWrite` on a wildcard write.** matter.js skips, in a
-  wildcard or group write, an attribute another write interaction holds
-  (`AttributeWriteResponse.ts:355-358`); the Go write has no such check.
-  Goes with the BUSY item above. (Triage 2026-10-29: wave H1, the device IM and write path.)
 - **A closed PASE session does not restart the commissioning
   advertisement.** The device keeps its commissionable record during PASE
   and publishes nothing when the session closes; matter.js starts a
