@@ -6,7 +6,8 @@
 
 matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` → `matter.sourceCommit`): 396 test files under `packages/node/test` and `packages/protocol/test` and `packages/thread-br-client/test`.
 `ported`: the Go tests cover the file's `it` cases; `partial`: they cover some, the note names the rest;
-`planned`: not ported yet; `excluded`: left out, with its class. The guard is `make testparity-check`.
+`planned`: not ported yet; `excluded`: left out, with its class. A `ported` or `partial` note's "Left"
+names the `it` cases that will not be ported, each with its class and reason. The guard is `make testparity-check`.
 
 | status | files |
 | --- | ---: |

@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"os"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 )
@@ -44,6 +45,27 @@ var classes = map[string]bool{
 	ClassTestInfrastructure: true,
 }
 
+// The two classes a left it case may carry beside the exclusion classes:
+// by-design — the Go behaviour deliberately differs, and the reason names
+// the notes/parity/by_design.md entry; skip — an existing t.Skip subtest of
+// a Go port names the case and says why it does not run.
+const (
+	ClassByDesign = "by-design"
+	ClassSkip     = "skip"
+)
+
+// leftClasses are the classes a Left row may carry: every exclusion class,
+// by-design and skip.
+var leftClasses = map[string]bool{
+	ClassControllerStage:    true,
+	ClassJSRuntimeOnly:      true,
+	ClassJointFabric:        true,
+	ClassDeviceBLEThread:    true,
+	ClassTestInfrastructure: true,
+	ClassByDesign:           true,
+	ClassSkip:               true,
+}
+
 // Register is register.json.
 type Register struct {
 	Entries []Entry `json:"entries"`
@@ -69,10 +91,20 @@ type Entry struct {
 	Status      Status   `json:"status"`
 	Go          []string `json:"go,omitempty"`
 	Missing     []string `json:"missing,omitempty"`
+	Left        []Left   `json:"left,omitempty"`
 	Class       string   `json:"class,omitempty"`
 	Until       string   `json:"until,omitempty"`
 	Reason      string   `json:"reason"`
 	SnapshotSHA string   `json:"snapshotSha"`
+}
+
+// Left is one it case of a ported or partial file that is not ported and
+// will not be: it leaves missing with its class and the reason, so the
+// missing list names only what is still to do.
+type Left struct {
+	It     string `json:"it"`
+	Class  string `json:"class"`
+	Reason string `json:"reason"`
 }
 
 var (
@@ -145,14 +177,7 @@ func (e *Entry) validate() error {
 	}
 	switch e.Status {
 	case StatusPorted, StatusPartial:
-		if len(e.Go) == 0 {
-			fail("%s without go references", e.Status)
-		}
-		for _, ref := range e.Go {
-			if !goRefPattern.MatchString(ref) {
-				fail("go reference %q is not <package dir>:<TestFunc>", ref)
-			}
-		}
+		e.validateGo(fail)
 		if e.Status == StatusPorted && len(e.Missing) > 0 {
 			fail("ported with missing it cases; that is partial")
 		}
@@ -162,13 +187,14 @@ func (e *Entry) validate() error {
 		if e.Class != "" || e.Until != "" {
 			fail("class/until on a %s entry", e.Status)
 		}
+		e.validateLeft(fail)
 	case StatusPlanned:
-		if len(e.Go) > 0 || len(e.Missing) > 0 || e.Class != "" {
+		if len(e.Go) > 0 || len(e.Missing) > 0 || len(e.Left) > 0 || e.Class != "" {
 			fail("planned carries only path, status, reason, snapshotSha and until")
 		}
 	case StatusExcluded:
-		if len(e.Go) > 0 || len(e.Missing) > 0 {
-			fail("go/missing on an excluded entry")
+		if len(e.Go) > 0 || len(e.Missing) > 0 || len(e.Left) > 0 {
+			fail("go/missing/left on an excluded entry")
 		}
 		if !classes[e.Class] {
 			fail("unknown class %q", e.Class)
@@ -186,6 +212,47 @@ func (e *Entry) validate() error {
 		fail("until %q is not a roadmap milestone or phase (M5, M5 phase 23)", e.Until)
 	}
 	return errors.Join(errs...)
+}
+
+// validateGo checks a ported or partial entry's go references: at least one,
+// each <package dir>:<TestFunc>.
+func (e *Entry) validateGo(fail func(string, ...any)) {
+	if len(e.Go) == 0 {
+		fail("%s without go references", e.Status)
+	}
+	for _, ref := range e.Go {
+		if !goRefPattern.MatchString(ref) {
+			fail("go reference %q is not <package dir>:<TestFunc>", ref)
+		}
+	}
+}
+
+// validateLeft checks the left rows of a ported or partial entry: each has an
+// it, a known class and a reason, names no case twice and no case that is
+// also missing.
+func (e *Entry) validateLeft(fail func(string, ...any)) {
+	missing := make(map[string]bool, len(e.Missing))
+	for _, m := range e.Missing {
+		missing[m] = true
+	}
+	seen := make(map[string]bool, len(e.Left))
+	for i, l := range e.Left {
+		switch {
+		case strings.TrimSpace(l.It) == "":
+			fail("left %d: no it", i)
+		case missing[l.It]:
+			fail("left %d (%s): also missing; a case is missing or left, not both", i, l.It)
+		case seen[l.It]:
+			fail("left %d (%s): a duplicate", i, l.It)
+		}
+		seen[l.It] = true
+		if !leftClasses[l.Class] {
+			fail("left %d (%s): unknown class %q", i, l.It, l.Class)
+		}
+		if strings.TrimSpace(l.Reason) == "" {
+			fail("left %d (%s): no reason", i, l.It)
+		}
+	}
 }
 
 // check holds the register against the snapshot: the same paths, both ways,
@@ -207,6 +274,7 @@ func (r *Register) check(snap *Snapshot) error {
 			errs = append(errs, fmt.Errorf("%s: in the register but not in the snapshot — the file is gone upstream; remove the entry", e.Path))
 			continue
 		}
+		errs = append(errs, checkLeftNames(e, f)...)
 		if e.SnapshotSHA != f.SHA {
 			switch e.Status {
 			case StatusPorted, StatusPartial:
@@ -229,6 +297,25 @@ func (r *Register) check(snap *Snapshot) error {
 		errs = append(errs, fmt.Errorf("%s: in the snapshot but not in the register — add an entry", p))
 	}
 	return errors.Join(errs...)
+}
+
+// checkLeftNames holds a left row's it against the snapshot where the
+// snapshot holds the name: the snapshot records a file's top-level describe
+// names, not its it names, so a row that leaves a whole describe out
+// ("Describe" or "Describe > …") must name one of them; an it-level row is
+// free text, as a missing case is.
+func checkLeftNames(e *Entry, f SnapshotFile) []error {
+	var errs []error
+	for _, l := range e.Left {
+		head, _, nested := strings.Cut(l.It, " > ")
+		if !nested {
+			continue
+		}
+		if !slices.Contains(f.Describes, head) {
+			errs = append(errs, fmt.Errorf("%s: left %q names describe %q, which the snapshot does not hold (%s)", e.Path, l.It, head, strings.Join(f.Describes, ", ")))
+		}
+	}
+	return errs
 }
 
 // count returns the number of entries per status.

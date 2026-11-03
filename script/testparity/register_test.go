@@ -61,6 +61,14 @@ const (
 	testparityMissingRatchet = 1130
 )
 
+// testparityLeftRatchet is the number of left it cases summed over the
+// ported and partial entries: the cases that leave missing without a port,
+// each with its class and reason (phase 31). Exact in both directions like
+// the others: a case moved from missing to left, or a left case ported
+// after all, moves it in the same commit, so a missing list cannot shrink
+// into left unseen.
+const testparityLeftRatchet = 0
+
 // moduleRoot is where the committed artefacts live, seen from this package.
 const moduleRoot = "../.."
 
@@ -209,6 +217,20 @@ func TestTestparityMissingRatchet(t *testing.T) {
 	}
 }
 
+func TestTestparityLeftRatchet(t *testing.T) {
+	_, reg := mustLoad(t)
+	got := 0
+	for _, e := range reg.Entries {
+		got += len(e.Left)
+	}
+	switch {
+	case got > testparityLeftRatchet:
+		t.Fatalf("%d left it cases, ratchet %d: cases left without a port — name each one's class and reason in the commit and raise testparityLeftRatchet to %d", got, testparityLeftRatchet, got)
+	case got < testparityLeftRatchet:
+		t.Fatalf("%d left it cases, ratchet %d: a left case was ported or removed — lower testparityLeftRatchet to %d", got, testparityLeftRatchet, got)
+	}
+}
+
 func TestTestparityEntryValidation(t *testing.T) {
 	sha := strings.Repeat("a", 40)
 	ok := []Entry{
@@ -219,6 +241,8 @@ func TestTestparityEntryValidation(t *testing.T) {
 		{Path: "p", Status: StatusExcluded, Class: ClassControllerStage, Until: "M4", Reason: "r", SnapshotSHA: sha},
 		{Path: "p", Status: StatusExcluded, Class: ClassDeviceBLEThread, Until: "M7", Reason: "r", SnapshotSHA: sha},
 		{Path: "p", Status: StatusExcluded, Class: ClassJSRuntimeOnly, Reason: "r", SnapshotSHA: sha},
+		{Path: "p", Status: StatusPartial, Go: []string{"im:TestX"}, Missing: []string{"m"}, Left: []Left{{It: "l", Class: ClassSkip, Reason: "r"}}, Reason: "r", SnapshotSHA: sha},
+		{Path: "p", Status: StatusPorted, Go: []string{"im:TestX"}, Left: []Left{{It: "l", Class: ClassByDesign, Reason: "BD-X"}, {It: "k", Class: ClassDeviceBLEThread, Reason: "r"}}, Reason: "r", SnapshotSHA: sha},
 	}
 	for i, e := range ok {
 		if err := e.validate(); err != nil {
@@ -244,6 +268,14 @@ func TestTestparityEntryValidation(t *testing.T) {
 		"until past M7":         {Path: "p", Status: StatusExcluded, Class: ClassControllerStage, Until: "M9", Reason: "r", SnapshotSHA: sha},
 		"missing on excluded":   {Path: "p", Status: StatusExcluded, Class: ClassJointFabric, Missing: []string{"m"}, Reason: "r", SnapshotSHA: sha},
 		"blank reason (spaces)": {Path: "p", Status: StatusPlanned, Reason: "  ", SnapshotSHA: sha},
+		"left also missing":     {Path: "p", Status: StatusPartial, Go: []string{"im:TestX"}, Missing: []string{"m"}, Left: []Left{{It: "m", Class: ClassSkip, Reason: "r"}}, Reason: "r", SnapshotSHA: sha},
+		"left without class":    {Path: "p", Status: StatusPorted, Go: []string{"im:TestX"}, Left: []Left{{It: "l", Reason: "r"}}, Reason: "r", SnapshotSHA: sha},
+		"left unknown class":    {Path: "p", Status: StatusPorted, Go: []string{"im:TestX"}, Left: []Left{{It: "l", Class: "later", Reason: "r"}}, Reason: "r", SnapshotSHA: sha},
+		"left without reason":   {Path: "p", Status: StatusPorted, Go: []string{"im:TestX"}, Left: []Left{{It: "l", Class: ClassSkip, Reason: " "}}, Reason: "r", SnapshotSHA: sha},
+		"left without it":       {Path: "p", Status: StatusPorted, Go: []string{"im:TestX"}, Left: []Left{{Class: ClassSkip, Reason: "r"}}, Reason: "r", SnapshotSHA: sha},
+		"left twice":            {Path: "p", Status: StatusPorted, Go: []string{"im:TestX"}, Left: []Left{{It: "l", Class: ClassSkip, Reason: "r"}, {It: "l", Class: ClassSkip, Reason: "r"}}, Reason: "r", SnapshotSHA: sha},
+		"left on planned":       {Path: "p", Status: StatusPlanned, Left: []Left{{It: "l", Class: ClassSkip, Reason: "r"}}, Reason: "r", SnapshotSHA: sha},
+		"left on excluded":      {Path: "p", Status: StatusExcluded, Class: ClassJointFabric, Left: []Left{{It: "l", Class: ClassSkip, Reason: "r"}}, Reason: "r", SnapshotSHA: sha},
 	}
 	for name, e := range bad {
 		if err := e.validate(); err == nil {
@@ -276,6 +308,22 @@ func TestTestparityCheckReportsDrift(t *testing.T) {
 	}
 	if strings.Contains(err.Error(), "d: ") {
 		t.Errorf("check reported a planned entry's changed blob:\n%v", err)
+	}
+
+	// A left row that names a describe is held to the snapshot's describe
+	// names; an it-level row is free text.
+	snap = &Snapshot{Files: []SnapshotFile{{Path: "a", SHA: sha, Describes: []string{"Top"}}}}
+	reg = &Register{Entries: []Entry{{Path: "a", Status: StatusPorted, Go: []string{"im:TestX"}, Left: []Left{
+		{It: "free text", Class: ClassSkip, Reason: "r"},
+		{It: "Top > it", Class: ClassSkip, Reason: "r"},
+		{It: "Gone > it", Class: ClassSkip, Reason: "r"},
+	}, Reason: "r", SnapshotSHA: sha}}}
+	err = reg.check(snap)
+	if err == nil || !strings.Contains(err.Error(), `names describe "Gone"`) {
+		t.Errorf("check on left names = %v, want the unknown describe reported", err)
+	}
+	if err != nil && strings.Count(err.Error(), "names describe") != 1 {
+		t.Errorf("check reported %d left names, want 1:\n%v", strings.Count(err.Error(), "names describe"), err)
 	}
 }
 
