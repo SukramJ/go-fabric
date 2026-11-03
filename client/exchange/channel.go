@@ -176,6 +176,16 @@ func (s *Session) Transport() Transport {
 	return TransportUDP
 }
 
+// Channel is the connection a TCP session is bound to, nil for a session
+// over UDP or BLE — matter.js Session.channel's transportChannel
+// (packages/protocol/src/session/Session.ts:349, MessageChannel.ts:130 at
+// 862ad75f). Closing it severs the connection under the session without
+// telling the peer anything, as matter.js's cert controller does to drop a
+// TCP session (support/chip-testing/src/cert/
+// InProcessControllerAdapter.ts:1707-1735, severTransportConnection); the
+// manager then evicts the sessions bound to it (watchChannel).
+func (s *Session) Channel() Channel { return s.channel }
+
 // MaxPayloadSize is the largest message payload an exchange of the
 // session sends: [MaxPayloadSize] over UDP, the channel's limit less the
 // Matter message overhead over TCP (MessageExchange.ts:435-439, :156).

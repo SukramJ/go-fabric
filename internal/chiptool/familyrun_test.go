@@ -903,21 +903,12 @@ func (f family) deviceTypeOf(name string) uint32 {
 // matterPort is the IANA Matter port (transport/udp.MatterPort).
 const matterPort = 5540
 
-// controllerRoleCases are the manual cases matter.js automates whose
-// substance is the commissioner's alone — parsing and refusing onboarding
-// payloads — with no device-side step beyond being commissionable: the
-// Go-TH leg does not run them, phase 29b runs them with the Go controller
-// as DUT (notes/briefs/phase-29a-2-go-th-bdx-su-bind-dd.md).
-var controllerRoleCases = map[string]string{
-	"DD/1.8": "TC-DD-1.8", "DD/3.12": "TC-DD-3.12", "DD/3.13": "TC-DD-3.13", "DD/3.14": "TC-DD-3.14",
-	"DD/3.15": "TC-DD-3.15", "DD/3.16": "TC-DD-3.16", "DD/3.17": "TC-DD-3.17",
-}
-
-// manualReason is the status page's reason for a manual case.
+// manualReason is the status page's reason for a manual case: a
+// controller-role case's own (controllerRoleCases), the generic one
+// otherwise.
 func manualReason(id string) string {
-	if tc, ok := controllerRoleCases[id]; ok {
-		return "controller role (phase 29b): matter.js automates it with its controller as DUT (support/chip-testing/test/cert/" +
-			tc + ".test.ts), and its substance is the commissioner's"
+	if g, ok := controllerRoleCases[id]; ok {
+		return g.reason
 	}
 	return "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate"
 }

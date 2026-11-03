@@ -436,6 +436,9 @@ func (f *fleet) testEventTrigger(_ context.Context, trigger uint64) error { //no
 	if handled, err := f.wifi.testEventTrigger(trigger); handled {
 		return err
 	}
+	if handled, err := f.icd.testEventTrigger(trigger); handled {
+		return err
+	}
 	switch trigger & smokeTriggerMask {
 	case triggerForceSmokeWarning:
 		return set(func(s *smokedef.State) { s.SmokeState = smokedef.AlarmStateWarning })

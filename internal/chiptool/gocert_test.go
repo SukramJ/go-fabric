@@ -58,6 +58,14 @@ import (
 // unavailable. What a passing case executed is pinned in
 // testdata/chip-cases.golden.json under goCert (steps run and skipped),
 // regenerated with -update-chip-cases like the families' counts.
+//
+// A case of role roleDUT runs in matter.js's own direction instead: the
+// module's controller is the DUT, the reference daemon the TH device
+// (phase 29b). Its PICS are the controller's own declarations
+// (goTHPICS), evaluated as stated; a step's evidence is named at the
+// step — the DUT controller's return value or error, a state read on the
+// daemon, or a daemon log line — because matter.js proves its DUT by the
+// TH device's log, which a Go TH does not print.
 
 // goCertEnv narrows the leg to families or case ids ("IDM,SC/4.2").
 const goCertEnv = "GOFABRIC_GOCERT"
@@ -76,7 +84,22 @@ func goCertLong() bool {
 	return v != "" && v != "0" && v != "false"
 }
 
-// goCertCase is one matter.js case file read mirrored.
+// goRole is who the Go controller is in a case: the TH (29a, the TS file
+// read mirrored) or the DUT (29b, the TS file in matter.js's own
+// direction).
+type goRole uint8
+
+const (
+	// roleTH: the daemon is the DUT, the Go controller performs the TS
+	// file's controller actions as TH.
+	roleTH goRole = iota
+	// roleDUT: the Go controller is the DUT, the daemon is the TH device
+	// the TS file names (support/chip-testing/README.md:112-118).
+	roleDUT
+)
+
+// goCertCase is one matter.js case file, read mirrored (roleTH) or in its
+// own direction (roleDUT).
 type goCertCase struct {
 	// tc is the matter.js case id ("TC-IDM-1.1"); its file is
 	// support/chip-testing/test/cert/<tc>.test.ts.
@@ -112,12 +135,18 @@ type goCertCase struct {
 	// committed slices (generated from the default composition) do not
 	// describe; each case states where its values come from.
 	declare map[string]string
+	// role is the Go controller's role; the zero value is roleTH.
+	role goRole
 }
 
 // goStep is one TS step.
 type goStep struct {
-	n     string // the TS step number ("1", "0a")
-	line  int    // the line of the TS file's .step( call
+	n    string // the TS step number ("1", "0a")
+	line int    // the line of the TS file's .step( call
+	// file is the TS file of the .step( call where it is not the case's
+	// own — a support file that defines the steps of several cases
+	// (tc-dd-flow-support.ts); "" is the case's file.
+	file  string
 	title string
 	// pics is the TS step's PICS expression, client side; the runner
 	// mirrors it onto the server side.
@@ -174,6 +203,9 @@ type goCertCounts struct {
 	// Findings are the steps that fail with a recorded daemon defect,
 	// "<step>: <finding id>".
 	Findings []string `json:"findings,omitempty"`
+	// Role is "dut" for a case the Go controller runs as the DUT
+	// (roleDUT); empty is the TH.
+	Role string `json:"role,omitempty"`
 }
 
 // goCertCases is the leg's case registry, keyed by the family runner's
@@ -260,19 +292,33 @@ func runGoCertCase(t *testing.T, bin string, flags map[string]bool, pics *commit
 	defer cancel()
 	th := newGoTH(ctx, t, bin, flags, pics, c)
 	defer th.close()
-	t.Logf("%s: support/chip-testing/test/cert/%s:%d at matter.js 862ad75f, read mirrored (the daemon is the DUT)", c.tc, c.source(), c.line)
+	if c.role == roleDUT {
+		t.Logf("%s: support/chip-testing/test/cert/%s:%d at matter.js 862ad75f, in its own direction (the Go controller is the DUT, the daemon the TH)", c.tc, c.source(), c.line)
+	} else {
+		t.Logf("%s: support/chip-testing/test/cert/%s:%d at matter.js 862ad75f, read mirrored (the daemon is the DUT)", c.tc, c.source(), c.line)
+	}
 	if expr := strings.Join(c.pics, " & "); expr != "" {
+		if missing := th.undeclared(expr); len(missing) > 0 {
+			t.Fatalf("%s: the case's PICS %q names %v, which the Go controller as DUT declares nothing about (goTHPICS)", c.tc, expr, missing)
+		}
 		m := th.casePICS(expr)
 		if ok, err := th.picsHolds(m, th.caseEP()); err != nil || !ok {
 			t.Fatalf("%s: the case's PICS %q (mirrored %q) is false for the reference daemon (%v): the case does not apply", c.tc, expr, m, err)
 		}
 	}
 	counts := goCertCounts{Source: c.source()}
+	if c.role == roleDUT {
+		counts.Role = "dut"
+	}
 	failed := false
 	for i := range c.steps {
 		s := &c.steps[i]
 		r := th.runStep(*s)
-		where := fmt.Sprintf("%s step %s (%s:%d)", c.tc, r.step.n, c.source(), r.step.line)
+		file := c.source()
+		if s.file != "" {
+			file = s.file
+		}
+		where := fmt.Sprintf("%s step %s (%s:%d)", c.tc, r.step.n, file, r.step.line)
 		switch {
 		case r.verdict == goPass && s.finding != "":
 			failed = true
@@ -340,6 +386,13 @@ func (b *syncBuffer) Write(p []byte) (int, error) {
 	return b.buf.Write(p)
 }
 
+// String is everything written so far.
+func (b *syncBuffer) String() string {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buf.String()
+}
+
 // tail is the last n lines.
 func (b *syncBuffer) tail(n int) string {
 	b.mu.Lock()
@@ -372,6 +425,10 @@ func (th *goTH) runStep(s goStep) goStepRecord {
 	}
 	var gate []string
 	if s.pics != "" {
+		if missing := th.undeclared(s.pics); len(missing) > 0 {
+			rec.verdict, rec.detail = goFail, fmt.Sprintf("PICS %q names %v, which the Go controller as DUT declares nothing about (goTHPICS)", s.pics, missing)
+			return rec
+		}
 		gate = append(gate, "("+th.casePICS(s.pics)+")")
 	}
 	if s.need != "" {
@@ -569,25 +626,72 @@ func (th *goTH) picsHolds(expr string, ep uint16) (bool, error) {
 }
 
 // casePICS is a TS PICS expression as the leg evaluates it: as stated for
-// a native case, mirrored onto the server side otherwise.
+// a native case and for a case the Go controller runs as the DUT,
+// mirrored onto the server side otherwise.
 func (th *goTH) casePICS(expr string) string {
-	if th.c.native {
+	if th.c.native || th.c.role == roleDUT {
 		return expr
 	}
 	return mirrorPICS(expr)
 }
 
-// goTHPICS is what the Go controller as TH declares about itself: the
-// codes of the roles it takes in these cases — OTA provider and BDX sender
-// and responder, the administrator that announces a provider, the
-// commissioner that scans a QR code — after matter.js's declarations for
-// its own controller (support/chip-testing/src/cert/
-// InProcessControllerAdapter.ts:177-308, MATTERJS_CONTROLLER_PICS). The
-// reference daemon is none of these in any case of the leg, so the codes
-// name the TH in either reading and are not mirrored.
+// undeclared are the codes of a DUT case's PICS expression the Go
+// controller declares nothing about: such a code would otherwise read the
+// daemon's value, a statement about the TH device, where the TS states
+// one about the DUT controller. Empty for a TH case.
+func (th *goTH) undeclared(expr string) []string {
+	if th.c.role != roleDUT {
+		return nil
+	}
+	var out []string
+	for _, code := range rePICSCode.FindAllString(expr, -1) {
+		if _, ok := goTHPICS[code]; !ok && !slices.Contains(out, code) {
+			out = append(out, code)
+		}
+	}
+	return out
+}
+
+// goTHPICS is what the Go controller declares about itself, as TH and as
+// DUT alike: the codes of the roles it takes in these cases — OTA provider
+// and BDX sender and responder, the administrator that announces a
+// provider, the commissioner that scans a QR code or reads a manual code,
+// the ICD client — after matter.js's declarations for its own controller
+// (support/chip-testing/src/cert/InProcessControllerAdapter.ts:177-308,
+// MATTERJS_CONTROLLER_PICS), each with the line matter.js declares it at.
+// A code matter.js leaves to the CHIP PICS file its runs load
+// (src/app/tests/suites/certification/ci-pics-values at connectedhomeip
+// 6170af84, packages/testing/src/chip/config.ts:22) is marked "own" with
+// that file's line and the reason the value holds for this controller.
+// The reference daemon is none of these in any case of the leg, so the
+// codes name the Go controller in either reading and are not mirrored —
+// except where the mirror table names a code (picsSpecial), which a TH case
+// keeps mirroring. A DUT case may only name codes declared here (undeclared).
 var goTHPICS = map[string]string{
-	"MCORE.DD.QR_COMMISSIONING":    "1", // :180
-	"MCORE.DD.SCAN_QR_CODE":        "1", // :184
+	"MCORE.ROLE.COMMISSIONER":          "1", // :179
+	"MCORE.DD.QR_COMMISSIONING":        "1", // :180
+	"MCORE.DD.MANUAL_PC_COMMISSIONING": "1", // :181
+	"MCORE.DD.SCAN_QR_CODE":            "1", // :184
+	// Own: ParsePairingCode reads both manual code lengths
+	// (secure/setup.DecodeManualCode); ci-pics-values:1117-1118.
+	"MCORE.DD.11_MANUAL_PC": "1",
+	"MCORE.DD.21_MANUAL_PC": "1",
+	// Own: Pair commissions a commissionable device whatever flow its QR
+	// code names — the flow is parsed (PairingCode.Flow), and the device's
+	// commissioning mode is the TH's to enter; ci-pics-values:1114-1116.
+	"MCORE.DD.STANDARD_COMM_FLOW":    "1",
+	"MCORE.DD.USER_INTENT_COMM_FLOW": "1",
+	"MCORE.DD.CUSTOM_COMM_FLOW":      "1",
+	// Own: the controller discovers over BLE (PairOptions.BLE, ADR 0024)
+	// and has no Wi-Fi PAF; ci-pics-values:1128 and :1095 state the same.
+	"MCORE.DD.DISCOVERY_BLE": "1",
+	"MCORE.DD.DISCOVERY_PAF": "0",
+	// Own: client.Node.ICD() is the IcdManagement client; ci-pics-values:2761.
+	"ICDM.C":                       "1",
+	"ICDM.C.C00.Tx":                "1", // :214
+	"ICDM.C.C02.Tx":                "1", // :215
+	"ICDM.C.C03.Tx":                "1", // :216
+	"ICDB.C":                       "1", // :240
 	"MCORE.BDX.Sender":             "1", // :262
 	"MCORE.BDX.Responder":          "1", // :263
 	"MCORE.BDX.SynchronousSender":  "1", // :264
@@ -608,14 +712,22 @@ func (th *goTH) declares(code string) bool {
 // controller builds a Go controller with its own fabric — one per TS
 // controller role (dut, th_cr2, …).
 func (th *goTH) controller(label string) (*gocontroller.Controller, error) {
+	return th.controllerWith(label, nil)
+}
+
+// controllerWith is controller with the configuration amended by edit
+// (nil: none) — the TCP roles of the TCP cases.
+func (th *goTH) controllerWith(label string, edit func(*gocontroller.Config)) (*gocontroller.Controller, error) {
 	db, err := gocontroller.OpenDB(filepath.Join(th.t.TempDir(), label+".db"))
 	if err != nil {
 		return nil, err
 	}
 	th.t.Cleanup(func() { _ = db.Close() })
-	c, err := gocontroller.New(th.ctx, gocontroller.Config{
-		DB: db, Attestation: attestation.TestStore(), Label: label, Logger: th.log,
-	})
+	cfg := gocontroller.Config{DB: db, Attestation: attestation.TestStore(), Label: label, Logger: th.log}
+	if edit != nil {
+		edit(&cfg)
+	}
+	c, err := gocontroller.New(th.ctx, cfg)
 	if err != nil {
 		return nil, err
 	}
@@ -908,11 +1020,11 @@ func mirrorPICS(expr string) string {
 }
 
 func mirrorPICSCode(code string) string {
-	if _, ok := goTHPICS[code]; ok {
-		return code
-	}
 	if m, ok := picsSpecial[code]; ok {
 		return m
+	}
+	if _, ok := goTHPICS[code]; ok {
+		return code
 	}
 	if strings.HasPrefix(code, "MCORE.IDM.C.") {
 		return "MCORE.IDM.S"

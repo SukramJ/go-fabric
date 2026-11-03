@@ -378,7 +378,7 @@ chiptool-test: chiptool-build ## commission the reference daemon and run the chi
 		-skip '^TestChipCertificationFamilies$$' ./internal/chiptool/...
 
 .PHONY: chiptool-gocert
-chiptool-gocert: chiptool-build ## run the Go-TH leg alone: matter.js's controller-side cert cases, read mirrored, with the Go controller as TH (GOFABRIC_GOCERT=IDM,SC narrows)
+chiptool-gocert: chiptool-build ## run the Go-TH leg alone: matter.js's cert cases with the Go controller as TH (read mirrored) and as DUT (GOFABRIC_GOCERT=DD,ICDM narrows)
 	@# Part of chiptool-test's scope as well; needs the daemon binary and
 	@# the host's multicast, not the CHIP harness image.
 	$(GO) test -tags=chiptool -count=1 -timeout=$(CHIPTOOL_TIMEOUT) -v \

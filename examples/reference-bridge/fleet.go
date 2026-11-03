@@ -1004,6 +1004,9 @@ type fleet struct {
 	// lightSwitch is the On/Off Light Switch of --light-switch
 	// (light_switch.go); nil without.
 	lightSwitch *demoLightSwitch
+	// icd is the ICD cadence and test event triggers of --icd-lit
+	// (icd.go); nil without.
+	icd *demoICD
 
 	// configChange raises the ConfigurationVersion of every bridged device
 	// (the app pipe's SimulateConfigurationVersionChange); wired by main.

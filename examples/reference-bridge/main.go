@@ -43,6 +43,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/hex"
+	"errors"
 	"flag"
 	"fmt"
 	"log/slog"
@@ -100,6 +101,8 @@ type flags struct {
 	advertise, osHostName, otaHarness, wifi    bool
 	wifiSim                                    bool
 	otaProvider, media, lightSwitch            bool
+	icdLIT                                     bool
+	icdIdleSeconds, icdActiveMillis            uint
 	thermostatSchedules                        bool
 	dumpSurface                                bool
 	extensions                                 string
@@ -134,6 +137,9 @@ func parseFlags() flags {
 	flag.StringVar(&f.extensions, "extensions", "", "comma-separated \"Ahead of matter.js\" register IDs to enable (surface.Policies.Extensions, notes/parity/by_design.md), on the node and every device; an unknown ID stops the daemon with the list of known ones; see surface.go")
 	flag.StringVar(&f.otbr, "otbr", "", "add a ThreadBorderRouter endpoint over the OpenThread Border Router's REST API at this URL (\"http://[fd00::1]:8081\"); off when empty; see otbr.go")
 	flag.BoolVar(&f.media, "media", false, "TESTING ONLY: add a simulated video player (CastingVideoPlayer) and content app (ContentApp) after chip's tv-app, for the media certification families; see media.go")
+	flag.BoolVar(&f.icdLIT, "icd-lit", false, "TESTING ONLY: make the node a Long Idle Time ICD after matter.js's lit-icd test app — ICD Management with Check-In, User Active Mode Trigger, LIT and Dynamic SIT/LIT on the root, a fixed idle/active cadence and the ICD test event triggers on TestEventTrigger (needs --enable-key) — for the ICD client certification cases; see icd.go")
+	flag.UintVar(&f.icdIdleSeconds, "icd-idle-mode-duration", defaultICDIdleSeconds, "with --icd-lit: the IdleModeDuration in seconds (the lit-icd app's --icdIdleModeDuration)")
+	flag.UintVar(&f.icdActiveMillis, "icd-active-mode-duration-ms", defaultICDActiveMillis, "with --icd-lit: the ActiveModeDuration in milliseconds (the lit-icd app's --icdActiveModeDurationMs)")
 	flag.BoolVar(&f.lightSwitch, "light-switch", false, "TESTING ONLY: add an On/Off Light Switch whose Binding entries the node resolves, and the app-pipe command SendOnOffToBindings that has it send OnOff On or Off to them, for the binding certification cases; turns on the node's client stack; see light_switch.go")
 	flag.StringVar(&f.specLevel, "spec-level", "", "the Matter specification level to compose at (surface.Policies.Level): one of the revisions matter.js has shipped, "+levelList()+"; the default is the pin's. Optional elements the level does not know are removed, devices whose type it does not know are withheld and logged, behaviour and ClusterRevision stay the pin's; an unknown level stops the daemon with the list; see surface.go")
 	flag.StringVar(&f.profiles, "profile", "", "comma-separated controller profiles to compose for (surface.Policies.Profiles): "+profileList()+". A profile removes only what a Reproduced row of notes/parity/controller_profiles.md names and logs every other row that names a served element as a warning decision; a profile's level applies when --spec-level is not set; an unknown profile stops the daemon with the list; see surface.go")
@@ -163,6 +169,16 @@ func checkFlags(f flags) (passcode uint32, discriminator uint16, err error) {
 	}
 	if _, err := dclClient(f.dcl); err != nil {
 		return 0, 0, err
+	}
+	// A zero value is a flags struct built without the flag set's defaults.
+	moved := func(v, def uint) bool { return v != 0 && v != def }
+	if !f.icdLIT && (moved(f.icdIdleSeconds, defaultICDIdleSeconds) || moved(f.icdActiveMillis, defaultICDActiveMillis)) {
+		return 0, 0, errors.New("--icd-idle-mode-duration and --icd-active-mode-duration-ms need --icd-lit")
+	}
+	// IdleModeDuration is 1 s to 18 h, ActiveModeDuration at most the idle
+	// duration (node.ICDConfig, Core § 9.17.6).
+	if f.icdLIT && (f.icdIdleSeconds < 1 || f.icdIdleSeconds > 64800 || f.icdActiveMillis > f.icdIdleSeconds*1000) {
+		return 0, 0, fmt.Errorf("--icd-idle-mode-duration %d s must be 1 to 64800 and --icd-active-mode-duration-ms %d at most it", f.icdIdleSeconds, f.icdActiveMillis)
 	}
 	return passcode, uint16(f.discriminator), nil
 }
@@ -195,6 +211,7 @@ func run() error { //nolint:funlen // the composition root: one sequential pass,
 	if err != nil {
 		return err
 	}
+	defer devices.icd.stop()
 	started := false
 	defer func() {
 		if !started {
@@ -330,6 +347,12 @@ func compose(ctx context.Context, f flags, logger *slog.Logger, passcode uint32,
 			return nil, nil, err
 		}
 	}
+	if f.icdLIT {
+		// The node as a LIT ICD with the test app's cadence (icd.go),
+		// TESTING ONLY.
+		cfg.ICD = icdConfig(f.icdIdleSeconds, f.icdActiveMillis)
+		devices.icd = newDemoICD(cfg.ICD, logger)
+	}
 	if f.lightSwitch {
 		// The light switch and its client stack (light_switch.go), TESTING
 		// ONLY.
@@ -379,6 +402,7 @@ func assemble(ctx context.Context, devices *fleet, cfg node.Config, applier *ota
 	// (nil without --wifi).
 	devices.wifi.attach(n.Root().WiFiNetworkDiagnostics)
 	attachLightSwitch(devices.lightSwitch, n)
+	attachICD(devices.icd, n)
 	if applier != nil {
 		applier.basicInfo = n.Root().BasicInformation
 		applier.requestor = func() *node.OTARequestorServer { return n.Root().OTARequestor }

@@ -95,6 +95,17 @@ const idPrefix = "peer"
 // node, culls expired commissionable nodes and addresses, and reacts to a
 // peer's BasicInformation events. It owns its nodes: a node is created
 // and deleted through it. It is safe for concurrent use.
+//
+// A node whose fabric another administrator removed while no subscription
+// to it was active stays commissioned, and commissioning the device again
+// finds that node by its commissionable instance and is refused with
+// [ErrAlreadyCommissioned] until the node is erased — as matter.js at
+// 862ad75f: a leave event without an active subscription is ignored
+// (Peers.ts:855-862), Peers.forDescriptor hands out the node the
+// descriptor matches (Peers.ts:371-389; its `find` is Peers.ts:981-991,
+// the ClientNodeFactory implementation),
+// and CommissioningClient.commission refuses a node with a peer address
+// (CommissioningClient.ts:204-209).
 type Registry struct {
 	cfg   RegistryConfig
 	log   *slog.Logger

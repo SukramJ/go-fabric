@@ -79,16 +79,26 @@ GOFABRIC_CHIP_FAMILIES=IDM,ACL make chiptool-families   # a selection
   daemon's own PICS, and a step whose PICS is false is recorded skipped with
   the expression. The leg needs the daemon and the host's multicast, not the
   harness image; its cases appear below as passed, with their step counts and
-  the TS file they follow. matter.js's own reading, the Go controller as the
-  DUT, is a later wave (roadmap phase 29b). The BDX receiver, SU requestor
+  the TS file they follow. The BDX receiver, SU requestor
   and BIND cases run the device as DUT in matter.js too: their PICS are
   evaluated as stated, the Go TH serves the OTA image from its own node and
   scripts its provider's answers as matter.js's cert harness does, and the
   BIND cases run the daemon with `--light-switch`. A step matter.js marks
   long-running (minutes of real time each) runs with
-  `GOFABRIC_GOCERT_LONG=1`; the counts below are the default run's. The DD
-  cases whose substance is the commissioner's alone stay rows below, named
-  "controller role (phase 29b)".
+  `GOFABRIC_GOCERT_LONG=1`; the counts below are the default run's.
+- **The Go controller as DUT** (the same leg, roadmap phase 29b): the TS files
+  in matter.js's own direction. The module's controller is the DUT and the
+  reference daemon the TH device the TS file names, with the flags and app-pipe
+  commands matter.js's TH apps have. Such a case's PICS are the controller's
+  own declarations (matter.js's for its controller where it states them, the
+  module's own where matter.js leaves the code to CHIP's PICS file), evaluated
+  as stated. matter.js proves its DUT controller by the TH device's log; here
+  each step names its evidence instead: the DUT controller's return value or
+  error, a state read on the daemon, or a line of the daemon's log. A case
+  passed in this role counts as passed in its family — the page states the
+  module in both roles since ADR 0020 — and is listed under "Controller role"
+  below; a case no family of the harness image lists is listed there and
+  counted in none.
 - **What a passing case executed** is pinned per case (steps run and steps
   skipped), so a PICS change that quietly turns a case into a no-op fails it.
 - **A case that passes with a recorded gap** is one whose CHIP spec checker
@@ -154,7 +164,7 @@ Harness image: `ghcr.io/matter-js/chip@sha256:d6f1de89d714309beb621543d451a98996
 | CNET | 23 | 2 | 0 | 0 | 12 | 4 | 5 |
 | CNETWIFI | 23 | 3 | 0 | 3 | 11 | 6 | 0 |
 | DA | 13 | 4 | 0 | 0 | 5 | 4 | 0 |
-| DD | 30 | 5 | 0 | 0 | 1 | 24 | 0 |
+| DD | 30 | 13 | 0 | 0 | 0 | 17 | 0 |
 | DESC | 3 | 2 | 0 | 0 | 0 | 1 | 0 |
 | DGGEN | 7 | 6 | 0 | 0 | 0 | 1 | 0 |
 | DT | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
@@ -265,7 +275,7 @@ Harness image: `ghcr.io/matter-js/chip@sha256:d6f1de89d714309beb621543d451a98996
 | MEDIAPLAYBACK | 11 | 5 | 0 | 0 | 2 | 4 | 0 |
 | TGTNAV | 2 | 1 | 0 | 0 | 0 | 1 | 0 |
 | WAKEONLAN | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
-| **all** | **707** | **437** | **0** | **4** | **131** | **130** | **5** |
+| **all** | **707** | **445** | **0** | **4** | **130** | **123** | **5** |
 
 ### Cases not run
 
@@ -390,23 +400,15 @@ Harness image: `ghcr.io/matter-js/chip@sha256:d6f1de89d714309beb621543d451a98996
 | DA/1.4 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | DA/1.6 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | DA/1.8 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
-| DA/1.9 | (b) not supported | not applicable: the case's PICS `MCORE.ROLE.COMMISSIONER` is false for the reference DUT |
+| DA/1.9 | (b) not supported | not applicable: the case's PICS `MCORE.ROLE.COMMISSIONER` is false for the reference DUT; controller role: matter.js drives chip's python script (prompt-driven-python-test.ts:41), the DUT answering its prompts — not ported (TC-DA-1.9.test.ts:32 TC_DA_1_9.py) |
 | DD/1.10 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | DD/1.11 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | DD/1.6 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | DD/1.7 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
-| DD/1.8 | (c) harness | controller role (phase 29b): matter.js automates it with its controller as DUT (support/chip-testing/test/cert/TC-DD-1.8.test.ts), and its substance is the commissioner's |
 | DD/1.9 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | DD/2.1 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | DD/2.2 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | DD/3.10 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
-| DD/3.11 | (b) not supported | not applicable: the case's PICS `MCORE.ROLE.COMMISSIONER & MCORE.DD.QR_COMMISSIONING & MCORE.DD.STANDARD_COMM_FLOW` is false for the reference DUT |
-| DD/3.12 | (c) harness | controller role (phase 29b): matter.js automates it with its controller as DUT (support/chip-testing/test/cert/TC-DD-3.12.test.ts), and its substance is the commissioner's |
-| DD/3.13 | (c) harness | controller role (phase 29b): matter.js automates it with its controller as DUT (support/chip-testing/test/cert/TC-DD-3.13.test.ts), and its substance is the commissioner's |
-| DD/3.14 | (c) harness | controller role (phase 29b): matter.js automates it with its controller as DUT (support/chip-testing/test/cert/TC-DD-3.14.test.ts), and its substance is the commissioner's |
-| DD/3.15 | (c) harness | controller role (phase 29b): matter.js automates it with its controller as DUT (support/chip-testing/test/cert/TC-DD-3.15.test.ts), and its substance is the commissioner's |
-| DD/3.16 | (c) harness | controller role (phase 29b): matter.js automates it with its controller as DUT (support/chip-testing/test/cert/TC-DD-3.16.test.ts), and its substance is the commissioner's |
-| DD/3.17 | (c) harness | controller role (phase 29b): matter.js automates it with its controller as DUT (support/chip-testing/test/cert/TC-DD-3.17.test.ts), and its substance is the commissioner's |
 | DD/3.19 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | DD/3.22 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | DD/3.3 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
@@ -509,7 +511,7 @@ Harness image: `ghcr.io/matter-js/chip@sha256:d6f1de89d714309beb621543d451a98996
 | SC/2.3 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | SC/2.4 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | SC/3.3 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
-| SC/3.5 | (b) not supported | not applicable: the case's PICS `MCORE.ROLE.COMMISSIONER` is false for the reference DUT |
+| SC/3.5 | (b) not supported | not applicable: the case's PICS `MCORE.ROLE.COMMISSIONER` is false for the reference DUT; controller role: matter.js drives chip's python script (prompt-driven-python-test.ts:41), the DUT answering its prompts — not ported (TC-SC-3.5.test.ts:43 TC_SC_3_5.py) |
 | SC/4.4 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | SC/4.6 | (b) not supported | not applicable: the case's PICS `MCORE.ROLE.COMMISSIONER & MCORE.DD.COMM_DISCOVERY` is false for the reference DUT |
 | SC/4.7 | (b) not supported | not applicable: the case's PICS `MCORE.ROLE.COMMISSIONEE & MCORE.DD.COMM_DISCOVERY` is false for the reference DUT |
@@ -576,6 +578,13 @@ expectations are what the daemon has to satisfy (`internal/chiptool` TestGoCerti
 | SC/4.8 | 4 | 0 | Go controller as TH, after matter.js `TC-SC-4.8.test.ts` |
 | SC/5.3 | 5 | 3 | Go controller as TH, after matter.js `TC-SC-5.3.test.ts` |
 | SC/6.1 | 8 | 3 | Go controller as TH, after matter.js `TC-SC-6.1.test.ts` |
+| SC/8.1 | 1 | 0 | Go controller as TH, after matter.js `TC-SC-8.1.test.ts`; passes with chip-tool as TH too |
+| SC/8.2 | 1 | 0 | Go controller as TH, after matter.js `TC-SC-8.2.test.ts`; passes with chip-tool as TH too |
+| SC/8.3 | 2 | 0 | Go controller as TH, after matter.js `TC-SC-8.3.test.ts`; passes with chip-tool as TH too |
+| SC/8.4 | 3 | 0 | Go controller as TH, after matter.js `TC-SC-8.4.test.ts`; passes with chip-tool as TH too |
+| SC/8.5 | 2 | 0 | Go controller as TH, after matter.js `TC-SC-8.5.test.ts`; passes with chip-tool as TH too |
+| SC/8.6 | 2 | 0 | Go controller as TH, after matter.js `TC-SC-8.6.test.ts`; passes with chip-tool as TH too |
+| SC/8.7 | 2 | 0 | Go controller as TH, after matter.js `TC-SC-8.7.test.ts`; passes with chip-tool as TH too |
 | SU/1.1 | 2 | 0 | Go controller as TH, after matter.js `TC-SU-1.1.test.ts` |
 | SU/2.1 | 3 | 1 | Go controller as TH, after matter.js `TC-SU-2.1.test.ts` |
 | SU/2.2 | 4 | 4 | Go controller as TH, after matter.js `TC-SU-2.2.test.ts`; passes with chip-tool as TH too |
@@ -590,6 +599,44 @@ expectations are what the daemon has to satisfy (`internal/chiptool` TestGoCerti
 | SU/3.4 | 3 | 1 | Go controller as TH, after matter.js `TC-SU-3.4.test.ts` |
 | SU/4.1 | 9 | 0 | Go controller as TH, after matter.js `TC-SU-4.1.test.ts`; passes with chip-tool as TH too |
 | SWTCH/3.2 | 16 | 7 | Go controller as TH, after matter.js `TC-SWTCH-3.2.test.ts` |
+
+### Controller role
+
+matter.js's certification cases in their own direction: the module's controller is the DUT and the
+reference daemon the TH device the TS file names (`internal/chiptool` TestGoCertificationCases). Such a
+case counts as passed in its family; one no family of the harness image lists is counted in none.
+
+#### Cases run with the Go controller as DUT
+
+| Case | Steps run | Steps skipped | Source |
+| --- | ---: | ---: | --- |
+| DD/1.8 | 7 | 0 | Go controller as DUT, after matter.js `TC-DD-1.8.test.ts` |
+| DD/3.11 | 6 | 4 | Go controller as DUT, after matter.js `TC-DD-3.11.test.ts` |
+| DD/3.12 | 8 | 5 | Go controller as DUT, after matter.js `TC-DD-3.12.test.ts` |
+| DD/3.13 | 8 | 5 | Go controller as DUT, after matter.js `TC-DD-3.13.test.ts` |
+| DD/3.14 | 10 | 2 | Go controller as DUT, after matter.js `TC-DD-3.14.test.ts` |
+| DD/3.15 | 4 | 0 | Go controller as DUT, after matter.js `TC-DD-3.15.test.ts` |
+| DD/3.16 | 11 | 0 | Go controller as DUT, after matter.js `TC-DD-3.16.test.ts` |
+| DD/3.17 | 15 | 0 | Go controller as DUT, after matter.js `TC-DD-3.17.test.ts` |
+| ICDB/1.3 | 5 | 0 | Go controller as DUT, after matter.js `TC-ICDB-1.3.test.ts`; in no family of the harness image |
+| ICDM/6.1 | 4 | 0 | Go controller as DUT, after matter.js `TC-ICDM-6.1.test.ts`; in no family of the harness image |
+
+#### Controller-role cases not run
+
+matter.js's cases with its controller as DUT that the Go controller does not run as the DUT and no family of
+the harness image lists; those a family lists carry the same reason on their row above.
+
+| Case | Class | Reason |
+| --- | --- | --- |
+| BR/4 | (c) harness | controller role (phase 29b-2): matter.js runs it with its controller as DUT against a bridge TH it drives through bridge-simulation app-pipe commands (TC-BR-4.test.ts:234) |
+| TBRM/3.1 | (b) not supported | controller role: the TH is a Thread border router (`--otbr` needs a live OTBR REST API; matter.js runs it against chip's network-manager app only, TC-TBRM-3.1.test.ts:133-140) |
+| WEBRTCR/2.1 | (b) not supported | controller role: matter.js drives chip's python script (prompt-driven-python-test.ts:41), the DUT answering its prompts — not ported (TC-WEBRTCR-2.1.test.ts:18 TC_WEBRTCR_2_1.py) |
+| WEBRTCR/2.2 | (b) not supported | controller role: matter.js drives chip's python script (prompt-driven-python-test.ts:41), the DUT answering its prompts — not ported (TC-WEBRTCR-2.2.test.ts:18 TC_WEBRTCR_2_2.py) |
+| WEBRTCR/2.3 | (b) not supported | controller role: matter.js drives chip's python script (prompt-driven-python-test.ts:41), the DUT answering its prompts — not ported (TC-WEBRTCR-2.3.test.ts:11 TC_WEBRTCR_2_3.py) |
+| WEBRTCR/2.4 | (b) not supported | controller role: matter.js drives chip's python script (prompt-driven-python-test.ts:41), the DUT answering its prompts — not ported (TC-WEBRTCR-2.4.test.ts:11 TC_WEBRTCR_2_4.py) |
+| WEBRTCR/2.5 | (b) not supported | controller role: matter.js drives chip's python script (prompt-driven-python-test.ts:41), the DUT answering its prompts — not ported (TC-WEBRTCR-2.5.test.ts:30 TC_WEBRTCR_2_5.py) |
+| WEBRTCR/2.6 | (b) not supported | controller role: matter.js drives chip's python script (prompt-driven-python-test.ts:41), the DUT answering its prompts — not ported (TC-WEBRTCR-2.6.test.ts:19 TC_WEBRTCR_2_6.py) |
+| WEBRTCR/2.7 | (b) not supported | controller role: matter.js drives chip's python script (prompt-driven-python-test.ts:41), the DUT answering its prompts — not ported (TC-WEBRTCR-2.7.test.ts:18 TC_WEBRTCR_2_7.py) |
 
 ### Cases that pass with a recorded gap
 
@@ -613,7 +660,7 @@ whose family is not in that list is "not yet run", not "not supported".
 | --- | --- | --- |
 | ILL, PRS, DISHM | the module serves the cluster (`cluster/measurement` Illuminance and Pressure; `cluster/modebase` DishwasherMode), but the reference daemon exposes no endpoint with it and the harness does not run the family | (c) not yet run |
 | CONCON, MESSAGES | the module serves ContentControl (`cluster/media`) and Messages (`cluster/core`), but chip has no case of either family at the harness pin | (c) no case |
-| ICDM, ICDB | not applicable to the reference daemon: it is mains-powered and sets no `node.Config.ICD`, so it serves no ICD Management (`ICDM.S` is false in its generated PICS). Applicable to a host that sets `Config.ICD`: the module then serves ICD Management and the Check-In protocol after matter.js ([ICD guide](./guides/icd.md)); the harness does not run the families against such a node | (b) not supported |
+| ICDM, ICDB | not applicable to the reference daemon: it is mains-powered and sets no `node.Config.ICD`, so it serves no ICD Management (`ICDM.S` is false in its generated PICS). Applicable to a host that sets `Config.ICD`: the module then serves ICD Management and the Check-In protocol after matter.js ([ICD guide](./guides/icd.md)); the harness does not run the families against such a node. The daemon's `--icd-lit` (TESTING ONLY) is such a node for the ICD client cases the Go controller runs as the DUT (TC-ICDM-6.1, TC-ICDB-1.3, under "Controller role" above) | (b) not supported |
 | SC_TC, the BLE and Thread cases of DD and SC | Bluetooth, Thread | (d) out of scope |
 | CNET Thread cases | the device side has no Thread radio; the Thread NetworkCommissioning variant over a border router (`core.ThreadNetworkCommissioning`, ADR 0027) is not on the reference daemon | (c) not yet run |
 | TBRM | the module serves ThreadBorderRouterManagement over an OTBR (`cluster/threadbr`, ADR 0027) and the reference daemon's `--otbr` adds the endpoint, but the harness does not run the family against a daemon with a virtual OTBR yet (`.github/workflows/otbr-virtual.yml` builds one, weekly and on dispatch) | (c) not yet run |

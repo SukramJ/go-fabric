@@ -200,6 +200,18 @@ the same two mechanisms CHIP's own example apps take (`control.go`):
   sends OnOff On or Off to every target the entries name, unicast or
   group — matter.js's cert light switch and its `sendOnOffToBindings`
   backchannel. The daemon's default composition does not change.
+- `--icd-lit` (TESTING ONLY) makes the node a Long Idle Time ICD after
+  matter.js's lit-icd test app (`icd.go`), for the ICD client
+  certification cases the Go controller runs as the DUT (TC-ICDM-6.1,
+  TC-ICDB-1.3): ICD Management on the root with Check-In, User Active Mode
+  Trigger, LIT and Dynamic SIT/LIT, SIT until a client registers; a fixed
+  cadence of the active window and the idle window, so a registered client
+  receives Check-Ins; and, with `--enable-key`, the ICD test event triggers
+  (`0x0046000000000001` AddActiveMode … `…04` InvalidateAllCounterValues,
+  `…06`/`…07` the Dynamic SIT/LIT ones) on TestEventTrigger.
+  `--icd-idle-mode-duration` (seconds, default 3600) and
+  `--icd-active-mode-duration-ms` (default 10000) are the app's timings.
+  The daemon's default composition does not change.
 - `--dcl prod|testnet|off` (default `off`) looks the image `--ota-provider`
   offers up in the CSA Distributed Compliance Ledger (`dcl.go`,
   `controller/dcl`): is the version listed for the requestor's vendor and

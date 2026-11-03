@@ -51,7 +51,12 @@ type docGoCert struct {
 	StepsSkipped int      `json:"stepsSkipped"`
 	Source       string   `json:"source"`
 	Findings     []string `json:"findings"`
+	// Role is "dut" for a case run with the Go controller as the DUT.
+	Role string `json:"role"`
 }
+
+// dut reports a case the Go controller runs as the DUT (phase 29b).
+func (c docGoCert) dut() bool { return c.Role == "dut" }
 
 // TestCertifiabilityDocument holds docs/certifiability.md's generated block
 // to the family table (families_table_test.go) and the last family run
@@ -74,8 +79,11 @@ func TestCertifiabilityDocument(t *testing.T) {
 			inFamily[fam.name+"/"+n] = true
 		}
 	}
-	for id := range g.GoCert {
-		if !inFamily[id] {
+	for id, c := range g.GoCert {
+		// A DUT case may name a case no family of the image has (matter.js
+		// automates controller cases CHIP's descriptor does not list): it is
+		// listed under the controller role and counted in no family.
+		if !inFamily[id] && !c.dut() {
 			t.Errorf("Go-TH case %s is in no declared family's case list", id)
 		}
 		if _, hs := g.HostSkipped[id]; hs {
@@ -187,10 +195,27 @@ func renderCertifiability(g docGolden) string {
 		var r row
 		for _, n := range names {
 			id := fam.name + "/" + n
+			// A case the Go controller passes as the DUT is passed in its
+			// family: the page states the module in both roles (ADR 0020),
+			// and the row the device role leaves (not applicable, manual)
+			// is about the daemon, not about the case.
+			if gc, ok := g.GoCert[id]; ok && gc.dut() {
+				passed++
+				if len(gc.Findings) > 0 {
+					known++
+					r.known = append(r.known, fmt.Sprintf("| %s | %s | Go controller as DUT: step %s (notes/parity/matter_behaviour_findings.md) |",
+						id, classDefect, mdCell(strings.Join(gc.Findings, "; step "))))
+				}
+				continue
+			}
 			if expr, na := g.NotApplicable[id]; na {
 				if _, ex := fam.gapFor(n); !ex {
 					counts[classNotSupported]++
-					r.gaps = append(r.gaps, fmt.Sprintf("| %s | %s | not applicable: the case's PICS %s%s%s is false for the reference DUT |", id, classNotSupported, "`", mdCell(expr), "`"))
+					why := ""
+					if g, ok := controllerRoleCases[id]; ok {
+						why = "; " + g.reason
+					}
+					r.gaps = append(r.gaps, fmt.Sprintf("| %s | %s | not applicable: the case's PICS %s%s%s is false for the reference DUT%s |", id, classNotSupported, "`", mdCell(expr), "`", mdCell(why)))
 					continue
 				}
 			}
@@ -255,10 +280,16 @@ func renderCertifiability(g docGolden) string {
 	b.WriteString("expectations are what the daemon has to satisfy (`internal/chiptool` TestGoCertificationCases).\n\n")
 	b.WriteString("| Case | Steps run | Steps skipped | Source |\n| --- | ---: | ---: | --- |\n")
 	goIDs := make([]string, 0, len(g.GoCert))
-	for id := range g.GoCert {
+	var dutIDs []string
+	for id, c := range g.GoCert {
+		if c.dut() {
+			dutIDs = append(dutIDs, id)
+			continue
+		}
 		goIDs = append(goIDs, id)
 	}
 	slices.Sort(goIDs)
+	slices.Sort(dutIDs)
 	for _, id := range goIDs {
 		c := g.GoCert[id]
 		also := ""
@@ -266,6 +297,37 @@ func renderCertifiability(g docGolden) string {
 			also = "; passes with chip-tool as TH too"
 		}
 		fmt.Fprintf(&b, "| %s | %d | %d | Go controller as TH, after matter.js `%s`%s |\n", id, c.Steps, c.StepsSkipped, mdCell(c.Source), also)
+	}
+	b.WriteString("\n### Controller role\n\n")
+	b.WriteString("matter.js's certification cases in their own direction: the module's controller is the DUT and the\n")
+	b.WriteString("reference daemon the TH device the TS file names (`internal/chiptool` TestGoCertificationCases). Such a\n")
+	b.WriteString("case counts as passed in its family; one no family of the harness image lists is counted in none.\n\n")
+	b.WriteString("#### Cases run with the Go controller as DUT\n\n")
+	b.WriteString("| Case | Steps run | Steps skipped | Source |\n| --- | ---: | ---: | --- |\n")
+	for _, id := range dutIDs {
+		c := g.GoCert[id]
+		also := ""
+		if _, ok := g.Cases[id]; ok {
+			also = "; passes with chip-tool too"
+		} else if !inFamilies(g, id) {
+			also = "; in no family of the harness image"
+		}
+		fmt.Fprintf(&b, "| %s | %d | %d | Go controller as DUT, after matter.js `%s`%s |\n", id, c.Steps, c.StepsSkipped, mdCell(c.Source), also)
+	}
+	b.WriteString("\n#### Controller-role cases not run\n\n")
+	b.WriteString("matter.js's cases with its controller as DUT that the Go controller does not run as the DUT and no family of\n")
+	b.WriteString("the harness image lists; those a family lists carry the same reason on their row above.\n\n")
+	b.WriteString("| Case | Class | Reason |\n| --- | --- | --- |\n")
+	roleIDs := make([]string, 0, len(controllerRoleCases))
+	for id := range controllerRoleCases {
+		if _, run := g.GoCert[id]; !run && !inFamilies(g, id) {
+			roleIDs = append(roleIDs, id)
+		}
+	}
+	slices.Sort(roleIDs)
+	for _, id := range roleIDs {
+		gp := controllerRoleCases[id]
+		fmt.Fprintf(&b, "| %s | %s | %s |\n", id, gp.class, mdCell(gp.reason))
 	}
 	b.WriteString("\n### Cases that pass with a recorded gap\n\n")
 	b.WriteString("The CHIP checker reports exactly the recorded problems and nothing else; the case fails as soon as\n")
@@ -276,6 +338,13 @@ func renderCertifiability(g docGolden) string {
 		b.WriteString(l + "\n")
 	}
 	return b.String()
+}
+
+// inFamilies reports whether a case id is in the case list of a family
+// of the last run.
+func inFamilies(g docGolden, id string) bool {
+	fam, name, _ := strings.Cut(id, "/")
+	return slices.Contains(g.Families[fam], name)
 }
 
 // mdCell escapes the pipes of a Markdown table cell.
