@@ -172,7 +172,7 @@ func (f *fake) MinInvokePrivilege(id uint32) uint8 {
 }
 
 var serverDef = &spec.Cluster{
-	ID: 0xFFF3, Name: "Server", Revision: 2,
+	ID: 0xFFF1_FC03, Name: "Server", Revision: 2,
 	Features: []spec.Feature{{Name: "F", Title: "Feat", Bit: 0, Conformance: spec.Conformance{Op: spec.ConfOptional}}},
 	Attributes: []spec.Attribute{
 		{ID: 0, Name: "RO", Type: spec.Type{Kind: spec.KindUint, Bits: 8}, Conformance: spec.Conformance{Op: spec.ConfMandatory}, Access: spec.Access{RW: "R"}},
@@ -218,7 +218,7 @@ func TestCheckServer(t *testing.T) {
 		s.spoil(f)
 		wantReport(t, s.name, run(t, func(tb *recorder) { spectest.CheckServer(tb, f, serverDef, 1) }), s.want)
 	}
-	other := &spec.Cluster{ID: 0xFFF4, Name: "Other", Revision: 9}
+	other := &spec.Cluster{ID: 0xFFF1_FC04, Name: "Other", Revision: 9}
 	errs := run(t, func(tb *recorder) { spectest.CheckServer(tb, newFake(), other, 0) })
 	wantReport(t, "cluster id", errs, "cluster id")
 	wantReport(t, "revision", errs, "ClusterRevision")

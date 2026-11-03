@@ -346,6 +346,22 @@ device-type validator (ADR 0016, warn mode) reports it at every start as
 `matter.devicetype.violation … requirement=Descriptor.TAGLIST`; that warning
 is this entry, not a new defect.
 
+Phase 31 ported matter.js's corpus case "refuses a Closure endpoint without
+the tags its Descriptor TagList requires"
+(`StandardDeviceTypeCorpusTest.ts:548-559` at 862ad75f): matter.js refuses
+the endpoint at construction, because its generated `ClosureDevice` turns
+TagList on and the Descriptor fails to initialize without
+`descriptor.state.tagList`. The kit builds a Closure without
+`Options.Tags` with the feature off, so the same endpoint is refused only
+by the device-type judge — a strict validator refuses it, the default warn
+mode reports it (`device:TestStandardDeviceTypeCorpusParityMatterJS`);
+with `Options.Tags` (phase 30) it conforms. The Duplicate condition's
+TagList requirement of Base is judged as matter.js judges it
+(`DeviceTypeConformance.ts:1189-1215`, the Aggregator waiver), so the
+kit's default bridge composition — bridged siblings below the Aggregator
+— owes none; composed siblings without Tags are warned of the same way.
+The same Apple reason holds for both.
+
 ### BD-Matter-ClosureControl-StopObserver — a bridged host hears of a Stop the server ignores
 
 `cluster/closure` answers a Stop while the closure is not Moving,
@@ -1757,8 +1773,8 @@ Binding mandatory (`missingBaseServersOf`). go-fabric's bridge judges the
 whole assembled topology on every Start and Reassemble
 (`bridge/devicetype_validation.go`), refuses the assembly as a whole so the
 previous topology stays live, takes its mode from
-`Bridge.SetDeviceTypeValidation`, and mounts no Binding a host did not ask
-for — the verdict names it instead. The verdicts, the modes (warn, strict,
+`Bridge.SetDeviceTypeValidation`, and mounts the Binding server Base
+mandates where the source supplies none (`endpoint/binding_mount.go`). The verdicts, the modes (warn, strict,
 off) and what each refuses are matter.js's; only the unit of construction
 differs, because a Go topology is installed whole. Pinned by
 `bridge/devicetype_validation_test.go`;
@@ -4332,6 +4348,25 @@ reassembly (ADR 0016, `endpoint/devicetype_validation.go` `Validate`), so
 reassembly is the module's unit of construction (above); the previous
 topology stays live, so a refusal costs the host nothing it had, while a
 logged singleton would answer two endpoints to one root-only cluster.
+
+### BD-Matter-DeclaredDisallowedElementRefused — a server that declares an element its conformance disallows is refused, not trimmed
+
+matter.js `ValidatedElements` drops an implemented element whose
+conformance is disallowed or obsolete with a non-fatal warning, and an
+element whose conformance names a dropped one goes with it
+(`ValidatedElements.ts` with `resolveInterElementConformance`;
+`ValidatedElementsTest.ts:376-428` at 862ad75f, "warns when disallowed
+element is implemented", "excludes an implemented obsolete element as it
+does a disallowed one", "makes an element depending on an implemented
+obsolete element absent"). `spec.New` refuses such a declaration with
+`ErrDisallowed` naming the element (`cluster/spec/instance.go`, `resolve`),
+and reads an element whose conformance names another element as present
+when the server declares it. By design: a Go server states the optional
+elements it serves in `spec.Options`, so declaring one the selection
+disallows is a host error to surface at construction rather than a
+surface silently smaller than the host asked for.
+
+---
 
 ### BD-Matter-UnimplementedCommand-ValidatorViolation — an unimplemented mandatory command is a device-type verdict, not a construction error
 

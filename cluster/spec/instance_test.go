@@ -21,7 +21,7 @@ import (
 // conformance; features with a choice group, a dependent and a mandatory
 // one.
 var testCluster = &spec.Cluster{
-	ID: 0xFFF1, Name: "Test", Revision: 3,
+	ID: 0xFFF1_FC01, Name: "Test", Revision: 3,
 	Features: []spec.Feature{
 		{Name: "AA", Title: "Alpha", Bit: 0, Conformance: spec.Conformance{Op: spec.ConfChoice, Choice: &spec.Choice{Name: "a", Num: 1, OrMore: true}, Args: []spec.Conformance{op(spec.ConfOptional)}}},
 		{Name: "BB", Title: "Beta", Bit: 1, Conformance: spec.Conformance{Op: spec.ConfChoice, Choice: &spec.Choice{Name: "a", Num: 1, OrMore: true}, Args: []spec.Conformance{op(spec.ConfOptional)}}},
@@ -140,7 +140,7 @@ func TestNewResolvesElements(t *testing.T) {
 	if !inst.Serves(2) || inst.Serves(3) || !inst.Accepts(0) || inst.Accepts(4) || !inst.Emits(1) || inst.Emits(2) {
 		t.Error("membership")
 	}
-	if inst.MatterClusterID() != 0xFFF1 || inst.Revision() != 3 || inst.FeatureMap() != 0b010101 || inst.Definition() != testCluster {
+	if inst.MatterClusterID() != 0xFFF1_FC01 || inst.Revision() != 3 || inst.FeatureMap() != 0b010101 || inst.Definition() != testCluster {
 		t.Error("identity")
 	}
 	if !inst.HasFeature("AA") || !inst.HasFeature("Gamma") || inst.HasFeature("BB") || inst.HasFeature("nope") {

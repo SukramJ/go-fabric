@@ -25,7 +25,7 @@ func TestStructAndListChecks(t *testing.T) {
 		{ID: 2, Name: "2two", Type: Type{Kind: KindUint, Bits: 8}},
 		{ID: 3, Name: "free-form", Type: Type{Kind: KindAny}},
 	}}
-	def := &Cluster{ID: 0xFFF1, Name: "Synthetic", Revision: 1, Attributes: []Attribute{
+	def := &Cluster{ID: 0xFFF1_FC01, Name: "Synthetic", Revision: 1, Attributes: []Attribute{
 		{ID: 0, Name: "Nested", Type: Type{Kind: KindStruct, Struct: st}, Conformance: Conformance{Op: ConfMandatory}},
 		{ID: 1, Name: "Bytes", Type: Type{Kind: KindList, Entry: &Field{Name: "entry", Type: Type{Kind: KindUint, Bits: 8}}}, Conformance: Conformance{Op: ConfMandatory}, Constraint: Constraint{Text: "all[min 1]", Entry: &Constraint{Text: "min 1", Min: &Bound{Int: 1}}}},
 		{ID: 2, Name: "Untyped", Type: Type{Kind: KindList}, Conformance: Conformance{Op: ConfMandatory}},
