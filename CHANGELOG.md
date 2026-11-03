@@ -39,6 +39,8 @@ pseudo-version of `main`.
 
 ### Changed
 
+- **Breaking:** `im`: `WriteTransaction` carries the node's hold table and is no longer comparable with `==`; compare the pointers a host keeps instead. Phase 31.
+- **Breaking:** `store`: `Eraser.Erase` is the method a host's own backend adds for `store.Port` (below). Phase 31.
 - **Breaking:** `store`: `store.Port` embeds the new `store.Eraser` (`Erase(ctx) error`, the factory reset: every row of every area, the next fabric index back at 1); `store.Store` and `store/memstore` implement it, a host's own backend adds it (`storetest` checks it). Phase 31.
 - **Breaking:** `cluster/core`: `WiFiNetworkCommissioning.OnCommissioningComplete` takes the CommissioningComplete request's `context.Context` and stores the committed networks under it; `node` hands the GeneralCommissioning hook's context through. Phase 31.
 - `cluster/spec`: `NewServer` names every mandatory command without a handler in one error (`errors.Join`, each wrapping `ErrMissingHandler`) instead of the first alone, as matter.js's `#validateRequiredCommands` reports them together (`ValidatedElements.ts:357-372` at 862ad75f). Phase 31.
