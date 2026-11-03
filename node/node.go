@@ -59,14 +59,16 @@ type Node struct {
 	cfg    Config
 	logger *slog.Logger
 	st     store.Port
-	// ownedDB is the handle opened for Config.Store.Path, closed by Stop;
-	// nil for a host's own.
-	ownedDB   *sql.DB
-	groups    *groups.Manager
-	assembler *endpoint.Assembler
-	br        *bridge.Bridge
-	root      *RootClusters
-	agg       *Aggregator
+	// ownedDB is the handle opened for Config.Store.Path, closed (and
+	// cleared) by Stop; nil for a host's own. keepOwnedDB keeps it open
+	// across the stop a FactoryReset makes, which erases it afterwards.
+	ownedDB     *sql.DB
+	keepOwnedDB bool
+	groups      *groups.Manager
+	assembler   *endpoint.Assembler
+	br          *bridge.Bridge
+	root        *RootClusters
+	agg         *Aggregator
 	// aggServers are the Aggregator endpoint's servers ([Node.Surface]);
 	// surfaceDigest is Config.Surface's digest, computed once.
 	aggServers    []contract.ClusterServer
@@ -456,12 +458,13 @@ func (n *Node) abandon() {
 // closeOwnedDB closes the handle the node opened for Store.Path; a no-op
 // for a host's own handle.
 func (n *Node) closeOwnedDB() {
-	if n.ownedDB == nil {
+	if n.ownedDB == nil || n.keepOwnedDB {
 		return
 	}
 	if err := n.ownedDB.Close(); err != nil {
 		n.logger.Warn("node.store.close", slog.Any("err", err))
 	}
+	n.ownedDB = nil
 }
 
 // advertisement is the commissionable record of the node's own window

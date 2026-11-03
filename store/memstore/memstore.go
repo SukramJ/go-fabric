@@ -121,6 +121,19 @@ func New() *Store {
 	}
 }
 
+// Erase empties the store, as [New] returns it ([store.Eraser]).
+func (s *Store) Erase(context.Context) error {
+	fresh := New()
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.fabrics, s.identities, s.acl, s.aclNextID = fresh.fabrics, fresh.identities, fresh.acl, fresh.aclNextID
+	s.keySets, s.keyMap, s.groupTable, s.groupcast = fresh.keySets, fresh.keyMap, fresh.groupTable, fresh.groupcast
+	s.resumption, s.otaDefault, s.icd = fresh.resumption, fresh.otaDefault, fresh.icd
+	s.subs, s.subsSeq, s.settings, s.metadata = fresh.subs, 0, fresh.settings, fresh.metadata
+	s.presets, s.locks = fresh.presets, fresh.locks
+	return nil
+}
+
 // hasFabric reports whether the fabric exists; the caller holds mu.
 func (s *Store) hasFabric(fabricIndex uint8) bool {
 	_, ok := s.fabrics[fabricIndex]

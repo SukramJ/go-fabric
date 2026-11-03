@@ -1,0 +1,232 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (C) 2026 SukramJ.
+
+package node_test
+
+import (
+	"errors"
+	"fmt"
+	"strings"
+	"sync"
+	"sync/atomic"
+	"testing"
+
+	"github.com/SukramJ/go-fabric/endpoint"
+	epmem "github.com/SukramJ/go-fabric/endpoint/memstore"
+	"github.com/SukramJ/go-fabric/fabrictest"
+	"github.com/SukramJ/go-fabric/node"
+	"github.com/SukramJ/go-fabric/store"
+	"github.com/SukramJ/go-fabric/store/memstore"
+)
+
+// resetStores are a device's stores, held by the test so it can look into
+// them across the node the factory reset ends and the one that follows.
+type resetStores struct {
+	credentials *memstore.Store
+	endpoints   *epmem.Store
+}
+
+func newResetStores() resetStores {
+	return resetStores{credentials: memstore.New(), endpoints: epmem.New()}
+}
+
+func (s resetStores) configure(cfg *node.Config) {
+	cfg.Store = node.Store{Credentials: s.credentials, Endpoints: s.endpoints}
+}
+
+// assertFactoryState holds testFactoryReset's checks (matter.js
+// packages/node/src/testing/node-helpers.ts:112-170 at 862ad75f) on the Go
+// node: no fabric is left, the UniqueID the old node pinned did not
+// persist, the device's BasicInformation and pairing codes are there, and
+// the device runs exactly when want says so.
+func assertFactoryState(t *testing.T, d *fabrictest.Device, s resetStores, wantRunning bool) {
+	t.Helper()
+	ctx := parityCtx(t)
+	if got := d.Running(); got != wantRunning {
+		t.Fatalf("device running %v after the factory reset, want %v", got, wantRunning)
+	}
+	if !wantRunning {
+		// The host comes back as matter.js's offline node is: unstarted
+		// until it is started, on the erased store.
+		fabrics, err := s.credentials.ListFabrics(ctx)
+		if err != nil || len(fabrics) != 0 {
+			t.Fatalf("fabrics after the factory reset %v (%v), want none", fabrics, err)
+		}
+		if v, ok, _ := s.credentials.GetSetting(ctx, store.SettingUniqueID); ok {
+			t.Fatalf("UniqueID %q persisted across the factory reset", v)
+		}
+		if err := d.Start(ctx); err != nil {
+			t.Fatal(err)
+		}
+	}
+	n := d.Node()
+	if infos, err := n.FabricInfos(ctx); err != nil || len(infos) != 0 {
+		t.Fatalf("fabrics of the node after the factory reset %v (%v), want none", infos, err)
+	}
+	if v, ok := n.Root().BasicInformation.MatterRead(0x0001); !ok || !strings.Contains(fmt.Sprint(v), "go-fabric") { // VendorName
+		t.Fatalf("VendorName %v (%v), want go-fabric", v, ok)
+	}
+	payload, err := n.SetupPayload()
+	if err != nil || payload.Manual == "" {
+		t.Fatalf("pairing codes after the factory reset %+v (%v)", payload, err)
+	}
+	if !n.Window().Open {
+		t.Fatal("the uncommissioned node opened no commissioning window")
+	}
+}
+
+// TestServerNodeFactoryResetParityMatterJS ports the factory-reset cases of
+// matter.js packages/node/test/node/ServerNodeTest.ts at 862ad75f. A Go
+// node is single-use: node.FactoryReset removes the fabrics through the
+// RemoveFabric fan-out, stops the node and erases its stores, and the host
+// — fabrictest.Device.FactoryReset here — builds the node that comes back
+// (BD-Matter-FactoryResetEndsTheNode). matter.js's online/offline
+// transitions are the device's running state; its "unique id did not
+// persist" is the pinned UniqueID gone from the store.
+func TestServerNodeFactoryResetParityMatterJS(t *testing.T) {
+	t.Parallel()
+
+	commissioned := func(t *testing.T) (*fabrictest.Site, *fabrictest.Pair, resetStores) {
+		t.Helper()
+		s := newResetStores()
+		site := quietSite(t)
+		p := site.CommissionedPair(fabrictest.PairOptions{Device: fabrictest.Topology{Configure: s.configure}})
+		return site, p, s
+	}
+
+	// ServerNodeTest.ts:655-657, testFactoryReset("offline-after-commission").
+	t.Run("factory resets when offline after commission", func(t *testing.T) {
+		t.Parallel()
+		_, p, s := commissioned(t)
+		if err := p.Device.Stop(parityCtx(t)); err != nil {
+			t.Fatal(err)
+		}
+		if err := p.Device.FactoryReset(parityCtx(t)); err != nil {
+			t.Fatal(err)
+		}
+		assertFactoryState(t, p.Device, s, false)
+	})
+
+	// ServerNodeTest.ts:659-661, testFactoryReset("online").
+	t.Run("factory resets when online after commission", func(t *testing.T) {
+		t.Parallel()
+		_, p, s := commissioned(t)
+		before := p.Device.Node().UniqueID()
+		if err := p.Device.FactoryReset(parityCtx(t)); err != nil {
+			t.Fatal(err)
+		}
+		assertFactoryState(t, p.Device, s, true)
+		if p.Device.Node().UniqueID() == "" || before == "" {
+			t.Fatal("no UniqueID served")
+		}
+	})
+
+	// ServerNodeTest.ts:663-665, testFactoryReset("offline"): a node that
+	// was never commissioned and is offline.
+	t.Run("factory resets when offline without commission", func(t *testing.T) {
+		t.Parallel()
+		s := newResetStores()
+		site := quietSite(t)
+		u := site.UncommissionedPair(fabrictest.PairOptions{Device: fabrictest.Topology{Configure: s.configure}})
+		if err := u.Device.Stop(parityCtx(t)); err != nil {
+			t.Fatal(err)
+		}
+		if err := u.Device.FactoryReset(parityCtx(t)); err != nil {
+			t.Fatal(err)
+		}
+		assertFactoryState(t, u.Device, s, false)
+	})
+
+	// ServerNodeTest.ts:667-669, testFactoryReset("offline-during-reset"):
+	// a stop called while the reset runs leaves the device offline.
+	t.Run("handles factory resets when online but in parallel offline is called correctly", func(t *testing.T) {
+		t.Parallel()
+		_, p, s := commissioned(t)
+		ctx := parityCtx(t)
+		var wg sync.WaitGroup
+		var resetErr, stopErr error
+		wg.Add(2)
+		go func() { defer wg.Done(); resetErr = p.Device.FactoryReset(ctx) }()
+		go func() { defer wg.Done(); stopErr = p.Device.Stop(ctx) }()
+		wg.Wait()
+		if err := errors.Join(resetErr, stopErr); err != nil {
+			t.Fatal(err)
+		}
+		if p.Device.Running() {
+			// The reset came back first and the stop took it down after,
+			// or the stop came first: either way the device ends offline.
+			t.Fatal("the device runs after a stop called during its factory reset")
+		}
+		assertFactoryState(t, p.Device, s, false)
+	})
+
+	// ServerNodeTest.ts:699-719: after a factory reset and a second
+	// commissioning, the removal of the fabric runs its fan-out once (Go's
+	// sanitisation is that fan-out; the host hears it as OnFabricRemoved).
+	t.Run("sanitizes fabric-scoped data once per fabric removal after a factory reset", func(t *testing.T) {
+		t.Parallel()
+		site, p, _ := commissioned(t)
+		ctx := parityCtx(t)
+		if err := p.Device.FactoryReset(ctx); err != nil {
+			t.Fatal(err)
+		}
+		again, err := p.Controller.Commission(ctx, p.Device, fabrictest.CommissionOptions{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		n := again.Device.Node()
+		var removed atomic.Int32
+		unsubscribe := n.Observe(node.Observers{OnFabricRemoved: func(node.FabricInfo) { removed.Add(1) }})
+		defer unsubscribe()
+		infos, err := n.FabricInfos(ctx)
+		if err != nil || len(infos) != 1 {
+			t.Fatalf("fabrics after the second commissioning %v (%v), want one", infos, err)
+		}
+		if err := again.Device.Act(func(n *node.Node) error { return n.RemoveFabric(ctx, infos[0].FabricIndex) }); err != nil {
+			t.Fatal(err)
+		}
+		if err := site.Eventually(ctx, "the fabric removal", func() bool { return removed.Load() >= 1 }); err != nil {
+			t.Fatal(err)
+		}
+		if err := site.Settle(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if got := removed.Load(); got != 1 {
+			t.Fatalf("fabric removal ran %d times, want once", got)
+		}
+	})
+
+	// ServerNodeTest.ts:850-869: a factory reset frees the number a stored
+	// endpoint that is not present holds. matter.js presets the numbers and
+	// reboots with the first endpoint only; Go has no presets, so the
+	// second light is added and removed while the node runs — its record,
+	// and with it its number, stays held (the assembler never removes a
+	// record, endpoint/assembler.go) — until the factory reset erases it.
+	t.Run("frees the endpoint numbers a factory reset erases", func(t *testing.T) {
+		t.Parallel()
+		s := newResetStores()
+		site := quietSite(t)
+		first := newLight(t, site, "first")
+		d := site.AddDevice(fabrictest.Topology{Configure: s.configure, Bridged: []node.Endpoint{first}})
+		ctx := parityCtx(t)
+		second := newLight(t, site, "second")
+		if err := d.Act(func(n *node.Node) error { return n.Aggregator().Add(ctx, second) }); err != nil {
+			t.Fatal(err)
+		}
+		if err := d.Act(func(n *node.Node) error { return n.Aggregator().Remove(ctx, endpoint.StringKey("second")) }); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := s.endpoints.GetEndpoint(ctx, endpoint.StringKey("second")); err != nil {
+			t.Fatalf("the removed endpoint's record before the reset: %v, want it held", err)
+		}
+		if err := d.FactoryReset(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := s.endpoints.GetEndpoint(ctx, endpoint.StringKey("second")); !errors.Is(err, endpoint.ErrNotFound) {
+			t.Fatalf("the removed endpoint's record after the reset: %v, want ErrNotFound", err)
+		}
+		if _, ok := d.EndpointOf("first"); !ok {
+			t.Fatal("the present endpoint has no number after the reset")
+		}
+	})
+}

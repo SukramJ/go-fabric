@@ -3375,6 +3375,31 @@ Findings wave 2026-10-17.
 By design. A reset of the host's device model is the host's decision, not
 a side effect of a controller removing itself.
 
+### BD-Matter-FactoryResetEndsTheNode — a factory reset stops the node; the host builds the one that comes back
+
+matter.js `ServerNode.erase` (`packages/node/src/node/ServerNode.ts:159-200`
+at `862ad75f`) takes the node offline, resets its in-memory state, erases its
+storage (`resetStorage`, `:241-256`) and brings the same object back online
+when it was; a controller's erase also drops its peers and CA material
+(`ServerEnvironment.eraseCredentials`, `server/ServerEnvironment.ts:72-89`)
+and the same instance commissions again (ServerNodeTest.ts:1488-1498). A Go
+node and controller are single-use — `Node.Stop` and `Controller.Close` end
+them (`node.ErrStopped`) — so `Node.FactoryReset` removes the fabrics
+through the RemoveFabric fan-out, stops the node and erases its credential
+store (`store.Eraser`) and endpoint records, and `Controller.Erase` closes
+the controller and erases its database; the host builds the node or
+controller that comes back on the same store (fabrictest's
+`Device.FactoryReset` restarts a device that ran). Two consequences: the
+endpoint allocation counter of `endpoint.Store` is not rewound (the
+interface has no reset; a freed number is reissued only after the wrap),
+and the re-pinned UniqueID is derived again (`DeriveUniqueID`), equal to the
+old one for the same vendor, product, label and serial, where matter.js
+draws a fresh one. Phase 31.
+
+By design. Rebuilding is how every in-memory state a reset erases — the
+root servers' values, Wi-Fi networks, scenes, the validator — goes for
+certain, without a reset path in each server.
+
 ### BD-Matter-OTAProvider-ACLEveryFabric — the OTA provider's ACL entry goes on every fabric
 
 matter.js adds the provider's Operate/CASE entry on the first fabric only
