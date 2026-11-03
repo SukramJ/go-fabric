@@ -719,6 +719,7 @@ func (g *GeneralCommissioning) watchFailSafeExpiry(ctx context.Context, fabricIn
 	}
 	g.mu.Lock()
 	stillArmed := g.failSafeArmed && !g.failSafeExpiresAt.After(g.clock.Now())
+	hadBreadcrumb := stillArmed && g.breadcrumb != 0
 	if stillArmed {
 		g.failSafeArmed = false
 		// chip's GeneralCommissioningCluster.cpp:146 (kFailSafeTimerExpired
@@ -735,8 +736,19 @@ func (g *GeneralCommissioning) watchFailSafeExpiry(ctx context.Context, fabricIn
 	}
 	hook := g.onFailSafeExpired
 	g.mu.Unlock()
-	if stillArmed && hook != nil {
-		hook(ctx, fabricIndex)
+	if stillArmed {
+		// The reset is reported like any other change of the attribute:
+		// chip's kFailSafeTimerExpired branch calls SetBreadCrumb(0)
+		// (GeneralCommissioningCluster.cpp:145-146 at 6170af84), which
+		// notifies when the value moved (:377-381); no command of this
+		// cluster runs here, so the bridge's invoke comparison cannot
+		// see it.
+		if hadBreadcrumb {
+			g.changes.Notify(gencommAttrBreadcrumb)
+		}
+		if hook != nil {
+			hook(ctx, fabricIndex)
+		}
 	}
 }
 
