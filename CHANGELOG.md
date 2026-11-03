@@ -51,6 +51,7 @@ pseudo-version of `main`.
 
 ### Fixed
 
+- `cluster/core`: the Breadcrumb reset at fail-safe expiry is reported to subscriptions through `GeneralCommissioning.OnAttributeChange`, as chip's `SetBreadCrumb(0)` on `kFailSafeTimerExpired` notifies (`GeneralCommissioningCluster.cpp:145-146`, `:377-381` at 6170af84); no command runs at expiry, so the invoke comparison could not see it.
 - `cluster/core`: GeneralCommissioning reports a Breadcrumb another server writes (`OnAttributeChange`), and the Wi-Fi NetworkCommissioning server reports its failsafe revert and its rejoin, so a subscription sees them — TC-CNET-4.4 and 4.9 found the subscription cache stale. A reverted network is connected while the link is on it. Phase 30.
 - `bridge`: a list-append write to Binding (a ListIndex-null AttributeDataIB, as a controller writes a list in a replace and appends) was answered CONSTRAINT_ERROR for every entry: the entry decoded to the generated list type, not the element type of the Binding server's own list the dispatcher appends it to. It decodes to that type now, as the ACL and GroupKeyMap entries do (found by TC-BIND-2.1 in the Go-TH leg, phase 29a-2).
 - `mdns`: the package's tests run under `-race`; `mdns/race_skip_test.go`, which skipped the whole test binary for grandcat/zeroconf's `Shutdown` race, is gone, and the discovery, peer and commissioner live tests no longer build without the race detector only (issue #362).
