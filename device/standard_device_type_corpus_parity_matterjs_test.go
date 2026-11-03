@@ -34,6 +34,7 @@ import (
 	"testing"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
+	"github.com/SukramJ/go-fabric/endpoint"
 )
 
 // standardDeviceTypeNames is STANDARD_DEVICE_TYPE_NAMES
@@ -173,8 +174,47 @@ func TestStandardDeviceTypeCorpusParityMatterJS(t *testing.T) {
 			}
 		})
 
+		// StandardDeviceTypeCorpusTest.ts:548-559: matter.js's ClosureDevice
+		// is generated with DescriptorServer.with("TagList") and fails to
+		// initialize without descriptor.state.tagList. The kit builds a
+		// Closure without Options.Tags with the TagList feature off — the
+		// Apple default, notes/parity/by_design.md
+		// BD-Matter-ClosureWithoutTagList — so the refusal is the device-type
+		// judge's: the Closure's own TAGLIST requirement is missing, a strict
+		// validator refuses the endpoint, a warn-mode one reports it. With the
+		// tags matter.js's fixture gives it (ClosureTag.Door) nothing is owed.
 		t.Run("refuses a Closure endpoint without the tags its Descriptor TagList requires", func(t *testing.T) {
-			t.Skip("StandardDeviceTypeCorpusTest.ts:548: a Descriptor TagList declaration has no Go subject yet (the SemanticNamespace subject, milestone 5)")
+			bare, err := New(ClosureType(), Options{StableKey: endpoint.StringKey("test:bare"), Name: "bare"}, testWith(t, "Closure")...)
+			if err != nil {
+				t.Fatal(err)
+			}
+			topo := assemble(t, bare)
+			var tagList []string
+			for _, v := range violationsOf(topo) {
+				if v.Requirement == "Descriptor.TAGLIST" {
+					tagList = append(tagList, string(v.Kind)+" "+v.DeviceType)
+				}
+			}
+			if !slices.Equal(tagList, []string{"missing Closure"}) {
+				t.Errorf("TagList violations = %v, want [missing Closure]", tagList)
+			}
+			_, err = endpoint.NewDeviceTypeValidator(endpoint.DeviceTypeValidationStrict).Validate(topo)
+			if err == nil || !strings.Contains(err.Error(), "Descriptor.TAGLIST") {
+				t.Errorf("strict validation = %v, want a refusal naming Descriptor.TAGLIST", err)
+			}
+			if _, err := endpoint.NewDeviceTypeValidator(endpoint.DeviceTypeValidationWarn).Validate(topo); err != nil {
+				t.Errorf("warn-mode validation refused: %v", err)
+			}
+
+			tagged, err := New(ClosureType(), Options{StableKey: endpoint.StringKey("test:tagged"), Name: "tagged", Tags: []SemanticTag{closureDoorTag}}, testWith(t, "Closure")...)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, v := range violationsOf(assemble(t, tagged)) {
+				if v.Requirement == "Descriptor.TAGLIST" {
+					t.Errorf("tagged Closure: %v", v)
+				}
+			}
 		})
 
 		for _, name := range standardDeviceTypeNames {
