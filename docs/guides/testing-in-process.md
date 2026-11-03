@@ -236,6 +236,15 @@ connection, subscription liveness and registry. A device the host builds
 with the device layer joins it when the node's Aggregator adds it, as in
 the first test above.
 
+The fake has two readings, as matter.js's `MockTime` has `nowUs` and
+`nowMs`: `Advance` moves both, `Set` jumps both, and `StepWall` moves the
+wall clock alone — what an NTP correction or a manual clock set does.
+Every interval the stack judges (a session's peer-active threshold, the
+per-peer eviction, a peer's newest session, a peer-loss cutoff) reads the
+monotonic one (`clock.MonotonicOf`), so a `StepWall` neither ages nor
+rejuvenates a session; what a session reports as a time (`LastActivity`,
+`LastPeerActivity`) is the stamp as the wall clock reads it now.
+
 The fake moves only when the test moves it, or inside `Site.Run` and
 `Site.Eventually`, which every wire helper and `Commission` use. While the
 work has not finished they advance the clock to its next deadline each time

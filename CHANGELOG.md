@@ -12,6 +12,11 @@ pseudo-version of `main`.
 
 ### Added
 
+- `clock`: the optional `Monotonic` reading of a `Clock` (`MonotonicOf`, `WallOf`; `System` on time.Now's monotonic component) and `clocktest.Fake.StepWall`, a step of the wall clock alone, after matter.js's `Time.nowUs` and `MockTime.stepWallClock`.
+- `secure/mattercert`: `Encode` (a certificate back to its Matter TLV, `asSignedTlv`), `DecodeDER` and `EncodeDER` (an external PKI's RCAC/ICAC/NOC from and to X.509 DER, `fromAsn1`/`asSignedDer`, the 600-byte cap before parsing), `NewVerifierFromCertificate`, `CreateCSR` (the PKCS#10 request as matter.js builds it); `Certificate.TBSDER` keeps a DER certificate's TBSCertificate for its signature.
+- `controller/attestation`: `IssuerMatterIDs`, the issuer DN's vendor and product id with the `Mvid:`/`Mpid:` fallback (matter.js parses the issuer as it parses the subject).
+- `secure/attestation`: `ValidateProduct` (`ErrProductMismatch`) judges a loaded chain's DAC and PAI ids against the product, after the servable-size check, as matter.js's `DeviceCertification` does; `node` applies it to `Attestation.Files` against the `ProductDescription`.
+- `internal/exchangeseam`: the test seam that stamps traffic on a client session.
 - `device`: `Options.DeviceTypes` lists further device types in the endpoint's Descriptor DeviceTypeList, after the device's own and before Bridged Node, each once with the schema's revision (an unknown id is refused), and `Options.Tags` (`device.SemanticTag`) opts the Descriptor into TagList — matter.js's bridge test instance declares both on its composed device (`BridgeTestInstance.ts:306-335`). `endpoint.Spec` carries them as `DeviceTypes` and `Tags`; the device-type validator reads the listed types. Without tags TagList stays off. Phase 30.
 - `internal/chiptool`: two real-controller proofs in `TestChipToolSuite` — `groups` (chip-tool's GroupSettings and Groupcast JoinGroup with the auxiliary ACL on FF05::FA, then a multicast OnOff Toggle the daemon's light follows; the CI `chiptool` job fails when it skips for want of multicast) and `subscription-restart` (a chip-tool subscription survives a daemon restart, re-established by the daemon without a new SubscribeRequest). Phase 30.
 - The reference daemon's `--wifi-sim-ssid` (TESTING ONLY, with `--wifi-sim`): the networks the simulated Wi-Fi driver finds and joins, `ssid:passphrase` comma-separated, default `zigbeehome:password123`; an unknown SSID is NetworkNotFound, a wrong passphrase AuthFailure. Phase 30.
@@ -32,6 +37,10 @@ pseudo-version of `main`.
 
 ### Changed
 
+- Session activity is judged on the clock's monotonic reading: the peer-active threshold (`operational.Entry.RetransmitBaseInterval` no longer consults its time argument), the per-peer LRU eviction, the controller's newest-session order (`client/exchange.Session.ActiveMonotonic`) and the peer-loss cutoff survive a wall-clock step, and `operational.SessionInfo` reports `LastActivity`/`LastPeerActivity` as the wall clock reads them now — matter.js `Session.ts:141-162`.
+- A root certificate that carries a matter-fabric-id binds every NOC the verifier accepts to it (`mattercert.NewVerifierFromRCAC`, matter.js `Noc.ts:116-125`); a NOC of another fabric is `ErrChainBroken`.
+- The node's CSR carries the subject `O=CSR`, as matter.js's `createCertificateSigningRequest` builds it, instead of `CN=CSR`.
+- `node.New` fails (or blocks commissioning under `BlockCommissioningOnError`) when `Attestation.Files` name a chain of another vendor or product id than the `ProductDescription`.
 - `endpoint`: a write to an attribute with the timed access quality outside a timed interaction answers NEEDS_TIMED_INTERACTION on a concrete path and is skipped on a wildcard one, after the access check (matter.js `AttributeWriteResponse.ts:243-247`); the transport stamps the write's timed window as it does an invoke's. No attribute of the snapshot carries the quality yet. Phase 30.
 - The generated EnergyEvse `ChargingTargetScheduleStruct` decoder no longer refuses an eleventh ChargingTarget at the model's `max 10`: the EnergyEvse server answers RESOURCE_EXHAUSTED, as chip's handler and TC-EEVSE-2.3 do — a deliberate divergence from matter.js's CONSTRAINT_ERROR (`BD-chip-EVSE-TargetsServerHeld`). Phase 30.
 - The chip-tool families run TC-CNET-4.1, 4.4 and 4.9 on the `--wifi-sim` daemon and TC-EEVSE-2.3; the status page has no class (a) case left. Phase 30.
