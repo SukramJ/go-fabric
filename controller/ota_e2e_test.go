@@ -14,6 +14,7 @@ import (
 
 	"github.com/SukramJ/go-fabric/bdx/otaimage"
 	mattercore "github.com/SukramJ/go-fabric/cluster/core"
+	provdef "github.com/SukramJ/go-fabric/cluster/spec/otasoftwareupdateprovider"
 	"github.com/SukramJ/go-fabric/controller"
 	"github.com/SukramJ/go-fabric/controller/attestation"
 	"github.com/SukramJ/go-fabric/controller/client"
@@ -201,5 +202,63 @@ func TestOTAPushFromTheController(t *testing.T) {
 	}
 	if q := mgr.QueuedUpdates(); len(q) != 0 {
 		t.Errorf("queue %v after the update", q)
+	}
+}
+
+// TestOTAPushScriptedProvider: the manager's script and exchange observer
+// reach the own node's provider on the wire (node/controllernode installs
+// them): a scripted Proceed with a DelayedActionTime is what the device
+// gets, and the QueryImage, the ApplyUpdateRequest and the
+// NotifyUpdateApplied are each reported with the answer — the record
+// matter.js's cert harness keeps (InProcessControllerAdapter.ts:456-638 at
+// 862ad75f).
+func TestOTAPushScriptedProvider(t *testing.T) {
+	t.Parallel()
+	var mu sync.Mutex
+	var exchanges []softwareupdate.ProviderExchange
+	scripted := false
+	r := newOTARig(t, func(o *controller.OTAConfig) {
+		o.OnProviderExchange = func(x softwareupdate.ProviderExchange) { mu.Lock(); exchanges = append(exchanges, x); mu.Unlock() }
+		o.ScriptApplyUpdate = func(softwareupdate.Peer, provdef.ApplyUpdateRequestRequest) (softwareupdate.ApplyUpdateScript, bool) {
+			mu.Lock()
+			defer mu.Unlock()
+			if scripted {
+				return softwareupdate.ApplyUpdateScript{}, false
+			}
+			scripted = true
+			d := uint32(1)
+			return softwareupdate.ApplyUpdateScript{Action: provdef.ApplyUpdateActionProceed, DelayedActionTime: &d}, true
+		}
+	})
+	r.storeImage(t, 2)
+	r.run(t, func(ctx context.Context) error {
+		_, err := r.c.SoftwareUpdates().AddUpdateConsent(ctx, r.peer(t), softwareupdate.Target{VendorID: 0xFFF1, ProductID: 0x8001, TargetSoftwareVersion: 2})
+		return err
+	})
+	r.eventually(t, "the NotifyUpdateApplied reported", func() bool {
+		mu.Lock()
+		defer mu.Unlock()
+		return len(exchanges) > 0 && exchanges[len(exchanges)-1].NotifyUpdateApplied != nil
+	})
+	mu.Lock()
+	defer mu.Unlock()
+	var query *softwareupdate.QueryImageExchange
+	var apply *softwareupdate.ApplyUpdateExchange
+	for _, x := range exchanges {
+		if x.QueryImage != nil && query == nil {
+			query = x.QueryImage
+		}
+		if x.ApplyUpdate != nil && apply == nil {
+			apply = x.ApplyUpdate
+		}
+	}
+	if query == nil || query.Response.Status != provdef.StatusUpdateAvailable || query.Request.SoftwareVersion != 1 {
+		t.Fatalf("QueryImage exchange %+v", query)
+	}
+	if apply == nil || apply.Response != (provdef.ApplyUpdateResponse{Action: provdef.ApplyUpdateActionProceed, DelayedActionTime: 1}) {
+		t.Fatalf("ApplyUpdateRequest exchange %+v", apply)
+	}
+	if n := exchanges[len(exchanges)-1].NotifyUpdateApplied; n.SoftwareVersion != 2 || !bytes.Equal(n.UpdateToken, *query.Response.UpdateToken) {
+		t.Fatalf("NotifyUpdateApplied %+v against the token %x", n, *query.Response.UpdateToken)
 	}
 }

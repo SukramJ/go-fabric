@@ -5,7 +5,6 @@ package softwareupdate
 
 import (
 	"context"
-	"math"
 	"time"
 
 	"github.com/SukramJ/go-fabric/bdx"
@@ -34,6 +33,9 @@ type ProviderConfig struct {
 	OnStatusChange    func(peer mattercore.OTAPeer, status mattercore.OTAUpdateStatus, version uint32)
 	RebootQuery       func(peer mattercore.OTAPeer, sessionID uint16)
 	TransferBlockSize func(peer mattercore.OTAPeer) uint16
+	// Commands wraps the provider's command handlers with [Config]'s
+	// script and exchange observer; nil without them (script.go).
+	Commands *ProviderCommands
 }
 
 // ProviderConfig is the provider configuration that serves the manager's
@@ -53,6 +55,7 @@ func (m *Manager) ProviderConfig() ProviderConfig {
 			}
 			return 0
 		},
+		Commands: m.providerCommands(),
 	}
 }
 
@@ -102,9 +105,20 @@ func (s providerPorts) RequestConsent(ctx context.Context, p mattercore.OTAPeer,
 
 // ApplyUpdate implements mattercore.OTAApplyPolicy: Proceed after the
 // apply delay, in whole seconds rounded up and at most a day
-// (:466-482); the manager arms its restart window with what it sent.
-func (s providerPorts) ApplyUpdate(_ context.Context, p mattercore.OTAPeer, _ provdef.ApplyUpdateRequestRequest) (provdef.ApplyUpdateActionEnum, time.Duration, error) {
-	delay := min(maxApplyDelay, max(0, time.Duration(math.Ceil(s.m.cfg.ApplyDelay.Seconds()))*time.Second))
+// (:466-482); the manager arms its restart window with what it sent. A
+// scripted ApplyUpdateRequest (script.go) replaces the delay, or refuses
+// as the provider refuses an update it holds no consent for.
+func (s providerPorts) ApplyUpdate(ctx context.Context, p mattercore.OTAPeer, _ provdef.ApplyUpdateRequestRequest) (provdef.ApplyUpdateActionEnum, time.Duration, error) {
+	configured := s.m.cfg.ApplyDelay
+	if o, ok := applyOverrideFrom(ctx); ok {
+		if o.refuse {
+			return provdef.ApplyUpdateActionDiscontinue, applyRefusalDelay, nil
+		}
+		if o.set {
+			configured = o.delay
+		}
+	}
+	delay := wholeSeconds(configured)
 	s.m.mu.Lock()
 	s.m.applyDelays[peerOf(p)] = delay
 	s.m.mu.Unlock()

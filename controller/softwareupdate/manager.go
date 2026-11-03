@@ -220,6 +220,18 @@ type Config struct {
 	// OnStatus observes each status the provider reports for a node.
 	OnStatus func(p Peer, status Status, version uint32)
 
+	// ScriptQueryImage and ScriptApplyUpdate, when set, are asked before
+	// the provider answers a QueryImage or an ApplyUpdateRequest; ok has
+	// the provider answer as the script says (script.go,
+	// [QueryImageScript], [ApplyUpdateScript]), and not ok leaves the
+	// answer to the provider. OnProviderExchange is told each command the
+	// provider answered, with its answer. A test harness's seam: matter.js
+	// keeps all three in its cert harness (support/chip-testing/src/cert/
+	// InProcessControllerAdapter.ts:456-638 at 862ad75f).
+	ScriptQueryImage   func(p Peer, req QueryImageRequest) (QueryImageScript, bool)
+	ScriptApplyUpdate  func(p Peer, req provdef.ApplyUpdateRequestRequest) (ApplyUpdateScript, bool)
+	OnProviderExchange func(x ProviderExchange)
+
 	// Clock runs the timers; nil is the system clock.
 	Clock clock.Clock
 	// Rand draws the timers' jitter in [0, 1); nil is math/rand/v2.

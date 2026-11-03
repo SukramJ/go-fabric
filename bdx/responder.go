@@ -322,10 +322,10 @@ func (r *Responder) HandleExchange(ctx context.Context, peer Peer, first Message
 			mx.SetPeerAdditionalMrpDelay(*d)
 		}
 	}
-	m := NewMessenger(ex, entry.cfg.MessageTimeout)
 	sessCtx, cancel := context.WithCancelCause(ctx)
 	defer cancel(nil)
 	s := &ServerSession{peer: peer, scope: scope, file: file, initType: t, init: init, cancel: cancel, lastActivity: r.now(), clock: clock.Or(r.clock)}
+	m := NewMessenger(observedExchange{Exchange: ex, s: s}, entry.cfg.MessageTimeout)
 	opts := ServeOptions{
 		InitType: t, Init: init,
 		// PersistedFileDesignator with a ScopedStorage names the file
@@ -421,6 +421,65 @@ type ServerSession struct {
 	onFinished   []func(uint64)
 	onCancelled  []func()
 	onClosed     []func()
+	onMessage    []func(MessageEvent)
+}
+
+// MessageEvent is one message of a transfer, as its session sent or
+// received it on the exchange: the line matter.js's exchange writes for
+// every message (`Message « for: BDX/…`, `Message » for: …`), which the
+// cert suite reads a transfer's counters and lengths from
+// (support/chip-testing/test/cert/tc-bdx-support.ts:273-296 at 862ad75f).
+// Payload is the message's; [Decode] reads a BDX one.
+type MessageEvent struct {
+	// Sent is true for a message this side sent, false for one the peer
+	// sent.
+	Sent       bool
+	ProtocolID uint16
+	Opcode     uint8
+	Payload    []byte
+}
+
+// OnMessage registers fn for every message the session sends or receives
+// after the Init that opened it ([ServerSession.Init] is that one). Go
+// only: matter.js logs the messages and has no observer for them. fn runs
+// on the session's goroutine, in the order the messages go out and come
+// in, and must not block.
+func (s *ServerSession) OnMessage(fn func(MessageEvent)) {
+	s.mu.Lock()
+	s.onMessage = append(s.onMessage, fn)
+	s.mu.Unlock()
+}
+
+func (s *ServerSession) message(e MessageEvent) {
+	s.mu.Lock()
+	fns := slices.Clone(s.onMessage)
+	s.mu.Unlock()
+	for _, fn := range fns {
+		fn(e)
+	}
+}
+
+// observedExchange reports a session's messages to its [ServerSession.OnMessage]
+// observers.
+type observedExchange struct {
+	Exchange
+	s *ServerSession
+}
+
+func (o observedExchange) Send(ctx context.Context, protocolID uint16, opcode uint8, payload []byte) error {
+	err := o.Exchange.Send(ctx, protocolID, opcode, payload)
+	if err == nil {
+		o.s.message(MessageEvent{Sent: true, ProtocolID: protocolID, Opcode: opcode, Payload: slices.Clone(payload)})
+	}
+	return err
+}
+
+func (o observedExchange) Receive(ctx context.Context) (Message, error) {
+	m, err := o.Exchange.Receive(ctx)
+	if err == nil {
+		o.s.message(MessageEvent{ProtocolID: m.ProtocolID, Opcode: m.Opcode, Payload: slices.Clone(m.Payload)})
+	}
+	return m, err
 }
 
 // Peer is the transfer's peer and the secure session it runs on

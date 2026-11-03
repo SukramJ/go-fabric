@@ -17,10 +17,15 @@ package controllernode
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"net"
 
 	"github.com/SukramJ/go-fabric/bdx"
+	mattercore "github.com/SukramJ/go-fabric/cluster/core"
+	provdef "github.com/SukramJ/go-fabric/cluster/spec/otasoftwareupdateprovider"
 	"github.com/SukramJ/go-fabric/controller"
+	"github.com/SukramJ/go-fabric/controller/softwareupdate"
+	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/node"
 )
 
@@ -104,8 +109,101 @@ func Start(ctx context.Context, spec controller.OwnNodeSpec) (controller.OwnNode
 // [Start] calls it; a host that builds the node from Config itself calls
 // it once after node.New. It returns the unsubscribe function.
 func Observe(n *node.Node, spec controller.OwnNodeSpec) (unsubscribe func()) {
-	return n.OnOTAProviderStatus(spec.Provider.OnStatusChange)
+	off := n.OnOTAProviderStatus(spec.Provider.OnStatusChange)
+	restore := wrapCommands(n.OTAProvider(), spec.Provider.Commands)
+	return func() { off(); restore() }
 }
+
+// wrapCommands installs the update manager's command wrappers
+// (softwareupdate.ProviderCommands, the scripted provider of a test
+// harness) over the provider's own handlers, and returns the function that
+// restores them.
+func wrapCommands(p *node.OTAProviderServer, c *softwareupdate.ProviderCommands) (restore func()) {
+	if p == nil || c == nil {
+		return func() {}
+	}
+	if c.QueryImage != nil {
+		_ = p.Handle(provdef.CmdQueryImage, func(ctx context.Context, fields any) (any, error) {
+			req, err := fieldsAs[provdef.QueryImageRequest](fields)
+			if err != nil {
+				return nil, err
+			}
+			own := func(ctx context.Context) (provdef.QueryImageResponse, error) { return p.QueryImage(ctx, req) }
+			peer, ok := requestor(ctx)
+			if !ok {
+				return own(ctx)
+			}
+			return c.QueryImage(ctx, peer, req, own)
+		})
+	}
+	if c.ApplyUpdate != nil {
+		_ = p.Handle(provdef.CmdApplyUpdateRequest, func(ctx context.Context, fields any) (any, error) {
+			req, err := fieldsAs[provdef.ApplyUpdateRequestRequest](fields)
+			if err != nil {
+				return nil, err
+			}
+			own := func(ctx context.Context) (provdef.ApplyUpdateResponse, error) { return p.ApplyUpdateRequest(ctx, req) }
+			peer, ok := requestor(ctx)
+			if !ok {
+				return own(ctx)
+			}
+			return c.ApplyUpdate(ctx, peer, req, own)
+		})
+	}
+	if c.NotifyUpdateApplied != nil {
+		_ = p.Handle(provdef.CmdNotifyUpdateApplied, func(ctx context.Context, fields any) (any, error) {
+			req, err := fieldsAs[provdef.NotifyUpdateAppliedRequest](fields)
+			if err != nil {
+				return nil, err
+			}
+			own := func(ctx context.Context) error { return p.NotifyUpdateApplied(ctx, req) }
+			peer, ok := requestor(ctx)
+			if !ok {
+				return nil, own(ctx)
+			}
+			return nil, c.NotifyUpdateApplied(ctx, peer, req, own)
+		})
+	}
+	return func() {
+		for _, cmd := range []uint32{provdef.CmdQueryImage, provdef.CmdApplyUpdateRequest, provdef.CmdNotifyUpdateApplied} {
+			_ = p.Handle(cmd, nil)
+		}
+	}
+}
+
+// requestor is the CASE peer a command came from; a command without one
+// goes to the provider's own handler, which refuses it.
+func requestor(ctx context.Context) (mattercore.OTAPeer, bool) {
+	_, fabric := im.FabricFilterFromContext(ctx)
+	nodeID, _ := im.SubjectFromContext(ctx)
+	if fabric == 0 || nodeID == 0 || im.IsPASEFromContext(ctx) {
+		return mattercore.OTAPeer{}, false
+	}
+	return mattercore.OTAPeer{FabricIndex: fabric, NodeID: nodeID}, true
+}
+
+// fieldsAs is a command's decoded request, as a value or a pointer.
+func fieldsAs[T any](fields any) (T, error) {
+	switch f := fields.(type) {
+	case *T:
+		if f != nil {
+			return *f, nil
+		}
+	case T:
+		return f, nil
+	}
+	var zero T
+	return zero, invalidCommand(fmt.Sprintf("controllernode: command fields %T", fields))
+}
+
+// invalidCommand is answered INVALID_COMMAND, as the provider answers
+// fields it cannot take.
+type invalidCommand string
+
+func (e invalidCommand) Error() string { return string(e) }
+
+// MatterStatusCode reports the IM status the error is answered with.
+func (invalidCommand) MatterStatusCode() im.StatusCode { return im.StatusInvalidCommand }
 
 // Wrap is n as the controller's own node.
 func Wrap(n *node.Node) controller.OwnNode { return ownNode{n} }
