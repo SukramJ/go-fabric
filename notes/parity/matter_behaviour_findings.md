@@ -709,6 +709,27 @@ Identify, WindowCovering and ServiceArea tests (brief BJ, PR #170,
   too. No matter.js test checks it. (Milestone 3, with brief BL's
   in-wave fixes or the next lights wave.)
 
+Found by the phase-31 port of `packages/node/test` (brief phase 31,
+2026-11-03). Line numbers at `862ad75f`.
+
+- **No generic sanitisation of fabric-scoped data on fabric removal.**
+  matter.js strips every fabric-scoped list entry of a removed fabric from
+  every behavior's state (`ServerEnvironment.ts:187-195`,
+  `limitNodeDataToAllowedFabrics`); Go drops it only in servers that
+  implement `MatterFabricRemoved` (`bridge/bridge.go:1317-1322`), and the
+  WebRTC Transport Provider (`cluster/camera/provider.go`) keeps a removed
+  fabric's `CurrentSessions` (ServerNodeTest.ts:1549-1580 "removes the
+  entries of a removed fabric from a fabric-sensitive list" stays missing).
+- **A corrupt endpoint allocation counter fails the allocation.**
+  `endpoint/sqlitestore` `allocate` refuses a counter below the first part
+  number (and a non-integer one fails its scan); matter.js starts over from
+  the first number (ServerNodeTest.ts:941-957, "starts over from 1 when the
+  next number in storage is corrupt", stays missing).
+- **No flushing close of a subscription.** `Manager.Close` drops the
+  queued changes; matter.js's close of a subscription sends a report queued
+  behind the one in flight first, despite a deferral
+  (ServerSubscriptionTest.ts:1123-1195 and :499-555 stay missing).
+
 ## Application cluster servers — open items. (Triage 2026-10-29: wave H1, the device IM and write path.)
 
 - **Wi-Fi NetworkCommissioning: the fail-safe check is not bound to the

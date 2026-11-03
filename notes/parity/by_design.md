@@ -3400,6 +3400,22 @@ By design. Rebuilding is how every in-memory state a reset erases — the
 root servers' values, Wi-Fi networks, scenes, the validator — goes for
 certain, without a reset path in each server.
 
+### BD-Matter-EndpointNumberAfterWrap — after the wrap the store takes the lowest free number on every allocation
+
+matter.js `ServerEndpointStores.assignNumber` keeps its counter after the
+number it assigned last and walks on from there after a wrap
+(`packages/node/src/storage/server/ServerEndpointStores.ts:169-183` at
+`862ad75f`; ServerNodeTest.ts:1153-1176 expects the endpoint after the
+wrapped one to take the next number, not the one a deleted endpoint freed).
+`endpoint/sqlitestore` lifts its counter past the highest number a row holds
+on every allocation (`allocate`), so once a row holds 0xFFFE every
+allocation wraps and takes the lowest free number, a just-freed one
+included. `endpoint:TestEndpointNumberWrapParityMatterJS` pins it. Phase 31.
+
+By design. The lift is what keeps a number a row placed above the counter
+from being reissued (BD-Matter-EndpointNumber-Monotonic); the reuse begins
+only after 65 533 allocations.
+
 ### BD-Matter-OTAProvider-ACLEveryFabric — the OTA provider's ACL entry goes on every fabric
 
 matter.js adds the provider's Operate/CASE entry on the first fabric only

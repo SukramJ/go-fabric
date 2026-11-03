@@ -282,3 +282,96 @@ func TestInteractionProtocolBridgeParityMatterJS(t *testing.T) {
 		}
 	})
 }
+
+// TestChunkedWriteAcrossMessagesParityMatterJS ports matter.js
+// packages/node/test/endpoint/server/InteractionProtocolTest.ts:1481-1603
+// at 862ad75f ("write chunked array values across multiple messages"): the
+// REPLACE-ALL of an empty ACL in the first WriteRequest (MoreChunkedMessages)
+// and two appends (ListIndex null) in the second, on one exchange, are
+// answered by one WriteResponse each — one status, then two — and leave
+// both entries with the session's fabric index.
+func TestChunkedWriteAcrossMessagesParityMatterJS(t *testing.T) {
+	t.Parallel()
+	gh := newGroupcastHarness(t, 1)
+	aclPath := func(appendEntry bool) im.ConcreteAttributePath {
+		return im.ConcreteAttributePath{Endpoint: 0, Cluster: 0x001F, Attribute: 0, HasEndpoint: true, HasCluster: true, HasAttribute: true, HasListIndex: appendEntry, ListAppend: appendEntry}
+	}
+	entry := func(enc *tlv.Encoder, tag tlv.Tag, privilege, authMode uint64, subject uint64) {
+		enc.StartStruct(tag)
+		enc.PutUint(tlv.ContextTag(1), privilege)
+		enc.PutUint(tlv.ContextTag(2), authMode)
+		if subject != 0 {
+			enc.StartArray(tlv.ContextTag(3))
+			enc.PutUint(tlv.AnonymousTag(), subject)
+			_ = enc.EndContainer()
+		} else {
+			enc.PutNull(tlv.ContextTag(3))
+		}
+		enc.PutNull(tlv.ContextTag(4))
+		enc.PutUint(tlv.ContextTag(254), 7) // overwritten by the session's fabric
+		_ = enc.EndContainer()
+	}
+	chunk := func(more bool, data func(enc *tlv.Encoder)) []byte {
+		enc := tlv.NewEncoder()
+		enc.StartStruct(tlv.AnonymousTag())
+		enc.PutBool(tlv.ContextTag(0), false)
+		enc.PutBool(tlv.ContextTag(1), false)
+		enc.StartArray(tlv.ContextTag(2))
+		data(enc)
+		_ = enc.EndContainer()
+		enc.PutBool(tlv.ContextTag(3), more)
+		enc.PutUint(tlv.ContextTag(0xFF), 12)
+		_ = enc.EndContainer()
+		body, err := enc.Bytes()
+		if err != nil {
+			t.Fatal(err)
+		}
+		return body
+	}
+	first := chunk(true, func(enc *tlv.Encoder) {
+		enc.StartStruct(tlv.AnonymousTag())
+		aclPath(false).MarshalTLV(enc, tlv.ContextTag(1))
+		enc.StartArray(tlv.ContextTag(2))
+		_ = enc.EndContainer()
+		_ = enc.EndContainer()
+	})
+	second := chunk(false, func(enc *tlv.Encoder) {
+		for _, e := range []struct{ privilege, authMode, subject uint64 }{{5, 2, harnessControllerNodeID}, {1, 3, 0}} {
+			enc.StartStruct(tlv.AnonymousTag())
+			aclPath(true).MarshalTLV(enc, tlv.ContextTag(1))
+			entry(enc, tlv.ContextTag(2), e.privilege, e.authMode, e.subject)
+			_ = enc.EndContainer()
+		}
+	})
+	const xid = 0x7000
+	statuses := func(payload []byte) []uint64 {
+		var out []uint64
+		for _, st := range decodeTLVTree(t, payload).mustChild(t, 0).Children {
+			out = append(out, st.mustChild(t, 1).mustChild(t, 0).El.Uint)
+		}
+		return out
+	}
+	op, payload, ok := gh.exchangeOn(xid, im.OpcodeWriteRequest, first)
+	if !ok || op != im.OpcodeWriteResponse {
+		t.Fatalf("first chunk answered 0x%02X (ok=%v), want WriteResponse", op, ok)
+	}
+	if got := statuses(payload); len(got) != 1 || got[0] != 0 {
+		t.Fatalf("first WriteResponse statuses %v, want one SUCCESS", got)
+	}
+	op, payload, ok = gh.exchangeOn(xid, im.OpcodeWriteRequest, second)
+	if !ok || op != im.OpcodeWriteResponse {
+		t.Fatalf("second chunk answered 0x%02X (ok=%v), want WriteResponse", op, ok)
+	}
+	if got := statuses(payload); len(got) != 2 || got[0] != 0 || got[1] != 0 {
+		t.Fatalf("second WriteResponse statuses %v, want two SUCCESS", got)
+	}
+	acl, err := gh.store.ListACL(context.Background(), gh.fabric)
+	if err != nil || len(acl) != 2 {
+		t.Fatalf("ACL %+v (%v), want two entries", acl, err)
+	}
+	for _, e := range acl {
+		if e.FabricIndex != gh.fabric {
+			t.Fatalf("entry %+v, want the session's fabric %d", e, gh.fabric)
+		}
+	}
+}

@@ -93,7 +93,7 @@ func TestInteractionProtocolParityMatterJS(t *testing.T) {
 			},
 		})
 		for p, want := range map[im.ConcreteAttributePath]im.StatusCode{
-			biAttr(400):                       im.StatusUnsupportedAttribute,
+			biAttr(400):                        im.StatusUnsupportedAttribute,
 			attrPath(0, unsupportedCluster, 4): im.StatusUnsupportedCluster,
 			attrPath(unsupportedEndpoint, basicinfo.ClusterID, 1): im.StatusUnsupportedEndpoint,
 		} {

@@ -240,7 +240,14 @@ func (h *secureHarness) exchange(opcode uint8, payload []byte) (replyOpcode uint
 	h.exchangeID++
 	xid := h.exchangeID
 	h.mu.Unlock()
+	return h.exchangeOn(xid, opcode, payload)
+}
 
+// exchangeOn is [secureHarness.exchange] on exchange xid, so a test sends
+// the further messages of one exchange (the chunks of a chunked write) —
+// the multi-message raw exchange of brief phase 31 §A.2.
+func (h *secureHarness) exchangeOn(xid uint16, opcode uint8, payload []byte) (replyOpcode uint8, replyPayload []byte, ok bool) {
+	h.t.Helper()
 	proto := message.ProtocolHeader{
 		Initiator: true, NeedsAck: true, Opcode: opcode,
 		ExchangeID: xid, ProtocolID: im.InteractionModelProtocolID,
