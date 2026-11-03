@@ -140,11 +140,18 @@ type confLocation struct {
 // enum values ([Instance.checkResponse]). The value checks of the host's
 // own values ([Instance.CheckSet], [Instance.CheckValue]) and
 // [Instance.ValidateWrite] leave it off.
+//
+// bits switches the conformance of a bitmap's bits on: a value the device
+// sets ([Instance.CheckValue], [Instance.CheckSet], a [Server]'s initial
+// values) is held to it, a controller's write ([Instance.ValidateWrite])
+// is not — matter.js enforces it only where no remote subject authored
+// the value (ValueValidator.ts:284-305 at 862ad75f, hasLocalActor).
 type nameScope struct {
 	peers       Peers
 	outer       func(name string) (any, bool)
 	conformance bool
 	enums       bool
+	bits        bool
 }
 
 // sameName reports whether two specification names name one element, as
@@ -213,6 +220,13 @@ type confCompiler struct {
 	// right-hand side names a member of an enum sibling
 	// (conformance-compiler.ts:671-710).
 	nameRef func(name string) confNode
+	// unreadable records a static comparison with an operand that is not
+	// a value ("LT > 4"), which matter.js's compiler refuses to compile
+	// (conformance-util.ts:183-196 at 862ad75f, performComparison's
+	// assertValue throws SchemaImplementationError); the field
+	// conformance reads it as nonconformant, a bit's is left unjudged
+	// ([Instance.checkBitConformance]).
+	unreadable bool
 }
 
 func (c *confCompiler) feature(name string) (*Feature, bool) {
@@ -553,6 +567,9 @@ func (c *confCompiler) createComparisonOp(op ConformanceOp, lhs, rhs Conformance
 	}
 	l, r := c.compile(lhs), c.compile(rhs)
 	if l.static() && r.static() {
+		if l.code != codeValue || r.code != codeValue {
+			c.unreadable = true
+		}
 		return performComparison(op, l, r)
 	}
 	return confNode{code: codeEvaluate, eval: func(own confValue, loc *confLocation) confNode {
