@@ -752,9 +752,9 @@ func (r *brRun) step3d(th *goTH) error {
 }
 
 // step3e: the TH removes LIGHT_1; it leaves the DUT's image on the
-// subscription alone — the root's PartsList no longer names it
-// (ClientStructure.ts:1076-1145, controller/client structure.go
-// synchronizePartsList) —, and the root and the aggregator no longer name
+// subscription alone — the root's parts list no longer names it, so the
+// image erases it (ClientStructure.ts:1076-1145; controller/client
+// structure.go synchronizePartsList) —, and the root and the aggregator no longer name
 // it (:858-897).
 func (r *brRun) step3e(th *goTH) error {
 	start := time.Now()

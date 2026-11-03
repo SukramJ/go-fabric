@@ -28,8 +28,9 @@ var bridgeSimCommands = []string{
 
 // TestBridgeSimFlag: with --bridge-sim the node bridges matter.js's bridge
 // test instance's devices after every other device
-// (BridgeTestInstance.ts:148-172 at 862ad75f) — free of device-type
-// violations but the TagList the device kit cannot declare; the composed
+// (BridgeTestInstance.ts:148-172 at 862ad75f). They mount free of
+// device-type violations but the composed sensors' tag list (:306-317),
+// which the device kit cannot declare; the composed
 // device lists Power Source beside Bridged Node, its sensors are its own
 // PartsList and carry no BridgedDeviceBasicInformation, its PowerSource
 // names the three endpoints; each app-pipe command moves the state it
