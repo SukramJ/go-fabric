@@ -102,3 +102,24 @@ func TestAttestationBlocksCommissioning(t *testing.T) {
 		t.Fatalf("own window: %v, want ErrCommissioningBlocked", err)
 	}
 }
+
+// Attestation.Files are judged against the product (matter.js
+// DeviceCertification.#validateCertification, DeviceCertification.ts:107-140
+// at 862ad75f): a chain of another product id fails New, or blocks
+// commissioning under BlockCommissioningOnError; a config without a
+// product (the zero description) does not judge.
+func TestAttestationFilesProduct(t *testing.T) {
+	files, _, _ := writeChainFiles(t) // VID 0xFFF1, PID 0x8002
+	c := Config{ProductDescription: ProductDescription{VendorID: 0xFFF1, ProductID: 0x8002}, Attestation: Attestation{Files: &files}}
+	if blocked, err := c.resolveAttestation(); err != nil || blocked != nil || c.Attestation.Chain == nil {
+		t.Fatalf("matching product: %v %v", blocked, err)
+	}
+	c = Config{ProductDescription: ProductDescription{VendorID: 0xFFF1, ProductID: 0x8003}, Attestation: Attestation{Files: &files}}
+	if _, err := c.resolveAttestation(); !errors.Is(err, attestation.ErrProductMismatch) {
+		t.Fatalf("other product id: err = %v, want ErrProductMismatch", err)
+	}
+	c = Config{ProductDescription: ProductDescription{VendorID: 0xFFF1, ProductID: 0x8003}, Attestation: Attestation{Files: &files, BlockCommissioningOnError: true}}
+	if blocked, err := c.resolveAttestation(); err != nil || !errors.Is(blocked, attestation.ErrProductMismatch) || c.Attestation.Chain != nil {
+		t.Fatalf("other product id, blocking: blocked %v err %v", blocked, err)
+	}
+}

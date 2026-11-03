@@ -5,6 +5,9 @@ package mattercert
 
 import (
 	"bytes"
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/sha256"
 	"encoding/asn1"
 	"encoding/base64"
 	"encoding/hex"
@@ -260,5 +263,45 @@ func TestCertificatesTLVOrderParityMatterJS(t *testing.T) {
 	}
 	if again, _ := Encode(unTLV); !bytes.Equal(again, nocTLV) {
 		t.Fatalf("TLV after the round trip = %x\nwant %x", again, nocTLV)
+	}
+}
+
+// TestCertificatesCSRParityMatterJS ports "generates a valid CSR"
+// (CertificatesTest.ts:628-645 at 862ad75f): the request is three DER
+// elements, the algorithm ecdsa-with-SHA256, the CertificationRequestInfo
+// the fixture TEST_CSR_REQUEST_ASN1 (TestCertificates.ts:207-209) byte for
+// byte, and the signature verifies with the key's public half.
+func TestCertificatesCSRParityMatterJS(t *testing.T) {
+	t.Parallel()
+	key, err := ecdsa.ParseRawPrivateKey(elliptic.P256(), certificatesHex(t, "727F1005CBA47ED7822A9D930943621617CFD3B79D9AF528B801ECF9F1992204"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	csr, err := CreateCSR(key, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var outer asn1.RawValue
+	if _, err := asn1.Unmarshal(csr, &outer); err != nil {
+		t.Fatal(err)
+	}
+	parts, err := derChildren(outer.Bytes)
+	if err != nil || len(parts) != 3 {
+		t.Fatalf("CSR has %d root elements, want 3", len(parts))
+	}
+	want := certificatesHex(t, "3070020100300e310c300a060355040a0c034353523059301306072a8648ce3d020106082a8648ce3d0301070342000462e2b6e1baff8d74a6fd8216c4cb67a3363a31e691492792e61aee610261481396725ef95e142686ba98f339b0ff65bc338bec7b9e8be0bdf3b2774982476220a000")
+	if !bytes.Equal(parts[0].FullBytes, want) {
+		t.Fatalf("request = %x\nwant %x", parts[0].FullBytes, want)
+	}
+	if alg, err := derFirstOID(parts[1]); err != nil || !alg.Equal(oidEcdsaWithSHA256) {
+		t.Fatalf("signature algorithm = %v (%v), want ecdsa-with-SHA256", alg, err)
+	}
+	var sig asn1.BitString
+	if _, err := asn1.Unmarshal(parts[2].FullBytes, &sig); err != nil {
+		t.Fatal(err)
+	}
+	digest := sha256.Sum256(parts[0].FullBytes)
+	if !ecdsa.VerifyASN1(&key.PublicKey, digest[:], sig.Bytes) {
+		t.Fatal("the CSR signature does not verify")
 	}
 }

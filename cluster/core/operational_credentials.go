@@ -13,8 +13,6 @@ import (
 	hkdfPkg "crypto/hkdf"
 	"crypto/rand"
 	"crypto/sha256"
-	"crypto/x509"
-	"crypto/x509/pkix"
 	"encoding/asn1"
 	"errors"
 	"fmt"
@@ -1515,17 +1513,14 @@ func (o *OperationalCredentials) handleCSRRequest(ctx context.Context, fields an
 	}, nil
 }
 
-// buildPKCS10CSR creates a minimal DER-encoded PKCS#10 certification
-// request with `priv` as the subject key. Subject DN carries the
-// fixed Matter-conventional `CN=CSR` placeholder; the CA replaces
-// it with the operational subject DN when issuing the NOC. Uses
-// ECDSA-SHA256 per Matter §6.4.1.2.
+// buildPKCS10CSR creates the DER-encoded PKCS#10 certification request
+// with `priv` as the subject key — [mattercert.CreateCSR], the request
+// matter.js's Certificate.createCertificateSigningRequest builds
+// (Certificate.ts:264-277 at 862ad75f): the placeholder subject `O=CSR`,
+// which the CA replaces with the operational subject DN when issuing the
+// NOC, signed ECDSA-SHA256 per Matter §6.4.1.2.
 func buildPKCS10CSR(priv *ecdsa.PrivateKey) ([]byte, error) {
-	tmpl := x509.CertificateRequest{
-		Subject:            pkix.Name{CommonName: "CSR"},
-		SignatureAlgorithm: x509.ECDSAWithSHA256,
-	}
-	return x509.CreateCertificateRequest(rand.Reader, &tmpl, priv)
+	return mattercert.CreateCSR(priv, rand.Reader)
 }
 
 // encodeNOCSRElements assembles the NOCSRElements TLV per Matter

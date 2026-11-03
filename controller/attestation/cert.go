@@ -13,6 +13,7 @@ import (
 	"crypto/elliptic"
 	"crypto/sha256"
 	"crypto/x509"
+	"crypto/x509/pkix"
 	"encoding/asn1"
 	"errors"
 	"fmt"
@@ -117,7 +118,21 @@ func matterTime(t time.Time) int64 {
 // parseInt(_, 16)) and :379-392 (the Mvid:/Mpid: commonName fallback,
 // only when the DN carries neither OID).
 func MatterIDs(c *x509.Certificate) (vid, pid *uint16, err error) {
-	for _, n := range c.Subject.Names {
+	return matterIDsOf(c.Subject)
+}
+
+// IssuerMatterIDs reads the vendor and product id of the issuer DN the
+// same way — matter.js parses the issuer with parseSubjectOrIssuer too
+// (Certificate.ts:667-669 at 862ad75f), so a DAC whose PAI carries its
+// vendor id only in a `Mvid:` commonName still names its issuer's vendor
+// (CertificatesTest.ts:319-324, the Nuki DAC).
+func IssuerMatterIDs(c *x509.Certificate) (vid, pid *uint16, err error) {
+	return matterIDsOf(c.Issuer)
+}
+
+// matterIDsOf is the vendor and product id of one DN.
+func matterIDsOf(name pkix.Name) (vid, pid *uint16, err error) {
+	for _, n := range name.Names {
 		s, ok := n.Value.(string)
 		switch {
 		case !ok:
@@ -131,7 +146,7 @@ func MatterIDs(c *x509.Certificate) (vid, pid *uint16, err error) {
 	if vid != nil || pid != nil {
 		return vid, pid, nil
 	}
-	cn := c.Subject.CommonName
+	cn := name.CommonName
 	if vid, err = fallbackID(cn, "Mvid:"); err != nil {
 		return nil, nil, err
 	}
