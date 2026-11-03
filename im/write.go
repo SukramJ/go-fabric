@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/SukramJ/go-fabric/schema"
 	"github.com/SukramJ/go-fabric/tlv"
 )
 
@@ -96,6 +97,13 @@ func UnmarshalWriteRequestTLV(dec *tlv.Decoder, valueReader AttributeValueReader
 		}
 		switch uint8(el.Tag.Number & 0xFF) {
 		case tagWriteReqSuppressResponse:
+			// TlvOptionalField(0, TlvBoolean): a SuppressResponse of another
+			// type fails the decode, and the request is answered
+			// (packages/types/src/protocol/messages/TlvWriteRequest.ts:18;
+			// SuppressResponseTest.ts:399-403).
+			if el.Type != tlv.TypeBoolTrue && el.Type != tlv.TypeBoolFalse {
+				return WriteRequest{}, fmt.Errorf("%w: SuppressResponse not a boolean", ErrInvalidWriteRequest)
+			}
 			req.SuppressResponse = el.Bool
 		case tagWriteReqTimedRequest:
 			req.TimedRequest = el.Bool
@@ -369,7 +377,7 @@ func HandleWriteRequest(ctx context.Context, d Dispatcher, req WriteRequest) Wri
 		// request means "caller does not constrain the version" — skip.
 		if hasDV && w.HasDataVersion && w.DataVersion != 0 && w.Path.HasEndpoint {
 			if current, ok := dvReader.CurrentDataVersion(ctx, w.Path.Endpoint, w.Path.Cluster); ok && current != 0 {
-				if current != w.DataVersion {
+				if current != w.DataVersion && versionCheckApplies(ctx, d, w.Path) {
 					wr.Responses = append(wr.Responses, AttributeStatus{
 						Path:   w.Path,
 						Status: StatusIB{Status: StatusDataVersionMismatch},
@@ -436,6 +444,31 @@ func HandleWriteRequest(ctx context.Context, d Dispatcher, req WriteRequest) Wri
 		tx.releaseHolds(nil)
 	}
 	return wr
+}
+
+// versionCheckApplies reports whether a write's DataVersion is judged at
+// all: matter.js answers a path that does not exist, an attribute that is
+// not writable and a timed attribute outside a timed interaction with their
+// own statuses before it compares the version
+// (packages/protocol/src/action/server/AttributeWriteResponse.ts:221-257 —
+// existence, writable, write privilege, timed, then the version), so the
+// dispatcher's answer is left to those. InteractionProtocolTest.ts:557-627
+// (WRITE_REQUEST: the read-only ProductName with a version is
+// UNSUPPORTED_WRITE).
+func versionCheckApplies(ctx context.Context, d Dispatcher, p ConcreteAttributePath) bool {
+	if writable, known := schema.AttributeWritable(p.Cluster, p.Attribute); known && !writable {
+		return false
+	}
+	if timed, known := TimedInteractionFromContext(ctx); known && !timed && schema.IsTimedWrite(p.Cluster, p.Attribute) {
+		return false
+	}
+	for _, r := range d.Read(ctx, p) {
+		switch r.Status {
+		case StatusUnsupportedEndpoint, StatusUnsupportedCluster, StatusUnsupportedAttribute:
+			return false
+		}
+	}
+	return true
 }
 
 // allSucceeded reports whether every result of a write is Success.
