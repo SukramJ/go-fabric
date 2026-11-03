@@ -23,7 +23,7 @@ import (
 // building a new controller on the same DB, which mints a new CA and
 // fabric and holds no peer (BD-Matter-FactoryResetEndsTheNode). Mirrors
 // matter.js ServerNode.resetStorage for a controller
-// (packages/node/src/node/ServerNode.ts:241-256: the peers first, then
+// (packages/node/src/node/ServerNode.ts:242-256: the peers first, then
 // ServerEnvironment.eraseCredentials, packages/node/src/node/server/
 // ServerEnvironment.ts:72-89, which erases the CertificateAuthority, and
 // the node store).

@@ -15,7 +15,7 @@ import (
 // slowReports is a manager whose reporter records the engine time of each
 // report and holds the reports whose index is in held until released —
 // matter.js ServerSubscriptionTest.ts's subscribeWithSlowReports
-// (:726-858 at 862ad75f), whose mocked report exchanges are acknowledged
+// (:732-842 at 862ad75f), whose mocked report exchanges are acknowledged
 // when the test releases them. The engine is driven by tick with explicit
 // times, which returns while a held report is still in flight.
 type slowReports struct {
@@ -178,7 +178,7 @@ func TestSlowReportParityMatterJS(t *testing.T) {
 		}
 	})
 
-	// reportQueuedBehindSlowReport (:845-858): A in flight from 0 to 5 s,
+	// reportQueuedBehindSlowReport (:851-863): A in flight from 0 to 5 s,
 	// a change at 1 s queues B, which goes out at 5 s.
 	queuedBehindSlow := func(t *testing.T, held ...int) *slowReports {
 		t.Helper()

@@ -3395,7 +3395,7 @@ a side effect of a controller removing itself.
 
 matter.js `ServerNode.erase` (`packages/node/src/node/ServerNode.ts:159-200`
 at `862ad75f`) takes the node offline, resets its in-memory state, erases its
-storage (`resetStorage`, `:241-256`) and brings the same object back online
+storage (`resetStorage`, `:242-256`) and brings the same object back online
 when it was; a controller's erase also drops its peers and CA material
 (`ServerEnvironment.eraseCredentials`, `server/ServerEnvironment.ts:72-89`)
 and the same instance commissions again (ServerNodeTest.ts:1488-1498). A Go

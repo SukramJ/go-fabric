@@ -200,7 +200,7 @@ type ICD interface {
 // controller.Controller.Erase). Every row of every area goes; the store is
 // then what a freshly applied schema holds, the next fabric index back at
 // 1. Mirrors matter.js ServerNode.resetStorage
-// (packages/node/src/node/ServerNode.ts:241-256), which clears the fabrics,
+// (packages/node/src/node/ServerNode.ts:242-256), which clears the fabrics,
 // the sessions, the occurrences and the credentials and erases the node's
 // store: Matter requires a factory reset to remove "all security- and
 // privacy-related data and key material" (Core §13.4).

@@ -35,7 +35,7 @@ func (s resetStores) configure(cfg *node.Config) {
 }
 
 // assertFactoryState holds testFactoryReset's checks (matter.js
-// packages/node/src/testing/node-helpers.ts:112-170 at 862ad75f) on the Go
+// packages/node/src/testing/node-helpers.ts:112-175 at 862ad75f) on the Go
 // node: no fabric is left, the UniqueID the old node pinned did not
 // persist, the device's BasicInformation and pairing codes are there, and
 // the device runs exactly when want says so.
