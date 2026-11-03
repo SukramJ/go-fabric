@@ -105,6 +105,11 @@ type Certificate struct {
 	Extensions         CertificateExtensions
 	Signature          []byte // 64-byte r||s
 	Raw                []byte // full TLV bytes (for chain hashing)
+	// TBSDER is the X.509 TBSCertificate as [DecodeDER] read it, nil for a
+	// certificate from [Decode]; [TBSToDER] returns it unchanged, so the
+	// signature of a DER certificate verifies over the bytes its issuer
+	// signed (matter.js Certificate.ts:196-199 asUnsignedDer).
+	TBSDER []byte
 }
 
 // CertificateExtensions captures the Matter-cert extension structure

@@ -96,6 +96,9 @@ var (
 // public key over SHA-256(TBSToDER(c)) reproduces the
 // chip-spec-compliant chain check.
 func TBSToDER(c *Certificate) ([]byte, error) {
+	if len(c.TBSDER) > 0 {
+		return append([]byte(nil), c.TBSDER...), nil
+	}
 	tbs, err := buildTBS(c)
 	if err != nil {
 		return nil, err
