@@ -929,7 +929,7 @@
   },
   {
     "file": "cluster/core/general_commissioning.go",
-    "line": 1034,
+    "line": 1046,
     "citation": "packages/node/src/behaviors/general-commissioning/GeneralCommissioningServer.ts:55-66",
     "resolved": "packages/node/src/behaviors/general-commissioning/GeneralCommissioningServer.ts",
     "at": "862ad75f",

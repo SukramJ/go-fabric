@@ -1300,3 +1300,51 @@ func TestGeneralCommissioningReportsAWrittenBreadcrumb(t *testing.T) {
 		t.Fatalf("reported %v, want Breadcrumb twice (6, then 0)", got)
 	}
 }
+
+// TestGeneralCommissioningReportsTheBreadcrumbResetOnExpiry: the fail-safe
+// timer's expiry resets Breadcrumb to 0 and reports it — chip's
+// kFailSafeTimerExpired branch calls SetBreadCrumb(0)
+// (GeneralCommissioningCluster.cpp:145-146 at 6170af84), which notifies
+// when the value moved (:377-381). A Breadcrumb already 0 at expiry
+// reports nothing. No command of this cluster runs at expiry, so the
+// bridge's invoke comparison cannot report it; the notifier must.
+func TestGeneralCommissioningReportsTheBreadcrumbResetOnExpiry(t *testing.T) {
+	for _, tc := range []struct {
+		name       string
+		breadcrumb uint64
+		want       int
+	}{{"non-zero", 7, 1}, {"zero", 0, 0}} {
+		t.Run(tc.name, func(t *testing.T) {
+			synctest.Test(t, func(t *testing.T) {
+				fired := make(chan uint8, 1)
+				gc := newGencomm(t, core.GeneralCommissioningConfig{
+					LocationCapability: core.RegulatoryIndoor,
+					FailSafeMaxSeconds: 600,
+					OnFailSafeExpired:  func(_ context.Context, idx uint8) { fired <- idx },
+				})
+				var mu sync.Mutex
+				var got [][]uint32
+				unsub := gc.OnAttributeChange(func(c contract.Change) {
+					mu.Lock()
+					defer mu.Unlock()
+					got = append(got, c.Attributes)
+				})
+				defer unsub()
+				ctx := im.WithFabricFilter(context.Background(), false, 1)
+				if _, err := gc.MatterInvoke(ctx, 0x00,
+					core.ArmFailSafeRequest{ExpiryLengthSeconds: 1, Breadcrumb: tc.breadcrumb}); err != nil {
+					t.Fatalf("ArmFailSafe: %v", err)
+				}
+				awaitFailSafeExpiryHook(t, time.Second, fired)
+				if v, _ := gc.MatterRead(0x0000); v != uint64(0) {
+					t.Fatalf("Breadcrumb after expiry = %v, want 0", v)
+				}
+				mu.Lock()
+				defer mu.Unlock()
+				if len(got) != tc.want || (tc.want == 1 && !slices.Equal(got[0], []uint32{0x0000})) {
+					t.Fatalf("reported %v, want %d Breadcrumb report(s)", got, tc.want)
+				}
+			})
+		})
+	}
+}
