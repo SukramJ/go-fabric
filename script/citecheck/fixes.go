@@ -54,7 +54,7 @@ func derive(pin tree, results []result) (fixes []fix, owner []ownerCitation) {
 	cited := map[string]map[string]bool{} // Go file → the matter.js files it cites resolvably
 	for i := range results {
 		r := &results[i]
-		if r.resolved != "" {
+		if r.resolved != "" && !r.cite.Server {
 			if cited[r.cite.File] == nil {
 				cited[r.cite.File] = map[string]bool{}
 			}

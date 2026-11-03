@@ -7,6 +7,7 @@ GOLANGCI_LINT   ?= golangci-lint
 GOVULNCHECK     ?= govulncheck
 MATTERJS_DIR    ?= ../matter.js
 MATTERJS_REF    ?= HEAD
+MATTERJS_SERVER_DIR ?= ../matterjs-server
 
 # Pinned on purpose, and to the same versions .github/workflows/ci.yml uses.
 # openccu-loom's setup target installs @latest, which is how a local checkout
@@ -253,18 +254,19 @@ ahead-check: ## check the Ahead-of-matter.js markers of notes/parity/by_design.m
 	exit $$rc
 
 .PHONY: cite-report
-cite-report: ## regenerate script/citecheck/drift.json and summary.md — the matter.js citations checked at the pin
-	@# Reads MATTERJS_DIR through git plumbing only (the clone may stand at any
-	@# commit that has the pin). Exit 2 when the clone or the pin is missing.
-	$(GO) run ./script/citecheck -matterjs $(MATTERJS_DIR) -report
+cite-report: ## regenerate script/citecheck/drift.json and summary.md — the matter.js (and matterjs-server) citations checked at the pin
+	@# Reads MATTERJS_DIR and MATTERJS_SERVER_DIR through git plumbing only (a
+	@# clone may stand at any commit that has the cited ones). Exit 2 when a
+	@# clone or the pin is missing.
+	$(GO) run ./script/citecheck -matterjs $(MATTERJS_DIR) -server $(MATTERJS_SERVER_DIR) -report
 
 .PHONY: cite-check
 cite-check: ## regenerate the citation artefacts, then fail on a hard error or when they moved off the committed ones
 	@# Built, not `go run`: go run turns every non-zero exit into 1, and exit 2
 	@# (no clone, no pin) must not read as "hard errors".
 	@bin=$$(mktemp -d)/citecheck; $(GO) build -o $$bin ./script/citecheck || exit 1; \
-	$$bin -matterjs $(MATTERJS_DIR); rc=$$?; rm -rf $$(dirname $$bin); \
-	if [ $$rc -eq 2 ]; then echo "cite-check: no matter.js clone with the pin at $(MATTERJS_DIR)"; exit 2; fi; \
+	$$bin -matterjs $(MATTERJS_DIR) -server $(MATTERJS_SERVER_DIR); rc=$$?; rm -rf $$(dirname $$bin); \
+	if [ $$rc -eq 2 ]; then echo "cite-check: no matter.js clone with the pin at $(MATTERJS_DIR), or no matterjs-server clone at $(MATTERJS_SERVER_DIR)"; exit 2; fi; \
 	git diff --quiet -- script/citecheck/drift.json script/citecheck/summary.md || { \
 		echo ""; \
 		echo "The committed citation artefacts are stale: regenerating them changed the files."; \

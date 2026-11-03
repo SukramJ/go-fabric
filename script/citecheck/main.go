@@ -45,6 +45,18 @@
 // rev-parse, ls-tree and one cat-file --batch. The working tree is never
 // read, so the clone may stand at any commit as long as it has the pin.
 //
+// # The second tree: matterjs-server
+//
+// A citation whose sentence names matterjs-server
+// (github.com/matter-js/matterjs-server, the behaviour source of the
+// controller's network topology, brief M9-module §1) is checked against
+// MATTERJS_SERVER_DIR (default ../matterjs-server) instead, at the
+// sentence's `at <sha>` — the first that is a commit of that clone. It has
+// no pin to fall back to: a sentence naming none is the hard error "no
+// matterjs-server commit". The clone is opened on the first such citation;
+// missing, it is exit 2 like a missing matter.js clone. Drift rows of it
+// carry "tree": "matterjs-server".
+//
 // # Exit status
 //
 // 0 when the artefacts were written and no citation has a hard error; 1
@@ -81,6 +93,7 @@ import (
 // driftEntry is one row of drift.json.
 type driftEntry struct {
 	File        string `json:"file"`
+	Tree        string `json:"tree,omitempty"` // "matterjs-server" for the second tree; empty for matter.js
 	Line        int    `json:"line"`
 	Citation    string `json:"citation"`
 	Resolved    string `json:"resolved"`
@@ -94,6 +107,7 @@ func main() {
 	var (
 		root    = flag.String("root", ".", "module root")
 		matter  = flag.String("matterjs", "", "matter.js clone (default $MATTERJS_DIR, else ../matter.js)")
+		server  = flag.String("server", "", "matterjs-server clone (default $MATTERJS_SERVER_DIR, else ../matterjs-server)")
 		out     = flag.String("out", "script/citecheck", "directory for drift.json and summary.md, relative to -root")
 		report  = flag.Bool("report", false, "exit 0 despite hard errors (make cite-report)")
 		fixFile = flag.String("fixes", "", "also write the derived corrections to this file")
@@ -106,7 +120,14 @@ func main() {
 	if dir == "" {
 		dir = filepath.Join(*root, "..", "matter.js")
 	}
-	code, err := run(*root, dir, filepath.Join(*root, *out), *fixFile)
+	serverDir := *server
+	if serverDir == "" {
+		serverDir = os.Getenv("MATTERJS_SERVER_DIR")
+	}
+	if serverDir == "" {
+		serverDir = filepath.Join(*root, "..", "matterjs-server")
+	}
+	code, err := run(*root, dir, serverDir, filepath.Join(*root, *out), *fixFile)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "citecheck:", err)
 	}
@@ -138,19 +159,34 @@ func readPin(root string) (string, error) {
 	return doc.Matter.SourceCommit, nil
 }
 
-func run(root, matterDir, outDir, fixFile string) (int, error) {
+// openRepo opens the clone at dir, or fails with errEnv (exit 2).
+func openRepo(dir, name, env string) (*gitRepo, error) {
+	if st, err := os.Stat(dir); err != nil || !st.IsDir() { //nolint:gosec // G703: the clone the caller names
+		return nil, fmt.Errorf("%w: %s clone %s missing (set %s)", errEnv, name, dir, env)
+	}
+	repo := &gitRepo{dir: dir}
+	if _, err := repo.git("rev-parse", "--git-dir"); err != nil {
+		return nil, fmt.Errorf("%w: %s is no git repository: %w", errEnv, dir, err)
+	}
+	return repo, nil
+}
+
+func run(root, matterDir, serverDir, outDir, fixFile string) (int, error) {
 	pin, err := readPin(root)
 	if err != nil {
 		return 2, err
 	}
-	if st, err := os.Stat(matterDir); err != nil || !st.IsDir() { //nolint:gosec // G703: the clone the caller names
-		return 2, fmt.Errorf("%w: matter.js clone %s missing (set MATTERJS_DIR)", errEnv, matterDir)
+	repo, err := openRepo(matterDir, "matter.js", "MATTERJS_DIR")
+	if err != nil {
+		return 2, err
 	}
-	repo := &gitRepo{dir: matterDir}
 	defer repo.close()
-	if _, err := repo.git("rev-parse", "--git-dir"); err != nil {
-		return 2, fmt.Errorf("%w: %s is no git repository: %w", errEnv, matterDir, err)
-	}
+	var server *gitRepo // opened on the first matterjs-server citation
+	defer func() {
+		if server != nil {
+			server.close()
+		}
+	}()
 	pinTree, err := repo.at(pin)
 	if err != nil {
 		return 2, fmt.Errorf("%w: the pin %s: %w", errEnv, pin, err)
@@ -162,6 +198,23 @@ func run(root, matterDir, outDir, fixFile string) (int, error) {
 	results := make([]result, 0, len(cites))
 	for i := range cites {
 		c := cites[i]
+		if c.Server {
+			if server == nil {
+				if server, err = openRepo(serverDir, serverName, "MATTERJS_SERVER_DIR"); err != nil {
+					return 2, err
+				}
+			}
+			r := result{cite: c, hard: errNoServerCommit}
+			for _, sha := range c.Shas {
+				if own, err := server.at(sha); err == nil {
+					c.Sha = sha
+					r = check(own, c)
+					break
+				}
+			}
+			results = append(results, r)
+			continue
+		}
 		t := pinTree
 		for _, sha := range c.Shas {
 			if own, err := repo.at(sha); err == nil {
@@ -192,6 +245,7 @@ func run(root, matterDir, outDir, fixFile string) (int, error) {
 type summary struct {
 	pin                      string
 	citations, files, ownSha int
+	server                   int // checked against matterjs-server
 	byRule                   map[string]int
 	driftChecked, hardOnly   int
 	drift                    []driftEntry
@@ -206,7 +260,10 @@ func summarise(pin string, results []result) summary {
 		r := &results[i]
 		s.citations++
 		files[r.cite.File] = true
-		if r.cite.Sha != "" {
+		switch {
+		case r.cite.Server:
+			s.server++
+		case r.cite.Sha != "":
 			s.ownSha++
 		}
 		if r.hard != "" {
@@ -264,6 +321,7 @@ func writeArtefacts(dir string, s summary) error {
 	var b strings.Builder
 	fmt.Fprintf(&b, "# matter.js citation check\n\n")
 	fmt.Fprintf(&b, "Pin: `%s` (parity/schema.json matter.sourceCommit). Regenerate with `make cite-report`; `make cite-check` fails when this file or drift.json moves.\n\n", s.pin)
+	fmt.Fprintf(&b, "Second tree: a sentence naming matterjs-server is checked against `MATTERJS_SERVER_DIR` (default `../matterjs-server`) at its own `at <sha>`; it has no pin.\n\n")
 	fmt.Fprintf(&b, "| Metric | Count |\n|---|---|\n")
 	row := func(k string, v int) { fmt.Fprintf(&b, "| %s | %d |\n", k, v) }
 	row("Citations", s.citations)
@@ -272,6 +330,7 @@ func writeArtefacts(dir string, s summary) error {
 	row("Resolved: unique suffix", s.byRule[ruleSuffix])
 	row("Resolved: unique basename", s.byRule[ruleBasename])
 	row("Checked at their own `at <sha>`", s.ownSha)
+	row("Checked against matterjs-server (`MATTERJS_SERVER_DIR`) at their `at <sha>`", s.server)
 	row("Drift-checked (the sentence names a name the file contains)", s.driftChecked)
 	row("Hard-checked only", s.hardOnly)
 	row("**Hard errors**", len(s.hard))

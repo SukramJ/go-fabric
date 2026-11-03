@@ -296,6 +296,10 @@ const (
 	errNotFound  = "file not found"
 	errAmbiguous = "ambiguous"
 	errLine      = "line beyond end of file"
+	// errNoServerCommit: the sentence names matterjs-server but no
+	// `at <sha>` of it is a commit of MATTERJS_SERVER_DIR — a
+	// matterjs-server citation has no pin to fall back to.
+	errNoServerCommit = "no matterjs-server commit"
 )
 
 // result is the outcome of checking one citation.
@@ -376,6 +380,7 @@ func check(t tree, c citation) result {
 	}
 	r.drift = &driftEntry{
 		File:        c.File,
+		Tree:        treeName(c),
 		Line:        c.Line,
 		Citation:    c.Text,
 		Resolved:    resolved,
@@ -402,4 +407,12 @@ func abs(n int) int {
 		return -n
 	}
 	return n
+}
+
+// treeName is the drift row's tree: empty for matter.js.
+func treeName(c citation) string {
+	if c.Server {
+		return serverName
+	}
+	return ""
 }
