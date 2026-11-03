@@ -36,14 +36,12 @@ const (
 // controller as the DUT (support/chip-testing/test/cert, 862ad75f) that the
 // Go controller does not run as the DUT, each with its class and reason;
 // the DD onboarding-payload cases, TC-ICDM-6.1, TC-ICDB-1.3 run since phase
-// 29b-1 (gocert_dddut_test.go, gocert_icd_test.go). A case the harness
+// 29b-1 (gocert_dddut_test.go, gocert_icd_test.go), TC-BR-4 since 29b-2
+// (gocert_br_test.go). A case the harness
 // image lists in a family gets the reason on its row — a manual one
 // through manualReason, a not-applicable one beside its PICS —; one no
 // family lists is a row of the status page's "Controller role" section.
 var controllerRoleCases = map[string]gap{
-	// TC-BR-4.test.ts:234: the bridge TH's simulated changes through
-	// app-pipe commands the daemon does not have yet.
-	"BR/4": {class: classHarness, reason: "controller role (phase 29b-2): matter.js runs it with its controller as DUT against a bridge TH it drives through bridge-simulation app-pipe commands (TC-BR-4.test.ts:234)"},
 	// TC-TBRM-3.1.test.ts:133-140: chip's network-manager app as the TH.
 	"TBRM/3.1":    {class: classNotSupported, reason: "controller role: the TH is a Thread border router (`--otbr` needs a live OTBR REST API; matter.js runs it against chip's network-manager app only, TC-TBRM-3.1.test.ts:133-140)"},
 	"DA/1.9":      pythonDriven("TC-DA-1.9.test.ts:32 TC_DA_1_9.py"),

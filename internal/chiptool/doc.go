@@ -126,7 +126,8 @@
 // The same leg runs cases in matter.js's own direction (goCertCase role
 // roleDUT, phase 29b): the module's controller is the DUT and the daemon
 // the TH device the TS file names, with the flags and app-pipe commands
-// matter.js's TH apps have (--icd-lit for its lit-icd app). A DUT case's
+// matter.js's TH apps have (--icd-lit for its lit-icd app, --bridge-sim
+// for its bridge test instance and that app's backchannel). A DUT case's
 // PICS are the controller's own declarations (goTHPICS), evaluated as
 // stated, and a code the controller declares nothing about fails the step
 // rather than reading the daemon's value. matter.js proves its DUT by the
@@ -134,8 +135,10 @@
 // controller's return value or error, a state read on the daemon, or a
 // daemon log line. The onboarding-payload DD cases (gocert_dddut_test.go,
 // payloads built bit by bit in gocert_payload_test.go as matter.js's
-// harness builds them) and the ICD client cases (gocert_icd_test.go) run
-// this way; their counts carry role "dut" in the golden file, and
+// harness builds them), the ICD client cases (gocert_icd_test.go) and the
+// bridge client case TC-BR-4 (gocert_br_test.go: the DUT's own image of the
+// bridge, client.Node.Endpoints and Cluster.Value, taken before any read
+// and followed on its default subscription alone) run this way; their counts carry role "dut" in the golden file, and
 // TestCertifiabilityDocument renders them under "Controller role", "Go
 // controller as DUT, after matter.js TC-X.test.ts", passed in their family.
 // The cases 29b does not run carry their reason there (controllerRoleCases).

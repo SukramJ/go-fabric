@@ -1007,6 +1007,9 @@ type fleet struct {
 	// icd is the ICD cadence and test event triggers of --icd-lit
 	// (icd.go); nil without.
 	icd *demoICD
+	// bridgeSim is the simulated bridge of --bridge-sim (bridge_sim.go);
+	// nil without.
+	bridgeSim *demoBridgeSim
 
 	// configChange raises the ConfigurationVersion of every bridged device
 	// (the app pipe's SimulateConfigurationVersionChange); wired by main.
@@ -1146,6 +1149,7 @@ func (f *fleet) numberPowerSources() error {
 	for _, ps := range sources {
 		errs = append(errs, powerSourceEndpointList(ps))
 	}
+	errs = append(errs, f.bridgeSim.numberPowerSource())
 	return errors.Join(errs...)
 }
 
@@ -1232,6 +1236,10 @@ func (f *fleet) endpoints() ([]node.Endpoint, error) { //nolint:funlen // the fl
 	// The light switch (--light-switch, TESTING ONLY) comes last.
 	if f.lightSwitch != nil {
 		out = append(out, f.lightSwitch.dev)
+	}
+	// The simulated bridge (--bridge-sim, TESTING ONLY) comes after it.
+	if f.bridgeSim != nil {
+		out = append(out, f.bridgeSim.endpoints()...)
 	}
 	if err := errors.Join(errs...); err != nil {
 		return nil, fmt.Errorf("fleet: %w", err)

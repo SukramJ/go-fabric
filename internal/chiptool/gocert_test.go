@@ -701,6 +701,14 @@ var goTHPICS = map[string]string{
 	"OTAR.C.M.AnnounceOTAProvider": "1", // :287
 	"OTAP.S.M.DelayedActionTime":   "1", // :296
 	"OTAP.S.M.UserConsentNeeded":   "1", // :297
+	// The bridge client: client.Node holds a bridge's endpoints, their
+	// names, state and battery in its image, kept by its sustained
+	// subscription (controller/client doc.go).
+	"MCORE.BRIDGECLIENT":           "1", // :303
+	"MCORE.DEVLIST.UseDevices":     "1", // :304
+	"MCORE.DEVLIST.UseDeviceName":  "1", // :305
+	"MCORE.DEVLIST.UseDeviceState": "1", // :306
+	"MCORE.DEVLIST.UseBatInfo":     "1", // :307
 }
 
 // declares is picsHolds for one code on the step's endpoint.
