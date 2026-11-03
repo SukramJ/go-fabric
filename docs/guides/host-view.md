@@ -121,8 +121,9 @@ func run(ctx context.Context) error {
 		_ = n.Stop(context.WithoutCancel(ctx)) // a failed Start leaves the node startable and its store open
 		return err
 	}
-	for _, d := range n.Topology().Devices {
-		slog.Info("bridged", slog.String("name", d.Name), slog.Int("endpoint", int(d.Endpoint)))
+	devices := n.Topology().Devices
+	for i := range devices {
+		slog.Info("bridged", slog.String("name", devices[i].Name), slog.Int("endpoint", int(devices[i].Endpoint)))
 	}
 	b.light.Rename(ctx, "Kitchen ceiling")
 	b.door.SetReachable(ctx, true)

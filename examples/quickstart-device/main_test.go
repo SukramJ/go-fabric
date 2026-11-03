@@ -18,9 +18,10 @@ import (
 // lightEndpoint returns the endpoint number the running node gave the
 // light, false when the topology has none.
 func lightEndpoint(n *node.Node) (uint16, bool) {
-	for _, d := range n.Topology().Devices {
-		if d.Key.String() == "light-1" {
-			return d.Endpoint, true
+	devices := n.Topology().Devices
+	for i := range devices {
+		if devices[i].Key.String() == "light-1" {
+			return devices[i].Endpoint, true
 		}
 	}
 	return 0, false
