@@ -206,9 +206,15 @@ the same two mechanisms CHIP's own example apps take (`control.go`):
   the Go controller runs as the DUT (TC-BR-4): "Light 1", "TempSensor 1"
   and "TempSensor 2", a battery-powered "Composed Device" (Bridged Node
   and Power Source, PowerSource with the Battery feature) with two
-  temperature sensors as its own parts, and "Action Light 1"–"4"; a second
-  light, "Light 2", is held back. The endpoint numbers are the node's own
-  allocation, not chip's: the case finds the devices by their NodeLabel. The daemon's
+  temperature sensors as its own parts, and "Action Light 1"–"4". The app
+  pipe's `{"Name": "toggleBridgedLights"}`, `warmBridgedTemperatureSensors`,
+  `renameBridgedLights`, `addBridgedLight` and `removeBridgedLight` — the
+  test instance's backchannel names, no further fields — toggle "Light 1"
+  (and "Light 2" once added), warm the four sensors by one degree, rename
+  the two lights "Light 1b" / "Light 2b", add "Light 2" under a fresh
+  endpoint number, and remove "Light 1"; add and remove do nothing when
+  already done. The endpoint numbers are the node's own allocation, not
+  chip's: the case finds the devices by their NodeLabel. The daemon's
   default composition does not change.
 - `--icd-lit` (TESTING ONLY) makes the node a Long Idle Time ICD after
   matter.js's lit-icd test app (`icd.go`), for the ICD client

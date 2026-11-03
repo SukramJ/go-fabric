@@ -4,11 +4,13 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"sync"
 
 	psdef "github.com/SukramJ/go-fabric/cluster/spec/powersource"
+	tmdef "github.com/SukramJ/go-fabric/cluster/spec/temperaturemeasurement"
 	"github.com/SukramJ/go-fabric/device"
 	"github.com/SukramJ/go-fabric/endpoint"
 	"github.com/SukramJ/go-fabric/node"
@@ -37,6 +39,9 @@ import (
 
 // Bridge-simulation constants (BridgeTestInstance.ts).
 const (
+	// bridgeSimOneDegree is how far one warming moves a sensor, in the
+	// hundredths of a degree the cluster reports (ONE_DEGREE, :46).
+	bridgeSimOneDegree = 100
 	// bridgeSimInitialCelsius is every sensor's starting reading:
 	// INITIAL_MEASURED_VALUE 100 (:50) in hundredths of a degree; the
 	// declaration's bounds are MIN_MEASURED_VALUE and MAX_MEASURED_VALUE
@@ -50,6 +55,10 @@ const (
 	bridgeSimLight2Label   = "Light 2"
 	bridgeSimComposedLabel = "Composed Device"
 )
+
+// bridgeSimRenames are the labels renameBridgedLights gives the two lights
+// (:234-237).
+var bridgeSimRenames = [2]string{"Light 1b", "Light 2b"}
 
 // demoBridgeSim is the simulated bridge: the device handles the app pipe
 // acts on, and the Aggregator it adds and removes lights through.
@@ -204,4 +213,109 @@ func (s *demoBridgeSim) numberPowerSource() error {
 		list = append(list, n)
 	}
 	return s.composed.PowerSource().Set(psdef.Patch{EndpointList: &list})
+}
+
+// errNoBridgeSim is a bridge-simulation command without the flag.
+func errNoBridgeSim(name string) error { return fmt.Errorf("%s needs --bridge-sim", name) }
+
+// toggle is #toggleLights (:205-214): OnOff toggled on the two lights the
+// command names, a light the bridge does not hold skipped; the action
+// lights are left alone.
+func (s *demoBridgeSim) toggle() error {
+	if s == nil {
+		return errNoBridgeSim("toggleBridgedLights")
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for _, l := range []*bridgeSimLight{s.light1, s.light2} {
+		if l.added {
+			l.light.setOn(!l.light.isOn())
+		}
+	}
+	return nil
+}
+
+// warm is #warmTemperatureSensors (:216-230): every sensor's MeasuredValue
+// one degree up, from the initial value where it holds none.
+func (s *demoBridgeSim) warm() error {
+	if s == nil {
+		return errNoBridgeSim("warmBridgedTemperatureSensors")
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	var errs []error
+	for _, d := range s.sensors {
+		srv := d.TemperatureMeasurement()
+		v := int16(bridgeSimInitialCelsius * 100)
+		if cur := srv.Get().MeasuredValue; cur != nil {
+			v = *cur
+		}
+		v += bridgeSimOneDegree
+		errs = append(errs, srv.Set(tmdef.Patch{MeasuredValue: &v}))
+	}
+	return errors.Join(errs...)
+}
+
+// rename is #renameLights (:232-244): "Light 1b" and "Light 2b" on
+// whichever of the two lights the bridge holds — the device's Rename,
+// which reports the NodeLabel to a subscribed controller
+// (device/lifecycle.go Rename, node/lifecycle.go NotifyEndpointNodeLabel).
+func (s *demoBridgeSim) rename() error {
+	if s == nil {
+		return errNoBridgeSim("renameBridgedLights")
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for i, l := range []*bridgeSimLight{s.light1, s.light2} {
+		if l.added {
+			l.dev.Rename(context.Background(), bridgeSimRenames[i])
+		}
+	}
+	return nil
+}
+
+// add is #addLight2 (:246-252): the second light under the Aggregator, a
+// no-op when it is there. Its StableKey is its own, so the node gives it a
+// number no device had (node/aggregator.go Add); the running node
+// reassembles and reports the root's and the Aggregator's PartsList and
+// every attribute of the new endpoint (bridge/bridge.go Reassemble).
+func (s *demoBridgeSim) add() error {
+	if s == nil {
+		return errNoBridgeSim("addBridgedLight")
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.light2.added {
+		return nil
+	}
+	if s.agg == nil {
+		return errors.New("addBridgedLight: the bridge simulation has no Aggregator")
+	}
+	if err := s.agg.Add(context.Background(), s.light2.dev); err != nil {
+		return fmt.Errorf("addBridgedLight: %w", err)
+	}
+	s.light2.added = true
+	return nil
+}
+
+// remove is #removeLight1 (:254-261): the first light taken off the
+// Aggregator, a no-op when it is gone. Its key keeps its number reserved
+// (node/aggregator.go Remove), so the second light never takes it.
+func (s *demoBridgeSim) remove() error {
+	if s == nil {
+		return errNoBridgeSim("removeBridgedLight")
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if !s.light1.added {
+		return nil
+	}
+	if s.agg == nil {
+		return errors.New("removeBridgedLight: the bridge simulation has no Aggregator")
+	}
+	if err := s.agg.Remove(context.Background(), s.light1.dev.Spec().StableKey); err != nil {
+		return fmt.Errorf("removeBridgedLight: %w", err)
+	}
+	s.light1.added = false
+	return nil
 }

@@ -278,6 +278,17 @@ func (f *fleet) applyPipeCommand(cmd pipeCommand) error {
 		ctx, cancel := context.WithTimeout(context.Background(), 2*lightSwitchResolutionTimeout)
 		defer cancel()
 		return f.lightSwitch.sendOnOff(ctx, cmd.EndpointID, cmd.Command)
+	// --- matter.js's bridge backchannel (--bridge-sim, bridge_sim.go) ---
+	case "toggleBridgedLights":
+		return f.bridgeSim.toggle()
+	case "warmBridgedTemperatureSensors":
+		return f.bridgeSim.warm()
+	case "renameBridgedLights":
+		return f.bridgeSim.rename()
+	case "addBridgedLight":
+		return f.bridgeSim.add()
+	case "removeBridgedLight":
+		return f.bridgeSim.remove()
 	case "OtaProviderConsent":
 		// The test OTA provider of --ota-provider (ota_provider.go).
 		return f.otaImages.pipeCommand(cmd)
