@@ -178,98 +178,600 @@
     },
     {
       "path": "packages/general/test/net/AppAddressTest.ts",
-      "status": "planned",
-      "reason": "Phase 33: a new register root, ported by meaning in this phase.",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "matter.js's AppAddress, the URL form of an application endpoint (IP, TLS, unix socket, wildcards); the module addresses peers with net/netip.",
       "snapshotSha": "3ec1d692b28e9b68f39f689e32bcd1dda1715772"
     },
     {
       "path": "packages/general/test/net/RetryScheduleTest.ts",
-      "status": "planned",
-      "reason": "Phase 33: a new register root, ported by meaning in this phase.",
+      "status": "partial",
+      "go": [
+        "client/discovery:TestParityDiscovery_RetrySchedule",
+        "client/discovery:TestSolicitor_DiscoverEndsWithTheScheduleAndTheCache",
+        "client/interaction:TestRetries"
+      ],
+      "missing": [
+        "combines timeout and maximumCount (timeout reached first)",
+        "combines timeout and maximumCount (count reached first)",
+        "applies maximumInterval before timeout adjustment",
+        "jitter is 0 when jitterFactor is 0",
+        "jitter is 0 when jitterFactor is undefined",
+        "applies different jitter to each interval",
+        "returns defaults when no override provided",
+        "handles very small intervals",
+        "handles backoffFactor of 1 (no growth)",
+        "handles fractional backoffFactor",
+        "tracks total time correctly",
+        "never exceeds timeout with accumulated time"
+      ],
+      "left": [
+        {
+          "it": "returns empty when maximumCount is 0",
+          "class": "js-runtime-only",
+          "reason": "a maximumCount of 0 told apart from an undefined one; the module's Retries reads a zero field as unset (client/discovery)"
+        }
+      ],
+      "reason": "The retry schedule of client/discovery (Retries): defaults, initial interval, backoff, maximum count, timeout and its final-interval cut, the maximum interval, jitter and the merge with defaults. Missing: combinations and edge values the schedule computes without a test asserting them.",
       "snapshotSha": "5d4a5c5592082083deaddf034f01c3235e8e21ca"
     },
     {
       "path": "packages/general/test/net/ServerAddressSetTest.ts",
-      "status": "planned",
-      "reason": "Phase 33: a new register root, ported by meaning in this phase.",
+      "status": "partial",
+      "go": [
+        "client/discovery:TestService_AddressChanges",
+        "client/discovery:TestService_AddressesFollowTheSRVTarget",
+        "client/discovery:TestParityDiscovery_AddressOrder"
+      ],
+      "missing": [
+        "tracks distinct addresses",
+        "returns the existing instance when adding an equal address",
+        "copies health markers onto equal targets"
+      ],
+      "left": [
+        {
+          "it": "replaces the stored addresses",
+          "class": "js-runtime-only",
+          "reason": "ServerAddressSet.replace; a Go service derives its addresses from the SRV target's records and has no replace operation"
+        }
+      ],
+      "reason": "Deleting and iterating a service's addresses and ranking a healthy address first. Missing: distinctness and the existing instance on an equal add asserted, and copyHealth, which the module does not have (findings register, phase 33).",
       "snapshotSha": "e319fb703d7bb063e7089ac92c50cd28c0c33cd7"
     },
     {
       "path": "packages/general/test/net/ServerAddressTest.ts",
-      "status": "planned",
-      "reason": "Phase 33: a new register root, ported by meaning in this phase.",
+      "status": "partial",
+      "go": [
+        "client/discovery:TestParityDiscovery_AddressOrder",
+        "mdns:TestParityMatterJS_AddressSelectionPreference"
+      ],
+      "missing": [
+        "classifies fe80::/10 addresses as IPV6_LINK_LOCAL",
+        "matches the full fe80::/10 range",
+        "rejects addresses outside fe80::/10"
+      ],
+      "left": [
+        {
+          "it": "isIp ignores enumerable undefined peripheralAddress",
+          "class": "js-runtime-only",
+          "reason": "type guards of matter.js's ServerAddress union; the module's discovery.Address is IP only"
+        },
+        {
+          "it": "isBle ignores enumerable undefined ip",
+          "class": "js-runtime-only",
+          "reason": "type guards of matter.js's ServerAddress union; the module's discovery.Address is IP only, BLE addressing is its own transport"
+        },
+        {
+          "it": "ranks a non-IP address after every IP address",
+          "class": "js-runtime-only",
+          "reason": "a BLE ServerAddress ranked after IP ones; the module's discovery.Address is IP only"
+        }
+      ],
+      "reason": "selectionPreferenceOf: ULA, generic IPv6 and IPv4 classified and ordered, the fc00::/8 half, upper case, fec0 not link-local. Missing: the full fe80::/10 range and its complement asserted case by case.",
       "snapshotSha": "a991ab1fd74b676beae6ec0f7544e3539d73a52f"
     },
     {
       "path": "packages/general/test/net/dns-sd/DnssdNamesTest.ts",
-      "status": "planned",
-      "reason": "Phase 33: a new register root, ported by meaning in this phase.",
+      "status": "partial",
+      "go": [
+        "client/discovery:TestParityDiscovery_TTLRules",
+        "client/discovery:TestNames_StagedAddressReplayedWhenAnSRVNamesTheHost",
+        "client/discovery:TestService_AddressChanges",
+        "client/discovery:TestNames_StagedGoodbyeAndFlushAndPrune",
+        "client/discovery:TestParityDiscovery_UnavailableSRVIgnored",
+        "client/discovery:TestDiscoveryDataCaseInsensitiveKeys",
+        "client/discovery:TestParityDiscovery_TXTParameters",
+        "client/discovery:TestCommissionableMdnsScanner",
+        "client/discovery:TestService_AddressesFollowTheSRVTarget",
+        "client/discovery:TestNames_QueryKnownAnswersAreNotCached",
+        "client/discovery:TestParityDiscovery_CacheFlushRetiresOlderUniqueRecords",
+        "client/discovery:TestSolicitor_KnownAnswersIncludeAssociatedNames",
+        "client/discovery:TestSolicitor_DiscoverRunsOneScheduleForAllCallers",
+        "client/discovery:TestKnownAnswersParityMatterJS"
+      ],
+      "missing": [
+        "discovers",
+        "expires",
+        "accepts records matching a dynamically added filter",
+        "stops accepting records after filter removal",
+        "accepts records if any filter matches (OR semantics)",
+        "removing one filter keeps the other active",
+        "already-discovered names persist after filter removal",
+        "no filters means accept all records",
+        "filters but tracks and expires SRV even if filtered out",
+        "exposes no address and no target host for a service that is unavailable",
+        "does not stage IP records from a packet whose only relevant record is unavailable",
+        "keeps a known service when a later announcement designates it unavailable",
+        "recomputes parameters when a TXT record is removed",
+        "drops keys absent from a replacement TXT record",
+        "exposes binary TXT values via parameters.raw while preserving the string view for ASCII keys",
+        "preserves empty-value TXT entries (key=) per RFC 6763 §6.4",
+        "keeps a record re-announced within the goodbye delay",
+        "retires the superseded TXT record",
+        "keeps a record a responder re-announces unchanged",
+        "lets the newer record's key win over an older one that differs only in case",
+        "keeps the record a rejected replacement would have superseded",
+        "retires only the type the flushing record carries",
+        "keeps a staged address set a responder had to split across packets",
+        "ignores the bit on a shared PTR record",
+        "first caller's retry config drives the shared discovery loop"
+      ],
+      "left": [
+        {
+          "it": "ignores an SRV record with a port outside the 16-bit range",
+          "class": "js-runtime-only",
+          "reason": "an SRV port of -1 or 65536 in a JavaScript record; the module's SRV port is a uint16 (mdns.DNSSRV), which cannot hold one"
+        }
+      ],
+      "reason": "The cache of client/discovery (Names): the TTL grace, IP staging and its goodbye and expiry, unavailable SRV records, TXT keys (first wins, empty keys and entries skipped), goodbyes, the cache-flush rules for TXT and address records and split record sets, known answers without the cache-flush bit and — since phase 33 — with their remaining TTL, a record past half its TTL left out (DnssdSolicitor knownAnswersOf), and coalesced discovery. Missing: cases whose behaviour the Go cache has without a test asserting it (the dynamic filters, the expiry of a host, TXT parameters after removal and replacement, cache-flush corner cases, the first caller's retry configuration).",
       "snapshotSha": "8108d2285191bbac825cee0ba05d3ee83c2e21df"
     },
     {
       "path": "packages/general/test/net/dns-sd/DnssdParametersTest.ts",
-      "status": "planned",
-      "reason": "Phase 33: a new register root, ported by meaning in this phase.",
+      "status": "partial",
+      "go": [
+        "client/discovery:TestParityDiscovery_TXTParameters",
+        "client/discovery:TestDiscoveryDataCaseInsensitiveKeys"
+      ],
+      "missing": [
+        "keeps the first of several entries whose keys differ only in case, spelled as received"
+      ],
+      "left": [
+        {
+          "it": "returns the original bytes losslessly",
+          "class": "js-runtime-only",
+          "reason": "the Map-like JavaScript API of DnssdParameters (raw, size, keys, values, entries, the iterator, forEach); the module's Parameters is a map of raw bytes read with Get"
+        },
+        {
+          "it": "returns undefined for missing keys",
+          "class": "js-runtime-only",
+          "reason": "the Map-like JavaScript API of DnssdParameters (raw, size, keys, values, entries, the iterator, forEach); the module's Parameters is a map of raw bytes read with Get"
+        },
+        {
+          "it": "matches the underlying entry count",
+          "class": "js-runtime-only",
+          "reason": "the Map-like JavaScript API of DnssdParameters (raw, size, keys, values, entries, the iterator, forEach); the module's Parameters is a map of raw bytes read with Get"
+        },
+        {
+          "it": "yields all keys",
+          "class": "js-runtime-only",
+          "reason": "the Map-like JavaScript API of DnssdParameters (raw, size, keys, values, entries, the iterator, forEach); the module's Parameters is a map of raw bytes read with Get"
+        },
+        {
+          "it": "yields UTF-8 decoded strings",
+          "class": "js-runtime-only",
+          "reason": "the Map-like JavaScript API of DnssdParameters (raw, size, keys, values, entries, the iterator, forEach); the module's Parameters is a map of raw bytes read with Get"
+        },
+        {
+          "it": "yields [key, decoded-value] pairs",
+          "class": "js-runtime-only",
+          "reason": "the Map-like JavaScript API of DnssdParameters (raw, size, keys, values, entries, the iterator, forEach); the module's Parameters is a map of raw bytes read with Get"
+        },
+        {
+          "it": "yields the same shape as entries()",
+          "class": "js-runtime-only",
+          "reason": "the Map-like JavaScript API of DnssdParameters (raw, size, keys, values, entries, the iterator, forEach); the module's Parameters is a map of raw bytes read with Get"
+        },
+        {
+          "it": "invokes callback with (value, key, map)",
+          "class": "js-runtime-only",
+          "reason": "the Map-like JavaScript API of DnssdParameters (raw, size, keys, values, entries, the iterator, forEach); the module's Parameters is a map of raw bytes read with Get"
+        },
+        {
+          "it": "honours thisArg",
+          "class": "js-runtime-only",
+          "reason": "the Map-like JavaScript API of DnssdParameters (raw, size, keys, values, entries, the iterator, forEach); the module's Parameters is a map of raw bytes read with Get"
+        }
+      ],
+      "reason": "Get decoding values, an empty value, a missing key, presence and case-insensitive lookup. Missing: the spelling of the first of several keys differing in case.",
       "snapshotSha": "29bf78712a4b1df0d958a2ff52c2a1b3f9e8b328"
     },
     {
       "path": "packages/general/test/net/dns-sd/IpServiceLinkLocalZoneTest.ts",
-      "status": "planned",
-      "reason": "Phase 33: a new register root, ported by meaning in this phase.",
+      "status": "partial",
+      "go": [
+        "client/discovery:TestParityDiscovery_ServiceAddressShape",
+        "client/discovery:TestService_AddressesFollowTheSRVTarget"
+      ],
+      "missing": [
+        "takes no address from a query's known answers"
+      ],
+      "reason": "An fe80 address zoned with the receiving interface, a ULA address unzoned. Missing: an address from a query's known answers asserted absent on the service.",
       "snapshotSha": "2991ef5922987ebd8f2bf86253ed7a46cbf38e02"
     },
     {
       "path": "packages/general/test/net/dns-sd/IpServiceStatusTest.ts",
-      "status": "planned",
-      "reason": "Phase 33: a new register root, ported by meaning in this phase.",
+      "status": "ported",
+      "go": [
+        "client/discovery:TestStatus_ConnectingResolvesUntilAnAddressAppears",
+        "client/discovery:TestStatus_FailedAttemptAndReachabilityStopResolving",
+        "client/discovery:TestParityDiscovery_ResolutionQueries"
+      ],
+      "reason": "Solicitation per connection status, the SRV target's addresses queried, a failed attempt marking the service unreachable.",
       "snapshotSha": "fa8d72a31a98441efa187a51d9635488c2b4b834"
     },
     {
       "path": "packages/general/test/net/dns-sd/IpServiceTest.ts",
-      "status": "planned",
-      "reason": "Phase 33: a new register root, ported by meaning in this phase.",
+      "status": "partial",
+      "go": [
+        "client/discovery:TestService_AddressesFollowTheSRVTarget",
+        "client/discovery:TestService_AddressChanges"
+      ],
+      "missing": [
+        "notifies on parameter changes but swallows identical re-announcements and TXT expiry",
+        "notifies when a superseding TXT record drops a key",
+        "expires",
+        "updates ttl"
+      ],
+      "reason": "A service noticing new addresses and streaming adds and deletes. Missing: the TXT notification rules, a service's TTL expiry and a re-announcement extending it, asserted on the service.",
       "snapshotSha": "27197bee646abdf010c365863f089189e794b811"
     },
     {
       "path": "packages/general/test/net/dns-sd/MdnsRelevanceFilterTest.ts",
-      "status": "planned",
-      "reason": "Phase 33: a new register root, ported by meaning in this phase.",
+      "status": "ported",
+      "go": [
+        "client/discovery:TestParityDiscovery_IngressFilter"
+      ],
+      "left": [
+        {
+          "it": "accepts everything when no owner has registered",
+          "class": "by-design",
+          "reason": "BD-Matter-MdnsRelevancePreFilter: the packet pre-filter of matter.js's MdnsSocket is a decode-cost optimisation with no wire behaviour; the module decodes every packet and admits records by the cache's ingress filter (client/discovery Names)"
+        },
+        {
+          "it": "becomes active once an owner registers a concrete name",
+          "class": "by-design",
+          "reason": "BD-Matter-MdnsRelevancePreFilter: the packet pre-filter of matter.js's MdnsSocket is a decode-cost optimisation with no wire behaviour; the module decodes every packet and admits records by the cache's ingress filter (client/discovery Names)"
+        },
+        {
+          "it": "an \"all\" owner disables filtering (accept everything)",
+          "class": "by-design",
+          "reason": "BD-Matter-MdnsRelevancePreFilter: the packet pre-filter of matter.js's MdnsSocket is a decode-cost optimisation with no wire behaviour; the module decodes every packet and admits records by the cache's ingress filter (client/discovery Names)"
+        },
+        {
+          "it": "an \"all\" owner overrides another owner's concrete footprints",
+          "class": "by-design",
+          "reason": "BD-Matter-MdnsRelevancePreFilter: the packet pre-filter of matter.js's MdnsSocket is a decode-cost optimisation with no wire behaviour; the module decodes every packet and admits records by the cache's ingress filter (client/discovery Names)"
+        },
+        {
+          "it": "treats a registration of only stoplist-folding names as inactive",
+          "class": "by-design",
+          "reason": "BD-Matter-MdnsRelevancePreFilter: the packet pre-filter of matter.js's MdnsSocket is a decode-cost optimisation with no wire behaviour; the module decodes every packet and admits records by the cache's ingress filter (client/discovery Names)"
+        },
+        {
+          "it": "reverts to accept-all after the last owner unregisters",
+          "class": "by-design",
+          "reason": "BD-Matter-MdnsRelevancePreFilter: the packet pre-filter of matter.js's MdnsSocket is a decode-cost optimisation with no wire behaviour; the module decodes every packet and admits records by the cache's ingress filter (client/discovery Names)"
+        },
+        {
+          "it": "ignores unregistering an unknown owner",
+          "class": "by-design",
+          "reason": "BD-Matter-MdnsRelevancePreFilter: the packet pre-filter of matter.js's MdnsSocket is a decode-cost optimisation with no wire behaviour; the module decodes every packet and admits records by the cache's ingress filter (client/discovery Names)"
+        },
+        {
+          "it": "matches the bare service type",
+          "class": "by-design",
+          "reason": "BD-Matter-MdnsRelevancePreFilter: the packet pre-filter of matter.js's MdnsSocket is a decode-cost optimisation with no wire behaviour; the module decodes every packet and admits records by the cache's ingress filter (client/discovery Names)"
+        },
+        {
+          "it": "matches an instance of the service type",
+          "class": "by-design",
+          "reason": "BD-Matter-MdnsRelevancePreFilter: the packet pre-filter of matter.js's MdnsSocket is a decode-cost optimisation with no wire behaviour; the module decodes every packet and admits records by the cache's ingress filter (client/discovery Names)"
+        },
+        {
+          "it": "matches a commissioning subtype (collapses via _sub to the service label)",
+          "class": "by-design",
+          "reason": "BD-Matter-MdnsRelevancePreFilter: the packet pre-filter of matter.js's MdnsSocket is a decode-cost optimisation with no wire behaviour; the module decodes every packet and admits records by the cache's ingress filter (client/discovery Names)"
+        },
+        {
+          "it": "does not match an unrelated service type",
+          "class": "by-design",
+          "reason": "BD-Matter-MdnsRelevancePreFilter: the packet pre-filter of matter.js's MdnsSocket is a decode-cost optimisation with no wire behaviour; the module decodes every packet and admits records by the cache's ingress filter (client/discovery Names)"
+        },
+        {
+          "it": "matches a registered bare hostname",
+          "class": "by-design",
+          "reason": "BD-Matter-MdnsRelevancePreFilter: the packet pre-filter of matter.js's MdnsSocket is a decode-cost optimisation with no wire behaviour; the module decodes every packet and admits records by the cache's ingress filter (client/discovery Names)"
+        },
+        {
+          "it": "matches a packet whose labels use different case than the registration",
+          "class": "by-design",
+          "reason": "BD-Matter-MdnsRelevancePreFilter: the packet pre-filter of matter.js's MdnsSocket is a decode-cost optimisation with no wire behaviour; the module decodes every packet and admits records by the cache's ingress filter (client/discovery Names)"
+        },
+        {
+          "it": "matches when the registration is upper-case and the packet is lower-case",
+          "class": "by-design",
+          "reason": "BD-Matter-MdnsRelevancePreFilter: the packet pre-filter of matter.js's MdnsSocket is a decode-cost optimisation with no wire behaviour; the module decodes every packet and admits records by the cache's ingress filter (client/discovery Names)"
+        },
+        {
+          "it": "matches after addRelevantName and stops after removeRelevantName",
+          "class": "by-design",
+          "reason": "BD-Matter-MdnsRelevancePreFilter: the packet pre-filter of matter.js's MdnsSocket is a decode-cost optimisation with no wire behaviour; the module decodes every packet and admits records by the cache's ingress filter (client/discovery Names)"
+        },
+        {
+          "it": "reference-counts a footprint added twice (within an owner)",
+          "class": "by-design",
+          "reason": "BD-Matter-MdnsRelevancePreFilter: the packet pre-filter of matter.js's MdnsSocket is a decode-cost optimisation with no wire behaviour; the module decodes every packet and admits records by the cache's ingress filter (client/discovery Names)"
+        },
+        {
+          "it": "tolerates removing a name that was never added",
+          "class": "by-design",
+          "reason": "BD-Matter-MdnsRelevancePreFilter: the packet pre-filter of matter.js's MdnsSocket is a decode-cost optimisation with no wire behaviour; the module decodes every packet and admits records by the cache's ingress filter (client/discovery Names)"
+        },
+        {
+          "it": "ignores addRelevantName on an \"all\" owner (no corruption)",
+          "class": "by-design",
+          "reason": "BD-Matter-MdnsRelevancePreFilter: the packet pre-filter of matter.js's MdnsSocket is a decode-cost optimisation with no wire behaviour; the module decodes every packet and admits records by the cache's ingress filter (client/discovery Names)"
+        },
+        {
+          "it": "keeps a shared footprint until the last owner releases it",
+          "class": "by-design",
+          "reason": "BD-Matter-MdnsRelevancePreFilter: the packet pre-filter of matter.js's MdnsSocket is a decode-cost optimisation with no wire behaviour; the module decodes every packet and admits records by the cache's ingress filter (client/discovery Names)"
+        },
+        {
+          "it": "unions footprints from different owners",
+          "class": "by-design",
+          "reason": "BD-Matter-MdnsRelevancePreFilter: the packet pre-filter of matter.js's MdnsSocket is a decode-cost optimisation with no wire behaviour; the module decodes every packet and admits records by the cache's ingress filter (client/discovery Names)"
+        },
+        {
+          "it": "replaces an owner's previous concrete set",
+          "class": "by-design",
+          "reason": "BD-Matter-MdnsRelevancePreFilter: the packet pre-filter of matter.js's MdnsSocket is a decode-cost optimisation with no wire behaviour; the module decodes every packet and admits records by the cache's ingress filter (client/discovery Names)"
+        },
+        {
+          "it": "transitions an owner from \"all\" to concrete (re-enables the gate)",
+          "class": "by-design",
+          "reason": "BD-Matter-MdnsRelevancePreFilter: the packet pre-filter of matter.js's MdnsSocket is a decode-cost optimisation with no wire behaviour; the module decodes every packet and admits records by the cache's ingress filter (client/discovery Names)"
+        },
+        {
+          "it": "transitions an owner from concrete to \"all\" (disables the gate)",
+          "class": "by-design",
+          "reason": "BD-Matter-MdnsRelevancePreFilter: the packet pre-filter of matter.js's MdnsSocket is a decode-cost optimisation with no wire behaviour; the module decodes every packet and admits records by the cache's ingress filter (client/discovery Names)"
+        },
+        {
+          "it": "scans question names",
+          "class": "by-design",
+          "reason": "BD-Matter-MdnsRelevancePreFilter: the packet pre-filter of matter.js's MdnsSocket is a decode-cost optimisation with no wire behaviour; the module decodes every packet and admits records by the cache's ingress filter (client/discovery Names)"
+        },
+        {
+          "it": "scans answer names after a non-matching first record",
+          "class": "by-design",
+          "reason": "BD-Matter-MdnsRelevancePreFilter: the packet pre-filter of matter.js's MdnsSocket is a decode-cost optimisation with no wire behaviour; the module decodes every packet and admits records by the cache's ingress filter (client/discovery Names)"
+        },
+        {
+          "it": "skips RDATA — a footprint only inside record data does not match",
+          "class": "by-design",
+          "reason": "BD-Matter-MdnsRelevancePreFilter: the packet pre-filter of matter.js's MdnsSocket is a decode-cost optimisation with no wire behaviour; the module decodes every packet and admits records by the cache's ingress filter (client/discovery Names)"
+        },
+        {
+          "it": "correctly advances past A/AAAA/TXT records to a later matching name",
+          "class": "by-design",
+          "reason": "BD-Matter-MdnsRelevancePreFilter: the packet pre-filter of matter.js's MdnsSocket is a decode-cost optimisation with no wire behaviour; the module decodes every packet and admits records by the cache's ingress filter (client/discovery Names)"
+        },
+        {
+          "it": "follows a pointer to a footprint reachable only via the pointer",
+          "class": "by-design",
+          "reason": "BD-Matter-MdnsRelevancePreFilter: the packet pre-filter of matter.js's MdnsSocket is a decode-cost optimisation with no wire behaviour; the module decodes every packet and admits records by the cache's ingress filter (client/discovery Names)"
+        },
+        {
+          "it": "keeps (defers) a packet with a forward/self compression pointer rather than looping",
+          "class": "by-design",
+          "reason": "BD-Matter-MdnsRelevancePreFilter: the packet pre-filter of matter.js's MdnsSocket is a decode-cost optimisation with no wire behaviour; the module decodes every packet and admits records by the cache's ingress filter (client/discovery Names)"
+        },
+        {
+          "it": "keeps a packet shorter than the DNS header",
+          "class": "by-design",
+          "reason": "BD-Matter-MdnsRelevancePreFilter: the packet pre-filter of matter.js's MdnsSocket is a decode-cost optimisation with no wire behaviour; the module decodes every packet and admits records by the cache's ingress filter (client/discovery Names)"
+        },
+        {
+          "it": "keeps a packet whose record count exceeds the available bytes",
+          "class": "by-design",
+          "reason": "BD-Matter-MdnsRelevancePreFilter: the packet pre-filter of matter.js's MdnsSocket is a decode-cost optimisation with no wire behaviour; the module decodes every packet and admits records by the cache's ingress filter (client/discovery Names)"
+        },
+        {
+          "it": "keeps a packet with a name label running past the end",
+          "class": "by-design",
+          "reason": "BD-Matter-MdnsRelevancePreFilter: the packet pre-filter of matter.js's MdnsSocket is a decode-cost optimisation with no wire behaviour; the module decodes every packet and admits records by the cache's ingress filter (client/discovery Names)"
+        },
+        {
+          "it": "keeps a packet using a reserved label type (top bits 0b01/0b10)",
+          "class": "by-design",
+          "reason": "BD-Matter-MdnsRelevancePreFilter: the packet pre-filter of matter.js's MdnsSocket is a decode-cost optimisation with no wire behaviour; the module decodes every packet and admits records by the cache's ingress filter (client/discovery Names)"
+        },
+        {
+          "it": "keeps a packet whose name pointer targets the header",
+          "class": "by-design",
+          "reason": "BD-Matter-MdnsRelevancePreFilter: the packet pre-filter of matter.js's MdnsSocket is a decode-cost optimisation with no wire behaviour; the module decodes every packet and admits records by the cache's ingress filter (client/discovery Names)"
+        },
+        {
+          "it": "keeps a question packet truncated before QTYPE/QCLASS",
+          "class": "by-design",
+          "reason": "BD-Matter-MdnsRelevancePreFilter: the packet pre-filter of matter.js's MdnsSocket is a decode-cost optimisation with no wire behaviour; the module decodes every packet and admits records by the cache's ingress filter (client/discovery Names)"
+        },
+        {
+          "it": "keeps a record whose RDLENGTH runs past the end",
+          "class": "by-design",
+          "reason": "BD-Matter-MdnsRelevancePreFilter: the packet pre-filter of matter.js's MdnsSocket is a decode-cost optimisation with no wire behaviour; the module decodes every packet and admits records by the cache's ingress filter (client/discovery Names)"
+        }
+      ],
+      "reason": "Every case is matter.js's MdnsRelevanceFilter, a packet pre-filter the module does not have (BD-Matter-MdnsRelevancePreFilter); the record-level admission it guards is the cache's ingress filter, held by TestParityDiscovery_IngressFilter.",
       "snapshotSha": "9edda852e395cc8037247a7df5d1ff14d674430e"
     },
     {
       "path": "packages/general/test/net/dns-sd/MdnsSocketTest.ts",
-      "status": "planned",
-      "reason": "Phase 33: a new register root, ported by meaning in this phase.",
+      "status": "partial",
+      "go": [
+        "mdns:TestMdnsServerSplitsResponse",
+        "mdns:TestMdnsSocketQuerySplittingParityMatterJS",
+        "mdns:TestMdnsServerRespondsToStandardQueries",
+        "mdns:TestSockets_Lifecycle",
+        "mdns:TestResponder_CloseIsIdempotentAndFinal",
+        "mdns:TestMdnsSocketConstantsParityMatterJS"
+      ],
+      "missing": [
+        "receives and parses valid DNS query",
+        "receives and parses valid DNS response",
+        "ignores unparseable messages",
+        "waits on close for a message handler still running",
+        "ignores messages after close",
+        "receives messages via IPv6",
+        "sends a simple query",
+        "sends a response with answers",
+        "sends unicast message to specific destination",
+        "sends oversized answer records with warning",
+        "ignores messages received after close starts"
+      ],
+      "left": [
+        {
+          "it": "accepts everything when no names are registered",
+          "class": "by-design",
+          "reason": "BD-Matter-MdnsRelevancePreFilter: the packet pre-filter of matter.js's MdnsSocket is a decode-cost optimisation with no wire behaviour; the module decodes every packet and admits records by the cache's ingress filter (client/discovery Names)"
+        },
+        {
+          "it": "keeps a registered service-type query and drops unrelated traffic",
+          "class": "by-design",
+          "reason": "BD-Matter-MdnsRelevancePreFilter: the packet pre-filter of matter.js's MdnsSocket is a decode-cost optimisation with no wire behaviour; the module decodes every packet and admits records by the cache's ingress filter (client/discovery Names)"
+        },
+        {
+          "it": "matches case-insensitively",
+          "class": "by-design",
+          "reason": "BD-Matter-MdnsRelevancePreFilter: the packet pre-filter of matter.js's MdnsSocket is a decode-cost optimisation with no wire behaviour; the module decodes every packet and admits records by the cache's ingress filter (client/discovery Names)"
+        },
+        {
+          "it": "keeps subtype and operational-instance names (derive the service-type label)",
+          "class": "by-design",
+          "reason": "BD-Matter-MdnsRelevancePreFilter: the packet pre-filter of matter.js's MdnsSocket is a decode-cost optimisation with no wire behaviour; the module decodes every packet and admits records by the cache's ingress filter (client/discovery Names)"
+        },
+        {
+          "it": "keeps an A/AAAA answer for a tracked hostname carrying no service text (trap #1)",
+          "class": "by-design",
+          "reason": "BD-Matter-MdnsRelevancePreFilter: the packet pre-filter of matter.js's MdnsSocket is a decode-cost optimisation with no wire behaviour; the module decodes every packet and admits records by the cache's ingress filter (client/discovery Names)"
+        },
+        {
+          "it": "drops an A/AAAA answer for an untracked hostname",
+          "class": "by-design",
+          "reason": "BD-Matter-MdnsRelevancePreFilter: the packet pre-filter of matter.js's MdnsSocket is a decode-cost optimisation with no wire behaviour; the module decodes every packet and admits records by the cache's ingress filter (client/discovery Names)"
+        },
+        {
+          "it": "follows compression pointers to a footprint reachable only via the pointer",
+          "class": "by-design",
+          "reason": "BD-Matter-MdnsRelevancePreFilter: the packet pre-filter of matter.js's MdnsSocket is a decode-cost optimisation with no wire behaviour; the module decodes every packet and admits records by the cache's ingress filter (client/discovery Names)"
+        },
+        {
+          "it": "disables filtering when an owner registers \"all\"",
+          "class": "by-design",
+          "reason": "BD-Matter-MdnsRelevancePreFilter: the packet pre-filter of matter.js's MdnsSocket is a decode-cost optimisation with no wire behaviour; the module decodes every packet and admits records by the cache's ingress filter (client/discovery Names)"
+        },
+        {
+          "it": "reverts to accept-all after the last owner unregisters",
+          "class": "by-design",
+          "reason": "BD-Matter-MdnsRelevancePreFilter: the packet pre-filter of matter.js's MdnsSocket is a decode-cost optimisation with no wire behaviour; the module decodes every packet and admits records by the cache's ingress filter (client/discovery Names)"
+        },
+        {
+          "it": "unions footprints across owners",
+          "class": "by-design",
+          "reason": "BD-Matter-MdnsRelevancePreFilter: the packet pre-filter of matter.js's MdnsSocket is a decode-cost optimisation with no wire behaviour; the module decodes every packet and admits records by the cache's ingress filter (client/discovery Names)"
+        },
+        {
+          "it": "adds and removes a tracked name incrementally",
+          "class": "by-design",
+          "reason": "BD-Matter-MdnsRelevancePreFilter: the packet pre-filter of matter.js's MdnsSocket is a decode-cost optimisation with no wire behaviour; the module decodes every packet and admits records by the cache's ingress filter (client/discovery Names)"
+        },
+        {
+          "it": "keeps a footprint shared by owners until the last releases it (refcount)",
+          "class": "by-design",
+          "reason": "BD-Matter-MdnsRelevancePreFilter: the packet pre-filter of matter.js's MdnsSocket is a decode-cost optimisation with no wire behaviour; the module decodes every packet and admits records by the cache's ingress filter (client/discovery Names)"
+        }
+      ],
+      "reason": "Response splitting with additional records spilled into follow-up packets (the responder), query splitting since phase 33 (mdns.PackDNSQueries, MdnsSocket.send and splitQueries: questions over MaxMessageSize split without known answers, known answers over it spilled after the question), closing, and the group addresses. Missing: the receive and send paths exercised through a socket rather than the codec and a fake wire.",
       "snapshotSha": "7a1efc0626475cb6ca6e47be184775b540886541"
     },
     {
       "path": "packages/general/test/net/dns-sd/ServiceDiscoveryTest.ts",
-      "status": "planned",
-      "reason": "Phase 33: a new register root, ported by meaning in this phase.",
+      "status": "partial",
+      "go": [
+        "client/discovery:TestBrowse_FindsAForeignServiceType",
+        "client/discovery:TestBrowse_CachedInstancesAndWithdrawals"
+      ],
+      "missing": [
+        "discovers a service instance",
+        "yields nothing when aborted before discovery",
+        "removes filter from DnssdNames after abort"
+      ],
+      "reason": "The Go form of discoverNames is Names.Browse, which returns the instances when its context ends. Missing: the iterator's per-instance yield, an abort before discovery and the filter removed after it, asserted on Browse.",
       "snapshotSha": "b61c3722ec71d1382d85746a32ba959879463143"
     },
     {
       "path": "packages/general/test/net/http/MockWsConnectionTest.ts",
-      "status": "planned",
-      "reason": "Phase 33: a new register root, ported by meaning in this phase.",
+      "status": "excluded",
+      "class": "test-infrastructure",
+      "reason": "The mock WebSocket connection of matter.js's own tests; the module has no WebSocket transport.",
       "snapshotSha": "0782e5797d8c73502d246a5d65679d218c07a7ed"
     },
     {
       "path": "packages/general/test/net/http/WebSocketClientTest.ts",
-      "status": "planned",
-      "reason": "Phase 33: a new register root, ported by meaning in this phase.",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "matter.js's WebSocket client; the module has no WebSocket transport.",
       "snapshotSha": "8ce7c87e12b4a27985a3d0736515a87ae246c56f"
     },
     {
       "path": "packages/general/test/net/mock/MockTcpTest.ts",
-      "status": "planned",
-      "reason": "Phase 33: a new register root, ported by meaning in this phase.",
+      "status": "excluded",
+      "class": "test-infrastructure",
+      "reason": "matter.js's mock TCP network for its own tests; the module's tests use fabrictest's in-memory network, and transport/tcp has its own tests.",
       "snapshotSha": "7c6de63be1b9364e3c4b7260631f8c1a5bf599a0"
     },
     {
       "path": "packages/general/test/net/udp/UdpMulticastServerTest.ts",
-      "status": "planned",
-      "reason": "Phase 33: a new register root, ported by meaning in this phase.",
+      "status": "partial",
+      "go": [
+        "mdns:TestSockets_Lifecycle"
+      ],
+      "missing": [
+        "sends at most once per IP family when an interface has multiple same-family addresses",
+        "opens no broadcast channel for a send after the server closed",
+        "closes the IPv4 socket when the IPv6 socket cannot be created",
+        "closes both sockets when the IPv6 socket cannot join the multicast group"
+      ],
+      "left": [
+        {
+          "it": "skips IPv4 when no broadcast address is configured",
+          "class": "js-runtime-only",
+          "reason": "a per-server IPv4 broadcast-address option; the module's sockets join the mDNS groups on every multicast interface (mdns/socket.go)"
+        },
+        {
+          "it": "evicts a broadcast channel after a send failure and rebinds on the next send",
+          "class": "js-runtime-only",
+          "reason": "the per-send broadcast channels of matter.js's UdpMulticastServer; the module keeps one socket per family"
+        },
+        {
+          "it": "leaves no broadcast channel open for a send started while the server closes",
+          "class": "js-runtime-only",
+          "reason": "the per-send broadcast channels of matter.js's UdpMulticastServer; the module keeps one socket per family"
+        }
+      ],
+      "reason": "The Go counterpart is mdns/socket.go, one UDP socket per IP family. Missing: one send per family asserted, a send after close counted, and the closing of both sockets when one family fails, where the module keeps the surviving family (findings register, phase 33).",
       "snapshotSha": "15242e8161ae5208a0aae3ca613d5ac558cdf73f"
     },
     {

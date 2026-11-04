@@ -217,6 +217,91 @@ func unpackReadable(msg []byte) (m *dns.Msg, ok bool) {
 	return m, true
 }
 
+// MaxMessageSize is the largest mDNS message the module writes: an IPv6
+// minimum MTU of 1280 bytes less the IPv6 and UDP headers. Mirrors
+// matter.js packages/general/src/codec/DnsCodec.ts:26 at 862ad75f
+// (MAX_MDNS_MESSAGE_SIZE).
+const MaxMessageSize = 1232
+
+// PackDNSQueries encodes an mDNS query as the messages it takes to stay
+// within [MaxMessageSize]. Questions that do not fit one message are split
+// across several, each without known answers (known-answer suppression
+// cannot span the split); questions that fit carry their known answers,
+// and answers past the limit spill into follow-up messages without the
+// questions, every message but the last flagged truncated (RFC 6762
+// §7.2). Mirrors matter.js
+// packages/general/src/net/dns-sd/MdnsSocket.ts:102-178 at 862ad75f (send)
+// and :208-238 (splitQueries).
+func PackDNSQueries(questions []DNSQuestion, knownAnswers []DNSRecord) ([][]byte, error) {
+	msgOf := func(qs []dns.Question, rrs []dns.RR, truncated bool) *dns.Msg {
+		m := new(dns.Msg)
+		m.Question, m.Answer, m.Truncated = qs, rrs, truncated
+		return m
+	}
+	pack := func(m *dns.Msg) ([]byte, error) {
+		out, err := m.Pack()
+		if err != nil {
+			return nil, fmt.Errorf("mdns: pack DNS query: %w", err)
+		}
+		return out, nil
+	}
+	const header = 12
+	qs := make([]dns.Question, 0, len(questions))
+	for _, q := range questions {
+		qs = append(qs, dns.Question{Name: fqdnOf(q.Name), Qtype: uint16(q.Type), Qclass: dns.ClassINET})
+	}
+	var chunks [][]dns.Question
+	var cur []dns.Question
+	size := header
+	for _, q := range qs {
+		n := msgOf([]dns.Question{q}, nil, false).Len() - header
+		if size+n > MaxMessageSize && len(cur) > 0 {
+			chunks, cur, size = append(chunks, cur), nil, header
+		}
+		cur, size = append(cur, q), size+n
+	}
+	if len(cur) > 0 || len(chunks) == 0 {
+		chunks = append(chunks, cur)
+	}
+	var out [][]byte
+	if len(chunks) > 1 {
+		for _, c := range chunks {
+			b, err := pack(msgOf(c, nil, false))
+			if err != nil {
+				return nil, err
+			}
+			out = append(out, b)
+		}
+		return out, nil
+	}
+	m := msgOf(chunks[0], nil, false)
+	size = m.Len()
+	for _, r := range knownAnswers {
+		rr := rrOf(r)
+		if rr == nil {
+			continue
+		}
+		n := msgOf(nil, []dns.RR{rr}, false).Len() - header
+		if size+n > MaxMessageSize {
+			m.Truncated = true
+			b, err := pack(m)
+			if err != nil {
+				return nil, err
+			}
+			out = append(out, b)
+			m = msgOf(nil, nil, false)
+			size = header
+		}
+		m.Answer = append(m.Answer, rr)
+		size += n
+	}
+	b, err := pack(m)
+	if err != nil {
+		return nil, err
+	}
+	return append(out, b), nil
+}
+
 func recordsOf(rrs []dns.RR) []DNSRecord {
 	if len(rrs) == 0 {
 		return nil

@@ -503,6 +503,22 @@ the module reads codes to commission and prints the standard-flow codes of
 its own node, so a validation switch, a flow argument and a TLV-data
 builder would serve no caller.
 
+### BD-Matter-MdnsRelevancePreFilter — no packet pre-filter in front of the mDNS decode
+
+matter.js's MdnsSocket runs every inbound packet through a relevance
+filter before decoding it: interested components register names, the
+filter reduces each to a hashed footprint label and scans only a packet's
+name structure, keeping any packet it cannot judge
+(`packages/general/src/net/dns-sd/MdnsRelevanceFilter.ts:63-75` at
+`862ad75f`). The module decodes every packet (`mdns.ParseDNSMessage`) and
+admits records by the discovery cache's ingress filter (client/discovery
+`Names`, `TestParityDiscovery_IngressFilter`), as `mdns/query_conn.go`
+states. The 36 cases of `MdnsRelevanceFilterTest.ts` and the 12 relevance
+cases of `MdnsSocketTest.ts` are `left` rows of the test register (phase
+33). Reasoning: the filter saves decode work and by its own contract never
+drops what the later gates would keep, so it has no wire behaviour to
+mirror.
+
 ### BD-Matter-MessageCodec-PrivacyWithExtensions — a header with the privacy flag and message extensions is decoded
 
 matter.js `decodePacket` refuses a packet header that sets both the P and the

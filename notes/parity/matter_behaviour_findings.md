@@ -806,6 +806,18 @@ with a port of the named case.
   (`encodedUnit`). Route: derive these in the generator, or have the
   extractor write matter.js's computed default into `parity/schema.json`.
 
+- **No copyHealth for re-resolved addresses.** matter.js's
+  `ServerAddressSet.copyHealth` carries an address's health markers onto an
+  equal address of a new set (`ServerAddressSetTest.ts` "copies health
+  markers onto equal targets"); `client/discovery` keeps health on
+  `Address` (`HealthyAt`, `UnhealthyAt`) and has no copy step.
+- **The responder sockets keep the surviving IP family.** matter.js's
+  `UdpMulticastServer` closes the IPv4 socket when the IPv6 one cannot be
+  created or join the group (`UdpMulticastServerTest.ts` two cases);
+  `mdns/socket.go` keeps the family that opened and fails only when both
+  do. Route: decide whether the module mirrors the all-or-nothing open or
+  records the difference in `by_design.md`.
+
 ## Tier 3 — LOW
 
 ---
