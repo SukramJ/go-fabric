@@ -5,9 +5,12 @@ package node
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
 	"fmt"
 
+	"github.com/SukramJ/go-fabric/bootid"
 	"github.com/SukramJ/go-fabric/endpoint"
 	"github.com/SukramJ/go-fabric/endpoint/sqlitestore"
 	"github.com/SukramJ/go-fabric/store"
@@ -28,8 +31,9 @@ import (
 // so the reset does not bring the node back: the host comes back by
 // building a new node on the same store and starting it if the old one
 // ran, exactly as after a restart (fabrictest.Device.FactoryReset does).
-// The new node starts uncommissioned, with a fresh UniqueID pin and a
-// device-type validation that reports every endpoint again. A host's own
+// The new node starts uncommissioned, with a fresh random UniqueID pinned
+// (unless UniqueID rotation is on) and a device-type validation that
+// reports every endpoint again. A host's own
 // [Config].EndpointPersistence is the host's to erase.
 //
 // FactoryReset is serialised with Start and Stop. Mirrors matter.js
@@ -79,11 +83,35 @@ func (n *Node) eraseStores(ctx context.Context) error {
 	var errs []error
 	if err := st.Erase(ctx); err != nil {
 		errs = append(errs, fmt.Errorf("node: factory reset: erase the store: %w", err))
+	} else if err := n.pinFreshUniqueID(ctx, st); err != nil {
+		errs = append(errs, fmt.Errorf("node: factory reset: pin a fresh UniqueID: %w", err))
 	}
 	if endpoints != nil {
 		errs = append(errs, eraseEndpointRecords(ctx, endpoints))
 	}
 	return errors.Join(errs...)
+}
+
+// pinFreshUniqueID pins a fresh random UniqueID — 16 random bytes in hex,
+// DeriveUniqueID's shape — in the erased store, so the node that comes back
+// serves another one (persisted.uniqueID reads a stored pin first). matter.js
+// draws one when the erased state holds none (BasicInformationServer.ts:89-91,
+// createUniqueId :161-170 at 862ad75f), so its reset node serves a new
+// UniqueID (testing/node-helpers.ts:164-165). With UniqueID rotation on the
+// pin is never read, and none is written.
+func (n *Node) pinFreshUniqueID(ctx context.Context, st store.Settings) error {
+	salt := n.persisted.salt
+	if salt == nil {
+		salt = bootid.Salt
+	}
+	if salt() != [16]byte{} {
+		return nil
+	}
+	var b [16]byte
+	if _, err := rand.Read(b[:]); err != nil {
+		return err
+	}
+	return st.SetSetting(ctx, store.SettingUniqueID, hex.EncodeToString(b[:]))
 }
 
 // eraseEndpointRecords removes every endpoint record (matter.js erases the

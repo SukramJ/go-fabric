@@ -59,7 +59,8 @@ func (b *Bridge) deviceTypeValidator() *endpoint.DeviceTypeValidator {
 
 // validateDeviceTypes judges topology and logs what it newly violates, as
 // DeviceTypeConformanceService logs "Endpoint … violates device type
-// requirements"; a refusal is returned unlogged.
+// requirements" — the Root-asserted violations at debug; a refusal is
+// returned unlogged.
 func (b *Bridge) validateDeviceTypes(topology *endpoint.Topology) error {
 	verdict, err := b.deviceTypeValidator().Validate(topology)
 	if err != nil {
@@ -69,6 +70,21 @@ func (b *Bridge) validateDeviceTypes(topology *endpoint.Topology) error {
 		v := &verdict.Fresh[i]
 		b.logger.Warn(
 			"matter.devicetype.violation",
+			slog.Int("endpoint", int(v.Endpoint)),
+			slog.String("device_type", v.DeviceType),
+			slog.String("requirement", v.Requirement),
+			slog.String("kind", string(v.Kind)),
+			slog.String("detail", v.Detail),
+		)
+	}
+	// What only a device type of the node asserts at the Root location
+	// requires is logged at debug, never as a warning — matter.js
+	// DeviceTypeConformanceService.ts:437-442 at 862ad75f ("does not meet
+	// requirements that device types of its node assert at the Root").
+	for i := range verdict.FreshAssertedAtRoot {
+		v := &verdict.FreshAssertedAtRoot[i]
+		b.logger.Debug(
+			"matter.devicetype.root_asserted",
 			slog.Int("endpoint", int(v.Endpoint)),
 			slog.String("device_type", v.DeviceType),
 			slog.String("requirement", v.Requirement),

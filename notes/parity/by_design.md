@@ -3405,12 +3405,11 @@ through the RemoveFabric fan-out, stops the node and erases its credential
 store (`store.Eraser`) and endpoint records, and `Controller.Erase` closes
 the controller and erases its database; the host builds the node or
 controller that comes back on the same store (fabrictest's
-`Device.FactoryReset` restarts a device that ran). Two consequences: the
+`Device.FactoryReset` restarts a device that ran). One consequence: the
 endpoint allocation counter of `endpoint.Store` is not rewound (the
-interface has no reset; a freed number is reissued only after the wrap),
-and the re-pinned UniqueID is derived again (`DeriveUniqueID`), equal to the
-old one for the same vendor, product, label and serial, where matter.js
-draws a fresh one. Phase 31.
+interface has no reset; a freed number is reissued only after the wrap).
+The erased store gets a fresh random UniqueID pin, as matter.js draws one
+(phase 32). Phase 31.
 
 By design. Rebuilding is how every in-memory state a reset erases — the
 root servers' values, Wi-Fi networks, scenes, the validator — goes for

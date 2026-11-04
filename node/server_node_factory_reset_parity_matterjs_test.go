@@ -132,8 +132,17 @@ func TestServerNodeFactoryResetParityMatterJS(t *testing.T) {
 		}
 		assertFactoryState(t, p.Device, s, true)
 		// node-helpers.ts:164-165: the node that came back serves its own.
-		if got := p.Device.Node().UniqueID(); got == "" || got == staleUniqueID {
+		got := p.Device.Node().UniqueID()
+		if got == "" || got == staleUniqueID {
 			t.Fatalf("UniqueID %q served after the reset", got)
+		}
+		// A fresh one, drawn at random, not derived again: a second reset
+		// of the same identity rotates it once more.
+		if err := p.Device.FactoryReset(parityCtx(t)); err != nil {
+			t.Fatal(err)
+		}
+		if again := p.Device.Node().UniqueID(); again == "" || again == got {
+			t.Fatalf("UniqueID %q served after the second reset, want another than %q", again, got)
 		}
 	})
 
