@@ -5555,7 +5555,10 @@ the chime are bridged devices, the chime one of its own (the Camera device
 type lists no Chime); with PERZONESENS the zone management serves no
 Sensitivity ("!PERZONESENS"), where the camera-app sets one that is not
 served either; the AvAnalysis app-pipe commands are logged and dropped (no
-AvAnalysis cluster in the snapshot). TESTING ONLY, off by default; the
+AvAnalysis cluster in the snapshot); a triggered zone stops when its
+TriggerDetectedDuration has elapsed, where the camera-app's one-second timer
+stops it a second later (`zone-manager.cpp:197`) — at the very end of the
+window TC-ZONEMGMT-2.4 allows (`TC_ZONEMGMT_2_4.py:279-285`). TESTING ONLY, off by default; the
 stream, PTZ and chime state is kept in `--db` as
 `BD-Matter-CameraPersistenceIsTheHosts` leaves it to the host.
 

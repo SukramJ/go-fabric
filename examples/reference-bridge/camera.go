@@ -1080,7 +1080,12 @@ func (c *demoCamera) zoneTick() {
 		}
 		t.sinceInitial += period
 		switch {
-		case t.sinceInitial > t.detectedDuration:
+		case t.sinceInitial >= t.detectedDuration:
+			// The camera-app stops a second later (zone-manager.cpp:197,
+			// `>`), at the very end of what TC-ZONEMGMT-2.4 step 3b
+			// allows (InitialDuration + 1 s from the ZoneTriggered
+			// report, TC_ZONEMGMT_2_4.py:279-285); the zone stays
+			// triggered for TriggerDetectedDuration here.
 			stops = append(stops, stopped{t.trigger.ZoneId, zmdef.ZoneEventStoppedReasonActionStopped})
 			t.blind = true
 		case t.sinceInitial > t.trigger.MaxDuration:
