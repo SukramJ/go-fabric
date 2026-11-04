@@ -13,6 +13,8 @@ import (
 
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/cluster/core"
+	"github.com/SukramJ/go-fabric/cluster/spec"
+	"github.com/SukramJ/go-fabric/im"
 )
 
 func TestDiagLogs_ClusterID(t *testing.T) {
@@ -87,8 +89,8 @@ func TestDiagLogs_InvokeUnknownCmdReturnsError(t *testing.T) {
 	ctx := context.Background()
 	for _, cmdID := range []uint32{0x01, 0x02, 0xFF} {
 		_, err := d.MatterInvoke(ctx, cmdID, nil)
-		if err == nil {
-			t.Errorf("MatterInvoke(0x%02X) expected error, got nil", cmdID)
+		if spec.StatusOf(err) != im.StatusUnsupportedCommand {
+			t.Errorf("MatterInvoke(0x%02X): status %v (%v), want %v", cmdID, spec.StatusOf(err), err, im.StatusUnsupportedCommand)
 		}
 	}
 }
@@ -99,8 +101,8 @@ func TestDiagLogs_WriteReturnsError(t *testing.T) {
 	ctx := context.Background()
 	for _, attrID := range []uint32{0x0000, 0xFFFD, 0xBEEF} {
 		err := d.MatterWrite(ctx, attrID, nil)
-		if err == nil {
-			t.Errorf("MatterWrite(0x%04X) expected error, got nil", attrID)
+		if spec.StatusOf(err) != im.StatusUnsupportedAttribute {
+			t.Errorf("MatterWrite(0x%04X): status %v (%v), want %v", attrID, spec.StatusOf(err), err, im.StatusUnsupportedAttribute)
 		}
 	}
 }

@@ -13,6 +13,7 @@ import (
 
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/cluster/core"
+	"github.com/SukramJ/go-fabric/cluster/spec"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
 )
@@ -156,8 +157,8 @@ func TestGenDiag_WriteReturnsError(t *testing.T) {
 	g := core.NewGeneralDiagnostics(core.BootReasonPowerOnReboot)
 	ctx := context.Background()
 	err := g.MatterWrite(ctx, 0x0001, uint16(0))
-	if err == nil {
-		t.Fatal("expected error for write, got nil")
+	if spec.StatusOf(err) != im.StatusUnsupportedWrite {
+		t.Fatalf("RebootCount write: status %v (%v), want %v", spec.StatusOf(err), err, im.StatusUnsupportedWrite)
 	}
 }
 

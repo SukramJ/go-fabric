@@ -15,6 +15,7 @@ import (
 	"github.com/SukramJ/go-fabric/clock/clocktest"
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/cluster/core"
+	"github.com/SukramJ/go-fabric/cluster/spec"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
 )
@@ -228,8 +229,8 @@ func TestGencomm_WriteBreadcrumbWrongType(t *testing.T) {
 	t.Parallel()
 	gc := defaultGencomm(t)
 	err := gc.MatterWrite(context.Background(), 0x0000, "not-a-uint64")
-	if err == nil {
-		t.Fatal("expected error for wrong type, got nil")
+	if spec.StatusOf(err) != im.StatusFailure {
+		t.Fatalf("Breadcrumb of the wrong type: status %v (%v), want %v", spec.StatusOf(err), err, im.StatusFailure)
 	}
 }
 
@@ -238,8 +239,8 @@ func TestGencomm_WriteReadOnlyAttr(t *testing.T) {
 	gc := defaultGencomm(t)
 	// RegulatoryConfig (0x0002) is read-only via MatterWrite.
 	err := gc.MatterWrite(context.Background(), 0x0002, uint8(1))
-	if err == nil {
-		t.Fatal("expected error for write to read-only attr, got nil")
+	if spec.StatusOf(err) != im.StatusUnsupportedWrite {
+		t.Fatalf("write to read-only RegulatoryConfig: status %v (%v), want %v", spec.StatusOf(err), err, im.StatusUnsupportedWrite)
 	}
 }
 
@@ -903,8 +904,8 @@ func TestGencomm_Invoke_UnknownCmd(t *testing.T) {
 	t.Parallel()
 	gc := defaultGencomm(t)
 	_, err := gc.MatterInvoke(context.Background(), 0xFF, nil)
-	if err == nil {
-		t.Fatal("expected error for unknown command, got nil")
+	if spec.StatusOf(err) != im.StatusUnsupportedCommand {
+		t.Fatalf("unknown command: status %v (%v), want %v", spec.StatusOf(err), err, im.StatusUnsupportedCommand)
 	}
 }
 

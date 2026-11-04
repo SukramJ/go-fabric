@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/SukramJ/go-fabric/cluster/core"
+	"github.com/SukramJ/go-fabric/cluster/spec"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
 	mstore "github.com/SukramJ/go-fabric/store"
@@ -970,8 +971,8 @@ func TestAccessControl_MatterWrite_WrongType(t *testing.T) {
 		t.Fatalf("NewAccessControl: %v", err)
 	}
 	err = ac.MatterWrite(context.Background(), 0x0000, "not a slice")
-	if err == nil {
-		t.Fatal("MatterWrite(ACL, wrong type): expected error, got nil")
+	if spec.StatusOf(err) != im.StatusFailure {
+		t.Fatalf("MatterWrite(ACL, wrong type): status %v (%v), want %v", spec.StatusOf(err), err, im.StatusFailure)
 	}
 }
 
@@ -1082,8 +1083,8 @@ func TestAccessControl_MatterWrite_UnknownAttr(t *testing.T) {
 		t.Fatalf("NewAccessControl: %v", err)
 	}
 	err = ac.MatterWrite(context.Background(), 0xDEAD, "any")
-	if err == nil {
-		t.Fatal("MatterWrite(unknown attr): expected error, got nil")
+	if spec.StatusOf(err) != im.StatusFailure {
+		t.Fatalf("MatterWrite(unknown attr): status %v (%v), want %v", spec.StatusOf(err), err, im.StatusFailure)
 	}
 }
 
