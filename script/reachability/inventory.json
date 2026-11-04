@@ -6913,49 +6913,49 @@
       "identifier": "TestAddKnownPeerMergeAndCoalescedSave",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/set_test.go",
-      "line": 69
+      "line": 74
     },
     {
       "package": "client/peer",
       "identifier": "TestAdoptSessions",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/set_test.go",
-      "line": 153
+      "line": 162
     },
     {
       "package": "client/peer",
       "identifier": "TestCloseDeleteAndDisconnect",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/set_test.go",
-      "line": 210
+      "line": 223
     },
     {
       "package": "client/peer",
       "identifier": "TestCloseSweepsSessionsAfterWorkers",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/set_test.go",
-      "line": 287
+      "line": 304
     },
     {
       "package": "client/peer",
       "identifier": "TestConnectDiscoveredAddress",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/connection_test.go",
-      "line": 59
+      "line": 60
     },
     {
       "package": "client/peer",
       "identifier": "TestConnectReuseSharedProcessAndTimeout",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/connection_test.go",
-      "line": 312
+      "line": 331
     },
     {
       "package": "client/peer",
       "identifier": "TestConnectionErrorDelays",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/connection_test.go",
-      "line": 189
+      "line": 200
     },
     {
       "package": "client/peer",
@@ -6976,35 +6976,35 @@
       "identifier": "TestDiscoverKick",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/connection_test.go",
-      "line": 403
+      "line": 426
     },
     {
       "package": "client/peer",
       "identifier": "TestEstablishmentUnresponsive",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/connection_test.go",
-      "line": 436
+      "line": 461
     },
     {
       "package": "client/peer",
       "identifier": "TestFallbackOnlyAndNotFirst",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/connection_test.go",
-      "line": 91
+      "line": 94
     },
     {
       "package": "client/peer",
       "identifier": "TestFallbackRetiredAfterStabilization",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/connection_test.go",
-      "line": 121
+      "line": 126
     },
     {
       "package": "client/peer",
       "identifier": "TestHandleErrorOverrideAndFatal",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/connection_test.go",
-      "line": 259
+      "line": 274
     },
     {
       "package": "client/peer",
@@ -7018,14 +7018,14 @@
       "identifier": "TestInitiateConnectionWithLiveSession",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/set_test.go",
-      "line": 258
+      "line": 273
     },
     {
       "package": "client/peer",
       "identifier": "TestKickRestartsTheExchange",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/connection_test.go",
-      "line": 355
+      "line": 376
     },
     {
       "package": "client/peer",
@@ -7046,35 +7046,35 @@
       "identifier": "TestMonitorAllProbesFail",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/monitor_test.go",
-      "line": 167
+      "line": 172
     },
     {
       "package": "client/peer",
       "identifier": "TestMonitorMigratesToAnAlternate",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/monitor_test.go",
-      "line": 133
+      "line": 136
     },
     {
       "package": "client/peer",
       "identifier": "TestMonitorScheduledByAServiceChange",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/monitor_test.go",
-      "line": 224
+      "line": 233
     },
     {
       "package": "client/peer",
       "identifier": "TestMonitorSessionSuspect",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/monitor_test.go",
-      "line": 193
+      "line": 200
     },
     {
       "package": "client/peer",
       "identifier": "TestMonitorStillDiscoveredAndCooldown",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/monitor_test.go",
-      "line": 95
+      "line": 96
     },
     {
       "package": "client/peer",
@@ -7095,42 +7095,42 @@
       "identifier": "TestNewSetNeedsItsCollaborators",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/set_test.go",
-      "line": 23
+      "line": 24
     },
     {
       "package": "client/peer",
       "identifier": "TestNewestSessionActivityParityMatterJS",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/set_test.go",
-      "line": 314
+      "line": 333
     },
     {
       "package": "client/peer",
       "identifier": "TestNoSharedTrustRootsDeletesTheRecordAndRetries",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/connection_test.go",
-      "line": 243
+      "line": 256
     },
     {
       "package": "client/peer",
       "identifier": "TestObserve",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/observer_test.go",
-      "line": 18
+      "line": 19
     },
     {
       "package": "client/peer",
       "identifier": "TestObserveEstablishmentUnresponsive",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/observer_test.go",
-      "line": 68
+      "line": 71
     },
     {
       "package": "client/peer",
       "identifier": "TestOperationalAddressStaysAsFallback",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/connection_test.go",
-      "line": 164
+      "line": 173
     },
     {
       "package": "client/peer",
@@ -7319,7 +7319,7 @@
       "identifier": "TestPeerTransportFlags",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/transport_test.go",
-      "line": 17
+      "line": 18
     },
     {
       "package": "client/peer",
@@ -7333,14 +7333,14 @@
       "identifier": "TestProbeFailures",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/probe_test.go",
-      "line": 134
+      "line": 137
     },
     {
       "package": "client/peer",
       "identifier": "TestProbeReadsTheReports",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/probe_test.go",
-      "line": 88
+      "line": 89
     },
     {
       "package": "client/peer",
@@ -7354,7 +7354,7 @@
       "identifier": "TestSemaphoreGrantedAndClear",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/transport_test.go",
-      "line": 65
+      "line": 68
     },
     {
       "package": "client/peer",
@@ -7368,28 +7368,28 @@
       "identifier": "TestServiceChangeUpdatesDiscoveryData",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/set_test.go",
-      "line": 125
+      "line": 132
     },
     {
       "package": "client/peer",
       "identifier": "TestSessionMoveCarriesOperationalAddress",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/monitor_test.go",
-      "line": 245
+      "line": 256
     },
     {
       "package": "client/peer",
       "identifier": "TestSessionParametersPreferTheReport",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/set_test.go",
-      "line": 192
+      "line": 203
     },
     {
       "package": "client/peer",
       "identifier": "TestSetForGetAndUnknownFabric",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/set_test.go",
-      "line": 44
+      "line": 47
     },
     {
       "package": "client/peer",
@@ -7403,14 +7403,14 @@
       "identifier": "TestTwoAddressesStaggered",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/connection_test.go",
-      "line": 145
+      "line": 152
     },
     {
       "package": "client/peer",
       "identifier": "TestUnhandledErrorAndDisconnectedSet",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/connection_test.go",
-      "line": 292
+      "line": 309
     },
     {
       "package": "clock/clocktest",
@@ -29845,7 +29845,7 @@
       "identifier": "TestSessionShutdownParityMatterJS",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/subscription/slow_report_parity_matterjs_test.go",
-      "line": 307
+      "line": 309
     },
     {
       "package": "im/subscription",
@@ -29859,7 +29859,7 @@
       "identifier": "TestSlowReportParityMatterJS",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/subscription/slow_report_parity_matterjs_test.go",
-      "line": 145
+      "line": 135
     },
     {
       "package": "im/subscription",
@@ -32106,35 +32106,35 @@
       "identifier": "TestCloseAllGraceful_DeadlinePastSkipsNotifications",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/operational/manager_close_parity_test.go",
-      "line": 402
+      "line": 409
     },
     {
       "package": "secure/operational",
       "identifier": "TestCloseAllGraceful_NotifiesEveryPeerWithoutReannounce",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/operational/manager_close_parity_test.go",
-      "line": 348
+      "line": 355
     },
     {
       "package": "secure/operational",
       "identifier": "TestClosePeerLost_ForceClosesWithoutCloseSession",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/operational/manager_close_parity_test.go",
-      "line": 438
+      "line": 445
     },
     {
       "package": "secure/operational",
       "identifier": "TestClosePeer_NotifiesAndResumesBroadcast",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/operational/manager_close_parity_test.go",
-      "line": 242
+      "line": 247
     },
     {
       "package": "secure/operational",
       "identifier": "TestClose_PeerInitiated_DoesNotEchoGracefulClose",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/operational/manager_close_parity_test.go",
-      "line": 315
+      "line": 322
     },
     {
       "package": "secure/operational",
@@ -32197,7 +32197,7 @@
       "identifier": "TestPeerCapEviction_ForceClosesWithoutCloseSessionOrReannounce",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/operational/manager_close_parity_test.go",
-      "line": 182
+      "line": 187
     },
     {
       "package": "secure/operational",
@@ -32211,21 +32211,21 @@
       "identifier": "TestReapIdle_NotifiesPeerBeforeKeyZeroise",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/operational/manager_close_parity_test.go",
-      "line": 100
+      "line": 101
     },
     {
       "package": "secure/operational",
       "identifier": "TestReapIdle_ReannouncePerFabricPeerPair",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/operational/manager_close_parity_test.go",
-      "line": 278
+      "line": 283
     },
     {
       "package": "secure/operational",
       "identifier": "TestReapIdle_ReannounceSkippedWhilePeerKeepsAnotherSession",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/operational/manager_close_parity_test.go",
-      "line": 140
+      "line": 143
     },
     {
       "package": "secure/operational",

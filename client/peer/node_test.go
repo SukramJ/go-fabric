@@ -74,6 +74,10 @@ func txtRR(name string, ttl uint32, entries ...string) dns.RR {
 	return &dns.TXT{Hdr: rrHdr(name, dns.TypeTXT, ttl), Txt: entries}
 }
 
+// eventually polls cond on the wall clock until it holds or ten seconds
+// pass: the external tests run a real node on UDP sockets (startNode,
+// node.Network{Listen: listen}), which no synctest bubble holds. It is the
+// test package's one poll.
 func eventually(t *testing.T, what string, cond func() bool) {
 	t.Helper()
 	deadline := time.Now().Add(10 * time.Second)

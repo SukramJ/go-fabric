@@ -28,6 +28,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/SukramJ/go-fabric/clock/clocktest"
 	"github.com/SukramJ/go-fabric/secure/channel"
 	"github.com/SukramJ/go-fabric/secure/sigma"
 	"github.com/SukramJ/go-fabric/transport/message"
@@ -100,6 +101,8 @@ func closeParityKeys(seed byte) sigma.SessionKeys {
 func TestReapIdle_NotifiesPeerBeforeKeyZeroise(t *testing.T) {
 	t.Parallel()
 	m := NewManager(newMinimalFakeStore())
+	clk := clocktest.New(time.UnixMilli(1_700_000_000_000)) // the stamps the reaper judges
+	m.SetClock(clk)
 	rec := &closeRecorder{}
 	rec.wire(m)
 
@@ -108,7 +111,7 @@ func TestReapIdle_NotifiesPeerBeforeKeyZeroise(t *testing.T) {
 		t.Fatalf("OpenFromPase: %v", err)
 	}
 	entry.MarkActiveRx()
-	time.Sleep(2 * time.Millisecond)
+	clk.Advance(2 * time.Millisecond)
 
 	m.reapIdle(time.Millisecond)
 
@@ -140,6 +143,8 @@ func TestReapIdle_NotifiesPeerBeforeKeyZeroise(t *testing.T) {
 func TestReapIdle_ReannounceSkippedWhilePeerKeepsAnotherSession(t *testing.T) {
 	t.Parallel()
 	m := NewManager(newMinimalFakeStore())
+	clk := clocktest.New(time.UnixMilli(1_700_000_000_000)) // the stamps the reaper judges
+	m.SetClock(clk)
 	rec := &closeRecorder{}
 	rec.wire(m)
 
@@ -153,7 +158,7 @@ func TestReapIdle_ReannounceSkippedWhilePeerKeepsAnotherSession(t *testing.T) {
 	// Only the first session ever saw traffic; the survivor's zero
 	// LastActivity exempts it from the reaper.
 	idle.MarkActiveRx()
-	time.Sleep(2 * time.Millisecond)
+	clk.Advance(2 * time.Millisecond)
 
 	m.reapIdle(time.Millisecond)
 
@@ -278,6 +283,8 @@ func TestClosePeer_NotifiesAndResumesBroadcast(t *testing.T) {
 func TestReapIdle_ReannouncePerFabricPeerPair(t *testing.T) {
 	t.Parallel()
 	m := NewManager(newMinimalFakeStore())
+	clk := clocktest.New(time.UnixMilli(1_700_000_000_000)) // the stamps the reaper judges
+	m.SetClock(clk)
 	rec := &closeRecorder{}
 	rec.wire(m)
 
@@ -292,7 +299,7 @@ func TestReapIdle_ReannouncePerFabricPeerPair(t *testing.T) {
 	for _, e := range opened {
 		e.MarkActiveRx()
 	}
-	time.Sleep(2 * time.Millisecond)
+	clk.Advance(2 * time.Millisecond)
 
 	m.reapIdle(time.Millisecond)
 
@@ -438,6 +445,8 @@ func TestCloseAllGraceful_DeadlinePastSkipsNotifications(t *testing.T) {
 func TestClosePeerLost_ForceClosesWithoutCloseSession(t *testing.T) {
 	t.Parallel()
 	m := NewManager(newMinimalFakeStore())
+	clk := clocktest.New(time.UnixMilli(1_700_000_000_000)) // the stamps the reaper judges
+	m.SetClock(clk)
 	rec := &closeRecorder{}
 	rec.wire(m)
 
@@ -458,8 +467,9 @@ func TestClosePeerLost_ForceClosesWithoutCloseSession(t *testing.T) {
 	if err != nil {
 		t.Fatalf("OpenFromSigma (other peer): %v", err)
 	}
-	asOf := time.Now()
-	time.Sleep(time.Millisecond)
+	clk.Advance(time.Millisecond) // the loss is observed after these sessions opened
+	asOf := clk.Now()
+	clk.Advance(time.Millisecond) // and before the later one
 	later, err := m.OpenFromSigma(fabricIndex, localNodeID, peerNodeID, closeParityKeys(4))
 	if err != nil {
 		t.Fatalf("OpenFromSigma (later): %v", err)

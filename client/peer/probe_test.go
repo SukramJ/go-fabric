@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"net"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/SukramJ/go-fabric/client/exchange"
@@ -87,44 +88,46 @@ func waitBool(t *testing.T, ch <-chan bool) bool {
 // InteractionMessenger.ts:938-972).
 func TestProbeReadsTheReports(t *testing.T) {
 	t.Parallel()
-	h := newHarness(t, nil)
-	s, ch := h.securePair(t, 0x40, udpAddr(addr1))
-	n := nodeSide{h: h, s: s, ch: ch}
-	res := probeAsync(h, s)
-	hdr, proto, payload := n.read(t, h.udp.next(t))
-	if proto.Opcode != im.OpcodeReadRequest || proto.ProtocolID != im.InteractionModelProtocolID {
-		t.Fatalf("probe sent %+v", proto)
-	}
-	req, err := im.UnmarshalReadRequestTLV(tlv.NewDecoder(payload))
-	if err != nil || req.FabricFiltered || len(req.AttributeRequests) != 0 {
-		t.Fatalf("probe request %+v, %v", req, err)
-	}
-	reply := message.ProtocolHeader{NeedsAck: true, HasAck: true, AckCounter: hdr.MessageCounter, Opcode: im.OpcodeReportData, ExchangeID: proto.ExchangeID, ProtocolID: im.InteractionModelProtocolID}
-	n.send(t, reply, reportData(true, false))
-	statusHdr, status, body := n.read(t, h.udp.next(t))
-	sr, err := im.UnmarshalStatusResponseTLV(tlv.NewDecoder(body))
-	if status.Opcode != im.OpcodeStatusResponse || err != nil || sr.Status != im.StatusSuccess {
-		t.Fatalf("after a chunk: %+v %v", status, err)
-	}
-	last := message.ProtocolHeader{NeedsAck: true, HasAck: true, AckCounter: statusHdr.MessageCounter, Opcode: im.OpcodeReportData, ExchangeID: proto.ExchangeID, ProtocolID: im.InteractionModelProtocolID}
-	n.send(t, last, reportData(false, false))
-	if !waitBool(t, res) {
-		t.Fatal("probe failed")
-	}
-	if _, final, _ := n.read(t, h.udp.next(t)); final.Opcode != im.OpcodeStatusResponse {
-		t.Fatalf("after the last report: %+v", final)
-	}
-	// An override sends the probe elsewhere; the session stays where it is.
-	res = probeVia(h, s, udpAddr(addr2))
-	d := h.udp.next(t)
-	if d.to.String() != addr2 {
-		t.Fatalf("override probe went to %v", d.to)
-	}
-	hdr, proto, _ = n.read(t, d)
-	n.send(t, message.ProtocolHeader{HasAck: true, AckCounter: hdr.MessageCounter, Opcode: im.OpcodeReportData, ExchangeID: proto.ExchangeID, ProtocolID: im.InteractionModelProtocolID}, reportData(false, true))
-	if !waitBool(t, res) || s.Addr().String() != addr1 {
-		t.Fatal("the override probe failed or moved the session")
-	}
+	synctest.Test(t, func(t *testing.T) {
+		h := newHarness(t, nil)
+		s, ch := h.securePair(t, 0x40, udpAddr(addr1))
+		n := nodeSide{h: h, s: s, ch: ch}
+		res := probeAsync(h, s)
+		hdr, proto, payload := n.read(t, h.udp.next(t))
+		if proto.Opcode != im.OpcodeReadRequest || proto.ProtocolID != im.InteractionModelProtocolID {
+			t.Fatalf("probe sent %+v", proto)
+		}
+		req, err := im.UnmarshalReadRequestTLV(tlv.NewDecoder(payload))
+		if err != nil || req.FabricFiltered || len(req.AttributeRequests) != 0 {
+			t.Fatalf("probe request %+v, %v", req, err)
+		}
+		reply := message.ProtocolHeader{NeedsAck: true, HasAck: true, AckCounter: hdr.MessageCounter, Opcode: im.OpcodeReportData, ExchangeID: proto.ExchangeID, ProtocolID: im.InteractionModelProtocolID}
+		n.send(t, reply, reportData(true, false))
+		statusHdr, status, body := n.read(t, h.udp.next(t))
+		sr, err := im.UnmarshalStatusResponseTLV(tlv.NewDecoder(body))
+		if status.Opcode != im.OpcodeStatusResponse || err != nil || sr.Status != im.StatusSuccess {
+			t.Fatalf("after a chunk: %+v %v", status, err)
+		}
+		last := message.ProtocolHeader{NeedsAck: true, HasAck: true, AckCounter: statusHdr.MessageCounter, Opcode: im.OpcodeReportData, ExchangeID: proto.ExchangeID, ProtocolID: im.InteractionModelProtocolID}
+		n.send(t, last, reportData(false, false))
+		if !waitBool(t, res) {
+			t.Fatal("probe failed")
+		}
+		if _, final, _ := n.read(t, h.udp.next(t)); final.Opcode != im.OpcodeStatusResponse {
+			t.Fatalf("after the last report: %+v", final)
+		}
+		// An override sends the probe elsewhere; the session stays where it is.
+		res = probeVia(h, s, udpAddr(addr2))
+		d := h.udp.next(t)
+		if d.to.String() != addr2 {
+			t.Fatalf("override probe went to %v", d.to)
+		}
+		hdr, proto, _ = n.read(t, d)
+		n.send(t, message.ProtocolHeader{HasAck: true, AckCounter: hdr.MessageCounter, Opcode: im.OpcodeReportData, ExchangeID: proto.ExchangeID, ProtocolID: im.InteractionModelProtocolID}, reportData(false, true))
+		if !waitBool(t, res) || s.Addr().String() != addr1 {
+			t.Fatal("the override probe failed or moved the session")
+		}
+	})
 }
 
 // TestProbeFailures: a closed session is not probed (requireExistingSession);
@@ -133,56 +136,58 @@ func TestProbeReadsTheReports(t *testing.T) {
 // a reply that is no report fails it.
 func TestProbeFailures(t *testing.T) {
 	t.Parallel()
-	h := newHarness(t, nil)
-	closed := h.secureSession(t, 0x41, udpAddr(addr1))
-	closed.Close()
-	if probe(context.Background(), h.mgr, closed, nil, slog.New(slog.DiscardHandler), nil, nil) {
-		t.Fatal("probed a closed session")
-	}
-	s, ch := h.securePair(t, 0x42, udpAddr(addr1))
-	n := nodeSide{h: h, s: s, ch: ch}
-	res := probeAsync(h, s)
-	h.udp.next(t)
-	for range 20 {
-		h.clock.Advance(5 * time.Second)
-		select {
-		case ok := <-res:
-			if ok {
-				t.Fatal("an unanswered probe succeeded")
-			}
-			if s.IsPeerLost() {
-				t.Fatal("the probe reported the peer lost")
-			}
-			sent := 1
-			for {
-				select {
-				case <-h.udp.ch:
-					sent++
-					continue
-				default:
-				}
-				break
-			}
-			if sent != probeMaxRetransmissions {
-				t.Fatalf("%d transmissions, want %d", sent, probeMaxRetransmissions)
-			}
-			goto answered
-		default:
-			time.Sleep(time.Millisecond)
+	synctest.Test(t, func(t *testing.T) {
+		h := newHarness(t, nil)
+		closed := h.secureSession(t, 0x41, udpAddr(addr1))
+		closed.Close()
+		if probe(context.Background(), h.mgr, closed, nil, slog.New(slog.DiscardHandler), nil, nil) {
+			t.Fatal("probed a closed session")
 		}
-	}
-	t.Fatal("the unanswered probe never gave up")
-answered:
-	res = probeAsync(h, s)
-	hdr, proto, _ := n.read(t, h.udp.next(t))
-	n.send(t, message.ProtocolHeader{HasAck: true, AckCounter: hdr.MessageCounter, Opcode: im.OpcodeStatusResponse, ExchangeID: proto.ExchangeID, ProtocolID: im.InteractionModelProtocolID}, statusSuccess())
-	if waitBool(t, res) {
-		t.Fatal("a StatusResponse passed as a report")
-	}
-	if _, _, err := reportFlags([]byte{0x15}); err == nil {
-		t.Fatal("a truncated report parsed")
-	}
-	if _, _, err := reportFlags([]byte{0x24, 0x00, 0x01}); err == nil {
-		t.Fatal("a non-structure parsed")
-	}
+		s, ch := h.securePair(t, 0x42, udpAddr(addr1))
+		n := nodeSide{h: h, s: s, ch: ch}
+		res := probeAsync(h, s)
+		h.udp.next(t)
+		for range 20 {
+			h.clock.Advance(5 * time.Second)
+			select {
+			case ok := <-res:
+				if ok {
+					t.Fatal("an unanswered probe succeeded")
+				}
+				if s.IsPeerLost() {
+					t.Fatal("the probe reported the peer lost")
+				}
+				sent := 1
+				for {
+					select {
+					case <-h.udp.ch:
+						sent++
+						continue
+					default:
+					}
+					break
+				}
+				if sent != probeMaxRetransmissions {
+					t.Fatalf("%d transmissions, want %d", sent, probeMaxRetransmissions)
+				}
+				goto answered
+			default:
+				time.Sleep(time.Millisecond)
+			}
+		}
+		t.Fatal("the unanswered probe never gave up")
+	answered:
+		res = probeAsync(h, s)
+		hdr, proto, _ := n.read(t, h.udp.next(t))
+		n.send(t, message.ProtocolHeader{HasAck: true, AckCounter: hdr.MessageCounter, Opcode: im.OpcodeStatusResponse, ExchangeID: proto.ExchangeID, ProtocolID: im.InteractionModelProtocolID}, statusSuccess())
+		if waitBool(t, res) {
+			t.Fatal("a StatusResponse passed as a report")
+		}
+		if _, _, err := reportFlags([]byte{0x15}); err == nil {
+			t.Fatal("a truncated report parsed")
+		}
+		if _, _, err := reportFlags([]byte{0x24, 0x00, 0x01}); err == nil {
+			t.Fatal("a non-structure parsed")
+		}
+	})
 }
