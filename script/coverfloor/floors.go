@@ -278,7 +278,7 @@ var floors = []packageFloor{
 	},
 	{
 		pkg: "github.com/SukramJ/go-fabric/script/testparity",
-		min: 67,
+		min: 70,
 		why: "the register guard and the snapshot parsers are covered; writeSnapshot and main, which shell out to git against a matter.js clone, are not, because the guard must run without one",
 	},
 	{
