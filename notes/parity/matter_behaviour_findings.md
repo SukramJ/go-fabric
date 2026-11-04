@@ -856,6 +856,21 @@ environment matter; they failed on an IPv6-capable runner because the node
 did not answer an AAAA query for its own host name, and run unconditionally
 since that was fixed.
 
+### TC-TLSCERT-2.2, TC-TLSCERT-2.9 — the TLS certificate lists over a transport without large payloads
+
+`cluster/tls` serves ProvisionedRootCertificates and
+ProvisionedClientCertificates with the certificates on every transport
+(`BD-chip-TlsCertificateManagement-RulesInServer`, owner decision
+2026-10-28: matter.js's generated behaviour). connectedhomeip encodes the
+ids alone when the read did not come over a large-payload transport
+(`TLSCertificateManagementCluster.cpp:108`, `:136-166` at `6170af84`), and
+both cases read over MRP expecting no certificate (`TC_TLSCERT_2_2.py`
+step 5, `TC_TLSCERT_2_9.py:174-181`); in 2.9 two client certificates with
+their intermediates exceed one message, and the read answers
+RESOURCE_EXHAUSTED. Closing it needs the read path to know the session's
+transport (no such flag reaches a cluster server today) and an owner
+decision to depart from rule 1 here. Phase 34.
+
 ### CHIP data model cross-check — class (ii)
 
 Differences where connectedhomeip's data model (the model the Python

@@ -689,6 +689,23 @@ runs too: its eleventh ChargingTarget is the server's RESOURCE_EXHAUSTED,
 as chip answers (`BD-chip-EVSE-TargetsServerHeld`). No class (a) case is
 left.
 
+The second compositions (phase 34) run the same way, each family against
+the daemon variant that serves its clusters, with PICS generated from that
+daemon (`internal/chiptool/testdata/pics-<variant>/`): `--tls-sim` for
+TLSCERT and TLSCLIENT; `--camera-sim` with `--tls-sim` (a Camera and a Chime
+after chip's camera-app) for WEBRTCP, AVSM, AVSUM, ZONEMGMT, PAVST, PAVSTI
+and CHIME, a case whose CI starts the camera-app with
+`--camera-deferred-offer` or `--camera-test-videosrc` starting the daemon
+with the same switch; `--jointfabric-sim` for JFADMIN and JFDS; and `--otbr`
+against a virtual OTBR agent for TBRM, DGTHREAD and THNETDIR, which run on
+dispatch and weekly in `.github/workflows/otbr-virtual.yml`, never on a pull
+request. The PAVST cases start chip's Push AV server and the JF cases chip's
+JF apps; matter.js's image carries neither, so they run in go-fabric's own
+image (`internal/chiptool/image`, built by `.github/workflows/chip-image.yml`).
+`TestUnfamiliedPrefixes` holds the rest of chip's case prefixes to this
+page: every prefix with three cases or more at the harness commit is a
+family row or a row of the table above.
+
 Some families run but have nothing the daemon can be tested on. The root's
 IcdManagement is not mounted (`node/root.go` buildRoot says why), so the
 ICDM cases are not applicable through the device's own PICS (`ICDM.S=0`).

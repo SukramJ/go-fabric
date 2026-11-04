@@ -991,7 +991,15 @@ var chipFamilies = []family{
 	// (examples/reference-bridge/tls.go); chip runs them against its
 	// all-clusters app's root (TC_TLSCERT_2_1.py and TC_TLSCLIENT_2_1.py
 	// CI arguments, --endpoint 0, at the harness pin).
-	{name: "TLSCERT", variant: variantTLS},
+	{
+		name: "TLSCERT", variant: variantTLS,
+		exclude: map[string]gap{
+			// notes/parity/matter_behaviour_findings.md, "Certification
+			// harness": TC-TLSCERT-2.2, TC-TLSCERT-2.9.
+			"2.2": {classDefect, "TC-TLSCERT-2.2 step 5: the module's reads of ProvisionedRootCertificates and ProvisionedClientCertificates serve the full certificates on every transport (BD-chip-TlsCertificateManagement-RulesInServer, owner decision 2026-10-28, after matter.js's generated behaviour); chip encodes the ids alone outside a large-payload transport (TLSCertificateManagementCluster.cpp:136-166 at the harness pin), and the case reads over MRP expecting no certificate", false},
+			"2.9": {classDefect, "TC-TLSCERT-2.9 step 13: the module's reads of ProvisionedRootCertificates and ProvisionedClientCertificates serve the full certificates on every transport (BD-chip-TlsCertificateManagement-RulesInServer, owner decision 2026-10-28, after matter.js's generated behaviour); chip encodes the ids alone outside a large-payload transport (TLSCertificateManagementCluster.cpp:136-166 at the harness pin), and the case reads over MRP expecting no certificate; two such client certificates exceed one MRP message, so the read answers RESOURCE_EXHAUSTED", false},
+		},
+	},
 	{name: "TLSCLIENT", variant: variantTLS},
 	// The camera families: the --camera-sim Camera and Chime after chip's
 	// camera-app (examples/reference-bridge/camera.go), which chip's CI
