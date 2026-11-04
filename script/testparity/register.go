@@ -29,6 +29,10 @@ const (
 var statuses = []Status{StatusPorted, StatusPartial, StatusPlanned, StatusExcluded}
 
 // The exclusion classes. Nothing else is a reason to leave a file out.
+// js-runtime-only covers JavaScript runtime concerns and matter.js's own
+// platform, util, storage, time and codec runtime — Node.js bindings, the
+// in-memory model classes, byte readers and writers, hand-written codecs
+// the Go standard library replaces (phase 33).
 const (
 	ClassControllerStage    = "controller-stage"
 	ClassJSRuntimeOnly      = "js-runtime-only"

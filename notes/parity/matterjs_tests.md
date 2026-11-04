@@ -4,7 +4,11 @@
 
 # matter.js tests: the porting register
 
-matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` → `matter.sourceCommit`): 396 test files under `packages/node/test` and `packages/protocol/test` and `packages/thread-br-client/test`.
+matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` → `matter.sourceCommit`): 588 test files under `packages/general/test` and `packages/model/test` and `packages/node/test` and `packages/nodejs/test` and `packages/protocol/test` and `packages/thread-br-client/test` and `packages/types/test`.
+Out of the roots, each for its reason: `packages/matter.js` (the umbrella package and its legacy controller API,
+MatterController and PairedNode, whose behaviour the protocol and node roots hold), `packages/nodejs-ble` (Node.js BLE
+bindings over noble; the module's BLE is its own Go transport), `packages/nodejs-ws` (a WebSocket transport the module
+does not have), `packages/testing` (matter.js's test harness) and `support/codegen` (its TypeScript tooling).
 `ported`: the Go tests cover the file's `it` cases; `partial`: they cover some, the note names the rest;
 `planned`: not ported yet; `excluded`: left out, with its class. A `ported` or `partial` note's "Left"
 names the `it` cases that will not be ported, each with its class and reason. The guard is `make testparity-check`.
@@ -13,14 +17,42 @@ names the `it` cases that will not be ported, each with its class and reason. Th
 | --- | ---: |
 | ported | 125 |
 | partial | 128 |
-| planned | 2 |
-| excluded | 141 |
-| total | 396 |
+| planned | 63 |
+| excluded | 272 |
+| total | 588 |
 
 ## Per directory
 
 | directory | files | ported | partial | planned | excluded |
 | --- | ---: | ---: | ---: | ---: | ---: |
+| [general/test](#generaltest) | 1 | 0 | 0 | 0 | 1 |
+| [general/test/codec](#generaltestcodec) | 3 | 0 | 0 | 3 | 0 |
+| [general/test/crypto](#generaltestcrypto) | 8 | 0 | 0 | 8 | 0 |
+| [general/test/crypto/aes](#generaltestcryptoaes) | 3 | 0 | 0 | 3 | 0 |
+| [general/test/environment](#generaltestenvironment) | 3 | 0 | 0 | 0 | 3 |
+| [general/test/fs](#generaltestfs) | 1 | 0 | 0 | 0 | 1 |
+| [general/test/log](#generaltestlog) | 1 | 0 | 0 | 0 | 1 |
+| [general/test/math](#generaltestmath) | 2 | 0 | 0 | 1 | 1 |
+| [general/test/net](#generaltestnet) | 4 | 0 | 0 | 4 | 0 |
+| [general/test/net/dns-sd](#generaltestnetdns-sd) | 8 | 0 | 0 | 8 | 0 |
+| [general/test/net/http](#generaltestnethttp) | 2 | 0 | 0 | 2 | 0 |
+| [general/test/net/mock](#generaltestnetmock) | 1 | 0 | 0 | 1 | 0 |
+| [general/test/net/udp](#generaltestnetudp) | 1 | 0 | 0 | 1 | 0 |
+| [general/test/storage](#generalteststorage) | 7 | 0 | 0 | 0 | 7 |
+| [general/test/storage/wal](#generalteststoragewal) | 6 | 0 | 0 | 0 | 6 |
+| [general/test/time](#generaltesttime) | 6 | 0 | 0 | 0 | 6 |
+| [general/test/transaction](#generaltesttransaction) | 3 | 0 | 0 | 0 | 3 |
+| [general/test/util](#generaltestutil) | 37 | 0 | 0 | 3 | 34 |
+| [model/test](#modeltest) | 1 | 0 | 0 | 0 | 1 |
+| [model/test/aspects](#modeltestaspects) | 4 | 0 | 0 | 4 | 0 |
+| [model/test/common](#modeltestcommon) | 3 | 0 | 0 | 0 | 3 |
+| [model/test/decoration](#modeltestdecoration) | 1 | 0 | 0 | 0 | 1 |
+| [model/test/decoration/semantics](#modeltestdecorationsemantics) | 2 | 0 | 0 | 0 | 2 |
+| [model/test/logic](#modeltestlogic) | 15 | 0 | 0 | 3 | 12 |
+| [model/test/logic/definition-validation](#modeltestlogicdefinition-validation) | 4 | 0 | 0 | 0 | 4 |
+| [model/test/logic/device-types](#modeltestlogicdevice-types) | 2 | 0 | 0 | 0 | 2 |
+| [model/test/models](#modeltestmodels) | 8 | 0 | 0 | 0 | 8 |
+| [model/test/standard](#modelteststandard) | 1 | 0 | 0 | 0 | 1 |
 | [node/test/behavior](#nodetestbehavior) | 4 | 0 | 0 | 0 | 4 |
 | [node/test/behavior/cluster](#nodetestbehaviorcluster) | 13 | 1 | 1 | 0 | 11 |
 | [node/test/behavior/internal](#nodetestbehaviorinternal) | 2 | 0 | 1 | 0 | 1 |
@@ -88,6 +120,14 @@ names the `it` cases that will not be ported, each with its class and reason. Th
 | [node/test/node/remote](#nodetestnoderemote) | 1 | 0 | 0 | 0 | 1 |
 | [node/test/storage](#nodeteststorage) | 2 | 0 | 0 | 0 | 2 |
 | [node/test/tsconfigs/nonstrict](#nodetesttsconfigsnonstrict) | 1 | 0 | 0 | 0 | 1 |
+| [nodejs/test/config](#nodejstestconfig) | 1 | 0 | 0 | 0 | 1 |
+| [nodejs/test/crypto](#nodejstestcrypto) | 3 | 0 | 0 | 1 | 2 |
+| [nodejs/test/environment](#nodejstestenvironment) | 1 | 0 | 0 | 0 | 1 |
+| [nodejs/test/fs](#nodejstestfs) | 3 | 0 | 0 | 0 | 3 |
+| [nodejs/test/log](#nodejstestlog) | 1 | 0 | 0 | 0 | 1 |
+| [nodejs/test/net](#nodejstestnet) | 5 | 0 | 0 | 0 | 5 |
+| [nodejs/test/storage](#nodejsteststorage) | 6 | 0 | 0 | 0 | 6 |
+| [nodejs/test/storage/sqlite](#nodejsteststoragesqlite) | 1 | 0 | 0 | 0 | 1 |
 | [protocol/test/action](#protocoltestaction) | 1 | 0 | 1 | 0 | 0 |
 | [protocol/test/action/client](#protocoltestactionclient) | 5 | 3 | 2 | 0 | 0 |
 | [protocol/test/action/client/subscription](#protocoltestactionclientsubscription) | 2 | 0 | 2 | 0 | 0 |
@@ -118,6 +158,291 @@ names the `it` cases that will not be ported, each with its class and reason. Th
 | [thread-br-client/test](#thread-br-clienttest) | 58 | 2 | 2 | 0 | 54 |
 | [thread-br-client/test/diag](#thread-br-clienttestdiag) | 13 | 0 | 0 | 0 | 13 |
 | [thread-br-client/test/diagnostic](#thread-br-clienttestdiagnostic) | 1 | 0 | 0 | 0 | 1 |
+| [types/test/cluster](#typestestcluster) | 6 | 0 | 0 | 0 | 6 |
+| [types/test/clusters](#typestestclusters) | 3 | 0 | 0 | 0 | 3 |
+| [types/test/common](#typestestcommon) | 1 | 0 | 0 | 0 | 1 |
+| [types/test/datatype](#typestestdatatype) | 4 | 0 | 0 | 0 | 4 |
+| [types/test/protocol](#typestestprotocol) | 1 | 0 | 0 | 1 | 0 |
+| [types/test/schema](#typestestschema) | 5 | 0 | 0 | 5 | 0 |
+| [types/test/tlv](#typestesttlv) | 13 | 0 | 0 | 13 | 0 |
+
+## general/test
+
+| file | lines | status | Go tests or class | note |
+| --- | ---: | --- | --- | --- |
+| MatterErrorTest.ts | 155 | excluded | `js-runtime-only` | Formatting (plain, ANSI, fallback) and instanceof matching of matter.js's MatterError class hierarchy; Go errors are values compared with errors.Is / errors.As. |
+
+## general/test/codec
+
+| file | lines | status | Go tests or class | note |
+| --- | ---: | --- | --- | --- |
+| Base64CodecTest.ts | 105 | planned | — | Phase 33: a new register root, ported by meaning in this phase. |
+| DerCodecTest.ts | 132 | planned | — | Phase 33: a new register root, ported by meaning in this phase. |
+| DnsCodecTest.ts | 406 | planned | — | Phase 33: a new register root, ported by meaning in this phase. |
+
+## general/test/crypto
+
+| file | lines | status | Go tests or class | note |
+| --- | ---: | --- | --- | --- |
+| EcdsaSignatureTest.ts | 40 | planned | — | Phase 33: a new register root, ported by meaning in this phase. |
+| KeyTest.ts | 91 | planned | — | Phase 33: a new register root, ported by meaning in this phase. |
+| MlDsaTest.ts | 491 | planned | — | Phase 33: a new register root, ported by meaning in this phase. |
+| NodeJsStyleCryptoTest.ts | 96 | planned | — | Phase 33: a new register root, ported by meaning in this phase. |
+| PemTest.ts | 47 | planned | — | Phase 33: a new register root, ported by meaning in this phase. |
+| Spake2pTest.ts | 111 | planned | — | Phase 33: a new register root, ported by meaning in this phase. |
+| StandardCryptoTest.ts | 303 | planned | — | Phase 33: a new register root, ported by meaning in this phase. |
+| X509Test.ts | 52 | planned | — | Phase 33: a new register root, ported by meaning in this phase. |
+
+## general/test/crypto/aes
+
+| file | lines | status | Go tests or class | note |
+| --- | ---: | --- | --- | --- |
+| AesTest.ts | 2112 | planned | — | Phase 33: a new register root, ported by meaning in this phase. |
+| CcmTest.ts | 301 | planned | — | Phase 33: a new register root, ported by meaning in this phase. |
+| CmacTest.ts | 40 | planned | — | Phase 33: a new register root, ported by meaning in this phase. |
+
+## general/test/environment
+
+| file | lines | status | Go tests or class | note |
+| --- | ---: | --- | --- | --- |
+| EnvironmentTest.ts | 855 | excluded | `js-runtime-only` | matter.js's Environment service container (service registration, lifetimes, inheritance between environments); the Go module wires its collaborators through constructors and Attach/Set calls. |
+| RuntimeServiceTest.ts | 130 | excluded | `js-runtime-only` | The RuntimeService that tracks matter.js's running workers and process signals; a Go host owns its process and goroutines. |
+| VariableServiceTest.ts | 148 | excluded | `js-runtime-only` | matter.js's configuration-variable service (environment variables, argv, config files); the module takes its configuration as Go option structs from the host. |
+
+## general/test/fs
+
+| file | lines | status | Go tests or class | note |
+| --- | ---: | --- | --- | --- |
+| MockFilesystemTest.ts | 331 | excluded | `test-infrastructure` | matter.js's in-memory filesystem for its own tests; the Go tests use t.TempDir. |
+
+## general/test/log
+
+| file | lines | status | Go tests or class | note |
+| --- | ---: | --- | --- | --- |
+| LoggerTest.ts | 829 | excluded | `js-runtime-only` | matter.js's Logger (log levels per facility, formats, destinations); the module logs through the host's log/slog handler. |
+
+## general/test/math
+
+| file | lines | status | Go tests or class | note |
+| --- | ---: | --- | --- | --- |
+| ReedSolomonTest.ts | 21 | excluded | `js-runtime-only` | Reed-Solomon error correction for matter.js's own QR-code renderer; the module returns the "MT:" payload text and renders no QR symbol (secure/setup QRCode). |
+| VerhoeffTest.ts | 17 | planned | — | Phase 33: a new register root, ported by meaning in this phase. |
+
+## general/test/net
+
+| file | lines | status | Go tests or class | note |
+| --- | ---: | --- | --- | --- |
+| AppAddressTest.ts | 102 | planned | — | Phase 33: a new register root, ported by meaning in this phase. |
+| RetryScheduleTest.ts | 392 | planned | — | Phase 33: a new register root, ported by meaning in this phase. |
+| ServerAddressSetTest.ts | 77 | planned | — | Phase 33: a new register root, ported by meaning in this phase. |
+| ServerAddressTest.ts | 116 | planned | — | Phase 33: a new register root, ported by meaning in this phase. |
+
+## general/test/net/dns-sd
+
+| file | lines | status | Go tests or class | note |
+| --- | ---: | --- | --- | --- |
+| DnssdNamesTest.ts | 1735 | planned | — | Phase 33: a new register root, ported by meaning in this phase. |
+| DnssdParametersTest.ts | 132 | planned | — | Phase 33: a new register root, ported by meaning in this phase. |
+| IpServiceLinkLocalZoneTest.ts | 87 | planned | — | Phase 33: a new register root, ported by meaning in this phase. |
+| IpServiceStatusTest.ts | 121 | planned | — | Phase 33: a new register root, ported by meaning in this phase. |
+| IpServiceTest.ts | 203 | planned | — | Phase 33: a new register root, ported by meaning in this phase. |
+| MdnsRelevanceFilterTest.ts | 356 | planned | — | Phase 33: a new register root, ported by meaning in this phase. |
+| MdnsSocketTest.ts | 747 | planned | — | Phase 33: a new register root, ported by meaning in this phase. |
+| ServiceDiscoveryTest.ts | 77 | planned | — | Phase 33: a new register root, ported by meaning in this phase. |
+
+## general/test/net/http
+
+| file | lines | status | Go tests or class | note |
+| --- | ---: | --- | --- | --- |
+| MockWsConnectionTest.ts | 138 | planned | — | Phase 33: a new register root, ported by meaning in this phase. |
+| WebSocketClientTest.ts | 100 | planned | — | Phase 33: a new register root, ported by meaning in this phase. |
+
+## general/test/net/mock
+
+| file | lines | status | Go tests or class | note |
+| --- | ---: | --- | --- | --- |
+| MockTcpTest.ts | 204 | planned | — | Phase 33: a new register root, ported by meaning in this phase. |
+
+## general/test/net/udp
+
+| file | lines | status | Go tests or class | note |
+| --- | ---: | --- | --- | --- |
+| UdpMulticastServerTest.ts | 284 | planned | — | Phase 33: a new register root, ported by meaning in this phase. |
+
+## general/test/storage
+
+| file | lines | status | Go tests or class | note |
+| --- | ---: | --- | --- | --- |
+| ByteStreamReaderTest.ts | 149 | excluded | `js-runtime-only` | A buffered reader over JavaScript byte streams for matter.js's storage drivers; Go uses io.Reader. |
+| MemoryBlobStorageDriverTest.ts | 110 | excluded | `js-runtime-only` | matter.js's in-memory blob storage driver; the module persists through the host's store port (store/), whose own tests cover it. |
+| MemoryStorageDriverTest.ts | 175 | excluded | `js-runtime-only` | matter.js's in-memory key/value storage driver; the module persists through the host's store port (store/), whose own tests cover it. |
+| StorageContextTest.ts | 256 | excluded | `js-runtime-only` | Context-scoped key/value access of matter.js's StorageManager; the module's store port has no context hierarchy. |
+| StorageManagerTest.ts | 81 | excluded | `js-runtime-only` | matter.js's StorageManager lifecycle around a driver; the host owns storage here. |
+| StorageServiceTest.ts | 293 | excluded | `js-runtime-only` | matter.js's StorageService (driver selection, namespaces, opening per node); the host owns storage here. |
+| StringifyToolsTest.ts | 142 | excluded | `js-runtime-only` | The JSON converter of matter.js's storage layer for bigint, bytes and other JavaScript values; Go persists typed values through encoding/json and the store port. |
+
+## general/test/storage/wal
+
+| file | lines | status | Go tests or class | note |
+| --- | ---: | --- | --- | --- |
+| WalCleanerTest.ts | 160 | excluded | `js-runtime-only` | matter.js's write-ahead-log storage driver; the module has no WAL driver, the host owns persistence. |
+| WalCommitTest.ts | 187 | excluded | `js-runtime-only` | matter.js's write-ahead-log storage driver; the module has no WAL driver, the host owns persistence. |
+| WalReaderTest.ts | 167 | excluded | `js-runtime-only` | matter.js's write-ahead-log storage driver; the module has no WAL driver, the host owns persistence. |
+| WalSnapshotTest.ts | 305 | excluded | `js-runtime-only` | matter.js's write-ahead-log storage driver; the module has no WAL driver, the host owns persistence. |
+| WalStorageDriverTest.ts | 678 | excluded | `js-runtime-only` | matter.js's write-ahead-log storage driver; the module has no WAL driver, the host owns persistence. |
+| WalWriterTest.ts | 139 | excluded | `js-runtime-only` | matter.js's write-ahead-log storage driver; the module has no WAL driver, the host owns persistence. |
+
+## general/test/time
+
+| file | lines | status | Go tests or class | note |
+| --- | ---: | --- | --- | --- |
+| DurationTest.ts | 150 | excluded | `js-runtime-only` | matter.js's Duration helpers (parsing and formatting of durations in JavaScript numbers); Go uses time.Duration. |
+| MockTimeResolveTest.ts | 244 | excluded | `test-infrastructure` | MockTime.resolve, the fake clock of matter.js's own tests; the Go tests drive their own fake clocks. |
+| StandardTimeTest.ts | 269 | excluded | `js-runtime-only` | matter.js's Time service and timers over setTimeout/setInterval; Go uses time.Timer and the module's clock seams. |
+| TimeUnitTest.ts | 62 | excluded | `js-runtime-only` | matter.js's branded time-unit constructors; Go uses time.Duration. |
+| TimespanTest.ts | 48 | excluded | `js-runtime-only` | matter.js's Timespan helper over JavaScript numbers; Go uses time.Time and time.Duration. |
+| TimestampTest.ts | 77 | excluded | `js-runtime-only` | matter.js's Timestamp helper over JavaScript numbers; Go uses time.Time. |
+
+## general/test/transaction
+
+| file | lines | status | Go tests or class | note |
+| --- | ---: | --- | --- | --- |
+| ResourceSetTest.ts | 111 | excluded | `js-runtime-only` | Resource locking of matter.js's transaction layer, which serialises behavior state changes; the Go servers guard their state with mutexes. |
+| StatusTest.ts | 34 | excluded | `js-runtime-only` | The status enum of matter.js's transaction layer, which serialises behavior state changes; the Go servers have no transactions. |
+| TransactionTest.ts | 1508 | excluded | `js-runtime-only` | matter.js's transaction layer (participants, commit phases, rollback of behavior state); the Go servers guard their state with mutexes and have no transactions. |
+
+## general/test/util
+
+| file | lines | status | Go tests or class | note |
+| --- | ---: | --- | --- | --- |
+| AbortTest.ts | 103 | excluded | `js-runtime-only` | AbortSignal helpers; Go cancels through context.Context. |
+| AsyncIteratorTest.ts | 203 | excluded | `js-runtime-only` | JavaScript async-iterator helpers; Go uses channels and iterator functions. |
+| BytesTest.ts | 104 | planned | — | Phase 33: a new register root, ported by meaning in this phase. |
+| CacheTest.ts | 579 | excluded | `js-runtime-only` | matter.js's generic timed caches (Cache, AsyncCache); the module's caches are purpose-built and tested with their owners. |
+| CancelableTest.ts | 85 | excluded | `js-runtime-only` | Cancelable JavaScript promises; Go cancels through context.Context. |
+| ConstructionTest.ts | 98 | excluded | `js-runtime-only` | matter.js's asynchronous-construction lifecycle helper for JavaScript classes. |
+| DataReadQueueTest.ts | 63 | excluded | `js-runtime-only` | An async read queue over JavaScript promises; Go uses channels. |
+| DataReaderTest.ts | 477 | excluded | `js-runtime-only` | matter.js's byte-buffer reader (endianness, integer widths over DataView); Go uses encoding/binary, and the TLV decoder built on it is held by the tlv tests. |
+| DataWriterTest.ts | 435 | excluded | `js-runtime-only` | matter.js's byte-buffer writer (endianness, integer widths, bigint input); Go uses encoding/binary, and the TLV encoder built on it is held by the tlv tests. |
+| DecoratorTest.ts | 21 | excluded | `js-runtime-only` | TypeScript decorator helpers. |
+| DeepCopyTest.ts | 114 | excluded | `js-runtime-only` | Deep copy of JavaScript object graphs. |
+| DeepEqualTest.ts | 96 | excluded | `js-runtime-only` | Deep equality of JavaScript object graphs; Go tests use reflect.DeepEqual and bytes.Equal. |
+| ErrorTest.ts | 73 | excluded | `js-runtime-only` | Normalising thrown JavaScript values (undefined, null, strings) into Error objects. |
+| FormattedTextTest.ts | 198 | excluded | `js-runtime-only` | Text wrapping and formatting for matter.js's console output. |
+| GeneratedClassTest.ts | 177 | excluded | `js-runtime-only` | Runtime class generation in JavaScript. |
+| GithubTest.ts | 46 | excluded | `js-runtime-only` | matter.js's GitHub HTTP helper for its tooling (rate-limit statuses); the module talks to no GitHub API. |
+| GzipTest.ts | 66 | excluded | `js-runtime-only` | Gzip through the JavaScript runtime's compression streams; the module compresses nothing, and Go has compress/gzip where a host needs it. |
+| HeapTest.ts | 195 | excluded | `js-runtime-only` | matter.js's priority-heap helper; the Go schedulers use container/heap or sorted slices where they need one. |
+| IntrospectionTest.ts | 79 | excluded | `js-runtime-only` | Runtime type introspection of JavaScript values. |
+| IpTest.ts | 180 | planned | — | Phase 33: a new register root, ported by meaning in this phase. |
+| LifecycleTest.ts | 265 | excluded | `js-runtime-only` | matter.js's lifecycle-state helper for JavaScript objects. |
+| LifetimeTest.ts | 133 | excluded | `js-runtime-only` | matter.js's Lifetime tracker for diagnostics of running JavaScript objects. |
+| MapTest.ts | 87 | excluded | `js-runtime-only` | matter.js's observable BasicMap collection. |
+| MockFetchTest.ts | 23 | excluded | `test-infrastructure` | The fetch mock of matter.js's own tests. |
+| MultiplexTest.ts | 52 | excluded | `js-runtime-only` | Promise multiplexing (BasicMultiplex) for JavaScript async work; Go uses goroutines and sync.WaitGroup. |
+| MutexTest.ts | 382 | excluded | `js-runtime-only` | A promise-based mutex for JavaScript async code; Go uses sync.Mutex. |
+| NamedHandlerTest.ts | 71 | excluded | `js-runtime-only` | Named JavaScript event-handler registry. |
+| NumberTest.ts | 66 | planned | — | Phase 33: a new register root, ported by meaning in this phase. |
+| ObjectTest.ts | 29 | excluded | `js-runtime-only` | JavaScript object utilities. |
+| ObservableTest.ts | 716 | excluded | `js-runtime-only` | matter.js's Observable event emitters and observable values; the Go event paths are typed callbacks and channels tested with their owners. |
+| PromisesTest.ts | 134 | excluded | `js-runtime-only` | JavaScript promise helpers (timeouts, settling); Go uses context.Context and channels. |
+| SchedulerTest.ts | 55 | excluded | `js-runtime-only` | matter.js's cooperative scheduler for JavaScript tasks; Go uses goroutines. |
+| SemaphoreTest.ts | 950 | excluded | `js-runtime-only` | A promise-based semaphore for JavaScript async code; Go uses buffered channels or golang.org/x/sync patterns. |
+| SerializeTest.ts | 68 | excluded | `js-runtime-only` | Diagnostic serialisation of JavaScript values for log output. |
+| SetTest.ts | 161 | excluded | `js-runtime-only` | matter.js's observable BasicSet collection. |
+| StreamsTest.ts | 40 | excluded | `js-runtime-only` | JavaScript stream helpers and EndOfStreamError; Go uses io.Reader and io.EOF. |
+| StringTest.ts | 61 | excluded | `js-runtime-only` | String case helpers (capitalize, camelize) and date rendering for matter.js's code generation and logs. |
+
+## model/test
+
+| file | lines | status | Go tests or class | note |
+| --- | ---: | --- | --- | --- |
+| MatterTest.ts | 47 | excluded | `js-runtime-only` | Self-validation of matter.js's in-memory Matter model (error count, scope); the Go side reads the extracted snapshot parity/schema.json, held by the schema parity tests and make chipdm-check. |
+
+## model/test/aspects
+
+| file | lines | status | Go tests or class | note |
+| --- | ---: | --- | --- | --- |
+| AccessTest.ts | 109 | planned | — | Phase 33: a new register root, ported by meaning in this phase. |
+| ConformanceTest.ts | 828 | planned | — | Phase 33: a new register root, ported by meaning in this phase. |
+| ConstraintTest.ts | 672 | planned | — | Phase 33: a new register root, ported by meaning in this phase. |
+| QualityTest.ts | 189 | planned | — | Phase 33: a new register root, ported by meaning in this phase. |
+
+## model/test/common
+
+| file | lines | status | Go tests or class | note |
+| --- | ---: | --- | --- | --- |
+| FieldValueTest.ts | 113 | excluded | `js-runtime-only` | FieldValue, matter.js's representation of model default values as JavaScript numbers, bigints and records; the extractor writes them into parity/schema.json, which the Go generators read as data. |
+| MetatypeTest.ts | 52 | excluded | `js-runtime-only` | Metatype classification and casting of JavaScript values in matter.js's model; the Go generators map the snapshot's metatypes to Go types. |
+| SpecificationTest.ts | 51 | excluded | `js-runtime-only` | Ordering of specification revision strings inside matter.js's model; the module serves one specification revision (1.6.1). |
+
+## model/test/decoration
+
+| file | lines | status | Go tests or class | note |
+| --- | ---: | --- | --- | --- |
+| SchemaTest.ts | 72 | excluded | `js-runtime-only` | TypeScript decorators that attach a model schema to a class. |
+
+## model/test/decoration/semantics
+
+| file | lines | status | Go tests or class | note |
+| --- | ---: | --- | --- | --- |
+| ClassSemanticsTest.ts | 213 | excluded | `js-runtime-only` | TypeScript decorators that attach model semantics to a class. |
+| FieldSemanticsTest.ts | 230 | excluded | `js-runtime-only` | TypeScript decorators that attach model semantics to a class field. |
+
+## model/test/logic
+
+| file | lines | status | Go tests or class | note |
+| --- | ---: | --- | --- | --- |
+| ClusterVarianceTest.ts | 748 | excluded | `js-runtime-only` | Classification of a cluster's elements by feature combination for matter.js's TypeScript cluster-type generation; the Go generator (script/clustergen) emits conformance that cluster/spec evaluates at run time. |
+| DefaultValueTest.ts | 158 | planned | — | Phase 33: a new register root, ported by meaning in this phase. |
+| EffectiveAccessTest.ts | 54 | planned | — | Phase 33: a new register root, ported by meaning in this phase. |
+| EncodedBitmapTest.ts | 184 | excluded | `js-runtime-only` | Conversion between bitmap records (JavaScript objects of flags) and integers; Go bitmaps are integers with generated named bits. |
+| EncodedConstraintTest.ts | 306 | excluded | `js-runtime-only` | Encoding of constraint names into values inside matter.js's model; script/clustergen resolves the snapshot's constraints at generation time and cluster/spec evaluates them (held by the cluster/spec constraint parity tests). |
+| EncodedValueTest.ts | 30 | excluded | `js-runtime-only` | Unit scaling of model values in JavaScript numbers inside matter.js's model; the extractor and script/clustergen restate values in the type's units. |
+| FeatureSelectionErrorsTest.ts | 144 | excluded | `js-runtime-only` | Error reporting of matter.js's TypeScript feature selection on behavior classes (with()/for()); a Go server takes its features as a bitmap that spec.New checks against the conformance. |
+| MergedModelTest.ts | 381 | excluded | `js-runtime-only` | Merging of several model sources (spec, CHIP, local) inside matter.js's model build; the module reads the merged result from parity/schema.json. |
+| ModelDiffTest.ts | 333 | excluded | `js-runtime-only` | Structural diff of matter.js model trees for its model tooling. |
+| ModelVariantTraversalTest.ts | 107 | excluded | `js-runtime-only` | Traversal of model variants during matter.js's model merge. |
+| RequirementApplicabilityTest.ts | 47 | planned | — | Phase 33: a new register root, ported by meaning in this phase. |
+| RequirementResolverTest.ts | 591 | excluded | `js-runtime-only` | Resolution of device-type requirements against matter.js's in-memory model; the Go generator (script/devicegen) emits each device type's requirements and the device layer checks them. |
+| ScopeTest.ts | 219 | excluded | `js-runtime-only` | Name scoping inside matter.js's model (datatype lookup through owners and bases); the extractor resolves names before parity/schema.json is written. |
+| SelectDefaultValueTest.ts | 149 | excluded | `js-runtime-only` | Choice of a default value for a model element when matter.js instantiates TypeScript behavior state; the Go generator writes the snapshot's defaults into the definitions. |
+| ValidateModelTest.ts | 108 | excluded | `js-runtime-only` | matter.js's validation of its in-memory model tree; the Go side is held by the schema parity tests and make chipdm-check. |
+
+## model/test/logic/definition-validation
+
+| file | lines | status | Go tests or class | note |
+| --- | ---: | --- | --- | --- |
+| AttributeValidatorTest.ts | 53 | excluded | `js-runtime-only` | matter.js's validation of attribute definitions inside its model; the Go side is held by the schema parity tests and make chipdm-check. |
+| ClusterValidatorTest.ts | 33 | excluded | `js-runtime-only` | matter.js's validation of cluster definitions inside its model; the Go side is held by the schema parity tests and make chipdm-check. |
+| RequirementValidatorTest.ts | 514 | excluded | `js-runtime-only` | matter.js's validation of device-type requirement definitions inside its model; the Go side is held by the device-type tests of script/devicegen and make chipdm-check. |
+| ValueValidatorTest.ts | 1366 | excluded | `js-runtime-only` | matter.js's validation of value definitions (types, constraints, defaults) inside its model; the Go side is held by the schema parity tests and make chipdm-check. |
+
+## model/test/logic/device-types
+
+| file | lines | status | Go tests or class | note |
+| --- | ---: | --- | --- | --- |
+| ConditionAssertionsTest.ts | 600 | excluded | `js-runtime-only` | Assertions over device-type conditions in matter.js's model-level device-type validation pass; the Go device layer checks its compositions in device/ and node/. |
+| DeviceTypeConformanceTest.ts | 1224 | excluded | `js-runtime-only` | matter.js's model-level device-type conformance over node facts (endpoints, clusters, features); the Go device layer checks its compositions in device/ and node/. |
+
+## model/test/models
+
+| file | lines | status | Go tests or class | note |
+| --- | ---: | --- | --- | --- |
+| ClusterModelTest.ts | 223 | excluded | `js-runtime-only` | The ClusterModel class of matter.js's in-memory model (children, inheritance, lookups). |
+| DeviceTypeModelTest.ts | 104 | excluded | `js-runtime-only` | The DeviceTypeModel class of matter.js's in-memory model. |
+| FieldModelTest.ts | 42 | excluded | `js-runtime-only` | The FieldModel class of matter.js's in-memory model. |
+| MatterModelTest.ts | 234 | excluded | `js-runtime-only` | The MatterModel class of matter.js's in-memory model. |
+| ModelTest.ts | 814 | excluded | `js-runtime-only` | The Model base class of matter.js's in-memory model (tree operations, cloning, serialisation). |
+| RequirementModelTest.ts | 79 | excluded | `js-runtime-only` | The RequirementModel class of matter.js's in-memory model. |
+| ResourceTest.ts | 151 | excluded | `js-runtime-only` | The documentation resources attached to matter.js's model. |
+| ValueModelTest.ts | 87 | excluded | `js-runtime-only` | The ValueModel class of matter.js's in-memory model. |
+
+## model/test/standard
+
+| file | lines | status | Go tests or class | note |
+| --- | ---: | --- | --- | --- |
+| MatterDefinitionTest.ts | 100 | excluded | `js-runtime-only` | Instantiation and self-validation of matter.js's standard model; the Go side reads the extracted snapshot parity/schema.json, held by the schema parity tests and make chipdm-check. |
 
 ## node/test/behavior
 
@@ -664,6 +989,67 @@ names the `it` cases that will not be ported, each with its class and reason. Th
 | --- | ---: | --- | --- | --- |
 | lenientTest.ts | 20 | excluded | `js-runtime-only` | A compile check under a non-strict TypeScript configuration. |
 
+## nodejs/test/config
+
+| file | lines | status | Go tests or class | note |
+| --- | ---: | --- | --- | --- |
+| ConfigTest.ts | 36 | excluded | `js-runtime-only` | Defaults and immutability of matter.js's Node.js configuration object. |
+
+## nodejs/test/crypto
+
+| file | lines | status | Go tests or class | note |
+| --- | ---: | --- | --- | --- |
+| CryptoInteropTest.ts | 134 | excluded | `js-runtime-only` | Agreement between matter.js's two JavaScript crypto backends (StandardCrypto, NodeJsCrypto); the module has one implementation over the Go standard library. |
+| NodeJsCryptoDefectTest.ts | 315 | excluded | `js-runtime-only` | Detection of a Node.js runtime whose crypto module lacks a cipher or digest and the backend selection around it; the module uses the Go standard library. |
+| NodeJsCryptoTest.ts | 313 | planned | — | Phase 33: a new register root, ported by meaning in this phase. |
+
+## nodejs/test/environment
+
+| file | lines | status | Go tests or class | note |
+| --- | ---: | --- | --- | --- |
+| NodeJsEnvironmentTest.ts | 342 | excluded | `js-runtime-only` | matter.js's Node.js environment bootstrap (variables, storage location, process integration). |
+
+## nodejs/test/fs
+
+| file | lines | status | Go tests or class | note |
+| --- | ---: | --- | --- | --- |
+| DirectoryLockTest.ts | 164 | excluded | `js-runtime-only` | matter.js's storage-directory lock on Node.js; the host owns its storage directory. |
+| FsUtilsTest.ts | 121 | excluded | `js-runtime-only` | Node.js filesystem helpers. |
+| NodeJsFilesystemTest.ts | 377 | excluded | `js-runtime-only` | matter.js's filesystem abstraction over Node.js fs. |
+
+## nodejs/test/log
+
+| file | lines | status | Go tests or class | note |
+| --- | ---: | --- | --- | --- |
+| FileLoggerTest.ts | 63 | excluded | `js-runtime-only` | matter.js's file log destination; the module logs through the host's log/slog handler. |
+
+## nodejs/test/net
+
+| file | lines | status | Go tests or class | note |
+| --- | ---: | --- | --- | --- |
+| NodeJsHttpEndpointTest.ts | 58 | excluded | `js-runtime-only` | matter.js's HTTP endpoint on Node.js; the module serves no HTTP. |
+| NodeJsNetworkTest.ts | 403 | excluded | `js-runtime-only` | Interface enumeration through Node.js os.networkInterfaces(); the module enumerates through net.Interfaces in transport/udp and mdns, tested there. |
+| NodeJsTcpConnectionTest.ts | 213 | excluded | `js-runtime-only` | matter.js's TCP connection wrapper over Node.js net.Socket; the Go TCP transport (transport/tcp) has its own tests. |
+| NodeJsTcpListenerTest.ts | 115 | excluded | `js-runtime-only` | matter.js's TCP listener wrapper over Node.js net.Server; the Go TCP transport (transport/tcp) has its own tests. |
+| NodeJsUdpSocketTest.ts | 61 | excluded | `js-runtime-only` | matter.js's UDP socket wrapper over Node.js dgram; the Go UDP transport (transport/udp) has its own tests. |
+
+## nodejs/test/storage
+
+| file | lines | status | Go tests or class | note |
+| --- | ---: | --- | --- | --- |
+| DirectoryBlobStorageDriverTest.ts | 183 | excluded | `js-runtime-only` | matter.js's directory blob storage driver on Node.js; the host owns persistence. |
+| FlatFileBlobStorageDriverTest.ts | 180 | excluded | `js-runtime-only` | matter.js's flat-file blob storage driver on Node.js; the host owns persistence. |
+| JsonFileStorageDriverTest.ts | 153 | excluded | `js-runtime-only` | matter.js's JSON-file storage driver on Node.js; the host owns persistence. |
+| SqliteBlobStorageDriverTest.ts | 135 | excluded | `js-runtime-only` | matter.js's SQLite blob storage driver on Node.js; the host owns persistence. |
+| StorageDriverTest.ts | 346 | excluded | `js-runtime-only` | The shared contract suite of matter.js's Node.js storage drivers; the host owns persistence. |
+| StorageMigrationTest.ts | 910 | excluded | `js-runtime-only` | Migration between matter.js's Node.js storage drivers and formats; the host owns persistence. |
+
+## nodejs/test/storage/sqlite
+
+| file | lines | status | Go tests or class | note |
+| --- | ---: | --- | --- | --- |
+| SqliteUtilTest.ts | 68 | excluded | `js-runtime-only` | SQLite helpers of matter.js's Node.js storage driver; the host owns persistence. |
+
 ## protocol/test/action
 
 | file | lines | status | Go tests or class | note |
@@ -1000,6 +1386,74 @@ names the `it` cases that will not be ported, each with its class and reason. Th
 | --- | ---: | --- | --- | --- |
 | DefaultTlvSetTest.ts | 41 | excluded | `device-ble-thread` | The DiagnosticSource abstraction over MeshCoP and REST (and its collection/action machinery): otbr.BorderRouter reads /node and /diagnostics directly, and MeshCoP stays out (ADR 0027 decision 5). |
 
+## types/test/cluster
+
+| file | lines | status | Go tests or class | note |
+| --- | ---: | --- | --- | --- |
+| ClassForValueModelTest.ts | 104 | excluded | `js-runtime-only` | Runtime generation of TypeScript bitmap classes from value models; Go bitmaps are generated integer types. |
+| ClusterNamingTest.ts | 95 | excluded | `js-runtime-only` | Name/id lookup of attributes, commands and events against matter.js's in-memory model (ClusterLookup); the Go definitions are generated with their names and ids (cluster/spec). |
+| ClusterTypeObsoleteTest.ts | 60 | excluded | `js-runtime-only` | Characterisation of matter.js's TypeScript ClusterType keeping obsolete elements; the Go definitions come from script/clustergen. |
+| ClusterTypeWithCompatTest.ts | 107 | excluded | `js-runtime-only` | The with() compat shim of matter.js's retired TypeScript ClusterType API. |
+| EnumForValueModelTest.ts | 25 | excluded | `js-runtime-only` | The runtime shape (forward and reverse mapping) of TypeScript numeric enums generated from value models; Go enums are generated integer types. |
+| RetiredClusterTypeTest.ts | 431 | excluded | `js-runtime-only` | matter.js's retired TypeScript ClusterType compatibility layer. |
+
+## types/test/clusters
+
+| file | lines | status | Go tests or class | note |
+| --- | ---: | --- | --- | --- |
+| administrator-commissioningTest.ts | 42 | excluded | `js-runtime-only` | Shape of matter.js's generated TypeScript AdministratorCommissioning namespace (component tuples, command lists); the Go definition is generated by script/clustergen and held by its staleness test. |
+| door-lockTest.ts | 41 | excluded | `js-runtime-only` | TypeScript typing of DoorLock status fields as the union of global and cluster status codes. |
+| window-coveringTest.ts | 32 | excluded | `js-runtime-only` | Shape of matter.js's generated TypeScript WindowCovering namespace (attribute metadata, command list); the Go definition is generated by script/clustergen and held by its staleness test. |
+
+## types/test/common
+
+| file | lines | status | Go tests or class | note |
+| --- | ---: | --- | --- | --- |
+| StatusResponseErrorTest.ts | 145 | excluded | `js-runtime-only` | The class families (local and received specialisations, identity, prototype checks) of matter.js's StatusResponseError; a Go status is an im.StatusCode carried by an error value. |
+
+## types/test/datatype
+
+| file | lines | status | Go tests or class | note |
+| --- | ---: | --- | --- | --- |
+| CaseAuthenticatedTagTest.ts | 59 | excluded | `js-runtime-only` | matter.js's branded CaseAuthenticatedTag constructors; the module checks CAT values where it handles them (controller/ca validateCATs, the NOC subject in secure/mattercert) and has no CAT datatype of its own. |
+| ManufacturerExtensibleIdentifierTest.ts | 54 | excluded | `js-runtime-only` | matter.js's branded Mei, ClusterId, FieldId and AttributeId constructors over JavaScript numbers; Go ids are typed unsigned integers that cannot hold a fraction or a negative value. |
+| NodeIdTest.ts | 84 | excluded | `js-runtime-only` | matter.js's branded NodeId constructors and range helpers over JavaScript bigints; the module checks node-id ranges where it handles them (secure/mattercert, controller/commissioner, client/exchange) and has no NodeId datatype of its own. |
+| VendorIdTest.ts | 29 | excluded | `js-runtime-only` | matter.js's branded VendorId and its isOperational helper; the module checks vendor ids where it handles them (secure/setup's 0..0xFFF4 bound) and has no VendorId datatype of its own. |
+
+## types/test/protocol
+
+| file | lines | status | Go tests or class | note |
+| --- | ---: | --- | --- | --- |
+| TlvInvokeRequestTest.ts | 85 | planned | — | Phase 33: a new register root, ported by meaning in this phase. |
+
+## types/test/schema
+
+| file | lines | status | Go tests or class | note |
+| --- | ---: | --- | --- | --- |
+| Base38SchemaTest.ts | 50 | planned | — | Phase 33: a new register root, ported by meaning in this phase. |
+| BitmapSchemaTest.ts | 138 | planned | — | Phase 33: a new register root, ported by meaning in this phase. |
+| PairingCodeSchemaTest.ts | 580 | planned | — | Phase 33: a new register root, ported by meaning in this phase. |
+| QrCodeSchemaTest.ts | 34 | planned | — | Phase 33: a new register root, ported by meaning in this phase. |
+| SpecificationVersionSchemaTest.ts | 30 | planned | — | Phase 33: a new register root, ported by meaning in this phase. |
+
+## types/test/tlv
+
+| file | lines | status | Go tests or class | note |
+| --- | ---: | --- | --- | --- |
+| TlvAnyTest.ts | 150 | planned | — | Phase 33: a new register root, ported by meaning in this phase. |
+| TlvArrayTest.ts | 151 | planned | — | Phase 33: a new register root, ported by meaning in this phase. |
+| TlvBooleanTest.ts | 57 | planned | — | Phase 33: a new register root, ported by meaning in this phase. |
+| TlvCodecTest.ts | 77 | planned | — | Phase 33: a new register root, ported by meaning in this phase. |
+| TlvComplexTest.ts | 214 | planned | — | Phase 33: a new register root, ported by meaning in this phase. |
+| TlvNullableTest.ts | 157 | planned | — | Phase 33: a new register root, ported by meaning in this phase. |
+| TlvNumberTest.ts | 275 | planned | — | Phase 33: a new register root, ported by meaning in this phase. |
+| TlvObjectTest.ts | 595 | planned | — | Phase 33: a new register root, ported by meaning in this phase. |
+| TlvOfModelTest.ts | 288 | planned | — | Phase 33: a new register root, ported by meaning in this phase. |
+| TlvSchemaElementTest.ts | 276 | planned | — | Phase 33: a new register root, ported by meaning in this phase. |
+| TlvSchemaTest.ts | 184 | planned | — | Phase 33: a new register root, ported by meaning in this phase. |
+| TlvStringTest.ts | 161 | planned | — | Phase 33: a new register root, ported by meaning in this phase. |
+| TlvVoidTest.ts | 34 | planned | — | Phase 33: a new register root, ported by meaning in this phase. |
+
 ## FixMe skips
 
 Go tests whose body is an unconditional `t.Skip("FixMe: …")`: each names a case it would mirror and
@@ -1026,6 +1480,83 @@ does not test. They count as passes in `go test`; this list is where they are re
 
 ## Planned
 
+### general/test/codec
+
+- `Base64CodecTest.ts` — Phase 33: a new register root, ported by meaning in this phase.
+- `DerCodecTest.ts` — Phase 33: a new register root, ported by meaning in this phase.
+- `DnsCodecTest.ts` — Phase 33: a new register root, ported by meaning in this phase.
+
+### general/test/crypto
+
+- `EcdsaSignatureTest.ts` — Phase 33: a new register root, ported by meaning in this phase.
+- `KeyTest.ts` — Phase 33: a new register root, ported by meaning in this phase.
+- `MlDsaTest.ts` — Phase 33: a new register root, ported by meaning in this phase.
+- `NodeJsStyleCryptoTest.ts` — Phase 33: a new register root, ported by meaning in this phase.
+- `PemTest.ts` — Phase 33: a new register root, ported by meaning in this phase.
+- `Spake2pTest.ts` — Phase 33: a new register root, ported by meaning in this phase.
+- `StandardCryptoTest.ts` — Phase 33: a new register root, ported by meaning in this phase.
+- `X509Test.ts` — Phase 33: a new register root, ported by meaning in this phase.
+
+### general/test/crypto/aes
+
+- `AesTest.ts` — Phase 33: a new register root, ported by meaning in this phase.
+- `CcmTest.ts` — Phase 33: a new register root, ported by meaning in this phase.
+- `CmacTest.ts` — Phase 33: a new register root, ported by meaning in this phase.
+
+### general/test/math
+
+- `VerhoeffTest.ts` — Phase 33: a new register root, ported by meaning in this phase.
+
+### general/test/net
+
+- `AppAddressTest.ts` — Phase 33: a new register root, ported by meaning in this phase.
+- `RetryScheduleTest.ts` — Phase 33: a new register root, ported by meaning in this phase.
+- `ServerAddressSetTest.ts` — Phase 33: a new register root, ported by meaning in this phase.
+- `ServerAddressTest.ts` — Phase 33: a new register root, ported by meaning in this phase.
+
+### general/test/net/dns-sd
+
+- `DnssdNamesTest.ts` — Phase 33: a new register root, ported by meaning in this phase.
+- `DnssdParametersTest.ts` — Phase 33: a new register root, ported by meaning in this phase.
+- `IpServiceLinkLocalZoneTest.ts` — Phase 33: a new register root, ported by meaning in this phase.
+- `IpServiceStatusTest.ts` — Phase 33: a new register root, ported by meaning in this phase.
+- `IpServiceTest.ts` — Phase 33: a new register root, ported by meaning in this phase.
+- `MdnsRelevanceFilterTest.ts` — Phase 33: a new register root, ported by meaning in this phase.
+- `MdnsSocketTest.ts` — Phase 33: a new register root, ported by meaning in this phase.
+- `ServiceDiscoveryTest.ts` — Phase 33: a new register root, ported by meaning in this phase.
+
+### general/test/net/http
+
+- `MockWsConnectionTest.ts` — Phase 33: a new register root, ported by meaning in this phase.
+- `WebSocketClientTest.ts` — Phase 33: a new register root, ported by meaning in this phase.
+
+### general/test/net/mock
+
+- `MockTcpTest.ts` — Phase 33: a new register root, ported by meaning in this phase.
+
+### general/test/net/udp
+
+- `UdpMulticastServerTest.ts` — Phase 33: a new register root, ported by meaning in this phase.
+
+### general/test/util
+
+- `BytesTest.ts` — Phase 33: a new register root, ported by meaning in this phase.
+- `IpTest.ts` — Phase 33: a new register root, ported by meaning in this phase.
+- `NumberTest.ts` — Phase 33: a new register root, ported by meaning in this phase.
+
+### model/test/aspects
+
+- `AccessTest.ts` — Phase 33: a new register root, ported by meaning in this phase.
+- `ConformanceTest.ts` — Phase 33: a new register root, ported by meaning in this phase.
+- `ConstraintTest.ts` — Phase 33: a new register root, ported by meaning in this phase.
+- `QualityTest.ts` — Phase 33: a new register root, ported by meaning in this phase.
+
+### model/test/logic
+
+- `DefaultValueTest.ts` — Phase 33: a new register root, ported by meaning in this phase.
+- `EffectiveAccessTest.ts` — Phase 33: a new register root, ported by meaning in this phase.
+- `RequirementApplicabilityTest.ts` — Phase 33: a new register root, ported by meaning in this phase.
+
 ### node/test/behaviors/access-control
 
 - `AccessControlCustomExtensionTest.ts` — A manufacturer extension of AccessControl (a custom attribute and command): no subject exists in the module (the root AccessControl server takes no extension elements); the port waits until a consumer asks for one (owner decision 2026-10-29).
@@ -1033,3 +1564,35 @@ does not test. They count as passes in `go test`; this list is where they are re
 ### node/test/endpoint/type
 
 - `SemanticNamespaceTest.ts` — Semantic tag namespaces as values (standard tags, custom namespaces): no subject exists in the module (schema and device carry no namespace table; the device kit declares TagList entries as values since phase 30, device.Options.Tags); the port waits until a consumer asks for one (owner decision 2026-10-29).
+
+### nodejs/test/crypto
+
+- `NodeJsCryptoTest.ts` — Phase 33: a new register root, ported by meaning in this phase.
+
+### types/test/protocol
+
+- `TlvInvokeRequestTest.ts` — Phase 33: a new register root, ported by meaning in this phase.
+
+### types/test/schema
+
+- `Base38SchemaTest.ts` — Phase 33: a new register root, ported by meaning in this phase.
+- `BitmapSchemaTest.ts` — Phase 33: a new register root, ported by meaning in this phase.
+- `PairingCodeSchemaTest.ts` — Phase 33: a new register root, ported by meaning in this phase.
+- `QrCodeSchemaTest.ts` — Phase 33: a new register root, ported by meaning in this phase.
+- `SpecificationVersionSchemaTest.ts` — Phase 33: a new register root, ported by meaning in this phase.
+
+### types/test/tlv
+
+- `TlvAnyTest.ts` — Phase 33: a new register root, ported by meaning in this phase.
+- `TlvArrayTest.ts` — Phase 33: a new register root, ported by meaning in this phase.
+- `TlvBooleanTest.ts` — Phase 33: a new register root, ported by meaning in this phase.
+- `TlvCodecTest.ts` — Phase 33: a new register root, ported by meaning in this phase.
+- `TlvComplexTest.ts` — Phase 33: a new register root, ported by meaning in this phase.
+- `TlvNullableTest.ts` — Phase 33: a new register root, ported by meaning in this phase.
+- `TlvNumberTest.ts` — Phase 33: a new register root, ported by meaning in this phase.
+- `TlvObjectTest.ts` — Phase 33: a new register root, ported by meaning in this phase.
+- `TlvOfModelTest.ts` — Phase 33: a new register root, ported by meaning in this phase.
+- `TlvSchemaElementTest.ts` — Phase 33: a new register root, ported by meaning in this phase.
+- `TlvSchemaTest.ts` — Phase 33: a new register root, ported by meaning in this phase.
+- `TlvStringTest.ts` — Phase 33: a new register root, ported by meaning in this phase.
+- `TlvVoidTest.ts` — Phase 33: a new register root, ported by meaning in this phase.

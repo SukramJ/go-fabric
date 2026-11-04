@@ -28,6 +28,10 @@ func renderPage(snap *Snapshot, reg *Register) []byte {
 	b.WriteString("# matter.js tests: the porting register\n\n")
 	fmt.Fprintf(&b, "matter.js pin `%s` (`parity/schema.json` → `matter.sourceCommit`): %d test files under %s.\n",
 		snap.Commit, len(snap.Files), joinCode(snap.Roots))
+	b.WriteString("Out of the roots, each for its reason: `packages/matter.js` (the umbrella package and its legacy controller API,\n")
+	b.WriteString("MatterController and PairedNode, whose behaviour the protocol and node roots hold), `packages/nodejs-ble` (Node.js BLE\n")
+	b.WriteString("bindings over noble; the module's BLE is its own Go transport), `packages/nodejs-ws` (a WebSocket transport the module\n")
+	b.WriteString("does not have), `packages/testing` (matter.js's test harness) and `support/codegen` (its TypeScript tooling).\n")
 	b.WriteString("`ported`: the Go tests cover the file's `it` cases; `partial`: they cover some, the note names the rest;\n")
 	b.WriteString("`planned`: not ported yet; `excluded`: left out, with its class. A `ported` or `partial` note's \"Left\"\n")
 	b.WriteString("names the `it` cases that will not be ported, each with its class and reason. The guard is `make testparity-check`.\n\n")

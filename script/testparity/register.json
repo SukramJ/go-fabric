@@ -1,6 +1,931 @@
 {
   "entries": [
     {
+      "path": "packages/general/test/MatterErrorTest.ts",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "Formatting (plain, ANSI, fallback) and instanceof matching of matter.js's MatterError class hierarchy; Go errors are values compared with errors.Is / errors.As.",
+      "snapshotSha": "2ff1d5ae05938aa91c10e2784c3a176bc6d8ac5f"
+    },
+    {
+      "path": "packages/general/test/codec/Base64CodecTest.ts",
+      "status": "planned",
+      "reason": "Phase 33: a new register root, ported by meaning in this phase.",
+      "snapshotSha": "d79fe075b58fb0cfdd33cf133784b695924bd7bd"
+    },
+    {
+      "path": "packages/general/test/codec/DerCodecTest.ts",
+      "status": "planned",
+      "reason": "Phase 33: a new register root, ported by meaning in this phase.",
+      "snapshotSha": "f00e4cfbf8e4d97120bd24b862d99899e6a07635"
+    },
+    {
+      "path": "packages/general/test/codec/DnsCodecTest.ts",
+      "status": "planned",
+      "reason": "Phase 33: a new register root, ported by meaning in this phase.",
+      "snapshotSha": "c188c4e8c069ad7f14ce1591b8bac2c0f1261c33"
+    },
+    {
+      "path": "packages/general/test/crypto/EcdsaSignatureTest.ts",
+      "status": "planned",
+      "reason": "Phase 33: a new register root, ported by meaning in this phase.",
+      "snapshotSha": "378c316dd42037496c5ecfca7116cbb77a8316e2"
+    },
+    {
+      "path": "packages/general/test/crypto/KeyTest.ts",
+      "status": "planned",
+      "reason": "Phase 33: a new register root, ported by meaning in this phase.",
+      "snapshotSha": "55fc0d1e942b01ac70b1409ad12bc14cb72a18a2"
+    },
+    {
+      "path": "packages/general/test/crypto/MlDsaTest.ts",
+      "status": "planned",
+      "reason": "Phase 33: a new register root, ported by meaning in this phase.",
+      "snapshotSha": "485deba2013fee6ad20d28ee00eed37a2d53c2b6"
+    },
+    {
+      "path": "packages/general/test/crypto/NodeJsStyleCryptoTest.ts",
+      "status": "planned",
+      "reason": "Phase 33: a new register root, ported by meaning in this phase.",
+      "snapshotSha": "dd66f1140d655c130495631fcc4b95b3e0ea1a7d"
+    },
+    {
+      "path": "packages/general/test/crypto/PemTest.ts",
+      "status": "planned",
+      "reason": "Phase 33: a new register root, ported by meaning in this phase.",
+      "snapshotSha": "c1a061070c356e54ed8a1c53f5b4d6c176a8a9a9"
+    },
+    {
+      "path": "packages/general/test/crypto/Spake2pTest.ts",
+      "status": "planned",
+      "reason": "Phase 33: a new register root, ported by meaning in this phase.",
+      "snapshotSha": "69e227ddc3f8408373f3bc0bee4087b638f18fef"
+    },
+    {
+      "path": "packages/general/test/crypto/StandardCryptoTest.ts",
+      "status": "planned",
+      "reason": "Phase 33: a new register root, ported by meaning in this phase.",
+      "snapshotSha": "68339c4328af4619c6504c483507931f8afcdb23"
+    },
+    {
+      "path": "packages/general/test/crypto/X509Test.ts",
+      "status": "planned",
+      "reason": "Phase 33: a new register root, ported by meaning in this phase.",
+      "snapshotSha": "e1307c27b0e3fe11199afabb109c191541ac8856"
+    },
+    {
+      "path": "packages/general/test/crypto/aes/AesTest.ts",
+      "status": "planned",
+      "reason": "Phase 33: a new register root, ported by meaning in this phase.",
+      "snapshotSha": "8e3f4399c449e28be545411e3543e3009d1d7614"
+    },
+    {
+      "path": "packages/general/test/crypto/aes/CcmTest.ts",
+      "status": "planned",
+      "reason": "Phase 33: a new register root, ported by meaning in this phase.",
+      "snapshotSha": "0b9fe4ce51f6b913fe5d696ebc0df0974bf36cfa"
+    },
+    {
+      "path": "packages/general/test/crypto/aes/CmacTest.ts",
+      "status": "planned",
+      "reason": "Phase 33: a new register root, ported by meaning in this phase.",
+      "snapshotSha": "695b580849dba67bf2d5ab27249680e0c9a146c7"
+    },
+    {
+      "path": "packages/general/test/environment/EnvironmentTest.ts",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "matter.js's Environment service container (service registration, lifetimes, inheritance between environments); the Go module wires its collaborators through constructors and Attach/Set calls.",
+      "snapshotSha": "12402b5ec66f97bf2f025d39c034dad291d09c30"
+    },
+    {
+      "path": "packages/general/test/environment/RuntimeServiceTest.ts",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "The RuntimeService that tracks matter.js's running workers and process signals; a Go host owns its process and goroutines.",
+      "snapshotSha": "3fdec37d94462f7f0011a5cde95e22c44832ded6"
+    },
+    {
+      "path": "packages/general/test/environment/VariableServiceTest.ts",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "matter.js's configuration-variable service (environment variables, argv, config files); the module takes its configuration as Go option structs from the host.",
+      "snapshotSha": "79ddbed7d4a8bb6db39d5a056c2bb24cd6ca3504"
+    },
+    {
+      "path": "packages/general/test/fs/MockFilesystemTest.ts",
+      "status": "excluded",
+      "class": "test-infrastructure",
+      "reason": "matter.js's in-memory filesystem for its own tests; the Go tests use t.TempDir.",
+      "snapshotSha": "4a5f4208060a5010a17bb870766dcbf0369f3725"
+    },
+    {
+      "path": "packages/general/test/log/LoggerTest.ts",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "matter.js's Logger (log levels per facility, formats, destinations); the module logs through the host's log/slog handler.",
+      "snapshotSha": "f9d95b291f3586bacda66f99412e9447d9e68752"
+    },
+    {
+      "path": "packages/general/test/math/ReedSolomonTest.ts",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "Reed-Solomon error correction for matter.js's own QR-code renderer; the module returns the \"MT:\" payload text and renders no QR symbol (secure/setup QRCode).",
+      "snapshotSha": "272b1ab0abecf58bf37b7204b741a0e5d309c316"
+    },
+    {
+      "path": "packages/general/test/math/VerhoeffTest.ts",
+      "status": "planned",
+      "reason": "Phase 33: a new register root, ported by meaning in this phase.",
+      "snapshotSha": "5965c150719256bfa2f113546078131c265a188c"
+    },
+    {
+      "path": "packages/general/test/net/AppAddressTest.ts",
+      "status": "planned",
+      "reason": "Phase 33: a new register root, ported by meaning in this phase.",
+      "snapshotSha": "3ec1d692b28e9b68f39f689e32bcd1dda1715772"
+    },
+    {
+      "path": "packages/general/test/net/RetryScheduleTest.ts",
+      "status": "planned",
+      "reason": "Phase 33: a new register root, ported by meaning in this phase.",
+      "snapshotSha": "5d4a5c5592082083deaddf034f01c3235e8e21ca"
+    },
+    {
+      "path": "packages/general/test/net/ServerAddressSetTest.ts",
+      "status": "planned",
+      "reason": "Phase 33: a new register root, ported by meaning in this phase.",
+      "snapshotSha": "e319fb703d7bb063e7089ac92c50cd28c0c33cd7"
+    },
+    {
+      "path": "packages/general/test/net/ServerAddressTest.ts",
+      "status": "planned",
+      "reason": "Phase 33: a new register root, ported by meaning in this phase.",
+      "snapshotSha": "a991ab1fd74b676beae6ec0f7544e3539d73a52f"
+    },
+    {
+      "path": "packages/general/test/net/dns-sd/DnssdNamesTest.ts",
+      "status": "planned",
+      "reason": "Phase 33: a new register root, ported by meaning in this phase.",
+      "snapshotSha": "8108d2285191bbac825cee0ba05d3ee83c2e21df"
+    },
+    {
+      "path": "packages/general/test/net/dns-sd/DnssdParametersTest.ts",
+      "status": "planned",
+      "reason": "Phase 33: a new register root, ported by meaning in this phase.",
+      "snapshotSha": "29bf78712a4b1df0d958a2ff52c2a1b3f9e8b328"
+    },
+    {
+      "path": "packages/general/test/net/dns-sd/IpServiceLinkLocalZoneTest.ts",
+      "status": "planned",
+      "reason": "Phase 33: a new register root, ported by meaning in this phase.",
+      "snapshotSha": "2991ef5922987ebd8f2bf86253ed7a46cbf38e02"
+    },
+    {
+      "path": "packages/general/test/net/dns-sd/IpServiceStatusTest.ts",
+      "status": "planned",
+      "reason": "Phase 33: a new register root, ported by meaning in this phase.",
+      "snapshotSha": "fa8d72a31a98441efa187a51d9635488c2b4b834"
+    },
+    {
+      "path": "packages/general/test/net/dns-sd/IpServiceTest.ts",
+      "status": "planned",
+      "reason": "Phase 33: a new register root, ported by meaning in this phase.",
+      "snapshotSha": "27197bee646abdf010c365863f089189e794b811"
+    },
+    {
+      "path": "packages/general/test/net/dns-sd/MdnsRelevanceFilterTest.ts",
+      "status": "planned",
+      "reason": "Phase 33: a new register root, ported by meaning in this phase.",
+      "snapshotSha": "9edda852e395cc8037247a7df5d1ff14d674430e"
+    },
+    {
+      "path": "packages/general/test/net/dns-sd/MdnsSocketTest.ts",
+      "status": "planned",
+      "reason": "Phase 33: a new register root, ported by meaning in this phase.",
+      "snapshotSha": "7a1efc0626475cb6ca6e47be184775b540886541"
+    },
+    {
+      "path": "packages/general/test/net/dns-sd/ServiceDiscoveryTest.ts",
+      "status": "planned",
+      "reason": "Phase 33: a new register root, ported by meaning in this phase.",
+      "snapshotSha": "b61c3722ec71d1382d85746a32ba959879463143"
+    },
+    {
+      "path": "packages/general/test/net/http/MockWsConnectionTest.ts",
+      "status": "planned",
+      "reason": "Phase 33: a new register root, ported by meaning in this phase.",
+      "snapshotSha": "0782e5797d8c73502d246a5d65679d218c07a7ed"
+    },
+    {
+      "path": "packages/general/test/net/http/WebSocketClientTest.ts",
+      "status": "planned",
+      "reason": "Phase 33: a new register root, ported by meaning in this phase.",
+      "snapshotSha": "8ce7c87e12b4a27985a3d0736515a87ae246c56f"
+    },
+    {
+      "path": "packages/general/test/net/mock/MockTcpTest.ts",
+      "status": "planned",
+      "reason": "Phase 33: a new register root, ported by meaning in this phase.",
+      "snapshotSha": "7c6de63be1b9364e3c4b7260631f8c1a5bf599a0"
+    },
+    {
+      "path": "packages/general/test/net/udp/UdpMulticastServerTest.ts",
+      "status": "planned",
+      "reason": "Phase 33: a new register root, ported by meaning in this phase.",
+      "snapshotSha": "15242e8161ae5208a0aae3ca613d5ac558cdf73f"
+    },
+    {
+      "path": "packages/general/test/storage/ByteStreamReaderTest.ts",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "A buffered reader over JavaScript byte streams for matter.js's storage drivers; Go uses io.Reader.",
+      "snapshotSha": "a91139cb00074fa1b079575cdc0487d5f7cd8330"
+    },
+    {
+      "path": "packages/general/test/storage/MemoryBlobStorageDriverTest.ts",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "matter.js's in-memory blob storage driver; the module persists through the host's store port (store/), whose own tests cover it.",
+      "snapshotSha": "2e3088f4497b5b64d289e863a908fb464062ca7e"
+    },
+    {
+      "path": "packages/general/test/storage/MemoryStorageDriverTest.ts",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "matter.js's in-memory key/value storage driver; the module persists through the host's store port (store/), whose own tests cover it.",
+      "snapshotSha": "8dd81ac484e5b95c22ab4ddbb3a6780cb170aefa"
+    },
+    {
+      "path": "packages/general/test/storage/StorageContextTest.ts",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "Context-scoped key/value access of matter.js's StorageManager; the module's store port has no context hierarchy.",
+      "snapshotSha": "bde855a948fe8320747ff257a49efe7fa17f0d23"
+    },
+    {
+      "path": "packages/general/test/storage/StorageManagerTest.ts",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "matter.js's StorageManager lifecycle around a driver; the host owns storage here.",
+      "snapshotSha": "9f6bcf8953b63fda4f75e6885a45cd510adb4adb"
+    },
+    {
+      "path": "packages/general/test/storage/StorageServiceTest.ts",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "matter.js's StorageService (driver selection, namespaces, opening per node); the host owns storage here.",
+      "snapshotSha": "faadc6c1faf172fb5c5a208f0b062cb2c93bc12c"
+    },
+    {
+      "path": "packages/general/test/storage/StringifyToolsTest.ts",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "The JSON converter of matter.js's storage layer for bigint, bytes and other JavaScript values; Go persists typed values through encoding/json and the store port.",
+      "snapshotSha": "145788450f57d7a0d1128bb602915d0b82d3774f"
+    },
+    {
+      "path": "packages/general/test/storage/wal/WalCleanerTest.ts",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "matter.js's write-ahead-log storage driver; the module has no WAL driver, the host owns persistence.",
+      "snapshotSha": "1f881056972d6f2d2afb0e5419702d0d459b56cd"
+    },
+    {
+      "path": "packages/general/test/storage/wal/WalCommitTest.ts",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "matter.js's write-ahead-log storage driver; the module has no WAL driver, the host owns persistence.",
+      "snapshotSha": "a7e4187c065800a806efabc028a4ce2707ccbda8"
+    },
+    {
+      "path": "packages/general/test/storage/wal/WalReaderTest.ts",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "matter.js's write-ahead-log storage driver; the module has no WAL driver, the host owns persistence.",
+      "snapshotSha": "973e4b4dee12d2a4afee22c03950d0a1f24848f0"
+    },
+    {
+      "path": "packages/general/test/storage/wal/WalSnapshotTest.ts",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "matter.js's write-ahead-log storage driver; the module has no WAL driver, the host owns persistence.",
+      "snapshotSha": "6c16f130813562b947486efd5a8a4fc9bc303846"
+    },
+    {
+      "path": "packages/general/test/storage/wal/WalStorageDriverTest.ts",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "matter.js's write-ahead-log storage driver; the module has no WAL driver, the host owns persistence.",
+      "snapshotSha": "62c9226a9d676fd4f9442a5ace585fe9c5d8c31b"
+    },
+    {
+      "path": "packages/general/test/storage/wal/WalWriterTest.ts",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "matter.js's write-ahead-log storage driver; the module has no WAL driver, the host owns persistence.",
+      "snapshotSha": "6e6192b847a7366b07372ae74368954b13a13341"
+    },
+    {
+      "path": "packages/general/test/time/DurationTest.ts",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "matter.js's Duration helpers (parsing and formatting of durations in JavaScript numbers); Go uses time.Duration.",
+      "snapshotSha": "093e83eedb4a987e4d86f728f4e76d552fbc1d6f"
+    },
+    {
+      "path": "packages/general/test/time/MockTimeResolveTest.ts",
+      "status": "excluded",
+      "class": "test-infrastructure",
+      "reason": "MockTime.resolve, the fake clock of matter.js's own tests; the Go tests drive their own fake clocks.",
+      "snapshotSha": "a6f4f5c772e14d3be6fbaffb26e603ea3e6303e3"
+    },
+    {
+      "path": "packages/general/test/time/StandardTimeTest.ts",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "matter.js's Time service and timers over setTimeout/setInterval; Go uses time.Timer and the module's clock seams.",
+      "snapshotSha": "f0842594776ff41493c0e14879068f48313f6160"
+    },
+    {
+      "path": "packages/general/test/time/TimeUnitTest.ts",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "matter.js's branded time-unit constructors; Go uses time.Duration.",
+      "snapshotSha": "0ec3f1ddb61def70035849adf3355cfb2461b912"
+    },
+    {
+      "path": "packages/general/test/time/TimespanTest.ts",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "matter.js's Timespan helper over JavaScript numbers; Go uses time.Time and time.Duration.",
+      "snapshotSha": "4bf2dc0c522d83c04401f1fca054852a710d59e9"
+    },
+    {
+      "path": "packages/general/test/time/TimestampTest.ts",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "matter.js's Timestamp helper over JavaScript numbers; Go uses time.Time.",
+      "snapshotSha": "d890b451384995ccb4f3658c8f44530099284f44"
+    },
+    {
+      "path": "packages/general/test/transaction/ResourceSetTest.ts",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "Resource locking of matter.js's transaction layer, which serialises behavior state changes; the Go servers guard their state with mutexes.",
+      "snapshotSha": "d8a1beaa78eebe06e8fc6e54a7a773ed94ed80a6"
+    },
+    {
+      "path": "packages/general/test/transaction/StatusTest.ts",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "The status enum of matter.js's transaction layer, which serialises behavior state changes; the Go servers have no transactions.",
+      "snapshotSha": "e66b1af64ec414400a3802bfae8b92946be1c5e1"
+    },
+    {
+      "path": "packages/general/test/transaction/TransactionTest.ts",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "matter.js's transaction layer (participants, commit phases, rollback of behavior state); the Go servers guard their state with mutexes and have no transactions.",
+      "snapshotSha": "76784ef4863ad4da271ec9f06bbf4bbb75d6273d"
+    },
+    {
+      "path": "packages/general/test/util/AbortTest.ts",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "AbortSignal helpers; Go cancels through context.Context.",
+      "snapshotSha": "a9c8dea87ff74328da6a63d7ef0c729de6361c21"
+    },
+    {
+      "path": "packages/general/test/util/AsyncIteratorTest.ts",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "JavaScript async-iterator helpers; Go uses channels and iterator functions.",
+      "snapshotSha": "0d5eef96bdc896ede55036bcb8d0b017350977b4"
+    },
+    {
+      "path": "packages/general/test/util/BytesTest.ts",
+      "status": "planned",
+      "reason": "Phase 33: a new register root, ported by meaning in this phase.",
+      "snapshotSha": "7771ed20270fadad56a3ea4d1377b6df96991db0"
+    },
+    {
+      "path": "packages/general/test/util/CacheTest.ts",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "matter.js's generic timed caches (Cache, AsyncCache); the module's caches are purpose-built and tested with their owners.",
+      "snapshotSha": "2a0602aadd9bf9d7a4da303d45e29614f8e19788"
+    },
+    {
+      "path": "packages/general/test/util/CancelableTest.ts",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "Cancelable JavaScript promises; Go cancels through context.Context.",
+      "snapshotSha": "b928542ee0154de8b3a9d4d7a3ae1eb65c161114"
+    },
+    {
+      "path": "packages/general/test/util/ConstructionTest.ts",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "matter.js's asynchronous-construction lifecycle helper for JavaScript classes.",
+      "snapshotSha": "d7c8845212a4af98b71345640968f186818f43ee"
+    },
+    {
+      "path": "packages/general/test/util/DataReadQueueTest.ts",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "An async read queue over JavaScript promises; Go uses channels.",
+      "snapshotSha": "a98dff2a2bf29ddee1072d727b2094d5bffcaed6"
+    },
+    {
+      "path": "packages/general/test/util/DataReaderTest.ts",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "matter.js's byte-buffer reader (endianness, integer widths over DataView); Go uses encoding/binary, and the TLV decoder built on it is held by the tlv tests.",
+      "snapshotSha": "9a50a951916a8d0f249b45179a6b60af94866934"
+    },
+    {
+      "path": "packages/general/test/util/DataWriterTest.ts",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "matter.js's byte-buffer writer (endianness, integer widths, bigint input); Go uses encoding/binary, and the TLV encoder built on it is held by the tlv tests.",
+      "snapshotSha": "ebb00665d4f2b72542d8d13cdf5e0c67508d2781"
+    },
+    {
+      "path": "packages/general/test/util/DecoratorTest.ts",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "TypeScript decorator helpers.",
+      "snapshotSha": "f51a789d92631b6849cf756f8d54eb69064867f7"
+    },
+    {
+      "path": "packages/general/test/util/DeepCopyTest.ts",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "Deep copy of JavaScript object graphs.",
+      "snapshotSha": "d6ff42886e9c4af024517638a0e87f7a06dd7623"
+    },
+    {
+      "path": "packages/general/test/util/DeepEqualTest.ts",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "Deep equality of JavaScript object graphs; Go tests use reflect.DeepEqual and bytes.Equal.",
+      "snapshotSha": "c3b3b8145ca778432a114fedc3097820adb44c79"
+    },
+    {
+      "path": "packages/general/test/util/ErrorTest.ts",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "Normalising thrown JavaScript values (undefined, null, strings) into Error objects.",
+      "snapshotSha": "285566b6b9fad29eaff7b81ac5fc04566d36467f"
+    },
+    {
+      "path": "packages/general/test/util/FormattedTextTest.ts",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "Text wrapping and formatting for matter.js's console output.",
+      "snapshotSha": "44c1440b3f0261c44dd8cdf03192c6c8e9a6068a"
+    },
+    {
+      "path": "packages/general/test/util/GeneratedClassTest.ts",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "Runtime class generation in JavaScript.",
+      "snapshotSha": "63edae32379be233c8287649cd3a5ce301a51802"
+    },
+    {
+      "path": "packages/general/test/util/GithubTest.ts",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "matter.js's GitHub HTTP helper for its tooling (rate-limit statuses); the module talks to no GitHub API.",
+      "snapshotSha": "cd00b7a7356635f2b92791b1b561037db6cd9e16"
+    },
+    {
+      "path": "packages/general/test/util/GzipTest.ts",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "Gzip through the JavaScript runtime's compression streams; the module compresses nothing, and Go has compress/gzip where a host needs it.",
+      "snapshotSha": "4006d16f26f76065e9acae599cb86cf598ad3b83"
+    },
+    {
+      "path": "packages/general/test/util/HeapTest.ts",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "matter.js's priority-heap helper; the Go schedulers use container/heap or sorted slices where they need one.",
+      "snapshotSha": "b7b5931e92936ae5df2ad88331bb78c9139a0703"
+    },
+    {
+      "path": "packages/general/test/util/IntrospectionTest.ts",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "Runtime type introspection of JavaScript values.",
+      "snapshotSha": "2660e75a4aaae595bc0264f8060eb8b91f40530e"
+    },
+    {
+      "path": "packages/general/test/util/IpTest.ts",
+      "status": "planned",
+      "reason": "Phase 33: a new register root, ported by meaning in this phase.",
+      "snapshotSha": "412146f763f80a08db9fed2c90ddf018c55872d6"
+    },
+    {
+      "path": "packages/general/test/util/LifecycleTest.ts",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "matter.js's lifecycle-state helper for JavaScript objects.",
+      "snapshotSha": "4490af6a85e19f27dc0d04f29b59e04a7c8a7654"
+    },
+    {
+      "path": "packages/general/test/util/LifetimeTest.ts",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "matter.js's Lifetime tracker for diagnostics of running JavaScript objects.",
+      "snapshotSha": "b7403f40d55368e63ef05e82f912c8744a2c57ad"
+    },
+    {
+      "path": "packages/general/test/util/MapTest.ts",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "matter.js's observable BasicMap collection.",
+      "snapshotSha": "d011e2b862b01259aa0f4b14713af8b770eda7be"
+    },
+    {
+      "path": "packages/general/test/util/MockFetchTest.ts",
+      "status": "excluded",
+      "class": "test-infrastructure",
+      "reason": "The fetch mock of matter.js's own tests.",
+      "snapshotSha": "c50ab0fa6b4c8e3bc9be4f9adcdb611f6b2ef27c"
+    },
+    {
+      "path": "packages/general/test/util/MultiplexTest.ts",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "Promise multiplexing (BasicMultiplex) for JavaScript async work; Go uses goroutines and sync.WaitGroup.",
+      "snapshotSha": "6f61b79dea1202d23fe44f5eb1033a63b4d6c357"
+    },
+    {
+      "path": "packages/general/test/util/MutexTest.ts",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "A promise-based mutex for JavaScript async code; Go uses sync.Mutex.",
+      "snapshotSha": "efb26786fd389054b29db7a75af997b8cf31c5c9"
+    },
+    {
+      "path": "packages/general/test/util/NamedHandlerTest.ts",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "Named JavaScript event-handler registry.",
+      "snapshotSha": "a33cd1401f52475f6d39c67ee92ac9c7286e3ffe"
+    },
+    {
+      "path": "packages/general/test/util/NumberTest.ts",
+      "status": "planned",
+      "reason": "Phase 33: a new register root, ported by meaning in this phase.",
+      "snapshotSha": "ee0739faab0a9dfb4bae746cc0fd808a7aa0da5d"
+    },
+    {
+      "path": "packages/general/test/util/ObjectTest.ts",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "JavaScript object utilities.",
+      "snapshotSha": "87c91d2ec9ff93c5e7140babd43d7d23f945473d"
+    },
+    {
+      "path": "packages/general/test/util/ObservableTest.ts",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "matter.js's Observable event emitters and observable values; the Go event paths are typed callbacks and channels tested with their owners.",
+      "snapshotSha": "6979152563269e8605019e84c9bb1a1dbd7ad716"
+    },
+    {
+      "path": "packages/general/test/util/PromisesTest.ts",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "JavaScript promise helpers (timeouts, settling); Go uses context.Context and channels.",
+      "snapshotSha": "5b9427908ff419201c874c06b4cc3a7b7863cf94"
+    },
+    {
+      "path": "packages/general/test/util/SchedulerTest.ts",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "matter.js's cooperative scheduler for JavaScript tasks; Go uses goroutines.",
+      "snapshotSha": "e98ac5233aa36586f447b9caa608037fbda04195"
+    },
+    {
+      "path": "packages/general/test/util/SemaphoreTest.ts",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "A promise-based semaphore for JavaScript async code; Go uses buffered channels or golang.org/x/sync patterns.",
+      "snapshotSha": "cfd1a460241d9f04aa5d6b4296688212590809f8"
+    },
+    {
+      "path": "packages/general/test/util/SerializeTest.ts",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "Diagnostic serialisation of JavaScript values for log output.",
+      "snapshotSha": "d814a7f55237fdc81dbd82d81c6b5d2a620b9a9e"
+    },
+    {
+      "path": "packages/general/test/util/SetTest.ts",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "matter.js's observable BasicSet collection.",
+      "snapshotSha": "1ce04375b79a7682a10b0993098f9c6675fc5f4a"
+    },
+    {
+      "path": "packages/general/test/util/StreamsTest.ts",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "JavaScript stream helpers and EndOfStreamError; Go uses io.Reader and io.EOF.",
+      "snapshotSha": "f1f075a9f8f44e8b8529e27f32f52ac3cac6030c"
+    },
+    {
+      "path": "packages/general/test/util/StringTest.ts",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "String case helpers (capitalize, camelize) and date rendering for matter.js's code generation and logs.",
+      "snapshotSha": "82c365cdff6043eca89892d9f48460e5d031d5b2"
+    },
+    {
+      "path": "packages/model/test/MatterTest.ts",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "Self-validation of matter.js's in-memory Matter model (error count, scope); the Go side reads the extracted snapshot parity/schema.json, held by the schema parity tests and make chipdm-check.",
+      "snapshotSha": "b6cc8e9519fd99ad9aa447b9d2fdb51cbca15008"
+    },
+    {
+      "path": "packages/model/test/aspects/AccessTest.ts",
+      "status": "planned",
+      "reason": "Phase 33: a new register root, ported by meaning in this phase.",
+      "snapshotSha": "c550c26f463f7210bce40ef3288f26b459897fbd"
+    },
+    {
+      "path": "packages/model/test/aspects/ConformanceTest.ts",
+      "status": "planned",
+      "reason": "Phase 33: a new register root, ported by meaning in this phase.",
+      "snapshotSha": "24e2e0e6c80694529aaab3297d084bcf97847625"
+    },
+    {
+      "path": "packages/model/test/aspects/ConstraintTest.ts",
+      "status": "planned",
+      "reason": "Phase 33: a new register root, ported by meaning in this phase.",
+      "snapshotSha": "fe22e5457953cb80626eb01a4fcd359662f47b3e"
+    },
+    {
+      "path": "packages/model/test/aspects/QualityTest.ts",
+      "status": "planned",
+      "reason": "Phase 33: a new register root, ported by meaning in this phase.",
+      "snapshotSha": "6d7875f82c327cc44890eef449472ac6a94edd9e"
+    },
+    {
+      "path": "packages/model/test/common/FieldValueTest.ts",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "FieldValue, matter.js's representation of model default values as JavaScript numbers, bigints and records; the extractor writes them into parity/schema.json, which the Go generators read as data.",
+      "snapshotSha": "adf0e646e0fee4e9a153da8f0e0a0931cc6b531e"
+    },
+    {
+      "path": "packages/model/test/common/MetatypeTest.ts",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "Metatype classification and casting of JavaScript values in matter.js's model; the Go generators map the snapshot's metatypes to Go types.",
+      "snapshotSha": "f6f79fb375bce904e3762ac38f72132a2d92c6cc"
+    },
+    {
+      "path": "packages/model/test/common/SpecificationTest.ts",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "Ordering of specification revision strings inside matter.js's model; the module serves one specification revision (1.6.1).",
+      "snapshotSha": "86b40b5f0adfc00c2c953789d34f6e057b3ddaea"
+    },
+    {
+      "path": "packages/model/test/decoration/SchemaTest.ts",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "TypeScript decorators that attach a model schema to a class.",
+      "snapshotSha": "dd65b7743e66ec78264a943eea2959fe940aa8fc"
+    },
+    {
+      "path": "packages/model/test/decoration/semantics/ClassSemanticsTest.ts",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "TypeScript decorators that attach model semantics to a class.",
+      "snapshotSha": "a5b36ae0637637934c62d738adcb50277f12e16c"
+    },
+    {
+      "path": "packages/model/test/decoration/semantics/FieldSemanticsTest.ts",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "TypeScript decorators that attach model semantics to a class field.",
+      "snapshotSha": "f9b68d90e0b2df6f7a59a9c53f5c75b37f4b0e5d"
+    },
+    {
+      "path": "packages/model/test/logic/ClusterVarianceTest.ts",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "Classification of a cluster's elements by feature combination for matter.js's TypeScript cluster-type generation; the Go generator (script/clustergen) emits conformance that cluster/spec evaluates at run time.",
+      "snapshotSha": "c984bcaea07f03be04eb5511a027e2d332d366cb"
+    },
+    {
+      "path": "packages/model/test/logic/DefaultValueTest.ts",
+      "status": "planned",
+      "reason": "Phase 33: a new register root, ported by meaning in this phase.",
+      "snapshotSha": "2bc83bcd56073af2f6b10c24c14b16f77f67e113"
+    },
+    {
+      "path": "packages/model/test/logic/EffectiveAccessTest.ts",
+      "status": "planned",
+      "reason": "Phase 33: a new register root, ported by meaning in this phase.",
+      "snapshotSha": "9a7a34920597ae516814ce027494706a3cd4113e"
+    },
+    {
+      "path": "packages/model/test/logic/EncodedBitmapTest.ts",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "Conversion between bitmap records (JavaScript objects of flags) and integers; Go bitmaps are integers with generated named bits.",
+      "snapshotSha": "5e90c041f527a414d276b8a501a6f4cb38af1f24"
+    },
+    {
+      "path": "packages/model/test/logic/EncodedConstraintTest.ts",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "Encoding of constraint names into values inside matter.js's model; script/clustergen resolves the snapshot's constraints at generation time and cluster/spec evaluates them (held by the cluster/spec constraint parity tests).",
+      "snapshotSha": "cb32f7d6dcb1145d2e2e1098e34db825215acd9f"
+    },
+    {
+      "path": "packages/model/test/logic/EncodedValueTest.ts",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "Unit scaling of model values in JavaScript numbers inside matter.js's model; the extractor and script/clustergen restate values in the type's units.",
+      "snapshotSha": "cde2104b0ca726884b0608dc94395747c346d7c6"
+    },
+    {
+      "path": "packages/model/test/logic/FeatureSelectionErrorsTest.ts",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "Error reporting of matter.js's TypeScript feature selection on behavior classes (with()/for()); a Go server takes its features as a bitmap that spec.New checks against the conformance.",
+      "snapshotSha": "f71a30b12fef70297a3a3f92ceb407c86a6f019f"
+    },
+    {
+      "path": "packages/model/test/logic/MergedModelTest.ts",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "Merging of several model sources (spec, CHIP, local) inside matter.js's model build; the module reads the merged result from parity/schema.json.",
+      "snapshotSha": "092e9d9d36417c6e2478872969a3114b009ec47c"
+    },
+    {
+      "path": "packages/model/test/logic/ModelDiffTest.ts",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "Structural diff of matter.js model trees for its model tooling.",
+      "snapshotSha": "db639487cc76959ec4187bb26bdf86bc923316ff"
+    },
+    {
+      "path": "packages/model/test/logic/ModelVariantTraversalTest.ts",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "Traversal of model variants during matter.js's model merge.",
+      "snapshotSha": "db4837ed44d24fcf284bd1f8500d8255ea71922d"
+    },
+    {
+      "path": "packages/model/test/logic/RequirementApplicabilityTest.ts",
+      "status": "planned",
+      "reason": "Phase 33: a new register root, ported by meaning in this phase.",
+      "snapshotSha": "34509a2f3319f8742f84a6af03433180eeebae65"
+    },
+    {
+      "path": "packages/model/test/logic/RequirementResolverTest.ts",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "Resolution of device-type requirements against matter.js's in-memory model; the Go generator (script/devicegen) emits each device type's requirements and the device layer checks them.",
+      "snapshotSha": "f696af1bab26757a60930a2ce64a8fa0d1983489"
+    },
+    {
+      "path": "packages/model/test/logic/ScopeTest.ts",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "Name scoping inside matter.js's model (datatype lookup through owners and bases); the extractor resolves names before parity/schema.json is written.",
+      "snapshotSha": "ba83ed2d116eb333d3a5f3aa874b955560c589a2"
+    },
+    {
+      "path": "packages/model/test/logic/SelectDefaultValueTest.ts",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "Choice of a default value for a model element when matter.js instantiates TypeScript behavior state; the Go generator writes the snapshot's defaults into the definitions.",
+      "snapshotSha": "f99a4168d33b85da0716569737eaed4e31d2c764"
+    },
+    {
+      "path": "packages/model/test/logic/ValidateModelTest.ts",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "matter.js's validation of its in-memory model tree; the Go side is held by the schema parity tests and make chipdm-check.",
+      "snapshotSha": "f10d7f88a5e3e84ad60165c417b6fb37d9970eca"
+    },
+    {
+      "path": "packages/model/test/logic/definition-validation/AttributeValidatorTest.ts",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "matter.js's validation of attribute definitions inside its model; the Go side is held by the schema parity tests and make chipdm-check.",
+      "snapshotSha": "7e9ccf45b2b15124416d0e046780a514f2fe94df"
+    },
+    {
+      "path": "packages/model/test/logic/definition-validation/ClusterValidatorTest.ts",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "matter.js's validation of cluster definitions inside its model; the Go side is held by the schema parity tests and make chipdm-check.",
+      "snapshotSha": "75c1c320f4c65cc04bfcff16b055d7818f6bad69"
+    },
+    {
+      "path": "packages/model/test/logic/definition-validation/RequirementValidatorTest.ts",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "matter.js's validation of device-type requirement definitions inside its model; the Go side is held by the device-type tests of script/devicegen and make chipdm-check.",
+      "snapshotSha": "42358183b0d3f98a86cda430761328bd28a2682c"
+    },
+    {
+      "path": "packages/model/test/logic/definition-validation/ValueValidatorTest.ts",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "matter.js's validation of value definitions (types, constraints, defaults) inside its model; the Go side is held by the schema parity tests and make chipdm-check.",
+      "snapshotSha": "09ef322121abb4669e771c214d49ef696db3596d"
+    },
+    {
+      "path": "packages/model/test/logic/device-types/ConditionAssertionsTest.ts",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "Assertions over device-type conditions in matter.js's model-level device-type validation pass; the Go device layer checks its compositions in device/ and node/.",
+      "snapshotSha": "f8dc5dfc37a8efbf2aba45c86c122191ec106a8d"
+    },
+    {
+      "path": "packages/model/test/logic/device-types/DeviceTypeConformanceTest.ts",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "matter.js's model-level device-type conformance over node facts (endpoints, clusters, features); the Go device layer checks its compositions in device/ and node/.",
+      "snapshotSha": "066fdb7dd24bfb8e8d11d634cf9018cbdf66beac"
+    },
+    {
+      "path": "packages/model/test/models/ClusterModelTest.ts",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "The ClusterModel class of matter.js's in-memory model (children, inheritance, lookups).",
+      "snapshotSha": "4a145c86d92a08e5d5ff0069085eb9b1c7a7bfeb"
+    },
+    {
+      "path": "packages/model/test/models/DeviceTypeModelTest.ts",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "The DeviceTypeModel class of matter.js's in-memory model.",
+      "snapshotSha": "c0242591f97e1eb5b477ff02651b38f2d8d4db13"
+    },
+    {
+      "path": "packages/model/test/models/FieldModelTest.ts",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "The FieldModel class of matter.js's in-memory model.",
+      "snapshotSha": "30da8c1d3b3ebe612ba0422e93962553bb7916d7"
+    },
+    {
+      "path": "packages/model/test/models/MatterModelTest.ts",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "The MatterModel class of matter.js's in-memory model.",
+      "snapshotSha": "4c1bedace5d346cd26e68e0822820aa9dfb663ed"
+    },
+    {
+      "path": "packages/model/test/models/ModelTest.ts",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "The Model base class of matter.js's in-memory model (tree operations, cloning, serialisation).",
+      "snapshotSha": "bfe01b83ac11380edd3eb50027f786c9ffc0af1f"
+    },
+    {
+      "path": "packages/model/test/models/RequirementModelTest.ts",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "The RequirementModel class of matter.js's in-memory model.",
+      "snapshotSha": "510bbe94ffb01300d89253dcf0791599651bbbe0"
+    },
+    {
+      "path": "packages/model/test/models/ResourceTest.ts",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "The documentation resources attached to matter.js's model.",
+      "snapshotSha": "3879e5634323010701f70da14c801497f0af133a"
+    },
+    {
+      "path": "packages/model/test/models/ValueModelTest.ts",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "The ValueModel class of matter.js's in-memory model.",
+      "snapshotSha": "7bcfeb03b745a3b804dea82c80a43ac81fb9b878"
+    },
+    {
+      "path": "packages/model/test/standard/MatterDefinitionTest.ts",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "Instantiation and self-validation of matter.js's standard model; the Go side reads the extracted snapshot parity/schema.json, held by the schema parity tests and make chipdm-check.",
+      "snapshotSha": "2a3a4620608816ffc5956dac7921989071e6b345"
+    },
+    {
       "path": "packages/node/test/behavior/BehaviorMigrateTest.ts",
       "status": "excluded",
       "class": "js-runtime-only",
@@ -3832,6 +4757,152 @@
       "snapshotSha": "eb4c08f0d95e02eefcb7abf1cbb8d2d24c0750e4"
     },
     {
+      "path": "packages/nodejs/test/config/ConfigTest.ts",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "Defaults and immutability of matter.js's Node.js configuration object.",
+      "snapshotSha": "8008428a91178b5c81bb84b6273b8827e3394988"
+    },
+    {
+      "path": "packages/nodejs/test/crypto/CryptoInteropTest.ts",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "Agreement between matter.js's two JavaScript crypto backends (StandardCrypto, NodeJsCrypto); the module has one implementation over the Go standard library.",
+      "snapshotSha": "2121d83698028234107dd93b4f774c84142e382d"
+    },
+    {
+      "path": "packages/nodejs/test/crypto/NodeJsCryptoDefectTest.ts",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "Detection of a Node.js runtime whose crypto module lacks a cipher or digest and the backend selection around it; the module uses the Go standard library.",
+      "snapshotSha": "ecc02cb012c2dcfee1e743419a33460cf987c11a"
+    },
+    {
+      "path": "packages/nodejs/test/crypto/NodeJsCryptoTest.ts",
+      "status": "planned",
+      "reason": "Phase 33: a new register root, ported by meaning in this phase.",
+      "snapshotSha": "79d6a5ea34fbb8276cd395ade7ab7f750c9eb786"
+    },
+    {
+      "path": "packages/nodejs/test/environment/NodeJsEnvironmentTest.ts",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "matter.js's Node.js environment bootstrap (variables, storage location, process integration).",
+      "snapshotSha": "931276c87a82ff028529956d96cf0ca47de3a7d2"
+    },
+    {
+      "path": "packages/nodejs/test/fs/DirectoryLockTest.ts",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "matter.js's storage-directory lock on Node.js; the host owns its storage directory.",
+      "snapshotSha": "923798cba7092ef0a8bb9f7785a964e0e7e14845"
+    },
+    {
+      "path": "packages/nodejs/test/fs/FsUtilsTest.ts",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "Node.js filesystem helpers.",
+      "snapshotSha": "20169755f0b94856b53b02e70adec35bee097c11"
+    },
+    {
+      "path": "packages/nodejs/test/fs/NodeJsFilesystemTest.ts",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "matter.js's filesystem abstraction over Node.js fs.",
+      "snapshotSha": "145538ea43ca7ff23eb11057ad3c673e71b34513"
+    },
+    {
+      "path": "packages/nodejs/test/log/FileLoggerTest.ts",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "matter.js's file log destination; the module logs through the host's log/slog handler.",
+      "snapshotSha": "cd71c458b778555fe0627a355b63938cd6e93b40"
+    },
+    {
+      "path": "packages/nodejs/test/net/NodeJsHttpEndpointTest.ts",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "matter.js's HTTP endpoint on Node.js; the module serves no HTTP.",
+      "snapshotSha": "443a12ef70da6d45a647af6f51aae3a37057ab9e"
+    },
+    {
+      "path": "packages/nodejs/test/net/NodeJsNetworkTest.ts",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "Interface enumeration through Node.js os.networkInterfaces(); the module enumerates through net.Interfaces in transport/udp and mdns, tested there.",
+      "snapshotSha": "0b4db3332e0265bcdf44ec2c28a106069de6cd39"
+    },
+    {
+      "path": "packages/nodejs/test/net/NodeJsTcpConnectionTest.ts",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "matter.js's TCP connection wrapper over Node.js net.Socket; the Go TCP transport (transport/tcp) has its own tests.",
+      "snapshotSha": "9ac56d7837ee4399d2ad12bfff51f9299a852e65"
+    },
+    {
+      "path": "packages/nodejs/test/net/NodeJsTcpListenerTest.ts",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "matter.js's TCP listener wrapper over Node.js net.Server; the Go TCP transport (transport/tcp) has its own tests.",
+      "snapshotSha": "0b7d06b1de03db1e061528fdf0d4d049eb93dd91"
+    },
+    {
+      "path": "packages/nodejs/test/net/NodeJsUdpSocketTest.ts",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "matter.js's UDP socket wrapper over Node.js dgram; the Go UDP transport (transport/udp) has its own tests.",
+      "snapshotSha": "218db2c54f768175601b599a2e2956542d96f5cc"
+    },
+    {
+      "path": "packages/nodejs/test/storage/DirectoryBlobStorageDriverTest.ts",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "matter.js's directory blob storage driver on Node.js; the host owns persistence.",
+      "snapshotSha": "983155ab92d18d526249a44b0046cb449fd353ce"
+    },
+    {
+      "path": "packages/nodejs/test/storage/FlatFileBlobStorageDriverTest.ts",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "matter.js's flat-file blob storage driver on Node.js; the host owns persistence.",
+      "snapshotSha": "42c0fafb7dab81a3bedac71d0d438cf670be6336"
+    },
+    {
+      "path": "packages/nodejs/test/storage/JsonFileStorageDriverTest.ts",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "matter.js's JSON-file storage driver on Node.js; the host owns persistence.",
+      "snapshotSha": "809253ed68e02c6af58c027b7aec9aad0fecf40c"
+    },
+    {
+      "path": "packages/nodejs/test/storage/SqliteBlobStorageDriverTest.ts",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "matter.js's SQLite blob storage driver on Node.js; the host owns persistence.",
+      "snapshotSha": "8ff36f5f8552d6a87fda2add58a0ce8ca1b9de78"
+    },
+    {
+      "path": "packages/nodejs/test/storage/StorageDriverTest.ts",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "The shared contract suite of matter.js's Node.js storage drivers; the host owns persistence.",
+      "snapshotSha": "495b6bd624de140cfd857e4f73abd81da16a4243"
+    },
+    {
+      "path": "packages/nodejs/test/storage/StorageMigrationTest.ts",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "Migration between matter.js's Node.js storage drivers and formats; the host owns persistence.",
+      "snapshotSha": "b58b1e863f15031ce7a53b21e21810fb66d1b45d"
+    },
+    {
+      "path": "packages/nodejs/test/storage/sqlite/SqliteUtilTest.ts",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "SQLite helpers of matter.js's Node.js storage driver; the host owns persistence.",
+      "snapshotSha": "09dfd03541ae7d88561d10ce1d92d3576d25bc1e"
+    },
+    {
       "path": "packages/protocol/test/action/InvokeLargeMessageTest.ts",
       "status": "partial",
       "go": [
@@ -6315,6 +7386,218 @@
       "class": "device-ble-thread",
       "reason": "The DiagnosticSource abstraction over MeshCoP and REST (and its collection/action machinery): otbr.BorderRouter reads /node and /diagnostics directly, and MeshCoP stays out (ADR 0027 decision 5).",
       "snapshotSha": "82724a5e679277f9d7cc1630171b09d533fbf466"
+    },
+    {
+      "path": "packages/types/test/cluster/ClassForValueModelTest.ts",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "Runtime generation of TypeScript bitmap classes from value models; Go bitmaps are generated integer types.",
+      "snapshotSha": "76cde19ecc954ec36258de2aef8a2c481b9d41c4"
+    },
+    {
+      "path": "packages/types/test/cluster/ClusterNamingTest.ts",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "Name/id lookup of attributes, commands and events against matter.js's in-memory model (ClusterLookup); the Go definitions are generated with their names and ids (cluster/spec).",
+      "snapshotSha": "f8b8a89a571274bb24cedab466146ca4b453366a"
+    },
+    {
+      "path": "packages/types/test/cluster/ClusterTypeObsoleteTest.ts",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "Characterisation of matter.js's TypeScript ClusterType keeping obsolete elements; the Go definitions come from script/clustergen.",
+      "snapshotSha": "293f7a423edd806b0d0de41f4fa44f7d5547967a"
+    },
+    {
+      "path": "packages/types/test/cluster/ClusterTypeWithCompatTest.ts",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "The with() compat shim of matter.js's retired TypeScript ClusterType API.",
+      "snapshotSha": "d5eca57e1c19e28d945e70f9e53c0a77c2db1a9d"
+    },
+    {
+      "path": "packages/types/test/cluster/EnumForValueModelTest.ts",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "The runtime shape (forward and reverse mapping) of TypeScript numeric enums generated from value models; Go enums are generated integer types.",
+      "snapshotSha": "e9c6a1334f64a4b123a9d994102e619af007a150"
+    },
+    {
+      "path": "packages/types/test/cluster/RetiredClusterTypeTest.ts",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "matter.js's retired TypeScript ClusterType compatibility layer.",
+      "snapshotSha": "985ec513a2d53bb431937c208c48635bf915e9c7"
+    },
+    {
+      "path": "packages/types/test/clusters/administrator-commissioningTest.ts",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "Shape of matter.js's generated TypeScript AdministratorCommissioning namespace (component tuples, command lists); the Go definition is generated by script/clustergen and held by its staleness test.",
+      "snapshotSha": "ab94a9561bbca162c0185841ec16ac6d81b18e5f"
+    },
+    {
+      "path": "packages/types/test/clusters/door-lockTest.ts",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "TypeScript typing of DoorLock status fields as the union of global and cluster status codes.",
+      "snapshotSha": "9665abdfa4be14232b3d4ccfaa0be771bb2dbaa4"
+    },
+    {
+      "path": "packages/types/test/clusters/window-coveringTest.ts",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "Shape of matter.js's generated TypeScript WindowCovering namespace (attribute metadata, command list); the Go definition is generated by script/clustergen and held by its staleness test.",
+      "snapshotSha": "78d46c71ce2d55a6e5d9c0065521e60a2b0e270d"
+    },
+    {
+      "path": "packages/types/test/common/StatusResponseErrorTest.ts",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "The class families (local and received specialisations, identity, prototype checks) of matter.js's StatusResponseError; a Go status is an im.StatusCode carried by an error value.",
+      "snapshotSha": "58c4df70e183b77256ed43157fd87b1ad5d29df5"
+    },
+    {
+      "path": "packages/types/test/datatype/CaseAuthenticatedTagTest.ts",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "matter.js's branded CaseAuthenticatedTag constructors; the module checks CAT values where it handles them (controller/ca validateCATs, the NOC subject in secure/mattercert) and has no CAT datatype of its own.",
+      "snapshotSha": "0b12be4e9f95a8d5d476f3d48f1a6f696520eab1"
+    },
+    {
+      "path": "packages/types/test/datatype/ManufacturerExtensibleIdentifierTest.ts",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "matter.js's branded Mei, ClusterId, FieldId and AttributeId constructors over JavaScript numbers; Go ids are typed unsigned integers that cannot hold a fraction or a negative value.",
+      "snapshotSha": "337cf59efe158f1dd7e17c17fd7089837d28e785"
+    },
+    {
+      "path": "packages/types/test/datatype/NodeIdTest.ts",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "matter.js's branded NodeId constructors and range helpers over JavaScript bigints; the module checks node-id ranges where it handles them (secure/mattercert, controller/commissioner, client/exchange) and has no NodeId datatype of its own.",
+      "snapshotSha": "1a51181ac169d673b3c2dfed2d6baad38bad7575"
+    },
+    {
+      "path": "packages/types/test/datatype/VendorIdTest.ts",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "matter.js's branded VendorId and its isOperational helper; the module checks vendor ids where it handles them (secure/setup's 0..0xFFF4 bound) and has no VendorId datatype of its own.",
+      "snapshotSha": "bc6c12efaf95efe5da560385b0467ced7485453b"
+    },
+    {
+      "path": "packages/types/test/protocol/TlvInvokeRequestTest.ts",
+      "status": "planned",
+      "reason": "Phase 33: a new register root, ported by meaning in this phase.",
+      "snapshotSha": "a128398457c1e9540f4ec396692315b36f110286"
+    },
+    {
+      "path": "packages/types/test/schema/Base38SchemaTest.ts",
+      "status": "planned",
+      "reason": "Phase 33: a new register root, ported by meaning in this phase.",
+      "snapshotSha": "febcb820ca71d98ff8fd4a8fac415ea0ea23aed0"
+    },
+    {
+      "path": "packages/types/test/schema/BitmapSchemaTest.ts",
+      "status": "planned",
+      "reason": "Phase 33: a new register root, ported by meaning in this phase.",
+      "snapshotSha": "577356a6381b3c76277b81c36c4210c9d14eab7f"
+    },
+    {
+      "path": "packages/types/test/schema/PairingCodeSchemaTest.ts",
+      "status": "planned",
+      "reason": "Phase 33: a new register root, ported by meaning in this phase.",
+      "snapshotSha": "b4f39f1a350f294cc4de4c6dffb9888344c26b5f"
+    },
+    {
+      "path": "packages/types/test/schema/QrCodeSchemaTest.ts",
+      "status": "planned",
+      "reason": "Phase 33: a new register root, ported by meaning in this phase.",
+      "snapshotSha": "4e234bda227585a7da2af0cdb230182ae4cb35bd"
+    },
+    {
+      "path": "packages/types/test/schema/SpecificationVersionSchemaTest.ts",
+      "status": "planned",
+      "reason": "Phase 33: a new register root, ported by meaning in this phase.",
+      "snapshotSha": "852e50e4a10b9d58706a0c82b2e750e06b8d9dfa"
+    },
+    {
+      "path": "packages/types/test/tlv/TlvAnyTest.ts",
+      "status": "planned",
+      "reason": "Phase 33: a new register root, ported by meaning in this phase.",
+      "snapshotSha": "bdcb8d435ebe347394dcaf16d1edb0908674e5f5"
+    },
+    {
+      "path": "packages/types/test/tlv/TlvArrayTest.ts",
+      "status": "planned",
+      "reason": "Phase 33: a new register root, ported by meaning in this phase.",
+      "snapshotSha": "a48a55de1ec0d65742a7f223ba319dd92bbc0af7"
+    },
+    {
+      "path": "packages/types/test/tlv/TlvBooleanTest.ts",
+      "status": "planned",
+      "reason": "Phase 33: a new register root, ported by meaning in this phase.",
+      "snapshotSha": "a0248363c91345151b0b2e5fb93022eba44335e1"
+    },
+    {
+      "path": "packages/types/test/tlv/TlvCodecTest.ts",
+      "status": "planned",
+      "reason": "Phase 33: a new register root, ported by meaning in this phase.",
+      "snapshotSha": "e95b1b5643bbbba4ac4c2b07227f9bd4e1c28d32"
+    },
+    {
+      "path": "packages/types/test/tlv/TlvComplexTest.ts",
+      "status": "planned",
+      "reason": "Phase 33: a new register root, ported by meaning in this phase.",
+      "snapshotSha": "47c5a2844a671b00c78b670e865963cc2da42ae3"
+    },
+    {
+      "path": "packages/types/test/tlv/TlvNullableTest.ts",
+      "status": "planned",
+      "reason": "Phase 33: a new register root, ported by meaning in this phase.",
+      "snapshotSha": "3bad37cff84d63a75fc5a84e7c96931f44b646cd"
+    },
+    {
+      "path": "packages/types/test/tlv/TlvNumberTest.ts",
+      "status": "planned",
+      "reason": "Phase 33: a new register root, ported by meaning in this phase.",
+      "snapshotSha": "f5f0d999724d435b7c742e0be8d802bdb4495265"
+    },
+    {
+      "path": "packages/types/test/tlv/TlvObjectTest.ts",
+      "status": "planned",
+      "reason": "Phase 33: a new register root, ported by meaning in this phase.",
+      "snapshotSha": "954eb21b84893d68a740d76b2be3433319be6fcc"
+    },
+    {
+      "path": "packages/types/test/tlv/TlvOfModelTest.ts",
+      "status": "planned",
+      "reason": "Phase 33: a new register root, ported by meaning in this phase.",
+      "snapshotSha": "f449d80c5d0beb1f36549fcc19b1b4e7ce30ad29"
+    },
+    {
+      "path": "packages/types/test/tlv/TlvSchemaElementTest.ts",
+      "status": "planned",
+      "reason": "Phase 33: a new register root, ported by meaning in this phase.",
+      "snapshotSha": "1b4283b2027383f083ae0bae59a9d54561483e3e"
+    },
+    {
+      "path": "packages/types/test/tlv/TlvSchemaTest.ts",
+      "status": "planned",
+      "reason": "Phase 33: a new register root, ported by meaning in this phase.",
+      "snapshotSha": "34dc19be34548d25921e747ad0f0f451bc8af8e5"
+    },
+    {
+      "path": "packages/types/test/tlv/TlvStringTest.ts",
+      "status": "planned",
+      "reason": "Phase 33: a new register root, ported by meaning in this phase.",
+      "snapshotSha": "10cc7d66e25872c8586930eba25cf7e7545a63f5"
+    },
+    {
+      "path": "packages/types/test/tlv/TlvVoidTest.ts",
+      "status": "planned",
+      "reason": "Phase 33: a new register root, ported by meaning in this phase.",
+      "snapshotSha": "aa0e3269698ffc50179e26885fdacc55cb275023"
     }
   ],
   "skips": [

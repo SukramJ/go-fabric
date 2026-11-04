@@ -37,8 +37,13 @@ import (
 // files, every one decided from the seed read and then checked against its
 // describe/it names and the Go tests' Test and t.Run names. Phase 16 brings
 // the protocol/test and node/test/node share of it to zero, milestone 3 the
-// node/test/behaviors share.
-const testparityPlannedRatchet = 2
+// node/test/behaviors share. Phase 33 widened the roots to
+// packages/general/test, packages/model/test, packages/nodejs/test and
+// packages/types/test (192 files): its first commit decides the 140 files
+// outside the six new register roots (131 excluded, 9 planned for a port)
+// and lists the six roots' 52 files as planned; each root's commit of the
+// phase lowers the count again.
+const testparityPlannedRatchet = 63
 
 // testparityPortedRatchet is the number of ported entries, and
 // testparityMissingRatchet the number of matter.js it cases the partial
