@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/SukramJ/go-fabric/cluster/light"
+	"github.com/SukramJ/go-fabric/cluster/spec"
 	ccdef "github.com/SukramJ/go-fabric/cluster/spec/colorcontrol"
 	"github.com/SukramJ/go-fabric/cluster/wire"
 	"github.com/SukramJ/go-fabric/im"
@@ -94,8 +95,8 @@ func TestColorControl_WriteThrough_WriterError(t *testing.T) {
 	_, err := srv.MatterInvoke(context.Background(), wire.ColorCtrlCmdMoveToColorTemperature,
 		ccdef.MoveToColorTemperatureRequest{ColorTemperatureMireds: 300})
 
-	if err == nil {
-		t.Fatal("MatterInvoke expected error when writer fails, got nil")
+	if spec.StatusOf(err) != im.StatusFailure {
+		t.Fatalf("MatterInvoke when the writer fails: status %v (%v), want %v", spec.StatusOf(err), err, im.StatusFailure)
 	}
 	if !errors.Is(err, sentinel) {
 		t.Errorf("error = %v, want wrapped sentinel %v", err, sentinel)
