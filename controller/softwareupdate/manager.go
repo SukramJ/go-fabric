@@ -291,6 +291,20 @@ type Manager struct {
 	work                   sync.WaitGroup
 	// obs are the observers of [Manager.Observe], with their own lock.
 	obs observers
+	// bdxSession, when set, stands in for the BDX responder's session
+	// lookup — a test seam (manager_bdx_parity_matterjs_test.go), as
+	// matter.js's OtaTest replaces BdxProtocol.sessionFor; set before the
+	// manager runs, nil in production.
+	bdxSession func(p Peer) bdxTransfer
+}
+
+// bdxTransfer is what the manager reads of a node's running BDX transfer,
+// a *bdx.ServerSession: matter.js reads the session's transferredBytes
+// and dataLength (#isTransferring, queuedUpdates,
+// SoftwareUpdateManager.ts:293-336 at 862ad75f).
+type bdxTransfer interface {
+	Transferred() uint64
+	Negotiated() (bdx.Result, bool)
 }
 
 // New returns the manager over cfg; [Manager.Start] starts it.
@@ -626,12 +640,19 @@ func (e *queueEntry) reset() {
 	e.applyDelay = 0
 }
 
-// bdxSessionFor is #bdxSessionFor (:322-328).
-func (m *Manager) bdxSessionFor(p Peer) *bdx.ServerSession {
+// bdxSessionFor is #bdxSessionFor (:322-328); nil when no transfer runs.
+func (m *Manager) bdxSessionFor(p Peer) bdxTransfer {
+	if m.bdxSession != nil {
+		return m.bdxSession(p)
+	}
 	if m.cfg.BDX == nil {
 		return nil
 	}
-	return m.cfg.BDX.SessionFor(bdx.Peer{FabricIndex: p.FabricIndex, NodeID: p.NodeID}, "ota")
+	s := m.cfg.BDX.SessionFor(bdx.Peer{FabricIndex: p.FabricIndex, NodeID: p.NodeID}, "ota")
+	if s == nil {
+		return nil // no typed nil in the interface
+	}
+	return s
 }
 
 // isTransferring is #isTransferring (:334-336): any change of the
@@ -647,7 +668,7 @@ func isTransferring(e *queueEntry, transferred *uint64) bool {
 	return *transferred != last
 }
 
-func transferredOf(s *bdx.ServerSession) *uint64 {
+func transferredOf(s bdxTransfer) *uint64 {
 	if s == nil {
 		return nil
 	}

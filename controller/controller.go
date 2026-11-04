@@ -217,6 +217,7 @@ type Controller struct {
 	ota       atomic.Pointer[softwareupdate.Manager]
 	registry  atomic.Pointer[client.Registry]
 	armer     *peer.RebootResubscribeArmer
+	armerObs  atomic.Pointer[armerObserver] // a test seam, nil in production (ota.go)
 	ownNode   OwnNode
 	ownNodeID uint64
 	ownAddr   *net.UDPAddr
