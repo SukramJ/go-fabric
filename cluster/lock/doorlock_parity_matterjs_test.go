@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	doorlockcluster "github.com/SukramJ/go-fabric/cluster/lock"
+	"github.com/SukramJ/go-fabric/cluster/spec"
 	"github.com/SukramJ/go-fabric/cluster/wire"
 	"github.com/SukramJ/go-fabric/im"
 	matterparity "github.com/SukramJ/go-fabric/parity"
@@ -268,8 +269,8 @@ func TestParityMatterJS_DoorLock_OperatingModeWritable(t *testing.T) {
 			t.Errorf("write OperatingMode=%d: %v, want ConstraintError", mode, err)
 		}
 	}
-	if err := srv.MatterWrite(ctx, wire.DoorLockAttrLockState, uint8(1)); err == nil {
-		t.Error("LockState was writable")
+	if err := srv.MatterWrite(ctx, wire.DoorLockAttrLockState, uint8(1)); spec.StatusOf(err) != im.StatusUnsupportedWrite {
+		t.Errorf("LockState write: status %v (%v), want %v", spec.StatusOf(err), err, im.StatusUnsupportedWrite)
 	}
 	if err := srv.MatterWrite(ctx, wire.DoorLockAttrOperatingMode, "normal"); err == nil {
 		t.Error("a non-numeric OperatingMode was accepted")
