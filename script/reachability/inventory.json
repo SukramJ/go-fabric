@@ -30196,91 +30196,91 @@
       "identifier": "TestConcurrent",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "logring/logring_test.go",
-      "line": 369
+      "line": 365
     },
     {
       "package": "logring",
       "identifier": "TestDefaults",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "logring/logring_test.go",
-      "line": 362
+      "line": 358
     },
     {
       "package": "logring",
       "identifier": "TestInnerErrorReturned",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "logring/logring_test.go",
-      "line": 169
+      "line": 170
     },
     {
       "package": "logring",
       "identifier": "TestInnerLevelGovernsForwarding",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "logring/logring_test.go",
-      "line": 151
+      "line": 152
     },
     {
       "package": "logring",
       "identifier": "TestLevelGateAtRunTime",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "logring/logring_test.go",
-      "line": 103
+      "line": 104
     },
     {
       "package": "logring",
       "identifier": "TestObserverDeliversInOrder",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "logring/logring_test.go",
-      "line": 246
+      "line": 247
     },
     {
       "package": "logring",
       "identifier": "TestObserverNeverBlocksTheLogger",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "logring/logring_test.go",
-      "line": 281
+      "line": 284
     },
     {
       "package": "logring",
       "identifier": "TestRecordsReturnsCopies",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "logring/logring_test.go",
-      "line": 94
+      "line": 95
     },
     {
       "package": "logring",
       "identifier": "TestRecordsSinceLimit",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "logring/logring_test.go",
-      "line": 69
+      "line": 70
     },
     {
       "package": "logring",
       "identifier": "TestRingBoundAndOrder",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "logring/logring_test.go",
-      "line": 51
+      "line": 52
     },
     {
       "package": "logring",
       "identifier": "TestSharedLevelVar",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "logring/logring_test.go",
-      "line": 138
+      "line": 139
     },
     {
       "package": "logring",
       "identifier": "TestUnsubscribeIdempotentAndStops",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "logring/logring_test.go",
-      "line": 343
+      "line": 339
     },
     {
       "package": "logring",
       "identifier": "TestWithAttrsWithGroupShareRingAndFlatten",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "logring/logring_test.go",
-      "line": 195
+      "line": 196
     },
     {
       "package": "mdns",

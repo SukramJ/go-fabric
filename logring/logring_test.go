@@ -13,6 +13,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
+	"testing/synctest"
 	"time"
 )
 
@@ -244,100 +245,95 @@ func TestWithAttrsWithGroupShareRingAndFlatten(t *testing.T) {
 }
 
 func TestObserverDeliversInOrder(t *testing.T) {
-	h := New(slog.DiscardHandler, Options{})
-	var mu sync.Mutex
-	var got []Record
-	all := make(chan struct{})
-	unsub := h.Observe(func(r Record) {
+	synctest.Test(t, func(t *testing.T) {
+		h := New(slog.DiscardHandler, Options{})
+		var mu sync.Mutex
+		var got []Record
+		all := make(chan struct{})
+		unsub := h.Observe(func(r Record) {
+			mu.Lock()
+			got = append(got, r)
+			n := len(got)
+			mu.Unlock()
+			if n == 5 {
+				close(all)
+			}
+		})
+		defer unsub()
+		log := slog.New(h).WithGroup("g")
+		for i := range 5 {
+			log.Info("x", "i", i)
+		}
+		select {
+		case <-all:
+		case <-time.After(5 * time.Second):
+			t.Fatal("observer did not receive five records")
+		}
 		mu.Lock()
-		got = append(got, r)
-		n := len(got)
-		mu.Unlock()
-		if n == 5 {
-			close(all)
+		defer mu.Unlock()
+		equalSeqs(t, got, 1, 2, 3, 4, 5)
+		if got[4].Attrs[0].Key != "g.i" {
+			t.Fatalf("observer record attrs %v", got[4].Attrs)
+		}
+		if h.Dropped() != 0 {
+			t.Fatalf("dropped %d", h.Dropped())
 		}
 	})
-	defer unsub()
-	log := slog.New(h).WithGroup("g")
-	for i := range 5 {
-		log.Info("x", "i", i)
-	}
-	select {
-	case <-all:
-	case <-time.After(5 * time.Second):
-		t.Fatal("observer did not receive five records")
-	}
-	mu.Lock()
-	defer mu.Unlock()
-	equalSeqs(t, got, 1, 2, 3, 4, 5)
-	if got[4].Attrs[0].Key != "g.i" {
-		t.Fatalf("observer record attrs %v", got[4].Attrs)
-	}
-	if h.Dropped() != 0 {
-		t.Fatalf("dropped %d", h.Dropped())
-	}
 }
 
 func TestObserverNeverBlocksTheLogger(t *testing.T) {
-	h := New(slog.DiscardHandler, Options{ObserverBuffer: 2})
-	entered := make(chan struct{}, 1)
-	release := make(chan struct{})
-	var mu sync.Mutex
-	var got []uint64
-	unsub := h.Observe(func(r Record) {
-		select {
-		case entered <- struct{}{}:
-		default:
-		}
-		<-release
-		mu.Lock()
-		got = append(got, r.Seq)
-		mu.Unlock()
-	})
-	log := slog.New(h)
+	synctest.Test(t, func(t *testing.T) {
+		h := New(slog.DiscardHandler, Options{ObserverBuffer: 2})
+		entered := make(chan struct{}, 1)
+		release := make(chan struct{})
+		var mu sync.Mutex
+		var got []uint64
+		unsub := h.Observe(func(r Record) {
+			select {
+			case entered <- struct{}{}:
+			default:
+			}
+			<-release
+			mu.Lock()
+			got = append(got, r.Seq)
+			mu.Unlock()
+		})
+		log := slog.New(h)
 
-	log.Info("first")
-	select {
-	case <-entered: // the observer holds record 1 and blocks
-	case <-time.After(5 * time.Second):
-		t.Fatal("observer never called")
-	}
-	done := make(chan struct{})
-	go func() {
-		for range 9 {
-			log.Info("more")
+		log.Info("first")
+		select {
+		case <-entered: // the observer holds record 1 and blocks
+		case <-time.After(5 * time.Second):
+			t.Fatal("observer never called")
 		}
-		close(done)
-	}()
-	select {
-	case <-done:
-	case <-time.After(5 * time.Second):
-		t.Fatal("a blocked observer blocked the logger")
-	}
-	// Records 2..10 offered to a queue of 2: 2..8 discarded, 9 and 10 queued.
-	if d := h.Dropped(); d != 7 {
-		t.Fatalf("Dropped = %d, want 7", d)
-	}
-	if n := len(h.Records(0, 0)); n != 10 {
-		t.Fatalf("the ring lost records to a slow observer: %d", n)
-	}
-	close(release)
-	deadline := time.Now().Add(5 * time.Second)
-	for {
+		done := make(chan struct{})
+		go func() {
+			for range 9 {
+				log.Info("more")
+			}
+			close(done)
+		}()
+		select {
+		case <-done:
+		case <-time.After(5 * time.Second):
+			t.Fatal("a blocked observer blocked the logger")
+		}
+		// Records 2..10 offered to a queue of 2: 2..8 discarded, 9 and 10 queued.
+		if d := h.Dropped(); d != 7 {
+			t.Fatalf("Dropped = %d, want 7", d)
+		}
+		if n := len(h.Records(0, 0)); n != 10 {
+			t.Fatalf("the ring lost records to a slow observer: %d", n)
+		}
+		close(release)
+		synctest.Wait() // the observer drains 1, 9 and 10 and blocks on its queue
+		unsub()
 		mu.Lock()
-		n := len(got)
-		mu.Unlock()
-		if n == 3 || time.Now().After(deadline) {
-			break
+		defer mu.Unlock()
+		if fmt.Sprint(got) != "[1 9 10]" {
+			t.Fatalf("delivered %v, want [1 9 10]", got)
 		}
-		time.Sleep(time.Millisecond)
-	}
-	unsub()
-	mu.Lock()
-	defer mu.Unlock()
-	if fmt.Sprint(got) != "[1 9 10]" {
-		t.Fatalf("delivered %v, want [1 9 10]", got)
-	}
+	})
 }
 
 func TestUnsubscribeIdempotentAndStops(t *testing.T) {
