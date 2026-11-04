@@ -51,8 +51,9 @@ func (l *reportLog) reports() []*exchange.Session {
 // TestOTAReportAnnouncesItsSessionParity ports OtaTest.ts:892-952: each
 // report the device pushes over the sustained subscription announces to
 // the armer the session it arrived over — the peer's one live session
-// (ClientSubscriptions.reportStarted; the Go controller's reportStarted,
-// RebootResubscribeArmer.ts:165-172 at 862ad75f).
+// (ClientSubscriptions.reportStarted, which the armer observes at
+// RebootResubscribeArmer.ts:68 at 862ad75f; the Go controller's
+// reportStarted).
 func TestOTAReportAnnouncesItsSessionParity(t *testing.T) {
 	t.Parallel()
 	r := newOTARigWith(t, nil, nil)
