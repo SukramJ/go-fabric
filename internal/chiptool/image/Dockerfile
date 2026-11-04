@@ -75,8 +75,12 @@ RUN set -e; \
     echo "$sum  /tmp/protoc.zip" | sha256sum -c -; \
     unzip -q -o /tmp/protoc.zip -d /usr/local bin/protoc 'include/*'; \
     rm /tmp/protoc.zip; protoc --version
-RUN build-one jf-admin-app/linux jfa-app
-RUN build-one jf-control-app jfc-app
+# Warnings are not errors here, as matter.js builds its camera-app (its
+# Dockerfile at 862ad75f): chip's CI builds these apps with its own
+# toolchain, and Ubuntu's clang reports pigweed's socket_stream.h under
+# -Wthread-safety-analysis. The code is upstream's.
+RUN build-one jf-admin-app/linux jfa-app jfa-app treat_warnings_as_errors=false
+RUN build-one jf-control-app jfc-app jfc-app treat_warnings_as_errors=false
 
 FROM ${CHIP_TEST_IMAGE} AS chip
 ARG CHIP_COMMIT=6170af8461b10b1766044122ac83332c6d00ab20

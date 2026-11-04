@@ -151,6 +151,11 @@ type demoCamera struct {
 	zones    []uint16
 	triggers []*camTriggerContext
 	timer    *time.Timer
+	// tickBase and ticks place the trigger timer's ticks on the second
+	// grid from the first trigger (zone-manager.cpp's periodic one-second
+	// timer), so they do not drift by the work each tick does.
+	tickBase time.Time
+	ticks    int
 	// transports are the push transports and their CMAF session numbers.
 	transports map[uint16]*camTransport
 }
@@ -868,6 +873,7 @@ func (c *demoCamera) zoneTriggered(ids []uint16) error {
 				remainingBlind: trigger.BlindDuration, count: 1,
 			})
 			if c.timer == nil {
+				c.tickBase, c.ticks = time.Now(), 1
 				c.timer = time.AfterFunc(camZoneTimerPeriod, c.zoneTick)
 			}
 			c.mu.Unlock()
@@ -927,7 +933,8 @@ func (c *demoCamera) zoneTick() {
 	}
 	c.triggers = kept
 	if len(c.triggers) > 0 {
-		c.timer = time.AfterFunc(camZoneTimerPeriod, c.zoneTick)
+		c.ticks++
+		c.timer = time.AfterFunc(time.Until(c.tickBase.Add(time.Duration(c.ticks)*camZoneTimerPeriod)), c.zoneTick)
 	} else {
 		c.timer = nil
 	}
