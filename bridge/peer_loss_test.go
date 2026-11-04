@@ -295,12 +295,12 @@ func TestReportPeerLoss_OnlyFirstMessageOfExchange(t *testing.T) {
 	t.Parallel()
 	b := newStartedBridgeWithSnapshotter(t, wbEmptySnapshotter)
 	key := mrp.ExchangeKey{SessionID: 7, ExchangeID: 9, Initiator: true}
-	created := time.Now()
-	b.reportExchangeOrigins.Store(key, reportExchangeOrigin{createdAt: created, firstCounter: 100})
+	created := clock.MonotonicOf(b.clk())
+	b.reportExchangeOrigins.Store(key, reportExchangeOrigin{createdAtMono: created, firstCounter: 100})
 	b.reportCounterOwner.Store(reportCounterKey(7, 100), uint32(1))
 	b.reportCounterOwner.Store(reportCounterKey(7, 101), uint32(1))
-	if asOf, lost := b.reportPeerLoss(7, 9, 100); !lost || !asOf.Equal(created) {
-		t.Fatalf("first message: lost=%v asOf=%v, want true %v", lost, asOf, created)
+	if sinceMono, lost := b.reportPeerLoss(7, 9, 100); !lost || sinceMono != created {
+		t.Fatalf("first message: lost=%v since=%v, want true %v", lost, sinceMono, created)
 	}
 	if _, lost := b.reportPeerLoss(7, 9, 101); lost {
 		t.Fatal("a later chunk counted as peer loss")

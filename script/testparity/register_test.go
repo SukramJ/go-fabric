@@ -73,8 +73,8 @@ const testparityPlannedRatchet = 2
 // ported on the device's registration hook, restarts and a sleeping peer,
 // five left, six stay missing) complete five files: 130 ported, 501 missing.
 const (
-	testparityPortedRatchet  = 129
-	testparityMissingRatchet = 510
+	testparityPortedRatchet  = 130
+	testparityMissingRatchet = 509
 )
 
 // testparityLeftRatchet is the number of left it cases summed over the

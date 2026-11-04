@@ -14,6 +14,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/SukramJ/go-fabric/clock"
 	"github.com/SukramJ/go-fabric/clock/clocktest"
 )
 
@@ -257,6 +258,45 @@ func TestSessionManagerWallClockSteps(t *testing.T) {
 		clk.Advance(time.Second)
 		if n := m.ClosePeerLost(sessionManagerFabric, 0x1234, time.Time{}); n != 1 || !sessionManagerClosing(m, 0x0100) {
 			t.Fatalf("ClosePeerLost closed %d, want the session closed", n)
+		}
+	})
+	t.Run("closes a session on peer shutdown after the clock stepped back", func(t *testing.T) {
+		// SessionManagerTest.ts:882-890: handlePeerShutdown with its default
+		// asOf (Time.nowUs, the monotonic reading) still closes a session
+		// created before a backward wall-clock step. Go's one sweep is
+		// ClosePeerLostSince on the clock's monotonic reading
+		// (SessionManager.ts:630-642 handlePeerShutdown and :645-647
+		// handlePeerLoss both run #handlePeerLoss, :688); what the shutdown
+		// cause adds — keepSubscriptions, the controller's own
+		// subscriptions to the peer — has no device-side subject.
+		t.Parallel()
+		m := NewManager(newMinimalFakeStore())
+		clk := clocktest.New(time.UnixMilli(1_700_000_000_000))
+		m.SetClock(clk)
+		open(t, m, 0x0100)
+		clk.StepWall(-time.Hour)
+		clk.Advance(time.Second)
+		if n := m.ClosePeerLostSince(sessionManagerFabric, 0x1234, clock.MonotonicOf(clk)); n != 1 || !sessionManagerClosing(m, 0x0100) {
+			t.Fatalf("ClosePeerLostSince closed %d, want the session created before the step closed", n)
+		}
+	})
+	t.Run("keeps a session created after the shutdown was observed, across a backward step", func(t *testing.T) {
+		// SessionManager.ts:688: sessions created at or after asOf are
+		// kept — on the monotonic reading, so the backward step between
+		// the reading and the session's creation does not condemn it.
+		t.Parallel()
+		m := NewManager(newMinimalFakeStore())
+		clk := clocktest.New(time.UnixMilli(1_700_000_000_000))
+		m.SetClock(clk)
+		open(t, m, 0x0100)
+		clk.Advance(time.Second)
+		since := clock.MonotonicOf(clk)
+		clk.StepWall(-time.Hour)
+		clk.Advance(time.Second)
+		open(t, m, 0x0101)
+		if n := m.ClosePeerLostSince(sessionManagerFabric, 0x1234, since); n != 1 || !sessionManagerClosing(m, 0x0100) || sessionManagerClosing(m, 0x0101) {
+			t.Fatalf("ClosePeerLostSince closed %d (0x0100 closing %v, 0x0101 closing %v), want only the older session",
+				n, sessionManagerClosing(m, 0x0100), sessionManagerClosing(m, 0x0101))
 		}
 	})
 	t.Run("closes a session on peer loss when the clock stepped forward before it was created", func(t *testing.T) {
