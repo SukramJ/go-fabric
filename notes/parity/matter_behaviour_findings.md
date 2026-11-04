@@ -746,6 +746,26 @@ Found by the phase-32 port of `packages/node/test/behaviors/ota/OtaTest.ts`
   sessions of a peer to the armer through the `controller.OwnNode` port, and
   decide whether the controller publishes its operational record.
 
+Found by the phase-32 port of `packages/node/test/node/ClientNodeTest.ts`
+(brief phase 32, 2026-11-04). Line numbers at `862ad75f`.
+
+- **A device that leaves a fabric does not deliver its Leave event.**
+  matter.js's `Fabric.leave` emits the Leave event and flushes every
+  session's subscriptions before it deletes the fabric
+  (`packages/protocol/src/fabric/Fabric.ts:446-455`, `NodeSession.ts:294-306`),
+  so the controller hears it and erases the node (ClientNodeTest.ts:2953-2977,
+  "erases node after leave event", stays missing). In Go
+  `OperationalCredentials.RemoveFabric` removes the fabric's rows — its ACL
+  entries with them — before the removal hook emits Leave
+  (`cluster/core/operational_credentials.go:2308-2345`,
+  `node.fabricRemoved`), and the sessions then close; a flush of the
+  fabric's subscriptions tried in the hook (phase 32) delivered no Leave —
+  most likely because the fabric's ACL rows, and so the subject's read
+  privilege, are gone by then (not verified further). Route:
+  emit Leave and flush the fabric's subscriptions before the store removal —
+  a change of a security-path server (the OperationalCredentials removal
+  order), for Fable.
+
 ## Application cluster servers — open items. (Triage 2026-10-29: wave H1, the device IM and write path.)
 
 - **Wi-Fi NetworkCommissioning: the fail-safe check is not bound to the
