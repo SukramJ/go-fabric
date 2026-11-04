@@ -397,7 +397,7 @@
   },
   {
     "file": "bridge/subscribe.go",
-    "line": 671,
+    "line": 675,
     "citation": "ServerSubscription.ts:866-876",
     "resolved": "packages/node/src/node/server/ServerSubscription.ts",
     "identifier": "InvalidSubscription",
@@ -406,7 +406,7 @@
   },
   {
     "file": "bridge/subscribe.go",
-    "line": 782,
+    "line": 786,
     "citation": "packages/protocol/src/interaction/InteractionMessenger.ts:347",
     "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
     "identifier": "sendDataReport",
@@ -415,7 +415,7 @@
   },
   {
     "file": "bridge/subscribe.go",
-    "line": 862,
+    "line": 866,
     "citation": "packages/node/src/node/server/ServerSubscription.ts:764",
     "resolved": "packages/node/src/node/server/ServerSubscription.ts",
     "identifier": "#sendUpdateMessage",
@@ -424,7 +424,7 @@
   },
   {
     "file": "bridge/subscribe.go",
-    "line": 1232,
+    "line": 1236,
     "citation": "ServerSubscription.ts:610-614",
     "resolved": "packages/node/src/node/server/ServerSubscription.ts",
     "identifier": "InvalidAction",
@@ -433,7 +433,7 @@
   },
   {
     "file": "bridge/subscribe.go",
-    "line": 1310,
+    "line": 1314,
     "citation": "ThermostatServer.ts:451",
     "resolved": "packages/node/src/behaviors/thermostat/ThermostatServer.ts",
     "identifier": "reactTo",
@@ -442,7 +442,7 @@
   },
   {
     "file": "bridge/subscribe.go",
-    "line": 1397,
+    "line": 1401,
     "citation": "packages/node/src/behavior/state/managed/Datasource.ts:776-796",
     "resolved": "packages/node/src/behavior/state/managed/Datasource.ts",
     "identifier": "onChange",
@@ -2126,7 +2126,7 @@
   },
   {
     "file": "secure/operational/manager.go",
-    "line": 898,
+    "line": 908,
     "citation": "packages/protocol/src/session/SessionManager.ts:490-508",
     "resolved": "packages/protocol/src/session/SessionManager.ts",
     "identifier": "getNextAvailableSessionId",
@@ -2135,7 +2135,7 @@
   },
   {
     "file": "secure/operational/manager.go",
-    "line": 924,
+    "line": 934,
     "citation": "packages/protocol/src/session/SessionManager.ts:513",
     "resolved": "packages/protocol/src/session/SessionManager.ts",
     "identifier": "getSession",
@@ -2144,7 +2144,7 @@
   },
   {
     "file": "secure/operational/manager.go",
-    "line": 1027,
+    "line": 1037,
     "citation": "Session.ts:248",
     "resolved": "packages/protocol/src/session/Session.ts",
     "identifier": "initiateClose",

@@ -13,6 +13,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/SukramJ/go-fabric/clock"
 	"github.com/SukramJ/go-fabric/cluster/measurement"
 	"github.com/SukramJ/go-fabric/contract"
 	endpointpkg "github.com/SukramJ/go-fabric/endpoint"
@@ -659,8 +660,11 @@ func (b *Bridge) forgetReportExchange(subID uint32) {
 // reportExchangeOrigin is when an ongoing report's exchange was opened
 // and the counter of the first message sent on it.
 type reportExchangeOrigin struct {
-	createdAt    time.Time
-	firstCounter uint32
+	// createdAtMono is the clock's monotonic reading when the report's
+	// exchange was opened — the cutoff of the peer-loss sweep it may
+	// trigger (matter.js's asOf, Time.nowUs).
+	createdAtMono time.Duration
+	firstCounter  uint32
 }
 
 // closeSubscriptionByExchange ends the subscription whose latest ongoing
@@ -900,7 +904,7 @@ func (b *Bridge) sendInitiatedReportArmed(target subTarget, report im.ReportData
 	freshTarget.peerInitiator = false
 	// The exchange context's creation time bounds a peer-loss sweep this
 	// report may trigger (matter.js ExchangeManager.ts:549, :576 asOf).
-	createdAt := b.clk().Now()
+	createdAtMono := clock.MonotonicOf(b.clk())
 	key := mrp.ExchangeKey{SessionID: target.sessionID, ExchangeID: freshExchangeID, Initiator: true}
 	// The first message's counter belongs to the report's exchange from
 	// the moment it is sent, not from when the whole report is out: a
@@ -914,7 +918,7 @@ func (b *Bridge) sendInitiatedReportArmed(target subTarget, report im.ReportData
 	var firstCounter uint32
 	counters, err = b.sendReportChunksNotify(freshTarget, report, func(counter uint32) {
 		firstCounter = counter
-		b.reportExchangeOrigins.Store(key, reportExchangeOrigin{createdAt: createdAt, firstCounter: counter})
+		b.reportExchangeOrigins.Store(key, reportExchangeOrigin{createdAtMono: createdAtMono, firstCounter: counter})
 		if report.SubscriptionID != 0 {
 			b.reportCounterOwner.Store(reportCounterKey(target.sessionID, counter), report.SubscriptionID)
 		}

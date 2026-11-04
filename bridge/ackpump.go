@@ -390,10 +390,10 @@ func (b *Bridge) tickOutboundReliable(outbound *outboundReliableTracker, now tim
 		}
 		if errors.Is(r.Err, mrp.ErrMaxRetransmissionsReached) {
 			// Read before the reap below forgets the report's exchange.
-			asOf, lost := b.reportPeerLoss(r.SessionID, r.ExchangeID, r.Counter)
+			sinceMono, lost := b.reportPeerLoss(r.SessionID, r.ExchangeID, r.Counter)
 			b.closeSubscriptionByCounter(r.SessionID, r.Counter)
 			if lost {
-				b.closeLostPeer(r.SessionID, r.ExchangeID, asOf, "an ongoing subscription report")
+				b.closeLostPeer(r.SessionID, r.ExchangeID, sinceMono, "an ongoing subscription report")
 			}
 			b.handleInitiatedPeerLoss(r.SessionID, r.ExchangeID)
 			continue

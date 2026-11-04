@@ -32338,28 +32338,28 @@
       "identifier": "TestSessionManagerEvictsOnlyForSessionsThePeerEstablished",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/operational/sessionmanager_parity_matterjs_test.go",
-      "line": 137
+      "line": 138
     },
     {
       "package": "secure/operational",
       "identifier": "TestSessionManagerGetNextAvailableSessionID",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/operational/sessionmanager_parity_matterjs_test.go",
-      "line": 52
+      "line": 53
     },
     {
       "package": "secure/operational",
       "identifier": "TestSessionManagerMaybeSessionFor",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/operational/sessionmanager_parity_matterjs_test.go",
-      "line": 87
+      "line": 88
     },
     {
       "package": "secure/operational",
       "identifier": "TestSessionManagerWallClockSteps",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/operational/sessionmanager_parity_matterjs_test.go",
-      "line": 159
+      "line": 160
     },
     {
       "package": "secure/operational",
