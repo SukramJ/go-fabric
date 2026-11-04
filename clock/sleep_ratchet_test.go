@@ -35,8 +35,8 @@ import (
 // test, and a removed one fails it until the constant is lowered in the same
 // commit, so the count only falls.
 const (
-	sleepRatchet = 133
-	afterRatchet = 145
+	sleepRatchet = 131
+	afterRatchet = 143
 )
 
 // TestSleepRatchet counts the wall-clock waits in every *_test.go of the

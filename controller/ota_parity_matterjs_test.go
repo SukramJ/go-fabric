@@ -241,18 +241,18 @@ func TestOTACancelByRemovingConsentParity(t *testing.T) {
 	// The device answered the announcement — the entry is in progress —
 	// before the consent goes, as matter.js's forceUpdate has sent it when
 	// removeConsent follows; its query is scheduled, the clock still.
-	awaitWall(t, "the announcement answered", func() bool {
-		q := mgr.QueuedUpdates()
-		return len(q) == 1 && q[0].Status == softwareupdate.PendingInProgress
-	})
 	// Settle, not under Run: Run advances the clock to its next deadline
 	// whenever the site is quiet before fn returns (50-250 ms in the
-	// coverage job), and no clock moves here.
+	// coverage job), and no clock moves here. Once the site is quiet the
+	// network has delivered the announcement and its answer.
 	settleCtx, settleCancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	if err := r.site.Settle(settleCtx); err != nil {
 		t.Fatal(err)
 	}
 	settleCancel()
+	if q := mgr.QueuedUpdates(); len(q) != 1 || q[0].Status != softwareupdate.PendingInProgress {
+		t.Fatalf("queue %+v once the site settled, want the announced entry in progress", q)
+	}
 	mgr.RemoveConsent(r.peer(t), 0)
 	consentGone.Store(true)
 	r.eventually(t, "the update failed", func() bool { _, _, failed := r.snapshot(); return failed > 0 })
@@ -278,15 +278,3 @@ func TestOTACancelByRemovingConsentParity(t *testing.T) {
 	}
 }
 
-// awaitWall polls cond on the wall clock with the site's clock still, for
-// work the network delivers without time passing.
-func awaitWall(t *testing.T, what string, cond func() bool) {
-	t.Helper()
-	deadline := time.Now().Add(fabrictest.DefaultWait)
-	for !cond() {
-		if time.Now().After(deadline) {
-			t.Fatalf("timed out waiting for %s", what)
-		}
-		time.Sleep(time.Millisecond)
-	}
-}
