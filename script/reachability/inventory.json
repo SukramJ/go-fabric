@@ -279,9 +279,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 17278,
+    "total_exported": 17279,
     "reachable": 12129,
-    "whitelisted": 5149,
+    "whitelisted": 5150,
     "unreachable": 0
   },
   "by_package": [],
@@ -6697,7 +6697,7 @@
       "identifier": "FlushingBatches",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/interaction/export_test.go",
-      "line": 19
+      "line": 24
     },
     {
       "package": "client/interaction",
@@ -6708,17 +6708,24 @@
     },
     {
       "package": "client/interaction",
+      "identifier": "HoldConnect",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/interaction/export_test.go",
+      "line": 41
+    },
+    {
+      "package": "client/interaction",
       "identifier": "QueuedInvokes",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/interaction/export_test.go",
-      "line": 8
+      "line": 13
     },
     {
       "package": "client/interaction",
       "identifier": "SetTimedWrite",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/interaction/export_test.go",
-      "line": 24
+      "line": 29
     },
     {
       "package": "client/interaction",
