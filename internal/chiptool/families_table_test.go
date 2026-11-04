@@ -122,6 +122,13 @@ type family struct {
 	// run only on a host where an up, multicast-capable interface has IPv6,
 	// and otherwise skip naming the exact command that enables it.
 	multicast map[string]bool
+	// labPath cases run their non-CI path, the one a test lab runs
+	// against a DUT the case did not start: the endpoint's PICS slice with
+	// PICS_SDK_CI_ONLY=0 instead of the CI values, and, uncommissioned,
+	// the runner leaves the commissioning to the case's own steps (the
+	// daemon's --passcode and --discriminator go in args). For a case whose
+	// CI path starts a CHIP app as the DUT and never reaches the daemon.
+	labPath map[string]bool //nolint:unused // read by the chiptool-tagged runner (familyrun_test.go)
 	// perEndpoint cases run once per endpoint of the daemon, each against
 	// that endpoint's PICS slice (TC-IDM-10.4, the PICS checker).
 	perEndpoint map[string]bool
@@ -970,7 +977,12 @@ var chipFamilies = []family{
 	// MESS: Messages (cluster/core) on the video player, after the
 	// tv-app's endpoint 1 (tv-app.matter:4407-4424; TC_MESS_1_1.py CI
 	// arguments: app ${TV_APP}, --endpoint 1).
-	{name: "MESS", deviceType: dtCastingVideoPlayer},
+	{
+		name: "MESS", deviceType: dtCastingVideoPlayer,
+		exclude: map[string]gap{
+			"1.1": {classNotSupported, "TC-MESS-1.1 runs only on an endpoint with SpokenMessages or AudioMessages (TC_MESS_1_1.py:76, TC_MESSTestBase.py:42-50); the player's Messages, like the tv-app's (featureMap 0, tv-app.matter:4419), has neither, and the case skips itself", true},
+		},
+	},
 
 	// --- The second compositions (phase 34) ---------------------------------
 	//
@@ -1004,9 +1016,17 @@ var chipFamilies = []family{
 	// administrator itself; see the reasons.
 	{
 		name: "JFADMIN", deviceType: dtJointFabricAdministrator, variant: variantJointFabric,
+		// TC-JFADMIN-1.2 has a lab path without the RPC: the case commissions
+		// the administrator it is given and drives its commands
+		// (TC_JFADMIN_1_2.py:98-103 and the steps from :140).
+		labPath:        map[string]bool{"1.2": true},
+		uncommissioned: map[string]bool{"1.2": true},
+		args:           map[string][]string{"1.2": {"--passcode", "{passcode}", "--discriminator", "{discriminator}"}},
+		edits: map[string][]edit{
+			"1.2": {{"_JOINT_FABRIC_ADMINISTRATOR_ENDPOINT = 1\n", "_JOINT_FABRIC_ADMINISTRATOR_ENDPOINT = {ep:0x0130}\n", "the administrator is the daemon's bridged JointFabricAdministrator, not endpoint 1 (TC_JFADMIN_1_2.py:57)"}},
+		},
 		exclude: map[string]gap{
 			"1.1": {classHarness, "TC-JFADMIN-1.1 drives the administrator through chip's jf-control-app and the administrator app's pigweed RPC JointFabric service (TC_JFADMIN_1_1.py:131-162; examples/common/pigweed/protos/joint_fabric_service.proto at the harness pin): with the CI PICS it starts chip's own jf-admin-app as the DUT and never reaches the daemon, without them it needs the DUT's RPC server (dut_rpc_server_ip/_port); the daemon serves no pigweed RPC, an SDK test interface outside Matter", false},
-			"1.2": {classHarness, "TC-JFADMIN-1.2 drives the administrator through chip's jf-control-app and the administrator app's pigweed RPC JointFabric service (TC_JFADMIN_1_2.py:83-103; examples/common/pigweed/protos/joint_fabric_service.proto at the harness pin): with the CI PICS it starts chip's own jf-admin-app as the DUT and never reaches the daemon, without them it needs the DUT's RPC server (dut_rpc_server_ip/_port); the daemon serves no pigweed RPC, an SDK test interface outside Matter", false},
 			"1.4": {classHarness, "TC-JFADMIN-1.4 drives the administrator through chip's jf-control-app and the administrator app's pigweed RPC JointFabric service (TC_JFADMIN_1_4.py:194-212; examples/common/pigweed/protos/joint_fabric_service.proto at the harness pin): with the CI PICS it starts chip's own jf-admin-app as the DUT and never reaches the daemon, without them it needs the DUT's RPC server (dut_rpc_server_ip/_port); the daemon serves no pigweed RPC, an SDK test interface outside Matter", false},
 			"2.1": {classHarness, "TC-JFADMIN-2.1 drives the administrator through chip's jf-control-app and the administrator app's pigweed RPC JointFabric service (TC_JFADMIN_2_1.py:155-170; examples/common/pigweed/protos/joint_fabric_service.proto at the harness pin): with the CI PICS it starts chip's own jf-admin-app as the DUT and never reaches the daemon, without them it needs the DUT's RPC server (dut_rpc_server_ip/_port); the daemon serves no pigweed RPC, an SDK test interface outside Matter", false},
 			"2.2": {classHarness, "TC-JFADMIN-2.2 drives the administrator through chip's jf-control-app and the administrator app's pigweed RPC JointFabric service (TC_JFADMIN_2_2.py:259-270; examples/common/pigweed/protos/joint_fabric_service.proto at the harness pin): with the CI PICS it starts chip's own jf-admin-app as the DUT and never reaches the daemon, without them it needs the DUT's RPC server (dut_rpc_server_ip/_port); the daemon serves no pigweed RPC, an SDK test interface outside Matter", false},

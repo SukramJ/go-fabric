@@ -473,7 +473,11 @@ func runFamily(ctx context.Context, t *testing.T, h *harness, fam family, cases 
 						ep = pics.endpoint(t, dtOnOffLight)
 					}
 				}
-				runPythonCase(ctx, t, h, fam, c, c.ID, pics.byEP[ep], ep, passEP, pics.epOf, bin, flags)
+				p := pics.byEP[ep]
+				if fam.labPath[c.Name] {
+					p = pics.honest[ep]
+				}
+				runPythonCase(ctx, t, h, fam, c, c.ID, p, ep, passEP, pics.epOf, bin, flags)
 			case c.Kind == "yaml":
 				dt := fam.deviceTypeOf(c.Name)
 				ep := pics.endpoint(t, dt)
@@ -640,7 +644,7 @@ func runPythonCase(ctx context.Context, t *testing.T, h *harness, fam family, c 
 	// A factory-fresh case whose descriptor supplies the onboarding code
 	// (TC-SC-7.1) commissions in its own steps; one without (TC-ACL-2.6)
 	// has the runner commission it in its commissioning step.
-	if fam.uncommissioned[c.Name] && !slices.Contains(args, "--qr-code") && !slices.Contains(args, "--manual-code") {
+	if fam.uncommissioned[c.Name] && !fam.labPath[c.Name] && !slices.Contains(args, "--qr-code") && !slices.Contains(args, "--manual-code") {
 		args = append(args, "--commissioning-method", "on-network", "--qr-code", br.info.qrCode)
 	}
 	if c.Subpath != "" {
