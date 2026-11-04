@@ -9,6 +9,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"log/slog"
 	"regexp"
@@ -224,11 +225,11 @@ func (i *Images) Store(ctx context.Context, image []byte, mode Mode, info *Updat
 	if err := i.blobs.Put(ctx, name, image); err != nil {
 		return StoredImage{}, fmt.Errorf("%w: store %s: %w", ErrOTA, name, err)
 	}
-	if info != nil && info.SpecificationVersion != 0 {
-		_ = i.blobs.Put(ctx, name+metaSuffix, []byte(strconv.FormatUint(uint64(info.SpecificationVersion), 10)))
-	} else {
-		_ = i.blobs.Delete(ctx, name+metaSuffix)
+	var spec uint32
+	if info != nil {
+		spec = info.SpecificationVersion
 	}
+	i.recordMeta(ctx, name, spec)
 	i.log.Debug("ota.images.stored", slog.String("file", name))
 	st, _ := i.entry(ctx, name)
 	return st, nil
@@ -258,6 +259,47 @@ func storeValidation(info *UpdateInfo) otaimage.FileOptions {
 		opts.ChecksumType = l.OTAChecksumType
 	}
 	return opts
+}
+
+// recordMeta records the specification version of the stored image name;
+// 0 removes the record. The record is optional, so a failure is logged and
+// fails nothing. Mirrors matter.js #recordMetadata
+// (DclOtaUpdateService.ts:468-491 at 862ad75f); an unset value is 0 here,
+// the one invalid value a uint32 can carry (isSpecificationVersion, :67-69).
+func (i *Images) recordMeta(ctx context.Context, name string, spec uint32) {
+	var err error
+	if spec == 0 {
+		err = i.blobs.Delete(ctx, name+metaSuffix)
+	} else {
+		err = i.blobs.Put(ctx, name+metaSuffix, []byte(strconv.FormatUint(uint64(spec), 10)))
+	}
+	if err != nil {
+		i.log.Warn("ota.images.meta_not_stored", slog.String("file", name), slog.Any("err", err))
+	}
+}
+
+// readMeta is the recorded specification version of the stored image
+// name, 0 when none is recorded. A record that cannot be read or holds no
+// valid version is removed, so it is reported once. Mirrors matter.js
+// #readMetadata (DclOtaUpdateService.ts:493-524 at 862ad75f).
+func (i *Images) readMeta(ctx context.Context, name string) uint32 {
+	m, err := i.blobs.Get(ctx, name+metaSuffix)
+	if errors.Is(err, fs.ErrNotExist) {
+		return 0
+	}
+	if err == nil {
+		v, perr := strconv.ParseUint(string(m), 10, 32)
+		if perr == nil && v > 0 {
+			return uint32(v)
+		}
+		i.log.Warn("ota.images.meta_invalid_removed", slog.String("file", name))
+	} else {
+		i.log.Warn("ota.images.meta_unreadable_removed", slog.String("file", name), slog.Any("err", err))
+	}
+	if err := i.blobs.Delete(ctx, name+metaSuffix); err != nil {
+		i.log.Warn("ota.images.meta_not_removed", slog.String("file", name), slog.Any("err", err))
+	}
+	return 0
 }
 
 // verifyHeader is #verifyUpdate's header check (:388-431).
@@ -296,11 +338,7 @@ func (i *Images) entry(ctx context.Context, name string) (StoredImage, bool) {
 		// admits any case (:55), the Mode constants are lower case.
 		MaxApplicable: h.MaxApplicableSoftwareVersion, Mode: Mode(strings.ToLower(parts[2])), Size: len(b),
 	}
-	if m, err := i.blobs.Get(ctx, name+metaSuffix); err == nil {
-		if v, err := strconv.ParseUint(string(m), 10, 32); err == nil && v > 0 {
-			st.SpecificationVersion = uint32(v)
-		}
-	}
+	st.SpecificationVersion = i.readMeta(ctx, name)
 	return st, true
 }
 
@@ -343,25 +381,103 @@ func (i *Images) Find(ctx context.Context, opts FindOptions) []StoredImage {
 	return out
 }
 
-// Delete removes the stored image named filename and its metadata
-// (DclOtaUpdateService.delete, :1187-1275, by filename).
-func (i *Images) Delete(ctx context.Context, filename string) error {
-	if !filenamePattern.MatchString(filename) {
-		return fmt.Errorf("%w: invalid OTA filename format: %s", ErrOTA, filename)
+// DeleteOptions select the stored images [Images.Delete] removes —
+// delete's options (DclOtaUpdateService.ts:1187-1194 at 862ad75f).
+type DeleteOptions struct {
+	// Filename names one stored image ("fff1.8000.prod.3"); the other
+	// fields are then not read.
+	Filename string
+	// VendorID selects the vendor's images; required without Filename.
+	VendorID *uint16
+	// ProductID narrows them to one product.
+	ProductID *uint16
+	// Mode narrows them to one storage mode; empty is every mode.
+	Mode Mode
+	// IsProduction, without Mode, is ModeProd (true) or ModeTest (false),
+	// matter.js's deprecated isProduction (:1203-1206).
+	IsProduction *bool
+}
+
+// Delete removes the stored images opts selects, each with its recorded
+// specification version, and returns how many it removed — matter.js
+// DclOtaUpdateService.delete (:1187-1275 at 862ad75f). A filename that is
+// not an OTA filename is refused; one that names no stored image removes
+// nothing and is no error (:1208-1221). Without a filename the vendor is
+// required (:1245-1247). A ProductID narrows the selection with or without
+// a mode, where matter.js narrows by product only together with a mode
+// (BD-Matter-OtaImages-DeleteProductWithoutMode).
+func (i *Images) Delete(ctx context.Context, opts DeleteOptions) (int, error) {
+	mode := opts.Mode
+	if mode == "" && opts.IsProduction != nil {
+		mode = ModeTest
+		if *opts.IsProduction {
+			mode = ModeProd
+		}
 	}
-	_ = i.blobs.Delete(ctx, filename+metaSuffix)
-	return i.blobs.Delete(ctx, filename)
+	if opts.Filename == "" && opts.VendorID == nil {
+		return 0, fmt.Errorf("%w: either filename or vendor ID must be provided to delete files", ErrOTA)
+	}
+	if opts.Filename != "" && !filenamePattern.MatchString(opts.Filename) {
+		return 0, fmt.Errorf("%w: invalid OTA filename format: %s", ErrOTA, opts.Filename)
+	}
+	names, err := i.blobs.List(ctx)
+	if err != nil {
+		return 0, fmt.Errorf("%w: list stored images: %w", ErrOTA, err)
+	}
+	deleted := 0
+	for _, name := range names {
+		if strings.HasSuffix(name, metaSuffix) || !filenamePattern.MatchString(name) {
+			continue
+		}
+		if opts.Filename != "" {
+			if name != opts.Filename {
+				continue
+			}
+		} else if !deleteSelects(name, opts.VendorID, opts.ProductID, mode) {
+			continue
+		}
+		_ = i.blobs.Delete(ctx, name+metaSuffix)
+		if err := i.blobs.Delete(ctx, name); err != nil {
+			return deleted, fmt.Errorf("%w: delete %s: %w", ErrOTA, name, err)
+		}
+		deleted++
+	}
+	if deleted > 0 {
+		i.log.Info("ota.images.deleted", slog.Int("count", deleted))
+	}
+	return deleted, nil
+}
+
+// deleteSelects reports whether the stored image name ("<vid>.<pid>.<mode>.
+// <version>", hex ids in any case) is of vid and, when given, pid and mode.
+func deleteSelects(name string, vid, pid *uint16, mode Mode) bool {
+	parts := strings.Split(name, ".")
+	if len(parts) != 4 {
+		return false
+	}
+	v, err := strconv.ParseUint(parts[0], 16, 16)
+	if err != nil || v != uint64(*vid) {
+		return false
+	}
+	if pid != nil {
+		if p, err := strconv.ParseUint(parts[1], 16, 16); err != nil || p != uint64(*pid) {
+			return false
+		}
+	}
+	return mode == "" || Mode(strings.ToLower(parts[2])) == mode
 }
 
 // Open opens the stored image named filename for a BDX transfer
-// (fileDesignatorForUpdate, :1156-1185).
+// (fileDesignatorForUpdate, :1156-1173). A name that is not an OTA
+// filename is refused as matter.js refuses it and, as no stored image has
+// it, wraps fs.ErrNotExist; a missing image wraps the Blobs error.
 func (i *Images) Open(ctx context.Context, filename string) (bdx.Blob, error) {
 	if !filenamePattern.MatchString(filename) {
-		return nil, fs.ErrNotExist
+		return nil, fmt.Errorf("%w: invalid OTA filename format: %s: %w", ErrOTA, filename, fs.ErrNotExist)
 	}
 	b, err := i.blobs.Get(ctx, filename)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%w: OTA file not found: %s: %w", ErrOTA, filename, err)
 	}
 	return bytes.NewReader(b), nil
 }
@@ -459,29 +575,94 @@ func modeOf(source string) Mode {
 	return ModeLocal
 }
 
+// storedCheck is what the check of a stored image found —
+// #checkStoredImage's verdict (DclOtaUpdateService.ts:429-451 at 862ad75f).
+type storedCheck int
+
+const (
+	storedUnchecked storedCheck = iota
+	storedValid
+	storedInvalid
+	// storedUnreadable is a stored image that cannot be read: a storage or
+	// I/O error says nothing about the image content.
+	storedUnreadable
+)
+
+// checkStored validates the stored image b (read with getErr) against info
+// as Store validates a new one — #checkStoredImage over #verifyUpdate
+// (:388-451): the ledger's whole-file checksum and size when info carries
+// them, the header's ids and version.
+func (i *Images) checkStored(name string, b []byte, getErr error, info UpdateInfo) storedCheck {
+	if getErr != nil {
+		i.log.Info("ota.images.stored_unreadable", slog.String("file", name), slog.Any("err", getErr))
+		return storedUnreadable
+	}
+	h, err := otaimage.ValidateFile(bytes.NewReader(b), storeValidation(&info))
+	if err == nil {
+		err = verifyHeader(h, info)
+	}
+	if err != nil {
+		i.log.Info("ota.images.stored_invalid", slog.String("file", name), slog.Any("err", err))
+		return storedInvalid
+	}
+	return storedValid
+}
+
 // DownloadUpdate makes info's image available in the store and returns
-// its filename — downloadUpdate (:615-720): a stored image that matches
-// its header is used; one that does not is removed; then a ledger image is
-// downloaded, verified and stored. A stored image needs no download, and
-// offline (no ledger) nothing is downloaded.
-func (i *Images) DownloadUpdate(ctx context.Context, info UpdateInfo) (string, error) {
+// its filename — downloadUpdate (DclOtaUpdateService.ts:615-720 at
+// 862ad75f). A stored image that validates is used, unless force asks for
+// a new download, and the specification version info carries is recorded
+// for it; a stored image that fails validation is removed. Online a
+// stored image that cannot be read, or one force replaces, is removed
+// too and the ledger's image is downloaded, verified and stored.
+//
+// Offline (no ledger) nothing is downloaded and the call fails with
+// [ErrOTA] unless a stored image validates: after removing one that failed
+// validation, when none is stored, and — keeping the stored image, since
+// nothing could replace it — when it cannot be read or force is set.
+func (i *Images) DownloadUpdate(ctx context.Context, info UpdateInfo, force bool) (string, error) {
 	mode := modeOf(info.Source)
 	name := fileName(info.VendorID, info.ProductID, mode, info.SoftwareVersion)
-	if b, err := i.blobs.Get(ctx, name); err == nil {
-		h, _, _, herr := otaimage.ReadHeader(bytes.NewReader(b))
-		if herr == nil && verifyHeader(h, info) == nil {
-			return name, nil
-		}
-		_ = i.Delete(ctx, name)
+	b, getErr := i.blobs.Get(ctx, name)
+	exists := !errors.Is(getErr, fs.ErrNotExist)
+	check := storedUnchecked
+	if exists && !force {
+		check = i.checkStored(name, b, getErr, info)
 	}
-	if i.offline || info.ledger == nil {
-		return "", fmt.Errorf("%w: no valid OTA image %s (%s) is stored and none is downloaded", ErrOTA, name, info.SoftwareVersionString)
+	if check == storedValid {
+		i.log.Info("ota.images.reused", slog.String("file", name))
+		if info.SpecificationVersion != 0 {
+			i.recordMeta(ctx, name, info.SpecificationVersion)
+		}
+		return name, nil
+	}
+	// Offline nothing can replace the image, so only one shown to be
+	// invalid is removed (:646-651).
+	keep := exists && i.offline && check != storedInvalid
+	if exists && !keep {
+		_ = i.blobs.Delete(ctx, name)
+		_ = i.blobs.Delete(ctx, name+metaSuffix)
+	}
+	if i.offline {
+		switch {
+		case check == storedUnreadable:
+			return "", fmt.Errorf("%w: cannot read stored OTA image %s (%s) to validate it and the service is offline; the stored image is kept: %w",
+				ErrOTA, name, info.SoftwareVersionString, getErr)
+		case keep:
+			return "", fmt.Errorf("%w: cannot force a download of OTA image %s (%s) while the service is offline; the stored image is kept",
+				ErrOTA, name, info.SoftwareVersionString)
+		}
+		return "", fmt.Errorf("%w: no valid OTA image %s (%s) is stored and the service is offline, so none is downloaded",
+			ErrOTA, name, info.SoftwareVersionString)
+	}
+	if info.ledger == nil {
+		return "", fmt.Errorf("%w: no OTA URL provided in update info for %s (%s)", ErrOTA, name, info.SoftwareVersionString)
 	}
 	var buf bytes.Buffer
 	if i.download != nil {
 		b, err := i.download(ctx, *info.ledger)
 		if err != nil {
-			return "", err
+			return "", fmt.Errorf("%w: %w", ErrOTA, err)
 		}
 		buf.Write(b)
 	} else if err := i.ledger.Download(ctx, *info.ledger, &buf); err != nil {
@@ -494,4 +675,81 @@ func (i *Images) DownloadUpdate(ctx context.Context, info UpdateInfo) (string, e
 		return "", err
 	}
 	return name, nil
+}
+
+// LocalImageOptions are the fields of a local image's [UpdateInfo] its
+// header may not carry — updateInfoFromStream's options
+// (DclOtaUpdateService.ts:841-863 at 862ad75f).
+type LocalImageOptions struct {
+	// MinApplicable is used when the header states none; nil is 0.
+	MinApplicable *uint32
+	// MaxApplicable is used when the header states none; nil is the
+	// image's version minus one.
+	MaxApplicable *uint32
+	// SpecificationVersion is the Matter specification version the image
+	// implements, recorded with it when it is stored; 0 is unknown.
+	SpecificationVersion uint32
+}
+
+// UpdateInfoFromImage reads the header of the OTA image r and returns its
+// update, of [SourceLocal], for [Images.Store] with [ModeLocal] — matter.js
+// updateInfoFromStream (DclOtaUpdateService.ts:841-901 at 862ad75f): the
+// header's ids, version and applicable range, opts where the header states
+// none.
+func UpdateInfoFromImage(r io.Reader, opts LocalImageOptions) (UpdateInfo, error) {
+	h, _, _, err := otaimage.ReadHeader(r)
+	if err != nil {
+		return UpdateInfo{}, fmt.Errorf("%w: %w", ErrOTA, err)
+	}
+	u := UpdateInfo{
+		VendorID: h.VendorID, ProductID: h.ProductID, SoftwareVersion: h.SoftwareVersion,
+		SoftwareVersionString: h.SoftwareVersionString, MaxApplicable: h.SoftwareVersion - 1,
+		SpecificationVersion: opts.SpecificationVersion, Source: SourceLocal,
+	}
+	switch {
+	case h.MinApplicableSoftwareVersion != nil:
+		u.MinApplicable = *h.MinApplicableSoftwareVersion
+	case opts.MinApplicable != nil:
+		u.MinApplicable = *opts.MinApplicable
+	}
+	switch {
+	case h.MaxApplicableSoftwareVersion != nil:
+		u.MaxApplicable = *h.MaxApplicableSoftwareVersion
+	case opts.MaxApplicable != nil:
+		u.MaxApplicable = *opts.MaxApplicable
+	}
+	if h.ReleaseNotesURL != nil {
+		u.ReleaseNotesURL = *h.ReleaseNotesURL
+	}
+	return u, nil
+}
+
+// UpdateInfoFromURL fetches the OTA image at the HTTP(S) URL fileURL and
+// returns its update, of [SourceLocal]; [Images.DownloadUpdate] then
+// downloads it from that URL into [ModeLocal] — matter.js
+// createUpdateInfoFromFile (DclOtaUpdateService.ts:924-981 at 862ad75f).
+// Another scheme is refused (a local file is [UpdateInfoFromImage]'s), and
+// so is every URL offline, without a fetch.
+func (i *Images) UpdateInfoFromURL(ctx context.Context, fileURL string, opts LocalImageOptions) (UpdateInfo, error) {
+	scheme, _, _ := strings.Cut(fileURL, ":")
+	if scheme = strings.ToLower(scheme); scheme != "https" && scheme != "http" {
+		return UpdateInfo{}, fmt.Errorf("%w: only HTTP(S) URLs are supported; for a local file use UpdateInfoFromImage", ErrOTA)
+	}
+	if i.offline {
+		return UpdateInfo{}, fmt.Errorf("%w: cannot read OTA image from %s: the service is offline, use UpdateInfoFromImage instead", ErrOTA, fileURL)
+	}
+	var buf bytes.Buffer
+	if err := i.ledger.Download(ctx, dcl.SoftwareVersion{OTAURL: fileURL}, &buf); err != nil {
+		return UpdateInfo{}, fmt.Errorf("%w: failed to read OTA image from %s: %w", ErrOTA, fileURL, err)
+	}
+	u, err := UpdateInfoFromImage(&buf, opts)
+	if err != nil {
+		return UpdateInfo{}, fmt.Errorf("failed to read OTA image from %s: %w", fileURL, err)
+	}
+	u.ledger = &dcl.SoftwareVersion{
+		VID: u.VendorID, PID: u.ProductID, SoftwareVersion: u.SoftwareVersion, SoftwareVersionString: u.SoftwareVersionString,
+		SoftwareVersionValid: true, OTAURL: fileURL, MinApplicableSoftwareVersion: u.MinApplicable,
+		MaxApplicableSoftwareVersion: u.MaxApplicable, ReleaseNotesURL: u.ReleaseNotesURL, SpecificationVersion: u.SpecificationVersion,
+	}
+	return u, nil
 }

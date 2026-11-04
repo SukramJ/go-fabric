@@ -581,7 +581,10 @@ func (c *ICDClient) flushAnnouncements() {
 
 // persist stores reg, nil to clear it — the only writer of the
 // stored registration (IcdClient.ts:444-456). The caller holds commitMu.
-func (c *ICDClient) persist(reg *ICDRegistration) {
+// The registration in memory takes reg either way; a store error is logged
+// and returned — a commit that fails in its second phase, whose state
+// stays committed in memory (IcdClientTest.ts:806-824 at 862ad75f).
+func (c *ICDClient) persist(reg *ICDRegistration) error {
 	var before bool
 	c.mu.Lock()
 	before = c.reg != nil
@@ -620,6 +623,7 @@ func (c *ICDClient) persist(reg *ICDRegistration) {
 		c.announce = append(c.announce, fn)
 		c.mu.Unlock()
 	}
+	return err
 }
 
 func call(fn func()) {
@@ -755,7 +759,7 @@ func (c *ICDClient) registerOnPeer(op *icdOperation, opts ICDRegisterOptions) er
 	}
 	if !c.commitIfOwned(op, func() {
 		reg := &ICDRegistration{Key: key, CounterStart: counter, MonitoredSubject: subject, ClientType: o.ClientType}
-		c.persist(reg)
+		_ = c.persist(reg)
 		// The peer just answered: it is reachable; seed its window.
 		c.feed(table, addr, reg, true)
 	}) {
@@ -898,7 +902,7 @@ func (c *ICDClient) clearLocal(op *icdOperation) (key []byte, ok bool) {
 			key = bytes.Clone(c.reg.Key)
 		}
 		c.mu.Unlock()
-		c.persist(nil)
+		_ = c.persist(nil)
 		c.dropReceivePath()
 	})
 	return key, ok
@@ -1045,7 +1049,7 @@ func (c *ICDClient) onCheckIn(in icd.ReceivedCheckIn) {
 		return
 	}
 	if entry, ok := table.PeerFor(fed.NodeID); ok {
-		c.persist(&ICDRegistration{
+		_ = c.persist(&ICDRegistration{
 			Key: entry.Key, PendingKey: entry.PendingKey, CounterStart: entry.CounterStart, LastOffset: entry.LastOffset,
 			MonitoredSubject: reg.MonitoredSubject, ClientType: reg.ClientType,
 		})
@@ -1118,10 +1122,17 @@ func (c *ICDClient) offerKey(op *icdOperation) error {
 		}
 		_ = table.SetPendingKey(addr.NodeID, key)
 		entry.PendingKey = key
-		c.persist(&ICDRegistration{
+		// A pending key the store refused is not offered: the refresh
+		// fails, the key stays pending in memory and the next Check-In
+		// retries (IcdClient.ts:882-901, :860-869 at 862ad75f; the commit
+		// that persists it rejects).
+		if err := c.persist(&ICDRegistration{
 			Key: entry.Key, PendingKey: key, CounterStart: entry.CounterStart, LastOffset: entry.LastOffset,
 			MonitoredSubject: reg.MonitoredSubject, ClientType: reg.ClientType,
-		})
+		}); err != nil {
+			failure = fmt.Errorf("client: storing the offered ICD key: %w", err)
+			return
+		}
 		verification := bytes.Clone(reg.Key)
 		req = &icddef.RegisterClientRequest{CheckInNodeId: own, MonitoredSubject: reg.MonitoredSubject, Key: key, ClientType: reg.ClientType, VerificationKey: &verification}
 	}) {
@@ -1147,7 +1158,7 @@ func (c *ICDClient) offerKey(op *icdOperation) error {
 		reg := c.reg
 		c.mu.Unlock()
 		if entry, ok := table.PeerFor(addr.NodeID); ok && reg != nil {
-			c.persist(&ICDRegistration{
+			_ = c.persist(&ICDRegistration{
 				Key: entry.Key, PendingKey: entry.PendingKey, CounterStart: entry.CounterStart, LastOffset: entry.LastOffset,
 				MonitoredSubject: reg.MonitoredSubject, ClientType: reg.ClientType,
 			})
@@ -1313,7 +1324,7 @@ func (c *ICDClient) onDecommissioned() {
 	c.mu.Unlock()
 	c.commitMu.Lock()
 	if reg != nil {
-		c.persist(nil)
+		_ = c.persist(nil)
 	}
 	c.unwatchAll()
 	c.commitMu.Unlock()

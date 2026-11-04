@@ -60,10 +60,13 @@ const testparityPlannedRatchet = 2
 // ProtocolServiceTest.ts case; 16 stay missing with a named reason (the
 // failing report sender, the no-MRP session and the mDNS scanner seams,
 // the multi-message invoke response, gaps in the findings register):
-// 121 ported, 813 missing.
+// 121 ported, 813 missing. Phase 32 (the controller and protocol tranche)
+// took 261 of the 312 cases of nine entries out of missing — ported or
+// left — and completed four files; 51 stay missing with a named reason
+// (the PR's report): 125 ported, 552 missing.
 const (
-	testparityPortedRatchet  = 121
-	testparityMissingRatchet = 813
+	testparityPortedRatchet  = 125
+	testparityMissingRatchet = 552
 )
 
 // testparityLeftRatchet is the number of left it cases summed over the
@@ -72,8 +75,13 @@ const (
 // the others: a case moved from missing to left, or a left case ported
 // after all, moves it in the same commit, so a missing list cannot shrink
 // into left unseen. Set to 127 by phase 31: the left rows of the eleven
-// server-tranche entries.
-const testparityLeftRatchet = 127
+// server-tranche entries. Raised to 270 by phase 32: 143 left rows of the
+// nine controller- and protocol-tranche entries — the write-through cache
+// (BD-Matter-ClientNode-WriteNotThroughCache), the sequential node-id
+// allocator (BD-Matter-ControllerNodeIDRandom), the ICD transaction model,
+// the ML-DSA ledger stores (BD-Matter-DCL-MirroredScope) and JS runtime
+// artefacts, each row with its class and reason.
+const testparityLeftRatchet = 270
 
 // moduleRoot is where the committed artefacts live, seen from this package.
 const moduleRoot = "../.."

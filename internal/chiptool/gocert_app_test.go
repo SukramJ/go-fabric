@@ -598,10 +598,11 @@ type switchEvents struct {
 	events []interaction.EventData
 }
 
-func (s *switchEvents) add(r *client.Report) {
+func (s *switchEvents) add(r *client.Report) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.events = append(s.events, r.Events...)
+	return nil
 }
 
 // since returns the events after the first n.

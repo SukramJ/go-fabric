@@ -96,7 +96,6 @@ func (r *Registry) complete(ctx context.Context, n *Node, addr PeerAddress, o Co
 	n.mu.Lock()
 	n.settings.defaultSubscription = o.DefaultSubscription.clone()
 	n.settings.autoSubscribe = o.AutoSubscribe == nil || *o.AutoSubscribe
-	n.s.subscribedFabricFiltered = n.settings.defaultSubscription == nil || !n.settings.defaultSubscription.NoFabricFilter
 	n.cfg.NoInitialRead = o.NoInitialRead
 	n.newlyCommissioned = true
 	n.saveSettingsLocked()

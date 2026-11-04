@@ -51,7 +51,7 @@ func TestPlugToggles(t *testing.T) {
 	reports := make(chan *fabrictest.Report, 8)
 	sub, err := fabrictest.Subscribe(ctx, pair, fabrictest.SubscribeRequest{
 		Attributes: []fabrictest.AttributePath{client.AttributeAt(ep, onoffdef.ClusterID, onoffdef.AttrOnOff)},
-		Updated:    func(r *fabrictest.Report) { reports <- r },
+		Updated:    func(r *fabrictest.Report) error { reports <- r; return nil },
 	})
 	if err != nil {
 		t.Fatal(err)

@@ -311,6 +311,14 @@ func (c *Controller) armerContext() peer.RebootArmerContext {
 	}
 }
 
+// armerObserver sees the report sessions the reboot armer is fed — a test
+// seam (export_ota_test.go), as matter.js's OtaTest listens on
+// ClientSubscriptions.reportStarted (OtaTest.ts:919-921 at 862ad75f). It
+// observes only; nil in production.
+type armerObserver struct {
+	ReportStarted func(s peer.ArmerSession)
+}
+
 // sessionAdded feeds a peer's new session to the armer
 // (RebootResubscribeArmer.ts:117-150 at 862ad75f).
 func (c *Controller) sessionAdded(p *peer.Peer, s *exchange.Session) {
@@ -323,7 +331,11 @@ func (c *Controller) sessionAdded(p *peer.Peer, s *exchange.Session) {
 // (RebootResubscribeArmer.ts:68, :165-172).
 func (c *Controller) reportStarted(s *exchange.Session) {
 	if c.armer != nil {
-		c.armer.ReportStarted(armerSession{s: s, initiator: c.peers.Initiated(s)})
+		as := armerSession{s: s, initiator: c.peers.Initiated(s)}
+		if o := c.armerObs.Load(); o != nil && o.ReportStarted != nil {
+			o.ReportStarted(as)
+		}
+		c.armer.ReportStarted(as)
 	}
 }
 

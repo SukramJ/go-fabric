@@ -61,6 +61,9 @@ type ControllerOptions struct {
 	// template. Its Store is the controller's own [client.MemoryStore],
 	// kept across restarts; an edit may replace it.
 	Registry func(*client.RegistryConfig)
+	// Scanners are the commissioner's scanners, told to forget a device it
+	// commissioned (controller.Config.Scanners); nil is none.
+	Scanners []commissioner.CommissionedScanner
 	// Attestation is the commissioner's trust store; nil is
 	// attestation.TestStore (the CSA test PAAs, test roots accepted).
 	Attestation attestation.PAAStore
@@ -291,7 +294,7 @@ func (c *Controller) build() (*stack, error) {
 	// the sessions a device opens to the controller into the peer set.
 	if st.com, err = commissioner.New(commissioner.Context{
 		Exchanges: st.mgr, Peers: st.set, Attestation: c.trustStore(), Logger: log, Clock: clk,
-		Subscriptions: st.subs, Fabrics: []*commissioner.Fabric{st.fabric}, Resumption: c.resume,
+		Subscriptions: st.subs, Fabrics: []*commissioner.Fabric{st.fabric}, Resumption: c.resume, Scanners: c.opts.Scanners,
 	}); err != nil {
 		return st, fmt.Errorf("commissioner: %w", err)
 	}

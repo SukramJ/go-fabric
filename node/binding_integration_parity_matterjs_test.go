@@ -433,7 +433,7 @@ func (s *boundLightSite) subscribeToOnOff(t *testing.T) *interaction.Subscriptio
 			// :117-129); the Go interaction applies none of its own.
 			MinIntervalFloor:   &floor,
 			MaxIntervalCeiling: &ceiling,
-			Updated: func(r *interaction.Report) {
+			Updated: func(r *interaction.Report) error {
 				s.mu.Lock()
 				defer s.mu.Unlock()
 				for i := range r.Attributes {
@@ -443,6 +443,7 @@ func (s *boundLightSite) subscribeToOnOff(t *testing.T) *interaction.Subscriptio
 						s.reports = append(s.reports, a.Value.El.Bool)
 					}
 				}
+				return nil
 			},
 			ActiveChanged: func(active bool) {
 				s.mu.Lock()

@@ -71,7 +71,7 @@ func KnownVersions(n *Node, req interaction.ReadRequest) []im.DataVersionFilter 
 func CacheFabricFiltered(n *Node) bool {
 	n.mu.RLock()
 	defer n.mu.RUnlock()
-	return n.s.subscribedFabricFiltered
+	return n.s.cacheFabricFiltered()
 }
 
 // UpdateRecord edits the node's commissioning record and stores it — what

@@ -67,8 +67,10 @@ type SubscribeOptions struct {
 	Attributes []AttributePath
 	Events     []EventPath
 	// NoFabricFilter subscribes unfiltered (fabricFilter false). The cache
-	// keeps the values of one fabric view: those of interactions with the
-	// default subscription's filter (ClientStructure.ts:468-471).
+	// keeps the values of one fabric view: those of interactions with its
+	// recorded filter, which adopts the default subscription's at Start and
+	// at [Node.SetDefaultSubscription] (ClientStructure.ts:343-390,
+	// :573-576 at 862ad75f).
 	NoFabricFilter bool
 	// KeepSubscriptions keeps our other subscriptions with the peer
 	// (keepSubscriptions true); the default subscription replaces them.

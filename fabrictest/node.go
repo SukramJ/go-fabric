@@ -64,7 +64,7 @@ func (c *Controller) CommissionNode(ctx context.Context, d *Device, o client.Com
 		return nil, fmt.Errorf("fabrictest: device %d was not discovered", d.index)
 	}
 	reg := c.Registry()
-	n, err := reg.ForDevice(ctx, found[0])
+	n, err := reg.ForDevice(ctx, found[0], "")
 	if err != nil {
 		return nil, err
 	}

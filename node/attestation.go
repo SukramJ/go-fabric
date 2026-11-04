@@ -37,6 +37,16 @@ func (c *Config) resolveAttestation() (blocked, err error) {
 	case err != nil:
 		return nil, fmt.Errorf("node: attestation files: %w", err)
 	}
+	// The chain must be the product's — matter.js validates the
+	// certification against the product description after the servable
+	// check (DeviceCertification.ts:75-78 at 862ad75f).
+	if pd := c.ProductDescription; (pd.VendorID != 0 || pd.ProductID != 0) && validateProduct(chain, pd) != nil {
+		err := validateProduct(chain, pd)
+		if a.BlockCommissioningOnError {
+			return fmt.Errorf("node: attestation files: %w", err), nil
+		}
+		return nil, fmt.Errorf("node: attestation files: %w", err)
+	}
 	a.Chain, a.CertificationDeclaration = chain, cd
 	return nil, nil
 }
@@ -46,3 +56,8 @@ func (c *Config) resolveAttestation() (blocked, err error) {
 // and refuses every commissioning until the files are fixed and a new
 // node is built. nil when the files loaded, named nothing, or are unset.
 func (n *Node) AttestationError() error { return n.attestationErr }
+
+// validateProduct is [attestation.ValidateProduct] for the node's product.
+func validateProduct(chain *attestation.Chain, pd ProductDescription) error {
+	return attestation.ValidateProduct(chain, pd.VendorID, pd.ProductID)
+}

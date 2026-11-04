@@ -155,7 +155,7 @@ func TestEventsAndSubscribe(t *testing.T) {
 	reports := make(chan *interaction.Report, 16)
 	sub, err := fabrictest.Subscribe(ctx, p, interaction.SubscribeRequest{
 		Attributes: []im.ConcreteAttributePath{onOffPath(ep)}, MinIntervalFloor: interaction.Interval(time.Second), MaxIntervalCeiling: interaction.Interval(time.Minute),
-		Updated: func(r *interaction.Report) { reports <- r },
+		Updated: func(r *interaction.Report) error { reports <- r; return nil },
 	})
 	if err != nil {
 		t.Fatalf("Subscribe: %v", err)

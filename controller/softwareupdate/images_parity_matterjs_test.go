@@ -136,8 +136,8 @@ func TestImagesFindDeleteParity(t *testing.T) {
 		imgs := softwareupdate.NewImages(softwareupdate.ImagesConfig{})
 		store(t, imgs, 0xfff1, 0x8000, 3, 2, softwareupdate.ModeProd)
 		store(t, imgs, 0xfff1, 0x8001, 2, 1, softwareupdate.ModeProd)
-		if err := imgs.Delete(ctx, "fff1.8000.prod.3"); err != nil {
-			t.Fatal(err)
+		if n, err := imgs.Delete(ctx, softwareupdate.DeleteOptions{Filename: "fff1.8000.prod.3"}); err != nil || n != 1 {
+			t.Fatalf("Delete = %d, %v, want 1", n, err)
 		}
 		if f := imgs.Find(ctx, softwareupdate.FindOptions{}); len(f) != 1 || f[0].ProductID != 0x8001 {
 			t.Fatalf("remaining %+v", f)
@@ -221,7 +221,7 @@ func TestImagesFilenameCaseParity(t *testing.T) {
 	if len(found) != 1 || found[0].Filename != "FFF1.8000.PROD.3" || found[0].Mode != softwareupdate.ModeProd {
 		t.Fatalf("Find %+v, want the upper-case prod image", found)
 	}
-	if err := imgs.Delete(ctx, "FFF1.8000.PROD.3"); err != nil {
-		t.Fatalf("Delete of an upper-case designator: %v", err)
+	if n, err := imgs.Delete(ctx, softwareupdate.DeleteOptions{Filename: "FFF1.8000.PROD.3"}); err != nil || n != 1 {
+		t.Fatalf("Delete of an upper-case designator = %d, %v", n, err)
 	}
 }

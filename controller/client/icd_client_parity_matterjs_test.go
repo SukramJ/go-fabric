@@ -36,6 +36,7 @@ import (
 	"github.com/SukramJ/go-fabric/controller/client"
 	"github.com/SukramJ/go-fabric/fabrictest"
 	"github.com/SukramJ/go-fabric/icd"
+	"github.com/SukramJ/go-fabric/internal/nodeseam"
 	"github.com/SukramJ/go-fabric/node"
 )
 
@@ -64,6 +65,8 @@ type icdPairOptions struct {
 	noICD      bool
 	commission client.CommissionOptions
 	configure  func(*node.Config)
+	// controller configures the controller.
+	controller fabrictest.ControllerOptions
 }
 
 func newICDPair(t *testing.T, o icdPairOptions) *icdPair {
@@ -88,7 +91,7 @@ func newICDPair(t *testing.T, o icdPairOptions) *icdPair {
 			}
 		},
 	}
-	cp.pair = site.UncommissionedPair(fabrictest.PairOptions{Device: topo})
+	cp.pair = site.UncommissionedPair(fabrictest.PairOptions{Device: topo, Controller: o.controller})
 	n, err := cp.pair.Controller.CommissionNode(parityCtx(t), cp.pair.Device, o.commission)
 	if err != nil {
 		t.Fatal(err)
@@ -329,7 +332,15 @@ func TestIcdClientParity(t *testing.T) {
 			}
 		})
 		t.Run("does NOT auto-register a LIT-advertising peer below spec 1.4.0", func(t *testing.T) {
-			t.Skip("the device's BasicInformation SpecificationVersion is fixed at 1.6.1 (cluster.SpecificationVersion); a node of this module cannot report 1.3.0 — litSupported's version gate is held by the physical-properties port (TestClientNodePhysicalPropertiesIcdParity) and TestProperties")
+			// The device reports 1.3.0 through the TESTING ONLY seam
+			// (basicInformation.specificationVersion, IcdClientTest.ts:567-582).
+			p := newICDPair(t, icdPairOptions{cfg: icdLITConfig(true), forceLIT: true, configure: func(c *node.Config) {
+				nodeseam.UseSpecificationVersion(c, 0x01030000)
+			}})
+			p.advance(t, 2*time.Second)
+			if p.icd().Registered() {
+				t.Fatal("registered")
+			}
 		})
 		t.Run("does NOT auto-register a DSLS peer operating in SIT", func(t *testing.T) {
 			p := newICDPair(t, icdPairOptions{cfg: icdLITConfig(true)})

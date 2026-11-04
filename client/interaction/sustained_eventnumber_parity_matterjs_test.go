@@ -81,7 +81,7 @@ func ssPushEvents(t *testing.T, r *ssRig, xid uint16, id uint32, numbers ...uint
 
 func TestSustainedSubscriptionMaxEventNumberChanged(t *testing.T) {
 	t.Parallel()
-	consume := func(*interaction.Report) {}
+	consume := func(*interaction.Report) error { return nil }
 
 	t.Run("resubscribes for events above the highest one it delivered", func(t *testing.T) {
 		t.Parallel()

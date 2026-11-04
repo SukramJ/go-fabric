@@ -31,6 +31,14 @@ func init() {
 		c.OTA = &ota
 		return true
 	}
+	nodeseam.UseSpecificationVersion = func(cfg any, version uint32) bool {
+		c, ok := cfg.(*Config)
+		if !ok || c == nil {
+			return false
+		}
+		c.specificationVersion = version
+		return true
+	}
 	nodeseam.UseWiFiCommissioning = func(cfg any, driver contract.WiFiDriver) bool {
 		c, ok := cfg.(*Config)
 		if !ok || c == nil || driver == nil {

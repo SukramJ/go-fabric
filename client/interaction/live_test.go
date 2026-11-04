@@ -238,7 +238,7 @@ func TestLiveSubscribe(t *testing.T) {
 		var err error
 		sub, err = lv.c.Subscribe(ctx, interaction.SubscribeRequest{
 			Attributes: []im.ConcreteAttributePath{lv.onOff()}, MinIntervalFloor: interaction.Interval(0), MaxIntervalCeiling: interaction.Interval(2 * time.Second),
-			Updated:           func(r *interaction.Report) { reports <- r },
+			Updated:           func(r *interaction.Report) error { reports <- r; return nil },
 			KeepaliveReceived: func() { keepalives <- struct{}{} },
 		})
 		return err
@@ -261,7 +261,7 @@ func TestLiveSubscribe(t *testing.T) {
 	var second *interaction.Subscription
 	err = lv.run(ctx, func(ctx context.Context) error {
 		var err error
-		second, err = lv.c.Subscribe(ctx, interaction.SubscribeRequest{Attributes: []im.ConcreteAttributePath{lv.onOff()}, ReplaceSubscriptions: true, Updated: func(r *interaction.Report) { reports <- r }})
+		second, err = lv.c.Subscribe(ctx, interaction.SubscribeRequest{Attributes: []im.ConcreteAttributePath{lv.onOff()}, ReplaceSubscriptions: true, Updated: func(r *interaction.Report) error { reports <- r; return nil }})
 		return err
 	})
 	if err != nil {
@@ -335,7 +335,7 @@ func TestLiveSustainedSurvivesRestart(t *testing.T) {
 		var err error
 		sub, err = lv.c.Subscribe(ctx, interaction.SubscribeRequest{
 			Attributes: []im.ConcreteAttributePath{lv.onOff()}, Sustain: true, MaxIntervalCeiling: interaction.Interval(time.Minute),
-			Updated: func(r *interaction.Report) { reports <- r },
+			Updated: func(r *interaction.Report) error { reports <- r; return nil },
 		})
 		return err
 	})

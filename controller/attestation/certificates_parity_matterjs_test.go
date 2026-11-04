@@ -55,6 +55,18 @@ func TestCertificatesFallbackVendorIDProductID(t *testing.T) {
 		pai := certificatesParse(t, certificatesDER(t, certificatesNukiPAI), true)
 		certificatesID(t, "vendorId", pai.vendorID, 0x135d)
 	})
+	t.Run("parses fallback VendorID from a DAC issuer commonName", func(t *testing.T) {
+		// CertificatesTest.ts:319-324 at 862ad75f: dac.cert.issuer.vendorId.
+		dac := certificatesParse(t, certificatesDER(t, certificatesNukiDAC), true)
+		vid, pid, err := IssuerMatterIDs(dac.x509)
+		if err != nil {
+			t.Fatal(err)
+		}
+		certificatesID(t, "issuer vendorId", vid, 0x135d)
+		if pid != nil {
+			t.Fatalf("issuer productId = %#04x, want none", *pid)
+		}
+	})
 }
 
 // TestCertificatesParseMatterFallbackVidPid is the describe

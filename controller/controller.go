@@ -90,6 +90,13 @@ type Config struct {
 	// controller that trusts the test PAAs by accident commissions
 	// counterfeit devices.
 	Attestation attestation.PAAStore
+	// Scanners are told to forget a device once it is commissioned — a
+	// BLE scanner (controller/ble.Scanner) still holding its commissioning
+	// advertisement, say: matter.js's ScannerSet, which the commissioner
+	// walks after the commissioning steps succeeded
+	// (packages/protocol/src/peer/ControllerCommissioner.ts:321-341,
+	// :721-723 at 862ad75f). nil is none.
+	Scanners []commissioner.CommissionedScanner
 	// Listen is the UDP address to listen on; "" is "[::]:0".
 	Listen string
 	// VendorID is our fabric's vendor ID on its first run; 0 is
@@ -217,6 +224,7 @@ type Controller struct {
 	ota       atomic.Pointer[softwareupdate.Manager]
 	registry  atomic.Pointer[client.Registry]
 	armer     *peer.RebootResubscribeArmer
+	armerObs  atomic.Pointer[armerObserver] // a test seam, nil in production (ota.go)
 	ownNode   OwnNode
 	ownNodeID uint64
 	ownAddr   *net.UDPAddr
@@ -309,7 +317,7 @@ func New(ctx context.Context, cfg Config) (_ *Controller, err error) {
 	//nolint:contextcheck // the constructors take no context; the peers they adopt resolve on their own
 	if c.com, err = commissioner.New(commissioner.Context{
 		Exchanges: c.mgr, Peers: c.peers, Attestation: cfg.Attestation, Logger: log, Clock: clk,
-		Subscriptions: c.subs, Fabrics: fabrics, Resumption: resumption,
+		Subscriptions: c.subs, Fabrics: fabrics, Resumption: resumption, Scanners: cfg.Scanners,
 	}); err != nil {
 		return nil, err
 	}
@@ -605,7 +613,7 @@ func (c *Controller) Pair(ctx context.Context, code string, opts PairOptions) (*
 		return c.pairDiscovered(ctx, pc, identity, opts)
 	}
 	commissioner.ReportDiscovery(opts.Progress, PairingSkipped, nil)
-	n, err := c.reg.ForDevice(ctx, *known)
+	n, err := c.reg.ForDevice(ctx, *known, "")
 	if err != nil {
 		return nil, err
 	}

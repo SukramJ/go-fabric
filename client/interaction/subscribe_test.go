@@ -73,7 +73,7 @@ func TestSubscribe(t *testing.T) {
 	updates := make(chan *interaction.Report, 4)
 	done := subscribeAsync(c, interaction.SubscribeRequest{
 		Attributes: []im.ConcreteAttributePath{onOff}, MinIntervalFloor: interaction.Interval(0), MaxIntervalCeiling: interaction.Interval(time.Hour),
-		Updated: func(r *interaction.Report) { updates <- r },
+		Updated: func(r *interaction.Report) error { updates <- r; return nil },
 	})
 	req := s.next(t)
 	sr, err := im.UnmarshalSubscribeRequestTLV(tlv.NewDecoder(req.payload))

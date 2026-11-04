@@ -21,6 +21,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strings"
 	"testing"
 	"time"
 )
@@ -107,6 +108,61 @@ func TestPqcAttestationCertificatesDeviceCertification(t *testing.T) {
 		_, _, err = LoadChainFiles(files)
 		if !errors.Is(err, ErrCertificateTooLarge) || !regexp.MustCompile(`DAC of \d+ bytes exceeds the 600 bytes`).MatchString(err.Error()) {
 			t.Fatalf("LoadChainFiles = %v, want the DAC refused as unservable", err)
+		}
+	})
+}
+
+// TestPqcAttestationCertificatesDeviceCertificationProduct ports "refuses
+// a chain it cannot serve without segmented responses"
+// (PqcAttestationCertificatesTest.ts:509-529 at 862ad75f) with the product
+// description: matter.js's DeviceCertification checks the servable size
+// first (#assertServable, DeviceCertification.ts:75-78) and the product
+// after, so an oversized ML-DSA chain is refused for its size whatever
+// the product says — here LoadChainFiles, then [ValidateProduct]. The
+// second case is #validateCertification (:107-140) on a chain that fits:
+// a DAC whose product id is not the product's is refused.
+func TestPqcAttestationCertificatesDeviceCertificationProduct(t *testing.T) {
+	t.Run("refuses a chain it cannot serve without segmented responses", func(t *testing.T) {
+		dac, pai, dacKey := pqcChain(t)
+		key, err := x509.MarshalPKCS8PrivateKey(dacKey)
+		if err != nil {
+			t.Fatalf("DAC key: %v", err)
+		}
+		cd, err := BuildTestCertificationDeclaration(0xfff1, 0x8000)
+		if err != nil {
+			t.Fatalf("CD: %v", err)
+		}
+		dir := t.TempDir()
+		files := ChainFiles{
+			DACPath: filepath.Join(dir, "dac.der"), DACKeyPath: filepath.Join(dir, "dac.key"),
+			PAIPath: filepath.Join(dir, "pai.der"), CDPath: filepath.Join(dir, "cd.der"),
+		}
+		for path, data := range map[string][]byte{files.DACPath: dac, files.DACKeyPath: key, files.PAIPath: pai, files.CDPath: cd} {
+			if err := os.WriteFile(path, data, 0o600); err != nil {
+				t.Fatalf("write: %v", err)
+			}
+		}
+		chain, _, err := LoadChainFiles(files)
+		if !errors.Is(err, ErrCertificateTooLarge) || !regexp.MustCompile(`DAC of \d+ bytes exceeds the 600 bytes`).MatchString(err.Error()) {
+			t.Fatalf("LoadChainFiles = %v, want the DAC refused as unservable before the product is judged", err)
+		}
+		if chain != nil {
+			t.Fatal("an unservable chain was returned")
+		}
+	})
+	t.Run("refuses a chain whose ids are not the product's", func(t *testing.T) {
+		chain, err := BuildTestChain(0xfff1, 0x8000)
+		if err != nil {
+			t.Fatalf("BuildTestChain: %v", err)
+		}
+		if err := ValidateProduct(chain, 0xfff1, 0x8000); err != nil {
+			t.Fatalf("ValidateProduct(matching) = %v", err)
+		}
+		if err := ValidateProduct(chain, 0xfff1, 0x8001); !errors.Is(err, ErrProductMismatch) || !strings.Contains(err.Error(), "DAC ProductID") {
+			t.Fatalf("ValidateProduct(product id off) = %v, want the DAC product id refusal", err)
+		}
+		if err := ValidateProduct(chain, 0xfff2, 0x8000); !errors.Is(err, ErrProductMismatch) || !strings.Contains(err.Error(), "VendorID") {
+			t.Fatalf("ValidateProduct(vendor id off) = %v, want a vendor id refusal", err)
 		}
 	})
 }

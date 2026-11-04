@@ -136,6 +136,17 @@ type Config struct {
 	// Identify, Descriptor, FixedLabel and UserLabel — an Actions server,
 	// say (the daemon's buildAggregatorClusters extra, wiring.go:330-345 at b4ea1f96^).
 	AggregatorServers []contract.ClusterServer
+	// RootServers are mounted on the root endpoint after the root's own
+	// servers — a PowerSource on a battery node's root, say: matter.js's
+	// ServerNode.RootEndpoint.with(...) (ClientNodeTest.ts:3192-3205 at
+	// 862ad75f puts PowerSourceServer.with("Battery") there). A cluster
+	// the root already serves is refused.
+	RootServers []contract.ClusterServer
+	// specificationVersion is the SpecificationVersion the node reports,
+	// 0 its own. TESTING ONLY, set through
+	// internal/nodeseam.UseSpecificationVersion: a test stands in for a
+	// node of an older release.
+	specificationVersion uint32
 	// Surface are the surface policies the node's devices are composed
 	// under (package surface, ADR 0030). A device carries the digest of the
 	// policies it was built with (device.Options.Surface), and

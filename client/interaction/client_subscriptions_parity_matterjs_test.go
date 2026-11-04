@@ -82,7 +82,7 @@ func TestClientSubscriptionsReportStarted(t *testing.T) {
 		updates := make(chan *interaction.Report, 4)
 		subscribed(t, s, c, interaction.SubscribeRequest{
 			Attributes: []im.ConcreteAttributePath{onOff},
-			Updated:    func(r *interaction.Report) { updates <- r },
+			Updated:    func(r *interaction.Report) error { updates <- r; return nil },
 		}, 5)
 		<-updates // the priming report
 		s.push(t, 0x7202, im.OpcodeReportData, pushedReport(t, 5, true, false, false, true))

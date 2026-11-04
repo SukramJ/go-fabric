@@ -142,6 +142,8 @@ func buildRoot(ctx context.Context, d rootDeps) (*RootClusters, error) { //nolin
 		CapabilityMinima:   cfg.CapabilityMinima,
 		MaxPathsPerInvoke:  cfg.MaxPathsPerInvoke,
 		Logger:             d.logger,
+		// TESTING ONLY (internal/nodeseam.UseSpecificationVersion).
+		SpecificationVersion: cfg.specificationVersion,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("basic information: %w", err)
@@ -353,6 +355,9 @@ func buildRoot(ctx context.Context, d rootDeps) (*RootClusters, error) { //nolin
 	)
 	servers = append(servers, r.configured()...)
 	servers = append(servers, optional...)
+	if servers, err = withRootServers(servers, cfg.RootServers); err != nil {
+		return nil, err
+	}
 	r.servers = servers
 	r.Descriptor.SetServerListProvider(clusterIDsOf(r.servers))
 	return r, nil
@@ -522,6 +527,19 @@ func buildAggregatorClusters(ctx context.Context, st store.Settings, extra []con
 	identify.SetClock(clk)
 	servers := append([]contract.ClusterServer{identify, descriptor, fixedLabel, userLabel}, extra...)
 	descriptor.SetServerListProvider(clusterIDsOf(servers))
+	return servers, nil
+}
+
+// withRootServers appends the host's own root servers ([Config].RootServers);
+// a cluster the root serves already is refused.
+func withRootServers(servers, extra []contract.ClusterServer) ([]contract.ClusterServer, error) {
+	for _, srv := range extra {
+		id := srv.MatterClusterID()
+		if slices.ContainsFunc(servers, func(s contract.ClusterServer) bool { return s.MatterClusterID() == id }) {
+			return nil, fmt.Errorf("node: root: Config.RootServers names cluster 0x%04x, which the root serves already", id)
+		}
+		servers = append(servers, srv)
+	}
 	return servers, nil
 }
 

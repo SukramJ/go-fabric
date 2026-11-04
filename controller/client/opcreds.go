@@ -68,6 +68,32 @@ func (n *Node) opCreds() *Cluster {
 	return root.Cluster(opCredsCluster)
 }
 
+// backfillFabricIndexOnPeer recovers a commissioned node's missing
+// FabricIndexOnPeer from the image's CurrentFabricIndex — a node stored
+// before the field existed, or one whose field was cleared. It runs when
+// the node is loaded and after each report, until the field is filled.
+// Mirrors matter.js CommissioningClient.#backfillFabricIndexOnPeer and its
+// currentFabricIndex$Changed reaction
+// (packages/node/src/behavior/system/commissioning/CommissioningClient.ts:605-630
+// at 862ad75f).
+func (n *Node) backfillFabricIndexOnPeer() {
+	n.mu.RLock()
+	missing := n.record.PeerAddress != nil && n.record.FabricIndexOnPeer == 0 && !n.erased
+	n.mu.RUnlock()
+	if !missing {
+		return
+	}
+	idx := currentFabricIndex(n.opCreds())
+	if idx == 0 {
+		return
+	}
+	n.updateRecord(func(r *Record) {
+		if r.PeerAddress != nil && r.FabricIndexOnPeer == 0 {
+			r.FabricIndexOnPeer = idx
+		}
+	})
+}
+
 // currentFabricIndex is the image's CurrentFabricIndex, 0 when absent.
 func currentFabricIndex(c *Cluster) uint8 {
 	if c == nil {

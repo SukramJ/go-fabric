@@ -227,7 +227,6 @@ func (r *Registry) commission(ctx context.Context, n *Node, o CommissionOptions)
 	n.mu.Lock()
 	n.settings.defaultSubscription = o.DefaultSubscription.clone()
 	n.settings.autoSubscribe = o.AutoSubscribe == nil || *o.AutoSubscribe
-	n.s.subscribedFabricFiltered = n.settings.defaultSubscription == nil || !n.settings.defaultSubscription.NoFabricFilter
 	n.cfg.NoInitialRead = o.NoInitialRead
 	n.newlyCommissioned = true
 	n.saveSettingsLocked()
@@ -304,8 +303,10 @@ func (r *Registry) decommission(ctx context.Context, n *Node) (PeerAddress, erro
 	oc := n.opCreds()
 	current := currentFabricIndex(oc)
 	if oc == nil || (rec.FabricIndexOnPeer == 0 && current == 0) {
+		// The read has the cache's fabric filter (CommissioningClient.ts:391-392
+		// at 862ad75f).
 		n.mu.RLock()
-		noFilter := n.settings.defaultSubscription != nil && n.settings.defaultSubscription.NoFabricFilter
+		noFilter := !n.s.cacheFabricFiltered()
 		n.mu.RUnlock()
 		rep, err := n.Read(ctx, ReadRequest{ReadRequest: ReadPaths{
 			Attributes:     []AttributePath{{Endpoint: 0, Cluster: opCredsCluster, Attribute: opCredsAttrCurrentFabricIndex, HasEndpoint: true, HasCluster: true, HasAttribute: true}},

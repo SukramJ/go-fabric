@@ -78,7 +78,7 @@ func TestClientSubscribeCancelledParity(t *testing.T) {
 		before := cp.pair.Device.Node().Subscriptions().Active()
 		ctx, cancel := context.WithCancel(parityCtx(t))
 		req := request()
-		req.Updated = func(*interaction.Report) { cancel() }
+		req.Updated = func(*interaction.Report) error { cancel(); return nil }
 		var err error
 		cp.run(t, func(context.Context) error {
 			_, err = cp.node.Subscribe(ctx, client.SubscribeRequest{SubscribeRequest: req})

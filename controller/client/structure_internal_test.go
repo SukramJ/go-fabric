@@ -493,7 +493,7 @@ func TestStructureEvents(t *testing.T) {
 	b.attr(2, onoff.ClusterID, 0, boolNode(true), 3)
 	b.r.Events = []interaction.EventData{ev(2), ev(3), ev(9)}
 	n.mu.Lock()
-	n.s.mutate(wildcard, &b.r, true)
+	n.s.mutate(wildcard, &b.r, true, nil)
 	em := n.s.takeEmissions()
 	n.mu.Unlock()
 	var got []string

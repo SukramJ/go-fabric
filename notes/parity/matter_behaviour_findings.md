@@ -723,6 +723,49 @@ Found by the phase-31 port of `packages/node/test` (brief phase 31,
   behind the one in flight first, despite a deferral
   (ServerSubscriptionTest.ts:1123-1195 and :499-555 stay missing).
 
+Found by the phase-32 port of `packages/node/test/behaviors/ota/OtaTest.ts`
+(brief phase 32, 2026-11-04). Line numbers at `862ad75f`.
+
+- **The reboot armer never sees a returning device's session.** matter.js
+  arms `RebootResubscribeArmer` at Applying and keys on the first session
+  the device opens after its restart (`RebootResubscribeArmer.ts:117-163`):
+  the NotifyUpdateApplied session to the provider — the controller's own
+  `ServerNode`, so its session manager — or the device's re-established
+  subscription; then it closes the older sessions (Mechanism A) and forces
+  a re-subscription when no report arrives within 30 s (Mechanism B). In Go
+  neither session reaches `controller.sessionAdded`: the provider is an own
+  node with its own session manager (`BD-Matter-OwnNode-SeparateIdentity`),
+  and the controller publishes no operational record, so a device cannot
+  resolve it to re-establish a persisted subscription (`bridge.connectPeer`
+  resolves the subscriber over DNS-SD; the site answers for nodes only). Only
+  the return-timeout backstop (`peer.RebootReturnTimeout`, apply delay plus
+  3 min) recovers the peer. OtaTest.ts:706-813 ("closes older sessions and
+  does not re-subscribe a device that feeds its subscription") and :815-890
+  ("force re-subscribes (Mechanism B) when the subscription is not fed
+  within the grace window") stay missing. Route: feed the own node's
+  sessions of a peer to the armer through the `controller.OwnNode` port, and
+  decide whether the controller publishes its operational record.
+
+Found by the phase-32 port of `packages/node/test/node/ClientNodeTest.ts`
+(brief phase 32, 2026-11-04). Line numbers at `862ad75f`.
+
+- **A device that leaves a fabric does not deliver its Leave event.**
+  matter.js's `Fabric.leave` emits the Leave event and flushes every
+  session's subscriptions before it deletes the fabric
+  (`packages/protocol/src/fabric/Fabric.ts:446-455`, `NodeSession.ts:294-306`),
+  so the controller hears it and erases the node (ClientNodeTest.ts:2953-2977,
+  "erases node after leave event", stays missing). In Go
+  `OperationalCredentials.RemoveFabric` removes the fabric's rows — its ACL
+  entries with them — before the removal hook emits Leave
+  (`cluster/core/operational_credentials.go:2308-2345`,
+  `node.fabricRemoved`), and the sessions then close; a flush of the
+  fabric's subscriptions tried in the hook (phase 32) delivered no Leave —
+  most likely because the fabric's ACL rows, and so the subject's read
+  privilege, are gone by then (not verified further). Route:
+  emit Leave and flush the fabric's subscriptions before the store removal —
+  a change of a security-path server (the OperationalCredentials removal
+  order), for Fable.
+
 ## Application cluster servers — open items. (Triage 2026-10-29: wave H1, the device IM and write path.)
 
 - **Wi-Fi NetworkCommissioning: the fail-safe check is not bound to the

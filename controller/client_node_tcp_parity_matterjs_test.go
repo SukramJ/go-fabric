@@ -247,11 +247,12 @@ func TestClientNodeTcpParity(t *testing.T) {
 			tp.run(t, func(ctx context.Context) error {
 				var req client.SubscribeRequest
 				req.Attributes = []client.AttributePath{client.AttributeAt(tp.ep, onoffdef.ClusterID, onoffdef.AttrOnOff)}
-				req.Updated = func(*client.Report) {
+				req.Updated = func(*client.Report) error {
 					select {
 					case got <- struct{}{}:
 					default:
 					}
+					return nil
 				}
 				_, err := tp.n.Subscribe(ctx, req)
 				return err

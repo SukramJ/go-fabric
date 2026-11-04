@@ -20,14 +20,19 @@ import (
 func TestEntry_RetransmitBaseInterval_FreshCountsThePeerActive(t *testing.T) {
 	t.Parallel()
 	m, _ := newTestManager()
+	clk := clocktest.New(time.UnixMilli(1_700_000_000_000))
+	m.SetClock(clk)
 	e, err := m.OpenFromSigma(1, 10, 20, testKeys())
 	if err != nil {
 		t.Fatalf("OpenFromSigma: %v", err)
 	}
-	if got := e.RetransmitBaseInterval(time.Now()); got != 300*time.Millisecond {
+	if got := e.RetransmitBaseInterval(clk.Now()); got != 300*time.Millisecond {
 		t.Errorf("RetransmitBaseInterval (fresh entry) = %v, want 300ms (SessionActiveIntervalDefault)", got)
 	}
-	if got := e.RetransmitBaseInterval(time.Now().Add(5 * time.Second)); got != 500*time.Millisecond {
+	// The threshold is judged on the clock's elapsed reading, not on the
+	// caller's time argument.
+	clk.Advance(5 * time.Second)
+	if got := e.RetransmitBaseInterval(clk.Now()); got != 500*time.Millisecond {
 		t.Errorf("RetransmitBaseInterval (past the 4s threshold) = %v, want 500ms (SessionIdleIntervalDefault)", got)
 	}
 }
@@ -57,13 +62,16 @@ func TestEntry_RetransmitBaseInterval_ActiveAfterMarkActiveRx(t *testing.T) {
 func TestEntry_RetransmitBaseInterval_IdleWithoutRx(t *testing.T) {
 	t.Parallel()
 	m, _ := newTestManager()
+	clk := clocktest.New(time.UnixMilli(1_700_000_000_000))
+	m.SetClock(clk)
 	e, err := m.OpenFromSigma(1, 10, 20, testKeys())
 	if err != nil {
 		t.Fatalf("OpenFromSigma: %v", err)
 	}
 	e.SetPeerMRPIntervals(5000, 1000, 2000)
 	// No MarkActiveRx call; the 2s threshold has passed since creation.
-	got := e.RetransmitBaseInterval(time.Now().Add(3 * time.Second))
+	clk.Advance(3 * time.Second)
+	got := e.RetransmitBaseInterval(clk.Now())
 	if got != 5000*time.Millisecond {
 		t.Errorf("RetransmitBaseInterval (no peer rx yet) = %v, want 5000ms (peer idle interval)", got)
 	}

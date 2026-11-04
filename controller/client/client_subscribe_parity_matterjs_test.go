@@ -90,10 +90,11 @@ func primingClustersOf(t *testing.T, cp *clientPair, req client.SubscribeRequest
 	req.Attributes = []im.ConcreteAttributePath{rootPath()}
 	var mu sync.Mutex
 	got := map[uint32]uint32{}
-	req.Updated = func(r *interaction.Report) {
+	req.Updated = func(r *interaction.Report) error {
 		mu.Lock()
 		clustersOf(r, got)
 		mu.Unlock()
+		return nil
 	}
 	cp.run(t, func(ctx context.Context) error {
 		s, err := cp.node.Subscribe(ctx, req)
@@ -131,10 +132,11 @@ func resubscribedClustersOf(t *testing.T, req client.SubscribeRequest) map[uint3
 	var mu sync.Mutex
 	got := map[uint32]uint32{}
 	activations := 0
-	req.Updated = func(r *interaction.Report) {
+	req.Updated = func(r *interaction.Report) error {
 		mu.Lock()
 		clustersOf(r, got)
 		mu.Unlock()
+		return nil
 	}
 	req.ActiveChanged = func(active bool) {
 		if active {
@@ -397,12 +399,13 @@ func TestClientSubscribeCacheFabricFilterParity(t *testing.T) {
 				r.NoFabricFilter = false
 				return r
 			},
-			Updated: func(r *interaction.Report) {
+			Updated: func(r *interaction.Report) error {
 				for _, a := range r.Attributes {
 					if a.Path.Attribute == onoff.AttrOnOff && a.Value.El.Bool {
 						once.Do(func() { close(reported) })
 					}
 				}
+				return nil
 			},
 		}
 		var s *interaction.Subscription

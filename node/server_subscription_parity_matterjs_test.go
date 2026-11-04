@@ -73,11 +73,12 @@ func TestServerSubscriptionParity(t *testing.T) {
 		primed := false
 		sub, err := fabrictest.Subscribe(ctx, p, interaction.SubscribeRequest{
 			Attributes: []im.ConcreteAttributePath{nodeLabel, location}, MinIntervalFloor: interaction.Interval(0), MaxIntervalCeiling: interaction.Interval(2 * time.Second),
-			Updated: func(r *interaction.Report) {
+			Updated: func(r *interaction.Report) error {
 				if primed {
 					reports <- r
 				}
 				primed = true
+				return nil
 			},
 		})
 		if err != nil {

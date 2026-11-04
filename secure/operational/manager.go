@@ -358,6 +358,15 @@ type Entry struct {
 	// peer-loss sweep spares sessions created at or after the exchange
 	// that reported the loss (matter.js SessionManager.ts:688-690).
 	createdAt time.Time
+	// lastActivityMono, lastPeerActivityMono and createdAtMono are the
+	// same stamps on the clock's monotonic reading (clock.MonotonicOf): the
+	// readings every interval is judged on — the peer-active threshold,
+	// the per-peer LRU eviction — so a wall-clock step neither ages nor
+	// rejuvenates a session. The wall times above are what the stamps
+	// read as, for [SessionInfo]. matter.js keeps its timestamps on
+	// Time.nowUs, the monotonic reading (Session.ts:141-151 at 862ad75f),
+	// and exposes them through the wall-clock offset (:154-162).
+	lastActivityMono, lastPeerActivityMono, createdAtMono time.Duration
 	// clock is the manager's clock when the entry opened; nil (an entry
 	// built outside a manager) is clock.System.
 	clock clock.Clock
@@ -368,10 +377,10 @@ type Entry struct {
 // MarkActiveRx updates the entry's activity timestamp after a
 // successful inbound message decryption.
 func (e *Entry) MarkActiveRx() {
+	now, mono := clock.Or(e.clock).Now(), clock.MonotonicOf(e.clock)
 	e.mu.Lock()
-	now := clock.Or(e.clock).Now()
-	e.lastActivity = now
-	e.lastPeerActivity = now
+	e.lastActivity, e.lastActivityMono = now, mono
+	e.lastPeerActivity, e.lastPeerActivityMono = now, mono
 	e.mu.Unlock()
 }
 
@@ -427,11 +436,16 @@ func (e *Entry) PeerTransportParameters() (transports uint16, maxTCPMessageSize 
 // defaults. Mirrors matter.js MRP.ts:129-135 retransmissionIntervalOf
 // ("baseInterval = isPeerActive ? activeInterval : idleInterval",
 // re-evaluated per transmission) and chip GetMRPBaseTimeout.
-func (e *Entry) RetransmitBaseInterval(now time.Time) time.Duration {
+func (e *Entry) RetransmitBaseInterval(_ time.Time) time.Duration {
+	// The peer-active decision is an interval, judged on the clock's
+	// monotonic reading so a wall-clock step cannot flip it (matter.js
+	// Session.ts:149-151 on Time.nowUs); the caller's wall reading is
+	// accepted for the signature's sake and not consulted.
 	e.mu.Lock()
-	lastPeer := e.lastPeerActivity
+	lastPeer, lastPeerMono := e.lastPeerActivity, e.lastPeerActivityMono
 	idleMs, activeMs, thresholdMs := e.peerIdleIntervalMs, e.peerActiveIntervalMs, e.peerActiveThresholdMs
 	e.mu.Unlock()
+	nowMono := clock.MonotonicOf(e.clock)
 
 	idle := mrp.SessionIdleIntervalDefault
 	if idleMs != 0 {
@@ -445,7 +459,7 @@ func (e *Entry) RetransmitBaseInterval(now time.Time) time.Duration {
 	if thresholdMs != 0 {
 		threshold = time.Duration(thresholdMs) * time.Millisecond
 	}
-	if !lastPeer.IsZero() && now.Sub(lastPeer) < threshold {
+	if !lastPeer.IsZero() && nowMono-lastPeerMono < threshold {
 		return active
 	}
 	return idle
@@ -454,9 +468,18 @@ func (e *Entry) RetransmitBaseInterval(now time.Time) time.Duration {
 // MarkActiveTx updates the entry's activity timestamp after a
 // successful outbound message encryption.
 func (e *Entry) MarkActiveTx() {
+	now, mono := clock.Or(e.clock).Now(), clock.MonotonicOf(e.clock)
 	e.mu.Lock()
-	e.lastActivity = clock.Or(e.clock).Now()
+	e.lastActivity, e.lastActivityMono = now, mono
 	e.mu.Unlock()
+}
+
+// lastActivityMonotonic is the monotonic reading of the last traffic, 0
+// for an entry that never carried any.
+func (e *Entry) lastActivityMonotonic() (time.Duration, bool) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	return e.lastActivityMono, !e.lastActivity.IsZero()
 }
 
 // LastActivity returns the last time this session exchanged a message.
@@ -606,8 +629,10 @@ func (m *Manager) OpenFromSigma(fabricIndex uint8, localNodeID, peerNodeID uint6
 		// The peer counts active from the session's creation: matter.js
 		// NodeSession.ts:120 ("We always set the active timestamp for Secure
 		// sessions"), chip SecureSession.h:349 (mLastPeerActivityTime = now).
-		lastPeerActivity: m.clk().Now(),
-		clock:            m.clk(),
+		lastPeerActivity:     m.clk().Now(),
+		lastPeerActivityMono: clock.MonotonicOf(m.clk()),
+		createdAtMono:        clock.MonotonicOf(m.clk()),
+		clock:                m.clk(),
 	}
 	m.sessions[id] = entry
 	excess := m.evictExcessPeerSessionsLocked(entry)
@@ -720,8 +745,10 @@ func (m *Manager) openFromSigma(id uint16, fabricIndex uint8, localNodeID, peerN
 		// The peer counts active from the session's creation: matter.js
 		// NodeSession.ts:120 ("We always set the active timestamp for Secure
 		// sessions"), chip SecureSession.h:349 (mLastPeerActivityTime = now).
-		lastPeerActivity: m.clk().Now(),
-		clock:            m.clk(),
+		lastPeerActivity:     m.clk().Now(),
+		lastPeerActivityMono: clock.MonotonicOf(m.clk()),
+		createdAtMono:        clock.MonotonicOf(m.clk()),
+		clock:                m.clk(),
 	}
 	m.mu.Lock()
 	// The pre-allocated id is in m.sessions as a placeholder Entry
@@ -792,8 +819,10 @@ func (m *Manager) OpenFromPase(localNodeID, peerNodeID uint64, peerSessionID uin
 		// The peer counts active from the session's creation: matter.js
 		// NodeSession.ts:120 ("We always set the active timestamp for Secure
 		// sessions"), chip SecureSession.h:349 (mLastPeerActivityTime = now).
-		lastPeerActivity: m.clk().Now(),
-		clock:            m.clk(),
+		lastPeerActivity:     m.clk().Now(),
+		lastPeerActivityMono: clock.MonotonicOf(m.clk()),
+		createdAtMono:        clock.MonotonicOf(m.clk()),
+		clock:                m.clk(),
 	}
 	m.sessions[id] = entry
 	m.mu.Unlock()
@@ -840,8 +869,10 @@ func (m *Manager) OpenFromPaseWithID(id uint16, localNodeID, peerNodeID uint64, 
 		// The peer counts active from the session's creation: matter.js
 		// NodeSession.ts:120 ("We always set the active timestamp for Secure
 		// sessions"), chip SecureSession.h:349 (mLastPeerActivityTime = now).
-		lastPeerActivity: m.clk().Now(),
-		clock:            m.clk(),
+		lastPeerActivity:     m.clk().Now(),
+		lastPeerActivityMono: clock.MonotonicOf(m.clk()),
+		createdAtMono:        clock.MonotonicOf(m.clk()),
+		clock:                m.clk(),
 	}
 	m.mu.Lock()
 	displaced := m.installEntryLocked(id, entry)
@@ -1187,15 +1218,21 @@ func (m *Manager) evictExcessPeerSessionsLocked(added *Entry) []*Entry {
 	if excess <= 0 {
 		return nil
 	}
-	// Least recently active first; the lower session id breaks a tie
-	// (two sessions that never carried traffic both report the zero
-	// time) so the eviction order is deterministic.
+	// Least recently active first on the monotonic reading, so a
+	// wall-clock step between two sessions' traffic does not reorder
+	// them; a session that never carried traffic sorts before every one
+	// that did; the lower session id breaks a tie so the eviction order
+	// is deterministic.
 	sort.Slice(claimants, func(i, j int) bool {
-		ti, tj := claimants[i].LastActivity(), claimants[j].LastActivity()
-		if ti.Equal(tj) {
-			return claimants[i].SessionID < claimants[j].SessionID
+		ti, oki := claimants[i].lastActivityMonotonic()
+		tj, okj := claimants[j].lastActivityMonotonic()
+		switch {
+		case oki != okj:
+			return !oki
+		case ti != tj:
+			return ti < tj
 		}
-		return ti.Before(tj)
+		return claimants[i].SessionID < claimants[j].SessionID
 	})
 	evicted := claimants[:excess]
 	for _, entry := range evicted {
@@ -1526,8 +1563,8 @@ func (m *Manager) Sessions() []SessionInfo {
 			PeerNodeID:       e.Session.PeerNodeID(),
 			LocalNodeID:      e.Session.LocalNodeID(),
 			IsPASE:           e.isPase,
-			LastActivity:     e.lastActivity,
-			LastPeerActivity: e.lastPeerActivity,
+			LastActivity:     wallAsNow(e.clock, e.lastActivity, e.lastActivityMono),
+			LastPeerActivity: wallAsNow(e.clock, e.lastPeerActivity, e.lastPeerActivityMono),
 
 			PeerIdleIntervalMs:    e.peerIdleIntervalMs,
 			PeerActiveIntervalMs:  e.peerActiveIntervalMs,
@@ -1539,4 +1576,16 @@ func (m *Manager) Sessions() []SessionInfo {
 	m.mu.RUnlock()
 	sort.Slice(out, func(i, j int) bool { return out[i].SessionID < out[j].SessionID })
 	return out
+}
+
+// wallAsNow is stamp as the wall clock reads it now: the monotonic
+// reading mono carried over the clock's current wall-clock offset, so a
+// step since the stamp moves the exposed time with the clock — matter.js
+// Session.ts:154-162 wallClockActivity. A zero stamp (no traffic yet)
+// stays zero.
+func wallAsNow(clk clock.Clock, stamp time.Time, mono time.Duration) time.Time {
+	if stamp.IsZero() {
+		return time.Time{}
+	}
+	return clock.WallOf(clk, mono)
 }

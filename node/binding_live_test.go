@@ -402,7 +402,7 @@ func TestLiveBinding(t *testing.T) {
 		cn, err := reg.ForDevice(ctx, discovery.Device{
 			InstanceID: map[uint64]string{bindDUT: "dut", bindTH2: "th2", bindTH3: "th3"}[id],
 			Addresses:  []discovery.Address{{IP: netip.MustParseAddr("127.0.0.1"), Port: ports[id]}},
-		})
+		}, "")
 		if err != nil {
 			t.Fatal(err)
 		}

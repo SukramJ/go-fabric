@@ -31,14 +31,24 @@ type Fake struct {
 	// moving one clock would interleave their firing order.
 	advancing sync.Mutex
 
-	// mu guards entries, now and seq.
-	mu      sync.Mutex
+	// mu guards entries, now, wall and seq.
+	mu sync.Mutex
+	// now is the advanced reading — what timers run on and what
+	// [Fake.Monotonic] measures from start; wall is the wall-clock
+	// offset [Fake.StepWall] accumulates, which [Fake.Now] adds and
+	// nothing else sees (MockTime's monotonicMs and wallClockOffsetMs,
+	// packages/testing/src/mocks/time.ts:455-478 at 862ad75f).
 	now     time.Time
+	start   time.Time
+	wall    time.Duration
 	seq     uint64
 	entries map[*entry]struct{}
 }
 
-var _ clock.Clock = (*Fake)(nil)
+var (
+	_ clock.Clock     = (*Fake)(nil)
+	_ clock.Monotonic = (*Fake)(nil)
+)
 
 // entry is one armed timer or ticker.
 type entry struct {
@@ -53,23 +63,43 @@ type entry struct {
 
 // New returns a Fake reading start. It arms nothing.
 func New(start time.Time) *Fake {
-	return &Fake{now: start, entries: make(map[*entry]struct{})}
+	return &Fake{now: start, start: start, entries: make(map[*entry]struct{})}
 }
 
-// Now is the fake's current time.
+// Now is the fake's current wall-clock time: the advanced reading plus
+// the offset of every [Fake.StepWall].
 func (f *Fake) Now() time.Time {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	return f.now
+	return f.now.Add(f.wall)
+}
+
+// Monotonic is the time the fake has advanced since [New] — the reading
+// [Fake.StepWall] does not move (MockTime.nowUs).
+func (f *Fake) Monotonic() time.Duration {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.now.Sub(f.start)
 }
 
 // Set moves the reading to t, forwards or backwards, without firing
-// anything — a wall-clock step. Armed timers keep their deadlines; one
-// that is overdue after the step fires on the next [Fake.Advance], which
-// may be Advance(0).
+// anything — a jump of the whole clock, the monotonic reading included.
+// Armed timers keep their deadlines; one that is overdue after the step
+// fires on the next [Fake.Advance], which may be Advance(0). For a step
+// of the wall clock alone, see [Fake.StepWall].
 func (f *Fake) Set(t time.Time) {
 	f.mu.Lock()
 	f.now = t
+	f.mu.Unlock()
+}
+
+// StepWall moves the wall clock by d, forwards or backwards, as an NTP
+// step or a manual clock set does: [Fake.Now] changes, [Fake.Monotonic]
+// and the armed timers do not — MockTime.stepWallClock
+// (packages/testing/src/mocks/time.ts:472-478 at 862ad75f).
+func (f *Fake) StepWall(d time.Duration) {
+	f.mu.Lock()
+	f.wall += d
 	f.mu.Unlock()
 }
 

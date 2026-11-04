@@ -69,8 +69,17 @@ type SubscribeRequest struct {
 	// [SubscriptionMaxIntervalPublisherLimit] (CI:1012).
 	MaxIntervalCeiling *time.Duration
 	// Updated receives each report with data, its chunks merged — the
-	// priming report too.
-	Updated func(r *Report)
+	// priming report too. An error is a failure of the caller's own
+	// processing: the priming report is answered INVALID_SUBSCRIPTION and
+	// Subscribe returns the error (the subscription is abandoned, as a
+	// cancelled establishment is); a later report is left unanswered and
+	// the error logged; a sustained subscription logs it, warning once,
+	// and keeps running. Mirrors matter.js's subscribe, whose updated
+	// rejection fails the establishment (ClientSubscribeTest.ts:1275-1331
+	// at 862ad75f), and
+	// SustainedSubscription.#deliver
+	// (packages/protocol/src/action/client/subscription/SustainedSubscription.ts:339-352).
+	Updated func(r *Report) error
 	// KeepaliveReceived is called for an empty report (Subscribe.ts:33-37).
 	KeepaliveReceived func()
 	// Closed is called when the subscription closed (Subscribe.ts:28-31).
@@ -244,7 +253,7 @@ func (c *Interaction) subscribeOnce(ctx context.Context, peer exchange.PeerAddre
 	if err := readDataReports(ctx, c.log, m, nil, func(rd *im.ReportData) error {
 		a.add(rd)
 		if !rd.MoreChunkedMessages && req.Updated != nil {
-			req.Updated(a.report)
+			return req.Updated(a.report)
 		}
 		return nil
 	}); err != nil {

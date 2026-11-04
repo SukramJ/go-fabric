@@ -2936,6 +2936,31 @@ cases of ClientNodeTest.ts:1137-2853 (at `862ad75f`, about 60) are
 By design (brief AK, D6). The compensation machinery is the price of
 optimistic local state; the port takes the pessimistic one.
 
+### BD-Matter-ControllerNodeIDRandom — the controller draws a peer's node id at random, never sequentially
+
+matter.js's controller hands out node ids from a stored counter by default
+— `ControllerBehavior.allocatePeerAddress` with `nodeIdAssignment:
+"sequential"`, `nextNodeId` from 1, skipping an id in use and never
+handing one out twice
+(`packages/node/src/behavior/system/controller/ControllerBehavior.ts:139-181`,
+`:285-290` at `862ad75f`) — and draws a random operational id only with
+`nodeIdAssignment: "random"` or in `ControllerCommissioner.#determineAddress`
+(`packages/protocol/src/peer/ControllerCommissioner.ts:569-582`).
+`controller/commissioner.Commissioner.determineAddress` always draws a
+random operational node id no peer of the fabric holds; a caller's id
+(`commissioner.Options.NodeID`) is taken as given and refused when in
+use. ClientNodeTest's four allocator cases ("assigns an unused node ID
+when commissioning after a restart with existing peers", "refuses to
+allocate a peer address whose NodeId is already in use", "skips the
+controller's own node ID", "skips a previously allocated node ID",
+`packages/node/test/node/ClientNodeTest.ts:537-567`, `:3024-3033`,
+`:4147-4192`) are `left` under this entry. Owner decision 2026-11-03
+(phase 32).
+
+By design: several administrators on one fabric collide when each counts
+from 1, while a random 64-bit draw does not, and a host's records keyed by
+node id stay stable across a controller that loses its counter.
+
 ### BD-Matter-ClientNode-EndpointInstalledOnce — an installed endpoint's clusters are not emitted again
 
 matter.js emits an installed endpoint through `emitEndpoint`, which emits
@@ -3405,12 +3430,11 @@ through the RemoveFabric fan-out, stops the node and erases its credential
 store (`store.Eraser`) and endpoint records, and `Controller.Erase` closes
 the controller and erases its database; the host builds the node or
 controller that comes back on the same store (fabrictest's
-`Device.FactoryReset` restarts a device that ran). Two consequences: the
+`Device.FactoryReset` restarts a device that ran). One consequence: the
 endpoint allocation counter of `endpoint.Store` is not rewound (the
-interface has no reset; a freed number is reissued only after the wrap),
-and the re-pinned UniqueID is derived again (`DeriveUniqueID`), equal to the
-old one for the same vendor, product, label and serial, where matter.js
-draws a fresh one. Phase 31.
+interface has no reset; a freed number is reissued only after the wrap).
+The erased store gets a fresh random UniqueID pin, as matter.js draws one
+(phase 32). Phase 31.
 
 By design. Rebuilding is how every in-memory state a reset erases — the
 root servers' values, Wi-Fi networks, scenes, the validator — goes for
@@ -3871,6 +3895,11 @@ DclOtaUpdateServiceTest are `missing` under this entry. Report BH (phase
 16, 2026-10-18).
 
 By design. One image store per host, not one per library.
+
+Superseded (brief CM §1, phase 32): `controller/softwareupdate.Images` is the
+module's image store after `DclOtaUpdateService`; its store cases are ported
+(`controller/softwareupdate:TestImages*`), and the version-keyed storage
+migration and `store()`'s boolean mode are left js-runtime-only.
 
 ### BD-Matter-DCL-ProductionSeed — the certificate snapshot seeds production entries only
 
@@ -5123,7 +5152,21 @@ digest is checked later, at extraction (`:262-278`,
 not when it is first served over BDX (review 2026-11 W4-ctlint-03; owner
 decision 2026-11-02). Reasoning: the store is the one place that reads the
 whole file once; a digest failure at serve time would surface as a device's
-failed download. Pinned by `TestImagesStoreValidatesFileParity`.
+failed download. Pinned by `TestImagesStoreValidatesFileParity`. The reuse
+check of `Images.DownloadUpdate` validates a stored image the same way, as
+matter.js's `#checkStoredImage` runs `#verifyUpdate` on it (`:433-451`).
+
+### BD-Matter-OtaImages-DeleteProductWithoutMode — `Images.Delete` narrows by product without a mode too
+
+matter.js's `DclOtaUpdateService.delete` documents `productId` as a filter
+of the files to delete, but reads it only together with a mode: a call with
+`vendorId` and `productId` and no `mode` (nor `isProduction`) falls through
+to the vendor branch and deletes every file of the vendor
+(`packages/protocol/src/dcl/DclOtaUpdateService.ts:1226-1243`, `:1245-1274`
+at `862ad75f`). `controller/softwareupdate.Images.Delete` applies
+`DeleteOptions.ProductID` with or without a mode, so that call deletes the
+product's images only (pinned by `TestImagesDeleteParity`). Reasoning: the
+documented contract, not a fall-through that deletes other products' images.
 
 ### BD-Thread-TBRM-ChipLogic — ThreadBorderRouterManagement follows connectedhomeip behind the `BorderRouter` port
 

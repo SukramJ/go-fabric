@@ -360,3 +360,75 @@ var certificatesSets = []certificatesSet{
 }
 
 const certificatesNOCCATASN1 = "308201cea003020102020101300a06082a8648ce3d04030230223120301e060a2b0601040182a27c01040c1030303030303030303030303030303030301e170d3231303631303030303030305a170d3331303630383030303030305a3081923120301e060a2b0601040182a27c01050c10303030303030303030303030303030313120301e060a2b0601040182a27c01010c103030303030303030303030303030444131183016060a2b0601040182a27c01060c08313233343536373831183016060a2b0601040182a27c01060c08353637383930313231183016060a2b0601040182a27c01060c0839303132333435363059301306072a8648ce3d020106082a8648ce3d03010703420004e0bf14a052dd7ab08d485e20570c6e6ac6fbb99513d3aacd66808c722941ae0538e9323ec89f39228bd228270f1716539cecc64e62b26c58c3355d68935d87b2a38183308180300c0603551d130101ff04023000300e0603551d0f0101ff04040302078030200603551d250101ff0416301406082b0601050507030206082b06010505070301301d0603551d0e04160414c524e05cad04a826ecda84501766732b5f181354301f0603551d23041830168014e766069362d7e35b79687161644d222bdde93a68"
+
+// TestCertificatesRecodeParityMatterJS ports "recode root certificate",
+// "recode intermediate certificate" and "recode operational certificate"
+// (CertificatesTest.ts:57-72 at 862ad75f): Rcac/Icac/Noc.fromTlv(…).asSignedTlv()
+// reproduces the fixture TLV of every certificate set — here Decode then
+// [Encode], the DN attributes and the extensions in their arrival order.
+func TestCertificatesRecodeParityMatterJS(t *testing.T) {
+	t.Parallel()
+	for _, set := range certificatesSets {
+		t.Run(set.name, func(t *testing.T) {
+			t.Parallel()
+			for name, tlvHex := range map[string]string{"root": set.rootTLV, "intermediate": set.icacTLV, "operational": set.nocTLV} {
+				if tlvHex == "" {
+					continue
+				}
+				raw := certificatesHex(t, tlvHex)
+				got, err := Encode(certificatesDecode(t, tlvHex))
+				if err != nil {
+					t.Fatalf("recode %s certificate: %v", name, err)
+				}
+				if !bytes.Equal(got, raw) {
+					t.Errorf("recode %s certificate: got %x\nwant %x", name, got, raw)
+				}
+			}
+		})
+	}
+}
+
+// TestCertificatesRootFabricIDParityMatterJS ports the three "verify
+// operational certificate via ICAC and ROOT with fabricId in root
+// matching / in all matching / in root not matching" cases
+// (CertificatesTest.ts:412-419, :430-449 at 862ad75f; matter.js Noc.ts:116-125):
+// a root that carries a matter-fabric-id binds the NOC to it, and a root
+// whose fabric id differs refuses the chain with "FabricId in NoC
+// certificate does not match the fabricId in the parent certificate".
+// matter.js edits the decoded root's and ICAC's subject in place; the Go
+// verifier takes the root as a decoded certificate
+// ([NewVerifierFromCertificate]) and still verifies the ICAC's signature,
+// so only the root's subject is edited here — the ICAC's own fabric id,
+// where a set's ICAC carries one, already equals the NOC's ("in all
+// matching") and the "in ica matching" case is checkICACShape's
+// (TestVerifier_MatterJSCommissionerChains).
+func TestCertificatesRootFabricIDParityMatterJS(t *testing.T) {
+	t.Parallel()
+	for _, set := range certificatesSets {
+		if set.icacTLV == "" {
+			continue
+		}
+		t.Run(set.name, func(t *testing.T) {
+			t.Parallel()
+			noc := certificatesDecode(t, set.nocTLV)
+			icac, nocRaw := certificatesHex(t, set.icacTLV), certificatesHex(t, set.nocTLV)
+			verifyWithRoot := func(fabricID uint64) error {
+				root := certificatesDecode(t, set.rootTLV)
+				root.Subject.MatterFabricID, root.Subject.HasFabricID = fabricID, true
+				v, err := NewVerifierFromCertificate(root, certificatesNow)
+				if err != nil {
+					t.Fatalf("NewVerifierFromCertificate: %v", err)
+				}
+				_, err = v.VerifyAndExtractPubKey(nocRaw, icac)
+				return err
+			}
+			if err := verifyWithRoot(noc.Subject.MatterFabricID); err != nil {
+				t.Errorf("fabricId in root matching: %v", err)
+			}
+			err := verifyWithRoot(noc.Subject.MatterFabricID + 1)
+			if !errors.Is(err, ErrChainBroken) || !strings.Contains(err.Error(), "FabricId in NoC certificate does not match the fabricId in the parent certificate") {
+				t.Errorf("fabricId in root not matching: err = %v, want the parent fabric id refusal", err)
+			}
+		})
+	}
+}

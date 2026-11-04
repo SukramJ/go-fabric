@@ -24,6 +24,12 @@ const (
 	settingAutoSubscribe       uint32 = 1
 	settingMaxEventNumber      uint32 = 2
 	settingDefaultSubscription uint32 = 3
+	// settingCacheFabricFiltered is the cache's recorded fabric filter —
+	// ClientNodeStore's "fabricFiltered" key of its cache context
+	// (packages/node/src/storage/client/ClientNodeStore.ts:17, :88-97 at
+	// 862ad75f). It is written on its own ([Node.adoptFabricFilter]),
+	// never with the other settings.
+	settingCacheFabricFiltered uint32 = 4
 )
 
 // settings are a node's persisted settings.
@@ -32,6 +38,9 @@ type settings struct {
 	autoSubscribe       bool
 	maxEventNumber      uint64
 	defaultSubscription *SubscribeOptions
+	// cacheFabricFiltered is the recorded fabric filter of the cache, nil
+	// when none is recorded; encode leaves it out.
+	cacheFabricFiltered *bool
 }
 
 // encode is the settings' stored form.
@@ -77,6 +86,11 @@ func decodeSettings(values map[uint32][]byte) (settings, error) {
 			s.maxEventNumber, err = spec.DecodeUint[uint64](64)(n)
 		case settingDefaultSubscription:
 			s.defaultSubscription, err = decodeSubscribeOptions(n)
+		case settingCacheFabricFiltered:
+			var f bool
+			if f, err = spec.DecodeBool(n); err == nil {
+				s.cacheFabricFiltered = &f
+			}
 		}
 		if err != nil {
 			return s, fmt.Errorf("setting %d: %w", id, err)

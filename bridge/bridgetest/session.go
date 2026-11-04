@@ -135,7 +135,7 @@ func (s *Session) Subscribe(ctx context.Context, minInterval, maxInterval uint16
 		ReplaceSubscriptions: true,
 		MinIntervalFloor:     interaction.Interval(time.Duration(minInterval) * time.Second),
 		MaxIntervalCeiling:   interaction.Interval(time.Duration(maxInterval) * time.Second),
-		Updated: func(r *interaction.Report) {
+		Updated: func(r *interaction.Report) error {
 			report := fromReport(r)
 			mu.Lock()
 			if !primed {
@@ -143,10 +143,11 @@ func (s *Session) Subscribe(ctx context.Context, minInterval, maxInterval uint16
 				// returns.
 				primed, priming = true, report
 				mu.Unlock()
-				return
+				return nil
 			}
 			mu.Unlock()
 			s.c.route(r.Session, report)
+			return nil
 		},
 	})
 	if err != nil {

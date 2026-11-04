@@ -39,7 +39,13 @@ type Verifier struct {
 	// It is an array, not a slice, so the Verifier stays comparable.
 	rootSKID    [20]byte
 	hasRootSKID bool
-	now         TimeSource
+	// rootFabricID is the root certificate's matter-fabric-id when the
+	// certificate is known and carries one (optional on a root, §6.5.6.1):
+	// a NOC's fabric id must then equal it, as it must equal the ICAC's
+	// (matter.js Noc.ts:116-132 at 862ad75f).
+	rootFabricID    uint64
+	hasRootFabricID bool
+	now             TimeSource
 }
 
 // TimeSource returns the current time for NotBefore/NotAfter checks: the
@@ -204,6 +210,20 @@ func NewVerifierFromRCAC(rcac []byte, ts TimeSource) (*Verifier, error) {
 	if err != nil {
 		return nil, fmt.Errorf("rcac: %w", err)
 	}
+	return NewVerifierFromCertificate(root, ts)
+}
+
+// NewVerifierFromCertificate is [NewVerifierFromRCAC] on a decoded root
+// certificate: its public key, its subject key identifier, and its
+// matter-fabric-id when it carries one, which every NOC the verifier
+// accepts must then match (matter.js Noc.ts:116-125 at 862ad75f,
+// rootFabricId: "When any matter-fabric-id attributes are present in
+// either the Matter Root CA Certificate or the Matter ICA Certificate,
+// the value SHALL match the one present in the NOC").
+func NewVerifierFromCertificate(root *Certificate, ts TimeSource) (*Verifier, error) {
+	if root == nil {
+		return nil, fmt.Errorf("%w: nil root certificate", ErrMalformed)
+	}
 	if !root.IsRoot() {
 		return nil, fmt.Errorf("%w: cert is not a root CA", ErrMalformed)
 	}
@@ -215,6 +235,7 @@ func NewVerifierFromRCAC(rcac []byte, ts TimeSource) (*Verifier, error) {
 		return nil, err
 	}
 	v.rootSKID, v.hasRootSKID = [20]byte(root.Extensions.SubjectKeyID), true
+	v.rootFabricID, v.hasRootFabricID = root.Subject.MatterFabricID, root.Subject.HasFabricID
 	return v, nil
 }
 
@@ -312,6 +333,13 @@ func (v *Verifier) VerifyAndExtractPubKey(noc, icac []byte) (*ecdsa.PublicKey, e
 	}
 	if err := checkNOCShape(nocCert); err != nil {
 		return nil, fmt.Errorf("noc: %w", err)
+	}
+	// A root that names a fabric binds the NOC to it, with or without an
+	// ICAC in between — matter.js Noc.ts:116-125 at 862ad75f (the ICAC's
+	// fabric id is compared in checkICACShape).
+	if v.hasRootFabricID && v.rootFabricID != nocCert.Subject.MatterFabricID {
+		return nil, fmt.Errorf("%w: FabricId in NoC certificate does not match the fabricId in the parent certificate: root 0x%016X != NOC 0x%016X",
+			ErrChainBroken, v.rootFabricID, nocCert.Subject.MatterFabricID)
 	}
 
 	var issuerKey *ecdsa.PublicKey
