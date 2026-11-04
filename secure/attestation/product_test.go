@@ -30,9 +30,10 @@ func TestValidateProductRefusesWhatItCannotRead(t *testing.T) {
 	}
 }
 
-// productIDsOf reads the Matter OIDs first; the `Mvid:`/`Mpid:` fallback
-// of the commonName applies only when the DN carries neither
-// (Certificate.ts:346-347, :380-385 at 862ad75f).
+// productIDsOf reads the Matter OIDs first (Certificate.ts:346-347
+// vendorId/productId at 862ad75f); the `Mvid:`/`Mpid:` fallback of the
+// common name applies only when the DN carries neither
+// (Certificate.ts:380-385, parseMatterFallbackVidPid).
 func TestProductIDsOfReadsTheOIDsElseTheCommonName(t *testing.T) {
 	t.Parallel()
 	attr := func(oid asn1.ObjectIdentifier, v any) pkix.AttributeTypeAndValue {

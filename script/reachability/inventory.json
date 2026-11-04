@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 7313,
+  "entry_points": 7330,
   "entry_packages": [
     ".",
     "bdx",
@@ -277,9 +277,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 17223,
+    "total_exported": 17235,
     "reachable": 12107,
-    "whitelisted": 5116,
+    "whitelisted": 5128,
     "unreachable": 0
   },
   "by_package": [],
@@ -31409,6 +31409,13 @@
     },
     {
       "package": "secure/attestation",
+      "identifier": "TestProductIDsOfReadsTheOIDsElseTheCommonName",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/attestation/product_test.go",
+      "line": 37
+    },
+    {
+      "package": "secure/attestation",
       "identifier": "TestTestCMSSigner_LooksLikeAppendixF",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/attestation/testpaa_test.go",
@@ -31441,6 +31448,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/attestation/testpaa_test.go",
       "line": 75
+    },
+    {
+      "package": "secure/attestation",
+      "identifier": "TestValidateProductRefusesWhatItCannotRead",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/attestation/product_test.go",
+      "line": 13
     },
     {
       "package": "secure/channel",
@@ -31766,6 +31780,41 @@
     },
     {
       "package": "secure/mattercert",
+      "identifier": "TestCreateCSRRefusesANilKey",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/mattercert/der_edges_test.go",
+      "line": 487
+    },
+    {
+      "package": "secure/mattercert",
+      "identifier": "TestDERDistinguishedNameEdges",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/mattercert/der_edges_test.go",
+      "line": 254
+    },
+    {
+      "package": "secure/mattercert",
+      "identifier": "TestDecodeDERRefusesEachMalformedPart",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/mattercert/der_edges_test.go",
+      "line": 140
+    },
+    {
+      "package": "secure/mattercert",
+      "identifier": "TestDecodeDERRefusesEveryTruncation",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/mattercert/der_edges_test.go",
+      "line": 206
+    },
+    {
+      "package": "secure/mattercert",
+      "identifier": "TestDecodeDERSkipsForeignExtensionsAndReadsEveryKeyPurpose",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/mattercert/der_edges_test.go",
+      "line": 222
+    },
+    {
+      "package": "secure/mattercert",
       "identifier": "TestDecode_IsICA",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/mattercert/decode_test.go",
@@ -31878,6 +31927,27 @@
     },
     {
       "package": "secure/mattercert",
+      "identifier": "TestEncodeCanonicalOrderWithoutAnOrder",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/mattercert/der_edges_test.go",
+      "line": 353
+    },
+    {
+      "package": "secure/mattercert",
+      "identifier": "TestEncodeDERRefusals",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/mattercert/der_edges_test.go",
+      "line": 294
+    },
+    {
+      "package": "secure/mattercert",
+      "identifier": "TestEncodeRefusesOrdersWithoutValues",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/mattercert/der_edges_test.go",
+      "line": 321
+    },
+    {
+      "package": "secure/mattercert",
       "identifier": "TestStripSignature_ErrorWhenSignatureAbsent",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/mattercert/strip_test.go",
@@ -31920,10 +31990,24 @@
     },
     {
       "package": "secure/mattercert",
+      "identifier": "TestValidateRCACRefusals",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/mattercert/der_edges_test.go",
+      "line": 455
+    },
+    {
+      "package": "secure/mattercert",
       "identifier": "TestValidateRCAC_MatterJSCommissionerRoots",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/mattercert/tbs_der_parity_matterjs_test.go",
       "line": 113
+    },
+    {
+      "package": "secure/mattercert",
+      "identifier": "TestVerifierConstructionAndExtractionRefusals",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/mattercert/der_edges_test.go",
+      "line": 390
     },
     {
       "package": "secure/mattercert",
