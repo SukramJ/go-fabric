@@ -68,12 +68,13 @@ const testparityPlannedRatchet = 2
 // five Presets observer cases (left, owner verdict), DiscoveryCancelTest.ts
 // (three ported on a held PASE, one left), ClientInvokeTest.ts (one ported
 // on a held connect, ten left), DecommissionTest.ts (five ported on a
-// patched RemoveFabric, nine left) and FailsafeCommissioningTest.ts's ACL
-// failure (ported on a failing credential store) complete five files: 130
-// ported, 516 missing.
+// patched RemoveFabric, nine left), FailsafeCommissioningTest.ts's ACL
+// failure (ported on a failing credential store) and IcdClientTest.ts (ten
+// ported on the device's registration hook, restarts and a sleeping peer,
+// five left, six stay missing) complete five files: 130 ported, 501 missing.
 const (
 	testparityPortedRatchet  = 130
-	testparityMissingRatchet = 516
+	testparityMissingRatchet = 501
 )
 
 // testparityLeftRatchet is the number of left it cases summed over the
@@ -91,9 +92,10 @@ const (
 // The seam wave (issue #396) adds the five Presets observer rows
 // (js-runtime-only, owner verdict), the discovery node's start, ten
 // ClientInvokeTest.ts rows (five of them a feature gap of InvokeOptions,
-// named for the findings register) and nine DecommissionTest.ts
-// construction-lifecycle rows: 295.
-const testparityLeftRatchet = 295
+// named for the findings register), nine DecommissionTest.ts
+// construction-lifecycle rows and five IcdClientTest.ts transaction-model
+// rows: 300.
+const testparityLeftRatchet = 300
 
 // moduleRoot is where the committed artefacts live, seen from this package.
 const moduleRoot = "../.."

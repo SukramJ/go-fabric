@@ -605,35 +605,21 @@
       "path": "packages/node/test/behavior/system/icd/IcdClientTest.ts",
       "status": "partial",
       "go": [
-        "controller/client:TestIcdClientParity",
         "client/peer:TestIcdClientPeerParity",
         "controller/client:TestIcdClientKeyStoreParity",
-        "controller/client:TestIcdClientOperationsParity"
+        "controller/client:TestIcdClientOperationsParity",
+        "controller/client:TestIcdClientParity",
+        "controller/client:TestIcdClientSeamParity"
       ],
       "missing": [
-        "refreshes the key while the Check-In that requested it still commits",
-        "keeps the pending key when the device refuses the refresh, and offers it again",
-        "decrypts Check-Ins under the pending key after a controller restart",
         "rejects a replay after a restart between a Check-In that confirmed the key and the lost response",
         "refuses register() and does not auto-register while unregister() waits for a sleeping peer",
-        "keeps the registration when unregister() gives up on a peer that does not wake",
-        "keeps the stored registration when closing abandons an unregister() parked on a sleeping peer",
-        "logs an error when the stored registration cannot be refreshed",
-        "forget() ends an unregister() parked on a sleeping peer",
-        "clears the registration when closing abandons an unregister() whose request went out",
-        "ends with no registration when a decommission lands while the registration commits",
-        "announces the clear once when a decommission waits behind an unregister() commit",
-        "announces registered, then unregistered, when a decommission waits behind the register commit",
-        "forget() after unregister() cleared locally leaves its UnregisterClient running",
-        "joins a second unregister() of a sleeping peer and sends one UnregisterClient",
-        "stores the offset of an old-key Check-In that arrives while a refresh waits",
         "starts no second refresh for an old-key Check-In while the refresh waits for its response",
-        "recreates the running subscription on the first registration-induced SIT→LIT flip",
         "resubscribes when a LIT peer reports on a subscription the controller already timed out",
         "does not auto-register when the fresh operating mode is Sit despite a persisted Lit",
         "exposes nextExpectedCheckin on the wall clock once no subscription is held"
       ],
-      "reason": "Registration, unregistration, forget, StayActive, LIT auto-registration, Check-In receipt with the replay drop and the key refresh, persistence across a restart, the decommission hooks, the LIT idle-interval floor and the address monitor's ICD branch (controller/client/icd_client_parity_matterjs_test.go, client/peer/icd_parity_matterjs_test.go). Phase 32: a refused store write of the offered key offers none (IcdClient.#offerKey, IcdClient.ts:860-901 at 862ad75f; controller/client:TestIcdClientKeyStoreParity), the operations a Go test observes without the transaction model — a forget begun by a Check-In listener, unregister() over a refresh, the registration joined, refused and abandoned, the Check-In time cleared, a registration after a forget ended a refresh (TestIcdClientOperationsParity) — and a peer reporting 1.3.0 (internal/nodeseam.UseSpecificationVersion). Left: the transaction model (holdIcdState, gated commit phases), throwing listeners and the JS SustainedSubscription routing. Missing: gated store commits, a device refusing RegisterClient, device-side Register/UnregisterClient counters, restarts across a pending key, a sleeping peer under a closing controller, a stale LIT seeded into the cache and the wall-clock nextExpectedCheckin.",
+      "reason": "Registration, unregistration, forget, StayActive, LIT auto-registration, Check-In receipt with the replay drop and the key refresh, persistence across a restart, the decommission hooks, the LIT idle-interval floor and the address monitor's ICD branch (controller/client/icd_client_parity_matterjs_test.go, client/peer/icd_parity_matterjs_test.go). Phase 32: a refused store write of the offered key offers none (IcdClient.#offerKey, IcdClient.ts:860-901 at 862ad75f; controller/client:TestIcdClientKeyStoreParity), the operations a Go test observes without the transaction model (TestIcdClientOperationsParity) and a peer reporting 1.3.0 (internal/nodeseam.UseSpecificationVersion). Seam wave (issue #396, TestIcdClientSeamParity): a device refusing or counting RegisterClient and UnregisterClient (internal/coreseam.ObserveICDRegistrations), a controller restarted across a pending key or an abandoned unregister (fabrictest.Controller.Restart), a sleeping peer (fabrictest.Network.Filter) and the SIT→LIT recreate. Left: the transaction model (holdIcdState, gated commit phases), throwing listeners, an undefined clientType and the JS SustainedSubscription routing. Missing: a crash-consistent store snapshot with a crafted replay fed into the fabric's Check-In path (:1172-1244), the hand-emitted subscriptionStatusChanged while unregister() waits (:1504-1527), a crafted old-key Check-In fed while the refresh waits (:1952-1980), a controller-side subscription timeout (:2598-2630), a stale LIT seeded into the cache (no Go seam plants an unreported value: :595-621), and the wall-clock nextExpectedCheckin — a behaviour gap, measured: after Fake.StepWall(1h) NextExpectedCheckIn reads now+15s where matter.js reads at least now+idleModeDuration (:2281-2293), a findings-register candidate.",
       "snapshotSha": "621b035602c12be5c0ea3d8cfc6bd10ccdf7003f",
       "left": [
         {
@@ -745,6 +731,31 @@
           "it": "routes a non-ICD peer to a plain (non-parking) SustainedSubscription",
           "class": "js-runtime-only",
           "reason": "the JS SustainedSubscription class routing; the parking is held by the SustainedSubscriptionTest port (client/interaction sustained_icd_parity_matterjs_test.go)"
+        },
+        {
+          "it": "refreshes the key while the Check-In that requested it still commits",
+          "class": "js-runtime-only",
+          "reason": "matter.js's transaction model: IcdClientTest.ts:861-888 at 862ad75f holds the Check-In reaction's commit (GatedIcdStorage) and asserts the refresh waits for that commit before it offers a key; the Go client has no commit phase for a refresh to wait on"
+        },
+        {
+          "it": "ends with no registration when a decommission lands while the registration commits",
+          "class": "js-runtime-only",
+          "reason": "matter.js's transaction model: :1713-1735 holds register()'s commit at the storage gate while the decommission runs; the Go registration writes no gated commit"
+        },
+        {
+          "it": "announces the clear once when a decommission waits behind an unregister() commit",
+          "class": "js-runtime-only",
+          "reason": "matter.js's transaction model: :1737-1769, the decommission's reaction waiting for the ICD state the unregister() commit holds"
+        },
+        {
+          "it": "announces registered, then unregistered, when a decommission waits behind the register commit",
+          "class": "js-runtime-only",
+          "reason": "matter.js's transaction model: :1771-1801, the decommission's reaction waiting for the ICD state the register commit holds"
+        },
+        {
+          "it": "logs an error when the stored registration cannot be refreshed",
+          "class": "js-runtime-only",
+          "reason": ":1601-1614 sets the behaviour state's clientType to undefined inside an act(); the Go ICDRegistration.ClientType is a value with no undefined, so no stored registration lacks it"
         }
       ]
     },
