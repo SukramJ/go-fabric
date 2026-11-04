@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	_ "modernc.org/sqlite"
@@ -40,60 +41,63 @@ func testStore(t *testing.T) *store.Store {
 // wiring.go:951-1036).
 func TestCountBootAndOperationalTime(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
-	st := testStore(t)
-	for want := range uint16(3) {
-		got, err := countBoot(ctx, st)
-		if err != nil || got != want {
-			t.Fatalf("boot %d: %d %v", want, got, err)
+	synctest.Test(t, func(t *testing.T) {
+		ctx := context.Background()
+		st := testStore(t)
+		for want := range uint16(3) {
+			got, err := countBoot(ctx, st)
+			if err != nil || got != want {
+				t.Fatalf("boot %d: %d %v", want, got, err)
+			}
 		}
-	}
-	if err := st.SetSetting(ctx, rebootCountSetting, "x"); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := countBoot(ctx, st); err == nil {
-		t.Error("a corrupt RebootCount was accepted")
-	}
+		if err := st.SetSetting(ctx, rebootCountSetting, "x"); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := countBoot(ctx, st); err == nil {
+			t.Error("a corrupt RebootCount was accepted")
+		}
 
-	if d, err := loadOperationalTime(ctx, st); err != nil || d != 0 {
-		t.Errorf("fresh store: %v %v", d, err)
-	}
-	if err := st.SetSetting(ctx, legacyOperationalHoursSetting, "3"); err != nil {
-		t.Fatal(err)
-	}
-	if d, err := loadOperationalTime(ctx, st); err != nil || d != 3*time.Hour {
-		t.Errorf("legacy hours: %v %v", d, err)
-	}
-	if err := st.SetSetting(ctx, legacyOperationalHoursSetting, "x"); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := loadOperationalTime(ctx, st); err == nil {
-		t.Error("a corrupt legacy count was accepted")
-	}
-	g := mattercore.NewGeneralDiagnostics(mattercore.BootReasonPowerOnReboot)
-	g.SetPersistedOperationalTime(90 * time.Second)
-	if err := storeOperationalTime(ctx, st, g); err != nil {
-		t.Fatal(err)
-	}
-	if d, err := loadOperationalTime(ctx, st); err != nil || d < 90*time.Second {
-		t.Errorf("stored time: %v %v", d, err)
-	}
-	if err := st.SetSetting(ctx, operationalTimeSetting, "-1"); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := loadOperationalTime(ctx, st); err == nil {
-		t.Error("a corrupt millisecond count was accepted")
-	}
+		if d, err := loadOperationalTime(ctx, st); err != nil || d != 0 {
+			t.Errorf("fresh store: %v %v", d, err)
+		}
+		if err := st.SetSetting(ctx, legacyOperationalHoursSetting, "3"); err != nil {
+			t.Fatal(err)
+		}
+		if d, err := loadOperationalTime(ctx, st); err != nil || d != 3*time.Hour {
+			t.Errorf("legacy hours: %v %v", d, err)
+		}
+		if err := st.SetSetting(ctx, legacyOperationalHoursSetting, "x"); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := loadOperationalTime(ctx, st); err == nil {
+			t.Error("a corrupt legacy count was accepted")
+		}
+		g := mattercore.NewGeneralDiagnostics(mattercore.BootReasonPowerOnReboot)
+		g.SetPersistedOperationalTime(90 * time.Second)
+		if err := storeOperationalTime(ctx, st, g); err != nil {
+			t.Fatal(err)
+		}
+		if d, err := loadOperationalTime(ctx, st); err != nil || d < 90*time.Second {
+			t.Errorf("stored time: %v %v", d, err)
+		}
+		if err := st.SetSetting(ctx, operationalTimeSetting, "-1"); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := loadOperationalTime(ctx, st); err == nil {
+			t.Error("a corrupt millisecond count was accepted")
+		}
 
-	kctx, cancel := context.WithCancel(ctx)
-	done := make(chan struct{})
-	go func() {
-		keepOperationalTime(kctx, nil, st, g, time.Millisecond, slog.New(slog.DiscardHandler))
-		close(done)
-	}()
-	time.Sleep(20 * time.Millisecond)
-	cancel()
-	<-done
+		kctx, cancel := context.WithCancel(ctx)
+		done := make(chan struct{})
+		go func() {
+			keepOperationalTime(kctx, nil, st, g, time.Millisecond, slog.New(slog.DiscardHandler))
+			close(done)
+		}()
+		time.Sleep(20 * time.Millisecond) // twenty ticks of the bubble's virtual clock
+		synctest.Wait()
+		cancel()
+		<-done
+	})
 }
 
 // TestPersistedKeys: labels, versions and scene tables live under the

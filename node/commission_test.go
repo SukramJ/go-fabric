@@ -351,15 +351,8 @@ func TestRemoveFabricClosesSessionsWithCloseSession(t *testing.T) {
 // Stop before that ends the subscription with the run.
 func waitPersisted(t *testing.T, n *node.Node) {
 	t.Helper()
-	deadline := time.Now().Add(5 * time.Second)
-	for {
+	waitLive(t, "the persisted subscription", func() bool {
 		rows, err := n.Store().LoadServerSubscriptions(context.Background())
-		if err == nil && len(rows) > 0 {
-			return
-		}
-		if time.Now().After(deadline) {
-			t.Fatalf("the subscription was not persisted: %d rows, %v", len(rows), err)
-		}
-		time.Sleep(10 * time.Millisecond)
-	}
+		return err == nil && len(rows) > 0
+	})
 }

@@ -167,11 +167,5 @@ func TestSolicitor_ClosedSolicitorSendsNothing(t *testing.T) {
 
 func waitFor(t *testing.T, cond func() bool) {
 	t.Helper()
-	deadline := time.Now().Add(3 * time.Second)
-	for !cond() {
-		if time.Now().After(deadline) {
-			t.Fatal("condition not reached")
-		}
-		time.Sleep(time.Millisecond)
-	}
+	eventually(t, "the condition", cond)
 }

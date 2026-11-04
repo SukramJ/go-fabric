@@ -20,6 +20,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/SukramJ/go-fabric/client/discovery"
@@ -187,190 +188,216 @@ func TestDiscoveryCancelParity(t *testing.T) {
 	reason := errors.New("caller gave up")
 	t.Run("refuses a PASE win after a cancel that came first, before the scan has ended", func(t *testing.T) {
 		t.Parallel()
-		clk := newClock()
-		tr := newFixed(deviceA)
-		tr.ignoresStop = true
-		l := newLateWinner()
-		r := race(context.Background(), clk, discovery.SessionOptions{Timeout: 30 * time.Second}, l.attempt, tr)
-		recv(t, l.started)
-		r.session.Cancel(reason)
-		close(l.pase)
-		if recv(t, l.won) {
-			t.Fatal("the late attempt won after the cancel")
-		}
-		tr.fail(errors.New("scan ends"))
-		if _, err := outcome(t, r.session, clk); !errors.Is(err, reason) {
-			t.Fatalf("err %v, want the cancel reason", err)
-		}
+		synctest.Test(t, func(t *testing.T) {
+			clk := newClock()
+			tr := newFixed(deviceA)
+			tr.ignoresStop = true
+			l := newLateWinner()
+			r := race(context.Background(), clk, discovery.SessionOptions{Timeout: 30 * time.Second}, l.attempt, tr)
+			recv(t, l.started)
+			r.session.Cancel(reason)
+			close(l.pase)
+			if recv(t, l.won) {
+				t.Fatal("the late attempt won after the cancel")
+			}
+			tr.fail(errors.New("scan ends"))
+			if _, err := outcome(t, r.session, clk); !errors.Is(err, reason) {
+				t.Fatalf("err %v, want the cancel reason", err)
+			}
+		})
 	})
 	t.Run("refuses a PASE win after the discovery timeout, before the scan has ended", func(t *testing.T) {
 		t.Parallel()
-		clk := newClock()
-		tr := newFixed(deviceA)
-		tr.ignoresStop = true
-		l := newLateWinner()
-		r := race(context.Background(), clk, discovery.SessionOptions{Timeout: time.Second}, l.attempt, tr)
-		recv(t, l.started)
-		clk.Advance(time.Second)
-		close(l.pase)
-		if recv(t, l.won) {
-			t.Fatal("the late attempt won after the timeout")
-		}
-		tr.fail(errors.New("scan ends"))
-		if _, err := outcome(t, r.session, clk); err == nil {
-			t.Fatal("no error")
-		}
+		synctest.Test(t, func(t *testing.T) {
+			clk := newClock()
+			tr := newFixed(deviceA)
+			tr.ignoresStop = true
+			l := newLateWinner()
+			r := race(context.Background(), clk, discovery.SessionOptions{Timeout: time.Second}, l.attempt, tr)
+			recv(t, l.started)
+			clk.Advance(time.Second)
+			close(l.pase)
+			if recv(t, l.won) {
+				t.Fatal("the late attempt won after the timeout")
+			}
+			tr.fail(errors.New("scan ends"))
+			if _, err := outcome(t, r.session, clk); err == nil {
+				t.Fatal("no error")
+			}
+		})
 	})
 	t.Run("honours the caller's abort signal like a cancel", func(t *testing.T) {
 		t.Parallel()
-		clk := newClock()
-		tr := newFixed(deviceA)
-		tr.ignoresStop = true
-		l := newLateWinner()
-		ctx, cancel := context.WithCancel(context.Background())
-		r := race(ctx, clk, discovery.SessionOptions{Timeout: 30 * time.Second}, l.attempt, tr)
-		recv(t, l.started)
-		cancel()
-		close(l.pase)
-		if recv(t, l.won) {
-			t.Fatal("the late attempt won after the abort")
-		}
-		tr.fail(errors.New("scan ends"))
-		if _, err := outcome(t, r.session, clk); !errors.Is(err, context.Canceled) {
-			t.Fatalf("err %v, want context.Canceled", err)
-		}
+		synctest.Test(t, func(t *testing.T) {
+			clk := newClock()
+			tr := newFixed(deviceA)
+			tr.ignoresStop = true
+			l := newLateWinner()
+			ctx, cancel := context.WithCancel(context.Background())
+			r := race(ctx, clk, discovery.SessionOptions{Timeout: 30 * time.Second}, l.attempt, tr)
+			recv(t, l.started)
+			cancel()
+			close(l.pase)
+			if recv(t, l.won) {
+				t.Fatal("the late attempt won after the abort")
+			}
+			tr.fail(errors.New("scan ends"))
+			if _, err := outcome(t, r.session, clk); !errors.Is(err, context.Canceled) {
+				t.Fatalf("err %v, want context.Canceled", err)
+			}
+		})
 	})
 	t.Run("cancels at once with a caller abort signal that is already aborted", func(t *testing.T) {
 		t.Parallel()
-		clk := newClock()
-		ctx, cancel := context.WithCancelCause(context.Background())
-		cancel(reason)
-		r := race(ctx, clk, discovery.SessionOptions{Timeout: 30 * time.Second}, winner(nil, nil), newFixed(deviceA))
-		if _, err := outcome(t, r.session, clk); !errors.Is(err, reason) {
-			t.Fatalf("err %v, want the abort reason", err)
-		}
-		if n := r.started.Load(); n != 0 {
-			t.Fatalf("%d attempts started", n)
-		}
+		synctest.Test(t, func(t *testing.T) {
+			clk := newClock()
+			ctx, cancel := context.WithCancelCause(context.Background())
+			cancel(reason)
+			r := race(ctx, clk, discovery.SessionOptions{Timeout: 30 * time.Second}, winner(nil, nil), newFixed(deviceA))
+			if _, err := outcome(t, r.session, clk); !errors.Is(err, reason) {
+				t.Fatalf("err %v, want the abort reason", err)
+			}
+			if n := r.started.Load(); n != 0 {
+				t.Fatalf("%d attempts started", n)
+			}
+		})
 	})
 	t.Run("does not start an attempt for a device that is handed over after the cancel", func(t *testing.T) {
 		t.Parallel()
-		clk := newClock()
-		tr := newFixed(deviceA)
-		var r *testRace
-		ready := make(chan struct{})
-		tr.beforeReport = func() {
-			<-ready
-			r.session.Cancel(reason)
-		}
-		r = race(context.Background(), clk, discovery.SessionOptions{Timeout: 30 * time.Second}, winner(nil, nil), tr)
-		close(ready)
-		if _, err := outcome(t, r.session, clk); !errors.Is(err, reason) {
-			t.Fatalf("err %v, want the cancel reason", err)
-		}
-		if d, n := r.discovered.Load(), r.started.Load(); d != 1 || n != 0 {
-			t.Fatalf("%d discovered, %d started; want 1 and 0", d, n)
-		}
+		synctest.Test(t, func(t *testing.T) {
+			clk := newClock()
+			tr := newFixed(deviceA)
+			var r *testRace
+			ready := make(chan struct{})
+			tr.beforeReport = func() {
+				<-ready
+				r.session.Cancel(reason)
+			}
+			r = race(context.Background(), clk, discovery.SessionOptions{Timeout: 30 * time.Second}, winner(nil, nil), tr)
+			close(ready)
+			if _, err := outcome(t, r.session, clk); !errors.Is(err, reason) {
+				t.Fatalf("err %v, want the cancel reason", err)
+			}
+			if d, n := r.discovered.Load(), r.started.Load(); d != 1 || n != 0 {
+				t.Fatalf("%d discovered, %d started; want 1 and 0", d, n)
+			}
+		})
 	})
 	t.Run("rejects with the cancel reason when an instance discovery is canceled before it finds a node", func(t *testing.T) {
 		t.Parallel()
-		clk := newClock()
-		s := discovery.FindInstance(context.Background(), []discovery.Transport{newFixed()}, discovery.SessionOptions{Timeout: 30 * time.Second, Clock: clk})
-		clk.Advance(time.Second)
-		s.Cancel(reason)
-		if _, err := outcome(t, s, clk); !errors.Is(err, reason) {
-			t.Fatalf("err %v, want the cancel reason", err)
-		}
+		synctest.Test(t, func(t *testing.T) {
+			clk := newClock()
+			s := discovery.FindInstance(context.Background(), []discovery.Transport{newFixed()}, discovery.SessionOptions{Timeout: 30 * time.Second, Clock: clk})
+			clk.Advance(time.Second)
+			s.Cancel(reason)
+			if _, err := outcome(t, s, clk); !errors.Is(err, reason) {
+				t.Fatalf("err %v, want the cancel reason", err)
+			}
+		})
 	})
 	t.Run("rejects with the cancel reason when a continuous discovery is canceled", func(t *testing.T) {
 		t.Parallel()
-		clk := newClock()
-		s := discovery.FindAll(context.Background(), []discovery.Transport{newFixed(deviceA)}, discovery.SessionOptions{Clock: clk}, nil)
-		clk.Advance(time.Second)
-		s.Cancel(reason)
-		if _, err := outcome(t, s, clk); !errors.Is(err, reason) {
-			t.Fatalf("err %v, want the cancel reason", err)
-		}
+		synctest.Test(t, func(t *testing.T) {
+			clk := newClock()
+			s := discovery.FindAll(context.Background(), []discovery.Transport{newFixed(deviceA)}, discovery.SessionOptions{Clock: clk}, nil)
+			clk.Advance(time.Second)
+			s.Cancel(reason)
+			if _, err := outcome(t, s, clk); !errors.Is(err, reason) {
+				t.Fatalf("err %v, want the cancel reason", err)
+			}
+		})
 	})
 	t.Run("resolves with the winner when the cancel comes right after the PASE win", func(t *testing.T) {
 		t.Parallel()
-		clk := newClock()
-		var r *testRace
-		ready := make(chan struct{})
-		r = race(context.Background(), clk, discovery.SessionOptions{Timeout: 30 * time.Second}, func(ctx context.Context, win func() bool, i int) error {
-			<-ready
-			return winner(func() { r.session.Cancel(reason) }, nil)(ctx, win, i)
-		}, newFixed(deviceA))
-		close(ready)
-		if c, err := outcome(t, r.session, clk); err != nil || c.Device.InstanceID != "device-a" {
-			t.Fatalf("%+v, %v; want the winner", c, err)
-		}
+		synctest.Test(t, func(t *testing.T) {
+			clk := newClock()
+			var r *testRace
+			ready := make(chan struct{})
+			r = race(context.Background(), clk, discovery.SessionOptions{Timeout: 30 * time.Second}, func(ctx context.Context, win func() bool, i int) error {
+				<-ready
+				return winner(func() { r.session.Cancel(reason) }, nil)(ctx, win, i)
+			}, newFixed(deviceA))
+			close(ready)
+			if c, err := outcome(t, r.session, clk); err != nil || c.Device.InstanceID != "device-a" {
+				t.Fatalf("%+v, %v; want the winner", c, err)
+			}
+		})
 	})
 	t.Run("resolves with the winner when the cancel comes while the winner commissions", func(t *testing.T) {
 		t.Parallel()
-		clk := newClock()
-		won, commissioned := make(chan struct{}), make(chan struct{})
-		r := race(context.Background(), clk, discovery.SessionOptions{Timeout: 30 * time.Second}, winner(func() { close(won) }, commissioned), newFixed(deviceA))
-		recv(t, won)
-		r.session.Cancel(reason)
-		close(commissioned)
-		if c, err := outcome(t, r.session, clk); err != nil || c.Device.InstanceID != "device-a" {
-			t.Fatalf("%+v, %v; want the winner", c, err)
-		}
+		synctest.Test(t, func(t *testing.T) {
+			clk := newClock()
+			won, commissioned := make(chan struct{}), make(chan struct{})
+			r := race(context.Background(), clk, discovery.SessionOptions{Timeout: 30 * time.Second}, winner(func() { close(won) }, commissioned), newFixed(deviceA))
+			recv(t, won)
+			r.session.Cancel(reason)
+			close(commissioned)
+			if c, err := outcome(t, r.session, clk); err != nil || c.Device.InstanceID != "device-a" {
+				t.Fatalf("%+v, %v; want the winner", c, err)
+			}
+		})
 	})
 	t.Run("resolves with the winner when every scanner fails after the PASE win", func(t *testing.T) {
 		t.Parallel()
-		clk := newClock()
-		tr := newFixed(deviceA)
-		tr.ignoresStop = true
-		r := race(context.Background(), clk, discovery.SessionOptions{Timeout: 30 * time.Second}, winner(func() { tr.fail(errors.New("scanner broke")) }, nil), tr)
-		if c, err := outcome(t, r.session, clk); err != nil || c.Device.InstanceID != "device-a" {
-			t.Fatalf("%+v, %v; want the winner", c, err)
-		}
+		synctest.Test(t, func(t *testing.T) {
+			clk := newClock()
+			tr := newFixed(deviceA)
+			tr.ignoresStop = true
+			r := race(context.Background(), clk, discovery.SessionOptions{Timeout: 30 * time.Second}, winner(func() { tr.fail(errors.New("scanner broke")) }, nil), tr)
+			if c, err := outcome(t, r.session, clk); err != nil || c.Device.InstanceID != "device-a" {
+				t.Fatalf("%+v, %v; want the winner", c, err)
+			}
+		})
 	})
 	t.Run("resolves with the node when an instance discovery is canceled after finding it", func(t *testing.T) {
 		t.Parallel()
-		clk := newClock()
-		var s *discovery.Session[discovery.Candidate]
-		ready := make(chan struct{})
-		tr := newFixed(deviceA)
-		tr.afterStop = func() {
-			<-ready
-			s.Cancel(reason)
-		}
-		s = discovery.FindInstance(context.Background(), []discovery.Transport{tr}, discovery.SessionOptions{Timeout: 30 * time.Second, Clock: clk})
-		close(ready)
-		if c, err := outcome(t, s, clk); err != nil || c.Device.InstanceID != "device-a" {
-			t.Fatalf("%+v, %v; want the node", c, err)
-		}
+		synctest.Test(t, func(t *testing.T) {
+			clk := newClock()
+			var s *discovery.Session[discovery.Candidate]
+			ready := make(chan struct{})
+			tr := newFixed(deviceA)
+			tr.afterStop = func() {
+				<-ready
+				s.Cancel(reason)
+			}
+			s = discovery.FindInstance(context.Background(), []discovery.Transport{tr}, discovery.SessionOptions{Timeout: 30 * time.Second, Clock: clk})
+			close(ready)
+			if c, err := outcome(t, s, clk); err != nil || c.Device.InstanceID != "device-a" {
+				t.Fatalf("%+v, %v; want the node", c, err)
+			}
+		})
 	})
 	t.Run("keeps the first cancel reason when canceled twice while attempts wind down", func(t *testing.T) {
 		t.Parallel()
-		clk := newClock()
-		r := race(context.Background(), clk, discovery.SessionOptions{Timeout: 5 * time.Second}, untilAborted, newFixed(deviceA))
-		for r.started.Load() == 0 {
-			time.Sleep(time.Millisecond)
-		}
-		r.session.Cancel(reason)
-		r.session.Cancel(errors.New("caller gave up again"))
-		if _, err := outcome(t, r.session, clk); !errors.Is(err, reason) {
-			t.Fatalf("err %v, want the first reason", err)
-		}
+		synctest.Test(t, func(t *testing.T) {
+			clk := newClock()
+			r := race(context.Background(), clk, discovery.SessionOptions{Timeout: 5 * time.Second}, untilAborted, newFixed(deviceA))
+			for r.started.Load() == 0 {
+				time.Sleep(time.Millisecond)
+			}
+			r.session.Cancel(reason)
+			r.session.Cancel(errors.New("caller gave up again"))
+			if _, err := outcome(t, r.session, clk); !errors.Is(err, reason) {
+				t.Fatalf("err %v, want the first reason", err)
+			}
+		})
 	})
 	t.Run("keeps the cancel reason when every scanner fails after the cancel", func(t *testing.T) {
 		t.Parallel()
-		clk := newClock()
-		tr := newFixed(deviceA)
-		tr.ignoresStop = true
-		r := race(context.Background(), clk, discovery.SessionOptions{Timeout: 30 * time.Second}, untilAborted, tr)
-		for r.started.Load() == 0 {
-			time.Sleep(time.Millisecond)
-		}
-		r.session.Cancel(reason)
-		tr.fail(errors.New("scanner broke"))
-		if _, err := outcome(t, r.session, clk); !errors.Is(err, reason) {
-			t.Fatalf("err %v, want the cancel reason", err)
-		}
+		synctest.Test(t, func(t *testing.T) {
+			clk := newClock()
+			tr := newFixed(deviceA)
+			tr.ignoresStop = true
+			r := race(context.Background(), clk, discovery.SessionOptions{Timeout: 30 * time.Second}, untilAborted, tr)
+			for r.started.Load() == 0 {
+				time.Sleep(time.Millisecond)
+			}
+			r.session.Cancel(reason)
+			tr.fail(errors.New("scanner broke"))
+			if _, err := outcome(t, r.session, clk); !errors.Is(err, reason) {
+				t.Fatalf("err %v, want the cancel reason", err)
+			}
+		})
 	})
 	for name, interrupt := range map[string]func(*testRace, context.CancelCauseFunc, *fixedTransport){
 		"a cancel":              func(r *testRace, _ context.CancelCauseFunc, _ *fixedTransport) { r.session.Cancel(reason) },
@@ -379,78 +406,89 @@ func TestDiscoveryCancelParity(t *testing.T) {
 	} {
 		t.Run("settles only after the aborted attempts have finished when interrupted by "+name, func(t *testing.T) {
 			t.Parallel()
-			clk := newClock()
-			tr := newFixed(deviceA)
-			ctx, cancel := context.WithCancelCause(context.Background())
-			defer cancel(nil)
-			var finished atomic.Bool
-			release := make(chan struct{})
-			r := race(ctx, clk, discovery.SessionOptions{Timeout: 30 * time.Second}, func(ctx context.Context, _ func() bool, _ int) error {
-				<-ctx.Done()
-				<-release // the cleanup outlives the abort
-				finished.Store(true)
-				return ctx.Err()
-			}, tr)
-			for r.started.Load() == 0 {
-				time.Sleep(time.Millisecond)
-			}
-			interrupt(r, cancel, tr)
-			select {
-			case <-r.session.Done():
-				t.Fatal("settled before the attempt finished")
-			case <-time.After(20 * time.Millisecond):
-			}
-			close(release)
-			_, _ = outcome(t, r.session, clk)
-			if !finished.Load() {
-				t.Fatal("settled before the attempt finished")
-			}
+			synctest.Test(t, func(t *testing.T) {
+				clk := newClock()
+				tr := newFixed(deviceA)
+				ctx, cancel := context.WithCancelCause(context.Background())
+				defer cancel(nil)
+				var finished atomic.Bool
+				release := make(chan struct{})
+				r := race(ctx, clk, discovery.SessionOptions{Timeout: 30 * time.Second}, func(ctx context.Context, _ func() bool, _ int) error {
+					<-ctx.Done()
+					<-release // the cleanup outlives the abort
+					finished.Store(true)
+					return ctx.Err()
+				}, tr)
+				for r.started.Load() == 0 {
+					time.Sleep(time.Millisecond)
+				}
+				interrupt(r, cancel, tr)
+				synctest.Wait()
+				select {
+				case <-r.session.Done():
+					t.Fatal("settled before the attempt finished")
+				default:
+				}
+				close(release)
+				_, _ = outcome(t, r.session, clk)
+				if !finished.Load() {
+					t.Fatal("settled before the attempt finished")
+				}
+			})
 		})
 	}
 	t.Run("detaches from the caller's abort signal once the discovery resolves", func(t *testing.T) {
 		t.Parallel()
-		// By meaning: an abort after the outcome changes nothing.
-		clk := newClock()
-		ctx, cancel := context.WithCancel(context.Background())
-		r := race(ctx, clk, discovery.SessionOptions{Timeout: 30 * time.Second}, winner(nil, nil), newFixed(deviceA))
-		if _, err := outcome(t, r.session, clk); err != nil {
-			t.Fatal(err)
-		}
-		cancel()
-		if _, err := r.session.Wait(context.Background()); err != nil {
-			t.Fatalf("the outcome moved to %v", err)
-		}
+		synctest.Test(t, func(t *testing.T) {
+			// By meaning: an abort after the outcome changes nothing.
+			clk := newClock()
+			ctx, cancel := context.WithCancel(context.Background())
+			r := race(ctx, clk, discovery.SessionOptions{Timeout: 30 * time.Second}, winner(nil, nil), newFixed(deviceA))
+			if _, err := outcome(t, r.session, clk); err != nil {
+				t.Fatal(err)
+			}
+			cancel()
+			if _, err := r.session.Wait(context.Background()); err != nil {
+				t.Fatalf("the outcome moved to %v", err)
+			}
+		})
 	})
 	t.Run("detaches from the caller's abort signal once the discovery rejects", func(t *testing.T) {
 		t.Parallel()
-		clk := newClock()
-		ctx, cancel := context.WithCancel(context.Background())
-		s := discovery.FindInstance(ctx, []discovery.Transport{newFixed()}, discovery.SessionOptions{Timeout: 5 * time.Second, Clock: clk})
-		_, err := outcome(t, s, clk)
-		cancel()
-		if _, err2 := s.Wait(context.Background()); !errors.Is(err, discovery.ErrDeviceNotDiscovered) || !errors.Is(err2, discovery.ErrDeviceNotDiscovered) {
-			t.Fatalf("%v then %v, want ErrDeviceNotDiscovered", err, err2)
-		}
+		synctest.Test(t, func(t *testing.T) {
+			clk := newClock()
+			ctx, cancel := context.WithCancel(context.Background())
+			s := discovery.FindInstance(ctx, []discovery.Transport{newFixed()}, discovery.SessionOptions{Timeout: 5 * time.Second, Clock: clk})
+			_, err := outcome(t, s, clk)
+			cancel()
+			if _, err2 := s.Wait(context.Background()); !errors.Is(err, discovery.ErrDeviceNotDiscovered) || !errors.Is(err2, discovery.ErrDeviceNotDiscovered) {
+				t.Fatalf("%v then %v, want ErrDeviceNotDiscovered", err, err2)
+			}
+		})
 	})
 	t.Run("keeps discovering while another scanner still runs", func(t *testing.T) {
 		t.Parallel()
-		clk := newClock()
-		broken := newFixed()
-		broken.fail(errors.New("BLE did not start"))
-		r := race(context.Background(), clk, discovery.SessionOptions{Timeout: 30 * time.Second}, winner(nil, nil), broken, newFixed(deviceA))
-		if c, err := outcome(t, r.session, clk); err != nil || c.Device.InstanceID != "device-a" {
-			t.Fatalf("%+v, %v; want the winner", c, err)
-		}
+		synctest.Test(t, func(t *testing.T) {
+			clk := newClock()
+			broken := newFixed()
+			broken.fail(errors.New("BLE did not start"))
+			r := race(context.Background(), clk, discovery.SessionOptions{Timeout: 30 * time.Second}, winner(nil, nil), broken, newFixed(deviceA))
+			if c, err := outcome(t, r.session, clk); err != nil || c.Device.InstanceID != "device-a" {
+				t.Fatalf("%+v, %v; want the winner", c, err)
+			}
+		})
 	})
 	t.Run("logs a failed scanner and resolves a continuous discovery with what it found", func(t *testing.T) {
 		t.Parallel()
-		clk := newClock()
-		broken := newFixed()
-		broken.fail(errors.New("BLE did not start"))
-		s := discovery.FindAll(context.Background(), []discovery.Transport{broken, newFixed()}, discovery.SessionOptions{Timeout: 5 * time.Second, Clock: clk}, nil)
-		if found, err := outcome(t, s, clk); err != nil || len(found) != 0 {
-			t.Fatalf("%v, %v; want nothing found and no error", found, err)
-		}
+		synctest.Test(t, func(t *testing.T) {
+			clk := newClock()
+			broken := newFixed()
+			broken.fail(errors.New("BLE did not start"))
+			s := discovery.FindAll(context.Background(), []discovery.Transport{broken, newFixed()}, discovery.SessionOptions{Timeout: 5 * time.Second, Clock: clk}, nil)
+			if found, err := outcome(t, s, clk); err != nil || len(found) != 0 {
+				t.Fatalf("%v, %v; want nothing found and no error", found, err)
+			}
+		})
 	})
 	scannerFailure := errors.New("BLE did not start")
 	for name, shape := range map[string]func(broken *fixedTransport) []discovery.Transport{
@@ -464,15 +502,17 @@ func TestDiscoveryCancelParity(t *testing.T) {
 	} {
 		t.Run("reports the scanner failure as DiscoveryAggregateError where "+name, func(t *testing.T) {
 			t.Parallel()
-			clk := newClock()
-			broken := newFixed()
-			broken.fail(scannerFailure)
-			s := discovery.FindInstance(context.Background(), shape(broken), discovery.SessionOptions{Timeout: 5 * time.Second, Clock: clk})
-			_, err := outcome(t, s, clk)
-			var agg *discovery.AggregateError
-			if !errors.As(err, &agg) || !errors.Is(err, scannerFailure) {
-				t.Fatalf("err %v, want an AggregateError of the scanner's", err)
-			}
+			synctest.Test(t, func(t *testing.T) {
+				clk := newClock()
+				broken := newFixed()
+				broken.fail(scannerFailure)
+				s := discovery.FindInstance(context.Background(), shape(broken), discovery.SessionOptions{Timeout: 5 * time.Second, Clock: clk})
+				_, err := outcome(t, s, clk)
+				var agg *discovery.AggregateError
+				if !errors.As(err, &agg) || !errors.Is(err, scannerFailure) {
+					t.Fatalf("err %v, want an AggregateError of the scanner's", err)
+				}
+			})
 		})
 	}
 }
@@ -481,151 +521,174 @@ func TestDiscoveryErrorParity(t *testing.T) {
 	t.Parallel()
 	t.Run("reports DeviceNotDiscoveredError when commissioning discovery finds no device", func(t *testing.T) {
 		t.Parallel()
-		clk := newClock()
-		s := discovery.CommissioningRace(context.Background(), []discovery.Transport{newFixed()}, discovery.SessionOptions{Timeout: 5 * time.Second, Clock: clk}, discovery.Identity{},
-			func(context.Context, discovery.Candidate, func() bool) (int, error) { return 0, nil })
-		if _, err := outcome(t, s, clk); !errors.Is(err, discovery.ErrDeviceNotDiscovered) {
-			t.Fatalf("err %v", err)
-		}
+		synctest.Test(t, func(t *testing.T) {
+			clk := newClock()
+			s := discovery.CommissioningRace(context.Background(), []discovery.Transport{newFixed()}, discovery.SessionOptions{Timeout: 5 * time.Second, Clock: clk}, discovery.Identity{},
+				func(context.Context, discovery.Candidate, func() bool) (int, error) { return 0, nil })
+			if _, err := outcome(t, s, clk); !errors.Is(err, discovery.ErrDeviceNotDiscovered) {
+				t.Fatalf("err %v", err)
+			}
+		})
 	})
 	t.Run("reports DeviceNotDiscoveredError when instance discovery finds no node", func(t *testing.T) {
 		t.Parallel()
-		clk := newClock()
-		s := discovery.FindInstance(context.Background(), []discovery.Transport{newFixed()}, discovery.SessionOptions{Timeout: 5 * time.Second, Clock: clk})
-		if _, err := outcome(t, s, clk); !errors.Is(err, discovery.ErrDeviceNotDiscovered) {
-			t.Fatalf("err %v", err)
-		}
+		synctest.Test(t, func(t *testing.T) {
+			clk := newClock()
+			s := discovery.FindInstance(context.Background(), []discovery.Transport{newFixed()}, discovery.SessionOptions{Timeout: 5 * time.Second, Clock: clk})
+			if _, err := outcome(t, s, clk); !errors.Is(err, discovery.ErrDeviceNotDiscovered) {
+				t.Fatalf("err %v", err)
+			}
+		})
 	})
 	t.Run("reports DiscoveryIncompleteError when the timeout aborts an attempt in flight", func(t *testing.T) {
 		t.Parallel()
-		clk := newClock()
-		r := race(context.Background(), clk, discovery.SessionOptions{Timeout: 5 * time.Second}, untilAborted, newFixed(deviceA))
-		if _, err := outcome(t, r.session, clk); !errors.Is(err, discovery.ErrDiscoveryIncomplete) {
-			t.Fatalf("err %v", err)
-		}
+		synctest.Test(t, func(t *testing.T) {
+			clk := newClock()
+			r := race(context.Background(), clk, discovery.SessionOptions{Timeout: 5 * time.Second}, untilAborted, newFixed(deviceA))
+			if _, err := outcome(t, r.session, clk); !errors.Is(err, discovery.ErrDiscoveryIncomplete) {
+				t.Fatalf("err %v", err)
+			}
+		})
 	})
 	t.Run("reports DiscoveryAggregateError when one attempt failed and the others were canceled", func(t *testing.T) {
 		t.Parallel()
-		clk := newClock()
-		failure := errors.New("PASE failed")
-		r := race(context.Background(), clk, discovery.SessionOptions{Timeout: 5 * time.Second}, func(ctx context.Context, win func() bool, i int) error {
-			if i == 0 {
-				return failure
+		synctest.Test(t, func(t *testing.T) {
+			clk := newClock()
+			failure := errors.New("PASE failed")
+			r := race(context.Background(), clk, discovery.SessionOptions{Timeout: 5 * time.Second}, func(ctx context.Context, win func() bool, i int) error {
+				if i == 0 {
+					return failure
+				}
+				return untilAborted(ctx, win, i)
+			}, newFixed(deviceA, deviceB))
+			_, err := outcome(t, r.session, clk)
+			var agg *discovery.AggregateError
+			if !errors.As(err, &agg) || len(agg.Errs) != 1 || !errors.Is(err, failure) {
+				t.Fatalf("err %v", err)
 			}
-			return untilAborted(ctx, win, i)
-		}, newFixed(deviceA, deviceB))
-		_, err := outcome(t, r.session, clk)
-		var agg *discovery.AggregateError
-		if !errors.As(err, &agg) || len(agg.Errs) != 1 || !errors.Is(err, failure) {
-			t.Fatalf("err %v", err)
-		}
+		})
 	})
 	t.Run("rejects with NoDiscoveryTransportError when no scanner is installed for the requested transports", func(t *testing.T) {
 		t.Parallel()
-		clk := newClock()
-		ble := newFixed(deviceA)
-		ble.kind = discovery.TransportBLE
-		s := discovery.FindInstance(context.Background(), []discovery.Transport{ble}, discovery.SessionOptions{Timeout: 5 * time.Second, Clock: clk, Capabilities: &discovery.Capabilities{OnIPNetwork: true}})
-		if _, err := outcome(t, s, clk); !errors.Is(err, discovery.ErrNoDiscoveryTransport) {
-			t.Fatalf("err %v", err)
-		}
+		synctest.Test(t, func(t *testing.T) {
+			clk := newClock()
+			ble := newFixed(deviceA)
+			ble.kind = discovery.TransportBLE
+			s := discovery.FindInstance(context.Background(), []discovery.Transport{ble}, discovery.SessionOptions{Timeout: 5 * time.Second, Clock: clk, Capabilities: &discovery.Capabilities{OnIPNetwork: true}})
+			if _, err := outcome(t, s, clk); !errors.Is(err, discovery.ErrNoDiscoveryTransport) {
+				t.Fatalf("err %v", err)
+			}
+		})
 	})
 	unusable := errors.New("cannot build the node")
 	t.Run("reports the error of a node that could not be built", func(t *testing.T) {
 		t.Parallel()
-		clk := newClock()
-		s := discovery.FindInstance(context.Background(), []discovery.Transport{newFixed(deviceA)}, discovery.SessionOptions{
-			Timeout: 5 * time.Second, Clock: clk, Prepare: func(context.Context, discovery.Candidate) error { return unusable },
+		synctest.Test(t, func(t *testing.T) {
+			clk := newClock()
+			s := discovery.FindInstance(context.Background(), []discovery.Transport{newFixed(deviceA)}, discovery.SessionOptions{
+				Timeout: 5 * time.Second, Clock: clk, Prepare: func(context.Context, discovery.Candidate) error { return unusable },
+			})
+			if _, err := outcome(t, s, clk); !errors.Is(err, unusable) {
+				t.Fatalf("err %v, want the preparation's", err)
+			}
 		})
-		if _, err := outcome(t, s, clk); !errors.Is(err, unusable) {
-			t.Fatalf("err %v, want the preparation's", err)
-		}
 	})
 	t.Run("keeps the first node found when further devices finish their preparation later", func(t *testing.T) {
 		t.Parallel()
-		clk := newClock()
-		slow := make(chan struct{})
-		s := discovery.FindInstance(context.Background(), []discovery.Transport{newFixed(deviceA, deviceB)}, discovery.SessionOptions{
-			Timeout: 5 * time.Second, Clock: clk, Prepare: func(_ context.Context, c discovery.Candidate) error {
-				if c.Device.InstanceID == "device-b" {
-					<-slow
-				}
-				return nil
-			},
+		synctest.Test(t, func(t *testing.T) {
+			clk := newClock()
+			slow := make(chan struct{})
+			s := discovery.FindInstance(context.Background(), []discovery.Transport{newFixed(deviceA, deviceB)}, discovery.SessionOptions{
+				Timeout: 5 * time.Second, Clock: clk, Prepare: func(_ context.Context, c discovery.Candidate) error {
+					if c.Device.InstanceID == "device-b" {
+						<-slow
+					}
+					return nil
+				},
+			})
+			go func() { time.Sleep(20 * time.Millisecond); close(slow) }()
+			if c, err := outcome(t, s, clk); err != nil || c.Device.InstanceID != "device-a" {
+				t.Fatalf("%+v, %v; want device-a", c, err)
+			}
 		})
-		go func() { time.Sleep(20 * time.Millisecond); close(slow) }()
-		if c, err := outcome(t, s, clk); err != nil || c.Device.InstanceID != "device-a" {
-			t.Fatalf("%+v, %v; want device-a", c, err)
-		}
 	})
 	t.Run("waits for a device still being prepared when the scan ends", func(t *testing.T) {
 		t.Parallel()
-		clk := newClock()
-		slow := make(chan struct{})
-		tr := newFixed(deviceA)
-		tr.endsAtOnce = true
-		s := discovery.FindInstance(context.Background(), []discovery.Transport{tr}, discovery.SessionOptions{
-			Clock: clk, Prepare: func(context.Context, discovery.Candidate) error { <-slow; return nil },
+		synctest.Test(t, func(t *testing.T) {
+			clk := newClock()
+			slow := make(chan struct{})
+			tr := newFixed(deviceA)
+			tr.endsAtOnce = true
+			s := discovery.FindInstance(context.Background(), []discovery.Transport{tr}, discovery.SessionOptions{
+				Clock: clk, Prepare: func(context.Context, discovery.Candidate) error { <-slow; return nil },
+			})
+			synctest.Wait()
+			select {
+			case <-s.Done():
+				t.Fatal("ended before the preparation")
+			default:
+			}
+			close(slow)
+			if c, err := outcome(t, s, clk); err != nil || c.Device.InstanceID != "device-a" {
+				t.Fatalf("%+v, %v; want device-a", c, err)
+			}
 		})
-		select {
-		case <-s.Done():
-			t.Fatal("ended before the preparation")
-		case <-time.After(20 * time.Millisecond):
-		}
-		close(slow)
-		if c, err := outcome(t, s, clk); err != nil || c.Device.InstanceID != "device-a" {
-			t.Fatalf("%+v, %v; want device-a", c, err)
-		}
 	})
 	t.Run("reports the first device's error when several cannot be used", func(t *testing.T) {
 		t.Parallel()
-		clk := newClock()
-		first := errors.New("first")
-		var n atomic.Int32
-		order := make(chan struct{})
-		s := discovery.FindInstance(context.Background(), []discovery.Transport{newFixed(deviceA, deviceB)}, discovery.SessionOptions{
-			Timeout: 5 * time.Second, Clock: clk, Prepare: func(_ context.Context, c discovery.Candidate) error {
-				if c.Device.InstanceID == "device-b" {
-					<-order
-					return errors.New("second")
-				}
-				defer close(order)
-				n.Add(1)
-				return first
-			},
+		synctest.Test(t, func(t *testing.T) {
+			clk := newClock()
+			first := errors.New("first")
+			var n atomic.Int32
+			order := make(chan struct{})
+			s := discovery.FindInstance(context.Background(), []discovery.Transport{newFixed(deviceA, deviceB)}, discovery.SessionOptions{
+				Timeout: 5 * time.Second, Clock: clk, Prepare: func(_ context.Context, c discovery.Candidate) error {
+					if c.Device.InstanceID == "device-b" {
+						<-order
+						return errors.New("second")
+					}
+					defer close(order)
+					n.Add(1)
+					return first
+				},
+			})
+			if _, err := outcome(t, s, clk); !errors.Is(err, first) {
+				t.Fatalf("err %v, want the first device's", err)
+			}
 		})
-		if _, err := outcome(t, s, clk); !errors.Is(err, first) {
-			t.Fatalf("err %v, want the first device's", err)
-		}
 	})
 	t.Run("keeps the attempts' own errors over the unusable device's error", func(t *testing.T) {
 		t.Parallel()
-		clk := newClock()
-		failure := errors.New("PASE failed")
-		s := discovery.Race(context.Background(), []discovery.Transport{newFixed(deviceA, deviceB)}, discovery.SessionOptions{
-			Timeout: 5 * time.Second, Clock: clk, Prepare: func(_ context.Context, c discovery.Candidate) error {
-				if c.Device.InstanceID == "device-b" {
-					return unusable
-				}
-				return nil
-			},
-		}, func(context.Context, discovery.Candidate, func() bool) (int, error) { return 0, failure })
-		_, err := outcome(t, s, clk)
-		if !errors.Is(err, failure) || errors.Is(err, unusable) {
-			t.Fatalf("err %v, want the attempt's", err)
-		}
+		synctest.Test(t, func(t *testing.T) {
+			clk := newClock()
+			failure := errors.New("PASE failed")
+			s := discovery.Race(context.Background(), []discovery.Transport{newFixed(deviceA, deviceB)}, discovery.SessionOptions{
+				Timeout: 5 * time.Second, Clock: clk, Prepare: func(_ context.Context, c discovery.Candidate) error {
+					if c.Device.InstanceID == "device-b" {
+						return unusable
+					}
+					return nil
+				},
+			}, func(context.Context, discovery.Candidate, func() bool) (int, error) { return 0, failure })
+			_, err := outcome(t, s, clk)
+			if !errors.Is(err, failure) || errors.Is(err, unusable) {
+				t.Fatalf("err %v, want the attempt's", err)
+			}
+		})
 	})
 	t.Run("warns once per device and logs repeats at debug", func(t *testing.T) {
 		t.Parallel()
-		// By meaning: the same device reported twice and unusable twice
-		// is one unusable device whose error is the outcome.
-		clk := newClock()
-		s := discovery.FindInstance(context.Background(), []discovery.Transport{newFixed(deviceA, deviceA)}, discovery.SessionOptions{
-			Timeout: 5 * time.Second, Clock: clk, Prepare: func(context.Context, discovery.Candidate) error { return unusable },
+		synctest.Test(t, func(t *testing.T) {
+			// By meaning: the same device reported twice and unusable twice
+			// is one unusable device whose error is the outcome.
+			clk := newClock()
+			s := discovery.FindInstance(context.Background(), []discovery.Transport{newFixed(deviceA, deviceA)}, discovery.SessionOptions{
+				Timeout: 5 * time.Second, Clock: clk, Prepare: func(context.Context, discovery.Candidate) error { return unusable },
+			})
+			if _, err := outcome(t, s, clk); !errors.Is(err, unusable) {
+				t.Fatalf("err %v", err)
+			}
 		})
-		if _, err := outcome(t, s, clk); !errors.Is(err, unusable) {
-			t.Fatalf("err %v", err)
-		}
 	})
 }
 
@@ -644,34 +707,42 @@ func TestDiscoveryTransportsParity(t *testing.T) {
 	}
 	t.Run("discovers on every installed transport where the caller states nothing", func(t *testing.T) {
 		t.Parallel()
-		if got := kinds(discovery.SelectTransports(all, nil)); len(got) != 2 {
-			t.Fatalf("%v", got)
-		}
+		synctest.Test(t, func(t *testing.T) {
+			if got := kinds(discovery.SelectTransports(all, nil)); len(got) != 2 {
+				t.Fatalf("%v", got)
+			}
+		})
 	})
 	t.Run("discovers on the IP network alone unless the payload names BLE", func(t *testing.T) {
 		t.Parallel()
-		got := kinds(discovery.SelectTransports(all, &discovery.Capabilities{SoftAP: true}))
-		if len(got) != 1 || got[0] != discovery.TransportIP {
-			t.Fatalf("%v", got)
-		}
+		synctest.Test(t, func(t *testing.T) {
+			got := kinds(discovery.SelectTransports(all, &discovery.Capabilities{SoftAP: true}))
+			if len(got) != 1 || got[0] != discovery.TransportIP {
+				t.Fatalf("%v", got)
+			}
+		})
 	})
 	t.Run("discovers on BLE where the payload names it", func(t *testing.T) {
 		t.Parallel()
-		caps := discovery.CapabilitiesOf(0b010)
-		if got := kinds(discovery.SelectTransports(all, &caps)); len(got) != 2 {
-			t.Fatalf("%v", got)
-		}
+		synctest.Test(t, func(t *testing.T) {
+			caps := discovery.CapabilitiesOf(0b010)
+			if got := kinds(discovery.SelectTransports(all, &caps)); len(got) != 2 {
+				t.Fatalf("%v", got)
+			}
+		})
 	})
 	t.Run("names the device to a scanner without the options that steer discovery itself", func(t *testing.T) {
 		t.Parallel()
-		clk := newClock()
-		tr := newFixed()
-		id := discovery.ByLongDiscriminator(3840)
-		s := discovery.FindInstance(context.Background(), []discovery.Transport{tr}, discovery.SessionOptions{Identifier: id, Timeout: time.Second, Clock: clk})
-		if got := recv(t, tr.ids); got != id {
-			t.Fatalf("identifier %+v, want %+v", got, id)
-		}
-		_, _ = outcome(t, s, clk)
+		synctest.Test(t, func(t *testing.T) {
+			clk := newClock()
+			tr := newFixed()
+			id := discovery.ByLongDiscriminator(3840)
+			s := discovery.FindInstance(context.Background(), []discovery.Transport{tr}, discovery.SessionOptions{Identifier: id, Timeout: time.Second, Clock: clk})
+			if got := recv(t, tr.ids); got != id {
+				t.Fatalf("identifier %+v, want %+v", got, id)
+			}
+			_, _ = outcome(t, s, clk)
+		})
 	})
 }
 
@@ -679,86 +750,92 @@ func TestParallelPaseRaceParity(t *testing.T) {
 	t.Parallel()
 	t.Run("resolves with the winner while a losing attempt's rejection stays handled", func(t *testing.T) {
 		t.Parallel()
-		clk := newClock()
-		r := race(context.Background(), clk, discovery.SessionOptions{Timeout: 30 * time.Second}, func(ctx context.Context, win func() bool, i int) error {
-			if i == 0 {
-				return winner(nil, nil)(ctx, win, i)
+		synctest.Test(t, func(t *testing.T) {
+			clk := newClock()
+			r := race(context.Background(), clk, discovery.SessionOptions{Timeout: 30 * time.Second}, func(ctx context.Context, win func() bool, i int) error {
+				if i == 0 {
+					return winner(nil, nil)(ctx, win, i)
+				}
+				return errors.New("loser")
+			}, newFixed(deviceA, deviceB))
+			if c, err := outcome(t, r.session, clk); err != nil || c.Device.InstanceID == "" {
+				t.Fatalf("%+v, %v", c, err)
 			}
-			return errors.New("loser")
-		}, newFixed(deviceA, deviceB))
-		if c, err := outcome(t, r.session, clk); err != nil || c.Device.InstanceID == "" {
-			t.Fatalf("%+v, %v", c, err)
-		}
+		})
 	})
 	t.Run("rejects with the winner's own error", func(t *testing.T) {
 		t.Parallel()
-		clk := newClock()
-		own := errors.New("commissioning failed")
-		r := race(context.Background(), clk, discovery.SessionOptions{Timeout: 30 * time.Second}, func(_ context.Context, win func() bool, _ int) error {
-			win()
-			return own
-		}, newFixed(deviceA))
-		if _, err := outcome(t, r.session, clk); !errors.Is(err, own) {
-			t.Fatalf("err %v, want the winner's", err)
-		}
+		synctest.Test(t, func(t *testing.T) {
+			clk := newClock()
+			own := errors.New("commissioning failed")
+			r := race(context.Background(), clk, discovery.SessionOptions{Timeout: 30 * time.Second}, func(_ context.Context, win func() bool, _ int) error {
+				win()
+				return own
+			}, newFixed(deviceA))
+			if _, err := outcome(t, r.session, clk); !errors.Is(err, own) {
+				t.Fatalf("err %v, want the winner's", err)
+			}
+		})
 	})
 	t.Run("starts attempts one stagger slot apart", func(t *testing.T) {
 		t.Parallel()
-		clk := newClock()
-		r := race(context.Background(), clk, discovery.SessionOptions{Timeout: 30 * time.Second}, untilAborted, newFixed(deviceA, deviceB, deviceC))
-		waitStarted := func(n int32) {
-			t.Helper()
-			deadline := time.Now().Add(5 * time.Second)
-			for r.started.Load() != n {
-				if time.Now().After(deadline) {
-					t.Fatalf("%d started, want %d", r.started.Load(), n)
+		synctest.Test(t, func(t *testing.T) {
+			clk := newClock()
+			r := race(context.Background(), clk, discovery.SessionOptions{Timeout: 30 * time.Second}, untilAborted, newFixed(deviceA, deviceB, deviceC))
+			// waitStarted settles the bubble: the race has started what it
+			// starts before the fake clock moves (W6-test-15: a 10 ms
+			// wall-clock window judged "not yet the second").
+			waitStarted := func(n int32) {
+				t.Helper()
+				synctest.Wait()
+				if got := r.started.Load(); got != n {
+					t.Fatalf("%d started, want %d", got, n)
 				}
-				time.Sleep(time.Millisecond)
 			}
-		}
-		waitStarted(1)
-		time.Sleep(10 * time.Millisecond)
-		if n := r.started.Load(); n != 1 {
-			t.Fatalf("%d started before the first slot", n)
-		}
-		// The discovery's timeout and the two stagger waits.
-		for len(clk.Armed()) < 3 {
-			time.Sleep(time.Millisecond)
-		}
-		clk.Advance(discovery.CrossDeviceStagger)
-		waitStarted(2)
-		clk.Advance(discovery.CrossDeviceStagger)
-		waitStarted(3)
-		r.session.Cancel(nil)
-		_, _ = outcome(t, r.session, clk)
+			waitStarted(1)
+			// The discovery's timeout and the two stagger waits.
+			if n := len(clk.Armed()); n < 3 {
+				t.Fatalf("%d timers armed, want the timeout and two stagger waits", n)
+			}
+			clk.Advance(discovery.CrossDeviceStagger)
+			waitStarted(2)
+			clk.Advance(discovery.CrossDeviceStagger)
+			waitStarted(3)
+			r.session.Cancel(nil)
+			_, _ = outcome(t, r.session, clk)
+		})
 	})
 	t.Run("does not start a staggered attempt once a candidate has won", func(t *testing.T) {
 		t.Parallel()
-		clk := newClock()
-		r := race(context.Background(), clk, discovery.SessionOptions{Timeout: 30 * time.Second}, winner(nil, nil), newFixed(deviceA, deviceB))
-		if _, err := outcome(t, r.session, clk); err != nil {
-			t.Fatal(err)
-		}
-		if n := r.started.Load(); n != 1 {
-			t.Fatalf("%d started, want the winner alone", n)
-		}
+		synctest.Test(t, func(t *testing.T) {
+			clk := newClock()
+			r := race(context.Background(), clk, discovery.SessionOptions{Timeout: 30 * time.Second}, winner(nil, nil), newFixed(deviceA, deviceB))
+			if _, err := outcome(t, r.session, clk); err != nil {
+				t.Fatal(err)
+			}
+			if n := r.started.Load(); n != 1 {
+				t.Fatalf("%d started, want the winner alone", n)
+			}
+		})
 	})
 	t.Run("ends pending stagger waits when discovery ends without a win", func(t *testing.T) {
 		t.Parallel()
-		clk := newClock()
-		r := race(context.Background(), clk, discovery.SessionOptions{Timeout: 30 * time.Second}, untilAborted, newFixed(deviceA, deviceB))
-		for r.started.Load() == 0 {
-			time.Sleep(time.Millisecond)
-		}
-		r.session.Stop()
-		select {
-		case <-r.session.Done():
-		case <-time.After(5 * time.Second):
-			t.Fatal("the stagger wait kept the discovery open")
-		}
-		if n := r.started.Load(); n != 1 {
-			t.Fatalf("%d started", n)
-		}
+		synctest.Test(t, func(t *testing.T) {
+			clk := newClock()
+			r := race(context.Background(), clk, discovery.SessionOptions{Timeout: 30 * time.Second}, untilAborted, newFixed(deviceA, deviceB))
+			for r.started.Load() == 0 {
+				time.Sleep(time.Millisecond)
+			}
+			r.session.Stop()
+			select {
+			case <-r.session.Done():
+			case <-time.After(5 * time.Second):
+				t.Fatal("the stagger wait kept the discovery open")
+			}
+			if n := r.started.Load(); n != 1 {
+				t.Fatalf("%d started", n)
+			}
+		})
 	})
 }
 
@@ -766,32 +843,36 @@ func TestContinuousDiscoveryParity(t *testing.T) {
 	t.Parallel()
 	t.Run("reports each device found and lists them when a timeout bounds the search", func(t *testing.T) {
 		t.Parallel()
-		// By meaning of ContinuousDiscoveryTest.ts:63-85: two concurrent
-		// discoveries each report the device once.
-		clk := newClock()
-		var seen atomic.Int32
-		opts := discovery.SessionOptions{Timeout: 5 * time.Second, Clock: clk}
-		first := discovery.FindAll(context.Background(), []discovery.Transport{newFixed(deviceA)}, opts, func(discovery.Candidate) { seen.Add(1) })
-		second := discovery.FindAll(context.Background(), []discovery.Transport{newFixed(deviceA)}, opts, nil)
-		for _, s := range []*discovery.Session[[]discovery.Candidate]{first, second} {
-			if found, err := outcome(t, s, clk); err != nil || len(found) != 1 || found[0].Device.InstanceID != "device-a" {
-				t.Fatalf("%v, %v", found, err)
+		synctest.Test(t, func(t *testing.T) {
+			// By meaning of ContinuousDiscoveryTest.ts:63-85: two concurrent
+			// discoveries each report the device once.
+			clk := newClock()
+			var seen atomic.Int32
+			opts := discovery.SessionOptions{Timeout: 5 * time.Second, Clock: clk}
+			first := discovery.FindAll(context.Background(), []discovery.Transport{newFixed(deviceA)}, opts, func(discovery.Candidate) { seen.Add(1) })
+			second := discovery.FindAll(context.Background(), []discovery.Transport{newFixed(deviceA)}, opts, nil)
+			for _, s := range []*discovery.Session[[]discovery.Candidate]{first, second} {
+				if found, err := outcome(t, s, clk); err != nil || len(found) != 1 || found[0].Device.InstanceID != "device-a" {
+					t.Fatalf("%v, %v", found, err)
+				}
 			}
-		}
-		if seen.Load() != 1 {
-			t.Fatalf("found reported %d times", seen.Load())
-		}
+			if seen.Load() != 1 {
+				t.Fatalf("found reported %d times", seen.Load())
+			}
+		})
 	})
 	t.Run("an unbounded search reports through found alone", func(t *testing.T) {
 		t.Parallel()
-		clk := newClock()
-		found := make(chan discovery.Candidate, 1)
-		s := discovery.FindAll(context.Background(), []discovery.Transport{newFixed(deviceA)}, discovery.SessionOptions{Clock: clk}, func(c discovery.Candidate) { found <- c })
-		recv(t, found)
-		s.Stop()
-		if list, err := outcome(t, s, clk); err != nil || len(list) != 0 {
-			t.Fatalf("%v, %v", list, err)
-		}
+		synctest.Test(t, func(t *testing.T) {
+			clk := newClock()
+			found := make(chan discovery.Candidate, 1)
+			s := discovery.FindAll(context.Background(), []discovery.Transport{newFixed(deviceA)}, discovery.SessionOptions{Clock: clk}, func(c discovery.Candidate) { found <- c })
+			recv(t, found)
+			s.Stop()
+			if list, err := outcome(t, s, clk); err != nil || len(list) != 0 {
+				t.Fatalf("%v, %v", list, err)
+			}
+		})
 	})
 }
 
@@ -801,22 +882,24 @@ func TestContinuousDiscoveryParity(t *testing.T) {
 // (DiscoveryError.ts:12-29).
 func TestPASERaceParity(t *testing.T) {
 	t.Parallel()
-	clk := newClock()
-	s := discovery.PASERace(context.Background(), []discovery.Transport{newFixed(deviceA)}, discovery.SessionOptions{Clock: clk},
-		func(_ context.Context, c discovery.Candidate, win func() bool) (string, error) {
-			if !win() {
-				return "", errors.New("lost")
-			}
-			return c.Device.InstanceID, nil
-		})
-	if got, err := outcome(t, s, clk); err != nil || got != "device-a" {
-		t.Fatalf("%q, %v", got, err)
-	}
-	none := discovery.PASERace(context.Background(), []discovery.Transport{newFixed()}, discovery.SessionOptions{Clock: clk, Timeout: time.Second},
-		func(context.Context, discovery.Candidate, func() bool) (string, error) { return "", nil })
-	if _, err := outcome(t, none, clk); !errors.Is(err, discovery.ErrDiscovery) || !errors.Is(err, discovery.ErrDeviceNotDiscovered) {
-		t.Fatalf("err %v, want ErrDeviceNotDiscovered, an ErrDiscovery", err)
-	}
+	synctest.Test(t, func(t *testing.T) {
+		clk := newClock()
+		s := discovery.PASERace(context.Background(), []discovery.Transport{newFixed(deviceA)}, discovery.SessionOptions{Clock: clk},
+			func(_ context.Context, c discovery.Candidate, win func() bool) (string, error) {
+				if !win() {
+					return "", errors.New("lost")
+				}
+				return c.Device.InstanceID, nil
+			})
+		if got, err := outcome(t, s, clk); err != nil || got != "device-a" {
+			t.Fatalf("%q, %v", got, err)
+		}
+		none := discovery.PASERace(context.Background(), []discovery.Transport{newFixed()}, discovery.SessionOptions{Clock: clk, Timeout: time.Second},
+			func(context.Context, discovery.Candidate, func() bool) (string, error) { return "", nil })
+		if _, err := outcome(t, none, clk); !errors.Is(err, discovery.ErrDiscovery) || !errors.Is(err, discovery.ErrDeviceNotDiscovered) {
+			t.Fatalf("err %v, want ErrDeviceNotDiscovered, an ErrDiscovery", err)
+		}
+	})
 }
 
 // TestSessionDescriptions: a session names what it looks for as matter.js's
@@ -824,35 +907,37 @@ func TestPASERaceParity(t *testing.T) {
 // its own context while the discovery runs on.
 func TestSessionDescriptions(t *testing.T) {
 	t.Parallel()
-	for id, want := range map[discovery.Identifier]string{
-		discovery.AnyCommissionable():         "node discovery",
-		discovery.ByInstanceID("abc"):         "discovery of node instance abc",
-		discovery.ByLongDiscriminator(3840):   "discovery of node with discriminator 3840",
-		discovery.ByShortDiscriminator(15):    "discovery of node with discriminator 15",
-		discovery.ByVendor(0xFFF1):            "discovery of node from vendor 65521",
-		discovery.ByVendorProduct(0xFFF1, 32): "discovery of product 32 from vendor 65521",
-		discovery.ByProduct(32):               "discovery of product 32",
-		discovery.ByDeviceType(0x100):         "discovery of node with device type 256",
-	} {
-		clk := newClock()
-		s := discovery.FindAll(context.Background(), []discovery.Transport{newFixed()}, discovery.SessionOptions{Identifier: id, Clock: clk}, nil)
-		if s.String() != want {
-			t.Errorf("%q, want %q", s.String(), want)
+	synctest.Test(t, func(t *testing.T) {
+		for id, want := range map[discovery.Identifier]string{
+			discovery.AnyCommissionable():         "node discovery",
+			discovery.ByInstanceID("abc"):         "discovery of node instance abc",
+			discovery.ByLongDiscriminator(3840):   "discovery of node with discriminator 3840",
+			discovery.ByShortDiscriminator(15):    "discovery of node with discriminator 15",
+			discovery.ByVendor(0xFFF1):            "discovery of node from vendor 65521",
+			discovery.ByVendorProduct(0xFFF1, 32): "discovery of product 32 from vendor 65521",
+			discovery.ByProduct(32):               "discovery of product 32",
+			discovery.ByDeviceType(0x100):         "discovery of node with device type 256",
+		} {
+			clk := newClock()
+			s := discovery.FindAll(context.Background(), []discovery.Transport{newFixed()}, discovery.SessionOptions{Identifier: id, Clock: clk}, nil)
+			if s.String() != want {
+				t.Errorf("%q, want %q", s.String(), want)
+			}
+			ctx, cancel := context.WithCancel(context.Background())
+			cancel()
+			if _, err := s.Wait(ctx); err == nil {
+				t.Error("Wait with an ended context returned no error")
+			}
+			s.Cancel(nil)
+			if _, err := outcome(t, s, clk); err == nil {
+				t.Error("a cancelled session reported no error")
+			}
 		}
-		ctx, cancel := context.WithCancel(context.Background())
-		cancel()
-		if _, err := s.Wait(ctx); err == nil {
-			t.Error("Wait with an ended context returned no error")
+		caps := discovery.CapabilitiesOf(0b101)
+		if !caps.SoftAP || caps.BLE || !caps.OnIPNetwork {
+			t.Fatalf("%+v", caps)
 		}
-		s.Cancel(nil)
-		if _, err := outcome(t, s, clk); err == nil {
-			t.Error("a cancelled session reported no error")
-		}
-	}
-	caps := discovery.CapabilitiesOf(0b101)
-	if !caps.SoftAP || caps.BLE || !caps.OnIPNetwork {
-		t.Fatalf("%+v", caps)
-	}
+	})
 }
 
 // syncLog collects log records under a lock.
@@ -886,20 +971,22 @@ func (l *syncLog) count() int {
 // test).
 func TestSessionReleasesTheCallerBeforeTheOutcome(t *testing.T) {
 	t.Parallel()
-	for range 50 {
-		log := &syncLog{}
-		ctx, cancel := context.WithCancel(context.Background())
-		tr := newFixed(deviceA)
-		tr.endsAtOnce = true
-		s := discovery.FindInstance(ctx, []discovery.Transport{tr}, discovery.SessionOptions{Timeout: 30 * time.Second, Logger: slog.New(log)})
-		if _, err := s.Wait(context.Background()); err != nil {
-			t.Fatalf("Wait: %v", err)
+	synctest.Test(t, func(t *testing.T) {
+		for range 50 {
+			log := &syncLog{}
+			ctx, cancel := context.WithCancel(context.Background())
+			tr := newFixed(deviceA)
+			tr.endsAtOnce = true
+			s := discovery.FindInstance(ctx, []discovery.Transport{tr}, discovery.SessionOptions{Timeout: 30 * time.Second, Logger: slog.New(log)})
+			if _, err := s.Wait(context.Background()); err != nil {
+				t.Fatalf("Wait: %v", err)
+			}
+			before := log.count()
+			cancel()
+			time.Sleep(time.Millisecond)
+			if after := log.count(); after != before {
+				t.Fatalf("the session logged %d record(s) after its outcome was delivered", after-before)
+			}
 		}
-		before := log.count()
-		cancel()
-		time.Sleep(time.Millisecond)
-		if after := log.count(); after != before {
-			t.Fatalf("the session logged %d record(s) after its outcome was delivered", after-before)
-		}
-	}
+	})
 }

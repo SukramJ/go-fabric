@@ -662,7 +662,7 @@
       "identifier": "TestArmStatusResponseWait_OrphanPreviousWaiter",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/outbound_reliable_test.go",
-      "line": 523
+      "line": 530
     },
     {
       "package": "bridge",
@@ -823,7 +823,7 @@
       "identifier": "TestBDXResponder_RefusedWithoutResponder",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/bdx_responder_test.go",
-      "line": 149
+      "line": 145
     },
     {
       "package": "bridge",
@@ -837,14 +837,14 @@
       "identifier": "TestBDXResponder_UnknownScope",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/bdx_responder_test.go",
-      "line": 177
+      "line": 173
     },
     {
       "package": "bridge",
       "identifier": "TestBindSessionRouteNeverSwitchesTransport",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/conn_tcp_test.go",
-      "line": 425
+      "line": 410
     },
     {
       "package": "bridge",
@@ -1208,119 +1208,119 @@
       "identifier": "TestCaseProvider_Active_EmptyZero",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/case_provider_test.go",
-      "line": 173
+      "line": 196
     },
     {
       "package": "bridge",
       "identifier": "TestCaseProvider_ForgetCausesNextResolveFresh",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/case_provider_test.go",
-      "line": 113
+      "line": 128
     },
     {
       "package": "bridge",
       "identifier": "TestCaseProvider_Forget_RemovesEntry",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/case_provider_test.go",
-      "line": 90
+      "line": 101
     },
     {
       "package": "bridge",
       "identifier": "TestCaseProvider_Forget_UnknownIDIsNoop",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/case_provider_test.go",
-      "line": 103
+      "line": 116
     },
     {
       "package": "bridge",
       "identifier": "TestCaseProvider_Reaper_CallsOnEvict",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/case_provider_test.go",
-      "line": 207
+      "line": 231
     },
     {
       "package": "bridge",
       "identifier": "TestCaseProvider_Reaper_DoesNotEvictRecentEntries",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/case_provider_test.go",
-      "line": 247
+      "line": 274
     },
     {
       "package": "bridge",
       "identifier": "TestCaseProvider_Reaper_EvictsStaleEntries",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/case_provider_test.go",
-      "line": 183
+      "line": 208
     },
     {
       "package": "bridge",
       "identifier": "TestCaseProvider_Reset_CallsOnEvict",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/case_provider_test.go",
-      "line": 148
+      "line": 167
     },
     {
       "package": "bridge",
       "identifier": "TestCaseProvider_Reset_DropsAll",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/case_provider_test.go",
-      "line": 133
+      "line": 150
     },
     {
       "package": "bridge",
       "identifier": "TestCaseProvider_Reset_NoOnEvictIsNoop",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/case_provider_test.go",
-      "line": 161
+      "line": 182
     },
     {
       "package": "bridge",
       "identifier": "TestCaseProvider_Resolve_AllocatesFreshAdapter",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/case_provider_test.go",
-      "line": 26
+      "line": 29
     },
     {
       "package": "bridge",
       "identifier": "TestCaseProvider_Resolve_DifferentExchanges",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/case_provider_test.go",
-      "line": 59
+      "line": 66
     },
     {
       "package": "bridge",
       "identifier": "TestCaseProvider_Resolve_FactoryReturnsNil",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/case_provider_test.go",
-      "line": 74
+      "line": 83
     },
     {
       "package": "bridge",
       "identifier": "TestCaseProvider_Resolve_NilFactory_ReturnsNil",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/case_provider_test.go",
-      "line": 18
+      "line": 19
     },
     {
       "package": "bridge",
       "identifier": "TestCaseProvider_Resolve_ReusesByExchangeID",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/case_provider_test.go",
-      "line": 42
+      "line": 47
     },
     {
       "package": "bridge",
       "identifier": "TestCaseProvider_StartReaper_DoubleIsNoop",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/case_provider_test.go",
-      "line": 232
+      "line": 255
     },
     {
       "package": "bridge",
       "identifier": "TestCaseProvider_StopReaper_WithoutStart_IsNoop",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/case_provider_test.go",
-      "line": 241
+      "line": 266
     },
     {
       "package": "bridge",
@@ -1453,14 +1453,14 @@
       "identifier": "TestChunkedReportFirstChunkUnacknowledgedIsPeerLoss",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/peer_loss_test.go",
-      "line": 436
+      "line": 458
     },
     {
       "package": "bridge",
       "identifier": "TestChunkedReportLaterChunkUnacknowledged",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/peer_loss_test.go",
-      "line": 494
+      "line": 516
     },
     {
       "package": "bridge",
@@ -1509,7 +1509,7 @@
       "identifier": "TestCloseSubscriptionByCounter_IsSessionScoped",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/outbound_reliable_test.go",
-      "line": 344
+      "line": 348
     },
     {
       "package": "bridge",
@@ -2769,7 +2769,7 @@
       "identifier": "TestDiagnosticEventsRecordSessionAndDiscoveryKinds",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/securechannel_close_parity_test.go",
-      "line": 539
+      "line": 536
     },
     {
       "package": "bridge",
@@ -3602,7 +3602,7 @@
       "identifier": "TestInboundCloseSessionStatusReport_DropsTimedDeadlines",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/timed_deadline_reclamation_test.go",
-      "line": 136
+      "line": 130
     },
     {
       "package": "bridge",
@@ -3630,14 +3630,14 @@
       "identifier": "TestInitiatedExchangePeerLoss_ForceClosesPeerSessions",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/peer_loss_test.go",
-      "line": 46
+      "line": 73
     },
     {
       "package": "bridge",
       "identifier": "TestInitiatedPeerLoss_UnknownExchangeIsNoOp",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/peer_loss_test.go",
-      "line": 140
+      "line": 169
     },
     {
       "package": "bridge",
@@ -3980,49 +3980,49 @@
       "identifier": "TestOutboundReliable_AbandonExchange",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/outbound_reliable_test.go",
-      "line": 131
+      "line": 132
     },
     {
       "package": "bridge",
       "identifier": "TestOutboundReliable_AckIsSessionScoped",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/outbound_reliable_test.go",
-      "line": 272
+      "line": 276
     },
     {
       "package": "bridge",
       "identifier": "TestOutboundReliable_AckStrayWithWaiter",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/outbound_reliable_test.go",
-      "line": 397
+      "line": 401
     },
     {
       "package": "bridge",
       "identifier": "TestOutboundReliable_PerSessionBaseInterval",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/outbound_reliable_test.go",
-      "line": 203
+      "line": 207
     },
     {
       "package": "bridge",
       "identifier": "TestOutboundReliable_TickGivesUp",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/outbound_reliable_test.go",
-      "line": 95
+      "line": 96
     },
     {
       "package": "bridge",
       "identifier": "TestOutboundReliable_TickRetransmits",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/outbound_reliable_test.go",
-      "line": 50
+      "line": 51
     },
     {
       "package": "bridge",
       "identifier": "TestOutboundReliable_TickSendError",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/outbound_reliable_test.go",
-      "line": 425
+      "line": 429
     },
     {
       "package": "bridge",
@@ -4036,7 +4036,7 @@
       "identifier": "TestOutboundReliable_TrackAck",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/outbound_reliable_test.go",
-      "line": 20
+      "line": 21
     },
     {
       "package": "bridge",
@@ -4295,63 +4295,63 @@
       "identifier": "TestPerExchangePaseProvider_FactoryProducesRealAdapter",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/pase_provider_test.go",
-      "line": 170
+      "line": 188
     },
     {
       "package": "bridge",
       "identifier": "TestPerExchangePaseProvider_FactoryReturnsNil",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/pase_provider_test.go",
-      "line": 77
+      "line": 84
     },
     {
       "package": "bridge",
       "identifier": "TestPerExchangePaseProvider_ForgetReleases",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/pase_provider_test.go",
-      "line": 90
+      "line": 99
     },
     {
       "package": "bridge",
       "identifier": "TestPerExchangePaseProvider_IsolatesExchanges",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/pase_provider_test.go",
-      "line": 40
+      "line": 43
     },
     {
       "package": "bridge",
       "identifier": "TestPerExchangePaseProvider_NilFactory",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/pase_provider_test.go",
-      "line": 63
+      "line": 68
     },
     {
       "package": "bridge",
       "identifier": "TestPerExchangePaseProvider_ReapBefore_EvictsStale",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/pase_provider_test.go",
-      "line": 125
+      "line": 138
     },
     {
       "package": "bridge",
       "identifier": "TestPerExchangePaseProvider_ResetClearsAll",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/pase_provider_test.go",
-      "line": 106
+      "line": 117
     },
     {
       "package": "bridge",
       "identifier": "TestPerExchangePaseProvider_Reuses",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/pase_provider_test.go",
-      "line": 17
+      "line": 18
     },
     {
       "package": "bridge",
       "identifier": "TestPerExchangePaseProvider_StartReaper_Cancels",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/pase_provider_test.go",
-      "line": 156
+      "line": 172
     },
     {
       "package": "bridge",
@@ -4624,7 +4624,7 @@
       "identifier": "TestReceiveOverReliableServesUnsecuredDropsGroup",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/conn_tcp_test.go",
-      "line": 398
+      "line": 383
     },
     {
       "package": "bridge",
@@ -4673,14 +4673,14 @@
       "identifier": "TestReportExhaustionPeerLoss_ClosesPeerSessionsAndSubscriptions",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/peer_loss_test.go",
-      "line": 161
+      "line": 190
     },
     {
       "package": "bridge",
       "identifier": "TestReportPeerLoss_OnlyFirstMessageOfExchange",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/peer_loss_test.go",
-      "line": 263
+      "line": 294
     },
     {
       "package": "bridge",
@@ -4771,14 +4771,14 @@
       "identifier": "TestReport_PeerUnreachable_ClosesSubscriptionWithoutMRP",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/outbound_reliable_test.go",
-      "line": 576
+      "line": 583
     },
     {
       "package": "bridge",
       "identifier": "TestReport_PeerUnreachable_RetriesBeforeEviction",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/outbound_reliable_test.go",
-      "line": 637
+      "line": 644
     },
     {
       "package": "bridge",
@@ -4960,7 +4960,7 @@
       "identifier": "TestRouteHelpers",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/conn_tcp_test.go",
-      "line": 497
+      "line": 482
     },
     {
       "package": "bridge",
@@ -5009,7 +5009,7 @@
       "identifier": "TestSendCloseSessionReport_ForgetsPeerAddrEvenWhenTheFarewellFails",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/securechannel_close_parity_test.go",
-      "line": 508
+      "line": 505
     },
     {
       "package": "bridge",
@@ -5233,21 +5233,21 @@
       "identifier": "TestStartHealthProbe_BoundReportsHealthy",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/health_probe_test.go",
-      "line": 53
+      "line": 54
     },
     {
       "package": "bridge",
       "identifier": "TestStartHealthProbe_NilArgsAreNoOps",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/health_probe_test.go",
-      "line": 111
+      "line": 104
     },
     {
       "package": "bridge",
       "identifier": "TestStartHealthProbe_UnboundReportsUnhealthy",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/health_probe_test.go",
-      "line": 80
+      "line": 77
     },
     {
       "package": "bridge",
@@ -5338,63 +5338,63 @@
       "identifier": "TestSubscriptionResumption_DisabledRecordsNothing",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscription_resume_e2e_test.go",
-      "line": 927
+      "line": 933
     },
     {
       "package": "bridge",
       "identifier": "TestSubscriptionResumption_FabricRemovalForgetsRows",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscription_resume_e2e_test.go",
-      "line": 945
+      "line": 951
     },
     {
       "package": "bridge",
       "identifier": "TestSubscriptionResumption_InvalidSubscriptionDropsTheRecord",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscription_resume_e2e_test.go",
-      "line": 816
+      "line": 822
     },
     {
       "package": "bridge",
       "identifier": "TestSubscriptionResumption_PeerReplacingSubscriptionForgetsIt",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscription_resume_e2e_test.go",
-      "line": 962
+      "line": 968
     },
     {
       "package": "bridge",
       "identifier": "TestSubscriptionResumption_PeerThatSubscribesIsSkipped",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscription_resume_e2e_test.go",
-      "line": 884
+      "line": 890
     },
     {
       "package": "bridge",
       "identifier": "TestSubscriptionResumption_RestartEndToEnd",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscription_resume_e2e_test.go",
-      "line": 726
+      "line": 732
     },
     {
       "package": "bridge",
       "identifier": "TestSubscriptionResumption_RestartEndToEndWithMRP",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscription_resume_e2e_test.go",
-      "line": 734
+      "line": 740
     },
     {
       "package": "bridge",
       "identifier": "TestSubscriptionResumption_SilentPeerStopsThatPeersLoop",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscription_resume_e2e_test.go",
-      "line": 988
+      "line": 994
     },
     {
       "package": "bridge",
       "identifier": "TestSubscriptionResumption_UnreachablePeerIsDropped",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscription_resume_e2e_test.go",
-      "line": 849
+      "line": 855
     },
     {
       "package": "bridge",
@@ -5408,21 +5408,21 @@
       "identifier": "TestSubscription_AutoCloseOnMaxRetries",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/outbound_reliable_test.go",
-      "line": 319
+      "line": 323
     },
     {
       "package": "bridge",
       "identifier": "TestSubscription_CloseUnknownCounterNoOp",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/outbound_reliable_test.go",
-      "line": 554
+      "line": 561
     },
     {
       "package": "bridge",
       "identifier": "TestSubscription_ReleaseCounterOnPeerAck",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/outbound_reliable_test.go",
-      "line": 380
+      "line": 384
     },
     {
       "package": "bridge",
@@ -5450,7 +5450,7 @@
       "identifier": "TestTCPConnClosedWhenLastSessionGoes",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/conn_tcp_test.go",
-      "line": 252
+      "line": 244
     },
     {
       "package": "bridge",
@@ -5471,14 +5471,14 @@
       "identifier": "TestTCPInboundCloseSessionClosesConn",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/conn_tcp_test.go",
-      "line": 316
+      "line": 301
     },
     {
       "package": "bridge",
       "identifier": "TestTCPListenerSharesUDPPortAndAdvertisesT",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/conn_tcp_test.go",
-      "line": 354
+      "line": 339
     },
     {
       "package": "bridge",
@@ -5527,7 +5527,7 @@
       "identifier": "TestTickOutboundReliable_RetransmitEvent",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/securechannel_close_parity_test.go",
-      "line": 660
+      "line": 657
     },
     {
       "package": "bridge",
@@ -5541,7 +5541,7 @@
       "identifier": "TestTriggerSessionReannounce_ReconnectEvent",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/securechannel_close_parity_test.go",
-      "line": 636
+      "line": 633
     },
     {
       "package": "bridge",
@@ -5604,7 +5604,7 @@
       "identifier": "TestUnsolicitedReportOverTCPHasNoMRP",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/conn_tcp_test.go",
-      "line": 472
+      "line": 457
     },
     {
       "package": "bridge",
@@ -5618,21 +5618,21 @@
       "identifier": "TestWaitForAck_AckClosesChannel",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/outbound_reliable_test.go",
-      "line": 494
+      "line": 498
     },
     {
       "package": "bridge",
       "identifier": "TestWaitForAck_ContextCancelled",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/outbound_reliable_test.go",
-      "line": 467
+      "line": 471
     },
     {
       "package": "bridge",
       "identifier": "TestWaitForAck_NotPending_ReturnsNilImmediately",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/outbound_reliable_test.go",
-      "line": 454
+      "line": 458
     },
     {
       "package": "bridge",
@@ -6080,7 +6080,7 @@
       "identifier": "TestService_Changes",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/discovery/status_test.go",
-      "line": 104
+      "line": 109
     },
     {
       "package": "client/discovery",
@@ -6143,14 +6143,14 @@
       "identifier": "TestStatus_ConnectingResolvesUntilAnAddressAppears",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/discovery/status_test.go",
-      "line": 30
+      "line": 35
     },
     {
       "package": "client/discovery",
       "identifier": "TestStatus_FailedAttemptAndReachabilityStopResolving",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/discovery/status_test.go",
-      "line": 67
+      "line": 72
     },
     {
       "package": "client/exchange",
@@ -31042,7 +31042,7 @@
       "identifier": "TestCountBootAndOperationalTime",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "node/persist_internal_test.go",
-      "line": 41
+      "line": 42
     },
     {
       "package": "node",
@@ -31091,7 +31091,7 @@
       "identifier": "TestPersistedKeys",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "node/persist_internal_test.go",
-      "line": 101
+      "line": 105
     },
     {
       "package": "node",
@@ -31112,7 +31112,7 @@
       "identifier": "TestRingLogs",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "node/persist_internal_test.go",
-      "line": 145
+      "line": 149
     },
     {
       "package": "node",
@@ -31140,7 +31140,7 @@
       "identifier": "TestUniqueIDRotationOnOffOn",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "node/persist_internal_test.go",
-      "line": 167
+      "line": 171
     },
     {
       "package": "node",

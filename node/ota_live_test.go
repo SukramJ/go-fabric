@@ -271,12 +271,9 @@ func TestLiveOTAProvider(t *testing.T) {
 		mattercore.OTAUpdateQuerying, mattercore.OTAUpdateDownloading, mattercore.OTAUpdateWaitForApply,
 		mattercore.OTAUpdateApplying, mattercore.OTAUpdateDone,
 	}
-	deadline := time.Now().Add(90 * time.Second)
-	for !slices.Equal(statuses.states(), want) {
-		if time.Now().After(deadline) || len(statuses.states()) > len(want) {
-			t.Fatalf("provider states %v, want %v", statuses.states(), want)
-		}
-		time.Sleep(20 * time.Millisecond)
+	waitLive(t, "the provider's states", func() bool { return len(statuses.states()) >= len(want) })
+	if got := statuses.states(); !slices.Equal(got, want) {
+		t.Fatalf("provider states %v, want %v", got, want)
 	}
 	if v, _ := requestor.Root().BasicInformation.MatterRead(0x0009); v != uint32(2) {
 		t.Errorf("requestor SoftwareVersion %v, want 2", v)

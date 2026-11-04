@@ -8,7 +8,6 @@ import (
 	"runtime"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/SukramJ/go-fabric/fabrictest"
 )
@@ -32,11 +31,7 @@ func TestClosedSiteLeavesNoFailSafeWatcher(t *testing.T) {
 	site := fabrictest.NewSite(t, fabrictest.Options{Logger: slog.New(slog.DiscardHandler)})
 	site.CommissionedPair(fabrictest.PairOptions{})
 	site.Close()
-	deadline := time.Now().Add(5 * time.Second)
-	for watchers() > before {
-		if time.Now().After(deadline) {
-			t.Fatalf("%d fail-safe watchers after the site closed, %d before", watchers(), before)
-		}
-		time.Sleep(10 * time.Millisecond)
-	}
+	// The watcher's goroutine leaves after Close returns; the process's
+	// goroutine count is the subject, which no site or bubble paces.
+	waitLive(t, "no fail-safe watcher after the site closed", func() bool { return watchers() <= before })
 }

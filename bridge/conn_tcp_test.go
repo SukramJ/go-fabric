@@ -221,19 +221,11 @@ func TestTCPConnectionDropEvictsBoundSessions(t *testing.T) {
 	waitReply(t, replies)
 	_ = conn.Close()
 
-	deadline := time.Now().Add(5 * time.Second)
-	for {
+	waitFor(t, "the registry closing the bound session", func() bool {
 		h.registry.mu.Lock()
-		closed := append([]uint16(nil), h.registry.closed...)
-		h.registry.mu.Unlock()
-		if len(closed) == 1 && closed[0] == harnessLocalSessionID {
-			break
-		}
-		if time.Now().After(deadline) {
-			t.Fatalf("registry closed %v, want [%d]", closed, harnessLocalSessionID)
-		}
-		time.Sleep(5 * time.Millisecond)
-	}
+		defer h.registry.mu.Unlock()
+		return len(h.registry.closed) == 1 && h.registry.closed[0] == harnessLocalSessionID
+	})
 	if _, ok := h.bridge.sessionPeerAddrs.Load(harnessLocalSessionID); ok {
 		t.Fatal("evicted session still has a route")
 	}
@@ -295,18 +287,11 @@ func TestTCPConnClosedWhenLastSessionGoes(t *testing.T) {
 	case <-time.After(5 * time.Second):
 		t.Fatal("connection still open after its last session went")
 	}
-	deadline := time.Now().Add(5 * time.Second)
-	for {
+	waitFor(t, "no connection route after the close", func() bool {
 		n := 0
 		h.bridge.connRoutes.Range(func(_, _ any) bool { n++; return true })
-		if n == 0 {
-			break
-		}
-		if time.Now().After(deadline) {
-			t.Fatalf("%d connection routes left after the close", n)
-		}
-		time.Sleep(5 * time.Millisecond)
-	}
+		return n == 0
+	})
 }
 
 // TestTCPInboundCloseSessionClosesConn: a CloseSession that arrives on
