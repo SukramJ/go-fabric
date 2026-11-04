@@ -25,6 +25,22 @@ principle 9).
 logs unless the test hands it a logger (`fabrictest.Options.Logger`), so a
 passing test prints nothing.
 
+A host that shows recent log lines in its own UI wraps its handler in a
+`logring.Handler`: `slog.New(logring.New(inner, logring.Options{}))` is
+the logger it hands to `node.Config.Logger`. The module still builds no
+handler; the host does. The handler forwards each record to `inner` and
+keeps the newest `Options.Size` records (1000 by default) in memory.
+`Handler.Records(since, limit)` returns them oldest first, each with a
+sequence number that starts at 1 and never repeats, its attributes
+resolved and groups flattened as `group.key`. `Handler.Observe` delivers
+each new record to a callback on a goroutine of its own. A callback that
+falls behind loses the oldest queued records, and `Handler.Dropped`
+counts them; the logger never waits for it. `Handler.SetLevel` moves the
+ring's level gate at run time: a record below it is neither kept nor
+forwarded, while `inner`'s own level still decides what `inner` prints.
+The UI reads the ring through a port of the host's own; the ring applies
+no redaction beyond the fact that the module logs no passcodes and no keys.
+
 ### Event names
 
 A log message is an event name in dotted lower case, `area.event`. The

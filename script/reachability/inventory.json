@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 7345,
+  "entry_points": 7358,
   "entry_packages": [
     ".",
     "bdx",
@@ -230,6 +230,7 @@
     "internal/paritytest",
     "internal/serialqueue",
     "internal/valuejson",
+    "logring",
     "mdns",
     "node",
     "node/controllernode",
@@ -278,9 +279,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 17259,
-    "reachable": 12123,
-    "whitelisted": 5136,
+    "total_exported": 17278,
+    "reachable": 12129,
+    "whitelisted": 5149,
     "unreachable": 0
   },
   "by_package": [],
@@ -30189,6 +30190,97 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "internal/paritytest/paritytest_test.go",
       "line": 69
+    },
+    {
+      "package": "logring",
+      "identifier": "TestConcurrent",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "logring/logring_test.go",
+      "line": 369
+    },
+    {
+      "package": "logring",
+      "identifier": "TestDefaults",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "logring/logring_test.go",
+      "line": 362
+    },
+    {
+      "package": "logring",
+      "identifier": "TestInnerErrorReturned",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "logring/logring_test.go",
+      "line": 169
+    },
+    {
+      "package": "logring",
+      "identifier": "TestInnerLevelGovernsForwarding",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "logring/logring_test.go",
+      "line": 151
+    },
+    {
+      "package": "logring",
+      "identifier": "TestLevelGateAtRunTime",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "logring/logring_test.go",
+      "line": 103
+    },
+    {
+      "package": "logring",
+      "identifier": "TestObserverDeliversInOrder",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "logring/logring_test.go",
+      "line": 246
+    },
+    {
+      "package": "logring",
+      "identifier": "TestObserverNeverBlocksTheLogger",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "logring/logring_test.go",
+      "line": 281
+    },
+    {
+      "package": "logring",
+      "identifier": "TestRecordsReturnsCopies",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "logring/logring_test.go",
+      "line": 94
+    },
+    {
+      "package": "logring",
+      "identifier": "TestRecordsSinceLimit",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "logring/logring_test.go",
+      "line": 69
+    },
+    {
+      "package": "logring",
+      "identifier": "TestRingBoundAndOrder",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "logring/logring_test.go",
+      "line": 51
+    },
+    {
+      "package": "logring",
+      "identifier": "TestSharedLevelVar",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "logring/logring_test.go",
+      "line": 138
+    },
+    {
+      "package": "logring",
+      "identifier": "TestUnsubscribeIdempotentAndStops",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "logring/logring_test.go",
+      "line": 343
+    },
+    {
+      "package": "logring",
+      "identifier": "TestWithAttrsWithGroupShareRingAndFlatten",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "logring/logring_test.go",
+      "line": 195
     },
     {
       "package": "mdns",
