@@ -96,6 +96,7 @@ pseudo-version of `main`.
 
 ### Fixed
 
+- `bridge`: a written structure or list of a cluster the generated definitions know (beyond the listed ACL, Binding, UserLabel, OTA and Thermostat cases) decodes with the attribute's type, as matter.js decodes a write with its TlvSchema; it reached the server as null (CameraAvStreamManagement's Viewport, TC-AVSM-2.12).
 - `bridge`: a list attribute a server returns as a plain slice of an enum, a bitmap, a bool or a string type (CameraAvStreamManagement's StreamUsagePriorities) goes on the wire as a TLV array of its values; it went as null, which controllers reject (TC-WEBRTCP-2.8).
 - `bridge`: a read or report whose list attribute holds an entry too large for any message answers the attribute with one RESOURCE_EXHAUSTED status on its path, instead of the list head followed by a status on a list-item path — which connectedhomeip's Python controller aborts on (TC-TLSCERT-2.9).
 - `bridge`: a list attribute a server returns as a plain slice of a type that encodes itself (`spec.Encodable`) goes on the wire as a TLV array of its entries — every host that set `device.Options.Tags` sent Descriptor `TagList` (`[]Semtag`) as TLV null, which a controller cached and decoded to nil. One general rule in the value writer, not a case per type; `bridge.EncodesAttributeValue` reports such a slice as encodable (G-N4, issue #388).

@@ -13,6 +13,7 @@ import (
 	"image/color"
 	"image/jpeg"
 	"log/slog"
+	"math"
 	"slices"
 	"sync"
 	"time"
@@ -167,6 +168,9 @@ type demoCamera struct {
 type camAvailableVideo struct {
 	params    csdef.VideoStreamStruct
 	allocated bool
+	// viewport is the stream's own (camera-device.cpp SetViewport per
+	// stream), the camera's at its allocation.
+	viewport avdef.ViewportStruct
 }
 
 type camAvailableAudio struct {
@@ -446,7 +450,7 @@ func (c *demoCamera) build() error {
 		},
 		wpdef.Declare{ProviderPort: camProviderPort{c}},
 		padef.Declare{PushTransportPort: camPushPort{c}},
-		avdef.Declare{Features: avsetFeatures, Initial: avset, MechanicalPTZ: camPTZ{}, DigitalPTZ: camPTZ{}},
+		avdef.Declare{Features: avsetFeatures, Initial: avset, MechanicalPTZ: camPTZ{c}, DigitalPTZ: camPTZ{c}},
 		zmdef.Declare{Features: zmFeatures, Initial: zm, ZonePort: camZonePort{c}},
 	)
 	if err != nil {
@@ -518,6 +522,8 @@ func (p camVideoPort) VideoStreamAllocate(_ context.Context, args csdef.VideoStr
 				return 0, statusErr(im.StatusResourceExhausted, "no encoder for the stream")
 			}
 			c.videos[i].allocated = true
+			vp := c.camera.CameraAvStreamManagement().Get().Viewport
+			c.videos[i].viewport = avdef.ViewportStruct{X1: vp.X1, Y1: vp.Y1, X2: vp.X2, Y2: vp.Y2}
 			return c.videos[i].params.VideoStreamId, nil
 		}
 	}
@@ -848,18 +854,105 @@ func (p camPushPort) CMAFSessionNumber(id uint16) (uint64, bool) {
 
 // --- CameraAvSettingsUserLevelManagement -----------------------------------
 
-// camPTZ moves at once (camera-avsettingsuserlevel-manager.cpp: the
-// camera-app's HAL sets the values and reports success).
-type camPTZ struct{}
+// camPTZ is the camera-app's PTZ manager: a mechanical move completes two
+// seconds after it starts, as the camera-app's timer mimics the physical
+// movement (camera-avsettingsuserlevel-manager.cpp:75, :93, :111,
+// onTimerExpiry :300-306); a preset save or removal and a digital move
+// take effect at once.
+type camPTZ struct{ c *demoCamera }
 
-func (camPTZ) MptzSetPosition(context.Context, avdef.MPTZStruct) error             { return nil }
-func (camPTZ) MptzRelativeMove(context.Context, avdef.MPTZStruct) error            { return nil }
-func (camPTZ) MptzMoveToPreset(context.Context, uint8, avdef.MPTZStruct) error     { return nil }
-func (camPTZ) MptzSavePreset(context.Context, uint8) error                         { return nil }
-func (camPTZ) MptzRemovePreset(context.Context, uint8) error                       { return nil }
-func (camPTZ) DptzSetViewport(context.Context, uint16, avdef.ViewportStruct) error { return nil }
-func (camPTZ) DptzRelativeMove(_ context.Context, _ avdef.DptzRelativeMoveRequest) (avdef.ViewportStruct, error) {
-	return avdef.ViewportStruct{}, errors.ErrUnsupported
+// camMoveDuration is the camera-app's simulated movement.
+const camMoveDuration = 2 * time.Second
+
+func (p camPTZ) moved() error {
+	time.AfterFunc(camMoveDuration, func() {
+		p.c.camera.CameraAvSettingsUserLevelManagement().Host().PhysicalMovementComplete(nil)
+	})
+	return nil
+}
+
+func (p camPTZ) MptzSetPosition(context.Context, avdef.MPTZStruct) error { return p.moved() }
+
+func (p camPTZ) MptzRelativeMove(context.Context, avdef.MPTZStruct) error { return p.moved() }
+
+func (p camPTZ) MptzMoveToPreset(context.Context, uint8, avdef.MPTZStruct) error { return p.moved() }
+func (camPTZ) MptzSavePreset(context.Context, uint8) error                       { return nil }
+func (camPTZ) MptzRemovePreset(context.Context, uint8) error                     { return nil }
+
+// DptzSetViewport sets an allocated stream's viewport.
+func (p camPTZ) DptzSetViewport(_ context.Context, id uint16, vp avdef.ViewportStruct) error {
+	p.c.mu.Lock()
+	defer p.c.mu.Unlock()
+	for i := range p.c.videos {
+		if p.c.videos[i].params.VideoStreamId == id && p.c.videos[i].allocated {
+			p.c.videos[i].viewport = vp
+			return nil
+		}
+	}
+	return statusErr(im.StatusNotFound, "video stream %d", id)
+}
+
+// DptzRelativeMove is the camera-app's DPTZRelativeMove
+// (camera-avsettingsuserlevel-manager.cpp:182-290): the deltas clamped at
+// the sensor's left and top edges, the zoom scaling the area by the
+// percentage at the viewport's aspect ratio, then no smaller than the
+// minimum viewport and no larger than the sensor — in its uint16
+// arithmetic.
+func (p camPTZ) DptzRelativeMove(_ context.Context, req avdef.DptzRelativeMoveRequest) (avdef.ViewportStruct, error) {
+	p.c.mu.Lock()
+	defer p.c.mu.Unlock()
+	for i := range p.c.videos {
+		v := &p.c.videos[i]
+		if v.params.VideoStreamId != req.VideoStreamId || !v.allocated {
+			continue
+		}
+		vp := v.viewport
+		move := func(lo, hi *uint16, d int16) {
+			if d == 0 {
+				return
+			}
+			m := func(edge uint16) uint16 {
+				if d < 0 && int(-d) > int(edge) {
+					return 0
+				}
+				return uint16(int(edge) + int(d)) //nolint:gosec // chip's uint16 arithmetic
+			}
+			*lo, *hi = m(*lo), m(*hi)
+		}
+		if req.DeltaX != nil {
+			move(&vp.X1, &vp.X2, *req.DeltaX)
+		}
+		if req.DeltaY != nil {
+			move(&vp.Y1, &vp.Y2, *req.DeltaY)
+		}
+		if req.ZoomDelta != nil && *req.ZoomDelta != 0 {
+			z := int(*req.ZoomDelta)
+			w, h := vp.X2-vp.X1, vp.Y2-vp.Y1
+			size := uint32(w) * uint32(h)
+			delta := size * uint32(max(z, -z)) / 100 //nolint:gosec // |z| ≤ 100
+			newSize := size + delta
+			if z < 0 {
+				newSize = size - delta
+			}
+			if minSize := uint32(camMinWidth) * uint32(camMinHeight); newSize < minSize {
+				newSize = minSize
+			}
+			ar := math.Floor(float64(float32(w)/float32(h)*100)) / 100
+			nw := uint16(math.Round(math.Sqrt(float64(newSize) * ar)))
+			nh := uint16(float64(nw) / ar)
+			vp.X1, vp.X2 = vp.X1-(nw-w), vp.X2+(nw-w)
+			vp.Y1, vp.Y2 = vp.Y1-(nh-h), vp.Y2+(nh-h)
+		}
+		if vp.X2-vp.X1 < camMinWidth || vp.Y2-vp.Y1 < camMinHeight {
+			vp.X2, vp.Y2 = vp.X1+camMinWidth, vp.Y1+camMinHeight
+		}
+		if vp.X2-vp.X1 > camMaxWidth || vp.Y2-vp.Y1 > camMaxHeight {
+			vp = avdef.ViewportStruct{X1: 0, Y1: 0, X2: camMaxWidth - 1, Y2: camMaxHeight - 1}
+		}
+		v.viewport = vp
+		return vp, nil
+	}
+	return avdef.ViewportStruct{}, statusErr(im.StatusNotFound, "video stream %d", req.VideoStreamId)
 }
 
 // --- ZoneManagement (zone-manager.cpp) -------------------------------------

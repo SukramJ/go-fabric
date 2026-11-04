@@ -73,6 +73,16 @@ func attributeValueReader(path im.ConcreteAttributePath, el tlv.Element, dec *tl
 		// (MatterScheduleConfiguration, brief CO), decodes the same way.
 		return generatedAttributeValue(thermostatdef.Definition, path.Attribute, el, dec, false)
 	}
+	// Any other structure or list of a cluster the generated definitions
+	// know decodes with the attribute's type, as matter.js decodes every
+	// write with its TlvSchema; the primitive reader below skips a
+	// container, so such a write reached the server as null
+	// (CameraAvStreamManagement's ViewportStruct, TC-AVSM-2.12 step 18).
+	if el.IsContainer {
+		if def := spec.Lookup(path.Cluster); def != nil && def.Attribute(path.Attribute) != nil {
+			return generatedAttributeValue(def, path.Attribute, el, dec, false)
+		}
+	}
 	if v, over := overlongBeforeIS1(path, el); over {
 		return v, nil
 	}
