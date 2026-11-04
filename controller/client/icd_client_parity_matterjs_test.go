@@ -738,7 +738,7 @@ func TestIcdClientParity(t *testing.T) {
 			}
 		})
 		t.Run("exposes nextExpectedCheckin on the wall clock once no subscription is held", func(t *testing.T) {
-			t.Skip("MockTime.stepWallClock: the Go wakefulness runs on one clock reading, its deadline already a time.Time; the no-subscription deadline is held by TestIcdPeerWakefulness's subscription cases")
+			t.Skip("behaviour gap (seam wave, issue #396): the Go deadline is anchored to the wall reading of the peer's last activity, so after Fake.StepWall(1h) NextExpectedCheckIn read now+15s where matter.js reads at least now+idleModeDuration (IcdClientTest.ts:2281-2293 at 862ad75f); the no-subscription deadline is held by TestIcdPeerWakefulness's subscription cases")
 		})
 		t.Run("has no nextExpectedCheckin for an unregistered peer", func(t *testing.T) {
 			if _, ok := newICDPair(t, icdPairOptions{}).icd().NextExpectedCheckIn(); ok {

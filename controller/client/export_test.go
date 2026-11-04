@@ -5,6 +5,7 @@ package client
 
 import (
 	"github.com/SukramJ/go-fabric/client/interaction"
+	"github.com/SukramJ/go-fabric/cluster/spec/basicinformation"
 	"github.com/SukramJ/go-fabric/icd"
 	"github.com/SukramJ/go-fabric/im"
 )
@@ -143,4 +144,30 @@ func SetNewlyCommissioned(n *Node) {
 	n.mu.Lock()
 	n.newlyCommissioned = true
 	n.mu.Unlock()
+}
+
+// PatchRemoveFabric makes r's decommissions call fn in place of their
+// RemoveFabric invoke — matter.js patchRemoveFabric
+// (DecommissionTest.ts:36-47 at 862ad75f), which replaces the peer's
+// OperationalCredentialsClient.removeFabric. fn gets the fabric index the
+// decommission removes and the invoke it replaces, which it may call with
+// any index. The returned restore removes the patch.
+func PatchRemoveFabric(r *Registry, fn func(fabricIndex uint8, invoke func(fabricIndex uint8) (Result, error)) (Result, error)) (restore func()) {
+	r.mu.Lock()
+	r.removeFabric = fn
+	r.mu.Unlock()
+	return func() {
+		r.mu.Lock()
+		r.removeFabric = nil
+		r.mu.Unlock()
+	}
+}
+
+// EmitLeave delivers a BasicInformation Leave event of fabricIndex to r as
+// n's subscription does (onEvent) and waits for the reaction it starts —
+// matter.js's leave.emit on the peer's BasicInformationClient events
+// (DecommissionTest.ts:231 at 862ad75f).
+func EmitLeave(r *Registry, n *Node, fabricIndex uint8) {
+	r.onEvent(n, 0, basicinformation.ClusterID, basicinformation.EventLeave, basicinformation.LeaveEvent{FabricIndex: fabricIndex})
+	r.work.Wait()
 }

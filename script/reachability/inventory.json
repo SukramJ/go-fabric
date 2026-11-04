@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 7359,
+  "entry_points": 7364,
   "entry_packages": [
     ".",
     "bdx",
@@ -279,9 +279,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 17278,
-    "reachable": 12129,
-    "whitelisted": 5149,
+    "total_exported": 17284,
+    "reachable": 12132,
+    "whitelisted": 5152,
     "unreachable": 0
   },
   "by_package": [],
@@ -6697,7 +6697,7 @@
       "identifier": "FlushingBatches",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/interaction/export_test.go",
-      "line": 19
+      "line": 24
     },
     {
       "package": "client/interaction",
@@ -6708,17 +6708,24 @@
     },
     {
       "package": "client/interaction",
+      "identifier": "HoldConnect",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/interaction/export_test.go",
+      "line": 41
+    },
+    {
+      "package": "client/interaction",
       "identifier": "QueuedInvokes",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/interaction/export_test.go",
-      "line": 8
+      "line": 13
     },
     {
       "package": "client/interaction",
       "identifier": "SetTimedWrite",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/interaction/export_test.go",
-      "line": 24
+      "line": 29
     },
     {
       "package": "client/interaction",
@@ -22622,7 +22629,7 @@
       "identifier": "CacheFabricFiltered",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/export_test.go",
-      "line": 71
+      "line": 72
     },
     {
       "package": "controller/client",
@@ -22643,7 +22650,7 @@
       "identifier": "ConnectionStateFor",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/export_test.go",
-      "line": 13
+      "line": 14
     },
     {
       "package": "controller/client",
@@ -22671,7 +22678,7 @@
       "identifier": "DeliverEvent",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/export_test.go",
-      "line": 90
+      "line": 91
     },
     {
       "package": "controller/client",
@@ -22686,6 +22693,13 @@
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "controller/client/surface.go",
       "line": 130
+    },
+    {
+      "package": "controller/client",
+      "identifier": "EmitLeave",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/client/export_test.go",
+      "line": 170
     },
     {
       "package": "controller/client",
@@ -22727,7 +22741,7 @@
       "identifier": "HoldOperation",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/export_test.go",
-      "line": 38
+      "line": 39
     },
     {
       "package": "controller/client",
@@ -22741,7 +22755,7 @@
       "identifier": "ICDTable",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/export_test.go",
-      "line": 94
+      "line": 95
     },
     {
       "package": "controller/client",
@@ -22776,21 +22790,28 @@
       "identifier": "KnownVersions",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/export_test.go",
-      "line": 63
+      "line": 64
     },
     {
       "package": "controller/client",
       "identifier": "MaxEventNumber",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/export_test.go",
-      "line": 83
+      "line": 84
     },
     {
       "package": "controller/client",
       "identifier": "ObserveRequests",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/export_test.go",
-      "line": 17
+      "line": 18
+    },
+    {
+      "package": "controller/client",
+      "identifier": "PatchRemoveFabric",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/client/export_test.go",
+      "line": 155
     },
     {
       "package": "controller/client",
@@ -22811,7 +22832,7 @@
       "identifier": "RebaseICDPeer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/export_test.go",
-      "line": 108
+      "line": 109
     },
     {
       "package": "controller/client",
@@ -22846,14 +22867,14 @@
       "identifier": "SaveRecord",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/export_test.go",
-      "line": 24
+      "line": 25
     },
     {
       "package": "controller/client",
       "identifier": "SaveSettingsAutoSubscribe",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/export_test.go",
-      "line": 52
+      "line": 53
     },
     {
       "package": "controller/client",
@@ -22867,21 +22888,21 @@
       "identifier": "SetICDCounterStart",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/export_test.go",
-      "line": 98
+      "line": 99
     },
     {
       "package": "controller/client",
       "identifier": "SetICDFedOffset",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/export_test.go",
-      "line": 128
+      "line": 129
     },
     {
       "package": "controller/client",
       "identifier": "SetNewlyCommissioned",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/export_test.go",
-      "line": 142
+      "line": 143
     },
     {
       "package": "controller/client",
@@ -23462,7 +23483,7 @@
       "identifier": "UpdateRecord",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/export_test.go",
-      "line": 79
+      "line": 80
     },
     {
       "package": "controller/client",
@@ -23476,7 +23497,7 @@
       "identifier": "WaitRegistry",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/export_test.go",
-      "line": 34
+      "line": 35
     },
     {
       "package": "controller/client",

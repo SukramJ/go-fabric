@@ -529,6 +529,32 @@ func TestInvokeBatcherParity(t *testing.T) {
 			}
 		})
 	})
+	t.Run("command queued while the interaction closes is rejected with the close reason", func(t *testing.T) {
+		t.Parallel()
+		synctest.Test(t, func(t *testing.T) {
+			// ClientInvokeTest.ts:832-865: the connect the batcher awaits
+			// before it queues the command is held, the interaction closes
+			// meanwhile and the connect is released — the command is
+			// rejected with the close reason and no invoke exchange opens.
+			s := newScriptedWith(t, &sessionparams.Parameters{MaxPathsPerInvoke: 10})
+			p, connecting, release := interaction.HoldConnect(interaction.SessionProvider(s.mgr, s.session))
+			c := interaction.Bind(p, interaction.Config{Clock: s.clock})
+			done := ciInvoke(context.Background(), c, ciPath(1, ciOn), batched())
+			<-connecting
+			reason := errors.New("closed for test")
+			c.Close(reason)
+			release()
+			if r := await(t, done); !errors.Is(r.err, reason) {
+				t.Fatalf("err %v, want the close reason", r.err)
+			}
+			s.clock.Advance(batchWindow)
+			synctest.Wait()
+			if n := interaction.QueuedInvokes(c); n != 0 {
+				t.Fatalf("%d commands queued after the close", n)
+			}
+			ciNothingSent(t, s)
+		})
+	})
 }
 
 // TestInvokeBatcherCloseParity covers ClientInteractionInvokeTest.ts's

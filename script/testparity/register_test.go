@@ -64,9 +64,17 @@ const testparityPlannedRatchet = 2
 // took 261 of the 312 cases of nine entries out of missing — ported or
 // left — and completed four files; 51 stay missing with a named reason
 // (the PR's report): 125 ported, 552 missing.
+// The seam wave (issue #396) moves cases out of missing item by item: the
+// five Presets observer cases (left, owner verdict), DiscoveryCancelTest.ts
+// (three ported on a held PASE, one left), ClientInvokeTest.ts (one ported
+// on a held connect, ten left), DecommissionTest.ts (five ported on a
+// patched RemoveFabric, nine left), FailsafeCommissioningTest.ts's ACL
+// failure (ported on a failing credential store) and IcdClientTest.ts (ten
+// ported on the device's registration hook, restarts and a sleeping peer,
+// five left, six stay missing) complete five files: 130 ported, 501 missing.
 const (
-	testparityPortedRatchet  = 126
-	testparityMissingRatchet = 550
+	testparityPortedRatchet  = 130
+	testparityMissingRatchet = 509
 )
 
 // testparityLeftRatchet is the number of left it cases summed over the
@@ -81,7 +89,13 @@ const (
 // allocator (BD-Matter-ControllerNodeIDRandom), the ICD transaction model,
 // the ML-DSA ledger stores (BD-Matter-DCL-MirroredScope) and JS runtime
 // artefacts, each row with its class and reason.
-const testparityLeftRatchet = 270
+// The seam wave (issue #396) adds the five Presets observer rows
+// (js-runtime-only, owner verdict), the discovery node's start, ten
+// ClientInvokeTest.ts rows (five of them a feature gap of InvokeOptions,
+// named for the findings register), nine DecommissionTest.ts
+// construction-lifecycle rows and five IcdClientTest.ts transaction-model
+// rows: 300.
+const testparityLeftRatchet = 291
 
 // moduleRoot is where the committed artefacts live, seen from this package.
 const moduleRoot = "../.."

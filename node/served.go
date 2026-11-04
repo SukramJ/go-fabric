@@ -24,10 +24,18 @@ type AttributeValue struct {
 	Cluster   uint32
 	Attribute uint32
 	// Value is the value as the cluster server's MatterRead returns it —
-	// the Go value the node encodes on the wire; nil for a null.
+	// the Go value the node encodes on the wire; nil for a null and for
+	// an attribute whose read failed.
 	Value any
-	// DataVersion is the cluster's DataVersion at the read.
+	// DataVersion is the cluster's DataVersion at the read; 0 for an
+	// attribute whose read failed.
 	DataVersion uint32
+	// Status is the IM status of the attribute's read — 0 (SUCCESS) for
+	// a value, otherwise the status a controller's read reports for the
+	// path (the value a [contract.StatusError] carries). Only
+	// [Node.ReadCluster] returns a failed attribute; [Node.ReadAttribute]
+	// returns its failure as the error.
+	Status uint8
 }
 
 // JSON renders Value by name, as a controller of this module renders the
@@ -69,10 +77,11 @@ func (n *Node) ReadAttribute(ctx context.Context, endpoint uint16, cluster, attr
 
 // ReadCluster returns every attribute one cluster of an endpoint serves,
 // the global attributes among them, in the order a controller's wildcard
-// read reports them, each as [Node.ReadAttribute] returns it. An attribute
-// whose read fails is left out. An endpoint or cluster the node does not
-// serve is a [contract.StatusError]; before [Node.Start] it is
-// [ErrNotStarted].
+// read reports them, each as [Node.ReadAttribute] returns it — an
+// attribute whose read fails among them, with its Status and a nil Value,
+// as the wildcard read reports a status for its path. An endpoint or
+// cluster the node does not serve is a [contract.StatusError]; before
+// [Node.Start] it is [ErrNotStarted].
 func (n *Node) ReadCluster(ctx context.Context, endpoint uint16, cluster uint32) ([]AttributeValue, error) {
 	results, err := n.readServed(ctx, im.ConcreteAttributePath{
 		Endpoint: endpoint, Cluster: cluster, HasEndpoint: true, HasCluster: true,
@@ -86,6 +95,9 @@ func (n *Node) ReadCluster(ctx context.Context, endpoint uint16, cluster uint32)
 			if !r.Path.HasAttribute || r.Status == im.StatusUnsupportedEndpoint || r.Status == im.StatusUnsupportedCluster {
 				return nil, statusError(r)
 			}
+			out = append(out, AttributeValue{
+				Endpoint: r.Path.Endpoint, Cluster: r.Path.Cluster, Attribute: r.Path.Attribute, Status: uint8(r.Status),
+			})
 			continue
 		}
 		out = append(out, attributeValueOf(r))

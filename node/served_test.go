@@ -6,6 +6,7 @@ package node_test
 import (
 	"context"
 	"errors"
+	"maps"
 	"path/filepath"
 	"slices"
 	"sync"
@@ -198,5 +199,90 @@ func TestServedEvents(t *testing.T) {
 	logged := n.Events(node.EventQuery{MinNumber: seen[i].Number, Limit: 1, Cluster: new(basicinfo.ClusterID)})
 	if len(logged) != 1 || logged[0].Number != seen[i].Number || logged[0].Event != seen[i].Event {
 		t.Fatalf("the log holds %+v, OnEvent saw %+v", logged, seen[i])
+	}
+}
+
+// listedServer is a fakeServer that lists attributes in its AttributeList
+// beyond the ones it reads — an attribute whose read fails.
+type listedServer struct {
+	*fakeServer
+	listed []uint32
+}
+
+func (l *listedServer) MatterAttributes() []uint32 { return l.listed }
+
+// TestReadClusterReportsFailedAttributes (issue #396): ReadCluster returns
+// every attribute the wildcard read reports, in its order, a failed one
+// with its status and no value — the per-path status a controller's
+// wildcard read of the same cluster receives — while ReadAttribute keeps
+// returning the failure as its error.
+func TestReadClusterReportsFailedAttributes(t *testing.T) {
+	t.Parallel()
+	const cluster, readable, unreadable = 0xFFF1FC01, 0x0000, 0x0001
+	srv := &listedServer{
+		fakeServer: &fakeServer{cluster: cluster, attrs: map[uint32]any{readable: uint8(7)}},
+		listed:     []uint32{readable, unreadable},
+	}
+	ep := &customEndpoint{key: "listed", deviceType: chimeDeviceType, servers: []contract.ClusterServer{srv}}
+	site := fabrictest.NewSite(t, fabrictest.Options{})
+	pair := site.CommissionedPair(fabrictest.PairOptions{Device: fabrictest.Topology{Bridged: []node.Endpoint{ep}}})
+	n := pair.Device.Node()
+	num, ok := pair.Device.EndpointOf("listed")
+	if !ok {
+		t.Fatal("no endpoint")
+	}
+	ctx := observeContext(t)
+	values, err := n.ReadCluster(ctx, num, cluster)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var failed, served *node.AttributeValue
+	for i := range values {
+		switch values[i].Attribute {
+		case unreadable:
+			failed = &values[i]
+		case readable:
+			served = &values[i]
+		}
+	}
+	if served == nil || served.Status != 0 || served.Value != uint8(7) {
+		t.Fatalf("readable attribute %+v", served)
+	}
+	if failed == nil || failed.Status != uint8(im.StatusUnsupportedAttribute) || failed.Value != nil {
+		t.Fatalf("unreadable attribute %+v, want status UNSUPPORTED_ATTRIBUTE without a value", failed)
+	}
+	if _, err := n.ReadAttribute(ctx, num, cluster, unreadable); err == nil {
+		t.Fatal("ReadAttribute of the unreadable attribute succeeded")
+	}
+
+	// The controller's wildcard read of the cluster reports the same
+	// paths: the values in the same order, the failed one with the same
+	// status.
+	var rep *fabrictest.Report
+	if err := site.Run(ctx, func(ctx context.Context) (err error) {
+		rep, err = fabrictest.ReadWith(ctx, pair, fabrictest.ReadRequest{Attributes: []fabrictest.AttributePath{client.ClusterAt(num, cluster)}})
+		return err
+	}); err != nil {
+		t.Fatal(err)
+	}
+	wireValues := make([]uint32, 0, len(rep.Attributes))
+	facadeValues := make([]uint32, 0, len(values))
+	for _, a := range rep.Attributes {
+		wireValues = append(wireValues, a.Path.Attribute)
+	}
+	wireStatus := map[uint32]uint8{}
+	for _, st := range rep.Statuses {
+		wireStatus[st.Path.Attribute] = uint8(st.Status)
+	}
+	facadeStatus := map[uint32]uint8{}
+	for _, v := range values {
+		if v.Status == 0 {
+			facadeValues = append(facadeValues, v.Attribute)
+		} else {
+			facadeStatus[v.Attribute] = v.Status
+		}
+	}
+	if !slices.Equal(facadeValues, wireValues) || !maps.Equal(facadeStatus, wireStatus) {
+		t.Fatalf("facade values %v statuses %v, wire values %v statuses %v", facadeValues, facadeStatus, wireValues, wireStatus)
 	}
 }
