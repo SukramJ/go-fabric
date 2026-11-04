@@ -72,8 +72,8 @@ func TestWriteTransactionRelease(t *testing.T) {
 }
 
 // TestWriteRequestSuppressResponseType: a SuppressResponse that is not a
-// boolean fails the decode (TlvWriteRequest.ts:18 TlvOptionalField(0,
-// TlvBoolean); SuppressResponseTest.ts:399-403 at 862ad75f).
+// boolean fails the decode, and the request is answered
+// (SuppressResponseTest.ts:399-403 at 862ad75f, UNREADABLE_SUPPRESS_RESPONSE).
 func TestWriteRequestSuppressResponseType(t *testing.T) {
 	t.Parallel()
 	enc := tlv.NewEncoder()

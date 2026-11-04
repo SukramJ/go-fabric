@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 7278,
+  "entry_points": 7283,
   "entry_packages": [
     ".",
     "bdx",
@@ -277,9 +277,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 17166,
+    "total_exported": 17169,
     "reachable": 12090,
-    "whitelisted": 5076,
+    "whitelisted": 5079,
     "unreachable": 0
   },
   "by_package": [],
@@ -29421,6 +29421,13 @@
     },
     {
       "package": "im",
+      "identifier": "TestVersionCheckApplies",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "im/write_version_check_test.go",
+      "line": 27
+    },
+    {
+      "package": "im",
       "identifier": "TestVolatileEventStore",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/volatile_event_store_parity_matterjs_test.go",
@@ -29523,6 +29530,20 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/write_parity_test.go",
       "line": 401
+    },
+    {
+      "package": "im",
+      "identifier": "TestWriteRequestSuppressResponseType",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "im/write_version_check_test.go",
+      "line": 77
+    },
+    {
+      "package": "im",
+      "identifier": "TestWriteTransactionRelease",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "im/write_version_check_test.go",
+      "line": 57
     },
     {
       "package": "im/subscription",
