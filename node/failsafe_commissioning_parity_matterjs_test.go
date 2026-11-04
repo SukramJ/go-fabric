@@ -25,14 +25,18 @@
 // published while a PASE session is up and publishes nothing when that
 // session closes, where matter.js starts a commissioning advertisement
 // round on every closed PASE session (packages/protocol/src/protocol/DeviceAdvertiser.ts:131-162
-// at 862ad75f) — so both cases stay missing in the register, as does the
-// third (the device's initial ACL creation failing during AddNOC: no seam
-// fails the Go AccessControl's).
+// at 862ad75f) — so both cases stay missing in the register. The third
+// (the device's initial ACL creation failing during AddNOC) wraps the
+// device's credential store (node.Config.Store.Credentials) so that the
+// ReplaceACL of the initial entry fails, and asserts the commissionable
+// record where matter.js awaits the announcement.
 package node_test
 
 import (
 	"context"
+	"errors"
 	"net"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -44,6 +48,7 @@ import (
 	"github.com/SukramJ/go-fabric/mdns"
 	"github.com/SukramJ/go-fabric/node"
 	"github.com/SukramJ/go-fabric/secure/sessionparams"
+	"github.com/SukramJ/go-fabric/store"
 )
 
 // adSpy is matter.js's CommissioningAdSpy: an advertiser that counts the
@@ -165,4 +170,72 @@ func TestFailsafeCommissioningParity(t *testing.T) {
 			t.Fatal("the device is not commissionable after the rollback")
 		}
 	})
+
+	// FailsafeCommissioningTest.ts:305-344: the device's initial ACL
+	// cannot be written during AddNOC (matter.js's FailingAccessControlServer
+	// throws from addDefaultCaseAcl, :100-104; here the credential store
+	// refuses the ReplaceACL AddNOC installs the CaseAdminSubject entry
+	// with): the commissioning fails, no fabric stays, the device stays up
+	// and commissionable. matter.js also awaits a commissioning
+	// announcement (adSpy.announced); that is the re-announcement the two
+	// cases above leave missing, so the subtest asserts the commissionable
+	// record instead and is named for it.
+	t.Run("recovers cleanly and stays commissionable when initial ACL creation fails during addNOC", func(t *testing.T) {
+		t.Parallel()
+		site := quietSite(t)
+		spy := &adSpy{Noop: mdns.NewNoop()}
+		creds := &failingACL{}
+		u := site.UncommissionedPair(fabrictest.PairOptions{Device: fabrictest.Topology{Configure: func(cfg *node.Config) {
+			cfg.Advertiser = spy
+			creds.Port = cfg.Store.Credentials
+			cfg.Store.Credentials = creds
+		}}})
+		ctx := parityCtx(t)
+		spy.arm()
+		err := site.Run(ctx, func(ctx context.Context) error {
+			_, err := u.Controller.Commissioner().Commission(ctx, commissioner.Options{
+				Fabric: u.Controller.Fabric(), Passcode: u.Device.Passcode(), Addresses: []*net.UDPAddr{u.Device.Addr()},
+			})
+			return err
+		})
+		if err == nil {
+			t.Fatal("the commissioning succeeded without its initial ACL")
+		}
+		// The device answers AddNOC InvalidNOC with the store's error as
+		// its debug text.
+		if !creds.failed() || !strings.Contains(err.Error(), "addNoc") || !strings.Contains(err.Error(), "simulated ACL transaction failure") {
+			t.Fatalf("commissioning: %v, want AddNOC refused for the initial ACL", err)
+		}
+		if err := site.Settle(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if n := fabrics(t, u); n != 0 || !u.Device.Running() || !spy.commissionable() {
+			t.Fatalf("%d fabrics, running %v, commissionable %v after the failed AddNOC", n, u.Device.Running(), spy.commissionable())
+		}
+	})
+}
+
+// failingACL is a credential store whose first ReplaceACL fails — the
+// write of the initial CaseAdminSubject entry AddNOC makes.
+type failingACL struct {
+	store.Port
+	mu    sync.Mutex
+	calls int
+}
+
+func (f *failingACL) ReplaceACL(ctx context.Context, fabricIndex uint8, entries []store.ACLEntry) error {
+	f.mu.Lock()
+	f.calls++
+	first := f.calls == 1
+	f.mu.Unlock()
+	if first {
+		return errors.New("simulated ACL transaction failure (test)")
+	}
+	return f.Port.ReplaceACL(ctx, fabricIndex, entries)
+}
+
+func (f *failingACL) failed() bool {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.calls > 0
 }

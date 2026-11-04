@@ -67,12 +67,13 @@ const testparityPlannedRatchet = 2
 // The seam wave (issue #396) moves cases out of missing item by item: the
 // five Presets observer cases (left, owner verdict), DiscoveryCancelTest.ts
 // (three ported on a held PASE, one left), ClientInvokeTest.ts (one ported
-// on a held connect, ten left) and DecommissionTest.ts (five ported on a
-// patched RemoveFabric, nine left) complete five files: 130 ported, 517
-// missing.
+// on a held connect, ten left), DecommissionTest.ts (five ported on a
+// patched RemoveFabric, nine left) and FailsafeCommissioningTest.ts's ACL
+// failure (ported on a failing credential store) complete five files: 130
+// ported, 516 missing.
 const (
 	testparityPortedRatchet  = 130
-	testparityMissingRatchet = 517
+	testparityMissingRatchet = 516
 )
 
 // testparityLeftRatchet is the number of left it cases summed over the
