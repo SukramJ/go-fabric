@@ -101,7 +101,7 @@ func TestDNSType_String(t *testing.T) {
 func TestOpenQueryConn(t *testing.T) {
 	c, err := mdns.OpenQueryConn()
 	if err != nil {
-		t.Skipf("no multicast here: %v", err)
+		t.Skipf("no mDNS query socket on this host: joining the mDNS multicast groups failed (%v)", err)
 	}
 	if c.Responses() == nil {
 		t.Fatal("no response channel")
