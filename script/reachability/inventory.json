@@ -9188,7 +9188,7 @@
       "identifier": "TestCommodityWireValue",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/energy/commodity_wire_internal_test.go",
-      "line": 19
+      "line": 20
     },
     {
       "package": "cluster/energy",
@@ -27227,14 +27227,14 @@
       "identifier": "TestEnergyMarketDevices",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/fleet_energy_market_test.go",
-      "line": 96
+      "line": 97
     },
     {
       "package": "examples/reference-bridge",
       "identifier": "TestEnergyMarketWireShapes",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/fleet_energy_market_test.go",
-      "line": 32
+      "line": 33
     },
     {
       "package": "examples/reference-bridge",
@@ -27269,7 +27269,7 @@
       "identifier": "TestFleetWireShapes",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/wire_shape_test.go",
-      "line": 73
+      "line": 75
     },
     {
       "package": "examples/reference-bridge",
@@ -27381,7 +27381,7 @@
       "identifier": "TestMeteringTriggers",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/fleet_energy_market_test.go",
-      "line": 230
+      "line": 231
     },
     {
       "package": "examples/reference-bridge",
@@ -27479,7 +27479,7 @@
       "identifier": "TestPriceAndGridTriggers",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/fleet_energy_market_test.go",
-      "line": 265
+      "line": 266
     },
     {
       "package": "examples/reference-bridge",
@@ -27577,7 +27577,7 @@
       "identifier": "TestTariffTriggers",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/fleet_energy_market_test.go",
-      "line": 165
+      "line": 166
     },
     {
       "package": "examples/reference-bridge",
