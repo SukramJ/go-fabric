@@ -159,8 +159,8 @@ func TestThermostatSetAttributesStoresTheRemainingAttributes(t *testing.T) {
 	if err := srv.SetAttributes(map[uint32]any{tdef.AttrOccupancy: uint8(1)}); !errors.Is(err, spec.ErrNotServed) {
 		t.Errorf("Occupancy without OCC: %v, want ErrNotServed", err)
 	}
-	if err := srv.SetAttributes(map[uint32]any{tdef.AttrPresets: "none"}); err == nil {
-		t.Error("Presets without PRES was accepted")
+	if err := srv.SetAttributes(map[uint32]any{tdef.AttrPresets: "none"}); !errors.Is(err, spec.ErrNotServed) {
+		t.Errorf("Presets without PRES: %v, want %v", err, spec.ErrNotServed)
 	}
 }
 
@@ -218,8 +218,8 @@ func TestThermostatSetAttributesHoldsTheLimits(t *testing.T) {
 			srv := thermostatServer(t, nil)
 			before := tdef.Wrap(srv).Get()
 			err := srv.SetAttributes(c.values)
-			if err == nil {
-				t.Fatal("SetAttributes succeeded")
+			if spec.StatusOf(err) != im.StatusConstraintError {
+				t.Fatalf("SetAttributes: status %v (%v), want %v", spec.StatusOf(err), err, im.StatusConstraintError)
 			}
 			if c.want != nil && !errors.Is(err, c.want) {
 				t.Errorf("SetAttributes = %v, want %v", err, c.want)
