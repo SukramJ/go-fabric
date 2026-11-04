@@ -1009,7 +1009,14 @@ var chipFamilies = []family{
 	// a row. A case whose CI starts the camera-app with
 	// --camera-deferred-offer or --camera-test-videosrc starts the daemon
 	// with the same switch (daemonAppArgs).
-	{name: "WEBRTCP", deviceType: dtCamera, variant: variantCamera},
+	{
+		name: "WEBRTCP", deviceType: dtCamera, variant: variantCamera,
+		edits: map[string][]edit{
+			// Step 2 sends its ProvideOffers to endpoint 1, step 3 to the
+			// case's endpoint (TC_WEBRTCP_2_16.py:159, :173).
+			"2.16": {{"cmd=provide_offer_cmd,\n                endpoint=1,", "cmd=provide_offer_cmd,\n                endpoint=endpoint,", "step 2 addresses endpoint 1, the camera-app's camera, where step 3 uses the case's endpoint (TC_WEBRTCP_2_16.py:159, :173); the daemon's camera is a bridged endpoint"}},
+		},
+	},
 	{name: "WebRTCP", deviceType: dtCamera, variant: variantCamera},
 	{name: "AVSM", deviceType: dtCamera, variant: variantCamera},
 	{name: "AVSUM", deviceType: dtCamera, variant: variantCamera},
