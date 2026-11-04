@@ -89,3 +89,57 @@ func DeviceTypeAllowsServerCluster(deviceType DeviceTypeID, clusterID uint32) (a
 func DeviceTypeRequiresServerCluster(deviceType DeviceTypeID, clusterID uint32) bool {
 	return slices.Contains(DeviceTypeMandatoryServerClusters[deviceType], clusterID)
 }
+
+// globalAttributeNames names the global attributes every cluster carries
+// (Matter Core §7.13). parity/schema.json lists FeatureMap and
+// ClusterRevision under each cluster but none of the id lists, which
+// matter.js models once as global elements: GeneratedCommandList
+// (generated-command-list.element.ts:14), AcceptedCommandList
+// (accepted-command-list.element.ts:14), EventList (event-list.element.ts:12,
+// conformance D), AttributeList (attribute-list.element.ts:13), FeatureMap
+// (feature-map.element.ts:13) and ClusterRevision
+// (cluster-revision.element.ts:13), all under
+// packages/model/src/standard/elements/ at 862ad75f.
+var globalAttributeNames = map[uint32]string{
+	0xFFF8: "GeneratedCommandList",
+	0xFFF9: "AcceptedCommandList",
+	0xFFFA: "EventList",
+	0xFFFB: "AttributeList",
+	0xFFFC: "FeatureMap",
+	0xFFFD: "ClusterRevision",
+}
+
+// AttributeName returns the matter.js name of a cluster's attribute — a
+// global attribute (AttributeList, FeatureMap, …) for any cluster id — or
+// ("", false) for an attribute the snapshot does not name.
+func AttributeName(cluster, attribute uint32) (string, bool) {
+	if name, ok := attributeNames[cluster][attribute]; ok {
+		return name, true
+	}
+	name, ok := globalAttributeNames[attribute]
+	return name, ok
+}
+
+// CommandName returns the matter.js name of a cluster's request command —
+// one a client invokes, as AcceptedCommandList lists it — or ("", false)
+// for a command the snapshot does not name. A response command's id lives
+// in its own space: [ResponseCommandName].
+func CommandName(cluster, command uint32) (string, bool) {
+	name, ok := commandNames[cluster][command]
+	return name, ok
+}
+
+// ResponseCommandName returns the matter.js name of a cluster's response
+// command — one a server answers with, as GeneratedCommandList lists it —
+// or ("", false) for a response the snapshot does not name.
+func ResponseCommandName(cluster, command uint32) (string, bool) {
+	name, ok := responseCommandNames[cluster][command]
+	return name, ok
+}
+
+// EventName returns the matter.js name of a cluster's event, or ("", false)
+// for an event the snapshot does not name.
+func EventName(cluster, event uint32) (string, bool) {
+	name, ok := eventNames[cluster][event]
+	return name, ok
+}

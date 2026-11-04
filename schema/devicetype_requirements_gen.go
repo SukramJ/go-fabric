@@ -13,15 +13,12 @@ package schema
 // device type it derives from. Generated from the device types'
 // "effective" layer in parity/schema.json.
 var deviceTypeDefinitions = map[DeviceTypeID]*DeviceTypeDefinition{
-	0x000A: {
-		ID: 0x000A, Name: "DoorLock", Classification: "simple", Revision: 4, Composition: "tree",
+	0x000A: {ID: 0x000A, Name: "DoorLock", Classification: "simple", Revision: 4, Composition: "tree",
 		Requirements: []DeviceTypeRequirement{
-			{
-				Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
+			{Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementAttribute, Name: "DeviceTypeList", Referent: Referent{Resolved: true, ID: 0x0000, Name: "DeviceTypeList"}},
-				},
-			},
+				}},
 			{Element: RequirementCondition, Name: "AclExtensionCond", Type: "RootNode.AclExtensionCond", Location: LocationRoot, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, Name: "AclExtensionCond", Declarer: "RootNode"}},
 			{Element: RequirementCondition, Name: "TimeSyncCond", Type: "RootNode.TimeSyncCond", Location: LocationRoot, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, Name: "TimeSyncCond", Declarer: "RootNode"}},
 			{Element: RequirementCondition, Name: "TimeSyncWithClientCond", Type: "RootNode.TimeSyncWithClientCond", Location: LocationRoot, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, Name: "TimeSyncWithClientCond", Declarer: "RootNode"}},
@@ -29,140 +26,102 @@ var deviceTypeDefinitions = map[DeviceTypeID]*DeviceTypeDefinition{
 			{Element: RequirementServerCluster, Name: "Groups", ID: 0x0004, HasID: true, Conformance: Conformance{Text: "X", Op: "X"}, Referent: Referent{Resolved: true, ID: 0x0004, Name: "Groups"}},
 			{Element: RequirementServerCluster, Name: "ScenesManagement", ID: 0x0062, HasID: true, Conformance: Conformance{Text: "X", Op: "X"}, Referent: Referent{Resolved: true, ID: 0x0062, Name: "ScenesManagement"}},
 			{Element: RequirementServerCluster, Name: "DoorLock", ID: 0x0101, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0101, Name: "DoorLock"}},
-		},
-	},
-	0x000B: {
-		ID: 0x000B, Name: "DoorLockController", Classification: "simple", Revision: 4, Composition: "tree",
+		}},
+	0x000B: {ID: 0x000B, Name: "DoorLockController", Classification: "simple", Revision: 4, Composition: "tree",
 		Requirements: []DeviceTypeRequirement{
-			{
-				Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
+			{Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementAttribute, Name: "DeviceTypeList", Referent: Referent{Resolved: true, ID: 0x0000, Name: "DeviceTypeList"}},
-				},
-			},
+				}},
 			{Element: RequirementCondition, Name: "TimeSyncCond", Type: "RootNode.TimeSyncCond", Location: LocationRoot, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, Name: "TimeSyncCond", Declarer: "RootNode"}},
 			{Element: RequirementCondition, Name: "GroupcastSenderCond", Type: "RootNode.GroupcastSenderCond", Location: LocationRoot, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, Name: "GroupcastSenderCond", Declarer: "RootNode"}},
 			{Element: RequirementClientCluster, Name: "Groups", ID: 0x0004, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0004, Name: "Groups"}},
 			{Element: RequirementClientCluster, Name: "ScenesManagement", ID: 0x0062, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0062, Name: "ScenesManagement"}},
 			{Element: RequirementClientCluster, Name: "DoorLock", ID: 0x0101, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0101, Name: "DoorLock"}},
-		},
-	},
-	0x000E: {
-		ID: 0x000E, Name: "Aggregator", Classification: "simple", Revision: 2, Composition: "full-family",
+		}},
+	0x000E: {ID: 0x000E, Name: "Aggregator", Classification: "simple", Revision: 2, Composition: "full-family",
 		Conditions: []string{"FabricSynchronization"},
 		Requirements: []DeviceTypeRequirement{
-			{
-				Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
+			{Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementAttribute, Name: "DeviceTypeList", Referent: Referent{Resolved: true, ID: 0x0000, Name: "DeviceTypeList"}},
-				},
-			},
+				}},
 			{Element: RequirementServerCluster, Name: "Actions", ID: 0x0025, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0025, Name: "Actions"}},
 			{Element: RequirementServerCluster, Name: "Identify", ID: 0x0003, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0003, Name: "Identify"}},
 			{Element: RequirementServerCluster, Name: "CommissionerControl", ID: 0x0751, HasID: true, Conformance: Conformance{Text: "FabricSynchronization", Op: "name", Name: "FabricSynchronization"}, Referent: Referent{Resolved: true, ID: 0x0751, Name: "CommissionerControl"}},
-		},
-	},
-	0x000F: {
-		ID: 0x000F, Name: "GenericSwitch", Classification: "simple", Revision: 3, Composition: "tree",
+		}},
+	0x000F: {ID: 0x000F, Name: "GenericSwitch", Classification: "simple", Revision: 3, Composition: "tree",
 		Requirements: []DeviceTypeRequirement{
-			{
-				Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
+			{Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementAttribute, Name: "DeviceTypeList", Referent: Referent{Resolved: true, ID: 0x0000, Name: "DeviceTypeList"}},
-				},
-			},
+				}},
 			{Element: RequirementServerCluster, Name: "Identify", ID: 0x0003, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0003, Name: "Identify"}},
 			{Element: RequirementServerCluster, Name: "Switch", ID: 0x003B, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x003B, Name: "Switch"}},
-		},
-	},
-	0x0011: {
-		ID: 0x0011, Name: "PowerSource", Classification: "utility", Revision: 1, Composition: "tree",
+		}},
+	0x0011: {ID: 0x0011, Name: "PowerSource", Classification: "utility", Revision: 1, Composition: "tree",
 		Requirements: []DeviceTypeRequirement{
-			{
-				Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
+			{Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementAttribute, Name: "DeviceTypeList", Referent: Referent{Resolved: true, ID: 0x0000, Name: "DeviceTypeList"}},
-				},
-			},
+				}},
 			{Element: RequirementServerCluster, Name: "PowerSource", ID: 0x002F, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x002F, Name: "PowerSource"}},
-		},
-	},
-	0x0012: {
-		ID: 0x0012, Name: "OtaRequestor", Classification: "utility", Revision: 1, Composition: "tree",
+		}},
+	0x0012: {ID: 0x0012, Name: "OtaRequestor", Classification: "utility", Revision: 1, Composition: "tree",
 		Requirements: []DeviceTypeRequirement{
-			{
-				Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
+			{Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementAttribute, Name: "DeviceTypeList", Referent: Referent{Resolved: true, ID: 0x0000, Name: "DeviceTypeList"}},
-				},
-			},
+				}},
 			{Element: RequirementClientCluster, Name: "OtaSoftwareUpdateProvider", ID: 0x0029, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0029, Name: "OtaSoftwareUpdateProvider"}},
 			{Element: RequirementServerCluster, Name: "OtaSoftwareUpdateRequestor", ID: 0x002A, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x002A, Name: "OtaSoftwareUpdateRequestor"}},
-		},
-	},
-	0x0013: {
-		ID: 0x0013, Name: "BridgedNode", Classification: "utility", Revision: 3, Composition: "full-family",
+		}},
+	0x0013: {ID: 0x0013, Name: "BridgedNode", Classification: "utility", Revision: 3, Composition: "full-family",
 		Conditions: []string{"FabricSynchronizedNode"},
 		Requirements: []DeviceTypeRequirement{
-			{
-				Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
+			{Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementAttribute, Name: "DeviceTypeList", Referent: Referent{Resolved: true, ID: 0x0000, Name: "DeviceTypeList"}},
-				},
-			},
+				}},
 			{Element: RequirementServerCluster, Name: "PowerSourceConfiguration", ID: 0x002E, HasID: true, Conformance: Conformance{Text: "BridgedPowerSourceInfo, D", Op: "otherwise", Args: []Conformance{{Op: "name", Name: "BridgedPowerSourceInfo"}, {Op: "D"}}}, Referent: Referent{Resolved: true, ID: 0x002E, Name: "PowerSourceConfiguration"}},
 			{Element: RequirementServerCluster, Name: "PowerSource", ID: 0x002F, HasID: true, Conformance: Conformance{Text: "BridgedPowerSourceInfo", Op: "name", Name: "BridgedPowerSourceInfo"}, Referent: Referent{Resolved: true, ID: 0x002F, Name: "PowerSource"}},
 			{Element: RequirementServerCluster, Name: "BridgedDeviceBasicInformation", ID: 0x0039, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0039, Name: "BridgedDeviceBasicInformation"}},
 			{Element: RequirementServerCluster, Name: "AdministratorCommissioning", ID: 0x003C, HasID: true, Conformance: Conformance{Text: "FabricSynchronizedNode", Op: "name", Name: "FabricSynchronizedNode"}, Referent: Referent{Resolved: true, ID: 0x003C, Name: "AdministratorCommissioning"}},
 			{Element: RequirementServerCluster, Name: "EcosystemInformation", ID: 0x0750, HasID: true, Conformance: Conformance{Text: "FabricSynchronizedNode, O", Op: "otherwise", Args: []Conformance{{Op: "name", Name: "FabricSynchronizedNode"}, {Op: "O"}}}, Referent: Referent{Resolved: true, ID: 0x0750, Name: "EcosystemInformation"}},
 			{Element: RequirementDeviceType, Name: "PowerSource", ID: 0x0011, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0011, Name: "PowerSource"}},
-		},
-	},
-	0x0014: {
-		ID: 0x0014, Name: "OtaProvider", Classification: "utility", Revision: 1, Composition: "tree",
+		}},
+	0x0014: {ID: 0x0014, Name: "OtaProvider", Classification: "utility", Revision: 1, Composition: "tree",
 		Requirements: []DeviceTypeRequirement{
-			{
-				Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
+			{Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementAttribute, Name: "DeviceTypeList", Referent: Referent{Resolved: true, ID: 0x0000, Name: "DeviceTypeList"}},
-				},
-			},
+				}},
 			{Element: RequirementServerCluster, Name: "OtaSoftwareUpdateProvider", ID: 0x0029, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0029, Name: "OtaSoftwareUpdateProvider"}},
 			{Element: RequirementClientCluster, Name: "OtaSoftwareUpdateRequestor", ID: 0x002A, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x002A, Name: "OtaSoftwareUpdateRequestor"}},
-		},
-	},
-	0x0015: {
-		ID: 0x0015, Name: "ContactSensor", Classification: "simple", Revision: 2, Composition: "tree",
+		}},
+	0x0015: {ID: 0x0015, Name: "ContactSensor", Classification: "simple", Revision: 2, Composition: "tree",
 		Requirements: []DeviceTypeRequirement{
-			{
-				Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
+			{Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementAttribute, Name: "DeviceTypeList", Referent: Referent{Resolved: true, ID: 0x0000, Name: "DeviceTypeList"}},
-				},
-			},
+				}},
 			{Element: RequirementServerCluster, Name: "Identify", ID: 0x0003, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0003, Name: "Identify"}},
 			{Element: RequirementServerCluster, Name: "BooleanState", ID: 0x0045, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0045, Name: "BooleanState"}},
 			{Element: RequirementServerCluster, Name: "BooleanStateConfiguration", ID: 0x0080, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0080, Name: "BooleanStateConfiguration"}},
-		},
-	},
-	0x0016: {
-		ID: 0x0016, Name: "RootNode", Classification: "node", Revision: 5, Composition: "full-family",
+		}},
+	0x0016: {ID: 0x0016, Name: "RootNode", Classification: "node", Revision: 5, Composition: "full-family",
 		Conditions: []string{"CustomNetworkConfig", "ManagedAclAllowed", "TimeSyncCond", "TimeSyncWithClientCond", "TimeSyncWithNtpcCond", "TimeSyncWithTzCond", "TlsCertificatesCond", "TlsClientCond", "PowerSourceCond", "AclExtensionCond", "GroupcastListenerCond", "GroupcastSenderCond"},
 		Requirements: []DeviceTypeRequirement{
-			{
-				Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
+			{Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementAttribute, Name: "DeviceTypeList", Referent: Referent{Resolved: true, ID: 0x0000, Name: "DeviceTypeList"}},
-				},
-			},
-			{
-				Element: RequirementServerCluster, Name: "AccessControl", ID: 0x001F, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Singleton: true, Referent: Referent{Resolved: true, ID: 0x001F, Name: "AccessControl"},
+				}},
+			{Element: RequirementServerCluster, Name: "AccessControl", ID: 0x001F, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Singleton: true, Referent: Referent{Resolved: true, ID: 0x001F, Name: "AccessControl"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementFeature, Name: "MNGD", Conformance: Conformance{Text: "[ManagedAclAllowed]", Op: "optionalIf", Args: []Conformance{{Op: "name", Name: "ManagedAclAllowed"}}}, Constraint: "desc", Referent: Referent{Resolved: true, ID: 1, Name: "MNGD"}},
 					{Element: RequirementFeature, Name: "AUX", Conformance: Conformance{Text: "GroupcastListenerCond", Op: "name", Name: "GroupcastListenerCond"}, Referent: Referent{Resolved: true, ID: 2, Name: "AUX"}},
 					{Element: RequirementAttribute, Name: "Extension", Conformance: Conformance{Text: "AclExtensionCond", Op: "name", Name: "AclExtensionCond"}, Referent: Referent{Resolved: true, ID: 0x0001, Name: "Extension"}},
-				},
-			},
+				}},
 			{Element: RequirementServerCluster, Name: "BasicInformation", ID: 0x0028, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Singleton: true, Referent: Referent{Resolved: true, ID: 0x0028, Name: "BasicInformation"}},
 			{Element: RequirementServerCluster, Name: "LocalizationConfiguration", ID: 0x002B, HasID: true, Conformance: Conformance{Text: "LanguageLocale", Op: "name", Name: "LanguageLocale"}, Singleton: true, Referent: Referent{Resolved: true, ID: 0x002B, Name: "LocalizationConfiguration"}},
 			{Element: RequirementServerCluster, Name: "TimeFormatLocalization", ID: 0x002C, HasID: true, Conformance: Conformance{Text: "TimeLocale", Op: "name", Name: "TimeLocale"}, Singleton: true, Referent: Referent{Resolved: true, ID: 0x002C, Name: "TimeFormatLocalization"}},
@@ -176,206 +135,142 @@ var deviceTypeDefinitions = map[DeviceTypeID]*DeviceTypeDefinition{
 			{Element: RequirementServerCluster, Name: "ThreadNetworkDiagnostics", ID: 0x0035, HasID: true, Conformance: Conformance{Text: "[Thread]", Op: "optionalIf", Args: []Conformance{{Op: "name", Name: "Thread"}}}, Referent: Referent{Resolved: true, ID: 0x0035, Name: "ThreadNetworkDiagnostics"}},
 			{Element: RequirementServerCluster, Name: "WiFiNetworkDiagnostics", ID: 0x0036, HasID: true, Conformance: Conformance{Text: "[WiFi]", Op: "optionalIf", Args: []Conformance{{Op: "name", Name: "WiFi"}}}, Referent: Referent{Resolved: true, ID: 0x0036, Name: "WiFiNetworkDiagnostics"}},
 			{Element: RequirementServerCluster, Name: "EthernetNetworkDiagnostics", ID: 0x0037, HasID: true, Conformance: Conformance{Text: "[Ethernet]", Op: "optionalIf", Args: []Conformance{{Op: "name", Name: "Ethernet"}}}, Referent: Referent{Resolved: true, ID: 0x0037, Name: "EthernetNetworkDiagnostics"}},
-			{
-				Element: RequirementServerCluster, Name: "TimeSynchronization", ID: 0x0038, HasID: true, Conformance: Conformance{Text: "TimeSyncCond, TimeSyncWithClientCond, TimeSyncWithNtpcCond, TimeSyncWithTzCond, TlsClientCond, TlsCertificatesCond, O", Op: "otherwise", Args: []Conformance{{Op: "name", Name: "TimeSyncCond"}, {Op: "name", Name: "TimeSyncWithClientCond"}, {Op: "name", Name: "TimeSyncWithNtpcCond"}, {Op: "name", Name: "TimeSyncWithTzCond"}, {Op: "name", Name: "TlsClientCond"}, {Op: "name", Name: "TlsCertificatesCond"}, {Op: "O"}}}, Singleton: true, Referent: Referent{Resolved: true, ID: 0x0038, Name: "TimeSynchronization"},
+			{Element: RequirementServerCluster, Name: "TimeSynchronization", ID: 0x0038, HasID: true, Conformance: Conformance{Text: "TimeSyncCond, TimeSyncWithClientCond, TimeSyncWithNtpcCond, TimeSyncWithTzCond, TlsClientCond, TlsCertificatesCond, O", Op: "otherwise", Args: []Conformance{{Op: "name", Name: "TimeSyncCond"}, {Op: "name", Name: "TimeSyncWithClientCond"}, {Op: "name", Name: "TimeSyncWithNtpcCond"}, {Op: "name", Name: "TimeSyncWithTzCond"}, {Op: "name", Name: "TlsClientCond"}, {Op: "name", Name: "TlsCertificatesCond"}, {Op: "O"}}}, Singleton: true, Referent: Referent{Resolved: true, ID: 0x0038, Name: "TimeSynchronization"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementFeature, Name: "TSC", Conformance: Conformance{Text: "TimeSyncWithClientCond, [TlsCertificatesCond | TlsClientCond].a+, O", Op: "otherwise", Args: []Conformance{{Op: "name", Name: "TimeSyncWithClientCond"}, {Op: "choice", Choice: &ConformanceChoice{Name: "a", Num: 1, OrMore: true, OrLess: false}, Args: []Conformance{{Op: "optionalIf", Args: []Conformance{{Op: "|", Args: []Conformance{{Op: "name", Name: "TlsCertificatesCond"}, {Op: "name", Name: "TlsClientCond"}}}}}}}, {Op: "O"}}}, Referent: Referent{Resolved: true, ID: 3, Name: "TSC"}},
 					{Element: RequirementFeature, Name: "NTPC", Conformance: Conformance{Text: "TimeSyncWithNtpcCond, [TlsCertificatesCond | TlsClientCond].a+, O", Op: "otherwise", Args: []Conformance{{Op: "name", Name: "TimeSyncWithNtpcCond"}, {Op: "choice", Choice: &ConformanceChoice{Name: "a", Num: 1, OrMore: true, OrLess: false}, Args: []Conformance{{Op: "optionalIf", Args: []Conformance{{Op: "|", Args: []Conformance{{Op: "name", Name: "TlsCertificatesCond"}, {Op: "name", Name: "TlsClientCond"}}}}}}}, {Op: "O"}}}, Referent: Referent{Resolved: true, ID: 1, Name: "NTPC"}},
 					{Element: RequirementFeature, Name: "TZ", Conformance: Conformance{Text: "TimeSyncWithTzCond, O", Op: "otherwise", Args: []Conformance{{Op: "name", Name: "TimeSyncWithTzCond"}, {Op: "O"}}}, Referent: Referent{Resolved: true, ID: 0, Name: "TZ"}},
-				},
-			},
-			{
-				Element: RequirementClientCluster, Name: "TimeSynchronization", ID: 0x0038, HasID: true, Conformance: Conformance{Text: "TimeSyncWithClientCond, O", Op: "otherwise", Args: []Conformance{{Op: "name", Name: "TimeSyncWithClientCond"}, {Op: "O"}}}, Singleton: true, Referent: Referent{Resolved: true, ID: 0x0038, Name: "TimeSynchronization"},
+				}},
+			{Element: RequirementClientCluster, Name: "TimeSynchronization", ID: 0x0038, HasID: true, Conformance: Conformance{Text: "TimeSyncWithClientCond, O", Op: "otherwise", Args: []Conformance{{Op: "name", Name: "TimeSyncWithClientCond"}, {Op: "O"}}}, Singleton: true, Referent: Referent{Resolved: true, ID: 0x0038, Name: "TimeSynchronization"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementFeature, Name: "TSC", Conformance: Conformance{Text: "TimeSyncWithClientCond, [TlsCertificatesCond | TlsClientCond].a+, O", Op: "otherwise", Args: []Conformance{{Op: "name", Name: "TimeSyncWithClientCond"}, {Op: "choice", Choice: &ConformanceChoice{Name: "a", Num: 1, OrMore: true, OrLess: false}, Args: []Conformance{{Op: "optionalIf", Args: []Conformance{{Op: "|", Args: []Conformance{{Op: "name", Name: "TlsCertificatesCond"}, {Op: "name", Name: "TlsClientCond"}}}}}}}, {Op: "O"}}}, Referent: Referent{Resolved: true, ID: 3, Name: "TSC"}},
 					{Element: RequirementFeature, Name: "NTPC", Conformance: Conformance{Text: "TimeSyncWithNtpcCond, [TlsCertificatesCond | TlsClientCond].a+, O", Op: "otherwise", Args: []Conformance{{Op: "name", Name: "TimeSyncWithNtpcCond"}, {Op: "choice", Choice: &ConformanceChoice{Name: "a", Num: 1, OrMore: true, OrLess: false}, Args: []Conformance{{Op: "optionalIf", Args: []Conformance{{Op: "|", Args: []Conformance{{Op: "name", Name: "TlsCertificatesCond"}, {Op: "name", Name: "TlsClientCond"}}}}}}}, {Op: "O"}}}, Referent: Referent{Resolved: true, ID: 1, Name: "NTPC"}},
 					{Element: RequirementFeature, Name: "TZ", Conformance: Conformance{Text: "TimeSyncWithTzCond, O", Op: "otherwise", Args: []Conformance{{Op: "name", Name: "TimeSyncWithTzCond"}, {Op: "O"}}}, Referent: Referent{Resolved: true, ID: 0, Name: "TZ"}},
-				},
-			},
+				}},
 			{Element: RequirementServerCluster, Name: "AdministratorCommissioning", ID: 0x003C, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Singleton: true, Referent: Referent{Resolved: true, ID: 0x003C, Name: "AdministratorCommissioning"}},
 			{Element: RequirementServerCluster, Name: "OperationalCredentials", ID: 0x003E, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Singleton: true, Referent: Referent{Resolved: true, ID: 0x003E, Name: "OperationalCredentials"}},
-			{
-				Element: RequirementServerCluster, Name: "GroupKeyManagement", ID: 0x003F, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Singleton: true, Referent: Referent{Resolved: true, ID: 0x003F, Name: "GroupKeyManagement"},
+			{Element: RequirementServerCluster, Name: "GroupKeyManagement", ID: 0x003F, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Singleton: true, Referent: Referent{Resolved: true, ID: 0x003F, Name: "GroupKeyManagement"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementFeature, Name: "GCAST", Conformance: Conformance{Text: "GroupcastListenerCond | GroupcastSenderCond, O", Op: "otherwise", Args: []Conformance{{Op: "|", Args: []Conformance{{Op: "name", Name: "GroupcastListenerCond"}, {Op: "name", Name: "GroupcastSenderCond"}}}, {Op: "O"}}}, Referent: Referent{Resolved: true, ID: 1, Name: "GCAST", Provisional: true}},
-				},
-			},
-			{
-				Element: RequirementServerCluster, Name: "IcdManagement", ID: 0x0046, HasID: true, Conformance: Conformance{Text: "Sit | Lit", Op: "|", Args: []Conformance{{Op: "name", Name: "Sit"}, {Op: "name", Name: "Lit"}}}, Singleton: true, Referent: Referent{Resolved: true, ID: 0x0046, Name: "IcdManagement"},
+				}},
+			{Element: RequirementServerCluster, Name: "IcdManagement", ID: 0x0046, HasID: true, Conformance: Conformance{Text: "Sit | Lit", Op: "|", Args: []Conformance{{Op: "name", Name: "Sit"}, {Op: "name", Name: "Lit"}}}, Singleton: true, Referent: Referent{Resolved: true, ID: 0x0046, Name: "IcdManagement"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementFeature, Name: "LITS", Conformance: Conformance{Text: "Lit", Op: "name", Name: "Lit"}, Referent: Referent{Resolved: true, ID: 2, Name: "LITS"}},
-				},
-			},
-			{
-				Element: RequirementServerCluster, Name: "Groupcast", ID: 0x0065, HasID: true, Conformance: Conformance{Text: "GroupcastListenerCond, GroupcastSenderCond, O", Op: "otherwise", Args: []Conformance{{Op: "name", Name: "GroupcastListenerCond"}, {Op: "name", Name: "GroupcastSenderCond"}, {Op: "O"}}}, Singleton: true, Referent: Referent{Resolved: true, ID: 0x0065, Name: "Groupcast"},
+				}},
+			{Element: RequirementServerCluster, Name: "Groupcast", ID: 0x0065, HasID: true, Conformance: Conformance{Text: "GroupcastListenerCond, GroupcastSenderCond, O", Op: "otherwise", Args: []Conformance{{Op: "name", Name: "GroupcastListenerCond"}, {Op: "name", Name: "GroupcastSenderCond"}, {Op: "O"}}}, Singleton: true, Referent: Referent{Resolved: true, ID: 0x0065, Name: "Groupcast"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementFeature, Name: "LN", Conformance: Conformance{Text: "GroupcastListenerCond, O", Op: "otherwise", Args: []Conformance{{Op: "name", Name: "GroupcastListenerCond"}, {Op: "O"}}}, Referent: Referent{Resolved: true, ID: 0, Name: "LN"}},
 					{Element: RequirementFeature, Name: "SD", Conformance: Conformance{Text: "GroupcastSenderCond, O", Op: "otherwise", Args: []Conformance{{Op: "name", Name: "GroupcastSenderCond"}, {Op: "O"}}}, Referent: Referent{Resolved: true, ID: 1, Name: "SD"}},
-				},
-			},
+				}},
 			{Element: RequirementServerCluster, Name: "TlsCertificateManagement", ID: 0x0801, HasID: true, Conformance: Conformance{Text: "TlsCertificatesCond, O", Op: "otherwise", Args: []Conformance{{Op: "name", Name: "TlsCertificatesCond"}, {Op: "O"}}}, Singleton: true, Referent: Referent{Resolved: true, ID: 0x0801, Name: "TlsCertificateManagement"}},
 			{Element: RequirementServerCluster, Name: "TlsClientManagement", ID: 0x0802, HasID: true, Conformance: Conformance{Text: "TlsClientCond, O", Op: "otherwise", Args: []Conformance{{Op: "name", Name: "TlsClientCond"}, {Op: "O"}}}, Singleton: true, Referent: Referent{Resolved: true, ID: 0x0802, Name: "TlsClientManagement"}},
 			{Element: RequirementDeviceType, Name: "PowerSource", ID: 0x0011, HasID: true, Conformance: Conformance{Text: "PowerSourceCond, O", Op: "otherwise", Args: []Conformance{{Op: "name", Name: "PowerSourceCond"}, {Op: "O"}}}, Referent: Referent{Resolved: true, ID: 0x0011, Name: "PowerSource"}},
-		},
-	},
-	0x0017: {
-		ID: 0x0017, Name: "SolarPower", Classification: "simple", Revision: 1, Composition: "tree",
+		}},
+	0x0017: {ID: 0x0017, Name: "SolarPower", Classification: "simple", Revision: 1, Composition: "tree",
 		Requirements: []DeviceTypeRequirement{
-			{
-				Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
+			{Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementAttribute, Name: "DeviceTypeList", Referent: Referent{Resolved: true, ID: 0x0000, Name: "DeviceTypeList"}},
-				},
-			},
+				}},
 			{Element: RequirementServerCluster, Name: "Identify", ID: 0x0003, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0003, Name: "Identify"}},
-			{
-				Element: RequirementDeviceType, Name: "PowerSource", ID: 0x0011, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Constraint: "min 1", Count: CountRange{Set: true, Min: 1, HasMin: true}, Referent: Referent{Resolved: true, ID: 0x0011, Name: "PowerSource"},
+			{Element: RequirementDeviceType, Name: "PowerSource", ID: 0x0011, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Constraint: "min 1", Count: CountRange{Set: true, Min: 1, HasMin: true}, Referent: Referent{Resolved: true, ID: 0x0011, Name: "PowerSource"},
 				Requirements: []DeviceTypeRequirement{
-					{
-						Element: RequirementServerCluster, Name: "PowerSource", ID: 0x002F, HasID: true, Referent: Referent{Resolved: true, ID: 0x002F, Name: "PowerSource"},
+					{Element: RequirementServerCluster, Name: "PowerSource", ID: 0x002F, HasID: true, Referent: Referent{Resolved: true, ID: 0x002F, Name: "PowerSource"},
 						Requirements: []DeviceTypeRequirement{
 							{Element: RequirementFeature, Name: "WIRED", Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0, Name: "WIRED"}},
-						},
-					},
-					{
-						Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
+						}},
+					{Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
 						Requirements: []DeviceTypeRequirement{
 							{Element: RequirementFeature, Name: "TAGLIST", Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0, Name: "TAGLIST"}},
-						},
-					},
-				},
-			},
-			{
-				Element: RequirementDeviceType, Name: "TemperatureSensor", ID: 0x0302, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0302, Name: "TemperatureSensor"},
+						}},
+				}},
+			{Element: RequirementDeviceType, Name: "TemperatureSensor", ID: 0x0302, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0302, Name: "TemperatureSensor"},
 				Requirements: []DeviceTypeRequirement{
-					{
-						Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
+					{Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
 						Requirements: []DeviceTypeRequirement{
 							{Element: RequirementFeature, Name: "TAGLIST", Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0, Name: "TAGLIST"}},
-						},
-					},
-				},
-			},
-			{
-				Element: RequirementDeviceType, Name: "DeviceEnergyManagement", ID: 0x050D, HasID: true, Conformance: Conformance{Text: "desc", Op: "desc"}, Referent: Referent{Resolved: true, ID: 0x050D, Name: "DeviceEnergyManagement"},
+						}},
+				}},
+			{Element: RequirementDeviceType, Name: "DeviceEnergyManagement", ID: 0x050D, HasID: true, Conformance: Conformance{Text: "desc", Op: "desc"}, Referent: Referent{Resolved: true, ID: 0x050D, Name: "DeviceEnergyManagement"},
 				Requirements: []DeviceTypeRequirement{
-					{
-						Element: RequirementServerCluster, Name: "DeviceEnergyManagement", ID: 0x0098, HasID: true, Referent: Referent{Resolved: true, ID: 0x0098, Name: "DeviceEnergyManagement"},
+					{Element: RequirementServerCluster, Name: "DeviceEnergyManagement", ID: 0x0098, HasID: true, Referent: Referent{Resolved: true, ID: 0x0098, Name: "DeviceEnergyManagement"},
 						Requirements: []DeviceTypeRequirement{
 							{Element: RequirementFeature, Name: "PA", Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0, Name: "PA"}},
-						},
-					},
-				},
-			},
-			{
-				Element: RequirementDeviceType, Name: "ElectricalSensor", ID: 0x0510, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Constraint: "min 1", Count: CountRange{Set: true, Min: 1, HasMin: true}, Referent: Referent{Resolved: true, ID: 0x0510, Name: "ElectricalSensor"},
+						}},
+				}},
+			{Element: RequirementDeviceType, Name: "ElectricalSensor", ID: 0x0510, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Constraint: "min 1", Count: CountRange{Set: true, Min: 1, HasMin: true}, Referent: Referent{Resolved: true, ID: 0x0510, Name: "ElectricalSensor"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementServerCluster, Name: "UserLabel", ID: 0x0041, HasID: true, Conformance: Conformance{Text: "desc", Op: "desc"}, Referent: Referent{Resolved: true, ID: 0x0041, Name: "UserLabel"}},
-					{
-						Element: RequirementServerCluster, Name: "ElectricalPowerMeasurement", ID: 0x0090, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0090, Name: "ElectricalPowerMeasurement"},
+					{Element: RequirementServerCluster, Name: "ElectricalPowerMeasurement", ID: 0x0090, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0090, Name: "ElectricalPowerMeasurement"},
 						Requirements: []DeviceTypeRequirement{
 							{Element: RequirementAttribute, Name: "Voltage", Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0004, Name: "Voltage"}},
 							{Element: RequirementAttribute, Name: "ActiveCurrent", Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0005, Name: "ActiveCurrent"}},
-						},
-					},
-					{
-						Element: RequirementServerCluster, Name: "ElectricalEnergyMeasurement", ID: 0x0091, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0091, Name: "ElectricalEnergyMeasurement"},
+						}},
+					{Element: RequirementServerCluster, Name: "ElectricalEnergyMeasurement", ID: 0x0091, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0091, Name: "ElectricalEnergyMeasurement"},
 						Requirements: []DeviceTypeRequirement{
 							{Element: RequirementFeature, Name: "EXPE", Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 1, Name: "EXPE"}},
-						},
-					},
-				},
-			},
-		},
-	},
-	0x0018: {
-		ID: 0x0018, Name: "BatteryStorage", Classification: "simple", Revision: 2, Composition: "tree",
+						}},
+				}},
+		}},
+	0x0018: {ID: 0x0018, Name: "BatteryStorage", Classification: "simple", Revision: 2, Composition: "tree",
 		Requirements: []DeviceTypeRequirement{
-			{
-				Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
+			{Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementAttribute, Name: "DeviceTypeList", Referent: Referent{Resolved: true, ID: 0x0000, Name: "DeviceTypeList"}},
-				},
-			},
+				}},
 			{Element: RequirementServerCluster, Name: "Identify", ID: 0x0003, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0003, Name: "Identify"}},
-			{
-				Element: RequirementDeviceType, Name: "ElectricalSensor", ID: 0x0510, HasID: true, Instance: 1, Conformance: Conformance{Text: "M", Op: "M"}, Constraint: "min 2", Count: CountRange{Set: true, Min: 2, HasMin: true}, Referent: Referent{Resolved: true, ID: 0x0510, Name: "ElectricalSensor"},
+			{Element: RequirementDeviceType, Name: "ElectricalSensor", ID: 0x0510, HasID: true, Instance: 1, Conformance: Conformance{Text: "M", Op: "M"}, Constraint: "min 2", Count: CountRange{Set: true, Min: 2, HasMin: true}, Referent: Referent{Resolved: true, ID: 0x0510, Name: "ElectricalSensor"},
 				Requirements: []DeviceTypeRequirement{
-					{
-						Element: RequirementServerCluster, Name: "ElectricalPowerMeasurement", ID: 0x0090, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0090, Name: "ElectricalPowerMeasurement"},
+					{Element: RequirementServerCluster, Name: "ElectricalPowerMeasurement", ID: 0x0090, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0090, Name: "ElectricalPowerMeasurement"},
 						Requirements: []DeviceTypeRequirement{
 							{Element: RequirementFeature, Name: "ALTC", Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 1, Name: "ALTC"}},
 							{Element: RequirementAttribute, Name: "Voltage", Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0004, Name: "Voltage"}},
 							{Element: RequirementAttribute, Name: "ActiveCurrent", Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0005, Name: "ActiveCurrent"}},
-						},
-					},
-					{
-						Element: RequirementServerCluster, Name: "ElectricalEnergyMeasurement", ID: 0x0091, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0091, Name: "ElectricalEnergyMeasurement"},
+						}},
+					{Element: RequirementServerCluster, Name: "ElectricalEnergyMeasurement", ID: 0x0091, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0091, Name: "ElectricalEnergyMeasurement"},
 						Requirements: []DeviceTypeRequirement{
 							{Element: RequirementFeature, Name: "EXPE", Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 1, Name: "EXPE"}},
-						},
-					},
-					{
-						Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
+						}},
+					{Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
 						Requirements: []DeviceTypeRequirement{
 							{Element: RequirementFeature, Name: "TAGLIST", Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0, Name: "TAGLIST"}},
-						},
-					},
-				},
-			},
-			{
-				Element: RequirementDeviceType, Name: "ElectricalSensor", ID: 0x0510, HasID: true, Instance: 2, Conformance: Conformance{Text: "M", Op: "M"}, Constraint: "min 2", Count: CountRange{Set: true, Min: 2, HasMin: true}, Referent: Referent{Resolved: true, ID: 0x0510, Name: "ElectricalSensor"},
+						}},
+				}},
+			{Element: RequirementDeviceType, Name: "ElectricalSensor", ID: 0x0510, HasID: true, Instance: 2, Conformance: Conformance{Text: "M", Op: "M"}, Constraint: "min 2", Count: CountRange{Set: true, Min: 2, HasMin: true}, Referent: Referent{Resolved: true, ID: 0x0510, Name: "ElectricalSensor"},
 				Requirements: []DeviceTypeRequirement{
-					{
-						Element: RequirementServerCluster, Name: "ElectricalPowerMeasurement", ID: 0x0090, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0090, Name: "ElectricalPowerMeasurement"},
+					{Element: RequirementServerCluster, Name: "ElectricalPowerMeasurement", ID: 0x0090, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0090, Name: "ElectricalPowerMeasurement"},
 						Requirements: []DeviceTypeRequirement{
 							{Element: RequirementFeature, Name: "DIRC", Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0, Name: "DIRC"}},
 							{Element: RequirementAttribute, Name: "Voltage", Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0004, Name: "Voltage"}},
 							{Element: RequirementAttribute, Name: "ActiveCurrent", Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0005, Name: "ActiveCurrent"}},
-						},
-					},
-					{
-						Element: RequirementServerCluster, Name: "ElectricalEnergyMeasurement", ID: 0x0091, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0091, Name: "ElectricalEnergyMeasurement"},
+						}},
+					{Element: RequirementServerCluster, Name: "ElectricalEnergyMeasurement", ID: 0x0091, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0091, Name: "ElectricalEnergyMeasurement"},
 						Requirements: []DeviceTypeRequirement{
 							{Element: RequirementFeature, Name: "EXPE", Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 1, Name: "EXPE"}},
-						},
-					},
-					{
-						Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
+						}},
+					{Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
 						Requirements: []DeviceTypeRequirement{
 							{Element: RequirementFeature, Name: "TAGLIST", Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0, Name: "TAGLIST"}},
-						},
-					},
-				},
-			},
-			{
-				Element: RequirementDeviceType, Name: "PowerSource", ID: 0x0011, HasID: true, Instance: 1, Conformance: Conformance{Text: "M", Op: "M"}, Constraint: "min 2", Count: CountRange{Set: true, Min: 2, HasMin: true}, Referent: Referent{Resolved: true, ID: 0x0011, Name: "PowerSource"},
+						}},
+				}},
+			{Element: RequirementDeviceType, Name: "PowerSource", ID: 0x0011, HasID: true, Instance: 1, Conformance: Conformance{Text: "M", Op: "M"}, Constraint: "min 2", Count: CountRange{Set: true, Min: 2, HasMin: true}, Referent: Referent{Resolved: true, ID: 0x0011, Name: "PowerSource"},
 				Requirements: []DeviceTypeRequirement{
-					{
-						Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
+					{Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
 						Requirements: []DeviceTypeRequirement{
 							{Element: RequirementFeature, Name: "TAGLIST", Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0, Name: "TAGLIST"}},
-						},
-					},
-					{
-						Element: RequirementServerCluster, Name: "PowerSource", ID: 0x002F, HasID: true, Referent: Referent{Resolved: true, ID: 0x002F, Name: "PowerSource"},
+						}},
+					{Element: RequirementServerCluster, Name: "PowerSource", ID: 0x002F, HasID: true, Referent: Referent{Resolved: true, ID: 0x002F, Name: "PowerSource"},
 						Requirements: []DeviceTypeRequirement{
 							{Element: RequirementFeature, Name: "WIRED", Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0, Name: "WIRED"}},
-						},
-					},
-				},
-			},
-			{
-				Element: RequirementDeviceType, Name: "PowerSource", ID: 0x0011, HasID: true, Instance: 2, Conformance: Conformance{Text: "M", Op: "M"}, Constraint: "min 2", Count: CountRange{Set: true, Min: 2, HasMin: true}, Referent: Referent{Resolved: true, ID: 0x0011, Name: "PowerSource"},
+						}},
+				}},
+			{Element: RequirementDeviceType, Name: "PowerSource", ID: 0x0011, HasID: true, Instance: 2, Conformance: Conformance{Text: "M", Op: "M"}, Constraint: "min 2", Count: CountRange{Set: true, Min: 2, HasMin: true}, Referent: Referent{Resolved: true, ID: 0x0011, Name: "PowerSource"},
 				Requirements: []DeviceTypeRequirement{
-					{
-						Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
+					{Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
 						Requirements: []DeviceTypeRequirement{
 							{Element: RequirementFeature, Name: "TAGLIST", Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0, Name: "TAGLIST"}},
-						},
-					},
-					{
-						Element: RequirementServerCluster, Name: "PowerSource", ID: 0x002F, HasID: true, Referent: Referent{Resolved: true, ID: 0x002F, Name: "PowerSource"},
+						}},
+					{Element: RequirementServerCluster, Name: "PowerSource", ID: 0x002F, HasID: true, Referent: Referent{Resolved: true, ID: 0x002F, Name: "PowerSource"},
 						Requirements: []DeviceTypeRequirement{
 							{Element: RequirementFeature, Name: "BAT", Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 1, Name: "BAT"}},
 							{Element: RequirementAttribute, Name: "BatVoltage", Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x000B, Name: "BatVoltage"}},
@@ -386,73 +281,51 @@ var deviceTypeDefinitions = map[DeviceTypeID]*DeviceTypeDefinition{
 							{Element: RequirementAttribute, Name: "BatTimeToFullCharge", Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x001B, Name: "BatTimeToFullCharge"}},
 							{Element: RequirementAttribute, Name: "BatChargingCurrent", Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x001D, Name: "BatChargingCurrent"}},
 							{Element: RequirementAttribute, Name: "ActiveBatChargeFaults", Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x001E, Name: "ActiveBatChargeFaults"}},
-						},
-					},
-				},
-			},
+						}},
+				}},
 			{Element: RequirementDeviceType, Name: "SolarPower", ID: 0x0017, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0017, Name: "SolarPower"}},
-			{
-				Element: RequirementDeviceType, Name: "TemperatureSensor", ID: 0x0302, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0302, Name: "TemperatureSensor"},
+			{Element: RequirementDeviceType, Name: "TemperatureSensor", ID: 0x0302, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0302, Name: "TemperatureSensor"},
 				Requirements: []DeviceTypeRequirement{
-					{
-						Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
+					{Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
 						Requirements: []DeviceTypeRequirement{
 							{Element: RequirementFeature, Name: "TAGLIST", Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0, Name: "TAGLIST"}},
-						},
-					},
-				},
-			},
-			{
-				Element: RequirementDeviceType, Name: "DeviceEnergyManagement", ID: 0x050D, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x050D, Name: "DeviceEnergyManagement"},
+						}},
+				}},
+			{Element: RequirementDeviceType, Name: "DeviceEnergyManagement", ID: 0x050D, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x050D, Name: "DeviceEnergyManagement"},
 				Requirements: []DeviceTypeRequirement{
-					{
-						Element: RequirementServerCluster, Name: "DeviceEnergyManagement", ID: 0x0098, HasID: true, Referent: Referent{Resolved: true, ID: 0x0098, Name: "DeviceEnergyManagement"},
+					{Element: RequirementServerCluster, Name: "DeviceEnergyManagement", ID: 0x0098, HasID: true, Referent: Referent{Resolved: true, ID: 0x0098, Name: "DeviceEnergyManagement"},
 						Requirements: []DeviceTypeRequirement{
 							{Element: RequirementFeature, Name: "PA", Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0, Name: "PA"}},
-						},
-					},
-				},
-			},
-		},
-	},
-	0x0019: {
-		ID: 0x0019, Name: "SecondaryNetworkInterface", Classification: "utility", Revision: 1, Composition: "tree",
+						}},
+				}},
+		}},
+	0x0019: {ID: 0x0019, Name: "SecondaryNetworkInterface", Classification: "utility", Revision: 1, Composition: "tree",
 		Requirements: []DeviceTypeRequirement{
-			{
-				Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
+			{Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementAttribute, Name: "DeviceTypeList", Referent: Referent{Resolved: true, ID: 0x0000, Name: "DeviceTypeList"}},
-				},
-			},
+				}},
 			{Element: RequirementServerCluster, Name: "NetworkCommissioning", ID: 0x0031, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0031, Name: "NetworkCommissioning"}},
 			{Element: RequirementServerCluster, Name: "ThreadNetworkDiagnostics", ID: 0x0035, HasID: true, Conformance: Conformance{Text: "[Thread]", Op: "optionalIf", Args: []Conformance{{Op: "name", Name: "Thread"}}}, Referent: Referent{Resolved: true, ID: 0x0035, Name: "ThreadNetworkDiagnostics"}},
 			{Element: RequirementServerCluster, Name: "WiFiNetworkDiagnostics", ID: 0x0036, HasID: true, Conformance: Conformance{Text: "[WiFi]", Op: "optionalIf", Args: []Conformance{{Op: "name", Name: "WiFi"}}}, Referent: Referent{Resolved: true, ID: 0x0036, Name: "WiFiNetworkDiagnostics"}},
 			{Element: RequirementServerCluster, Name: "EthernetNetworkDiagnostics", ID: 0x0037, HasID: true, Conformance: Conformance{Text: "[Ethernet]", Op: "optionalIf", Args: []Conformance{{Op: "name", Name: "Ethernet"}}}, Referent: Referent{Resolved: true, ID: 0x0037, Name: "EthernetNetworkDiagnostics"}},
-		},
-	},
-	0x0022: {
-		ID: 0x0022, Name: "Speaker", Classification: "simple", Revision: 1, Composition: "tree",
+		}},
+	0x0022: {ID: 0x0022, Name: "Speaker", Classification: "simple", Revision: 1, Composition: "tree",
 		Requirements: []DeviceTypeRequirement{
-			{
-				Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
+			{Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementAttribute, Name: "DeviceTypeList", Referent: Referent{Resolved: true, ID: 0x0000, Name: "DeviceTypeList"}},
-				},
-			},
+				}},
 			{Element: RequirementServerCluster, Name: "OnOff", ID: 0x0006, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0006, Name: "OnOff"}},
 			{Element: RequirementServerCluster, Name: "LevelControl", ID: 0x0008, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0008, Name: "LevelControl"}},
-		},
-	},
-	0x0023: {
-		ID: 0x0023, Name: "CastingVideoPlayer", Classification: "simple", Revision: 2, Composition: "tree",
+		}},
+	0x0023: {ID: 0x0023, Name: "CastingVideoPlayer", Classification: "simple", Revision: 2, Composition: "tree",
 		Conditions: []string{"ContentAppPlatform", "PhysicalInputs"},
 		Requirements: []DeviceTypeRequirement{
-			{
-				Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
+			{Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementAttribute, Name: "DeviceTypeList", Referent: Referent{Resolved: true, ID: 0x0000, Name: "DeviceTypeList"}},
-				},
-			},
+				}},
 			{Element: RequirementServerCluster, Name: "OnOff", ID: 0x0006, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0006, Name: "OnOff"}},
 			{Element: RequirementServerCluster, Name: "Messages", ID: 0x0097, HasID: true, Conformance: Conformance{Text: "[Rev >= v2]", Op: "optionalIf", Args: []Conformance{{Op: "revision", Rev: 2}}}, Referent: Referent{Resolved: true, ID: 0x0097, Name: "Messages"}},
 			{Element: RequirementServerCluster, Name: "WakeOnLan", ID: 0x0503, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0503, Name: "WakeOnLan"}},
@@ -464,64 +337,48 @@ var deviceTypeDefinitions = map[DeviceTypeID]*DeviceTypeDefinition{
 			{Element: RequirementServerCluster, Name: "KeypadInput", ID: 0x0509, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0509, Name: "KeypadInput"}},
 			{Element: RequirementServerCluster, Name: "ContentLauncher", ID: 0x050A, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x050A, Name: "ContentLauncher"}},
 			{Element: RequirementServerCluster, Name: "AudioOutput", ID: 0x050B, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x050B, Name: "AudioOutput"}},
-			{
-				Element: RequirementServerCluster, Name: "ApplicationLauncher", ID: 0x050C, HasID: true, Conformance: Conformance{Text: "ContentAppPlatform", Op: "name", Name: "ContentAppPlatform"}, Referent: Referent{Resolved: true, ID: 0x050C, Name: "ApplicationLauncher"},
+			{Element: RequirementServerCluster, Name: "ApplicationLauncher", ID: 0x050C, HasID: true, Conformance: Conformance{Text: "ContentAppPlatform", Op: "name", Name: "ContentAppPlatform"}, Referent: Referent{Resolved: true, ID: 0x050C, Name: "ApplicationLauncher"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementFeature, Name: "AP", Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0, Name: "AP"}},
-				},
-			},
+				}},
 			{Element: RequirementServerCluster, Name: "AccountLogin", ID: 0x050E, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x050E, Name: "AccountLogin"}},
 			{Element: RequirementServerCluster, Name: "ContentControl", ID: 0x050F, HasID: true, Conformance: Conformance{Text: "P, [Rev >= v2]", Op: "otherwise", Args: []Conformance{{Op: "P"}, {Op: "optionalIf", Args: []Conformance{{Op: "revision", Rev: 2}}}}}, Referent: Referent{Resolved: true, ID: 0x050F, Name: "ContentControl"}},
-		},
-	},
-	0x0024: {
-		ID: 0x0024, Name: "ContentApp", Classification: "simple", Revision: 2, Composition: "tree",
+		}},
+	0x0024: {ID: 0x0024, Name: "ContentApp", Classification: "simple", Revision: 2, Composition: "tree",
 		Conditions: []string{"ObserverClient"},
 		Requirements: []DeviceTypeRequirement{
-			{
-				Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
+			{Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementAttribute, Name: "DeviceTypeList", Referent: Referent{Resolved: true, ID: 0x0000, Name: "DeviceTypeList"}},
-				},
-			},
+				}},
 			{Element: RequirementServerCluster, Name: "Channel", ID: 0x0504, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0504, Name: "Channel"}},
 			{Element: RequirementServerCluster, Name: "TargetNavigator", ID: 0x0505, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0505, Name: "TargetNavigator"}},
 			{Element: RequirementServerCluster, Name: "MediaPlayback", ID: 0x0506, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0506, Name: "MediaPlayback"}},
 			{Element: RequirementServerCluster, Name: "KeypadInput", ID: 0x0509, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0509, Name: "KeypadInput"}},
 			{Element: RequirementServerCluster, Name: "ContentLauncher", ID: 0x050A, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x050A, Name: "ContentLauncher"}},
-			{
-				Element: RequirementServerCluster, Name: "ApplicationLauncher", ID: 0x050C, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x050C, Name: "ApplicationLauncher"},
+			{Element: RequirementServerCluster, Name: "ApplicationLauncher", ID: 0x050C, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x050C, Name: "ApplicationLauncher"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementFeature, Name: "AP", Conformance: Conformance{Text: "X", Op: "X"}, Referent: Referent{Resolved: true, ID: 0, Name: "AP"}},
-				},
-			},
+				}},
 			{Element: RequirementServerCluster, Name: "ApplicationBasic", ID: 0x050D, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x050D, Name: "ApplicationBasic"}},
 			{Element: RequirementServerCluster, Name: "AccountLogin", ID: 0x050E, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x050E, Name: "AccountLogin"}},
 			{Element: RequirementClientCluster, Name: "ContentAppObserver", ID: 0x0510, HasID: true, Conformance: Conformance{Text: "ObserverClient", Op: "name", Name: "ObserverClient"}, Referent: Referent{Resolved: true, ID: 0x0510, Name: "ContentAppObserver"}},
-		},
-	},
-	0x0027: {
-		ID: 0x0027, Name: "ModeSelect", Classification: "simple", Revision: 1, Composition: "tree",
+		}},
+	0x0027: {ID: 0x0027, Name: "ModeSelect", Classification: "simple", Revision: 1, Composition: "tree",
 		Requirements: []DeviceTypeRequirement{
-			{
-				Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
+			{Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementAttribute, Name: "DeviceTypeList", Referent: Referent{Resolved: true, ID: 0x0000, Name: "DeviceTypeList"}},
-				},
-			},
+				}},
 			{Element: RequirementServerCluster, Name: "ModeSelect", ID: 0x0050, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0050, Name: "ModeSelect"}},
-		},
-	},
-	0x0028: {
-		ID: 0x0028, Name: "BasicVideoPlayer", Classification: "simple", Revision: 2, Composition: "tree",
+		}},
+	0x0028: {ID: 0x0028, Name: "BasicVideoPlayer", Classification: "simple", Revision: 2, Composition: "tree",
 		Conditions: []string{"PhysicalInputs"},
 		Requirements: []DeviceTypeRequirement{
-			{
-				Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
+			{Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementAttribute, Name: "DeviceTypeList", Referent: Referent{Resolved: true, ID: 0x0000, Name: "DeviceTypeList"}},
-				},
-			},
+				}},
 			{Element: RequirementServerCluster, Name: "OnOff", ID: 0x0006, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0006, Name: "OnOff"}},
 			{Element: RequirementServerCluster, Name: "Messages", ID: 0x0097, HasID: true, Conformance: Conformance{Text: "[Rev >= v2]", Op: "optionalIf", Args: []Conformance{{Op: "revision", Rev: 2}}}, Referent: Referent{Resolved: true, ID: 0x0097, Name: "Messages"}},
 			{Element: RequirementServerCluster, Name: "WakeOnLan", ID: 0x0503, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0503, Name: "WakeOnLan"}},
@@ -533,17 +390,13 @@ var deviceTypeDefinitions = map[DeviceTypeID]*DeviceTypeDefinition{
 			{Element: RequirementServerCluster, Name: "KeypadInput", ID: 0x0509, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0509, Name: "KeypadInput"}},
 			{Element: RequirementServerCluster, Name: "AudioOutput", ID: 0x050B, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x050B, Name: "AudioOutput"}},
 			{Element: RequirementServerCluster, Name: "ContentControl", ID: 0x050F, HasID: true, Conformance: Conformance{Text: "P, [Rev >= v2]", Op: "otherwise", Args: []Conformance{{Op: "P"}, {Op: "optionalIf", Args: []Conformance{{Op: "revision", Rev: 2}}}}}, Referent: Referent{Resolved: true, ID: 0x050F, Name: "ContentControl"}},
-		},
-	},
-	0x0029: {
-		ID: 0x0029, Name: "CastingVideoClient", Classification: "simple", Revision: 2, Composition: "tree",
+		}},
+	0x0029: {ID: 0x0029, Name: "CastingVideoClient", Classification: "simple", Revision: 2, Composition: "tree",
 		Requirements: []DeviceTypeRequirement{
-			{
-				Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
+			{Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementAttribute, Name: "DeviceTypeList", Referent: Referent{Resolved: true, ID: 0x0000, Name: "DeviceTypeList"}},
-				},
-			},
+				}},
 			{Element: RequirementClientCluster, Name: "OnOff", ID: 0x0006, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0006, Name: "OnOff"}},
 			{Element: RequirementClientCluster, Name: "LevelControl", ID: 0x0008, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0008, Name: "LevelControl"}},
 			{Element: RequirementClientCluster, Name: "Messages", ID: 0x0097, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0097, Name: "Messages"}},
@@ -561,17 +414,13 @@ var deviceTypeDefinitions = map[DeviceTypeID]*DeviceTypeDefinition{
 			{Element: RequirementClientCluster, Name: "AccountLogin", ID: 0x050E, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x050E, Name: "AccountLogin"}},
 			{Element: RequirementClientCluster, Name: "ContentControl", ID: 0x050F, HasID: true, Conformance: Conformance{Text: "P, O", Op: "otherwise", Args: []Conformance{{Op: "P"}, {Op: "O"}}}, Referent: Referent{Resolved: true, ID: 0x050F, Name: "ContentControl"}},
 			{Element: RequirementServerCluster, Name: "ContentAppObserver", ID: 0x0510, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0510, Name: "ContentAppObserver"}},
-		},
-	},
-	0x002A: {
-		ID: 0x002A, Name: "VideoRemoteControl", Classification: "simple", Revision: 2, Composition: "tree",
+		}},
+	0x002A: {ID: 0x002A, Name: "VideoRemoteControl", Classification: "simple", Revision: 2, Composition: "tree",
 		Requirements: []DeviceTypeRequirement{
-			{
-				Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
+			{Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementAttribute, Name: "DeviceTypeList", Referent: Referent{Resolved: true, ID: 0x0000, Name: "DeviceTypeList"}},
-				},
-			},
+				}},
 			{Element: RequirementClientCluster, Name: "OnOff", ID: 0x0006, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0006, Name: "OnOff"}},
 			{Element: RequirementClientCluster, Name: "LevelControl", ID: 0x0008, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0008, Name: "LevelControl"}},
 			{Element: RequirementClientCluster, Name: "WakeOnLan", ID: 0x0503, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0503, Name: "WakeOnLan"}},
@@ -586,34 +435,26 @@ var deviceTypeDefinitions = map[DeviceTypeID]*DeviceTypeDefinition{
 			{Element: RequirementClientCluster, Name: "ApplicationLauncher", ID: 0x050C, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x050C, Name: "ApplicationLauncher"}},
 			{Element: RequirementClientCluster, Name: "AccountLogin", ID: 0x050E, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x050E, Name: "AccountLogin"}},
 			{Element: RequirementClientCluster, Name: "ContentControl", ID: 0x050F, HasID: true, Conformance: Conformance{Text: "P, O", Op: "otherwise", Args: []Conformance{{Op: "P"}, {Op: "O"}}}, Referent: Referent{Resolved: true, ID: 0x050F, Name: "ContentControl"}},
-		},
-	},
-	0x002B: {
-		ID: 0x002B, Name: "Fan", Classification: "simple", Revision: 5, Composition: "tree",
+		}},
+	0x002B: {ID: 0x002B, Name: "Fan", Classification: "simple", Revision: 5, Composition: "tree",
 		Requirements: []DeviceTypeRequirement{
-			{
-				Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
+			{Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementAttribute, Name: "DeviceTypeList", Referent: Referent{Resolved: true, ID: 0x0000, Name: "DeviceTypeList"}},
-				},
-			},
+				}},
 			{Element: RequirementCondition, Name: "GroupcastListenerCond", Type: "RootNode.GroupcastListenerCond", Location: LocationRoot, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, Name: "GroupcastListenerCond", Declarer: "RootNode"}},
 			{Element: RequirementServerCluster, Name: "Identify", ID: 0x0003, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0003, Name: "Identify"}},
 			{Element: RequirementServerCluster, Name: "Groups", ID: 0x0004, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0004, Name: "Groups"}},
 			{Element: RequirementServerCluster, Name: "OnOff", ID: 0x0006, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0006, Name: "OnOff"}},
 			{Element: RequirementServerCluster, Name: "FanControl", ID: 0x0202, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0202, Name: "FanControl"}},
 			{Element: RequirementDeviceType, Name: "Thermostat", ID: 0x0301, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0301, Name: "Thermostat"}},
-		},
-	},
-	0x002C: {
-		ID: 0x002C, Name: "AirQualitySensor", Classification: "simple", Revision: 1, Composition: "tree",
+		}},
+	0x002C: {ID: 0x002C, Name: "AirQualitySensor", Classification: "simple", Revision: 1, Composition: "tree",
 		Requirements: []DeviceTypeRequirement{
-			{
-				Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
+			{Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementAttribute, Name: "DeviceTypeList", Referent: Referent{Resolved: true, ID: 0x0000, Name: "DeviceTypeList"}},
-				},
-			},
+				}},
 			{Element: RequirementServerCluster, Name: "Identify", ID: 0x0003, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0003, Name: "Identify"}},
 			{Element: RequirementServerCluster, Name: "AirQuality", ID: 0x005B, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x005B, Name: "AirQuality"}},
 			{Element: RequirementServerCluster, Name: "TemperatureMeasurement", ID: 0x0402, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0402, Name: "TemperatureMeasurement"}},
@@ -628,17 +469,13 @@ var deviceTypeDefinitions = map[DeviceTypeID]*DeviceTypeDefinition{
 			{Element: RequirementServerCluster, Name: "Pm10ConcentrationMeasurement", ID: 0x042D, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x042D, Name: "Pm10ConcentrationMeasurement"}},
 			{Element: RequirementServerCluster, Name: "TotalVolatileOrganicCompoundsConcentrationMeasurement", ID: 0x042E, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x042E, Name: "TotalVolatileOrganicCompoundsConcentrationMeasurement"}},
 			{Element: RequirementServerCluster, Name: "RadonConcentrationMeasurement", ID: 0x042F, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x042F, Name: "RadonConcentrationMeasurement"}},
-		},
-	},
-	0x002D: {
-		ID: 0x002D, Name: "AirPurifier", Classification: "simple", Revision: 3, Composition: "tree",
+		}},
+	0x002D: {ID: 0x002D, Name: "AirPurifier", Classification: "simple", Revision: 3, Composition: "tree",
 		Requirements: []DeviceTypeRequirement{
-			{
-				Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
+			{Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementAttribute, Name: "DeviceTypeList", Referent: Referent{Resolved: true, ID: 0x0000, Name: "DeviceTypeList"}},
-				},
-			},
+				}},
 			{Element: RequirementCondition, Name: "GroupcastListenerCond", Type: "RootNode.GroupcastListenerCond", Location: LocationRoot, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, Name: "GroupcastListenerCond", Declarer: "RootNode"}},
 			{Element: RequirementServerCluster, Name: "Identify", ID: 0x0003, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0003, Name: "Identify"}},
 			{Element: RequirementServerCluster, Name: "Groups", ID: 0x0004, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0004, Name: "Groups"}},
@@ -650,310 +487,224 @@ var deviceTypeDefinitions = map[DeviceTypeID]*DeviceTypeDefinition{
 			{Element: RequirementDeviceType, Name: "Thermostat", ID: 0x0301, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0301, Name: "Thermostat"}},
 			{Element: RequirementDeviceType, Name: "TemperatureSensor", ID: 0x0302, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0302, Name: "TemperatureSensor"}},
 			{Element: RequirementDeviceType, Name: "HumiditySensor", ID: 0x0307, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0307, Name: "HumiditySensor"}},
-		},
-	},
-	0x0040: {
-		ID: 0x0040, Name: "IrrigationSystem", Classification: "simple", Revision: 1, Composition: "tree",
+		}},
+	0x0040: {ID: 0x0040, Name: "IrrigationSystem", Classification: "simple", Revision: 1, Composition: "tree",
 		Requirements: []DeviceTypeRequirement{
-			{
-				Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
+			{Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementAttribute, Name: "DeviceTypeList", Referent: Referent{Resolved: true, ID: 0x0000, Name: "DeviceTypeList"}},
-				},
-			},
+				}},
 			{Element: RequirementServerCluster, Name: "Identify", ID: 0x0003, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0003, Name: "Identify"}},
 			{Element: RequirementServerCluster, Name: "OperationalState", ID: 0x0060, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0060, Name: "OperationalState"}},
 			{Element: RequirementServerCluster, Name: "FlowMeasurement", ID: 0x0404, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0404, Name: "FlowMeasurement"}},
 			{Element: RequirementClientCluster, Name: "FlowMeasurement", ID: 0x0404, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0404, Name: "FlowMeasurement"}},
 			{Element: RequirementDeviceType, Name: "WaterValve", ID: 0x0042, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Constraint: "min 1", Count: CountRange{Set: true, Min: 1, HasMin: true}, Referent: Referent{Resolved: true, ID: 0x0042, Name: "WaterValve"}},
-		},
-	},
-	0x0041: {
-		ID: 0x0041, Name: "WaterFreezeDetector", Classification: "simple", Revision: 2, Composition: "tree",
+		}},
+	0x0041: {ID: 0x0041, Name: "WaterFreezeDetector", Classification: "simple", Revision: 2, Composition: "tree",
 		Requirements: []DeviceTypeRequirement{
-			{
-				Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
+			{Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementAttribute, Name: "DeviceTypeList", Referent: Referent{Resolved: true, ID: 0x0000, Name: "DeviceTypeList"}},
-				},
-			},
+				}},
 			{Element: RequirementServerCluster, Name: "Identify", ID: 0x0003, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0003, Name: "Identify"}},
-			{
-				Element: RequirementServerCluster, Name: "BooleanState", ID: 0x0045, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0045, Name: "BooleanState"},
+			{Element: RequirementServerCluster, Name: "BooleanState", ID: 0x0045, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0045, Name: "BooleanState"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementEvent, Name: "StateChange", Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0000, Name: "StateChange"}},
 					{Element: RequirementFeature, Name: "CHGEVENT", Conformance: Conformance{Text: "Rev >= v2", Op: "revision", Rev: 2}, Referent: Referent{Resolved: true, ID: 0, Name: "CHGEVENT"}},
-				},
-			},
+				}},
 			{Element: RequirementServerCluster, Name: "BooleanStateConfiguration", ID: 0x0080, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0080, Name: "BooleanStateConfiguration"}},
-		},
-	},
-	0x0042: {
-		ID: 0x0042, Name: "WaterValve", Classification: "simple", Revision: 1, Composition: "tree",
+		}},
+	0x0042: {ID: 0x0042, Name: "WaterValve", Classification: "simple", Revision: 1, Composition: "tree",
 		Requirements: []DeviceTypeRequirement{
-			{
-				Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
+			{Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementAttribute, Name: "DeviceTypeList", Referent: Referent{Resolved: true, ID: 0x0000, Name: "DeviceTypeList"}},
-				},
-			},
+				}},
 			{Element: RequirementServerCluster, Name: "Identify", ID: 0x0003, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0003, Name: "Identify"}},
 			{Element: RequirementServerCluster, Name: "ValveConfigurationAndControl", ID: 0x0081, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0081, Name: "ValveConfigurationAndControl"}},
 			{Element: RequirementServerCluster, Name: "FlowMeasurement", ID: 0x0404, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0404, Name: "FlowMeasurement"}},
 			{Element: RequirementClientCluster, Name: "FlowMeasurement", ID: 0x0404, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0404, Name: "FlowMeasurement"}},
-		},
-	},
-	0x0043: {
-		ID: 0x0043, Name: "WaterLeakDetector", Classification: "simple", Revision: 2, Composition: "tree",
+		}},
+	0x0043: {ID: 0x0043, Name: "WaterLeakDetector", Classification: "simple", Revision: 2, Composition: "tree",
 		Requirements: []DeviceTypeRequirement{
-			{
-				Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
+			{Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementAttribute, Name: "DeviceTypeList", Referent: Referent{Resolved: true, ID: 0x0000, Name: "DeviceTypeList"}},
-				},
-			},
+				}},
 			{Element: RequirementServerCluster, Name: "Identify", ID: 0x0003, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0003, Name: "Identify"}},
-			{
-				Element: RequirementServerCluster, Name: "BooleanState", ID: 0x0045, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0045, Name: "BooleanState"},
+			{Element: RequirementServerCluster, Name: "BooleanState", ID: 0x0045, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0045, Name: "BooleanState"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementEvent, Name: "StateChange", Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0000, Name: "StateChange"}},
 					{Element: RequirementFeature, Name: "CHGEVENT", Conformance: Conformance{Text: "Rev >= v2", Op: "revision", Rev: 2}, Referent: Referent{Resolved: true, ID: 0, Name: "CHGEVENT"}},
-				},
-			},
+				}},
 			{Element: RequirementServerCluster, Name: "BooleanStateConfiguration", ID: 0x0080, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0080, Name: "BooleanStateConfiguration"}},
-		},
-	},
-	0x0044: {
-		ID: 0x0044, Name: "RainSensor", Classification: "simple", Revision: 2, Composition: "tree",
+		}},
+	0x0044: {ID: 0x0044, Name: "RainSensor", Classification: "simple", Revision: 2, Composition: "tree",
 		Requirements: []DeviceTypeRequirement{
-			{
-				Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
+			{Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementAttribute, Name: "DeviceTypeList", Referent: Referent{Resolved: true, ID: 0x0000, Name: "DeviceTypeList"}},
-				},
-			},
+				}},
 			{Element: RequirementServerCluster, Name: "Identify", ID: 0x0003, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0003, Name: "Identify"}},
-			{
-				Element: RequirementServerCluster, Name: "BooleanState", ID: 0x0045, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0045, Name: "BooleanState"},
+			{Element: RequirementServerCluster, Name: "BooleanState", ID: 0x0045, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0045, Name: "BooleanState"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementEvent, Name: "StateChange", Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0000, Name: "StateChange"}},
 					{Element: RequirementFeature, Name: "CHGEVENT", Conformance: Conformance{Text: "Rev >= v2", Op: "revision", Rev: 2}, Referent: Referent{Resolved: true, ID: 0, Name: "CHGEVENT"}},
-				},
-			},
+				}},
 			{Element: RequirementServerCluster, Name: "BooleanStateConfiguration", ID: 0x0080, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0080, Name: "BooleanStateConfiguration"}},
-		},
-	},
-	0x0045: {
-		ID: 0x0045, Name: "SoilSensor", Classification: "simple", Revision: 1, Composition: "tree",
+		}},
+	0x0045: {ID: 0x0045, Name: "SoilSensor", Classification: "simple", Revision: 1, Composition: "tree",
 		Requirements: []DeviceTypeRequirement{
-			{
-				Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
+			{Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementAttribute, Name: "DeviceTypeList", Referent: Referent{Resolved: true, ID: 0x0000, Name: "DeviceTypeList"}},
-				},
-			},
+				}},
 			{Element: RequirementServerCluster, Name: "Identify", ID: 0x0003, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0003, Name: "Identify"}},
 			{Element: RequirementServerCluster, Name: "TemperatureMeasurement", ID: 0x0402, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0402, Name: "TemperatureMeasurement"}},
 			{Element: RequirementServerCluster, Name: "SoilMeasurement", ID: 0x0430, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0430, Name: "SoilMeasurement"}},
-		},
-	},
-	0x0070: {
-		ID: 0x0070, Name: "Refrigerator", Classification: "simple", Revision: 3, Composition: "tree",
+		}},
+	0x0070: {ID: 0x0070, Name: "Refrigerator", Classification: "simple", Revision: 3, Composition: "tree",
 		Requirements: []DeviceTypeRequirement{
-			{
-				Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
+			{Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementAttribute, Name: "DeviceTypeList", Referent: Referent{Resolved: true, ID: 0x0000, Name: "DeviceTypeList"}},
-				},
-			},
+				}},
 			{Element: RequirementCondition, Name: "Cooler", Type: "TemperatureControlledCabinet.Cooler", Location: LocationDescendant, Conformance: Conformance{Text: "M", Op: "M"}, Constraint: "min 1", Count: CountRange{Set: true, Min: 1, HasMin: true}, Referent: Referent{Resolved: true, Name: "Cooler", Declarer: "TemperatureControlledCabinet"}},
 			{Element: RequirementServerCluster, Name: "Identify", ID: 0x0003, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0003, Name: "Identify"}},
-			{
-				Element: RequirementServerCluster, Name: "RefrigeratorAndTemperatureControlledCabinetMode", ID: 0x0052, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0052, Name: "RefrigeratorAndTemperatureControlledCabinetMode"},
+			{Element: RequirementServerCluster, Name: "RefrigeratorAndTemperatureControlledCabinetMode", ID: 0x0052, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0052, Name: "RefrigeratorAndTemperatureControlledCabinetMode"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementFeature, Name: "DEPONOFF", Conformance: Conformance{Text: "X", Op: "X"}, Referent: Referent{Resolved: true, ID: 0, Name: "DEPONOFF"}},
 					{Element: RequirementAttribute, Name: "StartUpMode", Conformance: Conformance{Text: "X", Op: "X"}, Referent: Referent{Resolved: true, ID: 0x0002, Name: "StartUpMode"}},
-				},
-			},
+				}},
 			{Element: RequirementServerCluster, Name: "RefrigeratorAlarm", ID: 0x0057, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0057, Name: "RefrigeratorAlarm"}},
 			{Element: RequirementServerCluster, Name: "ActivatedCarbonFilterMonitoring", ID: 0x0072, HasID: true, Conformance: Conformance{Text: "[Rev >= v3]", Op: "optionalIf", Args: []Conformance{{Op: "revision", Rev: 3}}}, Referent: Referent{Resolved: true, ID: 0x0072, Name: "ActivatedCarbonFilterMonitoring"}},
 			{Element: RequirementDeviceType, Name: "TemperatureControlledCabinet", ID: 0x0071, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Constraint: "min 1", Count: CountRange{Set: true, Min: 1, HasMin: true}, Referent: Referent{Resolved: true, ID: 0x0071, Name: "TemperatureControlledCabinet"}},
-		},
-	},
-	0x0071: {
-		ID: 0x0071, Name: "TemperatureControlledCabinet", Classification: "simple", Revision: 6, Composition: "tree",
+		}},
+	0x0071: {ID: 0x0071, Name: "TemperatureControlledCabinet", Classification: "simple", Revision: 6, Composition: "tree",
 		Conditions: []string{"Cooler", "Heater"},
 		Requirements: []DeviceTypeRequirement{
-			{
-				Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
+			{Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementAttribute, Name: "DeviceTypeList", Referent: Referent{Resolved: true, ID: 0x0000, Name: "DeviceTypeList"}},
-				},
-			},
-			{
-				Element: RequirementServerCluster, Name: "TemperatureControl", ID: 0x0056, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0056, Name: "TemperatureControl"},
+				}},
+			{Element: RequirementServerCluster, Name: "TemperatureControl", ID: 0x0056, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0056, Name: "TemperatureControl"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementFeature, Name: "TN", Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0, Name: "TN"}},
 					{Element: RequirementFeature, Name: "TL", Conformance: Conformance{Text: "X", Op: "X"}, Referent: Referent{Resolved: true, ID: 1, Name: "TL"}},
-				},
-			},
+				}},
 			{Element: RequirementServerCluster, Name: "TemperatureMeasurement", ID: 0x0402, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0402, Name: "TemperatureMeasurement"}},
-			{
-				Element: RequirementServerCluster, Name: "RefrigeratorAndTemperatureControlledCabinetMode", ID: 0x0052, HasID: true, Conformance: Conformance{Text: "[Cooler]", Op: "optionalIf", Args: []Conformance{{Op: "name", Name: "Cooler"}}}, Referent: Referent{Resolved: true, ID: 0x0052, Name: "RefrigeratorAndTemperatureControlledCabinetMode"},
+			{Element: RequirementServerCluster, Name: "RefrigeratorAndTemperatureControlledCabinetMode", ID: 0x0052, HasID: true, Conformance: Conformance{Text: "[Cooler]", Op: "optionalIf", Args: []Conformance{{Op: "name", Name: "Cooler"}}}, Referent: Referent{Resolved: true, ID: 0x0052, Name: "RefrigeratorAndTemperatureControlledCabinetMode"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementAttribute, Name: "StartUpMode", Conformance: Conformance{Text: "X", Op: "X"}, Referent: Referent{Resolved: true, ID: 0x0002, Name: "StartUpMode"}},
 					{Element: RequirementFeature, Name: "DEPONOFF", Conformance: Conformance{Text: "X", Op: "X"}, Referent: Referent{Resolved: true, ID: 0, Name: "DEPONOFF"}},
-				},
-			},
-			{
-				Element: RequirementServerCluster, Name: "OvenMode", ID: 0x0049, HasID: true, Conformance: Conformance{Text: "[Heater]", Op: "optionalIf", Args: []Conformance{{Op: "name", Name: "Heater"}}}, Referent: Referent{Resolved: true, ID: 0x0049, Name: "OvenMode"},
+				}},
+			{Element: RequirementServerCluster, Name: "OvenMode", ID: 0x0049, HasID: true, Conformance: Conformance{Text: "[Heater]", Op: "optionalIf", Args: []Conformance{{Op: "name", Name: "Heater"}}}, Referent: Referent{Resolved: true, ID: 0x0049, Name: "OvenMode"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementAttribute, Name: "StartUpMode", Conformance: Conformance{Text: "X", Op: "X"}, Referent: Referent{Resolved: true, ID: 0x0002, Name: "StartUpMode"}},
 					{Element: RequirementFeature, Name: "DEPONOFF", Conformance: Conformance{Text: "X", Op: "X"}, Referent: Referent{Resolved: true, ID: 0, Name: "DEPONOFF"}},
-				},
-			},
-			{
-				Element: RequirementServerCluster, Name: "OvenCavityOperationalState", ID: 0x0048, HasID: true, Conformance: Conformance{Text: "[Heater]", Op: "optionalIf", Args: []Conformance{{Op: "name", Name: "Heater"}}}, Referent: Referent{Resolved: true, ID: 0x0048, Name: "OvenCavityOperationalState"},
+				}},
+			{Element: RequirementServerCluster, Name: "OvenCavityOperationalState", ID: 0x0048, HasID: true, Conformance: Conformance{Text: "[Heater]", Op: "optionalIf", Args: []Conformance{{Op: "name", Name: "Heater"}}}, Referent: Referent{Resolved: true, ID: 0x0048, Name: "OvenCavityOperationalState"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementCommand, Name: "Pause", Conformance: Conformance{Text: "X", Op: "X"}, Referent: Referent{Resolved: true, ID: 0x0000, Name: "Pause"}},
 					{Element: RequirementCommand, Name: "Resume", Conformance: Conformance{Text: "X", Op: "X"}, Referent: Referent{Resolved: true, ID: 0x0003, Name: "Resume"}},
 					{Element: RequirementEvent, Name: "OperationCompletion", Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0001, Name: "OperationCompletion"}},
-				},
-			},
+				}},
 			{Element: RequirementServerCluster, Name: "TemperatureAlarm", ID: 0x0064, HasID: true, Conformance: Conformance{Text: "P, O", Op: "otherwise", Args: []Conformance{{Op: "P"}, {Op: "O"}}}, Referent: Referent{Resolved: true, ID: 0x0064, Name: "TemperatureAlarm"}},
-		},
-	},
-	0x0072: {
-		ID: 0x0072, Name: "RoomAirConditioner", Classification: "simple", Revision: 4, Composition: "tree",
+		}},
+	0x0072: {ID: 0x0072, Name: "RoomAirConditioner", Classification: "simple", Revision: 4, Composition: "tree",
 		Requirements: []DeviceTypeRequirement{
-			{
-				Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
+			{Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementAttribute, Name: "DeviceTypeList", Referent: Referent{Resolved: true, ID: 0x0000, Name: "DeviceTypeList"}},
-				},
-			},
+				}},
 			{Element: RequirementCondition, Name: "GroupcastListenerCond", Type: "RootNode.GroupcastListenerCond", Location: LocationRoot, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, Name: "GroupcastListenerCond", Declarer: "RootNode"}},
 			{Element: RequirementServerCluster, Name: "Identify", ID: 0x0003, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0003, Name: "Identify"}},
 			{Element: RequirementServerCluster, Name: "Groups", ID: 0x0004, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0004, Name: "Groups"}},
-			{
-				Element: RequirementServerCluster, Name: "OnOff", ID: 0x0006, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0006, Name: "OnOff"},
+			{Element: RequirementServerCluster, Name: "OnOff", ID: 0x0006, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0006, Name: "OnOff"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementFeature, Name: "DF", Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 1, Name: "DF"}},
-				},
-			},
+				}},
 			{Element: RequirementServerCluster, Name: "ScenesManagement", ID: 0x0062, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0062, Name: "ScenesManagement"}},
 			{Element: RequirementServerCluster, Name: "HepaFilterMonitoring", ID: 0x0071, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0071, Name: "HepaFilterMonitoring"}},
 			{Element: RequirementServerCluster, Name: "ActivatedCarbonFilterMonitoring", ID: 0x0072, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0072, Name: "ActivatedCarbonFilterMonitoring"}},
 			{Element: RequirementServerCluster, Name: "Thermostat", ID: 0x0201, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0201, Name: "Thermostat"}},
 			{Element: RequirementServerCluster, Name: "FanControl", ID: 0x0202, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0202, Name: "FanControl"}},
-			{
-				Element: RequirementServerCluster, Name: "ThermostatUserInterfaceConfiguration", ID: 0x0204, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0204, Name: "ThermostatUserInterfaceConfiguration"},
+			{Element: RequirementServerCluster, Name: "ThermostatUserInterfaceConfiguration", ID: 0x0204, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0204, Name: "ThermostatUserInterfaceConfiguration"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementAttribute, Name: "KeypadLockout", Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0001, Name: "KeypadLockout"}},
-				},
-			},
+				}},
 			{Element: RequirementServerCluster, Name: "TemperatureMeasurement", ID: 0x0402, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0402, Name: "TemperatureMeasurement"}},
 			{Element: RequirementServerCluster, Name: "RelativeHumidityMeasurement", ID: 0x0405, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0405, Name: "RelativeHumidityMeasurement"}},
 			{Element: RequirementDeviceType, Name: "TemperatureSensor", ID: 0x0302, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0302, Name: "TemperatureSensor"}},
 			{Element: RequirementDeviceType, Name: "HumiditySensor", ID: 0x0307, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0307, Name: "HumiditySensor"}},
-		},
-	},
-	0x0073: {
-		ID: 0x0073, Name: "LaundryWasher", Classification: "simple", Revision: 2, Composition: "tree",
+		}},
+	0x0073: {ID: 0x0073, Name: "LaundryWasher", Classification: "simple", Revision: 2, Composition: "tree",
 		Requirements: []DeviceTypeRequirement{
-			{
-				Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
+			{Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementAttribute, Name: "DeviceTypeList", Referent: Referent{Resolved: true, ID: 0x0000, Name: "DeviceTypeList"}},
-				},
-			},
+				}},
 			{Element: RequirementServerCluster, Name: "Identify", ID: 0x0003, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0003, Name: "Identify"}},
-			{
-				Element: RequirementServerCluster, Name: "OnOff", ID: 0x0006, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0006, Name: "OnOff"},
+			{Element: RequirementServerCluster, Name: "OnOff", ID: 0x0006, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0006, Name: "OnOff"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementFeature, Name: "DF", Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 1, Name: "DF"}},
-				},
-			},
-			{
-				Element: RequirementServerCluster, Name: "LaundryWasherMode", ID: 0x0051, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0051, Name: "LaundryWasherMode"},
+				}},
+			{Element: RequirementServerCluster, Name: "LaundryWasherMode", ID: 0x0051, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0051, Name: "LaundryWasherMode"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementFeature, Name: "DEPONOFF", Conformance: Conformance{Text: "X", Op: "X"}, Referent: Referent{Resolved: true, ID: 0, Name: "DEPONOFF"}},
 					{Element: RequirementAttribute, Name: "StartUpMode", Conformance: Conformance{Text: "X", Op: "X"}, Referent: Referent{Resolved: true, ID: 0x0002, Name: "StartUpMode"}},
-				},
-			},
+				}},
 			{Element: RequirementServerCluster, Name: "LaundryWasherControls", ID: 0x0053, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0053, Name: "LaundryWasherControls"}},
 			{Element: RequirementServerCluster, Name: "TemperatureControl", ID: 0x0056, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0056, Name: "TemperatureControl"}},
-			{
-				Element: RequirementServerCluster, Name: "OperationalState", ID: 0x0060, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0060, Name: "OperationalState"},
+			{Element: RequirementServerCluster, Name: "OperationalState", ID: 0x0060, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0060, Name: "OperationalState"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementEvent, Name: "OperationCompletion", Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0001, Name: "OperationCompletion"}},
-				},
-			},
-		},
-	},
-	0x0074: {
-		ID: 0x0074, Name: "RoboticVacuumCleaner", Classification: "simple", Revision: 4, Composition: "tree",
+				}},
+		}},
+	0x0074: {ID: 0x0074, Name: "RoboticVacuumCleaner", Classification: "simple", Revision: 4, Composition: "tree",
 		Requirements: []DeviceTypeRequirement{
-			{
-				Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
+			{Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementAttribute, Name: "DeviceTypeList", Referent: Referent{Resolved: true, ID: 0x0000, Name: "DeviceTypeList"}},
-				},
-			},
+				}},
 			{Element: RequirementServerCluster, Name: "Identify", ID: 0x0003, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0003, Name: "Identify"}},
 			{Element: RequirementServerCluster, Name: "RvcRunMode", ID: 0x0054, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0054, Name: "RvcRunMode"}},
 			{Element: RequirementServerCluster, Name: "RvcCleanMode", ID: 0x0055, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0055, Name: "RvcCleanMode"}},
-			{
-				Element: RequirementServerCluster, Name: "RvcOperationalState", ID: 0x0061, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0061, Name: "RvcOperationalState"},
+			{Element: RequirementServerCluster, Name: "RvcOperationalState", ID: 0x0061, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0061, Name: "RvcOperationalState"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementEvent, Name: "OperationCompletion", Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0001, Name: "OperationCompletion"}},
-				},
-			},
+				}},
 			{Element: RequirementServerCluster, Name: "ServiceArea", ID: 0x0150, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0150, Name: "ServiceArea"}},
-		},
-	},
-	0x0075: {
-		ID: 0x0075, Name: "Dishwasher", Classification: "simple", Revision: 2, Composition: "tree",
+		}},
+	0x0075: {ID: 0x0075, Name: "Dishwasher", Classification: "simple", Revision: 2, Composition: "tree",
 		Requirements: []DeviceTypeRequirement{
-			{
-				Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
+			{Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementAttribute, Name: "DeviceTypeList", Referent: Referent{Resolved: true, ID: 0x0000, Name: "DeviceTypeList"}},
-				},
-			},
+				}},
 			{Element: RequirementServerCluster, Name: "Identify", ID: 0x0003, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0003, Name: "Identify"}},
-			{
-				Element: RequirementServerCluster, Name: "OnOff", ID: 0x0006, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0006, Name: "OnOff"},
+			{Element: RequirementServerCluster, Name: "OnOff", ID: 0x0006, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0006, Name: "OnOff"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementFeature, Name: "DF", Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 1, Name: "DF"}},
-				},
-			},
+				}},
 			{Element: RequirementServerCluster, Name: "TemperatureControl", ID: 0x0056, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0056, Name: "TemperatureControl"}},
-			{
-				Element: RequirementServerCluster, Name: "DishwasherMode", ID: 0x0059, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0059, Name: "DishwasherMode"},
+			{Element: RequirementServerCluster, Name: "DishwasherMode", ID: 0x0059, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0059, Name: "DishwasherMode"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementAttribute, Name: "StartUpMode", Conformance: Conformance{Text: "X", Op: "X"}, Referent: Referent{Resolved: true, ID: 0x0002, Name: "StartUpMode"}},
 					{Element: RequirementFeature, Name: "DEPONOFF", Conformance: Conformance{Text: "X", Op: "X"}, Referent: Referent{Resolved: true, ID: 0, Name: "DEPONOFF"}},
-				},
-			},
+				}},
 			{Element: RequirementServerCluster, Name: "DishwasherAlarm", ID: 0x005D, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x005D, Name: "DishwasherAlarm"}},
-			{
-				Element: RequirementServerCluster, Name: "OperationalState", ID: 0x0060, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0060, Name: "OperationalState"},
+			{Element: RequirementServerCluster, Name: "OperationalState", ID: 0x0060, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0060, Name: "OperationalState"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementEvent, Name: "OperationCompletion", Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0001, Name: "OperationCompletion"}},
-				},
-			},
-		},
-	},
-	0x0076: {
-		ID: 0x0076, Name: "SmokeCoAlarm", Classification: "simple", Revision: 2, Composition: "tree",
+				}},
+		}},
+	0x0076: {ID: 0x0076, Name: "SmokeCoAlarm", Classification: "simple", Revision: 2, Composition: "tree",
 		Requirements: []DeviceTypeRequirement{
-			{
-				Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
+			{Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementAttribute, Name: "DeviceTypeList", Referent: Referent{Resolved: true, ID: 0x0000, Name: "DeviceTypeList"}},
-				},
-			},
+				}},
 			{Element: RequirementCondition, Name: "GroupcastListenerCond", Type: "RootNode.GroupcastListenerCond", Location: LocationRoot, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, Name: "GroupcastListenerCond", Declarer: "RootNode"}},
 			{Element: RequirementServerCluster, Name: "Identify", ID: 0x0003, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0003, Name: "Identify"}},
 			{Element: RequirementServerCluster, Name: "Groups", ID: 0x0004, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0004, Name: "Groups"}},
@@ -962,161 +713,115 @@ var deviceTypeDefinitions = map[DeviceTypeID]*DeviceTypeDefinition{
 			{Element: RequirementServerCluster, Name: "TemperatureMeasurement", ID: 0x0402, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0402, Name: "TemperatureMeasurement"}},
 			{Element: RequirementServerCluster, Name: "CarbonMonoxideConcentrationMeasurement", ID: 0x040C, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x040C, Name: "CarbonMonoxideConcentrationMeasurement"}},
 			{Element: RequirementDeviceType, Name: "PowerSource", ID: 0x0011, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Constraint: "min 1", Count: CountRange{Set: true, Min: 1, HasMin: true}, Referent: Referent{Resolved: true, ID: 0x0011, Name: "PowerSource"}},
-		},
-	},
-	0x0077: {
-		ID: 0x0077, Name: "CookSurface", Classification: "simple", Revision: 2, Composition: "tree",
+		}},
+	0x0077: {ID: 0x0077, Name: "CookSurface", Classification: "simple", Revision: 2, Composition: "tree",
 		Requirements: []DeviceTypeRequirement{
-			{
-				Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
+			{Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementAttribute, Name: "DeviceTypeList", Referent: Referent{Resolved: true, ID: 0x0000, Name: "DeviceTypeList"}},
-				},
-			},
-			{
-				Element: RequirementServerCluster, Name: "OnOff", ID: 0x0006, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0006, Name: "OnOff"},
+				}},
+			{Element: RequirementServerCluster, Name: "OnOff", ID: 0x0006, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0006, Name: "OnOff"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementFeature, Name: "OFFONLY", Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 2, Name: "OFFONLY"}},
-				},
-			},
-			{
-				Element: RequirementServerCluster, Name: "TemperatureControl", ID: 0x0056, HasID: true, Conformance: Conformance{Text: "O.a+", Op: "choice", Choice: &ConformanceChoice{Name: "a", Num: 1, OrMore: true, OrLess: false}, Args: []Conformance{{Op: "O"}}}, Referent: Referent{Resolved: true, ID: 0x0056, Name: "TemperatureControl"},
+				}},
+			{Element: RequirementServerCluster, Name: "TemperatureControl", ID: 0x0056, HasID: true, Conformance: Conformance{Text: "O.a+", Op: "choice", Choice: &ConformanceChoice{Name: "a", Num: 1, OrMore: true, OrLess: false}, Args: []Conformance{{Op: "O"}}}, Referent: Referent{Resolved: true, ID: 0x0056, Name: "TemperatureControl"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementFeature, Name: "TL", Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 1, Name: "TL"}},
 					{Element: RequirementFeature, Name: "TN", Conformance: Conformance{Text: "X", Op: "X"}, Referent: Referent{Resolved: true, ID: 0, Name: "TN"}},
-				},
-			},
+				}},
 			{Element: RequirementServerCluster, Name: "TemperatureMeasurement", ID: 0x0402, HasID: true, Conformance: Conformance{Text: "O.a+", Op: "choice", Choice: &ConformanceChoice{Name: "a", Num: 1, OrMore: true, OrLess: false}, Args: []Conformance{{Op: "O"}}}, Referent: Referent{Resolved: true, ID: 0x0402, Name: "TemperatureMeasurement"}},
-		},
-	},
-	0x0078: {
-		ID: 0x0078, Name: "Cooktop", Classification: "simple", Revision: 1, Composition: "tree",
+		}},
+	0x0078: {ID: 0x0078, Name: "Cooktop", Classification: "simple", Revision: 1, Composition: "tree",
 		Requirements: []DeviceTypeRequirement{
-			{
-				Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
+			{Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementAttribute, Name: "DeviceTypeList", Referent: Referent{Resolved: true, ID: 0x0000, Name: "DeviceTypeList"}},
-				},
-			},
+				}},
 			{Element: RequirementServerCluster, Name: "Identify", ID: 0x0003, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0003, Name: "Identify"}},
-			{
-				Element: RequirementServerCluster, Name: "OnOff", ID: 0x0006, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0006, Name: "OnOff"},
+			{Element: RequirementServerCluster, Name: "OnOff", ID: 0x0006, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0006, Name: "OnOff"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementFeature, Name: "OFFONLY", Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 2, Name: "OFFONLY"}},
-				},
-			},
+				}},
 			{Element: RequirementDeviceType, Name: "CookSurface", ID: 0x0077, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Constraint: "min 1", Count: CountRange{Set: true, Min: 1, HasMin: true}, Referent: Referent{Resolved: true, ID: 0x0077, Name: "CookSurface"}},
-		},
-	},
-	0x0079: {
-		ID: 0x0079, Name: "MicrowaveOven", Classification: "simple", Revision: 2, Composition: "tree",
+		}},
+	0x0079: {ID: 0x0079, Name: "MicrowaveOven", Classification: "simple", Revision: 2, Composition: "tree",
 		Requirements: []DeviceTypeRequirement{
-			{
-				Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
+			{Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementAttribute, Name: "DeviceTypeList", Referent: Referent{Resolved: true, ID: 0x0000, Name: "DeviceTypeList"}},
-				},
-			},
+				}},
 			{Element: RequirementServerCluster, Name: "Identify", ID: 0x0003, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0003, Name: "Identify"}},
-			{
-				Element: RequirementServerCluster, Name: "OperationalState", ID: 0x0060, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0060, Name: "OperationalState"},
+			{Element: RequirementServerCluster, Name: "OperationalState", ID: 0x0060, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0060, Name: "OperationalState"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementAttribute, Name: "CountdownTime", Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0002, Name: "CountdownTime"}},
 					{Element: RequirementEvent, Name: "OperationCompletion", Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0001, Name: "OperationCompletion"}},
-				},
-			},
-			{
-				Element: RequirementServerCluster, Name: "FanControl", ID: 0x0202, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0202, Name: "FanControl"},
+				}},
+			{Element: RequirementServerCluster, Name: "FanControl", ID: 0x0202, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0202, Name: "FanControl"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementFeature, Name: "WND", Conformance: Conformance{Text: "X", Op: "X"}, Referent: Referent{Resolved: true, ID: 3, Name: "WND"}},
 					{Element: RequirementFeature, Name: "DIR", Conformance: Conformance{Text: "X", Op: "X"}, Referent: Referent{Resolved: true, ID: 5, Name: "DIR"}},
-				},
-			},
+				}},
 			{Element: RequirementServerCluster, Name: "MicrowaveOvenMode", ID: 0x005E, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x005E, Name: "MicrowaveOvenMode"}},
 			{Element: RequirementServerCluster, Name: "MicrowaveOvenControl", ID: 0x005F, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x005F, Name: "MicrowaveOvenControl"}},
 			{Element: RequirementDeviceType, Name: "OnOffLight", ID: 0x0100, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0100, Name: "OnOffLight"}},
-		},
-	},
-	0x007A: {
-		ID: 0x007A, Name: "ExtractorHood", Classification: "simple", Revision: 1, Composition: "tree",
+		}},
+	0x007A: {ID: 0x007A, Name: "ExtractorHood", Classification: "simple", Revision: 1, Composition: "tree",
 		Requirements: []DeviceTypeRequirement{
-			{
-				Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
+			{Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementAttribute, Name: "DeviceTypeList", Referent: Referent{Resolved: true, ID: 0x0000, Name: "DeviceTypeList"}},
-				},
-			},
+				}},
 			{Element: RequirementServerCluster, Name: "Identify", ID: 0x0003, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0003, Name: "Identify"}},
 			{Element: RequirementServerCluster, Name: "HepaFilterMonitoring", ID: 0x0071, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0071, Name: "HepaFilterMonitoring"}},
 			{Element: RequirementServerCluster, Name: "ActivatedCarbonFilterMonitoring", ID: 0x0072, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0072, Name: "ActivatedCarbonFilterMonitoring"}},
-			{
-				Element: RequirementServerCluster, Name: "FanControl", ID: 0x0202, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0202, Name: "FanControl"},
+			{Element: RequirementServerCluster, Name: "FanControl", ID: 0x0202, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0202, Name: "FanControl"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementFeature, Name: "RCK", Conformance: Conformance{Text: "X", Op: "X"}, Referent: Referent{Resolved: true, ID: 2, Name: "RCK"}},
 					{Element: RequirementFeature, Name: "WND", Conformance: Conformance{Text: "X", Op: "X"}, Referent: Referent{Resolved: true, ID: 3, Name: "WND"}},
 					{Element: RequirementFeature, Name: "DIR", Conformance: Conformance{Text: "X", Op: "X"}, Referent: Referent{Resolved: true, ID: 5, Name: "DIR"}},
-				},
-			},
+				}},
 			{Element: RequirementDeviceType, Name: "OnOffLight", ID: 0x0100, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0100, Name: "OnOffLight"}},
-		},
-	},
-	0x007B: {
-		ID: 0x007B, Name: "Oven", Classification: "simple", Revision: 2, Composition: "tree",
+		}},
+	0x007B: {ID: 0x007B, Name: "Oven", Classification: "simple", Revision: 2, Composition: "tree",
 		Requirements: []DeviceTypeRequirement{
-			{
-				Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
+			{Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementAttribute, Name: "DeviceTypeList", Referent: Referent{Resolved: true, ID: 0x0000, Name: "DeviceTypeList"}},
-				},
-			},
+				}},
 			{Element: RequirementCondition, Name: "Heater", Type: "TemperatureControlledCabinet.Heater", Location: LocationDescendant, Conformance: Conformance{Text: "M", Op: "M"}, Constraint: "min 1", Count: CountRange{Set: true, Min: 1, HasMin: true}, Referent: Referent{Resolved: true, Name: "Heater", Declarer: "TemperatureControlledCabinet"}},
 			{Element: RequirementServerCluster, Name: "Identify", ID: 0x0003, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0003, Name: "Identify"}},
 			{Element: RequirementDeviceType, Name: "TemperatureControlledCabinet", ID: 0x0071, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Constraint: "min 1", Count: CountRange{Set: true, Min: 1, HasMin: true}, Referent: Referent{Resolved: true, ID: 0x0071, Name: "TemperatureControlledCabinet"}},
 			{Element: RequirementDeviceType, Name: "Cooktop", ID: 0x0078, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Constraint: "max 1", Count: CountRange{Set: true, Max: 1, HasMax: true}, Referent: Referent{Resolved: true, ID: 0x0078, Name: "Cooktop"}},
-		},
-	},
-	0x007C: {
-		ID: 0x007C, Name: "LaundryDryer", Classification: "simple", Revision: 2, Composition: "tree",
+		}},
+	0x007C: {ID: 0x007C, Name: "LaundryDryer", Classification: "simple", Revision: 2, Composition: "tree",
 		Requirements: []DeviceTypeRequirement{
-			{
-				Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
+			{Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementAttribute, Name: "DeviceTypeList", Referent: Referent{Resolved: true, ID: 0x0000, Name: "DeviceTypeList"}},
-				},
-			},
+				}},
 			{Element: RequirementServerCluster, Name: "Identify", ID: 0x0003, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0003, Name: "Identify"}},
-			{
-				Element: RequirementServerCluster, Name: "LaundryWasherMode", ID: 0x0051, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0051, Name: "LaundryWasherMode"},
+			{Element: RequirementServerCluster, Name: "LaundryWasherMode", ID: 0x0051, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0051, Name: "LaundryWasherMode"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementFeature, Name: "DEPONOFF", Conformance: Conformance{Text: "X", Op: "X"}, Referent: Referent{Resolved: true, ID: 0, Name: "DEPONOFF"}},
 					{Element: RequirementAttribute, Name: "StartUpMode", Conformance: Conformance{Text: "X", Op: "X"}, Referent: Referent{Resolved: true, ID: 0x0002, Name: "StartUpMode"}},
-				},
-			},
-			{
-				Element: RequirementServerCluster, Name: "OnOff", ID: 0x0006, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0006, Name: "OnOff"},
+				}},
+			{Element: RequirementServerCluster, Name: "OnOff", ID: 0x0006, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0006, Name: "OnOff"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementFeature, Name: "DF", Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 1, Name: "DF"}},
-				},
-			},
+				}},
 			{Element: RequirementServerCluster, Name: "LaundryDryerControls", ID: 0x004A, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x004A, Name: "LaundryDryerControls"}},
 			{Element: RequirementServerCluster, Name: "TemperatureControl", ID: 0x0056, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0056, Name: "TemperatureControl"}},
-			{
-				Element: RequirementServerCluster, Name: "OperationalState", ID: 0x0060, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0060, Name: "OperationalState"},
+			{Element: RequirementServerCluster, Name: "OperationalState", ID: 0x0060, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0060, Name: "OperationalState"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementEvent, Name: "OperationCompletion", Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0001, Name: "OperationCompletion"}},
-				},
-			},
-		},
-	},
-	0x0090: {
-		ID: 0x0090, Name: "NetworkInfrastructureManager", Classification: "simple", Revision: 2, Composition: "tree",
+				}},
+		}},
+	0x0090: {ID: 0x0090, Name: "NetworkInfrastructureManager", Classification: "simple", Revision: 2, Composition: "tree",
 		Requirements: []DeviceTypeRequirement{
-			{
-				Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
+			{Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementAttribute, Name: "DeviceTypeList", Referent: Referent{Resolved: true, ID: 0x0000, Name: "DeviceTypeList"}},
-				},
-			},
+				}},
 			{Element: RequirementCondition, Name: "ManagedAclAllowed", Type: "RootNode.ManagedAclAllowed", Location: LocationRoot, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, Name: "ManagedAclAllowed", Declarer: "RootNode"}},
 			{Element: RequirementCondition, Name: "Ip", Type: "Base.Ip", Location: LocationRoot, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, Name: "Ip", Declarer: "Base"}},
 			{Element: RequirementCondition, Name: "IPv4", Type: "Base.IPv4", Location: LocationRoot, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, Name: "IPv4", Declarer: "Base"}},
@@ -1128,133 +833,97 @@ var deviceTypeDefinitions = map[DeviceTypeID]*DeviceTypeDefinition{
 			{Element: RequirementServerCluster, Name: "WiFiNetworkManagement", ID: 0x0451, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0451, Name: "WiFiNetworkManagement"}},
 			{Element: RequirementServerCluster, Name: "ThreadBorderRouterManagement", ID: 0x0452, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0452, Name: "ThreadBorderRouterManagement"}},
 			{Element: RequirementServerCluster, Name: "ThreadNetworkDirectory", ID: 0x0453, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0453, Name: "ThreadNetworkDirectory"}},
-		},
-	},
-	0x0091: {
-		ID: 0x0091, Name: "ThreadBorderRouter", Classification: "simple", Revision: 2, Composition: "tree",
+		}},
+	0x0091: {ID: 0x0091, Name: "ThreadBorderRouter", Classification: "simple", Revision: 2, Composition: "tree",
 		Requirements: []DeviceTypeRequirement{
-			{
-				Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
+			{Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementAttribute, Name: "DeviceTypeList", Referent: Referent{Resolved: true, ID: 0x0000, Name: "DeviceTypeList"}},
-				},
-			},
+				}},
 			{Element: RequirementServerCluster, Name: "ThreadNetworkDiagnostics", ID: 0x0035, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0035, Name: "ThreadNetworkDiagnostics"}},
 			{Element: RequirementServerCluster, Name: "ThreadBorderRouterManagement", ID: 0x0452, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0452, Name: "ThreadBorderRouterManagement"}},
 			{Element: RequirementServerCluster, Name: "ThreadNetworkDirectory", ID: 0x0453, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0453, Name: "ThreadNetworkDirectory"}},
 			{Element: RequirementDeviceType, Name: "SecondaryNetworkInterface", ID: 0x0019, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0019, Name: "SecondaryNetworkInterface"}},
-		},
-	},
-	0x0100: {
-		ID: 0x0100, Name: "OnOffLight", Classification: "simple", Revision: 4, Composition: "tree",
+		}},
+	0x0100: {ID: 0x0100, Name: "OnOffLight", Classification: "simple", Revision: 4, Composition: "tree",
 		Requirements: []DeviceTypeRequirement{
-			{
-				Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
+			{Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementAttribute, Name: "DeviceTypeList", Referent: Referent{Resolved: true, ID: 0x0000, Name: "DeviceTypeList"}},
-				},
-			},
+				}},
 			{Element: RequirementCondition, Name: "GroupcastListenerCond", Type: "RootNode.GroupcastListenerCond", Location: LocationRoot, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, Name: "GroupcastListenerCond", Declarer: "RootNode"}},
-			{
-				Element: RequirementServerCluster, Name: "Identify", ID: 0x0003, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0003, Name: "Identify"},
+			{Element: RequirementServerCluster, Name: "Identify", ID: 0x0003, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0003, Name: "Identify"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementCommand, Name: "TriggerEffect", Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0040, Name: "TriggerEffect"}},
-				},
-			},
+				}},
 			{Element: RequirementServerCluster, Name: "Groups", ID: 0x0004, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0004, Name: "Groups"}},
-			{
-				Element: RequirementServerCluster, Name: "OnOff", ID: 0x0006, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0006, Name: "OnOff"},
+			{Element: RequirementServerCluster, Name: "OnOff", ID: 0x0006, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0006, Name: "OnOff"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementFeature, Name: "LT", Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0, Name: "LT"}},
-				},
-			},
-			{
-				Element: RequirementServerCluster, Name: "LevelControl", ID: 0x0008, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0008, Name: "LevelControl"},
+				}},
+			{Element: RequirementServerCluster, Name: "LevelControl", ID: 0x0008, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0008, Name: "LevelControl"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementFeature, Name: "OO", Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0, Name: "OO"}},
 					{Element: RequirementFeature, Name: "LT", Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 1, Name: "LT"}},
 					{Element: RequirementAttribute, Name: "CurrentLevel", Constraint: "1 to 254", Count: CountRange{Set: true, Min: 1, HasMin: true, Max: 254, HasMax: true}, Referent: Referent{Resolved: true, ID: 0x0000, Name: "CurrentLevel"}},
 					{Element: RequirementAttribute, Name: "MinLevel", Constraint: "1", Count: CountRange{Set: true, Min: 1, HasMin: true, Max: 1, HasMax: true}, Referent: Referent{Resolved: true, ID: 0x0002, Name: "MinLevel"}},
 					{Element: RequirementAttribute, Name: "MaxLevel", Constraint: "254", Count: CountRange{Set: true, Min: 254, HasMin: true, Max: 254, HasMax: true}, Referent: Referent{Resolved: true, ID: 0x0003, Name: "MaxLevel"}},
-				},
-			},
-			{
-				Element: RequirementServerCluster, Name: "ScenesManagement", ID: 0x0062, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0062, Name: "ScenesManagement"},
+				}},
+			{Element: RequirementServerCluster, Name: "ScenesManagement", ID: 0x0062, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0062, Name: "ScenesManagement"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementCommand, Name: "CopyScene", Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0040, Name: "CopyScene"}},
-				},
-			},
+				}},
 			{Element: RequirementClientCluster, Name: "OccupancySensing", ID: 0x0406, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0406, Name: "OccupancySensing"}},
-		},
-	},
-	0x0101: {
-		ID: 0x0101, Name: "DimmableLight", Classification: "simple", Revision: 4, Composition: "tree", Base: "OnOffLight",
+		}},
+	0x0101: {ID: 0x0101, Name: "DimmableLight", Classification: "simple", Revision: 4, Composition: "tree", Base: "OnOffLight",
 		Requirements: []DeviceTypeRequirement{
-			{
-				Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
+			{Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementAttribute, Name: "DeviceTypeList", Referent: Referent{Resolved: true, ID: 0x0000, Name: "DeviceTypeList"}},
-				},
-			},
+				}},
 			{Element: RequirementCondition, Name: "GroupcastListenerCond", Type: "RootNode.GroupcastListenerCond", Location: LocationRoot, Conformance: Conformance{Text: "Rev >= v4", Op: "revision", Rev: 4}, Referent: Referent{Resolved: true, Name: "GroupcastListenerCond", Declarer: "RootNode"}},
-			{
-				Element: RequirementServerCluster, Name: "Identify", ID: 0x0003, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0003, Name: "Identify"},
+			{Element: RequirementServerCluster, Name: "Identify", ID: 0x0003, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0003, Name: "Identify"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementCommand, Name: "TriggerEffect", Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0040, Name: "TriggerEffect"}},
-				},
-			},
+				}},
 			{Element: RequirementServerCluster, Name: "Groups", ID: 0x0004, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0004, Name: "Groups"}},
-			{
-				Element: RequirementServerCluster, Name: "OnOff", ID: 0x0006, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0006, Name: "OnOff"},
+			{Element: RequirementServerCluster, Name: "OnOff", ID: 0x0006, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0006, Name: "OnOff"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementFeature, Name: "LT", Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0, Name: "LT"}},
-				},
-			},
-			{
-				Element: RequirementServerCluster, Name: "LevelControl", ID: 0x0008, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0008, Name: "LevelControl"},
+				}},
+			{Element: RequirementServerCluster, Name: "LevelControl", ID: 0x0008, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0008, Name: "LevelControl"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementFeature, Name: "LT", Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 1, Name: "LT"}},
 					{Element: RequirementFeature, Name: "OO", Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0, Name: "OO"}},
 					{Element: RequirementAttribute, Name: "CurrentLevel", Constraint: "1 to 254", Count: CountRange{Set: true, Min: 1, HasMin: true, Max: 254, HasMax: true}, Referent: Referent{Resolved: true, ID: 0x0000, Name: "CurrentLevel"}},
 					{Element: RequirementAttribute, Name: "MinLevel", Constraint: "1", Count: CountRange{Set: true, Min: 1, HasMin: true, Max: 1, HasMax: true}, Referent: Referent{Resolved: true, ID: 0x0002, Name: "MinLevel"}},
 					{Element: RequirementAttribute, Name: "MaxLevel", Constraint: "254", Count: CountRange{Set: true, Min: 254, HasMin: true, Max: 254, HasMax: true}, Referent: Referent{Resolved: true, ID: 0x0003, Name: "MaxLevel"}},
-				},
-			},
-			{
-				Element: RequirementServerCluster, Name: "ScenesManagement", ID: 0x0062, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0062, Name: "ScenesManagement"},
+				}},
+			{Element: RequirementServerCluster, Name: "ScenesManagement", ID: 0x0062, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0062, Name: "ScenesManagement"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementCommand, Name: "CopyScene", Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0040, Name: "CopyScene"}},
-				},
-			},
+				}},
 			{Element: RequirementClientCluster, Name: "OccupancySensing", ID: 0x0406, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0406, Name: "OccupancySensing"}},
-		},
-	},
-	0x0103: {
-		ID: 0x0103, Name: "OnOffLightSwitch", Classification: "simple", Revision: 4, Composition: "tree",
+		}},
+	0x0103: {ID: 0x0103, Name: "OnOffLightSwitch", Classification: "simple", Revision: 4, Composition: "tree",
 		Requirements: []DeviceTypeRequirement{
-			{
-				Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
+			{Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementAttribute, Name: "DeviceTypeList", Referent: Referent{Resolved: true, ID: 0x0000, Name: "DeviceTypeList"}},
-				},
-			},
+				}},
 			{Element: RequirementCondition, Name: "GroupcastSenderCond", Type: "RootNode.GroupcastSenderCond", Location: LocationRoot, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, Name: "GroupcastSenderCond", Declarer: "RootNode"}},
 			{Element: RequirementServerCluster, Name: "Identify", ID: 0x0003, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0003, Name: "Identify"}},
 			{Element: RequirementClientCluster, Name: "Identify", ID: 0x0003, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0003, Name: "Identify"}},
 			{Element: RequirementClientCluster, Name: "Groups", ID: 0x0004, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0004, Name: "Groups"}},
 			{Element: RequirementClientCluster, Name: "OnOff", ID: 0x0006, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0006, Name: "OnOff"}},
 			{Element: RequirementClientCluster, Name: "ScenesManagement", ID: 0x0062, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0062, Name: "ScenesManagement"}},
-		},
-	},
-	0x0104: {
-		ID: 0x0104, Name: "DimmerSwitch", Classification: "simple", Revision: 4, Composition: "tree", Base: "OnOffLightSwitch",
+		}},
+	0x0104: {ID: 0x0104, Name: "DimmerSwitch", Classification: "simple", Revision: 4, Composition: "tree", Base: "OnOffLightSwitch",
 		Requirements: []DeviceTypeRequirement{
-			{
-				Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
+			{Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementAttribute, Name: "DeviceTypeList", Referent: Referent{Resolved: true, ID: 0x0000, Name: "DeviceTypeList"}},
-				},
-			},
+				}},
 			{Element: RequirementCondition, Name: "GroupcastSenderCond", Type: "RootNode.GroupcastSenderCond", Location: LocationRoot, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, Name: "GroupcastSenderCond", Declarer: "RootNode"}},
 			{Element: RequirementServerCluster, Name: "Identify", ID: 0x0003, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0003, Name: "Identify"}},
 			{Element: RequirementClientCluster, Name: "Identify", ID: 0x0003, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0003, Name: "Identify"}},
@@ -1262,17 +931,13 @@ var deviceTypeDefinitions = map[DeviceTypeID]*DeviceTypeDefinition{
 			{Element: RequirementClientCluster, Name: "OnOff", ID: 0x0006, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0006, Name: "OnOff"}},
 			{Element: RequirementClientCluster, Name: "LevelControl", ID: 0x0008, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0008, Name: "LevelControl"}},
 			{Element: RequirementClientCluster, Name: "ScenesManagement", ID: 0x0062, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0062, Name: "ScenesManagement"}},
-		},
-	},
-	0x0105: {
-		ID: 0x0105, Name: "ColorDimmerSwitch", Classification: "simple", Revision: 4, Composition: "tree", Base: "DimmerSwitch",
+		}},
+	0x0105: {ID: 0x0105, Name: "ColorDimmerSwitch", Classification: "simple", Revision: 4, Composition: "tree", Base: "DimmerSwitch",
 		Requirements: []DeviceTypeRequirement{
-			{
-				Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
+			{Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementAttribute, Name: "DeviceTypeList", Referent: Referent{Resolved: true, ID: 0x0000, Name: "DeviceTypeList"}},
-				},
-			},
+				}},
 			{Element: RequirementCondition, Name: "GroupcastSenderCond", Type: "RootNode.GroupcastSenderCond", Location: LocationRoot, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, Name: "GroupcastSenderCond", Declarer: "RootNode"}},
 			{Element: RequirementServerCluster, Name: "Identify", ID: 0x0003, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0003, Name: "Identify"}},
 			{Element: RequirementClientCluster, Name: "Identify", ID: 0x0003, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0003, Name: "Identify"}},
@@ -1281,209 +946,150 @@ var deviceTypeDefinitions = map[DeviceTypeID]*DeviceTypeDefinition{
 			{Element: RequirementClientCluster, Name: "LevelControl", ID: 0x0008, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0008, Name: "LevelControl"}},
 			{Element: RequirementClientCluster, Name: "ScenesManagement", ID: 0x0062, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0062, Name: "ScenesManagement"}},
 			{Element: RequirementClientCluster, Name: "ColorControl", ID: 0x0300, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0300, Name: "ColorControl"}},
-		},
-	},
-	0x0106: {
-		ID: 0x0106, Name: "LightSensor", Classification: "simple", Revision: 4, Composition: "tree",
+		}},
+	0x0106: {ID: 0x0106, Name: "LightSensor", Classification: "simple", Revision: 4, Composition: "tree",
 		Requirements: []DeviceTypeRequirement{
-			{
-				Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
+			{Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementAttribute, Name: "DeviceTypeList", Referent: Referent{Resolved: true, ID: 0x0000, Name: "DeviceTypeList"}},
-				},
-			},
+				}},
 			{Element: RequirementServerCluster, Name: "Identify", ID: 0x0003, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0003, Name: "Identify"}},
 			{Element: RequirementServerCluster, Name: "IlluminanceMeasurement", ID: 0x0400, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0400, Name: "IlluminanceMeasurement"}},
-		},
-	},
-	0x0107: {
-		ID: 0x0107, Name: "OccupancySensor", Classification: "simple", Revision: 4, Composition: "tree",
+		}},
+	0x0107: {ID: 0x0107, Name: "OccupancySensor", Classification: "simple", Revision: 4, Composition: "tree",
 		Requirements: []DeviceTypeRequirement{
-			{
-				Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
+			{Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementAttribute, Name: "DeviceTypeList", Referent: Referent{Resolved: true, ID: 0x0000, Name: "DeviceTypeList"}},
-				},
-			},
+				}},
 			{Element: RequirementServerCluster, Name: "Identify", ID: 0x0003, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0003, Name: "Identify"}},
 			{Element: RequirementServerCluster, Name: "BooleanStateConfiguration", ID: 0x0080, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0080, Name: "BooleanStateConfiguration"}},
 			{Element: RequirementServerCluster, Name: "OccupancySensing", ID: 0x0406, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0406, Name: "OccupancySensing"}},
-		},
-	},
-	0x010A: {
-		ID: 0x010A, Name: "OnOffPlugInUnit", Classification: "simple", Revision: 5, Composition: "tree",
+		}},
+	0x010A: {ID: 0x010A, Name: "OnOffPlugInUnit", Classification: "simple", Revision: 5, Composition: "tree",
 		Requirements: []DeviceTypeRequirement{
-			{
-				Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
+			{Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementAttribute, Name: "DeviceTypeList", Referent: Referent{Resolved: true, ID: 0x0000, Name: "DeviceTypeList"}},
-				},
-			},
+				}},
 			{Element: RequirementCondition, Name: "GroupcastListenerCond", Type: "RootNode.GroupcastListenerCond", Location: LocationRoot, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, Name: "GroupcastListenerCond", Declarer: "RootNode"}},
-			{
-				Element: RequirementServerCluster, Name: "Identify", ID: 0x0003, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0003, Name: "Identify"},
+			{Element: RequirementServerCluster, Name: "Identify", ID: 0x0003, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0003, Name: "Identify"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementCommand, Name: "TriggerEffect", Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0040, Name: "TriggerEffect"}},
-				},
-			},
+				}},
 			{Element: RequirementServerCluster, Name: "Groups", ID: 0x0004, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0004, Name: "Groups"}},
-			{
-				Element: RequirementServerCluster, Name: "OnOff", ID: 0x0006, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0006, Name: "OnOff"},
+			{Element: RequirementServerCluster, Name: "OnOff", ID: 0x0006, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0006, Name: "OnOff"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementFeature, Name: "LT", Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0, Name: "LT"}},
-				},
-			},
-			{
-				Element: RequirementServerCluster, Name: "LevelControl", ID: 0x0008, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0008, Name: "LevelControl"},
+				}},
+			{Element: RequirementServerCluster, Name: "LevelControl", ID: 0x0008, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0008, Name: "LevelControl"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementFeature, Name: "OO", Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0, Name: "OO"}},
 					{Element: RequirementFeature, Name: "LT", Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 1, Name: "LT"}},
 					{Element: RequirementAttribute, Name: "CurrentLevel", Constraint: "1 to 254", Count: CountRange{Set: true, Min: 1, HasMin: true, Max: 254, HasMax: true}, Referent: Referent{Resolved: true, ID: 0x0000, Name: "CurrentLevel"}},
 					{Element: RequirementAttribute, Name: "MinLevel", Constraint: "1", Count: CountRange{Set: true, Min: 1, HasMin: true, Max: 1, HasMax: true}, Referent: Referent{Resolved: true, ID: 0x0002, Name: "MinLevel"}},
 					{Element: RequirementAttribute, Name: "MaxLevel", Constraint: "254", Count: CountRange{Set: true, Min: 254, HasMin: true, Max: 254, HasMax: true}, Referent: Referent{Resolved: true, ID: 0x0003, Name: "MaxLevel"}},
-				},
-			},
-			{
-				Element: RequirementServerCluster, Name: "ScenesManagement", ID: 0x0062, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0062, Name: "ScenesManagement"},
+				}},
+			{Element: RequirementServerCluster, Name: "ScenesManagement", ID: 0x0062, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0062, Name: "ScenesManagement"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementCommand, Name: "CopyScene", Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0040, Name: "CopyScene"}},
-				},
-			},
+				}},
 			{Element: RequirementClientCluster, Name: "OccupancySensing", ID: 0x0406, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0406, Name: "OccupancySensing"}},
-		},
-	},
-	0x010B: {
-		ID: 0x010B, Name: "DimmablePlugInUnit", Classification: "simple", Revision: 6, Composition: "tree",
+		}},
+	0x010B: {ID: 0x010B, Name: "DimmablePlugInUnit", Classification: "simple", Revision: 6, Composition: "tree",
 		Requirements: []DeviceTypeRequirement{
-			{
-				Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
+			{Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementAttribute, Name: "DeviceTypeList", Referent: Referent{Resolved: true, ID: 0x0000, Name: "DeviceTypeList"}},
-				},
-			},
+				}},
 			{Element: RequirementCondition, Name: "GroupcastListenerCond", Type: "RootNode.GroupcastListenerCond", Location: LocationRoot, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, Name: "GroupcastListenerCond", Declarer: "RootNode"}},
-			{
-				Element: RequirementServerCluster, Name: "Identify", ID: 0x0003, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0003, Name: "Identify"},
+			{Element: RequirementServerCluster, Name: "Identify", ID: 0x0003, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0003, Name: "Identify"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementCommand, Name: "TriggerEffect", Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0040, Name: "TriggerEffect"}},
-				},
-			},
+				}},
 			{Element: RequirementServerCluster, Name: "Groups", ID: 0x0004, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0004, Name: "Groups"}},
-			{
-				Element: RequirementServerCluster, Name: "OnOff", ID: 0x0006, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0006, Name: "OnOff"},
+			{Element: RequirementServerCluster, Name: "OnOff", ID: 0x0006, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0006, Name: "OnOff"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementFeature, Name: "LT", Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0, Name: "LT"}},
-				},
-			},
-			{
-				Element: RequirementServerCluster, Name: "LevelControl", ID: 0x0008, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0008, Name: "LevelControl"},
+				}},
+			{Element: RequirementServerCluster, Name: "LevelControl", ID: 0x0008, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0008, Name: "LevelControl"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementFeature, Name: "OO", Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0, Name: "OO"}},
 					{Element: RequirementFeature, Name: "LT", Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 1, Name: "LT"}},
 					{Element: RequirementAttribute, Name: "CurrentLevel", Constraint: "1 to 254", Count: CountRange{Set: true, Min: 1, HasMin: true, Max: 254, HasMax: true}, Referent: Referent{Resolved: true, ID: 0x0000, Name: "CurrentLevel"}},
 					{Element: RequirementAttribute, Name: "MinLevel", Constraint: "1", Count: CountRange{Set: true, Min: 1, HasMin: true, Max: 1, HasMax: true}, Referent: Referent{Resolved: true, ID: 0x0002, Name: "MinLevel"}},
 					{Element: RequirementAttribute, Name: "MaxLevel", Constraint: "254", Count: CountRange{Set: true, Min: 254, HasMin: true, Max: 254, HasMax: true}, Referent: Referent{Resolved: true, ID: 0x0003, Name: "MaxLevel"}},
-				},
-			},
-			{
-				Element: RequirementServerCluster, Name: "ScenesManagement", ID: 0x0062, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0062, Name: "ScenesManagement"},
+				}},
+			{Element: RequirementServerCluster, Name: "ScenesManagement", ID: 0x0062, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0062, Name: "ScenesManagement"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementCommand, Name: "CopyScene", Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0040, Name: "CopyScene"}},
-				},
-			},
+				}},
 			{Element: RequirementClientCluster, Name: "OccupancySensing", ID: 0x0406, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0406, Name: "OccupancySensing"}},
-		},
-	},
-	0x010C: {
-		ID: 0x010C, Name: "ColorTemperatureLight", Classification: "simple", Revision: 5, Composition: "tree", Base: "DimmableLight",
+		}},
+	0x010C: {ID: 0x010C, Name: "ColorTemperatureLight", Classification: "simple", Revision: 5, Composition: "tree", Base: "DimmableLight",
 		Requirements: []DeviceTypeRequirement{
-			{
-				Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
+			{Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementAttribute, Name: "DeviceTypeList", Referent: Referent{Resolved: true, ID: 0x0000, Name: "DeviceTypeList"}},
-				},
-			},
+				}},
 			{Element: RequirementCondition, Name: "GroupcastListenerCond", Type: "RootNode.GroupcastListenerCond", Location: LocationRoot, Conformance: Conformance{Text: "Rev >= v5", Op: "revision", Rev: 5}, Referent: Referent{Resolved: true, Name: "GroupcastListenerCond", Declarer: "RootNode"}},
-			{
-				Element: RequirementServerCluster, Name: "Identify", ID: 0x0003, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0003, Name: "Identify"},
+			{Element: RequirementServerCluster, Name: "Identify", ID: 0x0003, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0003, Name: "Identify"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementCommand, Name: "TriggerEffect", Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0040, Name: "TriggerEffect"}},
-				},
-			},
+				}},
 			{Element: RequirementServerCluster, Name: "Groups", ID: 0x0004, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0004, Name: "Groups"}},
-			{
-				Element: RequirementServerCluster, Name: "OnOff", ID: 0x0006, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0006, Name: "OnOff"},
+			{Element: RequirementServerCluster, Name: "OnOff", ID: 0x0006, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0006, Name: "OnOff"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementFeature, Name: "LT", Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0, Name: "LT"}},
-				},
-			},
-			{
-				Element: RequirementServerCluster, Name: "LevelControl", ID: 0x0008, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0008, Name: "LevelControl"},
+				}},
+			{Element: RequirementServerCluster, Name: "LevelControl", ID: 0x0008, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0008, Name: "LevelControl"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementFeature, Name: "OO", Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0, Name: "OO"}},
 					{Element: RequirementFeature, Name: "LT", Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 1, Name: "LT"}},
 					{Element: RequirementAttribute, Name: "CurrentLevel", Constraint: "1 to 254", Count: CountRange{Set: true, Min: 1, HasMin: true, Max: 254, HasMax: true}, Referent: Referent{Resolved: true, ID: 0x0000, Name: "CurrentLevel"}},
 					{Element: RequirementAttribute, Name: "MinLevel", Constraint: "1", Count: CountRange{Set: true, Min: 1, HasMin: true, Max: 1, HasMax: true}, Referent: Referent{Resolved: true, ID: 0x0002, Name: "MinLevel"}},
 					{Element: RequirementAttribute, Name: "MaxLevel", Constraint: "254", Count: CountRange{Set: true, Min: 254, HasMin: true, Max: 254, HasMax: true}, Referent: Referent{Resolved: true, ID: 0x0003, Name: "MaxLevel"}},
-				},
-			},
-			{
-				Element: RequirementServerCluster, Name: "ScenesManagement", ID: 0x0062, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0062, Name: "ScenesManagement"},
+				}},
+			{Element: RequirementServerCluster, Name: "ScenesManagement", ID: 0x0062, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0062, Name: "ScenesManagement"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementCommand, Name: "CopyScene", Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0040, Name: "CopyScene"}},
-				},
-			},
-			{
-				Element: RequirementServerCluster, Name: "ColorControl", ID: 0x0300, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0300, Name: "ColorControl"},
+				}},
+			{Element: RequirementServerCluster, Name: "ColorControl", ID: 0x0300, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0300, Name: "ColorControl"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementFeature, Name: "CT", Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 4, Name: "CT"}},
 					{Element: RequirementAttribute, Name: "RemainingTime", Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0002, Name: "RemainingTime"}},
-				},
-			},
+				}},
 			{Element: RequirementClientCluster, Name: "OccupancySensing", ID: 0x0406, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0406, Name: "OccupancySensing"}},
-		},
-	},
-	0x010D: {
-		ID: 0x010D, Name: "ExtendedColorLight", Classification: "simple", Revision: 5, Composition: "tree", Base: "ColorTemperatureLight",
+		}},
+	0x010D: {ID: 0x010D, Name: "ExtendedColorLight", Classification: "simple", Revision: 5, Composition: "tree", Base: "ColorTemperatureLight",
 		Requirements: []DeviceTypeRequirement{
-			{
-				Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
+			{Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementAttribute, Name: "DeviceTypeList", Referent: Referent{Resolved: true, ID: 0x0000, Name: "DeviceTypeList"}},
-				},
-			},
+				}},
 			{Element: RequirementCondition, Name: "GroupcastListenerCond", Type: "RootNode.GroupcastListenerCond", Location: LocationRoot, Conformance: Conformance{Text: "Rev >= v5", Op: "revision", Rev: 5}, Referent: Referent{Resolved: true, Name: "GroupcastListenerCond", Declarer: "RootNode"}},
-			{
-				Element: RequirementServerCluster, Name: "Identify", ID: 0x0003, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0003, Name: "Identify"},
+			{Element: RequirementServerCluster, Name: "Identify", ID: 0x0003, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0003, Name: "Identify"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementCommand, Name: "TriggerEffect", Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0040, Name: "TriggerEffect"}},
-				},
-			},
+				}},
 			{Element: RequirementServerCluster, Name: "Groups", ID: 0x0004, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0004, Name: "Groups"}},
-			{
-				Element: RequirementServerCluster, Name: "OnOff", ID: 0x0006, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0006, Name: "OnOff"},
+			{Element: RequirementServerCluster, Name: "OnOff", ID: 0x0006, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0006, Name: "OnOff"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementFeature, Name: "LT", Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0, Name: "LT"}},
-				},
-			},
-			{
-				Element: RequirementServerCluster, Name: "LevelControl", ID: 0x0008, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0008, Name: "LevelControl"},
+				}},
+			{Element: RequirementServerCluster, Name: "LevelControl", ID: 0x0008, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0008, Name: "LevelControl"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementFeature, Name: "OO", Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0, Name: "OO"}},
 					{Element: RequirementFeature, Name: "LT", Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 1, Name: "LT"}},
 					{Element: RequirementAttribute, Name: "CurrentLevel", Constraint: "1 to 254", Count: CountRange{Set: true, Min: 1, HasMin: true, Max: 254, HasMax: true}, Referent: Referent{Resolved: true, ID: 0x0000, Name: "CurrentLevel"}},
 					{Element: RequirementAttribute, Name: "MinLevel", Constraint: "1", Count: CountRange{Set: true, Min: 1, HasMin: true, Max: 1, HasMax: true}, Referent: Referent{Resolved: true, ID: 0x0002, Name: "MinLevel"}},
 					{Element: RequirementAttribute, Name: "MaxLevel", Constraint: "254", Count: CountRange{Set: true, Min: 254, HasMin: true, Max: 254, HasMax: true}, Referent: Referent{Resolved: true, ID: 0x0003, Name: "MaxLevel"}},
-				},
-			},
-			{
-				Element: RequirementServerCluster, Name: "ScenesManagement", ID: 0x0062, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0062, Name: "ScenesManagement"},
+				}},
+			{Element: RequirementServerCluster, Name: "ScenesManagement", ID: 0x0062, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0062, Name: "ScenesManagement"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementCommand, Name: "CopyScene", Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0040, Name: "CopyScene"}},
-				},
-			},
-			{
-				Element: RequirementServerCluster, Name: "ColorControl", ID: 0x0300, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0300, Name: "ColorControl"},
+				}},
+			{Element: RequirementServerCluster, Name: "ColorControl", ID: 0x0300, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0300, Name: "ColorControl"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementFeature, Name: "HS", Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0, Name: "HS"}},
 					{Element: RequirementFeature, Name: "EHUE", Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 1, Name: "EHUE"}},
@@ -1491,301 +1097,224 @@ var deviceTypeDefinitions = map[DeviceTypeID]*DeviceTypeDefinition{
 					{Element: RequirementFeature, Name: "XY", Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 3, Name: "XY"}},
 					{Element: RequirementFeature, Name: "CT", Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 4, Name: "CT"}},
 					{Element: RequirementAttribute, Name: "RemainingTime", Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0002, Name: "RemainingTime"}},
-				},
-			},
+				}},
 			{Element: RequirementClientCluster, Name: "OccupancySensing", ID: 0x0406, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0406, Name: "OccupancySensing"}},
-		},
-	},
-	0x010F: {
-		ID: 0x010F, Name: "MountedOnOffControl", Classification: "simple", Revision: 3, Composition: "tree", Base: "OnOffPlugInUnit",
+		}},
+	0x010F: {ID: 0x010F, Name: "MountedOnOffControl", Classification: "simple", Revision: 3, Composition: "tree", Base: "OnOffPlugInUnit",
 		Requirements: []DeviceTypeRequirement{
-			{
-				Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
+			{Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementAttribute, Name: "DeviceTypeList", Referent: Referent{Resolved: true, ID: 0x0000, Name: "DeviceTypeList"}},
-				},
-			},
+				}},
 			{Element: RequirementCondition, Name: "GroupcastListenerCond", Type: "RootNode.GroupcastListenerCond", Location: LocationRoot, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, Name: "GroupcastListenerCond", Declarer: "RootNode"}},
-			{
-				Element: RequirementServerCluster, Name: "Identify", ID: 0x0003, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0003, Name: "Identify"},
+			{Element: RequirementServerCluster, Name: "Identify", ID: 0x0003, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0003, Name: "Identify"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementCommand, Name: "TriggerEffect", Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0040, Name: "TriggerEffect"}},
-				},
-			},
+				}},
 			{Element: RequirementServerCluster, Name: "Groups", ID: 0x0004, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0004, Name: "Groups"}},
-			{
-				Element: RequirementServerCluster, Name: "OnOff", ID: 0x0006, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0006, Name: "OnOff"},
+			{Element: RequirementServerCluster, Name: "OnOff", ID: 0x0006, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0006, Name: "OnOff"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementFeature, Name: "LT", Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0, Name: "LT"}},
-				},
-			},
-			{
-				Element: RequirementServerCluster, Name: "LevelControl", ID: 0x0008, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0008, Name: "LevelControl"},
+				}},
+			{Element: RequirementServerCluster, Name: "LevelControl", ID: 0x0008, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0008, Name: "LevelControl"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementFeature, Name: "OO", Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0, Name: "OO"}},
 					{Element: RequirementFeature, Name: "LT", Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 1, Name: "LT"}},
 					{Element: RequirementAttribute, Name: "CurrentLevel", Constraint: "1 to 254", Count: CountRange{Set: true, Min: 1, HasMin: true, Max: 254, HasMax: true}, Referent: Referent{Resolved: true, ID: 0x0000, Name: "CurrentLevel"}},
 					{Element: RequirementAttribute, Name: "MinLevel", Constraint: "1", Count: CountRange{Set: true, Min: 1, HasMin: true, Max: 1, HasMax: true}, Referent: Referent{Resolved: true, ID: 0x0002, Name: "MinLevel"}},
 					{Element: RequirementAttribute, Name: "MaxLevel", Constraint: "254", Count: CountRange{Set: true, Min: 254, HasMin: true, Max: 254, HasMax: true}, Referent: Referent{Resolved: true, ID: 0x0003, Name: "MaxLevel"}},
-				},
-			},
-			{
-				Element: RequirementServerCluster, Name: "ScenesManagement", ID: 0x0062, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0062, Name: "ScenesManagement"},
+				}},
+			{Element: RequirementServerCluster, Name: "ScenesManagement", ID: 0x0062, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0062, Name: "ScenesManagement"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementCommand, Name: "CopyScene", Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0040, Name: "CopyScene"}},
-				},
-			},
+				}},
 			{Element: RequirementClientCluster, Name: "OccupancySensing", ID: 0x0406, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0406, Name: "OccupancySensing"}},
-		},
-	},
-	0x0110: {
-		ID: 0x0110, Name: "MountedDimmableLoadControl", Classification: "simple", Revision: 3, Composition: "tree", Base: "DimmablePlugInUnit",
+		}},
+	0x0110: {ID: 0x0110, Name: "MountedDimmableLoadControl", Classification: "simple", Revision: 3, Composition: "tree", Base: "DimmablePlugInUnit",
 		Requirements: []DeviceTypeRequirement{
-			{
-				Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
+			{Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementAttribute, Name: "DeviceTypeList", Referent: Referent{Resolved: true, ID: 0x0000, Name: "DeviceTypeList"}},
-				},
-			},
+				}},
 			{Element: RequirementCondition, Name: "GroupcastListenerCond", Type: "RootNode.GroupcastListenerCond", Location: LocationRoot, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, Name: "GroupcastListenerCond", Declarer: "RootNode"}},
-			{
-				Element: RequirementServerCluster, Name: "Identify", ID: 0x0003, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0003, Name: "Identify"},
+			{Element: RequirementServerCluster, Name: "Identify", ID: 0x0003, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0003, Name: "Identify"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementCommand, Name: "TriggerEffect", Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0040, Name: "TriggerEffect"}},
-				},
-			},
+				}},
 			{Element: RequirementServerCluster, Name: "Groups", ID: 0x0004, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0004, Name: "Groups"}},
-			{
-				Element: RequirementServerCluster, Name: "OnOff", ID: 0x0006, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0006, Name: "OnOff"},
+			{Element: RequirementServerCluster, Name: "OnOff", ID: 0x0006, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0006, Name: "OnOff"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementFeature, Name: "LT", Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0, Name: "LT"}},
-				},
-			},
-			{
-				Element: RequirementServerCluster, Name: "LevelControl", ID: 0x0008, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0008, Name: "LevelControl"},
+				}},
+			{Element: RequirementServerCluster, Name: "LevelControl", ID: 0x0008, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0008, Name: "LevelControl"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementFeature, Name: "OO", Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0, Name: "OO"}},
 					{Element: RequirementFeature, Name: "LT", Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 1, Name: "LT"}},
 					{Element: RequirementAttribute, Name: "CurrentLevel", Constraint: "1 to 254", Count: CountRange{Set: true, Min: 1, HasMin: true, Max: 254, HasMax: true}, Referent: Referent{Resolved: true, ID: 0x0000, Name: "CurrentLevel"}},
 					{Element: RequirementAttribute, Name: "MinLevel", Constraint: "1", Count: CountRange{Set: true, Min: 1, HasMin: true, Max: 1, HasMax: true}, Referent: Referent{Resolved: true, ID: 0x0002, Name: "MinLevel"}},
 					{Element: RequirementAttribute, Name: "MaxLevel", Constraint: "254", Count: CountRange{Set: true, Min: 254, HasMin: true, Max: 254, HasMax: true}, Referent: Referent{Resolved: true, ID: 0x0003, Name: "MaxLevel"}},
-				},
-			},
-			{
-				Element: RequirementServerCluster, Name: "ScenesManagement", ID: 0x0062, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0062, Name: "ScenesManagement"},
+				}},
+			{Element: RequirementServerCluster, Name: "ScenesManagement", ID: 0x0062, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0062, Name: "ScenesManagement"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementCommand, Name: "CopyScene", Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0040, Name: "CopyScene"}},
-				},
-			},
+				}},
 			{Element: RequirementClientCluster, Name: "OccupancySensing", ID: 0x0406, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0406, Name: "OccupancySensing"}},
-		},
-	},
-	0x0130: {
-		ID: 0x0130, Name: "JointFabricAdministrator", Classification: "utility", Revision: 1, Composition: "tree",
+		}},
+	0x0130: {ID: 0x0130, Name: "JointFabricAdministrator", Classification: "utility", Revision: 1, Composition: "tree",
 		Requirements: []DeviceTypeRequirement{
-			{
-				Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
+			{Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementAttribute, Name: "DeviceTypeList", Referent: Referent{Resolved: true, ID: 0x0000, Name: "DeviceTypeList"}},
-				},
-			},
+				}},
 			{Element: RequirementServerCluster, Name: "JointFabricDatastore", ID: 0x0752, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0752, Name: "JointFabricDatastore"}},
 			{Element: RequirementServerCluster, Name: "JointFabricAdministrator", ID: 0x0753, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0753, Name: "JointFabricAdministrator"}},
-		},
-	},
-	0x0140: {
-		ID: 0x0140, Name: "Intercom", Classification: "simple", Revision: 2, Composition: "tree",
+		}},
+	0x0140: {ID: 0x0140, Name: "Intercom", Classification: "simple", Revision: 2, Composition: "tree",
 		Requirements: []DeviceTypeRequirement{
-			{
-				Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
+			{Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementAttribute, Name: "DeviceTypeList", Referent: Referent{Resolved: true, ID: 0x0000, Name: "DeviceTypeList"}},
-				},
-			},
+				}},
 			{Element: RequirementCondition, Name: "TlsCertificatesCond", Type: "RootNode.TlsCertificatesCond", Location: LocationRoot, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, Name: "TlsCertificatesCond", Declarer: "RootNode"}},
 			{Element: RequirementCondition, Name: "PowerSourceCond", Type: "RootNode.PowerSourceCond", Location: LocationRoot, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, Name: "PowerSourceCond", Declarer: "RootNode"}},
 			{Element: RequirementCondition, Name: "TimeSyncWithNtpcCond", Type: "RootNode.TimeSyncWithNtpcCond", Location: LocationRoot, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, Name: "TimeSyncWithNtpcCond", Declarer: "RootNode"}},
 			{Element: RequirementCondition, Name: "TimeSyncWithClientCond", Type: "RootNode.TimeSyncWithClientCond", Location: LocationRoot, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, Name: "TimeSyncWithClientCond", Declarer: "RootNode"}},
 			{Element: RequirementCondition, Name: "TimeSyncWithTzCond", Type: "RootNode.TimeSyncWithTzCond", Location: LocationRoot, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, Name: "TimeSyncWithTzCond", Declarer: "RootNode"}},
 			{Element: RequirementServerCluster, Name: "Identify", ID: 0x0003, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0003, Name: "Identify"}},
-			{
-				Element: RequirementServerCluster, Name: "CameraAvStreamManagement", ID: 0x0551, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0551, Name: "CameraAvStreamManagement"},
+			{Element: RequirementServerCluster, Name: "CameraAvStreamManagement", ID: 0x0551, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0551, Name: "CameraAvStreamManagement"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementFeature, Name: "ADO", Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0, Name: "ADO"}},
 					{Element: RequirementFeature, Name: "VDO", Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 1, Name: "VDO"}},
 					{Element: RequirementFeature, Name: "SNP", Conformance: Conformance{Text: "X", Op: "X"}, Referent: Referent{Resolved: true, ID: 2, Name: "SNP"}},
-				},
-			},
+				}},
 			{Element: RequirementServerCluster, Name: "CameraAvSettingsUserLevelManagement", ID: 0x0552, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0552, Name: "CameraAvSettingsUserLevelManagement"}},
 			{Element: RequirementServerCluster, Name: "WebRtcTransportProvider", ID: 0x0553, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0553, Name: "WebRtcTransportProvider"}},
 			{Element: RequirementClientCluster, Name: "WebRtcTransportProvider", ID: 0x0553, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0553, Name: "WebRtcTransportProvider"}},
 			{Element: RequirementServerCluster, Name: "WebRtcTransportRequestor", ID: 0x0554, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0554, Name: "WebRtcTransportRequestor"}},
 			{Element: RequirementClientCluster, Name: "WebRtcTransportRequestor", ID: 0x0554, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0554, Name: "WebRtcTransportRequestor"}},
 			{Element: RequirementClientCluster, Name: "Chime", ID: 0x0556, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0556, Name: "Chime"}},
-			{
-				Element: RequirementDeviceType, Name: "GenericSwitch", ID: 0x000F, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Constraint: "min 1", Count: CountRange{Set: true, Min: 1, HasMin: true}, Referent: Referent{Resolved: true, ID: 0x000F, Name: "GenericSwitch"},
+			{Element: RequirementDeviceType, Name: "GenericSwitch", ID: 0x000F, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Constraint: "min 1", Count: CountRange{Set: true, Min: 1, HasMin: true}, Referent: Referent{Resolved: true, ID: 0x000F, Name: "GenericSwitch"},
 				Requirements: []DeviceTypeRequirement{
-					{
-						Element: RequirementServerCluster, Name: "Switch", ID: 0x003B, HasID: true, Referent: Referent{Resolved: true, ID: 0x003B, Name: "Switch"},
+					{Element: RequirementServerCluster, Name: "Switch", ID: 0x003B, HasID: true, Referent: Referent{Resolved: true, ID: 0x003B, Name: "Switch"},
 						Requirements: []DeviceTypeRequirement{
 							{Element: RequirementFeature, Name: "MS", Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 1, Name: "MS"}},
-						},
-					},
-				},
-			},
-		},
-	},
-	0x0141: {
-		ID: 0x0141, Name: "AudioDoorbell", Classification: "simple", Revision: 2, Composition: "tree",
+						}},
+				}},
+		}},
+	0x0141: {ID: 0x0141, Name: "AudioDoorbell", Classification: "simple", Revision: 2, Composition: "tree",
 		Requirements: []DeviceTypeRequirement{
-			{
-				Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
+			{Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementAttribute, Name: "DeviceTypeList", Referent: Referent{Resolved: true, ID: 0x0000, Name: "DeviceTypeList"}},
-				},
-			},
+				}},
 			{Element: RequirementCondition, Name: "TlsCertificatesCond", Type: "RootNode.TlsCertificatesCond", Location: LocationRoot, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, Name: "TlsCertificatesCond", Declarer: "RootNode"}},
 			{Element: RequirementCondition, Name: "PowerSourceCond", Type: "RootNode.PowerSourceCond", Location: LocationRoot, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, Name: "PowerSourceCond", Declarer: "RootNode"}},
 			{Element: RequirementCondition, Name: "TimeSyncWithNtpcCond", Type: "RootNode.TimeSyncWithNtpcCond", Location: LocationRoot, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, Name: "TimeSyncWithNtpcCond", Declarer: "RootNode"}},
 			{Element: RequirementCondition, Name: "TlsClientCond", Type: "RootNode.TlsClientCond", Location: LocationRoot, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, Name: "TlsClientCond", Declarer: "RootNode"}},
 			{Element: RequirementServerCluster, Name: "Identify", ID: 0x0003, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0003, Name: "Identify"}},
 			{Element: RequirementServerCluster, Name: "Switch", ID: 0x003B, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x003B, Name: "Switch"}},
-			{
-				Element: RequirementServerCluster, Name: "CameraAvStreamManagement", ID: 0x0551, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0551, Name: "CameraAvStreamManagement"},
+			{Element: RequirementServerCluster, Name: "CameraAvStreamManagement", ID: 0x0551, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0551, Name: "CameraAvStreamManagement"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementFeature, Name: "ADO", Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0, Name: "ADO"}},
 					{Element: RequirementFeature, Name: "SNP", Conformance: Conformance{Text: "X", Op: "X"}, Referent: Referent{Resolved: true, ID: 2, Name: "SNP"}},
 					{Element: RequirementFeature, Name: "VDO", Conformance: Conformance{Text: "X", Op: "X"}, Referent: Referent{Resolved: true, ID: 1, Name: "VDO"}},
-				},
-			},
+				}},
 			{Element: RequirementServerCluster, Name: "WebRtcTransportProvider", ID: 0x0553, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0553, Name: "WebRtcTransportProvider"}},
 			{Element: RequirementClientCluster, Name: "WebRtcTransportProvider", ID: 0x0553, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0553, Name: "WebRtcTransportProvider"}},
 			{Element: RequirementServerCluster, Name: "WebRtcTransportRequestor", ID: 0x0554, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0554, Name: "WebRtcTransportRequestor"}},
 			{Element: RequirementClientCluster, Name: "WebRtcTransportRequestor", ID: 0x0554, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0554, Name: "WebRtcTransportRequestor"}},
 			{Element: RequirementServerCluster, Name: "PushAvStreamTransport", ID: 0x0555, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0555, Name: "PushAvStreamTransport"}},
 			{Element: RequirementClientCluster, Name: "Chime", ID: 0x0556, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0556, Name: "Chime"}},
-		},
-	},
-	0x0142: {
-		ID: 0x0142, Name: "Camera", Classification: "simple", Revision: 1, Composition: "tree",
+		}},
+	0x0142: {ID: 0x0142, Name: "Camera", Classification: "simple", Revision: 1, Composition: "tree",
 		Requirements: []DeviceTypeRequirement{
-			{
-				Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
+			{Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementAttribute, Name: "DeviceTypeList", Referent: Referent{Resolved: true, ID: 0x0000, Name: "DeviceTypeList"}},
-				},
-			},
+				}},
 			{Element: RequirementCondition, Name: "TlsCertificatesCond", Type: "RootNode.TlsCertificatesCond", Location: LocationRoot, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, Name: "TlsCertificatesCond", Declarer: "RootNode"}},
 			{Element: RequirementCondition, Name: "PowerSourceCond", Type: "RootNode.PowerSourceCond", Location: LocationRoot, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, Name: "PowerSourceCond", Declarer: "RootNode"}},
 			{Element: RequirementCondition, Name: "TimeSyncWithNtpcCond", Type: "RootNode.TimeSyncWithNtpcCond", Location: LocationRoot, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, Name: "TimeSyncWithNtpcCond", Declarer: "RootNode"}},
 			{Element: RequirementCondition, Name: "TimeSyncWithClientCond", Type: "RootNode.TimeSyncWithClientCond", Location: LocationRoot, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, Name: "TimeSyncWithClientCond", Declarer: "RootNode"}},
 			{Element: RequirementCondition, Name: "TimeSyncWithTzCond", Type: "RootNode.TimeSyncWithTzCond", Location: LocationRoot, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, Name: "TimeSyncWithTzCond", Declarer: "RootNode"}},
 			{Element: RequirementCondition, Name: "TlsClientCond", Type: "RootNode.TlsClientCond", Location: LocationRoot, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, Name: "TlsClientCond", Declarer: "RootNode"}},
-			{
-				Element: RequirementServerCluster, Name: "CameraAvStreamManagement", ID: 0x0551, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0551, Name: "CameraAvStreamManagement"},
+			{Element: RequirementServerCluster, Name: "CameraAvStreamManagement", ID: 0x0551, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0551, Name: "CameraAvStreamManagement"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementFeature, Name: "VDO", Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 1, Name: "VDO"}},
 					{Element: RequirementFeature, Name: "ADO", Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0, Name: "ADO"}},
 					{Element: RequirementFeature, Name: "SNP", Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 2, Name: "SNP"}},
-				},
-			},
+				}},
 			{Element: RequirementServerCluster, Name: "WebRtcTransportProvider", ID: 0x0553, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0553, Name: "WebRtcTransportProvider"}},
 			{Element: RequirementClientCluster, Name: "WebRtcTransportRequestor", ID: 0x0554, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0554, Name: "WebRtcTransportRequestor"}},
 			{Element: RequirementClientCluster, Name: "WebRtcTransportProvider", ID: 0x0553, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0553, Name: "WebRtcTransportProvider"}},
 			{Element: RequirementServerCluster, Name: "WebRtcTransportRequestor", ID: 0x0554, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0554, Name: "WebRtcTransportRequestor"}},
 			{Element: RequirementServerCluster, Name: "PushAvStreamTransport", ID: 0x0555, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0555, Name: "PushAvStreamTransport"}},
 			{Element: RequirementServerCluster, Name: "CameraAvSettingsUserLevelManagement", ID: 0x0552, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0552, Name: "CameraAvSettingsUserLevelManagement"}},
-			{
-				Element: RequirementServerCluster, Name: "ZoneManagement", ID: 0x0550, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0550, Name: "ZoneManagement"},
+			{Element: RequirementServerCluster, Name: "ZoneManagement", ID: 0x0550, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0550, Name: "ZoneManagement"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementFeature, Name: "TWODCART", Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0, Name: "TWODCART"}},
-				},
-			},
+				}},
 			{Element: RequirementServerCluster, Name: "OccupancySensing", ID: 0x0406, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0406, Name: "OccupancySensing"}},
 			{Element: RequirementServerCluster, Name: "Identify", ID: 0x0003, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0003, Name: "Identify"}},
 			{Element: RequirementDeviceType, Name: "OccupancySensor", ID: 0x0107, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0107, Name: "OccupancySensor"}},
-		},
-	},
-	0x0143: {
-		ID: 0x0143, Name: "VideoDoorbell", Classification: "simple", Revision: 1, Composition: "tree",
+		}},
+	0x0143: {ID: 0x0143, Name: "VideoDoorbell", Classification: "simple", Revision: 1, Composition: "tree",
 		Requirements: []DeviceTypeRequirement{
-			{
-				Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
+			{Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementAttribute, Name: "DeviceTypeList", Referent: Referent{Resolved: true, ID: 0x0000, Name: "DeviceTypeList"}},
-				},
-			},
+				}},
 			{Element: RequirementDeviceType, Name: "Camera", ID: 0x0142, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Constraint: "1", Count: CountRange{Set: true, Min: 1, HasMin: true, Max: 1, HasMax: true}, Referent: Referent{Resolved: true, ID: 0x0142, Name: "Camera"}},
 			{Element: RequirementDeviceType, Name: "Doorbell", ID: 0x0148, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Constraint: "min 1", Count: CountRange{Set: true, Min: 1, HasMin: true}, Referent: Referent{Resolved: true, ID: 0x0148, Name: "Doorbell"}},
-		},
-	},
-	0x0144: {
-		ID: 0x0144, Name: "FloodlightCamera", Classification: "simple", Revision: 1, Composition: "tree",
+		}},
+	0x0144: {ID: 0x0144, Name: "FloodlightCamera", Classification: "simple", Revision: 1, Composition: "tree",
 		Requirements: []DeviceTypeRequirement{
-			{
-				Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
+			{Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementAttribute, Name: "DeviceTypeList", Referent: Referent{Resolved: true, ID: 0x0000, Name: "DeviceTypeList"}},
-				},
-			},
+				}},
 			{Element: RequirementDeviceType, Name: "OnOffLight", ID: 0x0100, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Constraint: "min 1", Count: CountRange{Set: true, Min: 1, HasMin: true}, Referent: Referent{Resolved: true, ID: 0x0100, Name: "OnOffLight"}},
 			{Element: RequirementDeviceType, Name: "Camera", ID: 0x0142, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Constraint: "1", Count: CountRange{Set: true, Min: 1, HasMin: true, Max: 1, HasMax: true}, Referent: Referent{Resolved: true, ID: 0x0142, Name: "Camera"}},
-		},
-	},
-	0x0145: {
-		ID: 0x0145, Name: "SnapshotCamera", Classification: "simple", Revision: 1, Composition: "tree",
+		}},
+	0x0145: {ID: 0x0145, Name: "SnapshotCamera", Classification: "simple", Revision: 1, Composition: "tree",
 		Requirements: []DeviceTypeRequirement{
-			{
-				Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
+			{Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementAttribute, Name: "DeviceTypeList", Referent: Referent{Resolved: true, ID: 0x0000, Name: "DeviceTypeList"}},
-				},
-			},
+				}},
 			{Element: RequirementCondition, Name: "PowerSourceCond", Type: "RootNode.PowerSourceCond", Location: LocationRoot, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, Name: "PowerSourceCond", Declarer: "RootNode"}},
 			{Element: RequirementCondition, Name: "TimeSyncWithTzCond", Type: "RootNode.TimeSyncWithTzCond", Location: LocationRoot, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, Name: "TimeSyncWithTzCond", Declarer: "RootNode"}},
 			{Element: RequirementServerCluster, Name: "Identify", ID: 0x0003, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0003, Name: "Identify"}},
 			{Element: RequirementServerCluster, Name: "OccupancySensing", ID: 0x0406, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0406, Name: "OccupancySensing"}},
-			{
-				Element: RequirementServerCluster, Name: "ZoneManagement", ID: 0x0550, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0550, Name: "ZoneManagement"},
+			{Element: RequirementServerCluster, Name: "ZoneManagement", ID: 0x0550, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0550, Name: "ZoneManagement"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementFeature, Name: "TWODCART", Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0, Name: "TWODCART"}},
-				},
-			},
-			{
-				Element: RequirementServerCluster, Name: "CameraAvStreamManagement", ID: 0x0551, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0551, Name: "CameraAvStreamManagement"},
+				}},
+			{Element: RequirementServerCluster, Name: "CameraAvStreamManagement", ID: 0x0551, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0551, Name: "CameraAvStreamManagement"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementFeature, Name: "SNP", Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 2, Name: "SNP"}},
 					{Element: RequirementFeature, Name: "VDO", Conformance: Conformance{Text: "X", Op: "X"}, Referent: Referent{Resolved: true, ID: 1, Name: "VDO"}},
 					{Element: RequirementFeature, Name: "ADO", Conformance: Conformance{Text: "X", Op: "X"}, Referent: Referent{Resolved: true, ID: 0, Name: "ADO"}},
-				},
-			},
+				}},
 			{Element: RequirementServerCluster, Name: "CameraAvSettingsUserLevelManagement", ID: 0x0552, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0552, Name: "CameraAvSettingsUserLevelManagement"}},
 			{Element: RequirementDeviceType, Name: "OccupancySensor", ID: 0x0107, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0107, Name: "OccupancySensor"}},
-		},
-	},
-	0x0146: {
-		ID: 0x0146, Name: "Chime", Classification: "simple", Revision: 2, Composition: "tree",
+		}},
+	0x0146: {ID: 0x0146, Name: "Chime", Classification: "simple", Revision: 2, Composition: "tree",
 		Requirements: []DeviceTypeRequirement{
-			{
-				Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
+			{Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementAttribute, Name: "DeviceTypeList", Referent: Referent{Resolved: true, ID: 0x0000, Name: "DeviceTypeList"}},
-				},
-			},
+				}},
 			{Element: RequirementServerCluster, Name: "Chime", ID: 0x0556, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0556, Name: "Chime"}},
 			{Element: RequirementServerCluster, Name: "Identify", ID: 0x0003, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0003, Name: "Identify"}},
 			{Element: RequirementDeviceType, Name: "Speaker", ID: 0x0022, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Constraint: "max 1", Count: CountRange{Set: true, Max: 1, HasMax: true}, Referent: Referent{Resolved: true, ID: 0x0022, Name: "Speaker"}},
-		},
-	},
-	0x0147: {
-		ID: 0x0147, Name: "CameraController", Classification: "simple", Revision: 1, Composition: "tree",
+		}},
+	0x0147: {ID: 0x0147, Name: "CameraController", Classification: "simple", Revision: 1, Composition: "tree",
 		Requirements: []DeviceTypeRequirement{
-			{
-				Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
+			{Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementAttribute, Name: "DeviceTypeList", Referent: Referent{Resolved: true, ID: 0x0000, Name: "DeviceTypeList"}},
-				},
-			},
+				}},
 			{Element: RequirementClientCluster, Name: "Identify", ID: 0x0003, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0003, Name: "Identify"}},
 			{Element: RequirementClientCluster, Name: "PowerSource", ID: 0x002F, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x002F, Name: "PowerSource"}},
 			{Element: RequirementClientCluster, Name: "OccupancySensing", ID: 0x0406, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0406, Name: "OccupancySensing"}},
@@ -1797,70 +1326,52 @@ var deviceTypeDefinitions = map[DeviceTypeID]*DeviceTypeDefinition{
 			{Element: RequirementClientCluster, Name: "PushAvStreamTransport", ID: 0x0555, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0555, Name: "PushAvStreamTransport"}},
 			{Element: RequirementClientCluster, Name: "TlsCertificateManagement", ID: 0x0801, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0801, Name: "TlsCertificateManagement"}},
 			{Element: RequirementClientCluster, Name: "TlsClientManagement", ID: 0x0802, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0802, Name: "TlsClientManagement"}},
-		},
-	},
-	0x0148: {
-		ID: 0x0148, Name: "Doorbell", Classification: "simple", Revision: 2, Composition: "tree",
+		}},
+	0x0148: {ID: 0x0148, Name: "Doorbell", Classification: "simple", Revision: 2, Composition: "tree",
 		Requirements: []DeviceTypeRequirement{
-			{
-				Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
+			{Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementAttribute, Name: "DeviceTypeList", Referent: Referent{Resolved: true, ID: 0x0000, Name: "DeviceTypeList"}},
-				},
-			},
+				}},
 			{Element: RequirementServerCluster, Name: "Identify", ID: 0x0003, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0003, Name: "Identify"}},
-			{
-				Element: RequirementServerCluster, Name: "Switch", ID: 0x003B, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x003B, Name: "Switch"},
+			{Element: RequirementServerCluster, Name: "Switch", ID: 0x003B, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x003B, Name: "Switch"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementFeature, Name: "MS", Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 1, Name: "MS"}},
-				},
-			},
+				}},
 			{Element: RequirementClientCluster, Name: "Chime", ID: 0x0556, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0556, Name: "Chime"}},
-		},
-	},
-	0x0202: {
-		ID: 0x0202, Name: "WindowCovering", Classification: "simple", Revision: 7, Composition: "tree",
+		}},
+	0x0202: {ID: 0x0202, Name: "WindowCovering", Classification: "simple", Revision: 7, Composition: "tree",
 		Requirements: []DeviceTypeRequirement{
-			{
-				Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
+			{Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementAttribute, Name: "DeviceTypeList", Referent: Referent{Resolved: true, ID: 0x0000, Name: "DeviceTypeList"}},
-				},
-			},
+				}},
 			{Element: RequirementCondition, Name: "GroupcastListenerCond", Type: "RootNode.GroupcastListenerCond", Location: LocationRoot, Conformance: Conformance{Text: "Active, O", Op: "otherwise", Args: []Conformance{{Op: "name", Name: "Active"}, {Op: "O"}}}, Referent: Referent{Resolved: true, Name: "GroupcastListenerCond", Declarer: "RootNode"}},
 			{Element: RequirementServerCluster, Name: "Identify", ID: 0x0003, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0003, Name: "Identify"}},
 			{Element: RequirementServerCluster, Name: "Groups", ID: 0x0004, HasID: true, Conformance: Conformance{Text: "Active, O", Op: "otherwise", Args: []Conformance{{Op: "name", Name: "Active"}, {Op: "O"}}}, Referent: Referent{Resolved: true, ID: 0x0004, Name: "Groups"}},
 			{Element: RequirementServerCluster, Name: "WindowCovering", ID: 0x0102, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0102, Name: "WindowCovering"}},
 			{Element: RequirementServerCluster, Name: "ClosureControl", ID: 0x0104, HasID: true, Conformance: Conformance{Text: "X", Op: "X"}, Referent: Referent{Resolved: true, ID: 0x0104, Name: "ClosureControl"}},
 			{Element: RequirementServerCluster, Name: "ClosureDimension", ID: 0x0105, HasID: true, Conformance: Conformance{Text: "X", Op: "X"}, Referent: Referent{Resolved: true, ID: 0x0105, Name: "ClosureDimension"}},
-		},
-	},
-	0x0203: {
-		ID: 0x0203, Name: "WindowCoveringController", Classification: "simple", Revision: 5, Composition: "tree",
+		}},
+	0x0203: {ID: 0x0203, Name: "WindowCoveringController", Classification: "simple", Revision: 5, Composition: "tree",
 		Requirements: []DeviceTypeRequirement{
-			{
-				Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
+			{Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementAttribute, Name: "DeviceTypeList", Referent: Referent{Resolved: true, ID: 0x0000, Name: "DeviceTypeList"}},
-				},
-			},
+				}},
 			{Element: RequirementCondition, Name: "GroupcastSenderCond", Type: "RootNode.GroupcastSenderCond", Location: LocationRoot, Conformance: Conformance{Text: "Active, O", Op: "otherwise", Args: []Conformance{{Op: "name", Name: "Active"}, {Op: "O"}}}, Referent: Referent{Resolved: true, Name: "GroupcastSenderCond", Declarer: "RootNode"}},
 			{Element: RequirementServerCluster, Name: "Identify", ID: 0x0003, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0003, Name: "Identify"}},
 			{Element: RequirementClientCluster, Name: "Identify", ID: 0x0003, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0003, Name: "Identify"}},
 			{Element: RequirementClientCluster, Name: "Groups", ID: 0x0004, HasID: true, Conformance: Conformance{Text: "Active, O", Op: "otherwise", Args: []Conformance{{Op: "name", Name: "Active"}, {Op: "O"}}}, Referent: Referent{Resolved: true, ID: 0x0004, Name: "Groups"}},
 			{Element: RequirementClientCluster, Name: "WindowCovering", ID: 0x0102, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0102, Name: "WindowCovering"}},
-		},
-	},
-	0x0230: {
-		ID: 0x0230, Name: "Closure", Classification: "simple", Revision: 1, Composition: "tree",
+		}},
+	0x0230: {ID: 0x0230, Name: "Closure", Classification: "simple", Revision: 1, Composition: "tree",
 		Requirements: []DeviceTypeRequirement{
-			{
-				Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
+			{Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementAttribute, Name: "DeviceTypeList", Referent: Referent{Resolved: true, ID: 0x0000, Name: "DeviceTypeList"}},
 					{Element: RequirementFeature, Name: "TAGLIST", Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0, Name: "TAGLIST"}},
-				},
-			},
+				}},
 			{Element: RequirementServerCluster, Name: "Identify", ID: 0x0003, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0003, Name: "Identify"}},
 			{Element: RequirementServerCluster, Name: "WindowCovering", ID: 0x0102, HasID: true, Conformance: Conformance{Text: "X", Op: "X"}, Referent: Referent{Resolved: true, ID: 0x0102, Name: "WindowCovering"}},
 			{Element: RequirementServerCluster, Name: "ClosureControl", ID: 0x0104, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0104, Name: "ClosureControl"}},
@@ -1868,47 +1379,35 @@ var deviceTypeDefinitions = map[DeviceTypeID]*DeviceTypeDefinition{
 			{Element: RequirementDeviceType, Name: "DoorLock", ID: 0x000A, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x000A, Name: "DoorLock"}},
 			{Element: RequirementDeviceType, Name: "OnOffLight", ID: 0x0100, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0100, Name: "OnOffLight"}},
 			{Element: RequirementDeviceType, Name: "ClosurePanel", ID: 0x0231, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0231, Name: "ClosurePanel"}},
-		},
-	},
-	0x0231: {
-		ID: 0x0231, Name: "ClosurePanel", Classification: "simple", Revision: 1, Composition: "tree",
+		}},
+	0x0231: {ID: 0x0231, Name: "ClosurePanel", Classification: "simple", Revision: 1, Composition: "tree",
 		Requirements: []DeviceTypeRequirement{
-			{
-				Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
+			{Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementAttribute, Name: "DeviceTypeList", Referent: Referent{Resolved: true, ID: 0x0000, Name: "DeviceTypeList"}},
 					{Element: RequirementFeature, Name: "TAGLIST", Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0, Name: "TAGLIST"}},
-				},
-			},
+				}},
 			{Element: RequirementServerCluster, Name: "WindowCovering", ID: 0x0102, HasID: true, Conformance: Conformance{Text: "X", Op: "X"}, Referent: Referent{Resolved: true, ID: 0x0102, Name: "WindowCovering"}},
 			{Element: RequirementServerCluster, Name: "ClosureControl", ID: 0x0104, HasID: true, Conformance: Conformance{Text: "X", Op: "X"}, Referent: Referent{Resolved: true, ID: 0x0104, Name: "ClosureControl"}},
 			{Element: RequirementServerCluster, Name: "ClosureDimension", ID: 0x0105, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0105, Name: "ClosureDimension"}},
-		},
-	},
-	0x023E: {
-		ID: 0x023E, Name: "ClosureController", Classification: "simple", Revision: 2, Composition: "tree",
+		}},
+	0x023E: {ID: 0x023E, Name: "ClosureController", Classification: "simple", Revision: 2, Composition: "tree",
 		Requirements: []DeviceTypeRequirement{
-			{
-				Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
+			{Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementAttribute, Name: "DeviceTypeList", Referent: Referent{Resolved: true, ID: 0x0000, Name: "DeviceTypeList"}},
-				},
-			},
+				}},
 			{Element: RequirementCondition, Name: "GroupcastSenderCond", Type: "RootNode.GroupcastSenderCond", Location: LocationRoot, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, Name: "GroupcastSenderCond", Declarer: "RootNode"}},
 			{Element: RequirementClientCluster, Name: "Identify", ID: 0x0003, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0003, Name: "Identify"}},
 			{Element: RequirementClientCluster, Name: "ClosureControl", ID: 0x0104, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0104, Name: "ClosureControl"}},
 			{Element: RequirementClientCluster, Name: "ClosureDimension", ID: 0x0105, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0105, Name: "ClosureDimension"}},
-		},
-	},
-	0x0301: {
-		ID: 0x0301, Name: "Thermostat", Classification: "simple", Revision: 7, Composition: "tree",
+		}},
+	0x0301: {ID: 0x0301, Name: "Thermostat", Classification: "simple", Revision: 7, Composition: "tree",
 		Requirements: []DeviceTypeRequirement{
-			{
-				Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
+			{Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementAttribute, Name: "DeviceTypeList", Referent: Referent{Resolved: true, ID: 0x0000, Name: "DeviceTypeList"}},
-				},
-			},
+				}},
 			{Element: RequirementCondition, Name: "GroupcastListenerCond", Type: "RootNode.GroupcastListenerCond", Location: LocationRoot, Conformance: Conformance{Text: "Active", Op: "name", Name: "Active"}, Referent: Referent{Resolved: true, Name: "GroupcastListenerCond", Declarer: "RootNode"}},
 			{Element: RequirementServerCluster, Name: "Identify", ID: 0x0003, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0003, Name: "Identify"}},
 			{Element: RequirementServerCluster, Name: "Groups", ID: 0x0004, HasID: true, Conformance: Conformance{Text: "Active", Op: "name", Name: "Active"}, Referent: Referent{Resolved: true, ID: 0x0004, Name: "Groups"}},
@@ -1920,36 +1419,26 @@ var deviceTypeDefinitions = map[DeviceTypeID]*DeviceTypeDefinition{
 			{Element: RequirementClientCluster, Name: "RelativeHumidityMeasurement", ID: 0x0405, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0405, Name: "RelativeHumidityMeasurement"}},
 			{Element: RequirementClientCluster, Name: "OccupancySensing", ID: 0x0406, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0406, Name: "OccupancySensing"}},
 			{Element: RequirementClientCluster, Name: "AmbientContextSensing", ID: 0x0431, HasID: true, Conformance: Conformance{Text: "P, [Rev >= v6]", Op: "otherwise", Args: []Conformance{{Op: "P"}, {Op: "optionalIf", Args: []Conformance{{Op: "revision", Rev: 6}}}}}, Referent: Referent{Resolved: true, ID: 0x0431, Name: "AmbientContextSensing"}},
-		},
-	},
-	0x0302: {
-		ID: 0x0302, Name: "TemperatureSensor", Classification: "simple", Revision: 3, Composition: "tree",
+		}},
+	0x0302: {ID: 0x0302, Name: "TemperatureSensor", Classification: "simple", Revision: 3, Composition: "tree",
 		Requirements: []DeviceTypeRequirement{
-			{
-				Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
+			{Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementAttribute, Name: "DeviceTypeList", Referent: Referent{Resolved: true, ID: 0x0000, Name: "DeviceTypeList"}},
-				},
-			},
+				}},
 			{Element: RequirementServerCluster, Name: "TemperatureMeasurement", ID: 0x0402, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0402, Name: "TemperatureMeasurement"}},
 			{Element: RequirementServerCluster, Name: "Identify", ID: 0x0003, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0003, Name: "Identify"}},
-			{
-				Element: RequirementServerCluster, Name: "ThermostatUserInterfaceConfiguration", ID: 0x0204, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0204, Name: "ThermostatUserInterfaceConfiguration"},
+			{Element: RequirementServerCluster, Name: "ThermostatUserInterfaceConfiguration", ID: 0x0204, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0204, Name: "ThermostatUserInterfaceConfiguration"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementAttribute, Name: "KeypadLockout", Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0001, Name: "KeypadLockout"}},
-				},
-			},
-		},
-	},
-	0x0303: {
-		ID: 0x0303, Name: "Pump", Classification: "simple", Revision: 4, Composition: "tree",
+				}},
+		}},
+	0x0303: {ID: 0x0303, Name: "Pump", Classification: "simple", Revision: 4, Composition: "tree",
 		Requirements: []DeviceTypeRequirement{
-			{
-				Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
+			{Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementAttribute, Name: "DeviceTypeList", Referent: Referent{Resolved: true, ID: 0x0000, Name: "DeviceTypeList"}},
-				},
-			},
+				}},
 			{Element: RequirementCondition, Name: "GroupcastListenerCond", Type: "RootNode.GroupcastListenerCond", Location: LocationRoot, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, Name: "GroupcastListenerCond", Declarer: "RootNode"}},
 			{Element: RequirementServerCluster, Name: "Identify", ID: 0x0003, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0003, Name: "Identify"}},
 			{Element: RequirementServerCluster, Name: "Groups", ID: 0x0004, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0004, Name: "Groups"}},
@@ -1964,17 +1453,13 @@ var deviceTypeDefinitions = map[DeviceTypeID]*DeviceTypeDefinition{
 			{Element: RequirementServerCluster, Name: "FlowMeasurement", ID: 0x0404, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0404, Name: "FlowMeasurement"}},
 			{Element: RequirementClientCluster, Name: "FlowMeasurement", ID: 0x0404, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0404, Name: "FlowMeasurement"}},
 			{Element: RequirementClientCluster, Name: "OccupancySensing", ID: 0x0406, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0406, Name: "OccupancySensing"}},
-		},
-	},
-	0x0304: {
-		ID: 0x0304, Name: "PumpController", Classification: "simple", Revision: 5, Composition: "tree",
+		}},
+	0x0304: {ID: 0x0304, Name: "PumpController", Classification: "simple", Revision: 5, Composition: "tree",
 		Requirements: []DeviceTypeRequirement{
-			{
-				Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
+			{Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementAttribute, Name: "DeviceTypeList", Referent: Referent{Resolved: true, ID: 0x0000, Name: "DeviceTypeList"}},
-				},
-			},
+				}},
 			{Element: RequirementCondition, Name: "GroupcastSenderCond", Type: "RootNode.GroupcastSenderCond", Location: LocationRoot, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, Name: "GroupcastSenderCond", Declarer: "RootNode"}},
 			{Element: RequirementServerCluster, Name: "Identify", ID: 0x0003, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0003, Name: "Identify"}},
 			{Element: RequirementClientCluster, Name: "Identify", ID: 0x0003, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0003, Name: "Identify"}},
@@ -1986,334 +1471,236 @@ var deviceTypeDefinitions = map[DeviceTypeID]*DeviceTypeDefinition{
 			{Element: RequirementClientCluster, Name: "TemperatureMeasurement", ID: 0x0402, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0402, Name: "TemperatureMeasurement"}},
 			{Element: RequirementClientCluster, Name: "PressureMeasurement", ID: 0x0403, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0403, Name: "PressureMeasurement"}},
 			{Element: RequirementClientCluster, Name: "FlowMeasurement", ID: 0x0404, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0404, Name: "FlowMeasurement"}},
-		},
-	},
-	0x0305: {
-		ID: 0x0305, Name: "PressureSensor", Classification: "simple", Revision: 3, Composition: "tree",
+		}},
+	0x0305: {ID: 0x0305, Name: "PressureSensor", Classification: "simple", Revision: 3, Composition: "tree",
 		Requirements: []DeviceTypeRequirement{
-			{
-				Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
+			{Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementAttribute, Name: "DeviceTypeList", Referent: Referent{Resolved: true, ID: 0x0000, Name: "DeviceTypeList"}},
-				},
-			},
+				}},
 			{Element: RequirementServerCluster, Name: "Identify", ID: 0x0003, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0003, Name: "Identify"}},
 			{Element: RequirementServerCluster, Name: "PressureMeasurement", ID: 0x0403, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0403, Name: "PressureMeasurement"}},
-		},
-	},
-	0x0306: {
-		ID: 0x0306, Name: "FlowSensor", Classification: "simple", Revision: 3, Composition: "tree",
+		}},
+	0x0306: {ID: 0x0306, Name: "FlowSensor", Classification: "simple", Revision: 3, Composition: "tree",
 		Requirements: []DeviceTypeRequirement{
-			{
-				Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
+			{Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementAttribute, Name: "DeviceTypeList", Referent: Referent{Resolved: true, ID: 0x0000, Name: "DeviceTypeList"}},
-				},
-			},
+				}},
 			{Element: RequirementServerCluster, Name: "Identify", ID: 0x0003, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0003, Name: "Identify"}},
 			{Element: RequirementServerCluster, Name: "FlowMeasurement", ID: 0x0404, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0404, Name: "FlowMeasurement"}},
-		},
-	},
-	0x0307: {
-		ID: 0x0307, Name: "HumiditySensor", Classification: "simple", Revision: 3, Composition: "tree",
+		}},
+	0x0307: {ID: 0x0307, Name: "HumiditySensor", Classification: "simple", Revision: 3, Composition: "tree",
 		Requirements: []DeviceTypeRequirement{
-			{
-				Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
+			{Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementAttribute, Name: "DeviceTypeList", Referent: Referent{Resolved: true, ID: 0x0000, Name: "DeviceTypeList"}},
-				},
-			},
+				}},
 			{Element: RequirementServerCluster, Name: "Identify", ID: 0x0003, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0003, Name: "Identify"}},
 			{Element: RequirementServerCluster, Name: "RelativeHumidityMeasurement", ID: 0x0405, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0405, Name: "RelativeHumidityMeasurement"}},
-		},
-	},
-	0x0309: {
-		ID: 0x0309, Name: "HeatPump", Classification: "simple", Revision: 1, Composition: "tree",
+		}},
+	0x0309: {ID: 0x0309, Name: "HeatPump", Classification: "simple", Revision: 1, Composition: "tree",
 		Requirements: []DeviceTypeRequirement{
-			{
-				Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
+			{Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementAttribute, Name: "DeviceTypeList", Referent: Referent{Resolved: true, ID: 0x0000, Name: "DeviceTypeList"}},
-				},
-			},
+				}},
 			{Element: RequirementServerCluster, Name: "Identify", ID: 0x0003, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0003, Name: "Identify"}},
 			{Element: RequirementClientCluster, Name: "Thermostat", ID: 0x0201, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0201, Name: "Thermostat"}},
-			{
-				Element: RequirementDeviceType, Name: "PowerSource", ID: 0x0011, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0011, Name: "PowerSource"},
+			{Element: RequirementDeviceType, Name: "PowerSource", ID: 0x0011, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0011, Name: "PowerSource"},
 				Requirements: []DeviceTypeRequirement{
-					{
-						Element: RequirementServerCluster, Name: "PowerSource", ID: 0x002F, HasID: true, Referent: Referent{Resolved: true, ID: 0x002F, Name: "PowerSource"},
+					{Element: RequirementServerCluster, Name: "PowerSource", ID: 0x002F, HasID: true, Referent: Referent{Resolved: true, ID: 0x002F, Name: "PowerSource"},
 						Requirements: []DeviceTypeRequirement{
 							{Element: RequirementFeature, Name: "WIRED", Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0, Name: "WIRED"}},
-						},
-					},
-					{
-						Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
+						}},
+					{Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
 						Requirements: []DeviceTypeRequirement{
 							{Element: RequirementFeature, Name: "TAGLIST", Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0, Name: "TAGLIST"}},
-						},
-					},
-				},
-			},
-			{
-				Element: RequirementDeviceType, Name: "Thermostat", ID: 0x0301, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0301, Name: "Thermostat"},
+						}},
+				}},
+			{Element: RequirementDeviceType, Name: "Thermostat", ID: 0x0301, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0301, Name: "Thermostat"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementServerCluster, Name: "UserLabel", ID: 0x0041, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0041, Name: "UserLabel"}},
-					{
-						Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
+					{Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
 						Requirements: []DeviceTypeRequirement{
 							{Element: RequirementFeature, Name: "TAGLIST", Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0, Name: "TAGLIST"}},
-						},
-					},
-				},
-			},
-			{
-				Element: RequirementDeviceType, Name: "TemperatureSensor", ID: 0x0302, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0302, Name: "TemperatureSensor"},
+						}},
+				}},
+			{Element: RequirementDeviceType, Name: "TemperatureSensor", ID: 0x0302, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0302, Name: "TemperatureSensor"},
 				Requirements: []DeviceTypeRequirement{
-					{
-						Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
+					{Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
 						Requirements: []DeviceTypeRequirement{
 							{Element: RequirementFeature, Name: "TAGLIST", Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0, Name: "TAGLIST"}},
-						},
-					},
-				},
-			},
-			{
-				Element: RequirementDeviceType, Name: "DeviceEnergyManagement", ID: 0x050D, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x050D, Name: "DeviceEnergyManagement"},
+						}},
+				}},
+			{Element: RequirementDeviceType, Name: "DeviceEnergyManagement", ID: 0x050D, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x050D, Name: "DeviceEnergyManagement"},
 				Requirements: []DeviceTypeRequirement{
-					{
-						Element: RequirementServerCluster, Name: "DeviceEnergyManagement", ID: 0x0098, HasID: true, Referent: Referent{Resolved: true, ID: 0x0098, Name: "DeviceEnergyManagement"},
+					{Element: RequirementServerCluster, Name: "DeviceEnergyManagement", ID: 0x0098, HasID: true, Referent: Referent{Resolved: true, ID: 0x0098, Name: "DeviceEnergyManagement"},
 						Requirements: []DeviceTypeRequirement{
 							{Element: RequirementFeature, Name: "PA", Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0, Name: "PA"}},
-						},
-					},
-				},
-			},
+						}},
+				}},
 			{Element: RequirementDeviceType, Name: "WaterHeater", ID: 0x050F, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x050F, Name: "WaterHeater"}},
-			{
-				Element: RequirementDeviceType, Name: "ElectricalSensor", ID: 0x0510, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Constraint: "min 1", Count: CountRange{Set: true, Min: 1, HasMin: true}, Referent: Referent{Resolved: true, ID: 0x0510, Name: "ElectricalSensor"},
+			{Element: RequirementDeviceType, Name: "ElectricalSensor", ID: 0x0510, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Constraint: "min 1", Count: CountRange{Set: true, Min: 1, HasMin: true}, Referent: Referent{Resolved: true, ID: 0x0510, Name: "ElectricalSensor"},
 				Requirements: []DeviceTypeRequirement{
-					{
-						Element: RequirementServerCluster, Name: "ElectricalPowerMeasurement", ID: 0x0090, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0090, Name: "ElectricalPowerMeasurement"},
+					{Element: RequirementServerCluster, Name: "ElectricalPowerMeasurement", ID: 0x0090, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0090, Name: "ElectricalPowerMeasurement"},
 						Requirements: []DeviceTypeRequirement{
 							{Element: RequirementFeature, Name: "ALTC", Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 1, Name: "ALTC"}},
 							{Element: RequirementAttribute, Name: "Voltage", Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0004, Name: "Voltage"}},
 							{Element: RequirementAttribute, Name: "ActiveCurrent", Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0005, Name: "ActiveCurrent"}},
-						},
-					},
+						}},
 					{Element: RequirementServerCluster, Name: "ElectricalEnergyMeasurement", ID: 0x0091, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0091, Name: "ElectricalEnergyMeasurement"}},
-				},
-			},
-		},
-	},
-	0x030A: {
-		ID: 0x030A, Name: "ThermostatController", Classification: "simple", Revision: 2, Composition: "tree",
+				}},
+		}},
+	0x030A: {ID: 0x030A, Name: "ThermostatController", Classification: "simple", Revision: 2, Composition: "tree",
 		Requirements: []DeviceTypeRequirement{
-			{
-				Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
+			{Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementAttribute, Name: "DeviceTypeList", Referent: Referent{Resolved: true, ID: 0x0000, Name: "DeviceTypeList"}},
-				},
-			},
+				}},
 			{Element: RequirementCondition, Name: "GroupcastSenderCond", Type: "RootNode.GroupcastSenderCond", Location: LocationRoot, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, Name: "GroupcastSenderCond", Declarer: "RootNode"}},
 			{Element: RequirementClientCluster, Name: "Identify", ID: 0x0003, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0003, Name: "Identify"}},
 			{Element: RequirementClientCluster, Name: "Groups", ID: 0x0004, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0004, Name: "Groups"}},
 			{Element: RequirementClientCluster, Name: "ScenesManagement", ID: 0x0062, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0062, Name: "ScenesManagement"}},
 			{Element: RequirementClientCluster, Name: "Thermostat", ID: 0x0201, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0201, Name: "Thermostat"}},
-		},
-	},
-	0x050C: {
-		ID: 0x050C, Name: "EnergyEvse", Classification: "simple", Revision: 2, Composition: "tree",
+		}},
+	0x050C: {ID: 0x050C, Name: "EnergyEvse", Classification: "simple", Revision: 2, Composition: "tree",
 		Requirements: []DeviceTypeRequirement{
-			{
-				Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
+			{Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementAttribute, Name: "DeviceTypeList", Referent: Referent{Resolved: true, ID: 0x0000, Name: "DeviceTypeList"}},
-				},
-			},
+				}},
 			{Element: RequirementServerCluster, Name: "Identify", ID: 0x0003, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0003, Name: "Identify"}},
 			{Element: RequirementServerCluster, Name: "EnergyEvse", ID: 0x0099, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0099, Name: "EnergyEvse"}},
 			{Element: RequirementServerCluster, Name: "EnergyEvseMode", ID: 0x009D, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x009D, Name: "EnergyEvseMode"}},
 			{Element: RequirementServerCluster, Name: "TemperatureMeasurement", ID: 0x0402, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0402, Name: "TemperatureMeasurement"}},
 			{Element: RequirementDeviceType, Name: "PowerSource", ID: 0x0011, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Constraint: "min 1", Count: CountRange{Set: true, Min: 1, HasMin: true}, Referent: Referent{Resolved: true, ID: 0x0011, Name: "PowerSource"}},
-			{
-				Element: RequirementDeviceType, Name: "DeviceEnergyManagement", ID: 0x050D, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Constraint: "min 1", Count: CountRange{Set: true, Min: 1, HasMin: true}, Referent: Referent{Resolved: true, ID: 0x050D, Name: "DeviceEnergyManagement"},
+			{Element: RequirementDeviceType, Name: "DeviceEnergyManagement", ID: 0x050D, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Constraint: "min 1", Count: CountRange{Set: true, Min: 1, HasMin: true}, Referent: Referent{Resolved: true, ID: 0x050D, Name: "DeviceEnergyManagement"},
 				Requirements: []DeviceTypeRequirement{
-					{
-						Element: RequirementServerCluster, Name: "DeviceEnergyManagement", ID: 0x0098, HasID: true, Referent: Referent{Resolved: true, ID: 0x0098, Name: "DeviceEnergyManagement"},
+					{Element: RequirementServerCluster, Name: "DeviceEnergyManagement", ID: 0x0098, HasID: true, Referent: Referent{Resolved: true, ID: 0x0098, Name: "DeviceEnergyManagement"},
 						Requirements: []DeviceTypeRequirement{
 							{Element: RequirementFeature, Name: "PFR", Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 1, Name: "PFR"}},
 							{Element: RequirementFeature, Name: "PA", Conformance: Conformance{Text: "desc", Op: "desc"}, Referent: Referent{Resolved: true, ID: 0, Name: "PA"}},
-						},
-					},
-				},
-			},
-			{
-				Element: RequirementDeviceType, Name: "ElectricalSensor", ID: 0x0510, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Constraint: "min 1", Count: CountRange{Set: true, Min: 1, HasMin: true}, Referent: Referent{Resolved: true, ID: 0x0510, Name: "ElectricalSensor"},
+						}},
+				}},
+			{Element: RequirementDeviceType, Name: "ElectricalSensor", ID: 0x0510, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Constraint: "min 1", Count: CountRange{Set: true, Min: 1, HasMin: true}, Referent: Referent{Resolved: true, ID: 0x0510, Name: "ElectricalSensor"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementServerCluster, Name: "ElectricalPowerMeasurement", ID: 0x0090, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0090, Name: "ElectricalPowerMeasurement"}},
 					{Element: RequirementServerCluster, Name: "ElectricalEnergyMeasurement", ID: 0x0091, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0091, Name: "ElectricalEnergyMeasurement"}},
-				},
-			},
-		},
-	},
-	0x050D: {
-		ID: 0x050D, Name: "DeviceEnergyManagement", Classification: "utility", Revision: 3, Composition: "tree",
+				}},
+		}},
+	0x050D: {ID: 0x050D, Name: "DeviceEnergyManagement", Classification: "utility", Revision: 3, Composition: "tree",
 		Conditions: []string{"ControllableEsa"},
 		Requirements: []DeviceTypeRequirement{
-			{
-				Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
+			{Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementAttribute, Name: "DeviceTypeList", Referent: Referent{Resolved: true, ID: 0x0000, Name: "DeviceTypeList"}},
-				},
-			},
-			{
-				Element: RequirementServerCluster, Name: "DeviceEnergyManagement", ID: 0x0098, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0098, Name: "DeviceEnergyManagement"},
+				}},
+			{Element: RequirementServerCluster, Name: "DeviceEnergyManagement", ID: 0x0098, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0098, Name: "DeviceEnergyManagement"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementFeature, Name: "PA", Conformance: Conformance{Text: "[ControllableEsa].a+", Op: "choice", Choice: &ConformanceChoice{Name: "a", Num: 1, OrMore: true, OrLess: false}, Args: []Conformance{{Op: "optionalIf", Args: []Conformance{{Op: "name", Name: "ControllableEsa"}}}}}, Referent: Referent{Resolved: true, ID: 0, Name: "PA"}},
 					{Element: RequirementFeature, Name: "STA", Conformance: Conformance{Text: "[ControllableEsa].a+", Op: "choice", Choice: &ConformanceChoice{Name: "a", Num: 1, OrMore: true, OrLess: false}, Args: []Conformance{{Op: "optionalIf", Args: []Conformance{{Op: "name", Name: "ControllableEsa"}}}}}, Referent: Referent{Resolved: true, ID: 3, Name: "STA"}},
 					{Element: RequirementFeature, Name: "PAU", Conformance: Conformance{Text: "[ControllableEsa].a+", Op: "choice", Choice: &ConformanceChoice{Name: "a", Num: 1, OrMore: true, OrLess: false}, Args: []Conformance{{Op: "optionalIf", Args: []Conformance{{Op: "name", Name: "ControllableEsa"}}}}}, Referent: Referent{Resolved: true, ID: 4, Name: "PAU"}},
 					{Element: RequirementFeature, Name: "FA", Conformance: Conformance{Text: "[ControllableEsa].a+", Op: "choice", Choice: &ConformanceChoice{Name: "a", Num: 1, OrMore: true, OrLess: false}, Args: []Conformance{{Op: "optionalIf", Args: []Conformance{{Op: "name", Name: "ControllableEsa"}}}}}, Referent: Referent{Resolved: true, ID: 5, Name: "FA"}},
 					{Element: RequirementFeature, Name: "CON", Conformance: Conformance{Text: "[ControllableEsa].a+", Op: "choice", Choice: &ConformanceChoice{Name: "a", Num: 1, OrMore: true, OrLess: false}, Args: []Conformance{{Op: "optionalIf", Args: []Conformance{{Op: "name", Name: "ControllableEsa"}}}}}, Referent: Referent{Resolved: true, ID: 6, Name: "CON"}},
-				},
-			},
+				}},
 			{Element: RequirementServerCluster, Name: "DeviceEnergyManagementMode", ID: 0x009F, HasID: true, Conformance: Conformance{Text: "ControllableEsa, O", Op: "otherwise", Args: []Conformance{{Op: "name", Name: "ControllableEsa"}, {Op: "O"}}}, Referent: Referent{Resolved: true, ID: 0x009F, Name: "DeviceEnergyManagementMode"}},
 			{Element: RequirementClientCluster, Name: "ElectricalGridConditions", ID: 0x00A0, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x00A0, Name: "ElectricalGridConditions"}},
-		},
-	},
-	0x050F: {
-		ID: 0x050F, Name: "WaterHeater", Classification: "simple", Revision: 1, Composition: "tree",
+		}},
+	0x050F: {ID: 0x050F, Name: "WaterHeater", Classification: "simple", Revision: 1, Composition: "tree",
 		Requirements: []DeviceTypeRequirement{
-			{
-				Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
+			{Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementAttribute, Name: "DeviceTypeList", Referent: Referent{Resolved: true, ID: 0x0000, Name: "DeviceTypeList"}},
-				},
-			},
+				}},
 			{Element: RequirementServerCluster, Name: "Identify", ID: 0x0003, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0003, Name: "Identify"}},
 			{Element: RequirementServerCluster, Name: "WaterHeaterManagement", ID: 0x0094, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0094, Name: "WaterHeaterManagement"}},
 			{Element: RequirementServerCluster, Name: "WaterHeaterMode", ID: 0x009E, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x009E, Name: "WaterHeaterMode"}},
-			{
-				Element: RequirementServerCluster, Name: "Thermostat", ID: 0x0201, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0201, Name: "Thermostat"},
+			{Element: RequirementServerCluster, Name: "Thermostat", ID: 0x0201, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0201, Name: "Thermostat"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementFeature, Name: "HEAT", Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0, Name: "HEAT"}},
-				},
-			},
+				}},
 			{Element: RequirementDeviceType, Name: "PowerSource", ID: 0x0011, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0011, Name: "PowerSource"}},
 			{Element: RequirementDeviceType, Name: "TemperatureSensor", ID: 0x0302, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0302, Name: "TemperatureSensor"}},
-			{
-				Element: RequirementDeviceType, Name: "DeviceEnergyManagement", ID: 0x050D, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x050D, Name: "DeviceEnergyManagement"},
+			{Element: RequirementDeviceType, Name: "DeviceEnergyManagement", ID: 0x050D, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x050D, Name: "DeviceEnergyManagement"},
 				Requirements: []DeviceTypeRequirement{
-					{
-						Element: RequirementServerCluster, Name: "DeviceEnergyManagement", ID: 0x0098, HasID: true, Referent: Referent{Resolved: true, ID: 0x0098, Name: "DeviceEnergyManagement"},
+					{Element: RequirementServerCluster, Name: "DeviceEnergyManagement", ID: 0x0098, HasID: true, Referent: Referent{Resolved: true, ID: 0x0098, Name: "DeviceEnergyManagement"},
 						Requirements: []DeviceTypeRequirement{
 							{Element: RequirementFeature, Name: "PFR", Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 1, Name: "PFR"}},
-						},
-					},
-				},
-			},
-			{
-				Element: RequirementDeviceType, Name: "ElectricalSensor", ID: 0x0510, HasID: true, Conformance: Conformance{Text: "desc", Op: "desc"}, Referent: Referent{Resolved: true, ID: 0x0510, Name: "ElectricalSensor"},
+						}},
+				}},
+			{Element: RequirementDeviceType, Name: "ElectricalSensor", ID: 0x0510, HasID: true, Conformance: Conformance{Text: "desc", Op: "desc"}, Referent: Referent{Resolved: true, ID: 0x0510, Name: "ElectricalSensor"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementServerCluster, Name: "ElectricalPowerMeasurement", ID: 0x0090, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0090, Name: "ElectricalPowerMeasurement"}},
 					{Element: RequirementServerCluster, Name: "ElectricalEnergyMeasurement", ID: 0x0091, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0091, Name: "ElectricalEnergyMeasurement"}},
-				},
-			},
-		},
-	},
-	0x0510: {
-		ID: 0x0510, Name: "ElectricalSensor", Classification: "utility", Revision: 1, Composition: "tree",
+				}},
+		}},
+	0x0510: {ID: 0x0510, Name: "ElectricalSensor", Classification: "utility", Revision: 1, Composition: "tree",
 		Requirements: []DeviceTypeRequirement{
-			{
-				Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
+			{Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementAttribute, Name: "DeviceTypeList", Referent: Referent{Resolved: true, ID: 0x0000, Name: "DeviceTypeList"}},
-				},
-			},
+				}},
 			{Element: RequirementServerCluster, Name: "ElectricalPowerMeasurement", ID: 0x0090, HasID: true, Conformance: Conformance{Text: "O.a+", Op: "choice", Choice: &ConformanceChoice{Name: "a", Num: 1, OrMore: true, OrLess: false}, Args: []Conformance{{Op: "O"}}}, Referent: Referent{Resolved: true, ID: 0x0090, Name: "ElectricalPowerMeasurement"}},
 			{Element: RequirementServerCluster, Name: "ElectricalEnergyMeasurement", ID: 0x0091, HasID: true, Conformance: Conformance{Text: "O.a+", Op: "choice", Choice: &ConformanceChoice{Name: "a", Num: 1, OrMore: true, OrLess: false}, Args: []Conformance{{Op: "O"}}}, Referent: Referent{Resolved: true, ID: 0x0091, Name: "ElectricalEnergyMeasurement"}},
 			{Element: RequirementServerCluster, Name: "PowerTopology", ID: 0x009C, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x009C, Name: "PowerTopology"}},
-		},
-	},
-	0x0511: {
-		ID: 0x0511, Name: "ElectricalUtilityMeter", Classification: "simple", Revision: 1, Composition: "tree", Base: "MeterReferencePoint",
+		}},
+	0x0511: {ID: 0x0511, Name: "ElectricalUtilityMeter", Classification: "simple", Revision: 1, Composition: "tree", Base: "MeterReferencePoint",
 		Requirements: []DeviceTypeRequirement{
-			{
-				Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
+			{Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementAttribute, Name: "DeviceTypeList", Referent: Referent{Resolved: true, ID: 0x0000, Name: "DeviceTypeList"}},
-				},
-			},
+				}},
 			{Element: RequirementCondition, Name: "TimeSyncCond", Type: "RootNode.TimeSyncCond", Location: LocationRoot, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, Name: "TimeSyncCond", Declarer: "RootNode"}},
 			{Element: RequirementServerCluster, Name: "MeterIdentification", ID: 0x0B06, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0B06, Name: "MeterIdentification"}},
-		},
-	},
-	0x0512: {
-		ID: 0x0512, Name: "MeterReferencePoint", Classification: "simple", Revision: 1, Composition: "tree",
+		}},
+	0x0512: {ID: 0x0512, Name: "MeterReferencePoint", Classification: "simple", Revision: 1, Composition: "tree",
 		Conditions: []string{"ElectricalEnergy"},
 		Requirements: []DeviceTypeRequirement{
-			{
-				Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
+			{Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementAttribute, Name: "DeviceTypeList", Referent: Referent{Resolved: true, ID: 0x0000, Name: "DeviceTypeList"}},
-				},
-			},
+				}},
 			{Element: RequirementCondition, Name: "TimeSyncCond", Type: "RootNode.TimeSyncCond", Location: LocationRoot, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, Name: "TimeSyncCond", Declarer: "RootNode"}},
 			{Element: RequirementServerCluster, Name: "Identify", ID: 0x0003, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0003, Name: "Identify"}},
-			{
-				Element: RequirementDeviceType, Name: "ElectricalEnergyTariff", ID: 0x0513, HasID: true, Conformance: Conformance{Text: "[ElectricalEnergy].a+", Op: "choice", Choice: &ConformanceChoice{Name: "a", Num: 1, OrMore: true, OrLess: false}, Args: []Conformance{{Op: "optionalIf", Args: []Conformance{{Op: "name", Name: "ElectricalEnergy"}}}}}, Constraint: "min 1", Count: CountRange{Set: true, Min: 1, HasMin: true}, Referent: Referent{Resolved: true, ID: 0x0513, Name: "ElectricalEnergyTariff"},
+			{Element: RequirementDeviceType, Name: "ElectricalEnergyTariff", ID: 0x0513, HasID: true, Conformance: Conformance{Text: "[ElectricalEnergy].a+", Op: "choice", Choice: &ConformanceChoice{Name: "a", Num: 1, OrMore: true, OrLess: false}, Args: []Conformance{{Op: "optionalIf", Args: []Conformance{{Op: "name", Name: "ElectricalEnergy"}}}}}, Constraint: "min 1", Count: CountRange{Set: true, Min: 1, HasMin: true}, Referent: Referent{Resolved: true, ID: 0x0513, Name: "ElectricalEnergyTariff"},
 				Requirements: []DeviceTypeRequirement{
-					{
-						Element: RequirementServerCluster, Name: "CommodityTariff", ID: 0x0700, HasID: true, Referent: Referent{Resolved: true, ID: 0x0700, Name: "CommodityTariff"},
+					{Element: RequirementServerCluster, Name: "CommodityTariff", ID: 0x0700, HasID: true, Referent: Referent{Resolved: true, ID: 0x0700, Name: "CommodityTariff"},
 						Requirements: []DeviceTypeRequirement{
 							{Element: RequirementAttribute, Name: "TariffUnit", Conformance: Conformance{Text: "M", Op: "M"}, Constraint: "kWh | kVAh", Referent: Referent{Resolved: true, ID: 0x0001, Name: "TariffUnit"}},
-						},
-					},
-				},
-			},
+						}},
+				}},
 			{Element: RequirementDeviceType, Name: "ElectricalMeter", ID: 0x0514, HasID: true, Conformance: Conformance{Text: "[ElectricalEnergy].a+", Op: "choice", Choice: &ConformanceChoice{Name: "a", Num: 1, OrMore: true, OrLess: false}, Args: []Conformance{{Op: "optionalIf", Args: []Conformance{{Op: "name", Name: "ElectricalEnergy"}}}}}, Constraint: "min 1", Count: CountRange{Set: true, Min: 1, HasMin: true}, Referent: Referent{Resolved: true, ID: 0x0514, Name: "ElectricalMeter"}},
-		},
-	},
-	0x0513: {
-		ID: 0x0513, Name: "ElectricalEnergyTariff", Classification: "simple", Revision: 1, Composition: "tree",
+		}},
+	0x0513: {ID: 0x0513, Name: "ElectricalEnergyTariff", Classification: "simple", Revision: 1, Composition: "tree",
 		Conditions: []string{"ActiveTariff"},
 		Requirements: []DeviceTypeRequirement{
-			{
-				Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
+			{Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementAttribute, Name: "DeviceTypeList", Referent: Referent{Resolved: true, ID: 0x0000, Name: "DeviceTypeList"}},
 					{Element: RequirementFeature, Name: "TAGLIST", Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0, Name: "TAGLIST"}},
-				},
-			},
+				}},
 			{Element: RequirementServerCluster, Name: "CommodityPrice", ID: 0x0095, HasID: true, Conformance: Conformance{Text: "[ActiveTariff].a+", Op: "choice", Choice: &ConformanceChoice{Name: "a", Num: 1, OrMore: true, OrLess: false}, Args: []Conformance{{Op: "optionalIf", Args: []Conformance{{Op: "name", Name: "ActiveTariff"}}}}}, Referent: Referent{Resolved: true, ID: 0x0095, Name: "CommodityPrice"}},
 			{Element: RequirementServerCluster, Name: "ElectricalGridConditions", ID: 0x00A0, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x00A0, Name: "ElectricalGridConditions"}},
 			{Element: RequirementServerCluster, Name: "CommodityTariff", ID: 0x0700, HasID: true, Conformance: Conformance{Text: "O.a+", Op: "choice", Choice: &ConformanceChoice{Name: "a", Num: 1, OrMore: true, OrLess: false}, Args: []Conformance{{Op: "O"}}}, Referent: Referent{Resolved: true, ID: 0x0700, Name: "CommodityTariff"}},
-		},
-	},
-	0x0514: {
-		ID: 0x0514, Name: "ElectricalMeter", Classification: "simple", Revision: 1, Composition: "tree", Base: "ElectricalEnergyTariff",
+		}},
+	0x0514: {ID: 0x0514, Name: "ElectricalMeter", Classification: "simple", Revision: 1, Composition: "tree", Base: "ElectricalEnergyTariff",
 		Requirements: []DeviceTypeRequirement{
-			{
-				Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
+			{Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementAttribute, Name: "DeviceTypeList", Referent: Referent{Resolved: true, ID: 0x0000, Name: "DeviceTypeList"}},
-				},
-			},
+				}},
 			{Element: RequirementServerCluster, Name: "CommodityMetering", ID: 0x0B07, HasID: true, Conformance: Conformance{Text: "P, M", Op: "otherwise", Args: []Conformance{{Op: "P"}, {Op: "M"}}}, Referent: Referent{Resolved: true, ID: 0x0B07, Name: "CommodityMetering"}},
 			{Element: RequirementServerCluster, Name: "ElectricalPowerMeasurement", ID: 0x0090, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0090, Name: "ElectricalPowerMeasurement"}},
 			{Element: RequirementServerCluster, Name: "ElectricalEnergyMeasurement", ID: 0x0091, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0091, Name: "ElectricalEnergyMeasurement"}},
 			{Element: RequirementDeviceType, Name: "ElectricalSensor", ID: 0x0510, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Constraint: "min 1", Count: CountRange{Set: true, Min: 1, HasMin: true}, Referent: Referent{Resolved: true, ID: 0x0510, Name: "ElectricalSensor"}},
-		},
-	},
-	0x0840: {
-		ID: 0x0840, Name: "ControlBridge", Classification: "simple", Revision: 4, Composition: "tree",
+		}},
+	0x0840: {ID: 0x0840, Name: "ControlBridge", Classification: "simple", Revision: 4, Composition: "tree",
 		Requirements: []DeviceTypeRequirement{
-			{
-				Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
+			{Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementAttribute, Name: "DeviceTypeList", Referent: Referent{Resolved: true, ID: 0x0000, Name: "DeviceTypeList"}},
-				},
-			},
+				}},
 			{Element: RequirementCondition, Name: "GroupcastSenderCond", Type: "RootNode.GroupcastSenderCond", Location: LocationRoot, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, Name: "GroupcastSenderCond", Declarer: "RootNode"}},
 			{Element: RequirementServerCluster, Name: "Identify", ID: 0x0003, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0003, Name: "Identify"}},
 			{Element: RequirementClientCluster, Name: "Identify", ID: 0x0003, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0003, Name: "Identify"}},
@@ -2324,17 +1711,13 @@ var deviceTypeDefinitions = map[DeviceTypeID]*DeviceTypeDefinition{
 			{Element: RequirementClientCluster, Name: "ColorControl", ID: 0x0300, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0300, Name: "ColorControl"}},
 			{Element: RequirementClientCluster, Name: "IlluminanceMeasurement", ID: 0x0400, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0400, Name: "IlluminanceMeasurement"}},
 			{Element: RequirementClientCluster, Name: "OccupancySensing", ID: 0x0406, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0406, Name: "OccupancySensing"}},
-		},
-	},
-	0x0850: {
-		ID: 0x0850, Name: "OnOffSensor", Classification: "simple", Revision: 4, Composition: "tree",
+		}},
+	0x0850: {ID: 0x0850, Name: "OnOffSensor", Classification: "simple", Revision: 4, Composition: "tree",
 		Requirements: []DeviceTypeRequirement{
-			{
-				Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
+			{Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementAttribute, Name: "DeviceTypeList", Referent: Referent{Resolved: true, ID: 0x0000, Name: "DeviceTypeList"}},
-				},
-			},
+				}},
 			{Element: RequirementCondition, Name: "GroupcastSenderCond", Type: "RootNode.GroupcastSenderCond", Location: LocationRoot, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, Name: "GroupcastSenderCond", Declarer: "RootNode"}},
 			{Element: RequirementServerCluster, Name: "Identify", ID: 0x0003, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0003, Name: "Identify"}},
 			{Element: RequirementClientCluster, Name: "Identify", ID: 0x0003, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x0003, Name: "Identify"}},
@@ -2343,130 +1726,125 @@ var deviceTypeDefinitions = map[DeviceTypeID]*DeviceTypeDefinition{
 			{Element: RequirementClientCluster, Name: "LevelControl", ID: 0x0008, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0008, Name: "LevelControl"}},
 			{Element: RequirementClientCluster, Name: "ScenesManagement", ID: 0x0062, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0062, Name: "ScenesManagement"}},
 			{Element: RequirementClientCluster, Name: "ColorControl", ID: 0x0300, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0300, Name: "ColorControl"}},
-		},
-	},
+		}},
 }
 
 // baseDeviceTypeDefinitions holds the device types classified "base" (the
 // Base device type), whose requirements apply to every endpoint that lists
 // a device type. Generated from baseDeviceTypes in parity/schema.json.
 var baseDeviceTypeDefinitions = []*DeviceTypeDefinition{
-	{
-		Name: "Base", Classification: "base", Revision: 3, Composition: "tree",
+	{Name: "Base", Classification: "base", Revision: 3, Composition: "tree",
 		Conditions: []string{"Ethernet", "WiFi", "Thread", "Ip", "Tcp", "Udp", "IPv4", "IPv6", "LanguageLocale", "TimeLocale", "UnitLocale", "Sit", "Lit", "Active", "Node", "App", "Simple", "Dynamic", "Composed", "Client", "Server", "Duplicate", "BridgedPowerSourceInfo"},
 		Requirements: []DeviceTypeRequirement{
-			{
-				Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
+			{Element: RequirementServerCluster, Name: "Descriptor", ID: 0x001D, HasID: true, Conformance: Conformance{Text: "M", Op: "M"}, Referent: Referent{Resolved: true, ID: 0x001D, Name: "Descriptor"},
 				Requirements: []DeviceTypeRequirement{
 					{Element: RequirementFeature, Name: "TAGLIST", Conformance: Conformance{Text: "Duplicate", Op: "name", Name: "Duplicate"}, Referent: Referent{Resolved: true, ID: 0, Name: "TAGLIST"}},
-				},
-			},
+				}},
 			{Element: RequirementServerCluster, Name: "Binding", ID: 0x001E, HasID: true, Conformance: Conformance{Text: "Simple & Client", Op: "&", Args: []Conformance{{Op: "name", Name: "Simple"}, {Op: "name", Name: "Client"}}}, Referent: Referent{Resolved: true, ID: 0x001E, Name: "Binding"}},
 			{Element: RequirementServerCluster, Name: "FixedLabel", ID: 0x0040, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0040, Name: "FixedLabel"}},
 			{Element: RequirementServerCluster, Name: "UserLabel", ID: 0x0041, HasID: true, Conformance: Conformance{Text: "O", Op: "O"}, Referent: Referent{Resolved: true, ID: 0x0041, Name: "UserLabel"}},
-		},
-	},
+		}},
 }
 
 // clusterFeatures lists every cluster's features in bit order. Generated
 // from the clusters' features in parity/schema.json.
 var clusterFeatures = map[uint32][]ClusterFeature{
-	0x0004: {{Name: "GN", Bit: 0}},                                                                                                                                                                                                                                                                                                        // Groups
-	0x0006: {{Name: "LT", Bit: 0}, {Name: "DF", Bit: 1}, {Name: "OFFONLY", Bit: 2}},                                                                                                                                                                                                                                                       // OnOff
-	0x0008: {{Name: "OO", Bit: 0}, {Name: "LT", Bit: 1}, {Name: "FQ", Bit: 2}},                                                                                                                                                                                                                                                            // LevelControl
-	0x001D: {{Name: "TAGLIST", Bit: 0}},                                                                                                                                                                                                                                                                                                   // Descriptor
-	0x001F: {{Name: "EXTS", Bit: 0}, {Name: "MNGD", Bit: 1}, {Name: "AUX", Bit: 2}},                                                                                                                                                                                                                                                       // AccessControl
-	0x002C: {{Name: "CALFMT", Bit: 0}},                                                                                                                                                                                                                                                                                                    // TimeFormatLocalization
-	0x002D: {{Name: "TEMP", Bit: 0}},                                                                                                                                                                                                                                                                                                      // UnitLocalization
-	0x002F: {{Name: "WIRED", Bit: 0}, {Name: "BAT", Bit: 1}, {Name: "RECHG", Bit: 2}, {Name: "REPLC", Bit: 3}},                                                                                                                                                                                                                            // PowerSource
-	0x0030: {{Name: "TC", Bit: 0}, {Name: "NR", Bit: 1}},                                                                                                                                                                                                                                                                                  // GeneralCommissioning
-	0x0031: {{Name: "WI", Bit: 0}, {Name: "TH", Bit: 1}, {Name: "ET", Bit: 2}},                                                                                                                                                                                                                                                            // NetworkCommissioning
-	0x0033: {{Name: "DMTEST", Bit: 0}},                                                                                                                                                                                                                                                                                                    // GeneralDiagnostics
-	0x0034: {{Name: "WTRMRK", Bit: 0}},                                                                                                                                                                                                                                                                                                    // SoftwareDiagnostics
-	0x0035: {{Name: "PKTCNT", Bit: 0}, {Name: "ERRCNT", Bit: 1}, {Name: "MLECNT", Bit: 2}, {Name: "MACCNT", Bit: 3}},                                                                                                                                                                                                                      // ThreadNetworkDiagnostics
-	0x0036: {{Name: "PKTCNT", Bit: 0}, {Name: "ERRCNT", Bit: 1}},                                                                                                                                                                                                                                                                          // WiFiNetworkDiagnostics
-	0x0037: {{Name: "PKTCNT", Bit: 0}, {Name: "ERRCNT", Bit: 1}},                                                                                                                                                                                                                                                                          // EthernetNetworkDiagnostics
-	0x0038: {{Name: "TZ", Bit: 0}, {Name: "NTPC", Bit: 1}, {Name: "NTPS", Bit: 2}, {Name: "TSC", Bit: 3}},                                                                                                                                                                                                                                 // TimeSynchronization
-	0x0039: {{Name: "BIS", Bit: 20}},                                                                                                                                                                                                                                                                                                      // BridgedDeviceBasicInformation
-	0x003B: {{Name: "LS", Bit: 0}, {Name: "MS", Bit: 1}, {Name: "MSR", Bit: 2}, {Name: "MSL", Bit: 3}, {Name: "MSM", Bit: 4}, {Name: "AS", Bit: 5}},                                                                                                                                                                                       // Switch
-	0x003C: {{Name: "BC", Bit: 0}},                                                                                                                                                                                                                                                                                                        // AdministratorCommissioning
-	0x003F: {{Name: "CS", Bit: 0}, {Name: "GCAST", Bit: 1}},                                                                                                                                                                                                                                                                               // GroupKeyManagement
-	0x0045: {{Name: "CHGEVENT", Bit: 0}},                                                                                                                                                                                                                                                                                                  // BooleanState
-	0x0046: {{Name: "CIP", Bit: 0}, {Name: "UAT", Bit: 1}, {Name: "LITS", Bit: 2}, {Name: "DSLS", Bit: 3}},                                                                                                                                                                                                                                // IcdManagement
-	0x0049: {{Name: "DEPONOFF", Bit: 0}},                                                                                                                                                                                                                                                                                                  // OvenMode
-	0x0050: {{Name: "DEPONOFF", Bit: 0}},                                                                                                                                                                                                                                                                                                  // ModeSelect
-	0x0051: {{Name: "DEPONOFF", Bit: 0}},                                                                                                                                                                                                                                                                                                  // LaundryWasherMode
-	0x0052: {{Name: "DEPONOFF", Bit: 0}},                                                                                                                                                                                                                                                                                                  // RefrigeratorAndTemperatureControlledCabinetMode
-	0x0053: {{Name: "SPIN", Bit: 0}, {Name: "RINSE", Bit: 1}},                                                                                                                                                                                                                                                                             // LaundryWasherControls
-	0x0054: {{Name: "DEPONOFF", Bit: 0}, {Name: "DIRECTMODECH", Bit: 20}},                                                                                                                                                                                                                                                                 // RvcRunMode
-	0x0055: {{Name: "DEPONOFF", Bit: 0}, {Name: "DIRECTMODECH", Bit: 20}},                                                                                                                                                                                                                                                                 // RvcCleanMode
-	0x0056: {{Name: "TN", Bit: 0}, {Name: "TL", Bit: 1}, {Name: "STEP", Bit: 2}},                                                                                                                                                                                                                                                          // TemperatureControl
-	0x0057: {{Name: "RESET", Bit: 0}},                                                                                                                                                                                                                                                                                                     // RefrigeratorAlarm
-	0x0059: {{Name: "DEPONOFF", Bit: 0}},                                                                                                                                                                                                                                                                                                  // DishwasherMode
-	0x005B: {{Name: "FAIR", Bit: 0}, {Name: "MOD", Bit: 1}, {Name: "VPOOR", Bit: 2}, {Name: "XPOOR", Bit: 3}},                                                                                                                                                                                                                             // AirQuality
-	0x005C: {{Name: "SMOKE", Bit: 0}, {Name: "CO", Bit: 1}},                                                                                                                                                                                                                                                                               // SmokeCoAlarm
-	0x005D: {{Name: "RESET", Bit: 0}},                                                                                                                                                                                                                                                                                                     // DishwasherAlarm
-	0x005E: {{Name: "DEPONOFF", Bit: 0}},                                                                                                                                                                                                                                                                                                  // MicrowaveOvenMode
-	0x005F: {{Name: "PWRNUM", Bit: 0}, {Name: "WATTS", Bit: 1}, {Name: "PWRLMTS", Bit: 2}},                                                                                                                                                                                                                                                // MicrowaveOvenControl
-	0x0062: {{Name: "SN", Bit: 0}},                                                                                                                                                                                                                                                                                                        // ScenesManagement
-	0x0064: {{Name: "RESET", Bit: 0}, {Name: "OVER", Bit: 20}, {Name: "UNDER", Bit: 21}, {Name: "MAJOR", Bit: 22}, {Name: "MINOR", Bit: 23}, {Name: "OCRIADJ", Bit: 24}, {Name: "OMAJADJ", Bit: 25}, {Name: "OMINADJ", Bit: 26}, {Name: "UMINADJ", Bit: 27}, {Name: "UMAJADJ", Bit: 28}, {Name: "UCRIADJ", Bit: 29}},                      // TemperatureAlarm
-	0x0065: {{Name: "LN", Bit: 0}, {Name: "SD", Bit: 1}, {Name: "PGA", Bit: 2}},                                                                                                                                                                                                                                                           // Groupcast
-	0x0071: {{Name: "CON", Bit: 0}, {Name: "WRN", Bit: 1}, {Name: "REP", Bit: 2}},                                                                                                                                                                                                                                                         // HepaFilterMonitoring
-	0x0072: {{Name: "CON", Bit: 0}, {Name: "WRN", Bit: 1}, {Name: "REP", Bit: 2}},                                                                                                                                                                                                                                                         // ActivatedCarbonFilterMonitoring
-	0x0079: {{Name: "CON", Bit: 0}, {Name: "WRN", Bit: 1}, {Name: "REP", Bit: 2}},                                                                                                                                                                                                                                                         // WaterTankLevelMonitoring
-	0x0080: {{Name: "VIS", Bit: 0}, {Name: "AUD", Bit: 1}, {Name: "SPRS", Bit: 2}, {Name: "SENSLVL", Bit: 3}, {Name: "FAULTEV", Bit: 4}},                                                                                                                                                                                                  // BooleanStateConfiguration
-	0x0081: {{Name: "TS", Bit: 0}, {Name: "LVL", Bit: 1}},                                                                                                                                                                                                                                                                                 // ValveConfigurationAndControl
-	0x0090: {{Name: "DIRC", Bit: 0}, {Name: "ALTC", Bit: 1}, {Name: "POLY", Bit: 2}, {Name: "HARM", Bit: 3}, {Name: "PWRQ", Bit: 4}},                                                                                                                                                                                                      // ElectricalPowerMeasurement
-	0x0091: {{Name: "IMPE", Bit: 0}, {Name: "EXPE", Bit: 1}, {Name: "CUME", Bit: 2}, {Name: "PERE", Bit: 3}, {Name: "APPE", Bit: 4}, {Name: "REAE", Bit: 5}},                                                                                                                                                                              // ElectricalEnergyMeasurement
-	0x0094: {{Name: "EM", Bit: 0}, {Name: "TP", Bit: 1}},                                                                                                                                                                                                                                                                                  // WaterHeaterManagement
-	0x0095: {{Name: "FORE", Bit: 0}},                                                                                                                                                                                                                                                                                                      // CommodityPrice
-	0x0097: {{Name: "CONF", Bit: 0}, {Name: "RESP", Bit: 1}, {Name: "RPLY", Bit: 2}, {Name: "PROT", Bit: 3}},                                                                                                                                                                                                                              // Messages
-	0x0098: {{Name: "PA", Bit: 0}, {Name: "PFR", Bit: 1}, {Name: "SFR", Bit: 2}, {Name: "STA", Bit: 3}, {Name: "PAU", Bit: 4}, {Name: "FA", Bit: 5}, {Name: "CON", Bit: 6}},                                                                                                                                                               // DeviceEnergyManagement
-	0x0099: {{Name: "PREF", Bit: 0}, {Name: "SOC", Bit: 1}, {Name: "PNC", Bit: 2}, {Name: "RFID", Bit: 3}, {Name: "V2X", Bit: 4}},                                                                                                                                                                                                         // EnergyEvse
-	0x009B: {{Name: "BALA", Bit: 0}, {Name: "LPMS", Bit: 1}},                                                                                                                                                                                                                                                                              // EnergyPreference
-	0x009C: {{Name: "NODE", Bit: 0}, {Name: "TREE", Bit: 1}, {Name: "SET", Bit: 2}, {Name: "DYPF", Bit: 3}},                                                                                                                                                                                                                               // PowerTopology
-	0x009D: {{Name: "DEPONOFF", Bit: 0}},                                                                                                                                                                                                                                                                                                  // EnergyEvseMode
-	0x009E: {{Name: "DEPONOFF", Bit: 0}},                                                                                                                                                                                                                                                                                                  // WaterHeaterMode
-	0x009F: {{Name: "DEPONOFF", Bit: 0}},                                                                                                                                                                                                                                                                                                  // DeviceEnergyManagementMode
-	0x00A0: {{Name: "FORE", Bit: 0}},                                                                                                                                                                                                                                                                                                      // ElectricalGridConditions
-	0x0101: {{Name: "PIN", Bit: 0}, {Name: "RID", Bit: 1}, {Name: "FGP", Bit: 2}, {Name: "WDSCH", Bit: 4}, {Name: "DPS", Bit: 5}, {Name: "FACE", Bit: 6}, {Name: "COTA", Bit: 7}, {Name: "USR", Bit: 8}, {Name: "YDSCH", Bit: 10}, {Name: "HDSCH", Bit: 11}, {Name: "UBOLT", Bit: 12}, {Name: "ALIRO", Bit: 13}, {Name: "ALBU", Bit: 14}}, // DoorLock
-	0x0102: {{Name: "LF", Bit: 0}, {Name: "TL", Bit: 1}, {Name: "PA_LF", Bit: 2}, {Name: "PA_TL", Bit: 4}},                                                                                                                                                                                                                                // WindowCovering
-	0x0104: {{Name: "PS", Bit: 0}, {Name: "LT", Bit: 1}, {Name: "IS", Bit: 2}, {Name: "SP", Bit: 3}, {Name: "VT", Bit: 4}, {Name: "PD", Bit: 5}, {Name: "CL", Bit: 6}, {Name: "PT", Bit: 7}, {Name: "MO", Bit: 8}},                                                                                                                        // ClosureControl
-	0x0105: {{Name: "PS", Bit: 0}, {Name: "LT", Bit: 1}, {Name: "UT", Bit: 2}, {Name: "LM", Bit: 3}, {Name: "SP", Bit: 4}, {Name: "TR", Bit: 5}, {Name: "RO", Bit: 6}, {Name: "MD", Bit: 7}},                                                                                                                                              // ClosureDimension
-	0x0150: {{Name: "SELRUN", Bit: 0}, {Name: "PROG", Bit: 1}, {Name: "MAPS", Bit: 2}},                                                                                                                                                                                                                                                    // ServiceArea
-	0x0200: {{Name: "PRSCONST", Bit: 0}, {Name: "PRSCOMP", Bit: 1}, {Name: "FLW", Bit: 2}, {Name: "SPD", Bit: 3}, {Name: "TEMP", Bit: 4}, {Name: "AUTO", Bit: 5}, {Name: "LOCAL", Bit: 6}},                                                                                                                                                // PumpConfigurationAndControl
-	0x0201: {{Name: "HEAT", Bit: 0}, {Name: "COOL", Bit: 1}, {Name: "OCC", Bit: 2}, {Name: "SB", Bit: 4}, {Name: "AUTO", Bit: 5}, {Name: "LTNE", Bit: 6}, {Name: "MSCH", Bit: 7}, {Name: "PRES", Bit: 8}, {Name: "TEVT", Bit: 9}, {Name: "TSUGGEST", Bit: 10}},                                                                            // Thermostat
-	0x0202: {{Name: "SPD", Bit: 0}, {Name: "AUT", Bit: 1}, {Name: "RCK", Bit: 2}, {Name: "WND", Bit: 3}, {Name: "STEP", Bit: 4}, {Name: "DIR", Bit: 5}},                                                                                                                                                                                   // FanControl
-	0x0300: {{Name: "HS", Bit: 0}, {Name: "EHUE", Bit: 1}, {Name: "CL", Bit: 2}, {Name: "XY", Bit: 3}, {Name: "CT", Bit: 4}},                                                                                                                                                                                                              // ColorControl
-	0x0403: {{Name: "EXT", Bit: 0}},                                                                                                                                                                                                                                                                                                       // PressureMeasurement
-	0x0406: {{Name: "OTHER", Bit: 0}, {Name: "PIR", Bit: 1}, {Name: "US", Bit: 2}, {Name: "PHY", Bit: 3}, {Name: "AIR", Bit: 4}, {Name: "RAD", Bit: 5}, {Name: "RFS", Bit: 6}, {Name: "VIS", Bit: 7}, {Name: "OCCEVENT", Bit: 9}},                                                                                                         // OccupancySensing
-	0x040C: {{Name: "MEA", Bit: 0}, {Name: "LEV", Bit: 1}, {Name: "MED", Bit: 2}, {Name: "CRI", Bit: 3}, {Name: "PEA", Bit: 4}, {Name: "AVG", Bit: 5}},                                                                                                                                                                                    // CarbonMonoxideConcentrationMeasurement
-	0x040D: {{Name: "MEA", Bit: 0}, {Name: "LEV", Bit: 1}, {Name: "MED", Bit: 2}, {Name: "CRI", Bit: 3}, {Name: "PEA", Bit: 4}, {Name: "AVG", Bit: 5}},                                                                                                                                                                                    // CarbonDioxideConcentrationMeasurement
-	0x0413: {{Name: "MEA", Bit: 0}, {Name: "LEV", Bit: 1}, {Name: "MED", Bit: 2}, {Name: "CRI", Bit: 3}, {Name: "PEA", Bit: 4}, {Name: "AVG", Bit: 5}},                                                                                                                                                                                    // NitrogenDioxideConcentrationMeasurement
-	0x0415: {{Name: "MEA", Bit: 0}, {Name: "LEV", Bit: 1}, {Name: "MED", Bit: 2}, {Name: "CRI", Bit: 3}, {Name: "PEA", Bit: 4}, {Name: "AVG", Bit: 5}},                                                                                                                                                                                    // OzoneConcentrationMeasurement
-	0x042A: {{Name: "MEA", Bit: 0}, {Name: "LEV", Bit: 1}, {Name: "MED", Bit: 2}, {Name: "CRI", Bit: 3}, {Name: "PEA", Bit: 4}, {Name: "AVG", Bit: 5}},                                                                                                                                                                                    // Pm25ConcentrationMeasurement
-	0x042B: {{Name: "MEA", Bit: 0}, {Name: "LEV", Bit: 1}, {Name: "MED", Bit: 2}, {Name: "CRI", Bit: 3}, {Name: "PEA", Bit: 4}, {Name: "AVG", Bit: 5}},                                                                                                                                                                                    // FormaldehydeConcentrationMeasurement
-	0x042C: {{Name: "MEA", Bit: 0}, {Name: "LEV", Bit: 1}, {Name: "MED", Bit: 2}, {Name: "CRI", Bit: 3}, {Name: "PEA", Bit: 4}, {Name: "AVG", Bit: 5}},                                                                                                                                                                                    // Pm1ConcentrationMeasurement
-	0x042D: {{Name: "MEA", Bit: 0}, {Name: "LEV", Bit: 1}, {Name: "MED", Bit: 2}, {Name: "CRI", Bit: 3}, {Name: "PEA", Bit: 4}, {Name: "AVG", Bit: 5}},                                                                                                                                                                                    // Pm10ConcentrationMeasurement
-	0x042E: {{Name: "MEA", Bit: 0}, {Name: "LEV", Bit: 1}, {Name: "MED", Bit: 2}, {Name: "CRI", Bit: 3}, {Name: "PEA", Bit: 4}, {Name: "AVG", Bit: 5}},                                                                                                                                                                                    // TotalVolatileOrganicCompoundsConcentrationMeasurement
-	0x042F: {{Name: "MEA", Bit: 0}, {Name: "LEV", Bit: 1}, {Name: "MED", Bit: 2}, {Name: "CRI", Bit: 3}, {Name: "PEA", Bit: 4}, {Name: "AVG", Bit: 5}},                                                                                                                                                                                    // RadonConcentrationMeasurement
-	0x0431: {{Name: "HA", Bit: 0}, {Name: "OC", Bit: 1}, {Name: "OI", Bit: 2}, {Name: "AUD", Bit: 3}, {Name: "PRED", Bit: 4}},                                                                                                                                                                                                             // AmbientContextSensing
-	0x0452: {{Name: "PC", Bit: 0}},                                                                                                                                                                                                                                                                                                        // ThreadBorderRouterManagement
-	0x0504: {{Name: "CL", Bit: 0}, {Name: "LI", Bit: 1}, {Name: "EG", Bit: 2}, {Name: "RP", Bit: 3}},                                                                                                                                                                                                                                      // Channel
-	0x0506: {{Name: "AS", Bit: 0}, {Name: "VS", Bit: 1}, {Name: "TT", Bit: 2}, {Name: "AT", Bit: 3}, {Name: "AA", Bit: 4}},                                                                                                                                                                                                                // MediaPlayback
-	0x0507: {{Name: "NU", Bit: 0}},                                                                                                                                                                                                                                                                                                        // MediaInput
-	0x0509: {{Name: "NV", Bit: 0}, {Name: "LK", Bit: 1}, {Name: "NK", Bit: 2}},                                                                                                                                                                                                                                                            // KeypadInput
-	0x050A: {{Name: "CS", Bit: 0}, {Name: "UP", Bit: 1}, {Name: "AS", Bit: 2}, {Name: "TT", Bit: 3}, {Name: "AT", Bit: 4}},                                                                                                                                                                                                                // ContentLauncher
-	0x050B: {{Name: "NU", Bit: 0}},                                                                                                                                                                                                                                                                                                        // AudioOutput
-	0x050C: {{Name: "AP", Bit: 0}},                                                                                                                                                                                                                                                                                                        // ApplicationLauncher
-	0x050F: {{Name: "ST", Bit: 0}, {Name: "PM", Bit: 1}, {Name: "BU", Bit: 2}, {Name: "OCR", Bit: 3}, {Name: "SCR", Bit: 4}, {Name: "BC", Bit: 5}, {Name: "BA", Bit: 6}, {Name: "BTW", Bit: 7}},                                                                                                                                           // ContentControl
-	0x0550: {{Name: "TWODCART", Bit: 0}, {Name: "PERZONESENS", Bit: 1}, {Name: "USERDEFINED", Bit: 2}, {Name: "FOCUSZONES", Bit: 3}},                                                                                                                                                                                                      // ZoneManagement
-	0x0551: {{Name: "ADO", Bit: 0}, {Name: "VDO", Bit: 1}, {Name: "SNP", Bit: 2}, {Name: "PRIV", Bit: 3}, {Name: "SPKR", Bit: 4}, {Name: "ICTL", Bit: 5}, {Name: "WMARK", Bit: 6}, {Name: "OSD", Bit: 7}, {Name: "STOR", Bit: 8}, {Name: "HDR", Bit: 9}, {Name: "NV", Bit: 10}},                                                           // CameraAvStreamManagement
-	0x0552: {{Name: "DPTZ", Bit: 0}, {Name: "MPAN", Bit: 1}, {Name: "MTILT", Bit: 2}, {Name: "MZOOM", Bit: 3}, {Name: "MPRESETS", Bit: 4}},                                                                                                                                                                                                // CameraAvSettingsUserLevelManagement
-	0x0553: {{Name: "METADATA", Bit: 0}},                                                                                                                                                                                                                                                                                                  // WebRtcTransportProvider
-	0x0555: {{Name: "PERZONESENS", Bit: 0}, {Name: "METADATA", Bit: 1}},                                                                                                                                                                                                                                                                   // PushAvStreamTransport
-	0x0700: {{Name: "PRICE", Bit: 0}, {Name: "FCRED", Bit: 1}, {Name: "AUXLD", Bit: 2}, {Name: "PEAKP", Bit: 3}, {Name: "PWRTHLD", Bit: 4}, {Name: "RNDM", Bit: 5}},                                                                                                                                                                       // CommodityTariff
-	0x0B06: {{Name: "PWRTHLD", Bit: 0}},                                                                                                                                                                                                                                                                                                   // MeterIdentification
+	0x0004: {{Name: "GN", Bit: 0, Title: "GroupNames"}},                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              // Groups
+	0x0006: {{Name: "LT", Bit: 0, Title: "Lighting"}, {Name: "DF", Bit: 1, Title: "DeadFrontBehavior"}, {Name: "OFFONLY", Bit: 2, Title: "OffOnly"}},                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 // OnOff
+	0x0008: {{Name: "OO", Bit: 0, Title: "OnOff"}, {Name: "LT", Bit: 1, Title: "Lighting"}, {Name: "FQ", Bit: 2, Title: "Frequency"}},                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                // LevelControl
+	0x001D: {{Name: "TAGLIST", Bit: 0, Title: "TagList"}},                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            // Descriptor
+	0x001F: {{Name: "EXTS", Bit: 0, Title: "Extension"}, {Name: "MNGD", Bit: 1, Title: "ManagedDevice"}, {Name: "AUX", Bit: 2, Title: "Auxiliary"}},                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  // AccessControl
+	0x002C: {{Name: "CALFMT", Bit: 0, Title: "CalendarFormat"}},                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      // TimeFormatLocalization
+	0x002D: {{Name: "TEMP", Bit: 0, Title: "TemperatureUnit"}},                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       // UnitLocalization
+	0x002F: {{Name: "WIRED", Bit: 0, Title: "Wired"}, {Name: "BAT", Bit: 1, Title: "Battery"}, {Name: "RECHG", Bit: 2, Title: "Rechargeable"}, {Name: "REPLC", Bit: 3, Title: "Replaceable"}},                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        // PowerSource
+	0x0030: {{Name: "TC", Bit: 0, Title: "TermsAndConditions"}, {Name: "NR", Bit: 1, Title: "NetworkRecovery"}},                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      // GeneralCommissioning
+	0x0031: {{Name: "WI", Bit: 0, Title: "WiFiNetworkInterface"}, {Name: "TH", Bit: 1, Title: "ThreadNetworkInterface"}, {Name: "ET", Bit: 2, Title: "EthernetNetworkInterface"}},                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    // NetworkCommissioning
+	0x0033: {{Name: "DMTEST", Bit: 0, Title: "DataModelTest"}},                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       // GeneralDiagnostics
+	0x0034: {{Name: "WTRMRK", Bit: 0, Title: "Watermarks"}},                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          // SoftwareDiagnostics
+	0x0035: {{Name: "PKTCNT", Bit: 0, Title: "PacketCounts"}, {Name: "ERRCNT", Bit: 1, Title: "ErrorCounts"}, {Name: "MLECNT", Bit: 2, Title: "MleCounts"}, {Name: "MACCNT", Bit: 3, Title: "MacCounts"}},                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            // ThreadNetworkDiagnostics
+	0x0036: {{Name: "PKTCNT", Bit: 0, Title: "PacketCounts"}, {Name: "ERRCNT", Bit: 1, Title: "ErrorCounts"}},                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        // WiFiNetworkDiagnostics
+	0x0037: {{Name: "PKTCNT", Bit: 0, Title: "PacketCounts"}, {Name: "ERRCNT", Bit: 1, Title: "ErrorCounts"}},                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        // EthernetNetworkDiagnostics
+	0x0038: {{Name: "TZ", Bit: 0, Title: "TimeZone"}, {Name: "NTPC", Bit: 1, Title: "NtpClient"}, {Name: "NTPS", Bit: 2, Title: "NtpServer"}, {Name: "TSC", Bit: 3, Title: "TimeSyncClient"}},                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        // TimeSynchronization
+	0x0039: {{Name: "BIS", Bit: 20, Title: "BridgedIcdSupport"}},                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     // BridgedDeviceBasicInformation
+	0x003B: {{Name: "LS", Bit: 0, Title: "LatchingSwitch"}, {Name: "MS", Bit: 1, Title: "MomentarySwitch"}, {Name: "MSR", Bit: 2, Title: "MomentarySwitchRelease"}, {Name: "MSL", Bit: 3, Title: "MomentarySwitchLongPress"}, {Name: "MSM", Bit: 4, Title: "MomentarySwitchMultiPress"}, {Name: "AS", Bit: 5, Title: "ActionSwitch"}},                                                                                                                                                                                                                                                                                                                                                                // Switch
+	0x003C: {{Name: "BC", Bit: 0, Title: "Basic"}},                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   // AdministratorCommissioning
+	0x003F: {{Name: "CS", Bit: 0, Title: "CacheAndSync"}, {Name: "GCAST", Bit: 1, Title: "Groupcast"}},                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               // GroupKeyManagement
+	0x0045: {{Name: "CHGEVENT", Bit: 0, Title: "ChangeEvent"}},                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       // BooleanState
+	0x0046: {{Name: "CIP", Bit: 0, Title: "CheckInProtocolSupport"}, {Name: "UAT", Bit: 1, Title: "UserActiveModeTrigger"}, {Name: "LITS", Bit: 2, Title: "LongIdleTimeSupport"}, {Name: "DSLS", Bit: 3, Title: "DynamicSitLitSupport"}},                                                                                                                                                                                                                                                                                                                                                                                                                                                             // IcdManagement
+	0x0049: {{Name: "DEPONOFF", Bit: 0, Title: "OnOff"}},                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             // OvenMode
+	0x0050: {{Name: "DEPONOFF", Bit: 0, Title: "OnOff"}},                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             // ModeSelect
+	0x0051: {{Name: "DEPONOFF", Bit: 0, Title: "OnOff"}},                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             // LaundryWasherMode
+	0x0052: {{Name: "DEPONOFF", Bit: 0, Title: "OnOff"}},                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             // RefrigeratorAndTemperatureControlledCabinetMode
+	0x0053: {{Name: "SPIN", Bit: 0, Title: "Spin"}, {Name: "RINSE", Bit: 1, Title: "Rinse"}},                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         // LaundryWasherControls
+	0x0054: {{Name: "DEPONOFF", Bit: 0, Title: "OnOff"}, {Name: "DIRECTMODECH", Bit: 20, Title: "DirectModeChange"}},                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 // RvcRunMode
+	0x0055: {{Name: "DEPONOFF", Bit: 0, Title: "OnOff"}, {Name: "DIRECTMODECH", Bit: 20, Title: "DirectModeChange"}},                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 // RvcCleanMode
+	0x0056: {{Name: "TN", Bit: 0, Title: "TemperatureNumber"}, {Name: "TL", Bit: 1, Title: "TemperatureLevel"}, {Name: "STEP", Bit: 2, Title: "TemperatureStep"}},                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    // TemperatureControl
+	0x0057: {{Name: "RESET", Bit: 0, Title: "Reset"}},                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                // RefrigeratorAlarm
+	0x0059: {{Name: "DEPONOFF", Bit: 0, Title: "OnOff"}},                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             // DishwasherMode
+	0x005B: {{Name: "FAIR", Bit: 0, Title: "Fair"}, {Name: "MOD", Bit: 1, Title: "Moderate"}, {Name: "VPOOR", Bit: 2, Title: "VeryPoor"}, {Name: "XPOOR", Bit: 3, Title: "ExtremelyPoor"}},                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           // AirQuality
+	0x005C: {{Name: "SMOKE", Bit: 0, Title: "SmokeAlarm"}, {Name: "CO", Bit: 1, Title: "CoAlarm"}},                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   // SmokeCoAlarm
+	0x005D: {{Name: "RESET", Bit: 0, Title: "Reset"}},                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                // DishwasherAlarm
+	0x005E: {{Name: "DEPONOFF", Bit: 0, Title: "OnOff"}},                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             // MicrowaveOvenMode
+	0x005F: {{Name: "PWRNUM", Bit: 0, Title: "PowerAsNumber"}, {Name: "WATTS", Bit: 1, Title: "PowerInWatts"}, {Name: "PWRLMTS", Bit: 2, Title: "PowerNumberLimits"}},                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                // MicrowaveOvenControl
+	0x0062: {{Name: "SN", Bit: 0, Title: "SceneNames"}},                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              // ScenesManagement
+	0x0064: {{Name: "RESET", Bit: 0, Title: "Reset"}, {Name: "OVER", Bit: 20, Title: "OverTemperature"}, {Name: "UNDER", Bit: 21, Title: "UnderTemperature"}, {Name: "MAJOR", Bit: 22, Title: "MajorThreshold"}, {Name: "MINOR", Bit: 23, Title: "MinorThreshold"}, {Name: "OCRIADJ", Bit: 24, Title: "OverCriticalAdjustable"}, {Name: "OMAJADJ", Bit: 25, Title: "OverMajorAdjustable"}, {Name: "OMINADJ", Bit: 26, Title: "OverMinorAdjustable"}, {Name: "UMINADJ", Bit: 27, Title: "UnderMinorAdjustable"}, {Name: "UMAJADJ", Bit: 28, Title: "UnderMajorAdjustable"}, {Name: "UCRIADJ", Bit: 29, Title: "UnderCriticalAdjustable"}},                                                             // TemperatureAlarm
+	0x0065: {{Name: "LN", Bit: 0, Title: "Listener"}, {Name: "SD", Bit: 1, Title: "Sender"}, {Name: "PGA", Bit: 2, Title: "PerGroup"}},                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               // Groupcast
+	0x0071: {{Name: "CON", Bit: 0, Title: "Condition"}, {Name: "WRN", Bit: 1, Title: "Warning"}, {Name: "REP", Bit: 2, Title: "ReplacementProductList"}},                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             // HepaFilterMonitoring
+	0x0072: {{Name: "CON", Bit: 0, Title: "Condition"}, {Name: "WRN", Bit: 1, Title: "Warning"}, {Name: "REP", Bit: 2, Title: "ReplacementProductList"}},                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             // ActivatedCarbonFilterMonitoring
+	0x0079: {{Name: "CON", Bit: 0, Title: "Condition"}, {Name: "WRN", Bit: 1, Title: "Warning"}, {Name: "REP", Bit: 2, Title: "ReplacementProductList"}},                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             // WaterTankLevelMonitoring
+	0x0080: {{Name: "VIS", Bit: 0, Title: "Visual"}, {Name: "AUD", Bit: 1, Title: "Audible"}, {Name: "SPRS", Bit: 2, Title: "AlarmSuppress"}, {Name: "SENSLVL", Bit: 3, Title: "SensitivityLevel"}, {Name: "FAULTEV", Bit: 4, Title: "FaultEvents"}},                                                                                                                                                                                                                                                                                                                                                                                                                                                 // BooleanStateConfiguration
+	0x0081: {{Name: "TS", Bit: 0, Title: "TimeSync"}, {Name: "LVL", Bit: 1, Title: "Level"}},                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         // ValveConfigurationAndControl
+	0x0090: {{Name: "DIRC", Bit: 0, Title: "DirectCurrent"}, {Name: "ALTC", Bit: 1, Title: "AlternatingCurrent"}, {Name: "POLY", Bit: 2, Title: "PolyphasePower"}, {Name: "HARM", Bit: 3, Title: "Harmonics"}, {Name: "PWRQ", Bit: 4, Title: "PowerQuality"}},                                                                                                                                                                                                                                                                                                                                                                                                                                        // ElectricalPowerMeasurement
+	0x0091: {{Name: "IMPE", Bit: 0, Title: "ImportedEnergy"}, {Name: "EXPE", Bit: 1, Title: "ExportedEnergy"}, {Name: "CUME", Bit: 2, Title: "CumulativeEnergy"}, {Name: "PERE", Bit: 3, Title: "PeriodicEnergy"}, {Name: "APPE", Bit: 4, Title: "ApparentEnergy"}, {Name: "REAE", Bit: 5, Title: "ReactiveEnergy"}},                                                                                                                                                                                                                                                                                                                                                                                 // ElectricalEnergyMeasurement
+	0x0094: {{Name: "EM", Bit: 0, Title: "EnergyManagement"}, {Name: "TP", Bit: 1, Title: "TankPercent"}},                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            // WaterHeaterManagement
+	0x0095: {{Name: "FORE", Bit: 0, Title: "Forecasting"}},                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           // CommodityPrice
+	0x0097: {{Name: "CONF", Bit: 0, Title: "ReceivedConfirmation"}, {Name: "RESP", Bit: 1, Title: "ConfirmationResponse"}, {Name: "RPLY", Bit: 2, Title: "ConfirmationReply"}, {Name: "PROT", Bit: 3, Title: "ProtectedMessages"}},                                                                                                                                                                                                                                                                                                                                                                                                                                                                   // Messages
+	0x0098: {{Name: "PA", Bit: 0, Title: "PowerAdjustment"}, {Name: "PFR", Bit: 1, Title: "PowerForecastReporting"}, {Name: "SFR", Bit: 2, Title: "StateForecastReporting"}, {Name: "STA", Bit: 3, Title: "StartTimeAdjustment"}, {Name: "PAU", Bit: 4, Title: "Pausable"}, {Name: "FA", Bit: 5, Title: "ForecastAdjustment"}, {Name: "CON", Bit: 6, Title: "ConstraintBasedAdjustment"}},                                                                                                                                                                                                                                                                                                            // DeviceEnergyManagement
+	0x0099: {{Name: "PREF", Bit: 0, Title: "ChargingPreferences"}, {Name: "SOC", Bit: 1, Title: "SoCReporting"}, {Name: "PNC", Bit: 2, Title: "PlugAndCharge"}, {Name: "RFID", Bit: 3, Title: "Rfid"}, {Name: "V2X", Bit: 4, Title: "V2X"}},                                                                                                                                                                                                                                                                                                                                                                                                                                                          // EnergyEvse
+	0x009B: {{Name: "BALA", Bit: 0, Title: "EnergyBalance"}, {Name: "LPMS", Bit: 1, Title: "LowPowerModeSensitivity"}},                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               // EnergyPreference
+	0x009C: {{Name: "NODE", Bit: 0, Title: "NodeTopology"}, {Name: "TREE", Bit: 1, Title: "TreeTopology"}, {Name: "SET", Bit: 2, Title: "SetTopology"}, {Name: "DYPF", Bit: 3, Title: "DynamicPowerFlow"}},                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           // PowerTopology
+	0x009D: {{Name: "DEPONOFF", Bit: 0, Title: "OnOff"}},                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             // EnergyEvseMode
+	0x009E: {{Name: "DEPONOFF", Bit: 0, Title: "OnOff"}},                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             // WaterHeaterMode
+	0x009F: {{Name: "DEPONOFF", Bit: 0, Title: "OnOff"}},                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             // DeviceEnergyManagementMode
+	0x00A0: {{Name: "FORE", Bit: 0, Title: "Forecasting"}},                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           // ElectricalGridConditions
+	0x0101: {{Name: "PIN", Bit: 0, Title: "PinCredential"}, {Name: "RID", Bit: 1, Title: "RfidCredential"}, {Name: "FGP", Bit: 2, Title: "FingerCredentials"}, {Name: "WDSCH", Bit: 4, Title: "WeekDayAccessSchedules"}, {Name: "DPS", Bit: 5, Title: "DoorPositionSensor"}, {Name: "FACE", Bit: 6, Title: "FaceCredentials"}, {Name: "COTA", Bit: 7, Title: "CredentialOverTheAirAccess"}, {Name: "USR", Bit: 8, Title: "User"}, {Name: "YDSCH", Bit: 10, Title: "YearDayAccessSchedules"}, {Name: "HDSCH", Bit: 11, Title: "HolidaySchedules"}, {Name: "UBOLT", Bit: 12, Title: "Unbolting"}, {Name: "ALIRO", Bit: 13, Title: "AliroProvisioning"}, {Name: "ALBU", Bit: 14, Title: "AliroBleuwb"}}, // DoorLock
+	0x0102: {{Name: "LF", Bit: 0, Title: "Lift"}, {Name: "TL", Bit: 1, Title: "Tilt"}, {Name: "PA_LF", Bit: 2, Title: "PositionAwareLift"}, {Name: "PA_TL", Bit: 4, Title: "PositionAwareTilt"}},                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     // WindowCovering
+	0x0104: {{Name: "PS", Bit: 0, Title: "Positioning"}, {Name: "LT", Bit: 1, Title: "MotionLatching"}, {Name: "IS", Bit: 2, Title: "Instantaneous"}, {Name: "SP", Bit: 3, Title: "Speed"}, {Name: "VT", Bit: 4, Title: "Ventilation"}, {Name: "PD", Bit: 5, Title: "Pedestrian"}, {Name: "CL", Bit: 6, Title: "Calibration"}, {Name: "PT", Bit: 7, Title: "Protection"}, {Name: "MO", Bit: 8, Title: "ManuallyOperable"}},                                                                                                                                                                                                                                                                           // ClosureControl
+	0x0105: {{Name: "PS", Bit: 0, Title: "Positioning"}, {Name: "LT", Bit: 1, Title: "MotionLatching"}, {Name: "UT", Bit: 2, Title: "Unit"}, {Name: "LM", Bit: 3, Title: "Limitation"}, {Name: "SP", Bit: 4, Title: "Speed"}, {Name: "TR", Bit: 5, Title: "Translation"}, {Name: "RO", Bit: 6, Title: "Rotation"}, {Name: "MD", Bit: 7, Title: "Modulation"}},                                                                                                                                                                                                                                                                                                                                        // ClosureDimension
+	0x0150: {{Name: "SELRUN", Bit: 0, Title: "SelectWhileRunning"}, {Name: "PROG", Bit: 1, Title: "ProgressReporting"}, {Name: "MAPS", Bit: 2, Title: "Maps"}},                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       // ServiceArea
+	0x0200: {{Name: "PRSCONST", Bit: 0, Title: "ConstantPressure"}, {Name: "PRSCOMP", Bit: 1, Title: "CompensatedPressure"}, {Name: "FLW", Bit: 2, Title: "ConstantFlow"}, {Name: "SPD", Bit: 3, Title: "ConstantSpeed"}, {Name: "TEMP", Bit: 4, Title: "ConstantTemperature"}, {Name: "AUTO", Bit: 5, Title: "Automatic"}, {Name: "LOCAL", Bit: 6, Title: "LocalOperation"}},                                                                                                                                                                                                                                                                                                                        // PumpConfigurationAndControl
+	0x0201: {{Name: "HEAT", Bit: 0, Title: "Heating"}, {Name: "COOL", Bit: 1, Title: "Cooling"}, {Name: "OCC", Bit: 2, Title: "Occupancy"}, {Name: "SB", Bit: 4, Title: "Setback"}, {Name: "AUTO", Bit: 5, Title: "AutoMode"}, {Name: "LTNE", Bit: 6, Title: "LocalTemperatureNotExposed"}, {Name: "MSCH", Bit: 7, Title: "MatterScheduleConfiguration"}, {Name: "PRES", Bit: 8, Title: "Presets"}, {Name: "TEVT", Bit: 9, Title: "Events"}, {Name: "TSUGGEST", Bit: 10, Title: "ThermostatSuggestions"}},                                                                                                                                                                                            // Thermostat
+	0x0202: {{Name: "SPD", Bit: 0, Title: "MultiSpeed"}, {Name: "AUT", Bit: 1, Title: "Auto"}, {Name: "RCK", Bit: 2, Title: "Rocking"}, {Name: "WND", Bit: 3, Title: "Wind"}, {Name: "STEP", Bit: 4, Title: "Step"}, {Name: "DIR", Bit: 5, Title: "AirflowDirection"}},                                                                                                                                                                                                                                                                                                                                                                                                                               // FanControl
+	0x0300: {{Name: "HS", Bit: 0, Title: "HueSaturation"}, {Name: "EHUE", Bit: 1, Title: "EnhancedHue"}, {Name: "CL", Bit: 2, Title: "ColorLoop"}, {Name: "XY", Bit: 3, Title: "Xy"}, {Name: "CT", Bit: 4, Title: "ColorTemperature"}},                                                                                                                                                                                                                                                                                                                                                                                                                                                               // ColorControl
+	0x0403: {{Name: "EXT", Bit: 0, Title: "Extended"}},                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               // PressureMeasurement
+	0x0406: {{Name: "OTHER", Bit: 0, Title: "Other"}, {Name: "PIR", Bit: 1, Title: "PassiveInfrared"}, {Name: "US", Bit: 2, Title: "Ultrasonic"}, {Name: "PHY", Bit: 3, Title: "PhysicalContact"}, {Name: "AIR", Bit: 4, Title: "ActiveInfrared"}, {Name: "RAD", Bit: 5, Title: "Radar"}, {Name: "RFS", Bit: 6, Title: "RfSensing"}, {Name: "VIS", Bit: 7, Title: "Vision"}, {Name: "OCCEVENT", Bit: 9, Title: "OccupancyEvent"}},                                                                                                                                                                                                                                                                    // OccupancySensing
+	0x040C: {{Name: "MEA", Bit: 0, Title: "NumericMeasurement"}, {Name: "LEV", Bit: 1, Title: "LevelIndication"}, {Name: "MED", Bit: 2, Title: "MediumLevel"}, {Name: "CRI", Bit: 3, Title: "CriticalLevel"}, {Name: "PEA", Bit: 4, Title: "PeakMeasurement"}, {Name: "AVG", Bit: 5, Title: "AverageMeasurement"}},                                                                                                                                                                                                                                                                                                                                                                                   // CarbonMonoxideConcentrationMeasurement
+	0x040D: {{Name: "MEA", Bit: 0, Title: "NumericMeasurement"}, {Name: "LEV", Bit: 1, Title: "LevelIndication"}, {Name: "MED", Bit: 2, Title: "MediumLevel"}, {Name: "CRI", Bit: 3, Title: "CriticalLevel"}, {Name: "PEA", Bit: 4, Title: "PeakMeasurement"}, {Name: "AVG", Bit: 5, Title: "AverageMeasurement"}},                                                                                                                                                                                                                                                                                                                                                                                   // CarbonDioxideConcentrationMeasurement
+	0x0413: {{Name: "MEA", Bit: 0, Title: "NumericMeasurement"}, {Name: "LEV", Bit: 1, Title: "LevelIndication"}, {Name: "MED", Bit: 2, Title: "MediumLevel"}, {Name: "CRI", Bit: 3, Title: "CriticalLevel"}, {Name: "PEA", Bit: 4, Title: "PeakMeasurement"}, {Name: "AVG", Bit: 5, Title: "AverageMeasurement"}},                                                                                                                                                                                                                                                                                                                                                                                   // NitrogenDioxideConcentrationMeasurement
+	0x0415: {{Name: "MEA", Bit: 0, Title: "NumericMeasurement"}, {Name: "LEV", Bit: 1, Title: "LevelIndication"}, {Name: "MED", Bit: 2, Title: "MediumLevel"}, {Name: "CRI", Bit: 3, Title: "CriticalLevel"}, {Name: "PEA", Bit: 4, Title: "PeakMeasurement"}, {Name: "AVG", Bit: 5, Title: "AverageMeasurement"}},                                                                                                                                                                                                                                                                                                                                                                                   // OzoneConcentrationMeasurement
+	0x042A: {{Name: "MEA", Bit: 0, Title: "NumericMeasurement"}, {Name: "LEV", Bit: 1, Title: "LevelIndication"}, {Name: "MED", Bit: 2, Title: "MediumLevel"}, {Name: "CRI", Bit: 3, Title: "CriticalLevel"}, {Name: "PEA", Bit: 4, Title: "PeakMeasurement"}, {Name: "AVG", Bit: 5, Title: "AverageMeasurement"}},                                                                                                                                                                                                                                                                                                                                                                                   // Pm25ConcentrationMeasurement
+	0x042B: {{Name: "MEA", Bit: 0, Title: "NumericMeasurement"}, {Name: "LEV", Bit: 1, Title: "LevelIndication"}, {Name: "MED", Bit: 2, Title: "MediumLevel"}, {Name: "CRI", Bit: 3, Title: "CriticalLevel"}, {Name: "PEA", Bit: 4, Title: "PeakMeasurement"}, {Name: "AVG", Bit: 5, Title: "AverageMeasurement"}},                                                                                                                                                                                                                                                                                                                                                                                   // FormaldehydeConcentrationMeasurement
+	0x042C: {{Name: "MEA", Bit: 0, Title: "NumericMeasurement"}, {Name: "LEV", Bit: 1, Title: "LevelIndication"}, {Name: "MED", Bit: 2, Title: "MediumLevel"}, {Name: "CRI", Bit: 3, Title: "CriticalLevel"}, {Name: "PEA", Bit: 4, Title: "PeakMeasurement"}, {Name: "AVG", Bit: 5, Title: "AverageMeasurement"}},                                                                                                                                                                                                                                                                                                                                                                                   // Pm1ConcentrationMeasurement
+	0x042D: {{Name: "MEA", Bit: 0, Title: "NumericMeasurement"}, {Name: "LEV", Bit: 1, Title: "LevelIndication"}, {Name: "MED", Bit: 2, Title: "MediumLevel"}, {Name: "CRI", Bit: 3, Title: "CriticalLevel"}, {Name: "PEA", Bit: 4, Title: "PeakMeasurement"}, {Name: "AVG", Bit: 5, Title: "AverageMeasurement"}},                                                                                                                                                                                                                                                                                                                                                                                   // Pm10ConcentrationMeasurement
+	0x042E: {{Name: "MEA", Bit: 0, Title: "NumericMeasurement"}, {Name: "LEV", Bit: 1, Title: "LevelIndication"}, {Name: "MED", Bit: 2, Title: "MediumLevel"}, {Name: "CRI", Bit: 3, Title: "CriticalLevel"}, {Name: "PEA", Bit: 4, Title: "PeakMeasurement"}, {Name: "AVG", Bit: 5, Title: "AverageMeasurement"}},                                                                                                                                                                                                                                                                                                                                                                                   // TotalVolatileOrganicCompoundsConcentrationMeasurement
+	0x042F: {{Name: "MEA", Bit: 0, Title: "NumericMeasurement"}, {Name: "LEV", Bit: 1, Title: "LevelIndication"}, {Name: "MED", Bit: 2, Title: "MediumLevel"}, {Name: "CRI", Bit: 3, Title: "CriticalLevel"}, {Name: "PEA", Bit: 4, Title: "PeakMeasurement"}, {Name: "AVG", Bit: 5, Title: "AverageMeasurement"}},                                                                                                                                                                                                                                                                                                                                                                                   // RadonConcentrationMeasurement
+	0x0431: {{Name: "HA", Bit: 0, Title: "HumanActivity"}, {Name: "OC", Bit: 1, Title: "ObjectCounting"}, {Name: "OI", Bit: 2, Title: "ObjectIdentification"}, {Name: "AUD", Bit: 3, Title: "SoundIdentification"}, {Name: "PRED", Bit: 4, Title: "PredictedActivity"}},                                                                                                                                                                                                                                                                                                                                                                                                                              // AmbientContextSensing
+	0x0452: {{Name: "PC", Bit: 0, Title: "PanChange"}},                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               // ThreadBorderRouterManagement
+	0x0504: {{Name: "CL", Bit: 0, Title: "ChannelList"}, {Name: "LI", Bit: 1, Title: "LineupInfo"}, {Name: "EG", Bit: 2, Title: "ElectronicGuide"}, {Name: "RP", Bit: 3, Title: "RecordProgram"}},                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    // Channel
+	0x0506: {{Name: "AS", Bit: 0, Title: "AdvancedSeek"}, {Name: "VS", Bit: 1, Title: "VariableSpeed"}, {Name: "TT", Bit: 2, Title: "TextTracks"}, {Name: "AT", Bit: 3, Title: "AudioTracks"}, {Name: "AA", Bit: 4, Title: "AudioAdvance"}},                                                                                                                                                                                                                                                                                                                                                                                                                                                          // MediaPlayback
+	0x0507: {{Name: "NU", Bit: 0, Title: "NameUpdates"}},                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             // MediaInput
+	0x0509: {{Name: "NV", Bit: 0, Title: "NavigationKeyCodes"}, {Name: "LK", Bit: 1, Title: "LocationKeys"}, {Name: "NK", Bit: 2, Title: "NumberKeys"}},                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              // KeypadInput
+	0x050A: {{Name: "CS", Bit: 0, Title: "ContentSearch"}, {Name: "UP", Bit: 1, Title: "UrlPlayback"}, {Name: "AS", Bit: 2, Title: "AdvancedSeek"}, {Name: "TT", Bit: 3, Title: "TextTracks"}, {Name: "AT", Bit: 4, Title: "AudioTracks"}},                                                                                                                                                                                                                                                                                                                                                                                                                                                           // ContentLauncher
+	0x050B: {{Name: "NU", Bit: 0, Title: "NameUpdates"}},                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             // AudioOutput
+	0x050C: {{Name: "AP", Bit: 0, Title: "ApplicationPlatform"}},                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     // ApplicationLauncher
+	0x050F: {{Name: "ST", Bit: 0, Title: "ScreenTime"}, {Name: "PM", Bit: 1, Title: "PinManagement"}, {Name: "BU", Bit: 2, Title: "BlockUnrated"}, {Name: "OCR", Bit: 3, Title: "OnDemandContentRating"}, {Name: "SCR", Bit: 4, Title: "ScheduledContentRating"}, {Name: "BC", Bit: 5, Title: "BlockChannels"}, {Name: "BA", Bit: 6, Title: "BlockApplications"}, {Name: "BTW", Bit: 7, Title: "BlockContentTimeWindow"}},                                                                                                                                                                                                                                                                            // ContentControl
+	0x0550: {{Name: "TWODCART", Bit: 0, Title: "TwoDimensionalCartesianZone"}, {Name: "PERZONESENS", Bit: 1, Title: "PerZoneSensitivity"}, {Name: "USERDEFINED", Bit: 2, Title: "UserDefined"}, {Name: "FOCUSZONES", Bit: 3, Title: "FocusZones"}},                                                                                                                                                                                                                                                                                                                                                                                                                                                   // ZoneManagement
+	0x0551: {{Name: "ADO", Bit: 0, Title: "Audio"}, {Name: "VDO", Bit: 1, Title: "Video"}, {Name: "SNP", Bit: 2, Title: "Snapshot"}, {Name: "PRIV", Bit: 3, Title: "Privacy"}, {Name: "SPKR", Bit: 4, Title: "Speaker"}, {Name: "ICTL", Bit: 5, Title: "ImageControl"}, {Name: "WMARK", Bit: 6, Title: "Watermark"}, {Name: "OSD", Bit: 7, Title: "OnScreenDisplay"}, {Name: "STOR", Bit: 8, Title: "LocalStorage"}, {Name: "HDR", Bit: 9, Title: "HighDynamicRange"}, {Name: "NV", Bit: 10, Title: "NightVision"}},                                                                                                                                                                                  // CameraAvStreamManagement
+	0x0552: {{Name: "DPTZ", Bit: 0, Title: "DigitalPtz"}, {Name: "MPAN", Bit: 1, Title: "MechanicalPan"}, {Name: "MTILT", Bit: 2, Title: "MechanicalTilt"}, {Name: "MZOOM", Bit: 3, Title: "MechanicalZoom"}, {Name: "MPRESETS", Bit: 4, Title: "MechanicalPresets"}},                                                                                                                                                                                                                                                                                                                                                                                                                                // CameraAvSettingsUserLevelManagement
+	0x0553: {{Name: "METADATA", Bit: 0, Title: "Metadata"}},                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          // WebRtcTransportProvider
+	0x0555: {{Name: "PERZONESENS", Bit: 0, Title: "PerZoneSensitivity"}, {Name: "METADATA", Bit: 1, Title: "Metadata"}},                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              // PushAvStreamTransport
+	0x0700: {{Name: "PRICE", Bit: 0, Title: "Pricing"}, {Name: "FCRED", Bit: 1, Title: "FriendlyCredit"}, {Name: "AUXLD", Bit: 2, Title: "AuxiliaryLoad"}, {Name: "PEAKP", Bit: 3, Title: "PeakPeriod"}, {Name: "PWRTHLD", Bit: 4, Title: "PowerThreshold"}, {Name: "RNDM", Bit: 5, Title: "Randomization"}},                                                                                                                                                                                                                                                                                                                                                                                         // CommodityTariff
+	0x0B06: {{Name: "PWRTHLD", Bit: 0, Title: "PowerThreshold"}},                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     // MeterIdentification
 }
 
 // clusterClassifications maps every cluster to its effective classification

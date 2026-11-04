@@ -317,11 +317,13 @@ func DeviceTypeElementRequirements(deviceType DeviceTypeID, clusterID uint32) []
 	return out
 }
 
-// ClusterFeature is one feature of a cluster: its code and its bit in the
-// FeatureMap.
+// ClusterFeature is one feature of a cluster: its code, its bit in the
+// FeatureMap and its title (matter.js FeatureModel title, "Lighting" for
+// OnOff's LT).
 type ClusterFeature struct {
-	Name string
-	Bit  uint8
+	Name  string
+	Bit   uint8
+	Title string
 }
 
 // ClusterFeatures returns a cluster's features in bit order, or nil for a

@@ -66,6 +66,7 @@ const (
 	requirementFile = "schema/devicetype_requirements_gen.go"
 	timedFile       = "schema/timed_gen.go"
 	largeMsgFile    = "schema/large_message_gen.go"
+	namesFile       = "schema/element_names_gen.go"
 )
 
 // moduleRoot returns the directory holding this module's go.mod, found by
@@ -99,6 +100,7 @@ type snapshotCluster struct {
 	FeatureMap     uint32              `json:"featureMap"`
 	Attributes     []snapshotAttribute `json:"attributes"`
 	Commands       []snapshotCommand   `json:"commands"`
+	Events         []snapshotEvent     `json:"events"`
 	Features       []snapshotFeature   `json:"features"`
 	Classification string              `json:"classification"`
 	Bindable       *bool               `json:"bindable"`
@@ -108,6 +110,16 @@ type snapshotCluster struct {
 type snapshotFeature struct {
 	Name string `json:"name"`
 	Bit  *int   `json:"bit"`
+	// Effective carries the feature's title (matter.js FeatureModel.title).
+	Effective *struct {
+		Title string `json:"title"`
+	} `json:"effective"`
+}
+
+// snapshotEvent mirrors one event of a cluster in parity/schema.json.
+type snapshotEvent struct {
+	ID   uint32 `json:"id"`
+	Name string `json:"name"`
 }
 
 // snapshotAttribute mirrors one attribute of a cluster in parity/schema.json.
@@ -134,7 +146,11 @@ type snapshotCommand struct {
 	Name      string `json:"name"`
 	Direction string `json:"direction"`
 	Effective *struct {
-		Access struct {
+		// Direction is the effective direction: a derived cluster's
+		// override of a base command (RvcOperationalState's Pause) states
+		// none of its own and inherits the base's here.
+		Direction string `json:"direction"`
+		Access    struct {
 			Timed bool `json:"timed"`
 		} `json:"access"`
 		Quality struct {
@@ -287,6 +303,12 @@ func main() {
 		os.Exit(1)
 	}
 	fmt.Printf("wrote %s\n", largeMsgFile)
+
+	if err := writeNamesFile(snap.Clusters); err != nil {
+		fmt.Fprintf(os.Stderr, "write %s: %v\n", namesFile, err)
+		os.Exit(1)
+	}
+	fmt.Printf("wrote %s\n", namesFile)
 
 	if err := writeRequirementsFile(snap); err != nil {
 		fmt.Fprintf(os.Stderr, "write %s: %v\n", requirementFile, err)
@@ -737,7 +759,11 @@ func writeRequirementsFile(snap snapshot) error {
 			if f.Bit == nil || *f.Bit < 0 || *f.Bit > 31 {
 				continue
 			}
-			feats = append(feats, fmt.Sprintf("{Name: %q, Bit: %d}", f.Name, *f.Bit))
+			title := ""
+			if f.Effective != nil {
+				title = f.Effective.Title
+			}
+			feats = append(feats, fmt.Sprintf("{Name: %q, Bit: %d, Title: %q}", f.Name, *f.Bit, title))
 		}
 		if len(feats) == 0 {
 			continue
@@ -1023,4 +1049,73 @@ func schemaConformance(raw json.RawMessage) (string, error) {
 		return "", fmt.Errorf("unknown conformance node %q", node.Type)
 	}
 	return strings.Join(parts, ", "), nil
+}
+
+// commandDirection is a command's effective direction, its own when the
+// effective layer states none.
+func commandDirection(m snapshotCommand) string {
+	if m.Effective != nil && m.Effective.Direction != "" {
+		return m.Effective.Direction
+	}
+	return m.Direction
+}
+
+// writeNamesFile writes the attribute, command and event names of every
+// cluster of the snapshot (schema.AttributeName, CommandName,
+// ResponseCommandName, EventName), whether or not cluster/spec holds a
+// generated definition of the cluster.
+func writeNamesFile(clusters []snapshotCluster) error {
+	var buf bytes.Buffer
+	buf.WriteString(fileHeaderTpl)
+	type idName struct {
+		id   uint32
+		name string
+	}
+	table := func(doc, name string, elems func(c snapshotCluster) []idName) {
+		buf.WriteString(doc)
+		fmt.Fprintf(&buf, "var %s = map[uint32]map[uint32]string{\n", name)
+		for _, c := range clusters {
+			list := elems(c)
+			if len(list) == 0 {
+				continue
+			}
+			sort.Slice(list, func(i, j int) bool { return list[i].id < list[j].id })
+			fmt.Fprintf(&buf, "\t0x%04X: { // %s\n", c.ID, c.Name)
+			for _, e := range list {
+				fmt.Fprintf(&buf, "\t\t0x%04X: %q,\n", e.id, e.name)
+			}
+			buf.WriteString("\t},\n")
+		}
+		buf.WriteString("}\n\n")
+	}
+	table("// attributeNames maps every cluster's attribute ids to their matter.js\n// names. Generated from parity/schema.json.\n", "attributeNames",
+		func(c snapshotCluster) []idName {
+			out := make([]idName, 0, len(c.Attributes))
+			for _, a := range c.Attributes {
+				out = append(out, idName{a.ID, a.Name})
+			}
+			return out
+		})
+	commands := func(direction string) func(c snapshotCluster) []idName {
+		return func(c snapshotCluster) []idName {
+			var out []idName
+			for _, m := range c.Commands {
+				if commandDirection(m) == direction {
+					out = append(out, idName{m.ID, m.Name})
+				}
+			}
+			return out
+		}
+	}
+	table("// commandNames maps every cluster's request command ids to their\n// matter.js names. Generated from parity/schema.json.\n", "commandNames", commands("request"))
+	table("// responseCommandNames maps every cluster's response command ids to\n// their matter.js names. Generated from parity/schema.json.\n", "responseCommandNames", commands("response"))
+	table("// eventNames maps every cluster's event ids to their matter.js names.\n// Generated from parity/schema.json.\n", "eventNames",
+		func(c snapshotCluster) []idName {
+			out := make([]idName, 0, len(c.Events))
+			for _, e := range c.Events {
+				out = append(out, idName{e.ID, e.Name})
+			}
+			return out
+		})
+	return writeIfChanged(namesFile, buf.Bytes())
 }
