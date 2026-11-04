@@ -9,6 +9,7 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/SukramJ/go-fabric/cluster/spec"
 	"github.com/SukramJ/go-fabric/cluster/wire"
 	"github.com/SukramJ/go-fabric/im"
 )
@@ -207,15 +208,18 @@ func TestAdmComm_Read_AdminVendorID_NotNull_ReturnsVendorID(t *testing.T) {
 func TestAdmComm_Write_ReturnsErrorForEveryAttr(t *testing.T) {
 	t.Parallel()
 	ac := newAdmComm()
-	for _, attrID := range []uint32{
-		admCommAttrWindow, admCommAttrFabric, admCommAttrVendor,
-		admCommAttrFeatMap, admCommAttrRev,
+	// The three served attributes are read-only; FeatureMap and
+	// ClusterRevision are the dispatcher's, not served by the definition.
+	for attrID, want := range map[uint32]im.StatusCode{
+		admCommAttrWindow: im.StatusUnsupportedWrite, admCommAttrFabric: im.StatusUnsupportedWrite,
+		admCommAttrVendor:  im.StatusUnsupportedWrite,
+		admCommAttrFeatMap: im.StatusUnsupportedAttribute, admCommAttrRev: im.StatusUnsupportedAttribute,
 	} {
 		t.Run("", func(t *testing.T) {
 			t.Parallel()
 			err := ac.MatterWrite(context.Background(), attrID, uint8(0))
-			if err == nil {
-				t.Errorf("MatterWrite(0x%04X) returned nil error; attribute is read-only", attrID)
+			if spec.StatusOf(err) != want {
+				t.Errorf("MatterWrite(0x%04X): status %v (%v), want %v", attrID, spec.StatusOf(err), err, want)
 			}
 		})
 	}
@@ -293,8 +297,8 @@ func TestAdmComm_Invoke_OpenBasicWindow_ReturnsUnsupported(t *testing.T) {
 	t.Parallel()
 	ac := newAdmComm()
 	_, err := ac.MatterInvoke(context.Background(), admCommCmdOpenBasicWindow, nil)
-	if err == nil {
-		t.Error("MatterInvoke(OpenBasicCommissioningWindow) returned nil error; feature not in FeatureMap")
+	if spec.StatusOf(err) != im.StatusUnsupportedCommand {
+		t.Errorf("MatterInvoke(OpenBasicCommissioningWindow) without BC: status %v (%v), want %v", spec.StatusOf(err), err, im.StatusUnsupportedCommand)
 	}
 }
 
@@ -331,8 +335,8 @@ func TestAdmComm_Invoke_UnknownCommand_ReturnsUnsupported(t *testing.T) {
 	t.Parallel()
 	ac := newAdmComm()
 	_, err := ac.MatterInvoke(context.Background(), 0xFF, nil)
-	if err == nil {
-		t.Error("MatterInvoke(unknown cmdID) returned nil error, want unsupported-command error")
+	if spec.StatusOf(err) != im.StatusUnsupportedCommand {
+		t.Errorf("MatterInvoke(unknown cmdID): status %v (%v), want %v", spec.StatusOf(err), err, im.StatusUnsupportedCommand)
 	}
 }
 
