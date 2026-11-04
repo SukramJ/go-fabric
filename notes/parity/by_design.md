@@ -346,6 +346,22 @@ device-type validator (ADR 0016, warn mode) reports it at every start as
 `matter.devicetype.violation … requirement=Descriptor.TAGLIST`; that warning
 is this entry, not a new defect.
 
+Phase 31 ported matter.js's corpus case "refuses a Closure endpoint without
+the tags its Descriptor TagList requires"
+(`StandardDeviceTypeCorpusTest.ts:548-559` at 862ad75f): matter.js refuses
+the endpoint at construction, because its generated `ClosureDevice` turns
+TagList on and the Descriptor fails to initialize without
+`descriptor.state.tagList`. The kit builds a Closure without
+`Options.Tags` with the feature off, so the same endpoint is refused only
+by the device-type judge — a strict validator refuses it, the default warn
+mode reports it (`device:TestStandardDeviceTypeCorpusParityMatterJS`);
+with `Options.Tags` (phase 30) it conforms. The Duplicate condition's
+TagList requirement of Base is judged as matter.js judges it
+(`DeviceTypeConformance.ts:1189-1215`, the Aggregator waiver), so the
+kit's default bridge composition — bridged siblings below the Aggregator
+— owes none; composed siblings without Tags are warned of the same way.
+The same Apple reason holds for both.
+
 ### BD-Matter-ClosureControl-StopObserver — a bridged host hears of a Stop the server ignores
 
 `cluster/closure` answers a Stop while the closure is not Moving,
@@ -1757,8 +1773,8 @@ Binding mandatory (`missingBaseServersOf`). go-fabric's bridge judges the
 whole assembled topology on every Start and Reassemble
 (`bridge/devicetype_validation.go`), refuses the assembly as a whole so the
 previous topology stays live, takes its mode from
-`Bridge.SetDeviceTypeValidation`, and mounts no Binding a host did not ask
-for — the verdict names it instead. The verdicts, the modes (warn, strict,
+`Bridge.SetDeviceTypeValidation`, and mounts the Binding server Base
+mandates where the source supplies none (`endpoint/binding_mount.go`). The verdicts, the modes (warn, strict,
 off) and what each refuses are matter.js's; only the unit of construction
 differs, because a Go topology is installed whole. Pinned by
 `bridge/devicetype_validation_test.go`;
@@ -3375,6 +3391,47 @@ Findings wave 2026-10-17.
 By design. A reset of the host's device model is the host's decision, not
 a side effect of a controller removing itself.
 
+### BD-Matter-FactoryResetEndsTheNode — a factory reset stops the node; the host builds the one that comes back
+
+matter.js `ServerNode.erase` (`packages/node/src/node/ServerNode.ts:159-200`
+at `862ad75f`) takes the node offline, resets its in-memory state, erases its
+storage (`resetStorage`, `:242-256`) and brings the same object back online
+when it was; a controller's erase also drops its peers and CA material
+(`ServerEnvironment.eraseCredentials`, `server/ServerEnvironment.ts:72-89`)
+and the same instance commissions again (ServerNodeTest.ts:1488-1498). A Go
+node and controller are single-use — `Node.Stop` and `Controller.Close` end
+them (`node.ErrStopped`) — so `Node.FactoryReset` removes the fabrics
+through the RemoveFabric fan-out, stops the node and erases its credential
+store (`store.Eraser`) and endpoint records, and `Controller.Erase` closes
+the controller and erases its database; the host builds the node or
+controller that comes back on the same store (fabrictest's
+`Device.FactoryReset` restarts a device that ran). Two consequences: the
+endpoint allocation counter of `endpoint.Store` is not rewound (the
+interface has no reset; a freed number is reissued only after the wrap),
+and the re-pinned UniqueID is derived again (`DeriveUniqueID`), equal to the
+old one for the same vendor, product, label and serial, where matter.js
+draws a fresh one. Phase 31.
+
+By design. Rebuilding is how every in-memory state a reset erases — the
+root servers' values, Wi-Fi networks, scenes, the validator — goes for
+certain, without a reset path in each server.
+
+### BD-Matter-EndpointNumberAfterWrap — after the wrap the store takes the lowest free number on every allocation
+
+matter.js `ServerEndpointStores.assignNumber` keeps its counter after the
+number it assigned last and walks on from there after a wrap
+(`packages/node/src/storage/server/ServerEndpointStores.ts:169-183` at
+`862ad75f`; ServerNodeTest.ts:1153-1176 expects the endpoint after the
+wrapped one to take the next number, not the one a deleted endpoint freed).
+`endpoint/sqlitestore` lifts its counter past the highest number a row holds
+on every allocation (`allocate`), so once a row holds 0xFFFE every
+allocation wraps and takes the lowest free number, a just-freed one
+included. `endpoint:TestEndpointNumberWrapParityMatterJS` pins it. Phase 31.
+
+By design. The lift is what keeps a number a row placed above the counter
+from being reissued (BD-Matter-EndpointNumber-Monotonic); the reuse begins
+only after 65 533 allocations.
+
 ### BD-Matter-OTAProvider-ACLEveryFabric — the OTA provider's ACL entry goes on every fabric
 
 matter.js adds the provider's Operate/CASE entry on the first fabric only
@@ -4291,6 +4348,25 @@ reassembly (ADR 0016, `endpoint/devicetype_validation.go` `Validate`), so
 reassembly is the module's unit of construction (above); the previous
 topology stays live, so a refusal costs the host nothing it had, while a
 logged singleton would answer two endpoints to one root-only cluster.
+
+### BD-Matter-DeclaredDisallowedElementRefused — a server that declares an element its conformance disallows is refused, not trimmed
+
+matter.js `ValidatedElements` drops an implemented element whose
+conformance is disallowed or obsolete with a non-fatal warning, and an
+element whose conformance names a dropped one goes with it
+(`ValidatedElements.ts` with `resolveInterElementConformance`;
+`ValidatedElementsTest.ts:376-428` at 862ad75f, "warns when disallowed
+element is implemented", "excludes an implemented obsolete element as it
+does a disallowed one", "makes an element depending on an implemented
+obsolete element absent"). `spec.New` refuses such a declaration with
+`ErrDisallowed` naming the element (`cluster/spec/instance.go`, `resolve`),
+and reads an element whose conformance names another element as present
+when the server declares it. By design: a Go server states the optional
+elements it serves in `spec.Options`, so declaring one the selection
+disallows is a host error to surface at construction rather than a
+surface silently smaller than the host asked for.
+
+---
 
 ### BD-Matter-UnimplementedCommand-ValidatorViolation — an unimplemented mandatory command is a device-type verdict, not a construction error
 

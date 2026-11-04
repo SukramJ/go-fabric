@@ -29,7 +29,8 @@ func renderPage(snap *Snapshot, reg *Register) []byte {
 	fmt.Fprintf(&b, "matter.js pin `%s` (`parity/schema.json` → `matter.sourceCommit`): %d test files under %s.\n",
 		snap.Commit, len(snap.Files), joinCode(snap.Roots))
 	b.WriteString("`ported`: the Go tests cover the file's `it` cases; `partial`: they cover some, the note names the rest;\n")
-	b.WriteString("`planned`: not ported yet; `excluded`: left out, with its class. The guard is `make testparity-check`.\n\n")
+	b.WriteString("`planned`: not ported yet; `excluded`: left out, with its class. A `ported` or `partial` note's \"Left\"\n")
+	b.WriteString("names the `it` cases that will not be ported, each with its class and reason. The guard is `make testparity-check`.\n\n")
 
 	b.WriteString("| status | files |\n| --- | ---: |\n")
 	for _, s := range statuses {
@@ -160,6 +161,13 @@ func note(e *Entry) string {
 			quoted[i] = "“" + oneLine(m) + "”"
 		}
 		s += " Missing: " + strings.Join(quoted, "; ") + "."
+	}
+	if len(e.Left) > 0 {
+		left := make([]string, len(e.Left))
+		for i, l := range e.Left {
+			left[i] = "“" + oneLine(l.It) + "” (" + l.Class + ": " + oneLine(l.Reason) + ")"
+		}
+		s += " Left: " + strings.Join(left, "; ") + "."
 	}
 	return s
 }

@@ -52,7 +52,15 @@ func (b *Bridge) buildInitialReport(
 		// attributes (ACL, NOCs) to a View-only / ACE-less subject, the
 		// same bypass reportSubscription closes for ongoing reports.
 		for _, rr := range b.readAuthorizedResults(subCtx, dispatcher, path) {
-			matched++
+			// Only a path that exists establishes the subscription: a
+			// status (unsupported endpoint, cluster or attribute) does not
+			// count (matter.js AttributeReadResponse.counts.existent,
+			// packages/protocol/src/action/server/AttributeReadResponse.ts:
+			// 125-131, the values and the version-filtered ones, read by
+			// ServerSubscription.ts:674, :707-711).
+			if rr.Status == im.StatusSuccess {
+				matched++
+			}
 			// DataVersionFilter evaluation: skip attributes whose cluster
 			// DataVersion matches the controller's cached version.
 			// Matter §10.6.5 — the controller infers "no change since

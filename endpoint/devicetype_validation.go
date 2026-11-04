@@ -91,6 +91,15 @@ type DeviceTypeViolation struct {
 	// Conditions are the names in that conformance that held for the
 	// endpoint — the conditions (and features) that made it apply.
 	Conditions []string
+	// AssertedAtRoot marks a violation of the node endpoint that goes
+	// away once the conditions only a device type of the node scope
+	// asserts at the Root location are false — Camera's
+	// TimeSyncWithNtpcCond for the Root Node. [DeviceTypeValidator] never
+	// refuses it and reports it apart ([DeviceTypeVerdict].FreshAssertedAtRoot).
+	// Mirrors matter.js DeviceTypeViolation.assertedAtRoot
+	// (packages/model/src/logic/device-types/DeviceTypeViolation.ts:53-59
+	// at 862ad75f).
+	AssertedAtRoot bool
 }
 
 // Key identifies the violation on its endpoint: its kind and requirement
@@ -364,8 +373,15 @@ type DeviceTypeVerdict struct {
 	// order.
 	Violations []DeviceTypeViolation
 	// Fresh are those not reported by an earlier validation — what
-	// matter.js logs, once, as a warning.
+	// matter.js logs, once, as a warning. A violation reported before only
+	// as AssertedAtRoot is fresh once it binds.
 	Fresh []DeviceTypeViolation
+	// FreshAssertedAtRoot are the fresh violations flagged AssertedAtRoot,
+	// apart from Fresh: what matter.js logs at debug level as "does not
+	// meet requirements that device types of its node assert at the Root"
+	// and never refuses (DeviceTypeConformanceService.ts:401, :433-442 at
+	// 862ad75f).
+	FreshAssertedAtRoot []DeviceTypeViolation
 }
 
 // DeviceTypeValidator holds a node's topologies to their device types
@@ -375,8 +391,10 @@ type DeviceTypeVerdict struct {
 // for concurrent use.
 type DeviceTypeValidator struct {
 	// mu guards known, recorded and reported.
-	mu       sync.Mutex
-	mode     DeviceTypeValidationMode
+	mu   sync.Mutex
+	mode DeviceTypeValidationMode
+	// reported are the violations reported, by endpoint and key; the
+	// value is whether the report was flagged AssertedAtRoot.
 	reported map[uint16]map[string]bool
 	recorded []DeviceTypeViolation
 	// known are the endpoints of the last recorded validation; one not
@@ -412,6 +430,11 @@ func (v *DeviceTypeValidator) Mode() DeviceTypeValidationMode { return v.mode }
 //     installed caused, a changed device type list or server set, a
 //     removed part — is reported and refuses nothing, as matter.js logs
 //     rather than refuses a violation after construction.
+//
+// A violation flagged [DeviceTypeViolation].AssertedAtRoot is never
+// refused and is reported apart, in FreshAssertedAtRoot; once it binds it
+// is fresh again (DeviceTypeConformanceService.ts:401, :433-442, :479-494
+// at 862ad75f).
 //
 // A refusal returns a *DeviceTypeConformanceError with the refused
 // endpoints' new violations and records nothing, so the next validation
@@ -482,8 +505,8 @@ func (v *DeviceTypeValidator) judge(all []DeviceTypeViolation, shape treeShape) 
 				if reported[viol.Endpoint] == nil {
 					reported[viol.Endpoint] = map[string]bool{}
 				}
-				reported[viol.Endpoint][viol.Key()] = true
-				if !v.reported[viol.Endpoint][viol.Key()] {
+				reported[viol.Endpoint][viol.Key()] = false
+				if _, ok := v.reported[viol.Endpoint][viol.Key()]; !ok {
 					verdict.Fresh = append(verdict.Fresh, *viol)
 				}
 			}
@@ -500,8 +523,15 @@ func (v *DeviceTypeValidator) judge(all []DeviceTypeViolation, shape treeShape) 
 		if byEndpoint[viol.Endpoint] == nil {
 			byEndpoint[viol.Endpoint] = map[string]bool{}
 		}
-		byEndpoint[viol.Endpoint][viol.Key()] = true
-		if v.reported[viol.Endpoint][viol.Key()] {
+		byEndpoint[viol.Endpoint][viol.Key()] = viol.AssertedAtRoot
+		// A violation that loses its Root-assertion flag now binds, so it
+		// is reported again (#judge, DeviceTypeConformanceService.ts:479-494
+		// at 862ad75f).
+		if flagged, ok := v.reported[viol.Endpoint][viol.Key()]; ok && (!flagged || viol.AssertedAtRoot) {
+			continue
+		}
+		if viol.AssertedAtRoot {
+			verdict.FreshAssertedAtRoot = append(verdict.FreshAssertedAtRoot, *viol)
 			continue
 		}
 		verdict.Fresh = append(verdict.Fresh, *viol)

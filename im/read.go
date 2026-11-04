@@ -278,6 +278,13 @@ func readAttributePathField(dec *tlv.Decoder, el tlv.Element, p *ConcreteAttribu
 			return nil
 		}
 		p.ListIndex, err = uint16Field(el)
+	case tagAttrPathWildcardPathFlags:
+		// TlvBitmap(TlvUInt32, WildcardPathFlagsBitmap), TlvAttributePath.ts:27.
+		p.WildcardPathFlags, err = uint32Field(el)
+	case tagAttrPathWildcardFilterCfgVer:
+		// TlvUInt32, TlvAttributePath.ts:28.
+		p.WildcardFilterConfigurationVersion, err = uint32Field(el)
+		p.HasWildcardFilterConfigurationVersion = true
 	default:
 		// EnableTagCompression and unknown tags: an encoder-side
 		// optimisation a receiver may ignore (§A.7), and forward
@@ -507,7 +514,7 @@ func HandleReadRequest(ctx context.Context, d Dispatcher, req ReadRequest) Repor
 		// addConcrete (error status) vs readAttributeForWildcard (omit).
 		concretePath := path.HasEndpoint && path.HasCluster && path.HasAttribute
 
-		results := d.Read(ctx, path)
+		results := ApplyWildcardPathFlags(ctx, d, path, d.Read(ctx, path))
 		var filtered []AttributeReport
 		for _, r := range results {
 			// Per-RESULT ACL check at the RESOLVED concrete (endpoint,

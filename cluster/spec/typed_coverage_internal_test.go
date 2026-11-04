@@ -87,7 +87,7 @@ func TestInPeerReadsTheSiblingSet(t *testing.T) {
 // testCluster is a cluster with one mandatory attribute, "Sibling".
 func testCluster() *Cluster {
 	return &Cluster{
-		ID: 0xFFF1, Name: "CoverageTest", Revision: 1,
+		ID: 0xFFF1_FC01, Name: "CoverageTest", Revision: 1,
 		Attributes: []Attribute{{
 			ID: 0, Name: "Sibling", Type: Type{Name: "uint8", Kind: KindUint, Bits: 8},
 			Conformance: Conformance{Text: "M", Op: ConfMandatory},

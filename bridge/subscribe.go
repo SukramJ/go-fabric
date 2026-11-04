@@ -407,7 +407,9 @@ func (b *Bridge) MatterEmitEvent(endpoint uint16, cluster, event uint32, data an
 // authority check). Unauthorized attributes are dropped from the report
 // — a subscription simply does not cover paths the subject cannot read.
 func (b *Bridge) readAuthorizedResults(ctx context.Context, dispatcher im.Dispatcher, path im.ConcreteAttributePath) []im.ReadResult {
-	results := dispatcher.Read(ctx, path)
+	// A wildcard path's WildcardPathFlags skip their paths in the
+	// subscription's reports as in a read (AttributeReadResponse.ts:149-197).
+	results := im.ApplyWildcardPathFlags(im.WithElementQualities(ctx, specElementQualities{}), dispatcher, path, dispatcher.Read(ctx, path))
 	_, fabricIndex := im.FabricFilterFromContext(ctx)
 	if im.IsPASEFromContext(ctx) {
 		return results // PASE — commissioning channel, implicit Administer
@@ -470,7 +472,7 @@ func (b *Bridge) reportSubscription(ctx context.Context, sub *subscription.Subsc
 		HasSubscription: true,
 		SubscriptionID:  sub.ID,
 	}
-	for _, path := range paths {
+	for _, path := range b.unskippedChangedPaths(readCtx, dispatcher, sub, paths) {
 		for _, rr := range b.readAuthorizedResults(readCtx, dispatcher, path) {
 			rep := im.AttributeReport{Path: rr.Path, DataVersion: rr.DataVersion}
 			if rr.Status != im.StatusSuccess {
@@ -1792,4 +1794,47 @@ func derefValue(v any) any {
 		return nil
 	}
 	return rv.Interface()
+}
+
+// unskippedChangedPaths drops from a report's changed paths each concrete
+// path the subscription covers only through wildcard paths whose
+// WildcardPathFlags skip it, so a change report omits what the priming
+// report omitted (matter.js builds every report through
+// AttributeReadResponse, packages/protocol/src/action/server/
+// AttributeReadResponse.ts:149-197). A wildcard changed path is left to
+// [Bridge.readAuthorizedResults].
+func (b *Bridge) unskippedChangedPaths(ctx context.Context, dispatcher im.Dispatcher, sub *subscription.Subscription, paths []im.ConcreteAttributePath) []im.ConcreteAttributePath {
+	flagged := false
+	for _, sp := range sub.AttributePaths {
+		if sp.WildcardPathFlags != 0 {
+			flagged = true
+			break
+		}
+	}
+	if !flagged {
+		return paths
+	}
+	qctx := im.WithElementQualities(ctx, specElementQualities{})
+	out := make([]im.ConcreteAttributePath, 0, len(paths))
+	for _, p := range paths {
+		if !p.HasEndpoint || !p.HasCluster || !p.HasAttribute {
+			out = append(out, p)
+			continue
+		}
+		for _, sp := range sub.AttributePaths {
+			if subscribedPathCovers(sp, p) && !im.WildcardPathFlagsSkip(qctx, dispatcher, sp, p) {
+				out = append(out, p)
+				break
+			}
+		}
+	}
+	return out
+}
+
+// subscribedPathCovers reports whether the subscribed (possibly wildcard)
+// path covers the concrete path p.
+func subscribedPathCovers(sp, p im.ConcreteAttributePath) bool {
+	return (!sp.HasEndpoint || sp.Endpoint == p.Endpoint) &&
+		(!sp.HasCluster || sp.Cluster == p.Cluster) &&
+		(!sp.HasAttribute || sp.Attribute == p.Attribute)
 }

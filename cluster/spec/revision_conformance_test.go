@@ -63,7 +63,7 @@ func TestRevisionConditionResolvesAgainstTheDefinition(t *testing.T) {
 		{"Rev >= v7, O on v6 declared", op(spec.ConfOtherwise, rev7, op(spec.ConfOptional)), 6, true, true, false},
 		{"Rev >= v7 on v6 declared", rev7, 6, true, false, true},
 	} {
-		def := &spec.Cluster{ID: 0xFFF1, Name: "Synthetic", Revision: tc.revision, Attributes: []spec.Attribute{attr(tc.c)}}
+		def := &spec.Cluster{ID: 0xFFF1_FC01, Name: "Synthetic", Revision: tc.revision, Attributes: []spec.Attribute{attr(tc.c)}}
 		var opts spec.Options
 		if tc.declared {
 			opts.Attributes = []uint32{2}

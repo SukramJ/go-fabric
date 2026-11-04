@@ -4,6 +4,7 @@
 package node
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"fmt"
@@ -426,6 +427,17 @@ type Attestation struct {
 	// CertificationDeclaration is the CMS-signed CD; nil is the CSA test
 	// CD for the vendor and product.
 	CertificationDeclaration []byte
+	// Provider supplies the chain and the CD when a commissioner first
+	// asks for them — the first AttestationRequest, CertificateChainRequest
+	// or CSRRequest — never at [New] or [Node.Start]; a nil chain or CD it
+	// returns is the CSA test material, as above. A failed call fails that
+	// request and is retried on the next. It excludes Files, Chain and
+	// CertificationDeclaration. Mirrors matter.js
+	// OperationalCredentialsServer.State.certification, which takes an
+	// async provider (packages/protocol/src/certificate/
+	// DeviceCertification.ts:181, built on first use by
+	// OperationalCredentialsServer.ts:560-572).
+	Provider func(ctx context.Context) (chain *AttestationChain, certificationDeclaration []byte, err error)
 }
 
 // OTAConfig mounts the OTA Software Update Requestor (ADR 0019).
@@ -548,7 +560,9 @@ func (c *Config) Validate() error {
 	errs = append(errs, c.Limits.validate()...)
 	errs = append(errs, c.Sessions.validate()...)
 	errs = append(errs, c.timeSynchronizationErrors()...)
-	if at := c.Attestation; at.Files != nil && (at.Chain != nil || at.CertificationDeclaration != nil) {
+	if at := c.Attestation; at.Provider != nil && (at.Files != nil || at.Chain != nil || at.CertificationDeclaration != nil) {
+		errs = append(errs, errors.New("node: Attestation.Provider excludes Files, Chain and CertificationDeclaration"))
+	} else if at.Files != nil && (at.Chain != nil || at.CertificationDeclaration != nil) {
 		errs = append(errs, errors.New("node: Attestation.Files excludes Chain and CertificationDeclaration"))
 	} else if at.Files == nil && at.BlockCommissioningOnError {
 		errs = append(errs, errors.New("node: Attestation.BlockCommissioningOnError needs Files"))

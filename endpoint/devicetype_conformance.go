@@ -410,6 +410,10 @@ type dtScopeConditions struct {
 	underived      map[uint16]map[string]bool
 	assertions     map[uint16][]dtAssertion
 	conditions     map[uint16]map[string]bool
+	// rootAsserted are the names among the node endpoint's conditions that
+	// hold only because an endpoint of the scope asserts them at Root
+	// (ConditionAssertions ScopeConditions #rootAsserted).
+	rootAsserted map[string]bool
 }
 
 func (p *dtPass) collect(nodeEp uint16) *dtScopeConditions {
@@ -418,9 +422,10 @@ func (p *dtPass) collect(nodeEp uint16) *dtScopeConditions {
 	}
 	c := &dtScopeConditions{
 		p: p, nodeEp: nodeEp,
-		underived:  map[uint16]map[string]bool{},
-		assertions: map[uint16][]dtAssertion{},
-		conditions: map[uint16]map[string]bool{},
+		underived:    map[uint16]map[string]bool{},
+		assertions:   map[uint16][]dtAssertion{},
+		conditions:   map[uint16]map[string]bool{},
+		rootAsserted: map[string]bool{},
 	}
 	p.collections[nodeEp] = c
 	return c
@@ -506,10 +511,25 @@ func (s *dtScopeConditions) conditionsOf(ep uint16) map[string]bool {
 	return conds
 }
 
+// rootAssertedOf is ConditionAssertions Collection.rootAssertedOf: the
+// names among ep's conditions that hold only because an endpoint of the
+// node scope asserts them at Root; none for any endpoint but the node
+// endpoint. Mirrors packages/model/src/logic/device-types/
+// ConditionAssertions.ts:411-417 at 862ad75f.
+func (s *dtScopeConditions) rootAssertedOf(ep uint16) map[string]bool {
+	if ep != s.nodeEp {
+		return nil
+	}
+	s.conditionsOf(ep)
+	return s.rootAsserted
+}
+
 // assertedOn: ep's underived conditions with those asserted on it — by
 // itself at Self, by the composers whose composition covers it at
 // Descendant, and, for the node endpoint, by any endpoint of the scope at
-// Root. Chains are not followed.
+// Root. Chains are not followed. A name only a Root assertion makes true
+// is recorded for rootAssertedOf (ConditionAssertions.ts:449-471 at
+// 862ad75f, #assertedOn).
 func (s *dtScopeConditions) assertedOn(ep uint16) map[string]bool {
 	conds := map[string]bool{}
 	for c := range s.underivedOf(ep) {
@@ -524,6 +544,9 @@ func (s *dtScopeConditions) assertedOn(ep uint16) map[string]bool {
 		for _, other := range s.p.nodeScopeOf(s.nodeEp) {
 			for _, a := range s.assertionsOf(other) {
 				if a.req.Location == schema.LocationRoot {
+					if !conds[a.condition] {
+						s.rootAsserted[a.condition] = true
+					}
 					conds[a.condition] = true
 				}
 			}
@@ -594,6 +617,9 @@ type dtContext struct {
 	conditions map[string]bool
 	waived     map[string]bool
 	p          *dtPass
+	// memoize reads the composing endpoint's components from the pass's
+	// cache; the re-check under other conditions groups them afresh.
+	memoize bool
 }
 
 // check is DeviceTypeConformance.check: the departures of ep from the
@@ -622,21 +648,29 @@ func (p *dtPass) check(ep uint16) []DeviceTypeViolation {
 	conditions := collection.conditionsOf(ep)
 
 	violations := p.unknownStated(ep)
-	deviceTypes := append([]*schema.DeviceTypeDefinition(nil), facts.deviceTypes...)
-	if len(deviceTypes) > 0 {
-		// Every device type derives from Base, so its requirements apply
-		// once per endpoint rather than once per device type.
-		deviceTypes = append(deviceTypes, p.l.m.base...)
-	}
-	for _, dt := range deviceTypes {
-		waived := map[string]bool{}
-		if dt.Classification == "base" {
-			waived = p.baseWaivers(facts)
+	judged := p.checkDeviceTypes(facts, conditions, collection, true)
+	if rootAsserted := collection.rootAssertedOf(ep); len(rootAsserted) > 0 {
+		// A requirement only Root assertions make mandatory is one whose
+		// violation goes away without them (DeviceTypeConformance.ts:65-79
+		// at 862ad75f).
+		unasserted := map[string]bool{}
+		for name := range conditions {
+			if !rootAsserted[name] {
+				unasserted[name] = true
+			}
 		}
-		ctx := &dtContext{violations: &violations, facts: facts, deviceType: dt, scope: dt, conditions: conditions, waived: waived, p: p}
-		ctx.checkClusters(dt.Requirements)
-		ctx.checkComposition(collection)
+		binding := map[string]bool{}
+		unassertedViolations := p.checkDeviceTypes(facts, unasserted, collection, false)
+		for i := range unassertedViolations {
+			binding[unassertedViolations[i].Key()] = true
+		}
+		for i := range judged {
+			if !binding[judged[i].Key()] {
+				judged[i].AssertedAtRoot = true
+			}
+		}
 	}
+	violations = append(violations, judged...)
 	p.checkComponentOf(&violations, facts, collection)
 	p.checkDescendantCounts(&violations, collection.descendantAssertionsOf(ep))
 	p.checkSingletons(&violations, facts)
@@ -651,6 +685,32 @@ func (p *dtPass) check(ep uint16) []DeviceTypeViolation {
 		}
 	}
 	return unique
+}
+
+// checkDeviceTypes judges ep's device types and Base under conditions:
+// their cluster requirements and the composition each requires.
+// memoize reads the components from the pass's cache, which holds them
+// under the endpoint's own conditions; a re-check under others groups
+// them afresh. Mirrors DeviceTypeConformance.ts:256-282 at 862ad75f,
+// checkDeviceTypes.
+func (p *dtPass) checkDeviceTypes(facts *dtResolved, conditions map[string]bool, collection *dtScopeConditions, memoize bool) []DeviceTypeViolation {
+	var violations []DeviceTypeViolation
+	deviceTypes := append([]*schema.DeviceTypeDefinition(nil), facts.deviceTypes...)
+	if len(deviceTypes) > 0 {
+		// Every device type derives from Base, so its requirements apply
+		// once per endpoint rather than once per device type.
+		deviceTypes = append(deviceTypes, p.l.m.base...)
+	}
+	for _, dt := range deviceTypes {
+		waived := map[string]bool{}
+		if dt.Classification == "base" {
+			waived = p.baseWaivers(facts)
+		}
+		ctx := &dtContext{violations: &violations, facts: facts, deviceType: dt, scope: dt, conditions: conditions, waived: waived, p: p, memoize: memoize}
+		ctx.checkClusters(dt.Requirements)
+		ctx.checkComposition(collection)
+	}
+	return violations
 }
 
 // checkClusters judges the server and client cluster requirements among
@@ -816,7 +876,8 @@ type dtComponent struct {
 }
 
 // componentsOf: the component requirements of dt, a device type of
-// composing, grouped by component device type.
+// composing, grouped by component device type — memoized per composing
+// endpoint and device type, under the endpoint's own conditions.
 func (p *dtPass) componentsOf(composing uint16, dt *schema.DeviceTypeDefinition, conditions map[string]bool) []*dtComponent {
 	byDT, ok := p.components[composing]
 	if !ok {
@@ -826,6 +887,14 @@ func (p *dtPass) componentsOf(composing uint16, dt *schema.DeviceTypeDefinition,
 	if found, ok := byDT[dt]; ok {
 		return found
 	}
+	found := p.groupComponents(dt, conditions)
+	byDT[dt] = found
+	return found
+}
+
+// groupComponents groups dt's component requirements by component device
+// type under conditions (DeviceTypeConformance.ts groupComponents).
+func (p *dtPass) groupComponents(dt *schema.DeviceTypeDefinition, conditions map[string]bool) []*dtComponent {
 	var found []*dtComponent
 	index := map[uint32]*dtComponent{}
 	for i := range dt.Requirements {
@@ -846,7 +915,6 @@ func (p *dtPass) componentsOf(composing uint16, dt *schema.DeviceTypeDefinition,
 			entry.disallowed = false
 		}
 	}
-	byDT[dt] = found
 	return found
 }
 
@@ -886,7 +954,12 @@ func (p *dtPass) failuresOf(candidate *dtResolved, instance *schema.DeviceTypeRe
 // checkComposition judges the endpoint as the composer of the component
 // device types its device type requires (Core § 9.2.3).
 func (c *dtContext) checkComposition(collection *dtScopeConditions) {
-	comps := c.p.componentsOf(c.facts.ep, c.deviceType, c.conditions)
+	var comps []*dtComponent
+	if c.memoize {
+		comps = c.p.componentsOf(c.facts.ep, c.deviceType, c.conditions)
+	} else {
+		comps = c.p.groupComponents(c.deviceType, c.conditions)
+	}
 	candidates := map[*dtComponent][]*dtResolved{}
 	for _, comp := range comps {
 		found := c.p.candidatesOf(c.facts, comp)

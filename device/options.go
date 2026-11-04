@@ -4,6 +4,7 @@
 package device
 
 import (
+	"errors"
 	"fmt"
 	"log/slog"
 	"maps"
@@ -202,6 +203,9 @@ func (s *settings) declare(d Declaration) error {
 				return fmt.Errorf("%w: a mounted server for %s (0x%04X): declare it, %sdef.Declare{HostServer: …} or device.HostServer(srv)",
 					ErrConfiguration, def.Name, o.decl.Cluster, strings.ToLower(def.Name))
 			}
+			if err := checkServedIDs(o.decl.Server); err != nil {
+				return fmt.Errorf("%w: HostServer for cluster 0x%08X: %w", ErrConfiguration, o.decl.Cluster, err)
+			}
 		}
 		s.merge(o.decl, o.mount)
 		return nil
@@ -317,6 +321,39 @@ func mountServer(srv contract.ClusterServer) Declaration {
 		return clusterOption{undeclared: true}
 	}
 	return clusterOption{decl: spec.ClusterDeclaration{Cluster: srv.MatterClusterID(), Server: srv}, undeclared: true}
+}
+
+// checkServedIDs refuses a host server whose cluster id, or any attribute,
+// command or event id it lists, is illegal, every one named: the endpoint
+// hosting it does not come up, as matter.js fails an endpoint's
+// initialization with the ClusterImplementationError of
+// ValidatedElements (packages/node/src/behavior/cluster/
+// ValidatedElements.ts:190-222 at 862ad75f; ValidatedElementsTest.ts:655-668
+// "fails endpoint initialization for a hosted cluster with an illegal ID").
+func checkServedIDs(srv contract.ClusterServer) error {
+	var errs []error
+	named := func(kind string, id uint32, err error) {
+		if err != nil {
+			errs = append(errs, fmt.Errorf("%s 0x%08X: %w", kind, id, err))
+		}
+	}
+	named("cluster", srv.MatterClusterID(), spec.CheckClusterID(srv.MatterClusterID()))
+	if l, ok := srv.(contract.ClusterAttributeLister); ok {
+		for _, id := range l.MatterAttributes() {
+			named("attribute", id, spec.CheckAttributeID(id))
+		}
+	}
+	if l, ok := srv.(contract.ClusterCommandLister); ok {
+		for _, id := range append(l.MatterAcceptedCommands(), l.MatterGeneratedCommands()...) {
+			named("command", id, spec.CheckCommandID(id))
+		}
+	}
+	if l, ok := srv.(contract.ClusterEventLister); ok {
+		for _, id := range l.MatterEvents() {
+			named("event", id, spec.CheckEventID(id))
+		}
+	}
+	return errors.Join(errs...)
 }
 
 // HostServer declares srv as the host's own server for its cluster

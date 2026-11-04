@@ -29,7 +29,7 @@ func rw(id uint32, n string, t spec.Type, q spec.Quality, c spec.Constraint) spe
 }
 
 var writeCluster = &spec.Cluster{
-	ID: 0xFFF2, Name: "Write", Revision: 1,
+	ID: 0xFFF1_FC02, Name: "Write", Revision: 1,
 	Features: []spec.Feature{{Name: "TB", Title: "Turbo", Bit: 0, Conformance: op(spec.ConfOptional)}},
 	Attributes: []spec.Attribute{
 		rw(0, "Level", spec.Type{Kind: spec.KindUint, Bits: 8}, spec.Quality{}, spec.Constraint{Text: "1 to 200", Min: &spec.Bound{Int: 1}, Max: &spec.Bound{Int: 200}}),

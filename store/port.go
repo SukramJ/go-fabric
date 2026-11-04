@@ -196,9 +196,23 @@ type ICD interface {
 	SaveICDCounter(ctx context.Context, counter uint32) error
 }
 
+// Eraser erases the whole store: the factory reset (node.Node.FactoryReset,
+// controller.Controller.Erase). Every row of every area goes; the store is
+// then what a freshly applied schema holds, the next fabric index back at
+// 1. Mirrors matter.js ServerNode.resetStorage
+// (packages/node/src/node/ServerNode.ts:242-256), which clears the fabrics,
+// the sessions, the occurrences and the credentials and erases the node's
+// store: Matter requires a factory reset to remove "all security- and
+// privacy-related data and key material" (Core §13.4).
+// fabric:reachable:reason="the method set store.Port embeds; node and controller call Erase through Port, so no call edge names the interface itself"
+type Eraser interface {
+	Erase(ctx context.Context) error
+}
+
 // Port is the whole persistence port: every area. [Store] and
 // store/memstore implement it; node.Config.Store.Credentials takes one.
 type Port interface {
+	Eraser
 	Fabrics
 	Identity
 	ACL

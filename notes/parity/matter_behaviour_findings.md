@@ -415,25 +415,12 @@ Device side:. (Triage 2026-10-29: owner's hand test (manual test list C5), no wa
   SubscriptionsServerTest "drops the stored subscription when the peer closes
   its session while the node keeps running"). Fix: terminate on every close
   except the one `Stop` performs. (Triage 2026-10-29: wave H1, the device IM and write path.)
-- **No BUSY for a write that races a chunked write.** A chunked write holds
-  its attribute (`bridge/exchange_routing.go:62` `writeTxs`); another
-  exchange writing the same attribute is not answered BUSY as matter.js does
-  (`InteractionServer.ts:507,526` at `862ad75f`, #4768; InteractionProtocolTest
-  "answers BUSY to another exchange's write of an attribute while a chunked
-  write holds it"). (Triage 2026-10-29: wave H1, the device IM and write path.)
 - **Utility component on the composing endpoint is not a candidate.**
   `endpoint/devicetype_conformance.go:842-850` `candidatesOf` iterates the
   composition scope; matter.js #4745 prepends the composing endpoint when it
   lists the utility component itself (`DeviceTypeConformance.ts:596-614`,
   Core § 9.2.1; Heat Pump and Solar Power examples). A composed product that
   carries its Power Source on the composing endpoint is refused here. (Triage 2026-10-29: wave H3, node options and the embedding layer.)
-- **A Root-asserted condition can refuse.** Conditions true for the node
-  endpoint only because a device type asserts them at `Root`
-  (`devicetype_conformance.go:503-526`) produce violations that
-  `devicetype_validation.go:333-339` refuses like any other; matter.js #4746
-  marks them `assertedAtRoot`, never refuses, logs at debug
-  (`DeviceTypeConformance.ts:65-76`, `ConditionAssertions.ts:63-68`).
-  (With the previous item.)
 
 
 Controller side:. (Triage 2026-10-29: wave H3, node options and the embedding layer.)
@@ -501,19 +488,12 @@ Found by the phase-16 port of `packages/node/test/node` (brief BI, PR #168,
 
 Device side:. (Triage 2026-10-29: wave H2, commissioning and security (Fable), once matter.js ships the forward feature for the device side.)
 
-- **AttributePathIB `WildcardPathFlags` (tag 7) is not decoded.** The
-  decoder in `im/` reads tags 0–5; a read that asks to skip the global
-  lists reads them all (AttributeReadResponseTest "skipAttributeList"). (Triage 2026-10-29: wave H1, the device IM and write path.)
 - **A write path without cluster or attribute is answered per path.**
   `im/write.go:292-298` appends an AttributeStatus of INVALID_ACTION for
   the path and goes on; matter.js and chip refuse the whole interaction
   with a StatusResponse of INVALID_ACTION
   (`action/server/AttributeWriteResponse.ts:278-285`, `:305-312`; chip
   `WriteHandler.cpp` `GetConcreteAttributePath` → `SuccessOrExit`). (Triage 2026-10-29: wave H1, the device IM and write path.)
-- **No `isHeldByOtherWrite` on a wildcard write.** matter.js skips, in a
-  wildcard or group write, an attribute another write interaction holds
-  (`AttributeWriteResponse.ts:355-358`); the Go write has no such check.
-  Goes with the BUSY item above. (Triage 2026-10-29: wave H1, the device IM and write path.)
 - **A closed PASE session does not restart the commissioning
   advertisement.** The device keeps its commissionable record during PASE
   and publishes nothing when the session closes; matter.js starts a
@@ -721,6 +701,27 @@ Identify, WindowCovering and ServiceArea tests (brief BJ, PR #170,
   `Observable.ts:1276-1280`) applies to the colour attributes' quieters
   too. No matter.js test checks it. (Milestone 3, with brief BL's
   in-wave fixes or the next lights wave.)
+
+Found by the phase-31 port of `packages/node/test` (brief phase 31,
+2026-11-03). Line numbers at `862ad75f`.
+
+- **No generic sanitisation of fabric-scoped data on fabric removal.**
+  matter.js strips every fabric-scoped list entry of a removed fabric from
+  every behavior's state (`ServerEnvironment.ts:187-195`,
+  `limitNodeDataToAllowedFabrics`); Go drops it only in servers that
+  implement `MatterFabricRemoved` (`bridge/bridge.go:1317-1322`), and the
+  WebRTC Transport Provider (`cluster/camera/provider.go`) keeps a removed
+  fabric's `CurrentSessions` (ServerNodeTest.ts:1549-1580 "removes the
+  entries of a removed fabric from a fabric-sensitive list" stays missing).
+- **A corrupt endpoint allocation counter fails the allocation.**
+  `endpoint/sqlitestore` `allocate` refuses a counter below the first part
+  number (and a non-integer one fails its scan); matter.js starts over from
+  the first number (ServerNodeTest.ts:941-957, "starts over from 1 when the
+  next number in storage is corrupt", stays missing).
+- **No flushing close of a subscription.** `Manager.Close` drops the
+  queued changes; matter.js's close of a subscription sends a report queued
+  behind the one in flight first, despite a deferral
+  (ServerSubscriptionTest.ts:1123-1195 and :499-555 stay missing).
 
 ## Application cluster servers — open items. (Triage 2026-10-29: wave H1, the device IM and write path.)
 

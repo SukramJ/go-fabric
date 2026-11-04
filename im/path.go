@@ -20,6 +20,8 @@ const (
 	tagAttrPathCluster              uint8 = 3
 	tagAttrPathAttribute            uint8 = 4
 	tagAttrPathListIndex            uint8 = 5
+	tagAttrPathWildcardPathFlags    uint8 = 6
+	tagAttrPathWildcardFilterCfgVer uint8 = 7
 )
 
 // CommandPathIB tag numbers (Matter Core Spec §10.6.2).
@@ -56,6 +58,16 @@ type ConcreteAttributePath struct {
 	// list element — to the list (Matter §10.6.4.3.1; the chunked list
 	// encoding a controller uses for a list too large for one message).
 	ListAppend bool
+
+	// WildcardPathFlags (tag 6) asks a wildcard read or subscribe to skip
+	// classes of paths ([WildcardSkipRootNode] …); zero when absent.
+	// [ApplyWildcardPathFlags] applies them. Mirrors matter.js
+	// packages/types/src/protocol/types/TlvAttributePath.ts:27.
+	WildcardPathFlags uint32
+	// WildcardFilterConfigurationVersion (tag 7) is the ConfigurationVersion
+	// the flags were chosen for (TlvAttributePath.ts:28).
+	WildcardFilterConfigurationVersion    uint32
+	HasWildcardFilterConfigurationVersion bool
 }
 
 // IsWildcardEndpoint reports whether the path matches every endpoint.
@@ -98,6 +110,12 @@ func (p ConcreteAttributePath) MarshalTLV(enc *tlv.Encoder, tag tlv.Tag) {
 		enc.PutNull(tlv.ContextTag(tagAttrPathListIndex))
 	case p.HasListIndex:
 		enc.PutUint(tlv.ContextTag(tagAttrPathListIndex), uint64(p.ListIndex))
+	}
+	if p.WildcardPathFlags != 0 {
+		enc.PutUint(tlv.ContextTag(tagAttrPathWildcardPathFlags), uint64(p.WildcardPathFlags))
+	}
+	if p.HasWildcardFilterConfigurationVersion {
+		enc.PutUint(tlv.ContextTag(tagAttrPathWildcardFilterCfgVer), uint64(p.WildcardFilterConfigurationVersion))
 	}
 	_ = enc.EndContainer()
 }
