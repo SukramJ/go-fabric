@@ -766,7 +766,7 @@
   },
   {
     "file": "client/interaction/subscribe.go",
-    "line": 138,
+    "line": 147,
     "citation": "InteractionMessenger.ts:938-972",
     "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
     "identifier": "SubscribeResponse",
@@ -775,7 +775,7 @@
   },
   {
     "file": "client/interaction/subscribe.go",
-    "line": 316,
+    "line": 325,
     "citation": "InteractionMessenger.ts:1052-1055",
     "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
     "identifier": "#encodeReadingRequest",
@@ -1501,7 +1501,7 @@
   },
   {
     "file": "controller/client/addresses.go",
-    "line": 22,
+    "line": 24,
     "citation": "Peers.ts:959-966",
     "resolved": "packages/node/src/node/client/Peers.ts",
     "identifier": "expirationOf",
@@ -1519,7 +1519,7 @@
   },
   {
     "file": "controller/client/cache.go",
-    "line": 86,
+    "line": 110,
     "citation": "DatasourceCache.ts:199-201",
     "resolved": "packages/node/src/storage/client/DatasourceCache.ts",
     "identifier": "invalidateVersion",
@@ -1609,7 +1609,7 @@
   },
   {
     "file": "controller/client/network.go",
-    "line": 266,
+    "line": 458,
     "citation": "NetworkClient.ts:215-238",
     "resolved": "packages/node/src/behavior/system/network/NetworkClient.ts",
     "identifier": "#recomputeConnectionState",
@@ -1618,7 +1618,7 @@
   },
   {
     "file": "controller/client/node.go",
-    "line": 74,
+    "line": 78,
     "citation": "NetworkClient.ts:385-391",
     "resolved": "packages/node/src/behavior/system/network/NetworkClient.ts",
     "identifier": "isNewlyCommissioned",
@@ -1627,7 +1627,7 @@
   },
   {
     "file": "controller/client/node.go",
-    "line": 87,
+    "line": 95,
     "citation": "NetworkClient.ts:268-273",
     "resolved": "packages/node/src/behavior/system/network/NetworkClient.ts",
     "identifier": "fabricLabelReconciled",
@@ -1636,7 +1636,7 @@
   },
   {
     "file": "controller/client/node.go",
-    "line": 393,
+    "line": 409,
     "citation": "NetworkClient.ts:60-102",
     "resolved": "packages/node/src/behavior/system/network/NetworkClient.ts",
     "identifier": "ClientNode",
@@ -1717,7 +1717,7 @@
   },
   {
     "file": "controller/client/structure.go",
-    "line": 209,
+    "line": 232,
     "citation": "ClientStructure.ts:1674-1692",
     "resolved": "packages/node/src/node/client/ClientStructure.ts",
     "identifier": "AttributeList",
@@ -1726,7 +1726,7 @@
   },
   {
     "file": "controller/client/structure.go",
-    "line": 223,
+    "line": 246,
     "citation": "ClientStructure.ts:1601-1605",
     "resolved": "packages/node/src/node/client/ClientStructure.ts",
     "identifier": "AttributeUpdates",
@@ -2018,7 +2018,7 @@
   },
   {
     "file": "node/config.go",
-    "line": 222,
+    "line": 233,
     "citation": "NetworkServer.ts:202-222",
     "resolved": "packages/node/src/behavior/system/network/NetworkServer.ts",
     "identifier": "network",

@@ -133,8 +133,8 @@ func (r *Subscriptions) handleReport(ctx context.Context, m *messenger, first *e
 		a.add(rd)
 		if !rd.MoreChunkedMessages && sub.request.Updated != nil {
 			// A failure of the consumer leaves the report unanswered and
-			// ends its exchange — ClientSubscriptionHandler.#handleExchange
-			// lets updated's rejection out (ClientSubscriptionHandler.ts:130-131
+			// ends its exchange — matter.js's subscription handler lets
+			// updated's rejection out (ClientSubscriptionHandler.ts:130-131
 			// at 862ad75f).
 			return sub.request.Updated(a.report)
 		}

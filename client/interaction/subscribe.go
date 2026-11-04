@@ -74,9 +74,9 @@ type SubscribeRequest struct {
 	// Subscribe returns the error (the subscription is abandoned, as a
 	// cancelled establishment is); a later report is left unanswered and
 	// the error logged; a sustained subscription logs it, warning once,
-	// and keeps running. Mirrors matter.js ClientInteraction.subscribe's
-	// updated, whose rejection fails the establishment
-	// (ClientSubscribeTest.ts:1275-1331 at 862ad75f), and
+	// and keeps running. Mirrors matter.js's subscribe, whose updated
+	// rejection fails the establishment (ClientSubscribeTest.ts:1275-1331
+	// at 862ad75f), and
 	// SustainedSubscription.#deliver
 	// (packages/protocol/src/action/client/subscription/SustainedSubscription.ts:339-352).
 	Updated func(r *Report) error
