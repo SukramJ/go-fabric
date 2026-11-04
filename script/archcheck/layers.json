@@ -5,7 +5,7 @@
     {"name": "transport", "packages": ["transport/...", "mdns", "internal/udpseam", "internal/channelseam"]},
     {"name": "security-and-storage", "packages": ["secure/...", "icd", "icd/...", "commissioning", "store", "store/memstore", "bdx/...", "diagevent", "bootid"]},
     {"name": "model-and-protocol", "packages": ["im", "im/...", "groups", "cluster", "cluster/spec", "cluster/spec/...", "cluster/wire", "contract", "eligibility", "surface", "internal/surfaceseam", "internal/exchangeseam", "client/..."]},
-    {"name": "servers", "packages": ["cluster/...", "binding"]},
+    {"name": "servers", "packages": ["cluster/...", "binding", "internal/coreseam"]},
     {"name": "endpoints", "packages": ["endpoint", "endpoint/...", "device", "device/...", "internal/deviceseam", "internal/fabrictestseam"]},
     {"name": "roles", "packages": ["bridge", "controller/...", "internal/bridgeseam", "internal/nodeseam"]},
     {"name": "facade", "packages": ["node", "node/controllernode", "node/metrics/..."]},

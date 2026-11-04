@@ -212,6 +212,11 @@ var floors = []packageFloor{
 	},
 	{pkg: "github.com/SukramJ/go-fabric/internal/clockvar", min: 100},
 	{
+		pkg: "github.com/SukramJ/go-fabric/internal/coreseam",
+		min: 0,
+		why: "declaration-only seam (M9 module wave): a function variable cluster/core installs from its init, so the package holds no statement a test could execute",
+	},
+	{
 		pkg: "github.com/SukramJ/go-fabric/internal/exchangeseam",
 		min: 0,
 		why: "declaration-only seam (phase 32): a function variable client/exchange installs from its init, so the package holds no statement a test could execute",

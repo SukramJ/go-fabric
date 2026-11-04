@@ -195,29 +195,23 @@ var errBasicInfoUnknown = spec.Errorf(im.StatusUnsupportedWrite, "core: BasicInf
 // the Matter BasicInformation attributes; non-empty values pass
 // through to the cluster as-is.
 type Config struct {
-	DataModelRevision uint16 // Matter §11.1.5.1 — 0 selects 21, the 1.6.x value (matter.js HEAD Specification.ts DATA_MODEL_REVISION)
-	// SpecificationVersion is the version the node reports; 0 is
-	// [cluster.SpecificationVersion], the release this module implements.
-	// TESTING ONLY: a test stands in for a node of an older release (a
-	// controller's version gates, IcdClientTest.ts:567-582 at 862ad75f,
-	// sets basicInformation.specificationVersion so).
-	SpecificationVersion uint32
-	VendorName           string
-	VendorID             uint16
-	ProductName          string
-	ProductID            uint16
-	ProductLabel         string
-	ProductURL           string
-	ProductAppearance    ProductAppearanceStruct
-	HardwareVersion      uint16
-	HardwareVersionStr   string
-	SoftwareVersion      uint32
-	SoftwareVersionStr   string
-	ManufacturingDate    string // ISO 8601 YYYYMMDD
-	PartNumber           string
-	SerialNumber         string
-	NodeLabel            string // user-writable; supplied default
-	Location             string // user-writable; "XX" for unset per spec
+	DataModelRevision  uint16 // Matter §11.1.5.1 — 0 selects 21, the 1.6.x value (matter.js HEAD Specification.ts DATA_MODEL_REVISION)
+	VendorName         string
+	VendorID           uint16
+	ProductName        string
+	ProductID          uint16
+	ProductLabel       string
+	ProductURL         string
+	ProductAppearance  ProductAppearanceStruct
+	HardwareVersion    uint16
+	HardwareVersionStr string
+	SoftwareVersion    uint32
+	SoftwareVersionStr string
+	ManufacturingDate  string // ISO 8601 YYYYMMDD
+	PartNumber         string
+	SerialNumber       string
+	NodeLabel          string // user-writable; supplied default
+	Location           string // user-writable; "XX" for unset per spec
 	// UniqueID pins the UniqueID attribute (Matter §11.1.5.13) to a
 	// previously persisted value. Empty means "derive one"
 	// ([DeriveUniqueID]); a caller that persists the derived value on
@@ -334,9 +328,11 @@ func NewBasicInformation(cfg Config) (*BasicInformation, error) {
 		swStr = strconv.FormatUint(uint64(swVersion), 10)
 	}
 	bi := &BasicInformation{
-		log:                  cmp.Or(cfg.Logger, slog.Default()),
-		dataModelRevision:    dmr,
-		specVersion:          cmp.Or(cfg.SpecificationVersion, cluster.SpecificationVersion),
+		log:               cmp.Or(cfg.Logger, slog.Default()),
+		dataModelRevision: dmr,
+		// The release this module implements; a test stands in for an
+		// older one through internal/coreseam.SetSpecificationVersion.
+		specVersion:          cluster.SpecificationVersion,
 		vendorName:           cfg.VendorName,
 		vendorID:             cfg.VendorID,
 		productName:          cfg.ProductName,
