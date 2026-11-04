@@ -1511,14 +1511,18 @@
     },
     {
       "path": "packages/node/test/behaviors/thermostat/PresetsAtomicWriteTest.ts",
-      "status": "partial",
+      "status": "ported",
       "go": [
         "cluster/thermo:TestParityMatterJS_PresetsAtomicWriteTest"
       ],
-      "missing": [
-        "refuses a commit whose settled presets an observer stripped the handle from"
+      "left": [
+        {
+          "it": "refuses a commit whose settled presets an observer stripped the handle from",
+          "class": "js-runtime-only",
+          "reason": "the case rewrites the presets in flight from an application observer on persistedPresets$Changing, matter.js's behavior-state observer; the Go server has no such observer — a Go host refuses presets through its PresetStore (owner verdict, issue #396)"
+        }
       ],
-      "reason": "BeginWrite, the chunked Presets write, CommitWrite and RollbackWrite run over the wire on a commissioned fabrictest pair, the controller's cache being its Presets subscription and the device's announcements the server's OnMatterAttributesChanged. Missing, js-runtime-only: an application observer on persistedPresets$Changing rewriting the presets in flight, a seam the Go server does not have (the host refuses through its PresetStore).",
+      "reason": "BeginWrite, the chunked Presets write, CommitWrite and RollbackWrite run over the wire on a commissioned fabrictest pair, the controller's cache being its Presets subscription and the device's announcements the server's OnMatterAttributesChanged. Left, js-runtime-only: an application observer on persistedPresets$Changing rewriting the presets in flight, a seam the Go server does not have (the host refuses through its PresetStore).",
       "snapshotSha": "23cae0af7ec40de910fa411bb37f0157a4906c63"
     },
     {
@@ -1535,17 +1539,33 @@
     },
     {
       "path": "packages/node/test/behaviors/thermostat/PresetsLocalWriteTest.ts",
-      "status": "partial",
+      "status": "ported",
       "go": [
         "cluster/thermo:TestParityMatterJS_PresetsLocalWriteTest"
       ],
-      "missing": [
-        "refuses a preset an observer stripped the handle from, and stays writable",
-        "checks the settled presets of every commit that shares one transaction",
-        "refuses a preset an observer marks built-in after the thermostat issued its handle",
-        "validates a change an observer makes after the thermostat normalized"
+      "left": [
+        {
+          "it": "refuses a preset an observer stripped the handle from, and stays writable",
+          "class": "js-runtime-only",
+          "reason": "the case rewrites the presets in flight from an application observer on persistedPresets$Changing, matter.js's behavior-state observer; the Go server has no such observer — a Go host refuses presets through its PresetStore (owner verdict, issue #396)"
+        },
+        {
+          "it": "checks the settled presets of every commit that shares one transaction",
+          "class": "js-runtime-only",
+          "reason": "the case rewrites the presets in flight from an application observer on persistedPresets$Changing, matter.js's behavior-state observer; the Go server has no such observer — a Go host refuses presets through its PresetStore (owner verdict, issue #396)"
+        },
+        {
+          "it": "refuses a preset an observer marks built-in after the thermostat issued its handle",
+          "class": "js-runtime-only",
+          "reason": "the case rewrites the presets in flight from an application observer on persistedPresets$Changing, matter.js's behavior-state observer; the Go server has no such observer — a Go host refuses presets through its PresetStore (owner verdict, issue #396)"
+        },
+        {
+          "it": "validates a change an observer makes after the thermostat normalized",
+          "class": "js-runtime-only",
+          "reason": "the case rewrites the presets in flight from an application observer on persistedPresets$Changing, matter.js's behavior-state observer; the Go server has no such observer — a Go host refuses presets through its PresetStore (owner verdict, issue #396)"
+        }
       ],
-      "reason": "The local writes run on a fabrictest device with SetPresets inside Device.Act (the one local write, for Presets and persistedPresets alike), the restart on the node's own store (Aggregator.Add, Device.Restart), an application's refusal being its PresetStore's. Missing, js-runtime-only: the four cases rewrite the presets in flight from an application observer on persistedPresets$Changing, a seam the Go server does not have.",
+      "reason": "The local writes run on a fabrictest device with SetPresets inside Device.Act (the one local write, for Presets and persistedPresets alike), the restart on the node's own store (Aggregator.Add, Device.Restart), an application's refusal being its PresetStore's. Left, js-runtime-only: the four cases rewrite the presets in flight from an application observer on persistedPresets$Changing, a seam the Go server does not have.",
       "snapshotSha": "7f2a9f8b2dfe56e3524b64f0a79664116d4bfeb4"
     },
     {

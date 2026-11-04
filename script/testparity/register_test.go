@@ -64,9 +64,12 @@ const testparityPlannedRatchet = 2
 // took 261 of the 312 cases of nine entries out of missing — ported or
 // left — and completed four files; 51 stay missing with a named reason
 // (the PR's report): 125 ported, 552 missing.
+// The seam wave (issue #396) moves cases out of missing item by item; its
+// first, the five Presets observer cases, left by owner verdict, completes
+// two files: 127 ported, 546 missing.
 const (
-	testparityPortedRatchet  = 125
-	testparityMissingRatchet = 551
+	testparityPortedRatchet  = 127
+	testparityMissingRatchet = 546
 )
 
 // testparityLeftRatchet is the number of left it cases summed over the
@@ -81,7 +84,9 @@ const (
 // allocator (BD-Matter-ControllerNodeIDRandom), the ICD transaction model,
 // the ML-DSA ledger stores (BD-Matter-DCL-MirroredScope) and JS runtime
 // artefacts, each row with its class and reason.
-const testparityLeftRatchet = 270
+// The seam wave (issue #396) adds the five Presets observer rows
+// (js-runtime-only, owner verdict): 275.
+const testparityLeftRatchet = 275
 
 // moduleRoot is where the committed artefacts live, seen from this package.
 const moduleRoot = "../.."
