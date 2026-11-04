@@ -5765,7 +5765,7 @@
       "identifier": "TestKnownAnswersParityMatterJS",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/discovery/known_answers_parity_matterjs_test.go",
-      "line": 19
+      "line": 20
     },
     {
       "package": "client/discovery",
@@ -31357,7 +31357,7 @@
       "identifier": "TestCcmTagVerificationParityMatterJS",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/aesccm/ccm_parity_matterjs_test.go",
-      "line": 72
+      "line": 73
     },
     {
       "package": "secure/aesccm",
@@ -31469,7 +31469,7 @@
       "identifier": "TestStandardCryptoAeadParityMatterJS",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/aesccm/ccm_parity_matterjs_test.go",
-      "line": 107
+      "line": 108
     },
     {
       "package": "secure/attestation",
@@ -32064,7 +32064,7 @@
       "identifier": "TestDerCodecTimeParityMatterJS",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/mattercert/der_codec_parity_matterjs_test.go",
-      "line": 50
+      "line": 51
     },
     {
       "package": "secure/mattercert",
@@ -32442,14 +32442,14 @@
       "identifier": "TestAssertValidPayloadIdentityParityMatterJS",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/setup/pairing_code_schema_parity_matterjs_test.go",
-      "line": 213
+      "line": 239
     },
     {
       "package": "secure/setup",
       "identifier": "TestBase38SchemaParityMatterJS",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/setup/pairing_code_schema_parity_matterjs_test.go",
-      "line": 315
+      "line": 352
     },
     {
       "package": "secure/setup",
@@ -32505,7 +32505,7 @@
       "identifier": "TestIsValidPasscodeParityMatterJS",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/setup/pairing_code_schema_parity_matterjs_test.go",
-      "line": 297
+      "line": 334
     },
     {
       "package": "secure/setup",
@@ -32582,7 +32582,7 @@
       "identifier": "TestManualPairingCodeCodecParityMatterJS",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/setup/pairing_code_schema_parity_matterjs_test.go",
-      "line": 230
+      "line": 259
     },
     {
       "package": "secure/setup",
@@ -32680,7 +32680,7 @@
       "identifier": "TestQrCodeTlvDataParityMatterJS",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/setup/pairing_code_schema_parity_matterjs_test.go",
-      "line": 151
+      "line": 168
     },
     {
       "package": "secure/setup",
@@ -35053,7 +35053,7 @@
       "identifier": "TestTlvStringByteSizeParityMatterJS",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "tlv/codec_tags_parity_matterjs_test.go",
-      "line": 100
+      "line": 105
     },
     {
       "package": "tlv",
