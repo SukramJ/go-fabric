@@ -7,7 +7,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
 
+	"github.com/SukramJ/go-fabric/schema"
 	"github.com/SukramJ/go-fabric/tlv"
 )
 
@@ -95,6 +97,13 @@ func UnmarshalWriteRequestTLV(dec *tlv.Decoder, valueReader AttributeValueReader
 		}
 		switch uint8(el.Tag.Number & 0xFF) {
 		case tagWriteReqSuppressResponse:
+			// TlvOptionalField(0, TlvBoolean): a SuppressResponse of another
+			// type fails the decode, and the request is answered
+			// (packages/types/src/protocol/messages/TlvWriteRequest.ts:18;
+			// SuppressResponseTest.ts:399-403).
+			if el.Type != tlv.TypeBoolTrue && el.Type != tlv.TypeBoolFalse {
+				return WriteRequest{}, fmt.Errorf("%w: SuppressResponse not a boolean", ErrInvalidWriteRequest)
+			}
 			req.SuppressResponse = el.Bool
 		case tagWriteReqTimedRequest:
 			req.TimedRequest = el.Bool
@@ -244,7 +253,7 @@ func (wr WriteResponse) MarshalTLV(enc *tlv.Encoder) {
 // [IsPASEFromContext] after it, mirroring matter.js
 // packages/protocol/src/interaction/FabricAccessControl.ts:189-191, which
 // keys the implicit Administer grant on the session's auth mode.
-func HandleWriteRequest(ctx context.Context, d Dispatcher, req WriteRequest) WriteResponse { //nolint:gocyclo // the write interaction's per-path gates in matter.js order
+func HandleWriteRequest(ctx context.Context, d Dispatcher, req WriteRequest) WriteResponse { //nolint:gocyclo,funlen // the write interaction's per-path gates in matter.js order
 	_, fabricIndex := FabricFilterFromContext(ctx)
 	subjectNodeID, subjectCATs := SubjectFromContext(ctx)
 	pase := IsPASEFromContext(ctx)
@@ -284,6 +293,18 @@ func HandleWriteRequest(ctx context.Context, d Dispatcher, req WriteRequest) Wri
 	// replace (TC-ACL-2.6, 2.8). matter.js checks every element
 	// (BD-Matter-ChunkedWriteAuthorizedOnce).
 	tx := writeTransactionFromContext(ctx)
+	// authorizeWildcard gates each location a wildcard-endpoint write
+	// resolves to: an attribute another interaction holds is skipped
+	// (AttributeWriteResponse.ts:355-358), then the ACL decides.
+	authorizeWildcard := func(endpoint uint16, clusterID, attrID uint32) StatusCode {
+		if tx.heldByOther(endpoint, clusterID, attrID) {
+			return StatusBusy
+		}
+		if !aclActive {
+			return StatusSuccess
+		}
+		return checkSubjectACL(ctx, aclChecker, fabricIndex, subjectNodeID, subjectCATs, endpoint, clusterID, writePrivilege(endpoint, clusterID, attrID))
+	}
 	lastWritten := tx.lastWritten
 	defer func() { tx.lastWritten = lastWritten }()
 	var wr WriteResponse
@@ -303,6 +324,19 @@ func HandleWriteRequest(ctx context.Context, d Dispatcher, req WriteRequest) Wri
 			wr.Responses = append(wr.Responses, AttributeStatus{
 				Path:   w.Path,
 				Status: StatusIB{Status: StatusInvalidAction},
+			})
+			continue
+		}
+		// An attribute another interaction's chunked write holds is
+		// answered BUSY; a concrete path this interaction accepts is held
+		// before it is written when the write is chunked or holds already.
+		// Mirrors matter.js packages/node/src/node/server/
+		// InteractionServer.ts:505-508 (#isHeldByOther → Status.Busy) and
+		// :536-543 (the hold, taken before any await).
+		if w.Path.HasEndpoint && !tx.holdUnlessBusy(w.Path, req.MoreChunkedMessages) {
+			wr.Responses = append(wr.Responses, AttributeStatus{
+				Path:   w.Path,
+				Status: StatusIB{Status: StatusBusy},
 			})
 			continue
 		}
@@ -343,7 +377,7 @@ func HandleWriteRequest(ctx context.Context, d Dispatcher, req WriteRequest) Wri
 		// request means "caller does not constrain the version" — skip.
 		if hasDV && w.HasDataVersion && w.DataVersion != 0 && w.Path.HasEndpoint {
 			if current, ok := dvReader.CurrentDataVersion(ctx, w.Path.Endpoint, w.Path.Cluster); ok && current != 0 {
-				if current != w.DataVersion {
+				if current != w.DataVersion && versionCheckApplies(ctx, d, w.Path) {
 					wr.Responses = append(wr.Responses, AttributeStatus{
 						Path:   w.Path,
 						Status: StatusIB{Status: StatusDataVersionMismatch},
@@ -357,14 +391,18 @@ func HandleWriteRequest(ctx context.Context, d Dispatcher, req WriteRequest) Wri
 		// location has to be authorized there — a check on the returned
 		// results would run after the value already landed. Mirrors
 		// matter.js AttributeWriteResponse.ts:324-343.
+		//
+		// A wildcard write skips, silently, an attribute another
+		// interaction's chunked write holds (matter.js
+		// AttributeWriteResponse.ts:355-358 isHeldByOtherWrite).
 		var results []WriteResult
 		switch {
-		case !aclActive || w.Path.HasEndpoint:
+		case w.Path.HasEndpoint:
 			results = d.Write(ctx, w.Path, w.Value)
 		case hasAuthWriter:
-			results = authWriter.WriteAuthorized(ctx, w.Path, w.Value, func(endpoint uint16, clusterID, attrID uint32) StatusCode {
-				return checkSubjectACL(ctx, aclChecker, fabricIndex, subjectNodeID, subjectCATs, endpoint, clusterID, writePrivilege(endpoint, clusterID, attrID))
-			})
+			results = authWriter.WriteAuthorized(ctx, w.Path, w.Value, authorizeWildcard)
+		case !aclActive:
+			results = d.Write(ctx, w.Path, w.Value)
 		default:
 			// ACL enforcement is on but this dispatcher cannot authorize
 			// the endpoints a wildcard resolves to. Fail closed rather
@@ -396,7 +434,42 @@ func HandleWriteRequest(ctx context.Context, d Dispatcher, req WriteRequest) Wri
 			})
 		}
 	}
+	// The chunk's writes are done: a chunk that announces more keeps only
+	// the hold of its last accepted attribute, the interaction's final
+	// message releases every hold (InteractionServer.ts:555-560
+	// releaseHeldPaths(previousProcessedAttributePath), :469 the disposal).
+	if req.MoreChunkedMessages {
+		tx.releaseHolds(tx.lastQueued)
+	} else {
+		tx.releaseHolds(nil)
+	}
 	return wr
+}
+
+// versionCheckApplies reports whether a write's DataVersion is judged at
+// all: matter.js answers a path that does not exist, an attribute that is
+// not writable and a timed attribute outside a timed interaction with their
+// own statuses before it compares the version
+// (packages/protocol/src/action/server/AttributeWriteResponse.ts:221-257 —
+// existence, writable, write privilege, timed, then the version), so the
+// dispatcher's answer is left to those. InteractionProtocolTest.ts:557-627
+// (WRITE_REQUEST: the read-only ProductName with a version is
+// UNSUPPORTED_WRITE).
+func versionCheckApplies(ctx context.Context, d Dispatcher, p ConcreteAttributePath) bool {
+	if writable, known := schema.AttributeWritable(p.Cluster, p.Attribute); known && !writable {
+		return false
+	}
+	if timed, known := TimedInteractionFromContext(ctx); known && !timed && schema.IsTimedWrite(p.Cluster, p.Attribute) {
+		return false
+	}
+	for _, r := range d.Read(ctx, p) {
+		switch r.Status {
+		case StatusUnsupportedEndpoint, StatusUnsupportedCluster, StatusUnsupportedAttribute:
+			return false
+		default:
+		}
+	}
+	return true
 }
 
 // allSucceeded reports whether every result of a write is Success.
@@ -412,12 +485,121 @@ func allSucceeded(results []WriteResult) bool {
 // WriteTransaction carries what one Write interaction remembers across the
 // WriteRequest messages of a chunked write: the attribute its last data
 // element was written to successfully (chip WriteHandler
-// mLastSuccessfullyWrittenPath, which lives as long as the interaction).
+// mLastSuccessfullyWrittenPath, which lives as long as the interaction),
+// and the attributes it holds in the node's [WriteHolds].
 // The transport keeps one per chunked write and hands it to every chunk
-// through [WithWriteTransaction]; the zero value starts a transaction.
+// through [WithWriteTransaction]; the zero value starts a transaction that
+// holds nothing, [NewWriteTransaction] one that takes part in holds.
 type WriteTransaction struct {
 	lastWritten *ConcreteAttributePath
+
+	holds *WriteHolds
+	// held are the attributes this transaction holds in holds; guarded
+	// by holds.mu.
+	held map[writeHoldKey]struct{}
+	// lastQueued is the last concrete attribute a chunk accepted, the one
+	// hold that moves on to the next chunk (matter.js
+	// previousProcessedAttributePath, InteractionServer.ts:458, :536-537).
+	lastQueued *writeHoldKey
 }
+
+// NewWriteTransaction starts a write interaction that holds the attributes
+// of its chunks in holds and is answered BUSY on an attribute another
+// interaction holds there.
+func NewWriteTransaction(holds *WriteHolds) *WriteTransaction {
+	return &WriteTransaction{holds: holds}
+}
+
+// writeHoldKey names one concrete attribute (matter.js
+// InteractionServer.ts:86-88 writePathKey).
+type writeHoldKey struct {
+	endpoint  uint16
+	cluster   uint32
+	attribute uint32
+}
+
+// WriteHolds is the table of attributes a chunked write holds, shared by
+// every write interaction of a node: matter.js InteractionServer's
+// #writingExchanges (packages/node/src/node/server/InteractionServer.ts:180,
+// :211-214 #isHeldByOther). The zero value is ready to use.
+type WriteHolds struct {
+	mu   sync.Mutex
+	held map[writeHoldKey]*WriteTransaction
+}
+
+// heldByOther reports whether another interaction holds the attribute
+// (InteractionServer.ts:211-214).
+func (tx *WriteTransaction) heldByOther(endpoint uint16, cluster, attribute uint32) bool {
+	if tx.holds == nil {
+		return false
+	}
+	tx.holds.mu.Lock()
+	defer tx.holds.mu.Unlock()
+	holder, ok := tx.holds.held[writeHoldKey{endpoint, cluster, attribute}]
+	return ok && holder != tx
+}
+
+// holdUnlessBusy reports false when another interaction holds the
+// attribute (the write is answered BUSY); otherwise it takes the hold
+// [WriteTransaction.hold] decides on and records the attribute as the
+// chunk's last accepted one.
+func (tx *WriteTransaction) holdUnlessBusy(p ConcreteAttributePath, more bool) bool {
+	if tx.heldByOther(p.Endpoint, p.Cluster, p.Attribute) {
+		return false
+	}
+	tx.hold(p, more)
+	tx.lastQueued = &writeHoldKey{p.Endpoint, p.Cluster, p.Attribute}
+	return true
+}
+
+// hold takes the attribute for this interaction when the write is chunked
+// or already holds an attribute — taken before the write is applied, so no
+// other exchange passes the BUSY check meanwhile (InteractionServer.ts:
+// 536-543).
+func (tx *WriteTransaction) hold(p ConcreteAttributePath, more bool) {
+	if tx.holds == nil {
+		return
+	}
+	tx.holds.mu.Lock()
+	defer tx.holds.mu.Unlock()
+	if !more && len(tx.held) == 0 {
+		return
+	}
+	k := writeHoldKey{p.Endpoint, p.Cluster, p.Attribute}
+	if tx.holds.held == nil {
+		tx.holds.held = make(map[writeHoldKey]*WriteTransaction)
+	}
+	if tx.held == nil {
+		tx.held = make(map[writeHoldKey]struct{})
+	}
+	tx.held[k] = struct{}{}
+	tx.holds.held[k] = tx
+}
+
+// releaseHolds releases every attribute this interaction holds but keep
+// (InteractionServer.ts:460-468 releaseHeldPaths): after a chunk's writes
+// with keep its last written attribute, and with no keep when the
+// interaction ends.
+func (tx *WriteTransaction) releaseHolds(keep *writeHoldKey) {
+	if tx.holds == nil {
+		return
+	}
+	tx.holds.mu.Lock()
+	defer tx.holds.mu.Unlock()
+	for k := range tx.held {
+		if keep != nil && k == *keep {
+			continue
+		}
+		if tx.holds.held[k] == tx {
+			delete(tx.holds.held, k)
+		}
+		delete(tx.held, k)
+	}
+}
+
+// Release ends the interaction's holds: the transport calls it for a
+// chunked write it abandons before the final chunk.
+func (tx *WriteTransaction) Release() { tx.releaseHolds(nil) }
 
 type writeTransactionKey struct{}
 

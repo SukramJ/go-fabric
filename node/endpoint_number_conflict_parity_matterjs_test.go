@@ -189,6 +189,21 @@ func TestEndpointNumberConflictParityMatterJS(t *testing.T) {
 		if got, ok := d.EndpointOf("holder"); !ok || got != holder {
 			t.Errorf("holder at %d, %v; want %d", got, ok, holder)
 		}
+		// ServerNodeTest.ts:1178-1199 ("keeps the holder's number when a
+		// refused endpoint is erased"): the endpoints added after the
+		// refusal never take the holder's number.
+		for i := range 4 {
+			key := "after-" + string(rune('a'+i))
+			if err := d.Act(func(n *node.Node) error { return n.Aggregator().Add(context.Background(), kitLight(t, key)) }); err != nil {
+				t.Fatal(err)
+			}
+			if got, _ := d.EndpointOf(key); got == holder {
+				t.Errorf("%s took the holder's number %d", key, holder)
+			}
+		}
+		if got, ok := d.EndpointOf("holder"); !ok || got != holder {
+			t.Errorf("holder at %d, %v after the additions; want %d", got, ok, holder)
+		}
 	})
 
 	t.Run("indexes parts with the same ID under different parents", func(t *testing.T) {

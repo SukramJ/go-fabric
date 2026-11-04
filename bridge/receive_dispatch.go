@@ -237,7 +237,7 @@ func (b *Bridge) dispatchReadRequest(ctx context.Context, src net.Addr, requestH
 	if readPASE {
 		readCtx = im.WithAuthModePASE(readCtx)
 	}
-	report := im.HandleReadRequest(readCtx, dispatcher, req)
+	report := im.HandleReadRequest(im.WithElementQualities(readCtx, specElementQualities{}), dispatcher, req)
 	// Evaluate EventRequests against the persistent event log so
 	// chip-tool `read-event-by-id` and Apple MTRDevice liveness
 	// checks return the buffered StartUp / BootReason / etc. events.
@@ -408,6 +408,16 @@ func (b *Bridge) dispatchWriteRequest(ctx context.Context, src net.Addr, request
 	// existed and was valid.
 	if req.TimedRequest && req.MoreChunkedMessages {
 		return b.replyStatusUnlessSuppressed(req.SuppressResponse, src, requestHdr, proto, "write_timed_chunked", im.StatusInvalidAction)
+	}
+	// WildcardPathFlags belong to Read and Subscribe only: a write path
+	// that carries them refuses the whole interaction with InvalidAction.
+	// Mirrors matter.js packages/protocol/src/action/server/
+	// AttributeWriteResponse.ts:60-66 ("WildcardPathFlags are not allowed
+	// in write interactions").
+	for _, w := range req.Writes {
+		if w.Path.WildcardPathFlags != 0 {
+			return b.replyStatusUnlessSuppressed(req.SuppressResponse, src, requestHdr, proto, "write_wildcard_path_flags", im.StatusInvalidAction)
+		}
 	}
 	// Stamp the session FabricIndex onto ctx so fabric-scoped writes
 	// (AccessControl.ACL above all) resolve the caller's fabric the

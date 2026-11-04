@@ -243,6 +243,15 @@
     "occurrences": 7
   },
   {
+    "file": "bridge/interaction_protocol_parity_matterjs_test.go",
+    "line": 184,
+    "citation": "InteractionProtocolTest.ts:2126-2138",
+    "resolved": "packages/node/test/endpoint/server/InteractionProtocolTest.ts",
+    "identifier": "CommandDataIB",
+    "nearest": 2351,
+    "occurrences": 4
+  },
+  {
     "file": "bridge/invoke_batch_dispatch_test.go",
     "line": 13,
     "citation": "InteractionServer.ts:1043-1074",
@@ -316,7 +325,7 @@
   },
   {
     "file": "bridge/receive_dispatch.go",
-    "line": 467,
+    "line": 477,
     "citation": "MessageExchange.ts:602",
     "resolved": "packages/protocol/src/protocol/MessageExchange.ts",
     "identifier": "requiresAck",
@@ -325,7 +334,7 @@
   },
   {
     "file": "bridge/receive_dispatch.go",
-    "line": 509,
+    "line": 519,
     "citation": "CommandInvokeResponse.ts:292-295",
     "resolved": "packages/protocol/src/action/server/CommandInvokeResponse.ts",
     "identifier": "InvokeResponse",
@@ -334,7 +343,7 @@
   },
   {
     "file": "bridge/receive_dispatch.go",
-    "line": 586,
+    "line": 596,
     "citation": "packages/node/src/node/server/InteractionServer.ts:1043-1074",
     "resolved": "packages/node/src/node/server/InteractionServer.ts",
     "identifier": "suppressedBuffer",
@@ -388,7 +397,7 @@
   },
   {
     "file": "bridge/subscribe.go",
-    "line": 652,
+    "line": 654,
     "citation": "ServerSubscription.ts:866-876",
     "resolved": "packages/node/src/node/server/ServerSubscription.ts",
     "identifier": "InvalidSubscription",
@@ -397,7 +406,7 @@
   },
   {
     "file": "bridge/subscribe.go",
-    "line": 763,
+    "line": 765,
     "citation": "packages/protocol/src/interaction/InteractionMessenger.ts:347",
     "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
     "identifier": "sendDataReport",
@@ -406,7 +415,7 @@
   },
   {
     "file": "bridge/subscribe.go",
-    "line": 843,
+    "line": 845,
     "citation": "packages/node/src/node/server/ServerSubscription.ts:764",
     "resolved": "packages/node/src/node/server/ServerSubscription.ts",
     "identifier": "#sendUpdateMessage",
@@ -415,7 +424,7 @@
   },
   {
     "file": "bridge/subscribe.go",
-    "line": 1143,
+    "line": 1145,
     "citation": "ServerSubscription.ts:610-614",
     "resolved": "packages/node/src/node/server/ServerSubscription.ts",
     "identifier": "InvalidAction",
@@ -424,7 +433,7 @@
   },
   {
     "file": "bridge/subscribe.go",
-    "line": 1221,
+    "line": 1223,
     "citation": "ThermostatServer.ts:451",
     "resolved": "packages/node/src/behaviors/thermostat/ThermostatServer.ts",
     "identifier": "reactTo",
@@ -433,7 +442,7 @@
   },
   {
     "file": "bridge/subscribe.go",
-    "line": 1308,
+    "line": 1310,
     "citation": "packages/node/src/behavior/state/managed/Datasource.ts:776-796",
     "resolved": "packages/node/src/behavior/state/managed/Datasource.ts",
     "identifier": "onChange",
@@ -442,7 +451,16 @@
   },
   {
     "file": "bridge/subscribe_dispatch.go",
-    "line": 432,
+    "line": 60,
+    "citation": "ServerSubscription.ts:674",
+    "resolved": "packages/node/src/node/server/ServerSubscription.ts",
+    "identifier": "AttributeReadResponse",
+    "nearest": 644,
+    "occurrences": 2
+  },
+  {
+    "file": "bridge/subscribe_dispatch.go",
+    "line": 440,
     "citation": "InteractionMessenger.ts:721",
     "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
     "identifier": "waitForSuccess",
@@ -484,6 +502,15 @@
     "identifier": "initiateExchange",
     "nearest": 900,
     "occurrences": 2
+  },
+  {
+    "file": "bridge/suppress_response_parity_matterjs_test.go",
+    "line": 169,
+    "citation": "SuppressResponseTest.ts:62-64",
+    "resolved": "packages/node/test/endpoint/server/SuppressResponseTest.ts",
+    "identifier": "SuppressResponse",
+    "nearest": 197,
+    "occurrences": 9
   },
   {
     "file": "bridge/timed_conformance_test.go",
@@ -993,7 +1020,7 @@
   },
   {
     "file": "cluster/core/operational_credentials.go",
-    "line": 250,
+    "line": 254,
     "citation": "Fabric.ts:548",
     "resolved": "packages/protocol/src/fabric/Fabric.ts",
     "identifier": "UpdateNOC",
@@ -1002,7 +1029,7 @@
   },
   {
     "file": "cluster/core/operational_credentials.go",
-    "line": 346,
+    "line": 350,
     "citation": "OperationalCredentialsServer.ts:247-252",
     "resolved": "packages/node/src/behaviors/operational-credentials/OperationalCredentialsServer.ts",
     "identifier": "addNoc",
@@ -1011,7 +1038,7 @@
   },
   {
     "file": "cluster/core/operational_credentials.go",
-    "line": 1357,
+    "line": 1376,
     "citation": "OperationalCredentialsServer.ts:110",
     "resolved": "packages/node/src/behaviors/operational-credentials/OperationalCredentialsServer.ts",
     "identifier": "AttestationNonce",
@@ -1020,7 +1047,7 @@
   },
   {
     "file": "cluster/core/operational_credentials.go",
-    "line": 1910,
+    "line": 1971,
     "citation": "Fabric.ts:557-559",
     "resolved": "packages/protocol/src/fabric/Fabric.ts",
     "identifier": "PublicKeyError",
@@ -1029,7 +1056,7 @@
   },
   {
     "file": "cluster/core/operational_credentials.go",
-    "line": 1962,
+    "line": 2023,
     "citation": "Fabric.ts:557-559",
     "resolved": "packages/protocol/src/fabric/Fabric.ts",
     "identifier": "PublicKeyError",
@@ -1038,7 +1065,7 @@
   },
   {
     "file": "cluster/core/operational_credentials.go",
-    "line": 2108,
+    "line": 2169,
     "citation": "Fabric.ts:548",
     "resolved": "packages/protocol/src/fabric/Fabric.ts",
     "identifier": "nodeId",
@@ -1309,7 +1336,7 @@
   },
   {
     "file": "cluster/spec/instance.go",
-    "line": 483,
+    "line": 487,
     "citation": "conformance-compiler.ts:857-858",
     "resolved": "packages/node/src/behavior/state/validation/conformance-compiler.ts",
     "identifier": "addEnumMemberValidation",
@@ -1847,7 +1874,7 @@
   },
   {
     "file": "im/invoke.go",
-    "line": 442,
+    "line": 449,
     "citation": "packages/node/src/node/server/InteractionServer.ts:1043-1074",
     "resolved": "packages/node/src/node/server/InteractionServer.ts",
     "identifier": "suppressedBuffer",
@@ -1856,7 +1883,7 @@
   },
   {
     "file": "im/invoke.go",
-    "line": 462,
+    "line": 469,
     "citation": "packages/node/src/node/server/InteractionServer.ts:950-955",
     "resolved": "packages/node/src/node/server/InteractionServer.ts",
     "identifier": "invokeRequests",
@@ -1883,7 +1910,7 @@
   },
   {
     "file": "im/read.go",
-    "line": 477,
+    "line": 484,
     "citation": "packages/protocol/src/action/server/AttributeReadResponse.ts:238-274",
     "resolved": "packages/protocol/src/action/server/AttributeReadResponse.ts",
     "identifier": "addConcrete",
@@ -1946,12 +1973,21 @@
   },
   {
     "file": "im/write.go",
-    "line": 41,
+    "line": 43,
     "citation": "InteractionServer.ts:521-532",
     "resolved": "packages/node/src/node/server/InteractionServer.ts",
     "identifier": "WriteResponse",
     "nearest": 563,
     "occurrences": 4
+  },
+  {
+    "file": "im/write.go",
+    "line": 397,
+    "citation": "AttributeWriteResponse.ts:355-358",
+    "resolved": "packages/protocol/src/action/server/AttributeWriteResponse.ts",
+    "identifier": "isHeldByOtherWrite",
+    "nearest": 486,
+    "occurrences": 3
   },
   {
     "file": "im/write_parity_test.go",
@@ -1964,7 +2000,7 @@
   },
   {
     "file": "node/config.go",
-    "line": 41,
+    "line": 42,
     "citation": "packages/node/src/node/ServerNode.ts:107-127",
     "resolved": "packages/node/src/node/ServerNode.ts",
     "identifier": "commissioning",
@@ -1973,7 +2009,7 @@
   },
   {
     "file": "node/config.go",
-    "line": 45,
+    "line": 46,
     "citation": "NetworkServer.ts:202-222",
     "resolved": "packages/node/src/behavior/system/network/NetworkServer.ts",
     "identifier": "network",
@@ -1982,7 +2018,7 @@
   },
   {
     "file": "node/config.go",
-    "line": 221,
+    "line": 222,
     "citation": "NetworkServer.ts:202-222",
     "resolved": "packages/node/src/behavior/system/network/NetworkServer.ts",
     "identifier": "network",

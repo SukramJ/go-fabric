@@ -717,12 +717,13 @@ func (w *WiFiNetworkCommissioning) connect(ctx context.Context, req netcommdef.C
 
 // OnCommissioningComplete keeps the staged networks and stores them
 // (CommitConfiguration, NetworkCommissioningCluster.cpp:984-990; the Linux
-// driver's KVS put, NetworkCommissioningWiFiDriver.cpp:135-167).
-func (w *WiFiNetworkCommissioning) OnCommissioningComplete() {
+// driver's KVS put, NetworkCommissioningWiFiDriver.cpp:135-167). ctx is the
+// CommissioningComplete request's context; the store write runs under it.
+func (w *WiFiNetworkCommissioning) OnCommissioningComplete(ctx context.Context) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	w.committed = slices.Clone(w.networks)
-	w.saveCommittedLocked(context.Background())
+	w.saveCommittedLocked(ctx)
 }
 
 // OnFailSafeExpired restores the committed networks (RevertConfiguration,

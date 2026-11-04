@@ -18,7 +18,7 @@ import (
 
 // testOptions are the Options a test device of a given name gets.
 func testOptions(name string) Options {
-	return Options{StableKey: endpoint.StringKey("test:" + name), Name: name}
+	return Options{StableKey: endpoint.StringKey("test:" + name), Name: name, Tags: fixtureTags[name]}
 }
 
 // nopGroupStore is a group store with one fabric and nothing else, so the

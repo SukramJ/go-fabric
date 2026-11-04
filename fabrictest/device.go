@@ -187,6 +187,11 @@ func (d *Device) Index() int { return d.index }
 func (d *Device) Start(ctx context.Context) error {
 	d.actMu.Lock()
 	defer d.actMu.Unlock()
+	return d.startLocked(ctx)
+}
+
+// startLocked is Start's work; d.actMu is held.
+func (d *Device) startLocked(ctx context.Context) error {
 	d.mu.Lock()
 	running := d.running
 	d.mu.Unlock()
@@ -381,6 +386,35 @@ func (d *Device) Stop(ctx context.Context) error {
 	return d.site.drain(ctx, d.group)
 }
 
+// FactoryReset factory-resets the device's node ([node.Node.FactoryReset]:
+// its fabrics removed, the node stopped, its store and endpoint records
+// erased) and, when the device was running, starts a new node on the
+// erased store and the same address — matter.js ServerNode.erase, which
+// comes back online when the node was (ServerNode.ts:159-200). A Stop
+// called meanwhile waits for it and takes the device offline after it. A
+// device that is stopped has its store erased and stays stopped.
+func (d *Device) FactoryReset(ctx context.Context) error {
+	d.actMu.Lock()
+	defer d.actMu.Unlock()
+	d.mu.Lock()
+	n, running := d.n, d.running
+	d.running = false
+	d.mu.Unlock()
+	if !running {
+		if n == nil {
+			return errors.New("fabrictest: the device has no node")
+		}
+		return n.FactoryReset(ctx)
+	}
+	if err := d.site.Run(ctx, n.FactoryReset); err != nil {
+		return err
+	}
+	if err := d.site.drain(ctx, d.group); err != nil {
+		return err
+	}
+	return d.startLocked(ctx)
+}
+
 // Restart stops the node and starts a new one on the same store and
 // address, serving the same topology: what survives is what the node
 // persisted — fabrics, ACL, subscriptions, endpoint numbers.
@@ -389,6 +423,14 @@ func (d *Device) Restart(ctx context.Context) error {
 		return fmt.Errorf("fabrictest: stop: %w", err)
 	}
 	return d.Start(ctx)
+}
+
+// Running reports whether the device's node runs: false after
+// [Device.Stop], or after a [Device.FactoryReset] of a stopped device.
+func (d *Device) Running() bool {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	return d.running
 }
 
 // Node is the running node; after a [Device.Restart] it is the new one.

@@ -244,10 +244,14 @@ func featureEntry(node Conformance, ctx FeatureContext) (applies, demands Applic
 // to a behavior's state and command implementations. Declaring an element
 // the selection disallows, or one the cluster does not define, is an
 // error rather than a silent drop: the host asked to serve something the
-// server will not.
+// server will not. A definition whose cluster, attribute, command or event
+// id is illegal is refused with every illegal id named ([ErrIllegalID]).
 func New(def *Cluster, opts Options) (*Instance, error) {
 	if def == nil {
 		return nil, ErrNoDefinition
+	}
+	if err := checkElementIDs(def); err != nil {
+		return nil, err
 	}
 	if err := CheckFeatures(def, opts.Features); err != nil {
 		return nil, err

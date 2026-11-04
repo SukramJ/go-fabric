@@ -33,6 +33,8 @@
 //	      "go":          ["<module-relative package dir>:<TestFunc>", …],
 //	                     // ported and partial only, at least one
 //	      "missing":     ["<it name>", …], // partial only, at least one
+//	      "left":        [{"it": "<it name>", "class": "<class>", "reason": "<one sentence>"}, …],
+//	                     // ported and partial only: cases that will not be ported
 //	      "class":       "controller-stage" | "js-runtime-only" | "joint-fabric" |
 //	                     "device-ble-thread" | "test-infrastructure",
 //	                     // excluded only, required there
@@ -63,6 +65,16 @@
 // scope until milestone 7; test-infrastructure — tests of matter.js's own test
 // helpers.
 //
+// left is the per-case counterpart of an exclusion: an it case of a ported or
+// partial file that leaves missing without a port, with one of the five
+// classes above or by-design (the Go behaviour deliberately differs; the
+// reason names the notes/parity/by_design.md entry) or skip (an existing
+// t.Skip subtest of the Go port names the case and its reason). A case is
+// missing or left, never both. The snapshot holds a file's top-level
+// describe names only, so a left row written "<describe> > <it>" is held to
+// them and an it-level row is free text, as a missing case is. -render
+// writes the rows as the note's "Left:" sentence.
+//
 // The guard is register_test.go (make testparity-check): every snapshot path
 // has an entry and every entry a path, every go reference resolves to a Test
 // function in the named package's _test.go files, a ported or partial entry
@@ -70,11 +82,12 @@
 // an excluded one too ("re-check the exclusion": its reason may no longer
 // hold),
 // every FixMe-skipped Go test in the module is a skips row and every row
-// such a test, the committed page is what rendering produces, and three
+// such a test, the committed page is what rendering produces, and four
 // exact ratchets hold: the planned entries (testparityPlannedRatchet), the
-// ported entries (testparityPortedRatchet) and the missing it cases summed
-// over the partial entries (testparityMissingRatchet). It needs no matter.js
-// clone: the snapshot is committed.
+// ported entries (testparityPortedRatchet), the missing it cases summed
+// over the partial entries (testparityMissingRatchet) and the left it cases
+// summed over the ported and partial entries (testparityLeftRatchet). It
+// needs no matter.js clone: the snapshot is committed.
 package main
 
 import (

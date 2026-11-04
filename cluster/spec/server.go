@@ -191,14 +191,22 @@ func NewServer(def *Cluster, opts Options, cfg ServerConfig) (*Server, error) {
 		}
 	}
 	s.own = maps.Clone(s.handlers)
+	// Every mandatory command without a handler is named, not the first
+	// alone: matter.js records a fatal error per command and reports them
+	// together (ValidatedElements.ts:357-372 #validateRequiredCommands,
+	// report :154-180 at 862ad75f).
+	var missing []error
 	for _, id := range inst.accepted {
 		switch {
 		case s.handlers[id] != nil:
 		case cfg.Unimplemented:
 			s.stubs = append(s.stubs, id)
 		case slices.Contains(inst.required, id):
-			return nil, fmt.Errorf("%w: %s command %s (0x%02X)", ErrMissingHandler, def.Name, def.Command(id, Request).Name, id)
+			missing = append(missing, fmt.Errorf("%w: %s command %s (0x%02X)", ErrMissingHandler, def.Name, def.Command(id, Request).Name, id))
 		}
+	}
+	if err := errors.Join(missing...); err != nil {
+		return nil, err
 	}
 	for _, id := range inst.attrs {
 		if v, ok := defaultValue(def.Attribute(id)); ok {

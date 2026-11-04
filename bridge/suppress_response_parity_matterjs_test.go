@@ -100,23 +100,172 @@ func TestParityMatterJS_SuppressResponseSuppressesErrorStatuses(t *testing.T) {
 			status: im.StatusInvalidAction,
 		},
 		{
+			// SuppressResponseTest.ts:384-397 answers the unexpected error
+			// of an unsuppressed request with FAILURE; its Go form is the
+			// request the bridge cannot decode.
 			name: "undecodable invoke", opcode: im.OpcodeInvokeRequest,
 			payload: malformedInvoke,
 			status:  im.StatusFailure,
+		},
+		{
+			// SuppressResponseTest.ts:230-240: one path more than
+			// MaxPathsPerInvoke is InvalidAction.
+			name: "too many paths", opcode: im.OpcodeInvokeRequest,
+			payload: func(s bool) []byte {
+				paths := make([]im.ConcreteCommandPath, im.DefaultMaxPathsPerInvoke+1)
+				for i := range paths {
+					paths[i] = im.ConcreteCommandPath{Endpoint: uint16(i), Cluster: 0x0006, Command: 0x01, HasEndpoint: true, HasCluster: true, HasCommand: true}
+				}
+				return encodeInvokeWith(t, s, false, paths...)
+			},
+			status: im.StatusInvalidAction,
+		},
+		{
+			// SuppressResponseTest.ts:278-282: SuppressResponse and nothing
+			// else (ONLY_SUPPRESS_RESPONSE, :62-64).
+			name: "invoke of SuppressResponse alone", opcode: im.OpcodeInvokeRequest,
+			payload: onlySuppressResponse,
+			status:  suppressedOnly,
+		},
+		{
+			// SuppressResponseTest.ts:284-288, the same for a write.
+			name: "write of SuppressResponse alone", opcode: im.OpcodeWriteRequest,
+			payload: onlySuppressResponse,
+			status:  suppressedOnly,
 		},
 	}
 	counter := uint32(100)
 	for _, c := range cases {
 		counter++
+		if c.status == suppressedOnly {
+			counter++
+			if reply := dispatchReply(t, b, c.opcode, c.payload(true), counter); reply != nil {
+				t.Errorf("%s with SuppressResponse: the bridge sent a %d-byte reply, want none", c.name, len(reply))
+			}
+			continue
+		}
 		reply := dispatchReply(t, b, c.opcode, c.payload(false), counter)
 		if reply == nil {
 			t.Errorf("%s without SuppressResponse: no StatusResponse", c.name)
-		} else if got := decodeWriteChunkedStatusResponse(t, reply); got != c.status {
+		} else if got := decodeWriteChunkedStatusResponse(t, reply); got != c.status && c.status != anyStatus {
 			t.Errorf("%s without SuppressResponse: status %v, want %v", c.name, got, c.status)
 		}
 		counter++
 		if reply := dispatchReply(t, b, c.opcode, c.payload(true), counter); reply != nil {
 			t.Errorf("%s with SuppressResponse: the bridge sent a %d-byte reply, want none", c.name, len(reply))
 		}
+	}
+}
+
+// anyStatus marks a case whose unsuppressed answer is a StatusResponse of
+// whatever status the decoder's refusal carries; suppressedOnly a case
+// matter.js states only with SuppressResponse set.
+const (
+	anyStatus      im.StatusCode = 0xFF
+	suppressedOnly im.StatusCode = 0xFE
+)
+
+// onlySuppressResponse is a request of the SuppressResponse field alone —
+// ONLY_SUPPRESS_RESPONSE of SuppressResponseTest.ts:62-64 when suppress.
+func onlySuppressResponse(suppress bool) []byte {
+	enc := tlv.NewEncoder()
+	enc.StartStruct(tlv.AnonymousTag())
+	enc.PutBool(tlv.ContextTag(0), suppress)
+	_ = enc.EndContainer()
+	body, _ := enc.Bytes()
+	return body
+}
+
+// unreadableSuppressResponse is UNREADABLE_SUPPRESS_RESPONSE
+// (SuppressResponseTest.ts:66-68): tag 0 an unsigned integer.
+func unreadableSuppressResponse() []byte {
+	enc := tlv.NewEncoder()
+	enc.StartStruct(tlv.AnonymousTag())
+	enc.PutUint(tlv.ContextTag(0), 1)
+	_ = enc.EndContainer()
+	body, _ := enc.Bytes()
+	return body
+}
+
+// TestSuppressResponseErrorPathsParityMatterJS ports the remaining cases of
+// matter.js packages/node/test/endpoint/server/SuppressResponseTest.ts at
+// 862ad75f that need more than one datagram's worth of setup: a seeded
+// timed window, a chunked write, and the requests whose SuppressResponse
+// cannot be read.
+func TestSuppressResponseErrorPathsParityMatterJS(t *testing.T) {
+	t.Parallel()
+	nodeLabel := im.ConcreteAttributePath{Endpoint: 0, Cluster: 0x0028, Attribute: 5, HasEndpoint: true, HasCluster: true, HasAttribute: true}
+	onOff := im.ConcreteCommandPath{Endpoint: 1, Cluster: 0x0006, Command: 0x01, HasEndpoint: true, HasCluster: true, HasCommand: true}
+
+	// SuppressResponseTest.ts:220-228: the TimedRequest window expired
+	// before the suppressed invoke — TIMEOUT, not sent. The window is
+	// seeded expired on the test session's exchange (buildProtocolHeader
+	// uses exchange 1), as the gate tests do.
+	t.Run("sends nothing for a suppressed invoke after the timed window expired", func(t *testing.T) {
+		t.Parallel()
+		b := newStartedBridge(t)
+		b.routing.timedDeadlines.Store(timedKey{sessionID: paseTestSessionID, exchangeID: 1}, time.Now().Add(-time.Millisecond))
+		if reply := dispatchReply(t, b, im.OpcodeInvokeRequest, encodeInvokeWith(t, true, true, onOff), 1); reply != nil {
+			t.Fatalf("the bridge sent a %d-byte reply, want none", len(reply))
+		}
+		if _, ok := b.routing.timedDeadlines.Load(timedKey{sessionID: paseTestSessionID, exchangeID: 1}); ok {
+			t.Fatal("the expired window was not consumed")
+		}
+	})
+
+	// SuppressResponseTest.ts:251-260: MoreChunkedMessages with
+	// SuppressResponse is InvalidAction, not sent.
+	t.Run("sends nothing for a suppressed write rejected with InvalidAction", func(t *testing.T) {
+		t.Parallel()
+		b := newStartedBridge(t)
+		if reply := dispatchReply(t, b, im.OpcodeWriteRequest, encodeWriteChunkedTestRequest(t, true, false, true, nodeLabel), 1); reply != nil {
+			t.Fatalf("the bridge sent a %d-byte reply, want none", len(reply))
+		}
+	})
+
+	// SuppressResponseTest.ts:329-335: a write whose SuppressResponse is
+	// absent is answered — TimedRequestMismatch for its timed flag.
+	t.Run("answers a write without SuppressResponse", func(t *testing.T) {
+		t.Parallel()
+		b := newStartedBridge(t)
+		enc := tlv.NewEncoder()
+		enc.StartStruct(tlv.AnonymousTag())
+		enc.PutBool(tlv.ContextTag(1), true) // TimedRequest, SuppressResponse absent
+		enc.StartArray(tlv.ContextTag(2))
+		enc.StartStruct(tlv.AnonymousTag())
+		nodeLabel.MarshalTLV(enc, tlv.ContextTag(1))
+		enc.PutUTF8(tlv.ContextTag(2), "written")
+		_ = enc.EndContainer()
+		_ = enc.EndContainer()
+		_ = enc.EndContainer()
+		body, _ := enc.Bytes()
+		reply := dispatchReply(t, b, im.OpcodeWriteRequest, body, 1)
+		if reply == nil {
+			t.Fatal("no StatusResponse")
+		}
+		if got := decodeWriteChunkedStatusResponse(t, reply); got != im.StatusTimedRequestMismatch {
+			t.Fatalf("status %v, want TIMED_REQUEST_MISMATCH", got)
+		}
+	})
+
+	// SuppressResponseTest.ts:337-343 and :399-403: a SuppressResponse that
+	// cannot be read does not suppress — the request is answered with a
+	// StatusResponse.
+	for _, c := range []struct {
+		name   string
+		opcode uint8
+	}{
+		{"answers an invoke whose SuppressResponse cannot be read", im.OpcodeInvokeRequest},
+		{"answers a write whose SuppressResponse cannot be read", im.OpcodeWriteRequest},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+			b := newStartedBridge(t)
+			reply := dispatchReply(t, b, c.opcode, unreadableSuppressResponse(), 1)
+			if reply == nil {
+				t.Fatal("no reply")
+			}
+			decodeWriteChunkedStatusResponse(t, reply) // fails unless a StatusResponse
+		})
 	}
 }

@@ -220,7 +220,7 @@ func TestWiFiNetworkCommissioningCommands(t *testing.T) {
 	}
 	// Committed by CommissioningComplete, a revert keeps it; Remove empties it.
 	_, _ = add("lab", "secret12", nil)
-	w.OnCommissioningComplete()
+	w.OnCommissioningComplete(t.Context())
 	w.OnFailSafeExpired()
 	if v, _ := w.MatterRead(netcommAttrNetworks); len(v.(spec.List[netcommdef.NetworkInfoStruct])) != 1 {
 		t.Fatalf("committed Networks %v", v)

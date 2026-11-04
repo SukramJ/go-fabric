@@ -129,40 +129,59 @@
     },
     {
       "path": "packages/node/test/behavior/cluster/ValidatedElementsTest.ts",
-      "status": "partial",
+      "status": "ported",
       "go": [
         "cluster/spec:TestApplicability",
         "cluster/spec:TestNewResolvesElements",
         "cluster/spec:TestNewServer_MandatoryCommandWithoutHandler",
         "cluster/spec:TestNewServer_UnimplementedStub",
-        "cluster/spec:TestRevisionConditionResolvesAgainstTheDefinition"
+        "cluster/spec:TestRevisionConditionResolvesAgainstTheDefinition",
+        "cluster/spec:TestValidatedElementsParityMatterJS",
+        "device:TestValidatedElementsHostedParityMatterJS"
       ],
-      "missing": [
-        "optional fallback when dep absent and element implemented",
-        "optional fallback when dep absent and element not implemented",
-        "cyclic pair both implemented",
-        "cyclic pair neither implemented",
-        "OperationalState-like scenario",
-        "errors when mandatory element not implemented",
-        "warns when disallowed element is implemented",
-        "excludes an implemented obsolete element as it does a disallowed one",
-        "makes an element depending on an implemented obsolete element absent",
-        "reads a misplaced obsolete term in an otherwise list as it reads a disallowed one",
-        "handles attributes with element references",
-        "is fatal for each mandatory command that throws unimplemented in strict mode",
-        "is fatal for a conditionally required command without implementation",
-        "reports a mandatory command that is not a function once",
-        "accepts the default ${server.name} in strict mode",
-        "accepts a cluster that implements its mandatory commands in strict mode",
-        "refuses illegal attribute, command and event IDs together",
-        "refuses an illegal cluster ID",
-        "refuses an illegal namespace cluster ID next to a legal schema",
-        "accepts a command without a Matter ID",
-        "reports an illegal ID for every behavior that hosts the schema",
-        "lets a client behavior model a cluster with an illegal ID",
-        "fails endpoint initialization for a hosted cluster with an illegal ID"
+      "left": [
+        {
+          "it": "warns when disallowed element is implemented",
+          "class": "by-design",
+          "reason": "BD-Matter-DeclaredDisallowedElementRefused: spec.New refuses a declared element its conformance disallows (ErrDisallowed) instead of dropping it with a warning"
+        },
+        {
+          "it": "excludes an implemented obsolete element as it does a disallowed one",
+          "class": "by-design",
+          "reason": "BD-Matter-DeclaredDisallowedElementRefused: spec.New refuses a declared element its conformance disallows (ErrDisallowed) instead of dropping it with a warning; an obsolete (Z) one alike"
+        },
+        {
+          "it": "makes an element depending on an implemented obsolete element absent",
+          "class": "by-design",
+          "reason": "BD-Matter-DeclaredDisallowedElementRefused: spec.New refuses a declared element its conformance disallows (ErrDisallowed) instead of dropping it with a warning, so the declared obsolete element never becomes a dropped dependency"
+        },
+        {
+          "it": "reports a mandatory command that is not a function once",
+          "class": "js-runtime-only",
+          "reason": "a behavior member that is not a function is a TypeScript runtime shape; a Go handler is a typed spec.CommandHandler, nil being absent"
+        },
+        {
+          "it": "refuses an illegal namespace cluster ID next to a legal schema",
+          "class": "js-runtime-only",
+          "reason": "a TypeScript namespace object carrying its own cluster id beside the schema; a Go server has one definition and one id (the legal-schema check is \"refuses an illegal cluster ID\")"
+        },
+        {
+          "it": "accepts a command without a Matter ID",
+          "class": "js-runtime-only",
+          "reason": "a behavior-only command without a Matter id; every Go command of a definition carries its id"
+        },
+        {
+          "it": "reports an illegal ID for every behavior that hosts the schema",
+          "class": "js-runtime-only",
+          "reason": "several TypeScript behavior classes sharing one validated schema, cached by validatedSchemas; spec.New checks each definition it binds"
+        },
+        {
+          "it": "lets a client behavior model a cluster with an illegal ID",
+          "class": "js-runtime-only",
+          "reason": "ClientBehavior(namespace) builds a client behavior class; the Go client has no behavior classes and models no cluster by id check"
+        }
       ],
-      "reason": "The Go conformance evaluator resolves feature- and revision-gated elements and refuses a mandatory command without a handler; matter.js's implemented-set resolution, strict mode and element-ID checks have no Go case.",
+      "reason": "Element presence from the declared elements, every missing mandatory handler named, and the element-ID legality checks of spec.New and the device kit; a declared disallowed element is refused by design (BD-Matter-DeclaredDisallowedElementRefused).",
       "snapshotSha": "bf80da4166b0c5bf2a39dc7848d537de159e9a97"
     },
     {
@@ -254,54 +273,87 @@
     },
     {
       "path": "packages/node/test/behavior/state/validation/ValueValidatorTest.ts",
-      "status": "partial",
+      "status": "ported",
       "go": [
         "cluster/spec:TestValidateWrite",
         "cluster/spec:TestRanges",
         "cluster:TestNegativeWriteParity",
-        "cluster:TestEnumManufacturerRangeParity"
+        "cluster:TestEnumManufacturerRangeParity",
+        "cluster/spec:TestValueValidatorParityMatterJS"
       ],
-      "missing": [
-        "accepts defined multi-bit field values",
-        "rejects a reserved gap bit",
-        "skips enforcement when no encoded value is carried",
-        "throws on a constraint violation stored only at the field's id slot",
-        "satisfies conformance for a mandatory field present only at its id slot",
-        "substitutes in place when the sentinel is stored at the field's id slot",
-        "substitutes in place when the sentinel is stored at the field's name slot",
-        "accepts a bit the value leaves clear",
-        "accepts a bit that states no gate",
-        "accepts a deprecated bit",
-        "rejects a bit whose choice is gated on an unsupported feature",
-        "rejects a bit a group disallows once its gate fails",
-        "rejects a bit the specification disallows",
-        "accepts a bit whose conformance names something a value would decide",
-        "accepts a bit whose conformance the compiler cannot read",
-        "judges a range of bits by whether the write sets any of them",
-        "judges a range of a shipped cluster by its feature alone",
-        "does not judge the bits of a feature map",
-        "is suppressed where conformance validation is turned off for the attribute",
-        "ignores the bit on a write from the wire",
-        "forwards the bit on a client peer write",
-        "still rejects a structurally invalid bit alongside a non-conformant one on a peer write",
-        "accepts a list within the bound",
-        "rejects a list beyond the bound and names the bound",
-        "rejects an obsolete attribute on a server write",
-        "forwards an obsolete attribute on a client peer write",
-        "rejects an obsolete enum value on a server write",
-        "forwards an obsolete enum value on a client peer write",
-        "forwards a feature-gated enum value on a client peer write",
-        "forwards an undefined enum value on a client peer write",
-        "forwards reserved bitmap bits on a client peer write",
-        "still rejects a structurally invalid bitmap field even alongside reserved bits on a peer write",
-        "still rejects a wrong-datatype value on a client peer write",
-        "still rejects a value-range constraint on a client peer write",
-        "still rejects a schema-constraint violation on a client peer write",
-        "rejects a feature-disallowed attribute on a server write",
-        "forwards a feature-disallowed attribute with a valid value on a client peer write",
-        "still validates datatype when a forwarded conformance failure would otherwise skip it"
+      "left": [
+        {
+          "it": "skips enforcement when no encoded value is carried",
+          "class": "js-runtime-only",
+          "reason": "a bitmap held as a JavaScript record with a hidden BitmapEncodedValue; a Go bitmap is an integer, so a value without its encoded form does not exist"
+        },
+        {
+          "it": "throws on a constraint violation stored only at the field's id slot",
+          "class": "js-runtime-only",
+          "reason": "a JavaScript record that keeps a struct member at its numeric id slot beside its name slot; a Go struct value has one typed field per member"
+        },
+        {
+          "it": "satisfies conformance for a mandatory field present only at its id slot",
+          "class": "js-runtime-only",
+          "reason": "a JavaScript record that keeps a struct member at its numeric id slot beside its name slot; a Go struct value has one typed field per member"
+        },
+        {
+          "it": "substitutes in place when the sentinel is stored at the field's id slot",
+          "class": "js-runtime-only",
+          "reason": "the OMIT_FABRIC sentinel substituted in a JavaScript record on a client-peer supervision (clientPeerContext) of matter.js's ClientNode: the Go client path holds no peer state and validates no value it writes, so there is nothing to forward or refuse"
+        },
+        {
+          "it": "substitutes in place when the sentinel is stored at the field's name slot",
+          "class": "js-runtime-only",
+          "reason": "the OMIT_FABRIC sentinel substituted in a JavaScript record on a client-peer supervision (clientPeerContext) of matter.js's ClientNode: the Go client path holds no peer state and validates no value it writes, so there is nothing to forward or refuse"
+        },
+        {
+          "it": "is suppressed where conformance validation is turned off for the attribute",
+          "class": "js-runtime-only",
+          "reason": "matter.js's per-attribute Supervision.Config switch (GlobalConfig.child(...).supervision); the Go value checks have no per-attribute configuration"
+        },
+        {
+          "it": "forwards the bit on a client peer write",
+          "class": "js-runtime-only",
+          "reason": "client-peer supervision (clientPeerContext) of matter.js's ClientNode: the Go client path holds no peer state and validates no value it writes, so there is nothing to forward or refuse"
+        },
+        {
+          "it": "still rejects a structurally invalid bit alongside a non-conformant one on a peer write",
+          "class": "js-runtime-only",
+          "reason": "client-peer supervision (clientPeerContext) of matter.js's ClientNode: the Go client path holds no peer state and validates no value it writes, so there is nothing to forward or refuse; the structural half is held by \"still rejects a structurally invalid bitmap field even alongside reserved bits on a peer write\""
+        },
+        {
+          "it": "forwards an obsolete attribute on a client peer write",
+          "class": "js-runtime-only",
+          "reason": "client-peer supervision (clientPeerContext) of matter.js's ClientNode: the Go client path holds no peer state and validates no value it writes, so there is nothing to forward or refuse"
+        },
+        {
+          "it": "forwards an obsolete enum value on a client peer write",
+          "class": "js-runtime-only",
+          "reason": "client-peer supervision (clientPeerContext) of matter.js's ClientNode: the Go client path holds no peer state and validates no value it writes, so there is nothing to forward or refuse"
+        },
+        {
+          "it": "forwards a feature-gated enum value on a client peer write",
+          "class": "js-runtime-only",
+          "reason": "client-peer supervision (clientPeerContext) of matter.js's ClientNode: the Go client path holds no peer state and validates no value it writes, so there is nothing to forward or refuse"
+        },
+        {
+          "it": "forwards an undefined enum value on a client peer write",
+          "class": "js-runtime-only",
+          "reason": "client-peer supervision (clientPeerContext) of matter.js's ClientNode: the Go client path holds no peer state and validates no value it writes, so there is nothing to forward or refuse"
+        },
+        {
+          "it": "forwards reserved bitmap bits on a client peer write",
+          "class": "js-runtime-only",
+          "reason": "client-peer supervision (clientPeerContext) of matter.js's ClientNode: the Go client path holds no peer state and validates no value it writes, so there is nothing to forward or refuse"
+        },
+        {
+          "it": "forwards a feature-disallowed attribute with a valid value on a client peer write",
+          "class": "js-runtime-only",
+          "reason": "client-peer supervision (clientPeerContext) of matter.js's ClientNode: the Go client path holds no peer state and validates no value it writes, so there is nothing to forward or refuse"
+        }
       ],
-      "reason": "Server-write validation of numeric ranges, enums, reserved and feature-gated bitmap bits is covered by the Go write validator and the negative-write parity table; the client-peer leniency, obsolete-element and id-slot cases are not.",
+      "reason": "Server-side value checks and the per-bit bitmap conformance of a locally set value (cluster/spec CheckValue); the client-peer and JavaScript record cases have no Go subject.",
       "snapshotSha": "a8df8b2d2f071d9163c64edd4acbad5fe3641648"
     },
     {
@@ -322,27 +374,32 @@
     },
     {
       "path": "packages/node/test/behavior/state/validation/constraintTest.ts",
-      "status": "partial",
+      "status": "ported",
       "go": [
         "cluster/spec:TestValidateWrite",
         "cluster/spec:TestRanges",
         "cluster/spec:TestConstraintInParityMatterJS",
-        "cluster/spec:TestServerListAndStructConstraints"
+        "cluster/spec:TestServerListAndStructConstraints",
+        "cluster/spec:TestConstraintParityMatterJS"
       ],
-      "missing": [
-        "min with reference",
-        "min with expression",
-        "max with reference",
-        "max with reference (sibling keyed by id)",
-        "range with expression",
-        "range with dot-qualified reference",
-        "percentage bound",
-        "percentage bound of a list entry",
-        "bound on a duration",
-        "entry of a list of durations",
-        "string length with codepoints"
+      "left": [
+        {
+          "it": "max with reference (sibling keyed by id)",
+          "class": "js-runtime-only",
+          "reason": "a JavaScript record whose sibling sits at its numeric id slot beside a stale name slot; a Go peer value is read by attribute id, one slot per attribute"
+        },
+        {
+          "it": "bound on a duration",
+          "class": "js-runtime-only",
+          "reason": "matter.js's duration metatype, held as milliseconds (Seconds(30) = 30000); spec.Kind has no duration, a duration attribute is a plain integer in its definition's unit"
+        },
+        {
+          "it": "entry of a list of durations",
+          "class": "js-runtime-only",
+          "reason": "matter.js's duration metatype, held as milliseconds (Seconds(30) = 30000); spec.Kind has no duration, a duration attribute is a plain integer in its definition's unit"
+        }
       ],
-      "reason": "A table of constraint cases (its it names are the table's group and case keys); literal min/max/range, string length, list-entry and bitmap bounds are covered by the Go write validator, the groups named below are not.",
+      "reason": "Reference, expression, dotted, percent and codepoint bounds over spec.Instance.ValidateWrite; the duration metatype and id-keyed record slots have no Go subject.",
       "snapshotSha": "85960491aac9c05b7e4864acec6262f63e859932"
     },
     {
@@ -1601,48 +1658,36 @@
         "bridge:TestDispatchInvokeRequest_TimedRequiredWithoutWindow_NeedsTimedInteraction",
         "im:TestValidateInvokeBatch",
         "im:TestValidateInvokeBatch_MaxPathsPerInvoke",
-        "bridge:TestDispatchInvokeRequest_SuppressResponseStatusOnly_SendsNothing"
+        "bridge:TestDispatchInvokeRequest_SuppressResponseStatusOnly_SendsNothing",
+        "bridge:TestChunkedWriteAcrossMessagesParityMatterJS",
+        "bridge:TestInteractionProtocolBridgeParityMatterJS",
+        "im:TestChunkedWriteHoldParityMatterJS",
+        "im:TestGroupInvokeParityMatterJS",
+        "im:TestGroupWriteParityMatterJS",
+        "node:TestInteractionProtocolParityMatterJS",
+        "node:TestWildcardPathFlagsParityMatterJS"
       ],
       "missing": [
-        "replies with attributes and events",
-        "replies with events for wildcard read  returns correct order",
-        "replies with events for wildcard read active version filter",
-        "replies with attributes with ${testCase} wildcard Filter",
-        "applies WildcardPathFlags when the filter version is current",
-        "ignores WildcardPathFlags when the configuration changed past the filter version",
-        "errors when no path match the requested path's",
         "does not answer the subscriber's error status for the initial report with a status",
-        "write values and return errors on invalid values",
-        "write chunked array values with Fabric Index handling",
-        "write chunked array values across multiple messages",
-        "answers BUSY to another exchange's write of an attribute while a chunked write holds it",
-        "releases the attribute a chunked write held once the write moves to another attribute",
-        "skips an attribute a chunked write holds in another exchange's wildcard write",
-        "answers BUSY to a write that overlaps another exchange's first chunk of the same attribute",
-        "holds an attribute until the writes of its chunk are done when the chunk moves to another one",
-        "does not hold the attribute of a write that fits one message",
-        "write values and return errors on invalid values timed interaction required by attribute",
-        "write values and return errors on invalid values timed interaction required by attribute success",
-        "write values and return errors on invalid values timed interaction in group message",
-        "write values and return errors on invalid values in timed interaction",
-        "invoke command with empty args",
-        "invoke command with no args",
-        "invalid invoke command",
-        "multi invoke commands are ok",
         "multi invoke response is split into multiple messages if needed",
-        "keeps already-sent chunks when a command on a later endpoint throws",
-        "sends no response under SuppressResponse when a command throws",
-        "sends the response under SuppressResponse when a CommandDataIB is generated",
-        "under SuppressResponse, flushes a held status alongside the forcing CommandDataIB",
-        "handles StatusResponseError gracefully",
-        "invoke command with timed interaction as group message",
-        "invoke command as group message completes dispatch without touching the exchange channel",
-        "names the group a received group invoke was sent to on its log line",
-        "does not name a group on the log line of a received unicast invoke",
-        "group invoke reports accessAllowed:true when the dispatched command returns a non-Success status",
-        "group invoke reports the source address of its own message",
-        "invoke command with with timed interaction success",
-        "invoke command with timed interaction required by command success"
+        "keeps already-sent chunks when a command on a later endpoint throws"
+      ],
+      "left": [
+        {
+          "it": "write values and return errors on invalid values timed interaction required by attribute",
+          "class": "test-infrastructure",
+          "reason": "commented out at the pin (InteractionProtocolTest.ts:1987-2006): matter.js has no timed attribute to run it against"
+        },
+        {
+          "it": "names the group a received group invoke was sent to on its log line",
+          "class": "js-runtime-only",
+          "reason": "matter.js log-line text of a group invoke"
+        },
+        {
+          "it": "does not name a group on the log line of a received unicast invoke",
+          "class": "js-runtime-only",
+          "reason": "matter.js log-line text of a unicast invoke"
+        }
       ],
       "reason": "The version filters, path ceilings, wildcard writes, the timed-interaction gates and the invoke-batch checks are covered on the Go IM paths; chunked-write holds, group dispatch, response chunking and the remaining read/subscribe cases are not ported case by case.",
       "snapshotSha": "3623f2b154cee5e8a0ba4d5e87dd61366af9cebd"
@@ -1654,37 +1699,44 @@
         "node:TestProtocolServiceParityMatterJS"
       ],
       "missing": [
-        "tags manufacturer-specific attributes in a standard cluster with skipCustomElements",
         "shares one state reference between local reads without a transaction",
         "requires a transaction to read cluster state for a remote subject",
         "rejects request with constraint violation"
       ],
-      "reason": "The protocol service ports over the wire from commissioned fabrictest pairs, a second fabric commissioned by a second controller: fabric-filtered ACL and NOCs, the fabric reports and the Leave event of a subscription, the command lists of a server with one implemented command, the FeatureMap, invoke, no EventList in any AttributeList, a wildcard read of every attribute, and the TestCluster's response held to the request's qualified conformance (FAILURE, spec.Server.checkResponse) (node/protocol_service_parity_matterjs_test.go); wildcard path flags and the transaction model have no Go subject, and a Go server leaves a request field's constraint to its handler where matter.js's ad-hoc request TLV schema refuses it.",
+      "reason": "The protocol service ports over the wire from commissioned fabrictest pairs, a second fabric commissioned by a second controller: fabric-filtered ACL and NOCs, the fabric reports and the Leave event of a subscription, the command lists of a server with one implemented command, the FeatureMap, invoke, no EventList in any AttributeList, a wildcard read of every attribute, and the TestCluster's response held to the request's qualified conformance (FAILURE, spec.Server.checkResponse) (node/protocol_service_parity_matterjs_test.go); the transaction model has no Go subject, and a Go server leaves a request field's constraint to its handler where matter.js's ad-hoc request TLV schema refuses it.",
       "snapshotSha": "87df1e9a341a4b7e9ea9320fac2faccd0e64a34f"
     },
     {
       "path": "packages/node/test/endpoint/server/SuppressResponseTest.ts",
-      "status": "partial",
+      "status": "ported",
       "go": [
         "bridge:TestParityMatterJS_SuppressResponseSuppressesErrorStatuses",
         "bridge:TestDispatchWriteRequest_ChunkedSuppressResponse_RejectsSilently",
         "bridge:TestDispatchInvokeRequest_SuppressResponseStatusOnly_SendsNothing",
-        "im:TestWriteParity_SuppressResponse"
+        "im:TestWriteParity_SuppressResponse",
+        "bridge:TestSuppressResponseErrorPathsParityMatterJS"
       ],
-      "missing": [
-        "sends nothing for a suppressed invoke after the timed window expired",
-        "sends nothing for a suppressed invoke rejected with InvalidAction",
-        "sends nothing for a suppressed write rejected with InvalidAction",
-        "sends nothing for an invoke with SuppressResponse TRUE and invalid other fields",
-        "sends nothing for a write with SuppressResponse TRUE and invalid other fields",
-        "reports a failure after the peer acknowledged a response chunk of a suppressed invoke",
-        "answers a write without SuppressResponse",
-        "answers an invoke whose SuppressResponse cannot be read",
-        "logs a suppressed status with the suppressed mark",
-        "logs a sent status with the outbound mark",
-        "logs a suppressed failure of an unexpected error",
-        "answers an unexpected error with Failure and no status log line",
-        "answers a write whose SuppressResponse cannot be read"
+      "left": [
+        {
+          "it": "reports a failure after the peer acknowledged a response chunk of a suppressed invoke",
+          "class": "js-runtime-only",
+          "reason": "a mocked InteractionRecipient that throws after its first InvokeResponse chunk; the Go bridge computes every response before the first chunk goes out, so no handler runs after a chunk was acknowledged"
+        },
+        {
+          "it": "logs a suppressed status with the suppressed mark",
+          "class": "js-runtime-only",
+          "reason": "matter.js status log-line text and its ⊘/» marks"
+        },
+        {
+          "it": "logs a sent status with the outbound mark",
+          "class": "js-runtime-only",
+          "reason": "matter.js status log-line text and its ⊘/» marks"
+        },
+        {
+          "it": "logs a suppressed failure of an unexpected error",
+          "class": "js-runtime-only",
+          "reason": "matter.js status log-line text and its ⊘/» marks"
+        }
       ],
       "reason": "Suppressed error statuses on the timed gate, the suppressed final chunk and the unsuppressed answers are covered; the InvalidAction, acknowledged-chunk and logging cases are not.",
       "snapshotSha": "5d96919725a44fff46f0e2c1b76b7dbb542908ff"
@@ -1783,43 +1835,45 @@
     },
     {
       "path": "packages/node/test/endpoint/validation/DeviceTypeConformanceServiceTest.ts",
-      "status": "partial",
+      "status": "ported",
       "go": [
         "endpoint:TestDeviceTypeViolationReportedOnce",
-        "endpoint:TestDeviceTypeValidatorModes"
+        "endpoint:TestDeviceTypeValidatorModes",
+        "endpoint:TestDeviceTypeConformanceServiceParityMatterJS"
       ],
-      "missing": [
-        "logs one warning listing every violation of an endpoint",
-        "names the node as the origin of its warning",
-        "logs only the new violation of an endpoint it reported before",
-        "logs a violation again once it disappeared and returned",
-        "is in warn mode unless the environment says otherwise",
-        "reads the mode from MATTER_ENDPOINT_VALIDATION",
-        "rejects an unknown mode, naming the variable, the value and the modes",
-        "judges on request in off mode, like warn mode, but records nothing",
-        "returns every violation of each judged endpoint, reported before or not",
-        "logs at debug and never refuses what only a Root assertion requires, even when strict",
-        "warns of a violation once it no longer only follows from a Root assertion",
-        "logs the violations a Root assertion explains apart from the others",
-        "refuses an endpoint only for the violations no Root assertion explains",
-        "refuses an endpoint again until it conforms",
-        "keeps what it reported for an endpoint it refuses",
-        "logs rather than throws in strict mode when told not to refuse",
-        "throws a misplaced singleton when validation is not strict",
-        "throws the first refused endpoint carrying the others and logs none",
-        "records nothing for an addition it refuses",
-        "validates every endpoint of a node scope",
-        "does not judge an endpoint in no node scope",
-        "validates no node scope for an endpoint in none",
-        "reports an endpoint's violations again once it is forgotten",
-        "reports every endpoint again after a factory reset"
+      "left": [
+        {
+          "it": "names the node as the origin of its warning",
+          "class": "js-runtime-only",
+          "reason": "asserts matter.js's log origin metadata (env.logOrigin); the Go validator returns its verdict and the bridge's slog logger carries no origin"
+        },
+        {
+          "it": "reads the mode from MATTER_ENDPOINT_VALIDATION",
+          "class": "by-design",
+          "reason": "BD-Matter-DeviceTypeValidationPerTopology: the mode is Bridge.SetDeviceTypeValidation / node.Config.DeviceTypeValidation, a closed Go enum; no environment variable"
+        },
+        {
+          "it": "rejects an unknown mode, naming the variable, the value and the modes",
+          "class": "by-design",
+          "reason": "BD-Matter-DeviceTypeValidationPerTopology: the mode is the closed enum DeviceTypeValidationMode set in code, so there is no variable or unknown value to reject"
+        },
+        {
+          "it": "keeps what it reported for an endpoint it refuses",
+          "class": "by-design",
+          "reason": "BD-Matter-DeviceTypeValidationPerTopology: the Go validator has no per-call refuse option; strict refuses only what an addition causes, so an endpoint whose violations were recorded is never refused for a later change"
+        },
+        {
+          "it": "validates no node scope for an endpoint in none",
+          "class": "by-design",
+          "reason": "BD-Matter-DeviceTypeValidationPerTopology: the Go validator judges the whole topology in one pass and has no per-scope entry point (validateNodeScope); an endpoint in no node scope is unjudged, held by does not judge an endpoint in no node scope"
+        }
       ],
-      "reason": "Reporting a violation once and the strict mode are covered; re-reporting, the environment-selected mode and the Root-assertion handling are not.",
+      "reason": "The service's logging, recording, refusal and Root-assertion flag (#4746) over the Go DeviceTypeValidator; the environment-variable mode, the per-call refuse option and the per-scope entry point are by design (BD-Matter-DeviceTypeValidationPerTopology).",
       "snapshotSha": "3b940d0cb74a8489113c97b225097f4758f6d979"
     },
     {
       "path": "packages/node/test/endpoint/validation/DeviceTypeConformanceTest.ts",
-      "status": "partial",
+      "status": "ported",
       "go": [
         "endpoint:TestApplicationDeviceTypesMeetTheirDeviceTypeRequirements",
         "endpoint:TestParityMatterJSMissingServerCluster",
@@ -1827,58 +1881,34 @@
         "endpoint:TestParityMatterJSProvisionalElementNeverMissing",
         "endpoint:TestParityMatterJSSingletonMisplaced",
         "endpoint:TestParityMatterJSStructuralConditionSpelling",
-        "endpoint:TestBaseMandatesBinding"
+        "endpoint:TestBaseMandatesBinding",
+        "endpoint:TestDeviceTypeConformanceNodeParityMatterJS",
+        "endpoint:TestBindingMountParityMatterJS",
+        "endpoint:TestDeclaredClientMountsBinding"
       ],
-      "missing": [
-        "reports a missing cluster once, not again for its nested requirements",
-        "reports a disallowed cluster the endpoint carries",
-        "accepts a disallowed cluster the endpoint does not carry",
-        "disallows by a feature term whatever condition it is combined with",
-        "reports a mandatory feature by the feature's code",
-        "reports a mandatory command the cluster does not implement",
-        "reports a mandatory element its own definition marks optional but not provisional as missing",
-        "does not report a requirement whose conformance it cannot decide",
-        "accepts a mandatory event the cluster emits",
-        "reports a mandatory event whose emitter survives from a base with the feature on",
-        "reports a mandatory event the cluster has no emitter for",
-        "accepts mandatory client clusters in the client list",
-        "reports a mandatory client cluster missing from the client list",
-        "reports a cluster missing on both sides once per side",
-        "skips a device type the model does not know",
-        "does not report a component's requirements against the composing endpoint",
-        "is added to an endpoint of a simple device type with a mandatory application client",
-        "is not added over a behavior with the Binding server's id",
-        "is added for an application client the developer adds",
-        "is not added to an endpoint without an application client",
-        "is neither added nor required where every application client is one a binding never directs",
-        "is not added to a utility endpoint with an application client",
-        "is not added to a node endpoint with an application client",
-        "keeps the Binding server the developer declares",
-        "is not added to an endpoint of a device type the model does not define, which is not judged",
-        "is added where the DeviceTypeList states a simple device type the endpoint type does not",
-        "is added with validation off",
-        "counts an extended application server for the Server condition",
-        "does not report Binding on an endpoint Base does not require it of",
-        "requires TagList of endpoints that duplicate a sibling's device type",
-        "requires no TagList of an aggregator's bridged devices, which disambiguate by NodeLabel",
-        "requires neither Binding nor TagList of the node endpoint",
-        "reports a requirement Base and a device type both state once, as the device type's",
-        "does not require NetworkCommissioning of a node that does not commission over BLE",
-        "requires NetworkCommissioning of a node that commissions over BLE",
-        "accepts a node that commissions over BLE with NetworkCommissioning",
-        "does not require the diagnostics cluster of a supported network interface",
-        "accepts the singletons on the endpoint that declares them",
-        "accepts a RootNode singleton on a bridged node whose device type lists it",
-        "accepts a cluster that another device type lists as no singleton",
-        "judges no singleton outside a node scope",
-        "keeps a nested node scope's singletons to itself",
-        "constructs an endpoint carrying an outer singleton below a nested node endpoint",
-        "takes the conditions of the whole tree for an endpoint in no node scope",
-        "does not treat another device type's condition as known to a requirement",
-        "aggregates violation errors",
-        "keeps the refused endpoint out of a violation error's own enumerable properties"
+      "left": [
+        {
+          "it": "counts an extended application server for the Server condition",
+          "class": "js-runtime-only",
+          "reason": "asserts a TypeScript behavior subclass whose schema.classification is undefined (OnOffServer.with(...).enable(...)); a Go server is identified by its cluster id, so there is no extended server apart from the cluster"
+        },
+        {
+          "it": "requires NetworkCommissioning of a node that commissions over BLE",
+          "class": "device-ble-thread",
+          "reason": "the node commissions over BLE (createBleNode); no Bluetooth on the device side (CLAUDE.md scope boundaries), so CustomNetworkConfig always holds for a Go node"
+        },
+        {
+          "it": "accepts a node that commissions over BLE with NetworkCommissioning",
+          "class": "device-ble-thread",
+          "reason": "the node commissions over BLE (createBleNode, RootWithWiFi); no Bluetooth on the device side (CLAUDE.md scope boundaries)"
+        },
+        {
+          "it": "keeps the refused endpoint out of a violation error's own enumerable properties",
+          "class": "js-runtime-only",
+          "reason": "asserts Object.keys of a JavaScript Error subclass; a Go error has no enumerable properties"
+        }
       ],
-      "reason": "The device-type parity tests port the cluster, feature, provisional, singleton and Base Binding cases; events, client lists, TagList, node conditions and the missing-Binding injection are not ported case by case.",
+      "reason": "Ported by meaning over fake endpoints in the snapshot's model and the TS stand-in models, and over the assembler's Binding mount; the left cases are TypeScript class shapes and device-side BLE.",
       "snapshotSha": "cd9c595fabd1b048e21e658a75011f90ed116332"
     },
     {
@@ -1890,39 +1920,147 @@
     },
     {
       "path": "packages/node/test/endpoint/validation/RuntimeValidationTest.ts",
-      "status": "partial",
+      "status": "ported",
       "go": [
         "endpoint:TestRuntimeValidationParityMatterJS",
         "node:TestDeviceTypeValidationNodeParityMatterJS"
       ],
-      "missing": [
-        "judges nothing when the owner crashed",
-        "logs rather than fails the destruction when judging it throws",
-        "follows the list again after a factory reset",
-        "logs rather than fails the change when judging it throws",
-        "judges nothing for a device type an endpoint adds while it is constructed",
-        "judges a constant number of endpoints per identical bridged light",
-        "judges only above the owner when a bridged device with a part is deleted",
-        "judges a constant number of endpoints per deleted bridged light",
-        "reads no earlier light when a light asserting a condition on the node endpoint is added",
-        "judges the whole node scope when an endpoint supporting a network interface is added",
-        "judges the whole node scope when a subtree with such an endpoint is added",
-        "judges the whole node scope when an endpoint declaring a singleton is added",
-        "judges the whole node scope when an endpoint without a recorded judgement changes",
-        "judges the whole node scope when an endpoint without a recorded judgement is destroyed",
-        "judges the whole node scope when a destroyed descendant has no recorded judgement",
-        "judges only the node endpoint when a nested node endpoint with such a descendant is destroyed",
-        "judges the whole node scope when an endpoint above such an endpoint becomes a node endpoint",
-        "judges the whole node scope when a subtree with such an endpoint is destroyed",
-        "judges a constant number of endpoints per bridged lock",
-        "leaves an unrelated sibling's descendants unread when an addition adds nothing that reaches the node scope",
-        "walks the node scope again after a reset instead of reusing what an earlier pass kept",
-        "drops an endpoint whose addition it refused, left crashed",
-        "is not refused for a singleton a runtime change misplaced in an ancestor",
-        "judges and logs nothing and forgets every endpoint",
-        "judges nothing when an endpoint of a peer is destroyed",
-        "refuses to validate an endpoint of a peer",
-        "follows no endpoint"
+      "left": [
+        {
+          "it": "judges nothing when the owner crashed",
+          "class": "skip",
+          "reason": "endpoint:TestRuntimeValidationParityMatterJS skips it: a crashed endpoint has no Go subject: the assembler builds an endpoint whole or leaves it out of the snapshot"
+        },
+        {
+          "it": "logs rather than fails the destruction when judging it throws",
+          "class": "skip",
+          "reason": "endpoint:TestRuntimeValidationParityMatterJS skips it: a throwing judgement has no Go subject: the Go pass cannot fail on a tree, so there is nothing to log in place of a failure"
+        },
+        {
+          "it": "follows the list again after a factory reset",
+          "class": "skip",
+          "reason": "endpoint:TestRuntimeValidationParityMatterJS skips it: following a list across a factory reset has no Go subject: the validator follows nothing, and every reassembly judges the snapshot as it is"
+        },
+        {
+          "it": "logs rather than fails the change when judging it throws",
+          "class": "skip",
+          "reason": "endpoint:TestRuntimeValidationParityMatterJS skips it: a throwing judgement has no Go subject: the Go pass cannot fail on a tree, so there is nothing to log in place of a failure"
+        },
+        {
+          "it": "judges nothing for a device type an endpoint adds while it is constructed",
+          "class": "skip",
+          "reason": "endpoint:TestRuntimeValidationParityMatterJS skips it: counts the endpoints a pass judges or reads (recordingChecks, recordingReads, NodeScopeIndex): the Go validator judges the whole tree once per reassembly (ADR 0016), linear in the tree, and keeps no index"
+        },
+        {
+          "it": "judges a constant number of endpoints per identical bridged light",
+          "class": "skip",
+          "reason": "endpoint:TestRuntimeValidationParityMatterJS skips it: counts the endpoints a pass judges or reads (recordingChecks, recordingReads, NodeScopeIndex): the Go validator judges the whole tree once per reassembly (ADR 0016), linear in the tree, and keeps no index"
+        },
+        {
+          "it": "judges only above the owner when a bridged device with a part is deleted",
+          "class": "skip",
+          "reason": "endpoint:TestRuntimeValidationParityMatterJS skips it: counts the endpoints a pass judges or reads (recordingChecks, recordingReads, NodeScopeIndex): the Go validator judges the whole tree once per reassembly (ADR 0016), linear in the tree, and keeps no index"
+        },
+        {
+          "it": "judges a constant number of endpoints per deleted bridged light",
+          "class": "skip",
+          "reason": "endpoint:TestRuntimeValidationParityMatterJS skips it: counts the endpoints a pass judges or reads (recordingChecks, recordingReads, NodeScopeIndex): the Go validator judges the whole tree once per reassembly (ADR 0016), linear in the tree, and keeps no index"
+        },
+        {
+          "it": "reads no earlier light when a light asserting a condition on the node endpoint is added",
+          "class": "skip",
+          "reason": "endpoint:TestRuntimeValidationParityMatterJS skips it: counts the endpoints a pass judges or reads (recordingChecks, recordingReads, NodeScopeIndex): the Go validator judges the whole tree once per reassembly (ADR 0016), linear in the tree, and keeps no index"
+        },
+        {
+          "it": "judges the whole node scope when an endpoint supporting a network interface is added",
+          "class": "skip",
+          "reason": "endpoint:TestRuntimeValidationParityMatterJS skips it: counts the endpoints a pass judges or reads (recordingChecks, recordingReads, NodeScopeIndex): the Go validator judges the whole tree once per reassembly (ADR 0016), linear in the tree, and keeps no index"
+        },
+        {
+          "it": "judges the whole node scope when a subtree with such an endpoint is added",
+          "class": "skip",
+          "reason": "endpoint:TestRuntimeValidationParityMatterJS skips it: counts the endpoints a pass judges or reads (recordingChecks, recordingReads, NodeScopeIndex): the Go validator judges the whole tree once per reassembly (ADR 0016), linear in the tree, and keeps no index"
+        },
+        {
+          "it": "judges the whole node scope when an endpoint declaring a singleton is added",
+          "class": "skip",
+          "reason": "endpoint:TestRuntimeValidationParityMatterJS skips it: counts the endpoints a pass judges or reads (recordingChecks, recordingReads, NodeScopeIndex): the Go validator judges the whole tree once per reassembly (ADR 0016), linear in the tree, and keeps no index"
+        },
+        {
+          "it": "judges the whole node scope when an endpoint without a recorded judgement changes",
+          "class": "skip",
+          "reason": "endpoint:TestRuntimeValidationParityMatterJS skips it: counts the endpoints a pass judges or reads (recordingChecks, recordingReads, NodeScopeIndex): the Go validator judges the whole tree once per reassembly (ADR 0016), linear in the tree, and keeps no index"
+        },
+        {
+          "it": "judges the whole node scope when an endpoint without a recorded judgement is destroyed",
+          "class": "skip",
+          "reason": "endpoint:TestRuntimeValidationParityMatterJS skips it: counts the endpoints a pass judges or reads (recordingChecks, recordingReads, NodeScopeIndex): the Go validator judges the whole tree once per reassembly (ADR 0016), linear in the tree, and keeps no index"
+        },
+        {
+          "it": "judges the whole node scope when a destroyed descendant has no recorded judgement",
+          "class": "skip",
+          "reason": "endpoint:TestRuntimeValidationParityMatterJS skips it: counts the endpoints a pass judges or reads (recordingChecks, recordingReads, NodeScopeIndex): the Go validator judges the whole tree once per reassembly (ADR 0016), linear in the tree, and keeps no index"
+        },
+        {
+          "it": "judges only the node endpoint when a nested node endpoint with such a descendant is destroyed",
+          "class": "skip",
+          "reason": "endpoint:TestRuntimeValidationParityMatterJS skips it: counts the endpoints a pass judges or reads (recordingChecks, recordingReads, NodeScopeIndex): the Go validator judges the whole tree once per reassembly (ADR 0016), linear in the tree, and keeps no index"
+        },
+        {
+          "it": "judges the whole node scope when an endpoint above such an endpoint becomes a node endpoint",
+          "class": "skip",
+          "reason": "endpoint:TestRuntimeValidationParityMatterJS skips it: counts the endpoints a pass judges or reads (recordingChecks, recordingReads, NodeScopeIndex): the Go validator judges the whole tree once per reassembly (ADR 0016), linear in the tree, and keeps no index"
+        },
+        {
+          "it": "judges the whole node scope when a subtree with such an endpoint is destroyed",
+          "class": "skip",
+          "reason": "endpoint:TestRuntimeValidationParityMatterJS skips it: counts the endpoints a pass judges or reads (recordingChecks, recordingReads, NodeScopeIndex): the Go validator judges the whole tree once per reassembly (ADR 0016), linear in the tree, and keeps no index"
+        },
+        {
+          "it": "judges a constant number of endpoints per bridged lock",
+          "class": "skip",
+          "reason": "endpoint:TestRuntimeValidationParityMatterJS skips it: counts the endpoints a pass judges or reads (recordingChecks, recordingReads, NodeScopeIndex): the Go validator judges the whole tree once per reassembly (ADR 0016), linear in the tree, and keeps no index"
+        },
+        {
+          "it": "leaves an unrelated sibling's descendants unread when an addition adds nothing that reaches the node scope",
+          "class": "skip",
+          "reason": "endpoint:TestRuntimeValidationParityMatterJS skips it: counts the endpoints a pass judges or reads (recordingChecks, recordingReads, NodeScopeIndex): the Go validator judges the whole tree once per reassembly (ADR 0016), linear in the tree, and keeps no index"
+        },
+        {
+          "it": "walks the node scope again after a reset instead of reusing what an earlier pass kept",
+          "class": "skip",
+          "reason": "endpoint:TestRuntimeValidationParityMatterJS skips it: counts the endpoints a pass judges or reads (recordingChecks, recordingReads, NodeScopeIndex): the Go validator judges the whole tree once per reassembly (ADR 0016), linear in the tree, and keeps no index"
+        },
+        {
+          "it": "drops an endpoint whose addition it refused, left crashed",
+          "class": "skip",
+          "reason": "endpoint:TestRuntimeValidationParityMatterJS skips it: a crashed endpoint has no Go subject: the assembler builds an endpoint whole or leaves it out of the snapshot"
+        },
+        {
+          "it": "is not refused for a singleton a runtime change misplaced in an ancestor",
+          "class": "skip",
+          "reason": "endpoint:TestRuntimeValidationParityMatterJS skips it: RuntimeValidationTest.ts:1221: a singleton a runtime change misplaces is refused in every mode in Go (ADR 0016), where matter.js logs it, so the change itself is refused before the later addition"
+        },
+        {
+          "it": "judges and logs nothing and forgets every endpoint",
+          "class": "skip",
+          "reason": "endpoint:TestRuntimeValidationParityMatterJS skips it: a node's teardown has no Go subject: Stop runs no pass, and the next Start judges the snapshot with a validator that recorded nothing (bridge.SetDeviceTypeValidation)"
+        },
+        {
+          "it": "judges nothing when an endpoint of a peer is destroyed",
+          "class": "skip",
+          "reason": "endpoint:TestRuntimeValidationParityMatterJS skips it: a peer's endpoints have no Go subject: the controller side runs no device-type validation"
+        },
+        {
+          "it": "refuses to validate an endpoint of a peer",
+          "class": "skip",
+          "reason": "endpoint:TestRuntimeValidationParityMatterJS skips it: a peer's endpoints have no Go subject: the controller side runs no device-type validation"
+        },
+        {
+          "it": "follows no endpoint",
+          "class": "skip",
+          "reason": "endpoint:TestRuntimeValidationParityMatterJS skips it: the observers matter.js registers per mode have no Go subject: the validator follows nothing in any mode"
+        }
       ],
       "reason": "A runtime change is a new snapshot judged as one reassembly: each case ports as a verdict of endpoint.DeviceTypeValidator over a fake tree (endpoint/runtime_validation_parity_matterjs_test.go) — a destroyed child, a changed device type list, duplicate siblings, conditions asserted on the node endpoint in the test's synthetic models, a refused addition, and a later addition in strict mode refused only for what it causes; the default-configuration cases run on fabrictest (node/devicetype_validation_parity_matterjs_test.go). The counts of judged and read endpoints, crashed endpoints, throwing judgements, peers, the observers, teardown and a factory reset of a followed endpoint have no Go subject (whole-tree pass, ADR 0016), and a singleton a runtime change misplaces is refused in every mode (ADR 0016).",
       "snapshotSha": "7dceb4c71f56ffe843b5c70f4448f6c89ce701e8"
@@ -1950,30 +2088,33 @@
     },
     {
       "path": "packages/node/test/endpoint/validation/StandardDeviceTypeCorpusTest.ts",
-      "status": "partial",
+      "status": "ported",
       "go": [
         "device:TestStandardDeviceTypeCorpusParityMatterJS"
       ],
-      "missing": [
-        "refuses a Closure endpoint without the tags its Descriptor TagList requires",
-        "judges Aggregator",
-        "judges AudioDoorbell",
-        "judges BridgedNode",
-        "judges Camera",
-        "judges CameraController",
-        "judges CastingVideoClient",
-        "judges Chime",
-        "judges FloodlightCamera",
-        "judges Intercom",
-        "judges JointFabricAdministrator",
-        "judges NetworkInfrastructureManager",
-        "judges OtaRequestor",
-        "judges RootNode as the root endpoint of a node, which carries the standard RootNode type",
-        "judges SnapshotCamera",
-        "judges ThreadBorderRouter",
-        "judges VideoDoorbell"
+      "left": [
+        {
+          "it": "judges Aggregator",
+          "class": "skip",
+          "reason": "device:TestStandardDeviceTypeCorpusParityMatterJS skips it: the aggregator endpoint is the node's, not a bridged device the kit builds (device/conformance_test.go noFixture)"
+        },
+        {
+          "it": "judges BridgedNode",
+          "class": "skip",
+          "reason": "device:TestStandardDeviceTypeCorpusParityMatterJS skips it: the assembler adds BridgedNode to every bridged endpoint, so a BridgedNode device would list it twice (device/conformance_test.go noFixture)"
+        },
+        {
+          "it": "judges OtaRequestor",
+          "class": "skip",
+          "reason": "device:TestStandardDeviceTypeCorpusParityMatterJS skips it: no OTA Software Update Requestor server of the module takes a device-layer form (device/conformance_test.go noFixture)"
+        },
+        {
+          "it": "judges RootNode as the root endpoint of a node, which carries the standard RootNode type",
+          "class": "skip",
+          "reason": "device:TestStandardDeviceTypeCorpusParityMatterJS skips it: the root endpoint is the node's, not a bridged device the kit builds (device/conformance_test.go noFixture)"
+        }
       ],
-      "reason": "Every committed kit type is built with the host statements of the device fixtures but without their parts, assembled as a bridged device and judged; it may carry only the corpus's pinned components, a mandatory server only a feature selection completes, and what its Go fixture tolerates with a reason (device/standard_device_type_corpus_parity_matterjs_test.go); the names devicegen does not commit are skipped with its reason, the node's root and Aggregator, BridgedNode and OtaRequestor with the fixture table's, and the Closure TagList refusal waits for a TagList declaration (milestone 5).",
+      "reason": "Every committed device type is built and judged; the Closure TagList refusal is the judge's (BD-Matter-ClosureWithoutTagList); the node's own endpoints and OtaRequestor have no device-layer fixture.",
       "snapshotSha": "bdfc8d3f028840052f223b3e3b1fb0f15f088d93"
     },
     {
@@ -2766,75 +2907,249 @@
       "path": "packages/node/test/node/ServerNodeTest.ts",
       "status": "partial",
       "go": [
-        "node:TestServerNodeParity"
+        "node:TestServerNodeParity",
+        "bridge:TestOperationalPortParityMatterJS",
+        "controller:TestControllerEraseParityMatterJS",
+        "controller:TestOperationalPortParityMatterJS",
+        "endpoint:TestEndpointNumberAfterPresetParityMatterJS",
+        "endpoint:TestEndpointNumberWrapParityMatterJS",
+        "node:TestEndpointNumberConflictParityMatterJS",
+        "node:TestEndpointNumberReservationParityMatterJS",
+        "node:TestServerNodeAttestationProviderParityMatterJS",
+        "node:TestServerNodeFactoryResetParityMatterJS",
+        "node:TestServerNodeOrphanedFabricDataParityMatterJS"
       ],
       "missing": [
-        "with part at startup",
-        "with part added before online",
-        "with part added after online",
         "announces and expires correctly",
-        "lists its peers in its diagnostics",
-        "binds the standard Matter port for a commissionable node without an explicit port",
-        "uses an ephemeral operational port for a controller node without an explicit port",
-        "honors an explicit port on a commissionable node",
-        "honors an explicit port on a controller node",
-        "commissions with delayed provided certificates",
-        "decommissions on the last fabric and resets once the fail-safe ends",
-        "keeps a commissioning that completes under the fail-safe after the last fabric left",
-        "resets when the fail-safe rolls back a fabric it added after the last fabric left",
-        "waits for a fail-safe armed after the last fabric left",
-        "factory resets when offline after commission",
-        "factory resets when online after commission",
-        "factory resets when offline without commission",
-        "handles factory resets when online but in parallel offline is called correctly",
-        "keeps node services across a factory reset and releases them on close",
-        "sanitizes fabric-scoped data once per fabric removal after a factory reset",
-        "releases storage a node opened before its construction failed",
-        "releases the storage lock when an earlier service fails to close",
-        "releases the storage lock when an endpoint fails to close",
-        "releases the storage lock when taking the node offline fails",
-        "starts a node after an earlier node could not open the mDNS socket",
-        "frees the endpoint numbers a factory reset erases",
-        "goes to the preset endpoint when it constructs before the stored endpoint",
-        "is refused when the stored endpoint is installed first",
-        "ignores a stored number outside the range of a part",
         "starts over from 1 when the next number in storage is corrupt",
-        "is taken over when the stored endpoint is not part of the node",
-        "is taken over from an endpoint closed in the same run",
-        "clears the stored number of the endpoint it took over",
-        "keeps both numbers across a restart when a returning endpoint changes its preset",
-        "gives a number two stored endpoints record to the first that returns",
-        "frees the numbers of a deleted subtree",
-        "continues new endpoint numbers after the highest preset number",
-        "wraps new endpoint numbers to the lowest free number",
-        "keeps the holder's number when a refused endpoint is erased",
-        "erases the persisted store of a part that crashes before number assignment",
-        "factory reset erases blobs an earlier session left behind",
-        "gives a restarted node new, unblocked client subscriptions",
-        "factory reset erases the blobs a transfer left behind",
-        "factory reset of a controller erases peers and CA key material",
-        "factory reset closes the fabric authority the node owns",
-        "completes factory reset when a peer cannot be torn down",
-        "completes factory reset when removing the protocol peer fails",
-        "erases CA key material the node never loaded",
-        "erases every peer endpoint store when one fails",
-        "erases remaining areas when one fails during factory reset",
-        "keeps serving events from the one event manager across factory reset",
-        "leaves its own event manager open when it creates a peer",
-        "commissions again on the same controller instance after factory reset",
-        "commissions again after factory reset of a controller with commissioned peers",
-        "removes the entries of a removed fabric from a fabric-sensitive list",
-        "sanitizes orphaned fabric-scoped data at startup",
-        "from root behavior error",
-        "from behavior error on child during node create",
-        "from behavior on child after node create",
-        "from root behavior error",
-        "from behavior error on child during startup",
-        "from behavior error on child added after startup",
-        "is resilient to conformance changes that affect persisted data",
-        "keeps the access control list when a newer default root endpoint adds a feature",
-        "validates the event buffers of a subclass of the events behavior",
-        "with part at startup"
+        "removes the entries of a removed fabric from a fabric-sensitive list"
+      ],
+      "left": [
+        {
+          "it": "with part at startup",
+          "class": "js-runtime-only",
+          "reason": "matter.js endpoint lifecycle observables (ready, installed, online, … destroyed); a Go node has no endpoint lifecycle event stream"
+        },
+        {
+          "it": "with part added before online",
+          "class": "js-runtime-only",
+          "reason": "matter.js endpoint lifecycle observables (ready, installed, online, … destroyed); a Go node has no endpoint lifecycle event stream"
+        },
+        {
+          "it": "with part added after online",
+          "class": "js-runtime-only",
+          "reason": "matter.js endpoint lifecycle observables (ready, installed, online, … destroyed); a Go node has no endpoint lifecycle event stream"
+        },
+        {
+          "it": "lists its peers in its diagnostics",
+          "class": "js-runtime-only",
+          "reason": "matter.js Diagnostic/LogFormat rendering of a controller's peers"
+        },
+        {
+          "it": "decommissions on the last fabric and resets once the fail-safe ends",
+          "class": "by-design",
+          "reason": "BD-Matter-LastFabricReopenWithoutErase: after the last fabric the node reopens its window when idle and erases nothing"
+        },
+        {
+          "it": "keeps a commissioning that completes under the fail-safe after the last fabric left",
+          "class": "by-design",
+          "reason": "BD-Matter-LastFabricReopenWithoutErase: after the last fabric the node reopens its window when idle and erases nothing"
+        },
+        {
+          "it": "resets when the fail-safe rolls back a fabric it added after the last fabric left",
+          "class": "by-design",
+          "reason": "BD-Matter-LastFabricReopenWithoutErase: after the last fabric the node reopens its window when idle and erases nothing"
+        },
+        {
+          "it": "waits for a fail-safe armed after the last fabric left",
+          "class": "by-design",
+          "reason": "BD-Matter-LastFabricReopenWithoutErase: after the last fabric the node reopens its window when idle and erases nothing"
+        },
+        {
+          "it": "keeps node services across a factory reset and releases them on close",
+          "class": "js-runtime-only",
+          "reason": "matter.js Environment service identity across erase"
+        },
+        {
+          "it": "releases storage a node opened before its construction failed",
+          "class": "js-runtime-only",
+          "reason": "matter.js storage driver/lock and Environment service close ordering; a Go node takes no storage lock"
+        },
+        {
+          "it": "releases the storage lock when an earlier service fails to close",
+          "class": "js-runtime-only",
+          "reason": "matter.js storage driver/lock and Environment service close ordering; a Go node takes no storage lock"
+        },
+        {
+          "it": "releases the storage lock when an endpoint fails to close",
+          "class": "js-runtime-only",
+          "reason": "matter.js storage driver/lock and Environment service close ordering; a Go node takes no storage lock"
+        },
+        {
+          "it": "releases the storage lock when taking the node offline fails",
+          "class": "js-runtime-only",
+          "reason": "matter.js storage driver/lock and Environment service close ordering; a Go node takes no storage lock"
+        },
+        {
+          "it": "starts a node after an earlier node could not open the mDNS socket",
+          "class": "js-runtime-only",
+          "reason": "matter.js Environment network-service reuse after a failed runtime"
+        },
+        {
+          "it": "goes to the preset endpoint when it constructs before the stored endpoint",
+          "class": "js-runtime-only",
+          "reason": "matter.js Endpoint number presets; a host claims no endpoint number in Go — the assembler allocates every number from the persisted counter (node/endpoint_number_conflict_parity_matterjs_test.go skipClaimant)"
+        },
+        {
+          "it": "is refused when the stored endpoint is installed first",
+          "class": "js-runtime-only",
+          "reason": "matter.js Endpoint number presets; a host claims no endpoint number in Go — the assembler allocates every number from the persisted counter (node/endpoint_number_conflict_parity_matterjs_test.go skipClaimant)"
+        },
+        {
+          "it": "ignores a stored number outside the range of a part",
+          "class": "js-runtime-only",
+          "reason": "matter.js Endpoint number presets; a host claims no endpoint number in Go — the assembler allocates every number from the persisted counter (node/endpoint_number_conflict_parity_matterjs_test.go skipClaimant)"
+        },
+        {
+          "it": "is taken over when the stored endpoint is not part of the node",
+          "class": "js-runtime-only",
+          "reason": "matter.js Endpoint number presets; a host claims no endpoint number in Go — the assembler allocates every number from the persisted counter (node/endpoint_number_conflict_parity_matterjs_test.go skipClaimant)"
+        },
+        {
+          "it": "is taken over from an endpoint closed in the same run",
+          "class": "js-runtime-only",
+          "reason": "matter.js Endpoint number presets; a host claims no endpoint number in Go — the assembler allocates every number from the persisted counter (node/endpoint_number_conflict_parity_matterjs_test.go skipClaimant)"
+        },
+        {
+          "it": "clears the stored number of the endpoint it took over",
+          "class": "js-runtime-only",
+          "reason": "matter.js Endpoint number presets; a host claims no endpoint number in Go — the assembler allocates every number from the persisted counter (node/endpoint_number_conflict_parity_matterjs_test.go skipClaimant)"
+        },
+        {
+          "it": "keeps both numbers across a restart when a returning endpoint changes its preset",
+          "class": "js-runtime-only",
+          "reason": "matter.js Endpoint number presets; a host claims no endpoint number in Go — the assembler allocates every number from the persisted counter (node/endpoint_number_conflict_parity_matterjs_test.go skipClaimant)"
+        },
+        {
+          "it": "gives a number two stored endpoints record to the first that returns",
+          "class": "js-runtime-only",
+          "reason": "matter.js Endpoint number presets; a host claims no endpoint number in Go — the assembler allocates every number from the persisted counter (node/endpoint_number_conflict_parity_matterjs_test.go skipClaimant)"
+        },
+        {
+          "it": "erases the persisted store of a part that crashes before number assignment",
+          "class": "js-runtime-only",
+          "reason": "matter.js endpoint store lifecycle of a behavior that crashes before number assignment"
+        },
+        {
+          "it": "factory reset erases blobs an earlier session left behind",
+          "class": "js-runtime-only",
+          "reason": "matter.js ServerNodeStore blob storage"
+        },
+        {
+          "it": "gives a restarted node new, unblocked client subscriptions",
+          "class": "js-runtime-only",
+          "reason": "matter.js ClientSubscriptions runtime objects"
+        },
+        {
+          "it": "factory reset erases the blobs a transfer left behind",
+          "class": "js-runtime-only",
+          "reason": "matter.js ServerNodeStore blob storage"
+        },
+        {
+          "it": "factory reset closes the fabric authority the node owns",
+          "class": "js-runtime-only",
+          "reason": "matter.js Environment ownership of FabricAuthority"
+        },
+        {
+          "it": "completes factory reset when a peer cannot be torn down",
+          "class": "js-runtime-only",
+          "reason": "matter.js erase() error aggregation over injected teardown failures"
+        },
+        {
+          "it": "completes factory reset when removing the protocol peer fails",
+          "class": "js-runtime-only",
+          "reason": "matter.js erase() error aggregation"
+        },
+        {
+          "it": "erases CA key material the node never loaded",
+          "class": "js-runtime-only",
+          "reason": "matter.js storage-key layout of CA material (nodes/, certificates)"
+        },
+        {
+          "it": "erases every peer endpoint store when one fails",
+          "class": "js-runtime-only",
+          "reason": "matter.js peer endpoint store layout and error aggregation"
+        },
+        {
+          "it": "erases remaining areas when one fails during factory reset",
+          "class": "js-runtime-only",
+          "reason": "matter.js storage-area erase aggregation"
+        },
+        {
+          "it": "keeps serving events from the one event manager across factory reset",
+          "class": "js-runtime-only",
+          "reason": "matter.js object identity of the protocol event handler"
+        },
+        {
+          "it": "leaves its own event manager open when it creates a peer",
+          "class": "js-runtime-only",
+          "reason": "matter.js Environment/protocol object lifecycle"
+        },
+        {
+          "it": "commissions again on the same controller instance after factory reset",
+          "class": "by-design",
+          "reason": "BD-Matter-FactoryResetEndsTheNode: a Go controller is single-use; the controller built on the erased database commissions again (controller:TestControllerEraseParityMatterJS)"
+        },
+        {
+          "it": "from root behavior error",
+          "class": "js-runtime-only",
+          "reason": "matter.js Behavior construction crash taxonomy (EndpointBehaviorsError, EndpointPartsError); Go cluster servers have no construction crash"
+        },
+        {
+          "it": "from behavior error on child during node create",
+          "class": "js-runtime-only",
+          "reason": "matter.js Behavior construction crash taxonomy (EndpointBehaviorsError, EndpointPartsError); Go cluster servers have no construction crash"
+        },
+        {
+          "it": "from behavior on child after node create",
+          "class": "js-runtime-only",
+          "reason": "matter.js Behavior construction crash taxonomy (EndpointBehaviorsError, EndpointPartsError); Go cluster servers have no construction crash"
+        },
+        {
+          "it": "from root behavior error",
+          "class": "js-runtime-only",
+          "reason": "matter.js Behavior construction crash taxonomy (EndpointBehaviorsError, EndpointPartsError); Go cluster servers have no construction crash"
+        },
+        {
+          "it": "from behavior error on child during startup",
+          "class": "js-runtime-only",
+          "reason": "matter.js Behavior construction crash taxonomy (EndpointBehaviorsError, EndpointPartsError); Go cluster servers have no construction crash"
+        },
+        {
+          "it": "from behavior error on child added after startup",
+          "class": "js-runtime-only",
+          "reason": "matter.js Behavior construction crash taxonomy (EndpointBehaviorsError, EndpointPartsError); Go cluster servers have no construction crash"
+        },
+        {
+          "it": "is resilient to conformance changes that affect persisted data",
+          "class": "js-runtime-only",
+          "reason": "matter.js behavior storage migration across conformance changes; Go servers keep no behavior store"
+        },
+        {
+          "it": "keeps the access control list when a newer default root endpoint adds a feature",
+          "class": "js-runtime-only",
+          "reason": "matter.js persisted-state migration across a changed default root endpoint"
+        },
+        {
+          "it": "validates the event buffers of a subclass of the events behavior",
+          "class": "js-runtime-only",
+          "reason": "TypeScript subclassing of EventsBehavior"
+        },
+        {
+          "it": "with part at startup",
+          "class": "js-runtime-only",
+          "reason": "matter.js node.protocol object model (ProtocolService); its wildcardPathFlags part is node:TestWildcardPathFlagsParityMatterJS"
+        }
       ],
       "reason": "Commissioning, its timeout, decommission and recommission, a second fabric and the removal of the first with its fabric-scoped data (fix: the removed fabric's fabric-sensitive events leave the log), a restart's persisted values and the Aggregator's composition run over the wire on fabrictest (node:TestServerNodeParity). Missing: the matter.js node runtime — lifecycle events, mDNS packet TTLs, the operational-port defaults of commissionable and controller nodes, factory reset (erase) and what it keeps or releases, storage locks and failed construction, behavior crashes, conformance migrations of persisted data, the event buffers of an events-behavior subclass, endpoint-number presets and their storage, the controller's factory reset of peers and CA material, its diagnostics — and the fail-safe interplay with a pending reset after the last fabric, which the Go node answers by reopening its window when idle rather than erasing.",
       "snapshotSha": "6b898f522247220a2d2ea42014fcef4e230e0499"
@@ -2849,36 +3164,73 @@
         "im/subscription:TestHandlerParity_Close_WhileDirty_StillMarksClosed",
         "node:TestServerSubscriptionParity",
         "im/subscription:TestServerSubscriptionParity",
-        "node:TestServerSubscriptionLITParity"
+        "node:TestServerSubscriptionLITParity",
+        "im/subscription:TestSessionShutdownParityMatterJS",
+        "im/subscription:TestSlowReportParityMatterJS"
       ],
       "missing": [
         "terminates when the peer refuses a report sent during a shutdown close",
-        "keeps a subscription that joins a session closing for shutdown",
         "terminates when the peer answers a report with an error status",
         "ends the subscription when the peer answers INVALID_SUBSCRIPTION on a session without MRP",
         "waits for the status and keeps the subscription when the peer answers SUCCESS on a session without MRP",
         "closes subscription even when in-flight exchange close throws",
         "abandons the subscription after repeated MRP exhaustion, leaving the session alone",
         "completes a flushing close triggered from inside an in-flight update",
-        "holds a report queued behind a report being sent until its deferral ends",
-        "sends the keep-alive queued behind a slow report within the send interval despite a deferral",
-        "sends the keep-alive that fell due while a report was in flight when that report completes",
-        "sends nothing for a queued pass with only unselected changes when no keep-alive is owed",
-        "sends nothing for a later queued pass with only unselected changes once the owed keep-alive went out",
-        "does not send the keep-alive that fell due while a report was in flight once closed",
-        "sends a change held by the min interval floor when the floor ends although the wall clock stepped backwards",
-        "sends the keep-alive at the send interval although the wall clock stepped backwards",
-        "sends a change held by a deferral when the deferral ends although the wall clock stepped backwards",
-        "holds a change inside the min interval floor after the wall clock stepped forwards",
-        "holds a change until its deferral ends after the wall clock stepped forwards",
-        "holds a report queued behind a report being sent until its deferral ends after the wall clock stepped forwards",
-        "keeps the deferral bound set at activation when the wall clock stepped backwards before it",
-        "sends a change at the end of a deferral requested after the wall clock stepped backwards",
-        "keeps the keep-alive on time after a report sent after the wall clock stepped forwards",
-        "keeps the min interval floor after the initial report when the wall clock stepped forwards before it",
         "flushes a report queued behind a report being sent on close despite a deferral",
         "completes session force-close triggered from inside an in-flight update",
         "suppresses peer loss on the exchanges it opens to push subscription reports"
+      ],
+      "left": [
+        {
+          "it": "sends a change held by the min interval floor when the floor ends although the wall clock stepped backwards",
+          "class": "js-runtime-only",
+          "reason": "MockTime.stepWallClock: a Go time.Time carries a monotonic reading and the engine has no wall clock to step"
+        },
+        {
+          "it": "sends the keep-alive at the send interval although the wall clock stepped backwards",
+          "class": "js-runtime-only",
+          "reason": "MockTime.stepWallClock: a Go time.Time carries a monotonic reading and the engine has no wall clock to step"
+        },
+        {
+          "it": "sends a change held by a deferral when the deferral ends although the wall clock stepped backwards",
+          "class": "js-runtime-only",
+          "reason": "MockTime.stepWallClock: a Go time.Time carries a monotonic reading and the engine has no wall clock to step"
+        },
+        {
+          "it": "holds a change inside the min interval floor after the wall clock stepped forwards",
+          "class": "js-runtime-only",
+          "reason": "MockTime.stepWallClock: a Go time.Time carries a monotonic reading and the engine has no wall clock to step"
+        },
+        {
+          "it": "holds a change until its deferral ends after the wall clock stepped forwards",
+          "class": "js-runtime-only",
+          "reason": "MockTime.stepWallClock: a Go time.Time carries a monotonic reading and the engine has no wall clock to step"
+        },
+        {
+          "it": "holds a report queued behind a report being sent until its deferral ends after the wall clock stepped forwards",
+          "class": "js-runtime-only",
+          "reason": "MockTime.stepWallClock: a Go time.Time carries a monotonic reading and the engine has no wall clock to step"
+        },
+        {
+          "it": "keeps the deferral bound set at activation when the wall clock stepped backwards before it",
+          "class": "js-runtime-only",
+          "reason": "MockTime.stepWallClock: a Go time.Time carries a monotonic reading and the engine has no wall clock to step"
+        },
+        {
+          "it": "sends a change at the end of a deferral requested after the wall clock stepped backwards",
+          "class": "js-runtime-only",
+          "reason": "MockTime.stepWallClock: a Go time.Time carries a monotonic reading and the engine has no wall clock to step"
+        },
+        {
+          "it": "keeps the keep-alive on time after a report sent after the wall clock stepped forwards",
+          "class": "js-runtime-only",
+          "reason": "MockTime.stepWallClock: a Go time.Time carries a monotonic reading and the engine has no wall clock to step"
+        },
+        {
+          "it": "keeps the min interval floor after the initial report when the wall clock stepped forwards before it",
+          "class": "js-runtime-only",
+          "reason": "MockTime.stepWallClock: a Go time.Time carries a monotonic reading and the engine has no wall clock to step"
+        }
       ],
       "reason": "Peer cancel, the send-interval bounds, the negotiated MaxInterval (fix: a floor above the publisher limit raises the ceiling instead of refusing the subscription), a report of only the changed attribute, the keep-alive answered INVALID_SUBSCRIPTION, endpoint selection by event paths and close against release are ported (im/subscription, and over the wire on fabrictest), and so is the LIT ICD publisher granting its IdleModeDuration as MaxInterval (node/server_subscription_lit_parity_matterjs_test.go). Missing: the engine's handling of mocked exchanges that block, throw or answer late — shutdown closes with a report in flight, a peer refusing a report with an error status, keep-alives on a session without MRP, repeated MRP exhaustion, slow and queued reports against deferrals and close; wall-clock steps (a Go time.Time carries a monotonic reading, so the engine's intervals do not see a wall-clock step, and the fake clock has no separate wall clock); session force-close from inside an update and peer-loss suppression on the report exchanges.",
       "snapshotSha": "aca0653ea64fdb3c221af4ac3ac55d3eaf1e4820"
@@ -4081,7 +4433,6 @@
         "groups:TestKeySetsCurrentKeyForID",
         "groups:TestKeySetsContainsOperationalKey"
       ],
-      "missing": [],
       "reason": "Lookup and replacement, the keys of a key set, the current key of a non-IPK key set and the operational-key match are ported on the manager's key sets (forId and allKeysForId on key set 1); the two key-set-0 current-key cases run on Manager.CurrentIPK and IPKKeys, the manager's key set 0 (fabricGroups.ipk, held apart from the session index as KeySets.ts #updateSessions skips id 0).",
       "snapshotSha": "63ab34a45d0cbe4b2da1181f1f6556c27356ec6c"
     },

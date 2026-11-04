@@ -214,6 +214,13 @@ func UnmarshalInvokeRequestTLV(dec *tlv.Decoder, fieldsReader CommandFieldsReade
 		}
 		switch uint8(el.Tag.Number & 0xFF) {
 		case tagInvokeReqSuppressResponse:
+			// TlvField(0, TlvBoolean): a SuppressResponse of another type
+			// fails the decode, and the request is answered
+			// (packages/types/src/protocol/messages/TlvInvokeRequest.ts:19;
+			// SuppressResponseTest.ts:337-343).
+			if el.Type != tlv.TypeBoolTrue && el.Type != tlv.TypeBoolFalse {
+				return InvokeRequest{}, fmt.Errorf("%w: SuppressResponse not a boolean", ErrInvalidInvokeRequest)
+			}
 			req.SuppressResponse = el.Bool
 		case tagInvokeReqTimedRequest:
 			req.TimedRequest = el.Bool

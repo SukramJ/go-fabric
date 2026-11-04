@@ -117,6 +117,22 @@ func part(t *testing.T, owner *Device, name string, conds []string, with ...Decl
 	}
 }
 
+// fixtureTags are the Descriptor TagList a type's test device carries
+// (testOptions): matter.js's fixtures state descriptor.tagList for the
+// device types whose Descriptor mandates TAGLIST
+// (StandardDeviceTypeCorpusTest.ts:182-183, :195) — ClosureTag.Door
+// (namespace 0x44, tag 0x06), ClosurePanelTag.Lift (0x45, 0x00) and
+// CommodityTariffCommodityTag.ElectricalEnergy (0x0D, 0x00), the ids of
+// packages/node/src/tags/{ClosureTag,ClosurePanelTag,
+// CommodityTariffCommodityTag}.ts at 862ad75f.
+var fixtureTags = map[string][]SemanticTag{
+	"Closure":                {closureDoorTag},
+	"ClosurePanel":           {{MfgCode: spec.NullOf[uint16](), NamespaceId: 0x45, Tag: 0x00}},
+	"ElectricalEnergyTariff": {{MfgCode: spec.NullOf[uint16](), NamespaceId: 0x0D, Tag: 0x00}},
+}
+
+var closureDoorTag = SemanticTag{MfgCode: spec.NullOf[uint16](), NamespaceId: 0x44, Tag: 0x06}
+
 func opts(o ...Declaration) func(*testing.T) []Declaration {
 	return func(*testing.T) []Declaration { return o }
 }
@@ -148,9 +164,10 @@ func meteredSensor(t *testing.T, features uint32) []Declaration {
 	}
 }
 
-// tagListReason: the Descriptor the assembler mounts has no TagList
-// feature; the device type mandates it.
-const tagListReason = "the assembler's Descriptor has no TagList feature and endpoint.Spec cannot select one"
+// tagListReason: a part the fixture adds carries no Tags, so its
+// Descriptor has no TagList feature; the component's device type mandates
+// it.
+const tagListReason = "the fixture's parts carry no Options.Tags, so their Descriptor has no TagList feature"
 
 var fixtures = map[string]fixture{
 	"BatteryStorage": {
@@ -172,16 +189,9 @@ var fixtures = map[string]fixture{
 			"missing device:BatteryStorage/ElectricalSensor": tagListReason, "missing device:BatteryStorage/PowerSource": tagListReason,
 		},
 	},
-	"Closure": {
-		with:     opts(feat(0x0104, cccdef.FeaturePositioning)),
-		tolerate: map[string]string{"missing Descriptor.TAGLIST": tagListReason},
-	},
-	"ClosurePanel": {
-		with:     opts(feat(0x0105, cddef.FeaturePositioning|cddef.FeatureTranslation)),
-		tolerate: map[string]string{"missing Descriptor.TAGLIST": tagListReason},
-	},
+	"Closure":                {with: opts(feat(0x0104, cccdef.FeaturePositioning))},
+	"ClosurePanel":           {with: opts(feat(0x0105, cddef.FeaturePositioning|cddef.FeatureTranslation))},
 	"DeviceEnergyManagement": {with: opts(forecast)},
-	"ElectricalEnergyTariff": {tolerate: map[string]string{"missing Descriptor.TAGLIST": tagListReason}},
 	"ElectricalMeter": {
 		with: opts(acPower, feat(0x0091, eemdef.FeatureImportedEnergy|eemdef.FeatureCumulativeEnergy)),
 		parts: func(t *testing.T, d *Device) {

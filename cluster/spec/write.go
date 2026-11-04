@@ -187,16 +187,24 @@ func (i *Instance) inPeer(in string, v any, peers Peers) bool {
 // behavior's state against the model on every commit, not only on a
 // controller's write (packages/node/src/behavior/state/validation/
 // ValueValidator.ts, constraint.ts); a server holds the values its host
-// sets to the same checks. A refusal is a [StatusError] with
-// CONSTRAINT_ERROR, UNSUPPORTED_ATTRIBUTE for an attribute the cluster
-// does not define.
+// sets to the same checks, and — the device being the actor — a bitmap
+// value to the conformance of the bits it sets ([Instance.ValidateWrite]
+// does not). A refusal is a [StatusError] with CONSTRAINT_ERROR,
+// UNSUPPORTED_ATTRIBUTE for an attribute the cluster does not define.
 func (i *Instance) CheckValue(attrID uint32, value any, peers Peers) (any, error) {
 	a := i.def.Attribute(attrID)
 	if a == nil {
 		return nil, Errorf(im.StatusUnsupportedAttribute, "%s: attribute 0x%04X is not defined", i.def.Name, attrID)
 	}
-	return i.checkValue(a.Name, a.Type, a.Quality.Nullable, a.Constraint, underlying(value), peers)
+	// The bits of a feature map are the feature selection itself, which a
+	// bit's conformance is judged against (state/validation/ValueValidator.ts:227-231 at
+	// 862ad75f).
+	scope := nameScope{peers: peers, bits: attrID != featureMapAttributeID}
+	return i.checkValueIn(a.Name, a.Type, a.Quality.Nullable, a.Constraint, underlying(value), peers, scope)
 }
+
+// featureMapAttributeID is the global FeatureMap attribute (0xFFFC).
+const featureMapAttributeID = 0xFFFC
 
 func (i *Instance) checkValue(name string, t Type, nullable bool, c Constraint, value any, peers Peers) (any, error) {
 	return i.checkValueIn(name, t, nullable, c, value, peers, nameScope{peers: peers})
@@ -218,6 +226,11 @@ func (i *Instance) checkValueIn(name string, t Type, nullable bool, c Constraint
 	switch t.Kind {
 	case KindUint, KindEnum, KindBitmap:
 		v, why = i.checkUnsigned(t, nullable, c, value, peers)
+		if n, ok := v.(uint64); ok && why == "" && scope.bits && t.Kind == KindBitmap && t.Bitmap != nil {
+			if err := i.checkBitConformance(name, t.Bitmap, n); err != nil {
+				return nil, err
+			}
+		}
 	case KindInt:
 		v, why = i.checkSigned(t, nullable, c, value, peers)
 	case KindFloat32, KindFloat64:
@@ -265,6 +278,51 @@ func (i *Instance) checkUnsigned(t Type, nullable bool, c Constraint, value any,
 		return nil, fmt.Sprintf("%d violates %q", n, c.Text)
 	}
 	return n, ""
+}
+
+// checkBitConformance refuses a value that sets a bit, or any bit of a
+// multi-bit member, whose conformance the instance's features disallow:
+// each member's conformance compiled with no record around it, judged
+// only where it refuses outright — a nonconformant or disallowed node, or
+// a value that is undefined. A conformance naming something only a record
+// decides (an attribute, an unknown name) or one the compiler cannot
+// decide leaves the bit unjudged, and a clear bit is never judged: a bit's
+// conformance says whether it may be set, never that it must be. The
+// refusal is CONSTRAINT_ERROR ([ErrConformance]), matter.js's
+// ConformanceError. Mirrors matter.js
+// packages/node/src/behavior/state/validation/ValueValidator.ts:198-305
+// (createBitmapValidator, the per-member conformance from
+// astToFunction(field, supervisor, { refusalOnly: true })) and
+// conformance-compiler.ts:74-185 (refusalOnly) at 862ad75f.
+func (i *Instance) checkBitConformance(name string, b *Bitmap, n uint64) error {
+	c := &confCompiler{inst: i}
+	for mi := range b.Members {
+		m := &b.Members[mi]
+		if n&m.Mask() == 0 || m.Conformance.Op == "" {
+			continue
+		}
+		c.unreadable = false
+		node := c.compile(m.Conformance)
+		if c.unreadable {
+			// A conformance the compiler cannot read is one matter.js
+			// cannot enforce; it leaves the bit unjudged rather than
+			// refuse to supervise the cluster (state/validation/ValueValidator.ts:235-243).
+			continue
+		}
+		refused := false
+		switch node.code {
+		case codeNonconformant, codeDisallowed:
+			refused = true
+		case codeValue:
+			refused = !node.value.defined
+		default:
+		}
+		if refused {
+			return Errorf(im.StatusConstraintError, "%s: %s.%s: conformance %q: Matter does not allow you to set this value: %w",
+				i.def.Name, name, m.Name, m.Conformance.Text, ErrConformance)
+		}
+	}
+	return nil
 }
 
 // checkSigned checks a signed integer against its width and constraint.

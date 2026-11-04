@@ -78,6 +78,33 @@ var cases = []testCase{
 	{"fabric-cascade", fabricCascade},
 	{"copies", copiesCase},
 	{"concurrent", concurrentCase},
+	{"erase", eraseCase},
+}
+
+// eraseCase: Erase leaves the store as a fresh one — no fabric, no ACL, no
+// setting or counter, no subscription — and the next fabric index back at 1
+// (store.Eraser, the factory reset).
+func eraseCase(ctx context.Context, t *testing.T, p store.Port) {
+	idx := addFabric(ctx, t, p, 1)
+	addFabric(ctx, t, p, 2)
+	must(t, p.ReplaceACL(ctx, idx, []store.ACLEntry{{FabricIndex: idx, Privilege: store.PrivilegeAdminister, AuthMode: store.AuthModeCASE}}))
+	must(t, p.SetSetting(ctx, "erase.key", "v"))
+	must(t, p.SetMetadataCounter(ctx, "erase.counter", 7))
+	must(t, p.SaveServerSubscription(ctx, 9, idx, 1, []byte{1}))
+	must(t, p.Erase(ctx))
+	fabrics, err := p.ListFabrics(ctx)
+	must(t, err)
+	wantEqual(t, "fabrics after erase", len(fabrics), 0)
+	if _, ok, err := p.GetSetting(ctx, "erase.key"); err != nil || ok {
+		t.Fatalf("setting after erase: ok=%v err=%v", ok, err)
+	}
+	if _, ok, err := p.GetMetadataCounter(ctx, "erase.counter"); err != nil || ok {
+		t.Fatalf("counter after erase: ok=%v err=%v", ok, err)
+	}
+	subs, err := p.LoadServerSubscriptions(ctx)
+	must(t, err)
+	wantEqual(t, "subscriptions after erase", len(subs), 0)
+	wantEqual(t, "first fabric index after erase", addFabric(ctx, t, p, 3), uint8(1))
 }
 
 // fabric returns a distinct fabric record; the index is left to the store.

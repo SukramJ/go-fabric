@@ -52,7 +52,12 @@ import (
 // cluster/core/general_commissioning.go (the PASE auto-arm),
 // controller/client/fabricops.go (CommissioningClient.ts) and im/client.go
 // (InteractionMessenger.ts) re-read and re-cited at the pin.
-const citecheckDriftRatchet = 250
+//
+// 254 after phase 31: four citations of the IM tranche drift (drift.json
+// names them: bridge/interaction_protocol_parity_matterjs_test.go,
+// bridge/subscribe_dispatch.go, bridge/suppress_response_parity_matterjs_test.go,
+// im/write.go); each is to be re-read at the pin and re-cited.
+const citecheckDriftRatchet = 254
 
 func readDrift(t *testing.T) []driftEntry {
 	t.Helper()
