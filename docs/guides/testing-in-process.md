@@ -362,7 +362,9 @@ Two rules follow for code a site paces:
 detector in `STRESS_P` (8) processes at once, `STRESS_COUNT` (50) times,
 through `golang.org/x/tools/cmd/stress`; `STRESS_INPROC` runs that many
 instances side by side in each process. `make stress-flakes` runs the
-tests the flake sweep fixed, and the nightly workflow runs it.
+open flakes (`STRESS_FLAKES` in the Makefile: a line is added when a flake
+is seen and removed when its cause is fixed; empty, it prints `no open
+flakes`), and the nightly workflow runs it.
 
 *Source: `fabrictest/site.go` (`Run`, `Eventually`, `Settle`, `Step`,
 `quiet`, `busy`), `internal/inflight`, `clock/context.go` (`WithTimeout`),
