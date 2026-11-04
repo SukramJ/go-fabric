@@ -2564,64 +2564,30 @@
     },
     {
       "path": "packages/node/test/node/ClientInvokeTest.ts",
-      "status": "ported",
+      "status": "partial",
       "go": [
         "client/interaction:TestInvokeBatcherParity",
         "controller/client:TestClientInvokeParity"
+      ],
+      "missing": [
+        "direct invoke (#invokeSingle) propagates network to exchange",
+        "batched invoke (#invokeWithBatching) propagates network to exchange",
+        "split invoke (#invokeWithSplitting) propagates network to each exchange",
+        "command with interactionModelRevision never joins a batch",
+        "command with beforeDispatch never joins a batch",
+        "command with delayReportData never joins a batch",
+        "only a non-default interaction model revision keeps a command out of the batch",
+        "command with an address override keeps it",
+        "command without a network and one naming the default network share a batch"
       ],
       "left": [
         {
           "it": "clears maxPathsPerInvoke cache when node goes offline",
           "class": "js-runtime-only",
           "reason": "ClientInvokeTest.ts:249-283 at 862ad75f clears matter.js's cached maxPathsPerInvoke; the Go provider reads the session parameters on every invoke (sessionProvider/peerProvider.maxPathsPerInvoke), there is no cache to clear"
-        },
-        {
-          "it": "direct invoke (#invokeSingle) propagates network to exchange",
-          "class": "js-runtime-only",
-          "reason": ":438-466 spies the network the exchange selects; the scripted session provider takes no network, and the Go network lane is held by the batcher cases (TestInvokeBatcherParity)"
-        },
-        {
-          "it": "batched invoke (#invokeWithBatching) propagates network to exchange",
-          "class": "js-runtime-only",
-          "reason": ":468-492, as the direct case: the scripted session provider takes no network"
-        },
-        {
-          "it": "split invoke (#invokeWithSplitting) propagates network to each exchange",
-          "class": "js-runtime-only",
-          "reason": ":494-540, as the direct case: the scripted session provider takes no network"
-        },
-        {
-          "it": "command with interactionModelRevision never joins a batch",
-          "class": "js-runtime-only",
-          "reason": "feature gap, a findings candidate (seam wave hand-back, issue #396), not a seam: :545-575 with interactionModelRevision; Go's InvokeOptions has no interaction model revision"
-        },
-        {
-          "it": "command with beforeDispatch never joins a batch",
-          "class": "js-runtime-only",
-          "reason": "feature gap, a findings candidate (seam wave hand-back, issue #396), not a seam: :545-575 with beforeDispatch; Go's InvokeOptions has no beforeDispatch hook"
-        },
-        {
-          "it": "command with delayReportData never joins a batch",
-          "class": "js-runtime-only",
-          "reason": "feature gap, a findings candidate (seam wave hand-back, issue #396), not a seam: :545-575 with delayReportData; Go's InvokeOptions has no DelayReportData"
-        },
-        {
-          "it": "only a non-default interaction model revision keeps a command out of the batch",
-          "class": "js-runtime-only",
-          "reason": "feature gap, a findings candidate (seam wave hand-back, issue #396), not a seam: :612-630; Go's InvokeOptions has no interaction model revision"
-        },
-        {
-          "it": "command with an address override keeps it",
-          "class": "js-runtime-only",
-          "reason": "feature gap, a findings candidate (seam wave hand-back, issue #396), not a seam: :715-732; Go's InvokeOptions has no address override (interaction.ExchangeOptions.AddressOverride exists below it, no invoke reaches it)"
-        },
-        {
-          "it": "command without a network and one naming the default network share a batch",
-          "class": "js-runtime-only",
-          "reason": ":811-830 binds the interaction to a default network (ClientInteraction's network option); interaction.Config has none, a command's lane is its own ClientRequest.Network"
         }
       ],
-      "reason": "The batcher of single commands (client/interaction Interaction.Invoke, ClientInteraction.#invokeWithBatching at 862ad75f) on the scripted rig — one InvokeRequest per batch window and network lane, numbered by CommandRef, its bypasses (MaxPathsPerInvoke 1, endpoint 0, timed, suppressed, expected processing time, extended fail-safe timeout, MRP delay, Large Message, NoBatch), duplicate paths in separate batches, a split by MaxPathsPerInvoke, close and abort, a close while the batcher's connect is held (interaction.HoldConnect, export_test.go) — and the commands through it on fabrictest (controller/client:TestClientInvokeParity). Left: the maxPathsPerInvoke cache (none in Go), the network observed on the exchange (the scripted session provider takes no network), an interaction-level default network, and the interaction model revision, beforeDispatch, DelayReportData and address-override options Go's InvokeOptions has not (a feature gap, named as a findings candidate).",
+      "reason": "The batcher of single commands (client/interaction Interaction.Invoke, ClientInteraction.#invokeWithBatching at 862ad75f) on the scripted rig — one InvokeRequest per batch window and network lane, numbered by CommandRef, its bypasses (MaxPathsPerInvoke 1, endpoint 0, timed, suppressed, expected processing time, extended fail-safe timeout, MRP delay, Large Message, NoBatch), duplicate paths in separate batches, a split by MaxPathsPerInvoke, close and abort, a close while the batcher's connect is held (interaction.HoldConnect, export_test.go) — and the commands through it on fabrictest (controller/client:TestClientInvokeParity). Left: the maxPathsPerInvoke cache (none in Go), the network observed on the exchange (the scripted session provider takes no network), an interaction-level default network, and the interaction model revision, beforeDispatch, DelayReportData and address-override options Go's InvokeOptions has not (a feature gap, named as a findings candidate). Missing (owner verdict at integration, 2026-11-04): the five option cases (interactionModelRevision ×2, beforeDispatch, delayReportData, address override) and the interaction-level default network are a feature gap of Go's InvokeOptions and interaction.Config, not matter.js's runtime (findings register T3-SW-1); the three network-on-the-exchange cases are portable on a fabrictest pair, whose peer provider carries the network — a port, not a seam.",
       "snapshotSha": "a743554ce3a6060f13492259bb66a152d9bfca31"
     },
     {

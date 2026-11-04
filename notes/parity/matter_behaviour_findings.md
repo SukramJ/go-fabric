@@ -763,6 +763,23 @@ Found by the phase-32 port of `packages/node/test/behaviors/ota/OtaTest.ts`
 
 ## Tier 3 — LOW
 
+### T3-SW-1 — the invoke options matter.js's ClientInteraction has and Go's does not (seam wave, 2026-11-04)
+
+- **Where:** `client/interaction` `InvokeOptions` and `interaction.Config`; the batcher (`Interaction.Invoke`).
+- **matter.js at 862ad75f:** a command carries `interactionModelRevision`, `beforeDispatch`, `delayReportData` and an address override, each of which keeps it out of a batch (`ClientInvokeTest.ts:545-575`, `:612-630`, `:715-732`), and the interaction binds a default network (`:811-830`). Go has none of the five; the register keeps the nine ClientInvokeTest cases `missing` (five as this gap, three network-on-the-exchange cases as a fabrictest port still to do, one default network).
+- **Unverified:** whether any consumer needs them before milestone 10; a port is a `controller/client` feature wave, not a seam.
+
+### T3-SW-2 — no commissionable advertisement round when PASE closes or the fail-safe expires (seam wave, 2026-11-04)
+
+- **Where:** the device keeps its commissionable record while PASE is up and publishes nothing when the PASE session closes; `node:TestFailsafeCommissioningParity` asserts the record, not a new advertisement.
+- **matter.js at 862ad75f:** `DeviceAdvertiser.ts:131-162` starts an advertisement round on PASE close and on fail-safe expiry; `FailsafeCommissioningTest.ts` "re-announces after failsafe expiry …" (two cases, `missing` in the register with the reason "behaviour gap, not a seam") awaits it.
+- **Fix shape:** `commissioning/` (a security path): on PASE close without CommissioningComplete and on fail-safe expiry, re-run the commissionable announcement as `AdvertiseCommissionable` does at start.
+
+### T3-SW-3 — the ICD client's nextExpectedCheckin follows the wall clock (seam wave, 2026-11-04, measured)
+
+- **Where:** `controller/client` ICD client, `NextExpectedCheckIn` after `clocktest.Fake.StepWall(time.Hour)` reads now+15 s where matter.js reads at least now+idleModeDuration (`IcdClientTest.ts:2281`); the skip in `icd_client_parity_matterjs_test.go` names it.
+- **Fix shape:** keep the expectation on the clock's monotonic reading and convert for exposure (`clock.WallOf`), as the session stamps do.
+
 ### T3-P35-1 — a write value of the wrong Go type gets three different statuses (phase 35, 2026-11-04)
 
 - **Where:** FAILURE from `cluster/core/access_control.go:674`, `bridged_device_basic_information.go:459`, `general_commissioning.go:403`, `network_commissioning.go:234`; CONSTRAINT_ERROR from BasicInformation and Binding through the convention `cluster/spec/write.go:126-128`; INVALID_ACTION from `cluster/core/identify.go:453-457`.
