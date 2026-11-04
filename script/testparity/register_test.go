@@ -43,7 +43,7 @@ import (
 // outside the six new register roots (131 excluded, 9 planned for a port)
 // and lists the six roots' 52 files as planned; each root's commit of the
 // phase lowers the count again.
-const testparityPlannedRatchet = 45
+const testparityPlannedRatchet = 42
 
 // testparityPortedRatchet is the number of ported entries, and
 // testparityMissingRatchet the number of matter.js it cases the partial
@@ -73,7 +73,7 @@ const testparityPlannedRatchet = 45
 // ported and 5 missing cases, each a findings-register row (133 ported,
 // 556 missing).
 const (
-	testparityPortedRatchet  = 135
+	testparityPortedRatchet  = 137
 	testparityMissingRatchet = 556
 )
 
@@ -93,7 +93,7 @@ const (
 // TlvArray's chunks (BD-Matter-TLVSchemaLayer), zero-length-as-null
 // (BD-Matter-TLVNullIsTheNullElement), JavaScript type checks, epoch
 // conversion and ModelBounds shapes (js-runtime-only).
-const testparityLeftRatchet = 363
+const testparityLeftRatchet = 367
 
 // moduleRoot is where the committed artefacts live, seen from this package.
 const moduleRoot = "../.."

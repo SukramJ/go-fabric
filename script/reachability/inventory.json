@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 7356,
+  "entry_points": 7363,
   "entry_packages": [
     ".",
     "bdx",
@@ -278,9 +278,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 17265,
+    "total_exported": 17267,
     "reachable": 12124,
-    "whitelisted": 5141,
+    "whitelisted": 5143,
     "unreachable": 0
   },
   "by_package": [],
@@ -31974,6 +31974,20 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/mattercert/decode_test.go",
       "line": 227
+    },
+    {
+      "package": "secure/mattercert",
+      "identifier": "TestDerCodecDecodeRefusalsParityMatterJS",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/mattercert/der_codec_parity_matterjs_test.go",
+      "line": 22
+    },
+    {
+      "package": "secure/mattercert",
+      "identifier": "TestDerCodecTimeParityMatterJS",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/mattercert/der_codec_parity_matterjs_test.go",
+      "line": 50
     },
     {
       "package": "secure/mattercert",

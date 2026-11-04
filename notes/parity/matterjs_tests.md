@@ -15,10 +15,10 @@ names the `it` cases that will not be ported, each with its class and reason. Th
 
 | status | files |
 | --- | ---: |
-| ported | 135 |
+| ported | 137 |
 | partial | 131 |
-| planned | 45 |
-| excluded | 277 |
+| planned | 42 |
+| excluded | 278 |
 | total | 588 |
 
 ## Per directory
@@ -26,7 +26,7 @@ names the `it` cases that will not be ported, each with its class and reason. Th
 | directory | files | ported | partial | planned | excluded |
 | --- | ---: | ---: | ---: | ---: | ---: |
 | [general/test](#generaltest) | 1 | 0 | 0 | 0 | 1 |
-| [general/test/codec](#generaltestcodec) | 3 | 0 | 0 | 3 | 0 |
+| [general/test/codec](#generaltestcodec) | 3 | 2 | 0 | 0 | 1 |
 | [general/test/crypto](#generaltestcrypto) | 8 | 0 | 0 | 8 | 0 |
 | [general/test/crypto/aes](#generaltestcryptoaes) | 3 | 0 | 0 | 3 | 0 |
 | [general/test/environment](#generaltestenvironment) | 3 | 0 | 0 | 0 | 3 |
@@ -176,9 +176,9 @@ names the `it` cases that will not be ported, each with its class and reason. Th
 
 | file | lines | status | Go tests or class | note |
 | --- | ---: | --- | --- | --- |
-| Base64CodecTest.ts | 105 | planned | — | Phase 33: a new register root, ported by meaning in this phase. |
-| DerCodecTest.ts | 132 | planned | — | Phase 33: a new register root, ported by meaning in this phase. |
-| DnsCodecTest.ts | 406 | planned | — | Phase 33: a new register root, ported by meaning in this phase. |
+| Base64CodecTest.ts | 105 | excluded | `js-runtime-only` | matter.js's hand-written Base64 and base64url codec (padding tolerance, alphabet); the module uses encoding/base64 from the Go standard library. |
+| DerCodecTest.ts | 132 | ported | `secure/mattercert:TestDerCodecDecodeRefusalsParityMatterJS`<br>`secure/mattercert:TestDerCodecTimeParityMatterJS`<br>`secure/mattercert:TestDecodeDERRefusesEveryTruncation`<br>`secure/mattercert:TestDecodeDERRefusesEachMalformedPart` | The six decode refusals (empty data, a length past the buffer, a negative long-form length, the indefinite length, a 7-byte length, a truncated nested element) on the certificate DER reader DecodeDER, and the UTCTime and "no well-defined expiration" GeneralizedTime encodings of a certificate's validity. Left: “encodes a message” (js-runtime-only: matter.js's hand-written DER encoder of JavaScript numbers, bigints, raw unsigned bytes and records; the module marshals DER through encoding/asn1 (secure/mattercert tbs_der.go) and builds its CSR through crypto/x509 (commissioning/csr.go)); “encodes Numbers correctly” (js-runtime-only: matter.js's hand-written DER encoder of JavaScript numbers, bigints, raw unsigned bytes and records; the module marshals DER through encoding/asn1 (secure/mattercert tbs_der.go) and builds its CSR through crypto/x509 (commissioning/csr.go)); “encodes BitStrings correctly” (js-runtime-only: matter.js's hand-written DER encoder of JavaScript numbers, bigints, raw unsigned bytes and records; the module marshals DER through encoding/asn1 (secure/mattercert tbs_der.go) and builds its CSR through crypto/x509 (commissioning/csr.go)); “encodes uints correctly on optimized path” (js-runtime-only: matter.js's hand-written DER encoder of JavaScript numbers, bigints, raw unsigned bytes and records; the module marshals DER through encoding/asn1 (secure/mattercert tbs_der.go) and builds its CSR through crypto/x509 (commissioning/csr.go)). |
+| DnsCodecTest.ts | 406 | ported | `mdns:TestDnsCodecDecodeParityMatterJS`<br>`mdns:TestDnsCodecEncodeParityMatterJS`<br>`mdns:TestDnsCodecQNameParityMatterJS`<br>`mdns:TestDnsCodecTXTParityMatterJS`<br>`mdns:TestDnsCodecAAAAParityMatterJS`<br>`mdns:TestPackDNSQuery_RoundTrip` | The message vectors decoded through mdns.ParseDNSMessage (which keeps the readable records of a message holding an unreadable one since phase 33, as DnsCodec.decodeRecord does), a private record type, the records of a decoded message round-tripped through mdns.PackDNSQuery (the module packs uncompressed as matter.js does; the response bytes of RESULT are a responder's, so the round trip is asserted on the records), names by meaning (a compressed reference, truncation and pointer loops refused, through miekg/dns), TXT entries (high bytes, the empty record as one zero byte and an entry cut at 255 bytes since phase 33) and AAAA records. |
 
 ## general/test/crypto
 
@@ -1474,12 +1474,6 @@ does not test. They count as passes in `go test`; this list is where they are re
 | `store:TestParityChip_FabricLabel_TooLongFails` | chip src/credentials/tests/TestFabricTable.cpp:2470 | The label-length limit is enforced by the OperationalCredentials server (UpdateFabricLabel), not by the store. |
 
 ## Planned
-
-### general/test/codec
-
-- `Base64CodecTest.ts` — Phase 33: a new register root, ported by meaning in this phase.
-- `DerCodecTest.ts` — Phase 33: a new register root, ported by meaning in this phase.
-- `DnsCodecTest.ts` — Phase 33: a new register root, ported by meaning in this phase.
 
 ### general/test/crypto
 

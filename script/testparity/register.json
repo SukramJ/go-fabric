@@ -9,20 +9,57 @@
     },
     {
       "path": "packages/general/test/codec/Base64CodecTest.ts",
-      "status": "planned",
-      "reason": "Phase 33: a new register root, ported by meaning in this phase.",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "matter.js's hand-written Base64 and base64url codec (padding tolerance, alphabet); the module uses encoding/base64 from the Go standard library.",
       "snapshotSha": "d79fe075b58fb0cfdd33cf133784b695924bd7bd"
     },
     {
       "path": "packages/general/test/codec/DerCodecTest.ts",
-      "status": "planned",
-      "reason": "Phase 33: a new register root, ported by meaning in this phase.",
+      "status": "ported",
+      "go": [
+        "secure/mattercert:TestDerCodecDecodeRefusalsParityMatterJS",
+        "secure/mattercert:TestDerCodecTimeParityMatterJS",
+        "secure/mattercert:TestDecodeDERRefusesEveryTruncation",
+        "secure/mattercert:TestDecodeDERRefusesEachMalformedPart"
+      ],
+      "left": [
+        {
+          "it": "encodes a message",
+          "class": "js-runtime-only",
+          "reason": "matter.js's hand-written DER encoder of JavaScript numbers, bigints, raw unsigned bytes and records; the module marshals DER through encoding/asn1 (secure/mattercert tbs_der.go) and builds its CSR through crypto/x509 (commissioning/csr.go)"
+        },
+        {
+          "it": "encodes Numbers correctly",
+          "class": "js-runtime-only",
+          "reason": "matter.js's hand-written DER encoder of JavaScript numbers, bigints, raw unsigned bytes and records; the module marshals DER through encoding/asn1 (secure/mattercert tbs_der.go) and builds its CSR through crypto/x509 (commissioning/csr.go)"
+        },
+        {
+          "it": "encodes BitStrings correctly",
+          "class": "js-runtime-only",
+          "reason": "matter.js's hand-written DER encoder of JavaScript numbers, bigints, raw unsigned bytes and records; the module marshals DER through encoding/asn1 (secure/mattercert tbs_der.go) and builds its CSR through crypto/x509 (commissioning/csr.go)"
+        },
+        {
+          "it": "encodes uints correctly on optimized path",
+          "class": "js-runtime-only",
+          "reason": "matter.js's hand-written DER encoder of JavaScript numbers, bigints, raw unsigned bytes and records; the module marshals DER through encoding/asn1 (secure/mattercert tbs_der.go) and builds its CSR through crypto/x509 (commissioning/csr.go)"
+        }
+      ],
+      "reason": "The six decode refusals (empty data, a length past the buffer, a negative long-form length, the indefinite length, a 7-byte length, a truncated nested element) on the certificate DER reader DecodeDER, and the UTCTime and \"no well-defined expiration\" GeneralizedTime encodings of a certificate's validity.",
       "snapshotSha": "f00e4cfbf8e4d97120bd24b862d99899e6a07635"
     },
     {
       "path": "packages/general/test/codec/DnsCodecTest.ts",
-      "status": "planned",
-      "reason": "Phase 33: a new register root, ported by meaning in this phase.",
+      "status": "ported",
+      "go": [
+        "mdns:TestDnsCodecDecodeParityMatterJS",
+        "mdns:TestDnsCodecEncodeParityMatterJS",
+        "mdns:TestDnsCodecQNameParityMatterJS",
+        "mdns:TestDnsCodecTXTParityMatterJS",
+        "mdns:TestDnsCodecAAAAParityMatterJS",
+        "mdns:TestPackDNSQuery_RoundTrip"
+      ],
+      "reason": "The message vectors decoded through mdns.ParseDNSMessage (which keeps the readable records of a message holding an unreadable one since phase 33, as DnsCodec.decodeRecord does), a private record type, the records of a decoded message round-tripped through mdns.PackDNSQuery (the module packs uncompressed as matter.js does; the response bytes of RESULT are a responder's, so the round trip is asserted on the records), names by meaning (a compressed reference, truncation and pointer loops refused, through miekg/dns), TXT entries (high bytes, the empty record as one zero byte and an entry cut at 255 bytes since phase 33) and AAAA records.",
       "snapshotSha": "c188c4e8c069ad7f14ce1591b8bac2c0f1261c33"
     },
     {
