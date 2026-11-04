@@ -3872,6 +3872,11 @@ DclOtaUpdateServiceTest are `missing` under this entry. Report BH (phase
 
 By design. One image store per host, not one per library.
 
+Superseded (brief CM §1, phase 32): `controller/softwareupdate.Images` is the
+module's image store after `DclOtaUpdateService`; its store cases are ported
+(`controller/softwareupdate:TestImages*`), and the version-keyed storage
+migration and `store()`'s boolean mode are left js-runtime-only.
+
 ### BD-Matter-DCL-ProductionSeed — the certificate snapshot seeds production entries only
 
 The embedded DCL snapshot is a reviewed production PAA set layered by
@@ -5123,7 +5128,21 @@ digest is checked later, at extraction (`:262-278`,
 not when it is first served over BDX (review 2026-11 W4-ctlint-03; owner
 decision 2026-11-02). Reasoning: the store is the one place that reads the
 whole file once; a digest failure at serve time would surface as a device's
-failed download. Pinned by `TestImagesStoreValidatesFileParity`.
+failed download. Pinned by `TestImagesStoreValidatesFileParity`. The reuse
+check of `Images.DownloadUpdate` validates a stored image the same way, as
+matter.js's `#checkStoredImage` runs `#verifyUpdate` on it (`:433-451`).
+
+### BD-Matter-OtaImages-DeleteProductWithoutMode — `Images.Delete` narrows by product without a mode too
+
+matter.js's `DclOtaUpdateService.delete` documents `productId` as a filter
+of the files to delete, but reads it only together with a mode: a call with
+`vendorId` and `productId` and no `mode` (nor `isProduction`) falls through
+to the vendor branch and deletes every file of the vendor
+(`packages/protocol/src/dcl/DclOtaUpdateService.ts:1226-1243`, `:1245-1274`
+at `862ad75f`). `controller/softwareupdate.Images.Delete` applies
+`DeleteOptions.ProductID` with or without a mode, so that call deletes the
+product's images only (pinned by `TestImagesDeleteParity`). Reasoning: the
+documented contract, not a fall-through that deletes other products' images.
 
 ### BD-Thread-TBRM-ChipLogic — ThreadBorderRouterManagement follows connectedhomeip behind the `BorderRouter` port
 

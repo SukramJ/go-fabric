@@ -803,7 +803,7 @@ func (m *Manager) cleanupObsoleteUpdates(ctx context.Context) {
 			continue
 		}
 		if st.Mode == ModeTest && purgeTest {
-			if err := m.cfg.Images.Delete(ctx, st.Filename); err == nil {
+			if n, err := m.cfg.Images.Delete(ctx, DeleteOptions{Filename: st.Filename}); err == nil && n > 0 {
 				m.log.Info("ota.manager.cleaned_test_image", slog.String("file", st.Filename))
 			}
 			continue
@@ -813,7 +813,7 @@ func (m *Manager) cleanupObsoleteUpdates(ctx context.Context) {
 			continue
 		}
 		if st.SoftwareVersion <= v {
-			if err := m.cfg.Images.Delete(ctx, st.Filename); err == nil {
+			if n, err := m.cfg.Images.Delete(ctx, DeleteOptions{Filename: st.Filename}); err == nil && n > 0 {
 				m.log.Info("ota.manager.cleaned_obsolete_image", slog.String("file", st.Filename))
 			}
 		}
@@ -914,7 +914,7 @@ func (m *Manager) checkProductForUpdates(ctx context.Context, vid, pid uint16, v
 	if !ok || m.suppressed() {
 		return nil, nil
 	}
-	if _, err := m.cfg.Images.DownloadUpdate(ctx, info); err != nil {
+	if _, err := m.cfg.Images.DownloadUpdate(ctx, info, false); err != nil {
 		return nil, err
 	}
 	details := SoftwareUpdateInfo{
