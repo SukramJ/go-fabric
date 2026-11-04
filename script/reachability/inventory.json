@@ -36061,7 +36061,7 @@
       "identifier": "TestCloseIsIdempotent",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/udp/listener_test.go",
-      "line": 167
+      "line": 177
     },
     {
       "package": "transport/udp",
@@ -36110,14 +36110,14 @@
       "identifier": "TestListenerEcho",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/udp/listener_test.go",
-      "line": 42
+      "line": 52
     },
     {
       "package": "transport/udp",
       "identifier": "TestListenerSourceAddressTagged",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/udp/listener_test.go",
-      "line": 77
+      "line": 87
     },
     {
       "package": "transport/udp",
@@ -36131,21 +36131,21 @@
       "identifier": "TestOrderedBacklogBound",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/udp/ordered_test.go",
-      "line": 128
+      "line": 123
     },
     {
       "package": "transport/udp",
       "identifier": "TestOrderedDispatchSharesTheConcurrencyBudget",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/udp/ordered_test.go",
-      "line": 148
+      "line": 143
     },
     {
       "package": "transport/udp",
       "identifier": "TestPanicInHandlerIsRecoveredCountedAndLogged",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/udp/listener_test.go",
-      "line": 182
+      "line": 192
     },
     {
       "package": "transport/udp",
@@ -36173,21 +36173,21 @@
       "identifier": "TestSendOnClosedListenerSurfacesErr",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/udp/listener_test.go",
-      "line": 119
+      "line": 129
     },
     {
       "package": "transport/udp",
       "identifier": "TestSendPayloadTooLarge",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/udp/listener_test.go",
-      "line": 107
+      "line": 117
     },
     {
       "package": "transport/udp",
       "identifier": "TestServeContextCancelStops",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/udp/listener_test.go",
-      "line": 142
+      "line": 152
     },
     {
       "package": "transport/udp",
@@ -36215,7 +36215,7 @@
       "identifier": "TestServeNilHandlerRefused",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/udp/listener_test.go",
-      "line": 132
+      "line": 142
     },
     {
       "package": "transport/udp",
@@ -36229,14 +36229,14 @@
       "identifier": "TestServeOrderedUnkeyedAndNil",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/udp/ordered_test.go",
-      "line": 99
+      "line": 94
     },
     {
       "package": "transport/udp",
       "identifier": "TestWaitIdleWaitsForRunningHandlers",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/udp/ordered_test.go",
-      "line": 191
+      "line": 182
     }
   ],
   "variant_disagreements": 0
