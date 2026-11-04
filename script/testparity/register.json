@@ -5552,7 +5552,7 @@
     },
     {
       "path": "packages/protocol/test/session/SessionManagerTest.ts",
-      "status": "partial",
+      "status": "ported",
       "go": [
         "secure/operational:TestOpenFromPase_AllocatesDistinctIDs",
         "secure/operational:TestManager_AllocateID_WrapAround",
@@ -5568,10 +5568,7 @@
         "client/exchange:TestSessionManagerSessionParameterSetter",
         "client/peer:TestNewestSessionActivityParityMatterJS"
       ],
-      "missing": [
-        "closes a session on peer shutdown after the clock stepped back"
-      ],
-      "reason": "Session-id allocation (skip, seed 0), the per-peer cap and the initiator sessions it spares, the group data counter and reception-state cases, the accepted local parameters and their merge are ported; the session pick by activity and the wall-clock steps run on the clock's monotonic reading (client/peer:TestNewestSessionActivityParityMatterJS, secure/operational:TestSessionManagerWallClockSteps, phase 32). Left: placeholder-only reuse (by design), subscriptions and log origins, the Lifetime and legacy-counter cases and values a Go field cannot carry. Missing: a session closed on peer shutdown after a backward clock step — the device side has no peer-shutdown path (ClosePeerLost is the only sweep).",
+      "reason": "Session-id allocation (skip, seed 0), the per-peer cap and the initiator sessions it spares, the group data counter and reception-state cases, the accepted local parameters and their merge are ported; the session pick by activity and the wall-clock steps run on the clock's monotonic reading (client/peer:TestNewestSessionActivityParityMatterJS, secure/operational:TestSessionManagerWallClockSteps, phase 32). Left: placeholder-only reuse (by design), subscriptions and log origins, the Lifetime and legacy-counter cases and values a Go field cannot carry. The peer-shutdown case after a backward clock step runs on the sweep's monotonic cutoff, Manager.ClosePeerLostSince (seam wave, issue #396): matter.js runs both causes through #handlePeerLoss with asOf on Time.nowUs, and the shutdown cause's keepSubscriptions is the controller's own subscriptions, no device-side subject.",
       "snapshotSha": "db7bfa3a82d2296b888015c59abf7695f84c43b5",
       "left": [
         {

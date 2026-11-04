@@ -65,8 +65,8 @@ const testparityPlannedRatchet = 2
 // left — and completed four files; 51 stay missing with a named reason
 // (the PR's report): 125 ported, 552 missing.
 const (
-	testparityPortedRatchet  = 125
-	testparityMissingRatchet = 551
+	testparityPortedRatchet  = 126
+	testparityMissingRatchet = 550
 )
 
 // testparityLeftRatchet is the number of left it cases summed over the
