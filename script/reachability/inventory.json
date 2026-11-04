@@ -23545,7 +23545,7 @@
       "identifier": "TestAddressesToCandidates",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/connection_test.go",
-      "line": 321
+      "line": 331
     },
     {
       "package": "controller/commissioner",
@@ -23615,21 +23615,21 @@
       "identifier": "TestCommissioningConnection",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/connection_parity_matterjs_test.go",
-      "line": 295
+      "line": 296
     },
     {
       "package": "controller/commissioner",
       "identifier": "TestCommissioningConnectionScripted",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/connection_parity_matterjs_test.go",
-      "line": 699
+      "line": 732
     },
     {
       "package": "controller/commissioner",
       "identifier": "TestCommissioningConnectionStagger",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/connection_parity_matterjs_test.go",
-      "line": 485
+      "line": 502
     },
     {
       "package": "controller/commissioner",
@@ -23643,28 +23643,28 @@
       "identifier": "TestConnectionBudget",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/connection_test.go",
-      "line": 247
+      "line": 253
     },
     {
       "package": "controller/commissioner",
       "identifier": "TestConnectionErrorClasses",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/connection_test.go",
-      "line": 287
+      "line": 295
     },
     {
       "package": "controller/commissioner",
       "identifier": "TestConnectionHoldingResponder",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/connection_test.go",
-      "line": 196
+      "line": 198
     },
     {
       "package": "controller/commissioner",
       "identifier": "TestConnectionPasscodeDropsDevice",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/connection_test.go",
-      "line": 224
+      "line": 228
     },
     {
       "package": "controller/commissioner",

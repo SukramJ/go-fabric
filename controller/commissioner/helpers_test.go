@@ -27,7 +27,10 @@ func newFakeClock() *fakeClock { return &fakeClock{clocktest.New(time.Unix(4_000
 // live counts the timers neither fired nor stopped.
 func (c *fakeClock) live() int { return c.Pending() }
 
-// eventually polls cond until it holds or ten seconds pass.
+// eventually polls cond until it holds or ten seconds pass. It is the
+// package's one wall-clock poll: wiring_test.go and node_test.go run the
+// manager on UDP loopback sockets (udp.New on 127.0.0.1), which no
+// synctest bubble holds; inside a bubble its sleep is virtual.
 func eventually(t *testing.T, what string, cond func() bool) {
 	t.Helper()
 	deadline := time.Now().Add(10 * time.Second)

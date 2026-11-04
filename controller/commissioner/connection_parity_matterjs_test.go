@@ -28,6 +28,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/SukramJ/go-fabric/client/exchange"
@@ -297,187 +298,203 @@ func TestCommissioningConnection(t *testing.T) {
 
 	t.Run("does not accept a late success on a device already dropped for invalid credentials", func(t *testing.T) {
 		t.Parallel()
-		late, lateSession := newGate(), make(chan *exchange.Session, 1)
-		h := ccStart(t, ccOptions{devices: []*candidate{ccDevice("a", "fd00::1", "fd00::2")}, timeout: 2 * time.Second, delay: ccDelay(0)},
-			func(h *ccHarness, a *ccAttempt) (*exchange.Session, error) {
-				if a.ip == "fd00::1" {
-					return nil, errPasscode
-				}
-				h.block(context.Background(), late) // ignores its signal
-				s := h.session()
-				lateSession <- s
-				return s, nil
+		synctest.Test(t, func(t *testing.T) {
+			late, lateSession := newGate(), make(chan *exchange.Session, 1)
+			h := ccStart(t, ccOptions{devices: []*candidate{ccDevice("a", "fd00::1", "fd00::2")}, timeout: 2 * time.Second, delay: ccDelay(0)},
+				func(h *ccHarness, a *ccAttempt) (*exchange.Session, error) {
+					if a.ip == "fd00::1" {
+						return nil, errPasscode
+					}
+					h.block(context.Background(), late) // ignores its signal
+					s := h.session()
+					lateSession <- s
+					return s, nil
+				})
+			// Let fd00::1 fail and mark the device invalid, then let fd00::2 complete.
+			h.until("the device drop", func() bool {
+				h.mu.Lock()
+				defer h.mu.Unlock()
+				return len(h.ctxs) == 2 && h.ctxs[1].Err() != nil
 			})
-		// Let fd00::1 fail and mark the device invalid, then let fd00::2 complete.
-		h.until("the device drop", func() bool {
-			h.mu.Lock()
-			defer h.mu.Unlock()
-			return len(h.ctxs) == 2 && h.ctxs[1].Err() != nil
+			late.open()
+			if _, err := h.result(); !errors.Is(err, handshake.ErrPasscodeMismatch) {
+				t.Fatalf("err = %v, want PasscodeMismatch", err)
+			}
+			// The late session is closed with the real credential error, not the generic race fallback.
+			if cause := h.closedWith(<-lateSession); !errors.Is(cause, handshake.ErrPasscodeMismatch) {
+				t.Fatalf("close cause = %v", cause)
+			}
 		})
-		late.open()
-		if _, err := h.result(); !errors.Is(err, handshake.ErrPasscodeMismatch) {
-			t.Fatalf("err = %v, want PasscodeMismatch", err)
-		}
-		// The late session is closed with the real credential error, not the generic race fallback.
-		if cause := h.closedWith(<-lateSession); !errors.Is(cause, handshake.ErrPasscodeMismatch) {
-			t.Fatalf("close cause = %v", cause)
-		}
 	})
 
 	t.Run("credential failure skips later entries with the same deviceIdentifier", func(t *testing.T) {
 		t.Parallel()
-		h := ccStart(t, ccOptions{devices: []*candidate{ccDevice("a", "fd00::1"), ccDevice("b", "fd00::2"), ccDevice("a", "fd00::3")}, timeout: 2 * time.Second, delay: ccDelay(time.Second)},
-			func(_ *ccHarness, a *ccAttempt) (*exchange.Session, error) {
-				if a.device == "a" {
-					return nil, errPasscode
-				}
-				return nil, errTransientNet
-			})
-		if _, err := h.result(); !errors.Is(err, handshake.ErrPasscodeMismatch) {
-			t.Fatalf("err = %v", err)
-		}
-		if got := h.labelled(); !slices.Equal(got, []string{"a:fd00::1", "b:fd00::2"}) {
-			t.Fatalf("attempts %v", got)
-		}
+		synctest.Test(t, func(t *testing.T) {
+			h := ccStart(t, ccOptions{devices: []*candidate{ccDevice("a", "fd00::1"), ccDevice("b", "fd00::2"), ccDevice("a", "fd00::3")}, timeout: 2 * time.Second, delay: ccDelay(time.Second)},
+				func(_ *ccHarness, a *ccAttempt) (*exchange.Session, error) {
+					if a.device == "a" {
+						return nil, errPasscode
+					}
+					return nil, errTransientNet
+				})
+			if _, err := h.result(); !errors.Is(err, handshake.ErrPasscodeMismatch) {
+				t.Fatalf("err = %v", err)
+			}
+			if got := h.labelled(); !slices.Equal(got, []string{"a:fd00::1", "b:fd00::2"}) {
+				t.Fatalf("attempts %v", got)
+			}
+		})
 	})
 
 	t.Run("keeps trying a device's other addresses after invalid PASE data on one", func(t *testing.T) {
 		t.Parallel()
-		h := ccStart(t, ccOptions{devices: []*candidate{ccDevice("a", "fd00::1", "fd00::2")}, timeout: 2 * time.Second, delay: ccDelay(time.Second)},
-			func(h *ccHarness, a *ccAttempt) (*exchange.Session, error) {
-				if a.ip == "fd00::1" {
-					return nil, fmt.Errorf("%w: Missing requested PbkdfParameters", handshake.ErrUnexpectedData)
-				}
-				return h.session(), nil
-			})
-		res, err := h.result()
-		if err != nil || res.device.identifier != "a" {
-			t.Fatalf("result %+v, %v", res, err)
-		}
-		if got := h.order(); !slices.Equal(got, []string{"fd00::1", "fd00::2"}) {
-			t.Fatalf("attempts %v", got)
-		}
+		synctest.Test(t, func(t *testing.T) {
+			h := ccStart(t, ccOptions{devices: []*candidate{ccDevice("a", "fd00::1", "fd00::2")}, timeout: 2 * time.Second, delay: ccDelay(time.Second)},
+				func(h *ccHarness, a *ccAttempt) (*exchange.Session, error) {
+					if a.ip == "fd00::1" {
+						return nil, fmt.Errorf("%w: Missing requested PbkdfParameters", handshake.ErrUnexpectedData)
+					}
+					return h.session(), nil
+				})
+			res, err := h.result()
+			if err != nil || res.device.identifier != "a" {
+				t.Fatalf("result %+v, %v", res, err)
+			}
+			if got := h.order(); !slices.Equal(got, []string{"fd00::1", "fd00::2"}) {
+				t.Fatalf("attempts %v", got)
+			}
+		})
 	})
 
 	t.Run("closes session if winner is found concurrently with another establishment completing", func(t *testing.T) {
 		t.Parallel()
-		first, second := newGate(), newGate()
-		loser := make(chan *exchange.Session, 1)
-		h := ccStart(t, ccOptions{devices: []*candidate{ccDevice("a", "fd00::1"), ccDevice("b", "fd00::2")}, timeout: 2 * time.Second, delay: ccDelay(0)},
-			func(h *ccHarness, a *ccAttempt) (*exchange.Session, error) {
-				if a.ip == "fd00::1" {
-					h.block(context.Background(), first)
-					return h.session(), nil // a wins
-				}
-				h.block(context.Background(), second)
-				s := h.session()
-				loser <- s
-				return s, nil // b loses
-			})
-		// Both attempts start; with no stagger their scripts record in either order.
-		h.until("both attempts", func() bool { return len(h.order()) == 2 })
-		h.settle()
-		// Let a finish first, then b (the JS test yields between the two).
-		first.open()
-		res, err := h.result()
-		if err != nil || res.device.identifier != "a" {
-			t.Fatalf("result %+v, %v", res, err)
-		}
-		second.open()
-		h.closedWith(<-loser)
+		synctest.Test(t, func(t *testing.T) {
+			first, second := newGate(), newGate()
+			loser := make(chan *exchange.Session, 1)
+			h := ccStart(t, ccOptions{devices: []*candidate{ccDevice("a", "fd00::1"), ccDevice("b", "fd00::2")}, timeout: 2 * time.Second, delay: ccDelay(0)},
+				func(h *ccHarness, a *ccAttempt) (*exchange.Session, error) {
+					if a.ip == "fd00::1" {
+						h.block(context.Background(), first)
+						return h.session(), nil // a wins
+					}
+					h.block(context.Background(), second)
+					s := h.session()
+					loser <- s
+					return s, nil // b loses
+				})
+			// Both attempts start; with no stagger their scripts record in either order.
+			h.until("both attempts", func() bool { return len(h.order()) == 2 })
+			h.settle()
+			// Let a finish first, then b (the JS test yields between the two).
+			first.open()
+			res, err := h.result()
+			if err != nil || res.device.identifier != "a" {
+				t.Fatalf("result %+v, %v", res, err)
+			}
+			second.open()
+			h.closedWith(<-loser)
+		})
 	})
 
 	t.Run("returns the won session without waiting for an abort-unresponsive loser to settle", func(t *testing.T) {
 		t.Parallel()
-		releaseLoser := newGate()
-		loser := make(chan *exchange.Session, 1)
-		var winner atomic.Pointer[exchange.Session]
-		h := ccStart(t, ccOptions{devices: []*candidate{ccDevice("winner", "abcd::2"), ccDevice("loser", "10.10.10.2")}, timeout: 90 * time.Second, delay: ccDelay(0)},
-			func(h *ccHarness, a *ccAttempt) (*exchange.Session, error) {
-				if a.ip == "abcd::2" {
+		synctest.Test(t, func(t *testing.T) {
+			releaseLoser := newGate()
+			loser := make(chan *exchange.Session, 1)
+			var winner atomic.Pointer[exchange.Session]
+			h := ccStart(t, ccOptions{devices: []*candidate{ccDevice("winner", "abcd::2"), ccDevice("loser", "10.10.10.2")}, timeout: 90 * time.Second, delay: ccDelay(0)},
+				func(h *ccHarness, a *ccAttempt) (*exchange.Session, error) {
+					if a.ip == "abcd::2" {
+						s := h.session()
+						winner.Store(s)
+						return s, nil
+					}
+					// Deliberately ignores the abort signal.
+					h.block(context.Background(), releaseLoser)
 					s := h.session()
-					winner.Store(s)
+					loser <- s
 					return s, nil
-				}
-				// Deliberately ignores the abort signal.
-				h.block(context.Background(), releaseLoser)
-				s := h.session()
-				loser <- s
-				return s, nil
-			})
-		// Without releasing the loser.
-		res, err := h.result()
-		if err != nil || res.device.identifier != "winner" || res.session != winner.Load() {
-			t.Fatalf("result %+v, %v", res, err)
-		}
-		if h.isClosed(res.session) {
-			t.Fatal("the won session was closed")
-		}
-		// Release the loser so its cleanup runs and nothing dangles into the next test.
-		releaseLoser.open()
-		h.closedWith(<-loser)
-		if h.isClosed(res.session) {
-			t.Fatal("the won session was closed")
-		}
+				})
+			// Without releasing the loser.
+			res, err := h.result()
+			if err != nil || res.device.identifier != "winner" || res.session != winner.Load() {
+				t.Fatalf("result %+v, %v", res, err)
+			}
+			if h.isClosed(res.session) {
+				t.Fatal("the won session was closed")
+			}
+			// Release the loser so its cleanup runs and nothing dangles into the next test.
+			releaseLoser.open()
+			h.closedWith(<-loser)
+			if h.isClosed(res.session) {
+				t.Fatal("the won session was closed")
+			}
+		})
 	})
 
 	t.Run("closes session if timeout fires while establishment is pending", func(t *testing.T) {
 		t.Parallel()
-		later := newGate()
-		late := make(chan *exchange.Session, 1)
-		h := ccStart(t, ccOptions{devices: []*candidate{ccDevice("a", "fd00::1")}, timeout: 50 * time.Millisecond, delay: ccDelay(0)},
-			func(h *ccHarness, _ *ccAttempt) (*exchange.Session, error) {
-				// Much longer than the timeout, so the abort fires before we return.
-				h.block(context.Background(), later)
-				s := h.session()
-				late <- s
-				return s, nil
-			})
-		h.at(50 * time.Millisecond)
-		later.open()
-		var pr *PairRetransmissionLimitReachedError
-		if _, err := h.result(); !errors.As(err, &pr) {
-			t.Fatalf("err = %v", err)
-		}
-		h.closedWith(<-late)
+		synctest.Test(t, func(t *testing.T) {
+			later := newGate()
+			late := make(chan *exchange.Session, 1)
+			h := ccStart(t, ccOptions{devices: []*candidate{ccDevice("a", "fd00::1")}, timeout: 50 * time.Millisecond, delay: ccDelay(0)},
+				func(h *ccHarness, _ *ccAttempt) (*exchange.Session, error) {
+					// Much longer than the timeout, so the abort fires before we return.
+					h.block(context.Background(), later)
+					s := h.session()
+					late <- s
+					return s, nil
+				})
+			h.at(50 * time.Millisecond)
+			later.open()
+			var pr *PairRetransmissionLimitReachedError
+			if _, err := h.result(); !errors.As(err, &pr) {
+				t.Fatalf("err = %v", err)
+			}
+			h.closedWith(<-late)
+		})
 	})
 
 	t.Run("external abort cancels in-flight connection and rejects with abort reason", func(t *testing.T) {
 		t.Parallel()
-		ctx, abort := context.WithCancelCause(context.Background())
-		h := ccStart(t, ccOptions{ctx: ctx, devices: []*candidate{ccDevice("loser", "fd00::1")}, timeout: 500 * time.Millisecond, delay: ccDelay(0)},
-			func(h *ccHarness, a *ccAttempt) (*exchange.Session, error) {
-				h.block(a.ctx, nil)
-				return nil, context.Cause(a.ctx)
-			})
-		reason := errors.New("another device won PASE")
-		abort(reason)
-		if _, err := h.result(); !errors.Is(err, reason) {
-			t.Fatalf("err = %v, want the abort reason", err)
-		}
+		synctest.Test(t, func(t *testing.T) {
+			ctx, abort := context.WithCancelCause(context.Background())
+			h := ccStart(t, ccOptions{ctx: ctx, devices: []*candidate{ccDevice("loser", "fd00::1")}, timeout: 500 * time.Millisecond, delay: ccDelay(0)},
+				func(h *ccHarness, a *ccAttempt) (*exchange.Session, error) {
+					h.block(a.ctx, nil)
+					return nil, context.Cause(a.ctx)
+				})
+			reason := errors.New("another device won PASE")
+			abort(reason)
+			if _, err := h.result(); !errors.Is(err, reason) {
+				t.Fatalf("err = %v, want the abort reason", err)
+			}
+		})
 	})
 
 	t.Run("passes abort signal to establishSession and aborts early when timeout fires", func(t *testing.T) {
 		t.Parallel()
-		var received atomic.Pointer[context.Context]
-		h := ccStart(t, ccOptions{devices: []*candidate{ccDevice("a", "fd00::1")}, timeout: 50 * time.Millisecond, delay: ccDelay(0)},
-			func(h *ccHarness, a *ccAttempt) (*exchange.Session, error) {
-				received.Store(&a.ctx)
-				timer := newGate()
-				h.clock.AfterFunc(time.Second, timer.open)
-				if h.block(a.ctx, timer) {
-					return h.session(), nil
-				}
-				return nil, context.Cause(a.ctx)
-			})
-		h.at(50 * time.Millisecond)
-		var pr *PairRetransmissionLimitReachedError
-		if _, err := h.result(); !errors.As(err, &pr) {
-			t.Fatalf("err = %v", err)
-		}
-		if c := received.Load(); c == nil || (*c).Err() == nil {
-			t.Fatal("the attempt's signal was not aborted")
-		}
+		synctest.Test(t, func(t *testing.T) {
+			var received atomic.Pointer[context.Context]
+			h := ccStart(t, ccOptions{devices: []*candidate{ccDevice("a", "fd00::1")}, timeout: 50 * time.Millisecond, delay: ccDelay(0)},
+				func(h *ccHarness, a *ccAttempt) (*exchange.Session, error) {
+					received.Store(&a.ctx)
+					timer := newGate()
+					h.clock.AfterFunc(time.Second, timer.open)
+					if h.block(a.ctx, timer) {
+						return h.session(), nil
+					}
+					return nil, context.Cause(a.ctx)
+				})
+			h.at(50 * time.Millisecond)
+			var pr *PairRetransmissionLimitReachedError
+			if _, err := h.result(); !errors.As(err, &pr) {
+				t.Fatalf("err = %v", err)
+			}
+			if c := received.Load(); c == nil || (*c).Err() == nil {
+				t.Fatal("the attempt's signal was not aborted")
+			}
+		})
 	})
 }
 
@@ -487,180 +504,196 @@ func TestCommissioningConnectionStagger(t *testing.T) {
 
 	t.Run("first candidate fires immediately, subsequent candidates wait delayBeforeNextAddress each", func(t *testing.T) {
 		t.Parallel()
-		g := newGate()
-		h := ccStart(t, ccOptions{devices: []*candidate{ccDevice("a", "fd00::1", "fd00::2", "fd00::3")}, timeout: time.Minute, delay: ccDelay(5 * time.Second)},
-			func(h *ccHarness, a *ccAttempt) (*exchange.Session, error) {
-				if !h.block(a.ctx, g) {
-					return nil, context.Cause(a.ctx)
-				}
-				if a.ip == "fd00::1" {
-					return h.session(), nil
-				}
-				return nil, fmt.Errorf("%w: losing", exchange.ErrTransient)
-			})
-		h.armed(2)
-		h.expectOrder(h.order, "fd00::1")
-		h.at(5 * time.Second)
-		h.expectOrder(h.order, "fd00::1", "fd00::2")
-		h.at(5 * time.Second)
-		h.expectOrder(h.order, "fd00::1", "fd00::2", "fd00::3")
-		g.open()
-		if res, err := h.result(); err != nil || res.device.identifier != "a" {
-			t.Fatalf("result %+v, %v", res, err)
-		}
+		synctest.Test(t, func(t *testing.T) {
+			g := newGate()
+			h := ccStart(t, ccOptions{devices: []*candidate{ccDevice("a", "fd00::1", "fd00::2", "fd00::3")}, timeout: time.Minute, delay: ccDelay(5 * time.Second)},
+				func(h *ccHarness, a *ccAttempt) (*exchange.Session, error) {
+					if !h.block(a.ctx, g) {
+						return nil, context.Cause(a.ctx)
+					}
+					if a.ip == "fd00::1" {
+						return h.session(), nil
+					}
+					return nil, fmt.Errorf("%w: losing", exchange.ErrTransient)
+				})
+			h.armed(2)
+			h.expectOrder(h.order, "fd00::1")
+			h.at(5 * time.Second)
+			h.expectOrder(h.order, "fd00::1", "fd00::2")
+			h.at(5 * time.Second)
+			h.expectOrder(h.order, "fd00::1", "fd00::2", "fd00::3")
+			g.open()
+			if res, err := h.result(); err != nil || res.device.identifier != "a" {
+				t.Fatalf("result %+v, %v", res, err)
+			}
+		})
 	})
 
 	t.Run("cancels pending stagger when a winner is established", func(t *testing.T) {
 		t.Parallel()
-		winnerGate := newGate()
-		h := ccStart(t, ccOptions{devices: []*candidate{ccDevice("a", "fd00::1", "fd00::2", "fd00::3")}, timeout: time.Minute, delay: ccDelay(5 * time.Second)},
-			func(h *ccHarness, a *ccAttempt) (*exchange.Session, error) {
-				if a.ip == "fd00::1" {
-					h.block(context.Background(), winnerGate)
-					return h.session(), nil
-				}
-				h.block(a.ctx, nil)
-				return nil, context.Cause(a.ctx)
-			})
-		h.armed(2)
-		h.expectOrder(h.order, "fd00::1")
-		winnerGate.open()
-		if res, err := h.result(); err != nil || res.device.identifier != "a" {
-			t.Fatalf("result %+v, %v", res, err)
-		}
-		h.at(15 * time.Second)
-		h.expectOrder(h.order, "fd00::1")
+		synctest.Test(t, func(t *testing.T) {
+			winnerGate := newGate()
+			h := ccStart(t, ccOptions{devices: []*candidate{ccDevice("a", "fd00::1", "fd00::2", "fd00::3")}, timeout: time.Minute, delay: ccDelay(5 * time.Second)},
+				func(h *ccHarness, a *ccAttempt) (*exchange.Session, error) {
+					if a.ip == "fd00::1" {
+						h.block(context.Background(), winnerGate)
+						return h.session(), nil
+					}
+					h.block(a.ctx, nil)
+					return nil, context.Cause(a.ctx)
+				})
+			h.armed(2)
+			h.expectOrder(h.order, "fd00::1")
+			winnerGate.open()
+			if res, err := h.result(); err != nil || res.device.identifier != "a" {
+				t.Fatalf("result %+v, %v", res, err)
+			}
+			h.at(15 * time.Second)
+			h.expectOrder(h.order, "fd00::1")
+		})
 	})
 
 	// b's rejection follows a's win in the JS test's microtask order (both
 	// await one gate, a's continuation first); here b waits for that win.
 	t.Run("stagger slot is global across distinct devices (contract doc)", func(t *testing.T) {
 		t.Parallel()
-		g := newGate()
-		h := ccStart(t, ccOptions{devices: []*candidate{ccDevice("a", "fd00::1"), ccDevice("b", "fd00::2")}, timeout: time.Minute, delay: ccDelay(5 * time.Second)},
-			func(h *ccHarness, a *ccAttempt) (*exchange.Session, error) {
-				if !h.block(a.ctx, g) {
-					return nil, context.Cause(a.ctx)
-				}
-				if a.device == "a" {
-					return h.session(), nil
-				}
-				h.block(a.ctx, nil)
-				return nil, errors.New("b")
-			})
-		h.armed(2)
-		h.expectOrder(h.labelled, "a:fd00::1")
-		h.at(4900 * time.Millisecond)
-		h.expectOrder(h.labelled, "a:fd00::1")
-		h.at(200 * time.Millisecond)
-		h.expectOrder(h.labelled, "a:fd00::1", "b:fd00::2")
-		g.open()
-		if res, err := h.result(); err != nil || res.device.identifier != "a" {
-			t.Fatalf("result %+v, %v", res, err)
-		}
+		synctest.Test(t, func(t *testing.T) {
+			g := newGate()
+			h := ccStart(t, ccOptions{devices: []*candidate{ccDevice("a", "fd00::1"), ccDevice("b", "fd00::2")}, timeout: time.Minute, delay: ccDelay(5 * time.Second)},
+				func(h *ccHarness, a *ccAttempt) (*exchange.Session, error) {
+					if !h.block(a.ctx, g) {
+						return nil, context.Cause(a.ctx)
+					}
+					if a.device == "a" {
+						return h.session(), nil
+					}
+					h.block(a.ctx, nil)
+					return nil, errors.New("b")
+				})
+			h.armed(2)
+			h.expectOrder(h.labelled, "a:fd00::1")
+			h.at(4900 * time.Millisecond)
+			h.expectOrder(h.labelled, "a:fd00::1")
+			h.at(200 * time.Millisecond)
+			h.expectOrder(h.labelled, "a:fd00::1", "b:fd00::2")
+			g.open()
+			if res, err := h.result(); err != nil || res.device.identifier != "a" {
+				t.Fatalf("result %+v, %v", res, err)
+			}
+		})
 	})
 
 	t.Run("a fast failure starts the next attempt at once, and that attempt still wins", func(t *testing.T) {
 		t.Parallel()
-		winnerGate := newGate()
-		h := ccStart(t, ccOptions{devices: []*candidate{ccDevice("a", "fd00::1", "fd00::2")}, timeout: time.Minute, delay: ccDelay(5 * time.Second)},
-			func(h *ccHarness, a *ccAttempt) (*exchange.Session, error) {
-				if a.ip == "fd00::1" {
-					return nil, fmt.Errorf("%w: fe80-like unreachable", exchange.ErrNetwork)
-				}
-				if !h.block(a.ctx, winnerGate) {
-					return nil, context.Cause(a.ctx)
-				}
-				return h.session(), nil
-			})
-		h.expectOrder(h.order, "fd00::1", "fd00::2")
-		winnerGate.open()
-		if res, err := h.result(); err != nil || res.device.identifier != "a" {
-			t.Fatalf("result %+v, %v", res, err)
-		}
+		synctest.Test(t, func(t *testing.T) {
+			winnerGate := newGate()
+			h := ccStart(t, ccOptions{devices: []*candidate{ccDevice("a", "fd00::1", "fd00::2")}, timeout: time.Minute, delay: ccDelay(5 * time.Second)},
+				func(h *ccHarness, a *ccAttempt) (*exchange.Session, error) {
+					if a.ip == "fd00::1" {
+						return nil, fmt.Errorf("%w: fe80-like unreachable", exchange.ErrNetwork)
+					}
+					if !h.block(a.ctx, winnerGate) {
+						return nil, context.Cause(a.ctx)
+					}
+					return h.session(), nil
+				})
+			h.expectOrder(h.order, "fd00::1", "fd00::2")
+			winnerGate.open()
+			if res, err := h.result(); err != nil || res.device.identifier != "a" {
+				t.Fatalf("result %+v, %v", res, err)
+			}
+		})
 	})
 
 	t.Run("gives a third address an attempt within the default 30s timeout", func(t *testing.T) {
 		t.Parallel()
-		h := ccStart(t, ccOptions{devices: []*candidate{ccDevice("a", "fd00::1", "fd00::2", "fd00::3")}, timeout: 30 * time.Second},
-			func(h *ccHarness, a *ccAttempt) (*exchange.Session, error) {
-				h.block(a.ctx, nil)
-				return nil, context.Cause(a.ctx)
-			})
-		h.armed(2)
-		h.at(20100 * time.Millisecond)
-		h.expectOrder(h.order, "fd00::1", "fd00::2", "fd00::3")
-		h.at(10 * time.Second)
-		var pr *PairRetransmissionLimitReachedError
-		if _, err := h.result(); !errors.As(err, &pr) {
-			t.Fatalf("err = %v", err)
-		}
+		synctest.Test(t, func(t *testing.T) {
+			h := ccStart(t, ccOptions{devices: []*candidate{ccDevice("a", "fd00::1", "fd00::2", "fd00::3")}, timeout: 30 * time.Second},
+				func(h *ccHarness, a *ccAttempt) (*exchange.Session, error) {
+					h.block(a.ctx, nil)
+					return nil, context.Cause(a.ctx)
+				})
+			h.armed(2)
+			h.at(20100 * time.Millisecond)
+			h.expectOrder(h.order, "fd00::1", "fd00::2", "fd00::3")
+			h.at(10 * time.Second)
+			var pr *PairRetransmissionLimitReachedError
+			if _, err := h.result(); !errors.As(err, &pr) {
+				t.Fatalf("err = %v", err)
+			}
+		})
 	})
 
 	t.Run("holds the next address while an attempt has reached its responder", func(t *testing.T) {
 		t.Parallel()
-		firstFails := newGate()
-		h := ccStart(t, ccOptions{devices: []*candidate{ccDevice("a", "fd00::1", "fd00::2")}, timeout: time.Minute, delay: ccDelay(5 * time.Second)},
-			func(h *ccHarness, a *ccAttempt) (*exchange.Session, error) {
-				if a.ip == "fd00::1" {
-					a.onPBKDF()
-					h.block(context.Background(), firstFails)
-					return nil, fmt.Errorf("%w: responder went silent", exchange.ErrNetwork)
-				}
-				return h.session(), nil
-			})
-		h.armed(2)
-		h.at(15 * time.Second)
-		h.expectOrder(h.order, "fd00::1")
-		firstFails.open()
-		res, err := h.result()
-		if err != nil || res.device.identifier != "a" {
-			t.Fatalf("result %+v, %v", res, err)
-		}
-		if got := h.order(); !slices.Equal(got, []string{"fd00::1", "fd00::2"}) {
-			t.Fatalf("order %v", got)
-		}
+		synctest.Test(t, func(t *testing.T) {
+			firstFails := newGate()
+			h := ccStart(t, ccOptions{devices: []*candidate{ccDevice("a", "fd00::1", "fd00::2")}, timeout: time.Minute, delay: ccDelay(5 * time.Second)},
+				func(h *ccHarness, a *ccAttempt) (*exchange.Session, error) {
+					if a.ip == "fd00::1" {
+						a.onPBKDF()
+						h.block(context.Background(), firstFails)
+						return nil, fmt.Errorf("%w: responder went silent", exchange.ErrNetwork)
+					}
+					return h.session(), nil
+				})
+			h.armed(2)
+			h.at(15 * time.Second)
+			h.expectOrder(h.order, "fd00::1")
+			firstFails.open()
+			res, err := h.result()
+			if err != nil || res.device.identifier != "a" {
+				t.Fatalf("result %+v, %v", res, err)
+			}
+			if got := h.order(); !slices.Equal(got, []string{"fd00::1", "fd00::2"}) {
+				t.Fatalf("order %v", got)
+			}
+		})
 	})
 
 	t.Run("skips the queued addresses of a device dropped for invalid credentials", func(t *testing.T) {
 		t.Parallel()
-		h := ccStart(t, ccOptions{devices: []*candidate{ccDevice("a", "fd00::1", "fd00::2")}, timeout: time.Minute, delay: ccDelay(5 * time.Second)},
-			func(_ *ccHarness, _ *ccAttempt) (*exchange.Session, error) {
-				return nil, fmt.Errorf("%w: wrong passcode", handshake.ErrPasscodeMismatch)
-			})
-		h.at(10 * time.Second)
-		if _, err := h.result(); !errors.Is(err, handshake.ErrPasscodeMismatch) {
-			t.Fatalf("err = %v", err)
-		}
-		if got := h.order(); !slices.Equal(got, []string{"fd00::1"}) {
-			t.Fatalf("order %v", got)
-		}
+		synctest.Test(t, func(t *testing.T) {
+			h := ccStart(t, ccOptions{devices: []*candidate{ccDevice("a", "fd00::1", "fd00::2")}, timeout: time.Minute, delay: ccDelay(5 * time.Second)},
+				func(_ *ccHarness, _ *ccAttempt) (*exchange.Session, error) {
+					return nil, fmt.Errorf("%w: wrong passcode", handshake.ErrPasscodeMismatch)
+				})
+			h.at(10 * time.Second)
+			if _, err := h.result(); !errors.Is(err, handshake.ErrPasscodeMismatch) {
+				t.Fatalf("err = %v", err)
+			}
+			if got := h.order(); !slices.Equal(got, []string{"fd00::1"}) {
+				t.Fatalf("order %v", got)
+			}
+		})
 	})
 
 	t.Run("default delayBeforeNextAddress is 10s", func(t *testing.T) {
 		t.Parallel()
-		g := newGate()
-		h := ccStart(t, ccOptions{devices: []*candidate{ccDevice("a", "fd00::1", "fd00::2")}, timeout: time.Minute},
-			func(h *ccHarness, a *ccAttempt) (*exchange.Session, error) {
-				if !h.block(a.ctx, g) {
-					return nil, context.Cause(a.ctx)
-				}
-				if a.ip == "fd00::1" {
-					return h.session(), nil
-				}
-				h.block(a.ctx, nil) // after fd00::1's win, as in the JS microtask order
-				return nil, errors.New("fd00::2")
-			})
-		h.armed(2)
-		h.expectOrder(h.order, "fd00::1")
-		h.at(9900 * time.Millisecond)
-		h.expectOrder(h.order, "fd00::1")
-		h.at(200 * time.Millisecond)
-		h.expectOrder(h.order, "fd00::1", "fd00::2")
-		g.open()
-		if _, err := h.result(); err != nil {
-			t.Fatalf("err = %v", err)
-		}
+		synctest.Test(t, func(t *testing.T) {
+			g := newGate()
+			h := ccStart(t, ccOptions{devices: []*candidate{ccDevice("a", "fd00::1", "fd00::2")}, timeout: time.Minute},
+				func(h *ccHarness, a *ccAttempt) (*exchange.Session, error) {
+					if !h.block(a.ctx, g) {
+						return nil, context.Cause(a.ctx)
+					}
+					if a.ip == "fd00::1" {
+						return h.session(), nil
+					}
+					h.block(a.ctx, nil) // after fd00::1's win, as in the JS microtask order
+					return nil, errors.New("fd00::2")
+				})
+			h.armed(2)
+			h.expectOrder(h.order, "fd00::1")
+			h.at(9900 * time.Millisecond)
+			h.expectOrder(h.order, "fd00::1")
+			h.at(200 * time.Millisecond)
+			h.expectOrder(h.order, "fd00::1", "fd00::2")
+			g.open()
+			if _, err := h.result(); err != nil {
+				t.Fatalf("err = %v", err)
+			}
+		})
 	})
 }
 
@@ -707,80 +740,90 @@ func TestCommissioningConnectionScripted(t *testing.T) {
 
 	t.Run("restarts the stagger from the last launch", func(t *testing.T) {
 		t.Parallel()
-		h := ccRun(t, []string{"fd00::1", "fd00::2", "fd00::3"}, map[string]ccStep{"fd00::1": {fail: 2000}})
-		h.armed(3)
-		h.at(ms(2000))
-		h.expectOrder(h.order, "fd00::1", "fd00::2")
-		h.at(ms(4900))
-		h.expectOrder(h.order, "fd00::1", "fd00::2")
-		h.at(ms(200))
-		h.expectOrder(h.order, "fd00::1", "fd00::2", "fd00::3")
-		end(t, h)
+		synctest.Test(t, func(t *testing.T) {
+			h := ccRun(t, []string{"fd00::1", "fd00::2", "fd00::3"}, map[string]ccStep{"fd00::1": {fail: 2000}})
+			h.armed(3)
+			h.at(ms(2000))
+			h.expectOrder(h.order, "fd00::1", "fd00::2")
+			h.at(ms(4900))
+			h.expectOrder(h.order, "fd00::1", "fd00::2")
+			h.at(ms(200))
+			h.expectOrder(h.order, "fd00::1", "fd00::2", "fd00::3")
+			end(t, h)
+		})
 	})
 
 	t.Run("lets an older failure leave the newer attempt's stagger running", func(t *testing.T) {
 		t.Parallel()
-		h := ccRun(t, []string{"fd00::1", "fd00::2", "fd00::3"}, map[string]ccStep{"fd00::1": {fail: 7000}})
-		h.armed(3)
-		h.at(ms(5000))
-		h.expectOrder(h.order, "fd00::1", "fd00::2")
-		h.at(ms(2100))
-		h.expectOrder(h.order, "fd00::1", "fd00::2")
-		h.at(ms(3000))
-		h.expectOrder(h.order, "fd00::1", "fd00::2", "fd00::3")
-		end(t, h)
+		synctest.Test(t, func(t *testing.T) {
+			h := ccRun(t, []string{"fd00::1", "fd00::2", "fd00::3"}, map[string]ccStep{"fd00::1": {fail: 7000}})
+			h.armed(3)
+			h.at(ms(5000))
+			h.expectOrder(h.order, "fd00::1", "fd00::2")
+			h.at(ms(2100))
+			h.expectOrder(h.order, "fd00::1", "fd00::2")
+			h.at(ms(3000))
+			h.expectOrder(h.order, "fd00::1", "fd00::2", "fd00::3")
+			end(t, h)
+		})
 	})
 
 	t.Run("keeps the newer attempt's delay when a held attempt fails while it is unanswered", func(t *testing.T) {
 		t.Parallel()
-		h := ccRun(t, []string{"fd00::1", "fd00::2", "fd00::3"}, map[string]ccStep{"fd00::1": {reach: 6000, fail: 8000}})
-		h.armed(3)
-		h.at(ms(5000))
-		h.at(ms(1000)) // fd00::1 holds its responder
-		h.at(ms(2100)) // fd00::1 fails; fd00::2, started at 5s, is still unanswered
-		h.expectOrder(h.order, "fd00::1", "fd00::2")
-		h.at(ms(2000)) // 5s after fd00::2 started
-		h.expectOrder(h.order, "fd00::1", "fd00::2", "fd00::3")
-		end(t, h)
+		synctest.Test(t, func(t *testing.T) {
+			h := ccRun(t, []string{"fd00::1", "fd00::2", "fd00::3"}, map[string]ccStep{"fd00::1": {reach: 6000, fail: 8000}})
+			h.armed(3)
+			h.at(ms(5000))
+			h.at(ms(1000)) // fd00::1 holds its responder
+			h.at(ms(2100)) // fd00::1 fails; fd00::2, started at 5s, is still unanswered
+			h.expectOrder(h.order, "fd00::1", "fd00::2")
+			h.at(ms(2000)) // 5s after fd00::2 started
+			h.expectOrder(h.order, "fd00::1", "fd00::2", "fd00::3")
+			end(t, h)
+		})
 	})
 
 	t.Run("launches the next address once a hold ends after the latest attempt failed", func(t *testing.T) {
 		t.Parallel()
-		h := ccRun(t, []string{"fd00::1", "fd00::2", "fd00::3", "fd00::4"}, map[string]ccStep{
-			"fd00::2": {reach: 6000, fail: 10000},
-			"fd00::3": {fail: 2000},
-			"fd00::4": {win: true},
+		synctest.Test(t, func(t *testing.T) {
+			h := ccRun(t, []string{"fd00::1", "fd00::2", "fd00::3", "fd00::4"}, map[string]ccStep{
+				"fd00::2": {reach: 6000, fail: 10000},
+				"fd00::3": {fail: 2000},
+				"fd00::4": {win: true},
+			})
+			h.armed(2)
+			h.at(ms(5000)) // fd00::2 starts
+			h.at(ms(5000)) // fd00::3 starts
+			h.at(ms(1000)) // fd00::2 holds its responder
+			h.at(ms(1000)) // fd00::3, the latest, fails while fd00::2 holds
+			h.expectOrder(h.order, "fd00::1", "fd00::2", "fd00::3")
+			h.at(ms(3100)) // fd00::2 fails; nothing unanswered is newer, so fd00::4 starts at once
+			h.expectOrder(h.order, "fd00::1", "fd00::2", "fd00::3", "fd00::4")
+			if res, err := h.result(); err != nil || res.device.identifier != "a" {
+				t.Fatalf("result %+v, %v", res, err)
+			}
 		})
-		h.armed(2)
-		h.at(ms(5000)) // fd00::2 starts
-		h.at(ms(5000)) // fd00::3 starts
-		h.at(ms(1000)) // fd00::2 holds its responder
-		h.at(ms(1000)) // fd00::3, the latest, fails while fd00::2 holds
-		h.expectOrder(h.order, "fd00::1", "fd00::2", "fd00::3")
-		h.at(ms(3100)) // fd00::2 fails; nothing unanswered is newer, so fd00::4 starts at once
-		h.expectOrder(h.order, "fd00::1", "fd00::2", "fd00::3", "fd00::4")
-		if res, err := h.result(); err != nil || res.device.identifier != "a" {
-			t.Fatalf("result %+v, %v", res, err)
-		}
 	})
 
 	t.Run("launches the next address when a held attempt fails with nothing else pending", func(t *testing.T) {
 		t.Parallel()
-		h := ccRun(t, []string{"fd00::1", "fd00::2", "fd00::3"}, map[string]ccStep{
-			"fd00::1": {reach: 6000, fail: 8000},
-			"fd00::2": {fail: 2000},
-			"fd00::3": {win: true},
+		synctest.Test(t, func(t *testing.T) {
+			h := ccRun(t, []string{"fd00::1", "fd00::2", "fd00::3"}, map[string]ccStep{
+				"fd00::1": {reach: 6000, fail: 8000},
+				"fd00::2": {fail: 2000},
+				"fd00::3": {win: true},
+			})
+			h.armed(3)
+			h.at(ms(5000))
+			h.expectOrder(h.order, "fd00::1", "fd00::2")
+			h.at(ms(1000)) // fd00::1 reaches its responder
+			h.at(ms(1000)) // fd00::2 fails while fd00::1 holds the responder
+			h.expectOrder(h.order, "fd00::1", "fd00::2")
+			h.at(ms(1100)) // fd00::1 fails
+			h.expectOrder(h.order, "fd00::1", "fd00::2", "fd00::3")
+			if res, err := h.result(); err != nil || res.device.identifier != "a" {
+				t.Fatalf("result %+v, %v", res, err)
+			}
 		})
-		h.armed(3)
-		h.at(ms(5000))
-		h.expectOrder(h.order, "fd00::1", "fd00::2")
-		h.at(ms(1000)) // fd00::1 reaches its responder
-		h.at(ms(1000)) // fd00::2 fails while fd00::1 holds the responder
-		h.expectOrder(h.order, "fd00::1", "fd00::2")
-		h.at(ms(1100)) // fd00::1 fails
-		h.expectOrder(h.order, "fd00::1", "fd00::2", "fd00::3")
-		if res, err := h.result(); err != nil || res.device.identifier != "a" {
-			t.Fatalf("result %+v, %v", res, err)
-		}
 	})
 }
