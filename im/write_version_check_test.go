@@ -88,3 +88,79 @@ func TestWriteRequestSuppressResponseType(t *testing.T) {
 		t.Fatalf("err = %v, want ErrInvalidWriteRequest", err)
 	}
 }
+
+// TestWriteRequestDecodeRefusals: the WriteRequest decoder refuses what
+// TlvWriteRequest.ts:16-24 at 862ad75f does not describe — a top level that
+// is no struct, a WriteRequests that is no array, an AttributeDataIB that
+// is no struct, a message cut short — and skips a field it does not know.
+func TestWriteRequestDecodeRefusals(t *testing.T) {
+	t.Parallel()
+	encode := func(t *testing.T, body func(enc *tlv.Encoder)) []byte {
+		t.Helper()
+		enc := tlv.NewEncoder()
+		body(enc)
+		data, err := enc.Bytes()
+		if err != nil {
+			t.Fatal(err)
+		}
+		return data
+	}
+	cases := []struct {
+		name    string
+		body    func(enc *tlv.Encoder)
+		cut     int
+		refused bool
+	}{
+		{"a top level that is no struct", func(enc *tlv.Encoder) { enc.PutBool(tlv.AnonymousTag(), true) }, 0, true},
+		{"a WriteRequests that is no array", func(enc *tlv.Encoder) {
+			enc.StartStruct(tlv.AnonymousTag())
+			enc.PutBool(tlv.ContextTag(2), true)
+			_ = enc.EndContainer()
+		}, 0, true},
+		{"an AttributeDataIB that is no struct", func(enc *tlv.Encoder) {
+			enc.StartStruct(tlv.AnonymousTag())
+			enc.StartArray(tlv.ContextTag(2))
+			enc.PutBool(tlv.AnonymousTag(), true)
+			_ = enc.EndContainer()
+			_ = enc.EndContainer()
+		}, 0, true},
+		{"a message cut short", func(enc *tlv.Encoder) {
+			enc.StartStruct(tlv.AnonymousTag())
+			enc.PutBool(tlv.ContextTag(1), true)
+			_ = enc.EndContainer()
+		}, 2, true},
+		{"a field it does not know", func(enc *tlv.Encoder) {
+			enc.StartStruct(tlv.AnonymousTag())
+			enc.StartStruct(tlv.ContextTag(9))
+			enc.PutBool(tlv.ContextTag(0), true)
+			_ = enc.EndContainer()
+			enc.PutBool(tlv.AnonymousTag(), true)
+			_ = enc.EndContainer()
+		}, 0, false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			data := encode(t, tc.body)
+			data = data[:len(data)-tc.cut]
+			_, err := UnmarshalWriteRequestTLV(tlv.NewDecoder(data), nil)
+			if (err != nil) != tc.refused {
+				t.Fatalf("err = %v, refused %v", err, tc.refused)
+			}
+		})
+	}
+}
+
+// TestWriteRequestWithoutClusterOrAttribute: a write whose path names no
+// cluster or no attribute is answered INVALID_ACTION on that path and the
+// request goes on (chip WriteHandler.cpp, "Wildcard path write must specify
+// an attributeId"; see HandleWriteRequest).
+func TestWriteRequestWithoutClusterOrAttribute(t *testing.T) {
+	t.Parallel()
+	d := &labelDispatcher{values: map[uint32]string{}}
+	req := WriteRequest{Writes: []AttributeWrite{{Path: ConcreteAttributePath{Endpoint: 0, HasEndpoint: true}}}}
+	resp := HandleWriteRequest(context.Background(), d, req)
+	if len(resp.Responses) != 1 || resp.Responses[0].Status.Status != StatusInvalidAction {
+		t.Fatalf("responses %+v, want one INVALID_ACTION", resp.Responses)
+	}
+}
