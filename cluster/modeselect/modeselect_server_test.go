@@ -420,8 +420,8 @@ func TestNilSourceReadsNullAndRefusesCommands(t *testing.T) {
 		}
 	}
 	if _, err := srv.MatterInvoke(context.Background(), modeselect.CmdChangeToMode,
-		modeselect.ChangeToModeRequest{NewMode: 1}); err == nil {
-		t.Error("ChangeToMode succeeded without a host port")
+		modeselect.ChangeToModeRequest{NewMode: 1}); spec.StatusOf(err) != im.StatusFailure {
+		t.Errorf("ChangeToMode without a host port: status %v (%v), want %v", spec.StatusOf(err), err, im.StatusFailure)
 	}
 }
 

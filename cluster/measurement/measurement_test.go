@@ -9,10 +9,12 @@ import (
 	"testing"
 
 	"github.com/SukramJ/go-fabric/cluster/measurement"
+	"github.com/SukramJ/go-fabric/cluster/spec"
 	swdef "github.com/SukramJ/go-fabric/cluster/spec/switchcluster"
 	switchserver "github.com/SukramJ/go-fabric/cluster/switch"
 	"github.com/SukramJ/go-fabric/cluster/wire"
 	"github.com/SukramJ/go-fabric/contract"
+	"github.com/SukramJ/go-fabric/im"
 )
 
 // --- fakes ---
@@ -164,8 +166,8 @@ func TestTemperatureServerWriteIsReadOnly(t *testing.T) {
 	t.Parallel()
 	s := measurement.NewTemperatureServer(fakeFloat{val: 21.5, obs: true})
 	err := s.MatterWrite(context.Background(), 0x0000, int16(100))
-	if err == nil {
-		t.Error("MatterWrite returned nil, want read-only error")
+	if spec.StatusOf(err) != im.StatusUnsupportedWrite {
+		t.Errorf("MatterWrite: status %v (%v), want %v", spec.StatusOf(err), err, im.StatusUnsupportedWrite)
 	}
 }
 
@@ -174,8 +176,8 @@ func TestTemperatureServerInvokeRejected(t *testing.T) {
 	t.Parallel()
 	s := measurement.NewTemperatureServer(fakeFloat{val: 21.5, obs: true})
 	_, err := s.MatterInvoke(context.Background(), 0x00, nil)
-	if err == nil {
-		t.Error("MatterInvoke returned nil error, want rejection")
+	if spec.StatusOf(err) != im.StatusUnsupportedCommand {
+		t.Errorf("MatterInvoke: status %v (%v), want %v", spec.StatusOf(err), err, im.StatusUnsupportedCommand)
 	}
 }
 
@@ -952,8 +954,8 @@ func TestCO2ConcentrationServerWriteRejected(t *testing.T) {
 	t.Parallel()
 	s := measurement.NewCO2ConcentrationServer(fakeFloat{val: 425.0, obs: true})
 	err := s.MatterWrite(context.Background(), 0x0000, float32(500.0))
-	if err == nil {
-		t.Error("MatterWrite returned nil, want read-only error")
+	if spec.StatusOf(err) != im.StatusUnsupportedWrite {
+		t.Errorf("MatterWrite: status %v (%v), want %v", spec.StatusOf(err), err, im.StatusUnsupportedWrite)
 	}
 }
 
@@ -962,8 +964,8 @@ func TestCO2ConcentrationServerInvokeRejected(t *testing.T) {
 	t.Parallel()
 	s := measurement.NewCO2ConcentrationServer(fakeFloat{val: 425.0, obs: true})
 	_, err := s.MatterInvoke(context.Background(), 0x00, nil)
-	if err == nil {
-		t.Error("MatterInvoke returned nil error, want rejection")
+	if spec.StatusOf(err) != im.StatusUnsupportedCommand {
+		t.Errorf("MatterInvoke: status %v (%v), want %v", spec.StatusOf(err), err, im.StatusUnsupportedCommand)
 	}
 }
 
@@ -1211,8 +1213,8 @@ func TestPowerSourceServerWriteRejected(t *testing.T) {
 	t.Parallel()
 	s := measurement.NewPowerSourceServer(fakeBool{class: contract.MeasurementBattery, val: false, obs: true})
 	err := s.MatterWrite(context.Background(), 0x0000, uint8(0))
-	if err == nil {
-		t.Error("MatterWrite returned nil, want read-only error")
+	if spec.StatusOf(err) != im.StatusUnsupportedWrite {
+		t.Errorf("MatterWrite: status %v (%v), want %v", spec.StatusOf(err), err, im.StatusUnsupportedWrite)
 	}
 }
 
@@ -1221,8 +1223,8 @@ func TestPowerSourceServerInvokeRejected(t *testing.T) {
 	t.Parallel()
 	s := measurement.NewPowerSourceServer(fakeBool{class: contract.MeasurementBattery, val: false, obs: true})
 	_, err := s.MatterInvoke(context.Background(), 0x00, nil)
-	if err == nil {
-		t.Error("MatterInvoke returned nil error, want rejection")
+	if spec.StatusOf(err) != im.StatusUnsupportedCommand {
+		t.Errorf("MatterInvoke: status %v (%v), want %v", spec.StatusOf(err), err, im.StatusUnsupportedCommand)
 	}
 }
 
@@ -1540,8 +1542,8 @@ func TestElectricalPowerServerWriteRejected(t *testing.T) {
 	t.Parallel()
 	s := measurement.NewElectricalPowerServer(fakeFloat{val: 1500.0, obs: true})
 	err := s.MatterWrite(context.Background(), 0x0008, int64(0))
-	if err == nil {
-		t.Error("MatterWrite returned nil, want read-only error")
+	if spec.StatusOf(err) != im.StatusUnsupportedWrite {
+		t.Errorf("MatterWrite: status %v (%v), want %v", spec.StatusOf(err), err, im.StatusUnsupportedWrite)
 	}
 }
 
@@ -1902,8 +1904,8 @@ func TestHumidityServer_MatterInvoke_Rejected(t *testing.T) {
 	t.Parallel()
 	s := measurement.NewHumidityServer(fakeFloat{val: 50, obs: true})
 	_, err := s.MatterInvoke(context.Background(), 0x00, nil)
-	if err == nil {
-		t.Error("MatterInvoke: want non-nil error")
+	if spec.StatusOf(err) != im.StatusUnsupportedCommand {
+		t.Errorf("MatterInvoke: status %v (%v), want %v", spec.StatusOf(err), err, im.StatusUnsupportedCommand)
 	}
 }
 
@@ -1956,8 +1958,8 @@ func TestIlluminanceServer_MatterInvoke_Rejected(t *testing.T) {
 	t.Parallel()
 	s := measurement.NewIlluminanceServer(fakeFloat{val: 500, obs: true})
 	_, err := s.MatterInvoke(context.Background(), 0x00, nil)
-	if err == nil {
-		t.Error("MatterInvoke: want non-nil error")
+	if spec.StatusOf(err) != im.StatusUnsupportedCommand {
+		t.Errorf("MatterInvoke: status %v (%v), want %v", spec.StatusOf(err), err, im.StatusUnsupportedCommand)
 	}
 }
 
@@ -2010,8 +2012,8 @@ func TestPressureServer_MatterInvoke_Rejected(t *testing.T) {
 	t.Parallel()
 	s := measurement.NewPressureServer(fakeFloat{val: 1013.25, obs: true})
 	_, err := s.MatterInvoke(context.Background(), 0x00, nil)
-	if err == nil {
-		t.Error("MatterInvoke: want non-nil error")
+	if spec.StatusOf(err) != im.StatusUnsupportedCommand {
+		t.Errorf("MatterInvoke: status %v (%v), want %v", spec.StatusOf(err), err, im.StatusUnsupportedCommand)
 	}
 }
 
@@ -2046,8 +2048,8 @@ func TestBooleanStateServer_MatterInvoke_Rejected(t *testing.T) {
 	t.Parallel()
 	s := measurement.NewBooleanStateServer(fakeBool{val: true, obs: true})
 	_, err := s.MatterInvoke(context.Background(), 0x00, nil)
-	if err == nil {
-		t.Error("MatterInvoke: want non-nil error")
+	if spec.StatusOf(err) != im.StatusUnsupportedCommand {
+		t.Errorf("MatterInvoke: status %v (%v), want %v", spec.StatusOf(err), err, im.StatusUnsupportedCommand)
 	}
 }
 
@@ -2087,8 +2089,8 @@ func TestElectricalPowerServer_MatterInvoke_Rejected(t *testing.T) {
 	t.Parallel()
 	s := measurement.NewElectricalPowerServer(fakeFloat{val: 1500, obs: true})
 	_, err := s.MatterInvoke(context.Background(), 0x00, nil)
-	if err == nil {
-		t.Error("MatterInvoke: want non-nil error")
+	if spec.StatusOf(err) != im.StatusUnsupportedCommand {
+		t.Errorf("MatterInvoke: status %v (%v), want %v", spec.StatusOf(err), err, im.StatusUnsupportedCommand)
 	}
 }
 
@@ -2122,8 +2124,8 @@ func TestElectricalEnergyServer_MatterInvoke_Rejected(t *testing.T) {
 	t.Parallel()
 	s := measurement.NewElectricalEnergyServer(fakeFloat{val: 100, obs: true})
 	_, err := s.MatterInvoke(context.Background(), 0x00, nil)
-	if err == nil {
-		t.Error("MatterInvoke: want non-nil error")
+	if spec.StatusOf(err) != im.StatusUnsupportedCommand {
+		t.Errorf("MatterInvoke: status %v (%v), want %v", spec.StatusOf(err), err, im.StatusUnsupportedCommand)
 	}
 }
 

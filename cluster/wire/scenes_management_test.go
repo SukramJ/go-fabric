@@ -8,7 +8,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/SukramJ/go-fabric/cluster/spec"
 	"github.com/SukramJ/go-fabric/cluster/wire"
+	"github.com/SukramJ/go-fabric/im"
 )
 
 // TestScenesManagementInvokeContainsNoCommands verifies that MatterInvoke
@@ -22,8 +24,8 @@ func TestScenesManagementInvokeContainsNoCommands(t *testing.T) {
 	t.Parallel()
 	s := wire.ScenesManagement{}
 	_, err := s.MatterInvoke(context.Background(), 0x00, nil)
-	if err == nil {
-		t.Fatal("MatterInvoke returned nil error, want rejection")
+	if spec.StatusOf(err) != im.StatusUnsupportedCommand {
+		t.Fatalf("MatterInvoke: status %v (%v), want %v", spec.StatusOf(err), err, im.StatusUnsupportedCommand)
 	}
 	if !strings.Contains(err.Error(), "no commands") {
 		t.Errorf("MatterInvoke error = %q; want message containing 'no commands' so dispatcher encodes UnsupportedCommand (0x81)", err.Error())
@@ -37,8 +39,8 @@ func TestScenesManagementInvokeRejectsAllCommandIDs(t *testing.T) {
 	s := wire.ScenesManagement{}
 	for _, cmdID := range []uint32{0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x40, 0xFF} {
 		_, err := s.MatterInvoke(context.Background(), cmdID, nil)
-		if err == nil {
-			t.Errorf("cmdID 0x%02X: MatterInvoke returned nil, want error", cmdID)
+		if spec.StatusOf(err) != im.StatusUnsupportedCommand {
+			t.Errorf("cmdID 0x%02X: MatterInvoke: status %v (%v), want %v", cmdID, spec.StatusOf(err), err, im.StatusUnsupportedCommand)
 		}
 	}
 }
@@ -61,8 +63,8 @@ func TestScenesManagementWriteReturnsError(t *testing.T) {
 	t.Parallel()
 	s := wire.ScenesManagement{}
 	err := s.MatterWrite(context.Background(), 0x0001, uint16(0))
-	if err == nil {
-		t.Error("MatterWrite returned nil, want error")
+	if spec.StatusOf(err) != im.StatusUnsupportedWrite {
+		t.Errorf("MatterWrite: status %v (%v), want %v", spec.StatusOf(err), err, im.StatusUnsupportedWrite)
 	}
 }
 

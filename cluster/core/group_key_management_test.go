@@ -11,6 +11,7 @@ import (
 
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/cluster/core"
+	"github.com/SukramJ/go-fabric/cluster/spec"
 	"github.com/SukramJ/go-fabric/im"
 )
 
@@ -151,8 +152,8 @@ func TestGKM_InvokeWithoutFabric_Fails(t *testing.T) {
 	gkm := newGKM(t)
 	// fabric == 0 (initial) → error.
 	_, err := gkm.MatterInvoke(context.Background(), 0x04, nil)
-	if err == nil {
-		t.Fatal("expected error for invoke without active fabric, got nil")
+	if spec.StatusOf(err) != im.StatusFailure {
+		t.Fatalf("invoke without active fabric: status %v (%v), want %v", spec.StatusOf(err), err, im.StatusFailure)
 	}
 }
 
@@ -383,8 +384,8 @@ func TestGKM_Write_ReadOnly(t *testing.T) {
 	t.Parallel()
 	gkm := newGKM(t)
 	err := gkm.MatterWrite(context.Background(), 0x0001 /*GroupTable — read-only*/, nil)
-	if err == nil {
-		t.Fatal("expected error for write to read-only attr, got nil")
+	if spec.StatusOf(err) != im.StatusUnsupportedWrite {
+		t.Fatalf("write to read-only GroupTable: status %v (%v), want %v", spec.StatusOf(err), err, im.StatusUnsupportedWrite)
 	}
 }
 
@@ -576,8 +577,8 @@ func TestGKM_KeySetWriteValidation(t *testing.T) {
 				core.KeySetWriteRequest{GroupKeySet: tc.gks},
 			)
 			if tc.wantError {
-				if err == nil {
-					t.Fatalf("expected error, got nil")
+				if spec.StatusOf(err) != im.StatusInvalidCommand {
+					t.Fatalf("KeySetWrite: status %v (%v), want %v", spec.StatusOf(err), err, im.StatusInvalidCommand)
 				}
 				if tc.wantSubstring != "" && !containsStr(err.Error(), tc.wantSubstring) {
 					t.Fatalf("error %q does not contain %q", err.Error(), tc.wantSubstring)

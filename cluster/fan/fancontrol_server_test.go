@@ -12,6 +12,7 @@ import (
 
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/cluster/fan"
+	"github.com/SukramJ/go-fabric/cluster/spec"
 	fandef "github.com/SukramJ/go-fabric/cluster/spec/fancontrol"
 	clusterwire "github.com/SukramJ/go-fabric/cluster/wire"
 	"github.com/SukramJ/go-fabric/im"
@@ -349,8 +350,12 @@ func TestFanModeMustBeOfferedByTheSequence(t *testing.T) {
 		srv := newBasic(t, &device{}, seq, features)
 		for _, m := range []fan.FanMode{fan.FanModeOff, fan.FanModeLow, fan.FanModeMedium, fan.FanModeHigh, fan.FanModeAuto} {
 			err := srv.MatterWrite(ctx, fan.AttrFanMode, uint64(m))
-			if slices.Contains(modes, m) != (err == nil) {
-				t.Errorf("sequence %d mode %d: err = %v, offered = %v", seq, m, err, slices.Contains(modes, m))
+			want := im.StatusConstraintError
+			if slices.Contains(modes, m) {
+				want = im.StatusSuccess
+			}
+			if got := spec.StatusOf(err); got != want {
+				t.Errorf("sequence %d mode %d: status %v (%v), want %v", seq, m, got, err, want)
 			}
 		}
 	}

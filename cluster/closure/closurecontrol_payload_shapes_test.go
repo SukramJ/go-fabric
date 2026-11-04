@@ -10,8 +10,10 @@ import (
 
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/cluster/closure"
+	"github.com/SukramJ/go-fabric/cluster/spec"
 	closuredef "github.com/SukramJ/go-fabric/cluster/spec/closurecontrol"
 	clusterwire "github.com/SukramJ/go-fabric/cluster/wire"
+	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/tlv"
 )
 
@@ -180,8 +182,8 @@ func TestClosureControlMoveToAndStopFailWithoutAHandler(t *testing.T) {
 	if _, err := srv.MatterInvoke(
 		context.Background(), clusterwire.ClosureControlCmdMoveTo,
 		closuredef.MoveToRequest{Position: (*closuredef.TargetPositionEnum)(&pos)},
-	); err == nil {
-		t.Error("MoveTo without a handler reported success")
+	); spec.StatusOf(err) != im.StatusInvalidInState {
+		t.Errorf("MoveTo on an unready closure without a handler: status %v (%v), want %v", spec.StatusOf(err), err, im.StatusInvalidInState)
 	}
 	// The state must not claim a move that never left the process.
 	if raw, ok := srv.MatterRead(clusterwire.ClosureControlAttrMainState); !ok ||
@@ -196,8 +198,8 @@ func TestClosureControlMoveToAndStopFailWithoutAHandler(t *testing.T) {
 	srv.SetMainState(clusterwire.ClosureMainStateMoving)
 	if _, err := srv.MatterInvoke(
 		context.Background(), clusterwire.ClosureControlCmdStop, nil,
-	); err == nil {
-		t.Error("Stop of a moving closure without a handler reported success")
+	); spec.StatusOf(err) != im.StatusFailure {
+		t.Errorf("Stop of a moving closure without a handler: status %v (%v), want %v", spec.StatusOf(err), err, im.StatusFailure)
 	}
 }
 

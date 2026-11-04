@@ -159,8 +159,8 @@ func TestZoneCommandRules(t *testing.T) { //nolint:funlen // one rule per block
 			t.Fatalf("MaxZones set: %v", err)
 		}
 		pz, _ := newChipZones(t, camera.FeatureTwoDimensionalCartesianZone|camera.FeaturePerZoneSensitivity)
-		if err := pz.SetSensitivity(2); err == nil {
-			t.Fatal("Sensitivity without its attribute")
+		if err := pz.SetSensitivity(2); !errors.Is(err, spec.ErrNotServed) {
+			t.Fatalf("Sensitivity without its attribute: %v, want %v", err, spec.ErrNotServed)
 		}
 	})
 }

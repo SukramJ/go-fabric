@@ -312,8 +312,8 @@ func TestInvokeRefusals(t *testing.T) {
 	if sce, ok := errors.AsType[im.StatusCodeError](err); !ok || sce.MatterStatusCode() != im.StatusInvalidCommand {
 		t.Errorf("SkipArea with SelectAreas fields: %v", err)
 	}
-	if err := full.MatterWrite(ctx, sa.AttrSelectedAreas, []uint32{}); err == nil {
-		t.Error("a write to SelectedAreas was accepted")
+	if err := full.MatterWrite(ctx, sa.AttrSelectedAreas, []uint32{}); spec.StatusOf(err) != im.StatusUnsupportedWrite {
+		t.Errorf("a write to SelectedAreas: status %v (%v), want %v", spec.StatusOf(err), err, im.StatusUnsupportedWrite)
 	}
 }
 
