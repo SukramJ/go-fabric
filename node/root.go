@@ -147,10 +147,9 @@ func buildRoot(ctx context.Context, d rootDeps) (*RootClusters, error) { //nolin
 	if err != nil {
 		return nil, fmt.Errorf("basic information: %w", err)
 	}
-	if cfg.specificationVersion != 0 {
-		// TESTING ONLY (internal/nodeseam.UseSpecificationVersion).
-		coreseam.SetSpecificationVersion(basicInfo, cfg.specificationVersion)
-	}
+	// TESTING ONLY (internal/nodeseam.UseSpecificationVersion); 0, every
+	// release node's value, leaves the server's own.
+	coreseam.SetSpecificationVersion(basicInfo, cfg.specificationVersion)
 	r.BasicInformation = basicInfo
 
 	// RebootCount and the operational time carry over from the previous

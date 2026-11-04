@@ -27,7 +27,7 @@ type RecordedEvent struct {
 // BD-Matter-ClientNodeEventHistory): matter.js's ClientNode emits a peer's
 // event to its observers and the ChangeNotificationService and keeps none
 // (packages/node/src/node/client/ClientEventEmitter.ts:45-74 at
-// 862ad75f), and matterjs-server keeps one global list of the last 25
+// 862ad75f). matterjs-server keeps one global list of the last 25
 // events of every node (packages/ws-controller/src/server/
 // WebSocketControllerHandler.ts:112, :368-380 at 0bd06f22).
 type eventHistory struct {

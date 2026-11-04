@@ -19,8 +19,8 @@ func recorded(numbers ...uint64) []RecordedEvent {
 
 func numbersOf(events []RecordedEvent) []uint64 {
 	out := make([]uint64, len(events))
-	for i, e := range events {
-		out[i] = e.Number
+	for i := range events {
+		out[i] = events[i].Number
 	}
 	return out
 }

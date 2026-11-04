@@ -12,8 +12,8 @@ import (
 	"github.com/SukramJ/go-fabric/bridge"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/controller/client"
 	"github.com/SukramJ/go-fabric/im"
+	"github.com/SukramJ/go-fabric/internal/valuejson"
 	"github.com/SukramJ/go-fabric/tlv"
 )
 
@@ -38,7 +38,7 @@ type AttributeValue struct {
 // without a definition renders untyped, a struct keyed by its context
 // tags.
 func (v AttributeValue) JSON() (json.RawMessage, error) {
-	return renderJSON(client.AttributeField(v.Cluster, v.Attribute), v.Value)
+	return renderJSON(valuejson.AttributeField(v.Cluster, v.Attribute), v.Value)
 }
 
 // ReadAttribute returns the value one attribute of the node serves, read
@@ -58,13 +58,13 @@ func (n *Node) ReadAttribute(ctx context.Context, endpoint uint16, cluster, attr
 	if err != nil {
 		return AttributeValue{}, err
 	}
-	for _, r := range results {
-		if r.Status != im.StatusSuccess {
-			return AttributeValue{}, statusError(r)
-		}
-		return attributeValueOf(r), nil
+	if len(results) == 0 {
+		return AttributeValue{}, contract.StatusError{Status: uint8(im.StatusUnsupportedAttribute)}
 	}
-	return AttributeValue{}, contract.StatusError{Status: uint8(im.StatusUnsupportedAttribute)}
+	if r := results[0]; r.Status != im.StatusSuccess {
+		return AttributeValue{}, statusError(r)
+	}
+	return attributeValueOf(results[0]), nil
 }
 
 // ReadCluster returns every attribute one cluster of an endpoint serves,
@@ -140,7 +140,7 @@ type Event struct {
 // JSON renders Payload by name, as [AttributeValue.JSON] renders a value,
 // with the event's type from the generated cluster definitions.
 func (e Event) JSON() (json.RawMessage, error) {
-	return renderJSON(client.EventField(e.Cluster, e.Event), e.Payload)
+	return renderJSON(valuejson.EventField(e.Cluster, e.Event), e.Payload)
 }
 
 // EventQuery selects the events [Node.Events] returns. A nil Endpoint,
@@ -192,9 +192,10 @@ func eventOf(r im.EventRecord) Event {
 }
 
 // renderJSON encodes v as the node puts it on the wire and renders the
-// element with the controller side's DecodeJSON, so the node and a
-// controller render one value alike.
-func renderJSON(f client.Field, v any) (json.RawMessage, error) {
+// element by name with the decoder controller/client.DecodeJSON uses
+// (internal/valuejson), so the node and a controller render one value
+// alike.
+func renderJSON(f *spec.Field, v any) (json.RawMessage, error) {
 	b, err := bridge.AttributeValueTLV(v)
 	if err != nil {
 		return nil, fmt.Errorf("node: encode %T: %w", v, err)
@@ -203,5 +204,5 @@ func renderJSON(f client.Field, v any) (json.RawMessage, error) {
 	if err != nil {
 		return nil, fmt.Errorf("node: decode %T: %w", v, err)
 	}
-	return client.DecodeJSON(f, el, client.NameBased)
+	return valuejson.Decode(f, el, true)
 }
