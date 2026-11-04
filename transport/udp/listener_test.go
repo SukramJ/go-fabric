@@ -15,6 +15,16 @@ import (
 	"time"
 )
 
+// poll calls cond on the wall clock until it holds or within passes; the
+// caller asserts afterwards. It is the package's one poll: the listener
+// serves a real UDP socket on loopback, whose reads no synctest bubble
+// holds.
+func poll(within time.Duration, cond func() bool) {
+	for deadline := time.Now().Add(within); !cond() && time.Now().Before(deadline); {
+		time.Sleep(time.Millisecond)
+	}
+}
+
 // newLoopbackPair returns a peer-A / peer-B pair bound on
 // 127.0.0.1:0. Tests bind ephemeral ports so they run in parallel
 // without port collisions.
@@ -222,28 +232,19 @@ func TestPanicInHandlerIsRecoveredCountedAndLogged(t *testing.T) {
 			// so the recovery can land after the second datagram was
 			// handled — poll rather than sampling once.
 			var recovered uint64
-			for range 100 {
-				recovered = a.RecoveredPanics()
-				if recovered > 0 {
-					break
-				}
-				time.Sleep(10 * time.Millisecond)
-			}
+			poll(time.Second, func() bool { recovered = a.RecoveredPanics(); return recovered > 0 })
 			if recovered != 1 {
 				t.Errorf("RecoveredPanics = %d, want 1", recovered)
 			}
 			// The counter is bumped before the log line is written, so
 			// poll for the record rather than sampling once.
 			var logged string
-			for range 100 {
+			poll(time.Second, func() bool {
 				logMu.Lock()
+				defer logMu.Unlock()
 				logged = logBuf.String()
-				logMu.Unlock()
-				if strings.Contains(logged, "matter.udp.dispatch_panic") {
-					break
-				}
-				time.Sleep(10 * time.Millisecond)
-			}
+				return strings.Contains(logged, "matter.udp.dispatch_panic")
+			})
 			if !strings.Contains(logged, "matter.udp.dispatch_panic") {
 				t.Errorf("recovered panic was not logged; log = %q", logged)
 			}

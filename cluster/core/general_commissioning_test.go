@@ -15,6 +15,7 @@ import (
 	"github.com/SukramJ/go-fabric/clock/clocktest"
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/cluster/core"
+	"github.com/SukramJ/go-fabric/cluster/spec"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
 )
@@ -228,8 +229,8 @@ func TestGencomm_WriteBreadcrumbWrongType(t *testing.T) {
 	t.Parallel()
 	gc := defaultGencomm(t)
 	err := gc.MatterWrite(context.Background(), 0x0000, "not-a-uint64")
-	if err == nil {
-		t.Fatal("expected error for wrong type, got nil")
+	if spec.StatusOf(err) != im.StatusFailure {
+		t.Fatalf("Breadcrumb of the wrong type: status %v (%v), want %v", spec.StatusOf(err), err, im.StatusFailure)
 	}
 }
 
@@ -238,8 +239,8 @@ func TestGencomm_WriteReadOnlyAttr(t *testing.T) {
 	gc := defaultGencomm(t)
 	// RegulatoryConfig (0x0002) is read-only via MatterWrite.
 	err := gc.MatterWrite(context.Background(), 0x0002, uint8(1))
-	if err == nil {
-		t.Fatal("expected error for write to read-only attr, got nil")
+	if spec.StatusOf(err) != im.StatusUnsupportedWrite {
+		t.Fatalf("write to read-only RegulatoryConfig: status %v (%v), want %v", spec.StatusOf(err), err, im.StatusUnsupportedWrite)
 	}
 }
 
@@ -903,8 +904,8 @@ func TestGencomm_Invoke_UnknownCmd(t *testing.T) {
 	t.Parallel()
 	gc := defaultGencomm(t)
 	_, err := gc.MatterInvoke(context.Background(), 0xFF, nil)
-	if err == nil {
-		t.Fatal("expected error for unknown command, got nil")
+	if spec.StatusOf(err) != im.StatusUnsupportedCommand {
+		t.Fatalf("unknown command: status %v (%v), want %v", spec.StatusOf(err), err, im.StatusUnsupportedCommand)
 	}
 }
 
@@ -1048,27 +1049,31 @@ func TestGenComm_ArmFailSafeForArmsThenExpires(t *testing.T) {
 // ArmFailSafeFor(0) → hook → RevokeWindow loop.
 func TestGencomm_ArmFailSafeFor_ZeroSecondsDisarmsWithoutFiringHook(t *testing.T) {
 	t.Parallel()
-	var fired atomic.Int32
-	gc := newGencomm(t, core.GeneralCommissioningConfig{
-		LocationCapability: core.RegulatoryIndoor,
-		FailSafeMaxSeconds: 600,
-		OnFailSafeExpired: func(_ context.Context, _ uint8) {
-			fired.Add(1)
-		},
+	synctest.Test(t, func(t *testing.T) {
+		var fired atomic.Int32
+		gc := newGencomm(t, core.GeneralCommissioningConfig{
+			LocationCapability: core.RegulatoryIndoor,
+			FailSafeMaxSeconds: 600,
+			OnFailSafeExpired: func(_ context.Context, _ uint8) {
+				fired.Add(1)
+			},
+		})
+
+		if err := gc.ArmFailSafeFor(context.Background(), 0, 0); err != nil {
+			t.Fatalf("ArmFailSafeFor(0): %v", err)
+		}
+		// Give any (erroneously-spawned) watcher goroutine time to fire: 50 ms
+		// of the bubble's virtual clock, then every goroutine settled.
+		time.Sleep(50 * time.Millisecond)
+		synctest.Wait()
+
+		if n := fired.Load(); n != 0 {
+			t.Fatalf("ArmFailSafeFor(0) fired OnFailSafeExpired %d time(s); a disarm must not fire it", n)
+		}
+		if gc.FailSafeArmed() {
+			t.Fatal("FailSafeArmed = true after ArmFailSafeFor(0), want false")
+		}
 	})
-
-	if err := gc.ArmFailSafeFor(context.Background(), 0, 0); err != nil {
-		t.Fatalf("ArmFailSafeFor(0): %v", err)
-	}
-	// Give any (erroneously-spawned) watcher goroutine time to fire.
-	time.Sleep(50 * time.Millisecond)
-
-	if n := fired.Load(); n != 0 {
-		t.Fatalf("ArmFailSafeFor(0) fired OnFailSafeExpired %d time(s); a disarm must not fire it", n)
-	}
-	if gc.FailSafeArmed() {
-		t.Fatal("FailSafeArmed = true after ArmFailSafeFor(0), want false")
-	}
 }
 
 // TestGencomm_ArmFailSafeFor_ZeroSecondsDoesNotSelfLoop reproduces the live
@@ -1081,28 +1086,31 @@ func TestGencomm_ArmFailSafeFor_ZeroSecondsDisarmsWithoutFiringHook(t *testing.T
 // stays at zero.
 func TestGencomm_ArmFailSafeFor_ZeroSecondsDoesNotSelfLoop(t *testing.T) {
 	t.Parallel()
-	var reentries atomic.Int32
-	gc := newGencomm(t, core.GeneralCommissioningConfig{
-		LocationCapability: core.RegulatoryIndoor,
-		FailSafeMaxSeconds: 600,
-	})
-	gc.SetOnFailSafeExpired(func(ctx context.Context, _ uint8) {
-		// Mirror bridge.RevokeWindow, which disarms via ArmFailSafeFor(0)
-		// from inside this very hook. Cap the re-entry so a regression fails
-		// the assertion rather than spinning forever.
-		if reentries.Add(1) < 8 {
-			_ = gc.ArmFailSafeFor(ctx, 0, 0)
+	synctest.Test(t, func(t *testing.T) {
+		var reentries atomic.Int32
+		gc := newGencomm(t, core.GeneralCommissioningConfig{
+			LocationCapability: core.RegulatoryIndoor,
+			FailSafeMaxSeconds: 600,
+		})
+		gc.SetOnFailSafeExpired(func(ctx context.Context, _ uint8) {
+			// Mirror bridge.RevokeWindow, which disarms via ArmFailSafeFor(0)
+			// from inside this very hook. Cap the re-entry so a regression fails
+			// the assertion rather than spinning forever.
+			if reentries.Add(1) < 8 {
+				_ = gc.ArmFailSafeFor(ctx, 0, 0)
+			}
+		})
+
+		if err := gc.ArmFailSafeFor(context.Background(), 0, 0); err != nil {
+			t.Fatalf("ArmFailSafeFor(0): %v", err)
+		}
+		time.Sleep(80 * time.Millisecond) // the bubble's virtual clock
+		synctest.Wait()
+
+		if n := reentries.Load(); n != 0 {
+			t.Fatalf("ArmFailSafeFor(0) disarm re-entered the expiry hook %d time(s); RevokeWindow→ArmFailSafeFor(0) must not loop", n)
 		}
 	})
-
-	if err := gc.ArmFailSafeFor(context.Background(), 0, 0); err != nil {
-		t.Fatalf("ArmFailSafeFor(0): %v", err)
-	}
-	time.Sleep(80 * time.Millisecond)
-
-	if n := reentries.Load(); n != 0 {
-		t.Fatalf("ArmFailSafeFor(0) disarm re-entered the expiry hook %d time(s); RevokeWindow→ArmFailSafeFor(0) must not loop", n)
-	}
 }
 
 // TestArmFailSafe_ReArmExtendsWithoutResettingState pins matter.js

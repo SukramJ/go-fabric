@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/SukramJ/go-fabric/cluster/spec"
 	"github.com/SukramJ/go-fabric/cluster/thermo"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
@@ -255,8 +256,8 @@ func TestParityMatterJS_Thermostat_IgnoredWrites(t *testing.T) {
 	}
 	heatOnly := thermo.DefaultThermostatConfig()
 	heatOnly.Features = thermo.ThermostatFeatureHEAT
-	if err := thermo.NewThermostatServer(heatOnly).MatterWrite(ctx, deadband, int16(5)); err == nil {
-		t.Error("MinSetpointDeadBand written without AUTO")
+	if err := thermo.NewThermostatServer(heatOnly).MatterWrite(ctx, deadband, int16(5)); spec.StatusOf(err) != im.StatusUnsupportedAttribute {
+		t.Errorf("MinSetpointDeadBand written without AUTO: status %v (%v), want %v", spec.StatusOf(err), err, im.StatusUnsupportedAttribute)
 	}
 	if err := s.MatterWrite(ctx, csoo, "x"); err == nil {
 		t.Error("a non-numeric ControlSequenceOfOperation was accepted")

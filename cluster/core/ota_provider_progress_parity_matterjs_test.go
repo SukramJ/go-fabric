@@ -6,6 +6,7 @@ package core
 import (
 	"context"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/SukramJ/go-fabric/bdx"
@@ -21,78 +22,77 @@ import (
 // and its blocks refresh it too. A test of the provider alone; no seam.
 func TestParityMatterJS_OTAProviderTransferKeepsEntryAlive(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
-	f := newOTAFixture(t, nil)
-	r := f.query(t, 7, bdxQuery())
-	key := otaKey(otaTestPeer, *r.UpdateToken)
-	entry := func() otaInProgress {
-		f.p.mu.Lock()
-		defer f.p.mu.Unlock()
-		d := f.p.inProgress[key]
-		if d == nil {
-			t.Fatal("no in-progress entry")
+	synctest.Test(t, func(t *testing.T) {
+		ctx := context.Background()
+		f := newOTAFixture(t, nil)
+		r := f.query(t, 7, bdxQuery())
+		key := otaKey(otaTestPeer, *r.UpdateToken)
+		entry := func() otaInProgress {
+			f.p.mu.Lock()
+			defer f.p.mu.Unlock()
+			d := f.p.inProgress[key]
+			if d == nil {
+				t.Fatal("no in-progress entry")
+			}
+			return *d
 		}
-		return *d
-	}
-	age := func() time.Time {
-		f.p.mu.Lock()
-		defer f.p.mu.Unlock()
-		aged := f.clock.Now().Add(-20 * time.Minute)
-		f.p.inProgress[key].timestamp = aged
-		return aged
-	}
-	// refreshed waits for the entry's timestamp to move past aged; the
-	// progress listener runs on the session's goroutine.
-	refreshed := func(what string, aged time.Time) {
-		t.Helper()
-		deadline := time.Now().Add(5 * time.Second)
-		for !entry().timestamp.After(aged) {
-			if time.Now().After(deadline) {
+		age := func() time.Time {
+			f.p.mu.Lock()
+			defer f.p.mu.Unlock()
+			aged := f.clock.Now().Add(-20 * time.Minute)
+			f.p.inProgress[key].timestamp = aged
+			return aged
+		}
+		// refreshed waits for the entry's timestamp to move past aged; the
+		// progress listener runs on the session's goroutine.
+		refreshed := func(what string, aged time.Time) {
+			t.Helper()
+			synctest.Wait() // the session's goroutine has run the progress listener
+			if !entry().timestamp.After(aged) {
 				t.Fatalf("%s: the entry kept its aged timestamp", what)
 			}
-			time.Sleep(time.Millisecond)
 		}
-	}
-	block := func(m *bdx.Messenger, counter uint32) bdx.MessageType {
-		t.Helper()
-		if err := m.SendBlockQuery(ctx, counter); err != nil {
+		block := func(m *bdx.Messenger, counter uint32) bdx.MessageType {
+			t.Helper()
+			if err := m.SendBlockQuery(ctx, counter); err != nil {
+				t.Fatal(err)
+			}
+			typ, _, err := m.ReadBlock(ctx)
+			if err != nil {
+				t.Fatal(err)
+			}
+			return typ
+		}
+
+		m, done := f.startDownload(t, 7, *r.ImageUri)
+		aged := age()
+		block(m, 0)
+		refreshed("the first transfer", aged)
+		counter := uint32(1)
+		for block(m, counter) != bdx.MessageBlockEOF {
+			counter++
+		}
+		if err := m.SendBlockAckEOF(ctx, counter); err != nil {
 			t.Fatal(err)
 		}
-		typ, _, err := m.ReadBlock(ctx)
-		if err != nil {
-			t.Fatal(err)
+		select {
+		case <-done:
+		case <-time.After(5 * time.Second):
+			t.Fatal("the first transfer did not end")
 		}
-		return typ
-	}
+		if s := entry().lastState; s != OTAUpdateWaitForApply {
+			t.Fatalf("state %v after the transfer, want WaitForApply", s)
+		}
 
-	m, done := f.startDownload(t, 7, *r.ImageUri)
-	aged := age()
-	block(m, 0)
-	refreshed("the first transfer", aged)
-	counter := uint32(1)
-	for block(m, counter) != bdx.MessageBlockEOF {
-		counter++
-	}
-	if err := m.SendBlockAckEOF(ctx, counter); err != nil {
-		t.Fatal(err)
-	}
-	select {
-	case <-done:
-	case <-time.After(5 * time.Second):
-		t.Fatal("the first transfer did not end")
-	}
-	if s := entry().lastState; s != OTAUpdateWaitForApply {
-		t.Fatalf("state %v after the transfer, want WaitForApply", s)
-	}
-
-	// The retry on a fresh session of the same query cycle.
-	retry, retryDone := f.startDownload(t, 7, *r.ImageUri)
-	if s := entry().lastState; s != OTAUpdateDownloading {
-		t.Fatalf("state %v of the retry, want Downloading", s)
-	}
-	aged = age()
-	block(retry, 0)
-	refreshed("the retry", aged)
-	_ = f.bdx.DisablePeerForScope(bdx.Peer{FabricIndex: otaTestFabric, NodeID: otaTestPeerNode}, "ota", true)
-	<-retryDone
+		// The retry on a fresh session of the same query cycle.
+		retry, retryDone := f.startDownload(t, 7, *r.ImageUri)
+		if s := entry().lastState; s != OTAUpdateDownloading {
+			t.Fatalf("state %v of the retry, want Downloading", s)
+		}
+		aged = age()
+		block(retry, 0)
+		refreshed("the retry", aged)
+		_ = f.bdx.DisablePeerForScope(bdx.Peer{FabricIndex: otaTestFabric, NodeID: otaTestPeerNode}, "ota", true)
+		<-retryDone
+	})
 }

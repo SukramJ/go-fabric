@@ -136,8 +136,10 @@ func TestProvisionEndpointConstraintErrors(t *testing.T) {
 	_, err := m.MatterInvoke(peer(testFabric), tcldef.CmdProvisionEndpoint, req)
 	wantStatus(t, "short hostname", err, im.StatusConstraintError)
 	req = provisionRequest(256)
-	if _, err = m.MatterInvoke(peer(testFabric), tcldef.CmdProvisionEndpoint, req); err == nil {
-		t.Fatal("CAID 256 provisioned")
+	_, err = m.MatterInvoke(peer(testFabric), tcldef.CmdProvisionEndpoint, req)
+	wantStatus(t, "CAID 256", err, im.StatusFailure)
+	if code, ok := clusterCode(err); !ok || code != uint8(tcldef.StatusCodeRootCertificateNotFound) {
+		t.Errorf("CAID 256: cluster status %d (%v), want RootCertificateNotFound", code, err)
 	}
 }
 

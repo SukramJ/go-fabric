@@ -9,7 +9,6 @@ import (
 	"path/filepath"
 	"slices"
 	"testing"
-	"time"
 
 	"github.com/SukramJ/go-fabric/client/discovery"
 	"github.com/SukramJ/go-fabric/device"
@@ -34,13 +33,7 @@ func silentNames(t *testing.T) *discovery.Names {
 
 func waitAttached(t *testing.T, n *node.Node, want []uint16) {
 	t.Helper()
-	deadline := time.Now().Add(10 * time.Second)
-	for !slices.Equal(n.Bindings().Attached(), want) {
-		if time.Now().After(deadline) {
-			t.Fatalf("attached %v, want %v", n.Bindings().Attached(), want)
-		}
-		time.Sleep(10 * time.Millisecond)
-	}
+	waitLive(t, "the attached bindings", func() bool { return slices.Equal(n.Bindings().Attached(), want) })
 }
 
 // TestNodeBindingsFollowTheTopology: the node's binding manager listens to

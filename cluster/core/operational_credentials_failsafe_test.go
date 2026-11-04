@@ -10,6 +10,8 @@ import (
 	"time"
 
 	"github.com/SukramJ/go-fabric/cluster/core"
+	"github.com/SukramJ/go-fabric/cluster/spec"
+	"github.com/SukramJ/go-fabric/im"
 )
 
 // TestOpcreds_OnFailSafeExpiry_ClearsPendingTrustRoot verifies that
@@ -99,8 +101,8 @@ func TestOpcreds_OnFailSafeExpiry_ClearsAllPendingFields(t *testing.T) {
 	// hit the duplicate-root guard (pendingTrustRoot != nil).
 	_, err = oc.MatterInvoke(ctx, 0x0B,
 		core.AddTrustedRootCertificateRequest{RootCACertificate: rootRaw})
-	if err == nil {
-		t.Fatal("expected constraint error on duplicate AddTrustedRootCertificate, got nil")
+	if spec.StatusOf(err) != im.StatusConstraintError {
+		t.Fatalf("duplicate AddTrustedRootCertificate: status %v (%v), want %v", spec.StatusOf(err), err, im.StatusConstraintError)
 	}
 
 	// Fire the expiry.

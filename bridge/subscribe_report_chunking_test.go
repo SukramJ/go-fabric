@@ -16,6 +16,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"sync"
 	"testing"
 	"time"
 
@@ -151,8 +152,24 @@ func chunkTestPeer(t *testing.T, b *Bridge, sessionID uint16) (*net.UDPConn, *ch
 	if !ok {
 		t.Fatalf("unexpected peer addr type %T", peerConn.LocalAddr())
 	}
+	bridgeAddr, err := net.ResolveUDPAddr("udp", b.LocalAddr())
+	if err != nil {
+		t.Fatalf("the bridge's address %q: %v", b.LocalAddr(), err)
+	}
+	chunkPeerBridgePort.Store(peerConn, bridgeAddr.Port)
+	t.Cleanup(func() { chunkPeerBridgePort.Delete(peerConn) })
 	return peerConn, peerSess, peerAddr
 }
+
+// chunkPeerBridgePort maps a chunkTestPeer socket to the port of the
+// bridge it was wired to. drainReportDataChunks reads only that bridge's
+// datagrams: the peer socket is an ephemeral loopback port, and a
+// parallel test's bridge still retransmitting to a closed socket whose
+// port the OS handed to this one delivers a datagram under another
+// session's keys (the hypothesis for nightly run 41816797999's
+// "aesccm: authentication failed", macos-latest; the datagram's source
+// was not recorded then, so it is unverified).
+var chunkPeerBridgePort sync.Map // *net.UDPConn -> int
 
 // drainReportDataChunks reads every datagram the bridge sent until the
 // socket goes quiet, decrypts each one and returns the per-chunk
@@ -193,9 +210,13 @@ func drainReportDataChunks(t *testing.T, peerConn *net.UDPConn, peerSess *channe
 		if err := peerConn.SetReadDeadline(time.Now().Add(wait)); err != nil {
 			t.Fatalf("SetReadDeadline: %v", err)
 		}
-		n, _, err := peerConn.ReadFromUDP(buf)
+		n, from, err := peerConn.ReadFromUDP(buf)
 		if err != nil {
 			return reportCounts, moreFlags
+		}
+		if port, ok := chunkPeerBridgePort.Load(peerConn); ok && from.Port != port.(int) {
+			t.Logf("a datagram from %v, not from the bridge (port %d): another test's traffic, ignored", from, port)
+			continue
 		}
 		hdr, hdrLen, err := message.UnmarshalHeader(buf[:n])
 		if err != nil {
@@ -203,7 +224,7 @@ func drainReportDataChunks(t *testing.T, peerConn *net.UDPConn, peerSess *channe
 		}
 		plain, _, err := peerSess.Decrypt(&hdr, securityFlagsByte(&hdr), buf[hdrLen:n])
 		if err != nil {
-			t.Fatalf("peer.Decrypt: %v", err)
+			t.Fatalf("peer.Decrypt of the bridge's datagram from %v: %v", from, err)
 		}
 		proto, protoLen, err := message.UnmarshalProtocolHeader(plain)
 		if err != nil {

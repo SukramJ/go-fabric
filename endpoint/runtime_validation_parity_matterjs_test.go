@@ -45,7 +45,7 @@ const (
 	skipCrash    = "a crashed endpoint has no Go subject: the assembler builds an endpoint whole or leaves it out of the snapshot"
 	skipThrows   = "a throwing judgement has no Go subject: the Go pass cannot fail on a tree, so there is nothing to log in place of a failure"
 	skipPeer     = "a peer's endpoints have no Go subject: the controller side runs no device-type validation"
-	skipNode     = "needs a whole node: ported as node:TestDeviceTypeValidationNodeParityMatterJS"
+	skipNode     = "needs a whole node, which this package cannot build (node imports endpoint): ported where one exists, as node:TestDeviceTypeValidationNodeParityMatterJS"
 
 	missingTagList   = "missing Descriptor.TAGLIST"
 	unguardedWidget  = "missing device:RootNode/Widget"

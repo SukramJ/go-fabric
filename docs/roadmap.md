@@ -367,6 +367,8 @@ SC BLE cases run.
 
 **Value.** The status page stops calling automatable cases manual; the in-process proofs get their real-controller counterpart; the port backlog halves. Every later milestone is proved on this.
 
+**Status 2026-11-04.** Phase 35, wave A (issue 395): `TestSleepRatchet` (`clock/sleep_ratchet_test.go`) holds the wall-clock waits in test files outside `synctest` at 66 `time.Sleep` and 130 `time.After` calls (165 and 166 at the phase's start), the rest being socket-bound polls, one helper per package, the chip-tool suite and a few named windows; the issue #383 steps end on their events; `STRESS_FLAKES` is the list of open flakes and empty; the three failures of nightly run 41816797999 are fixed in their tests; every mdns and endpoint skip names its condition. Wave B (the status assertions) follows.
+
 ### Milestone 9: View
 
 Planned in go-fabric-ui (concept U3 there, like U1 and U2); this page records the module side and the contract.

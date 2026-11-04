@@ -8,6 +8,7 @@ import (
 	"errors"
 	"net"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/SukramJ/go-fabric/im"
@@ -130,65 +131,68 @@ func TestOutboundReliable_TickGivesUp(t *testing.T) {
 // must stop retransmitting the now-superseded Sigma2 datagrams.
 func TestOutboundReliable_AbandonExchange(t *testing.T) {
 	t.Parallel()
-	tr := newOutboundReliableTracker(nil, nil)
-	dest := &net.UDPAddr{IP: net.IPv4(127, 0, 0, 3), Port: 5353}
-	const targetExchange = uint16(0xABCD)
-	const otherExchange = uint16(0x1234)
+	synctest.Test(t, func(t *testing.T) {
+		tr := newOutboundReliableTracker(nil, nil)
+		dest := &net.UDPAddr{IP: net.IPv4(127, 0, 0, 3), Port: 5353}
+		const targetExchange = uint16(0xABCD)
+		const otherExchange = uint16(0x1234)
 
-	// Three entries on the target exchange, two on a different one.
-	tr.Track(1, 0, targetExchange, []byte{0x01}, dest, time.Now())
-	tr.Track(2, 0, targetExchange, []byte{0x02}, dest, time.Now())
-	tr.Track(3, 0, otherExchange, []byte{0x03}, dest, time.Now())
-	tr.Track(4, 0, targetExchange, []byte{0x04}, dest, time.Now())
-	tr.Track(5, 0, otherExchange, []byte{0x05}, dest, time.Now())
+		// Three entries on the target exchange, two on a different one.
+		tr.Track(1, 0, targetExchange, []byte{0x01}, dest, time.Now())
+		tr.Track(2, 0, targetExchange, []byte{0x02}, dest, time.Now())
+		tr.Track(3, 0, otherExchange, []byte{0x03}, dest, time.Now())
+		tr.Track(4, 0, targetExchange, []byte{0x04}, dest, time.Now())
+		tr.Track(5, 0, otherExchange, []byte{0x05}, dest, time.Now())
 
-	if tr.Pending() != 5 {
-		t.Fatalf("Pending before abandon: got %d, want 5", tr.Pending())
-	}
-
-	// Block a waiter on counter=2 (target exchange) to verify it gets
-	// unblocked when AbandonExchange runs.
-	waitErrCh := make(chan error, 1)
-	go func() {
-		waitErrCh <- tr.WaitForAck(t.Context(), 0, 2)
-	}()
-	// Ensure the goroutine has installed its waiter channel.
-	time.Sleep(10 * time.Millisecond)
-
-	cleared := tr.AbandonExchange(targetExchange)
-	if cleared != 3 {
-		t.Errorf("AbandonExchange: cleared %d, want 3", cleared)
-	}
-	if tr.Pending() != 2 {
-		t.Errorf("Pending after abandon: got %d, want 2", tr.Pending())
-	}
-	// Confirm survivors are the otherExchange counters.
-	if !tr.Ack(0, 3) {
-		t.Error("Ack(3) after abandon: returned false, want survivor on otherExchange")
-	}
-	if !tr.Ack(0, 5) {
-		t.Error("Ack(5) after abandon: returned false, want survivor on otherExchange")
-	}
-	if tr.Pending() != 0 {
-		t.Errorf("Pending after acking survivors: got %d, want 0", tr.Pending())
-	}
-
-	// The blocked waiter must have been released. ErrAckWaitTimeout is
-	// the abandon marker; a nil-return is also acceptable (channel
-	// close on best-effort path) since both signal "stop waiting".
-	select {
-	case err := <-waitErrCh:
-		if err != nil && !errors.Is(err, ErrAckWaitTimeout) {
-			t.Errorf("waiter resolved with unexpected err: %v", err)
+		if tr.Pending() != 5 {
+			t.Fatalf("Pending before abandon: got %d, want 5", tr.Pending())
 		}
-	case <-time.After(time.Second):
-		t.Fatal("AbandonExchange did not release the WaitForAck waiter within 1s")
-	}
 
-	// Abandoning an unknown exchange is a no-op.
-	if got := tr.AbandonExchange(0xBEEF); got != 0 {
-		t.Errorf("AbandonExchange on unknown exchange: cleared %d, want 0", got)
-	}
+		// Block a waiter on counter=2 (target exchange) to verify it gets
+		// unblocked when AbandonExchange runs.
+		waitErrCh := make(chan error, 1)
+		go func() {
+			waitErrCh <- tr.WaitForAck(t.Context(), 0, 2)
+		}()
+		// The goroutine has installed its waiter channel once the bubble
+		// settles.
+		synctest.Wait()
+
+		cleared := tr.AbandonExchange(targetExchange)
+		if cleared != 3 {
+			t.Errorf("AbandonExchange: cleared %d, want 3", cleared)
+		}
+		if tr.Pending() != 2 {
+			t.Errorf("Pending after abandon: got %d, want 2", tr.Pending())
+		}
+		// Confirm survivors are the otherExchange counters.
+		if !tr.Ack(0, 3) {
+			t.Error("Ack(3) after abandon: returned false, want survivor on otherExchange")
+		}
+		if !tr.Ack(0, 5) {
+			t.Error("Ack(5) after abandon: returned false, want survivor on otherExchange")
+		}
+		if tr.Pending() != 0 {
+			t.Errorf("Pending after acking survivors: got %d, want 0", tr.Pending())
+		}
+
+		// The blocked waiter must have been released. ErrAckWaitTimeout is
+		// the abandon marker; a nil-return is also acceptable (channel
+		// close on best-effort path) since both signal "stop waiting".
+		select {
+		case err := <-waitErrCh:
+			if err != nil && !errors.Is(err, ErrAckWaitTimeout) {
+				t.Errorf("waiter resolved with unexpected err: %v", err)
+			}
+		case <-time.After(time.Second):
+			t.Fatal("AbandonExchange did not release the WaitForAck waiter within 1s")
+		}
+
+		// Abandoning an unknown exchange is a no-op.
+		if got := tr.AbandonExchange(0xBEEF); got != 0 {
+			t.Errorf("AbandonExchange on unknown exchange: cleared %d, want 0", got)
+		}
+	})
 }
 
 // TestOutboundReliable_PerSessionBaseInterval verifies that Track /
@@ -493,29 +497,32 @@ func TestWaitForAck_ContextCancelled(t *testing.T) {
 // blocked on the wait.
 func TestWaitForAck_AckClosesChannel(t *testing.T) {
 	t.Parallel()
-	tr := newOutboundReliableTracker(nil, nil)
-	dest := &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 5678}
-	const counter = uint32(88)
-	tr.Track(counter, 0, 0, []byte{0xAA}, dest, time.Now())
+	synctest.Test(t, func(t *testing.T) {
+		tr := newOutboundReliableTracker(nil, nil)
+		dest := &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 5678}
+		const counter = uint32(88)
+		tr.Track(counter, 0, 0, []byte{0xAA}, dest, time.Now())
 
-	errCh := make(chan error, 1)
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-	defer cancel()
-	go func() {
-		errCh <- tr.WaitForAck(ctx, 0, counter)
-	}()
-	// Give the goroutine time to install its waiter then Ack.
-	time.Sleep(5 * time.Millisecond)
-	tr.Ack(0, counter)
+		errCh := make(chan error, 1)
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+		go func() {
+			errCh <- tr.WaitForAck(ctx, 0, counter)
+		}()
+		// The goroutine has installed its waiter once the bubble settles;
+		// then Ack.
+		synctest.Wait()
+		tr.Ack(0, counter)
 
-	select {
-	case err := <-errCh:
-		if err != nil {
-			t.Errorf("WaitForAck after Ack: want nil, got %v", err)
+		select {
+		case err := <-errCh:
+			if err != nil {
+				t.Errorf("WaitForAck after Ack: want nil, got %v", err)
+			}
+		case <-time.After(time.Second):
+			t.Fatal("WaitForAck did not return after Ack")
 		}
-	case <-time.After(time.Second):
-		t.Fatal("WaitForAck did not return after Ack")
-	}
+	})
 }
 
 // TestArmStatusResponseWait_OrphanPreviousWaiter verifies that arming a

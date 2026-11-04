@@ -478,10 +478,7 @@ func TestTriggerSessionReannounce_RepublishesActiveRecords(t *testing.T) {
 	before := adv.publishes()
 
 	b.triggerSessionReannounce(1)
-	deadline := time.Now().Add(time.Second)
-	for adv.publishes() == before && time.Now().Before(deadline) {
-		time.Sleep(5 * time.Millisecond)
-	}
+	waitFor(t, "the re-publish of the active records", func() bool { return adv.publishes() > before })
 	if adv.publishes() <= before {
 		t.Fatalf("Publish count = %d after trigger, want > %d (re-publish of active records)", adv.publishes(), before)
 	}

@@ -13,6 +13,7 @@ import (
 
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/cluster/core"
+	"github.com/SukramJ/go-fabric/cluster/spec"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
 )
@@ -173,8 +174,8 @@ func TestBridgedBasicInfo_WriteNodeLabelWrongType(t *testing.T) {
 	t.Parallel()
 	b := newValidBridged(t)
 	err := b.MatterWrite(context.Background(), 0x0005, 42)
-	if err == nil {
-		t.Fatal("expected error for wrong type, got nil")
+	if spec.StatusOf(err) != im.StatusFailure {
+		t.Fatalf("NodeLabel of the wrong type: status %v (%v), want %v", spec.StatusOf(err), err, im.StatusFailure)
 	}
 }
 
@@ -182,10 +183,13 @@ func TestBridgedBasicInfo_WriteReadOnlyAttrReturnsError(t *testing.T) {
 	t.Parallel()
 	b := newValidBridged(t)
 	ctx := context.Background()
-	for _, attrID := range []uint32{0x0001, 0x0002, 0x0011, 0x0012} {
+	for attrID, want := range map[uint32]im.StatusCode{
+		0x0001: im.StatusUnsupportedAttribute, 0x0002: im.StatusUnsupportedAttribute,
+		0x0011: im.StatusUnsupportedWrite, 0x0012: im.StatusUnsupportedWrite,
+	} {
 		err := b.MatterWrite(ctx, attrID, "x")
-		if err == nil {
-			t.Errorf("MatterWrite(0x%04X) expected error, got nil", attrID)
+		if spec.StatusOf(err) != want {
+			t.Errorf("MatterWrite(0x%04X): status %v (%v), want %v", attrID, spec.StatusOf(err), err, want)
 		}
 		// errBridgedBasicInfoUnknown is unexported; verify a wrapped error is present.
 		if unwrapped := errors.Unwrap(err); unwrapped == nil {
@@ -383,8 +387,8 @@ func TestBridgedBasicInfo_InvokeReturnsError(t *testing.T) {
 	ctx := context.Background()
 	for _, cmdID := range []uint32{0x00, 0xFF} {
 		_, err := b.MatterInvoke(ctx, cmdID, nil)
-		if err == nil {
-			t.Errorf("MatterInvoke(0x%02X) expected error, got nil", cmdID)
+		if spec.StatusOf(err) != im.StatusUnsupportedCommand {
+			t.Errorf("MatterInvoke(0x%02X): status %v (%v), want %v", cmdID, spec.StatusOf(err), err, im.StatusUnsupportedCommand)
 		}
 	}
 }

@@ -90,7 +90,7 @@ func TestFullTableIsExhausted(t *testing.T) {
 	if raceEnabled {
 		// One goroutine, nothing for the detector to find; 65533 rows
 		// through the transpiled SQLite under -race take over a minute.
-		t.Skip("skipped under -race; runs in make test")
+		t.Skip("the race detector instruments the transpiled SQLite: 65533 inserts take over a minute under -race, and the single-goroutine test gives it nothing to find; it runs in make test")
 	}
 	db := openAt(t, filepath.Join(t.TempDir(), "endpoints.db"))
 	s := sqlitestore.New(db)

@@ -6,6 +6,7 @@ package peer
 import (
 	"context"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/SukramJ/go-fabric/client/handshake"
@@ -94,36 +95,38 @@ func failProbes(t *testing.T, h *harness, ch <-chan verifyResult) (r verifyResul
 // that answers advances the backoff (:213-216).
 func TestMonitorStillDiscoveredAndCooldown(t *testing.T) {
 	t.Parallel()
-	h, p, n := monitored(t)
-	if r := waitVerify(t, verifyAsync(context.Background(), p, ReasonAddressChange)); !r.ok {
-		t.Fatal("nothing discovered: want true without a probe")
-	}
-	h.announceAddrs(t, "fd00::1", "fd00::2")
-	eventually(t, "the addresses", func() bool { return len(p.Service().Addresses()) == 2 })
-	h.udp.drain()
-	if r := waitVerify(t, verifyAsync(context.Background(), p, ReasonAddressChange)); !r.ok {
-		t.Fatal("still discovered: want true")
-	}
-	h.expire(t, "fd00::1")
-	eventually(t, "the expiry", func() bool { return len(p.Service().Addresses()) == 1 })
-	if r := waitVerify(t, verifyAsync(context.Background(), p, ReasonAddressChange)); !r.ok {
-		t.Fatal("within the cooldown of the session's creation: want true")
-	}
-	h.udp.none(t)
-	h.clock.Advance(10 * time.Minute)
-	res := verifyAsync(context.Background(), p, ReasonAddressChange)
-	n.answer(t, h.udp.next(t))
-	if r := waitVerify(t, res); !r.ok {
-		t.Fatal("an answered probe: want true")
-	}
-	m := p.addressMonitor()
-	m.mu.Lock()
-	cur := m.fibCurr
-	m.mu.Unlock()
-	if cur != 10*time.Minute {
-		t.Fatalf("cooldown after the first probe = %v", cur)
-	}
-	m.stop()
+	synctest.Test(t, func(t *testing.T) {
+		h, p, n := monitored(t)
+		if r := waitVerify(t, verifyAsync(context.Background(), p, ReasonAddressChange)); !r.ok {
+			t.Fatal("nothing discovered: want true without a probe")
+		}
+		h.announceAddrs(t, "fd00::1", "fd00::2")
+		eventually(t, "the addresses", func() bool { return len(p.Service().Addresses()) == 2 })
+		h.udp.drain()
+		if r := waitVerify(t, verifyAsync(context.Background(), p, ReasonAddressChange)); !r.ok {
+			t.Fatal("still discovered: want true")
+		}
+		h.expire(t, "fd00::1")
+		eventually(t, "the expiry", func() bool { return len(p.Service().Addresses()) == 1 })
+		if r := waitVerify(t, verifyAsync(context.Background(), p, ReasonAddressChange)); !r.ok {
+			t.Fatal("within the cooldown of the session's creation: want true")
+		}
+		h.udp.none(t)
+		h.clock.Advance(10 * time.Minute)
+		res := verifyAsync(context.Background(), p, ReasonAddressChange)
+		n.answer(t, h.udp.next(t))
+		if r := waitVerify(t, res); !r.ok {
+			t.Fatal("an answered probe: want true")
+		}
+		m := p.addressMonitor()
+		m.mu.Lock()
+		cur := m.fibCurr
+		m.mu.Unlock()
+		if cur != 10*time.Minute {
+			t.Fatalf("cooldown after the first probe = %v", cur)
+		}
+		m.stop()
+	})
 }
 
 // TestMonitorMigratesToAnAlternate: the current address fails, a
@@ -132,59 +135,63 @@ func TestMonitorStillDiscoveredAndCooldown(t *testing.T) {
 // the peer's subscriptions (PeerAddressMonitor.ts:219-252).
 func TestMonitorMigratesToAnAlternate(t *testing.T) {
 	t.Parallel()
-	migrated := make(chan handshake.PeerAddress, 1)
-	h, p, n := monitoredWith(t, func(c *Context) { c.SessionMigrated = func(a handshake.PeerAddress) { migrated <- a } })
-	h.clock.Advance(time.Hour)
-	h.announceAddrs(t, "fd00::2")
-	eventually(t, "the address", func() bool { return len(p.Service().Addresses()) == 1 })
-	h.udp.drain()
-	res := verifyAsync(context.Background(), p, ReasonAddressChange)
-	for answered := false; !answered; {
-		select {
-		case d := <-h.udp.ch:
-			if d.to.String() == addr2 {
-				n.answer(t, d)
-				answered = true
+	synctest.Test(t, func(t *testing.T) {
+		migrated := make(chan handshake.PeerAddress, 1)
+		h, p, n := monitoredWith(t, func(c *Context) { c.SessionMigrated = func(a handshake.PeerAddress) { migrated <- a } })
+		h.clock.Advance(time.Hour)
+		h.announceAddrs(t, "fd00::2")
+		eventually(t, "the address", func() bool { return len(p.Service().Addresses()) == 1 })
+		h.udp.drain()
+		res := verifyAsync(context.Background(), p, ReasonAddressChange)
+		for answered := false; !answered; {
+			select {
+			case d := <-h.udp.ch:
+				if d.to.String() == addr2 {
+					n.answer(t, d)
+					answered = true
+				}
+			case <-time.After(5 * time.Millisecond):
+				h.clock.Advance(time.Second)
 			}
-		case <-time.After(5 * time.Millisecond):
-			h.clock.Advance(time.Second)
 		}
-	}
-	if r := waitVerify(t, res); !r.ok {
-		t.Fatal("migration: want true")
-	}
-	if n.s.Addr().String() != addr2 {
-		t.Fatalf("session at %v", n.s.Addr())
-	}
-	eventually(t, "the operational address", func() bool { return p.Descriptor().OperationalAddress.String() == addr2 })
-	if a := <-migrated; a != p.Address() {
-		t.Fatalf("SessionMigrated(%+v)", a)
-	}
+		if r := waitVerify(t, res); !r.ok {
+			t.Fatal("migration: want true")
+		}
+		if n.s.Addr().String() != addr2 {
+			t.Fatalf("session at %v", n.s.Addr())
+		}
+		eventually(t, "the operational address", func() bool { return p.Descriptor().OperationalAddress.String() == addr2 })
+		if a := <-migrated; a != p.Address() {
+			t.Fatalf("SessionMigrated(%+v)", a)
+		}
+	})
 }
 
 // TestMonitorAllProbesFail: no address answers: the session is lost with
 // PeerUnresponsiveError (PeerAddressMonitor.ts:254-266).
 func TestMonitorAllProbesFail(t *testing.T) {
 	t.Parallel()
-	h, p, n := monitored(t)
-	h.clock.Advance(time.Hour)
-	h.announceAddrs(t, "fd00::2")
-	eventually(t, "the address", func() bool { return len(p.Service().Addresses()) == 1 })
-	h.udp.drain()
-	r, to := failProbes(t, h, verifyAsync(context.Background(), p, ReasonAddressChange))
-	if r.ok || !n.s.IsPeerLost() {
-		t.Fatalf("ok %v lost %v", r.ok, n.s.IsPeerLost())
-	}
-	seen := map[string]bool{}
-	for _, a := range to {
-		seen[a] = true
-	}
-	if !seen[addr1] || !seen[addr2] {
-		t.Fatalf("probed %v, want both addresses", to)
-	}
-	if ok, err := p.VerifyReachability(context.Background(), ReasonAddressChange); ok || err != nil {
-		t.Fatal("a peer without a session verified")
-	}
+	synctest.Test(t, func(t *testing.T) {
+		h, p, n := monitored(t)
+		h.clock.Advance(time.Hour)
+		h.announceAddrs(t, "fd00::2")
+		eventually(t, "the address", func() bool { return len(p.Service().Addresses()) == 1 })
+		h.udp.drain()
+		r, to := failProbes(t, h, verifyAsync(context.Background(), p, ReasonAddressChange))
+		if r.ok || !n.s.IsPeerLost() {
+			t.Fatalf("ok %v lost %v", r.ok, n.s.IsPeerLost())
+		}
+		seen := map[string]bool{}
+		for _, a := range to {
+			seen[a] = true
+		}
+		if !seen[addr1] || !seen[addr2] {
+			t.Fatalf("probed %v, want both addresses", to)
+		}
+		if ok, err := p.VerifyReachability(context.Background(), ReasonAddressChange); ok || err != nil {
+			t.Fatal("a peer without a session verified")
+		}
+	})
 }
 
 // TestMonitorSessionSuspect: a session-suspect run probes the current
@@ -192,30 +199,32 @@ func TestMonitorAllProbesFail(t *testing.T) {
 // a joiner whose context ends returns without cancelling the run (:121-126).
 func TestMonitorSessionSuspect(t *testing.T) {
 	t.Parallel()
-	h, p, n := monitored(t)
-	h.announceAddrs(t, "fd00::2")
-	eventually(t, "the address", func() bool { return len(p.Service().Addresses()) == 1 })
-	h.udp.drain()
-	res := verifyAsync(context.Background(), p, ReasonSessionSuspect)
-	first := h.udp.next(t) // the suspect run is in flight
-	if first.to.String() != addr1 {
-		t.Fatalf("suspect probe to %v", first.to)
-	}
-	ctx, cancel := context.WithCancel(context.Background())
-	joiner := verifyAsync(ctx, p, ReasonAddressChange)
-	cancel()
-	if r := waitVerify(t, joiner); r.ok || r.err == nil {
-		t.Fatalf("a cancelled joiner = %+v", r)
-	}
-	r, to := failProbes(t, h, res)
-	if r.ok || !n.s.IsPeerLost() {
-		t.Fatal("a failed suspect probe kept the session")
-	}
-	for _, a := range to {
-		if a != addr1 {
-			t.Fatalf("a session-suspect run probed %s", a)
+	synctest.Test(t, func(t *testing.T) {
+		h, p, n := monitored(t)
+		h.announceAddrs(t, "fd00::2")
+		eventually(t, "the address", func() bool { return len(p.Service().Addresses()) == 1 })
+		h.udp.drain()
+		res := verifyAsync(context.Background(), p, ReasonSessionSuspect)
+		first := h.udp.next(t) // the suspect run is in flight
+		if first.to.String() != addr1 {
+			t.Fatalf("suspect probe to %v", first.to)
 		}
-	}
+		ctx, cancel := context.WithCancel(context.Background())
+		joiner := verifyAsync(ctx, p, ReasonAddressChange)
+		cancel()
+		if r := waitVerify(t, joiner); r.ok || r.err == nil {
+			t.Fatalf("a cancelled joiner = %+v", r)
+		}
+		r, to := failProbes(t, h, res)
+		if r.ok || !n.s.IsPeerLost() {
+			t.Fatal("a failed suspect probe kept the session")
+		}
+		for _, a := range to {
+			if a != addr1 {
+				t.Fatalf("a session-suspect run probed %s", a)
+			}
+		}
+	})
 }
 
 // TestMonitorScheduledByAServiceChange: a service change with a live
@@ -223,18 +232,20 @@ func TestMonitorSessionSuspect(t *testing.T) {
 // runs (Peer.ts:137-138, PeerAddressMonitor.ts:69-84).
 func TestMonitorScheduledByAServiceChange(t *testing.T) {
 	t.Parallel()
-	h, p, n := monitored(t)
-	h.clock.Advance(time.Hour)
-	h.announceAddrs(t, "fd00::2")
-	h.clock.waitTimer(t, 10*time.Second)
-	h.udp.drain()
-	h.clock.Advance(10 * time.Second)
-	n.answer(t, h.udp.nextTo(t, addr1))
-	eventually(t, "the backoff to advance", func() bool {
-		m := p.addressMonitor()
-		m.mu.Lock()
-		defer m.mu.Unlock()
-		return m.fibCurr == 10*time.Minute
+	synctest.Test(t, func(t *testing.T) {
+		h, p, n := monitored(t)
+		h.clock.Advance(time.Hour)
+		h.announceAddrs(t, "fd00::2")
+		h.clock.waitTimer(t, 10*time.Second)
+		h.udp.drain()
+		h.clock.Advance(10 * time.Second)
+		n.answer(t, h.udp.nextTo(t, addr1))
+		eventually(t, "the backoff to advance", func() bool {
+			m := p.addressMonitor()
+			m.mu.Lock()
+			defer m.mu.Unlock()
+			return m.fibCurr == 10*time.Minute
+		})
 	})
 }
 
@@ -244,9 +255,11 @@ func TestMonitorScheduledByAServiceChange(t *testing.T) {
 // descriptor's operational address with it (Peer.ts:161-163).
 func TestSessionMoveCarriesOperationalAddress(t *testing.T) {
 	t.Parallel()
-	_, p, n := monitored(t)
-	n.s.SetAddr(udpAddr(addr2))
-	if got := p.Descriptor().OperationalAddress; !sameUDPAddr(got, udpAddr(addr2)) {
-		t.Fatalf("operational address %v, want %v", got, udpAddr(addr2))
-	}
+	synctest.Test(t, func(t *testing.T) {
+		_, p, n := monitored(t)
+		n.s.SetAddr(udpAddr(addr2))
+		if got := p.Descriptor().OperationalAddress; !sameUDPAddr(got, udpAddr(addr2)) {
+			t.Fatalf("operational address %v, want %v", got, udpAddr(addr2))
+		}
+	})
 }

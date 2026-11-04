@@ -11,6 +11,7 @@ import (
 
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/cluster/core"
+	"github.com/SukramJ/go-fabric/cluster/spec"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
 )
@@ -196,8 +197,8 @@ func TestIdentify_WriteIdentifyTimeUnsupportedTypeReturnsError(t *testing.T) {
 	t.Parallel()
 	id := core.NewIdentify()
 	err := id.MatterWrite(context.Background(), 0x0000, "bad")
-	if err == nil {
-		t.Fatal("expected error for unsupported IdentifyTime type, got nil")
+	if spec.StatusOf(err) != im.StatusInvalidAction {
+		t.Fatalf("IdentifyTime of an unsupported type: status %v (%v), want %v", spec.StatusOf(err), err, im.StatusInvalidAction)
 	}
 }
 
@@ -205,8 +206,8 @@ func TestIdentify_WriteReadOnlyAttrReturnsError(t *testing.T) {
 	t.Parallel()
 	id := core.NewIdentify()
 	err := id.MatterWrite(context.Background(), 0x0001 /* IdentifyType, read-only */, uint8(0))
-	if err == nil {
-		t.Fatal("expected error for read-only attr write, got nil")
+	if spec.StatusOf(err) != im.StatusUnsupportedWrite {
+		t.Fatalf("read-only IdentifyType write: status %v (%v), want %v", spec.StatusOf(err), err, im.StatusUnsupportedWrite)
 	}
 }
 

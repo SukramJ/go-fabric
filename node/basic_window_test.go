@@ -49,17 +49,10 @@ func randomCredentials(t *testing.T, timeout time.Duration) node.WindowCredentia
 // waitRecord polls the commissionable record until want holds.
 func waitRecord(t *testing.T, adv *mdns.Noop, what string, want func(discriminator, mode uint64, ok bool) bool) {
 	t.Helper()
-	deadline := time.Now().Add(5 * time.Second)
-	for {
+	waitLive(t, "the commissionable record "+what, func() bool {
 		d, m, ok := commissionableRecord(adv)
-		if want(d, m, ok) {
-			return
-		}
-		if time.Now().After(deadline) {
-			t.Fatalf("commissionable record D=%d CM=%d present=%v; want %s", d, m, ok, what)
-		}
-		time.Sleep(10 * time.Millisecond)
-	}
+		return want(d, m, ok)
+	})
 }
 
 // startedNode starts an uncommissioned node advertising on adv.

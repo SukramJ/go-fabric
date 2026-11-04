@@ -10,6 +10,8 @@ import (
 
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/cluster/core"
+	"github.com/SukramJ/go-fabric/cluster/spec"
+	"github.com/SukramJ/go-fabric/im"
 )
 
 func TestBinding_ClusterID(t *testing.T) {
@@ -73,8 +75,8 @@ func TestBinding_WriteWrongType(t *testing.T) {
 	t.Parallel()
 	b := core.NewBinding()
 	err := b.MatterWrite(context.Background(), 0x0000, "not-a-slice")
-	if err == nil {
-		t.Fatal("expected error for wrong type, got nil")
+	if spec.StatusOf(err) != im.StatusConstraintError {
+		t.Fatalf("Binding of the wrong type: status %v (%v), want %v", spec.StatusOf(err), err, im.StatusConstraintError)
 	}
 }
 
@@ -82,8 +84,8 @@ func TestBinding_WriteUnknownAttribute(t *testing.T) {
 	t.Parallel()
 	b := core.NewBinding()
 	err := b.MatterWrite(context.Background(), 0xBEEF, []core.TargetStruct{})
-	if err == nil {
-		t.Fatal("expected error for unknown attribute, got nil")
+	if spec.StatusOf(err) != im.StatusUnsupportedAttribute {
+		t.Fatalf("unknown attribute: status %v (%v), want %v", spec.StatusOf(err), err, im.StatusUnsupportedAttribute)
 	}
 }
 
@@ -111,8 +113,8 @@ func TestBinding_InvokeReturnsError(t *testing.T) {
 	ctx := context.Background()
 	for _, cmdID := range []uint32{0x00, 0x01} {
 		_, err := b.MatterInvoke(ctx, cmdID, nil)
-		if err == nil {
-			t.Errorf("MatterInvoke(0x%02X) expected error, got nil", cmdID)
+		if spec.StatusOf(err) != im.StatusUnsupportedCommand {
+			t.Errorf("MatterInvoke(0x%02X): status %v (%v), want %v", cmdID, spec.StatusOf(err), err, im.StatusUnsupportedCommand)
 		}
 	}
 }

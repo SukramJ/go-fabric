@@ -62,16 +62,11 @@ func TestServeOrderedKeepsAStreamInOrder(t *testing.T) {
 	case <-time.After(3 * time.Second):
 		t.Fatal("the releasing handler never ran")
 	}
-	deadline := time.Now().Add(3 * time.Second)
-	for {
+	poll(3*time.Second, func() bool {
 		mu.Lock()
-		n := len(seen)
-		mu.Unlock()
-		if n == 4 || time.Now().After(deadline) {
-			break
-		}
-		time.Sleep(10 * time.Millisecond)
-	}
+		defer mu.Unlock()
+		return len(seen) == 4
+	})
 	close(finish)
 	time.Sleep(50 * time.Millisecond)
 	mu.Lock()
@@ -168,16 +163,12 @@ func TestOrderedDispatchSharesTheConcurrencyBudget(t *testing.T) {
 		t.Errorf("pending %d, queues %d; want %d pending and at most as many queues", pending, queues, maxConcurrentDispatch)
 	}
 	close(block)
-	deadline := time.Now().Add(5 * time.Second)
-	for {
+	poll(5*time.Second, func() bool {
 		o.mu.Lock()
+		defer o.mu.Unlock()
 		pending = o.pending
-		o.mu.Unlock()
-		if pending == 0 || time.Now().After(deadline) {
-			break
-		}
-		time.Sleep(time.Millisecond)
-	}
+		return pending == 0
+	})
 	mu.Lock()
 	defer mu.Unlock()
 	if pending != 0 || started != maxConcurrentDispatch {

@@ -355,16 +355,9 @@ func TestLiveCommissionerControl(t *testing.T) {
 
 	// A's request is closed: CommissionNode with it fails, a new request
 	// is taken.
-	deadline := time.Now().Add(10 * time.Second)
-	for {
+	waitLive(t, "A taking a new request", func() bool {
 		res, err = ctlA.Invoke(ctx, im.ConcreteCommandPath{Endpoint: epA, Cluster: commctrldef.ClusterID, Command: commctrldef.CmdRequestCommissioningApproval},
 			commctrldef.RequestCommissioningApprovalRequest{RequestId: ccRequestID + 1, VendorId: 0xFFF1, ProductId: 0x8001}, interaction.InvokeOptions{})
-		if err == nil && res.Status == im.StatusSuccess {
-			break
-		}
-		if time.Now().After(deadline) {
-			t.Fatalf("A takes no new request: %+v %v", res, err)
-		}
-		time.Sleep(50 * time.Millisecond)
-	}
+		return err == nil && res.Status == im.StatusSuccess
+	})
 }

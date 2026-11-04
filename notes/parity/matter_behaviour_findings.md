@@ -763,6 +763,18 @@ Found by the phase-32 port of `packages/node/test/behaviors/ota/OtaTest.ts`
 
 ## Tier 3 — LOW
 
+### T3-P35-1 — a write value of the wrong Go type gets three different statuses (phase 35, 2026-11-04)
+
+- **Where:** FAILURE from `cluster/core/access_control.go:674`, `bridged_device_basic_information.go:459`, `general_commissioning.go:403`, `network_commissioning.go:234`; CONSTRAINT_ERROR from BasicInformation and Binding through the convention `cluster/spec/write.go:126-128`; INVALID_ACTION from `cluster/core/identify.go:453-457`.
+- **matter.js at 862ad75f:** the node's write path validates through `ValueValidator`, whose `DatatypeError` extends `ValidateError` with the default `Status.InvalidDataType` (`packages/protocol/src/action/errors.ts:55-72`); the older TLV-schema path answers `ValidationDatatypeMismatchError` → `Status.InvalidAction` (`packages/types/src/common/ValidationError.ts:31-38`). Neither is FAILURE.
+- **Unverified:** whether a wire write can reach a Go server with a value of a type the attribute does not hold — the bridge decodes by the attribute's schema, so these may be unit-level paths only. Phase 35's status assertions pin today's answers (`TestBasicInfo_WriteNodeLabelWrongType` and siblings) so a change is visible; the rule — one status, matter.js's INVALID_DATA_TYPE on the node path — is a decision for the next write-path wave.
+
+### T3-P35-2 — GroupKeyManagement invoked without an accessing fabric answers FAILURE (phase 35, 2026-11-04)
+
+- **Where:** `cluster/core/group_key_management.go:604-611` returns a plain error (FAILURE) when neither the context nor the server carries a fabric index.
+- **matter.js at 862ad75f:** a fabric-scoped operation without a fabric is refused as `Status.UnsupportedAccess` (`packages/protocol/src/interaction/FabricAccessControl.ts:61`).
+- **Unverified:** whether the Go IM gate (`bridge/im_gate.go`) or the dispatcher refuses the command before the server sees it, in which case the server's answer is defensive only. Pinned by `TestGKM…` at `group_key_management_test.go:155-156` (phase 35).
+
 ---
 
 ## Closed in the 2026-10-17 findings wave (v0.6.0)

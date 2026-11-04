@@ -155,8 +155,8 @@ func TestCommodityPrice(t *testing.T) {
 	_, err = srv.MatterInvoke(context.Background(), cp.CmdGetDetailedForecastRequest, "junk")
 	wantStatus(t, err, im.StatusInvalidCommand)
 	wantStatus(t, srv.SetForecast(make([]energy.CommodityPrice, 57)), im.StatusConstraintError)
-	if err := srv.SetForecast([]energy.CommodityPrice{{}}); err == nil {
-		t.Error("a forecast entry without price accepted")
+	if err := srv.SetForecast([]energy.CommodityPrice{{}}); spec.StatusOf(err) != im.StatusConstraintError {
+		t.Errorf("a forecast entry without price: status %v (%v), want %v", spec.StatusOf(err), err, im.StatusConstraintError)
 	}
 
 	plain, err := energy.NewCommodityPrice(energy.CommodityPriceConfig{})
