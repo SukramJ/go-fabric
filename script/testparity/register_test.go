@@ -43,7 +43,7 @@ import (
 // outside the six new register roots (131 excluded, 9 planned for a port)
 // and lists the six roots' 52 files as planned; each root's commit of the
 // phase lowers the count again.
-const testparityPlannedRatchet = 63
+const testparityPlannedRatchet = 50
 
 // testparityPortedRatchet is the number of ported entries, and
 // testparityMissingRatchet the number of matter.js it cases the partial
@@ -68,10 +68,13 @@ const testparityPlannedRatchet = 63
 // 121 ported, 813 missing. Phase 32 (the controller and protocol tranche)
 // took 261 of the 312 cases of nine entries out of missing — ported or
 // left — and completed four files; 51 stay missing with a named reason
-// (the PR's report): 125 ported, 552 missing.
+// (the PR's report): 125 ported, 552 missing. Phase 33 (the general,
+// model, nodejs and types roots) adds its root files: the TLV root 8
+// ported and 5 missing cases, each a findings-register row (133 ported,
+// 556 missing).
 const (
-	testparityPortedRatchet  = 125
-	testparityMissingRatchet = 551
+	testparityPortedRatchet  = 133
+	testparityMissingRatchet = 556
 )
 
 // testparityLeftRatchet is the number of left it cases summed over the
@@ -85,8 +88,12 @@ const (
 // (BD-Matter-ClientNode-WriteNotThroughCache), the sequential node-id
 // allocator (BD-Matter-ControllerNodeIDRandom), the ICD transaction model,
 // the ML-DSA ledger stores (BD-Matter-DCL-MirroredScope) and JS runtime
-// artefacts, each row with its class and reason.
-const testparityLeftRatchet = 270
+// artefacts, each row with its class and reason. Phase 33 adds the left
+// rows of its root files: the TLV root 81 — TlvObject's schema API and
+// TlvArray's chunks (BD-Matter-TLVSchemaLayer), zero-length-as-null
+// (BD-Matter-TLVNullIsTheNullElement), JavaScript type checks, epoch
+// conversion and ModelBounds shapes (js-runtime-only).
+const testparityLeftRatchet = 351
 
 // moduleRoot is where the committed artefacts live, seen from this package.
 const moduleRoot = "../.."

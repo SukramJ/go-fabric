@@ -2233,15 +2233,6 @@
     "occurrences": 24
   },
   {
-    "file": "tlv/codec_parity_test.go",
-    "line": 245,
-    "citation": "packages/types/test/tlv/TlvStringTest.ts:86",
-    "resolved": "packages/types/test/tlv/TlvStringTest.ts",
-    "identifier": "TlvByteString",
-    "nearest": 102,
-    "occurrences": 8
-  },
-  {
     "file": "transport/message/fuzz_message_test.go",
     "line": 130,
     "citation": "MessageCodec.ts:481-504",

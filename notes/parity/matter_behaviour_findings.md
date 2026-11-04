@@ -761,6 +761,38 @@ Found by the phase-32 port of `packages/node/test/behaviors/ota/OtaTest.ts`
 
 ---. (Triage 2026-10-29: wave H2, commissioning and security (Fable), before milestone 7 makes the Wi-Fi server real.)
 
+## Phase 33 — the general, model and types test roots (matter.js 862ad75f)
+
+Cases of the six phase-33 register roots (`notes/parity/matterjs_tests.md`)
+the Go tests do not cover and no `by_design.md` entry explains. Each closes
+with a port of the named case.
+
+- **The TLV encoder writes an IS1 into a character string.** matter.js's
+  `TlvString.validate` refuses a character string containing Information
+  Separator 1 (0x1F) (`packages/types/src/tlv/TlvString.ts:78-81` at
+  `862ad75f`); `tlv.Encoder.PutUTF8` writes it, and a peer reading the
+  string cuts it there. Case:
+  `TlvStringTest.ts` "throws an error if a character string contains
+  Information Separator 1 (0x1F)". Route: refuse (or cut) the string in
+  the encoder's checked path and decide what a host value with an IS1
+  becomes.
+- **A write keeps the FabricIndex its caller supplies.** matter.js encodes
+  a fabric-scoped struct for a write interaction without its FabricIndex,
+  even when the value carries one (`TlvObjectTest.ts` "strips fabricIndex
+  for write interaction even when caller provided a value",
+  `forWriteInteraction`); `spec.EncodeJSON` writes it when present. The server overwrites it with the accessing
+  fabric, so the wire difference is the field's bytes. Route: strip field
+  254 on the controller's write encoding.
+- **Numeric bounds compare as float64.** `cluster/spec`'s constraint check
+  (`Instance.satisfies`, `bound_expr.go` `evalBound`) and `Bound.Int`
+  (int64) hold a bound beyond 2^53 inexactly: 2^62 + 1 compares equal to
+  2^62, and a uint64 bound above int64 cannot be stated. matter.js keeps
+  such bounds as bigints (`TlvOfModelTest.ts` "refuses a value beyond the
+  computed bound", "refuses the value above it", "states a bound beyond
+  the safe integers as a bigint"). No served attribute states such a bound
+  at the pin. Route: compare integers as integers (uint64/int64 or
+  math/big) where the type is a 64-bit integer.
+
 ## Tier 3 — LOW
 
 ---

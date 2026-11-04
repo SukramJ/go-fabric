@@ -5,6 +5,7 @@ package spec
 
 import (
 	"fmt"
+	"math"
 
 	"github.com/SukramJ/go-fabric/tlv"
 )
@@ -39,9 +40,9 @@ func DecodeValue(t Type, n Node) (any, error) {
 	case KindBool:
 		return DecodeBool(n)
 	case KindUint, KindEnum, KindBitmap:
-		return DecodeUint[uint64](bits)(n)
+		return DecodeUint[uint64](bits)(relaxedInteger(n, false))
 	case KindInt:
-		return DecodeInt[int64](bits)(n)
+		return DecodeInt[int64](bits)(relaxedInteger(n, true))
 	case KindFloat32:
 		return DecodeFloat32(n)
 	case KindFloat64:
@@ -57,6 +58,30 @@ func DecodeValue(t Type, n Node) (any, error) {
 	case KindAny:
 	}
 	return n, nil
+}
+
+// relaxedInteger restates an integer element of the other signedness as
+// the signedness the type wants, when its value is one that signedness
+// holds: a reported value is decoded with matter.js's relaxNumberTypeChecks,
+// so a signed-encoded unsigned value (or the reverse) from a non-compliant
+// device is taken and still range-checked rather than dropped. A negative
+// value for an unsigned type, an unsigned one beyond int64 for a signed
+// type and every non-integer element stay as they are and are refused by
+// the strict decoder. Mirrors matter.js
+// packages/protocol/src/action/client/InputChunk.ts:42-48 at 862ad75f
+// (DATA_REPORT_DECODE_OPTIONS) and packages/types/src/tlv/TlvNumber.ts:124-141
+// at 862ad75f (decodeTlvInternalValue: an integer of the other signedness
+// is read and checked against the schema's bounds). The server's decoders
+// (DecodeUintIn, DecodeIntIn) stay strict, as matter.js's default.
+func relaxedInteger(n Node, signed bool) Node {
+	el := n.El
+	switch {
+	case !signed && el.Type <= tlv.TypeSignedInt8 && el.Int >= 0:
+		n.El.Type, n.El.Uint = tlv.TypeUnsignedInt8, uint64(el.Int)
+	case signed && el.Type >= tlv.TypeUnsignedInt1 && el.Type <= tlv.TypeUnsignedInt8 && el.Uint <= math.MaxInt64:
+		n.El.Type, n.El.Int = tlv.TypeSignedInt8, int64(el.Uint)
+	}
+	return n
 }
 
 func decodeListValue(t Type, n Node) (any, error) {

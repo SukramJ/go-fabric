@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 7345,
+  "entry_points": 7350,
   "entry_packages": [
     ".",
     "bdx",
@@ -279,8 +279,8 @@
   ],
   "summary": {
     "total_exported": 17259,
-    "reachable": 12123,
-    "whitelisted": 5136,
+    "reachable": 12124,
+    "whitelisted": 5135,
     "unreachable": 0
   },
   "by_package": [],
@@ -34024,14 +34024,14 @@
       "identifier": "FuzzDecoderNext",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "tlv/fuzz_codec_test.go",
-      "line": 30
+      "line": 31
     },
     {
       "package": "tlv",
       "identifier": "FuzzEncodeDecodeRoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "tlv/fuzz_codec_test.go",
-      "line": 91
+      "line": 100
     },
     {
       "package": "tlv",
@@ -34388,14 +34388,14 @@
       "identifier": "TestEncoder_ContextTagInArray_NestedStruct_OK",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "tlv/object_parity_test.go",
-      "line": 620
+      "line": 621
     },
     {
       "package": "tlv",
       "identifier": "TestEncoder_ContextTagInArray_Panics",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "tlv/object_parity_test.go",
-      "line": 603
+      "line": 604
     },
     {
       "package": "tlv",
@@ -34451,49 +34451,49 @@
       "identifier": "TestObjectParity_Array_Decode",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "tlv/object_parity_test.go",
-      "line": 263
+      "line": 264
     },
     {
       "package": "tlv",
       "identifier": "TestObjectParity_Array_Encode",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "tlv/object_parity_test.go",
-      "line": 247
+      "line": 248
     },
     {
       "package": "tlv",
       "identifier": "TestObjectParity_Array_RoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "tlv/object_parity_test.go",
-      "line": 297
-    },
-    {
-      "package": "tlv",
-      "identifier": "TestObjectParity_ChunkedArray_NotImplemented",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "tlv/object_parity_test.go",
-      "line": 738
+      "line": 298
     },
     {
       "package": "tlv",
       "identifier": "TestObjectParity_Complex_AllFields",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "tlv/object_parity_test.go",
-      "line": 346
+      "line": 347
     },
     {
       "package": "tlv",
       "identifier": "TestObjectParity_Complex_MinFields",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "tlv/object_parity_test.go",
-      "line": 387
+      "line": 388
     },
     {
       "package": "tlv",
       "identifier": "TestObjectParity_Complex_MinFields_Decode",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "tlv/object_parity_test.go",
-      "line": 410
+      "line": 411
+    },
+    {
+      "package": "tlv",
+      "identifier": "TestObjectParity_Complex_WithoutWrappedFields",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "tlv/object_parity_test.go",
+      "line": 736
     },
     {
       "package": "tlv",
@@ -34525,59 +34525,52 @@
     },
     {
       "package": "tlv",
-      "identifier": "TestObjectParity_InjectField_NotImplemented",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "tlv/object_parity_test.go",
-      "line": 694
-    },
-    {
-      "package": "tlv",
       "identifier": "TestObjectParity_NestedArrayOfStructs",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "tlv/object_parity_test.go",
-      "line": 447
-    },
-    {
-      "package": "tlv",
-      "identifier": "TestObjectParity_RemoveField_NotImplemented",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "tlv/object_parity_test.go",
-      "line": 704
+      "line": 448
     },
     {
       "package": "tlv",
       "identifier": "TestObjectParity_Schema_ArrayField",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "tlv/object_parity_test.go",
-      "line": 537
+      "line": 538
+    },
+    {
+      "package": "tlv",
+      "identifier": "TestObjectParity_Schema_NestedStructs",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "tlv/object_parity_test.go",
+      "line": 693
     },
     {
       "package": "tlv",
       "identifier": "TestObjectParity_Schema_NumberFields",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "tlv/object_parity_test.go",
-      "line": 564
+      "line": 565
     },
     {
       "package": "tlv",
       "identifier": "TestObjectParity_Schema_StringFields",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "tlv/object_parity_test.go",
-      "line": 518
+      "line": 519
     },
     {
       "package": "tlv",
       "identifier": "TestObjectParity_Schema_UInt16AndBoolean",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "tlv/object_parity_test.go",
-      "line": 499
+      "line": 500
     },
     {
       "package": "tlv",
       "identifier": "TestObjectParity_TaggedList_Decode_Optional",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "tlv/object_parity_test.go",
-      "line": 223
+      "line": 224
     },
     {
       "package": "tlv",
@@ -34598,35 +34591,21 @@
       "identifier": "TestObjectParity_TaggedList_OptionalAndRequired_SwitchedOrder",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "tlv/object_parity_test.go",
-      "line": 177
-    },
-    {
-      "package": "tlv",
-      "identifier": "TestObjectParity_TaggedList_ProtocolSpecificTags_NotImplemented",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "tlv/object_parity_test.go",
-      "line": 727
+      "line": 178
     },
     {
       "package": "tlv",
       "identifier": "TestObjectParity_TaggedList_RepeatedFields",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "tlv/object_parity_test.go",
-      "line": 208
+      "line": 209
     },
     {
       "package": "tlv",
       "identifier": "TestObjectParity_TaggedList_RequiredOnly",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "tlv/object_parity_test.go",
-      "line": 193
-    },
-    {
-      "package": "tlv",
-      "identifier": "TestObjectParity_ValidationError_NotImplemented",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "tlv/object_parity_test.go",
-      "line": 714
+      "line": 194
     },
     {
       "package": "tlv",
@@ -34836,14 +34815,14 @@
       "identifier": "TestPutUintWidth_FixedWidths",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "tlv/object_parity_test.go",
-      "line": 644
+      "line": 645
     },
     {
       "package": "tlv",
       "identifier": "TestPutUintWidth_PanicOnBadWidth",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "tlv/object_parity_test.go",
-      "line": 675
+      "line": 676
     },
     {
       "package": "tlv",
@@ -34886,6 +34865,20 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "tlv/tlv_test.go",
       "line": 272
+    },
+    {
+      "package": "tlv",
+      "identifier": "TestTlvCodecTagsParityMatterJS",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "tlv/codec_tags_parity_matterjs_test.go",
+      "line": 18
+    },
+    {
+      "package": "tlv",
+      "identifier": "TestTlvStringByteSizeParityMatterJS",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "tlv/codec_tags_parity_matterjs_test.go",
+      "line": 100
     },
     {
       "package": "tlv",

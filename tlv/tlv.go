@@ -170,6 +170,13 @@ var (
 	// emitting the bytes.
 	ErrStrictTagViolation = errors.New("tlv: strict tag/container rule violation")
 
+	// ErrImplicitProfileTag is returned by [Decoder.Next] for an element
+	// whose tag control is an implicit-profile tag (2 or 4 octets): the
+	// decoder has no implicit profile to resolve it against, so the
+	// stream is malformed, as matter.js's TlvCodec.readTag and chip's
+	// TLVReader treat it.
+	ErrImplicitProfileTag = errors.New("tlv: implicit profile tag cannot be resolved")
+
 	// ErrLengthOverflow is returned when a length prefix exceeds the
 	// remaining buffer.
 	ErrLengthOverflow = errors.New("tlv: length exceeds buffer")

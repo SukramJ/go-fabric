@@ -449,6 +449,41 @@ or above its width is refused — INVALID_ACTION and CONSTRAINT_ERROR, as
 matter.js's `TlvNumber.validate` refuses it (`TlvNumber.ts:145-156`,
 `ValidationError.ts:35-38`) — rather than masked into a different, valid
 value (`cluster/wire/field_bounds.go`, W3-clucore-08).
+### BD-Matter-TLVSchemaLayer — the generated codecs are the TLV schema layer; tlv/ has no TlvObject
+
+matter.js's TLV package is a schema layer: `TlvObject` / `TlvTaggedList`
+encode a JavaScript record in tag order, inject and remove a field
+(`injectField` / `removeField`, `packages/types/src/tlv/TlvObject.ts:296-333`
+at `862ad75f`), refuse an unknown property or a non-context tag unless
+`allowProtocolSpecificTags` (`:205-213`), hold the length limits of a
+repeated field, and `TlvArray` encodes and assembles chunked lists. In this
+module `tlv/` is the raw element codec and the schema layer is the
+generated code: `script/clustergen` writes each struct's `EncodeTLV` in tag
+order and its `DecodeTLV` through `spec.DecodeFields`, which skips a member
+it does not bind; list chunking is the interaction layer's
+(`client/interaction/report.go`, `im/write_chunking.go`). The
+`TlvObjectTest.ts` and `TlvArrayTest.ts` cases of that API are `left` rows
+of the test register (phase 33), which also retired the five FixMe skips
+that stood for them in `tlv/object_parity_test.go`. Reasoning: a typed Go
+struct cannot carry an unknown property, a field of the wrong type or a
+caller's member order, so the checks that guard a JavaScript record have
+no value to act on.
+
+### BD-Matter-TLVNullIsTheNullElement — a nullable value is null only as the TLV null element
+
+matter.js's `TlvNullable` decodes a zero-length string or list as null when
+the inner schema has a minimum length above zero, and a zero-length octet
+string as null always (`packages/types/src/tlv/TlvNullable.ts:84-104` at
+`862ad75f`, citing connectedhomeip-spec issue 11387 for the ambiguity).
+`cluster/spec.DecodeNullable` and `DecodeValue` read null only from the
+TLV null element; a zero-length value decodes as itself and is then
+judged by its bound. The seven "zero length" cases of `TlvNullableTest.ts`
+are `left` rows of the test register (phase 33). Reasoning: matter.js's
+own comment (`:85-96`) calls the empty-as-null reading a specification
+versus SDK interpretation issue and applies it only in part, so the module
+keeps the value as encoded and leaves the null-or-empty reading to the host
+that consumes it.
+
 ### BD-Matter-MessageCodec-PrivacyWithExtensions — a header with the privacy flag and message extensions is decoded
 
 matter.js `decodePacket` refuses a packet header that sets both the P and the
@@ -978,7 +1013,11 @@ when Actions or another optional cluster lands.
 
 **L3 — TLV Wire Codec (Systematic Parity Run #02 — 2026-05-12):**
 
-- **L3-D2 ImplicitProfile-tag pass-through:** matter.js throws
+- **L3-D2 ImplicitProfile-tag pass-through — retired in phase 33:** the
+  decoder now refuses an implicit-profile tag with
+  `tlv.ErrImplicitProfileTag`, as matter.js and chip do (TlvCodecTest.ts
+  ported, `tlv.TestTlvCodecTagsParityMatterJS`). The record of the former
+  divergence: matter.js throws
   `UnexpectedDataError` for `ImplicitProfile16`/`ImplicitProfile32` tags
   (TlvCodec.ts:169-171 at the schema pin; `NotImplementedError` before
   e21a1e72, #4514, which classifies the tag as malformed peer data); chip resolves them against `ImplicitProfileId` and

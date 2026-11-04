@@ -272,6 +272,14 @@ func (i *Instance) checkUnsigned(t Type, nullable bool, c Constraint, value any,
 		return nil, fmt.Sprintf("%v outside 0..%d", value, limit)
 	case t.Kind == KindEnum && t.Enum != nil && !i.EnumSupported(t.Enum, n):
 		return nil, fmt.Sprintf("%d is not a supported %s value", n, t.Enum.Name)
+	case t.Kind == KindBitmap && nullable && n>>(bitWidth(t.Bits)-1) != 0:
+		// A nullable bitmap reserves its most-significant bit for null
+		// (Core § 7.19.1.2). Mirrors matter.js
+		// packages/types/src/tlv/TlvNullable.ts:53-56 at 862ad75f, which
+		// wraps a nullable BitmapWrapper in withReservedMsb, and
+		// packages/types/src/tlv/TlvNumber.ts:327-330 at 862ad75f, whose
+		// withReservedMsb bounds the value by half the base type's maximum.
+		return nil, fmt.Sprintf("0x%X sets the most-significant bit a nullable bitmap reserves", n)
 	case t.Kind == KindBitmap && t.Bitmap != nil && n&^t.Bitmap.Defined() != 0:
 		return nil, fmt.Sprintf("0x%X sets reserved %s bits", n, t.Bitmap.Name)
 	case !i.satisfies(c, float64(n), peers):
@@ -645,6 +653,14 @@ func UintMax(bits int, nullable bool) uint64 {
 		limit--
 	}
 	return limit
+}
+
+// bitWidth is bits, 64 when out of 1..64 as [UintMax] reads it.
+func bitWidth(bits int) int {
+	if bits <= 0 || bits > 64 {
+		return 64
+	}
+	return bits
 }
 
 // IntRange is the range a signed integer of bits holds; the minimum is one

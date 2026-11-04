@@ -7523,80 +7523,612 @@
     },
     {
       "path": "packages/types/test/tlv/TlvAnyTest.ts",
-      "status": "planned",
-      "reason": "Phase 33: a new register root, ported by meaning in this phase.",
+      "status": "ported",
+      "go": [
+        "tlv:TestCodecParity_AnyNull",
+        "tlv:TestCodecParity_AnyEmptyArray",
+        "tlv:TestCodecParity_AnyEmptyArray_Decode",
+        "tlv:TestObjectParity_NestedArrayOfStructs",
+        "cluster/spec:TestTlvAnyGenericDecodingParityMatterJS"
+      ],
+      "left": [
+        {
+          "it": "throws an error if the value is not a boolean",
+          "class": "js-runtime-only",
+          "reason": "TlvSchema.validate of an untyped JavaScript value; a Go value has its static type, and a wire element of the wrong type is refused by the typed decoders (cluster/spec DecodeBool, DecodeUintIn, DecodeStringIn)"
+        },
+        {
+          "it": "does not throw an error if the value is a boolean",
+          "class": "js-runtime-only",
+          "reason": "TlvSchema.validate of an untyped JavaScript value; a Go value has its static type, and a wire element of the wrong type is refused by the typed decoders (cluster/spec DecodeBool, DecodeUintIn, DecodeStringIn)"
+        }
+      ],
+      "reason": "The encode and decode vectors (null, an empty array) on the raw codec — the size cases are the byte counts the encode cases assert — and the generic decoding of a schema-less element stream as spec.DecodeJSON without a definition: a structure as a record keyed by tag number, an array or list as an array whatever its members' tags.",
       "snapshotSha": "bdcb8d435ebe347394dcaf16d1edb0908674e5f5"
     },
     {
       "path": "packages/types/test/tlv/TlvArrayTest.ts",
-      "status": "planned",
-      "reason": "Phase 33: a new register root, ported by meaning in this phase.",
+      "status": "ported",
+      "go": [
+        "tlv:TestObjectParity_Array_Encode",
+        "tlv:TestObjectParity_Array_Decode",
+        "tlv:TestObjectParity_Array_RoundTrip",
+        "cluster/spec:TestTlvBoundsParityMatterJS"
+      ],
+      "left": [
+        {
+          "it": "encodes an array to chunks",
+          "class": "by-design",
+          "reason": "BD-Matter-TLVSchemaLayer: TlvObject's schema API has no tlv counterpart; the generated cluster/spec codecs are the module's schema layer; chunk assembly is the interaction layer's (client/interaction/report.go, held by TestAttributeDataDecoderChunkedArrays; encode-side im/write_chunking.go)"
+        },
+        {
+          "it": "decodes an encoded array from chunks",
+          "class": "by-design",
+          "reason": "BD-Matter-TLVSchemaLayer: TlvObject's schema API has no tlv counterpart; the generated cluster/spec codecs are the module's schema layer; chunk assembly is the interaction layer's (client/interaction/report.go, held by TestAttributeDataDecoderChunkedArrays; encode-side im/write_chunking.go)"
+        },
+        {
+          "it": "decodes an encoded array from chunks with adding values",
+          "class": "by-design",
+          "reason": "BD-Matter-TLVSchemaLayer: TlvObject's schema API has no tlv counterpart; the generated cluster/spec codecs are the module's schema layer; chunk assembly is the interaction layer's (client/interaction/report.go, held by TestAttributeDataDecoderChunkedArrays; encode-side im/write_chunking.go)"
+        },
+        {
+          "it": "decodes an encoded array from chunks with removing values",
+          "class": "by-design",
+          "reason": "BD-Matter-TLVSchemaLayer: TlvObject's schema API has no tlv counterpart; the generated cluster/spec codecs are the module's schema layer; chunk assembly is the interaction layer's (client/interaction/report.go, held by TestAttributeDataDecoderChunkedArrays; encode-side im/write_chunking.go)"
+        },
+        {
+          "it": "decodes an encoded array from chunks with overwriting values",
+          "class": "by-design",
+          "reason": "BD-Matter-TLVSchemaLayer: TlvObject's schema API has no tlv counterpart; the generated cluster/spec codecs are the module's schema layer; chunk assembly is the interaction layer's (client/interaction/report.go, held by TestAttributeDataDecoderChunkedArrays; encode-side im/write_chunking.go)"
+        }
+      ],
+      "reason": "Encode, byte length, decode and the self-encoded round trip on the raw codec; the length bound and a wrong-typed entry (refused naming its index) on cluster/spec DecodeListIn.",
       "snapshotSha": "a48a55de1ec0d65742a7f223ba319dd92bbc0af7"
     },
     {
       "path": "packages/types/test/tlv/TlvBooleanTest.ts",
-      "status": "planned",
-      "reason": "Phase 33: a new register root, ported by meaning in this phase.",
+      "status": "ported",
+      "go": [
+        "tlv:TestCodecParity_BoolTrue",
+        "tlv:TestCodecParity_BoolFalse",
+        "tlv:TestCodecParity_BoolDecodeTrue",
+        "tlv:TestCodecParity_BoolDecodeFalse",
+        "tlv:TestCodecParity_BoolByteLength"
+      ],
+      "left": [
+        {
+          "it": "throws an error if the value is not a boolean",
+          "class": "js-runtime-only",
+          "reason": "TlvSchema.validate of an untyped JavaScript value; a Go value has its static type, and a wire element of the wrong type is refused by the typed decoders (cluster/spec DecodeBool, DecodeUintIn, DecodeStringIn)"
+        },
+        {
+          "it": "does not throw an error if the value is a boolean",
+          "class": "js-runtime-only",
+          "reason": "TlvSchema.validate of an untyped JavaScript value; a Go value has its static type, and a wire element of the wrong type is refused by the typed decoders (cluster/spec DecodeBool, DecodeUintIn, DecodeStringIn)"
+        }
+      ],
+      "reason": "The true/false vectors encoded, decoded and measured on the raw codec.",
       "snapshotSha": "a0248363c91345151b0b2e5fb93022eba44335e1"
     },
     {
       "path": "packages/types/test/tlv/TlvCodecTest.ts",
-      "status": "planned",
-      "reason": "Phase 33: a new register root, ported by meaning in this phase.",
+      "status": "ported",
+      "go": [
+        "tlv:TestTlvCodecTagsParityMatterJS",
+        "tlv:TestCommonTagWidthSelection",
+        "tlv:TestFullyQualifiedTagRoundTrip"
+      ],
+      "reason": "The Appendix A.12 tag vectors read and written, a structure member under a 4-octet fully qualified tag, and implicit-profile tags (2 and 4 octets, alone and inside a structure) refused as malformed data: the decoder returns ErrImplicitProfileTag since phase 33, as matter.js's readTag throws UnexpectedDataError.",
       "snapshotSha": "e95b1b5643bbbba4ac4c2b07227f9bd4e1c28d32"
     },
     {
       "path": "packages/types/test/tlv/TlvComplexTest.ts",
-      "status": "planned",
-      "reason": "Phase 33: a new register root, ported by meaning in this phase.",
+      "status": "ported",
+      "go": [
+        "tlv:TestObjectParity_Complex_AllFields",
+        "tlv:TestObjectParity_Complex_MinFields",
+        "tlv:TestObjectParity_Complex_MinFields_Decode",
+        "tlv:TestObjectParity_Complex_WithoutWrappedFields"
+      ],
+      "left": [
+        {
+          "it": "checks ${valueDescription} (six error vectors)",
+          "class": "js-runtime-only",
+          "reason": "TlvObject.validate of untyped JavaScript records (a missing mandatory field, a string where a number belongs, a FabricIndex of 0x12345678); a Go struct is typed, its fields cannot hold another type or a FabricIndex wider than uint8"
+        },
+        {
+          "it": "encodes ${valueDescription}, expect error (six error vectors)",
+          "class": "js-runtime-only",
+          "reason": "the same validation run by TlvObject.encode on untyped JavaScript records; Go structs are typed"
+        }
+      ],
+      "reason": "The three codec vectors (all fields, minimum fields, without the wrapper fields) encoded, decoded, measured and round-tripped on the raw codec.",
       "snapshotSha": "47c5a2844a671b00c78b670e865963cc2da42ae3"
     },
     {
       "path": "packages/types/test/tlv/TlvNullableTest.ts",
-      "status": "planned",
-      "reason": "Phase 33: a new register root, ported by meaning in this phase.",
+      "status": "ported",
+      "go": [
+        "tlv:TestCodecParity_NullableString_NonNull",
+        "tlv:TestCodecParity_NullableString_Null",
+        "tlv:TestCodecParity_NullableString_Decode_NonNull",
+        "tlv:TestCodecParity_NullableString_Decode_Null",
+        "tlv:TestCodecParity_NullableNullIs0x14",
+        "cluster/spec:TestTlvNullableParityMatterJS"
+      ],
+      "left": [
+        {
+          "it": "decodes null correctly without constraint",
+          "class": "by-design",
+          "reason": "BD-Matter-TLVNullIsTheNullElement: a nullable value is null only as the TLV null element (cluster/spec DecodeNullable); a zero-length string, octet string or list decodes as itself whatever its bound"
+        },
+        {
+          "it": "decodes null correctly with constraint",
+          "class": "by-design",
+          "reason": "BD-Matter-TLVNullIsTheNullElement: a nullable value is null only as the TLV null element (cluster/spec DecodeNullable); a zero-length string, octet string or list decodes as itself whatever its bound"
+        },
+        {
+          "it": "decodes zero length string with minlength 0 as empty string",
+          "class": "by-design",
+          "reason": "BD-Matter-TLVNullIsTheNullElement: a nullable value is null only as the TLV null element (cluster/spec DecodeNullable); a zero-length string, octet string or list decodes as itself whatever its bound"
+        },
+        {
+          "it": "decodes zero length byte-string with minlength 0 as null",
+          "class": "by-design",
+          "reason": "BD-Matter-TLVNullIsTheNullElement: a nullable value is null only as the TLV null element (cluster/spec DecodeNullable); a zero-length string, octet string or list decodes as itself whatever its bound"
+        },
+        {
+          "it": "decodes zero length string with constraint as null",
+          "class": "by-design",
+          "reason": "BD-Matter-TLVNullIsTheNullElement: a nullable value is null only as the TLV null element (cluster/spec DecodeNullable); a zero-length string, octet string or list decodes as itself whatever its bound"
+        },
+        {
+          "it": "decodes zero length array with minlength 0 as empty array",
+          "class": "by-design",
+          "reason": "BD-Matter-TLVNullIsTheNullElement: a nullable value is null only as the TLV null element (cluster/spec DecodeNullable); a zero-length string, octet string or list decodes as itself whatever its bound"
+        },
+        {
+          "it": "decodes zero length array with constraint as null",
+          "class": "by-design",
+          "reason": "BD-Matter-TLVNullIsTheNullElement: a nullable value is null only as the TLV null element (cluster/spec DecodeNullable); a zero-length string, octet string or list decodes as itself whatever its bound"
+        }
+      ],
+      "reason": "The non-null and null vectors on the raw codec; the sentinel a nullable integer reserves (uint64 maximum, int64 minimum, bounded or not), the extremes a bounded nullable int64 states and the most-significant bit a nullable map8 or map16 reserves on cluster/spec CheckValue — the bitmap bit since phase 33.",
       "snapshotSha": "3bad37cff84d63a75fc5a84e7c96931f44b646cd"
     },
     {
       "path": "packages/types/test/tlv/TlvNumberTest.ts",
-      "status": "planned",
-      "reason": "Phase 33: a new register root, ported by meaning in this phase.",
+      "status": "ported",
+      "go": [
+        "tlv:TestCodecParity_SignedInt1Byte",
+        "tlv:TestCodecParity_SignedInt2Byte",
+        "tlv:TestCodecParity_SignedInt4Byte",
+        "tlv:TestCodecParity_SignedInt8Byte",
+        "tlv:TestCodecParity_UnsignedInt1Byte",
+        "tlv:TestCodecParity_UnsignedInt2Byte",
+        "tlv:TestCodecParity_UnsignedInt4Byte",
+        "tlv:TestCodecParity_UnsignedInt8Byte",
+        "tlv:TestCodecParity_Float32",
+        "tlv:TestCodecParity_Float64",
+        "tlv:TestCodecParity_UInt32From8Bytes",
+        "tlv:TestCodecParity_UintWidthBoundaries",
+        "tlv:TestCodecParity_IntWidthBoundaries",
+        "cluster/spec:TestTlvBoundsParityMatterJS",
+        "cluster/spec:TestTlvNumberRelaxParityMatterJS"
+      ],
+      "left": [
+        {
+          "it": "states the same schema for the same bound",
+          "class": "js-runtime-only",
+          "reason": "identity of the TlvNumber schema objects .bound() returns; a Go bound is a constraint value"
+        },
+        {
+          "it": "refuses a bound a number states only approximately",
+          "class": "js-runtime-only",
+          "reason": "a JavaScript number that cannot hold a 64-bit bound exactly; Go bounds are integers in the definition"
+        },
+        {
+          "it": "accepts a bound a number states exactly",
+          "class": "js-runtime-only",
+          "reason": "the JavaScript number/bigint split of a bound; Go bounds are integers in the definition"
+        },
+        {
+          "it": "keeps the base type of the schema it bounds",
+          "class": "js-runtime-only",
+          "reason": "the base type of a TlvNumber schema object .bound() returns"
+        },
+        {
+          "it": "states the datatype of a bounded 64 bit schema",
+          "class": "js-runtime-only",
+          "reason": "the datatype element a bounded TlvNumber schema object derives"
+        },
+        {
+          "it": "throws an error if the value is not a number",
+          "class": "js-runtime-only",
+          "reason": "TlvSchema.validate of an untyped JavaScript value; a Go value has its static type, and a wire element of the wrong type is refused by the typed decoders (cluster/spec DecodeBool, DecodeUintIn, DecodeStringIn)"
+        },
+        {
+          "it": "throws an error if the value is not a bigint",
+          "class": "js-runtime-only",
+          "reason": "TlvSchema.validate of an untyped JavaScript value; a Go value has its static type, and a wire element of the wrong type is refused by the typed decoders (cluster/spec DecodeBool, DecodeUintIn, DecodeStringIn) (two its of the same name)"
+        },
+        {
+          "it": "does not throw an error if the value is a number",
+          "class": "js-runtime-only",
+          "reason": "TlvSchema.validate of an untyped JavaScript value; a Go value has its static type, and a wire element of the wrong type is refused by the typed decoders (cluster/spec DecodeBool, DecodeUintIn, DecodeStringIn)"
+        },
+        {
+          "it": "does not throw an error if the value is a bigint",
+          "class": "js-runtime-only",
+          "reason": "TlvSchema.validate of an untyped JavaScript value; a Go value has its static type, and a wire element of the wrong type is refused by the typed decoders (cluster/spec DecodeBool, DecodeUintIn, DecodeStringIn)"
+        },
+        {
+          "it": "encodes an TlvEpochS and validates that it is converted correctly",
+          "class": "js-runtime-only",
+          "reason": "the Unix-to-Matter epoch conversion of JavaScript Date values; the module keeps epoch-s as the wire integer"
+        },
+        {
+          "it": "Throws when self-converting EpochS values",
+          "class": "js-runtime-only",
+          "reason": "the Unix-to-Matter epoch conversion of JavaScript Date values; the module keeps epoch-s as the wire integer"
+        },
+        {
+          "it": "encodes an TlvEpochUs and validates that it is converted correctly",
+          "class": "js-runtime-only",
+          "reason": "the Unix-to-Matter epoch conversion of JavaScript values; the module keeps epoch-us as the wire integer"
+        },
+        {
+          "it": "Throws when self-converting EpochUs values",
+          "class": "js-runtime-only",
+          "reason": "the Unix-to-Matter epoch conversion of JavaScript values; the module keeps epoch-us as the wire integer"
+        }
+      ],
+      "reason": "The numeric and float vectors encoded, decoded and measured (smallest-fit widths, an 8-byte small value), the bound range of a bounded uint32 on cluster/spec DecodeUintIn, and relaxNumberTypeChecks: the server decoders are matter.js's strict default, spec.DecodeValue — the controller's decode of a reported value, where matter.js relaxes (InputChunk.ts DATA_REPORT_DECODE_OPTIONS) — takes an integer of the other signedness that fits, since phase 33, and refuses a negative value for an unsigned type, an out-of-range one and a float.",
       "snapshotSha": "f5f0d999724d435b7c742e0be8d802bdb4495265"
     },
     {
       "path": "packages/types/test/tlv/TlvObjectTest.ts",
-      "status": "planned",
-      "reason": "Phase 33: a new register root, ported by meaning in this phase.",
+      "status": "partial",
+      "go": [
+        "tlv:TestObjectParity_Encode_AllFields",
+        "tlv:TestObjectParity_Encode_OptionalOmitted",
+        "tlv:TestObjectParity_Decode_AllFields",
+        "tlv:TestObjectParity_Decode_OptionalOmitted",
+        "tlv:TestObjectParity_TaggedList_Optional",
+        "tlv:TestObjectParity_TaggedList_OptionalAndRequired_InOrder",
+        "tlv:TestObjectParity_TaggedList_RequiredOnly",
+        "tlv:TestObjectParity_TaggedList_RepeatedFields",
+        "tlv:TestObjectParity_TaggedList_Decode_Optional",
+        "cluster/spec:TestTlvObjectParityMatterJS"
+      ],
+      "missing": [
+        "strips fabricIndex for write interaction even when caller provided a value"
+      ],
+      "left": [
+        {
+          "it": "injects field value on missing value",
+          "class": "by-design",
+          "reason": "BD-Matter-TLVSchemaLayer: TlvObject's schema API has no tlv counterpart; the generated cluster/spec codecs are the module's schema layer"
+        },
+        {
+          "it": "injects field value on existing",
+          "class": "by-design",
+          "reason": "BD-Matter-TLVSchemaLayer: TlvObject's schema API has no tlv counterpart; the generated cluster/spec codecs are the module's schema layer"
+        },
+        {
+          "it": "do not inject field value when not wanted",
+          "class": "by-design",
+          "reason": "BD-Matter-TLVSchemaLayer: TlvObject's schema API has no tlv counterpart; the generated cluster/spec codecs are the module's schema layer"
+        },
+        {
+          "it": "do not inject field value when existing",
+          "class": "by-design",
+          "reason": "BD-Matter-TLVSchemaLayer: TlvObject's schema API has no tlv counterpart; the generated cluster/spec codecs are the module's schema layer"
+        },
+        {
+          "it": "throw error on invalid field value",
+          "class": "by-design",
+          "reason": "BD-Matter-TLVSchemaLayer: TlvObject's schema API has no tlv counterpart; the generated cluster/spec codecs are the module's schema layer"
+        },
+        {
+          "it": "injects field value also on nullable array schema",
+          "class": "by-design",
+          "reason": "BD-Matter-TLVSchemaLayer: TlvObject's schema API has no tlv counterpart; the generated cluster/spec codecs are the module's schema layer"
+        },
+        {
+          "it": "injects field value when an optional nested struct field is omitted",
+          "class": "by-design",
+          "reason": "BD-Matter-TLVSchemaLayer: TlvObject's schema API has no tlv counterpart; the generated cluster/spec codecs are the module's schema layer"
+        },
+        {
+          "it": "throws error on invalid field value",
+          "class": "by-design",
+          "reason": "BD-Matter-TLVSchemaLayer: TlvObject's schema API has no tlv counterpart; the generated cluster/spec codecs are the module's schema layer"
+        },
+        {
+          "it": "remove field value on missing value",
+          "class": "by-design",
+          "reason": "BD-Matter-TLVSchemaLayer: TlvObject's schema API has no tlv counterpart; the generated cluster/spec codecs are the module's schema layer"
+        },
+        {
+          "it": "do not change field value when missing",
+          "class": "by-design",
+          "reason": "BD-Matter-TLVSchemaLayer: TlvObject's schema API has no tlv counterpart; the generated cluster/spec codecs are the module's schema layer"
+        },
+        {
+          "it": "do not remove field value when existing but unwanted",
+          "class": "by-design",
+          "reason": "BD-Matter-TLVSchemaLayer: TlvObject's schema API has no tlv counterpart; the generated cluster/spec codecs are the module's schema layer"
+        },
+        {
+          "it": "removes field value also on nullable array schema",
+          "class": "by-design",
+          "reason": "BD-Matter-TLVSchemaLayer: TlvObject's schema API has no tlv counterpart; the generated cluster/spec codecs are the module's schema layer"
+        },
+        {
+          "it": "removes field value when an optional nested struct field is omitted",
+          "class": "by-design",
+          "reason": "BD-Matter-TLVSchemaLayer: TlvObject's schema API has no tlv counterpart; the generated cluster/spec codecs are the module's schema layer"
+        },
+        {
+          "it": "encodes in schema/tag order regardless of caller property order",
+          "class": "by-design",
+          "reason": "BD-Matter-TLVSchemaLayer: TlvObject's schema API has no tlv counterpart; the generated cluster/spec codecs are the module's schema layer"
+        },
+        {
+          "it": "encode and decode list with optional repeated fields with limit",
+          "class": "by-design",
+          "reason": "BD-Matter-TLVSchemaLayer: TlvObject's schema API has no tlv counterpart; the generated cluster/spec codecs are the module's schema layer"
+        },
+        {
+          "it": "throws error on too long repeated optional fields encoding",
+          "class": "by-design",
+          "reason": "BD-Matter-TLVSchemaLayer: TlvObject's schema API has no tlv counterpart; the generated cluster/spec codecs are the module's schema layer"
+        },
+        {
+          "it": "throws error on too long repeated optional fields decoding",
+          "class": "by-design",
+          "reason": "BD-Matter-TLVSchemaLayer: TlvObject's schema API has no tlv counterpart; the generated cluster/spec codecs are the module's schema layer"
+        },
+        {
+          "it": "encode and decode list with repeated fields",
+          "class": "by-design",
+          "reason": "BD-Matter-TLVSchemaLayer: TlvObject's schema API has no tlv counterpart; the generated cluster/spec codecs are the module's schema layer"
+        },
+        {
+          "it": "encodes repeated fields in schema/tag order regardless of caller property order",
+          "class": "by-design",
+          "reason": "BD-Matter-TLVSchemaLayer: TlvObject's schema API has no tlv counterpart; the generated cluster/spec codecs are the module's schema layer"
+        },
+        {
+          "it": "encode and decode list with repeated fields with limit #1",
+          "class": "by-design",
+          "reason": "BD-Matter-TLVSchemaLayer: TlvObject's schema API has no tlv counterpart; the generated cluster/spec codecs are the module's schema layer"
+        },
+        {
+          "it": "encode and decode list with repeated fields with limit #2",
+          "class": "by-design",
+          "reason": "BD-Matter-TLVSchemaLayer: TlvObject's schema API has no tlv counterpart; the generated cluster/spec codecs are the module's schema layer"
+        },
+        {
+          "it": "throws error on missing required fields",
+          "class": "by-design",
+          "reason": "BD-Matter-TLVSchemaLayer: TlvObject's schema API has no tlv counterpart; the generated cluster/spec codecs are the module's schema layer"
+        },
+        {
+          "it": "throws error on too short or too long repeated fields",
+          "class": "by-design",
+          "reason": "BD-Matter-TLVSchemaLayer: TlvObject's schema API has no tlv counterpart; the generated cluster/spec codecs are the module's schema layer"
+        },
+        {
+          "it": "throws error on decoding list with repeated fields without limit",
+          "class": "by-design",
+          "reason": "BD-Matter-TLVSchemaLayer: TlvObject's schema API has no tlv counterpart; the generated cluster/spec codecs are the module's schema layer"
+        },
+        {
+          "it": "encodes single-entry repeated field in schema/tag order regardless of caller property order",
+          "class": "by-design",
+          "reason": "BD-Matter-TLVSchemaLayer: TlvObject's schema API has no tlv counterpart; the generated cluster/spec codecs are the module's schema layer"
+        },
+        {
+          "it": "emits members in schema-defined tag order regardless of caller property order",
+          "class": "by-design",
+          "reason": "BD-Matter-TLVSchemaLayer: TlvObject's schema API has no tlv counterpart; the generated cluster/spec codecs are the module's schema layer"
+        },
+        {
+          "it": "omits absent optional fields and keeps remaining members in tag order",
+          "class": "by-design",
+          "reason": "BD-Matter-TLVSchemaLayer: TlvObject's schema API has no tlv counterpart; the generated cluster/spec codecs are the module's schema layer"
+        },
+        {
+          "it": "emits members in caller property order, not schema order",
+          "class": "by-design",
+          "reason": "BD-Matter-TLVSchemaLayer: TlvObject's schema API has no tlv counterpart; the generated cluster/spec codecs are the module's schema layer"
+        },
+        {
+          "it": "omits absent optional fields and emits remaining schema fields after caller-supplied ones",
+          "class": "by-design",
+          "reason": "BD-Matter-TLVSchemaLayer: TlvObject's schema API has no tlv counterpart; the generated cluster/spec codecs are the module's schema layer"
+        },
+        {
+          "it": "throws ValidationDatatypeMismatchError on unknown fields",
+          "class": "by-design",
+          "reason": "BD-Matter-TLVSchemaLayer: TlvObject's schema API has no tlv counterpart; the generated cluster/spec codecs are the module's schema layer"
+        },
+        {
+          "it": "throws ValidationDatatypeMismatchError on unknown fields in default schema-order mode",
+          "class": "by-design",
+          "reason": "BD-Matter-TLVSchemaLayer: TlvObject's schema API has no tlv counterpart; the generated cluster/spec codecs are the module's schema layer"
+        },
+        {
+          "it": "rejects prototype-chain keys (e.g. 'toString') as unknown fields",
+          "class": "by-design",
+          "reason": "BD-Matter-TLVSchemaLayer: TlvObject's schema API has no tlv counterpart; the generated cluster/spec codecs are the module's schema layer"
+        },
+        {
+          "it": "decodes list with protocol specific tags",
+          "class": "by-design",
+          "reason": "BD-Matter-TLVSchemaLayer: TlvObject's schema API has no tlv counterpart; the generated cluster/spec codecs are the module's schema layer"
+        },
+        {
+          "it": "fails when protocol specific tags are not allowed",
+          "class": "by-design",
+          "reason": "BD-Matter-TLVSchemaLayer: TlvObject's schema API has no tlv counterpart; the generated cluster/spec codecs are the module's schema layer"
+        },
+        {
+          "it": "calculate byte length ${valueDescription} (two vectors)",
+          "class": "js-runtime-only",
+          "reason": "TlvAny.getEncodedByteLength over an element stream; the encode cases assert the bytes, so their length"
+        },
+        {
+          "it": "encode/decodes ${valueDescription} (two vectors)",
+          "class": "js-runtime-only",
+          "reason": "the encodeTlv/decodeTlv element-stream round trip of a TlvObject; the Go round trip is the encode and decode of the same bytes (TestObjectParity_Encode_* / Decode_*)"
+        }
+      ],
+      "reason": "The two object vectors encoded and decoded on the raw codec, the tagged-list vectors the raw codec can state, an unknown field skipped (spec.DecodeFields), a fabric-scoped struct round-tripping its FabricIndex and one written without it (spec.EncodeJSON). Missing: the controller's encoder keeps a FabricIndex the caller supplies on a write (findings register, phase 33).",
       "snapshotSha": "954eb21b84893d68a740d76b2be3433319be6fcc"
     },
     {
       "path": "packages/types/test/tlv/TlvOfModelTest.ts",
-      "status": "planned",
-      "reason": "Phase 33: a new register root, ported by meaning in this phase.",
+      "status": "partial",
+      "go": [
+        "cluster/spec:TestTlvOfModelParityMatterJS",
+        "cluster/spec:TestTlvNullableParityMatterJS"
+      ],
+      "missing": [
+        "refuses a value beyond the computed bound",
+        "refuses the value above it",
+        "states a bound beyond the safe integers as a bigint"
+      ],
+      "left": [
+        {
+          "it": "applies epoch-us offset on round-trip",
+          "class": "js-runtime-only",
+          "reason": "the Unix-to-Matter epoch offset TlvOfModel applies to epoch-us values; the module keeps the wire integer"
+        },
+        {
+          "it": "applies epoch-s offset on round-trip",
+          "class": "js-runtime-only",
+          "reason": "the Unix-to-Matter epoch offset TlvOfModel applies to epoch-s values; the module keeps the wire integer"
+        },
+        {
+          "it": "keeps both bounds of a range",
+          "class": "js-runtime-only",
+          "reason": "the number/bigint shape of ModelBounds.createNumberBounds, matter.js's model-to-schema step; the Go bounds are generated into the definition"
+        },
+        {
+          "it": "keeps the computed bound next to a stated one",
+          "class": "js-runtime-only",
+          "reason": "the number/bigint shape of ModelBounds.createNumberBounds; the Go bounds are generated into the definition"
+        },
+        {
+          "it": "keeps a bound computed in more than one step",
+          "class": "js-runtime-only",
+          "reason": "the number/bigint shape of ModelBounds.createNumberBounds; the Go bounds are generated into the definition"
+        },
+        {
+          "it": "counts the units of an operand as the validator does",
+          "class": "js-runtime-only",
+          "reason": "agreement between ModelBounds and matter.js's validator; cluster/spec has one bound evaluator (bound_expr.go) for both"
+        },
+        {
+          "it": "leaves a bound an integer type cannot state exactly out of the schema",
+          "class": "js-runtime-only",
+          "reason": "the number/bigint shape of ModelBounds.createNumberBounds; the Go bounds are generated into the definition"
+        },
+        {
+          "it": "states a length bound as a number",
+          "class": "js-runtime-only",
+          "reason": "the number/bigint shape of ModelBounds.createLengthBounds"
+        },
+        {
+          "it": "states a magnitude beyond every number as it stands",
+          "class": "js-runtime-only",
+          "reason": "the number/bigint shape of ModelBounds.createNumberBounds"
+        },
+        {
+          "it": "refuses a bound a number states only approximately",
+          "class": "js-runtime-only",
+          "reason": "a JavaScript number that lost a 64-bit bound's magnitude before the schema saw it (ImplementationError); Go bounds are integers in the definition"
+        },
+        {
+          "it": "states an exact value the way it states a bound",
+          "class": "js-runtime-only",
+          "reason": "the number/bigint shape of ModelBounds.createNumberBounds"
+        }
+      ],
+      "reason": "TlvOfModel's model-driven codec as spec.EncodeJSON / DecodeJSON over generated definitions: GroupKeySetStruct with its nullable epoch fields alone and in KeySetWrite, CumulativeEnergyResetStruct, the nullable StartUpOnOff and CumulativeEnergyReset, the non-nullable GlobalSceneControl, an attribute typed any; a bounded nullable int64 and the widest uint64 its bound admits on CheckValue. Missing: bounds beyond 2^53 compare as float64 in cluster/spec (findings register, phase 33).",
       "snapshotSha": "f449d80c5d0beb1f36549fcc19b1b4e7ce30ad29"
     },
     {
       "path": "packages/types/test/tlv/TlvSchemaElementTest.ts",
-      "status": "planned",
-      "reason": "Phase 33: a new register root, ported by meaning in this phase.",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "TlvSchema.element, the model element matter.js derives back from a TypeScript TLV schema object (numerics, bounds, strings, objects, arrays, nullable, wrappers); the module has no TLV schema objects — its definitions are generated from the model (script/clustergen).",
       "snapshotSha": "1b4283b2027383f083ae0bae59a9d54561483e3e"
     },
     {
       "path": "packages/types/test/tlv/TlvSchemaTest.ts",
-      "status": "planned",
-      "reason": "Phase 33: a new register root, ported by meaning in this phase.",
+      "status": "ported",
+      "go": [
+        "tlv:TestObjectParity_Schema_UInt16AndBoolean",
+        "tlv:TestObjectParity_Schema_StringFields",
+        "tlv:TestObjectParity_Schema_ArrayField",
+        "tlv:TestObjectParity_Schema_NumberFields",
+        "tlv:TestObjectParity_Schema_NestedStructs"
+      ],
+      "left": [
+        {
+          "it": "TlvSchema.encode / calculateByteLength / decode TlvWrapper",
+          "class": "js-runtime-only",
+          "reason": "TlvWrapper converts a JavaScript object to and from its wire value; a Go type's EncodeTLV/DecodeTLV is that conversion"
+        }
+      ],
+      "reason": "Five of the six vectors (encode, byte length, decode: three it helpers each) on the raw codec.",
       "snapshotSha": "34dc19be34548d25921e747ad0f0f451bc8af8e5"
     },
     {
       "path": "packages/types/test/tlv/TlvStringTest.ts",
-      "status": "planned",
-      "reason": "Phase 33: a new register root, ported by meaning in this phase.",
+      "status": "partial",
+      "go": [
+        "tlv:TestCodecParity_UTF8String_ASCII",
+        "tlv:TestCodecParity_UTF8String_UTF8Encoded",
+        "tlv:TestCodecParity_UTF8String_Decode_ASCII",
+        "tlv:TestCodecParity_UTF8String_Decode_UTF8",
+        "tlv:TestCodecParity_OctetString",
+        "tlv:TestCodecParity_OctetString_Decode",
+        "tlv:TestUTF8String_IS1Truncation",
+        "tlv:TestUTF8String_NoIS1RemainsComplete",
+        "tlv:TestOctetString_IS1BytePreserved",
+        "tlv:TestUTF8String_IS1KeepsTheRawLength",
+        "tlv:TestTlvStringByteSizeParityMatterJS",
+        "cluster/spec:TestTlvBoundsParityMatterJS",
+        "cluster/spec:TestDecodeStringInBoundsTheLengthBeforeIS1"
+      ],
+      "missing": [
+        "throws an error if a character string contains Information Separator 1 (0x1F)"
+      ],
+      "left": [
+        {
+          "it": "throws an error if the value is not a ByteString",
+          "class": "js-runtime-only",
+          "reason": "TlvSchema.validate of an untyped JavaScript value; a Go value has its static type, and a wire element of the wrong type is refused by the typed decoders (cluster/spec DecodeBool, DecodeUintIn, DecodeStringIn)"
+        },
+        {
+          "it": "throws an error if the value is not a String",
+          "class": "js-runtime-only",
+          "reason": "TlvSchema.validate of an untyped JavaScript value; a Go value has its static type, and a wire element of the wrong type is refused by the typed decoders (cluster/spec DecodeBool, DecodeUintIn, DecodeStringIn)"
+        }
+      ],
+      "reason": "Strings and byte strings encoded, decoded and measured, the IS1 truncation of a character string (and none of a byte string), the length bound against the raw length, and the 4..6 bounds on cluster/spec DecodeStringIn / DecodeBytesIn. Missing: the encoder writes an IS1 inside a character string matter.js's validate refuses (findings register, phase 33).",
       "snapshotSha": "10cc7d66e25872c8586930eba25cf7e7545a63f5"
     },
     {
       "path": "packages/types/test/tlv/TlvVoidTest.ts",
-      "status": "planned",
-      "reason": "Phase 33: a new register root, ported by meaning in this phase.",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "TlvVoid encodes JavaScript undefined as nothing; a Go command without fields has an empty payload by construction.",
       "snapshotSha": "aa0e3269698ffc50179e26885fdacc55cb275023"
     }
   ],
@@ -7655,31 +8187,6 @@
       "test": "store:TestParityChip_FabricLabel_TooLongFails",
       "source": "chip src/credentials/tests/TestFabricTable.cpp:2470",
       "reason": "The label-length limit is enforced by the OperationalCredentials server (UpdateFabricLabel), not by the store."
-    },
-    {
-      "test": "tlv:TestObjectParity_ChunkedArray_NotImplemented",
-      "source": "matter.js packages/types/test/tlv/TlvArrayTest.ts:39-54",
-      "reason": "Chunked arrays are encoded and decoded in im, not in tlv."
-    },
-    {
-      "test": "tlv:TestObjectParity_InjectField_NotImplemented",
-      "source": "matter.js packages/types/test/tlv/TlvObjectTest.ts:203-264",
-      "reason": "No TlvObject.injectField counterpart: the caller builds the struct."
-    },
-    {
-      "test": "tlv:TestObjectParity_RemoveField_NotImplemented",
-      "source": "matter.js packages/types/test/tlv/TlvObjectTest.ts:286-325",
-      "reason": "No TlvObject.removeField counterpart."
-    },
-    {
-      "test": "tlv:TestObjectParity_TaggedList_ProtocolSpecificTags_NotImplemented",
-      "source": "matter.js packages/types/test/tlv/TlvObjectTest.ts:478-495",
-      "reason": "No allowProtocolSpecificTags check: the decoder passes non-context tags through."
-    },
-    {
-      "test": "tlv:TestObjectParity_ValidationError_NotImplemented",
-      "source": "matter.js packages/types/test/tlv/TlvObjectTest.ts:266-284",
-      "reason": "No schema validation layer in tlv: validation is the cluster definitions' (cluster/spec)."
     }
   ]
 }
