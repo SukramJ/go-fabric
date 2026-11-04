@@ -171,7 +171,7 @@ func TestFailsafeCommissioningParity(t *testing.T) {
 		}
 	})
 
-	// FailsafeCommissioningTest.ts:305-344: the device's initial ACL
+	// FailsafeCommissioningTest.ts:305-346: the device's initial ACL
 	// cannot be written during AddNOC (matter.js's FailingAccessControlServer
 	// throws from addDefaultCaseAcl, :100-104; here the credential store
 	// refuses the ReplaceACL AddNOC installs the CaseAdminSubject entry

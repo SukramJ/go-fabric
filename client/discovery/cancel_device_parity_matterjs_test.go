@@ -19,7 +19,7 @@ import (
 )
 
 // TestDiscoveryCancelWithRealDeviceParity is a port of
-// packages/node/test/behavior/system/controller/discovery/DiscoveryCancelTest.ts:568-679
+// packages/node/test/behavior/system/controller/discovery/DiscoveryCancelTest.ts:568-674
 // at 862ad75f ("with a real device", interruptMidPase): a commissioning
 // race over the controller's DNS-SD transport against a fabrictest device
 // whose PASE answers are held once the controller opens PASE
@@ -63,7 +63,7 @@ func TestDiscoveryCancelWithRealDeviceParity(t *testing.T) {
 	})
 }
 
-// midPASE is MidPaseInterruption (:599-603): the handles a test interrupts
+// midPASE is MidPaseInterruption (:603-607): the handles a test interrupts
 // a commissioning with.
 type midPASE struct {
 	session  *discovery.Session[*client.Node]
@@ -94,7 +94,7 @@ func (f *failingScanner) FindContinuously(ctx context.Context, id discovery.Iden
 	}
 }
 
-// interruptMidPASE is interruptMidPase (:605-679): it commissions a real
+// interruptMidPASE is interruptMidPase (:613-674): it commissions a real
 // device through a commissioning race, interrupts the race once the
 // device's first PASE answer is held, releases the held answers and
 // returns the race's error after checking the device was not commissioned.
@@ -153,7 +153,7 @@ func interruptMidPASE(t *testing.T, interrupt func(midPASE)) error {
 	if outcome == nil {
 		t.Fatal("the interrupted commissioning succeeded")
 	}
-	// Let the attempt settle (:668).
+	// Let the attempt settle (:667).
 	if err := site.Step(ctx, time.Minute); err != nil {
 		t.Fatal(err)
 	}

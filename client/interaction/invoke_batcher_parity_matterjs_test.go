@@ -535,7 +535,7 @@ func TestInvokeBatcherParity(t *testing.T) {
 			// ClientInvokeTest.ts:832-865: the connect the batcher awaits
 			// before it queues the command is held, the interaction closes
 			// meanwhile and the connect is released — the command is
-			// rejected with the close reason and no InvokeRequest goes out.
+			// rejected with the close reason and no invoke exchange opens.
 			s := newScriptedWith(t, &sessionparams.Parameters{MaxPathsPerInvoke: 10})
 			p, connecting, release := interaction.HoldConnect(interaction.SessionProvider(s.mgr, s.session))
 			c := interaction.Bind(p, interaction.Config{Clock: s.clock})
