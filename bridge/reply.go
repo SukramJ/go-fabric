@@ -432,6 +432,22 @@ func chunkReportData(rd im.ReportData, budget, hardCap int) ([]im.ReportData, er
 	var addAttributeReport func(rep im.AttributeReport) error
 	addAttributeReport = func(rep im.AttributeReport) error {
 		if parts, ok := splitListAttributeReport(rd, rep, budget); ok {
+			// A list entry too large for any message fails the whole
+			// attribute: one status on the attribute's path, never a
+			// status on a list-item path, which a reader's list buffering
+			// does not take (connectedhomeip's BufferedReadCallback passes
+			// a failed list item through, and its Python controller aborts
+			// on it, matter/clusters/attribute.cpp:110-116 at 6170af84 —
+			// TC-TLSCERT-2.9).
+			for _, part := range parts {
+				capped, err := capOversizedAttributeReport(rd, part, hardCap)
+				if err != nil {
+					return err
+				}
+				if capped.IsStatus {
+					return addAttributeReport(attributeStatus(rep, im.StatusResourceExhausted))
+				}
+			}
 			for _, part := range parts {
 				if err := addAttributeReport(part); err != nil {
 					return err
@@ -611,11 +627,15 @@ func capOversizedAttributeReport(rd im.ReportData, rep im.AttributeReport, hardC
 	if len(aloneBody) <= hardCap {
 		return rep, nil
 	}
-	return im.AttributeReport{
-		Path:     rep.Path,
-		IsStatus: true,
-		Status:   im.StatusIB{Status: im.StatusResourceExhausted},
-	}, nil
+	return attributeStatus(rep, im.StatusResourceExhausted), nil
+}
+
+// attributeStatus is rep's attribute answered with status: the path
+// without a list index, which a status never carries here.
+func attributeStatus(rep im.AttributeReport, status im.StatusCode) im.AttributeReport {
+	path := rep.Path
+	path.ListAppend, path.HasListIndex, path.ListIndex = false, false, 0
+	return im.AttributeReport{Path: path, IsStatus: true, Status: im.StatusIB{Status: status}}
 }
 
 // capOversizedEventReport is [capOversizedAttributeReport]'s twin for

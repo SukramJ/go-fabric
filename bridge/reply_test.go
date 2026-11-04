@@ -962,3 +962,40 @@ func TestDefaultAttrWriter_AccessControlExtensionEntry_PopulatedList(t *testing.
 		t.Errorf("FabricIndex=%d, want %d", fabricIdx.Uint, entries[0].FabricIndex)
 	}
 }
+
+// TestChunkReportData_OversizedListEntryFailsTheAttribute: a list whose one
+// entry cannot fit any message is answered with one status on the
+// attribute's path — no REPLACE-ALL head, no status on a list-item path,
+// which connectedhomeip's Python controller aborts on
+// (matter/clusters/attribute.cpp:110-116 at 6170af84, TC-TLSCERT-2.9).
+func TestChunkReportData_OversizedListEntryFailsTheAttribute(t *testing.T) {
+	t.Parallel()
+	small := []byte("small")
+	huge := make([]byte, 3000)
+	rep := im.AttributeReport{
+		Path: im.ConcreteAttributePath{
+			Endpoint: 0, Cluster: 0x0801, Attribute: 0x0003,
+			HasEndpoint: true, HasCluster: true, HasAttribute: true,
+		},
+		Value:       im.AttributeValue{Value: [][]byte{small, small, huge}},
+		DataVersion: 3,
+	}
+	chunks, err := chunkReportData(im.ReportData{Reports: []im.AttributeReport{rep}}, reportChunkPayloadBudget, reportChunkHardCap)
+	if err != nil {
+		t.Fatalf("chunkReportData: %v", err)
+	}
+	var reports []im.AttributeReport
+	for _, c := range chunks {
+		reports = append(reports, c.Reports...)
+	}
+	if len(reports) != 1 {
+		t.Fatalf("%d reports, want one status for the attribute: %+v", len(reports), reports)
+	}
+	got := reports[0]
+	if !got.IsStatus || got.Status.Status != im.StatusResourceExhausted {
+		t.Fatalf("report %+v, want RESOURCE_EXHAUSTED", got)
+	}
+	if got.Path.ListAppend || got.Path.HasListIndex || got.Path.Attribute != 0x0003 {
+		t.Fatalf("status path %+v, want the attribute's path without a list index", got.Path)
+	}
+}
