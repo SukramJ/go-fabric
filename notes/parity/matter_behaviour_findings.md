@@ -789,9 +789,22 @@ with a port of the named case.
   2^62, and a uint64 bound above int64 cannot be stated. matter.js keeps
   such bounds as bigints (`TlvOfModelTest.ts` "refuses a value beyond the
   computed bound", "refuses the value above it", "states a bound beyond
-  the safe integers as a bigint"). No served attribute states such a bound
-  at the pin. Route: compare integers as integers (uint64/int64 or
+  the safe integers as a bigint"; `ConstraintTest.ts` "keeps the magnitude
+  of a decimal / hexadecimal / negative bound", "judges a value against a
+  bound only a bigint states" and its value tests at 2^53 ± 1 and 2^62 ± 1).
+  No served attribute states such a bound at the pin. Route: compare integers as integers (uint64/int64 or
   math/big) where the type is a 64-bit integer.
+
+- **Defaults matter.js derives without a stated one.** matter.js's
+  `DefaultValue` gives a list whose type permits no entries the empty list,
+  builds a bitmap's default from its members' defaults (bit placement
+  across bit 31, a member without an upper bound, the first member to claim
+  a bit), and scales a unit default by the type a declared type derives
+  from (`packages/model/test/logic/DefaultValueTest.ts` at `862ad75f`,
+  nine cases). `script/clustergen` writes only the default the snapshot
+  states (`defaultLiteral`), scaling a unit by the declared type name
+  (`encodedUnit`). Route: derive these in the generator, or have the
+  extractor write matter.js's computed default into `parity/schema.json`.
 
 ## Tier 3 — LOW
 

@@ -691,26 +691,346 @@
     },
     {
       "path": "packages/model/test/aspects/AccessTest.ts",
-      "status": "planned",
-      "reason": "Phase 33: a new register root, ported by meaning in this phase.",
+      "status": "ported",
+      "go": [
+        "cluster/spec:TestAccessParityMatterJS"
+      ],
+      "left": [
+        {
+          "it": "parses",
+          "class": "js-runtime-only",
+          "reason": "the text form of the aspect, parsed and serialized by matter.js's model; the module receives the parsed form in parity/schema.json (script/extract-from-matter-js.ts) and has no Access, Quality or Constraint text parser"
+        },
+        {
+          "it": "serializes",
+          "class": "js-runtime-only",
+          "reason": "the text form of the aspect, parsed and serialized by matter.js's model; the module receives the parsed form in parity/schema.json (script/extract-from-matter-js.ts) and has no Access, Quality or Constraint text parser"
+        },
+        {
+          "it": "records error",
+          "class": "js-runtime-only",
+          "reason": "the text form of the aspect, parsed and serialized by matter.js's model; the module receives the parsed form in parity/schema.json (script/extract-from-matter-js.ts) and has no Access, Quality or Constraint text parser"
+        },
+        {
+          "it": "requires r/w privileges if RW",
+          "class": "js-runtime-only",
+          "reason": "Access.complete, matter.js's model-validation check that an access definition states its privileges; the snapshot's effective access always carries them"
+        },
+        {
+          "it": "requires read privilege if R",
+          "class": "js-runtime-only",
+          "reason": "Access.complete, a model-validation check; the snapshot's effective access always carries the privileges"
+        },
+        {
+          "it": "requires write privilege if W",
+          "class": "js-runtime-only",
+          "reason": "Access.complete, a model-validation check; the snapshot's effective access always carries the privileges"
+        }
+      ],
+      "reason": "readable and writable on cluster/spec Access, the effective access the snapshot carries.",
       "snapshotSha": "c550c26f463f7210bce40ef3288f26b459897fbd"
     },
     {
       "path": "packages/model/test/aspects/ConformanceTest.ts",
-      "status": "planned",
-      "reason": "Phase 33: a new register root, ported by meaning in this phase.",
+      "status": "ported",
+      "go": [
+        "internal/chipdm:TestConformanceTextParityMatterJS",
+        "internal/chipdm:TestConformanceInvalidParityMatterJS",
+        "internal/chipdm:TestConformanceRevisionParityMatterJS",
+        "internal/chipdm:TestConformancePrecedenceParityMatterJS",
+        "cluster/spec:TestConformanceApplicabilityParityMatterJS",
+        "cluster/spec:TestApplicability",
+        "cluster/spec:TestApplicabilityDeprecatedOptional"
+      ],
+      "left": [
+        {
+          "it": "recovers a following top-level term after partial optionality",
+          "class": "js-runtime-only",
+          "reason": "error recovery of matter.js's model parser for its validation report; the module's conformance parser (internal/chipdm, reading chip's XML) refuses the text"
+        },
+        {
+          "it": "is obsolete but not disallowed",
+          "class": "js-runtime-only",
+          "reason": "the isObsolete/isDisallowed properties of matter.js's Conformance object; cluster/spec treats Z as its own operator (ConfObsolete) in Applicability"
+        },
+        {
+          "it": "leaves a disallowed element not obsolete",
+          "class": "js-runtime-only",
+          "reason": "the isObsolete property of matter.js's Conformance object; cluster/spec treats Z as its own operator"
+        },
+        {
+          "it": "rejects \"${definition}\" (eight forms)",
+          "class": "js-runtime-only",
+          "reason": "INVALID_OBSOLETE, matter.js's validation of its model text; the snapshot's conformance arrives validated, and the chip-XML reader of internal/chipdm accepts the \"Z, X, D\" form chip states (TestParseConformance)"
+        },
+        {
+          "it": "rejects an obsolete entry in a list definition",
+          "class": "js-runtime-only",
+          "reason": "INVALID_OBSOLETE on matter.js's list form of a conformance definition; the snapshot's conformance arrives validated"
+        },
+        {
+          "it": "does not require a type for an obsolete element",
+          "class": "js-runtime-only",
+          "reason": "name resolution of matter.js's model validation (ValidateModel) over its in-memory model; the extractor resolves the names before parity/schema.json is written, and script/clustergen fails on a conformance it cannot render"
+        },
+        {
+          "it": "reports the misuse through model validation",
+          "class": "js-runtime-only",
+          "reason": "name resolution of matter.js's model validation (ValidateModel) over its in-memory model; the extractor resolves the names before parity/schema.json is written, and script/clustergen fails on a conformance it cannot render"
+        },
+        {
+          "it": "resolves simple enum field == value",
+          "class": "js-runtime-only",
+          "reason": "name resolution of matter.js's model validation (ValidateModel) over its in-memory model; the extractor resolves the names before parity/schema.json is written, and script/clustergen fails on a conformance it cannot render"
+        },
+        {
+          "it": "resolves enum field == value in OR expression",
+          "class": "js-runtime-only",
+          "reason": "name resolution of matter.js's model validation (ValidateModel) over its in-memory model; the extractor resolves the names before parity/schema.json is written, and script/clustergen fails on a conformance it cannot render"
+        },
+        {
+          "it": "resolves the right side through the resolver",
+          "class": "js-runtime-only",
+          "reason": "name resolution of matter.js's model validation (ValidateModel) over its in-memory model; the extractor resolves the names before parity/schema.json is written, and script/clustergen fails on a conformance it cannot render"
+        },
+        {
+          "it": "reports a right side the resolver does not know",
+          "class": "js-runtime-only",
+          "reason": "name resolution of matter.js's model validation (ValidateModel) over its in-memory model; the extractor resolves the names before parity/schema.json is written, and script/clustergen fails on a conformance it cannot render"
+        },
+        {
+          "it": "resolves True for boolean field",
+          "class": "js-runtime-only",
+          "reason": "name resolution of matter.js's model validation (ValidateModel) over its in-memory model; the extractor resolves the names before parity/schema.json is written, and script/clustergen fails on a conformance it cannot render"
+        },
+        {
+          "it": "resolves qualified field reference",
+          "class": "js-runtime-only",
+          "reason": "name resolution of matter.js's model validation (ValidateModel) over its in-memory model; the extractor resolves the names before parity/schema.json is written, and script/clustergen fails on a conformance it cannot render"
+        },
+        {
+          "it": "resolves multiple qualified references in expression",
+          "class": "js-runtime-only",
+          "reason": "name resolution of matter.js's model validation (ValidateModel) over its in-memory model; the extractor resolves the names before parity/schema.json is written, and script/clustergen fails on a conformance it cannot render"
+        },
+        {
+          "it": "reports unresolved qualified reference",
+          "class": "js-runtime-only",
+          "reason": "name resolution of matter.js's model validation (ValidateModel) over its in-memory model; the extractor resolves the names before parity/schema.json is written, and script/clustergen fails on a conformance it cannot render"
+        },
+        {
+          "it": "resolves names inside brackets and choices",
+          "class": "js-runtime-only",
+          "reason": "name resolution of matter.js's model validation (ValidateModel) over its in-memory model; the extractor resolves the names before parity/schema.json is written, and script/clustergen fails on a conformance it cannot render"
+        },
+        {
+          "it": "reports an unresolved name inside brackets",
+          "class": "js-runtime-only",
+          "reason": "name resolution of matter.js's model validation (ValidateModel) over its in-memory model; the extractor resolves the names before parity/schema.json is written, and script/clustergen fails on a conformance it cannot render"
+        },
+        {
+          "it": "reports an unresolved name inside a choice",
+          "class": "js-runtime-only",
+          "reason": "name resolution of matter.js's model validation (ValidateModel) over its in-memory model; the extractor resolves the names before parity/schema.json is written, and script/clustergen fails on a conformance it cannot render"
+        },
+        {
+          "it": "resolves response field reference to request command field",
+          "class": "js-runtime-only",
+          "reason": "name resolution of matter.js's model validation (ValidateModel) over its in-memory model; the extractor resolves the names before parity/schema.json is written, and script/clustergen fails on a conformance it cannot render"
+        },
+        {
+          "it": "reports unresolved response field reference",
+          "class": "js-runtime-only",
+          "reason": "name resolution of matter.js's model validation (ValidateModel) over its in-memory model; the extractor resolves the names before parity/schema.json is written, and script/clustergen fails on a conformance it cannot render"
+        },
+        {
+          "it": "resolves qualified condition types across device types",
+          "class": "js-runtime-only",
+          "reason": "name resolution of matter.js's model validation (ValidateModel) over its in-memory model; the extractor resolves the names before parity/schema.json is written, and script/clustergen fails on a conformance it cannot render"
+        },
+        {
+          "it": "validates condition elements without errors",
+          "class": "js-runtime-only",
+          "reason": "name resolution of matter.js's model validation (ValidateModel) over its in-memory model; the extractor resolves the names before parity/schema.json is written, and script/clustergen fails on a conformance it cannot render"
+        },
+        {
+          "it": "resolves Rev references without errors",
+          "class": "js-runtime-only",
+          "reason": "name resolution of matter.js's model validation (ValidateModel) over its in-memory model; the extractor resolves the names before parity/schema.json is written, and script/clustergen fails on a conformance it cannot render"
+        },
+        {
+          "it": "finds a provisional term anywhere in an otherwise list",
+          "class": "js-runtime-only",
+          "reason": "Conformance.isProvisional, a property of matter.js's model object; cluster/spec folds provisionality into Applicability (the applicability cases)"
+        },
+        {
+          "it": "is false where nothing is provisional",
+          "class": "js-runtime-only",
+          "reason": "Conformance.isProvisional, a property of matter.js's model object; cluster/spec folds provisionality into Applicability"
+        }
+      ],
+      "reason": "Every conformance text of the file parsed and serialized, the invalid and range-form choices and partial optionality refused (the range form and a second modifier since phase 33, as matter.js's INVALID_CHOICE), Rev conformance and operator precedence by internal/chipdm's parser; applicability, deprecated-as-optional and isMandatory on cluster/spec Conformance.",
       "snapshotSha": "24e2e0e6c80694529aaab3297d084bcf97847625"
     },
     {
       "path": "packages/model/test/aspects/ConstraintTest.ts",
-      "status": "planned",
-      "reason": "Phase 33: a new register root, ported by meaning in this phase.",
+      "status": "partial",
+      "go": [
+        "cluster/spec:TestConstraintValuesParityMatterJS",
+        "cluster/spec:TestBoundExpressionParity"
+      ],
+      "missing": [
+        "${vt.ok ? \"accepts\" : \"rejects\"} ${label}: the value tests beyond 2^53 (2^62 ± 1, 2^53 ± 1)",
+        "keeps the magnitude of a decimal bound",
+        "keeps the magnitude of a hexadecimal bound",
+        "keeps the magnitude of a negative bound",
+        "judges a value against a bound only a bigint states"
+      ],
+      "left": [
+        {
+          "it": "parses",
+          "class": "js-runtime-only",
+          "reason": "the text form of the aspect, parsed and serialized by matter.js's model; the module receives the parsed form in parity/schema.json (script/extract-from-matter-js.ts) and has no Access, Quality or Constraint text parser"
+        },
+        {
+          "it": "serializes",
+          "class": "js-runtime-only",
+          "reason": "the text form of the aspect, parsed and serialized by matter.js's model; the module receives the parsed form in parity/schema.json (script/extract-from-matter-js.ts) and has no Access, Quality or Constraint text parser"
+        },
+        {
+          "it": "states a name, including one the specification's tables use outside the constraint language",
+          "class": "js-runtime-only",
+          "reason": "the text form of the aspect, parsed and serialized by matter.js's model; the module receives the parsed form in parity/schema.json (script/extract-from-matter-js.ts) and has no Access, Quality or Constraint text parser"
+        },
+        {
+          "it": "computes an expression of numbers",
+          "class": "js-runtime-only",
+          "reason": "Constraint.constantOf, the constant folding matter.js's ModelBounds uses to type a schema bound as number or bigint; cluster/spec evaluates a bound at run time (evalBound, TestBoundExpressionParity), its precision is the findings register (phase 33): cluster/spec bounds compare as float64 and Bound.Int is int64, so a bound or value beyond 2^53 is inexact"
+        },
+        {
+          "it": "computes nothing from a name",
+          "class": "js-runtime-only",
+          "reason": "Constraint.constantOf, the constant folding matter.js's ModelBounds uses to type a schema bound as number or bigint; cluster/spec evaluates a bound at run time (evalBound, TestBoundExpressionParity), its precision is the findings register (phase 33): cluster/spec bounds compare as float64 and Bound.Int is int64, so a bound or value beyond 2^53 is inexact"
+        },
+        {
+          "it": "computes nothing from a unit",
+          "class": "js-runtime-only",
+          "reason": "Constraint.constantOf, the constant folding matter.js's ModelBounds uses to type a schema bound as number or bigint; cluster/spec evaluates a bound at run time (evalBound, TestBoundExpressionParity), its precision is the findings register (phase 33): cluster/spec bounds compare as float64 and Bound.Int is int64, so a bound or value beyond 2^53 is inexact"
+        },
+        {
+          "it": "computes nothing that is no number",
+          "class": "js-runtime-only",
+          "reason": "Constraint.constantOf, the constant folding matter.js's ModelBounds uses to type a schema bound as number or bigint; cluster/spec evaluates a bound at run time (evalBound, TestBoundExpressionParity), its precision is the findings register (phase 33): cluster/spec bounds compare as float64 and Bound.Int is int64, so a bound or value beyond 2^53 is inexact"
+        },
+        {
+          "it": "compares a bigint with a number in a function",
+          "class": "js-runtime-only",
+          "reason": "Constraint.constantOf, the constant folding matter.js's ModelBounds uses to type a schema bound as number or bigint; cluster/spec evaluates a bound at run time (evalBound, TestBoundExpressionParity), its precision is the findings register (phase 33): cluster/spec bounds compare as float64 and Bound.Int is int64, so a bound or value beyond 2^53 is inexact"
+        },
+        {
+          "it": "multiplies a bigint",
+          "class": "js-runtime-only",
+          "reason": "Constraint.constantOf, the constant folding matter.js's ModelBounds uses to type a schema bound as number or bigint; cluster/spec evaluates a bound at run time (evalBound, TestBoundExpressionParity), its precision is the findings register (phase 33): cluster/spec bounds compare as float64 and Bound.Int is int64, so a bound or value beyond 2^53 is inexact"
+        },
+        {
+          "it": "computes a fractional power beyond the safe integers as a number",
+          "class": "js-runtime-only",
+          "reason": "Constraint.constantOf, the constant folding matter.js's ModelBounds uses to type a schema bound as number or bigint; cluster/spec evaluates a bound at run time (evalBound, TestBoundExpressionParity), its precision is the findings register (phase 33): cluster/spec bounds compare as float64 and Bound.Int is int64, so a bound or value beyond 2^53 is inexact"
+        },
+        {
+          "it": "leaves a number as stated",
+          "class": "js-runtime-only",
+          "reason": "Constraint.constantOf, the constant folding matter.js's ModelBounds uses to type a schema bound as number or bigint; cluster/spec evaluates a bound at run time (evalBound, TestBoundExpressionParity), its precision is the findings register (phase 33): cluster/spec bounds compare as float64 and Bound.Int is int64, so a bound or value beyond 2^53 is inexact"
+        },
+        {
+          "it": "states a code point maximum as a number",
+          "class": "js-runtime-only",
+          "reason": "the JavaScript number/bigint typing of a parsed Constraint; the text form of the aspect, parsed and serialized by matter.js's model; the module receives the parsed form in parity/schema.json (script/extract-from-matter-js.ts) and has no Access, Quality or Constraint text parser"
+        },
+        {
+          "it": "states a narrower bound as a number",
+          "class": "js-runtime-only",
+          "reason": "the JavaScript number/bigint typing of a parsed Constraint; the text form of the aspect, parsed and serialized by matter.js's model; the module receives the parsed form in parity/schema.json (script/extract-from-matter-js.ts) and has no Access, Quality or Constraint text parser"
+        },
+        {
+          "it": "reports a fraction of a magnitude no number holds",
+          "class": "js-runtime-only",
+          "reason": "the JavaScript number/bigint typing of a parsed Constraint; the text form of the aspect, parsed and serialized by matter.js's model; the module receives the parsed form in parity/schema.json (script/extract-from-matter-js.ts) and has no Access, Quality or Constraint text parser"
+        },
+        {
+          "it": "survives serialization",
+          "class": "js-runtime-only",
+          "reason": "the JavaScript number/bigint typing of a parsed Constraint; the text form of the aspect, parsed and serialized by matter.js's model; the module receives the parsed form in parity/schema.json (script/extract-from-matter-js.ts) and has no Access, Quality or Constraint text parser"
+        },
+        {
+          "it": "reports a word following a number",
+          "class": "js-runtime-only",
+          "reason": "the text form of the aspect, parsed and serialized by matter.js's model; the module receives the parsed form in parity/schema.json (script/extract-from-matter-js.ts) and has no Access, Quality or Constraint text parser"
+        },
+        {
+          "it": "accepts the suffixes the syntax does state",
+          "class": "js-runtime-only",
+          "reason": "the text form of the aspect, parsed and serialized by matter.js's model; the module receives the parsed form in parity/schema.json (script/extract-from-matter-js.ts) and has no Access, Quality or Constraint text parser"
+        },
+        {
+          "it": "survives serialization (a field named like a keyword)",
+          "class": "js-runtime-only",
+          "reason": "the text form of the aspect, parsed and serialized by matter.js's model; the module receives the parsed form in parity/schema.json (script/extract-from-matter-js.ts) and has no Access, Quality or Constraint text parser"
+        },
+        {
+          "it": "remains distinct from the keyword",
+          "class": "js-runtime-only",
+          "reason": "the text form of the aspect, parsed and serialized by matter.js's model; the module receives the parsed form in parity/schema.json (script/extract-from-matter-js.ts) and has no Access, Quality or Constraint text parser"
+        },
+        {
+          "it": "states the segments of a member access as one path",
+          "class": "js-runtime-only",
+          "reason": "introspection of a parsed Constraint's names for matter.js's model validator; cluster/spec resolves a bound's names at run time (resolveName)"
+        },
+        {
+          "it": "states the operand of a membership set as one naming an element",
+          "class": "js-runtime-only",
+          "reason": "introspection of a parsed Constraint's names for matter.js's model validator; cluster/spec resolves a bound's names at run time (resolveName)"
+        },
+        {
+          "it": "states no name an access to a computed value holds",
+          "class": "js-runtime-only",
+          "reason": "introspection of a parsed Constraint's names for matter.js's model validator; cluster/spec resolves a bound's names at run time (resolveName)"
+        },
+        {
+          "it": "reports an access to a computed value as unevaluable",
+          "class": "js-runtime-only",
+          "reason": "introspection of a parsed Constraint's names for matter.js's model validator; cluster/spec resolves a bound's names at run time (resolveName)"
+        },
+        {
+          "it": "reports a nested access as unevaluable",
+          "class": "js-runtime-only",
+          "reason": "introspection of a parsed Constraint's names for matter.js's model validator; cluster/spec resolves a bound's names at run time (resolveName)"
+        },
+        {
+          "it": "reports a complete access as evaluable",
+          "class": "js-runtime-only",
+          "reason": "introspection of a parsed Constraint's names for matter.js's model validator; cluster/spec resolves a bound's names at run time (resolveName)"
+        },
+        {
+          "it": "states a name each member of a membership set holds",
+          "class": "js-runtime-only",
+          "reason": "introspection of a parsed Constraint's names for matter.js's model validator; cluster/spec resolves a bound's names at run time (resolveName)"
+        },
+        {
+          "it": "states no name an entry bound of an alternative holds",
+          "class": "js-runtime-only",
+          "reason": "introspection of a parsed Constraint's names for matter.js's model validator; cluster/spec resolves a bound's names at run time (resolveName)"
+        }
+      ],
+      "reason": "The value tests of the plain constraints (a value, min, max, a range) on cluster/spec CheckValue and the computed bounds on evalBound. Missing: bounds and values beyond 2^53 (findings register (phase 33): cluster/spec bounds compare as float64 and Bound.Int is int64, so a bound or value beyond 2^53 is inexact).",
       "snapshotSha": "fe22e5457953cb80626eb01a4fcd359662f47b3e"
     },
     {
       "path": "packages/model/test/aspects/QualityTest.ts",
-      "status": "planned",
-      "reason": "Phase 33: a new register root, ported by meaning in this phase.",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "Parsing, serializing and merging the text form of matter.js's Quality aspect (flag letters, illegal flags, removal); the module receives the parsed flags in parity/schema.json (cluster/spec Quality), held by the schema parity tests.",
       "snapshotSha": "6d7875f82c327cc44890eef449472ac6a94edd9e"
     },
     {
@@ -764,14 +1084,38 @@
     },
     {
       "path": "packages/model/test/logic/DefaultValueTest.ts",
-      "status": "planned",
-      "reason": "Phase 33: a new register root, ported by meaning in this phase.",
+      "status": "partial",
+      "go": [
+        "script/clustergen:TestDefaultValueParityMatterJS"
+      ],
+      "missing": [
+        "counts the units of the type a default's type derives from",
+        "is empty when its type permits no entries",
+        "places a single-bit member at its bit",
+        "places every bit of a multi-bit member, its last bit included",
+        "places a member with no upper bound from its lowest bit",
+        "keeps bit 31 a bit, not a sign",
+        "places members above bit 31, including one that crosses it",
+        "lets the first member to claim a bit decide it",
+        "places a bigint default and returns a bigint a number cannot hold"
+      ],
+      "left": [
+        {
+          "it": "is no default for ${type}",
+          "class": "js-runtime-only",
+          "reason": "FieldValue.None, the marker of a matter.js model that was never validated; the snapshot carries no such marker"
+        }
+      ],
+      "reason": "The defaults script/clustergen writes into a definition (defaultLiteral): a unit default counted in the type's units, a floating-point fraction kept, a plain value as stated, no default where none is stated. Missing: the defaults matter.js derives without a stated one (a list's empty default, a bitmap's from its members' defaults) and the scale of a type derived from a scaled one (findings register, phase 33).",
       "snapshotSha": "2bc83bcd56073af2f6b10c24c14b16f77f67e113"
     },
     {
       "path": "packages/model/test/logic/EffectiveAccessTest.ts",
-      "status": "planned",
-      "reason": "Phase 33: a new register root, ported by meaning in this phase.",
+      "status": "ported",
+      "go": [
+        "cluster/spec:TestEffectiveAccessParityMatterJS"
+      ],
+      "reason": "The effective access matter.js computes (a privilege alone is read-only, no access is RW, a command keeps its invoke privilege, a fabric-only field inherits its attribute's write) as cluster/spec Access reads it; the extractor writes the effective access into parity/schema.json.",
       "snapshotSha": "9a7a34920597ae516814ce027494706a3cd4113e"
     },
     {
@@ -825,8 +1169,11 @@
     },
     {
       "path": "packages/model/test/logic/RequirementApplicabilityTest.ts",
-      "status": "planned",
-      "reason": "Phase 33: a new register root, ported by meaning in this phase.",
+      "status": "ported",
+      "go": [
+        "cluster/spec:TestRequirementApplicabilityParityMatterJS"
+      ],
+      "reason": "A requirement's conformance judged by the names that hold among the known ones (cluster/spec Conformance.Applicability over a FeatureContext): mandatory, disallowed, a satisfied and an unsatisfied name, an unknown name and desc conditional, an optional fallback.",
       "snapshotSha": "34509a2f3319f8742f84a6af03433180eeebae65"
     },
     {

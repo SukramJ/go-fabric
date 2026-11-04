@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 7363,
+  "entry_points": 7373,
   "entry_packages": [
     ".",
     "bdx",
@@ -278,9 +278,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 17267,
+    "total_exported": 17271,
     "reachable": 12124,
-    "whitelisted": 5143,
+    "whitelisted": 5147,
     "unreachable": 0
   },
   "by_package": [],
@@ -29979,6 +29979,34 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "internal/chipdm/conf_test.go",
       "line": 114
+    },
+    {
+      "package": "internal/chipdm",
+      "identifier": "TestConformanceInvalidParityMatterJS",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "internal/chipdm/conformance_parity_matterjs_test.go",
+      "line": 55
+    },
+    {
+      "package": "internal/chipdm",
+      "identifier": "TestConformancePrecedenceParityMatterJS",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "internal/chipdm/conformance_parity_matterjs_test.go",
+      "line": 83
+    },
+    {
+      "package": "internal/chipdm",
+      "identifier": "TestConformanceRevisionParityMatterJS",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "internal/chipdm/conformance_parity_matterjs_test.go",
+      "line": 68
+    },
+    {
+      "package": "internal/chipdm",
+      "identifier": "TestConformanceTextParityMatterJS",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "internal/chipdm/conformance_parity_matterjs_test.go",
+      "line": 14
     },
     {
       "package": "internal/chipdm",
