@@ -277,4 +277,3 @@ func TestOTACancelByRemovingConsentParity(t *testing.T) {
 		t.Errorf("device SoftwareVersion %v, want 1", v)
 	}
 }
-
