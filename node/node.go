@@ -281,6 +281,7 @@ func New(ctx context.Context, cfg Config) (*Node, error) { //nolint:funlen // th
 	}
 	n.br.SetDeviceTypeValidation(cfg.DeviceTypeValidation)
 	n.br.SetOnAttributeChange(n.attributeChanged)
+	n.br.SetOnEvent(n.eventEmitted)
 
 	// Access control fails closed without a lister; the stored ACL is what
 	// a commissioner writes (main.go:230-233 at b4ea1f96^).

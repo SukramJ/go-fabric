@@ -179,6 +179,12 @@ func newEventLogWithBuffer(cfg bufferConfig) *EventLog {
 // The record is placed in the priority bucket corresponding to rec.Priority;
 // the oldest entry in that bucket is evicted when the bucket is full.
 func (l *EventLog) Append(rec EventRecord) uint64 {
+	return l.AppendRecord(rec).Number
+}
+
+// AppendRecord is [EventLog.Append] returning the record as the log
+// stamped it: its Number and, when rec carried none, its EpochMS.
+func (l *EventLog) AppendRecord(rec EventRecord) EventRecord {
 	l.mu.Lock()
 	// Persist a fresh ceiling BEFORE handing the number out so a crash
 	// can never reuse it (see the persistCeiling field doc). The write
@@ -197,7 +203,7 @@ func (l *EventLog) Append(rec EventRecord) uint64 {
 	}
 	l.occurrences = append(l.occurrences, rec)
 	l.harvestLocked()
-	return rec.Number
+	return rec
 }
 
 // DropBuffered discards every buffered record and keeps the numbering, so

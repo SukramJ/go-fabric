@@ -180,6 +180,39 @@ server among them); a host port that only signals
 has no node-wide event — it emits `$Changed` per endpoint and behavior —
 so a UI that shows every change reads this hook.
 
+## Served values and events
+
+A host reads what its node serves through the facade, below no seam:
+
+| Facade | What it does |
+| --- | --- |
+| `Node.ReadAttribute(ctx, endpoint, cluster, attribute)` | one attribute as a controller's read reaches it — the cluster server's `MatterRead` through the node's dispatcher — as `node.AttributeValue{Endpoint, Cluster, Attribute, Value, DataVersion}`. No access control and no accessing fabric: a fabric-scoped list holds every fabric's entries with their fabric-sensitive fields withheld. An unserved path is a `contract.StatusError` with the status a controller receives; before `Start`, `node.ErrNotStarted`. |
+| `Node.ReadCluster(ctx, endpoint, cluster)` | every attribute of one cluster, the globals among them, in a wildcard read's order. |
+| `AttributeValue.JSON()` | the value by name, rendered by the controller side's `client.DecodeJSON` (`NameBased`) from the bytes the node sends, so the node and a controller render a value alike. |
+| `Node.Events(node.EventQuery{Endpoint, Cluster, Event, MinNumber, Limit})` | the node's event log — the records a controller's event read is answered from — oldest first; nil path fields match every one, `MinNumber` is inclusive, a positive `Limit` keeps the newest. The log is bounded and emptied when the node stops. |
+| `Event.JSON()` | the event's payload by name, as `AttributeValue.JSON`. |
+
+`node.Observers.OnEvent` reports each new event with its record
+(`node.Event{Number, Priority, Endpoint, Cluster, Event, Time, Payload}`)
+after the log recorded it and the subscriptions were told — the node-wide
+broadcast matter.js's `ChangeNotificationService` makes of each occurrence.
+It runs on the emitter's goroutine, or queued through `Node.ObserveAsync`.
+
+`schema.AttributeName`, `CommandName`, `ResponseCommandName` and
+`EventName` name the elements of every cluster of the snapshot, and
+`schema.ClusterFeatures` carries each feature's `Title`.
+
+On the controller side, each `controller/client.Node` keeps a bounded
+history of the events it delivered to `Hooks.Event` — the default
+subscription's, its bootstrap read's and the newly-commissioned read's:
+`Node.EventHistory(since, limit)` returns them oldest first (`since`
+inclusive, a positive `limit` keeps the newest) as `client.RecordedEvent`,
+the event with its decoded payload. `Config.EventHistory` sizes it (0 keeps
+`client.DefaultEventHistory`, 100; negative keeps none); it is memory only
+and `Node.Erase` clears it. An event is in the history when `Hooks.Event`
+runs, so that hook is its change notification. matter.js's `ClientNode`
+keeps no history; this is the module's own (`BD-Matter-ClientNodeEventHistory`).
+
 `Node.Subscriptions().Snapshot()` lists the active subscriptions, each as a
 copy (`node.SubscriptionInfo`: id, fabric, peer, session, the requested
 intervals, the attribute and event paths, the send interval), and

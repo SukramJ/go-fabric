@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/SukramJ/go-fabric/contract"
+	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/store"
 	"github.com/SukramJ/go-fabric/surface"
 )
@@ -114,6 +115,16 @@ type Observers struct {
 	// emitted by Datasource.ts:1444-1446 at 862ad75f) — this hook is
 	// their union for a host that shows every change.
 	OnAttributeChanged func(AttributeChange)
+	// OnEvent runs after a cluster server on any endpoint emitted an
+	// event and the node's event log recorded it ([Node.Events] holds it)
+	// and the subscriptions were told, with the record: its number,
+	// priority, path, time and payload. It runs on the emitter's
+	// goroutine. matter.js emits each event on its endpoint's behavior and
+	// broadcasts the occurrence node-wide through the
+	// ChangeNotificationService (packages/node/src/behavior/Events.ts:219,
+	// packages/node/src/node/integration/ChangeNotificationService.ts:71-87
+	// at 862ad75f) — this hook is that broadcast for a host.
+	OnEvent func(Event)
 }
 
 // AttributeChange is one change [Observers].OnAttributeChanged reports:
@@ -277,6 +288,17 @@ func (n *Node) attributeChanged(endpoint uint16, cluster uint32, change contract
 	}
 }
 
+// eventEmitted runs every observer's OnEvent for one event the bridge
+// recorded (bridge.Bridge.SetOnEvent), on the emitter's goroutine.
+func (n *Node) eventEmitted(rec im.EventRecord) {
+	e := eventOf(rec)
+	for _, o := range n.observerList() {
+		if fn := o.OnEvent; fn != nil {
+			observe(n.logger, "event", func() { fn(e) })
+		}
+	}
+}
+
 // Observe registers o's hooks on a running (or not yet started) node:
 // each hook o sets runs after [Config].Observers' hook for the same event
 // and after the hooks registered before it, under the same rules — on
@@ -333,6 +355,7 @@ func (o Observers) queuedOn(n *Node) Observers {
 	o.OnSessionClosed = queuedHook(n, "session_closed", o.OnSessionClosed)
 	o.OnSubscriptionsChanged = queuedHook(n, "subscriptions_changed", o.OnSubscriptionsChanged)
 	o.OnAttributeChanged = queuedHook(n, "attribute_changed", o.OnAttributeChanged)
+	o.OnEvent = queuedHook(n, "event", o.OnEvent)
 	return o
 }
 
