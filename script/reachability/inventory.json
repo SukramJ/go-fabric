@@ -24784,49 +24784,49 @@
       "identifier": "TestObserveAppliedUpdate",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/softwareupdate/observe_test.go",
-      "line": 64
+      "line": 65
     },
     {
       "package": "controller/softwareupdate",
       "identifier": "TestObserveCheckFinished",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/softwareupdate/observe_test.go",
-      "line": 183
+      "line": 194
     },
     {
       "package": "controller/softwareupdate",
       "identifier": "TestObserveFailedApply",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/softwareupdate/observe_test.go",
-      "line": 169
+      "line": 178
     },
     {
       "package": "controller/softwareupdate",
       "identifier": "TestObserveQueuedTargetReplaced",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/softwareupdate/observe_test.go",
-      "line": 123
+      "line": 128
     },
     {
       "package": "controller/softwareupdate",
       "identifier": "TestObserveQueuedUpdateSequence",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/softwareupdate/observe_test.go",
-      "line": 90
+      "line": 93
     },
     {
       "package": "controller/softwareupdate",
       "identifier": "TestObserveRemovedConsent",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/softwareupdate/observe_test.go",
-      "line": 148
+      "line": 155
     },
     {
       "package": "controller/softwareupdate",
       "identifier": "TestObserveUnsubscribe",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/softwareupdate/observe_test.go",
-      "line": 199
+      "line": 212
     },
     {
       "package": "controller/softwareupdate",
@@ -24854,7 +24854,7 @@
       "identifier": "TestUpdateEventKindNames",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/softwareupdate/observe_test.go",
-      "line": 227
+      "line": 242
     },
     {
       "package": "controller/topology",
