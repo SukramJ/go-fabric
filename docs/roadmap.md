@@ -367,6 +367,8 @@ SC BLE cases run.
 
 **Value.** The status page stops calling automatable cases manual; the in-process proofs get their real-controller counterpart; the port backlog halves. Every later milestone is proved on this.
 
+**Status 2026-11-04.** Phase 33 (branch `m8/phase-33`): the test-parity register covers `packages/general/test`, `packages/model/test`, `packages/nodejs/test` and `packages/types/test` at `862ad75f` — 192 more files, every one decided. The six roots (TLV, net, codec, model aspects, schema, crypto) and six files with a Go subject elsewhere are ported by meaning, with their `left` rows and the gaps they found in the findings register; the rest is excluded with its class. Fixes the ports brought: the TLV decoder refuses implicit-profile tags, a nullable bitmap reserves its top bit, the controller decodes a reported integer of the other signedness as matter.js's data reports do, the mDNS reader keeps the readable records of a damaged message, queries split at 1232 bytes with known answers carrying their remaining TTL, the conformance parser refuses range-form choices. No `planned` file is added (the ratchet stays 2).
+
 ### Milestone 9: View
 
 Planned in go-fabric-ui (concept U3 there, like U1 and U2); this page records the module side and the contract.
