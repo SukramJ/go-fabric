@@ -213,8 +213,9 @@ func TestDiagnosticsUnconfigured(t *testing.T) {
 }
 
 // ADR 0027 owner decision 2: MleCounts and MacCounts, from the record's
-// MLE and MAC counters (DTNDP :325-371, :379-389, :481-491); PacketCounts
-// and ErrorCounts are refused.
+// MLE and MAC counters (DTNDP :325-371, :379-389, :481-491); PacketCounts,
+// and ErrorCounts with chip's constant OverrunCount (:178-182) and
+// ResetCounts (:735-738), since phase 34.
 func TestDiagnosticsCounters(t *testing.T) {
 	t.Parallel()
 	br := newFake()
@@ -243,8 +244,21 @@ func TestDiagnosticsCounters(t *testing.T) {
 	if got := read(t, s, tnd.AttrRxUnicastCount); got != uint32(0) {
 		t.Errorf("RxUnicastCount without a record = %v", got)
 	}
-	if _, err := threadbr.NewDiagnostics(context.Background(), threadbr.DiagnosticsConfig{BorderRouter: br, Features: tnd.FeaturePacketCounts}); !errors.Is(err, threadbr.ErrDiagnosticsFeature) {
-		t.Errorf("PacketCounts = %v, want ErrDiagnosticsFeature", err)
+	if got := read(t, s, tnd.AttrOverrunCount); got != uint64(0) {
+		t.Errorf("OverrunCount = %v (%T), want chip's constant 0", got, got)
+	}
+	if _, err := s.MatterInvoke(context.Background(), tnd.CmdResetCounts, nil); err != nil {
+		t.Errorf("ResetCounts = %v", err)
+	}
+	if got := read(t, s, tnd.AttrOverrunCount); got != uint64(0) {
+		t.Errorf("OverrunCount after ResetCounts = %v", got)
+	}
+	if _, err := threadbr.NewDiagnostics(context.Background(), threadbr.DiagnosticsConfig{BorderRouter: br, Features: tnd.Feature(1 << 4)}); !errors.Is(err, threadbr.ErrDiagnosticsFeature) {
+		t.Errorf("an unknown feature = %v, want ErrDiagnosticsFeature", err)
+	}
+	mle := newDiagnostics(t, br, tnd.FeatureMleCounts)
+	if _, err := mle.MatterInvoke(context.Background(), tnd.CmdResetCounts, nil); err == nil {
+		t.Error("ResetCounts without ErrorCounts succeeded")
 	}
 	if _, err := threadbr.NewDiagnostics(context.Background(), threadbr.DiagnosticsConfig{}); !errors.Is(err, threadbr.ErrNoBorderRouter) {
 		t.Errorf("no border router = %v", err)

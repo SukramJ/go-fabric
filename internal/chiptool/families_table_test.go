@@ -139,7 +139,7 @@ type family struct {
 	// (daemonVariants: the flags it adds), with PICS generated from that
 	// daemon and a commissioned snapshot of its own. Empty is the
 	// certified default composition.
-	variant string //nolint:unused // read by the chiptool-tagged runner (familyrun_test.go)
+	variant string
 }
 
 // The Wi-Fi network of the CNETWIFI run: the defaults of the CNET cases'
@@ -152,6 +152,57 @@ const (
 	// variantWiFiSim is the daemon with --wifi-sim (daemonVariants).
 	variantWiFiSim = "wifi-sim"
 )
+
+// The second compositions of the reference daemon (phase 34), one variant
+// each (daemonVariants): the families of the clusters only they serve run
+// against them, with PICS generated from them (testdata/pics-<variant>/).
+const (
+	// variantTLS is the daemon with --tls-sim: TlsCertificateManagement
+	// and TlsClientManagement on the root (examples/reference-bridge/tls.go).
+	variantTLS = "tls-sim"
+	// variantCamera is the daemon with --camera-sim and --tls-sim: a
+	// Camera and a Chime after chip's camera-app
+	// (examples/reference-bridge/camera.go).
+	variantCamera = "camera-sim"
+	// variantJointFabric is the daemon with --jointfabric-sim: a
+	// JointFabricAdministrator endpoint
+	// (examples/reference-bridge/jointfabric.go).
+	variantJointFabric = "jointfabric-sim"
+	// variantThread is the daemon with --otbr against the virtual OTBR
+	// agent (script/otbr-virtual-test.sh): the ThreadBorderRouter endpoint
+	// with ThreadNetworkDirectory and the root's ThreadNetworkDiagnostics
+	// (examples/reference-bridge/otbr.go).
+	variantThread = "thread"
+	// otbrURL is the virtual agent's REST API (script/otbr-virtual-test.sh
+	// --rest-listen-address 127.0.0.1 --rest-listen-port 8081).
+	otbrURL = "http://127.0.0.1:8081"
+)
+
+// Device types only a variant's daemon has (variantDeviceTypes).
+const (
+	// dtCamera is the --camera-sim Camera: CameraAvStreamManagement,
+	// WebRtcTransportProvider and Requestor, PushAvStreamTransport,
+	// CameraAvSettingsUserLevelManagement and ZoneManagement.
+	dtCamera = 0x0142
+	// dtChime is the --camera-sim Chime.
+	dtChime = 0x0146
+	// dtJointFabricAdministrator is the --jointfabric-sim administrator:
+	// JointFabricAdministrator and JointFabricDatastore.
+	dtJointFabricAdministrator = 0x0130
+	// dtThreadBorderRouter is the --otbr border router:
+	// ThreadBorderRouterManagement, ThreadNetworkDiagnostics and
+	// ThreadNetworkDirectory.
+	dtThreadBorderRouter = 0x0091
+)
+
+// variantDeviceTypes are the device types the harness resolves to an
+// endpoint of a variant's daemon besides endpointDeviceTypes; a family row
+// of that variant may name them (TestFamilyDeviceTypesResolve).
+var variantDeviceTypes = map[string][]uint32{
+	variantCamera:      {dtCamera, dtChime},
+	variantJointFabric: {dtJointFabricAdministrator},
+	variantThread:      {dtThreadBorderRouter},
+}
 
 // wifiCaseArgs are a Python CNET case's network and endpoint: the network
 // the TH commissioned the DUT onto (TC_CNET_4_1.py:37-40 usage), and the
@@ -916,4 +967,72 @@ var chipFamilies = []family{
 	},
 	{name: "TGTNAV", deviceType: dtCastingVideoPlayer},
 	{name: "WAKEONLAN", deviceType: dtCastingVideoPlayer},
+	// MESS: Messages (cluster/core) on the video player, after the
+	// tv-app's endpoint 1 (tv-app.matter:4407-4424; TC_MESS_1_1.py CI
+	// arguments: app ${TV_APP}, --endpoint 1).
+	{name: "MESS", deviceType: dtCastingVideoPlayer},
+
+	// --- The second compositions (phase 34) ---------------------------------
+	//
+	// TLSCERT and TLSCLIENT: the root's TlsCertificateManagement and
+	// TlsClientManagement (node.Config.TLS) of the --tls-sim daemon
+	// (examples/reference-bridge/tls.go); chip runs them against its
+	// all-clusters app's root (TC_TLSCERT_2_1.py and TC_TLSCLIENT_2_1.py
+	// CI arguments, --endpoint 0, at the harness pin).
+	{name: "TLSCERT", variant: variantTLS},
+	{name: "TLSCLIENT", variant: variantTLS},
+	// The camera families: the --camera-sim Camera and Chime after chip's
+	// camera-app (examples/reference-bridge/camera.go), which chip's CI
+	// runs them against (the cases' CI arguments: app ${CAMERA_APP},
+	// --endpoint 1). The image's descriptor files the WEBRTCP cases under
+	// two names, WEBRTCP and WebRTCP (the case titles' spelling); each is
+	// a row. A case whose CI starts the camera-app with
+	// --camera-deferred-offer or --camera-test-videosrc starts the daemon
+	// with the same switch (daemonAppArgs).
+	{name: "WEBRTCP", deviceType: dtCamera, variant: variantCamera},
+	{name: "WebRTCP", deviceType: dtCamera, variant: variantCamera},
+	{name: "AVSM", deviceType: dtCamera, variant: variantCamera},
+	{name: "AVSUM", deviceType: dtCamera, variant: variantCamera},
+	{name: "ZONEMGMT", deviceType: dtCamera, variant: variantCamera},
+	{name: "PAVST", deviceType: dtCamera, variant: variantCamera},
+	{name: "PAVSTI", deviceType: dtCamera, variant: variantCamera},
+	// CHIME: run1 drives the camera-app's endpoint 1 (TC_CHIME_2_1.py CI
+	// arguments); here the Chime is a device of its own.
+	{name: "CHIME", deviceType: dtChime, variant: variantCamera},
+	// JFADMIN and JFDS: the --jointfabric-sim administrator
+	// (examples/reference-bridge/jointfabric.go). Every case starts its
+	// administrator itself; see the reasons.
+	{
+		name: "JFADMIN", deviceType: dtJointFabricAdministrator, variant: variantJointFabric,
+		exclude: map[string]gap{
+			"1.1": {classHarness, "TC-JFADMIN-1.1 drives the administrator through chip's jf-control-app and the administrator app's pigweed RPC JointFabric service (TC_JFADMIN_1_1.py:131-162; examples/common/pigweed/protos/joint_fabric_service.proto at the harness pin): with the CI PICS it starts chip's own jf-admin-app as the DUT and never reaches the daemon, without them it needs the DUT's RPC server (dut_rpc_server_ip/_port); the daemon serves no pigweed RPC, an SDK test interface outside Matter", false},
+			"1.2": {classHarness, "TC-JFADMIN-1.2 drives the administrator through chip's jf-control-app and the administrator app's pigweed RPC JointFabric service (TC_JFADMIN_1_2.py:83-103; examples/common/pigweed/protos/joint_fabric_service.proto at the harness pin): with the CI PICS it starts chip's own jf-admin-app as the DUT and never reaches the daemon, without them it needs the DUT's RPC server (dut_rpc_server_ip/_port); the daemon serves no pigweed RPC, an SDK test interface outside Matter", false},
+			"1.4": {classHarness, "TC-JFADMIN-1.4 drives the administrator through chip's jf-control-app and the administrator app's pigweed RPC JointFabric service (TC_JFADMIN_1_4.py:194-212; examples/common/pigweed/protos/joint_fabric_service.proto at the harness pin): with the CI PICS it starts chip's own jf-admin-app as the DUT and never reaches the daemon, without them it needs the DUT's RPC server (dut_rpc_server_ip/_port); the daemon serves no pigweed RPC, an SDK test interface outside Matter", false},
+			"2.1": {classHarness, "TC-JFADMIN-2.1 drives the administrator through chip's jf-control-app and the administrator app's pigweed RPC JointFabric service (TC_JFADMIN_2_1.py:155-170; examples/common/pigweed/protos/joint_fabric_service.proto at the harness pin): with the CI PICS it starts chip's own jf-admin-app as the DUT and never reaches the daemon, without them it needs the DUT's RPC server (dut_rpc_server_ip/_port); the daemon serves no pigweed RPC, an SDK test interface outside Matter", false},
+			"2.2": {classHarness, "TC-JFADMIN-2.2 drives the administrator through chip's jf-control-app and the administrator app's pigweed RPC JointFabric service (TC_JFADMIN_2_2.py:259-270; examples/common/pigweed/protos/joint_fabric_service.proto at the harness pin): with the CI PICS it starts chip's own jf-admin-app as the DUT and never reaches the daemon, without them it needs the DUT's RPC server (dut_rpc_server_ip/_port); the daemon serves no pigweed RPC, an SDK test interface outside Matter", false},
+		},
+	},
+	{
+		name: "JFDS", deviceType: dtJointFabricAdministrator, variant: variantJointFabric,
+		exclude: map[string]gap{
+			"2.1": {classHarness, "TC-JFDS-2.1 drives the administrator through chip's jf-control-app and the administrator app's pigweed RPC JointFabric service (TC_JFDS_2_1.py:95-130; examples/common/pigweed/protos/joint_fabric_service.proto at the harness pin): with the CI PICS it starts chip's own jf-admin-app as the DUT and never reaches the daemon, without them it needs the DUT's RPC server (dut_rpc_server_ip/_port); the daemon serves no pigweed RPC, an SDK test interface outside Matter", false},
+			"2.2": {classHarness, "TC-JFDS-2.2 drives the administrator through chip's jf-control-app and the administrator app's pigweed RPC JointFabric service (TC_JFDS_2_2.py:99-120; examples/common/pigweed/protos/joint_fabric_service.proto at the harness pin): with the CI PICS it starts chip's own jf-admin-app as the DUT and never reaches the daemon, without them it needs the DUT's RPC server (dut_rpc_server_ip/_port); the daemon serves no pigweed RPC, an SDK test interface outside Matter", false},
+			"2.3": {classHarness, "TC-JFDS-2.3 drives the administrator through chip's jf-control-app and the administrator app's pigweed RPC JointFabric service (TC_JFDS_2_3.py:99-120; examples/common/pigweed/protos/joint_fabric_service.proto at the harness pin): with the CI PICS it starts chip's own jf-admin-app as the DUT and never reaches the daemon, without them it needs the DUT's RPC server (dut_rpc_server_ip/_port); the daemon serves no pigweed RPC, an SDK test interface outside Matter", false},
+			"2.4": {classHarness, "TC-JFDS-2.4 drives the administrator through chip's jf-control-app and the administrator app's pigweed RPC JointFabric service (TC_JFDS_2_4.py:108-130; examples/common/pigweed/protos/joint_fabric_service.proto at the harness pin): with the CI PICS it starts chip's own jf-admin-app as the DUT and never reaches the daemon, without them it needs the DUT's RPC server (dut_rpc_server_ip/_port); the daemon serves no pigweed RPC, an SDK test interface outside Matter", false},
+			"2.5": {classHarness, "TC-JFDS-2.5 drives the administrator through chip's jf-control-app and the administrator app's pigweed RPC JointFabric service (TC_JFDS_2_5.py:124-162; examples/common/pigweed/protos/joint_fabric_service.proto at the harness pin): with the CI PICS it starts chip's own jf-admin-app as the DUT and never reaches the daemon, without them it needs the DUT's RPC server (dut_rpc_server_ip/_port); the daemon serves no pigweed RPC, an SDK test interface outside Matter", false},
+		},
+	},
+	// TBRM, DGTHREAD and THNETDIR: the --otbr border router against the
+	// virtual OTBR agent (script/otbr-virtual-test.sh): ThreadBorderRouter-
+	// Management, ThreadNetworkDiagnostics (the four counts) and
+	// ThreadNetworkDirectory on the 0x0091 endpoint
+	// (examples/reference-bridge/otbr.go). chip runs TBRM and THNETDIR
+	// against its network-manager app's endpoint 1 and DGTHREAD against the
+	// root of a Thread device (Test_TC_DGTHREAD_2_1.yaml config endpoint
+	// 0); the daemon has no Thread radio (ADR 0027), so DGTHREAD reads the
+	// border router's diagnostics. They run in the thread group, on
+	// dispatch and weekly (.github/workflows/otbr-virtual.yml).
+	{name: "TBRM", deviceType: dtThreadBorderRouter, variant: variantThread},
+	{name: "DGTHREAD", deviceType: dtThreadBorderRouter, variant: variantThread},
+	{name: "THNETDIR", deviceType: dtThreadBorderRouter, variant: variantThread},
 }

@@ -293,6 +293,12 @@ func TestGenerateClientCsrSuccess(t *testing.T) {
 	if len(resp.Csr) == 0 || len(resp.NonceSignature) == 0 || resp.Ccdid != 0 {
 		t.Fatalf("ClientCsrResponse %+v", resp)
 	}
+	// A CSR-only entry lists empty intermediates (instance :107-124;
+	// TC_TLSCERT_2_8.py reads their length).
+	got, ok := c.ClientCertificate(testFabric, resp.Ccdid)
+	if !ok || got.IntermediateCertificates == nil || len(*got.IntermediateCertificates) != 0 {
+		t.Fatalf("CSR-only entry %+v %v, want an empty intermediates list", got, ok)
+	}
 }
 
 // TestProvisionClientCertificateSuccess (:694-730).
@@ -323,6 +329,11 @@ func TestFindClientCertificateSuccess(t *testing.T) {
 	if len(resp.CertificateDetails) != 1 || resp.CertificateDetails[0].Ccdid != ccdid ||
 		!bytes.Equal(resp.CertificateDetails[0].ClientCertificate.Value, cert) {
 		t.Fatalf("FindClientCertificateResponse %+v", resp)
+	}
+	// The empty intermediates are an empty list, not an absent field
+	// (instance :107-124; TC_TLSCERT_2_11.py reads its length).
+	if inter := resp.CertificateDetails[0].IntermediateCertificates; inter == nil || len(*inter) != 0 {
+		t.Fatalf("IntermediateCertificates %v, want an empty list", inter)
 	}
 }
 

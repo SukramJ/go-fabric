@@ -36,9 +36,10 @@ var updateChipPrefixes = flag.Bool("update-chip-prefixes", false,
 // was classified cannot slide back to unseen.
 //
 // Phase 34 (2026-11-04) took it from 31 (the roadmap's count, which
-// excluded only chipFamilies rows; 27 with the not-run table already
-// counted) to the value below.
-const unfamiliedRatchet = 26
+// excluded only chipFamilies rows) — 26 with the not-run table counted —
+// to 0: the camera, TLS, Joint Fabric, Thread and Messages families got
+// rows, and the rest a not-run row with its class.
+const unfamiliedRatchet = 0
 
 // minPrefixCases is the case count from which a prefix counts as a family.
 const minPrefixCases = 3

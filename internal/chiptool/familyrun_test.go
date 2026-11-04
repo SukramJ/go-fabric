@@ -108,6 +108,13 @@ func (f family) descriptorFamily() string {
 // the certified default (family.variant): the daemon flags each adds.
 var daemonVariants = map[string][]string{
 	variantWiFiSim: {"--wifi-sim"},
+	variantTLS:     {"--tls-sim"},
+	// The camera's PushAvStreamTransport reaches its TLS endpoints
+	// through the root's TLS clusters (node.Config.TLS), as chip's
+	// camera-app serves both on its root (camera-app.matter endpoint 0).
+	variantCamera:      {"--camera-sim", "--tls-sim"},
+	variantJointFabric: {"--jointfabric-sim"},
+	variantThread:      {"--otbr", otbrURL},
 }
 
 // daemonVariant is the variant every daemon of the running family is
@@ -127,6 +134,9 @@ func variantPICS(ctx context.Context, t *testing.T, h *harness, bin string, flag
 		t.Fatalf("unknown daemon variant %q", variant)
 	}
 	for _, f := range extra {
+		if !strings.HasPrefix(f, "--") {
+			continue // a flag's value
+		}
 		if !flags[strings.TrimPrefix(f, "--")] {
 			t.Fatalf("the daemon binary has no %s, which the %s run needs", f, variant)
 		}
@@ -227,6 +237,9 @@ func devicePICS(ctx context.Context, t *testing.T, h *harness, bin string, flags
 
 	set := &picsSet{byEP: map[uint16]string{}, values: map[uint16]map[string]string{}, honest: map[uint16]string{}, epOf: map[uint32]uint16{}}
 	for _, dt := range endpointDeviceTypes {
+		set.epOf[dt] = br.endpointFor(t, dt)
+	}
+	for _, dt := range variantDeviceTypes[daemonVariant] {
 		set.epOf[dt] = br.endpointFor(t, dt)
 	}
 	for key, at := range pseudoEndpoints {
@@ -587,6 +600,7 @@ func runPythonCase(ctx context.Context, t *testing.T, h *harness, fam family, c 
 		dbPath:    filepath.Join(work, "dut.db"),
 		appPipe:   filepath.Join(work, "app.fifo"),
 		enableKey: chipTestEnableKey,
+		extraArgs: daemonAppArgs(c.AppArgs, flags),
 	})
 
 	args := []string{
@@ -608,6 +622,9 @@ func runPythonCase(ctx context.Context, t *testing.T, h *harness, fam family, c 
 		}
 		args = append(args, a)
 	}
+	// A case that starts a TH app of its own names it as CHIP's CI does
+	// (${PUSH_AV_SERVER}, ${JF_ADMIN_APP}, …): the image's path.
+	args = expandAppPaths(ctx, t, h, id, args)
 	// An SU requestor case starts chip's OTA provider app itself and has it
 	// serve the staged image (TC_SU_2_2.py:39-41 at the harness pin).
 	if needsOta(c.Args) {

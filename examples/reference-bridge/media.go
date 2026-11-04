@@ -20,6 +20,7 @@ import (
 	lowpowerdef "github.com/SukramJ/go-fabric/cluster/spec/lowpower"
 	inputdef "github.com/SukramJ/go-fabric/cluster/spec/mediainput"
 	mpdef "github.com/SukramJ/go-fabric/cluster/spec/mediaplayback"
+	msgdef "github.com/SukramJ/go-fabric/cluster/spec/messages"
 	targetdef "github.com/SukramJ/go-fabric/cluster/spec/targetnavigator"
 	woldef "github.com/SukramJ/go-fabric/cluster/spec/wakeonlan"
 	"github.com/SukramJ/go-fabric/device"
@@ -40,7 +41,7 @@ import (
 //     ContentAppPlatform and PhysicalInputs: OnOff, MediaPlayback (AS, VS, TT, AT, AA),
 //     KeypadInput (NV, LK, NK), ContentLauncher (CS, UP), ApplicationLauncher
 //     (AP), MediaInput (NU), AudioOutput (NU), Channel (CL, LI),
-//     TargetNavigator, LowPower and WakeOnLan.
+//     TargetNavigator, LowPower, WakeOnLan and Messages.
 //   - "app" is a ContentApp (tv-app endpoint 3, ma_contentapp,
 //     tv-app.matter's endpoint 3): ApplicationBasic, ApplicationLauncher
 //     (no AP), AccountLogin and KeypadInput — the test suite's app, catalog
@@ -132,6 +133,11 @@ func (m *demoMedia) newPlayer() (*device.CastingVideoPlayer, error) {
 	// the daemon has no radio, so a locally administered address.
 	mac := "02005E102002"
 
+	messages, err := newTVMessages(m.logger)
+	if err != nil {
+		return nil, err
+	}
+
 	opts := bridged("player", "Living Room TV")
 	opts.Surface = m.surface
 	opts.Conditions = []string{"ContentAppPlatform", "PhysicalInputs"}
@@ -185,6 +191,9 @@ func (m *demoMedia) newPlayer() (*device.CastingVideoPlayer, error) {
 		targetdef.Declare{Targets: tvTargets{}, Initial: targetdef.Patch{TargetList: &targets, CurrentTarget: &currentTarget}},
 		lowpowerdef.Declare{LowPower: tvSleep{logger: m.logger}},
 		woldef.Declare{Initial: woldef.Patch{MacAddress: &mac}},
+		// tv-app.matter:4407-4424 (Messages, featureMap 0): the module's
+		// server over the tv-app's MessagesManager (messages.go).
+		msgdef.Declare{HostServer: messages},
 	)
 }
 
