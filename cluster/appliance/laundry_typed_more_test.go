@@ -11,6 +11,7 @@ import (
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	ldc "github.com/SukramJ/go-fabric/cluster/spec/laundrydryercontrols"
 	lwc "github.com/SukramJ/go-fabric/cluster/spec/laundrywashercontrols"
+	"github.com/SukramJ/go-fabric/im"
 )
 
 // TestTypedLaundrySetRefusals: an attribute the server does not serve is
@@ -66,8 +67,8 @@ func TestTypedWasherConfiguredLists(t *testing.T) {
 	if err := s.Set(lwc.Patch{SupportedRinses: ptrTo([]lwc.NumberOfRinsesEnum{lwc.NumberOfRinsesExtra})}); !errors.Is(err, spec.ErrNotHeld) {
 		t.Errorf("other SupportedRinses: %v", err)
 	}
-	if err := s.Set(lwc.Patch{NumberOfRinses: ptrTo(lwc.NumberOfRinsesExtra)}); err == nil {
-		t.Error("a NumberOfRinses outside SupportedRinses was set")
+	if err := s.Set(lwc.Patch{NumberOfRinses: ptrTo(lwc.NumberOfRinsesExtra)}); spec.StatusOf(err) != im.StatusInvalidInState {
+		t.Errorf("a NumberOfRinses outside SupportedRinses: status %v (%v), want %v", spec.StatusOf(err), err, im.StatusInvalidInState)
 	}
 	// The stored list form compares as the configured list too.
 	stored, _ := washer.MatterRead(lwc.AttrSupportedRinses)
