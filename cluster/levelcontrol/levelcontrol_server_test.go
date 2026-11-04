@@ -11,6 +11,7 @@ import (
 
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/cluster/levelcontrol"
+	"github.com/SukramJ/go-fabric/cluster/spec"
 	lvldef "github.com/SukramJ/go-fabric/cluster/spec/levelcontrol"
 	"github.com/SukramJ/go-fabric/cluster/wire"
 	"github.com/SukramJ/go-fabric/im"
@@ -485,8 +486,8 @@ func TestHostRefusalIsNotSuccess(t *testing.T) {
 			before := srv.MatterDataVersion()
 
 			_, err := srv.MatterInvoke(context.Background(), tc.cmdID, tc.fields)
-			if err == nil {
-				t.Fatalf("%s reported Success although the host refused", tc.name)
+			if spec.StatusOf(err) != im.StatusFailure {
+				t.Fatalf("%s although the host refused: status %v (%v), want %v", tc.name, spec.StatusOf(err), err, im.StatusFailure)
 			}
 			if !errors.Is(err, refusal) {
 				t.Errorf("error %v does not wrap the host's refusal", err)
@@ -506,11 +507,11 @@ func TestNoHostPortIsNotSuccess(t *testing.T) {
 	srv := levelcontrol.NewServer(levelcontrol.Config{})
 	if _, err := srv.MatterInvoke(
 		context.Background(), levelcontrol.CmdMoveToLevel, wire.MoveToLevelRequest{Level: 1},
-	); err == nil {
-		t.Error("MoveToLevel reported Success with no host port")
+	); spec.StatusOf(err) != im.StatusFailure {
+		t.Errorf("MoveToLevel with no host port: status %v (%v), want %v", spec.StatusOf(err), err, im.StatusFailure)
 	}
-	if err := srv.MatterWrite(context.Background(), levelcontrol.AttrOnLevel, uint64(10)); err == nil {
-		t.Error("OnLevel write reported Success with no host port")
+	if err := srv.MatterWrite(context.Background(), levelcontrol.AttrOnLevel, uint64(10)); spec.StatusOf(err) != im.StatusFailure {
+		t.Errorf("OnLevel write with no host port: status %v (%v), want %v", spec.StatusOf(err), err, im.StatusFailure)
 	}
 }
 
@@ -750,8 +751,8 @@ func TestUnknownCommandIsUnsupported(t *testing.T) {
 	srv := levelcontrol.NewServer(levelcontrol.Config{Source: observedHost()})
 	// 0x8 is MoveToClosestFrequency, which carries conformance "FQ".
 	_, err := srv.MatterInvoke(context.Background(), 0x08, nil)
-	if err == nil {
-		t.Fatal("MoveToClosestFrequency was accepted although FQ is not advertised")
+	if spec.StatusOf(err) != im.StatusUnsupportedCommand {
+		t.Fatalf("MoveToClosestFrequency without FQ: status %v (%v), want %v", spec.StatusOf(err), err, im.StatusUnsupportedCommand)
 	}
 }
 
