@@ -69,9 +69,14 @@ type structure struct {
 	partsListOf map[*Endpoint]map[uint16]bool
 	composition map[*Endpoint]schema.Composition
 
-	// subscribedFabricFiltered is the default subscription's fabric filter
-	// (:437-460): the cache holds one fabric view.
-	subscribedFabricFiltered bool
+	// recordedFabricFiltered is the fabric filter the cache records, nil
+	// before one is recorded — ClientNodeStore.cacheFabricFiltered
+	// (packages/node/src/storage/client/ClientNodeStore.ts:80-97 at
+	// 862ad75f); [structure.cacheFabricFiltered] reads it.
+	recordedFabricFiltered *bool
+	// epoch is the epoch an interaction starting now belongs to
+	// (ClientStructure.ts:128, :335-341).
+	epoch *epoch
 
 	events  []emission
 	delayed []EventData
@@ -83,17 +88,34 @@ type structure struct {
 func newStructure(mu *sync.RWMutex, log *slog.Logger, p *persister) *structure {
 	s := &structure{
 		mu: mu, log: log, p: p,
-		endpoints:                map[uint16]*Endpoint{},
-		pending:                  map[*Endpoint]*pendingChange{},
-		claims:                   map[*Endpoint][]*Endpoint{},
-		partsListOf:              map[*Endpoint]map[uint16]bool{},
-		composition:              map[*Endpoint]schema.Composition{},
-		subscribedFabricFiltered: true,
+		endpoints:   map[uint16]*Endpoint{},
+		pending:     map[*Endpoint]*pendingChange{},
+		claims:      map[*Endpoint][]*Endpoint{},
+		partsListOf: map[*Endpoint]map[uint16]bool{},
+		composition: map[*Endpoint]schema.Composition{},
+		epoch:       &epoch{trusted: true},
 	}
 	s.root = newEndpoint(mu, 0)
 	s.root.deviceType, s.root.classification, s.root.name, s.root.installed = rootNodeDeviceType, "node", "RootNode", true
 	s.endpoints[0] = s.root
 	return s
+}
+
+// epoch is ClientStructure.Epoch (ClientStructure.ts:1776-1782 at
+// 862ad75f): an interaction records the data versions it reports only if
+// its epoch is still the current one and trusted when its data is
+// applied; a change of the cache's fabric filter starts a new one, and
+// while the versions are forgotten the epoch is not trusted. Not
+// zero-sized, so two epochs never share an address.
+type epoch struct{ trusted bool }
+
+// cacheFabricFiltered is the fabric filter of the interactions the cache
+// takes data from: only they update cached values and data versions, and
+// only they get versions injected. Fabric filtered until a filter is
+// recorded. Mirrors matter.js ClientStructure.cacheFabricFiltered
+// (packages/node/src/node/client/ClientStructure.ts:326-333 at 862ad75f).
+func (s *structure) cacheFabricFiltered() bool {
+	return s.recordedFabricFiltered == nil || *s.recordedFabricFiltered
 }
 
 // takeEmissions returns what the structure emitted and forgets it.
@@ -179,12 +201,13 @@ func (s *structure) injectVersionFilters(sc scope, refreshChangesOmitted bool) [
 // the caller's own, kept as given and first, then the injected ones.
 // Mirrors matter.js packages/node/src/node/client/ClientStructure.ts:286-323
 // (injectVersionFilters at 862ad75f): a request with the other fabric
-// filter than the cache's gets none injected (:288), and a cluster the
-// caller filters gets no injected filter (:293-295, :312), so the peer
-// sees exactly the caller's filter for it. caller is not modified.
+// filter than the cache's, or one sent while the epoch is not trusted,
+// gets none injected (:288), and a cluster the caller filters gets no
+// injected filter (:293-295, :312), so the peer sees exactly the
+// caller's filter for it. caller is not modified.
 func (s *structure) withKnownVersions(sc scope, caller []DataVersionFilter, refreshChangesOmitted bool) []DataVersionFilter {
 	out := slices.Clone(caller)
-	if sc.fabricFiltered != s.subscribedFabricFiltered {
+	if !s.epoch.trusted || sc.fabricFiltered != s.cacheFabricFiltered() {
 		return out
 	}
 	type key struct {
@@ -236,6 +259,8 @@ type mutateContext struct {
 	// emitsEvents: the interaction's events reach the node's observers
 	// and its cursor — options.emitEvents (:412, default false).
 	emitsEvents bool
+	// epoch is the interaction's (options.epoch, :409, :427).
+	epoch *epoch
 }
 
 // mutate applies a report — ClientStructure.mutate (:295-380) over a merged
@@ -249,8 +274,14 @@ type mutateContext struct {
 // current, its bootstrap read and the newly-commissioned read — hands its
 // events to the Event hook and raises the event cursor; every other
 // returns them in its Report only (#emitOccurrence, :1757-1770).
-func (s *structure) mutate(sc scope, r *Report, emitEvents bool) {
-	q := &mutateContext{endpointsWithData: map[uint16]bool{}, clustersWithData: map[*Cluster]bool{}, emitsEvents: emitEvents}
+//
+// in is the epoch the interaction started in, nil for the current one
+// (options.epoch, :396-397, :427).
+func (s *structure) mutate(sc scope, r *Report, emitEvents bool, in *epoch) {
+	if in == nil {
+		in = s.epoch
+	}
+	q := &mutateContext{endpointsWithData: map[uint16]bool{}, clustersWithData: map[*Cluster]bool{}, emitsEvents: emitEvents, epoch: in}
 	var cur *batch
 	for i := range r.Attributes {
 		cur = s.mutateAttribute(&r.Attributes[i], sc, cur, q)
@@ -275,12 +306,12 @@ func (s *structure) mutate(sc scope, r *Report, emitEvents bool) {
 }
 
 // mutateAttribute is #mutateAttribute (:462-504): nothing is stored from an
-// interaction whose fabric filter differs from the subscription's
-// (:468-471); the endpoint is recorded (:477); a change of endpoint or
+// interaction whose fabric filter differs from the cache's (:573-576 at
+// 862ad75f); the endpoint is recorded (:477); a change of endpoint or
 // cluster flushes the batch (:479-484); a new batch carries the report's
 // version only when the read covered the whole cluster (:494-497).
 func (s *structure) mutateAttribute(a *AttributeData, sc scope, cur *batch, q *mutateContext) *batch {
-	if s.subscribedFabricFiltered != sc.fabricFiltered {
+	if s.cacheFabricFiltered() != sc.fabricFiltered {
 		return cur
 	}
 	ep, cl := a.Path.Endpoint, a.Path.Cluster
@@ -330,7 +361,10 @@ func (s *structure) preserveAbsentCluster(ep *Endpoint, c *Cluster) {
 	c.pendingDelete = false
 }
 
-// updateCluster applies one batch — #updateCluster (:572-587).
+// updateCluster applies one batch — #applyUpdates and #updateCluster
+// (:673-695 at 862ad75f): data of an interaction that began before a
+// fabric filter switch, or while the epoch is not trusted, is applied with
+// an unknown version (:674-678).
 func (s *structure) updateCluster(b *batch, q *mutateContext) {
 	ep := s.endpointFor(b.ep)
 	c := s.clusterFor(ep, b.cluster)
@@ -338,7 +372,11 @@ func (s *structure) updateCluster(b *batch, q *mutateContext) {
 	s.preserveAbsentCluster(ep, c)
 	s.pruneUnlistedAttributes(c, b.values)
 	s.invalidateOnDefinitionChange(c, b.values)
-	c.cache.externalSet(b.values, b.version)
+	if q.epoch != s.epoch || !q.epoch.trusted {
+		c.cache.externalSetUnversioned(b.values)
+	} else {
+		c.cache.externalSet(b.values, b.version)
+	}
 	s.synchronizeCluster(ep, c, q.clustersWithData)
 }
 

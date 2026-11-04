@@ -263,7 +263,7 @@ func TestDecommissionParity(t *testing.T) {
 		}
 		found := make(chan *client.Node, 1)
 		go func() {
-			n, _ := reg.ForDevice(parityCtx(t), discovery.Device{InstanceID: id})
+			n, _ := reg.ForDevice(parityCtx(t), discovery.Device{InstanceID: id}, "")
 			found <- n
 		}()
 		select {

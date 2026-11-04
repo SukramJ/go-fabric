@@ -85,7 +85,7 @@ func runAttestation(t *testing.T, store attestation.PAAStore, policy attestation
 		t.Fatalf("discovered %+v, %v", found, err)
 	}
 	reg := p.Controller.Registry()
-	n, err := reg.ForDevice(parityCtx(t), found[0])
+	n, err := reg.ForDevice(parityCtx(t), found[0], "")
 	if err != nil {
 		t.Fatal(err)
 	}

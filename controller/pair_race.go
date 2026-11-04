@@ -102,7 +102,7 @@ func (c *Controller) pairAttempt(actx, pairCtx context.Context, cand discovery.C
 		defer func() { _ = ch.Close() }()
 		channel = ch
 	}
-	n, err := c.reg.ForDevice(actx, dev)
+	n, err := c.reg.ForDevice(actx, dev, "")
 	if err != nil {
 		return nil, err
 	}

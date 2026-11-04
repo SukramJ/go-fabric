@@ -276,7 +276,7 @@ func TestLiveRegistry(t *testing.T) {
 
 	// 1. Found and commissioned.
 	nodeAddr := netip.MustParseAddrPort(lv.node.Bridge().LocalAddr())
-	n, err := r.ForDevice(ctx, discovery.Device{InstanceID: "live", Addresses: []discovery.Address{{IP: nodeAddr.Addr(), Port: nodeAddr.Port()}}})
+	n, err := r.ForDevice(ctx, discovery.Device{InstanceID: "live", Addresses: []discovery.Address{{IP: nodeAddr.Addr(), Port: nodeAddr.Port()}}}, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -393,7 +393,7 @@ func TestLiveRegistry(t *testing.T) {
 
 	// 6. A commissionable node the scanner does not see again is culled
 	// once its lifespan ends: DefaultTTL, the Go scanner carrying no TTL.
-	gone, err := r2.ForDevice(ctx, discovery.Device{InstanceID: "gone", Addresses: []discovery.Address{{IP: netip.MustParseAddr("127.0.0.1"), Port: 9}}})
+	gone, err := r2.ForDevice(ctx, discovery.Device{InstanceID: "gone", Addresses: []discovery.Address{{IP: netip.MustParseAddr("127.0.0.1"), Port: 9}}}, "")
 	if err != nil || gone.ID() != "peer2" {
 		t.Fatalf("ForDevice %v %v", gone, err)
 	}

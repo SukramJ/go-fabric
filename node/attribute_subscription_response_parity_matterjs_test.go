@@ -157,12 +157,13 @@ func subscribeWithProbe(t *testing.T, paths []im.ConcreteAttributePath) *subscri
 	sub, err := fabrictest.Subscribe(parityCtx(t), p, interaction.SubscribeRequest{
 		Attributes:       append(append([]im.ConcreteAttributePath(nil), paths...), attrPath(ep, onoff.ClusterID, onoff.AttrOnOff)),
 		MinIntervalFloor: interaction.Interval(time.Second), MaxIntervalCeiling: interaction.Interval(time.Hour),
-		Updated: func(r *interaction.Report) {
+		Updated: func(r *interaction.Report) error {
 			if !primed {
 				primed = true
-				return
+				return nil
 			}
 			s.reports <- r
+			return nil
 		},
 	})
 	if err != nil {

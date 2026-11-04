@@ -62,6 +62,9 @@ func (n *Node) read(ctx context.Context, req ReadRequest, emitEvents bool) (*Rep
 	if !req.IncludeKnownVersions {
 		r.DataVersionFilters = n.s.withKnownVersions(sc, r.DataVersionFilters, true)
 	}
+	// The read records versions only while its epoch stays current
+	// (ClientStructure.ts:335-341 at 862ad75f).
+	in := n.s.epoch
 	n.mu.RUnlock()
 	ia, err := n.interaction()
 	if err != nil {
@@ -75,7 +78,7 @@ func (n *Node) read(ctx context.Context, req ReadRequest, emitEvents bool) (*Rep
 		return nil, err
 	}
 	n.noteICDActive()
-	n.apply(sc, rep, emitEvents)
+	n.applyIn(sc, rep, emitEvents, in)
 	return rep, nil
 }
 
@@ -159,29 +162,32 @@ func (n *Node) subscribe(ctx context.Context, sr SubscribeRequest, emitEvents fu
 	if req.Sustain {
 		callerRefresh = req.RefreshRequest
 	}
-	// sentMu guards sent, the scope the next report is applied by, which a
-	// re-subscription's RefreshRequest replaces.
+	// sentMu guards sent and sentIn, the scope and the cache epoch the next
+	// report is applied by, which a re-subscription's RefreshRequest
+	// replaces (ClientNodeInteraction.ts:128-132, :162-168 at 862ad75f).
 	var sentMu sync.Mutex
 	sent := newScope(req.Attributes, req.NoFabricFilter)
 	r := req
 	n.mu.RLock()
 	r.DataVersionFilters = withKnownVersions(sent, callerFilters)
+	sentIn := n.s.epoch
 	n.mu.RUnlock()
 	floor, ceiling := n.IntervalBounds(req.MinIntervalFloor, req.MaxIntervalCeiling)
 	r.MinIntervalFloor, r.MaxIntervalCeiling = &floor, &ceiling
-	r.Updated = func(rep *Report) {
+	r.Updated = func(rep *Report) error {
 		sentMu.Lock()
-		sc := sent
+		sc, in := sent, sentIn
 		sentMu.Unlock()
 		// The image changes now and the caller's Updated sees it; the
 		// store writes and the hooks run on the node's job queue, so the
 		// report's final StatusResponse waits for neither (W4-ctlim-04,
 		// ClientStructure.ts:417-439; the caller's updated iterates the
 		// mutate inline, ClientNodeInteraction.ts:146-158).
-		n.applyDeferred(sc, rep, emitEvents != nil && emitEvents())
+		n.applyDeferred(sc, rep, emitEvents != nil && emitEvents(), in)
 		if req.Updated != nil {
-			req.Updated(rep)
+			return req.Updated(rep)
 		}
+		return nil
 	}
 	r.RefreshRequest = func(x SubscribePaths) SubscribePaths {
 		x.DataVersionFilters = slices.Clone(callerFilters)
@@ -197,10 +203,11 @@ func (n *Node) subscribe(ctx context.Context, sr SubscribeRequest, emitEvents fu
 		// node-wide cursor here replaced a host's own filters
 		// (W4-ctlim-05).
 		n.mu.RLock()
+		in := n.s.epoch
 		x.DataVersionFilters = withKnownVersions(sc, x.DataVersionFilters)
 		n.mu.RUnlock()
 		sentMu.Lock()
-		sent = sc
+		sent, sentIn = sc, in
 		sentMu.Unlock()
 		n.observeRequest(x)
 		return x
@@ -210,6 +217,12 @@ func (n *Node) subscribe(ctx context.Context, sr SubscribeRequest, emitEvents fu
 		return nil, err
 	}
 	n.observeRequest(r)
+	n.mu.RLock()
+	intercept := n.subscribeInterceptor
+	n.mu.RUnlock()
+	if intercept != nil {
+		return intercept(r, func() (*Subscription, error) { return ia.Subscribe(ctx, r) })
+	}
 	return ia.Subscribe(ctx, r)
 }
 

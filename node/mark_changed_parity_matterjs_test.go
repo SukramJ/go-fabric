@@ -110,7 +110,7 @@ func computedPair(t *testing.T, c *computedServer) (site *fabrictest.Site, p *fa
 	reports = make(chan *interaction.Report, 16)
 	sub, err := fabrictest.Subscribe(parityCtx(t), p, interaction.SubscribeRequest{
 		Attributes: []fabrictest.AttributePath{client.AttributeAt(ep, onoffdef.ClusterID, onoffdef.AttrOnOff)},
-		Updated:    func(r *interaction.Report) { reports <- r },
+		Updated:    func(r *interaction.Report) error { reports <- r; return nil },
 	})
 	if err != nil {
 		t.Fatal(err)

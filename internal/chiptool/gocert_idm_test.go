@@ -559,12 +559,13 @@ func (th *goTH) subscribeOne(n *client.Node, minFloor, maxCeiling time.Duration,
 	}
 	sub, err = n.Subscribe(th.ctx, client.SubscribeRequest{SubscribeRequest: client.SubscribePaths{
 		Attributes: paths, MinIntervalFloor: interaction.Interval(minFloor), MaxIntervalCeiling: interaction.Interval(maxCeiling),
-		Updated: func(r *client.Report) {
+		Updated: func(r *client.Report) error {
 			for _, p := range paths {
 				if v, ok := r.Value(p.Endpoint, p.Cluster, p.Attribute); ok {
 					reports[p].add(describeNode(v))
 				}
 			}
+			return nil
 		},
 	}})
 	if err != nil {
@@ -780,11 +781,12 @@ func caseIDM64() goCertCase {
 		primed := make(chan uint32, 1)
 		sub, err := n.Subscribe(th.ctx, client.SubscribeRequest{SubscribeRequest: client.SubscribePaths{
 			Events: []im.ConcreteEventPath{startUpEvent}, MinIntervalFloor: interaction.Interval(minFloor), MaxIntervalCeiling: interaction.Interval(maxCeiling),
-			Updated: func(r *client.Report) {
+			Updated: func(r *client.Report) error {
 				select {
 				case primed <- r.SubscriptionID:
 				default:
 				}
+				return nil
 			},
 		}})
 		if err != nil {

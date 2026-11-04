@@ -189,11 +189,12 @@ func use(ctx context.Context, n *client.Node) error {
 	sub, err := n.Subscribe(ctx, client.SubscribeRequest{SubscribeRequest: client.SubscribePaths{
 		Attributes:         []client.AttributePath{client.AttributeAt(1, onoffdef.ClusterID, onoffdef.AttrOnOff)},
 		MaxIntervalCeiling: client.Interval(time.Minute),
-		Updated: func(r *client.Report) { // keep it short: it runs on the report's exchange
+		Updated: func(r *client.Report) error { // keep it short: it runs on the report's exchange
 			if _, ok := r.Value(1, onoffdef.ClusterID, onoffdef.AttrOnOff); ok {
 				st, _ := onoffdef.StateFrom(r.Values(1, onoffdef.ClusterID))
 				fmt.Printf("OnOff: %v\n", st.OnOff)
 			}
+			return nil
 		},
 	}})
 	if err != nil {

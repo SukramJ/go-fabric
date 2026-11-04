@@ -114,7 +114,7 @@ func TestAggregatorReplaceAndTopology(t *testing.T) {
 	reports := make(chan *interaction.Report, 8)
 	sub, err := fabrictest.Subscribe(ctx, pair, interaction.SubscribeRequest{
 		Attributes: []im.ConcreteAttributePath{types},
-		Updated:    func(r *interaction.Report) { reports <- r },
+		Updated:    func(r *interaction.Report) error { reports <- r; return nil },
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -198,7 +198,7 @@ func TestDeviceReachableReachesSubscription(t *testing.T) {
 	reports := make(chan *interaction.Report, 8)
 	sub, err := fabrictest.Subscribe(ctx, pair, interaction.SubscribeRequest{
 		Attributes: []im.ConcreteAttributePath{reachable},
-		Updated:    func(r *interaction.Report) { reports <- r },
+		Updated:    func(r *interaction.Report) error { reports <- r; return nil },
 	})
 	if err != nil {
 		t.Fatal(err)

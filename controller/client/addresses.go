@@ -5,7 +5,9 @@ package client
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
+	"slices"
 	"time"
 )
 
@@ -146,7 +148,11 @@ func (r *Registry) cull(ctx context.Context) error {
 // RemoteDescriptor.is RemoteDescriptor.ts:37-50); a match under decommission is waited for
 // and the search repeated (:360-368); a match is refreshed from the device
 // (:369-375, the record's applyDevice); otherwise a new node is created
-// with an allocated id (:376). The host runs discovery.Scanner and hands
+// with id, or an allocated one when id is "" (:376; the id is the local
+// id a newly discovered node takes, matter.js Discovery.InstanceOptions.id,
+// packages/node/src/behavior/system/controller/discovery/Discovery.ts:269,
+// :355-357, :505-513 at 862ad75f — a found node keeps its own; an id
+// another node holds is [ErrConfig]). The host runs discovery.Scanner and hands
 // the device over; Commission commissions the node. A device known by its
 // address alone — no DNS-SD answer, no instance id, its Addresses only
 // (controller.DeviceAt) — is a supported input: it matches no node and a
@@ -155,9 +161,9 @@ func (r *Registry) cull(ctx context.Context) error {
 // (packages/matter.js/src/MatterController.ts:545-549 at 862ad75f) and
 // RemoteDescriptor.is matches nothing on an absent identifier
 // (RemoteDescriptor.ts:37-50).
-func (r *Registry) ForDevice(ctx context.Context, d Device) (*Node, error) {
+func (r *Registry) ForDevice(ctx context.Context, d Device, id string) (*Node, error) {
 	for {
-		n, op, err := r.findOrCreate(d)
+		n, op, err := r.findOrCreate(d, id)
 		if op == nil {
 			return n, err
 		}
@@ -175,7 +181,7 @@ func (r *Registry) ForDevice(ctx context.Context, d Device) (*Node, error) {
 // (Peers.ts:371-389 at 862ad75f), a second forDescriptor finding the node
 // the first created. A match under decommission is returned as the
 // operation to wait for.
-func (r *Registry) findOrCreate(d Device) (*Node, *fabricOp, error) {
+func (r *Registry) findOrCreate(d Device, id string) (*Node, *fabricOp, error) {
 	r.op.Lock()
 	defer r.op.Unlock()
 	if n := r.find(d.InstanceID); n != nil {
@@ -191,7 +197,12 @@ func (r *Registry) findOrCreate(d Device) (*Node, *fabricOp, error) {
 		r.mu.Unlock()
 		return nil, nil, ErrClosed
 	}
-	id := r.allocateIDLocked()
+	if id == "" {
+		id = r.allocateIDLocked()
+	} else if slices.ContainsFunc(r.nodes, func(n *Node) bool { return n.ID() == id }) {
+		r.mu.Unlock()
+		return nil, nil, fmt.Errorf("%w: id %q is taken", ErrConfig, id)
+	}
 	r.mu.Unlock()
 	n, err := r.build(id, nil)
 	if err != nil {

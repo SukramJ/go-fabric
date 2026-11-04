@@ -37,6 +37,10 @@ type Node struct {
 	// (NetworkClient.ts:113-115 at 862ad75f) — so Start and
 	// SetAutoSubscribe do not both establish one.
 	subSync sync.Mutex
+	// adoptMu runs the cache's fabric filter adoptions one after the
+	// other (ClientStructure.#adoptions, ClientStructure.ts:129, :357-358
+	// at 862ad75f).
+	adoptMu sync.Mutex
 
 	// mu guards the node's mutable state, every field below it, and the
 	// image: the structure, its Endpoints and Clusters all share this lock.
@@ -80,6 +84,10 @@ type Node struct {
 	// :207, :245): its callbacks and event emits act only while it is
 	// current, so a replaced or ended one never acts for its successor.
 	subOwner *subscriptionOwner
+	// subReported is the subscription status last announced for the
+	// current default subscription — subscriptionActive as
+	// #endDefaultSubscription reads it (NetworkClient.ts:242-250).
+	subReported bool
 	// likelyOffline is the latch of :393-398.
 	likelyOffline bool
 	seeded        bool
@@ -92,6 +100,10 @@ type Node struct {
 	// requestObserver is a test seam: it sees each subscription request the
 	// node hands to the interaction.
 	requestObserver func(SubscribePaths)
+	// subscribeInterceptor is a test seam: it runs each subscription
+	// request in place of the interaction's Subscribe, which subscribe
+	// performs (matter.js ClientSubscribeTest's interceptSubscribe).
+	subscribeInterceptor func(r SubscribePaths, subscribe func() (*Subscription, error)) (*Subscription, error)
 	// icd is the ICD client a [Registry] gives its nodes, nil otherwise;
 	// storedICD its stored registration until the registry built it.
 	icd       *ICDClient
@@ -166,18 +178,21 @@ func newNode(cfg Config) (*Node, error) {
 	if changed {
 		n.saveSettingsLocked()
 	}
-	n.s.subscribedFabricFiltered = n.settings.defaultSubscription == nil || !n.settings.defaultSubscription.NoFabricFilter
+	n.s.recordedFabricFiltered = n.settings.cacheFabricFiltered
 	n.deliver(n.s.takeEmissions())
+	n.backfillFabricIndexOnPeer()
 	return n, nil
 }
 
-// apply applies a report to the image under the lock and delivers what it
-// produced after — ClientStructure.mutate. emitEvents is mutate's
+// applyIn applies a report of an interaction that started in the epoch
+// in to the image under the lock and delivers what it produced after —
+// ClientStructure.mutate with options.epoch (ClientStructure.ts:409, :427 at
+// 862ad75f); nil is the current epoch. emitEvents is mutate's
 // options.emitEvents (ClientStructure.ts:412): the report's events reach
-// Hooks.Event and the cursor only when it is set. A read applies after
-// its exchange ended, so it writes and delivers on the caller's goroutine.
-func (n *Node) apply(sc scope, r *Report, emitEvents bool) {
-	n.applyWith(sc, r, emitEvents, false)
+// Hooks.Event and the cursor only when it is set. A read applies after its
+// exchange ended, so it writes and delivers on the caller's goroutine.
+func (n *Node) applyIn(sc scope, r *Report, emitEvents bool, in *epoch) {
+	n.applyWith(sc, r, emitEvents, false, in)
 }
 
 // applyDeferred is apply for a subscription report, inside its exchange:
@@ -187,11 +202,11 @@ func (n *Node) apply(sc scope, r *Report, emitEvents bool) {
 // ClientStructure.ts:417-439 (the deferred persist/emit queue, bounded at
 // :57, :469-471) and InteractionMessenger.ts:1020-1045 (the status sent
 // once the consumer took the chunk) (W4-ctlim-04).
-func (n *Node) applyDeferred(sc scope, r *Report, emitEvents bool) {
-	n.applyWith(sc, r, emitEvents, true)
+func (n *Node) applyDeferred(sc scope, r *Report, emitEvents bool, in *epoch) {
+	n.applyWith(sc, r, emitEvents, true, in)
 }
 
-func (n *Node) applyWith(sc scope, r *Report, emitEvents, deferred bool) {
+func (n *Node) applyWith(sc scope, r *Report, emitEvents, deferred bool, in *epoch) {
 	n.mu.Lock()
 	before := n.configurationVersionsLocked()
 	icdBefore := n.icdModeLocked()
@@ -199,7 +214,7 @@ func (n *Node) applyWith(sc scope, r *Report, emitEvents, deferred bool) {
 	if deferred {
 		n.persist.collect = &saves
 	}
-	n.s.mutate(sc, r, emitEvents)
+	n.s.mutate(sc, r, emitEvents, in)
 	n.persist.collect = nil
 	em := n.s.takeEmissions()
 	if !n.frozen {
@@ -223,6 +238,7 @@ func (n *Node) applyWith(sc scope, r *Report, emitEvents, deferred bool) {
 // ConfigurationVersion moved.
 func (n *Node) deliverApplied(em []emission, icdChanged bool, changed []*Endpoint) {
 	n.deliver(em)
+	n.backfillFabricIndexOnPeer()
 	// IcdManagementClient.operatingMode$Changed (IcdClient.ts:118-123).
 	if n.icd != nil && icdChanged {
 		n.icd.onOperatingModeChanged()
@@ -424,7 +440,13 @@ func (n *Node) Start(ctx context.Context) error {
 	n.mu.Lock()
 	n.stopObserve = stop
 	n.mu.Unlock()
-	err := n.syncAutoSubscribe(ctx)
+	// The cache adopts the default subscription's fabric filter before
+	// the default subscription syncs, one reaction at a time
+	// (NetworkClient.ts:88-97 at 862ad75f).
+	n.subSync.Lock()
+	n.adoptDefaultFabricFilter()
+	err := n.syncAutoSubscribeLocked(ctx, nil)
+	n.subSync.Unlock()
 	n.recompute()
 	return err
 }

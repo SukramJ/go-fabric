@@ -135,10 +135,13 @@ func (s *Subscription) MaxEventNumber() (uint64, bool) {
 // returned. Mirrors matter.js SustainedSubscription.#deliver and
 // #raiseMaxEventNumber
 // (packages/protocol/src/action/client/subscription/SustainedSubscription.ts:339-364)
-// at 862ad75f, the maxEventNumberChanged hook included; the failure of a
-// consumer has no Go counterpart (Updated returns nothing).
-func (st *sustainedState) deliver(r *Report, consumer func(*Report)) {
-	consumer(r)
+// at 862ad75f, the maxEventNumberChanged hook included: a failure of the
+// consumer is the subscriber's own, logged by #logLocalFailure's rule
+// (:345-347), and the report's events still count (:348-350).
+func (st *sustainedState) deliver(r *Report, consumer func(*Report) error) error {
+	if err := consumer(r); err != nil {
+		st.logLocalFailure("processing a report", err)
+	}
 	st.mu.Lock()
 	raised := false
 	for i := range r.Events {
@@ -149,11 +152,12 @@ func (st *sustainedState) deliver(r *Report, consumer func(*Report)) {
 	number := st.maxEvent
 	st.mu.Unlock()
 	if !raised || st.changed == nil {
-		return
+		return nil
 	}
 	if err := st.changed(number); err != nil {
 		st.logLocalFailure("handling the event number of a report", err)
 	}
+	return nil
 }
 
 // logLocalFailure logs a failure of the subscription's own processing: the
@@ -178,11 +182,11 @@ func (st *sustainedState) logLocalFailure(what string, err error) {
 
 // delivering is the consumer reached through deliver, nil without one
 // (SustainedSubscription.ts:120-121 at 862ad75f).
-func (st *sustainedState) delivering(consumer func(*Report)) func(*Report) {
+func (st *sustainedState) delivering(consumer func(*Report) error) func(*Report) error {
 	if consumer == nil {
 		return nil
 	}
-	return func(r *Report) { st.deliver(r, consumer) }
+	return func(r *Report) error { return st.deliver(r, consumer) }
 }
 
 // requestNewEvents asks for the events above the highest one delivered,
@@ -388,7 +392,7 @@ func (s *Subscription) wakefulness() *icd.PeerWakefulness {
 // the outer request without the sustained fields, its closed callback
 // clearing the inner subscription and closing the returned channel, unless
 // the returned flag marks a teardown of our own (:305-308).
-func innerRequest(outer *Subscription, updated func(*Report)) (SubscribeRequest, <-chan struct{}, *atomic.Bool) {
+func innerRequest(outer *Subscription, updated func(*Report) error) (SubscribeRequest, <-chan struct{}, *atomic.Bool) {
 	st := outer.sustained
 	closed := make(chan struct{})
 	var closeOnce sync.Once

@@ -4,8 +4,10 @@
 package client
 
 import (
+	"bytes"
 	"context"
 	"log/slog"
+	"maps"
 	"slices"
 
 	"github.com/SukramJ/go-fabric/client/exchange"
@@ -41,31 +43,52 @@ func (n *Node) defaultRequest() SubscribePaths {
 	return r
 }
 
-// dropDefaultSubscription closes the default subscription no longer
-// desired (NetworkClient.ts:113-196).
-func (n *Node) dropDefaultSubscription() {
+// endDefaultSubscription ends the default subscription and reports it not
+// subscribed if it was reported subscribed. Mirrors matter.js
+// NetworkClient.#endDefaultSubscription
+// (packages/node/src/behavior/system/network/NetworkClient.ts:238-251 at
+// 862ad75f).
+func (n *Node) endDefaultSubscription() {
 	n.mu.Lock()
-	s := n.sub
-	n.sub, n.subOwner = nil, nil
+	s, wasActive := n.sub, n.subReported
+	n.sub, n.subOwner, n.subReported = nil, nil, false
 	n.mu.Unlock()
-	s.Close()
+	if s != nil {
+		s.Close()
+	}
+	if wasActive {
+		n.announceSubscriptionStatus(false)
+	}
 }
 
-// syncAutoSubscribe is NetworkClient.#syncAutoSubscribe
-// (NetworkClient.ts:113-196): a newly commissioned node reads the default
-// subscription's paths once (:133-143, unless NoInitialRead); then, when a
-// subscription is desired and none is active, the default subscription is
-// established, sustained, with the event minimum past the highest event
-// seen and a bootstrap read unless the initial read ran (:149-156).
+// syncAutoSubscribe is NetworkClient.#syncAutoSubscribe with the node's
+// autoSubscribe, serialised with the other reactions (subSync, the
+// subscriptionChanges queue, NetworkClient.ts:113-115 at 862ad75f).
 func (n *Node) syncAutoSubscribe(ctx context.Context) error {
 	n.subSync.Lock()
 	defer n.subSync.Unlock()
+	return n.syncAutoSubscribeLocked(ctx, nil)
+}
+
+// syncAutoSubscribeLocked is NetworkClient.#syncAutoSubscribe
+// (NetworkClient.ts:130-236 at 862ad75f): a newly commissioned node reads
+// the default subscription's paths once (:142-151, unless NoInitialRead);
+// then, when a subscription is desired and none is held, the default
+// subscription is established, sustained, with the event minimum past the
+// highest event seen and a bootstrap read unless the initial read ran
+// (:163-200); when none is desired the held one ends (:153-160). desire
+// overrides the node's autoSubscribe (desiredState, :130). The caller
+// holds subSync.
+func (n *Node) syncAutoSubscribeLocked(ctx context.Context, desire *bool) error {
 	n.mu.Lock()
 	desired := n.settings.autoSubscribe && !n.settings.disabled
+	if desire != nil {
+		desired = *desire && !n.settings.disabled
+	}
 	newly := n.newlyCommissioned
 	n.newlyCommissioned = false
 	req := n.defaultRequest()
-	active := n.sub != nil
+	held := n.subOwner != nil
 	n.mu.Unlock()
 	didRead := false
 	if newly && !n.cfg.NoInitialRead {
@@ -76,14 +99,169 @@ func (n *Node) syncAutoSubscribe(ctx context.Context) error {
 		}
 		didRead = true
 	}
-	if desired == active {
+	if desired == held {
 		return nil
 	}
 	if !desired {
-		n.dropDefaultSubscription()
+		n.endDefaultSubscription()
 		return nil
 	}
 	return n.establishDefaultSubscription(ctx, req, didRead)
+}
+
+// SetDefaultSubscription replaces the node's default subscription and
+// persists it with the node's settings; nil is the default (every
+// attribute, every event urgent, fabric filtered). The held default
+// subscription ends, the cache adopts the new request's fabric filter
+// ([Node.adoptDefaultFabricFilter]) and, when the node is started and
+// keeps a default subscription, the new one is established — matter.js
+// NetworkClient.#handleDefaultSubscriptionChange
+// (packages/node/src/behavior/system/network/NetworkClient.ts:117-128 at
+// 862ad75f), a reaction to the defaultSubscription state that runs one at
+// a time with Start and [Node.SetAutoSubscribe] (:113-115, :88-97). An
+// unchanged request is nothing.
+func (n *Node) SetDefaultSubscription(ctx context.Context, o *SubscribeOptions) error {
+	n.subSync.Lock()
+	defer n.subSync.Unlock()
+	n.mu.Lock()
+	if sameSubscribeOptions(n.settings.defaultSubscription, o) {
+		n.mu.Unlock()
+		return nil
+	}
+	n.settings.defaultSubscription = o.clone()
+	n.saveSettingsLocked()
+	started := n.started && !n.closing
+	n.mu.Unlock()
+	if started {
+		off := false
+		if err := n.syncAutoSubscribeLocked(ctx, &off); err != nil {
+			return err
+		}
+	}
+	n.adoptDefaultFabricFilter()
+	if !started {
+		return nil
+	}
+	err := n.syncAutoSubscribeLocked(ctx, nil)
+	n.recompute()
+	return err
+}
+
+// DefaultSubscription is the node's default subscription as set, nil for
+// the default ([Node.SetDefaultSubscription]).
+func (n *Node) DefaultSubscription() *SubscribeOptions {
+	n.mu.RLock()
+	defer n.mu.RUnlock()
+	return n.settings.defaultSubscription.clone()
+}
+
+// sameSubscribeOptions reports whether two default subscriptions are the
+// same request (their stored forms are equal).
+func sameSubscribeOptions(a, b *SubscribeOptions) bool {
+	if a == nil || b == nil {
+		return a == b
+	}
+	ea, errA := encodeSubscribeOptions(a)
+	eb, errB := encodeSubscribeOptions(b)
+	return errA == nil && errB == nil && bytes.Equal(ea, eb)
+}
+
+// adoptDefaultFabricFilter makes the fabric filter the default
+// subscription sends the filter of the node's cache. The node still starts
+// and subscribes after a storage failure: when the cache keeps the other
+// filter, it takes no data from that subscription until the switch
+// succeeds at the next start or the next change of the default
+// subscription. Mirrors matter.js NetworkClient.#adoptFabricFilter
+// (packages/node/src/behavior/system/network/NetworkClient.ts:273-298 at
+// 862ad75f): a record that failed while the filter is already the cache's
+// is a warning, a failed switch an error. The caller holds subSync.
+func (n *Node) adoptDefaultFabricFilter() {
+	n.mu.RLock()
+	filtered := !n.defaultRequest().NoFabricFilter
+	n.mu.RUnlock()
+	err := n.adoptFabricFilter(filtered)
+	if err == nil {
+		return
+	}
+	n.mu.RLock()
+	kept := n.s.cacheFabricFiltered() == filtered
+	n.mu.RUnlock()
+	if kept {
+		n.log.Warn("matter.controller.client.fabric_filter_record_failed", slog.String("node", n.cfg.ID), slog.Bool("fabric_filtered", filtered), slog.Any("err", err))
+		return
+	}
+	n.log.Error("matter.controller.client.fabric_filter_switch_failed", slog.String("node", n.cfg.ID), slog.Bool("fabric_filtered", filtered), slog.Any("err", err))
+}
+
+// adoptFabricFilter makes filtered the fabric filter of the cache; calls
+// run one after the other. Data versions do not depend on the fabric
+// filter, but cached values of fabric-scoped data do: when the cache was
+// filled under the other filter every cached data version becomes unknown,
+// in memory and in the store, while the values stay, and the next full
+// report refreshes them. A cache without a recorded filter is trusted to
+// hold data of the first filter adopted, which is recorded, its versions
+// kept. Each change starts a new epoch, so an interaction that began
+// before it records no data version. A failed store write is returned and
+// the old record stays — written last, so the next attempt forgets the
+// versions again. Mirrors matter.js ClientStructure.adoptFabricFilter
+// (packages/node/src/node/client/ClientStructure.ts:343-390 at 862ad75f).
+func (n *Node) adoptFabricFilter(filtered bool) error {
+	n.adoptMu.Lock()
+	defer n.adoptMu.Unlock()
+	// The deferred report writes and a flush in hand land before a
+	// version is forgotten (DatasourceCache.ts:324-325).
+	n.jobs.wait()
+	n.persist.flushMu.Lock()
+	defer n.persist.flushMu.Unlock()
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	s := n.s
+	recorded := s.recordedFabricFiltered
+	if recorded != nil && *recorded == filtered {
+		return nil
+	}
+	if recorded == nil {
+		if s.cacheFabricFiltered() != filtered {
+			s.epoch = &epoch{trusted: true}
+		}
+		return n.recordCacheFabricFilteredLocked(filtered)
+	}
+	s.epoch = &epoch{trusted: false}
+	defer func() { s.epoch = &epoch{trusted: true} }()
+	for _, epNo := range slices.Sorted(maps.Keys(s.endpoints)) {
+		ep := s.endpoints[epNo]
+		for _, id := range slices.Sorted(maps.Keys(ep.clusters)) {
+			// Also when unknown in memory only: the store can still hold a
+			// version of the old filter (:381).
+			if c := ep.clusters[id]; c.cache != nil {
+				if err := c.cache.forgetVersion(); err != nil {
+					return err
+				}
+			}
+		}
+	}
+	return n.recordCacheFabricFilteredLocked(filtered)
+}
+
+// recordCacheFabricFilteredLocked records the cache's fabric filter in the
+// store — ClientNodeStore.recordCacheFabricFiltered
+// (packages/node/src/storage/client/ClientNodeStore.ts:88-97 at 862ad75f),
+// under the settings' place. The caller holds n.mu.
+func (n *Node) recordCacheFabricFilteredLocked(filtered bool) error {
+	if n.erased {
+		return nil
+	}
+	e := tlv.NewEncoder()
+	e.PutBool(tlv.AnonymousTag(), filtered)
+	b, err := e.Bytes()
+	if err == nil {
+		err = n.store.Save(n.cfg.ID, 0, settingsCluster, map[uint32][]byte{settingCacheFabricFiltered: b}, nil)
+	}
+	if err != nil {
+		return err
+	}
+	n.s.recordedFabricFiltered = &filtered
+	return nil
 }
 
 // establishDefaultSubscription establishes the default subscription of
@@ -107,26 +285,39 @@ func (n *Node) establishDefaultSubscription(ctx context.Context, req SubscribePa
 		sreq.BootstrapRead = func(ctx context.Context) error { return n.bootstrapRead(ctx, req, isCurrent()) }
 	}
 	var sub *Subscription
+	// The callbacks act only while this is the node's default
+	// subscription, so a replaced or ended one never acts for its
+	// successor (NetworkClient.ts:162-166, :176-200, :216-232 at 862ad75f).
 	alive := func() {
 		n.mu.RLock()
-		s := n.sub
+		s, current := n.sub, n.subOwner == owner
 		n.mu.RUnlock()
+		if !current {
+			return
+		}
 		n.noteICDActive()
 		if s != nil && s.ID() != interaction.NoSubscription && n.cfg.Hooks.SubscriptionAlive != nil {
 			n.cfg.Hooks.SubscriptionAlive()
 		}
 	}
 	n.icdSustainHooks(&sreq)
-	sreq.Updated = func(*Report) { alive() }
+	sreq.Updated = func(*Report) error { alive(); return nil }
 	sreq.KeepaliveReceived = alive
 	sreq.Closed = func() {
-		n.mu.Lock()
-		if n.subOwner == owner {
-			n.sub, n.subOwner = nil, nil
+		if isCurrent() {
+			n.endDefaultSubscription()
 		}
-		n.mu.Unlock()
 	}
-	sreq.ActiveChanged = n.defaultActiveChanged
+	sreq.ActiveChanged = func(active bool) {
+		n.mu.Lock()
+		if n.subOwner != owner {
+			n.mu.Unlock()
+			return
+		}
+		n.subReported = active
+		n.mu.Unlock()
+		n.announceSubscriptionStatus(active)
+	}
 	// A Stop (or Close) that ran during the initial read leaves the node
 	// stopped: no default subscription is established on it. Mirrors
 	// matter.js NetworkClient.ts:113-131 (each sync re-reads the node's
@@ -156,10 +347,10 @@ func (n *Node) establishDefaultSubscription(ctx context.Context, req SubscribePa
 	return nil
 }
 
-// defaultActiveChanged is the default subscription's ActiveChanged
-// (NetworkClient.ts:226-235): the status hook, the ICD client, and on going
-// live the alive hook and a flush of the cache.
-func (n *Node) defaultActiveChanged(active bool) {
+// announceSubscriptionStatus is subscriptionStatusChanged with its
+// reactions (NetworkClient.ts:226-235): the status hook, the ICD client,
+// and on going live the alive hook and a flush of the cache.
+func (n *Node) announceSubscriptionStatus(active bool) {
 	if h := n.cfg.Hooks.SubscriptionStatusChanged; h != nil {
 		h(active)
 	}
@@ -213,8 +404,9 @@ func (n *Node) bootstrapRead(ctx context.Context, req SubscribePaths, emitEvents
 	r := ReadPaths{
 		Attributes: req.Attributes, Events: req.Events, NoFabricFilter: req.NoFabricFilter,
 		EventFilters:       []EventMinimumNumber{{EventMin: n.settings.maxEventNumber + 1}},
-		DataVersionFilters: n.s.injectVersionFilters(sc, false),
+		DataVersionFilters: n.s.withKnownVersions(sc, nil, false),
 	}
+	in := n.s.epoch
 	n.mu.RUnlock()
 	ia, err := n.interaction()
 	if err != nil {
@@ -224,7 +416,7 @@ func (n *Node) bootstrapRead(ctx context.Context, req SubscribePaths, emitEvents
 	if err != nil {
 		return err
 	}
-	n.apply(sc, rep, emitEvents)
+	n.applyIn(sc, rep, emitEvents, in)
 	return nil
 }
 

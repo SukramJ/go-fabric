@@ -206,18 +206,19 @@ type reportedLevels struct {
 	levels []uint64
 }
 
-func (r *reportedLevels) update(rep *interaction.Report) {
+func (r *reportedLevels) update(rep *interaction.Report) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if !r.primed {
 		r.primed = true
-		return
+		return nil
 	}
 	for i := range rep.Attributes {
 		if a := &rep.Attributes[i]; a.Path.Cluster == levelcontroldef.ClusterID && a.Path.Attribute == levelcontroldef.AttrCurrentLevel {
 			r.levels = append(r.levels, a.Value.El.Uint)
 		}
 	}
+	return nil
 }
 
 func (r *reportedLevels) get() []uint64 {
@@ -418,16 +419,17 @@ func TestThermostatControllerWriteReachesOnChanged(t *testing.T) {
 	sub, err := fabrictest.Subscribe(ctx, pair, interaction.SubscribeRequest{
 		Attributes:       []im.ConcreteAttributePath{path},
 		MinIntervalFloor: interaction.Interval(0), MaxIntervalCeiling: interaction.Interval(60 * time.Second),
-		Updated: func(r *interaction.Report) {
+		Updated: func(r *interaction.Report) error {
 			rmu.Lock()
 			defer rmu.Unlock()
 			if !primed {
 				primed = true
-				return
+				return nil
 			}
 			for _, a := range r.Attributes {
 				reported = append(reported, a.Value.El.Int)
 			}
+			return nil
 		},
 	})
 	if err != nil {

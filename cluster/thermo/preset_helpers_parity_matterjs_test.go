@@ -311,7 +311,7 @@ func (p *thermostatPair) subscribePresets(ctx context.Context, t *testing.T) *pr
 		Attributes:         []im.ConcreteAttributePath{p.attrPath(presetsAttribute)},
 		MinIntervalFloor:   &floor,
 		MaxIntervalCeiling: &ceiling,
-		Updated: func(rep *interaction.Report) {
+		Updated: func(rep *interaction.Report) error {
 			for i := range rep.Attributes {
 				if rep.Attributes[i].Path.Attribute != presetsAttribute {
 					continue
@@ -324,6 +324,7 @@ func (p *thermostatPair) subscribePresets(ctx context.Context, t *testing.T) *pr
 				r.reports = append(r.reports, []thermo.Preset(v.(spec.List[thermo.Preset])))
 				r.mu.Unlock()
 			}
+			return nil
 		},
 	})
 	if err != nil {

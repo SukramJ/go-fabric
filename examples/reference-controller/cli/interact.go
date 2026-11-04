@@ -300,11 +300,12 @@ func cmdSubscribe(e *env, args []string) error {
 			Attributes: attrs, Events: events,
 			MinIntervalFloor:   interaction.Interval(minI.or(0)),
 			MaxIntervalCeiling: interaction.Interval(maxI.or(60 * time.Second)),
-			Updated: func(r *interaction.Report) {
+			Updated: func(r *interaction.Report) error {
 				select {
 				case reports <- r:
 				case <-ctx.Done():
 				}
+				return nil
 			},
 		}})
 		if err != nil {

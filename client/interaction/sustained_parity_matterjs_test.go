@@ -220,7 +220,7 @@ func TestSustainedSubscriptionNonICD(t *testing.T) {
 		keepalives := make(chan struct{}, 4)
 		sub, err := r.c.Subscribe(context.Background(), interaction.SubscribeRequest{
 			Attributes: []im.ConcreteAttributePath{onOff}, Sustain: true, ActiveChanged: states.record,
-			Updated:           func(*interaction.Report) {},
+			Updated:           func(*interaction.Report) error { return nil },
 			KeepaliveReceived: func() { keepalives <- struct{}{} },
 		})
 		if err != nil {
@@ -243,7 +243,7 @@ func TestSustainedSubscriptionNonICD(t *testing.T) {
 // (SustainedSubscriptionTest.ts:1196-1520).
 func TestSustainedSubscriptionEventNumbers(t *testing.T) {
 	t.Parallel()
-	consume := func(*interaction.Report) {}
+	consume := func(*interaction.Report) error { return nil }
 
 	t.Run("keeps the caller's event filters until it delivered an event", func(t *testing.T) {
 		t.Parallel()
@@ -282,10 +282,11 @@ func TestSustainedSubscriptionEventNumbers(t *testing.T) {
 		seen := make(chan struct{}, 1)
 		sub, err := r.c.Subscribe(context.Background(), interaction.SubscribeRequest{
 			Events: ssAllEvents, Sustain: true, ActiveChanged: states.record,
-			Updated: func(*interaction.Report) {
+			Updated: func(*interaction.Report) error {
 				_, ok := self.Load().MaxEventNumber()
 				seenOK.Store(ok)
 				seen <- struct{}{}
+				return nil
 			},
 		})
 		if err != nil {

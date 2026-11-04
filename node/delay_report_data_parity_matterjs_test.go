@@ -355,14 +355,15 @@ func (d *deferHost) subscribeOn(t *testing.T, p *fabrictest.Pair, paths []im.Con
 	sub, err := fabrictest.Subscribe(parityCtx(t), p, interaction.SubscribeRequest{
 		Attributes: paths, Events: events,
 		MinIntervalFloor: interaction.Interval(0), MaxIntervalCeiling: interaction.Interval(time.Duration(ceiling) * time.Second),
-		Updated: func(*interaction.Report) {
+		Updated: func(*interaction.Report) error {
 			r.mu.Lock()
 			defer r.mu.Unlock()
 			if !primed {
 				primed = true
-				return
+				return nil
 			}
 			r.at = append(r.at, d.site.Clock().Now())
+			return nil
 		},
 	})
 	if err != nil {

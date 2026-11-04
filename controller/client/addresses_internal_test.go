@@ -50,7 +50,7 @@ func TestCullUncommissioned(t *testing.T) {
 	if h.clock.armed() != 0 {
 		t.Fatal("the timer runs on an empty registry")
 	}
-	stale, err := r.ForDevice(t.Context(), device("STALE", "[fd00::1]:5540"))
+	stale, err := r.ForDevice(t.Context(), device("STALE", "[fd00::1]:5540"), "")
 	if err != nil || stale.ID() != "peer1" || stale.IsCommissioned() {
 		t.Fatalf("ForDevice %v %v", stale, err)
 	}
@@ -58,7 +58,7 @@ func TestCullUncommissioned(t *testing.T) {
 		t.Fatal("the timer is not armed")
 	}
 	stale.updateRecord(func(rec *Record) { rec.Addresses[0].TTL = time.Second })
-	fresh, _ := r.ForDevice(t.Context(), device("FRESH", "[fd00::2]:5540"))
+	fresh, _ := r.ForDevice(t.Context(), device("FRESH", "[fd00::2]:5540"), "")
 	// The node's own lifespan is two minutes; its address lives longer.
 	fresh.updateRecord(func(rec *Record) { rec.TTL = 2 * time.Minute })
 	h.tick()
@@ -155,16 +155,16 @@ func TestForDevice(t *testing.T) {
 	t.Parallel()
 	h := newRegHarness(t)
 	r := h.registry(t, nil)
-	first, _ := r.ForDevice(t.Context(), device("CAFE", "[fd00::1]:5540"))
+	first, _ := r.ForDevice(t.Context(), device("CAFE", "[fd00::1]:5540"), "")
 	h.clock.Advance(time.Second)
-	again, err := r.ForDevice(t.Context(), device("CAFE", "[fd00::9]:5540"))
+	again, err := r.ForDevice(t.Context(), device("CAFE", "[fd00::9]:5540"), "")
 	if err != nil || again != first || r.Size() != 1 {
 		t.Fatalf("a second sighting: %v %d", err, r.Size())
 	}
 	if rec := again.Record(); rec.Addresses[0].String() != "[fd00::9]:5540" || !rec.DiscoveredAt.Equal(h.clock.Now()) {
 		t.Fatalf("not refreshed %+v", rec)
 	}
-	if anon, _ := r.ForDevice(t.Context(), device("", "[fd00::2]:5540")); anon == first {
+	if anon, _ := r.ForDevice(t.Context(), device("", "[fd00::2]:5540"), ""); anon == first {
 		t.Fatal("an anonymous device matched")
 	}
 	op, err := r.registerOperation(first, opDecommission)
@@ -173,7 +173,7 @@ func TestForDevice(t *testing.T) {
 	}
 	got := make(chan *Node, 1)
 	go func() {
-		n, _ := r.ForDevice(t.Context(), device("CAFE"))
+		n, _ := r.ForDevice(t.Context(), device("CAFE"), "")
 		got <- n
 	}()
 	select {
@@ -190,7 +190,7 @@ func TestForDevice(t *testing.T) {
 	}
 	// A commission does not hold ForDevice back.
 	op, _ = r.registerOperation(first, opCommission)
-	if n, _ := r.ForDevice(t.Context(), device("CAFE")); n != first {
+	if n, _ := r.ForDevice(t.Context(), device("CAFE"), ""); n != first {
 		t.Fatal("a commission held ForDevice")
 	}
 	r.mu.Lock()
@@ -198,7 +198,7 @@ func TestForDevice(t *testing.T) {
 	r.mu.Unlock()
 	close(op.done)
 	_ = r.Close(t.Context())
-	if _, err := r.ForDevice(t.Context(), device("NEW")); err == nil {
+	if _, err := r.ForDevice(t.Context(), device("NEW"), ""); err == nil {
 		t.Fatal("ForDevice after Close")
 	}
 }

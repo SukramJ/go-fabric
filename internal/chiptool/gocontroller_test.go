@@ -273,10 +273,11 @@ func TestGoControllerSubscribesReferenceBridge(t *testing.T) {
 	sub, err := c.Subscribe(ctx, interaction.SubscribeRequest{
 		Attributes: []im.ConcreteAttributePath{onOff}, Sustain: true,
 		MinIntervalFloor: interaction.Interval(0), MaxIntervalCeiling: interaction.Interval(time.Minute),
-		Updated: func(r *interaction.Report) {
+		Updated: func(r *interaction.Report) error {
 			if v, ok := r.Value(light, 0x0006, 0x0000); ok {
 				reports <- v.El.Bool
 			}
+			return nil
 		},
 	})
 	if err != nil {

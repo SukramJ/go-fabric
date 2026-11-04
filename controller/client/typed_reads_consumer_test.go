@@ -86,10 +86,11 @@ func TestTypedReadsConsumer(t *testing.T) {
 				client.ClusterAt(lightEP, onoffdef.ClusterID),
 				client.ClusterAt(lightEP, levelcontroldef.ClusterID),
 			},
-			Updated: func(*client.Report) {
+			Updated: func(*client.Report) error {
 				mu.Lock()
 				reports++
 				mu.Unlock()
+				return nil
 			},
 		}})
 		return err

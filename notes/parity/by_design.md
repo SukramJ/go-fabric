@@ -2936,6 +2936,31 @@ cases of ClientNodeTest.ts:1137-2853 (at `862ad75f`, about 60) are
 By design (brief AK, D6). The compensation machinery is the price of
 optimistic local state; the port takes the pessimistic one.
 
+### BD-Matter-ControllerNodeIDRandom — the controller draws a peer's node id at random, never sequentially
+
+matter.js's controller hands out node ids from a stored counter by default
+— `ControllerBehavior.allocatePeerAddress` with `nodeIdAssignment:
+"sequential"`, `nextNodeId` from 1, skipping an id in use and never
+handing one out twice
+(`packages/node/src/behavior/system/controller/ControllerBehavior.ts:139-181`,
+`:285-290` at `862ad75f`) — and draws a random operational id only with
+`nodeIdAssignment: "random"` or in `ControllerCommissioner.#determineAddress`
+(`packages/protocol/src/peer/ControllerCommissioner.ts:569-582`).
+`controller/commissioner.Commissioner.determineAddress` always draws a
+random operational node id no peer of the fabric holds; a caller's id
+(`commissioner.Options.NodeID`) is taken as given and refused when in
+use. ClientNodeTest's four allocator cases ("assigns an unused node ID
+when commissioning after a restart with existing peers", "refuses to
+allocate a peer address whose NodeId is already in use", "skips the
+controller's own node ID", "skips a previously allocated node ID",
+`packages/node/test/node/ClientNodeTest.ts:537-567`, `:3024-3033`,
+`:4147-4192`) are `left` under this entry. Owner decision 2026-11-03
+(phase 32).
+
+By design: several administrators on one fabric collide when each counts
+from 1, while a random 64-bit draw does not, and a host's records keyed by
+node id stay stable across a controller that loses its counter.
+
 ### BD-Matter-ClientNode-EndpointInstalledOnce — an installed endpoint's clusters are not emitted again
 
 matter.js emits an installed endpoint through `emitEndpoint`, which emits

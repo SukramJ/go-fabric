@@ -269,7 +269,7 @@ func TestLiveCommissionerControl(t *testing.T) {
 			HasEndpoint: true, HasCluster: true, HasEvent: true, IsUrgent: true,
 		}},
 		MaxIntervalCeiling: interaction.Interval(10 * time.Second),
-		Updated: func(r *interaction.Report) {
+		Updated: func(r *interaction.Report) error {
 			for _, ev := range r.Events {
 				if !ev.HasValue {
 					continue
@@ -278,6 +278,7 @@ func TestLiveCommissionerControl(t *testing.T) {
 					events <- v
 				}
 			}
+			return nil
 		},
 	})
 	if err != nil {

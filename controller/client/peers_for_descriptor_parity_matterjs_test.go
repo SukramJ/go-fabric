@@ -50,7 +50,7 @@ func TestPeersForDescriptorParity(t *testing.T) {
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				nodes[i], _ = reg.ForDevice(parityCtx(t), deviceA("device-a"))
+				nodes[i], _ = reg.ForDevice(parityCtx(t), deviceA("device-a"), "")
 			}()
 		}
 		wg.Wait()
@@ -62,12 +62,12 @@ func TestPeersForDescriptorParity(t *testing.T) {
 	t.Run("matches a constructed node by its current state, not the descriptor it was created with", func(t *testing.T) {
 		t.Parallel()
 		reg := quietSite(t).AddController(fabrictest.ControllerOptions{}).Registry()
-		n, err := reg.ForDevice(parityCtx(t), deviceA("device-a"))
+		n, err := reg.ForDevice(parityCtx(t), deviceA("device-a"), "")
 		if err != nil {
 			t.Fatal(err)
 		}
 		client.UpdateRecord(n, func(r *client.Record) { r.DeviceIdentifier = "device-b" })
-		found, err := reg.ForDevice(parityCtx(t), deviceA("device-b"))
+		found, err := reg.ForDevice(parityCtx(t), deviceA("device-b"), "")
 		if err != nil || found != n {
 			t.Fatalf("found %p (%v), want the renamed node %p", found, err, n)
 		}

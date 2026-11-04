@@ -355,7 +355,7 @@ func TestClientNodeParity(t *testing.T) {
 		d := found[0]
 		d.Addresses = nil
 		reg := p.Controller.Registry()
-		n, err := reg.ForDevice(parityCtx(t), d)
+		n, err := reg.ForDevice(parityCtx(t), d, "")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -842,7 +842,7 @@ func TestClientNodeOrphanedPeerCleanupParity(t *testing.T) {
 		if err != nil || len(found) != 1 {
 			t.Fatalf("discovered %+v, %v", found, err)
 		}
-		n, err := c.Registry().ForDevice(parityCtx(t), found[0])
+		n, err := c.Registry().ForDevice(parityCtx(t), found[0], "")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -940,11 +940,11 @@ func TestClientNodeOrphanedPeerCleanupParity(t *testing.T) {
 		n2 := discovered(t, cp.pair.Controller, second)
 		reg := cp.pair.Controller.Registry()
 		d := discovery.Device{InstanceID: n2.Record().DeviceIdentifier}
-		if found, err := reg.ForDevice(parityCtx(t), d); err != nil || found != n2 {
+		if found, err := reg.ForDevice(parityCtx(t), d, ""); err != nil || found != n2 {
 			t.Fatalf("ForDevice %p, %v; want the discovered node %p", found, err, n2)
 		}
 		cp.run(t, func(ctx context.Context) error { return reg.Decommission(ctx, n2) })
-		if found, err := reg.ForDevice(parityCtx(t), d); err != nil || found == n2 {
+		if found, err := reg.ForDevice(parityCtx(t), d, ""); err != nil || found == n2 {
 			t.Fatalf("ForDevice after the delete returned the deleted node (%v)", err)
 		}
 	})

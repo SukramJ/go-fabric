@@ -4,8 +4,9 @@
 // Package nodeseam carries the one-way seams to a node's configuration
 // that are not public API: fabrictest puts a node's client stack onto its
 // in-memory network, and the reference daemon and the module's tests set
-// the two TESTING ONLY knobs — the OTA requestor's harness mode and the
-// Wi-Fi NetworkCommissioning driver (review 2026-11 W5-api-11).
+// the TESTING ONLY knobs — the OTA requestor's harness mode, the Wi-Fi
+// NetworkCommissioning driver (review 2026-11 W5-api-11) and the
+// SpecificationVersion a node reports (phase 32).
 //
 // Direction of the edge: package node installs [UseClientListener] from
 // its init; fabrictest reads it. node.Client names a bind address and a
@@ -41,3 +42,11 @@ var UseOTAHarness func(cfg any) bool
 // configure. TESTING ONLY: the module's nodes are Ethernet-attached.
 // Reports false when cfg is not a *node.Config or driver is nil.
 var UseWiFiCommissioning func(cfg any, driver contract.WiFiDriver) bool
+
+// UseSpecificationVersion makes the node built from cfg (a *node.Config)
+// report version as its BasicInformation SpecificationVersion instead of
+// the release the module implements. TESTING ONLY: a test stands in for a
+// node of an older release, as matter.js's IcdClientTest sets
+// basicInformation.specificationVersion (IcdClientTest.ts:567-582 at
+// 862ad75f). Reports false when cfg is not a *node.Config.
+var UseSpecificationVersion func(cfg any, version uint32) bool

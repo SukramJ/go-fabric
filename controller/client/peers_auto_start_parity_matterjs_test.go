@@ -49,7 +49,7 @@ func TestPeersAutoStartParity(t *testing.T) {
 		if err != nil || len(found) != 1 {
 			t.Fatalf("discovered %+v, %v", found, err)
 		}
-		n2, err := reg.ForDevice(parityCtx(t), found[0])
+		n2, err := reg.ForDevice(parityCtx(t), found[0], "")
 		if err != nil || n2.IsCommissioned() {
 			t.Fatalf("discovered node %v, %v", n2, err)
 		}

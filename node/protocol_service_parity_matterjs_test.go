@@ -245,7 +245,7 @@ func TestProtocolServiceParityMatterJS(t *testing.T) {
 				Events:           []im.ConcreteEventPath{client.EventAt(0, psClBasicInfo, psEvLeave)},
 				NoFabricFilter:   true,
 				MinIntervalFloor: &minFloor, MaxIntervalCeiling: &maxCeiling,
-				Updated: func(r *interaction.Report) { reports <- r },
+				Updated: func(r *interaction.Report) error { reports <- r; return nil },
 			})
 			if err != nil {
 				t.Fatal(err)

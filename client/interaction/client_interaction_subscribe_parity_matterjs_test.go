@@ -102,9 +102,10 @@ func TestClientInteractionSubscribeClosedWhileProcessingParity(t *testing.T) {
 	go func() {
 		_, err := c.Subscribe(context.Background(), interaction.SubscribeRequest{
 			Attributes: []im.ConcreteAttributePath{onOff},
-			Updated: func(*interaction.Report) {
+			Updated: func(*interaction.Report) error {
 				close(processing)
 				<-proceed
+				return nil
 			},
 		})
 		done <- err

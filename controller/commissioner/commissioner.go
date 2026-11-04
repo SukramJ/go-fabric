@@ -575,8 +575,23 @@ func (c *Commissioner) forgetCommissioned(opts Options) {
 		}
 	}
 	for _, s := range c.ctx.Scanners {
-		s.ForgetCommissioned(addresses, identity)
+		c.forgetIn(s, addresses, identity)
 	}
+}
+
+// forgetIn tells one scanner to forget the device. The device is
+// commissioned either way, so a scanner's bookkeeping that fails (panics)
+// is logged and the other scanners are still told —
+// ControllerCommissioner.#forgetCommissionedDevice's catch
+// (packages/protocol/src/peer/ControllerCommissioner.ts:335-339 at
+// 862ad75f).
+func (c *Commissioner) forgetIn(s CommissionedScanner, addresses []string, identity *discovery.CommissionedIdentity) {
+	defer func() {
+		if r := recover(); r != nil {
+			c.log.Warn("matter.controller.commissioning.scanner_forget_failed", slog.Any("err", r))
+		}
+	}()
+	s.ForgetCommissioned(addresses, identity)
 }
 
 // transitionToCase is the flow's transition (:671-716): a non-concurrent

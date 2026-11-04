@@ -82,6 +82,30 @@ func (c *cache) externalSet(values map[uint32]*spec.Node, version *uint32) {
 	c.p.save(c, slices.Collect(maps.Keys(values)))
 }
 
+// externalSetUnversioned is externalSet with the version set unknown —
+// #applyUpdates' UNKNOWN_VERSION (ClientStructure.ts:674-678 at 862ad75f).
+func (c *cache) externalSetUnversioned(values map[uint32]*spec.Node) {
+	if c.erased {
+		return
+	}
+	c.hasVersion = false
+	c.versionDirty = c.p.interval > 0
+	c.externalSet(values, nil)
+}
+
+// forgetVersion makes the version unknown in memory and in the store — a
+// flush in hand lands first — and returns the store's error. Mirrors
+// matter.js DatasourceCache.forgetVersion
+// (packages/node/src/storage/client/DatasourceCache.ts:318-332 at
+// 862ad75f). The caller holds the node's lock.
+func (c *cache) forgetVersion() error {
+	if c.erased {
+		return nil
+	}
+	c.hasVersion, c.versionDirty = false, false
+	return c.p.store.Save(c.p.nodeID, c.ep, c.cluster, map[uint32][]byte{}, nil)
+}
+
 // invalidateVersion forgets the version, so the next wildcard read fetches
 // the whole cluster (DatasourceCache.ts:199-201).
 func (c *cache) invalidateVersion() { c.hasVersion = false }
