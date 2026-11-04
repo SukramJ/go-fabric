@@ -536,7 +536,7 @@ func withRootServers(servers, extra []contract.ClusterServer) ([]contract.Cluste
 	for _, srv := range extra {
 		id := srv.MatterClusterID()
 		if slices.ContainsFunc(servers, func(s contract.ClusterServer) bool { return s.MatterClusterID() == id }) {
-			return nil, fmt.Errorf("root: Config.RootServers names cluster 0x%04x, which the root serves already", id)
+			return nil, fmt.Errorf("node: root: Config.RootServers names cluster 0x%04x, which the root serves already", id)
 		}
 		servers = append(servers, srv)
 	}

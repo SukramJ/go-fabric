@@ -84,7 +84,7 @@ var areaKeys = []string{
 	"detail", "device_type", "discriminator", "dropped", "duplicate",
 	"endpoint_set", "endpoints", "entries", "event", "event_paths",
 	"event_reports", "events", "examined", "exchanges", "expected",
-	"fabric_id", "fallback", "family", "features", "field", "file", "final",
+	"fabric_filtered", "fabric_id", "fallback", "family", "features", "field", "file", "final",
 	"floor", "force", "former", "formerly", "fragment_size", "from",
 	"general_code", "github", "grace", "hint", "holds", "hook", "host",
 	"icac_bytes", "ideal", "ids", "iface", "ignored", "in",

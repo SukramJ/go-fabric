@@ -24,11 +24,11 @@ func TestAttestationConfig(t *testing.T) {
 	if att := attestationConfig(""); att.Files != nil || att.Chain != nil || att.CertificationDeclaration != nil {
 		t.Fatalf("empty flag: %+v", att)
 	}
-	chain, err := attestation.BuildTestChain(0xFFF1, 0x8002)
+	chain, err := attestation.BuildTestChain(testVendorID, testProductID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	cd, err := attestation.BuildTestCertificationDeclaration(0xFFF1, 0x8002)
+	cd, err := attestation.BuildTestCertificationDeclaration(testVendorID, testProductID)
 	if err != nil {
 		t.Fatal(err)
 	}
