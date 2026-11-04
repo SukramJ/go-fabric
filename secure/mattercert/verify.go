@@ -214,12 +214,12 @@ func NewVerifierFromRCAC(rcac []byte, ts TimeSource) (*Verifier, error) {
 }
 
 // NewVerifierFromCertificate is [NewVerifierFromRCAC] on a decoded root
-// certificate: its public key, its subjectKeyIdentifier, and its
+// certificate: its public key, its subject key identifier, and its
 // matter-fabric-id when it carries one, which every NOC the verifier
-// accepts must then match (matter.js Noc.ts:116-132 at 862ad75f: "When
-// any matter-fabric-id attributes are present in either the Matter Root
-// CA Certificate or the Matter ICA Certificate, the value SHALL match
-// the one present in the NOC").
+// accepts must then match (matter.js Noc.ts:116-125 at 862ad75f,
+// rootFabricId: "When any matter-fabric-id attributes are present in
+// either the Matter Root CA Certificate or the Matter ICA Certificate,
+// the value SHALL match the one present in the NOC").
 func NewVerifierFromCertificate(root *Certificate, ts TimeSource) (*Verifier, error) {
 	if root == nil {
 		return nil, fmt.Errorf("%w: nil root certificate", ErrMalformed)

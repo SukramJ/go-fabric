@@ -24,8 +24,9 @@ var ErrProductMismatch = errors.New("attestation: the chain's vendor or product 
 // (packages/protocol/src/certificate/DeviceCertification.ts:107-140 at
 // 862ad75f), which runs after the servable-size check of the chain
 // (#assertServable, :87-105 — [LoadChainFiles] here). The ids are read as
-// matter.js reads a subject: the Matter OIDs, else the `Mvid:`/`Mpid:`
-// commonName fallback (Certificate.ts:345-352, :379-392).
+// matter.js reads a subject: the Matter OIDs (Certificate.ts:346-347
+// vendorId/productId), else the `Mvid:`/`Mpid:` fallback parsed from the
+// commonName (Certificate.ts:380-385, parseMatterFallbackVidPid).
 func ValidateProduct(chain *Chain, vendorID, productID uint16) error {
 	if chain == nil {
 		return errors.New("attestation: ValidateProduct: nil chain")
