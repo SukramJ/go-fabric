@@ -10,9 +10,10 @@ import "github.com/SukramJ/go-fabric/cluster/spec"
 // generated [spec.List], which encodes itself as a TLV array. The servers
 // keep plain slices internally (their validation and derivation compare
 // and index them), but a plain slice carries no EncodeTLV, and the
-// bridge's attribute writer writes a value it does not know as null
-// (bridge/reply.go defaultAttributeValueWriter, the default arm after
-// encodeApplicationValue). That is how TC-SETRF-2.2 step 4, TC-SETRF-2.3,
+// bridge's attribute writer wrote such a value as null (bridge/reply.go
+// defaultAttributeValueWriter, the default arm after
+// encodeApplicationValue) until its Encodable-slice rule (issue #388
+// G-N4). That is how TC-SETRF-2.2 step 4, TC-SETRF-2.3,
 // TC-SETRF-3.1 step 27 and TC-COMMTR-3.1 step 6 saw Null for a list the
 // test event trigger had set (CI run 38114710064). The other servers
 // return spec.List the same way (cluster/servicearea, cluster/core
