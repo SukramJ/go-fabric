@@ -275,6 +275,42 @@ func TestClientNodeParity(t *testing.T) {
 		}
 	})
 
+	// A device that leaves the fabric flushes the Leave event to its
+	// subscribers before the fabric's rows go; the controller erases the
+	// node (ClientNodeTest.ts:2953-2977 at 862ad75f, Fabric.ts:447-457).
+	t.Run("erases node after leave event", func(t *testing.T) {
+		t.Parallel()
+		cp := newClientPair(t, clientPairOptions{})
+		if err := cp.site.Eventually(parityCtx(t), "the default subscription", cp.node.SubscriptionActive); err != nil {
+			t.Fatal(err)
+		}
+		// subscribedPeer waits for the established subscription: the
+		// device's priming must be over, or the flush has nothing to send.
+		if err := cp.site.Settle(parityCtx(t)); err != nil {
+			t.Fatal(err)
+		}
+		// The leave runs under the site's clock (MockTime.resolve around
+		// deviceFabric.leave()): the flush waits for the controller's
+		// answer, or for its bound, on that clock.
+		if err := cp.site.Run(parityCtx(t), func(ctx context.Context) error {
+			return cp.pair.Device.Act(func(n *node.Node) error {
+				fabrics, err := n.FabricInfos(ctx)
+				if err != nil {
+					return err
+				}
+				if len(fabrics) != 1 {
+					return fmt.Errorf("%d fabrics on the device, want 1", len(fabrics))
+				}
+				return n.RemoveFabric(ctx, fabrics[0].FabricIndex)
+			})
+		}); err != nil {
+			t.Fatal(err)
+		}
+		if err := cp.site.Eventually(parityCtx(t), "the node erased after Leave", func() bool { return cp.pair.Controller.Registry().Size() == 0 }); err != nil {
+			t.Fatal(err)
+		}
+	})
+
 	t.Run("commissions with a short numeric passcode", func(t *testing.T) {
 		t.Parallel()
 		cp := newClientPair(t, clientPairOptions{configure: func(c *node.Config) { c.Commissioning.Passcode = 1 }})

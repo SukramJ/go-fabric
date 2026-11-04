@@ -374,6 +374,7 @@ func New(ctx context.Context, cfg Config) (*Node, error) { //nolint:funlen // th
 
 	// --- fabric hooks (main.go:362-414 at b4ea1f96^) ---------------------------------
 	// The host's observers run after each (observers.go).
+	n.root.OperationalCredentials.SetOnFabricLeaving(n.fabricLeaving)
 	n.root.OperationalCredentials.SetOnFabricRemoved(n.observedFabricRemoved)
 	n.root.OperationalCredentials.SetOnFabricUpdated(n.observedFabricUpdated)
 	n.root.OperationalCredentials.SetOnFabricChanged(n.observedFabricChanged)
@@ -516,12 +517,24 @@ func (n *Node) fabricInstalled(ctx context.Context, fabricIndex uint8, _, _ uint
 	n.br.AnnounceFabric(ctx, fabricIndex, compressedID, nodeID)
 }
 
-// fabricRemoved is OperationalCredentials' OnFabricRemoved
-// (main.go:362-385 at b4ea1f96^): Leave, the OTA providers, the CASE identity and
-// record, the sessions, and the node's own window once the last fabric
-// is gone.
-func (n *Node) fabricRemoved(ctx context.Context, fabricIndex uint8) {
+// fabricLeaving is the cluster's OnFabricLeaving hook: the Leave event,
+// then the flush of the fabric's subscriptions, both while the store
+// still holds the fabric. Mirrors matter.js Fabric.leave
+// (packages/protocol/src/fabric/Fabric.ts:447-457 at 862ad75f, leave):
+// the leaving event BasicInformationServer answers with Leave
+// (BasicInformationServer.ts:175, :186-188), then every session's
+// closeSubscriptions(true), then the delete. A fail-safe's revert
+// deletes without leaving (FailsafeContext.ts:271-274) and emits none.
+func (n *Node) fabricLeaving(ctx context.Context, fabricIndex uint8) {
 	n.root.BasicInformation.EmitLeave(fabricIndex)
+	n.br.EmitFabricLeavingContext(ctx, fabricIndex)
+}
+
+// fabricRemoved is OperationalCredentials' OnFabricRemoved
+// (main.go:362-385 at b4ea1f96^): the OTA providers, the CASE identity and
+// record, the sessions, and the node's own window once the last fabric
+// is gone; the Leave event went out in [Node.fabricLeaving].
+func (n *Node) fabricRemoved(ctx context.Context, fabricIndex uint8) {
 	if n.root.OTARequestor != nil {
 		n.root.OTARequestor.FabricRemoved(fabricIndex)
 	}

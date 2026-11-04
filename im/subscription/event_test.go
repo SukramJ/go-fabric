@@ -320,3 +320,112 @@ func TestOnEventFired_NonConcretePath_IsNoOp(t *testing.T) {
 		t.Fatalf("EventReporter called %d time(s) for non-concrete path, want 0", len(ch))
 	}
 }
+
+// FlushFabric reports what the fabric's subscriptions owe at once — an
+// Info event behind its min interval included — and leaves the invoking
+// session's and the other fabrics' subscriptions alone: matter.js
+// Fabric.leave's closeSubscriptions(true) on every session of the fabric
+// (packages/protocol/src/fabric/Fabric.ts:447-457 at 862ad75f).
+func TestFlushFabricReportsNowExceptTheInvokingSession(t *testing.T) {
+	t.Parallel()
+	ch := make(chan eventReporterCall, 8)
+	m, fire := newEventManager(subscription.Config{})
+	m.SetEventReporter(chanEventReporter(ch))
+
+	args := defaultEventArgs()
+	flushed, err := m.Subscribe(args)
+	if err != nil {
+		t.Fatalf("Subscribe: %v", err)
+	}
+	args.SessionID = 11
+	if _, err := m.Subscribe(args); err != nil {
+		t.Fatalf("Subscribe(invoking session): %v", err)
+	}
+	args.FabricIndex, args.SessionID = 2, 12
+	if _, err := m.Subscribe(args); err != nil {
+		t.Fatalf("Subscribe(other fabric): %v", err)
+	}
+	fire(mkEventFiring(1, 0x003B, 0x01, im.EventPriorityInfo))
+
+	ctx := context.Background()
+	m.Tick(ctx, time.Now()) // inside every min interval: nothing is due
+	select {
+	case call := <-ch:
+		t.Fatalf("a report of %d events went out on the tick", len(call.events))
+	default:
+	}
+
+	m.FlushFabric(ctx, 1, 11)
+	select {
+	case call := <-ch:
+		if call.sub.ID != flushed.ID || len(call.events) != 1 {
+			t.Fatalf("flushed subscription %d with %d events, want %d with 1", call.sub.ID, len(call.events), flushed.ID)
+		}
+	default:
+		t.Fatal("FlushFabric reported nothing")
+	}
+	select {
+	case call := <-ch:
+		t.Fatalf("a second report went out, subscription %d", call.sub.ID)
+	default:
+	}
+	m.FlushFabric(ctx, 1, 11) // nothing owed any more
+	select {
+	case call := <-ch:
+		t.Fatalf("a flush without pending data reported, subscription %d", call.sub.ID)
+	default:
+	}
+}
+
+// TestFlushFabricWaitsForTheReportInFlight: a subscription whose report
+// the engine is sending at the moment of the flush is flushed once that
+// report is done, not skipped — its queues were drained before the
+// event arrived.
+func TestFlushFabricWaitsForTheReportInFlight(t *testing.T) {
+	t.Parallel()
+	ch := make(chan eventReporterCall, 8)
+	m, fire := newEventManager(subscription.Config{})
+	m.SetEventReporter(chanEventReporter(ch))
+	sub, err := m.Subscribe(defaultEventArgs())
+	if err != nil {
+		t.Fatalf("Subscribe: %v", err)
+	}
+	release := subscription.HoldReporting(sub)
+	fire(mkEventFiring(1, 0x003B, 0x01, im.EventPriorityInfo))
+
+	flushed := make(chan struct{})
+	go func() {
+		defer close(flushed)
+		m.FlushFabric(context.Background(), 1, 0)
+	}()
+	select {
+	case call := <-ch:
+		t.Fatalf("flushed subscription %d while its report was in flight", call.sub.ID)
+	case <-flushed:
+		t.Fatal("FlushFabric returned while the report was in flight")
+	case <-time.After(20 * time.Millisecond):
+	}
+	release()
+	select {
+	case call := <-ch:
+		if call.sub.ID != sub.ID || len(call.events) != 1 {
+			t.Fatalf("flushed subscription %d with %d events, want %d with 1", call.sub.ID, len(call.events), sub.ID)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("FlushFabric reported nothing after the report in flight finished")
+	}
+	<-flushed
+
+	// A flush whose context ends while the report is in flight gives up.
+	release = subscription.HoldReporting(sub)
+	fire(mkEventFiring(1, 0x003B, 0x01, im.EventPriorityInfo))
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	m.FlushFabric(ctx, 1, 0)
+	release()
+	select {
+	case call := <-ch:
+		t.Fatalf("a flush with an ended context reported, subscription %d", call.sub.ID)
+	default:
+	}
+}

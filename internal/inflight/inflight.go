@@ -64,6 +64,14 @@ const (
 	// its address resolution reads the cached session address first, so
 	// the pass waits on no peer.
 	ICDCheckIns = "icd.checkins"
+	// RegistryReactions: a controller registry's reaction to a peer's
+	// root event (Leave, ShutDown, StartUp) or label change, from the
+	// event's arrival until the reaction returned. matter.js runs the
+	// reaction under Peers.#mutex, work MockTime.resolve waits for
+	// before it moves the clock; a reaction that waited on the registry's
+	// mutex uncounted would see the subscription it checks timed out by
+	// a clock that moved meanwhile.
+	RegistryReactions = "registry.reactions"
 )
 
 // Group is one host's counters. Its methods are safe for concurrent use;

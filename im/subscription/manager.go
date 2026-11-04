@@ -36,7 +36,7 @@ var (
 	// configured minimum) exceeds MaxIntervalCeiling (capped down to
 	// the configured ceiling). Example: cfg.MaxIntervalCeilingSeconds=5,
 	// request min=10, max=30 → after clamp min=10 > max=5. A silent
-	// inversion causes drainDirtyIfElapsed to never fire because the
+	// inversion causes drainDirty to never fire because the
 	// floor can never elapse relative to a ceiling that is below it.
 	ErrCadenceInvertedAfterClamp = errors.New("subscription: cadence inverted after clamp")
 	// ErrNotFound is returned when a Get / Close hits no subscription.
@@ -393,7 +393,7 @@ func (m *Manager) Subscribe(req SubscribeArgs) (*Subscription, error) {
 	minFloor := max(req.MinIntervalFloor, m.cfg.MinIntervalFloorSeconds)
 	// Re-validate AFTER clamp: the configured ceiling may be below the
 	// floored minimum, producing a silent inversion that permanently
-	// blocks drainDirtyIfElapsed. Reject early so callers can surface
+	// blocks drainDirty. Reject early so callers can surface
 	// a SubscribeResponse.Status = CONSTRAINT_ERROR rather than silently
 	// delivering a subscription that never reports dirty changes.
 	// matter.js ref: packages/node/src/node/server/ServerSubscription.ts
@@ -560,6 +560,76 @@ func (m *Manager) CloseFabric(fabricIndex uint8) {
 	delete(m.perFabric, fabricIndex)
 	m.mu.Unlock()
 	m.finishClose(victims, true)
+}
+
+// FlushFabric reports what the fabric's subscriptions owe — the pending
+// events and the dirty attributes — now, the min interval and a deferral
+// notwithstanding, and returns once the reports are handed to the wire;
+// the subscriptions of exceptSessionID, the session carrying the command,
+// are left for after its response (0 excepts none). It is the flush of
+// matter.js's Fabric.leave before the fabric goes: every session of the
+// fabric runs `closeSubscriptions(true)` (packages/protocol/src/fabric/Fabric.ts:447-457
+// at 862ad75f), each subscription closing with a flush through the
+// session (NodeSession.ts:294-306), so the Leave event the node emitted
+// a moment before reaches the subscribers while the fabric still admits
+// them. A subscription whose report is in flight carries what it drained
+// and is skipped; a priming one owes nothing yet.
+func (m *Manager) FlushFabric(ctx context.Context, fabricIndex uint8, exceptSessionID uint16) {
+	m.mu.RLock()
+	eventReporter := m.eventReporter
+	reporter := m.reporter
+	m.mu.RUnlock()
+	now := m.cfg.Clock.Now()
+	var wg sync.WaitGroup
+	for _, sub := range m.snapshot() {
+		if sub.FabricIndex != fabricIndex || sub.SessionID == exceptSessionID || sub.IsClosed() || sub.isPriming() {
+			continue
+		}
+		if !m.claimReport(ctx, sub) {
+			continue
+		}
+		events := sub.drainEvents(now, m.eventSourceOf(), true)
+		dirty := sub.drainDirty(now, true)
+		if (len(events) == 0 || eventReporter == nil) && (len(dirty) == 0 || reporter == nil) {
+			sub.reporting.Store(false)
+			continue
+		}
+		wg.Add(1)
+		m.inflight.Enter(inflight.SubscriptionPending)
+		go func() {
+			defer wg.Done()
+			defer m.inflight.Leave(inflight.SubscriptionPending)
+			defer sub.reporting.Store(false)
+			if len(events) > 0 && eventReporter != nil {
+				eventReporter(ctx, sub, events)
+			}
+			if len(dirty) > 0 && reporter != nil {
+				reporter(ctx, sub, dirty)
+			}
+		}()
+	}
+	wg.Wait()
+}
+
+// claimReport takes sub's reporting flag for a flush. A report the
+// engine is sending at that moment drained the queues before the data
+// the flush owes arrived, so the flush waits for it to finish instead of
+// skipping the subscription; it gives up when sub closes or ctx ends.
+// The wait is paced on the manager's clock.
+func (m *Manager) claimReport(ctx context.Context, sub *Subscription) bool {
+	for !sub.reporting.CompareAndSwap(false, true) {
+		if sub.IsClosed() {
+			return false
+		}
+		timer := m.cfg.Clock.NewTimer(time.Millisecond)
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+			return false
+		case <-timer.C():
+		}
+	}
+	return true
 }
 
 // CloseFabricExcept closes every subscription on fabricIndex except those
@@ -840,7 +910,7 @@ func pathMatches(subscribed, concrete im.ConcreteAttributePath) bool {
 // map at that instant; new subscriptions added after the snapshot are
 // picked up on the next tick, and removed subscriptions are guarded by
 // [Subscription.IsClosed] inside the engine loop. Per-subscription
-// mutations (markDirty, drainDirtyIfElapsed, drainEventsIfElapsed) are
+// mutations (markDirty, drainDirty, drainEvents) are
 // each protected by [Subscription.mu], so no data race exists. This
 // pattern mirrors matter.js's per-subscription timer model where each
 // ServerSubscription owns its own timer and there is no shared-map

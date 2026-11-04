@@ -145,7 +145,7 @@
   },
   {
     "file": "bridge/bridge.go",
-    "line": 1432,
+    "line": 1455,
     "citation": "Fabric.ts:408-415",
     "resolved": "packages/protocol/src/fabric/Fabric.ts",
     "identifier": "initiateForceClose",
@@ -154,7 +154,7 @@
   },
   {
     "file": "bridge/bridge.go",
-    "line": 1757,
+    "line": 1780,
     "citation": "Session.ts:248",
     "resolved": "packages/protocol/src/session/Session.ts",
     "identifier": "initiateClose",
@@ -397,7 +397,7 @@
   },
   {
     "file": "bridge/subscribe.go",
-    "line": 665,
+    "line": 671,
     "citation": "ServerSubscription.ts:866-876",
     "resolved": "packages/node/src/node/server/ServerSubscription.ts",
     "identifier": "InvalidSubscription",
@@ -406,7 +406,7 @@
   },
   {
     "file": "bridge/subscribe.go",
-    "line": 776,
+    "line": 782,
     "citation": "packages/protocol/src/interaction/InteractionMessenger.ts:347",
     "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
     "identifier": "sendDataReport",
@@ -415,7 +415,7 @@
   },
   {
     "file": "bridge/subscribe.go",
-    "line": 856,
+    "line": 862,
     "citation": "packages/node/src/node/server/ServerSubscription.ts:764",
     "resolved": "packages/node/src/node/server/ServerSubscription.ts",
     "identifier": "#sendUpdateMessage",
@@ -424,7 +424,7 @@
   },
   {
     "file": "bridge/subscribe.go",
-    "line": 1156,
+    "line": 1232,
     "citation": "ServerSubscription.ts:610-614",
     "resolved": "packages/node/src/node/server/ServerSubscription.ts",
     "identifier": "InvalidAction",
@@ -433,7 +433,7 @@
   },
   {
     "file": "bridge/subscribe.go",
-    "line": 1234,
+    "line": 1310,
     "citation": "ThermostatServer.ts:451",
     "resolved": "packages/node/src/behaviors/thermostat/ThermostatServer.ts",
     "identifier": "reactTo",
@@ -442,7 +442,7 @@
   },
   {
     "file": "bridge/subscribe.go",
-    "line": 1321,
+    "line": 1397,
     "citation": "packages/node/src/behavior/state/managed/Datasource.ts:776-796",
     "resolved": "packages/node/src/behavior/state/managed/Datasource.ts",
     "identifier": "onChange",
@@ -1020,7 +1020,7 @@
   },
   {
     "file": "cluster/core/operational_credentials.go",
-    "line": 252,
+    "line": 262,
     "citation": "Fabric.ts:548",
     "resolved": "packages/protocol/src/fabric/Fabric.ts",
     "identifier": "UpdateNOC",
@@ -1029,7 +1029,7 @@
   },
   {
     "file": "cluster/core/operational_credentials.go",
-    "line": 348,
+    "line": 358,
     "citation": "OperationalCredentialsServer.ts:247-252",
     "resolved": "packages/node/src/behaviors/operational-credentials/OperationalCredentialsServer.ts",
     "identifier": "addNoc",
@@ -1038,7 +1038,7 @@
   },
   {
     "file": "cluster/core/operational_credentials.go",
-    "line": 1374,
+    "line": 1395,
     "citation": "OperationalCredentialsServer.ts:110",
     "resolved": "packages/node/src/behaviors/operational-credentials/OperationalCredentialsServer.ts",
     "identifier": "AttestationNonce",
@@ -1047,7 +1047,7 @@
   },
   {
     "file": "cluster/core/operational_credentials.go",
-    "line": 1966,
+    "line": 1987,
     "citation": "Fabric.ts:557-559",
     "resolved": "packages/protocol/src/fabric/Fabric.ts",
     "identifier": "PublicKeyError",
@@ -1056,7 +1056,7 @@
   },
   {
     "file": "cluster/core/operational_credentials.go",
-    "line": 2018,
+    "line": 2039,
     "citation": "Fabric.ts:557-559",
     "resolved": "packages/protocol/src/fabric/Fabric.ts",
     "identifier": "PublicKeyError",
@@ -1065,7 +1065,7 @@
   },
   {
     "file": "cluster/core/operational_credentials.go",
-    "line": 2164,
+    "line": 2185,
     "citation": "Fabric.ts:548",
     "resolved": "packages/protocol/src/fabric/Fabric.ts",
     "identifier": "nodeId",
@@ -1654,7 +1654,7 @@
   },
   {
     "file": "controller/client/reactions.go",
-    "line": 147,
+    "line": 152,
     "citation": "Peers.ts:837-858",
     "resolved": "packages/node/src/node/client/Peers.ts",
     "identifier": "#onShutdown",

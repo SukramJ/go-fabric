@@ -18,6 +18,7 @@ import (
 	"github.com/SukramJ/go-fabric/client/peer"
 	"github.com/SukramJ/go-fabric/controller/commissioner"
 	"github.com/SukramJ/go-fabric/icd"
+	"github.com/SukramJ/go-fabric/internal/inflight"
 )
 
 // RegistryConfig is what a [Registry] works with.
@@ -111,6 +112,10 @@ type Registry struct {
 	log   *slog.Logger
 	clock exchange.Clock
 	store Store
+	// inflight counts the registry's reactions (internal/inflight
+	// RegistryReactions): the group the clock carries, nil outside a
+	// fabrictest site.
+	inflight *inflight.Group
 
 	// op is matter.js Peers.#mutex (Peers.ts:91): it serializes the
 	// registration of a fabric operation, ForAddress's creation, the cull,
@@ -162,6 +167,7 @@ func NewRegistry(cfg RegistryConfig) (*Registry, error) {
 	if r.clock == nil {
 		r.clock = exchange.SystemClock{}
 	}
+	r.inflight = inflight.Of(r.clock)
 	if r.store == nil {
 		r.store = &MemoryStore{}
 	}

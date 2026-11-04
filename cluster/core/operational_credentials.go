@@ -81,6 +81,7 @@ type OperationalCredentials struct {
 	// rearmFailSafeForFabric re-stamps the armed fail-safe with the fabric
 	// AddNOC installed; see [OpcredsConfig.RearmFailSafeForFabric].
 	rearmFailSafeForFabric func(fabricIndex uint8)
+	onFabricLeaving        func(ctx context.Context, fabricIndex uint8)
 	onFabricRemoved        func(ctx context.Context, fabricIndex uint8)
 	onAdminEntryInstalled  func(entry store.ACLEntry)
 
@@ -189,6 +190,15 @@ type OperationalCredentials struct {
 func (o *OperationalCredentials) SetOnFabricRemoved(hook func(ctx context.Context, fabricIndex uint8)) {
 	o.mu.Lock()
 	o.onFabricRemoved = hook
+	o.mu.Unlock()
+}
+
+// SetOnFabricLeaving wires the fabric-leaving hook after construction
+// ([OpcredsConfig.OnFabricLeaving]); as [OperationalCredentials.SetOnFabricRemoved],
+// nil detaches it.
+func (o *OperationalCredentials) SetOnFabricLeaving(hook func(ctx context.Context, fabricIndex uint8)) {
+	o.mu.Lock()
+	o.onFabricLeaving = hook
 	o.mu.Unlock()
 }
 
@@ -409,6 +419,16 @@ type OpcredsConfig struct {
 	// failed`, the chip-tool / Apple Home pair retry chain abort.
 	// May be nil — the cluster works regardless.
 	OnFabricRemoved func(ctx context.Context, fabricIndex uint8)
+	// OnFabricLeaving fires inside RemoveFabric before the fabric's rows go,
+	// while the store still holds the fabric and its ACL entries — the node
+	// emits the Leave event and flushes the fabric's subscriptions here, so
+	// the event reaches the subscribers the fabric still admits. matter.js
+	// Fabric.leave: the leaving event, the flush of every session's
+	// subscriptions, then the delete (packages/protocol/src/fabric/Fabric.ts:447-457
+	// at 862ad75f; BasicInformationServer.ts:175, :186-188 emits Leave on
+	// it). A fail-safe's revert of an AddNOC deletes without leaving
+	// (FailsafeContext.ts:271-274, :310) and does not fire it. May be nil.
+	OnFabricLeaving func(ctx context.Context, fabricIndex uint8)
 	// FailSafe reports whether a fail-safe window is active and the fabric
 	// it is armed for. Bound to [GeneralCommissioning.FailSafeFabric].
 	// CSRRequest, AddNOC and AddTrustedRootCertificate answer
@@ -486,6 +506,7 @@ func NewOperationalCredentials(s StoreFacade, cfg OpcredsConfig) (*OperationalCr
 		attestationProvider:    cfg.AttestationProvider,
 		onFabricInstalled:      cfg.OnFabricInstalled,
 		rearmFailSafeForFabric: cfg.RearmFailSafeForFabric,
+		onFabricLeaving:        cfg.OnFabricLeaving,
 		onFabricRemoved:        cfg.OnFabricRemoved,
 		onFabricUpdated:        cfg.OnFabricUpdated,
 		onFabricWithdraw:       cfg.OnFabricWithdraw,
@@ -2311,6 +2332,19 @@ func (o *OperationalCredentials) RemoveFabric(ctx context.Context, fabricIndex u
 	// name the stale <compressedID>-<nodeID> instance, and after
 	// RemoveFabric there is nothing left to compute it from.
 	removedFab, gerr := o.store.GetFabric(ctx, fabricIndex)
+	if gerr == nil {
+		// The fabric leaves before its rows go: the Leave event and the
+		// flush of its subscriptions run while the store still holds the
+		// fabric and its ACL (Fabric.leave, Fabric.ts:447-457 at 862ad75f:
+		// the leaving event, the sessions' closeSubscriptions(true), then
+		// delete). An index the store does not hold leaves nothing.
+		o.mu.Lock()
+		leaving := o.onFabricLeaving
+		o.mu.Unlock()
+		if leaving != nil {
+			leaving(ctx, fabricIndex)
+		}
+	}
 	if err := o.store.RemoveFabric(ctx, fabricIndex); err != nil {
 		return err
 	}

@@ -66,7 +66,7 @@ const testparityPlannedRatchet = 2
 // (the PR's report): 125 ported, 552 missing.
 const (
 	testparityPortedRatchet  = 125
-	testparityMissingRatchet = 552
+	testparityMissingRatchet = 551
 )
 
 // testparityLeftRatchet is the number of left it cases summed over the
