@@ -673,3 +673,47 @@ func TestParityOpcreds_UpdateNOCFailSafeFabricAndRoot(t *testing.T) {
 		}
 	})
 }
+
+// TestParityFabricLeave_OpcredsLeavingHookRunsBeforeTheRowsGo: the
+// leaving hook runs while the store still holds the fabric, before the
+// removed hook, and not for an index the store does not hold — matter.js
+// Fabric.leave: the leaving event, the flush, then delete
+// (packages/protocol/src/fabric/Fabric.ts:447-457 at 862ad75f).
+func TestParityFabricLeave_OpcredsLeavingHookRunsBeforeTheRowsGo(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	s := newFakeStore()
+
+	var order []string
+	var heldAtLeaving bool
+	oc, err := core.NewOperationalCredentials(s, core.OpcredsConfig{
+		SupportedFabrics: 5,
+		OnFabricLeaving: func(ctx context.Context, fi uint8) {
+			_, gerr := s.GetFabric(ctx, fi)
+			heldAtLeaving = gerr == nil
+			order = append(order, "leaving")
+		},
+		OnFabricRemoved: func(_ context.Context, _ uint8) { order = append(order, "removed") },
+	})
+	if err != nil {
+		t.Fatalf("NewOperationalCredentials: %v", err)
+	}
+	idx, err := s.AddFabric(ctx, newFabricForTest(61))
+	if err != nil {
+		t.Fatalf("AddFabric: %v", err)
+	}
+	if err := oc.RemoveFabric(ctx, idx); err != nil {
+		t.Fatalf("RemoveFabric: %v", err)
+	}
+	if !heldAtLeaving || len(order) != 2 || order[0] != "leaving" || order[1] != "removed" {
+		t.Fatalf("hooks %v, fabric held at leaving %v; want [leaving removed] with the fabric still held", order, heldAtLeaving)
+	}
+	order = nil
+	if err := oc.RemoveFabric(ctx, idx); err == nil {
+		t.Fatal("RemoveFabric of a gone index succeeded")
+	}
+	if len(order) != 0 {
+		t.Fatalf("hooks %v for an index the store does not hold", order)
+	}
+	oc.SetOnFabricLeaving(nil)
+}

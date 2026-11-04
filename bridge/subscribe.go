@@ -307,7 +307,7 @@ func (b *Bridge) reportSubscriptionEvents(ctx context.Context, sub *subscription
 	// (ExchangeManager.ts:441-452), which the MRP layer here would then
 	// mistake for delivery. Ongoing server reports are always fresh
 	// server-initiated exchanges (ServerSubscription.ts:823).
-	counters, freshExch, err := b.sendInitiatedReport(target, report)
+	counters, freshExch, wait, err := b.sendInitiatedReportArmed(target, report, flushWaitFromContext(ctx))
 	if err != nil {
 		// Owe the same events again, so the next report retries them;
 		// the third consecutive failure reaps the subscription. Mirrors
@@ -327,6 +327,9 @@ func (b *Bridge) reportSubscriptionEvents(ctx context.Context, sub *subscription
 		slog.Int("subscription_id", int(sub.ID)),
 		slog.Int("events", len(events)),
 		slog.Int("exchange_id", int(freshExch)))
+	if wait != nil {
+		b.awaitFlushedReport(ctx, "subscribe.event_report", target.sessionID, freshExch, wait)
+	}
 }
 
 // EmitEvent is the bridge-side [contract.EventEmitter]
@@ -504,7 +507,7 @@ func (b *Bridge) reportSubscription(ctx context.Context, sub *subscription.Subsc
 		report.SuppressResponse = true
 	}
 
-	counters, freshExch, err := b.sendInitiatedReport(target, report)
+	counters, freshExch, wait, err := b.sendInitiatedReportArmed(target, report, flushWaitFromContext(ctx))
 	if err != nil {
 		// Mark the drained paths dirty again, so the next report
 		// retries them; the third consecutive failure reaps the
@@ -532,6 +535,9 @@ func (b *Bridge) reportSubscription(ctx context.Context, sub *subscription.Subsc
 		slog.Int("paths", len(paths)),
 		slog.Int("reports", len(report.Reports)),
 		slog.Int("exchange_id", int(freshExch)))
+	if wait != nil {
+		b.awaitFlushedReport(ctx, "subscribe.report", target.sessionID, freshExch, wait)
+	}
 }
 
 // sendErrorRetryLimit is how many consecutive send failures an ongoing
@@ -871,7 +877,21 @@ func (b *Bridge) sendReportChunksNotify(target subTarget, report im.ReportData, 
 // negotiated SubscriptionID — which matches the commissioner's
 // expectation regardless of which exchange carries the report.
 func (b *Bridge) sendInitiatedReport(target subTarget, report im.ReportData) (counters []uint32, exchangeID uint16, err error) {
+	counters, exchangeID, _, err = b.sendInitiatedReportArmed(target, report, false)
+	return counters, exchangeID, err
+}
+
+// sendInitiatedReportArmed is [Bridge.sendInitiatedReport] that, with
+// arm, also arms the wait for the peer's StatusResponse on the fresh
+// exchange before the report goes out ([Bridge.armStatusResponseWait]),
+// so the answer cannot land before the waiter exists; the caller
+// receives on wait through [Bridge.awaitFlushedReport], which disarms
+// it. A failed send disarms it here.
+func (b *Bridge) sendInitiatedReportArmed(target subTarget, report im.ReportData, arm bool) (counters []uint32, exchangeID uint16, wait <-chan im.StatusCode, err error) {
 	freshExchangeID := b.nextOutboundExchangeID()
+	if arm {
+		wait = b.armStatusResponseWait(target.sessionID, freshExchangeID, true)
+	}
 	freshTarget := target
 	freshTarget.exchangeID = freshExchangeID
 	// Set peerInitiator=false so sendUnsolicitedIM's
@@ -900,13 +920,69 @@ func (b *Bridge) sendInitiatedReport(target subTarget, report im.ReportData) (co
 		}
 	})
 	if err != nil {
+		if arm {
+			b.disarmStatusResponseWait(target.sessionID, freshExchangeID, true)
+		}
 		if firstCounter != 0 {
 			b.reportExchangeOrigins.Delete(key)
 			b.reportCounterOwner.Delete(reportCounterKey(target.sessionID, firstCounter))
 		}
-		return nil, 0, err
+		return nil, 0, nil, err
 	}
-	return counters, freshExchangeID, nil
+	return counters, freshExchangeID, wait, nil
+}
+
+// flushWaitKey marks the context of a flush before the fabric's
+// sessions close: a report sent under it waits for the peer's
+// StatusResponse before the reporter returns.
+type flushWaitKey struct{}
+
+// withFlushWait returns ctx under which a report waits for its answer.
+func withFlushWait(ctx context.Context) context.Context {
+	return context.WithValue(ctx, flushWaitKey{}, true)
+}
+
+// flushWaitFromContext reports whether ctx asks a report to wait for its
+// answer.
+func flushWaitFromContext(ctx context.Context) bool {
+	v, _ := ctx.Value(flushWaitKey{}).(bool)
+	return v
+}
+
+// awaitFlushedReport waits for the peer's StatusResponse to a flushed
+// report — one sent while its fabric leaves, before the fabric's
+// sessions close — so the peer has taken the report before the
+// CloseSession follows it: a CloseSession overtaking the report leaves
+// the report on a session the peer no longer knows, and the Leave in it
+// never arrives. matter.js's flush awaits the update it triggered
+// (ServerSubscription.ts:753-763 at 862ad75f, #flush awaits
+// #currentUpdatePromise) and the update awaits the answer to each
+// DataReport (InteractionMessenger.ts:799-844, sendDataReportMessage
+// ends in waitForSuccess). The wait ends with the answer, with ctx, or
+// after the chunk StatusResponse bound ([Bridge.chunkStatusResponseTimeout]);
+// the answer's standalone ack goes out at once, as for a StatusResponse
+// no chunk loop waited for (receive_dispatch's absorbStatusResponse).
+func (b *Bridge) awaitFlushedReport(ctx context.Context, op string, sessionID, exchangeID uint16, wait <-chan im.StatusCode) {
+	timeout := b.chunkStatusResponseTimeout(sessionID)
+	timer := b.clk().NewTimer(timeout)
+	defer timer.Stop()
+	defer b.disarmStatusResponseWait(sessionID, exchangeID, true)
+	select {
+	case status := <-wait:
+		b.expediteDuplicateAck(sessionID, exchangeID, true)
+		b.RunAckPumpOnce(b.clk().Now())
+		b.logger.Debug("matter.tx."+op+".flush_answered",
+			slog.Int("exchange_id", int(exchangeID)),
+			slog.String("status", status.String()))
+	case <-ctx.Done():
+		b.logger.Debug("matter.tx."+op+".flush_abandoned",
+			slog.Int("exchange_id", int(exchangeID)),
+			slog.Any("err", ctx.Err()))
+	case <-timer.C():
+		b.logger.Debug("matter.tx."+op+".flush_unanswered",
+			slog.Int("exchange_id", int(exchangeID)),
+			slog.String("timeout", timeout.String()))
+	}
 }
 
 // piggybackOwedAck returns target with the ack the bridge owes the peer on

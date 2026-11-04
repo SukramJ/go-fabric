@@ -40,3 +40,6 @@ examples/reference-bridge/reference-bridge
 
 # The ble-virtual job installs the matter.js packages here (npm ci).
 /script/ble-virtual/node_modules/
+
+# a tool binary go build ./script/<tool> leaves at the root
+/coverfloor

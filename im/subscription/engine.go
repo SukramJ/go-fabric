@@ -107,8 +107,8 @@ func (m *Manager) dueReport(ctx context.Context, sub *Subscription, now time.Tim
 	// behind a value sweep.
 	//
 	// After an event drain the same-tick dirty drain is explicitly
-	// skipped. drainEventsIfElapsed stamps lastReport=now,
-	// which makes drainDirtyIfElapsed return nil (0 < MinIntervalFloor)
+	// skipped. drainEvents stamps lastReport=now,
+	// which makes drainDirty return nil (0 < MinIntervalFloor)
 	// for floor>0, but the skip-flag makes the intent unambiguous and
 	// prevents a double-report when floor=0 (degenerate subscription
 	// created outside the manager). Apple Home's duplicate-suppression
@@ -116,7 +116,7 @@ func (m *Manager) dueReport(ctx context.Context, sub *Subscription, now time.Tim
 	// 250 ms window regardless of which path produced them.
 	// matter.js ref: ServerSubscription.ts — events and dirty attrs
 	// are merged into a single ReportData per send cycle.
-	if events := sub.drainEventsIfElapsed(now, m.eventSourceOf()); len(events) > 0 {
+	if events := sub.drainEvents(now, m.eventSourceOf(), false); len(events) > 0 {
 		if eventReporter == nil {
 			return nil
 		}
@@ -124,7 +124,7 @@ func (m *Manager) dueReport(ctx context.Context, sub *Subscription, now time.Tim
 	}
 	// Dirty-path report fires when MinInterval has elapsed, but only
 	// when no event report fired in the same tick (returned above).
-	if dirty := sub.drainDirtyIfElapsed(now); len(dirty) > 0 {
+	if dirty := sub.drainDirty(now, false); len(dirty) > 0 {
 		if m.reporter == nil {
 			return nil
 		}

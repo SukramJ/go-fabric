@@ -9,6 +9,7 @@ import (
 
 	"github.com/SukramJ/go-fabric/cluster/spec/basicinformation"
 	"github.com/SukramJ/go-fabric/controller/commissioner"
+	"github.com/SukramJ/go-fabric/internal/inflight"
 )
 
 // The registry's reactions to a peer's BasicInformation events —
@@ -44,7 +45,9 @@ func (r *Registry) onEvent(n *Node, endpoint uint16, cluster, event uint32, valu
 }
 
 // goWork runs fn as background work of the registry, unless it is
-// closed; Close waits for it.
+// closed; Close waits for it. The work is counted in the clock's
+// in-flight group (inflight.RegistryReactions) from here until fn
+// returned, so a test site holds its clock for it.
 func (r *Registry) goWork(fn func()) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -52,8 +55,10 @@ func (r *Registry) goWork(fn func()) {
 		return
 	}
 	r.work.Add(1)
+	r.inflight.Enter(inflight.RegistryReactions)
 	go func() {
 		defer r.work.Done()
+		defer r.inflight.Leave(inflight.RegistryReactions)
 		fn()
 	}()
 }

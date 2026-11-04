@@ -270,19 +270,19 @@ func (s *Subscription) TouchLastReport(now time.Time) {
 	s.touchLastReport(now)
 }
 
-// drainDirtyIfElapsed returns the dirty paths *only* when
+// drainDirty returns the dirty paths *only* when (force: whatever the interval, a flush)
 // MinIntervalFloor has elapsed since the last report; otherwise
 // returns nil and leaves the dirty bucket alone.
-func (s *Subscription) drainDirtyIfElapsed(now time.Time) []im.ConcreteAttributePath {
+func (s *Subscription) drainDirty(now time.Time, force bool) []im.ConcreteAttributePath {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.closed || len(s.pendingDirty) == 0 {
 		return nil
 	}
-	if !s.lastReport.IsZero() && now.Sub(s.lastReport) < time.Duration(s.MinIntervalFloor)*time.Second {
+	if !force && !s.lastReport.IsZero() && now.Sub(s.lastReport) < time.Duration(s.MinIntervalFloor)*time.Second {
 		return nil
 	}
-	if now.Before(s.deferredUntil) {
+	if !force && now.Before(s.deferredUntil) {
 		return nil
 	}
 	out := make([]im.ConcreteAttributePath, 0, len(s.pendingDirty))
@@ -355,20 +355,20 @@ func (s *Subscription) RequeueAttributes(paths []im.ConcreteAttributePath) {
 	}
 }
 
-// drainEventsIfElapsed mirrors drainDirtyIfElapsed for events: when the
+// drainEvents mirrors drainDirty for events: when the
 // owed events are due it takes the watermark and reads the subscription's
 // events from src. Critical-priority events bypass the MinIntervalFloor
 // gate per Matter §10.6.6 — controllers expect immediate delivery.
 // Number order and timestamps are the log's, the same as a Read answers
 // (matter.js ServerSubscription.ts:537-555 reads the occurrences for
 // both).
-func (s *Subscription) drainEventsIfElapsed(now time.Time, src EventSource) []im.EventReport {
+func (s *Subscription) drainEvents(now time.Time, src EventSource, force bool) []im.EventReport {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.closed || !s.eventsPending {
 		return nil
 	}
-	urgent := s.eventsUrgent
+	urgent := s.eventsUrgent || force
 	if !urgent && !s.lastReport.IsZero() && now.Sub(s.lastReport) < time.Duration(s.MinIntervalFloor)*time.Second {
 		return nil
 	}
