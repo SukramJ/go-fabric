@@ -29,6 +29,7 @@ func TestTlvCodecTagsParityMatterJS(t *testing.T) {
 		{"fully qualified tag, 4 octets", "e4f1ffeddeedfe55aa", FullyQualifiedTag(0xFFF1, 0xDEED, 0xAA55FEED)},
 	} {
 		t.Run("reads "+c.name, func(t *testing.T) {
+			t.Parallel()
 			raw, _ := hex.DecodeString(c.encoded + "00")
 			el, err := NewDecoder(raw).Next()
 			if err != nil {
@@ -39,6 +40,7 @@ func TestTlvCodecTagsParityMatterJS(t *testing.T) {
 			}
 		})
 		t.Run("writes "+c.name, func(t *testing.T) {
+			t.Parallel()
 			enc := NewEncoder()
 			enc.PutUint(c.tag, 0)
 			got, err := enc.Bytes()
@@ -53,6 +55,7 @@ func TestTlvCodecTagsParityMatterJS(t *testing.T) {
 	}
 
 	t.Run("decodes a structure member with a 4-octet fully qualified tag", func(t *testing.T) {
+		t.Parallel()
 		raw, _ := hex.DecodeString("15e4f1ffeddeedfe55aa2a18")
 		d := NewDecoder(raw)
 		if _, err := d.Next(); err != nil {
@@ -72,6 +75,7 @@ func TestTlvCodecTagsParityMatterJS(t *testing.T) {
 		{"rejects implicit profile tag, 4 octets as unexpected data", "a401000000"},
 	} {
 		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
 			raw, _ := hex.DecodeString(c.encoded)
 			if _, err := NewDecoder(raw).Next(); !errors.Is(err, ErrImplicitProfileTag) {
 				t.Errorf("Next = %v, want ErrImplicitProfileTag", err)
@@ -80,6 +84,7 @@ func TestTlvCodecTagsParityMatterJS(t *testing.T) {
 	}
 
 	t.Run("rejects a structure containing an implicit profile tag as unexpected data", func(t *testing.T) {
+		t.Parallel()
 		raw, _ := hex.DecodeString("158401002a18")
 		d := NewDecoder(raw)
 		if _, err := d.Next(); err != nil {

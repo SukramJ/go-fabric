@@ -45,6 +45,7 @@ func TestCcmVectorsParityMatterJS(t *testing.T) {
 	t.Parallel()
 	for _, v := range ccmVectors {
 		t.Run(v[0], func(t *testing.T) {
+			t.Parallel()
 			c, err := New(unhex(t, v[1]))
 			if err != nil {
 				t.Fatal(err)

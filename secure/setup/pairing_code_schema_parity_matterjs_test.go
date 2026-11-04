@@ -38,16 +38,19 @@ func TestQrPairingCodeCodecParityMatterJS(t *testing.T) {
 	withTLV.Extra = &Extra{Raw: []byte{0x01, 0x02, 0x03}}
 
 	t.Run("encodes the data", func(t *testing.T) {
+		t.Parallel()
 		if got, err := QRCode(qrVector); err != nil || got != qr {
 			t.Fatalf("QRCode = %q, %v; want %q", got, err, qr)
 		}
 	})
 	t.Run("encodes the data with TLV Data", func(t *testing.T) {
+		t.Parallel()
 		if got, err := QRCode(withTLV); err != nil || got != qrWithTLV {
 			t.Fatalf("QRCode = %q, %v; want %q", got, err, qrWithTLV)
 		}
 	})
 	t.Run("encodes the data of a multi qrcode", func(t *testing.T) {
+		t.Parallel()
 		// A multi code is the codes joined by '*', each after the first
 		// without its "MT:" prefix (PairingCodeSchemaTest.ts:48).
 		a, _ := QRCode(qrVector)
@@ -57,24 +60,28 @@ func TestQrPairingCodeCodecParityMatterJS(t *testing.T) {
 		}
 	})
 	t.Run("decodes the data", func(t *testing.T) {
+		t.Parallel()
 		p, err := DecodeQRCode(qr)
 		if err != nil || p.VendorID != 9050 || p.ProductID != 65279 || p.Discriminator != 2976 || p.Passcode != 34567890 || p.DiscoveryCaps != DiscoveryBLE || p.Extra != nil {
 			t.Fatalf("DecodeQRCode = %+v, %v", p, err)
 		}
 	})
 	t.Run("decodes the data with TLV Data", func(t *testing.T) {
+		t.Parallel()
 		p, err := DecodeQRCode(qrWithTLV)
 		if err != nil || p.Extra == nil || !bytes.Equal(p.Extra.Raw, []byte{1, 2, 3}) {
 			t.Fatalf("DecodeQRCode = %+v, %v", p, err)
 		}
 	})
 	t.Run("decodes the data of a multi qrcode", func(t *testing.T) {
+		t.Parallel()
 		ps, err := DecodeQRCodes(qr + "*" + qrWithTLV[3:])
 		if err != nil || len(ps) != 2 || ps[0].Extra != nil || ps[1].Extra == nil {
 			t.Fatalf("DecodeQRCodes = %+v, %v", ps, err)
 		}
 	})
 	t.Run("round-trips a short numeric passcode", func(t *testing.T) {
+		t.Parallel()
 		p := qrVector
 		p.Passcode = 1
 		code, err := QRCode(p)
@@ -90,6 +97,7 @@ func TestQrPairingCodeCodecParityMatterJS(t *testing.T) {
 		return &Extra{Raw: raw}
 	}
 	t.Run("encodes a payload of the maximum length", func(t *testing.T) {
+		t.Parallel()
 		p := qrVector
 		p.Extra = tlvDataOf(135)
 		if got, err := QRCode(p); err != nil || len(got) != 255 {
@@ -97,36 +105,43 @@ func TestQrPairingCodeCodecParityMatterJS(t *testing.T) {
 		}
 	})
 	t.Run("rejects a payload one base38 group past it", func(t *testing.T) {
+		t.Parallel()
 		p := qrVector
 		p.Extra = tlvDataOf(136)
 		_, err := QRCode(p)
 		wantErr(t, err, "257")
 	})
 	t.Run("rejects encoding an invalid passcode", func(t *testing.T) {
+		t.Parallel()
 		p := qrVector
 		p.Passcode = 12345678
 		_, err := QRCode(p)
 		wantErr(t, err, "12345678")
 	})
 	t.Run("rejects decoding an invalid passcode", func(t *testing.T) {
+		t.Parallel()
 		_, err := DecodeQRCode("MT:YNJV7VSC00ANG46Y900")
 		wantErr(t, err, "Invalid passcode 12345678")
 	})
 	t.Run("rejects encoding a reserved version", func(t *testing.T) {
+		t.Parallel()
 		p := qrVector
 		p.Version = 1
 		_, err := QRCode(p)
 		wantErr(t, err, "version 1")
 	})
 	t.Run("rejects decoding a reserved version", func(t *testing.T) {
+		t.Parallel()
 		_, err := DecodeQRCode("MT:ZNJV7VSC00CMVH7SR00")
 		wantErr(t, err, "version 1")
 	})
 	t.Run("rejects decoding a product ID of 0 beside a real vendor ID", func(t *testing.T) {
+		t.Parallel()
 		_, err := DecodeQRCode("MT:Y.K904KP00KA0648G00")
 		wantErr(t, err, "An onboarding payload naming vendor ID 65521 must name a product too")
 	})
 	t.Run("reports an unspecified vendor and product as absent, not as 0", func(t *testing.T) {
+		t.Parallel()
 		// The Go payload's absent identifier is 0, the value the wire carries.
 		p, err := DecodeQRCode("MT:000004KP00KA0648G00")
 		if err != nil || p.VendorID != 0 || p.ProductID != 0 {
@@ -134,6 +149,7 @@ func TestQrPairingCodeCodecParityMatterJS(t *testing.T) {
 		}
 	})
 	t.Run("writes an absent identifier back as the 0 the wire carries", func(t *testing.T) {
+		t.Parallel()
 		p, err := DecodeQRCode("MT:000004KP00KA0648G00")
 		if err != nil {
 			t.Fatal(err)
@@ -143,6 +159,7 @@ func TestQrPairingCodeCodecParityMatterJS(t *testing.T) {
 		}
 	})
 	t.Run("rejects decoding a vendor ID past the last test vendor", func(t *testing.T) {
+		t.Parallel()
 		_, err := DecodeQRCode("MT:U34J029Q00KA0648G00")
 		wantErr(t, err, "Invalid vendor ID 65525")
 	})
@@ -159,50 +176,59 @@ func TestQrCodeTlvDataParityMatterJS(t *testing.T) {
 		return DecodeExtra(raw)
 	}
 	t.Run("encodes and decodes just serialNumber as string", func(t *testing.T) {
+		t.Parallel()
 		e, err := decode(t, "152C000A3132333435363738393018")
 		if err != nil || e.SerialNumber != "1234567890" || e.SerialNumberNumeric {
 			t.Fatalf("DecodeExtra = %+v, %v", e, err)
 		}
 	})
 	t.Run("encodes and decodes just serialNumber as number", func(t *testing.T) {
+		t.Parallel()
 		e, err := decode(t, "152600d202964918")
 		if err != nil || e.SerialNumber != "1234567890" || !e.SerialNumberNumeric {
 			t.Fatalf("DecodeExtra = %+v, %v", e, err)
 		}
 	})
 	t.Run("encodes and decodes serial and vendor specific field with custom schema", func(t *testing.T) {
+		t.Parallel()
 		e, err := decode(t, "152C810656656E646F722C000A3132333435363738393018")
 		if err != nil || e.SerialNumber != "1234567890" || hex.EncodeToString(e.Vendor[0x81]) != "2c810656656e646f72" {
 			t.Fatalf("DecodeExtra = %+v, %v", e, err)
 		}
 	})
 	t.Run("encodes and decodes both PBKDF parameters together", func(t *testing.T) {
+		t.Parallel()
 		e, err := decode(t, "152501e80330021000112233445566778899aabbccddeeff18")
 		if err != nil || e.PBKDFIterations != 1000 || hex.EncodeToString(e.PBKDFSalt) != "00112233445566778899aabbccddeeff" {
 			t.Fatalf("DecodeExtra = %+v, %v", e, err)
 		}
 	})
 	t.Run("rejects decoding PBKDF iterations without salt", func(t *testing.T) {
+		t.Parallel()
 		_, err := decode(t, "152501e80318")
 		wantErr(t, err, "PBKDF iteration count and salt must both be present or both absent")
 	})
 	t.Run("rejects decoding PBKDF salt without iterations", func(t *testing.T) {
+		t.Parallel()
 		_, err := decode(t, "1530021000112233445566778899aabbccddeeff18")
 		wantErr(t, err, "PBKDF iteration count and salt must both be present or both absent")
 	})
 	t.Run("rejects decoding a reserved-range top-level tag", func(t *testing.T) {
+		t.Parallel()
 		for _, h := range []string{"1524050118", "15247f0118"} {
 			_, err := decode(t, h)
 			wantErr(t, err, "Reserved onboarding payload TLV tag")
 		}
 	})
 	t.Run("rejects a non-context-specific top-level tag", func(t *testing.T) {
+		t.Parallel()
 		for _, h := range []string{"154400000118", "15040118"} {
 			_, err := decode(t, h)
 			wantErr(t, err, "must use context-specific tags")
 		}
 	})
 	t.Run("accepts a manufacturer-specific tag in range 0x80-0xFF", func(t *testing.T) {
+		t.Parallel()
 		e, err := decode(t, "1524800718")
 		if err != nil || hex.EncodeToString(e.Vendor[0x80]) != "248007" {
 			t.Fatalf("DecodeExtra = %+v, %v", e, err)
@@ -215,14 +241,17 @@ func TestAssertValidPayloadIdentityParityMatterJS(t *testing.T) {
 	// An absent identifier is 0 in Go, the wire's value: matter.js's
 	// "however it spells them" is one spelling here.
 	t.Run("reads a wire 0 the same as an absent identifier", func(t *testing.T) {
+		t.Parallel()
 		wantErr(t, assertValidPayloadIdentity(0xfff1, 0), "An onboarding payload naming vendor ID 65521 must name a product too")
 	})
 	t.Run("accepts a payload that names neither, however it spells them", func(t *testing.T) {
+		t.Parallel()
 		if err := assertValidPayloadIdentity(0, 0); err != nil {
 			t.Fatal(err)
 		}
 	})
 	t.Run("rejects a vendor past the last test vendor whichever form it arrives in", func(t *testing.T) {
+		t.Parallel()
 		wantErr(t, assertValidPayloadIdentity(0xfff5, 0x8001), "Invalid vendor ID 65525")
 	})
 }
@@ -230,6 +259,7 @@ func TestAssertValidPayloadIdentityParityMatterJS(t *testing.T) {
 func TestManualPairingCodeCodecParityMatterJS(t *testing.T) {
 	t.Parallel()
 	t.Run("round-trips short numeric passcodes using canonical manual code encoding", func(t *testing.T) {
+		t.Parallel()
 		code, err := ManualCode(1234, 123456)
 		if err != nil || len(code) != 11 {
 			t.Fatalf("ManualCode = %q, %v", code, err)
@@ -239,6 +269,7 @@ func TestManualPairingCodeCodecParityMatterJS(t *testing.T) {
 		}
 	})
 	t.Run("round-trips passcode value 1", func(t *testing.T) {
+		t.Parallel()
 		code, err := ManualCode(1234, 1)
 		if err != nil {
 			t.Fatal(err)
@@ -248,6 +279,7 @@ func TestManualPairingCodeCodecParityMatterJS(t *testing.T) {
 		}
 	})
 	t.Run("rejects encoding an invalid passcode", func(t *testing.T) {
+		t.Parallel()
 		_, err := ManualCode(10, 12345678)
 		wantErr(t, err, "12345678")
 	})
@@ -262,23 +294,27 @@ func TestManualPairingCodeCodecParityMatterJS(t *testing.T) {
 		{"rejects a vendor ID past the last test vendor as an invalid payload (65525)", "749701123365525327699", "Invalid vendor ID 65525"},
 	} {
 		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
 			_, err := DecodeManualCode(c.code)
 			wantErr(t, err, c.want)
 		})
 	}
 	t.Run("accepts the plan's own 21-digit example", func(t *testing.T) {
+		t.Parallel()
 		mp, err := DecodeManualCode("749701123365521327694")
 		if err != nil || mp.VendorID != 0xfff1 || mp.ProductID != 0x8001 {
 			t.Fatalf("DecodeManualCode = %+v, %v", mp, err)
 		}
 	})
 	t.Run("decodes the last test vendor ID", func(t *testing.T) {
+		t.Parallel()
 		mp, err := DecodeManualCode("749701123365524327693")
 		if err != nil || mp.VendorID != 0xfff4 {
 			t.Fatalf("DecodeManualCode = %+v, %v", mp, err)
 		}
 	})
 	t.Run("encodes a custom flow with VID/PID as a 21-digit code", func(t *testing.T) {
+		t.Parallel()
 		code, err := ManualCodeLong(2976, 34567890, 9050, 65279)
 		if err != nil || len(code) != 21 {
 			t.Fatalf("ManualCodeLong = %q, %v", code, err)
@@ -288,6 +324,7 @@ func TestManualPairingCodeCodecParityMatterJS(t *testing.T) {
 		}
 	})
 	t.Run("encodes a standard flow without VID/PID", func(t *testing.T) {
+		t.Parallel()
 		if code, err := ManualCode(2976, 34567890); err != nil || len(code) != 11 {
 			t.Fatalf("ManualCode = %q, %v", code, err)
 		}
@@ -317,16 +354,19 @@ func TestBase38SchemaParityMatterJS(t *testing.T) {
 	const encoded = "-MOA57ZU02IT2L2BJ00"
 	decoded, _ := hex.DecodeString("88ffa7915040004751dd02")
 	t.Run("encodes a string", func(t *testing.T) {
+		t.Parallel()
 		if got := base38Encode(decoded); got != encoded {
 			t.Fatalf("base38Encode = %q, want %q", got, encoded)
 		}
 	})
 	t.Run("decodes a string", func(t *testing.T) {
+		t.Parallel()
 		if got, err := base38Decode(encoded); err != nil || !bytes.Equal(got, decoded) {
 			t.Fatalf("base38Decode = %x, %v", got, err)
 		}
 	})
 	t.Run("reads back everything encode writes", func(t *testing.T) {
+		t.Parallel()
 		for length := 1; length <= 24; length++ {
 			b := make([]byte, length)
 			for i := range b {
@@ -338,6 +378,7 @@ func TestBase38SchemaParityMatterJS(t *testing.T) {
 		}
 	})
 	t.Run("rejects a length no group count can produce", func(t *testing.T) {
+		t.Parallel()
 		for _, s := range []string{"0", "000"} {
 			if _, err := base38Decode(s); err == nil {
 				t.Errorf("base38Decode(%q) accepted", s)
@@ -345,6 +386,7 @@ func TestBase38SchemaParityMatterJS(t *testing.T) {
 		}
 	})
 	t.Run("rejects a group holding more than the bytes it stands for", func(t *testing.T) {
+		t.Parallel()
 		for _, s := range []string{"..", "....."} {
 			if _, err := base38Decode(s); err == nil {
 				t.Errorf("base38Decode(%q) accepted", s)

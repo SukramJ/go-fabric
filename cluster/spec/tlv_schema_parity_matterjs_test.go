@@ -76,6 +76,7 @@ func TestTlvAnyGenericDecodingParityMatterJS(t *testing.T) {
 		{"decodes and array of structures", "16152c0101612c02016218152c0301632c040164" + "1818", `[{"1":"a","2":"b"},{"3":"c","4":"d"}]`},
 	} {
 		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
 			got, err := spec.DecodeJSON(nil, wireNode(t, c.wire))
 			if err != nil {
 				t.Fatal(err)
@@ -103,6 +104,7 @@ func TestTlvBoundsParityMatterJS(t *testing.T) {
 		}
 	}
 	t.Run("number", func(t *testing.T) {
+		t.Parallel()
 		dec := spec.DecodeUintIn[uint32](32, 5, 10)
 		for _, c := range []struct {
 			name string
@@ -118,6 +120,7 @@ func TestTlvBoundsParityMatterJS(t *testing.T) {
 		}
 	})
 	t.Run("string", func(t *testing.T) {
+		t.Parallel()
 		dec := spec.DecodeStringIn(4, 6)
 		for in, out := range map[string]bool{"abcde": false, "a": true, "abcdefgh": true} {
 			_, err := dec(wireNode(t, "0c"+hex.EncodeToString([]byte{byte(len(in))})+hex.EncodeToString([]byte(in))))
@@ -125,6 +128,7 @@ func TestTlvBoundsParityMatterJS(t *testing.T) {
 		}
 	})
 	t.Run("byte string", func(t *testing.T) {
+		t.Parallel()
 		dec := spec.DecodeBytesIn(4, 6)
 		for in, out := range map[string]bool{"0001020304": false, "00": true, "0001020304050607": true} {
 			_, err := dec(wireNode(t, "10"+hex.EncodeToString([]byte{byte(len(in) / 2)})+in))
@@ -132,6 +136,7 @@ func TestTlvBoundsParityMatterJS(t *testing.T) {
 		}
 	})
 	t.Run("array", func(t *testing.T) {
+		t.Parallel()
 		dec := spec.DecodeListIn(spec.DecodeString, 2, 4)
 		str := func(s string) string { return "0c01" + hex.EncodeToString([]byte(s)) }
 		for _, c := range []struct {
@@ -168,41 +173,49 @@ func TestTlvNumberRelaxParityMatterJS(t *testing.T) {
 	i8 := spec.Type{Kind: spec.KindInt, Bits: 8}
 	enum32 := spec.Type{Kind: spec.KindEnum, Bits: 32}
 	t.Run("accepts a signed-encoded positive value for an unsigned schema when relaxed", func(t *testing.T) {
+		t.Parallel()
 		if v, err := spec.DecodeValue(u8, wireNode(t, "0005")); err != nil || v != uint64(5) {
 			t.Errorf("DecodeValue = %v, %v; want 5", v, err)
 		}
 	})
 	t.Run("rejects a signed-encoded value for an unsigned schema by default", func(t *testing.T) {
+		t.Parallel()
 		if _, err := spec.DecodeUint[uint8](8)(wireNode(t, "0005")); err == nil {
 			t.Error("the strict decoder accepted a signed-encoded value")
 		}
 	})
 	t.Run("rejects a signed-encoded negative value for an unsigned schema even when relaxed", func(t *testing.T) {
+		t.Parallel()
 		if _, err := spec.DecodeValue(u8, wireNode(t, "00ff")); err == nil {
 			t.Error("accepted -1 for uint8")
 		}
 	})
 	t.Run("accepts an unsigned-encoded in-range value for a signed schema when relaxed", func(t *testing.T) {
+		t.Parallel()
 		if v, err := spec.DecodeValue(i8, wireNode(t, "0405")); err != nil || v != int64(5) {
 			t.Errorf("DecodeValue = %v, %v; want 5", v, err)
 		}
 	})
 	t.Run("rejects an unsigned-encoded out-of-range value for a signed schema even when relaxed", func(t *testing.T) {
+		t.Parallel()
 		if _, err := spec.DecodeValue(i8, wireNode(t, "04c8")); err == nil {
 			t.Error("accepted 200 for int8")
 		}
 	})
 	t.Run("rejects a float-encoded value for an integer schema even when relaxed", func(t *testing.T) {
+		t.Parallel()
 		if _, err := spec.DecodeValue(u8, wireNode(t, "0a0892cc45")); err == nil {
 			t.Error("accepted a float for uint8")
 		}
 	})
 	t.Run("accepts a signed-encoded enum value when relaxed", func(t *testing.T) {
+		t.Parallel()
 		if v, err := spec.DecodeValue(enum32, wireNode(t, "0005")); err != nil || v != uint64(5) {
 			t.Errorf("DecodeValue = %v, %v; want 5", v, err)
 		}
 	})
 	t.Run("threads relax options through chunked array element decode", func(t *testing.T) {
+		t.Parallel()
 		list := wireNode(t, "16000518")
 		if _, err := spec.DecodeList(spec.DecodeUint[uint8](8))(list); err == nil {
 			t.Error("the strict list decoder accepted a signed-encoded entry")
@@ -266,6 +279,7 @@ func TestTlvNullableParityMatterJS(t *testing.T) {
 		{"accepts map16 with only lower bits set", 5, uint16(0x0001), true},
 	} {
 		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
 			_, err := inst.CheckValue(c.attr, c.value, nil)
 			if (err == nil) != c.ok {
 				t.Fatalf("CheckValue(%d, %v) = %v, want ok %v", c.attr, c.value, err, c.ok)
@@ -289,6 +303,7 @@ func TestTlvNullableParityMatterJS(t *testing.T) {
 func TestTlvObjectParityMatterJS(t *testing.T) {
 	t.Parallel()
 	t.Run("ignores unknown fields", func(t *testing.T) {
+		t.Parallel()
 		var optional string
 		err := spec.DecodeFields(wireNode(t, "152401012c02047465737418"), "Object",
 			spec.Bind(2, "optionalField", false, &optional, spec.DecodeString))
@@ -311,6 +326,7 @@ func TestTlvObjectParityMatterJS(t *testing.T) {
 		return hex.EncodeToString(raw)
 	}
 	t.Run("encode/decodes with fabricIndex", func(t *testing.T) {
+		t.Parallel()
 		in := `{"mandatoryField":1,"optionalField":"test","fabricIndex":1}`
 		n, err := spec.EncodeJSON(withFabric, json.RawMessage(in))
 		if err != nil {
@@ -325,6 +341,7 @@ func TestTlvObjectParityMatterJS(t *testing.T) {
 		}
 	})
 	t.Run("encode/decodes with ignoring fabricIndex for write interaction", func(t *testing.T) {
+		t.Parallel()
 		n, err := spec.EncodeJSON(withFabric, json.RawMessage(`{"mandatoryField":1,"optionalField":"test"}`))
 		if err != nil {
 			t.Fatal(err)
@@ -367,25 +384,32 @@ func TestTlvOfModelParityMatterJS(t *testing.T) {
 	reset := `{"importedResetTimestamp":1000,"exportedResetTimestamp":2000}`
 	attr := func(def *spec.Cluster, id uint32) *spec.Field { return spec.AttributeField(def.Attribute(id)) }
 	t.Run("preserves epoch-us fields in GroupKeySetStruct", func(t *testing.T) {
+		t.Parallel()
 		roundTrip(t, &spec.Field{Name: "GroupKeySet", Type: spec.Type{Kind: spec.KindStruct, Struct: gkmdef.GroupKeySetStructDef}}, keySet)
 	})
 	t.Run("round-trips CumulativeEnergyResetStruct", func(t *testing.T) {
+		t.Parallel()
 		roundTrip(t, attr(eemdef.Definition, eemdef.AttrCumulativeEnergyReset), reset)
 	})
 	t.Run("scalar (enum) attribute round-trips null", func(t *testing.T) {
+		t.Parallel()
 		roundTrip(t, attr(onoffdef.Definition, onoffdef.AttrStartUpOnOff), `null`)
 	})
 	t.Run("scalar (enum) attribute round-trips non-null values", func(t *testing.T) {
+		t.Parallel()
 		roundTrip(t, attr(onoffdef.Definition, onoffdef.AttrStartUpOnOff), `0`)
 		roundTrip(t, attr(onoffdef.Definition, onoffdef.AttrStartUpOnOff), `2`)
 	})
 	t.Run("struct attribute round-trips null", func(t *testing.T) {
+		t.Parallel()
 		roundTrip(t, attr(eemdef.Definition, eemdef.AttrCumulativeEnergyReset), `null`)
 	})
 	t.Run("struct attribute round-trips non-null value", func(t *testing.T) {
+		t.Parallel()
 		roundTrip(t, attr(eemdef.Definition, eemdef.AttrCumulativeEnergyReset), reset)
 	})
 	t.Run("non-nullable conditional attribute round-trips false and true", func(t *testing.T) {
+		t.Parallel()
 		f := attr(onoffdef.Definition, onoffdef.AttrGlobalSceneControl)
 		roundTrip(t, f, `false`)
 		roundTrip(t, f, `true`)
@@ -394,9 +418,11 @@ func TestTlvOfModelParityMatterJS(t *testing.T) {
 		}
 	})
 	t.Run("returns TlvAny for attribute typed as any", func(t *testing.T) {
+		t.Parallel()
 		roundTrip(t, &spec.Field{Name: "unknown_1"}, `{"1":"a"}`)
 	})
 	t.Run("preserves epoch-us fields in KeySetWrite", func(t *testing.T) {
+		t.Parallel()
 		roundTrip(t, spec.CommandField(gkmdef.Definition.CommandByName("KeySetWrite")), `{"groupKeySet":`+keySet+`}`)
 	})
 }

@@ -38,18 +38,21 @@ func TestTlvInvokeRequestParityMatterJS(t *testing.T) {
 	const head = "1528002801" + "3602" + "15" + "3700" + "240000" + "240130" + "240200" + "18" + "18" + "18"
 	const tail = "24ff0c18"
 	t.Run("round-trips DelayReportData in context tag 3", func(t *testing.T) {
+		t.Parallel()
 		req, err := decode(t, head+"35032500e8032501e80318"+tail)
 		if err != nil || req.DelayReportData == nil || *req.DelayReportData != (DelayReportData{DelayMinMs: 1000, DelayJitterWindowMs: 1000}) {
 			t.Fatalf("DelayReportData = %+v, %v; want 1000/1000", req.DelayReportData, err)
 		}
 	})
 	t.Run("decodes a request without DelayReportData", func(t *testing.T) {
+		t.Parallel()
 		req, err := decode(t, head+tail)
 		if err != nil || req.DelayReportData != nil || len(req.Invokes) != 1 {
 			t.Fatalf("request = %+v, %v; want one invoke and no DelayReportData", req, err)
 		}
 	})
 	t.Run("decodes a missing DelayReportData field as 0", func(t *testing.T) {
+		t.Parallel()
 		for in, want := range map[string]DelayReportData{
 			"35032400c818": {DelayMinMs: 200},
 			"350318":       {},
@@ -61,6 +64,7 @@ func TestTlvInvokeRequestParityMatterJS(t *testing.T) {
 		}
 	})
 	t.Run("rejects DelayReportData that is not a structure", func(t *testing.T) {
+		t.Parallel()
 		if _, err := decode(t, head+"2403c8"+tail); err == nil {
 			t.Fatal("a DelayReportData of uint 200 was accepted")
 		}

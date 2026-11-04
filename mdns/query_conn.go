@@ -251,7 +251,7 @@ func PackDNSQueries(questions []DNSQuestion, knownAnswers []DNSRecord) ([][]byte
 		qs = append(qs, dns.Question{Name: fqdnOf(q.Name), Qtype: uint16(q.Type), Qclass: dns.ClassINET})
 	}
 	var chunks [][]dns.Question
-	var cur []dns.Question
+	cur := make([]dns.Question, 0, len(qs))
 	size := header
 	for _, q := range qs {
 		n := msgOf([]dns.Question{q}, nil, false).Len() - header

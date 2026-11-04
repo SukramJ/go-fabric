@@ -7,8 +7,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/mdns"
 	"github.com/miekg/dns"
+
+	"github.com/SukramJ/go-fabric/mdns"
 )
 
 // TestKnownAnswersParityMatterJS mirrors
@@ -28,6 +29,7 @@ func TestKnownAnswersParityMatterJS(t *testing.T) {
 		{"leave out a record past half its TTL so the responder refreshes it", 61 * time.Second, 0},
 	} {
 		t.Run(c.it, func(t *testing.T) {
+			t.Parallel()
 			n, conn, clk := testNames(t)
 			deliver(t, n, 0, []dns.RR{srvRR(instQ, hostQ, 5540, 120, true)})
 			clk.advance(n, c.elapsed)

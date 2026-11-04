@@ -52,7 +52,8 @@ func TestMdnsSocketQuerySplittingParityMatterJS(t *testing.T) {
 		return q, a
 	}
 	t.Run("clears queries after first split message", func(t *testing.T) {
-		var known []mdns.DNSRecord
+		t.Parallel()
+		known := make([]mdns.DNSRecord, 0, 40)
 		for i := range 40 {
 			known = append(known, mdns.DNSRecord{
 				Name: "_matter._tcp.local", Type: mdns.DNSTypePTR, TTL: 120,
@@ -73,6 +74,7 @@ func TestMdnsSocketQuerySplittingParityMatterJS(t *testing.T) {
 		}
 	})
 	t.Run("sends queries in single message when they fit (1 packet)", func(t *testing.T) {
+		t.Parallel()
 		var qs []mdns.DNSQuestion
 		for i := 1; i <= 5; i++ {
 			qs = append(qs, mdns.DNSQuestion{Name: fmt.Sprintf("_svc%d._tcp.local", i), Type: mdns.DNSType(255)})
@@ -90,6 +92,7 @@ func TestMdnsSocketQuerySplittingParityMatterJS(t *testing.T) {
 		{"splits queries into 3 packets when they are very large", 50, 3},
 	} {
 		t.Run(c.it, func(t *testing.T) {
+			t.Parallel()
 			ms := parse(t, mustPack(t, questions(c.n), nil))
 			if q, _ := total(ms); len(ms) != c.msgs || q != c.n {
 				t.Fatalf("%d messages with %d questions, want %d with %d", len(ms), q, c.msgs, c.n)
@@ -97,6 +100,7 @@ func TestMdnsSocketQuerySplittingParityMatterJS(t *testing.T) {
 		})
 	}
 	t.Run("does not include known-answers when splitting queries", func(t *testing.T) {
+		t.Parallel()
 		known := []mdns.DNSRecord{{Name: "_matter._tcp.local", Type: mdns.DNSTypePTR, TTL: 120, PTR: "device._matter._tcp.local"}}
 		ms := parse(t, mustPack(t, questions(25), known))
 		if _, a := total(ms); len(ms) < 2 || a != 0 {
@@ -104,6 +108,7 @@ func TestMdnsSocketQuerySplittingParityMatterJS(t *testing.T) {
 		}
 	})
 	t.Run("preserves message type when splitting queries", func(t *testing.T) {
+		t.Parallel()
 		if ms := parse(t, mustPack(t, questions(25), nil)); len(ms) < 2 {
 			t.Fatalf("%d messages, want a split", len(ms))
 		}

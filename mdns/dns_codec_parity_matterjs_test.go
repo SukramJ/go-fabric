@@ -69,8 +69,9 @@ func names(rs []mdns.DNSRecord) []string {
 func TestDnsCodecDecodeParityMatterJS(t *testing.T) {
 	t.Parallel()
 	t.Run("decodes a message", func(t *testing.T) {
+		t.Parallel()
 		m := mustDNS(t, dnsCodecEncoded)
-		var qs []string
+		qs := make([]string, 0, len(m.Questions))
 		for _, q := range m.Questions {
 			qs = append(qs, q.Name)
 		}
@@ -83,6 +84,7 @@ func TestDnsCodecDecodeParityMatterJS(t *testing.T) {
 		}
 	})
 	t.Run("keeps the readable records of a message that holds an unreadable one", func(t *testing.T) {
+		t.Parallel()
 		// A TXT record whose string length overruns its RDATA, then a valid A record.
 		m := mustDNS(t, "000084000000000200000000"+"0162056c6f63616c00"+"0010"+"0001"+"0000003c"+"0003"+"054142"+
 			"0161056c6f63616c00"+"0001"+"0001"+"0000003c"+"0004"+"c0a80101")
@@ -91,6 +93,7 @@ func TestDnsCodecDecodeParityMatterJS(t *testing.T) {
 		}
 	})
 	t.Run("keeps the readable records of a message whose record value has a bad name pointer", func(t *testing.T) {
+		t.Parallel()
 		// A PTR record whose RDATA is a compression pointer past the end of the message, then a valid A record.
 		m := mustDNS(t, "000084000000000200000000"+"0162056c6f63616c00"+"000c"+"0001"+"0000003c"+"0002"+"c0ff"+
 			"0161056c6f63616c00"+"0001"+"0001"+"0000003c"+"0004"+"c0a80101")
@@ -99,6 +102,7 @@ func TestDnsCodecDecodeParityMatterJS(t *testing.T) {
 		}
 	})
 	t.Run("decodes message with private record type", func(t *testing.T) {
+		t.Parallel()
 		m := mustDNS(t, dnsCodecPrivate)
 		if len(m.Questions) != 1 || m.Questions[0].Name != "3BE0FCD63F79EEC2._matterc._udp.local" || m.Questions[0].Type != mdns.DNSType(255) {
 			t.Fatalf("questions %+v", m.Questions)
@@ -138,6 +142,7 @@ func TestDnsCodecEncodeParityMatterJS(t *testing.T) {
 		}
 	}
 	t.Run("encodes a message and verify with decoding again", func(t *testing.T) {
+		t.Parallel()
 		m := mustDNS(t, dnsCodecResult)
 		if want := []string{"_services._dns-sd._udp.local", "_services._dns-sd._udp.local", "_matter._tcp.local", "_ID559AF361549A9A2._sub._matter._tcp.local"}; !slices.Equal(names(m.Answers), want) {
 			t.Fatalf("answers %v, want %v", names(m.Answers), want)
@@ -150,6 +155,7 @@ func TestDnsCodecEncodeParityMatterJS(t *testing.T) {
 		roundTrip(t, m, append(append([]mdns.DNSRecord(nil), m.Answers...), m.Additional...))
 	})
 	t.Run("encodes second message and verify with decoding again", func(t *testing.T) {
+		t.Parallel()
 		m := mustDNS(t, dnsCodecEncoded)
 		roundTrip(t, m, m.Answers)
 	})
@@ -171,6 +177,7 @@ func TestDnsCodecQNameParityMatterJS(t *testing.T) {
 		{"a compressed reference to the first question", "000000000002000000000000" + "047465737400" + "00010001" + "c00c" + "00010001", "test"},
 	} {
 		t.Run("decodes "+c.name, func(t *testing.T) {
+			t.Parallel()
 			m := mustDNS(t, c.wire)
 			if got := m.Questions[len(m.Questions)-1].Name; got != c.want {
 				t.Errorf("name %q, want %q", got, c.want)
@@ -184,6 +191,7 @@ func TestDnsCodecQNameParityMatterJS(t *testing.T) {
 		{"infinite recursion inside the stream", "000000000001000000000000" + "0474657374c00c" + "00010001"},
 	} {
 		t.Run("refuses "+c.name, func(t *testing.T) {
+			t.Parallel()
 			raw, _ := hex.DecodeString(c.wire)
 			if _, err := mdns.ParseDNSMessage(raw); err == nil {
 				t.Errorf("ParseDNSMessage(%s) accepted", c.wire)
@@ -203,6 +211,7 @@ func TestDnsCodecTXTParityMatterJS(t *testing.T) {
 		return wire
 	}
 	t.Run("round-trips a TXT entry containing high bytes losslessly", func(t *testing.T) {
+		t.Parallel()
 		raw, _ := hex.DecodeString("5aaf359c0501a1b0")
 		entry := append([]byte("xa="), raw...)
 		m, err := mdns.ParseDNSMessage(pack(t, [][]byte{entry}))
@@ -211,6 +220,7 @@ func TestDnsCodecTXTParityMatterJS(t *testing.T) {
 		}
 	})
 	t.Run("encodes an empty TXT record as a single zero byte per RFC 6763 §6.1", func(t *testing.T) {
+		t.Parallel()
 		wire := pack(t, nil)
 		// The record's RDLENGTH and RDATA close the message.
 		if !bytes.HasSuffix(wire, []byte{0x00, 0x01, 0x00}) {
@@ -222,6 +232,7 @@ func TestDnsCodecTXTParityMatterJS(t *testing.T) {
 		}
 	})
 	t.Run("truncates entries longer than 255 bytes per RFC 6763 §6.1", func(t *testing.T) {
+		t.Parallel()
 		wire := pack(t, [][]byte{bytes.Repeat([]byte{0x41}, 300)})
 		// RDLENGTH 256: one length byte of 0xFF and 255 bytes.
 		if tail := wire[len(wire)-258:]; tail[0] != 0x01 || tail[1] != 0x00 || tail[2] != 0xff {
@@ -239,6 +250,7 @@ func TestDnsCodecAAAAParityMatterJS(t *testing.T) {
 		{"encodes and decodes AAAA record with more cutted 0s", "fe80::1", "fe800000000000000000000000000001"},
 	} {
 		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
 			addr := netip.MustParseAddr(c.addr)
 			wire, err := mdns.PackDNSQuery(nil, []mdns.DNSRecord{{Name: "h.local", Type: mdns.DNSTypeAAAA, TTL: 1, IP: addr}})
 			if err != nil {

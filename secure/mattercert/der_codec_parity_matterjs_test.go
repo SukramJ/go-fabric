@@ -30,6 +30,7 @@ func TestDerCodecDecodeRefusalsParityMatterJS(t *testing.T) {
 		{"rejects a truncated nested element", "30020208"},
 	} {
 		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
 			der, err := hex.DecodeString(c.der)
 			if err != nil {
 				t.Fatal(err)
@@ -58,6 +59,7 @@ func TestDerCodecTimeParityMatterJS(t *testing.T) {
 		{"encodes special non-well defined GeneralizedDate correctly", matterEpochToTime(0), "180f39393939313233313233353935395a"},
 	} {
 		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
 			got, err := asn1.Marshal(c.at)
 			if err != nil {
 				t.Fatal(err)
