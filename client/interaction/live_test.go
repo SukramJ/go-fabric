@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"slices"
 	"testing"
 	"time"
 
@@ -311,8 +312,15 @@ func TestLiveLivenessTimeout(t *testing.T) {
 	}
 	lv.site.Net().Set(fabrictest.NetOptions{Loss: 1})
 	timeout := sub.MaxInterval() + 2*lv.c.MaximumPeerResponseTime(interaction.SubscriptionProcessingTime, false)
-	clock.waitTimer(t, timeout)
-	clock.Advance(timeout)
+	if err := lv.site.Settle(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Contains(clock.pending(), timeout) {
+		t.Fatalf("no liveness timer of %v armed (pending %v)", timeout, clock.pending())
+	}
+	if err := lv.site.Step(ctx, timeout); err != nil {
+		t.Fatal(err)
+	}
 	select {
 	case <-sub.Done():
 	case <-time.After(5 * time.Second):

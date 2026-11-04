@@ -6878,7 +6878,7 @@
       "identifier": "TestSustainedSubscriptionICD",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/interaction/sustained_icd_parity_matterjs_test.go",
-      "line": 277
+      "line": 282
     },
     {
       "package": "client/peer",
