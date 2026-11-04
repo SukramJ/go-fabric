@@ -1255,7 +1255,9 @@ func defaultAttributeValueWriter(enc *tlv.Encoder, tag tlv.Tag, v im.AttributeVa
 			return
 		}
 		// Cluster server returned a Go value the writer does not
-		// handle (e.g. a struct or list). Emit null so the reply still
+		// handle — a struct or a list of a type with no EncodeTLV; a
+		// plain slice of an Encodable type took encodeApplicationValue's
+		// general slice rule above. Emit null so the reply still
 		// parses on the controller side; the cluster server should
 		// either downcast to a primitive in MatterRead or supply its
 		// own writer in a future iteration.

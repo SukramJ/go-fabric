@@ -85,6 +85,7 @@ pseudo-version of `main`.
 
 ### Fixed
 
+- `bridge`: a list attribute a server returns as a plain slice of a type that encodes itself (`spec.Encodable`) goes on the wire as a TLV array of its entries — every host that set `device.Options.Tags` sent Descriptor `TagList` (`[]Semtag`) as TLV null, which a controller cached and decoded to nil. One general rule in the value writer, not a case per type; `bridge.EncodesAttributeValue` reports such a slice as encodable (G-N4, issue #388).
 - `im`: an InvokeRequest or WriteRequest whose SuppressResponse is not a boolean fails to decode and is answered with a StatusResponse, as matter.js's TlvBoolean field refuses it (`TlvInvokeRequest.ts:19`, `TlvWriteRequest.ts:18`; SuppressResponseTest). Phase 31.
 - `im`: a write's DataVersion is judged only after the path exists, the attribute is writable and a timed attribute arrived timed — a read-only attribute with a stale version is UNSUPPORTED_WRITE, not DATA_VERSION_MISMATCH (matter.js `AttributeWriteResponse.ts:221-257`). Phase 31.
 - `bridge`: a SubscribeRequest establishes only when a requested attribute exists — the statuses of unsupported paths no longer count — and is otherwise refused with INVALID_ACTION (matter.js `AttributeReadResponse.counts.existent`, `ServerSubscription.ts:707-711`). Phase 31.
