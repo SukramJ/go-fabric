@@ -127,6 +127,16 @@ func (cp *clientPair) eventually(t *testing.T, what string, cond func() bool) {
 	}
 }
 
+// settle waits until the site is quiet (Site.Settle), moving no clock: what
+// the stack would do now it has done, and what it waits for is a timer or
+// the peer.
+func (cp *clientPair) settle(t *testing.T) {
+	t.Helper()
+	if err := cp.site.Settle(parityCtx(t)); err != nil {
+		t.Fatal(err)
+	}
+}
+
 // run runs fn under the site, failing the test on an error.
 func (cp *clientPair) run(t *testing.T, fn func(ctx context.Context) error) {
 	t.Helper()

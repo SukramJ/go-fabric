@@ -722,8 +722,18 @@ func TestIcdClientParity(t *testing.T) {
 			// after the tenth step (seen in the race job of #346): wait for
 			// the subscription to be established — matter.js's settled()
 			// after each advance — before reading the deadline.
-			p.eventually(t, "the recreated subscription", p.node.SubscriptionActive)
-			if _, ok := p.icd().NextExpectedCheckIn(); ok {
+			//
+			// The step ends on the event (issue #383): the active flag can
+			// flip before the new subscription takes its hold, so a single
+			// read right after it saw the gap. The site runs until the
+			// subscription holds the peer, then the settled site is checked
+			// again — the steady state, not a window.
+			p.eventually(t, "the recreated subscription holding the peer", func() bool {
+				_, due := p.icd().NextExpectedCheckIn()
+				return p.node.SubscriptionActive() && !due
+			})
+			p.settle(t)
+			if _, ok := p.icd().NextExpectedCheckIn(); ok && p.node.SubscriptionActive() {
 				t.Fatal("a deadline while subscribed")
 			}
 		})

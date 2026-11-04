@@ -3833,14 +3833,14 @@
       "identifier": "TestOngoingReportChunkPiggybacksTheStatusResponseAck",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscribe_report_chunking_test.go",
-      "line": 403
+      "line": 424
     },
     {
       "package": "bridge",
       "identifier": "TestOngoingReportWaitsForEachChunksStatusResponse",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscribe_report_chunking_test.go",
-      "line": 364
+      "line": 385
     },
     {
       "package": "bridge",
@@ -4694,14 +4694,14 @@
       "identifier": "TestReportSubscriptionChunksAnOversizedOngoingReport",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscribe_report_chunking_test.go",
-      "line": 251
+      "line": 272
     },
     {
       "package": "bridge",
       "identifier": "TestReportSubscriptionEventsChunksAnOversizedReport",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscribe_report_chunking_test.go",
-      "line": 311
+      "line": 332
     },
     {
       "package": "bridge",
@@ -23293,21 +23293,21 @@
       "identifier": "TestRegistryAutoStart",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/registry_internal_test.go",
-      "line": 257
+      "line": 261
     },
     {
       "package": "controller/client",
       "identifier": "TestRegistryConfig",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/registry_internal_test.go",
-      "line": 151
+      "line": 155
     },
     {
       "package": "controller/client",
       "identifier": "TestRegistryErase",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/registry_internal_test.go",
-      "line": 311
+      "line": 315
     },
     {
       "package": "controller/client",
@@ -23321,7 +23321,7 @@
       "identifier": "TestRegistryRestore",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/registry_internal_test.go",
-      "line": 189
+      "line": 193
     },
     {
       "package": "controller/client",
@@ -23342,7 +23342,7 @@
       "identifier": "TestRemovalConfirmedByFabricRemoved",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/registry_follow_internal_test.go",
-      "line": 49
+      "line": 45
     },
     {
       "package": "controller/client",

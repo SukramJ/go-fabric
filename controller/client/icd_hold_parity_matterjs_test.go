@@ -17,6 +17,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/SukramJ/go-fabric/clock/clocktest"
@@ -124,53 +125,65 @@ func TestHoldUntilIcdPeerAwakeParity(t *testing.T) {
 		go func() { out <- client.HoldUntilICDPeerAwake(ctx, w, addr, timeout, nil) }()
 		return out
 	}
-	armed := func(fake *clocktest.Fake) {
-		for fake.Pending() == 0 {
-			time.Sleep(time.Millisecond)
+	// armed lets the case's synctest bubble settle: the hold has armed its
+	// timer on the fake, or it never will.
+	armed := func(t *testing.T, fake *clocktest.Fake) {
+		t.Helper()
+		synctest.Wait()
+		if fake.Pending() == 0 {
+			t.Fatal("the hold armed no timer")
 		}
 	}
 	t.Run("holdUntilIcdPeerAwake", func(t *testing.T) {
 		t.Parallel()
 		t.Run("does not hold without a wakefulness, or for a peer that needs no awaiting", func(t *testing.T) {
 			t.Parallel()
-			if err := client.HoldUntilICDPeerAwake(context.Background(), nil, addr, 0, nil); err != nil {
-				t.Fatal(err)
-			}
-			if err := client.HoldUntilICDPeerAwake(context.Background(), icd.NewPeerWakefulness(nil), addr, 0, nil); err != nil {
-				t.Fatal(err)
-			}
+			synctest.Test(t, func(t *testing.T) {
+				if err := client.HoldUntilICDPeerAwake(context.Background(), nil, addr, 0, nil); err != nil {
+					t.Fatal(err)
+				}
+				if err := client.HoldUntilICDPeerAwake(context.Background(), icd.NewPeerWakefulness(nil), addr, 0, nil); err != nil {
+					t.Fatal(err)
+				}
+			})
 		})
 		t.Run("holds a sleeping peer until it wakes", func(t *testing.T) {
 			t.Parallel()
-			w, fake := sleepingPeer(t)
-			ch := hold(context.Background(), w, 0)
-			armed(fake)
-			w.NoteActive()
-			if err := <-ch; err != nil {
-				t.Fatal(err)
-			}
+			synctest.Test(t, func(t *testing.T) {
+				w, fake := sleepingPeer(t)
+				ch := hold(context.Background(), w, 0)
+				armed(t, fake)
+				w.NoteActive()
+				if err := <-ch; err != nil {
+					t.Fatal(err)
+				}
+			})
 		})
 		t.Run("rejects with IcdPeerAsleepError when the peer does not wake in time", func(t *testing.T) {
 			t.Parallel()
-			w, fake := sleepingPeer(t)
-			ch := hold(context.Background(), w, 5*time.Second)
-			armed(fake)
-			fake.Advance(5 * time.Second)
-			var e *client.ICDPeerAsleepError
-			if err := <-ch; !errors.As(err, &e) {
-				t.Fatal(err)
-			}
+			synctest.Test(t, func(t *testing.T) {
+				w, fake := sleepingPeer(t)
+				ch := hold(context.Background(), w, 5*time.Second)
+				armed(t, fake)
+				fake.Advance(5 * time.Second)
+				var e *client.ICDPeerAsleepError
+				if err := <-ch; !errors.As(err, &e) {
+					t.Fatal(err)
+				}
+			})
 		})
 		t.Run("rejects with the abort error when aborted", func(t *testing.T) {
 			t.Parallel()
-			w, fake := sleepingPeer(t)
-			ctx, cancel := context.WithCancel(context.Background())
-			ch := hold(ctx, w, 0)
-			armed(fake)
-			cancel()
-			if err := <-ch; !errors.Is(err, context.Canceled) {
-				t.Fatal(err)
-			}
+			synctest.Test(t, func(t *testing.T) {
+				w, fake := sleepingPeer(t)
+				ctx, cancel := context.WithCancel(context.Background())
+				ch := hold(ctx, w, 0)
+				armed(t, fake)
+				cancel()
+				if err := <-ch; !errors.Is(err, context.Canceled) {
+					t.Fatal(err)
+				}
+			})
 		})
 	})
 }
@@ -251,7 +264,7 @@ func TestClientNodeInteractionIcdParity(t *testing.T) {
 				t.Fatal("awake")
 			}
 			read := p.readAsync(parityCtx(t), descriptorRead)
-			time.Sleep(20 * time.Millisecond)
+			p.settle(t)
 			select {
 			case err := <-read:
 				t.Fatalf("the read went out: %v", err)
@@ -275,7 +288,7 @@ func TestClientNodeInteractionIcdParity(t *testing.T) {
 			p := registeredLITPair(t)
 			p.silence(true)
 			read := p.readAsync(parityCtx(t), descriptorRead)
-			time.Sleep(20 * time.Millisecond)
+			p.settle(t)
 			p.advance(t, 3700*time.Second)
 			var e *client.ICDPeerAsleepError
 			if err := <-read; !errors.As(err, &e) {
@@ -324,7 +337,7 @@ func TestClientNodeInteractionIcdParity(t *testing.T) {
 			p := registeredLITPair(t)
 			p.silence(true)
 			read := p.readAsync(client.WithICDAwaitTimeout(parityCtx(t), 10*time.Second), descriptorRead)
-			time.Sleep(20 * time.Millisecond)
+			p.settle(t)
 			p.advance(t, 15*time.Second)
 			var e *client.ICDPeerAsleepError
 			if err := <-read; !errors.As(err, &e) || e.Timeout != 10*time.Second {
@@ -336,7 +349,7 @@ func TestClientNodeInteractionIcdParity(t *testing.T) {
 			p.silence(true)
 			ctx, cancel := context.WithCancel(parityCtx(t))
 			read := p.readAsync(ctx, descriptorRead)
-			time.Sleep(20 * time.Millisecond)
+			p.settle(t)
 			cancel()
 			if err := <-read; !errors.Is(err, context.Canceled) {
 				t.Fatal(err)
@@ -351,7 +364,7 @@ func TestClientNodeInteractionIcdParity(t *testing.T) {
 				_, err := p.node.Write(ctx, []client.WriteRequest{{Path: client.AttributeAt(0, 0x0028, 0x0005), Value: spec.String("x")}}, client.WriteOptions{})
 				out <- err
 			}()
-			time.Sleep(20 * time.Millisecond)
+			p.settle(t)
 			cancel()
 			if err := <-out; !errors.Is(err, context.Canceled) {
 				t.Fatal(err)
@@ -366,7 +379,7 @@ func TestClientNodeInteractionIcdParity(t *testing.T) {
 				_, err := p.icd().StayActive(ctx, time.Second)
 				out <- err
 			}()
-			time.Sleep(20 * time.Millisecond)
+			p.settle(t)
 			cancel()
 			if err := <-out; !errors.Is(err, context.Canceled) {
 				t.Fatal(err)
