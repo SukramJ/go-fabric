@@ -12,9 +12,10 @@ import (
 
 // TestCommodityWireValue: every list type the four commodity servers store
 // reads as a spec.List that encodes as a TLV array, a nil list stays null,
-// and any other value passes unchanged. A plain slice would reach the
-// bridge's attribute writer without an EncodeTLV and go on the wire as
-// null (bridge/reply.go defaultAttributeValueWriter) — the cause of the
+// and any other value passes unchanged. A plain slice reached the
+// bridge's attribute writer without an EncodeTLV and went on the wire as
+// null (bridge/reply.go defaultAttributeValueWriter, before its
+// Encodable-slice rule of issue #388 G-N4) — the cause of the
 // TC-SETRF-2.2/2.3/3.1 and TC-COMMTR-3.1 failures in CI run 38114710064.
 func TestCommodityWireValue(t *testing.T) {
 	t.Parallel()

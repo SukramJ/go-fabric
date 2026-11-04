@@ -299,7 +299,7 @@ func TestClusterFeatureAndClassificationLookups(t *testing.T) {
 	if schema.ClusterFeatureNames(0x0008, 1<<31) != nil || schema.ClusterFeatures(0xFFFF) != nil {
 		t.Error("an undefined bit or cluster yields features")
 	}
-	if fs := schema.ClusterFeatures(0x0006); len(fs) == 0 || fs[0] != (schema.ClusterFeature{Name: "LT", Bit: 0}) {
+	if fs := schema.ClusterFeatures(0x0006); len(fs) == 0 || fs[0] != (schema.ClusterFeature{Name: "LT", Bit: 0, Title: "Lighting"}) {
 		t.Errorf("OnOff features = %v", fs)
 	}
 	if c, ok := schema.ClusterClassification(0x0028); !ok || c != "node" {

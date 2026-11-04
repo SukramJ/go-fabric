@@ -365,20 +365,31 @@ func (b *Bridge) EmitEvent(endpoint uint16, cluster, event uint32, data any, pri
 	// race to a later one. The manager is read before emitMu is taken,
 	// so emitMu is never held while waiting for b.mu.
 	m := b.subscriptionManagerLocked()
+	rec = b.recordAndFanOut(m, rec)
+	if hook := b.onEvent.Load(); hook != nil {
+		(*hook)(rec)
+	}
+}
+
+// recordAndFanOut appends rec to the event log and tells the subscriptions
+// under emitMu, and returns the record as the log stamped it (its number
+// and timestamp).
+func (b *Bridge) recordAndFanOut(m *subscription.Manager, rec im.EventRecord) im.EventRecord {
 	b.emitMu.Lock()
 	defer b.emitMu.Unlock()
-	num := b.eventLog.Append(rec)
+	rec = b.eventLog.AppendRecord(rec)
 	if m == nil {
-		return
+		return rec
 	}
 	m.OnEventFired(subscription.EventFiring{
 		Path: im.ConcreteEventPath{
 			HasEndpoint: true, HasCluster: true, HasEvent: true,
-			Endpoint: endpoint, Cluster: cluster, Event: event,
+			Endpoint: rec.Endpoint, Cluster: rec.Cluster, Event: rec.EventID,
 		},
-		Number:   num,
-		Priority: im.EventPriority(priority),
+		Number:   rec.Number,
+		Priority: rec.Priority,
 	})
+	return rec
 }
 
 // MatterEmitEvent is an alias of [Bridge.EmitEvent] satisfying

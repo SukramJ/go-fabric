@@ -188,8 +188,8 @@
 //   - SetOnInboundActivity — feeds every authenticated inbound message to
 //     the ICD's mode machine; without it the active window is not
 //     extended and the node goes idle mid-exchange.
-//   - SetOnReassembled, SetOnFabricRemoved and SetOnAttributeChange are
-//     nil-safe observer hooks. A fabric's installation is observed on the node
+//   - SetOnReassembled, SetOnFabricRemoved, SetOnAttributeChange and
+//     SetOnEvent are nil-safe observer hooks. A fabric's installation is observed on the node
 //     (node.Observers.OnFabricAdded); the bridge installs no fabric.
 //   - SetDeviceTypeValidation — visible either way. Start and every
 //     Reassemble judge the topology against its device types; the
@@ -627,6 +627,10 @@ type Bridge struct {
 	// AttributeChangeNotifier reports (wireAttributeNotifiersLocked).
 	// Atomic: a change fires on its own goroutine, b.mu possibly held.
 	onAttributeChange atomic.Pointer[func(endpoint uint16, cluster uint32, change contract.Change)]
+
+	// onEvent, when set, hears every event EmitEvent recorded
+	// (SetOnEvent). Atomic: an event fires on the emitter's goroutine.
+	onEvent atomic.Pointer[func(im.EventRecord)]
 
 	// unsecuredCounter generates monotonic MessageCounter values for
 	// SessionID==0 replies (PASE / commissioning chatter pre-CASE).
@@ -1257,6 +1261,19 @@ func (b *Bridge) SetOnAttributeChange(fn func(endpoint uint16, cluster uint32, c
 		return
 	}
 	b.onAttributeChange.Store(&fn)
+}
+
+// SetOnEvent wires the event hook: fn hears every event a cluster server
+// emits ([Bridge.EmitEvent]) with the record [Bridge.EventLog] holds — its
+// number, priority, path, timestamp and payload — after the log recorded
+// it and the subscriptions were told. It runs on the emitter's goroutine,
+// outside the bridge's locks; nil detaches.
+func (b *Bridge) SetOnEvent(fn func(im.EventRecord)) {
+	if fn == nil {
+		b.onEvent.Store(nil)
+		return
+	}
+	b.onEvent.Store(&fn)
 }
 
 // matterEndpointReceiver is the optional capability a cluster server

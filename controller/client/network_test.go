@@ -261,6 +261,13 @@ func TestDefaultSubscription(t *testing.T) {
 		t.Fatalf("events %v seeded %d alive %d status %v", hl.events, hl.seeded, hl.alive, hl.status)
 	}
 	hl.mu.Unlock()
+	// The delivered event is in the node's history (G-C2, issue #388).
+	if h := sn.node.EventHistory(0, 0); len(h) != 1 || h[0].Number != 7 || h[0].Decoded.(basicinfo.StartUpEvent).SoftwareVersion != 3 {
+		t.Fatalf("event history %+v, want StartUp 7", h)
+	}
+	if h := sn.node.EventHistory(8, 0); len(h) != 0 {
+		t.Fatalf("event history since 8: %+v", h)
+	}
 
 	// The underlying subscription is lost: the replacement is refreshed.
 	sn.reg.CloseForPeer(sn.reg.Active()[0].Peer())

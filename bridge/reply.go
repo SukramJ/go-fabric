@@ -707,16 +707,22 @@ func EncodesAttributeValue(v any) bool {
 	if v == nil {
 		return false
 	}
-	enc := tlv.NewEncoder()
-	defaultAttributeValueWriter(enc, tlv.ContextTag(0), im.AttributeValue{Value: v})
-	out, err := enc.Bytes()
+	out, err := AttributeValueTLV(v)
 	if err != nil {
 		return false
 	}
-	null := tlv.NewEncoder()
-	null.PutNull(tlv.ContextTag(0))
-	nb, _ := null.Bytes()
-	return !bytes.Equal(out, nb)
+	return !bytes.Equal(out, []byte{byte(tlv.TypeNull)})
+}
+
+// AttributeValueTLV returns v, a Go value a cluster server returns from
+// MatterRead or emits as an event payload, as the bridge writes it on the
+// wire: one anonymous TLV element — the Data of an AttributeDataIB or an
+// EventDataIB. A nil value, and one of a type the writer does not know,
+// is TLV null, as on the wire.
+func AttributeValueTLV(v any) ([]byte, error) {
+	enc := tlv.NewEncoder()
+	defaultAttributeValueWriter(enc, tlv.AnonymousTag(), im.AttributeValue{Value: v})
+	return enc.Bytes()
 }
 
 // defaultAttributeValueWriter is the wire writer the bridge plugs
@@ -1255,7 +1261,9 @@ func defaultAttributeValueWriter(enc *tlv.Encoder, tag tlv.Tag, v im.AttributeVa
 			return
 		}
 		// Cluster server returned a Go value the writer does not
-		// handle (e.g. a struct or list). Emit null so the reply still
+		// handle — a struct or a list of a type with no EncodeTLV; a
+		// plain slice of an Encodable type took encodeApplicationValue's
+		// general slice rule above. Emit null so the reply still
 		// parses on the controller side; the cluster server should
 		// either downcast to a primitive in MatterRead or supply its
 		// own writer in a future iteration.

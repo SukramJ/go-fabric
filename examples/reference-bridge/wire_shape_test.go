@@ -66,17 +66,19 @@ func schemaNullable(t *testing.T) map[uint32]map[uint32]bool {
 // endpoint of the reference daemon through the bridge's dispatcher — the
 // values the bridge hands its writer — and fails on a value the writer
 // would put on the wire as null: one of a type its switch does not know
-// (a plain Go slice of generated structs, the defect class of the #47
-// fix-up, cluster/energy/commodity_wire.go), or a null where the
-// snapshot says the attribute is not nullable. It extends
+// (a plain Go slice of a struct without an EncodeTLV — a plain slice of
+// generated structs was the defect class of the #47 fix-up,
+// cluster/energy/commodity_wire.go, until the writer's general
+// Encodable-slice rule, issue #388 G-N4), or a null where the snapshot
+// says the attribute is not nullable. It extends
 // TestEnergyMarketWireShapes from the energy-market clusters to the fleet.
 func TestFleetWireShapes(t *testing.T) {
-	// The mechanism, on the defect class it exists for: a plain slice of
-	// generated structs is not encoded, its spec.List is — the form a typed
-	// Patch stores (Patch.AttributeValues) and cluster/energy's servers
-	// hand out (commodity_wire.go).
-	if writerEncodes([]ct.DayEntryStruct{}) || !writerEncodes(spec.List[ct.DayEntryStruct]{}) {
-		t.Fatal("writerEncodes misjudges a plain slice / spec.List of generated structs")
+	// The mechanism: a plain slice of generated structs and its spec.List
+	// both encode (the writer's Encodable-slice rule); a slice of a struct
+	// that encodes nothing does not.
+	type stranger struct{ A int }
+	if !writerEncodes([]ct.DayEntryStruct{}) || !writerEncodes(spec.List[ct.DayEntryStruct]{}) || writerEncodes([]stranger{{1}}) {
+		t.Fatal("writerEncodes misjudges a plain slice / spec.List of generated structs or a slice of an unknown struct")
 	}
 	f, br := startFleetBridge(t)
 	nullable := schemaNullable(t)

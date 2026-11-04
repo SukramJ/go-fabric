@@ -26,6 +26,7 @@ import (
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/endpoint"
 	"github.com/SukramJ/go-fabric/groups"
+	"github.com/SukramJ/go-fabric/internal/coreseam"
 	"github.com/SukramJ/go-fabric/schema"
 	"github.com/SukramJ/go-fabric/secure/attestation"
 	"github.com/SukramJ/go-fabric/store"
@@ -142,12 +143,13 @@ func buildRoot(ctx context.Context, d rootDeps) (*RootClusters, error) { //nolin
 		CapabilityMinima:   cfg.CapabilityMinima,
 		MaxPathsPerInvoke:  cfg.MaxPathsPerInvoke,
 		Logger:             d.logger,
-		// TESTING ONLY (internal/nodeseam.UseSpecificationVersion).
-		SpecificationVersion: cfg.specificationVersion,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("basic information: %w", err)
 	}
+	// TESTING ONLY (internal/nodeseam.UseSpecificationVersion); 0, every
+	// release node's value, leaves the server's own.
+	coreseam.SetSpecificationVersion(basicInfo, cfg.specificationVersion)
 	r.BasicInformation = basicInfo
 
 	// RebootCount and the operational time carry over from the previous

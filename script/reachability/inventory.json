@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 7330,
+  "entry_points": 7339,
   "entry_packages": [
     ".",
     "bdx",
@@ -229,6 +229,7 @@
     "internal/inflight",
     "internal/paritytest",
     "internal/serialqueue",
+    "internal/valuejson",
     "mdns",
     "node",
     "node/controllernode",
@@ -277,9 +278,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 17235,
-    "reachable": 12107,
-    "whitelisted": 5128,
+    "total_exported": 17254,
+    "reachable": 12122,
+    "whitelisted": 5132,
     "unreachable": 0
   },
   "by_package": [],
@@ -3147,6 +3148,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fabric_session_close_test.go",
       "line": 97
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestEncodableSliceWritesAnArray",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/encodable_slice_test.go",
+      "line": 32
     },
     {
       "package": "bridge",
@@ -7990,7 +7998,7 @@
       "identifier": "LeaveEvent",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/core/basic_information.go",
-      "line": 587
+      "line": 583
     },
     {
       "package": "cluster/core",
@@ -8018,14 +8026,14 @@
       "identifier": "ShutDownEvent",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/core/basic_information.go",
-      "line": 584
+      "line": 580
     },
     {
       "package": "cluster/core",
       "identifier": "StartUpEvent",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/core/basic_information.go",
-      "line": 579
+      "line": 575
     },
     {
       "package": "cluster/core",
@@ -9180,7 +9188,7 @@
       "identifier": "TestCommodityWireValue",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/energy/commodity_wire_internal_test.go",
-      "line": 19
+      "line": 20
     },
     {
       "package": "cluster/energy",
@@ -22669,7 +22677,7 @@
       "identifier": "Encodable",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "controller/client/json.go",
-      "line": 48
+      "line": 46
     },
     {
       "package": "controller/client",
@@ -23058,6 +23066,13 @@
     },
     {
       "package": "controller/client",
+      "identifier": "TestEventHistoryRing",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/client/event_history_internal_test.go",
+      "line": 31
+    },
+    {
+      "package": "controller/client",
       "identifier": "TestEveryGeneratedClusterIsKnown",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/cluster_internal_test.go",
@@ -23432,7 +23447,7 @@
       "identifier": "Value",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "controller/client/json.go",
-      "line": 45
+      "line": 43
     },
     {
       "package": "controller/client",
@@ -27212,14 +27227,14 @@
       "identifier": "TestEnergyMarketDevices",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/fleet_energy_market_test.go",
-      "line": 96
+      "line": 97
     },
     {
       "package": "examples/reference-bridge",
       "identifier": "TestEnergyMarketWireShapes",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/fleet_energy_market_test.go",
-      "line": 32
+      "line": 33
     },
     {
       "package": "examples/reference-bridge",
@@ -27254,7 +27269,7 @@
       "identifier": "TestFleetWireShapes",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/wire_shape_test.go",
-      "line": 73
+      "line": 75
     },
     {
       "package": "examples/reference-bridge",
@@ -27366,7 +27381,7 @@
       "identifier": "TestMeteringTriggers",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/fleet_energy_market_test.go",
-      "line": 230
+      "line": 231
     },
     {
       "package": "examples/reference-bridge",
@@ -27464,7 +27479,7 @@
       "identifier": "TestPriceAndGridTriggers",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/fleet_energy_market_test.go",
-      "line": 265
+      "line": 266
     },
     {
       "package": "examples/reference-bridge",
@@ -27562,7 +27577,7 @@
       "identifier": "TestTariffTriggers",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/fleet_energy_market_test.go",
-      "line": 165
+      "line": 166
     },
     {
       "package": "examples/reference-bridge",
@@ -31231,6 +31246,20 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "schema/schema_lookup_test.go",
       "line": 124
+    },
+    {
+      "package": "schema",
+      "identifier": "TestElementNameLookups",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "schema/element_names_test.go",
+      "line": 112
+    },
+    {
+      "package": "schema",
+      "identifier": "TestElementNamesMatchSnapshot",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "schema/element_names_test.go",
+      "line": 19
     },
     {
       "package": "schema",

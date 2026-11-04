@@ -4,6 +4,8 @@
 package bridge
 
 import (
+	"reflect"
+
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	clusterwire "github.com/SukramJ/go-fabric/cluster/wire"
 	"github.com/SukramJ/go-fabric/tlv"
@@ -42,8 +44,40 @@ func encodeApplicationValue(enc *tlv.Encoder, tag tlv.Tag, v any) bool {
 		// encodes itself as matter.js's TlvOfModel does.
 		x.EncodeTLV(enc, tag)
 	default:
+		return encodeEncodableSlice(enc, tag, v)
+	}
+	return true
+}
+
+// encodableType is the reflect type of [spec.Encodable].
+var encodableType = reflect.TypeFor[spec.Encodable]()
+
+// encodeEncodableSlice writes a plain slice whose element type encodes
+// itself ([spec.Encodable]) as a TLV array of its elements — the general
+// rule for a list attribute a server returns as []T rather than
+// spec.List[T]: Descriptor.TagList ([]Semtag, cluster/core cloneTags) and
+// any list of a generated or hand-written struct with an EncodeTLV. A
+// plain slice carries no method, so without this rule each such list fell
+// through to the writer's default arm and went on the wire as TLV null.
+// A nil pointer or interface element encodes as null. It reports false
+// for any other value.
+func encodeEncodableSlice(enc *tlv.Encoder, tag tlv.Tag, v any) bool {
+	rv := reflect.ValueOf(v)
+	if rv.Kind() != reflect.Slice || !rv.Type().Elem().Implements(encodableType) {
 		return false
 	}
+	enc.StartArray(tag)
+	for i := range rv.Len() {
+		el := rv.Index(i)
+		if (el.Kind() == reflect.Pointer || el.Kind() == reflect.Interface) && el.IsNil() {
+			enc.PutNull(tlv.AnonymousTag())
+			continue
+		}
+		if e, ok := el.Interface().(spec.Encodable); ok {
+			e.EncodeTLV(enc, tlv.AnonymousTag())
+		}
+	}
+	_ = enc.EndContainer()
 	return true
 }
 

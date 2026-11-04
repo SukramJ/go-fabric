@@ -32,6 +32,7 @@ A host names none of the packages below for these:
 | The served topology | `Node.Topology()`: the Aggregator's endpoint and each bridged device's key, endpoint, device type and its revision, name, reachability, mounted clusters (id, schema name, revision: `node.ClusterInfo`) and parts (`node.BridgeTopology`, `node.BridgedDevice`) |
 | A device's lifecycle | `Device.SetReachable`, `Device.Rename` (a persisted label, as a controller writes it), `Device.Update` (the host's statements: name, addresses — persisted nowhere, a written label wins), `Device.EndpointNumber`; `Aggregator.Add`, `Remove` (the key keeps its endpoint number for its return), `Replace`, `Forget` (frees it) |
 | A bridged NodeLabel | `device.ComposeNodeLabel(base, suffix)`: the parameter suffix and the 32-byte cap of the generated definition; `device.New`, `Rename` and `Update` cap a name with it |
+| Served values and events | `Node.ReadAttribute`, `Node.ReadCluster` (`node.AttributeValue` with its DataVersion and `JSON()`), `Node.Events(node.EventQuery)` (`node.Event`), `Observers.OnEvent` — the node's own read path and event log without `Bridge().Dispatcher()` or `Bridge().EventLog()`; see [Observability](observability.md#served-values-and-events) |
 | Who changed an attribute | `contract.Change.Origin` in every `OnChanged` callback (`OriginHostSet`, `OriginControllerWrite`, `OriginCommand`) |
 | Field and return types | the aliases `node.Groups` (`Config.Groups`, `Node.Groups`), `node.Advertiser` (`Config.Advertiser`), `node.Snapshotter`, `Topology`, `TCPConfig`, `DiagnosticEvent`, `HealthSample`, `MDNSFinding`, `MDNSService`, `AttestationFiles`, `AttestationChain`, `WindowStatus`, `DeviceTypeValidationMode`, `CapabilityMinimaStruct`, `GeneralDiagnosticsFeatures`; the host ports `node.OTAImageSource`, `OTAConsent`, `OTAConsentState`, `OTAApplyPolicy`, `OTAPeer`, `OTAUpdateStatus`, `OTAApplier`, `WiFiReporter`, `CommissioningApprover`, `ReverseCommissioner`; `device.SourceKey` |
 | The camera's signals to a requestor | `camera.Provider.Offer`, `Answer`, `IceCandidates`, `End`: the requestor's commands invoked on the session's peer node, fabric and endpoint over a CASE session the node initiates; the node attaches the route (`camera.PeerConnector`) to every provider it assembles |
@@ -80,7 +81,7 @@ server and breaks when the device mounts another.
 
 **Gives.** `Node.Bridge()` returns the `*bridge.Bridge` the node runs on:
 the `Attach…` and `Set…` ports, `Reassemble`, the event log
-(`EventLog`), the controller round-trip statistics (`ControllerRTT`) and
+(`EventLog`; the facade reads it through `Node.Events`), the controller round-trip statistics (`ControllerRTT`) and
 the hook the facade leaves to the host (`SetOnReassembled`; a fabric's
 installation is `node.Observers.OnFabricAdded`).
 

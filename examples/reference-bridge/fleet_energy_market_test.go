@@ -24,8 +24,9 @@ import (
 // TestEnergyMarketWireShapes fires the triggers TC-SETRF-2.2 (step 3) and
 // TC-COMMTR-3.1 send through the daemon's whole TestEventTrigger dispatch
 // and reads the mounted servers as the bridge does: every attribute is
-// null, a scalar or a spec.Encodable — a plain slice goes on the wire as
-// null (bridge/reply.go defaultAttributeValueWriter) — and the lists the
+// null, a scalar or a spec.Encodable — a plain slice went on the wire as
+// null (bridge/reply.go defaultAttributeValueWriter) until the writer's
+// Encodable-slice rule, issue #388 G-N4 — and the lists the
 // cases iterate carry the trigger's entries (TC_SETRF_2_2.py step 4,
 // TC_SETRF_3_1.py step 27, TC_COMMTR_3_1.py's MeteredQuantity report; CI
 // run 38114710064 saw Null for each).

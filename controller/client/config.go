@@ -47,6 +47,10 @@ type Config struct {
 	// NoInitialRead skips that read — autoStateInitialize false
 	// (NetworkClient.ts:139, :441-445).
 	NoInitialRead bool
+	// EventHistory is the number of events the node keeps for
+	// [Node.EventHistory], the oldest dropped first: 0 keeps
+	// [DefaultEventHistory], a negative value none.
+	EventHistory int
 	// Hooks are the node's callbacks.
 	Hooks Hooks
 	// Logger receives the diagnostics; nil discards them.
@@ -121,7 +125,9 @@ type Hooks struct {
 	// subscription while it is current, its bootstrap read and the
 	// newly-commissioned read deliver here (and raise the event cursor); a
 	// host's own Read or Subscribe returns its events in its Report only
-	// (matter.js ClientStructure.ts:412, NetworkClient.ts:171-173).
+	// (matter.js ClientStructure.ts:412, NetworkClient.ts:171-173). The
+	// event is in [Node.EventHistory] when the hook runs, so the hook is
+	// the history's change notification.
 	Event func(endpoint uint16, cluster, event uint32, e EventData, value any)
 	// Seeded: the structure is known, once — BasicInformation is present
 	// and every endpoint the root's PartsList names is installed, more than

@@ -136,7 +136,7 @@
   },
   {
     "file": "bridge/bridge.go",
-    "line": 690,
+    "line": 694,
     "citation": "ExchangeManager.ts:425-431",
     "resolved": "packages/protocol/src/protocol/ExchangeManager.ts",
     "identifier": "CloseSession",
@@ -145,7 +145,7 @@
   },
   {
     "file": "bridge/bridge.go",
-    "line": 1415,
+    "line": 1432,
     "citation": "Fabric.ts:408-415",
     "resolved": "packages/protocol/src/fabric/Fabric.ts",
     "identifier": "initiateForceClose",
@@ -154,7 +154,7 @@
   },
   {
     "file": "bridge/bridge.go",
-    "line": 1740,
+    "line": 1757,
     "citation": "Session.ts:248",
     "resolved": "packages/protocol/src/session/Session.ts",
     "identifier": "initiateClose",
@@ -397,7 +397,7 @@
   },
   {
     "file": "bridge/subscribe.go",
-    "line": 654,
+    "line": 665,
     "citation": "ServerSubscription.ts:866-876",
     "resolved": "packages/node/src/node/server/ServerSubscription.ts",
     "identifier": "InvalidSubscription",
@@ -406,7 +406,7 @@
   },
   {
     "file": "bridge/subscribe.go",
-    "line": 765,
+    "line": 776,
     "citation": "packages/protocol/src/interaction/InteractionMessenger.ts:347",
     "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
     "identifier": "sendDataReport",
@@ -415,7 +415,7 @@
   },
   {
     "file": "bridge/subscribe.go",
-    "line": 845,
+    "line": 856,
     "citation": "packages/node/src/node/server/ServerSubscription.ts:764",
     "resolved": "packages/node/src/node/server/ServerSubscription.ts",
     "identifier": "#sendUpdateMessage",
@@ -424,7 +424,7 @@
   },
   {
     "file": "bridge/subscribe.go",
-    "line": 1145,
+    "line": 1156,
     "citation": "ServerSubscription.ts:610-614",
     "resolved": "packages/node/src/node/server/ServerSubscription.ts",
     "identifier": "InvalidAction",
@@ -433,7 +433,7 @@
   },
   {
     "file": "bridge/subscribe.go",
-    "line": 1223,
+    "line": 1234,
     "citation": "ThermostatServer.ts:451",
     "resolved": "packages/node/src/behaviors/thermostat/ThermostatServer.ts",
     "identifier": "reactTo",
@@ -442,7 +442,7 @@
   },
   {
     "file": "bridge/subscribe.go",
-    "line": 1310,
+    "line": 1321,
     "citation": "packages/node/src/behavior/state/managed/Datasource.ts:776-796",
     "resolved": "packages/node/src/behavior/state/managed/Datasource.ts",
     "identifier": "onChange",
@@ -1636,7 +1636,7 @@
   },
   {
     "file": "controller/client/node.go",
-    "line": 409,
+    "line": 413,
     "citation": "NetworkClient.ts:60-102",
     "resolved": "packages/node/src/behavior/system/network/NetworkClient.ts",
     "identifier": "ClientNode",
@@ -2027,7 +2027,7 @@
   },
   {
     "file": "node/observers.go",
-    "line": 51,
+    "line": 52,
     "citation": "FabricManager.ts:253",
     "resolved": "packages/protocol/src/fabric/FabricManager.ts",
     "identifier": "deleted",
