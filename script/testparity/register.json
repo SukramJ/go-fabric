@@ -503,17 +503,19 @@
     },
     {
       "path": "packages/node/test/behavior/system/controller/discovery/DiscoveryCancelTest.ts",
-      "status": "partial",
+      "status": "ported",
       "go": [
-        "client/discovery:TestDiscoveryCancelParity"
+        "client/discovery:TestDiscoveryCancelParity",
+        "client/discovery:TestDiscoveryCancelWithRealDeviceParity"
       ],
-      "missing": [
-        "rejects with the cancel reason when the node fails to start after the cancel",
-        "does not commission a device whose PASE was in progress when the commissioning was canceled",
-        "does not commission a device whose PASE was in progress when the caller aborted",
-        "does not commission a device whose PASE was in progress when every scanner failed"
+      "left": [
+        {
+          "it": "rejects with the cancel reason when the node fails to start after the cancel",
+          "class": "js-runtime-only",
+          "reason": "a Go discovery session starts no node: the outcome after a cancel is the cancel reason with nothing left to fail (matter.js's ClientNode start inside the discovery, Discovery.ts:333-357)"
+        }
       ],
-      "reason": "The interruption of a discovery session (client/discovery Session, matter.js Discovery.ts:37-483 at 862ad75f) on fixed and failing transports: a cancel, the timeout and the caller's context before the result close the race, an interruption after it is ignored, the first reason stays, the outcome waits for the aborted attempts, and the failure of one transport against all. Missing: the node's start (a Go session starts no node) and the three real-device cases, which need a PASE held mid-way on fabrictest (no seam).",
+      "reason": "The interruption of a discovery session (client/discovery Session, matter.js Discovery.ts:37-483 at 862ad75f) on fixed and failing transports: a cancel, the timeout and the caller's context before the result close the race, an interruption after it is ignored, the first reason stays, the outcome waits for the aborted attempts, and the failure of one transport against all. The three real-device cases run a commissioning race against a fabrictest device whose PASE answers fabrictest.Network.Filter holds until the interruption (TestDiscoveryCancelWithRealDeviceParity). Left: the node's start (a Go session starts no node).",
       "snapshotSha": "1613033bcf3b348c3340969c197ef12d366c0995"
     },
     {
