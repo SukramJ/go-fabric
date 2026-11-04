@@ -519,6 +519,21 @@ cases of `MdnsSocketTest.ts` are `left` rows of the test register (phase
 drops what the later gates would keep, so it has no wire behaviour to
 mirror.
 
+### BD-Matter-AESCCMMatterOnly — AES-CCM with Matter's parameters only, and no AES-CMAC
+
+matter.js's crypto offers AES-CCM with a configurable tag length and L (an
+8-byte tag, a 12-byte nonce with L=3, the NIST SP 800-38C Example 3 KAT)
+and an AES-CMAC (`packages/general/test/crypto/aes/CcmTest.ts:230-301`,
+`StandardCryptoTest.ts:102-105` and `:270-303`,
+`packages/nodejs/test/crypto/NodeJsCryptoTest.ts:76-113` at `862ad75f`).
+`secure/aesccm` fixes Matter's parameters — a 13-byte nonce, a 16-byte tag,
+L=2 (`secure/aesccm/aesccm.go:19-25`) — and the module implements no
+AES-CMAC. Those cases are `left` rows of the test register (phase 33),
+and `CmacTest.ts` is excluded. Reasoning: every Matter protocol the
+module speaks uses AES-CCM-128 with these parameters (Core § 3.6) and none
+uses CMAC, so a configurable mode would add attack surface without a
+caller.
+
 ### BD-Matter-MessageCodec-PrivacyWithExtensions — a header with the privacy flag and message extensions is decoded
 
 matter.js `decodePacket` refuses a packet header that sets both the P and the

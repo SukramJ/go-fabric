@@ -64,68 +64,332 @@
     },
     {
       "path": "packages/general/test/crypto/EcdsaSignatureTest.ts",
-      "status": "planned",
-      "reason": "Phase 33: a new register root, ported by meaning in this phase.",
+      "status": "ported",
+      "go": [
+        "secure/sigma:TestEcdsaSignatureP1363ParityMatterJS",
+        "secure/mattercert:TestEcdsaSignatureDERParityMatterJS"
+      ],
+      "reason": "The 64-byte r ‖ s form (secure/sigma packECDSASig / unpackECDSASig, a wrong length refused) and the DER ECDSA-Sig-Value of a certificate read back to it, malformed DER refused (secure/mattercert derECDSASignature).",
       "snapshotSha": "378c316dd42037496c5ecfca7116cbb77a8316e2"
     },
     {
       "path": "packages/general/test/crypto/KeyTest.ts",
-      "status": "planned",
-      "reason": "Phase 33: a new register root, ported by meaning in this phase.",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "Decoding and re-encoding key formats (SEC1, PKCS#8, SPKI, PEM, raw public keys) into matter.js's Key record; the module reads keys with crypto/x509 and crypto/ecdh.",
       "snapshotSha": "55fc0d1e942b01ac70b1409ad12bc14cb72a18a2"
     },
     {
       "path": "packages/general/test/crypto/MlDsaTest.ts",
-      "status": "planned",
-      "reason": "Phase 33: a new register root, ported by meaning in this phase.",
+      "status": "partial",
+      "go": [
+        "controller/attestation:TestMlDsa"
+      ],
+      "missing": [
+        "rejects a public key of the wrong length"
+      ],
+      "left": [
+        {
+          "it": "signs chunked data as its concatenation",
+          "class": "js-runtime-only",
+          "reason": "signing a message given as JavaScript chunks; crypto/mldsa signs one byte slice"
+        },
+        {
+          "it": "rejects a private key whose public key does not belong to its seed",
+          "class": "js-runtime-only",
+          "reason": "matter.js's ML-DSA PrivateKey record carrying a seed and a public key that may disagree; a crypto/mldsa private key derives its public key from the seed"
+        },
+        {
+          "it": "derives the key from the crypto's entropy",
+          "class": "js-runtime-only",
+          "reason": "ML-DSA keys and signatures drawn from matter.js's injectable Crypto entropy; crypto/mldsa draws from crypto/rand"
+        },
+        {
+          "it": "hedges portable signatures with the crypto's entropy",
+          "class": "js-runtime-only",
+          "reason": "ML-DSA keys and signatures drawn from matter.js's injectable Crypto entropy; crypto/mldsa draws from crypto/rand"
+        },
+        {
+          "it": "verifies a ${parameterSet} signature from each backend with the other",
+          "class": "js-runtime-only",
+          "reason": "the choice between matter.js's native Node.js ML-DSA backend and its portable one, and restricted-provider behaviour; the module has one implementation, crypto/mldsa"
+        },
+        {
+          "it": "falls back to the portable implementation where native verification accepts a zero signature",
+          "class": "js-runtime-only",
+          "reason": "the choice between matter.js's native Node.js ML-DSA backend and its portable one, and restricted-provider behaviour; the module has one implementation, crypto/mldsa"
+        },
+        {
+          "it": "falls back to the portable implementation where the runtime rejects ML-DSA keys",
+          "class": "js-runtime-only",
+          "reason": "the choice between matter.js's native Node.js ML-DSA backend and its portable one, and restricted-provider behaviour; the module has one implementation, crypto/mldsa"
+        },
+        {
+          "it": "reports a native signing failure as a key error",
+          "class": "js-runtime-only",
+          "reason": "the choice between matter.js's native Node.js ML-DSA backend and its portable one, and restricted-provider behaviour; the module has one implementation, crypto/mldsa"
+        },
+        {
+          "it": "reports a native verification failure as a verify error",
+          "class": "js-runtime-only",
+          "reason": "the choice between matter.js's native Node.js ML-DSA backend and its portable one, and restricted-provider behaviour; the module has one implementation, crypto/mldsa"
+        },
+        {
+          "it": "does not substitute the portable implementation",
+          "class": "js-runtime-only",
+          "reason": "the choice between matter.js's native Node.js ML-DSA backend and its portable one, and restricted-provider behaviour; the module has one implementation, crypto/mldsa"
+        },
+        {
+          "it": "does not create keys with the portable implementation",
+          "class": "js-runtime-only",
+          "reason": "the choice between matter.js's native Node.js ML-DSA backend and its portable one, and restricted-provider behaviour; the module has one implementation, crypto/mldsa"
+        },
+        {
+          "it": "verifies with the provider's own implementation",
+          "class": "js-runtime-only",
+          "reason": "the choice between matter.js's native Node.js ML-DSA backend and its portable one, and restricted-provider behaviour; the module has one implementation, crypto/mldsa"
+        },
+        {
+          "it": "uses each operation natively where Node.js offers it",
+          "class": "js-runtime-only",
+          "reason": "the choice between matter.js's native Node.js ML-DSA backend and its portable one, and restricted-provider behaviour; the module has one implementation, crypto/mldsa"
+        },
+        {
+          "it": "neither probes nor substitutes signing under a restricted provider",
+          "class": "js-runtime-only",
+          "reason": "the choice between matter.js's native Node.js ML-DSA backend and its portable one, and restricted-provider behaviour; the module has one implementation, crypto/mldsa"
+        }
+      ],
+      "reason": "ML-DSA (PQC Phase 1, a forward feature) by meaning on controller/attestation: the RFC 9881 OIDs, the Annex H certificates' algorithms and SubjectPublicKeyInfo round trip, malformed key info refused, verification and its refusals, generated keys, the seed length. Missing: a public key of the wrong length refused by the signature check itself.",
       "snapshotSha": "485deba2013fee6ad20d28ee00eed37a2d53c2b6"
     },
     {
       "path": "packages/general/test/crypto/NodeJsStyleCryptoTest.ts",
-      "status": "planned",
-      "reason": "Phase 33: a new register root, ported by meaning in this phase.",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "The OpenSSL algorithm names matter.js's Node.js-style crypto adapter asks for; the module hashes with the Go standard library.",
       "snapshotSha": "dd66f1140d655c130495631fcc4b95b3e0ea1a7d"
     },
     {
       "path": "packages/general/test/crypto/PemTest.ts",
-      "status": "planned",
-      "reason": "Phase 33: a new register root, ported by meaning in this phase.",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "matter.js's PEM wrapper (block kinds, BEGIN/END lines, DER passthrough); the module uses encoding/pem.",
       "snapshotSha": "c1a061070c356e54ed8a1c53f5b4d6c176a8a9a9"
     },
     {
       "path": "packages/general/test/crypto/Spake2pTest.ts",
-      "status": "planned",
-      "reason": "Phase 33: a new register root, ported by meaning in this phase.",
+      "status": "partial",
+      "go": [
+        "secure/spake2:TestParityMatterJS_Spake2_Vectors",
+        "secure/spake2:TestEphemeralScalarBoundParityMatterJS"
+      ],
+      "missing": [
+        "generates the correct context hash"
+      ],
+      "reason": "The IETF draft-01 vectors (X, Y, both sides' shared secret and confirmations) and the ephemeral scalar drawn below the group order n — secure/spake2. Missing: the PASE context hash against chip's captured vector; the module computes it inline in the PASE responder and initiator (bridge/handlers.go, client/handshake) without a test on that vector.",
       "snapshotSha": "69e227ddc3f8408373f3bc0bee4087b638f18fef"
     },
     {
       "path": "packages/general/test/crypto/StandardCryptoTest.ts",
-      "status": "planned",
-      "reason": "Phase 33: a new register root, ported by meaning in this phase.",
+      "status": "ported",
+      "go": [
+        "secure/aesccm:TestStandardCryptoAeadParityMatterJS",
+        "controller/ca:TestCompressedFabricIDHkdfParityMatterJS",
+        "secure/sigma:TestDhSharedSecretParityMatterJS"
+      ],
+      "left": [
+        {
+          "it": "signs & verifies",
+          "class": "js-runtime-only",
+          "reason": "matter.js's ECDSA signing and key generation over its Key records (raw, SEC1, SPKI) and Node.js key objects; the module signs and generates P-256 keys with crypto/ecdsa and crypto/ecdh"
+        },
+        {
+          "it": "signs & verifies with SEC1/SPKI keys",
+          "class": "js-runtime-only",
+          "reason": "matter.js's ECDSA signing and key generation over its Key records (raw, SEC1, SPKI) and Node.js key objects; the module signs and generates P-256 keys with crypto/ecdsa and crypto/ecdh"
+        },
+        {
+          "it": "generates a working DSA key pair",
+          "class": "js-runtime-only",
+          "reason": "matter.js's ECDSA signing and key generation over its Key records (raw, SEC1, SPKI) and Node.js key objects; the module signs and generates P-256 keys with crypto/ecdsa and crypto/ecdh"
+        },
+        {
+          "it": "creates correct EC hash",
+          "class": "js-runtime-only",
+          "reason": "matter.js's Crypto hashing API over JavaScript buffers, streams and its algorithm registry; the module hashes with crypto/sha256 and the other Go standard library digests where it needs them"
+        },
+        {
+          "it": "cmac matches RFC 4493 Example 2 via the Crypto abstraction",
+          "class": "by-design",
+          "reason": "BD-Matter-AESCCMMatterOnly: secure/aesccm is AES-CCM with Matter's 13-byte nonce, 16-byte tag and L=2 only; a tag-8, 12-byte-nonce or L=3 form, and AES-CMAC, have no caller in Matter"
+        },
+        {
+          "it": "produces the 20-byte RFC 5280 method-1 digest",
+          "class": "js-runtime-only",
+          "reason": "matter.js's Crypto hashing API over JavaScript buffers, streams and its algorithm registry; the module hashes with crypto/sha256 and the other Go standard library digests where it needs them"
+        },
+        {
+          "it": "maps algorithms to their RFC 6920 registry identifiers",
+          "class": "js-runtime-only",
+          "reason": "matter.js's Crypto hashing API over JavaScript buffers, streams and its algorithm registry; the module hashes with crypto/sha256 and the other Go standard library digests where it needs them"
+        },
+        {
+          "it": "resolves registry identifiers back to algorithm names",
+          "class": "js-runtime-only",
+          "reason": "matter.js's Crypto hashing API over JavaScript buffers, streams and its algorithm registry; the module hashes with crypto/sha256 and the other Go standard library digests where it needs them"
+        },
+        {
+          "it": "returns undefined for unsupported identifiers",
+          "class": "js-runtime-only",
+          "reason": "matter.js's Crypto hashing API over JavaScript buffers, streams and its algorithm registry; the module hashes with crypto/sha256 and the other Go standard library digests where it needs them"
+        },
+        {
+          "it": "computes hash via computeHash",
+          "class": "js-runtime-only",
+          "reason": "matter.js's Crypto hashing API over JavaScript buffers, streams and its algorithm registry; the module hashes with crypto/sha256 and the other Go standard library digests where it needs them"
+        },
+        {
+          "it": "computes hash via computeSha256()",
+          "class": "js-runtime-only",
+          "reason": "matter.js's Crypto hashing API over JavaScript buffers, streams and its algorithm registry; the module hashes with crypto/sha256 and the other Go standard library digests where it needs them"
+        },
+        {
+          "it": "computeSha256() produces same result as computeHash(1)",
+          "class": "js-runtime-only",
+          "reason": "matter.js's Crypto hashing API over JavaScript buffers, streams and its algorithm registry; the module hashes with crypto/sha256 and the other Go standard library digests where it needs them"
+        },
+        {
+          "it": "produces different hashes for different inputs",
+          "class": "js-runtime-only",
+          "reason": "matter.js's Crypto hashing API over JavaScript buffers, streams and its algorithm registry; the module hashes with crypto/sha256 and the other Go standard library digests where it needs them"
+        },
+        {
+          "it": "handles array of buffers",
+          "class": "js-runtime-only",
+          "reason": "matter.js's Crypto hashing API over JavaScript buffers, streams and its algorithm registry; the module hashes with crypto/sha256 and the other Go standard library digests where it needs them"
+        },
+        {
+          "it": "computes the ${alg} example value",
+          "class": "js-runtime-only",
+          "reason": "matter.js's Crypto hashing API over JavaScript buffers, streams and its algorithm registry; the module hashes with crypto/sha256 and the other Go standard library digests where it needs them"
+        },
+        {
+          "it": "computes ${alg} over chunks and streams",
+          "class": "js-runtime-only",
+          "reason": "matter.js's Crypto hashing API over JavaScript buffers, streams and its algorithm registry; the module hashes with crypto/sha256 and the other Go standard library digests where it needs them"
+        },
+        {
+          "it": "computes SHA3-256 where Web Crypto lacks it",
+          "class": "js-runtime-only",
+          "reason": "matter.js's Crypto hashing API over JavaScript buffers, streams and its algorithm registry; the module hashes with crypto/sha256 and the other Go standard library digests where it needs them"
+        },
+        {
+          "it": "computes ${alg} via computeHash",
+          "class": "js-runtime-only",
+          "reason": "matter.js's Crypto hashing API over JavaScript buffers, streams and its algorithm registry; the module hashes with crypto/sha256 and the other Go standard library digests where it needs them"
+        },
+        {
+          "it": "supports array of buffers",
+          "class": "js-runtime-only",
+          "reason": "matter.js's Crypto hashing API over JavaScript buffers, streams and its algorithm registry; the module hashes with crypto/sha256 and the other Go standard library digests where it needs them"
+        },
+        {
+          "it": "produces different hashes for different inputs",
+          "class": "js-runtime-only",
+          "reason": "matter.js's Crypto hashing API over JavaScript buffers, streams and its algorithm registry; the module hashes with crypto/sha256 and the other Go standard library digests where it needs them"
+        },
+        {
+          "it": "encrypts with an 8-byte tag (nonce=13, L=2)",
+          "class": "by-design",
+          "reason": "BD-Matter-AESCCMMatterOnly: secure/aesccm is AES-CCM with Matter's 13-byte nonce, 16-byte tag and L=2 only; a tag-8, 12-byte-nonce or L=3 form, and AES-CMAC, have no caller in Matter"
+        },
+        {
+          "it": "round-trips tag-8 with a 12-byte nonce (L=3)",
+          "class": "by-design",
+          "reason": "BD-Matter-AESCCMMatterOnly: secure/aesccm is AES-CCM with Matter's 13-byte nonce, 16-byte tag and L=2 only; a tag-8, 12-byte-nonce or L=3 form, and AES-CMAC, have no caller in Matter"
+        },
+        {
+          "it": "encrypts/decrypts the NIST SP 800-38C Example 3 KAT (nonce=12, L=3, tag=8)",
+          "class": "by-design",
+          "reason": "BD-Matter-AESCCMMatterOnly: secure/aesccm is AES-CCM with Matter's 13-byte nonce, 16-byte tag and L=2 only; a tag-8, 12-byte-nonce or L=3 form, and AES-CMAC, have no caller in Matter"
+        }
+      ],
+      "reason": "The AEAD vectors on secure/aesccm, the HKDF vector as the compressed fabric id (controller/ca CompressedFabricID) and the ECDH shared secret (secure/sigma ecdhSharedSecret).",
       "snapshotSha": "68339c4328af4619c6504c483507931f8afcdb23"
     },
     {
       "path": "packages/general/test/crypto/X509Test.ts",
-      "status": "planned",
-      "reason": "Phase 33: a new register root, ported by meaning in this phase.",
+      "status": "partial",
+      "go": [
+        "secure/mattercert:TestX509ExtensionsParityMatterJS"
+      ],
+      "missing": [
+        "rejects a path length on a non-CA certificate"
+      ],
+      "reason": "Extended key usage (none, the known values, an unsupported one refused), basic constraints and key usage encoded — the X.509 extensions of a certificate's DER form (secure/mattercert tbs_der.go). Missing: a path length on a non-CA certificate refused; the DER writer writes the path length the certificate's TLV carries, as chip's conversion does, so a signature over it still verifies.",
       "snapshotSha": "e1307c27b0e3fe11199afabb109c191541ac8856"
     },
     {
       "path": "packages/general/test/crypto/aes/AesTest.ts",
-      "status": "planned",
-      "reason": "Phase 33: a new register root, ported by meaning in this phase.",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "matter.js's own JavaScript AES block cipher run over the NIST vectors; the module uses crypto/aes.",
       "snapshotSha": "8e3f4399c449e28be545411e3543e3009d1d7614"
     },
     {
       "path": "packages/general/test/crypto/aes/CcmTest.ts",
-      "status": "planned",
-      "reason": "Phase 33: a new register root, ported by meaning in this phase.",
+      "status": "ported",
+      "go": [
+        "secure/aesccm:TestCcmVectorsParityMatterJS",
+        "secure/aesccm:TestCcmTagVerificationParityMatterJS",
+        "secure/aesccm:TestNIST_SP80038C_Example4_RoundTrip"
+      ],
+      "left": [
+        {
+          "it": "encrypts plaintext and adata supplied at a non-zero byteOffset",
+          "class": "js-runtime-only",
+          "reason": "plaintext and associated data passed as JavaScript typed-array views at a byte offset; a Go slice carries no offset to get wrong"
+        },
+        {
+          "it": "encrypts with an 8-byte tag",
+          "class": "by-design",
+          "reason": "BD-Matter-AESCCMMatterOnly: secure/aesccm is AES-CCM with Matter's 13-byte nonce, 16-byte tag and L=2 only; a tag-8, 12-byte-nonce or L=3 form, and AES-CMAC, have no caller in Matter"
+        },
+        {
+          "it": "round-trips with an 8-byte tag",
+          "class": "by-design",
+          "reason": "BD-Matter-AESCCMMatterOnly: secure/aesccm is AES-CCM with Matter's 13-byte nonce, 16-byte tag and L=2 only; a tag-8, 12-byte-nonce or L=3 form, and AES-CMAC, have no caller in Matter"
+        },
+        {
+          "it": "round-trips a 12-byte-nonce/tag-8 payload",
+          "class": "by-design",
+          "reason": "BD-Matter-AESCCMMatterOnly: secure/aesccm is AES-CCM with Matter's 13-byte nonce, 16-byte tag and L=2 only; a tag-8, 12-byte-nonce or L=3 form, and AES-CMAC, have no caller in Matter"
+        },
+        {
+          "it": "round-trips an L=3 payload larger than the L=2 ciphertext cap (2^16)",
+          "class": "by-design",
+          "reason": "BD-Matter-AESCCMMatterOnly: secure/aesccm is AES-CCM with Matter's 13-byte nonce, 16-byte tag and L=2 only; a tag-8, 12-byte-nonce or L=3 form, and AES-CMAC, have no caller in Matter"
+        },
+        {
+          "it": "encrypts to the NIST reference ciphertext+tag",
+          "class": "by-design",
+          "reason": "BD-Matter-AESCCMMatterOnly: secure/aesccm is AES-CCM with Matter's 13-byte nonce, 16-byte tag and L=2 only; a tag-8, 12-byte-nonce or L=3 form, and AES-CMAC, have no caller in Matter"
+        },
+        {
+          "it": "decrypts the NIST reference ciphertext+tag back to the plaintext",
+          "class": "by-design",
+          "reason": "BD-Matter-AESCCMMatterOnly: secure/aesccm is AES-CCM with Matter's 13-byte nonce, 16-byte tag and L=2 only; a tag-8, 12-byte-nonce or L=3 form, and AES-CMAC, have no caller in Matter"
+        }
+      ],
+      "reason": "Every vector of the file (NIST CCM vectors within Matter's constraints and matter.js's diagnostic ones) encrypted and decrypted, a tag tampered in each 32-bit word and a wrong key refused — secure/aesccm.",
       "snapshotSha": "0b9fe4ce51f6b913fe5d696ebc0df0974bf36cfa"
     },
     {
       "path": "packages/general/test/crypto/aes/CmacTest.ts",
-      "status": "planned",
-      "reason": "Phase 33: a new register root, ported by meaning in this phase.",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "matter.js's AES-CMAC over its own JavaScript AES; the module implements no AES-CMAC — Matter's protocols use AES-CCM and HKDF (BD-Matter-AESCCMMatterOnly).",
       "snapshotSha": "695b580849dba67bf2d5ab27249680e0c9a146c7"
     },
     {
@@ -172,8 +436,12 @@
     },
     {
       "path": "packages/general/test/math/VerhoeffTest.ts",
-      "status": "planned",
-      "reason": "Phase 33: a new register root, ported by meaning in this phase.",
+      "status": "ported",
+      "go": [
+        "secure/setup:TestVerhoeffParityMatterJS",
+        "secure/setup:TestManualCode_VerhoeffSelfCheck"
+      ],
+      "reason": "The Verhoeff check digit of \"236\" (secure/setup verhoeffCheck, the digit a manual pairing code closes with).",
       "snapshotSha": "5965c150719256bfa2f113546078131c265a188c"
     },
     {
@@ -944,8 +1212,9 @@
     },
     {
       "path": "packages/general/test/util/BytesTest.ts",
-      "status": "planned",
-      "reason": "Phase 33: a new register root, ported by meaning in this phase.",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "matter.js's Bytes helpers over JavaScript typed arrays (hex, base64, string, concat, views); the module uses encoding/hex, encoding/base64 and Go byte slices.",
       "snapshotSha": "7771ed20270fadad56a3ea4d1377b6df96991db0"
     },
     {
@@ -1062,8 +1331,9 @@
     },
     {
       "path": "packages/general/test/util/IpTest.ts",
-      "status": "planned",
-      "reason": "Phase 33: a new register root, ported by meaning in this phase.",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "matter.js's IP string helpers (isIPv4/isIPv6, address to number, array and byte conversions, onSameNetwork over string masks); the module parses and compares addresses with net/netip and has no counterpart of these helpers.",
       "snapshotSha": "412146f763f80a08db9fed2c90ddf018c55872d6"
     },
     {
@@ -1117,8 +1387,9 @@
     },
     {
       "path": "packages/general/test/util/NumberTest.ts",
-      "status": "planned",
-      "reason": "Phase 33: a new register root, ported by meaning in this phase.",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "matter.js's number helpers over JavaScript numbers and bigints (toNumber, minValue/maxValue with undefined operands, toHex, cropValueRange, addValueWithOverflow); the module has no counterpart of these helpers.",
       "snapshotSha": "ee0739faab0a9dfb4bae746cc0fd808a7aa0da5d"
     },
     {
@@ -5665,8 +5936,107 @@
     },
     {
       "path": "packages/nodejs/test/crypto/NodeJsCryptoTest.ts",
-      "status": "planned",
-      "reason": "Phase 33: a new register root, ported by meaning in this phase.",
+      "status": "ported",
+      "go": [
+        "secure/aesccm:TestStandardCryptoAeadParityMatterJS",
+        "secure/sigma:TestDeriveOperationalIPKMatchesMatterJSVector",
+        "groups:TestGroupSessionIDDerivationParityMatterJS",
+        "secure/sigma:TestDhSharedSecretParityMatterJS",
+        "secure/aesccm:TestOpenRejectsTooShort"
+      ],
+      "left": [
+        {
+          "it": "tag-8 L=3 output matches StandardCrypto byte-for-byte",
+          "class": "by-design",
+          "reason": "BD-Matter-AESCCMMatterOnly: secure/aesccm is AES-CCM with Matter's 13-byte nonce, 16-byte tag and L=2 only; a tag-8, 12-byte-nonce or L=3 form, and AES-CMAC, have no caller in Matter"
+        },
+        {
+          "it": "rejects an illegal tagLength",
+          "class": "by-design",
+          "reason": "BD-Matter-AESCCMMatterOnly: secure/aesccm is AES-CCM with Matter's 13-byte nonce, 16-byte tag and L=2 only; a tag-8, 12-byte-nonce or L=3 form, and AES-CMAC, have no caller in Matter"
+        },
+        {
+          "it": "rejects ciphertext shorter than the tag",
+          "class": "by-design",
+          "reason": "BD-Matter-AESCCMMatterOnly: secure/aesccm is AES-CCM with Matter's 13-byte nonce, 16-byte tag and L=2 only; a tag-8, 12-byte-nonce or L=3 form, and AES-CMAC, have no caller in Matter; a sealed input shorter than the 16-byte tag is refused (TestOpenRejectsTooShort)"
+        },
+        {
+          "it": "signs data with known private key",
+          "class": "js-runtime-only",
+          "reason": "matter.js's ECDSA signing and key generation over its Key records (raw, SEC1, SPKI) and Node.js key objects; the module signs and generates P-256 keys with crypto/ecdsa and crypto/ecdh"
+        },
+        {
+          "it": "signs data with known sec1 key",
+          "class": "js-runtime-only",
+          "reason": "matter.js's ECDSA signing and key generation over its Key records (raw, SEC1, SPKI) and Node.js key objects; the module signs and generates P-256 keys with crypto/ecdsa and crypto/ecdh"
+        },
+        {
+          "it": "generates a working key pair",
+          "class": "js-runtime-only",
+          "reason": "matter.js's ECDSA signing and key generation over its Key records (raw, SEC1, SPKI) and Node.js key objects; the module signs and generates P-256 keys with crypto/ecdsa and crypto/ecdh"
+        },
+        {
+          "it": "hash with single chunk",
+          "class": "js-runtime-only",
+          "reason": "matter.js's Crypto hashing API over JavaScript buffers, streams and its algorithm registry; the module hashes with crypto/sha256 and the other Go standard library digests where it needs them"
+        },
+        {
+          "it": "hash with multiple chunks",
+          "class": "js-runtime-only",
+          "reason": "matter.js's Crypto hashing API over JavaScript buffers, streams and its algorithm registry; the module hashes with crypto/sha256 and the other Go standard library digests where it needs them"
+        },
+        {
+          "it": "hash with async iterator",
+          "class": "js-runtime-only",
+          "reason": "matter.js's Crypto hashing API over JavaScript buffers, streams and its algorithm registry; the module hashes with crypto/sha256 and the other Go standard library digests where it needs them"
+        },
+        {
+          "it": "Has with ReadableStream",
+          "class": "js-runtime-only",
+          "reason": "matter.js's Crypto hashing API over JavaScript buffers, streams and its algorithm registry; the module hashes with crypto/sha256 and the other Go standard library digests where it needs them"
+        },
+        {
+          "it": "computes SHA-256 via computeHash",
+          "class": "js-runtime-only",
+          "reason": "matter.js's Crypto hashing API over JavaScript buffers, streams and its algorithm registry; the module hashes with crypto/sha256 and the other Go standard library digests where it needs them"
+        },
+        {
+          "it": "computeSha256() produces same result as computeHash",
+          "class": "js-runtime-only",
+          "reason": "matter.js's Crypto hashing API over JavaScript buffers, streams and its algorithm registry; the module hashes with crypto/sha256 and the other Go standard library digests where it needs them"
+        },
+        {
+          "it": "supports streaming",
+          "class": "js-runtime-only",
+          "reason": "matter.js's Crypto hashing API over JavaScript buffers, streams and its algorithm registry; the module hashes with crypto/sha256 and the other Go standard library digests where it needs them"
+        },
+        {
+          "it": "supports array of buffers",
+          "class": "js-runtime-only",
+          "reason": "matter.js's Crypto hashing API over JavaScript buffers, streams and its algorithm registry; the module hashes with crypto/sha256 and the other Go standard library digests where it needs them"
+        },
+        {
+          "it": "computes ${alg} via computeHash",
+          "class": "js-runtime-only",
+          "reason": "matter.js's Crypto hashing API over JavaScript buffers, streams and its algorithm registry; the module hashes with crypto/sha256 and the other Go standard library digests where it needs them"
+        },
+        {
+          "it": "supports streaming",
+          "class": "js-runtime-only",
+          "reason": "matter.js's Crypto hashing API over JavaScript buffers, streams and its algorithm registry; the module hashes with crypto/sha256 and the other Go standard library digests where it needs them"
+        },
+        {
+          "it": "supports array of buffers",
+          "class": "js-runtime-only",
+          "reason": "matter.js's Crypto hashing API over JavaScript buffers, streams and its algorithm registry; the module hashes with crypto/sha256 and the other Go standard library digests where it needs them"
+        },
+        {
+          "it": "produces different hashes for different inputs",
+          "class": "js-runtime-only",
+          "reason": "matter.js's Crypto hashing API over JavaScript buffers, streams and its algorithm registry; the module hashes with crypto/sha256 and the other Go standard library digests where it needs them"
+        }
+      ],
+      "reason": "The AEAD vectors on secure/aesccm, the group key derivation (GroupKey v1.0) on the operational IPK derivation, the group session id (GroupKeyHash, 0xB9F7) on groups.SessionID and the ECDH shared secret.",
       "snapshotSha": "79d6a5ea34fbb8276cd395ade7ab7f750c9eb786"
     },
     {
@@ -8373,8 +8743,23 @@
     },
     {
       "path": "packages/types/test/protocol/TlvInvokeRequestTest.ts",
-      "status": "planned",
-      "reason": "Phase 33: a new register root, ported by meaning in this phase.",
+      "status": "partial",
+      "go": [
+        "im:TestTlvInvokeRequestParityMatterJS",
+        "node:TestDelayReportDataParity"
+      ],
+      "missing": [
+        "encodes DelayReportDataIB with context tags 0 and 1",
+        "round-trips DelayReportData in context tag 3"
+      ],
+      "left": [
+        {
+          "it": "is skipped by a decoder that does not know the field",
+          "class": "js-runtime-only",
+          "reason": "a second TLV schema object without the field; the module's one InvokeRequest decoder reads tag 3 and skips other unknown context tags"
+        }
+      ],
+      "reason": "The decode side of DelayReportData on im.UnmarshalInvokeRequestTLV: tag 3 with its two fields (the decode half of the round trip), a request without it, a missing field as 0, a value that is not a structure refused. Missing: the module has no DelayReportData encoder (its client sends none), so the encoded bytes are not asserted.",
       "snapshotSha": "a128398457c1e9540f4ec396692315b36f110286"
     },
     {
