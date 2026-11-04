@@ -6206,21 +6206,21 @@
       "identifier": "TestCloseBehaviour",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/exchange_test.go",
-      "line": 425
+      "line": 441
     },
     {
       "package": "client/exchange",
       "identifier": "TestCloseSessionSendsCloseSession",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/exchange_test.go",
-      "line": 665
+      "line": 692
     },
     {
       "package": "client/exchange",
       "identifier": "TestCloseTimerExpires",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/exchange_test.go",
-      "line": 503
+      "line": 521
     },
     {
       "package": "client/exchange",
@@ -6234,28 +6234,28 @@
       "identifier": "TestDefaultsAndAccessors",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/exchange_test.go",
-      "line": 774
+      "line": 807
     },
     {
       "package": "client/exchange",
       "identifier": "TestDuplicateIsAckedAtOnceAndNotDelivered",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/exchange_test.go",
-      "line": 159
+      "line": 168
     },
     {
       "package": "client/exchange",
       "identifier": "TestExchangeCapEvictsLeastRecentlyActive",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/exchange_test.go",
-      "line": 528
+      "line": 548
     },
     {
       "package": "client/exchange",
       "identifier": "TestExchangeIDsAreConsecutiveAndIndexedApart",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/exchange_test.go",
-      "line": 35
+      "line": 36
     },
     {
       "package": "client/exchange",
@@ -6290,14 +6290,14 @@
       "identifier": "TestHandlerNotForUnsecuredOrSecureChannel",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/handler_test.go",
-      "line": 108
+      "line": 111
     },
     {
       "package": "client/exchange",
       "identifier": "TestHandlerTakesPeerOpenedIMExchange",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/handler_test.go",
-      "line": 53
+      "line": 54
     },
     {
       "package": "client/exchange",
@@ -6444,7 +6444,7 @@
       "identifier": "TestNextTimeoutIsMaxPeerResponseTime",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/exchange_test.go",
-      "line": 389
+      "line": 403
     },
     {
       "package": "client/exchange",
@@ -6458,7 +6458,7 @@
       "identifier": "TestPBKDFParamRequestIsRefused",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/handler_test.go",
-      "line": 244
+      "line": 247
     },
     {
       "package": "client/exchange",
@@ -6514,14 +6514,14 @@
       "identifier": "TestPeerLostHook",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/exchange_test.go",
-      "line": 612
+      "line": 636
     },
     {
       "package": "client/exchange",
       "identifier": "TestPeerOpenedExchangeOnClosingSessionDeclined",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/handler_test.go",
-      "line": 271
+      "line": 273
     },
     {
       "package": "client/exchange",
@@ -6542,7 +6542,7 @@
       "identifier": "TestReliableManagerRunsNoMRP",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/reliable_test.go",
-      "line": 20
+      "line": 21
     },
     {
       "package": "client/exchange",
@@ -6556,49 +6556,49 @@
       "identifier": "TestRetransmissionOptions",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/exchange_test.go",
-      "line": 307
+      "line": 324
     },
     {
       "package": "client/exchange",
       "identifier": "TestRetransmissionSchedule",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/exchange_test.go",
-      "line": 247
+      "line": 262
     },
     {
       "package": "client/exchange",
       "identifier": "TestSecondReliableMessageAcksTheFirstAtOnce",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/exchange_test.go",
-      "line": 195
+      "line": 206
     },
     {
       "package": "client/exchange",
       "identifier": "TestSecondSendWhileUnackedIsFlowError",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/exchange_test.go",
-      "line": 140
+      "line": 147
     },
     {
       "package": "client/exchange",
       "identifier": "TestSecureSessionRoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/exchange_test.go",
-      "line": 573
+      "line": 595
     },
     {
       "package": "client/exchange",
       "identifier": "TestSendContextCancelled",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/exchange_test.go",
-      "line": 343
+      "line": 362
     },
     {
       "package": "client/exchange",
       "identifier": "TestSendWaitsForAckAndPiggybacksOwedAck",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/exchange_test.go",
-      "line": 97
+      "line": 102
     },
     {
       "package": "client/exchange",
@@ -6612,35 +6612,35 @@
       "identifier": "TestSessionIDAllocation",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/exchange_test.go",
-      "line": 692
+      "line": 721
     },
     {
       "package": "client/exchange",
       "identifier": "TestShutdownWaitsForTheHandlers",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/handler_test.go",
-      "line": 302
+      "line": 306
     },
     {
       "package": "client/exchange",
       "identifier": "TestSigma1ReachesHandlerOnInboundSession",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/handler_test.go",
-      "line": 172
+      "line": 174
     },
     {
       "package": "client/exchange",
       "identifier": "TestSigma1WithoutHandlerIsAcknowledged",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/handler_test.go",
-      "line": 226
+      "line": 227
     },
     {
       "package": "client/exchange",
       "identifier": "TestStatusReportTravelsOnSecureChannel",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/exchange_test.go",
-      "line": 222
+      "line": 235
     },
     {
       "package": "client/exchange",
@@ -6654,14 +6654,14 @@
       "identifier": "TestUnsecuredSessionParameters",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/exchange_test.go",
-      "line": 737
+      "line": 768
     },
     {
       "package": "client/exchange",
       "identifier": "TestUnsolicitedMessageWithoutAckIsDropped",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/exchange_test.go",
-      "line": 71
+      "line": 74
     },
     {
       "package": "client/exchange",
