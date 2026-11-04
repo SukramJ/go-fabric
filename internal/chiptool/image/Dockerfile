@@ -93,5 +93,5 @@ RUN --mount=type=cache,sharing=locked,target=/var/cache/apt \
     --mount=type=cache,sharing=locked,target=/var/lib/apt \
     apt-get -qq update && apt-get -qq -y install --no-install-recommends python3-pip patch && \
     pip install --break-system-packages --no-cache-dir -r /src/tools/push_av_server/requirements.txt && \
-    patch -d "$(pip show hypercorn | sed -n 's/^Location: //p')" < /src/tools/push_av_server/hypercorn.patch && \
+    patch -d "$(python3 -c 'import hypercorn, os; print(os.path.dirname(os.path.dirname(hypercorn.__file__)))')" -p0 < /src/tools/push_av_server/hypercorn.patch && \
     apt-get -qq -y purge python3-pip && apt-get -qq -y autoremove
