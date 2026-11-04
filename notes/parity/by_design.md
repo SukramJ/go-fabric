@@ -484,6 +484,25 @@ versus SDK interpretation issue and applies it only in part, so the module
 keeps the value as encoded and leaves the null-or-empty reading to the host
 that consumes it.
 
+### BD-Matter-SetupCodecShape — the setup-code codecs always validate, take no flow and encode no TLV data
+
+matter.js's pairing-code codecs can skip validation on decode
+(`Schema.decode(encoded, validate = true)`,
+`packages/types/src/schema/Schema.ts:18` at `862ad75f`), take a
+commissioning flow on a manual-code encode and refuse a non-standard one
+without VID/PID (`packages/types/src/schema/PairingCodeSchema.ts:430-437`),
+and build a QR code's TLV data from a record (`encodeTlvData`, `:386-392`,
+refusing PBKDF iterations without salt and a reserved tag). `secure/setup`
+decodes with validation always on (`DecodeQRCode`, `DecodeManualCode`,
+`DecodeExtra`), offers `ManualCode` as the standard-flow code and
+`ManualCodeLong` as the one carrying VID/PID, and writes a QR code's TLV
+data as the bytes a caller gives (`Extra.Raw`). Twelve
+`PairingCodeSchemaTest.ts` cases are `left` rows of the test register
+(phase 33); the decode halves of the TLV-data cases are ported. Reasoning:
+the module reads codes to commission and prints the standard-flow codes of
+its own node, so a validation switch, a flow argument and a TLV-data
+builder would serve no caller.
+
 ### BD-Matter-MessageCodec-PrivacyWithExtensions — a header with the privacy flag and message extensions is decoded
 
 matter.js `decodePacket` refuses a packet header that sets both the P and the

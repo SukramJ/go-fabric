@@ -15,10 +15,10 @@ names the `it` cases that will not be ported, each with its class and reason. Th
 
 | status | files |
 | --- | ---: |
-| ported | 133 |
+| ported | 135 |
 | partial | 131 |
-| planned | 50 |
-| excluded | 274 |
+| planned | 45 |
+| excluded | 277 |
 | total | 588 |
 
 ## Per directory
@@ -163,7 +163,7 @@ names the `it` cases that will not be ported, each with its class and reason. Th
 | [types/test/common](#typestestcommon) | 1 | 0 | 0 | 0 | 1 |
 | [types/test/datatype](#typestestdatatype) | 4 | 0 | 0 | 0 | 4 |
 | [types/test/protocol](#typestestprotocol) | 1 | 0 | 0 | 1 | 0 |
-| [types/test/schema](#typestestschema) | 5 | 0 | 0 | 5 | 0 |
+| [types/test/schema](#typestestschema) | 5 | 2 | 0 | 0 | 3 |
 | [types/test/tlv](#typestesttlv) | 13 | 8 | 3 | 0 | 2 |
 
 ## general/test
@@ -1430,11 +1430,11 @@ names the `it` cases that will not be ported, each with its class and reason. Th
 
 | file | lines | status | Go tests or class | note |
 | --- | ---: | --- | --- | --- |
-| Base38SchemaTest.ts | 50 | planned | — | Phase 33: a new register root, ported by meaning in this phase. |
-| BitmapSchemaTest.ts | 138 | planned | — | Phase 33: a new register root, ported by meaning in this phase. |
-| PairingCodeSchemaTest.ts | 580 | planned | — | Phase 33: a new register root, ported by meaning in this phase. |
-| QrCodeSchemaTest.ts | 34 | planned | — | Phase 33: a new register root, ported by meaning in this phase. |
-| SpecificationVersionSchemaTest.ts | 30 | planned | — | Phase 33: a new register root, ported by meaning in this phase. |
+| Base38SchemaTest.ts | 50 | ported | `secure/setup:TestBase38SchemaParityMatterJS`<br>`secure/setup:TestQRCode_RoundTrip` | The vector encoded and decoded, every length from 1 to 24 bytes read back, a length no group count produces and a group above its byte width refused (secure/setup base38Encode / base38Decode). |
+| BitmapSchemaTest.ts | 138 | excluded | `js-runtime-only` | BitmapSchema and ByteArrayBitmapSchema convert JavaScript records of flags and bit fields to and from integers and byte arrays; Go bitmaps are integers with generated named bits, and the setup payload's fields are packed by secure/setup itself. |
+| PairingCodeSchemaTest.ts | 580 | ported | `secure/setup:TestQrPairingCodeCodecParityMatterJS`<br>`secure/setup:TestQrCodeTlvDataParityMatterJS`<br>`secure/setup:TestAssertValidPayloadIdentityParityMatterJS`<br>`secure/setup:TestManualPairingCodeCodecParityMatterJS`<br>`secure/setup:TestIsValidPasscodeParityMatterJS`<br>`secure/setup:TestDecodeQRCode_MatterJSVectors`<br>`secure/setup:TestDecodeManualCode_MatterJSVectors`<br>`secure/setup:TestManualCode_KnownVectors`<br>`secure/setup:TestQRCode_TooLong`<br>`secure/setup:TestDecodeExtra` | The QR and manual vectors encoded and decoded, a multi code, the maximum length, passcode, version and vendor/product validation, VID_PID_PRESENT against the length (refused whatever the validation, as the Go decoder always validates), the commissioning-flow forms as ManualCode / ManualCodeLong, the decode halves of the TLV-data cases (serial number as string and number, a vendor element, PBKDF both-or-neither, the tag ranges), assertValidPayloadIdentity and isValidPasscode — secure/setup. Left: “QrPairingCodeCodec > decodes an invalid passcode when validation is disabled” (by-design: BD-Matter-SetupCodecShape: the Go decoders always validate; matter.js's decode(…, false) has no counterpart); “QrPairingCodeCodec > decodes a reserved version when validation is disabled” (by-design: BD-Matter-SetupCodecShape: the Go decoders always validate; matter.js's decode(…, false) has no counterpart); “QrPairingCodeCodec > decodes either when validation is disabled” (by-design: BD-Matter-SetupCodecShape: the Go decoders always validate; matter.js's decode(…, false) has no counterpart); “ManualPairingCodeCodec > decodes an invalid passcode when validation is disabled” (by-design: BD-Matter-SetupCodecShape: the Go decoders always validate; matter.js's decode(…, false) has no counterpart); “ManualPairingCodeCodec > decodes it when validation is disabled” (by-design: BD-Matter-SetupCodecShape: the Go decoders always validate; matter.js's decode(…, false) has no counterpart); “ManualPairingCodeCodec > decodes an out-of-range vendor ID when validation is disabled” (by-design: BD-Matter-SetupCodecShape: the Go decoders always validate; matter.js's decode(…, false) has no counterpart); “rejects encoding PBKDF iterations without salt” (by-design: BD-Matter-SetupCodecShape: no TLV-data encoder; a QR code's TLV data is the caller's bytes (Extra.Raw), and DecodeExtra refuses the same shape); “rejects encoding PBKDF salt without iterations” (by-design: BD-Matter-SetupCodecShape: no TLV-data encoder; a QR code's TLV data is the caller's bytes (Extra.Raw), and DecodeExtra refuses the same shape); “rejects encoding a reserved-range tag from a custom schema” (by-design: BD-Matter-SetupCodecShape: no TLV-data encoder; a QR code's TLV data is the caller's bytes (Extra.Raw), and DecodeExtra refuses the same tag); “rejects encoding a non-standard flow without VID/PID” (by-design: BD-Matter-SetupCodecShape: the manual-code encoders take no flow: ManualCode is the standard-flow code, ManualCodeLong carries VID/PID); “rejects encoding a user-intent flow without VID/PID” (by-design: BD-Matter-SetupCodecShape: the manual-code encoders take no flow: ManualCode is the standard-flow code, ManualCodeLong carries VID/PID); “rejects non-integers” (js-runtime-only: a fractional or NaN JavaScript number; a Go passcode is a uint32). |
+| QrCodeSchemaTest.ts | 34 | excluded | `js-runtime-only` | matter.js's terminal rendering of a QR symbol in half-block characters; the module returns the "MT:" payload text (secure/setup QRCode) and renders no symbol. |
+| SpecificationVersionSchemaTest.ts | 30 | excluded | `js-runtime-only` | The JavaScript record form ({major, minor, patch}) of the SpecificationVersion uint32; the module states the version as the uint32 itself (0x01060100, client/exchange and secure/sessionparams). |
 
 ## types/test/tlv
 
@@ -1567,11 +1567,3 @@ does not test. They count as passes in `go test`; this list is where they are re
 ### types/test/protocol
 
 - `TlvInvokeRequestTest.ts` — Phase 33: a new register root, ported by meaning in this phase.
-
-### types/test/schema
-
-- `Base38SchemaTest.ts` — Phase 33: a new register root, ported by meaning in this phase.
-- `BitmapSchemaTest.ts` — Phase 33: a new register root, ported by meaning in this phase.
-- `PairingCodeSchemaTest.ts` — Phase 33: a new register root, ported by meaning in this phase.
-- `QrCodeSchemaTest.ts` — Phase 33: a new register root, ported by meaning in this phase.
-- `SpecificationVersionSchemaTest.ts` — Phase 33: a new register root, ported by meaning in this phase.

@@ -7493,32 +7493,113 @@
     },
     {
       "path": "packages/types/test/schema/Base38SchemaTest.ts",
-      "status": "planned",
-      "reason": "Phase 33: a new register root, ported by meaning in this phase.",
+      "status": "ported",
+      "go": [
+        "secure/setup:TestBase38SchemaParityMatterJS",
+        "secure/setup:TestQRCode_RoundTrip"
+      ],
+      "reason": "The vector encoded and decoded, every length from 1 to 24 bytes read back, a length no group count produces and a group above its byte width refused (secure/setup base38Encode / base38Decode).",
       "snapshotSha": "febcb820ca71d98ff8fd4a8fac415ea0ea23aed0"
     },
     {
       "path": "packages/types/test/schema/BitmapSchemaTest.ts",
-      "status": "planned",
-      "reason": "Phase 33: a new register root, ported by meaning in this phase.",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "BitmapSchema and ByteArrayBitmapSchema convert JavaScript records of flags and bit fields to and from integers and byte arrays; Go bitmaps are integers with generated named bits, and the setup payload's fields are packed by secure/setup itself.",
       "snapshotSha": "577356a6381b3c76277b81c36c4210c9d14eab7f"
     },
     {
       "path": "packages/types/test/schema/PairingCodeSchemaTest.ts",
-      "status": "planned",
-      "reason": "Phase 33: a new register root, ported by meaning in this phase.",
+      "status": "ported",
+      "go": [
+        "secure/setup:TestQrPairingCodeCodecParityMatterJS",
+        "secure/setup:TestQrCodeTlvDataParityMatterJS",
+        "secure/setup:TestAssertValidPayloadIdentityParityMatterJS",
+        "secure/setup:TestManualPairingCodeCodecParityMatterJS",
+        "secure/setup:TestIsValidPasscodeParityMatterJS",
+        "secure/setup:TestDecodeQRCode_MatterJSVectors",
+        "secure/setup:TestDecodeManualCode_MatterJSVectors",
+        "secure/setup:TestManualCode_KnownVectors",
+        "secure/setup:TestQRCode_TooLong",
+        "secure/setup:TestDecodeExtra"
+      ],
+      "left": [
+        {
+          "it": "QrPairingCodeCodec > decodes an invalid passcode when validation is disabled",
+          "class": "by-design",
+          "reason": "BD-Matter-SetupCodecShape: the Go decoders always validate; matter.js's decode(…, false) has no counterpart"
+        },
+        {
+          "it": "QrPairingCodeCodec > decodes a reserved version when validation is disabled",
+          "class": "by-design",
+          "reason": "BD-Matter-SetupCodecShape: the Go decoders always validate; matter.js's decode(…, false) has no counterpart"
+        },
+        {
+          "it": "QrPairingCodeCodec > decodes either when validation is disabled",
+          "class": "by-design",
+          "reason": "BD-Matter-SetupCodecShape: the Go decoders always validate; matter.js's decode(…, false) has no counterpart"
+        },
+        {
+          "it": "ManualPairingCodeCodec > decodes an invalid passcode when validation is disabled",
+          "class": "by-design",
+          "reason": "BD-Matter-SetupCodecShape: the Go decoders always validate; matter.js's decode(…, false) has no counterpart"
+        },
+        {
+          "it": "ManualPairingCodeCodec > decodes it when validation is disabled",
+          "class": "by-design",
+          "reason": "BD-Matter-SetupCodecShape: the Go decoders always validate; matter.js's decode(…, false) has no counterpart"
+        },
+        {
+          "it": "ManualPairingCodeCodec > decodes an out-of-range vendor ID when validation is disabled",
+          "class": "by-design",
+          "reason": "BD-Matter-SetupCodecShape: the Go decoders always validate; matter.js's decode(…, false) has no counterpart"
+        },
+        {
+          "it": "rejects encoding PBKDF iterations without salt",
+          "class": "by-design",
+          "reason": "BD-Matter-SetupCodecShape: no TLV-data encoder; a QR code's TLV data is the caller's bytes (Extra.Raw), and DecodeExtra refuses the same shape"
+        },
+        {
+          "it": "rejects encoding PBKDF salt without iterations",
+          "class": "by-design",
+          "reason": "BD-Matter-SetupCodecShape: no TLV-data encoder; a QR code's TLV data is the caller's bytes (Extra.Raw), and DecodeExtra refuses the same shape"
+        },
+        {
+          "it": "rejects encoding a reserved-range tag from a custom schema",
+          "class": "by-design",
+          "reason": "BD-Matter-SetupCodecShape: no TLV-data encoder; a QR code's TLV data is the caller's bytes (Extra.Raw), and DecodeExtra refuses the same tag"
+        },
+        {
+          "it": "rejects encoding a non-standard flow without VID/PID",
+          "class": "by-design",
+          "reason": "BD-Matter-SetupCodecShape: the manual-code encoders take no flow: ManualCode is the standard-flow code, ManualCodeLong carries VID/PID"
+        },
+        {
+          "it": "rejects encoding a user-intent flow without VID/PID",
+          "class": "by-design",
+          "reason": "BD-Matter-SetupCodecShape: the manual-code encoders take no flow: ManualCode is the standard-flow code, ManualCodeLong carries VID/PID"
+        },
+        {
+          "it": "rejects non-integers",
+          "class": "js-runtime-only",
+          "reason": "a fractional or NaN JavaScript number; a Go passcode is a uint32"
+        }
+      ],
+      "reason": "The QR and manual vectors encoded and decoded, a multi code, the maximum length, passcode, version and vendor/product validation, VID_PID_PRESENT against the length (refused whatever the validation, as the Go decoder always validates), the commissioning-flow forms as ManualCode / ManualCodeLong, the decode halves of the TLV-data cases (serial number as string and number, a vendor element, PBKDF both-or-neither, the tag ranges), assertValidPayloadIdentity and isValidPasscode — secure/setup.",
       "snapshotSha": "b4f39f1a350f294cc4de4c6dffb9888344c26b5f"
     },
     {
       "path": "packages/types/test/schema/QrCodeSchemaTest.ts",
-      "status": "planned",
-      "reason": "Phase 33: a new register root, ported by meaning in this phase.",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "matter.js's terminal rendering of a QR symbol in half-block characters; the module returns the \"MT:\" payload text (secure/setup QRCode) and renders no symbol.",
       "snapshotSha": "4e234bda227585a7da2af0cdb230182ae4cb35bd"
     },
     {
       "path": "packages/types/test/schema/SpecificationVersionSchemaTest.ts",
-      "status": "planned",
-      "reason": "Phase 33: a new register root, ported by meaning in this phase.",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "The JavaScript record form ({major, minor, patch}) of the SpecificationVersion uint32; the module states the version as the uint32 itself (0x01060100, client/exchange and secure/sessionparams).",
       "snapshotSha": "852e50e4a10b9d58706a0c82b2e750e06b8d9dfa"
     },
     {
