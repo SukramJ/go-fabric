@@ -11,7 +11,10 @@
 // removeFabric throws a chosen error or emits a leave first
 // (patchRemoveFabric, :36-47); the port reaches the same outcomes on the
 // wire where it can — RemoveFabric never acknowledged is every datagram to
-// the device dropped — and leaves the patched cases missing. matter.js's
+// the device dropped, a non-Ok status the device's answer for an index it
+// does not hold — and patches the call where it cannot
+// (client.PatchRemoveFabric: an answer lost after the acknowledgement, a
+// leave timed inside the call, client.EmitLeave). matter.js's
 // node delete is the registry's Decommission in Go (a deleted node is
 // closed: client.ErrClosed where matter.js throws DestroyedDependencyError
 // "is closing or being deleted"); a held commission or decommission is
@@ -24,6 +27,7 @@ import (
 	"log/slog"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -175,6 +179,94 @@ func TestDecommissionParity(t *testing.T) {
 		expectKept(t, cp, cp.decommission(t))
 	})
 
+	t.Run("removes the node when removeFabric is delivered but the response is lost", func(t *testing.T) {
+		t.Parallel()
+		// :146-170: the device tore the session down before its NOCResponse
+		// arrived — the request was acknowledged, the answer is missing.
+		// The Go device acknowledges RemoveFabric only with its answer, so
+		// no drop on the wire leaves the request acknowledged and the
+		// answer missing; the patch throws the error as matter.js's does.
+		cp := newClientPair(t, clientPairOptions{})
+		addr, _ := cp.node.PeerAddress()
+		called := false
+		restore := client.PatchRemoveFabric(cp.pair.Controller.Registry(), func(uint8, func(uint8) (client.Result, error)) (client.Result, error) {
+			called = true
+			return client.Result{}, &exchange.PeerMessageMissingError{Timeout: 11 * time.Second}
+		})
+		err := cp.decommission(t)
+		restore()
+		if err != nil || !called {
+			t.Fatalf("decommission: %v (patch called %v)", err, called)
+		}
+		if cp.pair.Controller.Registry().Size() != 0 || fabrictestseam.Peers(cp.pair.Controller).Get(addr) != nil {
+			t.Fatal("the node or its peer was kept")
+		}
+	})
+
+	t.Run("removes the node when a matching leave event arrives even if removeFabric rejects", func(t *testing.T) {
+		t.Parallel()
+		// :216-247: the leave of our fabric arrives inside the call, then
+		// RemoveFabric is never acknowledged (every datagram to the device
+		// dropped): the leave confirms the removal.
+		cp := newClientPair(t, clientPairOptions{})
+		addr, _ := cp.node.PeerAddress()
+		reg := cp.pair.Controller.Registry()
+		restore := client.PatchRemoveFabric(reg, func(fi uint8, invoke func(uint8) (client.Result, error)) (client.Result, error) {
+			client.EmitLeave(reg, cp.node, fi)
+			unacknowledged(cp)
+			return invoke(fi)
+		})
+		err := cp.decommission(t)
+		restore()
+		if err != nil {
+			t.Fatalf("decommission: %v", err)
+		}
+		cp.advance(t, 5*time.Second)
+		if reg.Size() != 0 || fabrictestseam.Peers(cp.pair.Controller).Get(addr) != nil || cp.node.IsCommissioned() {
+			t.Fatal("the node or its peer was kept")
+		}
+	})
+
+	t.Run("does not treat a leave for a different fabric as confirmation", func(t *testing.T) {
+		t.Parallel()
+		// :249-271: a leave of another fabric index inside the call does
+		// not confirm the removal; RemoveFabric unacknowledged keeps the
+		// node.
+		cp := newClientPair(t, clientPairOptions{})
+		reg := cp.pair.Controller.Registry()
+		restore := client.PatchRemoveFabric(reg, func(fi uint8, invoke func(uint8) (client.Result, error)) (client.Result, error) {
+			client.EmitLeave(reg, cp.node, fi+1)
+			unacknowledged(cp)
+			return invoke(fi)
+		})
+		err := cp.decommission(t)
+		restore()
+		expectKept(t, cp, err)
+	})
+
+	t.Run("keeps the node and throws when removeFabric returns a non-Ok status, even if a leave arrives", func(t *testing.T) {
+		t.Parallel()
+		// :273-299: the leave of our fabric arrives inside the call, then
+		// the device answers InvalidFabricIndex — RemoveFabric of an index
+		// the device does not hold (handleRemoveFabric answers it with
+		// that status): the refusal stands.
+		cp := newClientPair(t, clientPairOptions{})
+		reg := cp.pair.Controller.Registry()
+		restore := client.PatchRemoveFabric(reg, func(fi uint8, invoke func(uint8) (client.Result, error)) (client.Result, error) {
+			client.EmitLeave(reg, cp.node, fi)
+			return invoke(fi + 1)
+		})
+		err := cp.decommission(t)
+		restore()
+		if err == nil || !strings.Contains(err.Error(), "failed with status") {
+			t.Fatalf("decommission: %v, want a failed status", err)
+		}
+		cp.advance(t, 5*time.Second)
+		if reg.Size() != 1 || !cp.node.IsCommissioned() || !cp.deviceCommissioned(t) {
+			t.Fatal("the node was not kept")
+		}
+	})
+
 	t.Run("accepts another decommission after a failed one", func(t *testing.T) {
 		t.Parallel()
 		cp := newClientPair(t, clientPairOptions{})
@@ -274,6 +366,54 @@ func TestDecommissionParity(t *testing.T) {
 		release()
 		if n := <-found; n != cp.node || reg.Size() != 1 {
 			t.Fatalf("found %p, want the kept node %p; size %d", n, cp.node, reg.Size())
+		}
+	})
+
+	t.Run("waits for a running decommission before handing out a node (removed)", func(t *testing.T) {
+		t.Parallel()
+		// :418-474 with PeerMessageMissingError: ForDevice asked while
+		// RemoveFabric is out waits for the decommission, and hands out a
+		// new node once the old one is removed.
+		cp := newClientPair(t, clientPairOptions{})
+		reg := cp.pair.Controller.Registry()
+		id := cp.node.Record().DeviceIdentifier
+		if id == "" {
+			t.Fatal("no device identifier")
+		}
+		removing, released := make(chan struct{}), make(chan struct{})
+		var answered atomic.Bool
+		restore := client.PatchRemoveFabric(reg, func(uint8, func(uint8) (client.Result, error)) (client.Result, error) {
+			close(removing)
+			<-released
+			answered.Store(true)
+			return client.Result{}, &exchange.PeerMessageMissingError{Timeout: 11 * time.Second}
+		})
+		defer restore()
+		decommissioned := make(chan error, 1)
+		go func() { decommissioned <- cp.pair.Controller.Registry().Decommission(parityCtx(t), cp.node) }()
+		<-removing
+		type lookup struct {
+			n           *client.Node
+			err         error
+			afterAnswer bool
+		}
+		found := make(chan lookup, 1)
+		go func() {
+			n, err := reg.ForDevice(parityCtx(t), discovery.Device{InstanceID: id}, "")
+			found <- lookup{n, err, answered.Load()}
+		}()
+		select {
+		case <-found:
+			t.Fatal("ForDevice handed out a node during the decommission")
+		default:
+		}
+		close(released)
+		if err := <-decommissioned; err != nil {
+			t.Fatalf("decommission: %v", err)
+		}
+		got := <-found
+		if got.err != nil || !got.afterAnswer || got.n == nil || got.n == cp.node || reg.Size() != 1 {
+			t.Fatalf("found %p (%v, after the answer %v), want a new node; size %d", got.n, got.err, got.afterAnswer, reg.Size())
 		}
 	})
 

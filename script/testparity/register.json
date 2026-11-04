@@ -3154,28 +3154,59 @@
     },
     {
       "path": "packages/node/test/node/DecommissionTest.ts",
-      "status": "partial",
+      "status": "ported",
       "go": [
-        "controller/client:TestDecommissionUnstructuredParity",
-        "controller/client:TestDecommissionParity"
+        "controller/client:TestDecommissionParity",
+        "controller/client:TestDecommissionUnstructuredParity"
       ],
-      "missing": [
-        "removes the node when removeFabric is delivered but the response is lost",
-        "removes the node when a matching leave event arrives even if removeFabric rejects",
-        "does not treat a leave for a different fabric as confirmation",
-        "keeps the node and throws when removeFabric returns a non-Ok status, even if a leave arrives",
-        "probe resolves false on a destroyed node instead of throwing",
-        "rejects a decommission of a node that is being deleted",
-        "waits for a running decommission before handing out a node (removed)",
-        "rejects a decommission of a crashed node with its lifecycle error",
-        "rejects a commission of a crashed node with its lifecycle error",
-        "rejects a commission attempt registered for a crashed node",
-        "does not cull the node while its decommission deletes it",
-        "reports the node gone as soon as its deletion begins",
-        "rejects acting on a node whose deletion has begun instead of restarting it",
-        "ignores an event that arrives for a node while it is deleted"
+      "left": [
+        {
+          "it": "probe resolves false on a destroyed node instead of throwing",
+          "class": "js-runtime-only",
+          "reason": "no Go subject (no construction lifecycle): DecommissionTest.ts:301-320 at 862ad75f probes ClientNodeInteraction of a destroyed node; a Go client.Node has no node-level probe, a closed node's calls fail with client.ErrClosed"
+        },
+        {
+          "it": "rejects a decommission of a node that is being deleted",
+          "class": "js-runtime-only",
+          "reason": "no Go subject (no construction lifecycle): :345-357 starts peer1.delete() and decommissions meanwhile; deletion is the registry's Decommission, there is no public delete in flight to race"
+        },
+        {
+          "it": "rejects a decommission of a crashed node with its lifecycle error",
+          "class": "js-runtime-only",
+          "reason": "no Go subject (no construction lifecycle): :512-520 sets construction status Crashed; a Go node has no construction status"
+        },
+        {
+          "it": "rejects a commission of a crashed node with its lifecycle error",
+          "class": "js-runtime-only",
+          "reason": "no Go subject (no construction lifecycle): :522-531, as the decommission: no construction status"
+        },
+        {
+          "it": "rejects a commission attempt registered for a crashed node",
+          "class": "js-runtime-only",
+          "reason": "no Go subject (no construction lifecycle): :533-549 runs peers.runCommissioning on a Crashed node; neither the construction status nor runCommissioning exists in Go (client.HoldOperation holds an operation)"
+        },
+        {
+          "it": "does not cull the node while its decommission deletes it",
+          "class": "js-runtime-only",
+          "reason": "no Go subject (no construction lifecycle): :551-583 wraps peer1.delete to hold the decommission between clearing the address and deleting the node; Go's deletion is internal to Decommission, there is no delete to wrap"
+        },
+        {
+          "it": "reports the node gone as soon as its deletion begins",
+          "class": "js-runtime-only",
+          "reason": "no Go subject (no construction lifecycle): :585-594 reads lifecycle.isGone while delete() runs; a Go node has no isGone, a deleted node is closed"
+        },
+        {
+          "it": "rejects acting on a node whose deletion has begun instead of restarting it",
+          "class": "js-runtime-only",
+          "reason": "no Go subject (no construction lifecycle): :596-622 acts on the node from a construction-status observer during delete(); a Go node has no act or construction status"
+        },
+        {
+          "it": "ignores an event that arrives for a node while it is deleted",
+          "class": "js-runtime-only",
+          "reason": "no Go subject (no construction lifecycle): :624-665 feeds a leave into the structure (structure.mutate) from a construction-status observer during delete(); Node.apply is package-internal and a closing node drops events"
+        }
       ],
-      "reason": "The decommission of a peer without a structure read or subscription (fabric index recorded, read, or read unfiltered), RemoveFabric never acknowledged (every datagram to the device dropped: the node kept, a second attempt accepted), one fabric operation at a time against a held commission or decommission (client.HoldOperation for peers.runCommissioning), ForDevice waiting for a held decommission, a node deleted by its decommission or by a leave the device reports (client.ErrClosed for DestroyedDependencyError) and nothing left in the store run on fabrictest (controller/client:TestDecommission*). Missing: the cases that patch the peer's removeFabric client to throw PeerMessageMissingError or a non-Ok status or to emit a leave inside the call (no seam on the wire for a delivered request whose answer is lost, nor for a leave timed inside the call); the probe of a destroyed node (no node-level probe); a node being deleted or a delete wrapper (deletion is the registry's Decommission, no public delete in flight); the crashed construction status, runCommissioning, isGone and act on a node whose deletion began (no construction lifecycle in Go); an event fed into the structure while the node is deleted (Node.apply is package-internal; covered by the closing node dropping events).",
+      "reason": "The decommission of a peer without a structure read or subscription (fabric index recorded, read, or read unfiltered), RemoveFabric never acknowledged (every datagram to the device dropped: the node kept, a second attempt accepted), one fabric operation at a time against a held commission or decommission (client.HoldOperation for peers.runCommissioning), ForDevice waiting for a held decommission, a node deleted by its decommission or by a leave the device reports (client.ErrClosed for DestroyedDependencyError) and nothing left in the store run on fabrictest (controller/client:TestDecommission*). The patched cases — an answer lost after the acknowledgement, a leave of our fabric or another inside the call, a non-Ok status (the device's InvalidFabricIndex for an index it does not hold) and a decommission held while ForDevice waits for the removal — run on client.PatchRemoveFabric and client.EmitLeave (export_test.go), matter.js's patchRemoveFabric: the Go device acknowledges RemoveFabric only with its answer, so no wire drop leaves the request acknowledged and the answer missing. Left: the node-level probe, a delete in flight or wrapped, the construction status (Crashed, isGone, act during deletion) and an event fed into the structure while the node is deleted — no construction lifecycle in Go.",
       "snapshotSha": "1e1c5744fb3ee77eefc2ec262e9a685ee429585d"
     },
     {

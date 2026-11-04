@@ -336,7 +336,19 @@ func (r *Registry) decommission(ctx context.Context, n *Node) (PeerAddress, erro
 		r.mu.Unlock()
 	}()
 	r.log.Debug("matter.controller.client.registry.removing_fabric", slog.String("node", n.ID()), slog.String("peer", former), slog.Int("fabric_index", int(fabricIndex)))
-	res, err := n.Invoke(ctx, opCredsCommand(opCredsCmdRemoveFabric), removeFabricRequest(fabricIndex), InvokeOptions{})
+	invoke := func(fabricIndex uint8) (Result, error) {
+		return n.Invoke(ctx, opCredsCommand(opCredsCmdRemoveFabric), removeFabricRequest(fabricIndex), InvokeOptions{})
+	}
+	r.mu.Lock()
+	patch := r.removeFabric
+	r.mu.Unlock()
+	var res Result
+	var err error
+	if patch != nil {
+		res, err = patch(fabricIndex, invoke)
+	} else {
+		res, err = invoke(fabricIndex)
+	}
 	if err == nil {
 		nr, derr := nocResponseOf(res)
 		if derr != nil {
