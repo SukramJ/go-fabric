@@ -4,6 +4,10 @@
 // Package logring keeps the newest log records of a process in memory so a
 // host can show them, for example in a diagnostics page of its own UI.
 //
+// matter.js keeps no log records and matterjs-server sets a level only; the
+// ring is ahead of both, register row BD-Matter-LogRing in
+// notes/parity/by_design.md.
+//
 // [Handler] is a [slog.Handler] that wraps the host's own handler. A host
 // builds its logger as
 //
