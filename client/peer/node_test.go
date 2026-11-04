@@ -7,6 +7,7 @@ import (
 	"context"
 	"log/slog"
 	"net"
+	"net/netip"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -105,13 +106,34 @@ func startNode(t *testing.T, adv mdns.Advertiser, listen string) (*node.Node, *n
 	return d.Node(), d.Addr()
 }
 
+// loopbackOf is the loopback address of the same family for a socket bound
+// to the unspecified address ("[::]:port" -> "[::1]:port"): the
+// commissioner sends to it, and macOS refuses a datagram to [::] with
+// EHOSTUNREACH ("sendto: no route to host", nightly run 41816797999,
+// macos-latest) where Linux delivers it to loopback.
+func loopbackOf(t *testing.T, addr string) string {
+	t.Helper()
+	ap, err := netip.ParseAddrPort(addr)
+	if err != nil {
+		t.Fatalf("the node's address %q: %v", addr, err)
+	}
+	switch {
+	case !ap.Addr().IsUnspecified():
+		return addr
+	case ap.Addr().Is4():
+		return netip.AddrPortFrom(netip.AddrFrom4([4]byte{127, 0, 0, 1}), ap.Port()).String()
+	default:
+		return netip.AddrPortFrom(netip.IPv6Loopback(), ap.Port()).String()
+	}
+}
+
 // commissioned starts a node, commissions it with the test commissioner
 // and returns it, its address and our side of the fabric as controller
 // node 112233 on fabric index 1.
 func commissioned(t *testing.T, adv mdns.Advertiser, listen string) (*node.Node, *net.UDPAddr, handshake.Fabric) {
 	t.Helper()
 	n, addr := startNode(t, adv, listen)
-	c := bridgetest.Dial(t, n.Bridge().LocalAddr(), bridgetest.Options{
+	c := bridgetest.Dial(t, loopbackOf(t, n.Bridge().LocalAddr()), bridgetest.Options{
 		Passcode: nodePasscode, Discriminator: 3840, FabricID: nodeFabricID, NodeID: testNode, Seed: 7,
 	})
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
