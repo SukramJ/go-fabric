@@ -278,6 +278,24 @@ ticker (Identify) is stepped one period at a time. A site given
 `Options{Clock: clock.System{}}` runs on the wall clock, and `Run` only runs
 the work.
 
+A test does not wait on the wall clock. `clock/sleep_ratchet_test.go`
+(`TestSleepRatchet`) counts the `time.Sleep` and `time.After` calls in the
+module's test files that do not import `testing/synctest` and holds each
+count at a constant (`sleepRatchet`, `afterRatchet`) that only falls: a new
+wall-clock wait fails the build, and a removed one fails it until the
+constant is lowered in the same commit. A wait has three replacements: the
+site's quiet protocol (`Settle`, `Step`, `Run`, `Eventually`) for a subject
+on a site; a `clocktest.Fake` the subject takes through its clock seam,
+moved with `Advance` and `Resolve`, for a timer-driven subject without one;
+and a `synctest` bubble, whose clock is virtual and moves only when every
+goroutine in it is durably blocked, for a subject that blocks on channels,
+mutexes and timers. "Nothing happened within the window" is asserted after
+`synctest.Wait()` or a fake clock's `Advance` past the window, never after a
+sleep. The rule is per file because a static check can state no more: a
+file that imports `testing/synctest` is taken to sleep inside its bubbles.
+Tests on real sockets (the UDP and TCP transports, the live mDNS tests, a
+real chip-tool) keep their polling, one helper per package.
+
 The controller's DNS-SD cache (`discovery.Names`) keeps its record TTLs on
 the wall clock; the site's answers carry 120 s, as the module's mDNS
 responder announces every record, longer than a test.
