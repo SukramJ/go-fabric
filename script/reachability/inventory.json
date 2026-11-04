@@ -8124,14 +8124,14 @@
       "identifier": "TestCommissionerControlApproved",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/commissioner_control_test.go",
-      "line": 173
+      "line": 174
     },
     {
       "package": "cluster/core",
       "identifier": "TestCommissionerControlCASEOnly",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/commissioner_control_test.go",
-      "line": 134
+      "line": 135
     },
     {
       "package": "cluster/core",
@@ -8348,7 +8348,7 @@
       "identifier": "TestOTARequestor_Announce",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/ota_software_update_requestor_test.go",
-      "line": 620
+      "line": 621
     },
     {
       "package": "cluster/core",
@@ -8362,7 +8362,7 @@
       "identifier": "TestOTARequestor_ApplyActions",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/ota_software_update_requestor_test.go",
-      "line": 943
+      "line": 944
     },
     {
       "package": "cluster/core",
@@ -8383,28 +8383,28 @@
       "identifier": "TestOTARequestor_ChooseProvider",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/ota_software_update_requestor_test.go",
-      "line": 662
+      "line": 663
     },
     {
       "package": "cluster/core",
       "identifier": "TestOTARequestor_Consent",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/ota_software_update_requestor_test.go",
-      "line": 836
+      "line": 837
     },
     {
       "package": "cluster/core",
       "identifier": "TestOTARequestor_DecodeDefaultProvidersWrite",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/ota_software_update_requestor_test.go",
-      "line": 587
+      "line": 588
     },
     {
       "package": "cluster/core",
       "identifier": "TestOTARequestor_DefaultProvidersWrite",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/ota_software_update_requestor_test.go",
-      "line": 535
+      "line": 536
     },
     {
       "package": "cluster/core",
@@ -8418,21 +8418,21 @@
       "identifier": "TestOTARequestor_DownloadFailure",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/ota_software_update_requestor_test.go",
-      "line": 891
+      "line": 892
     },
     {
       "package": "cluster/core",
       "identifier": "TestOTARequestor_DownloadProtocolNotSupported",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/ota_software_update_requestor_test.go",
-      "line": 764
+      "line": 765
     },
     {
       "package": "cluster/core",
       "identifier": "TestOTARequestor_EnableDisable",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/ota_software_update_requestor_test.go",
-      "line": 508
+      "line": 509
     },
     {
       "package": "cluster/core",
@@ -8446,42 +8446,42 @@
       "identifier": "TestOTARequestor_FullUpdate",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/ota_software_update_requestor_test.go",
-      "line": 688
+      "line": 689
     },
     {
       "package": "cluster/core",
       "identifier": "TestOTARequestor_Initialize",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/ota_software_update_requestor_test.go",
-      "line": 402
+      "line": 403
     },
     {
       "package": "cluster/core",
       "identifier": "TestOTARequestor_InvalidAnswers",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/ota_software_update_requestor_test.go",
-      "line": 786
+      "line": 787
     },
     {
       "package": "cluster/core",
       "identifier": "TestOTARequestor_InvalidImage",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/ota_software_update_requestor_test.go",
-      "line": 920
+      "line": 921
     },
     {
       "package": "cluster/core",
       "identifier": "TestOTARequestor_NotAvailableAndBusy",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/ota_software_update_requestor_test.go",
-      "line": 724
+      "line": 725
     },
     {
       "package": "cluster/core",
       "identifier": "TestOTARequestor_OnlineAddsDefaultsAndSchedules",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/ota_software_update_requestor_test.go",
-      "line": 428
+      "line": 429
     },
     {
       "package": "cluster/core",
@@ -8495,14 +8495,14 @@
       "identifier": "TestOTARequestor_PreviousUpdateApplied",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/ota_software_update_requestor_test.go",
-      "line": 450
+      "line": 451
     },
     {
       "package": "cluster/core",
       "identifier": "TestOTARequestor_PreviousUpdateFailed",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/ota_software_update_requestor_test.go",
-      "line": 484
+      "line": 485
     },
     {
       "package": "cluster/core",
@@ -8670,7 +8670,7 @@
       "identifier": "TestParityMatterJS_OTAProviderTransferKeepsEntryAlive",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/ota_provider_progress_parity_matterjs_test.go",
-      "line": 22
+      "line": 23
     },
     {
       "package": "cluster/core",
