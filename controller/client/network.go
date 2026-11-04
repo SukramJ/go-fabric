@@ -544,6 +544,7 @@ func (n *Node) deliverEvent(e *EventData) {
 			n.log.Warn("matter.controller.client.event_undecodable", slog.Uint64("cluster", uint64(path.Cluster)), slog.Uint64("event", uint64(path.Event)), slog.Any("err", err))
 		}
 	}
+	n.events.record(RecordedEvent{EventData: *e, Decoded: value})
 	if h := n.cfg.Hooks.Event; h != nil {
 		h(path.Endpoint, path.Cluster, path.Event, *e, value)
 	}

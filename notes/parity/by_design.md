@@ -127,6 +127,7 @@ pin lift confirms by re-reading the row, [`pin-lifts.md`](./pin-lifts.md)).
 | BD-chip-Commissioner-CsrNonceEchoed | `ControllerCommissioningFlow.ts:1395` draws the CSR nonce and the flow never reads the echoed one back (presence) | `packages/protocol/src/peer/ControllerCommissioningFlow.ts` | `"fields: { csrNonce: this.fabric.crypto.randomBytes(32) },"` | connectedhomeip `src/credentials/attestation_verifier/DefaultDeviceAttestationVerifier.cpp:847-870` at `6170af84` (`VerifyNodeOperationalCSRInformation`) | no |
 | BD-chip-EnergyReporting-FakeReadings | `GeneralDiagnosticsServer.ts:164-166` answers every test event trigger with INVALID_COMMAND, and the chip-testing node's `TestGeneralDiagnosticsServer.ts:15-22` accepts only the generic trigger; a grep for `0x0091`, `FakeReadings` and `EnergyReporting` over `packages/` and `support/chip-testing/` at the pin finds only the cluster id in `packages/types/src/clusters/electrical-energy-measurement.d.ts:25` (presence: the two rejections) | `packages/node/src/behaviors/general-diagnostics/GeneralDiagnosticsServer.ts`<br>`support/chip-testing/src/cluster/TestGeneralDiagnosticsServer.ts` | `"Unsupported test event trigger "`<br>`"} else if (testEvent !== 0x0000000000000003) {\n            throw new StatusResponseError(\"Wrong test event\", Status.InvalidCommand);"` | connectedhomeip `src/app/clusters/electrical-energy-measurement-server/EnergyReportingTestEventTriggerHandler.h:47-51`, `examples/energy-management/energy-management-triggers/EnergyReportingEventTriggers.cpp:28-85` and `FakeReadings.cpp:73-175` at `6170af84` | no |
 | BD-matterjs-server-NetworkTopology | `NetworkClient.ts:35` declares the controller's network behaviour, which holds the subscription state only; matter.js at the pin has no topology service (absence: no neighbour-table or graph code under `packages/`) | `packages/node/src/behavior/system/network/NetworkClient.ts` | `class NetworkClient` | matterjs-server `packages/ws-controller/src/controller/NetworkTopologyService.ts` and `packages/ws-client/src/topology/topology-utils.ts` at `0bd06f22` | no |
+| BD-Matter-ClientNodeEventHistory | `ClientEventEmitter.ts:45-74` emits a peer's event to the node's observers and the ChangeNotificationService and keeps none; no code under `packages/node/src/node/client/` holds past events (absence: the end of `emitClientEvent`, :72-76, where a record would go) | `packages/node/src/node/client/ClientEventEmitter.ts` | `"            });\n        }\n    }\n\n    function getTarget(node: ClientNode, occurrence: ReadResult.EventValue, clusterName: string, eventName: string) {"` | matterjs-server `packages/ws-controller/src/server/WebSocketControllerHandler.ts:112`, `:368-380` at `0bd06f22` (a global last-25 list), kept per node here (issue #388 G-C2) | no |
 
 ---
 
@@ -1948,6 +1949,27 @@ and the `TopologyUtilsTest.ts` cases of the ported functions, in
 `controller/topology/*_test.go`. Reason: the UI and go-fabric-server need
 one implementation of Matter knowledge (neighbour matching, LQI/RSSI
 buckets) that matter.js does not hold.
+
+### BD-Matter-ClientNodeEventHistory — a bounded per-node event history in the controller client
+
+matter.js at `862ad75f` keeps no event history on the client side: a peer's
+event reaches `emitClientEvent`
+(`packages/node/src/node/client/ClientEventEmitter.ts:45-74`), which emits
+it on the endpoint's behavior event and broadcasts it through the
+`ChangeNotificationService` (`broadcastEvent`,
+`packages/node/src/node/integration/ChangeNotificationService.ts:74-87`),
+and nothing stores it. matterjs-server keeps one global list of the last
+25 events of every node (`#addEventToHistory`, `EVENT_HISTORY_SIZE`,
+`packages/ws-controller/src/server/WebSocketControllerHandler.ts:112`,
+`:368-380` at `0bd06f22`). `controller/client` keeps a ring per node
+instead (issue #388 G-C2): `Config.EventHistory` events (`DefaultEventHistory`
+100 when 0, none when negative), fed by exactly the events `Hooks.Event`
+receives — the default subscription's, its bootstrap read's and the
+newly-commissioned read's — recorded before the hook runs, so the hook is
+the history's change notification; `Node.EventHistory(since, limit)`
+answers. Memory only, cleared by `Node.Erase`. Reason: go-fabric-ui's
+event tab and go-fabric-server's `node_event`/`diagnostics` read one source
+per node rather than each keeping its own list.
 
 ### BD-chip-ClosureDimension-RulesInServer — the command rules are connectedhomeip's; the feature check is matter.js's stricter one
 

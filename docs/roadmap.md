@@ -102,7 +102,7 @@ one none uses, and both come before completeness for its own sake.
 | 6 | [Completeness](#milestone-6-completeness) | `v0.14.0` | 26–27 | 135/135 clusters, 91/91 device types, every matter.js row of the comparison closed |
 | 7 | [BLE on the device side](#milestone-7-ble-on-the-device-side) | not yet assigned | 28 | a node of this module without a network is commissioned over BLE, as matter.js's `nodejs-ble` node is |
 | 8 | [Proof](#milestone-8-proof) | `v0.17.0` | 29–35 | what is automatable runs: the 68 certification cases matter.js automated, the four defects, 644 more matter.js cases, the families without a run, no sleep-driven test |
-| 9 | [View](#milestone-9-view) | go-fabric-ui `0.4.0`, contract `0.3.0` | U3–U5 | topology, live device details and an operator's diagnostics in the UI, from data the module already has |
+| 9 | [View](#milestone-9-view) | go-fabric-ui `0.4.0`, contract `0.3.0`/`0.3.1` (U3a/U3b); go-fabric-ui `0.5.0`, contract `0.4.0` (U4) | U3–U5 | topology, live device details and an operator's diagnostics in the UI, from data the module already has |
 | 10 | [The rest of the standard](#milestone-10-the-rest-of-the-standard) | `v0.18.0` | 36–39 | the features matter.js serves and we refuse; the consumer features after chip; the 1.7 pin when matter.js moves |
 
 Milestones 8–10 are [concept v13](https://github.com/SukramJ/go-fabric/blob/main/docs/concept-v13-roadmap-extension.md)
@@ -374,12 +374,14 @@ Planned in go-fabric-ui (concept U3 there, like U1 and U2); this page records th
 | Phase | Content | Proof |
 | --- | --- | --- |
 | U3 | topology: the node family's graph aggregator → bridged devices → parts with fabrics and their sessions and subscriptions (data: `Topology()`, `FabricInfos`, `SessionDiagnostics`, `Subscriptions()`), the controller family's network graph from the server's `get_network_topology` (Thread role, RLOC16, LQI/RSSI; Wi-Fi SSID/BSSID), own SVG, no graph library | contract 0.3.0 (additive), golden fixtures |
-| U4 | device details: per endpoint the device type with revision, clusters with revision and feature map, the attribute inventory with live values, events, parts, tags, reachability, the host's surface decision; on the controller side an inventory tab, an event log, decoded feature maps | contract 0.3.0; the two detail pages |
+| U4 | device details: per endpoint the device type with revision, clusters with revision and feature map, the attribute inventory with live values, events, parts, tags, reachability, the host's surface decision; on the controller side an inventory tab, an event log, decoded feature maps | contract 0.4.0 (go-fabric-ui 0.5.0); the two detail pages |
 | U5 | operation: live status, a diagnostics page with log level, log stream and `ping_node`, the camera QR scan in commissioning, ecosystem hints in pairing, node pages for every node on the server, Playwright end-to-end per page | e2e green; README and contract version current |
 
 **Value.** The data the module and the server already hold becomes an operator's view: who is connected to whom, what a device does now.
 
 **Status 2026-11-03.** Module side landed (brief M9-module, issues 380 and 381): `controller/topology` builds the controller's network graph after matterjs-server's `NetworkTopologyService` (Ahead of matter.js, `BD-matterjs-server-NetworkTopology`), so go-fabric-server's `get_network_topology` and go-fabric-ui's adapter become two callers of one implementation; the node facade lists subscriptions (`Subscriptions().Snapshot()`, `SessionInfo.SubscriptionIDs`), gives each bridged device its `Scope`, `Tags` and `Labels` (and `Aggregator.Partitions()`), and reports every attribute change (`Observers.OnAttributeChanged`). The milestone's version is go-fabric-ui `0.4.0`: go-fabric-ui's own `0.3.0` was its dependency release of 2026-11-02, so the row's former `0.3.0` was stale. Next: go-fabric-server's switch to `controller/topology` and go-fabric-ui U3b.
+
+**Status 2026-11-04.** The U4 module side (issue 388, the M9 module wave): the node facade reads its served attribute values with their DataVersion (`Node.ReadAttribute`, `Node.ReadCluster`, rendered by name with `JSON`), queries its served events (`Node.Events`) and reports each new one (`Observers.OnEvent`); `schema` names every attribute, command and event of the snapshot and titles its features; `controller/client` keeps a bounded per-node event history (`Node.EventHistory`, `Hooks.EventRecorded`); a Descriptor TagList no longer goes on the wire as null.
 
 ### Milestone 10: The rest of the standard
 

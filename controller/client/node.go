@@ -108,6 +108,9 @@ type Node struct {
 	// storedICD its stored registration until the registry built it.
 	icd       *ICDClient
 	storedICD map[uint32][]byte
+
+	// events is the node's bounded event history ([Node.EventHistory]).
+	events *eventHistory
 }
 
 // New builds the node cfg describes and loads its image from the store.
@@ -139,6 +142,7 @@ func newNode(cfg Config) (*Node, error) {
 		n.store = &MemoryStore{}
 	}
 	n.jobs = newJobQueue()
+	n.events = newEventHistory(cfg.EventHistory)
 	n.persist = &persister{store: n.store, nodeID: cfg.ID, interval: cfg.FlushInterval, clock: n.clock, log: n.log, image: &n.mu}
 	stored, err := n.store.Load(cfg.ID)
 	if err != nil {
@@ -634,6 +638,7 @@ func (n *Node) Erase(ctx context.Context) error {
 	n.mu.Unlock()
 	// The store is the host's (SQLite in the reference controller): it is
 	// erased with the node's lock released (ADR 0026 P6).
+	n.events.clear()
 	if err := n.store.EraseNode(n.cfg.ID); err != nil {
 		n.log.Warn("matter.controller.client.store_erase_failed", slog.Any("err", err))
 	}

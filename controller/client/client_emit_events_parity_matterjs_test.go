@@ -57,4 +57,7 @@ func TestHostReadDoesNotEmitEvents(t *testing.T) {
 	if got := client.MaxEventNumber(n); got != 0 {
 		t.Errorf("event cursor %d after a host read, want 0", got)
 	}
+	if h := n.EventHistory(0, 0); len(h) != 0 {
+		t.Errorf("event history %+v after a host read, want none", h)
+	}
 }
