@@ -296,7 +296,7 @@ func TestChunkedWriteAcrossMessagesParityMatterJS(t *testing.T) {
 	aclPath := func(appendEntry bool) im.ConcreteAttributePath {
 		return im.ConcreteAttributePath{Endpoint: 0, Cluster: 0x001F, Attribute: 0, HasEndpoint: true, HasCluster: true, HasAttribute: true, HasListIndex: appendEntry, ListAppend: appendEntry}
 	}
-	entry := func(enc *tlv.Encoder, tag tlv.Tag, privilege, authMode uint64, subject uint64) {
+	entry := func(enc *tlv.Encoder, tag tlv.Tag, privilege, authMode, subject uint64) {
 		enc.StartStruct(tag)
 		enc.PutUint(tlv.ContextTag(1), privilege)
 		enc.PutUint(tlv.ContextTag(2), authMode)
@@ -345,8 +345,9 @@ func TestChunkedWriteAcrossMessagesParityMatterJS(t *testing.T) {
 	})
 	const xid = 0x7000
 	statuses := func(payload []byte) []uint64 {
-		var out []uint64
-		for _, st := range decodeTLVTree(t, payload).mustChild(t, 0).Children {
+		children := decodeTLVTree(t, payload).mustChild(t, 0).Children
+		out := make([]uint64, 0, len(children))
+		for _, st := range children {
 			out = append(out, st.mustChild(t, 1).mustChild(t, 0).El.Uint)
 		}
 		return out

@@ -23,7 +23,7 @@ import (
 // (BD-Matter-FactoryResetEndsTheNode); "commissions again on the same
 // controller instance" (:1488-1498) is therefore the same case as the one
 // after a reboot (:1500-1516).
-func TestControllerEraseParityMatterJS(t *testing.T) {
+func TestControllerEraseParityMatterJS(t *testing.T) { //nolint:tparallel // the subtests are ordered: the erase, then the reboot on its database
 	t.Parallel()
 	site := fabrictest.NewSite(t, fabrictest.Options{})
 	dev := site.AddDevice(fabrictest.Topology{})

@@ -30,12 +30,12 @@ import (
 func (c *Controller) Erase(ctx context.Context) error {
 	errs := []error{c.Close(ctx)}
 	nodes := sqlstore.New(c.db)
-	ids, err := nodes.NodeIDs()
+	ids, err := nodes.NodeIDs() //nolint:contextcheck // sqlstore's node API carries no context
 	if err != nil {
 		errs = append(errs, fmt.Errorf("controller: erase: list nodes: %w", err))
 	}
 	for _, id := range ids {
-		if err := nodes.EraseNode(id); err != nil {
+		if err := nodes.EraseNode(id); err != nil { //nolint:contextcheck // as above
 			errs = append(errs, fmt.Errorf("controller: erase node %s: %w", id, err))
 		}
 	}

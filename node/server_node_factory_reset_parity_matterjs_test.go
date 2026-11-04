@@ -26,8 +26,19 @@ type resetStores struct {
 	endpoints   *epmem.Store
 }
 
-func newResetStores() resetStores {
-	return resetStores{credentials: memstore.New(), endpoints: epmem.New()}
+// staleUniqueID is the UniqueID the store holds before the reset, the
+// value the node to be reset serves (node-helpers.ts:135-138 sets a known
+// uniqueId so the reset's effect is visible); after the reset the store
+// holds another one or none (:164-165).
+const staleUniqueID = "asdf"
+
+func newResetStores(t *testing.T) resetStores {
+	t.Helper()
+	s := resetStores{credentials: memstore.New(), endpoints: epmem.New()}
+	if err := s.credentials.SetSetting(t.Context(), store.SettingUniqueID, staleUniqueID); err != nil {
+		t.Fatal(err)
+	}
+	return s
 }
 
 func (s resetStores) configure(cfg *node.Config) {
@@ -36,9 +47,10 @@ func (s resetStores) configure(cfg *node.Config) {
 
 // assertFactoryState holds testFactoryReset's checks (matter.js
 // packages/node/src/testing/node-helpers.ts:112-175 at 862ad75f) on the Go
-// node: no fabric is left, the UniqueID the old node pinned did not
-// persist, the device's BasicInformation and pairing codes are there, and
-// the device runs exactly when want says so.
+// node: no fabric is left, the UniqueID the old node served did not
+// persist (the store holds none, or the one a node that came back pinned),
+// the device's BasicInformation and pairing codes are there, and the
+// device runs exactly when want says so.
 func assertFactoryState(t *testing.T, d *fabrictest.Device, s resetStores, wantRunning bool) {
 	t.Helper()
 	ctx := parityCtx(t)
@@ -52,7 +64,7 @@ func assertFactoryState(t *testing.T, d *fabrictest.Device, s resetStores, wantR
 		if err != nil || len(fabrics) != 0 {
 			t.Fatalf("fabrics after the factory reset %v (%v), want none", fabrics, err)
 		}
-		if v, ok, _ := s.credentials.GetSetting(ctx, store.SettingUniqueID); ok {
+		if v, ok, _ := s.credentials.GetSetting(ctx, store.SettingUniqueID); ok && v == staleUniqueID {
 			t.Fatalf("UniqueID %q persisted across the factory reset", v)
 		}
 		if err := d.Start(ctx); err != nil {
@@ -82,13 +94,14 @@ func assertFactoryState(t *testing.T, d *fabrictest.Device, s resetStores, wantR
 // — fabrictest.Device.FactoryReset here — builds the node that comes back
 // (BD-Matter-FactoryResetEndsTheNode). matter.js's online/offline
 // transitions are the device's running state; its "unique id did not
-// persist" is the pinned UniqueID gone from the store.
+// persist" is the UniqueID the old node served gone from the store (a
+// node that came back before a parallel stop pinned its own).
 func TestServerNodeFactoryResetParityMatterJS(t *testing.T) {
 	t.Parallel()
 
 	commissioned := func(t *testing.T) (*fabrictest.Site, *fabrictest.Pair, resetStores) {
 		t.Helper()
-		s := newResetStores()
+		s := newResetStores(t)
 		site := quietSite(t)
 		p := site.CommissionedPair(fabrictest.PairOptions{Device: fabrictest.Topology{Configure: s.configure}})
 		return site, p, s
@@ -111,13 +124,16 @@ func TestServerNodeFactoryResetParityMatterJS(t *testing.T) {
 	t.Run("factory resets when online after commission", func(t *testing.T) {
 		t.Parallel()
 		_, p, s := commissioned(t)
-		before := p.Device.Node().UniqueID()
+		if before := p.Device.Node().UniqueID(); before != staleUniqueID {
+			t.Fatalf("UniqueID %q served before the reset, want the stored %q", before, staleUniqueID)
+		}
 		if err := p.Device.FactoryReset(parityCtx(t)); err != nil {
 			t.Fatal(err)
 		}
 		assertFactoryState(t, p.Device, s, true)
-		if p.Device.Node().UniqueID() == "" || before == "" {
-			t.Fatal("no UniqueID served")
+		// node-helpers.ts:164-165: the node that came back serves its own.
+		if got := p.Device.Node().UniqueID(); got == "" || got == staleUniqueID {
+			t.Fatalf("UniqueID %q served after the reset", got)
 		}
 	})
 
@@ -125,7 +141,7 @@ func TestServerNodeFactoryResetParityMatterJS(t *testing.T) {
 	// was never commissioned and is offline.
 	t.Run("factory resets when offline without commission", func(t *testing.T) {
 		t.Parallel()
-		s := newResetStores()
+		s := newResetStores(t)
 		site := quietSite(t)
 		u := site.UncommissionedPair(fabrictest.PairOptions{Device: fabrictest.Topology{Configure: s.configure}})
 		if err := u.Device.Stop(parityCtx(t)); err != nil {
@@ -204,7 +220,7 @@ func TestServerNodeFactoryResetParityMatterJS(t *testing.T) {
 	// record, endpoint/assembler.go) — until the factory reset erases it.
 	t.Run("frees the endpoint numbers a factory reset erases", func(t *testing.T) {
 		t.Parallel()
-		s := newResetStores()
+		s := newResetStores(t)
 		site := quietSite(t)
 		first := newLight(t, site, "first")
 		d := site.AddDevice(fabrictest.Topology{Configure: s.configure, Bridged: []node.Endpoint{first}})

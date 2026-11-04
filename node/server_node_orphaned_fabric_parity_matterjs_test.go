@@ -22,7 +22,7 @@ import (
 // own entry and none of the missing fabric's.
 func TestServerNodeOrphanedFabricDataParityMatterJS(t *testing.T) {
 	t.Parallel()
-	s := newResetStores()
+	s := newResetStores(t)
 	site := quietSite(t)
 	p := site.CommissionedPair(fabrictest.PairOptions{Device: fabrictest.Topology{Configure: s.configure}})
 	ctx := parityCtx(t)
