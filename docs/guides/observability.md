@@ -203,7 +203,7 @@ A host reads what its node serves through the facade, below no seam:
 | Facade | What it does |
 | --- | --- |
 | `Node.ReadAttribute(ctx, endpoint, cluster, attribute)` | one attribute as a controller's read reaches it — the cluster server's `MatterRead` through the node's dispatcher — as `node.AttributeValue{Endpoint, Cluster, Attribute, Value, DataVersion}`. No access control and no accessing fabric: a fabric-scoped list holds every fabric's entries with their fabric-sensitive fields withheld. An unserved path is a `contract.StatusError` with the status a controller receives; before `Start`, `node.ErrNotStarted`. |
-| `Node.ReadCluster(ctx, endpoint, cluster)` | every attribute of one cluster, the globals among them, in a wildcard read's order. |
+| `Node.ReadCluster(ctx, endpoint, cluster)` | every attribute of one cluster, the globals among them, in a wildcard read's order — one whose read fails among them, with the IM status the wildcard read reports for its path in `AttributeValue.Status` and no value (0 is success). |
 | `AttributeValue.JSON()` | the value by name, rendered by the decoder behind the controller side's `client.DecodeJSON` (`NameBased`) from the bytes the node sends, so the node and a controller render a value alike. |
 | `Node.Events(node.EventQuery{Endpoint, Cluster, Event, MinNumber, Limit})` | the node's event log — the records a controller's event read is answered from — oldest first; nil path fields match every one, `MinNumber` is inclusive, a positive `Limit` keeps the newest. The log is bounded and emptied when the node stops. |
 | `Event.JSON()` | the event's payload by name, as `AttributeValue.JSON`. |
