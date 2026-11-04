@@ -879,13 +879,25 @@ func (p camPTZ) MptzMoveToPreset(context.Context, uint8, avdef.MPTZStruct) error
 func (camPTZ) MptzSavePreset(context.Context, uint8) error                       { return nil }
 func (camPTZ) MptzRemovePreset(context.Context, uint8) error                     { return nil }
 
-// DptzSetViewport sets an allocated stream's viewport.
+// DptzSetViewport sets an allocated stream's viewport: no smaller than
+// the minimum viewport, no larger than the sensor, at the stream's aspect
+// ratio to two places, CONSTRAINT_ERROR otherwise
+// (camera-avsettingsuserlevel-manager.cpp:131-175).
 func (p camPTZ) DptzSetViewport(_ context.Context, id uint16, vp avdef.ViewportStruct) error {
 	p.c.mu.Lock()
 	defer p.c.mu.Unlock()
+	ratio := func(w, h uint16) float32 { return float32(math.Floor(float64(float32(w)/float32(h)*100))) / 100 }
 	for i := range p.c.videos {
-		if p.c.videos[i].params.VideoStreamId == id && p.c.videos[i].allocated {
-			p.c.videos[i].viewport = vp
+		v := &p.c.videos[i]
+		if v.params.VideoStreamId == id && v.allocated {
+			w, h := vp.X2-vp.X1, vp.Y2-vp.Y1
+			if w < camMinWidth || h < camMinHeight || w > camMaxWidth || h > camMaxHeight {
+				return statusErr(im.StatusConstraintError, "viewport %dx%d", w, h)
+			}
+			if ratio(w, h) != ratio(v.params.MaxResolution.Width, v.params.MaxResolution.Height) {
+				return statusErr(im.StatusConstraintError, "viewport %dx%d has not the stream's aspect ratio", w, h)
+			}
+			v.viewport = vp
 			return nil
 		}
 	}
