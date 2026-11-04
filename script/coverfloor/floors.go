@@ -53,8 +53,8 @@ var floors = []packageFloor{
 		why: "Go 1.27.2 counts statements per cover block differently: against 1.27.1 the profile has the same blocks and the same covered/uncovered set, only fewer statements per block, so the percentage fell without any test or code change (84.9 % to 83.6 %)",
 	},
 	{pkg: "github.com/SukramJ/go-fabric/bridge/bridgetest", min: 92},
-	{pkg: "github.com/SukramJ/go-fabric/clock", min: 87, why: "phase 32: measured after Fable's security tranche (the monotonic reading, the certificate codec, the product judged against the chain) without the tests that held the old floor; lowered by the last agent to get the bundle through, for Fable to restore or confirm (100 before)"},
-	{pkg: "github.com/SukramJ/go-fabric/clock/clocktest", min: 91, why: "phase 32: measured after Fable's security tranche (the monotonic reading, the certificate codec, the product judged against the chain) without the tests that held the old floor; lowered by the last agent to get the bundle through, for Fable to restore or confirm (95 before)"},
+	{pkg: "github.com/SukramJ/go-fabric/clock", min: 100},
+	{pkg: "github.com/SukramJ/go-fabric/clock/clocktest", min: 99, why: "phase 32: 99.3 with the wall-step and monotonic cases; what is left is Resolve's first select"},
 	{pkg: "github.com/SukramJ/go-fabric/cluster", min: 99},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/alarm", min: 98},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/alarmbase", min: 94},
@@ -295,8 +295,8 @@ var floors = []packageFloor{
 	{pkg: "github.com/SukramJ/go-fabric/secure/aesccm", min: 96},
 	{
 		pkg: "github.com/SukramJ/go-fabric/secure/attestation",
-		min: 79,
-		why: "phase 32: measured after Fable's security tranche (the monotonic reading, the certificate codec, the product judged against the chain) without the tests that held the old floor; lowered by the last agent to get the bundle through, for Fable to restore or confirm (80 before); Go 1.27.2 counts statements per cover block differently: against 1.27.1 the profile has the same blocks and the same covered/uncovered set, only fewer statements per block, so the percentage fell without any test or code change (85.7 % to 80.2 %)",
+		min: 84,
+		why: "Go 1.27.2 counts statements per cover block differently: against 1.27.1 the profile has the same blocks and the same covered/uncovered set, only fewer statements per block, so the percentage fell without any test or code change (85.7 % to 80.2 %); phase 32: 84.8 with the product-id tests",
 	},
 	{pkg: "github.com/SukramJ/go-fabric/secure/channel", min: 85},
 	// These three floors are deliberately set from the module WITHOUT its
@@ -308,7 +308,7 @@ var floors = []packageFloor{
 	// Anchoring below the fuzz contribution keeps the floor measuring the
 	// package's own tests. Re-measure and raise them once the fuzz corpus
 	// has settled; `make cover-check` says by how much.
-	{pkg: "github.com/SukramJ/go-fabric/secure/mattercert", min: 83, why: "phase 32: measured after Fable's security tranche (the monotonic reading, the certificate codec, the product judged against the chain) without the tests that held the old floor; lowered by the last agent to get the bundle through, for Fable to restore or confirm (90 before)"},
+	{pkg: "github.com/SukramJ/go-fabric/secure/mattercert", min: 94, why: "phase 32: 95.2 with the DER codec's refusal cases (der_edges_test.go)"},
 	{pkg: "github.com/SukramJ/go-fabric/secure/operational", min: 95},
 	{pkg: "github.com/SukramJ/go-fabric/secure/setup", min: 97},
 	{
