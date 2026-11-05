@@ -449,7 +449,9 @@ func (c *demoCamera) build() error {
 			VideoStreamPort: camVideoPort{c}, AudioStreamPort: camAudioPort{c}, SnapshotStreamPort: camSnapshotPort{c}, SnapshotCapturePort: camCapturePort{c},
 		},
 		wpdef.Declare{ProviderPort: camProviderPort{c}},
-		padef.Declare{PushTransportPort: camPushPort{c}},
+		// camera-app.matter's PushAvStreamTransport, featureMap 3:
+		// PERZONESENS and METADATA.
+		padef.Declare{Features: padef.FeaturePerZoneSensitivity | padef.FeatureMetadata, PushTransportPort: camPushPort{c}},
 		avdef.Declare{Features: avsetFeatures, Initial: avset, MechanicalPTZ: camPTZ{c}, DigitalPTZ: camPTZ{c}},
 		zmdef.Declare{Features: zmFeatures, Initial: zm, ZonePort: camZonePort{c}},
 	)
