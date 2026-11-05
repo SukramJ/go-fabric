@@ -301,10 +301,6 @@ func (c *Controller) OnCameraSignal(fn func(CameraSignal)) (unsubscribe func()) 
 	}
 }
 
-// ErrNoAdvertiser is an operational record asked for without an
-// advertiser.
-var ErrNoAdvertiser = errors.New("controller: no mDNS advertiser")
-
 // advertiseOperational publishes the operational record of RootNodeID
 // (`_matter._tcp`, Matter §4.3.1), so that a node of the fabric can open
 // CASE to the controller when no session of ours is alive — chip's

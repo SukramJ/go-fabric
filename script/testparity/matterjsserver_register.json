@@ -506,7 +506,7 @@
     },
     {
       "path": "packages/ws-controller/test/NetworkTopologyServiceTest.ts",
-      "status": "ported",
+      "status": "partial",
       "go": [
         "controller/topology:TestBuildSyntheticMesh",
         "controller/topology:TestBuildLikeTheServerPort",
@@ -523,8 +523,15 @@
         "controller/topology:TestServiceSourceChanged",
         "controller/topology:TestServiceOnASite"
       ],
-      "reason": "NetworkTopologyService as controller/topology ports it (issue 380; notes/parity/by_design.md, the network topology entry): getTopology, change-driven emission, node sources, refresh, stop.",
-      "snapshotSha": "c7414f2618576185fadb1ebd5e23b5133b3ec8f2"
+      "reason": "NetworkTopologyService as controller/topology ports it (issue 380; notes/parity/by_design.md, the network topology entry): getTopology, change-driven emission, node sources, refresh, stop. The five border-router and host-name cases are missing: the module has no border-router registry (controller/topology builds without one; notes/parity/by_design.md, the network topology entry) — route: the registry with the server's host-name rules, when a consumer needs it.",
+      "snapshotSha": "c7414f2618576185fadb1ebd5e23b5133b3ec8f2",
+      "missing": [
+        "omits host_name when the Border Router has no mDNS hostname",
+        "omits host_name when the mDNS hostname strips to nothing",
+        "prefers the node's own Thread network name over the Border Router registry",
+        "rebuilds against the current Border Router registry when a BR is discovered",
+        "rebuilds when a Border Router entry is updated (e.g. its network name resolves)"
+      ]
     },
     {
       "path": "packages/ws-controller/test/OverlayPolicyTest.ts",

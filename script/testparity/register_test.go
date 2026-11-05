@@ -148,8 +148,8 @@ const testparityLeftRatchet = 576
 // as ported: 0 planned, 19 ported, 1 missing, 97 left.
 const (
 	serverPlannedRatchet = 0
-	serverPortedRatchet  = 19
-	serverMissingRatchet = 1
+	serverPortedRatchet  = 18
+	serverMissingRatchet = 6
 	serverLeftRatchet    = 97
 )
 
