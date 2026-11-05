@@ -97,10 +97,10 @@ type videoEnvelopeArgs struct {
 // they are whole.
 func floorInt(v float64) int {
 	switch {
-	case v >= math.MaxInt64:
-		return math.MaxInt64
-	case v <= math.MinInt64:
-		return math.MinInt64
+	case v >= math.MaxInt:
+		return math.MaxInt
+	case v <= math.MinInt:
+		return math.MinInt
 	default:
 		return int(math.Floor(v))
 	}
