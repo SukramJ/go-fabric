@@ -29,8 +29,10 @@ var DefaultTimings = Timings{ActiveModeThreshold: 5 * time.Second, IdleModeDurat
 // other activity, and until a StayActive promise ends, whichever is last;
 // then idle for at most IdleModeDuration before it checks in again. The
 // peer is assumed not to back off, as the CHIP SDK's default strategy does
-// not. Callers pass the time; the schedule holds no timer. Not safe for
-// concurrent use; [PeerWakefulness] guards it.
+// not. Callers pass the time — readings of whichever clock they keep it
+// on, as matter.js's Timestamp: [PeerWakefulness] passes the monotonic
+// reading, so a step of the wall clock moves no deadline; the schedule
+// holds no timer. Not safe for concurrent use; [PeerWakefulness] guards it.
 //
 // Mirrors matter.js packages/protocol/src/icd/IcdPeerSchedule.ts:23-88
 // (Core §9.15.1.3.2.3, §9.16.6.2-3).
