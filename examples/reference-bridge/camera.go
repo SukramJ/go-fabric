@@ -178,10 +178,14 @@ type camAvailableAudio struct {
 	allocated bool
 }
 
+// camTransport is a push transport of the manager (push-av-stream-manager.cpp
+// mTransportMap) and the recording its PushAVTransport runs.
 type camTransport struct {
-	options csdef.StreamUsageEnum
-	session uint64
-	status  padef.TransportStatusEnum
+	trigger   padef.TransportTriggerOptionsStruct
+	session   uint64
+	status    padef.TransportStatusEnum
+	streaming bool
+	stop      *time.Timer
 }
 
 // camTriggerContext is the zone manager's ZoneTriggerContext.
@@ -799,42 +803,171 @@ func (c *demoCamera) endSession(id uint16, reason uint8) {
 
 type camPushPort struct{ c *demoCamera }
 
+// The push transports follow the camera-app's PushAvStreamTransportManager
+// and PushAVTransport (push-av-stream-manager.cpp:187-315,
+// pushav-transport.cpp:409-427, :520-627) without a recorder or uploader:
+// a continuous transport begins when set Active and ends when set
+// Inactive; a triggered one — the ManuallyTriggerTransport command, or a
+// ZoneTriggered motion for a motion transport — begins on an Active
+// transport and ends after its InitialDuration. Begin and end are the
+// server's PushTransportBegin and PushTransportEnd events
+// (NotifyTransportStarted, NotifyTransportStopped); each begin is a new
+// CMAF session.
+
 func (p camPushPort) AllocatePushTransport(_ context.Context, id uint16, _ uint8, options padef.TransportOptionsStruct, _ padef.TLSCredentials) error {
 	p.c.mu.Lock()
 	defer p.c.mu.Unlock()
-	p.c.transports[id] = &camTransport{options: csdef.StreamUsageEnum(options.StreamUsage), status: padef.TransportStatusInactive}
+	p.c.transports[id] = &camTransport{trigger: options.TriggerOptions, status: padef.TransportStatusInactive}
 	return nil
 }
 
 func (p camPushPort) DeallocatePushTransport(_ context.Context, id uint16) error {
 	p.c.mu.Lock()
 	defer p.c.mu.Unlock()
+	if t, ok := p.c.transports[id]; ok && t.stop != nil {
+		t.stop.Stop()
+	}
 	delete(p.c.transports, id)
 	return nil
 }
 
-func (camPushPort) ModifyPushTransport(context.Context, uint16, padef.TransportOptionsStruct) error {
+func (p camPushPort) ModifyPushTransport(_ context.Context, id uint16, options padef.TransportOptionsStruct) error {
+	p.c.mu.Lock()
+	defer p.c.mu.Unlock()
+	if t, ok := p.c.transports[id]; ok {
+		t.trigger = options.TriggerOptions
+	}
 	return nil
 }
 
+// SetTransportStatus is the manager's SetTransportStatus (:239-285): no
+// Active while a privacy mode is on (INVALID_IN_STATE).
 func (p camPushPort) SetTransportStatus(_ context.Context, ids []uint16, status padef.TransportStatusEnum) error {
-	p.c.mu.Lock()
-	defer p.c.mu.Unlock()
+	if status == padef.TransportStatusActive {
+		if av, ok := p.c.camera.CameraAvStreamManagement().Underlying().(*camera.AvStream); ok {
+			if hard, rec, live := av.PrivacyModes(); hard || rec || live {
+				return statusErr(im.StatusInvalidInState, "a privacy mode is on")
+			}
+		}
+	}
 	for _, id := range ids {
-		if t, ok := p.c.transports[id]; ok {
-			t.status = status
+		p.c.mu.Lock()
+		t, ok := p.c.transports[id]
+		if !ok || t.status == status {
+			p.c.mu.Unlock()
+			continue
+		}
+		t.status = status
+		continuous := t.trigger.TriggerType == padef.TransportTriggerTypeContinuous
+		p.c.mu.Unlock()
+		switch {
+		case status == padef.TransportStatusActive && continuous:
+			p.c.beginTransport(id, nil, 0)
+		case status == padef.TransportStatusInactive:
+			p.c.endTransport(id)
 		}
 	}
 	return nil
 }
 
-func (p camPushPort) ManuallyTriggerTransport(_ context.Context, id uint16, _ padef.TriggerActivationReasonEnum, _ *padef.TransportMotionTriggerTimeControlStruct) error {
+func (p camPushPort) ManuallyTriggerTransport(_ context.Context, id uint16, reason padef.TriggerActivationReasonEnum, tc *padef.TransportMotionTriggerTimeControlStruct) error {
 	p.c.mu.Lock()
-	defer p.c.mu.Unlock()
-	if t, ok := p.c.transports[id]; ok {
-		t.session++
+	t, ok := p.c.transports[id]
+	if !ok {
+		p.c.mu.Unlock()
+		return statusErr(im.StatusNotFound, "connection %d", id)
+	}
+	active := t.status == padef.TransportStatusActive
+	p.c.mu.Unlock()
+	if active {
+		d := uint16(1)
+		if tc != nil {
+			d = tc.InitialDuration
+		}
+		p.c.beginTransport(id, &reason, time.Duration(d)*time.Second)
 	}
 	return nil
+}
+
+// beginTransport starts a transport's recording: a new CMAF session and
+// PushTransportBegin; a triggered one ends after d.
+func (c *demoCamera) beginTransport(id uint16, reason *padef.TriggerActivationReasonEnum, d time.Duration) {
+	c.mu.Lock()
+	t, ok := c.transports[id]
+	if !ok {
+		c.mu.Unlock()
+		return
+	}
+	trigger := t.trigger.TriggerType
+	already := t.streaming
+	if !already {
+		t.streaming = true
+		t.session++
+	}
+	if d > 0 {
+		if t.stop != nil {
+			t.stop.Stop()
+		}
+		t.stop = time.AfterFunc(d, func() { c.endTransport(id) })
+	}
+	c.mu.Unlock()
+	if already {
+		return
+	}
+	go func() {
+		if err := c.pushTransport().TransportStarted(id, trigger, reason); err != nil {
+			c.logger.Info("camerasim.pushbegin", slog.Uint64("connection", uint64(id)), slog.Any("err", err))
+		}
+	}()
+}
+
+// endTransport ends a transport's recording: PushTransportEnd.
+func (c *demoCamera) endTransport(id uint16) {
+	c.mu.Lock()
+	t, ok := c.transports[id]
+	if !ok || !t.streaming {
+		c.mu.Unlock()
+		return
+	}
+	t.streaming = false
+	if t.stop != nil {
+		t.stop.Stop()
+		t.stop = nil
+	}
+	c.mu.Unlock()
+	go func() {
+		if err := c.pushTransport().TransportStopped(id); err != nil {
+			c.logger.Info("camerasim.pushend", slog.Uint64("connection", uint64(id)), slog.Any("err", err))
+		}
+	}()
+}
+
+// pushTransport is the camera's push transport server's host side.
+func (c *demoCamera) pushTransport() padef.Host {
+	return c.camera.PushAvStreamTransport().Host()
+}
+
+// motionTriggered is the manager's HandleZoneTrigger (:673-694): every
+// Active motion transport begins with the reason Automation and ends after
+// its InitialDuration.
+func (c *demoCamera) motionTriggered() {
+	automation := padef.TriggerActivationReasonAutomation
+	c.mu.Lock()
+	var ids []uint16
+	var durations []time.Duration
+	for id, t := range c.transports {
+		if t.trigger.TriggerType == padef.TransportTriggerTypeMotion && t.status == padef.TransportStatusActive {
+			d := time.Second
+			if t.trigger.MotionTimeControl != nil {
+				d = time.Duration(t.trigger.MotionTimeControl.InitialDuration) * time.Second
+			}
+			ids, durations = append(ids, id), append(durations, d)
+		}
+	}
+	c.mu.Unlock()
+	for i, id := range ids {
+		c.beginTransport(id, &automation, durations[i])
+	}
 }
 
 // TransportBusy is GetTransportBusyStatus: nothing uploads here.
@@ -1165,7 +1298,9 @@ func (c *demoCamera) apply(cmd cameraPipeCommand) error {
 			}
 			ids = []uint16{one}
 		}
-		return c.zoneTriggered(ids)
+		err := c.zoneTriggered(ids)
+		c.motionTriggered()
+		return err
 	default:
 		// AmbientContextTriggered and the AvAnalysis commands drive the
 		// camera-app's AvAnalysis cluster, which is not served here.
