@@ -1445,6 +1445,16 @@
     "occurrences": 1
   },
   {
+    "file": "cluster/wire/admincommissioning_basic_test.go",
+    "line": 19,
+    "citation": "AdministratorCommissioningServer.ts:55-57",
+    "resolved": "packages/node/src/behaviors/administrator-commissioning/AdministratorCommissioningServer.ts",
+    "at": "862ad75f",
+    "identifier": "BasicCommissioning",
+    "nearest": 114,
+    "occurrences": 0
+  },
+  {
     "file": "cluster/wire/fancontrol.go",
     "line": 11,
     "citation": "fan-control.element.ts:69-74",

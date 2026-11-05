@@ -3197,12 +3197,13 @@
         "cluster/lock:TestDoorLockServerOperatingModeParity",
         "cluster/lock:TestDoorLockServerLockHardwareParity",
         "cluster/lock:TestDoorLockServerLockOperationEventsParity",
-        "cluster/lock:TestDoorLockServerLockUserChangeParity"
+        "cluster/lock:TestDoorLockServerLockUserChangeParity",
+        "cluster/lock:TestDoorLockServerFaceCredentialParity"
       ],
       "missing": [
         "measures the lockout on the monotonic clock"
       ],
-      "reason": "67 of 68 cases ported onto a commissioned fabrictest pair, one Go file per describe (cluster/lock/doorlockserver_*_parity_matterjs_test.go). Missing, M4: findings entry \"clock.Clock has no monotonic reading\": the monotonic-lockout case steps MockTime's wall clock apart from its timers; clocktest.Fake has one reading, so the step moves the lockout deadline's reading too (the server compares time.Time, monotonic under clock.System).",
+      "reason": "67 of 68 cases ported onto a commissioned fabrictest pair, one Go file per describe (cluster/lock/doorlockserver_*_parity_matterjs_test.go). The file names no face credential; since phase 36 serves FACE (DoorLockServer.ts:86-98), four SetCredential cases of describe(\"DoorLockServer\") run once more with the Face type (doorlockserver_face_parity_matterjs_test.go). Missing, M4: findings entry \"clock.Clock has no monotonic reading\": the monotonic-lockout case steps MockTime's wall clock apart from its timers; clocktest.Fake has one reading, so the step moves the lockout deadline's reading too (the server compares time.Time, monotonic under clock.System).",
       "snapshotSha": "b56582b0263eb069b28554616645021a9e18d060"
     },
     {
