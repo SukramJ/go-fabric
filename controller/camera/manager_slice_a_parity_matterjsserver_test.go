@@ -1594,9 +1594,9 @@ func TestSliceAResolveAudioStreamParityMatterjsServer(t *testing.T) {
 	t.Run("fails when a caller that asked for audio gets an allocate response with no id", func(t *testing.T) {
 		m, _, _ := managerWith(fixtureState(), nil)
 		_, err := sliceAResolveAudio(t.Context(), m, nil, &audioHints{bitRate: 32000})
-		var le *localError
+		var le *StackError
 		if !errors.As(err, &le) {
-			t.Errorf("err = %v, want *localError", err)
+			t.Errorf("err = %v, want *StackError", err)
 		}
 	})
 

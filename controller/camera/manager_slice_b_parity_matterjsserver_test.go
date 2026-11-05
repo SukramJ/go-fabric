@@ -258,11 +258,11 @@ func sliceBIncompatible(t *testing.T, err error) *IncompatibleError {
 	return inc
 }
 
-func sliceBLocal(t *testing.T, err error) *localError {
+func sliceBLocal(t *testing.T, err error) *StackError {
 	t.Helper()
-	var le *localError
+	var le *StackError
 	if !errors.As(err, &le) {
-		t.Fatalf("err = %v, want *localError (SDKStackError)", err)
+		t.Fatalf("err = %v, want *StackError (SDKStackError)", err)
 	}
 	return le
 }

@@ -801,7 +801,7 @@ func TestSliceCSnapshotParityMatterjsServer(t *testing.T) { //nolint:gocognit,go
 
 	t.Run("gives the snapshot stream back when the capture response is unusable", func(t *testing.T) {
 		m, io, _ := managerWith(fixtureState(), sliceCSnapshotCamera(3, csdef.CaptureSnapshotResponse{ImageCodec: csdef.ImageCodecJpeg}))
-		sliceCAs[*localError](t, sliceCSnapshotErr(t, m, snapshotArgs{}))
+		sliceCAs[*StackError](t, sliceCSnapshotErr(t, m, snapshotArgs{}))
 		sliceCSlice(t, "deallocated", sliceCSnapshotDeallocs(io), []uint16{3})
 	})
 }

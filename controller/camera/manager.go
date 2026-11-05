@@ -597,19 +597,21 @@ func isTyped(err error) bool {
 		ns  *NotSupportedError
 		pr  *PrivacyError
 		ae  *argumentError
-		le  *localError
+		le  *StackError
 	)
 	return errors.As(err, &inc) || errors.As(err, &exh) || errors.As(err, &ns) || errors.As(err, &pr) || errors.As(err, &ae) || errors.As(err, &le)
 }
 
-// localError is a failure of the controller's own (matterjs-server's
-// error 7, SDKStackError): a broken device answer, a session given up.
-type localError struct{ msg string }
+// StackError is a failure of the controller's own — a broken device
+// answer, a session given up: matterjs-server's error 7, SDKStackError
+// (packages/ws-controller/src/types/WebSocketMessageTypes.ts:94 at 0bd06f2), the "any other error" a host maps that code onto.
+// Exported so a host matches it with errors.As.
+type StackError struct{ msg string }
 
-func (e *localError) Error() string { return "camera: " + e.msg }
+func (e *StackError) Error() string { return "camera: " + e.msg }
 
 func stackError(format string, args ...any) error {
-	return &localError{msg: fmt.Sprintf(format, args...)}
+	return &StackError{msg: fmt.Sprintf(format, args...)}
 }
 
 // privacyFailure is the typed privacy refusal behind a device

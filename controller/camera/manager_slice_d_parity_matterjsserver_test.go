@@ -815,12 +815,12 @@ func TestSliceDDeviceFeaturesAndPrivacyParityMatterjsServer(t *testing.T) {
 			case cmdVideoStreamAllocate:
 				return sliceDVideoAlloc(9)
 			case callProvideOffer:
-				return nil, fmt.Errorf("%w: %w", &localError{msg: "provider relay failed"}, statusErr(im.StatusInvalidInState))
+				return nil, fmt.Errorf("%w: %w", &StackError{msg: "provider relay failed"}, statusErr(im.StatusInvalidInState))
 			}
 			return nil, nil
 		})
 		_, err := m.startStream(t.Context(), liveStart(liveView))
-		sliceDAs[*localError](t, err)
+		sliceDAs[*StackError](t, err)
 		var pe *PrivacyError
 		if errors.As(err, &pe) {
 			t.Fatalf("err = %v, replaced by a privacy explanation", err)
@@ -1540,7 +1540,7 @@ func TestSliceDAllocateAnsweredOutsideBoundsParityMatterjsServer(t *testing.T) {
 			return sliceDVideoAlloc(7)
 		})
 		_, err := m.resolveVideoStream(t.Context(), sliceDLive(sliceDPinned1080p()))
-		sliceDAs[*localError](t, err)
+		sliceDAs[*StackError](t, err)
 		if n := m.leasedEndpoints(); n != 0 {
 			t.Fatalf("leased endpoints = %d", n)
 		}
@@ -1616,7 +1616,7 @@ func TestSliceDAllocateAnsweredOutsideBoundsParityMatterjsServer(t *testing.T) {
 			return sliceDAudioAlloc(4)
 		})
 		_, err := m.resolveAudioStream(t.Context(), audioRequest{t: tTarget, usage: liveView, hints: &audioHints{}}, trackDemanded)
-		sliceDAs[*localError](t, err)
+		sliceDAs[*StackError](t, err)
 		if n := m.leasedEndpoints(); n != 0 {
 			t.Fatalf("leased endpoints = %d", n)
 		}
@@ -1784,7 +1784,7 @@ func TestSliceDAllocateAnsweredOutsideBoundsParityMatterjsServer(t *testing.T) {
 			return sliceDAnswerSnapshotWith5(r)
 		})
 		_, err := m.snapshot(t.Context(), snapshotArgs{t: tTarget})
-		sliceDAs[*localError](t, err)
+		sliceDAs[*StackError](t, err)
 	})
 }
 
@@ -2019,7 +2019,7 @@ func TestSliceDEvictionOrderParityMatterjsServer(t *testing.T) {
 		m, io, recordingAllocates := sliceDStaysFull(uint16(9), uint16(12))
 		sliceDOwnServable(t, m, io)
 		_, err := m.startStream(t.Context(), sliceDStart("", trackDeferred, nil, trackDeclined, nil))
-		sliceDAs[*localError](t, err)
+		sliceDAs[*StackError](t, err)
 		deallocates := sliceDInvokesOf(io, cmdVideoStreamDeallocate)
 		freed := make([]uint16, 0, len(deallocates))
 		for _, r := range deallocates {

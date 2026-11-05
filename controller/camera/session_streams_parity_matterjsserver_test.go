@@ -293,7 +293,7 @@ func ssReOffer(edit func(*wpdef.ProvideOfferRequest)) wpdef.ProvideOfferRequest 
 // TestSessionStreamsEstablishParityMatterjsServer is describe("establishWebRtcProviderSession")
 // (WebRtcSessionStreamsTest.ts:226-877, matterjs-server at 0bd06f2).
 func TestSessionStreamsEstablishParityMatterjsServer(t *testing.T) {
-	var local *localError
+	var local *StackError
 	t.Run("throws when the device response carries no numeric webRtcSessionId", func(t *testing.T) {
 		f := newSSFixture()
 		f.respond = func(context.Context, string) (any, error) { return nil, nil }
