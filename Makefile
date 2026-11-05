@@ -65,7 +65,12 @@ STRESS_INPROC  ?= 1
 # syntax. Phase 35 (#395) emptied the list: its eighteen lines were the
 # regression list of brief CG's fixes, and each test's last wall-clock
 # window moved to a settled site, a synctest bubble or a fake clock.
-STRESS_FLAKES =
+STRESS_FLAKES = \
+	"./controller:TestOTAPushFromTheController$$"
+# TestOTAPushFromTheController: once under the full-package cover run of
+# phase 37's final guards ("statuses lack WaitForApply"); 6/6 alone and 2/2
+# in the package afterwards — placed here for the nightly stress job
+# (phase 37, 2026-11-05).
 
 .DEFAULT_GOAL := help
 
