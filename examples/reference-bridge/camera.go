@@ -191,6 +191,11 @@ type camTransport struct {
 	// mMotionDetectedDurationS), kept while the transport is Inactive.
 	activated time.Time
 	detected  time.Duration
+	// manual is an activation by ManuallyTriggerTransport, whose end
+	// starts no blind period (mCurrentActivationByManualTrigger).
+	manual bool
+	// maxClip bounds an augmented recording (mMaxClipDurationS).
+	maxClip time.Duration
 }
 
 // camTriggerContext is the zone manager's ZoneTriggerContext.
@@ -912,13 +917,19 @@ func (p camPushPort) ManuallyTriggerTransport(_ context.Context, id uint16, reas
 		return statusErr(im.StatusNotFound, "connection %d", id)
 	}
 	active := t.status == padef.TransportStatusActive
+	d, maxClip := time.Second, time.Second
+	if tc != nil {
+		d = time.Duration(max(tc.InitialDuration, 1)) * time.Second
+		maxClip = max(time.Duration(tc.MaxDuration)*time.Second, d)
+	}
+	if active {
+		// A manual activation (TriggerTransport with the manual flag,
+		// pushav-transport.cpp:345-405).
+		t.activated, t.detected, t.manual, t.maxClip = time.Now(), d, true, maxClip
+	}
 	p.c.mu.Unlock()
 	if active {
-		d := uint16(1)
-		if tc != nil {
-			d = tc.InitialDuration
-		}
-		p.c.beginTransport(id, &reason, time.Duration(d)*time.Second)
+		p.c.beginTransport(id, &reason, d)
 	}
 	return nil
 }
@@ -1004,13 +1015,14 @@ func (c *demoCamera) motionTriggered() {
 		// after a recording; a new activation once the detected
 		// duration is over, else the recording augmented up to the
 		// maximum.
-		if !t.activated.IsZero() && now.Before(t.activated.Add(t.detected).Add(sec(uint32(tc.BlindDuration)))) && now.After(t.activated.Add(t.detected)) {
+		if !t.manual && !t.activated.IsZero() && now.Before(t.activated.Add(t.detected).Add(sec(uint32(tc.BlindDuration)))) && now.After(t.activated.Add(t.detected)) {
 			continue
 		}
 		if t.activated.IsZero() || now.Sub(t.activated) >= t.detected {
-			t.activated, t.detected = now, sec(uint32(max(tc.InitialDuration, 1)))
+			t.activated, t.detected, t.manual = now, sec(uint32(max(tc.InitialDuration, 1))), false
+			t.maxClip = sec(max(tc.MaxDuration, uint32(tc.InitialDuration)))
 		} else {
-			t.detected = min(t.detected+sec(uint32(tc.AugmentationDuration)), sec(max(tc.MaxDuration, uint32(tc.InitialDuration))))
+			t.detected = min(t.detected+sec(uint32(tc.AugmentationDuration)), max(t.maxClip, t.detected))
 		}
 		if t.status == padef.TransportStatusActive {
 			ids, durations = append(ids, id), append(durations, t.activated.Add(t.detected).Sub(now))
