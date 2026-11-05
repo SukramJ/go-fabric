@@ -186,6 +186,11 @@ type camTransport struct {
 	status    padef.TransportStatusEnum
 	streaming bool
 	stop      *time.Timer
+	// activated and detected are the last motion's activation time and
+	// its detected duration (PushAVTransport mClipInfo.mActivationTime,
+	// mMotionDetectedDurationS), kept while the transport is Inactive.
+	activated time.Time
+	detected  time.Duration
 }
 
 // camTriggerContext is the zone manager's ZoneTriggerContext.
@@ -878,10 +883,20 @@ func (p camPushPort) SetTransportStatus(_ context.Context, ids []uint16, status 
 		}
 		t.status = status
 		continuous := t.trigger.TriggerType == padef.TransportTriggerTypeContinuous
+		// A motion within its detected duration before the transport
+		// went Active starts the recording for the rest of it
+		// (pushav-transport.cpp:616-638).
+		var rest time.Duration
+		if t.trigger.TriggerType == padef.TransportTriggerTypeMotion && !t.activated.IsZero() {
+			rest = t.detected - time.Since(t.activated)
+		}
 		p.c.mu.Unlock()
 		switch {
 		case status == padef.TransportStatusActive && continuous:
 			p.c.beginTransport(id, nil, 0)
+		case status == padef.TransportStatusActive && rest > 0:
+			automation := padef.TriggerActivationReasonAutomation
+			p.c.beginTransport(id, &automation, rest)
 		case status == padef.TransportStatusInactive:
 			p.c.endTransport(id)
 		}
@@ -975,11 +990,19 @@ func (c *demoCamera) motionTriggered() {
 	var ids []uint16
 	var durations []time.Duration
 	for id, t := range c.transports {
-		if t.trigger.TriggerType == padef.TransportTriggerTypeMotion && t.status == padef.TransportStatusActive {
-			d := time.Second
-			if t.trigger.MotionTimeControl != nil {
-				d = time.Duration(t.trigger.MotionTimeControl.InitialDuration) * time.Second
-			}
+		if t.trigger.TriggerType != padef.TransportTriggerTypeMotion {
+			continue
+		}
+		d := time.Second
+		if t.trigger.MotionTimeControl != nil {
+			d = time.Duration(t.trigger.MotionTimeControl.InitialDuration) * time.Second
+		}
+		// HandleTriggerDetected (:345-405) records the activation
+		// whether or not the transport is Active.
+		if t.activated.IsZero() || time.Since(t.activated) >= t.detected {
+			t.activated, t.detected = time.Now(), d
+		}
+		if t.status == padef.TransportStatusActive {
 			ids, durations = append(ids, id), append(durations, d)
 		}
 	}
