@@ -136,7 +136,7 @@
   },
   {
     "file": "bridge/bridge.go",
-    "line": 694,
+    "line": 697,
     "citation": "ExchangeManager.ts:425-431",
     "resolved": "packages/protocol/src/protocol/ExchangeManager.ts",
     "identifier": "CloseSession",
@@ -145,7 +145,7 @@
   },
   {
     "file": "bridge/bridge.go",
-    "line": 1455,
+    "line": 1458,
     "citation": "Fabric.ts:408-415",
     "resolved": "packages/protocol/src/fabric/Fabric.ts",
     "identifier": "initiateForceClose",
@@ -154,7 +154,7 @@
   },
   {
     "file": "bridge/bridge.go",
-    "line": 1780,
+    "line": 1783,
     "citation": "Session.ts:248",
     "resolved": "packages/protocol/src/session/Session.ts",
     "identifier": "initiateClose",
@@ -2099,7 +2099,7 @@
   },
   {
     "file": "secure/operational/manager.go",
-    "line": 64,
+    "line": 67,
     "citation": "packages/protocol/src/session/NodeSession.ts:368",
     "resolved": "packages/protocol/src/session/NodeSession.ts",
     "identifier": "gracefulClose",
@@ -2108,7 +2108,7 @@
   },
   {
     "file": "secure/operational/manager.go",
-    "line": 125,
+    "line": 128,
     "citation": "NodeSession.ts:368",
     "resolved": "packages/protocol/src/session/NodeSession.ts",
     "identifier": "gracefulClose",
@@ -2117,7 +2117,7 @@
   },
   {
     "file": "secure/operational/manager.go",
-    "line": 349,
+    "line": 374,
     "citation": "SessionManager.ts:484",
     "resolved": "packages/protocol/src/session/SessionManager.ts",
     "identifier": "getPaseSession",
@@ -2126,7 +2126,7 @@
   },
   {
     "file": "secure/operational/manager.go",
-    "line": 908,
+    "line": 933,
     "citation": "packages/protocol/src/session/SessionManager.ts:490-508",
     "resolved": "packages/protocol/src/session/SessionManager.ts",
     "identifier": "getNextAvailableSessionId",
@@ -2135,7 +2135,7 @@
   },
   {
     "file": "secure/operational/manager.go",
-    "line": 934,
+    "line": 959,
     "citation": "packages/protocol/src/session/SessionManager.ts:513",
     "resolved": "packages/protocol/src/session/SessionManager.ts",
     "identifier": "getSession",
@@ -2144,7 +2144,7 @@
   },
   {
     "file": "secure/operational/manager.go",
-    "line": 1037,
+    "line": 1062,
     "citation": "Session.ts:248",
     "resolved": "packages/protocol/src/session/Session.ts",
     "identifier": "initiateClose",
