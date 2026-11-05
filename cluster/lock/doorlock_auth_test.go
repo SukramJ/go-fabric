@@ -39,7 +39,7 @@ func openStore(t *testing.T) (*store.Store, *sql.DB) {
 func TestServerWithEveryFeatureMatchesTheDefinition(t *testing.T) {
 	t.Parallel()
 	cfg := scheduledLockState(scheduledUser(lockdef.UserTypeUnrestrictedUser, nil))
-	cfg.Features |= lock.FeatureRID | lock.FeatureFGP | lock.FeatureDPS
+	cfg.Features |= lock.FeatureRID | lock.FeatureFGP | lock.FeatureFACE | lock.FeatureDPS
 	cfg.NumberOfRfidUsersSupported, cfg.MinRfidCodeLength, cfg.MaxRfidCodeLength = 10, 4, 16
 	srv, err := lock.New(cfg)
 	if err != nil {
@@ -48,13 +48,19 @@ func TestServerWithEveryFeatureMatchesTheDefinition(t *testing.T) {
 	spectest.CheckServer(t, srv, lockdef.Definition, uint32(cfg.Features))
 }
 
-// TestNewRefusesAFeatureItDoesNotServe: ALIRO, ALBU and FACE stay out.
+// TestNewRefusesAFeatureItDoesNotServe: ALIRO and ALBU stay out (FACE is
+// served since phase 36, as matter.js's base server serves it).
 func TestNewRefusesAFeatureItDoesNotServe(t *testing.T) {
 	t.Parallel()
-	cfg := lockState()
-	cfg.Features |= lockdef.FeatureFaceCredentials
-	if _, err := lock.New(cfg); !errors.Is(err, lock.ErrConfig) {
-		t.Errorf("FACE: %v, want ErrConfig", err)
+	for name, f := range map[string]lock.Feature{
+		"ALIRO":      lockdef.FeatureAliroProvisioning,
+		"ALIRO+ALBU": lockdef.FeatureAliroProvisioning | lockdef.FeatureAliroBleuwb,
+	} {
+		cfg := lockState()
+		cfg.Features |= f
+		if _, err := lock.New(cfg); !errors.Is(err, lock.ErrConfig) {
+			t.Errorf("%s: %v, want ErrConfig", name, err)
+		}
 	}
 }
 

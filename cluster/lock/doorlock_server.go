@@ -20,7 +20,7 @@
 //     schedules; then the hardware moves ([LockOperationHandler], matter.js
 //     handleLockOperation :236) and the lock reports the operation.
 //   - Users, credentials and the three schedule kinds (USR, PIN, RID, FGP,
-//     WDSCH, YDSCH, HDSCH) with every status matter.js answers, the
+//     FACE, WDSCH, YDSCH, HDSCH) with every status matter.js answers, the
 //     LockUserChange events, auto-relock (AutoRelockTime, UnlockWithTimeout)
 //     and ExpiringUser timeouts on [clock.Clock].
 //   - The records persist through an [AuthStore] — every store.Port is one —
@@ -59,12 +59,22 @@ const ClusterID = lockdef.ClusterID
 type Feature = lockdef.Feature
 
 // FeatureMap bits as [Feature] values for [DoorLockConfig].Features. The
-// definition's conformance holds: USR needs PIN, RID or FGP. ALIRO, ALBU
-// and FACE are not served.
+// definition's conformance holds: USR needs PIN, RID, FGP or FACE. ALIRO
+// and ALBU are not served.
+//
+// FACE is served as matter.js's base server serves it: the feature is in
+// DoorLockBaseServerClass's with list (matter.js
+// packages/node/src/behaviors/door-lock/DoorLockServer.ts:86-98, :90), and
+// a face credential takes the credential paths every type without a length
+// or count attribute of its own takes — NumberOfTotalUsersSupported bounds
+// its index (:1415-1427), any data length is accepted (:1429-1445),
+// ClearCredential's wildcard clears it (:604-621). The model marks the
+// feature provisional (door-lock-cluster.element.ts:30, FACE "P, O").
 const (
 	FeaturePIN   = lockdef.FeaturePinCredential
 	FeatureRID   = lockdef.FeatureRfidCredential
 	FeatureFGP   = lockdef.FeatureFingerCredentials
+	FeatureFACE  = lockdef.FeatureFaceCredentials
 	FeatureWDSCH = lockdef.FeatureWeekDayAccessSchedules
 	FeatureDPS   = lockdef.FeatureDoorPositionSensor
 	FeatureCOTA  = lockdef.FeatureCredentialOverTheAirAccess
@@ -75,7 +85,7 @@ const (
 )
 
 // servedFeatures are the bits this server implements.
-const servedFeatures = FeaturePIN | FeatureRID | FeatureFGP | FeatureWDSCH | FeatureDPS |
+const servedFeatures = FeaturePIN | FeatureRID | FeatureFGP | FeatureFACE | FeatureWDSCH | FeatureDPS |
 	FeatureCOTA | FeatureUSR | FeatureYDSCH | FeatureHDSCH | FeatureUBOLT
 
 // defaultSupportedOperatingModes is matter.js's default

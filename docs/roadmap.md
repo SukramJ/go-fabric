@@ -416,6 +416,8 @@ Planned in go-fabric-ui (concept U3 there, like U1 and U2); this page records th
 | 39 | the protocol remainder, consumer-driven: the OTA requestor over HTTPS, the BTP renegotiation after a stall, the trusted-time-source client, the Fabric Sync remainder; ARL and NFC stay non-goals | comparison rows |
 | 40 | the 1.7 pin when matter.js's snapshot moves (chip's `data_model/1.7`: 12 clusters, 13 device types beyond the snapshot): pin lift, generators, `chipdm-check` 1.7; nothing before | the weekly `matterjs-pin` job reports the jump |
 
+**Status 2026-11-05.** Phase 36 landed on one branch: DoorLock serves FACE as matter.js's base server does; AdministratorCommissioning's Basic feature is a node option (`node.Commissioning.BasicCommissioning`), which the reference daemon turns on; OccupancySensing takes any detector selection with OccupancyChanged on the OccupancyEvent feature — on the device kit's new self-held server (`cluster/sensing.Occupancy`), which also runs chip's HoldTime timer (*Ahead of matter.js*), and on the measurement projection, whose host states its selection through `contract.OccupancySelection`; the projected PowerSource serves WIRED for a mains-powered source (`contract.PowerSourceSelection`). The DRLK, CADMIN, OCC and PS families run green in update mode, CADMIN 1.4, 1.6 and 1.16 and the OccupancyEvent and HoldTime steps of OCC 2.1–3.2 newly exercised; the PS family runs on the PowerSource part, where TC-PS-2.1 runs again.
+
 **Value.** The premise's remainder, in the premise's order: matter.js's features first, the consumers' features with chip as the authority, the next revision when the gold standard moves.
 
 ## Standing work, outside the milestones

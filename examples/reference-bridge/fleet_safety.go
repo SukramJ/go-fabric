@@ -193,7 +193,7 @@ func (l *demoLock) declaration() device.Declaration {
 	weekDay, yearDay, holiday := uint8(10), uint8(10), uint8(10)
 	wrongCodes, disable, relock := uint8(3), uint8(10), uint32(60)
 	return lockdef.Declare{
-		Features: lockdef.FeatureUser | lockdef.FeaturePinCredential | lockdef.FeatureCredentialOverTheAirAccess |
+		Features: lockdef.FeatureUser | lockdef.FeaturePinCredential | lockdef.FeatureFaceCredentials | lockdef.FeatureCredentialOverTheAirAccess |
 			lockdef.FeatureWeekDayAccessSchedules | lockdef.FeatureYearDayAccessSchedules | lockdef.FeatureHolidaySchedules |
 			lockdef.FeatureUnbolting,
 		StateSource: l,

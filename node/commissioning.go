@@ -164,6 +164,19 @@ func (h *commissioningHost) transition(ctx context.Context, window *bridge.Commi
 		h.logger.Info("commissioning.window.open", slog.Int("discriminator", int(adv.Discriminator)))
 		return false
 	}
+	if snap.Status == wire.WindowStatusBasic {
+		// An administrator's basic window (OpenBasicCommissioningWindow,
+		// the BC feature): PASE with the configured passcode and the
+		// commissionable record under the configured discriminator, CM=1
+		// — matter.js allowBasicCommissioning builds the PASE server from
+		// the node's own passcode (DeviceCommissioner.ts:130-137 at
+		// 862ad75f) and #open advertises the configured discriminator
+		// (:236-256), the status BasicWindowOpen.
+		h.attachPase(h.baseline)
+		h.announce(ctx, h.advert, "commissioning.basic_window.announce")
+		h.logger.Info("commissioning.basic_window.open", slog.Int("discriminator", int(h.advert.Discriminator)))
+		return false
+	}
 	if snap.Status == wire.WindowStatusClosed {
 		// No window: no PASE acceptor and no commissionable record
 		// (matter.js #closeWindow: removePaseCommissioner,

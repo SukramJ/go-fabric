@@ -9,6 +9,7 @@ import (
 
 	"github.com/SukramJ/go-fabric/cluster/sensing"
 	acsdef "github.com/SukramJ/go-fabric/cluster/spec/ambientcontextsensing"
+	occdef "github.com/SukramJ/go-fabric/cluster/spec/occupancysensing"
 )
 
 // acsType is ContactSensor with AmbientContextSensing as an optional
@@ -43,6 +44,9 @@ func sensingCases() []struct {
 		want    any
 	}{
 		{acsdef.ClusterID, func() (*Device, error) { return New(acsType(), testOptions("acs"), acsHA()) }, (*sensing.AmbientContext)(nil)},
+		{occdef.ClusterID, func() (*Device, error) {
+			return New(OccupancySensorType(), testOptions("occ"), withFeatures(occdef.ClusterID, uint32(occdef.FeaturePassiveInfrared)))
+		}, (*sensing.Occupancy)(nil)},
 	}
 }
 
@@ -83,5 +87,42 @@ func TestAmbientContextKit(t *testing.T) {
 	}
 	if d.Server(acsdef.ClusterID) != own {
 		t.Error("the HostServer not mounted")
+	}
+}
+
+// TestOccupancyKit: the OccupancySensor's default server is the kit's
+// OccupancySensing (cluster/sensing.Occupancy) — the reference daemon's
+// declaration: PIR with OccupancyEvent, HoldTime and its limits from
+// Initial as configuration, the PIR delay alias served and reading
+// HoldTime; a selection without a detector type is refused (the model's
+// O.a+).
+func TestOccupancyKit(t *testing.T) {
+	hold := uint16(10)
+	limits := occdef.HoldTimeLimitsStruct{HoldTimeMin: 1, HoldTimeMax: 300, HoldTimeDefault: hold}
+	d, err := New(OccupancySensorType(), testOptions("occ"), occdef.Declare{
+		Features: occdef.FeaturePassiveInfrared | occdef.FeatureOccupancyEvent,
+		Initial:  occdef.Patch{HoldTime: &hold, HoldTimeLimits: &limits, PirOccupiedToUnoccupiedDelay: &hold},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	srv, _ := d.Server(occdef.ClusterID).(*sensing.Occupancy)
+	if srv == nil || srv.HoldTime() != 10 {
+		t.Fatalf("server %T, HoldTime from Initial", d.Server(occdef.ClusterID))
+	}
+	for _, id := range []uint32{occdef.AttrHoldTime, occdef.AttrHoldTimeLimits, occdef.AttrPirOccupiedToUnoccupiedDelay} {
+		if !slices.Contains(srv.MatterAttributes(), id) {
+			t.Errorf("attribute 0x%04X not served", id)
+		}
+	}
+	st := occdef.Wrap(srv).Get()
+	if st.HoldTimeLimits != limits || st.PirOccupiedToUnoccupiedDelay != 10 || st.OccupancySensorType != occdef.OccupancySensorTypeEnumPir {
+		t.Errorf("state %+v", st)
+	}
+	if !slices.Contains(srv.MatterEvents(), occdef.EventOccupancyChanged) {
+		t.Errorf("events %v lack OccupancyChanged", srv.MatterEvents())
+	}
+	if _, err := New(OccupancySensorType(), testOptions("occ-none"), occdef.Declare{Features: occdef.FeatureOccupancyEvent}); err == nil {
+		t.Error("OccupancyEvent alone accepted")
 	}
 }

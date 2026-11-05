@@ -44,6 +44,16 @@ func (specReadings) Frequency() (float64, bool)   { return 50, true }
 func (specReadings) Energy() (float64, bool)      { return 10, true }
 func (specReadings) HasEnergy() bool              { return true }
 
+// selectingOccupancy is an occupancy reading that states its sensor's
+// selection.
+type selectingOccupancy struct{ sel contract.OccupancySelection }
+
+func (selectingOccupancy) MatterBoolValue() (value, observed bool) { return true, true }
+func (selectingOccupancy) MatterMeasurementClass() contract.MeasurementClass {
+	return contract.MeasurementOccupancy
+}
+func (s selectingOccupancy) MatterOccupancySelection() contract.OccupancySelection { return s.sel }
+
 // TestServersMatchTheGeneratedDefinitions holds every measurement server
 // against its matter.js element (cluster/spec, ADR 0013) for the feature
 // selection it serves: FeatureMap and ClusterRevision as the definition
@@ -65,7 +75,10 @@ func TestServersMatchTheGeneratedDefinitions(t *testing.T) {
 		{"Pressure", NewPressureServer(f), prsdef.Definition, 0},
 		{"Flow", NewFlowServer(f), flowdef.Definition, 0},
 		{"BooleanState", NewBooleanStateServer(b), booldef.Definition, uint32(booldef.FeatureChangeEvent)},
-		{"OccupancySensing", NewOccupancySensingServer(b), occdef.Definition, uint32(occdef.FeaturePassiveInfrared)},
+		{"OccupancySensing", NewOccupancySensingServer(b), occdef.Definition, uint32(occdef.FeaturePassiveInfrared | occdef.FeatureOccupancyEvent)},
+		{"OccupancySensing selected", NewOccupancySensingServer(selectingOccupancy{
+			contract.OccupancySelection{Detectors: contract.OccupancyDetectorUltrasonic | contract.OccupancyDetectorRadar, NoOccupancyEvent: true},
+		}), occdef.Definition, uint32(occdef.FeatureUltrasonic | occdef.FeatureRadar)},
 		{"AirQuality", NewAirQualityServer(contract.MeasurementCO2, f), aqdef.Definition, 0},
 		{"CO2", NewCO2ConcentrationServer(f), co2def.Definition, uint32(co2def.FeatureNumericMeasurement)},
 		{"PM2.5", NewPM25ConcentrationServer(f), pm25def.Definition, uint32(pm25def.FeatureNumericMeasurement)},
@@ -79,6 +92,7 @@ func TestServersMatchTheGeneratedDefinitions(t *testing.T) {
 		{"Radon", NewRadonConcentrationServer(f), radondef.Definition, uint32(radondef.FeatureNumericMeasurement)},
 		{"PowerSource bool", NewPowerSourceServer(b), psdef.Definition, uint32(psdef.FeatureBattery)},
 		{"PowerSource float", NewPowerSourceServerFromFloat(f), psdef.Definition, uint32(psdef.FeatureBattery)},
+		{"PowerSource wired", NewWiredPowerSourceServer(contract.WiredCurrentDC), psdef.Definition, uint32(psdef.FeatureWired)},
 		{"PowerTopology", NewPowerTopologyServer(), ptdef.Definition, uint32(ptdef.FeatureNodeTopology)},
 		{"ElectricalPower", NewElectricalPowerServer(f), epmdef.Definition, uint32(epmdef.FeatureAlternatingCurrent)},
 		{"ElectricalPower readings", NewElectricalPowerServerFromReadings(specReadings{f}), epmdef.Definition, uint32(epmdef.FeatureAlternatingCurrent)},

@@ -167,7 +167,7 @@ Harness image: `ghcr.io/sukramj/go-fabric-chip@sha256:e443ea0c1b91478720ee8b94c3
 | ACL | 11 | 10 | 0 | 0 | 1 | 0 | 0 |
 | BINFO | 4 | 2 | 0 | 0 | 2 | 0 | 0 |
 | BRBINFO | 5 | 1 | 0 | 0 | 3 | 1 | 0 |
-| CADMIN | 21 | 10 | 0 | 0 | 3 | 8 | 0 |
+| CADMIN | 21 | 13 | 0 | 0 | 0 | 8 | 0 |
 | CGEN | 10 | 3 | 0 | 0 | 7 | 0 | 0 |
 | CNET | 23 | 2 | 0 | 0 | 12 | 4 | 5 |
 | CNETWIFI | 23 | 6 | 0 | 0 | 11 | 6 | 0 |
@@ -299,7 +299,7 @@ Harness image: `ghcr.io/sukramj/go-fabric-chip@sha256:e443ea0c1b91478720ee8b94c3
 | TBRM | 5 | 3 | 0 | 0 | 1 | 1 | 0 |
 | DGTHREAD | 6 | 4 | 0 | 0 | 1 | 1 | 0 |
 | THNETDIR | 3 | 3 | 0 | 0 | 0 | 0 | 0 |
-| **all** | **829** | **546** | **0** | **2** | **138** | **138** | **5** |
+| **all** | **829** | **549** | **0** | **2** | **135** | **138** | **5** |
 
 ### Cases not run
 
@@ -331,11 +331,8 @@ Harness image: `ghcr.io/sukramj/go-fabric-chip@sha256:e443ea0c1b91478720ee8b94c3
 | CADMIN/1.12 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | CADMIN/1.13 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | CADMIN/1.14 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
-| CADMIN/1.16 | (b) not supported | not applicable: the case's PICS `CADMIN.S & CADMIN.S.F00` is false for the reference DUT |
 | CADMIN/1.18 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | CADMIN/1.2 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
-| CADMIN/1.4 | (b) not supported | not applicable: the case's PICS `CADMIN.S.F00` is false for the reference DUT |
-| CADMIN/1.6 | (b) not supported | not applicable: the case's PICS `CADMIN.S & CADMIN.S.F00` is false for the reference DUT |
 | CADMIN/1.7 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | CADMIN/1.8 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | CC/3.4.Simulated | (b) not supported | not applicable: the case's PICS `CC.C` is false for the reference DUT |

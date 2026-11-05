@@ -550,12 +550,10 @@ Line numbers at `862ad75f`. (Triage 2026-10-29: owner: a re-audit with Apple Hom
   `bridge/commissioning_window.go` checks the fail-safe and the fabric
   first, so an armed fail-safe with an invalid timeout gets Busy, and a PASE
   session without fabric Busy instead of UnsupportedAccess. Needs a read
-  against chip's order and the CADMIN cases before a change. (Triage 2026-10-29: wave H2, commissioning and security (Fable).)
-- **No Basic commissioning window (BC).** `openBasicCommissioningWindow`
-  (`AdministratorCommissioningServer.ts:106-116`) answers
-  UnsupportedCommand; the window code carries `IsBasicWindow` without a
-  feature to reach it. One `CommissioningWindowLifetimeTest.ts` case is
-  `missing` for this. (Triage 2026-10-29: wave H3, node options and the embedding layer.)
+  against chip's order and the CADMIN cases before a change. (Triage 2026-10-29: wave H2, commissioning and security (Fable).) Phase 36's OpenBasicCommissioningWindow takes the same gates in the same order as the enhanced command, so one read settles both.
+- **No Basic commissioning window (BC)** — closed 2026-11-05, phase 36:
+  `node.Commissioning.BasicCommissioning` serves the feature, the
+  `CommissioningWindowLifetimeTest.ts` case is ported.
 - **FailSafeExpiryLengthSeconds is 900 where matter.js seeds 60.**
   `GeneralCommissioningServer.ts:39-41` seeds 60 s (900 s for
   MaxCumulativeFailsafeSeconds, `:44-46`); `NewGeneralCommissioning` floors
@@ -567,14 +565,6 @@ Line numbers at `862ad75f`. (Triage 2026-10-29: owner: a re-audit with Apple Hom
 Found by the phase-19 port (brief BR, 2026-10-20). Line numbers at
 `862ad75f`. (Triage 2026-10-29: wave H2, commissioning and security (Fable).)
 
-- **OccupancySensing has no feature selection.** The Go server serves
-  PassiveInfrared alone (`cluster/measurement/definitions.go`
-  `occupancyInst`), so neither another detector type nor the
-  OccupancyEvent feature can be chosen, and no OccupancyChanged event is
-  emitted, where matter.js emits it on `occupancy$Changed` with the
-  feature (`OccupancySensingServer.ts` `initialize`,
-  `#emitOccupancyChanged`). One `OccupancySensingServerTest.ts` case is
-  `missing` for this. (Triage 2026-10-29: wave H3, node options and the embedding layer.)
 - **The Groupcast server has no Listener-only configuration.** The module
   builds Groupcast with Listener, Sender and PerGroup
   (`GroupcastServer.ts:81-83` as RootEndpoint installs it); a node without
