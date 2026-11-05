@@ -429,3 +429,12 @@ In English: no host device carries a camera cluster until a live test
 with Apple Home has passed. Apple Home is the only ecosystem with Matter
 camera support in 2026. The same rule applies to MSCH. The reference
 bridge composes none of these clusters.
+
+Reworded for the controller side (owner decision 2026-11-05, issue 410
+decision 5): the gate keeps applying to host devices that show themselves
+as a camera. The controller's requestor (`controller.Config.Camera`, the
+Camera Controller endpoint the controller serves under its own identity)
+is excepted: it is the controller role, not a device an ecosystem sees,
+and passes a live test instead — a stream from a camera that go-ha2fabric
+relays with its opt-in `CAMERA` (default off), and chip's camera-app in the
+harness as the independent counterpart.

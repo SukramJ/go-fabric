@@ -46,13 +46,13 @@ var controllerRoleCases = map[string]gap{
 	"TBRM/3.1":    {class: classNotSupported, reason: "controller role: the TH is a Thread border router (`--otbr` needs a live OTBR REST API; matter.js runs it against chip's network-manager app only, TC-TBRM-3.1.test.ts:133-140)"},
 	"DA/1.9":      pythonDriven("TC-DA-1.9.test.ts:32 TC_DA_1_9.py"),
 	"SC/3.5":      pythonDriven("TC-SC-3.5.test.ts:43 TC_SC_3_5.py"),
-	"WEBRTCR/2.1": pythonDriven("TC-WEBRTCR-2.1.test.ts:18 TC_WEBRTCR_2_1.py"),
-	"WEBRTCR/2.2": pythonDriven("TC-WEBRTCR-2.2.test.ts:18 TC_WEBRTCR_2_2.py"),
-	"WEBRTCR/2.3": pythonDriven("TC-WEBRTCR-2.3.test.ts:11 TC_WEBRTCR_2_3.py"),
-	"WEBRTCR/2.4": pythonDriven("TC-WEBRTCR-2.4.test.ts:11 TC_WEBRTCR_2_4.py"),
-	"WEBRTCR/2.5": pythonDriven("TC-WEBRTCR-2.5.test.ts:30 TC_WEBRTCR_2_5.py"),
-	"WEBRTCR/2.6": pythonDriven("TC-WEBRTCR-2.6.test.ts:19 TC_WEBRTCR_2_6.py"),
-	"WEBRTCR/2.7": pythonDriven("TC-WEBRTCR-2.7.test.ts:18 TC_WEBRTCR_2_7.py"),
+	"WEBRTCR/2.1": requestorServed("TC-WEBRTCR-2.1.test.ts:18 TC_WEBRTCR_2_1.py"),
+	"WEBRTCR/2.2": requestorServed("TC-WEBRTCR-2.2.test.ts:18 TC_WEBRTCR_2_2.py"),
+	"WEBRTCR/2.3": requestorServed("TC-WEBRTCR-2.3.test.ts:11 TC_WEBRTCR_2_3.py"),
+	"WEBRTCR/2.4": requestorServed("TC-WEBRTCR-2.4.test.ts:11 TC_WEBRTCR_2_4.py"),
+	"WEBRTCR/2.5": requestorServed("TC-WEBRTCR-2.5.test.ts:30 TC_WEBRTCR_2_5.py"),
+	"WEBRTCR/2.6": requestorServed("TC-WEBRTCR-2.6.test.ts:19 TC_WEBRTCR_2_6.py"),
+	"WEBRTCR/2.7": requestorServed("TC-WEBRTCR-2.7.test.ts:18 TC_WEBRTCR_2_7.py"),
 }
 
 // pythonDriven is the row of a case matter.js runs as chip's own Python
@@ -61,6 +61,16 @@ var controllerRoleCases = map[string]gap{
 // PromptDrivenPythonTest); script names the TS line and the script.
 func pythonDriven(script string) gap {
 	return gap{class: classNotSupported, reason: "controller role: matter.js drives chip's python script (prompt-driven-python-test.ts:41), the DUT answering its prompts — not ported (" + script + ")"}
+}
+
+// requestorServed is the row of a WEBRTCR case now that the controller
+// serves the WebRtcTransportRequestor (phase 37, controller.Config.Camera):
+// matter.js runs these with chip's camera-app as TH_SERVER and the DUT as
+// the requestor (support/chip-testing/test/cert/tc-webrtcr-support.ts:142-148
+// at 862ad75f) through the prompt-driven Python runner; that runner is the
+// harness's follow-up, so the gap is the harness's (class (c)).
+func requestorServed(script string) gap {
+	return gap{class: classHarness, reason: "controller role, served since phase 37 (controller.Config.Camera): matter.js drives chip's python script with chip-camera-app as TH_SERVER and the DUT as requestor (tc-webrtcr-support.ts:142-148, prompt-driven-python-test.ts:41) — the prompt-driven runner is a follow-up (" + script + ")"}
 }
 
 // gap is one case of a family that is not run, with its class and reason.
