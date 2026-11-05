@@ -312,6 +312,16 @@ func assignField(cert *Certificate, el tlv.Element, d *tlv.Decoder) error {
 	case tagSignatureAlgorithm:
 		cert.SignatureAlgorithm = el.Uint
 	case tagIssuer:
+		if !el.IsContainer || el.Type != tlv.TypeList {
+			// A DN is a TLV list; a structure (TC-JFADMIN-1.2 step 16
+			// re-encodes the Subject so) is malformed. Mirrors chip
+			// CHIPCert.cpp:782 ChipDN::DecodeFromTLV (kTLVType_List,
+			// CHIP_ERROR_WRONG_TLV_TYPE) at 6170af84 and matter.js
+			// TlvObject.ts:205-207 at 862ad75f (the DN schema is a
+			// TlvTaggedListPreservingOrder, operational.ts:69-110; another
+			// type is UnexpectedDataError).
+			return fmt.Errorf("%w: issuer is not a TLV list (type 0x%02X)", ErrMalformed, el.Type)
+		}
 		dn, err := decodeDN(d)
 		if err != nil {
 			return fmt.Errorf("issuer: %w", err)
@@ -322,6 +332,16 @@ func assignField(cert *Certificate, el tlv.Element, d *tlv.Decoder) error {
 	case tagNotAfter:
 		cert.NotAfter = el.Uint
 	case tagSubject:
+		if !el.IsContainer || el.Type != tlv.TypeList {
+			// A DN is a TLV list; a structure (TC-JFADMIN-1.2 step 16
+			// re-encodes the Subject so) is malformed. Mirrors chip
+			// CHIPCert.cpp:782 ChipDN::DecodeFromTLV (kTLVType_List,
+			// CHIP_ERROR_WRONG_TLV_TYPE) at 6170af84 and matter.js
+			// TlvObject.ts:205-207 at 862ad75f (the DN schema is a
+			// TlvTaggedListPreservingOrder, operational.ts:69-110; another
+			// type is UnexpectedDataError).
+			return fmt.Errorf("%w: subject is not a TLV list (type 0x%02X)", ErrMalformed, el.Type)
+		}
 		dn, err := decodeDN(d)
 		if err != nil {
 			return fmt.Errorf("subject: %w", err)
