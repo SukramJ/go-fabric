@@ -171,6 +171,13 @@ const (
 	// Camera and a Chime after chip's camera-app
 	// (examples/reference-bridge/camera.go).
 	variantCamera = "camera-sim"
+	// variantMessages is the --media daemon with --media-messages: Messages
+	// on the video player (examples/reference-bridge/media.go). Not the
+	// default composition: chip's TC-IDM-10.5 at the harness pin judges the
+	// device type's `[Rev >= v2]` term against a placeholder revision 1
+	// (conformance.py EmptyClusterGlobalAttributes) and reports Messages
+	// disallowed on the player (docs/certifiability.md).
+	variantMessages = "media-messages"
 	// variantJointFabric is the daemon with --jointfabric-sim: a
 	// JointFabricAdministrator endpoint
 	// (examples/reference-bridge/jointfabric.go).
@@ -975,7 +982,7 @@ var chipFamilies = []family{
 	// tv-app's endpoint 1 (tv-app.matter:4407-4424; TC_MESS_1_1.py CI
 	// arguments: app ${TV_APP}, --endpoint 1).
 	{
-		name: "MESS", deviceType: dtCastingVideoPlayer,
+		name: "MESS", deviceType: dtCastingVideoPlayer, variant: variantMessages,
 		exclude: map[string]gap{
 			"1.1": {classNotSupported, "TC-MESS-1.1 runs only on an endpoint with SpokenMessages or AudioMessages (TC_MESS_1_1.py:76, TC_MESSTestBase.py:42-50); the player's Messages, like the tv-app's (featureMap 0, tv-app.matter:4419), has neither, and the case skips itself", true},
 		},

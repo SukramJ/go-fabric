@@ -776,7 +776,15 @@ The media families (ADR 0022) run against the daemon's `--media` pair
 and a ContentApp that simulate connectedhomeip's tv-app — its transport,
 channels, inputs, outputs, targets and the test suite's content app —
 behind the `cluster/media` servers, and which every daemon of the suite
-carries. The image lists the media cases whose every step is disabled as
+carries. Messages joins the player only with `--media-messages` (the MESS
+family's variant): connectedhomeip's TC-IDM-10.5 at the harness pin
+evaluates a device type's cluster conformance with
+`EmptyClusterGlobalAttributes`, whose revision is 1
+(`matter/testing/conformance.py:139-147`, `:277-294`;
+`device_conformance_tests.py:404-414` at 6170af84), so the Casting Video
+Player's `[Rev >= v2]` term for Messages is false and the cluster is
+reported disallowed on a revision-2 player — the tv-app's own composition
+(`tv-app.matter:4385`, `:4407`, revision 3) would be judged the same. The image lists the media cases whose every step is disabled as
 manual, recorded as class (c); TC-MEDIAPLAYBACK-6.8 expects an inactive
 text track to read as a track with an empty ID, which the model at the pin
 cannot carry (null is its inactive track), and is excluded as class (c);

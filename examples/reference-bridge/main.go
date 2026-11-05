@@ -92,25 +92,25 @@ func main() {
 
 // flags are the daemon's command line.
 type flags struct {
-	dbPath, listen, tcp, label, salt, logLevel string
-	appPipe, enableKey, otaDir, dcl            string
-	attestationDir, metricsExpvar              string
-	wifiSimSSIDs                               string
-	otbr                                       string
-	passcode, discriminator                    uint
-	iterations                                 int
-	advertise, osHostName, otaHarness, wifi    bool
-	wifiSim                                    bool
-	otaProvider, media, lightSwitch            bool
-	icdLIT, bridgeSim                          bool
-	tlsSim, cameraSim, jointFabricSim          bool
-	camera                                     cameraOptions
-	icdIdleSeconds, icdActiveMillis            uint
-	thermostatSchedules                        bool
-	dumpSurface                                bool
-	extensions                                 string
-	specLevel                                  string
-	profiles                                   string
+	dbPath, listen, tcp, label, salt, logLevel     string
+	appPipe, enableKey, otaDir, dcl                string
+	attestationDir, metricsExpvar                  string
+	wifiSimSSIDs                                   string
+	otbr                                           string
+	passcode, discriminator                        uint
+	iterations                                     int
+	advertise, osHostName, otaHarness, wifi        bool
+	wifiSim                                        bool
+	otaProvider, media, mediaMessages, lightSwitch bool
+	icdLIT, bridgeSim                              bool
+	tlsSim, cameraSim, jointFabricSim              bool
+	camera                                         cameraOptions
+	icdIdleSeconds, icdActiveMillis                uint
+	thermostatSchedules                            bool
+	dumpSurface                                    bool
+	extensions                                     string
+	specLevel                                      string
+	profiles                                       string
 }
 
 func parseFlags() flags {
@@ -141,6 +141,7 @@ func parseFlags() flags {
 	flag.StringVar(&f.extensions, "extensions", "", "comma-separated \"Ahead of matter.js\" register IDs to enable (surface.Policies.Extensions, notes/parity/by_design.md), on the node and every device; an unknown ID stops the daemon with the list of known ones; see surface.go")
 	flag.StringVar(&f.otbr, "otbr", "", "add a ThreadBorderRouter endpoint over the OpenThread Border Router's REST API at this URL (\"http://[fd00::1]:8081\"); off when empty; see otbr.go")
 	flag.BoolVar(&f.media, "media", false, "TESTING ONLY: add a simulated video player (CastingVideoPlayer) and content app (ContentApp) after chip's tv-app, for the media certification families; see media.go")
+	flag.BoolVar(&f.mediaMessages, "media-messages", false, "TESTING ONLY, with --media: add Messages to the video player, as chip's tv-app serves it (tv-app.matter endpoint 1); off by default because connectedhomeip's TC-IDM-10.5 at the harness pin judges the device type's `[Rev >= v2]` term against a placeholder revision 1 and reports the cluster disallowed (conformance.py EmptyClusterGlobalAttributes), see docs/certifiability.md")
 	flag.BoolVar(&f.icdLIT, "icd-lit", false, "TESTING ONLY: make the node a Long Idle Time ICD after matter.js's lit-icd test app — ICD Management with Check-In, User Active Mode Trigger, LIT and Dynamic SIT/LIT on the root, a fixed idle/active cadence and the ICD test event triggers on TestEventTrigger (needs --enable-key) — for the ICD client certification cases; see icd.go")
 	flag.UintVar(&f.icdIdleSeconds, "icd-idle-mode-duration", defaultICDIdleSeconds, "with --icd-lit: the IdleModeDuration in seconds (the lit-icd app's --icdIdleModeDuration)")
 	flag.UintVar(&f.icdActiveMillis, "icd-active-mode-duration-ms", defaultICDActiveMillis, "with --icd-lit: the ActiveModeDuration in milliseconds (the lit-icd app's --icdActiveModeDurationMs)")
@@ -354,7 +355,7 @@ func compose(ctx context.Context, f flags, logger *slog.Logger, passcode uint32,
 	}
 	if f.media {
 		// The video player and content app (media.go), TESTING ONLY.
-		if devices.media, err = newDemoMedia(policies, logger); err != nil {
+		if devices.media, err = newDemoMedia(policies, logger, f.mediaMessages); err != nil {
 			return nil, nil, err
 		}
 	}

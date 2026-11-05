@@ -114,6 +114,7 @@ var daemonVariants = map[string][]string{
 	// camera-app serves both on its root (camera-app.matter endpoint 0).
 	variantCamera:      {"--camera-sim", "--tls-sim"},
 	variantJointFabric: {"--jointfabric-sim"},
+	variantMessages:    {"--media-messages"},
 	variantThread:      {"--otbr", otbrURL},
 }
 

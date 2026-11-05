@@ -188,7 +188,7 @@ the same two mechanisms CHIP's own example apps take (`control.go`):
   (`media.go`, ADR 0022): a CastingVideoPlayer stating ContentAppPlatform
   and PhysicalInputs (OnOff, MediaPlayback, KeypadInput, ContentLauncher,
   ApplicationLauncher with the platform feature, MediaInput, AudioOutput,
-  Channel, TargetNavigator, LowPower, WakeOnLan, Messages) and a ContentApp
+  Channel, TargetNavigator, LowPower, WakeOnLan; Messages with `--media-messages`) and a ContentApp
   (ApplicationBasic, ApplicationLauncher, AccountLogin, KeypadInput),
   each a simulation of connectedhomeip's tv-app — its transport, three of
   its channels, two inputs, three outputs, two targets and the test suite's
@@ -200,6 +200,12 @@ the same two mechanisms CHIP's own example apps take (`control.go`):
   over its own player. The player's Messages (`messages.go`) presents a
   message at its StartTime and completes it when its Duration is over, as
   the tv-app's MessagesManager does; nothing is shown.
+- `--media-messages` (TESTING ONLY, with `--media`) adds Messages to the
+  player, as chip's tv-app serves it on its endpoint 1. Off by default:
+  connectedhomeip's TC-IDM-10.5 at the harness pin evaluates the Casting
+  Video Player's `[Rev >= v2]` term for Messages against a placeholder
+  revision 1 and reports the cluster disallowed (see
+  `docs/certifiability.md`); the MESS family runs against this variant.
 - `--tls-sim` (TESTING ONLY) serves TlsCertificateManagement and
   TlsClientManagement on the root (`node.Config.TLS`, `tls.go`) over a
   software P-256 key store: a client certificate's key is made at its

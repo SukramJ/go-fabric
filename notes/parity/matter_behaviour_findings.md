@@ -957,6 +957,25 @@ RESOURCE_EXHAUSTED. Closing it needs the read path to know the session's
 transport (no such flag reaches a cluster server today) and an owner
 decision to depart from rule 1 here. Phase 34.
 
+### TC-IDM-10.5 — a device type's revision term is judged against revision 1
+
+connectedhomeip's device-type conformance check (`TC_IDM_10_5`,
+`matter/testing/device_conformance_tests.py:404-414` at `6170af84`)
+evaluates each cluster requirement with `EMPTY_CLUSTER_GLOBAL_ATTRIBUTES`,
+whose `cluster_revision` is 1 (`conformance.py:139-147`), and the
+`revision` term's "current" reads that field (`:277-294`). The Casting
+Video Player's Messages conformance is `[Rev >= v2]`
+(`data_model/1.6.1/device_types/CastingVideoPlayer.xml`; matter.js
+`casting-video-player.element.ts`, the generated `device` requirement
+"[Rev >= v2]"), so the case reports Messages disallowed on a revision-2
+player — CI run 41967709504 on PR #403 — though the device type is at
+revision 2 and chip's own tv-app serves Messages on a revision-3 player.
+A TH limitation, not a gap of the module: the daemon's Messages moved
+behind `--media-messages` (the MESS family's variant) so the default
+composition passes the case. Route: re-read at the next harness pin
+lift; when the check reads the endpoint's declared revision, Messages
+returns to the default player. Phase 34.
+
 ### TC-JFADMIN-1.2 — AddICAC takes an ICAC whose Subject DN is a structure
 
 On the case's lab path (the daemon's `--jointfabric-sim` administrator,
