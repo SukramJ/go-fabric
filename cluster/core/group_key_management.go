@@ -607,7 +607,13 @@ func (g *GroupKeyManagement) MatterInvoke(ctx context.Context, cmdID uint32, fie
 		g.mu.RUnlock()
 	}
 	if fabric == 0 {
-		return nil, errors.New("core: GroupKeyManagement command without active fabric")
+		// A fabric-scoped operation without an accessing fabric is
+		// UNSUPPORTED_ACCESS, matter.js's AccessDeniedError
+		// (packages/protocol/src/interaction/FabricAccessControl.ts:59-63 at
+		// 862ad75f); the dispatcher's ACL gate refuses such a request
+		// before the server sees it (endpoint/dispatcher.go CheckACL), so
+		// this is the server's own answer on a direct call.
+		return nil, spec.Errorf(im.StatusUnsupportedAccess, "core: GroupKeyManagement command without active fabric")
 	}
 
 	switch cmdID {

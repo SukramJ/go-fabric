@@ -90,8 +90,8 @@ func (n *Node) read(ctx context.Context, req ReadRequest, emitEvents bool) (*Rep
 // caches it across a SIT⇄LIT flip. Mirrors matter.js
 // ClientNodeInteraction.#awaitModeIcdRouting
 // (packages/node/src/node/client/ClientNodeInteraction.ts:300-318 at
-// 862ad75f), applied at :78-81 (read) and :188-191 (write) — and to invoke
-// the same way.
+// 862ad75f), applied at :78-81 (read) and :188-191 (write). An invoke
+// takes routeInvoke instead.
 func (n *Node) routeICD(r *interaction.ClientRequest) {
 	if n.icd == nil || r.Network != "" {
 		return
@@ -259,8 +259,24 @@ func (n *Node) Write(ctx context.Context, writes []WriteRequest, opts WriteOptio
 	return st, err
 }
 
+// routeInvoke sends a command that names no network through the
+// unthrottled "unlimited" profile: the caller manages command traffic
+// itself, and the LIT wake is the hold before it (holdICD), not the
+// icdLit routing a read or write takes. Mirrors matter.js
+// ClientNodeInteraction.invoke
+// (packages/node/src/node/client/ClientNodeInteraction.ts:213-216 at
+// 862ad75f: `if (request.network === undefined) request = { ...request,
+// network: "unlimited" }`), where #awaitModeIcdRouting is applied to read
+// (:78-81) and write (:188-191) only. A caller that named a network keeps
+// it. Applied to the caller's copy.
+func routeInvoke(r *interaction.ClientRequest) {
+	if r.Network == "" {
+		r.Network = peer.NetworkUnlimited
+	}
+}
+
 // Invoke invokes a command on the peer — ClientNodeInteraction.invoke
-// (ClientNodeInteraction.ts:197-210).
+// (ClientNodeInteraction.ts:197-224).
 func (n *Node) Invoke(ctx context.Context, path CommandPath, fields spec.Encodable, opts InvokeOptions) (Result, error) {
 	ia, err := n.interaction()
 	if err != nil {
@@ -269,7 +285,7 @@ func (n *Node) Invoke(ctx context.Context, path CommandPath, fields spec.Encodab
 	if err := n.holdICD(ctx); err != nil {
 		return Result{}, err
 	}
-	n.routeICD(&opts.ClientRequest)
+	routeInvoke(&opts.ClientRequest)
 	res, err := ia.Invoke(ctx, path, fields, opts)
 	if err == nil {
 		n.noteICDActive()
@@ -294,7 +310,7 @@ func (n *Node) InvokeBatch(ctx context.Context, cmds []CommandRequest, opts Invo
 	if err := n.holdICD(ctx); err != nil {
 		return nil, err
 	}
-	n.routeICD(&opts.ClientRequest)
+	routeInvoke(&opts.ClientRequest)
 	res, err := ia.InvokeBatch(ctx, cmds, n.MaxPathsPerInvoke(), opts)
 	if err == nil {
 		n.noteICDActive()

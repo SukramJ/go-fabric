@@ -1045,6 +1045,16 @@ func (b *Bridge) AttachSessionRegistry(reg SessionRegistry) {
 	if setter, ok := reg.(reannounceTriggerSetter); ok {
 		setter.SetReannounceTrigger(b.triggerSessionReannounce)
 	}
+	if setter, ok := reg.(paseCloseNotifierSetter); ok {
+		setter.SetOnPaseSessionClose(b.triggerCommissioningReannounce)
+	}
+}
+
+// paseCloseNotifierSetter is the session registry's hook for a closed
+// PASE session (secure/operational Manager.SetOnPaseSessionClose), which
+// the bridge takes for the commissioning re-advertisement.
+type paseCloseNotifierSetter interface {
+	SetOnPaseSessionClose(fn func(sessionID uint16))
 }
 
 // abortPaseOnStatusReport ends the PASE handshake in progress when the
@@ -1314,13 +1324,14 @@ type serviceRetransmitter interface {
 // MdnsAdvertisement.ts:132-134; a running schedule is not reset,
 // Advertisement.ts:78-91): an advertiser with ServiceDisconnected
 // (mdns.Responder) runs the broadcast schedule again for that fabric's
-// operational service only. Index 0 (a PASE session, no fabric) and a
-// fabric without an announced service reach no service there. An
-// advertiser without the events re-announces every active record as
-// before — the commissionable one among them, which for a PASE session
-// stands in for matter.js's commissioning re-advertisement
-// (DeviceAdvertiser.ts:152-161). A terminated subscription takes the same
-// path for its fabric (DeviceAdvertiser.ts:174-179; see
+// operational service only; an advertiser without the events re-publishes
+// every active operational record instead. Index 0 — a PASE session, no
+// fabric — reaches no operational service and returns: a closed PASE
+// session's commissioning re-advertisement is
+// [Bridge.triggerCommissioningReannounce]'s (DeviceAdvertiser.ts:152-161),
+// fired by the session registry's PASE close hook for the session that
+// was PASE, adopted onto a fabric or not. A terminated subscription takes
+// this path for its fabric (DeviceAdvertiser.ts:174-179; see
 // [Bridge.AttachSubscriptionManager]).
 //
 // The republish runs on its own goroutine bounded by the advertise
@@ -1332,6 +1343,9 @@ type serviceRetransmitter interface {
 // sessions to prevent exactly this re-announce
 // (ServerNetworkRuntime.ts:427).
 func (b *Bridge) triggerSessionReannounce(fabricIndex uint8) {
+	if fabricIndex == 0 {
+		return
+	}
 	instance, scoped := b.operationalInstanceFor(fabricIndex)
 	b.mu.RLock()
 	started := b.started
@@ -1368,6 +1382,9 @@ func (b *Bridge) triggerSessionReannounce(fabricIndex uint8) {
 		default:
 			active := advertiser.Active()
 			for i := range active {
+				if active[i].ServiceType != mdns.ServiceTypeOperational {
+					continue
+				}
 				if err := advertiser.Publish(ctx, active[i]); err != nil {
 					b.logger.Debug("matter.mdns.session_reannounce",
 						slog.String("instance", active[i].InstanceName),
@@ -1386,6 +1403,54 @@ func (b *Bridge) triggerSessionReannounce(fabricIndex uint8) {
 		Severity: diagevent.SeverityInfo,
 		Message:  "The bridge re-announced itself on the network after a controller's last session or a subscription ended.",
 	})
+}
+
+// triggerCommissioningReannounce starts a new announcement round of the
+// commissionable record after a PASE session closed, while the record is
+// published: the commissioner that comes next — after a fail-safe expiry,
+// a revoked window, a commissioner that gave up — finds a fresh round
+// instead of a record announced once at the window's open. Mirrors
+// matter.js packages/protocol/src/protocol/DeviceAdvertiser.ts:152-161 at
+// 862ad75f (sessions.deleted → session.isPase →
+// #startCommissioningAdvertisement, which returns without a commissioning
+// service — after exitCommissioningMode — or while closing) and
+// FailsafeCommissioningTest.ts:106-196, :198-303: exactly one round in the
+// AddNOC case, whether the session was PASE alone or adopted onto the
+// fabric by AddNOC — the CASE session's close takes
+// triggerSessionReannounce's operational path and announces nothing
+// commissionable. Publishing the record again restarts the responder's
+// startup round (mdns.Responder.Publish, same fingerprint). Runs on its
+// own goroutine, bounded and awaited as triggerSessionReannounce's; a
+// no-op once the bridge stopped or the record is withdrawn.
+func (b *Bridge) triggerCommissioningReannounce(uint16) {
+	b.mu.RLock()
+	started := b.started
+	advertiser := b.advertiser
+	svc, instance := b.commissioningService, b.commissioningInstanceName
+	timeout := b.cfg.AdvertiseTimeout
+	base := b.handlerCtx
+	run := started && advertiser != nil && instance != ""
+	if run {
+		b.reannounces.Add(1)
+	}
+	b.mu.RUnlock()
+	if !run {
+		return
+	}
+	if base == nil {
+		base = context.Background()
+	}
+	go func() {
+		defer b.reannounces.Done()
+		ctx, cancel := clock.WithTimeout(base, b.clk(), timeout)
+		defer cancel()
+		if err := advertiser.Publish(ctx, svc); err != nil {
+			b.logger.Debug("matter.mdns.commissioning_reannounce",
+				slog.String("instance", instance), slog.Any("err", err))
+			return
+		}
+		b.logger.Info("matter.mdns.commissioning_reannounced", slog.String("instance", instance))
+	}()
 }
 
 // closeSecureSessionsForShutdown drains every operational session with

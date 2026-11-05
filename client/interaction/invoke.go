@@ -18,7 +18,7 @@ import (
 )
 
 // InvokeOptions configures [Interaction.Invoke] — the options of matter.js
-// Invoke.Definition the commissioning flow sets.
+// Invoke.Definition and ClientInvoke a client sets.
 type InvokeOptions struct {
 	// ExpectedProcessingTime is the peer's processing time of the command;
 	// 0 is the default (ClientInteraction.ts:466-474).
@@ -53,6 +53,21 @@ type InvokeOptions struct {
 	// NoBatch sends the command on its own — batchDuration false
 	// (ClientInteraction.ts:195).
 	NoBatch bool
+	// InteractionModelRevision is the InvokeRequest's
+	// InteractionModelRevision — matter.js Invoke.Definition
+	// .interactionModelRevision (packages/protocol/src/action/request/Invoke.ts:189
+	// at 862ad75f); 0 is this module's [im.MatterInteractionModelRevision].
+	// Any other revision sends the command on its own, as the batch
+	// request carries the default (ClientInteraction.ts:196-198).
+	InteractionModelRevision uint8
+	// DelayReportData asks the peer to hold off the next Report Data of the
+	// subscriptions on the endpoints the commands target — matter.js
+	// Invoke.Definition.delayReportData (Invoke.ts:200-203), written under
+	// the InvokeRequest's tag 3; nil sends none. A command that carries one
+	// goes on its own (ClientInteraction.ts:203). matter.js refuses it
+	// unless the delay-report-data forward feature is on (Invoke.ts:111-113);
+	// this module has no such switch (BD-Matter-DelayReportData).
+	DelayReportData *im.DelayReportData
 	// ClientRequest names the invoke exchange's network profile and margin.
 	ClientRequest
 }
@@ -213,7 +228,10 @@ func (c *Interaction) exchangeInvoke(ctx context.Context, invokes []im.CommandIn
 		ept = DefaultMinimumResponseTimeoutWithFailsafe
 	}
 	enc := tlv.NewEncoder()
-	im.MarshalInvokeRequestTLV(enc, im.InvokeRequest{SuppressResponse: opts.SuppressResponse, TimedRequest: timed, Invokes: invokes},
+	im.MarshalInvokeRequestTLV(enc, im.InvokeRequest{
+		SuppressResponse: opts.SuppressResponse, TimedRequest: timed, Invokes: invokes,
+		DelayReportData: opts.DelayReportData, InteractionModelRevision: opts.InteractionModelRevision,
+	},
 		func(e *tlv.Encoder, tag tlv.Tag, v any) {
 			fields, _ := v.(spec.Encodable)
 			if fields == nil {

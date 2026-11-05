@@ -15,8 +15,12 @@ import (
 // / TlvInvokeResponse (packages/types/src/protocol/messages/).
 
 // MarshalInvokeRequestTLV encodes req as an InvokeRequestMessage, each
-// command's fields through fieldsWriter, stamped with this module's
-// InteractionModelRevision.
+// command's fields through fieldsWriter, in matter.js TlvInvokeRequest's
+// field order (packages/types/src/protocol/messages/TlvInvokeRequest.ts:17-31
+// at 862ad75f): the DelayReportData (tag 3) when req carries one, both its
+// fields written (TlvDelayReportData.ts, TlvField with a decode fallback
+// only), then req's InteractionModelRevision — this module's
+// [MatterInteractionModelRevision] when 0.
 func MarshalInvokeRequestTLV(enc *tlv.Encoder, req InvokeRequest, fieldsWriter CommandFieldsWriter) {
 	enc.StartStruct(tlv.AnonymousTag())
 	enc.PutBool(tlv.ContextTag(tagInvokeReqSuppressResponse), req.SuppressResponse)
@@ -32,7 +36,17 @@ func MarshalInvokeRequestTLV(enc *tlv.Encoder, req InvokeRequest, fieldsWriter C
 		_ = enc.EndContainer()
 	}
 	_ = enc.EndContainer()
-	enc.PutUint(tlv.ContextTag(tagInteractionModelRevision), uint64(MatterInteractionModelRevision))
+	if d := req.DelayReportData; d != nil {
+		enc.StartStruct(tlv.ContextTag(tagInvokeReqDelayReportData))
+		enc.PutUint(tlv.ContextTag(0), uint64(d.DelayMinMs))
+		enc.PutUint(tlv.ContextTag(1), uint64(d.DelayJitterWindowMs))
+		_ = enc.EndContainer()
+	}
+	revision := req.InteractionModelRevision
+	if revision == 0 {
+		revision = MatterInteractionModelRevision
+	}
+	enc.PutUint(tlv.ContextTag(tagInteractionModelRevision), uint64(revision))
 	_ = enc.EndContainer()
 }
 

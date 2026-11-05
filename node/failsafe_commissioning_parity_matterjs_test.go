@@ -18,14 +18,15 @@
 // commissionable services the device publishes. The site's clock runs the
 // fail-safe out.
 //
-// What the port asserts holds: the fail-safe expires, the provisional
-// fabric is rolled back, and the device stays commissionable — its
-// commissionable record is active. What it cannot assert is the
-// re-announcement itself: the Go device keeps its commissionable record
-// published while a PASE session is up and publishes nothing when that
-// session closes, where matter.js starts a commissioning advertisement
-// round on every closed PASE session (packages/protocol/src/protocol/DeviceAdvertiser.ts:131-162
-// at 862ad75f) — so both cases stay missing in the register. The third
+// The port asserts what matter.js asserts: the fail-safe expires, the
+// provisional fabric is rolled back, the device stays commissionable — its
+// commissionable record is active — and it announces itself again: the
+// closed PASE session starts a new announcement round of the record
+// (node commissioningHost.reannounceAfterPaseClose, as matter.js's
+// DeviceAdvertiser does on `sessions.deleted` for a session with `isPase`,
+// packages/protocol/src/protocol/DeviceAdvertiser.ts:131-162 at 862ad75f),
+// exactly once in the AddNOC case — the CASE session's close announces
+// nothing (FailsafeCommissioningTest.ts:290-300). The third
 // (the device's initial ACL creation failing during AddNOC) wraps the
 // device's credential store (node.Config.Store.Credentials) so that the
 // ReplaceACL of the initial entry fails, and asserts the commissionable
@@ -74,6 +75,14 @@ func (a *adSpy) arm() {
 	a.mu.Unlock()
 }
 
+// announced is the number of commissionable publishes since arm — matter.js's
+// adSpy.count.
+func (a *adSpy) announced() int {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.count
+}
+
 // commissionable reports whether a commissionable record is published.
 func (a *adSpy) commissionable() bool {
 	active := a.Active()
@@ -105,12 +114,7 @@ func TestFailsafeCommissioningParity(t *testing.T) {
 		return len(f)
 	}
 
-	// matter.js's two cases are titled "re-announces after failsafe expiry
-	// …"; these assert the rollback and the commissionable record only.
-	// The re-announcement itself is missing (notes/parity/matterjs_tests.md,
-	// FailsafeCommissioningTest.ts), so the subtests are named for what they
-	// check (W6-reg-17).
-	t.Run("rolls back and stays commissionable after failsafe expiry with PASE session active (before addNOC)", func(t *testing.T) {
+	t.Run("re-announces after failsafe expiry with PASE session active (before addNOC)", func(t *testing.T) {
 		t.Parallel()
 		site, u, spy := newDevice(t)
 		ctx := parityCtx(t)
@@ -134,9 +138,14 @@ func TestFailsafeCommissioningParity(t *testing.T) {
 		if n := fabrics(t, u); n != 0 || !spy.commissionable() {
 			t.Fatalf("%d fabrics, commissionable %v after the expiry", n, spy.commissionable())
 		}
+		// FailsafeCommissioningTest.ts:175-186: the expiry closes the PASE
+		// session, and the device announces itself again.
+		if err := site.Eventually(ctx, "the commissionable re-announcement", func() bool { return spy.announced() > 0 }); err != nil {
+			t.Fatal(err)
+		}
 	})
 
-	t.Run("rolls back the fabric and stays commissionable after failsafe expiry with CASE session after addNOC (before CommissioningComplete)", func(t *testing.T) {
+	t.Run("re-announces after failsafe expiry with CASE session after addNOC (before CommissioningComplete)", func(t *testing.T) {
 		t.Parallel()
 		site, u, spy := newDevice(t)
 		ctx := parityCtx(t)
@@ -168,6 +177,18 @@ func TestFailsafeCommissioningParity(t *testing.T) {
 		}
 		if !spy.commissionable() {
 			t.Fatal("the device is not commissionable after the rollback")
+		}
+		// FailsafeCommissioningTest.ts:290-300: the PASE session's close
+		// during the rollback announced once; the CASE session's close
+		// (fabric.delete) announced nothing — the count is 1, not 2.
+		if err := site.Eventually(ctx, "the commissionable re-announcement", func() bool { return spy.announced() > 0 }); err != nil {
+			t.Fatal(err)
+		}
+		if err := site.Settle(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if n := spy.announced(); n != 1 {
+			t.Fatalf("%d commissionable announcements after the rollback, want 1 (the CASE close announces nothing)", n)
 		}
 	})
 

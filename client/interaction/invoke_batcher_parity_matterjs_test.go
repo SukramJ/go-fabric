@@ -17,6 +17,8 @@ package interaction_test
 import (
 	"context"
 	"errors"
+	"net"
+	"slices"
 	"testing"
 	"testing/synctest"
 	"time"
@@ -306,7 +308,11 @@ func TestInvokeBatcherParity(t *testing.T) {
 		// (:867-882) and "does not batch L commands" of
 		// InvokeLargeMessageTest.ts: a command that sets an option the
 		// batch request does not rebuild goes at once and on its own
-		// (isBatchable, ClientInteraction.ts:185-214).
+		// (isBatchable, ClientInteraction.ts:185-214), and the option
+		// reaches its InvokeRequest. The interactionModelRevision row is
+		// matter.js's fallback − 1 (:549-552): one below this module's
+		// default; the delayReportData row is :557. The beforeDispatch row
+		// (:554) is a register left: a server-only field (Invoke.ts:52-55).
 		delay := 3 * time.Second
 		large := true
 		rows := []struct {
@@ -320,6 +326,8 @@ func TestInvokeBatcherParity(t *testing.T) {
 			{"suppressResponse", interaction.InvokeOptions{SuppressResponse: true}},
 			{"largeMessage", interaction.InvokeOptions{ClientRequest: interaction.ClientRequest{LargeMessage: &large}}},
 			{"batchDuration false", interaction.InvokeOptions{NoBatch: true, ExpectedProcessingTime: 90 * time.Second}},
+			{"interactionModelRevision", interaction.InvokeOptions{InteractionModelRevision: im.MatterInteractionModelRevision - 1}},
+			{"delayReportData", interaction.InvokeOptions{DelayReportData: &im.DelayReportData{}}},
 		}
 		for _, row := range rows {
 			t.Run(row.name, func(t *testing.T) {
@@ -339,6 +347,12 @@ func TestInvokeBatcherParity(t *testing.T) {
 					req := ciRequest(t, m)
 					if len(req.Invokes) != 1 || req.Invokes[0].Path.Command != ciToggle {
 						t.Fatalf("direct request %+v", req.Invokes)
+					}
+					if want := row.opts.InteractionModelRevision; want != 0 && req.InteractionModelRevision != want {
+						t.Fatalf("revision %d on the wire, want %d", req.InteractionModelRevision, want)
+					}
+					if want := row.opts.DelayReportData; want != nil && (req.DelayReportData == nil || *req.DelayReportData != *want) {
+						t.Fatalf("DelayReportData %+v on the wire, want %+v", req.DelayReportData, want)
 					}
 					if req.SuppressResponse {
 						s.ack(t, m)
@@ -555,6 +569,99 @@ func TestInvokeBatcherParity(t *testing.T) {
 			ciNothingSent(t, s)
 		})
 	})
+	t.Run("only a non-default interaction model revision keeps a command out of the batch", func(t *testing.T) {
+		t.Parallel()
+		synctest.Test(t, func(t *testing.T) {
+			// :612-630: two commands naming the default revision share a
+			// batch, the one naming default − 1 goes on its own — isBatchable
+			// blocks a revision only when it is set and not the default
+			// (ClientInteraction.ts:196-198). matter.js's default is
+			// SessionParameters.fallbacks (Invoke.ts:102); this module's is
+			// im.MatterInteractionModelRevision, the revision its batch
+			// request carries.
+			s, c := batchingPair(t, 10)
+			opts := batched()
+			opts.InteractionModelRevision = im.MatterInteractionModelRevision
+			on := ciInvoke(context.Background(), c, ciPath(1, ciOn), opts)
+			queued(t, c, 1)
+			toggle := ciInvoke(context.Background(), c, ciPath(1, ciToggle), opts)
+			queued(t, c, 2)
+			opts.InteractionModelRevision = im.MatterInteractionModelRevision - 1
+			off := ciInvoke(context.Background(), c, ciPath(1, ciOff), opts)
+			direct := ciRefLess(t, s, s.next(t))
+			s.clock.Advance(batchWindow)
+			batch := answerByRef(t, s, s.next(t))
+			counts := []int{len(direct.Invokes), len(batch.Invokes)}
+			slices.Sort(counts)
+			if !slices.Equal(counts, []int{1, 2}) {
+				t.Fatalf("command counts %v, want [1 2]", counts)
+			}
+			if direct.Invokes[0].Path.Command != ciOff || direct.InteractionModelRevision != im.MatterInteractionModelRevision-1 {
+				t.Fatalf("direct request %+v", direct)
+			}
+			if batch.InteractionModelRevision != im.MatterInteractionModelRevision {
+				t.Fatalf("batch revision %d", batch.InteractionModelRevision)
+			}
+			wantSuccess(t, on, toggle, off)
+		})
+	})
+	t.Run("command with an address override keeps it", func(t *testing.T) {
+		t.Parallel()
+		synctest.Test(t, func(t *testing.T) {
+			// :715-732: a command with an address override goes on its own
+			// (ClientInteraction.ts:209) and its exchange carries the
+			// override (:1254, ClientRequest.ts:34-40); the batched command
+			// goes to the session's address. matter.js overrides with the
+			// peer's own address; another port here makes the override
+			// observable on the datagram.
+			s, c := batchingPair(t, 10)
+			override := &net.UDPAddr{IP: peerAddr.IP, Port: peerAddr.Port + 1}
+			toggle := ciInvoke(context.Background(), c, ciPath(1, ciToggle), batched())
+			queued(t, c, 1)
+			opts := batched()
+			opts.AddressOverride = override
+			on := ciInvoke(context.Background(), c, ciPath(1, ciOn), opts)
+			m := s.next(t)
+			direct := ciRefLess(t, s, m)
+			if len(direct.Invokes) != 1 || direct.Invokes[0].Path.Command != ciOn || !m.to.IP.Equal(override.IP) || m.to.Port != override.Port {
+				t.Fatalf("direct request %+v to %v, want On to %v", direct.Invokes, m.to, override)
+			}
+			s.clock.Advance(batchWindow)
+			m = s.next(t)
+			batch := ciRefLess(t, s, m)
+			if len(batch.Invokes) != 1 || batch.Invokes[0].Path.Command != ciToggle || m.to.Port != peerAddr.Port {
+				t.Fatalf("batch %+v to %v, want Toggle to the session's address", batch.Invokes, m.to)
+			}
+			wantSuccess(t, toggle, on)
+		})
+	})
+	t.Run("command without a network and one naming the default network share a batch", func(t *testing.T) {
+		t.Parallel()
+		synctest.Test(t, func(t *testing.T) {
+			// :811-830: an interaction constructed with network "unlimited"
+			// puts a command without one in the lane of that network
+			// (`request.network ?? this.#network`, ClientInteraction.ts:765),
+			// and its exchange takes the network (:1250).
+			s := newScriptedWith(t, &sessionparams.Parameters{MaxPathsPerInvoke: 10})
+			p, networks := interaction.RecordNetworks(interaction.SessionProvider(s.mgr, s.session))
+			c := interaction.Bind(p, interaction.Config{Clock: s.clock, Network: "unlimited"})
+			t.Cleanup(func() { c.Close(nil) })
+			on := ciInvoke(context.Background(), c, ciPath(1, ciOn), batched())
+			queued(t, c, 1)
+			opts := batched()
+			opts.Network = "unlimited"
+			toggle := ciInvoke(context.Background(), c, ciPath(1, ciToggle), opts)
+			queued(t, c, 2)
+			s.clock.Advance(batchWindow)
+			if req := answerByRef(t, s, s.next(t)); len(req.Invokes) != 2 {
+				t.Fatalf("%d commands, want one batch of 2", len(req.Invokes))
+			}
+			wantSuccess(t, on, toggle)
+			if got := networks(); !slices.Equal(got, []string{"unlimited"}) {
+				t.Fatalf("exchange networks %q, want [unlimited]", got)
+			}
+		})
+	})
 }
 
 // TestInvokeBatcherCloseParity covers ClientInteractionInvokeTest.ts's
@@ -613,6 +720,100 @@ func TestInvokeBatcherCloseParity(t *testing.T) {
 				t.Fatalf("%d queued", n)
 			}
 			ciNothingSent(t, s)
+		})
+	})
+}
+
+// TestInvokeNetworkParity covers ClientInvokeTest.ts's network propagation
+// cases (:417-541 at 862ad75f): the network of an invoke reaches the
+// exchange on the direct, the batched and the split path. matter.js spies
+// NetworkProfiles.select (:421-436); the provider here records the network
+// of every exchange it initiates (interaction.RecordNetworks), the
+// options a peer provider hands NetworkProfiles.Select
+// (provider.go peerProvider.InitiateExchange). matter.js's "unlimited"
+// comes from ClientNodeInteraction.invoke, which names it for a request
+// without a network (ClientNodeInteraction.ts:213-216); here the request
+// names it.
+func TestInvokeNetworkParity(t *testing.T) {
+	t.Parallel()
+	pair := func(t *testing.T, maxPaths uint16) (*scripted, *interaction.Interaction, func() []string) {
+		t.Helper()
+		s := newScriptedWith(t, &sessionparams.Parameters{MaxPathsPerInvoke: maxPaths})
+		p, networks := interaction.RecordNetworks(interaction.SessionProvider(s.mgr, s.session))
+		c := interaction.Bind(p, interaction.Config{Clock: s.clock})
+		t.Cleanup(func() { c.Close(nil) })
+		return s, c, networks
+	}
+	unlimited := func(o interaction.InvokeOptions) interaction.InvokeOptions {
+		o.Network = "unlimited"
+		return o
+	}
+	wantNetworks := func(t *testing.T, networks func() []string, n int) {
+		t.Helper()
+		got := networks()
+		if len(got) != n {
+			t.Fatalf("%d exchanges (%q), want %d", len(got), got, n)
+		}
+		for _, id := range got {
+			if id != "unlimited" {
+				t.Fatalf("exchange networks %q, want unlimited on each", got)
+			}
+		}
+	}
+	t.Run("direct invoke (#invokeSingle) propagates network to exchange", func(t *testing.T) {
+		t.Parallel()
+		synctest.Test(t, func(t *testing.T) {
+			// :438-466: two concurrent invokes with batching off go on two
+			// exchanges, each on the request's network.
+			s, c, networks := pair(t, 10)
+			on := ciInvoke(context.Background(), c, ciPath(1, ciOn), unlimited(interaction.InvokeOptions{NoBatch: true}))
+			toggle := ciInvoke(context.Background(), c, ciPath(1, ciToggle), unlimited(interaction.InvokeOptions{NoBatch: true}))
+			for range 2 {
+				if req := ciRefLess(t, s, s.next(t)); len(req.Invokes) != 1 {
+					t.Fatalf("%d commands, want 1", len(req.Invokes))
+				}
+			}
+			wantSuccess(t, on, toggle)
+			wantNetworks(t, networks, 2)
+		})
+	})
+	t.Run("batched invoke (#invokeWithBatching) propagates network to exchange", func(t *testing.T) {
+		t.Parallel()
+		synctest.Test(t, func(t *testing.T) {
+			// :468-492: on and toggle share one batch exchange, on the
+			// network of their lane (ClientInteraction.ts:765, :934-958).
+			s, c, networks := pair(t, 10)
+			on := ciInvoke(context.Background(), c, ciPath(1, ciOn), unlimited(batched()))
+			queued(t, c, 1)
+			toggle := ciInvoke(context.Background(), c, ciPath(1, ciToggle), unlimited(batched()))
+			queued(t, c, 2)
+			s.clock.Advance(batchWindow)
+			if req := answerByRef(t, s, s.next(t)); len(req.Invokes) != 2 {
+				t.Fatalf("%d commands, want 2", len(req.Invokes))
+			}
+			wantSuccess(t, on, toggle)
+			wantNetworks(t, networks, 1)
+		})
+	})
+	t.Run("split invoke (#invokeWithSplitting) propagates network to each exchange", func(t *testing.T) {
+		t.Parallel()
+		synctest.Test(t, func(t *testing.T) {
+			// :494-540: two commands of one request against MaxPathsPerInvoke
+			// 1 go on two exchanges (ClientInteraction.ts:654-700), each on
+			// the request's network.
+			s, c, networks := pair(t, 1)
+			done := make(chan batchResult, 1)
+			go func() {
+				res, err := c.InvokeBatch(context.Background(), []interaction.CommandRequest{{Path: ciPath(1, ciOn)}, {Path: ciPath(1, ciOff)}}, 1, unlimited(interaction.InvokeOptions{}))
+				done <- batchResult{res, err}
+			}()
+			for range 2 {
+				ciRefLess(t, s, s.next(t))
+			}
+			if r := await(t, done); r.err != nil || len(r.res) != 2 {
+				t.Fatalf("results %+v (%v)", r.res, r.err)
+			}
+			wantNetworks(t, networks, 2)
 		})
 	})
 }

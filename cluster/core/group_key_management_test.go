@@ -152,7 +152,7 @@ func TestGKM_InvokeWithoutFabric_Fails(t *testing.T) {
 	gkm := newGKM(t)
 	// fabric == 0 (initial) → error.
 	_, err := gkm.MatterInvoke(context.Background(), 0x04, nil)
-	if spec.StatusOf(err) != im.StatusFailure {
+	if spec.StatusOf(err) != im.StatusUnsupportedAccess {
 		t.Fatalf("invoke without active fabric: status %v (%v), want %v", spec.StatusOf(err), err, im.StatusFailure)
 	}
 }
