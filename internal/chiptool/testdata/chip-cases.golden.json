@@ -1980,7 +1980,7 @@
     "SC/4.1": {
       "tests": 1,
       "steps": 31,
-      "stepsSkipped": 26
+      "stepsSkipped": 8
     },
     "SC/4.3": {
       "tests": 1,
