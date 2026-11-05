@@ -520,6 +520,26 @@ cases of `MdnsSocketTest.ts` are `left` rows of the test register (phase
 drops what the later gates would keep, so it has no wire behaviour to
 mirror.
 
+
+### BD-Matter-MdnsResponderKeepsTheSurvivingFamily — the mDNS responder serves the IP family that bound when the other cannot
+
+matter.js's `UdpMulticastServer.create` tolerates a missing IPv4 (the
+socket or its group join fails: logged, the server runs IPv6-only,
+`packages/general/src/net/udp/UdpMulticastServer.ts:52-67` at `862ad75f`)
+but not a missing IPv6: that failure is rethrown with "required by Matter"
+and both sockets are closed (`:69-82`, `:95-105`;
+`UdpMulticastServerTest.ts:202-206`, "closes the IPv4 socket when the IPv6
+socket cannot be created", "closes both sockets when the IPv6 socket cannot
+join the multicast group"). `mdns/socket.go` `openSockets` keeps whichever
+family bound and fails only when neither did, each failure logged
+(`mdns.responder.udp4_join_failed`, `udp6_join_failed`) and the result in
+`mdns.responder.started` (`ipv4`, `ipv6`). Owner decision 2026-11-05
+(phase 33 question 3). Reasoning: on a host whose IPv6 stack is down the
+node stays reachable for the controllers that commission and operate over
+IPv4 (chip-tool and the ecosystems do), and the log names the degraded
+state; an all-or-nothing start would turn a host misconfiguration into a
+silent absence from the network.
+
 ### BD-Matter-AESCCMMatterOnly — AES-CCM with Matter's parameters only, and no AES-CMAC
 
 matter.js's crypto offers AES-CCM with a configurable tag length and L (an
