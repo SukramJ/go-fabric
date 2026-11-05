@@ -81,9 +81,12 @@ const testparityPlannedRatchet = 2
 // behaviour gaps among them findings-register rows (the float64 bounds,
 // derived defaults, the FabricIndex a write keeps, an IS1 in a character
 // string, copyHealth, the socket open) — 153 ported, 600 missing.
+// T3-SW-1 (InvokeOptions' revision, DelayReportData and address override,
+// interaction.Config.Network) ports eight ClientInvokeTest.ts cases and
+// leaves beforeDispatch, completing the file: 154 ported, 591 missing.
 const (
-	testparityPortedRatchet  = 153
-	testparityMissingRatchet = 600
+	testparityPortedRatchet  = 154
+	testparityMissingRatchet = 591
 )
 
 // testparityLeftRatchet is the number of left it cases summed over the
@@ -112,7 +115,9 @@ const (
 // (BD-Matter-MdnsRelevancePreFilter), AES-CCM-8 and CMAC
 // (BD-Matter-AESCCMMatterOnly), and JavaScript type checks, text parsers,
 // model resolution, hashing and key-format APIs (js-runtime-only).
-const testparityLeftRatchet = 576
+// T3-SW-1 adds ClientInvokeTest.ts's beforeDispatch row (js-runtime-only:
+// a server-only field of the shared Invoke type, Invoke.ts:52-55): 577.
+const testparityLeftRatchet = 577
 
 // moduleRoot is where the committed artefacts live, seen from this package.
 const moduleRoot = "../.."
