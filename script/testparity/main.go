@@ -159,9 +159,10 @@ var snapshotRoots = []string{
 }
 
 // serverSnapshotRoots are the matterjs-server test files the module ports
-// or classifies: its camera stream management's (phase 37, issue 410). A
-// root is a file here, not a tree.
+// or classifies: its network topology's (issue 380) and its camera stream
+// management's (phase 37, issue 410). A root is a file here, not a tree.
 var serverSnapshotRoots = []string{
+	"packages/ws-client/test/TopologyUtilsTest.ts",
 	"packages/ws-controller/test/CameraCommandsTest.ts",
 	"packages/ws-controller/test/CameraErrorsTest.ts",
 	"packages/ws-controller/test/CameraStreamManagerTest.ts",
@@ -169,6 +170,7 @@ var serverSnapshotRoots = []string{
 	"packages/ws-controller/test/CameraWireContractTest.ts",
 	"packages/ws-controller/test/MatterCameraDeviceIoTest.ts",
 	"packages/ws-controller/test/MatterControllerCameraStreamsTest.ts",
+	"packages/ws-controller/test/NetworkTopologyServiceTest.ts",
 	"packages/ws-controller/test/OverlayPolicyTest.ts",
 	"packages/ws-controller/test/SdpConstraintsTest.ts",
 	"packages/ws-controller/test/SessionRegistryClientKeyTest.ts",

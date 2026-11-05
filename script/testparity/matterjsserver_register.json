@@ -1,31 +1,436 @@
 {
   "entries": [
     {
+      "path": "packages/ws-client/test/TopologyUtilsTest.ts",
+      "status": "ported",
+      "go": [
+        "controller/topology:TestBuildSyntheticMesh",
+        "controller/topology:TestBuildThreadPair",
+        "controller/topology:TestBuildWiFiStar",
+        "controller/topology:TestBuildExternals",
+        "controller/topology:TestNetworkTypeAndThresholds",
+        "controller/topology:TestThreadMatching",
+        "controller/topology:TestWiFiFields"
+      ],
+      "reason": "The topology-utils functions controller/topology ports (issue 380; notes/parity/by_design.md, the network topology entry): network type, signal buckets, neighbour and route matching, Wi-Fi fields, unknown devices.",
+      "snapshotSha": "18cc8e04aeb5f9ef3d427b796b685d80ecdff0c2"
+    },
+    {
       "path": "packages/ws-controller/test/CameraCommandsTest.ts",
-      "status": "planned",
-      "until": "M10 phase 37",
-      "reason": "cameraCommands.ts, the camera_* command parsers, ports with the service in phase 37 wave C.",
+      "status": "ported",
+      "go": [
+        "controller/camera:TestCommandsErrorsParseStartStreamArgsParityMatterjsServer",
+        "controller/camera:TestCommandsErrorsParseSnapshotArgsParityMatterjsServer",
+        "controller/camera:TestCommandsErrorsParseReleaseStreamArgsParityMatterjsServer",
+        "controller/camera:TestCommandsErrorsToWireCapabilitiesParityMatterjsServer",
+        "controller/camera:TestCommandsErrorsToWireStartStreamResultParityMatterjsServer"
+      ],
+      "left": [
+        {
+          "it": "accepts a numeric node id",
+          "class": "host-server",
+          "reason": "JSON node_id parsing; the Go API takes a commissioned *client.Node"
+        },
+        {
+          "it": "accepts a bigint node id without losing precision",
+          "class": "js-runtime-only",
+          "reason": "JavaScript number versus bigint precision"
+        },
+        {
+          "it": "rejects a missing node id",
+          "class": "host-server",
+          "reason": "JSON presence check of the WebSocket argument"
+        },
+        {
+          "it": "rejects a fractional, NaN, or infinite numeric node id instead of letting NodeId() throw",
+          "class": "host-server",
+          "reason": "JSON number domain of the WebSocket argument"
+        },
+        {
+          "it": "rejects a negative node id of either type instead of branding it",
+          "class": "host-server",
+          "reason": "JSON number domain of the WebSocket argument"
+        },
+        {
+          "it": "rejects a bigint node id wider than the 64 bits a node id has",
+          "class": "host-server",
+          "reason": "JSON number domain of the WebSocket argument"
+        },
+        {
+          "it": "accepts the widest operational node id",
+          "class": "host-server",
+          "reason": "the node id is the WebSocket argument's; the Go API takes a commissioned *client.Node"
+        },
+        {
+          "it": "refuses a Group Node ID, which no camera command can get an answer from",
+          "class": "host-server",
+          "reason": "node id classes are the WebSocket argument's; a commissioned *client.Node names one node"
+        },
+        {
+          "it": "refuses every other node id class that names no single node, naming the class",
+          "class": "host-server",
+          "reason": "node id classes are the WebSocket argument's; a commissioned *client.Node names one node"
+        },
+        {
+          "it": "accepts the Temporary Local range, where this server allocates its test nodes",
+          "class": "host-server",
+          "reason": "the server's own test-node allocation"
+        },
+        {
+          "it": "rejects a numeric node id past the safe range, which names a different node than the client sent",
+          "class": "js-runtime-only",
+          "reason": "Number.MAX_SAFE_INTEGER"
+        },
+        {
+          "it": "accepts the widest node id a number states exactly",
+          "class": "js-runtime-only",
+          "reason": "Number.MAX_SAFE_INTEGER"
+        },
+        {
+          "it": "rejects a non-integer endpoint id",
+          "class": "host-server",
+          "reason": "JSON number domain of the WebSocket argument"
+        },
+        {
+          "it": "rejects an endpoint id above the 16-bit range",
+          "class": "host-server",
+          "reason": "the Go endpoint is a uint16"
+        },
+        {
+          "it": "rejects a negative endpoint id",
+          "class": "host-server",
+          "reason": "JSON number domain of the WebSocket argument"
+        },
+        {
+          "it": "accepts a stream usage name in any case, as the codec names are",
+          "class": "host-server",
+          "reason": "stream usage names are the wire's; the Go API takes the enum"
+        },
+        {
+          "it": "rejects the decimal spelling of a stream usage, which the device cannot be asked for",
+          "class": "host-server",
+          "reason": "wire spelling"
+        },
+        {
+          "it": "refuses talkback ${JSON.stringify(talkback)}, which is not a boolean",
+          "class": "host-server",
+          "reason": "JSON type"
+        },
+        {
+          "it": "refuses a non-boolean overlay hint",
+          "class": "host-server",
+          "reason": "JSON type"
+        },
+        {
+          "it": "rejects a non-string sdp",
+          "class": "host-server",
+          "reason": "JSON type"
+        },
+        {
+          "it": "rejects a non-array ice_servers",
+          "class": "host-server",
+          "reason": "JSON type"
+        },
+        {
+          "it": "rejects an ice_servers entry that is not an object",
+          "class": "host-server",
+          "reason": "JSON type"
+        },
+        {
+          "it": "rejects an ice_servers entry whose urls are not strings",
+          "class": "host-server",
+          "reason": "JSON type"
+        },
+        {
+          "it": "rejects an unknown key on an ice_servers entry",
+          "class": "host-server",
+          "reason": "JSON keys"
+        },
+        {
+          "it": "rejects a non-string ice_transport_policy",
+          "class": "host-server",
+          "reason": "JSON type"
+        },
+        {
+          "it": "rejects a non-boolean metadata_enabled",
+          "class": "host-server",
+          "reason": "JSON type"
+        },
+        {
+          "it": "rejects a non-numeric max_frame_rate hint",
+          "class": "host-server",
+          "reason": "JSON type"
+        },
+        {
+          "it": "rejects a non-numeric min_bit_rate hint",
+          "class": "host-server",
+          "reason": "JSON type"
+        },
+        {
+          "it": "rejects a negative, zero, fractional, NaN, or infinite max_frame_rate hint",
+          "class": "host-server",
+          "reason": "JSON number domain; a uint16 holds none of these and 0 is unstated"
+        },
+        {
+          "it": "rejects a negative, zero, fractional, NaN, or infinite min_bit_rate hint",
+          "class": "host-server",
+          "reason": "JSON number domain; a uint32 holds none of these and 0 is unstated"
+        },
+        {
+          "it": "rejects a value past the wire width of the field it becomes",
+          "class": "host-server",
+          "reason": "the Go fields are the wire widths"
+        },
+        {
+          "it": "rejects a video codecs hint that is not an array of strings",
+          "class": "host-server",
+          "reason": "JSON type"
+        },
+        {
+          "it": "rejects a non-object video hints value",
+          "class": "host-server",
+          "reason": "JSON type"
+        },
+        {
+          "it": "rejects a non-numeric channel_count audio hint",
+          "class": "host-server",
+          "reason": "JSON type"
+        },
+        {
+          "it": "rejects a negative, zero, fractional, NaN, or infinite channel_count audio hint",
+          "class": "host-server",
+          "reason": "JSON number domain; 0 is unstated"
+        },
+        {
+          "it": "rejects a negative, zero, fractional, NaN, or infinite sample_rate or bit_rate audio hint",
+          "class": "host-server",
+          "reason": "JSON number domain; 0 is unstated"
+        },
+        {
+          "it": "rejects an audio codecs hint that is not an array of strings",
+          "class": "host-server",
+          "reason": "JSON type"
+        },
+        {
+          "it": "reads webrtc_session_id",
+          "class": "host-server",
+          "reason": "StopSession takes a typed uint16"
+        },
+        {
+          "it": "rejects a missing webrtc_session_id",
+          "class": "host-server",
+          "reason": "JSON presence check"
+        },
+        {
+          "it": "rejects a non-integer webrtc_session_id",
+          "class": "host-server",
+          "reason": "JSON number domain"
+        },
+        {
+          "it": "takes the highest webrtc_session_id the field holds and refuses the one above it",
+          "class": "host-server",
+          "reason": "the uint16 is the field's full range"
+        },
+        {
+          "it": "accepts a codec name in any case, as the video and audio hints do",
+          "class": "host-server",
+          "reason": "image codec names are the wire's"
+        },
+        {
+          "it": "accepts the decimal spelling capabilities report for a codec the enum does not name",
+          "class": "host-server",
+          "reason": "wire spelling"
+        },
+        {
+          "it": "rejects a codec that is neither a known name nor a number",
+          "class": "host-server",
+          "reason": "wire spelling"
+        },
+        {
+          "it": "rejects a numeric codec, which is the pre-schema-14 spelling",
+          "class": "host-server",
+          "reason": "wire spelling"
+        },
+        {
+          "it": "rejects a zero, negative, fractional, NaN, or infinite resolution width or height",
+          "class": "host-server",
+          "reason": "JSON number domain; a ResolutionTarget side of 0 is unstated"
+        },
+        {
+          "it": "parses kind and stream_id",
+          "class": "host-server",
+          "reason": "ReleaseStream takes typed values"
+        },
+        {
+          "it": "rejects a non-integer stream_id",
+          "class": "host-server",
+          "reason": "JSON number domain"
+        },
+        {
+          "it": "reports each camera session with its stream ids and a named stream usage",
+          "class": "host-server",
+          "reason": "wire rendering of DeviceSession"
+        },
+        {
+          "it": "names every codec it reports, so the output can be sent back as a request",
+          "class": "host-server",
+          "reason": "codec names are the wire's"
+        },
+        {
+          "it": "names every stream usage it reports, so the output can be sent back as a request",
+          "class": "host-server",
+          "reason": "stream usage names are the wire's"
+        },
+        {
+          "it": "names the camera's talkback support, as the README tells a client to read it",
+          "class": "host-server",
+          "reason": "enum names are the wire's"
+        },
+        {
+          "it": "reports a stream usage the cluster enum does not name by its number",
+          "class": "host-server",
+          "reason": "wire naming"
+        },
+        {
+          "it": "reports a codec the cluster enum does not name by its number",
+          "class": "host-server",
+          "reason": "wire naming"
+        },
+        {
+          "it": "converts allocated video/audio/snapshot streams to snake_case",
+          "class": "host-server",
+          "reason": "wire keys and names"
+        },
+        {
+          "it": "base64-encodes the image data and names the codec and size of the frame",
+          "class": "host-server",
+          "reason": "wire encoding"
+        },
+        {
+          "it": "names the stream the frame came from and its provenance",
+          "class": "host-server",
+          "reason": "wire names of Snapshot.StreamID and Provenance"
+        },
+        {
+          "it": "parseCapabilitiesArgs returns ids usable as NodeId/EndpointNumber",
+          "class": "host-server",
+          "reason": "JSON id parsing"
+        },
+        {
+          "it": "hands over the converted candidates in order, and fieldsFor builds the fields for any subset",
+          "class": "host-server",
+          "reason": "JSON candidate conversion; the Go API takes []wpdef.ICECandidateStruct"
+        }
+      ],
+      "reason": "The Matter rules of the camera_* commands against the typed StartRequest, SnapshotRequest and ReleaseStream checks (field ranges, Internal usage, talkback without an offer, the key and ICE limits) and the result types; JSON argument parsing and wire rendering are go-fabric-server's.",
       "snapshotSha": "5b06248f35ffb023ccdab3e0e64602e25ae29556"
     },
     {
       "path": "packages/ws-controller/test/CameraErrorsTest.ts",
-      "status": "planned",
-      "until": "M10 phase 37",
-      "reason": "The manager's mapping of device refusals onto errors 102 to 106 ports with the service in phase 37 wave C.",
+      "status": "ported",
+      "go": [
+        "controller/camera:TestCommandsErrorsCameraServerErrorsParityMatterjsServer"
+      ],
+      "left": [
+        {
+          "it": "carries `feature` for the feature reason and for no other",
+          "class": "host-server",
+          "reason": "leaving feature out of the JSON detail is the emitter's"
+        },
+        {
+          "it": "keeps the key order of the details",
+          "class": "host-server",
+          "reason": "JSON key order"
+        },
+        {
+          "it": "produces details the client parses under the same code",
+          "class": "host-server",
+          "reason": "ws-client parsing"
+        }
+      ],
+      "reason": "The typed errors 102 to 106 and 8: reasons, messages, fields, the device status, the occupying streams, the missing clusters; the JSON detail encoding is go-fabric-server's.",
       "snapshotSha": "e8e6072b8d4baba4412ac9f316b2d3d8158fc38e"
     },
     {
       "path": "packages/ws-controller/test/CameraStreamManagerTest.ts",
-      "status": "planned",
-      "until": "M10 phase 37",
-      "reason": "CameraStreamManager.ts is the service of phase 37 wave C; its left rows name what a Go port cannot carry.",
+      "status": "ported",
+      "go": [
+        "controller/camera:TestSliceAGetCapabilitiesParityMatterjsServer",
+        "controller/camera:TestSliceAResolveVideoStreamParityMatterjsServer",
+        "controller/camera:TestSliceAWithEndpointLockParityMatterjsServer",
+        "controller/camera:TestSliceAResolveAudioStreamParityMatterjsServer",
+        "controller/camera:TestSliceBSessionsTracksParityMatterjsServer",
+        "controller/camera:TestSliceBSessionsTalkbackNoticeParityMatterjsServer",
+        "controller/camera:TestSliceBSessionsTalkbackParityMatterjsServer",
+        "controller/camera:TestSliceBSessionsStopsParityMatterjsServer",
+        "controller/camera:TestSliceBSessionsEndpointLockParityMatterjsServer",
+        "controller/camera:TestSliceBSessionsRegistryParityMatterjsServer",
+        "controller/camera:TestSliceBSessionsReportsInFlightParityMatterjsServer",
+        "controller/camera:TestSliceBSessionsAnnouncesExactlyOnceParityMatterjsServer",
+        "controller/camera:TestSliceBSessionsReportsParityMatterjsServer",
+        "controller/camera:TestSliceBSessionsFailedStartsParityMatterjsServer",
+        "controller/camera:TestSliceBSessionsReleasesParityMatterjsServer",
+        "controller/camera:TestSliceBSessionsClientSessionKeysParityMatterjsServer",
+        "controller/camera:TestSliceCSnapshotWithAResolutionTargetParityMatterjsServer",
+        "controller/camera:TestSliceCSnapshotParityMatterjsServer",
+        "controller/camera:TestSliceCCameraNotSupportedParityMatterjsServer",
+        "controller/camera:TestSliceCReleaseStreamParityMatterjsServer",
+        "controller/camera:TestSliceCLeasesParityMatterjsServer",
+        "controller/camera:TestSliceCReuseBeforeTheDeviceHasReportedParityMatterjsServer",
+        "controller/camera:TestSliceDPreferredVideoCodecParityMatterjsServer",
+        "controller/camera:TestSliceDDeviceCleanupBudgetParityMatterjsServer",
+        "controller/camera:TestSliceDDeviceFeaturesAndPrivacyParityMatterjsServer",
+        "controller/camera:TestSliceDOverlaysParityMatterjsServer",
+        "controller/camera:TestSliceDAllocateAnsweredWithExistingStreamParityMatterjsServer",
+        "controller/camera:TestSliceDAllocateAnsweredOutsideBoundsParityMatterjsServer",
+        "controller/camera:TestSliceDEvictionOrderParityMatterjsServer",
+        "controller/camera:TestSliceDStreamListReadAfterExistingStreamParityMatterjsServer",
+        "controller/camera:TestSliceDDeallocateNotFoundWhileMakingRoomParityMatterjsServer",
+        "controller/camera:TestSliceDUntrackedSessionEndsParityMatterjsServer"
+      ],
+      "left": [
+        {
+          "it": "reports the stop even when a listener of the ending throws",
+          "class": "js-runtime-only",
+          "reason": "isolates a throwing Observable listener; the Go manager's end callback is a plain call with no error path"
+        },
+        {
+          "it": "reports the stop of a session it holds no record of even when a listener throws",
+          "class": "js-runtime-only",
+          "reason": "the same Observable.emit exception isolation, for an untracked id"
+        },
+        {
+          "it": "does not leave an async listener's rejection unhandled",
+          "class": "js-runtime-only",
+          "reason": "the promise rejection Observable.emit hands back from an async listener; a Go callback returns no promise"
+        },
+        {
+          "it": "logs a local encode error at warn",
+          "class": "js-runtime-only",
+          "reason": "asserts the level on matter.js's Logger destination and a matter.js ValidationError; Go logs every unavailable deferred track at Info in one place (manager_audio.go resolveTrack)"
+        },
+        {
+          "it": "logs a stream id the camera no longer lists at warn",
+          "class": "js-runtime-only",
+          "reason": "asserts the level on matter.js's Logger destination of a JavaScript getter state"
+        },
+        {
+          "it": "logs a refusal the camera stated at info",
+          "class": "js-runtime-only",
+          "reason": "asserts the level on matter.js's Logger destination"
+        }
+      ],
+      "reason": "All 421 cases against the manager over a fake camera (manager*.go): the ladders, the sessions with their registry, the snapshots, the leases and the cleanup budget on the fake clock; the left rows are JavaScript-only mechanisms (Observable listener isolation, assertions on matter.js's Logger).",
       "snapshotSha": "56f452c0535ca2bfc1d69af935636eb1dbc20aef"
     },
     {
       "path": "packages/ws-controller/test/CameraVideoAllocateTest.ts",
-      "status": "planned",
-      "until": "M10 phase 37",
-      "reason": "Drives CameraStreamManager.resolveVideoStream against a fake camera with fixed profiles: the allocate ladder of the service (phase 37 wave C) over the window search wave B ports.",
+      "status": "ported",
+      "go": [
+        "controller/camera:TestVideoAllocateFakeCameraParityMatterjsServer",
+        "controller/camera:TestVideoAllocateFixedProfilesParityMatterjsServer"
+      ],
+      "reason": "All 24 cases: the video allocate ladder of the manager against the fake camera with the fixed profiles a tested camera showed, the probes of the fake included.",
       "snapshotSha": "4506f229c6a033503cd407378205c3dd183fe51f"
     },
     {
@@ -37,17 +442,89 @@
     },
     {
       "path": "packages/ws-controller/test/MatterCameraDeviceIoTest.ts",
-      "status": "planned",
-      "until": "M10 phase 37",
-      "reason": "MatterCameraDeviceIo.ts, the device reads and invokes, ports with the service in phase 37 wave C.",
+      "status": "partial",
+      "go": [
+        "controller/camera:TestDeviceIOToCameraStateParityMatterjsServer",
+        "controller/camera:TestDeviceIORoutingParityMatterjsServer",
+        "controller/camera:TestDeviceIOStreamListReadParityMatterjsServer",
+        "controller/camera:TestDeviceIOImageParityMatterjsServer"
+      ],
+      "missing": [
+        "reports only AV stream management missing when the endpoint carries just the transport provider"
+      ],
+      "left": [
+        {
+          "it": "reports a successful EndSession even when dropping the local tracking fails",
+          "class": "js-runtime-only",
+          "reason": "matter.js's requestor act can reject; the Go requestor's RemoveSession cannot fail"
+        },
+        {
+          "it": "reports the device's status even when dropping the local tracking fails",
+          "class": "js-runtime-only",
+          "reason": "matter.js's requestor act can reject; the Go requestor's RemoveSession cannot fail"
+        },
+        {
+          "it": "does not untrack when endSession's webRtcSessionId is missing or non-numeric",
+          "class": "js-runtime-only",
+          "reason": "a JavaScript value; the generated EndSessionRequest always carries a uint16"
+        }
+      ],
+      "reason": "toCameraState and the invoke routing over fakes; the image reads on fabrictest with a camera and a snapshot camera. One case is missing: no device type of the module serves the WebRTC provider without AV stream management.",
       "snapshotSha": "4982d64c2ec3a967908bc7c7feb570d34c7fb99a"
     },
     {
       "path": "packages/ws-controller/test/MatterControllerCameraStreamsTest.ts",
-      "status": "planned",
-      "until": "M10 phase 37",
-      "reason": "The controller's lazy camera service ports with the service in phase 37 wave C.",
+      "status": "ported",
+      "go": [
+        "controller/camera:TestServiceWiringParityMatterjsServer",
+        "controller/camera:TestServiceRefusesWithoutRequestor"
+      ],
+      "left": [
+        {
+          "it": "is undefined until cameraStreams is first accessed",
+          "class": "host-server",
+          "reason": "the server process creates its camera service lazily; the module's service is built by the host with camera.New"
+        },
+        {
+          "it": "does not throw once the controller is stopped if cameraStreams was never accessed",
+          "class": "host-server",
+          "reason": "the server process's lazy getter; the module has none"
+        },
+        {
+          "it": "fails typed on every getter that needs a started controller",
+          "class": "host-server",
+          "reason": "the server's vendor-info getter, not the camera service"
+        },
+        {
+          "it": "keeps the shared callback emitting when one carries an endpoint id out of range",
+          "class": "js-runtime-only",
+          "reason": "a JavaScript number endpoint id; the Go signal carries a uint16"
+        }
+      ],
+      "reason": "The service's own wiring: the peer's End drops the registry entry, a report's vanished session leaves the requestor, a removed node's sessions end, Close ends the sessions first, a closed service and a controller without a requestor fail typed.",
       "snapshotSha": "c9fb8f2320b642974a2dcab037b53947c0631d1e"
+    },
+    {
+      "path": "packages/ws-controller/test/NetworkTopologyServiceTest.ts",
+      "status": "ported",
+      "go": [
+        "controller/topology:TestBuildSyntheticMesh",
+        "controller/topology:TestBuildLikeTheServerPort",
+        "controller/topology:TestBuildNodeFlags",
+        "controller/topology:TestServiceDebounce",
+        "controller/topology:TestServiceLifecycle",
+        "controller/topology:TestServicePeriodic",
+        "controller/topology:TestServiceRefreshFanOut",
+        "controller/topology:TestServiceRefreshConcurrency",
+        "controller/topology:TestServiceRefreshDeadline",
+        "controller/topology:TestServiceRefreshShared",
+        "controller/topology:TestServiceClose",
+        "controller/topology:TestServiceSourceMerges",
+        "controller/topology:TestServiceSourceChanged",
+        "controller/topology:TestServiceOnASite"
+      ],
+      "reason": "NetworkTopologyService as controller/topology ports it (issue 380; notes/parity/by_design.md, the network topology entry): getTopology, change-driven emission, node sources, refresh, stop.",
+      "snapshotSha": "c7414f2618576185fadb1ebd5e23b5133b3ec8f2"
     },
     {
       "path": "packages/ws-controller/test/OverlayPolicyTest.ts",
@@ -104,9 +581,74 @@
     },
     {
       "path": "packages/ws-controller/test/StartingSessionSignallingTest.ts",
-      "status": "planned",
-      "until": "M10 phase 37",
-      "reason": "startingSessionSignalling.ts ports with the service in phase 37 wave C.",
+      "status": "ported",
+      "go": [
+        "controller/camera:TestSignallingHoldParityMatterjsServer",
+        "controller/camera:TestSignallingSendsParityMatterjsServer"
+      ],
+      "left": [
+        {
+          "it": "answers undefined when no start names the key",
+          "class": "host-server",
+          "reason": "the queue of a connection's ICE candidates named by client_session_key until the camera_start_stream response is go-fabric-server's; the module's Session exists once the start answered"
+        },
+        {
+          "it": "queues on the start that named the key, not on another start of the same node and endpoint",
+          "class": "host-server",
+          "reason": "the queue of a connection's ICE candidates named by client_session_key until the camera_start_stream response is go-fabric-server's; the module's Session exists once the start answered"
+        },
+        {
+          "it": "queues on the start of its own node when another node's start uses the same key",
+          "class": "host-server",
+          "reason": "the queue of a connection's ICE candidates named by client_session_key until the camera_start_stream response is go-fabric-server's; the module's Session exists once the start answered"
+        },
+        {
+          "it": "queues on the start of its own endpoint when another endpoint's start uses the same key",
+          "class": "host-server",
+          "reason": "the queue of a connection's ICE candidates named by client_session_key until the camera_start_stream response is go-fabric-server's; the module's Session exists once the start answered"
+        },
+        {
+          "it": "refuses with error 8 once more candidates than the bound wait, and accepts exactly the bound",
+          "class": "host-server",
+          "reason": "the queue of a connection's ICE candidates named by client_session_key until the camera_start_stream response is go-fabric-server's; the module's Session exists once the start answered"
+        },
+        {
+          "it": "counts only the candidates still waiting once the queue is being sent",
+          "class": "host-server",
+          "reason": "the queue of a connection's ICE candidates named by client_session_key until the camera_start_stream response is go-fabric-server's; the module's Session exists once the start answered"
+        },
+        {
+          "it": "refuses the rest of the queue with error 8 once the session ${what}, during a send",
+          "class": "host-server",
+          "reason": "the queue of a connection's ICE candidates named by client_session_key until the camera_start_stream response is go-fabric-server's; the module's Session exists once the start answered"
+        },
+        {
+          "it": "rejects the queued candidates with error 8 when the response was an error",
+          "class": "host-server",
+          "reason": "the queue of a connection's ICE candidates named by client_session_key until the camera_start_stream response is go-fabric-server's; the module's Session exists once the start answered"
+        },
+        {
+          "it": "sends the candidates of every queued command in one invoke, in order, and resolves each",
+          "class": "host-server",
+          "reason": "the queue of a connection's ICE candidates named by client_session_key until the camera_start_stream response is go-fabric-server's; the module's Session exists once the start answered"
+        },
+        {
+          "it": "fails every command of a failed merged invoke, and not the commands of the next invoke",
+          "class": "host-server",
+          "reason": "the queue of a connection's ICE candidates named by client_session_key until the camera_start_stream response is go-fabric-server's; the module's Session exists once the start answered"
+        },
+        {
+          "it": "sends candidates queued during an invoke in the next invoke, all together",
+          "class": "host-server",
+          "reason": "the queue of a connection's ICE candidates named by client_session_key until the camera_start_stream response is go-fabric-server's; the module's Session exists once the start answered"
+        },
+        {
+          "it": "checks that the key still names the session before every invoke of a split queue",
+          "class": "host-server",
+          "reason": "the queue of a connection's ICE candidates named by client_session_key until the camera_start_stream response is go-fabric-server's; the module's Session exists once the start answered"
+        }
+      ],
+      "reason": "The module's part: a session's signals are its own and keep their order until the host reads Session.Signals, and Session.ProvideICECandidates splits candidates by the byte budget; the queue by client_session_key is the connection's.",
       "snapshotSha": "e7e5020450c66d4816c7d3dcd3aca2f0708c1856"
     },
     {
@@ -162,30 +704,99 @@
     },
     {
       "path": "packages/ws-controller/test/WebRtcProviderDeviceTest.ts",
-      "status": "planned",
-      "until": "M10 phase 37",
-      "reason": "The provider sessions against a simulated camera port with the service in phase 37 wave C.",
+      "status": "ported",
+      "go": [
+        "controller/camera:TestProviderDeviceParityMatterjsServer",
+        "controller/camera:TestProviderSessionsClockParityMatterjsServer"
+      ],
+      "reason": "All 11 cases: seven against a camera device with cluster/camera's Provider on fabrictest (the restart is a device restart, the added endpoint an Aggregator.Add), the four clock cases against the session layer with fake nodes, since the module's device root serves no TimeSynchronization to refuse on.",
       "snapshotSha": "7755b13a8ae651c08431ef663ac97bc0a29fad96"
     },
     {
       "path": "packages/ws-controller/test/WebRtcProviderSessionWatchTest.ts",
-      "status": "planned",
-      "until": "M10 phase 37",
-      "reason": "WebRtcProviderSessionWatch.ts ports with the service in phase 37 wave C.",
+      "status": "ported",
+      "go": [
+        "controller/camera:TestSessionWatchParityMatterjsServer"
+      ],
+      "reason": "All 27 cases against the service's session watch (session_watch.go) over a fake image and the fake clock; a microtask wait is a wait on the watch's sweeps, a logged notice a slog Info record.",
       "snapshotSha": "e5e115ec5da8bf0d9030cfa62acdfc7db2e678a9"
     },
     {
       "path": "packages/ws-controller/test/WebRtcProviderSessionsTest.ts",
-      "status": "planned",
-      "until": "M10 phase 37",
-      "reason": "WebRtcProviderSessions.ts ports with the service in phase 37 wave C.",
+      "status": "ported",
+      "go": [
+        "controller/camera:TestProviderSessionsWatchParityMatterjsServer",
+        "controller/camera:TestProviderSessionsEstablishParityMatterjsServer",
+        "controller/camera:TestProviderSessionsClockParityMatterjsServer",
+        "controller/camera:TestProviderSessionsAbandonParityMatterjsServer"
+      ],
+      "reason": "All 22 cases against the service's session layer, watch and signal routing with fake nodes and a fake requestor; attributeChanged is a changed CurrentSessions in the image at the batch end, the event filter is isStartUp.",
       "snapshotSha": "2c8374c2bfd42cc178cbf70e75ad7e6327039227"
     },
     {
       "path": "packages/ws-controller/test/WebRtcSessionStreamsTest.ts",
-      "status": "planned",
-      "until": "M10 phase 37",
-      "reason": "webRtcSessionStreams.ts and webRtcSessionTracking.ts port with the service in phase 37 wave C.",
+      "status": "ported",
+      "go": [
+        "controller/camera:TestSessionStreamsResolveParityMatterjsServer",
+        "controller/camera:TestSessionStreamsSelectParityMatterjsServer",
+        "controller/camera:TestSessionStreamsTrackableParityMatterjsServer",
+        "controller/camera:TestSessionStreamsEstablishParityMatterjsServer",
+        "controller/camera:TestSessionStreamsRecordedOffersParityMatterjsServer",
+        "controller/camera:TestSessionStreamsTrackedSessionOfParityMatterjsServer"
+      ],
+      "left": [
+        {
+          "it": "keeps only numeric entries from a mixed request list",
+          "class": "js-runtime-only",
+          "reason": "a JavaScript value the typed Go fields cannot hold: a non-numeric, fractional, negative, NaN or out-of-uint16 id or list"
+        },
+        {
+          "it": "falls through when a request list contains no numeric entries",
+          "class": "js-runtime-only",
+          "reason": "a JavaScript value the typed Go fields cannot hold: a non-numeric, fractional, negative, NaN or out-of-uint16 id or list"
+        },
+        {
+          "it": "yields no stream when auto-selection is requested but the echo is non-numeric",
+          "class": "js-runtime-only",
+          "reason": "a JavaScript value the typed Go fields cannot hold: a non-numeric, fractional, negative, NaN or out-of-uint16 id or list"
+        },
+        {
+          "it": "rejects non-integer, negative, and NaN ids from a list",
+          "class": "js-runtime-only",
+          "reason": "a JavaScript value the typed Go fields cannot hold: a non-numeric, fractional, negative, NaN or out-of-uint16 id or list"
+        },
+        {
+          "it": "treats a non-integer/negative scalar request id as an omitted media kind",
+          "class": "js-runtime-only",
+          "reason": "a JavaScript value the typed Go fields cannot hold: a non-numeric, fractional, negative, NaN or out-of-uint16 id or list"
+        },
+        {
+          "it": "ignores a non-integer auto-select echo",
+          "class": "js-runtime-only",
+          "reason": "a JavaScript value the typed Go fields cannot hold: a non-numeric, fractional, negative, NaN or out-of-uint16 id or list"
+        },
+        {
+          "it": "refuses a stream id past the uint16 its cluster field encodes it in",
+          "class": "js-runtime-only",
+          "reason": "a JavaScript value the typed Go fields cannot hold: a non-numeric, fractional, negative, NaN or out-of-uint16 id or list"
+        },
+        {
+          "it": "refuses a list entry that is not a stream id",
+          "class": "js-runtime-only",
+          "reason": "a JavaScript value the typed Go fields cannot hold: a non-numeric, fractional, negative, NaN or out-of-uint16 id or list"
+        },
+        {
+          "it": "refuses a stream list that is not a list",
+          "class": "js-runtime-only",
+          "reason": "a JavaScript value the typed Go fields cannot hold: a non-numeric, fractional, negative, NaN or out-of-uint16 id or list"
+        },
+        {
+          "it": "rejects a session whose stream usage is non-integer or negative",
+          "class": "js-runtime-only",
+          "reason": "a JavaScript value the typed Go fields cannot hold: a non-numeric, fractional, negative, NaN or out-of-uint16 id or list"
+        }
+      ],
+      "reason": "The session layer's stream fields, trackability, establish with its recorded offers, and the requestor lookup, over typed requests.",
       "snapshotSha": "545b9556d5be11ccd58351411085f02d46c466e3"
     }
   ]

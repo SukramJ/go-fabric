@@ -137,12 +137,20 @@ const testparityLeftRatchet = 576
 // WebRtcProviderArgumentsTest.ts and SessionRegistryClientKeyTest.ts —
 // eleven planned for wave C (the stream manager's ten files and
 // CameraVideoAllocateTest.ts, which drives it), two excluded as
-// host-server; no case missing or left.
+// host-server; no case missing or left. Phase 37 wave C (issue 410) took
+// the eleven planned files: ten ported, MatterCameraDeviceIoTest.ts in part
+// (one case missing: no device type of the module serves the WebRTC
+// provider without AV stream management), 97 cases left (host-server:
+// the WebSocket argument parsing and wire rendering, the connection's
+// candidate queue, the server process's lazy service; js-runtime-only:
+// JavaScript values the typed fields cannot hold, Observable and Logger
+// mechanics). The two topology files issue 380 ported joined the snapshot
+// as ported: 0 planned, 19 ported, 1 missing, 97 left.
 const (
-	serverPlannedRatchet = 11
-	serverPortedRatchet  = 7
-	serverMissingRatchet = 0
-	serverLeftRatchet    = 0
+	serverPlannedRatchet = 0
+	serverPortedRatchet  = 19
+	serverMissingRatchet = 1
+	serverLeftRatchet    = 97
 )
 
 // moduleRoot is where the committed artefacts live, seen from this package.

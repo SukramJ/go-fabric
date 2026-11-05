@@ -1,6 +1,7 @@
 {
   "commit": "0bd06f222a3d51415980022c5f207705de57b8aa",
   "roots": [
+    "packages/ws-client/test/TopologyUtilsTest.ts",
     "packages/ws-controller/test/CameraCommandsTest.ts",
     "packages/ws-controller/test/CameraErrorsTest.ts",
     "packages/ws-controller/test/CameraStreamManagerTest.ts",
@@ -8,6 +9,7 @@
     "packages/ws-controller/test/CameraWireContractTest.ts",
     "packages/ws-controller/test/MatterCameraDeviceIoTest.ts",
     "packages/ws-controller/test/MatterControllerCameraStreamsTest.ts",
+    "packages/ws-controller/test/NetworkTopologyServiceTest.ts",
     "packages/ws-controller/test/OverlayPolicyTest.ts",
     "packages/ws-controller/test/SdpConstraintsTest.ts",
     "packages/ws-controller/test/SessionRegistryClientKeyTest.ts",
@@ -23,6 +25,14 @@
     "packages/ws-controller/test/WebRtcSessionStreamsTest.ts"
   ],
   "files": [
+    {
+      "path": "packages/ws-client/test/TopologyUtilsTest.ts",
+      "lines": 690,
+      "sha": "18cc8e04aeb5f9ef3d427b796b685d80ecdff0c2",
+      "describes": [
+        "topology-utils"
+      ]
+    },
     {
       "path": "packages/ws-controller/test/CameraCommandsTest.ts",
       "lines": 1398,
@@ -93,6 +103,14 @@
       "sha": "c9fb8f2320b642974a2dcab037b53947c0631d1e",
       "describes": [
         "MatterController.cameraStreamsIfCreated"
+      ]
+    },
+    {
+      "path": "packages/ws-controller/test/NetworkTopologyServiceTest.ts",
+      "lines": 815,
+      "sha": "c7414f2618576185fadb1ebd5e23b5133b3ec8f2",
+      "describes": [
+        "NetworkTopologyService"
       ]
     },
     {

@@ -557,6 +557,18 @@ func TestProviderSessionsClockParityMatterjsServer(t *testing.T) {
 			t.Errorf("calls %q", got)
 		}
 	})
+	t.Run("hands the camera's second INVALID_IN_STATE refusal to the caller", func(t *testing.T) {
+		// WebRtcProviderDeviceTest.ts:340-349, matterjs-server at 0bd06f2.
+		f := newPSFixture()
+		f.respond = func(string) (any, error) { return nil, statusErr(im.StatusInvalidInState) }
+		_, err := f.establish(t, psEndpoint, psOfferRequest(func(r *wpdef.ProvideOfferRequest) { r.IceServers = turns }))
+		if !statusIs(err, im.StatusInvalidInState) {
+			t.Errorf("err = %v", err)
+		}
+		if got := commands(f); !slices.Equal(got, []string{"provideOffer", "sync", "provideOffer"}) {
+			t.Errorf("calls %q", got)
+		}
+	})
 	t.Run("does not retry a re-offer", func(t *testing.T) {
 		f := newPSFixture()
 		refuseFirst(f)
