@@ -491,6 +491,10 @@ func nodeConfig(f flags, passcode uint32, discriminator uint16, tcp node.TCPConf
 		Commissioning: node.Commissioning{
 			Passcode: passcode, Discriminator: discriminator,
 			PBKDFIterations: pbkdfIterations(f.iterations), Salt: []byte(f.salt),
+			// The Basic feature (BC), as connectedhomeip's all-clusters app
+			// serves it: TC-CADMIN-1.4 and 1.11 exercise
+			// OpenBasicCommissioningWindow (phase 36).
+			BasicCommissioning: true,
 		},
 		ProductDescription: node.ProductDescription{VendorID: testVendorID, ProductID: testProductID},
 		BasicInformation: node.BasicInformation{

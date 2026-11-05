@@ -24,10 +24,10 @@
 // TestWireCommissioned_ArmFailSafeOverCASEWhileWindowOpen and
 // TestCommissioningWindow_RevokeWindow_OnOpenWindow_StatusReturnsToClosed.
 //
-// Missing (register): "replaces a window the node opened itself with an
-// administrator's basic window" — the Go AdministratorCommissioning has no
-// Basic feature (BC), so OpenBasicCommissioningWindow answers
-// UnsupportedCommand; "refuses a window the node opens while an
+// "replaces a window the node opened itself with an administrator's basic
+// window" is commissioning_window_basic_parity_matterjs_test.go (phase 36:
+// the Basic feature is node.Commissioning.BasicCommissioning).
+// Missing (register): "refuses a window the node opens while an
 // administrator's window is still opening" and "opens no window once the
 // commissioner closes during the open" — js-runtime-only: DeviceCommissioner
 // opens asynchronously (#open awaits the previous window's close), where the

@@ -67,17 +67,24 @@ const (
 	admCommClusterRevision = admdef.Revision
 )
 
-// admCommInst is the definition bound to what the server serves: no
-// feature (BC, the basic commissioning method, is not advertised), so
-// OpenCommissioningWindow and RevokeCommissioning are accepted and
-// OpenBasicCommissioningWindow is not.
-var admCommInst = func() *spec.Instance {
-	inst, err := spec.New(admdef.Definition, spec.Options{})
+// admCommInst is the definition bound to what the server serves without
+// the Basic feature: OpenCommissioningWindow and RevokeCommissioning are
+// accepted and OpenBasicCommissioningWindow is not. admCommInstBasic is the
+// same definition with BC (FeatureMap bit 0), which admits
+// OpenBasicCommissioningWindow and the BasicWindowOpen status
+// (administrator-commissioning.element.ts:23, :43, :55 at 862ad75f).
+var (
+	admCommInst      = mustAdmCommInstance(0)
+	admCommInstBasic = mustAdmCommInstance(uint32(admdef.FeatureBasic))
+)
+
+func mustAdmCommInstance(features uint32) *spec.Instance {
+	inst, err := spec.New(admdef.Definition, spec.Options{Features: features})
 	if err != nil {
 		panic(fmt.Sprintf("wire: AdministratorCommissioning: %v", err))
 	}
 	return inst
-}()
+}
 
 // CommissioningWindowStatus mirrors the Matter §11.19.6.1 enum.
 type CommissioningWindowStatus uint8
@@ -193,6 +200,20 @@ type AdministratorCommissioning struct {
 	versionMu    sync.Mutex
 	version      contract.DataVersionTracker
 	lastSnapshot string
+
+	// basic is the Basic feature (BC): set at construction, read-only after.
+	basic bool
+}
+
+// AdministratorCommissioningConfig selects the cluster's features.
+type AdministratorCommissioningConfig struct {
+	// BasicCommissioning serves the Basic feature (BC, FeatureMap bit 0):
+	// an administrator's OpenBasicCommissioningWindow opens a window
+	// against the node's configured passcode, status BasicWindowOpen.
+	// matter.js serves it only through AdministratorCommissioningServer
+	// .with("Basic") (AdministratorCommissioningServer.ts:55-57, :105-117
+	// at 862ad75f); off by default here too.
+	BasicCommissioning bool
 }
 
 // VendorIDResolver returns the rootVendorId of a fabric. The daemon
@@ -238,7 +259,24 @@ func (a *AdministratorCommissioning) MatterDataVersion() uint32 {
 // controller wired — every command returns Status BUSY until the
 // daemon plumbs a [WindowController] in via [SetController].
 func NewAdministratorCommissioning() *AdministratorCommissioning {
-	return &AdministratorCommissioning{}
+	return NewAdministratorCommissioningWith(AdministratorCommissioningConfig{})
+}
+
+// NewAdministratorCommissioningWith constructs the cluster with cfg's
+// features and no controller wired (see [NewAdministratorCommissioning]).
+func NewAdministratorCommissioningWith(cfg AdministratorCommissioningConfig) *AdministratorCommissioning {
+	return &AdministratorCommissioning{basic: cfg.BasicCommissioning}
+}
+
+// BasicCommissioning reports whether the Basic feature (BC) is served.
+func (a *AdministratorCommissioning) BasicCommissioning() bool { return a.basic }
+
+// instance is the definition instance of the served feature set.
+func (a *AdministratorCommissioning) instance() *spec.Instance {
+	if a.basic {
+		return admCommInstBasic
+	}
+	return admCommInst
 }
 
 // SetController wires the bridge-side window controller. Pass nil to
@@ -289,7 +327,7 @@ func (a *AdministratorCommissioning) MatterClusterID() uint32 {
 // every command carries access "A T" (Administer) in the definition;
 // any other id answers Operate.
 func (a *AdministratorCommissioning) MinInvokePrivilege(cmdID uint32) uint8 {
-	return admCommInst.MinInvokePrivilege(cmdID)
+	return a.instance().MinInvokePrivilege(cmdID)
 }
 
 // MatterRead resolves attribute reads.
@@ -325,10 +363,9 @@ func (a *AdministratorCommissioning) MatterRead(attrID uint32) (any, bool) {
 		}
 		return snap.AdminVendorID, true
 	case matterAttrAdmCommFeatureMap, matterAttrAdmCommClusterRevision:
-		// FeatureMap = 0: basic-commissioning-method (BC feature) not
-		// advertised. Enhanced commissioning (the default) does not
-		// require a feature bit.
-		return admCommInst.ReadGlobal(attrID)
+		// FeatureMap bit 0 (BC) only with [AdministratorCommissioningConfig]
+		// .BasicCommissioning; enhanced commissioning needs no feature bit.
+		return a.instance().ReadGlobal(attrID)
 	default:
 		return nil, false
 	}
@@ -339,7 +376,7 @@ func (a *AdministratorCommissioning) MatterRead(attrID uint32) (any, bool) {
 // UNSUPPORTED_ATTRIBUTE, as the definition judges them (matter.js
 // AttributeWriteResponse).
 func (a *AdministratorCommissioning) MatterWrite(_ context.Context, attrID uint32, value any) error {
-	_, err := admCommInst.ValidateWrite(attrID, value, nil)
+	_, err := a.instance().ValidateWrite(attrID, value, nil)
 	return err
 }
 
@@ -423,10 +460,53 @@ func (a *AdministratorCommissioning) MatterInvoke(ctx context.Context, cmdID uin
 		}
 		return nil, nil
 	case matterCmdAdmCommOpenBasicWindow:
-		// FeatureMap bit 0 (BC) not advertised; controllers should
-		// see UnsupportedCommand. Returning a wrapped error is the
-		// dispatcher contract.
-		return nil, errAdmCommUnsupportedCommand
+		if !a.basic {
+			// Without the BC feature the command is UnsupportedCommand
+			// (conformance "BC", administrator-commissioning.element.ts:43).
+			return nil, errAdmCommUnsupportedCommand
+		}
+		timeout, ok := openBasicWindowTimeout(fields)
+		if !ok {
+			return nil, errAdmCommInvalidFields
+		}
+		// The basic window takes the enhanced window's gates minus the
+		// PAKE parameters it does not carry: a CASE session, no armed
+		// fail-safe, a controller; the window's own timeout bounds and
+		// Busy for an open administrator window are the controller's
+		// (bridge.CommissioningWindow.OpenWindow), as matter.js's
+		// openBasicCommissioningWindow runs the same
+		// #assertCommissioningWindowRequirements as openCommissioningWindow
+		// (AdministratorCommissioningServer.ts:105-117, :191-212 at
+		// 862ad75f) and opens through DeviceCommissioner
+		// .allowBasicCommissioning with the node's own passcode
+		// (DeviceCommissioner.ts:130-137).
+		_, fabIdx := im.FabricFilterFromContext(ctx)
+		if fabIdx == 0 {
+			return nil, errAdmCommBusy
+		}
+		if failSafeCheck != nil && failSafeCheck() {
+			return nil, errAdmCommBusy
+		}
+		if c == nil {
+			return nil, errAdmCommBusy
+		}
+		params := OpenWindowParams{
+			CommissioningTimeoutSeconds: timeout,
+			IsBasicWindow:               true,
+			AdminFabricIndex:            fabIdx,
+		}
+		if vr != nil {
+			params.AdminVendorID = vr(ctx, fabIdx)
+		}
+		if fc != nil {
+			if n, err := fc(ctx); err == nil && n == 0 {
+				params.IsUncommissioned = true
+			}
+		}
+		if err := c.OpenWindow(ctx, params); err != nil {
+			return nil, err
+		}
+		return nil, nil
 	case matterCmdAdmCommRevoke:
 		if c == nil {
 			return nil, errAdmCommBusy
@@ -476,7 +556,7 @@ func (a *AdministratorCommissioning) MatterReportable() []uint32 {
 // attributes, all mandatory: WindowStatus, AdminFabricIndex,
 // AdminVendorId. The globals are the dispatcher's.
 func (a *AdministratorCommissioning) MatterAttributes() []uint32 {
-	return admCommInst.MatterAttributes()
+	return a.instance().MatterAttributes()
 }
 
 // openWindowParams takes the OpenCommissioningWindow fields: the
@@ -504,6 +584,25 @@ func openWindowParams(fields any) (OpenWindowParams, bool) {
 		}
 	}
 	return OpenWindowParams{}, false
+}
+
+// openBasicWindowTimeout reads OpenBasicCommissioningWindow's one field.
+func openBasicWindowTimeout(fields any) (uint16, bool) {
+	switch f := fields.(type) {
+	case admdef.OpenBasicCommissioningWindowRequest:
+		return f.CommissioningTimeout, true
+	case *admdef.OpenBasicCommissioningWindowRequest:
+		if f != nil {
+			return f.CommissioningTimeout, true
+		}
+	case OpenWindowParams:
+		return f.CommissioningTimeoutSeconds, true
+	case *OpenWindowParams:
+		if f != nil {
+			return f.CommissioningTimeoutSeconds, true
+		}
+	}
+	return 0, false
 }
 
 // Typed error values that implement [im.StatusCodeError]: the dispatcher
@@ -631,13 +730,13 @@ const (
 // (0x01) is conformance BC, which the FeatureMap does not advertise; its
 // handler answers UnsupportedCommand.
 func (a *AdministratorCommissioning) MatterAcceptedCommands() []uint32 {
-	return admCommInst.MatterAcceptedCommands()
+	return a.instance().MatterAcceptedCommands()
 }
 
 // MatterGeneratedCommands implements [contract.ClusterCommandLister]:
 // none — every command answers with a status.
 func (a *AdministratorCommissioning) MatterGeneratedCommands() []uint32 {
-	return admCommInst.MatterGeneratedCommands()
+	return a.instance().MatterGeneratedCommands()
 }
 
 // Compile-time assertions: [AdministratorCommissioning] satisfies the

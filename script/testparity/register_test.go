@@ -90,9 +90,11 @@ const testparityPlannedRatchet = 2
 // completes IcdPeerWakefulnessTest.ts and ports IcdClientTest's wall-clock
 // deadline, and PingAddress ports DecommissionTest's probe case out of left:
 // 156 ported, 586 missing, 576 left.
+// Phase 36: the administrator's basic window of
+// CommissioningWindowLifetimeTest.ts ported on the Basic feature: 585 missing.
 const (
 	testparityPortedRatchet  = 156
-	testparityMissingRatchet = 586
+	testparityMissingRatchet = 585
 )
 
 // testparityLeftRatchet is the number of left it cases summed over the

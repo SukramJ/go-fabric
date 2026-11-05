@@ -267,7 +267,7 @@ func buildRoot(ctx context.Context, d rootDeps) (*RootClusters, error) { //nolin
 	if err != nil {
 		return nil, fmt.Errorf("root descriptor: %w", err)
 	}
-	r.AdministratorCommissioning = wire.NewAdministratorCommissioning()
+	r.AdministratorCommissioning = wire.NewAdministratorCommissioningWith(wire.AdministratorCommissioningConfig{BasicCommissioning: cfg.Commissioning.BasicCommissioning})
 	if r.TimeSynchronization, err = d.timeSynchronization(cfg, r.GeneralDiagnostics); err != nil { //nolint:contextcheck // the constructor takes no context; it reads the store once
 		return nil, err
 	}
