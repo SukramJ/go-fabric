@@ -285,7 +285,7 @@ Harness image: `ghcr.io/matter-js/chip@sha256:d6f1de89d714309beb621543d451a98996
 | TLSCLIENT | 6 | 6 | 0 | 0 | 0 | 0 | 0 |
 | WEBRTCP | 7 | 7 | 0 | 0 | 0 | 0 | 0 |
 | WebRTCP | 13 | 12 | 0 | 0 | 1 | 0 | 0 |
-| AVSM | 19 | 15 | 0 | 0 | 4 | 0 | 0 |
+| AVSM | 19 | 19 | 0 | 0 | 0 | 0 | 0 |
 | AVSUM | 9 | 9 | 0 | 0 | 0 | 0 | 0 |
 | ZONEMGMT | 4 | 4 | 0 | 0 | 0 | 0 | 0 |
 | PAVST | 15 | 10 | 0 | 0 | 1 | 4 | 0 |
@@ -296,7 +296,7 @@ Harness image: `ghcr.io/matter-js/chip@sha256:d6f1de89d714309beb621543d451a98996
 | TBRM | 5 | 3 | 0 | 0 | 1 | 1 | 0 |
 | DGTHREAD | 6 | 4 | 0 | 0 | 1 | 1 | 0 |
 | THNETDIR | 3 | 3 | 0 | 0 | 0 | 0 | 0 |
-| **all** | **829** | **541** | **0** | **3** | **142** | **138** | **5** |
+| **all** | **829** | **545** | **0** | **3** | **138** | **138** | **5** |
 
 ### Cases not run
 
@@ -310,10 +310,6 @@ Harness image: `ghcr.io/matter-js/chip@sha256:d6f1de89d714309beb621543d451a98996
 | APPOBSERVER/13.1 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | AUDIOOUTPUT/7.3 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | AUDIOOUTPUT/7.4 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
-| AVSM/2.18 | (b) not supported | not applicable: the case's PICS `AVSM.S & AVSM.S.F_VDO` is false for the reference DUT |
-| AVSM/2.19 | (b) not supported | not applicable: the case's PICS `AVSM.S & AVSM.S.F_ADO` is false for the reference DUT |
-| AVSM/2.20 | (b) not supported | not applicable: the case's PICS `AVSM.S & AVSM.S.F_SNP` is false for the reference DUT |
-| AVSM/2.21 | (b) not supported | not applicable: the case's PICS `AVSM.S & AVSM.S.F_VDO` is false for the reference DUT |
 | BDX/1.1 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | BDX/1.3 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | BDX/1.5 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |

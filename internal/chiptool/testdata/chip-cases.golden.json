@@ -182,9 +182,29 @@
       "steps": 8,
       "stepsSkipped": 0
     },
+    "AVSM/2.18": {
+      "tests": 1,
+      "steps": 20,
+      "stepsSkipped": 0
+    },
+    "AVSM/2.19": {
+      "tests": 1,
+      "steps": 16,
+      "stepsSkipped": 0
+    },
     "AVSM/2.2": {
       "tests": 1,
       "steps": 15,
+      "stepsSkipped": 0
+    },
+    "AVSM/2.20": {
+      "tests": 1,
+      "steps": 16,
+      "stepsSkipped": 0
+    },
+    "AVSM/2.21": {
+      "tests": 1,
+      "steps": 9,
       "stepsSkipped": 0
     },
     "AVSM/2.3": {
@@ -3666,10 +3686,6 @@
   "notApplicable": {
     "ACL/2.11": "ACL.S.F01",
     "ALOGIN/12.3": "ALOGIN.S \u0026 ALOGIN.S.F00",
-    "AVSM/2.18": "AVSM.S \u0026 AVSM.S.F_VDO",
-    "AVSM/2.19": "AVSM.S \u0026 AVSM.S.F_ADO",
-    "AVSM/2.20": "AVSM.S \u0026 AVSM.S.F_SNP",
-    "AVSM/2.21": "AVSM.S \u0026 AVSM.S.F_VDO",
     "BINFO/3.1": "BINFO.S.A0014",
     "BINFO/3.2": "BINFO.S \u0026 BINFO.S.M.DeviceConfigurationChange",
     "BRBINFO/3.1": "BRBINFO.S.A0014",
