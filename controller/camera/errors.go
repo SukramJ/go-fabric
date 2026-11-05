@@ -174,6 +174,28 @@ func (*ExhaustedError) Error() string { return "Camera has no capacity for this 
 // 0bd06f2.
 var ErrStreamInUse = errors.New("camera: stream is in use and cannot be released")
 
+// InUseError is the [ErrStreamInUse] of one release: the stream and, when
+// the camera's cached report states one above zero, its reference count.
+// It matches ErrStreamInUse with errors.Is and unwraps to the camera's
+// refusal. Mirrors matterjs-server
+// packages/ws-controller/src/types/WebSocketMessageTypes.ts:317-324 at
+// 0bd06f2.
+type InUseError struct {
+	StreamID uint16
+	// ReferenceCount is the cached count; 0 when the report states none
+	// above zero, since the cache can lag.
+	ReferenceCount int
+	cause          error
+}
+
+func (e *InUseError) Error() string { return ErrStreamInUse.Error() }
+
+// Is makes an InUseError [ErrStreamInUse].
+func (e *InUseError) Is(target error) bool { return target == ErrStreamInUse }
+
+// Unwrap is the camera's refusal.
+func (e *InUseError) Unwrap() error { return e.cause }
+
 // NotSupportedError is error 105: the endpoint lacks clusters camera
 // streaming needs. Mirrors matterjs-server
 // packages/ws-controller/src/types/WebSocketMessageTypes.ts:335-341 at

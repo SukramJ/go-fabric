@@ -10,7 +10,7 @@
 // mirrors; matter.js itself models only the WebRTC requestor of a camera
 // controller, so this package is ahead of matter.js.
 //
-// This first part holds the policies, pure functions over small types:
+// The policies are pure functions over small types:
 //
 //   - the stream policy (policy_stream.go): the video window a request
 //     asks for (computeVideoEnvelope), the reuse, degraded and eviction
@@ -34,10 +34,35 @@
 //     and peer ends arrive in.
 //
 // The typed errors (errors.go) map one-to-one onto matterjs-server's
-// camera error codes 102 to 106. The camera quirks matterjs-server works
-// around are named constants in types.go.
+// camera error codes 102 to 106, and [ErrInvalidArgument] onto its error
+// 8. The camera quirks matterjs-server works around are named constants in
+// types.go.
 //
-// The service that composes these over a controller's nodes, the
-// sessions and the signalling channel follow in this package (phase 37
-// wave C); until then nothing outside it imports it.
+// Over the policies runs the [Service], one per controller:
+//
+//   - the manager (manager*.go): the per-endpoint lock, the stream leases
+//     and their grace window, the allocation ladders for video, audio and
+//     snapshots, the session start and the stops and releases, every effect
+//     of a request given back on its failure;
+//   - the session layer (provider_sessions.go): ProvideOffer and
+//     SolicitOffer with the controller's requestor endpoint as originating
+//     endpoint, the stream fields reconciled with the camera's cluster
+//     revision, the UTC-time retry, the requestor's session table kept in
+//     step, the offers an answer is narrowed to;
+//   - the watch (session_watch.go): each camera's CurrentSessions at the
+//     end of a report batch, a restart told from a drop by the StartUp
+//     event, and the sweep of the sessions a camera holds for this
+//     controller that nothing here does;
+//   - the facade (service.go, session.go, capabilities.go,
+//     provider_route.go, reports.go): [Service.StartStream] and its
+//     [Session] with the camera's signals, [Service.Snapshot],
+//     [Service.Capabilities], [Service.ReleaseStream], the raw [Provider]
+//     route and the [Observer].
+//
+// The controller serves the requestor the cameras call back
+// (controller.Config.Camera) under its one operational identity; the
+// service needs outgoing TCP (controller.Config.TCP.Outgoing), since
+// ProvideOffer and ProvideAnswer carry the Large Message quality, and the
+// cameras' reports through a [Reports] installed on the controller's
+// configuration.
 package camera

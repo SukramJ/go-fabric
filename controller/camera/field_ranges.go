@@ -6,6 +6,7 @@ package camera
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math"
 	"strconv"
@@ -168,6 +169,14 @@ type argumentError struct {
 }
 
 func (e *argumentError) Error() string { return e.msg }
+
+// Is makes every refusal of an argument [ErrInvalidArgument].
+func (e *argumentError) Is(target error) bool { return target == ErrInvalidArgument }
+
+// ErrInvalidArgument is matterjs-server's error 8: a caller's argument the
+// controller refuses before anything reaches a camera. Every such refusal
+// matches it with errors.Is; its text names the argument.
+var ErrInvalidArgument = errors.New("camera: invalid argument")
 
 // invalidArguments is an argumentError with a formatted text.
 func invalidArguments(format string, args ...any) error {

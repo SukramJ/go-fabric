@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 7504,
+  "entry_points": 7506,
   "entry_packages": [
     ".",
     "bdx",
@@ -279,9 +279,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 17457,
-    "reachable": 12209,
-    "whitelisted": 5247,
+    "total_exported": 17512,
+    "reachable": 12263,
+    "whitelisted": 5248,
     "unreachable": 1
   },
   "by_package": [
@@ -22329,14 +22329,14 @@
       "identifier": "PairingPhase",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "controller/controller.go",
-      "line": 624
+      "line": 635
     },
     {
       "package": "controller",
       "identifier": "PairingStep",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "controller/controller.go",
-      "line": 620
+      "line": 631
     },
     {
       "package": "controller",
@@ -22680,6 +22680,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/ca/keyfile/keyfile_test.go",
       "line": 80
+    },
+    {
+      "package": "controller/camera",
+      "identifier": "Signal",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/camera/service.go",
+      "line": 42
     },
     {
       "package": "controller/camera",

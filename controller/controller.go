@@ -216,9 +216,11 @@ type Controller struct {
 	reg    *client.Registry
 	udp    *udp.Listener
 	stop   func()
-	// stopTCP closes the TCP listener (tcp.go); tcpAddr is its address.
+	// stopTCP closes the TCP listener (tcp.go); tcpAddr is its address;
+	// tcp is the configuration they follow.
 	stopTCP func()
 	tcpAddr *net.TCPAddr
+	tcp     TCPConfig
 	// unadvertise withdraws the commissioner record (advertise.go).
 	unadvertise func(context.Context) error
 	// adv is the advertiser of the controller's records (the commissioner
@@ -285,7 +287,7 @@ func New(ctx context.Context, cfg Config) (_ *Controller, err error) {
 		openNames = discovery.Open
 	}
 	clk := clock.Or(cfg.Clock)
-	c := &Controller{db: cfg.DB, log: log, clock: clk, stop: func() {}, dcl: cfg.DCL}
+	c := &Controller{db: cfg.DB, log: log, clock: clk, stop: func() {}, dcl: cfg.DCL, tcp: cfg.TCP}
 	defer func() {
 		if err != nil {
 			_ = c.Close(context.WithoutCancel(ctx))
@@ -553,6 +555,15 @@ func (c *Controller) Fabric() *commissioner.Fabric { return c.fabric }
 // Commissioner().Interaction. A seam of the role — matter.js's node
 // peers (packages/node/src/node/client/Peers.ts:93 at 862ad75f).
 func (c *Controller) Peers() *peer.Set { return c.peers }
+
+// Clock is the time source of the controller's stack ([Config.Clock], the
+// system clock without one), for a service composed over the controller
+// that paces on the same clock.
+func (c *Controller) Clock() clock.Clock { return c.clock }
+
+// TCP is the controller's TCP configuration ([Config.TCP]): whether it
+// accepts and whether it opens TCP connections.
+func (c *Controller) TCP() TCPConfig { return c.tcp }
 
 // Addr is the controller's UDP address: where its sessions, its
 // commissioner record and, with a served tree, its operational record
