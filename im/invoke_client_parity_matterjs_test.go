@@ -119,3 +119,65 @@ func TestInvokeClientResponseRoundTrip(t *testing.T) {
 		t.Fatalf("command status %+v", status)
 	}
 }
+
+// TestInvokeClientRequestOptionsParityMatterJS: the client's InvokeRequest
+// carries a DelayReportData under tag 3, both its fields written, ahead of
+// the InteractionModelRevision, and the revision the request names — the
+// field order of matter.js TlvInvokeRequest
+// (packages/types/src/protocol/messages/TlvInvokeRequest.ts:17-31 at
+// 862ad75f) and TlvDelayReportData's two TlvFields. A request without a
+// revision carries [MatterInteractionModelRevision]; the decoder reads
+// back what the encoder wrote.
+func TestInvokeClientRequestOptionsParityMatterJS(t *testing.T) {
+	t.Parallel()
+	encode := func(req InvokeRequest) []byte {
+		enc := tlv.NewEncoder()
+		MarshalInvokeRequestTLV(enc, req, func(*tlv.Encoder, tlv.Tag, any) {})
+		b, err := enc.Bytes()
+		if err != nil {
+			t.Fatal(err)
+		}
+		return b
+	}
+	want := func(drd *DelayReportData, revision uint8) []byte {
+		return encodeStruct(t, func(e *tlv.Encoder) {
+			e.PutBool(tlv.ContextTag(0), false)
+			e.PutBool(tlv.ContextTag(1), false)
+			e.StartArray(tlv.ContextTag(2))
+			_ = e.EndContainer()
+			if drd != nil {
+				e.StartStruct(tlv.ContextTag(3))
+				e.PutUint(tlv.ContextTag(0), uint64(drd.DelayMinMs))
+				e.PutUint(tlv.ContextTag(1), uint64(drd.DelayJitterWindowMs))
+				_ = e.EndContainer()
+			}
+			e.PutUint(tlv.ContextTag(0xFF), uint64(revision))
+		})
+	}
+	for _, c := range []struct {
+		name     string
+		req      InvokeRequest
+		drd      *DelayReportData
+		revision uint8
+	}{
+		{"defaults", InvokeRequest{}, nil, MatterInteractionModelRevision},
+		{"zero DelayReportData", InvokeRequest{DelayReportData: &DelayReportData{}}, &DelayReportData{}, MatterInteractionModelRevision},
+		{
+			"DelayReportData and revision",
+			InvokeRequest{DelayReportData: &DelayReportData{DelayMinMs: 100, DelayJitterWindowMs: 250}, InteractionModelRevision: 11},
+			&DelayReportData{DelayMinMs: 100, DelayJitterWindowMs: 250}, 11,
+		},
+	} {
+		got := encode(c.req)
+		if w := want(c.drd, c.revision); !bytes.Equal(got, w) {
+			t.Fatalf("%s: %s", c.name, bytesDiff(got, w))
+		}
+		back, err := UnmarshalInvokeRequestTLV(tlv.NewDecoder(got), nil)
+		if err != nil {
+			t.Fatalf("%s: %v", c.name, err)
+		}
+		if back.InteractionModelRevision != c.revision || (c.drd == nil) != (back.DelayReportData == nil) || (c.drd != nil && *back.DelayReportData != *c.drd) {
+			t.Fatalf("%s: decoded %+v", c.name, back)
+		}
+	}
+}
