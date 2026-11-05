@@ -986,6 +986,7 @@ func (c *demoCamera) pushTransport() padef.Host {
 // its InitialDuration.
 func (c *demoCamera) motionTriggered() {
 	automation := padef.TriggerActivationReasonAutomation
+	now := time.Now()
 	c.mu.Lock()
 	var ids []uint16
 	var durations []time.Duration
@@ -993,17 +994,26 @@ func (c *demoCamera) motionTriggered() {
 		if t.trigger.TriggerType != padef.TransportTriggerTypeMotion {
 			continue
 		}
-		d := time.Second
+		var tc padef.TransportMotionTriggerTimeControlStruct
 		if t.trigger.MotionTimeControl != nil {
-			d = time.Duration(t.trigger.MotionTimeControl.InitialDuration) * time.Second
+			tc = *t.trigger.MotionTimeControl
 		}
-		// HandleTriggerDetected (:345-405) records the activation
-		// whether or not the transport is Active.
-		if t.activated.IsZero() || time.Since(t.activated) >= t.detected {
-			t.activated, t.detected = time.Now(), d
+		sec := func(v uint32) time.Duration { return time.Duration(v) * time.Second }
+		// HandleTriggerDetected (pushav-transport.cpp:345-405), whether
+		// or not the transport is Active: nothing in the blind period
+		// after a recording; a new activation once the detected
+		// duration is over, else the recording augmented up to the
+		// maximum.
+		if !t.activated.IsZero() && now.Before(t.activated.Add(t.detected).Add(sec(uint32(tc.BlindDuration)))) && now.After(t.activated.Add(t.detected)) {
+			continue
+		}
+		if t.activated.IsZero() || now.Sub(t.activated) >= t.detected {
+			t.activated, t.detected = now, sec(uint32(max(tc.InitialDuration, 1)))
+		} else {
+			t.detected = min(t.detected+sec(uint32(tc.AugmentationDuration)), sec(max(tc.MaxDuration, uint32(tc.InitialDuration))))
 		}
 		if t.status == padef.TransportStatusActive {
-			ids, durations = append(ids, id), append(durations, d)
+			ids, durations = append(ids, id), append(durations, t.activated.Add(t.detected).Sub(now))
 		}
 	}
 	c.mu.Unlock()
