@@ -3,10 +3,11 @@
 # commissioner and the CSA certification harness on the other side of the
 # wire, against the reference daemon in examples/reference-bridge.
 #
-# Everything runs in matter.js's CHIP image (ghcr.io/matter-js/chip), pinned
-# by digest in the Makefile (CHIP_TEST_IMAGE) — the single source for the
-# commissioner, the harness and the CHIP reference apps, at one CHIP commit.
-# The image is multi-arch, so the jobs run on ordinary amd64 runners. The
+# Everything runs in the module's harness image (ghcr.io/sukramj/go-fabric-chip,
+# matter.js's CHIP image plus chip's joint-fabric apps and Push AV server),
+# pinned by digest in the Makefile (CHIP_TEST_IMAGE) — the single source for
+# the commissioner, the harness and the CHIP reference apps, at one CHIP
+# commit. The image is amd64, as the runners are. The
 # container shares the host network and the runner's avahi over /run/dbus.
 #
 # Three jobs, and the second is the point:

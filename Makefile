@@ -281,15 +281,20 @@ cite-check: ## regenerate the citation artefacts, then fail on a hard error or w
 CHIP_CERT_BINS_IMAGE ?= connectedhomeip/chip-cert-bins:6feac778f196483b6355d35fc529f183b293b71f
 CHIPTOOL_BIN_DIR     ?= bin
 
-# The CHIP test harness image the chip-tool suite runs by default: matter.js's
-# own (../matter.js/support/chip), multi-arch, carrying chip-tool, the YAML
-# and Python certification cases and the CHIP reference apps at one CHIP
-# commit. Pinned by digest, never a floating tag; the CHIP commit it was
-# built from is in the image's org.opencontainers.image.revision label and
+# The CHIP test harness image the chip-tool suite runs by default: the
+# module's own (internal/chiptool/image, built and pushed by
+# .github/workflows/chip-image.yml, amd64), which is matter.js's CHIP image
+# (CHIP_BASE_IMAGE, ../matter.js/support/chip: chip-tool, the YAML and Python
+# certification cases and the CHIP reference apps at one CHIP commit) plus
+# chip's jf-admin-app, jf-control-app and Push AV server at that commit
+# (phase 34). Both pinned by digest, never a floating tag; the CHIP commit
+# is in the images' org.opencontainers.image.revision label and
 # /etc/chip-version, recorded below; `make chiptool-setup` checks the CHIP
-# source out at that commit. Bump both together, deliberately: a new digest is
-# a new commissioner and a new case set.
-CHIP_TEST_IMAGE        ?= ghcr.io/matter-js/chip@sha256:d6f1de89d714309beb621543d451a98996690eea82fa74d1563abd7d2b3cb326
+# source out at that commit. Bump the three together, deliberately: a new
+# digest is a new commissioner and a new case set — lift CHIP_BASE_IMAGE and
+# the commit, dispatch chip-image.yml, then pin the digest it prints here.
+CHIP_BASE_IMAGE        ?= ghcr.io/matter-js/chip@sha256:d6f1de89d714309beb621543d451a98996690eea82fa74d1563abd7d2b3cb326
+CHIP_TEST_IMAGE        ?= ghcr.io/sukramj/go-fabric-chip@sha256:e443ea0c1b91478720ee8b94c34c46e95792d77493e1b50bbc99e3e603b77606
 CHIP_TEST_IMAGE_COMMIT ?= 6170af8461b10b1766044122ac83332c6d00ab20
 
 # The CHIP data model directory the snapshot is cross-checked against

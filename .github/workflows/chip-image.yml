@@ -1,12 +1,12 @@
 # go-fabric's certification harness image (internal/chiptool/image): the
-# pinned matter.js CHIP image (the Makefile's CHIP_TEST_IMAGE) with chip's
+# pinned matter.js CHIP image (the Makefile's CHIP_BASE_IMAGE) with chip's
 # jf-admin-app, jf-control-app and Push AV server added, built from the
 # Makefile's CHIP_TEST_IMAGE_COMMIT and pushed as
 # ghcr.io/sukramj/go-fabric-chip:<that commit>.
 #
-# Manual only. After a run the owner pastes the digest the run's summary
-# prints into the Makefile's CHIP_TEST_IMAGE (phase 34): the families then
-# run in this image, which carries everything matter.js's does.
+# Manual only. After a run the digest the run's summary prints goes into
+# the Makefile's CHIP_TEST_IMAGE (phase 34): the suite then runs in this
+# image, which carries everything matter.js's does.
 name: chip-image
 
 on:
@@ -36,8 +36,8 @@ jobs:
         run: |
           set -euo pipefail
           commit=$(sed -n 's/^CHIP_TEST_IMAGE_COMMIT[[:space:]]*?=[[:space:]]*//p' Makefile)
-          base=$(sed -n 's/^CHIP_TEST_IMAGE[[:space:]]*?=[[:space:]]*//p' Makefile)
-          case "$base" in ghcr.io/matter-js/chip@*) ;; *) echo "::error::CHIP_TEST_IMAGE ($base) is not matter.js's image; build FROM the matter.js digest the Makefile pinned before"; exit 1 ;; esac
+          base=$(sed -n 's/^CHIP_BASE_IMAGE[[:space:]]*?=[[:space:]]*//p' Makefile)
+          case "$base" in ghcr.io/matter-js/chip@*) ;; *) echo "::error::CHIP_BASE_IMAGE ($base) is not matter.js's image pinned by digest"; exit 1 ;; esac
           tag="ghcr.io/sukramj/go-fabric-chip:$commit"
           echo "$GH_TOKEN" | docker login ghcr.io -u "$ACTOR" --password-stdin
           docker buildx create --use --name chip
