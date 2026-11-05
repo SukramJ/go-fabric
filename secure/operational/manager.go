@@ -49,6 +49,9 @@ type Manager struct {
 	sessions       map[uint16]*Entry
 	nextID         uint16
 	onSessionClose func(sessionID uint16)
+	// onPaseSessionClose fires after onSessionClose for a session
+	// established via PASE (SetOnPaseSessionClose).
+	onPaseSessionClose func(sessionID uint16)
 
 	// onGracefulClose, when non-nil, fires once per session BEFORE its
 	// key material is zeroised on every locally-initiated ("graceful")
@@ -220,21 +223,43 @@ func (m *Manager) SetOnSessionClose(fn func(sessionID uint16)) {
 	m.mu.Unlock()
 }
 
-// fireOnSessionClose dispatches the close hook for every entry in
+// SetOnPaseSessionClose installs a hook that fires once per closed
+// session that was established via PASE — after the [Manager.SetOnSessionClose]
+// hook, with the same session id — whatever closed it: the peer's
+// CloseSession, the fail-safe expiry and CommissioningComplete
+// ([Manager.ClosePASESessions]), a revoked window, an eviction. A session
+// adopted onto a fabric by [Manager.AdoptFabricIndex] stays a PASE
+// session here. The node resumes its commissionable advertisement on it,
+// as matter.js's DeviceAdvertiser does on `sessions.deleted` for a
+// session with `isPase` (packages/protocol/src/protocol/DeviceAdvertiser.ts:131-162
+// at 862ad75f). Passing nil clears any prior hook; the callback fires
+// outside the manager's lock.
+func (m *Manager) SetOnPaseSessionClose(fn func(sessionID uint16)) {
+	m.mu.Lock()
+	m.onPaseSessionClose = fn
+	m.mu.Unlock()
+}
+
+// fireOnSessionClose dispatches the close hooks for every entry in
 // entries. Caller MUST hold no manager locks. nil entries / nil hooks
 // are no-ops.
 func (m *Manager) fireOnSessionClose(entries []*Entry) {
 	m.mu.RLock()
-	hook := m.onSessionClose
+	hook, paseHook := m.onSessionClose, m.onPaseSessionClose
 	m.mu.RUnlock()
-	if hook == nil {
+	if hook == nil && paseHook == nil {
 		return
 	}
 	for _, e := range entries {
 		if e == nil {
 			continue
 		}
-		hook(e.SessionID)
+		if hook != nil {
+			hook(e.SessionID)
+		}
+		if paseHook != nil && e.IsPASE() {
+			paseHook(e.SessionID)
+		}
 	}
 }
 

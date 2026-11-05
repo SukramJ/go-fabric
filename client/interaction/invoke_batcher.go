@@ -51,8 +51,12 @@ func (c *Interaction) maxPathsPerInvoke() int {
 // and one that sets anything the batch request does not rebuild —
 // BatchDuration disabled, a timed or suppressed invoke, an expected
 // processing time, the extended fail-safe timeout, an MRP delay, the
-// Large Message quality — goes on its own. Network does not block: it
-// picks the batch's lane. A command timed-required in the snapshot is a
+// Large Message quality, an interaction model revision other than the
+// default (:196-198), a DelayReportData (:203), an address override
+// (:209) — goes on its own. Network does not block (:191): it picks the
+// batch's lane (:765). beforeDispatch, the remaining field isBatchable
+// classifies (:211), is "Server only" (Invoke.ts:52-55) and has no Go
+// client option. A command timed-required in the snapshot is a
 // timed invoke even with zero options: matter.js's isBatchable reads the
 // timedRequest Invoke() inferred from the model (ClientInteraction.ts:200,
 // Invoke.ts:136-139) (W4-ctlim-02). TimedOff goes on its own as well: the
@@ -61,7 +65,9 @@ func (c *Interaction) maxPathsPerInvoke() int {
 func batchable(path im.ConcreteCommandPath, opts InvokeOptions) bool {
 	return path.Endpoint != 0 && !opts.NoBatch && !opts.SuppressResponse && !opts.TimedOff &&
 		!opts.timedFor(im.CommandInvocation{Path: path}) && opts.ExpectedProcessingTime == 0 &&
-		!opts.ExtendedFailSafeTimeout && opts.AdditionalMrpDelay == nil && !opts.large()
+		!opts.ExtendedFailSafeTimeout && opts.AdditionalMrpDelay == nil && !opts.large() &&
+		(opts.InteractionModelRevision == 0 || opts.InteractionModelRevision == im.MatterInteractionModelRevision) &&
+		opts.DelayReportData == nil && opts.AddressOverride == nil
 }
 
 // batchLane is the commands queued for one network — matter.js BatchLane
@@ -136,6 +142,7 @@ func (c *Interaction) invokeBatched(ctx context.Context, cmd CommandRequest, opt
 	if err := ctx.Err(); err != nil {
 		return Result{}, false, err
 	}
+	opts.Network = c.networkFor(opts.Network)
 	if p, ok := c.provider.(connector); ok {
 		if err := p.connect(ctx, opts.exchangeOptions()); err != nil {
 			return Result{}, false, c.closeReasonOr(err)

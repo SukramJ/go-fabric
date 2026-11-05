@@ -5,10 +5,8 @@
 // 862ad75f: a LIT peer's awake and available state on a fake clock
 // (MockTime.advance is Fake.Advance), subscriptions held, the default wait,
 // the operating-mode flips, suspend and close. matter.js's observables are
-// the On… registrations; `awake.value` is Awake. The two "clock" cases need
-// MockTime.stepWallClock, which clocktest.Fake has not (its Set moves the one
-// reading it has, and on the system clock a time.Time carries the monotonic
-// reading a wall step does not move) — skipped with that reason.
+// the On… registrations; `awake.value` is Awake. MockTime.stepWallClock, of
+// the two "clock" cases, is clocktest.Fake.StepWall.
 package icd_test
 
 import (
@@ -155,16 +153,38 @@ func TestIcdPeerWakefulness(t *testing.T) {
 	})
 	t.Run("clock", func(t *testing.T) {
 		t.Parallel()
-		for _, name := range []string{
-			"keeps its deadline across a forward wall-clock step",
-			"ends Active Mode on time across a backward wall-clock step",
-		} {
-			t.Run(name, func(t *testing.T) {
-				synctest.Test(t, func(t *testing.T) {
-					t.Skip("MockTime.stepWallClock: clocktest.Fake has one reading, and the system clock's time.Time carries the monotonic reading a wall-clock step does not move")
-				})
+		// MockTime.stepWallClock is Fake.StepWall: the schedule runs on the
+		// monotonic reading (IcdPeerWakefulness.ts:148, :154, :160, :226).
+		t.Run("keeps its deadline across a forward wall-clock step", func(t *testing.T) {
+			t.Parallel()
+			synctest.Test(t, func(t *testing.T) {
+				w, fake, _ := litPeer()
+				w.NoteActive()
+				fake.StepWall(time.Hour)
+				// Exposed on the stepped wall clock, still the whole window
+				// ahead (IcdClient.ts:83-87).
+				wantDueIn(t, w, fake, checkInDue)
+				if !w.Available() || !w.Awake() {
+					t.Fatalf("awake %v available %v after the step", w.Awake(), w.Available())
+				}
 			})
-		}
+		})
+		t.Run("ends Active Mode on time across a backward wall-clock step", func(t *testing.T) {
+			t.Parallel()
+			synctest.Test(t, func(t *testing.T) {
+				w, fake, _ := litPeer()
+				w.NoteActive()
+				fake.Advance(wakeTimings.ActiveModeThreshold + time.Millisecond)
+				fake.StepWall(-time.Hour)
+				w.NoteStayActive(0)
+				if w.Awake() {
+					t.Fatal("awake after the threshold passed on the monotonic clock")
+				}
+				// The zero promise ends Active Mode now on the monotonic
+				// clock, the idle window ahead of the stepped wall clock.
+				wantDueIn(t, w, fake, wakeTimings.IdleModeDuration+icd.CheckInMargin)
+			})
+		})
 	})
 	t.Run("subscription", func(t *testing.T) {
 		t.Parallel()

@@ -80,3 +80,19 @@ func TestClockCarriesGroup(t *testing.T) {
 		t.Fatal("a carrier of the system clock lost its group")
 	}
 }
+
+// TestCarrierForwardsMonotonic: the carrier tells the monotonic reading by
+// the clock it wraps, so a wall step of a fake moves Now and not it.
+func TestCarrierForwardsMonotonic(t *testing.T) {
+	t.Parallel()
+	f := clocktest.New(time.Unix(1_000, 0))
+	c := inflight.WithGroup(f, inflight.New("host"))
+	f.Advance(time.Second)
+	f.StepWall(time.Hour)
+	if got := clock.MonotonicOf(c); got != time.Second {
+		t.Fatalf("monotonic reading %v through the carrier, want 1s", got)
+	}
+	if !c.Now().Equal(time.Unix(1_000, 0).Add(time.Hour + time.Second)) {
+		t.Fatalf("wall reading %v", c.Now())
+	}
+}

@@ -20,8 +20,8 @@ const (
 	tagInvokeReqInvokeRequests   uint8 = 2
 	// tagInvokeReqDelayReportData is Matter 1.7's DelayReportData
 	// (matter.js packages/types/src/protocol/messages/TlvInvokeRequest.ts,
-	// 67be3a83 #4569): decoded and validated, not acted on — see
-	// [InvokeRequest.DelayReportData].
+	// 67be3a83 #4569): decoded and validated by the server, written by the
+	// client — see [InvokeRequest.DelayReportData].
 	tagInvokeReqDelayReportData uint8 = 3
 )
 
@@ -74,6 +74,12 @@ type InvokeRequest struct {
 	// bridge defers the subscription reports it asks for
 	// (BD-Matter-DelayReportData).
 	DelayReportData *DelayReportData
+	// InteractionModelRevision is the request's InteractionModelRevision
+	// (tag 0xFF, TlvInvokeRequest.ts:30 at 862ad75f):
+	// [MarshalInvokeRequestTLV] writes it, 0 writing
+	// [MatterInteractionModelRevision]; [UnmarshalInvokeRequestTLV] fills
+	// it, 0 when the field is absent. The server acts on neither.
+	InteractionModelRevision uint8
 }
 
 // DelayReportData is the DelayReportData structure of an InvokeRequest
@@ -239,6 +245,10 @@ func UnmarshalInvokeRequestTLV(dec *tlv.Decoder, fieldsReader CommandFieldsReade
 				return InvokeRequest{}, err
 			}
 			req.DelayReportData = drd
+		case tagInteractionModelRevision:
+			if el.Type >= tlv.TypeUnsignedInt1 && el.Type <= tlv.TypeUnsignedInt8 && el.Uint <= 0xFF {
+				req.InteractionModelRevision = uint8(el.Uint)
+			}
 		default:
 			if el.IsContainer {
 				if err := skipContainer(dec); err != nil {

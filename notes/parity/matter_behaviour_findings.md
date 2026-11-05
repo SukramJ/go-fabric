@@ -815,34 +815,13 @@ with a port of the named case.
 
 ## Tier 3 — LOW
 
-### T3-SW-1 — the invoke options matter.js's ClientInteraction has and Go's does not (seam wave, 2026-11-04)
-
-- **Where:** `client/interaction` `InvokeOptions` and `interaction.Config`; the batcher (`Interaction.Invoke`).
-- **matter.js at 862ad75f:** a command carries `interactionModelRevision`, `beforeDispatch`, `delayReportData` and an address override, each of which keeps it out of a batch (`ClientInvokeTest.ts:545-575`, `:612-630`, `:715-732`), and the interaction binds a default network (`:811-830`). Go has none of the five; the register keeps the nine ClientInvokeTest cases `missing` (five as this gap, three network-on-the-exchange cases as a fabrictest port still to do, one default network).
-- **Unverified:** whether any consumer needs them before milestone 10; a port is a `controller/client` feature wave, not a seam.
-
-### T3-SW-2 — no commissionable advertisement round when PASE closes or the fail-safe expires (seam wave, 2026-11-04)
-
-- **Where:** the device keeps its commissionable record while PASE is up and publishes nothing when the PASE session closes; `node:TestFailsafeCommissioningParity` asserts the record, not a new advertisement.
-- **matter.js at 862ad75f:** `DeviceAdvertiser.ts:131-162` starts an advertisement round on PASE close and on fail-safe expiry; `FailsafeCommissioningTest.ts` "re-announces after failsafe expiry …" (two cases, `missing` in the register with the reason "behaviour gap, not a seam") awaits it.
-- **Fix shape:** `commissioning/` (a security path): on PASE close without CommissioningComplete and on fail-safe expiry, re-run the commissionable announcement as `AdvertiseCommissionable` does at start.
-
-### T3-SW-3 — the ICD client's nextExpectedCheckin follows the wall clock (seam wave, 2026-11-04, measured)
-
-- **Where:** `controller/client` ICD client, `NextExpectedCheckIn` after `clocktest.Fake.StepWall(time.Hour)` reads now+15 s where matter.js reads at least now+idleModeDuration (`IcdClientTest.ts:2281`); the skip in `icd_client_parity_matterjs_test.go` names it.
-- **Fix shape:** keep the expectation on the clock's monotonic reading and convert for exposure (`clock.WallOf`), as the session stamps do.
 
 ### T3-P35-1 — a write value of the wrong Go type gets three different statuses (phase 35, 2026-11-04)
 
 - **Where:** FAILURE from `cluster/core/access_control.go:674`, `bridged_device_basic_information.go:459`, `general_commissioning.go:403`, `network_commissioning.go:234`; CONSTRAINT_ERROR from BasicInformation and Binding through the convention `cluster/spec/write.go:126-128`; INVALID_ACTION from `cluster/core/identify.go:453-457`.
 - **matter.js at 862ad75f:** the node's write path validates through `ValueValidator`, whose `DatatypeError` extends `ValidateError` with the default `Status.InvalidDataType` (`packages/protocol/src/action/errors.ts:55-72`); the older TLV-schema path answers `ValidationDatatypeMismatchError` → `Status.InvalidAction` (`packages/types/src/common/ValidationError.ts:31-38`). Neither is FAILURE.
 - **Unverified:** whether a wire write can reach a Go server with a value of a type the attribute does not hold — the bridge decodes by the attribute's schema, so these may be unit-level paths only. Phase 35's status assertions pin today's answers (`TestBasicInfo_WriteNodeLabelWrongType` and siblings) so a change is visible; the rule — one status, matter.js's INVALID_DATA_TYPE on the node path — is a decision for the next write-path wave.
-
-### T3-P35-2 — GroupKeyManagement invoked without an accessing fabric answers FAILURE (phase 35, 2026-11-04)
-
-- **Where:** `cluster/core/group_key_management.go:604-611` returns a plain error (FAILURE) when neither the context nor the server carries a fabric index.
-- **matter.js at 862ad75f:** a fabric-scoped operation without a fabric is refused as `Status.UnsupportedAccess` (`packages/protocol/src/interaction/FabricAccessControl.ts:61`).
-- **Unverified:** whether the Go IM gate (`bridge/im_gate.go`) or the dispatcher refuses the command before the server sees it, in which case the server's answer is defensive only. Pinned by `TestGKM…` at `group_key_management_test.go:155-156` (phase 35).
+- **Measured 2026-11-05 (follow-up wave, attempt reverted):** the "wrong Go type" convention of `cluster/spec/write.go:122-128` also carries a wire case — `bridge.undecodedValue` (`bridge/attribute_value_reader.go:108-114`), the value the attribute's decoder refused (a label over its max, a string cut at an IS1), which the server's write check answers CONSTRAINT_ERROR because it is of no attribute type; matter.js answers a value its TlvSchema rejects with CONSTRAINT_ERROR too (`AttributeWriteResponse.ts` #decodeWithSchema, cited there), and the ported cases `bridge:TestNodeLabelWriteBoundsTheLengthBeforeIS1` (TlvString.ts:57-69), `bridge/attribute_value_reader_userlabel_test.go:87` and `cluster/spec:TestValueValidatorParityMatterJS/still_rejects_a_wrong-datatype_value_on_a_client_peer_write` (ValueValidatorTest.ts:478-480) assert CONSTRAINT_ERROR. Switching the convention to INVALID_DATA_TYPE therefore breaks three matter.js-asserted cases and 20 module tests; the write-path wave has to separate the undecoded wire value (CONSTRAINT_ERROR, as matter.js) from a host-side Go value of the wrong type before the statuses can be unified, and read what matter.js's node path answers a TLV element of another type on the wire (the decoder's error, not the validator's) at the pin.
 
 ---
 

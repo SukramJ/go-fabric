@@ -136,7 +136,7 @@
   },
   {
     "file": "bridge/bridge.go",
-    "line": 694,
+    "line": 697,
     "citation": "ExchangeManager.ts:425-431",
     "resolved": "packages/protocol/src/protocol/ExchangeManager.ts",
     "identifier": "CloseSession",
@@ -145,7 +145,7 @@
   },
   {
     "file": "bridge/bridge.go",
-    "line": 1455,
+    "line": 1458,
     "citation": "Fabric.ts:408-415",
     "resolved": "packages/protocol/src/fabric/Fabric.ts",
     "identifier": "initiateForceClose",
@@ -154,7 +154,7 @@
   },
   {
     "file": "bridge/bridge.go",
-    "line": 1780,
+    "line": 1783,
     "citation": "Session.ts:248",
     "resolved": "packages/protocol/src/session/Session.ts",
     "identifier": "initiateClose",
@@ -640,7 +640,7 @@
   },
   {
     "file": "client/interaction/interaction.go",
-    "line": 172,
+    "line": 181,
     "citation": "ClientInteraction.ts:1249-1251",
     "resolved": "packages/protocol/src/action/client/ClientInteraction.ts",
     "identifier": "maximumPeerResponseTime",
@@ -649,7 +649,7 @@
   },
   {
     "file": "client/interaction/interaction.go",
-    "line": 279,
+    "line": 299,
     "citation": "InteractionMessenger.ts:148-161",
     "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
     "identifier": "StatusResponse",
@@ -658,7 +658,7 @@
   },
   {
     "file": "client/interaction/invoke.go",
-    "line": 91,
+    "line": 106,
     "citation": "InteractionMessenger.ts:1082-1105",
     "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
     "identifier": "StatusResponse",
@@ -676,7 +676,7 @@
   },
   {
     "file": "client/interaction/provider.go",
-    "line": 274,
+    "line": 282,
     "citation": "ClientInteraction.ts:1112",
     "resolved": "packages/protocol/src/action/client/ClientInteraction.ts",
     "identifier": "verifyReachability",
@@ -1865,7 +1865,7 @@
   },
   {
     "file": "im/invoke.go",
-    "line": 152,
+    "line": 158,
     "citation": "packages/protocol/src/action/server/CommandInvokeResponse.ts:446-448",
     "resolved": "packages/protocol/src/action/server/CommandInvokeResponse.ts",
     "identifier": "requestTlv",
@@ -1874,7 +1874,7 @@
   },
   {
     "file": "im/invoke.go",
-    "line": 449,
+    "line": 459,
     "citation": "packages/node/src/node/server/InteractionServer.ts:1043-1074",
     "resolved": "packages/node/src/node/server/InteractionServer.ts",
     "identifier": "suppressedBuffer",
@@ -1883,7 +1883,7 @@
   },
   {
     "file": "im/invoke.go",
-    "line": 469,
+    "line": 479,
     "citation": "packages/node/src/node/server/InteractionServer.ts:950-955",
     "resolved": "packages/node/src/node/server/InteractionServer.ts",
     "identifier": "invokeRequests",
@@ -2099,7 +2099,7 @@
   },
   {
     "file": "secure/operational/manager.go",
-    "line": 64,
+    "line": 67,
     "citation": "packages/protocol/src/session/NodeSession.ts:368",
     "resolved": "packages/protocol/src/session/NodeSession.ts",
     "identifier": "gracefulClose",
@@ -2108,7 +2108,7 @@
   },
   {
     "file": "secure/operational/manager.go",
-    "line": 125,
+    "line": 128,
     "citation": "NodeSession.ts:368",
     "resolved": "packages/protocol/src/session/NodeSession.ts",
     "identifier": "gracefulClose",
@@ -2117,7 +2117,7 @@
   },
   {
     "file": "secure/operational/manager.go",
-    "line": 349,
+    "line": 374,
     "citation": "SessionManager.ts:484",
     "resolved": "packages/protocol/src/session/SessionManager.ts",
     "identifier": "getPaseSession",
@@ -2126,7 +2126,7 @@
   },
   {
     "file": "secure/operational/manager.go",
-    "line": 908,
+    "line": 933,
     "citation": "packages/protocol/src/session/SessionManager.ts:490-508",
     "resolved": "packages/protocol/src/session/SessionManager.ts",
     "identifier": "getNextAvailableSessionId",
@@ -2135,7 +2135,7 @@
   },
   {
     "file": "secure/operational/manager.go",
-    "line": 934,
+    "line": 959,
     "citation": "packages/protocol/src/session/SessionManager.ts:513",
     "resolved": "packages/protocol/src/session/SessionManager.ts",
     "identifier": "getSession",
@@ -2144,7 +2144,7 @@
   },
   {
     "file": "secure/operational/manager.go",
-    "line": 1037,
+    "line": 1062,
     "citation": "Session.ts:248",
     "resolved": "packages/protocol/src/session/Session.ts",
     "identifier": "initiateClose",

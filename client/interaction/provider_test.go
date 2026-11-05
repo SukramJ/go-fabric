@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/SukramJ/go-fabric/bridge/bridgetest"
@@ -20,6 +21,7 @@ import (
 	"github.com/SukramJ/go-fabric/mdns"
 	"github.com/SukramJ/go-fabric/secure/channel"
 	"github.com/SukramJ/go-fabric/secure/mattercert"
+	"github.com/SukramJ/go-fabric/secure/sessionparams"
 )
 
 // TestSessionProvider: the session-bound provider (DedicatedChannelExchangeProvider,
@@ -181,4 +183,28 @@ func TestMaximumPeerResponseTimeCarriesLocalPad(t *testing.T) {
 	if got <= exchange.MaxPeerResponseTime(nil, false, local, interaction.SubscriptionProcessingTime) {
 		t.Fatal("the local pad does not lengthen the wait")
 	}
+}
+
+// TestConfigNetworkIsTheExchangeDefault: [interaction.Config].Network is
+// the network of an exchange whose request names none, on the direct path
+// as on the batched one, and a request's own network wins — matter.js
+// `request.network ?? this.#network` (ClientInteraction.ts:1250 at
+// 862ad75f).
+func TestConfigNetworkIsTheExchangeDefault(t *testing.T) {
+	t.Parallel()
+	synctest.Test(t, func(t *testing.T) {
+		s := newScriptedWith(t, &sessionparams.Parameters{MaxPathsPerInvoke: 10})
+		p, networks := interaction.RecordNetworks(interaction.SessionProvider(s.mgr, s.session))
+		c := interaction.Bind(p, interaction.Config{Clock: s.clock, Network: peer.NetworkFast})
+		t.Cleanup(func() { c.Close(nil) })
+		plain := ciInvoke(context.Background(), c, ciPath(1, ciOn), interaction.InvokeOptions{NoBatch: true})
+		ciRefLess(t, s, s.next(t))
+		wantSuccess(t, plain)
+		own := ciInvoke(context.Background(), c, ciPath(1, ciOff), interaction.InvokeOptions{NoBatch: true, ClientRequest: interaction.ClientRequest{Network: peer.NetworkUnlimited}})
+		ciRefLess(t, s, s.next(t))
+		wantSuccess(t, own)
+		if got := networks(); len(got) != 2 || got[0] != peer.NetworkFast || got[1] != peer.NetworkUnlimited {
+			t.Fatalf("exchange networks %q, want [fast unlimited]", got)
+		}
+	})
 }

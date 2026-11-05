@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 7416,
+  "entry_points": 7426,
   "entry_packages": [
     ".",
     "bdx",
@@ -279,9 +279,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 17320,
-    "reachable": 12135,
-    "whitelisted": 5185,
+    "total_exported": 17326,
+    "reachable": 12138,
+    "whitelisted": 5188,
     "unreachable": 0
   },
   "by_package": [],
@@ -6732,7 +6732,7 @@
       "identifier": "FlushingBatches",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/interaction/export_test.go",
-      "line": 24
+      "line": 26
     },
     {
       "package": "client/interaction",
@@ -6746,21 +6746,28 @@
       "identifier": "HoldConnect",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/interaction/export_test.go",
-      "line": 41
+      "line": 43
     },
     {
       "package": "client/interaction",
       "identifier": "QueuedInvokes",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/interaction/export_test.go",
-      "line": 13
+      "line": 15
+    },
+    {
+      "package": "client/interaction",
+      "identifier": "RecordNetworks",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/interaction/export_test.go",
+      "line": 76
     },
     {
       "package": "client/interaction",
       "identifier": "SetTimedWrite",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/interaction/export_test.go",
-      "line": 29
+      "line": 31
     },
     {
       "package": "client/interaction",
@@ -23403,6 +23410,13 @@
     },
     {
       "package": "controller/client",
+      "identifier": "TestRouteInvoke",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/client/invoke_network_internal_test.go",
+      "line": 18
+    },
+    {
+      "package": "controller/client",
       "identifier": "TestScope",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/scope_internal_test.go",
@@ -29035,6 +29049,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/wire_fixtures_parity_test.go",
       "line": 298
+    },
+    {
+      "package": "im",
+      "identifier": "TestInvokeClientRequestOptionsParityMatterJS",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "im/invoke_client_parity_matterjs_test.go",
+      "line": 131
     },
     {
       "package": "im",

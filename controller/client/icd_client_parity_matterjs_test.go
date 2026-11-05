@@ -738,7 +738,25 @@ func TestIcdClientParity(t *testing.T) {
 			}
 		})
 		t.Run("exposes nextExpectedCheckin on the wall clock once no subscription is held", func(t *testing.T) {
-			t.Skip("behaviour gap (seam wave, issue #396): the Go deadline is anchored to the wall reading of the peer's last activity, so after Fake.StepWall(1h) NextExpectedCheckIn read now+15s where matter.js reads at least now+idleModeDuration (IcdClientTest.ts:2281-2293 at 862ad75f); the no-subscription deadline is held by TestIcdPeerWakefulness's subscription cases")
+			// IcdClientTest.ts:2281-2293 at 862ad75f: a step of the wall clock
+			// alone leaves the deadline at least the idle mode duration ahead
+			// of the stepped now — the wakefulness runs on the monotonic
+			// reading, nextExpectedCheckin converts (IcdClient.ts:83-87).
+			p := litOperatingPair(t)
+			if err := p.do(t, func(ctx context.Context) error { return p.node.SetAutoSubscribe(ctx, false) }); err != nil {
+				t.Fatal(err)
+			}
+			p.settle(t)
+			p.site.Fake().StepWall(time.Hour)
+			due, ok := p.icd().NextExpectedCheckIn()
+			if !ok {
+				t.Fatal("no deadline without a subscription")
+			}
+			idle := icdLITConfig(true).IdleModeDuration
+			now := p.site.Clock().Now()
+			if due.Before(now.Add(idle)) || due.After(now.Add(idle+30*time.Second)) {
+				t.Fatalf("NextExpectedCheckIn %v after a 1 h wall step, want within [now+%v, now+%v]", due.Sub(now), idle, idle+30*time.Second)
+			}
 		})
 		t.Run("has no nextExpectedCheckin for an unregistered peer", func(t *testing.T) {
 			if _, ok := newICDPair(t, icdPairOptions{}).icd().NextExpectedCheckIn(); ok {

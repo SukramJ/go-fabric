@@ -38,8 +38,11 @@ const (
 // asleep and unavailable; a peer that needs no awaiting (RequiresAwait
 // false: not LIT) is always awake and available, with no timers.
 //
-// The two deadlines come from a [PeerSchedule]; the timers run on the
-// injected clock. Every callback runs outside the wakefulness's lock, on
+// The two deadlines come from a [PeerSchedule] fed the clock's monotonic
+// reading ([clock.MonotonicOf]), so a step of the wall clock moves neither:
+// matter.js feeds its schedule Time.nowUs (IcdPeerWakefulness.ts:148, :154,
+// :160) and compares on it (:100, :116, :226 at 862ad75f). The timers run
+// on the injected clock. Every callback runs outside the wakefulness's lock, on
 // the goroutine of the change (a timer's for an expiry). Safe for
 // concurrent use.
 //
@@ -182,21 +185,32 @@ func (w *PeerWakefulness) observe(o wakeObserver) func() {
 	}
 }
 
-// NextCheckInDue is the deadline of the peer's next Check-In; ok is false
-// when the peer needs no awaiting, while a subscription is held, before
-// any activity and once the deadline passed (IcdPeerWakefulness.ts:95-104).
+// NextCheckInDue is the deadline of the peer's next Check-In on the wall
+// clock; ok is false when the peer needs no awaiting, while a subscription
+// is held, before any activity and once the deadline passed
+// (IcdPeerWakefulness.ts:95-104). The deadline is kept on the monotonic
+// reading and converted at the current wall-clock offset, as matter.js's
+// IcdClient.nextExpectedCheckin exposes it: "The wakefulness runs on the
+// monotonic clock; expose the deadline on the wall clock"
+// (packages/node/src/behavior/system/icd/IcdClient.ts:83-87 at 862ad75f).
 func (w *PeerWakefulness) NextCheckInDue() (time.Time, bool) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
-	return w.nextCheckInDueLocked()
+	due, ok := w.nextCheckInDueLocked()
+	if !ok {
+		return time.Time{}, false
+	}
+	return clock.WallOf(w.clock, due.Sub(monotonicEpoch)), true
 }
 
+// nextCheckInDueLocked is the deadline on the monotonic reading
+// ([PeerWakefulness.now]).
 func (w *PeerWakefulness) nextCheckInDueLocked() (time.Time, bool) {
 	if !w.awaitingLocked() || len(w.subscriptions) > 0 {
 		return time.Time{}, false
 	}
 	due, ok := w.schedule.NextCheckInDue()
-	if !ok || !due.After(w.clock.Now()) {
+	if !ok || !due.After(w.now()) {
 		return time.Time{}, false
 	}
 	return due, true
@@ -213,7 +227,7 @@ func (w *PeerWakefulness) NextCheckInWithin() time.Duration {
 	if !ok {
 		return idle
 	}
-	return max(due.Sub(w.clock.Now()), idle)
+	return max(due.Sub(w.now()), idle)
 }
 
 // RequiresAwait reports a peer the controller awaits: a LIT peer
@@ -260,7 +274,7 @@ func (w *PeerWakefulness) SetTimings(t Timings) {
 // the configured one (IcdPeerWakefulness.ts:147-150).
 func (w *PeerWakefulness) NoteCheckIn(threshold *time.Duration) {
 	w.mu.Lock()
-	w.schedule.NoteCheckIn(w.clock.Now(), threshold)
+	w.schedule.NoteCheckIn(w.now(), threshold)
 	w.deliver(w.refreshLocked(true))
 }
 
@@ -268,14 +282,14 @@ func (w *PeerWakefulness) NoteCheckIn(threshold *time.Duration) {
 // (IcdPeerWakefulness.ts:153-156).
 func (w *PeerWakefulness) NoteActive() {
 	w.mu.Lock()
-	w.schedule.NoteActive(w.clock.Now())
+	w.schedule.NoteActive(w.now())
 	w.deliver(w.refreshLocked(true))
 }
 
 // NoteStayActive records a StayActive promise (IcdPeerWakefulness.ts:159-162).
 func (w *PeerWakefulness) NoteStayActive(promised time.Duration) {
 	w.mu.Lock()
-	w.schedule.NoteStayActive(w.clock.Now(), promised)
+	w.schedule.NoteStayActive(w.now(), promised)
 	w.deliver(w.refreshLocked(true))
 }
 
@@ -340,6 +354,15 @@ func (w *PeerWakefulness) Close() {
 	w.deliver(evs)
 }
 
+// monotonicEpoch anchors the schedule's times: a time.Time the monotonic
+// reading is an offset from.
+var monotonicEpoch = time.Unix(0, 0)
+
+// now is the clock's monotonic reading as a time on [monotonicEpoch] — the
+// schedule's clock, matter.js's Time.nowUs. For a clock without a
+// monotonic reading it is the wall reading ([clock.MonotonicOf]).
+func (w *PeerWakefulness) now() time.Time { return monotonicEpoch.Add(clock.MonotonicOf(w.clock)) }
+
 func (w *PeerWakefulness) awaitingLocked() bool { return w.requiresAwait && !w.suspended }
 
 // refreshLocked re-arms the timers from the schedule
@@ -350,7 +373,7 @@ func (w *PeerWakefulness) refreshLocked(reportMissed bool) []event {
 	if !w.awaitingLocked() {
 		return nil
 	}
-	now := w.clock.Now()
+	now := w.now()
 	activeUntil, active := w.schedule.ActiveUntil()
 	due, hasDue := w.schedule.NextCheckInDue()
 	if len(w.subscriptions) > 0 {

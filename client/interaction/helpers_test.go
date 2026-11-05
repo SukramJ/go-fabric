@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"net"
 	"slices"
+	"sync"
 	"testing"
 	"testing/synctest"
 	"time"
@@ -39,12 +40,42 @@ func (c *fakeClock) waitTimer(t *testing.T, d time.Duration) {
 	}
 }
 
-// fakeConn records the datagrams the manager sends.
-type fakeConn struct{ ch chan []byte }
+// fakeConn records the datagrams the manager sends, and where to: the
+// address each went to by its message counter, and every destination in
+// order.
+type fakeConn struct {
+	ch   chan []byte
+	mu   sync.Mutex
+	to   map[uint32]*net.UDPAddr
+	dsts []*net.UDPAddr
+}
 
-func (c *fakeConn) Send(_ *net.UDPAddr, payload []byte) error {
+func (c *fakeConn) Send(to *net.UDPAddr, payload []byte) error {
+	c.mu.Lock()
+	c.dsts = append(c.dsts, to)
+	if hdr, _, err := message.UnmarshalHeader(payload); err == nil {
+		if c.to == nil {
+			c.to = map[uint32]*net.UDPAddr{}
+		}
+		c.to[hdr.MessageCounter] = to
+	}
+	c.mu.Unlock()
 	c.ch <- append([]byte(nil), payload...)
 	return nil
+}
+
+// dest is the address the datagram with message counter n went to.
+func (c *fakeConn) dest(n uint32) *net.UDPAddr {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.to[n]
+}
+
+// destinations are the addresses of the datagrams sent so far, in order.
+func (c *fakeConn) destinations() []*net.UDPAddr {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return slices.Clone(c.dsts)
 }
 
 var peerAddr = &net.UDPAddr{IP: net.ParseIP("fd00::1"), Port: 5540}
@@ -91,11 +122,12 @@ func newScriptedWith(t *testing.T, reported *sessionparams.Parameters) *scripted
 	return &scripted{mgr: m, clock: clock, conn: conn, session: s, peer: peer}
 }
 
-// msg is one message the manager sent.
+// msg is one message the manager sent, to the address to.
 type msg struct {
 	hdr     message.Header
 	proto   message.ProtocolHeader
 	payload []byte
+	to      *net.UDPAddr
 }
 
 // next returns the next message the manager sent, skipping standalone
@@ -120,7 +152,7 @@ func (s *scripted) next(t *testing.T) msg {
 			if proto.ProtocolID == 0 && proto.Opcode == 0x10 { // standalone ack
 				continue
 			}
-			return msg{hdr: hdr, proto: proto, payload: plain[pl:]}
+			return msg{hdr: hdr, proto: proto, payload: plain[pl:], to: s.conn.dest(hdr.MessageCounter)}
 		case <-time.After(5 * time.Second):
 			t.Fatal("the manager sent nothing")
 			return msg{}
