@@ -460,53 +460,7 @@ func (a *AdministratorCommissioning) MatterInvoke(ctx context.Context, cmdID uin
 		}
 		return nil, nil
 	case matterCmdAdmCommOpenBasicWindow:
-		if !a.basic {
-			// Without the BC feature the command is UnsupportedCommand
-			// (conformance "BC", administrator-commissioning.element.ts:43).
-			return nil, errAdmCommUnsupportedCommand
-		}
-		timeout, ok := openBasicWindowTimeout(fields)
-		if !ok {
-			return nil, errAdmCommInvalidFields
-		}
-		// The basic window takes the enhanced window's gates minus the
-		// PAKE parameters it does not carry: a CASE session, no armed
-		// fail-safe, a controller; the window's own timeout bounds and
-		// Busy for an open administrator window are the controller's
-		// (bridge.CommissioningWindow.OpenWindow), as matter.js's
-		// openBasicCommissioningWindow runs the same
-		// #assertCommissioningWindowRequirements as openCommissioningWindow
-		// (AdministratorCommissioningServer.ts:105-117, :191-212 at
-		// 862ad75f) and opens through DeviceCommissioner
-		// .allowBasicCommissioning with the node's own passcode
-		// (DeviceCommissioner.ts:130-137).
-		_, fabIdx := im.FabricFilterFromContext(ctx)
-		if fabIdx == 0 {
-			return nil, errAdmCommBusy
-		}
-		if failSafeCheck != nil && failSafeCheck() {
-			return nil, errAdmCommBusy
-		}
-		if c == nil {
-			return nil, errAdmCommBusy
-		}
-		params := OpenWindowParams{
-			CommissioningTimeoutSeconds: timeout,
-			IsBasicWindow:               true,
-			AdminFabricIndex:            fabIdx,
-		}
-		if vr != nil {
-			params.AdminVendorID = vr(ctx, fabIdx)
-		}
-		if fc != nil {
-			if n, err := fc(ctx); err == nil && n == 0 {
-				params.IsUncommissioned = true
-			}
-		}
-		if err := c.OpenWindow(ctx, params); err != nil {
-			return nil, err
-		}
-		return nil, nil
+		return a.openBasicWindow(ctx, fields, c, vr, fc, failSafeCheck)
 	case matterCmdAdmCommRevoke:
 		if c == nil {
 			return nil, errAdmCommBusy
@@ -557,6 +511,60 @@ func (a *AdministratorCommissioning) MatterReportable() []uint32 {
 // AdminVendorId. The globals are the dispatcher's.
 func (a *AdministratorCommissioning) MatterAttributes() []uint32 {
 	return a.instance().MatterAttributes()
+}
+
+// openBasicWindow is OpenBasicCommissioningWindow (BC), MatterInvoke's
+// case split out with the collaborators it read under the lock.
+func (a *AdministratorCommissioning) openBasicWindow(ctx context.Context, fields any, c WindowController, vr VendorIDResolver,
+	fc FabricCounter, failSafeCheck func() bool,
+) (any, error) {
+	if !a.basic {
+		// Without the BC feature the command is UnsupportedCommand
+		// (conformance "BC", administrator-commissioning.element.ts:43).
+		return nil, errAdmCommUnsupportedCommand
+	}
+	timeout, ok := openBasicWindowTimeout(fields)
+	if !ok {
+		return nil, errAdmCommInvalidFields
+	}
+	// The basic window takes the enhanced window's gates minus the
+	// PAKE parameters it does not carry: a CASE session, no armed
+	// fail-safe, a controller; the window's own timeout bounds and
+	// Busy for an open administrator window are the controller's
+	// (bridge.CommissioningWindow.OpenWindow), as matter.js's
+	// openBasicCommissioningWindow runs the same
+	// #assertCommissioningWindowRequirements as openCommissioningWindow
+	// (AdministratorCommissioningServer.ts:105-117, :191-212 at
+	// 862ad75f) and opens through DeviceCommissioner
+	// .allowBasicCommissioning with the node's own passcode
+	// (DeviceCommissioner.ts:130-137).
+	_, fabIdx := im.FabricFilterFromContext(ctx)
+	if fabIdx == 0 {
+		return nil, errAdmCommBusy
+	}
+	if failSafeCheck != nil && failSafeCheck() {
+		return nil, errAdmCommBusy
+	}
+	if c == nil {
+		return nil, errAdmCommBusy
+	}
+	params := OpenWindowParams{
+		CommissioningTimeoutSeconds: timeout,
+		IsBasicWindow:               true,
+		AdminFabricIndex:            fabIdx,
+	}
+	if vr != nil {
+		params.AdminVendorID = vr(ctx, fabIdx)
+	}
+	if fc != nil {
+		if n, err := fc(ctx); err == nil && n == 0 {
+			params.IsUncommissioned = true
+		}
+	}
+	if err := c.OpenWindow(ctx, params); err != nil {
+		return nil, err
+	}
+	return nil, nil
 }
 
 // openWindowParams takes the OpenCommissioningWindow fields: the
