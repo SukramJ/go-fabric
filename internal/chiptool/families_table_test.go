@@ -1021,6 +1021,10 @@ var chipFamilies = []family{
 	{
 		name: "PAVST", deviceType: dtCamera, variant: variantCamera,
 		exclude: map[string]gap{
+			"2.3": {classHarness, "TC-PAVST-2.3 step 25 allocates a motion transport with MotionSensitivity 11 on a camera with PERZONESENS and expects chip's INVALID_COMMAND (TC_PAVST_2_3.py:435-443, PushAVStreamTransportLogic.cpp:573-574); the module validates the request's fields first, as matter.js does, and answers CONSTRAINT_ERROR — matter.js answers a constraint and a conformance violation alike with CONSTRAINT_ERROR (packages/protocol/src/action/errors.ts:77-118 at 862ad75f)", false},
+			"2.6": {classHarness, "TC-PAVST-2.6 step 8 modifies the transport with empty VideoStreams and AudioStreams lists (TC_PAVST_2_6.py:283-294), which the fields' constraint refuses (\"1 to 16\", matter.js push-av-stream-transport.element.ts:266, :270 at 862ad75f; CONSTRAINT_ERROR); chip's server treats an empty list as absent (PushAVStreamTransportLogic.cpp:671-680)", false},
+			"2.11": {classHarness, "TC-PAVST-2.11 step 21a allocates with an empty AudioStreams list (TC_PAVST_2_11.py:470-479), which the field's constraint refuses (\"1 to 16\", matter.js push-av-stream-transport.element.ts:270 at 862ad75f; CONSTRAINT_ERROR) before the stream check the case is after; chip's server treats an empty list as absent (PushAVStreamTransportLogic.cpp:671-680)", false},
+			"2.15": {classNotSupported, "TC-PAVST-2.15 drives UpdateMotionZoneOptions (command 0x08), which the matter.js snapshot does not carry (push-av-stream-transport.element.ts at 862ad75f lists commands 0x00-0x07); the module's server answers UNSUPPORTED_COMMAND", false},
 			"2.4": {classHarness, "TC-PAVST-2.4 step 5 modifies the transport with empty VideoStreams and AudioStreams lists (TC_PAVST_2_4.py:203-204), which the fields' constraint refuses (\"1 to 16\", matter.js push-av-stream-transport.element.ts:266, :270 at 862ad75f; CONSTRAINT_ERROR, as matter.js validates a request); chip's server treats an empty list as absent (PushAVStreamTransportLogic.cpp:671-680)", false},
 		},
 	},
