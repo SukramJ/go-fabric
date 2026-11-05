@@ -811,12 +811,7 @@ with a port of the named case.
   equal address of a new set (`ServerAddressSetTest.ts` "copies health
   markers onto equal targets"); `client/discovery` keeps health on
   `Address` (`HealthyAt`, `UnhealthyAt`) and has no copy step.
-- **The responder sockets keep the surviving IP family.** matter.js's
-  `UdpMulticastServer` closes the IPv4 socket when the IPv6 one cannot be
-  created or join the group (`UdpMulticastServerTest.ts` two cases);
-  `mdns/socket.go` keeps the family that opened and fails only when both
-  do. Route: decide whether the module mirrors the all-or-nothing open or
-  records the difference in `by_design.md`.
+- **The responder sockets keep the surviving IP family** — closed 2026-11-05: `BD-Matter-MdnsResponderKeepsTheSurvivingFamily` (owner decision).
 
 ## Tier 3 — LOW
 
@@ -954,19 +949,6 @@ behind `--media-messages` (the MESS family's variant) so the default
 composition passes the case. Route: re-read at the next harness pin
 lift; when the check reads the endpoint's declared revision, Messages
 returns to the default player. Phase 34.
-
-### TC-JFADMIN-1.2 — AddICAC takes an ICAC whose Subject DN is a structure
-
-On the case's lab path (the daemon's `--jointfabric-sim` administrator,
-commissioned by the case itself) steps 1-15 pass. Step 16 sends an ICAC
-whose Subject DN is re-encoded as a TLV structure instead of a list
-(`TC_JFADMIN_1_2.py:318-323` at `6170af84`) and expects InvalidICAC:
-connectedhomeip's first check, `VerifyAddICACStep1` (`ValidateCert`), refuses
-it (`joint-fabric-administrator-server.cpp:375-376`). Here
-`cluster/jointfabric.verifyICACChain` decodes it with `secure/mattercert`
-`Decode` and lets it pass, and the public-key check answers InvalidPublicKey.
-The decoder's acceptance of a non-list DN is the gap; `secure/` is a
-security path (CLAUDE.md), left to its owner. Phase 34.
 
 ### CHIP data model cross-check — class (ii)
 
