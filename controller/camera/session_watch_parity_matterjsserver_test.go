@@ -150,7 +150,7 @@ func (h recordingHandler) Enabled(context.Context, slog.Level) bool { return tru
 func (h recordingHandler) Handle(_ context.Context, r slog.Record) error {
 	line := r.Level.String() + " " + r.Message
 	r.Attrs(func(a slog.Attr) bool {
-		if a.Key == "session" || a.Key == "sweeps" {
+		if a.Key == "webrtc_session_id" || a.Key == "count" {
 			line += " " + a.Key + "=" + a.Value.String()
 		}
 		return true
@@ -477,7 +477,7 @@ func TestSessionWatchParityMatterjsServer(t *testing.T) {
 		return logs()
 	}
 	t.Run("logs each leftover session it ended at notice level", func(t *testing.T) {
-		if got := sweepOne(nil); !slices.Equal(got, []string{"INFO camera.sweep.ended session=1"}) {
+		if got := sweepOne(nil); !slices.Equal(got, []string{"INFO camera.sweep.ended webrtc_session_id=1"}) {
 			t.Errorf("logged %q", got)
 		}
 	})
@@ -485,7 +485,7 @@ func TestSessionWatchParityMatterjsServer(t *testing.T) {
 		if got := sweepOne(statusErr(im.StatusNotFound)); len(got) != 0 {
 			t.Errorf("NotFound logged %q", got)
 		}
-		if got := sweepOne(statusErr(im.StatusBusy)); len(got) != 1 || !strings.HasPrefix(got[0], "WARN camera.sweep.end_failed session=1") {
+		if got := sweepOne(statusErr(im.StatusBusy)); len(got) != 1 || !strings.HasPrefix(got[0], "WARN camera.sweep.end_failed webrtc_session_id=1") {
 			t.Errorf("Busy logged %q", got)
 		}
 	})
@@ -531,7 +531,7 @@ func TestSessionWatchParityMatterjsServer(t *testing.T) {
 		if _, _, n := f.snapshot(); n != maxFailedLeftoverSweeps {
 			t.Fatalf("attempts = %d, want %d", n, maxFailedLeftoverSweeps)
 		}
-		if got := logs(); got[len(got)-1] != "WARN camera.sweep.given_up sweeps=3" {
+		if got := logs(); got[len(got)-1] != "WARN camera.sweep.given_up count=3" {
 			t.Errorf("last log %q", got[len(got)-1])
 		}
 		w.sweepAgain(wCamera, wEndpoint)

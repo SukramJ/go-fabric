@@ -336,9 +336,11 @@ func (p *sliceBProbe) Done() <-chan struct{} {
 
 func sliceBAwait(t *testing.T, ch <-chan struct{}, what string) {
 	t.Helper()
+	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+	defer cancel()
 	select {
 	case <-ch:
-	case <-time.After(10 * time.Second):
+	case <-ctx.Done():
 		t.Fatalf("timed out waiting for %s", what)
 	}
 }
@@ -403,10 +405,12 @@ func sliceBGo[T any](f func() (T, error)) <-chan sliceBResult[T] {
 
 func sliceBRecv[T any](t *testing.T, ch <-chan sliceBResult[T], what string) sliceBResult[T] {
 	t.Helper()
+	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+	defer cancel()
 	select {
 	case r := <-ch:
 		return r
-	case <-time.After(10 * time.Second):
+	case <-ctx.Done():
 		t.Fatalf("timed out waiting for %s", what)
 		return sliceBResult[T]{}
 	}
@@ -660,7 +664,7 @@ func TestSliceBSessionsTracksParityMatterjsServer(t *testing.T) {
 		// The Go log is structured: the left-out track and the offer's refusal.
 		if !logs.has("camera.track.unavailable", func(a map[string]slog.Value) bool {
 			var inc *IncompatibleError
-			err, _ := a["reason"].Any().(error)
+			err, _ := a["err"].Any().(error)
 			return a["track"].String() == "video" && errors.As(err, &inc) && inc.Reason == ReasonOffer
 		}) {
 			t.Fatal("no log names the video track the offer left out")

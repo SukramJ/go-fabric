@@ -116,6 +116,9 @@ var areaKeys = []string{
 	"sw_version", "system_mode", "target", "tcp", "test", "timed", "timeout",
 	"timeout_ms", "to", "token", "took", "token_version", "total", "total_endpoints",
 	"trimmed_bytes", "type", "uri_node", "url", "valid",
+	// controller/camera (phase 37): a camera's WebRTC session and stream ids
+	// and the track of a session start.
+	"stream_id", "track", "webrtc_session_id",
 	"valid_mapping", "value", "value_type", "vendor_id", "version",
 	"violation", "what", "with_paths",
 }

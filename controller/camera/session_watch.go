@@ -211,7 +211,7 @@ func (w *sessionWatch) report(nodeID uint64, endpoints []uint16, changed map[uin
 		func() {
 			defer func() {
 				if r := recover(); r != nil {
-					w.log.Warn("camera.watch.report_failed", slog.Uint64("node", nodeID), slog.Int("endpoint", int(ep)), slog.Any("panic", r))
+					w.log.Warn("camera.watch.report_failed", slog.Uint64("node_id", nodeID), slog.Int("endpoint", int(ep)), slog.Any("panic", r))
 				}
 			}()
 			w.io.reported(nodeID, ep, ours, restarted)
@@ -320,7 +320,7 @@ func (w *sessionWatch) sweep(nodeID uint64, ep uint16, ours map[uint16]bool) {
 		failed := false
 		for _, id := range leftovers {
 			if err := w.endLeftover(nodeID, ep, id); err != nil {
-				w.log.Warn("camera.sweep.end_failed", slog.Uint64("node", nodeID), slog.Int("session", int(id)), slog.Any("err", err))
+				w.log.Warn("camera.sweep.end_failed", slog.Uint64("node_id", nodeID), slog.Int("webrtc_session_id", int(id)), slog.Any("err", err))
 				failed = true
 			}
 		}
@@ -349,7 +349,7 @@ func (w *sessionWatch) sweepFailed(nodeID uint64, ep uint16) {
 	}
 	if count >= maxFailedLeftoverSweeps {
 		delete(w.failed, k)
-		w.log.Warn("camera.sweep.given_up", slog.Uint64("node", nodeID), slog.Int("endpoint", int(ep)), slog.Int("sweeps", count))
+		w.log.Warn("camera.sweep.given_up", slog.Uint64("node_id", nodeID), slog.Int("endpoint", int(ep)), slog.Int("count", count))
 		return
 	}
 	w.failed[k] = &failedSweeps{count: count, retryAt: w.clk.Now().Add(leftoverSweepRetryDelay)}
@@ -367,7 +367,7 @@ func (w *sessionWatch) endLeftover(nodeID uint64, ep, id uint16) error {
 		}
 		return err
 	}
-	w.log.Info("camera.sweep.ended", slog.Uint64("node", nodeID), slog.Int("endpoint", int(ep)), slog.Int("session", int(id)))
+	w.log.Info("camera.sweep.ended", slog.Uint64("node_id", nodeID), slog.Int("endpoint", int(ep)), slog.Int("webrtc_session_id", int(id)))
 	return nil
 }
 

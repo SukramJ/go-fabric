@@ -375,7 +375,7 @@ func (m *manager) resolveVideoStreamLocked(ctx context.Context, req videoRequest
 			}
 			if !satisfiesVideoCallerBounds(cur, &bounds) {
 				// A smaller window would be answered with the same stream.
-				m.log.Info("camera.video.answered_outside_bounds", slog.Uint64("node", t.nodeID), slog.Int("endpoint", int(t.endpointID)), slog.Int("stream", int(id)))
+				m.log.Info("camera.video.answered_outside_bounds", slog.Uint64("node_id", t.nodeID), slog.Int("endpoint", int(t.endpointID)), slog.Int("stream_id", int(id)))
 				answeredOutside = &id
 				break
 			}
@@ -472,7 +472,7 @@ func (m *manager) freeAnUnreferencedVideoStream(ctx context.Context, t target, s
 	}
 	victim := *v
 	if !ours(&victim) {
-		m.log.Info("camera.video.evict_foreign", slog.Uint64("node", t.nodeID), slog.Int("stream", int(victim.videoStreamID)))
+		m.log.Info("camera.video.evict_foreign", slog.Uint64("node_id", t.nodeID), slog.Int("stream_id", int(victim.videoStreamID)))
 	}
 	if _, err := m.io.invoke(ctx, deallocateCall(t, StreamVideo, victim.videoStreamID)); err != nil {
 		return m.deallocateFailed(t, StreamVideo, victim.videoStreamID, err)
@@ -489,7 +489,7 @@ func (m *manager) freeAnUnreferencedVideoStream(ctx context.Context, t target, s
 		once.Do(func() {
 			r, err := m.restoreFreedVideoStream(ctx, t, victim)
 			if err != nil {
-				m.log.Warn("camera.video.restore_failed", slog.Uint64("node", t.nodeID), slog.Int("stream", int(victim.videoStreamID)), slog.Any("err", err))
+				m.log.Warn("camera.video.restore_failed", slog.Uint64("node_id", t.nodeID), slog.Int("stream_id", int(victim.videoStreamID)), slog.Any("err", err))
 				return
 			}
 			restored = r
@@ -510,7 +510,7 @@ func (m *manager) deallocateFailed(t target, kind StreamKind, id uint16, err err
 		m.dropLease(t, kind, id)
 		return &freedRoom{streamID: id, outcome: roomGone}
 	}
-	m.log.Info("camera.deallocate.refused", slog.String("kind", string(kind)), slog.Int("stream", int(id)), slog.Any("err", err))
+	m.log.Info("camera.deallocate.refused", slog.String("kind", string(kind)), slog.Int("stream_id", int(id)), slog.Any("err", err))
 	return &freedRoom{streamID: id, outcome: roomRefused}
 }
 
@@ -534,7 +534,7 @@ func (m *manager) freeSnapshotStream(ctx context.Context, t target, streams []al
 	}
 	spend := scope.returnUnlessSpent(func(ctx context.Context) error {
 		if err := m.restoreFreedSnapshotStream(ctx, t, victim); err != nil {
-			m.log.Warn("camera.snapshot.restore_failed", slog.Uint64("node", t.nodeID), slog.Int("stream", int(victim.snapshotStreamID)), slog.Any("err", err))
+			m.log.Warn("camera.snapshot.restore_failed", slog.Uint64("node_id", t.nodeID), slog.Int("stream_id", int(victim.snapshotStreamID)), slog.Any("err", err))
 		}
 		return nil
 	})

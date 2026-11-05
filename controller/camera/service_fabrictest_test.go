@@ -359,13 +359,15 @@ func errString(err error) string {
 
 func next(t *testing.T, signals <-chan camera.Signal) camera.Signal {
 	t.Helper()
+	ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
+	defer cancel()
 	select {
 	case sig, ok := <-signals:
 		if !ok {
 			t.Fatal("Signals closed")
 		}
 		return sig
-	case <-time.After(30 * time.Second):
+	case <-ctx.Done():
 		t.Fatal("no signal")
 		return camera.Signal{}
 	}

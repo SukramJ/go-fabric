@@ -190,7 +190,7 @@ func (m *manager) establishSession( //nolint:gocyclo // one function, as the sou
 	talkbackOffered := args.talkback && sdp != nil && len(sdp.sendingAudioSections) > 0
 	cameraTalks := st.twoWayTalkSupport != nil && (*st.twoWayTalkSupport == csdef.TwoWayTalkSupportTypeHalfDuplex || *st.twoWayTalkSupport == csdef.TwoWayTalkSupportTypeFullDuplex)
 	if talkbackOffered && !cameraTalks {
-		m.log.Info("camera.talkback.unsupported", slog.Uint64("node", t.nodeID), slog.Int("endpoint", int(t.endpointID)))
+		m.log.Info("camera.talkback.unsupported", slog.Uint64("node_id", t.nodeID), slog.Int("endpoint", int(t.endpointID)))
 	}
 	var video, audio *resolvedStream
 	if args.videoState != trackDeclined {
@@ -239,7 +239,7 @@ func (m *manager) establishSession( //nolint:gocyclo // one function, as the sou
 		}
 	}
 	if talkbackOffered && cameraTalks && audio == nil {
-		m.log.Info("camera.talkback.no_audio", slog.Uint64("node", t.nodeID), slog.Int("endpoint", int(t.endpointID)))
+		m.log.Info("camera.talkback.no_audio", slog.Uint64("node_id", t.nodeID), slog.Int("endpoint", int(t.endpointID)))
 	}
 	if video == nil && audio == nil {
 		return nil, &IncompatibleError{Reason: ReasonNoMedia, Device: []string{}, Requested: []string{}}
@@ -289,7 +289,7 @@ func (m *manager) giveUp(ctx context.Context, pending *pendingSession, t target,
 	if !end.answered || end.err != nil {
 		actx, acancel := m.cleanupContext(ctx)
 		if aerr := m.io.abandonSession(actx, t, id); aerr != nil {
-			m.log.Warn("camera.session.abandon_failed", slog.Int("session", int(id)), slog.Any("err", aerr))
+			m.log.Warn("camera.session.abandon_failed", slog.Int("webrtc_session_id", int(id)), slog.Any("err", aerr))
 		}
 		acancel()
 	}
@@ -422,7 +422,7 @@ func (m *manager) releaseSessions(ctx context.Context, matches func(sessionScope
 		go func() {
 			defer func() { done <- struct{}{} }()
 			if _, err := m.stopStream(cctx, target{s.nodeID, s.endpointID}, s.webRTCSessionID, ""); err != nil {
-				m.log.Warn("camera.session.release_failed", slog.Int("session", int(s.webRTCSessionID)), slog.Uint64("node", s.nodeID), slog.Any("err", err))
+				m.log.Warn("camera.session.release_failed", slog.Int("webrtc_session_id", int(s.webRTCSessionID)), slog.Uint64("node_id", s.nodeID), slog.Any("err", err))
 			}
 		}()
 	}

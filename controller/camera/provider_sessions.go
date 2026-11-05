@@ -403,7 +403,7 @@ func (p *providerSessions) endWithinBudget(ctx context.Context, cleanup func(con
 	cctx, cancel := cleanup(ctx)
 	defer cancel()
 	if _, err := p.nodes.invokeProvider(cctx, t, callEndSession, wpdef.EndSessionRequest{WebRtcSessionId: id, Reason: endReasonOutOfResources}); err != nil {
-		p.log.Warn("camera.session.cleanup_failed", slog.Int("session", int(id)), slog.Any("err", err))
+		p.log.Warn("camera.session.cleanup_failed", slog.Int("webrtc_session_id", int(id)), slog.Any("err", err))
 	}
 }
 
@@ -463,7 +463,7 @@ func (p *providerSessions) reOffer(ctx context.Context, t target, fields wpdef.P
 	}
 	if session, ok := p.trackableSession(t, fields, resp); ok && !p.tracks(k) {
 		if err := p.requestor.upsert(session); err != nil {
-			p.log.Warn("camera.reoffer.untracked", slog.Int("session", int(k.id)), slog.Any("err", err))
+			p.log.Warn("camera.reoffer.untracked", slog.Int("webrtc_session_id", int(k.id)), slog.Any("err", err))
 		}
 	}
 	if !p.tracks(k) {

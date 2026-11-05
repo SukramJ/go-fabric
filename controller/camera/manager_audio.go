@@ -43,7 +43,7 @@ func (m *manager) resolveTrack(track Track, nodeID uint64, state trackState, o t
 	if state == trackDemanded {
 		return nil, o.unavailable
 	}
-	m.log.Info("camera.track.unavailable", slog.String("track", string(track)), slog.Uint64("node", nodeID), slog.Any("reason", o.unavailable))
+	m.log.Info("camera.track.unavailable", slog.String("track", string(track)), slog.Uint64("node_id", nodeID), slog.Any("err", o.unavailable))
 	return nil, nil
 }
 

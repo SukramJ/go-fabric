@@ -138,8 +138,8 @@ func newManager(io deviceIO, clk clock.Clock, log *slog.Logger) *manager {
 			}
 		},
 		func(s managedSession, cause sessionEndCause) {
-			m.log.Info("camera.session.vanished", slog.Uint64("node", s.nodeID), slog.Int("endpoint", int(s.endpointID)),
-				slog.Int("session", int(s.webRTCSessionID)), slog.String("cause", string(cause)))
+			m.log.Info("camera.session.vanished", slog.Uint64("node_id", s.nodeID), slog.Int("endpoint", int(s.endpointID)),
+				slog.Int("webrtc_session_id", int(s.webRTCSessionID)), slog.String("reason", string(cause)))
 			if m.onVanished != nil {
 				m.onVanished(s, cause)
 			}
@@ -736,7 +736,7 @@ func deallocateCall(t target, kind StreamKind, id uint16) deviceCall {
 // 0bd06f2.
 func (m *manager) deallocate(ctx context.Context, t target, lease *streamLease) error {
 	if _, err := m.io.invoke(ctx, deallocateCall(t, lease.kind, lease.streamID)); err != nil && !statusIs(err, im.StatusNotFound) {
-		m.log.Warn("camera.giveback.failed", slog.String("kind", string(lease.kind)), slog.Int("stream", int(lease.streamID)), slog.Any("err", err))
+		m.log.Warn("camera.giveback.failed", slog.String("kind", string(lease.kind)), slog.Int("stream_id", int(lease.streamID)), slog.Any("err", err))
 		return nil
 	}
 	m.dropLeaseIfCurrent(t, lease)

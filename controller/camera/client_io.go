@@ -205,7 +205,7 @@ func (io *clientIO) refreshStreamList(ctx context.Context, t target, attr uint32
 		}
 	}
 	if err := read(ctx, t, attr); err != nil {
-		io.log.Warn("camera.read.stream_list_failed", slog.Uint64("node", t.nodeID), slog.Int("endpoint", int(t.endpointID)), slog.Any("err", err))
+		io.log.Warn("camera.read.stream_list_failed", slog.Uint64("node_id", t.nodeID), slog.Int("endpoint", int(t.endpointID)), slog.Any("err", err))
 	}
 }
 
