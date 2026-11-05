@@ -1,0 +1,192 @@
+{
+  "entries": [
+    {
+      "path": "packages/ws-controller/test/CameraCommandsTest.ts",
+      "status": "planned",
+      "until": "M10 phase 37",
+      "reason": "cameraCommands.ts, the camera_* command parsers, ports with the service in phase 37 wave C.",
+      "snapshotSha": "5b06248f35ffb023ccdab3e0e64602e25ae29556"
+    },
+    {
+      "path": "packages/ws-controller/test/CameraErrorsTest.ts",
+      "status": "planned",
+      "until": "M10 phase 37",
+      "reason": "The manager's mapping of device refusals onto errors 102 to 106 ports with the service in phase 37 wave C.",
+      "snapshotSha": "e8e6072b8d4baba4412ac9f316b2d3d8158fc38e"
+    },
+    {
+      "path": "packages/ws-controller/test/CameraStreamManagerTest.ts",
+      "status": "planned",
+      "until": "M10 phase 37",
+      "reason": "CameraStreamManager.ts is the service of phase 37 wave C; its left rows name what a Go port cannot carry.",
+      "snapshotSha": "56f452c0535ca2bfc1d69af935636eb1dbc20aef"
+    },
+    {
+      "path": "packages/ws-controller/test/CameraVideoAllocateTest.ts",
+      "status": "planned",
+      "until": "M10 phase 37",
+      "reason": "Drives CameraStreamManager.resolveVideoStream against a fake camera with fixed profiles: the allocate ladder of the service (phase 37 wave C) over the window search wave B ports.",
+      "snapshotSha": "4506f229c6a033503cd407378205c3dd183fe51f"
+    },
+    {
+      "path": "packages/ws-controller/test/CameraWireContractTest.ts",
+      "status": "excluded",
+      "class": "host-server",
+      "reason": "The camera_* wire contract of matterjs-server's WebSocket API: go-fabric-server's, which maps it onto this module's API (its issue 40).",
+      "snapshotSha": "9cd2baf63571e3989f1fe164601a0bca64dbf4de"
+    },
+    {
+      "path": "packages/ws-controller/test/MatterCameraDeviceIoTest.ts",
+      "status": "planned",
+      "until": "M10 phase 37",
+      "reason": "MatterCameraDeviceIo.ts, the device reads and invokes, ports with the service in phase 37 wave C.",
+      "snapshotSha": "4982d64c2ec3a967908bc7c7feb570d34c7fb99a"
+    },
+    {
+      "path": "packages/ws-controller/test/MatterControllerCameraStreamsTest.ts",
+      "status": "planned",
+      "until": "M10 phase 37",
+      "reason": "The controller's lazy camera service ports with the service in phase 37 wave C.",
+      "snapshotSha": "c9fb8f2320b642974a2dcab037b53947c0631d1e"
+    },
+    {
+      "path": "packages/ws-controller/test/OverlayPolicyTest.ts",
+      "status": "ported",
+      "go": [
+        "controller/camera:TestOverlaySupportParityMatterjsServer",
+        "controller/camera:TestResolveOverlaysParityMatterjsServer",
+        "controller/camera:TestOverlaysMatchParityMatterjsServer"
+      ],
+      "reason": "All 16 cases: overlaySupport (devicePolicy.ts) over the AVSM FeatureMap, resolveOverlays and overlaysMatch with a three-state flag for the optional boolean.",
+      "snapshotSha": "7ddfd038876bfb57476927123891dd76191752c9"
+    },
+    {
+      "path": "packages/ws-controller/test/SdpConstraintsTest.ts",
+      "status": "ported",
+      "go": [
+        "controller/camera:TestParseSdpVideoConstraintsLimitsParityMatterjsServer",
+        "controller/camera:TestParseSdpVideoConstraintsDispositionParityMatterjsServer",
+        "controller/camera:TestDecodableVideoCodecsParityMatterjsServer",
+        "controller/camera:TestMediaRefusalParityMatterjsServer",
+        "controller/camera:TestWithoutTalkbackParityMatterjsServer",
+        "controller/camera:TestAnswerWithinOfferedDirectionsParityMatterjsServer"
+      ],
+      "reason": "All 83 cases over the Go reading of sdp-transform's grammar (the m-line, a=rtpmap, a=fmtp, the direction and a=bundle-only lines), the H.264 and H.265 level tables, withoutTalkback and answerWithinOfferedDirections.",
+      "snapshotSha": "6a62f6832ece4c940ff1851689ecc02ee0f1903d"
+    },
+    {
+      "path": "packages/ws-controller/test/SessionRegistryClientKeyTest.ts",
+      "status": "ported",
+      "go": [
+        "controller/camera:TestSessionRegistryClientKeysParityMatterjsServer",
+        "controller/camera:TestSessionRegistryIssuedParityMatterjsServer",
+        "controller/camera:TestSessionRegistryReportDuringEstablishmentParityMatterjsServer",
+        "controller/camera:TestSessionRegistryForgetNodeParityMatterjsServer"
+      ],
+      "reason": "All 17 cases; a promise the test awaits is a wait function or a closed channel of the Go registry, which is safe for concurrent use.",
+      "snapshotSha": "c566f8369cf2c5f8ae967a8ac8dd10605c126af0"
+    },
+    {
+      "path": "packages/ws-controller/test/SnapshotPolicyTest.ts",
+      "status": "ported",
+      "go": [
+        "controller/camera:TestUsesHardwareEncoderParityMatterjsServer",
+        "controller/camera:TestEncodersExhaustedParityMatterjsServer",
+        "controller/camera:TestSelectSnapshotCapabilitiesParityMatterjsServer",
+        "controller/camera:TestSelectSnapshotCapabilitiesTargetParityMatterjsServer",
+        "controller/camera:TestRequestedResolutionParityMatterjsServer",
+        "controller/camera:TestIsDegradedFromTargetParityMatterjsServer",
+        "controller/camera:TestChooseSnapshotStreamToFreeParityMatterjsServer",
+        "controller/camera:TestFindAdoptableSnapshotStreamParityMatterjsServer"
+      ],
+      "reason": "All 71 cases of the snapshot policy.",
+      "snapshotSha": "10d82c721b7e6e5a71799dca24b48b643bee46b8"
+    },
+    {
+      "path": "packages/ws-controller/test/StartingSessionSignallingTest.ts",
+      "status": "planned",
+      "until": "M10 phase 37",
+      "reason": "startingSessionSignalling.ts ports with the service in phase 37 wave C.",
+      "snapshotSha": "e7e5020450c66d4816c7d3dcd3aca2f0708c1856"
+    },
+    {
+      "path": "packages/ws-controller/test/StreamPolicyTest.ts",
+      "status": "ported",
+      "go": [
+        "controller/camera:TestComputeVideoEnvelopeParityMatterjsServer",
+        "controller/camera:TestPlanBitRateFloorParityMatterjsServer",
+        "controller/camera:TestCertificationWindowParityMatterjsServer",
+        "controller/camera:TestFindReusableVideoStreamParityMatterjsServer",
+        "controller/camera:TestSatisfiesVideoCallerBoundsParityMatterjsServer",
+        "controller/camera:TestFindDegradedVideoStreamParityMatterjsServer",
+        "controller/camera:TestFreeEncodedPixelRateParityMatterjsServer",
+        "controller/camera:TestSatisfiesAudioCallerBoundsParityMatterjsServer",
+        "controller/camera:TestChooseEvictionVictimParityMatterjsServer",
+        "controller/camera:TestComputeAudioEnvelopeParityMatterjsServer"
+      ],
+      "reason": "All 124 cases of the stream policy; the two trade-off-point orders of the bit rate floor run as subtests of one Go test.",
+      "snapshotSha": "c28e500ec75811c295936ec0a64a390826733a55"
+    },
+    {
+      "path": "packages/ws-controller/test/VideoWindowSearchTest.ts",
+      "status": "ported",
+      "go": [
+        "controller/camera:TestVideoWindowSearchUnservableParityMatterjsServer",
+        "controller/camera:TestVideoWindowSearchCapacityParityMatterjsServer",
+        "controller/camera:TestVideoWindowSearchBitRateFloorParityMatterjsServer",
+        "controller/camera:TestVideoWindowSearchBudgetParityMatterjsServer",
+        "controller/camera:TestVideoWindowSearchCertificationParityMatterjsServer",
+        "controller/camera:TestVideoWindowSearchParityMatterjsServer",
+        "controller/camera:TestFirstVideoWindowParityMatterjsServer"
+      ],
+      "reason": "All 35 cases with the test's walk driver over the Go window search.",
+      "snapshotSha": "71366af59a2b9321a245af33273feb2dc86d77f5"
+    },
+    {
+      "path": "packages/ws-controller/test/WebRtcCallbackBridgeTest.ts",
+      "status": "excluded",
+      "class": "host-server",
+      "reason": "The bridge from matter.js's requestor callbacks to the WebSocket events: go-fabric-server's; the module's requestor signals reach the service through controller/camera (wave C).",
+      "snapshotSha": "4f82aaf875180f1f7bdd8654fd44596adc369b63"
+    },
+    {
+      "path": "packages/ws-controller/test/WebRtcProviderArgumentsTest.ts",
+      "status": "ported",
+      "go": [
+        "controller/camera:TestProviderArgumentsBothRoutesParityMatterjsServer",
+        "controller/camera:TestProviderArgumentsGatedFieldsParityMatterjsServer",
+        "controller/camera:TestProviderArgumentsFieldsParityMatterjsServer"
+      ],
+      "reason": "All 31 cases; a logged warning is a notice of the result, the fields are the generated request with the requestor's originating endpoint set. The two cases of both routes hold toIceServers, the managed route's converter, against the raw route; the stream manager's own start is CameraStreamManagerTest's (wave C).",
+      "snapshotSha": "bc872cd6b5b0a74b5d67e568d847d70b14d2dff6"
+    },
+    {
+      "path": "packages/ws-controller/test/WebRtcProviderDeviceTest.ts",
+      "status": "planned",
+      "until": "M10 phase 37",
+      "reason": "The provider sessions against a simulated camera port with the service in phase 37 wave C.",
+      "snapshotSha": "7755b13a8ae651c08431ef663ac97bc0a29fad96"
+    },
+    {
+      "path": "packages/ws-controller/test/WebRtcProviderSessionWatchTest.ts",
+      "status": "planned",
+      "until": "M10 phase 37",
+      "reason": "WebRtcProviderSessionWatch.ts ports with the service in phase 37 wave C.",
+      "snapshotSha": "e5e115ec5da8bf0d9030cfa62acdfc7db2e678a9"
+    },
+    {
+      "path": "packages/ws-controller/test/WebRtcProviderSessionsTest.ts",
+      "status": "planned",
+      "until": "M10 phase 37",
+      "reason": "WebRtcProviderSessions.ts ports with the service in phase 37 wave C.",
+      "snapshotSha": "2c8374c2bfd42cc178cbf70e75ad7e6327039227"
+    },
+    {
+      "path": "packages/ws-controller/test/WebRtcSessionStreamsTest.ts",
+      "status": "planned",
+      "until": "M10 phase 37",
+      "reason": "webRtcSessionStreams.ts and webRtcSessionTracking.ts port with the service in phase 37 wave C.",
+      "snapshotSha": "545b9556d5be11ccd58351411085f02d46c466e3"
+    }
+  ]
+}

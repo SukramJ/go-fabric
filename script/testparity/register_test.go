@@ -129,16 +129,38 @@ const (
 // a server-only field of the shared Invoke type, Invoke.ts:52-55): 577.
 const testparityLeftRatchet = 576
 
+// The matterjs-server register's four ratchets, exact in both directions as
+// the matter.js register's are (the comments above give the rules). Set by
+// phase 37 wave B (issue 412) at matterjs-server 0bd06f2: seven files
+// ported — the policies' StreamPolicyTest.ts, VideoWindowSearchTest.ts,
+// SdpConstraintsTest.ts, SnapshotPolicyTest.ts, OverlayPolicyTest.ts,
+// WebRtcProviderArgumentsTest.ts and SessionRegistryClientKeyTest.ts —
+// eleven planned for wave C (the stream manager's ten files and
+// CameraVideoAllocateTest.ts, which drives it), two excluded as
+// host-server; no case missing or left.
+const (
+	serverPlannedRatchet = 11
+	serverPortedRatchet  = 7
+	serverMissingRatchet = 0
+	serverLeftRatchet    = 0
+)
+
 // moduleRoot is where the committed artefacts live, seen from this package.
 const moduleRoot = "../.."
 
+// mustLoad loads the matter.js register.
 func mustLoad(t *testing.T) (*Snapshot, *Register) {
 	t.Helper()
-	snap, err := loadSnapshot(filepath.Join(moduleRoot, snapshotFile))
+	return mustLoadSource(t, matterjsSource)
+}
+
+func mustLoadSource(t *testing.T, src *source) (*Snapshot, *Register) {
+	t.Helper()
+	snap, err := loadSnapshot(filepath.Join(moduleRoot, src.snapshotFile))
 	if err != nil {
 		t.Fatal(err)
 	}
-	reg, err := loadRegister(filepath.Join(moduleRoot, registerFile))
+	reg, err := loadRegister(filepath.Join(moduleRoot, src.registerFile))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -146,17 +168,29 @@ func mustLoad(t *testing.T) (*Snapshot, *Register) {
 }
 
 func TestTestparitySnapshotIsThePin(t *testing.T) {
-	snap, _ := mustLoad(t)
-	commit, err := pinnedCommit(filepath.Join(moduleRoot, schemaFile))
-	if err != nil {
-		t.Fatal(err)
+	for _, src := range sources {
+		t.Run(src.name, func(t *testing.T) {
+			snap, _ := mustLoadSource(t, src)
+			commit, err := src.pin(moduleRoot)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if snap.Commit != commit {
+				t.Fatalf("snapshot is of %s %s, the pin is %s — regenerate the snapshot and re-check every changed file's mapping", src.name, snap.Commit, commit)
+			}
+			if strings.Join(snap.Roots, ",") != strings.Join(src.roots, ",") {
+				t.Errorf("snapshot roots %v, want %v", snap.Roots, src.roots)
+			}
+			checkSnapshotFiles(t, snap, src.roots)
+		})
 	}
-	if snap.Commit != commit {
-		t.Fatalf("snapshot is of matter.js %s, parity/schema.json pins %s — run make testparity-snapshot and re-check every changed file's mapping", snap.Commit, commit)
-	}
-	if strings.Join(snap.Roots, ",") != strings.Join(snapshotRoots, ",") {
-		t.Errorf("snapshot roots %v, want %v", snap.Roots, snapshotRoots)
-	}
+}
+
+// checkSnapshotFiles holds every snapshot file to the roots: sorted, a blob
+// id, a *Test.ts under a root (or a root itself, for a register of files),
+// some lines.
+func checkSnapshotFiles(t *testing.T, snap *Snapshot, roots []string) {
+	t.Helper()
 	for i, f := range snap.Files {
 		if i > 0 && snap.Files[i-1].Path >= f.Path {
 			t.Errorf("snapshot not sorted or duplicate at %s", f.Path)
@@ -164,7 +198,7 @@ func TestTestparitySnapshotIsThePin(t *testing.T) {
 		if !shaPattern.MatchString(f.SHA) {
 			t.Errorf("%s: sha %q", f.Path, f.SHA)
 		}
-		underRoot := slices.ContainsFunc(snapshotRoots, func(r string) bool { return strings.HasPrefix(f.Path, r+"/") })
+		underRoot := slices.ContainsFunc(roots, func(r string) bool { return f.Path == r || strings.HasPrefix(f.Path, r+"/") })
 		if !strings.HasSuffix(f.Path, "Test.ts") || !underRoot {
 			t.Errorf("%s: not a *Test.ts under the snapshot roots", f.Path)
 		}
@@ -175,23 +209,29 @@ func TestTestparitySnapshotIsThePin(t *testing.T) {
 }
 
 func TestTestparityRegisterCoversSnapshot(t *testing.T) {
-	snap, reg := mustLoad(t)
-	if err := reg.check(snap); err != nil {
-		t.Fatal(err)
+	for _, src := range sources {
+		t.Run(src.name, func(t *testing.T) {
+			snap, reg := mustLoadSource(t, src)
+			if err := reg.check(snap); err != nil {
+				t.Fatal(err)
+			}
+		})
 	}
 }
 
 func TestTestparityGoReferencesResolve(t *testing.T) {
-	_, reg := mustLoad(t)
 	funcs := map[string]map[string]bool{} // package dir -> Test function names
-	for _, e := range reg.Entries {
-		for _, ref := range e.Go {
-			dir, name, _ := strings.Cut(ref, ":")
-			if _, ok := funcs[dir]; !ok {
-				funcs[dir] = testFuncs(t, filepath.Join(moduleRoot, filepath.FromSlash(dir)))
-			}
-			if !funcs[dir][name] {
-				t.Errorf("%s: %s — no func %s in %s/*_test.go", e.Path, ref, name, dir)
+	for _, src := range sources {
+		_, reg := mustLoadSource(t, src)
+		for _, e := range reg.Entries {
+			for _, ref := range e.Go {
+				dir, name, _ := strings.Cut(ref, ":")
+				if _, ok := funcs[dir]; !ok {
+					funcs[dir] = testFuncs(t, filepath.Join(moduleRoot, filepath.FromSlash(dir)))
+				}
+				if !funcs[dir][name] {
+					t.Errorf("%s: %s — no func %s in %s/*_test.go", e.Path, ref, name, dir)
+				}
 			}
 		}
 	}
@@ -227,17 +267,47 @@ func testFuncs(t *testing.T, dir string) map[string]bool {
 }
 
 func TestTestparityPageIsCurrent(t *testing.T) {
-	snap, reg := mustLoad(t)
-	if err := reg.check(snap); err != nil {
-		t.Skip("register does not match the snapshot; TestTestparityRegisterCoversSnapshot reports it")
+	for _, src := range sources {
+		t.Run(src.name, func(t *testing.T) {
+			snap, reg := mustLoadSource(t, src)
+			if err := reg.check(snap); err != nil {
+				t.Skip("register does not match the snapshot; TestTestparityRegisterCoversSnapshot reports it")
+			}
+			want := renderPage(src, snap, reg)
+			got, err := os.ReadFile(filepath.Join(moduleRoot, src.pageFile))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !bytes.Equal(got, want) {
+				t.Fatalf("%s is stale: run make testparity and commit the result", src.pageFile)
+			}
+		})
 	}
-	want := renderPage(snap, reg)
-	got, err := os.ReadFile(filepath.Join(moduleRoot, pageFile))
-	if err != nil {
-		t.Fatal(err)
+}
+
+func TestTestparityServerRatchets(t *testing.T) {
+	_, reg := mustLoadSource(t, serverSource)
+	missing, left := 0, 0
+	for _, e := range reg.Entries {
+		missing += len(e.Missing)
+		left += len(e.Left)
 	}
-	if !bytes.Equal(got, want) {
-		t.Fatalf("%s is stale: run make testparity and commit the result", pageFile)
+	counts := reg.count()
+	for _, r := range []struct {
+		name         string
+		got, ratchet int
+	}{
+		{"planned files", counts[StatusPlanned], serverPlannedRatchet},
+		{"ported files", counts[StatusPorted], serverPortedRatchet},
+		{"missing it cases", missing, serverMissingRatchet},
+		{"left it cases", left, serverLeftRatchet},
+	} {
+		if r.got != r.ratchet {
+			t.Errorf("matterjs-server register: %d %s, ratchet %d — justify the move and set the ratchet in the same commit", r.got, r.name, r.ratchet)
+		}
+	}
+	if len(reg.Skips) > 0 {
+		t.Errorf("matterjs-server register lists %d skips; the module's FixMe skips belong to %s", len(reg.Skips), registerFile)
 	}
 }
 
@@ -325,7 +395,7 @@ func TestTestparityEntryValidation(t *testing.T) {
 		"stage without until":   {Path: "p", Status: StatusExcluded, Class: ClassControllerStage, Reason: "r", SnapshotSHA: sha},
 		"until on js-runtime":   {Path: "p", Status: StatusExcluded, Class: ClassJSRuntimeOnly, Until: "M9", Reason: "r", SnapshotSHA: sha},
 		"malformed until":       {Path: "p", Status: StatusPlanned, Until: "later", Reason: "r", SnapshotSHA: sha},
-		"until past M7":         {Path: "p", Status: StatusExcluded, Class: ClassControllerStage, Until: "M9", Reason: "r", SnapshotSHA: sha},
+		"until past M19":        {Path: "p", Status: StatusExcluded, Class: ClassControllerStage, Until: "M20", Reason: "r", SnapshotSHA: sha},
 		"missing on excluded":   {Path: "p", Status: StatusExcluded, Class: ClassJointFabric, Missing: []string{"m"}, Reason: "r", SnapshotSHA: sha},
 		"blank reason (spaces)": {Path: "p", Status: StatusPlanned, Reason: "  ", SnapshotSHA: sha},
 		"left also missing":     {Path: "p", Status: StatusPartial, Go: []string{"im:TestX"}, Missing: []string{"m"}, Left: []Left{{It: "m", Class: ClassSkip, Reason: "r"}}, Reason: "r", SnapshotSHA: sha},
