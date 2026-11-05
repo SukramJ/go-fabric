@@ -1021,7 +1021,12 @@ var chipFamilies = []family{
 	{name: "AVSM", deviceType: dtCamera, variant: variantCamera},
 	{name: "AVSUM", deviceType: dtCamera, variant: variantCamera},
 	{name: "ZONEMGMT", deviceType: dtCamera, variant: variantCamera},
-	{name: "PAVST", deviceType: dtCamera, variant: variantCamera},
+	{
+		name: "PAVST", deviceType: dtCamera, variant: variantCamera,
+		exclude: map[string]gap{
+			"2.4": {classHarness, "TC-PAVST-2.4 step 5 modifies the transport with empty VideoStreams and AudioStreams lists (TC_PAVST_2_4.py:203-204), which the fields' constraint refuses (\"1 to 16\", matter.js push-av-stream-transport.element.ts:266, :270 at 862ad75f; CONSTRAINT_ERROR, as matter.js validates a request); chip's server takes an empty list (PushAVStreamTransportLogic.cpp:677)", false},
+		},
+	},
 	{name: "PAVSTI", deviceType: dtCamera, variant: variantCamera},
 	// CHIME: run1 drives the camera-app's endpoint 1 (TC_CHIME_2_1.py CI
 	// arguments); here the Chime is a device of its own.
