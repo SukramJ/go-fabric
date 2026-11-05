@@ -1010,6 +1010,15 @@ type fleet struct {
 	// bridgeSim is the simulated bridge of --bridge-sim (bridge_sim.go);
 	// nil without.
 	bridgeSim *demoBridgeSim
+	// tlsKeys is the root TLS clusters' key store of --tls-sim (tls.go);
+	// nil without.
+	tlsKeys *tlsKeys
+	// camera is the camera and chime of --camera-sim (camera.go); nil
+	// without.
+	camera *demoCamera
+	// jointFabric is the administrator of --jointfabric-sim
+	// (jointfabric.go); nil without.
+	jointFabric *demoJointFabric
 
 	// configChange raises the ConfigurationVersion of every bridged device
 	// (the app pipe's SimulateConfigurationVersionChange); wired by main.
@@ -1240,6 +1249,22 @@ func (f *fleet) endpoints() ([]node.Endpoint, error) { //nolint:funlen // the fl
 	// The simulated bridge (--bridge-sim, TESTING ONLY) comes after it.
 	if f.bridgeSim != nil {
 		out = append(out, f.bridgeSim.endpoints()...)
+	}
+	// The Joint Fabric administrator (--jointfabric-sim, TESTING ONLY).
+	if f.jointFabric != nil {
+		eps, err := f.jointFabric.devices()
+		if err != nil {
+			errs = append(errs, err)
+		}
+		out = append(out, eps...)
+	}
+	// The camera and the chime (--camera-sim, TESTING ONLY) come last.
+	if f.camera != nil {
+		pair, err := f.camera.devices()
+		if err != nil {
+			errs = append(errs, err)
+		}
+		out = append(out, pair...)
 	}
 	if err := errors.Join(errs...); err != nil {
 		return nil, fmt.Errorf("fleet: %w", err)

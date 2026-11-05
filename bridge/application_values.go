@@ -63,8 +63,11 @@ var encodableType = reflect.TypeFor[spec.Encodable]()
 // for any other value.
 func encodeEncodableSlice(enc *tlv.Encoder, tag tlv.Tag, v any) bool {
 	rv := reflect.ValueOf(v)
-	if rv.Kind() != reflect.Slice || !rv.Type().Elem().Implements(encodableType) {
+	if rv.Kind() != reflect.Slice {
 		return false
+	}
+	if !rv.Type().Elem().Implements(encodableType) {
+		return encodeScalarSlice(enc, tag, rv)
 	}
 	enc.StartArray(tag)
 	for i := range rv.Len() {
@@ -76,6 +79,36 @@ func encodeEncodableSlice(enc *tlv.Encoder, tag tlv.Tag, v any) bool {
 		if e, ok := el.Interface().(spec.Encodable); ok {
 			e.EncodeTLV(enc, tlv.AnonymousTag())
 		}
+	}
+	_ = enc.EndContainer()
+	return true
+}
+
+// encodeScalarSlice writes a plain slice of a named integer, bool or
+// string type — a list of enums (CameraAvStreamManagement's
+// StreamUsagePriorities, []StreamUsageEnum) or of a bitmap — as a TLV
+// array of its values, the integers at the smallest width that holds
+// them as the writer's integer rule does (matter.js TlvUInt/TlvInt).
+// Without it such a list went on the wire as TLV null, which a
+// controller rejects (connectedhomeip's Python TH: ValueDecodeFailure,
+// TC-WEBRTCP-2.8). It reports false for any other element kind.
+func encodeScalarSlice(enc *tlv.Encoder, tag tlv.Tag, rv reflect.Value) bool {
+	var put func(reflect.Value)
+	switch rv.Type().Elem().Kind() {
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		put = func(el reflect.Value) { enc.PutUint(tlv.AnonymousTag(), el.Uint()) }
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		put = func(el reflect.Value) { enc.PutInt(tlv.AnonymousTag(), el.Int()) }
+	case reflect.Bool:
+		put = func(el reflect.Value) { enc.PutBool(tlv.AnonymousTag(), el.Bool()) }
+	case reflect.String:
+		put = func(el reflect.Value) { enc.PutUTF8(tlv.AnonymousTag(), el.String()) }
+	default:
+		return false
+	}
+	enc.StartArray(tag)
+	for i := range rv.Len() {
+		put(rv.Index(i))
 	}
 	_ = enc.EndContainer()
 	return true

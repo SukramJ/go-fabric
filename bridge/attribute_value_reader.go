@@ -73,6 +73,22 @@ func attributeValueReader(path im.ConcreteAttributePath, el tlv.Element, dec *tl
 		// (MatterScheduleConfiguration, brief CO), decodes the same way.
 		return generatedAttributeValue(thermostatdef.Definition, path.Attribute, el, dec, false)
 	}
+	// Any other structure or list of a cluster the generated definitions
+	// know decodes with the attribute's type, as matter.js decodes every
+	// write with its TlvSchema; the primitive reader below skips a
+	// container, so such a write reached the server as null
+	// (CameraAvStreamManagement's ViewportStruct, TC-AVSM-2.12 step 18).
+	// Only an attribute with a generated decoder — a writable one; a
+	// read-only list such as OperationalCredentials.TrustedRootCertificates
+	// has none, and its write drains below and is answered UNSUPPORTED_WRITE
+	// by the dispatcher (TC-ACE-2.2 writes every attribute).
+	if el.IsContainer {
+		if def := spec.Lookup(path.Cluster); def != nil {
+			if attr := def.Attribute(path.Attribute); attr != nil && attr.Decode != nil {
+				return generatedAttributeValue(def, path.Attribute, el, dec, false)
+			}
+		}
+	}
 	if v, over := overlongBeforeIS1(path, el); over {
 		return v, nil
 	}
@@ -128,6 +144,10 @@ func generatedAttributeValue(def *spec.Cluster, attrID uint32, el tlv.Element, d
 		n = spec.Node{El: tlv.Element{Type: tlv.TypeArray, IsContainer: true}, Children: []spec.Node{n}}
 	}
 	attr := def.Attribute(attrID)
+	if attr == nil || attr.Decode == nil {
+		// Never a panic on wire input: the caller checks, this guards it.
+		return im.AttributeValue{}, fmt.Errorf("bridge: %s attribute 0x%04X has no generated decoder", def.Name, attrID)
+	}
 	if attr.Access.Fabric == "F" {
 		stampFabricPlaceholder(&n)
 	}

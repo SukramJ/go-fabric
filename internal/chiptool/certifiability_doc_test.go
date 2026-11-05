@@ -368,7 +368,7 @@ func TestWorkflowRunsEveryFamily(t *testing.T) {
 	}
 	// The groups are the `"<group>=<FAMILY,FAMILY,…>"` entries of the
 	// `groups` step in the workflow's `code touched` job.
-	entry := regexp.MustCompile(`^"([a-z-]+)=([A-Z0-9,]+)"$`)
+	entry := regexp.MustCompile(`^"([a-z-]+)=([A-Za-z0-9,]+)"$`)
 	seen := map[string]int{}
 	long := map[string]bool{}
 	groups := 0
@@ -407,6 +407,39 @@ func TestWorkflowRunsEveryFamily(t *testing.T) {
 			t.Errorf("the workflow runs family %s, which families_table_test.go does not declare", f)
 		}
 	}
+	checkThreadGroup(t, string(data))
+}
+
+// threadGroupFamilies are the families of the `thread` group: they need
+// the virtual OTBR agent and run in .github/workflows/otbr-virtual.yml's
+// thread-families job (dispatch and weekly, armed by the owner), never in
+// chiptool.yml's matrix, so never on a pull request (phase 34, owner
+// decision 2026-11-04).
+const threadGroupFamilies = "TBRM,DGTHREAD,THNETDIR"
+
+// checkThreadGroup holds the dispatch-only rule: chiptool.yml's groups name
+// the thread group and its `groups` step skips it, and otbr-virtual.yml runs
+// exactly its families.
+func checkThreadGroup(t *testing.T, chiptool string) {
+	t.Helper()
+	if !strings.Contains(chiptool, `"thread=`+threadGroupFamilies+`"`) {
+		t.Errorf("chiptool.yml's groups name no thread group %q", threadGroupFamilies)
+	}
+	if !regexp.MustCompile(`if \[ "\$group" = thread \]; then\s+continue`).MatchString(chiptool) {
+		t.Error("chiptool.yml's groups step does not skip the thread group: it would run TBRM, DGTHREAD and THNETDIR without the virtual OTBR, and on pull requests")
+	}
+	data, err := os.ReadFile(filepath.Join("..", "..", ".github", "workflows", "otbr-virtual.yml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(data), "GOFABRIC_CHIP_FAMILIES: "+threadGroupFamilies) {
+		t.Errorf("otbr-virtual.yml's thread-families job does not run %s", threadGroupFamilies)
+	}
+	for _, f := range strings.Split(threadGroupFamilies, ",") {
+		if !slices.ContainsFunc(chipFamilies, func(fam family) bool { return fam.name == f && fam.variant == variantThread }) {
+			t.Errorf("thread group family %s is no %s row of the family table", f, variantThread)
+		}
+	}
 }
 
 // TestFamilyDeviceTypesResolve holds every endpoint the family table names
@@ -425,14 +458,16 @@ func TestFamilyDeviceTypesResolve(t *testing.T) {
 	if err := json.Unmarshal(data, &g); err != nil {
 		t.Fatal(err)
 	}
-	resolves := func(dt uint32) bool {
-		if dt == 0 || slices.Contains(endpointDeviceTypes, dt) {
-			return true
-		}
-		at, ok := pseudoEndpoints[dt]
-		return ok && slices.Contains(endpointDeviceTypes, at[0]) && slices.Contains(endpointDeviceTypes, at[1])
-	}
 	for _, fam := range chipFamilies {
+		// A variant's rows also reach the device types only its daemon
+		// has (variantDeviceTypes).
+		resolves := func(dt uint32) bool {
+			if dt == 0 || slices.Contains(endpointDeviceTypes, dt) || slices.Contains(variantDeviceTypes[fam.variant], dt) {
+				return true
+			}
+			at, ok := pseudoEndpoints[dt]
+			return ok && slices.Contains(endpointDeviceTypes, at[0]) && slices.Contains(endpointDeviceTypes, at[1])
+		}
 		if !resolves(fam.deviceType) {
 			t.Errorf("family %s runs on device type 0x%X, which the harness does not resolve (endpointDeviceTypes)", fam.name, fam.deviceType)
 		}

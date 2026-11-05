@@ -110,7 +110,7 @@ pin lift confirms by re-reading the row, [`pin-lifts.md`](./pin-lifts.md)).
 | BD-chip-WiFiNetworkCommissioningServer | `NetworkCommissioningServer.ts:18` is the generated empty subclass (absence: the class line, 18 lines in all) | `packages/node/src/behaviors/network-commissioning/NetworkCommissioningServer.ts` | `"export class NetworkCommissioningServer extends NetworkCommissioningBehavior {}"` | connectedhomeip `src/app/clusters/network-commissioning/NetworkCommissioningCluster.cpp` at `6170af84` (the handlers, `Init` :200-214, `OnNetworkingStatusChange` :283-307, `OnCommissioningComplete` :984-990), `src/platform/Linux/NetworkCommissioningWiFiDriver.cpp` (`Init` :77-128, `CommitConfiguration` :135-167) | no |
 | BD-chip-ThreadNetworkDirectory-RulesInServer | `ThreadNetworkDirectoryServer.ts:14` is the empty subclass (absence: the class line, 14 lines in all) | `packages/node/src/behaviors/thread-network-directory/ThreadNetworkDirectoryServer.ts` | `"export class ThreadNetworkDirectoryServer extends ThreadNetworkDirectoryBehavior {}"` | connectedhomeip `src/app/clusters/thread-network-directory-server/ThreadNetworkDirectoryCluster.cpp` at `6170af84` (`WritePreferredExtendedPanId` :139, `ReadThreadNetworks` :153, `HandleAddNetworkRequest` :214, `HandleRemoveNetworkRequest` :278, `HandleOperationalDatasetRequest` :309; `ThreadNetworkDirectoryStorage.h`) | no |
 | BD-Thread-TBRM-ChipLogic | `ThreadBorderRouterManagementServer.ts:14` is the empty subclass (absence: the class line, 14 lines in all) | `packages/node/src/behaviors/thread-border-router-management/ThreadBorderRouterManagementServer.ts` | `"export class ThreadBorderRouterManagementServer extends ThreadBorderRouterManagementBehavior {}"` | connectedhomeip `src/app/clusters/thread-border-router-management-server/ThreadBorderRouterManagementCluster.cpp` at `6170af84` (`ReadAttribute` :32, `InvokeCommand` :148, `OnActivateDatasetComplete` :272, `OnPlatformEventHandler` :297; `ThreadBorderRouterManagementDelegate.h:63-106`), tests `tests/TestThreadBorderRouterManagementCluster.cpp` | no |
-| BD-Thread-TND-FromBorderRouter | `ThreadNetworkDiagnosticsServer.ts:14` is the empty subclass (absence: the class line, 14 lines in all) | `packages/node/src/behaviors/thread-network-diagnostics/ThreadNetworkDiagnosticsServer.ts` | `"export class ThreadNetworkDiagnosticsServer extends ThreadNetworkDiagnosticsBehavior {}"` | connectedhomeip `src/app/clusters/thread-network-diagnostics-server/DirectThreadNetworkDiagnosticsProvider.cpp` at `6170af84` (`ReadAttribute` :59, the unconfigured nulls :65-92, `RoutingRole` :104-145, the tables :184-293, the counts :325-571, the dataset attributes :577-689), `ThreadNetworkDiagnosticsCluster.cpp` | no |
+| BD-Thread-TND-FromBorderRouter | `ThreadNetworkDiagnosticsServer.ts:14` is the empty subclass (absence: the class line, 14 lines in all) | `packages/node/src/behaviors/thread-network-diagnostics/ThreadNetworkDiagnosticsServer.ts` | `"export class ThreadNetworkDiagnosticsServer extends ThreadNetworkDiagnosticsBehavior {}"` | connectedhomeip `src/app/clusters/thread-network-diagnostics-server/DirectThreadNetworkDiagnosticsProvider.cpp` at `6170af84` (`ReadAttribute` :59, the unconfigured nulls :65-92, `RoutingRole` :104-145, OverrunCount :178-182, the tables :184-293, the counts :325-571, the dataset attributes :577-689, `ResetCounts` :735-738), `ThreadNetworkDiagnosticsCluster.cpp` | no |
 | BD-Thread-NetComm-ThreadVariant | `NetworkCommissioningServer.ts:18` is the empty subclass: no network-type branch, no Thread logic (absence: the class line, 18 lines in all) | `packages/node/src/behaviors/network-commissioning/NetworkCommissioningServer.ts` | `"export class NetworkCommissioningServer extends NetworkCommissioningBehavior {}"` | connectedhomeip `src/app/clusters/network-commissioning/NetworkCommissioningCluster.cpp` at `6170af84` (the Thread paths: `HandleScanNetworks` :349-367, `HandleAddOrUpdateThreadNetwork` :561-587, `OnFinished` :904-928, `ReadAttribute` :1102-1108) over `src/platform/OpenThread/GenericNetworkCommissioningThreadDriver.cpp` | yes |
 | BD-chip-AmbientContextSensing-RulesInServer | `AmbientContextSensingServer.ts:14` is the empty subclass (absence: the class line, 14 lines in all) | `packages/node/src/behaviors/ambient-context-sensing/AmbientContextSensingServer.ts` | `"export class AmbientContextSensingServer extends AmbientContextSensingBehavior {}"` | connectedhomeip `src/app/clusters/ambient-context-sensing-server/AmbientContextSensingCluster.cpp` at `6170af84` (the constructor and `Startup` :48-89, `WriteAttribute` :140-159, `AddDetection` :205-301, `SetObjectCountConfig` :303-367, `SetObjectCount` :369-385, `SetHoldTimeLimits` :438-466, `TimerFired` :498-509, `UpdateDetectionAttributes` :600-646, `CheckPredictedActivity` :844-892; `AmbientContextSensingDelegate.h:78-106`), tests `tests/TestAmbientContextSensingCluster.cpp` | no |
 | BD-chip-TimeSynchronization-Features | `TimeSynchronizationServer.ts:14` is the empty subclass (absence: the class line, 14 lines in all) | `packages/node/src/behaviors/time-synchronization/TimeSynchronizationServer.ts` | `"export class TimeSynchronizationServer extends TimeSynchronizationBehavior {}"` | connectedhomeip `src/app/clusters/time-synchronization-server/TimeSynchronizationCluster.cpp` at `6170af84` (the attribute gating :186-248, the feature logic :619-1028, `HandleSetUTCTime` :1110-1136, the four handlers :1138-1275), `TimeSyncDataProvider.h:58-75`, tests `tests/TestTimeSynchronizationCluster.cpp` | yes |
@@ -5336,7 +5336,10 @@ had the route, and chip's empty-dataset attach
 matter.js's `ThreadNetworkDiagnosticsServer.ts:14` at `862ad75f` is the
 empty subclass. `cluster/threadbr.DiagnosticsServer` serves the 17
 mandatory attributes, the two provisional ones, MLECNT and the four MACCNT
-counts a border router's REST diagnostics record carries, following chip's
+counts a border router's REST diagnostics record carries — and, since
+phase 34 (ADR 0027 addendum), PKTCNT (no element conforms to it) and
+ERRCNT with OverrunCount the constant 0 chip reads (:178-182) and
+ResetCounts (:735-738; the REST surface resets nothing else) — following chip's
 `DirectThreadNetworkDiagnosticsProvider.cpp` at `6170af84` (`ReadAttribute`
 :59, the unconfigured nulls :65-92, `RoutingRole` :104-145, the tables
 :184-293, the counts :325-571, the dataset attributes :577-689), with the
@@ -5640,6 +5643,37 @@ sweep): persistence is the host's, as every other host-owned value of the
 device model, so a host that does not persist them starts at chip's
 defaults after a restart. Moved here from the findings register at the
 triage of 2026-10-29.
+
+### BD-chip-CameraApp-Simulation — the reference daemon's `--camera-sim` follows connectedhomeip's camera-app managers without a media stack
+
+matter.js has no camera test device (`support/chip-testing/src/devices/all-devices.ts` at
+`862ad75f` lists none). The reference daemon's `--camera-sim`
+(`examples/reference-bridge/camera.go`, phase 34) follows connectedhomeip's
+camera-app at `6170af84`: the HAL's capabilities and features
+(`camera-device.h:41-88`, `camera-device.cpp:1491-1640`,
+`camera-app.cpp:43-283`), the available streams and their compatibility
+(`InitializeVideoStreams`, `InitializeAudioStreams`, `AddSnapshotStream`,
+`camera-device-interface.h:51-97`), the managers' allocation statuses
+(`camera-av-stream-manager.cpp:347-677`), the provider's session
+(`webrtc-provider-manager.cpp` `HandleSolicitOffer`, deferred with
+`--camera-deferred-offer`), the zone manager's trigger timing
+(`zone-manager.cpp:169-289`) and the chime's sounds (`chime-manager.h:41-45`).
+Deliberate differences: nothing is captured or sent — ProvideOffer keeps the
+session but sends no Answer, a push transport uploads nothing and is never
+busy, its recording only the PushTransportBegin and PushTransportEnd of the
+camera-app's transport lifecycle (a continuous transport while Active, a
+triggered one for its InitialDuration), CaptureSnapshot returns a generated JPEG under `--camera-test-videosrc`
+and fails without it (the camera-app's `/dev/video0` capture); the camera and
+the chime are bridged devices, the chime one of its own (the Camera device
+type lists no Chime); with PERZONESENS the zone management serves no
+Sensitivity ("!PERZONESENS"), where the camera-app sets one that is not
+served either; the AvAnalysis app-pipe commands are logged and dropped (no
+AvAnalysis cluster in the snapshot); a triggered zone stops when its
+TriggerDetectedDuration has elapsed, where the camera-app's one-second timer
+stops it a second later (`zone-manager.cpp:197`) — at the very end of the
+window TC-ZONEMGMT-2.4 allows (`TC_ZONEMGMT_2_4.py:279-285`). TESTING ONLY, off by default; the
+stream, PTZ and chime state is kept in `--db` as
+`BD-Matter-CameraPersistenceIsTheHosts` leaves it to the host.
 
 ### BD-Matter-BTP-NoStallRenegotiation — a BTP central that stalls after the handshake is not re-established with a smaller segment size
 

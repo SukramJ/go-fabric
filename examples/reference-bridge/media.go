@@ -20,6 +20,7 @@ import (
 	lowpowerdef "github.com/SukramJ/go-fabric/cluster/spec/lowpower"
 	inputdef "github.com/SukramJ/go-fabric/cluster/spec/mediainput"
 	mpdef "github.com/SukramJ/go-fabric/cluster/spec/mediaplayback"
+	msgdef "github.com/SukramJ/go-fabric/cluster/spec/messages"
 	targetdef "github.com/SukramJ/go-fabric/cluster/spec/targetnavigator"
 	woldef "github.com/SukramJ/go-fabric/cluster/spec/wakeonlan"
 	"github.com/SukramJ/go-fabric/device"
@@ -40,7 +41,7 @@ import (
 //     ContentAppPlatform and PhysicalInputs: OnOff, MediaPlayback (AS, VS, TT, AT, AA),
 //     KeypadInput (NV, LK, NK), ContentLauncher (CS, UP), ApplicationLauncher
 //     (AP), MediaInput (NU), AudioOutput (NU), Channel (CL, LI),
-//     TargetNavigator, LowPower and WakeOnLan.
+//     TargetNavigator, LowPower, WakeOnLan and Messages.
 //   - "app" is a ContentApp (tv-app endpoint 3, ma_contentapp,
 //     tv-app.matter's endpoint 3): ApplicationBasic, ApplicationLauncher
 //     (no AP), AccountLogin and KeypadInput — the test suite's app, catalog
@@ -80,10 +81,12 @@ type demoMedia struct {
 
 	player *device.CastingVideoPlayer
 	app    *device.ContentApp
+	// messages adds the Messages server to the player (--media-messages).
+	messages bool
 }
 
-func newDemoMedia(policies surface.Policies, logger *slog.Logger) (*demoMedia, error) {
-	m := &demoMedia{logger: logger, surface: policies}
+func newDemoMedia(policies surface.Policies, logger *slog.Logger, messages bool) (*demoMedia, error) {
+	m := &demoMedia{logger: logger, surface: policies, messages: messages}
 	var err error
 	if m.player, err = m.newPlayer(); err != nil {
 		return nil, fmt.Errorf("media player: %w", err)
@@ -132,10 +135,15 @@ func (m *demoMedia) newPlayer() (*device.CastingVideoPlayer, error) {
 	// the daemon has no radio, so a locally administered address.
 	mac := "02005E102002"
 
+	messages, err := newTVMessages(m.logger)
+	if err != nil {
+		return nil, err
+	}
+
 	opts := bridged("player", "Living Room TV")
 	opts.Surface = m.surface
 	opts.Conditions = []string{"ContentAppPlatform", "PhysicalInputs"}
-	return device.NewCastingVideoPlayer(opts,
+	decls := []device.Declaration{
 		mpdef.Declare{
 			Playback: playerTransport{},
 			// tv-app.matter:4475 (featureMap 0x001F: AS, VS, TT, AT, AA).
@@ -185,7 +193,20 @@ func (m *demoMedia) newPlayer() (*device.CastingVideoPlayer, error) {
 		targetdef.Declare{Targets: tvTargets{}, Initial: targetdef.Patch{TargetList: &targets, CurrentTarget: &currentTarget}},
 		lowpowerdef.Declare{LowPower: tvSleep{logger: m.logger}},
 		woldef.Declare{Initial: woldef.Patch{MacAddress: &mac}},
-	)
+	}
+	if m.messages {
+		// tv-app.matter:4407-4424 (Messages, featureMap 0): the module's
+		// server over the tv-app's MessagesManager (messages.go). Only with
+		// --media-messages: at the harness pin chip's TC-IDM-10.5 evaluates
+		// the Casting Video Player's `[Rev >= v2]` term for Messages against
+		// EmptyClusterGlobalAttributes, whose revision is 1
+		// (matter/testing/conformance.py:139-147, :277-294;
+		// device_conformance_tests.py:404-414 at 6170af84), so it reports
+		// the cluster disallowed on a revision-2 player — the tv-app's own
+		// composition would fail it the same way.
+		decls = append(decls, msgdef.Declare{HostServer: messages})
+	}
+	return device.NewCastingVideoPlayer(opts, decls...)
 }
 
 func (m *demoMedia) newApp() (*device.ContentApp, error) {

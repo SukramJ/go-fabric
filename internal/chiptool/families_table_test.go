@@ -122,6 +122,13 @@ type family struct {
 	// run only on a host where an up, multicast-capable interface has IPv6,
 	// and otherwise skip naming the exact command that enables it.
 	multicast map[string]bool
+	// labPath cases run their non-CI path, the one a test lab runs
+	// against a DUT the case did not start: the endpoint's PICS slice with
+	// PICS_SDK_CI_ONLY=0 instead of the CI values, and, uncommissioned,
+	// the runner leaves the commissioning to the case's own steps (the
+	// daemon's --passcode and --discriminator go in args). For a case whose
+	// CI path starts a CHIP app as the DUT and never reaches the daemon.
+	labPath map[string]bool //nolint:unused // read by the chiptool-tagged runner (familyrun_test.go)
 	// perEndpoint cases run once per endpoint of the daemon, each against
 	// that endpoint's PICS slice (TC-IDM-10.4, the PICS checker).
 	perEndpoint map[string]bool
@@ -139,7 +146,7 @@ type family struct {
 	// (daemonVariants: the flags it adds), with PICS generated from that
 	// daemon and a commissioned snapshot of its own. Empty is the
 	// certified default composition.
-	variant string //nolint:unused // read by the chiptool-tagged runner (familyrun_test.go)
+	variant string
 }
 
 // The Wi-Fi network of the CNETWIFI run: the defaults of the CNET cases'
@@ -152,6 +159,61 @@ const (
 	// variantWiFiSim is the daemon with --wifi-sim (daemonVariants).
 	variantWiFiSim = "wifi-sim"
 )
+
+// The second compositions of the reference daemon (phase 34), one variant
+// each (daemonVariants): the families of the clusters only they serve run
+// against them, with PICS generated from them (testdata/pics-<variant>/).
+const (
+	// variantTLS is the daemon with --tls-sim: TlsCertificateManagement
+	// and TlsClientManagement on the root (examples/reference-bridge/tls.go).
+	variantTLS = "tls-sim"
+	// variantCamera is the daemon with --camera-sim and --tls-sim: a
+	// Camera and a Chime after chip's camera-app
+	// (examples/reference-bridge/camera.go).
+	variantCamera = "camera-sim"
+	// variantMessages is the --media daemon with --media-messages: Messages
+	// on the video player (examples/reference-bridge/media.go). Not the
+	// default composition: chip's TC-IDM-10.5 at the harness pin judges the
+	// device type's `[Rev >= v2]` term against a placeholder revision 1
+	// (conformance.py EmptyClusterGlobalAttributes) and reports Messages
+	// disallowed on the player (docs/certifiability.md).
+	variantMessages = "media-messages"
+	// variantJointFabric is the daemon with --jointfabric-sim: a
+	// JointFabricAdministrator endpoint
+	// (examples/reference-bridge/jointfabric.go).
+	variantJointFabric = "jointfabric-sim"
+	// variantThread is the daemon with --otbr against the virtual OTBR
+	// agent (script/otbr-virtual-test.sh): the ThreadBorderRouter endpoint
+	// with ThreadNetworkDirectory and the root's ThreadNetworkDiagnostics
+	// (examples/reference-bridge/otbr.go).
+	variantThread = "thread"
+)
+
+// Device types only a variant's daemon has (variantDeviceTypes).
+const (
+	// dtCamera is the --camera-sim Camera: CameraAvStreamManagement,
+	// WebRtcTransportProvider and Requestor, PushAvStreamTransport,
+	// CameraAvSettingsUserLevelManagement and ZoneManagement.
+	dtCamera = 0x0142
+	// dtChime is the --camera-sim Chime.
+	dtChime = 0x0146
+	// dtJointFabricAdministrator is the --jointfabric-sim administrator:
+	// JointFabricAdministrator and JointFabricDatastore.
+	dtJointFabricAdministrator = 0x0130
+	// dtThreadBorderRouter is the --otbr border router:
+	// ThreadBorderRouterManagement, ThreadNetworkDiagnostics and
+	// ThreadNetworkDirectory.
+	dtThreadBorderRouter = 0x0091
+)
+
+// variantDeviceTypes are the device types the harness resolves to an
+// endpoint of a variant's daemon besides endpointDeviceTypes; a family row
+// of that variant may name them (TestFamilyDeviceTypesResolve).
+var variantDeviceTypes = map[string][]uint32{
+	variantCamera:      {dtCamera, dtChime},
+	variantJointFabric: {dtJointFabricAdministrator},
+	variantThread:      {dtThreadBorderRouter},
+}
 
 // wifiCaseArgs are a Python CNET case's network and endpoint: the network
 // the TH commissioned the DUT onto (TC_CNET_4_1.py:37-40 usage), and the
@@ -916,4 +978,136 @@ var chipFamilies = []family{
 	},
 	{name: "TGTNAV", deviceType: dtCastingVideoPlayer},
 	{name: "WAKEONLAN", deviceType: dtCastingVideoPlayer},
+	// MESS: Messages (cluster/core) on the video player, after the
+	// tv-app's endpoint 1 (tv-app.matter:4407-4424; TC_MESS_1_1.py CI
+	// arguments: app ${TV_APP}, --endpoint 1).
+	{
+		name: "MESS", deviceType: dtCastingVideoPlayer, variant: variantMessages,
+		exclude: map[string]gap{
+			"1.1": {classNotSupported, "TC-MESS-1.1 runs only on an endpoint with SpokenMessages or AudioMessages (TC_MESS_1_1.py:76, TC_MESSTestBase.py:42-50); the player's Messages, like the tv-app's (featureMap 0, tv-app.matter:4419), has neither, and the case skips itself", true},
+		},
+	},
+
+	// --- The second compositions (phase 34) ---------------------------------
+	//
+	// TLSCERT and TLSCLIENT: the root's TlsCertificateManagement and
+	// TlsClientManagement (node.Config.TLS) of the --tls-sim daemon
+	// (examples/reference-bridge/tls.go); chip runs them against its
+	// all-clusters app's root (TC_TLSCERT_2_1.py and TC_TLSCLIENT_2_1.py
+	// CI arguments, --endpoint 0, at the harness pin).
+	{
+		name: "TLSCERT", variant: variantTLS,
+		exclude: map[string]gap{
+			// notes/parity/matter_behaviour_findings.md, "Certification
+			// harness": TC-TLSCERT-2.2, TC-TLSCERT-2.9.
+			"2.2": {classDefect, "TC-TLSCERT-2.2 step 5: the module's reads of ProvisionedRootCertificates and ProvisionedClientCertificates serve the full certificates on every transport (BD-chip-TlsCertificateManagement-RulesInServer, owner decision 2026-10-28, after matter.js's generated behaviour); chip encodes the ids alone outside a large-payload transport (TLSCertificateManagementCluster.cpp:136-166 at the harness pin), and the case reads over MRP expecting no certificate", false},
+			"2.9": {classDefect, "TC-TLSCERT-2.9 step 13: the module's reads of ProvisionedRootCertificates and ProvisionedClientCertificates serve the full certificates on every transport (BD-chip-TlsCertificateManagement-RulesInServer, owner decision 2026-10-28, after matter.js's generated behaviour); chip encodes the ids alone outside a large-payload transport (TLSCertificateManagementCluster.cpp:136-166 at the harness pin), and the case reads over MRP expecting no certificate; two such client certificates exceed one MRP message, so the read answers RESOURCE_EXHAUSTED", false},
+		},
+	},
+	{name: "TLSCLIENT", variant: variantTLS},
+	// The camera families: the --camera-sim Camera and Chime after chip's
+	// camera-app (examples/reference-bridge/camera.go), which chip's CI
+	// runs them against (the cases' CI arguments: app ${CAMERA_APP},
+	// --endpoint 1). The image's descriptor files the WEBRTCP cases under
+	// two names, WEBRTCP and WebRTCP (the case titles' spelling); each is
+	// a row. A case whose CI starts the camera-app with
+	// --camera-deferred-offer or --camera-test-videosrc starts the daemon
+	// with the same switch (daemonAppArgs).
+	{
+		name: "WEBRTCP", deviceType: dtCamera, variant: variantCamera,
+		edits: map[string][]edit{
+			// Step 2 sends its ProvideOffers to endpoint 1, step 3 to the
+			// case's endpoint (TC_WEBRTCP_2_16.py:159, :173).
+			"2.16": {{"cmd=provide_offer_cmd,\n                endpoint=1,", "cmd=provide_offer_cmd,\n                endpoint=endpoint,", "step 2 addresses endpoint 1, the camera-app's camera, where step 3 uses the case's endpoint (TC_WEBRTCP_2_16.py:159, :173); the daemon's camera is a bridged endpoint"}},
+		},
+	},
+	{name: "WebRTCP", deviceType: dtCamera, variant: variantCamera},
+	{
+		name: "AVSM", deviceType: dtCamera, variant: variantCamera,
+		// TC_AVSM_2_18 to 2_21 gate on AVSM.S.F_VDO, F_ADO and F_SNP
+		// (TC_AVSM_2_18.py:82-83, 2_19:78-79, 2_20:78-79, 2_21:73-74),
+		// codes no PICS defines: a feature's code is AVSM.S.Fnn (CHIP's
+		// derivation, and ci-pics-values's AVSM.S.F00-F04). The gates are
+		// corrected, the steps unchanged.
+		picsEdits: map[string]edit{
+			"2.18": {"AVSM.S.F_VDO", "AVSM.S.F01", "TC_AVSM_2_18 gates on the undefined code AVSM.S.F_VDO; Video is AVSM.S.F01"},
+			"2.19": {"AVSM.S.F_ADO", "AVSM.S.F00", "TC_AVSM_2_19 gates on the undefined code AVSM.S.F_ADO; Audio is AVSM.S.F00"},
+			"2.20": {"AVSM.S.F_SNP", "AVSM.S.F02", "TC_AVSM_2_20 gates on the undefined code AVSM.S.F_SNP; Snapshot is AVSM.S.F02"},
+			"2.21": {"AVSM.S.F_VDO", "AVSM.S.F01", "TC_AVSM_2_21 gates on the undefined code AVSM.S.F_VDO; Video is AVSM.S.F01"},
+		},
+		edits: map[string][]edit{
+			"2.18": {{`"AVSM.S", "AVSM.S.F_VDO"`, `"AVSM.S", "AVSM.S.F01"`, "TC_AVSM_2_18 gates on the undefined code AVSM.S.F_VDO; Video is AVSM.S.F01"}},
+			"2.19": {{`"AVSM.S", "AVSM.S.F_ADO"`, `"AVSM.S", "AVSM.S.F00"`, "TC_AVSM_2_19 gates on the undefined code AVSM.S.F_ADO; Audio is AVSM.S.F00"}},
+			"2.20": {{`"AVSM.S", "AVSM.S.F_SNP"`, `"AVSM.S", "AVSM.S.F02"`, "TC_AVSM_2_20 gates on the undefined code AVSM.S.F_SNP; Snapshot is AVSM.S.F02"}},
+			"2.21": {{`"AVSM.S", "AVSM.S.F_VDO"`, `"AVSM.S", "AVSM.S.F01"`, "TC_AVSM_2_21 gates on the undefined code AVSM.S.F_VDO; Video is AVSM.S.F01"}},
+		},
+	},
+	{name: "AVSUM", deviceType: dtCamera, variant: variantCamera},
+	{name: "ZONEMGMT", deviceType: dtCamera, variant: variantCamera},
+	{
+		name: "PAVST", deviceType: dtCamera, variant: variantCamera,
+		exclude: map[string]gap{
+			"2.3":  {classHarness, "TC-PAVST-2.3 step 25 allocates a motion transport with MotionSensitivity 11 on a camera with PERZONESENS and expects chip's INVALID_COMMAND (TC_PAVST_2_3.py:435-443, PushAVStreamTransportLogic.cpp:573-574); the module validates the request's fields first, as matter.js does, and answers CONSTRAINT_ERROR — matter.js answers a constraint and a conformance violation alike with CONSTRAINT_ERROR (packages/protocol/src/action/errors.ts:77-118 at 862ad75f)", false},
+			"2.6":  {classHarness, "TC-PAVST-2.6 step 8 modifies the transport with empty VideoStreams and AudioStreams lists (TC_PAVST_2_6.py:283-294), which the fields' constraint refuses (\"1 to 16\", matter.js push-av-stream-transport.element.ts:266, :270 at 862ad75f; CONSTRAINT_ERROR); chip's server treats an empty list as absent (PushAVStreamTransportLogic.cpp:671-680)", false},
+			"2.11": {classHarness, "TC-PAVST-2.11 step 21a allocates with an empty AudioStreams list (TC_PAVST_2_11.py:470-479), which the field's constraint refuses (\"1 to 16\", matter.js push-av-stream-transport.element.ts:270 at 862ad75f; CONSTRAINT_ERROR) before the stream check the case is after; chip's server treats an empty list as absent (PushAVStreamTransportLogic.cpp:671-680)", false},
+			"2.15": {classNotSupported, "TC-PAVST-2.15 drives UpdateMotionZoneOptions (command 0x08), which the matter.js snapshot does not carry (push-av-stream-transport.element.ts at 862ad75f lists commands 0x00-0x07); the module's server answers UNSUPPORTED_COMMAND", false},
+			"2.4":  {classHarness, "TC-PAVST-2.4 step 5 modifies the transport with empty VideoStreams and AudioStreams lists (TC_PAVST_2_4.py:203-204), which the fields' constraint refuses (\"1 to 16\", matter.js push-av-stream-transport.element.ts:266, :270 at 862ad75f; CONSTRAINT_ERROR, as matter.js validates a request); chip's server treats an empty list as absent (PushAVStreamTransportLogic.cpp:671-680)", false},
+		},
+	},
+	{name: "PAVSTI", deviceType: dtCamera, variant: variantCamera},
+	// CHIME: run1 drives the camera-app's endpoint 1 (TC_CHIME_2_1.py CI
+	// arguments); here the Chime is a device of its own.
+	{name: "CHIME", deviceType: dtChime, variant: variantCamera},
+	// JFADMIN and JFDS: the --jointfabric-sim administrator
+	// (examples/reference-bridge/jointfabric.go). Every case starts its
+	// administrator itself; see the reasons.
+	{
+		name: "JFADMIN", deviceType: dtJointFabricAdministrator, variant: variantJointFabric,
+		// TC-JFADMIN-1.2 has a lab path without the RPC: the case commissions
+		// the administrator it is given and drives its commands
+		// (TC_JFADMIN_1_2.py:98-103 and the steps from :140).
+		labPath:        map[string]bool{"1.2": true},
+		uncommissioned: map[string]bool{"1.2": true},
+		args:           map[string][]string{"1.2": {"--passcode", "{passcode}", "--discriminator", "{discriminator}"}},
+		edits: map[string][]edit{
+			"1.2": {{"_JOINT_FABRIC_ADMINISTRATOR_ENDPOINT = 1\n", "_JOINT_FABRIC_ADMINISTRATOR_ENDPOINT = {ep:0x0130}\n", "the administrator is the daemon's bridged JointFabricAdministrator, not endpoint 1 (TC_JFADMIN_1_2.py:57)"}},
+		},
+		exclude: map[string]gap{
+			// notes/parity/matter_behaviour_findings.md, "Certification
+			// harness": TC-JFADMIN-1.2. Steps 1-15 pass on the lab path.
+			"1.2": {classDefect, "TC-JFADMIN-1.2 step 16: an ICAC whose Subject DN is a TLV structure instead of a list (TC_JFADMIN_1_2.py:318-323) passes the AddICAC chain check (secure/mattercert Decode), so the administrator answers InvalidPublicKey where chip's ValidateCert refuses the certificate first, InvalidICAC (joint-fabric-administrator-server.cpp:375-376 at the harness pin); the fix is in secure/mattercert, a security path", false},
+			"1.1": {classHarness, "TC-JFADMIN-1.1 drives the administrator through chip's jf-control-app and the administrator app's pigweed RPC JointFabric service (TC_JFADMIN_1_1.py:131-162; examples/common/pigweed/protos/joint_fabric_service.proto at the harness pin): with the CI PICS it starts chip's own jf-admin-app as the DUT and never reaches the daemon, without them it needs the DUT's RPC server (dut_rpc_server_ip/_port); the daemon serves no pigweed RPC, an SDK test interface outside Matter", false},
+			"1.4": {classHarness, "TC-JFADMIN-1.4 drives the administrator through chip's jf-control-app and the administrator app's pigweed RPC JointFabric service (TC_JFADMIN_1_4.py:194-212; examples/common/pigweed/protos/joint_fabric_service.proto at the harness pin): with the CI PICS it starts chip's own jf-admin-app as the DUT and never reaches the daemon, without them it needs the DUT's RPC server (dut_rpc_server_ip/_port); the daemon serves no pigweed RPC, an SDK test interface outside Matter", false},
+			"2.1": {classHarness, "TC-JFADMIN-2.1 drives the administrator through chip's jf-control-app and the administrator app's pigweed RPC JointFabric service (TC_JFADMIN_2_1.py:155-170; examples/common/pigweed/protos/joint_fabric_service.proto at the harness pin): with the CI PICS it starts chip's own jf-admin-app as the DUT and never reaches the daemon, without them it needs the DUT's RPC server (dut_rpc_server_ip/_port); the daemon serves no pigweed RPC, an SDK test interface outside Matter", false},
+			"2.2": {classHarness, "TC-JFADMIN-2.2 drives the administrator through chip's jf-control-app and the administrator app's pigweed RPC JointFabric service (TC_JFADMIN_2_2.py:259-270; examples/common/pigweed/protos/joint_fabric_service.proto at the harness pin): with the CI PICS it starts chip's own jf-admin-app as the DUT and never reaches the daemon, without them it needs the DUT's RPC server (dut_rpc_server_ip/_port); the daemon serves no pigweed RPC, an SDK test interface outside Matter", false},
+		},
+	},
+	{
+		name: "JFDS", deviceType: dtJointFabricAdministrator, variant: variantJointFabric,
+		exclude: map[string]gap{
+			"2.1": {classHarness, "TC-JFDS-2.1 drives the administrator through chip's jf-control-app and the administrator app's pigweed RPC JointFabric service (TC_JFDS_2_1.py:95-130; examples/common/pigweed/protos/joint_fabric_service.proto at the harness pin): with the CI PICS it starts chip's own jf-admin-app as the DUT and never reaches the daemon, without them it needs the DUT's RPC server (dut_rpc_server_ip/_port); the daemon serves no pigweed RPC, an SDK test interface outside Matter", false},
+			"2.2": {classHarness, "TC-JFDS-2.2 drives the administrator through chip's jf-control-app and the administrator app's pigweed RPC JointFabric service (TC_JFDS_2_2.py:99-120; examples/common/pigweed/protos/joint_fabric_service.proto at the harness pin): with the CI PICS it starts chip's own jf-admin-app as the DUT and never reaches the daemon, without them it needs the DUT's RPC server (dut_rpc_server_ip/_port); the daemon serves no pigweed RPC, an SDK test interface outside Matter", false},
+			"2.3": {classHarness, "TC-JFDS-2.3 drives the administrator through chip's jf-control-app and the administrator app's pigweed RPC JointFabric service (TC_JFDS_2_3.py:99-120; examples/common/pigweed/protos/joint_fabric_service.proto at the harness pin): with the CI PICS it starts chip's own jf-admin-app as the DUT and never reaches the daemon, without them it needs the DUT's RPC server (dut_rpc_server_ip/_port); the daemon serves no pigweed RPC, an SDK test interface outside Matter", false},
+			"2.4": {classHarness, "TC-JFDS-2.4 drives the administrator through chip's jf-control-app and the administrator app's pigweed RPC JointFabric service (TC_JFDS_2_4.py:108-130; examples/common/pigweed/protos/joint_fabric_service.proto at the harness pin): with the CI PICS it starts chip's own jf-admin-app as the DUT and never reaches the daemon, without them it needs the DUT's RPC server (dut_rpc_server_ip/_port); the daemon serves no pigweed RPC, an SDK test interface outside Matter", false},
+			"2.5": {classHarness, "TC-JFDS-2.5 drives the administrator through chip's jf-control-app and the administrator app's pigweed RPC JointFabric service (TC_JFDS_2_5.py:124-162; examples/common/pigweed/protos/joint_fabric_service.proto at the harness pin): with the CI PICS it starts chip's own jf-admin-app as the DUT and never reaches the daemon, without them it needs the DUT's RPC server (dut_rpc_server_ip/_port); the daemon serves no pigweed RPC, an SDK test interface outside Matter", false},
+		},
+	},
+	// TBRM, DGTHREAD and THNETDIR: the --otbr border router against the
+	// virtual OTBR agent (script/otbr-virtual-test.sh): ThreadBorderRouter-
+	// Management, ThreadNetworkDiagnostics (the four counts) and
+	// ThreadNetworkDirectory on the 0x0091 endpoint
+	// (examples/reference-bridge/otbr.go). chip runs TBRM and THNETDIR
+	// against its network-manager app's endpoint 1 and DGTHREAD against the
+	// root of a Thread device (Test_TC_DGTHREAD_2_1.yaml config endpoint
+	// 0); the daemon has no Thread radio (ADR 0027), so DGTHREAD reads the
+	// border router's diagnostics. They run in the thread group, on
+	// dispatch and weekly (.github/workflows/otbr-virtual.yml).
+	{
+		name: "TBRM", deviceType: dtThreadBorderRouter, variant: variantThread,
+		exclude: map[string]gap{
+			"2.2": {classHarness, "TC-TBRM-2.2 step 13 compares the GetActiveDatasetRequest answer byte for byte with the dataset the case set (Test_TC_TBRM_2_2.yaml:158-166, PIXIT.TBRM.THREAD_ACTIVE_DATASET); an OpenThread border router serializes the dataset's TLVs in its own order (the virtual agent answers the Network Name TLV after the Mesh-Local Prefix), and the module answers the border router's bytes, as chip's TBRM server answers its Thread stack's; chip runs the case against network-manager-app's simulated stack, which keeps the bytes as set", false},
+		},
+	},
+	{name: "DGTHREAD", deviceType: dtThreadBorderRouter, variant: variantThread},
+	{name: "THNETDIR", deviceType: dtThreadBorderRouter, variant: variantThread},
 }
