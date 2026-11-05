@@ -67,6 +67,7 @@ pseudo-version of `main`.
 
 ### Changed
 
+- The chip-tool suite's default harness image is the module's own, `ghcr.io/sukramj/go-fabric-chip@sha256:e443ea0c…` (`internal/chiptool/image`, built by `chip-image.yml` from matter.js's CHIP image, now the Makefile's `CHIP_BASE_IMAGE`, plus chip's jf-admin-app, jf-control-app and Push AV server at 6170af84): the PAVST, PAVSTI, JFADMIN and JFDS families run in CI; the image is amd64 only, `make chiptool-image` pulls it. Phase 34.
 - `cluster/core`: a GroupKeyManagement command invoked without an accessing fabric is refused UNSUPPORTED_ACCESS instead of FAILURE — matter.js's AccessDeniedError (`FabricAccessControl.ts:59-63` at 862ad75f); the dispatcher's ACL gate refuses such a request before the server sees it, so this is the server's own answer on a direct call. Closes finding T3-P35-2.
 - `cluster/threadbr`: the border router's ThreadNetworkDiagnostics serves PacketCounts and ErrorCounts as well (`DiagnosticsFeatures`): OverrunCount is the constant 0 connectedhomeip's provider reads, and ResetCounts resets it (ADR 0027 addendum); a declaration of either is no longer refused.
 - `cluster/tls`: a client certificate entry always carries its IntermediateCertificates, an empty list for none — a CSR-only entry's too — as connectedhomeip's certificate table encodes it (TC-TLSCERT-2.8, 2.11).
