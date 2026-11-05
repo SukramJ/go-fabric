@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 7434,
+  "entry_points": 7450,
   "entry_packages": [
     ".",
     "bdx",
@@ -279,9 +279,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 17329,
-    "reachable": 12141,
-    "whitelisted": 5188,
+    "total_exported": 17358,
+    "reachable": 12165,
+    "whitelisted": 5193,
     "unreachable": 0
   },
   "by_package": [],
@@ -3856,6 +3856,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/dormant_wiring_test.go",
       "line": 107
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestOccupancyChangedEvent",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/boolean_state_event_test.go",
+      "line": 156
     },
     {
       "package": "bridge",
@@ -9980,21 +9987,21 @@
       "identifier": "BooleanStateChangeEvent",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/measurement/definitions.go",
-      "line": 162
+      "line": 155
     },
     {
       "package": "cluster/measurement",
       "identifier": "ElectricalReadingsSource",
       "reason": "called from electricalSensorServers in materializers.go:142-150, which reaches it as a function value in the measurement-kind registry map — an indirect call RTA cannot follow",
       "file": "cluster/measurement/measurement.go",
-      "line": 887
+      "line": 969
     },
     {
       "package": "cluster/measurement",
       "identifier": "EnergyMeasurementStruct",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/measurement/definitions.go",
-      "line": 157
+      "line": 150
     },
     {
       "package": "cluster/measurement",
@@ -10008,21 +10015,28 @@
       "identifier": "NewElectricalPowerServerFromReadings",
       "reason": "called from electricalSensorServers in materializers.go:142-150, which reaches it as a function value in the measurement-kind registry map — an indirect call RTA cannot follow",
       "file": "cluster/measurement/measurement.go",
-      "line": 879
+      "line": 961
     },
     {
       "package": "cluster/measurement",
       "identifier": "NewPowerTopologyServer",
       "reason": "called from electricalSensorServers in materializers.go:142-150, which reaches it as a function value in the measurement-kind registry map — an indirect call RTA cannot follow",
       "file": "cluster/measurement/measurement.go",
-      "line": 1629
+      "line": 1757
+    },
+    {
+      "package": "cluster/measurement",
+      "identifier": "OccupancyChangedEvent",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/measurement/measurement.go",
+      "line": 889
     },
     {
       "package": "cluster/measurement",
       "identifier": "TestElectricalValuesDecodeThroughTheGeneratedCodecs",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/measurement/spec_parity_matterjs_test.go",
-      "line": 100
+      "line": 114
     },
     {
       "package": "cluster/measurement",
@@ -10120,7 +10134,7 @@
       "identifier": "TestServersMatchTheGeneratedDefinitions",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/measurement/spec_parity_matterjs_test.go",
-      "line": 52
+      "line": 62
     },
     {
       "package": "cluster/measurement",
@@ -10660,6 +10674,20 @@
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/sensing/ambient.go",
       "line": 36
+    },
+    {
+      "package": "cluster/sensing",
+      "identifier": "OccupancyFeature",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/sensing/occupancy.go",
+      "line": 29
+    },
+    {
+      "package": "cluster/sensing",
+      "identifier": "OccupancyHoldTimeLimits",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/sensing/occupancy.go",
+      "line": 31
     },
     {
       "package": "cluster/sensing",
@@ -25205,7 +25233,7 @@
       "identifier": "TestAmbientContextKit",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/defaults_sensing_test.go",
-      "line": 53
+      "line": 57
     },
     {
       "package": "device",
@@ -25415,7 +25443,7 @@
       "identifier": "TestEveryKitServerHasItsHostDecided",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/host_methods_test.go",
-      "line": 371
+      "line": 375
     },
     {
       "package": "device",
@@ -25478,7 +25506,7 @@
       "identifier": "TestHostIsTheKitServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/host_methods_test.go",
-      "line": 406
+      "line": 410
     },
     {
       "package": "device",
@@ -25584,6 +25612,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/declared_coverage_test.go",
       "line": 133
+    },
+    {
+      "package": "device",
+      "identifier": "TestOccupancyKit",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "device/defaults_sensing_test.go",
+      "line": 99
     },
     {
       "package": "device",

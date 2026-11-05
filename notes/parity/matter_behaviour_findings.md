@@ -565,14 +565,6 @@ Line numbers at `862ad75f`. (Triage 2026-10-29: owner: a re-audit with Apple Hom
 Found by the phase-19 port (brief BR, 2026-10-20). Line numbers at
 `862ad75f`. (Triage 2026-10-29: wave H2, commissioning and security (Fable).)
 
-- **OccupancySensing has no feature selection.** The Go server serves
-  PassiveInfrared alone (`cluster/measurement/definitions.go`
-  `occupancyInst`), so neither another detector type nor the
-  OccupancyEvent feature can be chosen, and no OccupancyChanged event is
-  emitted, where matter.js emits it on `occupancy$Changed` with the
-  feature (`OccupancySensingServer.ts` `initialize`,
-  `#emitOccupancyChanged`). One `OccupancySensingServerTest.ts` case is
-  `missing` for this. (Triage 2026-10-29: wave H3, node options and the embedding layer.)
 - **The Groupcast server has no Listener-only configuration.** The module
   builds Groupcast with Listener, Sender and PerGroup
   (`GroupcastServer.ts:81-83` as RootEndpoint installs it); a node without

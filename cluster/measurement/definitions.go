@@ -14,7 +14,6 @@ import (
 	epmdef "github.com/SukramJ/go-fabric/cluster/spec/electricalpowermeasurement"
 	flowdef "github.com/SukramJ/go-fabric/cluster/spec/flowmeasurement"
 	illdef "github.com/SukramJ/go-fabric/cluster/spec/illuminancemeasurement"
-	occdef "github.com/SukramJ/go-fabric/cluster/spec/occupancysensing"
 	pm10def "github.com/SukramJ/go-fabric/cluster/spec/pm10concentrationmeasurement"
 	pm25def "github.com/SukramJ/go-fabric/cluster/spec/pm25concentrationmeasurement"
 	psdef "github.com/SukramJ/go-fabric/cluster/spec/powersource"
@@ -45,14 +44,6 @@ var (
 	// default; it makes the event mandatory.
 	booleanStateInst = mustInstance(booldef.Definition, spec.Options{Features: uint32(booldef.FeatureChangeEvent)})
 
-	// PIR: every HM motion detector is passive infrared. From revision 5
-	// on one sensor-type feature is required, and controllers that
-	// branch on it (matter.js OccupancySensingServer.ts
-	// `features.passiveInfrared`) classify the sensor from this bit
-	// alone. HoldTime (0x3) and the deprecated delay attributes it gates
-	// are not served.
-	occupancyInst = mustInstance(occdef.Definition, spec.Options{Features: uint32(occdef.FeaturePassiveInfrared)})
-
 	// No feature: the reportable levels are the conformance-mandatory
 	// Unknown / Good / Poor.
 	airQualityInst = mustInstance(aqdef.Definition, spec.Options{})
@@ -65,6 +56,8 @@ var (
 	// BAT; BatPercentRemaining ("[BAT]") only with a percentage source.
 	powerSourceInst      = mustInstance(psdef.Definition, spec.Options{Features: pwrFeatureBAT})
 	powerSourceFloatInst = mustInstance(psdef.Definition, spec.Options{Features: pwrFeatureBAT, Attributes: []uint32{psdef.AttrBatPercentRemaining}})
+	// WIRED: a mains-powered device's source (contract.PowerSourceSelection).
+	powerSourceWiredInst = mustInstance(psdef.Definition, spec.Options{Features: uint32(psdef.FeatureWired)})
 
 	// NODE: the cluster's whole surface is its globals.
 	powerTopologyInst = mustInstance(ptdef.Definition, spec.Options{Features: powerTopologyFeatureNode})

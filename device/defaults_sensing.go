@@ -8,6 +8,7 @@ import (
 
 	"github.com/SukramJ/go-fabric/cluster/sensing"
 	acsdef "github.com/SukramJ/go-fabric/cluster/spec/ambientcontextsensing"
+	occdef "github.com/SukramJ/go-fabric/cluster/spec/occupancysensing"
 	"github.com/SukramJ/go-fabric/contract"
 )
 
@@ -26,6 +27,7 @@ import (
 
 func init() {
 	selfHeldDefaults[acsdef.ClusterID] = newAmbientContextServer
+	selfHeldDefaults[occdef.ClusterID] = newOccupancyServer
 }
 
 // newAmbientContextServer is the module's AmbientContextSensing server
@@ -40,6 +42,29 @@ func newAmbientContextServer(b defaultBuild) (contract.ClusterServer, error) {
 	}
 	configFrom(&cfg, b.def, b.initial)
 	srv, err := sensing.NewAmbientContext(cfg)
+	if err != nil {
+		return nil, notServed(err)
+	}
+	return srv, nil
+}
+
+// newOccupancyServer is the module's OccupancySensing server
+// ([sensing.NewOccupancy]): matter.js's OccupancySensingServer — the
+// sensor type from the detector features, OccupancyChanged on every
+// Occupancy change with OccupancyEvent
+// (packages/node/src/behaviors/occupancy-sensing/OccupancySensingServer.ts:22-90
+// at 862ad75f) — and, when the declaration serves HoldTime, chip's hold
+// timer on the device's clock. HoldTime and HoldTimeLimits start from
+// Initial; it needs no port, so it is the default wherever a device type
+// lists the cluster (OccupancySensor).
+func newOccupancyServer(b defaultBuild) (contract.ClusterServer, error) {
+	cfg := sensing.OccupancyConfig{
+		Features:   sensing.OccupancyFeature(b.opts.Features),
+		Attributes: slices.Clone(b.opts.Attributes), Events: slices.Clone(b.opts.Events),
+		Clock: b.clock, DataVersion: b.cfg.DataVersion,
+	}
+	configFrom(&cfg, b.def, b.initial)
+	srv, err := sensing.NewOccupancy(cfg)
 	if err != nil {
 		return nil, notServed(err)
 	}

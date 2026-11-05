@@ -13,10 +13,10 @@ import (
 	"github.com/SukramJ/go-fabric/im"
 )
 
-// The Basic feature (BC): served only through
-// wire.AdministratorCommissioningConfig.BasicCommissioning, as matter.js
-// serves it only through AdministratorCommissioningServer.with("Basic")
-// (AdministratorCommissioningServer.ts:55-57 at 862ad75f); with it,
+// The Basic feature (BC): served only behind the switch of
+// wire.AdministratorCommissioningConfig. matter.js serves it only through
+// AdministratorCommissioningServer.with("Basic")
+// (AdministratorCommissioningServer.ts:55-57 at 862ad75f). With it,
 // OpenBasicCommissioningWindow (:105-117) opens the controller's window as
 // a basic one with the command's timeout and the admin fabric, and without
 // a PAKE verifier (DeviceCommissioner.allowBasicCommissioning builds the

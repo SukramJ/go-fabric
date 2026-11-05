@@ -140,15 +140,25 @@ func airQualityServers(class contract.MeasurementClass, build func(contract.Floa
 // operating-voltage-level sensor — BatPercentRemaining). Checked in this
 // order because both interfaces are structurally possible on a source
 // that also implements other measurement surfaces; a bool source is the
-// more specific and more common signal.
+// more specific and more common signal. A source whose
+// [contract.PowerSourceSelection] is Wired is a mains-powered device's: the
+// Wired server, whatever reading it carries.
 func powerSourceServers(src any, mc contract.MeasurementContext) []contract.ClusterServer {
+	var sel contract.PowerSourceSelection
+	if ss, ok := src.(contract.PowerSourceSelectionSource); ok {
+		sel = ss.MatterPowerSourceSelection()
+	}
 	var ps *PowerSourceServer
 	switch s := src.(type) {
 	case contract.BoolMeasurementSource:
 		ps = NewPowerSourceServer(s)
 	case contract.FloatMeasurementSource:
 		ps = NewPowerSourceServerFromFloat(s)
-	default:
+	}
+	if sel.Wired {
+		ps = NewWiredPowerSourceServer(sel.WiredCurrent)
+	}
+	if ps == nil {
 		return nil
 	}
 	ps.SetEndpoint(mc.EndpointID)

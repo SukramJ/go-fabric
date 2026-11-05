@@ -92,9 +92,11 @@ const testparityPlannedRatchet = 2
 // 156 ported, 586 missing, 576 left.
 // Phase 36: the administrator's basic window of
 // CommissioningWindowLifetimeTest.ts ported on the Basic feature: 585 missing.
+// Phase 36: OccupancySensingServerTest.ts ported on the OccupancyEvent
+// feature: 157 ported, 584 missing.
 const (
-	testparityPortedRatchet  = 156
-	testparityMissingRatchet = 585
+	testparityPortedRatchet  = 157
+	testparityMissingRatchet = 584
 )
 
 // testparityLeftRatchet is the number of left it cases summed over the

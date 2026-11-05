@@ -3443,14 +3443,13 @@
     },
     {
       "path": "packages/node/test/behaviors/occupancy-sensing/OccupancySensingServerTest.ts",
-      "status": "partial",
+      "status": "ported",
       "go": [
-        "cluster/measurement:TestOccupancySensingServerParityMatterJS"
+        "cluster/measurement:TestOccupancySensingServerParityMatterJS",
+        "cluster/sensing:TestOccupancySensingServerParityMatterJS",
+        "bridge:TestOccupancyChangedEvent"
       ],
-      "missing": [
-        "emits OccupancyChanged when occupancy changes and the OccupancyEvent feature is enabled"
-      ],
-      "reason": "The construction and the absent HoldTime dependents run on the Go server, PassiveInfrared its one feature selection (cluster/measurement/occupancy_sensing_parity_matterjs_test.go). Missing, M4: findings entry \"OccupancySensing has no feature selection\": the server serves PIR alone, without the OccupancyEvent feature and so without the OccupancyChanged event matter.js emits on occupancy$Changed (OccupancySensingServer.ts initialize).",
+      "reason": "The three cases run on both servers (phase 36): the device kit's cluster/sensing.Occupancy, which emits OccupancyChanged itself on a change with OccupancyEvent (cluster/sensing/occupancy_parity_matterjs_test.go), and the measurement-projected server, which takes the source's detector selection and OccupancyEvent and whose event the bridge emits on a change of the reading, as for BooleanState (cluster/measurement/occupancy_sensing_parity_matterjs_test.go, bridge:TestOccupancyChangedEvent).",
       "snapshotSha": "51868775f7d7a9ae1566f27af0fd4a3615801269"
     },
     {
@@ -3516,12 +3515,13 @@
       "path": "packages/node/test/behaviors/power-source/PowerSourceServerTest.ts",
       "status": "partial",
       "go": [
-        "endpoint:TestSpecPartsComposeAChildEndpoint"
+        "endpoint:TestSpecPartsComposeAChildEndpoint",
+        "device:TestPowerSourceSelectionsParityMatterJS"
       ],
       "missing": [
         "successfully augments descriptor"
       ],
-      "reason": "Missing, by_design BD-Matter-PowerSource-DeviceTypeOnPart: matter.js's PowerSourceServer adds the PowerSource device type to its own endpoint's DeviceTypeList (PowerSourceServer.ts:23, DescriptorServer.addDeviceTypes); the Go endpoint layer lists one device type per endpoint, serves a bridged device's battery as BridgedNode's optional PowerSource cluster (endpoint/types.go Endpoint.PowerSource) and the PowerSource device type as a part endpoint of its own (the Go test named).",
+      "reason": "The case's selection (Battery, Replaceable) and state, and every selection of the base server's with list, build on the kit's PowerSource of a HumiditySensor and read matter.js's initialize defaults (device/power_source_parity_matterjs_test.go, phase 36). Missing, by_design BD-Matter-PowerSource-DeviceTypeOnPart: matter.js's PowerSourceServer adds the PowerSource device type to its own endpoint's DeviceTypeList (PowerSourceServer.ts:23, DescriptorServer.addDeviceTypes); the Go endpoint layer lists one device type per endpoint, serves a bridged device's battery as BridgedNode's optional PowerSource cluster (endpoint/types.go Endpoint.PowerSource) and the PowerSource device type as a part endpoint of its own (the Go test named).",
       "snapshotSha": "10432eff46484005a9b53521644582b2b4aa7a2a"
     },
     {

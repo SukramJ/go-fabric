@@ -10,12 +10,12 @@ without endpoint numbers, so a change of that encoding moves it as well.
 
 | Metric | Value |
 |---|---|
-| Effective surface digest | `281eaeb4b45f7bc853d3593baf24e7f1e18f024b1d1d41d49c89e442279f31ae` |
+| Effective surface digest | `6d988ec23a81b69ea56687b22bd1705fc7d259ff74a51e3f906b297cb4a47711` |
 | Policies digest | `fc6822f08d6c5d98a1632f05ea480c2666bc0701ab657f56500011c73e050c24` |
 | Specification level | 1.6.1 |
 | Endpoints (the root included) | 45 |
 | Clusters | 240 |
-| Decisions | 577 |
+| Decisions | 581 |
 | Withheld | 0 |
 
 ## Clusters per endpoint

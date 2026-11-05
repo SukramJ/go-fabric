@@ -397,7 +397,7 @@
   },
   {
     "file": "bridge/subscribe.go",
-    "line": 675,
+    "line": 677,
     "citation": "ServerSubscription.ts:866-876",
     "resolved": "packages/node/src/node/server/ServerSubscription.ts",
     "identifier": "InvalidSubscription",
@@ -406,7 +406,7 @@
   },
   {
     "file": "bridge/subscribe.go",
-    "line": 786,
+    "line": 788,
     "citation": "packages/protocol/src/interaction/InteractionMessenger.ts:347",
     "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
     "identifier": "sendDataReport",
@@ -415,7 +415,7 @@
   },
   {
     "file": "bridge/subscribe.go",
-    "line": 866,
+    "line": 868,
     "citation": "packages/node/src/node/server/ServerSubscription.ts:764",
     "resolved": "packages/node/src/node/server/ServerSubscription.ts",
     "identifier": "#sendUpdateMessage",
@@ -424,7 +424,7 @@
   },
   {
     "file": "bridge/subscribe.go",
-    "line": 1236,
+    "line": 1238,
     "citation": "ServerSubscription.ts:610-614",
     "resolved": "packages/node/src/node/server/ServerSubscription.ts",
     "identifier": "InvalidAction",
@@ -433,7 +433,7 @@
   },
   {
     "file": "bridge/subscribe.go",
-    "line": 1314,
+    "line": 1316,
     "citation": "ThermostatServer.ts:451",
     "resolved": "packages/node/src/behaviors/thermostat/ThermostatServer.ts",
     "identifier": "reactTo",
@@ -442,7 +442,7 @@
   },
   {
     "file": "bridge/subscribe.go",
-    "line": 1401,
+    "line": 1403,
     "citation": "packages/node/src/behavior/state/managed/Datasource.ts:776-796",
     "resolved": "packages/node/src/behavior/state/managed/Datasource.ts",
     "identifier": "onChange",
@@ -1445,16 +1445,6 @@
     "occurrences": 1
   },
   {
-    "file": "cluster/wire/admincommissioning_basic_test.go",
-    "line": 19,
-    "citation": "AdministratorCommissioningServer.ts:55-57",
-    "resolved": "packages/node/src/behaviors/administrator-commissioning/AdministratorCommissioningServer.ts",
-    "at": "862ad75f",
-    "identifier": "BasicCommissioning",
-    "nearest": 114,
-    "occurrences": 0
-  },
-  {
     "file": "cluster/wire/fancontrol.go",
     "line": 11,
     "citation": "fan-control.element.ts:69-74",
@@ -1483,7 +1473,7 @@
   },
   {
     "file": "contract/matter.go",
-    "line": 613,
+    "line": 683,
     "citation": "packages/node/src/behaviors/thermostat/ThermostatServer.ts:451",
     "resolved": "packages/node/src/behaviors/thermostat/ThermostatServer.ts",
     "identifier": "reactTo",

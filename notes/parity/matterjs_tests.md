@@ -15,8 +15,8 @@ names the `it` cases that will not be ported, each with its class and reason. Th
 
 | status | files |
 | --- | ---: |
-| ported | 156 |
-| partial | 139 |
+| ported | 157 |
+| partial | 138 |
 | planned | 2 |
 | excluded | 291 |
 | total | 588 |
@@ -90,7 +90,7 @@ names the `it` cases that will not be ported, each with its class and reason. Th
 | [node/test/behaviors/identify](#nodetestbehaviorsidentify) | 1 | 0 | 1 | 0 | 0 |
 | [node/test/behaviors/level-control](#nodetestbehaviorslevel-control) | 4 | 1 | 3 | 0 | 0 |
 | [node/test/behaviors/measurement](#nodetestbehaviorsmeasurement) | 1 | 0 | 1 | 0 | 0 |
-| [node/test/behaviors/occupancy-sensing](#nodetestbehaviorsoccupancy-sensing) | 1 | 0 | 1 | 0 | 0 |
+| [node/test/behaviors/occupancy-sensing](#nodetestbehaviorsoccupancy-sensing) | 1 | 1 | 0 | 0 | 0 |
 | [node/test/behaviors/on-off](#nodetestbehaviorson-off) | 1 | 1 | 0 | 0 | 0 |
 | [node/test/behaviors/operational-credentials](#nodetestbehaviorsoperational-credentials) | 1 | 1 | 0 | 0 | 0 |
 | [node/test/behaviors/ota](#nodetestbehaviorsota) | 1 | 0 | 1 | 0 | 0 |
@@ -721,7 +721,7 @@ names the `it` cases that will not be ported, each with its class and reason. Th
 
 | file | lines | status | Go tests or class | note |
 | --- | ---: | --- | --- | --- |
-| OccupancySensingServerTest.ts | 55 | partial | `cluster/measurement:TestOccupancySensingServerParityMatterJS` | The construction and the absent HoldTime dependents run on the Go server, PassiveInfrared its one feature selection (cluster/measurement/occupancy_sensing_parity_matterjs_test.go). Missing, M4: findings entry "OccupancySensing has no feature selection": the server serves PIR alone, without the OccupancyEvent feature and so without the OccupancyChanged event matter.js emits on occupancy$Changed (OccupancySensingServer.ts initialize). Missing: “emits OccupancyChanged when occupancy changes and the OccupancyEvent feature is enabled”. |
+| OccupancySensingServerTest.ts | 55 | ported | `cluster/measurement:TestOccupancySensingServerParityMatterJS`<br>`cluster/sensing:TestOccupancySensingServerParityMatterJS`<br>`bridge:TestOccupancyChangedEvent` | The three cases run on both servers (phase 36): the device kit's cluster/sensing.Occupancy, which emits OccupancyChanged itself on a change with OccupancyEvent (cluster/sensing/occupancy_parity_matterjs_test.go), and the measurement-projected server, which takes the source's detector selection and OccupancyEvent and whose event the bridge emits on a change of the reading, as for BooleanState (cluster/measurement/occupancy_sensing_parity_matterjs_test.go, bridge:TestOccupancyChangedEvent). |
 
 ## node/test/behaviors/on-off
 
@@ -745,7 +745,7 @@ names the `it` cases that will not be ported, each with its class and reason. Th
 
 | file | lines | status | Go tests or class | note |
 | --- | ---: | --- | --- | --- |
-| PowerSourceServerTest.ts | 38 | partial | `endpoint:TestSpecPartsComposeAChildEndpoint` | Missing, by_design BD-Matter-PowerSource-DeviceTypeOnPart: matter.js's PowerSourceServer adds the PowerSource device type to its own endpoint's DeviceTypeList (PowerSourceServer.ts:23, DescriptorServer.addDeviceTypes); the Go endpoint layer lists one device type per endpoint, serves a bridged device's battery as BridgedNode's optional PowerSource cluster (endpoint/types.go Endpoint.PowerSource) and the PowerSource device type as a part endpoint of its own (the Go test named). Missing: “successfully augments descriptor”. |
+| PowerSourceServerTest.ts | 38 | partial | `endpoint:TestSpecPartsComposeAChildEndpoint`<br>`device:TestPowerSourceSelectionsParityMatterJS` | The case's selection (Battery, Replaceable) and state, and every selection of the base server's with list, build on the kit's PowerSource of a HumiditySensor and read matter.js's initialize defaults (device/power_source_parity_matterjs_test.go, phase 36). Missing, by_design BD-Matter-PowerSource-DeviceTypeOnPart: matter.js's PowerSourceServer adds the PowerSource device type to its own endpoint's DeviceTypeList (PowerSourceServer.ts:23, DescriptorServer.addDeviceTypes); the Go endpoint layer lists one device type per endpoint, serves a bridged device's battery as BridgedNode's optional PowerSource cluster (endpoint/types.go Endpoint.PowerSource) and the PowerSource device type as a part endpoint of its own (the Go test named). Missing: “successfully augments descriptor”. |
 
 ## node/test/behaviors/rvc-operational-state
 

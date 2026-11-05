@@ -129,6 +129,7 @@ pin lift confirms by re-reading the row, [`pin-lifts.md`](./pin-lifts.md)).
 | BD-matterjs-server-NetworkTopology | `NetworkClient.ts:35` declares the controller's network behaviour, which holds the subscription state only; matter.js at the pin has no topology service (absence: no neighbour-table or graph code under `packages/`) | `packages/node/src/behavior/system/network/NetworkClient.ts` | `class NetworkClient` | matterjs-server `packages/ws-controller/src/controller/NetworkTopologyService.ts` and `packages/ws-client/src/topology/topology-utils.ts` at `0bd06f22` | no |
 | BD-Matter-ClientNodeEventHistory | `ClientEventEmitter.ts:45-74` emits a peer's event to the node's observers and the ChangeNotificationService and keeps none; no code under `packages/node/src/node/client/` holds past events (absence: the end of `emitClientEvent`, :72-76, where a record would go) | `packages/node/src/node/client/ClientEventEmitter.ts` | `"            });\n        }\n    }\n\n    function getTarget(node: ClientNode, occurrence: ReadResult.EventValue, clusterName: string, eventName: string) {"` | matterjs-server `packages/ws-controller/src/server/WebSocketControllerHandler.ts:112`, `:368-380` at `0bd06f22` (a global last-25 list), kept per node here (issue #388 G-C2) | no |
 | BD-Matter-LogRing | absence: the default `LogDestination` formats a message and writes it (`LogDestination.ts:77-93`, `add` → `write`), `Logger.ts` fans a message out to its destinations and keeps nothing, and no file under `packages/general/src/log/` holds past records or a run-time level a host reads back as records | `packages/general/src/log/LogDestination.ts` | `"        add(message: Diagnostic.Message) {\n            this.write(this.format(message), message);\n        },"` | matterjs-server's dashboard sets and reads the console and file levels only (`packages/dashboard/src/components/dialogs/settings/log-level-section.ts:56-82` at `0bd06f22`: `getLogLevel`/`setLogLevel`, no records); the ring is this module's own design for go-fabric-ui's operation page (issue #393, M9 U5) | no |
+| BD-chip-OccupancySensing-HoldTimer | `OccupancySensingServer.ts:76-85` clears the HoldTime dependents (:93-104) when HoldTime is unset and arms no timer (absence: the whole class body, :21-91) | `packages/node/src/behaviors/occupancy-sensing/OccupancySensingServer.ts` | `class OccupancySensingServer` | connectedhomeip `src/app/clusters/occupancy-sensor-server/OccupancySensingCluster.cpp` at `6170af84` (`SetHoldTime` :206-275, `SetOccupancy` :277-297, `TimerFired` :299-302, the aliases :151-155, :170-181, `SetHoldTimeLimits` :333-351), tests `tests/TestOccupancySensingCluster.cpp` | no |
 
 ---
 
@@ -977,10 +978,21 @@ causes UnsupportedCluster rejection by strict controllers. The sirenBooleanState
 type is retained for potential future use. Test: `TestSirenClusterServersIncludeOnOff`
 asserts 0x0045 is absent.
 
-**L02-D02** OccupancySensing PIROccupiedToUnoccupiedDelay (0x0010) added: returns
-`uint16(0)` (no configurable HM hold-time). Conditionally conformant when PIR feature
-is active per matter.js `OccupancySensingServer.ts:17-60`.
-Tests: `TestOccupancyServerPIRDelayPresent` / `TestOccupancyServerMatterAttributesIncludesPIRDelay`.
+**L02-D02** OccupancySensing on a measurement-projected endpoint
+(`cluster/measurement.OccupancySensingServer`, rewritten in phase 36): the
+FeatureMap is the source's `contract.OccupancySelection` — its detector
+types, PassiveInfrared when it names none, and OccupancyEvent unless it
+leaves the event out — and OccupancySensorType and its bitmap follow the
+detectors as matter.js's initialize sets them
+(`OccupancySensingServer.ts:27-65` at `862ad75f`). HoldTime and the
+delay attributes it gates (PIROccupiedToUnoccupiedDelay 0x0010 among them)
+are not served there: the projected server is rebuilt on every dispatch
+and holds no timer; the device kit's server (`cluster/sensing.Occupancy`,
+BD-chip-OccupancySensing-HoldTimer) serves them. The entry formerly
+claimed PIROccupiedToUnoccupiedDelay served as a constant 0; the code had
+not served it since the generated definition replaced the hand list.
+Tests: `cluster/measurement:TestServersMatchTheGeneratedDefinitions`
+(OccupancySensing rows), `TestOccupancySensingServerParityMatterJS`.
 
 **L02-D03 — Siren device-type semantic approximation (by-design).**
 Generic Siren (HmIP-ASIR) maps to OnOffPlugInUnit (0x010A). No better-fit Matter
@@ -5442,6 +5454,39 @@ transport uses answers the model's cluster status EndpointInUse, not the
 example delegate's INVALID_IN_STATE (owner decision 2026-10-28: the
 matter.js schema defines that status for this case). Pinned by
 `tls/client_chip_test.go` (chip's 16 cases).
+
+### BD-chip-OccupancySensing-HoldTimer — the hold timer is connectedhomeip's; matter.js has none
+
+matter.js's `OccupancySensingServer`
+(`packages/node/src/behaviors/occupancy-sensing/OccupancySensingServer.ts`
+at `862ad75f`) emits OccupancyChanged with the OccupancyEvent feature
+(:67-74) and, for HoldTime, only clears its dependents when it is unset
+(:76-85, :93-104): no timer delays the clear of Occupancy. The device
+kit's server `cluster/sensing.Occupancy` (phase 36) serves HoldTime as
+connectedhomeip's `OccupancySensingCluster.cpp` at `6170af84` does when a
+host serves the attribute: the limits are sanitised (`SetHoldTimeLimits`
+:333-351) and a HoldTime clamped into them at construction (:99-100); a
+HoldTime outside them is CONSTRAINT_ERROR (:209-210); the host's
+unoccupied starts the timer on the clock's monotonic reading and Occupancy
+clears when HoldTime elapses, its occupied cancels the timer (`SetOccupancy`
+:277-297, `TimerFired` :299-302); a new HoldTime re-arms a running timer
+for the time that remains, or clears at once (:234-258); the deprecated
+`*OccupiedToUnoccupiedDelay` attributes read and write HoldTime (:151-155,
+:170-181). Two chip rules give way to matter.js: chip forces OCCEVENT on
+and always emits OccupancyChanged (`OccupancySensingCluster.h:51-56`,
+`.cpp:315-320`), here the event follows the feature as in matter.js; and
+chip shows the delay aliases by default, here a host serves them when it
+opts them in. The surface is no ahead element: HoldTime and its
+dependents are model attributes matter.js serves as stored values when an
+application sets them. Persistence is the host's through the change
+reports and `OccupancyConfig.HoldTime` (chip persists HoldTime,
+`.cpp:111-123`, `:265-272`). Tests: `cluster/sensing/occupancy_chip_test.go`
+(fifteen of chip's twenty-five cases by meaning, one of them as matter.js
+decides it; the rest test chip's delegate, its attribute persistence and
+its feature-to-type table, which are the host's or matter.js's here). Reasoning: TC-OCC-2.3 and TC-OCC-3.1
+read HoldTime and wait for it; a server that stored HoldTime without the
+timer would serve a value that does nothing (owner decision 2026-11-05,
+brief phase 36 §1.3).
 
 ### BD-chip-WebRtcTransportProvider-RulesInServer — offer, answer, ICE and session rules follow connectedhomeip behind the `ProviderPort`
 
