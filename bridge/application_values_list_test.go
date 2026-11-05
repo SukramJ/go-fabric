@@ -52,3 +52,31 @@ func TestATypedPatchListIsStoredAsItsList(t *testing.T) {
 		t.Errorf("Get reads Accuracy back as %+v", st.Accuracy)
 	}
 }
+
+// TestAPlainEnumListIsAnArray: a list a server returns as a plain slice
+// of an enum (CameraAvStreamManagement.StreamUsagePriorities,
+// []StreamUsageEnum) is a TLV array of its values, not null
+// (TC-WEBRTCP-2.8 read it as ValueDecodeFailure).
+func TestAPlainEnumListIsAnArray(t *testing.T) {
+	type usage uint8
+	type flag bool
+	got, err := callAttributeWriter(im.AttributeValue{Value: []usage{3, 1}}).Bytes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := tlv.NewEncoder()
+	want.StartArray(tlv.AnonymousTag())
+	want.PutUint(tlv.AnonymousTag(), 3)
+	want.PutUint(tlv.AnonymousTag(), 1)
+	_ = want.EndContainer()
+	wantBytes, _ := want.Bytes()
+	if !bytes.Equal(got, wantBytes) {
+		t.Fatalf("[]usage = %x, want %x", got, wantBytes)
+	}
+	if got, _ := callAttributeWriter(im.AttributeValue{Value: []flag{true}}).Bytes(); len(got) < 2 || got[0] != 0x16 {
+		t.Fatalf("[]flag = %x, want an array", got)
+	}
+	if got, _ := callAttributeWriter(im.AttributeValue{Value: []struct{}{{}}}).Bytes(); len(got) != 1 || got[0] != 0x14 {
+		t.Fatalf("[]struct{} = %x, want null (no rule)", got)
+	}
+}

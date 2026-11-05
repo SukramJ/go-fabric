@@ -118,6 +118,16 @@ func readPipe(f *fleet, r io.Reader, logger *slog.Logger) {
 		if line == "" {
 			continue
 		}
+		// The camera-app's commands carry fields of other types than the
+		// generic command's (a bool Value, a ZoneId that may be a list).
+		if name, ok := pipeCommandName(line); ok && isCameraPipeCommand(name) {
+			if err := f.applyCameraPipeCommand(line); err != nil {
+				logger.Warn("apppipe.error", slog.String("name", name), slog.Any("err", err))
+				continue
+			}
+			logger.Info("apppipe.applied", slog.String("name", name))
+			continue
+		}
 		var cmd pipeCommand
 		if err := json.Unmarshal([]byte(line), &cmd); err != nil {
 			logger.Warn("apppipe.error", slog.String("line", line), slog.Any("err", err))
@@ -129,6 +139,30 @@ func readPipe(f *fleet, r io.Reader, logger *slog.Logger) {
 		}
 		logger.Info("apppipe.applied", slog.String("name", cmd.Name))
 	}
+}
+
+// pipeCommandName is a command line's Name.
+func pipeCommandName(line string) (string, bool) {
+	var head struct {
+		Name string `json:"Name"`
+	}
+	if err := json.Unmarshal([]byte(line), &head); err != nil {
+		return "", false
+	}
+	return head.Name, true
+}
+
+// applyCameraPipeCommand applies a camera-app command (camera.go) to the
+// --camera-sim camera.
+func (f *fleet) applyCameraPipeCommand(line string) error {
+	if f.camera == nil {
+		return errors.New("the daemon runs without --camera-sim")
+	}
+	var cmd cameraPipeCommand
+	if err := json.Unmarshal([]byte(line), &cmd); err != nil {
+		return err
+	}
+	return f.camera.apply(cmd)
 }
 
 // errUnknownPipeCommand reports a command this daemon does not implement.

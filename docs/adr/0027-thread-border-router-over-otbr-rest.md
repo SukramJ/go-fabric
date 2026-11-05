@@ -236,3 +236,35 @@ The four points the draft left open, answered before it was filed:
 3. **`ScanNetworks` under `TH`.** The border router's own network from the
    active dataset, as written into decision 3.
 4. **Layer of `thread/`.** `foundation`.
+
+## Addendum (phase 34, owner decisions 2026-11-04)
+
+The decisions above stand; the device side still has no Thread radio.
+Phase 34 adds the certification run of decision 7 and changes three
+points of the border-router endpoint:
+
+1. **ThreadNetworkDirectory on the border router.** The reference
+   daemon's `--otbr` endpoint (device type ThreadBorderRouter, where the
+   cluster is optional) declares ThreadNetworkDirectory over the kit's
+   in-memory store, so the THNETDIR family runs against it, as chip runs
+   it against its network-manager app's endpoint 1.
+2. **The four diagnostics counts.** Decision 2 of 2026-10-23 is revised:
+   `threadbr.DiagnosticsFeatures` serves PacketCounts and ErrorCounts as
+   well, as connectedhomeip does — no element of the cluster conforms to
+   PacketCounts (matter.js `thread-network-diagnostics.element.ts:25` at
+   `862ad75f`), and ErrorCounts' OverrunCount is the constant 0 chip's
+   provider reads (`DirectThreadNetworkDiagnosticsProvider.cpp:178-182` at
+   `6170af84`), with ResetCounts resetting it (`:735-738` resets the
+   stack's counters; the REST surface has no reset, so the MLE and MAC
+   counts stay the border router's). DGTHREAD runs against the border
+   router's endpoint (the family's device type); no root
+   ThreadNetworkDiagnostics is served.
+3. **The thread group's policy.** TBRM, DGTHREAD and THNETDIR form the
+   `thread` group of `.github/workflows/chiptool.yml`, which that
+   workflow never runs: `.github/workflows/otbr-virtual.yml`'s
+   `thread-families` job runs it after the agent's live test, on
+   dispatch and weekly, never on a pull request, armed by the repository
+   variable `OTBR_THREAD_FAMILIES=armed` once one `otbr-virtual` run is
+   green. Its agent starts with `script/otbr-virtual-test.sh`
+   (`OTBR_SERVE=1`); an agent that does not come up is the environment
+   (exit 2), reported as a warning and no defect.

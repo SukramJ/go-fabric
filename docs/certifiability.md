@@ -280,7 +280,23 @@ Harness image: `ghcr.io/matter-js/chip@sha256:d6f1de89d714309beb621543d451a98996
 | MEDIAPLAYBACK | 11 | 5 | 0 | 0 | 2 | 4 | 0 |
 | TGTNAV | 2 | 1 | 0 | 0 | 0 | 1 | 0 |
 | WAKEONLAN | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
-| **all** | **707** | **449** | **0** | **0** | **130** | **123** | **5** |
+| MESS | 4 | 0 | 0 | 0 | 4 | 0 | 0 |
+| TLSCERT | 13 | 11 | 0 | 2 | 0 | 0 | 0 |
+| TLSCLIENT | 6 | 6 | 0 | 0 | 0 | 0 | 0 |
+| WEBRTCP | 7 | 7 | 0 | 0 | 0 | 0 | 0 |
+| WebRTCP | 13 | 12 | 0 | 0 | 1 | 0 | 0 |
+| AVSM | 19 | 19 | 0 | 0 | 0 | 0 | 0 |
+| AVSUM | 9 | 9 | 0 | 0 | 0 | 0 | 0 |
+| ZONEMGMT | 4 | 4 | 0 | 0 | 0 | 0 | 0 |
+| PAVST | 15 | 10 | 0 | 0 | 1 | 4 | 0 |
+| PAVSTI | 2 | 2 | 0 | 0 | 0 | 0 | 0 |
+| CHIME | 6 | 6 | 0 | 0 | 0 | 0 | 0 |
+| JFADMIN | 5 | 0 | 0 | 1 | 0 | 4 | 0 |
+| JFDS | 5 | 0 | 0 | 0 | 0 | 5 | 0 |
+| TBRM | 5 | 3 | 0 | 0 | 1 | 1 | 0 |
+| DGTHREAD | 6 | 4 | 0 | 0 | 1 | 1 | 0 |
+| THNETDIR | 3 | 3 | 0 | 0 | 0 | 0 | 0 |
+| **all** | **829** | **545** | **0** | **3** | **138** | **138** | **5** |
 
 ### Cases not run
 
@@ -428,6 +444,8 @@ Harness image: `ghcr.io/matter-js/chip@sha256:d6f1de89d714309beb621543d451a98996
 | DGSW/2.2 | (b) not supported | not applicable: the case's PICS `DGSW.S.E00` is false for the reference DUT |
 | DGSW/2.3 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | DGSW/3.2.Simulated | (b) not supported | not applicable: the case's PICS `DGSW.C` is false for the reference DUT |
+| DGTHREAD/2.5 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
+| DGTHREAD/3.4.Simulated | (b) not supported | not applicable: the case's PICS `DGTHREAD.C` is false for the reference DUT |
 | DGWIFI/2.2 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | DGWIFI/3.2.Simulated | (b) not supported | not applicable: the case's PICS `DGWIFI.C` is false for the reference DUT |
 | DISHALM/3.1 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
@@ -469,6 +487,16 @@ Harness image: `ghcr.io/matter-js/chip@sha256:d6f1de89d714309beb621543d451a98996
 | IDM/6.2 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | IDM/7.1 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | IDM/8.1 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
+| JFADMIN/1.1 | (c) harness | TC-JFADMIN-1.1 drives the administrator through chip's jf-control-app and the administrator app's pigweed RPC JointFabric service (TC_JFADMIN_1_1.py:131-162; examples/common/pigweed/protos/joint_fabric_service.proto at the harness pin): with the CI PICS it starts chip's own jf-admin-app as the DUT and never reaches the daemon, without them it needs the DUT's RPC server (dut_rpc_server_ip/_port); the daemon serves no pigweed RPC, an SDK test interface outside Matter |
+| JFADMIN/1.2 | (a) defect | TC-JFADMIN-1.2 step 16: an ICAC whose Subject DN is a TLV structure instead of a list (TC_JFADMIN_1_2.py:318-323) passes the AddICAC chain check (secure/mattercert Decode), so the administrator answers InvalidPublicKey where chip's ValidateCert refuses the certificate first, InvalidICAC (joint-fabric-administrator-server.cpp:375-376 at the harness pin); the fix is in secure/mattercert, a security path |
+| JFADMIN/1.4 | (c) harness | TC-JFADMIN-1.4 drives the administrator through chip's jf-control-app and the administrator app's pigweed RPC JointFabric service (TC_JFADMIN_1_4.py:194-212; examples/common/pigweed/protos/joint_fabric_service.proto at the harness pin): with the CI PICS it starts chip's own jf-admin-app as the DUT and never reaches the daemon, without them it needs the DUT's RPC server (dut_rpc_server_ip/_port); the daemon serves no pigweed RPC, an SDK test interface outside Matter |
+| JFADMIN/2.1 | (c) harness | TC-JFADMIN-2.1 drives the administrator through chip's jf-control-app and the administrator app's pigweed RPC JointFabric service (TC_JFADMIN_2_1.py:155-170; examples/common/pigweed/protos/joint_fabric_service.proto at the harness pin): with the CI PICS it starts chip's own jf-admin-app as the DUT and never reaches the daemon, without them it needs the DUT's RPC server (dut_rpc_server_ip/_port); the daemon serves no pigweed RPC, an SDK test interface outside Matter |
+| JFADMIN/2.2 | (c) harness | TC-JFADMIN-2.2 drives the administrator through chip's jf-control-app and the administrator app's pigweed RPC JointFabric service (TC_JFADMIN_2_2.py:259-270; examples/common/pigweed/protos/joint_fabric_service.proto at the harness pin): with the CI PICS it starts chip's own jf-admin-app as the DUT and never reaches the daemon, without them it needs the DUT's RPC server (dut_rpc_server_ip/_port); the daemon serves no pigweed RPC, an SDK test interface outside Matter |
+| JFDS/2.1 | (c) harness | TC-JFDS-2.1 drives the administrator through chip's jf-control-app and the administrator app's pigweed RPC JointFabric service (TC_JFDS_2_1.py:95-130; examples/common/pigweed/protos/joint_fabric_service.proto at the harness pin): with the CI PICS it starts chip's own jf-admin-app as the DUT and never reaches the daemon, without them it needs the DUT's RPC server (dut_rpc_server_ip/_port); the daemon serves no pigweed RPC, an SDK test interface outside Matter |
+| JFDS/2.2 | (c) harness | TC-JFDS-2.2 drives the administrator through chip's jf-control-app and the administrator app's pigweed RPC JointFabric service (TC_JFDS_2_2.py:99-120; examples/common/pigweed/protos/joint_fabric_service.proto at the harness pin): with the CI PICS it starts chip's own jf-admin-app as the DUT and never reaches the daemon, without them it needs the DUT's RPC server (dut_rpc_server_ip/_port); the daemon serves no pigweed RPC, an SDK test interface outside Matter |
+| JFDS/2.3 | (c) harness | TC-JFDS-2.3 drives the administrator through chip's jf-control-app and the administrator app's pigweed RPC JointFabric service (TC_JFDS_2_3.py:99-120; examples/common/pigweed/protos/joint_fabric_service.proto at the harness pin): with the CI PICS it starts chip's own jf-admin-app as the DUT and never reaches the daemon, without them it needs the DUT's RPC server (dut_rpc_server_ip/_port); the daemon serves no pigweed RPC, an SDK test interface outside Matter |
+| JFDS/2.4 | (c) harness | TC-JFDS-2.4 drives the administrator through chip's jf-control-app and the administrator app's pigweed RPC JointFabric service (TC_JFDS_2_4.py:108-130; examples/common/pigweed/protos/joint_fabric_service.proto at the harness pin): with the CI PICS it starts chip's own jf-admin-app as the DUT and never reaches the daemon, without them it needs the DUT's RPC server (dut_rpc_server_ip/_port); the daemon serves no pigweed RPC, an SDK test interface outside Matter |
+| JFDS/2.5 | (c) harness | TC-JFDS-2.5 drives the administrator through chip's jf-control-app and the administrator app's pigweed RPC JointFabric service (TC_JFDS_2_5.py:124-162; examples/common/pigweed/protos/joint_fabric_service.proto at the harness pin): with the CI PICS it starts chip's own jf-admin-app as the DUT and never reaches the daemon, without them it needs the DUT's RPC server (dut_rpc_server_ip/_port); the daemon serves no pigweed RPC, an SDK test interface outside Matter |
 | KEYPADINPUT/3.1 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | LOWPOWER/2.2 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | LVL/7.1 | (b) not supported | not applicable: the case's PICS `LVL.S & LVL.S.F02` is false for the reference DUT |
@@ -482,6 +510,10 @@ Harness image: `ghcr.io/matter-js/chip@sha256:d6f1de89d714309beb621543d451a98996
 | MEDIAPLAYBACK/6.5 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | MEDIAPLAYBACK/6.7 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | MEDIAPLAYBACK/6.8 | (c) harness | TC-MEDIAPLAYBACK-6.8 step 1 (and the reads after DeactivateTextTrack) expects ActiveTextTrack to read a TrackStruct with an empty ID and a null TrackAttributes (Test_TC_MEDIAPLAYBACK_6_8.yaml:26-31), the tv-app's empty track under chip's revision 3; the model at the pin makes TrackAttributes mandatory and not nullable (matter.js media-playback.element.ts:206-208) and ActiveTextTrack itself nullable (:71-74), so the daemon reads null while no text track is active |
+| MESS/1.1 | (b) not supported | TC-MESS-1.1 runs only on an endpoint with SpokenMessages or AudioMessages (TC_MESS_1_1.py:76, TC_MESSTestBase.py:42-50); the player's Messages, like the tv-app's (featureMap 0, tv-app.matter:4419), has neither, and the case skips itself (runs, and skips itself) |
+| MESS/3.1 | (b) not supported | not applicable: the case's PICS `MESS.S & MESS.S.F04` is false for the reference DUT |
+| MESS/3.2 | (b) not supported | not applicable: the case's PICS `MESS.S & MESS.S.F05` is false for the reference DUT |
+| MESS/3.3 | (b) not supported | not applicable: the case's PICS `MESS.S & MESS.S.F05 & MESS.S.E03` is false for the reference DUT |
 | MOD/2.2 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | MOD/2.3 | (b) not supported | not applicable: the case's PICS `MOD.S & S.S` is false for the reference DUT |
 | MOD/3.1 | (b) not supported | not applicable: the case's PICS `MOD.S.A0005` is false for the reference DUT |
@@ -496,6 +528,11 @@ Harness image: `ghcr.io/matter-js/chip@sha256:d6f1de89d714309beb621543d451a98996
 | OPCREDS/3.6 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | OPCREDS/3.9 | (b) not supported | not applicable: the case's PICS `OPCREDS.S & OPCREDS.S.F00 & OPCREDS.S.C02.Rsp & OPCREDS.S.C03.Tx` is false for the reference DUT |
 | OVENOPSTATE/2.6 | (b) not supported | not applicable: the case's PICS `OVENOPSTATE.S & OVENOPSTATE.S.A0002` is false for the reference DUT |
+| PAVST/2.11 | (c) harness | TC-PAVST-2.11 step 21a allocates with an empty AudioStreams list (TC_PAVST_2_11.py:470-479), which the field's constraint refuses ("1 to 16", matter.js push-av-stream-transport.element.ts:270 at 862ad75f; CONSTRAINT_ERROR) before the stream check the case is after; chip's server treats an empty list as absent (PushAVStreamTransportLogic.cpp:671-680) |
+| PAVST/2.15 | (b) not supported | TC-PAVST-2.15 drives UpdateMotionZoneOptions (command 0x08), which the matter.js snapshot does not carry (push-av-stream-transport.element.ts at 862ad75f lists commands 0x00-0x07); the module's server answers UNSUPPORTED_COMMAND |
+| PAVST/2.3 | (c) harness | TC-PAVST-2.3 step 25 allocates a motion transport with MotionSensitivity 11 on a camera with PERZONESENS and expects chip's INVALID_COMMAND (TC_PAVST_2_3.py:435-443, PushAVStreamTransportLogic.cpp:573-574); the module validates the request's fields first, as matter.js does, and answers CONSTRAINT_ERROR — matter.js answers a constraint and a conformance violation alike with CONSTRAINT_ERROR (packages/protocol/src/action/errors.ts:77-118 at 862ad75f) |
+| PAVST/2.4 | (c) harness | TC-PAVST-2.4 step 5 modifies the transport with empty VideoStreams and AudioStreams lists (TC_PAVST_2_4.py:203-204), which the fields' constraint refuses ("1 to 16", matter.js push-av-stream-transport.element.ts:266, :270 at 862ad75f; CONSTRAINT_ERROR, as matter.js validates a request); chip's server treats an empty list as absent (PushAVStreamTransportLogic.cpp:671-680) |
+| PAVST/2.6 | (c) harness | TC-PAVST-2.6 step 8 modifies the transport with empty VideoStreams and AudioStreams lists (TC_PAVST_2_6.py:283-294), which the fields' constraint refuses ("1 to 16", matter.js push-av-stream-transport.element.ts:266, :270 at 862ad75f; CONSTRAINT_ERROR); chip's server treats an empty list as absent (PushAVStreamTransportLogic.cpp:671-680) |
 | PS/2.2 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | PS/2.3 | (b) not supported | not applicable: the case's PICS `PWRTL.S` is false for the reference DUT |
 | PSCFG/2.2 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
@@ -520,6 +557,8 @@ Harness image: `ghcr.io/matter-js/chip@sha256:d6f1de89d714309beb621543d451a98996
 | SEPR/2.3 | (b) not supported | not applicable: the case's PICS `SEPR.S & SEPR.F00` is false for the reference DUT |
 | SWTCH/2.2 | (b) not supported | TC-SWTCH-2.2 runs only on a latching switch (PICS SWTCH.S.F00=0: the daemon's switch is momentary) (runs, and skips itself) |
 | SWTCH/2.6 | (b) not supported | TC-SWTCH-2.6 runs only with ActionSwitch (PICS SWTCH.S.F05=0): the daemon's button serves MomentarySwitchRelease, which ActionSwitch excludes (MSR conformance "[MS & !AS]", switch.element.ts) (runs, and skips itself) |
+| TBRM/2.2 | (c) harness | TC-TBRM-2.2 step 13 compares the GetActiveDatasetRequest answer byte for byte with the dataset the case set (Test_TC_TBRM_2_2.yaml:158-166, PIXIT.TBRM.THREAD_ACTIVE_DATASET); an OpenThread border router serializes the dataset's TLVs in its own order (the virtual agent answers the Network Name TLV after the Mesh-Local Prefix), and the module answers the border router's bytes, as chip's TBRM server answers its Thread stack's; chip runs the case against network-manager-app's simulated stack, which keeps the bytes as set |
+| TBRM/3.1.Simulated | (b) not supported | not applicable: the case's PICS `TBRM.C` is false for the reference DUT |
 | TCCM/2.1 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | TCTL/2.3 | (b) not supported | not applicable: the case's PICS `TCTL.S & TCTL.S.F01` is false for the reference DUT |
 | TCTL/3.3 | (b) not supported | not applicable: the case's PICS `TCTL.S & TCTL.S.F01` is false for the reference DUT |
@@ -535,6 +574,8 @@ Harness image: `ghcr.io/matter-js/chip@sha256:d6f1de89d714309beb621543d451a98996
 | TIMESYNC/2.7 | (b) not supported | not applicable: the case's PICS `TIMESYNC.S.F00` is false for the reference DUT |
 | TIMESYNC/2.8 | (b) not supported | not applicable: the case's PICS `TIMESYNC.S.F00` is false for the reference DUT |
 | TIMESYNC/2.9 | (b) not supported | not applicable: the case's PICS `TIMESYNC.S.F00` is false for the reference DUT |
+| TLSCERT/2.2 | (a) defect | TC-TLSCERT-2.2 step 5: the module's reads of ProvisionedRootCertificates and ProvisionedClientCertificates serve the full certificates on every transport (BD-chip-TlsCertificateManagement-RulesInServer, owner decision 2026-10-28, after matter.js's generated behaviour); chip encodes the ids alone outside a large-payload transport (TLSCertificateManagementCluster.cpp:136-166 at the harness pin), and the case reads over MRP expecting no certificate |
+| TLSCERT/2.9 | (a) defect | TC-TLSCERT-2.9 step 13: the module's reads of ProvisionedRootCertificates and ProvisionedClientCertificates serve the full certificates on every transport (BD-chip-TlsCertificateManagement-RulesInServer, owner decision 2026-10-28, after matter.js's generated behaviour); chip encodes the ids alone outside a large-payload transport (TLSCertificateManagementCluster.cpp:136-166 at the harness pin), and the case reads over MRP expecting no certificate; two such client certificates exceed one MRP message, so the read answers RESOURCE_EXHAUSTED |
 | TMP/2.2 | (c) harness | TC-TMP-2.2 has an operator change the measured value between two reads (a UserPrompt under TMP.M.ManuallyControlled); an unattended run has no operator, and the YAML case has no app-pipe step that would stand in |
 | TSTAT/3.2 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | TSTAT/4.3 | (b) not supported | not applicable: the case's PICS `TSTAT.S & TSTAT.S.F08 & TSTAT.S.F0a` is false for the reference DUT |
@@ -544,6 +585,7 @@ Harness image: `ghcr.io/matter-js/chip@sha256:d6f1de89d714309beb621543d451a98996
 | WASHERCTRL/2.2 | (c) harness | TC-WASHERCTRL-2.2 step 6 writes NumberOfRinses 4, a value NumberOfRinsesEnum does not define, and expects INVALID_IN_STATE: chip decodes it to kUnknownEnumValue and refuses it as not a supported rinse (LaundryWasherControlsCluster.cpp:132-145 at 6170af84). matter.js refuses an undefined enum value as CONSTRAINT_ERROR before any server logic (UnknownEnumValueError, packages/protocol/src/action/errors.ts:99-103, thrown by conformance-compiler.ts:859-862 at 862ad75f), and this module answers as matter.js does |
 | WNCV/6.1.Simulated | (b) not supported | not applicable: the case's PICS `WNCV.C` is false for the reference DUT |
 | WNCV/7.1.Simulated | (b) not supported | not applicable: the case's PICS `WNCV.C` is false for the reference DUT |
+| WebRTCP/2.1 | (b) not supported | not applicable: the case's PICS `WEBRTCP.S & WEBRTCP.S.A0000 & WEBRTCP.S.C00.Rsp & WEBRTCP.S.C01.Tx & AVSM.S & AVSM.S.F00 & AVSM.S.F01 & PS.S.F01` is false for the reference DUT |
 
 ### Cases run with the Go controller as TH
 
@@ -660,14 +702,16 @@ whose family is not in that list is "not yet run", not "not supported".
 | Family | Why not | Class |
 | --- | --- | --- |
 | ILL, PRS, DISHM | the module serves the cluster (`cluster/measurement` Illuminance and Pressure; `cluster/modebase` DishwasherMode), but the reference daemon exposes no endpoint with it and the harness does not run the family | (c) not yet run |
-| CONCON, MESSAGES | the module serves ContentControl (`cluster/media`) and Messages (`cluster/core`), but chip has no case of either family at the harness pin | (c) no case |
+| CONCON | the module serves ContentControl (`cluster/media`), but chip has no case of the family at the harness pin | (c) no case |
 | ICDM, ICDB | not applicable to the reference daemon: it is mains-powered and sets no `node.Config.ICD`, so it serves no ICD Management (`ICDM.S` is false in its generated PICS). Applicable to a host that sets `Config.ICD`: the module then serves ICD Management and the Check-In protocol after matter.js ([ICD guide](./guides/icd.md)); the harness does not run the families against such a node. The daemon's `--icd-lit` (TESTING ONLY) is such a node for the ICD client cases the Go controller runs as the DUT (TC-ICDM-6.1, TC-ICDB-1.3, under "Controller role" above) | (b) not supported |
 | SC_TC, the BLE and Thread cases of DD and SC | Bluetooth, Thread | (d) out of scope |
 | CNET Thread cases | the device side has no Thread radio; the Thread NetworkCommissioning variant over a border router (`core.ThreadNetworkCommissioning`, ADR 0027) is not on the reference daemon | (c) not yet run |
-| TBRM | the module serves ThreadBorderRouterManagement over an OTBR (`cluster/threadbr`, ADR 0027) and the reference daemon's `--otbr` adds the endpoint, but the harness does not run the family against a daemon with a virtual OTBR yet (`.github/workflows/otbr-virtual.yml` builds one, weekly and on dispatch) | (c) not yet run |
-| JFADMIN, JFDS | the module serves JointFabricAdministrator and JointFabricDatastore after connectedhomeip (`cluster/jointfabric`, wave 26-D; report 26-D cites `TC_JFDS_2_2` and `TC_JFADMIN_2_2`), but the reference daemon composes neither and the harness does not run the families | (c) not yet run |
 | TSTAT 4.5 (MatterScheduleConfiguration) | the module serves MSCH behind `surface.Policies.Extensions("BD-chip-Thermostat-Schedules")` and the reference daemon enables it with `--thermostat-schedules`, but `TC_TSTAT_4_5.py` is absent at the harness commit `6170af84` (present in connectedhomeip from 2026-10-23); lifting `CHIP_TEST_IMAGE` is a separate owner decision | (c) not yet run |
-| the camera, TLS, network-infrastructure and AmbientContextSensing families | the module serves the seven camera clusters, the two TLS clusters (`cluster/camera`, `cluster/tls`, waves 26-A1 to 26-A3), WiFiNetworkManagement and ThreadNetworkDirectory (`cluster/netinfra`, wave 26-B) and AmbientContextSensing (`cluster/sensing`, wave 26-C), but the reference daemon composes none of them and the harness does not run their families | (c) not yet run |
+| ACS, WIFINM | the module serves AmbientContextSensing (`cluster/sensing`, wave 26-C, a host server only: no device type at the pin lists it, `BD-chip-AmbientContextSensing-RulesInServer`) and WiFiNetworkManagement (`cluster/netinfra`, wave 26-B), but the reference daemon composes neither and the harness does not run their families | (c) not yet run |
+| CCTRL | the module serves CommissionerControl (`node.Config.CommissionerControl`, ADR 0020 stage 6), but the reference daemon mounts none, and chip runs the cases against its fabric-sync bridge (`TC_CCTRL_2_1.py` CI arguments: `app: examples/fabric-admin/scripts/fabric-sync-app.py`) | (c) not yet run |
+| AVANALY, ESALM, EPALM, TSTATM, ASU, AUDIOCONTROL, MEDIAFILEMANAGEMENT, NETIM, PROXR, HSTAT, COMPRO | the cluster is not in the matter.js snapshot at `862ad75f` (`parity/schema.json`; no `packages/model/src/standard/elements/<name>.element.ts` at the pin): AvAnalysis, ElectricalAlarm, ElectricalProtectionAlarm, ThermostatMode, AmbientSensingUnion, AudioControl, MediaFileManagement, NetworkIdentityManagement, ProximityRanging, Humidistat, CommissioningProxy. chip has them at the harness pin; a server waits for a snapshot that carries the cluster (schema values come from matter.js) | (b) not supported |
+| WEBRTC | `TC_WEBRTC_1_1` to `1_8` establish a WebRTC media session with the camera (`TC_WEBRTC_1_1.py`:77, "Verify the WebRTC session has been successfully established"); the module carries no media stack (`cluster/camera`: the host runs the peer connection), and the harness image's descriptor lists none of the cases | (c) harness |
+| WEBRTCR | controller role: the cases drive a camera controller (the image's descriptor: app `camera-controller`); matter.js runs them with its controller as the DUT, listed under "Controller role" above | (d) out of scope |
 | the TZ, NTPC, NTPS and TSC cases of TIMESYNC | the module serves the four features after connectedhomeip since wave 27-B (`node.Config.TimeSynchronization`); the reference daemon turns none on, so the cases stay not applicable in the status block above | (c) not yet run |
 
 CNET runs twice. The `CNET` row is the certified default composition, whose
@@ -686,6 +730,23 @@ per-device credentials stay classified in the table above. TC-EEVSE-2.3
 runs too: its eleventh ChargingTarget is the server's RESOURCE_EXHAUSTED,
 as chip answers (`BD-chip-EVSE-TargetsServerHeld`). No class (a) case is
 left.
+
+The second compositions (phase 34) run the same way, each family against
+the daemon variant that serves its clusters, with PICS generated from that
+daemon (`internal/chiptool/testdata/pics-<variant>/`): `--tls-sim` for
+TLSCERT and TLSCLIENT; `--camera-sim` with `--tls-sim` (a Camera and a Chime
+after chip's camera-app) for WEBRTCP, AVSM, AVSUM, ZONEMGMT, PAVST, PAVSTI
+and CHIME, a case whose CI starts the camera-app with
+`--camera-deferred-offer` or `--camera-test-videosrc` starting the daemon
+with the same switch; `--jointfabric-sim` for JFADMIN and JFDS; and `--otbr`
+against a virtual OTBR agent for TBRM, DGTHREAD and THNETDIR, which run on
+dispatch and weekly in `.github/workflows/otbr-virtual.yml`, never on a pull
+request. The PAVST cases start chip's Push AV server and the JF cases chip's
+JF apps; matter.js's image carries neither, so they run in go-fabric's own
+image (`internal/chiptool/image`, built by `.github/workflows/chip-image.yml`).
+`TestUnfamiliedPrefixes` holds the rest of chip's case prefixes to this
+page: every prefix with three cases or more at the harness commit is a
+family row or a row of the table above.
 
 Some families run but have nothing the daemon can be tested on. The root's
 IcdManagement is not mounted (`node/root.go` buildRoot says why), so the
@@ -715,7 +776,15 @@ The media families (ADR 0022) run against the daemon's `--media` pair
 and a ContentApp that simulate connectedhomeip's tv-app — its transport,
 channels, inputs, outputs, targets and the test suite's content app —
 behind the `cluster/media` servers, and which every daemon of the suite
-carries. The image lists the media cases whose every step is disabled as
+carries. Messages joins the player only with `--media-messages` (the MESS
+family's variant): connectedhomeip's TC-IDM-10.5 at the harness pin
+evaluates a device type's cluster conformance with
+`EmptyClusterGlobalAttributes`, whose revision is 1
+(`matter/testing/conformance.py:139-147`, `:277-294`;
+`device_conformance_tests.py:404-414` at 6170af84), so the Casting Video
+Player's `[Rev >= v2]` term for Messages is false and the cluster is
+reported disallowed on a revision-2 player — the tv-app's own composition
+(`tv-app.matter:4385`, `:4407`, revision 3) would be judged the same. The image lists the media cases whose every step is disabled as
 manual, recorded as class (c); TC-MEDIAPLAYBACK-6.8 expects an inactive
 text track to read as a track with an empty ID, which the model at the pin
 cannot carry (null is its inactive track), and is excluded as class (c);

@@ -14,6 +14,7 @@ import (
 
 	tbrmdef "github.com/SukramJ/go-fabric/cluster/spec/threadborderroutermanagement"
 	tnddef "github.com/SukramJ/go-fabric/cluster/spec/threadnetworkdiagnostics"
+	tdirdef "github.com/SukramJ/go-fabric/cluster/spec/threadnetworkdirectory"
 	"github.com/SukramJ/go-fabric/cluster/threadbr"
 	"github.com/SukramJ/go-fabric/device"
 	"github.com/SukramJ/go-fabric/surface"
@@ -23,8 +24,9 @@ import (
 // --otbr http://[host]:8081 (ADR 0027 decision 6, off by default): one
 // ThreadBorderRouter endpoint over an existing OpenThread Border Router's
 // REST API — ThreadBorderRouterManagement with PanChange and
-// ThreadNetworkDiagnostics with the MLE and MAC counts, both on the
-// border router thread/otbr reaches. The daemon joins no Thread mesh.
+// ThreadNetworkDiagnostics with the packet, error, MLE and MAC counts,
+// both on the border router thread/otbr reaches, and a
+// ThreadNetworkDirectory of the networks controllers store on it. The daemon joins no Thread mesh.
 // Without the flag nothing moves, so the default composition and the
 // chip-tool guard runs are unchanged.
 
@@ -81,7 +83,13 @@ func newDemoBorderRouter(raw string, policies surface.Policies, logger *slog.Log
 	}
 	d, err := device.NewThreadBorderRouter(device.Options{StableKey: device.StringKey("otbr"), Name: "Thread Border Router", Surface: policies},
 		tbrmdef.Declare{BorderRouter: br, Features: tbrmdef.FeaturePanChange},
-		tnddef.Declare{Features: threadbr.DiagnosticsFeatures})
+		tnddef.Declare{Features: threadbr.DiagnosticsFeatures},
+		// ThreadNetworkDirectory (optional on the device type) over the
+		// kit's in-memory store, for the THNETDIR family (phase 34); chip
+		// runs it against its network-manager app, whose endpoint 1 serves
+		// it beside ThreadBorderRouterManagement
+		// (network-manager-app.matter at the harness pin).
+		tdirdef.Declare{})
 	if err != nil {
 		return nil, fmt.Errorf("--otbr: %w", err)
 	}

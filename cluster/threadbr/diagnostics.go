@@ -28,13 +28,20 @@ import (
 // own diagnostics record (ADR 0027 decision 3).
 
 // DiagnosticsFeatures are the features the server serves: the MLE and MAC
-// counts (owner decision 2 of ADR 0027). PacketCounts and ErrorCounts stay
-// off; the REST surface carries neither the packet counts nor an overrun
-// count, and ResetCounts has no REST counterpart.
-const DiagnosticsFeatures = tnd.FeatureMleCounts | tnd.FeatureMacCounts
+// counts (owner decision 2 of ADR 0027), and PacketCounts and ErrorCounts
+// as connectedhomeip serves them (phase 34, owner decision 2026-11-04):
+// no element of the cluster conforms to PacketCounts
+// (thread-network-diagnostics.element.ts:25 at matter.js 862ad75f), and
+// ErrorCounts' OverrunCount is the constant 0 chip's provider reads
+// (DTNDP :178-182, the overrun count is not tracked) — a border router's
+// REST record carries none either — with ResetCounts resetting it
+// (DTNDP :735-738 resets the stack's counters; the REST surface has no
+// reset, so the MLE and MAC counts stay the border router's). chip's
+// camera-app root serves the four (camera-app.matter, featureMap 0x000F).
+const DiagnosticsFeatures = tnd.FeaturePacketCounts | tnd.FeatureErrorCounts | tnd.FeatureMleCounts | tnd.FeatureMacCounts
 
 // ErrDiagnosticsFeature is a feature selection the server does not serve.
-var ErrDiagnosticsFeature = errors.New("threadbr: ThreadNetworkDiagnostics serves MleCounts and MacCounts only")
+var ErrDiagnosticsFeature = errors.New("threadbr: ThreadNetworkDiagnostics serves PacketCounts, ErrorCounts, MleCounts and MacCounts only")
 
 // mleCountAttrs are the MleCounts attributes (DTNDP :325-371).
 var mleCountAttrs = []uint32{
@@ -123,15 +130,27 @@ func NewDiagnostics(ctx context.Context, cfg DiagnosticsConfig) (*DiagnosticsSer
 	if err != nil {
 		s.logger.Warn("threadbr.diagnostics.refresh_failed", slog.Any("err", err))
 	}
+	var handlers map[uint32]spec.CommandHandler
+	if cfg.Features&tnd.FeatureErrorCounts != 0 {
+		handlers = map[uint32]spec.CommandHandler{tnd.CmdResetCounts: s.resetCounts}
+	}
 	srv, err := spec.NewServer(tnd.Definition, spec.Options{Features: uint32(cfg.Features), Attributes: optional}, spec.ServerConfig{
 		DataVersion: cfg.DataVersion,
 		Initial:     initial,
+		Handlers:    handlers,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("threadbr: %w", err)
 	}
 	s.Instance, s.SelfHeld, s.srv = srv.Instance, spec.NewSelfHeld(srv), srv
 	return s, nil
+}
+
+// resetCounts is ResetCounts (ThreadNetworkDiagnosticsCluster.cpp hands it
+// to the provider, DTNDP :735-738): OverrunCount reads 0 again, which it
+// always does here.
+func (s *DiagnosticsServer) resetCounts(context.Context, any) (any, error) {
+	return nil, s.srv.SetAttributes(map[uint32]any{tnd.AttrOverrunCount: uint64(0)})
 }
 
 // Refresh reads the border router again and reports what moved; a border
@@ -187,6 +206,9 @@ func (s *DiagnosticsServer) read(ctx context.Context) (map[uint32]any, error) {
 		values[tnd.AttrPartitionIdChangeCount] = c.PartitionIDChanges
 		values[tnd.AttrBetterPartitionAttachAttemptCount] = c.BetterPartitionAttachAttempts
 		values[tnd.AttrParentChangeCount] = c.ParentChanges // :367-371
+	}
+	if s.features&tnd.FeatureErrorCounts != 0 {
+		values[tnd.AttrOverrunCount] = uint64(0) // DTNDP :178-182
 	}
 	if s.features&tnd.FeatureMacCounts != 0 {
 		var c thread.MacCounters
