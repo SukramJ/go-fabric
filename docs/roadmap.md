@@ -103,7 +103,7 @@ one none uses, and both come before completeness for its own sake.
 | 7 | [BLE on the device side](#milestone-7-ble-on-the-device-side) | not yet assigned | 28 | a node of this module without a network is commissioned over BLE, as matter.js's `nodejs-ble` node is |
 | 8 | [Proof](#milestone-8-proof) | `v0.17.0` | 29–35 | what is automatable runs: the 68 certification cases matter.js automated, the four defects, 644 more matter.js cases, the families without a run, no sleep-driven test |
 | 9 | [View](#milestone-9-view) | go-fabric-ui `0.4.0`, contract `0.3.0`/`0.3.1` (U3a/U3b); go-fabric-ui `0.5.0`, contract `0.4.0` (U4) | U3–U5 | topology, live device details and an operator's diagnostics in the UI, from data the module already has |
-| 10 | [The rest of the standard](#milestone-10-the-rest-of-the-standard) | `v0.18.0` | 36–39 | the features matter.js serves and we refuse; the consumer features after chip; the 1.7 pin when matter.js moves |
+| 10 | [The rest of the standard](#milestone-10-the-rest-of-the-standard) | `v0.18.0` | 36–40 | the features matter.js serves and we refuse; the consumer features after chip; the 1.7 pin when matter.js moves |
 
 Milestones 8–10 are [concept v13](https://github.com/SukramJ/go-fabric/blob/main/docs/concept-v13-roadmap-extension.md)
 (2026-11-02, German while current); the owner's order of the same day is
@@ -411,9 +411,10 @@ Planned in go-fabric-ui (concept U3 there, like U1 and U2); this page records th
 | Phase | Content | Proof |
 | --- | --- | --- |
 | 36 | the parity features (matter.js serves them, this module refuses them): DoorLock FACE, AdministratorCommissioning BC, OccupancySensing beyond PIR with `OccupancyChanged`, PowerSource WIRED/RECHG/REPLC | comparison rows ✅; DRLK, CADMIN, OCC, PS families |
-| 37 | the consumer features after chip (owner decision 2026-11-02, all four groups): Descriptor TAGLIST; concentration LEV/MED/CRI/PEA/AVG and the AirQuality levels; ClosureControl LT/IS/SP/CL and Valve LVL/TS; Thermostat TSUGGEST, GeneralCommissioning TC, LevelControl FQ, ColorControl primaries — each an *Ahead of matter.js* row | Ahead rows, chip families green |
-| 38 | the protocol remainder, consumer-driven: the OTA requestor over HTTPS, the BTP renegotiation after a stall, the trusted-time-source client, the Fabric Sync remainder; ARL and NFC stay non-goals | comparison rows |
-| 39 | the 1.7 pin when matter.js's snapshot moves (chip's `data_model/1.7`: 12 clusters, 13 device types beyond the snapshot): pin lift, generators, `chipdm-check` 1.7; nothing before | the weekly `matterjs-pin` job reports the jump |
+| 37 | the controller side of Matter cameras on one operational identity (issue 410, owner decisions 2026-11-05): `controller/camera` after matterjs-server's stream management with chip as the provider authority, the controller serving the camera's callbacks through the client stack as matter.js's one node does, OTA moved onto that identity (the own node removed, a documented break), the ecosystem gate excepting the controller's requestor | an Ahead row; a chip-camera-app session end to end in the harness; the acceptance of issue 410 |
+| 38 | the consumer features after chip (owner decision 2026-11-02, all four groups): Descriptor TAGLIST; concentration LEV/MED/CRI/PEA/AVG and the AirQuality levels; ClosureControl LT/IS/SP/CL and Valve LVL/TS; Thermostat TSUGGEST, GeneralCommissioning TC, LevelControl FQ, ColorControl primaries — each an *Ahead of matter.js* row | Ahead rows, chip families green |
+| 39 | the protocol remainder, consumer-driven: the OTA requestor over HTTPS, the BTP renegotiation after a stall, the trusted-time-source client, the Fabric Sync remainder; ARL and NFC stay non-goals | comparison rows |
+| 40 | the 1.7 pin when matter.js's snapshot moves (chip's `data_model/1.7`: 12 clusters, 13 device types beyond the snapshot): pin lift, generators, `chipdm-check` 1.7; nothing before | the weekly `matterjs-pin` job reports the jump |
 
 **Value.** The premise's remainder, in the premise's order: matter.js's features first, the consumers' features with chip as the authority, the next revision when the gold standard moves.
 
