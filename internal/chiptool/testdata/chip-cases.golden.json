@@ -1,5 +1,5 @@
 {
-  "image": "ghcr.io/matter-js/chip@sha256:d6f1de89d714309beb621543d451a98996690eea82fa74d1563abd7d2b3cb326",
+  "image": "go-fabric-chip:local",
   "cases": {
     "ACE/1.1": {
       "steps": 38,
@@ -1450,6 +1450,11 @@
     "IDM/9.1": {
       "tests": 1,
       "steps": 3,
+      "stepsSkipped": 0
+    },
+    "JFADMIN/1.2": {
+      "tests": 1,
+      "steps": 17,
       "stepsSkipped": 0
     },
     "KEYPADINPUT/3.2": {

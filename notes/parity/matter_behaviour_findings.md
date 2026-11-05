@@ -971,19 +971,6 @@ composition passes the case. Route: re-read at the next harness pin
 lift; when the check reads the endpoint's declared revision, Messages
 returns to the default player. Phase 34.
 
-### TC-JFADMIN-1.2 — AddICAC takes an ICAC whose Subject DN is a structure
-
-On the case's lab path (the daemon's `--jointfabric-sim` administrator,
-commissioned by the case itself) steps 1-15 pass. Step 16 sends an ICAC
-whose Subject DN is re-encoded as a TLV structure instead of a list
-(`TC_JFADMIN_1_2.py:318-323` at `6170af84`) and expects InvalidICAC:
-connectedhomeip's first check, `VerifyAddICACStep1` (`ValidateCert`), refuses
-it (`joint-fabric-administrator-server.cpp:375-376`). Here
-`cluster/jointfabric.verifyICACChain` decodes it with `secure/mattercert`
-`Decode` and lets it pass, and the public-key check answers InvalidPublicKey.
-The decoder's acceptance of a non-list DN is the gap; `secure/` is a
-security path (CLAUDE.md), left to its owner. Phase 34.
-
 ### CHIP data model cross-check — class (ii)
 
 Differences where connectedhomeip's data model (the model the Python
