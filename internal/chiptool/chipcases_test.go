@@ -70,6 +70,9 @@ type chipCase struct {
 	Path    string
 	Subpath string
 	Args    []string // the descriptor's script-args
+	// AppArgs are the descriptor's app-args: the arguments CHIP's CI
+	// starts its app with (daemonAppArgs).
+	AppArgs []string
 	Steps   []string
 	// PICS is the descriptor's applicability expression ("" for none).
 	PICS string
@@ -144,22 +147,83 @@ func addCase(out map[string][]chipCase, fam string, n descriptorNode) {
 		ID: fam + "/" + n.Name, Family: fam, Name: n.Name, Kind: n.Kind,
 		Path: n.Path, Subpath: n.Subpath, PICS: n.PICS,
 	}
-	switch a := n.Config["script-args"].(type) {
-	case string:
-		c.Args = strings.Fields(a)
-	case []any:
-		for _, s := range a {
-			if str, ok := s.(string); ok {
-				c.Args = append(c.Args, str)
-			}
-		}
-	}
+	c.Args = descriptorArgs(n.Config["script-args"])
+	c.AppArgs = descriptorArgs(n.Config["app-args"])
 	for _, s := range n.Members {
 		if s.Kind == "step" {
 			c.Steps = append(c.Steps, s.Name)
 		}
 	}
 	out[fam] = append(out[fam], c)
+}
+
+// descriptorArgs is a descriptor argument list, given as one string or a
+// list.
+func descriptorArgs(v any) []string {
+	var out []string
+	switch a := v.(type) {
+	case string:
+		out = strings.Fields(a)
+	case []any:
+		for _, s := range a {
+			if str, ok := s.(string); ok {
+				out = append(out, str)
+			}
+		}
+	}
+	return out
+}
+
+// harnessAppPaths are the TH apps a case starts itself, named as CHIP's CI
+// names them (.github/workflows/tests.yaml:1192-1199 at the harness pin,
+// the test_env.yaml entries), and where the harness image carries them.
+// The Joint Fabric apps and the Push AV server are in go-fabric's own
+// image (internal/chiptool/image), not in matter.js's.
+var harnessAppPaths = map[string]string{
+	"${PUSH_AV_SERVER}":                "/src/tools/push_av_server/src/server.py",
+	"${JF_ADMIN_APP}":                  "/bin/jfa-app",
+	"${JF_CONTROL_APP}":                "/bin/jfc-app",
+	"${ALL_CLUSTERS_APP}":              "/bin/chip-all-clusters-app",
+	"${ALL_CLUSTERS_NO_GROUPCAST_APP}": "/bin/chip-all-clusters-app-nogroupcast",
+}
+
+// expandAppPaths replaces the TH app names of a case's arguments by the
+// image's paths, and fails the case naming the image that carries an app
+// this one lacks.
+func expandAppPaths(ctx context.Context, t *testing.T, h *harness, id string, args []string) []string {
+	t.Helper()
+	out := slices.Clone(args)
+	for i, a := range out {
+		for name, path := range harnessAppPaths {
+			if !strings.Contains(a, name) {
+				continue
+			}
+			if res, err := h.exec(ctx, "test", "-e", path); err != nil {
+				t.Fatalf("%s starts %s (%s), which the harness image does not carry: run it in go-fabric's own image "+
+					"(internal/chiptool/image, %s=<its tag or digest>): %v %s", id, name, path, chipImageEnv, err, res)
+			}
+			out[i] = strings.ReplaceAll(out[i], name, path)
+		}
+	}
+	return out
+}
+
+// mirroredAppSwitches are CHIP app switches the reference daemon mirrors
+// under the same name: a case whose CI starts CHIP's app with one starts
+// the daemon with it (daemonAppArgs). Each is a behaviour of a simulated
+// port (examples/reference-bridge/camera.go).
+var mirroredAppSwitches = []string{"--camera-deferred-offer", "--camera-test-videosrc", "--camera-test-audiosrc"}
+
+// daemonAppArgs are the switches of a case's app-args the daemon mirrors
+// and has (flags, its --help).
+func daemonAppArgs(appArgs []string, flags map[string]bool) []string {
+	var out []string
+	for _, a := range appArgs {
+		if slices.Contains(mirroredAppSwitches, a) && flags[strings.TrimPrefix(a, "--")] {
+			out = append(out, a)
+		}
+	}
+	return out
 }
 
 // caseCounts is what a run of one case did, pinned in the golden file.

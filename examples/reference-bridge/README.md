@@ -188,7 +188,7 @@ the same two mechanisms CHIP's own example apps take (`control.go`):
   (`media.go`, ADR 0022): a CastingVideoPlayer stating ContentAppPlatform
   and PhysicalInputs (OnOff, MediaPlayback, KeypadInput, ContentLauncher,
   ApplicationLauncher with the platform feature, MediaInput, AudioOutput,
-  Channel, TargetNavigator, LowPower, WakeOnLan) and a ContentApp
+  Channel, TargetNavigator, LowPower, WakeOnLan; Messages with `--media-messages`) and a ContentApp
   (ApplicationBasic, ApplicationLauncher, AccountLogin, KeypadInput),
   each a simulation of connectedhomeip's tv-app — its transport, three of
   its channels, two inputs, three outputs, two targets and the test suite's
@@ -197,7 +197,50 @@ the same two mechanisms CHIP's own example apps take (`control.go`):
   move. The app pipe's `{"Name": "MediaPlaybackState", "Operation":
   "Playing"|"Paused"|"NotPlaying"|"Buffering"}` moves the transport.
   Nothing plays: a product's host implements the `cluster/media` ports
-  over its own player.
+  over its own player. The player's Messages (`messages.go`) presents a
+  message at its StartTime and completes it when its Duration is over, as
+  the tv-app's MessagesManager does; nothing is shown.
+- `--media-messages` (TESTING ONLY, with `--media`) adds Messages to the
+  player, as chip's tv-app serves it on its endpoint 1. Off by default:
+  connectedhomeip's TC-IDM-10.5 at the harness pin evaluates the Casting
+  Video Player's `[Rev >= v2]` term for Messages against a placeholder
+  revision 1 and reports the cluster disallowed (see
+  `docs/certifiability.md`); the MESS family runs against this variant.
+- `--tls-sim` (TESTING ONLY) serves TlsCertificateManagement and
+  TlsClientManagement on the root (`node.Config.TLS`, `tls.go`) over a
+  software P-256 key store: a client certificate's key is made at its
+  ClientCSR and kept in `--db`, the CSR is a DER PKCS#10 request signed
+  ecdsa-with-SHA256 and the nonce signature raw r‖s, as chip's
+  certificate table makes them. For the TLSCERT and TLSCLIENT families,
+  and for `--camera-sim`'s push transports.
+- `--camera-sim` (TESTING ONLY) bridges a Camera and a Chime after
+  connectedhomeip's camera-app (`camera.go`): CameraAvStreamManagement
+  with every feature the camera-app's HAL reports and its available video,
+  audio and snapshot streams, WebRtcTransportProvider,
+  PushAvStreamTransport, CameraAvSettingsUserLevelManagement (DPTZ, MPAN,
+  MTILT, MZOOM, MPRESETS), ZoneManagement (TWODCART, PERZONESENS,
+  USERDEFINED, FOCUSZONES) and the camera-app's three chime sounds. The
+  stream, PTZ and chime state persists in `--db`. Nothing is captured or
+  sent. The camera-app's own switches the cases pass are mirrored:
+  `--camera-deferred-offer` (SolicitOffer answers DeferredOffer true),
+  `--camera-test-videosrc` (CaptureSnapshot returns a generated JPEG;
+  without it the camera has no video device and the capture fails) and
+  `--camera-test-audiosrc` (accepted, nothing observable). The app pipe
+  takes the camera-app's `{"Name": "SetHardPrivacyModeOn", "Value": bool}`
+  and `{"Name": "ZoneTriggered", "ZoneId": id | [ids]}` (the zone
+  manager's trigger timing: ZoneTriggered, augmentation, ZoneStopped,
+  blind duration); `AmbientContextTriggered` and the `AvAnalysis…`
+  commands are logged and dropped (no AvAnalysis cluster). Use it with
+  `--tls-sim`, which the push transports' TLS endpoints need.
+- `--jointfabric-sim` (TESTING ONLY) bridges a JointFabricAdministrator
+  (`jointfabric.go`): JointFabricDatastore over the node's store and a
+  simulated member-node synchronisation that reaches no node, and
+  JointFabricAdministrator with a software administrator key kept in
+  `--db`; the flag turns on the node's client stack for the commissioner
+  reach.
+- `--otbr` serves, besides ThreadBorderRouterManagement, the border
+  router's ThreadNetworkDiagnostics with the packet, error, MLE and MAC
+  counts and a ThreadNetworkDirectory over the kit's memory store.
 - `--light-switch` (TESTING ONLY) bridges an On/Off Light Switch after
   every other device (`light_switch.go`), for the binding certification
   cases the Go controller runs as TH (TC-BIND-2.1, TC-BIND-2.3): its Binding

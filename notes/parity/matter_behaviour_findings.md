@@ -942,6 +942,53 @@ environment matter; they failed on an IPv6-capable runner because the node
 did not answer an AAAA query for its own host name, and run unconditionally
 since that was fixed.
 
+### TC-TLSCERT-2.2, TC-TLSCERT-2.9 — the TLS certificate lists over a transport without large payloads
+
+`cluster/tls` serves ProvisionedRootCertificates and
+ProvisionedClientCertificates with the certificates on every transport
+(`BD-chip-TlsCertificateManagement-RulesInServer`, owner decision
+2026-10-28: matter.js's generated behaviour). connectedhomeip encodes the
+ids alone when the read did not come over a large-payload transport
+(`TLSCertificateManagementCluster.cpp:108`, `:136-166` at `6170af84`), and
+both cases read over MRP expecting no certificate (`TC_TLSCERT_2_2.py`
+step 5, `TC_TLSCERT_2_9.py:174-181`); in 2.9 two client certificates with
+their intermediates exceed one message, and the read answers
+RESOURCE_EXHAUSTED. Closing it needs the read path to know the session's
+transport (no such flag reaches a cluster server today) and an owner
+decision to depart from rule 1 here. Phase 34.
+
+### TC-IDM-10.5 — a device type's revision term is judged against revision 1
+
+connectedhomeip's device-type conformance check (`TC_IDM_10_5`,
+`matter/testing/device_conformance_tests.py:404-414` at `6170af84`)
+evaluates each cluster requirement with `EMPTY_CLUSTER_GLOBAL_ATTRIBUTES`,
+whose `cluster_revision` is 1 (`conformance.py:139-147`), and the
+`revision` term's "current" reads that field (`:277-294`). The Casting
+Video Player's Messages conformance is `[Rev >= v2]`
+(`data_model/1.6.1/device_types/CastingVideoPlayer.xml`; matter.js
+`casting-video-player.element.ts`, the generated `device` requirement
+"[Rev >= v2]"), so the case reports Messages disallowed on a revision-2
+player — CI run 41967709504 on PR #403 — though the device type is at
+revision 2 and chip's own tv-app serves Messages on a revision-3 player.
+A TH limitation, not a gap of the module: the daemon's Messages moved
+behind `--media-messages` (the MESS family's variant) so the default
+composition passes the case. Route: re-read at the next harness pin
+lift; when the check reads the endpoint's declared revision, Messages
+returns to the default player. Phase 34.
+
+### TC-JFADMIN-1.2 — AddICAC takes an ICAC whose Subject DN is a structure
+
+On the case's lab path (the daemon's `--jointfabric-sim` administrator,
+commissioned by the case itself) steps 1-15 pass. Step 16 sends an ICAC
+whose Subject DN is re-encoded as a TLV structure instead of a list
+(`TC_JFADMIN_1_2.py:318-323` at `6170af84`) and expects InvalidICAC:
+connectedhomeip's first check, `VerifyAddICACStep1` (`ValidateCert`), refuses
+it (`joint-fabric-administrator-server.cpp:375-376`). Here
+`cluster/jointfabric.verifyICACChain` decodes it with `secure/mattercert`
+`Decode` and lets it pass, and the public-key check answers InvalidPublicKey.
+The decoder's acceptance of a non-list DN is the gap; `secure/` is a
+security path (CLAUDE.md), left to its owner. Phase 34.
+
 ### CHIP data model cross-check — class (ii)
 
 Differences where connectedhomeip's data model (the model the Python

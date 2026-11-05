@@ -209,13 +209,14 @@ func clientStruct(e clientEntry) ClientCertificate {
 		cert = spec.ValueOf(bytes.Clone(e.Certificate))
 	}
 	out := ClientCertificate{Ccdid: e.CCDID, ClientCertificate: &cert, FabricIndex: e.Fabric}
-	if e.Intermediates != nil {
-		inter := make([][]byte, len(e.Intermediates))
-		for i, b := range e.Intermediates {
-			inter[i] = bytes.Clone(b)
-		}
-		out.IntermediateCertificates = &inter
+	// The intermediates are always present, an empty list for none — a
+	// CSR-only entry's too: chip's example table encodes the field in
+	// both branches (tls-certificate-management-instance.cpp:107-124).
+	inter := make([][]byte, len(e.Intermediates))
+	for i, b := range e.Intermediates {
+		inter[i] = bytes.Clone(b)
 	}
+	out.IntermediateCertificates = &inter
 	return out
 }
 

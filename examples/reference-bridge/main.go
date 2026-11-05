@@ -92,23 +92,25 @@ func main() {
 
 // flags are the daemon's command line.
 type flags struct {
-	dbPath, listen, tcp, label, salt, logLevel string
-	appPipe, enableKey, otaDir, dcl            string
-	attestationDir, metricsExpvar              string
-	wifiSimSSIDs                               string
-	otbr                                       string
-	passcode, discriminator                    uint
-	iterations                                 int
-	advertise, osHostName, otaHarness, wifi    bool
-	wifiSim                                    bool
-	otaProvider, media, lightSwitch            bool
-	icdLIT, bridgeSim                          bool
-	icdIdleSeconds, icdActiveMillis            uint
-	thermostatSchedules                        bool
-	dumpSurface                                bool
-	extensions                                 string
-	specLevel                                  string
-	profiles                                   string
+	dbPath, listen, tcp, label, salt, logLevel     string
+	appPipe, enableKey, otaDir, dcl                string
+	attestationDir, metricsExpvar                  string
+	wifiSimSSIDs                                   string
+	otbr                                           string
+	passcode, discriminator                        uint
+	iterations                                     int
+	advertise, osHostName, otaHarness, wifi        bool
+	wifiSim                                        bool
+	otaProvider, media, mediaMessages, lightSwitch bool
+	icdLIT, bridgeSim                              bool
+	tlsSim, cameraSim, jointFabricSim              bool
+	camera                                         cameraOptions
+	icdIdleSeconds, icdActiveMillis                uint
+	thermostatSchedules                            bool
+	dumpSurface                                    bool
+	extensions                                     string
+	specLevel                                      string
+	profiles                                       string
 }
 
 func parseFlags() flags {
@@ -139,6 +141,7 @@ func parseFlags() flags {
 	flag.StringVar(&f.extensions, "extensions", "", "comma-separated \"Ahead of matter.js\" register IDs to enable (surface.Policies.Extensions, notes/parity/by_design.md), on the node and every device; an unknown ID stops the daemon with the list of known ones; see surface.go")
 	flag.StringVar(&f.otbr, "otbr", "", "add a ThreadBorderRouter endpoint over the OpenThread Border Router's REST API at this URL (\"http://[fd00::1]:8081\"); off when empty; see otbr.go")
 	flag.BoolVar(&f.media, "media", false, "TESTING ONLY: add a simulated video player (CastingVideoPlayer) and content app (ContentApp) after chip's tv-app, for the media certification families; see media.go")
+	flag.BoolVar(&f.mediaMessages, "media-messages", false, "TESTING ONLY, with --media: add Messages to the video player, as chip's tv-app serves it (tv-app.matter endpoint 1); off by default because connectedhomeip's TC-IDM-10.5 at the harness pin judges the device type's `[Rev >= v2]` term against a placeholder revision 1 and reports the cluster disallowed (conformance.py EmptyClusterGlobalAttributes), see docs/certifiability.md")
 	flag.BoolVar(&f.icdLIT, "icd-lit", false, "TESTING ONLY: make the node a Long Idle Time ICD after matter.js's lit-icd test app — ICD Management with Check-In, User Active Mode Trigger, LIT and Dynamic SIT/LIT on the root, a fixed idle/active cadence and the ICD test event triggers on TestEventTrigger (needs --enable-key) — for the ICD client certification cases; see icd.go")
 	flag.UintVar(&f.icdIdleSeconds, "icd-idle-mode-duration", defaultICDIdleSeconds, "with --icd-lit: the IdleModeDuration in seconds (the lit-icd app's --icdIdleModeDuration)")
 	flag.UintVar(&f.icdActiveMillis, "icd-active-mode-duration-ms", defaultICDActiveMillis, "with --icd-lit: the ActiveModeDuration in milliseconds (the lit-icd app's --icdActiveModeDurationMs)")
@@ -146,6 +149,12 @@ func parseFlags() flags {
 	flag.BoolVar(&f.bridgeSim, "bridge-sim", false, "TESTING ONLY: add the bridge matter.js's bridge test instance simulates after chip's bridge-app — \"Light 1\", \"TempSensor 1\" and \"2\", a battery-powered \"Composed Device\" with two temperature sensors as its parts, \"Action Light 1\"–\"4\" — and the app-pipe commands toggleBridgedLights, warmBridgedTemperatureSensors, renameBridgedLights, addBridgedLight and removeBridgedLight, for the bridge-client certification case TC-BR-4; see bridge_sim.go")
 	flag.StringVar(&f.specLevel, "spec-level", "", "the Matter specification level to compose at (surface.Policies.Level): one of the revisions matter.js has shipped, "+levelList()+"; the default is the pin's. Optional elements the level does not know are removed, devices whose type it does not know are withheld and logged, behaviour and ClusterRevision stay the pin's; an unknown level stops the daemon with the list; see surface.go")
 	flag.StringVar(&f.profiles, "profile", "", "comma-separated controller profiles to compose for (surface.Policies.Profiles): "+profileList()+". A profile removes only what a Reproduced row of notes/parity/controller_profiles.md names and logs every other row that names a served element as a warning decision; a profile's level applies when --spec-level is not set; an unknown profile stops the daemon with the list; see surface.go")
+	flag.BoolVar(&f.tlsSim, "tls-sim", false, "TESTING ONLY: serve TlsCertificateManagement and TlsClientManagement on the root over a software P-256 key store kept in --db, for the TLS certification families and the camera's push transport; see tls.go")
+	flag.BoolVar(&f.cameraSim, "camera-sim", false, "TESTING ONLY: add a simulated Camera and Chime after chip's camera-app (no media is captured or sent), for the camera certification families; with --tls-sim its push transports reach the root's TLS clusters; see camera.go")
+	flag.BoolVar(&f.camera.deferredOffer, "camera-deferred-offer", false, "TESTING ONLY, with --camera-sim: answer SolicitOffer with DeferredOffer true, as chip's camera-app does with the same switch; see camera.go")
+	flag.BoolVar(&f.camera.testVideoSource, "camera-test-videosrc", false, "TESTING ONLY, with --camera-sim: capture snapshots from a test pattern, as chip's camera-app does with the same switch (without it the simulated camera has no video device); see camera.go")
+	flag.BoolVar(&f.camera.testAudioSource, "camera-test-audiosrc", false, "TESTING ONLY, with --camera-sim: chip's camera-app switch to a test audio source; accepted, nothing observable changes (no audio is captured); see camera.go")
+	flag.BoolVar(&f.jointFabricSim, "jointfabric-sim", false, "TESTING ONLY: add a JointFabricAdministrator endpoint (Joint Fabric Datastore and Administrator) whose member-node synchronisation is simulated, and turn on the node's client stack for its commissioner reach, for the Joint Fabric certification families; see jointfabric.go")
 	flag.BoolVar(&f.dumpSurface, "dump-surface", false, "print the node's served surface — the assembled effective surface of the root, the Aggregator and every endpoint, the clusters the endpoint assembler mounts included, the surface policies' digest, the selected profiles, the effective level and its origin (explicit, profile <name> or pin) and every decision (package surface) — as JSON on stdout and exit, composed as the other flags say on an in-memory store and assembled by starting the node on a loopback UDP port the system assigns, then stopping it: no mDNS record is published and the --db store is not opened; see surface.go")
 	flag.Parse()
 	return f
@@ -346,7 +355,7 @@ func compose(ctx context.Context, f flags, logger *slog.Logger, passcode uint32,
 	}
 	if f.media {
 		// The video player and content app (media.go), TESTING ONLY.
-		if devices.media, err = newDemoMedia(policies, logger); err != nil {
+		if devices.media, err = newDemoMedia(policies, logger, f.mediaMessages); err != nil {
 			return nil, nil, err
 		}
 	}
@@ -369,6 +378,21 @@ func compose(ctx context.Context, f flags, logger *slog.Logger, passcode uint32,
 		if devices.bridgeSim, err = newDemoBridgeSim(devices); err != nil {
 			return nil, nil, err
 		}
+	}
+	if f.cameraSim {
+		// The camera and the chime (camera.go), TESTING ONLY.
+		devices.camera = newDemoCamera(policies, f.camera, logger)
+	}
+	if f.jointFabricSim {
+		// The Joint Fabric administrator (jointfabric.go), TESTING ONLY.
+		devices.jointFabric = newDemoJointFabric(policies, logger)
+		applyJointFabric(&cfg)
+	}
+	if f.tlsSim {
+		// The root's TLS clusters over a software key store (tls.go),
+		// TESTING ONLY.
+		devices.tlsKeys = newTLSKeys(logger)
+		cfg.TLS = devices.tlsKeys.tlsConfig()
 	}
 	if f.otbr != "" {
 		// The ThreadBorderRouter endpoint (otbr.go), off by default.
@@ -418,6 +442,15 @@ func assemble(ctx context.Context, devices *fleet, cfg node.Config, applier *ota
 	}
 	restoreBlind(ctx, n.Store(), devices.blind, cfg.Logger)
 	devices.lock.auth = n.Store()
+	if devices.tlsKeys != nil {
+		devices.tlsKeys.attach(ctx, n.Store())
+	}
+	if devices.camera != nil {
+		devices.camera.attach(ctx, n.Store())
+	}
+	if devices.jointFabric != nil {
+		devices.jointFabric.attach(n.Store())
+	}
 	devices.thermostat.attachStore(store.NewThermostatPresetStore(n.Store(), thermostatStoreKey), n.Store())
 
 	eps, err := devices.endpoints() //nolint:contextcheck // thermo.New takes no context; its PresetStore load runs once, at construction

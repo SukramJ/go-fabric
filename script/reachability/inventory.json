@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 7407,
+  "entry_points": 7415,
   "entry_packages": [
     ".",
     "bdx",
@@ -279,9 +279,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 17311,
+    "total_exported": 17319,
     "reachable": 12135,
-    "whitelisted": 5176,
+    "whitelisted": 5184,
     "unreachable": 0
   },
   "by_package": [],
@@ -475,6 +475,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/groupcast_wire_test.go",
       "line": 229
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestAPlainEnumListIsAnArray",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/application_values_list_test.go",
+      "line": 60
     },
     {
       "package": "bridge",
@@ -765,6 +772,13 @@
     },
     {
       "package": "bridge",
+      "identifier": "TestAttributeValueReader_ContainerWithoutDecoder",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/attribute_value_reader_nodecoder_test.go",
+      "line": 23
+    },
+    {
+      "package": "bridge",
       "identifier": "TestAttributeValueReader_Extension_DecodesAndClusterAccepts",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/attribute_value_reader_structured_test.go",
@@ -790,6 +804,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/attribute_value_reader_userlabel_test.go",
       "line": 28
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestAttributeValueReader_Viewport",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/attribute_value_reader_viewport_test.go",
+      "line": 31
     },
     {
       "package": "bridge",
@@ -1406,6 +1427,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/reply_test.go",
       "line": 573
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestChunkReportData_OversizedListEntryFailsTheAttribute",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/reply_test.go",
+      "line": 971
     },
     {
       "package": "bridge",
@@ -27176,6 +27204,20 @@
     },
     {
       "package": "examples/reference-bridge",
+      "identifier": "TestCameraStateSurvivesARestart",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-bridge/camera_test.go",
+      "line": 43
+    },
+    {
+      "package": "examples/reference-bridge",
+      "identifier": "TestCameraVideoStreamCompatibility",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-bridge/camera_test.go",
+      "line": 69
+    },
+    {
+      "package": "examples/reference-bridge",
       "identifier": "TestCeilingLightOnDoesNotDeadlockItsNotifier",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/conformance_test.go",
@@ -27621,6 +27663,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/surface_test.go",
       "line": 103
+    },
+    {
+      "package": "examples/reference-bridge",
+      "identifier": "TestTLSKeysMatchTheirCertificate",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-bridge/camera_test.go",
+      "line": 98
     },
     {
       "package": "examples/reference-bridge",
@@ -30203,7 +30252,7 @@
       "identifier": "TestFamilyDeviceTypesResolve",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "internal/chiptool/certifiability_doc_test.go",
-      "line": 419
+      "line": 452
     },
     {
       "package": "internal/chiptool",
@@ -30225,6 +30274,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "internal/chiptool/surface_families_test.go",
       "line": 103
+    },
+    {
+      "package": "internal/chiptool",
+      "identifier": "TestUnfamiliedPrefixes",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "internal/chiptool/prefixes_test.go",
+      "line": 79
     },
     {
       "package": "internal/chiptool",

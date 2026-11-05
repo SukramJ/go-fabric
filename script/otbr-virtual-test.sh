@@ -12,6 +12,11 @@
 # The summary separates the ENVIRONMENT (the clone, the bootstrap, the
 # builds, the agent coming up) from a DEFECT (the live test), as
 # script/ble-virtual-test.sh does; both fail.
+#
+# OTBR_SERVE=1 builds and starts the agent and leaves it running instead
+# of the live test (the thread certification families of
+# .github/workflows/otbr-virtual.yml run against it); only the
+# ENVIRONMENT can fail then. The agent's pid is in $WORK/otbr-agent.pid.
 set -euo pipefail
 
 OTBR_REF="${OTBR_REF:-main}"
@@ -59,6 +64,13 @@ for _ in $(seq 1 60); do
 	sleep 1
 done
 curl -fsS "http://127.0.0.1:$REST_PORT/node/state" >/dev/null 2>&1 || environment "the agent's REST API did not come up"
+
+if [ "${OTBR_SERVE:-}" = "1" ]; then
+	trap - EXIT
+	echo "$agent_pid" >"$WORK/otbr-agent.pid"
+	echo "otbr-virtual: SERVING on http://127.0.0.1:$REST_PORT (pid $agent_pid)"
+	exit 0
+fi
 
 GOFABRIC_OTBR_URL="http://127.0.0.1:$REST_PORT" go test -count=1 -run TestLiveOTBR -v ./thread/otbr/ \
 	| tee "$LOG_DIR/live-test.log" || defect "the live test failed"

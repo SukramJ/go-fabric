@@ -108,7 +108,20 @@ func (f family) descriptorFamily() string {
 // the certified default (family.variant): the daemon flags each adds.
 var daemonVariants = map[string][]string{
 	variantWiFiSim: {"--wifi-sim"},
+	variantTLS:     {"--tls-sim"},
+	// The camera's PushAvStreamTransport reaches its TLS endpoints
+	// through the root's TLS clusters (node.Config.TLS), as chip's
+	// camera-app serves both on its root (camera-app.matter endpoint 0).
+	variantCamera:      {"--camera-sim", "--tls-sim"},
+	variantJointFabric: {"--jointfabric-sim"},
+	variantMessages:    {"--media-messages"},
+	variantThread:      {"--otbr", otbrURL},
 }
+
+// otbrURL is the virtual OTBR agent's REST API the thread variant's daemon
+// reaches (script/otbr-virtual-test.sh --rest-listen-address 127.0.0.1
+// --rest-listen-port 8081).
+const otbrURL = "http://127.0.0.1:8081"
 
 // daemonVariant is the variant every daemon of the running family is
 // started with ("" the default); the families run one after another.
@@ -127,6 +140,9 @@ func variantPICS(ctx context.Context, t *testing.T, h *harness, bin string, flag
 		t.Fatalf("unknown daemon variant %q", variant)
 	}
 	for _, f := range extra {
+		if !strings.HasPrefix(f, "--") {
+			continue // a flag's value
+		}
 		if !flags[strings.TrimPrefix(f, "--")] {
 			t.Fatalf("the daemon binary has no %s, which the %s run needs", f, variant)
 		}
@@ -227,6 +243,9 @@ func devicePICS(ctx context.Context, t *testing.T, h *harness, bin string, flags
 
 	set := &picsSet{byEP: map[uint16]string{}, values: map[uint16]map[string]string{}, honest: map[uint16]string{}, epOf: map[uint32]uint16{}}
 	for _, dt := range endpointDeviceTypes {
+		set.epOf[dt] = br.endpointFor(t, dt)
+	}
+	for _, dt := range variantDeviceTypes[daemonVariant] {
 		set.epOf[dt] = br.endpointFor(t, dt)
 	}
 	for key, at := range pseudoEndpoints {
@@ -460,7 +479,11 @@ func runFamily(ctx context.Context, t *testing.T, h *harness, fam family, cases 
 						ep = pics.endpoint(t, dtOnOffLight)
 					}
 				}
-				runPythonCase(ctx, t, h, fam, c, c.ID, pics.byEP[ep], ep, passEP, pics.epOf, bin, flags)
+				p := pics.byEP[ep]
+				if fam.labPath[c.Name] {
+					p = pics.honest[ep]
+				}
+				runPythonCase(ctx, t, h, fam, c, c.ID, p, ep, passEP, pics.epOf, bin, flags)
 			case c.Kind == "yaml":
 				dt := fam.deviceTypeOf(c.Name)
 				ep := pics.endpoint(t, dt)
@@ -587,6 +610,7 @@ func runPythonCase(ctx context.Context, t *testing.T, h *harness, fam family, c 
 		dbPath:    filepath.Join(work, "dut.db"),
 		appPipe:   filepath.Join(work, "app.fifo"),
 		enableKey: chipTestEnableKey,
+		extraArgs: daemonAppArgs(c.AppArgs, flags),
 	})
 
 	args := []string{
@@ -608,6 +632,9 @@ func runPythonCase(ctx context.Context, t *testing.T, h *harness, fam family, c 
 		}
 		args = append(args, a)
 	}
+	// A case that starts a TH app of its own names it as CHIP's CI does
+	// (${PUSH_AV_SERVER}, ${JF_ADMIN_APP}, …): the image's path.
+	args = expandAppPaths(ctx, t, h, id, args)
 	// An SU requestor case starts chip's OTA provider app itself and has it
 	// serve the staged image (TC_SU_2_2.py:39-41 at the harness pin).
 	if needsOta(c.Args) {
@@ -623,7 +650,7 @@ func runPythonCase(ctx context.Context, t *testing.T, h *harness, fam family, c 
 	// A factory-fresh case whose descriptor supplies the onboarding code
 	// (TC-SC-7.1) commissions in its own steps; one without (TC-ACL-2.6)
 	// has the runner commission it in its commissioning step.
-	if fam.uncommissioned[c.Name] && !slices.Contains(args, "--qr-code") && !slices.Contains(args, "--manual-code") {
+	if fam.uncommissioned[c.Name] && !fam.labPath[c.Name] && !slices.Contains(args, "--qr-code") && !slices.Contains(args, "--manual-code") {
 		args = append(args, "--commissioning-method", "on-network", "--qr-code", br.info.qrCode)
 	}
 	if c.Subpath != "" {

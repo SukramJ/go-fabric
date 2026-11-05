@@ -95,7 +95,11 @@ The server serves the mandatory attributes, the provisional `ExtAddress`
 and `Rloc16`, and, with the declared features, the MLE counts (`MLECNT`)
 and the MAC counts the border router's record carries (`MACCNT`: the
 unicast and broadcast frames sent and received). `PKTCNT` and `ERRCNT` are
-refused. The values come from:
+served as connectedhomeip serves them: no element conforms to `PKTCNT`, and
+`ERRCNT`'s OverrunCount is the constant 0 chip's provider reads, which
+`ResetCounts` resets — the REST surface resets nothing else, so the MLE and
+MAC counts stay the border router's (ADR 0027 addendum). The values come
+from:
 
 | Attributes | Source |
 | --- | --- |
@@ -128,8 +132,11 @@ participant.
 ## The reference daemon
 
 `reference-bridge --otbr http://[fd00::1]:8081` adds one ThreadBorderRouter
-endpoint under the Aggregator, with `PanChange` and the MLE and MAC counts.
-Without the flag the daemon's composition does not change.
+endpoint under the Aggregator, with `PanChange`, the four diagnostics counts
+and a ThreadNetworkDirectory over the kit's in-memory store. Without the
+flag the daemon's composition does not change. The certification harness
+runs the TBRM, DGTHREAD and THNETDIR families against it on a virtual OTBR
+agent (`.github/workflows/otbr-virtual.yml`, the `thread-families` job).
 
 ## Testing
 

@@ -4,7 +4,6 @@
 package device_test
 
 import (
-	"errors"
 	"testing"
 	"time"
 
@@ -75,14 +74,17 @@ func TestThreadBorderRouterDeclaresTheThreadbrServers(t *testing.T) {
 	}
 }
 
-// A declared diagnostics feature the server does not serve fails the
-// device: the host asked for it.
-func TestThreadBorderRouterRefusesPacketCounts(t *testing.T) {
+// The four diagnostics features are the kit's server since phase 34
+// (threadbr.DiagnosticsFeatures, chip's camera-app root FeatureMap 0x000F).
+func TestThreadBorderRouterServesTheFourCounts(t *testing.T) {
 	t.Parallel()
-	_, err := device.NewThreadBorderRouter(device.Options{StableKey: device.StringKey("tbr"), Name: "tbr"},
+	d, err := device.NewThreadBorderRouter(device.Options{StableKey: device.StringKey("tbr"), Name: "tbr"},
 		tbrmdef.Declare{BorderRouter: fakeBorderRouter(t)},
-		tnddef.Declare{Features: tnddef.FeaturePacketCounts})
-	if !errors.Is(err, device.ErrSelectionNotServed) {
-		t.Errorf("PacketCounts = %v, want ErrSelectionNotServed", err)
+		tnddef.Declare{Features: threadbr.DiagnosticsFeatures})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := d.ThreadNetworkDiagnostics().Underlying().(*threadbr.DiagnosticsServer); !ok {
+		t.Errorf("diagnostics is %T", d.ThreadNetworkDiagnostics().Underlying())
 	}
 }
