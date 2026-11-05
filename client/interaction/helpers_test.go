@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"net"
 	"slices"
+	"sync"
 	"testing"
 	"testing/synctest"
 	"time"
@@ -39,12 +40,27 @@ func (c *fakeClock) waitTimer(t *testing.T, d time.Duration) {
 	}
 }
 
-// fakeConn records the datagrams the manager sends.
-type fakeConn struct{ ch chan []byte }
+// fakeConn records the datagrams the manager sends, and where to.
+type fakeConn struct {
+	ch chan []byte
 
-func (c *fakeConn) Send(_ *net.UDPAddr, payload []byte) error {
+	mu   sync.Mutex
+	dsts []*net.UDPAddr
+}
+
+func (c *fakeConn) Send(addr *net.UDPAddr, payload []byte) error {
+	c.mu.Lock()
+	c.dsts = append(c.dsts, addr)
+	c.mu.Unlock()
 	c.ch <- append([]byte(nil), payload...)
 	return nil
+}
+
+// destinations are the addresses of the datagrams sent so far, in order.
+func (c *fakeConn) destinations() []*net.UDPAddr {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return slices.Clone(c.dsts)
 }
 
 var peerAddr = &net.UDPAddr{IP: net.ParseIP("fd00::1"), Port: 5540}
