@@ -10,8 +10,8 @@
 // the server's SetAttributes (the typed Set), its TimerDelegateMock the
 // fake clock. Two chip rules give way to matter.js: chip forces OCCEVENT
 // on and always emits OccupancyChanged (TestOccupancyChangedEventAlwaysGenerated,
-// :716-746), matter.js emits it with the feature only; and chip shows the
-// deprecated *OccupiedToUnoccupiedDelay aliases by default
+// :716-746), matter.js emits it with the feature only; and chip shows
+// the *OccupiedToUnoccupiedDelay aliases (conformance D) by default
 // (mShowDeprecatedAttributes = true, OccupancySensingCluster.h:81), here a
 // host serves them when it opts them in.
 package sensing_test
