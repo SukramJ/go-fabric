@@ -1076,7 +1076,12 @@ var chipFamilies = []family{
 	// 0); the daemon has no Thread radio (ADR 0027), so DGTHREAD reads the
 	// border router's diagnostics. They run in the thread group, on
 	// dispatch and weekly (.github/workflows/otbr-virtual.yml).
-	{name: "TBRM", deviceType: dtThreadBorderRouter, variant: variantThread},
+	{
+		name: "TBRM", deviceType: dtThreadBorderRouter, variant: variantThread,
+		exclude: map[string]gap{
+			"2.2": {classHarness, "TC-TBRM-2.2 step 14 compares the GetActiveDatasetRequest answer byte for byte with the dataset step 6 set (Test_TC_TBRM_2_2.yaml:160-166); an OpenThread border router serializes the dataset's TLVs in its own order (the virtual agent answers the Network Name TLV after the Mesh-Local Prefix), and the module answers the border router's bytes, as chip's TBRM server answers its Thread stack's; chip runs the case against network-manager-app's simulated stack, which keeps the bytes as set", false},
+		},
+	},
 	{name: "DGTHREAD", deviceType: dtThreadBorderRouter, variant: variantThread},
 	{name: "THNETDIR", deviceType: dtThreadBorderRouter, variant: variantThread},
 }
