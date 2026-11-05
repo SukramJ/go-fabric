@@ -15,8 +15,8 @@ names the `it` cases that will not be ported, each with its class and reason. Th
 
 | status | files |
 | --- | ---: |
-| ported | 153 |
-| partial | 142 |
+| ported | 154 |
+| partial | 141 |
 | planned | 2 |
 | excluded | 291 |
 | total | 588 |
@@ -114,7 +114,7 @@ names the `it` cases that will not be ported, each with its class and reason. Th
 | [node/test/endpoint/validation](#nodetestendpointvalidation) | 9 | 4 | 3 | 0 | 2 |
 | [node/test/endpoints](#nodetestendpoints) | 3 | 1 | 2 | 0 | 0 |
 | [node/test/loader](#nodetestloader) | 1 | 0 | 0 | 0 | 1 |
-| [node/test/node](#nodetestnode) | 50 | 19 | 22 | 0 | 9 |
+| [node/test/node](#nodetestnode) | 50 | 20 | 21 | 0 | 9 |
 | [node/test/node/client](#nodetestnodeclient) | 11 | 6 | 1 | 0 | 4 |
 | [node/test/node/integration](#nodetestnodeintegration) | 2 | 0 | 0 | 0 | 2 |
 | [node/test/node/remote](#nodetestnoderemote) | 1 | 0 | 0 | 0 | 1 |
@@ -926,7 +926,7 @@ names the `it` cases that will not be ported, each with its class and reason. Th
 | DelayReportDataTest.ts | 533 | partial | `im/subscription:TestDeferReports`<br>`node:TestDelayReportDataParity` | Every forward-feature case runs over the wire on fabrictest (node:TestDelayReportDataParity), matter.js's 50 ms send delay read as the engine's 250 ms tick (L10-D11) and the jitter as its window; fix: a command that cannot be dispatched defers nothing. Missing: the case with forward features off — the module acts on DelayReportData always (BD-Matter-DelayReportData). Missing: “ignores DelayReportData”. |
 | DotQualifiedConstraintTest.ts | 265 | ported | `node:TestDotQualifiedConstraintParity` | Writes over the wire on fabrictest, local sets and server construction against the generated servers (node:TestDotQualifiedConstraintParity); fix: dot-qualified bounds resolved and initial values re-checked with their siblings in place. |
 | EventReadResponseTest.ts | 496 | ported | `node:TestEventReadResponseParity` | Every case runs over the wire on fabrictest (node:TestEventReadResponseParity), event numbers and the commissioning history asserted as the Go node's own; fixes: the existence statuses of a concrete event path, Messages and AccountLogin events fabric-sensitive. |
-| FailsafeCommissioningTest.ts | 347 | partial | `node:TestFailsafeCommissioningParity` | On fabrictest the fail-safe expiry before AddNOC (PASE) and after it (flow stopped at the transition) rolls back and leaves the device commissionable, and an AddNOC whose initial ACL write fails (the device's credential store refusing the ReplaceACL, node.Config.Store.Credentials) fails the commissioning, keeps no fabric and leaves the device up and commissionable (node:TestFailsafeCommissioningParity; that case asserts the commissionable record where matter.js awaits the announcement). Missing, behaviour gap, not a seam: the re-announcement itself — the Go device keeps its commissionable record while PASE is up and publishes nothing when the PASE session closes, where matter.js starts an advertisement round (DeviceAdvertiser.ts:131-162 at 862ad75f); a findings-register candidate (seam wave, issue #396). Missing: “re-announces after failsafe expiry with PASE session active (before addNOC)”; “re-announces after failsafe expiry with CASE session after addNOC (before CommissioningComplete)”. |
+| FailsafeCommissioningTest.ts | 347 | ported | `node:TestFailsafeCommissioningParity` | On fabrictest the fail-safe expiry before AddNOC (PASE) and after it (flow stopped at the transition) rolls back, leaves the device commissionable and announces it again — the closed PASE session restarts the commissionable record's announcement round (bridge triggerCommissioningReannounce on the session registry's PASE close hook, DeviceAdvertiser.ts:152-161 at 862ad75f), once in the AddNOC case where the CASE session's close announces nothing commissionable (FailsafeCommissioningTest.ts:290-300); an AddNOC whose initial ACL write fails (the device's credential store refusing the ReplaceACL, node.Config.Store.Credentials) fails the commissioning, keeps no fabric and leaves the device up and commissionable (node:TestFailsafeCommissioningParity; that case asserts the commissionable record where matter.js awaits the announcement). Closed finding T3-SW-2. |
 | InteractionModelRevisionAbsentTest.ts | 134 | ported | `im:TestRequestsWithoutInteractionModelRevision` | Read, write, invoke, subscribe and timed request without InteractionModelRevision are each a subtest. |
 | LifetimeReleaseTest.ts | 75 | excluded | `js-runtime-only` | Release of matter.js runtime lifetimes so the runtime goes inactive. |
 | MockServerNodeTest.ts | 31 | excluded | `test-infrastructure` | matter.js's MockServerNode test helper. |

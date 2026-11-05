@@ -609,7 +609,10 @@ type Bridge struct {
 	// bridge published via [Bridge.AnnounceCommissioning] so the
 	// matching [Bridge.WithdrawCommissioning] call can target the
 	// right record. Empty means "no commissioning record outstanding".
+	// commissioningService is that record as published, what a closed
+	// PASE session announces again (triggerCommissioningReannounce).
 	commissioningInstanceName string
+	commissioningService      mdns.Service
 
 	// onReassembled, when non-nil, is invoked at the end of every
 	// successful Reassemble with the bridged-endpoint count (excluding
@@ -2311,6 +2314,7 @@ func (b *Bridge) AnnounceCommissioning(ctx context.Context, params Commissioning
 	}
 	b.mu.Lock()
 	b.commissioningInstanceName = svc.InstanceName
+	b.commissioningService = svc
 	b.mu.Unlock()
 	// The noop advertiser accepts every Publish without emitting a
 	// single multicast packet. Logging "published" then sends an
@@ -2347,6 +2351,7 @@ func (b *Bridge) WithdrawCommissioning(ctx context.Context) {
 	b.mu.Lock()
 	instance := b.commissioningInstanceName
 	b.commissioningInstanceName = ""
+	b.commissioningService = mdns.Service{}
 	advertiser := b.advertiser
 	b.mu.Unlock()
 	if instance == "" || advertiser == nil {

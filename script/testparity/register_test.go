@@ -82,8 +82,8 @@ const testparityPlannedRatchet = 2
 // derived defaults, the FabricIndex a write keeps, an IS1 in a character
 // string, copyHealth, the socket open) — 153 ported, 600 missing.
 const (
-	testparityPortedRatchet  = 153
-	testparityMissingRatchet = 600
+	testparityPortedRatchet  = 154
+	testparityMissingRatchet = 598
 )
 
 // testparityLeftRatchet is the number of left it cases summed over the
