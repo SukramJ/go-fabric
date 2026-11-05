@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 7581,
+  "entry_points": 7613,
   "entry_packages": [
     ".",
     "bdx",
@@ -279,9 +279,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 17587,
+    "total_exported": 17595,
     "reachable": 12265,
-    "whitelisted": 5322,
+    "whitelisted": 5330,
     "unreachable": 0
   },
   "by_package": [],
@@ -22332,10 +22332,52 @@
     },
     {
       "package": "controller",
+      "identifier": "TestCameraPortFansOut",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/units_internal_test.go",
+      "line": 90
+    },
+    {
+      "package": "controller",
+      "identifier": "TestControllerAccessorsWithoutServices",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/units_internal_test.go",
+      "line": 130
+    },
+    {
+      "package": "controller",
+      "identifier": "TestFieldsAs",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/units_internal_test.go",
+      "line": 60
+    },
+    {
+      "package": "controller",
       "identifier": "TestOperationalPortParityMatterJS",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/operational_port_parity_matterjs_test.go",
       "line": 20
+    },
+    {
+      "package": "controller",
+      "identifier": "TestServedQualities",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/units_internal_test.go",
+      "line": 80
+    },
+    {
+      "package": "controller",
+      "identifier": "TestSessionIntervalsApply",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/units_internal_test.go",
+      "line": 43
+    },
+    {
+      "package": "controller",
+      "identifier": "TestSessionIntervalsValidate",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/units_internal_test.go",
+      "line": 21
     },
     {
       "package": "controller/attestation",
@@ -28898,6 +28940,13 @@
     },
     {
       "package": "fabrictest",
+      "identifier": "TestControllerAdvertiser",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "fabrictest/controller_advertiser_internal_test.go",
+      "line": 21
+    },
+    {
+      "package": "fabrictest",
       "identifier": "TestControllerFailedStartReleasesItsAddress",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "fabrictest/controller_internal_test.go",
@@ -28916,6 +28965,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "fabrictest/pacing_internal_test.go",
       "line": 122
+    },
+    {
+      "package": "fabrictest",
+      "identifier": "TestEventStatusError",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "fabrictest/controller_advertiser_internal_test.go",
+      "line": 75
     },
     {
       "package": "fabrictest",
