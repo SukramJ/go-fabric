@@ -19,7 +19,7 @@
   },
   {
     "file": "bdx/responder.go",
-    "line": 240,
+    "line": 246,
     "citation": "BdxProtocol.ts:204-211",
     "resolved": "packages/protocol/src/bdx/BdxProtocol.ts",
     "identifier": "SessionFor",
@@ -28,7 +28,7 @@
   },
   {
     "file": "bdx/responder.go",
-    "line": 367,
+    "line": 373,
     "citation": "BdxProtocol.ts:159-164",
     "resolved": "packages/protocol/src/bdx/BdxProtocol.ts",
     "identifier": "onNewExchange",
@@ -1808,7 +1808,7 @@
   },
   {
     "file": "endpoint/materialize.go",
-    "line": 544,
+    "line": 554,
     "citation": "OnOffServer.ts:97-122",
     "resolved": "packages/node/src/behaviors/on-off/OnOffServer.ts",
     "identifier": "OnOff",
@@ -1817,7 +1817,7 @@
   },
   {
     "file": "endpoint/types.go",
-    "line": 755,
+    "line": 765,
     "citation": "OnOffServer.ts:97-100",
     "resolved": "packages/node/src/behaviors/on-off/OnOffServer.ts",
     "identifier": "OnOff",

@@ -192,3 +192,41 @@ func TestGroupKeys_ListGroupKeyMappings_ClosedDB(t *testing.T) {
 		t.Error("ListGroupKeyMappings on closed DB: want error, got nil")
 	}
 }
+
+// TestSettingsAndTables_ClosedDB: the settings, metadata, server
+// subscription, OTA provider, group table, thermostat preset and
+// per-fabric resumption calls report the closed database.
+func TestSettingsAndTables_ClosedDB(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	s := closedStore(t)
+	calls := map[string]func() error{
+		"GetSetting":         func() error { _, _, err := s.GetSetting(ctx, mstore.SettingNodeLabel); return err },
+		"SetSetting":         func() error { return s.SetSetting(ctx, mstore.SettingNodeLabel, "x") },
+		"DeleteSetting":      func() error { return s.DeleteSetting(ctx, mstore.SettingNodeLabel) },
+		"GetMetadataCounter": func() error { _, _, err := s.GetMetadataCounter(ctx, mstore.MetadataKeyEventNumber); return err },
+		"SetMetadataCounter": func() error { return s.SetMetadataCounter(ctx, mstore.MetadataKeyEventNumber, 1) },
+		"SaveServerSubscription": func() error {
+			return s.SaveServerSubscription(ctx, 1, 1, 0x1234, []byte{1})
+		},
+		"DeleteServerSubscription":          func() error { return s.DeleteServerSubscription(ctx, 1) },
+		"DeleteServerSubscriptionsByFabric": func() error { return s.DeleteServerSubscriptionsByFabric(ctx, 1) },
+		"LoadServerSubscriptions":           func() error { _, err := s.LoadServerSubscriptions(ctx); return err },
+		"ClearServerSubscriptions":          func() error { return s.ClearServerSubscriptions(ctx) },
+		"ListDefaultOTAProviders":           func() error { _, err := s.ListDefaultOTAProviders(ctx); return err },
+		"ReplaceDefaultOTAProviders":        func() error { return s.ReplaceDefaultOTAProviders(ctx, 1, nil) },
+		"RemoveGroupTableEntry":             func() error { return s.RemoveGroupTableEntry(ctx, 1, 1) },
+		"ListGroupTable":                    func() error { _, err := s.ListGroupTable(ctx, 1); return err },
+		"LoadThermostatPresets":             func() error { _, _, _, err := s.LoadThermostatPresets(ctx, "ep"); return err },
+		"SaveThermostatPresets":             func() error { return s.SaveThermostatPresets(ctx, "ep", []byte{1}, nil) },
+		"RemoveResumptionsByFabric":         func() error { return s.RemoveResumptionsByFabric(ctx, 1) },
+		"ListGroupcastGroups":               func() error { _, err := s.ListGroupcastGroups(ctx, 1); return err },
+		"ListICDRegistrations":              func() error { _, err := s.ListICDRegistrations(ctx); return err },
+		"ReplaceICDRegistrations":           func() error { return s.ReplaceICDRegistrations(ctx, 1, nil) },
+	}
+	for name, call := range calls {
+		if err := call(); err == nil {
+			t.Errorf("%s on closed DB: want error, got nil", name)
+		}
+	}
+}

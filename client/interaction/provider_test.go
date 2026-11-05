@@ -149,6 +149,9 @@ func TestPeerProvider(t *testing.T) {
 	if _, err := prov.InitiateExchange(context.Background(), interaction.ExchangeOptions{RequireExistingSession: true}); !errors.Is(err, interaction.ErrNoSession) {
 		t.Fatalf("without a session: %v", err)
 	}
+	if prov.VerifyReachability(context.Background()) {
+		t.Fatal("a peer without a session verified reachable")
+	}
 }
 
 // TestMaximumPeerResponseTimeCarriesLocalPad (W4-ctlim-07): with a local

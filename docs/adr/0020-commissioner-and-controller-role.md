@@ -1,6 +1,11 @@
 # ADR 0020 — The commissioner and controller role enters the scope as `controller/`; the responder side stays as it is
 
 - **Status**: Accepted (owner, 2026-10-13; proposed the same day; concept v2
+  Note (2026-11-05, phase 37, issue 410): the rule "nothing outside
+  `controller/` changes for the controller role" is recorded as crossed
+  once more, as BX4 was: `client/interaction` serves requests to the
+  controller's own endpoints, and `endpoint` lists a bare endpoint; both
+  are role-neutral changes below the roles.
   [`../concept-v2-scope-extension.md`](https://github.com/SukramJ/go-fabric/blob/main/docs/history/concept-v2-scope-extension.md)
   decision 0.1, phase 7). The non-goal it supersedes is retired; phase 7
   starts with stage 1.

@@ -3983,6 +3983,12 @@
       "stepsSkipped": 0,
       "source": "TC-CADMIN-1.17.test.ts"
     },
+    "CAMERA-GO/1.1": {
+      "steps": 7,
+      "stepsSkipped": 0,
+      "source": "the camera acceptance of issue 410: one WebRTC session against chip-camera-app at 6170af84, the SDP over TCP (gocert_camera_test.go)",
+      "role": "dut"
+    },
     "DD/1.8": {
       "steps": 7,
       "stepsSkipped": 0,

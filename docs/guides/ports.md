@@ -110,8 +110,9 @@ Use `Observers` instead.
 
 | Field | What it does | When nil or zero |
 | --- | --- | --- |
-| `OTA` (`controller.OTAConfig`) | the OTA push: the update manager (`Controller.SoftwareUpdates`) over an image store (`Images`, nil is an in-memory one without ledgers) and the controller's own node with the OTA provider | no OTA push, no own node |
-| `OTA.StartNode` | starts the own node from a `controller.OwnNodeSpec` and returns it as a `controller.OwnNode` with its address: `node/controllernode.Start`, or a test's starter that runs it on its site (`fabrictest.Site.ControllerConfig` sets one) | required with `OTA`: `New` refuses with `ErrConfiguration` |
+| `OTA` (`controller.OTAConfig`) | the OTA push: the update manager (`Controller.SoftwareUpdates`) over an image store (`Images`, nil is an in-memory one without ledgers), with the OTA provider served at `controller.OTAProviderEndpoint` of the controller's own tree and its BDX responder (`Controller.BDX`) | no OTA push, no provider endpoint |
+| `Camera` (`controller.CameraConfig`) | the controller side of Matter cameras: the Camera Controller endpoint (`controller.CameraControllerEndpoint`) with a WebRtcTransportRequestor the fabric's cameras reach (`Controller.CameraRequestor`, `Controller.OnCameraSignal`), and the operational record of RootNodeID | no camera endpoint |
+| `GroupTransport` (`groups.MulticastTransport`) | the transport group messages leave on (`Controller.Groups`, `Controller.SetGroupKey`) | the controller's own UDP socket |
 | `TCP` (`controller.TCPConfig{Incoming, Outgoing}`) | a TCP listener (`Controller.TCPAddr`) and the TCP initiator | UDP only |
 | `TransportPreference` | the transport each peer prefers | UDP |
 | `Networks`, `OwnNetworkProfile` | the network profiles' defaults and the profile our own MRP margin comes from | matter.js's defaults (`peer.DefaultTemplates`); `fast` |

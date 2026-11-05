@@ -631,11 +631,12 @@ software-update manager: `Controller.SoftwareUpdates()` is a
 announces the provider to it, `ForceUpdate` announces at once,
 `RemoveConsent` cancels, `QueryUpdates` and `CheckForUpdates` look for
 updates in the `softwareupdate.Images` store and the DCL ledgers,
-`QueuedUpdates` shows the queue. The provider runs on the controller's own
-node, which `OTAConfig.StartNode` starts (required;
-`node/controllernode.Start`) in the controller's database and the
-controller commissions into its fabric on first use; `Controller.OwnNode()`
-returns it. The update needs the node's default subscription: the manager
+`QueuedUpdates` shows the queue. The provider is the controller itself: the
+OTA provider server sits at `controller.OTAProviderEndpoint` of the
+controller's own endpoint tree, served as RootNodeID over the sessions the
+controller holds (matter.js's provider on the controller's node), and the
+announced provider is that identity; `Controller.BDX()` is its transfer
+responder. The update needs the node's default subscription: the manager
 judges a node on current data only.
 
 `Manager.Observe(fn)` reports the manager's state as it moves, as a
@@ -656,7 +657,7 @@ idempotent. The `OTAConfig.OnUpdate…` callbacks remain.
 ```go
 images := softwareupdate.NewImages(softwareupdate.ImagesConfig{})
 c, err := controller.New(ctx, controller.Config{ /* … */
-	OTA: &controller.OTAConfig{Images: images, AllowTestImages: true, StartNode: controllernode.Start},
+	OTA: &controller.OTAConfig{Images: images, AllowTestImages: true},
 })
 _, _ = images.Store(ctx, image, softwareupdate.ModeLocal, nil)
 _, err = c.SoftwareUpdates().AddUpdateConsent(ctx, peer, softwareupdate.Target{
@@ -758,8 +759,8 @@ line. The commissioner provisions the dataset as bytes
 ## What is not here yet
 
 BLE on macOS and Windows (ADR 0024 decision 6) is outside the current
-stages. Group messages need a node of the fabric: the reference
-controller uses the controller's own node (`Controller.OwnNode`) for
-`group` and `ota`.
+stages. Group messages and OTA images come from the controller's own
+identity (`Controller.Groups`, `Controller.SetGroupKey`, `Config.OTA`); the
+reference controller's `group` and `ota` commands use them.
 
-*Source: `controller/ota.go`, `controller/tcp.go`, `controller/advertise.go`, `controller/softwareupdate`, `node/controllernode`, `client/peer/network.go`, `controller/client/complete.go`, `examples/reference-controller/README.md` (The controller's own node).*
+*Source: `controller/ota.go`, `controller/tcp.go`, `controller/advertise.go`, `controller/softwareupdate`, `controller/ota_provider.go`, `controller/groups.go`, `controller/serve.go`, `client/peer/network.go`, `controller/client/complete.go`, `examples/reference-controller/README.md` (The controller's own node).*

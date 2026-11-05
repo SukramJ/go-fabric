@@ -77,7 +77,7 @@ var areaKeys = []string{
 	"bridged_endpoints", "budget", "by", "bytes", "candidate",
 	"case_admin_subject", "category", "ceiling", "changed", "channel",
 	"check", "chunk", "chunk_count", "chunks", "cleared", "client_node_id",
-	"closed", "cluster_set", "code", "color_mode", "command", "command_name",
+	"camera", "closed", "cluster_set", "code", "color_mode", "command", "command_name",
 	"concurrent", "configured_ms", "conn", "consecutive_errors", "context",
 	"count", "counter", "counter_start", "country", "ctx_fabric_index",
 	"current", "current_fabric_index", "datagram_bytes", "debug", "delay",
@@ -96,7 +96,7 @@ var areaKeys = []string{
 	"message_bytes", "min", "min_interval", "missing", "more", "name", "new",
 	"next_check_in", "next_query", "noc_bytes", "noc_subject_fabric_id",
 	"noc_subject_node_id", "node", "notifier_ok", "of", "offered", "offline",
-	"op", "opcode", "origin", "original_bytes", "outgoing", "panic", "parent",
+	"op", "opcode", "origin", "original_bytes", "ota", "outgoing", "panic", "parent",
 	"part", "path", "path_index", "paths", "payload_bytes", "policy", "port",
 	"preset_handle", "previous", "product_id", "production", "profile",
 	"protocol_code", "protocol_id", "provider",
@@ -116,6 +116,9 @@ var areaKeys = []string{
 	"sw_version", "system_mode", "target", "tcp", "test", "timed", "timeout",
 	"timeout_ms", "to", "token", "took", "token_version", "total", "total_endpoints",
 	"trimmed_bytes", "type", "uri_node", "url", "valid",
+	// controller/camera (phase 37): a camera's WebRTC session and stream ids
+	// and the track of a session start.
+	"stream_id", "track", "webrtc_session_id",
 	"valid_mapping", "value", "value_type", "vendor_id", "version",
 	"violation", "what", "with_paths",
 }

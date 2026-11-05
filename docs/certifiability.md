@@ -84,7 +84,7 @@ GOFABRIC_CHIP_FAMILIES=IDM,ACL make chiptool-families   # a selection
   harness image; its cases appear below as passed, with their step counts and
   the TS file they follow. The BDX receiver, SU requestor
   and BIND cases run the device as DUT in matter.js too: their PICS are
-  evaluated as stated, the Go TH serves the OTA image from its own node and
+  evaluated as stated, the Go TH serves the OTA image from its own identity and
   scripts its provider's answers as matter.js's cert harness does, and the
   BIND cases run the daemon with `--light-switch`. A step matter.js marks
   long-running (minutes of real time each) runs with
@@ -653,6 +653,7 @@ case counts as passed in its family; one no family of the harness image lists is
 | Case | Steps run | Steps skipped | Source |
 | --- | ---: | ---: | --- |
 | BR/4 | 15 | 0 | Go controller as DUT, after matter.js `TC-BR-4.test.ts`; in no family of the harness image |
+| CAMERA-GO/1.1 | 7 | 0 | Go controller as DUT, the camera acceptance of issue 410: one WebRTC session against chip-camera-app at 6170af84, the SDP over TCP (gocert_camera_test.go); in no family of the harness image |
 | DD/1.8 | 7 | 0 | Go controller as DUT, after matter.js `TC-DD-1.8.test.ts` |
 | DD/3.11 | 6 | 4 | Go controller as DUT, after matter.js `TC-DD-3.11.test.ts` |
 | DD/3.12 | 8 | 5 | Go controller as DUT, after matter.js `TC-DD-3.12.test.ts` |
@@ -672,13 +673,13 @@ the harness image lists; those a family lists carry the same reason on their row
 | Case | Class | Reason |
 | --- | --- | --- |
 | TBRM/3.1 | (b) not supported | controller role: the TH is a Thread border router (`--otbr` needs a live OTBR REST API; matter.js runs it against chip's network-manager app only, TC-TBRM-3.1.test.ts:133-140) |
-| WEBRTCR/2.1 | (b) not supported | controller role: matter.js drives chip's python script (prompt-driven-python-test.ts:41), the DUT answering its prompts — not ported (TC-WEBRTCR-2.1.test.ts:18 TC_WEBRTCR_2_1.py) |
-| WEBRTCR/2.2 | (b) not supported | controller role: matter.js drives chip's python script (prompt-driven-python-test.ts:41), the DUT answering its prompts — not ported (TC-WEBRTCR-2.2.test.ts:18 TC_WEBRTCR_2_2.py) |
-| WEBRTCR/2.3 | (b) not supported | controller role: matter.js drives chip's python script (prompt-driven-python-test.ts:41), the DUT answering its prompts — not ported (TC-WEBRTCR-2.3.test.ts:11 TC_WEBRTCR_2_3.py) |
-| WEBRTCR/2.4 | (b) not supported | controller role: matter.js drives chip's python script (prompt-driven-python-test.ts:41), the DUT answering its prompts — not ported (TC-WEBRTCR-2.4.test.ts:11 TC_WEBRTCR_2_4.py) |
-| WEBRTCR/2.5 | (b) not supported | controller role: matter.js drives chip's python script (prompt-driven-python-test.ts:41), the DUT answering its prompts — not ported (TC-WEBRTCR-2.5.test.ts:30 TC_WEBRTCR_2_5.py) |
-| WEBRTCR/2.6 | (b) not supported | controller role: matter.js drives chip's python script (prompt-driven-python-test.ts:41), the DUT answering its prompts — not ported (TC-WEBRTCR-2.6.test.ts:19 TC_WEBRTCR_2_6.py) |
-| WEBRTCR/2.7 | (b) not supported | controller role: matter.js drives chip's python script (prompt-driven-python-test.ts:41), the DUT answering its prompts — not ported (TC-WEBRTCR-2.7.test.ts:18 TC_WEBRTCR_2_7.py) |
+| WEBRTCR/2.1 | (c) harness | controller role, served since phase 37 (controller.Config.Camera): matter.js drives chip's python script with chip-camera-app as TH_SERVER and the DUT as requestor (tc-webrtcr-support.ts:142-148, prompt-driven-python-test.ts:41) — the prompt-driven runner is a follow-up (TC-WEBRTCR-2.1.test.ts:18 TC_WEBRTCR_2_1.py) |
+| WEBRTCR/2.2 | (c) harness | controller role, served since phase 37 (controller.Config.Camera): matter.js drives chip's python script with chip-camera-app as TH_SERVER and the DUT as requestor (tc-webrtcr-support.ts:142-148, prompt-driven-python-test.ts:41) — the prompt-driven runner is a follow-up (TC-WEBRTCR-2.2.test.ts:18 TC_WEBRTCR_2_2.py) |
+| WEBRTCR/2.3 | (c) harness | controller role, served since phase 37 (controller.Config.Camera): matter.js drives chip's python script with chip-camera-app as TH_SERVER and the DUT as requestor (tc-webrtcr-support.ts:142-148, prompt-driven-python-test.ts:41) — the prompt-driven runner is a follow-up (TC-WEBRTCR-2.3.test.ts:11 TC_WEBRTCR_2_3.py) |
+| WEBRTCR/2.4 | (c) harness | controller role, served since phase 37 (controller.Config.Camera): matter.js drives chip's python script with chip-camera-app as TH_SERVER and the DUT as requestor (tc-webrtcr-support.ts:142-148, prompt-driven-python-test.ts:41) — the prompt-driven runner is a follow-up (TC-WEBRTCR-2.4.test.ts:11 TC_WEBRTCR_2_4.py) |
+| WEBRTCR/2.5 | (c) harness | controller role, served since phase 37 (controller.Config.Camera): matter.js drives chip's python script with chip-camera-app as TH_SERVER and the DUT as requestor (tc-webrtcr-support.ts:142-148, prompt-driven-python-test.ts:41) — the prompt-driven runner is a follow-up (TC-WEBRTCR-2.5.test.ts:30 TC_WEBRTCR_2_5.py) |
+| WEBRTCR/2.6 | (c) harness | controller role, served since phase 37 (controller.Config.Camera): matter.js drives chip's python script with chip-camera-app as TH_SERVER and the DUT as requestor (tc-webrtcr-support.ts:142-148, prompt-driven-python-test.ts:41) — the prompt-driven runner is a follow-up (TC-WEBRTCR-2.6.test.ts:19 TC_WEBRTCR_2_6.py) |
+| WEBRTCR/2.7 | (c) harness | controller role, served since phase 37 (controller.Config.Camera): matter.js drives chip's python script with chip-camera-app as TH_SERVER and the DUT as requestor (tc-webrtcr-support.ts:142-148, prompt-driven-python-test.ts:41) — the prompt-driven runner is a follow-up (TC-WEBRTCR-2.7.test.ts:18 TC_WEBRTCR_2_7.py) |
 
 ### Cases that pass with a recorded gap
 
@@ -710,7 +711,7 @@ whose family is not in that list is "not yet run", not "not supported".
 | CCTRL | the module serves CommissionerControl (`node.Config.CommissionerControl`, ADR 0020 stage 6), but the reference daemon mounts none, and chip runs the cases against its fabric-sync bridge (`TC_CCTRL_2_1.py` CI arguments: `app: examples/fabric-admin/scripts/fabric-sync-app.py`) | (c) not yet run |
 | AVANALY, ESALM, EPALM, TSTATM, ASU, AUDIOCONTROL, MEDIAFILEMANAGEMENT, NETIM, PROXR, HSTAT, COMPRO | the cluster is not in the matter.js snapshot at `862ad75f` (`parity/schema.json`; no `packages/model/src/standard/elements/<name>.element.ts` at the pin): AvAnalysis, ElectricalAlarm, ElectricalProtectionAlarm, ThermostatMode, AmbientSensingUnion, AudioControl, MediaFileManagement, NetworkIdentityManagement, ProximityRanging, Humidistat, CommissioningProxy. chip has them at the harness pin; a server waits for a snapshot that carries the cluster (schema values come from matter.js) | (b) not supported |
 | WEBRTC | `TC_WEBRTC_1_1` to `1_8` establish a WebRTC media session with the camera (`TC_WEBRTC_1_1.py`:77, "Verify the WebRTC session has been successfully established"); the module carries no media stack (`cluster/camera`: the host runs the peer connection), and the harness image's descriptor lists none of the cases | (c) harness |
-| WEBRTCR | controller role: the cases drive a camera controller (the image's descriptor: app `camera-controller`); matter.js runs them with its controller as the DUT, listed under "Controller role" above | (d) out of scope |
+| WEBRTCR | controller role: the cases drive a camera controller (the image's descriptor: app `camera-controller`) through chip's prompt-driven Python runner with chip-camera-app as TH_SERVER; since phase 37 the controller serves the requestor (`controller.Config.Camera`) and `controller/camera` streams from a camera — the `CAMERA-GO/1.1` leg carries one session end to end against chip-camera-app (above) — so the cases wait only for the prompt-driven runner in the harness | (c) harness |
 | the TZ, NTPC, NTPS and TSC cases of TIMESYNC | the module serves the four features after connectedhomeip since wave 27-B (`node.Config.TimeSynchronization`); the reference daemon turns none on, so the cases stay not applicable in the status block above | (c) not yet run |
 
 CNET runs twice. The `CNET` row is the certified default composition, whose

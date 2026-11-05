@@ -417,6 +417,47 @@ CurrentConnections and hands them back in `PushTransportConfig.Connections`
 (or the declaration's `Initial`). The TLS tables persist through the
 servers' `Store`.
 
+## The controller side
+
+Since phase 37 the controller role streams from a Matter camera itself
+(issue 410): `controller.Config.Camera` makes the controller serve a Camera
+Controller endpoint (`controller.CameraControllerEndpoint`) with a
+WebRtcTransportRequestor under its one operational identity — the camera
+stores RootNodeID as the session's peer and calls the controller back over
+the session the controller opened, or over a CASE session of its own to the
+controller's operational record — and `controller/camera` manages the
+streams after matterjs-server (`BD-matterjs-server-CameraStreamManagement`
+in `notes/parity/by_design.md`):
+
+```go
+ctrl, _ := controller.New(ctx, controller.Config{ /* … */
+	Camera: &controller.CameraConfig{}, TCP: controller.TCPConfig{Outgoing: true},
+})
+svc, _ := camera.New(ctx, ctrl, camera.Config{Reports: reports, Observer: obs})
+sess, err := svc.StartStream(ctx, camera.StartRequest{Node: n, Endpoint: 1, Usage: camera.UsageLiveView, Offer: &offer})
+for sig := range sess.Signals() { /* Answer, ICECandidates, End */ }
+_, _ = sess.Stop()
+```
+
+The SDP travels over TCP: ProvideOffer and ProvideAnswer are large-message
+commands, which the client stack sends over TCP only
+(`client/interaction/invoke.go` `inferLargeMessage`), so the controller
+needs `TCP.Outgoing` and the camera a TCP server; `camera.New` refuses with
+`ErrTCPRequired` otherwise, as matterjs-server runs its controller with TCP.
+`Capabilities` reads the camera's features, codecs and allocated streams;
+`StartStream` allocates or reuses a stream within the camera's budget
+(evicting a lower-priority one when allowed), narrows the SDP to what the
+camera can deliver and registers the session with the controller's
+requestor; `Snapshot`, `ReleaseStream`, `StopSession`, `Provider` (the raw
+commands) and `Observer` (a session's end with its cause, an eviction, a
+signal no session holds) complete the surface. Typed errors map one-to-one
+onto matterjs-server's `camera_*` error codes (`*IncompatibleError`,
+`*ExhaustedError`, `*InUseError`, `*NotSupportedError`, `*PrivacyError`,
+`ErrInvalidArgument`). The quirks of real cameras matterjs-server records
+(`docs/CAMERA_LIMITATIONS.md`) are cited constants of the package.
+
+*Source: `controller/serve.go`, `controller/camera/service.go`, `session.go`, `manager*.go`, `provider_sessions.go`, `session_watch.go`, `errors.go`; `client/interaction/server.go`.*
+
 ## The ecosystem gate
 
 Concept v10 §D (owner decision, 2026-10-27), verbatim:
@@ -429,3 +470,12 @@ In English: no host device carries a camera cluster until a live test
 with Apple Home has passed. Apple Home is the only ecosystem with Matter
 camera support in 2026. The same rule applies to MSCH. The reference
 bridge composes none of these clusters.
+
+Reworded for the controller side (owner decision 2026-11-05, issue 410
+decision 5): the gate keeps applying to host devices that show themselves
+as a camera. The controller's requestor (`controller.Config.Camera`, the
+Camera Controller endpoint the controller serves under its own identity)
+is excepted: it is the controller role, not a device an ecosystem sees,
+and passes a live test instead — a stream from a camera that go-ha2fabric
+relays with its opt-in `CAMERA` (default off), and chip's camera-app in the
+harness as the independent counterpart.

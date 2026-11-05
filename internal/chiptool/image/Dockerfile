@@ -89,9 +89,15 @@ LABEL org.opencontainers.image.source=https://github.com/SukramJ/go-fabric/tree/
 LABEL org.opencontainers.image.revision=${CHIP_COMMIT}
 COPY --from=bins /dist/bin/jfa-app /dist/bin/jfc-app /bin/
 COPY --from=source /connectedhomeip/src/tools/push_av_server /src/tools/push_av_server
+# The base image installs libcurl4 for chip-camera-app (matter.js
+# support/chip/Dockerfile:28-33 at 862ad75f); its apt state does not survive
+# the base's cache mounts, so the autoremove below took libcurl4t64 with
+# pip's dependencies (/var/log/apt/history.log of the e443ea0c image), and
+# chip-camera-app no longer loaded ("libcurl.so.4 => not found"). It is
+# marked manual first.
 RUN --mount=type=cache,sharing=locked,target=/var/cache/apt \
     --mount=type=cache,sharing=locked,target=/var/lib/apt \
     apt-get -qq update && apt-get -qq -y install --no-install-recommends python3-pip patch && \
     pip install --break-system-packages --no-cache-dir -r /src/tools/push_av_server/requirements.txt && \
     patch -d "$(python3 -c 'import hypercorn, os; print(os.path.dirname(os.path.dirname(hypercorn.__file__)))')" -p0 < /src/tools/push_av_server/hypercorn.patch && \
-    apt-get -qq -y purge python3-pip && apt-get -qq -y autoremove
+    apt-mark manual libcurl4t64 && apt-get -qq -y purge python3-pip && apt-get -qq -y autoremove

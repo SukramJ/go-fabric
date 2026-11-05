@@ -25,7 +25,9 @@ Welle, die sie betrifft.
   (Schema 14, der python-matter-server-Vertrag), damit Home Assistants
   Matter-Integration ihn als Drop-in verwendet; (b) als
   **Geräteseiten-Server** mit einer Fern-API (Deklaration, Zustandsdeltas,
-  Kommandos) für Hosts, die nicht in Go laufen. Kamera/WebRTC ausgeschlossen.
+  Kommandos) für Hosts, die nicht in Go laufen. Kamera/WebRTC: seit Phase 37
+  (Owner-Entscheidung 2026-11-05, go-fabric #410) im Modul (`controller/camera`);
+  der Server bildet `camera_*` darauf ab (go-fabric-server #40).
 - **0.4 go-hamapping ist ein Go-Modul**, Eingabe das go-hamqtt-Vokabular,
   keine JSON-Form; eigenes Repository wegen zweier Konsumenten (die
   go-*2mqtt-Daemons und go-ha2fabric).
@@ -199,7 +201,7 @@ go-ha2fabric bettet ein (0.2); go-hamapping hat keine JSON-Form (0.4).
   ICD-Kommandos (brauchen Phase 24), `import_test_node`.
 - **Mit M6/ADR 0027 (S3):** `get_thread_border_routers`,
   `get_thread_diagnostics`, `get_network_topology`.
-- **Nie:** Kamera/WebRTC (`camera_*`, `send_webrtc_provider_command`),
+- **Nie (bis Phase 37; seit 2026-11-05 aufgehoben, go-fabric #410 / Server #40):** Kamera/WebRTC (`camera_*`, `send_webrtc_provider_command`),
   BLE-Proxy als Endpunkt `/ble` — der Commissioner spricht BLE lokal
   (ADR 0024); ein Proxy wird erst Thema, wenn ein Container ohne Adapter
   ihn braucht (dann in matterjs-server-Form, Karte 4013-4032).

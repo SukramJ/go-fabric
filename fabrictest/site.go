@@ -144,6 +144,10 @@ type Site struct {
 	nextIndex   int
 	devices     []*Device
 	controllers []*Controller
+	// advertisers are the records of the controllers built on
+	// ControllerConfig (controller_advertiser.go), under advMu.
+	advMu       sync.Mutex
+	advertisers []*controllerAdvertiser
 	closers     []func()
 	closeOnce   sync.Once
 }

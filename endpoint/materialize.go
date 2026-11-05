@@ -66,6 +66,16 @@ func ClusterServers(ep *Endpoint) []contract.ClusterServer { //nolint:funlen // 
 	if ep.IsRoot() || ep.IsAggregator() {
 		return ep.AttachedClusterServers()
 	}
+	if ep.IsBare() {
+		// A bare endpoint: one its composer lists by hand with the servers
+		// it publishes ([Endpoint.PublishClusterServers]) and no source —
+		// the controller role's own endpoints (its camera controller, its
+		// OTA provider), matter.js's plain Endpoint under its node, as
+		// matterjs-server composes them
+		// (packages/ws-controller/src/controller/ControllerNode.ts:140-147
+		// at 0bd06f2). It carries no bridged-device identity.
+		return ep.AttachedClusterServers()
+	}
 
 	// Source / measurement-driven cluster servers come first so the
 	// dispatcher's wildcard read enumerates them in the same order

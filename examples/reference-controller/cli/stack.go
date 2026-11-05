@@ -69,8 +69,7 @@ type stack struct {
 	certs    *dcl.CertificateStore
 	policy   attestation.Policy
 
-	self *selfNode
-	// images is the own node's image store; onStatus the serving
+	// images is the OTA push's image store; onStatus the serving
 	// command's observer of the update statuses, under statusMu.
 	images   *softwareupdate.Images
 	statusMu sync.Mutex
@@ -165,11 +164,20 @@ func openStack(e *env) (_ *stack, err error) {
 			_ = l.Close()
 			return nil, err
 		}
-		cfg.OTA = s.ownNodeConfig()
+		cfg.OTA = s.otaConfig()
+	}
+	if selfHooks.advertiser != nil {
+		cfg.Advertiser = selfHooks.advertiser()
+	}
+	if selfHooks.transport != nil {
+		cfg.GroupTransport = selfHooks.transport()
 	}
 	s.ctl, err = controller.New(e.ctx, cfg)
 	if err != nil {
 		return nil, err // New closed the socket
+	}
+	if selfHooks.started != nil {
+		selfHooks.started(s.ctl.Fabric().RootNodeID, s.ctl.Addr())
 	}
 	s.fabric, s.set, s.com, s.reg = s.ctl.Fabric(), s.ctl.Peers(), s.ctl.Commissioner(), s.ctl.Registry()
 	return s, nil

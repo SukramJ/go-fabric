@@ -42,6 +42,21 @@ still held there. Each row names the facade route, or the section of
 | `cluster/core` | `SoftwareVersionFromString` (`daemon_matter.go:527`) | `node.SoftwareVersionFromString` |
 | `cluster/core` | `RegulatoryIndoorOutdoor` (`daemon_matter.go:506`) | `node.RegulatoryIndoorOutdoor` for `Commissioning.LocationCapability` |
 
+## Removed in the next release: the controller's own node
+
+Phase 37 (issue 410) serves the OTA provider, the group sender and the
+camera controller's requestor from the controller's one operational
+identity. What a host changes:
+
+| Symbol | Route |
+| --- | --- |
+| `node/controllernode` (`Config`, `Start`, `Observe`, `Wrap`, `Node`) | gone: the controller composes the provider itself (`controller/ota_provider.go`) |
+| `controller.OTAConfig.StartNode`, `.Listen`, `.Advertiser`, `.ProductID` | drop them; `controller.Config.Advertiser` publishes the controller's records |
+| `controller.OwnNodeSpec`, `controller.OwnNode`, `Controller.OwnNode()` | `Controller.Fabric().RootNodeID` is the provider's node id, `controller.OTAProviderEndpoint` its endpoint, `Controller.BDX()` its transfers |
+| a `node.Node` reached through `controllernode.Node(own)` for group sending | `Controller.Groups()` and `Controller.SetGroupKey(ctx, keySet, groupID)` |
+
+The database migrates itself at the first start (CHANGELOG "Changed").
+
 ## Removed or changed in the next release: the facade review
 
 The review of 2026-11 (`notes/review/2026-11/wave-5-api.md`) made the

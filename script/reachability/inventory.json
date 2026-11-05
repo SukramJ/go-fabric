@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 7464,
+  "entry_points": 7613,
   "entry_packages": [
     ".",
     "bdx",
@@ -196,6 +196,7 @@
     "controller/ble/bletest",
     "controller/ca",
     "controller/ca/keyfile",
+    "controller/camera",
     "controller/client",
     "controller/client/sqlstore",
     "controller/commissioner",
@@ -233,7 +234,6 @@
     "logring",
     "mdns",
     "node",
-    "node/controllernode",
     "node/metrics/expvar",
     "parity",
     "schema",
@@ -279,9 +279,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 17371,
-    "reachable": 12165,
-    "whitelisted": 5206,
+    "total_exported": 17595,
+    "reachable": 12265,
+    "whitelisted": 5330,
     "unreachable": 0
   },
   "by_package": [],
@@ -22314,14 +22314,14 @@
       "identifier": "PairingPhase",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "controller/controller.go",
-      "line": 563
+      "line": 635
     },
     {
       "package": "controller",
       "identifier": "PairingStep",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "controller/controller.go",
-      "line": 559
+      "line": 631
     },
     {
       "package": "controller",
@@ -22332,10 +22332,52 @@
     },
     {
       "package": "controller",
+      "identifier": "TestCameraPortFansOut",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/units_internal_test.go",
+      "line": 90
+    },
+    {
+      "package": "controller",
+      "identifier": "TestControllerAccessorsWithoutServices",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/units_internal_test.go",
+      "line": 130
+    },
+    {
+      "package": "controller",
+      "identifier": "TestFieldsAs",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/units_internal_test.go",
+      "line": 60
+    },
+    {
+      "package": "controller",
       "identifier": "TestOperationalPortParityMatterJS",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/operational_port_parity_matterjs_test.go",
       "line": 20
+    },
+    {
+      "package": "controller",
+      "identifier": "TestServedQualities",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/units_internal_test.go",
+      "line": 80
+    },
+    {
+      "package": "controller",
+      "identifier": "TestSessionIntervalsApply",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/units_internal_test.go",
+      "line": 43
+    },
+    {
+      "package": "controller",
+      "identifier": "TestSessionIntervalsValidate",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/units_internal_test.go",
+      "line": 21
     },
     {
       "package": "controller/attestation",
@@ -22665,6 +22707,818 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/ca/keyfile/keyfile_test.go",
       "line": 80
+    },
+    {
+      "package": "controller/camera",
+      "identifier": "Signal",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/camera/service.go",
+      "line": 42
+    },
+    {
+      "package": "controller/camera",
+      "identifier": "TestAnswerWithinOfferedDirectionsParityMatterjsServer",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/camera/policy_sdp_parity_matterjsserver_test.go",
+      "line": 436
+    },
+    {
+      "package": "controller/camera",
+      "identifier": "TestCameraErrors",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/camera/camera_internal_test.go",
+      "line": 49
+    },
+    {
+      "package": "controller/camera",
+      "identifier": "TestCameraFieldRangesFromModel",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/camera/camera_internal_test.go",
+      "line": 33
+    },
+    {
+      "package": "controller/camera",
+      "identifier": "TestCameraQuirkConstants",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/camera/camera_internal_test.go",
+      "line": 24
+    },
+    {
+      "package": "controller/camera",
+      "identifier": "TestCertificationWindowParityMatterjsServer",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/camera/policy_stream_parity_matterjsserver_test.go",
+      "line": 405
+    },
+    {
+      "package": "controller/camera",
+      "identifier": "TestChooseEvictionVictimParityMatterjsServer",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/camera/policy_stream_parity_matterjsserver_test.go",
+      "line": 804
+    },
+    {
+      "package": "controller/camera",
+      "identifier": "TestChooseSnapshotStreamToFreeParityMatterjsServer",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/camera/policy_snapshot_parity_matterjsserver_test.go",
+      "line": 316
+    },
+    {
+      "package": "controller/camera",
+      "identifier": "TestClientIOAbandon",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/camera/client_io_internal_test.go",
+      "line": 40
+    },
+    {
+      "package": "controller/camera",
+      "identifier": "TestClientIOTimePush",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/camera/client_io_internal_test.go",
+      "line": 20
+    },
+    {
+      "package": "controller/camera",
+      "identifier": "TestCommandsErrorsCameraServerErrorsParityMatterjsServer",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/camera/commands_errors_parity_matterjsserver_test.go",
+      "line": 480
+    },
+    {
+      "package": "controller/camera",
+      "identifier": "TestCommandsErrorsParseReleaseStreamArgsParityMatterjsServer",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/camera/commands_errors_parity_matterjsserver_test.go",
+      "line": 346
+    },
+    {
+      "package": "controller/camera",
+      "identifier": "TestCommandsErrorsParseSnapshotArgsParityMatterjsServer",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/camera/commands_errors_parity_matterjsserver_test.go",
+      "line": 299
+    },
+    {
+      "package": "controller/camera",
+      "identifier": "TestCommandsErrorsParseStartStreamArgsParityMatterjsServer",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/camera/commands_errors_parity_matterjsserver_test.go",
+      "line": 89
+    },
+    {
+      "package": "controller/camera",
+      "identifier": "TestCommandsErrorsToWireCapabilitiesParityMatterjsServer",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/camera/commands_errors_parity_matterjsserver_test.go",
+      "line": 374
+    },
+    {
+      "package": "controller/camera",
+      "identifier": "TestCommandsErrorsToWireStartStreamResultParityMatterjsServer",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/camera/commands_errors_parity_matterjsserver_test.go",
+      "line": 427
+    },
+    {
+      "package": "controller/camera",
+      "identifier": "TestComputeAudioEnvelopeParityMatterjsServer",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/camera/policy_stream_parity_matterjsserver_test.go",
+      "line": 855
+    },
+    {
+      "package": "controller/camera",
+      "identifier": "TestComputeVideoEnvelopeParityMatterjsServer",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/camera/policy_stream_parity_matterjsserver_test.go",
+      "line": 93
+    },
+    {
+      "package": "controller/camera",
+      "identifier": "TestDecodableVideoCodecsParityMatterjsServer",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/camera/policy_sdp_parity_matterjsserver_test.go",
+      "line": 275
+    },
+    {
+      "package": "controller/camera",
+      "identifier": "TestDeviceIOImageParityMatterjsServer",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/camera/device_fabrictest_internal_test.go",
+      "line": 346
+    },
+    {
+      "package": "controller/camera",
+      "identifier": "TestDeviceIORoutingParityMatterjsServer",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/camera/device_io_parity_matterjsserver_test.go",
+      "line": 213
+    },
+    {
+      "package": "controller/camera",
+      "identifier": "TestDeviceIOStreamListReadParityMatterjsServer",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/camera/device_io_parity_matterjsserver_test.go",
+      "line": 290
+    },
+    {
+      "package": "controller/camera",
+      "identifier": "TestDeviceIOToCameraStateParityMatterjsServer",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/camera/device_io_parity_matterjsserver_test.go",
+      "line": 61
+    },
+    {
+      "package": "controller/camera",
+      "identifier": "TestEncodersExhaustedParityMatterjsServer",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/camera/policy_snapshot_parity_matterjsserver_test.go",
+      "line": 76
+    },
+    {
+      "package": "controller/camera",
+      "identifier": "TestFindAdoptableSnapshotStreamParityMatterjsServer",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/camera/policy_snapshot_parity_matterjsserver_test.go",
+      "line": 369
+    },
+    {
+      "package": "controller/camera",
+      "identifier": "TestFindDegradedVideoStreamParityMatterjsServer",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/camera/policy_stream_parity_matterjsserver_test.go",
+      "line": 674
+    },
+    {
+      "package": "controller/camera",
+      "identifier": "TestFindReusableVideoStreamParityMatterjsServer",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/camera/policy_stream_parity_matterjsserver_test.go",
+      "line": 465
+    },
+    {
+      "package": "controller/camera",
+      "identifier": "TestFirstVideoWindowParityMatterjsServer",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/camera/policy_stream_search_parity_matterjsserver_test.go",
+      "line": 594
+    },
+    {
+      "package": "controller/camera",
+      "identifier": "TestFreeEncodedPixelRateParityMatterjsServer",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/camera/policy_stream_parity_matterjsserver_test.go",
+      "line": 740
+    },
+    {
+      "package": "controller/camera",
+      "identifier": "TestIsDegradedFromTargetParityMatterjsServer",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/camera/policy_snapshot_parity_matterjsserver_test.go",
+      "line": 279
+    },
+    {
+      "package": "controller/camera",
+      "identifier": "TestMediaRefusalParityMatterjsServer",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/camera/policy_sdp_parity_matterjsserver_test.go",
+      "line": 320
+    },
+    {
+      "package": "controller/camera",
+      "identifier": "TestOutcomeWaitEndsWithItsContext",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/camera/camera_internal_test.go",
+      "line": 287
+    },
+    {
+      "package": "controller/camera",
+      "identifier": "TestOverlaySupportParityMatterjsServer",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/camera/policy_overlay_parity_matterjsserver_test.go",
+      "line": 34
+    },
+    {
+      "package": "controller/camera",
+      "identifier": "TestOverlaysMatchParityMatterjsServer",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/camera/policy_overlay_parity_matterjsserver_test.go",
+      "line": 92
+    },
+    {
+      "package": "controller/camera",
+      "identifier": "TestParseSdpVideoConstraintsDispositionParityMatterjsServer",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/camera/policy_sdp_parity_matterjsserver_test.go",
+      "line": 182
+    },
+    {
+      "package": "controller/camera",
+      "identifier": "TestParseSdpVideoConstraintsLimitsParityMatterjsServer",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/camera/policy_sdp_parity_matterjsserver_test.go",
+      "line": 118
+    },
+    {
+      "package": "controller/camera",
+      "identifier": "TestPlanBitRateFloorParityMatterjsServer",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/camera/policy_stream_parity_matterjsserver_test.go",
+      "line": 345
+    },
+    {
+      "package": "controller/camera",
+      "identifier": "TestProviderArgumentsBothRoutesParityMatterjsServer",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/camera/provider_arguments_parity_matterjsserver_test.go",
+      "line": 90
+    },
+    {
+      "package": "controller/camera",
+      "identifier": "TestProviderArgumentsFieldsParityMatterjsServer",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/camera/provider_arguments_parity_matterjsserver_test.go",
+      "line": 191
+    },
+    {
+      "package": "controller/camera",
+      "identifier": "TestProviderArgumentsGatedFieldsParityMatterjsServer",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/camera/provider_arguments_parity_matterjsserver_test.go",
+      "line": 121
+    },
+    {
+      "package": "controller/camera",
+      "identifier": "TestProviderCommandNames",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/camera/camera_internal_test.go",
+      "line": 83
+    },
+    {
+      "package": "controller/camera",
+      "identifier": "TestProviderDeviceParityMatterjsServer",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/camera/device_fabrictest_internal_test.go",
+      "line": 225
+    },
+    {
+      "package": "controller/camera",
+      "identifier": "TestProviderSessionsAbandonParityMatterjsServer",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/camera/provider_sessions_parity_matterjsserver_test.go",
+      "line": 587
+    },
+    {
+      "package": "controller/camera",
+      "identifier": "TestProviderSessionsClockParityMatterjsServer",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/camera/provider_sessions_parity_matterjsserver_test.go",
+      "line": 504
+    },
+    {
+      "package": "controller/camera",
+      "identifier": "TestProviderSessionsEstablishParityMatterjsServer",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/camera/provider_sessions_parity_matterjsserver_test.go",
+      "line": 388
+    },
+    {
+      "package": "controller/camera",
+      "identifier": "TestProviderSessionsWatchParityMatterjsServer",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/camera/provider_sessions_parity_matterjsserver_test.go",
+      "line": 253
+    },
+    {
+      "package": "controller/camera",
+      "identifier": "TestRequestedResolutionParityMatterjsServer",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/camera/policy_snapshot_parity_matterjsserver_test.go",
+      "line": 249
+    },
+    {
+      "package": "controller/camera",
+      "identifier": "TestResolveOverlaysParityMatterjsServer",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/camera/policy_overlay_parity_matterjsserver_test.go",
+      "line": 49
+    },
+    {
+      "package": "controller/camera",
+      "identifier": "TestSatisfiesAudioCallerBoundsParityMatterjsServer",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/camera/policy_stream_parity_matterjsserver_test.go",
+      "line": 786
+    },
+    {
+      "package": "controller/camera",
+      "identifier": "TestSatisfiesVideoCallerBoundsParityMatterjsServer",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/camera/policy_stream_parity_matterjsserver_test.go",
+      "line": 632
+    },
+    {
+      "package": "controller/camera",
+      "identifier": "TestSelectSnapshotCapabilitiesParityMatterjsServer",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/camera/policy_snapshot_parity_matterjsserver_test.go",
+      "line": 124
+    },
+    {
+      "package": "controller/camera",
+      "identifier": "TestSelectSnapshotCapabilitiesTargetParityMatterjsServer",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/camera/policy_snapshot_parity_matterjsserver_test.go",
+      "line": 194
+    },
+    {
+      "package": "controller/camera",
+      "identifier": "TestServiceWiringParityMatterjsServer",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/camera/service_parity_matterjsserver_test.go",
+      "line": 55
+    },
+    {
+      "package": "controller/camera",
+      "identifier": "TestSessionRegistryClaimAndForget",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/camera/camera_internal_test.go",
+      "line": 254
+    },
+    {
+      "package": "controller/camera",
+      "identifier": "TestSessionRegistryClientKeysParityMatterjsServer",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/camera/registry_parity_matterjsserver_test.go",
+      "line": 46
+    },
+    {
+      "package": "controller/camera",
+      "identifier": "TestSessionRegistryEndSessionOfAnUnknownID",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/camera/camera_internal_test.go",
+      "line": 213
+    },
+    {
+      "package": "controller/camera",
+      "identifier": "TestSessionRegistryEstablishingSessionEndedByEndSession",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/camera/camera_internal_test.go",
+      "line": 232
+    },
+    {
+      "package": "controller/camera",
+      "identifier": "TestSessionRegistryForgetNodeParityMatterjsServer",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/camera/registry_parity_matterjsserver_test.go",
+      "line": 290
+    },
+    {
+      "package": "controller/camera",
+      "identifier": "TestSessionRegistryIssuedParityMatterjsServer",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/camera/registry_parity_matterjsserver_test.go",
+      "line": 164
+    },
+    {
+      "package": "controller/camera",
+      "identifier": "TestSessionRegistryReportDuringEstablishmentParityMatterjsServer",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/camera/registry_parity_matterjsserver_test.go",
+      "line": 217
+    },
+    {
+      "package": "controller/camera",
+      "identifier": "TestSessionRegistryScopesByNodeAndKey",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/camera/camera_internal_test.go",
+      "line": 304
+    },
+    {
+      "package": "controller/camera",
+      "identifier": "TestSessionRegistryStopFailureKeepsTheSession",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/camera/camera_internal_test.go",
+      "line": 189
+    },
+    {
+      "package": "controller/camera",
+      "identifier": "TestSessionRegistryStopNotFoundAnnouncesTheCameraEnd",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/camera/camera_internal_test.go",
+      "line": 169
+    },
+    {
+      "package": "controller/camera",
+      "identifier": "TestSessionRegistryStopSharesOneEndSession",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/camera/camera_internal_test.go",
+      "line": 123
+    },
+    {
+      "package": "controller/camera",
+      "identifier": "TestSessionRegistryVanishedAfterAReportDroppedIt",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/camera/camera_internal_test.go",
+      "line": 278
+    },
+    {
+      "package": "controller/camera",
+      "identifier": "TestSessionStreamsEstablishParityMatterjsServer",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/camera/session_streams_parity_matterjsserver_test.go",
+      "line": 295
+    },
+    {
+      "package": "controller/camera",
+      "identifier": "TestSessionStreamsRecordedOffersParityMatterjsServer",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/camera/session_streams_parity_matterjsserver_test.go",
+      "line": 528
+    },
+    {
+      "package": "controller/camera",
+      "identifier": "TestSessionStreamsResolveParityMatterjsServer",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/camera/session_streams_parity_matterjsserver_test.go",
+      "line": 36
+    },
+    {
+      "package": "controller/camera",
+      "identifier": "TestSessionStreamsSelectParityMatterjsServer",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/camera/session_streams_parity_matterjsserver_test.go",
+      "line": 67
+    },
+    {
+      "package": "controller/camera",
+      "identifier": "TestSessionStreamsTrackableParityMatterjsServer",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/camera/session_streams_parity_matterjsserver_test.go",
+      "line": 158
+    },
+    {
+      "package": "controller/camera",
+      "identifier": "TestSessionStreamsTrackedSessionOfParityMatterjsServer",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/camera/session_streams_parity_matterjsserver_test.go",
+      "line": 591
+    },
+    {
+      "package": "controller/camera",
+      "identifier": "TestSessionWatchParityMatterjsServer",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/camera/session_watch_parity_matterjsserver_test.go",
+      "line": 219
+    },
+    {
+      "package": "controller/camera",
+      "identifier": "TestSignallingHoldParityMatterjsServer",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/camera/signalling_parity_matterjsserver_test.go",
+      "line": 53
+    },
+    {
+      "package": "controller/camera",
+      "identifier": "TestSignallingSendsParityMatterjsServer",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/camera/signalling_parity_matterjsserver_test.go",
+      "line": 94
+    },
+    {
+      "package": "controller/camera",
+      "identifier": "TestSliceAGetCapabilitiesParityMatterjsServer",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/camera/manager_slice_a_parity_matterjsserver_test.go",
+      "line": 225
+    },
+    {
+      "package": "controller/camera",
+      "identifier": "TestSliceAResolveAudioStreamParityMatterjsServer",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/camera/manager_slice_a_parity_matterjsserver_test.go",
+      "line": 1448
+    },
+    {
+      "package": "controller/camera",
+      "identifier": "TestSliceAResolveVideoStreamParityMatterjsServer",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/camera/manager_slice_a_parity_matterjsserver_test.go",
+      "line": 349
+    },
+    {
+      "package": "controller/camera",
+      "identifier": "TestSliceAWithEndpointLockParityMatterjsServer",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/camera/manager_slice_a_parity_matterjsserver_test.go",
+      "line": 1395
+    },
+    {
+      "package": "controller/camera",
+      "identifier": "TestSliceBSessionsAnnouncesExactlyOnceParityMatterjsServer",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/camera/manager_slice_b_parity_matterjsserver_test.go",
+      "line": 1768
+    },
+    {
+      "package": "controller/camera",
+      "identifier": "TestSliceBSessionsClientSessionKeysParityMatterjsServer",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/camera/manager_slice_b_parity_matterjsserver_test.go",
+      "line": 2420
+    },
+    {
+      "package": "controller/camera",
+      "identifier": "TestSliceBSessionsEndpointLockParityMatterjsServer",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/camera/manager_slice_b_parity_matterjsserver_test.go",
+      "line": 1173
+    },
+    {
+      "package": "controller/camera",
+      "identifier": "TestSliceBSessionsFailedStartsParityMatterjsServer",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/camera/manager_slice_b_parity_matterjsserver_test.go",
+      "line": 2043
+    },
+    {
+      "package": "controller/camera",
+      "identifier": "TestSliceBSessionsRegistryParityMatterjsServer",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/camera/manager_slice_b_parity_matterjsserver_test.go",
+      "line": 1298
+    },
+    {
+      "package": "controller/camera",
+      "identifier": "TestSliceBSessionsReleasesParityMatterjsServer",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/camera/manager_slice_b_parity_matterjsserver_test.go",
+      "line": 2179
+    },
+    {
+      "package": "controller/camera",
+      "identifier": "TestSliceBSessionsReportsInFlightParityMatterjsServer",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/camera/manager_slice_b_parity_matterjsserver_test.go",
+      "line": 1643
+    },
+    {
+      "package": "controller/camera",
+      "identifier": "TestSliceBSessionsReportsParityMatterjsServer",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/camera/manager_slice_b_parity_matterjsserver_test.go",
+      "line": 1834
+    },
+    {
+      "package": "controller/camera",
+      "identifier": "TestSliceBSessionsStopsParityMatterjsServer",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/camera/manager_slice_b_parity_matterjsserver_test.go",
+      "line": 994
+    },
+    {
+      "package": "controller/camera",
+      "identifier": "TestSliceBSessionsTalkbackNoticeParityMatterjsServer",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/camera/manager_slice_b_parity_matterjsserver_test.go",
+      "line": 804
+    },
+    {
+      "package": "controller/camera",
+      "identifier": "TestSliceBSessionsTalkbackParityMatterjsServer",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/camera/manager_slice_b_parity_matterjsserver_test.go",
+      "line": 885
+    },
+    {
+      "package": "controller/camera",
+      "identifier": "TestSliceBSessionsTracksParityMatterjsServer",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/camera/manager_slice_b_parity_matterjsserver_test.go",
+      "line": 502
+    },
+    {
+      "package": "controller/camera",
+      "identifier": "TestSliceCCameraNotSupportedParityMatterjsServer",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/camera/manager_slice_c_parity_matterjsserver_test.go",
+      "line": 812
+    },
+    {
+      "package": "controller/camera",
+      "identifier": "TestSliceCLeasesParityMatterjsServer",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/camera/manager_slice_c_parity_matterjsserver_test.go",
+      "line": 890
+    },
+    {
+      "package": "controller/camera",
+      "identifier": "TestSliceCReleaseStreamParityMatterjsServer",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/camera/manager_slice_c_parity_matterjsserver_test.go",
+      "line": 835
+    },
+    {
+      "package": "controller/camera",
+      "identifier": "TestSliceCReuseBeforeTheDeviceHasReportedParityMatterjsServer",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/camera/manager_slice_c_parity_matterjsserver_test.go",
+      "line": 1151
+    },
+    {
+      "package": "controller/camera",
+      "identifier": "TestSliceCSnapshotParityMatterjsServer",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/camera/manager_slice_c_parity_matterjsserver_test.go",
+      "line": 386
+    },
+    {
+      "package": "controller/camera",
+      "identifier": "TestSliceCSnapshotWithAResolutionTargetParityMatterjsServer",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/camera/manager_slice_c_parity_matterjsserver_test.go",
+      "line": 320
+    },
+    {
+      "package": "controller/camera",
+      "identifier": "TestSliceDAllocateAnsweredOutsideBoundsParityMatterjsServer",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/camera/manager_slice_d_parity_matterjsserver_test.go",
+      "line": 1489
+    },
+    {
+      "package": "controller/camera",
+      "identifier": "TestSliceDAllocateAnsweredWithExistingStreamParityMatterjsServer",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/camera/manager_slice_d_parity_matterjsserver_test.go",
+      "line": 1278
+    },
+    {
+      "package": "controller/camera",
+      "identifier": "TestSliceDDeallocateNotFoundWhileMakingRoomParityMatterjsServer",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/camera/manager_slice_d_parity_matterjsserver_test.go",
+      "line": 2090
+    },
+    {
+      "package": "controller/camera",
+      "identifier": "TestSliceDDeviceCleanupBudgetParityMatterjsServer",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/camera/manager_slice_d_parity_matterjsserver_test.go",
+      "line": 311
+    },
+    {
+      "package": "controller/camera",
+      "identifier": "TestSliceDDeviceFeaturesAndPrivacyParityMatterjsServer",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/camera/manager_slice_d_parity_matterjsserver_test.go",
+      "line": 584
+    },
+    {
+      "package": "controller/camera",
+      "identifier": "TestSliceDEvictionOrderParityMatterjsServer",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/camera/manager_slice_d_parity_matterjsserver_test.go",
+      "line": 1920
+    },
+    {
+      "package": "controller/camera",
+      "identifier": "TestSliceDOverlaysParityMatterjsServer",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/camera/manager_slice_d_parity_matterjsserver_test.go",
+      "line": 958
+    },
+    {
+      "package": "controller/camera",
+      "identifier": "TestSliceDPreferredVideoCodecParityMatterjsServer",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/camera/manager_slice_d_parity_matterjsserver_test.go",
+      "line": 211
+    },
+    {
+      "package": "controller/camera",
+      "identifier": "TestSliceDStreamListReadAfterExistingStreamParityMatterjsServer",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/camera/manager_slice_d_parity_matterjsserver_test.go",
+      "line": 2069
+    },
+    {
+      "package": "controller/camera",
+      "identifier": "TestSliceDUntrackedSessionEndsParityMatterjsServer",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/camera/manager_slice_d_parity_matterjsserver_test.go",
+      "line": 2157
+    },
+    {
+      "package": "controller/camera",
+      "identifier": "TestUsesHardwareEncoderParityMatterjsServer",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/camera/policy_snapshot_parity_matterjsserver_test.go",
+      "line": 50
+    },
+    {
+      "package": "controller/camera",
+      "identifier": "TestVideoAllocateFakeCameraParityMatterjsServer",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/camera/video_allocate_parity_matterjsserver_test.go",
+      "line": 182
+    },
+    {
+      "package": "controller/camera",
+      "identifier": "TestVideoAllocateFixedProfilesParityMatterjsServer",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/camera/video_allocate_parity_matterjsserver_test.go",
+      "line": 240
+    },
+    {
+      "package": "controller/camera",
+      "identifier": "TestVideoWindowSearchBitRateFloorParityMatterjsServer",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/camera/policy_stream_search_parity_matterjsserver_test.go",
+      "line": 292
+    },
+    {
+      "package": "controller/camera",
+      "identifier": "TestVideoWindowSearchBudgetParityMatterjsServer",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/camera/policy_stream_search_parity_matterjsserver_test.go",
+      "line": 361
+    },
+    {
+      "package": "controller/camera",
+      "identifier": "TestVideoWindowSearchCapacityParityMatterjsServer",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/camera/policy_stream_search_parity_matterjsserver_test.go",
+      "line": 151
+    },
+    {
+      "package": "controller/camera",
+      "identifier": "TestVideoWindowSearchCertificationParityMatterjsServer",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/camera/policy_stream_search_parity_matterjsserver_test.go",
+      "line": 455
+    },
+    {
+      "package": "controller/camera",
+      "identifier": "TestVideoWindowSearchParityMatterjsServer",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/camera/policy_stream_search_parity_matterjsserver_test.go",
+      "line": 540
+    },
+    {
+      "package": "controller/camera",
+      "identifier": "TestVideoWindowSearchUnservableParityMatterjsServer",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/camera/policy_stream_search_parity_matterjsserver_test.go",
+      "line": 94
+    },
+    {
+      "package": "controller/camera",
+      "identifier": "TestWithoutTalkbackParityMatterjsServer",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/camera/policy_sdp_parity_matterjsserver_test.go",
+      "line": 349
     },
     {
       "package": "controller/client",
@@ -28086,6 +28940,13 @@
     },
     {
       "package": "fabrictest",
+      "identifier": "TestControllerAdvertiser",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "fabrictest/controller_advertiser_internal_test.go",
+      "line": 21
+    },
+    {
+      "package": "fabrictest",
       "identifier": "TestControllerFailedStartReleasesItsAddress",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "fabrictest/controller_internal_test.go",
@@ -28104,6 +28965,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "fabrictest/pacing_internal_test.go",
       "line": 122
+    },
+    {
+      "package": "fabrictest",
+      "identifier": "TestEventStatusError",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "fabrictest/controller_advertiser_internal_test.go",
+      "line": 75
     },
     {
       "package": "fabrictest",
@@ -30399,7 +31267,7 @@
       "identifier": "TestFamilyDeviceTypesResolve",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "internal/chiptool/certifiability_doc_test.go",
-      "line": 452
+      "line": 462
     },
     {
       "package": "internal/chiptool",
@@ -30434,7 +31302,7 @@
       "identifier": "TestWorkflowRunsEveryFamily",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "internal/chiptool/certifiability_doc_test.go",
-      "line": 364
+      "line": 374
     },
     {
       "package": "internal/paritytest",

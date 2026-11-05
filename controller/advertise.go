@@ -40,10 +40,7 @@ type Advertise struct {
 // [Controller.Close]). The instance id is 8 random bytes, as matter.js's
 // MdnsAdvertiser.createInstanceId (MdnsAdvertiser.ts:102-104).
 func (c *Controller) advertise(ctx context.Context, a Advertise, adv mdns.Advertiser, vendor uint16) error {
-	own := adv == nil
-	if own {
-		adv = mdns.NewResponder()
-	}
+	adv = c.openAdvertiser(adv)
 	if a.VendorID == 0 {
 		a.VendorID = vendor
 	}
@@ -54,19 +51,25 @@ func (c *Controller) advertise(ctx context.Context, a Advertise, adv mdns.Advert
 	_, _ = rand.Read(cfg.InstanceID[:])
 	svc := mdns.BuildCommissionerService(cfg)
 	if err := adv.Publish(ctx, svc); err != nil {
-		if own {
-			_ = adv.Close()
-		}
 		return fmt.Errorf("controller: commissioner advertisement: %w", err)
 	}
 	c.unadvertise = func(ctx context.Context) error {
-		err := adv.Withdraw(ctx, svc.InstanceName, mdns.ServiceTypeCommissioner)
-		if own {
-			if cerr := adv.Close(); err == nil {
-				err = cerr
-			}
-		}
-		return err
+		return adv.Withdraw(ctx, svc.InstanceName, mdns.ServiceTypeCommissioner)
 	}
 	return nil
+}
+
+// openAdvertiser is the controller's advertiser: adv when given, else a
+// responder of its own that Close closes (mdns.NewResponder); opened once
+// for every record the controller publishes.
+func (c *Controller) openAdvertiser(adv mdns.Advertiser) mdns.Advertiser {
+	if c.adv != nil {
+		return c.adv
+	}
+	if adv == nil {
+		adv = mdns.NewResponder()
+		c.advOwn = true
+	}
+	c.adv = adv
+	return adv
 }

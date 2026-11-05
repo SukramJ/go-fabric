@@ -1,0 +1,227 @@
+{
+  "commit": "0bd06f222a3d51415980022c5f207705de57b8aa",
+  "roots": [
+    "packages/ws-client/test/TopologyUtilsTest.ts",
+    "packages/ws-controller/test/CameraCommandsTest.ts",
+    "packages/ws-controller/test/CameraErrorsTest.ts",
+    "packages/ws-controller/test/CameraStreamManagerTest.ts",
+    "packages/ws-controller/test/CameraVideoAllocateTest.ts",
+    "packages/ws-controller/test/CameraWireContractTest.ts",
+    "packages/ws-controller/test/MatterCameraDeviceIoTest.ts",
+    "packages/ws-controller/test/MatterControllerCameraStreamsTest.ts",
+    "packages/ws-controller/test/NetworkTopologyServiceTest.ts",
+    "packages/ws-controller/test/OverlayPolicyTest.ts",
+    "packages/ws-controller/test/SdpConstraintsTest.ts",
+    "packages/ws-controller/test/SessionRegistryClientKeyTest.ts",
+    "packages/ws-controller/test/SnapshotPolicyTest.ts",
+    "packages/ws-controller/test/StartingSessionSignallingTest.ts",
+    "packages/ws-controller/test/StreamPolicyTest.ts",
+    "packages/ws-controller/test/VideoWindowSearchTest.ts",
+    "packages/ws-controller/test/WebRtcCallbackBridgeTest.ts",
+    "packages/ws-controller/test/WebRtcProviderArgumentsTest.ts",
+    "packages/ws-controller/test/WebRtcProviderDeviceTest.ts",
+    "packages/ws-controller/test/WebRtcProviderSessionWatchTest.ts",
+    "packages/ws-controller/test/WebRtcProviderSessionsTest.ts",
+    "packages/ws-controller/test/WebRtcSessionStreamsTest.ts"
+  ],
+  "files": [
+    {
+      "path": "packages/ws-client/test/TopologyUtilsTest.ts",
+      "lines": 690,
+      "sha": "18cc8e04aeb5f9ef3d427b796b685d80ecdff0c2",
+      "describes": [
+        "topology-utils"
+      ]
+    },
+    {
+      "path": "packages/ws-controller/test/CameraCommandsTest.ts",
+      "lines": 1398,
+      "sha": "5b06248f35ffb023ccdab3e0e64602e25ae29556",
+      "describes": [
+        "cameraCommands"
+      ]
+    },
+    {
+      "path": "packages/ws-controller/test/CameraErrorsTest.ts",
+      "lines": 201,
+      "sha": "e8e6072b8d4baba4412ac9f316b2d3d8158fc38e",
+      "describes": [
+        "camera server errors"
+      ]
+    },
+    {
+      "path": "packages/ws-controller/test/CameraStreamManagerTest.ts",
+      "lines": 10369,
+      "sha": "56f452c0535ca2bfc1d69af935636eb1dbc20aef",
+      "describes": [
+        "CameraStreamManager",
+        "CameraStreamManager reuse before the device has reported",
+        "preferredVideoCodec",
+        "CameraStreamManager device cleanup budget",
+        "CameraStreamManager overlays",
+        "CameraStreamManager allocate answered with an existing stream",
+        "CameraStreamManager allocate answered with an existing stream outside the caller's bounds",
+        "CameraStreamManager eviction order",
+        "CameraStreamManager stream list read after an allocate answered with an existing stream",
+        "CameraStreamManager deallocate answered with NOT_FOUND while making room",
+        "CameraStreamManager track left out when not demanded",
+        "CameraStreamManager untracked session ends"
+      ]
+    },
+    {
+      "path": "packages/ws-controller/test/CameraVideoAllocateTest.ts",
+      "lines": 611,
+      "sha": "4506f229c6a033503cd407378205c3dd183fe51f",
+      "describes": [
+        "VideoStreamAllocate against a camera with fixed stream profiles"
+      ]
+    },
+    {
+      "path": "packages/ws-controller/test/CameraWireContractTest.ts",
+      "lines": 598,
+      "sha": "9cd2baf63571e3989f1fe164601a0bca64dbf4de",
+      "describes": [
+        "camera wire contract"
+      ]
+    },
+    {
+      "path": "packages/ws-controller/test/MatterCameraDeviceIoTest.ts",
+      "lines": 909,
+      "sha": "4982d64c2ec3a967908bc7c7feb570d34c7fb99a",
+      "describes": [
+        "toCameraState",
+        "MatterCameraDeviceIo.invoke (webrtcProvider routing)",
+        "MatterCameraDeviceIo.invoke (stream list re-read)",
+        "MatterCameraDeviceIo.readCameraState",
+        "MatterCameraDeviceIo.readWebRtcSessions",
+        "MatterCameraDeviceIo.missingCameraClusters"
+      ]
+    },
+    {
+      "path": "packages/ws-controller/test/MatterControllerCameraStreamsTest.ts",
+      "lines": 216,
+      "sha": "c9fb8f2320b642974a2dcab037b53947c0631d1e",
+      "describes": [
+        "MatterController.cameraStreamsIfCreated"
+      ]
+    },
+    {
+      "path": "packages/ws-controller/test/NetworkTopologyServiceTest.ts",
+      "lines": 815,
+      "sha": "c7414f2618576185fadb1ebd5e23b5133b3ec8f2",
+      "describes": [
+        "NetworkTopologyService"
+      ]
+    },
+    {
+      "path": "packages/ws-controller/test/OverlayPolicyTest.ts",
+      "lines": 111,
+      "sha": "7ddfd038876bfb57476927123891dd76191752c9",
+      "describes": [
+        "overlayPolicy"
+      ]
+    },
+    {
+      "path": "packages/ws-controller/test/SdpConstraintsTest.ts",
+      "lines": 1045,
+      "sha": "6a62f6832ece4c940ff1851689ecc02ee0f1903d",
+      "describes": [
+        "sdpConstraints",
+        "withoutTalkback",
+        "answerWithinOfferedDirections"
+      ]
+    },
+    {
+      "path": "packages/ws-controller/test/SessionRegistryClientKeyTest.ts",
+      "lines": 287,
+      "sha": "c566f8369cf2c5f8ae967a8ac8dd10605c126af0",
+      "describes": [
+        "CameraSessionRegistry client session keys"
+      ]
+    },
+    {
+      "path": "packages/ws-controller/test/SnapshotPolicyTest.ts",
+      "lines": 702,
+      "sha": "10d82c721b7e6e5a71799dca24b48b643bee46b8",
+      "describes": [
+        "snapshotPolicy"
+      ]
+    },
+    {
+      "path": "packages/ws-controller/test/StartingSessionSignallingTest.ts",
+      "lines": 460,
+      "sha": "e7e5020450c66d4816c7d3dcd3aca2f0708c1856",
+      "describes": [
+        "StartingSessionSignalling"
+      ]
+    },
+    {
+      "path": "packages/ws-controller/test/StreamPolicyTest.ts",
+      "lines": 1608,
+      "sha": "c28e500ec75811c295936ec0a64a390826733a55",
+      "describes": [
+        "streamPolicy"
+      ]
+    },
+    {
+      "path": "packages/ws-controller/test/VideoWindowSearchTest.ts",
+      "lines": 646,
+      "sha": "71366af59a2b9321a245af33273feb2dc86d77f5",
+      "describes": [
+        "VideoWindowSearch"
+      ]
+    },
+    {
+      "path": "packages/ws-controller/test/WebRtcCallbackBridgeTest.ts",
+      "lines": 326,
+      "sha": "4f82aaf875180f1f7bdd8654fd44596adc369b63",
+      "describes": [
+        "WebRtcCallbackBridge"
+      ]
+    },
+    {
+      "path": "packages/ws-controller/test/WebRtcProviderArgumentsTest.ts",
+      "lines": 464,
+      "sha": "bc872cd6b5b0a74b5d67e568d847d70b14d2dff6",
+      "describes": [
+        "WebRTC provider arguments"
+      ]
+    },
+    {
+      "path": "packages/ws-controller/test/WebRtcProviderDeviceTest.ts",
+      "lines": 392,
+      "sha": "7755b13a8ae651c08431ef663ac97bc0a29fad96",
+      "describes": [
+        "WebRTC provider sessions against a simulated camera"
+      ]
+    },
+    {
+      "path": "packages/ws-controller/test/WebRtcProviderSessionWatchTest.ts",
+      "lines": 559,
+      "sha": "e5e115ec5da8bf0d9030cfa62acdfc7db2e678a9",
+      "describes": [
+        "WebRtcProviderSessionWatch"
+      ]
+    },
+    {
+      "path": "packages/ws-controller/test/WebRtcProviderSessionsTest.ts",
+      "lines": 464,
+      "sha": "2c8374c2bfd42cc178cbf70e75ad7e6327039227",
+      "describes": [
+        "WebRtcProviderSessions"
+      ]
+    },
+    {
+      "path": "packages/ws-controller/test/WebRtcSessionStreamsTest.ts",
+      "lines": 933,
+      "sha": "545b9556d5be11ccd58351411085f02d46c466e3",
+      "describes": [
+        "resolveWebRtcSessionStreams",
+        "selectWebRtcStreamFields",
+        "isTrackableWebRtcSession",
+        "establishWebRtcProviderSession",
+        "trackedSessionOf"
+      ]
+    }
+  ]
+}

@@ -32,13 +32,16 @@ var statuses = []Status{StatusPorted, StatusPartial, StatusPlanned, StatusExclud
 // js-runtime-only covers JavaScript runtime concerns and matter.js's own
 // platform, util, storage, time and codec runtime — Node.js bindings, the
 // in-memory model classes, byte readers and writers, hand-written codecs
-// the Go standard library replaces (phase 33).
+// the Go standard library replaces (phase 33). host-server covers the
+// matterjs-server register's tests of its WebSocket server (its wire
+// contract, its callback bridge): go-fabric-server's, not the module's.
 const (
 	ClassControllerStage    = "controller-stage"
 	ClassJSRuntimeOnly      = "js-runtime-only"
 	ClassJointFabric        = "joint-fabric"
 	ClassDeviceBLEThread    = "device-ble-thread"
 	ClassTestInfrastructure = "test-infrastructure"
+	ClassHostServer         = "host-server"
 )
 
 var classes = map[string]bool{
@@ -47,6 +50,7 @@ var classes = map[string]bool{
 	ClassJointFabric:        true,
 	ClassDeviceBLEThread:    true,
 	ClassTestInfrastructure: true,
+	ClassHostServer:         true,
 }
 
 // The two classes a left it case may carry beside the exclusion classes:
@@ -66,6 +70,7 @@ var leftClasses = map[string]bool{
 	ClassJointFabric:        true,
 	ClassDeviceBLEThread:    true,
 	ClassTestInfrastructure: true,
+	ClassHostServer:         true,
 	ClassByDesign:           true,
 	ClassSkip:               true,
 }
@@ -120,7 +125,7 @@ var (
 	// trees phase 16 brings to 100 % are checked as "ported, or until a
 	// named phase"; an excluded controller-stage or device-ble-thread entry
 	// always carries one.
-	untilPattern = regexp.MustCompile(`^M[1-7]( phase \d{1,2})?$`)
+	untilPattern = regexp.MustCompile(`^M(?:[1-9]|1\d)( phase \d{1,2})?$`)
 )
 
 func loadRegister(p string) (*Register, error) {
@@ -213,7 +218,7 @@ func (e *Entry) validate() error {
 		fail("unknown status %q", e.Status)
 	}
 	if e.Until != "" && !untilPattern.MatchString(e.Until) {
-		fail("until %q is not a roadmap milestone or phase (M5, M5 phase 23)", e.Until)
+		fail("until %q is not a roadmap milestone or phase (M5, M10 phase 37)", e.Until)
 	}
 	return errors.Join(errs...)
 }

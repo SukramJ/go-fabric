@@ -229,6 +229,13 @@ testparity-snapshot: ## refresh script/testparity/matterjs_tests.json from $(MAT
 	@# and changed; testparity-check then lists every mapping to re-check.
 	MATTERJS_DIR=$(MATTERJS_DIR) $(GO) run ./script/testparity -snapshot
 
+.PHONY: testparity-server
+testparity-server: ## refresh script/testparity/matterjsserver_tests.json from $(MATTERJS_SERVER_DIR) at the matterjs-server pin (exit 2 without the clone)
+	@# The matterjs-server register's snapshot step: the diff names the test
+	@# files added, removed and changed; testparity-check then lists every
+	@# mapping to re-check.
+	MATTERJS_SERVER_DIR=$(MATTERJS_SERVER_DIR) $(GO) run ./script/testparity -server-snapshot
+
 .PHONY: testparity-check
 testparity-check: ## fail if the test register and the snapshot disagree, a Go test it names is gone, the page is stale, a FixMe skip is unregistered, or planned, ported or missing is off its ratchet
 	$(GO) test -count=1 -run 'Testparity' ./script/testparity/

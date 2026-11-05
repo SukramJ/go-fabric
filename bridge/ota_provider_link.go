@@ -524,6 +524,14 @@ func (e *initiatedSecureExchange) Send(_ context.Context, protocolID uint16, opc
 		if tracker != nil {
 			tracker.Untrack(e.sessionID, hdr.MessageCounter)
 		}
+		if isConnRoute(dest) {
+			// A send on a connection that is gone is the reliable
+			// transport's "retransmissions exhausted": the peer is lost
+			// on that session, as matter.js's send reports peerLost on a
+			// failed send (MessageExchange.ts:605-624 at 862ad75f) — the
+			// next connection to the peer runs a fresh CASE.
+			b.handleInitiatedPeerLoss(e.sessionID, e.exchangeID)
+		}
 		return err
 	}
 	return nil

@@ -38,7 +38,7 @@
 //	      "left":        [{"it": "<it name>", "class": "<class>", "reason": "<one sentence>"}, …],
 //	                     // ported and partial only: cases that will not be ported
 //	      "class":       "controller-stage" | "js-runtime-only" | "joint-fabric" |
-//	                     "device-ble-thread" | "test-infrastructure",
+//	                     "device-ble-thread" | "test-infrastructure" | "host-server",
 //	                     // excluded only, required there
 //	      "until":       "<roadmap stage or milestone>",
 //	                     // controller-stage (required) and device-ble-thread (optional)
@@ -54,6 +54,21 @@
 //	    }
 //	  ]
 //	}
+//
+// # The second register: matterjs-server
+//
+// matterjs-server (github.com/matter-js/matterjs-server), matter.js's own
+// server on top of it, is the behaviour source of what this module ports
+// from it ahead of matter.js (notes/parity/by_design.md, the Ahead of
+// matter.js register). Its register has the same three artefacts —
+// matterjsserver_tests.json, matterjsserver_register.json and
+// notes/parity/matterjsserver_tests.md — and the same entry rules. Its
+// snapshot is not of whole trees: it lists the test files of the parts the
+// module ports (serverSnapshotRoots), at matterjsServerCommit, written by
+// `go run ./script/testparity -server-snapshot` from a matterjs-server clone
+// (MATTERJS_SERVER_DIR, default ../matterjs-server). A test of
+// matterjs-server's WebSocket server rather than of the behaviour the
+// module takes is excluded with class host-server: go-fabric-server's.
 //
 // Entries are sorted by path, skips by test. A skip is a Go test whose body
 // is an unconditional t.Skip("FixMe: …"): it names a gap and tests nothing,
@@ -121,6 +136,17 @@ const (
 	schemaFile   = "parity/schema.json"
 )
 
+// The committed artefacts of the matterjs-server register.
+const (
+	serverSnapshotFile = "script/testparity/matterjsserver_tests.json"
+	serverRegisterFile = "script/testparity/matterjsserver_register.json"
+	serverPageFile     = "notes/parity/matterjsserver_tests.md"
+)
+
+// matterjsServerCommit is the matterjs-server commit the module's ports of
+// it follow; its citations name the same commit (script/citecheck).
+const matterjsServerCommit = "0bd06f222a3d51415980022c5f207705de57b8aa"
+
 // snapshotRoots are the matter.js test trees the register covers.
 var snapshotRoots = []string{
 	"packages/general/test",
@@ -132,21 +158,90 @@ var snapshotRoots = []string{
 	"packages/types/test",
 }
 
+// serverSnapshotRoots are the matterjs-server test files the module ports
+// or classifies: its network topology's (issue 380) and its camera stream
+// management's (phase 37, issue 410). A root is a file here, not a tree.
+var serverSnapshotRoots = []string{
+	"packages/ws-client/test/TopologyUtilsTest.ts",
+	"packages/ws-controller/test/CameraCommandsTest.ts",
+	"packages/ws-controller/test/CameraErrorsTest.ts",
+	"packages/ws-controller/test/CameraStreamManagerTest.ts",
+	"packages/ws-controller/test/CameraVideoAllocateTest.ts",
+	"packages/ws-controller/test/CameraWireContractTest.ts",
+	"packages/ws-controller/test/MatterCameraDeviceIoTest.ts",
+	"packages/ws-controller/test/MatterControllerCameraStreamsTest.ts",
+	"packages/ws-controller/test/NetworkTopologyServiceTest.ts",
+	"packages/ws-controller/test/OverlayPolicyTest.ts",
+	"packages/ws-controller/test/SdpConstraintsTest.ts",
+	"packages/ws-controller/test/SessionRegistryClientKeyTest.ts",
+	"packages/ws-controller/test/SnapshotPolicyTest.ts",
+	"packages/ws-controller/test/StartingSessionSignallingTest.ts",
+	"packages/ws-controller/test/StreamPolicyTest.ts",
+	"packages/ws-controller/test/VideoWindowSearchTest.ts",
+	"packages/ws-controller/test/WebRtcCallbackBridgeTest.ts",
+	"packages/ws-controller/test/WebRtcProviderArgumentsTest.ts",
+	"packages/ws-controller/test/WebRtcProviderDeviceTest.ts",
+	"packages/ws-controller/test/WebRtcProviderSessionWatchTest.ts",
+	"packages/ws-controller/test/WebRtcProviderSessionsTest.ts",
+	"packages/ws-controller/test/WebRtcSessionStreamsTest.ts",
+}
+
+// source is one register: its artefacts, the roots its snapshot covers, the
+// clone it is taken from and how the pin is read.
+type source struct {
+	// name is the source as the page and the errors name it.
+	name                                 string
+	snapshotFile, registerFile, pageFile string
+	roots                                []string
+	// cloneEnv names the clone's environment variable, cloneDefault its
+	// path without one.
+	cloneEnv, cloneDefault string
+	// pin is the commit the snapshot is taken at.
+	pin func(root string) (string, error)
+	// intro is the page's paragraph before the counts.
+	intro func(snap *Snapshot) string
+	// skips: the register holds the module's FixMe skips.
+	skips bool
+}
+
+var (
+	matterjsSource = &source{
+		name: "matter.js", snapshotFile: snapshotFile, registerFile: registerFile, pageFile: pageFile,
+		roots: snapshotRoots, cloneEnv: "MATTERJS_DIR", cloneDefault: "../matter.js",
+		pin:   func(root string) (string, error) { return pinnedCommit(path.Join(root, schemaFile)) },
+		intro: matterjsIntro, skips: true,
+	}
+	serverSource = &source{
+		name: "matterjs-server", snapshotFile: serverSnapshotFile, registerFile: serverRegisterFile, pageFile: serverPageFile,
+		roots: serverSnapshotRoots, cloneEnv: "MATTERJS_SERVER_DIR", cloneDefault: "../matterjs-server",
+		pin:   func(string) (string, error) { return matterjsServerCommit, nil },
+		intro: serverIntro,
+	}
+	sources = []*source{matterjsSource, serverSource}
+)
+
 func main() {
 	snapshot := flag.Bool("snapshot", false, "regenerate "+snapshotFile+" from the matter.js clone in $MATTERJS_DIR (default ../matter.js) at the commit "+schemaFile+" names")
-	render := flag.Bool("render", false, "render "+pageFile+" from the snapshot and the register")
+	serverSnapshot := flag.Bool("server-snapshot", false, "regenerate "+serverSnapshotFile+" from the matterjs-server clone in $MATTERJS_SERVER_DIR (default ../matterjs-server) at "+matterjsServerCommit)
+	render := flag.Bool("render", false, "render "+pageFile+" and "+serverPageFile+" from the snapshots and the registers")
 	root := flag.String("root", ".", "module root")
 	flag.Parse()
-	if !*snapshot && !*render {
-		fmt.Fprintln(os.Stderr, "testparity: nothing to do; pass -snapshot and/or -render")
+	if !*snapshot && !*serverSnapshot && !*render {
+		fmt.Fprintln(os.Stderr, "testparity: nothing to do; pass -snapshot, -server-snapshot and/or -render")
 		os.Exit(1)
 	}
-	if *snapshot {
-		dir := os.Getenv("MATTERJS_DIR")
-		if dir == "" {
-			dir = "../matter.js"
+	for _, s := range []struct {
+		on  bool
+		src *source
+	}{{*snapshot, matterjsSource}, {*serverSnapshot, serverSource}} {
+		if !s.on {
+			continue
 		}
-		if err := writeSnapshot(*root, dir); err != nil {
+		dir := os.Getenv(s.src.cloneEnv)
+		if dir == "" {
+			dir = s.src.cloneDefault
+		}
+		if err := writeSnapshot(*root, s.src, dir); err != nil {
 			fmt.Fprintln(os.Stderr, "testparity:", err)
 			var unavailable errUnavailable
 			if errors.As(err, &unavailable) {
@@ -156,9 +251,11 @@ func main() {
 		}
 	}
 	if *render {
-		if err := writePage(*root); err != nil {
-			fmt.Fprintln(os.Stderr, "testparity:", err)
-			os.Exit(1)
+		for _, src := range sources {
+			if err := writePage(*root, src); err != nil {
+				fmt.Fprintln(os.Stderr, "testparity:", err)
+				os.Exit(1)
+			}
 		}
 	}
 }
@@ -184,22 +281,22 @@ type SnapshotFile struct {
 	Describes []string `json:"describes"`
 }
 
-func writeSnapshot(root, matterjs string) error {
-	commit, err := pinnedCommit(path.Join(root, schemaFile))
+func writeSnapshot(root string, src *source, clone string) error {
+	commit, err := src.pin(root)
 	if err != nil {
 		return err
 	}
-	if fi, statErr := os.Stat(matterjs); statErr != nil || !fi.IsDir() { //nolint:gosec // G703: the clone the operator names in MATTERJS_DIR
-		return errUnavailable{fmt.Sprintf("no matter.js clone at %s (set MATTERJS_DIR)", matterjs)}
+	if fi, statErr := os.Stat(clone); statErr != nil || !fi.IsDir() { //nolint:gosec // G703: the clone the operator names in the source's variable
+		return errUnavailable{fmt.Sprintf("no %s clone at %s (set %s)", src.name, clone, src.cloneEnv)}
 	}
-	if out, gitErr := exec.CommandContext(context.Background(), "git", "-C", matterjs, "cat-file", "-t", commit).Output(); gitErr != nil || strings.TrimSpace(string(out)) != "commit" { //nolint:gosec // G204: git with the operator's clone and the pinned commit
-		return errUnavailable{fmt.Sprintf("matter.js clone at %s has no commit %s (fetch it)", matterjs, commit)}
+	if out, gitErr := exec.CommandContext(context.Background(), "git", "-C", clone, "cat-file", "-t", commit).Output(); gitErr != nil || strings.TrimSpace(string(out)) != "commit" { //nolint:gosec // G204: git with the operator's clone and the pinned commit
+		return errUnavailable{fmt.Sprintf("%s clone at %s has no commit %s (fetch it)", src.name, clone, commit)}
 	}
-	snap, err := buildSnapshot(matterjs, commit)
+	snap, err := buildSnapshot(clone, commit, src.roots)
 	if err != nil {
 		return err
 	}
-	return writeJSON(path.Join(root, snapshotFile), snap)
+	return writeJSON(path.Join(root, src.snapshotFile), snap)
 }
 
 // pinnedCommit reads matter.sourceCommit from parity/schema.json.
@@ -222,8 +319,8 @@ func pinnedCommit(schemaPath string) (string, error) {
 	return doc.Matter.SourceCommit, nil
 }
 
-func buildSnapshot(matterjs, commit string) (*Snapshot, error) {
-	args := append([]string{"-C", matterjs, "ls-tree", "-r", commit, "--"}, snapshotRoots...)
+func buildSnapshot(matterjs, commit string, roots []string) (*Snapshot, error) {
+	args := append([]string{"-C", matterjs, "ls-tree", "-r", commit, "--"}, roots...)
 	out, err := exec.CommandContext(context.Background(), "git", args...).Output() //nolint:gosec // G204: git ls-tree with the operator's clone and the pinned commit
 	if err != nil {
 		return nil, fmt.Errorf("git ls-tree: %w", err)
@@ -240,7 +337,7 @@ func buildSnapshot(matterjs, commit string) (*Snapshot, error) {
 		files[i].Lines = countLines(contents[i])
 		files[i].Describes = topLevelDescribes(contents[i])
 	}
-	return &Snapshot{Commit: commit, Roots: append([]string(nil), snapshotRoots...), Files: files}, nil
+	return &Snapshot{Commit: commit, Roots: append([]string(nil), roots...), Files: files}, nil
 }
 
 // parseLsTree keeps the *Test.ts blobs of `git ls-tree -r` output, sorted by
@@ -352,20 +449,20 @@ func writeJSON(p string, v any) error {
 	return os.WriteFile(p, append(raw, '\n'), 0o644) //nolint:gosec // a committed artefact, world-readable like every file in the tree
 }
 
-func writePage(root string) error {
-	snap, err := loadSnapshot(path.Join(root, snapshotFile))
+func writePage(root string, src *source) error {
+	snap, err := loadSnapshot(path.Join(root, src.snapshotFile))
 	if err != nil {
 		return err
 	}
-	reg, err := loadRegister(path.Join(root, registerFile))
+	reg, err := loadRegister(path.Join(root, src.registerFile))
 	if err != nil {
 		return err
 	}
 	if err := reg.check(snap); err != nil {
 		return err
 	}
-	page := renderPage(snap, reg)
-	return os.WriteFile(path.Join(root, pageFile), page, 0o644) //nolint:gosec // a committed artefact
+	page := renderPage(src, snap, reg)
+	return os.WriteFile(path.Join(root, src.pageFile), page, 0o644) //nolint:gosec // a committed artefact
 }
 
 func loadSnapshot(p string) (*Snapshot, error) {

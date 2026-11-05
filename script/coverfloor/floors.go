@@ -106,6 +106,11 @@ var floors = []packageFloor{
 	{pkg: "github.com/SukramJ/go-fabric/controller/attestation", min: 92},
 	{pkg: "github.com/SukramJ/go-fabric/controller/ble", min: 90},
 	{
+		pkg: "github.com/SukramJ/go-fabric/controller/camera",
+		min: 94,
+		why: "phase 37 waves B and C: measured 95.0–95.2; the sweep and give-back paths run on the fabrictest clock and a tick lands on either side of a branch, so one point of margin",
+	},
+	{
 		pkg: "github.com/SukramJ/go-fabric/controller/ble/bletest", min: 92, spread: 3.3,
 		why: "measures 92.6 or 95.9 (review 2026-11 W6): the virtual central's teardown closes sessions and drops connections on fire-and-forget goroutines (bletest.go drop, UnsubscribeC2, the pipe loop's stop arm), and whether they run before the test binary exits is scheduling, which no clock drives. The floor is the whole percent below the lowest measurement",
 	},
@@ -261,11 +266,6 @@ var floors = []packageFloor{
 		pkg: "github.com/SukramJ/go-fabric/node",
 		min: 85,
 		why: "the end-to-end tests commission the node over UDP with bridgetest.Commissioner (PASE, AddNOC, CASE, re-establishment after a restart, RemoveFabric); the enhanced commissioning window, UpdateNOC's fabric hook, CASE resumption and the OTA applier have no test in the package. Measures 86.0–86.1 (2026-11-02, the fabric-scoped broadcast events); 85 leaves the timing-dependent paths a point",
-	},
-	{
-		pkg: "github.com/SukramJ/go-fabric/node/controllernode",
-		min: 81,
-		why: "brief CM §1: measured 67.9; phase 29a-2 (the scripted-provider wrappers, wrap_commands_test.go): 81.2. Start's failure paths (node.New refusing the spec, a socket address that does not resolve) have no test",
 	},
 	{pkg: "github.com/SukramJ/go-fabric/node/metrics/expvar", min: 100},
 	{pkg: "github.com/SukramJ/go-fabric/parity", min: 100},

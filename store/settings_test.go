@@ -146,3 +146,24 @@ func TestSettings_SetMetadataCounter_UpsertOverwrites(t *testing.T) {
 		t.Fatalf("GetMetadataCounter = %d, want 200 (overwritten value)", got)
 	}
 }
+
+// TestSettings_DeleteSetting removes a written key, so GetSetting misses
+// it afterwards; deleting a key that is not there is no error.
+func TestSettings_DeleteSetting(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	s := store.New(openTestDB(t))
+
+	if err := s.SetSetting(ctx, store.SettingNodeLabel, "kitchen"); err != nil {
+		t.Fatalf("SetSetting: %v", err)
+	}
+	if err := s.DeleteSetting(ctx, store.SettingNodeLabel); err != nil {
+		t.Fatalf("DeleteSetting: %v", err)
+	}
+	if _, ok, err := s.GetSetting(ctx, store.SettingNodeLabel); err != nil || ok {
+		t.Fatalf("GetSetting after delete: ok=%v err=%v, want a miss", ok, err)
+	}
+	if err := s.DeleteSetting(ctx, "never-written"); err != nil {
+		t.Fatalf("DeleteSetting of a missing key: %v", err)
+	}
+}

@@ -15,6 +15,7 @@ import (
 
 	"github.com/SukramJ/go-fabric/bdx/otaimage"
 	mattercore "github.com/SukramJ/go-fabric/cluster/core"
+	"github.com/SukramJ/go-fabric/controller"
 	"github.com/SukramJ/go-fabric/controller/softwareupdate"
 )
 
@@ -88,10 +89,6 @@ func cmdOTAServe(e *env, args []string) error {
 	return withStack(e, func(s *stack) error {
 		ctx, cancel := e.timeoutCtx()
 		defer cancel()
-		self, err := s.ensureSelf(ctx)
-		if err != nil {
-			return err
-		}
 		mgr := s.ctl.SoftwareUpdates()
 		if _, err := s.images.Store(ctx, image, softwareupdate.ModeLocal, nil); err != nil {
 			return err
@@ -108,8 +105,7 @@ func cmdOTAServe(e *env, args []string) error {
 			}
 		}
 		s.statusMu.Unlock()
-		provEP, _ := self.n.OTAProviderEndpoint()
-		e.printf("serving version %d for %04X:%04X from node %d endpoint %d\n", h.SoftwareVersion, h.VendorID, h.ProductID, self.nodeID, provEP)
+		e.printf("serving version %d for %04X:%04X from node %d endpoint %d\n", h.SoftwareVersion, h.VendorID, h.ProductID, s.ctl.Fabric().RootNodeID, controller.OTAProviderEndpoint)
 		target := softwareupdate.Target{VendorID: h.VendorID, ProductID: h.ProductID, TargetSoftwareVersion: h.SoftwareVersion}
 		if announce != "" {
 			if err := pushTo(ctx, e, s, mgr, announce, target, versionString, yes); err != nil {

@@ -24,7 +24,7 @@ import (
 	"github.com/SukramJ/go-fabric/node"
 )
 
-// otaRig is a site with a controller whose OTA push runs on its own node
+// otaRig is a site with a controller whose OTA push runs on its own identity
 // and a device with the module's OTA requestor (harness mode: it applies
 // in place and reports the new version, node/ota.go) — the setting of
 // matter.js's OtaTest (packages/node/test/behaviors/ota/OtaTest.ts at
@@ -165,7 +165,7 @@ func (r *otaRig) snapshot() (statuses []mattercore.OTAUpdateStatus, done, failed
 	return slices.Clone(r.statuses), len(r.done), len(r.failed)
 }
 
-// TestOTAPushFromTheController: the controller's own node serves an image
+// TestOTAPushFromTheController: the controller serves an image
 // the controller pushes to a device — consent, announcement, QueryImage,
 // a BDX download, the apply request and the applied notification — and the
 // device runs the new version (OtaTest.ts:91 "Successfully processes a
@@ -206,8 +206,8 @@ func TestOTAPushFromTheController(t *testing.T) {
 }
 
 // TestOTAPushScriptedProvider: the manager's script and exchange observer
-// reach the own node's provider on the wire (node/controllernode installs
-// them): a scripted Proceed with a DelayedActionTime is what the device
+// reach the controller's provider on the wire (controller/ota_provider.go
+// installs them): a scripted Proceed with a DelayedActionTime is what the device
 // gets, and the QueryImage, the ApplyUpdateRequest and the
 // NotifyUpdateApplied are each reported with the answer — the record
 // matter.js's cert harness keeps (InProcessControllerAdapter.ts:456-638 at

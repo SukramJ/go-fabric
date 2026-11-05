@@ -89,6 +89,18 @@ func (s *Site) answer(questions []dns.Question) []dns.RR {
 		asked[strings.ToLower(dns.Fqdn(q.Name))] = true
 	}
 	var out []dns.RR
+	for _, a := range s.controllerAdvertisers() {
+		services := a.Active()
+		for i := range services {
+			rrs, names := serviceRecords(&services[i], "fabrictest-c"+strconv.Itoa(a.index)+".local.", a.addr.IP)
+			for _, name := range names {
+				if asked[name] {
+					out = append(out, rrs...)
+					break
+				}
+			}
+		}
+	}
 	for _, d := range s.devicesSnapshot() {
 		adv, ip, host := d.advertised()
 		if adv == nil || ip == nil {

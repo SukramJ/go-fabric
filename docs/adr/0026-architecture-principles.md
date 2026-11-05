@@ -9,6 +9,15 @@
   (`contract/status.go`) is a second, host-facing status type, needed
   because `contract` imports the standard library only, and the servers
   map it to the wire status (`spec.CarriesStatus`).
+  Note (2026-11-05, phase 37, issue 410): the controller role composes an
+  endpoint tree of its own from the layers below the roles (`endpoint`,
+  `cluster/core`, `cluster/camera`) and serves it through the client
+  stack's Interaction Model server (`client/interaction`, principle 12's
+  role-neutral home) under its one operational identity — the OTA
+  provider, the camera controller's requestor, the group sender. This is
+  `controller/*` composing its role (principle 2), not a second facade:
+  `node/controllernode` and the own node are gone (`layers.json` lost the
+  entry), and `bridge` and `controller/...` stay peers.
 - **Date**: 2026-10-20
 - **Related**: [ADR 0025 — design principles of the facade](./0025-facade-design-principles.md),
   [ADR 0018 — the device layer and the node facade](./0018-device-layer-and-node-facade.md),

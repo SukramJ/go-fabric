@@ -51,6 +51,14 @@ func (r *Subscriptions) Register(mgr *exchange.Manager) {
 func (r *Subscriptions) HandleExchange(x *exchange.Exchange, first *exchange.Message) {
 	m := &messenger{x: x}
 	ctx := r.readingCtx
+	if s := r.serverFor(first.Opcode); s != nil {
+		// A request for the endpoints this stack serves itself
+		// ([Subscriptions.Serve]): matter.js's InteractionServer takes
+		// every first message that is not a report
+		// (InteractionServer.ts:240-249).
+		s.handle(ctx, x, first)
+		return
+	}
 	if first.Opcode != im.OpcodeReportData {
 		r.log.Debug("matter.controller.interaction.unsupported_message", slog.Int("opcode", int(first.Opcode)))
 		r.sendStatus(ctx, m, im.StatusInvalidAction)

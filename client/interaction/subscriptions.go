@@ -50,6 +50,10 @@ type Subscriptions struct {
 	// stop (readingAbortSignal, :65-71).
 	readingCtx    context.Context
 	readingCancel context.CancelFunc
+
+	// server is the Interaction Model server [Subscriptions.Serve]
+	// installed, nil for the report-only handler.
+	server serverRef
 }
 
 // NewSubscriptions returns an empty registry.

@@ -296,7 +296,7 @@ func renderCertifiability(g docGolden) string {
 		if _, ok := g.Cases[id]; ok {
 			also = "; passes with chip-tool as TH too"
 		}
-		fmt.Fprintf(&b, "| %s | %d | %d | Go controller as TH, after matter.js `%s`%s |\n", id, c.Steps, c.StepsSkipped, mdCell(c.Source), also)
+		fmt.Fprintf(&b, "| %s | %d | %d | Go controller as TH, %s%s |\n", id, c.Steps, c.StepsSkipped, goSourceCell(c.Source), also)
 	}
 	b.WriteString("\n### Controller role\n\n")
 	b.WriteString("matter.js's certification cases in their own direction: the module's controller is the DUT and the\n")
@@ -312,7 +312,7 @@ func renderCertifiability(g docGolden) string {
 		} else if !inFamilies(g, id) {
 			also = "; in no family of the harness image"
 		}
-		fmt.Fprintf(&b, "| %s | %d | %d | Go controller as DUT, after matter.js `%s`%s |\n", id, c.Steps, c.StepsSkipped, mdCell(c.Source), also)
+		fmt.Fprintf(&b, "| %s | %d | %d | Go controller as DUT, %s%s |\n", id, c.Steps, c.StepsSkipped, goSourceCell(c.Source), also)
 	}
 	b.WriteString("\n#### Controller-role cases not run\n\n")
 	b.WriteString("matter.js's cases with its controller as DUT that the Go controller does not run as the DUT and no family of\n")
@@ -345,6 +345,16 @@ func renderCertifiability(g docGolden) string {
 func inFamilies(g docGolden, id string) bool {
 	fam, name, _ := strings.Cut(id, "/")
 	return slices.Contains(g.Families[fam], name)
+}
+
+// goSourceCell is a Go-TH case's source on the page: the matter.js case file
+// it follows, or — for a case that mirrors none (goCertCase.origin) — the
+// source as recorded.
+func goSourceCell(src string) string {
+	if strings.HasSuffix(src, ".test.ts") {
+		return "after matter.js `" + mdCell(src) + "`"
+	}
+	return mdCell(src)
 }
 
 // mdCell escapes the pipes of a Markdown table cell.

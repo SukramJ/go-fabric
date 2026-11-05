@@ -716,25 +716,21 @@ Found by the phase-31 port of `packages/node/test` (brief phase 31,
 Found by the phase-32 port of `packages/node/test/behaviors/ota/OtaTest.ts`
 (brief phase 32, 2026-11-04). Line numbers at `862ad75f`.
 
-- **The reboot armer never sees a returning device's session.** matter.js
+- **The reboot armer's two OtaTest.ts cases are not ported yet.** matter.js
   arms `RebootResubscribeArmer` at Applying and keys on the first session
   the device opens after its restart (`RebootResubscribeArmer.ts:117-163`):
-  the NotifyUpdateApplied session to the provider — the controller's own
-  `ServerNode`, so its session manager — or the device's re-established
-  subscription; then it closes the older sessions (Mechanism A) and forces
-  a re-subscription when no report arrives within 30 s (Mechanism B). In Go
-  neither session reaches `controller.sessionAdded`: the provider is an own
-  node with its own session manager (`BD-Matter-OwnNode-SeparateIdentity`),
-  and the controller publishes no operational record, so a device cannot
-  resolve it to re-establish a persisted subscription (`bridge.connectPeer`
-  resolves the subscriber over DNS-SD; the site answers for nodes only). Only
-  the return-timeout backstop (`peer.RebootReturnTimeout`, apply delay plus
-  3 min) recovers the peer. OtaTest.ts:706-813 ("closes older sessions and
-  does not re-subscribe a device that feeds its subscription") and :815-890
-  ("force re-subscribes (Mechanism B) when the subscription is not fed
-  within the grace window") stay missing. Route: feed the own node's
-  sessions of a peer to the armer through the `controller.OwnNode` port, and
-  decide whether the controller publishes its operational record.
+  the NotifyUpdateApplied session to the provider or the device's
+  re-established subscription; then it closes the older sessions
+  (Mechanism A) and forces a re-subscription when no report arrives within
+  30 s (Mechanism B). Since phase 37 both sessions reach
+  `controller.sessionAdded`: the provider is the controller itself and the
+  controller publishes its operational record (issue 410), so a device
+  resolves it to re-establish a persisted subscription. What stays open is
+  the port of OtaTest.ts:706-813 ("closes older sessions and does not
+  re-subscribe a device that feeds its subscription") and :815-890 ("force
+  re-subscribes (Mechanism B) when the subscription is not fed within the
+  grace window") onto `fabrictest`, with the site answering the
+  controller's operational record. Route: phase 37 wave D.
 
 ## Application cluster servers — open items. (Triage 2026-10-29: wave H1, the device IM and write path.)
 

@@ -31,7 +31,6 @@ import (
 	"github.com/SukramJ/go-fabric/controller/client"
 	"github.com/SukramJ/go-fabric/controller/softwareupdate"
 	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/node/controllernode"
 )
 
 // The SU cases, and the Go TH as OTA provider the SU and BDX cases share.
@@ -39,7 +38,7 @@ import (
 // matter.js's SU-2.x and SU-4.1 cases run the device as DUT, as here: the
 // TS's TH is a controller that serves the image (support/chip-testing/
 // test/cert/tc-bdx-support.ts:48-51, BDX_RECEIVER_ROLES), which the Go
-// controller is, with its OTA provider on its own node (controller.OTAConfig).
+// controller is, with its OTA provider on its own identity (controller.OTAConfig).
 // SU-1.1 and SU-3.x have matter.js's controller as the DUT provider and a
 // requestor app as TH; read mirrored, the daemon is that requestor, and
 // what it sends is what the cases check.
@@ -75,7 +74,7 @@ func otaTestPayload(size int) []byte {
 	return p
 }
 
-// otaTH is the Go TH as OTA provider: a controller with its own node
+// otaTH is the Go TH as OTA provider: a controller serving the provider itself
 // serving the provider, the answers a case scripts per requestor, and the
 // record of what the provider answered and what its BDX transfers carried
 // — matter.js's RecordingOtaProviderServer and OtaExchangeRecording
@@ -130,7 +129,7 @@ func (th *goTH) otaProvider(label string) (*otaTH, error) {
 		DB: db, Attestation: attestation.TestStore(), Label: label, Logger: th.log,
 		HooksFor: func(string) client.Hooks { return client.Hooks{Event: o.event} },
 		OTA: &gocontroller.OTAConfig{
-			Images: o.images, AllowTestImages: true, StartNode: controllernode.Start,
+			Images: o.images, AllowTestImages: true,
 			ScriptQueryImage: o.scriptQuery, ScriptApplyUpdate: o.scriptApply, OnProviderExchange: o.record,
 		},
 	})
@@ -139,16 +138,13 @@ func (th *goTH) otaProvider(label string) (*otaTH, error) {
 	}
 	th.ctrls = append(th.ctrls, c)
 	o.ctrl = c
-	own, nodeID, _ := c.OwnNode()
-	if own == nil {
-		return nil, errors.New("the controller started no own node")
+	// The provider is the controller itself: RootNodeID at its provider
+	// endpoint (phase 37, one identity).
+	o.nodeID, o.endpoint = c.Fabric().RootNodeID, gocontroller.OTAProviderEndpoint
+	if c.BDX() == nil {
+		return nil, errors.New("the controller serves no OTA provider")
 	}
-	ep, ok := own.OTAProviderEndpoint()
-	if !ok {
-		return nil, errors.New("the controller's own node serves no OTA provider")
-	}
-	o.nodeID, o.endpoint = nodeID, ep
-	own.BDX().OnSessionStarted(o.sessionStarted)
+	c.BDX().OnSessionStarted(o.sessionStarted)
 	return o, nil
 }
 
