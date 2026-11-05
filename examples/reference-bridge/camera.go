@@ -1109,10 +1109,11 @@ func (p camPTZ) DptzRelativeMove(_ context.Context, req avdef.DptzRelativeMoveRe
 			vp.X1, vp.X2 = vp.X1-(nw-w), vp.X2+(nw-w)
 			vp.Y1, vp.Y2 = vp.Y1-(nh-h), vp.Y2+(nh-h)
 		}
-		if vp.X2-vp.X1 < camMinWidth || vp.Y2-vp.Y1 < camMinHeight {
+		// The bounds compare in int, as C++ promotes the uint16 operands.
+		if int(vp.X2)-int(vp.X1) < int(camMinWidth) || int(vp.Y2)-int(vp.Y1) < int(camMinHeight) {
 			vp.X2, vp.Y2 = vp.X1+camMinWidth, vp.Y1+camMinHeight
 		}
-		if vp.X2-vp.X1 > camMaxWidth || vp.Y2-vp.Y1 > camMaxHeight {
+		if int(vp.X2)-int(vp.X1) > int(camMaxWidth) || int(vp.Y2)-int(vp.Y1) > int(camMaxHeight) {
 			vp = avdef.ViewportStruct{X1: 0, Y1: 0, X2: camMaxWidth - 1, Y2: camMaxHeight - 1}
 		}
 		v.viewport = vp
