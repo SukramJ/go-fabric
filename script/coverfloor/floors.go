@@ -105,6 +105,7 @@ var floors = []packageFloor{
 	},
 	{pkg: "github.com/SukramJ/go-fabric/controller/attestation", min: 92},
 	{pkg: "github.com/SukramJ/go-fabric/controller/ble", min: 90},
+	{pkg: "github.com/SukramJ/go-fabric/controller/camera", min: 95},
 	{
 		pkg: "github.com/SukramJ/go-fabric/controller/ble/bletest", min: 92, spread: 3.3,
 		why: "measures 92.6 or 95.9 (review 2026-11 W6): the virtual central's teardown closes sessions and drops connections on fire-and-forget goroutines (bletest.go drop, UnsubscribeC2, the pipe loop's stop arm), and whether they run before the test binary exits is scheduling, which no clock drives. The floor is the whole percent below the lowest measurement",
