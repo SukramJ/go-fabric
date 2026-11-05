@@ -220,6 +220,22 @@ func (f *outboundFlow) process(ctx context.Context, isDriver bool) error {
 	f.emit()
 	ack, err := f.m.ReadBlockAckEOF(ctx)
 	if err != nil {
+		if errors.Is(context.Cause(ctx), ErrScopeDisabled) {
+			// Every block went out and the scope was disabled while the
+			// final acknowledgement was still being read: the receiver
+			// has moved on — an OTA requestor asks to apply right after
+			// its BlockAckEOF, and a stack that serves the two exchanges
+			// concurrently (the controller's client stack) can take the
+			// ApplyUpdateRequest first. matter.js's provider force-closes
+			// a transfer "when not known as completed"
+			// (OtaSoftwareUpdateProviderServer.ts:437 at 862ad75f) and,
+			// single-threaded, always reads the ack first; here the
+			// transfer is complete, not cancelled.
+			if f.hooks.finished != nil {
+				f.hooks.finished(f.transferred)
+			}
+			return nil
+		}
 		return err
 	}
 	if err := validateCounter(ack.BlockCounter, f.finalCounter); err != nil {

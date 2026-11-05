@@ -19,7 +19,7 @@
   },
   {
     "file": "bdx/responder.go",
-    "line": 240,
+    "line": 246,
     "citation": "BdxProtocol.ts:204-211",
     "resolved": "packages/protocol/src/bdx/BdxProtocol.ts",
     "identifier": "SessionFor",
@@ -28,7 +28,7 @@
   },
   {
     "file": "bdx/responder.go",
-    "line": 367,
+    "line": 373,
     "citation": "BdxProtocol.ts:159-164",
     "resolved": "packages/protocol/src/bdx/BdxProtocol.ts",
     "identifier": "onNewExchange",

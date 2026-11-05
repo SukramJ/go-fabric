@@ -231,10 +231,16 @@ func (r *Responder) DisablePeerForScope(peer Peer, scope string, force bool) err
 	delete(r.scopes, key)
 	r.mu.Unlock()
 	if active != nil {
-		active.Close(errors.New("bdx: BDX protocol scope disabled"))
+		active.Close(ErrScopeDisabled)
 	}
 	return nil
 }
+
+// ErrScopeDisabled is the cause a session is closed with when its scope is
+// disabled while it runs ([Responder.DisablePeerForScope] with force) —
+// an OTA provider's ApplyUpdateRequest closing a transfer it does not know
+// as completed.
+var ErrScopeDisabled = errors.New("bdx: BDX protocol scope disabled")
 
 // SessionFor returns the running transfer of peer in scope, nil when none
 // runs (BdxProtocol.ts:204-211).

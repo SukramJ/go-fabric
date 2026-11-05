@@ -31,6 +31,10 @@ pseudo-version of `main`.
 - `examples/reference-bridge`: the occupancy sensor serves OccupancyEvent, HoldTime (10 s, limits 1–300 s) and PIROccupiedToUnoccupiedDelay; the door lock serves FACE.
 - `internal/chiptool`: the PS family runs on the PowerSource part of the smoke alarm, where the cluster is (TC-PS-2.1 runs again); TC-CADMIN-1.4 gets the daemon's passcode and discriminator, and TC-CADMIN-1.6 and 1.16 run with their own PIXIT.CADMIN.CwDuration (180 s), as the daemon keeps the specification's minimum window timeout.
 
+### Fixed
+
+- `bdx`: an outbound transfer whose scope is disabled after its last block went out reports finished, not cancelled — the receiver has moved on (an OTA requestor's ApplyUpdateRequest can reach a stack that serves exchanges concurrently before its BlockAckEOF is read), so the provider sees WaitForApply before Applying as matter.js's single-threaded provider does (`OtaSoftwareUpdateProviderServer.ts:437`). `bdx.ErrScopeDisabled` is the close cause.
+
 ### Removed
 
 - `node/controllernode`, `controller.OwnNodeSpec`, `controller.OwnNode`, `Controller.OwnNode()`, `OTAConfig.StartNode`, `OTAConfig.Listen`, `OTAConfig.Advertiser`, `OTAConfig.ProductID`: the controller's second node (owner decision 2026-11-05, issue 410 decision 6). `fabrictest.Site.ControllerConfig` no longer starts one.
