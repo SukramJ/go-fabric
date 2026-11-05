@@ -343,6 +343,11 @@ const (
 	// (config endpoint: 1, and 3 for ALOGIN-12.1 and APBSC-9.1).
 	dtCastingVideoPlayer = 0x0023
 	dtContentApp         = 0x0024
+	// dtPowerSource is the smoke alarm's PowerSource part (the device
+	// type's PowerSource component, examples/reference-bridge): the first
+	// endpoint that serves the PowerSource cluster, which the alarm's own
+	// endpoint does not.
+	dtPowerSource = 0x0011
 )
 
 // endpointDeviceTypes are the device types the harness resolves to an
@@ -356,7 +361,7 @@ var endpointDeviceTypes = []uint32{
 	dtSmokeCOAlarm, dtPump, dtFlowSensor, dtLaundryWasher, dtRVC, dtThermostat, dtWindowCovering,
 	dtDoorLock, dtHumiditySensor, dtOccupancySensor, dtContactSensor, dtGenericSwitch, dtAirPurifier, dtClosure,
 	dtTempControlledCabinet, dtAirQualitySensor, dtWaterHeater, dtElectricalUtilityMeter, dtRefrigerator, dtDishwasher, dtMicrowaveOven, dtOven, dtEnergyEvse, dtDeviceEnergyManagement, dtClosurePanel, dtSoilSensor, dtElectricalEnergyTariff, dtElectricalMeter,
-	dtCastingVideoPlayer, dtContentApp, dtElectricalSensor, dtLaundryDryer,
+	dtCastingVideoPlayer, dtContentApp, dtElectricalSensor, dtLaundryDryer, dtPowerSource,
 }
 
 // pseudoEndpoints are the keys that name an endpoint by its position: the
@@ -393,7 +398,29 @@ var chipFamilies = []family{
 			"4.1": {classNotSupported, "TC-BRBINFO-4.1 exercises KeepActive of a bridged ICD (BridgedICDSupport, PICS BRBINFO.S.F00=0) against a LIT ICD test app the case starts itself (${LIT_ICD_APP}); the case carries no PICS gate, so it runs regardless (matter.js test/core/BRBINFO.test.ts excludes it for the same reason)", false},
 		},
 	},
-	{name: "CADMIN"},
+	{
+		name: "CADMIN",
+		// TC-CADMIN-1.4 opens a Basic window and commissions over it with
+		// the setup payload it was given (TC_CADMIN_1_3_4.py:84-88, :126,
+		// :155-157); CHIP's CI passes --passcode and --discriminator in the
+		// script-args (:39-40), which the image's descriptor drops for a
+		// commissioned case. The daemon's are passed, as for TC-JFADMIN-1.2.
+		//
+		// TC-CADMIN-1.6 and 1.16 open Basic windows of
+		// PIXIT.CADMIN.CwDuration seconds. The runner passes 3, as matter.js's
+		// YAML runner does (packages/testing/src/chip/config.ts:102, :130 at
+		// 862ad75f) for a test node whose minimum window timeout it lowers to
+		// one second (support/chip-testing/src/NodeTestInstance.ts:105); the
+		// daemon keeps the specification's 180 s minimum
+		// (bridge/commissioning_window.go), so these two run with the cases'
+		// own default, 180 (Test_TC_CADMIN_1_6.yaml, Test_TC_CADMIN_1_16.yaml
+		// config PIXIT.CADMIN.CwDuration). The later flag wins.
+		args: map[string][]string{
+			"1.4":  {"--passcode", "{passcode}", "--discriminator", "{discriminator}"},
+			"1.6":  {"--PIXIT.CADMIN.CwDuration", "180"},
+			"1.16": {"--PIXIT.CADMIN.CwDuration", "180"},
+		},
+	},
 	{name: "CGEN"},
 	{
 		name: "CNET",
@@ -847,7 +874,10 @@ var chipFamilies = []family{
 	},
 	{name: "OPSTATE", deviceType: dtLaundryWasher},
 	{name: "PCC", deviceType: dtPump},
-	{name: "PS", deviceType: dtSmokeCOAlarm},
+	// PS runs on the PowerSource part: the SmokeCoAlarm endpoint lists the
+	// part, not the cluster (BD-Matter-PowerSource-DeviceTypeOnPart), so
+	// TC-PS-2.1 read PS.S false there and stopped running.
+	{name: "PS", deviceType: dtPowerSource},
 	{
 		name: "RH", deviceType: dtHumiditySensor,
 		exclude: map[string]gap{

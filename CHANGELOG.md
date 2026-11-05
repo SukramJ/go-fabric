@@ -10,6 +10,20 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+### Added
+
+- `node`, `cluster/wire`: AdministratorCommissioning's Basic feature (BC) behind `node.Commissioning.BasicCommissioning` (off by default, as matter.js serves it only through `AdministratorCommissioningServer.with("Basic")`): an administrator's OpenBasicCommissioningWindow opens a window against the configured passcode under the configured discriminator, status BasicWindowOpen, advertised CM=1, with the enhanced command's gates (a CASE session, no armed fail-safe, the timeout bounds, Busy while an administrator's window is open; `AdministratorCommissioningServer.ts:105-117`, `DeviceCommissioner.ts:130-137` at 862ad75f); `wire.NewAdministratorCommissioningWith(wire.AdministratorCommissioningConfig{BasicCommissioning: true})`. The reference daemon serves it (TC-CADMIN-1.4, 1.11). Phase 36.
+
+- `cluster/lock`: DoorLock serves FACE (`lock.FeatureFACE`), as matter.js's base server does (`DoorLockServer.ts:86-98`): a face credential takes the credential paths every type without its own length or count attribute takes — NumberOfTotalUsersSupported bounds its index, any data length is accepted, ClearCredential's wildcard clears it. ALIRO and ALBU stay refused.
+- `cluster/sensing`: `Occupancy`, the OccupancySensing server the device kit mounts by default (an OccupancySensor's cluster): any detector selection, the sensor type and its bitmap from the detector features (matter.js `OccupancySensingServer.ts` initialize; `sensing.OccupancySensorTypeFor`), OccupancyChanged on every change of Occupancy with the OccupancyEvent feature, and — when the declaration serves HoldTime — chip's hold timer on the device's clock: a cleared Occupancy holds for HoldTime, HoldTime is held to HoldTimeLimits (CONSTRAINT_ERROR) and re-arms a running timer, the deprecated `*OccupiedToUnoccupiedDelay` attributes read and write HoldTime. matter.js has no timer (*Ahead of matter.js*, `BD-chip-OccupancySensing-HoldTimer`).
+- `contract`: `OccupancySelection` (`OccupancyDetector` bits and `NoOccupancyEvent`) behind the optional `OccupancySelectionSource` of an occupancy reading, and `PowerSourceSelection` (`Wired`, `WiredCurrent`) behind the optional `PowerSourceSelectionSource` of a power source; `cluster/measurement`: the projected OccupancySensing takes the selection (`measurement.OccupancyFeatures`) and lists OccupancyChanged with the event, which the bridge emits on each change of the reading; the projected PowerSource serves WIRED for a mains-powered source (`measurement.NewWiredPowerSourceServer`: WiredCurrentType, Description "Mains power").
+
+### Changed
+
+- `cluster/measurement`: the projected OccupancySensing's default selection is PassiveInfrared with OccupancyEvent (FeatureMap `0x202`, was `0x2`), and it lists OccupancyChanged, which the bridge now emits on each change of the reading — matter.js's server emits it with the feature. A host that wants the former surface states `contract.OccupancySelection{NoOccupancyEvent: true}`.
+- `examples/reference-bridge`: the occupancy sensor serves OccupancyEvent, HoldTime (10 s, limits 1–300 s) and PIROccupiedToUnoccupiedDelay; the door lock serves FACE.
+- `internal/chiptool`: the PS family runs on the PowerSource part of the smoke alarm, where the cluster is (TC-PS-2.1 runs again); TC-CADMIN-1.4 gets the daemon's passcode and discriminator, and TC-CADMIN-1.6 and 1.16 run with their own PIXIT.CADMIN.CwDuration (180 s), as the daemon keeps the specification's minimum window timeout.
+
 ## [0.17.0] — 2026-11-05
 
 Milestones 8 (Proof) and 9 (View) of the roadmap, released together (owner decision 2026-11-04): the certification harness with the Go controller in both roles, the matter.js test register over every test root, the second compositions of the reference daemon in the module's own harness image, determinism, and the module side of go-fabric-ui's topology, device-detail and operation pages.

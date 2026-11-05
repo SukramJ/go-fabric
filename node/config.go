@@ -358,6 +358,16 @@ type Commissioning struct {
 	// mattercore.RegulatoryIndoor (the zero value, the facade's default),
 	// RegulatoryOutdoor or RegulatoryIndoorOutdoor.
 	LocationCapability uint8
+	// BasicCommissioning serves AdministratorCommissioning's Basic feature
+	// (BC): an administrator's OpenBasicCommissioningWindow opens a
+	// commissioning window against this Passcode under this Discriminator,
+	// WindowStatus BasicWindowOpen, where the enhanced command carries its
+	// own verifier. Off by default, as matter.js serves the feature only
+	// through AdministratorCommissioningServer.with("Basic")
+	// (AdministratorCommissioningServer.ts:55-57, :105-117 at 862ad75f);
+	// a host that turns it on offers the weaker method knowingly (the
+	// window's PASE runs against the fixed setup passcode).
+	BasicCommissioning bool
 }
 
 // ProductDescription is matter.js `productDescription`

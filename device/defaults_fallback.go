@@ -4,6 +4,7 @@
 package device
 
 import (
+	"github.com/SukramJ/go-fabric/cluster/sensing"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	fandef "github.com/SukramJ/go-fabric/cluster/spec/fancontrol"
 	occdef "github.com/SukramJ/go-fabric/cluster/spec/occupancysensing"
@@ -56,34 +57,22 @@ var initializeDefaults = map[uint32]func(features uint32, initial map[uint32]any
 	// bitmap unset, the bitmap from the features (PIR, Ultrasonic,
 	// PhysicalContact) and the type from the bitmap — PirAndUltrasonic,
 	// Pir, else PhysicalContact; Ultrasonic alone leaves the type unset,
-	// as there.
+	// as there ([sensing.OccupancySensorTypeFor], which the kit's
+	// self-held server applies too). The generated server takes it only
+	// for a selection that server refuses.
 	occdef.ClusterID: func(features uint32, initial map[uint32]any) {
 		_, hasType := initial[occdef.AttrOccupancySensorType]
 		bmp, hasBmp := initial[occdef.AttrOccupancySensorTypeBitmap]
 		if features == 0 || (hasType && hasBmp && bmp != occdef.OccupancySensorTypeBitmap(0)) {
 			return
 		}
-		var b occdef.OccupancySensorTypeBitmap
-		if features&uint32(occdef.FeaturePassiveInfrared) != 0 {
-			b |= occdef.OccupancySensorTypeBitmapPir
-		}
-		if features&uint32(occdef.FeatureUltrasonic) != 0 {
-			b |= occdef.OccupancySensorTypeBitmapUltrasonic
-		}
-		if features&uint32(occdef.FeaturePhysicalContact) != 0 {
-			b |= occdef.OccupancySensorTypeBitmapPhysicalContact
-		}
-		if b == 0 {
+		kind, b, typed, ok := sensing.OccupancySensorTypeFor(sensing.OccupancyFeature(features))
+		if !ok {
 			return
 		}
 		initial[occdef.AttrOccupancySensorTypeBitmap] = b
-		switch {
-		case b&occdef.OccupancySensorTypeBitmapPir != 0 && b&occdef.OccupancySensorTypeBitmapUltrasonic != 0:
-			initial[occdef.AttrOccupancySensorType] = occdef.OccupancySensorTypeEnumPirAndUltrasonic
-		case b&occdef.OccupancySensorTypeBitmapPir != 0:
-			initial[occdef.AttrOccupancySensorType] = occdef.OccupancySensorTypeEnumPir
-		case b&occdef.OccupancySensorTypeBitmapPhysicalContact != 0:
-			initial[occdef.AttrOccupancySensorType] = occdef.OccupancySensorTypeEnumPhysicalContact
+		if typed {
+			initial[occdef.AttrOccupancySensorType] = kind
 		}
 	},
 }

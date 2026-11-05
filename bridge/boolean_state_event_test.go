@@ -138,3 +138,69 @@ func TestPathValuesReportOnlyMovedAttributes(t *testing.T) {
 		t.Fatal("derefValue of nil")
 	}
 }
+
+// fakeOccupancy is an occupancy reading of a PIR sensor, the projection's
+// default selection (PassiveInfrared with OccupancyEvent).
+type fakeOccupancy struct{ fakeContact }
+
+func (*fakeOccupancy) MatterMeasurementClass() contract.MeasurementClass {
+	return contract.MeasurementOccupancy
+}
+
+// TestOccupancyChangedEvent ports matter.js
+// packages/node/test/behaviors/occupancy-sensing/OccupancySensingServerTest.ts:33-54
+// at 862ad75f on the measurement-projected server: with the OccupancyEvent
+// feature an Occupancy change emits OccupancyChanged (event 0x00) carrying
+// the new bitmap; a notification that does not change it emits nothing;
+// a selection without the feature emits nothing.
+func TestOccupancyChangedEvent(t *testing.T) {
+	t.Parallel()
+	for _, c := range []struct {
+		name string
+		src  interface {
+			contract.BoolMeasurementSource
+			set(bool)
+		}
+		want int
+	}{
+		{"OccupancyEvent", &fakeOccupancy{}, 1},
+		{"without OccupancyEvent", &noEventOccupancy{}, 0},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+			asm, err := endpoint.New(endpointtest.NewFakeStore(), endpointtest.AssemblerConfig(), nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			snap := func(ctx context.Context) (*endpoint.Topology, error) {
+				return asm.Assemble(ctx, []endpoint.Snapshot{{Scope: "s", Endpoints: []endpoint.Spec{{
+					StableKey: endpoint.StringKey("occ"), DeviceAddress: "O", DeviceType: 0x0107,
+					FriendlyName: "Occupancy", ChannelAddress: "O:1", Measurement: c.src,
+				}}}})
+			}
+			b := newStartedBridgeWithSnapshotter(t, snap)
+			b.AttachSubscriptionManager(subscription.NewManager(subscription.Config{}, nil, nil))
+			var ep uint16
+			for _, e := range b.Topology().Bridged() {
+				ep = e.ID
+			}
+			count := func() int { return len(b.EventLog().Query(ep, 0x0406, 0x00, 0)) }
+			c.src.set(true)
+			if n := count(); n != c.want {
+				t.Fatalf("after a change: %d OccupancyChanged events, want %d", n, c.want)
+			}
+			c.src.set(true)
+			if n := count(); n != c.want {
+				t.Fatalf("after an unchanged notification: %d OccupancyChanged events, want still %d", n, c.want)
+			}
+		})
+	}
+}
+
+// noEventOccupancy is an occupancy reading whose selection leaves the
+// OccupancyEvent feature out.
+type noEventOccupancy struct{ fakeOccupancy }
+
+func (*noEventOccupancy) MatterOccupancySelection() contract.OccupancySelection {
+	return contract.OccupancySelection{NoOccupancyEvent: true}
+}

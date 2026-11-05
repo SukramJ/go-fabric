@@ -601,6 +601,76 @@ type BoolMeasurementSource interface {
 	MatterBoolValue() (value, observed bool)
 }
 
+// OccupancyDetector is a sensing technology of an occupancy sensor, one
+// bit per technology; the bits are OccupancySensing's detector-type
+// FeatureMap bits 0-7 (Other, PassiveInfrared, Ultrasonic,
+// PhysicalContact, ActiveInfrared, Radar, RFSensing, Vision).
+type OccupancyDetector uint8
+
+// The occupancy sensing technologies.
+const (
+	OccupancyDetectorOther OccupancyDetector = 1 << iota
+	OccupancyDetectorPassiveInfrared
+	OccupancyDetectorUltrasonic
+	OccupancyDetectorPhysicalContact
+	OccupancyDetectorActiveInfrared
+	OccupancyDetectorRadar
+	OccupancyDetectorRFSensing
+	OccupancyDetectorVision
+)
+
+// OccupancySelection is what an occupancy sensor serves of the
+// OccupancySensing cluster: the sensing technologies it detects with and
+// whether it reports each change as an OccupancyChanged event. The zero
+// value is a passive-infrared sensor with the event.
+type OccupancySelection struct {
+	// Detectors are the sensing technologies; zero is PassiveInfrared.
+	Detectors OccupancyDetector
+	// NoOccupancyEvent leaves the OccupancyEvent feature clear: no
+	// OccupancyChanged event.
+	NoOccupancyEvent bool
+}
+
+// OccupancySelectionSource is the optional capability of a
+// [BoolMeasurementSource] of class [MeasurementOccupancy] that states its
+// sensor's [OccupancySelection]. A source without it is the zero
+// selection. The selection is part of the endpoint's surface: a host
+// that changes it reassembles.
+type OccupancySelectionSource interface {
+	MatterOccupancySelection() OccupancySelection
+}
+
+// WiredCurrent is the kind of current a mains-powered device draws.
+type WiredCurrent uint8
+
+// The wired current kinds; the zero value is alternating current.
+const (
+	WiredCurrentAC WiredCurrent = iota
+	WiredCurrentDC
+)
+
+// PowerSourceSelection is what a device's power source serves of the
+// PowerSource cluster. The zero value is a battery, its reading the
+// source's [BoolMeasurementSource] (low battery) or
+// [FloatMeasurementSource] (percentage remaining).
+type PowerSourceSelection struct {
+	// Wired is a mains-powered device: the Wired feature in place of
+	// Battery (the cluster serves one of the two), with no battery
+	// reading.
+	Wired bool
+	// WiredCurrent is the current a wired source draws; zero is AC.
+	WiredCurrent WiredCurrent
+}
+
+// PowerSourceSelectionSource is the optional capability of a
+// [MeasurementSource] of class [MeasurementBattery] that states its
+// [PowerSourceSelection]. A source without it is the zero selection, a
+// battery. The selection is part of the endpoint's surface: a host that
+// changes it reassembles.
+type PowerSourceSelectionSource interface {
+	MatterPowerSourceSelection() PowerSourceSelection
+}
+
 // ChangeNotifier is the push-side complement to the read-side
 // FloatMeasurementSource / BoolMeasurementSource pull
 // interfaces. Implementations fire `cb` whenever their observable

@@ -10,11 +10,13 @@ import (
 	"log/slog"
 	"net"
 	"reflect"
+	"slices"
 	"sync"
 	"time"
 
 	"github.com/SukramJ/go-fabric/clock"
 	"github.com/SukramJ/go-fabric/cluster/measurement"
+	occdef "github.com/SukramJ/go-fabric/cluster/spec/occupancysensing"
 	"github.com/SukramJ/go-fabric/contract"
 	endpointpkg "github.com/SukramJ/go-fabric/endpoint"
 	"github.com/SukramJ/go-fabric/im"
@@ -1554,8 +1556,10 @@ func (b *Bridge) wireAttributeNotifiersLocked(mgr *subscription.Manager) {
 func (b *Bridge) wireMeasurementNotifier(mgr *subscription.Manager, ep *endpointpkg.Endpoint, notifier contract.ChangeNotifier, pathSet []im.ConcreteAttributePath) {
 	epID := ep.ID
 	boolState := newBooleanStateEvents(b, ep, pathSet)
+	occupancy := newOccupancyEvents(b, ep, pathSet)
 	values := newPathValues(ep, pathSet)
 	unsub := notifier.OnMatterValueChanged(func() {
+		defer occupancy.check()
 		defer boolState.check()
 		// Only the attributes whose value moved are reported, and only
 		// their clusters' DataVersions advance: matter.js Datasource
@@ -1808,6 +1812,83 @@ func (e *booleanStateEvents) check() {
 	if changed {
 		e.b.MatterEmitEvent(e.ep.ID, measurement.ClusterBooleanState, 0x00,
 			measurement.BooleanStateChangeEvent{StateValue: v}, contract.EventPriorityInfo)
+	}
+}
+
+// occupancyEvents emits OccupancySensing.OccupancyChanged when the
+// Occupancy of an endpoint's measurement-projected server changes and the
+// server lists the event — the OccupancyEvent feature of its selection.
+// matter.js emits it on occupancy$Changed when that feature is set
+// (packages/node/src/behaviors/occupancy-sensing/OccupancySensingServer.ts:67-74,
+// :88-90 at 862ad75f); the projected server is rebuilt on every dispatch,
+// so the change is observed here, where the host's notification arrives,
+// as for BooleanState's StateChange. The device kit's server
+// (sensing.Occupancy) emits the event itself and is no
+// measurement.OccupancySensingServer.
+type occupancyEvents struct {
+	b  *Bridge
+	ep *endpointpkg.Endpoint
+	// mu guards last.
+	mu   sync.Mutex
+	last *uint8
+}
+
+// newOccupancyEvents returns nil when the notifier does not cover
+// OccupancySensing.Occupancy or the endpoint's projected server does not
+// list OccupancyChanged.
+func newOccupancyEvents(b *Bridge, ep *endpointpkg.Endpoint, pathSet []im.ConcreteAttributePath) *occupancyEvents {
+	srv := projectedOccupancy(ep)
+	if srv == nil || !slices.Contains(srv.MatterEvents(), measurement.OccupancyEventChanged) {
+		return nil
+	}
+	for _, p := range pathSet {
+		if p.Cluster == measurement.ClusterOccupancySensing && p.Attribute == 0x0000 {
+			e := &occupancyEvents{b: b, ep: ep}
+			if v, ok := e.read(); ok {
+				e.last = &v
+			}
+			return e
+		}
+	}
+	return nil
+}
+
+// projectedOccupancy is the endpoint's measurement-projected
+// OccupancySensing server, nil without one.
+func projectedOccupancy(ep *endpointpkg.Endpoint) *measurement.OccupancySensingServer {
+	for _, srv := range endpointpkg.ClusterServers(ep) {
+		if s, ok := srv.(*measurement.OccupancySensingServer); ok {
+			return s
+		}
+	}
+	return nil
+}
+
+func (e *occupancyEvents) read() (uint8, bool) {
+	srv := projectedOccupancy(e.ep)
+	if srv == nil {
+		return 0, false
+	}
+	v, ok := srv.MatterRead(0x0000)
+	bitmap, isU8 := v.(uint8)
+	return bitmap, ok && isU8
+}
+
+func (e *occupancyEvents) check() {
+	if e == nil {
+		return
+	}
+	v, ok := e.read()
+	if !ok {
+		return
+	}
+	e.mu.Lock()
+	changed := e.last == nil || *e.last != v
+	e.last = &v
+	e.mu.Unlock()
+	if changed {
+		e.b.MatterEmitEvent(e.ep.ID, measurement.ClusterOccupancySensing, measurement.OccupancyEventChanged,
+			measurement.OccupancyChangedEvent{Occupancy: occdef.OccupancyBitmap(v)}, contract.EventPriorityInfo)
 	}
 }
 

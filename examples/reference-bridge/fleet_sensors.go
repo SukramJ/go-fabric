@@ -216,13 +216,22 @@ func occupancyOf(occupied bool) osdef.OccupancyBitmap {
 }
 
 // occupancySensor builds the OccupancySensor the state drives: a PIR
-// sensor (OccupancySensorType PIR, the bitmap's PIR bit).
+// sensor (OccupancySensorType PIR, the bitmap's PIR bit) that reports each
+// change as OccupancyChanged (OccupancyEvent) and holds an occupied state
+// for HoldTime after the sensor clears — chip's hold timer, which the
+// kit's server runs (cluster/sensing.Occupancy) — with the deprecated
+// PIROccupiedToUnoccupiedDelay alias chip serves beside it (TC-OCC-2.3).
 func (b *demoBinary) occupancySensor(opts device.Options) (*device.OccupancySensor, error) {
 	occupied := occupancyOf(b.state())
 	kind, bitmap := osdef.OccupancySensorTypeEnumPir, osdef.OccupancySensorTypeBitmapPir
+	hold := uint16(10)
+	limits := osdef.HoldTimeLimitsStruct{HoldTimeMin: 1, HoldTimeMax: 300, HoldTimeDefault: hold}
 	d, err := device.NewOccupancySensor(opts, osdef.Declare{
-		Features: osdef.FeaturePassiveInfrared,
-		Initial:  osdef.Patch{Occupancy: &occupied, OccupancySensorType: &kind, OccupancySensorTypeBitmap: &bitmap},
+		Features: osdef.FeaturePassiveInfrared | osdef.FeatureOccupancyEvent,
+		Initial: osdef.Patch{
+			Occupancy: &occupied, OccupancySensorType: &kind, OccupancySensorTypeBitmap: &bitmap,
+			HoldTime: &hold, HoldTimeLimits: &limits, PirOccupiedToUnoccupiedDelay: &hold,
+		},
 	})
 	if err != nil {
 		return nil, err

@@ -2511,15 +2511,15 @@
         "bridge:TestCommissioningWindow_OpenWindow_Twice_ReturnsBusy",
         "bridge:TestWireCommissioned_ArmFailSafeOverCASEWhileWindowOpen",
         "bridge:TestCommissioningWindow_RevokeWindow_OnOpenWindow_StatusReturnsToClosed",
-        "node:TestCommissioningWindowLifetime"
+        "node:TestCommissioningWindowLifetime",
+        "node:TestCommissioningWindowLifetime_AdministratorBasicWindow"
       ],
       "missing": [
-        "replaces a window the node opened itself with an administrator's basic window",
         "refuses a window the node opens while an administrator's window is still opening",
         "opens no window once the commissioner closes during the open",
         "ignores a close after the commissioner closed"
       ],
-      "reason": "The node's own window, its timeouts, restart (also across the replaced window's deadline), replacement by an administrator's enhanced window, two concurrent administrator opens (one Busy), a close callback opening the next window, the administrator's window kept against the node's own, and revoke are ported (node/commissioning_window_lifetime_parity_matterjs_test.go on fabrictest). Missing: the Go AdministratorCommissioning has no Basic feature (BC), so there is no administrator's basic window; js-runtime-only, the window still opening and the commissioner closing during it (DeviceCommissioner's asynchronous #open; the Go window opens and closes atomically under its lock) and the terminal DeviceCommissioner.close (the Go window ends with the node).",
+      "reason": "The node's own window, its timeouts, restart (also across the replaced window's deadline), replacement by an administrator's enhanced window, two concurrent administrator opens (one Busy), a close callback opening the next window, the administrator's window kept against the node's own, and revoke are ported (node/commissioning_window_lifetime_parity_matterjs_test.go on fabrictest). The administrator's basic window is ported on a node with node.Commissioning.BasicCommissioning (phase 36, commissioning_window_basic_parity_matterjs_test.go). Missing, js-runtime-only: the window still opening and the commissioner closing during it (DeviceCommissioner's asynchronous #open; the Go window opens and closes atomically under its lock) and the terminal DeviceCommissioner.close (the Go window ends with the node).",
       "snapshotSha": "0eca265225f836d304af49c6a2bcb0a0872e638f"
     },
     {
@@ -3197,12 +3197,13 @@
         "cluster/lock:TestDoorLockServerOperatingModeParity",
         "cluster/lock:TestDoorLockServerLockHardwareParity",
         "cluster/lock:TestDoorLockServerLockOperationEventsParity",
-        "cluster/lock:TestDoorLockServerLockUserChangeParity"
+        "cluster/lock:TestDoorLockServerLockUserChangeParity",
+        "cluster/lock:TestDoorLockServerFaceCredentialParity"
       ],
       "missing": [
         "measures the lockout on the monotonic clock"
       ],
-      "reason": "67 of 68 cases ported onto a commissioned fabrictest pair, one Go file per describe (cluster/lock/doorlockserver_*_parity_matterjs_test.go). Missing, M4: findings entry \"clock.Clock has no monotonic reading\": the monotonic-lockout case steps MockTime's wall clock apart from its timers; clocktest.Fake has one reading, so the step moves the lockout deadline's reading too (the server compares time.Time, monotonic under clock.System).",
+      "reason": "67 of 68 cases ported onto a commissioned fabrictest pair, one Go file per describe (cluster/lock/doorlockserver_*_parity_matterjs_test.go). The file names no face credential; since phase 36 serves FACE (DoorLockServer.ts:86-98), four SetCredential cases of describe(\"DoorLockServer\") run once more with the Face type (doorlockserver_face_parity_matterjs_test.go). Missing, M4: findings entry \"clock.Clock has no monotonic reading\": the monotonic-lockout case steps MockTime's wall clock apart from its timers; clocktest.Fake has one reading, so the step moves the lockout deadline's reading too (the server compares time.Time, monotonic under clock.System).",
       "snapshotSha": "b56582b0263eb069b28554616645021a9e18d060"
     },
     {
@@ -3442,14 +3443,13 @@
     },
     {
       "path": "packages/node/test/behaviors/occupancy-sensing/OccupancySensingServerTest.ts",
-      "status": "partial",
+      "status": "ported",
       "go": [
-        "cluster/measurement:TestOccupancySensingServerParityMatterJS"
+        "cluster/measurement:TestOccupancySensingServerParityMatterJS",
+        "cluster/sensing:TestOccupancySensingServerParityMatterJS",
+        "bridge:TestOccupancyChangedEvent"
       ],
-      "missing": [
-        "emits OccupancyChanged when occupancy changes and the OccupancyEvent feature is enabled"
-      ],
-      "reason": "The construction and the absent HoldTime dependents run on the Go server, PassiveInfrared its one feature selection (cluster/measurement/occupancy_sensing_parity_matterjs_test.go). Missing, M4: findings entry \"OccupancySensing has no feature selection\": the server serves PIR alone, without the OccupancyEvent feature and so without the OccupancyChanged event matter.js emits on occupancy$Changed (OccupancySensingServer.ts initialize).",
+      "reason": "The three cases run on both servers (phase 36): the device kit's cluster/sensing.Occupancy, which emits OccupancyChanged itself on a change with OccupancyEvent (cluster/sensing/occupancy_parity_matterjs_test.go), and the measurement-projected server, which takes the source's detector selection and OccupancyEvent and whose event the bridge emits on a change of the reading, as for BooleanState (cluster/measurement/occupancy_sensing_parity_matterjs_test.go, bridge:TestOccupancyChangedEvent).",
       "snapshotSha": "51868775f7d7a9ae1566f27af0fd4a3615801269"
     },
     {
@@ -3515,12 +3515,13 @@
       "path": "packages/node/test/behaviors/power-source/PowerSourceServerTest.ts",
       "status": "partial",
       "go": [
-        "endpoint:TestSpecPartsComposeAChildEndpoint"
+        "endpoint:TestSpecPartsComposeAChildEndpoint",
+        "device:TestPowerSourceSelectionsParityMatterJS"
       ],
       "missing": [
         "successfully augments descriptor"
       ],
-      "reason": "Missing, by_design BD-Matter-PowerSource-DeviceTypeOnPart: matter.js's PowerSourceServer adds the PowerSource device type to its own endpoint's DeviceTypeList (PowerSourceServer.ts:23, DescriptorServer.addDeviceTypes); the Go endpoint layer lists one device type per endpoint, serves a bridged device's battery as BridgedNode's optional PowerSource cluster (endpoint/types.go Endpoint.PowerSource) and the PowerSource device type as a part endpoint of its own (the Go test named).",
+      "reason": "The case's selection (Battery, Replaceable) and state, and every selection of the base server's with list, build on the kit's PowerSource of a HumiditySensor and read matter.js's initialize defaults (device/power_source_parity_matterjs_test.go, phase 36). Missing, by_design BD-Matter-PowerSource-DeviceTypeOnPart: matter.js's PowerSourceServer adds the PowerSource device type to its own endpoint's DeviceTypeList (PowerSourceServer.ts:23, DescriptorServer.addDeviceTypes); the Go endpoint layer lists one device type per endpoint, serves a bridged device's battery as BridgedNode's optional PowerSource cluster (endpoint/types.go Endpoint.PowerSource) and the PowerSource device type as a part endpoint of its own (the Go test named).",
       "snapshotSha": "10432eff46484005a9b53521644582b2b4aa7a2a"
     },
     {

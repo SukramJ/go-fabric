@@ -83,6 +83,7 @@ import (
 	h_mwoc "github.com/SukramJ/go-fabric/cluster/spec/microwaveovencontrol"
 	h_mwom "github.com/SukramJ/go-fabric/cluster/spec/microwaveovenmode"
 	h_ms "github.com/SukramJ/go-fabric/cluster/spec/modeselect"
+	h_occ "github.com/SukramJ/go-fabric/cluster/spec/occupancysensing"
 	h_onoff "github.com/SukramJ/go-fabric/cluster/spec/onoff"
 	h_op "github.com/SukramJ/go-fabric/cluster/spec/operationalstate"
 	h_oven "github.com/SukramJ/go-fabric/cluster/spec/ovencavityoperationalstate"
@@ -221,6 +222,9 @@ var hostCases = map[uint32]hostCase{
 		"AttachCommissionerReach", "AttachFailSafe", "AttachNode", "OnCommissioningComplete", "OnFabricRemoved", "OnFailSafeExpired",
 	}},
 	h_acs.ClusterID: {kit: kitOf[*sensing.AmbientContext](), host: hostOf[h_acs.Host](h_acs.Wrap), covered: []string{"HoldTime", "ObjectCountConfig"}},
+	// OccupancySensing (cluster/sensing): HoldTime is what Get reads,
+	// Close the quiesce.
+	h_occ.ClusterID: {kit: kitOf[*sensing.Occupancy](), covered: []string{"Close", "HoldTime"}},
 	// The media servers: their event helpers are Emit<Event>'s.
 	h_mp.ClusterID:       {kit: kitOf[*media.PlaybackServer](), covered: []string{"EmitStateChanged"}},
 	h_keypad.ClusterID:   {kit: kitOf[*media.KeypadServer]()},

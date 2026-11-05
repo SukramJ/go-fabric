@@ -20,8 +20,10 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"sync"
 
 	"github.com/SukramJ/go-fabric/cluster"
+	"github.com/SukramJ/go-fabric/cluster/sensing"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	aqdef "github.com/SukramJ/go-fabric/cluster/spec/airquality"
 	booldef "github.com/SukramJ/go-fabric/cluster/spec/booleanstate"
@@ -143,6 +145,7 @@ const (
 	// BatPercentRemaining above is conformance "[BAT]" (optional even
 	// with BAT set) — only advertised by [PowerSourceServer] instances
 	// constructed via [NewPowerSourceServerFromFloat].
+	attrPwrWiredCurrentType     = psdef.AttrWiredCurrentType // WIRED: mandatory, quality F
 	attrPwrBatChargeLevel       = psdef.AttrBatChargeLevel
 	attrPwrBatReplacementNeeded = psdef.AttrBatReplacementNeeded
 	attrPwrBatReplaceability    = psdef.AttrBatReplaceability
@@ -739,8 +742,24 @@ func (s *BooleanStateServer) MatterEvents() []uint32 { return booleanStateInst.M
 
 // OccupancySensingServer projects a [contract.BoolMeasurementSource]
 // onto Matter OccupancySensing. The Occupancy attribute is a bitmap8
-// where bit 0 = occupied; OccupancySensorType is fixed to 0 (PIR)
-// because every HM motion sensor uses PIR.
+// where bit 0 = occupied. The feature selection is the source's
+// [contract.OccupancySelection] when it states one
+// ([contract.OccupancySelectionSource]), PassiveInfrared with the
+// OccupancyEvent feature otherwise: from revision 5 on one sensor-type
+// feature is required, and controllers that branch on it (matter.js
+// OccupancySensingServer.ts `features.passiveInfrared`) classify the
+// sensor from these bits alone. OccupancySensorType and its bitmap follow
+// the detector features as matter.js's initialize sets them
+// ([sensing.OccupancySensorTypeFor]).
+//
+// With OccupancyEvent the server lists OccupancyChanged, and the bridge
+// emits it on each change of the reading, as it emits BooleanState's
+// StateChange: the server is rebuilt on every dispatch and holds no
+// state, so the change is observed where the host's notification arrives
+// (matter.js packages/node/src/behaviors/occupancy-sensing/OccupancySensingServer.ts:67-74
+// at 862ad75f: reactTo occupancy$Changed when the feature is set). HoldTime
+// and the delay attributes it gates are not served: the hold timer needs
+// state ([sensing.Occupancy], the device kit's server, has it).
 //
 // OccupancySensingServer embeds [cluster.DataVersionTracker] and
 // implements [contract.ClusterDataVersion]. See TemperatureServer
@@ -750,12 +769,58 @@ type OccupancySensingServer struct {
 	src contract.BoolMeasurementSource
 }
 
-// Compile-time assertion: OccupancySensingServer satisfies MatterClusterDataVersion.
-var _ contract.ClusterDataVersion = (*OccupancySensingServer)(nil)
+// Compile-time assertions: OccupancySensingServer satisfies
+// MatterClusterDataVersion and lists its events.
+var (
+	_ contract.ClusterDataVersion = (*OccupancySensingServer)(nil)
+	_ contract.ClusterEventLister = (*OccupancySensingServer)(nil)
+)
 
 // NewOccupancySensingServer constructs an OccupancySensingServer backed by src.
 func NewOccupancySensingServer(src contract.BoolMeasurementSource) *OccupancySensingServer {
 	return &OccupancySensingServer{src: src}
+}
+
+// OccupancyFeatures is the OccupancySensing FeatureMap of a selection:
+// its detector bits (FeatureMap bits 0-7), PassiveInfrared when it names
+// none, and OccupancyEvent unless it leaves the event out.
+func OccupancyFeatures(sel contract.OccupancySelection) uint32 {
+	f := uint32(sel.Detectors)
+	if f == 0 {
+		f = uint32(occdef.FeaturePassiveInfrared)
+	}
+	if !sel.NoOccupancyEvent {
+		f |= uint32(occdef.FeatureOccupancyEvent)
+	}
+	return f
+}
+
+// features is the FeatureMap of the source's selection.
+func (s *OccupancySensingServer) features() uint32 {
+	var sel contract.OccupancySelection
+	if ss, ok := s.src.(contract.OccupancySelectionSource); ok {
+		sel = ss.MatterOccupancySelection()
+	}
+	return OccupancyFeatures(sel)
+}
+
+// occupancyInsts holds one instance per feature selection; the server is
+// rebuilt on every dispatch, its instance is not.
+var occupancyInsts sync.Map // uint32 → *spec.Instance
+
+// inst is the definition bound to the source's selection.
+func (s *OccupancySensingServer) inst() *spec.Instance {
+	f := s.features()
+	if v, ok := occupancyInsts.Load(f); ok {
+		if inst, isInst := v.(*spec.Instance); isInst {
+			return inst
+		}
+	}
+	// Every detector combination with at least one bit is a selection the
+	// definition's "O.a+" admits, and OCCEVENT is optional.
+	inst := mustInstance(occdef.Definition, spec.Options{Features: f})
+	occupancyInsts.Store(f, inst)
+	return inst
 }
 
 // MatterDataVersion implements [contract.ClusterDataVersion].
@@ -778,18 +843,22 @@ func (s *OccupancySensingServer) MatterRead(attrID uint32) (any, bool) {
 		}
 		return uint8(0), true
 	case attrOccupancySensorType:
-		return uint8(0), true // 0 = PIR
+		// A type the features leave unset reads as the enum's
+		// SelectDefaultValue, Pir (0), as the kit's server does.
+		kind, _, _, _ := sensing.OccupancySensorTypeFor(sensing.OccupancyFeature(s.features()))
+		return uint8(kind), true
 	case attrOccupancySensorBmp:
-		return uint8(1 << 0), true // bit 0 = PIR
+		_, bitmap, _, _ := sensing.OccupancySensorTypeFor(sensing.OccupancyFeature(s.features()))
+		return uint8(bitmap), true
 	case cluster.AttrGlobalFeatureMap, cluster.AttrGlobalClusterRevision:
-		return occupancyInst.ReadGlobal(attrID)
+		return s.inst().ReadGlobal(attrID)
 	}
 	return nil, false
 }
 
 // MatterWrite refuses the write as the definition answers it (see refuseWrite): the Occupancy Sensing cluster is read-only at the wire layer.
 func (s *OccupancySensingServer) MatterWrite(_ context.Context, attrID uint32, value any) error {
-	return refuseWrite(occupancyInst, attrID, value)
+	return refuseWrite(s.inst(), attrID, value)
 }
 
 // MatterInvoke returns errNoCommands — the Matter Occupancy Sensing cluster has no commands.
@@ -804,7 +873,20 @@ func (s *OccupancySensingServer) MatterReportable() []uint32 { return []uint32{a
 // server implements via MatterRead. Apple Home's HAP service rebuild
 // reads the full attribute set; without this the dispatcher falls back
 // to MatterReportable's single attribute.
-func (s *OccupancySensingServer) MatterAttributes() []uint32 { return occupancyInst.MatterAttributes() }
+func (s *OccupancySensingServer) MatterAttributes() []uint32 { return s.inst().MatterAttributes() }
+
+// MatterEvents implements [contract.ClusterEventLister]: OccupancyChanged
+// with the OccupancyEvent feature ("OCCEVENT, O",
+// occupancy-sensing.element.ts:97), which the bridge emits on every change
+// of the reading.
+func (s *OccupancySensingServer) MatterEvents() []uint32 { return s.inst().MatterEvents() }
+
+// OccupancyEventChanged is the OccupancyChanged event (0x00).
+const OccupancyEventChanged = occdef.EventOccupancyChanged
+
+// OccupancyChangedEvent is OccupancyChanged's payload: the new Occupancy
+// bitmap.
+type OccupancyChangedEvent = occdef.OccupancyChangedEvent
 
 // --- Materializer ------------------------------------------------------
 
@@ -1376,7 +1458,7 @@ func NewPM10ConcentrationServer(src contract.FloatMeasurementSource) *PM10Concen
 	return &PM10ConcentrationServer{concentrationServer{src: src, clusterID: ClusterPM10Concentration, unit: concUnitMicroGramPerCubicMeter, inst: pm10Inst}}
 }
 
-// --- PowerSource (0x002F) — battery-only flavour ----------------------
+// --- PowerSource (0x002F) — battery or mains --------------------------
 
 // PowerSourceServer projects either a [contract.BoolMeasurementSource]
 // (typically the LOWBAT binary parameter) or a
@@ -1402,6 +1484,15 @@ func NewPM10ConcentrationServer(src contract.FloatMeasurementSource) *PM10Concen
 // a bool-source instance omits the attribute entirely rather than
 // reporting null forever, matching the optional conformance.
 //
+// A mains-powered device's source states [contract.PowerSourceSelection]
+// Wired ([NewWiredPowerSourceServer]): the Wired feature in place of
+// Battery, as the model's "O.a" admits one of the two per cluster
+// (power-source-cluster.element.ts:24-25 at 862ad75f). It serves no
+// battery reading; its current type and its Description "Mains power" are
+// matter.js PowerSourceServer.initialize's defaults for WIRED
+// (packages/node/src/behaviors/power-source/PowerSourceServer.ts:40-46,
+// :57-61 at 862ad75f).
+//
 // PowerSourceServer embeds [cluster.DataVersionTracker] and implements
 // [contract.ClusterDataVersion]. See TemperatureServer for the
 // DataVersion tracking follows the same pattern as TemperatureServer.
@@ -1409,6 +1500,10 @@ type PowerSourceServer struct {
 	cluster.DataVersionTracker
 	src      contract.BoolMeasurementSource
 	floatSrc contract.FloatMeasurementSource
+	// wired is a mains-powered source ([NewWiredPowerSourceServer]):
+	// feature WIRED, current its WiredCurrentType.
+	wired   bool
+	current contract.WiredCurrent
 	// endpoint is the Matter endpoint this power source feeds, stamped
 	// post-construction by the endpoint assembler via [SetEndpoint] so
 	// EndpointList (0x001F) can name it. Zero means "unspecified", which
@@ -1433,6 +1528,13 @@ func NewPowerSourceServer(src contract.BoolMeasurementSource) *PowerSourceServer
 // no-observation fallback for the bool path.
 func NewPowerSourceServerFromFloat(src contract.FloatMeasurementSource) *PowerSourceServer {
 	return &PowerSourceServer{floatSrc: src}
+}
+
+// NewWiredPowerSourceServer is a mains-powered device's power source: the
+// Wired feature, WiredCurrentType from current (AC for the zero value, as
+// matter.js defaults it), Description "Mains power".
+func NewWiredPowerSourceServer(current contract.WiredCurrent) *PowerSourceServer {
+	return &PowerSourceServer{wired: true, current: current}
 }
 
 // OnMatterValueChanged implements [contract.ChangeNotifier] by forwarding
@@ -1463,6 +1565,9 @@ func (s *PowerSourceServer) OnMatterValueChanged(cb func()) func() {
 // inst is the definition bound to what this instance serves:
 // BatPercentRemaining joins the attributes with a percentage source.
 func (s *PowerSourceServer) inst() *spec.Instance {
+	if s.wired {
+		return powerSourceWiredInst
+	}
 	if s.floatSrc != nil {
 		return powerSourceFloatInst
 	}
@@ -1488,8 +1593,22 @@ func (s *PowerSourceServer) MatterRead(attrID uint32) (any, bool) {
 	case attrPwrOrder:
 		return uint8(1), true // primary source
 	case attrPwrDescription:
+		if s.wired {
+			return "Mains power", true
+		}
 		return "Battery", true
+	case attrPwrWiredCurrentType:
+		if !s.wired {
+			return nil, false
+		}
+		if s.current == contract.WiredCurrentDC {
+			return uint8(psdef.WiredCurrentTypeDc), true
+		}
+		return uint8(psdef.WiredCurrentTypeAc), true
 	case attrPwrBatChargeLevel:
+		if s.wired {
+			return nil, false
+		}
 		// s.src is nil on a float-constructed instance (see
 		// [NewPowerSourceServerFromFloat]) — there is no boolean LOWBAT
 		// signal to derive Warning from, so it falls back to OK the same
@@ -1521,6 +1640,9 @@ func (s *PowerSourceServer) MatterRead(attrID uint32) (any, bool) {
 		}
 		return percentToHalfPercent(v), true
 	case attrPwrBatReplacementNeeded:
+		if s.wired {
+			return nil, false
+		}
 		if s.src == nil {
 			return false, true
 		}
@@ -1530,6 +1652,9 @@ func (s *PowerSourceServer) MatterRead(attrID uint32) (any, bool) {
 		}
 		return v, true
 	case attrPwrBatReplaceability:
+		if s.wired {
+			return nil, false
+		}
 		return batReplaceUserReplaceable, true
 	case attrPwrEndpointList:
 		// EndpointList names the endpoints this power source feeds. We mount
@@ -1559,6 +1684,9 @@ func (s *PowerSourceServer) MatterInvoke(_ context.Context, cmdID uint32, _ any)
 
 // MatterReportable returns the attribute IDs that the Matter Power Source cluster reports on change.
 func (s *PowerSourceServer) MatterReportable() []uint32 {
+	if s.wired {
+		return []uint32{} // a constant surface: nothing moves
+	}
 	if s.floatSrc != nil {
 		return []uint32{attrPwrBatChargeLevel, attrPwrBatReplacementNeeded, attrPwrBatPercentRemaining}
 	}

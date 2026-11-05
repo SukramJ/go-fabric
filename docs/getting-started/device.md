@@ -230,7 +230,11 @@ it lists holds the type's default, the host's `Initial`, or the fallback
 matter.js's `SelectDefaultValue` gives — null when nullable, 0 for a
 number or bitmap, false, an empty list — and what matter.js's default
 server sets in its `initialize` (FanControl's FanMode Off, SmokeCoAlarm's
-alarm states Normal, OccupancySensing's sensor type from its features). A
+alarm states Normal). OccupancySensing has a self-held server of the
+module's: the sensor type follows its detector features, each change of
+Occupancy emits OccupancyChanged when the selection has OccupancyEvent,
+and a declaration that serves HoldTime gets chip's hold timer — a cleared
+Occupancy holds for HoldTime. A
 TemperatureSensor therefore answers MeasuredValue null until you set a
 reading. An enum, a string or a struct has no fallback in matter.js either
 and stays yours to state (the test `TestEveryListedAttributeHasAValue`
