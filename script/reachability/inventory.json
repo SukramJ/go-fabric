@@ -23232,84 +23232,84 @@
       "identifier": "TestSliceBSessionsAnnouncesExactlyOnceParityMatterjsServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/camera/manager_slice_b_parity_matterjsserver_test.go",
-      "line": 1764
+      "line": 1768
     },
     {
       "package": "controller/camera",
       "identifier": "TestSliceBSessionsClientSessionKeysParityMatterjsServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/camera/manager_slice_b_parity_matterjsserver_test.go",
-      "line": 2416
+      "line": 2420
     },
     {
       "package": "controller/camera",
       "identifier": "TestSliceBSessionsEndpointLockParityMatterjsServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/camera/manager_slice_b_parity_matterjsserver_test.go",
-      "line": 1169
+      "line": 1173
     },
     {
       "package": "controller/camera",
       "identifier": "TestSliceBSessionsFailedStartsParityMatterjsServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/camera/manager_slice_b_parity_matterjsserver_test.go",
-      "line": 2039
+      "line": 2043
     },
     {
       "package": "controller/camera",
       "identifier": "TestSliceBSessionsRegistryParityMatterjsServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/camera/manager_slice_b_parity_matterjsserver_test.go",
-      "line": 1294
+      "line": 1298
     },
     {
       "package": "controller/camera",
       "identifier": "TestSliceBSessionsReleasesParityMatterjsServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/camera/manager_slice_b_parity_matterjsserver_test.go",
-      "line": 2175
+      "line": 2179
     },
     {
       "package": "controller/camera",
       "identifier": "TestSliceBSessionsReportsInFlightParityMatterjsServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/camera/manager_slice_b_parity_matterjsserver_test.go",
-      "line": 1639
+      "line": 1643
     },
     {
       "package": "controller/camera",
       "identifier": "TestSliceBSessionsReportsParityMatterjsServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/camera/manager_slice_b_parity_matterjsserver_test.go",
-      "line": 1830
+      "line": 1834
     },
     {
       "package": "controller/camera",
       "identifier": "TestSliceBSessionsStopsParityMatterjsServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/camera/manager_slice_b_parity_matterjsserver_test.go",
-      "line": 990
+      "line": 994
     },
     {
       "package": "controller/camera",
       "identifier": "TestSliceBSessionsTalkbackNoticeParityMatterjsServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/camera/manager_slice_b_parity_matterjsserver_test.go",
-      "line": 800
+      "line": 804
     },
     {
       "package": "controller/camera",
       "identifier": "TestSliceBSessionsTalkbackParityMatterjsServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/camera/manager_slice_b_parity_matterjsserver_test.go",
-      "line": 881
+      "line": 885
     },
     {
       "package": "controller/camera",
       "identifier": "TestSliceBSessionsTracksParityMatterjsServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/camera/manager_slice_b_parity_matterjsserver_test.go",
-      "line": 498
+      "line": 502
     },
     {
       "package": "controller/camera",
