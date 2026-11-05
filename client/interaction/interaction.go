@@ -90,6 +90,8 @@ type Interaction struct {
 	log      *slog.Logger
 	clock    exchange.Clock
 	rand     func() float64
+	// network is [Config].Network, #network (ClientInteraction.ts:231).
+	network string
 	// attemptHook, a test seam, replaces a sustained subscription's
 	// subscribe of one attempt — matter.js's injected subscribe
 	// (SustainedSubscription.Configuration.subscribe).
@@ -133,6 +135,13 @@ type Config struct {
 	// Rand returns the retry jitter draw in [0, 1); nil is
 	// math/rand/v2.Float64.
 	Rand func() float64
+	// Network is the network profile of every request that names none —
+	// matter.js ClientInteractionContext.network
+	// (ClientInteraction.ts:146, :231, :250 at 862ad75f), applied as
+	// `request.network ?? this.#network` to the exchange (:1250) and to the
+	// batch lane of a command (:765): a command without a network and one
+	// naming this network share a batch. "" is the peer's medium profile.
+	Network string
 }
 
 // New returns the interaction over session s of mgr — matter.js
@@ -144,7 +153,7 @@ func New(mgr *exchange.Manager, s *exchange.Session, log *slog.Logger) *Interact
 
 // Bind returns the interaction over provider p.
 func Bind(p Provider, cfg Config) *Interaction {
-	c := &Interaction{provider: p, subs: cfg.Subscriptions, log: cfg.Logger, clock: cfg.Clock, rand: cfg.Rand}
+	c := &Interaction{provider: p, subs: cfg.Subscriptions, log: cfg.Logger, clock: cfg.Clock, rand: cfg.Rand, network: cfg.Network}
 	c.abort, c.abortFn = context.WithCancelCause(context.Background())
 	if c.log == nil {
 		c.log = slog.Default()
@@ -240,6 +249,7 @@ func (m *messenger) close() {
 // exchange's work runs under, ends with ctx and with [Interaction.Close];
 // a closed interaction refuses with its close reason.
 func (c *Interaction) begin(ctx context.Context, opts ExchangeOptions) (*messenger, context.Context, error) {
+	opts.Network = c.networkFor(opts.Network)
 	c.closeMu.Lock()
 	if err := c.closed; err != nil {
 		c.closeMu.Unlock()
@@ -260,6 +270,16 @@ func (c *Interaction) begin(ctx context.Context, opts ExchangeOptions) (*messeng
 		return nil, ctx, c.closedCause(ictx, err)
 	}
 	return &messenger{x: x, release: release}, ictx, nil
+}
+
+// networkFor is `request.network ?? this.#network`
+// (ClientInteraction.ts:765, :1250): network, or the interaction's default
+// when it names none.
+func (c *Interaction) networkFor(network string) string {
+	if network == "" {
+		return c.network
+	}
+	return network
 }
 
 // closedCause is err, or the close reason when Close aborted ictx.
