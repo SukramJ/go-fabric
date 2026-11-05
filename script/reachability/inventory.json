@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 7566,
+  "entry_points": 7568,
   "entry_packages": [
     ".",
     "bdx",
@@ -279,9 +279,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 17571,
+    "total_exported": 17573,
     "reachable": 12263,
-    "whitelisted": 5307,
+    "whitelisted": 5309,
     "unreachable": 1
   },
   "by_package": [
@@ -22736,6 +22736,20 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/camera/policy_snapshot_parity_matterjsserver_test.go",
       "line": 316
+    },
+    {
+      "package": "controller/camera",
+      "identifier": "TestClientIOAbandon",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/camera/client_io_internal_test.go",
+      "line": 40
+    },
+    {
+      "package": "controller/camera",
+      "identifier": "TestClientIOTimePush",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/camera/client_io_internal_test.go",
+      "line": 20
     },
     {
       "package": "controller/camera",
