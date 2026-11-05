@@ -27,6 +27,7 @@ import (
 	"maps"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/SukramJ/go-fabric/clock"
 )
@@ -156,6 +157,13 @@ type carrier struct {
 	clock.Clock
 	g *Group
 }
+
+// Monotonic forwards the wrapped clock's monotonic reading
+// ([clock.MonotonicOf]): without it the embedded interface hides a
+// [clock.Monotonic] reading, and every component on a site's clock would
+// measure its intervals on the wall reading a clocktest.Fake.StepWall
+// moves.
+func (c carrier) Monotonic() time.Duration { return clock.MonotonicOf(c.Clock) }
 
 // InflightGroup is the group the clock carries: the method [Of] reads,
 // which a component's own clock wrapper forwards to the clock it wraps.
