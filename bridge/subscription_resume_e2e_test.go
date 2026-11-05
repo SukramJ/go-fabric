@@ -710,9 +710,15 @@ func subscribeOverCASE(t *testing.T, dev *resumeDevice, ctrl *fakeController) ui
 	}
 }
 
+// waitFor polls cond on the wall clock for up to five seconds. It is the
+// package's one poll: the bridge tests run real bridges on UDP and TCP
+// loopback sockets (Config{Listen: "127.0.0.1:0"}), whose reads no
+// synctest bubble holds and no site paces; the in-memory subjects (the
+// providers' reapers, the windows' timers, the health probe) run in
+// synctest bubbles instead.
 func waitFor(t *testing.T, what string, cond func() bool) {
 	t.Helper()
-	deadline := time.Now().Add(3 * time.Second)
+	deadline := time.Now().Add(5 * time.Second)
 	for !cond() {
 		if time.Now().After(deadline) {
 			t.Fatalf("timed out waiting for %s", what)

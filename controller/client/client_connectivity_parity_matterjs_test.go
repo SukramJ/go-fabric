@@ -156,12 +156,15 @@ func TestClientConnectivityParity(t *testing.T) {
 		if err := cp.pair.Device.Start(parityCtx(t)); err != nil {
 			t.Fatal(err)
 		}
-		cp.eventually(t, "the subscription back", cp.node.SubscriptionActive)
-		mu.Lock()
-		defer mu.Unlock()
-		if alive == 0 {
-			t.Fatal("no subscription-alive signal on the re-established subscription")
-		}
+		// The step ends on the event, not on a window (issue #383): the
+		// active flag can flip before the hook runs, so the site runs until
+		// both hold; a re-establishment that never signals fails with
+		// ErrWaited.
+		cp.eventually(t, "the subscription back with a subscription-alive signal", func() bool {
+			mu.Lock()
+			defer mu.Unlock()
+			return cp.node.SubscriptionActive() && alive > 0
+		})
 	})
 
 	t.Run("resubscribes after extended offline period", func(t *testing.T) {

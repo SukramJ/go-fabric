@@ -113,7 +113,7 @@ func TestICDEndToEnd(t *testing.T) {
 	got := &checkIns{}
 	p.icd().OnCheckIn(got.record)
 	read := p.readAsync(parityCtx(t), descriptorRead)
-	time.Sleep(20 * time.Millisecond)
+	p.settle(t)
 	select {
 	case err := <-read:
 		t.Fatalf("the read went out to a sleeping peer: %v", err)

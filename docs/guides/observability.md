@@ -25,6 +25,22 @@ principle 9).
 logs unless the test hands it a logger (`fabrictest.Options.Logger`), so a
 passing test prints nothing.
 
+A host that shows recent log lines in its own UI wraps its handler in a
+`logring.Handler`: `slog.New(logring.New(inner, logring.Options{}))` is
+the logger it hands to `node.Config.Logger`. The module still builds no
+handler; the host does. The handler forwards each record to `inner` and
+keeps the newest `Options.Size` records (1000 by default) in memory.
+`Handler.Records(since, limit)` returns them oldest first, each with a
+sequence number that starts at 1 and never repeats, its attributes
+resolved and groups flattened as `group.key`. `Handler.Observe` delivers
+each new record to a callback on a goroutine of its own. A callback that
+falls behind loses the oldest queued records, and `Handler.Dropped`
+counts them; the logger never waits for it. `Handler.SetLevel` moves the
+ring's level gate at run time: a record below it is neither kept nor
+forwarded, while `inner`'s own level still decides what `inner` prints.
+The UI reads the ring through a port of the host's own; the ring applies
+no redaction beyond the fact that the module logs no passcodes and no keys.
+
 ### Event names
 
 A log message is an event name in dotted lower case, `area.event`. The
@@ -187,7 +203,7 @@ A host reads what its node serves through the facade, below no seam:
 | Facade | What it does |
 | --- | --- |
 | `Node.ReadAttribute(ctx, endpoint, cluster, attribute)` | one attribute as a controller's read reaches it — the cluster server's `MatterRead` through the node's dispatcher — as `node.AttributeValue{Endpoint, Cluster, Attribute, Value, DataVersion}`. No access control and no accessing fabric: a fabric-scoped list holds every fabric's entries with their fabric-sensitive fields withheld. An unserved path is a `contract.StatusError` with the status a controller receives; before `Start`, `node.ErrNotStarted`. |
-| `Node.ReadCluster(ctx, endpoint, cluster)` | every attribute of one cluster, the globals among them, in a wildcard read's order. |
+| `Node.ReadCluster(ctx, endpoint, cluster)` | every attribute of one cluster, the globals among them, in a wildcard read's order — one whose read fails among them, with the IM status the wildcard read reports for its path in `AttributeValue.Status` and no value (0 is success). |
 | `AttributeValue.JSON()` | the value by name, rendered by the decoder behind the controller side's `client.DecodeJSON` (`NameBased`) from the bytes the node sends, so the node and a controller render a value alike. |
 | `Node.Events(node.EventQuery{Endpoint, Cluster, Event, MinNumber, Limit})` | the node's event log — the records a controller's event read is answered from — oldest first; nil path fields match every one, `MinNumber` is inclusive, a positive `Limit` keeps the newest. The log is bounded and emptied when the node stops. |
 | `Event.JSON()` | the event's payload by name, as `AttributeValue.JSON`. |

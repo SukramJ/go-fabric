@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/SukramJ/go-fabric/clock"
 	"github.com/SukramJ/go-fabric/node"
 
 	otadef "github.com/SukramJ/go-fabric/cluster/spec/otasoftwareupdaterequestor"
@@ -44,6 +45,8 @@ type otaApplier struct {
 	harness             bool
 	requestor           func() *node.OTARequestorServer
 	logger              *slog.Logger
+	// clock paces restartedWhenIdle's wait for Idle; nil is clock.System.
+	clock clock.Clock
 }
 
 var _ node.OTAApplier = (*otaApplier)(nil)
@@ -160,12 +163,13 @@ func (a *otaApplier) restartedWhenIdle(ctx context.Context) {
 	if r == nil {
 		return
 	}
-	deadline := time.Now().Add(10 * time.Second)
-	for time.Now().Before(deadline) {
+	clk := clock.Or(a.clock)
+	deadline := clk.Now().Add(10 * time.Second)
+	for clk.Now().Before(deadline) {
 		if v, _ := r.MatterRead(otadef.AttrUpdateState); v == uint8(otadef.UpdateStateIdle) {
 			break
 		}
-		time.Sleep(10 * time.Millisecond)
+		clock.Sleep(clk, 10*time.Millisecond, ctx.Done())
 	}
 	if a.basicInfo != nil {
 		a.basicInfo.EmitStartUp()

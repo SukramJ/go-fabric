@@ -33,7 +33,10 @@ type fakeClock struct{ *clocktest.Fake }
 
 func newFakeClock() *fakeClock { return &fakeClock{clocktest.New(time.Unix(2_000_000, 0))} }
 
-// eventually polls cond until it holds or ten seconds pass.
+// eventually polls cond until it holds or ten seconds pass. Inside the
+// synctest bubbles of the harness cases its sleep is the bubble's virtual
+// clock; the cases outside a bubble (the parity ports over the harness)
+// poll the wall clock.
 func eventually(t *testing.T, what string, cond func() bool) {
 	t.Helper()
 	deadline := time.Now().Add(10 * time.Second)
@@ -150,7 +153,10 @@ func aaaaRR(name, ip string, ttl uint32) dns.RR {
 func testFabric(t *testing.T) handshake.Fabric {
 	t.Helper()
 	const fabricID, nodeID uint64 = 0x0F0B, 112233
-	authority, err := ca.New(ca.Config{})
+	// The CA issues at a fixed instant: the cases in synctest bubbles read
+	// 2000-01-01 UTC on the system clock, and a certificate backdated from
+	// there falls before the Matter epoch.
+	authority, err := ca.New(ca.Config{Clock: clocktest.New(time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC))})
 	if err != nil {
 		t.Fatal(err)
 	}

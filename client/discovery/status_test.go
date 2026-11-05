@@ -12,6 +12,11 @@ import (
 )
 
 // eventually polls cond until it holds or five seconds pass.
+// eventually polls cond on the wall clock for up to five seconds. It is the
+// package's one poll: the scanner and resolver tests run the DNS-SD cache
+// over real multicast sockets (scanner_live_test.go, names_test.go) and
+// over subjects with their own goroutines; the session parity cases run in
+// synctest bubbles instead.
 func eventually(t *testing.T, what string, cond func() bool) {
 	t.Helper()
 	deadline := time.Now().Add(5 * time.Second)

@@ -119,13 +119,7 @@ func TestBridgeStart_AckPumpReclaimsExpiredTimedDeadlines(t *testing.T) {
 		_ = b.Stop(stopCtx)
 	})
 
-	deadline := time.Now().Add(3 * time.Second)
-	for hasTimedDeadline(&b.routing, abandoned) {
-		if time.Now().After(deadline) {
-			t.Fatal("expired deadline still present — the bridge never sweeps while idle")
-		}
-		time.Sleep(10 * time.Millisecond)
-	}
+	waitFor(t, "the idle sweep of the expired deadline", func() bool { return !hasTimedDeadline(&b.routing, abandoned) })
 }
 
 // TestInboundCloseSessionStatusReport_DropsTimedDeadlines pins the

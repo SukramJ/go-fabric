@@ -7,6 +7,7 @@ import (
 	"context"
 	"sync"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/SukramJ/go-fabric/im"
@@ -88,7 +89,6 @@ func (r *slowReports) at(ms int) {
 	now := r.start.Add(time.Duration(ms) * time.Millisecond)
 	r.mu.Lock()
 	r.now = now
-	before := len(r.sends)
 	r.mu.Unlock()
 	if r.sub.reporting.Load() {
 		r.m.tick(context.Background(), now) // skips the subscription in flight
@@ -96,17 +96,9 @@ func (r *slowReports) at(ms int) {
 	}
 	r.m.tick(context.Background(), now)
 	// A report the tick started reaches the reporter on its own goroutine:
-	// wait until it did (a held one stays in flight) or finished.
-	deadline := time.Now().Add(5 * time.Second)
-	for time.Now().Before(deadline) {
-		r.mu.Lock()
-		entered := len(r.sends) > before
-		r.mu.Unlock()
-		if entered || !r.sub.reporting.Load() {
-			return
-		}
-		time.Sleep(100 * time.Microsecond)
-	}
+	// once the case's synctest bubble settles it did (a held one stays in
+	// flight) or finished.
+	synctest.Wait()
 }
 
 // change reports a change of the selected attribute; unselected one of an
@@ -126,11 +118,9 @@ func (r *slowReports) releaseReport(t *testing.T, i int) {
 		t.Fatalf("report %d was never sent", i)
 	}
 	<-d
-	// The reporting flag drops after the reporter returned.
-	deadline := time.Now().Add(5 * time.Second)
-	for r.sub.reporting.Load() && time.Now().Before(deadline) {
-		time.Sleep(time.Millisecond)
-	}
+	// The reporting flag drops after the reporter returned: settle the
+	// bubble.
+	synctest.Wait()
 }
 
 func (r *slowReports) sent() []time.Time {
@@ -151,31 +141,33 @@ func TestSlowReportParityMatterJS(t *testing.T) {
 	// ends, and nothing follows it within a second.
 	t.Run("holds a report queued behind a report being sent until its deferral ends", func(t *testing.T) {
 		t.Parallel()
-		r := newSlowReports(t, sendInterval, 0)
-		r.change()
-		r.at(0)
-		r.change()
-		r.at(100)
-		r.at(200)
-		if n := len(r.sent()); n != 1 {
-			t.Fatalf("%d reports with A in flight, want 1", n)
-		}
-		deferredAt := r.start.Add(200 * time.Millisecond)
-		r.sub.DeferReports(deferredAt, 5*time.Second)
-		r.releaseReport(t, 0)
-		r.at(300)
-		if n := len(r.sent()); n != 1 {
-			t.Fatalf("%d reports during the deferral, want 1", n)
-		}
-		r.at(5300)
-		sends := r.sent()
-		if len(sends) != 2 || sends[1].Sub(deferredAt) < 5*time.Second {
-			t.Fatalf("reports at %v, want B once the deferral ended", sends)
-		}
-		r.at(6300)
-		if n := len(r.sent()); n != 2 {
-			t.Fatalf("%d reports a second later, want 2", n)
-		}
+		synctest.Test(t, func(t *testing.T) {
+			r := newSlowReports(t, sendInterval, 0)
+			r.change()
+			r.at(0)
+			r.change()
+			r.at(100)
+			r.at(200)
+			if n := len(r.sent()); n != 1 {
+				t.Fatalf("%d reports with A in flight, want 1", n)
+			}
+			deferredAt := r.start.Add(200 * time.Millisecond)
+			r.sub.DeferReports(deferredAt, 5*time.Second)
+			r.releaseReport(t, 0)
+			r.at(300)
+			if n := len(r.sent()); n != 1 {
+				t.Fatalf("%d reports during the deferral, want 1", n)
+			}
+			r.at(5300)
+			sends := r.sent()
+			if len(sends) != 2 || sends[1].Sub(deferredAt) < 5*time.Second {
+				t.Fatalf("reports at %v, want B once the deferral ended", sends)
+			}
+			r.at(6300)
+			if n := len(r.sent()); n != 2 {
+				t.Fatalf("%d reports a second later, want 2", n)
+			}
+		})
 	})
 
 	// reportQueuedBehindSlowReport (:851-863): A in flight from 0 to 5 s,
@@ -204,97 +196,107 @@ func TestSlowReportParityMatterJS(t *testing.T) {
 	// send interval after B although a deferral was requested.
 	t.Run("sends the keep-alive queued behind a slow report within the send interval despite a deferral", func(t *testing.T) {
 		t.Parallel()
-		r := queuedBehindSlow(t, 0, 1)
-		bSentAt := r.sent()[1]
-		r.at(9200)
-		r.sub.DeferReports(r.start.Add(9200*time.Millisecond), 10*time.Second)
-		r.at(9500)
-		r.releaseReport(t, 1)
-		r.at(int(bSentAt.Add(sendInterval).Sub(r.start)/time.Millisecond) + 1)
-		sends := r.sent()
-		if len(sends) != 3 || sends[2].Sub(bSentAt) > sendInterval+time.Millisecond {
-			t.Fatalf("reports at %v, want the keep-alive within %v of B", sends, sendInterval)
-		}
+		synctest.Test(t, func(t *testing.T) {
+			r := queuedBehindSlow(t, 0, 1)
+			bSentAt := r.sent()[1]
+			r.at(9200)
+			r.sub.DeferReports(r.start.Add(9200*time.Millisecond), 10*time.Second)
+			r.at(9500)
+			r.releaseReport(t, 1)
+			r.at(int(bSentAt.Add(sendInterval).Sub(r.start)/time.Millisecond) + 1)
+			sends := r.sent()
+			if len(sends) != 3 || sends[2].Sub(bSentAt) > sendInterval+time.Millisecond {
+				t.Fatalf("reports at %v, want the keep-alive within %v of B", sends, sendInterval)
+			}
+		})
 	})
 
 	// :865-878: the keep-alive that fell due while B was in flight goes
 	// out once B completes, within the send interval after B.
 	t.Run("sends the keep-alive that fell due while a report was in flight when that report completes", func(t *testing.T) {
 		t.Parallel()
-		r := queuedBehindSlow(t, 0, 1)
-		bSentAt := r.sent()[1]
-		r.at(9500)
-		if n := len(r.sent()); n != 2 {
-			t.Fatalf("%d reports with B in flight, want 2", n)
-		}
-		r.releaseReport(t, 1)
-		for ms := 9600; ms <= 20_000; ms += 100 {
-			r.at(ms)
-		}
-		sends := r.sent()
-		if len(sends) < 3 || sends[2].Sub(bSentAt) > sendInterval {
-			t.Fatalf("reports at %v, want a third within %v of B", sends, sendInterval)
-		}
+		synctest.Test(t, func(t *testing.T) {
+			r := queuedBehindSlow(t, 0, 1)
+			bSentAt := r.sent()[1]
+			r.at(9500)
+			if n := len(r.sent()); n != 2 {
+				t.Fatalf("%d reports with B in flight, want 2", n)
+			}
+			r.releaseReport(t, 1)
+			for ms := 9600; ms <= 20_000; ms += 100 {
+				r.at(ms)
+			}
+			sends := r.sent()
+			if len(sends) < 3 || sends[2].Sub(bSentAt) > sendInterval {
+				t.Fatalf("reports at %v, want a third within %v of B", sends, sendInterval)
+			}
+		})
 	})
 
 	// :882-898: a pass queued behind A with only a change the subscription
 	// does not select sends nothing.
 	t.Run("sends nothing for a queued pass with only unselected changes when no keep-alive is owed", func(t *testing.T) {
 		t.Parallel()
-		r := newSlowReports(t, sendInterval, 0)
-		r.change()
-		r.at(0)
-		r.at(1000)
-		r.unselected()
-		r.at(5000)
-		r.releaseReport(t, 0)
-		r.at(5500)
-		if n := len(r.sent()); n != 1 {
-			t.Fatalf("%d reports, want 1", n)
-		}
+		synctest.Test(t, func(t *testing.T) {
+			r := newSlowReports(t, sendInterval, 0)
+			r.change()
+			r.at(0)
+			r.at(1000)
+			r.unselected()
+			r.at(5000)
+			r.releaseReport(t, 0)
+			r.at(5500)
+			if n := len(r.sent()); n != 1 {
+				t.Fatalf("%d reports, want 1", n)
+			}
+		})
 	})
 
 	// :900-923: once the owed keep-alive went out, a later pass with only
 	// an unselected change behind report D sends nothing either.
 	t.Run("sends nothing for a later queued pass with only unselected changes once the owed keep-alive went out", func(t *testing.T) {
 		t.Parallel()
-		r := queuedBehindSlow(t, 0, 1, 3)
-		r.at(9500)
-		r.releaseReport(t, 1)
-		r.at(int(r.sent()[1].Add(sendInterval).Sub(r.start) / time.Millisecond))
-		if n := len(r.sent()); n != 3 {
-			t.Fatalf("%d reports after the keep-alive, want 3", n)
-		}
-		r.change()
-		r.at(int(r.sent()[2].Sub(r.start)/time.Millisecond) + 200)
-		if n := len(r.sent()); n != 4 {
-			t.Fatalf("%d reports after the change, want 4", n)
-		}
-		r.unselected()
-		r.at(int(r.sent()[3].Sub(r.start)/time.Millisecond) + 1000)
-		r.releaseReport(t, 3)
-		r.at(int(r.sent()[3].Sub(r.start)/time.Millisecond) + 1500)
-		if n := len(r.sent()); n != 4 {
-			t.Fatalf("%d reports, want 4", n)
-		}
+		synctest.Test(t, func(t *testing.T) {
+			r := queuedBehindSlow(t, 0, 1, 3)
+			r.at(9500)
+			r.releaseReport(t, 1)
+			r.at(int(r.sent()[1].Add(sendInterval).Sub(r.start) / time.Millisecond))
+			if n := len(r.sent()); n != 3 {
+				t.Fatalf("%d reports after the keep-alive, want 3", n)
+			}
+			r.change()
+			r.at(int(r.sent()[2].Sub(r.start)/time.Millisecond) + 200)
+			if n := len(r.sent()); n != 4 {
+				t.Fatalf("%d reports after the change, want 4", n)
+			}
+			r.unselected()
+			r.at(int(r.sent()[3].Sub(r.start)/time.Millisecond) + 1000)
+			r.releaseReport(t, 3)
+			r.at(int(r.sent()[3].Sub(r.start)/time.Millisecond) + 1500)
+			if n := len(r.sent()); n != 4 {
+				t.Fatalf("%d reports, want 4", n)
+			}
+		})
 	})
 
 	// :926-938: a closed subscription does not send the keep-alive that
 	// fell due while B was in flight.
 	t.Run("does not send the keep-alive that fell due while a report was in flight once closed", func(t *testing.T) {
 		t.Parallel()
-		r := queuedBehindSlow(t, 0, 1)
-		r.at(9200)
-		if err := r.m.Close(r.sub.ID); err != nil {
-			t.Fatal(err)
-		}
-		r.releaseReport(t, 1)
-		for ms := 9300; ms <= 30_000; ms += 1000 {
-			r.at(ms)
-		}
-		if n := len(r.sent()); n != 2 {
-			t.Fatalf("%d reports, want 2", n)
-		}
+		synctest.Test(t, func(t *testing.T) {
+			r := queuedBehindSlow(t, 0, 1)
+			r.at(9200)
+			if err := r.m.Close(r.sub.ID); err != nil {
+				t.Fatal(err)
+			}
+			r.releaseReport(t, 1)
+			for ms := 9300; ms <= 30_000; ms += 1000 {
+				r.at(ms)
+			}
+			if n := len(r.sent()); n != 2 {
+				t.Fatalf("%d reports, want 2", n)
+			}
+		})
 	})
 }
 
@@ -306,24 +308,26 @@ func TestSlowReportParityMatterJS(t *testing.T) {
 // (Manager.CloseSession), matter.js remembers the shutdown on the session.
 func TestSessionShutdownParityMatterJS(t *testing.T) {
 	t.Parallel()
-	m := NewManager(Config{}, nil, nil)
-	terminated := map[uint32]bool{}
-	var mu sync.Mutex
-	m.SetOnSubscriptionTerminated(func(id uint32, _ uint8) { mu.Lock(); terminated[id] = true; mu.Unlock() })
-	args := SubscribeArgs{FabricIndex: 1, PeerNodeID: 1, SessionID: 7, MaxIntervalCeiling: 60, KeepSubscriptions: true}
-	first, err := m.Subscribe(args)
-	if err != nil {
-		t.Fatal(err)
-	}
-	m.closeSession(args.SessionID, false) // closeSubscriptionsForShutdown
-	late, err := m.Subscribe(args)
-	if err != nil {
-		t.Fatal(err)
-	}
-	m.CloseSession(args.SessionID)
-	mu.Lock()
-	defer mu.Unlock()
-	if terminated[first.ID] || terminated[late.ID] {
-		t.Fatalf("terminated %v, want neither", terminated)
-	}
+	synctest.Test(t, func(t *testing.T) {
+		m := NewManager(Config{}, nil, nil)
+		terminated := map[uint32]bool{}
+		var mu sync.Mutex
+		m.SetOnSubscriptionTerminated(func(id uint32, _ uint8) { mu.Lock(); terminated[id] = true; mu.Unlock() })
+		args := SubscribeArgs{FabricIndex: 1, PeerNodeID: 1, SessionID: 7, MaxIntervalCeiling: 60, KeepSubscriptions: true}
+		first, err := m.Subscribe(args)
+		if err != nil {
+			t.Fatal(err)
+		}
+		m.closeSession(args.SessionID, false) // closeSubscriptionsForShutdown
+		late, err := m.Subscribe(args)
+		if err != nil {
+			t.Fatal(err)
+		}
+		m.CloseSession(args.SessionID)
+		mu.Lock()
+		defer mu.Unlock()
+		if terminated[first.ID] || terminated[late.ID] {
+			t.Fatalf("terminated %v, want neither", terminated)
+		}
+	})
 }

@@ -501,6 +501,16 @@ func (e *Entry) CreatedAt() time.Time {
 	return t
 }
 
+// CreatedAtMonotonic is the clock's monotonic reading ([clock.MonotonicOf])
+// when the session was installed with its keys — what a peer-loss cutoff
+// compares against ([Manager.ClosePeerLostSince]); 0 for a placeholder.
+func (e *Entry) CreatedAtMonotonic() time.Duration {
+	e.mu.Lock()
+	t := e.createdAtMono
+	e.mu.Unlock()
+	return t
+}
+
 // FabricIndex returns the fabric this session currently belongs to.
 // Safe to call concurrently with [Manager.AdoptFabricIndex] — callers
 // that resolve a fabric off an [Entry] captured earlier (e.g. via
@@ -1152,7 +1162,39 @@ func (m *Manager) ClosePeer(fabricIndex uint8, peerNodeID uint64) int {
 // created before the reporting exchange (SessionManager.ts:677-695
 // #handlePeerLoss, the `asOf` check at :688). A zero asOf closes them
 // all. Returns the number of sessions closed.
+//
+// asOf is compared with the session's wall-clock creation time: on
+// [clock.System] both carry Go's monotonic reading and a wall-clock step
+// between them does not change the verdict; on a clock without one the
+// comparison follows the step. A caller that holds the clock's monotonic
+// reading of the moment the loss was observed uses
+// [Manager.ClosePeerLostSince], the form matter.js's `asOf` has
+// (Time.nowUs, SessionManager.ts:630-642 handlePeerShutdown and :645-647
+// handlePeerLoss at 862ad75f).
 func (m *Manager) ClosePeerLost(fabricIndex uint8, peerNodeID uint64, asOf time.Time) int {
+	return m.closePeerLost(fabricIndex, peerNodeID, func(entry *Entry) bool {
+		return !asOf.IsZero() && !entry.CreatedAt().Before(asOf)
+	})
+}
+
+// ClosePeerLostSince is [Manager.ClosePeerLost] with the cutoff on the
+// clock's monotonic reading ([clock.MonotonicOf], [Entry.CreatedAtMonotonic]):
+// every live session of the peer created before sinceMono is force-closed,
+// one created at or after it is kept — matter.js keeps "sessions created
+// at or after this instant", its asOf being Time.nowUs, the monotonic
+// reading (SessionManager.ts:623-642 handlePeerShutdown, :688
+// #handlePeerLoss at 862ad75f), so a wall-clock step between the session's
+// creation and the loss neither spares nor condemns it. Returns the number
+// of sessions closed.
+func (m *Manager) ClosePeerLostSince(fabricIndex uint8, peerNodeID uint64, sinceMono time.Duration) int {
+	return m.closePeerLost(fabricIndex, peerNodeID, func(entry *Entry) bool {
+		return entry.CreatedAtMonotonic() >= sinceMono
+	})
+}
+
+// closePeerLost is the sweep behind ClosePeerLost and ClosePeerLostSince:
+// keep reports a session of the peer that survives the sweep.
+func (m *Manager) closePeerLost(fabricIndex uint8, peerNodeID uint64, keep func(*Entry) bool) int {
 	m.mu.Lock()
 	victims := make([]*Entry, 0)
 	for id, entry := range m.sessions {
@@ -1162,7 +1204,7 @@ func (m *Manager) ClosePeerLost(fabricIndex uint8, peerNodeID uint64, asOf time.
 		if entry.FabricIndex() != fabricIndex || entry.Session.PeerNodeID() != peerNodeID {
 			continue
 		}
-		if !asOf.IsZero() && !entry.CreatedAt().Before(asOf) {
+		if keep(entry) {
 			continue // established after the loss was observed
 		}
 		victims = append(victims, entry)

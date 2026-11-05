@@ -362,6 +362,36 @@ A host application that pins its own copy of these bytes (the reference daemon
 does, to keep a schema change from arriving unnoticed in a dependency bump)
 updates that pin after the snapshot lands here, not before.
 
+## The architecture standard
+
+Set by the owner on 2026-10-20, reaffirmed 2026-10-24 and 2026-11-04 (in
+the owner's words: "hervorragende Architektur, zukunftsweisend, innovativ,
+herausragend"). It is the bar every design decision in this module and
+its family (go-fabric-ui, go-fabric-server, the hosts) is held to:
+
+- **Outstanding, not adequate.** Every layer — facade, servers, protocol,
+  transport, the test harness, the UI contract — is the best design we
+  can state, coherent with the others, and judged as API design: one
+  shape, no convenience seam, the developer's view (`node`, `device`,
+  `contract` are the product).
+- **Forward-looking and innovative.** A decision is weighed against where
+  Matter, the ecosystems and the consumers are going, not only against
+  today's need; going ahead of matter.js is allowed and recorded (the
+  *Ahead of matter.js* register), copying a limitation is not.
+- **Better than others, better than before, the right cut.** Every
+  concept carries an explicit section that answers three questions:
+  better than the comparison targets (matter.js, matterjs-server, chip's
+  apps)? better than the state before? is the split between module,
+  host, UI and server right? A concept without that section is not
+  finished.
+- **The check is stated, not assumed.** When a decision is put to the
+  owner, the recommendation says whether it is the best architecture and
+  why; when the owner's choice is not the best architecture in the
+  assistant's judgement, the assistant says so with its reasons before
+  implementing — the owner decides, the reasons are on record. A scope
+  boundary that is a decision (no Thread radio on the device side, no
+  device-side BLE) is kept unless the owner reopens it.
+
 ## Which model does which work
 
 Set on 2026-10-10. The rule follows from the parity discipline above: a

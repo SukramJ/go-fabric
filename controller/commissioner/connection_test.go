@@ -10,6 +10,7 @@ import (
 	"net"
 	"sync"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/SukramJ/go-fabric/client/discovery"
@@ -98,22 +99,21 @@ func (h *connectionHarness) next(t *testing.T) *attemptCall {
 // next attempt would ever launch.
 func (h *connectionHarness) armed(t *testing.T) {
 	t.Helper()
-	deadline := time.Now().Add(5 * time.Second)
-	for h.clock.live() < 2 {
-		if time.Now().After(deadline) {
-			t.Fatal("connectPASE armed no next-address timer")
-		}
-		time.Sleep(time.Millisecond)
+	synctest.Wait()
+	if h.clock.live() < 2 {
+		t.Fatal("connectPASE armed no next-address timer")
 	}
 }
 
-// none checks no attempt launches for a moment.
+// none checks that no attempt launched once the case's synctest bubble
+// has settled.
 func (h *connectionHarness) none(t *testing.T) {
 	t.Helper()
+	synctest.Wait()
 	select {
 	case c := <-h.calls:
 		t.Fatalf("unexpected attempt on %s", c.addr)
-	case <-time.After(30 * time.Millisecond):
+	default:
 	}
 }
 
@@ -169,25 +169,27 @@ func cancelled(t *testing.T, c *attemptCall) {
 // returns at once and cancels the other attempt (:158-161).
 func TestConnectionStaggerAndWinner(t *testing.T) {
 	t.Parallel()
-	h := newConnectionHarness(t)
-	h.start(context.Background(), time.Minute, device("dev", 1, 2))
-	first := h.next(t)
-	h.none(t)
-	h.armed(t)
-	h.clock.Advance(DelayBeforeNextAddress - time.Second)
-	h.none(t)
-	h.clock.Advance(time.Second)
-	second := h.next(t)
-	if first.addr == second.addr {
-		t.Fatal("the same address twice")
-	}
-	s := h.session(t)
-	second.result <- attemptResult{s: s}
-	res, err := h.wait(t)
-	if err != nil || res.session != s || res.device.identifier != "dev" {
-		t.Fatalf("result %+v, %v", res, err)
-	}
-	cancelled(t, first)
+	synctest.Test(t, func(t *testing.T) {
+		h := newConnectionHarness(t)
+		h.start(context.Background(), time.Minute, device("dev", 1, 2))
+		first := h.next(t)
+		h.none(t)
+		h.armed(t)
+		h.clock.Advance(DelayBeforeNextAddress - time.Second)
+		h.none(t)
+		h.clock.Advance(time.Second)
+		second := h.next(t)
+		if first.addr == second.addr {
+			t.Fatal("the same address twice")
+		}
+		s := h.session(t)
+		second.result <- attemptResult{s: s}
+		res, err := h.wait(t)
+		if err != nil || res.session != s || res.device.identifier != "dev" {
+			t.Fatalf("result %+v, %v", res, err)
+		}
+		cancelled(t, first)
+	})
 }
 
 // TestConnectionHoldingResponder: an attempt that received the
@@ -195,27 +197,29 @@ func TestConnectionStaggerAndWinner(t *testing.T) {
 // (:97, :127-133); a late success after the winner is closed (:137-157).
 func TestConnectionHoldingResponder(t *testing.T) {
 	t.Parallel()
-	h := newConnectionHarness(t)
-	h.start(context.Background(), time.Minute, device("dev", 1, 2, 3))
-	first := h.next(t)
-	first.onPBKDF()
-	first.onPBKDF() // once only
-	h.clock.Advance(3 * DelayBeforeNextAddress)
-	h.none(t)
-	first.result <- attemptResult{err: fmt.Errorf("%w: lost", exchange.ErrTransient)}
-	second := h.next(t)
-	h.armed(t)
-	h.clock.Advance(DelayBeforeNextAddress)
-	third := h.next(t)
-	won := h.session(t)
-	third.result <- attemptResult{s: won}
-	if res, err := h.wait(t); err != nil || res.session != won {
-		t.Fatalf("result %v", err)
-	}
-	late := h.session(t)
-	<-second.ctx.Done()
-	second.result <- attemptResult{s: late}
-	eventually(t, "the late session closed", late.IsPeerLost)
+	synctest.Test(t, func(t *testing.T) {
+		h := newConnectionHarness(t)
+		h.start(context.Background(), time.Minute, device("dev", 1, 2, 3))
+		first := h.next(t)
+		first.onPBKDF()
+		first.onPBKDF() // once only
+		h.clock.Advance(3 * DelayBeforeNextAddress)
+		h.none(t)
+		first.result <- attemptResult{err: fmt.Errorf("%w: lost", exchange.ErrTransient)}
+		second := h.next(t)
+		h.armed(t)
+		h.clock.Advance(DelayBeforeNextAddress)
+		third := h.next(t)
+		won := h.session(t)
+		third.result <- attemptResult{s: won}
+		if res, err := h.wait(t); err != nil || res.session != won {
+			t.Fatalf("result %v", err)
+		}
+		late := h.session(t)
+		<-second.ctx.Done()
+		second.result <- attemptResult{s: late}
+		eventually(t, "the late session closed", late.IsPeerLost)
+	})
 }
 
 // TestConnectionPasscodeDropsDevice: a wrong passcode drops every address
@@ -223,22 +227,24 @@ func TestConnectionHoldingResponder(t *testing.T) {
 // winner the passcode error is the result (:223-225).
 func TestConnectionPasscodeDropsDevice(t *testing.T) {
 	t.Parallel()
-	h := newConnectionHarness(t)
-	h.start(context.Background(), time.Minute, device("a", 1, 2), device("b", 3))
-	first := h.next(t)
-	if first.device != "a" {
-		t.Fatalf("first attempt on %s", first.device)
-	}
-	first.result <- attemptResult{err: handshake.ErrPasscodeMismatch}
-	other := h.next(t)
-	if other.device != "b" {
-		t.Fatalf("after the drop, an attempt on %s (%s)", other.device, other.addr)
-	}
-	other.result <- attemptResult{err: fmt.Errorf("%w: lost", exchange.ErrTransient)}
-	_, err := h.wait(t)
-	if !errors.Is(err, handshake.ErrPasscodeMismatch) {
-		t.Fatalf("error %v", err)
-	}
+	synctest.Test(t, func(t *testing.T) {
+		h := newConnectionHarness(t)
+		h.start(context.Background(), time.Minute, device("a", 1, 2), device("b", 3))
+		first := h.next(t)
+		if first.device != "a" {
+			t.Fatalf("first attempt on %s", first.device)
+		}
+		first.result <- attemptResult{err: handshake.ErrPasscodeMismatch}
+		other := h.next(t)
+		if other.device != "b" {
+			t.Fatalf("after the drop, an attempt on %s (%s)", other.device, other.addr)
+		}
+		other.result <- attemptResult{err: fmt.Errorf("%w: lost", exchange.ErrTransient)}
+		_, err := h.wait(t)
+		if !errors.Is(err, handshake.ErrPasscodeMismatch) {
+			t.Fatalf("error %v", err)
+		}
+	})
 }
 
 // TestConnectionBudget: the budget's end without a retryable error is a
@@ -246,38 +252,40 @@ func TestConnectionPasscodeDropsDevice(t *testing.T) {
 // around it (:234-238); an external cancellation is returned as is.
 func TestConnectionBudget(t *testing.T) {
 	t.Parallel()
-	h := newConnectionHarness(t)
-	h.start(context.Background(), 15*time.Second, device("dev", 1, 2))
-	first := h.next(t)
-	h.armed(t)
-	h.clock.Advance(DelayBeforeNextAddress)
-	second := h.next(t)
-	h.clock.Advance(5 * time.Second)
-	cancelled(t, first)
-	cancelled(t, second)
-	var pr *PairRetransmissionLimitReachedError
-	if _, err := h.wait(t); !errors.As(err, &pr) || pr.Cause != nil {
-		t.Fatalf("budget: %v", err)
-	}
+	synctest.Test(t, func(t *testing.T) {
+		h := newConnectionHarness(t)
+		h.start(context.Background(), 15*time.Second, device("dev", 1, 2))
+		first := h.next(t)
+		h.armed(t)
+		h.clock.Advance(DelayBeforeNextAddress)
+		second := h.next(t)
+		h.clock.Advance(5 * time.Second)
+		cancelled(t, first)
+		cancelled(t, second)
+		var pr *PairRetransmissionLimitReachedError
+		if _, err := h.wait(t); !errors.As(err, &pr) || pr.Cause != nil {
+			t.Fatalf("budget: %v", err)
+		}
 
-	h = newConnectionHarness(t)
-	h.start(context.Background(), time.Minute, device("x", 1), device("y", 2))
-	retry := fmt.Errorf("%w: no answer", exchange.ErrTransient)
-	h.next(t).result <- attemptResult{err: retry}
-	h.next(t).result <- attemptResult{err: retry}
-	if _, err := h.wait(t); !errors.As(err, &pr) || !errors.Is(err, retry) {
-		t.Fatalf("retryable: %v", err)
-	}
+		h = newConnectionHarness(t)
+		h.start(context.Background(), time.Minute, device("x", 1), device("y", 2))
+		retry := fmt.Errorf("%w: no answer", exchange.ErrTransient)
+		h.next(t).result <- attemptResult{err: retry}
+		h.next(t).result <- attemptResult{err: retry}
+		if _, err := h.wait(t); !errors.As(err, &pr) || !errors.Is(err, retry) {
+			t.Fatalf("retryable: %v", err)
+		}
 
-	h = newConnectionHarness(t)
-	ctx, cancel := context.WithCancel(context.Background())
-	h.start(ctx, time.Minute, device("dev", 1))
-	call := h.next(t)
-	cancel()
-	cancelled(t, call)
-	if _, err := h.wait(t); !errors.Is(err, context.Canceled) {
-		t.Fatalf("external cancellation: %v", err)
-	}
+		h = newConnectionHarness(t)
+		ctx, cancel := context.WithCancel(context.Background())
+		h.start(ctx, time.Minute, device("dev", 1))
+		call := h.next(t)
+		cancel()
+		cancelled(t, call)
+		if _, err := h.wait(t); !errors.Is(err, context.Canceled) {
+			t.Fatalf("external cancellation: %v", err)
+		}
+	})
 }
 
 // TestConnectionErrorClasses: other unexpected data is the non-retryable
@@ -286,53 +294,57 @@ func TestConnectionBudget(t *testing.T) {
 // PairRetransmissionLimitReachedError (:239).
 func TestConnectionErrorClasses(t *testing.T) {
 	t.Parallel()
-	h := newConnectionHarness(t)
-	h.start(context.Background(), time.Minute, device("dev", 1, 2))
-	h.next(t).result <- attemptResult{err: fmt.Errorf("%w: garbage", handshake.ErrUnexpectedData)}
-	won := h.session(t)
-	h.next(t).result <- attemptResult{s: won}
-	if res, err := h.wait(t); err != nil || res.session != won {
-		t.Fatalf("after unexpected data: %v", err)
-	}
+	synctest.Test(t, func(t *testing.T) {
+		h := newConnectionHarness(t)
+		h.start(context.Background(), time.Minute, device("dev", 1, 2))
+		h.next(t).result <- attemptResult{err: fmt.Errorf("%w: garbage", handshake.ErrUnexpectedData)}
+		won := h.session(t)
+		h.next(t).result <- attemptResult{s: won}
+		if res, err := h.wait(t); err != nil || res.session != won {
+			t.Fatalf("after unexpected data: %v", err)
+		}
 
-	h = newConnectionHarness(t)
-	h.start(context.Background(), time.Minute, device("dev", 1, 2))
-	first := h.next(t)
-	h.armed(t)
-	h.clock.Advance(DelayBeforeNextAddress)
-	second := h.next(t)
-	fatal := errors.New("fatal")
-	first.result <- attemptResult{err: fatal}
-	cancelled(t, second)
-	if _, err := h.wait(t); !errors.Is(err, fatal) {
-		t.Fatalf("fatal: %v", err)
-	}
+		h = newConnectionHarness(t)
+		h.start(context.Background(), time.Minute, device("dev", 1, 2))
+		first := h.next(t)
+		h.armed(t)
+		h.clock.Advance(DelayBeforeNextAddress)
+		second := h.next(t)
+		fatal := errors.New("fatal")
+		first.result <- attemptResult{err: fatal}
+		cancelled(t, second)
+		if _, err := h.wait(t); !errors.Is(err, fatal) {
+			t.Fatalf("fatal: %v", err)
+		}
 
-	h = newConnectionHarness(t)
-	h.start(context.Background(), time.Minute)
-	var pr *PairRetransmissionLimitReachedError
-	if _, err := h.wait(t); !errors.As(err, &pr) || pr.Error() == "" {
-		t.Fatalf("no candidates: %v", err)
-	}
+		h = newConnectionHarness(t)
+		h.start(context.Background(), time.Minute)
+		var pr *PairRetransmissionLimitReachedError
+		if _, err := h.wait(t); !errors.As(err, &pr) || pr.Error() == "" {
+			t.Fatalf("no candidates: %v", err)
+		}
+	})
 }
 
 // TestAddressesToCandidates: the distinct addresses by desirability; one
 // candidate with a device identifier, else one per address (:547-566).
 func TestAddressesToCandidates(t *testing.T) {
 	t.Parallel()
-	v4 := &net.UDPAddr{IP: net.ParseIP("192.168.1.2"), Port: 5540}
-	global := &net.UDPAddr{IP: net.ParseIP("2001:db8::1"), Port: 5540}
-	ula := &net.UDPAddr{IP: net.ParseIP("fd00::1"), Port: 5540}
-	cands := addressesToCandidates([]*net.UDPAddr{v4, global, ula, v4}, nil)
-	if len(cands) != 3 || cands[0].addrs[0] != ula || cands[1].addrs[0] != global || cands[2].addrs[0] != v4 ||
-		cands[0].identifier != "known-address-0-[fd00::1]:5540" {
-		t.Fatalf("candidates %+v", cands)
-	}
-	dd := &discoveryDevice
-	one := addressesToCandidates([]*net.UDPAddr{v4, ula}, dd)
-	if len(one) != 1 || one[0].identifier != "INST" || len(one[0].addrs) != 2 || one[0].addrs[0] != ula {
-		t.Fatalf("one device %+v", one)
-	}
+	synctest.Test(t, func(t *testing.T) {
+		v4 := &net.UDPAddr{IP: net.ParseIP("192.168.1.2"), Port: 5540}
+		global := &net.UDPAddr{IP: net.ParseIP("2001:db8::1"), Port: 5540}
+		ula := &net.UDPAddr{IP: net.ParseIP("fd00::1"), Port: 5540}
+		cands := addressesToCandidates([]*net.UDPAddr{v4, global, ula, v4}, nil)
+		if len(cands) != 3 || cands[0].addrs[0] != ula || cands[1].addrs[0] != global || cands[2].addrs[0] != v4 ||
+			cands[0].identifier != "known-address-0-[fd00::1]:5540" {
+			t.Fatalf("candidates %+v", cands)
+		}
+		dd := &discoveryDevice
+		one := addressesToCandidates([]*net.UDPAddr{v4, ula}, dd)
+		if len(one) != 1 || one[0].identifier != "INST" || len(one[0].addrs) != 2 || one[0].addrs[0] != ula {
+			t.Fatalf("one device %+v", one)
+		}
+	})
 }
 
 var discoveryDevice = discovery.Device{InstanceID: "INST"}

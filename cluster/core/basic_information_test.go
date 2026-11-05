@@ -15,6 +15,7 @@ import (
 
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/cluster/core"
+	"github.com/SukramJ/go-fabric/cluster/spec"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/tlv"
@@ -352,8 +353,8 @@ func TestBasicInfo_WriteNodeLabelTooLong(t *testing.T) {
 	b := newValidBasicInfo(t)
 	long := strings.Repeat("x", 33)
 	err := b.MatterWrite(context.Background(), 0x0005, long)
-	if err == nil {
-		t.Fatal("expected error for NodeLabel > 32 bytes, got nil")
+	if spec.StatusOf(err) != im.StatusConstraintError {
+		t.Fatalf("NodeLabel > 32 bytes: status %v (%v), want %v", spec.StatusOf(err), err, im.StatusConstraintError)
 	}
 }
 
@@ -361,8 +362,8 @@ func TestBasicInfo_WriteNodeLabelWrongType(t *testing.T) {
 	t.Parallel()
 	b := newValidBasicInfo(t)
 	err := b.MatterWrite(context.Background(), 0x0005, 42)
-	if err == nil {
-		t.Fatal("expected error for wrong type, got nil")
+	if spec.StatusOf(err) != im.StatusConstraintError {
+		t.Fatalf("NodeLabel of the wrong type: status %v (%v), want %v", spec.StatusOf(err), err, im.StatusConstraintError)
 	}
 }
 
@@ -384,8 +385,8 @@ func TestBasicInfo_WriteLocationWrongLength(t *testing.T) {
 	b := newValidBasicInfo(t)
 	for _, s := range []string{"", "D", "DEU", "DEUU"} {
 		err := b.MatterWrite(context.Background(), 0x0006, s)
-		if err == nil {
-			t.Errorf("expected error for Location=%q (len=%d), got nil", s, len(s))
+		if spec.StatusOf(err) != im.StatusConstraintError {
+			t.Errorf("Location=%q (len=%d): status %v (%v), want %v", s, len(s), spec.StatusOf(err), err, im.StatusConstraintError)
 		}
 	}
 }
@@ -396,8 +397,8 @@ func TestBasicInfo_WriteReadOnlyAttrReturnsErrBasicInfoUnknown(t *testing.T) {
 	ctx := context.Background()
 	// VendorID (0x0002) is read-only.
 	err := b.MatterWrite(ctx, 0x0002, uint16(0x9999))
-	if err == nil {
-		t.Fatal("expected error for read-only attr, got nil")
+	if spec.StatusOf(err) != im.StatusUnsupportedWrite {
+		t.Fatalf("read-only VendorID: status %v (%v), want %v", spec.StatusOf(err), err, im.StatusUnsupportedWrite)
 	}
 	// errBasicInfoUnknown is unexported; verify the error chain contains a non-nil wrapped err.
 	// We can only check that errors.Is doesn't panic and that err is non-nil (already checked).
@@ -408,8 +409,8 @@ func TestBasicInfo_WriteReadOnlyAttrSentinelViaIs(t *testing.T) {
 	t.Parallel()
 	b := newValidBasicInfo(t)
 	err := b.MatterWrite(context.Background(), 0x0004, uint16(1))
-	if err == nil {
-		t.Fatal("expected error, got nil")
+	if spec.StatusOf(err) != im.StatusUnsupportedWrite {
+		t.Fatalf("read-only ProductID: status %v (%v), want %v", spec.StatusOf(err), err, im.StatusUnsupportedWrite)
 	}
 	// errBasicInfoUnknown is unexported, but we can check it is wrapped via errors.Unwrap.
 	unwrapped := errors.Unwrap(err)
@@ -480,8 +481,8 @@ func TestBasicInfo_InvokeReturnsError(t *testing.T) {
 	ctx := context.Background()
 	for _, cmdID := range []uint32{0x00, 0x01, 0xFF} {
 		_, err := b.MatterInvoke(ctx, cmdID, nil)
-		if err == nil {
-			t.Errorf("MatterInvoke(0x%02X) expected error, got nil", cmdID)
+		if spec.StatusOf(err) != im.StatusUnsupportedCommand {
+			t.Errorf("MatterInvoke(0x%02X): status %v (%v), want %v", cmdID, spec.StatusOf(err), err, im.StatusUnsupportedCommand)
 		}
 	}
 }
@@ -1072,8 +1073,8 @@ func TestBasicInfo_MatterWrite_LocationTypeMismatch(t *testing.T) {
 	bi := newValidBasicInfo(t)
 	const attrLocation = 0x0006
 	err := bi.MatterWrite(context.Background(), attrLocation, uint32(42))
-	if err == nil {
-		t.Fatal("MatterWrite(Location, uint32): expected error, got nil")
+	if spec.StatusOf(err) != im.StatusConstraintError {
+		t.Fatalf("MatterWrite(Location, uint32): status %v (%v), want %v", spec.StatusOf(err), err, im.StatusConstraintError)
 	}
 }
 

@@ -9,6 +9,7 @@ import (
 	"errors"
 	"sync"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/SukramJ/go-fabric/clock/clocktest"
@@ -172,83 +173,82 @@ func TestCommissionerControlCASEOnly(t *testing.T) {
 // (CCD:200-201), so a new request is taken.
 func TestCommissionerControlApproved(t *testing.T) {
 	t.Parallel()
-	h := newCCHarness(t, nil)
-	ctx := caseCtx(clientNode)
-	if _, err := h.commission(ctx, goodRequest, 30); statusOf(err) != im.StatusFailure {
-		t.Fatalf("CommissionNode before a request: %v", err)
-	}
-	if err := h.request(ctx, goodRequest); err != nil {
-		t.Fatalf("RequestCommissioningApproval: %v", err)
-	}
-	asked := <-h.approved
-	if asked.RequestID != goodRequest || asked.ClientNodeID != clientNode || asked.FabricIndex != 1 || asked.VendorID != 0xFFF1 ||
-		asked.ProductID != 0x8001 || asked.Label == nil || *asked.Label != "Test Ecosystem" {
-		t.Fatalf("approver asked %+v", asked)
-	}
-	// Open: another request is refused (CCD:77).
-	if err := h.request(caseCtx(clientNode+1), goodRequest+1); statusOf(err) != im.StatusFailure {
-		t.Fatalf("a second request while one is open: %v", err)
-	}
-	// Not yet approved.
-	if _, err := h.commission(ctx, goodRequest, 30); statusOf(err) != im.StatusFailure {
-		t.Fatalf("CommissionNode before the approval: %v", err)
-	}
-	h.decisions <- true
-	ev := h.events.next(t)
-	if ev.RequestId != goodRequest || ev.ClientNodeId != clientNode || ev.FabricIndex != 1 || ev.StatusCode != commctrldef.StatusSuccess || h.events.eps[0] != 1 {
-		t.Fatalf("event %+v on %v", ev, h.events.eps)
-	}
-
-	for name, try := range map[string]func() error{
-		"unknown request id": func() error { _, err := h.commission(ctx, badRequest, 30); return err },
-		"another client":     func() error { _, err := h.commission(caseCtx(clientNode+1), goodRequest, 30); return err },
-		"another fabric": func() error {
-			_, err := h.commission(im.WithSubject(im.WithFabricFilter(context.Background(), true, 2), clientNode, nil), goodRequest, 30)
-			return err
-		},
-	} {
-		if err := try(); statusOf(err) != im.StatusFailure {
-			t.Errorf("%s: %v", name, err)
+	synctest.Test(t, func(t *testing.T) {
+		h := newCCHarness(t, nil)
+		ctx := caseCtx(clientNode)
+		if _, err := h.commission(ctx, goodRequest, 30); statusOf(err) != im.StatusFailure {
+			t.Fatalf("CommissionNode before a request: %v", err)
 		}
-	}
-
-	resp, err := h.commission(ctx, goodRequest, 45)
-	if err != nil {
-		t.Fatalf("CommissionNode: %v", err)
-	}
-	win, ok := resp.(commctrldef.ReverseOpenCommissioningWindowResponse)
-	if !ok {
-		t.Fatalf("response %T", resp)
-	}
-	if len(win.PakePasscodeVerifier) != 97 || win.Iterations != 1000 || len(win.Salt) != 32 || win.Discriminator > 0x0FFF || win.CommissioningTimeout != 300 {
-		t.Fatalf("window %+v", win)
-	}
-	rc := <-h.commissed
-	if rc.Request.RequestID != goodRequest || rc.Discriminator != win.Discriminator || !bytes.Equal(rc.Salt, win.Salt) ||
-		rc.Iterations != win.Iterations || rc.ResponseTimeout != 45*time.Second || rc.CommissioningTimeout != 300*time.Second || !setup.IsValidSetupPIN(rc.Passcode) {
-		t.Fatalf("commissioner asked %+v", rc)
-	}
-	// The verifier is the passcode's.
-	vc, err := spake2.NewVerifierContext(rc.Passcode, rc.Salt, int(rc.Iterations))
-	if err != nil {
-		t.Fatal(err)
-	}
-	l, _ := vc.L.Bytes()
-	if !bytes.Equal(win.PakePasscodeVerifier, append(vc.W0.FillBytes(make([]byte, 32)), l...)) {
-		t.Fatal("the verifier is not the passcode's")
-	}
-	// The state resets after the commissioner: a new request is taken; the
-	// used one is gone.
-	deadline := time.Now().Add(5 * time.Second)
-	for h.request(ctx, goodRequest+2) != nil {
-		if time.Now().After(deadline) {
-			t.Fatal("the state did not reset")
+		if err := h.request(ctx, goodRequest); err != nil {
+			t.Fatalf("RequestCommissioningApproval: %v", err)
 		}
-		time.Sleep(5 * time.Millisecond)
-	}
-	if _, err := h.commission(ctx, goodRequest, 30); statusOf(err) != im.StatusFailure {
-		t.Fatalf("a used request: %v", err)
-	}
+		asked := <-h.approved
+		if asked.RequestID != goodRequest || asked.ClientNodeID != clientNode || asked.FabricIndex != 1 || asked.VendorID != 0xFFF1 ||
+			asked.ProductID != 0x8001 || asked.Label == nil || *asked.Label != "Test Ecosystem" {
+			t.Fatalf("approver asked %+v", asked)
+		}
+		// Open: another request is refused (CCD:77).
+		if err := h.request(caseCtx(clientNode+1), goodRequest+1); statusOf(err) != im.StatusFailure {
+			t.Fatalf("a second request while one is open: %v", err)
+		}
+		// Not yet approved.
+		if _, err := h.commission(ctx, goodRequest, 30); statusOf(err) != im.StatusFailure {
+			t.Fatalf("CommissionNode before the approval: %v", err)
+		}
+		h.decisions <- true
+		ev := h.events.next(t)
+		if ev.RequestId != goodRequest || ev.ClientNodeId != clientNode || ev.FabricIndex != 1 || ev.StatusCode != commctrldef.StatusSuccess || h.events.eps[0] != 1 {
+			t.Fatalf("event %+v on %v", ev, h.events.eps)
+		}
+
+		for name, try := range map[string]func() error{
+			"unknown request id": func() error { _, err := h.commission(ctx, badRequest, 30); return err },
+			"another client":     func() error { _, err := h.commission(caseCtx(clientNode+1), goodRequest, 30); return err },
+			"another fabric": func() error {
+				_, err := h.commission(im.WithSubject(im.WithFabricFilter(context.Background(), true, 2), clientNode, nil), goodRequest, 30)
+				return err
+			},
+		} {
+			if err := try(); statusOf(err) != im.StatusFailure {
+				t.Errorf("%s: %v", name, err)
+			}
+		}
+
+		resp, err := h.commission(ctx, goodRequest, 45)
+		if err != nil {
+			t.Fatalf("CommissionNode: %v", err)
+		}
+		win, ok := resp.(commctrldef.ReverseOpenCommissioningWindowResponse)
+		if !ok {
+			t.Fatalf("response %T", resp)
+		}
+		if len(win.PakePasscodeVerifier) != 97 || win.Iterations != 1000 || len(win.Salt) != 32 || win.Discriminator > 0x0FFF || win.CommissioningTimeout != 300 {
+			t.Fatalf("window %+v", win)
+		}
+		rc := <-h.commissed
+		if rc.Request.RequestID != goodRequest || rc.Discriminator != win.Discriminator || !bytes.Equal(rc.Salt, win.Salt) ||
+			rc.Iterations != win.Iterations || rc.ResponseTimeout != 45*time.Second || rc.CommissioningTimeout != 300*time.Second || !setup.IsValidSetupPIN(rc.Passcode) {
+			t.Fatalf("commissioner asked %+v", rc)
+		}
+		// The verifier is the passcode's.
+		vc, err := spake2.NewVerifierContext(rc.Passcode, rc.Salt, int(rc.Iterations))
+		if err != nil {
+			t.Fatal(err)
+		}
+		l, _ := vc.L.Bytes()
+		if !bytes.Equal(win.PakePasscodeVerifier, append(vc.W0.FillBytes(make([]byte, 32)), l...)) {
+			t.Fatal("the verifier is not the passcode's")
+		}
+		// The state resets after the commissioner: a new request is taken; the
+		// used one is gone.
+		synctest.Wait() // the commissioner's goroutine has finished with the request
+		if err := h.request(ctx, goodRequest+2); err != nil {
+			t.Fatalf("the state did not reset: %v", err)
+		}
+		if _, err := h.commission(ctx, goodRequest, 30); statusOf(err) != im.StatusFailure {
+			t.Fatalf("a used request: %v", err)
+		}
+	})
 }
 
 // TestCommissionerControlDenied: a denial and an approver error are

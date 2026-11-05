@@ -2585,17 +2585,19 @@
     },
     {
       "path": "packages/node/test/behavior/system/controller/discovery/DiscoveryCancelTest.ts",
-      "status": "partial",
+      "status": "ported",
       "go": [
-        "client/discovery:TestDiscoveryCancelParity"
+        "client/discovery:TestDiscoveryCancelParity",
+        "client/discovery:TestDiscoveryCancelWithRealDeviceParity"
       ],
-      "missing": [
-        "rejects with the cancel reason when the node fails to start after the cancel",
-        "does not commission a device whose PASE was in progress when the commissioning was canceled",
-        "does not commission a device whose PASE was in progress when the caller aborted",
-        "does not commission a device whose PASE was in progress when every scanner failed"
+      "left": [
+        {
+          "it": "rejects with the cancel reason when the node fails to start after the cancel",
+          "class": "js-runtime-only",
+          "reason": "a Go discovery session starts no node: the outcome after a cancel is the cancel reason with nothing left to fail (matter.js's ClientNode start inside the discovery, Discovery.ts:333-357)"
+        }
       ],
-      "reason": "The interruption of a discovery session (client/discovery Session, matter.js Discovery.ts:37-483 at 862ad75f) on fixed and failing transports: a cancel, the timeout and the caller's context before the result close the race, an interruption after it is ignored, the first reason stays, the outcome waits for the aborted attempts, and the failure of one transport against all. Missing: the node's start (a Go session starts no node) and the three real-device cases, which need a PASE held mid-way on fabrictest (no seam).",
+      "reason": "The interruption of a discovery session (client/discovery Session, matter.js Discovery.ts:37-483 at 862ad75f) on fixed and failing transports: a cancel, the timeout and the caller's context before the result close the race, an interruption after it is ignored, the first reason stays, the outcome waits for the aborted attempts, and the failure of one transport against all. The three real-device cases run a commissioning race against a fabrictest device whose PASE answers fabrictest.Network.Filter holds until the interruption (TestDiscoveryCancelWithRealDeviceParity). Left: the node's start (a Go session starts no node).",
       "snapshotSha": "1613033bcf3b348c3340969c197ef12d366c0995"
     },
     {
@@ -2685,35 +2687,21 @@
       "path": "packages/node/test/behavior/system/icd/IcdClientTest.ts",
       "status": "partial",
       "go": [
-        "controller/client:TestIcdClientParity",
         "client/peer:TestIcdClientPeerParity",
         "controller/client:TestIcdClientKeyStoreParity",
-        "controller/client:TestIcdClientOperationsParity"
+        "controller/client:TestIcdClientOperationsParity",
+        "controller/client:TestIcdClientParity",
+        "controller/client:TestIcdClientSeamParity"
       ],
       "missing": [
-        "refreshes the key while the Check-In that requested it still commits",
-        "keeps the pending key when the device refuses the refresh, and offers it again",
-        "decrypts Check-Ins under the pending key after a controller restart",
         "rejects a replay after a restart between a Check-In that confirmed the key and the lost response",
         "refuses register() and does not auto-register while unregister() waits for a sleeping peer",
-        "keeps the registration when unregister() gives up on a peer that does not wake",
-        "keeps the stored registration when closing abandons an unregister() parked on a sleeping peer",
-        "logs an error when the stored registration cannot be refreshed",
-        "forget() ends an unregister() parked on a sleeping peer",
-        "clears the registration when closing abandons an unregister() whose request went out",
-        "ends with no registration when a decommission lands while the registration commits",
-        "announces the clear once when a decommission waits behind an unregister() commit",
-        "announces registered, then unregistered, when a decommission waits behind the register commit",
-        "forget() after unregister() cleared locally leaves its UnregisterClient running",
-        "joins a second unregister() of a sleeping peer and sends one UnregisterClient",
-        "stores the offset of an old-key Check-In that arrives while a refresh waits",
         "starts no second refresh for an old-key Check-In while the refresh waits for its response",
-        "recreates the running subscription on the first registration-induced SIT→LIT flip",
         "resubscribes when a LIT peer reports on a subscription the controller already timed out",
         "does not auto-register when the fresh operating mode is Sit despite a persisted Lit",
         "exposes nextExpectedCheckin on the wall clock once no subscription is held"
       ],
-      "reason": "Registration, unregistration, forget, StayActive, LIT auto-registration, Check-In receipt with the replay drop and the key refresh, persistence across a restart, the decommission hooks, the LIT idle-interval floor and the address monitor's ICD branch (controller/client/icd_client_parity_matterjs_test.go, client/peer/icd_parity_matterjs_test.go). Phase 32: a refused store write of the offered key offers none (IcdClient.#offerKey, IcdClient.ts:860-901 at 862ad75f; controller/client:TestIcdClientKeyStoreParity), the operations a Go test observes without the transaction model — a forget begun by a Check-In listener, unregister() over a refresh, the registration joined, refused and abandoned, the Check-In time cleared, a registration after a forget ended a refresh (TestIcdClientOperationsParity) — and a peer reporting 1.3.0 (internal/nodeseam.UseSpecificationVersion). Left: the transaction model (holdIcdState, gated commit phases), throwing listeners and the JS SustainedSubscription routing. Missing: gated store commits, a device refusing RegisterClient, device-side Register/UnregisterClient counters, restarts across a pending key, a sleeping peer under a closing controller, a stale LIT seeded into the cache and the wall-clock nextExpectedCheckin.",
+      "reason": "Registration, unregistration, forget, StayActive, LIT auto-registration, Check-In receipt with the replay drop and the key refresh, persistence across a restart, the decommission hooks, the LIT idle-interval floor and the address monitor's ICD branch (controller/client/icd_client_parity_matterjs_test.go, client/peer/icd_parity_matterjs_test.go). Phase 32: a refused store write of the offered key offers none (IcdClient.#offerKey, IcdClient.ts:860-901 at 862ad75f; controller/client:TestIcdClientKeyStoreParity), the operations a Go test observes without the transaction model (TestIcdClientOperationsParity) and a peer reporting 1.3.0 (internal/nodeseam.UseSpecificationVersion). Seam wave (issue #396, TestIcdClientSeamParity): a device refusing or counting RegisterClient and UnregisterClient (internal/coreseam.ObserveICDRegistrations), a controller restarted across a pending key or an abandoned unregister (fabrictest.Controller.Restart), a sleeping peer (fabrictest.Network.Filter) and the SIT→LIT recreate. Left: the transaction model (holdIcdState, gated commit phases), throwing listeners, an undefined clientType and the JS SustainedSubscription routing. Missing: a crash-consistent store snapshot with a crafted replay fed into the fabric's Check-In path (:1172-1244), the hand-emitted subscriptionStatusChanged while unregister() waits (:1504-1527), a crafted old-key Check-In fed while the refresh waits (:1952-1980), a controller-side subscription timeout (:2598-2630), a stale LIT seeded into the cache (no Go seam plants an unreported value: :595-621), and the wall-clock nextExpectedCheckin — a behaviour gap, measured: after Fake.StepWall(1h) NextExpectedCheckIn reads now+15s where matter.js reads at least now+idleModeDuration (:2281-2293), a findings-register candidate.",
       "snapshotSha": "621b035602c12be5c0ea3d8cfc6bd10ccdf7003f",
       "left": [
         {
@@ -2825,6 +2813,31 @@
           "it": "routes a non-ICD peer to a plain (non-parking) SustainedSubscription",
           "class": "js-runtime-only",
           "reason": "the JS SustainedSubscription class routing; the parking is held by the SustainedSubscriptionTest port (client/interaction sustained_icd_parity_matterjs_test.go)"
+        },
+        {
+          "it": "refreshes the key while the Check-In that requested it still commits",
+          "class": "js-runtime-only",
+          "reason": "matter.js's transaction model: IcdClientTest.ts:861-888 at 862ad75f holds the Check-In reaction's commit (GatedIcdStorage) and asserts the refresh waits for that commit before it offers a key; the Go client has no commit phase for a refresh to wait on"
+        },
+        {
+          "it": "ends with no registration when a decommission lands while the registration commits",
+          "class": "js-runtime-only",
+          "reason": "matter.js's transaction model: :1713-1735 holds register()'s commit at the storage gate while the decommission runs; the Go registration writes no gated commit"
+        },
+        {
+          "it": "announces the clear once when a decommission waits behind an unregister() commit",
+          "class": "js-runtime-only",
+          "reason": "matter.js's transaction model: :1737-1769, the decommission's reaction waiting for the ICD state the unregister() commit holds"
+        },
+        {
+          "it": "announces registered, then unregistered, when a decommission waits behind the register commit",
+          "class": "js-runtime-only",
+          "reason": "matter.js's transaction model: :1771-1801, the decommission's reaction waiting for the ICD state the register commit holds"
+        },
+        {
+          "it": "logs an error when the stored registration cannot be refreshed",
+          "class": "js-runtime-only",
+          "reason": ":1601-1614 sets the behaviour state's clientType to undefined inside an act(); the Go ICDRegistration.ClientType is a value with no undefined, so no stored registration lacks it"
         }
       ]
     },
@@ -3496,7 +3509,7 @@
         "OTA reboot: closes older sessions and does not re-subscribe a device that feeds its subscription",
         "OTA reboot: force re-subscribes (Mechanism B) when the subscription is not fed within the grace window"
       ],
-      "reason": "The requestor's cases run on two fabrictest devices of one site, the Go provider being a node's (node/ota_parity_matterjs_test.go): the update through download, apply and NotifyUpdateApplied after the restart into the new version, the restart from storage into the new and the previous version, the failed apply, no query while applying, the announcement during a running query (fix: handled once the query ended, OtaSoftwareUpdateRequestorServer.ts:376-420, :568-582) and the Busy describe. The provider's answers run on the provider (cluster/core/ota_provider_parity_matterjs_test.go): the apply without consent, the update-token rules (fix: OtaSoftwareUpdateProviderServer.ts:417-430, :444-464), the apply delay on the wire, queryImage cases A, B (the provider's half) and C, and Done clearing the consent. The controller's SoftwareUpdateManager (controller/softwareupdate, brief CM §1) runs the push end to end on a site (controller/ota_e2e_test.go, controller/ota_parity_matterjs_test.go: transfer options, the queued path, no requestor, the cancel by removing the consent with a requestor that cannot consent) and its queue cases on its own state, as matter.js sets su.internal.updateQueue directly (controller/softwareupdate/manager_parity_matterjs_test.go: Cancelled reset, the stall during the apply delay, the failed apply on startUp, the startUp suppression, the outcome after the resubscription, the test-image cleanup). Go cannot express a negative, fractional or NaN block size or a NaN delay; those invalid-option cases are the type's. Phase 32: the inbound report's session, the armer's failed-apply and node-gone cases, the BDX liveness of the manager and the provider's transfer entry (controller:TestOTAReportAnnouncesItsSessionParity, controller/softwareupdate:TestManager*Parity, cluster/core:TestParityMatterJS_OTAProviderTransferKeepsEntryAlive). Missing: the two reboot cases (Mechanism A/B) — the Go reboot armer never sees the returning device's session: the NotifyUpdateApplied session reaches the controller's own node (BD-Matter-OwnNode-SeparateIdentity) and the controller publishes no operational record a device could re-establish its subscription to; only the return-timeout backstop runs.",
+      "reason": "The requestor's cases run on two fabrictest devices of one site, the Go provider being a node's (node/ota_parity_matterjs_test.go): the update through download, apply and NotifyUpdateApplied after the restart into the new version, the restart from storage into the new and the previous version, the failed apply, no query while applying, the announcement during a running query (fix: handled once the query ended, OtaSoftwareUpdateRequestorServer.ts:376-420, :568-582) and the Busy describe. The provider's answers run on the provider (cluster/core/ota_provider_parity_matterjs_test.go): the apply without consent, the update-token rules (fix: OtaSoftwareUpdateProviderServer.ts:417-430, :444-464), the apply delay on the wire, queryImage cases A, B (the provider's half) and C, and Done clearing the consent. The controller's SoftwareUpdateManager (controller/softwareupdate, brief CM §1) runs the push end to end on a site (controller/ota_e2e_test.go, controller/ota_parity_matterjs_test.go: transfer options, the queued path, no requestor, the cancel by removing the consent with a requestor that cannot consent) and its queue cases on its own state, as matter.js sets su.internal.updateQueue directly (controller/softwareupdate/manager_parity_matterjs_test.go: Cancelled reset, the stall during the apply delay, the failed apply on startUp, the startUp suppression, the outcome after the resubscription, the test-image cleanup). Go cannot express a negative, fractional or NaN block size or a NaN delay; those invalid-option cases are the type's. Phase 32: the inbound report's session, the armer's failed-apply and node-gone cases, the BDX liveness of the manager and the provider's transfer entry (controller:TestOTAReportAnnouncesItsSessionParity, controller/softwareupdate:TestManager*Parity, cluster/core:TestParityMatterJS_OTAProviderTransferKeepsEntryAlive). Missing: the two reboot cases (Mechanism A/B, OtaTest.ts:706-890) — they assert the controller-side RebootResubscribeArmer (RebootResubscribeArmer.ts at 862ad75f), not the device: matter.js's device only sets its BasicInformation softwareVersion across stop/start (:783-785, :874-876), which the Go device already reports after its restart into the new version (node:TestOtaParityMatterJS); what is missing is the controller seeing the returning device's own (non-initiator) session — the Go armer is fed through the peer set (controller/ota.go sessionAdded), and the NotifyUpdateApplied session reaches the controller's own node (BD-Matter-OwnNode-SeparateIdentity), whose sessions the armer is not fed, nor does the controller publish an operational record a device could re-establish its subscription to; only the return-timeout backstop runs (seam wave, issue #396: no device-side image/version feed unblocks them).",
       "snapshotSha": "a6e773f32ed4c1c3eb3a3c00ca1d8b474cd448ae"
     },
     {
@@ -3593,14 +3606,18 @@
     },
     {
       "path": "packages/node/test/behaviors/thermostat/PresetsAtomicWriteTest.ts",
-      "status": "partial",
+      "status": "ported",
       "go": [
         "cluster/thermo:TestParityMatterJS_PresetsAtomicWriteTest"
       ],
-      "missing": [
-        "refuses a commit whose settled presets an observer stripped the handle from"
+      "left": [
+        {
+          "it": "refuses a commit whose settled presets an observer stripped the handle from",
+          "class": "js-runtime-only",
+          "reason": "the case rewrites the presets in flight from an application observer on persistedPresets$Changing, matter.js's behavior-state observer; the Go server has no such observer — a Go host refuses presets through its PresetStore (owner verdict, issue #396)"
+        }
       ],
-      "reason": "BeginWrite, the chunked Presets write, CommitWrite and RollbackWrite run over the wire on a commissioned fabrictest pair, the controller's cache being its Presets subscription and the device's announcements the server's OnMatterAttributesChanged. Missing, js-runtime-only: an application observer on persistedPresets$Changing rewriting the presets in flight, a seam the Go server does not have (the host refuses through its PresetStore).",
+      "reason": "BeginWrite, the chunked Presets write, CommitWrite and RollbackWrite run over the wire on a commissioned fabrictest pair, the controller's cache being its Presets subscription and the device's announcements the server's OnMatterAttributesChanged. Left, js-runtime-only: an application observer on persistedPresets$Changing rewriting the presets in flight, a seam the Go server does not have (the host refuses through its PresetStore).",
       "snapshotSha": "23cae0af7ec40de910fa411bb37f0157a4906c63"
     },
     {
@@ -3617,17 +3634,33 @@
     },
     {
       "path": "packages/node/test/behaviors/thermostat/PresetsLocalWriteTest.ts",
-      "status": "partial",
+      "status": "ported",
       "go": [
         "cluster/thermo:TestParityMatterJS_PresetsLocalWriteTest"
       ],
-      "missing": [
-        "refuses a preset an observer stripped the handle from, and stays writable",
-        "checks the settled presets of every commit that shares one transaction",
-        "refuses a preset an observer marks built-in after the thermostat issued its handle",
-        "validates a change an observer makes after the thermostat normalized"
+      "left": [
+        {
+          "it": "refuses a preset an observer stripped the handle from, and stays writable",
+          "class": "js-runtime-only",
+          "reason": "the case rewrites the presets in flight from an application observer on persistedPresets$Changing, matter.js's behavior-state observer; the Go server has no such observer — a Go host refuses presets through its PresetStore (owner verdict, issue #396)"
+        },
+        {
+          "it": "checks the settled presets of every commit that shares one transaction",
+          "class": "js-runtime-only",
+          "reason": "the case rewrites the presets in flight from an application observer on persistedPresets$Changing, matter.js's behavior-state observer; the Go server has no such observer — a Go host refuses presets through its PresetStore (owner verdict, issue #396)"
+        },
+        {
+          "it": "refuses a preset an observer marks built-in after the thermostat issued its handle",
+          "class": "js-runtime-only",
+          "reason": "the case rewrites the presets in flight from an application observer on persistedPresets$Changing, matter.js's behavior-state observer; the Go server has no such observer — a Go host refuses presets through its PresetStore (owner verdict, issue #396)"
+        },
+        {
+          "it": "validates a change an observer makes after the thermostat normalized",
+          "class": "js-runtime-only",
+          "reason": "the case rewrites the presets in flight from an application observer on persistedPresets$Changing, matter.js's behavior-state observer; the Go server has no such observer — a Go host refuses presets through its PresetStore (owner verdict, issue #396)"
+        }
       ],
-      "reason": "The local writes run on a fabrictest device with SetPresets inside Device.Act (the one local write, for Presets and persistedPresets alike), the restart on the node's own store (Aggregator.Add, Device.Restart), an application's refusal being its PresetStore's. Missing, js-runtime-only: the four cases rewrite the presets in flight from an application observer on persistedPresets$Changing, a seam the Go server does not have.",
+      "reason": "The local writes run on a fabrictest device with SetPresets inside Device.Act (the one local write, for Presets and persistedPresets alike), the restart on the node's own store (Aggregator.Add, Device.Restart), an application's refusal being its PresetStore's. Left, js-runtime-only: the four cases rewrite the presets in flight from an application observer on persistedPresets$Changing, a seam the Go server does not have.",
       "snapshotSha": "7f2a9f8b2dfe56e3524b64f0a79664116d4bfeb4"
     },
     {
@@ -4615,11 +4648,10 @@
       "path": "packages/node/test/node/ClientInvokeTest.ts",
       "status": "partial",
       "go": [
-        "controller/client:TestClientInvokeParity",
-        "client/interaction:TestInvokeBatcherParity"
+        "client/interaction:TestInvokeBatcherParity",
+        "controller/client:TestClientInvokeParity"
       ],
       "missing": [
-        "clears maxPathsPerInvoke cache when node goes offline",
         "direct invoke (#invokeSingle) propagates network to exchange",
         "batched invoke (#invokeWithBatching) propagates network to exchange",
         "split invoke (#invokeWithSplitting) propagates network to each exchange",
@@ -4628,10 +4660,16 @@
         "command with delayReportData never joins a batch",
         "only a non-default interaction model revision keeps a command out of the batch",
         "command with an address override keeps it",
-        "command without a network and one naming the default network share a batch",
-        "command queued while the interaction closes is rejected with the close reason"
+        "command without a network and one naming the default network share a batch"
       ],
-      "reason": "The batcher of single commands (client/interaction Interaction.Invoke, ClientInteraction.#invokeWithBatching at 862ad75f) on the scripted rig — one InvokeRequest per batch window and network lane, numbered by CommandRef, its bypasses (MaxPathsPerInvoke 1, endpoint 0, timed, suppressed, expected processing time, extended fail-safe timeout, MRP delay, Large Message, NoBatch), duplicate paths in separate batches, a split by MaxPathsPerInvoke, close and abort — and the commands through it on fabrictest (controller/client:TestClientInvokeParity). Missing: the maxPathsPerInvoke cache (the Go provider reads the session parameters on every invoke, there is no cache to clear), the network observed on the exchange (the scripted session provider takes no network), the interaction model revision, beforeDispatch, DelayReportData and address-override options (the Go InvokeOptions has none of them), an interaction-level default network, and a close while the peer connects (no seam holds the connect).",
+      "left": [
+        {
+          "it": "clears maxPathsPerInvoke cache when node goes offline",
+          "class": "js-runtime-only",
+          "reason": "ClientInvokeTest.ts:249-283 at 862ad75f clears matter.js's cached maxPathsPerInvoke; the Go provider reads the session parameters on every invoke (sessionProvider/peerProvider.maxPathsPerInvoke), there is no cache to clear"
+        }
+      ],
+      "reason": "The batcher of single commands (client/interaction Interaction.Invoke, ClientInteraction.#invokeWithBatching at 862ad75f) on the scripted rig — one InvokeRequest per batch window and network lane, numbered by CommandRef, its bypasses (MaxPathsPerInvoke 1, endpoint 0, timed, suppressed, expected processing time, extended fail-safe timeout, MRP delay, Large Message, NoBatch), duplicate paths in separate batches, a split by MaxPathsPerInvoke, close and abort, a close while the batcher's connect is held (interaction.HoldConnect, export_test.go) — and the commands through it on fabrictest (controller/client:TestClientInvokeParity). Left: the maxPathsPerInvoke cache (none in Go), the network observed on the exchange (the scripted session provider takes no network), an interaction-level default network, and the interaction model revision, beforeDispatch, DelayReportData and address-override options Go's InvokeOptions has not (a feature gap, named as a findings candidate). Missing (owner verdict at integration, 2026-11-04): the five option cases (interactionModelRevision ×2, beforeDispatch, delayReportData, address override) and the interaction-level default network are a feature gap of Go's InvokeOptions and interaction.Config, not matter.js's runtime (findings register T3-SW-1); the three network-on-the-exchange cases are portable on a fabrictest pair, whose peer provider carries the network — a port, not a seam.",
       "snapshotSha": "a743554ce3a6060f13492259bb66a152d9bfca31"
     },
     {
@@ -5175,28 +5213,59 @@
     },
     {
       "path": "packages/node/test/node/DecommissionTest.ts",
-      "status": "partial",
+      "status": "ported",
       "go": [
-        "controller/client:TestDecommissionUnstructuredParity",
-        "controller/client:TestDecommissionParity"
+        "controller/client:TestDecommissionParity",
+        "controller/client:TestDecommissionUnstructuredParity"
       ],
-      "missing": [
-        "removes the node when removeFabric is delivered but the response is lost",
-        "removes the node when a matching leave event arrives even if removeFabric rejects",
-        "does not treat a leave for a different fabric as confirmation",
-        "keeps the node and throws when removeFabric returns a non-Ok status, even if a leave arrives",
-        "probe resolves false on a destroyed node instead of throwing",
-        "rejects a decommission of a node that is being deleted",
-        "waits for a running decommission before handing out a node (removed)",
-        "rejects a decommission of a crashed node with its lifecycle error",
-        "rejects a commission of a crashed node with its lifecycle error",
-        "rejects a commission attempt registered for a crashed node",
-        "does not cull the node while its decommission deletes it",
-        "reports the node gone as soon as its deletion begins",
-        "rejects acting on a node whose deletion has begun instead of restarting it",
-        "ignores an event that arrives for a node while it is deleted"
+      "left": [
+        {
+          "it": "probe resolves false on a destroyed node instead of throwing",
+          "class": "js-runtime-only",
+          "reason": "no Go subject (no construction lifecycle): DecommissionTest.ts:301-320 at 862ad75f probes ClientNodeInteraction of a destroyed node; a Go client.Node has no node-level probe, a closed node's calls fail with client.ErrClosed"
+        },
+        {
+          "it": "rejects a decommission of a node that is being deleted",
+          "class": "js-runtime-only",
+          "reason": "no Go subject (no construction lifecycle): :345-357 starts peer1.delete() and decommissions meanwhile; deletion is the registry's Decommission, there is no public delete in flight to race"
+        },
+        {
+          "it": "rejects a decommission of a crashed node with its lifecycle error",
+          "class": "js-runtime-only",
+          "reason": "no Go subject (no construction lifecycle): :512-520 sets construction status Crashed; a Go node has no construction status"
+        },
+        {
+          "it": "rejects a commission of a crashed node with its lifecycle error",
+          "class": "js-runtime-only",
+          "reason": "no Go subject (no construction lifecycle): :522-531, as the decommission: no construction status"
+        },
+        {
+          "it": "rejects a commission attempt registered for a crashed node",
+          "class": "js-runtime-only",
+          "reason": "no Go subject (no construction lifecycle): :533-549 runs peers.runCommissioning on a Crashed node; neither the construction status nor runCommissioning exists in Go (client.HoldOperation holds an operation)"
+        },
+        {
+          "it": "does not cull the node while its decommission deletes it",
+          "class": "js-runtime-only",
+          "reason": "no Go subject (no construction lifecycle): :551-583 wraps peer1.delete to hold the decommission between clearing the address and deleting the node; Go's deletion is internal to Decommission, there is no delete to wrap"
+        },
+        {
+          "it": "reports the node gone as soon as its deletion begins",
+          "class": "js-runtime-only",
+          "reason": "no Go subject (no construction lifecycle): :585-594 reads lifecycle.isGone while delete() runs; a Go node has no isGone, a deleted node is closed"
+        },
+        {
+          "it": "rejects acting on a node whose deletion has begun instead of restarting it",
+          "class": "js-runtime-only",
+          "reason": "no Go subject (no construction lifecycle): :596-622 acts on the node from a construction-status observer during delete(); a Go node has no act or construction status"
+        },
+        {
+          "it": "ignores an event that arrives for a node while it is deleted",
+          "class": "js-runtime-only",
+          "reason": "no Go subject (no construction lifecycle): :624-665 feeds a leave into the structure (structure.mutate) from a construction-status observer during delete(); Node.apply is package-internal and a closing node drops events"
+        }
       ],
-      "reason": "The decommission of a peer without a structure read or subscription (fabric index recorded, read, or read unfiltered), RemoveFabric never acknowledged (every datagram to the device dropped: the node kept, a second attempt accepted), one fabric operation at a time against a held commission or decommission (client.HoldOperation for peers.runCommissioning), ForDevice waiting for a held decommission, a node deleted by its decommission or by a leave the device reports (client.ErrClosed for DestroyedDependencyError) and nothing left in the store run on fabrictest (controller/client:TestDecommission*). Missing: the cases that patch the peer's removeFabric client to throw PeerMessageMissingError or a non-Ok status or to emit a leave inside the call (no seam on the wire for a delivered request whose answer is lost, nor for a leave timed inside the call); the probe of a destroyed node (no node-level probe); a node being deleted or a delete wrapper (deletion is the registry's Decommission, no public delete in flight); the crashed construction status, runCommissioning, isGone and act on a node whose deletion began (no construction lifecycle in Go); an event fed into the structure while the node is deleted (Node.apply is package-internal; covered by the closing node dropping events).",
+      "reason": "The decommission of a peer without a structure read or subscription (fabric index recorded, read, or read unfiltered), RemoveFabric never acknowledged (every datagram to the device dropped: the node kept, a second attempt accepted), one fabric operation at a time against a held commission or decommission (client.HoldOperation for peers.runCommissioning), ForDevice waiting for a held decommission, a node deleted by its decommission or by a leave the device reports (client.ErrClosed for DestroyedDependencyError) and nothing left in the store run on fabrictest (controller/client:TestDecommission*). The patched cases — an answer lost after the acknowledgement, a leave of our fabric or another inside the call, a non-Ok status (the device's InvalidFabricIndex for an index it does not hold) and a decommission held while ForDevice waits for the removal — run on client.PatchRemoveFabric and client.EmitLeave (export_test.go), matter.js's patchRemoveFabric: the Go device acknowledges RemoveFabric only with its answer, so no wire drop leaves the request acknowledged and the answer missing. Left: the node-level probe, a delete in flight or wrapped, the construction status (Crashed, isGone, act during deletion) and an event fed into the structure while the node is deleted — no construction lifecycle in Go.",
       "snapshotSha": "1e1c5744fb3ee77eefc2ec262e9a685ee429585d"
     },
     {
@@ -5238,10 +5307,9 @@
       ],
       "missing": [
         "re-announces after failsafe expiry with PASE session active (before addNOC)",
-        "re-announces after failsafe expiry with CASE session after addNOC (before CommissioningComplete)",
-        "recovers cleanly when initial ACL creation fails during addNOC"
+        "re-announces after failsafe expiry with CASE session after addNOC (before CommissioningComplete)"
       ],
-      "reason": "On fabrictest the fail-safe expiry before AddNOC (PASE) and after it (flow stopped at the transition) rolls back and leaves the device commissionable (node:TestFailsafeCommissioningParity); the re-announcement itself is missing — the Go device keeps its commissionable record while PASE is up and publishes nothing when the PASE session closes, where matter.js starts an advertisement round (DeviceAdvertiser.ts:131-162); the ACL-failure case has no seam to fail the device's initial ACL.",
+      "reason": "On fabrictest the fail-safe expiry before AddNOC (PASE) and after it (flow stopped at the transition) rolls back and leaves the device commissionable, and an AddNOC whose initial ACL write fails (the device's credential store refusing the ReplaceACL, node.Config.Store.Credentials) fails the commissioning, keeps no fabric and leaves the device up and commissionable (node:TestFailsafeCommissioningParity; that case asserts the commissionable record where matter.js awaits the announcement). Missing, behaviour gap, not a seam: the re-announcement itself — the Go device keeps its commissionable record while PASE is up and publishes nothing when the PASE session closes, where matter.js starts an advertisement round (DeviceAdvertiser.ts:131-162 at 862ad75f); a findings-register candidate (seam wave, issue #396).",
       "snapshotSha": "8e1751cc53222167bae7811a878aa7bb8f11fc4d"
     },
     {
@@ -7879,7 +7947,7 @@
     },
     {
       "path": "packages/protocol/test/session/SessionManagerTest.ts",
-      "status": "partial",
+      "status": "ported",
       "go": [
         "secure/operational:TestOpenFromPase_AllocatesDistinctIDs",
         "secure/operational:TestManager_AllocateID_WrapAround",
@@ -7895,10 +7963,7 @@
         "client/exchange:TestSessionManagerSessionParameterSetter",
         "client/peer:TestNewestSessionActivityParityMatterJS"
       ],
-      "missing": [
-        "closes a session on peer shutdown after the clock stepped back"
-      ],
-      "reason": "Session-id allocation (skip, seed 0), the per-peer cap and the initiator sessions it spares, the group data counter and reception-state cases, the accepted local parameters and their merge are ported; the session pick by activity and the wall-clock steps run on the clock's monotonic reading (client/peer:TestNewestSessionActivityParityMatterJS, secure/operational:TestSessionManagerWallClockSteps, phase 32). Left: placeholder-only reuse (by design), subscriptions and log origins, the Lifetime and legacy-counter cases and values a Go field cannot carry. Missing: a session closed on peer shutdown after a backward clock step — the device side has no peer-shutdown path (ClosePeerLost is the only sweep).",
+      "reason": "Session-id allocation (skip, seed 0), the per-peer cap and the initiator sessions it spares, the group data counter and reception-state cases, the accepted local parameters and their merge are ported; the session pick by activity and the wall-clock steps run on the clock's monotonic reading (client/peer:TestNewestSessionActivityParityMatterJS, secure/operational:TestSessionManagerWallClockSteps, phase 32). Left: placeholder-only reuse (by design), subscriptions and log origins, the Lifetime and legacy-counter cases and values a Go field cannot carry. The peer-shutdown case after a backward clock step runs on the sweep's monotonic cutoff, Manager.ClosePeerLostSince (seam wave, issue #396): matter.js runs both causes through #handlePeerLoss with asOf on Time.nowUs, and the shutdown cause's keepSubscriptions is the controller's own subscriptions, no device-side subject.",
       "snapshotSha": "db7bfa3a82d2296b888015c59abf7695f84c43b5",
       "left": [
         {

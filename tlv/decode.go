@@ -105,7 +105,7 @@ func (d *Decoder) readTag(kind TagKind) (Tag, error) {
 		// tag bytes are read. Mirrors matter.js
 		// packages/types/src/tlv/TlvCodec.ts:169-171 readTag (throws
 		// UnexpectedDataError "Implicit profile tag … cannot be resolved");
-		// chip's TLVReader.cpp:916-923 (at f589ae56) ReadTag yields UnknownImplicitTag
+		// chip's TLVReader.cpp:916-923 (at 6170af84) ReadTag yields UnknownImplicitTag
 		// without an ImplicitProfileId, which VerifyElement refuses at
 		// :861-862 (CHIP_ERROR_UNKNOWN_IMPLICIT_TLV_TAG). The module sets no
 		// implicit profile, so there is nothing to resolve the tag against.

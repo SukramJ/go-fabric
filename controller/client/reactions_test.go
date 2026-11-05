@@ -10,6 +10,7 @@ import (
 	"slices"
 	"sync"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/SukramJ/go-fabric/client/exchange"
@@ -67,28 +68,30 @@ func eventReport(event, number uint64) im.EventReport {
 // at all (W4-ctlim-01).
 func TestReactionsNeedSubscription(t *testing.T) {
 	t.Parallel()
-	logs := &msgLog{}
-	sr := newScriptedRegistry(t, seedCommissioned(3), func(c *client.RegistryConfig) { c.Logger = slog.New(logs) })
-	n := sr.reg.Get("peer1")
-	client.SetNewlyCommissioned(n)
-	read := make(chan error, 1)
-	go func() { read <- n.Start(context.Background()) }() // no autoSubscribe: started, unsubscribed
-	m := sr.next(t)
-	reports := sr.imageWithOpCreds("ours")
-	sr.reply(t, m, im.InteractionModelProtocolID, im.OpcodeReportData, dataReport(t, 0, reports,
-		eventReport(uint64(basicinfo.EventShutDown), 1), eventReport(uint64(basicinfo.EventStartUp), 2), leaveEvent(3, 3)))
-	if err := <-read; err != nil {
-		t.Fatal(err)
-	}
-	client.WaitRegistry(sr.reg)
-	for _, want := range []string{"leave_ignored", "shutdown_ignored", "startup_ignored"} {
-		if !logs.has("matter.controller.client.registry." + want) {
-			t.Errorf("no %s", want)
+	synctest.Test(t, func(t *testing.T) {
+		logs := &msgLog{}
+		sr := newScriptedRegistry(t, seedCommissioned(3), func(c *client.RegistryConfig) { c.Logger = slog.New(logs) })
+		n := sr.reg.Get("peer1")
+		client.SetNewlyCommissioned(n)
+		read := make(chan error, 1)
+		go func() { read <- n.Start(context.Background()) }() // no autoSubscribe: started, unsubscribed
+		m := sr.next(t)
+		reports := sr.imageWithOpCreds("ours")
+		sr.reply(t, m, im.InteractionModelProtocolID, im.OpcodeReportData, dataReport(t, 0, reports,
+			eventReport(uint64(basicinfo.EventShutDown), 1), eventReport(uint64(basicinfo.EventStartUp), 2), leaveEvent(3, 3)))
+		if err := <-read; err != nil {
+			t.Fatal(err)
 		}
-	}
-	if sr.reg.Size() != 1 || sr.session.IsPeerLost() {
-		t.Fatal("an ignored reaction acted")
-	}
+		client.WaitRegistry(sr.reg)
+		for _, want := range []string{"leave_ignored", "shutdown_ignored", "startup_ignored"} {
+			if !logs.has("matter.controller.client.registry." + want) {
+				t.Errorf("no %s", want)
+			}
+		}
+		if sr.reg.Size() != 1 || sr.session.IsPeerLost() {
+			t.Fatal("an ignored reaction acted")
+		}
+	})
 }
 
 // TestReactionLeave: Peers.#onLeave — a leave of a fabric index the peer's
@@ -96,45 +99,47 @@ func TestReactionsNeedSubscription(t *testing.T) {
 // ours decommissions and deletes the node.
 func TestReactionLeave(t *testing.T) {
 	t.Parallel()
-	sr := newScriptedRegistry(t, seedCommissioned(3), nil)
-	n := sr.reg.Get("peer1")
-	reports := sr.imageWithOpCreds("ours")
-	// A second entry of another fabric under index 4.
-	reports[len(reports)-2].Value = im.AttributeValue{Value: tlvNode(func(e *tlv.Encoder, tag tlv.Tag) {
-		e.StartArray(tag)
-		for _, f := range []struct {
-			root []byte
-			idx  uint8
-		}{{sr.fabric.RootPublicKey, 3}, {bytes.Repeat([]byte{4}, 65), 4}} {
-			e.StartStruct(tlv.AnonymousTag())
-			e.PutOctets(tlv.ContextTag(1), f.root)
-			e.PutUint(tlv.ContextTag(2), 0xFFF1)
-			e.PutUint(tlv.ContextTag(3), sr.fabric.FabricID)
-			e.PutUint(tlv.ContextTag(4), 0x2222)
-			e.PutUTF8(tlv.ContextTag(5), "ours")
-			e.PutUint(tlv.ContextTag(0xFE), uint64(f.idx))
+	synctest.Test(t, func(t *testing.T) {
+		sr := newScriptedRegistry(t, seedCommissioned(3), nil)
+		n := sr.reg.Get("peer1")
+		reports := sr.imageWithOpCreds("ours")
+		// A second entry of another fabric under index 4.
+		reports[len(reports)-2].Value = im.AttributeValue{Value: tlvNode(func(e *tlv.Encoder, tag tlv.Tag) {
+			e.StartArray(tag)
+			for _, f := range []struct {
+				root []byte
+				idx  uint8
+			}{{sr.fabric.RootPublicKey, 3}, {bytes.Repeat([]byte{4}, 65), 4}} {
+				e.StartStruct(tlv.AnonymousTag())
+				e.PutOctets(tlv.ContextTag(1), f.root)
+				e.PutUint(tlv.ContextTag(2), 0xFFF1)
+				e.PutUint(tlv.ContextTag(3), sr.fabric.FabricID)
+				e.PutUint(tlv.ContextTag(4), 0x2222)
+				e.PutUTF8(tlv.ContextTag(5), "ours")
+				e.PutUint(tlv.ContextTag(0xFE), uint64(f.idx))
+				_ = e.EndContainer()
+			}
 			_ = e.EndContainer()
+		})}
+		sr.subscribe(t, n, reports, 33)
+		sr.pushEvents(t, 33, leaveEvent(10, 5), leaveEvent(11, 4))
+		waitUntil(t, "the events", func() bool { sr.hooks.mu.Lock(); defer sr.hooks.mu.Unlock(); return len(sr.hooks.events) == 2 })
+		client.WaitRegistry(sr.reg)
+		if sr.reg.Size() != 1 || !n.IsCommissioned() {
+			t.Fatal("a foreign leave deleted the node")
 		}
-		_ = e.EndContainer()
-	})}
-	sr.subscribe(t, n, reports, 33)
-	sr.pushEvents(t, 33, leaveEvent(10, 5), leaveEvent(11, 4))
-	waitUntil(t, "the events", func() bool { sr.hooks.mu.Lock(); defer sr.hooks.mu.Unlock(); return len(sr.hooks.events) == 2 })
-	client.WaitRegistry(sr.reg)
-	if sr.reg.Size() != 1 || !n.IsCommissioned() {
-		t.Fatal("a foreign leave deleted the node")
-	}
-	sr.pushEvents(t, 33, leaveEvent(12, 3))
-	waitUntil(t, "the deletion", func() bool { return sr.reg.Size() == 0 })
-	client.WaitRegistry(sr.reg)
-	// The store is waited on, not read once (report AU: one -race run read
-	// it before the erase was visible).
-	waitUntil(t, "the erased store", func() bool { ids, _ := sr.store.NodeIDs(); return len(ids) == 0 })
-	sr.hooks.mu.Lock()
-	defer sr.hooks.mu.Unlock()
-	if !slices.Equal(sr.hooks.decommissioned, []string{"peer1"}) || !sr.session.IsPeerLost() || sr.set.Get(scriptedAddr) != nil {
-		t.Fatalf("after the leave: decommissioned %v, session lost %v", sr.hooks.decommissioned, sr.session.IsPeerLost())
-	}
+		sr.pushEvents(t, 33, leaveEvent(12, 3))
+		waitUntil(t, "the deletion", func() bool { return sr.reg.Size() == 0 })
+		client.WaitRegistry(sr.reg)
+		// The store is waited on, not read once (report AU: one -race run read
+		// it before the erase was visible).
+		waitUntil(t, "the erased store", func() bool { ids, _ := sr.store.NodeIDs(); return len(ids) == 0 })
+		sr.hooks.mu.Lock()
+		defer sr.hooks.mu.Unlock()
+		if !slices.Equal(sr.hooks.decommissioned, []string{"peer1"}) || !sr.session.IsPeerLost() || sr.set.Get(scriptedAddr) != nil {
+			t.Fatalf("after the leave: decommissioned %v, session lost %v", sr.hooks.decommissioned, sr.session.IsPeerLost())
+		}
+	})
 }
 
 // secondSession adds a secure session B with the same peer, adopted into
@@ -176,23 +181,25 @@ func (sr *scriptedRegistry) sendOn(t *testing.T, ch *channel.Session, id uint16,
 // (SessionManager.ts:690-692).
 func TestReactionStartUp(t *testing.T) {
 	t.Parallel()
-	sr := newScriptedRegistry(t, seedCommissioned(3), nil)
-	n := sr.reg.Get("peer1")
-	sr.subscribe(t, n, sr.imageWithOpCreds("ours"), 33)
-	sr.clock.Advance(time.Second)
-	b, ch := sr.secondSession(t)
-	sr.clock.Advance(time.Second)
-	// The rebooted device reports its StartUp over its new session.
-	sr.sendOn(t, ch, 0x0102, message.ProtocolHeader{Initiator: true, NeedsAck: true, Opcode: im.OpcodeReportData, ExchangeID: 0x7101, ProtocolID: im.InteractionModelProtocolID},
-		dataReport(t, 33, nil, eventReport(uint64(basicinfo.EventStartUp), 40)))
-	waitUntil(t, "the old session's loss", sr.session.IsPeerLost)
-	client.WaitRegistry(sr.reg)
-	if b.IsPeerLost() || b.IsClosed() {
-		t.Fatal("the newest session was lost")
-	}
-	if got := sr.mgr.SessionsFor(scriptedAddr); len(got) != 1 || got[0] != b {
-		t.Fatalf("sessions %v", got)
-	}
+	synctest.Test(t, func(t *testing.T) {
+		sr := newScriptedRegistry(t, seedCommissioned(3), nil)
+		n := sr.reg.Get("peer1")
+		sr.subscribe(t, n, sr.imageWithOpCreds("ours"), 33)
+		sr.clock.Advance(time.Second)
+		b, ch := sr.secondSession(t)
+		sr.clock.Advance(time.Second)
+		// The rebooted device reports its StartUp over its new session.
+		sr.sendOn(t, ch, 0x0102, message.ProtocolHeader{Initiator: true, NeedsAck: true, Opcode: im.OpcodeReportData, ExchangeID: 0x7101, ProtocolID: im.InteractionModelProtocolID},
+			dataReport(t, 33, nil, eventReport(uint64(basicinfo.EventStartUp), 40)))
+		waitUntil(t, "the old session's loss", sr.session.IsPeerLost)
+		client.WaitRegistry(sr.reg)
+		if b.IsPeerLost() || b.IsClosed() {
+			t.Fatal("the newest session was lost")
+		}
+		if got := sr.mgr.SessionsFor(scriptedAddr); len(got) != 1 || got[0] != b {
+			t.Fatalf("sessions %v", got)
+		}
+	})
 }
 
 // TestReactionShutDown: Peers.#onShutdown — every session with the peer is
@@ -200,14 +207,16 @@ func TestReactionStartUp(t *testing.T) {
 // stays registered (keepSubscriptions, :629).
 func TestReactionShutDown(t *testing.T) {
 	t.Parallel()
-	sr := newScriptedRegistry(t, seedCommissioned(3), nil)
-	n := sr.reg.Get("peer1")
-	sr.subscribe(t, n, sr.imageWithOpCreds("ours"), 33)
-	b, _ := sr.secondSession(t)
-	sr.pushEvents(t, 33, eventReport(uint64(basicinfo.EventShutDown), 41))
-	waitUntil(t, "the sessions' loss", func() bool { return sr.session.IsPeerLost() && b.IsPeerLost() })
-	client.WaitRegistry(sr.reg)
-	if len(sr.subs.Active()) != 1 || sr.reg.Size() != 1 {
-		t.Fatal("the shutdown closed the subscription or the node")
-	}
+	synctest.Test(t, func(t *testing.T) {
+		sr := newScriptedRegistry(t, seedCommissioned(3), nil)
+		n := sr.reg.Get("peer1")
+		sr.subscribe(t, n, sr.imageWithOpCreds("ours"), 33)
+		b, _ := sr.secondSession(t)
+		sr.pushEvents(t, 33, eventReport(uint64(basicinfo.EventShutDown), 41))
+		waitUntil(t, "the sessions' loss", func() bool { return sr.session.IsPeerLost() && b.IsPeerLost() })
+		client.WaitRegistry(sr.reg)
+		if len(sr.subs.Active()) != 1 || sr.reg.Size() != 1 {
+			t.Fatal("the shutdown closed the subscription or the node")
+		}
+	})
 }

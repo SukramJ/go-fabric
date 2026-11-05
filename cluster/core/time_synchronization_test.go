@@ -9,7 +9,9 @@ import (
 
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/cluster/core"
+	"github.com/SukramJ/go-fabric/cluster/spec"
 	tsdef "github.com/SukramJ/go-fabric/cluster/spec/timesynchronization"
+	"github.com/SukramJ/go-fabric/im"
 )
 
 func TestTimeSync_ClusterID(t *testing.T) {
@@ -82,10 +84,12 @@ func TestTimeSync_ReadUnknownAttrReturnsFalse(t *testing.T) {
 func TestTimeSync_WriteReturnsError(t *testing.T) {
 	t.Parallel()
 	ts := core.NewTimeSynchronization()
-	for _, attrID := range []uint32{0x0000, 0x0001, 0xFFFD} {
+	for attrID, want := range map[uint32]im.StatusCode{
+		0x0000: im.StatusUnsupportedWrite, 0x0001: im.StatusUnsupportedWrite, 0xFFFD: im.StatusUnsupportedAttribute,
+	} {
 		err := ts.MatterWrite(context.Background(), attrID, nil)
-		if err == nil {
-			t.Errorf("MatterWrite(0x%04X) expected error, got nil", attrID)
+		if spec.StatusOf(err) != want {
+			t.Errorf("MatterWrite(0x%04X): status %v (%v), want %v", attrID, spec.StatusOf(err), err, want)
 		}
 	}
 }
@@ -106,8 +110,8 @@ func TestTimeSync_InvokeUnknownCmdReturnsError(t *testing.T) {
 	ts := core.NewTimeSynchronization()
 	for _, cmdID := range []uint32{0x01, 0xFF} {
 		_, err := ts.MatterInvoke(context.Background(), cmdID, nil)
-		if err == nil {
-			t.Errorf("MatterInvoke(0x%02X) expected error, got nil", cmdID)
+		if spec.StatusOf(err) != im.StatusUnsupportedCommand {
+			t.Errorf("MatterInvoke(0x%02X): status %v (%v), want %v", cmdID, spec.StatusOf(err), err, im.StatusUnsupportedCommand)
 		}
 	}
 }

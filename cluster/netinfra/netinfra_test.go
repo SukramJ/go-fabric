@@ -134,8 +134,8 @@ func TestThreadDirectoryReloadAndSet(t *testing.T) {
 		t.Errorf("ThreadNetworks: %v, want ErrNotHeld", err)
 	}
 	mustT(t, s.SetAttributes(map[uint32]any{}))
-	if err := s.MatterWrite(caseCtx(), tdir.AttrThreadNetworks, nil); err == nil {
-		t.Error("ThreadNetworks was written")
+	if err := s.MatterWrite(caseCtx(), tdir.AttrThreadNetworks, nil); spec.StatusOf(err) != im.StatusUnsupportedWrite {
+		t.Errorf("ThreadNetworks write: status %v (%v), want %v", spec.StatusOf(err), err, im.StatusUnsupportedWrite)
 	}
 	before := s.MatterDataVersion()
 	mustT(t, store.RemoveNetwork(ctx, exPanID1))

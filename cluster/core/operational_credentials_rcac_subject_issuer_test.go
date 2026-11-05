@@ -13,6 +13,8 @@ import (
 	"testing"
 
 	"github.com/SukramJ/go-fabric/cluster/core"
+	"github.com/SukramJ/go-fabric/cluster/spec"
+	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/secure/mattercert"
 	"github.com/SukramJ/go-fabric/tlv"
 )
@@ -98,8 +100,8 @@ func TestPin_ValidateRCAC_SubjectVsIssuer(t *testing.T) {
 	}
 	_, ierr := ocBad.MatterInvoke(ctx, 0x0B,
 		core.AddTrustedRootCertificateRequest{RootCACertificate: subjectMismatch})
-	if ierr == nil {
-		t.Fatal("AddTrustedRootCertificate(subject-mismatch): accepted a root that is not self-signed")
+	if spec.StatusOf(ierr) != im.StatusInvalidCommand {
+		t.Fatalf("AddTrustedRootCertificate(subject-mismatch): status %v (%v), want %v", spec.StatusOf(ierr), ierr, im.StatusInvalidCommand)
 	}
 	if !errors.Is(ierr, mattercert.ErrInvalidRCAC) {
 		t.Errorf("AddTrustedRootCertificate(subject-mismatch) error = %v, want one wrapping mattercert.ErrInvalidRCAC", ierr)

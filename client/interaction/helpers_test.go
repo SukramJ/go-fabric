@@ -6,7 +6,9 @@ package interaction_test
 import (
 	"bytes"
 	"net"
+	"slices"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/SukramJ/go-fabric/client/exchange"
@@ -25,20 +27,15 @@ func newFakeClock() *fakeClock { return &fakeClock{clocktest.New(time.Unix(3_000
 // pending lists the time left on each armed timer.
 func (c *fakeClock) pending() []time.Duration { return c.Armed() }
 
-// waitTimer waits until a timer of duration d is armed.
+// waitTimer lets the case's synctest bubble settle and fails unless a
+// timer of duration d is armed: once every goroutine of the bubble is
+// durably blocked, the subject has armed what it will arm until the test
+// moves the fake. It must run inside synctest.Test.
 func (c *fakeClock) waitTimer(t *testing.T, d time.Duration) {
 	t.Helper()
-	deadline := time.Now().Add(5 * time.Second)
-	for {
-		for _, p := range c.pending() {
-			if p == d {
-				return
-			}
-		}
-		if time.Now().After(deadline) {
-			t.Fatalf("no timer of %v armed (pending %v)", d, c.pending())
-		}
-		time.Sleep(time.Millisecond)
+	synctest.Wait()
+	if !slices.Contains(c.pending(), d) {
+		t.Fatalf("no timer of %v armed (pending %v)", d, c.pending())
 	}
 }
 

@@ -243,7 +243,10 @@ type initiatedSecureExchange struct {
 	// a session the peer established after the exchange was opened is
 	// not what went unanswered (matter.js ExchangeManager.ts:554 takes
 	// the context's creation time, SessionManager.ts:688 compares).
-	createdAt time.Time
+	// createdAtMono is the same instant on the clock's monotonic reading,
+	// the one the sweep compares (matter.js's asOf is Time.nowUs).
+	createdAt     time.Time
+	createdAtMono time.Duration
 	// responder is set on an exchange the peer opened (bdx_responder.go):
 	// this node answers on it with the I flag clear.
 	responder bool
@@ -309,17 +312,17 @@ func (b *Bridge) openInitiatedExchange(link peerLink) (*initiatedSecureExchange,
 	}
 	ex := &initiatedSecureExchange{
 		b: b, sessionID: link.sessionID, addr: link.addr, exchangeID: b.nextOutboundExchangeID(),
-		createdAt: b.clk().Now(), in: make(chan bdx.Message, 16), done: make(chan struct{}),
+		createdAt: b.clk().Now(), createdAtMono: clock.MonotonicOf(b.clk()), in: make(chan bdx.Message, 16), done: make(chan struct{}),
 	}
 	b.resumption.initiated.Store(secureExchangeKey{sessionID: ex.sessionID, exchangeID: ex.exchangeID}, ex)
 	return ex, nil
 }
 
 // peerLossCloser is the optional [SessionRegistry] capability that
-// force-closes every session of a peer created before asOf
-// (secure/operational.Manager.ClosePeerLost).
+// force-closes every session of a peer created before a monotonic
+// reading of the registry's clock (secure/operational.Manager.ClosePeerLostSince).
 type peerLossCloser interface {
-	ClosePeerLost(fabricIndex uint8, peerNodeID uint64, asOf time.Time) int
+	ClosePeerLostSince(fabricIndex uint8, peerNodeID uint64, sinceMono time.Duration) int
 }
 
 // handleInitiatedPeerLoss is the outbound-reliable tracker giving up on a
@@ -343,7 +346,7 @@ func (b *Bridge) handleInitiatedPeerLoss(sessionID, exchangeID uint16) {
 	if !ok {
 		return
 	}
-	b.closeLostPeer(sessionID, exchangeID, ex.createdAt, "an exchange this node opened")
+	b.closeLostPeer(sessionID, exchangeID, ex.createdAtMono, "an exchange this node opened")
 	ex.fail(mrp.ErrMaxRetransmissionsReached)
 }
 
@@ -356,28 +359,29 @@ func (b *Bridge) handleInitiatedPeerLoss(sessionID, exchangeID uint16) {
 // (MessageExchange.ts:616-621, #reportsPeerLoss :630-633,
 // #messageReceivedCounter === 0); a later chunk is sent only after the
 // peer's StatusResponse to the previous one, so its loss is not.
-func (b *Bridge) reportPeerLoss(sessionID, exchangeID uint16, counter uint32) (time.Time, bool) {
+func (b *Bridge) reportPeerLoss(sessionID, exchangeID uint16, counter uint32) (time.Duration, bool) {
 	if _, owned := b.reportCounterOwner.Load(reportCounterKey(sessionID, counter)); !owned {
-		return time.Time{}, false
+		return 0, false
 	}
 	raw, ok := b.reportExchangeOrigins.Load(mrp.ExchangeKey{SessionID: sessionID, ExchangeID: exchangeID, Initiator: true})
 	if !ok {
-		return time.Time{}, false
+		return 0, false
 	}
 	origin, ok := raw.(reportExchangeOrigin)
 	if !ok || origin.firstCounter != counter {
-		return time.Time{}, false
+		return 0, false
 	}
-	return origin.createdAt, true
+	return origin.createdAtMono, true
 }
 
 // closeLostPeer force-closes the sessions of the peer of sessionID that
-// were created before asOf — every one with a commissioned peer
+// were created before sinceMono, the clock's monotonic reading of the
+// exchange's creation ([clock.MonotonicOf]) — every one with a commissioned peer
 // (SessionManager.ts:677-695 #handlePeerLoss), the session alone without a
 // fabric or node id (ExchangeManager.ts:561-571). The sessions'
 // subscriptions fall with them through the registry's close hook. what
 // names the exchange for the log.
-func (b *Bridge) closeLostPeer(sessionID, exchangeID uint16, asOf time.Time, what string) {
+func (b *Bridge) closeLostPeer(sessionID, exchangeID uint16, sinceMono time.Duration, what string) {
 	b.mu.RLock()
 	sessions := b.sessions
 	registry := b.sessionRegistry
@@ -397,7 +401,7 @@ func (b *Bridge) closeLostPeer(sessionID, exchangeID uint16, asOf time.Time, wha
 	closed := 0
 	closer, perPeer := registry.(peerLossCloser)
 	if perPeer && fabricIndex != 0 && peerNodeID != 0 {
-		closed = closer.ClosePeerLost(fabricIndex, peerNodeID, asOf)
+		closed = closer.ClosePeerLostSince(fabricIndex, peerNodeID, sinceMono)
 	} else if err := registry.Close(sessionID); err == nil {
 		closed = 1
 	}

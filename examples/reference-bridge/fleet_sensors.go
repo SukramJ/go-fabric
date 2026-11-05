@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/SukramJ/go-fabric/clock"
 	"github.com/SukramJ/go-fabric/node"
 
 	aqdef "github.com/SukramJ/go-fabric/cluster/spec/airquality"
@@ -257,6 +258,10 @@ type demoButton struct {
 	// one is refused, as SwitchSimulator.executeActions refuses one while
 	// actions are pending (SwitchSimulator.ts:25-32).
 	running sync.Mutex
+
+	// clock paces the delays between a sequence's actions; nil is
+	// clock.System.
+	clock clock.Clock
 }
 
 func newDemoButton(name string) *demoButton { return &demoButton{name: name} }
@@ -332,7 +337,7 @@ func (b *demoButton) execute(tune func(switchServer), actions []switchAction) er
 			return err
 		}
 		if a.delay > 0 {
-			time.Sleep(a.delay)
+			clock.Sleep(clock.Or(b.clock), a.delay, nil)
 		}
 	}
 	return nil

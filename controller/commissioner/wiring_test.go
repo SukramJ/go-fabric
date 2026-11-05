@@ -94,15 +94,11 @@ func TestContextWiring(t *testing.T) {
 	if _, _, err := handshake.CASE(ctx, nodeMgr, addr, nodeFabric, controllerNodeID, handshake.CASEOptions{}); err != nil {
 		t.Fatalf("CASE to the commissioner: %v", err)
 	}
-	deadline := time.Now().Add(5 * time.Second)
 	var p *peer.Peer
-	for p == nil || !p.HasSession() {
-		if time.Now().After(deadline) {
-			t.Fatal("the inbound session did not join the peer set")
-		}
-		time.Sleep(5 * time.Millisecond)
+	eventually(t, "the inbound session in the peer set", func() bool {
 		p = set.Get(fabric.AddressOf(commissionedNode))
-	}
+		return p != nil && p.HasSession()
+	})
 	if addr, ok := com.Interaction(p).Provider().PeerAddress(); !ok || addr != p.Address() {
 		t.Fatalf("Interaction peer address %+v", addr)
 	}

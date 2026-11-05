@@ -8,11 +8,13 @@ import (
 	"context"
 	"crypto/rand"
 	"errors"
+	"fmt"
 	"net"
 	"sync/atomic"
 	"testing"
 	"time"
 
+	"github.com/SukramJ/go-fabric/clock"
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/im/subscription"
 	"github.com/SukramJ/go-fabric/secure/channel"
@@ -20,6 +22,31 @@ import (
 	"github.com/SukramJ/go-fabric/secure/sigma"
 	"github.com/SukramJ/go-fabric/transport/mrp"
 )
+
+// stampClock is the system clock whose reading a test steps forward. The
+// peer-loss sweep keeps the peer's sessions created at or after the lost
+// exchange's creation (operational.Manager.ClosePeerLost compares the
+// session table's CreatedAt with the bridge's createdAt), so a test
+// orders the two stamps with step instead of a wall-clock sleep; the
+// bridge and the session table read the same clock, its timers stay the
+// system's.
+type stampClock struct {
+	clock.System
+	off atomic.Int64
+}
+
+func (c *stampClock) Now() time.Time { return time.Now().Add(time.Duration(c.off.Load())) }
+
+// step moves the reading forward by d: every stamp after it is later than
+// every stamp before it.
+func (c *stampClock) step(d time.Duration) { c.off.Add(int64(d)) }
+
+// onStampClock puts br and sessions on stamp; a configure callback of
+// startResumeDevice calls it before Start.
+func onStampClock(br *Bridge, sessions *operational.Manager, stamp *stampClock) {
+	br.clock = stamp
+	sessions.SetClock(stamp)
+}
 
 func peerLossKeys(t *testing.T) sigma.SessionKeys {
 	t.Helper()
@@ -45,7 +72,9 @@ func peerLossKeys(t *testing.T) sigma.SessionKeys {
 // requestor kept invoking on the dead session and never reached it.
 func TestInitiatedExchangePeerLoss_ForceClosesPeerSessions(t *testing.T) {
 	t.Parallel()
-	dev := startResumeDevice(t, newMemSubscriptionStore(), func(br *Bridge, _ *operational.Manager) {
+	stamp := &stampClock{}
+	dev := startResumeDevice(t, newMemSubscriptionStore(), func(br *Bridge, sessions *operational.Manager) {
+		onStampClock(br, sessions, stamp)
 		br.AttachAckTracker(mrp.NewAckTracker(0))
 	})
 	var graceful atomic.Int32
@@ -86,7 +115,7 @@ func TestInitiatedExchangePeerLoss_ForceClosesPeerSessions(t *testing.T) {
 	}
 	defer func() { _ = ex.Close() }()
 	// Established after the exchange was opened: not what went unanswered.
-	time.Sleep(time.Millisecond)
+	stamp.step(time.Millisecond)
 	if _, err := dev.sessions.OpenFromSigmaWithID(laterSID, resumeFabricIndex, resumeDeviceNode, resumeCtrlNode, 0x0B03, nil, peerLossKeys(t)); err != nil {
 		t.Fatal(err)
 	}
@@ -160,7 +189,9 @@ func TestInitiatedPeerLoss_UnknownExchangeIsNoOp(t *testing.T) {
 // peer, survive.
 func TestReportExhaustionPeerLoss_ClosesPeerSessionsAndSubscriptions(t *testing.T) {
 	t.Parallel()
-	dev := startResumeDevice(t, newMemSubscriptionStore(), func(br *Bridge, _ *operational.Manager) {
+	stamp := &stampClock{}
+	dev := startResumeDevice(t, newMemSubscriptionStore(), func(br *Bridge, sessions *operational.Manager) {
+		onStampClock(br, sessions, stamp)
 		br.AttachAckTracker(mrp.NewAckTracker(0))
 	})
 	var graceful atomic.Int32
@@ -217,7 +248,7 @@ func TestReportExhaustionPeerLoss_ClosesPeerSessionsAndSubscriptions(t *testing.
 		t.Fatal(err)
 	}
 	dev.br.reportSubscription(context.Background(), sub, []im.ConcreteAttributePath{path})
-	time.Sleep(time.Millisecond)
+	stamp.step(time.Millisecond)
 	if _, err := dev.sessions.OpenFromSigmaWithID(laterSID, resumeFabricIndex, resumeDeviceNode, resumeCtrlNode, laterSID+0x100, nil, peerLossKeys(t)); err != nil {
 		t.Fatal(err)
 	}
@@ -264,12 +295,12 @@ func TestReportPeerLoss_OnlyFirstMessageOfExchange(t *testing.T) {
 	t.Parallel()
 	b := newStartedBridgeWithSnapshotter(t, wbEmptySnapshotter)
 	key := mrp.ExchangeKey{SessionID: 7, ExchangeID: 9, Initiator: true}
-	created := time.Now()
-	b.reportExchangeOrigins.Store(key, reportExchangeOrigin{createdAt: created, firstCounter: 100})
+	created := clock.MonotonicOf(b.clk())
+	b.reportExchangeOrigins.Store(key, reportExchangeOrigin{createdAtMono: created, firstCounter: 100})
 	b.reportCounterOwner.Store(reportCounterKey(7, 100), uint32(1))
 	b.reportCounterOwner.Store(reportCounterKey(7, 101), uint32(1))
-	if asOf, lost := b.reportPeerLoss(7, 9, 100); !lost || !asOf.Equal(created) {
-		t.Fatalf("first message: lost=%v asOf=%v, want true %v", lost, asOf, created)
+	if sinceMono, lost := b.reportPeerLoss(7, 9, 100); !lost || sinceMono != created {
+		t.Fatalf("first message: lost=%v since=%v, want true %v", lost, sinceMono, created)
 	}
 	if _, lost := b.reportPeerLoss(7, 9, 101); lost {
 		t.Fatal("a later chunk counted as peer loss")
@@ -315,17 +346,20 @@ type chunkedReportPeer struct {
 	siblingSID uint16
 	otherSID   uint16
 	graceful   *atomic.Int32
+	stamp      *stampClock
 }
 
 func newChunkedReportPeer(t *testing.T, base uint16) *chunkedReportPeer {
 	t.Helper()
-	dev := startResumeDevice(t, newMemSubscriptionStore(), func(br *Bridge, _ *operational.Manager) {
+	stamp := &stampClock{}
+	dev := startResumeDevice(t, newMemSubscriptionStore(), func(br *Bridge, sessions *operational.Manager) {
+		onStampClock(br, sessions, stamp)
 		br.AttachAckTracker(mrp.NewAckTracker(0))
 		// Long enough for the test to drive the first chunk to exhaustion
 		// while the send still waits for its StatusResponse.
 		br.chunkStatusResponseTimeoutOverride = 2 * time.Second
 	})
-	p := &chunkedReportPeer{dev: dev, graceful: &atomic.Int32{}, reportSID: base, siblingSID: base + 1, otherSID: base + 2}
+	p := &chunkedReportPeer{dev: dev, stamp: stamp, graceful: &atomic.Int32{}, reportSID: base, siblingSID: base + 1, otherSID: base + 2}
 	dev.sessions.SetGracefulCloseNotifier(func(uint16, *channel.Session) { p.graceful.Add(1) })
 	silent, err := net.ListenPacket("udp", "127.0.0.1:0")
 	if err != nil {
@@ -380,13 +414,7 @@ func (p *chunkedReportPeer) send(t *testing.T) <-chan error {
 // awaitPending waits until n messages are tracked for retransmission.
 func (p *chunkedReportPeer) awaitPending(t *testing.T, n int) {
 	t.Helper()
-	deadline := time.Now().Add(2 * time.Second)
-	for p.outbound.Pending() != n {
-		if time.Now().After(deadline) {
-			t.Fatalf("%d messages tracked, want %d", p.outbound.Pending(), n)
-		}
-		time.Sleep(time.Millisecond)
-	}
+	waitFor(t, fmt.Sprintf("%d messages tracked for retransmission", n), func() bool { return p.outbound.Pending() == n })
 }
 
 // exhaust drives every tracked message to its last retransmission.
@@ -403,10 +431,9 @@ func (p *chunkedReportPeer) exhaust() {
 // message tracked may be a few instructions ahead of it: poll.
 func (p *chunkedReportPeer) reportOrigin(t *testing.T) (mrp.ExchangeKey, reportExchangeOrigin) {
 	t.Helper()
-	deadline := time.Now().Add(2 * time.Second)
-	for {
-		var key mrp.ExchangeKey
-		var origin reportExchangeOrigin
+	var key mrp.ExchangeKey
+	var origin reportExchangeOrigin
+	waitFor(t, "the report's first message registered with its exchange", func() bool {
 		found := false
 		p.dev.br.reportExchangeOrigins.Range(func(k, v any) bool {
 			key, _ = k.(mrp.ExchangeKey)
@@ -414,14 +441,9 @@ func (p *chunkedReportPeer) reportOrigin(t *testing.T) (mrp.ExchangeKey, reportE
 			found = key.SessionID == p.reportSID
 			return !found
 		})
-		if found {
-			return key, origin
-		}
-		if time.Now().After(deadline) {
-			t.Fatal("the report's first message is not registered with its exchange")
-		}
-		time.Sleep(time.Millisecond)
-	}
+		return found
+	})
+	return key, origin
 }
 
 // TestChunkedReportFirstChunkUnacknowledgedIsPeerLoss: the first chunk of
@@ -439,7 +461,7 @@ func TestChunkedReportFirstChunkUnacknowledgedIsPeerLoss(t *testing.T) {
 	done := p.send(t)
 	p.awaitPending(t, 1)
 	p.reportOrigin(t)
-	time.Sleep(time.Millisecond)
+	p.stamp.step(time.Millisecond)
 	const laterSID = uint16(0x1281)
 	if _, err := p.dev.sessions.OpenFromSigmaWithID(laterSID, resumeFabricIndex, resumeDeviceNode, resumeCtrlNode, laterSID+0x100, nil, peerLossKeys(t)); err != nil {
 		t.Fatal(err)

@@ -55,30 +55,17 @@ STRESS_TIMEOUT ?= 10m
 # parallel test runs them side by side, the load of its package siblings.
 STRESS_INPROC  ?= 1
 
-# The tests the flake sweep (brief CG) fixed at their root, one line each:
-# <package>:<-run regexp>. make stress-flakes runs every line under make
-# stress; the nightly workflow runs it, a red line is a signal, not a gate.
-# Each line is quoted: the recipe's shell reads the list, and ( in a
-# regexp is shell syntax.
-STRESS_FLAKES = \
-	'./fabrictest:^TestHostStatementName$$' \
-	'./controller/client:^TestTypedReadsConsumer$$' \
-	'./node:^TestLevelControlTransitionReachesHostAndSubscriber$$' \
-	'./client/interaction:^TestLiveSustainedSurvivesRestart$$' \
-	'./controller/client:^TestLiveClientNode$$' \
-	'./controller/client:^TestRegistryDecommission$$' \
-	'./node:^TestOtaParityMatterJS$$' \
-	'./node:^TestSessionAndSubscriptionDiagnostics$$' \
-	'./controller/commissioner:^Test(Commissioning)?Connection' \
-	'./controller/client:^TestIcdClientParity$$/availability' \
-	'./cluster/core:^TestICDManagementRegistrationLifecycle$$' \
-	'./client/exchange:^TestMessageExchangePaddedBDXCap$$' \
-	'./controller/client:^TestConnectionStateParityMatterJS$$' \
-	'./controller/ble:^TestBleScannerTimeoutEndsOneDiscovery$$' \
-	'./controller/ble:^TestBleScannerCloseDuringContinuousCallback$$' \
-	'./controller:^TestOTACancelByRemovingConsentParity$$' \
-	'./client/exchange:^TestNextTimeoutIsMaxPeerResponseTime$$' \
-	'./controller/client:^TestICDEndToEnd$$'
+# The open flakes, one line each: <package>:<-run regexp>. A line is added
+# when a flake is seen (a red CI or nightly run that is not the code under
+# review) and removed in the commit that fixes its cause, after
+# `make stress PKG=... TESTS=...` is green; an empty list is the goal.
+# make stress-flakes runs every line under make stress; the nightly
+# workflow runs it, a red line is a signal, not a gate. Each line is
+# quoted: the recipe's shell reads the list, and ( in a regexp is shell
+# syntax. Phase 35 (#395) emptied the list: its eighteen lines were the
+# regression list of brief CG's fixes, and each test's last wall-clock
+# window moved to a settled site, a synctest bubble or a fake clock.
+STRESS_FLAKES =
 
 .DEFAULT_GOAL := help
 
@@ -139,8 +126,10 @@ stress: ## run TESTS of PKG under x/tools/cmd/stress with -race, -p $(STRESS_P),
 		-o "$${STRESS_OUT:-$$dir/fail-}" "$$dir/pkg.test" -test.run '$(TESTS)' -test.count=$(STRESS_INPROC)
 
 .PHONY: stress-flakes
-stress-flakes: ## make stress for every line of STRESS_FLAKES (the tests brief CG fixed); fails on the first line with a failure
-	@for line in $(STRESS_FLAKES); do \
+stress-flakes: ## make stress for every line of STRESS_FLAKES (the open flakes); fails on the first line with a failure
+	@set -- $(STRESS_FLAKES); \
+	if [ $$# -eq 0 ]; then echo "stress-flakes: no open flakes"; exit 0; fi; \
+	for line in "$$@"; do \
 		$(MAKE) --no-print-directory stress PKG="$${line%%:*}" TESTS="$${line#*:}" || exit 1; \
 	done
 

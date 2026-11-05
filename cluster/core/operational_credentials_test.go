@@ -15,6 +15,7 @@ import (
 
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/cluster/core"
+	"github.com/SukramJ/go-fabric/cluster/spec"
 	"github.com/SukramJ/go-fabric/im"
 	mstore "github.com/SukramJ/go-fabric/store"
 )
@@ -353,8 +354,8 @@ func TestOpcreds_AddTrustedRoot_MalformedCert(t *testing.T) {
 	_, err := oc.MatterInvoke(context.Background(), 0x0B, core.AddTrustedRootCertificateRequest{
 		RootCACertificate: []byte{0xDE, 0xAD},
 	})
-	if err == nil {
-		t.Fatal("expected error for malformed root cert, got nil")
+	if spec.StatusOf(err) != im.StatusInvalidCommand {
+		t.Fatalf("malformed root cert: status %v (%v), want %v", spec.StatusOf(err), err, im.StatusInvalidCommand)
 	}
 }
 
@@ -375,8 +376,8 @@ func TestOpcreds_Write_ReadOnly(t *testing.T) {
 	t.Parallel()
 	oc := newOpcreds(t)
 	err := oc.MatterWrite(context.Background(), 0x0002, uint8(10))
-	if err == nil {
-		t.Fatal("expected error for write to read-only attr, got nil")
+	if spec.StatusOf(err) != im.StatusUnsupportedWrite {
+		t.Fatalf("write to read-only attr: status %v (%v), want %v", spec.StatusOf(err), err, im.StatusUnsupportedWrite)
 	}
 }
 
@@ -384,8 +385,8 @@ func TestOpcreds_Invoke_UnknownCmd(t *testing.T) {
 	t.Parallel()
 	oc := newOpcreds(t)
 	_, err := oc.MatterInvoke(context.Background(), 0xFF, nil)
-	if err == nil {
-		t.Fatal("expected error for unknown command, got nil")
+	if spec.StatusOf(err) != im.StatusUnsupportedCommand {
+		t.Fatalf("unknown command: status %v (%v), want %v", spec.StatusOf(err), err, im.StatusUnsupportedCommand)
 	}
 }
 
@@ -705,8 +706,8 @@ func TestAddTrustedRoot_DuplicateRootInSameFailSafe(t *testing.T) {
 	_, err := oc.MatterInvoke(ctx, 0x0B, core.AddTrustedRootCertificateRequest{
 		RootCACertificate: rootRaw,
 	})
-	if err == nil {
-		t.Fatal("second AddTrustedRootCertificate should fail (duplicate-root guard), got nil")
+	if spec.StatusOf(err) != im.StatusConstraintError {
+		t.Fatalf("second AddTrustedRootCertificate (duplicate-root guard): status %v (%v), want %v", spec.StatusOf(err), err, im.StatusConstraintError)
 	}
 }
 
@@ -734,8 +735,8 @@ func TestAddTrustedRoot_AfterNOCCommandRejected(t *testing.T) {
 	_, err = oc.MatterInvoke(ctx, 0x0B, core.AddTrustedRootCertificateRequest{
 		RootCACertificate: rootRaw2,
 	})
-	if err == nil {
-		t.Fatal("AddTrustedRootCertificate after AddNOC should fail (nocWasInvoked guard), got nil")
+	if spec.StatusOf(err) != im.StatusConstraintError {
+		t.Fatalf("AddTrustedRootCertificate after AddNOC (nocWasInvoked guard): status %v (%v), want %v", spec.StatusOf(err), err, im.StatusConstraintError)
 	}
 }
 

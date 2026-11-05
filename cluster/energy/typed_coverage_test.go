@@ -69,8 +69,8 @@ func TestTariffSetAttributes(t *testing.T) {
 	// A partial update with a null list in it is one update, refused as a
 	// whole by the cross validation; it must not clear the stored tariff.
 	partial := map[uint32]any{ct.AttrTariffUnit: uint8(ct.TariffUnitKWh), ct.AttrDayEntries: nil}
-	if err := srv.SetAttributes(partial); err == nil {
-		t.Error("a partial tariff was accepted")
+	if err := srv.SetAttributes(partial); !errors.Is(err, energy.ErrTariffMissing) {
+		t.Errorf("a partial tariff: %v, want %v", err, energy.ErrTariffMissing)
 	}
 	if v := read(t, srv, ct.AttrTariffUnit); v != uint8(ct.TariffUnitKWh) {
 		t.Errorf("TariffUnit = %v after a refused update", v)

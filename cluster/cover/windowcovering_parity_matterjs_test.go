@@ -14,6 +14,7 @@ import (
 
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/cluster/cover"
+	"github.com/SukramJ/go-fabric/cluster/spec"
 	clusterwire "github.com/SukramJ/go-fabric/cluster/wire"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
@@ -298,8 +299,8 @@ func TestWindowCoveringServer_UnknownCommandReturnsError(t *testing.T) {
 
 	srv := cover.NewWindowCoveringServer(cover.Config{})
 	_, err := srv.MatterInvoke(context.Background(), 0xFF, nil)
-	if err == nil {
-		t.Error("expected error for unknown command, got nil")
+	if spec.StatusOf(err) != im.StatusUnsupportedCommand {
+		t.Errorf("unknown command: status %v (%v), want %v", spec.StatusOf(err), err, im.StatusUnsupportedCommand)
 	}
 }
 
@@ -311,8 +312,8 @@ func TestWindowCoveringServer_WriteReturnsError(t *testing.T) {
 	srv := cover.NewWindowCoveringServer(cover.Config{})
 	// Type (0x0000) is read-only; writes must be rejected.
 	err := srv.MatterWrite(context.Background(), clusterwire.WindowCoveringAttrType, uint8(0))
-	if err == nil {
-		t.Error("expected error from MatterWrite on read-only attribute Type, got nil")
+	if spec.StatusOf(err) != im.StatusUnsupportedWrite {
+		t.Errorf("MatterWrite on read-only attribute Type: status %v (%v), want %v", spec.StatusOf(err), err, im.StatusUnsupportedWrite)
 	}
 }
 

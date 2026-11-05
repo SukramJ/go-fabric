@@ -133,13 +133,9 @@ func TestBDXResponder_RoutesReceiveInit(t *testing.T) {
 	if !bytes.Equal(got, image) {
 		t.Fatalf("received %d bytes, served %d", len(got), len(image))
 	}
-	deadline := time.Now().Add(5 * time.Second)
-	for responder.SessionFor(bdx.Peer{FabricIndex: resumeFabricIndex, NodeID: resumeCtrlNode}, "ota") != nil {
-		if time.Now().After(deadline) {
-			t.Fatal("the session did not end after BlockAckEof")
-		}
-		time.Sleep(10 * time.Millisecond)
-	}
+	waitFor(t, "the BDX session's end after BlockAckEof", func() bool {
+		return responder.SessionFor(bdx.Peer{FabricIndex: resumeFabricIndex, NodeID: resumeCtrlNode}, "ota") == nil
+	})
 }
 
 // TestBDXResponder_RefusedWithoutResponder: without an attached responder a

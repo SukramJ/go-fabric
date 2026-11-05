@@ -261,10 +261,7 @@ func TestRunStopsWithTheContext(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan error, 1)
 	go func() { done <- n.Run(ctx) }()
-	deadline := time.Now().Add(5 * time.Second)
-	for n.Bridge().Topology() == nil && time.Now().Before(deadline) {
-		time.Sleep(10 * time.Millisecond)
-	}
+	waitLive(t, "the running node's topology", func() bool { return n.Bridge().Topology() != nil })
 	cancel()
 	select {
 	case err := <-done:
