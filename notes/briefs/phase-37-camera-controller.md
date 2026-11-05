@@ -32,14 +32,21 @@ worktree `../go-fabric-p37`, logs `~/.cache/go-fabric-scratch/p37/`.
   same one. The migration is therefore one change of `ProviderNodeID` to RootNodeID
   (`manager.go:168`, `ota.go:200`): the next announcement round rewrites every node's
   record.
-- **Q5 — TCP for the SDP:** no payload-driven choice. `Config.TransportPreference`
-  is controller-wide and a soft hint (`controller/controller.go:176-181`;
-  `client/peer/transport.go:39-56`), `Config.TCP{Incoming, Outgoing}`
-  (`controller/tcp.go:20-27`). matterjs-server runs its controller with
-  `tcp: true, transportPreference: "tcp"` (`ControllerNode.ts:113-114` at 0bd06f2).
-  Decision: no per-peer selection; the camera service requires `TCP.Outgoing` and
-  `TransportPreference == TCP` and refuses `StartStream` otherwise with a typed error
-  (`ErrTCPRequired`), as go-fabric-server will set both as matterjs-server does.
+- **Q5 — TCP for the SDP:** `client.Node.Invoke` does select TCP for a large
+  payload: a command whose schema carries the Large Message quality ("L") is
+  inferred large (`client/interaction/invoke.go:149-170` `inferLargeMessage`,
+  `schema.CommandLargeMessage`; ClientInteraction.ts:716-719, :1235 at 862ad75f)
+  and its exchange requires TCP (`provider.go:93-101`), which needs
+  `Config.TCP.Outgoing` and a camera that serves TCP; without a dialer the
+  invoke fails with `ErrNoTCP` before any UDP attempt. ProvideOffer and
+  ProvideAnswer are such commands. matterjs-server runs its controller with
+  `tcp: true, transportPreference: "tcp"` (`ControllerNode.ts:113-114` at
+  0bd06f2). Decision: the camera service requires `TCP.Outgoing` and refuses
+  `StartStream` otherwise with a typed error (`ErrTCPRequired`); the
+  preference stays the controller's (`Config.TransportPreference`), a soft
+  hint. Verified by `controller/serve_camera_test.go` (wave A): the invoke
+  reaches the camera over TCP and the camera's signals come back on that
+  session.
 
 ## 1. Scope and the facade
 

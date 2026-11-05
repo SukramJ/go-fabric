@@ -182,6 +182,11 @@ type Config struct {
 	// OTA, when set, turns on the OTA push: the update manager and the
 	// own node its provider runs on ([OTAConfig]); nil runs neither.
 	OTA *OTAConfig
+	// Camera, when set, turns on the controller side of Matter cameras
+	// ([CameraConfig]): the controller serves a Camera Controller endpoint
+	// with a WebRtcTransportRequestor under its own identity and
+	// publishes its operational record; nil serves none.
+	Camera *CameraConfig
 	// Advertiser publishes the Advertise record; nil is
 	// mdns.NewResponder(), which Close closes. A test passes
 	// mdns.NewNoop().
@@ -211,6 +216,14 @@ type Controller struct {
 	tcpAddr *net.TCPAddr
 	// unadvertise withdraws the commissioner record (advertise.go).
 	unadvertise func(context.Context) error
+	// adv is the advertiser of the controller's records (the commissioner
+	// record, the operational record of a served tree); advOwn says Close
+	// closes it.
+	adv    mdns.Advertiser
+	advOwn bool
+	// served is the controller's own endpoint tree (serve.go), nil
+	// without one.
+	served *served
 
 	// dcl is the configuration of the ledger services, vendorInfo the
 	// vendor information service built on first use (vendorinfo.go).
@@ -319,6 +332,9 @@ func New(ctx context.Context, cfg Config) (_ *Controller, err error) {
 		Exchanges: c.mgr, Peers: c.peers, Attestation: cfg.Attestation, Logger: log, Clock: clk,
 		Subscriptions: c.subs, Fabrics: fabrics, Resumption: resumption, Scanners: cfg.Scanners,
 	}); err != nil {
+		return nil, err
+	}
+	if err := c.serveEndpoints(ctx, cfg, log); err != nil {
 		return nil, err
 	}
 	if err := c.openRegistry(ctx, cfg, fabrics, clk, log); err != nil {
@@ -458,9 +474,19 @@ func (c *Controller) Close(ctx context.Context) error {
 		c.peers.Close(ctx)
 		c.peers = nil
 	}
+	if c.served != nil && c.served.withdraw != nil {
+		errs = append(errs, c.served.withdraw(ctx))
+		c.served.withdraw = nil
+	}
 	if c.unadvertise != nil {
 		errs = append(errs, c.unadvertise(ctx))
 		c.unadvertise = nil
+	}
+	if c.adv != nil {
+		if c.advOwn {
+			errs = append(errs, c.adv.Close())
+		}
+		c.adv = nil
 	}
 	if c.stopTCP != nil {
 		c.stopTCP()

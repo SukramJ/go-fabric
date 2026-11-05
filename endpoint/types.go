@@ -637,6 +637,16 @@ func (e *Endpoint) SetNodeLabel(label string) {
 // IsRoot reports whether this is the root bridge endpoint (ID 0).
 func (e *Endpoint) IsRoot() bool { return e.ID == 0 }
 
+// IsBare reports an endpoint that is neither the root, the Aggregator,
+// a part nor sourced: a composer listed it by hand and published its
+// servers ([Endpoint.PublishClusterServers]), as the controller role
+// composes its own endpoints. Such an endpoint serves exactly what was
+// published — no bridged-device identity, no kit defaults.
+func (e *Endpoint) IsBare() bool {
+	return e.ID != 0 && !e.Aggregator && !e.Part && e.Source == nil && e.Measurement == nil && e.PowerSource == nil &&
+		e.attachedClusters.Load() != nil
+}
+
 // IsAggregator reports whether this is the Aggregator endpoint
 // ([Endpoint.Aggregator]). The aggregator hosts only the Descriptor
 // (mandatory) + optional Identify clusters; its PartsList enumerates every
