@@ -738,10 +738,10 @@ func TestIcdClientParity(t *testing.T) {
 			}
 		})
 		t.Run("exposes nextExpectedCheckin on the wall clock once no subscription is held", func(t *testing.T) {
-			// IcdClientTest.ts:2281-2293 at 862ad75f: the deadline runs on the
-			// monotonic reading and is exposed on the wall clock, so a step
-			// of the wall clock alone leaves it at least idleModeDuration
-			// ahead of the stepped now (IcdClient.ts:83-87).
+			// IcdClientTest.ts:2281-2293 at 862ad75f: a step of the wall clock
+			// alone leaves the deadline at least the idle mode duration ahead
+			// of the stepped now — the wakefulness runs on the monotonic
+			// reading, nextExpectedCheckin converts (IcdClient.ts:83-87).
 			p := litOperatingPair(t)
 			if err := p.do(t, func(ctx context.Context) error { return p.node.SetAutoSubscribe(ctx, false) }); err != nil {
 				t.Fatal(err)

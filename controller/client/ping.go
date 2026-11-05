@@ -16,10 +16,10 @@ import (
 )
 
 var (
-	// ErrNoSession: the node holds no operational session to run the
+	// ErrNoSession is a node holding no operational session to run the
 	// exchange on — the client machinery's [interaction.ErrNoSession].
 	ErrNoSession = interaction.ErrNoSession
-	// ErrUnreachable: the address did not answer [Node.PingAddress].
+	// ErrUnreachable is an address that did not answer [Node.PingAddress].
 	ErrUnreachable = errors.New("client: address unreachable")
 )
 
