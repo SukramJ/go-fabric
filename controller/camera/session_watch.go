@@ -286,7 +286,8 @@ func (w *sessionWatch) nodeRemoved(nodeID uint64) {
 }
 
 // sweep ends, once per endpoint and run, the sessions the camera holds for
-// this controller that no local record names. Mirrors matterjs-server
+// this controller that no local record names, one after the other in id
+// order on a goroutine of the watch. Mirrors matterjs-server
 // packages/ws-controller/src/controller/WebRtcProviderSessionWatch.ts:196-222
 // at 0bd06f2.
 func (w *sessionWatch) sweep(nodeID uint64, ep uint16, ours map[uint16]bool) {
@@ -317,21 +318,12 @@ func (w *sessionWatch) sweep(nodeID uint64, ep uint16, ours map[uint16]bool) {
 	go func() {
 		defer w.work.Done()
 		failed := false
-		var wg sync.WaitGroup
-		var fmu sync.Mutex
 		for _, id := range leftovers {
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
-				if err := w.endLeftover(nodeID, ep, id); err != nil {
-					w.log.Warn("camera.sweep.end_failed", slog.Uint64("node", nodeID), slog.Int("session", int(id)), slog.Any("err", err))
-					fmu.Lock()
-					failed = true
-					fmu.Unlock()
-				}
-			}()
+			if err := w.endLeftover(nodeID, ep, id); err != nil {
+				w.log.Warn("camera.sweep.end_failed", slog.Uint64("node", nodeID), slog.Int("session", int(id)), slog.Any("err", err))
+				failed = true
+			}
 		}
-		wg.Wait()
 		if failed {
 			w.sweepFailed(nodeID, ep)
 		}

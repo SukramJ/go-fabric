@@ -185,17 +185,30 @@ func (s *Session) ProvideAnswer(ctx context.Context, sdp string) error {
 
 // ProvideICECandidates sends the host's candidates, in order, in as many
 // ProvideICECandidates as keep each within one Matter message over UDP;
-// the first failure is returned.
+// every send is made, and the first failure is returned.
 func (s *Session) ProvideICECandidates(ctx context.Context, candidates []wpdef.ICECandidateStruct) error {
 	if len(candidates) == 0 {
 		return invalidArguments("ice_candidates names no candidate")
 	}
+	return provideCandidates(ctx, candidates, func(ctx context.Context, send []wpdef.ICECandidateStruct) error {
+		_, err := s.svc.io.invokeProvider(ctx, s.t, callProvideIceCandidates, wpdef.ProvideIceCandidatesRequest{WebRtcSessionId: s.ID, IceCandidates: send})
+		return err
+	})
+}
+
+// provideCandidates sends the candidates in sends that fit the byte
+// budget, each with provide, and answers with the first failure, else
+// success. Mirrors matterjs-server
+// packages/ws-controller/src/server/startingSessionSignalling.ts:181-226
+// at 0bd06f2.
+func provideCandidates(ctx context.Context, candidates []wpdef.ICECandidateStruct, provide func(context.Context, []wpdef.ICECandidateStruct) error) error {
+	var first error
 	for _, send := range iceCandidateSends(candidates) {
-		if _, err := s.svc.io.invokeProvider(ctx, s.t, callProvideIceCandidates, wpdef.ProvideIceCandidatesRequest{WebRtcSessionId: s.ID, IceCandidates: send}); err != nil {
-			return err
+		if err := provide(ctx, send); err != nil && first == nil {
+			first = err
 		}
 	}
-	return nil
+	return first
 }
 
 // Stop ends the session on the camera; its streams stay allocated for a

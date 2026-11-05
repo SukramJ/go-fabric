@@ -139,6 +139,13 @@ type Service struct {
 	cancel context.CancelFunc
 	unsub  func()
 
+	// image reads the cameras' provider state; localNodeID is the
+	// PeerNodeID a camera stores for this controller; reported applies one
+	// report of an endpoint to the registry.
+	image       imageReader
+	localNodeID func() uint64
+	reported    func(nodeID uint64, endpointID uint16, present map[uint16]bool, restarted bool)
+
 	mu       sync.Mutex
 	closed   bool
 	sessions map[sessionKey]*Session
@@ -167,20 +174,32 @@ func New(ctx context.Context, ctrl *controller.Controller, cfg Config) (*Service
 	s := &Service{ctrl: ctrl, cfg: cfg, log: log, life: life, cancel: cancel, sessions: map[sessionKey]*Session{}, lastSeen: map[watchKey][]sessionPeer{}}
 	s.io = &clientIO{ctrl: ctrl, svc: s, syncTime: cfg.SyncTime, log: log}
 	s.m = newManager(s.io, ctrl.Clock(), log)
-	s.w = newSessionWatch(life, s.io, ctrl.Clock(), log)
+	s.image = s.io
+	s.localNodeID = func() uint64 { return ctrl.Fabric().RootNodeID }
+	s.reported = s.reconcile
+	s.w = newSessionWatch(life, serviceWatch{s}, ctrl.Clock(), log)
 	s.ps = &providerSessions{nodes: clientProviderNodes{s.io}, requestor: requestor{ctrl.CameraRequestor()}, fabricIndex: ctrl.Fabric().FabricIndex, watch: s.w, log: log, cleanup: s.m.cleanupContext, offers: map[providerKey]string{}}
+	s.wire()
+	s.unsub = ctrl.OnCameraSignal(s.onSignal)
+	cfg.Reports.attach(s)
+	return s, nil
+}
+
+// wire hangs the service on its manager's events: an end goes to the
+// session and the observer, an eviction to the observer, and a session a
+// report dropped leaves the requestor's table. Mirrors matterjs-server
+// packages/ws-controller/src/controller/MatterController.ts:557-593 at
+// 0bd06f2.
+func (s *Service) wire() {
 	s.m.onEnded = s.sessionEnded
 	s.m.onEvicted = func(e StreamEvicted) {
-		if cfg.Observer.StreamEvicted != nil {
-			cfg.Observer.StreamEvicted(e)
+		if s.cfg.Observer.StreamEvicted != nil {
+			s.cfg.Observer.StreamEvicted(e)
 		}
 	}
 	s.m.onVanished = func(ms managedSession, _ sessionEndCause) {
 		s.ps.removeTracked(target{ms.nodeID, ms.endpointID}, ms.webRTCSessionID)
 	}
-	s.unsub = ctrl.OnCameraSignal(s.onSignal)
-	cfg.Reports.attach(s)
-	return s, nil
 }
 
 // Close ends every session this service holds, stops its sweeps and
@@ -193,10 +212,18 @@ func (s *Service) Close(ctx context.Context) error {
 	}
 	s.closed = true
 	s.mu.Unlock()
-	s.cfg.Reports.detach(s)
+	if s.cfg.Reports != nil {
+		s.cfg.Reports.detach(s)
+	}
+	// The EndSessions need the camera connections, so the sessions end
+	// before the service lets go of the controller.
 	s.m.stopAll(ctx)
-	s.unsub()
-	s.cancel()
+	if s.unsub != nil {
+		s.unsub()
+	}
+	if s.cancel != nil {
+		s.cancel()
+	}
 	s.w.wait()
 	s.mu.Lock()
 	open := s.sessions
@@ -332,9 +359,12 @@ func (s *Service) onSignal(sig Signal) {
 	s.mu.Lock()
 	sess := s.sessions[k]
 	s.mu.Unlock()
-	if sess != nil {
+	switch _, owned := s.m.sessions.signallingOwner(t.nodeID, t.endpointID, sig.Session.Id); {
+	case sess != nil:
 		sess.box.put(sig)
-	} else if s.cfg.Observer.Signal != nil {
+	case owned:
+		// A start the host never learned the id of: its signals go with it.
+	case s.cfg.Observer.Signal != nil:
 		s.cfg.Observer.Signal(sig)
 	}
 	if sig.Kind == SignalEnd {
@@ -356,12 +386,68 @@ func (s *Service) nodeRemoved(nodeID uint64) {
 	s.mu.Unlock()
 }
 
+// imageReader reads the cameras' WebRtcTransportProvider state from the
+// controller's image.
+type imageReader interface {
+	providerEndpoints(nodeID uint64) []uint16
+	currentSessions(nodeID uint64, endpointID uint16) ([]sessionPeer, bool)
+}
+
+// serviceWatch is the watch's view of the service. Mirrors
+// matterjs-server packages/ws-controller/src/controller/WebRtcProviderSessions.ts:92-117
+// at 0bd06f2.
+type serviceWatch struct{ s *Service }
+
+func (w serviceWatch) localNodeID() uint64 { return w.s.localNodeID() }
+
+func (w serviceWatch) providerEndpoints(nodeID uint64) []uint16 {
+	return w.s.image.providerEndpoints(nodeID)
+}
+
+func (w serviceWatch) currentSessions(nodeID uint64, endpointID uint16) ([]sessionPeer, bool) {
+	return w.s.image.currentSessions(nodeID, endpointID)
+}
+
+// requestorSessionIDs are the ids the requestor holds for the endpoint on
+// this fabric: a session it holds for another endpoint or fabric is a
+// leftover here.
+func (w serviceWatch) requestorSessionIDs(nodeID uint64, endpointID uint16) map[uint16]bool {
+	return w.s.ps.requestorSessionIDs(nodeID, endpointID)
+}
+
+// endSession ends a leftover with UnknownReason: no reason states "this
+// controller lost its record". Mirrors matterjs-server
+// packages/ws-controller/src/controller/WebRtcProviderSessions.ts:107-113
+// at 0bd06f2.
+func (w serviceWatch) endSession(ctx context.Context, nodeID uint64, endpointID, id uint16) error {
+	_, err := w.s.ps.nodes.invokeProvider(ctx, target{nodeID, endpointID}, callEndSession, wpdef.EndSessionRequest{WebRtcSessionId: id, Reason: endReasonUnknown})
+	return err
+}
+
+func (w serviceWatch) reported(nodeID uint64, endpointID uint16, present map[uint16]bool, restarted bool) {
+	w.s.reported(nodeID, endpointID, present, restarted)
+}
+
+// reconcile applies one CurrentSessions report to the registry: a session
+// an earlier report listed and this one does not ends as camera_restarted
+// after a StartUp, else camera_dropped. Mirrors matterjs-server
+// packages/ws-controller/src/camera/CameraStreamManager.ts:2283-2296 at
+// 0bd06f2.
+func (s *Service) reconcile(nodeID uint64, endpointID uint16, present map[uint16]bool, restarted bool) {
+	cause := endCameraDropped
+	if restarted {
+		cause = endCameraRestarted
+	}
+	s.m.sessions.reconcile(nodeID, endpointID, present, cause)
+}
+
 // reportCompleted is a report batch of the node applied: each provider
 // endpoint whose CurrentSessions differs from the last batch's is a
-// change, then the watch reports and sweeps.
+// change (the first seen is the baseline, as matter.js's first value is
+// no change event), then the watch reports and sweeps.
 func (s *Service) reportCompleted(nodeID uint64) {
-	for _, ep := range s.io.providerEndpoints(nodeID) {
-		now, ok := s.io.currentSessions(nodeID, ep)
+	for _, ep := range s.image.providerEndpoints(nodeID) {
+		now, ok := s.image.currentSessions(nodeID, ep)
 		if !ok {
 			continue
 		}
@@ -370,7 +456,7 @@ func (s *Service) reportCompleted(nodeID uint64) {
 		before, seen := s.lastSeen[k]
 		s.lastSeen[k] = now
 		s.mu.Unlock()
-		if !seen || !slices.Equal(before, now) {
+		if seen && !slices.Equal(before, now) {
 			s.w.currentSessionsChanged(nodeID, ep)
 		}
 	}
@@ -401,5 +487,3 @@ func validateStreamID(kind StreamKind, id uint16) error {
 func usageAllowed(u csdef.StreamUsageEnum) bool {
 	return u == csdef.StreamUsageRecording || u == csdef.StreamUsageAnalysis || u == csdef.StreamUsageLiveView
 }
-
-var _ = wpdef.ClusterID

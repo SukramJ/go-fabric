@@ -65,6 +65,22 @@ type clientIO struct {
 	svc      *Service
 	syncTime func(context.Context, *client.Node) error
 	log      *slog.Logger
+	// send and reread reach the camera; nil is the client node's Invoke
+	// and Read. A test of the routing replaces them.
+	send   func(ctx context.Context, t target, cluster, command uint32, fields spec.Encodable) (any, error)
+	reread func(ctx context.Context, t target, attr uint32) error
+}
+
+// call invokes one command on the camera and decodes the response.
+func (io *clientIO) call(ctx context.Context, t target, cluster, command uint32, fields spec.Encodable) (any, error) {
+	if io.send != nil {
+		return io.send(ctx, t, cluster, command, fields)
+	}
+	n := io.node(t.nodeID)
+	if n == nil {
+		return nil, stackError("node 0x%016X is not in the registry", t.nodeID)
+	}
+	return invokeDecoded(ctx, n, t.endpointID, cluster, command, fields)
 }
 
 // node is the client node of a camera, nil when the registry holds none.
@@ -138,16 +154,12 @@ func (io *clientIO) readWebRTCSessions(_ context.Context, t target) ([]DeviceSes
 // 0bd06f2.
 func (io *clientIO) invoke(ctx context.Context, call deviceCall) (any, error) {
 	if call.cluster == clusterAVSM {
-		n := io.node(call.nodeID)
-		if n == nil {
-			return nil, stackError("node 0x%016X is not in the registry", call.nodeID)
-		}
-		resp, err := invokeDecoded(ctx, n, call.endpointID, csdef.ClusterID, avsmCommands[call.command], call.fields)
+		resp, err := io.call(ctx, call.target, csdef.ClusterID, avsmCommands[call.command], call.fields)
 		if err != nil {
 			return nil, err
 		}
 		if attr, ok := streamListOf[call.command]; ok {
-			io.refreshStreamList(ctx, n, call.endpointID, attr)
+			io.refreshStreamList(ctx, call.target, attr)
 		}
 		return resp, nil
 	}
@@ -175,11 +187,22 @@ func (io *clientIO) invoke(ctx context.Context, call deviceCall) (any, error) {
 // subscription; a failure is logged, the subscription catches up. Mirrors
 // matterjs-server packages/ws-controller/src/camera/MatterCameraDeviceIo.ts:196-214
 // at 0bd06f2.
-func (io *clientIO) refreshStreamList(ctx context.Context, n *client.Node, endpoint uint16, attr uint32) {
-	var req client.ReadRequest
-	req.Attributes = []im.ConcreteAttributePath{client.AttributeAt(endpoint, csdef.ClusterID, attr)}
-	if _, err := n.Read(ctx, req); err != nil {
-		io.log.Warn("camera.read.stream_list_failed", slog.String("node", n.ID()), slog.Int("endpoint", int(endpoint)), slog.Any("err", err))
+func (io *clientIO) refreshStreamList(ctx context.Context, t target, attr uint32) {
+	read := io.reread
+	if read == nil {
+		read = func(ctx context.Context, t target, attr uint32) error {
+			n := io.node(t.nodeID)
+			if n == nil {
+				return stackError("node 0x%016X is not in the registry", t.nodeID)
+			}
+			var req client.ReadRequest
+			req.Attributes = []im.ConcreteAttributePath{client.AttributeAt(t.endpointID, csdef.ClusterID, attr)}
+			_, err := n.Read(ctx, req)
+			return err
+		}
+	}
+	if err := read(ctx, t, attr); err != nil {
+		io.log.Warn("camera.read.stream_list_failed", slog.Uint64("node", t.nodeID), slog.Int("endpoint", int(t.endpointID)), slog.Any("err", err))
 	}
 }
 
@@ -202,11 +225,7 @@ func (io *clientIO) providerRevision(t target) (revision uint16, known bool, err
 }
 
 func (io *clientIO) invokeProvider(ctx context.Context, t target, command string, fields spec.Encodable) (any, error) {
-	n := io.node(t.nodeID)
-	if n == nil {
-		return nil, stackError("node 0x%016X is not in the registry", t.nodeID)
-	}
-	return invokeDecoded(ctx, n, t.endpointID, wpdef.ClusterID, providerCommands[command], fields)
+	return io.call(ctx, t, wpdef.ClusterID, providerCommands[command], fields)
 }
 
 // syncTime pushes this controller's time to the node: the host's push
@@ -277,9 +296,7 @@ func (r requestor) upsert(s wrdef.WebRTCSessionStruct) error {
 }
 func (r requestor) remove(k wrdef.SessionKey) { r.r.RemoveSession(k) }
 
-// The watchIO of the service.
-
-func (io *clientIO) localNodeID() uint64 { return io.ctrl.Fabric().RootNodeID }
+// The image reads of the watch.
 
 func (io *clientIO) providerEndpoints(nodeID uint64) []uint16 {
 	n := io.node(nodeID)
@@ -307,27 +324,6 @@ func (io *clientIO) currentSessions(nodeID uint64, endpointID uint16) ([]session
 		out[i] = sessionPeer{id: s.Id, peerNodeID: s.PeerNodeId}
 	}
 	return out, true
-}
-
-func (io *clientIO) requestorSessionIDs(nodeID uint64, endpointID uint16) map[uint16]bool {
-	return io.svc.ps.requestorSessionIDs(nodeID, endpointID)
-}
-
-// endSession ends a leftover with UnknownReason: no reason states "this
-// controller lost its record". Mirrors matterjs-server
-// packages/ws-controller/src/controller/WebRtcProviderSessions.ts:107-113
-// at 0bd06f2.
-func (io *clientIO) endSession(ctx context.Context, nodeID uint64, endpointID, id uint16) error {
-	_, err := io.invokeProvider(ctx, target{nodeID, endpointID}, callEndSession, wpdef.EndSessionRequest{WebRtcSessionId: id, Reason: endReasonUnknown})
-	return err
-}
-
-func (io *clientIO) reported(nodeID uint64, endpointID uint16, present map[uint16]bool, restarted bool) {
-	cause := endCameraDropped
-	if restarted {
-		cause = endCameraRestarted
-	}
-	io.svc.m.sessions.reconcile(nodeID, endpointID, present, cause)
 }
 
 // providerNodes adapter: syncTime is named syncTimeOf on clientIO, so the

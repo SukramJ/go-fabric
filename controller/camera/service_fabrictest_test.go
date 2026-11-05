@@ -275,6 +275,26 @@ func TestServiceRefusesWithoutTCP(t *testing.T) {
 	}
 }
 
+// TestServiceRefusesWithoutRequestor: a controller that serves no camera
+// requestor (no Config.Camera) gets no service, typed.
+func TestServiceRefusesWithoutRequestor(t *testing.T) {
+	t.Parallel()
+	site := fabrictest.NewSite(t, fabrictest.Options{})
+	cfg := site.ControllerConfig(fabrictest.ControllerOptions{})
+	cfg.TCP = controller.TCPConfig{Outgoing: true}
+	var reports camera.Reports
+	reports.Install(&cfg)
+	ctx := context.Background()
+	var c *controller.Controller
+	if err := site.Run(ctx, func(ctx context.Context) (err error) { c, err = controller.New(ctx, cfg); return err }); err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = site.Run(ctx, c.Close) }()
+	if _, err := camera.New(ctx, c, camera.Config{Reports: &reports}); !errors.Is(err, camera.ErrNoRequestor) {
+		t.Fatalf("New: %v", err)
+	}
+}
+
 func errString(err error) string {
 	if err == nil {
 		return "nil"

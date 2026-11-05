@@ -260,28 +260,43 @@ func (s *allocationScope) returnUnlessSpent(give func(context.Context) error) (s
 	}
 }
 
-// settle runs what is due within one deviceCleanupBudget; a failed
-// give-back is logged, and a stream left behind stays leased.
+// settle runs what is due, newest first, and waits for it at most one
+// deviceCleanupBudget on the manager's clock. A chain the budget abandons
+// keeps running on a context detached from the request, as an abandoned
+// promise does, so a give-back the camera answers late still drops its
+// lease, unless the id was leased again since (dropLeaseIfCurrent). A
+// failed give-back is logged, and a stream left behind stays leased.
+// Mirrors matterjs-server packages/ws-controller/src/camera/CameraStreamManager.ts:380-398
+// at 0bd06f2.
 func (m *manager) settle(ctx context.Context, s *allocationScope, succeeded bool) {
 	s.mu.Lock()
 	returns := slices.Clone(s.returns)
 	s.mu.Unlock()
-	if len(returns) == 0 {
+	var due []scopedReturn
+	for i := len(returns) - 1; i >= 0; i-- {
+		if returns[i].due(succeeded) {
+			due = append(due, returns[i])
+		}
+	}
+	if len(due) == 0 {
 		return
 	}
-	cctx, cancel := m.cleanupContext(ctx)
-	defer cancel()
-	for i := len(returns) - 1; i >= 0; i-- {
-		if !returns[i].due(succeeded) {
-			continue
+	detached := context.WithoutCancel(ctx)
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		for _, r := range due {
+			if err := r.give(detached); err != nil {
+				m.log.Warn("camera.cleanup.failed", slog.Any("err", err))
+			}
 		}
-		if cctx.Err() != nil {
-			m.log.Warn("camera.cleanup.abandoned", slog.Duration("budget", deviceCleanupBudget))
-			return
-		}
-		if err := returns[i].give(cctx); err != nil {
-			m.log.Warn("camera.cleanup.failed", slog.Any("err", err))
-		}
+	}()
+	budget := m.clk.NewTimer(deviceCleanupBudget)
+	defer budget.Stop()
+	select {
+	case <-done:
+	case <-budget.C():
+		m.log.Warn("camera.cleanup.abandoned", slog.Duration("budget", deviceCleanupBudget))
 	}
 }
 

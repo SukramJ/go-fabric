@@ -352,6 +352,15 @@ func sessionIDOf(resp any) (id uint16, video, audio *spec.Nullable[uint16], ok b
 	return 0, nil, nil, false
 }
 
+// isTrackableWebRTCSession reports whether a session can be stored in the
+// WebRTCSessionStruct: a stream usage (mandatory) and a video or audio
+// stream (choice a, min 1). Mirrors matterjs-server
+// packages/ws-controller/src/controller/webRtcSessionStreams.ts:106-124 at
+// 0bd06f2.
+func isTrackableWebRTCSession(usage *wpdef.StreamUsageEnum, video, audio []uint16) bool {
+	return usage != nil && (video != nil || audio != nil)
+}
+
 // trackableSession is the requestor entry for the session, false when the
 // request lacks what the struct requires: a stream usage and a video or
 // audio stream. Mirrors matterjs-server
@@ -373,7 +382,7 @@ func (p *providerSessions) trackableSession(t target, fields spec.Encodable, res
 	}
 	video := resolveWebRTCSessionStreams(s.videoStreams, s.videoID, rv)
 	audio := resolveWebRTCSessionStreams(s.audioStreams, s.audioID, ra)
-	if usage == nil || (video == nil && audio == nil) {
+	if !isTrackableWebRTCSession(usage, video, audio) {
 		return wrdef.WebRTCSessionStruct{}, false
 	}
 	out := wrdef.WebRTCSessionStruct{Id: id, PeerNodeId: t.nodeID, PeerEndpointId: t.endpointID, StreamUsage: wrdef.StreamUsageEnum(*usage), MetadataEnabled: metadata, FabricIndex: p.fabricIndex}

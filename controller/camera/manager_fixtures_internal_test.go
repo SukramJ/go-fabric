@@ -119,8 +119,9 @@ func (f *fakeIO) recorded() []recordedInvoke {
 
 // commands is the command names invoked, in order.
 func (f *fakeIO) commands() []string {
-	var out []string
-	for _, r := range f.recorded() {
+	rs := f.recorded()
+	out := make([]string, 0, len(rs))
+	for _, r := range rs {
 		out = append(out, r.command)
 	}
 	return out
@@ -238,24 +239,6 @@ func liveStream(id uint16, refs int) allocatedVideoStream {
 // startDefaults is a ProvideOffer start of a live-view session.
 func startDefaults(sdp string) startArgs {
 	return startArgs{t: tTarget, connectionID: "conn-1", usage: liveView, sdp: &sdp, allowEviction: true}
-}
-
-// offerSession answers an establishing offer with session id, and
-// allocates video stream videoID.
-func offerSession(id, videoID uint16) func(*recordedInvoke) (any, error) {
-	return func(r *recordedInvoke) (any, error) {
-		switch r.command {
-		case cmdVideoStreamAllocate:
-			return csdef.VideoStreamAllocateResponse{VideoStreamId: videoID}, nil
-		case cmdAudioStreamAllocate:
-			return csdef.AudioStreamAllocateResponse{AudioStreamId: 3}, nil
-		case callProvideOffer:
-			return wpdef.ProvideOfferResponse{WebRtcSessionId: id}, nil
-		case callSolicitOffer:
-			return wpdef.SolicitOfferResponse{WebRtcSessionId: id}, nil
-		}
-		return nil, nil
-	}
 }
 
 var _ = intp

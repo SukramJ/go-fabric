@@ -29,6 +29,9 @@ type Reports struct {
 	mu   sync.Mutex
 	done bool
 	svc  *Service
+	// known is the operational node id of each client node seen, for a
+	// decommission, whose hook runs once the peer address is cleared.
+	known map[string]uint64
 }
 
 // Install wraps cfg's node hooks — cfg.HooksFor, else the template
@@ -69,7 +72,8 @@ func (r *Reports) detach(s *Service) {
 }
 
 // with runs fn with the attached service and the operational node id of
-// the client node id, if both exist.
+// the client node id, if both exist; a node whose address is gone is
+// named by the id it had.
 func (r *Reports) with(id string, fn func(s *Service, nodeID uint64)) {
 	r.mu.Lock()
 	s := r.svc
@@ -77,15 +81,34 @@ func (r *Reports) with(id string, fn func(s *Service, nodeID uint64)) {
 	if s == nil {
 		return
 	}
-	n := s.ctrl.Registry().Get(id)
-	if n == nil {
-		return
+	nodeID, ok := uint64(0), false
+	if n := s.ctrl.Registry().Get(id); n != nil {
+		var addr client.PeerAddress
+		if addr, ok = n.PeerAddress(); ok {
+			nodeID = addr.NodeID
+		}
 	}
-	addr, ok := n.PeerAddress()
-	if !ok {
-		return
+	r.mu.Lock()
+	if ok {
+		if r.known == nil {
+			r.known = map[string]uint64{}
+		}
+		r.known[id] = nodeID
+	} else {
+		nodeID, ok = r.known[id]
 	}
-	fn(s, addr.NodeID)
+	r.mu.Unlock()
+	if ok {
+		fn(s, nodeID)
+	}
+}
+
+// isStartUp reports whether an event is the root's BasicInformation
+// StartUp, the one event that marks a restart. Mirrors matterjs-server
+// packages/ws-controller/src/controller/WebRtcProviderSessions.ts:139-143
+// at 0bd06f2.
+func isStartUp(endpoint uint16, cluster, event uint32) bool {
+	return endpoint == 0 && cluster == basicinformation.ClusterID && event == basicinformation.EventStartUp
 }
 
 func (r *Reports) wrap(id string, h client.Hooks) client.Hooks {
@@ -94,7 +117,7 @@ func (r *Reports) wrap(id string, h client.Hooks) client.Hooks {
 		if event != nil {
 			event(endpoint, cluster, ev, e, value)
 		}
-		if endpoint == 0 && cluster == basicinformation.ClusterID && ev == basicinformation.EventStartUp {
+		if isStartUp(endpoint, cluster, ev) {
 			r.with(id, func(s *Service, nodeID uint64) { s.w.startedUp(nodeID) })
 		}
 	}
