@@ -24,7 +24,7 @@ func TestOperationalResolver_LiveMulticastRoundTrip(t *testing.T) {
 	instance := OperationalInstanceQName(testCFID, testNodeID)
 	responder, err := joinMcast4()
 	if err != nil {
-		t.Skipf("join: %v", err)
+		t.Skipf("no IPv4 multicast join on this host (a UDP 5353 socket joined to the mDNS group 224.0.0.251): %v", err)
 	}
 	t.Cleanup(func() { _ = responder.Close() })
 	go func() {
@@ -51,7 +51,7 @@ func TestOperationalResolver_LiveMulticastRoundTrip(t *testing.T) {
 	defer cancel()
 	addrs, err := NewOperationalResolver(nil).ResolveOperational(ctx, testCFID, testNodeID)
 	if err != nil {
-		t.Skipf("multicast loopback unavailable here: %v", err)
+		t.Skipf("the record published on this host did not resolve within 3 s: the host does not loop IPv4 multicast back to its own sockets (%v)", err)
 	}
 	if len(addrs) == 0 || addrs[0].String() != "127.0.0.1:5540" {
 		t.Fatalf("addresses = %v", addrs)
@@ -76,7 +76,7 @@ func TestResolution_ZonesLinkLocalByInterface(t *testing.T) {
 	t.Parallel()
 	ifaces, err := net.Interfaces()
 	if err != nil || len(ifaces) == 0 {
-		t.Skip("no interfaces")
+		t.Skipf("the host reports no network interface (net.Interfaces: %d, %v)", len(ifaces), err)
 	}
 	ifi := ifaces[0]
 	instance := OperationalInstanceQName(testCFID, testNodeID)

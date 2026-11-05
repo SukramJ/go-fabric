@@ -8,7 +8,9 @@
 // Three artefacts, one of them generated from the other two:
 //
 //   - matterjs_tests.json — the SNAPSHOT. Every *Test.ts under
-//     packages/node/test, packages/protocol/test and packages/thread-br-client/test
+//     packages/general/test, packages/model/test, packages/node/test,
+//     packages/nodejs/test, packages/protocol/test,
+//     packages/thread-br-client/test and packages/types/test
 //     of matter.js at the commit
 //     parity/schema.json names in matter.sourceCommit, with its line count,
 //     the SHA-1 of its blob and its top-level describe names. Written by
@@ -60,7 +62,10 @@
 // cases semantically; partial names the it cases they do not cover. The
 // classes: controller-stage — controller behaviour this module does not have
 // yet; js-runtime-only — tests of JavaScript runtime concerns (observables,
-// environment, plugins, storage caches, the Reactor); joint-fabric — Joint
+// environment, plugins, storage caches, the Reactor) and of matter.js's own
+// platform, util, storage, time and codec runtime (its Node.js bindings, its
+// in-memory model classes, byte readers and writers, hand-written codecs the
+// Go standard library replaces); joint-fabric — Joint
 // Fabric, deferred; device-ble-thread — device-side BLE or Thread, out of
 // scope until milestone 7; test-infrastructure — tests of matter.js's own test
 // helpers.
@@ -117,7 +122,15 @@ const (
 )
 
 // snapshotRoots are the matter.js test trees the register covers.
-var snapshotRoots = []string{"packages/node/test", "packages/protocol/test", "packages/thread-br-client/test"}
+var snapshotRoots = []string{
+	"packages/general/test",
+	"packages/model/test",
+	"packages/node/test",
+	"packages/nodejs/test",
+	"packages/protocol/test",
+	"packages/thread-br-client/test",
+	"packages/types/test",
+}
 
 func main() {
 	snapshot := flag.Bool("snapshot", false, "regenerate "+snapshotFile+" from the matter.js clone in $MATTERJS_DIR (default ../matter.js) at the commit "+schemaFile+" names")

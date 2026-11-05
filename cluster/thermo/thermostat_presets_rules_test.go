@@ -101,8 +101,8 @@ func TestPresetAPIsWithoutTheirFeature(t *testing.T) {
 		_, err := srv.MatterInvoke(remoteCtx(1, 5), tdef.CmdAtomicRequest, fields)
 		wantStatusCode(t, err, im.StatusInvalidCommand, "")
 	}
-	if _, err := srv.MatterInvoke(remoteCtx(1, 5), tdef.CmdAtomicRequest, &tdef.AtomicRequestRequest{RequestType: rollbackWrite, AttributeRequests: []uint32{presetsAttribute}}); err == nil {
-		t.Error("a RollbackWrite without a BeginWrite accepted")
+	if _, err := srv.MatterInvoke(remoteCtx(1, 5), tdef.CmdAtomicRequest, &tdef.AtomicRequestRequest{RequestType: rollbackWrite, AttributeRequests: []uint32{presetsAttribute}}); spec.StatusOf(err) != im.StatusInvalidInState {
+		t.Errorf("a RollbackWrite without a BeginWrite: status %v (%v), want %v", spec.StatusOf(err), err, im.StatusInvalidInState)
 	}
 	if err := srv.MatterWrite(remoteCtx(1, 5), presetsAttribute, "not a list"); err == nil {
 		t.Error("a Presets write of a string accepted")

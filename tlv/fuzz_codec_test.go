@@ -22,7 +22,8 @@ import (
 // The asserted property is that the walk terminates and does not panic —
 // each [Decoder.Next] consumes at least the control byte, so a decoder
 // that ever failed to advance would surface here as a hang rather than
-// as a wrong answer. [Validate] is exercised on the same input because
+// as a wrong answer. No element it yields carries an implicit-profile
+// tag: those are refused as malformed data. [Validate] is exercised on the same input because
 // it is the strict-mode entry point north-bound code calls on bytes it
 // is about to emit or accept.
 //
@@ -56,6 +57,11 @@ func FuzzDecoderNext(f *testing.F) {
 	f.Add([]byte{0x0C, 0xFF})                   // UTF-8 string claiming 255 bytes of body
 	f.Add([]byte{0x38})                         // end-of-container carrying a context tag-control
 	f.Add([]byte{0x16, 0x24, 0x01, 0x05, 0x18}) // context tag inside an array
+	// Implicit-profile tags, refused as malformed data before their tag
+	// bytes are read (TlvCodecTest.ts:59-75 at 862ad75f).
+	f.Add([]byte{0x84, 0x01, 0x00})                   // implicit profile tag, 2 octets
+	f.Add([]byte{0xA4, 0x01, 0x00, 0x00, 0x00})       // implicit profile tag, 4 octets
+	f.Add([]byte{0x15, 0x84, 0x01, 0x00, 0x2A, 0x18}) // inside a structure
 
 	f.Fuzz(func(t *testing.T, payload []byte) {
 		d := NewDecoder(payload)
@@ -69,6 +75,9 @@ func FuzzDecoderNext(f *testing.F) {
 			}
 			if d.Pos() > len(payload) {
 				t.Fatalf("element %+v left the read cursor at %d, past the %d-byte buffer", el, d.Pos(), len(payload))
+			}
+			if el.Tag.Kind == TagKindImplicitProfile2 || el.Tag.Kind == TagKindImplicitProfile4 {
+				t.Fatalf("element %+v carries an implicit-profile tag the decoder must refuse", el)
 			}
 		}
 		_ = Validate(payload)

@@ -131,6 +131,11 @@ type Registry struct {
 	nextID int
 	timer  exchange.Timer
 	closed bool
+	// removeFabric, when set, stands between a decommission and its
+	// RemoveFabric invoke: the test seam of matter.js's patchRemoveFabric
+	// (DecommissionTest.ts:36-47 at 862ad75f), set only by
+	// export_test.go's PatchRemoveFabric. Nil invokes directly.
+	removeFabric func(fabricIndex uint8, invoke func(fabricIndex uint8) (Result, error)) (Result, error)
 
 	// icdMu guards icdTables, the ICD state of our fabrics — matter.js
 	// Fabric.icd (FabricIcd.ts), one peer table per fabric.

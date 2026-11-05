@@ -10,6 +10,7 @@ import (
 	"slices"
 	"sync"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/SukramJ/go-fabric/clock/clocktest"
@@ -172,130 +173,133 @@ func (r *icdRecorder) count() int {
 	return len(r.sent)
 }
 
+// icdWaitFor lets the case's synctest bubble settle and fails unless cond
+// holds: the server's Check-In passes run on its goroutines over the fake
+// clock, so a settled bubble is their final word until the test moves it.
+// It must run inside synctest.Test.
 func icdWaitFor(t *testing.T, what string, cond func() bool) {
 	t.Helper()
-	deadline := time.Now().Add(5 * time.Second)
-	for !cond() {
-		if time.Now().After(deadline) {
-			t.Fatalf("timed out waiting for %s", what)
-		}
-		time.Sleep(time.Millisecond)
+	synctest.Wait()
+	if !cond() {
+		t.Fatalf("the server settled without %s", what)
 	}
 }
 
 func TestICDManagementRegistrationLifecycle(t *testing.T) {
 	t.Parallel()
-	st := icdStore(t)
-	rec := &icdRecorder{}
-	cfg := core.ICDManagementConfig{
-		IdleModeDuration: 4, MaximumCheckInBackoff: 4, ActiveModeDuration: 2000, ActiveModeThreshold: 1000,
-		ClientsSupportedPerFabric: 2, Store: st, Clock: inflight.WithGroup(clocktest.New(icdEpoch), inflight.New("icd-test")),
-	}
-	work := inflight.Of(cfg.Clock)
-	s := newICDServer(t, cfg)
-	s.SetCheckInSender(rec.send)
-	if err := s.Start(t.Context()); err != nil {
-		t.Fatal(err)
-	}
-	// Start enters active mode, which runs a Check-In pass in the
-	// background (activeEntered). Drain it before registering: a pass that
-	// runs after the registrations below answers them, and the back-off
-	// then suppresses the wake's Check-Ins this test counts.
-	icdWaitFor(t, "the start-time Check-In pass", func() bool { return !work.Busy() })
-	if c := s.Counter(); c == nil || c.Value() <= icd.BootBump {
-		t.Fatalf("counter %v", c)
-	}
-	persisted, ok, err := st.LoadICDCounter(t.Context())
-	if err != nil || !ok || persisted != s.Counter().Value() {
-		t.Fatalf("persisted counter %d %v %v", persisted, ok, err)
-	}
+	synctest.Test(t, func(t *testing.T) {
+		st := icdStore(t)
+		rec := &icdRecorder{}
+		cfg := core.ICDManagementConfig{
+			IdleModeDuration: 4, MaximumCheckInBackoff: 4, ActiveModeDuration: 2000, ActiveModeThreshold: 1000,
+			ClientsSupportedPerFabric: 2, Store: st, Clock: inflight.WithGroup(clocktest.New(icdEpoch), inflight.New("icd-test")),
+		}
+		work := inflight.Of(cfg.Clock)
+		s := newICDServer(t, cfg)
+		s.SetCheckInSender(rec.send)
+		if err := s.Start(t.Context()); err != nil {
+			t.Fatal(err)
+		}
+		// Start enters active mode, which runs a Check-In pass in the
+		// background (activeEntered). Drain it before registering: a pass that
+		// runs after the registrations below answers them, and the back-off
+		// then suppresses the wake's Check-Ins this test counts.
+		icdWaitFor(t, "the start-time Check-In pass", func() bool { return !work.Busy() })
+		if c := s.Counter(); c == nil || c.Value() <= icd.BootBump {
+			t.Fatalf("counter %v", c)
+		}
+		persisted, ok, err := st.LoadICDCounter(t.Context())
+		if err != nil || !ok || persisted != s.Counter().Value() {
+			t.Fatalf("persisted counter %d %v %v", persisted, ok, err)
+		}
 
-	admin := icdInvokeCtx(1, privAdminister)
-	reg := func(ctx context.Context, node uint64, k []byte, vk *[]byte, ct icddef.ClientTypeEnum) error {
-		_, err := s.MatterInvoke(ctx, icddef.CmdRegisterClient, icddef.RegisterClientRequest{
-			CheckInNodeId: node, MonitoredSubject: node, Key: k, VerificationKey: vk, ClientType: ct,
-		})
-		return err
-	}
-	if err := reg(admin, 0x10, icdKey(1), nil, icddef.ClientTypePermanent); err != nil {
-		t.Fatal(err)
-	}
-	if err := reg(admin, 0x11, icdKey(2), nil, icddef.ClientTypePermanent); err != nil {
-		t.Fatal(err)
-	}
-	if err := reg(admin, 0x12, icdKey(3), nil, icddef.ClientTypePermanent); icdStatus(err) != im.StatusResourceExhausted {
-		t.Fatalf("third registration = %v", err)
-	}
-	if err := reg(icdInvokeCtx(2, privManage), 0x20, icdKey(4), nil, icddef.ClientTypeEphemeral); err != nil {
-		t.Fatal(err)
-	}
-	// A Manage update needs the stored key.
-	manage := icdInvokeCtx(1, privManage)
-	wrong, right := icdKey(9), icdKey(1)
-	if err := reg(manage, 0x10, icdKey(5), &wrong, icddef.ClientTypePermanent); icdStatus(err) != im.StatusFailure {
-		t.Fatalf("wrong verification key = %v", err)
-	}
-	if err := reg(manage, 0x10, icdKey(5), nil, icddef.ClientTypePermanent); icdStatus(err) != im.StatusFailure {
-		t.Fatalf("missing verification key = %v", err)
-	}
-	if err := reg(manage, 0x10, icdKey(5), &right, icddef.ClientTypePermanent); err != nil {
-		t.Fatal(err)
-	}
-	if got := s.Registrations(1); len(got) != 2 || !bytes.Equal(got[0].Key, icdKey(5)) {
-		t.Fatalf("fabric 1 registrations %+v", got)
-	}
+		admin := icdInvokeCtx(1, privAdminister)
+		reg := func(ctx context.Context, node uint64, k []byte, vk *[]byte, ct icddef.ClientTypeEnum) error {
+			_, err := s.MatterInvoke(ctx, icddef.CmdRegisterClient, icddef.RegisterClientRequest{
+				CheckInNodeId: node, MonitoredSubject: node, Key: k, VerificationKey: vk, ClientType: ct,
+			})
+			return err
+		}
+		if err := reg(admin, 0x10, icdKey(1), nil, icddef.ClientTypePermanent); err != nil {
+			t.Fatal(err)
+		}
+		if err := reg(admin, 0x11, icdKey(2), nil, icddef.ClientTypePermanent); err != nil {
+			t.Fatal(err)
+		}
+		if err := reg(admin, 0x12, icdKey(3), nil, icddef.ClientTypePermanent); icdStatus(err) != im.StatusResourceExhausted {
+			t.Fatalf("third registration = %v", err)
+		}
+		if err := reg(icdInvokeCtx(2, privManage), 0x20, icdKey(4), nil, icddef.ClientTypeEphemeral); err != nil {
+			t.Fatal(err)
+		}
+		// A Manage update needs the stored key.
+		manage := icdInvokeCtx(1, privManage)
+		wrong, right := icdKey(9), icdKey(1)
+		if err := reg(manage, 0x10, icdKey(5), &wrong, icddef.ClientTypePermanent); icdStatus(err) != im.StatusFailure {
+			t.Fatalf("wrong verification key = %v", err)
+		}
+		if err := reg(manage, 0x10, icdKey(5), nil, icddef.ClientTypePermanent); icdStatus(err) != im.StatusFailure {
+			t.Fatalf("missing verification key = %v", err)
+		}
+		if err := reg(manage, 0x10, icdKey(5), &right, icddef.ClientTypePermanent); err != nil {
+			t.Fatal(err)
+		}
+		if got := s.Registrations(1); len(got) != 2 || !bytes.Equal(got[0].Key, icdKey(5)) {
+			t.Fatalf("fabric 1 registrations %+v", got)
+		}
 
-	// The fabric-filtered read lists one fabric, the unfiltered one every
-	// fabric with another fabric's entry reduced to its index.
-	filtered, _ := s.MatterReadFiltered(im.WithFabricFilter(context.Background(), true, 2), icddef.AttrRegisteredClients)
-	if l := filtered.(spec.List[icddef.MonitoringRegistrationStruct]); len(l) != 1 || l[0].CheckInNodeId != 0x20 {
-		t.Fatalf("filtered %+v", l)
-	}
-	unfiltered, _ := s.MatterReadFiltered(im.WithFabricFilter(context.Background(), false, 2), icddef.AttrRegisteredClients)
-	if l := unfiltered.(spec.List[icddef.MonitoringRegistrationStruct]); len(l) != 3 || l[0].CheckInNodeId != 0 || l[0].FabricIndex != 1 || l[2].CheckInNodeId != 0x20 {
-		t.Fatalf("unfiltered %+v", l)
-	}
+		// The fabric-filtered read lists one fabric, the unfiltered one every
+		// fabric with another fabric's entry reduced to its index.
+		filtered, _ := s.MatterReadFiltered(im.WithFabricFilter(context.Background(), true, 2), icddef.AttrRegisteredClients)
+		if l := filtered.(spec.List[icddef.MonitoringRegistrationStruct]); len(l) != 1 || l[0].CheckInNodeId != 0x20 {
+			t.Fatalf("filtered %+v", l)
+		}
+		unfiltered, _ := s.MatterReadFiltered(im.WithFabricFilter(context.Background(), false, 2), icddef.AttrRegisteredClients)
+		if l := unfiltered.(spec.List[icddef.MonitoringRegistrationStruct]); len(l) != 3 || l[0].CheckInNodeId != 0 || l[0].FabricIndex != 1 || l[2].CheckInNodeId != 0x20 {
+			t.Fatalf("unfiltered %+v", l)
+		}
 
-	// A wake sends one Check-In per Permanent client, post-increment.
-	before, sent := s.Counter().Value(), rec.count()
-	s.EnterIdleMode()
-	s.RequestActiveMode()
-	icdWaitFor(t, "two Check-Ins", func() bool { return rec.count() == sent+2 })
-	icdWaitFor(t, "the pass to finish", func() bool { return !work.Busy() })
-	s.Stop()
-	if got := s.Counter().Value(); got != before+2 {
-		t.Fatalf("counter %d, want %d", got, before+2)
-	}
+		// A wake sends one Check-In per Permanent client, post-increment.
+		before, sent := s.Counter().Value(), rec.count()
+		s.EnterIdleMode()
+		s.RequestActiveMode()
+		icdWaitFor(t, "two Check-Ins", func() bool { return rec.count() == sent+2 })
+		icdWaitFor(t, "the pass to finish", func() bool { return !work.Busy() })
+		s.Stop()
+		if got := s.Counter().Value(); got != before+2 {
+			t.Fatalf("counter %d, want %d", got, before+2)
+		}
 
-	// Unregister: Manage with the key, NOT_FOUND for an unknown client.
-	if _, err := s.MatterInvoke(manage, icddef.CmdUnregisterClient, icddef.UnregisterClientRequest{CheckInNodeId: 0x99}); icdStatus(err) != im.StatusNotFound {
-		t.Fatalf("unknown client = %v", err)
-	}
-	vk := icdKey(2)
-	if _, err := s.MatterInvoke(manage, icddef.CmdUnregisterClient, icddef.UnregisterClientRequest{CheckInNodeId: 0x11, VerificationKey: &vk}); err != nil {
-		t.Fatal(err)
-	}
+		// Unregister: Manage with the key, NOT_FOUND for an unknown client.
+		if _, err := s.MatterInvoke(manage, icddef.CmdUnregisterClient, icddef.UnregisterClientRequest{CheckInNodeId: 0x99}); icdStatus(err) != im.StatusNotFound {
+			t.Fatalf("unknown client = %v", err)
+		}
+		vk := icdKey(2)
+		if _, err := s.MatterInvoke(manage, icddef.CmdUnregisterClient, icddef.UnregisterClientRequest{CheckInNodeId: 0x11, VerificationKey: &vk}); err != nil {
+			t.Fatal(err)
+		}
 
-	// A new server on the same store restores the registrations.
-	again := newICDServer(t, cfg)
-	if err := again.Start(t.Context()); err != nil {
-		t.Fatal(err)
-	}
-	if got := again.Registrations(1); len(got) != 1 || got[0].CheckInNodeID != 0x10 {
-		t.Fatalf("restored %+v", got)
-	}
-	if again.Counter().Value() <= s.Counter().Value() {
-		t.Fatalf("counter did not advance across a restart: %d after %d", again.Counter().Value(), s.Counter().Value())
-	}
+		// A new server on the same store restores the registrations.
+		again := newICDServer(t, cfg)
+		if err := again.Start(t.Context()); err != nil {
+			t.Fatal(err)
+		}
+		if got := again.Registrations(1); len(got) != 1 || got[0].CheckInNodeID != 0x10 {
+			t.Fatalf("restored %+v", got)
+		}
+		if again.Counter().Value() <= s.Counter().Value() {
+			t.Fatalf("counter did not advance across a restart: %d after %d", again.Counter().Value(), s.Counter().Value())
+		}
 
-	// Fabric removal drops the fabric's registrations.
-	if err := st.RemoveFabric(t.Context(), 2); err != nil {
-		t.Fatal(err)
-	}
-	again.FabricRemoved(t.Context(), 2)
-	if got := again.Registrations(2); len(got) != 0 {
-		t.Fatalf("fabric 2 kept %+v", got)
-	}
+		// Fabric removal drops the fabric's registrations.
+		if err := st.RemoveFabric(t.Context(), 2); err != nil {
+			t.Fatal(err)
+		}
+		again.FabricRemoved(t.Context(), 2)
+		if got := again.Registrations(2); len(got) != 0 {
+			t.Fatalf("fabric 2 kept %+v", got)
+		}
+	})
 }
 
 func TestICDManagementPrunesDepartedFabrics(t *testing.T) {

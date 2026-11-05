@@ -12,6 +12,7 @@ import (
 	"slices"
 	"sync"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/SukramJ/go-fabric/bdx"
@@ -942,49 +943,48 @@ func TestOTARequestor_InvalidImage(t *testing.T) {
 // Discontinue deletes the file (:792-800).
 func TestOTARequestor_ApplyActions(t *testing.T) {
 	t.Parallel()
-	h := newOtaHarness(t, nil)
-	h.addActive(t)
-	h.provider.apply = func(n int) provdef.ApplyUpdateResponse {
-		if n == 0 {
-			return provdef.ApplyUpdateResponse{Action: provdef.ApplyUpdateActionAwaitNextAction, DelayedActionTime: 5}
+	synctest.Test(t, func(t *testing.T) {
+		h := newOtaHarness(t, nil)
+		h.addActive(t)
+		h.provider.apply = func(n int) provdef.ApplyUpdateResponse {
+			if n == 0 {
+				return provdef.ApplyUpdateResponse{Action: provdef.ApplyUpdateActionAwaitNextAction, DelayedActionTime: 5}
+			}
+			return provdef.ApplyUpdateResponse{Action: provdef.ApplyUpdateActionProceed, DelayedActionTime: 90000}
 		}
-		return provdef.ApplyUpdateResponse{Action: provdef.ApplyUpdateActionProceed, DelayedActionTime: 90000}
-	}
-	done := make(chan struct{})
-	go func() {
-		h.r.performUpdateQuery(context.Background())
-		close(done)
-	}()
-	waitPending := func(want time.Duration) {
-		t.Helper()
-		deadline := time.Now().Add(3 * time.Second)
-		for !slices.Contains(h.clock.pending(), want) {
-			if time.Now().After(deadline) {
+		done := make(chan struct{})
+		go func() {
+			h.r.performUpdateQuery(context.Background())
+			close(done)
+		}()
+		waitPending := func(want time.Duration) {
+			t.Helper()
+			synctest.Wait() // the query goroutine has armed its wait
+			if !slices.Contains(h.clock.pending(), want) {
 				t.Fatalf("no %v wait; pending %v", want, h.clock.pending())
 			}
-			time.Sleep(5 * time.Millisecond)
+			h.clock.advance(want)
 		}
-		h.clock.advance(want)
-	}
-	waitPending(2 * time.Minute) // max(5 s, minimumApplyDelay)
-	waitPending(24 * time.Hour)  // min(90000 s, 24 h)
-	<-done
-	if got := states(h.events.transitions()); !slices.Equal(got, []string{"1>2/1", "2>4/1", "4>5/1", "5>6/4", "6>5/1", "5>6/4", "6>5/1", "5>1/1"}) {
-		t.Fatalf("transitions %v", got)
-	}
-	if len(h.applier.applied) != 1 {
-		t.Fatal("not applied")
-	}
+		waitPending(2 * time.Minute) // max(5 s, minimumApplyDelay)
+		waitPending(24 * time.Hour)  // min(90000 s, 24 h)
+		<-done
+		if got := states(h.events.transitions()); !slices.Equal(got, []string{"1>2/1", "2>4/1", "4>5/1", "5>6/4", "6>5/1", "5>6/4", "6>5/1", "5>1/1"}) {
+			t.Fatalf("transitions %v", got)
+		}
+		if len(h.applier.applied) != 1 {
+			t.Fatal("not applied")
+		}
 
-	h2 := newOtaHarness(t, nil)
-	h2.addActive(t)
-	h2.provider.apply = func(int) provdef.ApplyUpdateResponse {
-		return provdef.ApplyUpdateResponse{Action: provdef.ApplyUpdateActionDiscontinue}
-	}
-	h2.r.performUpdateQuery(context.Background())
-	if _, err := os.Stat(h2.r.downloadPath()); !os.IsNotExist(err) || len(h2.applier.applied) != 0 || h2.r.inProgress != nil {
-		t.Fatal("Discontinue")
-	}
+		h2 := newOtaHarness(t, nil)
+		h2.addActive(t)
+		h2.provider.apply = func(int) provdef.ApplyUpdateResponse {
+			return provdef.ApplyUpdateResponse{Action: provdef.ApplyUpdateActionDiscontinue}
+		}
+		h2.r.performUpdateQuery(context.Background())
+		if _, err := os.Stat(h2.r.downloadPath()); !os.IsNotExist(err) || len(h2.applier.applied) != 0 || h2.r.inProgress != nil {
+			t.Fatal("Discontinue")
+		}
+	})
 }
 
 // TestOTARequestor_ApplyFailure: a failing applyUpdate forgets the update

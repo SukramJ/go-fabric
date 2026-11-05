@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/SukramJ/go-fabric/cluster/closure"
+	"github.com/SukramJ/go-fabric/cluster/spec"
 	closuredef "github.com/SukramJ/go-fabric/cluster/spec/closurecontrol"
 	clusterwire "github.com/SukramJ/go-fabric/cluster/wire"
 	"github.com/SukramJ/go-fabric/im"
@@ -167,8 +168,8 @@ func TestClosureControlMoveToKeepsTheTargetUnchangedWhenTheDeviceRefuses(t *test
 
 	_, err := s.MatterInvoke(context.Background(), clusterwire.ClosureControlCmdMoveTo,
 		closuredef.MoveToRequest{Position: (*closuredef.TargetPositionEnum)(new(clusterwire.ClosureTargetPositionMoveToFullyOpen))})
-	if err == nil {
-		t.Fatal("MoveTo must report the device's refusal")
+	if spec.StatusOf(err) != im.StatusFailure {
+		t.Fatalf("MoveTo the device refused: status %v (%v), want %v", spec.StatusOf(err), err, im.StatusFailure)
 	}
 	if got := readOverallTarget(t, s); got.Position != nil {
 		t.Errorf("OverallTargetState.Position = %v after a refused move, want null", *got.Position)
@@ -185,8 +186,8 @@ func TestClosureControlMoveToWithoutAPositionIsRefused(t *testing.T) {
 
 	_, err := s.MatterInvoke(context.Background(), clusterwire.ClosureControlCmdMoveTo,
 		closuredef.MoveToRequest{})
-	if err == nil {
-		t.Fatal("MoveTo carrying no supported field must be refused")
+	if spec.StatusOf(err) != im.StatusInvalidCommand {
+		t.Fatalf("MoveTo carrying no supported field: status %v (%v), want %v", spec.StatusOf(err), err, im.StatusInvalidCommand)
 	}
 	if len(h.moved) != 0 {
 		t.Errorf("a refused MoveTo must not reach the device, handler saw %v", h.moved)

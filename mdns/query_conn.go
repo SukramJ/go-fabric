@@ -4,6 +4,7 @@
 package mdns
 
 import (
+	"encoding/binary"
 	"fmt"
 	"net/netip"
 	"strings"
@@ -121,11 +122,20 @@ type DNSMessage struct {
 	Additional  []DNSRecord
 }
 
-// ParseDNSMessage decodes msg. It fails on a message that does not parse.
+// ParseDNSMessage decodes msg. A record whose value does not parse is
+// dropped and the others kept; the message fails when its header, a
+// question or a record's name, fixed fields or length do not parse.
+// Mirrors matter.js packages/general/src/codec/DnsCodec.ts:265-289 at
+// 862ad75f (decodeRecord: the reader stands after the record before its
+// value is decoded, so "a record we cannot read costs only itself") and
+// :216-253 (decode, undefined on any other failure).
 func ParseDNSMessage(msg []byte) (DNSMessage, error) {
 	m := new(dns.Msg)
 	if err := m.Unpack(msg); err != nil {
-		return DNSMessage{}, fmt.Errorf("mdns: parse DNS message: %w", err)
+		var ok bool
+		if m, ok = unpackReadable(msg); !ok {
+			return DNSMessage{}, fmt.Errorf("mdns: parse DNS message: %w", err)
+		}
 	}
 	out := DNSMessage{
 		Response:    m.Response,
@@ -160,6 +170,136 @@ func PackDNSQuery(questions []DNSQuestion, knownAnswers []DNSRecord) ([]byte, er
 		return nil, fmt.Errorf("mdns: pack DNS query: %w", err)
 	}
 	return out, nil
+}
+
+// unpackReadable walks msg record by record when miekg/dns refuses it
+// whole: the header, the questions, then each record's name, fixed
+// fields and RDLENGTH bound the next record's start, and a record whose
+// value does not unpack is skipped. ok is false when the walk itself
+// fails (a truncated header, question, name or value).
+func unpackReadable(msg []byte) (m *dns.Msg, ok bool) {
+	if len(msg) < 12 {
+		return nil, false
+	}
+	m = new(dns.Msg)
+	m.Id = binary.BigEndian.Uint16(msg)
+	m.Response = msg[2]&0x80 != 0
+	counts := [4]int{}
+	for i := range counts {
+		counts[i] = int(binary.BigEndian.Uint16(msg[4+2*i:]))
+	}
+	off := 12
+	for range counts[0] {
+		name, next, err := dns.UnpackDomainName(msg, off)
+		if err != nil || next+4 > len(msg) {
+			return nil, false
+		}
+		m.Question = append(m.Question, dns.Question{Name: name, Qtype: binary.BigEndian.Uint16(msg[next:]), Qclass: binary.BigEndian.Uint16(msg[next+2:])})
+		off = next + 4
+	}
+	sections := [3]*[]dns.RR{&m.Answer, &m.Ns, &m.Extra}
+	for si, sec := range sections {
+		for range counts[si+1] {
+			_, next, err := dns.UnpackDomainName(msg, off)
+			if err != nil || next+10 > len(msg) {
+				return nil, false
+			}
+			end := next + 10 + int(binary.BigEndian.Uint16(msg[next+8:]))
+			if end > len(msg) {
+				return nil, false
+			}
+			if rr, after, err := dns.UnpackRR(msg, off); err == nil && rr != nil && after == end {
+				*sec = append(*sec, rr)
+			}
+			off = end
+		}
+	}
+	return m, true
+}
+
+// MaxMessageSize is the largest mDNS message the module writes: an IPv6
+// minimum MTU of 1280 bytes less the IPv6 and UDP headers. Mirrors
+// matter.js packages/general/src/codec/DnsCodec.ts:26 at 862ad75f
+// (MAX_MDNS_MESSAGE_SIZE).
+const MaxMessageSize = 1232
+
+// PackDNSQueries encodes an mDNS query as the messages it takes to stay
+// within [MaxMessageSize]. Questions that do not fit one message are split
+// across several, each without known answers (known-answer suppression
+// cannot span the split); questions that fit carry their known answers,
+// and answers past the limit spill into follow-up messages without the
+// questions, every message but the last flagged truncated (RFC 6762
+// §7.2). Mirrors matter.js
+// packages/general/src/net/dns-sd/MdnsSocket.ts:102-178 at 862ad75f (send)
+// and :208-238 (splitQueries).
+func PackDNSQueries(questions []DNSQuestion, knownAnswers []DNSRecord) ([][]byte, error) {
+	msgOf := func(qs []dns.Question, rrs []dns.RR, truncated bool) *dns.Msg {
+		m := new(dns.Msg)
+		m.Question, m.Answer, m.Truncated = qs, rrs, truncated
+		return m
+	}
+	pack := func(m *dns.Msg) ([]byte, error) {
+		out, err := m.Pack()
+		if err != nil {
+			return nil, fmt.Errorf("mdns: pack DNS query: %w", err)
+		}
+		return out, nil
+	}
+	const header = 12
+	qs := make([]dns.Question, 0, len(questions))
+	for _, q := range questions {
+		qs = append(qs, dns.Question{Name: fqdnOf(q.Name), Qtype: uint16(q.Type), Qclass: dns.ClassINET})
+	}
+	var chunks [][]dns.Question
+	cur := make([]dns.Question, 0, len(qs))
+	size := header
+	for _, q := range qs {
+		n := msgOf([]dns.Question{q}, nil, false).Len() - header
+		if size+n > MaxMessageSize && len(cur) > 0 {
+			chunks, cur, size = append(chunks, cur), nil, header
+		}
+		cur, size = append(cur, q), size+n
+	}
+	if len(cur) > 0 || len(chunks) == 0 {
+		chunks = append(chunks, cur)
+	}
+	var out [][]byte
+	if len(chunks) > 1 {
+		for _, c := range chunks {
+			b, err := pack(msgOf(c, nil, false))
+			if err != nil {
+				return nil, err
+			}
+			out = append(out, b)
+		}
+		return out, nil
+	}
+	m := msgOf(chunks[0], nil, false)
+	size = m.Len()
+	for _, r := range knownAnswers {
+		rr := rrOf(r)
+		if rr == nil {
+			continue
+		}
+		n := msgOf(nil, []dns.RR{rr}, false).Len() - header
+		if size+n > MaxMessageSize {
+			m.Truncated = true
+			b, err := pack(m)
+			if err != nil {
+				return nil, err
+			}
+			out = append(out, b)
+			m = msgOf(nil, nil, false)
+			size = header
+		}
+		m.Answer = append(m.Answer, rr)
+		size += n
+	}
+	b, err := pack(m)
+	if err != nil {
+		return nil, err
+	}
+	return append(out, b), nil
 }
 
 func recordsOf(rrs []dns.RR) []DNSRecord {
@@ -219,9 +359,16 @@ func rrOf(r DNSRecord) dns.RR {
 	case DNSTypeSRV:
 		return &dns.SRV{Hdr: h, Priority: r.SRV.Priority, Weight: r.SRV.Weight, Port: r.SRV.Port, Target: fqdnOf(r.SRV.Target)}
 	case DNSTypeTXT:
-		txt := make([]string, 0, len(r.TXT))
+		// An empty TXT record is a single zero-length string (RFC 6763
+		// §6.1), and an entry is at most 255 bytes, a longer one cut there.
+		// Mirrors matter.js packages/general/src/codec/DnsCodec.ts:477-497
+		// at 862ad75f (encodeTxtRecord).
+		txt := make([]string, 0, max(len(r.TXT), 1))
 		for _, e := range r.TXT {
-			txt = append(txt, escapeText(e))
+			txt = append(txt, escapeText(e[:min(len(e), 255)]))
+		}
+		if len(txt) == 0 {
+			txt = append(txt, "")
 		}
 		return &dns.TXT{Hdr: h, Txt: txt}
 	}

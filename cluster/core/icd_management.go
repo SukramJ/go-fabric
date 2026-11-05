@@ -277,6 +277,12 @@ type ICDManagement struct {
 	life          context.Context
 	cancel        context.CancelFunc
 
+	// registrationHook is the test seam of internal/coreseam
+	// ObserveICDRegistrations: called at the start of RegisterClient
+	// (true) and UnregisterClient (false); its error fails the command.
+	// Nil in every node the module builds.
+	registrationHook func(register bool) error
+
 	// cmdMu serialises the commands and the fabric removal, each a
 	// read-check-persist sequence over the registrations.
 	cmdMu sync.Mutex
@@ -979,6 +985,9 @@ func (s *ICDManagement) registerClient(ctx context.Context, req icddef.RegisterC
 	if err != nil {
 		return icddef.RegisterClientResponse{}, err
 	}
+	if err := s.callRegistrationHook(true); err != nil {
+		return icddef.RegisterClientResponse{}, err
+	}
 	s.cmdMu.Lock()
 	defer s.cmdMu.Unlock()
 
@@ -1038,12 +1047,30 @@ func (s *ICDManagement) registerClient(ctx context.Context, req icddef.RegisterC
 	return icddef.RegisterClientResponse{IcdCounter: value}, nil
 }
 
+// callRegistrationHook runs the coreseam hook of a registration command;
+// its error is the command's FAILURE.
+func (s *ICDManagement) callRegistrationHook(register bool) error {
+	s.mu.Lock()
+	hook := s.registrationHook
+	s.mu.Unlock()
+	if hook == nil {
+		return nil
+	}
+	if err := hook(register); err != nil {
+		return spec.Errorf(im.StatusFailure, "core: %v", err)
+	}
+	return nil
+}
+
 // unregisterClient mirrors IcdManagementServer.ts:705-730 (unregisterClient,
 // Core §9.16.7.3): NOT_FOUND for an unknown client, the right to modify,
 // then the entry, its key and its back-off state go.
 func (s *ICDManagement) unregisterClient(ctx context.Context, req icddef.UnregisterClientRequest) error {
 	fabric, err := accessingFabric(ctx)
 	if err != nil {
+		return err
+	}
+	if err := s.callRegistrationHook(false); err != nil {
 		return err
 	}
 	s.cmdMu.Lock()

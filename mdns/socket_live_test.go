@@ -49,7 +49,7 @@ func TestJoinMcast4_Success(t *testing.T) {
 	skipUnlessMulticastV4(t)
 	pc, err := joinMcast4()
 	if err != nil {
-		t.Skipf("joinMcast4 (possibly IPv4 not available): %v", err)
+		t.Skipf("no IPv4 multicast join on this host (a UDP 5353 socket joined to the mDNS group 224.0.0.251): %v", err)
 	}
 	if err := pc.Close(); err != nil {
 		t.Fatalf("Close: %v", err)
@@ -82,7 +82,7 @@ func TestSockets_Lifecycle(t *testing.T) {
 	r := NewResponder()
 	s, err := openSockets(isVirtualInterfaceName, r.logger(), &r.clock, func([]byte, int, *net.UDPAddr) {})
 	if err != nil {
-		t.Skipf("openSockets: %v", err)
+		t.Skipf("the responder opened no multicast socket on any interface of this host: %v", err)
 	}
 	pkt, _ := newResponse(0).Pack()
 	for _, i := range s.links() {
@@ -129,7 +129,7 @@ func livePublish(t *testing.T, instance string) *Responder {
 	})
 	svc.InstanceName = instance
 	if err := r.Publish(context.Background(), svc); err != nil {
-		t.Skipf("Publish: %v", err)
+		t.Skipf("the responder could not publish on this host's multicast interfaces: %v", err)
 	}
 	return r
 }
@@ -172,12 +172,12 @@ func TestResponder_LiveHostAnswerV4(t *testing.T) {
 		}
 	}
 	if ifi == nil {
-		t.Skip("no advertised IPv4 multicast interface")
+		t.Skip("no multicast interface of this host carries a primary IPv4 address the responder announces")
 	}
 	livePublish(t, "GOFABRICLIVE-V4")
 	conn, err := net.ListenMulticastUDP("udp4", ifi, mdnsGroup4)
 	if err != nil {
-		t.Skipf("listen on the group: %v", err)
+		t.Skipf("this host lets no second socket join the IPv4 mDNS group 224.0.0.251:5353 on %s: %v", ifi.Name, err)
 	}
 	defer conn.Close()
 	pc := ipv4.NewPacketConn(conn)
@@ -187,7 +187,7 @@ func TestResponder_LiveHostAnswerV4(t *testing.T) {
 	q.Id, q.RecursionDesired = 0, false
 	out, _ := q.Pack()
 	if _, err := pc.WriteTo(out, &ipv4.ControlMessage{IfIndex: ifi.Index}, mdnsGroup4); err != nil {
-		t.Skipf("send to the group: %v", err)
+		t.Skipf("this host refused a datagram to the IPv4 mDNS group on %s: %v", ifi.Name, err)
 	}
 	ok := awaitAnswer(t, func(b []byte) (int, error) {
 		_ = conn.SetReadDeadline(time.Now().Add(200 * time.Millisecond))
@@ -215,12 +215,12 @@ func TestResponder_LiveHostAnswerV6(t *testing.T) {
 		}
 	}
 	if ifi == nil {
-		t.Skip("no advertised IPv6 multicast interface")
+		t.Skip("no multicast interface of this host carries a primary IPv6 address the responder announces")
 	}
 	livePublish(t, "GOFABRICLIVE-V6")
 	conn, err := net.ListenMulticastUDP("udp6", ifi, mdnsGroup6)
 	if err != nil {
-		t.Skipf("listen on the group: %v", err)
+		t.Skipf("this host lets no second socket join the IPv6 mDNS group [ff02::fb]:5353 on %s: %v", ifi.Name, err)
 	}
 	defer conn.Close()
 	pc := ipv6.NewPacketConn(conn)
@@ -230,7 +230,7 @@ func TestResponder_LiveHostAnswerV6(t *testing.T) {
 	q.Id, q.RecursionDesired = 0, false
 	out, _ := q.Pack()
 	if _, err := pc.WriteTo(out, &ipv6.ControlMessage{IfIndex: ifi.Index}, &net.UDPAddr{IP: mdnsGroup6.IP, Port: 5353, Zone: ifi.Name}); err != nil {
-		t.Skipf("send to the group: %v", err)
+		t.Skipf("this host refused a datagram to the IPv6 mDNS group on %s: %v", ifi.Name, err)
 	}
 	ok := awaitAnswer(t, func(b []byte) (int, error) {
 		_ = conn.SetReadDeadline(time.Now().Add(200 * time.Millisecond))
@@ -255,7 +255,7 @@ func TestResponder_LiveOperationalRoundTrip(t *testing.T) {
 	livePublish(t, instance)
 	conn, err := OpenQueryConn()
 	if err != nil {
-		t.Skipf("OpenQueryConn: %v", err)
+		t.Skipf("no mDNS query socket on this host: joining the mDNS multicast groups failed (%v)", err)
 	}
 	defer conn.Close()
 
@@ -265,7 +265,7 @@ func TestResponder_LiveOperationalRoundTrip(t *testing.T) {
 			t.Fatal(err)
 		}
 		if err := conn.Send(q); err != nil {
-			t.Skipf("send: %v", err)
+			t.Skipf("this host refused the query to the mDNS multicast groups: %v", err)
 		}
 	}
 	// await collects the records of responses until want holds.

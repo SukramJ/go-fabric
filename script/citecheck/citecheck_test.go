@@ -57,7 +57,10 @@ import (
 // names them: bridge/interaction_protocol_parity_matterjs_test.go,
 // bridge/subscribe_dispatch.go, bridge/suppress_response_parity_matterjs_test.go,
 // im/write.go); each is to be re-read at the pin and re-cited.
-const citecheckDriftRatchet = 254
+//
+// 253 after phase 33's TLV root: the TlvStringTest.ts citation of
+// tlv/codec_parity_test.go re-cited at the pin.
+const citecheckDriftRatchet = 253
 
 func readDrift(t *testing.T) []driftEntry {
 	t.Helper()

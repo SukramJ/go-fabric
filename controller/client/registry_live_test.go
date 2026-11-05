@@ -231,6 +231,10 @@ func (lr *liveRegistry) waitAlive(t *testing.T, after int) {
 	waitUntil60(t, "a SubscriptionAlive", func() bool { return lr.hooks.count(&lr.hooks.alive) > after })
 }
 
+// waitUntil60 polls cond on the wall clock: the live tests run a real
+// node and controller on UDP loopback sockets (udp.New on 127.0.0.1),
+// whose reads no synctest bubble holds and no site paces. It is the
+// package's one poll.
 func waitUntil60(t *testing.T, what string, cond func() bool) {
 	t.Helper()
 	deadline := time.Now().Add(60 * time.Second)

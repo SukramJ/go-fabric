@@ -13,6 +13,7 @@ import (
 	tdef "github.com/SukramJ/go-fabric/cluster/spec/thermostat"
 	"github.com/SukramJ/go-fabric/cluster/thermo"
 	"github.com/SukramJ/go-fabric/contract"
+	"github.com/SukramJ/go-fabric/im"
 )
 
 func ptrOf[T any](v T) *T { return &v }
@@ -155,8 +156,8 @@ func TestThermostatTypedSetPresets(t *testing.T) {
 	if err := s.Set(tdef.Patch{
 		Presets:          ptrOf([]tdef.PresetStruct{newPreset(withHandle([]byte{1, 2, 3, 4}))}),
 		LocalTemperature: ptrOf(int16(2150)),
-	}); err == nil {
-		t.Fatal("a preset with an unknown handle was accepted")
+	}); spec.StatusOf(err) != im.StatusNotFound {
+		t.Fatalf("a preset with an unknown handle: status %v (%v), want %v", spec.StatusOf(err), err, im.StatusNotFound)
 	}
 	if st := s.Get(); len(st.Presets) != 0 || st.LocalTemperature != nil {
 		t.Fatalf("a refused patch stored %+v / %v", st.Presets, st.LocalTemperature)

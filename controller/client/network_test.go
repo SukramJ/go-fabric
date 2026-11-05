@@ -8,6 +8,7 @@ import (
 	"slices"
 	"sync"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/SukramJ/go-fabric/client/interaction"
@@ -206,111 +207,113 @@ func (h *hookLog) wait(t *testing.T, want client.ConnectionState) {
 // the store bootstraps with a read carrying them (SustainedSubscription.ts:187-204).
 func TestDefaultSubscription(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
-	st := &client.MemoryStore{}
-	hl := newHookLog()
-	sn := newScriptedNode(t, client.Config{ID: "peer1", Store: st, AutoSubscribe: true, NewlyCommissioned: true, Hooks: hl.hooks()})
-	var mu sync.Mutex
-	var observed []interaction.SubscribeRequest
-	client.ObserveRequests(sn.node, func(r interaction.SubscribeRequest) {
-		mu.Lock()
-		observed = append(observed, r)
-		mu.Unlock()
-	})
-	started := make(chan error, 1)
-	go func() { started <- sn.node.Start(ctx) }()
+	synctest.Test(t, func(t *testing.T) {
+		ctx := context.Background()
+		st := &client.MemoryStore{}
+		hl := newHookLog()
+		sn := newScriptedNode(t, client.Config{ID: "peer1", Store: st, AutoSubscribe: true, NewlyCommissioned: true, Hooks: hl.hooks()})
+		var mu sync.Mutex
+		var observed []interaction.SubscribeRequest
+		client.ObserveRequests(sn.node, func(r interaction.SubscribeRequest) {
+			mu.Lock()
+			observed = append(observed, r)
+			mu.Unlock()
+		})
+		started := make(chan error, 1)
+		go func() { started <- sn.node.Start(ctx) }()
 
-	read := sn.next(t)
-	rr := readRequestOf(t, read)
-	if len(rr.DataVersionFilters) != 0 || len(rr.EventFilters) != 0 || len(rr.AttributeRequests) != 1 || rr.AttributeRequests[0].HasEndpoint ||
-		len(rr.EventRequests) != 1 || !rr.EventRequests[0].IsUrgent || !rr.FabricFiltered {
-		t.Fatalf("initial read %+v", rr)
-	}
-	sn.reply(t, read, im.InteractionModelProtocolID, im.OpcodeReportData, dataReport(t, 0, image(5)))
-	if err := <-started; err != nil {
-		t.Fatal(err)
-	}
-	if !sn.node.Seeded() {
-		t.Fatal("not seeded after the initial read")
-	}
+		read := sn.next(t)
+		rr := readRequestOf(t, read)
+		if len(rr.DataVersionFilters) != 0 || len(rr.EventFilters) != 0 || len(rr.AttributeRequests) != 1 || rr.AttributeRequests[0].HasEndpoint ||
+			len(rr.EventRequests) != 1 || !rr.EventRequests[0].IsUrgent || !rr.FabricFiltered {
+			t.Fatalf("initial read %+v", rr)
+		}
+		sn.reply(t, read, im.InteractionModelProtocolID, im.OpcodeReportData, dataReport(t, 0, image(5)))
+		if err := <-started; err != nil {
+			t.Fatal(err)
+		}
+		if !sn.node.Seeded() {
+			t.Fatal("not seeded after the initial read")
+		}
 
-	sub := sn.next(t)
-	sr := subscribeRequestOf(t, sub)
-	if !hasFilter(sr.DataVersionFilters, 1, onoff.ClusterID, 5) || !hasFilter(sr.DataVersionFilters, 0, basicinfo.ClusterID, 3) ||
-		len(sr.EventFilters) != 1 || sr.EventFilters[0].EventMin != 1 || sr.KeepSubscriptions || sr.MinIntervalFloor != 0 || sr.MaxIntervalCeiling != 60 {
-		t.Fatalf("default subscription %+v", sr)
-	}
-	sn.reply(t, sub, im.InteractionModelProtocolID, im.OpcodeReportData, dataReport(t, 33, []im.AttributeReport{value(1, onoff.ClusterID, onoff.AttrOnOff, 6, tlvNode(func(e *tlv.Encoder, tag tlv.Tag) { e.PutBool(tag, true) }))}, startUp(7)))
-	sn.reply(t, sub, im.InteractionModelProtocolID, im.OpcodeSubscribeResponse, subscribeResponse(t, 33))
-	hl.wait(t, client.Connected)
-	if !sn.node.SubscriptionActive() {
-		t.Fatal("not active")
-	}
-	if v, _ := sn.node.Endpoint(1).Cluster(onoff.ClusterID).Decoded(onoff.AttrOnOff); v != true {
-		t.Fatal("the priming report was not applied")
-	}
-	// The report's hooks run on the node's job queue, off its exchange
-	// (W4-ctlim-04): the event arrives after the image changed.
-	waitUntil(t, "the priming report's event", func() bool {
+		sub := sn.next(t)
+		sr := subscribeRequestOf(t, sub)
+		if !hasFilter(sr.DataVersionFilters, 1, onoff.ClusterID, 5) || !hasFilter(sr.DataVersionFilters, 0, basicinfo.ClusterID, 3) ||
+			len(sr.EventFilters) != 1 || sr.EventFilters[0].EventMin != 1 || sr.KeepSubscriptions || sr.MinIntervalFloor != 0 || sr.MaxIntervalCeiling != 60 {
+			t.Fatalf("default subscription %+v", sr)
+		}
+		sn.reply(t, sub, im.InteractionModelProtocolID, im.OpcodeReportData, dataReport(t, 33, []im.AttributeReport{value(1, onoff.ClusterID, onoff.AttrOnOff, 6, tlvNode(func(e *tlv.Encoder, tag tlv.Tag) { e.PutBool(tag, true) }))}, startUp(7)))
+		sn.reply(t, sub, im.InteractionModelProtocolID, im.OpcodeSubscribeResponse, subscribeResponse(t, 33))
+		hl.wait(t, client.Connected)
+		if !sn.node.SubscriptionActive() {
+			t.Fatal("not active")
+		}
+		if v, _ := sn.node.Endpoint(1).Cluster(onoff.ClusterID).Decoded(onoff.AttrOnOff); v != true {
+			t.Fatal("the priming report was not applied")
+		}
+		// The report's hooks run on the node's job queue, off its exchange
+		// (W4-ctlim-04): the event arrives after the image changed.
+		waitUntil(t, "the priming report's event", func() bool {
+			hl.mu.Lock()
+			defer hl.mu.Unlock()
+			return len(hl.events) > 0
+		})
 		hl.mu.Lock()
-		defer hl.mu.Unlock()
-		return len(hl.events) > 0
+		if len(hl.events) != 1 || hl.events[0].(basicinfo.StartUpEvent).SoftwareVersion != 3 || hl.seeded != 1 || hl.alive == 0 || !slices.Equal(hl.status, []bool{true}) {
+			t.Fatalf("events %v seeded %d alive %d status %v", hl.events, hl.seeded, hl.alive, hl.status)
+		}
+		hl.mu.Unlock()
+		// The delivered event is in the node's history (G-C2, issue #388).
+		if h := sn.node.EventHistory(0, 0); len(h) != 1 || h[0].Number != 7 || h[0].Decoded.(basicinfo.StartUpEvent).SoftwareVersion != 3 {
+			t.Fatalf("event history %+v, want StartUp 7", h)
+		}
+		if h := sn.node.EventHistory(8, 0); len(h) != 0 {
+			t.Fatalf("event history since 8: %+v", h)
+		}
+
+		// The underlying subscription is lost: the replacement is refreshed.
+		sn.reg.CloseForPeer(sn.reg.Active()[0].Peer())
+		hl.wait(t, client.Reconnecting)
+		again := sn.next(t)
+		ar := subscribeRequestOf(t, again)
+		if !hasFilter(ar.DataVersionFilters, 1, onoff.ClusterID, 6) || len(ar.EventFilters) != 1 || ar.EventFilters[0].EventMin != 8 {
+			t.Fatalf("re-subscription %+v", ar)
+		}
+		sn.reply(t, again, im.InteractionModelProtocolID, im.OpcodeReportData, dataReport(t, 34, nil))
+		sn.reply(t, again, im.InteractionModelProtocolID, im.OpcodeSubscribeResponse, subscribeResponse(t, 34))
+		hl.wait(t, client.Connected)
+		mu.Lock()
+		// The refreshed request keeps the default subscription's own event
+		// filter; the sustained subscription raises it past the event it
+		// delivered on the wire (ar above) — ClientNodeInteraction.ts:162-168,
+		// SustainedSubscription.ts:379-384 (W4-ctlim-05).
+		if len(observed) != 2 || len(observed[1].EventFilters) != 1 || observed[1].EventFilters[0].EventMin != 1 {
+			t.Fatalf("observed requests %d", len(observed))
+		}
+		mu.Unlock()
+		if err := sn.node.Close(ctx); err != nil {
+			t.Fatal(err)
+		}
+		hl.wait(t, client.Disconnected)
+
+		// The next node on the store: autoSubscribe persisted, a bootstrap read
+		// with the cached versions and the event minimum first.
+		hl2 := newHookLog()
+		sn2 := newScriptedNode(t, client.Config{ID: "peer1", Store: st, Hooks: hl2.hooks()})
+		if err := sn2.node.Start(ctx); err != nil {
+			t.Fatal(err)
+		}
+		boot := sn2.next(t)
+		br := readRequestOf(t, boot)
+		if !hasFilter(br.DataVersionFilters, 1, onoff.ClusterID, 6) || len(br.EventFilters) != 1 || br.EventFilters[0].EventMin != 8 {
+			t.Fatalf("bootstrap read %+v", br)
+		}
+		sn2.reply(t, boot, im.InteractionModelProtocolID, im.OpcodeReportData, dataReport(t, 0, []im.AttributeReport{value(1, onoff.ClusterID, onoff.AttrOnOff, 9, tlvNode(func(e *tlv.Encoder, tag tlv.Tag) { e.PutBool(tag, false) }))}))
+		after := subscribeRequestOf(t, sn2.next(t))
+		if !hasFilter(after.DataVersionFilters, 1, onoff.ClusterID, 9) || after.EventFilters[0].EventMin != 8 {
+			t.Fatalf("subscription after the bootstrap read %+v", after)
+		}
 	})
-	hl.mu.Lock()
-	if len(hl.events) != 1 || hl.events[0].(basicinfo.StartUpEvent).SoftwareVersion != 3 || hl.seeded != 1 || hl.alive == 0 || !slices.Equal(hl.status, []bool{true}) {
-		t.Fatalf("events %v seeded %d alive %d status %v", hl.events, hl.seeded, hl.alive, hl.status)
-	}
-	hl.mu.Unlock()
-	// The delivered event is in the node's history (G-C2, issue #388).
-	if h := sn.node.EventHistory(0, 0); len(h) != 1 || h[0].Number != 7 || h[0].Decoded.(basicinfo.StartUpEvent).SoftwareVersion != 3 {
-		t.Fatalf("event history %+v, want StartUp 7", h)
-	}
-	if h := sn.node.EventHistory(8, 0); len(h) != 0 {
-		t.Fatalf("event history since 8: %+v", h)
-	}
-
-	// The underlying subscription is lost: the replacement is refreshed.
-	sn.reg.CloseForPeer(sn.reg.Active()[0].Peer())
-	hl.wait(t, client.Reconnecting)
-	again := sn.next(t)
-	ar := subscribeRequestOf(t, again)
-	if !hasFilter(ar.DataVersionFilters, 1, onoff.ClusterID, 6) || len(ar.EventFilters) != 1 || ar.EventFilters[0].EventMin != 8 {
-		t.Fatalf("re-subscription %+v", ar)
-	}
-	sn.reply(t, again, im.InteractionModelProtocolID, im.OpcodeReportData, dataReport(t, 34, nil))
-	sn.reply(t, again, im.InteractionModelProtocolID, im.OpcodeSubscribeResponse, subscribeResponse(t, 34))
-	hl.wait(t, client.Connected)
-	mu.Lock()
-	// The refreshed request keeps the default subscription's own event
-	// filter; the sustained subscription raises it past the event it
-	// delivered on the wire (ar above) — ClientNodeInteraction.ts:162-168,
-	// SustainedSubscription.ts:379-384 (W4-ctlim-05).
-	if len(observed) != 2 || len(observed[1].EventFilters) != 1 || observed[1].EventFilters[0].EventMin != 1 {
-		t.Fatalf("observed requests %d", len(observed))
-	}
-	mu.Unlock()
-	if err := sn.node.Close(ctx); err != nil {
-		t.Fatal(err)
-	}
-	hl.wait(t, client.Disconnected)
-
-	// The next node on the store: autoSubscribe persisted, a bootstrap read
-	// with the cached versions and the event minimum first.
-	hl2 := newHookLog()
-	sn2 := newScriptedNode(t, client.Config{ID: "peer1", Store: st, Hooks: hl2.hooks()})
-	if err := sn2.node.Start(ctx); err != nil {
-		t.Fatal(err)
-	}
-	boot := sn2.next(t)
-	br := readRequestOf(t, boot)
-	if !hasFilter(br.DataVersionFilters, 1, onoff.ClusterID, 6) || len(br.EventFilters) != 1 || br.EventFilters[0].EventMin != 8 {
-		t.Fatalf("bootstrap read %+v", br)
-	}
-	sn2.reply(t, boot, im.InteractionModelProtocolID, im.OpcodeReportData, dataReport(t, 0, []im.AttributeReport{value(1, onoff.ClusterID, onoff.AttrOnOff, 9, tlvNode(func(e *tlv.Encoder, tag tlv.Tag) { e.PutBool(tag, false) }))}))
-	after := subscribeRequestOf(t, sn2.next(t))
-	if !hasFilter(after.DataVersionFilters, 1, onoff.ClusterID, 9) || after.EventFilters[0].EventMin != 8 {
-		t.Fatalf("subscription after the bootstrap read %+v", after)
-	}
 }
 
 // TestIncludeKnownVersions: a read carries the cached versions unless
@@ -318,106 +321,112 @@ func TestDefaultSubscription(t *testing.T) {
 // its fabric filter differs from the default subscription's.
 func TestIncludeKnownVersions(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
-	sn := newScriptedNode(t, client.Config{ID: "peer1"})
-	wildcard := interaction.ReadRequest{Attributes: []im.ConcreteAttributePath{{}}}
-	read := func(req client.ReadRequest) im.ReadRequest {
-		t.Helper()
-		done := make(chan error, 1)
-		go func() {
-			_, err := sn.node.Read(ctx, req)
-			done <- err
-		}()
-		m := sn.next(t)
-		rr := readRequestOf(t, m)
-		sn.reply(t, m, im.InteractionModelProtocolID, im.OpcodeReportData, dataReport(t, 0, image(5)))
-		if err := <-done; err != nil {
-			t.Fatal(err)
+	synctest.Test(t, func(t *testing.T) {
+		ctx := context.Background()
+		sn := newScriptedNode(t, client.Config{ID: "peer1"})
+		wildcard := interaction.ReadRequest{Attributes: []im.ConcreteAttributePath{{}}}
+		read := func(req client.ReadRequest) im.ReadRequest {
+			t.Helper()
+			done := make(chan error, 1)
+			go func() {
+				_, err := sn.node.Read(ctx, req)
+				done <- err
+			}()
+			m := sn.next(t)
+			rr := readRequestOf(t, m)
+			sn.reply(t, m, im.InteractionModelProtocolID, im.OpcodeReportData, dataReport(t, 0, image(5)))
+			if err := <-done; err != nil {
+				t.Fatal(err)
+			}
+			return rr
 		}
-		return rr
-	}
-	if rr := read(client.ReadRequest{ReadRequest: wildcard}); len(rr.DataVersionFilters) != 0 {
-		t.Fatal("filters on an empty image")
-	}
-	if rr := read(client.ReadRequest{ReadRequest: wildcard}); !hasFilter(rr.DataVersionFilters, 1, onoff.ClusterID, 5) {
-		t.Fatalf("no filters %+v", rr.DataVersionFilters)
-	}
-	if rr := read(client.ReadRequest{ReadRequest: wildcard, IncludeKnownVersions: true}); len(rr.DataVersionFilters) != 0 {
-		t.Fatal("IncludeKnownVersions sent filters")
-	}
-	unfiltered := wildcard
-	unfiltered.NoFabricFilter = true
-	if rr := read(client.ReadRequest{ReadRequest: unfiltered}); len(rr.DataVersionFilters) != 0 {
-		t.Fatal("an unfiltered read sent filters")
-	}
-	// Errors pass through.
-	ctxDone, cancel := context.WithCancel(ctx)
-	cancel()
-	if _, err := sn.node.Read(ctxDone, client.ReadRequest{ReadRequest: wildcard}); err == nil {
-		t.Fatal("a cancelled read succeeded")
-	}
+		if rr := read(client.ReadRequest{ReadRequest: wildcard}); len(rr.DataVersionFilters) != 0 {
+			t.Fatal("filters on an empty image")
+		}
+		if rr := read(client.ReadRequest{ReadRequest: wildcard}); !hasFilter(rr.DataVersionFilters, 1, onoff.ClusterID, 5) {
+			t.Fatalf("no filters %+v", rr.DataVersionFilters)
+		}
+		if rr := read(client.ReadRequest{ReadRequest: wildcard, IncludeKnownVersions: true}); len(rr.DataVersionFilters) != 0 {
+			t.Fatal("IncludeKnownVersions sent filters")
+		}
+		unfiltered := wildcard
+		unfiltered.NoFabricFilter = true
+		if rr := read(client.ReadRequest{ReadRequest: unfiltered}); len(rr.DataVersionFilters) != 0 {
+			t.Fatal("an unfiltered read sent filters")
+		}
+		// Errors pass through.
+		ctxDone, cancel := context.WithCancel(ctx)
+		cancel()
+		if _, err := sn.node.Read(ctxDone, client.ReadRequest{ReadRequest: wildcard}); err == nil {
+			t.Fatal("a cancelled read succeeded")
+		}
+	})
 }
 
 // TestConnectionStateTable is NetworkClient.ts:223-235.
 func TestConnectionStateTable(t *testing.T) {
 	t.Parallel()
-	for _, tc := range []struct {
-		active, session, offline, latch bool
-		want                            client.ConnectionState
-	}{
-		{true, true, false, false, client.Connected},
-		{true, true, true, true, client.Connected},
-		{true, false, false, false, client.Reconnecting},
-		{false, true, false, false, client.Reconnecting},
-		{false, true, true, true, client.Disconnected},
-		{true, false, true, false, client.Disconnected},
-		{false, false, false, true, client.WaitingForDeviceDiscovery},
-		{true, false, false, true, client.WaitingForDeviceDiscovery},
-	} {
-		if got := client.ConnectionStateFor(tc.active, tc.session, tc.offline, tc.latch); got != tc.want {
-			t.Errorf("%+v: %v", tc, got)
+	synctest.Test(t, func(t *testing.T) {
+		for _, tc := range []struct {
+			active, session, offline, latch bool
+			want                            client.ConnectionState
+		}{
+			{true, true, false, false, client.Connected},
+			{true, true, true, true, client.Connected},
+			{true, false, false, false, client.Reconnecting},
+			{false, true, false, false, client.Reconnecting},
+			{false, true, true, true, client.Disconnected},
+			{true, false, true, false, client.Disconnected},
+			{false, false, false, true, client.WaitingForDeviceDiscovery},
+			{true, false, false, true, client.WaitingForDeviceDiscovery},
+		} {
+			if got := client.ConnectionStateFor(tc.active, tc.session, tc.offline, tc.latch); got != tc.want {
+				t.Errorf("%+v: %v", tc, got)
+			}
 		}
-	}
+	})
 }
 
 // TestWriteAndInvokeForward: Write and Invoke go to the peer
 // (ClientNodeInteraction.ts:175-186, :197-210); the image is not touched.
 func TestWriteAndInvokeForward(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
-	sn := newScriptedNode(t, client.Config{ID: "peer1"})
-	path := attrPath(0, basicinfo.ClusterID, basicinfo.AttrNodeLabel)
-	wrote := make(chan error, 1)
-	go func() {
-		_, err := sn.node.Write(ctx, []interaction.WriteRequest{{Path: path, Value: interaction.Raw(tlvNode(func(e *tlv.Encoder, tag tlv.Tag) { e.PutUTF8(tag, "x") }))}}, interaction.WriteOptions{})
-		wrote <- err
-	}()
-	w := sn.next(t)
-	if w.proto.Opcode != im.OpcodeWriteRequest {
-		t.Fatalf("opcode 0x%02X", w.proto.Opcode)
-	}
-	sn.reply(t, w, im.InteractionModelProtocolID, im.OpcodeWriteResponse, encode(t, func(e *tlv.Encoder) {
-		im.WriteResponse{Responses: []im.AttributeStatus{{Path: path, Status: im.StatusIB{Status: im.StatusSuccess}}}}.MarshalTLV(e)
-	}))
-	if err := <-wrote; err != nil {
-		t.Fatal(err)
-	}
-	invoked := make(chan error, 1)
-	go func() {
-		_, err := sn.node.Invoke(ctx, im.ConcreteCommandPath{Endpoint: 1, Cluster: onoff.ClusterID, Command: onoff.CmdToggle}, nil, interaction.InvokeOptions{})
-		invoked <- err
-	}()
-	inv := sn.next(t)
-	if inv.proto.Opcode != im.OpcodeInvokeRequest {
-		t.Fatalf("opcode 0x%02X", inv.proto.Opcode)
-	}
-	sn.reply(t, inv, im.InteractionModelProtocolID, im.OpcodeStatusResponse, encode(t, func(e *tlv.Encoder) { im.StatusResponse{Status: im.StatusUnsupportedCommand}.MarshalTLV(e) }))
-	if err := <-invoked; err == nil {
-		t.Fatal("the refused invoke succeeded")
-	}
-	if len(sn.node.Endpoints()) != 1 {
-		t.Fatal("the image changed")
-	}
+	synctest.Test(t, func(t *testing.T) {
+		ctx := context.Background()
+		sn := newScriptedNode(t, client.Config{ID: "peer1"})
+		path := attrPath(0, basicinfo.ClusterID, basicinfo.AttrNodeLabel)
+		wrote := make(chan error, 1)
+		go func() {
+			_, err := sn.node.Write(ctx, []interaction.WriteRequest{{Path: path, Value: interaction.Raw(tlvNode(func(e *tlv.Encoder, tag tlv.Tag) { e.PutUTF8(tag, "x") }))}}, interaction.WriteOptions{})
+			wrote <- err
+		}()
+		w := sn.next(t)
+		if w.proto.Opcode != im.OpcodeWriteRequest {
+			t.Fatalf("opcode 0x%02X", w.proto.Opcode)
+		}
+		sn.reply(t, w, im.InteractionModelProtocolID, im.OpcodeWriteResponse, encode(t, func(e *tlv.Encoder) {
+			im.WriteResponse{Responses: []im.AttributeStatus{{Path: path, Status: im.StatusIB{Status: im.StatusSuccess}}}}.MarshalTLV(e)
+		}))
+		if err := <-wrote; err != nil {
+			t.Fatal(err)
+		}
+		invoked := make(chan error, 1)
+		go func() {
+			_, err := sn.node.Invoke(ctx, im.ConcreteCommandPath{Endpoint: 1, Cluster: onoff.ClusterID, Command: onoff.CmdToggle}, nil, interaction.InvokeOptions{})
+			invoked <- err
+		}()
+		inv := sn.next(t)
+		if inv.proto.Opcode != im.OpcodeInvokeRequest {
+			t.Fatalf("opcode 0x%02X", inv.proto.Opcode)
+		}
+		sn.reply(t, inv, im.InteractionModelProtocolID, im.OpcodeStatusResponse, encode(t, func(e *tlv.Encoder) { im.StatusResponse{Status: im.StatusUnsupportedCommand}.MarshalTLV(e) }))
+		if err := <-invoked; err == nil {
+			t.Fatal("the refused invoke succeeded")
+		}
+		if len(sn.node.Endpoints()) != 1 {
+			t.Fatal("the image changed")
+		}
+	})
 }
 
 // TestSustainedHostSubscriptionKeepsEventFilters (W4-ctlim-05): a host's
@@ -427,41 +436,43 @@ func TestWriteAndInvokeForward(t *testing.T) {
 // the version filters only) and SustainedSubscription.ts:379-384.
 func TestSustainedHostSubscriptionKeepsEventFilters(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
-	sn := newScriptedNode(t, client.Config{ID: "peer1", Store: &client.MemoryStore{}})
-	client.DeliverEvent(sn.node, interaction.EventData{Number: 41}) // the node-wide cursor at 41
-	var mu sync.Mutex
-	var observed []interaction.SubscribeRequest
-	client.ObserveRequests(sn.node, func(r interaction.SubscribeRequest) {
-		mu.Lock()
-		observed = append(observed, r)
-		mu.Unlock()
+	synctest.Test(t, func(t *testing.T) {
+		ctx := context.Background()
+		sn := newScriptedNode(t, client.Config{ID: "peer1", Store: &client.MemoryStore{}})
+		client.DeliverEvent(sn.node, interaction.EventData{Number: 41}) // the node-wide cursor at 41
+		var mu sync.Mutex
+		var observed []interaction.SubscribeRequest
+		client.ObserveRequests(sn.node, func(r interaction.SubscribeRequest) {
+			mu.Lock()
+			observed = append(observed, r)
+			mu.Unlock()
+		})
+		type result struct {
+			sub *client.Subscription
+			err error
+		}
+		done := make(chan result, 1)
+		go func() {
+			s, err := sn.node.Subscribe(ctx, client.SubscribeRequest{SubscribeRequest: interaction.SubscribeRequest{
+				Events: []im.ConcreteEventPath{{}}, EventFilters: []im.EventMinimumNumber{{EventMin: 0}}, Sustain: true,
+			}})
+			done <- result{s, err}
+		}()
+		sub := sn.next(t)
+		sn.reply(t, sub, im.InteractionModelProtocolID, im.OpcodeReportData, dataReport(t, 61, nil))
+		sn.reply(t, sub, im.InteractionModelProtocolID, im.OpcodeSubscribeResponse, subscribeResponse(t, 61))
+		r := <-done
+		if r.err != nil {
+			t.Fatal(r.err)
+		}
+		t.Cleanup(r.sub.Close)
+		sn.reg.CloseForPeer(sn.reg.Active()[0].Peer())
+		// The re-subscription waits on timers; their timing is not the subject.
+		again := subscribeRequestOf(t, sn.nextAdvancing(t))
+		if len(again.EventFilters) != 1 || again.EventFilters[0].EventMin != 0 {
+			t.Fatalf("re-subscription event filters %+v, want the host's EventMin 0", again.EventFilters)
+		}
 	})
-	type result struct {
-		sub *client.Subscription
-		err error
-	}
-	done := make(chan result, 1)
-	go func() {
-		s, err := sn.node.Subscribe(ctx, client.SubscribeRequest{SubscribeRequest: interaction.SubscribeRequest{
-			Events: []im.ConcreteEventPath{{}}, EventFilters: []im.EventMinimumNumber{{EventMin: 0}}, Sustain: true,
-		}})
-		done <- result{s, err}
-	}()
-	sub := sn.next(t)
-	sn.reply(t, sub, im.InteractionModelProtocolID, im.OpcodeReportData, dataReport(t, 61, nil))
-	sn.reply(t, sub, im.InteractionModelProtocolID, im.OpcodeSubscribeResponse, subscribeResponse(t, 61))
-	r := <-done
-	if r.err != nil {
-		t.Fatal(r.err)
-	}
-	t.Cleanup(r.sub.Close)
-	sn.reg.CloseForPeer(sn.reg.Active()[0].Peer())
-	// The re-subscription waits on timers; their timing is not the subject.
-	again := subscribeRequestOf(t, sn.nextAdvancing(t))
-	if len(again.EventFilters) != 1 || again.EventFilters[0].EventMin != 0 {
-		t.Fatalf("re-subscription event filters %+v, want the host's EventMin 0", again.EventFilters)
-	}
 }
 
 // within returns the next message the manager sends within d, skipping
@@ -524,21 +535,23 @@ func (s *scripted) nextAdvancing(t *testing.T) msg {
 // NetworkClient.ts:113-131 and :207-221 (isCurrent after subscribe).
 func TestStopDuringInitialReadEstablishesNothing(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
-	sn := newScriptedNode(t, client.Config{ID: "peer1", Store: &client.MemoryStore{}, AutoSubscribe: true, NewlyCommissioned: true})
-	started := make(chan error, 1)
-	go func() { started <- sn.node.Start(ctx) }()
-	read := sn.next(t)
-	readRequestOf(t, read)
-	if err := sn.node.Stop(ctx); err != nil {
-		t.Fatal(err)
-	}
-	sn.reply(t, read, im.InteractionModelProtocolID, im.OpcodeReportData, dataReport(t, 0, image(5)))
-	if err := <-started; err != nil {
-		t.Fatal(err)
-	}
-	sn.quiet(t, 200*time.Millisecond)
-	if sn.node.SubscriptionActive() || len(sn.reg.Active()) != 0 {
-		t.Fatal("a default subscription on a stopped node")
-	}
+	synctest.Test(t, func(t *testing.T) {
+		ctx := context.Background()
+		sn := newScriptedNode(t, client.Config{ID: "peer1", Store: &client.MemoryStore{}, AutoSubscribe: true, NewlyCommissioned: true})
+		started := make(chan error, 1)
+		go func() { started <- sn.node.Start(ctx) }()
+		read := sn.next(t)
+		readRequestOf(t, read)
+		if err := sn.node.Stop(ctx); err != nil {
+			t.Fatal(err)
+		}
+		sn.reply(t, read, im.InteractionModelProtocolID, im.OpcodeReportData, dataReport(t, 0, image(5)))
+		if err := <-started; err != nil {
+			t.Fatal(err)
+		}
+		sn.quiet(t, 200*time.Millisecond)
+		if sn.node.SubscriptionActive() || len(sn.reg.Active()) != 0 {
+			t.Fatal("a default subscription on a stopped node")
+		}
+	})
 }

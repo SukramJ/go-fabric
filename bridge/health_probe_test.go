@@ -7,6 +7,7 @@ import (
 	"context"
 	"sync"
 	"testing"
+	"testing/synctest"
 	"time"
 )
 
@@ -52,26 +53,22 @@ func (r *recordingTracker) snapshot() []HealthSample {
 // sample on the immediate first probe.
 func TestStartHealthProbe_BoundReportsHealthy(t *testing.T) {
 	t.Parallel()
-	status := &fakeBridgeStatus{addr: "[::]:5540"}
-	tracker := &recordingTracker{}
-	stop := StartHealthProbe(context.Background(), status, tracker, time.Hour)
-	t.Cleanup(stop)
-	// The probe records its first sample synchronously inside the
-	// goroutine. Spin briefly so the goroutine reaches probeOnce.
-	deadline := time.Now().Add(2 * time.Second)
-	for time.Now().Before(deadline) {
-		if len(tracker.snapshot()) > 0 {
-			break
+	synctest.Test(t, func(t *testing.T) {
+		status := &fakeBridgeStatus{addr: "[::]:5540"}
+		tracker := &recordingTracker{}
+		stop := StartHealthProbe(context.Background(), status, tracker, time.Hour)
+		t.Cleanup(stop)
+		// The probe records its first sample synchronously inside its
+		// goroutine; once the bubble settles it has run probeOnce.
+		synctest.Wait()
+		got := tracker.snapshot()
+		if len(got) != 1 {
+			t.Fatalf("expected 1 sample, got %d", len(got))
 		}
-		time.Sleep(5 * time.Millisecond)
-	}
-	got := tracker.snapshot()
-	if len(got) != 1 {
-		t.Fatalf("expected 1 sample, got %d", len(got))
-	}
-	if !got[0].Healthy {
-		t.Fatalf("expected Healthy=true, got %+v", got[0])
-	}
+		if !got[0].Healthy {
+			t.Fatalf("expected Healthy=true, got %+v", got[0])
+		}
+	})
 }
 
 // TestStartHealthProbe_UnboundReportsUnhealthy verifies that an
@@ -79,30 +76,26 @@ func TestStartHealthProbe_BoundReportsHealthy(t *testing.T) {
 // flap-damp rule transitions the tracker straight to UNHEALTHY.
 func TestStartHealthProbe_UnboundReportsUnhealthy(t *testing.T) {
 	t.Parallel()
-	status := &fakeBridgeStatus{addr: ""}
-	tracker := &recordingTracker{}
-	stop := StartHealthProbe(context.Background(), status, tracker, time.Hour)
-	t.Cleanup(stop)
-	deadline := time.Now().Add(2 * time.Second)
-	for time.Now().Before(deadline) {
-		if len(tracker.snapshot()) >= 1 {
-			break
+	synctest.Test(t, func(t *testing.T) {
+		status := &fakeBridgeStatus{addr: ""}
+		tracker := &recordingTracker{}
+		stop := StartHealthProbe(context.Background(), status, tracker, time.Hour)
+		t.Cleanup(stop)
+		synctest.Wait() // the probe goroutine has recorded its first sample
+		got := tracker.snapshot()
+		// One report per probe: an unbound listener is a condition the probe
+		// states, so the tracker takes it at once. It used to be recorded twice,
+		// the second time with an invented "(escalated)" note, purely to clear the
+		// flap-damping that Record applies to sampled observations.
+		if len(got) < 1 {
+			t.Fatalf("expected at least one sample, got %d", len(got))
 		}
-		time.Sleep(5 * time.Millisecond)
-	}
-	got := tracker.snapshot()
-	// One report per probe: an unbound listener is a condition the probe
-	// states, so the tracker takes it at once. It used to be recorded twice,
-	// the second time with an invented "(escalated)" note, purely to clear the
-	// flap-damping that Record applies to sampled observations.
-	if len(got) < 1 {
-		t.Fatalf("expected at least one sample, got %d", len(got))
-	}
-	for i, s := range got {
-		if s.Healthy {
-			t.Fatalf("sample %d expected Healthy=false, got %+v", i, s)
+		for i, s := range got {
+			if s.Healthy {
+				t.Fatalf("sample %d expected Healthy=false, got %+v", i, s)
+			}
 		}
-	}
+	})
 }
 
 // TestStartHealthProbe_NilArgsAreNoOps covers the boot-time path
@@ -110,8 +103,10 @@ func TestStartHealthProbe_UnboundReportsUnhealthy(t *testing.T) {
 // arg returns a no-op stop without spawning a goroutine.
 func TestStartHealthProbe_NilArgsAreNoOps(t *testing.T) {
 	t.Parallel()
-	stop := StartHealthProbe(context.Background(), nil, &recordingTracker{}, time.Second)
-	stop() // must not panic
-	stop = StartHealthProbe(context.Background(), &fakeBridgeStatus{}, nil, time.Second)
-	stop()
+	synctest.Test(t, func(t *testing.T) {
+		stop := StartHealthProbe(context.Background(), nil, &recordingTracker{}, time.Second)
+		stop() // must not panic
+		stop = StartHealthProbe(context.Background(), &fakeBridgeStatus{}, nil, time.Second)
+		stop()
+	})
 }

@@ -722,13 +722,23 @@ func TestIcdClientParity(t *testing.T) {
 			// after the tenth step (seen in the race job of #346): wait for
 			// the subscription to be established — matter.js's settled()
 			// after each advance — before reading the deadline.
-			p.eventually(t, "the recreated subscription", p.node.SubscriptionActive)
-			if _, ok := p.icd().NextExpectedCheckIn(); ok {
+			//
+			// The step ends on the event (issue #383): the active flag can
+			// flip before the new subscription takes its hold, so a single
+			// read right after it saw the gap. The site runs until the
+			// subscription holds the peer, then the settled site is checked
+			// again — the steady state, not a window.
+			p.eventually(t, "the recreated subscription holding the peer", func() bool {
+				_, due := p.icd().NextExpectedCheckIn()
+				return p.node.SubscriptionActive() && !due
+			})
+			p.settle(t)
+			if _, ok := p.icd().NextExpectedCheckIn(); ok && p.node.SubscriptionActive() {
 				t.Fatal("a deadline while subscribed")
 			}
 		})
 		t.Run("exposes nextExpectedCheckin on the wall clock once no subscription is held", func(t *testing.T) {
-			t.Skip("MockTime.stepWallClock: the Go wakefulness runs on one clock reading, its deadline already a time.Time; the no-subscription deadline is held by TestIcdPeerWakefulness's subscription cases")
+			t.Skip("behaviour gap (seam wave, issue #396): the Go deadline is anchored to the wall reading of the peer's last activity, so after Fake.StepWall(1h) NextExpectedCheckIn read now+15s where matter.js reads at least now+idleModeDuration (IcdClientTest.ts:2281-2293 at 862ad75f); the no-subscription deadline is held by TestIcdPeerWakefulness's subscription cases")
 		})
 		t.Run("has no nextExpectedCheckin for an unregistered peer", func(t *testing.T) {
 			if _, ok := newICDPair(t, icdPairOptions{}).icd().NextExpectedCheckIn(); ok {

@@ -11,8 +11,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/SukramJ/go-fabric/clock/clocktest"
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/cluster/core"
+	"github.com/SukramJ/go-fabric/cluster/spec"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
 )
@@ -141,13 +143,22 @@ func TestGenDiag_ReadTestEventTriggersEnabled(t *testing.T) {
 func TestGenDiag_UpTimeMonotonicallyNonDecreasing(t *testing.T) {
 	t.Parallel()
 	g := core.NewGeneralDiagnostics(core.BootReasonPowerOnReboot)
+	fake := clocktest.New(time.Unix(1_700_000_000, 0))
+	g.SetClock(fake)
 	v1, _ := g.MatterRead(0x0002)
 	up1 := v1.(uint64)
-	time.Sleep(10 * time.Millisecond)
+	fake.Advance(10 * time.Second)
 	v2, _ := g.MatterRead(0x0002)
 	up2 := v2.(uint64)
 	if up2 < up1 {
 		t.Fatalf("UpTime decreased: %d → %d", up1, up2)
+	}
+	if up2-up1 != 10 {
+		t.Fatalf("UpTime %d → %d across a 10 s advance, want +10", up1, up2)
+	}
+	fake.StepWall(-time.Hour) // a wall-clock step back does not move UpTime back
+	if v3, _ := g.MatterRead(0x0002); v3.(uint64) < up2 {
+		t.Fatalf("UpTime %d → %d across a wall-clock step back", up2, v3)
 	}
 }
 
@@ -156,8 +167,8 @@ func TestGenDiag_WriteReturnsError(t *testing.T) {
 	g := core.NewGeneralDiagnostics(core.BootReasonPowerOnReboot)
 	ctx := context.Background()
 	err := g.MatterWrite(ctx, 0x0001, uint16(0))
-	if err == nil {
-		t.Fatal("expected error for write, got nil")
+	if spec.StatusOf(err) != im.StatusUnsupportedWrite {
+		t.Fatalf("RebootCount write: status %v (%v), want %v", spec.StatusOf(err), err, im.StatusUnsupportedWrite)
 	}
 }
 

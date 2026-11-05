@@ -8,6 +8,7 @@ import (
 	"errors"
 	"sync/atomic"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/SukramJ/go-fabric/client/exchange"
@@ -58,29 +59,31 @@ const (
 // address (PeerConnection.ts:186-200, :341-358).
 func TestConnectDiscoveredAddress(t *testing.T) {
 	t.Parallel()
-	h := newHarness(t, nil)
-	p, _ := h.set.For(testAddr)
-	res := connectAsync(p, ConnectOptions{ConnectionTimeout: -1})
-	eventually(t, "the process", func() bool { return process(p) != nil && p.status.IsResolving() })
-	if p.TimeOffline() != 0 {
-		t.Fatal("time offline on a fresh process")
-	}
-	h.clock.Advance(time.Second)
-	if p.TimeOffline() != time.Second {
-		t.Fatalf("TimeOffline = %v", p.TimeOffline())
-	}
-	h.announceAddrs(t, "fd00::1")
-	s1 := h.sigma1(t, addr1)
-	if s1.proto.ExchangeID == 0 && s1.hdr.SourceNodeID == 0 {
-		t.Fatal("Sigma1 without an initiator")
-	}
-	p.Close(context.Background())
-	if r := waitResult(t, res); !errors.Is(r.err, ErrClosed) {
-		t.Fatalf("Connect after Close = %v", r.err)
-	}
-	if _, err := p.Connect(context.Background(), ConnectOptions{}); !errors.Is(err, ErrClosed) {
-		t.Fatalf("Connect on a closed peer = %v", err)
-	}
+	synctest.Test(t, func(t *testing.T) {
+		h := newHarness(t, nil)
+		p, _ := h.set.For(testAddr)
+		res := connectAsync(p, ConnectOptions{ConnectionTimeout: -1})
+		eventually(t, "the process", func() bool { return process(p) != nil && p.status.IsResolving() })
+		if p.TimeOffline() != 0 {
+			t.Fatal("time offline on a fresh process")
+		}
+		h.clock.Advance(time.Second)
+		if p.TimeOffline() != time.Second {
+			t.Fatalf("TimeOffline = %v", p.TimeOffline())
+		}
+		h.announceAddrs(t, "fd00::1")
+		s1 := h.sigma1(t, addr1)
+		if s1.proto.ExchangeID == 0 && s1.hdr.SourceNodeID == 0 {
+			t.Fatal("Sigma1 without an initiator")
+		}
+		p.Close(context.Background())
+		if r := waitResult(t, res); !errors.Is(r.err, ErrClosed) {
+			t.Fatalf("Connect after Close = %v", r.err)
+		}
+		if _, err := p.Connect(context.Background(), ConnectOptions{}); !errors.Is(err, ErrClosed) {
+			t.Fatalf("Connect on a closed peer = %v", err)
+		}
+	})
 }
 
 // TestFallbackOnlyAndNotFirst: the operational address is the fallback
@@ -90,28 +93,30 @@ func TestConnectDiscoveredAddress(t *testing.T) {
 // :519-520, :597-603).
 func TestFallbackOnlyAndNotFirst(t *testing.T) {
 	t.Parallel()
-	h := newHarness(t, nil)
-	p, _ := h.set.AddKnownPeer(Descriptor{Address: testAddr, OperationalAddress: udpAddr(addr9)})
-	connectAsync(p, ConnectOptions{ConnectionTimeout: -1})
-	h.sigma1(t, addr9)
-	if h.clock.hasTimer(2 * time.Minute) {
-		t.Fatal("the first fallback attempt waits the initial-contact maximum")
-	}
-	p.Close(context.Background())
+	synctest.Test(t, func(t *testing.T) {
+		h := newHarness(t, nil)
+		p, _ := h.set.AddKnownPeer(Descriptor{Address: testAddr, OperationalAddress: udpAddr(addr9)})
+		connectAsync(p, ConnectOptions{ConnectionTimeout: -1})
+		h.sigma1(t, addr9)
+		if h.clock.hasTimer(2 * time.Minute) {
+			t.Fatal("the first fallback attempt waits the initial-contact maximum")
+		}
+		p.Close(context.Background())
 
-	h2 := newHarness(t, nil)
-	q, _ := h2.set.AddKnownPeer(Descriptor{Address: testAddr, OperationalAddress: udpAddr(addr9)})
-	h2.announceAddrs(t, "fd00::1")
-	eventually(t, "the address", func() bool { return len(q.Service().Addresses()) == 1 })
-	connectAsync(q, ConnectOptions{ConnectionTimeout: -1})
-	h2.sigma1(t, addr1)
-	h2.expire(t, "fd00::1")
-	// The discovered address left: its attempt ends, the fallback waits for
-	// the stagger, then goes with the long backoff.
-	h2.clock.waitTimer(t, 45*time.Second)
-	h2.clock.Advance(45 * time.Second)
-	h2.sigma1(t, addr9)
-	h2.clock.waitTimer(t, 2*time.Minute)
+		h2 := newHarness(t, nil)
+		q, _ := h2.set.AddKnownPeer(Descriptor{Address: testAddr, OperationalAddress: udpAddr(addr9)})
+		h2.announceAddrs(t, "fd00::1")
+		eventually(t, "the address", func() bool { return len(q.Service().Addresses()) == 1 })
+		connectAsync(q, ConnectOptions{ConnectionTimeout: -1})
+		h2.sigma1(t, addr1)
+		h2.expire(t, "fd00::1")
+		// The discovered address left: its attempt ends, the fallback waits for
+		// the stagger, then goes with the long backoff.
+		h2.clock.waitTimer(t, 45*time.Second)
+		h2.clock.Advance(45 * time.Second)
+		h2.sigma1(t, addr9)
+		h2.clock.waitTimer(t, 2*time.Minute)
+	})
 }
 
 // TestFallbackRetiredAfterStabilization: discovery that names other
@@ -120,23 +125,25 @@ func TestFallbackOnlyAndNotFirst(t *testing.T) {
 // (PeerConnection.ts:264-303).
 func TestFallbackRetiredAfterStabilization(t *testing.T) {
 	t.Parallel()
-	h := newHarness(t, nil)
-	p, _ := h.set.AddKnownPeer(Descriptor{Address: testAddr, OperationalAddress: udpAddr(addr9)})
-	connectAsync(p, ConnectOptions{ConnectionTimeout: -1})
-	h.sigma1(t, addr9)
-	h.announceAddrs(t, "fd00::1")
-	h.clock.waitTimer(t, 10*time.Second)
-	h.clock.waitTimer(t, 45*time.Second)
-	h.clock.Advance(10*time.Second - time.Millisecond)
-	h.noSigma1(t, addr1)
-	h.clock.Advance(time.Millisecond)
-	h.sigma1(t, addr1)
-	eventually(t, "the fallback to go", func() bool {
-		c := process(p)
-		c.mu.Lock()
-		defer c.mu.Unlock()
-		_, ok := c.attempts[attemptKey{ap: addressOf(udpAddr(addr9)).AddrPort()}]
-		return !ok && c.fallback == nil
+	synctest.Test(t, func(t *testing.T) {
+		h := newHarness(t, nil)
+		p, _ := h.set.AddKnownPeer(Descriptor{Address: testAddr, OperationalAddress: udpAddr(addr9)})
+		connectAsync(p, ConnectOptions{ConnectionTimeout: -1})
+		h.sigma1(t, addr9)
+		h.announceAddrs(t, "fd00::1")
+		h.clock.waitTimer(t, 10*time.Second)
+		h.clock.waitTimer(t, 45*time.Second)
+		h.clock.Advance(10*time.Second - time.Millisecond)
+		h.noSigma1(t, addr1)
+		h.clock.Advance(time.Millisecond)
+		h.sigma1(t, addr1)
+		eventually(t, "the fallback to go", func() bool {
+			c := process(p)
+			c.mu.Lock()
+			defer c.mu.Unlock()
+			_, ok := c.attempts[attemptKey{ap: addressOf(udpAddr(addr9)).AddrPort()}]
+			return !ok && c.fallback == nil
+		})
 	})
 }
 
@@ -144,18 +151,20 @@ func TestFallbackRetiredAfterStabilization(t *testing.T) {
 // DelayBeforeNextAddress apart (PeerConnection.ts:233-260).
 func TestTwoAddressesStaggered(t *testing.T) {
 	t.Parallel()
-	h := newHarness(t, nil)
-	p, _ := h.set.For(testAddr)
-	h.announceAddrs(t, "fd00::1", "fd00::2")
-	eventually(t, "the addresses", func() bool { return len(p.Service().Addresses()) == 2 })
-	connectAsync(p, ConnectOptions{ConnectionTimeout: -1})
-	first := h.sigma1(t, addr1)
-	_ = first
-	h.clock.waitTimer(t, 45*time.Second)
-	h.clock.Advance(45*time.Second - time.Millisecond)
-	h.noSigma1(t, addr2)
-	h.clock.Advance(time.Millisecond)
-	h.sigma1(t, addr2)
+	synctest.Test(t, func(t *testing.T) {
+		h := newHarness(t, nil)
+		p, _ := h.set.For(testAddr)
+		h.announceAddrs(t, "fd00::1", "fd00::2")
+		eventually(t, "the addresses", func() bool { return len(p.Service().Addresses()) == 2 })
+		connectAsync(p, ConnectOptions{ConnectionTimeout: -1})
+		first := h.sigma1(t, addr1)
+		_ = first
+		h.clock.waitTimer(t, 45*time.Second)
+		h.clock.Advance(45*time.Second - time.Millisecond)
+		h.noSigma1(t, addr2)
+		h.clock.Advance(time.Millisecond)
+		h.sigma1(t, addr2)
+	})
 }
 
 // TestOperationalAddressStaysAsFallback: when every discovered address
@@ -163,25 +172,27 @@ func TestTwoAddressesStaggered(t *testing.T) {
 // (PeerConnection.ts:422-429).
 func TestOperationalAddressStaysAsFallback(t *testing.T) {
 	t.Parallel()
-	h := newHarness(t, nil)
-	p, _ := h.set.AddKnownPeer(Descriptor{Address: testAddr, OperationalAddress: udpAddr(addr1)})
-	h.announceAddrs(t, "fd00::1")
-	eventually(t, "the address", func() bool { return len(p.Service().Addresses()) == 1 })
-	connectAsync(p, ConnectOptions{ConnectionTimeout: -1})
-	s1 := h.sigma1(t, addr1)
-	h.expire(t, "fd00::1")
-	eventually(t, "the fallback mark", func() bool {
-		c := process(p)
-		c.mu.Lock()
-		defer c.mu.Unlock()
-		return c.fallback != nil && len(c.attempts) == 1
+	synctest.Test(t, func(t *testing.T) {
+		h := newHarness(t, nil)
+		p, _ := h.set.AddKnownPeer(Descriptor{Address: testAddr, OperationalAddress: udpAddr(addr1)})
+		h.announceAddrs(t, "fd00::1")
+		eventually(t, "the address", func() bool { return len(p.Service().Addresses()) == 1 })
+		connectAsync(p, ConnectOptions{ConnectionTimeout: -1})
+		s1 := h.sigma1(t, addr1)
+		h.expire(t, "fd00::1")
+		eventually(t, "the fallback mark", func() bool {
+			c := process(p)
+			c.mu.Lock()
+			defer c.mu.Unlock()
+			return c.fallback != nil && len(c.attempts) == 1
+		})
+		// The attempt is the same exchange: it retransmits on.
+		h.clock.Advance(5 * time.Second)
+		d := decodeUnsecured(t, h.udp.nextTo(t, addr1).bytes)
+		if d.proto.ExchangeID != s1.proto.ExchangeID {
+			t.Fatal("the attempt restarted")
+		}
 	})
-	// The attempt is the same exchange: it retransmits on.
-	h.clock.Advance(5 * time.Second)
-	d := decodeUnsecured(t, h.udp.nextTo(t, addr1).bytes)
-	if d.proto.ExchangeID != s1.proto.ExchangeID {
-		t.Fatal("the attempt restarted")
-	}
 }
 
 // TestConnectionErrorDelays: the pause after each kind of failure
@@ -219,15 +230,17 @@ func TestConnectionErrorDelays(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			t.Parallel()
-			h := newHarness(t, nil)
-			p, _ := h.set.AddKnownPeer(Descriptor{Address: testAddr, OperationalAddress: udpAddr(addr1)})
-			connectAsync(p, ConnectOptions{ConnectionTimeout: -1})
-			c.reply(t, h, h.sigma1(t, addr1))
-			h.clock.waitTimer(t, c.delay)
-			h.clock.Advance(c.delay - time.Millisecond)
-			h.noSigma1(t, addr1)
-			h.clock.Advance(time.Millisecond)
-			h.sigma1(t, addr1)
+			synctest.Test(t, func(t *testing.T) {
+				h := newHarness(t, nil)
+				p, _ := h.set.AddKnownPeer(Descriptor{Address: testAddr, OperationalAddress: udpAddr(addr1)})
+				connectAsync(p, ConnectOptions{ConnectionTimeout: -1})
+				c.reply(t, h, h.sigma1(t, addr1))
+				h.clock.waitTimer(t, c.delay)
+				h.clock.Advance(c.delay - time.Millisecond)
+				h.noSigma1(t, addr1)
+				h.clock.Advance(time.Millisecond)
+				h.sigma1(t, addr1)
+			})
 		})
 	}
 }
@@ -242,15 +255,17 @@ func caseResponseTimeout() time.Duration {
 // the next attempt starts at once (PeerConnection.ts:681-685).
 func TestNoSharedTrustRootsDeletesTheRecordAndRetries(t *testing.T) {
 	t.Parallel()
-	h := newHarness(t, nil)
-	_ = h.resume.SaveResumptionRecord(resumptionRecordFor(t, h))
-	p, _ := h.set.AddKnownPeer(Descriptor{Address: testAddr, OperationalAddress: udpAddr(addr1)})
-	connectAsync(p, ConnectOptions{ConnectionTimeout: -1})
-	h.status(h.sigma1(t, addr1), addr1, mrp.SCStatusGeneralFailure, mrp.SCStatusProtocolNoSharedTrustRoots, nil)
-	h.sigma1(t, addr1)
-	if _, ok := h.resume.FindResumptionRecord(testAddr); ok {
-		t.Fatal("the resumption record survived")
-	}
+	synctest.Test(t, func(t *testing.T) {
+		h := newHarness(t, nil)
+		_ = h.resume.SaveResumptionRecord(resumptionRecordFor(t, h))
+		p, _ := h.set.AddKnownPeer(Descriptor{Address: testAddr, OperationalAddress: udpAddr(addr1)})
+		connectAsync(p, ConnectOptions{ConnectionTimeout: -1})
+		h.status(h.sigma1(t, addr1), addr1, mrp.SCStatusGeneralFailure, mrp.SCStatusProtocolNoSharedTrustRoots, nil)
+		h.sigma1(t, addr1)
+		if _, ok := h.resume.FindResumptionRecord(testAddr); ok {
+			t.Fatal("the resumption record survived")
+		}
+	})
 }
 
 // TestHandleErrorOverrideAndFatal: the handler replaces the delay; an
@@ -258,32 +273,34 @@ func TestNoSharedTrustRootsDeletesTheRecordAndRetries(t *testing.T) {
 // (PeerConnection.ts:704-717).
 func TestHandleErrorOverrideAndFatal(t *testing.T) {
 	t.Parallel()
-	fatal := errors.New("give up")
-	calls := 0
-	h := newHarness(t, func(c *Context) {
-		c.HandleError = func(err error) (time.Duration, bool, error) {
-			calls++
-			if calls == 1 {
-				return time.Second, true, nil
+	synctest.Test(t, func(t *testing.T) {
+		fatal := errors.New("give up")
+		calls := 0
+		h := newHarness(t, func(c *Context) {
+			c.HandleError = func(err error) (time.Duration, bool, error) {
+				calls++
+				if calls == 1 {
+					return time.Second, true, nil
+				}
+				if calls == 2 {
+					return 0, false, nil
+				}
+				return 0, false, fatal
 			}
-			if calls == 2 {
-				return 0, false, nil
-			}
-			return 0, false, fatal
+		})
+		p, _ := h.set.AddKnownPeer(Descriptor{Address: testAddr, OperationalAddress: udpAddr(addr1)})
+		res := connectAsync(p, ConnectOptions{ConnectionTimeout: -1})
+		h.status(h.sigma1(t, addr1), addr1, mrp.SCStatusGeneralFailure, mrp.SCStatusProtocolInvalidParameter, nil)
+		h.clock.waitTimer(t, time.Second)
+		h.clock.Advance(time.Second)
+		h.status(h.sigma1(t, addr1), addr1, mrp.SCStatusGeneralFailure, mrp.SCStatusProtocolInvalidParameter, nil)
+		h.clock.waitTimer(t, 5*time.Minute)
+		h.clock.Advance(5 * time.Minute)
+		h.status(h.sigma1(t, addr1), addr1, mrp.SCStatusGeneralFailure, mrp.SCStatusProtocolInvalidParameter, nil)
+		if r := waitResult(t, res); !errors.Is(r.err, fatal) {
+			t.Fatalf("Connect = %v, want the fatal error", r.err)
 		}
 	})
-	p, _ := h.set.AddKnownPeer(Descriptor{Address: testAddr, OperationalAddress: udpAddr(addr1)})
-	res := connectAsync(p, ConnectOptions{ConnectionTimeout: -1})
-	h.status(h.sigma1(t, addr1), addr1, mrp.SCStatusGeneralFailure, mrp.SCStatusProtocolInvalidParameter, nil)
-	h.clock.waitTimer(t, time.Second)
-	h.clock.Advance(time.Second)
-	h.status(h.sigma1(t, addr1), addr1, mrp.SCStatusGeneralFailure, mrp.SCStatusProtocolInvalidParameter, nil)
-	h.clock.waitTimer(t, 5*time.Minute)
-	h.clock.Advance(5 * time.Minute)
-	h.status(h.sigma1(t, addr1), addr1, mrp.SCStatusGeneralFailure, mrp.SCStatusProtocolInvalidParameter, nil)
-	if r := waitResult(t, res); !errors.Is(r.err, fatal) {
-		t.Fatalf("Connect = %v, want the fatal error", r.err)
-	}
 }
 
 // TestUnhandledErrorAndDisconnectedSet: an attempt that cannot start waits
@@ -291,17 +308,19 @@ func TestHandleErrorOverrideAndFatal(t *testing.T) {
 // (PeerSet.ts:248-262).
 func TestUnhandledErrorAndDisconnectedSet(t *testing.T) {
 	t.Parallel()
-	h := newHarness(t, nil)
-	p, _ := h.set.AddKnownPeer(Descriptor{Address: testAddr, OperationalAddress: udpAddr(addr1)})
-	h.set.Disconnect(context.Background())
-	res := connectAsync(p, ConnectOptions{ConnectionTimeout: 3 * time.Minute})
-	h.clock.waitTimer(t, 2*time.Minute)
-	h.udp.none(t)
-	h.clock.Advance(3 * time.Minute)
-	var unreachable *UnreachableError
-	if r := waitResult(t, res); !errors.As(r.err, &unreachable) || !errors.Is(r.err, exchange.ErrTransient) {
-		t.Fatalf("Connect = %v", r.err)
-	}
+	synctest.Test(t, func(t *testing.T) {
+		h := newHarness(t, nil)
+		p, _ := h.set.AddKnownPeer(Descriptor{Address: testAddr, OperationalAddress: udpAddr(addr1)})
+		h.set.Disconnect(context.Background())
+		res := connectAsync(p, ConnectOptions{ConnectionTimeout: 3 * time.Minute})
+		h.clock.waitTimer(t, 2*time.Minute)
+		h.udp.none(t)
+		h.clock.Advance(3 * time.Minute)
+		var unreachable *UnreachableError
+		if r := waitResult(t, res); !errors.As(r.err, &unreachable) || !errors.Is(r.err, exchange.ErrTransient) {
+			t.Fatalf("Connect = %v", r.err)
+		}
+	})
 }
 
 // TestConnectReuseSharedProcessAndTimeout: a live session is returned at
@@ -311,42 +330,44 @@ func TestUnhandledErrorAndDisconnectedSet(t *testing.T) {
 // and Connect returns it (Peer.ts:414-491, :628-673).
 func TestConnectReuseSharedProcessAndTimeout(t *testing.T) {
 	t.Parallel()
-	h := newHarness(t, nil)
-	p, _ := h.set.AddKnownPeer(Descriptor{Address: testAddr, OperationalAddress: udpAddr(addr1)})
-	long := connectAsync(p, ConnectOptions{})
-	h.sigma1(t, addr1)
-	c := process(p)
-	h.clock.Advance(30 * time.Second)
-	short := connectAsync(p, ConnectOptions{ConnectionTimeout: time.Minute})
-	h.clock.waitTimer(t, 30*time.Second) // a minute less the 30 s offline
-	if process(p) != c {
-		t.Fatal("the second Connect started a second process")
-	}
-	h.noSigma1(t, addr1)
-	h.clock.Advance(30 * time.Second)
-	var unreachable *UnreachableError
-	if r := waitResult(t, short); !errors.As(r.err, &unreachable) || unreachable.TimeOffline != time.Minute {
-		t.Fatalf("short Connect = %v", r.err)
-	}
-	if _, err := p.Connect(context.Background(), ConnectOptions{ConnectionTimeout: time.Minute}); !errors.As(err, &unreachable) {
-		t.Fatalf("a Connect whose timeout is already spent = %v", err)
-	}
-	// A session from elsewhere ends the process; the waiting Connect takes it.
-	s := h.secureSession(t, 0x30, udpAddr(addr1))
-	h.set.Adopt(s)
-	if r := waitResult(t, long); r.err != nil || r.s != s {
-		t.Fatalf("long Connect = %v, %v", r.s, r.err)
-	}
-	eventually(t, "the process to end", func() bool { return process(p) == nil && p.TimeOffline() == 0 })
-	if got, err := p.Connect(context.Background(), ConnectOptions{}); err != nil || got != s {
-		t.Fatal("Connect did not reuse the live session")
-	}
-	ctx, cancel := context.WithCancel(context.Background())
-	cancel()
-	s.Close()
-	if _, err := p.Connect(ctx, ConnectOptions{ConnectionTimeout: -1}); !errors.Is(err, context.Canceled) {
-		t.Fatalf("Connect with a cancelled context = %v", err)
-	}
+	synctest.Test(t, func(t *testing.T) {
+		h := newHarness(t, nil)
+		p, _ := h.set.AddKnownPeer(Descriptor{Address: testAddr, OperationalAddress: udpAddr(addr1)})
+		long := connectAsync(p, ConnectOptions{})
+		h.sigma1(t, addr1)
+		c := process(p)
+		h.clock.Advance(30 * time.Second)
+		short := connectAsync(p, ConnectOptions{ConnectionTimeout: time.Minute})
+		h.clock.waitTimer(t, 30*time.Second) // a minute less the 30 s offline
+		if process(p) != c {
+			t.Fatal("the second Connect started a second process")
+		}
+		h.noSigma1(t, addr1)
+		h.clock.Advance(30 * time.Second)
+		var unreachable *UnreachableError
+		if r := waitResult(t, short); !errors.As(r.err, &unreachable) || unreachable.TimeOffline != time.Minute {
+			t.Fatalf("short Connect = %v", r.err)
+		}
+		if _, err := p.Connect(context.Background(), ConnectOptions{ConnectionTimeout: time.Minute}); !errors.As(err, &unreachable) {
+			t.Fatalf("a Connect whose timeout is already spent = %v", err)
+		}
+		// A session from elsewhere ends the process; the waiting Connect takes it.
+		s := h.secureSession(t, 0x30, udpAddr(addr1))
+		h.set.Adopt(s)
+		if r := waitResult(t, long); r.err != nil || r.s != s {
+			t.Fatalf("long Connect = %v, %v", r.s, r.err)
+		}
+		eventually(t, "the process to end", func() bool { return process(p) == nil && p.TimeOffline() == 0 })
+		if got, err := p.Connect(context.Background(), ConnectOptions{}); err != nil || got != s {
+			t.Fatal("Connect did not reuse the live session")
+		}
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+		s.Close()
+		if _, err := p.Connect(ctx, ConnectOptions{ConnectionTimeout: -1}); !errors.Is(err, context.Canceled) {
+			t.Fatalf("Connect with a cancelled context = %v", err)
+		}
+	})
 }
 
 // TestKickRestartsTheExchange: a kick is ignored below
@@ -354,47 +375,49 @@ func TestConnectReuseSharedProcessAndTimeout(t *testing.T) {
 // otherwise the attempt opens a fresh exchange (PeerConnection.ts:568-594).
 func TestKickRestartsTheExchange(t *testing.T) {
 	t.Parallel()
-	h := newHarness(t, nil)
-	p, _ := h.set.AddKnownPeer(Descriptor{Address: testAddr, OperationalAddress: udpAddr(addr1)})
-	connectAsync(p, ConnectOptions{ConnectionTimeout: -1})
-	first := h.sigma1(t, addr1)
-	c := process(p)
-	exchangeOf := func() *exchange.Exchange {
-		var x *exchange.Exchange
-		eventually(t, "the attempt's exchange", func() bool {
-			c.mu.Lock()
-			defer c.mu.Unlock()
-			x = currentExchange(c)
-			return x != nil && x.RetransmissionCount() == 0
-		})
-		return x
-	}
-	// Below the retransmission minimum: nothing.
-	p.Kick()
-	h.noSigma1(t, addr1)
-	// Retransmit until a restart saves a minute.
-	x := exchangeOf()
-	for x.RetransmissionRestartSaving() < time.Minute {
-		h.clock.Advance(5 * time.Second)
-		eventually(t, "the retransmission", func() bool { return x.RetransmissionCount() > 0 })
-	}
-	h.clock.Advance(3 * time.Second) // past the kick throttle
-	p.Kick()
-	restarted := h.sigma1(t, addr1)
-	if restarted.proto.ExchangeID == first.proto.ExchangeID {
-		t.Fatal("the kick did not open a fresh exchange")
-	}
-	// Again until the restart would pay, but within the 10-minute cooldown.
-	x = exchangeOf()
-	for x.RetransmissionRestartSaving() < time.Minute {
-		h.clock.Advance(5 * time.Second)
-	}
-	h.clock.Advance(3 * time.Second)
-	p.Kick()
-	h.noSigma1(t, addr1)
-	h.clock.Advance(10 * time.Minute)
-	p.Kick()
-	h.sigma1(t, addr1)
+	synctest.Test(t, func(t *testing.T) {
+		h := newHarness(t, nil)
+		p, _ := h.set.AddKnownPeer(Descriptor{Address: testAddr, OperationalAddress: udpAddr(addr1)})
+		connectAsync(p, ConnectOptions{ConnectionTimeout: -1})
+		first := h.sigma1(t, addr1)
+		c := process(p)
+		exchangeOf := func() *exchange.Exchange {
+			var x *exchange.Exchange
+			eventually(t, "the attempt's exchange", func() bool {
+				c.mu.Lock()
+				defer c.mu.Unlock()
+				x = currentExchange(c)
+				return x != nil && x.RetransmissionCount() == 0
+			})
+			return x
+		}
+		// Below the retransmission minimum: nothing.
+		p.Kick()
+		h.noSigma1(t, addr1)
+		// Retransmit until a restart saves a minute.
+		x := exchangeOf()
+		for x.RetransmissionRestartSaving() < time.Minute {
+			h.clock.Advance(5 * time.Second)
+			eventually(t, "the retransmission", func() bool { return x.RetransmissionCount() > 0 })
+		}
+		h.clock.Advance(3 * time.Second) // past the kick throttle
+		p.Kick()
+		restarted := h.sigma1(t, addr1)
+		if restarted.proto.ExchangeID == first.proto.ExchangeID {
+			t.Fatal("the kick did not open a fresh exchange")
+		}
+		// Again until the restart would pay, but within the 10-minute cooldown.
+		x = exchangeOf()
+		for x.RetransmissionRestartSaving() < time.Minute {
+			h.clock.Advance(5 * time.Second)
+		}
+		h.clock.Advance(3 * time.Second)
+		p.Kick()
+		h.noSigma1(t, addr1)
+		h.clock.Advance(10 * time.Minute)
+		p.Kick()
+		h.sigma1(t, addr1)
+	})
 }
 
 // TestDiscoverKick: a fallback that discovery names becomes a real
@@ -402,32 +425,34 @@ func TestKickRestartsTheExchange(t *testing.T) {
 // exchange that has retransmitted enough (PeerConnection.ts:346-352).
 func TestDiscoverKick(t *testing.T) {
 	t.Parallel()
-	h := newHarness(t, nil)
-	p, _ := h.set.AddKnownPeer(Descriptor{Address: testAddr, OperationalAddress: udpAddr(addr1)})
-	connectAsync(p, ConnectOptions{ConnectionTimeout: -1})
-	first := h.sigma1(t, addr1)
-	c := process(p)
-	var x *exchange.Exchange
-	eventually(t, "the exchange", func() bool {
+	synctest.Test(t, func(t *testing.T) {
+		h := newHarness(t, nil)
+		p, _ := h.set.AddKnownPeer(Descriptor{Address: testAddr, OperationalAddress: udpAddr(addr1)})
+		connectAsync(p, ConnectOptions{ConnectionTimeout: -1})
+		first := h.sigma1(t, addr1)
+		c := process(p)
+		var x *exchange.Exchange
+		eventually(t, "the exchange", func() bool {
+			c.mu.Lock()
+			defer c.mu.Unlock()
+			x = currentExchange(c)
+			return x != nil && c.fallback != nil
+		})
+		for x.RetransmissionRestartSaving() < time.Minute {
+			h.clock.Advance(5 * time.Second)
+		}
+		h.announceAddrs(t, "fd00::1")
+		restarted := h.sigma1(t, addr1)
+		if restarted.proto.ExchangeID == first.proto.ExchangeID {
+			t.Fatal("discovery of the fallback did not restart the exchange")
+		}
 		c.mu.Lock()
-		defer c.mu.Unlock()
-		x = currentExchange(c)
-		return x != nil && c.fallback != nil
+		fb := c.fallback
+		c.mu.Unlock()
+		if fb != nil {
+			t.Fatal("the discovered fallback is still marked as fallback")
+		}
 	})
-	for x.RetransmissionRestartSaving() < time.Minute {
-		h.clock.Advance(5 * time.Second)
-	}
-	h.announceAddrs(t, "fd00::1")
-	restarted := h.sigma1(t, addr1)
-	if restarted.proto.ExchangeID == first.proto.ExchangeID {
-		t.Fatal("discovery of the fallback did not restart the exchange")
-	}
-	c.mu.Lock()
-	fb := c.fallback
-	c.mu.Unlock()
-	if fb != nil {
-		t.Fatal("the discovered fallback is still marked as fallback")
-	}
 }
 
 // TestEstablishmentUnresponsive: retransmitting Sigma1 past the MRP
@@ -435,23 +460,25 @@ func TestDiscoverKick(t *testing.T) {
 // the service unreachable on the first retransmission (:847-855).
 func TestEstablishmentUnresponsive(t *testing.T) {
 	t.Parallel()
-	var fired atomic.Int32
-	h := newHarness(t, func(c *Context) { c.EstablishmentUnresponsive = func(*Peer) { fired.Add(1) } })
-	p, _ := h.set.AddKnownPeer(Descriptor{Address: testAddr, OperationalAddress: udpAddr(addr1)})
-	connectAsync(p, ConnectOptions{ConnectionTimeout: -1})
-	h.sigma1(t, addr1)
-	if !p.Service().Reachable() {
-		t.Fatal("unreachable before any retransmission")
-	}
-	for range 40 {
-		h.clock.Advance(10 * time.Second)
-		if fired.Load() > 0 {
-			break
+	synctest.Test(t, func(t *testing.T) {
+		var fired atomic.Int32
+		h := newHarness(t, func(c *Context) { c.EstablishmentUnresponsive = func(*Peer) { fired.Add(1) } })
+		p, _ := h.set.AddKnownPeer(Descriptor{Address: testAddr, OperationalAddress: udpAddr(addr1)})
+		connectAsync(p, ConnectOptions{ConnectionTimeout: -1})
+		h.sigma1(t, addr1)
+		if !p.Service().Reachable() {
+			t.Fatal("unreachable before any retransmission")
 		}
-		time.Sleep(time.Millisecond)
-	}
-	eventually(t, "the hook", func() bool { return fired.Load() == 1 })
-	if p.Service().Reachable() {
-		t.Fatal("retransmitting left the service reachable")
-	}
+		for range 40 {
+			h.clock.Advance(10 * time.Second)
+			if fired.Load() > 0 {
+				break
+			}
+			time.Sleep(time.Millisecond)
+		}
+		eventually(t, "the hook", func() bool { return fired.Load() == 1 })
+		if p.Service().Reachable() {
+			t.Fatal("retransmitting left the service reachable")
+		}
+	})
 }

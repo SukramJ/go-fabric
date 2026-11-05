@@ -333,20 +333,14 @@ func TestSessionAndSubscriptionDiagnostics(t *testing.T) {
 // session table holds no PASE session.
 func waitNoPASE(t *testing.T, n *node.Node) {
 	t.Helper()
-	deadline := time.Now().Add(30 * time.Second)
-	for {
-		pase := false
+	waitLive(t, "no PASE session after its CloseSession", func() bool {
 		for _, e := range n.Sessions().Sessions() {
-			pase = pase || e.IsPASE
+			if e.IsPASE {
+				return false
+			}
 		}
-		if !pase {
-			return
-		}
-		if time.Now().After(deadline) {
-			t.Fatalf("the PASE session outlived its CloseSession: %+v", n.Sessions().Sessions())
-		}
-		time.Sleep(5 * time.Millisecond)
-	}
+		return true
+	})
 }
 
 // TestHostGroups: a host that assembles its own topology hands the facade

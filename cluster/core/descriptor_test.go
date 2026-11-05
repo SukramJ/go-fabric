@@ -12,6 +12,8 @@ import (
 
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/cluster/core"
+	"github.com/SukramJ/go-fabric/cluster/spec"
+	"github.com/SukramJ/go-fabric/im"
 )
 
 func defaultDescriptor(t *testing.T) *core.Descriptor {
@@ -158,10 +160,13 @@ func TestDescriptor_WriteReturnsError(t *testing.T) {
 	t.Parallel()
 	d := defaultDescriptor(t)
 	ctx := context.Background()
-	for _, attrID := range []uint32{0x0000, 0x0001, 0x0002, 0x0003, 0xFFFD} {
+	for attrID, want := range map[uint32]im.StatusCode{
+		0x0000: im.StatusUnsupportedWrite, 0x0001: im.StatusUnsupportedWrite, 0x0002: im.StatusUnsupportedWrite,
+		0x0003: im.StatusUnsupportedWrite, 0xFFFD: im.StatusUnsupportedAttribute,
+	} {
 		err := d.MatterWrite(ctx, attrID, nil)
-		if err == nil {
-			t.Errorf("MatterWrite(0x%04X) expected error, got nil", attrID)
+		if spec.StatusOf(err) != want {
+			t.Errorf("MatterWrite(0x%04X): status %v (%v), want %v", attrID, spec.StatusOf(err), err, want)
 		}
 	}
 }
@@ -172,8 +177,8 @@ func TestDescriptor_InvokeReturnsError(t *testing.T) {
 	ctx := context.Background()
 	for _, cmdID := range []uint32{0x00, 0x01, 0xFF} {
 		_, err := d.MatterInvoke(ctx, cmdID, nil)
-		if err == nil {
-			t.Errorf("MatterInvoke(0x%02X) expected error, got nil", cmdID)
+		if spec.StatusOf(err) != im.StatusUnsupportedCommand {
+			t.Errorf("MatterInvoke(0x%02X): status %v (%v), want %v", cmdID, spec.StatusOf(err), err, im.StatusUnsupportedCommand)
 		}
 	}
 }
@@ -245,8 +250,8 @@ func TestDescriptor_WriteErrorWrapsReadOnly(t *testing.T) {
 	t.Parallel()
 	d := defaultDescriptor(t)
 	err := d.MatterWrite(context.Background(), 0x0000, nil)
-	if err == nil {
-		t.Fatal("expected error, got nil")
+	if spec.StatusOf(err) != im.StatusUnsupportedWrite {
+		t.Fatalf("DeviceTypeList write: status %v (%v), want %v", spec.StatusOf(err), err, im.StatusUnsupportedWrite)
 	}
 	// Descriptor does not export errDescriptorReadOnly but we verify a non-nil error.
 	_ = errors.Unwrap(err) // exercising wrapping chain; error existence already checked above.

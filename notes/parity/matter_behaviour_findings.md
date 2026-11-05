@@ -761,7 +761,93 @@ Found by the phase-32 port of `packages/node/test/behaviors/ota/OtaTest.ts`
 
 ---. (Triage 2026-10-29: wave H2, commissioning and security (Fable), before milestone 7 makes the Wi-Fi server real.)
 
+## Phase 33 — the general, model and types test roots (matter.js 862ad75f)
+
+Cases of the six phase-33 register roots (`notes/parity/matterjs_tests.md`)
+the Go tests do not cover and no `by_design.md` entry explains. Each closes
+with a port of the named case.
+
+- **The TLV encoder writes an IS1 into a character string.** matter.js's
+  `TlvString.validate` refuses a character string containing Information
+  Separator 1 (0x1F) (`packages/types/src/tlv/TlvString.ts:78-81` at
+  `862ad75f`); `tlv.Encoder.PutUTF8` writes it, and a peer reading the
+  string cuts it there. Case:
+  `TlvStringTest.ts` "throws an error if a character string contains
+  Information Separator 1 (0x1F)". Route: refuse (or cut) the string in
+  the encoder's checked path and decide what a host value with an IS1
+  becomes.
+- **A write keeps the FabricIndex its caller supplies.** matter.js encodes
+  a fabric-scoped struct for a write interaction without its FabricIndex,
+  even when the value carries one (`TlvObjectTest.ts` "strips fabricIndex
+  for write interaction even when caller provided a value",
+  `forWriteInteraction`); `spec.EncodeJSON` writes it when present. The server overwrites it with the accessing
+  fabric, so the wire difference is the field's bytes. Route: strip field
+  254 on the controller's write encoding.
+- **Numeric bounds compare as float64.** `cluster/spec`'s constraint check
+  (`Instance.satisfies`, `bound_expr.go` `evalBound`) and `Bound.Int`
+  (int64) hold a bound beyond 2^53 inexactly: 2^62 + 1 compares equal to
+  2^62, and a uint64 bound above int64 cannot be stated. matter.js keeps
+  such bounds as bigints (`TlvOfModelTest.ts` "refuses a value beyond the
+  computed bound", "refuses the value above it", "states a bound beyond
+  the safe integers as a bigint"; `ConstraintTest.ts` "keeps the magnitude
+  of a decimal / hexadecimal / negative bound", "judges a value against a
+  bound only a bigint states" and its value tests at 2^53 ± 1 and 2^62 ± 1).
+  No served attribute states such a bound at the pin. Route: compare integers as integers (uint64/int64 or
+  math/big) where the type is a 64-bit integer.
+
+- **Defaults matter.js derives without a stated one.** matter.js's
+  `DefaultValue` gives a list whose type permits no entries the empty list,
+  builds a bitmap's default from its members' defaults (bit placement
+  across bit 31, a member without an upper bound, the first member to claim
+  a bit), and scales a unit default by the type a declared type derives
+  from (`packages/model/test/logic/DefaultValueTest.ts` at `862ad75f`,
+  nine cases). `script/clustergen` writes only the default the snapshot
+  states (`defaultLiteral`), scaling a unit by the declared type name
+  (`encodedUnit`). Route: derive these in the generator, or have the
+  extractor write matter.js's computed default into `parity/schema.json`.
+
+- **No copyHealth for re-resolved addresses.** matter.js's
+  `ServerAddressSet.copyHealth` carries an address's health markers onto an
+  equal address of a new set (`ServerAddressSetTest.ts` "copies health
+  markers onto equal targets"); `client/discovery` keeps health on
+  `Address` (`HealthyAt`, `UnhealthyAt`) and has no copy step.
+- **The responder sockets keep the surviving IP family.** matter.js's
+  `UdpMulticastServer` closes the IPv4 socket when the IPv6 one cannot be
+  created or join the group (`UdpMulticastServerTest.ts` two cases);
+  `mdns/socket.go` keeps the family that opened and fails only when both
+  do. Route: decide whether the module mirrors the all-or-nothing open or
+  records the difference in `by_design.md`.
+
 ## Tier 3 — LOW
+
+### T3-SW-1 — the invoke options matter.js's ClientInteraction has and Go's does not (seam wave, 2026-11-04)
+
+- **Where:** `client/interaction` `InvokeOptions` and `interaction.Config`; the batcher (`Interaction.Invoke`).
+- **matter.js at 862ad75f:** a command carries `interactionModelRevision`, `beforeDispatch`, `delayReportData` and an address override, each of which keeps it out of a batch (`ClientInvokeTest.ts:545-575`, `:612-630`, `:715-732`), and the interaction binds a default network (`:811-830`). Go has none of the five; the register keeps the nine ClientInvokeTest cases `missing` (five as this gap, three network-on-the-exchange cases as a fabrictest port still to do, one default network).
+- **Unverified:** whether any consumer needs them before milestone 10; a port is a `controller/client` feature wave, not a seam.
+
+### T3-SW-2 — no commissionable advertisement round when PASE closes or the fail-safe expires (seam wave, 2026-11-04)
+
+- **Where:** the device keeps its commissionable record while PASE is up and publishes nothing when the PASE session closes; `node:TestFailsafeCommissioningParity` asserts the record, not a new advertisement.
+- **matter.js at 862ad75f:** `DeviceAdvertiser.ts:131-162` starts an advertisement round on PASE close and on fail-safe expiry; `FailsafeCommissioningTest.ts` "re-announces after failsafe expiry …" (two cases, `missing` in the register with the reason "behaviour gap, not a seam") awaits it.
+- **Fix shape:** `commissioning/` (a security path): on PASE close without CommissioningComplete and on fail-safe expiry, re-run the commissionable announcement as `AdvertiseCommissionable` does at start.
+
+### T3-SW-3 — the ICD client's nextExpectedCheckin follows the wall clock (seam wave, 2026-11-04, measured)
+
+- **Where:** `controller/client` ICD client, `NextExpectedCheckIn` after `clocktest.Fake.StepWall(time.Hour)` reads now+15 s where matter.js reads at least now+idleModeDuration (`IcdClientTest.ts:2281`); the skip in `icd_client_parity_matterjs_test.go` names it.
+- **Fix shape:** keep the expectation on the clock's monotonic reading and convert for exposure (`clock.WallOf`), as the session stamps do.
+
+### T3-P35-1 — a write value of the wrong Go type gets three different statuses (phase 35, 2026-11-04)
+
+- **Where:** FAILURE from `cluster/core/access_control.go:674`, `bridged_device_basic_information.go:459`, `general_commissioning.go:403`, `network_commissioning.go:234`; CONSTRAINT_ERROR from BasicInformation and Binding through the convention `cluster/spec/write.go:126-128`; INVALID_ACTION from `cluster/core/identify.go:453-457`.
+- **matter.js at 862ad75f:** the node's write path validates through `ValueValidator`, whose `DatatypeError` extends `ValidateError` with the default `Status.InvalidDataType` (`packages/protocol/src/action/errors.ts:55-72`); the older TLV-schema path answers `ValidationDatatypeMismatchError` → `Status.InvalidAction` (`packages/types/src/common/ValidationError.ts:31-38`). Neither is FAILURE.
+- **Unverified:** whether a wire write can reach a Go server with a value of a type the attribute does not hold — the bridge decodes by the attribute's schema, so these may be unit-level paths only. Phase 35's status assertions pin today's answers (`TestBasicInfo_WriteNodeLabelWrongType` and siblings) so a change is visible; the rule — one status, matter.js's INVALID_DATA_TYPE on the node path — is a decision for the next write-path wave.
+
+### T3-P35-2 — GroupKeyManagement invoked without an accessing fabric answers FAILURE (phase 35, 2026-11-04)
+
+- **Where:** `cluster/core/group_key_management.go:604-611` returns a plain error (FAILURE) when neither the context nor the server carries a fabric index.
+- **matter.js at 862ad75f:** a fabric-scoped operation without a fabric is refused as `Status.UnsupportedAccess` (`packages/protocol/src/interaction/FabricAccessControl.ts:61`).
+- **Unverified:** whether the Go IM gate (`bridge/im_gate.go`) or the dispatcher refuses the command before the server sees it, in which case the server's answer is defensive only. Pinned by `TestGKM…` at `group_key_management_test.go:155-156` (phase 35).
 
 ---
 

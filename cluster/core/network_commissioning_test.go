@@ -12,6 +12,8 @@ import (
 
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/cluster/core"
+	"github.com/SukramJ/go-fabric/cluster/spec"
+	"github.com/SukramJ/go-fabric/im"
 )
 
 // ---- helpers ----
@@ -229,8 +231,8 @@ func TestNetcomm_WriteInterfaceEnabled_WrongType(t *testing.T) {
 	t.Parallel()
 	nc := defaultNetcomm()
 	err := nc.MatterWrite(context.Background(), 0x0004, "yes")
-	if err == nil {
-		t.Fatal("expected error for wrong type, got nil")
+	if spec.StatusOf(err) != im.StatusFailure {
+		t.Fatalf("InterfaceEnabled of the wrong type: status %v (%v), want %v", spec.StatusOf(err), err, im.StatusFailure)
 	}
 }
 
@@ -239,8 +241,8 @@ func TestNetcomm_WriteReadOnlyAttr(t *testing.T) {
 	nc := defaultNetcomm()
 	// MaxNetworks (0x0000) is read-only.
 	err := nc.MatterWrite(context.Background(), 0x0000, uint8(2))
-	if err == nil {
-		t.Fatal("expected error for write to read-only attr, got nil")
+	if spec.StatusOf(err) != im.StatusUnsupportedWrite {
+		t.Fatalf("write to read-only MaxNetworks: status %v (%v), want %v", spec.StatusOf(err), err, im.StatusUnsupportedWrite)
 	}
 }
 
@@ -252,8 +254,8 @@ func TestNetcomm_Invoke_AllRejected(t *testing.T) {
 	ctx := context.Background()
 	for _, cmdID := range []uint32{0x00, 0x02, 0x03, 0x04, 0x06, 0x08} {
 		_, err := nc.MatterInvoke(ctx, cmdID, nil)
-		if err == nil {
-			t.Errorf("MatterInvoke(0x%02X) expected error, got nil", cmdID)
+		if spec.StatusOf(err) != im.StatusUnsupportedCommand {
+			t.Errorf("MatterInvoke(0x%02X): status %v (%v), want %v", cmdID, spec.StatusOf(err), err, im.StatusUnsupportedCommand)
 		}
 	}
 }

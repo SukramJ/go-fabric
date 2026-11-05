@@ -22,8 +22,8 @@ func mustHex(t *testing.T, s string) []byte {
 }
 
 // The group-key derivation vector matter.js asserts on in
-// packages/nodejs/test/crypto/NodeJsCryptoTest.ts:144-155 ("validate group
-// key derivation"): createHkdfKey(ikm, salt, "GroupKey v1.0") with the
+// packages/nodejs/test/crypto/NodeJsCryptoTest.ts:164-172 at 862ad75f
+// ("validate group key derivation"): createHkdfKey(ikm, salt, "GroupKey v1.0") with the
 // default 16-byte length.
 //
 // It is the gold standard's own fixture, so it pins all four inputs at once

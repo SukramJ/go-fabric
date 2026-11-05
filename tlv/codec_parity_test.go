@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright (C) 2026 SukramJ.
 
-// Package tlv — codec parity tests ported from matter.js HEAD ebe091744.
+// Package tlv — codec parity tests ported from matter.js at 862ad75f.
 //
 // These tests lock the TLV wire-byte output for every primitive type and
 // tag combination against the matter.js reference encoder. Each test
@@ -14,7 +14,7 @@
 //   - packages/types/test/tlv/TlvNullableTest.ts
 //   - packages/types/test/tlv/TlvAnyTest.ts
 //
-// matter.js HEAD: ebe091744
+// Line citations are at 862ad75f.
 
 package tlv
 
@@ -110,7 +110,7 @@ func TestCodecParity_BoolDecodeFalse(t *testing.T) {
 
 // TestCodecParity_SignedInt1Byte locks encoding of −1 in 1 byte (0x00 ff).
 // Pins TlvNumber width semantics 0x00..0x07 control octets against the matter.js reference.
-// Mirrors matter.js packages/types/test/tlv/TlvNumberTest.ts:33 (case "an 1 byte signed int")
+// Mirrors matter.js packages/types/test/tlv/TlvNumberTest.ts:37 (case "an 1 byte signed int")
 func TestCodecParity_SignedInt1Byte(t *testing.T) {
 	t.Parallel()
 	got := encodeOnly(t, func(e *Encoder) { e.PutInt(AnonymousTag(), -1) })
@@ -118,7 +118,7 @@ func TestCodecParity_SignedInt1Byte(t *testing.T) {
 }
 
 // TestCodecParity_SignedInt2Byte locks encoding of 0x0100 in 2 bytes (01 0001).
-// Mirrors matter.js packages/types/test/tlv/TlvNumberTest.ts:34 (case "a 2 bytes signed int")
+// Mirrors matter.js packages/types/test/tlv/TlvNumberTest.ts:38 (case "a 2 bytes signed int")
 func TestCodecParity_SignedInt2Byte(t *testing.T) {
 	t.Parallel()
 	got := encodeOnly(t, func(e *Encoder) { e.PutInt(AnonymousTag(), 0x0100) })
@@ -126,7 +126,7 @@ func TestCodecParity_SignedInt2Byte(t *testing.T) {
 }
 
 // TestCodecParity_SignedInt4Byte locks encoding of 0x01000000 in 4 bytes (02 00000001).
-// Mirrors matter.js packages/types/test/tlv/TlvNumberTest.ts:35 (case "a 4 bytes signed int")
+// Mirrors matter.js packages/types/test/tlv/TlvNumberTest.ts:39 (case "a 4 bytes signed int")
 func TestCodecParity_SignedInt4Byte(t *testing.T) {
 	t.Parallel()
 	got := encodeOnly(t, func(e *Encoder) { e.PutInt(AnonymousTag(), 0x01000000) })
@@ -134,7 +134,7 @@ func TestCodecParity_SignedInt4Byte(t *testing.T) {
 }
 
 // TestCodecParity_SignedInt8Byte locks encoding of 0x01000000000000 in 8 bytes.
-// Mirrors matter.js packages/types/test/tlv/TlvNumberTest.ts:36 (case "a 8 bytes signed int")
+// Mirrors matter.js packages/types/test/tlv/TlvNumberTest.ts:40 (case "a 8 bytes signed int")
 func TestCodecParity_SignedInt8Byte(t *testing.T) {
 	t.Parallel()
 	got := encodeOnly(t, func(e *Encoder) { e.PutInt(AnonymousTag(), 0x01000000000000) })
@@ -144,7 +144,7 @@ func TestCodecParity_SignedInt8Byte(t *testing.T) {
 // --- TlvNumber — unsigned (TlvNumberTest.ts codecVectorNumeric) ---
 
 // TestCodecParity_UnsignedInt1Byte locks encoding of 1 in 1 byte (04 01).
-// Mirrors matter.js packages/types/test/tlv/TlvNumberTest.ts:37 (case "an 1 byte unsigned int")
+// Mirrors matter.js packages/types/test/tlv/TlvNumberTest.ts:41 (case "an 1 byte unsigned int")
 func TestCodecParity_UnsignedInt1Byte(t *testing.T) {
 	t.Parallel()
 	got := encodeOnly(t, func(e *Encoder) { e.PutUint(AnonymousTag(), 1) })
@@ -152,7 +152,7 @@ func TestCodecParity_UnsignedInt1Byte(t *testing.T) {
 }
 
 // TestCodecParity_UnsignedInt2Byte locks encoding of 0x0100 in 2 bytes.
-// Mirrors matter.js packages/types/test/tlv/TlvNumberTest.ts:38 (case "a 2 bytes unsigned int")
+// Mirrors matter.js packages/types/test/tlv/TlvNumberTest.ts:42 (case "a 2 bytes unsigned int")
 func TestCodecParity_UnsignedInt2Byte(t *testing.T) {
 	t.Parallel()
 	got := encodeOnly(t, func(e *Encoder) { e.PutUint(AnonymousTag(), 0x0100) })
@@ -160,7 +160,7 @@ func TestCodecParity_UnsignedInt2Byte(t *testing.T) {
 }
 
 // TestCodecParity_UnsignedInt4Byte locks encoding of 0x01000000 in 4 bytes.
-// Mirrors matter.js packages/types/test/tlv/TlvNumberTest.ts:39 (case "a 4 bytes unsigned int")
+// Mirrors matter.js packages/types/test/tlv/TlvNumberTest.ts:43 (case "a 4 bytes unsigned int")
 func TestCodecParity_UnsignedInt4Byte(t *testing.T) {
 	t.Parallel()
 	got := encodeOnly(t, func(e *Encoder) { e.PutUint(AnonymousTag(), 0x01000000) })
@@ -168,7 +168,7 @@ func TestCodecParity_UnsignedInt4Byte(t *testing.T) {
 }
 
 // TestCodecParity_UnsignedInt8Byte locks encoding of 0x01000000000000 in 8 bytes.
-// Mirrors matter.js packages/types/test/tlv/TlvNumberTest.ts:40 (case "a 8 bytes unsigned int")
+// Mirrors matter.js packages/types/test/tlv/TlvNumberTest.ts:44 (case "a 8 bytes unsigned int")
 func TestCodecParity_UnsignedInt8Byte(t *testing.T) {
 	t.Parallel()
 	got := encodeOnly(t, func(e *Encoder) { e.PutUint(AnonymousTag(), 0x01000000000000) })
@@ -178,7 +178,7 @@ func TestCodecParity_UnsignedInt8Byte(t *testing.T) {
 // --- TlvNumber — floats (TlvNumberTest.ts codecVectorNumber) ---
 
 // TestCodecParity_Float32 locks the 4-byte float wire shape for 6546.25390625.
-// Mirrors matter.js packages/types/test/tlv/TlvNumberTest.ts:44 (case "a float")
+// Mirrors matter.js packages/types/test/tlv/TlvNumberTest.ts:48 (case "a float")
 func TestCodecParity_Float32(t *testing.T) {
 	t.Parallel()
 	// matter.js "a float": value 6546.25390625, encoded "0a0892cc45"
@@ -187,7 +187,7 @@ func TestCodecParity_Float32(t *testing.T) {
 }
 
 // TestCodecParity_Float64 locks the 8-byte double wire shape for 6546.254.
-// Mirrors matter.js packages/types/test/tlv/TlvNumberTest.ts:45 (case "a double")
+// Mirrors matter.js packages/types/test/tlv/TlvNumberTest.ts:49 (case "a double")
 func TestCodecParity_Float64(t *testing.T) {
 	t.Parallel()
 	// matter.js "a double": value 6546.254, encoded "0b2fdd24064192b940"
@@ -198,7 +198,7 @@ func TestCodecParity_Float64(t *testing.T) {
 // --- TlvString (TlvStringTest.ts) ---
 
 // TestCodecParity_UTF8String_ASCII locks encoding of "test" → 0c 04 74657374.
-// Mirrors matter.js packages/types/test/tlv/TlvStringTest.ts:29 (encode "test")
+// Mirrors matter.js packages/types/test/tlv/TlvStringTest.ts:28 (encode "test")
 func TestCodecParity_UTF8String_ASCII(t *testing.T) {
 	t.Parallel()
 	got := encodeOnly(t, func(e *Encoder) { e.PutUTF8(AnonymousTag(), "test") })
@@ -242,7 +242,7 @@ func TestCodecParity_UTF8String_Decode_UTF8(t *testing.T) {
 }
 
 // TestCodecParity_OctetString locks encoding of 0x0001 → 10 02 0001.
-// Mirrors matter.js packages/types/test/tlv/TlvStringTest.ts:86 (TlvByteString encode)
+// Mirrors matter.js packages/types/test/tlv/TlvStringTest.ts:104 (TlvByteString encode)
 func TestCodecParity_OctetString(t *testing.T) {
 	t.Parallel()
 	got := encodeOnly(t, func(e *Encoder) { e.PutOctets(AnonymousTag(), []byte{0x00, 0x01}) })
@@ -250,7 +250,7 @@ func TestCodecParity_OctetString(t *testing.T) {
 }
 
 // TestCodecParity_OctetString_Decode locks decoding of 10 02 0001 → {0x00, 0x01}.
-// Mirrors matter.js packages/types/test/tlv/TlvStringTest.ts:94 (TlvByteString decode)
+// Mirrors matter.js packages/types/test/tlv/TlvStringTest.ts:112 (TlvByteString decode)
 func TestCodecParity_OctetString_Decode(t *testing.T) {
 	t.Parallel()
 	dec := NewDecoder(hexBytes(t, "10020001"))
@@ -267,7 +267,7 @@ func TestCodecParity_OctetString_Decode(t *testing.T) {
 
 // TestCodecParity_NullableString_NonNull locks encoding of non-null string "a" → 0c 01 61.
 // Pins TlvNullable's 0x14 null sentinel against the matter.js TlvNullable reference.
-// Mirrors matter.js packages/types/test/tlv/TlvNullableTest.ts:17 (codecVector "a non-null value")
+// Mirrors matter.js packages/types/test/tlv/TlvNullableTest.ts:20 (codecVector "a non-null value")
 func TestCodecParity_NullableString_NonNull(t *testing.T) {
 	t.Parallel()
 	got := encodeOnly(t, func(e *Encoder) { e.PutUTF8(AnonymousTag(), "a") })
@@ -276,7 +276,7 @@ func TestCodecParity_NullableString_NonNull(t *testing.T) {
 
 // TestCodecParity_NullableString_Null locks encoding of null → 0x14.
 // Pins TlvNullable's 0x14 null sentinel against the matter.js TlvNullable reference.
-// Mirrors matter.js packages/types/test/tlv/TlvNullableTest.ts:18 (codecVector "a null value")
+// Mirrors matter.js packages/types/test/tlv/TlvNullableTest.ts:21 (codecVector "a null value")
 func TestCodecParity_NullableString_Null(t *testing.T) {
 	t.Parallel()
 	got := encodeOnly(t, func(e *Encoder) { e.PutNull(AnonymousTag()) })
@@ -284,7 +284,7 @@ func TestCodecParity_NullableString_Null(t *testing.T) {
 }
 
 // TestCodecParity_NullableString_Decode_NonNull locks decoding of 0c0161 → string "a".
-// Mirrors matter.js packages/types/test/tlv/TlvNullableTest.ts:48 (decode loop for "a non-null value")
+// Mirrors matter.js packages/types/test/tlv/TlvNullableTest.ts:51 (decode loop for "a non-null value")
 func TestCodecParity_NullableString_Decode_NonNull(t *testing.T) {
 	t.Parallel()
 	dec := NewDecoder(hexBytes(t, "0c0161"))
@@ -298,7 +298,7 @@ func TestCodecParity_NullableString_Decode_NonNull(t *testing.T) {
 }
 
 // TestCodecParity_NullableString_Decode_Null locks decoding of 0x14 → null.
-// Mirrors matter.js packages/types/test/tlv/TlvNullableTest.ts:48 (decode loop for "a null value")
+// Mirrors matter.js packages/types/test/tlv/TlvNullableTest.ts:51 (decode loop for "a null value")
 func TestCodecParity_NullableString_Decode_Null(t *testing.T) {
 	t.Parallel()
 	dec := NewDecoder(hexBytes(t, "14"))
@@ -333,7 +333,7 @@ func TestCodecParity_AnyEmptyArray(t *testing.T) {
 }
 
 // TestCodecParity_AnyEmptyArray_Decode locks decoding of 1618 → array open + end.
-// Mirrors matter.js packages/types/test/tlv/TlvAnyTest.ts:55 (decode loop for "array")
+// Mirrors matter.js packages/types/test/tlv/TlvAnyTest.ts:58 (decode loop for "array")
 func TestCodecParity_AnyEmptyArray_Decode(t *testing.T) {
 	t.Parallel()
 	dec := NewDecoder(hexBytes(t, "1618"))
@@ -351,11 +351,11 @@ func TestCodecParity_AnyEmptyArray_Decode(t *testing.T) {
 	}
 }
 
-// --- UInt32 decode from 8-byte representation (TlvNumberTest.ts:103) ---
+// --- UInt32 decode from 8-byte representation (TlvNumberTest.ts:107) ---
 
 // TestCodecParity_UInt32From8Bytes verifies that a small value encoded as
 // uint64 (07 01 00000000000000) decodes to the correct integer value 1.
-// Mirrors matter.js packages/types/test/tlv/TlvNumberTest.ts:103
+// Mirrors matter.js packages/types/test/tlv/TlvNumberTest.ts:107
 // (decode "decodes a 8 bytes small value as a number")
 func TestCodecParity_UInt32From8Bytes(t *testing.T) {
 	t.Parallel()
@@ -516,7 +516,7 @@ func TestCodecParity_BoolByteLength(t *testing.T) {
 // TestCodecParity_NullableNullIs0x14 locks the canonical null-sentinel wire byte 0x14
 // for TlvNullable. This is the critical regression guard: any encoder that emits the
 // wrong control octet for null breaks the apple commissioner's attribute cache.
-// Mirrors matter.js packages/types/test/tlv/TlvNullableTest.ts:18 (codecVector "a null value")
+// Mirrors matter.js packages/types/test/tlv/TlvNullableTest.ts:21 (codecVector "a null value")
 // and packages/types/src/tlv/TlvNullable.ts NullableSchema.encodeTlv.
 func TestCodecParity_NullableNullIs0x14(t *testing.T) {
 	t.Parallel()

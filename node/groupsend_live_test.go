@@ -12,6 +12,7 @@ package node_test
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"log/slog"
 	"net"
 	"path/filepath"
@@ -333,13 +334,7 @@ func TestLiveGroupSend(t *testing.T) {
 		if err := s.Invoke(ctx, toggle, nil, groups.RequestOptions{}); err != nil {
 			t.Fatalf("Toggle %d: %v", i, err)
 		}
-		deadline := time.Now().Add(10 * time.Second)
-		for plug.OnOff() != want {
-			if time.Now().After(deadline) {
-				t.Fatalf("Toggle %d: the receiver's plug is %v, want %v", i, plug.OnOff(), want)
-			}
-			time.Sleep(10 * time.Millisecond)
-		}
+		waitLive(t, fmt.Sprintf("toggle %d reaching the receiver's plug", i), func() bool { return plug.OnOff() == want })
 	}
 	redirect.mu.Lock()
 	group, port := redirect.group, redirect.port

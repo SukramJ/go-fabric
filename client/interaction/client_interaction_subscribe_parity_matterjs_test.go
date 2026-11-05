@@ -7,7 +7,7 @@ import (
 	"context"
 	"errors"
 	"testing"
-	"time"
+	"testing/synctest"
 
 	"github.com/SukramJ/go-fabric/client/interaction"
 	"github.com/SukramJ/go-fabric/im"
@@ -31,33 +31,35 @@ func protoOn(to msg, opcode uint8) message.ProtocolHeader {
 // the interaction closes, and Close ends that wait (:187-201).
 func TestClientInteractionSubscribeAbortedParity(t *testing.T) {
 	t.Parallel()
-	s := newScripted(t)
-	c := subscribeInteraction(s)
-	ctx, cancel := context.WithCancel(context.Background())
-	done := make(chan error, 1)
-	go func() {
-		_, err := c.Subscribe(ctx, interaction.SubscribeRequest{Attributes: []im.ConcreteAttributePath{onOff}})
-		done <- err
-	}()
-	req := s.next(t)
-	if req.proto.Opcode != im.OpcodeSubscribeRequest {
-		t.Fatalf("opcode 0x%02X", req.proto.Opcode)
-	}
-	s.ack(t, req)
-	cancel()
-	if err := await(t, done); !errors.Is(err, context.Canceled) {
-		t.Fatalf("subscribe: %v, want the abort", err)
-	}
-	closed := make(chan struct{})
-	go func() {
-		c.Close(nil)
-		close(closed)
-	}()
-	await(t, closed)
-	// Closed: a new interaction is refused with the close reason.
-	if _, err := c.Read(context.Background(), onOff); !errors.Is(err, interaction.ErrClosed) {
-		t.Fatalf("read after Close: %v, want ErrClosed", err)
-	}
+	synctest.Test(t, func(t *testing.T) {
+		s := newScripted(t)
+		c := subscribeInteraction(s)
+		ctx, cancel := context.WithCancel(context.Background())
+		done := make(chan error, 1)
+		go func() {
+			_, err := c.Subscribe(ctx, interaction.SubscribeRequest{Attributes: []im.ConcreteAttributePath{onOff}})
+			done <- err
+		}()
+		req := s.next(t)
+		if req.proto.Opcode != im.OpcodeSubscribeRequest {
+			t.Fatalf("opcode 0x%02X", req.proto.Opcode)
+		}
+		s.ack(t, req)
+		cancel()
+		if err := await(t, done); !errors.Is(err, context.Canceled) {
+			t.Fatalf("subscribe: %v, want the abort", err)
+		}
+		closed := make(chan struct{})
+		go func() {
+			c.Close(nil)
+			close(closed)
+		}()
+		await(t, closed)
+		// Closed: a new interaction is refused with the close reason.
+		if _, err := c.Read(context.Background(), onOff); !errors.Is(err, interaction.ErrClosed) {
+			t.Fatalf("read after Close: %v, want ErrClosed", err)
+		}
+	})
 }
 
 // TestClientInteractionSubscribeAbandonedReportParity: a priming report
@@ -65,28 +67,30 @@ func TestClientInteractionSubscribeAbortedParity(t *testing.T) {
 // abandoned establishment awaits it (InteractionMessenger.ts:1116-1129).
 func TestClientInteractionSubscribeAbandonedReportParity(t *testing.T) {
 	t.Parallel()
-	s := newScripted(t)
-	c := subscribeInteraction(s)
-	ctx, cancel := context.WithCancel(context.Background())
-	done := make(chan error, 1)
-	go func() {
-		_, err := c.Subscribe(ctx, interaction.SubscribeRequest{Attributes: []im.ConcreteAttributePath{onOff}})
-		done <- err
-	}()
-	req := s.next(t)
-	s.ack(t, req)
-	cancel()
-	if err := await(t, done); !errors.Is(err, context.Canceled) {
-		t.Fatalf("subscribe: %v, want the abort", err)
-	}
-	s.send(t, protoOn(req, im.OpcodeReportData), reportChunk(t, false, false,
-		data(onOff, func(e *tlv.Encoder, tag tlv.Tag) { e.PutBool(tag, true) })))
-	status := s.next(t)
-	if status.proto.Opcode != im.OpcodeStatusResponse || decodeStatus(t, status.payload) != im.StatusInvalidSubscription {
-		t.Fatalf("answer opcode 0x%02X, want StatusResponse INVALID_SUBSCRIPTION", status.proto.Opcode)
-	}
-	s.ack(t, status)
-	c.Close(nil)
+	synctest.Test(t, func(t *testing.T) {
+		s := newScripted(t)
+		c := subscribeInteraction(s)
+		ctx, cancel := context.WithCancel(context.Background())
+		done := make(chan error, 1)
+		go func() {
+			_, err := c.Subscribe(ctx, interaction.SubscribeRequest{Attributes: []im.ConcreteAttributePath{onOff}})
+			done <- err
+		}()
+		req := s.next(t)
+		s.ack(t, req)
+		cancel()
+		if err := await(t, done); !errors.Is(err, context.Canceled) {
+			t.Fatalf("subscribe: %v, want the abort", err)
+		}
+		s.send(t, protoOn(req, im.OpcodeReportData), reportChunk(t, false, false,
+			data(onOff, func(e *tlv.Encoder, tag tlv.Tag) { e.PutBool(tag, true) })))
+		status := s.next(t)
+		if status.proto.Opcode != im.OpcodeStatusResponse || decodeStatus(t, status.payload) != im.StatusInvalidSubscription {
+			t.Fatalf("answer opcode 0x%02X, want StatusResponse INVALID_SUBSCRIPTION", status.proto.Opcode)
+		}
+		s.ack(t, status)
+		c.Close(nil)
+	})
 }
 
 // TestClientInteractionSubscribeClosedWhileProcessingParity: a report
@@ -95,58 +99,55 @@ func TestClientInteractionSubscribeAbandonedReportParity(t *testing.T) {
 // (:256-292).
 func TestClientInteractionSubscribeClosedWhileProcessingParity(t *testing.T) {
 	t.Parallel()
-	s := newScripted(t)
-	c := subscribeInteraction(s)
-	processing, proceed := make(chan struct{}), make(chan struct{})
-	done := make(chan error, 1)
-	go func() {
-		_, err := c.Subscribe(context.Background(), interaction.SubscribeRequest{
-			Attributes: []im.ConcreteAttributePath{onOff},
-			Updated: func(*interaction.Report) error {
-				close(processing)
-				<-proceed
-				return nil
-			},
-		})
-		done <- err
-	}()
-	req := s.next(t)
-	s.reply(t, req, im.InteractionModelProtocolID, im.OpcodeReportData, reportChunk(t, false, false,
-		data(onOff, func(e *tlv.Encoder, tag tlv.Tag) { e.PutBool(tag, true) })))
-	<-processing
-	closed := make(chan struct{})
-	go func() {
-		c.Close(nil)
-		close(closed)
-	}()
-	// Close aborts the establishment while the report is still owed: it
-	// refuses new work first and aborts right after.
-	// The probe's context is done, so a read before the close sends
-	// nothing.
-	probe, stop := context.WithCancel(context.Background())
-	stop()
-	for deadline := time.Now().Add(5 * time.Second); ; {
-		if _, err := c.Read(probe, onOff); errors.Is(err, interaction.ErrClosed) {
-			break
+	synctest.Test(t, func(t *testing.T) {
+		s := newScripted(t)
+		c := subscribeInteraction(s)
+		processing, proceed := make(chan struct{}), make(chan struct{})
+		done := make(chan error, 1)
+		go func() {
+			_, err := c.Subscribe(context.Background(), interaction.SubscribeRequest{
+				Attributes: []im.ConcreteAttributePath{onOff},
+				Updated: func(*interaction.Report) error {
+					close(processing)
+					<-proceed
+					return nil
+				},
+			})
+			done <- err
+		}()
+		req := s.next(t)
+		s.reply(t, req, im.InteractionModelProtocolID, im.OpcodeReportData, reportChunk(t, false, false,
+			data(onOff, func(e *tlv.Encoder, tag tlv.Tag) { e.PutBool(tag, true) })))
+		<-processing
+		closed := make(chan struct{})
+		go func() {
+			c.Close(nil)
+			close(closed)
+		}()
+		// Close aborts the establishment while the report is still owed: it
+		// refuses new work first and aborts right after.
+		// The probe's context is done, so a read before the close sends
+		// nothing.
+		probe, stop := context.WithCancel(context.Background())
+		stop()
+		synctest.Wait() // Close runs until it waits on the owed report
+		if _, err := c.Read(probe, onOff); !errors.Is(err, interaction.ErrClosed) {
+			t.Fatalf("read after Close: %v, want ErrClosed", err)
 		}
-		if time.Now().After(deadline) {
-			t.Fatal("Close did not take effect")
+		close(proceed)
+		if err := await(t, done); !errors.Is(err, interaction.ErrClosed) {
+			t.Fatalf("subscribe: %v, want the close reason", err)
 		}
-		time.Sleep(time.Millisecond)
-	}
-	time.Sleep(10 * time.Millisecond)
-	close(proceed)
-	if err := await(t, done); !errors.Is(err, interaction.ErrClosed) {
-		t.Fatalf("subscribe: %v, want the close reason", err)
-	}
-	status := s.next(t)
-	if status.proto.Opcode != im.OpcodeStatusResponse || decodeStatus(t, status.payload) != im.StatusInvalidSubscription {
-		t.Fatalf("answer opcode 0x%02X, want StatusResponse INVALID_SUBSCRIPTION", status.proto.Opcode)
-	}
-	await(t, closed)
-	select {
-	case b := <-s.conn.ch:
-		t.Fatalf("a retransmission after Close (%d bytes)", len(b))
-	case <-time.After(50 * time.Millisecond):
-	}
+		status := s.next(t)
+		if status.proto.Opcode != im.OpcodeStatusResponse || decodeStatus(t, status.payload) != im.StatusInvalidSubscription {
+			t.Fatalf("answer opcode 0x%02X, want StatusResponse INVALID_SUBSCRIPTION", status.proto.Opcode)
+		}
+		await(t, closed)
+		synctest.Wait() // every goroutine of the bubble has settled: anything owed is sent
+		select {
+		case b := <-s.conn.ch:
+			t.Fatalf("a retransmission after Close (%d bytes)", len(b))
+		default:
+		}
+	})
 }

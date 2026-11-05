@@ -40,7 +40,10 @@ var rawTimeExceptions = map[string]rawTimeException{
 
 // skipDirs are the trees the guard does not read: this package (it is the
 // port), the runnable examples and the build scripts (package main, not
-// part of the library).
+// part of the library). The examples stay skipped because their demo
+// devices still run their simulations on the time package (33 sites at
+// phase 35, most of them examples/reference-bridge's fleet timers and
+// stamps); their two sleeps moved to a clock seam (ota.go, fleet_sensors.go).
 var skipDirs = []string{"clock", "examples", "script"}
 
 // TestNoRawTimeOutsideClock fails on a call of — or a reference to — one of

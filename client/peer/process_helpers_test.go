@@ -7,6 +7,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/miekg/dns"
@@ -111,10 +112,12 @@ func (h *harness) sigma1(t *testing.T, addr string) unsecured {
 	}
 }
 
-// noSigma1 fails when a first Sigma1 transmission to addr is queued.
+// noSigma1 fails when a first Sigma1 transmission to addr is queued once
+// the case's synctest bubble has settled (a Sigma1 on its way has arrived).
+// It must run inside synctest.Test.
 func (h *harness) noSigma1(t *testing.T, addr string) {
 	t.Helper()
-	time.Sleep(20 * time.Millisecond) // let a Sigma1 that is on its way arrive
+	synctest.Wait()
 	for {
 		select {
 		case d := <-h.udp.ch:

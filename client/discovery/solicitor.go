@@ -339,22 +339,28 @@ func (s *Solicitor) emit() {
 	s.toSolicit.clear()
 	var questions []mdns.DNSQuestion
 	var answers []mdns.DNSRecord
+	now := s.names.clock.Now()
 	for _, e := range entries {
 		for _, t := range e.types {
 			questions = append(questions, mdns.DNSQuestion{Name: e.name.qname, Type: t})
 		}
-		answers = append(answers, knownAnswersOf(e.name)...)
+		answers = append(answers, knownAnswersOf(e.name, now)...)
 		for _, a := range e.associated {
 			for _, nm := range a.fn() {
-				answers = append(answers, knownAnswersOf(nm)...)
+				answers = append(answers, knownAnswersOf(nm, now)...)
 			}
 		}
 	}
 	if len(questions) == 0 {
 		return
 	}
-	msg, err := mdns.PackDNSQuery(questions, answers)
-	if err == nil && s.names.conn != nil {
+	// A query too large for one message is split as matter.js's
+	// MdnsSocket.send splits it (mdns.PackDNSQueries).
+	msgs, err := mdns.PackDNSQueries(questions, answers)
+	for _, msg := range msgs {
+		if err != nil || s.names.conn == nil {
+			break
+		}
 		err = s.names.conn.Send(msg)
 	}
 	if err != nil {
@@ -362,13 +368,23 @@ func (s *Solicitor) emit() {
 	}
 }
 
-// knownAnswersOf gives a name's records as known answers, without the
-// cache-flush bit, which means nothing outside a response (RFC 6762
-// §18.12). Mirrors matter.js 0ceb202d DnssdSolicitor.ts:274-276.
-func knownAnswersOf(nm *Name) []mdns.DNSRecord {
+// knownAnswersOf gives a name's records as known answers: each with its
+// remaining TTL, rounded up to a whole second so a remaining TTL under one
+// second is not sent as zero (a goodbye), and a record past half its TTL
+// left out so the responder refreshes it before it expires (RFC 6762
+// §7.1); without the cache-flush bit, which means nothing outside a
+// response (RFC 6762 §18.12). Mirrors matter.js
+// packages/general/src/net/dns-sd/DnssdSolicitor.ts:271-292 at 862ad75f
+// (knownAnswersOf).
+func knownAnswersOf(nm *Name, now time.Time) []mdns.DNSRecord {
 	out := make([]mdns.DNSRecord, 0, nm.records.len())
 	for _, r := range nm.records.values() {
+		remaining := r.InstalledAt.Add(r.TTL).Sub(now)
+		if remaining*2 < r.TTL {
+			continue
+		}
 		d := r.dnsRecord()
+		d.TTL = uint32(min((remaining+time.Second-1)/time.Second, math.MaxUint32)) //nolint:gosec // clamped to the uint32 range
 		d.CacheFlush = false
 		out = append(out, d)
 	}

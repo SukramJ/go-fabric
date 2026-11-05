@@ -61,7 +61,11 @@ func newRegHarness(t *testing.T) *regHarness {
 	}
 	h.mgr = mgr
 	names := discovery.NewNames(silentMDNS{out: make(chan mdns.QueryResponse)}, slog.New(slog.DiscardHandler))
-	authority, err := ca.New(ca.Config{Store: &ca.MemoryStore{}})
+	t.Cleanup(func() { _ = names.Close() }) // its resolver goroutine ends with the test (a synctest bubble requires it)
+	// The CA issues on the harness's clock: a case in a synctest bubble
+	// reads 2000-01-01 UTC on the system clock, and a certificate
+	// backdated from there falls before the Matter epoch.
+	authority, err := ca.New(ca.Config{Store: &ca.MemoryStore{}, Clock: h.clock})
 	if err != nil {
 		t.Fatal(err)
 	}

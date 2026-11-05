@@ -1384,7 +1384,7 @@ func TestDeviceTypeRevision_KnownType(t *testing.T) {
 	got := deviceTypeRevision(id)
 	want, ok := schema.DeviceTypeRevision(schema.DeviceTypeID(id))
 	if !ok {
-		t.Skip("0x0100 not in schema — skipping")
+		t.Fatal("OnOffLight 0x0100 is not in the generated schema (schema.DeviceTypeRevision): a regeneration dropped it")
 	}
 	if got != want {
 		t.Errorf("deviceTypeRevision(0x0100) = %d, want %d", got, want)

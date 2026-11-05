@@ -266,9 +266,15 @@ func attrPath(ep uint16, cluster, attribute uint32) im.ConcreteAttributePath {
 	return im.ConcreteAttributePath{Endpoint: ep, Cluster: cluster, Attribute: attribute, HasEndpoint: true, HasCluster: true, HasAttribute: true}
 }
 
+// waitLive polls cond on the wall clock for up to ninety seconds (the OTA
+// transfer of ota_live_test.go is the longest wait). It is the
+// package's one poll: the node tests run real nodes and bridgetest
+// commissioners on UDP loopback sockets (node.Network{Listen:
+// "127.0.0.1:0"}), whose reads no synctest bubble holds and no site
+// paces.
 func waitLive(t *testing.T, what string, cond func() bool) {
 	t.Helper()
-	deadline := time.Now().Add(60 * time.Second)
+	deadline := time.Now().Add(90 * time.Second)
 	for !cond() {
 		if time.Now().After(deadline) {
 			t.Fatalf("timed out waiting for %s", what)

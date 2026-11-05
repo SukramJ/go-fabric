@@ -128,6 +128,7 @@ pin lift confirms by re-reading the row, [`pin-lifts.md`](./pin-lifts.md)).
 | BD-chip-EnergyReporting-FakeReadings | `GeneralDiagnosticsServer.ts:164-166` answers every test event trigger with INVALID_COMMAND, and the chip-testing node's `TestGeneralDiagnosticsServer.ts:15-22` accepts only the generic trigger; a grep for `0x0091`, `FakeReadings` and `EnergyReporting` over `packages/` and `support/chip-testing/` at the pin finds only the cluster id in `packages/types/src/clusters/electrical-energy-measurement.d.ts:25` (presence: the two rejections) | `packages/node/src/behaviors/general-diagnostics/GeneralDiagnosticsServer.ts`<br>`support/chip-testing/src/cluster/TestGeneralDiagnosticsServer.ts` | `"Unsupported test event trigger "`<br>`"} else if (testEvent !== 0x0000000000000003) {\n            throw new StatusResponseError(\"Wrong test event\", Status.InvalidCommand);"` | connectedhomeip `src/app/clusters/electrical-energy-measurement-server/EnergyReportingTestEventTriggerHandler.h:47-51`, `examples/energy-management/energy-management-triggers/EnergyReportingEventTriggers.cpp:28-85` and `FakeReadings.cpp:73-175` at `6170af84` | no |
 | BD-matterjs-server-NetworkTopology | `NetworkClient.ts:35` declares the controller's network behaviour, which holds the subscription state only; matter.js at the pin has no topology service (absence: no neighbour-table or graph code under `packages/`) | `packages/node/src/behavior/system/network/NetworkClient.ts` | `class NetworkClient` | matterjs-server `packages/ws-controller/src/controller/NetworkTopologyService.ts` and `packages/ws-client/src/topology/topology-utils.ts` at `0bd06f22` | no |
 | BD-Matter-ClientNodeEventHistory | `ClientEventEmitter.ts:45-74` emits a peer's event to the node's observers and the ChangeNotificationService and keeps none; no code under `packages/node/src/node/client/` holds past events (absence: the end of `emitClientEvent`, :72-76, where a record would go) | `packages/node/src/node/client/ClientEventEmitter.ts` | `"            });\n        }\n    }\n\n    function getTarget(node: ClientNode, occurrence: ReadResult.EventValue, clusterName: string, eventName: string) {"` | matterjs-server `packages/ws-controller/src/server/WebSocketControllerHandler.ts:112`, `:368-380` at `0bd06f22` (a global last-25 list), kept per node here (issue #388 G-C2) | no |
+| BD-Matter-LogRing | absence: the default `LogDestination` formats a message and writes it (`LogDestination.ts:77-93`, `add` → `write`), `Logger.ts` fans a message out to its destinations and keeps nothing, and no file under `packages/general/src/log/` holds past records or a run-time level a host reads back as records | `packages/general/src/log/LogDestination.ts` | `"        add(message: Diagnostic.Message) {\n            this.write(this.format(message), message);\n        },"` | matterjs-server's dashboard sets and reads the console and file levels only (`packages/dashboard/src/components/dialogs/settings/log-level-section.ts:56-82` at `0bd06f22`: `getLogLevel`/`setLogLevel`, no records); the ring is this module's own design for go-fabric-ui's operation page (issue #393, M9 U5) | no |
 
 ---
 
@@ -449,6 +450,91 @@ or above its width is refused — INVALID_ACTION and CONSTRAINT_ERROR, as
 matter.js's `TlvNumber.validate` refuses it (`TlvNumber.ts:145-156`,
 `ValidationError.ts:35-38`) — rather than masked into a different, valid
 value (`cluster/wire/field_bounds.go`, W3-clucore-08).
+### BD-Matter-TLVSchemaLayer — the generated codecs are the TLV schema layer; tlv/ has no TlvObject
+
+matter.js's TLV package is a schema layer: `TlvObject` / `TlvTaggedList`
+encode a JavaScript record in tag order, inject and remove a field
+(`injectField` / `removeField`, `packages/types/src/tlv/TlvObject.ts:296-333`
+at `862ad75f`), refuse an unknown property or a non-context tag unless
+`allowProtocolSpecificTags` (`:205-213`), hold the length limits of a
+repeated field, and `TlvArray` encodes and assembles chunked lists. In this
+module `tlv/` is the raw element codec and the schema layer is the
+generated code: `script/clustergen` writes each struct's `EncodeTLV` in tag
+order and its `DecodeTLV` through `spec.DecodeFields`, which skips a member
+it does not bind; list chunking is the interaction layer's
+(`client/interaction/report.go`, `im/write_chunking.go`). The
+`TlvObjectTest.ts` and `TlvArrayTest.ts` cases of that API are `left` rows
+of the test register (phase 33), which also retired the five FixMe skips
+that stood for them in `tlv/object_parity_test.go`. Reasoning: a typed Go
+struct cannot carry an unknown property, a field of the wrong type or a
+caller's member order, so the checks that guard a JavaScript record have
+no value to act on.
+
+### BD-Matter-TLVNullIsTheNullElement — a nullable value is null only as the TLV null element
+
+matter.js's `TlvNullable` decodes a zero-length string or list as null when
+the inner schema has a minimum length above zero, and a zero-length octet
+string as null always (`packages/types/src/tlv/TlvNullable.ts:84-104` at
+`862ad75f`, citing connectedhomeip-spec issue 11387 for the ambiguity).
+`cluster/spec.DecodeNullable` and `DecodeValue` read null only from the
+TLV null element; a zero-length value decodes as itself and is then
+judged by its bound. The seven "zero length" cases of `TlvNullableTest.ts`
+are `left` rows of the test register (phase 33). Reasoning: matter.js's
+own comment (`:85-96`) calls the empty-as-null reading a specification
+versus SDK interpretation issue and applies it only in part, so the module
+keeps the value as encoded and leaves the null-or-empty reading to the host
+that consumes it.
+
+### BD-Matter-SetupCodecShape — the setup-code codecs always validate, take no flow and encode no TLV data
+
+matter.js's pairing-code codecs can skip validation on decode
+(`Schema.decode(encoded, validate = true)`,
+`packages/types/src/schema/Schema.ts:18` at `862ad75f`), take a
+commissioning flow on a manual-code encode and refuse a non-standard one
+without VID/PID (`packages/types/src/schema/PairingCodeSchema.ts:430-437`),
+and build a QR code's TLV data from a record (`encodeTlvData`, `:386-392`,
+refusing PBKDF iterations without salt and a reserved tag). `secure/setup`
+decodes with validation always on (`DecodeQRCode`, `DecodeManualCode`,
+`DecodeExtra`), offers `ManualCode` as the standard-flow code and
+`ManualCodeLong` as the one carrying VID/PID, and writes a QR code's TLV
+data as the bytes a caller gives (`Extra.Raw`). Twelve
+`PairingCodeSchemaTest.ts` cases are `left` rows of the test register
+(phase 33); the decode halves of the TLV-data cases are ported. Reasoning:
+the module reads codes to commission and prints the standard-flow codes of
+its own node, so a validation switch, a flow argument and a TLV-data
+builder would serve no caller.
+
+### BD-Matter-MdnsRelevancePreFilter — no packet pre-filter in front of the mDNS decode
+
+matter.js's MdnsSocket runs every inbound packet through a relevance
+filter before decoding it: interested components register names, the
+filter reduces each to a hashed footprint label and scans only a packet's
+name structure, keeping any packet it cannot judge
+(`packages/general/src/net/dns-sd/MdnsRelevanceFilter.ts:63-75` at
+`862ad75f`). The module decodes every packet (`mdns.ParseDNSMessage`) and
+admits records by the discovery cache's ingress filter (client/discovery
+`Names`, `TestParityDiscovery_IngressFilter`), as `mdns/query_conn.go`
+states. The 36 cases of `MdnsRelevanceFilterTest.ts` and the 12 relevance
+cases of `MdnsSocketTest.ts` are `left` rows of the test register (phase
+33). Reasoning: the filter saves decode work and by its own contract never
+drops what the later gates would keep, so it has no wire behaviour to
+mirror.
+
+### BD-Matter-AESCCMMatterOnly — AES-CCM with Matter's parameters only, and no AES-CMAC
+
+matter.js's crypto offers AES-CCM with a configurable tag length and L (an
+8-byte tag, a 12-byte nonce with L=3, the NIST SP 800-38C Example 3 KAT)
+and an AES-CMAC (`packages/general/test/crypto/aes/CcmTest.ts:230-301`,
+`StandardCryptoTest.ts:102-105` and `:270-303`,
+`packages/nodejs/test/crypto/NodeJsCryptoTest.ts:76-113` at `862ad75f`).
+`secure/aesccm` fixes Matter's parameters — a 13-byte nonce, a 16-byte tag,
+L=2 (`secure/aesccm/aesccm.go:19-25`) — and the module implements no
+AES-CMAC. Those cases are `left` rows of the test register (phase 33),
+and `CmacTest.ts` is excluded. Reasoning: every Matter protocol the
+module speaks uses AES-CCM-128 with these parameters (Core § 3.6) and none
+uses CMAC, so a configurable mode would add attack surface without a
+caller.
+
 ### BD-Matter-MessageCodec-PrivacyWithExtensions — a header with the privacy flag and message extensions is decoded
 
 matter.js `decodePacket` refuses a packet header that sets both the P and the
@@ -978,7 +1064,11 @@ when Actions or another optional cluster lands.
 
 **L3 — TLV Wire Codec (Systematic Parity Run #02 — 2026-05-12):**
 
-- **L3-D2 ImplicitProfile-tag pass-through:** matter.js throws
+- **L3-D2 ImplicitProfile-tag pass-through — retired in phase 33:** the
+  decoder now refuses an implicit-profile tag with
+  `tlv.ErrImplicitProfileTag`, as matter.js and chip do (TlvCodecTest.ts
+  ported, `tlv.TestTlvCodecTagsParityMatterJS`). The record of the former
+  divergence: matter.js throws
   `UnexpectedDataError` for `ImplicitProfile16`/`ImplicitProfile32` tags
   (TlvCodec.ts:169-171 at the schema pin; `NotImplementedError` before
   e21a1e72, #4514, which classifies the tag as malformed peer data); chip resolves them against `ImplicitProfileId` and
@@ -1970,6 +2060,27 @@ the history's change notification; `Node.EventHistory(since, limit)`
 answers. Memory only, cleared by `Node.Erase`. Reason: go-fabric-ui's
 event tab and go-fabric-server's `node_event`/`diagnostics` read one source
 per node rather than each keeping its own list.
+
+### BD-Matter-LogRing — a bounded slog ring with a run-time level, for every host
+
+matter.js at `862ad75f` keeps no log records: a message reaches the
+destinations `Logger` holds, and the default destination's `add` formats it
+and hands it to `write` (`packages/general/src/log/LogDestination.ts:77-93`);
+nothing under `packages/general/src/log/` stores what was written or
+answers a reader with past records. matterjs-server's dashboard changes
+the level only (`log-level-section.ts:56-82` at `0bd06f22`: `getLogLevel`,
+`setLogLevel` for the console and file levels). The `logring` package is
+ahead of both (issue #393, owner decision F.2 of 2026-11-04): a
+`slog.Handler` that wraps the host's handler, keeps the newest `N` records
+in a ring with sequence numbers, gates on a `slog.LevelVar` the host and
+the UI set at run time, and delivers each record to observers without
+blocking the logger (a slow observer loses records, counted). The host
+builds `slog.New(logring.New(inner, opts))` and passes it as
+`node.Config.Logger`; no facade changes. Reason: go-fabric-ui's operation
+page reads one shape through one port on every host (openccu-loom,
+go-ha2fabric, go-fabric-server) instead of each host building its own
+ring. The record keeps what the module logs and nothing more; the module
+logs no passcode and no key.
 
 ### BD-chip-ClosureDimension-RulesInServer — the command rules are connectedhomeip's; the feature check is matter.js's stricter one
 

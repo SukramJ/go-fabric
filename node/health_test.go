@@ -37,13 +37,7 @@ func (l *sampleLog) len() int {
 // records on its own goroutine.
 func waitSamples(t *testing.T, log *sampleLog, n int) {
 	t.Helper()
-	deadline := time.Now().Add(5 * time.Second)
-	for log.len() < n {
-		if time.Now().After(deadline) {
-			t.Fatalf("%d samples, want %d", log.len(), n)
-		}
-		time.Sleep(time.Millisecond)
-	}
+	waitLive(t, "the health samples", func() bool { return log.len() >= n })
 }
 
 // The health probe samples the listener at Start and on every interval

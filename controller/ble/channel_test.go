@@ -8,6 +8,7 @@ import (
 	"errors"
 	"slices"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/SukramJ/go-fabric/client/exchange"
@@ -121,36 +122,35 @@ func (c *silentCentral) Connect(context.Context, ble.Peripheral) (ble.Connection
 }
 
 func TestDialHandshakeTimeoutAndDisconnect(t *testing.T) {
-	clock := clocktest.New(time.Unix(0, 0))
-	c := &silentCentral{conn: &silent{gone: make(chan struct{})}}
-	errc := make(chan error, 1)
-	go func() {
-		_, err := ble.Dial(context.Background(), c, ble.Peripheral{Address: "x"}, ble.DialOptions{Clock: clock})
-		errc <- err
-	}()
-	// The handshake arms its response timeout; nothing answers, so it
-	// expires once the clock passes btp.ConnRspTimeout.
-	deadline := time.Now().Add(5 * time.Second)
-	for !slices.Contains(clock.Armed(), btp.ConnRspTimeout) {
-		if time.Now().After(deadline) {
+	synctest.Test(t, func(t *testing.T) {
+		clock := clocktest.New(time.Unix(0, 0))
+		c := &silentCentral{conn: &silent{gone: make(chan struct{})}}
+		errc := make(chan error, 1)
+		go func() {
+			_, err := ble.Dial(context.Background(), c, ble.Peripheral{Address: "x"}, ble.DialOptions{Clock: clock})
+			errc <- err
+		}()
+		// The handshake arms its response timeout; nothing answers, so it
+		// expires once the clock passes btp.ConnRspTimeout.
+		synctest.Wait() // the handshake has armed what it waits on
+		if !slices.Contains(clock.Armed(), btp.ConnRspTimeout) {
 			t.Fatalf("no %v handshake timeout armed (armed %v)", btp.ConnRspTimeout, clock.Armed())
 		}
-		time.Sleep(time.Millisecond)
-	}
-	clock.Advance(btp.ConnRspTimeout)
-	if err := <-errc; !errors.Is(err, ble.ErrHandshakeTimeout) {
-		t.Fatalf("Dial = %v", err)
-	}
-	// A connection that drops during the handshake.
-	c2 := &silentCentral{conn: &silent{gone: make(chan struct{})}}
-	close(c2.conn.gone)
-	if _, err := ble.Dial(context.Background(), c2, ble.Peripheral{Address: "y"}, ble.DialOptions{}); !errors.Is(err, btp.ErrDisconnected) {
-		t.Fatalf("Dial on a dropped connection = %v", err)
-	}
-	// An unknown peripheral.
-	if _, err := ble.Dial(context.Background(), bletest.NewCentral(), ble.Peripheral{Address: "z"}, ble.DialOptions{}); !errors.Is(err, bletest.ErrUnknownPeripheral) {
-		t.Fatalf("Dial to an unknown peripheral = %v", err)
-	}
+		clock.Advance(btp.ConnRspTimeout)
+		if err := <-errc; !errors.Is(err, ble.ErrHandshakeTimeout) {
+			t.Fatalf("Dial = %v", err)
+		}
+		// A connection that drops during the handshake.
+		c2 := &silentCentral{conn: &silent{gone: make(chan struct{})}}
+		close(c2.conn.gone)
+		if _, err := ble.Dial(context.Background(), c2, ble.Peripheral{Address: "y"}, ble.DialOptions{}); !errors.Is(err, btp.ErrDisconnected) {
+			t.Fatalf("Dial on a dropped connection = %v", err)
+		}
+		// An unknown peripheral.
+		if _, err := ble.Dial(context.Background(), bletest.NewCentral(), ble.Peripheral{Address: "z"}, ble.DialOptions{}); !errors.Is(err, bletest.ErrUnknownPeripheral) {
+			t.Fatalf("Dial to an unknown peripheral = %v", err)
+		}
+	})
 }
 
 func TestChannelClosesWhenPeripheralDrops(t *testing.T) {

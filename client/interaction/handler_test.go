@@ -6,6 +6,7 @@ package interaction_test
 import (
 	"context"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/SukramJ/go-fabric/client/exchange"
@@ -72,45 +73,47 @@ func expectStatus(t *testing.T, s *scripted, want im.StatusCode) msg {
 // liveness deadline restarts after each (:139-144).
 func TestInboundReports(t *testing.T) {
 	t.Parallel()
-	s, _, c, started := handlerRig(t)
-	updates := make(chan *interaction.Report, 4)
-	keepalives := make(chan struct{}, 4)
-	sub := subscribed(t, s, c, interaction.SubscribeRequest{
-		Attributes:        []im.ConcreteAttributePath{onOff},
-		Updated:           func(r *interaction.Report) error { updates <- r; return nil },
-		KeepaliveReceived: func() { keepalives <- struct{}{} },
-	}, 5)
-	<-updates // the priming report
+	synctest.Test(t, func(t *testing.T) {
+		s, _, c, started := handlerRig(t)
+		updates := make(chan *interaction.Report, 4)
+		keepalives := make(chan struct{}, 4)
+		sub := subscribed(t, s, c, interaction.SubscribeRequest{
+			Attributes:        []im.ConcreteAttributePath{onOff},
+			Updated:           func(r *interaction.Report) error { updates <- r; return nil },
+			KeepaliveReceived: func() { keepalives <- struct{}{} },
+		}, 5)
+		<-updates // the priming report
 
-	s.push(t, 0x7001, im.OpcodeReportData, pushedReport(t, 5, true, true, false, true))
-	first := expectStatus(t, s, im.StatusSuccess)
-	if got := <-started; got != s.session {
-		t.Fatal("ReportStarted with another session")
-	}
-	s.continueOn(t, first, im.OpcodeReportData, pushedReport(t, 5, false, false, false, false))
-	final := expectStatus(t, s, im.StatusSuccess)
-	s.ackPushed(t, final)
-	r := <-updates
-	if v, ok := r.Value(1, 6, 0); !ok || !v.El.Bool {
-		t.Fatalf("pushed report %+v", r)
-	}
-	// The report carries its subscription id (the first chunk's) and the
-	// session it arrived over.
-	if r.SubscriptionID != 5 || r.Session != s.session {
-		t.Fatalf("pushed report on subscription %d over session %p, want 5 over %p", r.SubscriptionID, r.Session, s.session)
-	}
+		s.push(t, 0x7001, im.OpcodeReportData, pushedReport(t, 5, true, true, false, true))
+		first := expectStatus(t, s, im.StatusSuccess)
+		if got := <-started; got != s.session {
+			t.Fatal("ReportStarted with another session")
+		}
+		s.continueOn(t, first, im.OpcodeReportData, pushedReport(t, 5, false, false, false, false))
+		final := expectStatus(t, s, im.StatusSuccess)
+		s.ackPushed(t, final)
+		r := <-updates
+		if v, ok := r.Value(1, 6, 0); !ok || !v.El.Bool {
+			t.Fatalf("pushed report %+v", r)
+		}
+		// The report carries its subscription id (the first chunk's) and the
+		// session it arrived over.
+		if r.SubscriptionID != 5 || r.Session != s.session {
+			t.Fatalf("pushed report on subscription %d over session %p, want 5 over %p", r.SubscriptionID, r.Session, s.session)
+		}
 
-	s.push(t, 0x7002, im.OpcodeReportData, pushedReport(t, 5, false, false, true, false))
-	select {
-	case <-keepalives:
-	case <-time.After(5 * time.Second):
-		t.Fatal("no keepalive")
-	}
-	timeout := 30*time.Second + 2*c.MaximumPeerResponseTime(interaction.SubscriptionProcessingTime, false)
-	s.clock.waitTimer(t, timeout)
-	if len(updates) != 0 || sub.ID() != 5 {
-		t.Fatal("a keepalive reached Updated")
-	}
+		s.push(t, 0x7002, im.OpcodeReportData, pushedReport(t, 5, false, false, true, false))
+		select {
+		case <-keepalives:
+		case <-time.After(5 * time.Second):
+			t.Fatal("no keepalive")
+		}
+		timeout := 30*time.Second + 2*c.MaximumPeerResponseTime(interaction.SubscriptionProcessingTime, false)
+		s.clock.waitTimer(t, timeout)
+		if len(updates) != 0 || sub.ID() != 5 {
+			t.Fatal("a keepalive reached Updated")
+		}
+	})
 }
 
 // TestInboundReportsRefused: the answers of ClientSubscriptionHandler.ts
@@ -120,24 +123,26 @@ func TestInboundReports(t *testing.T) {
 // not a report (InteractionMessenger.ts:357-361).
 func TestInboundReportsRefused(t *testing.T) {
 	t.Parallel()
-	s, reg, c, _ := handlerRig(t)
-	subscribed(t, s, c, interaction.SubscribeRequest{Attributes: []im.ConcreteAttributePath{onOff}}, 5)
+	synctest.Test(t, func(t *testing.T) {
+		s, reg, c, _ := handlerRig(t)
+		subscribed(t, s, c, interaction.SubscribeRequest{Attributes: []im.ConcreteAttributePath{onOff}}, 5)
 
-	s.push(t, 0x7101, im.OpcodeReportData, pushedReport(t, 0, true, false, false, true))
-	s.ackPushed(t, expectStatus(t, s, im.StatusInvalidSubscription))
-	s.push(t, 0x7102, im.OpcodeReportData, pushedReport(t, 99, true, false, false, true))
-	s.ackPushed(t, expectStatus(t, s, im.StatusInvalidSubscription))
-	s.push(t, 0x7103, im.OpcodeReadRequest, encode(t, func(e *tlv.Encoder) { im.ReadRequest{}.MarshalTLV(e) }))
-	s.ackPushed(t, expectStatus(t, s, im.StatusInvalidAction))
+		s.push(t, 0x7101, im.OpcodeReportData, pushedReport(t, 0, true, false, false, true))
+		s.ackPushed(t, expectStatus(t, s, im.StatusInvalidSubscription))
+		s.push(t, 0x7102, im.OpcodeReportData, pushedReport(t, 99, true, false, false, true))
+		s.ackPushed(t, expectStatus(t, s, im.StatusInvalidSubscription))
+		s.push(t, 0x7103, im.OpcodeReadRequest, encode(t, func(e *tlv.Encoder) { im.ReadRequest{}.MarshalTLV(e) }))
+		s.ackPushed(t, expectStatus(t, s, im.StatusInvalidAction))
 
-	s.push(t, 0x7104, im.OpcodeReportData, pushedReport(t, 5, true, true, false, true))
-	first := expectStatus(t, s, im.StatusSuccess)
-	s.continueOn(t, first, im.OpcodeReportData, pushedReport(t, 6, true, false, false, true))
-	s.ackPushed(t, expectStatus(t, s, im.StatusInvalidSubscription))
+		s.push(t, 0x7104, im.OpcodeReportData, pushedReport(t, 5, true, true, false, true))
+		first := expectStatus(t, s, im.StatusSuccess)
+		s.continueOn(t, first, im.OpcodeReportData, pushedReport(t, 6, true, false, false, true))
+		s.ackPushed(t, expectStatus(t, s, im.StatusInvalidSubscription))
 
-	if err := reg.BlockNewActivity(context.Background()); err != nil {
-		t.Fatal(err)
-	}
-	s.push(t, 0x7105, im.OpcodeReportData, pushedReport(t, 5, true, false, false, true))
-	s.ackPushed(t, expectStatus(t, s, im.StatusInvalidSubscription))
+		if err := reg.BlockNewActivity(context.Background()); err != nil {
+			t.Fatal(err)
+		}
+		s.push(t, 0x7105, im.OpcodeReportData, pushedReport(t, 5, true, false, false, true))
+		s.ackPushed(t, expectStatus(t, s, im.StatusInvalidSubscription))
+	})
 }

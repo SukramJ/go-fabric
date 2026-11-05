@@ -395,9 +395,12 @@ device's Reachable attribute and its ReachableChanged event),
 `Node.Topology()` is what the node serves: the Aggregator's endpoint and
 every bridged device with its key, endpoint, device type, name and
 reachability. The [host's view](../guides/host-view.md) walks through a
-program that uses each.
+program that uses each. `Node.Endpoints()` is the same tree as a
+controller sees it: every endpoint — the root and the Aggregator
+included — by number, with its parent and the PartsList, DeviceTypeList
+and ServerList its Descriptor serves.
 
-*Source: `node/aggregator.go:40-132`, `device/lifecycle.go`, `node/` (`Topology`, `BridgeTopology`), `examples/reference-bridge/main.go:329-331`, `examples/reference-bridge/fleet_node.go` (`endpointByKey`).*
+*Source: `node/aggregator.go:40-132`, `device/lifecycle.go`, `node/` (`Topology`, `BridgeTopology`, `Endpoints`), `examples/reference-bridge/main.go:329-331`, `examples/reference-bridge/fleet_node.go` (`endpointByKey`).*
 
 ## Commissioning
 

@@ -12,7 +12,9 @@ import (
 	"testing"
 
 	"github.com/SukramJ/go-fabric/cluster/measurement"
+	"github.com/SukramJ/go-fabric/cluster/spec"
 	"github.com/SukramJ/go-fabric/contract"
+	"github.com/SukramJ/go-fabric/im"
 )
 
 // Global attribute IDs from cluster/globals.go.
@@ -331,8 +333,8 @@ func TestOccupancySensingServer_MatterInvoke_Rejected(t *testing.T) {
 	t.Parallel()
 	s := measurement.NewOccupancySensingServer(fakeBool{class: contract.MeasurementOccupancy, val: true, obs: true})
 	_, err := s.MatterInvoke(context.Background(), 0x00, nil)
-	if err == nil {
-		t.Error("MatterInvoke: want non-nil error")
+	if spec.StatusOf(err) != im.StatusUnsupportedCommand {
+		t.Errorf("MatterInvoke: status %v (%v), want %v", spec.StatusOf(err), err, im.StatusUnsupportedCommand)
 	}
 }
 

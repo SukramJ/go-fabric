@@ -15,7 +15,8 @@ package interaction
 // Sustain. matter.js's `inactive` observable is !Active; its "icdLit"
 // network is ExchangeOptions.Priority; its flush() — macrotask drains — is a
 // wait for the loop's effect, and "nothing happened" a wait for the loop to
-// settle on the wall clock.
+// settle: every case runs in a synctest bubble, and settling is
+// synctest.Wait — every goroutine of the bubble durably blocked.
 
 import (
 	"context"
@@ -23,6 +24,7 @@ import (
 	"slices"
 	"sync"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/SukramJ/go-fabric/client/exchange"
@@ -178,20 +180,23 @@ func (r *icdRig) lose() {
 	}
 }
 
-// waitFor waits on the wall clock for the loop to reach cond.
+// waitFor lets the loop run what it would run now and fails unless it
+// reached cond. Every case runs in a synctest bubble on the rig's fake
+// clock: once every goroutine of the bubble is durably blocked, the loop
+// waits on a fake timer or a channel only the test moves, so a cond that
+// does not hold then never will (issue #383: a wall-clock window here was
+// the flake).
 func waitFor(t *testing.T, what string, cond func() bool) {
 	t.Helper()
-	deadline := time.Now().Add(5 * time.Second)
-	for !cond() {
-		if time.Now().After(deadline) {
-			t.Fatalf("timed out waiting for %s", what)
-		}
-		time.Sleep(time.Millisecond)
+	synctest.Wait()
+	if !cond() {
+		t.Fatalf("the loop settled without %s", what)
 	}
 }
 
-// settle lets the loop run what it would run now.
-func settle() { time.Sleep(20 * time.Millisecond) }
+// settle lets the loop run what it would run now: it returns once every
+// goroutine of the case's bubble is durably blocked.
+func settle() { synctest.Wait() }
 
 func (r *icdRig) wantAttempts(n int) {
 	r.t.Helper()
@@ -281,35 +286,39 @@ func TestSustainedSubscriptionICD(t *testing.T) {
 		t.Parallel()
 		t.Run("treats a wakefulness with requiresAwait===false as non-ICD (timed retry, probe)", func(t *testing.T) {
 			t.Parallel()
-			r := newICDRig(t, nil)
-			w := icd.NewPeerWakefulness(r.fake) // requiresAwait false: always awake
-			r.start(fixed(w), nil)
-			r.wantAttempts(1)
-			r.wantActive(true)
-			r.lose()
-			r.wantAttempts(2)
-			if r.prov.probeCount() != 1 {
-				t.Fatalf("%d probes", r.prov.probeCount())
-			}
+			synctest.Test(t, func(t *testing.T) {
+				r := newICDRig(t, nil)
+				w := icd.NewPeerWakefulness(r.fake) // requiresAwait false: always awake
+				r.start(fixed(w), nil)
+				r.wantAttempts(1)
+				r.wantActive(true)
+				r.lose()
+				r.wantAttempts(2)
+				if r.prov.probeCount() != 1 {
+					t.Fatalf("%d probes", r.prov.probeCount())
+				}
+			})
 		})
 		t.Run("parks on the next loss once its wakefulness flips to requiresAwait===true", func(t *testing.T) {
 			t.Parallel()
-			r := newICDRig(t, nil)
-			w := sitWakefulness(r.fake)
-			r.start(fixed(w), nil)
-			r.wantAttempts(1)
-			// A runtime SIT→LIT flip: the subscription recreates and parks, the
-			// peer being asleep; the loss then finds nothing to replace.
-			w.SetRequiresAwait(true)
-			settle()
-			r.lose()
-			r.advance(60 * time.Second)
-			if r.prov.probeCount() != 0 {
-				t.Fatalf("%d probes", r.prov.probeCount())
-			}
-			r.wantAttempts(1)
-			w.NoteActive()
-			r.wantAttempts(2)
+			synctest.Test(t, func(t *testing.T) {
+				r := newICDRig(t, nil)
+				w := sitWakefulness(r.fake)
+				r.start(fixed(w), nil)
+				r.wantAttempts(1)
+				// A runtime SIT→LIT flip: the subscription recreates and parks, the
+				// peer being asleep; the loss then finds nothing to replace.
+				w.SetRequiresAwait(true)
+				settle()
+				r.lose()
+				r.advance(60 * time.Second)
+				if r.prov.probeCount() != 0 {
+					t.Fatalf("%d probes", r.prov.probeCount())
+				}
+				r.wantAttempts(1)
+				w.NoteActive()
+				r.wantAttempts(2)
+			})
 		})
 	})
 
@@ -317,287 +326,325 @@ func TestSustainedSubscriptionICD(t *testing.T) {
 		t.Parallel()
 		t.Run("parks while asleep and subscribes only after a wake signal", func(t *testing.T) {
 			t.Parallel()
-			r := newICDRig(t, nil)
-			w := litWakefulness(r.fake)
-			sub := r.start(fixed(w), nil)
-			r.advance(20 * time.Second)
-			r.wantAttempts(0)
-			if sub.Active() {
-				t.Fatal("active while parked")
-			}
-			w.NoteActive()
-			r.wantAttempts(1)
-			r.wantActive(true)
+			synctest.Test(t, func(t *testing.T) {
+				r := newICDRig(t, nil)
+				w := litWakefulness(r.fake)
+				sub := r.start(fixed(w), nil)
+				r.advance(20 * time.Second)
+				r.wantAttempts(0)
+				if sub.Active() {
+					t.Fatal("active while parked")
+				}
+				w.NoteActive()
+				r.wantAttempts(1)
+				r.wantActive(true)
+			})
 		})
 		t.Run("leaves a subscribed LIT peer's availability to the subscription", func(t *testing.T) {
 			t.Parallel()
-			r := newICDRig(t, nil)
-			w := litWakefulness(r.fake)
-			r.start(fixed(w), nil)
-			w.NoteActive()
-			r.wantActive(true)
-			r.advance(2 * time.Hour)
-			if !w.Available() || !r.sub.Active() {
-				t.Fatalf("available %v active %v", w.Available(), r.sub.Active())
-			}
+			synctest.Test(t, func(t *testing.T) {
+				r := newICDRig(t, nil)
+				w := litWakefulness(r.fake)
+				r.start(fixed(w), nil)
+				w.NoteActive()
+				r.wantActive(true)
+				r.advance(2 * time.Hour)
+				if !w.Available() || !r.sub.Active() {
+					t.Fatalf("available %v active %v", w.Available(), r.sub.Active())
+				}
+			})
 		})
 		t.Run("fires checkInMissed for a parked LIT peer that never subscribes and misses its Check-In", func(t *testing.T) {
 			t.Parallel()
-			r := newICDRig(t, func(int) error { return errTransient })
-			w := litWakefulness(r.fake)
-			var mu sync.Mutex
-			missed := 0
-			w.OnCheckInMissed(func() { mu.Lock(); missed++; mu.Unlock() })
-			r.start(fixed(w), nil)
-			w.NoteActive() // arms the deadline; the subscribe fails, so no hold
-			r.wantAttempts(1)
-			r.advance(30*time.Second + 5*time.Second + icd.CheckInMargin + time.Millisecond)
-			mu.Lock()
-			defer mu.Unlock()
-			if w.Available() || missed != 1 {
-				t.Fatalf("available %v missed %d", w.Available(), missed)
-			}
+			synctest.Test(t, func(t *testing.T) {
+				r := newICDRig(t, func(int) error { return errTransient })
+				w := litWakefulness(r.fake)
+				var mu sync.Mutex
+				missed := 0
+				w.OnCheckInMissed(func() { mu.Lock(); missed++; mu.Unlock() })
+				r.start(fixed(w), nil)
+				w.NoteActive() // arms the deadline; the subscribe fails, so no hold
+				r.wantAttempts(1)
+				r.advance(30*time.Second + 5*time.Second + icd.CheckInMargin + time.Millisecond)
+				mu.Lock()
+				defer mu.Unlock()
+				if w.Available() || missed != 1 {
+					t.Fatalf("available %v missed %d", w.Available(), missed)
+				}
+			})
 		})
 		t.Run("goes inactive immediately on a subscription loss, regardless of the availability window", func(t *testing.T) {
 			t.Parallel()
-			r := newICDRig(t, nil)
-			w := litWakefulness(r.fake)
-			r.start(fixed(w), nil)
-			w.NoteActive()
-			r.wantActive(true)
-			r.advance(10 * time.Second) // past the threshold: asleep, still available
-			r.lose()
-			r.wantActive(false)
-			if !w.Available() {
-				t.Fatal("unavailable")
-			}
-			w.NoteActive()
-			r.wantActive(true)
+			synctest.Test(t, func(t *testing.T) {
+				r := newICDRig(t, nil)
+				w := litWakefulness(r.fake)
+				r.start(fixed(w), nil)
+				w.NoteActive()
+				r.wantActive(true)
+				r.advance(10 * time.Second) // past the threshold: asleep, still available
+				r.lose()
+				r.wantActive(false)
+				if !w.Available() {
+					t.Fatal("unavailable")
+				}
+				w.NoteActive()
+				r.wantActive(true)
+			})
 		})
 		t.Run("parks on subscribe failure instead of running a timed retry", func(t *testing.T) {
 			t.Parallel()
-			r := newICDRig(t, func(n int) error {
-				if n == 1 {
-					return errTransient
-				}
-				return nil
+			synctest.Test(t, func(t *testing.T) {
+				r := newICDRig(t, func(n int) error {
+					if n == 1 {
+						return errTransient
+					}
+					return nil
+				})
+				w := litWakefulness(r.fake)
+				r.start(fixed(w), nil)
+				w.NoteActive()
+				r.wantAttempts(1)
+				r.advance(60 * time.Second)
+				r.wantAttempts(1)
+				w.NoteActive()
+				r.wantAttempts(2)
+				r.wantActive(true)
 			})
-			w := litWakefulness(r.fake)
-			r.start(fixed(w), nil)
-			w.NoteActive()
-			r.wantAttempts(1)
-			r.advance(60 * time.Second)
-			r.wantAttempts(1)
-			w.NoteActive()
-			r.wantAttempts(2)
-			r.wantActive(true)
 		})
 		t.Run("retries a flipped SIT peer after a bounded delay instead of stranding on a wake edge", func(t *testing.T) {
 			t.Parallel()
-			r := newICDRig(t, func(n int) error {
-				if n == 1 {
-					return errTransient
-				}
-				return nil
+			synctest.Test(t, func(t *testing.T) {
+				r := newICDRig(t, func(n int) error {
+					if n == 1 {
+						return errTransient
+					}
+					return nil
+				})
+				w := litWakefulness(r.fake)
+				r.start(fixed(w), nil)
+				settle()
+				w.SetRequiresAwait(false) // a DSLS LIT→SIT flip releases the parked loop
+				r.wantAttempts(1)
+				r.advance(SITRetryInterval)
+				r.wantAttempts(2)
+				r.wantActive(true)
 			})
-			w := litWakefulness(r.fake)
-			r.start(fixed(w), nil)
-			settle()
-			w.SetRequiresAwait(false) // a DSLS LIT→SIT flip releases the parked loop
-			r.wantAttempts(1)
-			r.advance(SITRetryInterval)
-			r.wantAttempts(2)
-			r.wantActive(true)
 		})
 		t.Run("close() resolves done cleanly while parked", func(t *testing.T) {
 			t.Parallel()
-			r := newICDRig(t, nil)
-			sub := r.start(fixed(litWakefulness(r.fake)), nil)
-			settle()
-			sub.Close()
-			select {
-			case <-sub.Done():
-			case <-time.After(5 * time.Second):
-				t.Fatal("done not closed")
-			}
+			synctest.Test(t, func(t *testing.T) {
+				r := newICDRig(t, nil)
+				sub := r.start(fixed(litWakefulness(r.fake)), nil)
+				settle()
+				sub.Close()
+				select {
+				case <-sub.Done():
+				case <-time.After(5 * time.Second):
+					t.Fatal("done not closed")
+				}
+			})
 		})
 		t.Run("closes the active peer subscription on abort", func(t *testing.T) {
 			t.Parallel()
-			r := newICDRig(t, nil)
-			w := litWakefulness(r.fake)
-			sub := r.start(fixed(w), nil)
-			w.NoteActive()
-			r.wantActive(true)
-			sub.Close()
-			<-sub.Done()
-			if _, closes := r.count(); closes != 1 || sub.ID() != NoSubscription {
-				t.Fatalf("%d closes, id %d", closes, sub.ID())
-			}
+			synctest.Test(t, func(t *testing.T) {
+				r := newICDRig(t, nil)
+				w := litWakefulness(r.fake)
+				sub := r.start(fixed(w), nil)
+				w.NoteActive()
+				r.wantActive(true)
+				sub.Close()
+				<-sub.Done()
+				if _, closes := r.count(); closes != 1 || sub.ID() != NoSubscription {
+					t.Fatalf("%d closes, id %d", closes, sub.ID())
+				}
+			})
 		})
 		t.Run("honors a wakefulness provider that returns undefined until the peer registers", func(t *testing.T) {
 			t.Parallel()
-			r := newICDRig(t, nil)
-			reg := &registration{}
-			r.start(reg.get, nil)
-			r.wantAttempts(1) // no wakefulness: non-ICD, at once
-			reg.set(litWakefulness(r.fake))
+			synctest.Test(t, func(t *testing.T) {
+				r := newICDRig(t, nil)
+				reg := &registration{}
+				r.start(reg.get, nil)
+				r.wantAttempts(1) // no wakefulness: non-ICD, at once
+				reg.set(litWakefulness(r.fake))
+			})
 		})
 		t.Run("recreates the subscription immediately on a LIT->SIT runtime flip", func(t *testing.T) {
 			t.Parallel()
-			r := newICDRig(t, nil)
-			w := litWakefulness(r.fake)
-			r.start(fixed(w), nil)
-			w.NoteActive()
-			r.wantAttempts(1)
-			r.wantActive(true)
-			w.SetRequiresAwait(false)
-			r.wantAttempts(2)
-			if _, closes := r.count(); closes != 1 || r.prov.probeCount() != 0 || !r.sub.Active() {
-				t.Fatalf("%d closes, %d probes, active %v", closes, r.prov.probeCount(), r.sub.Active())
-			}
+			synctest.Test(t, func(t *testing.T) {
+				r := newICDRig(t, nil)
+				w := litWakefulness(r.fake)
+				r.start(fixed(w), nil)
+				w.NoteActive()
+				r.wantAttempts(1)
+				r.wantActive(true)
+				w.SetRequiresAwait(false)
+				r.wantAttempts(2)
+				if _, closes := r.count(); closes != 1 || r.prov.probeCount() != 0 || !r.sub.Active() {
+					t.Fatalf("%d closes, %d probes, active %v", closes, r.prov.probeCount(), r.sub.Active())
+				}
+			})
 		})
 		t.Run("recreates after the next check-in on a SIT->LIT runtime flip", func(t *testing.T) {
 			t.Parallel()
-			r := newICDRig(t, nil)
-			w := sitWakefulness(r.fake)
-			r.start(fixed(w), nil)
-			r.wantAttempts(1)
-			r.wantActive(true)
-			w.SetRequiresAwait(true)
-			r.wantActive(false)
-			r.wantAttempts(1)
-			if _, closes := r.count(); closes != 1 {
-				t.Fatalf("%d closes", closes)
-			}
-			w.NoteActive()
-			r.wantAttempts(2)
+			synctest.Test(t, func(t *testing.T) {
+				r := newICDRig(t, nil)
+				w := sitWakefulness(r.fake)
+				r.start(fixed(w), nil)
+				r.wantAttempts(1)
+				r.wantActive(true)
+				w.SetRequiresAwait(true)
+				r.wantActive(false)
+				r.wantAttempts(1)
+				if _, closes := r.count(); closes != 1 {
+					t.Fatalf("%d closes", closes)
+				}
+				w.NoteActive()
+				r.wantAttempts(2)
+			})
 		})
 		t.Run("does not emit an active dip across an instant mode-flip recreate", func(t *testing.T) {
 			t.Parallel()
-			r := newICDRig(t, nil)
-			w := litWakefulness(r.fake)
-			r.start(fixed(w), nil)
-			w.NoteActive()
-			r.wantActive(true)
-			r.resetEmissions()
-			w.SetRequiresAwait(false)
-			r.wantAttempts(2)
-			if !r.sub.Active() || r.dips() {
-				t.Fatal("an active dip")
-			}
+			synctest.Test(t, func(t *testing.T) {
+				r := newICDRig(t, nil)
+				w := litWakefulness(r.fake)
+				r.start(fixed(w), nil)
+				w.NoteActive()
+				r.wantActive(true)
+				r.resetEmissions()
+				w.SetRequiresAwait(false)
+				r.wantAttempts(2)
+				if !r.sub.Active() || r.dips() {
+					t.Fatal("an active dip")
+				}
+			})
 		})
 		t.Run("reports not live when closed while a mode-flip recreate tears down the old subscription", func(t *testing.T) {
 			t.Parallel()
-			r := newICDRig(t, nil)
-			r.closeGate = make(chan struct{})
-			w := litWakefulness(r.fake)
-			sub := r.start(fixed(w), nil)
-			w.NoteActive()
-			r.wantActive(true)
-			w.SetRequiresAwait(false) // the recreate waits on the old subscription's close
-			settle()
-			if !sub.Active() {
-				t.Fatal("not active during the recreate")
-			}
-			sub.Close()
-			close(r.closeGate)
-			<-sub.Done()
-			if sub.Active() {
-				t.Fatal("live after close")
-			}
+			synctest.Test(t, func(t *testing.T) {
+				r := newICDRig(t, nil)
+				r.closeGate = make(chan struct{})
+				w := litWakefulness(r.fake)
+				sub := r.start(fixed(w), nil)
+				w.NoteActive()
+				r.wantActive(true)
+				w.SetRequiresAwait(false) // the recreate waits on the old subscription's close
+				settle()
+				if !sub.Active() {
+					t.Fatal("not active during the recreate")
+				}
+				sub.Close()
+				close(r.closeGate)
+				<-sub.Done()
+				if sub.Active() {
+					t.Fatal("live after close")
+				}
+			})
 		})
 		t.Run("recreates on the icdLit network profile, then reverts to the default on a later loss", func(t *testing.T) {
 			t.Parallel()
-			r := newICDRig(t, nil)
-			w := litWakefulness(r.fake)
-			r.start(fixed(w), nil)
-			w.NoteActive()
-			r.wantAttempts(1)
-			w.SetRequiresAwait(false)
-			r.wantAttempts(2)
-			r.lose()
-			r.wantAttempts(3)
-			if got := r.networks(); !slices.Equal(got, []bool{true, true, false}) {
-				t.Fatalf("priority %v", got)
-			}
+			synctest.Test(t, func(t *testing.T) {
+				r := newICDRig(t, nil)
+				w := litWakefulness(r.fake)
+				r.start(fixed(w), nil)
+				w.NoteActive()
+				r.wantAttempts(1)
+				w.SetRequiresAwait(false)
+				r.wantAttempts(2)
+				r.lose()
+				r.wantAttempts(3)
+				if got := r.networks(); !slices.Equal(got, []bool{true, true, false}) {
+					t.Fatalf("priority %v", got)
+				}
+			})
 		})
 		t.Run("keeps a runtime SIT→LIT peer on icdLit for a post-loss resubscribe, not just the flip recreate", func(t *testing.T) {
 			t.Parallel()
-			r := newICDRig(t, nil)
-			w := sitWakefulness(r.fake)
-			r.start(fixed(w), nil)
-			r.wantAttempts(1)
-			w.SetRequiresAwait(true)
-			w.NoteActive()
-			r.wantAttempts(2)
-			r.lose()
-			r.wantAttempts(3)
-			if got := r.networks(); !slices.Equal(got, []bool{false, true, true}) {
-				t.Fatalf("priority %v", got)
-			}
+			synctest.Test(t, func(t *testing.T) {
+				r := newICDRig(t, nil)
+				w := sitWakefulness(r.fake)
+				r.start(fixed(w), nil)
+				r.wantAttempts(1)
+				w.SetRequiresAwait(true)
+				w.NoteActive()
+				r.wantAttempts(2)
+				r.lose()
+				r.wantAttempts(3)
+				if got := r.networks(); !slices.Equal(got, []bool{false, true, true}) {
+					t.Fatalf("priority %v", got)
+				}
+			})
 		})
 		t.Run("keeps active live across a report-driven SIT→LIT flip when the recreate lands in-window", func(t *testing.T) {
 			t.Parallel()
-			r := newICDRig(t, nil)
-			w := sitWakefulness(r.fake)
-			r.start(fixed(w), nil)
-			r.wantAttempts(1)
-			r.wantActive(true)
-			r.resetEmissions()
-			w.SetRequiresAwait(true)
-			w.NoteActive()
-			r.wantAttempts(2)
-			if got := r.networks(); !got[1] || !r.sub.Active() || r.dips() {
-				t.Fatalf("priority %v active %v dips %v", got, r.sub.Active(), r.dips())
-			}
+			synctest.Test(t, func(t *testing.T) {
+				r := newICDRig(t, nil)
+				w := sitWakefulness(r.fake)
+				r.start(fixed(w), nil)
+				r.wantAttempts(1)
+				r.wantActive(true)
+				r.resetEmissions()
+				w.SetRequiresAwait(true)
+				w.NoteActive()
+				r.wantAttempts(2)
+				if got := r.networks(); !got[1] || !r.sub.Active() || r.dips() {
+					t.Fatalf("priority %v active %v dips %v", got, r.sub.Active(), r.dips())
+				}
+			})
 		})
 		t.Run("drops to not-live when a mode-flip recreate parks for a peer that never wakes", func(t *testing.T) {
 			t.Parallel()
-			r := newICDRig(t, nil)
-			w := sitWakefulness(r.fake)
-			r.start(fixed(w), nil)
-			r.wantAttempts(1)
-			r.wantActive(true)
-			w.SetRequiresAwait(true)
-			r.advance(120 * time.Second)
-			r.wantAttempts(1)
-			r.wantActive(false)
-			w.NoteActive()
-			r.wantAttempts(2)
-			r.wantActive(true)
+			synctest.Test(t, func(t *testing.T) {
+				r := newICDRig(t, nil)
+				w := sitWakefulness(r.fake)
+				r.start(fixed(w), nil)
+				r.wantAttempts(1)
+				r.wantActive(true)
+				w.SetRequiresAwait(true)
+				r.advance(120 * time.Second)
+				r.wantAttempts(1)
+				r.wantActive(false)
+				w.NoteActive()
+				r.wantAttempts(2)
+				r.wantActive(true)
+			})
 		})
 		t.Run("recreates on the first registration-induced feed while the subscription was established unfed", func(t *testing.T) {
 			t.Parallel()
-			r := newICDRig(t, nil)
-			reg, f := &registration{}, &feed{}
-			r.start(reg.get, f.on)
-			r.wantAttempts(1)
-			r.wantActive(true)
-			r.resetEmissions()
-			w := litWakefulness(r.fake)
-			w.NoteActive()
-			reg.set(w)
-			f.emit(1)
-			r.wantAttempts(2)
-			if _, closes := r.count(); closes != 1 || !r.networks()[1] || !r.sub.Active() || r.dips() {
-				t.Fatalf("%d closes, priority %v", closes, r.networks())
-			}
+			synctest.Test(t, func(t *testing.T) {
+				r := newICDRig(t, nil)
+				reg, f := &registration{}, &feed{}
+				r.start(reg.get, f.on)
+				r.wantAttempts(1)
+				r.wantActive(true)
+				r.resetEmissions()
+				w := litWakefulness(r.fake)
+				w.NoteActive()
+				reg.set(w)
+				f.emit(1)
+				r.wantAttempts(2)
+				if _, closes := r.count(); closes != 1 || !r.networks()[1] || !r.sub.Active() || r.dips() {
+					t.Fatalf("%d closes, priority %v", closes, r.networks())
+				}
+			})
 		})
 		t.Run("does not double-recreate: a stray feed signal after the peer is fed is a no-op, later flips use the observer", func(t *testing.T) {
 			t.Parallel()
-			r := newICDRig(t, nil)
-			reg, f := &registration{}, &feed{}
-			r.start(reg.get, f.on)
-			r.wantAttempts(1)
-			w := litWakefulness(r.fake)
-			w.NoteActive()
-			reg.set(w)
-			f.emit(1)
-			r.wantAttempts(2)
-			f.emit(1)
-			r.wantAttempts(2)
-			w.SetRequiresAwait(false)
-			r.wantAttempts(3)
+			synctest.Test(t, func(t *testing.T) {
+				r := newICDRig(t, nil)
+				reg, f := &registration{}, &feed{}
+				r.start(reg.get, f.on)
+				r.wantAttempts(1)
+				w := litWakefulness(r.fake)
+				w.NoteActive()
+				reg.set(w)
+				f.emit(1)
+				r.wantAttempts(2)
+				f.emit(1)
+				r.wantAttempts(2)
+				w.SetRequiresAwait(false)
+				r.wantAttempts(3)
+			})
 		})
 		t.Run("subscription hold", func(t *testing.T) {
 			t.Parallel()
@@ -629,65 +676,79 @@ func TestSustainedSubscriptionICD(t *testing.T) {
 			}
 			t.Run("has no Check-In deadline while subscribed", func(t *testing.T) {
 				t.Parallel()
-				_, w := subscribedLitPeer(t)
-				w.NoteActive()
-				if _, ok := w.NextCheckInDue(); ok {
-					t.Fatal("deadline while subscribed")
-				}
+				synctest.Test(t, func(t *testing.T) {
+					_, w := subscribedLitPeer(t)
+					w.NoteActive()
+					if _, ok := w.NextCheckInDue(); ok {
+						t.Fatal("deadline while subscribed")
+					}
+				})
 			})
 			t.Run("releases its hold when closed", func(t *testing.T) {
 				t.Parallel()
-				r, w := subscribedLitPeer(t)
-				r.sub.Close()
-				<-r.sub.Done()
-				wantDue(t, r, w)
+				synctest.Test(t, func(t *testing.T) {
+					r, w := subscribedLitPeer(t)
+					r.sub.Close()
+					<-r.sub.Done()
+					wantDue(t, r, w)
+				})
 			})
 			t.Run("releases its hold when the subscription is lost", func(t *testing.T) {
 				t.Parallel()
-				r, w := subscribedLitPeer(t)
-				r.lose()
-				r.wantActive(false)
-				settle()
-				wantDue(t, r, w)
+				synctest.Test(t, func(t *testing.T) {
+					r, w := subscribedLitPeer(t)
+					r.lose()
+					r.wantActive(false)
+					settle()
+					wantDue(t, r, w)
+				})
 			})
 			t.Run("releases its hold when the recreate after a mode change fails", func(t *testing.T) {
 				t.Parallel()
-				r, w := subscribedLitPeer(t)
-				w.SetRequiresAwait(false) // the recreate's resubscribe fails
-				r.wantAttempts(2)
-				w.SetRequiresAwait(true)
-				wantDue(t, r, w)
+				synctest.Test(t, func(t *testing.T) {
+					r, w := subscribedLitPeer(t)
+					w.SetRequiresAwait(false) // the recreate's resubscribe fails
+					r.wantAttempts(2)
+					w.SetRequiresAwait(true)
+					wantDue(t, r, w)
+				})
 			})
 			t.Run("keeps its subscription when the peer's wakefulness is suspended", func(t *testing.T) {
 				t.Parallel()
-				r, w := subscribedLitPeer(t)
-				id := r.sub.ID()
-				w.Suspend()
-				settle()
-				if !r.sub.Active() || r.sub.ID() != id {
-					t.Fatalf("active %v id %d", r.sub.Active(), r.sub.ID())
-				}
+				synctest.Test(t, func(t *testing.T) {
+					r, w := subscribedLitPeer(t)
+					id := r.sub.ID()
+					w.Suspend()
+					settle()
+					if !r.sub.Active() || r.sub.ID() != id {
+						t.Fatalf("active %v id %d", r.sub.Active(), r.sub.ID())
+					}
+				})
 			})
 			t.Run("stops observing the peer's mode once closed", func(t *testing.T) {
 				t.Parallel()
-				r, w := subscribedLitPeer(t)
-				r.sub.Close()
-				<-r.sub.Done()
-				w.SetRequiresAwait(false)
-				r.wantAttempts(1)
+				synctest.Test(t, func(t *testing.T) {
+					r, w := subscribedLitPeer(t)
+					r.sub.Close()
+					<-r.sub.Done()
+					w.SetRequiresAwait(false)
+					r.wantAttempts(1)
+				})
 			})
 		})
 		t.Run("ignores a feed signal for a different peer", func(t *testing.T) {
 			t.Parallel()
-			r := newICDRig(t, nil)
-			reg, f := &registration{}, &feed{}
-			r.start(reg.get, f.on)
-			r.wantAttempts(1)
-			w := litWakefulness(r.fake)
-			w.NoteActive()
-			reg.set(w)
-			f.emit(2)
-			r.wantAttempts(1)
+			synctest.Test(t, func(t *testing.T) {
+				r := newICDRig(t, nil)
+				reg, f := &registration{}, &feed{}
+				r.start(reg.get, f.on)
+				r.wantAttempts(1)
+				w := litWakefulness(r.fake)
+				w.NoteActive()
+				reg.set(w)
+				f.emit(2)
+				r.wantAttempts(1)
+			})
 		})
 	})
 }
