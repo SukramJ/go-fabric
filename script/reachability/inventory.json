@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 7451,
+  "entry_points": 7464,
   "entry_packages": [
     ".",
     "bdx",
@@ -279,9 +279,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 17358,
+    "total_exported": 17371,
     "reachable": 12165,
-    "whitelisted": 5193,
+    "whitelisted": 5206,
     "unreachable": 0
   },
   "by_package": [],
@@ -27253,6 +27253,83 @@
     },
     {
       "package": "examples/reference-bridge",
+      "identifier": "TestCameraSimAppPipeRefusals",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-bridge/camera_sim_test.go",
+      "line": 857
+    },
+    {
+      "package": "examples/reference-bridge",
+      "identifier": "TestCameraSimAudioAndSnapshotStreams",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-bridge/camera_sim_test.go",
+      "line": 190
+    },
+    {
+      "package": "examples/reference-bridge",
+      "identifier": "TestCameraSimChime",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-bridge/camera_sim_test.go",
+      "line": 830
+    },
+    {
+      "package": "examples/reference-bridge",
+      "identifier": "TestCameraSimDigitalPTZ",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-bridge/camera_sim_test.go",
+      "line": 628
+    },
+    {
+      "package": "examples/reference-bridge",
+      "identifier": "TestCameraSimMechanicalPTZ",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-bridge/camera_sim_test.go",
+      "line": 578
+    },
+    {
+      "package": "examples/reference-bridge",
+      "identifier": "TestCameraSimMotionTransport",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-bridge/camera_sim_test.go",
+      "line": 517
+    },
+    {
+      "package": "examples/reference-bridge",
+      "identifier": "TestCameraSimPushTransportLifecycle",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-bridge/camera_sim_test.go",
+      "line": 411
+    },
+    {
+      "package": "examples/reference-bridge",
+      "identifier": "TestCameraSimRestoresItsAllocations",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-bridge/camera_sim_test.go",
+      "line": 254
+    },
+    {
+      "package": "examples/reference-bridge",
+      "identifier": "TestCameraSimVideoStreams",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-bridge/camera_sim_test.go",
+      "line": 127
+    },
+    {
+      "package": "examples/reference-bridge",
+      "identifier": "TestCameraSimWebRTCProvider",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-bridge/camera_sim_test.go",
+      "line": 286
+    },
+    {
+      "package": "examples/reference-bridge",
+      "identifier": "TestCameraSimZoneTriggers",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-bridge/camera_sim_test.go",
+      "line": 722
+    },
+    {
+      "package": "examples/reference-bridge",
       "identifier": "TestCameraStateSurvivesARestart",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/camera_test.go",
@@ -27439,6 +27516,20 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/icd_test.go",
       "line": 22
+    },
+    {
+      "package": "examples/reference-bridge",
+      "identifier": "TestJointFabricSimKeepsItsAdministratorKey",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-bridge/jointfabric_test.go",
+      "line": 45
+    },
+    {
+      "package": "examples/reference-bridge",
+      "identifier": "TestJointFabricSimSyncReachesNoNode",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-bridge/jointfabric_test.go",
+      "line": 111
     },
     {
       "package": "examples/reference-bridge",
