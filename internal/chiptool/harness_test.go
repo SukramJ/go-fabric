@@ -25,8 +25,10 @@ import (
 //
 // matter.js tests itself against chip-tool and the connectedhomeip
 // certification cases out of one image it publishes, ghcr.io/matter-js/chip
-// (source: ../matter.js/support/chip). The image is multi-arch (amd64 and
-// arm64), and it carries everything a run needs at one CHIP commit:
+// (source: ../matter.js/support/chip); the suite's image builds on it
+// (internal/chiptool/image, the Makefile's CHIP_BASE_IMAGE → CHIP_TEST_IMAGE).
+// The matter.js image is multi-arch (amd64 and arm64), and it carries
+// everything a run needs at one CHIP commit:
 // chip-tool, the YAML suites and their cluster XML, the YAML runner, the
 // Python `TC_*.py` harness with its installed wheels, and the CHIP reference
 // apps. That makes it this suite's default harness too — on any Linux host

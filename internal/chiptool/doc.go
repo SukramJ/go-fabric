@@ -37,10 +37,12 @@
 //
 // # The harness
 //
-// By default the suite runs chip-tool and the Python harness inside
-// matter.js's CHIP image (ghcr.io/matter-js/chip, multi-arch), pinned by
-// digest in the Makefile's CHIP_TEST_IMAGE; the CHIP commit it was built
-// from is logged with every run. The container shares the host network and
+// By default the suite runs chip-tool and the Python harness inside the
+// module's own harness image (ghcr.io/sukramj/go-fabric-chip, amd64: matter.js's
+// CHIP image plus chip's jf-admin-app, jf-control-app and Push AV server,
+// internal/chiptool/image), pinned by digest in the Makefile's
+// CHIP_TEST_IMAGE; the CHIP commit it was built from is logged with every
+// run. The container shares the host network and
 // the host's avahi over /run/dbus, so the only host prerequisites are Linux,
 // Docker and a running avahi-daemon. `make chiptool-image` pulls the image
 // ahead of time; the suite pulls it on first use otherwise.
