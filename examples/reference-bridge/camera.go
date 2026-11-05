@@ -18,6 +18,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/SukramJ/go-fabric/clock"
 	"github.com/SukramJ/go-fabric/cluster/camera"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	avdef "github.com/SukramJ/go-fabric/cluster/spec/cameraavsettingsuserlevelmanagement"
@@ -133,6 +134,10 @@ type demoCamera struct {
 	logger  *slog.Logger
 	surface surface.Policies
 	opts    cameraOptions
+	// clk paces the zone manager's trigger timer, a triggered push
+	// transport's recording and the PTZ movement; the system clock,
+	// a fake one in the tests.
+	clk clock.Clock
 
 	camera *device.Camera
 	chime  *device.Chime
@@ -152,7 +157,7 @@ type demoCamera struct {
 	// running trigger contexts (zone-manager.h ZoneTriggerContext).
 	zones    []uint16
 	triggers []*camTriggerContext
-	timer    *time.Timer
+	timer    clock.Timer
 	// tickBase and ticks place the trigger timer's ticks on the second
 	// grid from the first trigger (zone-manager.cpp's periodic one-second
 	// timer), so they do not drift by the work each tick does.
@@ -185,7 +190,7 @@ type camTransport struct {
 	session   uint64
 	status    padef.TransportStatusEnum
 	streaming bool
-	stop      *time.Timer
+	stop      clock.Timer
 	// activated and detected are the last motion's activation time and
 	// its detected duration (PushAVTransport mClipInfo.mActivationTime,
 	// mMotionDetectedDurationS), kept while the transport is Inactive.
@@ -236,7 +241,7 @@ var (
 // endpoints once attach has restored the state.
 func newDemoCamera(policies surface.Policies, opts cameraOptions, logger *slog.Logger) *demoCamera {
 	c := &demoCamera{
-		logger: logger, surface: policies, opts: opts,
+		logger: logger, surface: policies, opts: opts, clk: clock.System{},
 		snapshots: map[uint16]bool{}, transports: map[uint16]*camTransport{}, sessions: map[uint16]bool{},
 	}
 	c.videos = []camAvailableVideo{
@@ -893,7 +898,7 @@ func (p camPushPort) SetTransportStatus(_ context.Context, ids []uint16, status 
 		// (pushav-transport.cpp:616-638).
 		var rest time.Duration
 		if t.trigger.TriggerType == padef.TransportTriggerTypeMotion && !t.activated.IsZero() {
-			rest = t.detected - time.Since(t.activated)
+			rest = t.detected - clock.Since(p.c.clk, t.activated)
 		}
 		p.c.mu.Unlock()
 		switch {
@@ -925,7 +930,7 @@ func (p camPushPort) ManuallyTriggerTransport(_ context.Context, id uint16, reas
 	if active {
 		// A manual activation (TriggerTransport with the manual flag,
 		// pushav-transport.cpp:345-405).
-		t.activated, t.detected, t.manual, t.maxClip = time.Now(), d, true, maxClip
+		t.activated, t.detected, t.manual, t.maxClip = p.c.clk.Now(), d, true, maxClip
 	}
 	p.c.mu.Unlock()
 	if active {
@@ -953,7 +958,7 @@ func (c *demoCamera) beginTransport(id uint16, reason *padef.TriggerActivationRe
 		if t.stop != nil {
 			t.stop.Stop()
 		}
-		t.stop = time.AfterFunc(d, func() { c.endTransport(id) })
+		t.stop = c.clk.AfterFunc(d, func() { c.endTransport(id) })
 	}
 	c.mu.Unlock()
 	if already {
@@ -997,7 +1002,7 @@ func (c *demoCamera) pushTransport() padef.Host {
 // its InitialDuration.
 func (c *demoCamera) motionTriggered() {
 	automation := padef.TriggerActivationReasonAutomation
-	now := time.Now()
+	now := c.clk.Now()
 	c.mu.Lock()
 	var ids []uint16
 	var durations []time.Duration
@@ -1064,7 +1069,7 @@ type camPTZ struct{ c *demoCamera }
 const camMoveDuration = 2 * time.Second
 
 func (p camPTZ) moved() error {
-	time.AfterFunc(camMoveDuration, func() {
+	p.c.clk.AfterFunc(camMoveDuration, func() {
 		p.c.camera.CameraAvSettingsUserLevelManagement().Host().PhysicalMovementComplete(nil)
 	})
 	return nil
@@ -1231,8 +1236,8 @@ func (c *demoCamera) zoneTriggered(ids []uint16) error {
 				remainingBlind: trigger.BlindDuration, count: 1,
 			})
 			if c.timer == nil {
-				c.tickBase, c.ticks = time.Now(), 1
-				c.timer = time.AfterFunc(camZoneTimerPeriod, c.zoneTick)
+				c.tickBase, c.ticks = c.clk.Now(), 1
+				c.timer = c.clk.AfterFunc(camZoneTimerPeriod, c.zoneTick)
 			}
 			c.mu.Unlock()
 			errs = append(errs, zones.ZoneTriggered(id, zmdef.ZoneEventTriggeredReasonMotion))
@@ -1297,7 +1302,7 @@ func (c *demoCamera) zoneTick() {
 	c.triggers = kept
 	if len(c.triggers) > 0 {
 		c.ticks++
-		c.timer = time.AfterFunc(time.Until(c.tickBase.Add(time.Duration(c.ticks)*camZoneTimerPeriod)), c.zoneTick)
+		c.timer = c.clk.AfterFunc(clock.Until(c.clk, c.tickBase.Add(time.Duration(c.ticks)*camZoneTimerPeriod)), c.zoneTick)
 	} else {
 		c.timer = nil
 	}
