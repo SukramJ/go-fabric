@@ -5465,7 +5465,9 @@ at `862ad75f`) emits OccupancyChanged with the OccupancyEvent feature
 kit's server `cluster/sensing.Occupancy` (phase 36) serves HoldTime as
 connectedhomeip's `OccupancySensingCluster.cpp` at `6170af84` does when a
 host serves the attribute: the limits are sanitised (`SetHoldTimeLimits`
-:333-351) and a HoldTime clamped into them at construction (:99-100); a
+:333-351), and a configured HoldTime outside them refuses construction
+with CONSTRAINT_ERROR as matter.js validates it at initialization
+(`DotQualifiedConstraintTest.ts:189`; chip clamps it, :100); a
 HoldTime outside them is CONSTRAINT_ERROR (:209-210); the host's
 unoccupied starts the timer on the clock's monotonic reading and Occupancy
 clears when HoldTime elapses, its occupied cancels the timer (`SetOccupancy`
@@ -5474,15 +5476,15 @@ for the time that remains, or clears at once (:234-258); the deprecated
 `*OccupiedToUnoccupiedDelay` attributes read and write HoldTime (:151-155,
 :170-181). Two chip rules give way to matter.js: chip forces OCCEVENT on
 and always emits OccupancyChanged (`OccupancySensingCluster.h:51-56`,
-`.cpp:315-320`), here the event follows the feature as in matter.js; and
-chip shows the delay aliases by default, here a host serves them when it
+`.cpp:315-320`), here the event follows the feature as in matter.js;
+chip clamps a configured HoldTime, matter.js refuses it; and chip shows the delay aliases by default, here a host serves them when it
 opts them in. The surface is no ahead element: HoldTime and its
 dependents are model attributes matter.js serves as stored values when an
 application sets them. Persistence is the host's through the change
 reports and `OccupancyConfig.HoldTime` (chip persists HoldTime,
 `.cpp:111-123`, `:265-272`). Tests: `cluster/sensing/occupancy_chip_test.go`
-(fifteen of chip's twenty-five cases by meaning, one of them as matter.js
-decides it; the rest test chip's delegate, its attribute persistence and
+(fifteen of chip's twenty-five cases by meaning, two of them as matter.js
+decides them; the rest test chip's delegate, its attribute persistence and
 its feature-to-type table, which are the host's or matter.js's here). Reasoning: TC-OCC-2.3 and TC-OCC-3.1
 read HoldTime and wait for it; a server that stored HoldTime without the
 timer would serve a value that does nothing (owner decision 2026-11-05,

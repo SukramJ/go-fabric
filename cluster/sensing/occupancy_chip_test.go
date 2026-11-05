@@ -10,7 +10,9 @@
 // the server's SetAttributes (the typed Set), its TimerDelegateMock the
 // fake clock. Two chip rules give way to matter.js: chip forces OCCEVENT
 // on and always emits OccupancyChanged (TestOccupancyChangedEventAlwaysGenerated,
-// :716-746), matter.js emits it with the feature only; and chip shows
+// :716-746), matter.js emits it with the feature only; chip clamps a
+// configured HoldTime outside the limits, matter.js refuses it; and chip
+// shows
 // the *OccupiedToUnoccupiedDelay aliases (conformance D) by default
 // (mShowDeprecatedAttributes = true, OccupancySensingCluster.h:81), here a
 // host serves them when it opts them in.
@@ -331,16 +333,27 @@ func TestOccupancyHoldTimeChangeWithActiveTimer(t *testing.T) {
 	}
 }
 
-// TestOccupancyConstructorClampsHoldTime ports
-// TestConstructorClampsInitialHoldTime (:980-1005).
-func TestOccupancyConstructorClampsHoldTime(t *testing.T) {
-	for _, c := range []struct{ in, want uint16 }{{5, 10}, {25, 20}} {
-		o, _ := newOcc(t, sensing.OccupancyConfig{Attributes: holdTimeAttrs, HoldTimeLimits: occLimits(10, 20, 15), HoldTime: ptr(c.in), Clock: newFake()})
-		if o.HoldTime() != c.want {
-			t.Errorf("HoldTime %d starts at %d, want %d", c.in, o.HoldTime(), c.want)
+// TestOccupancyConstructorHoldsHoldTimeToTheLimits ports
+// TestConstructorClampsInitialHoldTime (:980-1005) as matter.js decides
+// it: chip clamps a configured HoldTime outside the limits, matter.js
+// refuses to initialize with it (DotQualifiedConstraintTest.ts:189 at
+// 862ad75f), so construction fails with CONSTRAINT_ERROR; no HoldTime
+// starts at HoldTimeDefault.
+func TestOccupancyConstructorHoldsHoldTimeToTheLimits(t *testing.T) {
+	for _, h := range []uint16{5, 25} {
+		_, err := sensing.NewOccupancy(sensing.OccupancyConfig{
+			Features: occdef.FeaturePassiveInfrared, Attributes: holdTimeAttrs,
+			HoldTimeLimits: occLimits(10, 20, 15), HoldTime: ptr(h), Clock: newFake(),
+		})
+		if statusOf(err) != im.StatusConstraintError {
+			t.Errorf("HoldTime %d: %v, want CONSTRAINT_ERROR", h, err)
 		}
 	}
-	o, _ := newOcc(t, sensing.OccupancyConfig{Attributes: holdTimeAttrs, HoldTimeLimits: occLimits(10, 20, 15), Clock: newFake()})
+	o, _ := newOcc(t, sensing.OccupancyConfig{Attributes: holdTimeAttrs, HoldTimeLimits: occLimits(10, 20, 15), HoldTime: ptr[uint16](12), Clock: newFake()})
+	if o.HoldTime() != 12 {
+		t.Errorf("HoldTime 12 starts at %d", o.HoldTime())
+	}
+	o, _ = newOcc(t, sensing.OccupancyConfig{Attributes: holdTimeAttrs, HoldTimeLimits: occLimits(10, 20, 15), Clock: newFake()})
 	if o.HoldTime() != 15 {
 		t.Errorf("no HoldTime starts at %d, want HoldTimeDefault 15", o.HoldTime())
 	}

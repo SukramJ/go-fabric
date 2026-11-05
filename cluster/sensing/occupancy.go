@@ -49,8 +49,11 @@ type OccupancyConfig struct {
 	// chip's SetHoldTimeLimits does to {1, 10, 1}.
 	HoldTimeLimits *OccupancyHoldTimeLimits
 	// HoldTime is the value the host persisted; nil starts at
-	// HoldTimeLimits.HoldTimeDefault. A value outside the limits is
-	// clamped into them, as chip's constructor clamps it.
+	// HoldTimeLimits.HoldTimeDefault. A value outside the limits refuses
+	// construction with CONSTRAINT_ERROR, as matter.js validates the
+	// configured state at initialization
+	// (packages/node/test/node/DotQualifiedConstraintTest.ts:189 at
+	// 862ad75f); chip clamps it (OccupancySensingCluster.cpp:100).
 	HoldTime *uint16
 	// Clock is the device's clock: the hold timer; nil is the system
 	// clock.
@@ -166,7 +169,8 @@ func OccupancySensorTypeFor(features OccupancyFeature) (kind occdef.OccupancySen
 
 // NewOccupancy builds an OccupancySensing server, unoccupied. Mirrors
 // chip OccupancySensingCluster.cpp:95-101 (the constructor: the limits
-// sanitised, HoldTime clamped into them) and matter.js
+// sanitised; a configured HoldTime is held to them, not clamped, as
+// matter.js validates it) and matter.js
 // OccupancySensingServer.ts:22-86 (initialize).
 func NewOccupancy(cfg OccupancyConfig) (*Occupancy, error) {
 	opts := spec.Options{Features: uint32(cfg.Features), Attributes: slices.Clone(cfg.Attributes), Events: slices.Clone(cfg.Events)}
@@ -201,7 +205,11 @@ func NewOccupancy(cfg OccupancyConfig) (*Occupancy, error) {
 		o.limits = sanitizeOccupancyLimits(limits) // :99
 		o.holdTime = o.limits[2]
 		if cfg.HoldTime != nil {
-			o.holdTime = min(max(*cfg.HoldTime, o.limits[0]), o.limits[1]) // :100
+			if h := *cfg.HoldTime; h < o.limits[0] || h > o.limits[1] {
+				return nil, spec.Errorf(im.StatusConstraintError, "sensing: OccupancySensing: HoldTime %d outside %s (%d to %d)",
+					h, occdef.Definition.Attribute(occdef.AttrHoldTime).Constraint.Text, o.limits[0], o.limits[1])
+			}
+			o.holdTime = *cfg.HoldTime
 		}
 		initial[occdef.AttrHoldTimeLimits] = o.limitsValue()
 		initial[occdef.AttrHoldTime] = o.holdTime
