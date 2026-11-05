@@ -733,7 +733,7 @@ type camProviderPort struct{ c *demoCamera }
 
 // camSession is HandleSolicitOffer's and HandleProvideOffer's session:
 // the request's peer and streams, the first of each list as the
-// deprecated single id.
+// former single id.
 func camSession(args wpdef.OfferArgs) wpdef.WebRTCSessionStruct {
 	s := wpdef.WebRTCSessionStruct{
 		Id: args.SessionID, PeerNodeId: args.PeerNodeID, PeerEndpointId: args.OriginatingEndpointID,
