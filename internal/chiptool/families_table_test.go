@@ -1107,6 +1107,13 @@ var chipFamilies = []family{
 	// border router's diagnostics. They run in the thread group, on
 	// dispatch and weekly (.github/workflows/otbr-virtual.yml).
 	{
+		// The golden counts assume a fresh agent without an active dataset,
+		// as script/otbr-virtual-test.sh and otbr-virtual.yml start it:
+		// TC-TBRM-2.3 runs its ArmFailSafe, ActiveDatasetRequest and
+		// CommissioningComplete steps only then (Test_TC_TBRM_2_3.yaml:53,
+		// "If the ActiveDatasetTimestamp attribute not null, go to step 5"),
+		// 16 steps; against an agent a previous run configured it skips the
+		// three (run 41978050704 against the golden of a reused container).
 		name: "TBRM", deviceType: dtThreadBorderRouter, variant: variantThread,
 		exclude: map[string]gap{
 			"2.2": {classHarness, "TC-TBRM-2.2 step 13 compares the GetActiveDatasetRequest answer byte for byte with the dataset the case set (Test_TC_TBRM_2_2.yaml:158-166, PIXIT.TBRM.THREAD_ACTIVE_DATASET); an OpenThread border router serializes the dataset's TLVs in its own order (the virtual agent answers the Network Name TLV after the Mesh-Local Prefix), and the module answers the border router's bytes, as chip's TBRM server answers its Thread stack's; chip runs the case against network-manager-app's simulated stack, which keeps the bytes as set", false},
