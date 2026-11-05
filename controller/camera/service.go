@@ -172,7 +172,7 @@ func New(ctx context.Context, ctrl *controller.Controller, cfg Config) (*Service
 	}
 	life, cancel := context.WithCancel(context.WithoutCancel(ctx))
 	s := &Service{ctrl: ctrl, cfg: cfg, log: log, life: life, cancel: cancel, sessions: map[sessionKey]*Session{}, lastSeen: map[watchKey][]sessionPeer{}}
-	s.io = &clientIO{ctrl: ctrl, svc: s, syncTime: cfg.SyncTime, log: log}
+	s.io = &clientIO{ctrl: ctrl, svc: s, syncTime: cfg.SyncTime, clk: ctrl.Clock(), log: log}
 	s.m = newManager(s.io, ctrl.Clock(), log)
 	s.image = s.io
 	s.localNodeID = func() uint64 { return ctrl.Fabric().RootNodeID }

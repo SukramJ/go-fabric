@@ -8,6 +8,8 @@ import (
 	"log/slog"
 	"slices"
 
+	"github.com/SukramJ/go-fabric/clock"
+
 	"github.com/SukramJ/go-fabric/cluster/camera"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	"github.com/SukramJ/go-fabric/cluster/spec/basicinformation"
@@ -64,6 +66,7 @@ type clientIO struct {
 	ctrl     *controller.Controller
 	svc      *Service
 	syncTime func(context.Context, *client.Node) error
+	clk      clock.Clock
 	log      *slog.Logger
 	// send and reread reach the camera; nil is the client node's Invoke
 	// and Read. A test of the routing replaces them.
@@ -231,17 +234,16 @@ func (io *clientIO) invokeProvider(ctx context.Context, t target, command string
 // syncTime pushes this controller's time to the node: the host's push
 // when Config.SyncTime is set, else SetUTCTime on the root endpoint.
 func (io *clientIO) syncTimeOf(ctx context.Context, nodeID uint64) error {
-	n := io.node(nodeID)
-	if n == nil {
-		return stackError("node 0x%016X is not in the registry", nodeID)
-	}
 	if io.syncTime != nil {
+		n := io.node(nodeID)
+		if n == nil {
+			return stackError("node 0x%016X is not in the registry", nodeID)
+		}
 		return io.syncTime(ctx, n)
 	}
-	now := io.ctrl.Clock().Now()
-	us := uint64(now.Sub(matterEpoch).Microseconds()) //nolint:gosec // G115: a clock after 2000
-	_, err := n.Invoke(ctx, client.CommandPath{Endpoint: 0, Cluster: tsdef.ClusterID, Command: tsdef.CmdSetUtcTime},
-		tsdef.SetUtcTimeRequest{UtcTime: us, Granularity: tsdef.GranularityMillisecondsGranularity}, client.InvokeOptions{})
+	us := uint64(io.clk.Now().Sub(matterEpoch).Microseconds()) //nolint:gosec // G115: a clock after 2000
+	_, err := io.call(ctx, target{nodeID: nodeID}, tsdef.ClusterID, tsdef.CmdSetUtcTime,
+		tsdef.SetUtcTimeRequest{UtcTime: us, Granularity: tsdef.GranularityMillisecondsGranularity})
 	return err
 }
 

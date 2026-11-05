@@ -57,10 +57,21 @@ func (r *Reports) installed() bool {
 	return r.done
 }
 
+// attach hangs s on the reports and learns the operational node id of
+// every node the registry holds, so a node decommissioned before its next
+// report is still named.
 func (r *Reports) attach(s *Service) {
 	r.mu.Lock()
+	defer r.mu.Unlock()
 	r.svc = s
-	r.mu.Unlock()
+	if r.known == nil {
+		r.known = map[string]uint64{}
+	}
+	for _, n := range s.ctrl.Registry().Nodes() {
+		if addr, ok := n.PeerAddress(); ok {
+			r.known[n.ID()] = addr.NodeID
+		}
+	}
 }
 
 func (r *Reports) detach(s *Service) {

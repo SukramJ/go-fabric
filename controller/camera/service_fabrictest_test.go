@@ -233,6 +233,61 @@ func TestServiceOnTheFabric(t *testing.T) {
 		t.Fatal("the host's answer did not reach the camera")
 	}
 
+	// The rest of the facade over the same camera: capabilities, a
+	// snapshot, the stops by key, by id, by owner and by a host's own
+	// EndSession, and a stream release.
+	run(func(ctx context.Context) error {
+		caps, err := svc.Capabilities(ctx, n, ep)
+		if err != nil {
+			return err
+		}
+		if len(caps.Video.Codecs) != 1 || caps.Video.Codecs[0] != csdef.VideoCodecH264 || len(caps.Allocated.Video) == 0 {
+			return errors.New("capabilities")
+		}
+		snap, err := svc.Snapshot(ctx, camera.SnapshotRequest{Node: n, Endpoint: ep})
+		if err != nil {
+			return err
+		}
+		if len(snap.Data) == 0 || snap.Provenance != camera.ProvenanceAllocated {
+			return errors.New("snapshot")
+		}
+		offer := acceptanceOffer
+		keyed, err := svc.StartStream(ctx, camera.StartRequest{Node: n, Endpoint: ep, Usage: csdef.StreamUsageLiveView, Offer: &offer, Owner: "host", Key: "keyed"})
+		if err != nil {
+			return err
+		}
+		if ended, err := svc.StopByKey(ctx, n, ep, "host", "keyed"); err != nil || !ended || port.ended(keyed.ID) != 2 {
+			return errors.New("StopByKey")
+		}
+		byID, err := svc.StartStream(ctx, camera.StartRequest{Node: n, Endpoint: ep, Usage: csdef.StreamUsageLiveView, Offer: &offer})
+		if err != nil {
+			return err
+		}
+		if ended, err := svc.StopSession(ctx, n, ep, byID.ID, "other"); err != nil || !ended {
+			return errors.New("StopSession")
+		}
+		owned, err := svc.StartStream(ctx, camera.StartRequest{Node: n, Endpoint: ep, Usage: csdef.StreamUsageLiveView, Offer: &offer, Owner: "leaving"})
+		if err != nil {
+			return err
+		}
+		svc.Release(ctx, "leaving")
+		if port.ended(owned.ID) != 2 {
+			return errors.New("Release")
+		}
+		raw, err := svc.StartStream(ctx, camera.StartRequest{Node: n, Endpoint: ep, Usage: csdef.StreamUsageLiveView, Offer: &offer})
+		if err != nil {
+			return err
+		}
+		p, err := svc.Provider(n, ep)
+		if err != nil {
+			return err
+		}
+		if err := p.EndSession(ctx, wpdef.EndSessionRequest{WebRtcSessionId: raw.ID, Reason: 4}, "host"); err != nil || port.ended(raw.ID) != 4 {
+			return errors.New("Provider.EndSession")
+		}
+		return svc.ReleaseStream(ctx, n, ep, camera.StreamSnapshot, snap.StreamID)
+	})
+
 	// After a camera restart — the node disabled so the registry does not
 	// reopen a session — the camera's next signal opens CASE to RootNodeID
 	// and reaches the session.
@@ -363,6 +418,7 @@ func newAcceptanceCamera(t *testing.T, port *cameraPort) *device.Camera {
 	points := []csdef.RateDistortionTradeOffPointsStruct{{Codec: csdef.VideoCodecH264, Resolution: csdef.VideoResolutionStruct{Width: 640, Height: 480}, MinBitRate: 100_000}}
 	sensor := csdef.VideoSensorParamsStruct{SensorWidth: 1920, SensorHeight: 1080, MaxFps: 30}
 	minView := csdef.VideoResolutionStruct{Width: 640, Height: 480}
+	snapshots := []csdef.SnapshotCapabilitiesStruct{{Resolution: csdef.VideoResolutionStruct{Width: 640, Height: 480}, MaxFrameRate: 1, ImageCodec: csdef.ImageCodecJpeg}}
 	encoders := uint8(4)
 	pixelRate := uint32(1920 * 1080 * 30 * 4)
 	bandwidth := uint32(20_000_000)
@@ -371,7 +427,7 @@ func newAcceptanceCamera(t *testing.T, port *cameraPort) *device.Camera {
 			Features: csdef.FeatureVideo | csdef.FeatureAudio | csdef.FeatureSnapshot,
 			Initial: csdef.Patch{
 				SupportedStreamUsages: &usages, StreamUsagePriorities: &usages, AllocatedVideoStreams: &streams,
-				RateDistortionTradeOffPoints: &points, VideoSensorParams: &sensor, MinViewportResolution: &minView,
+				RateDistortionTradeOffPoints: &points, VideoSensorParams: &sensor, MinViewportResolution: &minView, SnapshotCapabilities: &snapshots,
 				MaxConcurrentEncoders: &encoders, MaxEncodedPixelRate: &pixelRate, MaxNetworkBandwidth: &bandwidth,
 			},
 			VideoStreamPort: port, AudioStreamPort: port, SnapshotStreamPort: port, SnapshotCapturePort: port,
@@ -503,6 +559,6 @@ func (p *cameraPort) SnapshotStreamModify(context.Context, uint16, *bool, *bool)
 
 func (p *cameraPort) SnapshotStreamDeallocate(context.Context, uint16) error { return nil }
 
-func (p *cameraPort) CaptureSnapshot(context.Context, *uint16, csdef.VideoResolutionStruct) (csdef.CaptureSnapshotResponse, error) {
-	return csdef.CaptureSnapshotResponse{}, errors.New("no snapshot")
+func (p *cameraPort) CaptureSnapshot(_ context.Context, _ *uint16, r csdef.VideoResolutionStruct) (csdef.CaptureSnapshotResponse, error) {
+	return csdef.CaptureSnapshotResponse{Data: []byte{0xFF, 0xD8}, ImageCodec: csdef.ImageCodecJpeg, Resolution: r}, nil
 }
