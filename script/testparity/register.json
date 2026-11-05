@@ -4646,30 +4646,25 @@
     },
     {
       "path": "packages/node/test/node/ClientInvokeTest.ts",
-      "status": "partial",
+      "status": "ported",
       "go": [
         "client/interaction:TestInvokeBatcherParity",
+        "client/interaction:TestInvokeNetworkParity",
         "controller/client:TestClientInvokeParity"
-      ],
-      "missing": [
-        "direct invoke (#invokeSingle) propagates network to exchange",
-        "batched invoke (#invokeWithBatching) propagates network to exchange",
-        "split invoke (#invokeWithSplitting) propagates network to each exchange",
-        "command with interactionModelRevision never joins a batch",
-        "command with beforeDispatch never joins a batch",
-        "command with delayReportData never joins a batch",
-        "only a non-default interaction model revision keeps a command out of the batch",
-        "command with an address override keeps it",
-        "command without a network and one naming the default network share a batch"
       ],
       "left": [
         {
           "it": "clears maxPathsPerInvoke cache when node goes offline",
           "class": "js-runtime-only",
           "reason": "ClientInvokeTest.ts:249-283 at 862ad75f clears matter.js's cached maxPathsPerInvoke; the Go provider reads the session parameters on every invoke (sessionProvider/peerProvider.maxPathsPerInvoke), there is no cache to clear"
+        },
+        {
+          "it": "command with beforeDispatch never joins a batch",
+          "class": "js-runtime-only",
+          "reason": "beforeDispatch is `Server only` in matter.js's own words (Invoke.ts:52-55 at 862ad75f): it reaches ClientInvoke through the shared Invoke type and the client reads it nowhere but isBatchable; a Go client option nothing dispatches would copy the type-sharing artefact, not a behaviour."
         }
       ],
-      "reason": "The batcher of single commands (client/interaction Interaction.Invoke, ClientInteraction.#invokeWithBatching at 862ad75f) on the scripted rig — one InvokeRequest per batch window and network lane, numbered by CommandRef, its bypasses (MaxPathsPerInvoke 1, endpoint 0, timed, suppressed, expected processing time, extended fail-safe timeout, MRP delay, Large Message, NoBatch), duplicate paths in separate batches, a split by MaxPathsPerInvoke, close and abort, a close while the batcher's connect is held (interaction.HoldConnect, export_test.go) — and the commands through it on fabrictest (controller/client:TestClientInvokeParity). Left: the maxPathsPerInvoke cache (none in Go), the network observed on the exchange (the scripted session provider takes no network), an interaction-level default network, and the interaction model revision, beforeDispatch, DelayReportData and address-override options Go's InvokeOptions has not (a feature gap, named as a findings candidate). Missing (owner verdict at integration, 2026-11-04): the five option cases (interactionModelRevision ×2, beforeDispatch, delayReportData, address override) and the interaction-level default network are a feature gap of Go's InvokeOptions and interaction.Config, not matter.js's runtime (findings register T3-SW-1); the three network-on-the-exchange cases are portable on a fabrictest pair, whose peer provider carries the network — a port, not a seam.",
+      "reason": "The batcher of single commands (client/interaction Interaction.Invoke, ClientInteraction.#invokeWithBatching at 862ad75f) on the scripted rig — one InvokeRequest per batch window and network lane, numbered by CommandRef, its bypasses (MaxPathsPerInvoke 1, endpoint 0, timed, suppressed, expected processing time, extended fail-safe timeout, MRP delay, Large Message, NoBatch, a non-default InvokeOptions.InteractionModelRevision, a DelayReportData, a ClientRequest.AddressOverride whose exchange carries it — isBatchable, ClientInteraction.ts:185-213), duplicate paths in separate batches, a split by MaxPathsPerInvoke, the interaction's default network (interaction.Config.Network, `request.network ?? this.#network` :765, :1250) sharing a lane with a command naming it, close and abort, a close while the batcher's connect is held (interaction.HoldConnect, export_test.go) — and the commands through it on fabrictest (controller/client:TestClientInvokeParity). The network of the direct, batched and split exchange (TestInvokeNetworkParity) is observed on a provider that records each exchange's network (interaction.RecordNetworks, export_test.go), matter.js's spy on NetworkProfiles.select; the request names \"unlimited\", which matter.js's ClientNodeInteraction.invoke supplies (ClientNodeInteraction.ts:213-216). Left: the maxPathsPerInvoke cache (none in Go) and beforeDispatch (a server-only field of the shared Invoke type).",
       "snapshotSha": "a743554ce3a6060f13492259bb66a152d9bfca31"
     },
     {

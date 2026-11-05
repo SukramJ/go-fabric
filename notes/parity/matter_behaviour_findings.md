@@ -820,12 +820,6 @@ with a port of the named case.
 
 ## Tier 3 — LOW
 
-### T3-SW-1 — the invoke options matter.js's ClientInteraction has and Go's does not (seam wave, 2026-11-04)
-
-- **Where:** `client/interaction` `InvokeOptions` and `interaction.Config`; the batcher (`Interaction.Invoke`).
-- **matter.js at 862ad75f:** a command carries `interactionModelRevision`, `beforeDispatch`, `delayReportData` and an address override, each of which keeps it out of a batch (`ClientInvokeTest.ts:545-575`, `:612-630`, `:715-732`), and the interaction binds a default network (`:811-830`). Go has none of the five; the register keeps the nine ClientInvokeTest cases `missing` (five as this gap, three network-on-the-exchange cases as a fabrictest port still to do, one default network).
-- **Unverified:** whether any consumer needs them before milestone 10; a port is a `controller/client` feature wave, not a seam.
-
 ### T3-SW-3 — the ICD client's nextExpectedCheckin follows the wall clock (seam wave, 2026-11-04, measured)
 
 - **Where:** `controller/client` ICD client, `NextExpectedCheckIn` after `clocktest.Fake.StepWall(time.Hour)` reads now+15 s where matter.js reads at least now+idleModeDuration (`IcdClientTest.ts:2281`); the skip in `icd_client_parity_matterjs_test.go` names it.

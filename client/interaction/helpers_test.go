@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"net"
 	"slices"
+	"sync"
 	"testing"
 	"testing/synctest"
 	"time"
@@ -39,12 +40,32 @@ func (c *fakeClock) waitTimer(t *testing.T, d time.Duration) {
 	}
 }
 
-// fakeConn records the datagrams the manager sends.
-type fakeConn struct{ ch chan []byte }
+// fakeConn records the datagrams the manager sends, and the address each
+// went to by its message counter.
+type fakeConn struct {
+	ch chan []byte
+	mu sync.Mutex
+	to map[uint32]*net.UDPAddr
+}
 
-func (c *fakeConn) Send(_ *net.UDPAddr, payload []byte) error {
+func (c *fakeConn) Send(to *net.UDPAddr, payload []byte) error {
+	if hdr, _, err := message.UnmarshalHeader(payload); err == nil {
+		c.mu.Lock()
+		if c.to == nil {
+			c.to = map[uint32]*net.UDPAddr{}
+		}
+		c.to[hdr.MessageCounter] = to
+		c.mu.Unlock()
+	}
 	c.ch <- append([]byte(nil), payload...)
 	return nil
+}
+
+// dest is the address the datagram with message counter n went to.
+func (c *fakeConn) dest(n uint32) *net.UDPAddr {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.to[n]
 }
 
 var peerAddr = &net.UDPAddr{IP: net.ParseIP("fd00::1"), Port: 5540}
@@ -91,11 +112,12 @@ func newScriptedWith(t *testing.T, reported *sessionparams.Parameters) *scripted
 	return &scripted{mgr: m, clock: clock, conn: conn, session: s, peer: peer}
 }
 
-// msg is one message the manager sent.
+// msg is one message the manager sent, to the address to.
 type msg struct {
 	hdr     message.Header
 	proto   message.ProtocolHeader
 	payload []byte
+	to      *net.UDPAddr
 }
 
 // next returns the next message the manager sent, skipping standalone
@@ -120,7 +142,7 @@ func (s *scripted) next(t *testing.T) msg {
 			if proto.ProtocolID == 0 && proto.Opcode == 0x10 { // standalone ack
 				continue
 			}
-			return msg{hdr: hdr, proto: proto, payload: plain[pl:]}
+			return msg{hdr: hdr, proto: proto, payload: plain[pl:], to: s.conn.dest(hdr.MessageCounter)}
 		case <-time.After(5 * time.Second):
 			t.Fatal("the manager sent nothing")
 			return msg{}

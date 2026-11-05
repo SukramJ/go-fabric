@@ -6,6 +6,8 @@ package interaction
 import (
 	"context"
 	"sync"
+
+	"github.com/SukramJ/go-fabric/client/exchange"
 )
 
 // QueuedInvokes is the number of commands waiting in the batch lanes of c,
@@ -62,6 +64,46 @@ func (h *heldConnect) connect(ctx context.Context, opts ExchangeOptions) error {
 
 func (h *heldConnect) maxPathsPerInvoke() int {
 	if p, ok := h.Provider.(pathsPerInvoker); ok {
+		return p.maxPathsPerInvoke()
+	}
+	return 1
+}
+
+// RecordNetworks wraps p in a provider that records the network of every
+// exchange it initiates, in order — the test seam of ClientInvokeTest.ts's
+// spyNetworkSelect (:421-436 at 862ad75f), which captures each id
+// NetworkProfiles.select receives. p's MaxPathsPerInvoke and connect stay.
+func RecordNetworks(p Provider) (recorded Provider, networks func() []string) {
+	r := &networkRecorder{Provider: p}
+	return r, func() []string {
+		r.mu.Lock()
+		defer r.mu.Unlock()
+		return append([]string(nil), r.networks...)
+	}
+}
+
+type networkRecorder struct {
+	Provider
+	mu       sync.Mutex
+	networks []string
+}
+
+func (r *networkRecorder) InitiateExchange(ctx context.Context, opts ExchangeOptions) (*exchange.Exchange, error) {
+	r.mu.Lock()
+	r.networks = append(r.networks, opts.Network)
+	r.mu.Unlock()
+	return r.Provider.InitiateExchange(ctx, opts)
+}
+
+func (r *networkRecorder) connect(ctx context.Context, opts ExchangeOptions) error {
+	if c, ok := r.Provider.(connector); ok {
+		return c.connect(ctx, opts)
+	}
+	return nil
+}
+
+func (r *networkRecorder) maxPathsPerInvoke() int {
+	if p, ok := r.Provider.(pathsPerInvoker); ok {
 		return p.maxPathsPerInvoke()
 	}
 	return 1

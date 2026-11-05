@@ -640,7 +640,7 @@
   },
   {
     "file": "client/interaction/interaction.go",
-    "line": 172,
+    "line": 181,
     "citation": "ClientInteraction.ts:1249-1251",
     "resolved": "packages/protocol/src/action/client/ClientInteraction.ts",
     "identifier": "maximumPeerResponseTime",
@@ -649,7 +649,7 @@
   },
   {
     "file": "client/interaction/interaction.go",
-    "line": 279,
+    "line": 299,
     "citation": "InteractionMessenger.ts:148-161",
     "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
     "identifier": "StatusResponse",
@@ -658,7 +658,7 @@
   },
   {
     "file": "client/interaction/invoke.go",
-    "line": 91,
+    "line": 106,
     "citation": "InteractionMessenger.ts:1082-1105",
     "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
     "identifier": "StatusResponse",
@@ -676,7 +676,7 @@
   },
   {
     "file": "client/interaction/provider.go",
-    "line": 274,
+    "line": 282,
     "citation": "ClientInteraction.ts:1112",
     "resolved": "packages/protocol/src/action/client/ClientInteraction.ts",
     "identifier": "verifyReachability",
@@ -1865,7 +1865,7 @@
   },
   {
     "file": "im/invoke.go",
-    "line": 152,
+    "line": 158,
     "citation": "packages/protocol/src/action/server/CommandInvokeResponse.ts:446-448",
     "resolved": "packages/protocol/src/action/server/CommandInvokeResponse.ts",
     "identifier": "requestTlv",
@@ -1874,7 +1874,7 @@
   },
   {
     "file": "im/invoke.go",
-    "line": 449,
+    "line": 459,
     "citation": "packages/node/src/node/server/InteractionServer.ts:1043-1074",
     "resolved": "packages/node/src/node/server/InteractionServer.ts",
     "identifier": "suppressedBuffer",
@@ -1883,7 +1883,7 @@
   },
   {
     "file": "im/invoke.go",
-    "line": 469,
+    "line": 479,
     "citation": "packages/node/src/node/server/InteractionServer.ts:950-955",
     "resolved": "packages/node/src/node/server/InteractionServer.ts",
     "identifier": "invokeRequests",

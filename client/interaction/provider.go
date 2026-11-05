@@ -62,14 +62,22 @@ type ExchangeOptions struct {
 
 // ClientRequest is what every interaction request carries for its
 // exchange — matter.js ClientRequest (action/client/ClientRequest.ts:13-87
-// at 862ad75f): the network profile and the MRP margin override. It is
-// embedded in [ReadRequest], [SubscribeRequest], [WriteOptions] and
-// [InvokeOptions].
+// at 862ad75f): the network profile, the MRP margin override and the
+// address override. It is embedded in [ReadRequest], [SubscribeRequest],
+// [WriteOptions] and [InvokeOptions].
 type ClientRequest struct {
-	// Network is [ExchangeOptions].Network.
+	// Network is [ExchangeOptions].Network; "" is the interaction's
+	// [Config].Network (ClientInteraction.ts:1250, :765).
 	Network string
 	// AdditionalMrpDelay is [ExchangeOptions].AdditionalMrpDelay.
 	AdditionalMrpDelay *time.Duration
+	// AddressOverride sends this interaction's exchange to this address
+	// instead of the session's, without affecting other exchanges on the
+	// session — matter.js ClientRequest.addressOverride
+	// (ClientRequest.ts:34-40), passed to the exchange at
+	// ClientInteraction.ts:1254; it is [ExchangeOptions].AddressOverride.
+	// An invoke that carries one goes on its own (ClientInteraction.ts:209).
+	AddressOverride *net.UDPAddr
 	// LargeMessage requires a session that permits payloads larger than
 	// the IPv6 MTU: a TCP session, established or failing, never the MRP
 	// fallback of a transport preference (ClientRequest.ts:62-86). A peer
@@ -85,7 +93,7 @@ func (r ClientRequest) large() bool { return r.LargeMessage != nil && *r.LargeMe
 // exchangeOptions are the exchange options of the request: a large message
 // requires TCP (ClientInteraction.ts:1235).
 func (r ClientRequest) exchangeOptions() ExchangeOptions {
-	o := ExchangeOptions{Network: r.Network, AdditionalMrpDelay: r.AdditionalMrpDelay}
+	o := ExchangeOptions{Network: r.Network, AdditionalMrpDelay: r.AdditionalMrpDelay, AddressOverride: r.AddressOverride}
 	if r.large() {
 		tcp := exchange.TransportTCP
 		o.RequiredTransport = &tcp
