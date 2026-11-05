@@ -146,7 +146,7 @@ func generatedAttributeValue(def *spec.Cluster, attrID uint32, el tlv.Element, d
 	attr := def.Attribute(attrID)
 	if attr == nil || attr.Decode == nil {
 		// Never a panic on wire input: the caller checks, this guards it.
-		return im.AttributeValue{}, fmt.Errorf("%s: attribute 0x%04X has no generated decoder", def.Name, attrID)
+		return im.AttributeValue{}, fmt.Errorf("bridge: %s attribute 0x%04X has no generated decoder", def.Name, attrID)
 	}
 	if attr.Access.Fabric == "F" {
 		stampFabricPlaceholder(&n)

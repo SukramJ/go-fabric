@@ -48,7 +48,7 @@ func TestAttributeValueReader_ContainerWithoutDecoder(t *testing.T) {
 		read(t, opcredsdef.ClusterID, opcredsdef.AttrTrustedRootCertificates, body)
 	}
 	clusters, attrs := 0, 0
-	for id := uint32(0); id < 0x2000; id++ {
+	for id := range uint32(0x2000) {
 		def := spec.Lookup(id)
 		if def == nil {
 			continue
