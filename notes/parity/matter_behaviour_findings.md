@@ -761,6 +761,63 @@ Found by the phase-32 port of `packages/node/test/behaviors/ota/OtaTest.ts`
 
 ---. (Triage 2026-10-29: wave H2, commissioning and security (Fable), before milestone 7 makes the Wi-Fi server real.)
 
+## Phase 33 — the general, model and types test roots (matter.js 862ad75f)
+
+Cases of the six phase-33 register roots (`notes/parity/matterjs_tests.md`)
+the Go tests do not cover and no `by_design.md` entry explains. Each closes
+with a port of the named case.
+
+- **The TLV encoder writes an IS1 into a character string.** matter.js's
+  `TlvString.validate` refuses a character string containing Information
+  Separator 1 (0x1F) (`packages/types/src/tlv/TlvString.ts:78-81` at
+  `862ad75f`); `tlv.Encoder.PutUTF8` writes it, and a peer reading the
+  string cuts it there. Case:
+  `TlvStringTest.ts` "throws an error if a character string contains
+  Information Separator 1 (0x1F)". Route: refuse (or cut) the string in
+  the encoder's checked path and decide what a host value with an IS1
+  becomes.
+- **A write keeps the FabricIndex its caller supplies.** matter.js encodes
+  a fabric-scoped struct for a write interaction without its FabricIndex,
+  even when the value carries one (`TlvObjectTest.ts` "strips fabricIndex
+  for write interaction even when caller provided a value",
+  `forWriteInteraction`); `spec.EncodeJSON` writes it when present. The server overwrites it with the accessing
+  fabric, so the wire difference is the field's bytes. Route: strip field
+  254 on the controller's write encoding.
+- **Numeric bounds compare as float64.** `cluster/spec`'s constraint check
+  (`Instance.satisfies`, `bound_expr.go` `evalBound`) and `Bound.Int`
+  (int64) hold a bound beyond 2^53 inexactly: 2^62 + 1 compares equal to
+  2^62, and a uint64 bound above int64 cannot be stated. matter.js keeps
+  such bounds as bigints (`TlvOfModelTest.ts` "refuses a value beyond the
+  computed bound", "refuses the value above it", "states a bound beyond
+  the safe integers as a bigint"; `ConstraintTest.ts` "keeps the magnitude
+  of a decimal / hexadecimal / negative bound", "judges a value against a
+  bound only a bigint states" and its value tests at 2^53 ± 1 and 2^62 ± 1).
+  No served attribute states such a bound at the pin. Route: compare integers as integers (uint64/int64 or
+  math/big) where the type is a 64-bit integer.
+
+- **Defaults matter.js derives without a stated one.** matter.js's
+  `DefaultValue` gives a list whose type permits no entries the empty list,
+  builds a bitmap's default from its members' defaults (bit placement
+  across bit 31, a member without an upper bound, the first member to claim
+  a bit), and scales a unit default by the type a declared type derives
+  from (`packages/model/test/logic/DefaultValueTest.ts` at `862ad75f`,
+  nine cases). `script/clustergen` writes only the default the snapshot
+  states (`defaultLiteral`), scaling a unit by the declared type name
+  (`encodedUnit`). Route: derive these in the generator, or have the
+  extractor write matter.js's computed default into `parity/schema.json`.
+
+- **No copyHealth for re-resolved addresses.** matter.js's
+  `ServerAddressSet.copyHealth` carries an address's health markers onto an
+  equal address of a new set (`ServerAddressSetTest.ts` "copies health
+  markers onto equal targets"); `client/discovery` keeps health on
+  `Address` (`HealthyAt`, `UnhealthyAt`) and has no copy step.
+- **The responder sockets keep the surviving IP family.** matter.js's
+  `UdpMulticastServer` closes the IPv4 socket when the IPv6 one cannot be
+  created or join the group (`UdpMulticastServerTest.ts` two cases);
+  `mdns/socket.go` keeps the family that opened and fails only when both
+  do. Route: decide whether the module mirrors the all-or-nothing open or
+  records the difference in `by_design.md`.
+
 ## Tier 3 — LOW
 
 ### T3-SW-1 — the invoke options matter.js's ClientInteraction has and Go's does not (seam wave, 2026-11-04)

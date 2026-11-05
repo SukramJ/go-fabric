@@ -11,8 +11,9 @@ import (
 	"testing"
 )
 
-// The vectors below are copied from matter.js at 0ceb202d,
-// packages/types/test/schema/PairingCodeSchemaTest.ts; each cites its line.
+// The vectors below are copied from matter.js
+// packages/types/test/schema/PairingCodeSchemaTest.ts; each cites its line
+// at 862ad75f.
 
 // qrVector is PairingCodeSchemaTest.ts:27-40 (QR_CODE, QR_CODE_DATA).
 var qrVector = Payload{

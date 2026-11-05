@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 7364,
+  "entry_points": 7407,
   "entry_packages": [
     ".",
     "bdx",
@@ -279,9 +279,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 17284,
-    "reachable": 12132,
-    "whitelisted": 5152,
+    "total_exported": 17311,
+    "reachable": 12135,
+    "whitelisted": 5176,
     "unreachable": 0
   },
   "by_package": [],
@@ -5760,6 +5760,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/discovery/txt_data_parity_matterjs_test.go",
       "line": 146
+    },
+    {
+      "package": "client/discovery",
+      "identifier": "TestKnownAnswersParityMatterJS",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/discovery/known_answers_parity_matterjs_test.go",
+      "line": 20
     },
     {
       "package": "client/discovery",
@@ -28093,6 +28100,13 @@
     },
     {
       "package": "groups",
+      "identifier": "TestGroupSessionIDDerivationParityMatterJS",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "groups/crypto_parity_matterjs_test.go",
+      "line": 16
+    },
+    {
+      "package": "groups",
       "identifier": "TestGroupcastChangeSignal",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "groups/groupcast_test.go",
@@ -29521,6 +29535,13 @@
     },
     {
       "package": "im",
+      "identifier": "TestTlvInvokeRequestParityMatterJS",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "im/tlv_invoke_request_parity_matterjs_test.go",
+      "line": 19
+    },
+    {
+      "package": "im",
       "identifier": "TestUnmarshalReadRequest_ScalarEventFiltersFieldIsSkipped",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/event_filter_read_test.go",
@@ -30001,6 +30022,34 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "internal/chipdm/conf_test.go",
       "line": 114
+    },
+    {
+      "package": "internal/chipdm",
+      "identifier": "TestConformanceInvalidParityMatterJS",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "internal/chipdm/conformance_parity_matterjs_test.go",
+      "line": 55
+    },
+    {
+      "package": "internal/chipdm",
+      "identifier": "TestConformancePrecedenceParityMatterJS",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "internal/chipdm/conformance_parity_matterjs_test.go",
+      "line": 83
+    },
+    {
+      "package": "internal/chipdm",
+      "identifier": "TestConformanceRevisionParityMatterJS",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "internal/chipdm/conformance_parity_matterjs_test.go",
+      "line": 68
+    },
+    {
+      "package": "internal/chipdm",
+      "identifier": "TestConformanceTextParityMatterJS",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "internal/chipdm/conformance_parity_matterjs_test.go",
+      "line": 14
     },
     {
       "package": "internal/chipdm",
@@ -30575,6 +30624,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "mdns/responder_server_parity_matterjs_test.go",
       "line": 381
+    },
+    {
+      "package": "mdns",
+      "identifier": "TestMdnsSocketConstantsParityMatterJS",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "mdns/socket_const_parity_matterjs_test.go",
+      "line": 12
     },
     {
       "package": "mdns",
@@ -31411,6 +31467,20 @@
     },
     {
       "package": "secure/aesccm",
+      "identifier": "TestCcmTagVerificationParityMatterJS",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/aesccm/ccm_parity_matterjs_test.go",
+      "line": 73
+    },
+    {
+      "package": "secure/aesccm",
+      "identifier": "TestCcmVectorsParityMatterJS",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/aesccm/ccm_parity_matterjs_test.go",
+      "line": 44
+    },
+    {
+      "package": "secure/aesccm",
       "identifier": "TestNIST_RFC3610_TamperedVectors",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/aesccm/aesccm_test.go",
@@ -31506,6 +31576,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/aesccm/aesccm_test.go",
       "line": 52
+    },
+    {
+      "package": "secure/aesccm",
+      "identifier": "TestStandardCryptoAeadParityMatterJS",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/aesccm/ccm_parity_matterjs_test.go",
+      "line": 108
     },
     {
       "package": "secure/attestation",
@@ -32090,10 +32167,31 @@
     },
     {
       "package": "secure/mattercert",
+      "identifier": "TestDerCodecDecodeRefusalsParityMatterJS",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/mattercert/der_codec_parity_matterjs_test.go",
+      "line": 22
+    },
+    {
+      "package": "secure/mattercert",
+      "identifier": "TestDerCodecTimeParityMatterJS",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/mattercert/der_codec_parity_matterjs_test.go",
+      "line": 51
+    },
+    {
+      "package": "secure/mattercert",
       "identifier": "TestDumpAppleNOC",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/mattercert/dump_apple_noc_test.go",
       "line": 18
+    },
+    {
+      "package": "secure/mattercert",
+      "identifier": "TestEcdsaSignatureDERParityMatterJS",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/mattercert/crypto_parity_matterjs_test.go",
+      "line": 20
     },
     {
       "package": "secure/mattercert",
@@ -32185,6 +32283,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/mattercert/tbs_der_parity_matterjs_test.go",
       "line": 132
+    },
+    {
+      "package": "secure/mattercert",
+      "identifier": "TestX509ExtensionsParityMatterJS",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/mattercert/crypto_parity_matterjs_test.go",
+      "line": 52
     },
     {
       "package": "secure/operational",
@@ -32447,52 +32552,73 @@
     },
     {
       "package": "secure/setup",
+      "identifier": "TestAssertValidPayloadIdentityParityMatterJS",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/setup/pairing_code_schema_parity_matterjs_test.go",
+      "line": 239
+    },
+    {
+      "package": "secure/setup",
+      "identifier": "TestBase38SchemaParityMatterJS",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/setup/pairing_code_schema_parity_matterjs_test.go",
+      "line": 352
+    },
+    {
+      "package": "secure/setup",
       "identifier": "TestDecodeExtra",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/setup/decode_test.go",
-      "line": 152
+      "line": 153
     },
     {
       "package": "secure/setup",
       "identifier": "TestDecodeManualCode_MatterJSVectors",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/setup/decode_test.go",
-      "line": 241
+      "line": 242
     },
     {
       "package": "secure/setup",
       "identifier": "TestDecodeManualCode_Rejects",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/setup/decode_test.go",
-      "line": 293
+      "line": 294
     },
     {
       "package": "secure/setup",
       "identifier": "TestDecodeManualCode_RoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/setup/decode_test.go",
-      "line": 272
+      "line": 273
     },
     {
       "package": "secure/setup",
       "identifier": "TestDecodeQRCode_MatterJSVectors",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/setup/decode_test.go",
-      "line": 35
+      "line": 36
     },
     {
       "package": "secure/setup",
       "identifier": "TestDecodeQRCode_Rejects",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/setup/decode_test.go",
-      "line": 81
+      "line": 82
     },
     {
       "package": "secure/setup",
       "identifier": "TestDecode_EveryInvalidPasscode",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/setup/decode_test.go",
-      "line": 313
+      "line": 314
+    },
+    {
+      "package": "secure/setup",
+      "identifier": "TestIsValidPasscodeParityMatterJS",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/setup/pairing_code_schema_parity_matterjs_test.go",
+      "line": 334
     },
     {
       "package": "secure/setup",
@@ -32566,6 +32692,13 @@
     },
     {
       "package": "secure/setup",
+      "identifier": "TestManualPairingCodeCodecParityMatterJS",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/setup/pairing_code_schema_parity_matterjs_test.go",
+      "line": 259
+    },
+    {
+      "package": "secure/setup",
       "identifier": "TestQRCode_ChipToolCrossCheck",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/setup/setup_test.go",
@@ -32632,14 +32765,14 @@
       "identifier": "TestQRCode_RoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/setup/decode_test.go",
-      "line": 101
+      "line": 102
     },
     {
       "package": "secure/setup",
       "identifier": "TestQRCode_RoundTripWithTLVTail",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/setup/decode_test.go",
-      "line": 123
+      "line": 124
     },
     {
       "package": "secure/setup",
@@ -32653,7 +32786,21 @@
       "identifier": "TestQRCode_TooLong",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/setup/decode_test.go",
-      "line": 209
+      "line": 210
+    },
+    {
+      "package": "secure/setup",
+      "identifier": "TestQrCodeTlvDataParityMatterJS",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/setup/pairing_code_schema_parity_matterjs_test.go",
+      "line": 168
+    },
+    {
+      "package": "secure/setup",
+      "identifier": "TestQrPairingCodeCodecParityMatterJS",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/setup/pairing_code_schema_parity_matterjs_test.go",
+      "line": 31
     },
     {
       "package": "secure/setup",
@@ -32682,6 +32829,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/setup/setup_test.go",
       "line": 21
+    },
+    {
+      "package": "secure/setup",
+      "identifier": "TestVerhoeffParityMatterJS",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/setup/verhoeff_parity_matterjs_test.go",
+      "line": 12
     },
     {
       "package": "secure/sigma",
@@ -32717,6 +32871,20 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/sigma/sigma_test.go",
       "line": 478
+    },
+    {
+      "package": "secure/sigma",
+      "identifier": "TestDhSharedSecretParityMatterJS",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/sigma/crypto_parity_matterjs_test.go",
+      "line": 41
+    },
+    {
+      "package": "secure/sigma",
+      "identifier": "TestEcdsaSignatureP1363ParityMatterJS",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/sigma/crypto_parity_matterjs_test.go",
+      "line": 18
     },
     {
       "package": "secure/sigma",
@@ -33476,6 +33644,13 @@
     },
     {
       "package": "secure/spake2",
+      "identifier": "TestEphemeralScalarBoundParityMatterJS",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/spake2/crypto_parity_matterjs_test.go",
+      "line": 15
+    },
+    {
+      "package": "secure/spake2",
       "identifier": "TestGeneratePake1_CalledTwiceReturnsError",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/spake2/spake2_test.go",
@@ -34137,14 +34312,14 @@
       "identifier": "FuzzDecoderNext",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "tlv/fuzz_codec_test.go",
-      "line": 30
+      "line": 31
     },
     {
       "package": "tlv",
       "identifier": "FuzzEncodeDecodeRoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "tlv/fuzz_codec_test.go",
-      "line": 91
+      "line": 100
     },
     {
       "package": "tlv",
@@ -34501,14 +34676,14 @@
       "identifier": "TestEncoder_ContextTagInArray_NestedStruct_OK",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "tlv/object_parity_test.go",
-      "line": 620
+      "line": 621
     },
     {
       "package": "tlv",
       "identifier": "TestEncoder_ContextTagInArray_Panics",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "tlv/object_parity_test.go",
-      "line": 603
+      "line": 604
     },
     {
       "package": "tlv",
@@ -34564,49 +34739,49 @@
       "identifier": "TestObjectParity_Array_Decode",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "tlv/object_parity_test.go",
-      "line": 263
+      "line": 264
     },
     {
       "package": "tlv",
       "identifier": "TestObjectParity_Array_Encode",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "tlv/object_parity_test.go",
-      "line": 247
+      "line": 248
     },
     {
       "package": "tlv",
       "identifier": "TestObjectParity_Array_RoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "tlv/object_parity_test.go",
-      "line": 297
-    },
-    {
-      "package": "tlv",
-      "identifier": "TestObjectParity_ChunkedArray_NotImplemented",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "tlv/object_parity_test.go",
-      "line": 738
+      "line": 298
     },
     {
       "package": "tlv",
       "identifier": "TestObjectParity_Complex_AllFields",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "tlv/object_parity_test.go",
-      "line": 346
+      "line": 347
     },
     {
       "package": "tlv",
       "identifier": "TestObjectParity_Complex_MinFields",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "tlv/object_parity_test.go",
-      "line": 387
+      "line": 388
     },
     {
       "package": "tlv",
       "identifier": "TestObjectParity_Complex_MinFields_Decode",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "tlv/object_parity_test.go",
-      "line": 410
+      "line": 411
+    },
+    {
+      "package": "tlv",
+      "identifier": "TestObjectParity_Complex_WithoutWrappedFields",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "tlv/object_parity_test.go",
+      "line": 736
     },
     {
       "package": "tlv",
@@ -34638,59 +34813,52 @@
     },
     {
       "package": "tlv",
-      "identifier": "TestObjectParity_InjectField_NotImplemented",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "tlv/object_parity_test.go",
-      "line": 694
-    },
-    {
-      "package": "tlv",
       "identifier": "TestObjectParity_NestedArrayOfStructs",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "tlv/object_parity_test.go",
-      "line": 447
-    },
-    {
-      "package": "tlv",
-      "identifier": "TestObjectParity_RemoveField_NotImplemented",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "tlv/object_parity_test.go",
-      "line": 704
+      "line": 448
     },
     {
       "package": "tlv",
       "identifier": "TestObjectParity_Schema_ArrayField",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "tlv/object_parity_test.go",
-      "line": 537
+      "line": 538
+    },
+    {
+      "package": "tlv",
+      "identifier": "TestObjectParity_Schema_NestedStructs",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "tlv/object_parity_test.go",
+      "line": 693
     },
     {
       "package": "tlv",
       "identifier": "TestObjectParity_Schema_NumberFields",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "tlv/object_parity_test.go",
-      "line": 564
+      "line": 565
     },
     {
       "package": "tlv",
       "identifier": "TestObjectParity_Schema_StringFields",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "tlv/object_parity_test.go",
-      "line": 518
+      "line": 519
     },
     {
       "package": "tlv",
       "identifier": "TestObjectParity_Schema_UInt16AndBoolean",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "tlv/object_parity_test.go",
-      "line": 499
+      "line": 500
     },
     {
       "package": "tlv",
       "identifier": "TestObjectParity_TaggedList_Decode_Optional",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "tlv/object_parity_test.go",
-      "line": 223
+      "line": 224
     },
     {
       "package": "tlv",
@@ -34711,35 +34879,21 @@
       "identifier": "TestObjectParity_TaggedList_OptionalAndRequired_SwitchedOrder",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "tlv/object_parity_test.go",
-      "line": 177
-    },
-    {
-      "package": "tlv",
-      "identifier": "TestObjectParity_TaggedList_ProtocolSpecificTags_NotImplemented",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "tlv/object_parity_test.go",
-      "line": 727
+      "line": 178
     },
     {
       "package": "tlv",
       "identifier": "TestObjectParity_TaggedList_RepeatedFields",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "tlv/object_parity_test.go",
-      "line": 208
+      "line": 209
     },
     {
       "package": "tlv",
       "identifier": "TestObjectParity_TaggedList_RequiredOnly",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "tlv/object_parity_test.go",
-      "line": 193
-    },
-    {
-      "package": "tlv",
-      "identifier": "TestObjectParity_ValidationError_NotImplemented",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "tlv/object_parity_test.go",
-      "line": 714
+      "line": 194
     },
     {
       "package": "tlv",
@@ -34949,14 +35103,14 @@
       "identifier": "TestPutUintWidth_FixedWidths",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "tlv/object_parity_test.go",
-      "line": 644
+      "line": 645
     },
     {
       "package": "tlv",
       "identifier": "TestPutUintWidth_PanicOnBadWidth",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "tlv/object_parity_test.go",
-      "line": 675
+      "line": 676
     },
     {
       "package": "tlv",
@@ -34999,6 +35153,20 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "tlv/tlv_test.go",
       "line": 272
+    },
+    {
+      "package": "tlv",
+      "identifier": "TestTlvCodecTagsParityMatterJS",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "tlv/codec_tags_parity_matterjs_test.go",
+      "line": 18
+    },
+    {
+      "package": "tlv",
+      "identifier": "TestTlvStringByteSizeParityMatterJS",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "tlv/codec_tags_parity_matterjs_test.go",
+      "line": 105
     },
     {
       "package": "tlv",

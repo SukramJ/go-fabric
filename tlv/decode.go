@@ -100,24 +100,23 @@ func (d *Decoder) readTag(kind TagKind) (Tag, error) {
 		}
 		tag.Number = uint32(d.buf[d.pos])
 		d.pos++
-	case TagKindCommonProfile2, TagKindImplicitProfile2:
-		// Note: ImplicitProfile tags are decoded as raw
-		// Tag{Kind: TagKindImplicitProfile2, Number: n} without resolving
-		// the implicit profile context — by design (L3-D2). matter.js
-		// TlvCodec.ts readTag throws UnexpectedDataError for these (malformed
-		// peer data since e21a1e72, #4514); chip's TLVReader resolves them
-		// against ImplicitProfileId when set and otherwise fails with
-		// CHIP_ERROR_UNKNOWN_IMPLICIT_TLV_TAG. Consumers here switch on
-		// context tags, so such an element is skipped rather than accepted. go-fabric acts solely as a
-		// responder (never initiates ImplicitProfile-tagged requests) so
-		// no resolution is needed. If future code paths require it, implement
-		// chip's ImplicitProfileId pattern.
+	case TagKindImplicitProfile2, TagKindImplicitProfile4:
+		// An implicit-profile tag is refused as malformed data, before its
+		// tag bytes are read. Mirrors matter.js
+		// packages/types/src/tlv/TlvCodec.ts:169-171 readTag (throws
+		// UnexpectedDataError "Implicit profile tag … cannot be resolved");
+		// chip's TLVReader.cpp:916-923 (at 6170af84) ReadTag yields UnknownImplicitTag
+		// without an ImplicitProfileId, which VerifyElement refuses at
+		// :861-862 (CHIP_ERROR_UNKNOWN_IMPLICIT_TLV_TAG). The module sets no
+		// implicit profile, so there is nothing to resolve the tag against.
+		return tag, fmt.Errorf("%w (tag control %d) at pos %d", ErrImplicitProfileTag, kind, d.pos-1)
+	case TagKindCommonProfile2:
 		if err := d.need(2); err != nil {
 			return tag, err
 		}
 		tag.Number = uint32(binary.LittleEndian.Uint16(d.buf[d.pos:]))
 		d.pos += 2
-	case TagKindCommonProfile4, TagKindImplicitProfile4:
+	case TagKindCommonProfile4:
 		if err := d.need(4); err != nil {
 			return tag, err
 		}

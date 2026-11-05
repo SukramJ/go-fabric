@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright (C) 2026 SukramJ.
 
-// Package tlv — struct / container parity tests ported from matter.js HEAD ebe091744.
+// Package tlv — struct / container parity tests ported from matter.js at 862ad75f.
 //
 // These tests lock TLV wire bytes for composite structures (TlvObject,
 // TlvTaggedList, TlvArray) against the matter.js reference codec. Cases
@@ -11,12 +11,11 @@
 //   - packages/types/test/tlv/TlvArrayTest.ts
 //   - packages/types/test/tlv/TlvComplexTest.ts
 //
-// Where go-fabric does not expose a schema-layer equivalent
-// (TlvObject.validate, injectField, removeField), the wire-byte invariant
-// is tested directly against the encoder/decoder; higher-level schema
-// semantics are noted as FixMe gaps.
-//
-// matter.js HEAD: ebe091744
+// The schema layer itself (TlvObject.validate, injectField, removeField,
+// the repeated-field limits of TlvTaggedList, chunked arrays) has no tlv
+// counterpart: the generated cluster/spec codecs are the module's schema
+// layer (BD-Matter-TLVSchemaLayer), so the wire-byte invariant is tested
+// directly against the encoder/decoder. Line citations are at 862ad75f.
 
 package tlv
 
@@ -25,6 +24,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"io"
+	"strings"
 	"testing"
 )
 
@@ -65,7 +65,7 @@ func buildWire(t *testing.T, fn func(*Encoder)) []byte {
 // TestObjectParity_Encode_AllFields locks the wire bytes for a TlvObject with
 // all fields present: { mandatoryField=1 (uint8 ctx1), optionalField="test" (utf8 ctx2) }.
 // matter.js encoding: struct-open (15) + ctx1-uint8-1 (240101) + ctx2-utf8-"test" (2c020474657374) + end (18)
-// Mirrors matter.js packages/types/test/tlv/TlvObjectTest.ts:90 (codecVector "an object with all fields")
+// Mirrors matter.js packages/types/test/tlv/TlvObjectTest.ts:91 (codecVector "an object with all fields")
 func TestObjectParity_Encode_AllFields(t *testing.T) {
 	t.Parallel()
 	// Encode: struct { field1=ctx1/uint8=1, field2=ctx2/utf8="test" }
@@ -80,7 +80,7 @@ func TestObjectParity_Encode_AllFields(t *testing.T) {
 
 // TestObjectParity_Encode_OptionalOmitted locks the wire bytes for a TlvObject
 // without the optional field: { mandatoryField=1 }.
-// Mirrors matter.js packages/types/test/tlv/TlvObjectTest.ts:94 (codecVector "an object without optional fields")
+// Mirrors matter.js packages/types/test/tlv/TlvObjectTest.ts:95 (codecVector "an object without optional fields")
 func TestObjectParity_Encode_OptionalOmitted(t *testing.T) {
 	t.Parallel()
 	got := buildWire(t, func(e *Encoder) {
@@ -93,7 +93,7 @@ func TestObjectParity_Encode_OptionalOmitted(t *testing.T) {
 
 // TestObjectParity_Decode_AllFields locks decoding of the "all fields" payload
 // back to the same two fields.
-// Mirrors matter.js packages/types/test/tlv/TlvObjectTest.ts:109 (decode loop, "an object with all fields")
+// Mirrors matter.js packages/types/test/tlv/TlvObjectTest.ts:112 (decode loop, "an object with all fields")
 func TestObjectParity_Decode_AllFields(t *testing.T) {
 	t.Parallel()
 	dec := NewDecoder(hexB(t, "152401012c02047465737418"))
@@ -118,7 +118,7 @@ func TestObjectParity_Decode_AllFields(t *testing.T) {
 
 // TestObjectParity_Decode_OptionalOmitted locks decoding of the "no optional field"
 // payload — only one field and then end-of-container.
-// Mirrors matter.js packages/types/test/tlv/TlvObjectTest.ts:109 (decode loop, "an object without optional fields")
+// Mirrors matter.js packages/types/test/tlv/TlvObjectTest.ts:112 (decode loop, "an object without optional fields")
 func TestObjectParity_Decode_OptionalOmitted(t *testing.T) {
 	t.Parallel()
 	dec := NewDecoder(hexB(t, "1524010118"))
@@ -141,7 +141,7 @@ func TestObjectParity_Decode_OptionalOmitted(t *testing.T) {
 
 // TestObjectParity_TaggedList_Optional locks the wire bytes for a TlvTaggedList
 // with one optional field: { optionalField="test" }.
-// Mirrors matter.js packages/types/test/tlv/TlvObjectTest.ts:329-334
+// Mirrors matter.js packages/types/test/tlv/TlvObjectTest.ts:350-355
 // (case "encode and decode list with optional fields", encoded "172c01047465737418")
 func TestObjectParity_TaggedList_Optional(t *testing.T) {
 	t.Parallel()
@@ -155,7 +155,7 @@ func TestObjectParity_TaggedList_Optional(t *testing.T) {
 
 // TestObjectParity_TaggedList_OptionalAndRequired_InOrder locks the wire bytes
 // for a list with both fields in definition order.
-// Mirrors matter.js packages/types/test/tlv/TlvObjectTest.ts:336-341
+// Mirrors matter.js packages/types/test/tlv/TlvObjectTest.ts:357-362
 // (case "encode and decode list with optional and required fields in list order",
 // encoded "172c0104746573742c02077465737472657118")
 func TestObjectParity_TaggedList_OptionalAndRequired_InOrder(t *testing.T) {
@@ -170,10 +170,11 @@ func TestObjectParity_TaggedList_OptionalAndRequired_InOrder(t *testing.T) {
 }
 
 // TestObjectParity_TaggedList_OptionalAndRequired_SwitchedOrder verifies that
-// encoding in switched field order produces the expected bytes.
-// Mirrors matter.js packages/types/test/tlv/TlvObjectTest.ts:343-348
-// (case "encode and decode list with optional and required fields in switched order",
-// encoded "172c0207746573747265712c01047465737418")
+// the raw encoder writes list members in the order it is given. matter.js's
+// TlvTaggedList reorders them into tag order
+// (packages/types/test/tlv/TlvObjectTest.ts:364-369, "encodes in schema/tag
+// order regardless of caller property order"); the generated encoders of
+// cluster/spec write in tag order by construction (BD-Matter-TLVSchemaLayer).
 func TestObjectParity_TaggedList_OptionalAndRequired_SwitchedOrder(t *testing.T) {
 	t.Parallel()
 	got := buildWire(t, func(e *Encoder) {
@@ -187,7 +188,7 @@ func TestObjectParity_TaggedList_OptionalAndRequired_SwitchedOrder(t *testing.T)
 
 // TestObjectParity_TaggedList_RequiredOnly locks the wire bytes for a list with
 // only the required field.
-// Mirrors matter.js packages/types/test/tlv/TlvObjectTest.ts:350-354
+// Mirrors matter.js packages/types/test/tlv/TlvObjectTest.ts:371-376
 // (case "encode and decode list with optional and required fields without optional field",
 // encoded "172c02077465737472657118")
 func TestObjectParity_TaggedList_RequiredOnly(t *testing.T) {
@@ -202,7 +203,7 @@ func TestObjectParity_TaggedList_RequiredOnly(t *testing.T) {
 
 // TestObjectParity_TaggedList_RepeatedFields locks the wire bytes for a list
 // with a repeated field (same tag id appears multiple times).
-// Mirrors matter.js packages/types/test/tlv/TlvObjectTest.ts:356-362
+// Mirrors matter.js packages/types/test/tlv/TlvObjectTest.ts:378-386
 // (case "encode and decode list with optional repeated fields",
 // encoded "172c0104746573742c020574657374312c0205746573743218")
 func TestObjectParity_TaggedList_RepeatedFields(t *testing.T) {
@@ -219,7 +220,7 @@ func TestObjectParity_TaggedList_RepeatedFields(t *testing.T) {
 
 // TestObjectParity_TaggedList_Decode_Optional locks decoding of a list with
 // one optional context-tagged field back to the correct tag / value.
-// Mirrors matter.js packages/types/test/tlv/TlvObjectTest.ts:329-334 (decode half)
+// Mirrors matter.js packages/types/test/tlv/TlvObjectTest.ts:350-355 (decode half)
 func TestObjectParity_TaggedList_Decode_Optional(t *testing.T) {
 	t.Parallel()
 	dec := NewDecoder(hexB(t, "172c01047465737418"))
@@ -258,7 +259,7 @@ func TestObjectParity_Array_Encode(t *testing.T) {
 
 // TestObjectParity_Array_Decode locks decoding of the three-element string
 // array "160c01610c01620c016318" back to ["a","b","c"].
-// Mirrors matter.js packages/types/test/tlv/TlvArrayTest.ts:57-61
+// Mirrors matter.js packages/types/test/tlv/TlvArrayTest.ts:58-62
 // (case "decodes an array")
 func TestObjectParity_Array_Decode(t *testing.T) {
 	t.Parallel()
@@ -494,7 +495,7 @@ func TestObjectParity_NestedArrayOfStructs(t *testing.T) {
 // containing TlvUInt16 and TlvBoolean fields. The encoded payload is
 // 15 2402 0124 0300 2804 18 — note TlvUInt16 with value 1 uses TypeUnsignedInt1
 // (smallest fit) and TlvBoolean false uses TypeBoolFalse (0x28 with ctx4).
-// Mirrors matter.js packages/types/test/tlv/TlvSchemaTest.ts:42 (testTlvSchemaEncode,
+// Mirrors matter.js packages/types/test/tlv/TlvSchemaTest.ts:41 (testTlvSchemaEncode,
 // "TlvObject: TlvUInt16 and TlvBoolean fields")
 func TestObjectParity_Schema_UInt16AndBoolean(t *testing.T) {
 	t.Parallel()
@@ -513,7 +514,7 @@ func TestObjectParity_Schema_UInt16AndBoolean(t *testing.T) {
 
 // TestObjectParity_Schema_StringFields locks the wire bytes for a struct
 // containing two TlvString fields.
-// Mirrors matter.js packages/types/test/tlv/TlvSchemaTest.ts:52 (testTlvSchemaEncode,
+// Mirrors matter.js packages/types/test/tlv/TlvSchemaTest.ts:51 (testTlvSchemaEncode,
 // "TlvObject: TlvString fields")
 func TestObjectParity_Schema_StringFields(t *testing.T) {
 	t.Parallel()
@@ -532,7 +533,7 @@ func TestObjectParity_Schema_StringFields(t *testing.T) {
 
 // TestObjectParity_Schema_ArrayField locks the wire bytes for a struct
 // with an array-of-strings field.
-// Mirrors matter.js packages/types/test/tlv/TlvSchemaTest.ts:58 (testTlvSchemaEncode,
+// Mirrors matter.js packages/types/test/tlv/TlvSchemaTest.ts:60 (testTlvSchemaEncode,
 // "TlvObject: TlvArray field")
 func TestObjectParity_Schema_ArrayField(t *testing.T) {
 	t.Parallel()
@@ -559,7 +560,7 @@ func TestObjectParity_Schema_ArrayField(t *testing.T) {
 // emits the declared width. For value -1: int8/16/32/64 all emit TypeSignedIntN
 // with all-ones payload. For value 1: uint8/16/32/64 all emit TypeUnsignedInt1
 // (smallest fit in matter.js).
-// Mirrors matter.js packages/types/test/tlv/TlvSchemaTest.ts:63 (testTlvSchemaEncode,
+// Mirrors matter.js packages/types/test/tlv/TlvSchemaTest.ts:68 (testTlvSchemaEncode,
 // "TlvObject: TlvNumber fields")
 func TestObjectParity_Schema_NumberFields(t *testing.T) {
 	t.Parallel()
@@ -684,59 +685,70 @@ func TestPutUintWidth_PanicOnBadWidth(t *testing.T) {
 	enc.PutUintWidth(AnonymousTag(), 1, 3)
 }
 
-// --- Schema-layer gaps (FixMe stubs) ---
+// TestObjectParity_Schema_NestedStructs locks the wire bytes of two nested
+// structures and an array of structures.
+// Mirrors matter.js packages/types/test/tlv/TlvSchemaTest.ts:96-131
+// (testTlvSchemaEncode / testTlvSchemaDecode, "TlvObject: nested struct and
+// array of struct") at 862ad75f.
+func TestObjectParity_Schema_NestedStructs(t *testing.T) {
+	t.Parallel()
+	want := hexB(t, "1535012c010574657374312c020574657374321835022c010574657374332c02057465737434183603152c0505746573743518152c0505746573743618152c05057465737437181818")
+	got := buildWire(t, func(e *Encoder) {
+		e.StartStruct(AnonymousTag())
+		for i, pair := range [][2]string{{"test1", "test2"}, {"test3", "test4"}} {
+			e.StartStruct(ContextTag(uint8(i + 1)))
+			e.PutUTF8(ContextTag(1), pair[0])
+			e.PutUTF8(ContextTag(2), pair[1])
+			_ = e.EndContainer()
+		}
+		e.StartArray(ContextTag(3))
+		for _, s := range []string{"test5", "test6", "test7"} {
+			e.StartStruct(AnonymousTag())
+			e.PutUTF8(ContextTag(5), s)
+			_ = e.EndContainer()
+		}
+		_ = e.EndContainer()
+		_ = e.EndContainer()
+	})
+	assertHex(t, "schema-nested-structs", got, want)
 
-// TestObjectParity_InjectField_NotImplemented documents that go-fabric does
-// not expose a schema-layer injectField API (TlvObject.injectField in matter.js).
-// The wire bytes are correct; only the field-injection helper is missing.
-// Mirrors matter.js packages/types/test/tlv/TlvObjectTest.ts:203-264
-// (describe "inject Field value")
-func TestObjectParity_InjectField_NotImplemented(t *testing.T) {
-	t.Skip("FixMe: go-fabric gap — no TlvObject.injectField equivalent; " +
-		"wire-byte encoding is correct but field injection must be done by the caller. " +
-		"Tracked as L3-D7-FUTURE.")
+	// The decode half: the strings in tag order, three array members.
+	d := NewDecoder(want)
+	var strs []string
+	for {
+		el, err := d.Next()
+		if err != nil {
+			break
+		}
+		if el.Type >= TypeUTF8Str1 && el.Type <= TypeUTF8Str8 {
+			strs = append(strs, el.String)
+		}
+	}
+	if got := strings.Join(strs, ","); got != "test1,test2,test3,test4,test5,test6,test7" {
+		t.Errorf("decoded strings %s", got)
+	}
 }
 
-// TestObjectParity_RemoveField_NotImplemented documents that go-fabric does
-// not expose a schema-layer removeField API (TlvObject.removeField in matter.js).
-// Mirrors matter.js packages/types/test/tlv/TlvObjectTest.ts:286-325
-// (describe "remove Field value")
-func TestObjectParity_RemoveField_NotImplemented(t *testing.T) {
-	t.Skip("FixMe: go-fabric gap — no TlvObject.removeField equivalent. " +
-		"Tracked as L3-D8-FUTURE.")
-}
-
-// TestObjectParity_ValidationError_NotImplemented documents that go-fabric's
-// TLV layer does not have a schema-level validation layer equivalent to
-// TlvObject.validate / ValidationError with fieldName.
-// Mirrors matter.js packages/types/test/tlv/TlvObjectTest.ts:266-284
-// (describe "ValidationError")
-func TestObjectParity_ValidationError_NotImplemented(t *testing.T) {
-	t.Skip("FixMe: go-fabric gap — no TlvSchema validation layer; " +
-		"validation is caller responsibility at cluster-server boundary. " +
-		"Tracked as L3-D9-FUTURE.")
-}
-
-// TestObjectParity_TaggedList_ProtocolSpecificTags_NotImplemented documents
-// that go-fabric has no allowProtocolSpecificTags flag equivalent.
-// When decoding a list with non-context-specific tags, the go-fabric
-// decoder surfaces them as TagKindImplicitProfile / TagKindFullyQualified
-// rather than throwing or silently ignoring them.
-// Mirrors matter.js packages/types/test/tlv/TlvObjectTest.ts:478-495
-// (describe "Tlv Lists with protocol specific tags")
-func TestObjectParity_TaggedList_ProtocolSpecificTags_NotImplemented(t *testing.T) {
-	t.Skip("FixMe: go-fabric gap — no allowProtocolSpecificTags validation; " +
-		"decoder passes through non-context tags without error. " +
-		"Tracked as L3-D10-FUTURE.")
-}
-
-// TestObjectParity_ChunkedArray_NotImplemented documents that go-fabric has
-// no encodeAsChunkedArray / decodeFromChunkedArray API equivalent.
-// The full-array wire encoding is identical; chunking is an IM-layer concern.
-// Mirrors matter.js packages/types/test/tlv/TlvArrayTest.ts:39-54 + 63-103
-// (describe "encode/decode chunked array")
-func TestObjectParity_ChunkedArray_NotImplemented(t *testing.T) {
-	t.Skip("FixMe: go-fabric gap — chunked-array encode/decode lives in the IM " +
-		"layer (im/), not in the tlv package. " +
-		"Tracked as L3-D11-FUTURE.")
+// TestObjectParity_Complex_WithoutWrappedFields locks the wire bytes for the
+// complex schema without its two wrapper fields (tags 4 and 5).
+// Mirrors matter.js packages/types/test/tlv/TlvComplexTest.ts:75-84
+// (the vector "an object without wrapped fields") at 862ad75f.
+func TestObjectParity_Complex_WithoutWrappedFields(t *testing.T) {
+	t.Parallel()
+	got := buildWire(t, func(e *Encoder) {
+		e.StartStruct(AnonymousTag())
+		e.StartArray(ContextTag(1))
+		for i, b := range []byte{0x00, 0x99} {
+			e.StartStruct(AnonymousTag())
+			e.PutUint(ContextTag(1), uint64(i+1))
+			e.PutOctets(ContextTag(2), []byte{b, b, b})
+			_ = e.EndContainer()
+		}
+		_ = e.EndContainer()
+		e.PutUTF8(ContextTag(2), "test")
+		e.PutBool(ContextTag(3), true)
+		_ = e.EndContainer()
+	})
+	assertHex(t, "complex-without-wrapped", got,
+		hexB(t, "15360115240101300203000000181524010230020399999918182c020474657374290318"))
 }
