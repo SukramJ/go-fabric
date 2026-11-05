@@ -832,11 +832,6 @@ with a port of the named case.
 - **matter.js at 862ad75f:** `DeviceAdvertiser.ts:131-162` starts an advertisement round on PASE close and on fail-safe expiry; `FailsafeCommissioningTest.ts` "re-announces after failsafe expiry …" (two cases, `missing` in the register with the reason "behaviour gap, not a seam") awaits it.
 - **Fix shape:** `commissioning/` (a security path): on PASE close without CommissioningComplete and on fail-safe expiry, re-run the commissionable announcement as `AdvertiseCommissionable` does at start.
 
-### T3-SW-3 — the ICD client's nextExpectedCheckin follows the wall clock (seam wave, 2026-11-04, measured)
-
-- **Where:** `controller/client` ICD client, `NextExpectedCheckIn` after `clocktest.Fake.StepWall(time.Hour)` reads now+15 s where matter.js reads at least now+idleModeDuration (`IcdClientTest.ts:2281`); the skip in `icd_client_parity_matterjs_test.go` names it.
-- **Fix shape:** keep the expectation on the clock's monotonic reading and convert for exposure (`clock.WallOf`), as the session stamps do.
-
 ### T3-P35-1 — a write value of the wrong Go type gets three different statuses (phase 35, 2026-11-04)
 
 - **Where:** FAILURE from `cluster/core/access_control.go:674`, `bridged_device_basic_information.go:459`, `general_commissioning.go:403`, `network_commissioning.go:234`; CONSTRAINT_ERROR from BasicInformation and Binding through the convention `cluster/spec/write.go:126-128`; INVALID_ACTION from `cluster/core/identify.go:453-457`.
