@@ -65,7 +65,7 @@ import (
 //
 // The state the module does not persist (cluster/camera/doc.go: the
 // streams, priorities and settings of the stream management, the camera's
-// position, presets and DPTZ streams, the chime's
+// position, presets and DPTZ streams, the push transports, the chime's
 // SelectedChime and Enabled) is kept here in the daemon's settings
 // (cameraStateSetting) and restored as the declarations' Initial, so a
 // daemon restarted on the same --db keeps it, as the camera-app keeps it
@@ -203,6 +203,7 @@ type camTriggerContext struct {
 type cameraState struct {
 	AvStream   json.RawMessage `json:"avStream,omitempty"`
 	AvSettings json.RawMessage `json:"avSettings,omitempty"`
+	Push       json.RawMessage `json:"push,omitempty"`
 	Chime      json.RawMessage `json:"chime,omitempty"`
 }
 
@@ -218,6 +219,7 @@ var (
 	}
 	camPersistAvSettings = []string{"MptzPosition", "MptzPresets", "DptzStreams"}
 	camPersistChime      = []string{"SelectedChime", "Enabled"}
+	camPersistPush       = []string{"CurrentConnections"}
 )
 
 // newDemoCamera returns the camera simulation; devices builds the
@@ -308,6 +310,7 @@ func (c *demoCamera) persist() {
 		AvStream:   keep(c.camera.CameraAvStreamManagement().Get(), camPersistAvStream),
 		AvSettings: keep(c.camera.CameraAvSettingsUserLevelManagement().Get(), camPersistAvSettings),
 		Chime:      keep(c.chime.Chime().Get(), camPersistChime),
+		Push:       keep(c.camera.PushAvStreamTransport().Get(), camPersistPush),
 	}
 	data, err := json.Marshal(state)
 	if err != nil {
@@ -447,6 +450,20 @@ func (c *demoCamera) build() error {
 	zm.Sensitivity = nil
 	zmFeatures := zmdef.FeatureTwoDimensionalCartesianZone | zmdef.FeaturePerZoneSensitivity | zmdef.FeatureUserDefined | zmdef.FeatureFocusZones
 
+	// The push transports, kept as the camera-app keeps them
+	// (push-av-stream-manager.cpp LoadCurrentConnections, :630-671).
+	push := restore[padef.Patch](restored.Push)
+	push.SupportedFormats = nil
+	if push.CurrentConnections != nil {
+		for _, conn := range *push.CurrentConnections {
+			t := &camTransport{status: conn.TransportStatus}
+			if conn.TransportOptions != nil {
+				t.trigger = conn.TransportOptions.TriggerOptions
+			}
+			c.transports[conn.ConnectionId] = t
+		}
+	}
+
 	cam, err := device.NewCamera(c.options("camera", "Camera"),
 		csdef.Declare{
 			Features: avsFeatures, Initial: avs,
@@ -455,7 +472,7 @@ func (c *demoCamera) build() error {
 		wpdef.Declare{ProviderPort: camProviderPort{c}},
 		// camera-app.matter's PushAvStreamTransport, featureMap 3:
 		// PERZONESENS and METADATA.
-		padef.Declare{Features: padef.FeaturePerZoneSensitivity | padef.FeatureMetadata, PushTransportPort: camPushPort{c}},
+		padef.Declare{Features: padef.FeaturePerZoneSensitivity | padef.FeatureMetadata, Initial: push, PushTransportPort: camPushPort{c}},
 		avdef.Declare{Features: avsetFeatures, Initial: avset, MechanicalPTZ: camPTZ{c}, DigitalPTZ: camPTZ{c}},
 		zmdef.Declare{Features: zmFeatures, Initial: zm, ZonePort: camZonePort{c}},
 	)
@@ -477,6 +494,7 @@ func (c *demoCamera) build() error {
 	cam.CameraAvStreamManagement().OnChangedAsync(func(csdef.State, contract.Change) { persist() })
 	cam.CameraAvSettingsUserLevelManagement().OnChangedAsync(func(avdef.State, contract.Change) { persist() })
 	cam.ZoneManagement().OnChangedAsync(func(zmdef.State, contract.Change) { persist() })
+	cam.PushAvStreamTransport().OnChangedAsync(func(padef.State, contract.Change) { persist() })
 	chime.Chime().OnChangedAsync(func(chimedef.State, contract.Change) { persist() })
 	return nil
 }
