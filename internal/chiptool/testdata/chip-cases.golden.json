@@ -364,12 +364,16 @@
     "CADMIN/1.11": {
       "tests": 1,
       "steps": 15,
-      "stepsSkipped": 8
+      "stepsSkipped": 0
     },
     "CADMIN/1.15": {
       "tests": 1,
       "steps": 21,
       "stepsSkipped": 0
+    },
+    "CADMIN/1.16": {
+      "steps": 25,
+      "stepsSkipped": 1
     },
     "CADMIN/1.19": {
       "tests": 1,
@@ -391,10 +395,19 @@
       "steps": 16,
       "stepsSkipped": 0
     },
+    "CADMIN/1.4": {
+      "tests": 1,
+      "steps": 9,
+      "stepsSkipped": 0
+    },
     "CADMIN/1.5": {
       "tests": 1,
       "steps": 17,
       "stepsSkipped": 0
+    },
+    "CADMIN/1.6": {
+      "steps": 23,
+      "stepsSkipped": 1
     },
     "CADMIN/1.9": {
       "tests": 1,
@@ -1613,7 +1626,7 @@
     "OCC/2.1": {
       "tests": 1,
       "steps": 15,
-      "stepsSkipped": 20
+      "stepsSkipped": 16
     },
     "OCC/2.2": {
       "tests": 1,
@@ -1623,17 +1636,17 @@
     "OCC/2.3": {
       "tests": 1,
       "steps": 11,
-      "stepsSkipped": 16
+      "stepsSkipped": 8
     },
     "OCC/3.1": {
       "tests": 1,
       "steps": 17,
-      "stepsSkipped": 8
+      "stepsSkipped": 0
     },
     "OCC/3.2": {
       "tests": 1,
       "steps": 10,
-      "stepsSkipped": 6
+      "stepsSkipped": 0
     },
     "OO/2.1": {
       "steps": 12,
@@ -3695,9 +3708,6 @@
     "BINFO/3.2": "BINFO.S \u0026 BINFO.S.M.DeviceConfigurationChange",
     "BRBINFO/3.1": "BRBINFO.S.A0014",
     "BRBINFO/3.2": "BRBINFO.S \u0026 BRBINFO.S.A.A0018 \u0026 BRBINFO.S.M.DeviceConfigurationChange",
-    "CADMIN/1.16": "CADMIN.S \u0026 CADMIN.S.F00",
-    "CADMIN/1.4": "CADMIN.S.F00",
-    "CADMIN/1.6": "CADMIN.S \u0026 CADMIN.S.F00",
     "CC/3.4.Simulated": "CC.C",
     "CC/4.5.Simulated": "CC.C",
     "CC/5.4.Simulated": "CC.C",

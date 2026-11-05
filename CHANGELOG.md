@@ -21,7 +21,8 @@ pseudo-version of `main`.
 ### Changed
 
 - `cluster/measurement`: the projected OccupancySensing's default selection is PassiveInfrared with OccupancyEvent (FeatureMap `0x202`, was `0x2`), and it lists OccupancyChanged, which the bridge now emits on each change of the reading — matter.js's server emits it with the feature. A host that wants the former surface states `contract.OccupancySelection{NoOccupancyEvent: true}`.
-- `examples/reference-bridge`: the occupancy sensor serves OccupancyEvent, HoldTime (10 s, limits 1–300 s) and PIROccupiedToUnoccupiedDelay.
+- `examples/reference-bridge`: the occupancy sensor serves OccupancyEvent, HoldTime (10 s, limits 1–300 s) and PIROccupiedToUnoccupiedDelay; the door lock serves FACE.
+- `internal/chiptool`: the PS family runs on the PowerSource part of the smoke alarm, where the cluster is (TC-PS-2.1 runs again); TC-CADMIN-1.4 gets the daemon's passcode and discriminator, and TC-CADMIN-1.6 and 1.16 run with their own PIXIT.CADMIN.CwDuration (180 s), as the daemon keeps the specification's minimum window timeout.
 
 ## [0.17.0] — 2026-11-05
 
