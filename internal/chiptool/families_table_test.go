@@ -1079,7 +1079,7 @@ var chipFamilies = []family{
 	{
 		name: "TBRM", deviceType: dtThreadBorderRouter, variant: variantThread,
 		exclude: map[string]gap{
-			"2.2": {classHarness, "TC-TBRM-2.2 step 14 compares the GetActiveDatasetRequest answer byte for byte with the dataset step 6 set (Test_TC_TBRM_2_2.yaml:160-166); an OpenThread border router serializes the dataset's TLVs in its own order (the virtual agent answers the Network Name TLV after the Mesh-Local Prefix), and the module answers the border router's bytes, as chip's TBRM server answers its Thread stack's; chip runs the case against network-manager-app's simulated stack, which keeps the bytes as set", false},
+			"2.2": {classHarness, "TC-TBRM-2.2 step 13 compares the GetActiveDatasetRequest answer byte for byte with the dataset the case set (Test_TC_TBRM_2_2.yaml:158-166, PIXIT.TBRM.THREAD_ACTIVE_DATASET); an OpenThread border router serializes the dataset's TLVs in its own order (the virtual agent answers the Network Name TLV after the Mesh-Local Prefix), and the module answers the border router's bytes, as chip's TBRM server answers its Thread stack's; chip runs the case against network-manager-app's simulated stack, which keeps the bytes as set", false},
 		},
 	},
 	{name: "DGTHREAD", deviceType: dtThreadBorderRouter, variant: variantThread},
