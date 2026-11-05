@@ -820,10 +820,6 @@ with a port of the named case.
 
 ## Tier 3 — LOW
 
-### T3-SW-3 — the ICD client's nextExpectedCheckin follows the wall clock (seam wave, 2026-11-04, measured)
-
-- **Where:** `controller/client` ICD client, `NextExpectedCheckIn` after `clocktest.Fake.StepWall(time.Hour)` reads now+15 s where matter.js reads at least now+idleModeDuration (`IcdClientTest.ts:2281`); the skip in `icd_client_parity_matterjs_test.go` names it.
-- **Fix shape:** keep the expectation on the clock's monotonic reading and convert for exposure (`clock.WallOf`), as the session stamps do.
 
 ### T3-P35-1 — a write value of the wrong Go type gets three different statuses (phase 35, 2026-11-04)
 

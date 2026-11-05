@@ -2698,10 +2698,9 @@
         "refuses register() and does not auto-register while unregister() waits for a sleeping peer",
         "starts no second refresh for an old-key Check-In while the refresh waits for its response",
         "resubscribes when a LIT peer reports on a subscription the controller already timed out",
-        "does not auto-register when the fresh operating mode is Sit despite a persisted Lit",
-        "exposes nextExpectedCheckin on the wall clock once no subscription is held"
+        "does not auto-register when the fresh operating mode is Sit despite a persisted Lit"
       ],
-      "reason": "Registration, unregistration, forget, StayActive, LIT auto-registration, Check-In receipt with the replay drop and the key refresh, persistence across a restart, the decommission hooks, the LIT idle-interval floor and the address monitor's ICD branch (controller/client/icd_client_parity_matterjs_test.go, client/peer/icd_parity_matterjs_test.go). Phase 32: a refused store write of the offered key offers none (IcdClient.#offerKey, IcdClient.ts:860-901 at 862ad75f; controller/client:TestIcdClientKeyStoreParity), the operations a Go test observes without the transaction model (TestIcdClientOperationsParity) and a peer reporting 1.3.0 (internal/nodeseam.UseSpecificationVersion). Seam wave (issue #396, TestIcdClientSeamParity): a device refusing or counting RegisterClient and UnregisterClient (internal/coreseam.ObserveICDRegistrations), a controller restarted across a pending key or an abandoned unregister (fabrictest.Controller.Restart), a sleeping peer (fabrictest.Network.Filter) and the SIT→LIT recreate. Left: the transaction model (holdIcdState, gated commit phases), throwing listeners, an undefined clientType and the JS SustainedSubscription routing. Missing: a crash-consistent store snapshot with a crafted replay fed into the fabric's Check-In path (:1172-1244), the hand-emitted subscriptionStatusChanged while unregister() waits (:1504-1527), a crafted old-key Check-In fed while the refresh waits (:1952-1980), a controller-side subscription timeout (:2598-2630), a stale LIT seeded into the cache (no Go seam plants an unreported value: :595-621), and the wall-clock nextExpectedCheckin — a behaviour gap, measured: after Fake.StepWall(1h) NextExpectedCheckIn reads now+15s where matter.js reads at least now+idleModeDuration (:2281-2293), a findings-register candidate.",
+      "reason": "Registration, unregistration, forget, StayActive, LIT auto-registration, Check-In receipt with the replay drop and the key refresh, persistence across a restart, the decommission hooks, the LIT idle-interval floor and the address monitor's ICD branch (controller/client/icd_client_parity_matterjs_test.go, client/peer/icd_parity_matterjs_test.go). Phase 32: a refused store write of the offered key offers none (IcdClient.#offerKey, IcdClient.ts:860-901 at 862ad75f; controller/client:TestIcdClientKeyStoreParity), the operations a Go test observes without the transaction model (TestIcdClientOperationsParity) and a peer reporting 1.3.0 (internal/nodeseam.UseSpecificationVersion). Seam wave (issue #396, TestIcdClientSeamParity): a device refusing or counting RegisterClient and UnregisterClient (internal/coreseam.ObserveICDRegistrations), a controller restarted across a pending key or an abandoned unregister (fabrictest.Controller.Restart), a sleeping peer (fabrictest.Network.Filter) and the SIT→LIT recreate. Left: the transaction model (holdIcdState, gated commit phases), throwing listeners, an undefined clientType and the JS SustainedSubscription routing. Missing: a crash-consistent store snapshot with a crafted replay fed into the fabric's Check-In path (:1172-1244), the hand-emitted subscriptionStatusChanged while unregister() waits (:1504-1527), a crafted old-key Check-In fed while the refresh waits (:1952-1980), a controller-side subscription timeout (:2598-2630), a stale LIT seeded into the cache (no Go seam plants an unreported value: :595-621). The wall-clock nextExpectedCheckin (:2281-2293) is ported since the follow-up wave (finding T3-SW-3): the wakefulness runs on the clock's monotonic reading and exposes the deadline through clock.WallOf, as IcdClient.ts:83-87 at 862ad75f converts it.",
       "snapshotSha": "621b035602c12be5c0ea3d8cfc6bd10ccdf7003f",
       "left": [
         {
@@ -5211,14 +5210,10 @@
       "status": "ported",
       "go": [
         "controller/client:TestDecommissionParity",
+        "controller/client:TestDecommissionProbeParity",
         "controller/client:TestDecommissionUnstructuredParity"
       ],
       "left": [
-        {
-          "it": "probe resolves false on a destroyed node instead of throwing",
-          "class": "js-runtime-only",
-          "reason": "no Go subject (no construction lifecycle): DecommissionTest.ts:301-320 at 862ad75f probes ClientNodeInteraction of a destroyed node; a Go client.Node has no node-level probe, a closed node's calls fail with client.ErrClosed"
-        },
         {
           "it": "rejects a decommission of a node that is being deleted",
           "class": "js-runtime-only",
@@ -7357,16 +7352,12 @@
     },
     {
       "path": "packages/protocol/test/icd/IcdPeerWakefulnessTest.ts",
-      "status": "partial",
+      "status": "ported",
       "go": [
         "icd:TestIcdPeerWakefulness",
         "icd:TestAwaitAwake"
       ],
-      "missing": [
-        "keeps its deadline across a forward wall-clock step",
-        "ends Active Mode on time across a backward wall-clock step"
-      ],
-      "reason": "Awake and available on the fake clock, the subscriptions held, the default wait, the operating-mode flips, suspend and close; matter.js's observables are the On… registrations and the signal channels (icd/peer_wakefulness_parity_matterjs_test.go). Missing: the two wall-clock steps — MockTime.stepWallClock moves the wall clock apart from the monotonic one, clocktest.Fake has one reading, and on the system clock a time.Time carries the monotonic reading a wall step does not move.",
+      "reason": "Awake and available on the fake clock, the subscriptions held, the default wait, the operating-mode flips, suspend and close, and the two wall-clock steps — the wakefulness feeds its schedule the clock's monotonic reading (clock.MonotonicOf; IcdPeerWakefulness.ts:148, :154, :160 at 862ad75f pass Time.nowUs) and clocktest.Fake.StepWall moves the wall reading alone, as MockTime.stepWallClock does; matter.js's observables are the On… registrations and the signal channels (icd/peer_wakefulness_parity_matterjs_test.go). Finding T3-SW-3, follow-up wave.",
       "snapshotSha": "5bdf22eb5e54328ad9715454ab897b117e9c943d"
     },
     {

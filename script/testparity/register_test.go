@@ -86,10 +86,13 @@ const testparityPlannedRatchet = 2
 // leaves beforeDispatch, completing the file: 154 ported, 591 missing.
 // The follow-up wave's T3-SW-2 (the commissionable re-announcement on a
 // closed PASE session) completes FailsafeCommissioningTest.ts: 155 ported,
-// 589 missing.
+// 589 missing. T3-SW-3 (the ICD wakefulness on the monotonic clock)
+// completes IcdPeerWakefulnessTest.ts and ports IcdClientTest's wall-clock
+// deadline, and PingAddress ports DecommissionTest's probe case out of left:
+// 156 ported, 586 missing, 576 left.
 const (
-	testparityPortedRatchet  = 155
-	testparityMissingRatchet = 589
+	testparityPortedRatchet  = 156
+	testparityMissingRatchet = 586
 )
 
 // testparityLeftRatchet is the number of left it cases summed over the
@@ -120,7 +123,7 @@ const (
 // model resolution, hashing and key-format APIs (js-runtime-only).
 // T3-SW-1 adds ClientInvokeTest.ts's beforeDispatch row (js-runtime-only:
 // a server-only field of the shared Invoke type, Invoke.ts:52-55): 577.
-const testparityLeftRatchet = 577
+const testparityLeftRatchet = 576
 
 // moduleRoot is where the committed artefacts live, seen from this package.
 const moduleRoot = "../.."

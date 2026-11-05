@@ -40,23 +40,26 @@ func (c *fakeClock) waitTimer(t *testing.T, d time.Duration) {
 	}
 }
 
-// fakeConn records the datagrams the manager sends, and the address each
-// went to by its message counter.
+// fakeConn records the datagrams the manager sends, and where to: the
+// address each went to by its message counter, and every destination in
+// order.
 type fakeConn struct {
-	ch chan []byte
-	mu sync.Mutex
-	to map[uint32]*net.UDPAddr
+	ch   chan []byte
+	mu   sync.Mutex
+	to   map[uint32]*net.UDPAddr
+	dsts []*net.UDPAddr
 }
 
 func (c *fakeConn) Send(to *net.UDPAddr, payload []byte) error {
+	c.mu.Lock()
+	c.dsts = append(c.dsts, to)
 	if hdr, _, err := message.UnmarshalHeader(payload); err == nil {
-		c.mu.Lock()
 		if c.to == nil {
 			c.to = map[uint32]*net.UDPAddr{}
 		}
 		c.to[hdr.MessageCounter] = to
-		c.mu.Unlock()
 	}
+	c.mu.Unlock()
 	c.ch <- append([]byte(nil), payload...)
 	return nil
 }
@@ -66,6 +69,13 @@ func (c *fakeConn) dest(n uint32) *net.UDPAddr {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	return c.to[n]
+}
+
+// destinations are the addresses of the datagrams sent so far, in order.
+func (c *fakeConn) destinations() []*net.UDPAddr {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return slices.Clone(c.dsts)
 }
 
 var peerAddr = &net.UDPAddr{IP: net.ParseIP("fd00::1"), Port: 5540}

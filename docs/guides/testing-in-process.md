@@ -150,7 +150,27 @@ timeout)` is the discovery alone, the timeout on the site's clock.
 `NoAttestationStore` commissions without one. The registry itself is not
 started: a test that wants `AutoStart` calls `Registry().Start`.
 
-*Source: `fabrictest/node.go`, `fabrictest/controller.go`.*
+A client node's `PingAddress(ctx, addr)` sends one empty read to one
+operational address over the session the node holds and returns the round
+trip on the node's clock — the per-address reachability a host's ping
+reports. The session keeps its address and the record its addresses; a
+failed ping is `client.ErrUnreachable` naming the address and does not count
+as a lost peer. On a site, the device's `Addr()` answers and an address of
+the in-memory network nobody listens on — the device's host on another
+port — does not; run the ping under `Site.Run`, which moves the site's
+clock through the ping's two MRP transmissions:
+
+```go
+var err error
+_ = site.Run(ctx, func(ctx context.Context) error {
+	_, err = n.PingAddress(ctx, netip.AddrPortFrom(dev.Addr().AddrPort().Addr(), 5541))
+	return nil
+})
+// errors.Is(err, client.ErrUnreachable)
+```
+
+*Source: `fabrictest/node.go`, `fabrictest/controller.go`,
+`controller/client/ping.go`.*
 
 ## BLE
 
