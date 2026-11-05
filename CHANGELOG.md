@@ -10,6 +10,10 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+## [0.17.0] — 2026-11-05
+
+Milestones 8 (Proof) and 9 (View) of the roadmap, released together (owner decision 2026-11-04): the certification harness with the Go controller in both roles, the matter.js test register over every test root, the second compositions of the reference daemon in the module's own harness image, determinism, and the module side of go-fabric-ui's topology, device-detail and operation pages.
+
 ### Added
 
 - `secure/operational`: `Manager.SetOnPaseSessionClose` installs a hook fired once per closed session that was established via PASE, after the `SetOnSessionClose` hook — whatever closed it, and whether or not AddNOC adopted the session onto a fabric; the bridge takes it for the commissioning re-advertisement (below). Closes finding T3-SW-2.
@@ -5446,7 +5450,8 @@ consumer of an older pseudo-version should read.
   earlier than it was. Both fields are gone; the commit holding the file is
   its provenance.
 
-[Unreleased]: https://github.com/SukramJ/go-fabric/compare/v0.16.0...HEAD
+[Unreleased]: https://github.com/SukramJ/go-fabric/compare/v0.17.0...HEAD
+[0.17.0]: https://github.com/SukramJ/go-fabric/compare/v0.16.0...v0.17.0
 [0.16.0]: https://github.com/SukramJ/go-fabric/compare/v0.15.6...v0.16.0
 [0.15.6]: https://github.com/SukramJ/go-fabric/compare/v0.15.5...v0.15.6
 [0.15.5]: https://github.com/SukramJ/go-fabric/compare/v0.15.4...v0.15.5

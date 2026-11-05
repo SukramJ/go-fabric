@@ -26,7 +26,7 @@ element model ships embedded so parity is a test, not a claim.
 
 ## Status
 
-As of `v0.16.0` (2026-11-02); the starting point of the milestones is [the roadmap's baseline](./docs/roadmap.md#baseline-2026-10-17-v060) of 2026-10-17.
+As of `v0.17.0` (2026-11-05); the starting point of the milestones is [the roadmap's baseline](./docs/roadmap.md#baseline-2026-10-17-v060) of 2026-10-17.
 
 | Area | State |
 | --- | --- |

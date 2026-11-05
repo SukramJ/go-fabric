@@ -368,7 +368,23 @@ SC BLE cases run.
 **Value.** The status page stops calling automatable cases manual; the in-process proofs get their real-controller counterpart; the port backlog halves. Every later milestone is proved on this.
 
 **Status 2026-11-04.** Phase 33 (branch `m8/phase-33`): the test-parity register covers `packages/general/test`, `packages/model/test`, `packages/nodejs/test` and `packages/types/test` at `862ad75f` — 192 more files, every one decided. The six roots (TLV, net, codec, model aspects, schema, crypto) and six files with a Go subject elsewhere are ported by meaning, with their `left` rows and the gaps they found in the findings register; the rest is excluded with its class. Fixes the ports brought: the TLV decoder refuses implicit-profile tags, a nullable bitmap reserves its top bit, the controller decodes a reported integer of the other signedness as matter.js's data reports do, the mDNS reader keeps the readable records of a damaged message, queries split at 1232 bytes with known answers carrying their remaining TTL, the conformance parser refuses range-form choices. No `planned` file is added (the ratchet stays 2).
-**Status 2026-11-04.** Phase 35, wave A (issue 395): `TestSleepRatchet` (`clock/sleep_ratchet_test.go`) holds the wall-clock waits in test files outside `synctest` at 66 `time.Sleep` and 130 `time.After` calls (165 and 166 at the phase's start), the rest being socket-bound polls, one helper per package, the chip-tool suite and a few named windows; the issue #383 steps end on their events; `STRESS_FLAKES` is the list of open flakes and empty; the three failures of nightly run 41816797999 are fixed in their tests; every mdns and endpoint skip names its condition. Wave B (the status assertions) follows.
+**Status 2026-11-04.** Phase 35, wave A (issue 395): `TestSleepRatchet` (`clock/sleep_ratchet_test.go`) holds the wall-clock waits in test files outside `synctest` at 66 `time.Sleep` and 130 `time.After` calls (165 and 166 at the phase's start), the rest being socket-bound polls, one helper per package, the chip-tool suite and a few named windows; the issue #383 steps end on their events; `STRESS_FLAKES` is the list of open flakes and empty; the three failures of nightly run 41816797999 are fixed in their tests; every mdns and endpoint skip names its condition. Wave B, the status assertions on 87 `err == nil`-only refusals, landed in the same pull request (399); the seam wave (400, 401) and the follow-up wave (405) took the T3 items with it.
+
+**Status 2026-11-05.** Phase 34 (403): the reference daemon's second compositions — `--tls-sim`, `--camera-sim` after connectedhomeip's camera-app, `--jointfabric-sim`, `--otbr` with ThreadNetworkDirectory and the four diagnostics counts on the border router, `--media --media-messages` — with their harness variants, family rows (TLSCERT, TLSCLIENT, WEBRTCP, AVSM, AVSUM, ZONEMGMT, PAVST, PAVSTI, CHIME, JFADMIN, JFDS, TBRM, DGTHREAD, THNETDIR, MESS) and the counter `TestUnfamiliedPrefixes` at 0 (31 → 0 unaccounted prefixes); the module's own harness image (`internal/chiptool/image`, `chip-image.yml`, pinned as `CHIP_TEST_IMAGE` in 407 with matter.js's as `CHIP_BASE_IMAGE`); the thread group in `otbr-virtual.yml`, armed by the repository variable after its golden from a fresh agent (#408). The runs found three bridge defects (a plain enum slice sent as null, a written structure decoded to null, a status on a list-item path) and two in the TLS and Thread servers; TC-JFADMIN-1.2 passes to the end once `secure/mattercert` requires a DN to be a TLV list (406). A TH limitation is recorded: TC-IDM-10.5 judges a device type's revision term against revision 1, so Messages sits behind its own flag.
+
+**Status 2026-11-05: closed.** Every phase landed, released as `v0.17.0` together with milestone 9:
+
+| Phase | Pull requests |
+| --- | --- |
+| 29 | #377, #378 (29a); #379, #382 (29b) |
+| 30 | #386, #387 |
+| 31 | #389 |
+| 32 | #390 |
+| 33 | #402 |
+| 34 | #403, #406, #407, #408 |
+| 35 | #399; seam wave #400, #401; follow-up wave #405 |
+
+Open after the close, none a gate: the flake family of issue 383 (the flake pass after the release, owner decision 2026-11-03) and the unit coverage of the camera and joint-fabric simulations (issue 404, the daemon's floor at 67 until then).
 
 ### Milestone 9: View
 
@@ -385,6 +401,10 @@ Planned in go-fabric-ui (concept U3 there, like U1 and U2); this page records th
 **Status 2026-11-03.** Module side landed (brief M9-module, issues 380 and 381): `controller/topology` builds the controller's network graph after matterjs-server's `NetworkTopologyService` (Ahead of matter.js, `BD-matterjs-server-NetworkTopology`), so go-fabric-server's `get_network_topology` and go-fabric-ui's adapter become two callers of one implementation; the node facade lists subscriptions (`Subscriptions().Snapshot()`, `SessionInfo.SubscriptionIDs`), gives each bridged device its `Scope`, `Tags` and `Labels` (and `Aggregator.Partitions()`), and reports every attribute change (`Observers.OnAttributeChanged`). The milestone's version is go-fabric-ui `0.4.0`: go-fabric-ui's own `0.3.0` was its dependency release of 2026-11-02, so the row's former `0.3.0` was stale. Next: go-fabric-server's switch to `controller/topology` and go-fabric-ui U3b.
 
 **Status 2026-11-04.** The U4 module side (issue 388, the M9 module wave): the node facade reads its served attribute values with their DataVersion (`Node.ReadAttribute`, `Node.ReadCluster`, rendered by name with `JSON`), queries its served events (`Node.Events`) and reports each new one (`Observers.OnEvent`); `schema` names every attribute, command and event of the snapshot and titles its features; `controller/client` keeps a bounded per-node event history (`Node.EventHistory`, announced by `Hooks.Event`); a Descriptor TagList no longer goes on the wire as null.
+
+**Status 2026-11-05.** U5, the module side: `logring` (a bounded slog ring with a run-time level, 397), `Node.Endpoints` and the per-attribute status of `ReadCluster` for the endpoint tree (401), `Node.PingAddress` for the ping measured per address (405), a device that leaves a fabric delivering its Leave event (392). go-fabric-ui U5a (its #42, #45) and go-fabric-server S-U5 (its #35, #37) consume them.
+
+**Status 2026-11-05: closed.** Every phase landed, released as `v0.17.0` together with milestone 8 — module side: U3 #384, #385; U4 #391; U5 #397, #401, #405, #392. go-fabric-ui carries the pages (U3 #33/#34, U4 #36/#37/#44, U5 #42/#45) and go-fabric-server the ports (#31, #35, #37); their releases follow this one.
 
 ### Milestone 10: The rest of the standard
 
