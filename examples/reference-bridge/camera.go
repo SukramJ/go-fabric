@@ -766,7 +766,7 @@ const camEndOutOfResources = 8
 // (:279-292).
 func (p camProviderPort) SolicitOffer(_ context.Context, args wpdef.OfferArgs) (wpdef.WebRTCSessionStruct, bool, error) {
 	if p.c.addSession(args.SessionID) > camMaxWebRTCSessions {
-		go p.c.endSession(args.SessionID, camEndOutOfResources) //nolint:gosec // the End outlives the SolicitOffer request; the camera-app schedules it (ScheduleEndSend)
+		go p.c.endSession(args.SessionID, camEndOutOfResources) //nolint:gosec,contextcheck // the End outlives the SolicitOffer request; the camera-app schedules it (ScheduleEndSend)
 	}
 	return camSession(args), p.c.opts.deferredOffer, nil
 }
