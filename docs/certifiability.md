@@ -653,6 +653,7 @@ case counts as passed in its family; one no family of the harness image lists is
 | Case | Steps run | Steps skipped | Source |
 | --- | ---: | ---: | --- |
 | BR/4 | 15 | 0 | Go controller as DUT, after matter.js `TC-BR-4.test.ts`; in no family of the harness image |
+| CAMERA-GO/1.1 | 7 | 0 | Go controller as DUT, the camera acceptance of issue 410: one WebRTC session against chip-camera-app at 6170af84, the SDP over TCP (gocert_camera_test.go); in no family of the harness image |
 | DD/1.8 | 7 | 0 | Go controller as DUT, after matter.js `TC-DD-1.8.test.ts` |
 | DD/3.11 | 6 | 4 | Go controller as DUT, after matter.js `TC-DD-3.11.test.ts` |
 | DD/3.12 | 8 | 5 | Go controller as DUT, after matter.js `TC-DD-3.12.test.ts` |

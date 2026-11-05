@@ -137,6 +137,15 @@ type goCertCase struct {
 	declare map[string]string
 	// role is the Go controller's role; the zero value is roleTH.
 	role goRole
+	// origin is the source of a case that mirrors no matter.js case file —
+	// an acceptance of this module's own (gocert_camera_test.go) — recorded
+	// as its golden source; its steps cite no TS lines. "" is the matter.js
+	// file <tc>.test.ts.
+	origin string
+	// noDaemon marks a case whose TH device is not the reference daemon but
+	// one the case starts itself (chip's camera-app): no daemon is started,
+	// and the case's PICS and steps' gates name nothing of the daemon's.
+	noDaemon bool
 }
 
 // goStep is one TS step.
@@ -230,7 +239,12 @@ func goCertID(tc string) string {
 	return s[:i] + "/" + s[i+1:]
 }
 
-func (c goCertCase) source() string { return c.tc + ".test.ts" }
+func (c goCertCase) source() string {
+	if c.origin != "" {
+		return c.origin
+	}
+	return c.tc + ".test.ts"
+}
 
 // TestGoCertificationCases runs the Go-TH leg: every registered case,
 // against a fresh reference daemon each, with a fresh Go controller as TH.
@@ -292,9 +306,12 @@ func runGoCertCase(t *testing.T, bin string, flags map[string]bool, pics *commit
 	defer cancel()
 	th := newGoTH(ctx, t, bin, flags, pics, c)
 	defer th.close()
-	if c.role == roleDUT {
+	switch {
+	case c.origin != "":
+		t.Logf("%s: %s (the Go controller is the DUT)", c.tc, c.origin)
+	case c.role == roleDUT:
 		t.Logf("%s: support/chip-testing/test/cert/%s:%d at matter.js 862ad75f, in its own direction (the Go controller is the DUT, the daemon the TH)", c.tc, c.source(), c.line)
-	} else {
+	default:
 		t.Logf("%s: support/chip-testing/test/cert/%s:%d at matter.js 862ad75f, read mirrored (the daemon is the DUT)", c.tc, c.source(), c.line)
 	}
 	if expr := strings.Join(c.pics, " & "); expr != "" {
@@ -319,6 +336,9 @@ func runGoCertCase(t *testing.T, bin string, flags map[string]bool, pics *commit
 			file = s.file
 		}
 		where := fmt.Sprintf("%s step %s (%s:%d)", c.tc, r.step.n, file, r.step.line)
+		if c.origin != "" {
+			where = fmt.Sprintf("%s step %s", c.tc, r.step.n)
+		}
 		switch {
 		case r.verdict == goPass && s.finding != "":
 			failed = true
@@ -343,7 +363,9 @@ func runGoCertCase(t *testing.T, bin string, flags map[string]bool, pics *commit
 		c.finalize(th)
 	}
 	if failed {
-		th.dut.dump(t)
+		if th.dut != nil {
+			th.dut.dump(t)
+		}
 		t.Logf("the Go controllers' last log lines:\n%s", th.logs.tail(200))
 		return counts, false
 	}
@@ -484,6 +506,11 @@ func (th *goTH) call(run func(th *goTH) error) (err error) {
 
 func newGoTH(ctx context.Context, t *testing.T, bin string, flags map[string]bool, pics *committedPICS, c goCertCase) *goTH {
 	t.Helper()
+	if c.noDaemon {
+		th := &goTH{t: t, ctx: ctx, c: c, bin: bin, flags: flags, pics: pics}
+		th.log = slog.New(slog.NewTextHandler(&th.logs, &slog.HandlerOptions{Level: slog.LevelDebug}))
+		return th
+	}
 	pipe := filepath.Join(t.TempDir(), "app-pipe")
 	// The Matter port: a group message goes to it (groups/sender.go
 	// groupPort, GroupSession.ts:150-153), and the cases run one at a time.

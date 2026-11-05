@@ -8,15 +8,14 @@ Entry points: 7568 across 275 test packages.
 | Metric | Count |
 |---|---|
 | Total exported | 17573 |
-| Reached by a test | 12263 |
+| Reached by a test | 12264 |
 | Whitelisted | 5309 |
-| **Unreached** | **1** |
+| **Unreached** | **0** |
 
 ## Top-20 packages by unreached exported identifiers
 
 | Package | Funcs | Types | Other |
 |---|---|---|---|
-| controller | 0 | 0 | 1 |
 
 ## First 50 unreached functions
 
@@ -27,4 +26,3 @@ Entry points: 7568 across 275 test packages.
 
 | Package | Funcs | Types | Other |
 |---|---|---|---|
-| controller | 0 | 0 | 1 |

@@ -280,27 +280,12 @@
   ],
   "summary": {
     "total_exported": 17573,
-    "reachable": 12263,
+    "reachable": 12264,
     "whitelisted": 5309,
-    "unreachable": 1
+    "unreachable": 0
   },
-  "by_package": [
-    {
-      "package": "controller",
-      "unreachable_funcs": 0,
-      "unreachable_types": 0,
-      "unreachable_other": 1
-    }
-  ],
-  "unreachable": [
-    {
-      "package": "controller",
-      "identifier": "ErrNoAdvertiser",
-      "file": "controller/serve.go",
-      "line": 306,
-      "kind": "var"
-    }
-  ],
+  "by_package": [],
+  "unreachable": null,
   "whitelisted": [
     {
       "package": "bdx",
@@ -31135,7 +31120,7 @@
       "identifier": "TestFamilyDeviceTypesResolve",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "internal/chiptool/certifiability_doc_test.go",
-      "line": 452
+      "line": 462
     },
     {
       "package": "internal/chiptool",
@@ -31170,7 +31155,7 @@
       "identifier": "TestWorkflowRunsEveryFamily",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "internal/chiptool/certifiability_doc_test.go",
-      "line": 364
+      "line": 374
     },
     {
       "package": "internal/paritytest",
