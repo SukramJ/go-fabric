@@ -179,8 +179,8 @@ var floors = []packageFloor{
 	},
 	{
 		pkg: "github.com/SukramJ/go-fabric/examples/reference-bridge",
-		min: 67,
-		why: "review 2026-11 W6-test-13: measured 75.1. The reference daemon is the DUT of every chip-tool case, which runs the built binary; its own tests (fleet_test.go and the control tests) drive the fleet through mounted endpoints, and this floor holds what they reach. Phase 34: measured 67.7 — the camera simulation (camera.go, 2.3k lines after chip's camera-app) and the joint-fabric administrator (jointfabric.go) are exercised by the app-camera and app-jointfabric families (66 cases green), not by unit tests; raising it back is issue #404",
+		min: 78,
+		why: "review 2026-11 W6-test-13: measured 75.1. The reference daemon is the DUT of every chip-tool case, which runs the built binary; its own tests (fleet_test.go and the control tests) drive the fleet through mounted endpoints, and this floor holds what they reach. Phase 34 measured 67.7 with the camera simulation (camera.go) and the joint-fabric administrator (jointfabric.go) reached only by the app-camera and app-jointfabric families; camera_sim_test.go and jointfabric_test.go drive both after chip's camera-app and jf-admin-app at 6170af84: measured 78.4",
 	},
 	{
 		pkg: "github.com/SukramJ/go-fabric/examples/reference-controller",

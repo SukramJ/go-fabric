@@ -888,6 +888,21 @@ defect wording.
 
 ## Certification harness — open certifiability findings
 
+- **The reference daemon's push transport augments a clip on every motion;
+  chip's once per elapsed duration.** `examples/reference-bridge/camera.go`
+  `motionTriggered` extends a recording transport's clip on each motion
+  within the clip, where chip's `PushAVTransport` augments only when it has
+  not yet augmented or the clip has run past the previous detected
+  duration (`examples/camera-app/linux/src/pushav-transport/pushav-transport.cpp:375-387`
+  at 6170af84, `mHasAugmented`, `mPreviousMotionDetectedDurationS`): a third
+  motion soon after the second extends the clip here and not in chip. And
+  at the instant a recording ends, chip is already in the blind period
+  (`InBlindPeriod`, `:330-342`, `elapsedSeconds >= 0`) where the daemon is
+  not until the next instant (`now.After`). Found by the #404 unit tests
+  (2026-11-05), which assert only the agreeing cases. Route: align
+  `motionTriggered` and the blind-period start with chip in the next
+  camera-simulation change; the app-camera family does not reach either.
+
 Class (a) gaps the CHIP certification families
 (`internal/chiptool`, [ADR 0011](../../docs/adr/0011-certifiability-is-a-goal.md),
 [`docs/certifiability.md`](../../docs/certifiability.md)) still report. Each
