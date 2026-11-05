@@ -147,6 +147,126 @@
       "steps": 3,
       "stepsSkipped": 1
     },
+    "AVSM/2.1": {
+      "tests": 1,
+      "steps": 42,
+      "stepsSkipped": 0
+    },
+    "AVSM/2.10": {
+      "tests": 1,
+      "steps": 11,
+      "stepsSkipped": 0
+    },
+    "AVSM/2.11": {
+      "tests": 1,
+      "steps": 9,
+      "stepsSkipped": 0
+    },
+    "AVSM/2.12": {
+      "tests": 1,
+      "steps": 55,
+      "stepsSkipped": 0
+    },
+    "AVSM/2.13": {
+      "tests": 1,
+      "steps": 12,
+      "stepsSkipped": 0
+    },
+    "AVSM/2.14": {
+      "tests": 1,
+      "steps": 9,
+      "stepsSkipped": 0
+    },
+    "AVSM/2.15": {
+      "tests": 1,
+      "steps": 8,
+      "stepsSkipped": 0
+    },
+    "AVSM/2.2": {
+      "tests": 1,
+      "steps": 15,
+      "stepsSkipped": 0
+    },
+    "AVSM/2.3": {
+      "tests": 1,
+      "steps": 9,
+      "stepsSkipped": 0
+    },
+    "AVSM/2.4": {
+      "tests": 1,
+      "steps": 6,
+      "stepsSkipped": 0
+    },
+    "AVSM/2.5": {
+      "tests": 1,
+      "steps": 17,
+      "stepsSkipped": 0
+    },
+    "AVSM/2.6": {
+      "tests": 1,
+      "steps": 6,
+      "stepsSkipped": 0
+    },
+    "AVSM/2.7": {
+      "tests": 1,
+      "steps": 28,
+      "stepsSkipped": 0
+    },
+    "AVSM/2.8": {
+      "tests": 1,
+      "steps": 9,
+      "stepsSkipped": 0
+    },
+    "AVSM/2.9": {
+      "tests": 1,
+      "steps": 6,
+      "stepsSkipped": 0
+    },
+    "AVSUM/2.1": {
+      "tests": 1,
+      "steps": 14,
+      "stepsSkipped": 0
+    },
+    "AVSUM/2.2": {
+      "tests": 1,
+      "steps": 29,
+      "stepsSkipped": 2
+    },
+    "AVSUM/2.3": {
+      "tests": 1,
+      "steps": 29,
+      "stepsSkipped": 2
+    },
+    "AVSUM/2.4": {
+      "tests": 1,
+      "steps": 19,
+      "stepsSkipped": 12
+    },
+    "AVSUM/2.5": {
+      "tests": 1,
+      "steps": 15,
+      "stepsSkipped": 0
+    },
+    "AVSUM/2.6": {
+      "tests": 1,
+      "steps": 12,
+      "stepsSkipped": 6
+    },
+    "AVSUM/2.7": {
+      "tests": 1,
+      "steps": 16,
+      "stepsSkipped": 0
+    },
+    "AVSUM/2.8": {
+      "tests": 1,
+      "steps": 15,
+      "stepsSkipped": 0
+    },
+    "AVSUM/2.9": {
+      "tests": 1,
+      "steps": 26,
+      "stepsSkipped": 0
+    },
     "BINFO/2.1": {
       "tests": 1,
       "steps": 30,
@@ -378,6 +498,36 @@
     "CHANNEL/5.3": {
       "steps": 6,
       "stepsSkipped": 1
+    },
+    "CHIME/2.1": {
+      "tests": 1,
+      "steps": 6,
+      "stepsSkipped": 0
+    },
+    "CHIME/2.2": {
+      "tests": 1,
+      "steps": 4,
+      "stepsSkipped": 0
+    },
+    "CHIME/2.3": {
+      "tests": 1,
+      "steps": 8,
+      "stepsSkipped": 0
+    },
+    "CHIME/2.4": {
+      "tests": 1,
+      "steps": 12,
+      "stepsSkipped": 0
+    },
+    "CHIME/2.5": {
+      "tests": 1,
+      "steps": 6,
+      "stepsSkipped": 2
+    },
+    "CHIME/2.6": {
+      "tests": 1,
+      "steps": 7,
+      "stepsSkipped": 0
     },
     "CLCTRL/2.1": {
       "tests": 1,
@@ -636,6 +786,22 @@
       "tests": 1,
       "steps": 5,
       "stepsSkipped": 4
+    },
+    "DGTHREAD/2.1": {
+      "steps": 22,
+      "stepsSkipped": 12
+    },
+    "DGTHREAD/2.2": {
+      "steps": 3,
+      "stepsSkipped": 15
+    },
+    "DGTHREAD/2.3": {
+      "steps": 3,
+      "stepsSkipped": 15
+    },
+    "DGTHREAD/2.4": {
+      "steps": 3,
+      "stepsSkipped": 0
     },
     "DGWIFI/2.1": {
       "steps": 7,
@@ -1553,6 +1719,66 @@
       "steps": 6,
       "stepsSkipped": 6
     },
+    "PAVST/2.1": {
+      "tests": 1,
+      "steps": 3,
+      "stepsSkipped": 0
+    },
+    "PAVST/2.10": {
+      "tests": 1,
+      "steps": 10,
+      "stepsSkipped": 0
+    },
+    "PAVST/2.12": {
+      "tests": 1,
+      "steps": 18,
+      "stepsSkipped": 0
+    },
+    "PAVST/2.13": {
+      "tests": 1,
+      "steps": 19,
+      "stepsSkipped": 0
+    },
+    "PAVST/2.14": {
+      "tests": 1,
+      "steps": 14,
+      "stepsSkipped": 0
+    },
+    "PAVST/2.2": {
+      "tests": 1,
+      "steps": 8,
+      "stepsSkipped": 0
+    },
+    "PAVST/2.5": {
+      "tests": 1,
+      "steps": 7,
+      "stepsSkipped": 0
+    },
+    "PAVST/2.7": {
+      "tests": 1,
+      "steps": 15,
+      "stepsSkipped": 0
+    },
+    "PAVST/2.8": {
+      "tests": 1,
+      "steps": 7,
+      "stepsSkipped": 0
+    },
+    "PAVST/2.9": {
+      "tests": 1,
+      "steps": 8,
+      "stepsSkipped": 0
+    },
+    "PAVSTI/1.1": {
+      "tests": 1,
+      "steps": 24,
+      "stepsSkipped": 0
+    },
+    "PAVSTI/1.2": {
+      "tests": 1,
+      "steps": 23,
+      "stepsSkipped": 0
+    },
     "PCC/2.1": {
       "steps": 11,
       "stepsSkipped": 13
@@ -1907,6 +2133,18 @@
       "steps": 15,
       "stepsSkipped": 0
     },
+    "TBRM/2.1": {
+      "steps": 7,
+      "stepsSkipped": 0
+    },
+    "TBRM/2.3": {
+      "steps": 13,
+      "stepsSkipped": 3
+    },
+    "TBRM/2.4": {
+      "steps": 8,
+      "stepsSkipped": 0
+    },
     "TCCM/1.2": {
       "tests": 1,
       "steps": 3,
@@ -1928,6 +2166,18 @@
       "steps": 5,
       "stepsSkipped": 0
     },
+    "THNETDIR/2.1": {
+      "steps": 3,
+      "stepsSkipped": 0
+    },
+    "THNETDIR/2.2": {
+      "steps": 25,
+      "stepsSkipped": 0
+    },
+    "THNETDIR/2.3": {
+      "steps": 5,
+      "stepsSkipped": 0
+    },
     "TIMESYNC/2.1": {
       "tests": 1,
       "steps": 15,
@@ -1941,6 +2191,91 @@
     "TIMESYNC/3.1": {
       "tests": 1,
       "steps": 3,
+      "stepsSkipped": 0
+    },
+    "TLSCERT/2.1": {
+      "tests": 1,
+      "steps": 9,
+      "stepsSkipped": 0
+    },
+    "TLSCERT/2.10": {
+      "tests": 1,
+      "steps": 23,
+      "stepsSkipped": 0
+    },
+    "TLSCERT/2.11": {
+      "tests": 1,
+      "steps": 16,
+      "stepsSkipped": 0
+    },
+    "TLSCERT/2.12": {
+      "tests": 1,
+      "steps": 28,
+      "stepsSkipped": 0
+    },
+    "TLSCERT/2.13": {
+      "tests": 1,
+      "steps": 23,
+      "stepsSkipped": 0
+    },
+    "TLSCERT/2.3": {
+      "tests": 1,
+      "steps": 24,
+      "stepsSkipped": 0
+    },
+    "TLSCERT/2.4": {
+      "tests": 1,
+      "steps": 11,
+      "stepsSkipped": 0
+    },
+    "TLSCERT/2.5": {
+      "tests": 1,
+      "steps": 16,
+      "stepsSkipped": 0
+    },
+    "TLSCERT/2.6": {
+      "tests": 1,
+      "steps": 22,
+      "stepsSkipped": 0
+    },
+    "TLSCERT/2.7": {
+      "tests": 1,
+      "steps": 18,
+      "stepsSkipped": 0
+    },
+    "TLSCERT/2.8": {
+      "tests": 1,
+      "steps": 21,
+      "stepsSkipped": 0
+    },
+    "TLSCLIENT/2.1": {
+      "tests": 1,
+      "steps": 3,
+      "stepsSkipped": 0
+    },
+    "TLSCLIENT/3.1": {
+      "tests": 1,
+      "steps": 23,
+      "stepsSkipped": 0
+    },
+    "TLSCLIENT/3.10": {
+      "tests": 1,
+      "steps": 18,
+      "stepsSkipped": 0
+    },
+    "TLSCLIENT/3.2": {
+      "tests": 1,
+      "steps": 25,
+      "stepsSkipped": 0
+    },
+    "TLSCLIENT/3.20": {
+      "tests": 1,
+      "steps": 28,
+      "stepsSkipped": 0
+    },
+    "TLSCLIENT/3.3": {
+      "tests": 1,
+      "steps": 26,
       "stepsSkipped": 0
     },
     "TMP/2.1": {
@@ -2039,6 +2374,41 @@
       "steps": 5,
       "stepsSkipped": 0
     },
+    "WEBRTCP/2.10": {
+      "tests": 1,
+      "steps": 4,
+      "stepsSkipped": 0
+    },
+    "WEBRTCP/2.13": {
+      "tests": 1,
+      "steps": 7,
+      "stepsSkipped": 0
+    },
+    "WEBRTCP/2.14": {
+      "tests": 1,
+      "steps": 6,
+      "stepsSkipped": 0
+    },
+    "WEBRTCP/2.15": {
+      "tests": 1,
+      "steps": 5,
+      "stepsSkipped": 0
+    },
+    "WEBRTCP/2.16": {
+      "tests": 1,
+      "steps": 4,
+      "stepsSkipped": 0
+    },
+    "WEBRTCP/2.8": {
+      "tests": 1,
+      "steps": 6,
+      "stepsSkipped": 0
+    },
+    "WEBRTCP/2.9": {
+      "tests": 1,
+      "steps": 7,
+      "stepsSkipped": 0
+    },
     "WHM/1.2": {
       "tests": 1,
       "steps": 3,
@@ -2108,6 +2478,86 @@
     "WNCV/4.5": {
       "steps": 13,
       "stepsSkipped": 4
+    },
+    "WebRTCP/2.2": {
+      "tests": 1,
+      "steps": 7,
+      "stepsSkipped": 0
+    },
+    "WebRTCP/2.27": {
+      "tests": 1,
+      "steps": 11,
+      "stepsSkipped": 0
+    },
+    "WebRTCP/2.28": {
+      "tests": 1,
+      "steps": 7,
+      "stepsSkipped": 0
+    },
+    "WebRTCP/2.29": {
+      "tests": 1,
+      "steps": 10,
+      "stepsSkipped": 0
+    },
+    "WebRTCP/2.3": {
+      "tests": 1,
+      "steps": 9,
+      "stepsSkipped": 0
+    },
+    "WebRTCP/2.30": {
+      "tests": 1,
+      "steps": 7,
+      "stepsSkipped": 0
+    },
+    "WebRTCP/2.31": {
+      "tests": 1,
+      "steps": 11,
+      "stepsSkipped": 0
+    },
+    "WebRTCP/2.32": {
+      "tests": 1,
+      "steps": 4,
+      "stepsSkipped": 0
+    },
+    "WebRTCP/2.4": {
+      "tests": 1,
+      "steps": 7,
+      "stepsSkipped": 0
+    },
+    "WebRTCP/2.5": {
+      "tests": 1,
+      "steps": 15,
+      "stepsSkipped": 0
+    },
+    "WebRTCP/2.6": {
+      "tests": 1,
+      "steps": 5,
+      "stepsSkipped": 0
+    },
+    "WebRTCP/2.7": {
+      "tests": 1,
+      "steps": 7,
+      "stepsSkipped": 0
+    },
+    "ZONEMGMT/2.1": {
+      "tests": 1,
+      "steps": 8,
+      "stepsSkipped": 2
+    },
+    "ZONEMGMT/2.2": {
+      "tests": 1,
+      "steps": 10,
+      "stepsSkipped": 0
+    },
+    "ZONEMGMT/2.3": {
+      "tests": 1,
+      "steps": 10,
+      "stepsSkipped": 2
+    },
+    "ZONEMGMT/2.4": {
+      "tests": 1,
+      "steps": 23,
+      "stepsSkipped": 2
     }
   },
   "families": {
@@ -2171,6 +2621,38 @@
       "7.2",
       "7.3",
       "7.4"
+    ],
+    "AVSM": [
+      "2.1",
+      "2.2",
+      "2.3",
+      "2.4",
+      "2.5",
+      "2.6",
+      "2.7",
+      "2.8",
+      "2.9",
+      "2.10",
+      "2.11",
+      "2.12",
+      "2.13",
+      "2.14",
+      "2.15",
+      "2.18",
+      "2.19",
+      "2.20",
+      "2.21"
+    ],
+    "AVSUM": [
+      "2.1",
+      "2.2",
+      "2.3",
+      "2.4",
+      "2.5",
+      "2.6",
+      "2.7",
+      "2.8",
+      "2.9"
     ],
     "BDX": [
       "1.1",
@@ -2296,6 +2778,14 @@
       "5.4",
       "5.5",
       "5.6"
+    ],
+    "CHIME": [
+      "2.1",
+      "2.2",
+      "2.3",
+      "2.4",
+      "2.5",
+      "2.6"
     ],
     "CLCTRL": [
       "2.1",
@@ -2481,6 +2971,14 @@
       "2.3",
       "3.2.Simulated"
     ],
+    "DGTHREAD": [
+      "2.1",
+      "2.2",
+      "2.3",
+      "2.4",
+      "2.5",
+      "3.4.Simulated"
+    ],
     "DGWIFI": [
       "2.1",
       "2.2",
@@ -2665,6 +3163,20 @@
       "13.1",
       "14.1"
     ],
+    "JFADMIN": [
+      "1.1",
+      "1.2",
+      "1.4",
+      "2.1",
+      "2.2"
+    ],
+    "JFDS": [
+      "2.1",
+      "2.2",
+      "2.3",
+      "2.4",
+      "2.5"
+    ],
     "KEYPADINPUT": [
       "3.1",
       "3.2",
@@ -2721,6 +3233,12 @@
       "6.10",
       "6.11",
       "6.12"
+    ],
+    "MESS": [
+      "1.1",
+      "3.1",
+      "3.2",
+      "3.3"
     ],
     "MOD": [
       "1.2",
@@ -2797,6 +3315,27 @@
     ],
     "OZCONC": [
       "2.1"
+    ],
+    "PAVST": [
+      "2.1",
+      "2.2",
+      "2.3",
+      "2.4",
+      "2.5",
+      "2.6",
+      "2.7",
+      "2.8",
+      "2.9",
+      "2.10",
+      "2.11",
+      "2.12",
+      "2.13",
+      "2.14",
+      "2.15"
+    ],
+    "PAVSTI": [
+      "1.1",
+      "1.2"
     ],
     "PCC": [
       "2.1",
@@ -2960,6 +3499,13 @@
       "2.6",
       "3.2"
     ],
+    "TBRM": [
+      "2.1",
+      "2.2",
+      "2.3",
+      "2.4",
+      "3.1.Simulated"
+    ],
     "TCCM": [
       "1.2",
       "2.1"
@@ -2974,6 +3520,11 @@
     "TGTNAV": [
       "8.1",
       "8.2"
+    ],
+    "THNETDIR": [
+      "2.1",
+      "2.2",
+      "2.3"
     ],
     "TIMESYNC": [
       "2.1",
@@ -2990,6 +3541,29 @@
       "2.12",
       "2.13",
       "3.1"
+    ],
+    "TLSCERT": [
+      "2.1",
+      "2.2",
+      "2.3",
+      "2.4",
+      "2.5",
+      "2.6",
+      "2.7",
+      "2.8",
+      "2.9",
+      "2.10",
+      "2.11",
+      "2.12",
+      "2.13"
+    ],
+    "TLSCLIENT": [
+      "2.1",
+      "3.1",
+      "3.2",
+      "3.3",
+      "3.10",
+      "3.20"
     ],
     "TMP": [
       "2.1",
@@ -3035,6 +3609,15 @@
       "2.1",
       "2.2"
     ],
+    "WEBRTCP": [
+      "2.8",
+      "2.9",
+      "2.10",
+      "2.13",
+      "2.14",
+      "2.15",
+      "2.16"
+    ],
     "WHM": [
       "1.2",
       "2.1"
@@ -3057,11 +3640,36 @@
       "4.5",
       "6.1.Simulated",
       "7.1.Simulated"
+    ],
+    "WebRTCP": [
+      "2.1",
+      "2.2",
+      "2.3",
+      "2.4",
+      "2.5",
+      "2.6",
+      "2.7",
+      "2.27",
+      "2.28",
+      "2.29",
+      "2.30",
+      "2.31",
+      "2.32"
+    ],
+    "ZONEMGMT": [
+      "2.1",
+      "2.2",
+      "2.3",
+      "2.4"
     ]
   },
   "notApplicable": {
     "ACL/2.11": "ACL.S.F01",
     "ALOGIN/12.3": "ALOGIN.S \u0026 ALOGIN.S.F00",
+    "AVSM/2.18": "AVSM.S \u0026 AVSM.S.F_VDO",
+    "AVSM/2.19": "AVSM.S \u0026 AVSM.S.F_ADO",
+    "AVSM/2.20": "AVSM.S \u0026 AVSM.S.F_SNP",
+    "AVSM/2.21": "AVSM.S \u0026 AVSM.S.F_VDO",
     "BINFO/3.1": "BINFO.S.A0014",
     "BINFO/3.2": "BINFO.S \u0026 BINFO.S.M.DeviceConfigurationChange",
     "BRBINFO/3.1": "BRBINFO.S.A0014",
@@ -3127,6 +3735,7 @@
     "DGETH/3.2.Simulated": "DGETH.C",
     "DGSW/2.2": "DGSW.S.E00",
     "DGSW/3.2.Simulated": "DGSW.C",
+    "DGTHREAD/3.4.Simulated": "DGTHREAD.C",
     "DGWIFI/3.2.Simulated": "DGWIFI.C",
     "DRLK/2.11": "DRLK.S \u0026 DRLK.S.F00 \u0026 DRLK.S.F01 \u0026 DRLK.S.F02",
     "DRLK/2.13": "DRLK.S.F0d",
@@ -3148,6 +3757,9 @@
     "LVL/7.1": "LVL.S \u0026 LVL.S.F02",
     "MEDIAPLAYBACK/6.11": "MEDIAPLAYBACK.S \u0026 MEDIAPLAYBACK.S.A000b",
     "MEDIAPLAYBACK/6.12": "MEDIAPLAYBACK.S \u0026 MEDIAPLAYBACK.S.A000c",
+    "MESS/3.1": "MESS.S \u0026 MESS.S.F04",
+    "MESS/3.2": "MESS.S \u0026 MESS.S.F05",
+    "MESS/3.3": "MESS.S \u0026 MESS.S.F05 \u0026 MESS.S.E03",
     "MOD/2.3": "MOD.S \u0026 S.S",
     "MOD/3.1": "MOD.S.A0005",
     "MOD/3.2": "MOD.S.A0004",
@@ -3164,6 +3776,7 @@
     "SC/4.6": "MCORE.ROLE.COMMISSIONER \u0026 MCORE.DD.COMM_DISCOVERY",
     "SC/4.7": "MCORE.ROLE.COMMISSIONEE \u0026 MCORE.DD.COMM_DISCOVERY",
     "SEPR/2.3": "SEPR.S \u0026 SEPR.F00",
+    "TBRM/3.1.Simulated": "TBRM.C",
     "TCTL/2.3": "TCTL.S \u0026 TCTL.S.F01",
     "TCTL/3.3": "TCTL.S \u0026 TCTL.S.F01",
     "TIMESYNC/2.10": "TIMESYNC.S.F00",
@@ -3180,7 +3793,8 @@
     "TSTAT/4.3": "TSTAT.S \u0026 TSTAT.S.F08 \u0026 TSTAT.S.F0a",
     "TSTAT/4.4": "TSTAT.S \u0026 TSTAT.S.F0b",
     "WNCV/6.1.Simulated": "WNCV.C",
-    "WNCV/7.1.Simulated": "WNCV.C"
+    "WNCV/7.1.Simulated": "WNCV.C",
+    "WebRTCP/2.1": "WEBRTCP.S \u0026 WEBRTCP.S.A0000 \u0026 WEBRTCP.S.C00.Rsp \u0026 WEBRTCP.S.C01.Tx \u0026 AVSM.S \u0026 AVSM.S.F00 \u0026 AVSM.S.F01 \u0026 PS.S.F01"
   },
   "hostSkipped": {
     "ACT/2.1": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
@@ -3243,6 +3857,7 @@
     "DESC/2.1": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
     "DGGEN/2.2": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
     "DGSW/2.3": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
+    "DGTHREAD/2.5": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
     "DGWIFI/2.2": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
     "DISHALM/3.1": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
     "DISHALM/3.2": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",

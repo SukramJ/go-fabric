@@ -1015,7 +1015,26 @@ var chipFamilies = []family{
 		},
 	},
 	{name: "WebRTCP", deviceType: dtCamera, variant: variantCamera},
-	{name: "AVSM", deviceType: dtCamera, variant: variantCamera},
+	{
+		name: "AVSM", deviceType: dtCamera, variant: variantCamera,
+		// TC_AVSM_2_18 to 2_21 gate on AVSM.S.F_VDO, F_ADO and F_SNP
+		// (TC_AVSM_2_18.py:82-83, 2_19:78-79, 2_20:78-79, 2_21:73-74),
+		// codes no PICS defines: a feature's code is AVSM.S.Fnn (CHIP's
+		// derivation, and ci-pics-values's AVSM.S.F00-F04). The gates are
+		// corrected, the steps unchanged.
+		picsEdits: map[string]edit{
+			"2.18": {"AVSM.S.F_VDO", "AVSM.S.F01", "TC_AVSM_2_18 gates on the undefined code AVSM.S.F_VDO; Video is AVSM.S.F01"},
+			"2.19": {"AVSM.S.F_ADO", "AVSM.S.F00", "TC_AVSM_2_19 gates on the undefined code AVSM.S.F_ADO; Audio is AVSM.S.F00"},
+			"2.20": {"AVSM.S.F_SNP", "AVSM.S.F02", "TC_AVSM_2_20 gates on the undefined code AVSM.S.F_SNP; Snapshot is AVSM.S.F02"},
+			"2.21": {"AVSM.S.F_VDO", "AVSM.S.F01", "TC_AVSM_2_21 gates on the undefined code AVSM.S.F_VDO; Video is AVSM.S.F01"},
+		},
+		edits: map[string][]edit{
+			"2.18": {{`"AVSM.S", "AVSM.S.F_VDO"`, `"AVSM.S", "AVSM.S.F01"`, "TC_AVSM_2_18 gates on the undefined code AVSM.S.F_VDO; Video is AVSM.S.F01"}},
+			"2.19": {{`"AVSM.S", "AVSM.S.F_ADO"`, `"AVSM.S", "AVSM.S.F00"`, "TC_AVSM_2_19 gates on the undefined code AVSM.S.F_ADO; Audio is AVSM.S.F00"}},
+			"2.20": {{`"AVSM.S", "AVSM.S.F_SNP"`, `"AVSM.S", "AVSM.S.F02"`, "TC_AVSM_2_20 gates on the undefined code AVSM.S.F_SNP; Snapshot is AVSM.S.F02"}},
+			"2.21": {{`"AVSM.S", "AVSM.S.F_VDO"`, `"AVSM.S", "AVSM.S.F01"`, "TC_AVSM_2_21 gates on the undefined code AVSM.S.F_VDO; Video is AVSM.S.F01"}},
+		},
+	},
 	{name: "AVSUM", deviceType: dtCamera, variant: variantCamera},
 	{name: "ZONEMGMT", deviceType: dtCamera, variant: variantCamera},
 	{
