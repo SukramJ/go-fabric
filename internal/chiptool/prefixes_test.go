@@ -159,11 +159,13 @@ func writeChipPrefixes(t *testing.T, file string) {
 	}
 	for _, line := range strings.Split(strings.TrimSpace(string(out)), "\n") {
 		m := reCaseFile.FindStringSubmatch(filepath.Base(line))
-		if m == nil || reSupportFile.MatchString(m[2]) {
+		if len(m) < 3 || reSupportFile.MatchString(m[2]) {
 			continue
 		}
 		dir := filepath.Dir(line)
-		if !(strings.HasSuffix(m[0], ".py") && dir == "src/python_testing") && !(strings.HasSuffix(m[0], ".yaml") && dir == "src/app/tests/suites/certification") {
+		py := strings.HasSuffix(m[0], ".py") && dir == "src/python_testing"
+		yaml := strings.HasSuffix(m[0], ".yaml") && dir == "src/app/tests/suites/certification"
+		if !py && !yaml {
 			continue
 		}
 		listing.Prefixes[m[1]]++

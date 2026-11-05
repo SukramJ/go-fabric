@@ -117,6 +117,11 @@ var daemonVariants = map[string][]string{
 	variantThread:      {"--otbr", otbrURL},
 }
 
+// otbrURL is the virtual OTBR agent's REST API the thread variant's daemon
+// reaches (script/otbr-virtual-test.sh --rest-listen-address 127.0.0.1
+// --rest-listen-port 8081).
+const otbrURL = "http://127.0.0.1:8081"
+
 // daemonVariant is the variant every daemon of the running family is
 // started with ("" the default); the families run one after another.
 var daemonVariant string

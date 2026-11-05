@@ -540,16 +540,17 @@ func (p camVideoPort) VideoStreamAllocate(_ context.Context, args csdef.VideoStr
 		return id, nil
 	}
 	for i := range c.videos {
-		if !c.videos[i].allocated && camVideoCompatible(c.videos[i].params, args) {
-			rate := uint32(args.MaxFrameRate) * uint32(args.MaxResolution.Height) * uint32(args.MaxResolution.Width)
-			if !host.ResourceAvailable(rate, true) {
-				return 0, statusErr(im.StatusResourceExhausted, "no encoder for the stream")
-			}
-			c.videos[i].allocated = true
-			vp := c.camera.CameraAvStreamManagement().Get().Viewport
-			c.videos[i].viewport = avdef.ViewportStruct{X1: vp.X1, Y1: vp.Y1, X2: vp.X2, Y2: vp.Y2}
-			return c.videos[i].params.VideoStreamId, nil
+		if c.videos[i].allocated || !camVideoCompatible(c.videos[i].params, args) {
+			continue
 		}
+		rate := uint32(args.MaxFrameRate) * uint32(args.MaxResolution.Height) * uint32(args.MaxResolution.Width)
+		if !host.ResourceAvailable(rate, true) {
+			return 0, statusErr(im.StatusResourceExhausted, "no encoder for the stream")
+		}
+		c.videos[i].allocated = true
+		vp := c.camera.CameraAvStreamManagement().Get().Viewport
+		c.videos[i].viewport = avdef.ViewportStruct{X1: vp.X1, Y1: vp.Y1, X2: vp.X2, Y2: vp.Y2}
+		return c.videos[i].params.VideoStreamId, nil
 	}
 	return 0, statusErr(im.StatusResourceExhausted, "no compatible video stream is free")
 }
@@ -765,7 +766,7 @@ const camEndOutOfResources = 8
 // (:279-292).
 func (p camProviderPort) SolicitOffer(_ context.Context, args wpdef.OfferArgs) (wpdef.WebRTCSessionStruct, bool, error) {
 	if p.c.addSession(args.SessionID) > camMaxWebRTCSessions {
-		go p.c.endSession(args.SessionID, camEndOutOfResources)
+		go p.c.endSession(args.SessionID, camEndOutOfResources) //nolint:gosec // the End outlives the SolicitOffer request; the camera-app schedules it (ScheduleEndSend)
 	}
 	return camSession(args), p.c.opts.deferredOffer, nil
 }

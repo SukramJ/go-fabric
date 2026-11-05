@@ -180,9 +180,6 @@ const (
 	// with ThreadNetworkDirectory and the root's ThreadNetworkDiagnostics
 	// (examples/reference-bridge/otbr.go).
 	variantThread = "thread"
-	// otbrURL is the virtual agent's REST API (script/otbr-virtual-test.sh
-	// --rest-listen-address 127.0.0.1 --rest-listen-port 8081).
-	otbrURL = "http://127.0.0.1:8081"
 )
 
 // Device types only a variant's daemon has (variantDeviceTypes).

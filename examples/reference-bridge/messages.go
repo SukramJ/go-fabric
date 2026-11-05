@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"log/slog"
+	"math"
 	"sync"
 	"time"
 
@@ -66,7 +67,7 @@ func (p *tvMessages) PresentMessage(_ context.Context, msg msgdef.MessageStruct)
 			time.Sleep(presentRetry)
 		}
 		if !msg.Duration.Null {
-			p.schedule(id, time.Duration(msg.Duration.Value)*time.Millisecond, func() {
+			p.schedule(id, time.Duration(min(msg.Duration.Value, uint64(math.MaxInt64)/uint64(time.Millisecond)))*time.Millisecond, func() { //nolint:gosec // bounded above
 				p.srv.Complete(id, core.MessageOutcome{})
 			})
 		}

@@ -432,21 +432,10 @@ func chunkReportData(rd im.ReportData, budget, hardCap int) ([]im.ReportData, er
 	var addAttributeReport func(rep im.AttributeReport) error
 	addAttributeReport = func(rep im.AttributeReport) error {
 		if parts, ok := splitListAttributeReport(rd, rep, budget); ok {
-			// A list entry too large for any message fails the whole
-			// attribute: one status on the attribute's path, never a
-			// status on a list-item path, which a reader's list buffering
-			// does not take (connectedhomeip's BufferedReadCallback passes
-			// a failed list item through, and its Python controller aborts
-			// on it, matter/clusters/attribute.cpp:110-116 at 6170af84 —
-			// TC-TLSCERT-2.9).
-			for _, part := range parts {
-				capped, err := capOversizedAttributeReport(rd, part, hardCap)
-				if err != nil {
-					return err
-				}
-				if capped.IsStatus {
-					return addAttributeReport(attributeStatus(rep, im.StatusResourceExhausted))
-				}
+			if oversized, err := anyPartOversized(rd, parts, hardCap); err != nil {
+				return err
+			} else if oversized {
+				return addAttributeReport(attributeStatus(rep, im.StatusResourceExhausted))
 			}
 			for _, part := range parts {
 				if err := addAttributeReport(part); err != nil {
@@ -628,6 +617,25 @@ func capOversizedAttributeReport(rd im.ReportData, rep im.AttributeReport, hardC
 		return rep, nil
 	}
 	return attributeStatus(rep, im.StatusResourceExhausted), nil
+}
+
+// anyPartOversized reports a part of a split list too large for any
+// message. Such an entry fails the whole attribute: one status on the
+// attribute's path, never a status on a list-item path, which a reader's
+// list buffering does not take (connectedhomeip's BufferedReadCallback
+// passes a failed list item through, and its Python controller aborts on
+// it, matter/clusters/attribute.cpp:110-116 at 6170af84 — TC-TLSCERT-2.9).
+func anyPartOversized(rd im.ReportData, parts []im.AttributeReport, hardCap int) (bool, error) {
+	for _, part := range parts {
+		capped, err := capOversizedAttributeReport(rd, part, hardCap)
+		if err != nil {
+			return false, err
+		}
+		if capped.IsStatus {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 // attributeStatus is rep's attribute answered with status: the path
