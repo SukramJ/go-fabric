@@ -447,6 +447,13 @@ func (r *Registry) remove(n *Node) {
 	r.manageExpiration()
 }
 
+// Forget drops n from the registry and the database without reaching it:
+// its subscriptions close, its rows and its peer go. For a node that no
+// longer exists — the controller's former own node (phase 37) — not for a
+// node still on the fabric, which [Node.Decommission] removes from both
+// sides.
+func (r *Registry) Forget(ctx context.Context, n *Node) error { return r.deleteNode(ctx, n, nil) }
+
 // deleteNode deletes a node — ClientNode.delete (node/ClientNode.ts:213-225):
 // it is closed and forgotten, its store erased, and the protocol peer of
 // addr (the node's peer address when nil) deleted even when the teardown

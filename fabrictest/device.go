@@ -514,6 +514,11 @@ func (r siteResolver) ResolveOperational(ctx context.Context, compressedFabricID
 			return []*net.UDPAddr{c.Addr()}, nil
 		}
 	}
+	for _, a := range r.s.controllerAdvertisers() {
+		if a.answersOperational(compressedFabricID, nodeID) {
+			return []*net.UDPAddr{a.addr}, nil
+		}
+	}
 	// A device of the site, as its operational record names it: a node's
 	// initiator (an OTA requestor reaching its provider) resolves another
 	// node of its fabric.

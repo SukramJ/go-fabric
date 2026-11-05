@@ -84,7 +84,7 @@ GOFABRIC_CHIP_FAMILIES=IDM,ACL make chiptool-families   # a selection
   harness image; its cases appear below as passed, with their step counts and
   the TS file they follow. The BDX receiver, SU requestor
   and BIND cases run the device as DUT in matter.js too: their PICS are
-  evaluated as stated, the Go TH serves the OTA image from its own node and
+  evaluated as stated, the Go TH serves the OTA image from its own identity and
   scripts its provider's answers as matter.js's cert harness does, and the
   BIND cases run the daemon with `--light-switch`. A step matter.js marks
   long-running (minutes of real time each) runs with

@@ -24,6 +24,7 @@ import (
 	"github.com/SukramJ/go-fabric/controller/client"
 	"github.com/SukramJ/go-fabric/groups"
 	"github.com/SukramJ/go-fabric/im"
+	"github.com/SukramJ/go-fabric/store"
 )
 
 // epochStartTime0 is the key set's EpochStartTime0, the value of
@@ -206,15 +207,11 @@ func cmdGroupCreate(e *env, args []string) error {
 			}
 			e.printf("node %d joined group %d on endpoints %v (%s)\n", id, g.GroupID, g.Endpoints, how)
 		}
-		self, err := s.ensureSelf(ctx)
-		if err != nil {
-			return err
-		}
-		if err := invokeOK(ctx, self.ia, gkmdef.ClusterID, keySetWrite(g.KeySetID, key)); err != nil {
-			return fmt.Errorf("own node KeySetWrite: %w", err)
-		}
-		if err := invokeOK(ctx, self.ia, groupcastdef.ClusterID, joinGroup(g.GroupID, g.KeySetID, nil, false)); err != nil {
-			return fmt.Errorf("own node JoinGroup: %w", err)
+		// The controller keeps the key set itself: it is the sender.
+		if err := s.ctl.SetGroupKey(ctx, store.GroupKeySet{
+			GroupKeySetID: g.KeySetID, SecurityPolicy: store.SecurityPolicyTrustFirst, EpochKey0: key, EpochStart0: epochStartTime0,
+		}, g.GroupID); err != nil {
+			return fmt.Errorf("the controller's key set: %w", err)
 		}
 		b, err := json.Marshal(g)
 		if err != nil {
@@ -261,17 +258,9 @@ func cmdGroupSend(e *env, args []string) error {
 	return withStack(e, func(s *stack) error {
 		ctx, cancel := e.timeoutCtx()
 		defer cancel()
-		self, err := s.ensureSelf(ctx)
+		sender, err := s.ctl.Groups().Sender(ctx, s.ctl.Fabric().FabricIndex, gid)
 		if err != nil {
-			return err
-		}
-		fi, ok, err := self.fabricIndex(ctx, s)
-		if err != nil || !ok {
-			return fmt.Errorf("the own node is not on the fabric: %w", err)
-		}
-		sender, err := self.n.Groups().Sender(ctx, fi, gid)
-		if err != nil {
-			return fmt.Errorf("group %d: %w (group create provisions the own node)", gid, err)
+			return fmt.Errorf("group %d: %w (group create keeps the controller's key set)", gid, err)
 		}
 		if err := sender.Invoke(ctx, cp, fields, groups.RequestOptions{}); err != nil {
 			return fmt.Errorf("group send: %w", err)

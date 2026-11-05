@@ -262,11 +262,6 @@ var floors = []packageFloor{
 		min: 85,
 		why: "the end-to-end tests commission the node over UDP with bridgetest.Commissioner (PASE, AddNOC, CASE, re-establishment after a restart, RemoveFabric); the enhanced commissioning window, UpdateNOC's fabric hook, CASE resumption and the OTA applier have no test in the package. Measures 86.0–86.1 (2026-11-02, the fabric-scoped broadcast events); 85 leaves the timing-dependent paths a point",
 	},
-	{
-		pkg: "github.com/SukramJ/go-fabric/node/controllernode",
-		min: 81,
-		why: "brief CM §1: measured 67.9; phase 29a-2 (the scripted-provider wrappers, wrap_commands_test.go): 81.2. Start's failure paths (node.New refusing the spec, a socket address that does not resolve) have no test",
-	},
 	{pkg: "github.com/SukramJ/go-fabric/node/metrics/expvar", min: 100},
 	{pkg: "github.com/SukramJ/go-fabric/parity", min: 100},
 	{pkg: "github.com/SukramJ/go-fabric/schema", min: 100},

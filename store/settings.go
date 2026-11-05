@@ -64,6 +64,14 @@ ON CONFLICT(key) DO UPDATE SET value = excluded.value`, key, value); err != nil 
 	return nil
 }
 
+// DeleteSetting removes key; a key that is not there is no error.
+func (s *Store) DeleteSetting(ctx context.Context, key string) error {
+	if _, err := s.db.ExecContext(ctx, `DELETE FROM matter_settings WHERE key = ?`, key); err != nil {
+		return fmt.Errorf("store: delete setting %q: %w", key, err)
+	}
+	return nil
+}
+
 // GetMetadataCounter returns the persisted integer counter for key
 // from matter_metadata. ok=false when the key has never been written.
 func (s *Store) GetMetadataCounter(ctx context.Context, key string) (value uint64, ok bool, err error) {

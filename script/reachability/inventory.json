@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 7426,
+  "entry_points": 7424,
   "entry_packages": [
     ".",
     "bdx",
@@ -233,7 +233,6 @@
     "logring",
     "mdns",
     "node",
-    "node/controllernode",
     "node/metrics/expvar",
     "parity",
     "schema",
@@ -279,13 +278,28 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 17326,
-    "reachable": 12138,
+    "total_exported": 17339,
+    "reachable": 12150,
     "whitelisted": 5188,
-    "unreachable": 0
+    "unreachable": 1
   },
-  "by_package": [],
-  "unreachable": null,
+  "by_package": [
+    {
+      "package": "controller",
+      "unreachable_funcs": 0,
+      "unreachable_types": 0,
+      "unreachable_other": 1
+    }
+  ],
+  "unreachable": [
+    {
+      "package": "controller",
+      "identifier": "ErrNoAdvertiser",
+      "file": "controller/serve.go",
+      "line": 306,
+      "kind": "var"
+    }
+  ],
   "whitelisted": [
     {
       "package": "bdx",
@@ -22286,14 +22300,14 @@
       "identifier": "PairingPhase",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "controller/controller.go",
-      "line": 563
+      "line": 624
     },
     {
       "package": "controller",
       "identifier": "PairingStep",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "controller/controller.go",
-      "line": 559
+      "line": 620
     },
     {
       "package": "controller",

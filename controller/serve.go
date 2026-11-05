@@ -15,6 +15,7 @@ import (
 	mattercore "github.com/SukramJ/go-fabric/cluster/core"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	descdef "github.com/SukramJ/go-fabric/cluster/spec/descriptor"
+	provdef "github.com/SukramJ/go-fabric/cluster/spec/otasoftwareupdateprovider"
 	wrdef "github.com/SukramJ/go-fabric/cluster/spec/webrtctransportrequestor"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/endpoint"
@@ -26,12 +27,13 @@ import (
 // The controller's own endpoints — what it serves to the nodes of its
 // fabric under its one operational identity, RootNodeID.
 //
-// matter.js's controller is a ServerNode with the ControllerBehavior
-// (matterjs-server ControllerNode.ts:33 at 0bd06f2; matter.js
-// ControllerBehavior.ts:43-50, Peers.ts:109,:549-552,:574-579 at
-// 862ad75f): the endpoints it adds — the OTA provider
-// (ControllerNode.ts:140-141), the camera controller with its
-// WebRtcTransportRequestor (:147) — are served by the node's
+// matter.js's controller is a ServerNode with the ControllerBehavior: the
+// behavior and the peers on one node (ControllerBehavior.ts:43-50,
+// Peers.ts:109,:549-552,:574-579 at 862ad75f). matterjs-server composes its
+// controller so, and adds the OTA provider and the camera controller with
+// its WebRtcTransportRequestor as endpoints
+// (packages/ws-controller/src/controller/ControllerNode.ts:33,:140-147 at
+// 0bd06f2). Those endpoints are served by the node's
 // InteractionServer on the same sessions the controller opens, and a
 // camera that stores the invoker as its PeerNodeID calls the controller
 // back on them. This module's controller composes the same tree from the
@@ -45,15 +47,16 @@ import (
 // CameraConfig turns on the controller side of Matter cameras: endpoint
 // [CameraControllerEndpoint] with the Camera Controller device type and a
 // WebRtcTransportRequestor the cameras of the fabric reach (matter.js
-// camera-controller.ts:133 mandates the requestor; the entry that lets a
+// packages/node/src/devices/camera-controller.ts:133 mandates the requestor; the entry that lets a
 // camera reach it mirrors WebRtcTransportRequestorServer.ts:45-94). The
 // stream management over it is the camera service (controller/camera).
 type CameraConfig struct{}
 
 // Endpoint numbers of the controller's tree. The root is 0; the camera
 // controller sits at 1 and the OTA provider at 2, as matterjs-server adds
-// them (ControllerNode.ts:140-147, the provider first when enabled, the
-// camera controller after it).
+// them (packages/ws-controller/src/controller/ControllerNode.ts:140-147 at
+// 0bd06f2: the provider first when enabled, the camera controller after
+// it).
 const (
 	CameraControllerEndpoint uint16 = 1
 	OTAProviderEndpoint      uint16 = 2
@@ -99,7 +102,7 @@ type served struct {
 }
 
 // servesEndpoints reports whether cfg composes a tree at all.
-func servesEndpoints(cfg Config) bool { return cfg.Camera != nil }
+func servesEndpoints(cfg Config) bool { return cfg.Camera != nil || cfg.OTA != nil }
 
 // serveEndpoints composes the tree cfg asks for and installs it into the
 // client stack's Interaction Model server; nothing is composed without
@@ -132,6 +135,14 @@ func (c *Controller) composeTree(cfg Config, log *slog.Logger) error {
 		endpoints = append(endpoints, ep)
 		parts = append(parts, CameraControllerEndpoint)
 	}
+	if c.otaProvider != nil {
+		ep, err := bareEndpoint(OTAProviderEndpoint, schema.DeviceTypeID(0x0014), c.otaProvider.server)
+		if err != nil {
+			return err
+		}
+		endpoints = append(endpoints, ep)
+		parts = append(parts, OTAProviderEndpoint)
+	}
 	root, err := bareEndpoint(0, schema.DeviceTypeID(0x0016))
 	if err != nil {
 		return err
@@ -142,7 +153,7 @@ func (c *Controller) composeTree(cfg Config, log *slog.Logger) error {
 	s.dispatcher.SetACLLister(servedACL{c: c, s: s})
 	c.subs.Serve(interaction.ServerConfig{Dispatcher: s.dispatcher, Qualities: servedQualities{}})
 	c.served = s
-	log.Info("controller.serve.endpoints", slog.Int("endpoints", len(s.topology.Endpoints)), slog.Bool("camera", cfg.Camera != nil))
+	log.Info("controller.serve.endpoints", slog.Int("endpoints", len(s.topology.Endpoints)), slog.Bool("camera", cfg.Camera != nil), slog.Bool("ota", cfg.OTA != nil))
 	return nil
 }
 
@@ -195,12 +206,20 @@ func (a servedACL) ListACL(_ context.Context, fabricIndex uint8) ([]store.ACLEnt
 		FabricIndex: fabricIndex, Privilege: store.PrivilegeAdminister, AuthMode: store.AuthModeCASE,
 		Subjects: []uint64{a.c.fabric.RootNodeID},
 	}}
-	if a.s.requestor != nil {
-		cluster, ep := wrdef.ClusterID, CameraControllerEndpoint
+	operate := func(cluster uint32, ep uint16) {
 		entries = append(entries, store.ACLEntry{
 			FabricIndex: fabricIndex, Privilege: store.PrivilegeOperate, AuthMode: store.AuthModeCASE,
 			Targets: []store.ACLTarget{{Cluster: &cluster, Endpoint: &ep}},
 		})
+	}
+	if a.s.requestor != nil {
+		operate(wrdef.ClusterID, CameraControllerEndpoint)
+	}
+	if a.c.otaProvider != nil {
+		// The requestors of the fabric reach the provider as node/ lets
+		// them (node/ota_provider.go: Operate, CASE, no subject, the
+		// provider's endpoint and cluster).
+		operate(provdef.ClusterID, OTAProviderEndpoint)
 	}
 	return entries, nil
 }

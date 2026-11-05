@@ -222,7 +222,7 @@ func TestOTACancelByRemovingConsentParity(t *testing.T) {
 	r := newOTARigWith(t, nil, &node.OTAConfig{Dir: filepath.Join(t.TempDir(), "ota"), AnnouncedUpdateQueryDelay: &announced})
 	r.storeImage(t, 2)
 	mgr := r.c.SoftwareUpdates()
-	_, _, provider := r.c.OwnNode()
+	provider := r.c.Addr()
 	dev := r.dev.Addr().String()
 	var consentGone, queried atomic.Bool
 	r.site.Net().Filter(func(d fabrictest.Datagram) bool {

@@ -70,9 +70,10 @@ func ClusterServers(ep *Endpoint) []contract.ClusterServer { //nolint:funlen // 
 		// A bare endpoint: one its composer lists by hand with the servers
 		// it publishes ([Endpoint.PublishClusterServers]) and no source —
 		// the controller role's own endpoints (its camera controller, its
-		// OTA provider), matter.js's plain Endpoint under a ServerNode
-		// (ControllerNode.ts:140-147 at matterjs-server 0bd06f2 composes
-		// them so). It carries no bridged-device identity.
+		// OTA provider), matter.js's plain Endpoint under its node, as
+		// matterjs-server composes them
+		// (packages/ws-controller/src/controller/ControllerNode.ts:140-147
+		// at 0bd06f2). It carries no bridged-device identity.
 		return ep.AttachedClusterServers()
 	}
 

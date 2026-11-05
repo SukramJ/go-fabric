@@ -19,9 +19,10 @@ import (
 // ServerConfig is the Interaction Model server the client stack serves on
 // endpoints of its own — matter.js's one InteractionServer on a node that
 // is also a controller: the ClientSubscriptionHandler is installed into
-// it (Peers.ts:546-563, InteractionServer.ts:218-228 at 862ad75f) and its
-// onNewExchange hands a first ReportData to the client handler and every
-// other first message to the server (InteractionServer.ts:240-249). The
+// it (Peers.ts:589-590, InteractionServer.ts:218-228 at 862ad75f) and its
+// onNewExchange hands a first ReportData to the client
+// handler and every other first message to the server
+// (InteractionServer.ts:240-249). The
 // controller role composes the endpoints (a camera controller's
 // WebRtcTransportRequestor, an OTA provider) and installs them here with
 // [Subscriptions.Serve]; a camera then reaches the requestor over the
@@ -38,7 +39,7 @@ type ServerConfig struct {
 	// attribute beyond the globals.
 	Qualities im.ElementQualities
 	// MaxPathsPerInvoke bounds the invokes of one InvokeRequest
-	// (InteractionServer.ts:1017-1021); 0 is 1, the Matter default.
+	// (InteractionServer.ts:970-1021); 0 is 1, the Matter default.
 	MaxPathsPerInvoke int
 	// FieldsReader, FieldsWriter and ValueWriter are the codecs of the
 	// served clusters; nil is the application codec of the generated
@@ -107,8 +108,8 @@ type serverRef = atomic.Pointer[server]
 // InteractionServerMessenger.handleRequest (InteractionMessenger.ts:344-459
 // at 862ad75f): the message is decoded and dispatched by type, a
 // StatusResponseError on the way is answered as a StatusResponse with its
-// code (:82-116), a decode failure as InvalidAction, and the exchange is
-// closed afterwards (:119).
+// code (:425-459), a decode failure as InvalidAction, and the exchange is
+// closed afterwards (:462).
 func (s *server) handle(ctx context.Context, x *exchange.Exchange, first *exchange.Message) {
 	defer x.Close()
 	status := s.serve(ctx, x, first, false)
@@ -249,9 +250,9 @@ func (s *server) chunkReport(rd im.ReportData, budget int) []im.ReportData {
 }
 
 // awaitChunkStatus reads the StatusResponse a peer owes for a chunk that
-// announced more (InteractionMessenger.ts:507-510: the report is sent with
-// expectAckOnly false and the status read); a status other than Success,
-// or anything else, ends the report.
+// announced more (InteractionMessenger.ts:509-510, sendAndResetReport:
+// each chunk goes out through sendDataReportMessage, which reads the
+// status); a status other than Success, or anything else, ends the report.
 func (s *server) awaitChunkStatus(ctx context.Context, x *exchange.Exchange) bool {
 	msg, err := x.Next(ctx, exchange.ReceiveOptions{})
 	if err != nil || msg.Opcode != im.OpcodeStatusResponse {
@@ -287,7 +288,7 @@ func (s *server) write(ctx context.Context, x *exchange.Exchange, req im.WriteRe
 	return im.StatusSuccess
 }
 
-// invoke is InteractionServer.handleInvokeRequest (InteractionServer.ts:970-1100):
+// invoke is InteractionServer.handleInvokeRequest (InteractionServer.ts:970-1025):
 // the timed flag must match the exchange's timed interaction
 // (TimedRequestMismatch, :999-1003), the batch is bounded by
 // maxPathsPerInvoke (InvalidAction, :1017-1021), the invokes run, each

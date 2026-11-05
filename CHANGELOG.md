@@ -10,6 +10,22 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+### Added
+
+- `controller`: the controller serves endpoints of its own under its one operational identity (phase 37, issue 410) — a Camera Controller endpoint with a WebRtcTransportRequestor (`Config.Camera`, `CameraControllerEndpoint`, `Controller.CameraRequestor`, `Controller.OnCameraSignal`) and the OTA provider endpoint (`OTAProviderEndpoint`, `Controller.BDX`), the operational record of RootNodeID, an ACL that lets the fabric's nodes operate them; `Controller.Groups` and `Controller.SetGroupKey` send to groups from that identity (`Config.GroupTransport` for a test's transport); `Controller.Addr`. A camera that stores the controller as its PeerNodeID reaches it over the session the controller opened, as matter.js's one-node controller is reached.
+- `client/interaction`: the Interaction Model server branch of the client stack (`Subscriptions.Serve`, `ServerConfig`): a Read, Write, Invoke or Timed request a peer opens is served by the installed dispatcher — matter.js's one `InteractionServer` beside its `ClientSubscriptionHandler`.
+- `cluster/wire`: the application codec of the generated definitions as a role-neutral package (`AttributeValueWriter`, `AttributeValueReader`, `CommandFieldsReader`, `CommandFieldsWriter`, `ResponseCommandOf`, `DecodeGenericTagMap`), what the bridge's hand tables fall back to.
+- `endpoint`: a bare endpoint (`Endpoint.IsBare`) — listed by hand with its published servers, no bridged-device identity — for a role's own tree.
+- `controller/client`: `Registry.Forget` drops a node that no longer exists without reaching it. `store`: `Store.DeleteSetting`.
+
+### Changed
+
+- `controller`: the OTA provider is the controller itself — `softwareupdate.Config.ProviderNodeID` is RootNodeID and the endpoint `controller.OTAProviderEndpoint`; a database that ran the provider on the former own node is migrated at the first start (the `controller.ownnode` record goes, the registry forgets that node, the next announcement round rewrites every node's DefaultOTAProviders). A group key set the reference controller created before this release is not carried over: run `group create` again.
+
+### Removed
+
+- `node/controllernode`, `controller.OwnNodeSpec`, `controller.OwnNode`, `Controller.OwnNode()`, `OTAConfig.StartNode`, `OTAConfig.Listen`, `OTAConfig.Advertiser`, `OTAConfig.ProductID`: the controller's second node (owner decision 2026-11-05, issue 410 decision 6). `fabrictest.Site.ControllerConfig` no longer starts one.
+
 ## [0.17.0] — 2026-11-05
 
 Milestones 8 (Proof) and 9 (View) of the roadmap, released together (owner decision 2026-11-04): the certification harness with the Go controller in both roles, the matter.js test register over every test root, the second compositions of the reference daemon in the module's own harness image, determinism, and the module side of go-fabric-ui's topology, device-detail and operation pages.

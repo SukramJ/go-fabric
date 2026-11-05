@@ -3422,12 +3422,13 @@ Signed integers are JSON numbers only, as in chip-tool. Report AT.
 By design (ADR 0020). chip is the authority for tool input; the names
 are a convenience the definitions make exact.
 
-### BD-chip-ControllerCLI-OwnNode — the reference controller runs its own node for group sending and OTA serving, asks OTA consent at offer time, and sets a group up the pre-1.5 way where Groupcast is absent
+### BD-chip-ControllerCLI-GroupsAndOTA — the reference controller sends to groups and serves OTA images from the controller's own identity, asks OTA consent at offer time, and sets a group up the pre-1.5 way where Groupcast is absent
 
-`group send` and `ota serve` need a node on the fabric (the group sender
-and the OTA provider are node services, `node/client.go`,
-`node.Config.OTAProvider`), so the tool commissions a `node.Node` of its
-own into its fabric on first use, as the `node/` live tests do. OTA
+`group send` and `ota serve` run on the controller's own identity:
+`Controller.Groups` sends with the key set `group create` keeps through
+`Controller.SetGroupKey`, and `controller.Config.OTA` serves the provider
+at the controller's provider endpoint (phase 37; until then the tool
+commissioned a second `node.Node` of its own for both). OTA
 consent is asked when an image is offered, not through the provider's
 consent hook: with the hook, matter.js's requestor cancels the update at
 apply time for a device that consents itself (`BD-Matter-OTAProvider-HostPorts`,
@@ -3442,7 +3443,7 @@ matter.js does; chip stores its 64-bit group node id in that form,
 endpoints where the YAML's own entry (`:188-211`) grants any group Manage.
 Report AT.
 
-By design (ADR 0020). A bare controller has no sender socket of its own;
+By design (ADR 0020). The controller sends through its own socket;
 the narrower ACL is what the group needs; a device before Matter 1.5 has
 no Groupcast.
 
@@ -4822,26 +4823,6 @@ there is reported, not silently widened into a scan the caller did not
 ask for; a caller that wants the fallback calls `Pair` without the
 address. go-fabric-server's `commission_on_network` with `ip_addr`
 implements matterjs-server's "dial first, then discover" on top of it.
-
-### BD-Matter-OwnNode-SeparateIdentity — the controller's OTA provider is an own node, with its own node id, composed above the controller role
-
-matter.js serves the OTA provider from the controller's `ServerNode`, so
-the announced `providerNodeId` is the fabric's root node id and the
-provider endpoint is one of the controller's own
-(`packages/node/src/behavior/system/software-update/OtaAnnouncements.ts:47-58`,
-`:272-278` at `862ad75f`; `docs/OTA.md`, "Enable OTA Provider on Controller
-Creation"). The controller role here runs no server node, so brief CM §1.3
-composes one: `node/controllernode.Start` starts a `node.Node` with node/'s
-OTA provider in the controller's database, `Controller.OwnNode` commissions
-it into the fabric on first use with a node id of its own, and the
-announcement names that id. The layering guard forbids `controller → node`
-(the facade sits above the role), so the controller reaches it through the
-`controller.OwnNode` port and `OTAConfig.StartNode` is required, with no
-`archcheck` exception (owner decision 2026-10-26). Reasoning: one OTA
-provider implementation in the module and a controller whose own identity
-stays a CASE initiator; a device sees a provider node like any other on the
-fabric, and the one line of configuration is cheaper than an import cycle
-between the facade and the role.
 
 ### BD-Matter-CommissionerAdvert-PrivacyMask — `Advertise.PrivacyMasked` drops the vendor subtype and VP, nothing else
 

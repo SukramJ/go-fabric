@@ -1808,7 +1808,7 @@
   },
   {
     "file": "endpoint/materialize.go",
-    "line": 544,
+    "line": 554,
     "citation": "OnOffServer.ts:97-122",
     "resolved": "packages/node/src/behaviors/on-off/OnOffServer.ts",
     "identifier": "OnOff",
@@ -1817,7 +1817,7 @@
   },
   {
     "file": "endpoint/types.go",
-    "line": 755,
+    "line": 765,
     "citation": "OnOffServer.ts:97-100",
     "resolved": "packages/node/src/behaviors/on-off/OnOffServer.ts",
     "identifier": "OnOff",

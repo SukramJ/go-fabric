@@ -90,9 +90,9 @@ type ControllerOptions struct {
 	// TransportPreference is each peer's preferred transport
 	// (controller.Config.TransportPreference).
 	TransportPreference exchange.Transport
-	// OTA turns on controller.New's OTA push ([Site.ControllerConfig]);
-	// the own node runs on the site unless OTA.StartNode is set. The
-	// fabrictest Controller ignores it.
+	// OTA turns on controller.New's OTA push ([Site.ControllerConfig]):
+	// the provider on the controller's own identity. The fabrictest
+	// Controller ignores it.
 	OTA *controller.OTAConfig
 }
 

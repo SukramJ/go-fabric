@@ -54,6 +54,7 @@ import (
 	"github.com/SukramJ/go-fabric/controller/commissioner"
 	"github.com/SukramJ/go-fabric/controller/dcl"
 	"github.com/SukramJ/go-fabric/controller/softwareupdate"
+	"github.com/SukramJ/go-fabric/groups"
 	"github.com/SukramJ/go-fabric/mdns"
 	"github.com/SukramJ/go-fabric/store"
 	"github.com/SukramJ/go-fabric/transport/udp"
@@ -182,6 +183,10 @@ type Config struct {
 	// OTA, when set, turns on the OTA push: the update manager and the
 	// own node its provider runs on ([OTAConfig]); nil runs neither.
 	OTA *OTAConfig
+	// GroupTransport is the transport group messages leave on; nil is the
+	// controller's own UDP socket, as matter.js's node sends from its own
+	// interface. A test hands a redirecting transport here.
+	GroupTransport groups.MulticastTransport
 	// Camera, when set, turns on the controller side of Matter cameras
 	// ([CameraConfig]): the controller serves a Camera Controller endpoint
 	// with a WebRtcTransportRequestor under its own identity and
@@ -234,13 +239,15 @@ type Controller struct {
 	// The OTA push (ota.go): the update manager and the reboot armer, the
 	// own node with its node id and address; registry is reg for the
 	// node hooks, which run while New builds it.
-	ota       atomic.Pointer[softwareupdate.Manager]
-	registry  atomic.Pointer[client.Registry]
-	armer     *peer.RebootResubscribeArmer
-	armerObs  atomic.Pointer[armerObserver] // a test seam, nil in production (ota.go)
-	ownNode   OwnNode
-	ownNodeID uint64
-	ownAddr   *net.UDPAddr
+	ota      atomic.Pointer[softwareupdate.Manager]
+	registry atomic.Pointer[client.Registry]
+	armer    *peer.RebootResubscribeArmer
+	armerObs atomic.Pointer[armerObserver] // a test seam, nil in production (ota.go)
+	// groups is the controller's group sender (groups.go).
+	groups *groups.Manager
+	// otaProvider is the OTA provider on the controller's identity
+	// (ota_provider.go), nil without Config.OTA.
+	otaProvider *otaProvider
 }
 
 // New builds the controller over cfg.DB: the fabric is created on the
@@ -260,8 +267,6 @@ func New(ctx context.Context, cfg Config) (_ *Controller, err error) {
 		return nil, fmt.Errorf("%w: DB is required", ErrConfiguration)
 	case cfg.Attestation == nil:
 		return nil, fmt.Errorf("%w: Attestation is required (attestation.TestStore() for development devices)", ErrConfiguration)
-	case cfg.OTA != nil && cfg.OTA.StartNode == nil:
-		return nil, fmt.Errorf("%w: OTA.StartNode is required (node/controllernode.Start)", ErrConfiguration)
 	}
 	log := cfg.Logger
 	if log == nil {
@@ -334,10 +339,10 @@ func New(ctx context.Context, cfg Config) (_ *Controller, err error) {
 	}); err != nil {
 		return nil, err
 	}
-	if err := c.serveEndpoints(ctx, cfg, log); err != nil {
+	if err := c.openRegistry(cfg, fabrics, clk, log); err != nil { //nolint:contextcheck // the registry's hooks run on its own lifetime, as otaHooks notes
 		return nil, err
 	}
-	if err := c.openRegistry(ctx, cfg, fabrics, clk, log); err != nil {
+	if err := c.serveAndStart(ctx, cfg, log); err != nil {
 		return nil, err
 	}
 	if !cfg.ManualStart {
@@ -350,7 +355,7 @@ func New(ctx context.Context, cfg Config) (_ *Controller, err error) {
 
 // openRegistry builds the node registry over the commissioner and, with
 // OTA, starts the OTA push: the steps of [New] after the commissioner.
-func (c *Controller) openRegistry(ctx context.Context, cfg Config, fabrics []*commissioner.Fabric, clk clock.Clock, log *slog.Logger) error {
+func (c *Controller) openRegistry(cfg Config, fabrics []*commissioner.Fabric, clk clock.Clock, log *slog.Logger) error {
 	nodeCfg := cfg.Node
 	if nodeCfg.Logger == nil {
 		nodeCfg.Logger = log
@@ -371,6 +376,25 @@ func (c *Controller) openRegistry(ctx context.Context, cfg Config, fabrics []*co
 		return err
 	}
 	c.registry.Store(c.reg)
+	return nil
+}
+
+// serveAndStart composes what the controller serves under its own
+// identity over the registry — the group sender, the OTA provider, the
+// tree they and the camera controller sit on — then starts the manager
+// that waits for the tree.
+func (c *Controller) serveAndStart(ctx context.Context, cfg Config, log *slog.Logger) error {
+	if err := c.openGroups(ctx, cfg, log); err != nil {
+		return err
+	}
+	if cfg.OTA != nil {
+		if err := c.openOTA(ctx, cfg); err != nil {
+			return err
+		}
+	}
+	if err := c.serveEndpoints(ctx, cfg, log); err != nil {
+		return err
+	}
 	if cfg.OTA != nil {
 		return c.startOTA(ctx, cfg)
 	}
@@ -451,9 +475,15 @@ func (c *Controller) Close(ctx context.Context) error {
 	if m := c.ota.Swap(nil); m != nil {
 		m.Close()
 	}
-	if c.ownNode != nil {
-		errs = append(errs, c.ownNode.Stop(ctx))
-		c.ownNode = nil
+	if c.groups != nil {
+		c.groups.SetTransport(nil)
+		c.groups = nil
+	}
+	if c.otaProvider != nil {
+		c.otaProvider.stop()
+		c.otaProvider.restore()
+		c.otaProvider.bdx.Close()
+		c.otaProvider = nil
 	}
 	if c.armer != nil {
 		c.armer.Close()
@@ -523,6 +553,11 @@ func (c *Controller) Fabric() *commissioner.Fabric { return c.fabric }
 // Commissioner().Interaction. A seam of the role — matter.js's node
 // peers (packages/node/src/node/client/Peers.ts:93 at 862ad75f).
 func (c *Controller) Peers() *peer.Set { return c.peers }
+
+// Addr is the controller's UDP address: where its sessions, its
+// commissioner record and, with a served tree, its operational record
+// point.
+func (c *Controller) Addr() *net.UDPAddr { return c.udp.LocalAddr() }
 
 // Commissioner is the commissioner the registry pairs through. A seam of
 // the role.
