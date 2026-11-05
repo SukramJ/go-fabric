@@ -5549,7 +5549,9 @@ camera-app at `6170af84`: the HAL's capabilities and features
 (`zone-manager.cpp:169-289`) and the chime's sounds (`chime-manager.h:41-45`).
 Deliberate differences: nothing is captured or sent — ProvideOffer keeps the
 session but sends no Answer, a push transport uploads nothing and is never
-busy, CaptureSnapshot returns a generated JPEG under `--camera-test-videosrc`
+busy, its recording only the PushTransportBegin and PushTransportEnd of the
+camera-app's transport lifecycle (a continuous transport while Active, a
+triggered one for its InitialDuration), CaptureSnapshot returns a generated JPEG under `--camera-test-videosrc`
 and fails without it (the camera-app's `/dev/video0` capture); the camera and
 the chime are bridged devices, the chime one of its own (the Camera device
 type lists no Chime); with PERZONESENS the zone management serves no
