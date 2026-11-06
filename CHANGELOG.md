@@ -50,6 +50,7 @@ pseudo-version of `main`.
 ### Fixed
 
 - `cluster/core`: TimeSynchronization's TimeZoneDatabase (TZ) went on the wire as TLV null — the server returned a named enum type the bridge's reply writer does not encode; it is now the value (`None` 0 by default).
+- `bridge`: what a command or a change notification moved is decided by value — the attribute's TLV wire form, the Go value behind a null — not by its `%#v` rendering, which printed a pointer as its address: a cluster server whose `MatterRead` answers with a fresh struct or nested pointers no longer has an unchanged attribute reported after every command. Mirrors matter.js's Datasource, which notes only a value that is not `isDeepEqual` to the old one. `cluster/closure` drops its cached state views and the process-wide intern table that worked around it; `OverallCurrentState` and `OverallTargetState` read as a fresh copy (#419).
 - `bdx`: an outbound transfer whose scope is disabled after its last block went out reports finished, not cancelled — the receiver has moved on (an OTA requestor's ApplyUpdateRequest can reach a stack that serves exchanges concurrently before its BlockAckEOF is read), so the provider sees WaitForApply before Applying as matter.js's single-threaded provider does (`OtaSoftwareUpdateProviderServer.ts:437`). `bdx.ErrScopeDisabled` is the close cause; the same holds for a scope disabled while the last block's own acknowledgement is still awaited.
 
 ### Removed
