@@ -2355,6 +2355,14 @@ redirect policy. Each deviation fails the download as an `otaDownloadError`
 response (for a refused redirect the redirect's, which `net/http` returns
 with the error), or before a response UpdateState Unknown's value (0) as
 the BDX path uses.
+A fourth: `NewOTASoftwareUpdateRequestor` refuses a `TransferProtocols`
+list without BDX synchronous, where matter.js's `transferProtocolsSupported`
+takes any list a host sets and only its default carries BDX
+(`OtaSoftwareUpdateRequestorServer.ts:1372` at `862ad75f`).
+connectedhomeip's requestor announces BDX synchronous alone
+(`src/app/clusters/ota-requestor/DefaultOTARequestor.cpp:747` at
+`6170af84`); the refusal keeps BDX synchronous in every list, as both
+announce it.
 A GET that gets no response mirrors matter.js: `fetch` rejects with an
 error that is no `MatterError`, `MatterError.accept` rethrows it (`:925`)
 to `#queryForUpdate`'s handler (`:632-640`), and the provider counts as

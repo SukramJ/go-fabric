@@ -8433,7 +8433,7 @@
       "identifier": "TestOTARequestorHTTPS_Config",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/ota_requestor_https_test.go",
-      "line": 513
+      "line": 518
     },
     {
       "package": "cluster/core",
