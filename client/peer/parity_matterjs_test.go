@@ -198,12 +198,6 @@ func TestParityKnownPeerMerge(t *testing.T) {
 			func(d Descriptor) bool { return d.OperationalAddress.String() == addr1 }, ":317",
 		},
 		{
-			"CATs replace",
-			Descriptor{CaseAuthenticatedTags: []uint32{1}},
-			Descriptor{CaseAuthenticatedTags: []uint32{2}},
-			func(d Descriptor) bool { return d.CaseAuthenticatedTags[0] == 2 }, ":321-323",
-		},
-		{
 			"discovery data: the peer's wins",
 			Descriptor{DiscoveryData: &discoveryTXT{SII: &old}},
 			Descriptor{DiscoveryData: &discoveryTXT{SII: &nw, SAI: &sai}},

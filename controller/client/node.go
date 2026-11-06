@@ -88,7 +88,7 @@ type Node struct {
 	// current default subscription — subscriptionActive as
 	// #endDefaultSubscription reads it (NetworkClient.ts:242-250).
 	subReported bool
-	// likelyOffline is the latch of :393-398.
+	// likelyOffline is the latch of NetworkClient.ts:404-407 at db021da0.
 	likelyOffline bool
 	seeded        bool
 	// labelReconciled is NetworkClient's fabricLabelReconciled latch

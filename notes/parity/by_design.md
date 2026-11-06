@@ -6243,3 +6243,19 @@ not divergences: TimeSynchronization's optional features (milestone 6 wave
 27-B) and AirQuality's feature-gated values. Re-read at every pin lift
 together with the Ahead-of-matter.js markers: a `*Server.ts` of one of
 these clusters growing past the shell reopens the question.
+
+### BD-Matter-NoConfiguredCATs — the client stack keeps no configured CATs for a peer; matter.js keeps its ignored option
+
+Since the db021da0 lift a CASE session's CATs are the peer's NOC's on both
+sides of the handshake (wave P1, #435), and matter.js documents its own
+`PairOptions.caseAuthenticatedTags` as "Not applied yet; the option is
+ignored" (`packages/protocol/src/session/case/CaseClient.ts:396-404` at
+`db021da0`) while `PeerSet.addKnownPeer` still replaces a known peer's
+descriptor CATs (`packages/protocol/src/peer/PeerSet.ts:321-323`). This
+module removes the field instead (owner decision 2026-11-06 on #433):
+`peer.Descriptor.CaseAuthenticatedTags`, `client.CommissionOptions` and
+`client.Record`'s set are gone, a stored record's field 1 is read and
+ignored and dropped by the next save — a facade option that does nothing
+is no option. Proof: `controller/client:TestRecordIgnoresRetiredCATs`; the
+`client/peer` merge row "CATs replace" (`PeerSet.ts:321-323`) is dropped
+from `client/peer:TestParityKnownPeerMerge`'s table.

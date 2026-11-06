@@ -2970,14 +2970,13 @@
       "path": "packages/node/test/behavior/system/network/ConnectionStateTest.ts",
       "status": "partial",
       "go": [
-        "controller/client:TestConnectionStateParityMatterJS"
+        "controller/client:TestConnectionStateParityMatterJS",
+        "controller/client:TestConnectionStateWithoutAddressParity"
       ],
       "missing": [
-        "transitions to WaitingForDeviceDiscovery when a registered ICD misses its check-in",
-        "reports WaitingForDeviceDiscovery while a peer has no address to try",
-        "returns to Reconnecting when discovery finds an address for a peer without a subscription"
+        "transitions to WaitingForDeviceDiscovery when a registered ICD misses its check-in"
       ],
-      "reason": "Ten cases run on the registry's client.Node of a commissioned fabrictest device: Node.ConnectionState and the ConnectionStateChanged hook every node of the registry gets; the establishment-unresponsive signal fires as in the field, the stopped device leaving the sustained subscription's CASE re-establishment unanswered (the Go peer's signal is not emitted from outside), the session loss is Peer.Disconnect with a cause (controller/client/connection_state_parity_matterjs_test.go). Missing, controller-side: the IcdClient's checkInMissed (ClientNode's ICD client, with the ICD files of milestone 5 phase 23); Register candidate.",
+      "reason": "Ten cases run on the registry's client.Node of a commissioned fabrictest device: Node.ConnectionState and the ConnectionStateChanged hook every node of the registry gets; the establishment-unresponsive signal fires as in the field, the stopped device leaving the sustained subscription's CASE re-establishment unanswered (the Go peer's signal is not emitted from outside), the session loss is Peer.Disconnect with a cause (controller/client/connection_state_parity_matterjs_test.go). Missing, controller-side: the IcdClient's checkInMissed (ClientNode's ICD client, with the ICD files of milestone 5 phase 23); Register candidate. Pin lift wave P4 (#433): a peer with no session, no operational address and no service address reports WaitingForDeviceDiscovery and returns to Reconnecting once DNS-SD finds an address (NetworkClient.ts:390-392, :541-546 at db021da0), on the registry harness with a node stored without an address (controller/client:TestConnectionStateWithoutAddressParity).",
       "snapshotSha": "83f5ea26601b2afee3b43f36a446375aae88d6b2"
     },
     {
@@ -5428,8 +5427,11 @@
     },
     {
       "path": "packages/node/test/node/CommissioningClosedSessionReArmTest.ts",
-      "status": "planned",
-      "reason": "matter.js pin lift 862ad75f → db021da0 (2026-11-06): wave P4 (#433, the TCP size cap, the Sigma1 refresh schedule, delta event timestamps, the discovery state and the between-steps re-arm after #4793/#4794/#4832/#4808/#4815; the peer VID verification of #4880) ports it by meaning.",
+      "status": "ported",
+      "go": [
+        "controller/commissioner:TestCommissioningClosedSessionReArmParity"
+      ],
+      "reason": "The flow's between-steps re-arm skips a closed commissioning session (ControllerCommissioningFlow.ts:835-849 at db021da0), after a step that left less than half the failsafe and before a step that re-arms first; the Go flow runs over a scripted device on a fake clock, the closing step its own (controller/commissioner:TestCommissioningClosedSessionReArmParity). Pin lift wave P4 (#433).",
       "snapshotSha": "b08e549f5ba36963dec113deac0cc568c0fd2151"
     },
     {

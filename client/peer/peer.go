@@ -265,10 +265,6 @@ func (p *Peer) mergeKnown(d Descriptor) {
 		p.desc.OperationalAddress = cloneUDPAddr(d.OperationalAddress)
 		p.changedLocked()
 	}
-	if d.CaseAuthenticatedTags != nil && (p.desc.CaseAuthenticatedTags == nil || !slices.Equal(p.desc.CaseAuthenticatedTags, d.CaseAuthenticatedTags)) {
-		p.desc.CaseAuthenticatedTags = slices.Clone(d.CaseAuthenticatedTags)
-		p.changedLocked()
-	}
 	if d.DiscoveryData != nil {
 		merged := *d.DiscoveryData
 		if p.desc.DiscoveryData != nil {

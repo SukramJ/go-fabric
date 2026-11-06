@@ -2310,15 +2310,6 @@
     "occurrences": 2
   },
   {
-    "file": "controller/client/network.go",
-    "line": 458,
-    "citation": "NetworkClient.ts:215-238",
-    "resolved": "packages/node/src/behavior/system/network/NetworkClient.ts",
-    "identifier": "#recomputeConnectionState",
-    "nearest": 108,
-    "occurrences": 10
-  },
-  {
     "file": "controller/client/node.go",
     "line": 78,
     "citation": "NetworkClient.ts:385-391",
@@ -2383,7 +2374,7 @@
   },
   {
     "file": "controller/client/record.go",
-    "line": 129,
+    "line": 130,
     "citation": "CommissioningClient.ts:836-845",
     "resolved": "packages/node/src/behavior/system/commissioning/CommissioningClient.ts",
     "identifier": "AdvertisedIntervals",
@@ -2392,7 +2383,7 @@
   },
   {
     "file": "controller/client/record.go",
-    "line": 461,
+    "line": 451,
     "citation": "behavior/system/commissioning/RemoteDescriptor.ts:214-234",
     "resolved": "packages/node/src/behavior/system/commissioning/RemoteDescriptor.ts",
     "identifier": "toLongForm",
@@ -2401,7 +2392,7 @@
   },
   {
     "file": "controller/client/record.go",
-    "line": 485,
+    "line": 475,
     "citation": "RemoteDescriptor.ts:91-143",
     "resolved": "packages/node/src/behavior/system/commissioning/RemoteDescriptor.ts",
     "identifier": "fromLongForm",
@@ -2410,7 +2401,7 @@
   },
   {
     "file": "controller/client/record.go",
-    "line": 690,
+    "line": 681,
     "citation": "CommissioningClient.ts:586",
     "resolved": "packages/node/src/behavior/system/commissioning/CommissioningClient.ts",
     "identifier": "peerAddress",

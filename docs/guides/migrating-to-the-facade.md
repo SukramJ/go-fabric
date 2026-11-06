@@ -272,6 +272,17 @@ sides of the handshake — a `ResumptionStore` that persisted both keeps one.
 `peer.Descriptor.CaseAuthenticatedTags` is still recorded and no longer
 reaches the handshake.
 
+## Changed after v0.17.0: the configured CATs
+
+`peer.Descriptor.CaseAuthenticatedTags`, `client.CommissionOptions.CaseAuthenticatedTags`
+and `client.Record.CaseAuthenticatedTags` are removed. Since the CASE
+options above, a session's CATs are the peer's NOC's and the configured set
+reached nothing; delete the field from the literal. A node record a
+registry stored before carries the set at its field 1: it is read with the
+field ignored, and the record's next save drops it. matter.js keeps its
+ignored `caseAuthenticatedTags` option only for its legacy API
+(`CaseClient.ts:396-404` at db021da0).
+
 ## Changed after v0.17.0: `DatastoreSync.SyncEndpointBindings`
 
 `jointfabricdatastore.DatastoreSync` (`jointfabric.DatastoreSync`) gains

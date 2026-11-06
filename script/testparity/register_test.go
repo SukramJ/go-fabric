@@ -46,7 +46,8 @@ import (
 // DistinguishedNameTest, OperationalCertificateVerifyTest) as partial: 16.
 // // Pin lift wave P2 (#431) ports AttestationCertificateProfileTest.ts (in
 // part), CdSignersTest.ts and DeviceAttestationValidatorChipCdTest.ts as well: 13.
-const testparityPlannedRatchet = 13
+// Pin lift wave P4 (#433) ports CommissioningClosedSessionReArmTest.ts: 12.
+const testparityPlannedRatchet = 12
 
 // testparityPortedRatchet is the number of ported entries, and
 // testparityMissingRatchet the number of matter.js it cases the partial
@@ -114,9 +115,10 @@ const testparityPlannedRatchet = 13
 // DclCertificateServiceTest.ts leave missing, the 23 distinguished-name
 // cases of AttestationCertificateProfileTest.ts (#4880, wave P1) join it:
 // merged with wave P1: 149 ported, 1024 missing.
+// Pin lift wave P4 (#433): CommissioningClosedSessionReArmTest.ts ported, ConnectionStateTest.ts's two no-address cases: 150 ported, 1022 missing.
 const (
-	testparityPortedRatchet  = 149
-	testparityMissingRatchet = 1024
+	testparityPortedRatchet  = 150
+	testparityMissingRatchet = 1022
 )
 
 // testparityLeftRatchet is the number of left it cases summed over the

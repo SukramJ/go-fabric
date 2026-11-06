@@ -429,15 +429,27 @@ func (n *Node) SubscriptionActive() bool {
 	return s != nil && s.Active()
 }
 
-// observePeer binds the peer's signals (NetworkClient.ts:79-83): an
-// unresponsive establishment sets the likely-offline latch (:244-247), a
-// new session clears it (:254-257), each recomputes the connection state.
+// observePeer binds the peer's signals (NetworkClient.ts:84-88 at
+// db021da0): an unresponsive establishment sets the likely-offline latch
+// (:404-407), a new session clears it (:414-417), a deleted session and a
+// change of the peer's operational service recompute the connection state —
+// the service's addresses decide whether the peer has any address to try
+// (:88, :390-392).
 func (n *Node) observePeer() func() {
 	p := n.peer()
 	if p == nil {
 		return nil
 	}
-	return p.Observe(peer.Observer{
+	ctx, cancel := context.WithCancel(context.Background())
+	if svc := p.Service(); svc != nil {
+		changes := svc.Changes(ctx)
+		go func() {
+			for range changes {
+				n.recompute()
+			}
+		}()
+	}
+	stop := p.Observe(peer.Observer{
 		SessionAdded: func(*exchange.Session) {
 			n.mu.Lock()
 			n.likelyOffline = false
@@ -452,19 +464,39 @@ func (n *Node) observePeer() func() {
 			n.recompute()
 		},
 	})
+	return func() {
+		stop()
+		cancel()
+	}
+}
+
+// hasAnyAddress reports whether the peer has anything to try: a session,
+// an operational address or an address of its operational service.
+// Without one no establishment runs, so the establishment-unresponsive
+// signal that marks the peer likely offline never fires. Mirrors matter.js
+// NetworkClient.ts:541-546 (hasAnyAddress) at db021da0.
+func hasAnyAddress(p *peer.Peer) bool {
+	if len(p.Sessions()) > 0 || p.Descriptor().OperationalAddress != nil {
+		return true
+	}
+	svc := p.Service()
+	return svc != nil && len(svc.Addresses()) > 0
 }
 
 // recompute sets the connection state from the liveness signals —
-// NetworkClient.#recomputeConnectionState (NetworkClient.ts:215-238): an
-// active subscription with a session of the peer is Connected (:223), a
-// disabled or stopped node Disconnected (:226-230), the latch
-// WaitingForDeviceDiscovery (:231-232), anything else Reconnecting; a
+// NetworkClient.#recomputeConnectionState (NetworkClient.ts:374-398 at
+// db021da0): an active subscription with a session of the peer is
+// Connected (:383-385), a disabled or stopped node Disconnected
+// (:386-389), the latch or a peer without any address to try
+// WaitingForDeviceDiscovery (:390-392), anything else Reconnecting; a
 // transition calls ConnectionStateChanged (ClientNodeLifecycle.ts:101-107).
 func (n *Node) recompute() {
+	p := n.peer()
+	noAddress := p != nil && !hasAnyAddress(p)
 	n.mu.Lock()
 	active := n.sub != nil && n.sub.Active()
-	hasSession := n.cfg.Peer == nil || len(n.cfg.Peer.Sessions()) > 0
-	st := connectionStateFor(active, hasSession, n.settings.disabled || !n.started, n.likelyOffline)
+	hasSession := p == nil || len(p.Sessions()) > 0
+	st := connectionStateFor(active, hasSession, n.settings.disabled || !n.started, n.likelyOffline || noAddress)
 	if st == Connected || st == Disconnected {
 		n.likelyOffline = false
 	}
@@ -496,14 +528,15 @@ func (n *Node) recompute() {
 	}
 }
 
-// connectionStateFor is the decision of NetworkClient.ts:223-235.
-func connectionStateFor(active, hasSession, offline, likelyOffline bool) ConnectionState {
+// connectionStateFor is the decision of NetworkClient.ts:383-396 at
+// db021da0; waiting is the latch or a peer without any address.
+func connectionStateFor(active, hasSession, offline, waiting bool) ConnectionState {
 	switch {
 	case active && hasSession:
 		return Connected
 	case offline:
 		return Disconnected
-	case likelyOffline:
+	case waiting:
 		return WaitingForDeviceDiscovery
 	}
 	return Reconnecting
