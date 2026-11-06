@@ -577,7 +577,7 @@ func (s *ColorControlServer) MatterRead(attrID uint32) (any, bool) {
 	if !s.inst.Serves(attrID) {
 		return nil, false
 	}
-	if v, ok := s.points[attrID]; ok {
+	if v, ok := s.readColorPoint(attrID); ok {
 		return v, true
 	}
 	s.mu.Lock()
@@ -604,15 +604,6 @@ func (s *ColorControlServer) MatterRead(attrID uint32) (any, bool) {
 		return uint8(st.mode), true
 	case ccdef.AttrOptions:
 		return s.options, true
-	case ccdef.AttrNumberOfPrimaries:
-		// NumberOfPrimaries is mandatory with Quality X (nullable): the
-		// count of the supplied primaries, null without any
-		// (connectedhomeip ColorControlCluster.cpp:178-191 counts the
-		// supplied table; matter.js leaves the value to the application).
-		if n := len(s.cfg.Primaries); n > 0 {
-			return uint8(n), true //nolint:gosec // at most maxPrimaries
-		}
-		return nil, true
 	case ccdef.AttrEnhancedCurrentHue:
 		return st.enhancedHue, true
 	case ccdef.AttrEnhancedColorMode:
@@ -649,6 +640,22 @@ func (s *ColorControlServer) MatterRead(attrID uint32) (any, bool) {
 		return *s.startUpMireds, true
 	}
 	return nil, false
+}
+
+// readColorPoint reads NumberOfPrimaries and the supplied colour points,
+// which are the configuration's. NumberOfPrimaries is mandatory with
+// quality X (nullable): the count of the supplied primaries, null without
+// any (connectedhomeip ColorControlCluster.cpp:178-191 counts the
+// supplied table; matter.js leaves the value to the application).
+func (s *ColorControlServer) readColorPoint(attrID uint32) (any, bool) {
+	if attrID == ccdef.AttrNumberOfPrimaries {
+		if n := len(s.cfg.Primaries); n > 0 {
+			return uint8(n), true //nolint:gosec // at most maxPrimaries
+		}
+		return nil, true
+	}
+	v, ok := s.points[attrID]
+	return v, ok
 }
 
 // MatterWrite accepts the writable attributes: Options ("RW VO") and, with
