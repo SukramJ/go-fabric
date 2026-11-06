@@ -453,10 +453,40 @@
     },
     {
       "path": "packages/general/test/net/NetworkInterfaceChangesTest.ts",
-      "status": "excluded",
-      "class": "js-runtime-only",
-      "reason": "The JS Network abstraction's interfacesChanged observable (#4842); the behaviour it drives — the mDNS responder and GeneralDiagnostics following interface changes — is the lift's wave P3 (#432), whose tests are MdnsServerAddressChangeTest.ts and GeneralDiagnosticsNetworkInterfacesTest.ts.",
-      "snapshotSha": "823f1994fa5eafb5928b8854389915840d4fbb84"
+      "status": "ported",
+      "snapshotSha": "823f1994fa5eafb5928b8854389915840d4fbb84",
+      "go": [
+        "internal/netwatch:TestNetworkInterfaceChanges",
+        "internal/netwatch:TestWatcherInterval"
+      ],
+      "left": [
+        {
+          "it": "keeps copies of the details it compares",
+          "class": "js-runtime-only",
+          "reason": "The Go snapshot is a map of description strings built per check; there is no shared details object a later edit could change."
+        },
+        {
+          "it": "does not poll for an observer that is not observant",
+          "class": "js-runtime-only",
+          "reason": "Observant observers are a property of matter.js's Observable; the Go watcher runs between Start and Stop, which its owner calls."
+        },
+        {
+          "it": "closes only after a running check reached its observers",
+          "class": "js-runtime-only",
+          "reason": "The Network's close awaits the running check's promise; the Go watcher has no close, and a tick of a stopped generation is discarded."
+        },
+        {
+          "it": "shares one run between overlapping checks",
+          "class": "js-runtime-only",
+          "reason": "matter.js returns the running check's promise to an overlapping caller; the Go watcher serialises checks on a mutex, so changed never runs concurrently either."
+        },
+        {
+          "it": "does not poll after close when observed again",
+          "class": "js-runtime-only",
+          "reason": "The Network's closed state has no Go counterpart: the watcher lives with its owner (the responder, GeneralDiagnostics), whose close stops it."
+        }
+      ],
+      "reason": "The Network's interface comparison (#4842) is internal/netwatch's Watcher, ported by meaning on a fake host and the fake clock: the first snapshot only records, the sorted changed names, order and duplicates no change, a MAC change a change, polling only while observed, a failed listing keeping the previous snapshot, a fresh start after Stop, an interface without details absent, polling after a failed check, no poll after Stop; the interval switch the host has (issue #432) is TestWatcherInterval."
     },
     {
       "path": "packages/general/test/net/RetryScheduleTest.ts",
@@ -3335,9 +3365,12 @@
     },
     {
       "path": "packages/node/test/behaviors/fixed-label/FixedLabelServerTest.ts",
-      "status": "planned",
-      "reason": "matter.js pin lift 862ad75f → db021da0 (2026-11-06): wave P3 (#432, mDNS goodbye scope and interface following, GeneralDiagnostics after #4844/#4842/#4881; the label and localisation server tests of #4900 read for server fixes) ports it by meaning.",
-      "snapshotSha": "d0dfe0a20f02de08208df79547753681c2f461c9"
+      "status": "ported",
+      "reason": "Ported over the wire (#4900): the application's labels served, a controller REPLACE_ALL and a REPLACE_ALL followed by ADD refused with UNSUPPORTED_WRITE with the labels kept, the labels from the application after a restart. The ADD case moved FixedLabel's LabelList into schema's read-only table (it answered CONSTRAINT_ERROR before).",
+      "snapshotSha": "d0dfe0a20f02de08208df79547753681c2f461c9",
+      "go": [
+        "node:TestFixedLabelServerParity"
+      ]
     },
     {
       "path": "packages/node/test/behaviors/general-diagnostics/GeneralDiagnosticsFeaturesTest.ts",
@@ -3354,9 +3387,12 @@
     },
     {
       "path": "packages/node/test/behaviors/general-diagnostics/GeneralDiagnosticsNetworkInterfacesTest.ts",
-      "status": "planned",
-      "reason": "matter.js pin lift 862ad75f → db021da0 (2026-11-06): wave P3 (#432, mDNS goodbye scope and interface following, GeneralDiagnostics after #4844/#4842/#4881; the label and localisation server tests of #4900 read for server fixes) ports it by meaning.",
-      "snapshotSha": "e15a91f38ef7a07945faf089eb662fb50650f17d"
+      "status": "ported",
+      "reason": "Ported on the server: matter.js's node online while its Network is observed is the Go server observed by the bridge's attribute listener; an address change reaches NetworkInterfaces' subscribers within one interface check with the DataVersion advanced, nothing is compared while unobserved and the attribute reads the current interfaces; the host's switch (node.Network.InterfaceCheck) is a third case.",
+      "snapshotSha": "e15a91f38ef7a07945faf089eb662fb50650f17d",
+      "go": [
+        "cluster/core:TestGeneralDiagnosticsNetworkInterfaces"
+      ]
     },
     {
       "path": "packages/node/test/behaviors/general-diagnostics/GeneralDiagnosticsOperationalHoursTest.ts",
@@ -3382,9 +3418,39 @@
     },
     {
       "path": "packages/node/test/behaviors/general-diagnostics/GeneralDiagnosticsServerTest.ts",
-      "status": "planned",
-      "reason": "matter.js pin lift 862ad75f → db021da0 (2026-11-06): wave P3 (#432, mDNS goodbye scope and interface following, GeneralDiagnostics after #4844/#4842/#4881; the label and localisation server tests of #4900 read for server fixes) ports it by meaning.",
-      "snapshotSha": "d5b64d9fd9b849b5dcf7872703d16f5642c9ebd3"
+      "status": "partial",
+      "reason": "The enable-key gate of both test commands (#4881), TestEventTriggersEnabled derived from the key, PayloadTestRequest's constraints and TimeSnapshot's SystemTimeMs on the UpTime base are ported on the server. Missing: the faults describe — the Go server serves none of the optional fault attributes or fault events (general_diagnostics.go), a feature gap.",
+      "snapshotSha": "d5b64d9fd9b849b5dcf7872703d16f5642c9ebd3",
+      "go": [
+        "cluster/core:TestGeneralDiagnosticsServerTestEventTrigger",
+        "cluster/core:TestGeneralDiagnosticsServerTestEventTriggersEnabled",
+        "cluster/core:TestGeneralDiagnosticsServerPayloadTestRequest",
+        "cluster/core:TestGeneralDiagnosticsServerTimeSnapshot"
+      ],
+      "missing": [
+        "registers and clears hardware faults with one event per change",
+        "registers and clears radio faults with one event per change",
+        "registers and clears network faults with one event per change",
+        "emits nothing when an active fault is registered again",
+        "emits nothing when an absent fault is cleared"
+      ],
+      "left": [
+        {
+          "it": "is true when a non-zero key is configured and the attribute is set false",
+          "class": "js-runtime-only",
+          "reason": "The Go server has no TestEventTriggersEnabled state a host could set beside the key; EnableTestEventTriggers is the one input."
+        },
+        {
+          "it": "refuses to start when set true without a key",
+          "class": "js-runtime-only",
+          "reason": "The Go server has no TestEventTriggersEnabled state a host could set beside the key; EnableTestEventTriggers is the one input."
+        },
+        {
+          "it": "keeps both test commands disabled when the key is set after initialization",
+          "class": "js-runtime-only",
+          "reason": "The case assigns the state field after initialize, which matter.js does not observe; the Go key is configured through EnableTestEventTriggers, which takes effect whenever it is called."
+        }
+      ]
     },
     {
       "path": "packages/node/test/behaviors/group-key-management/GroupKeyManagementServerTest.ts",
@@ -3565,9 +3631,10 @@
     },
     {
       "path": "packages/node/test/behaviors/localization-configuration/LocalizationConfigurationServerTest.ts",
-      "status": "planned",
-      "reason": "matter.js pin lift 862ad75f → db021da0 (2026-11-06): wave P3 (#432, mDNS goodbye scope and interface following, GeneralDiagnostics after #4844/#4842/#4881; the label and localisation server tests of #4900 read for server fixes) ports it by meaning.",
-      "snapshotSha": "46be92b7ac7c39322d25b71eae41afa7c8e7cb31"
+      "status": "excluded",
+      "reason": "The one case overrides the detected locale through a getter on a subclass of a derived behavior type, a TypeScript class mechanism; the Go server takes its locale from the host's configuration.",
+      "snapshotSha": "46be92b7ac7c39322d25b71eae41afa7c8e7cb31",
+      "class": "js-runtime-only"
     },
     {
       "path": "packages/node/test/behaviors/measurement/MeasurementServersTest.ts",
@@ -3868,9 +3935,19 @@
     },
     {
       "path": "packages/node/test/behaviors/user-label/UserLabelServerTest.ts",
-      "status": "planned",
-      "reason": "matter.js pin lift 862ad75f → db021da0 (2026-11-06): wave P3 (#432, mDNS goodbye scope and interface following, GeneralDiagnostics after #4844/#4842/#4881; the label and localisation server tests of #4900 read for server fixes) ports it by meaning.",
-      "snapshotSha": "0e2154923651d15c7747cf8224f53253fd2c4c45"
+      "status": "ported",
+      "reason": "Ported over the wire on a commissioned fabrictest light (#4900): REPLACE_ALL alone and chunked with ADD, the empty list, the 16-character limits, the maxLabels limit with RESOURCE_EXHAUSTED for a REPLACE_ALL and the crossing ADD, the 255 default, the LabelStruct constraints in both write forms, UNSUPPORTED_ACCESS for an Operate-only writer and persistence across a restart on the same store. No server fix was needed.",
+      "snapshotSha": "0e2154923651d15c7747cf8224f53253fd2c4c45",
+      "go": [
+        "node:TestUserLabelServerParity"
+      ],
+      "left": [
+        {
+          "it": "answers a lone ADD to a non-empty list with BUSY and keeps the list",
+          "class": "skip",
+          "reason": "The skipped subtest names it: im/write.go applies an ADD without a preceding write to the same attribute, matter.js answers BUSY (InteractionServer.ts:511-531 at db021da0); findings register T3-P3-1."
+        }
+      ]
     },
     {
       "path": "packages/node/test/behaviors/web-rtc-transport-requestor/WebRtcTransportRequestorServerTest.ts",
@@ -7803,9 +7880,34 @@
     },
     {
       "path": "packages/protocol/test/mdns/MdnsServerAddressChangeTest.ts",
-      "status": "planned",
-      "reason": "matter.js pin lift 862ad75f → db021da0 (2026-11-06): wave P3 (#432, mDNS goodbye scope and interface following, GeneralDiagnostics after #4844/#4842/#4881; the label and localisation server tests of #4900 read for server fixes) ports it by meaning.",
-      "snapshotSha": "ca85534121a565c2158700f3fcac45b31a3d91b7"
+      "status": "ported",
+      "reason": "Ported on the fake wire, whose addresses are the test network's interface details, with CheckInterfaces as Network.checkInterfaces: the goodbye of a lost address and the repeat a second later, an added address, answers after a change, publication only on the changed interface, observation only while services are published, nothing after close; plus the periodic check and the host's switch (node.Network.InterfaceCheck).",
+      "snapshotSha": "ca85534121a565c2158700f3fcac45b31a3d91b7",
+      "go": [
+        "mdns:TestMdnsServerAddressChange"
+      ],
+      "left": [
+        {
+          "it": "reads the details again after a change, also shortly after a read reported none",
+          "class": "by-design",
+          "reason": "The responder keeps no details-retry interval: every record rebuild reads the advertised addresses again (notes/parity/by_design.md BD-Matter-MdnsFollowsAdvertisedAddresses)."
+        },
+        {
+          "it": "keeps the interface check working when a generator throws after a change",
+          "class": "js-runtime-only",
+          "reason": "The Go records are built from the Service and the addresses and cannot throw; the watcher's check has no observer error path to survive."
+        },
+        {
+          "it": "publishes on every interface when the host name changes",
+          "class": "by-design",
+          "reason": "The host name is the Service's and is not chosen again on an interface change (notes/parity/by_design.md BD-Matter-MdnsFollowsAdvertisedAddresses)."
+        },
+        {
+          "it": "sends nothing when the server closes while it handles a change",
+          "class": "js-runtime-only",
+          "reason": "The case holds an asynchronous details read across close; the Go change handler runs under the responder's lock and checks closed first, so there is no interleaving to hold."
+        }
+      ]
     },
     {
       "path": "packages/protocol/test/mdns/MdnsServerTest.ts",
@@ -7824,15 +7926,14 @@
         "mdns:TestMdnsServerDuplicateQuestionSuppression",
         "mdns:TestMdnsServerUnknownNameQueryRejection",
         "mdns:TestMdnsServerClose",
-        "mdns:TestMdnsServerHostName"
+        "mdns:TestMdnsServerHostName",
+        "mdns:TestMdnsServerGoodbye"
       ],
       "missing": [
         "chooses the name on a network that reports interface details asynchronously",
         "names each interface by its own MAC when the interfaces cannot be listed",
         "names each interface by its own MAC when none has a usable one",
-        "announces a changed record on the broadcast after a refresh and says goodbye to its old value",
         "announces a record registered again at once after its goodbye",
-        "announces all services in one packet with each shared record once",
         "announces another service in a withdrawal after the host name changed",
         "announces another service only on listed interfaces",
         "announces at once right after a multicast answer",
@@ -7872,14 +7973,10 @@
         "holds the address records of one name together across answers and additional records",
         "ignores a query on an interface whose details cannot be read",
         "ignores a replaced registration",
-        "includes the host addresses once no other service publishes them",
-        "includes the host addresses once when the last services are withdrawn together",
         "keeps a service registered again under the same name while the goodbye runs",
         "keeps additional records of a unicast reply that multicast would hold back",
-        "keeps answering after a goodbye whose send failed",
         "keeps no registration whose generator throws",
         "keeps nothing registered when the server closes while a registration runs",
-        "keeps saying goodbye for a record whose TTL outlasts the idle time of the interface",
         "keeps the current registration when the handle of a replaced one withdraws",
         "keeps the goodbye of an interface that one listing misses",
         "keeps the host address of a service registered right after the last one was withdrawn",
@@ -7899,8 +7996,6 @@
         "notices failed goodbyes once per outage of the interface",
         "notices once that the details of an interface cannot be read",
         "notices once why a query on an interface without details is not answered",
-        "omits the host addresses a remaining service publishes when several services leave at once",
-        "omits the host addresses another service still publishes",
         "publishes only the masked records after a refresh",
         "reads an interface that reported no details again only after the retry interval",
         "reads the details of a new interface once for two queries that arrive together",
@@ -7909,10 +8004,6 @@
         "returns an inert registration ${when}",
         "returns the same promise from every close, unregisters its names and stops truncated queries",
         "says goodbye on an interface whose details can no longer be read",
-        "says goodbye to a record only once",
-        "says goodbye to a record that went out only as an additional record",
-        "says goodbye to a replaced address without the cache-flush bit while its set has records",
-        "says goodbye to the vendor pointer on the broadcast after a refresh masks it",
         "says goodbye with records that the server cannot change",
         "says no goodbye to the records of a live service while the interface reports no details",
         "sends a deferred additional record alone in the answer section",
@@ -7923,9 +8014,7 @@
         "sends no announcement when the server closes before it goes out",
         "sends no answer chunk of a withdrawn service after its goodbye",
         "sends no deferred packet for a record withdrawn before it was due",
-        "sends no goodbye for records that peers no longer cache",
         "sends no goodbye once every record it sent has expired",
-        "sends no packet when there is nothing to announce or say goodbye to",
         "sends one deferred answer for many queries that hit the same held record",
         "sends only goodbyes when the server closes while an announcement waits behind a send",
         "sends only the held record in the deferred answer",
@@ -7953,9 +8042,24 @@
     },
     {
       "path": "packages/protocol/test/mdns/MdnsServerTransportTest.ts",
-      "status": "planned",
-      "reason": "matter.js pin lift 862ad75f → db021da0 (2026-11-06): wave P3 (#432, mDNS goodbye scope and interface following, GeneralDiagnostics after #4844/#4842/#4881; the label and localisation server tests of #4900 read for server fixes) ports it by meaning.",
-      "snapshotSha": "4663aa6f30574b7b7dcb524ef94a9f8a19be13c0"
+      "status": "partial",
+      "reason": "The goodbye retry of #4844 is ported on the fake wire, whose failure rule is the test network's failing multicast (reach none) and its IPv4-failing multicast on an interface with IPv6 (reach some): the failed goodbye with the next publication, the retry without a further publication, its end once peers dropped the records or the goodbyes left, no retry for an announcement, the 1 s doubling to 1 min gaps, one schedule for two failures, a retry with only the goodbyes, none after close, a fresh schedule after an earlier one ended, records whose announcement or goodbye left on IPv6 only. Missing: the notice-once-per-outage logging, the deferred answer (the one-second rule's deferral is not ported), the per-datagram reach of a split message and the details-read cases.",
+      "snapshotSha": "4663aa6f30574b7b7dcb524ef94a9f8a19be13c0",
+      "go": [
+        "mdns:TestMdnsServerTransport"
+      ],
+      "missing": [
+        "notices a failing multicast answer once even when a unicast answer succeeds in between",
+        "notices a failing deferred answer",
+        "says goodbye to the records of an announcement whose later datagram failed",
+        "logs at debug level a unicast answer whose later datagram failed, and notices nothing",
+        "keeps the state of an interface whose goodbye retry waits, so close stops the retry",
+        "does not try a goodbye again that failed while the server closes",
+        "neither notices nor says goodbye on an interface with only a family the server does not use",
+        "publishes an address the interface gained after its details were read",
+        "notices once per outage, whether multicasts reach some address families or none",
+        "multicasts the answer to a QU query after a goodbye that left on IPv6 only"
+      ]
     },
     {
       "path": "packages/protocol/test/mdns/MdnsTest.ts",
@@ -7966,7 +8070,8 @@
         "mdns:TestParityMdnsServer_CommissionableTXTSchemaLock",
         "mdns:TestParityMdnsServer_OperationalSIIFloor500ms",
         "mdns:TestMdnsAdvertisementParity",
-        "mdns:TestMdnsAnnouncementOverflow"
+        "mdns:TestMdnsAnnouncementOverflow",
+        "mdns:TestMdnsGoodbyeScopeAcrossAdvertisements"
       ],
       "missing": [
         "has correct crypto installed",
@@ -7975,11 +8080,7 @@
         "broadcasts the device commissionable info on one port",
         "broadcasts the device fabric on one port and expires",
         "keeps answering for an advertisement that replaced one of the same service",
-        "keeps the host addresses and the service type when one of two operational advertisements ends",
-        "keeps the host addresses when a commissionable advertisement ends and the operational one stays",
-        "keeps the shared service type pointers when one of two commissionable advertisements ends",
         "omits vendor details from commissioner broadcasts when privacy masked",
-        "says goodbye to the host addresses and the service type once the last advertisement ends",
         "says goodbye to the vendor pointer when the commissioning window becomes privacy masked"
       ],
       "reason": "The announcement and TTL-0 expiry packets of the operational, commissionable and commissioner services, the multi-service announcement and the oversized-announcement split are ported against the module's own responder (issue #362) and compared as sets, as matter.js's expectMessage does; the TXT values are the builders' (the operational SAT is always emitted, notes/parity/by_design.md BD-mDNS-SAT-AlwaysEmitted). The crypto case checks matter.js's MockCrypto itself and stays missing.",

@@ -41,7 +41,11 @@ import (
 // packages/general/test, packages/model/test, packages/nodejs/test and
 // packages/types/test (192 files) and decided every one of them in the
 // same pull request, so the count stays 2.
-const testparityPlannedRatchet = 20
+//
+// Pin lift wave P3 (#432) decided seven of the lift's planned files (the
+// GeneralDiagnostics, mDNS address-change and transport, label and
+// localisation tests); CommissionableMdnsScannerWindowChangeTest.ts stays: 13.
+const testparityPlannedRatchet = 13
 
 // testparityPortedRatchet is the number of ported entries, and
 // testparityMissingRatchet the number of matter.js it cases the partial
@@ -97,9 +101,13 @@ const testparityPlannedRatchet = 20
 // Phase 39: packages/nodejs-ble/test joins the roots for the BTP
 // renegotiation; NobleBleChannelTest.ts ported (its 18 stall and ATT_MTU
 // cases), ScanControlTest.ts excluded: 158 ported.
+// Pin lift wave P3 (#432): NetworkInterfaceChangesTest.ts, MdnsServerAddressChangeTest.ts,
+// GeneralDiagnosticsNetworkInterfacesTest.ts, UserLabelServerTest.ts and FixedLabelServerTest.ts
+// ported; 18 MdnsServerTest.ts/MdnsTest.ts goodbye cases out of missing, ten
+// MdnsServerTransportTest.ts and five GeneralDiagnosticsServerTest.ts fault cases in: 151 ported, 974 missing.
 const (
-	testparityPortedRatchet  = 146
-	testparityMissingRatchet = 977
+	testparityPortedRatchet  = 151
+	testparityMissingRatchet = 974
 )
 
 // testparityLeftRatchet is the number of left it cases summed over the
@@ -134,7 +142,11 @@ const (
 // retries, interview and abort handling (js-runtime-only, the platform's
 // behind the ble.Central seam) and the unsubscribe after a handshake
 // timeout (by-design, BD-Matter-BTP-RenegotiationAfterStall): 593.
-const testparityLeftRatchet = 592
+// Pin lift wave P3 (#432) leaves 13 cases, each with class and reason: five
+// JS Network lifecycle cases, four address-change cases (two by design,
+// BD-Matter-MdnsFollowsAdvertisedAddresses), three state-field cases of
+// GeneralDiagnosticsServerTest.ts and the lone-ADD skip (findings T3-P3-1): 605.
+const testparityLeftRatchet = 605
 
 // The matterjs-server register's four ratchets, exact in both directions as
 // the matter.js register's are (the comments above give the rules). Set by
