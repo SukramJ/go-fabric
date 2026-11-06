@@ -205,7 +205,7 @@ Defaults worth knowing:
 | `Network.WiFi` | nil mounts no WiFiNetworkDiagnostics; set, its `Reporter` (required) serves it |
 | `Sessions` | the Matter MRP intervals (500 ms idle, 300 ms active, 4000 ms active threshold); set, the PASE and CASE session parameters and the operational record carry the node's own (`node.SessionIntervals`, whole milliseconds, the threshold at most 65535 ms); `Node.SessionParameters` returns what the node reports ([Limits](../guides/limits.md#transport-and-reliability)) |
 | `Limits.BDXAdditionalMrpDelay` | no margin; set, the exchange of every inbound BDX transfer (an OTA requestor's download) adds it to the peer's MRP base interval, as matter.js's `bdxAdditionalMrpDelay` does |
-| `TimeSynchronization` | mounted, UTCTime and Granularity alone; `Off` leaves it off the root, `Config` serves the TZ, NTPC, NTPS and TSC features it names, after connectedhomeip ([Time synchronization](#time-synchronization)) |
+| `TimeSynchronization` | mounted, UTCTime, Granularity and TimeSource of the node's UTC; `Off` leaves it off the root, `Config` serves the TZ, NTPC, NTPS and TSC features it names, after connectedhomeip ([Time synchronization](#time-synchronization)) |
 | `TLS` | no TLS servers; set, TlsCertificateManagement and TlsClientManagement mount on endpoint 0 (`node.TLSConfig`: the `CertificatePort`, per-fabric maxima defaulting to chip's 5, the stores defaulting to the node's) and every camera's PushAvStreamTransport without its own TLS lookups validates against them ([Camera](../guides/camera.md#the-transport-model)) |
 
 *Source: `node/config.go:37-205`, `node/config.go:303-365`, `node/config.go:466-524`, `node/node.go` (`New`).*
@@ -424,25 +424,46 @@ its configured attestation chain.
 
 ## Time synchronization
 
-The root's TimeSynchronization serves UTCTime from the node's clock and
-Granularity. `Config.TimeSynchronization.Config` adds the features after
-connectedhomeip (`TimeSynchronizationCluster.cpp` at `6170af84`;
-matter.js's server is the generated behaviour):
+The root's TimeSynchronization serves the node's UTC: UTCTime,
+Granularity and TimeSource. `Config.TimeSynchronization.Config` adds the
+features after connectedhomeip (`TimeSynchronizationCluster.cpp` at
+`6170af84`; matter.js's server is the generated behaviour):
 
 | Feature | Attributes and commands | What the host supplies |
 | --- | --- | --- |
 | TZ | TimeZone (one default entry, offset 0), DSTOffset, LocalTime (UTC plus the zone's and the DST offset in effect, null without a DST list), TimeZoneDatabase, the two list sizes (2); SetTimeZone with SetTimeZoneResponse, SetDSTOffset; the events DSTTableEmpty, DSTStatus and TimeZoneStatus | `TimeZoneDatabase` (nil is None) and, with a database, `DSTOffsetsFor`, which answers SetTimeZone with the zone's DST offsets |
 | NTPC | DefaultNTP, SupportsDNSResolve; SetDefaultNTP (an IPv6 address, or a domain when `SupportsDNSResolve`) | `SupportsDNSResolve` |
 | NTPS | NTPServerAvailable | `NTPServerAvailable`, changed later with `SetNTPServerAvailable` |
-| TSC | TrustedTimeSource; SetTrustedTimeSource (null emits MissingTrustedTimeSource) | nothing; a removed fabric's source is cleared |
+| TSC | TrustedTimeSource; SetTrustedTimeSource (null emits MissingTrustedTimeSource); the time client reads the source's UTCTime | `Config.Client` (the node reads the source over its client stack) or a `PeerReader`; a removed fabric's source is cleared |
 
 The node persists TrustedTimeSource, DefaultNTP, TimeZone and DSTOffset in
-its store. UTCTime stays the node's clock. SetUTCTime answers chip's
-statuses without setting it (`HandleSetUTCTime`, :1110-1136):
-INVALID_COMMAND for a granularity or time source outside its enum,
-TimeNotAccepted for NoTimeGranularity or a granularity coarser than the
-node's milliseconds, SUCCESS otherwise. The trusted time source is stored
-and reported but not read. The reference daemon turns no feature on.
+its store. The node's UTC is `Config.Clock` plus an offset; the host clock
+is never set:
+
+- **The host clock** is the time source until something sets the offset:
+  MillisecondsGranularity and TimeSource MixedNTP while it reads a time
+  past the Matter epoch, as chip's default delegate reports it.
+  `PlatformTime` says otherwise — a GNSS-disciplined host names its source
+  and granularity, a host whose clock is not trustworthy returns
+  NoTimeGranularity, and UTCTime is then null until a source answers.
+- **SetUTCTime** sets the offset with chip's checks (`HandleSetUTCTime`,
+  :1110-1136): INVALID_COMMAND for a granularity or time source outside its
+  enum; TimeNotAccepted for NoTimeGranularity, for a granularity coarser
+  than the current one while the node has a time, or for a time past
+  32-bit epoch seconds; otherwise SUCCESS, the request's granularity and
+  TimeSource Admin.
+- **The time client** runs from `Node.Start` while the node has no time,
+  and again whenever a trusted time source is set then (chip's
+  `AttemptToGetTime`, :541-593): it reads UTCTime and Granularity from the
+  trusted time source's root endpoint and adopts the time with TimeSource
+  NodeTimeCluster and seconds (minutes for a source of seconds or minutes),
+  for the network delay; failing that it asks DefaultNTP through the
+  host's `NTPClient` (the module ships none) and adopts the answer with
+  milliseconds and NonMatterSNTP; failing that it emits TimeFailure.
+
+The offset lives in memory: after a restart the node serves its host clock
+again, where chip's node keeps the time its system clock was set to. GeneralDiagnostics'
+TimeSnapshot reads the same UTC. The reference daemon turns no feature on.
 
 ## Persistence
 

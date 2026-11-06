@@ -394,6 +394,11 @@ func New(ctx context.Context, cfg Config) (*Node, error) { //nolint:funlen // th
 		if n.client, err = n.newClientStack(); err != nil { //nolint:contextcheck // the client stack runs for the node's lifetime, not New's call
 			return nil, err
 		}
+		// The root's time client reads the trusted time source over the
+		// client stack, as the commissioner reach does (brief 39 §2.3).
+		if ts := n.root.TimeSynchronization; ts != nil {
+			ts.AttachTimePeerReader(timePeerReader{n})
+		}
 	}
 	if n.bindings, err = n.newBindings(); err != nil {
 		if n.client != nil {
@@ -867,6 +872,13 @@ func (n *Node) startLocked(ctx context.Context) error {
 	for _, fabric := range loaded {
 		n.br.AnnounceFabric(ctx, fabric.FabricIndex, fabric.CompressedID, fabric.NodeID)
 	}
+	// The server is ready: without a time the root's TimeSynchronization
+	// asks the trusted time source, then the default NTP server
+	// (OnPlatformEventFn, TimeSynchronizationCluster.cpp:556-569 at
+	// 6170af84), for the node's lifetime.
+	if ts := n.root.TimeSynchronization; ts != nil {
+		ts.Start(n.life) //nolint:contextcheck // the time client runs for the node's lifetime, not the call's
+	}
 	n.startICD(ctx)
 	// The Binding servers register their entries once the node is online
 	// and its CASE identities are loaded (BindingManager.ts:65-78: the
@@ -919,6 +931,9 @@ func (n *Node) stopLocked(ctx context.Context) error {
 	defer work.pause()
 	if n.root.OTARequestor != nil {
 		n.root.OTARequestor.Stop()
+	}
+	if ts := n.root.TimeSynchronization; ts != nil {
+		ts.Stop()
 	}
 	if n.root.otaApplier != nil {
 		n.root.otaApplier.close()
