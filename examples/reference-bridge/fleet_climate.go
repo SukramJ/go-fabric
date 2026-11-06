@@ -196,6 +196,13 @@ func copyUint8(v *uint8) *uint8 {
 // day, and one built-in week program, active. A host gates the feature
 // behind a flag, off by default, until a live ecosystem pairing is
 // verified (issue #273); the chip-tool suite turns it on.
+//
+// When they enable BD-chip-Thermostat-Suggestions (the row in
+// --extensions) it also serves ThermostatSuggestions (cluster/thermo
+// suggestions.go, ahead of matter.js): five suggestions of its presets, on
+// the node's Matter time — the root TimeSynchronization's UTCTime, the
+// host clock. Off by default for the same reason; the chip-tool harness
+// passes the row to every daemon it starts, for TC-TSTAT-4.3.
 type demoThermostat struct {
 	name string
 
@@ -258,6 +265,9 @@ func (t *demoThermostat) device(opts device.Options) (*device.Thermostat, error)
 	if opts.Surface.Extensions.Has(schedulesRow) {
 		t.declareSchedules(&decl)
 	}
+	if opts.Surface.Extensions.Has(suggestionsRow) {
+		decl.Features |= thermostatdef.FeatureThermostatSuggestions
+	}
 	d, err := device.NewThermostat(opts,
 		decl,
 		epdef.Declare{
@@ -283,6 +293,10 @@ func (t *demoThermostat) device(opts device.Options) (*device.Thermostat, error)
 // schedulesRow is the "Ahead of matter.js" register row of
 // MatterScheduleConfiguration (thermo.Ahead).
 const schedulesRow = "BD-chip-Thermostat-Schedules"
+
+// suggestionsRow is the "Ahead of matter.js" register row of
+// ThermostatSuggestions (thermo.Ahead).
+const suggestionsRow = "BD-chip-Thermostat-Suggestions"
 
 // weekdaysHandle is the handle of the demo thermostat's built-in week
 // program.
