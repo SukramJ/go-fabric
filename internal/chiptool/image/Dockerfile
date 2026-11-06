@@ -91,10 +91,10 @@ COPY --from=bins /dist/bin/jfa-app /dist/bin/jfc-app /bin/
 COPY --from=source /connectedhomeip/src/tools/push_av_server /src/tools/push_av_server
 # The base image installs libcurl4 for chip-camera-app (matter.js
 # support/chip/Dockerfile:28-33 at 862ad75f); its apt state does not survive
-# the base's cache mounts, so the autoremove below took libcurl4t64 with
-# pip's dependencies (/var/log/apt/history.log of the e443ea0c image), and
-# chip-camera-app no longer loaded ("libcurl.so.4 => not found"). It is
-# marked manual first.
+# the base's cache mounts, so an autoremove takes libcurl4t64 with pip's
+# dependencies unless it is marked manual first, as below — the e443ea0c
+# image was built without the mark and its chip-camera-app did not load
+# ("libcurl.so.4 => not found"); since 482f8caf it loads (issue 415).
 RUN --mount=type=cache,sharing=locked,target=/var/cache/apt \
     --mount=type=cache,sharing=locked,target=/var/lib/apt \
     apt-get -qq update && apt-get -qq -y install --no-install-recommends python3-pip patch && \
