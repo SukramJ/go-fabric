@@ -1329,7 +1329,9 @@ func TestCommandFieldsReader_OpenCommissioningWindow(t *testing.T) {
 		t.Errorf("decoded %+v", p)
 	}
 
-	// Discriminator is 12 bits.
+	// A 13-bit discriminator decodes: it is the handler's INVALID_COMMAND
+	// after the Busy checks, not a constraint error here (matter.js
+	// AdministratorCommissioningServer.ts:42, :92-97 at db021da0).
 	enc = tlv.NewEncoder()
 	enc.StartStruct(tlv.AnonymousTag())
 	enc.PutUint(tlv.ContextTag(2), 4096)
@@ -1337,8 +1339,12 @@ func TestCommandFieldsReader_OpenCommissioningWindow(t *testing.T) {
 	raw, _ = enc.Bytes()
 	dec = tlv.NewDecoder(raw)
 	opener, _ = dec.Next()
-	if _, err := commandFieldsReader(cmdPath(0x003C, 0x00), dec, opener); err == nil {
-		t.Error("a 13-bit discriminator decoded")
+	v, err = commandFieldsReader(cmdPath(0x003C, 0x00), dec, opener)
+	if err != nil {
+		t.Fatalf("a 13-bit discriminator: %v, want it decoded for the handler", err)
+	}
+	if p, ok := v.(wire.OpenWindowParams); !ok || p.Discriminator != 4096 {
+		t.Errorf("a 13-bit discriminator decoded as %+v", v)
 	}
 }
 

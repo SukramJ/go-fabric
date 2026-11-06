@@ -14,10 +14,13 @@ import (
 
 // TestPin_OpenWindow_PaseReject pins that OpenCommissioningWindow refuses a
 // caller that reaches the cluster over a PASE session (no operational
-// fabric, FabricIndex == 0). Multi-Admin is a CASE-only operation per
-// Matter §11.19.8.1; a PASE peer that could open a window would be able to
-// invite a further commissioner onto a bridge it has not itself joined.
-// Mirrors chip AdministratorCommissioningCluster.cpp OpenCommissioningWindow
+// fabric, FabricIndex == 0) with PAKEParameterError. Multi-Admin is a
+// CASE-only operation per Matter §11.19.8.1; a PASE peer that could open a
+// window would be able to invite a further commissioner onto a bridge it
+// has not itself joined. Mirrors matter.js
+// AdministratorCommissioningServer.ts:164-177 at db021da0 (#adminFabric:
+// the specification names no status, chip answers PAKEParameterError) and
+// chip AdministratorCommissioningCluster.cpp OpenCommissioningWindow
 // VerifyOrExit(session.IsSecureSession(), ...).
 //
 // The assertion that matters is the second one: the window controller must
@@ -49,8 +52,8 @@ func TestPin_OpenWindow_PaseReject(t *testing.T) {
 		// A bare context carries no fabric filter, so
 		// im.FabricFilterFromContext reports FabricIndex 0 — the PASE case.
 		_, err := ac.MatterInvoke(context.Background(), admCommCmdOpenWindow, params())
-		if !errors.Is(err, wire.ErrAdmCommBusy) {
-			t.Errorf("MatterInvoke(OpenWindow) over PASE: error = %v, want wire.ErrAdmCommBusy", err)
+		if !errors.Is(err, wire.ErrAdmCommPakeParameter) {
+			t.Errorf("MatterInvoke(OpenWindow) over PASE: error = %v, want wire.ErrAdmCommPakeParameter", err)
 		}
 		if ctrl.openWindowCalls != 0 {
 			t.Errorf("controller OpenWindow calls = %d, want 0 — a PASE caller opened a commissioning window",

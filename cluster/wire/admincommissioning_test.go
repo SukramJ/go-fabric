@@ -412,7 +412,7 @@ func TestAdmComm_Invoke_OpenWindow_ResolvesAdminVendorIDFromFabricStore(t *testi
 // (fabricIndex == 0). Multi-Admin commissioning windows may only be opened
 // over a CASE session per chip AdministratorCommissioningCluster.cpp
 // VerifyOrExit(session.IsSecureSession(), ...).
-func TestAdmComm_Invoke_OpenWindow_PASEReturnsErrBusy(t *testing.T) {
+func TestAdmComm_Invoke_OpenWindow_PASEReturnsPakeParameterError(t *testing.T) {
 	t.Parallel()
 	ac := newAdmComm()
 	ctrl := &fakeWindowController{}
@@ -425,15 +425,16 @@ func TestAdmComm_Invoke_OpenWindow_PASEReturnsErrBusy(t *testing.T) {
 	})
 
 	// No WithFabricFilter wrapping → FabricFilterFromContext returns fabricIndex == 0 (PASE).
-	// The cluster must reject the command with ErrAdmCommBusy.
+	// The cluster must reject the command with ErrAdmCommPakeParameter
+	// (matter.js AdministratorCommissioningServer.ts:164-177 at db021da0).
 	_, err := ac.MatterInvoke(context.Background(), admCommCmdOpenWindow, wire.OpenWindowParams{
 		CommissioningTimeoutSeconds: 300,
 		Iterations:                  1000,
 		Salt:                        make([]byte, 16),
 		PAKEPasscodeVerifier:        make([]byte, 97),
 	})
-	if !errors.Is(err, wire.ErrAdmCommBusy) {
-		t.Errorf("MatterInvoke(OpenWindow, PASE): want ErrAdmCommBusy, got %v", err)
+	if !errors.Is(err, wire.ErrAdmCommPakeParameter) {
+		t.Errorf("MatterInvoke(OpenWindow, PASE): want ErrAdmCommPakeParameter, got %v", err)
 	}
 	// Resolver must not be called when the request was rejected before vendor lookup.
 	if resolverCalls != 0 {
@@ -645,38 +646,67 @@ func TestAdmComm_TypedErrors_Interface(t *testing.T) {
 	}
 }
 
-// TestAdmComm_Invoke_OpenWindow_MalformedPAKEBeatsBusy pins that PAKE
-// parameter validation runs BEFORE the Busy / fail-safe gates: a request that
-// is both malformed (bad verifier length) AND busy (FailSafe armed) surfaces
-// the PAKEParameterError, not Busy. Mirrors matter.js
-// AdministratorCommissioningServer.ts:82-97 (openCommissioningWindow validates
-// verifier length / iterations / salt bounds before
-// #assertCommissioningWindowRequirements runs the Busy checks).
-func TestAdmComm_Invoke_OpenWindow_MalformedPAKEBeatsBusy(t *testing.T) {
+// TestAdmComm_Invoke_OpenWindow_BusyBeatsMalformedPAKE pins the check
+// order of matter.js AdministratorCommissioningServer.ts:70-97 at
+// db021da0 (#4878): the Busy gates — an armed fail-safe, an
+// administrator's open window — run before the PAKE parameters are
+// looked at, so a request that is both malformed (bad verifier length)
+// and busy surfaces Busy, not the PAKEParameterError; and a 13-bit
+// discriminator, checked last, is INVALID_COMMAND (:92-97).
+func TestAdmComm_Invoke_OpenWindow_BusyBeatsMalformedPAKE(t *testing.T) {
 	t.Parallel()
+	malformed := func() wire.OpenWindowParams {
+		return wire.OpenWindowParams{
+			CommissioningTimeoutSeconds: 300,
+			Iterations:                  1000,
+			Salt:                        make([]byte, 16),
+			PAKEPasscodeVerifier:        make([]byte, 10), // wrong length
+		}
+	}
+	// CASE session so the fabric check does not pre-empt anything.
+	caseCtx := im.WithFabricFilter(context.Background(), true, 1)
+
 	ac := newAdmComm()
 	ctrl := &fakeWindowController{}
 	ac.SetController(ctrl)
-	// Make the cluster "busy": a FailSafe window is armed.
 	ac.SetIsFailSafeArmed(func() bool { return true })
-
-	// CASE session so the PASE reject does not pre-empt anything.
-	caseCtx := im.WithFabricFilter(context.Background(), true, 1)
-	// Malformed verifier length (want 97) — and the window is busy.
-	_, err := ac.MatterInvoke(caseCtx, admCommCmdOpenWindow, wire.OpenWindowParams{
-		CommissioningTimeoutSeconds: 300,
-		Iterations:                  1000,
-		Salt:                        make([]byte, 16),
-		PAKEPasscodeVerifier:        make([]byte, 10), // wrong length
-	})
-	if !errors.Is(err, wire.ErrAdmCommPakeParameter) {
-		t.Fatalf("MatterInvoke(OpenWindow, malformed+busy): want ErrAdmCommPakeParameter, got %v", err)
+	_, err := ac.MatterInvoke(caseCtx, admCommCmdOpenWindow, malformed())
+	if !errors.Is(err, wire.ErrAdmCommBusy) {
+		t.Fatalf("MatterInvoke(OpenWindow, malformed+fail-safe armed): want ErrAdmCommBusy, got %v", err)
 	}
-	if errors.Is(err, wire.ErrAdmCommBusy) {
-		t.Errorf("malformed+busy request returned Busy; PAKE validation must run first")
+
+	ac = newAdmComm()
+	ctrl = &fakeWindowController{snapshot: wire.WindowStatusSnapshot{Status: wire.WindowStatusEnhanced, AdminFabricIndex: 2, AdminVendorID: 0xFFF1}}
+	ac.SetController(ctrl)
+	_, err = ac.MatterInvoke(caseCtx, admCommCmdOpenWindow, malformed())
+	if !errors.Is(err, wire.ErrAdmCommBusy) {
+		t.Fatalf("MatterInvoke(OpenWindow, malformed+window open): want ErrAdmCommBusy, got %v", err)
 	}
 	if ctrl.openWindowCalls != 0 {
 		t.Errorf("OpenWindow call count = %d, want 0 (rejected before controller dispatch)", ctrl.openWindowCalls)
+	}
+
+	ac = newAdmComm()
+	ctrl = &fakeWindowController{}
+	ac.SetController(ctrl)
+	_, err = ac.MatterInvoke(caseCtx, admCommCmdOpenWindow, malformed())
+	if !errors.Is(err, wire.ErrAdmCommPakeParameter) {
+		t.Fatalf("MatterInvoke(OpenWindow, malformed, idle): want ErrAdmCommPakeParameter, got %v", err)
+	}
+
+	wide := malformed()
+	wide.PAKEPasscodeVerifier = make([]byte, 97)
+	wide.Discriminator = 0x1000
+	_, err = ac.MatterInvoke(caseCtx, admCommCmdOpenWindow, wide)
+	if sce, ok := errors.AsType[im.StatusCodeError](err); !ok || sce.MatterStatusCode() != im.StatusInvalidCommand {
+		t.Fatalf("MatterInvoke(OpenWindow, discriminator 0x1000): want INVALID_COMMAND, got %v", err)
+	}
+	if ctrl.openWindowCalls != 0 {
+		t.Errorf("OpenWindow call count = %d, want 0 (rejected before controller dispatch)", ctrl.openWindowCalls)
+	}
+	wide.Discriminator = 0xFFF
+	if _, err := ac.MatterInvoke(caseCtx, admCommCmdOpenWindow, wide); err != nil {
+		t.Fatalf("MatterInvoke(OpenWindow, discriminator 0xFFF): %v", err)
 	}
 }
 

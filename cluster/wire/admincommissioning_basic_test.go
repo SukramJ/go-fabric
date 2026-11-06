@@ -5,6 +5,7 @@ package wire_test
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
@@ -61,11 +62,17 @@ func TestAdmComm_Basic_OpenBasicWindow_ForwardsABasicWindow(t *testing.T) {
 func TestAdmComm_Basic_OpenBasicWindow_GatesLikeTheEnhancedCommand(t *testing.T) {
 	t.Parallel()
 	req := admdef.OpenBasicCommissioningWindowRequest{CommissioningTimeout: 180}
-	// Over PASE (no fabric): Busy, as OpenCommissioningWindow answers.
+	// Over PASE (no fabric): PAKEParameterError, as OpenCommissioningWindow answers.
 	ac := newBasicAdmComm()
 	ac.SetController(&fakeWindowController{})
-	if _, err := ac.MatterInvoke(context.Background(), admCommCmdOpenBasicWindow, req); spec.StatusOf(err) != im.StatusFailure {
-		t.Errorf("over PASE: %v, want the Busy failure", err)
+	if _, err := ac.MatterInvoke(context.Background(), admCommCmdOpenBasicWindow, req); !errors.Is(err, wire.ErrAdmCommPakeParameter) {
+		t.Errorf("over PASE: %v, want ErrAdmCommPakeParameter", err)
+	}
+	// An administrator's open window: Busy.
+	ac = newBasicAdmComm()
+	ac.SetController(&fakeWindowController{snapshot: wire.WindowStatusSnapshot{Status: wire.WindowStatusBasic, AdminFabricIndex: 2}})
+	if _, err := ac.MatterInvoke(im.WithFabricFilter(context.Background(), true, 1), admCommCmdOpenBasicWindow, req); !errors.Is(err, wire.ErrAdmCommBusy) {
+		t.Errorf("window open: %v, want ErrAdmCommBusy", err)
 	}
 	// An armed fail-safe: Busy.
 	ac = newBasicAdmComm()
