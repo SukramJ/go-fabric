@@ -66,6 +66,15 @@ updated (`ServerBehaviorBacking.ts` quiet subscription `:251-259` /
 `tc-cadmin-support.ts`, `tc-dd-flow-support.ts:72-189`, `MdnsTest.ts`
 `expectMessage` `:1001-1024`, `Rcac.ts:135`).
 
+The matter.js test register (`script/testparity/register.json`) moved with
+the snapshot: 56 entries re-checked against their new blobs (395 new `it`
+cases listed as missing, 30 removed cases pruned, 11 ported files now
+partial), 3 files gone (the WAL cleaner and snapshot tests, the peer
+establishment progress test), 24 new files entered — 6 excluded as JS
+runtime, 18 planned on the lift's waves P1–P4. Ratchets: planned 2 → 20,
+ported 158 → 146, missing 583 → 977, left 593 → 592. The missing cases are
+the waves' port lists.
+
 ### Security
 
 | PR | Fix | Verdict | Where |

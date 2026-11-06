@@ -41,7 +41,7 @@ import (
 // packages/general/test, packages/model/test, packages/nodejs/test and
 // packages/types/test (192 files) and decided every one of them in the
 // same pull request, so the count stays 2.
-const testparityPlannedRatchet = 2
+const testparityPlannedRatchet = 20
 
 // testparityPortedRatchet is the number of ported entries, and
 // testparityMissingRatchet the number of matter.js it cases the partial
@@ -98,8 +98,8 @@ const testparityPlannedRatchet = 2
 // renegotiation; NobleBleChannelTest.ts ported (its 18 stall and ATT_MTU
 // cases), ScanControlTest.ts excluded: 158 ported.
 const (
-	testparityPortedRatchet  = 158
-	testparityMissingRatchet = 583
+	testparityPortedRatchet  = 146
+	testparityMissingRatchet = 977
 )
 
 // testparityLeftRatchet is the number of left it cases summed over the
@@ -134,7 +134,7 @@ const (
 // retries, interview and abort handling (js-runtime-only, the platform's
 // behind the ble.Central seam) and the unsubscribe after a handshake
 // timeout (by-design, BD-Matter-BTP-RenegotiationAfterStall): 593.
-const testparityLeftRatchet = 593
+const testparityLeftRatchet = 592
 
 // The matterjs-server register's four ratchets, exact in both directions as
 // the matter.js register's are (the comments above give the rules). Set by
