@@ -70,6 +70,10 @@ func encodeDN(e *tlv.Encoder, tag uint8, dn *DistinguishedName) error {
 			e.PutUint(tlv.ContextTag(t), dn.MatterRCACID)
 		case dnTagMatterFabricID:
 			e.PutUint(tlv.ContextTag(t), dn.MatterFabricID)
+		case dnTagMatterVVSID:
+			e.PutUint(tlv.ContextTag(t), dn.MatterVVSID)
+		case dnTagMatterFirmwareSignID:
+			e.PutUint(tlv.ContextTag(t), dn.MatterFirmwareSigningID)
 		case dnTagMatterCASEAuth:
 			if catIdx >= len(dn.CASEAuthTags) {
 				return fmt.Errorf("%w: CAT order entry without value", ErrMalformed)
@@ -106,6 +110,12 @@ func canonicalDNOrder(dn *DistinguishedName) []uint8 {
 	}
 	if dn.HasFabricID {
 		order = append(order, dnTagMatterFabricID)
+	}
+	if dn.HasFirmwareSigningID {
+		order = append(order, dnTagMatterFirmwareSignID)
+	}
+	if dn.HasVVSID {
+		order = append(order, dnTagMatterVVSID)
 	}
 	for range dn.CASEAuthTags {
 		order = append(order, dnTagMatterCASEAuth)

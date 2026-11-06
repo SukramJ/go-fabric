@@ -111,7 +111,7 @@ func scProto(opcode uint8, exchangeID uint16, hasAck bool, ackCounter uint32) me
 
 // scHdr builds a minimal message.Header for SecureChannel tests.
 func scHdr() *message.Header {
-	return &message.Header{SessionID: 0, MessageCounter: 1}
+	return &message.Header{SessionID: 0, MessageCounter: 1, HasSourceNodeID: true, SourceNodeID: 0x5A5A}
 }
 
 // ─── Default-noop cases (4) ───────────────────────────────────────────────────

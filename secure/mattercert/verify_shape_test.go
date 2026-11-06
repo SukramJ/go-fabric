@@ -78,6 +78,16 @@ func TestVerifyAndExtractPubKey_StructuralPredicates(t *testing.T) {
 		{"NOC flagged as CA", nil, func(o *verifyTestCertOpts) { o.extIsCA = &bTrue }, mattercert.ErrMalformed},
 		{"NOC without digitalSignature keyUsage", nil, func(o *verifyTestCertOpts) { o.extKeyUsage = ku(0x0060) }, mattercert.ErrMalformed},
 		{"NOC without serverAuth/clientAuth EKU", nil, func(o *verifyTestCertOpts) { o.extEKU = []uint8{3} }, mattercert.ErrMalformed},
+		// Pin db021da0: Noc.ts:148-154 requires serverAuth (CHIP's rule); clientAuth alone no longer passes.
+		{"NOC with clientAuth only", nil, func(o *verifyTestCertOpts) { o.extEKU = []uint8{2} }, mattercert.ErrMalformed},
+		{"NOC with serverAuth only is allowed", nil, func(o *verifyTestCertOpts) { o.extEKU = []uint8{1} }, nil},
+		{"NOC with serverAuth and further key purposes is allowed", nil, func(o *verifyTestCertOpts) { o.extEKU = []uint8{1, 2, 3} }, nil},
+		// Pin db021da0: the DN limits — no matter-vvs-id in a NOC or ICAC (Noc.ts:109-111, Icac.ts:93-95),
+		// at most five RDNs (OperationalBase.ts:92-97), a single-valued field once (DistinguishedName.ts:261-283).
+		{"NOC carrying a matter-vvs-id", nil, func(o *verifyTestCertOpts) { v := uint64(7); o.subjectVVSID = &v }, mattercert.ErrMalformed},
+		{"ICAC carrying a matter-vvs-id", func(o *verifyTestCertOpts) { v := uint64(7); o.subjectVVSID = &v }, nil, mattercert.ErrMalformed},
+		{"NOC subject with six RDNs", nil, func(o *verifyTestCertOpts) { o.subjectExtraRDNs = 4 }, mattercert.ErrMalformed},
+		{"NOC subject with five RDNs is allowed", nil, func(o *verifyTestCertOpts) { o.subjectExtraRDNs = 3 }, nil},
 		{"NOC fabric id 0", nil, func(o *verifyTestCertOpts) { o.subjectFabricID = 0 }, mattercert.ErrMalformed},
 		{"NOC node id outside the operational range", nil, func(o *verifyTestCertOpts) { o.subjectNodeID = 0xFFFF_FFF0_0000_0001 }, mattercert.ErrMalformed},
 		{"NOC carrying an ICAC id in its subject", nil, func(o *verifyTestCertOpts) { o.subjectHasICACID, o.subjectICACID = true, 0x0002 }, mattercert.ErrMalformed},

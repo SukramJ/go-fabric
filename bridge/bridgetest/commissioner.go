@@ -83,6 +83,10 @@ type Options struct {
 	ControllerNodeID uint64
 	// CAT are the CASE Authenticated Tags of the commissioner's NOC.
 	CAT []uint32
+	// DeviceCAT are the CASE Authenticated Tags the commissioner puts into
+	// the device's NOC (matter.js CaseSessionCatsTest.ts "with CATs in the
+	// device NOC" at db021da0); nil for none, the usual device.
+	DeviceCAT []uint32
 	// AdminSubject has no effect: AddNOC's CaseAdminSubject is
 	// ControllerNodeID, the fabric's root node id, as matter.js's
 	// commissioning flow sends it (controller/commissioner.FabricConfig
@@ -351,7 +355,7 @@ func (c *Commissioner) Commission(ctx context.Context) (*Session, error) {
 	}
 	c.feedOperational()
 	res, err := c.com.Commission(ctx, commissioner.Options{
-		Fabric: c.fabric, Passcode: c.opts.Passcode, NodeID: c.opts.NodeID, Addresses: []*net.UDPAddr{addr},
+		Fabric: c.fabric, Passcode: c.opts.Passcode, NodeID: c.opts.NodeID, CATs: c.opts.DeviceCAT, Addresses: []*net.UDPAddr{addr},
 	})
 	if err != nil {
 		if handshakeFailure(err) {

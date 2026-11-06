@@ -43,6 +43,7 @@ func TestAdmCommTakesTheGeneratedOpenWindowRequest(t *testing.T) {
 	t.Parallel()
 	ctx := im.WithFabricFilter(context.Background(), true, 1)
 	ac := wire.NewAdministratorCommissioning()
+	ac.SetController(&fakeWindowController{})
 	for _, fields := range []any{
 		admdef.OpenCommissioningWindowRequest{Iterations: 1},
 		&admdef.OpenCommissioningWindowRequest{Iterations: 1},

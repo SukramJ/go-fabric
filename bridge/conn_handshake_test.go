@@ -174,7 +174,7 @@ func TestHandshakeHoldLifecycle(t *testing.T) {
 
 	// The peer's failure StatusReport on the handshake's exchange.
 	b.holdHandshake(route, 4, true)
-	hdr := &message.Header{SessionID: 0, MessageCounter: 9}
+	hdr := &message.Header{SessionID: 0, MessageCounter: 9, HasSourceNodeID: true, SourceNodeID: 0x5A5A}
 	if err := b.dispatchSecureChannel(route, hdr, scProto(mrp.SCOpcodeStatusReport, 4, false, 0), failure); err != nil {
 		t.Fatal(err)
 	}

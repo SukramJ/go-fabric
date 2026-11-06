@@ -57,7 +57,7 @@ func TestSigma2FirstRetransmitFollowsTheInitiatorsActiveInterval(t *testing.T) {
 				t.Fatalf("ListenUDP: %v", err)
 			}
 			t.Cleanup(func() { _ = peer.Close() })
-			hdr := &message.Header{MessageCounter: 11}
+			hdr := &message.Header{MessageCounter: 11, HasSourceNodeID: true, SourceNodeID: 0x5A5A}
 			proto := message.ProtocolHeader{
 				Initiator:  true,
 				NeedsAck:   true,

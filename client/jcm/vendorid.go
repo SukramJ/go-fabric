@@ -170,7 +170,10 @@ func verifyRaw(pub *ecdsa.PublicKey, msg, sig []byte) bool {
 // verifyChain validates the NOC (and ICAC, if any) against the root
 // public key: the operational certificate checks and the signatures up to
 // the root — chip's ValidateCert with kDigitalSignature and kClientAuth
-// (VendorIdVerificationClient.cpp:28-49).
+// (VendorIdVerificationClient.cpp:28-49). mattercert's NOC check requires
+// serverAuth since the db021da0 lift, as matter.js's VendorIdVerification
+// verifies through Noc.verify (VendorIdVerification.ts:228, Noc.ts:148-154
+// at db021da0, which notes chip's clientAuth there).
 func verifyChain(noc, icac, rootPublicKey []byte) error {
 	v, err := mattercert.NewVerifier(rootPublicKey, nil)
 	if err != nil {
