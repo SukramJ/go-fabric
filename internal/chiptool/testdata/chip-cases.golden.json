@@ -1,5 +1,5 @@
 {
-  "image": "ghcr.io/sukramj/go-fabric-chip@sha256:e443ea0c1b91478720ee8b94c34c46e95792d77493e1b50bbc99e3e603b77606",
+  "image": "ghcr.io/sukramj/go-fabric-chip@sha256:482f8caf68ff7921c7b7ffeeea4fb4f2afc6d04fb831e7b69b44b2d6de0234e4",
   "cases": {
     "ACE/1.1": {
       "steps": 38,
