@@ -213,6 +213,59 @@ type Datastore struct {
 
 	// pushes are the pushes the commands started.
 	pushes sync.WaitGroup
+
+	// bindingMu guards bindingLocks: one lock per node and endpoint, so
+	// the read-merge-write of an endpoint's binding list runs one at a
+	// time ([Datastore.pushBinding]).
+	bindingMu    sync.Mutex
+	bindingLocks map[bindingEndpoint]*endpointLock
+}
+
+// bindingEndpoint names one node's endpoint.
+type bindingEndpoint struct {
+	node     uint64
+	endpoint uint16
+}
+
+// endpointLock is a lock a waiter can leave when its context ends; refs
+// counts its holders and waiters, so the map drops it with the last.
+type endpointLock struct {
+	held chan struct{}
+	refs int
+}
+
+// lockEndpoint takes the lock of the node's endpoint, or fails with the
+// context's error; the returned func releases it.
+func (d *Datastore) lockEndpoint(ctx context.Context, k bindingEndpoint) (func(), error) {
+	d.bindingMu.Lock()
+	if d.bindingLocks == nil {
+		d.bindingLocks = map[bindingEndpoint]*endpointLock{}
+	}
+	l := d.bindingLocks[k]
+	if l == nil {
+		l = &endpointLock{held: make(chan struct{}, 1)}
+		d.bindingLocks[k] = l
+	}
+	l.refs++
+	d.bindingMu.Unlock()
+	drop := func() {
+		d.bindingMu.Lock()
+		l.refs--
+		if l.refs == 0 {
+			delete(d.bindingLocks, k)
+		}
+		d.bindingMu.Unlock()
+	}
+	select {
+	case l.held <- struct{}{}:
+	case <-ctx.Done():
+		drop()
+		return nil, ctx.Err()
+	}
+	return func() {
+		<-l.held
+		drop()
+	}, nil
 }
 
 // Compile-time assertions.

@@ -125,8 +125,8 @@ type OTARequestorConfig struct {
 	// (transferProtocolsSupported, :1367-1372); empty is BDX synchronous
 	// alone, matter.js's default. Add [DownloadProtocolHTTPS] only where
 	// the node reaches the image hosts, as matter.js advises there. A list
-	// without [DownloadProtocolBDXSynchronous] does not conform; another
-	// protocol is refused.
+	// without [DownloadProtocolBDXSynchronous] does not conform and is
+	// refused, as is another protocol.
 	TransferProtocols []DownloadProtocol
 	// HTTPClient sends the GET of an HTTPS download; *http.Client
 	// implements it. nil is the module's client: http.DefaultTransport,
@@ -390,6 +390,10 @@ func NewOTASoftwareUpdateRequestor(cfg OTARequestorConfig) (*OTASoftwareUpdateRe
 	}
 	if len(cfg.TransferProtocols) == 0 {
 		cfg.TransferProtocols = []DownloadProtocol{DownloadProtocolBDXSynchronous}
+	} else if !slices.Contains(cfg.TransferProtocols, DownloadProtocolBDXSynchronous) {
+		// matter.js's query carries BDX synchronous by default
+		// (OtaSoftwareUpdateRequestorServer.ts:1367-1372 at 862ad75f).
+		return nil, errors.New("core: OTA requestor TransferProtocols must include DownloadProtocolBDXSynchronous")
 	} else {
 		cfg.TransferProtocols = slices.Clone(cfg.TransferProtocols)
 	}

@@ -2355,6 +2355,14 @@ redirect policy. Each deviation fails the download as an `otaDownloadError`
 response (for a refused redirect the redirect's, which `net/http` returns
 with the error), or before a response UpdateState Unknown's value (0) as
 the BDX path uses.
+A fourth: `NewOTASoftwareUpdateRequestor` refuses a `TransferProtocols`
+list without BDX synchronous, where matter.js's `transferProtocolsSupported`
+takes any list a host sets and only its default carries BDX
+(`OtaSoftwareUpdateRequestorServer.ts:1372` at `862ad75f`).
+connectedhomeip's requestor announces BDX synchronous alone
+(`src/app/clusters/ota-requestor/DefaultOTARequestor.cpp:747` at
+`6170af84`); the refusal keeps BDX synchronous in every list, as both
+announce it.
 A GET that gets no response mirrors matter.js: `fetch` rejects with an
 error that is no `MatterError`, `MatterError.accept` rethrows it (`:925`)
 to `#queryForUpdate`'s handler (`:632-640`), and the provider counts as
@@ -5813,8 +5821,17 @@ the module's datastore merges itself, so the port does not carry it
 leaves the entry Pending or DeletePending for the next `RefreshNode`;
 jf-admin-app writes the one entry over an empty list
 (`JFADatastoreSync.cpp:1726-1730` at `6170af84`), which drops the node's
-other bindings on a transient read failure. Pinned by
-`datastore_endpoint_sync_test.go`.
+other bindings on a transient read failure. The fetch, the merge and the
+write run under one lock per node and endpoint, so two pushes to one
+endpoint cannot both merge into the list read before the other wrote;
+jf-admin-app's fetch-then-write has the same race in principle, two
+`SyncNode` calls in flight each fetching before either writes
+(`JFADatastoreSync.cpp:1706-1757` at `6170af84`). A push held at the port
+therefore holds the later pushes to its endpoint, so the two ports of
+chip's deferred-completion cases (`TestRemoveBindingIteratorUseAfterFree`,
+`TestAddBindingBackReferenceMarksWrongEntry` in `datastore_chip_test.go`)
+run their adds beside the held push, where chip's adds return before the
+delegate completes. Pinned by `datastore_endpoint_sync_test.go`.
 
 ### BD-chip-JointFabricAdministrator-RulesInServer — the administrator's commands and the commissionee's trust verification follow connectedhomeip; the anchor is recorded at CommissioningComplete as chip's example app does
 
@@ -5937,12 +5954,15 @@ clock is never set: the offset lives in memory and a restart serves the
 host clock again (chip's system clock keeps the time); the platform source
 is read live, not once at server ready; Last Known Good Time is not
 updated (`UpdateUTCTime` :82; the module keeps none); an NTP answer
-before the Matter epoch or past 32-bit seconds is a failed query. The
+before the Matter epoch or past 32-bit seconds is a failed query; each
+read and NTP query ends after `core.TimeSyncAttemptTimeout` (30 s) on the
+server's clock, a bound of the module's because the ports are a host's
+and an attempt that never ended would hold every later one. The
 Thermostat's and the Valve's Matter time (`core.MatterEpochSeconds` over
 the device's clock) does not see the offset. TimeSource and
 TimeZoneDatabase go out as plain integers; a named enum type went out as
 TLV null through the bridge's reply writer. Pinned by `cluster/core`
-time-synchronization tests (3 chip cases, 9 rules, 5 client cases, 1 wire)
+time-synchronization tests (3 chip cases, 9 rules, 6 client cases, 1 wire)
 and `node`'s client wire test.
 
 ### BD-chip-GeneralCommissioning-TermsAndConditions — the TC feature follows connectedhomeip when the node states its terms
@@ -6104,7 +6124,13 @@ half (`transport/btp.Session.OnStall`, `Suspend`) reports the stall, the
 channel swaps the session behind its `btp.Conn` (`Channel.Conn` is the
 current one), `Channel.Send` waits for a renegotiation in flight and
 answers `ErrChannelClosed` when the channel is lost meanwhile, a failed
-renegotiation or a lost connection closes the channel, and `Dial` waits up
+renegotiation or a lost connection closes the channel, each C2 unsubscribe
+runs under `ble.DisconnectTimeout` (5 s, `BLE_DISCONNECT_TIMEOUT`,
+`NobleBleChannel.ts:38`, `:579`) and each handshake's C1 write and C2
+subscribe under its `btp.ConnRspTimeout` attempt (`:602-606`, `:634-641`),
+both on the channel's clock, so a peripheral that vanished without a
+disconnect event fails the renegotiation within the bound and the channel
+closes, and `Dial` waits up
 to `ATTMTUSettleTimeout` (2 s, `NobleBleChannel.ts:40-41`, `:526-567` at
 `862ad75f`) for a connection that reports its ATT_MTU exchange
 (`ble.MTUExchange`) before it sizes the segment. The workaround is adopted

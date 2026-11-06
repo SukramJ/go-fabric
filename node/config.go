@@ -520,7 +520,7 @@ type OTAConfig struct {
 	// TransferProtocols are the download protocols the requestor announces
 	// (mattercore.OTARequestorConfig.TransferProtocols); empty is BDX
 	// alone. Add [OTADownloadHTTPS] only where the node reaches the image
-	// hosts.
+	// hosts; a list without [OTADownloadBDXSynchronous] fails the build.
 	TransferProtocols []OTADownloadProtocol
 	// HTTPClient sends an HTTPS download's GET; nil is the module's client,
 	// which follows a redirect only to an https:// target. A host's client

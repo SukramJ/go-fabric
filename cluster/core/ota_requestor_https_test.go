@@ -498,9 +498,12 @@ func TestOTARequestorHTTPS_BDXOfferStillWorks(t *testing.T) {
 		})
 	}
 
-	// BDX not announced: a bdx:// offer is refused (:1078-1083).
+	// BDX not announced: a bdx:// offer is refused (:1078-1083). The
+	// config refuses such a list, so the branch is reached by setting the
+	// requestor's own copy.
 	s := newOtaHTTPSServer(t, http.NotFound)
-	h := newHTTPSHarness(t, s, func(c *OTARequestorConfig) { c.TransferProtocols = []DownloadProtocol{DownloadProtocolHTTPS} })
+	h := newHTTPSHarness(t, s, nil)
+	h.r.cfg.TransferProtocols = []DownloadProtocol{DownloadProtocolHTTPS}
 	h.provider.answer = func(int) (provdef.QueryImageResponse, error) { return h.available(2), nil }
 	h.r.performUpdateQuery(context.Background())
 	if h.provider.transfers != 0 || len(h.applier.applied) != 0 {
@@ -509,7 +512,9 @@ func TestOTARequestorHTTPS_BDXOfferStillWorks(t *testing.T) {
 }
 
 // TestOTARequestorHTTPS_Config: a protocol the requestor cannot download
-// over is refused; the list is the requestor's own copy.
+// over is refused, as is a list without BDX synchronous, which matter.js's
+// query always carries by default (:1367-1372); the list is the
+// requestor's own copy.
 func TestOTARequestorHTTPS_Config(t *testing.T) {
 	t.Parallel()
 	base := OTARequestorConfig{NodeInformation: func() OtaNodeInformation { return OtaNodeInformation{} }, DownloadDir: t.TempDir()}
@@ -519,6 +524,11 @@ func TestOTARequestorHTTPS_Config(t *testing.T) {
 		if _, err := NewOTASoftwareUpdateRequestor(cfg); err == nil {
 			t.Fatalf("protocol %d accepted", p)
 		}
+	}
+	noBDX := base
+	noBDX.TransferProtocols = []DownloadProtocol{DownloadProtocolHTTPS}
+	if _, err := NewOTASoftwareUpdateRequestor(noBDX); err == nil {
+		t.Fatal("a list without BDX synchronous accepted")
 	}
 	cfg := base
 	list := []DownloadProtocol{DownloadProtocolBDXSynchronous, DownloadProtocolHTTPS}

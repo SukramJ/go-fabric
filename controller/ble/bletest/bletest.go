@@ -174,6 +174,12 @@ type Faults struct {
 	// UnsubscribeC2 is the error every UnsubscribeC2 returns, the
 	// subscription left standing; nil succeeds.
 	UnsubscribeC2 error
+	// HangUnsubscribeC2From leaves the UnsubscribeC2 of that number,
+	// counted over every connection from 1, and every later one pending
+	// until the call's context ends or the connection drops — a
+	// peripheral that vanished without a disconnect event; 0 answers
+	// every one.
+	HangUnsubscribeC2From int
 	// WithholdHandshakeFrom leaves the handshake request of that number
 	// and every later one unanswered, so the central waits out its
 	// timer; 0 answers every one.
@@ -510,10 +516,19 @@ func (c *connection) SubscribeC2(_ context.Context, on func([]byte)) error {
 // 862ad75f). A served session's end drops the connection, as that server's
 // close does; a stalled session's end leaves it, as the fake peer of
 // NobleBleChannelTest.ts does.
-func (c *connection) UnsubscribeC2(context.Context) error {
+func (c *connection) UnsubscribeC2(ctx context.Context) error {
 	c.p.mu.Lock()
 	c.p.unsubscribes++
+	n := c.p.unsubscribes
 	c.p.mu.Unlock()
+	if from := c.p.Faults.HangUnsubscribeC2From; from > 0 && n >= from {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-c.gone:
+			return btp.ErrDisconnected
+		}
+	}
 	if err := c.p.Faults.UnsubscribeC2; err != nil {
 		return err
 	}

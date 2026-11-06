@@ -296,7 +296,7 @@ func (s *Session) OnStall(f func(replay [][]byte)) {
 
 // Stalled reports whether the session was suspended by its stall report.
 // matter.js suspends and emits in one synchronous step
-// (BtpSessionHandler.ts:656-657 at 862ad75f); here the observer runs
+// (BtpSessionHandler.ts:657-658 at 862ad75f); here the observer runs
 // after the lock is released, so a transport whose Send met the inactive
 // session in between asks this and waits for the renegotiation the
 // report starts.

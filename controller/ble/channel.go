@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/SukramJ/go-fabric/client/exchange"
+	"github.com/SukramJ/go-fabric/clock"
 	"github.com/SukramJ/go-fabric/secure/sessionparams"
 	"github.com/SukramJ/go-fabric/transport/btp"
 )
@@ -35,6 +36,13 @@ var ErrChannelClosed = fmt.Errorf("ble: commissioning channel closed: %w", btp.E
 // ATT_MTU_SETTLE_TIMEOUT (packages/nodejs-ble/src/NobleBleChannel.ts:40-41
 // at 862ad75f).
 const ATTMTUSettleTimeout = 2 * time.Second
+
+// DisconnectTimeout bounds each C2 unsubscribe: a GATT stack can leave
+// the operation pending when the peripheral vanished without a disconnect
+// event — matter.js BLE_DISCONNECT_TIMEOUT
+// (packages/nodejs-ble/src/NobleBleChannel.ts:38 at 862ad75f) and its
+// unsubscribeC2 (:573-588), which runs the unsubscribe under it (:579).
+const DisconnectTimeout = 5 * time.Second
 
 // DialOptions configure [Dial]; the zero value is the system clock, no
 // log, the default session parameters and the segment size the ATT_MTU
@@ -239,7 +247,7 @@ func Dial(ctx context.Context, central Central, p Peripheral, opts DialOptions) 
 // landing, the timeout or the connection going settles it, and the
 // context ending fails it. "Deriving the BTP segment size from an unknown
 // MTU would pin the session to the 20-byte minimum for its whole life".
-func segmentSizeFor(ctx context.Context, conn Connection, clock exchange.Clock, log *slog.Logger, address string) (int, error) {
+func segmentSizeFor(ctx context.Context, conn Connection, clk exchange.Clock, log *slog.Logger, address string) (int, error) {
 	mtu := conn.ATTMTU()
 	if mtu <= 0 {
 		if x, ok := conn.(MTUExchange); ok {
@@ -247,7 +255,7 @@ func segmentSizeFor(ctx context.Context, conn Connection, clock exchange.Clock, 
 				return 0, fmt.Errorf("ble: %s: ATT_MTU wait: %w", address, err)
 			}
 			expired := make(chan struct{})
-			t := clock.AfterFunc(ATTMTUSettleTimeout, func() { close(expired) })
+			t := clk.AfterFunc(ATTMTUSettleTimeout, func() { close(expired) })
 			select {
 			case <-x.ATTMTUExchanged():
 				mtu = conn.ATTMTU()
@@ -269,33 +277,69 @@ func segmentSizeFor(ctx context.Context, conn Connection, clock exchange.Clock, 
 	return segment, nil
 }
 
-// handshake is performBtpHandshake (NobleBleChannel.ts:593-668). A context
-// that ends during the write is the caller's abort (:645-647 at 862ad75f).
-func handshake(ctx context.Context, conn Connection, h *handshakeState, segment int, clock exchange.Clock) ([]byte, error) {
+// unsubscribeC2 is matter.js unsubscribeC2
+// (packages/nodejs-ble/src/NobleBleChannel.ts:573-588 at 862ad75f): the
+// unsubscribe under [DisconnectTimeout] on the clock, so a peripheral that
+// vanished without a disconnect event cannot hold the caller.
+func unsubscribeC2(ctx context.Context, conn Connection, c exchange.Clock) error {
+	bounded, cancel := clock.WithTimeout(ctx, c, DisconnectTimeout)
+	defer cancel()
+	err := conn.UnsubscribeC2(bounded)
+	if err != nil && ctx.Err() == nil && bounded.Err() != nil {
+		return fmt.Errorf("ble: unsubscribe C2 not completed within %v: %w", DisconnectTimeout, err)
+	}
+	return err
+}
+
+// handshake is performBtpHandshake (NobleBleChannel.ts:593-668). The C1
+// write and the C2 subscribe run under the btp.ConnRspTimeout attempt
+// as the response wait does (:602-606, :634-641 at 862ad75f: "Every
+// await below must end on abort or timeout"), so a write that never
+// completes ends in [ErrHandshakeTimeout]. A context that ends meanwhile
+// is the caller's abort (:645-647 at 862ad75f).
+func handshake(ctx context.Context, conn Connection, h *handshakeState, segment int, c exchange.Clock) ([]byte, error) {
 	req := btp.EncodeHandshakeRequest(btp.HandshakeRequest{Versions: btp.SupportedVersions, ATTMTU: uint16(segment), ClientWindowSize: btp.MaximumWindowSize}) //nolint:gosec // a segment size, at most 244
-	expired := make(chan struct{})
-	t := clock.AfterFunc(btp.ConnRspTimeout, func() { close(expired) })
-	defer t.Stop()
-	if err := conn.WriteC1(ctx, req); err != nil {
+	attempt, cancel := clock.WithTimeout(ctx, c, btp.ConnRspTimeout)
+	defer cancel()
+	// timedOut abandons the handshake whose attempt expired: C2
+	// unsubscribed while the connection is up (:652-654 at 862ad75f).
+	timedOut := func() ([]byte, error) {
+		select {
+		case <-conn.Disconnected():
+		default:
+			_ = unsubscribeC2(context.WithoutCancel(ctx), conn, c)
+		}
+		return nil, ErrHandshakeTimeout
+	}
+	if err := conn.WriteC1(attempt, req); err != nil {
 		if ctx.Err() != nil {
 			return nil, fmt.Errorf("ble: %s: BTP handshake: %w", h.address, ctx.Err())
 		}
+		if attempt.Err() != nil {
+			return timedOut()
+		}
 		return nil, fmt.Errorf("ble: write the BTP handshake request: %w", err)
 	}
-	if err := conn.SubscribeC2(ctx, h.onC2); err != nil {
+	if err := conn.SubscribeC2(attempt, h.onC2); err != nil {
+		if ctx.Err() != nil {
+			return nil, fmt.Errorf("ble: %s: BTP handshake: %w", h.address, ctx.Err())
+		}
+		if attempt.Err() != nil {
+			return timedOut()
+		}
 		return nil, fmt.Errorf("ble: subscribe C2: %w", err)
 	}
 	select {
 	case resp := <-h.response:
 		return resp, nil
-	case <-expired:
-		_ = conn.UnsubscribeC2(context.WithoutCancel(ctx))
-		return nil, ErrHandshakeTimeout
 	case <-conn.Disconnected():
 		return nil, fmt.Errorf("ble: %s disconnected during the BTP handshake: %w", h.address, btp.ErrDisconnected)
-	case <-ctx.Done():
-		_ = conn.UnsubscribeC2(context.WithoutCancel(ctx))
-		return nil, ctx.Err()
+	case <-attempt.Done():
+		if ctx.Err() != nil {
+			_ = unsubscribeC2(context.WithoutCancel(ctx), conn, c)
+			return nil, ctx.Err()
+		}
+		return timedOut()
 	}
 }
 
@@ -342,7 +386,7 @@ func (c *Channel) releaseGATT(unsubscribe bool) error {
 		return nil
 	}
 	if unsubscribe {
-		if err := c.conn.UnsubscribeC2(c.gattCtx); err != nil {
+		if err := unsubscribeC2(c.gattCtx, c.conn, c.clock); err != nil {
 			c.log.Debug("matter.ble.unsubscribe_failed", slog.Any("err", err))
 		}
 	}
@@ -395,16 +439,20 @@ func (c *Channel) startRenegotiation(replay [][]byte) {
 // suspended already — and C2 unsubscribed, which closes the peripheral's
 // BTP session (§4.19.4.10) and leaves the BLE connection; a failure there
 // may leave the peer holding the old session, so no new handshake is
-// attempted. Then the handshake at btp.MinimumATTMTU under the channel's
-// lifetime, with a fresh C2 handler, the session adopted, and the
-// unacknowledged messages replayed in order.
+// attempted. The unsubscribe runs under [DisconnectTimeout] (:579 at
+// 862ad75f), the handshake's write and subscribe under its
+// btp.ConnRspTimeout attempt, so a peripheral that vanished without a
+// disconnect event fails the renegotiation within the bound and the
+// channel closes. Then the handshake at btp.MinimumATTMTU under the
+// channel's lifetime, with a fresh C2 handler, the session adopted, and
+// the unacknowledged messages replayed in order.
 func (c *Channel) renegotiate(replay [][]byte) error {
 	c.mu.Lock()
 	old := c.c2
 	c.mu.Unlock()
 	old.detach()
 	c.log.Info("matter.ble.renegotiate", slog.String("address", c.peripheral.Address), slog.Int("fragment_size", btp.MinimumATTMTU))
-	if err := c.conn.UnsubscribeC2(c.life.ctx); err != nil {
+	if err := unsubscribeC2(c.life.ctx, c.conn, c.clock); err != nil {
 		return fmt.Errorf("ble: unsubscribe C2 for the renegotiation: %w", err)
 	}
 	if err := c.assertRenegotiable(); err != nil {
@@ -496,22 +544,32 @@ func (c *Channel) deliver(msg []byte) error {
 
 // Send is the exchange manager's carrier: one Matter message on the BTP
 // session; dst is the channel's own address. It waits for a renegotiation
-// in flight — the replay goes first — and returns [ErrChannelClosed] when
-// the channel is lost meanwhile (NobleBleChannel.ts:944-953 at 862ad75f:
-// "BtpFlowError from the suspended session would not read as channel
-// loss downstream").
+// in flight — the replay goes first — as matter.js's send awaits it before
+// it takes the session: "A renegotiation replaces the session, so sending
+// into the outgoing one would be rejected as inactive"
+// (NobleBleChannel.ts:944-953 at 862ad75f). It returns [ErrChannelClosed]
+// when the channel is lost meanwhile, the error matter.js's test asserts
+// for a send parked on a failed renegotiation: "BtpFlowError from the
+// suspended session would not read as channel loss downstream"
+// (packages/nodejs-ble/test/NobleBleChannelTest.ts:772 at 862ad75f).
 func (c *Channel) Send(_ *net.UDPAddr, payload []byte) error {
 	for {
+		// The renegotiation and the session are read in one critical
+		// section: a session swapped in by a renegotiation this send has
+		// not seen would carry the payload ahead of the replay.
 		c.mu.Lock()
-		wait := c.renegotiation
-		c.mu.Unlock()
-		if wait != nil {
+		if wait := c.renegotiation; wait != nil {
 			select {
 			case <-wait:
-			case <-c.life.ctx.Done():
+			default:
+				c.mu.Unlock()
+				select {
+				case <-wait:
+				case <-c.life.ctx.Done():
+				}
+				c.mu.Lock()
 			}
 		}
-		c.mu.Lock()
 		usable, conn := c.usableLocked(), c.btpConn
 		c.mu.Unlock()
 		if !usable {
@@ -563,14 +621,16 @@ func (c *Channel) ClosedCause() error { return ErrChannelClosed }
 // Close closes the exchange manager and the BTP session, which
 // unsubscribes C2 and disconnects — matter.js close
 // (NobleBleChannel.ts:1004-1021 at 862ad75f). A renegotiation in flight
-// is abandoned, its parked sends released, and the connection a
-// suspended session no longer owns is dropped here.
+// is abandoned, its parked sends released, the C2 handler detached so
+// data that still arrives is dropped (:1010 #detachDataHandler), and the
+// connection a suspended session no longer owns is dropped here.
 func (c *Channel) Close() error {
 	c.mu.Lock()
 	c.closing = true
-	s := c.session
+	s, h := c.session, c.c2
 	c.mu.Unlock()
 	c.life.end()
+	h.detach()
 	c.mgr.Close()
 	err := s.Close()
 	if rerr := c.releaseGATT(false); err == nil {
