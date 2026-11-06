@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 7707,
+  "entry_points": 7722,
   "entry_packages": [
     ".",
     "bdx",
@@ -279,9 +279,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 17682,
-    "reachable": 12315,
-    "whitelisted": 5367,
+    "total_exported": 17704,
+    "reachable": 12323,
+    "whitelisted": 5381,
     "unreachable": 0
   },
   "by_package": [],
@@ -22563,6 +22563,48 @@
     },
     {
       "package": "controller/attestation",
+      "identifier": "TestAttestationProfileAcceptsSuccessVectors",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/attestation/attestationcertificateprofile_parity_matterjs_test.go",
+      "line": 180
+    },
+    {
+      "package": "controller/attestation",
+      "identifier": "TestAttestationProfileRefusesDAC",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/attestation/attestationcertificateprofile_parity_matterjs_test.go",
+      "line": 106
+    },
+    {
+      "package": "controller/attestation",
+      "identifier": "TestAttestationProfileRefusesPAI",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/attestation/attestationcertificateprofile_parity_matterjs_test.go",
+      "line": 148
+    },
+    {
+      "package": "controller/attestation",
+      "identifier": "TestCdSignersCSAKeys",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/attestation/cdsigners_parity_matterjs_test.go",
+      "line": 29
+    },
+    {
+      "package": "controller/attestation",
+      "identifier": "TestCdSignersKnown",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/attestation/cdsigners_parity_matterjs_test.go",
+      "line": 115
+    },
+    {
+      "package": "controller/attestation",
+      "identifier": "TestCdSignersVerifyCertificate",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/attestation/cdsigners_parity_matterjs_test.go",
+      "line": 57
+    },
+    {
+      "package": "controller/attestation",
       "identifier": "TestCertificateRules",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/attestation/cert_internal_test.go",
@@ -22573,28 +22615,63 @@
       "identifier": "TestCertificatesFallbackVendorIDProductID",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/attestation/certificates_parity_matterjs_test.go",
-      "line": 48
+      "line": 54
     },
     {
       "package": "controller/attestation",
       "identifier": "TestCertificatesPaaFromAsn1",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/attestation/certificates_parity_matterjs_test.go",
-      "line": 125
+      "line": 131
     },
     {
       "package": "controller/attestation",
       "identifier": "TestCertificatesParseMatterFallbackVidPid",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/attestation/certificates_parity_matterjs_test.go",
-      "line": 75
+      "line": 81
+    },
+    {
+      "package": "controller/attestation",
+      "identifier": "TestCertificationDeclarationEnvelope",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/attestation/certificationdeclaration_parity_matterjs_test.go",
+      "line": 165
     },
     {
       "package": "controller/attestation",
       "identifier": "TestCertificationDeclarationParse",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/attestation/certificationdeclaration_parity_matterjs_test.go",
-      "line": 44
+      "line": 47
+    },
+    {
+      "package": "controller/attestation",
+      "identifier": "TestChipCDAcceptsValidCD",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/attestation/deviceattestationvalidatorchipcd_parity_matterjs_test.go",
+      "line": 89
+    },
+    {
+      "package": "controller/attestation",
+      "identifier": "TestChipCDEnvelopeRules",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/attestation/deviceattestationvalidatorchipcd_parity_matterjs_test.go",
+      "line": 106
+    },
+    {
+      "package": "controller/attestation",
+      "identifier": "TestChipCDSigner",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/attestation/deviceattestationvalidatorchipcd_parity_matterjs_test.go",
+      "line": 126
+    },
+    {
+      "package": "controller/attestation",
+      "identifier": "TestChipCDSignerTrust",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/attestation/deviceattestationvalidatorchipcd_parity_matterjs_test.go",
+      "line": 149
     },
     {
       "package": "controller/attestation",
@@ -22616,6 +22693,27 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/attestation/pqcattestationcertificates_parity_matterjs_test.go",
       "line": 193
+    },
+    {
+      "package": "controller/attestation",
+      "identifier": "TestProfileAcceptViolation",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/attestation/attestationcertificateprofile_parity_matterjs_test.go",
+      "line": 198
+    },
+    {
+      "package": "controller/attestation",
+      "identifier": "TestProfileDeviceAttestationFindings",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/attestation/attestationcertificateprofile_parity_matterjs_test.go",
+      "line": 388
+    },
+    {
+      "package": "controller/attestation",
+      "identifier": "TestProfileParser",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/attestation/attestationcertificateprofile_parity_matterjs_test.go",
+      "line": 257
     },
     {
       "package": "controller/ble",
@@ -25163,14 +25261,14 @@
       "identifier": "TestCertificateStoreCDSigner",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/dcl/certstore_test.go",
-      "line": 204
+      "line": 205
     },
     {
       "package": "controller/dcl",
       "identifier": "TestCertificateStoreCloseCancelsPeriodicUpdate",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/dcl/certstore_test.go",
-      "line": 393
+      "line": 398
     },
     {
       "package": "controller/dcl",
@@ -25184,7 +25282,7 @@
       "identifier": "TestCertificateStoreGitHub",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/dcl/certstore_test.go",
-      "line": 293
+      "line": 295
     },
     {
       "package": "controller/dcl",
@@ -25205,7 +25303,7 @@
       "identifier": "TestCertificateStoreSelfHeal",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/dcl/certstore_test.go",
-      "line": 254
+      "line": 256
     },
     {
       "package": "controller/dcl",
@@ -25254,14 +25352,14 @@
       "identifier": "TestCommissionRevokedDAC",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/dcl/commission_test.go",
-      "line": 173
+      "line": 184
     },
     {
       "package": "controller/dcl",
       "identifier": "TestCommissionWithDCLStore",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/dcl/commission_test.go",
-      "line": 129
+      "line": 130
     },
     {
       "package": "controller/dcl",
@@ -25275,105 +25373,105 @@
       "identifier": "TestDclCertificateServiceAddCertificate",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/dcl/certstore_parity_matterjs_test.go",
-      "line": 1004
+      "line": 1005
     },
     {
       "package": "controller/dcl",
       "identifier": "TestDclCertificateServiceBytesSubjectKeyIDs",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/dcl/certstore_parity_matterjs_test.go",
-      "line": 810
+      "line": 811
     },
     {
       "package": "controller/dcl",
       "identifier": "TestDclCertificateServiceCertificateDeletion",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/dcl/certstore_parity_matterjs_test.go",
-      "line": 654
+      "line": 655
     },
     {
       "package": "controller/dcl",
       "identifier": "TestDclCertificateServiceCertificateRetrieval",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/dcl/certstore_parity_matterjs_test.go",
-      "line": 545
+      "line": 546
     },
     {
       "package": "controller/dcl",
       "identifier": "TestDclCertificateServiceCustomDclConfig",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/dcl/certstore_parity_matterjs_test.go",
-      "line": 859
+      "line": 860
     },
     {
       "package": "controller/dcl",
       "identifier": "TestDclCertificateServiceCustomGithubConfig",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/dcl/certstore_parity_matterjs_test.go",
-      "line": 923
+      "line": 924
     },
     {
       "package": "controller/dcl",
       "identifier": "TestDclCertificateServiceErrorHandling",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/dcl/certstore_parity_matterjs_test.go",
-      "line": 472
+      "line": 473
     },
     {
       "package": "controller/dcl",
       "identifier": "TestDclCertificateServiceFetchGithubCertificatesOption",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/dcl/certstore_parity_matterjs_test.go",
-      "line": 898
-    },
-    {
-      "package": "controller/dcl",
-      "identifier": "TestDclCertificateServiceGetOrFetchCdSigner",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/dcl/certstore_parity_matterjs_test.go",
-      "line": 1043
+      "line": 899
     },
     {
       "package": "controller/dcl",
       "identifier": "TestDclCertificateServiceGetOrFetchCertificate",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/dcl/certstore_parity_matterjs_test.go",
-      "line": 742
+      "line": 743
     },
     {
       "package": "controller/dcl",
       "identifier": "TestDclCertificateServiceGitHubRateLimitLogging",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/dcl/certstore_parity_matterjs_test.go",
-      "line": 1515
+      "line": 1613
     },
     {
       "package": "controller/dcl",
       "identifier": "TestDclCertificateServiceInitialization",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/dcl/certstore_parity_matterjs_test.go",
-      "line": 352
+      "line": 353
     },
     {
       "package": "controller/dcl",
       "identifier": "TestDclCertificateServiceIsProductionFlag",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/dcl/certstore_parity_matterjs_test.go",
-      "line": 953
+      "line": 954
+    },
+    {
+      "package": "controller/dcl",
+      "identifier": "TestDclCertificateServiceLookupCdSigner",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/dcl/certstore_parity_matterjs_test.go",
+      "line": 1050
     },
     {
       "package": "controller/dcl",
       "identifier": "TestDclCertificateServiceManualUpdate",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/dcl/certstore_parity_matterjs_test.go",
-      "line": 704
+      "line": 705
     },
     {
       "package": "controller/dcl",
       "identifier": "TestDclCertificateServicePeriodicUpdates",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/dcl/certstore_parity_matterjs_test.go",
-      "line": 371
+      "line": 372
     },
     {
       "package": "controller/dcl",
@@ -25394,21 +25492,21 @@
       "identifier": "TestDclCertificateServiceRevocationParseRevocationSet",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/dcl/revocation_parity_matterjs_test.go",
-      "line": 314
+      "line": 316
     },
     {
       "package": "controller/dcl",
       "identifier": "TestDclCertificateServiceRevocationSupport",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/dcl/certstore_parity_matterjs_test.go",
-      "line": 1165
+      "line": 1263
     },
     {
       "package": "controller/dcl",
       "identifier": "TestDclCertificateServiceTestCertificateVisibility",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/dcl/certstore_parity_matterjs_test.go",
-      "line": 1313
+      "line": 1411
     },
     {
       "package": "controller/dcl",
@@ -25499,56 +25597,56 @@
       "identifier": "TestDclCrlAuthenticationAuthorityName",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/dcl/crlauthentication_parity_matterjs_test.go",
-      "line": 694
+      "line": 706
     },
     {
       "package": "controller/dcl",
       "identifier": "TestDclCrlAuthenticationCRLChecks",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/dcl/crlauthentication_parity_matterjs_test.go",
-      "line": 621
+      "line": 633
     },
     {
       "package": "controller/dcl",
       "identifier": "TestDclCrlAuthenticationForeignEntry",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/dcl/crlauthentication_parity_matterjs_test.go",
-      "line": 759
+      "line": 771
     },
     {
       "package": "controller/dcl",
       "identifier": "TestDclCrlAuthenticationMLDSAForwardFeaturesOff",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/dcl/crlauthentication_parity_matterjs_test.go",
-      "line": 971
+      "line": 983
     },
     {
       "package": "controller/dcl",
       "identifier": "TestDclCrlAuthenticationPartitions",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/dcl/crlauthentication_parity_matterjs_test.go",
-      "line": 772
+      "line": 784
     },
     {
       "package": "controller/dcl",
       "identifier": "TestDclCrlAuthenticationRetrying",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/dcl/crlauthentication_parity_matterjs_test.go",
-      "line": 833
+      "line": 845
     },
     {
       "package": "controller/dcl",
       "identifier": "TestDclCrlAuthenticationSignerForms",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/dcl/crlauthentication_parity_matterjs_test.go",
-      "line": 437
+      "line": 449
     },
     {
       "package": "controller/dcl",
       "identifier": "TestDclCrlAuthenticationVendorAndProduct",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/dcl/crlauthentication_parity_matterjs_test.go",
-      "line": 576
+      "line": 588
     },
     {
       "package": "controller/dcl",
@@ -25723,7 +25821,7 @@
       "identifier": "TestStores",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/dcl/certstore_test.go",
-      "line": 355
+      "line": 360
     },
     {
       "package": "controller/dcl",
@@ -25744,7 +25842,7 @@
       "identifier": "TestEmbedded",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/dcl/snapshot/snapshot_test.go",
-      "line": 76
+      "line": 64
     },
     {
       "package": "controller/dcl/snapshot",
@@ -25758,14 +25856,14 @@
       "identifier": "TestLoad",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/dcl/snapshot/snapshot_test.go",
-      "line": 104
+      "line": 92
     },
     {
       "package": "controller/dcl/snapshot",
       "identifier": "TestSnapshotIsNoRevocationSource",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/dcl/snapshot/snapshot_test.go",
-      "line": 174
+      "line": 162
     },
     {
       "package": "controller/softwareupdate",
