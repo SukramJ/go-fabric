@@ -508,14 +508,29 @@ func (s *ThermostatServer) handleSetActivePresetRequest(ctx context.Context, fie
 	if err != nil {
 		return err
 	}
+	var handle []byte
+	if !req.PresetHandle.Null {
+		handle = bytes.Clone(req.PresetHandle.Value)
+		if handle == nil {
+			handle = []byte{}
+		}
+	}
 	s.op.Lock()
 	defer s.op.Unlock()
+	return s.activatePreset(ctx, handle)
+}
+
+// activatePreset makes handle the active preset (nil: none) as
+// SetActivePresetRequest does — the body of
+// [ThermostatServer.handleSetActivePresetRequest], which a followed
+// thermostat suggestion runs too (suggestions.go). The caller holds s.op.
+func (s *ThermostatServer) activatePreset(ctx context.Context, handle []byte) error {
 	s.mu.RLock()
 	var preset *Preset
-	if !req.PresetHandle.Null {
+	if handle != nil {
 		for i := range s.presets {
 			p := s.presets[i]
-			if !p.PresetHandle.Null && bytes.Equal(p.PresetHandle.Value, req.PresetHandle.Value) {
+			if !p.PresetHandle.Null && bytes.Equal(p.PresetHandle.Value, handle) {
 				preset = &p
 				break
 			}
@@ -525,12 +540,8 @@ func (s *ThermostatServer) handleSetActivePresetRequest(ctx context.Context, fie
 	unoccupied := !s.occupiedLocked()
 	previous := bytes.Clone(s.activePresetHandle)
 	s.mu.RUnlock()
-	if !req.PresetHandle.Null && preset == nil {
+	if handle != nil && preset == nil {
 		return spec.Errorf(im.StatusInvalidCommand, "Requested PresetHandle not found")
-	}
-	var handle []byte
-	if !req.PresetHandle.Null {
-		handle = bytes.Clone(req.PresetHandle.Value)
 	}
 	s.logger().Info("matter.thermostat.active_preset", slog.String("preset_handle", handleKey(handle)))
 

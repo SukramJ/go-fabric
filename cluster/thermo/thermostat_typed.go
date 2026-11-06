@@ -72,6 +72,14 @@ var setpointKeys = map[uint32]struct {
 // MinSetpointDeadBand, PresetTypes, NumberOfPresets, ScheduleTypes and the
 // three schedule counts are the configuration's: [spec.ErrNotHeld] for a
 // value other than the one they read (any value for the lists and counts).
+//
+// With TSUGGEST, ThermostatSuggestionNotFollowingReason is the device's
+// own reasons for not following the current suggestion (null for none,
+// the hold's OngoingHold is the server's): the served value is them, with
+// OngoingHold while a hold is on, while there is a current suggestion, and
+// a change re-evaluates the suggestions. MaxThermostatSuggestions is the
+// configuration's, ThermostatSuggestions and CurrentThermostatSuggestion
+// the server's own state: [spec.ErrNotHeld].
 func (s *ThermostatServer) SetAttributes(values map[uint32]any) error {
 	checked, presets, err := s.checkSet(values)
 	if err != nil {
@@ -139,9 +147,13 @@ func (s *ThermostatServer) SetAttributes(values map[uint32]any) error {
 		s.occupied = occupied
 	}
 	s.setOptionalLocked(checked, note)
+	reevaluate := s.setSuggestionReasonLocked(checked) || slices.Contains(changed, thermoAttrTemperatureSetpointHold)
 	after := s.eventStateLocked()
 	s.mu.Unlock()
 	s.emitChanges(context.Background(), before, after)
+	if reevaluate {
+		s.scheduleSuggestionReevaluation()
+	}
 
 	if len(changed) > 0 {
 		slices.Sort(changed)
@@ -179,6 +191,28 @@ func (s *ThermostatServer) setOptionalLocked(checked map[uint32]any, note func(i
 		note(thermoAttrThermostatRunningState, s.runningState != n)
 		s.runningState = n
 	}
+}
+
+// setSuggestionReasonLocked stores the device's own reasons for not
+// following the current suggestion (ThermostatSuggestionNotFollowingReason,
+// null for none) when checked holds them, and reports whether they changed;
+// the served value follows at the re-evaluation (suggestions.go). The caller
+// holds s.mu.
+func (s *ThermostatServer) setSuggestionReasonLocked(checked map[uint32]any) bool {
+	v, ok := checked[tdef.AttrThermostatSuggestionNotFollowingReason]
+	if !ok {
+		return false
+	}
+	var bits uint16
+	switch n := v.(type) {
+	case uint16:
+		bits = n
+	case uint64:
+		bits = uint16(n) //nolint:gosec // a map16 per CheckSet
+	}
+	changed := s.suggest.hostReason != bits
+	s.suggest.hostReason = bits
+	return changed
 }
 
 // presetValues are the Presets and ActivePresetHandle a
@@ -255,8 +289,10 @@ func (s *ThermostatServer) checkSet(values map[uint32]any) (map[uint32]any, pres
 			presets.scheduleHandle, presets.hasScheduleHandle = handle, true
 			continue
 		case tdef.AttrPresetTypes, tdef.AttrNumberOfPresets, tdef.AttrScheduleTypes, tdef.AttrNumberOfSchedules,
-			tdef.AttrNumberOfScheduleTransitions, tdef.AttrNumberOfScheduleTransitionPerDay:
+			tdef.AttrNumberOfScheduleTransitions, tdef.AttrNumberOfScheduleTransitionPerDay, tdef.AttrMaxThermostatSuggestions:
 			return nil, presets, fmt.Errorf("%w: thermostat: attribute 0x%04X is the configuration's", spec.ErrNotHeld, id)
+		case tdef.AttrThermostatSuggestions, tdef.AttrCurrentThermostatSuggestion:
+			return nil, presets, fmt.Errorf("%w: thermostat: attribute 0x%04X is the suggestions' own state", spec.ErrNotHeld, id)
 		case thermoAttrControlSequenceOfOperation, thermoAttrMinSetpointDeadBand:
 			if cur, _ := s.MatterRead(id); v != cur {
 				return nil, presets, fmt.Errorf("%w: thermostat: attribute 0x%04X is fixed at %v", spec.ErrNotHeld, id, cur)

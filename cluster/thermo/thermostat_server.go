@@ -14,7 +14,10 @@
 // it, the server serves MatterScheduleConfiguration (the device's week
 // programs, the active one, SetActiveScheduleRequest and the atomic write
 // of Schedules) after connectedhomeip's ThermostatSchedules, behind a
-// [SchedulePort] (schedules.go).
+// [SchedulePort] (schedules.go), and ThermostatSuggestions (the presets a
+// controller suggests for a span of time, the one the thermostat follows)
+// after connectedhomeip's ThermostatSuggestions, on the node's Matter time
+// ([ThermostatConfig.MatterTime], suggestions.go).
 //
 // The server holds its own state. Without a host port it answers every
 // write and command without forwarding it anywhere — the reference daemon
@@ -83,11 +86,12 @@ const (
 // MatterScheduleConfiguration is served ahead of matter.js ("not
 // implemented yet", ThermostatServer.ts:82 and :126-128 at 862ad75f),
 // after connectedhomeip (schedules.go), and so are the Events feature's
-// events, which matter.js does not emit (events.go). ScheduleConfiguration
-// and Setback (deprecated, refused, :120-125) and ThermostatSuggestions are
-// not.
+// events, which matter.js does not emit (events.go), and
+// ThermostatSuggestions, which ThermostatServer.ts does not implement
+// either (suggestions.go). ScheduleConfiguration and Setback
+// (deprecated, refused, :120-125) are not.
 const servedFeatures = ThermostatFeatureHEAT | ThermostatFeatureCOOL | ThermostatFeatureAUTO | ThermostatFeatureLTNE |
-	ThermostatFeatureOCC | ThermostatFeaturePRES | ThermostatFeatureMSCH | ThermostatFeatureTEVT
+	ThermostatFeatureOCC | ThermostatFeaturePRES | ThermostatFeatureMSCH | ThermostatFeatureTEVT | ThermostatFeatureTSUGGEST
 
 // ErrFeatures reports a ThermostatConfig.Features the server refuses.
 var ErrFeatures = errors.New("thermo: feature selection not served")
@@ -228,6 +232,18 @@ type ThermostatConfig struct {
 	// SchedulePort switches the device's active schedule and stores the
 	// schedules a controller wrote, with MSCH; nil keeps them in memory.
 	SchedulePort SchedulePort
+	// MaxThermostatSuggestions is how many thermostat suggestions the
+	// thermostat holds with ThermostatSuggestions (TSUGGEST, which needs
+	// PRES): at least 5, 0 for 5. The suggestions live in memory.
+	MaxThermostatSuggestions uint8
+	// MatterTime is the node's Matter time with TSUGGEST: the current
+	// Matter epoch second and whether the node's time is synchronised. A
+	// suggestion is refused with INVALID_IN_STATE while it is not, and nil
+	// is a time never synchronised — connectedhomeip's
+	// GetClock_MatterEpochS gate (ThermostatClusterSuggestions.cpp:173-178
+	// at 6170af84). The device kit reads the root TimeSynchronization's
+	// UTCTime through the node's clock (cluster/core.MatterEpochSeconds).
+	MatterTime func() (epochS uint32, synced bool)
 	// Clock times the atomic writes; nil is the system clock.
 	Clock clock.Clock
 	// Sink is the optional host port; nil keeps the server self-contained.
@@ -415,6 +431,9 @@ type ThermostatServer struct {
 	activeScheduleHandle        []byte
 	schedulePort                SchedulePort
 
+	// suggest is the TSUGGEST state (suggestions.go).
+	suggest suggestions
+
 	clk    clock.Clock
 	atomic atomicWrites
 
@@ -432,8 +451,9 @@ type ThermostatServer struct {
 // set when HEAT+COOL are not both present. A selection with neither HEAT
 // nor COOL — which matter.js's FeatureSelectionErrors refuses, HEAT and
 // COOL being "AUTO, O.a+" (thermostat-cluster.element.ts) — or naming a
-// feature the server does not serve (Setback, the schedule, event and
-// suggestion features) is refused with [ErrFeatures]; a negative
+// feature the server does not serve (Setback, ScheduleConfiguration) or
+// ThermostatSuggestions without Presets is refused with [ErrFeatures]; a
+// MaxThermostatSuggestions below 5 too; a negative
 // MinSetpointDeadBand with [ErrSetpoints], a preset configuration the
 // write rules refuse with [ErrPresets], a schedule configuration with
 // [ErrSchedules].
@@ -550,6 +570,11 @@ func New(cfg ThermostatConfig) (*ThermostatServer, error) {
 	if features&ThermostatFeatureMSCH != 0 {
 		if err := s.seedSchedules(cfg); err != nil {
 			return nil, err
+		}
+	}
+	if features&ThermostatFeatureTSUGGEST != 0 {
+		if err := s.seedSuggestions(cfg); err != nil {
+			return nil, fmt.Errorf("%w: %w", ErrFeatures, err)
 		}
 	}
 
@@ -722,6 +747,7 @@ func (s *ThermostatServer) SetTemperatureSetpointHold(hold uint8) {
 	s.mu.Unlock()
 	if changed {
 		s.changes.NotifyFrom(contract.OriginHostSet, thermoAttrTemperatureSetpointHold)
+		s.scheduleSuggestionReevaluation()
 	}
 }
 
@@ -943,7 +969,7 @@ func (s *ThermostatServer) readOptionalLocked(attrID uint32) (any, bool) {
 	case tdef.AttrSchedules:
 		return spec.List[Schedule](cloneSchedules(s.schedules)), true
 	}
-	return nil, false
+	return s.readSuggestionLocked(attrID)
 }
 
 // MatterReadFiltered implements [contract.FabricScopedReader] for the two
@@ -1155,6 +1181,8 @@ func (s *ThermostatServer) writeHold(ctx context.Context, v uint8) error {
 	s.hold = v
 	s.mu.Unlock()
 	s.changes.NotifyFrom(contract.OriginControllerWrite, thermoAttrTemperatureSetpointHold)
+	// A hold keeps the thermostat off its current suggestion (suggestions.go).
+	s.reevaluateSuggestions(contract.WithOrigin(ctx, contract.OriginControllerWrite))
 	return nil
 }
 
@@ -1323,7 +1351,9 @@ func (s *ThermostatServer) OnAttributeChange(cb func(change contract.Change)) (u
 }
 
 // MatterInvoke handles SetpointRaiseLower and, with PRES,
-// SetActivePresetRequest and AtomicRequest. Without PRES (and without
+// SetActivePresetRequest and AtomicRequest, with MSCH
+// SetActiveScheduleRequest, with TSUGGEST AddThermostatSuggestion and
+// RemoveThermostatSuggestion. Without PRES (and without
 // MatterScheduleConfiguration, which the server does not serve) AtomicRequest
 // is unsupported (matter.js ThermostatServer.ts:130-132 at 862ad75f).
 func (s *ThermostatServer) MatterInvoke(ctx context.Context, cmdID uint32, fields any) (any, error) {
@@ -1337,6 +1367,10 @@ func (s *ThermostatServer) MatterInvoke(ctx context.Context, cmdID uint32, field
 		return nil, s.handleSetActivePresetRequest(ctx, fields)
 	case cmdID == tdef.CmdSetActiveScheduleRequest && s.inst.Accepts(cmdID):
 		return nil, s.handleSetActiveScheduleRequest(ctx, fields)
+	case cmdID == tdef.CmdAddThermostatSuggestion && s.inst.Accepts(cmdID):
+		return s.handleAddThermostatSuggestion(ctx, fields)
+	case cmdID == tdef.CmdRemoveThermostatSuggestion && s.inst.Accepts(cmdID):
+		return nil, s.handleRemoveThermostatSuggestion(ctx, fields)
 	case cmdID == tdef.CmdAtomicRequest && s.inst.Accepts(cmdID):
 		s.op.Lock()
 		defer s.op.Unlock()
