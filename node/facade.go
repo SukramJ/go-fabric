@@ -156,6 +156,19 @@ type OTAUpdateStatus = mattercore.OTAUpdateStatus
 // OTAApplier is the type of [OTAConfig].Applier: the requestor's consent and apply hooks ([mattercore.OtaApplier]).
 type OTAApplier = mattercore.OtaApplier
 
+// OTADownloadProtocol is the element type of [OTAConfig].TransferProtocols ([mattercore.DownloadProtocol]).
+type OTADownloadProtocol = mattercore.DownloadProtocol
+
+// OTAHTTPClient is the type of [OTAConfig].HTTPClient: the GET of an HTTPS download ([mattercore.OtaHTTPClient]); *http.Client implements it.
+type OTAHTTPClient = mattercore.OtaHTTPClient
+
+// The download protocols [OTAConfig].TransferProtocols takes
+// ([mattercore.DownloadProtocolBDXSynchronous], [mattercore.DownloadProtocolHTTPS]).
+const (
+	OTADownloadBDXSynchronous = mattercore.DownloadProtocolBDXSynchronous
+	OTADownloadHTTPS          = mattercore.DownloadProtocolHTTPS
+)
+
 // WiFiReporter is the type of [WiFi].Reporter: the live Wi-Fi diagnostics the host reports ([mattercore.WiFiReporter]).
 type WiFiReporter = mattercore.WiFiReporter
 

@@ -118,7 +118,7 @@ pin lift confirms by re-reading the row, [`pin-lifts.md`](./pin-lifts.md)).
 | BD-chip-GeneralCommissioning-TermsAndConditions | `GeneralCommissioningServer.ts:31` is the class line; no terms-and-conditions text in the file (absence: the class body, 285 lines in all) | `packages/node/src/behaviors/general-commissioning/GeneralCommissioningServer.ts` | `class GeneralCommissioningServer` | connectedhomeip `src/app/clusters/general-commissioning-server/GeneralCommissioningCluster.cpp` at `6170af84` (the attribute reads :199-230, the change notifications :73-135 and :367-372, the fail-safe revert :149-157, the CommissioningComplete gate :476-525, `HandleSetTCAcknowledgements` :617-672, `OnFabricRemoved` :357-374), `src/app/server/TermsAndConditionsProvider.h:35-220`, `DefaultTermsAndConditionsProvider.cpp:153-252`, tests `tests/TestGeneralCommissioningCluster.cpp`, the CSA cases TC-CGEN-2.5 to 2.11 | yes |
 | BD-chip-Thermostat-Events | `ThermostatServer.ts:525` is the only `events.` emit of the server, the custom `calibratedTemperature$Changed` (absence: none of the model's eight Thermostat events is emitted anywhere in the file, 1790 lines) | `packages/node/src/behaviors/thermostat/ThermostatServer.ts` | `"this.events.calibratedTemperature$Changed.emit(temperature, oldTemperature, this.context);"` | connectedhomeip `src/app/clusters/thermostat-server/ThermostatClusterEvents.cpp` at `6170af84` (every `Generate*` gated on `Feature::kEvents`, :33-36, :59-61, :83-86, :109-112), the emit sites `ThermostatClusterBase.cpp:158-162, :179-183, :246-250, :283-287`, `ThermostatClusterSetpointsBase.cpp:63-85`, `ThermostatClusterPresets.cpp:461-500`; the entry is the events paragraph of `BD-chip-Thermostat-Schedules` | yes |
 | BD-matterjs-server-CameraStreamManagement | `camera-controller.ts:133` mandates the requestor as the device type's whole server set — matter.js's controller-side camera surface is the WebRtcTransportRequestor and nothing above it (absence: the tree at the pin holds six WebRTC behaviour files and one test under `packages/node`, no stream management) | `packages/node/src/devices/camera-controller.ts` | `"export const server = { mandatory: { WebRtcTransportRequestor: WebRtcTransportRequestorServer } };"` | matterjs-server `packages/ws-controller/src/camera/CameraStreamManager.ts`, `streamPolicy.ts`, `sdpConstraints.ts`, `sessionRegistry.ts` at 0bd06f2; connectedhomeip `WebRTCTransportProviderCluster.cpp` at 6170af84 for the provider's rules | no |
-| BD-chip-JointFabricDatastore-RulesInServer | `JointFabricDatastoreServer.ts:14` is the empty subclass (absence: the class line, 14 lines in all) | `packages/node/src/behaviors/joint-fabric-datastore/JointFabricDatastoreServer.ts` | `"export class JointFabricDatastoreServer extends JointFabricDatastoreBehavior {}"` | connectedhomeip `src/app/server/JointFabricDatastore.cpp` at `6170af84` (the operations :181-2373, `RefreshNode`/`ContinueRefresh` :241-1130, the status codes), `JointFabricDatastore.h` (the capacities :512-517, the delegate :166-285, `MarkEntryCommittedIfFound` :75-85), `src/app/clusters/joint-fabric-datastore-server/joint-fabric-datastore-server.cpp` (the 20 commands :293-785), tests `src/app/server/tests/TestJointFabricDatastore.cpp` | no |
+| BD-chip-JointFabricDatastore-RulesInServer | `JointFabricDatastoreServer.ts:14` is the empty subclass (absence: the class line, 14 lines in all) | `packages/node/src/behaviors/joint-fabric-datastore/JointFabricDatastoreServer.ts` | `"export class JointFabricDatastoreServer extends JointFabricDatastoreBehavior {}"` | connectedhomeip `src/app/server/JointFabricDatastore.cpp` at `6170af84` (the operations :181-2373, `RefreshNode`/`ContinueRefresh` :241-1130, the status codes), `JointFabricDatastore.h` (the capacities :512-517, the delegate :166-285, `MarkEntryCommittedIfFound` :75-85), `src/app/clusters/joint-fabric-datastore-server/joint-fabric-datastore-server.cpp` (the 20 commands :293-785), tests `src/app/server/tests/TestJointFabricDatastore.cpp`, `examples/jf-admin-app/linux/JFADatastoreSync.cpp` (the endpoint's whole binding list, `EndpointBindingSync`: the delegate's merge :1706-1757, the write :1759-1779 and :661-685) | no |
 | BD-chip-JointFabricAdministrator-RulesInServer | `JointFabricAdministratorServer.ts:14` is the empty subclass (absence: the class line, 14 lines in all) | `packages/node/src/behaviors/joint-fabric-administrator/JointFabricAdministratorServer.ts` | `"export class JointFabricAdministratorServer extends JointFabricAdministratorBehavior {}"` | connectedhomeip `src/app/clusters/joint-fabric-administrator-server/joint-fabric-administrator-server.cpp` at `6170af84` (the handlers :172-449), `JCMCommissionee.{h,cpp}`, `src/app/server/JointFabricAdministrator.h`, `src/credentials/jcm/` (`TrustVerification.cpp`, `VendorIdVerificationClient.cpp`), tests `joint-fabric-administrator-server/tests/TestJCMCommissionee.cpp`, `src/credentials/tests/jcm/` | no |
 | BD-chip-JCM-Commissioner | `ControllerCommissioningFlow.ts:576-583` runs `OperationalCredentials.Certificates` right after `OperationalCredentials.DeviceAttestation`, no Joint Commissioning step between (absence: the two step pushes, :573-585) | `packages/protocol/src/peer/ControllerCommissioningFlow.ts` | `"name: \"OperationalCredentials.DeviceAttestation\",\n            stepLogic: () => this.#deviceAttestation(),\n        });\n\n        this.commissioningSteps.push({\n            stepNumber: 11, // includes 11-13"` | connectedhomeip `src/controller/jcm/DeviceCommissioner.cpp` at `6170af84` (:45-550), `src/controller/jcm/AutoCommissioner.{h,cpp}` (the read paths `.h:56-66`), `src/controller/AutoCommissioner.cpp:522-531` (the stage after attestation), tests `src/controller/tests/jcm/TestJCMCommissioner.cpp` | no |
 | BD-Matter-SurfaceChange-ConfigurationVersion | `BasicInformationServer.ts:35-37` leaves the "when" to the application: the version is "seeded to 1 and constrained to only ever increase", and the application bumps it "with `increaseConfigurationVersion`" (`:132`); the only production caller at the pin is the bridged-to-root coupling, `BridgedDeviceBasicInformationServer.ts:86` | `packages/node/src/behaviors/basic-information/BasicInformationServer.ts` | `"node's configuration changes in a way clients should detect, bump it with {@link increaseConfigurationVersion},"` | this module: concept v11 §C.9, ADR 0030 decision 6, wave S4 — the node persists each endpoint's effective surface next to its ConfigurationVersion and raises the bridged and the root ConfigurationVersion (one change, matter.js's coupling) when the surface of a returning endpoint differs (`node/surface_stability.go`) | no |
@@ -2317,10 +2317,46 @@ differences:
 Recorded so they are not re-derived, not divergences: the host-facing
 surface — `OtaApplier` for matter.js's `requestUserConsent` / `applyUpdate`
 extension points, `OtaProviderConnector` for its node's peer connection, a
-host directory for its blob store — and the absence of HTTPS downloads,
-which matter.js's default `transferProtocolsSupported` (:139, :852 at `862ad75f`) does
-not announce either. Retire the `spec.Instance` half when `spec.Server`
-learns fabric-scoped attributes.
+host directory for its blob store. The HTTPS download is
+`BD-Matter-OTARequestor-HTTPS`. Retire the `spec.Instance` half when
+`spec.Server` learns fabric-scoped attributes.
+
+### BD-Matter-OTARequestor-HTTPS — the HTTPS download is opt-in as in matter.js, and bounded in size and time where matter.js's `fetch` is not
+
+matter.js's requestor announces `transferProtocolsSupported`, BDX
+synchronous by default — "HTTPS can be added as protocol as well"
+(`packages/node/src/behaviors/ota-software-update-requestor/OtaSoftwareUpdateRequestorServer.ts:1367-1372`
+at `862ad75f`); `#handleDownload` routes a `bdx://` or `https://` URI by
+that list and refuses any other, `http://` among them (`:1077-1107`); and
+`#handleHttpsDownload` (`:1008-1062`) GETs the URI with `fetch`, turns a
+non-ok status into an `OtaDownloadError` carrying it (`:1010-1011`) and
+streams the body into the download location with progress from
+Content-Length, a failure while streaming being an `OtaDownloadError` with
+the status and the bytes received (`:1052-1060`). `cluster/core`'s
+requestor does the same, opt-in through `OTARequestorConfig.TransferProtocols`
+(`node.OTAConfig.TransferProtocols`; empty is BDX alone), the GET through
+the host's `OtaHTTPClient` (nil is `http.DefaultClient`), the body through
+the BDX path's `bdx.FileSink` temporary file, then `validateUpdateFile`.
+Two deviations: `HTTPSMaxImageSize` (default 256 MiB; a Content-Length
+above it fails before the body is read, a chunked answer after the bytes up
+to it) and `HTTPSTimeout` (default 10 minutes on the requestor's clock,
+from the request to the last byte). Each fails the download as an
+`otaDownloadError` — DownloadError, Idle with Failure — carrying the status,
+or before a response UpdateState Unknown's value (0) as the BDX path does.
+A GET that gets no response mirrors matter.js: `fetch` rejects with an
+error that is no `MatterError`, `MatterError.accept` rethrows it (`:925`)
+to `#queryForUpdate`'s handler (`:632-640`), and the provider counts as
+without update, with no DownloadError. Redirects follow the client's
+policy, as `fetch` follows them (Go's default client stops after ten,
+`net/http/client.go` "stopped after 10 redirects"); no scheme policy is
+added for a redirect target. matter.js has no test of the HTTPS branch at
+the pin — `packages/node/test/behaviors/ota/OtaTest.ts:65-84` mocks `fetch`
+only for the DCL endpoints — so its code is the parity case, held by
+`cluster/core/ota_requestor_https_test.go` (`TestOTARequestorHTTPS_*`,
+`httptest` over TLS). Reasoning: the image comes from a host on the open
+network, not from a fabric peer, so a hostile or broken host must neither
+fill the download directory nor hold the requestor in Downloading; a host
+that needs more raises either bound.
 
 ### BD-Matter-OTARequestor-AnnouncementAnsweredAtOnce — an AnnounceOTAProvider that arrives during a query is answered at once and handled when the query ends
 
@@ -5744,6 +5780,28 @@ endpoints shows; and a refresh of a node the datastore does not hold ends
 cleanly — chip leaves `mRefreshingNodeId` set (:247-249) and refuses every
 later refresh. Pinned by `datastore_chip_test.go` (chip's 26 cases) and
 `datastore_rules_test.go` (the rules of `TC_JFDS_2_2…2_5`).
+
+The delegate's endpoint-scoped overload `SyncNode(nodeId, endpointId,
+bindingEntries)` (`JointFabricDatastore.h:196-203` at `6170af84`) is the
+optional port `EndpointBindingSync` (phase 39). chip's datastore never
+calls that overload — every `SyncNode` it makes carries one entry or a
+node's whole list — and its test delegate does not implement it; its
+jf-admin-app does, and carries the one binding entry the datastore pushes
+as the endpoint's merged list: it fetches the endpoint's current bindings,
+removes the entries whose target matches a DeletePending entry's (no list
+id travels to the node) or appends the entry, and writes the list to the
+endpoint's Binding attribute, an empty list included
+(`examples/jf-admin-app/linux/JFADatastoreSync.cpp:1706-1757` at
+`6170af84`, the write :1759-1779 and :661-685). The datastore does that
+merge for a `DatastoreSync` that is an `EndpointBindingSync`, so the host
+writes a list and reads a list (`FetchEndpointBindingList`), nothing more;
+any other port takes the one entry (`SyncBinding`) as chip's datastore
+pushes it. One divergence: a fetch that fails is the push's error and
+leaves the entry Pending or DeletePending for the next `RefreshNode`;
+jf-admin-app writes the one entry over an empty list
+(`JFADatastoreSync.cpp:1726-1730` at `6170af84`), which drops the node's
+other bindings on a transient read failure. Pinned by
+`datastore_endpoint_sync_test.go`.
 
 ### BD-chip-JointFabricAdministrator-RulesInServer — the administrator's commands and the commissionee's trust verification follow connectedhomeip; the anchor is recorded at CommissioningComplete as chip's example app does
 

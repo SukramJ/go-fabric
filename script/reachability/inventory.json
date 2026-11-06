@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 7676,
+  "entry_points": 7691,
   "entry_packages": [
     ".",
     "bdx",
@@ -279,9 +279,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 17647,
-    "reachable": 12305,
-    "whitelisted": 5342,
+    "total_exported": 17672,
+    "reachable": 12311,
+    "whitelisted": 5361,
     "unreachable": 0
   },
   "by_package": [],
@@ -8066,6 +8066,13 @@
     },
     {
       "package": "cluster/core",
+      "identifier": "DownloadProtocol",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/core/ota_software_update_requestor.go",
+      "line": 181
+    },
+    {
+      "package": "cluster/core",
       "identifier": "LeaveEvent",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/core/basic_information.go",
@@ -8392,6 +8399,76 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/ota_provider_test.go",
       "line": 165
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestOTARequestorHTTPS_BDXOfferStillWorks",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/ota_requestor_https_test.go",
+      "line": 379
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestOTARequestorHTTPS_Config",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/ota_requestor_https_test.go",
+      "line": 415
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestOTARequestorHTTPS_Download",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/ota_requestor_https_test.go",
+      "line": 140
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestOTARequestorHTTPS_FetchRejected",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/ota_requestor_https_test.go",
+      "line": 358
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestOTARequestorHTTPS_Redirect",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/ota_requestor_https_test.go",
+      "line": 189
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestOTARequestorHTTPS_Refused",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/ota_requestor_https_test.go",
+      "line": 324
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestOTARequestorHTTPS_SizeCap",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/ota_requestor_https_test.go",
+      "line": 238
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestOTARequestorHTTPS_StatusNotOK",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/ota_requestor_https_test.go",
+      "line": 211
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestOTARequestorHTTPS_Timeout",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/ota_requestor_https_test.go",
+      "line": 258
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestOTARequestorHTTPS_TruncatedBody",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/ota_requestor_https_test.go",
+      "line": 222
     },
     {
       "package": "cluster/core",
@@ -9371,35 +9448,35 @@
       "identifier": "ACLEntry",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/jointfabric/datastore.go",
-      "line": 46
+      "line": 49
     },
     {
       "package": "cluster/jointfabric",
       "identifier": "AccessControlEntry",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/jointfabric/datastore.go",
-      "line": 48
+      "line": 51
     },
     {
       "package": "cluster/jointfabric",
       "identifier": "AccessControlTarget",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/jointfabric/datastore.go",
-      "line": 50
+      "line": 53
     },
     {
       "package": "cluster/jointfabric",
       "identifier": "AddGroupRequest",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/jointfabric/datastore.go",
-      "line": 60
+      "line": 63
     },
     {
       "package": "cluster/jointfabric",
       "identifier": "AdminEntry",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/jointfabric/datastore.go",
-      "line": 34
+      "line": 37
     },
     {
       "package": "cluster/jointfabric",
@@ -9420,7 +9497,7 @@
       "identifier": "BindingTarget",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/jointfabric/datastore.go",
-      "line": 54
+      "line": 57
     },
     {
       "package": "cluster/jointfabric",
@@ -9441,7 +9518,7 @@
       "identifier": "DatastoreStore",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/jointfabric/datastore.go",
-      "line": 30
+      "line": 33
     },
     {
       "package": "cluster/jointfabric",
@@ -9455,35 +9532,42 @@
       "identifier": "EndpointBindingEntry",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/jointfabric/datastore.go",
-      "line": 42
+      "line": 45
+    },
+    {
+      "package": "cluster/jointfabric",
+      "identifier": "EndpointBindingSync",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/jointfabric/datastore.go",
+      "line": 31
     },
     {
       "package": "cluster/jointfabric",
       "identifier": "EndpointEntry",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/jointfabric/datastore.go",
-      "line": 52
+      "line": 55
     },
     {
       "package": "cluster/jointfabric",
       "identifier": "EndpointGroupIDEntry",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/jointfabric/datastore.go",
-      "line": 40
+      "line": 43
     },
     {
       "package": "cluster/jointfabric",
       "identifier": "GroupEntry",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/jointfabric/datastore.go",
-      "line": 38
+      "line": 41
     },
     {
       "package": "cluster/jointfabric",
       "identifier": "GroupKeySet",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/jointfabric/datastore.go",
-      "line": 32
+      "line": 35
     },
     {
       "package": "cluster/jointfabric",
@@ -9504,28 +9588,28 @@
       "identifier": "NodeEntry",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/jointfabric/datastore.go",
-      "line": 36
+      "line": 39
     },
     {
       "package": "cluster/jointfabric",
       "identifier": "NodeKeySetEntry",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/jointfabric/datastore.go",
-      "line": 44
+      "line": 47
     },
     {
       "package": "cluster/jointfabric",
       "identifier": "State",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/jointfabric/datastore.go",
-      "line": 58
+      "line": 61
     },
     {
       "package": "cluster/jointfabric",
       "identifier": "StatusEntry",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/jointfabric/datastore.go",
-      "line": 56
+      "line": 59
     },
     {
       "package": "cluster/jointfabric",
@@ -9652,6 +9736,34 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/jointfabric/datastore_rules_test.go",
       "line": 476
+    },
+    {
+      "package": "cluster/jointfabric",
+      "identifier": "TestEndpointBindingSyncAppendsToFetchedList",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/jointfabric/datastore_endpoint_sync_test.go",
+      "line": 85
+    },
+    {
+      "package": "cluster/jointfabric",
+      "identifier": "TestEndpointBindingSyncCommandPushesAfterAnswer",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/jointfabric/datastore_endpoint_sync_test.go",
+      "line": 186
+    },
+    {
+      "package": "cluster/jointfabric",
+      "identifier": "TestEndpointBindingSyncFetchFailureLeavesPending",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/jointfabric/datastore_endpoint_sync_test.go",
+      "line": 153
+    },
+    {
+      "package": "cluster/jointfabric",
+      "identifier": "TestEndpointBindingSyncRemovesByTarget",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/jointfabric/datastore_endpoint_sync_test.go",
+      "line": 113
     },
     {
       "package": "cluster/jointfabric",
@@ -9917,7 +10029,7 @@
       "identifier": "UpdateGroupRequest",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/jointfabric/datastore.go",
-      "line": 62
+      "line": 65
     },
     {
       "package": "cluster/levelcontrol",
@@ -32002,7 +32114,7 @@
       "identifier": "AttestationChain",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 181
+      "line": 194
     },
     {
       "package": "node",
@@ -32016,7 +32128,7 @@
       "identifier": "BDXResponder",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 197
+      "line": 210
     },
     {
       "package": "node",
@@ -32030,21 +32142,21 @@
       "identifier": "CapabilityMinimaStruct",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 169
+      "line": 182
     },
     {
       "package": "node",
       "identifier": "CommissionerControlServer",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 200
+      "line": 213
     },
     {
       "package": "node",
       "identifier": "CommissioningApprover",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 163
+      "line": 176
     },
     {
       "package": "node",
@@ -32072,7 +32184,7 @@
       "identifier": "DeviceTypeValidationMode",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 175
+      "line": 188
     },
     {
       "package": "node",
@@ -32086,7 +32198,7 @@
       "identifier": "DiscoveryNames",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 203
+      "line": 216
     },
     {
       "package": "node",
@@ -32107,7 +32219,7 @@
       "identifier": "GeneralDiagnosticsFeatures",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 172
+      "line": 185
     },
     {
       "package": "node",
@@ -32181,10 +32293,24 @@
     },
     {
       "package": "node",
+      "identifier": "OTADownloadProtocol",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "node/facade.go",
+      "line": 160
+    },
+    {
+      "package": "node",
       "identifier": "OTAFileDesignator",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/routes.go",
       "line": 31
+    },
+    {
+      "package": "node",
+      "identifier": "OTAHTTPClient",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "node/facade.go",
+      "line": 163
     },
     {
       "package": "node",
@@ -32226,7 +32352,7 @@
       "identifier": "OTAProviderServer",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 194
+      "line": 207
     },
     {
       "package": "node",
@@ -32268,7 +32394,7 @@
       "identifier": "ReverseCommissioner",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 166
+      "line": 179
     },
     {
       "package": "node",
@@ -32289,7 +32415,7 @@
       "identifier": "SessionParameters",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 191
+      "line": 204
     },
     {
       "package": "node",
@@ -32339,6 +32465,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "node/attestation_internal_test.go",
       "line": 111
+    },
+    {
+      "package": "node",
+      "identifier": "TestBuildOtaRequestorTransferProtocols",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "node/ota_owner_internal_test.go",
+      "line": 60
     },
     {
       "package": "node",
@@ -32394,7 +32527,7 @@
       "identifier": "TestOtaApplierCloseWaitsForTheRestart",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "node/ota_owner_internal_test.go",
-      "line": 18
+      "line": 21
     },
     {
       "package": "node",
@@ -32499,14 +32632,14 @@
       "identifier": "WiFiReporter",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 160
+      "line": 173
     },
     {
       "package": "node",
       "identifier": "WindowStatus",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 178
+      "line": 191
     },
     {
       "package": "schema",
