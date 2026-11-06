@@ -136,8 +136,14 @@ func (r *Responder) recordsForLocked(ifIndex int) *linkRecords {
 		byService: map[string][]dns.RR{}, owned: map[string]bool{},
 		byKey: map[string]bool{}, setKeys: map[string]bool{}, at: now,
 	}
+	// A listed interface gets its service records whatever its address
+	// list — matter.js's generator yields PTR, SRV and TXT for details with
+	// no addresses (MdnsAdvertisement.ts:154-185 at db021da0), only the
+	// view of an unlisted interface is missing (InterfaceResponder.ts:796-800)
+	// — so a goodbye for an interface left without advertised addresses
+	// names the addresses alone, not the service.
 	addrs := r.wire.addrs(ifIndex)
-	if len(addrs) > 0 {
+	if len(addrs) > 0 || r.isListedLocked(ifIndex) {
 		for _, key := range r.order {
 			e := r.services[key]
 			var hostAddrs []net.IP

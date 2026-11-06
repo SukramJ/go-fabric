@@ -8180,7 +8180,7 @@
         "holds the address records of one name together",
         "holds the address records of one name together across answers and additional records",
         "ignores a query on an interface whose details cannot be read",
-        "ignores a replaced registration",
+        "ignores a replaced registration's refresh and withdraw",
         "keeps a service registered again under the same name while the goodbye runs",
         "keeps additional records of a unicast reply that multicast would hold back",
         "keeps no registration whose generator throws",

@@ -97,6 +97,8 @@ type Responder struct {
 	// nil when none waits; changeRepeat is its timer (follow.go).
 	repeatOn     map[int]bool
 	changeRepeat clock.Timer
+	// changeRepeatGen tells a fired repeat timer from the current one.
+	changeRepeatGen uint64
 	// wire is the transport; nil until the first Publish opens the
 	// sockets (or a test installs a fake).
 	wire wire
@@ -404,6 +406,7 @@ func (r *Responder) Close() error {
 	r.resetLocked()
 	r.publishEverywhereLocked(nil, false)
 	r.stopAllGoodbyeRetriesLocked()
+	clear(r.linkStates)
 	r.stopChangeRepeatLocked()
 	r.closed = true
 	socks := r.socks

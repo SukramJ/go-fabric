@@ -49,8 +49,9 @@ const (
 	goodbyeRetryMax = time.Minute
 )
 
-// reach is how far a send reached — matter.js UdpMulticastServer.Reach
-// (packages/general/src/net/dns-sd/MdnsSocket.ts:102-127 at db021da0).
+// reach is how far a send reached — the combined result of matter.js's
+// MdnsSocket.send (packages/general/src/net/dns-sd/MdnsSocket.ts:102-127 at
+// db021da0).
 type reach int
 
 const (
@@ -199,6 +200,11 @@ func (r *Responder) publishLocked(ifIndex int, services map[string]bool, all boo
 		return
 	}
 	now := r.clock.Load().Now()
+	// Prune on every publication, as matter.js prunes on every interface
+	// listing (MdnsServer.ts:405-411, InterfaceResponder.ts:142-160 at
+	// db021da0), so a record whose TTL ended without a goodbye leaves the
+	// cache on a long-running node.
+	r.pruneLinkStatesLocked()
 	lr := r.recordsForLocked(ifIndex)
 	st := r.linkStateLocked(ifIndex)
 	goodbye := r.goodbyesLocked(st, lr, now)

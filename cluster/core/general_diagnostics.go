@@ -686,6 +686,7 @@ func (g *GeneralDiagnostics) EnableTestEventTriggers(key []byte, handler TestEve
 		g.testEnableKey, g.testTrigger = nil, nil
 		g.mu.Unlock()
 		g.dataVersion.Bump()
+		g.changes.Notify(gendiagAttrTestEventTriggersEnabled) // the attribute it reads
 		return nil
 	}
 	if len(key) != TestEnableKeySize {
@@ -696,6 +697,7 @@ func (g *GeneralDiagnostics) EnableTestEventTriggers(key []byte, handler TestEve
 	g.testTrigger = handler
 	g.mu.Unlock()
 	g.dataVersion.Bump()
+	g.changes.Notify(gendiagAttrTestEventTriggersEnabled)
 	return nil
 }
 
@@ -1129,24 +1131,24 @@ func classifyInterface(name string) uint8 {
 // mounts the root endpoint.
 func (g *GeneralDiagnostics) OnAttributeChange(cb func(change contract.Change)) (unsubscribe func()) {
 	unsub := g.changes.OnAttributeChange(cb)
+	// Start and Stop run under obsMu, so a register racing an unregister
+	// cannot leave the watcher running with no observer or stopped with one.
 	g.obsMu.Lock()
 	g.observers++
-	first := g.observers == 1
-	g.obsMu.Unlock()
-	if first {
+	if g.observers == 1 {
 		g.ifWatch.Start()
 	}
+	g.obsMu.Unlock()
 	var once sync.Once
 	return func() {
 		once.Do(func() {
 			unsub()
 			g.obsMu.Lock()
 			g.observers--
-			last := g.observers == 0
-			g.obsMu.Unlock()
-			if last {
+			if g.observers == 0 {
 				g.ifWatch.Stop()
 			}
+			g.obsMu.Unlock()
 		})
 	}
 }
@@ -1160,11 +1162,12 @@ func (g *GeneralDiagnostics) SetInterfaceCheckInterval(d time.Duration) {
 	g.ifWatch.SetInterval(d)
 }
 
-// Stop ends the interface comparison until the next listener registers:
-// matter.js closes the Network, and with it the periodic check, when the
-// node's environment shuts down (Network.ts close, :239-244 at db021da0).
-// The node calls it from Stop, so no interface check stays armed on its
-// clock.
+// Stop ends the interface comparison: matter.js closes the Network, and
+// with it the periodic check, when the node's environment shuts down
+// (Network.ts close, :239-244 at db021da0). The node calls it from Stop,
+// after which no listener registers (a stopped node is ErrStopped), so no
+// interface check stays armed on its clock; the observer count is not
+// reset, a later registration does not restart the watcher.
 func (g *GeneralDiagnostics) Stop() {
 	g.ifWatch.Stop()
 }
@@ -1188,6 +1191,13 @@ func (g *GeneralDiagnostics) listInterfaces() []NetworkInterfaceStruct {
 // address and addresses, the comparison matter.js's Network makes
 // (Network.ts:188-195, :251-254 at db021da0).
 func (g *GeneralDiagnostics) interfaceSnapshot() map[string]string {
+	// A failed listing keeps the previous snapshot (nil, the Watcher's
+	// contract), as matter.js keeps its state (Network.ts:174-177 at
+	// db021da0); enumerateNetworkInterfaces would turn it into the
+	// synthetic Ethernet entry and report a change twice.
+	if _, err := net.Interfaces(); err != nil {
+		return nil
+	}
 	out := map[string]string{}
 	for _, iface := range g.listInterfaces() {
 		v4 := make([]string, 0, len(iface.IPv4Addresses))

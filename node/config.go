@@ -269,7 +269,9 @@ type Network struct {
 	// while NetworkInterfaces is observed, to report the change. Zero is
 	// matter.js's 60 s (INTERFACE_CHECK_INTERVAL, Network.ts:91-95 at
 	// db021da0); negative disables the periodic check — a host that
-	// learns of changes itself calls [Node.TriggerReannounce].
+	// learns of changes itself calls [Node.TriggerReannounce], which
+	// re-announces the mDNS records; GeneralDiagnostics' NetworkInterfaces
+	// is then current on each read and reports no change of its own.
 	InterfaceCheck time.Duration
 }
 

@@ -8105,7 +8105,7 @@
       "identifier": "PayloadTestResponse",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/core/general_diagnostics.go",
-      "line": 753
+      "line": 755
     },
     {
       "package": "cluster/core",
@@ -8308,7 +8308,7 @@
       "identifier": "TestEventTriggerRequest",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/core/general_diagnostics.go",
-      "line": 781
+      "line": 783
     },
     {
       "package": "cluster/core",

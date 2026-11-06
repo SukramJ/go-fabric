@@ -116,15 +116,22 @@ func (r *Responder) interfacesChanged(names []string) {
 		r.repeatOn[i] = true
 	}
 	r.stopChangeRepeatTimerLocked()
-	r.changeRepeat = r.clock.Load().AfterFunc(changeRepeatInterval, r.repeatChange)
+	// The timer's generation: a repeat that fired before the re-arm and
+	// waits for r.mu is stale and must neither publish early nor drop the
+	// new timer (MdnsServer.ts:337 stop().start() at db021da0).
+	gen := r.changeRepeatGen
+	r.changeRepeat = r.clock.Load().AfterFunc(changeRepeatInterval, func() { r.repeatChange(gen) })
 	r.publishOnListedLocked(changed)
 }
 
 // repeatChange publishes once more on the interfaces of the changes since
 // the last repeat (MdnsServer.ts #repeatChange, :341-349 at db021da0).
-func (r *Responder) repeatChange() {
+func (r *Responder) repeatChange(gen uint64) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	if gen != r.changeRepeatGen {
+		return // a stale timer; the current one repeats
+	}
 	on := r.repeatOn
 	r.repeatOn = nil
 	r.changeRepeat = nil
@@ -153,6 +160,7 @@ func (r *Responder) stopChangeRepeatLocked() {
 }
 
 func (r *Responder) stopChangeRepeatTimerLocked() {
+	r.changeRepeatGen++
 	if r.changeRepeat != nil {
 		r.changeRepeat.Stop()
 		r.changeRepeat = nil

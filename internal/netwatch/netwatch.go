@@ -110,7 +110,11 @@ func (w *Watcher) Start() {
 		return
 	}
 	w.prev = snap
-	w.armLocked()
+	// SetInterval may have armed the timer while the snapshot ran; one
+	// tick chain only.
+	if w.timer == nil {
+		w.armLocked()
+	}
 }
 
 // Stop ends the observation and forgets the snapshot, so a later Start
