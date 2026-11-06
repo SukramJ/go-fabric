@@ -1899,41 +1899,42 @@ type pathValues struct {
 	mu    sync.Mutex
 	ep    *endpointpkg.Endpoint
 	paths []im.ConcreteAttributePath
-	last  map[im.ConcreteAttributePath]string
+	last  map[im.ConcreteAttributePath]attributeReading
 }
 
 func newPathValues(ep *endpointpkg.Endpoint, paths []im.ConcreteAttributePath) *pathValues {
-	v := &pathValues{ep: ep, paths: paths, last: make(map[im.ConcreteAttributePath]string, len(paths))}
+	v := &pathValues{ep: ep, paths: paths, last: make(map[im.ConcreteAttributePath]attributeReading, len(paths))}
 	for p, val := range v.read() {
 		v.last[p] = val
 	}
 	return v
 }
 
-// read renders every path's current value; a path no server answers is
+// read captures every path's current value; a path no server answers is
 // left out, so it counts as changed on every notification.
-func (v *pathValues) read() map[im.ConcreteAttributePath]string {
+func (v *pathValues) read() map[im.ConcreteAttributePath]attributeReading {
 	servers := map[uint32]contract.ClusterServer{}
 	for _, srv := range endpointpkg.ClusterServers(v.ep) {
 		if srv != nil {
 			servers[srv.MatterClusterID()] = srv
 		}
 	}
-	out := make(map[im.ConcreteAttributePath]string, len(v.paths))
+	out := make(map[im.ConcreteAttributePath]attributeReading, len(v.paths))
 	for _, p := range v.paths {
 		srv := servers[p.Cluster]
 		if srv == nil {
 			continue
 		}
 		if val, ok := srv.MatterRead(p.Attribute); ok {
-			out[p] = fmt.Sprintf("%#v", derefValue(val))
+			out[p] = readingOf(im.AttributeValue{Value: val})
 		}
 	}
 	return out
 }
 
 // changed returns the paths whose value differs from the last
-// notification's, and remembers the new values.
+// notification's, compared by value ([attributeReading]), and remembers
+// the new values.
 func (v *pathValues) changed() []im.ConcreteAttributePath {
 	now := v.read()
 	v.mu.Lock()
@@ -1941,7 +1942,7 @@ func (v *pathValues) changed() []im.ConcreteAttributePath {
 	out := make([]im.ConcreteAttributePath, 0, len(v.paths))
 	for _, p := range v.paths {
 		cur, ok := now[p]
-		if prev, had := v.last[p]; ok && had && prev == cur {
+		if prev, had := v.last[p]; ok && had && prev.equal(cur) {
 			continue
 		}
 		out = append(out, p)
@@ -1950,22 +1951,6 @@ func (v *pathValues) changed() []im.ConcreteAttributePath {
 		}
 	}
 	return out
-}
-
-// derefValue follows pointers so two reads of an unchanged pointer-typed
-// value render alike.
-func derefValue(v any) any {
-	rv := reflect.ValueOf(v)
-	for rv.IsValid() && rv.Kind() == reflect.Pointer {
-		if rv.IsNil() {
-			return nil
-		}
-		rv = rv.Elem()
-	}
-	if !rv.IsValid() {
-		return nil
-	}
-	return rv.Interface()
 }
 
 // unskippedChangedPaths drops from a report's changed paths each concrete

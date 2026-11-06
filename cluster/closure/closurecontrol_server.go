@@ -184,17 +184,6 @@ type ControlServer struct {
 	currentLatch, targetLatch *bool
 	currentSpeed, targetSpeed *closuredef.ThreeLevelAutoEnum
 
-	// currentView and targetView are what MatterRead answers for
-	// OverallCurrentState and OverallTargetState, replaced by refreshLocked
-	// when their value moves and the same pointer otherwise: the bridge
-	// renders a read value with %#v to find what a command changed
-	// (bridge reportInvokeChanges), and a struct allocated per read
-	// rendered as changed every time — an unchanged OverallCurrentState
-	// was reported after every command, which TC-CLCTRL-5.1 step 4i takes
-	// for the latch it waits for.
-	currentView *wire.ClosureOverallCurrentState
-	targetView  *wire.ClosureOverallTargetState
-
 	// emitter and endpoint address the events (closurecontrol_events.go);
 	// the bridge wires both at reassembly.
 	emitter  contract.EventEmitter
@@ -256,7 +245,6 @@ func New(cfg Config) (*ControlServer, error) {
 		cur, tgt := closuredef.ThreeLevelAutoAuto, closuredef.ThreeLevelAutoAuto
 		s.currentSpeed, s.targetSpeed = &cur, &tgt
 	}
-	s.refreshLocked()
 	s.Init(inst)
 	return s, nil
 }
@@ -304,9 +292,9 @@ func (s *ControlServer) MatterRead(attrID uint32) (value any, ok bool) {
 		copy(out, s.errorList)
 		return out, true
 	case wire.ClosureControlAttrOverallCurrentState:
-		return s.currentView, true
+		return s.currentStateLocked(), true
 	case wire.ClosureControlAttrOverallTargetState:
-		return s.targetView, true
+		return s.targetStateLocked(), true
 	case wire.ClosureControlAttrLatchControlModes:
 		if !s.has(wire.ClosureControlFeatureMotionLatching) {
 			return nil, false
@@ -503,7 +491,6 @@ func (s *ControlServer) invokeMoveTo(ctx context.Context, fields any) error {
 		s.targetSpeed = copyOf(speed)
 	}
 	s.mainState = wire.ClosureMainStateMoving
-	s.refreshLocked()
 	s.mu.Unlock()
 	s.NotifyFrom(contract.OriginCommand, wire.ClosureControlAttrMainState, wire.ClosureControlAttrOverallTargetState)
 	return nil
@@ -817,52 +804,27 @@ func (s *ControlServer) setCurrent(r currentReport) {
 	if l := s.currentLatch; r.setLatch && l != nil && s.targetLatch != nil && *l == *s.targetLatch {
 		s.targetLatch = nil
 	}
-	s.refreshLocked()
 }
 
-// refreshLocked rebuilds the views MatterRead answers the two state
-// structs with. Caller holds s.mu for writing.
-//
-// The views' fields point at interned values ([interned]): the bridge's
-// change detection renders a value with %#v, which prints a nested
-// pointer as its address, so equal states must share their pointers to
-// render alike — also against a baseline rendered before the state was
-// last replaced by an equal one (bridge pathValues).
-func (s *ControlServer) refreshLocked() {
-	lt := s.has(wire.ClosureControlFeatureMotionLatching)
-	cur := wire.ClosureOverallCurrentState{
-		Position: interned(s.currentPosition), SecureState: interned(s.secureState),
-		Latch: interned(s.currentLatch), HasLatch: lt, Speed: interned(s.currentSpeed),
-	}
-	tgt := wire.ClosureOverallTargetState{
-		Position: interned(s.targetPosition), Latch: interned(s.targetLatch), HasLatch: lt, Speed: interned(s.targetSpeed),
-	}
-	// A view is replaced only when its value moved: the bridge renders
-	// the read value itself as a pointer, so a new view of an equal state
-	// would read as a change too. With interned fields, equal states
-	// compare equal.
-	if s.currentView == nil || *s.currentView != cur {
-		s.currentView = &cur
-	}
-	if s.targetView == nil || *s.targetView != tgt {
-		s.targetView = &tgt
+// currentStateLocked is OverallCurrentState as MatterRead answers it: a
+// fresh struct per read whose fields copy the state, so a reader cannot
+// reach the server's state through it. The bridge compares two readings
+// by value, not by the struct's address. Caller holds s.mu.
+func (s *ControlServer) currentStateLocked() *wire.ClosureOverallCurrentState {
+	return &wire.ClosureOverallCurrentState{
+		Position: copyOf(s.currentPosition), SecureState: copyOf(s.secureState),
+		Latch: copyOf(s.currentLatch), HasLatch: s.has(wire.ClosureControlFeatureMotionLatching),
+		Speed: copyOf(s.currentSpeed),
 	}
 }
 
-// internTable holds one pointer per value of the small types the state
-// structs carry, so equal values share an address.
-var internTable sync.Map // map[any]any: the value → its pointer
-
-// interned is the shared pointer of *p's value; nil for nil.
-func interned[T comparable](p *T) *T {
-	if p == nil {
-		return nil
+// targetStateLocked is OverallTargetState as MatterRead answers it, built
+// like [ControlServer.currentStateLocked]. Caller holds s.mu.
+func (s *ControlServer) targetStateLocked() *wire.ClosureOverallTargetState {
+	return &wire.ClosureOverallTargetState{
+		Position: copyOf(s.targetPosition), Latch: copyOf(s.targetLatch),
+		HasLatch: s.has(wire.ClosureControlFeatureMotionLatching), Speed: copyOf(s.targetSpeed),
 	}
-	v, _ := internTable.LoadOrStore(*p, copyOf(p))
-	if t, ok := v.(*T); ok {
-		return t
-	}
-	return p
 }
 
 // secureLocked derives SecureState, "the closure is in a position that
