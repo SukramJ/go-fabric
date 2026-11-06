@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 7672,
+  "entry_points": 7675,
   "entry_packages": [
     ".",
     "bdx",
@@ -279,9 +279,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 17643,
+    "total_exported": 17646,
     "reachable": 12301,
-    "whitelisted": 5342,
+    "whitelisted": 5345,
     "unreachable": 0
   },
   "by_package": [],
@@ -755,6 +755,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/attribute_data_encoder_parity_matterjs_test.go",
       "line": 26
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestAttributeReadingEqual",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/value_compare_test.go",
+      "line": 150
     },
     {
       "package": "bridge",
@@ -3677,6 +3684,13 @@
     },
     {
       "package": "bridge",
+      "identifier": "TestInvokeChangesCompareByValue",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/value_compare_test.go",
+      "line": 81
+    },
+    {
+      "package": "bridge",
       "identifier": "TestInvokeDelayReportDataDefersSubscriptions",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/delay_report_data_test.go",
@@ -3862,7 +3876,7 @@
       "identifier": "TestOccupancyChangedEvent",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/boolean_state_event_test.go",
-      "line": 156
+      "line": 153
     },
     {
       "package": "bridge",
@@ -4304,6 +4318,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/securechannel_test.go",
       "line": 579
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestPathValuesCompareByValue",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/value_compare_test.go",
+      "line": 125
     },
     {
       "package": "bridge",

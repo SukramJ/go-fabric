@@ -134,9 +134,6 @@ func TestPathValuesReportOnlyMovedAttributes(t *testing.T) {
 	if got := v.changed(); len(got) != 1 {
 		t.Fatalf("after the report: %v, want StateValue quiet again", got)
 	}
-	if derefValue((*int)(nil)) != nil || derefValue(nil) != nil {
-		t.Fatal("derefValue of nil")
-	}
 }
 
 // fakeOccupancy is an occupancy reading of a PIR sensor, the projection's

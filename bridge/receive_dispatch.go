@@ -743,22 +743,22 @@ type invokedCluster struct {
 	cluster  uint32
 }
 
-// snapshotInvokedClusters renders every attribute of each cluster a
+// snapshotInvokedClusters reads every attribute of each cluster a
 // concrete invoke path names, before the commands run. A subscription
 // manager is required for the comparison to matter; without one this is a
 // no-op.
-func (b *Bridge) snapshotInvokedClusters(ctx context.Context, d im.Dispatcher, req im.InvokeRequest) map[invokedCluster]map[uint32]string {
+func (b *Bridge) snapshotInvokedClusters(ctx context.Context, d im.Dispatcher, req im.InvokeRequest) map[invokedCluster]map[uint32]attributeReading {
 	if b.subscriptionManagerLocked() == nil {
 		return nil
 	}
-	out := map[invokedCluster]map[uint32]string{}
+	out := map[invokedCluster]map[uint32]attributeReading{}
 	for _, inv := range req.Invokes {
 		if !inv.Path.HasEndpoint {
 			continue
 		}
 		key := invokedCluster{inv.Path.Endpoint, inv.Path.Cluster}
 		if _, done := out[key]; !done {
-			out[key] = renderCluster(ctx, d, key)
+			out[key] = readCluster(ctx, d, key)
 		}
 	}
 	return out
@@ -773,22 +773,23 @@ func (b *Bridge) snapshotInvokedClusters(ctx context.Context, d im.Dispatcher, r
 // GeneralCommissioning's Breadcrumb on ArmFailSafe, OperationalCredentials'
 // Fabrics on AddNOC — so without this comparison no subscriber ever saw
 // those changes. Found by the CHIP Python harness (TC-IDM-1.5 subscribes to
-// Breadcrumb and arms the fail-safe).
-func (b *Bridge) reportInvokeChanges(ctx context.Context, d im.Dispatcher, before map[invokedCluster]map[uint32]string) {
+// Breadcrumb and arms the fail-safe). The comparison is by value
+// ([attributeReading]), as matter.js's Datasource deep-compares.
+func (b *Bridge) reportInvokeChanges(ctx context.Context, d im.Dispatcher, before map[invokedCluster]map[uint32]attributeReading) {
 	mgr := b.subscriptionManagerLocked()
 	if mgr == nil || len(before) == 0 {
 		return
 	}
 	topo := b.Topology()
 	for key, old := range before {
-		now := renderCluster(ctx, d, key)
+		now := readCluster(ctx, d, key)
 		selfReported := selfReportedAttributes(topo, key)
 		bumped := false
 		for attr, v := range now {
 			if attr >= 0xFFF8 || selfReported[attr] {
 				continue
 			}
-			if prev, ok := old[attr]; ok && prev == v {
+			if prev, ok := old[attr]; ok && prev.equal(v) {
 				continue
 			}
 			if !bumped && topo != nil {
@@ -836,13 +837,13 @@ func selfReportedAttributes(topo *endpointpkg.Topology, key invokedCluster) map[
 	return nil
 }
 
-// renderCluster reads every attribute of one cluster instance and renders
+// readCluster reads every attribute of one cluster instance and captures
 // each value for comparison.
-func renderCluster(ctx context.Context, d im.Dispatcher, key invokedCluster) map[uint32]string {
-	out := map[uint32]string{}
+func readCluster(ctx context.Context, d im.Dispatcher, key invokedCluster) map[uint32]attributeReading {
+	out := map[uint32]attributeReading{}
 	for _, r := range d.Read(ctx, im.ConcreteAttributePath{Endpoint: key.endpoint, Cluster: key.cluster, HasEndpoint: true, HasCluster: true}) {
 		if r.Status == im.StatusSuccess {
-			out[r.Path.Attribute] = fmt.Sprintf("%#v", r.Value)
+			out[r.Path.Attribute] = readingOf(r.Value)
 		}
 	}
 	return out

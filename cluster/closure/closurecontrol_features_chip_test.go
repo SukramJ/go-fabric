@@ -6,7 +6,7 @@ package closure_test
 import (
 	"context"
 	"errors"
-	"fmt"
+	"reflect"
 	"slices"
 	"strings"
 	"testing"
@@ -396,49 +396,50 @@ func TestClosureControlSetAttributesLatchSpeedChip(t *testing.T) {
 	}
 }
 
-// TestClosureControlStateReadsRenderAlike: two reads of the state structs
-// render alike — the bridge compares rendered values before and after a
-// command to decide what to report (bridge reportInvokeChanges), so a
-// fresh pointer per read would report an unchanged OverallCurrentState
-// after every command, which TC-CLCTRL-5.1 step 4i reads as the latch it
-// waits for.
-func TestClosureControlStateReadsRenderAlike(t *testing.T) {
+// TestClosureControlStateReadsByValue: the state structs read as values —
+// a fresh struct per read, equal in content while the state is, and not
+// aliasing the server's state. The bridge decides what a command changed by
+// comparing two readings by value (bridge attributeReading), so a command
+// that moves only the target leaves OverallCurrentState unchanged, which
+// TC-CLCTRL-5.1 step 4i relies on.
+func TestClosureControlStateReadsByValue(t *testing.T) {
 	t.Parallel()
 	s := newFeatured(t, fPS|fLT|fSP, &fullMover{modes: bothLatchModes})
 	s.SetCurrentLatch(ptr(false))
 	latch := true
-	wrap := func(v any) string { return fmt.Sprintf("%#v", struct{ V any }{v}) }
 	beforeCmd, _ := s.MatterRead(clusterwire.ClosureControlAttrOverallCurrentState)
 	if _, err := s.MatterInvoke(context.Background(), clusterwire.ClosureControlCmdMoveTo, moveTo(nil, &latch, nil)); err != nil {
 		t.Fatal(err)
 	}
-	// A command that moves only the target leaves OverallCurrentState
-	// rendering as before (bridge reportInvokeChanges).
-	if afterCmd, _ := s.MatterRead(clusterwire.ClosureControlAttrOverallCurrentState); wrap(beforeCmd) != wrap(afterCmd) {
-		t.Error("a MoveTo of the latch alone renders OverallCurrentState as changed")
+	if afterCmd, _ := s.MatterRead(clusterwire.ClosureControlAttrOverallCurrentState); !reflect.DeepEqual(beforeCmd, afterCmd) {
+		t.Errorf("a MoveTo of the latch alone moved OverallCurrentState: %+v / %+v", beforeCmd, afterCmd)
 	}
 	before, _ := s.MatterRead(clusterwire.ClosureControlAttrOverallCurrentState)
 	s.SetCurrentLatch(ptr(true))
-	if after, _ := s.MatterRead(clusterwire.ClosureControlAttrOverallCurrentState); fmt.Sprintf("%#v", struct{ V any }{before}) == fmt.Sprintf("%#v", struct{ V any }{after}) {
-		t.Error("a changed OverallCurrentState renders as before")
+	if after, _ := s.MatterRead(clusterwire.ClosureControlAttrOverallCurrentState); reflect.DeepEqual(before, after) {
+		t.Error("a changed OverallCurrentState reads as before")
 	}
-	// An equal state set again — fresh pointers from the drive — renders
-	// as the state before (bridge pathValues keeps an older rendering as
-	// its baseline).
-	deref := func(v any) string { return fmt.Sprintf("%#v", *v.(*clusterwire.ClosureOverallCurrentState)) }
+	// An equal state set again — fresh pointers from the drive — reads as
+	// the state before.
 	again, _ := s.MatterRead(clusterwire.ClosureControlAttrOverallCurrentState)
 	s.SetCurrentLatch(ptr(true))
 	s.SetCurrentSpeed(closuredef.ThreeLevelAutoAuto)
-	if now, _ := s.MatterRead(clusterwire.ClosureControlAttrOverallCurrentState); deref(again) != deref(now) {
-		t.Errorf("an equal state renders differently: %s / %s", deref(again), deref(now))
+	if now, _ := s.MatterRead(clusterwire.ClosureControlAttrOverallCurrentState); !reflect.DeepEqual(again, now) {
+		t.Errorf("an equal state reads differently: %+v / %+v", again, now)
 	}
-	for _, id := range []uint32{clusterwire.ClosureControlAttrOverallCurrentState, clusterwire.ClosureControlAttrOverallTargetState} {
-		// The bridge renders the value wrapped (im.AttributeValue), so a
-		// pointer renders as its address.
-		a, _ := s.MatterRead(id)
-		b, _ := s.MatterRead(id)
-		if fmt.Sprintf("%#v", struct{ V any }{a}) != fmt.Sprintf("%#v", struct{ V any }{b}) {
-			t.Errorf("attribute 0x%X renders differently on two reads: %#v / %#v", id, a, b)
-		}
+	// A read does not alias the state: writing through it changes nothing.
+	read := readOverallCurrent(t, s)
+	*read.Latch = false
+	if cur := readOverallCurrent(t, s); cur.Latch == nil || !*cur.Latch {
+		t.Errorf("a write through a read value reached the state: %+v", cur)
+	}
+	tgt, _ := s.MatterRead(clusterwire.ClosureControlAttrOverallTargetState)
+	tgtState, ok := tgt.(*clusterwire.ClosureOverallTargetState)
+	if !ok || tgtState.Speed == nil {
+		t.Fatalf("OverallTargetState = %#v", tgt)
+	}
+	*tgtState.Speed = closuredef.ThreeLevelAutoHigh
+	if again, _ := s.MatterRead(clusterwire.ClosureControlAttrOverallTargetState); *again.(*clusterwire.ClosureOverallTargetState).Speed == closuredef.ThreeLevelAutoHigh {
+		t.Error("a write through a read OverallTargetState reached the state")
 	}
 }
