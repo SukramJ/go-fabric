@@ -16,6 +16,7 @@ import (
 	"github.com/SukramJ/go-fabric/cluster/alarm"
 	"github.com/SukramJ/go-fabric/cluster/appliance"
 	"github.com/SukramJ/go-fabric/cluster/closure"
+	"github.com/SukramJ/go-fabric/cluster/core"
 	"github.com/SukramJ/go-fabric/cluster/energy"
 	"github.com/SukramJ/go-fabric/cluster/measurement"
 	"github.com/SukramJ/go-fabric/cluster/modebase"
@@ -135,17 +136,31 @@ func newPumpServer(b defaultBuild) (contract.ClusterServer, error) {
 }
 
 // newValveServer is the module's ValveConfigurationAndControl server
-// ([valve.NewServer]) on the declared StateSource.
+// ([valve.New]) on the declared StateSource, with the selection's Level
+// and TimeSync features and optional attributes, LevelStep from the
+// declaration's Initial, and the node's Matter time from the device's
+// clock (core.MatterEpochSeconds: the root's UTCTime reads the same
+// clock).
 func newValveServer(b defaultBuild) (contract.ClusterServer, error) {
 	d, _ := b.ports.(valvedef.Declare)
 	if d.StateSource == nil {
 		return nil, notServed(fmt.Errorf("valve: %w", errNoPort))
 	}
-	if b.opts.Features != 0 {
-		return nil, notServed(errors.New("device: valve: the server serves no feature"))
+	cfg := valve.Config{
+		Source: d.StateSource, Events: slices.Clone(b.opts.Events), DataVersion: b.cfg.DataVersion,
+		Features: b.opts.Features, Attributes: slices.Clone(b.opts.Attributes),
 	}
+	if cfg.Features&valve.FeatureTimeSync != 0 {
+		clk := b.clock
+		cfg.MatterTime = func() (uint32, bool) { return core.MatterEpochSeconds(clk) }
+	}
+	configFrom(&cfg, b.def, b.initial)
 	hostState(b.initial)
-	return valve.NewServer(valve.Config{Source: d.StateSource, Events: slices.Clone(b.opts.Events), DataVersion: b.cfg.DataVersion}), nil
+	srv, err := valve.New(cfg)
+	if errors.Is(err, valve.ErrSelection) {
+		return nil, notServed(err)
+	}
+	return srv, err
 }
 
 // newModeSelectServer is the module's ModeSelect server

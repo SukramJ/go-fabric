@@ -10,9 +10,13 @@ import (
 	"math/bits"
 	"slices"
 
+	"github.com/SukramJ/go-fabric/cluster/closure"
 	"github.com/SukramJ/go-fabric/cluster/spec"
+	ccldef "github.com/SukramJ/go-fabric/cluster/spec/closurecontrol"
 	thermostatdef "github.com/SukramJ/go-fabric/cluster/spec/thermostat"
+	valvedef "github.com/SukramJ/go-fabric/cluster/spec/valveconfigurationandcontrol"
 	"github.com/SukramJ/go-fabric/cluster/thermo"
+	"github.com/SukramJ/go-fabric/cluster/valve"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/endpoint"
 	"github.com/SukramJ/go-fabric/schema"
@@ -170,6 +174,8 @@ func candidatesOf(t *Type, s *settings, key string) []surface.Element {
 // reference policy refuses unless surface.Policies.Extensions enables it.
 var aheadByCluster = map[uint32]surface.AheadSet{
 	thermostatdef.ClusterID: thermo.Ahead,
+	ccldef.ClusterID:        closure.Ahead,
+	valvedef.ClusterID:      valve.Ahead,
 }
 
 // aheadRows returns the "Ahead of matter.js" register IDs the device

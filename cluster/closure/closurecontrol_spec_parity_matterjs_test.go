@@ -17,18 +17,25 @@ import (
 
 // servable lists the optional features the server serves next to
 // Positioning (closure-control.element.ts: VT and PD add a position, PT a
-// MainState value, MO an event).
+// MainState value, MO an event, IS withdraws Stop and MovementCompleted;
+// LT, SP and CL on a mover with their interface).
 var servable = []uint32{
 	clusterwire.ClosureControlFeatureVentilation,
 	clusterwire.ClosureControlFeaturePedestrian,
 	clusterwire.ClosureControlFeatureProtection,
 	clusterwire.ClosureControlFeatureManuallyOperable,
+	clusterwire.ClosureControlFeatureInstantaneous,
+	clusterwire.ClosureControlFeatureMotionLatching,
+	clusterwire.ClosureControlFeatureSpeed,
+	clusterwire.ClosureControlFeatureCalibration,
 }
 
 // TestServerMatchesTheGeneratedDefinition holds every FeatureMap the server
 // derives against matter.js closure-control.element.ts
-// (spectest.CheckServer): Positioning with each subset of the four optional
-// features it serves, and the zero default.
+// (spectest.CheckServer): Positioning with each subset of the optional
+// features it serves on a mover with every capability interface — but
+// Speed with Instantaneous, which "[PS & !IS]" forbids — and the zero
+// default.
 func TestServerMatchesTheGeneratedDefinition(t *testing.T) {
 	t.Parallel()
 	for subset := range 1 << len(servable) {
@@ -38,11 +45,15 @@ func TestServerMatchesTheGeneratedDefinition(t *testing.T) {
 				fm |= f
 			}
 		}
-		srv, err := closure.New(closure.Config{FeatureMap: fm})
+		if fm&clusterwire.ClosureControlFeatureSpeed != 0 && fm&clusterwire.ClosureControlFeatureInstantaneous != 0 {
+			continue
+		}
+		cfg := closure.Config{FeatureMap: fm, Mover: &fullMover{modes: bothLatchModes}}
+		srv, err := closure.New(cfg)
 		if err != nil {
 			t.Fatalf("FeatureMap 0x%X: %v", fm, err)
 		}
-		if got := closure.DerivedFeatureMap(closure.Config{FeatureMap: fm}); got != fm {
+		if got := closure.DerivedFeatureMap(cfg); got != fm {
 			t.Errorf("DerivedFeatureMap(0x%X) = 0x%X", fm, got)
 		}
 		spectest.CheckServer(t, srv, closuredef.Definition, fm)
@@ -51,16 +62,16 @@ func TestServerMatchesTheGeneratedDefinition(t *testing.T) {
 }
 
 // TestFeatureMapIsDerivedFromWhatTheServerServes pins the refusal: a
-// FeatureMap naming a feature whose elements the server does not serve
-// (LT, IS, SP, CL), or leaving out Positioning, fails construction —
-// New with ErrFeatureMap, NewControlServer with a panic — instead of
-// advertising attributes, commands or events nobody answers.
+// FeatureMap naming a feature whose elements the server does not serve —
+// LT, SP and CL on a mover without their interface — or leaving out
+// Positioning, fails construction — New with ErrFeatureMap,
+// NewControlServer with a panic — instead of advertising attributes,
+// commands or events nobody answers.
 func TestFeatureMapIsDerivedFromWhatTheServerServes(t *testing.T) {
 	t.Parallel()
 	for _, fm := range []uint32{
 		clusterwire.ClosureControlFeatureMotionLatching,
 		clusterwire.ClosureControlFeatureVentilation, // no Positioning
-		clusterwire.ClosureControlFeaturePositioning | clusterwire.ClosureControlFeatureInstantaneous,
 		clusterwire.ClosureControlFeaturePositioning | clusterwire.ClosureControlFeatureSpeed,
 		clusterwire.ClosureControlFeaturePositioning | clusterwire.ClosureControlFeatureCalibration,
 		clusterwire.ClosureControlFeaturePositioning | 1<<9, // undefined

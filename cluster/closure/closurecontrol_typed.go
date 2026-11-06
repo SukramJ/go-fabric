@@ -26,7 +26,12 @@ var (
 // all or nothing — every value is checked against the definition first.
 //   - OverallCurrentState's Position follows
 //     [ControlServer.SetCurrentPosition] (null between the stops; the
-//     server derives SecureState and emits SecureStateChanged).
+//     server derives SecureState and emits SecureStateChanged), its Latch
+//     [ControlServer.SetCurrentLatch] and its Speed
+//     [ControlServer.SetCurrentSpeed]; a Latch or Speed field of a feature
+//     the server does not advertise is refused, as connectedhomeip's
+//     SetOverallCurrentState refuses it (ClosureControlCluster.cpp:342-360
+//     at 6170af84).
 //   - MainState Error with a non-empty CurrentErrorList is
 //     [ControlServer.ReportError] (the OperationalError event); Disengaged,
 //     and leaving it, is [ControlServer.SetEngaged] where the closure is
@@ -42,6 +47,7 @@ func (s *ControlServer) SetAttributes(values map[uint32]any) error {
 		errs             wire.ClosureErrorList
 		setPos, setState bool
 		setErrs          bool
+		cur              currentReport
 	)
 	for _, id := range slices.Sorted(maps.Keys(values)) {
 		v, err := s.inst.CheckSet(id, values[id], nil)
@@ -72,12 +78,28 @@ func (s *ControlServer) SetAttributes(values map[uint32]any) error {
 				pos = &cp
 			}
 			setPos = true
+			if l := st.Latch; l != nil {
+				if !s.has(wire.ClosureControlFeatureMotionLatching) {
+					return fmt.Errorf("%w: closure: OverallCurrentState Latch without MotionLatching", spec.ErrInvalidValue)
+				}
+				cur.setLatch = true
+				if !l.Null {
+					cur.latch = &l.Value
+				}
+			}
+			if sp := st.Speed; sp != nil {
+				if !s.has(wire.ClosureControlFeatureSpeed) {
+					return fmt.Errorf("%w: closure: OverallCurrentState Speed without Speed", spec.ErrInvalidValue)
+				}
+				cur.speed = sp
+			}
 		default:
 			return fmt.Errorf("%w: closure: attribute 0x%04X is the commands'", spec.ErrNotHeld, id)
 		}
 	}
 	if setPos {
-		s.SetCurrentPosition(pos)
+		cur.position, cur.setPosition = pos, true
+		s.setCurrent(cur)
 	}
 	switch {
 	case setState && state == wire.ClosureMainStateError && len(errs) > 0:

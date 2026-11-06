@@ -2,33 +2,38 @@
 // Copyright (C) 2026 SukramJ.
 
 // Package valve contains the Matter ValveConfigurationAndControl cluster
-// server (0x0081) for a valve that opens and closes without a level axis.
+// server (0x0081): a valve that opens and closes, with the Level (LVL)
+// and TimeSync (TS) features where the host selects them.
 //
 // The server owns no valve state. Every attribute it answers is read
 // from a [StateSource] the host implements, and both commands are
 // forwarded to that same port; a server that flipped an internal field
 // and reported Success would tell a controller the valve moved without
-// anything having reached the device.
+// anything having reached the device. The one value it derives is
+// AutoCloseTime (TS): the node's Matter time at an Open plus the opening's
+// duration, as connectedhomeip sets it.
 //
-// The Level (LVL) feature is deliberately not implemented. CurrentLevel
-// (0x6) and TargetLevel (0x7) carry conformance "LVL"
-// (matter.js packages/model/src/standard/elements/
-// valve-configuration-and-control.element.ts:39-40), so they exist only
-// while that feature bit is advertised — and this server advertises an
-// empty FeatureMap. A host that needs a positionable valve extends the
-// port and the FeatureMap together; advertising LVL without the two
-// attributes would be the broken half of that pair.
+// Level is served over the StateSource's optional [LevelSource] (and
+// [DefaultOpenLevelSource] for the optional DefaultOpenLevel): the server
+// resolves an Open's level and checks it against LevelStep, as
+// connectedhomeip's cluster does. matter.js's server is the empty
+// subclass (ValveConfigurationAndControlServer.ts:14 at 862ad75f), so
+// both features are an "Ahead of matter.js" row
+// (notes/parity/by_design.md BD-chip-Valve-RulesInServer; [Ahead]).
 //
 // The cluster's identity is the generated definition
 // (cluster/spec/valveconfigurationandcontrol, ADR 0013): ids, revision,
-// the attribute and command lists the empty feature selection yields, the
-// write checks and the decoding of the Open request. What stays here is
-// the host port and the OpenDuration presence rule.
+// the attribute and command lists the selection yields, the write checks
+// and the decoding of the Open request. What stays here is the host port,
+// the OpenDuration presence rule and the Level and TimeSync rules.
 package valve
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"slices"
+	"sync"
 
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/cluster/spec"
@@ -40,12 +45,12 @@ import (
 // ClusterID is the ValveConfigurationAndControl cluster id.
 const ClusterID = valvedef.ClusterID
 
-// Attribute ids. Only the conformance-M attributes are listed: the five
-// this server serves. AutoCloseTime (0x2) is "TS"-gated
-// (valve-configuration-and-control.element.ts:35), CurrentLevel (0x6),
-// TargetLevel (0x7), DefaultOpenLevel (0x8) and LevelStep (0xa) are
-// LVL-gated (:39-40, :41-44, :46-49), and ValveFault (0x9) is optional
-// (:45) — none of them belong to this projection.
+// Attribute ids of the five conformance-M attributes. AutoCloseTime (0x2)
+// is "TS"-gated (valve-configuration-and-control.element.ts:35),
+// CurrentLevel (0x6), TargetLevel (0x7), DefaultOpenLevel (0x8) and
+// LevelStep (0xa) are LVL-gated (:39-40, :41-44, :46-49); the server
+// serves them with the features (valvedef.Attr…). ValveFault (0x9) is
+// optional (:45) and not served.
 const (
 	// AttrOpenDuration is the duration the valve stays open for the
 	// current opening, in seconds; null means "until closed by the user
@@ -85,31 +90,37 @@ const (
 	openFieldTargetLevel  uint8 = 1
 )
 
-// FeatureMap bits, named so a later projection has the verified bit
-// positions rather than a guess. Neither is advertised by this server.
-//
-// TS carries conformance "desc" and constraint "0"; LVL carries "O" and
-// constraint "1" (element :24-25).
+// FeatureMap bits. TS carries conformance "desc" and constraint "0"; LVL
+// carries "O" and constraint "1" (element :24-25).
 const (
-	// FeatureTimeSync is the TS bit — the valve expresses durations and
-	// AutoCloseTime against synchronized UTC time. Not advertised: it
-	// requires the Time Synchronization cluster (resource :21-26).
+	// FeatureTimeSync is the TS bit — the valve expresses AutoCloseTime
+	// against synchronized UTC time (resource :21-26); it needs the node's
+	// Matter time ([Config].MatterTime).
 	FeatureTimeSync = uint32(valvedef.FeatureTimeSync)
 	// FeatureLevel is the LVL bit — the valve can be driven to a
-	// percentage of its range (resource :29-32).
+	// percentage of its range (resource :29-32); it needs a [LevelSource].
 	FeatureLevel = uint32(valvedef.FeatureLevel)
 )
 
-// featureMapNone is the FeatureMap this server advertises: no optional
-// feature. TS is conformance "desc" and LVL is optional, so zero is a
-// conformant value for a valve that only opens and closes.
+// featureMapNone is the FeatureMap of a valve that only opens and closes:
+// TS is conformance "desc" and LVL is optional, so zero is conformant.
 const featureMapNone uint32 = 0
 
 // instance is the definition bound to [featureMapNone] with no optional
-// element declared: the five mandatory attributes, Open and Close. The
-// selection is conformant, so New has nothing to refuse; the parity test
-// holds the server against it (spectest.CheckServer).
+// element declared: the five mandatory attributes, Open and Close — what
+// [Server.MatterRead] answers the globals from.
 var instance, _ = spec.New(valvedef.Definition, spec.Options{Features: featureMapNone})
+
+// maxLevel is the full level, 100 %: the level of an Open without
+// TargetLevel and DefaultOpenLevel, and a level that complies with any
+// LevelStep (connectedhomeip kMaxLevelValuePercent).
+const maxLevel uint8 = 100
+
+// ErrSelection reports a Config whose selection the server cannot serve on
+// its StateSource: a feature or optional attribute whose interface the
+// source lacks, TS without the node's time, or a selection the definition
+// refuses.
+var ErrSelection = errors.New("valve: selection not served")
 
 // State is the ValveStateEnum (enum8) a controller reads from
 // CurrentState and TargetState.
@@ -135,7 +146,7 @@ const (
 // closes me" (resource :46-52 vs :213-218). Collapsing the two would
 // silently turn an indefinite opening into the default one. TargetLevel
 // needs the Level feature this server does not advertise, so the source
-// never sees one.
+// sees one only with the Level feature, resolved by the server.
 type OpenRequest = valvedef.OpenRequest
 
 // StateSource is the host port this server reads and drives. The host
@@ -156,6 +167,15 @@ type OpenRequest = valvedef.OpenRequest
 // It is the generated port (valveconfigurationandcontroldef.StateSource).
 type StateSource = valvedef.StateSource
 
+// LevelSource is the StateSource's optional interface for the Level
+// feature (valveconfigurationandcontroldef.LevelSource).
+type LevelSource = valvedef.LevelSource
+
+// DefaultOpenLevelSource is the StateSource's optional interface for the
+// DefaultOpenLevel attribute
+// (valveconfigurationandcontroldef.DefaultOpenLevelSource).
+type DefaultOpenLevelSource = valvedef.DefaultOpenLevelSource
+
 // Config carries the construction parameters for [Server].
 type Config struct {
 	// Source is the host port. A nil Source makes every attribute read
@@ -171,6 +191,22 @@ type Config struct {
 	// (ValveStateChanged, ValveFault), which the host emits through the
 	// typed server's Emit.
 	Events []uint32
+	// Features is the FeatureMap: zero, [FeatureLevel] (the Source
+	// implements [LevelSource]) and [FeatureTimeSync] (MatterTime is set).
+	Features uint32
+	// Attributes are the optional attributes the server serves beyond the
+	// selection's mandatory ones: DefaultOpenLevel (the Source implements
+	// [DefaultOpenLevelSource]) and LevelStep, both "[LVL]".
+	Attributes []uint32
+	// LevelStep is the LevelStep attribute (fixed, 1 to 50; the
+	// definition's default 1 when zero) where Attributes carries it: a
+	// TargetLevel or DefaultOpenLevel must then be 100 or a multiple of it.
+	LevelStep uint8
+	// MatterTime is the node's Matter time in epoch seconds, false while
+	// UTCTime is null (core.MatterEpochSeconds over the node's clock); TS
+	// needs it. An Open while it is false leaves AutoCloseTime null, as
+	// connectedhomeip's SetAutoCloseTime does without a valid UTC time.
+	MatterTime func() (epochS uint32, ok bool)
 }
 
 // Server implements [contract.ClusterServer] for
@@ -179,8 +215,18 @@ type Server struct {
 	embedded cluster.DataVersionTracker // used when Config.DataVersion is nil
 	ext      *cluster.DataVersionTracker
 	src      StateSource
-	inst     *spec.Instance // the definition with Config.Events
+	inst     *spec.Instance // the definition with the selection and Config.Events
 	hooks    spec.Hooks
+
+	level      LevelSource            // nil without LVL
+	defaults   DefaultOpenLevelSource // nil without DefaultOpenLevel
+	levelStep  uint8                  // zero without LevelStep
+	matterTime func() (uint32, bool)  // nil without TS
+
+	// mu guards autoClose, the AutoCloseTime the last Open set (TS),
+	// epoch-us; nil is null.
+	mu        sync.Mutex
+	autoClose *uint64
 }
 
 // Compile-time assertions.
@@ -191,17 +237,67 @@ var (
 	_ contract.ClusterCommandLister   = (*Server)(nil)
 )
 
-// NewServer constructs a [Server] over the host port in cfg.
-func NewServer(cfg Config) *Server {
-	s := &Server{src: cfg.Source, ext: cfg.DataVersion, inst: instance}
-	if len(cfg.Events) > 0 {
-		// An event id outside the definition leaves the EventList empty,
-		// as without Events.
-		if inst, err := spec.New(valvedef.Definition, spec.Options{Features: featureMapNone, Events: cfg.Events}); err == nil {
-			s.inst = inst
+// New constructs a [Server] over the host port in cfg. A selection the
+// server cannot serve is refused with [ErrSelection], naming the missing
+// interface: LVL without a [LevelSource], DefaultOpenLevel without a
+// [DefaultOpenLevelSource], TS without MatterTime, a LevelStep outside 1
+// to 50, or a selection the definition refuses.
+func New(cfg Config) (*Server, error) {
+	s := &Server{src: cfg.Source, ext: cfg.DataVersion}
+	if cfg.Features&^(FeatureLevel|FeatureTimeSync) != 0 {
+		return nil, fmt.Errorf("%w: FeatureMap 0x%X names an undefined feature", ErrSelection, cfg.Features)
+	}
+	if cfg.Features&FeatureLevel != 0 {
+		l, ok := cfg.Source.(LevelSource)
+		if !ok {
+			return nil, fmt.Errorf("%w: Level needs a StateSource that implements valveconfigurationandcontrol.LevelSource", ErrSelection)
+		}
+		s.level = l
+	}
+	if cfg.Features&FeatureTimeSync != 0 {
+		if cfg.MatterTime == nil {
+			return nil, fmt.Errorf("%w: TimeSync needs Config.MatterTime, the node's Matter time", ErrSelection)
+		}
+		s.matterTime = cfg.MatterTime
+	}
+	if slices.Contains(cfg.Attributes, valvedef.AttrDefaultOpenLevel) {
+		d, ok := cfg.Source.(DefaultOpenLevelSource)
+		if !ok {
+			return nil, fmt.Errorf("%w: DefaultOpenLevel needs a StateSource that implements valveconfigurationandcontrol.DefaultOpenLevelSource", ErrSelection)
+		}
+		s.defaults = d
+	}
+	if slices.Contains(cfg.Attributes, valvedef.AttrLevelStep) {
+		s.levelStep = cfg.LevelStep
+		if s.levelStep == 0 {
+			s.levelStep = 1 // the definition's default (element :46-49)
+		}
+		if s.levelStep > 50 {
+			return nil, fmt.Errorf("%w: LevelStep %d is outside 1 to 50", ErrSelection, s.levelStep)
 		}
 	}
+	inst, err := spec.New(valvedef.Definition, spec.Options{Features: cfg.Features, Attributes: cfg.Attributes, Events: cfg.Events})
+	if err != nil {
+		if len(cfg.Events) == 0 || cfg.Features != 0 || len(cfg.Attributes) != 0 {
+			return nil, fmt.Errorf("%w: %w", ErrSelection, err)
+		}
+		// An event id outside the definition leaves the EventList empty,
+		// as without Events.
+		inst = instance
+	}
+	s.inst = inst
 	s.hooks.Init(s.inst)
+	return s, nil
+}
+
+// NewServer constructs a [Server] from cfg, as [New] does; it panics on a
+// selection [New] refuses — a wiring error, not a runtime condition. A
+// host that builds its selection at run time calls [New].
+func NewServer(cfg Config) *Server {
+	s, err := New(cfg)
+	if err != nil {
+		panic(err)
+	}
 	return s
 }
 
@@ -229,19 +325,57 @@ func (*Server) MatterClusterID() uint32 { return ClusterID }
 // MatterDataVersion implements [contract.ClusterDataVersion].
 func (s *Server) MatterDataVersion() uint32 { return s.tracker().Current() }
 
-// MatterRead resolves the five conformance-M attributes plus the two
-// universal globals every cluster server answers itself.
+// MatterRead resolves the served attributes plus the two universal
+// globals every cluster server answers itself.
 func (s *Server) MatterRead(attrID uint32) (value any, ok bool) {
-	switch attrID {
-	case AttrOpenDuration, AttrDefaultOpenDuration, AttrRemainingDuration,
-		AttrCurrentState, AttrTargetState:
-		if s.src == nil {
-			return nil, true
-		}
-		return s.readFromSource(attrID)
-	default:
-		return instance.ReadGlobal(attrID)
+	if v, ok := s.inst.ReadGlobal(attrID); ok {
+		return v, true
 	}
+	if !s.inst.Serves(attrID) {
+		return nil, false
+	}
+	switch attrID {
+	case valvedef.AttrAutoCloseTime:
+		return s.readAutoClose()
+	case valvedef.AttrCurrentLevel:
+		return nullablePercent(s.level.CurrentLevel())
+	case valvedef.AttrTargetLevel:
+		return nullablePercent(s.level.TargetLevel())
+	case valvedef.AttrDefaultOpenLevel:
+		return s.defaults.DefaultOpenLevel(), true
+	case valvedef.AttrLevelStep:
+		return s.levelStep, true
+	}
+	if s.src == nil {
+		return nil, true
+	}
+	return s.readFromSource(attrID)
+}
+
+// readAutoClose answers AutoCloseTime: the value the last Open set, while
+// the valve still counts down (RemainingDuration known and not zero); null
+// otherwise — after a Close, a self-close or an Open without a duration or
+// a synchronized time (connectedhomeip ValveConfigurationAndControlCluster.cpp
+// CloseValve :243-247 and SetAutoCloseTime :391-413 at 6170af84).
+func (s *Server) readAutoClose() (any, bool) {
+	s.mu.Lock()
+	at := s.autoClose
+	s.mu.Unlock()
+	if at == nil || s.src == nil {
+		return nil, true
+	}
+	if left, known := s.src.RemainingDuration(); !known || left == 0 {
+		return nil, true
+	}
+	return *at, true
+}
+
+// nullablePercent mirrors [nullableSeconds] for the level attributes.
+func nullablePercent(percent uint8, known bool) (any, bool) {
+	if !known {
+		return nil, true
+	}
+	return percent, true
 }
 
 // readFromSource projects one host-reported value onto the wire types
@@ -282,21 +416,25 @@ func nullableState(state State, known bool) (any, bool) {
 	return uint8(state), true
 }
 
-// MatterWrite applies the one writable attribute this cluster has.
+// MatterWrite applies the writable attributes: DefaultOpenDuration and,
+// where served, DefaultOpenLevel.
 //
-// DefaultOpenDuration carries access "RW VO"; the other four are "R V" and
-// are rejected as UNSUPPORTED_WRITE rather than silently dropped, an id the
-// cluster does not serve as UNSUPPORTED_ATTRIBUTE. The definition checks the
-// value: a null clears the default (resource :50-52), any other value must
-// satisfy constraint "min 1", so zero is a CONSTRAINT_ERROR rather than a
-// duration of no seconds.
+// Both carry access "RW VO"; the others are "R V" and are rejected as
+// UNSUPPORTED_WRITE rather than silently dropped, an id the cluster does
+// not serve as UNSUPPORTED_ATTRIBUTE. The definition checks the value: a
+// null DefaultOpenDuration clears the default (resource :50-52), any other
+// value must satisfy constraint "min 1", so zero is a CONSTRAINT_ERROR
+// rather than a duration of no seconds; DefaultOpenLevel is 1 to 100.
 func (s *Server) MatterWrite(ctx context.Context, attrID uint32, value any) error {
-	v, err := instance.ValidateWrite(attrID, value, nil)
+	v, err := s.inst.ValidateWrite(attrID, value, nil)
 	if err != nil {
 		return err
 	}
 	if err := s.hooks.CheckWrite(ctx, attrID, v); err != nil {
 		return err
+	}
+	if attrID == valvedef.AttrDefaultOpenLevel {
+		return s.writeDefaultOpenLevel(ctx, v)
 	}
 	var seconds *uint32
 	if n, ok := v.(uint64); ok {
@@ -320,6 +458,35 @@ func (s *Server) MatterWrite(ctx context.Context, attrID uint32, value any) erro
 	return nil
 }
 
+// writeDefaultOpenLevel applies a checked DefaultOpenLevel: a level that
+// is not 100 or a multiple of LevelStep is CONSTRAINT_ERROR, an unchanged
+// one a successful no-op. Mirrors connectedhomeip
+// src/app/clusters/valve-configuration-and-control-server/ValveConfigurationAndControlCluster.cpp:175-192
+// at 6170af84.
+func (s *Server) writeDefaultOpenLevel(ctx context.Context, v any) error {
+	n, _ := v.(uint64)
+	level := uint8(n) //nolint:gosec // percent, 1 to 100 per ValidateWrite
+	if !s.compliesWithLevelStep(level) {
+		return constraintError{fmt.Sprintf("valve: DefaultOpenLevel %d is not 100 or a multiple of LevelStep %d", level, s.levelStep)}
+	}
+	if s.defaults.DefaultOpenLevel() == level {
+		return nil
+	}
+	if err := s.defaults.SetDefaultOpenLevel(ctx, level); err != nil {
+		return fmt.Errorf("valve: DefaultOpenLevel write: %w", err)
+	}
+	s.tracker().Bump()
+	return nil
+}
+
+// compliesWithLevelStep reports whether level is 100 or a multiple of
+// LevelStep; any level complies without LevelStep (connectedhomeip
+// ValueCompliesWithLevelStep, ValveConfigurationAndControlCluster.cpp:483-490
+// at 6170af84).
+func (s *Server) compliesWithLevelStep(level uint8) bool {
+	return s.levelStep == 0 || level == maxLevel || level%s.levelStep == 0
+}
+
 // MatterInvoke dispatches the two conformance-M commands. Both reach
 // the host port; neither reports Success on its own.
 //
@@ -337,12 +504,17 @@ func (s *Server) MatterInvoke(ctx context.Context, cmdID uint32, fields any) (an
 		if err != nil {
 			return nil, err
 		}
+		if err := s.resolveLevel(&req); err != nil {
+			return nil, err
+		}
 		if s.src == nil {
 			return nil, errNoSource("Open")
 		}
+		at := s.autoCloseFor(req)
 		if err := s.src.Open(ctx, req); err != nil {
 			return nil, fmt.Errorf("valve: Open: %w", err)
 		}
+		s.setAutoClose(at)
 		s.tracker().Bump()
 		return nil, nil
 	case CmdClose:
@@ -352,11 +524,79 @@ func (s *Server) MatterInvoke(ctx context.Context, cmdID uint32, fields any) (an
 		if err := s.src.Close(ctx); err != nil {
 			return nil, fmt.Errorf("valve: Close: %w", err)
 		}
+		s.setAutoClose(nil)
 		s.tracker().Bump()
 		return nil, nil
 	default:
 		return nil, im.UnsupportedCommandf("valve: unknown command 0x%02X", cmdID)
 	}
+}
+
+// resolveLevel applies the Level rules to an Open: without LVL a
+// TargetLevel is refused ([errTargetLevel]); with it a TargetLevel that is
+// not 100 or a multiple of LevelStep is CONSTRAINT_ERROR, and an absent
+// one becomes DefaultOpenLevel where served, else 100 — the level the
+// StateSource opens to. Mirrors connectedhomeip
+// src/app/clusters/valve-configuration-and-control-server/ValveConfigurationAndControlCluster.cpp:312-341
+// at 6170af84.
+func (s *Server) resolveLevel(req *OpenRequest) error {
+	if s.level == nil {
+		if req.TargetLevel != nil {
+			return errTargetLevel
+		}
+		return nil
+	}
+	if req.TargetLevel != nil {
+		if !s.compliesWithLevelStep(*req.TargetLevel) {
+			return constraintError{fmt.Sprintf("valve: Open TargetLevel %d is not 100 or a multiple of LevelStep %d", *req.TargetLevel, s.levelStep)}
+		}
+		return nil
+	}
+	level := maxLevel
+	if s.defaults != nil {
+		level = s.defaults.DefaultOpenLevel()
+	}
+	req.TargetLevel = &level
+	return nil
+}
+
+// autoCloseFor is the AutoCloseTime an Open of req sets (TS): the node's
+// Matter time plus the opening's duration — the request's OpenDuration,
+// else DefaultOpenDuration — in epoch-us; nil without TS, for an opening
+// without a duration, and while the node's time is not synchronized.
+// Mirrors connectedhomeip
+// src/app/clusters/valve-configuration-and-control-server/ValveConfigurationAndControlCluster.cpp:391-413
+// at 6170af84 (SetAutoCloseTime), with the epoch-s the node's time carries.
+func (s *Server) autoCloseFor(req OpenRequest) *uint64 {
+	if s.matterTime == nil {
+		return nil
+	}
+	var seconds uint32
+	switch {
+	case req.OpenDuration != nil && req.OpenDuration.Null:
+		return nil
+	case req.OpenDuration != nil:
+		seconds = req.OpenDuration.Value
+	default:
+		d, known := s.src.DefaultOpenDuration()
+		if !known {
+			return nil
+		}
+		seconds = d
+	}
+	now, ok := s.matterTime()
+	if !ok {
+		return nil
+	}
+	at := (uint64(now) + uint64(seconds)) * 1_000_000
+	return &at
+}
+
+// setAutoClose records the AutoCloseTime of the last Open (nil: null).
+func (s *Server) setAutoClose(at *uint64) {
+	s.mu.Lock()
+	s.autoClose = at
+	s.mu.Unlock()
 }
 
 // openRequestFrom normalises the payload the bridge hands over. The
@@ -384,18 +624,14 @@ func openRequestFrom(fields any) (OpenRequest, error) {
 	}
 }
 
-// openRequestFromGenerated refuses a decoded request that carries
-// TargetLevel; an absent OpenDuration stays apart from a null one.
-func openRequestFromGenerated(r OpenRequest) (OpenRequest, error) {
-	if r.TargetLevel != nil {
-		return OpenRequest{}, errTargetLevel
-	}
-	return r, nil
-}
+// openRequestFromGenerated takes a decoded request as it is: an absent
+// OpenDuration stays apart from a null one, and TargetLevel is
+// [Server.resolveLevel]'s.
+func openRequestFromGenerated(r OpenRequest) (OpenRequest, error) { return r, nil }
 
-// errTargetLevel refuses an Open that carries TargetLevel: it is
-// conformance "[LVL]" (element :62) and this server advertises no LVL.
-// Ignoring the field would open the valve to a level the controller never
+// errTargetLevel refuses an Open that carries TargetLevel on a valve
+// without the Level feature: the field is conformance "[LVL]" (element
+// :62). Ignoring it would open the valve to a level the controller never
 // got told was impossible.
 var errTargetLevel = constraintError{
 	"valve: Open carries TargetLevel, which needs the Level feature this server does not advertise",
@@ -408,8 +644,14 @@ var errTargetLevel = constraintError{
 // distinguishable from absence.
 func openRequestFromTagMap(m map[uint8]any) (OpenRequest, error) {
 	var req OpenRequest
-	if _, present := m[openFieldTargetLevel]; present {
-		return req, errTargetLevel
+	if raw, present := m[openFieldTargetLevel]; present {
+		// percent, constraint "1 to 100" (element :62).
+		level, ok := asUint32(raw)
+		if !ok || level < 1 || level > uint32(maxLevel) {
+			return req, constraintError{fmt.Sprintf("valve: Open TargetLevel violates constraint 1 to 100: %v", raw)}
+		}
+		l := uint8(level)
+		req.TargetLevel = &l
 	}
 	raw, present := m[openFieldOpenDuration]
 	if !present {
@@ -471,29 +713,37 @@ func asUint32(v any) (uint32, bool) {
 	return uint32(n), true //nolint:gosec // range-checked against 0 and uint32 max above
 }
 
-// MatterReportable lists the attributes that move while the valve runs.
-// DefaultOpenDuration is absent: it changes only through a write, which
-// the dispatcher already reflects in the endpoint's DataVersion.
-func (*Server) MatterReportable() []uint32 {
-	return []uint32{
-		AttrOpenDuration,
-		AttrRemainingDuration,
-		AttrCurrentState,
-		AttrTargetState,
+// MatterReportable lists the attributes that move while the valve runs:
+// the durations and states, and with the features AutoCloseTime and the
+// two levels. DefaultOpenDuration and DefaultOpenLevel are absent: they
+// change only through a write, which the dispatcher already reflects in
+// the endpoint's DataVersion; LevelStep is fixed.
+func (s *Server) MatterReportable() []uint32 {
+	out := []uint32{AttrOpenDuration}
+	if s.matterTime != nil {
+		out = append(out, valvedef.AttrAutoCloseTime)
 	}
+	out = append(out, AttrRemainingDuration, AttrCurrentState, AttrTargetState)
+	if s.level != nil {
+		out = append(out, valvedef.AttrCurrentLevel, valvedef.AttrTargetLevel)
+	}
+	return out
 }
 
 // MatterAttributes implements [contract.ClusterAttributeLister], in id
 // order and without the universal globals — the dispatcher merges those.
-func (*Server) MatterAttributes() []uint32 { return instance.MatterAttributes() }
+func (s *Server) MatterAttributes() []uint32 { return s.inst.MatterAttributes() }
 
 // MatterAcceptedCommands implements [contract.ClusterCommandLister].
-func (*Server) MatterAcceptedCommands() []uint32 { return instance.MatterAcceptedCommands() }
+func (s *Server) MatterAcceptedCommands() []uint32 { return s.inst.MatterAcceptedCommands() }
 
 // MatterGeneratedCommands implements [contract.ClusterCommandLister].
 // Open and Close both declare response "status", so the server emits no
 // command payloads.
-func (*Server) MatterGeneratedCommands() []uint32 { return instance.MatterGeneratedCommands() }
+func (s *Server) MatterGeneratedCommands() []uint32 { return s.inst.MatterGeneratedCommands() }
+
+// FeatureMap reports the advertised feature set.
+func (s *Server) FeatureMap() uint32 { return s.inst.FeatureMap() }
 
 // errNoSource reports that the server has no host port to reach.
 func errNoSource(what string) error {

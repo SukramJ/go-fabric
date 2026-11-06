@@ -57,23 +57,54 @@ const ClusterRevision = closuredef.Revision
 const PositioningVentilationFeatureMap = wire.ClosureControlFeaturePositioning |
 	wire.ClosureControlFeatureVentilation
 
-// servedFeatures are the features whose elements this server serves.
+// servedFeatures are the features whose elements this server serves on
+// any mover.
 //
 // Positioning is fixed: OverallCurrentState / OverallTargetState carry a
 // Position and MoveTo moves to one. Ventilation and Pedestrian add only a
 // TargetPositionEnum / CurrentPositionEnum value each, ManuallyOperable
 // only EngageStateChanged (served by [ControlServer.SetEngaged]),
-// Protection only MainState Protected — so a host may select them for a
+// Protection only MainState Protected, and Instantaneous withdraws Stop,
+// MovementCompleted and CountdownTime — so a host may select them for a
 // drive that has them (closure-control.element.ts, conformance of every
-// element). The others are not served: MotionLatching needs
-// LatchControlModes and the Latch fields, Speed the Speed fields,
-// Calibration the Calibrate command, and Instantaneous withdraws Stop and
-// MovementCompleted, which this server serves.
+// element). The capability features ([capabilityFeatures]) are served on
+// a mover that implements their interface.
 const servedFeatures = wire.ClosureControlFeaturePositioning |
 	wire.ClosureControlFeatureVentilation |
 	wire.ClosureControlFeaturePedestrian |
 	wire.ClosureControlFeatureProtection |
-	wire.ClosureControlFeatureManuallyOperable
+	wire.ClosureControlFeatureManuallyOperable |
+	wire.ClosureControlFeatureInstantaneous
+
+// capabilityFeatures are the features served on a mover that implements
+// the optional interface each needs: MotionLatching (LatchControlModes,
+// the Latch fields, MoveTo's Latch) a [closuredef.Latcher], Speed (the
+// Speed fields, MoveTo's Speed) a [closuredef.SpeedMover], Calibration
+// (Calibrate, MainState Calibrating) a [closuredef.Calibrator]. An Ahead
+// of matter.js row (notes/parity/by_design.md
+// BD-chip-ClosureControl-RulesInServer; [AheadFeatures]).
+var capabilityFeatures = []struct {
+	bit   uint32
+	name  string
+	iface string
+	has   func(Mover) bool
+}{
+	{wire.ClosureControlFeatureMotionLatching, "MotionLatching", "closurecontrol.Latcher", func(m Mover) bool { _, ok := m.(closuredef.Latcher); return ok }},
+	{wire.ClosureControlFeatureSpeed, "Speed", "closurecontrol.SpeedMover", func(m Mover) bool { _, ok := m.(closuredef.SpeedMover); return ok }},
+	{wire.ClosureControlFeatureCalibration, "Calibration", "closurecontrol.Calibrator", func(m Mover) bool { _, ok := m.(closuredef.Calibrator); return ok }},
+}
+
+// servable is the feature set the server serves on m: [servedFeatures]
+// and each capability feature whose interface m implements.
+func servable(m Mover) uint32 {
+	fm := uint32(servedFeatures)
+	for _, c := range capabilityFeatures {
+		if m != nil && c.has(m) {
+			fm |= c.bit
+		}
+	}
+	return fm
+}
 
 // ErrFeatureMap reports a Config.FeatureMap the server does not serve.
 var ErrFeatureMap = errors.New("closure: FeatureMap names features this server does not serve")
@@ -98,11 +129,15 @@ type Config struct {
 	// FeatureMap is the advertised feature set. Zero selects
 	// [PositioningVentilationFeatureMap]. Any other value must be the one
 	// [DerivedFeatureMap] derives from it — Positioning plus a choice of
-	// Ventilation, Pedestrian, Protection and ManuallyOperable — or
-	// [New] refuses it.
+	// Ventilation, Pedestrian, Protection, ManuallyOperable and
+	// Instantaneous, and MotionLatching, Speed and Calibration where the
+	// Mover implements their interface — or [New] refuses it. The
+	// conformance between them (Speed "[PS & !IS]") is the definition's.
 	FeatureMap uint32
-	// Mover carries out MoveTo and Stop. Nil makes both report Failure
-	// rather than accepting a command that reaches nothing.
+	// Mover carries out MoveTo and Stop, and through its optional
+	// interfaces the latch, the speed and Calibrate. Nil makes the
+	// commands report Failure rather than accepting a command that
+	// reaches nothing.
 	Mover Mover
 }
 
@@ -120,11 +155,16 @@ type ControlServer struct {
 	cluster.AttributeChanges
 	spec.Hooks
 
-	// mu guards currentPosition, errorList, mainState, secureState and targetPosition.
+	// mu guards currentPosition, currentLatch, currentSpeed, errorList,
+	// mainState, secureState, targetPosition, targetLatch and targetSpeed.
 	mu sync.RWMutex
 
 	inst  *spec.Instance
 	mover Mover
+
+	// latchModes is LatchControlModes (LT, fixed), read from the
+	// mover's [closuredef.Latcher] at construction.
+	latchModes closuredef.LatchControlModesBitmap
 
 	mainState wire.ClosureMainState
 	errorList wire.ClosureErrorList
@@ -136,6 +176,12 @@ type ControlServer struct {
 	targetPosition  *wire.ClosureTargetPosition
 	secureState     *bool
 
+	// currentLatch and targetLatch are the Latch fields (LT): nil is
+	// null. currentSpeed and targetSpeed are the Speed fields (SP), which
+	// carry no null: Auto until the drive or a MoveTo says otherwise.
+	currentLatch, targetLatch *bool
+	currentSpeed, targetSpeed *closuredef.ThreeLevelAutoEnum
+
 	// emitter and endpoint address the events (closurecontrol_events.go);
 	// the bridge wires both at reassembly.
 	emitter  contract.EventEmitter
@@ -144,30 +190,42 @@ type ControlServer struct {
 
 // DerivedFeatureMap is the FeatureMap the server advertises for cfg: what
 // it serves. Zero selects [PositioningVentilationFeatureMap]; otherwise
-// Positioning is always served and Ventilation, Pedestrian, Protection and
-// ManuallyOperable are taken from cfg.FeatureMap (see servedFeatures). It
-// differs from a non-zero cfg.FeatureMap exactly when that one names a
-// feature the server does not serve, or leaves out Positioning.
+// Positioning is always served and the rest is taken from cfg.FeatureMap
+// as far as the server serves it on cfg.Mover (see servedFeatures and
+// capabilityFeatures). It differs from a non-zero cfg.FeatureMap exactly
+// when that one names a feature the server does not serve — or whose
+// interface the Mover lacks — or leaves out Positioning.
 func DerivedFeatureMap(cfg Config) uint32 {
 	if cfg.FeatureMap == 0 {
 		return PositioningVentilationFeatureMap
 	}
-	return wire.ClosureControlFeaturePositioning | cfg.FeatureMap&servedFeatures
+	return wire.ClosureControlFeaturePositioning | cfg.FeatureMap&servable(cfg.Mover)
 }
 
 // New constructs a [ControlServer] from cfg. A cfg.FeatureMap other than
 // zero and the one [DerivedFeatureMap] derives is refused with
-// [ErrFeatureMap]: advertising it would list attributes, commands or events
-// the server does not serve.
+// [ErrFeatureMap], naming each capability feature whose interface the
+// Mover lacks: advertising it would list attributes, commands or events
+// the server does not serve. A derived selection the definition's
+// conformance refuses (Speed with Instantaneous) is refused with the
+// definition's error.
 func New(cfg Config) (*ControlServer, error) {
 	fm := DerivedFeatureMap(cfg)
 	if cfg.FeatureMap != 0 && cfg.FeatureMap != fm {
-		return nil, fmt.Errorf("%w: 0x%X, the server serves 0x%X", ErrFeatureMap, cfg.FeatureMap, fm)
+		msg := fmt.Sprintf("0x%X, the server serves 0x%X", cfg.FeatureMap, fm)
+		for _, c := range capabilityFeatures {
+			if cfg.FeatureMap&c.bit != 0 && fm&c.bit == 0 {
+				msg += fmt.Sprintf("; %s needs a Mover that implements %s", c.name, c.iface)
+			}
+		}
+		return nil, fmt.Errorf("%w: %s", ErrFeatureMap, msg)
 	}
-	// The derived selection satisfies every feature conformance
-	// (Positioning, so "O.a+" and "[PS]" hold), and no optional element is
-	// declared, so spec.New cannot refuse it.
-	inst, _ := spec.New(closuredef.Definition, spec.Options{Features: fm})
+	// Positioning holds "O.a+" and "[PS]"; Speed "[PS & !IS]" is the one
+	// conformance a served selection can break, and spec.New refuses it.
+	inst, err := spec.New(closuredef.Definition, spec.Options{Features: fm})
+	if err != nil {
+		return nil, fmt.Errorf("closure: %w", err)
+	}
 	s := &ControlServer{
 		inst:  inst,
 		mover: cfg.Mover,
@@ -177,9 +235,19 @@ func New(cfg Config) (*ControlServer, error) {
 		mainState: wire.ClosureMainStateSetupRequired,
 		errorList: wire.ClosureErrorList{},
 	}
+	if l, ok := cfg.Mover.(closuredef.Latcher); ok && s.has(wire.ClosureControlFeatureMotionLatching) {
+		s.latchModes = l.LatchControlModes()
+	}
+	if s.has(wire.ClosureControlFeatureSpeed) {
+		cur, tgt := closuredef.ThreeLevelAutoAuto, closuredef.ThreeLevelAutoAuto
+		s.currentSpeed, s.targetSpeed = &cur, &tgt
+	}
 	s.Init(inst)
 	return s, nil
 }
+
+// has reports whether the advertised FeatureMap carries feature.
+func (s *ControlServer) has(feature uint32) bool { return s.inst.FeatureMap()&feature != 0 }
 
 // NewControlServer constructs a [ControlServer] from cfg, as [New] does; it
 // panics on a cfg.FeatureMap [New] refuses — a wiring error, not a runtime
@@ -198,9 +266,8 @@ func (s *ControlServer) MatterClusterID() uint32 { return closuredef.ClusterID }
 // MatterRead resolves the mandatory ClosureControl attributes and the two
 // globals.
 //
-// CountdownTime (conformance "[PS & !IS]") and LatchControlModes
-// (conformance "LT") are absent: the first is optional and not served, the
-// second belongs to a feature the server does not serve.
+// CountdownTime (conformance "[PS & !IS]") is optional and not served;
+// LatchControlModes (conformance "LT") is answered with MotionLatching.
 func (s *ControlServer) MatterRead(attrID uint32) (value any, ok bool) {
 	// FeatureMap and ClusterRevision: every cluster server answers the two
 	// universal globals itself; nothing upstream fills them in. Without
@@ -225,9 +292,22 @@ func (s *ControlServer) MatterRead(attrID uint32) (value any, ok bool) {
 		return &wire.ClosureOverallCurrentState{
 			Position:    s.currentPosition,
 			SecureState: s.secureState,
+			Latch:       copyOf(s.currentLatch),
+			HasLatch:    s.has(wire.ClosureControlFeatureMotionLatching),
+			Speed:       copyOf(s.currentSpeed),
 		}, true
 	case wire.ClosureControlAttrOverallTargetState:
-		return &wire.ClosureOverallTargetState{Position: s.targetPosition}, true
+		return &wire.ClosureOverallTargetState{
+			Position: s.targetPosition,
+			Latch:    copyOf(s.targetLatch),
+			HasLatch: s.has(wire.ClosureControlFeatureMotionLatching),
+			Speed:    copyOf(s.targetSpeed),
+		}, true
+	case wire.ClosureControlAttrLatchControlModes:
+		if !s.has(wire.ClosureControlFeatureMotionLatching) {
+			return nil, false
+		}
+		return uint8(s.latchModes), true
 	default:
 		return nil, false
 	}
@@ -277,13 +357,13 @@ var (
 	_ im.StatusCodeError = closureConstraintErr{}
 )
 
-// MatterInvoke handles the ClosureControl commands this feature set
-// carries: MoveTo (conformance M) and Stop (conformance "!IS", mandatory
-// because the server does not advertise Instantaneous).
+// MatterInvoke handles the ClosureControl commands: MoveTo (conformance
+// M), Stop (conformance "!IS") and Calibrate (conformance "CL").
 //
-// Calibrate is conformance "CL" and this server does not advertise
-// Calibration, so it reports UnsupportedCommand rather than succeeding
-// silently.
+// Stop with Instantaneous and Calibrate without Calibration report
+// UnsupportedCommand rather than succeeding silently, as connectedhomeip's
+// HandleStop and HandleCalibrate do (ClosureControlCluster.cpp:535, :644
+// at 6170af84).
 func (s *ControlServer) MatterInvoke(
 	ctx context.Context, cmdID uint32, fields any,
 ) (response any, err error) {
@@ -294,11 +374,12 @@ func (s *ControlServer) MatterInvoke(
 	case closuredef.CmdMoveTo:
 		return nil, s.invokeMoveTo(ctx, fields)
 	case closuredef.CmdStop:
+		if s.has(wire.ClosureControlFeatureInstantaneous) {
+			return nil, closureUnsupportedCommandErr{"closure: Stop is withdrawn by the Instantaneous feature"}
+		}
 		return nil, s.invokeStop(ctx)
 	case closuredef.CmdCalibrate:
-		return nil, closureUnsupportedCommandErr{
-			"closure: Calibrate requires the Calibration feature, which this server does not advertise",
-		}
+		return nil, s.invokeCalibrate(ctx)
 	default:
 		return nil, im.UnsupportedCommandf("closure: unknown command 0x%02X", cmdID)
 	}
@@ -309,9 +390,10 @@ func (s *ControlServer) MatterInvoke(
 // cluster§5.4.8.2): a request with none of the three "O.a+" fields is
 // INVALID_COMMAND; a field of a feature the server does not advertise is
 // ignored rather than refused; with Positioning, an absent Position falls
-// back to OverallTargetState.Position, and with that null too the closure
-// does not change its position; a Position outside the advertised set is
-// CONSTRAINT_ERROR. matter.js has no ClosureControl logic
+// back to OverallTargetState.Position when the request carries no served
+// Latch or Speed, and with that null too the closure does not change its
+// position; a Position outside the advertised set is CONSTRAINT_ERROR.
+// matter.js has no ClosureControl logic
 // (notes/parity/by_design.md BD-chip-ClosureControl-RulesInServer):
 // connectedhomeip's HandleMoveTo is the authority for the state rules — a
 // closure whose MainState is not Moving, WaitingForMotion or Stopped
@@ -319,6 +401,14 @@ func (s *ControlServer) MatterInvoke(
 // OverallCurrentState (ClosureControlCluster.cpp:560-562 at 6170af84),
 // cannot fire here: this server reads OverallCurrentState as a struct
 // whose fields are null until observed, never as null.
+//
+// With MotionLatching and Speed the request's Latch and Speed follow
+// HandleMoveTo too (ClosureControlCluster.cpp:579-597, :607-620 at
+// 6170af84): a Latch the LatchControlModes do not allow remotely is
+// INVALID_IN_STATE, an unknown Speed CONSTRAINT_ERROR, and a Position
+// change of a latched closure without Latch false INVALID_IN_STATE. The
+// mover hears the request in the order a drive carries it out — unlatch,
+// speed, motion, latch.
 func (s *ControlServer) invokeMoveTo(ctx context.Context, fields any) error {
 	req, err := moveToRequest(fields)
 	if errors.Is(err, wire.ErrClosureControlMalformed) {
@@ -330,17 +420,42 @@ func (s *ControlServer) invokeMoveTo(ctx context.Context, fields any) error {
 	s.mu.RLock()
 	fallback := s.targetPosition
 	state := s.mainState
+	latched := s.currentLatch != nil && *s.currentLatch
 	s.mu.RUnlock()
-	// Position belongs to Positioning, which the server always serves;
-	// Latch and Speed to features it does not (LT, SP): both ignored.
+	// Latch and Speed of a feature the server does not advertise are
+	// ignored (cluster§5.4.8.2; chip :579, :592).
+	latch, speed := req.Latch, req.Speed
+	if !s.has(wire.ClosureControlFeatureMotionLatching) {
+		latch = nil
+	}
+	if !s.has(wire.ClosureControlFeatureSpeed) {
+		speed = nil
+	}
 	target := (*wire.ClosureTargetPosition)(req.Position)
-	if target == nil {
+	if target == nil && latch == nil && speed == nil {
 		target = fallback
 	}
 	if target != nil {
 		if err := s.checkPositionSupported(*target); err != nil {
 			return err
 		}
+	}
+	// Mirrors connectedhomeip
+	// src/app/clusters/closure-control-server/ClosureControlCluster.cpp:579-590
+	// at 6170af84: a Latch true needs RemoteLatching, a Latch false
+	// RemoteUnlatching, or the request is INVALID_IN_STATE.
+	if latch != nil {
+		need := closuredef.LatchControlModesRemoteUnlatching
+		if *latch {
+			need = closuredef.LatchControlModesRemoteLatching
+		}
+		if s.latchModes&need == 0 {
+			return spec.Errorf(im.StatusInvalidInState, "closure: MoveTo Latch %t is not allowed remotely (LatchControlModes 0x%X)", *latch, s.latchModes)
+		}
+	}
+	// chip :592-597: a Speed outside ThreeLevelAutoEnum is CONSTRAINT_ERROR.
+	if speed != nil && !slices.ContainsFunc(closuredef.ThreeLevelAutoEnumDef.Values, func(v spec.EnumValue) bool { return v.Value == uint64(*speed) }) {
+		return closureConstraintErr{fmt.Sprintf("closure: MoveTo speed %d is not a ThreeLevelAutoEnum value", *speed)}
 	}
 	// Mirrors connectedhomeip
 	// src/app/clusters/closure-control-server/ClosureControlCluster.cpp:599-605
@@ -354,25 +469,112 @@ func (s *ControlServer) invokeMoveTo(ctx context.Context, fields any) error {
 	default:
 		return spec.Errorf(im.StatusInvalidInState, "closure: MoveTo in MainState %d", state)
 	}
-	if target == nil {
+	// Mirrors connectedhomeip ClosureControlCluster.cpp:607-620 at
+	// 6170af84: a Position change of a latched closure needs Latch false
+	// in the same request.
+	if latched && req.Position != nil && s.has(wire.ClosureControlFeatureMotionLatching) && (latch == nil || *latch) {
+		return spec.Errorf(im.StatusInvalidInState, "closure: MoveTo Position while latched needs Latch false")
+	}
+	if target == nil && latch == nil && speed == nil {
 		return nil
 	}
 	if s.mover == nil {
 		return errors.New("closure: MoveTo has no mover")
 	}
-	if err := s.mover.MoveTo(ctx, closuredef.TargetPositionEnum(*target)); err != nil {
+	if err := s.drive(ctx, target, latch, speed); err != nil {
 		// Deliberately no state change: recording a target the device
 		// refused would leave the controller reading a move that never
 		// happened.
 		return fmt.Errorf("closure: MoveTo: %w", err)
 	}
 	s.mu.Lock()
-	t := *target
-	s.targetPosition = &t
+	if target != nil {
+		t := *target
+		s.targetPosition = &t
+	}
+	if latch != nil {
+		s.targetLatch = copyOf(latch)
+	}
+	if speed != nil {
+		s.targetSpeed = copyOf(speed)
+	}
 	s.mainState = wire.ClosureMainStateMoving
 	s.mu.Unlock()
 	s.NotifyFrom(contract.OriginCommand, wire.ClosureControlAttrMainState, wire.ClosureControlAttrOverallTargetState)
 	return nil
+}
+
+// drive hands a checked MoveTo to the mover in the order a drive carries
+// it out: an unlatch before the motion, the speed, the motion, a latch
+// after it (connectedhomeip's closure-app orders a panel's actions so,
+// examples/closure-app/linux/ClosureManager.cpp HandlePanelUnlatchAction,
+// HandlePanelSetTargetAction at 6170af84). The capability interfaces are
+// present: the advertised features required them at construction.
+func (s *ControlServer) drive(ctx context.Context, target *wire.ClosureTargetPosition, latch *bool, speed *closuredef.ThreeLevelAutoEnum) error {
+	latcher, _ := s.mover.(closuredef.Latcher)
+	if latch != nil && !*latch {
+		if err := latcher.Latch(ctx, false); err != nil {
+			return err
+		}
+	}
+	if speed != nil {
+		if err := s.mover.(closuredef.SpeedMover).SetSpeed(ctx, *speed); err != nil {
+			return err
+		}
+	}
+	if target != nil {
+		if err := s.mover.MoveTo(ctx, closuredef.TargetPositionEnum(*target)); err != nil {
+			return err
+		}
+	}
+	if latch != nil && *latch {
+		return latcher.Latch(ctx, true)
+	}
+	return nil
+}
+
+// invokeCalibrate starts a calibration, as connectedhomeip's
+// HandleCalibrate does (ClosureControlCluster.cpp:642-665 at 6170af84):
+// without Calibration UnsupportedCommand; already Calibrating SUCCESS
+// without another call; in any MainState other than Stopped and
+// SetupRequired INVALID_IN_STATE; otherwise the mover's
+// [closuredef.Calibrator] starts it and, on its success, MainState is
+// Calibrating — the drive reports Stopped when it is done. matter.js has
+// no Calibrate logic (ClosureControlServer.ts:17, the empty subclass).
+func (s *ControlServer) invokeCalibrate(ctx context.Context) error {
+	if !s.has(wire.ClosureControlFeatureCalibration) {
+		return closureUnsupportedCommandErr{
+			"closure: Calibrate requires the Calibration feature, which this server does not advertise",
+		}
+	}
+	s.mu.RLock()
+	state := s.mainState
+	s.mu.RUnlock()
+	switch state {
+	case wire.ClosureMainStateCalibrating:
+		return nil
+	case wire.ClosureMainStateStopped, wire.ClosureMainStateSetupRequired:
+	default:
+		return spec.Errorf(im.StatusInvalidInState, "closure: Calibrate in MainState %d", state)
+	}
+	if err := s.mover.(closuredef.Calibrator).Calibrate(ctx); err != nil {
+		return fmt.Errorf("closure: Calibrate: %w", err)
+	}
+	s.mu.Lock()
+	s.mainState = wire.ClosureMainStateCalibrating
+	s.mu.Unlock()
+	s.NotifyFrom(contract.OriginCommand, wire.ClosureControlAttrMainState)
+	return nil
+}
+
+// copyOf is a copy of *p, nil for nil: a value read out of the server, or
+// handed into it, does not alias its state.
+func copyOf[T any](p *T) *T {
+	if p == nil {
+		return nil
+	}
+	v := *p
+	return &v
 }
 
 // invokeStop halts motion (cluster§5.4.8.1): only a closure that is
@@ -525,51 +727,106 @@ func (s *ControlServer) FeatureMap() uint32 { return s.inst.FeatureMap() }
 // travel, most often — which the spec expresses as a null Position rather
 // than a nearest-stop guess.
 //
-// A change of SecureState — true exactly at FullyClosed — emits
-// SecureStateChanged.
+// A change of SecureState — true exactly at FullyClosed, and latched
+// where the closure advertises MotionLatching — emits SecureStateChanged.
 func (s *ControlServer) SetCurrentPosition(pos *wire.ClosureCurrentPosition) {
+	s.setCurrent(currentReport{position: pos, setPosition: true})
+}
+
+// SetCurrentLatch records the latch the device reported (MotionLatching):
+// nil is unknown, the null of the quality-X field. Reaching the latch a
+// MoveTo asked for clears OverallTargetState's Latch, as an arrival
+// clears its Position; SecureState follows ([ControlServer.SetCurrentPosition]).
+// Without MotionLatching it changes nothing.
+func (s *ControlServer) SetCurrentLatch(latch *bool) {
+	if !s.has(wire.ClosureControlFeatureMotionLatching) {
+		return
+	}
+	s.setCurrent(currentReport{latch: latch, setLatch: true})
+}
+
+// SetCurrentSpeed records the speed the device reported (Speed). Without
+// Speed it changes nothing.
+func (s *ControlServer) SetCurrentSpeed(speed closuredef.ThreeLevelAutoEnum) {
+	if !s.has(wire.ClosureControlFeatureSpeed) {
+		return
+	}
+	s.setCurrent(currentReport{speed: &speed})
+}
+
+// currentReport is one report of OverallCurrentState's fields; a field
+// whose set flag (or pointer, for speed) is unset stays as it is.
+type currentReport struct {
+	position              *wire.ClosureCurrentPosition
+	setPosition, setLatch bool
+	latch                 *bool
+	speed                 *closuredef.ThreeLevelAutoEnum
+}
+
+// setCurrent applies r, derives SecureState and clears what an arrival
+// fulfils in OverallTargetState.
+func (s *ControlServer) setCurrent(r currentReport) {
 	var events []pendingEvent
 	defer func() { s.emit(events) }()
 	defer s.NotifyFrom(contract.OriginHostSet, wire.ClosureControlAttrOverallCurrentState, wire.ClosureControlAttrOverallTargetState)
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	prevSecure := s.secureState
-	defer func() {
-		if s.secureState != nil && (prevSecure == nil || *prevSecure != *s.secureState) {
-			events = append(events, pendingEvent{
-				closuredef.EventSecureStateChanged,
-				SecureStateChangedEvent{SecureValue: *s.secureState},
-				s.inst.EventPriority(closuredef.EventSecureStateChanged),
-			})
-		}
-	}()
-	s.currentPosition = pos
-	// SecureState is "the closure is in a position that secures the
-	// opening" — true only when fully closed (matter.js
-	// closure-control.element.ts:134-137).
-	secure := pos != nil && *pos == wire.ClosureCurrentPositionFullyClosed
-	if pos == nil {
-		s.secureState = nil
-	} else {
-		s.secureState = &secure
+	if r.setPosition {
+		s.currentPosition = r.position
 	}
-	if pos == nil {
-		// A null Position means the drive's position is unknown, which the
-		// spec says plainly (matter.js closure-control.resource.ts:429-439:
-		// "If the closure doesn't know accurately its current state the value
-		// null shall be used"). Whether it is MOVING is a different question
-		// and a different attribute, answered by the model from the drive's
-		// own motion signal and delivered through [ControlServer.SetMainState]
-		// — reading it off the position made a stuck or unreferenced door
-		// report as perpetually in motion.
-		return
+	if r.setLatch {
+		s.currentLatch = copyOf(r.latch)
 	}
+	if r.speed != nil {
+		s.currentSpeed = copyOf(r.speed)
+	}
+	s.secureState = s.secureLocked()
+	if s.secureState != nil && (prevSecure == nil || *prevSecure != *s.secureState) {
+		events = append(events, pendingEvent{
+			closuredef.EventSecureStateChanged,
+			SecureStateChangedEvent{SecureValue: *s.secureState},
+			s.inst.EventPriority(closuredef.EventSecureStateChanged),
+		})
+	}
+	// A null Position means the drive's position is unknown, which the
+	// spec says plainly (matter.js closure-control.resource.ts:429-439:
+	// "If the closure doesn't know accurately its current state the value
+	// null shall be used"). Whether it is MOVING is a different question
+	// and a different attribute, answered by the model from the drive's
+	// own motion signal and delivered through [ControlServer.SetMainState]
+	// — reading it off the position made a stuck or unreferenced door
+	// report as perpetually in motion.
+	//
 	// The drive arrived at the target, so nothing is outstanding; a
 	// position on the way (PartiallyOpened while moving to FullyOpen) keeps
-	// it (W3-club1-05).
-	if s.targetPosition != nil && reachedTarget(*pos, *s.targetPosition) {
+	// it (W3-club1-05). The latch alike.
+	if p := s.currentPosition; r.setPosition && p != nil && s.targetPosition != nil && reachedTarget(*p, *s.targetPosition) {
 		s.targetPosition = nil
 	}
+	if l := s.currentLatch; r.setLatch && l != nil && s.targetLatch != nil && *l == *s.targetLatch {
+		s.targetLatch = nil
+	}
+}
+
+// secureLocked derives SecureState, "the closure is in a position that
+// secures the opening" (matter.js closure-control.element.ts:134-137):
+// unknown while the position is, false away from FullyClosed, and at
+// FullyClosed true — where the closure advertises MotionLatching, only
+// latched, unknown with an unknown latch. connectedhomeip refuses a true
+// SecureState otherwise (ClosureControlCluster.cpp:364-386 at 6170af84).
+func (s *ControlServer) secureLocked() *bool {
+	if s.currentPosition == nil {
+		return nil
+	}
+	secure := *s.currentPosition == wire.ClosureCurrentPositionFullyClosed
+	if secure && s.has(wire.ClosureControlFeatureMotionLatching) {
+		if s.currentLatch == nil {
+			return nil
+		}
+		secure = *s.currentLatch
+	}
+	return &secure
 }
 
 // reachedTarget reports whether a CurrentPositionEnum is the position a

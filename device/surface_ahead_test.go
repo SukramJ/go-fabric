@@ -11,8 +11,12 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/SukramJ/go-fabric/cluster/closure"
+	ccldef "github.com/SukramJ/go-fabric/cluster/spec/closurecontrol"
 	thermostatdef "github.com/SukramJ/go-fabric/cluster/spec/thermostat"
+	valvedef "github.com/SukramJ/go-fabric/cluster/spec/valveconfigurationandcontrol"
 	"github.com/SukramJ/go-fabric/cluster/thermo"
+	"github.com/SukramJ/go-fabric/cluster/valve"
 	"github.com/SukramJ/go-fabric/endpoint"
 	"github.com/SukramJ/go-fabric/surface"
 )
@@ -49,8 +53,16 @@ func TestAheadDeclarationsAreThermo(t *testing.T) {
 			t.Errorf("thermo.Ahead names feature 0x%X as %q, want %q", uint32(r.feature), got, r.row)
 		}
 	}
-	if !slices.Equal(aheadRows(), thermo.Ahead.IDs()) {
-		t.Errorf("aheadRows() = %v, want %v", aheadRows(), thermo.Ahead.IDs())
+	if !reflect.DeepEqual(aheadByCluster[ccldef.ClusterID], closure.Ahead) || !reflect.DeepEqual(aheadByCluster[valvedef.ClusterID], valve.Ahead) {
+		t.Fatal("the device layer's ClosureControl or Valve declaration is not the server package's Ahead")
+	}
+	var want []string
+	for _, s := range []surface.AheadSet{thermo.Ahead, closure.Ahead, valve.Ahead} {
+		want = append(want, s.IDs()...)
+	}
+	slices.Sort(want)
+	if !slices.Equal(aheadRows(), want) {
+		t.Errorf("aheadRows() = %v, want %v", aheadRows(), want)
 	}
 }
 

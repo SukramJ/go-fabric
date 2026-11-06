@@ -63,8 +63,8 @@ func TestDeclaredServersRefuseASelectionOrAPortTheyLack(t *testing.T) {
 		cluster uint32
 		build   defaultBuild
 	}{
-		{"Valve with a feature", valvedef.ClusterID, defaultBuild{
-			opts: spec.Options{Features: 1}, ports: valvedef.Declare{StateSource: fakeValve{}},
+		{"Valve with Level on a StateSource without LevelSource", valvedef.ClusterID, defaultBuild{
+			opts: spec.Options{Features: uint32(valvedef.FeatureLevel)}, ports: valvedef.Declare{StateSource: fakeValve{}},
 		}},
 		{"ServiceArea without a Selector", sadef.ClusterID, defaultBuild{def: sadef.Definition}},
 		{"ClosureControl with an unknown feature", ccldef.ClusterID, defaultBuild{

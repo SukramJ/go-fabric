@@ -162,6 +162,14 @@ type ClosureOverallCurrentState struct {
 	Position *ClosureCurrentPosition
 	// SecureState is field 3, conformance M, quality X.
 	SecureState *bool
+	// Latch is field 1, conformance LT, quality X: written — null for a
+	// nil pointer — only when HasLatch, the server advertising
+	// MotionLatching.
+	Latch    *bool
+	HasLatch bool
+	// Speed is field 2, conformance SP: written when non-nil, which a
+	// server advertising Speed always sets.
+	Speed *ccdef.ThreeLevelAutoEnum
 }
 
 // ClosureOverallTargetState is OverallTargetStateStruct (attribute
@@ -171,6 +179,12 @@ type ClosureOverallCurrentState struct {
 type ClosureOverallTargetState struct {
 	// Position is field 0, conformance PS, quality X.
 	Position *ClosureTargetPosition
+	// Latch is field 1, conformance LT, quality X: written — null for a
+	// nil pointer — only when HasLatch.
+	Latch    *bool
+	HasLatch bool
+	// Speed is field 2, conformance SP: written when non-nil.
+	Speed *ccdef.ThreeLevelAutoEnum
 }
 
 // EncodeTLV implements spec.Encodable with the generated codec of
@@ -185,8 +199,9 @@ func (l ClosureErrorList) EncodeTLV(enc *tlv.Encoder, tag tlv.Tag) {
 
 // EncodeTLV implements spec.Encodable with the generated
 // OverallCurrentStateStruct codec. Position is always written (null for a
-// nil pointer): the server always serves Positioning. Latch and Speed
-// stay out. A nil *ClosureOverallCurrentState is the attribute's null.
+// nil pointer): the server always serves Positioning. Latch is written
+// with HasLatch, Speed when set. A nil *ClosureOverallCurrentState is the
+// attribute's null.
 func (s *ClosureOverallCurrentState) EncodeTLV(enc *tlv.Encoder, tag tlv.Tag) {
 	if s == nil {
 		enc.PutNull(tag)
@@ -199,12 +214,13 @@ func (s *ClosureOverallCurrentState) EncodeTLV(enc *tlv.Encoder, tag tlv.Tag) {
 	if s.SecureState != nil {
 		out.SecureState = spec.Nullable[bool]{Value: *s.SecureState}
 	}
+	out.Latch, out.Speed = nullableLatch(s.HasLatch, s.Latch), s.Speed
 	out.EncodeTLV(enc, tag)
 }
 
 // EncodeTLV implements spec.Encodable with the generated
 // OverallTargetStateStruct codec. Position is always written (null for a
-// nil pointer); Latch and Speed stay out. A nil
+// nil pointer); Latch is written with HasLatch, Speed when set. A nil
 // *ClosureOverallTargetState is the attribute's null.
 func (s *ClosureOverallTargetState) EncodeTLV(enc *tlv.Encoder, tag tlv.Tag) {
 	if s == nil {
@@ -215,7 +231,20 @@ func (s *ClosureOverallTargetState) EncodeTLV(enc *tlv.Encoder, tag tlv.Tag) {
 	if s.Position != nil {
 		out.Position.Null, out.Position.Value = false, ccdef.TargetPositionEnum(*s.Position)
 	}
+	out.Latch, out.Speed = nullableLatch(s.HasLatch, s.Latch), s.Speed
 	out.EncodeTLV(enc, tag)
+}
+
+// nullableLatch is the Latch field of a state struct: absent without
+// MotionLatching, null for an unknown latch, the value otherwise.
+func nullableLatch(has bool, latch *bool) *spec.Nullable[bool] {
+	switch {
+	case !has:
+		return nil
+	case latch == nil:
+		return &spec.Nullable[bool]{Null: true}
+	}
+	return &spec.Nullable[bool]{Value: *latch}
 }
 
 // OverallCurrentState / OverallTargetState field tags.
