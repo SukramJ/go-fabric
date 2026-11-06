@@ -144,6 +144,12 @@ Owner decisions 2026-11-06, second wizard (after the four reports):
    `MTUExchange` (esphome checked); the live multicast test selects its
    node by discriminator; `node/commissioner_reach.go` sets the path flags.
 
+8. **`DatastoreSync.SyncBinding` dropped** (third wizard): after decision 5
+   the datastore calls it nowhere; a required port carries only what the
+   module calls. A second line under the same break, migration guide
+   updated. chip's delegate keeps the single-entry overload
+   (`JointFabricDatastore.h:189-194` at 6170af84); not mirrored, recorded.
+
 Decisions the brief takes itself (on record for the review):
 
 - **HTTPS is opt-in**, as matter.js's default list is BDX only:
