@@ -180,6 +180,11 @@ type ControlServer struct {
 	// currentLatch and targetLatch are the Latch fields (LT): nil is
 	// null. currentSpeed and targetSpeed are the Speed fields (SP), which
 	// carry no null: Auto until the drive or a MoveTo says otherwise.
+	// Each is replaced by a fresh pointer, never written through, so a
+	// read hands out the stored one: a stable pointer renders alike
+	// across reads (bridge reportInvokeChanges compares the rendered
+	// values, and a fresh copy per read reported an unchanged
+	// OverallCurrentState after every command).
 	currentLatch, targetLatch *bool
 	currentSpeed, targetSpeed *closuredef.ThreeLevelAutoEnum
 
@@ -294,16 +299,16 @@ func (s *ControlServer) MatterRead(attrID uint32) (value any, ok bool) {
 		return &wire.ClosureOverallCurrentState{
 			Position:    s.currentPosition,
 			SecureState: s.secureState,
-			Latch:       copyOf(s.currentLatch),
+			Latch:       s.currentLatch,
 			HasLatch:    s.has(wire.ClosureControlFeatureMotionLatching),
-			Speed:       copyOf(s.currentSpeed),
+			Speed:       s.currentSpeed,
 		}, true
 	case wire.ClosureControlAttrOverallTargetState:
 		return &wire.ClosureOverallTargetState{
 			Position: s.targetPosition,
-			Latch:    copyOf(s.targetLatch),
+			Latch:    s.targetLatch,
 			HasLatch: s.has(wire.ClosureControlFeatureMotionLatching),
-			Speed:    copyOf(s.targetSpeed),
+			Speed:    s.targetSpeed,
 		}, true
 	case wire.ClosureControlAttrLatchControlModes:
 		if !s.has(wire.ClosureControlFeatureMotionLatching) {

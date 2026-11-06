@@ -6,6 +6,7 @@ package closure_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"slices"
 	"strings"
 	"testing"
@@ -392,5 +393,24 @@ func TestClosureControlSetAttributesLatchSpeedChip(t *testing.T) {
 	ps.SetCurrentSpeed(closuredef.ThreeLevelAutoHigh)
 	if cur := readOverallCurrent(t, ps); cur.Latch != nil || cur.Speed != nil {
 		t.Errorf("PS-only current state = %+v", cur)
+	}
+}
+
+// TestClosureControlStateReadsRenderAlike: two reads of the state structs
+// render alike — the bridge compares rendered values before and after a
+// command to decide what to report (bridge reportInvokeChanges), so a
+// fresh pointer per read would report an unchanged OverallCurrentState
+// after every command, which TC-CLCTRL-5.1 step 4i reads as the latch it
+// waits for.
+func TestClosureControlStateReadsRenderAlike(t *testing.T) {
+	t.Parallel()
+	s := newFeatured(t, fPS|fLT|fSP, &fullMover{modes: bothLatchModes})
+	s.SetCurrentLatch(ptr(false))
+	for _, id := range []uint32{clusterwire.ClosureControlAttrOverallCurrentState, clusterwire.ClosureControlAttrOverallTargetState} {
+		a, _ := s.MatterRead(id)
+		b, _ := s.MatterRead(id)
+		if fmt.Sprintf("%#v", a) != fmt.Sprintf("%#v", b) {
+			t.Errorf("attribute 0x%X renders differently on two reads: %#v / %#v", id, a, b)
+		}
 	}
 }
