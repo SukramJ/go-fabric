@@ -794,9 +794,12 @@ func TestBtpSessionReportsStall(t *testing.T) {
 	if f.rec.len() != 2 {
 		t.Fatalf("writes %d", f.rec.len())
 	}
+	if f.s.Stalled() {
+		t.Fatal("stalled before the acknowledgement timeout")
+	}
 	f.clock.Advance(AckTimeout)
-	if stalled != 1 || isClosed(f.s) || f.disconnected.Load() {
-		t.Fatalf("stalled %d closed %v disconnected %v", stalled, isClosed(f.s), f.disconnected.Load())
+	if stalled != 1 || isClosed(f.s) || f.disconnected.Load() || !f.s.Stalled() {
+		t.Fatalf("stalled %d closed %v disconnected %v Stalled %v", stalled, isClosed(f.s), f.disconnected.Load(), f.s.Stalled())
 	}
 	if len(replayed) != 2 || !bytes.Equal(replayed[0], first) || !bytes.Equal(replayed[1], second) {
 		t.Fatalf("replayed %x", replayed)

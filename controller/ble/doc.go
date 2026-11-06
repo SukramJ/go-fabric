@@ -17,7 +17,9 @@
 // codec of packages/protocol/src/codec/BtpCodec.ts, and the central's
 // channel of packages/nodejs-ble/src/NobleBleChannel.ts (the BTP
 // handshake over C1 and C2, the session's writes on C1, C2 data into the
-// session, the disconnect by unsubscribing C2).
+// session, the disconnect by unsubscribing C2). The channel's
+// renegotiation at the minimum segment size after a stall follows
+// NobleBleChannel.ts at 862ad75f (BD-Matter-BTP-RenegotiationAfterStall).
 //
 // A BTP session is reliable, so the channel's exchange manager runs no
 // MRP (exchange.Config.Reliable; matter.js Ble.ts:38, Session.ts:355-356).

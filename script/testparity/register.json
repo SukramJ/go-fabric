@@ -5969,6 +5969,111 @@
       "snapshotSha": "eb4c08f0d95e02eefcb7abf1cbb8d2d24c0750e4"
     },
     {
+      "path": "packages/nodejs-ble/test/NobleBleChannelTest.ts",
+      "status": "ported",
+      "go": [
+        "controller/ble:TestNobleBleChannelAttMtuSettle",
+        "controller/ble:TestNobleBleChannelRenegotiation",
+        "controller/ble:TestNobleBleChannelRenegotiationLoss"
+      ],
+      "left": [
+        {
+          "it": "retries a connect reported as failed and gives up after three attempts",
+          "class": "js-runtime-only",
+          "reason": "noble's connect retries, interview and abort handling in NobleBleCentralInterface.openChannel (NobleBleChannel.ts:91-517): the platform's, behind the ble.Central seam — ble/bluez and ble/esphome connect on their own stacks and carry their own tests"
+        },
+        {
+          "it": "reports the last connect error as cause",
+          "class": "js-runtime-only",
+          "reason": "noble's connect retries, interview and abort handling in NobleBleCentralInterface.openChannel (NobleBleChannel.ts:91-517): the platform's, behind the ble.Central seam — ble/bluez and ble/esphome connect on their own stacks and carry their own tests"
+        },
+        {
+          "it": "retries a connect error reported as an Error instance",
+          "class": "js-runtime-only",
+          "reason": "noble's connect retries, interview and abort handling in NobleBleCentralInterface.openChannel (NobleBleChannel.ts:91-517): the platform's, behind the ble.Central seam — ble/bluez and ble/esphome connect on their own stacks and carry their own tests"
+        },
+        {
+          "it": "connects a peripheral a previous call left in the failed state",
+          "class": "js-runtime-only",
+          "reason": "noble's connect retries, interview and abort handling in NobleBleCentralInterface.openChannel (NobleBleChannel.ts:91-517): the platform's, behind the ble.Central seam — ble/bluez and ble/esphome connect on their own stacks and carry their own tests"
+        },
+        {
+          "it": "bounds the attempts when the connect error is reported from within connectAsync",
+          "class": "js-runtime-only",
+          "reason": "noble's connect retries, interview and abort handling in NobleBleCentralInterface.openChannel (NobleBleChannel.ts:91-517): the platform's, behind the ble.Central seam — ble/bluez and ble/esphome connect on their own stacks and carry their own tests"
+        },
+        {
+          "it": "continues with the connected peripheral once a retried connect succeeds",
+          "class": "js-runtime-only",
+          "reason": "noble's connect retries, interview and abort handling in NobleBleCentralInterface.openChannel (NobleBleChannel.ts:91-517): the platform's, behind the ble.Central seam — ble/bluez and ble/esphome connect on their own stacks and carry their own tests"
+        },
+        {
+          "it": "retries a link that drops while connecting and reports the disconnect reason as cause",
+          "class": "js-runtime-only",
+          "reason": "noble's connect retries, interview and abort handling in NobleBleCentralInterface.openChannel (NobleBleChannel.ts:91-517): the platform's, behind the ble.Central seam — ble/bluez and ble/esphome connect on their own stacks and carry their own tests"
+        },
+        {
+          "it": "keeps the peripheral reserved while a retry started from the interview runs",
+          "class": "js-runtime-only",
+          "reason": "noble's connect retries, interview and abort handling in NobleBleCentralInterface.openChannel (NobleBleChannel.ts:91-517): the platform's, behind the ble.Central seam — ble/bluez and ble/esphome connect on their own stacks and carry their own tests"
+        },
+        {
+          "it": "rejects without connecting when the abort signal is already set",
+          "class": "js-runtime-only",
+          "reason": "noble's connect retries, interview and abort handling in NobleBleCentralInterface.openChannel (NobleBleChannel.ts:91-517): the platform's, behind the ble.Central seam — ble/bluez and ble/esphome connect on their own stacks and carry their own tests"
+        },
+        {
+          "it": "stops retrying when the abort signal fires between attempts",
+          "class": "js-runtime-only",
+          "reason": "noble's connect retries, interview and abort handling in NobleBleCentralInterface.openChannel (NobleBleChannel.ts:91-517): the platform's, behind the ble.Central seam — ble/bluez and ble/esphome connect on their own stacks and carry their own tests"
+        },
+        {
+          "it": "leaves no abort listener behind once the attempts end",
+          "class": "js-runtime-only",
+          "reason": "noble's connect retries, interview and abort handling in NobleBleCentralInterface.openChannel (NobleBleChannel.ts:91-517): the platform's, behind the ble.Central seam — ble/bluez and ble/esphome connect on their own stacks and carry their own tests"
+        },
+        {
+          "it": "disconnects the peripheral when the abort lands during the interview",
+          "class": "js-runtime-only",
+          "reason": "noble's connect retries, interview and abort handling in NobleBleCentralInterface.openChannel (NobleBleChannel.ts:91-517): the platform's, behind the ble.Central seam — ble/bluez and ble/esphome connect on their own stacks and carry their own tests"
+        },
+        {
+          "it": "cancels a pending connect when the abort lands before the peripheral answers",
+          "class": "js-runtime-only",
+          "reason": "noble's connect retries, interview and abort handling in NobleBleCentralInterface.openChannel (NobleBleChannel.ts:91-517): the platform's, behind the ble.Central seam — ble/bluez and ble/esphome connect on their own stacks and carry their own tests"
+        },
+        {
+          "it": "rejects rather than throws when a disconnect-driven retry races the interface closing",
+          "class": "js-runtime-only",
+          "reason": "noble's connect retries, interview and abort handling in NobleBleCentralInterface.openChannel (NobleBleChannel.ts:91-517): the platform's, behind the ble.Central seam — ble/bluez and ble/esphome connect on their own stacks and carry their own tests"
+        },
+        {
+          "it": "closes a channel that completes after the caller aborted",
+          "class": "js-runtime-only",
+          "reason": "noble's connect retries, interview and abort handling in NobleBleCentralInterface.openChannel (NobleBleChannel.ts:91-517): the platform's, behind the ble.Central seam — ble/bluez and ble/esphome connect on their own stacks and carry their own tests"
+        },
+        {
+          "it": "bounds a disconnect that never completes after a failed channel setup",
+          "class": "js-runtime-only",
+          "reason": "noble leaves a disconnect pending for a vanished peripheral, so matter.js bounds it (BLE_DISCONNECT_TIMEOUT); a Go Connection.Disconnect returns, and a platform that cannot is the platform module's concern"
+        },
+        {
+          "it": "raises an abort during the unsubscribe that follows a handshake timeout",
+          "class": "by-design",
+          "reason": "the cleanup unsubscribe after a handshake timeout runs on a context that outlives the caller's and Dial reports ErrHandshakeTimeout, not the abort (BD-Matter-BTP-RenegotiationAfterStall)"
+        }
+      ],
+      "reason": "controller/ble/channel_parity_matterjs_test.go ports the ATT_MTU settle wait and the BTP renegotiation after a stall by meaning (phase 39): the bletest peripheral's Stall and Faults play handshakeOnlyMatterService, a synctest bubble on clocktest plays MockTime, a goroutine the parked send. The left cases are noble's connect handling, the platform's behind the ble.Central seam, and one recorded difference.",
+      "snapshotSha": "a503a1d478babcb72040f4f5dbaac2cbabef83ad"
+    },
+    {
+      "path": "packages/nodejs-ble/test/ScanControlTest.ts",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "ScanControl keeps noble's radio scan where BleScanner wants it, one radio call at a time (ScanControl.ts:24-30): the platform's scan arbitration behind the ble.Central seam (StartScanning, StopScanning), which ble/bluez and ble/esphome implement on their own stacks.",
+      "snapshotSha": "82e28dddce1c6e61a7c8f2d09316041efc0655e0"
+    },
+    {
       "path": "packages/nodejs/test/config/ConfigTest.ts",
       "status": "excluded",
       "class": "js-runtime-only",

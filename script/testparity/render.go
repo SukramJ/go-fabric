@@ -72,9 +72,9 @@ func matterjsIntro(snap *Snapshot) string {
 	fmt.Fprintf(&b, "matter.js pin `%s` (`parity/schema.json` → `matter.sourceCommit`): %d test files under %s.\n",
 		snap.Commit, len(snap.Files), joinCode(snap.Roots))
 	b.WriteString("Out of the roots, each for its reason: `packages/matter.js` (the umbrella package and its legacy controller API,\n")
-	b.WriteString("MatterController and PairedNode, whose behaviour the protocol and node roots hold), `packages/nodejs-ble` (Node.js BLE\n")
-	b.WriteString("bindings over noble; the module's BLE is its own Go transport), `packages/nodejs-ws` (a WebSocket transport the module\n")
-	b.WriteString("does not have), `packages/testing` (matter.js's test harness) and `support/codegen` (its TypeScript tooling).\n")
+	b.WriteString("MatterController and PairedNode, whose behaviour the protocol and node roots hold), `packages/nodejs-ws` (a WebSocket\n")
+	b.WriteString("transport the module does not have), `packages/testing` (matter.js's test harness) and `support/codegen` (its TypeScript\n")
+	b.WriteString("tooling). `packages/nodejs-ble/test` is in the roots since phase 39: its channel's BTP renegotiation is ported.\n")
 	return b.String()
 }
 

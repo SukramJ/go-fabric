@@ -153,6 +153,7 @@ var snapshotRoots = []string{
 	"packages/model/test",
 	"packages/node/test",
 	"packages/nodejs/test",
+	"packages/nodejs-ble/test",
 	"packages/protocol/test",
 	"packages/thread-br-client/test",
 	"packages/types/test",

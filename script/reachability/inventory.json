@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 7672,
+  "entry_points": 7676,
   "entry_packages": [
     ".",
     "bdx",
@@ -279,8 +279,8 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 17643,
-    "reachable": 12301,
+    "total_exported": 17647,
+    "reachable": 12305,
     "whitelisted": 5342,
     "unreachable": 0
   },
@@ -36545,28 +36545,28 @@
       "identifier": "TestBtpSessionClosesAtMinimumSegmentSize",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/btp/session_parity_matterjs_test.go",
-      "line": 815
+      "line": 818
     },
     {
       "package": "transport/btp",
       "identifier": "TestBtpSessionClosesOncePeerSentAnything",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/btp/session_parity_matterjs_test.go",
-      "line": 930
+      "line": 933
     },
     {
       "package": "transport/btp",
       "identifier": "TestBtpSessionClosesWhenNobodyObservesStall",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/btp/session_parity_matterjs_test.go",
-      "line": 806
+      "line": 809
     },
     {
       "package": "transport/btp",
       "identifier": "TestBtpSessionClosesWhenOnlyStandaloneAckUnanswered",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/btp/session_parity_matterjs_test.go",
-      "line": 916
+      "line": 919
     },
     {
       "package": "transport/btp",
@@ -36601,7 +36601,7 @@
       "identifier": "TestBtpSessionFailedWriteNeverReplays",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/btp/session_parity_matterjs_test.go",
-      "line": 826
+      "line": 829
     },
     {
       "package": "transport/btp",
@@ -36622,14 +36622,14 @@
       "identifier": "TestBtpSessionKeepsOfferedSegmentSize",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/btp/session_parity_matterjs_test.go",
-      "line": 1023
+      "line": 1026
     },
     {
       "package": "transport/btp",
       "identifier": "TestBtpSessionLateWriteFailureAfterStall",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/btp/session_parity_matterjs_test.go",
-      "line": 989
+      "line": 992
     },
     {
       "package": "transport/btp",
@@ -36643,7 +36643,7 @@
       "identifier": "TestBtpSessionNoAckForMessageWhoseHandlerClosed",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/btp/session_parity_matterjs_test.go",
-      "line": 858
+      "line": 861
     },
     {
       "package": "transport/btp",
@@ -36685,7 +36685,7 @@
       "identifier": "TestBtpSessionNothingWrittenAfterCloseDuringStandaloneAck",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/btp/session_parity_matterjs_test.go",
-      "line": 877
+      "line": 880
     },
     {
       "package": "transport/btp",
@@ -36762,7 +36762,7 @@
       "identifier": "TestBtpSessionStopsWritingSuspendedFragments",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/btp/session_parity_matterjs_test.go",
-      "line": 953
+      "line": 956
     },
     {
       "package": "transport/btp",

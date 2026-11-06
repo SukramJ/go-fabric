@@ -5978,22 +5978,47 @@ window TC-ZONEMGMT-2.4 allows (`TC_ZONEMGMT_2_4.py:279-285`). TESTING ONLY, off 
 stream, PTZ and chime state is kept in `--db` as
 `BD-Matter-CameraPersistenceIsTheHosts` leaves it to the host.
 
-### BD-Matter-BTP-NoStallRenegotiation — a BTP central that stalls after the handshake is not re-established with a smaller segment size
+### BD-Matter-BTP-RenegotiationAfterStall — a BTP central that stalls after the handshake is re-established once at the minimum segment size, as matter.js's channel does
 
-matter.js's `BtpSessionHandler` reports a session whose first messages are
-never acknowledged in submission order (`stalledAfterHandshake`,
-`packages/protocol/src/ble/BtpSessionHandler.ts:53-82` at `862ad75f`), and
-its own comment calls the remedy "an interop workaround with no basis in
-the specification": the noble transport may establish a fresh session with
-a smaller segment size and resend the messages (`NobleBleChannel.ts`, the
-handshake :591-630 with the segment size derived from the ATT MTU, :40-41,
-:523). `transport/btp` and `controller/ble` report the stall and close the
-session on the acknowledgement timeout, as a transport that cannot
-renegotiate does in matter.js (:79), and do not re-establish it: the
-workaround targets peripherals matter.js met through noble, none of which
-this module's `ble/bluez` or `ble/esphome` paths have shown; a stall seen
-in the field reopens this entry as a finding. Recorded at the milestone-6
-sweep (report 27-C, 2026-10-29).
+matter.js's `BtpSessionHandler` reports a central session above the minimum
+segment size whose peer completed the handshake and then sent no BTP packet
+before the acknowledgement timeout, although it was sent Matter data
+(`stalledAfterHandshake`, `packages/protocol/src/ble/BtpSessionHandler.ts:67-84`
+at `862ad75f`), and its own comment calls the remedy "an interop workaround
+with no basis in the specification": "Some peripherals were observed to
+behave this way with large segments on Bluetooth 4.1 adapters and to work
+with the minimum segment size; the cause is not established." Its central
+channel acts on the report (`packages/nodejs-ble/src/NobleBleChannel.ts:835`,
+`:864-889` `#startRenegotiation` — at most once per channel, every send
+awaits it, a failure closes the channel unless the channel is closing;
+`:891-918` `#renegotiate` — the C2 handler detached, C2 unsubscribed, a new
+handshake with `MINIMUM_ATT_MTU`, the session adopted, the unacknowledged
+messages replayed in order; `:920-926` the channel lost meanwhile ends it).
+connectedhomeip closes the endpoint when its acknowledgement timer fires
+(`src/ble/BLEEndPoint.cpp:1454-1464` at `6170af84`,
+`HandleAckReceivedTimeout`: "ack recv timeout, closing ep",
+`DoClose(kBleCloseFlag_AbortTransmission, BLE_ERROR_FRAGMENT_ACK_TIMED_OUT)`).
+Here `controller/ble.Channel` mirrors matter.js (phase 39): the session
+half (`transport/btp.Session.OnStall`, `Suspend`) reports the stall, the
+channel swaps the session behind its `btp.Conn` (`Channel.Conn` is the
+current one), `Channel.Send` waits for a renegotiation in flight and
+answers `ErrChannelClosed` when the channel is lost meanwhile, a failed
+renegotiation or a lost connection closes the channel, and `Dial` waits up
+to `ATTMTUSettleTimeout` (2 s, `NobleBleChannel.ts:40-41`, `:526-567` at
+`862ad75f`) for a connection that reports its ATT_MTU exchange
+(`ble.MTUExchange`) before it sizes the segment. The workaround is adopted
+as matter.js's production-hardened behaviour (the order of authority:
+matter.js decides where it models something), and recorded here because
+the specification neither describes nor forbids it and connectedhomeip does
+not do it. One Go-side difference: the cleanup unsubscribe after a
+handshake timeout runs on a context that outlives the caller's and `Dial`
+reports `ErrHandshakeTimeout`, where matter.js raises its `AbortedError`
+when the abort lands during that unsubscribe
+(`packages/nodejs-ble/test/NobleBleChannelTest.ts:1075-1097` at `862ad75f`);
+the register leaves that case. Supersedes `BD-Matter-BTP-NoStallRenegotiation`
+(report 27-C, 2026-10-29), which recorded the absence. Proof:
+`controller/ble/channel_parity_matterjs_test.go` over the `bletest`
+peripheral's `Stall` and `Faults`; no chip-tool leg exists (no BTP family).
 
 ### BD-Matter-GeneratedServerSuffices — clusters whose generated server is complete: no source carries behaviour beyond the model
 

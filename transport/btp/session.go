@@ -108,6 +108,8 @@ type Session struct {
 	pendingFirstAck [][]byte
 	pendingLive     bool
 	onStall         func(replay [][]byte)
+	// stalled is the session suspended by its stall report.
+	stalled bool
 
 	ackReceiveTimer, sendAckTimer, idleTimer *sessionTimer
 
@@ -290,6 +292,18 @@ func (s *Session) OnStall(f func(replay [][]byte)) {
 	s.mu.Lock()
 	s.onStall = f
 	s.mu.Unlock()
+}
+
+// Stalled reports whether the session was suspended by its stall report.
+// matter.js suspends and emits in one synchronous step
+// (BtpSessionHandler.ts:656-657 at 862ad75f); here the observer runs
+// after the lock is released, so a transport whose Send met the inactive
+// session in between asks this and waits for the renegotiation the
+// report starts.
+func (s *Session) Stalled() bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.stalled
 }
 
 // HandleIncoming takes one BTP packet from the GATT layer and hands every
@@ -653,7 +667,7 @@ func (s *Session) ackTimeoutTriggered() {
 		s.log.Debug("matter.btp.stall", slog.Int("fragment_size", s.fragmentSize))
 		s.pendingFirstAck, s.pendingLive = nil, false
 		s.stopTimersLocked()
-		s.active = false
+		s.active, s.stalled = false, true
 		observer := s.onStall
 		s.mu.Unlock()
 		observer(replay)
