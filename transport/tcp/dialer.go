@@ -16,8 +16,9 @@ import (
 // #connect). The connection uses the same framing and handler contract
 // as an inbound one. The zero value is usable.
 type Dialer struct {
-	// MaxPayloadSize is the maximum frame size. Zero means
-	// [DefaultMaxPayloadSize] (TcpTransport.ts:62).
+	// MaxPayloadSize is the largest message a connection sends or
+	// receives, the length prefix not counted (TcpChannel.ts:37-41 at
+	// db021da0). Zero means [DefaultMaxPayloadSize].
 	MaxPayloadSize int
 	// Logger receives the connections' log lines. nil means
 	// slog.Default.

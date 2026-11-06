@@ -436,6 +436,7 @@
     "line": 556,
     "citation": "MessageExchange.ts:435-439",
     "resolved": "packages/protocol/src/protocol/MessageExchange.ts",
+    "at": "db021da0",
     "identifier": "maxPayloadSize",
     "nearest": 465,
     "occurrences": 3
@@ -784,7 +785,7 @@
   },
   {
     "file": "client/exchange/channel.go",
-    "line": 57,
+    "line": 60,
     "citation": "packages/protocol/src/protocol/ExchangeManager.ts:651-665",
     "resolved": "packages/protocol/src/protocol/ExchangeManager.ts",
     "identifier": "TransportClosedError",
@@ -793,7 +794,7 @@
   },
   {
     "file": "client/exchange/channel.go",
-    "line": 129,
+    "line": 132,
     "citation": "ExchangeManager.ts:668-710",
     "resolved": "packages/protocol/src/protocol/ExchangeManager.ts",
     "identifier": "#closeTcpChannelIfLastSession",
@@ -802,7 +803,7 @@
   },
   {
     "file": "client/exchange/channel.go",
-    "line": 185,
+    "line": 188,
     "citation": "support/chip-testing/src/cert/InProcessControllerAdapter.ts:1707-1735",
     "resolved": "support/chip-testing/src/cert/InProcessControllerAdapter.ts",
     "identifier": "severTransportConnection",
@@ -820,7 +821,7 @@
   },
   {
     "file": "client/exchange/errors.go",
-    "line": 118,
+    "line": 127,
     "citation": "NodeSession.ts:305-309",
     "resolved": "packages/protocol/src/session/NodeSession.ts",
     "identifier": "handlePeerClose",
@@ -883,7 +884,7 @@
   },
   {
     "file": "client/exchange/exchange.go",
-    "line": 553,
+    "line": 556,
     "citation": "MessageExchange.ts:987-997",
     "resolved": "packages/protocol/src/protocol/MessageExchange.ts",
     "identifier": "#endAckWait",
@@ -892,7 +893,7 @@
   },
   {
     "file": "client/exchange/exchange.go",
-    "line": 594,
+    "line": 597,
     "citation": "MessageExchange.ts:1215-1222",
     "resolved": "packages/protocol/src/protocol/MessageExchange.ts",
     "identifier": "#sendAdditionalDelay",

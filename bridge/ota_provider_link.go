@@ -555,9 +555,8 @@ func (e *initiatedSecureExchange) Receive(ctx context.Context) (bdx.Message, err
 // message overhead, as matter.js MessageExchange.maxPayloadSize computes
 // it (MessageExchange.ts:435-439) — over UDP [exchangeMaxPayloadSize],
 // over a TCP connection the connection's largest message
-// (tcp.Conn.MaxMessageSize, the frame less its length prefix; matter.js
-// subtracts from the frame size, TcpChannel.ts:47, :115-117) less the same
-// overhead.
+// (tcp.Conn.MaxMessageSize, MAX_TCP_MESSAGE_SIZE without the length
+// prefix, TcpChannel.ts:37-41 at db021da0) less the same overhead.
 func (e *initiatedSecureExchange) MaxPayloadSize() int {
 	if r, ok := e.route().(*connRoute); ok && r != nil && r.conn != nil && r.conn.Reliable() {
 		if m, ok := r.conn.(interface{ MaxMessageSize() int }); ok {

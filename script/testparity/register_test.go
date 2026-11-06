@@ -117,9 +117,10 @@ const testparityPlannedRatchet = 12
 // merged with wave P1: 149 ported, 1024 missing.
 // Pin lift wave P4 (#433): CommissioningClosedSessionReArmTest.ts ported, ConnectionStateTest.ts's two no-address cases: 150 ported, 1022 missing.
 // Pin lift wave P4 (#433): InputChunkTest.ts completed by the nine resolved-timestamp cases, ClientEventNotificationTest.ts's resolved delivery: 151 ported, 1012 missing.
+// Pin lift wave P4 (#433): the TCP limit cases of matter.js #4793 in MessageChannelTest.ts, TcpChannelTest.ts, SessionParametersTest.ts and BdxTest.ts: 998 missing.
 const (
 	testparityPortedRatchet  = 151
-	testparityMissingRatchet = 1012
+	testparityMissingRatchet = 998
 )
 
 // testparityLeftRatchet is the number of left it cases summed over the

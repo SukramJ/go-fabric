@@ -53,6 +53,15 @@ var (
 	// ack-only send answered with data (MessageExchange.ts:815-817).
 	ErrUnexpectedMessage = errors.New("exchange: unexpected message")
 
+	// ErrMessageTooLarge is a message above the TCP limit of its session —
+	// the peer's announced MAX_TCP_MESSAGE_SIZE under the channel's own —
+	// refused instead of sent: the peer would close the connection, which
+	// ends every exchange on it. Not transient: the caller splits the
+	// message by [Session.MaxPayloadSize]. Mirrors matter.js
+	// MessageTooLargeError (packages/protocol/src/protocol/errors.ts:32-38
+	// at db021da0), thrown by MessageChannel.ts:106-112.
+	ErrMessageTooLarge = errors.New("exchange: message exceeds the TCP limit")
+
 	// ErrNoSessionID is returned when every session id is taken and no
 	// session can be closed to free one (SessionManager.ts:515-523).
 	ErrNoSessionID = errors.New("exchange: no session id available")

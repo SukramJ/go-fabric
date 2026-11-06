@@ -10,13 +10,12 @@
 //
 // Framing: every Matter message is preceded by its length as a 4-byte
 // little-endian uint32 (TcpChannel.ts:37-41, FRAMING_HEADER_SIZE = 4 at
-// :28). The configured maximum payload size counts the whole frame, so
-// a message may carry at most MaxPayloadSize-4 bytes (:114-116); a
-// larger send is refused (:125-126) and a larger announced length, or a
-// zero one, closes the connection (:260-271). Received bytes not yet
-// forming a message are bounded at twice the maximum payload size, past
-// which the connection is closed (MAX_RECEIVE_BUFFER_FACTOR = 2, :32,
-// :212-218).
+// :28). The configured maximum payload size is MAX_TCP_MESSAGE_SIZE,
+// the length prefix not counted, so a message may carry MaxPayloadSize
+// bytes (TcpChannel.ts:37-41 at db021da0); a larger send is refused
+// (:116-120) and a larger announced length, or a zero one, closes the
+// connection (:241-256). The received bytes have no cap of their own: the
+// header check bounds an incomplete message (:204).
 //
 // Listener (TcpTransport.ts:78-110): at most three connections per peer
 // IP address (MAX_CONNECTIONS_PER_PEER_IP, :27-28); an inbound

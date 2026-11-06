@@ -483,6 +483,9 @@ func (x *Exchange) transmitLocked(opcode uint8, payload []byte, ackFor *uint32) 
 	if err != nil {
 		return nil, err
 	}
+	if err := x.session.checkSize(datagram); err != nil {
+		return nil, err
+	}
 	if x.onSend != nil {
 		x.onSend(0)
 	}

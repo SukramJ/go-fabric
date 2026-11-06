@@ -6847,15 +6847,15 @@
         "bdx:TestServe_AbortedTransfers",
         "bdx:TestBdxSuccessfulTransfers",
         "bdx:TestBdxPerBlockDebugLogging",
-        "bdx:TestBdxErrorCases"
+        "bdx:TestBdxErrorCases",
+        "bdx:TestReceive_BlockSizeAtMost16Bit"
       ],
       "missing": [
         "Block/BlockEof/BlockAck/BlockAckEof count blocks from zero (Sender-Driver)",
         "BlockQuery carries an ascending block counter starting at 0 (Receiver-Driver)",
-        "sessionId and sessionActiveTimestamp are accessible after transfer completes",
-        "Proposes at most a 16-bit maxBlockSize on a channel with a larger payload size"
+        "sessionId and sessionActiveTimestamp are accessible after transfer completes"
       ],
-      "reason": "Every successful transfer (all sizes, drive modes, designators and partial transfers), the responder's reported parameters and every error case run between Send / Receive and a Responder with the messages of both sides recorded; the two per-block logging cases assert the log context BdxMessenger.ts:140-200 attaches to each sent message, which the Go messenger does not log, and the getters case reads the initiator BdxClient's secure session, an object the Go initiator API (which takes an Exchange) does not have.",
+      "reason": "Every successful transfer (all sizes, drive modes, designators and partial transfers), the responder's reported parameters and every error case run between Send / Receive and a Responder with the messages of both sides recorded; the two per-block logging cases assert the log context BdxMessenger.ts:140-200 attaches to each sent message, which the Go messenger does not log, and the getters case reads the initiator BdxClient's secure session, an object the Go initiator API (which takes an Exchange) does not have. Pin lift wave P4 (#433): an exchange carrying more than 65539 bytes offers a 16-bit block size (bdx:TestReceive_BlockSizeAtMost16Bit, the receiving initiator; the sending one shares the computation).",
       "snapshotSha": "33029b4c048a97b9e01895c6f3cad0076b501c20"
     },
     {
@@ -8503,20 +8503,14 @@
       "path": "packages/protocol/test/protocol/MessageChannelTest.ts",
       "status": "partial",
       "go": [
-        "client/exchange:TestMessageChannelSocketSwap"
+        "client/exchange:TestMessageChannelSocketSwap",
+        "client/exchange:TestMessageChannelTCPLimitParity"
       ],
       "missing": [
         "stops observing the transport channel address without closing the channel",
-        "closes the transport channel of an unreliable transport on close",
-        "caps a TCP channel at the MAX_TCP_MESSAGE_SIZE the peer announced",
-        "does not cap a TCP channel below the UDP message size",
-        "ignores the peer",
-        "keeps the own TCP limit when the peer announces a larger one",
-        "refuses a message above the peer",
-        "uses the spec default for a TCP peer that announces no limit",
-        "uses the spec default for a peer that announces no TCP support"
+        "closes the transport channel of an unreliable transport on close"
       ],
-      "reason": "The socket swap is ported against Session.SetAddr (the Go MessageChannel is folded into the Session and has no address observable, so the change is held as the reported and used address); the release cases have no Go counterpart, because every session sends on the manager's one socket and owns no transport channel to release or close.",
+      "reason": "The socket swap is ported against Session.SetAddr (the Go MessageChannel is folded into the Session and has no address observable, so the change is held as the reported and used address); the release cases have no Go counterpart, because every session sends on the manager's one socket and owns no transport channel to release or close. Pin lift wave P4 (#433): the TCP limit of matter.js #4793 — the peer's MAX_TCP_MESSAGE_SIZE under the channel's own, the spec default without one, never below the UDP message size, a larger message refused with ErrMessageTooLarge before it reaches the channel — on a session bound to a fake TCP channel; the two non-TCP cases as a session without a channel (client/exchange:TestMessageChannelTCPLimitParity).",
       "snapshotSha": "59cf9deb0ce2a262ea2ab36284f76100dd5f1f0d"
     },
     {
@@ -8841,15 +8835,14 @@
         "client/exchange:TestSessionParameters",
         "client/exchange:TestSessionParametersMaxPathsPerInvoke",
         "client/exchange:TestSessionParametersTCPSpecVersionGate",
-        "client/exchange:TestSessionParametersReported"
+        "client/exchange:TestSessionParametersReported",
+        "client/exchange:TestSessionParametersMaxTCPMessageSizeParity"
       ],
       "missing": [
         "assumes one for a persisted limit the wire could not have carried",
-        "keeps supported transports given as an object",
-        "honors a peer-reported limit below the default",
-        "uses the spec default when the peer reports zero"
+        "keeps supported transports given as an object"
       ],
-      "reason": "The factory (exchange.PeerParameters: intervals over one hour, the maxPathsPerInvoke fallbacks, the TCP spec-version gate) and reported (the decoded sessionparams.Parameters) are ported; the untyped persisted values (NaN, 2.5, \"10\", null, …) and the object form of supportedTransports are JavaScript-only shapes a Go uint16 bitmap field cannot hold.",
+      "reason": "The factory (exchange.PeerParameters: intervals over one hour, the maxPathsPerInvoke fallbacks, the TCP spec-version gate) and reported (the decoded sessionparams.Parameters) are ported; the untyped persisted values (NaN, 2.5, \"10\", null, …) and the object form of supportedTransports are JavaScript-only shapes a Go uint16 bitmap field cannot hold. Pin lift wave P4 (#433): a TCP peer's limit below the default kept, 0 taking the default (client/exchange:TestSessionParametersMaxTCPMessageSizeParity).",
       "snapshotSha": "dc94995d451ae0b0e6c2637e8015e28c140d95b9"
     },
     {
@@ -8937,13 +8930,9 @@
         "transport/tcp:TestTcpChannelAsyncIteration"
       ],
       "missing": [
-        "callback listeners take priority over iterator queue",
-        "accepts a message of exactly MAX_TCP_MESSAGE_SIZE, which excludes the length header",
-        "accepts several messages at a small limit arriving in one chunk",
-        "accepts two maximum-size messages arriving in one chunk",
-        "rejects a message one byte over MAX_TCP_MESSAGE_SIZE"
+        "callback listeners take priority over iterator queue"
       ],
-      "reason": "Framing, send after close, properties, name, both size limits, zero-length frames, close and the message stream (Handler then Closed for the async iterator) are ported on a net.Pipe pair; the listener-over-iterator priority has no Go counterpart, as tcp.Conn has a single delivery path (the Handler).",
+      "reason": "Framing, send after close, properties, name, both size limits, zero-length frames, close and the message stream (Handler then Closed for the async iterator) are ported on a net.Pipe pair; the listener-over-iterator priority has no Go counterpart, as tcp.Conn has a single delivery path (the Handler). Pin lift wave P4 (#433): MAX_TCP_MESSAGE_SIZE excludes the length header and several complete frames in one read are all taken (transport/tcp:TestTcpChannelOversizedMessageHandling, matter.js #4793).",
       "snapshotSha": "9fbb1298c1a469d731d088e2d30b02ae87323ce9"
     },
     {
