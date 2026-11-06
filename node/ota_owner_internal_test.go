@@ -4,6 +4,9 @@
 package node
 
 import (
+	"context"
+	"net/http"
+	"path/filepath"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -50,3 +53,31 @@ func TestOtaApplierCloseWaitsForTheRestart(t *testing.T) {
 		t.Fatalf("restart ran %d times, want once", n)
 	}
 }
+
+// TestBuildOtaRequestorTransferProtocols: OTAConfig's HTTPS fields reach the
+// requestor — a list with HTTPS builds, a protocol the requestor cannot
+// download over fails the build.
+func TestBuildOtaRequestorTransferProtocols(t *testing.T) {
+	t.Parallel()
+	build := func(protocols ...OTADownloadProtocol) error {
+		cfg := &Config{OTA: &OTAConfig{
+			Dir: filepath.Join(t.TempDir(), "ota"), Applier: nopOTAApplier{},
+			TransferProtocols: protocols, HTTPClient: http.DefaultClient, HTTPSMaxImageSize: 1 << 20, HTTPSTimeout: time.Minute,
+		}}
+		_, _, err := buildOtaRequestor(cfg, nil, &mattercore.BasicInformation{})
+		return err
+	}
+	if err := build(OTADownloadBDXSynchronous, OTADownloadHTTPS); err != nil {
+		t.Fatal(err)
+	}
+	if err := build(OTADownloadBDXSynchronous, OTADownloadProtocol(3)); err == nil {
+		t.Fatal("a vendor-specific protocol built")
+	}
+}
+
+type nopOTAApplier struct{}
+
+func (nopOTAApplier) RequestUserConsent(context.Context, uint32, string) (bool, error) {
+	return false, nil
+}
+func (nopOTAApplier) ApplyUpdate(context.Context, uint32, string) error { return nil }
