@@ -198,6 +198,16 @@ func derDN(name asn1.RawValue) (DistinguishedName, error) {
 	if err != nil {
 		return dn, fmt.Errorf("%w: invalid subject/issuer structure", ErrMalformed)
 	}
+	var seen []asn1.ObjectIdentifier
+	once := func(oid asn1.ObjectIdentifier) error {
+		for _, k := range seen {
+			if k.Equal(oid) {
+				return fmt.Errorf("%w: dn attribute %s repeated", ErrMalformed, oid)
+			}
+		}
+		seen = append(seen, oid)
+		return nil
+	}
 	for _, set := range rdns {
 		attrs, err := derChildren(set.Bytes)
 		if err != nil {
@@ -221,6 +231,18 @@ func derDN(name asn1.RawValue) (DistinguishedName, error) {
 				return v, nil
 			}
 			switch {
+			case oid.Equal(oidMatterNodeID), oid.Equal(oidMatterICACID), oid.Equal(oidMatterRCACID), oid.Equal(oidMatterFabricID), oid.Equal(oidMatterVVSID):
+				if err := once(oid); err != nil {
+					return dn, err
+				}
+			}
+			switch {
+			case oid.Equal(oidMatterVVSID):
+				if dn.MatterVVSID, err = id(64); err != nil {
+					return dn, err
+				}
+				dn.HasVVSID = true
+				dn.Order = append(dn.Order, dnTagMatterVVSID)
 			case oid.Equal(oidMatterNodeID):
 				if dn.MatterNodeID, err = id(64); err != nil {
 					return dn, err

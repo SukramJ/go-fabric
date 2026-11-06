@@ -68,6 +68,7 @@ var (
 	oidMatterRCACID      = asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 37244, 1, 4}
 	oidMatterFabricID    = asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 37244, 1, 5}
 	oidMatterCASEAuthTag = asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 37244, 1, 6}
+	oidMatterVVSID       = asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 37244, 1, 7}
 	// oidDomainComponent is domainComponent (0.9.2342.19200300.100.1.25),
 	// an IA5String — matter.js X520.DomainComponent.
 	oidDomainComponent = asn1.ObjectIdentifier{0, 9, 2342, 19200300, 100, 1, 25}
@@ -214,6 +215,8 @@ func buildDN(dn DistinguishedName) []asn1.RawValue {
 			emit(oidMatterNodeID, hex16(dn.MatterNodeID))
 		case dnTagMatterFabricID:
 			emit(oidMatterFabricID, hex16(dn.MatterFabricID))
+		case dnTagMatterVVSID:
+			emit(oidMatterVVSID, hex16(dn.MatterVVSID))
 		case dnTagMatterCASEAuth:
 			if catIdx < len(dn.CASEAuthTags) {
 				emit(oidMatterCASEAuthTag, hex8(dn.CASEAuthTags[catIdx]))

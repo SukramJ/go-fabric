@@ -10,6 +10,7 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 
@@ -38,6 +39,12 @@ type verifyTestCertOpts struct {
 	subjectHasFabricID bool
 	subjectFabricID    uint64
 	subjectCATs        []uint32
+	// subjectVVSID adds a matter-vvs-id (tag 23); subjectRepeatNodeID
+	// encodes the node id twice; subjectExtraRDNs adds that many
+	// commonName attributes (pin db021da0: the DN limits).
+	subjectVVSID        *uint64
+	subjectRepeatNodeID bool
+	subjectExtraRDNs    int
 	// key
 	pubKey []byte
 	// extensions — zero values take the spec shape for the subject kind
@@ -152,6 +159,15 @@ func buildTBSCert(t *testing.T, opts verifyTestCertOpts) []byte {
 	for _, cat := range opts.subjectCATs {
 		e.PutUint(tlv.ContextTag(22), uint64(cat))
 	}
+	if opts.subjectVVSID != nil {
+		e.PutUint(tlv.ContextTag(23), *opts.subjectVVSID)
+	}
+	if opts.subjectRepeatNodeID {
+		e.PutUint(tlv.ContextTag(17), opts.subjectNodeID)
+	}
+	for i := 0; i < opts.subjectExtraRDNs; i++ {
+		e.PutUTF8(tlv.ContextTag(3), fmt.Sprintf("cn%d", i)) // commonName
+	}
 	if err := e.EndContainer(); err != nil {
 		t.Fatalf("EndContainer subject: %v", err)
 	}
@@ -255,6 +271,15 @@ func buildSignedCert(t *testing.T, opts verifyTestCertOpts, priv *ecdsa.PrivateK
 	}
 	for _, cat := range opts.subjectCATs {
 		e.PutUint(tlv.ContextTag(22), uint64(cat))
+	}
+	if opts.subjectVVSID != nil {
+		e.PutUint(tlv.ContextTag(23), *opts.subjectVVSID)
+	}
+	if opts.subjectRepeatNodeID {
+		e.PutUint(tlv.ContextTag(17), opts.subjectNodeID)
+	}
+	for i := 0; i < opts.subjectExtraRDNs; i++ {
+		e.PutUTF8(tlv.ContextTag(3), fmt.Sprintf("cn%d", i)) // serialNumber (tag 3), a standard attribute
 	}
 	if err := e.EndContainer(); err != nil {
 		t.Fatalf("EndContainer subject2: %v", err)
