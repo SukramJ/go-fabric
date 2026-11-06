@@ -550,16 +550,22 @@ func (c *Channel) deliver(msg []byte) error {
 // loss downstream").
 func (c *Channel) Send(_ *net.UDPAddr, payload []byte) error {
 	for {
+		// The renegotiation and the session are read in one critical
+		// section: a session swapped in by a renegotiation this send has
+		// not seen would carry the payload ahead of the replay.
 		c.mu.Lock()
-		wait := c.renegotiation
-		c.mu.Unlock()
-		if wait != nil {
+		if wait := c.renegotiation; wait != nil {
 			select {
 			case <-wait:
-			case <-c.life.ctx.Done():
+			default:
+				c.mu.Unlock()
+				select {
+				case <-wait:
+				case <-c.life.ctx.Done():
+				}
+				c.mu.Lock()
 			}
 		}
-		c.mu.Lock()
 		usable, conn := c.usableLocked(), c.btpConn
 		c.mu.Unlock()
 		if !usable {
