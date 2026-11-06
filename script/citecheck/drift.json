@@ -848,7 +848,7 @@
   },
   {
     "file": "client/exchange/exchange.go",
-    "line": 312,
+    "line": 329,
     "citation": "MessageExchange.ts:410-413",
     "resolved": "packages/protocol/src/protocol/MessageExchange.ts",
     "identifier": "retransmissionCount",
@@ -857,16 +857,7 @@
   },
   {
     "file": "client/exchange/exchange.go",
-    "line": 327,
-    "citation": "MessageExchange.ts:1258-1266",
-    "resolved": "packages/protocol/src/protocol/MessageExchange.ts",
-    "identifier": "retransmissionRestartSaving",
-    "nearest": 1305,
-    "occurrences": 1
-  },
-  {
-    "file": "client/exchange/exchange.go",
-    "line": 338,
+    "line": 356,
     "citation": "MessageExchange.ts:376-378",
     "resolved": "packages/protocol/src/protocol/MessageExchange.ts",
     "identifier": "considerClosed",
@@ -875,7 +866,7 @@
   },
   {
     "file": "client/exchange/exchange.go",
-    "line": 348,
+    "line": 366,
     "citation": "MessageExchange.ts:376-378",
     "resolved": "packages/protocol/src/protocol/MessageExchange.ts",
     "identifier": "considerClosed",
@@ -884,7 +875,7 @@
   },
   {
     "file": "client/exchange/exchange.go",
-    "line": 556,
+    "line": 575,
     "citation": "MessageExchange.ts:987-997",
     "resolved": "packages/protocol/src/protocol/MessageExchange.ts",
     "identifier": "#endAckWait",
@@ -893,7 +884,7 @@
   },
   {
     "file": "client/exchange/exchange.go",
-    "line": 597,
+    "line": 616,
     "citation": "MessageExchange.ts:1215-1222",
     "resolved": "packages/protocol/src/protocol/MessageExchange.ts",
     "identifier": "#sendAdditionalDelay",
@@ -1127,7 +1118,7 @@
   },
   {
     "file": "client/handshake/case.go",
-    "line": 58,
+    "line": 66,
     "citation": "PeerConnection.ts:829-860",
     "resolved": "packages/protocol/src/peer/PeerConnection.ts",
     "identifier": "CaseClient",
@@ -1433,7 +1424,7 @@
   },
   {
     "file": "client/peer/connection.go",
-    "line": 1060,
+    "line": 1071,
     "citation": "SessionManager.ts:468-480",
     "resolved": "packages/protocol/src/session/SessionManager.ts",
     "identifier": "deleteResumptionRecord",
@@ -1449,6 +1440,16 @@
     "identifier": "#save",
     "nearest": 105,
     "occurrences": 2
+  },
+  {
+    "file": "client/peer/peer_connection_kick_parity_matterjs_test.go",
+    "line": 225,
+    "citation": "InitialContactSchedule.ts:112-126",
+    "resolved": "packages/protocol/src/peer/InitialContactSchedule.ts",
+    "at": "db021da0",
+    "identifier": "PeerConnection",
+    "nearest": 21,
+    "occurrences": 1
   },
   {
     "file": "client/peer/probe.go",
@@ -1476,6 +1477,16 @@
     "identifier": "fabricFor",
     "nearest": 453,
     "occurrences": 2
+  },
+  {
+    "file": "client/peer/sigma1_refresh_parity_matterjs_test.go",
+    "line": 12,
+    "citation": "PeerConnection.ts:639-653",
+    "resolved": "packages/protocol/src/peer/PeerConnection.ts",
+    "at": "db021da0",
+    "identifier": "InitialContactSchedule",
+    "nearest": 518,
+    "occurrences": 4
   },
   {
     "file": "client/peer/store.go",

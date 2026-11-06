@@ -4744,17 +4744,17 @@
         "client/peer:TestTwoAddressesStaggered",
         "client/peer:TestOperationalAddressStaysAsFallback",
         "client/peer:TestConnectDiscoveredAddress",
-        "controller/client:TestClientConnectivityParity"
+        "controller/client:TestClientConnectivityParity",
+        "client/peer:TestConnectionRefreshesUnacknowledgedSigma1Parity"
       ],
       "missing": [
         "connects via last known address when MDNS is unavailable",
         "reconnects after device address change with expired records",
         "reconnects after device address change with stale MDNS records",
         "tracks peer online status with session lifecycle",
-        "subscribes to a peer that is not initially available (recreate)",
-        "refreshes a Sigma1 that is never acknowledged"
+        "subscribes to a peer that is not initially available (recreate)"
       ],
-      "reason": "Staggered addresses and the last-known address as fallback keep their client/peer tests; on fabrictest (controller/client:TestClientConnectivityParity) a command to a stopped device fails and succeeds once it is back, the default subscription is lost and re-established with a new id after a timeout and a long absence and signals alive, a close during the reconnection and a shutdown while an exchange is being established log no error, disable ends the subscription and enable starts a fresh one, a restart keeps an uncommissioned node and subscribes to a device once it is back. Missing: a second device address, a moved address and blocked or stale DNS-SD (fabrictest gives a device one address and answers DNS-SD in-process; the peer-level tests cover the connection logic), the online/offline lifecycle events of sessions (no such events on client.Node; Hooks.ConnectionStateChanged is the subscription's state), a non-sustained subscription closed by disabling the node (client.Node.Disable closes the default subscription only — a register candidate), and hosts closed and recreated on the site's stored state (fabrictest keeps stores per host object; Restart is the supported path). Disable closes every subscription of the node, not only the default one (fix: ClientNode.disable cancelling the interaction, ClientNode.ts:239-253, ClientInteraction.ts:270-282).",
+      "reason": "Staggered addresses and the last-known address as fallback keep their client/peer tests; on fabrictest (controller/client:TestClientConnectivityParity) a command to a stopped device fails and succeeds once it is back, the default subscription is lost and re-established with a new id after a timeout and a long absence and signals alive, a close during the reconnection and a shutdown while an exchange is being established log no error, disable ends the subscription and enable starts a fresh one, a restart keeps an uncommissioned node and subscribes to a device once it is back. Missing: a second device address, a moved address and blocked or stale DNS-SD (fabrictest gives a device one address and answers DNS-SD in-process; the peer-level tests cover the connection logic), the online/offline lifecycle events of sessions (no such events on client.Node; Hooks.ConnectionStateChanged is the subscription's state), a non-sustained subscription closed by disabling the node (client.Node.Disable closes the default subscription only — a register candidate), and hosts closed and recreated on the site's stored state (fabrictest keeps stores per host object; Restart is the supported path). Disable closes every subscription of the node, not only the default one (fix: ClientNode.disable cancelling the interaction, ClientNode.ts:239-253, ClientInteraction.ts:270-282). Pin lift wave P4 (#433): a peer whose Sigma1 messages are all lost gets one Sigma1 for at least the MRP budget, then fresh ones three times each with the backoff continued, on the connection process over a silent socket (client/peer:TestConnectionRefreshesUnacknowledgedSigma1Parity).",
       "snapshotSha": "3dda3d0109c1d6ed85f5da3832c848b7a7ff3171"
     },
     {
@@ -8230,8 +8230,11 @@
     },
     {
       "path": "packages/protocol/test/peer/InitialContactScheduleTest.ts",
-      "status": "planned",
-      "reason": "matter.js pin lift 862ad75f → db021da0 (2026-11-06): wave P4 (#433, the TCP size cap, the Sigma1 refresh schedule, delta event timestamps, the discovery state and the between-steps re-arm after #4793/#4794/#4832/#4808/#4815; the peer VID verification of #4880) ports it by meaning.",
+      "status": "ported",
+      "go": [
+        "client/peer:TestInitialContactScheduleParity"
+      ],
+      "reason": "The Sigma1 schedule of one address (client/peer initial_contact.go after InitialContactSchedule.ts at db021da0, matter.js #4794): the identical phase for the MRP budget and the retry delay, fresh Sigma1 messages three times each with the backoff continued, the unresponsive signal once per run counted across attempts, the other ends of an attempt and the kick blocker, on an exchange.Manager over a silent socket and a fake clock; matter.js's PeerAckMissingError is exchange's *PeerUnresponsiveError (client/peer:TestInitialContactScheduleParity). Pin lift wave P4 (#433).",
       "snapshotSha": "454f6c02c901fbed7421d7e3de896f49bdb15b2d"
     },
     {
@@ -8341,14 +8344,13 @@
         "client/peer:TestPeerConnectionKickTiming",
         "client/peer:TestPeerConnectionKickOrigin",
         "client/peer:TestPeerConnectionKickRateLimiting",
-        "client/peer:TestPeerConnectionKickGate",
         "client/peer:TestPeerConnectionKickLocalAbort",
         "client/peer:TestPeerConnectionKickObserver"
       ],
       "missing": [
         "Observable<[KickOrigin]> matches QuietObservable<[KickOrigin]>"
       ],
-      "reason": "The kick timing defaults and overrides, the 3 s kick throttle with its origins, the shared per-origin restart cooldown, the retransmission gate, the per-try abort under the attempt and the per-try handler registration are ported against client/peer's connection process (kickGate and restartAllowedLocked split out of the kick handler); the QuietObservable-to-Observable assignability is a TypeScript type contract with no Go counterpart.",
+      "reason": "The kick timing defaults and overrides, the 3 s kick throttle with its origins, the shared per-origin restart cooldown, the retransmission gate, the per-try abort under the attempt and the per-try handler registration are ported against client/peer's connection process (kickGate and restartAllowedLocked split out of the kick handler); the QuietObservable-to-Observable assignability is a TypeScript type contract with no Go counterpart. Pin lift wave P4 (#433): the kick gate describe left this file for InitialContactScheduleTest.ts with matter.js #4794 (the attempt's kick blocker), and client/peer:TestPeerConnectionKickGate with it.",
       "snapshotSha": "f1f5581c208632561936cf7b4c862d4cca46a6e4"
     },
     {

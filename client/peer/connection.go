@@ -153,7 +153,6 @@ type attempt struct {
 type connection struct {
 	p           *Peer
 	timing      Timing
-	setTiming   Timing
 	handleError ErrorHandler
 	// network and margin are the profile the process holds a slot of and
 	// the CASE exchanges' MRP margin (PeerConnection.ts:110-118).
@@ -228,7 +227,6 @@ func (p *Peer) initiateConnection(opts ConnectOptions) *connection {
 	c := &connection{
 		p:            p,
 		timing:       timing,
-		setTiming:    setTiming,
 		handleError:  handleError,
 		network:      network,
 		margin:       margin,
@@ -751,54 +749,12 @@ func (c *connection) kickLocked(origin kickOrigin) {
 	}
 }
 
-// connect attempts the address until the attempt is aborted
-// (PeerConnection.ts:466-493).
+// connect attempts the address until the attempt is aborted, the Sigma1
+// messages of every try on the address's one [initialContactSchedule]
+// (PeerConnection.ts:471-497 at db021da0).
 func (c *connection) connect(att *attempt) {
-	for n := 1; att.ctx.Err() == nil; n++ {
-		if err := c.attemptOnce(att, n); err != nil {
-			c.handleConnectionError(err, att)
-		}
-	}
-}
-
-// unresponsiveDetector fires once when the retransmission count passes
-// MRP's transmission budget and re-arms at 0 — matter.js
-// PeerConnection.establishmentUnresponsiveDetector (PeerConnection.ts:810-827).
-func unresponsiveDetector(fire func()) func(int) {
-	var signaled atomic.Bool
-	return func(n int) {
-		if n == 0 {
-			signaled.Store(false)
-		} else if n > exchange.MaxTransmissions && signaled.CompareAndSwap(false, true) {
-			fire()
-		}
-	}
-}
-
-// attemptOnce makes one CASE attempt at the address
-// (PeerConnection.ts:495-651): a fresh unsecured session with the peer's
-// session parameters, CASE with the descriptor's CATs and unlimited first
-// retransmissions capped at MaxDelayBetweenInitialContactRetries — which
-// is also added to every backoff when this is the fallback and not the
-// first address — and the exchange's notifiers of createExchange
-// (:829-860). A kick that restarts the attempt or an abort returns nil.
-func (c *connection) attemptOnce(att *attempt, attemptNo int) error {
 	p := c.p
-	if p.set.isDisconnected() {
-		return ErrNotConnectable
-	}
-	fabric, ok := p.set.ctx.Fabrics(p.address)
-	if !ok {
-		return fmt.Errorf("%w with index %d", ErrNoFabric, p.address.FabricIndex)
-	}
-	c.mu.Lock()
-	isFallback := c.fallback != nil && c.addrsAttempted > 1
-	markedFallback := c.fallback != nil && c.fallback.AddrPort() == att.addr.AddrPort()
-	c.mu.Unlock()
-
-	local, restart := context.WithCancel(att.ctx)
-	defer restart()
-	unresponsive := unresponsiveDetector(func() {
+	schedule := newInitialContactSchedule(c.timing, func() {
 		p.goWork(func() {
 			if h := p.set.ctx.EstablishmentUnresponsive; h != nil {
 				h(p)
@@ -810,6 +766,41 @@ func (c *connection) attemptOnce(att *attempt, attemptNo int) error {
 			}
 		})
 	})
+	for n := 1; att.ctx.Err() == nil; n++ {
+		if err := c.attemptOnce(att, schedule, n); err != nil {
+			c.handleConnectionError(err, att)
+		}
+	}
+}
+
+// attemptOnce makes one CASE attempt at the address
+// (PeerConnection.ts:514-673 at db021da0): a fresh unsecured session with
+// the peer's session parameters, CASE with the Sigma1 send options of the
+// schedule's next attempt, and the exchange's notifiers of createExchange
+// (:847-878) with the attempt observing them. A kick that restarts the
+// attempt or an abort returns nil, and so does a Sigma1 the peer never
+// acknowledged: the schedule moves on to a fresh one at once, without the
+// error handling (:639-653).
+func (c *connection) attemptOnce(att *attempt, schedule *initialContactSchedule, attemptNo int) error {
+	p := c.p
+	if p.set.isDisconnected() {
+		return ErrNotConnectable
+	}
+	fabric, ok := p.set.ctx.Fabrics(p.address)
+	if !ok {
+		return fmt.Errorf("%w with index %d", ErrNoFabric, p.address.FabricIndex)
+	}
+	c.mu.Lock()
+	markedFallback := c.fallback != nil && c.fallback.AddrPort() == att.addr.AddrPort()
+	c.mu.Unlock()
+
+	a, err := schedule.begin(c.isDelayedFallback(att))
+	if err != nil {
+		return err
+	}
+	defer a.dispose()
+	local, restart := context.WithCancel(att.ctx)
+	defer restart()
 	margin := c.margin
 	notifiers := exchange.Options{
 		PeerAdditionalMrpDelay: &margin,
@@ -818,12 +809,15 @@ func (c *connection) attemptOnce(att *attempt, attemptNo int) error {
 				// Retransmitting: let discovery look for a fresh address.
 				p.status.SetReachable(false)
 			}
-			unresponsive(n)
+			a.onSend(n)
 		},
-		OnReceive: func() { p.status.SetLastReceiptAt(p.set.clock.Now()) },
+		OnReceive: func() {
+			p.status.SetLastReceiptAt(p.set.clock.Now())
+			a.onReceive()
+		},
 	}
 	c.mu.Lock()
-	c.kickHandlers[att] = func(origin kickOrigin) { c.onKickLocked(origin, att, restart) }
+	c.kickHandlers[att] = func(origin kickOrigin) { c.onKickLocked(origin, att, a, restart) }
 	c.mu.Unlock()
 	defer func() {
 		c.mu.Lock()
@@ -831,20 +825,25 @@ func (c *connection) attemptOnce(att *attempt, attemptNo int) error {
 		c.mu.Unlock()
 	}()
 
-	p.log.Info("matter.controller.peer.connecting",
+	// A refreshing attempt logs at debug (PeerConnection.ts:549-550).
+	logConnecting := p.log.Info
+	if a.isRefresh {
+		logConnecting = p.log.Debug
+	}
+	logConnecting("matter.controller.peer.connecting",
 		slog.String("address", att.addr.String()), slog.Int("address_index", att.addrNo), slog.Int("attempt", attemptNo),
-		slog.Bool("fallback", markedFallback))
+		slog.Bool("fallback", markedFallback), slog.Bool("refresh", a.isRefresh))
 	params := p.SessionParameters()
 	opts := handshake.CASEOptions{
-		PeerParameters:               &params,
-		MaxInitialRetransmissions:    -1,
-		MaxInitialRetransmissionTime: c.timing.MaxDelayBetweenInitialContactRetries,
-		Exchange:                     notifiers,
-		OnExchange:                   att.exchange.Store,
-		Logger:                       p.log,
-	}
-	if isFallback {
-		opts.InitialRetransmissionTime = c.timing.MaxDelayBetweenInitialContactRetries
+		PeerParameters:                 &params,
+		MaxInitialRetransmissions:      a.maxTransmissions,
+		MaxInitialRetransmissionTime:   a.maxRetransmissionTime,
+		InitialRetransmissionTime:      a.initialRetransmissionTime,
+		InitialRetransmissionTimeLimit: a.retransmissionTimeLimit,
+		InitialBackoffOffset:           a.backoffOffset,
+		Exchange:                       notifiers,
+		OnExchange:                     att.exchange.Store,
+		Logger:                         p.log,
 	}
 	if r := p.set.ctx.Resumption; r != nil {
 		opts.Resumption = r
@@ -880,7 +879,29 @@ func (c *connection) attemptOnce(att *attempt, attemptNo int) error {
 	if local.Err() != nil {
 		return nil
 	}
+	// An unacknowledged Sigma1 is the schedule moving on, not a failure:
+	// retry at once, without the error handling (PeerConnection.ts:639-653).
+	log := p.log.With(slog.String("address", att.addr.String()))
+	switch a.fail(err) {
+	case contactSwitched:
+		log.Info("matter.controller.peer.sigma1_refresh", slog.Any("err", err))
+		return nil
+	case contactRefreshed:
+		log.Debug("matter.controller.peer.sigma1_refresh_again")
+		return nil
+	case contactRestarted:
+		return nil
+	}
 	return err
+}
+
+// isDelayedFallback reports whether an attempt at att starts at the
+// maximum retry delay: the fallback address once it is not the first
+// address tried (PeerConnection.ts:499-512 at db021da0).
+func (c *connection) isDelayedFallback(att *attempt) bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.fallback != nil && c.fallback.AddrPort() == att.addr.AddrPort() && c.addrsAttempted > 1
 }
 
 // attemptAddress is the address an attempt's handshake runs on: the
@@ -907,53 +928,43 @@ func (c *connection) attemptAddress(ctx context.Context, att *attempt) (*net.UDP
 	return c.p.set.ctx.Exchanges.AttachChannel(ch), ch, nil
 }
 
-// onKickLocked is the kick handler of one attempt (PeerConnection.ts:568-594):
-// it restarts the attempt's exchange when it has retransmitted enough, a
-// restart would save enough, and the last restart of the process is older
-// than the origin's cooldown. The thresholds are the set's timing.
-func (c *connection) onKickLocked(origin kickOrigin, att *attempt, restart context.CancelFunc) {
+// onKickLocked is the kick handler of one attempt (PeerConnection.ts:579-605
+// at db021da0): it restarts the attempt's exchange when the schedule's
+// attempt has no blocker — Sigma1 retransmitted enough across the
+// schedule's attempts, the peer not answered yet, a restart saving
+// enough — and the last restart of the process is older than the origin's
+// cooldown. The thresholds are the connection's timing.
+func (c *connection) onKickLocked(origin kickOrigin, att *attempt, a *contactAttempt, restart context.CancelFunc) {
 	x := att.exchange.Load()
 	if x == nil {
 		return
 	}
 	log := c.p.log.With(slog.String("address", att.addr.String()), slog.String("origin", origin.String()))
-	if ok, why := kickGate(c.setTiming, x.RetransmissionCount(), x.RetransmissionRestartSaving()); !ok {
-		if why != "" {
-			log.Debug("matter.controller.peer.kick_suppressed", slog.String("reason", why))
+	delayed := c.fallback != nil && c.fallback.AddrPort() == att.addr.AddrPort() && c.addrsAttempted > 1
+	if why := a.kickBlocker(x.RetransmissionRestartSaving(), delayed); why != "" {
+		if why == kickBlockedSaving {
+			log.Debug("matter.controller.peer.kick_suppressed", slog.String("reason", "restart would save too little time"))
 		}
 		return
 	}
 	if c.restartAllowedLocked(origin) {
 		log.Info("matter.controller.peer.kick_restart")
+		a.restart()
 		restart()
 		return
 	}
 	log.Debug("matter.controller.peer.kick_suppressed", slog.Duration("since_last_restart", c.p.set.clock.Now().Sub(c.lastRestartAt)))
 }
 
-// kickGate reports whether a kick may restart an exchange that has
-// retransmitted retransmissions times and whose restart would save
-// saving; why is set when the saving is too small. Mirrors matter.js
-// packages/protocol/src/peer/PeerConnection.ts:568-575.
-func kickGate(timing Timing, retransmissions int, saving time.Duration) (ok bool, why string) {
-	if retransmissions < timing.KickMinRetransmissions {
-		return false, ""
-	}
-	if saving < timing.KickMinRestartSaving {
-		return false, "restart would save too little time"
-	}
-	return true, ""
-}
-
 // restartAllowedLocked is the per-origin restart cooldown of the kick
 // handler, shared by every attempt of the process: true, and the restart
 // recorded, when no restart happened yet or the last one is at least the
-// origin's cooldown old. Mirrors matter.js
-// packages/protocol/src/peer/PeerConnection.ts:577-584.
+// origin's cooldown old, on the connection's timing. Mirrors matter.js
+// packages/protocol/src/peer/PeerConnection.ts:588-597 at db021da0.
 func (c *connection) restartAllowedLocked(origin kickOrigin) bool {
-	threshold := c.setTiming.KickRestartCooldown.Connect
+	threshold := c.timing.KickRestartCooldown.Connect
 	if origin == kickDiscover {
-		threshold = c.setTiming.KickRestartCooldown.AddressChange
+		threshold = c.timing.KickRestartCooldown.AddressChange
 	}
 	now := c.p.set.clock.Now()
 	if c.lastRestartAt.IsZero() || now.Sub(c.lastRestartAt) >= threshold {

@@ -52,6 +52,14 @@ type CASEOptions struct {
 	MaxInitialRetransmissions    int
 	MaxInitialRetransmissionTime time.Duration
 	InitialRetransmissionTime    time.Duration
+	// InitialRetransmissionTimeLimit and InitialBackoffOffset apply to
+	// Sigma1 only, as exchange.SendOptions RetransmissionTimeLimit and
+	// BackoffOffset: a connection's schedule ends an identical Sigma1
+	// after a time and continues the backoff with a fresh one
+	// (CaseClient.ts:62-63, :80-81, :410-414 at db021da0, matter.js #4794).
+	// A fresh Sigma1 is a new handshake attempt, not a new Sigma message.
+	InitialRetransmissionTimeLimit time.Duration
+	InitialBackoffOffset           int
 	// Exchange configures the exchange the handshake runs on: its
 	// [exchange.Options.OnSend] and [exchange.Options.OnReceive] notifiers
 	// are how a connection process watches the Sigma messages — matter.js
@@ -198,6 +206,8 @@ func (c *caseClient) pair(ctx context.Context) (*exchange.Session, ResumptionRec
 		MaxRetransmissions:        c.opts.MaxInitialRetransmissions,
 		MaxRetransmissionTime:     c.opts.MaxInitialRetransmissionTime,
 		InitialRetransmissionTime: c.opts.InitialRetransmissionTime,
+		RetransmissionTimeLimit:   c.opts.InitialRetransmissionTimeLimit,
+		BackoffOffset:             c.opts.InitialBackoffOffset,
 	}); err != nil {
 		return nil, ResumptionRecord{}, false, err
 	}

@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 7730,
+  "entry_points": 7729,
   "entry_packages": [
     ".",
     "bdx",
@@ -279,9 +279,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 17711,
+    "total_exported": 17710,
     "reachable": 12324,
-    "whitelisted": 5387,
+    "whitelisted": 5386,
     "unreachable": 0
   },
   "by_package": [],
@@ -7065,6 +7065,13 @@
     },
     {
       "package": "client/peer",
+      "identifier": "TestConnectionRefreshesUnacknowledgedSigma1Parity",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/peer/sigma1_refresh_parity_matterjs_test.go",
+      "line": 26
+    },
+    {
+      "package": "client/peer",
       "identifier": "TestConnectionThrottledByTheConnectProfile",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/network_profile_parity_matterjs_test.go",
@@ -7111,6 +7118,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/icd_parity_matterjs_test.go",
       "line": 23
+    },
+    {
+      "package": "client/peer",
+      "identifier": "TestInitialContactScheduleParity",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/peer/initial_contact_schedule_parity_matterjs_test.go",
+      "line": 162
     },
     {
       "package": "client/peer",
@@ -7243,14 +7257,14 @@
       "identifier": "TestParityKnownPeerMerge",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/parity_matterjs_test.go",
-      "line": 176
+      "line": 157
     },
     {
       "package": "client/peer",
       "identifier": "TestParityProbeCooldownFibonacci",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/parity_matterjs_test.go",
-      "line": 153
+      "line": 134
     },
     {
       "package": "client/peer",
@@ -7265,13 +7279,6 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/parity_matterjs_test.go",
       "line": 58
-    },
-    {
-      "package": "client/peer",
-      "identifier": "TestParityUnresponsiveDetector",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "client/peer/parity_matterjs_test.go",
-      "line": 132
     },
     {
       "package": "client/peer",
@@ -7352,24 +7359,17 @@
     },
     {
       "package": "client/peer",
-      "identifier": "TestPeerConnectionKickGate",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "client/peer/peer_connection_kick_parity_matterjs_test.go",
-      "line": 224
-    },
-    {
-      "package": "client/peer",
       "identifier": "TestPeerConnectionKickLocalAbort",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/peer_connection_kick_parity_matterjs_test.go",
-      "line": 282
+      "line": 269
     },
     {
       "package": "client/peer",
       "identifier": "TestPeerConnectionKickObserver",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/peer_connection_kick_parity_matterjs_test.go",
-      "line": 344
+      "line": 331
     },
     {
       "package": "client/peer",
@@ -7398,13 +7398,6 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/transport_parity_matterjs_test.go",
       "line": 242
-    },
-    {
-      "package": "client/peer",
-      "identifier": "TestPeerEstablishmentProgressDetector",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "client/peer/peer_establishment_progress_parity_matterjs_test.go",
-      "line": 18
     },
     {
       "package": "client/peer",

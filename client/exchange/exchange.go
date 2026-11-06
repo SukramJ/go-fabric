@@ -117,6 +117,19 @@ type SendOptions struct {
 	MaxRetransmissionTime time.Duration
 	// InitialRetransmissionTime is added to every backoff.
 	InitialRetransmissionTime time.Duration
+	// RetransmissionTimeLimit is the time after the first transmission
+	// from which no further retransmission is sent; 0 is unlimited. It
+	// applies only once [MaxTransmissions] transmissions went out, so the
+	// peer always gets the standard MRP budget, and reaching it ends the
+	// send as reaching MaxRetransmissions does, the final wait included.
+	// Mirrors matter.js ExchangeSendOptions.retransmissionTimeLimit
+	// (MessageExchange.ts:141-147 at db021da0, matter.js #4794).
+	RetransmissionTimeLimit time.Duration
+	// BackoffOffset is the transmission number the MRP backoff of this
+	// send starts at, so a new exchange continues the schedule of one it
+	// replaces; it does not count against MaxRetransmissions. Mirrors
+	// ExchangeSendOptions.backoffOffset (MessageExchange.ts:149-154).
+	BackoffOffset int
 	// SuppressPeerLoss waives the peer-loss report for this send.
 	SuppressPeerLoss bool
 	// AckWaitAbort, once closed, ends only the waits for the
@@ -204,6 +217,10 @@ type Exchange struct {
 	ackWaitEnded    *pending // the pending message whose ack wait AckWaitAbort ended
 	retransCount    int
 	lastTransmitAt  time.Time // the last transmission of a non-ack message
+	// firstTransmitAt is the first transmission of the reliable message
+	// sent last — matter.js #firstTransmissionAt (MessageExchange.ts:801-803
+	// at db021da0), which RetransmissionTimeLimit counts from.
+	firstTransmitAt time.Time
 	sendOpts        SendOptions
 	used            bool
 	closing         bool
@@ -319,20 +336,21 @@ func (x *Exchange) RetransmissionCount() int {
 	return x.retransCount
 }
 
-// RetransmissionRestartSaving is how much restarting the exchange — a
-// fresh exchange whose first transmission waits the base backoff — would
-// shorten the wait until the next (re)transmission: the interval of the
-// retransmission timer armed last minus the backoff of transmission 0,
-// never negative, and 0 before the exchange armed a timer. Mirrors
-// matter.js MessageExchange.ts:1258-1266 (retransmissionRestartSaving),
-// which reads the last timer's interval whether or not it still runs.
+// RetransmissionRestartSaving is how much restarting on a new exchange
+// with the base MRP schedule — no BackoffOffset and no
+// InitialRetransmissionTime — would shorten the wait until the next
+// (re)transmission: the interval of the retransmission timer armed last
+// minus the base backoff of transmission 0, never negative, and 0 before
+// the exchange armed a timer. Mirrors matter.js MessageExchange.ts:1301-1316
+// (retransmissionRestartSaving) at db021da0, which reads the last timer's
+// interval whether or not it still runs.
 func (x *Exchange) RetransmissionRestartSaving() time.Duration {
 	x.mu.Lock()
 	defer x.mu.Unlock()
 	if x.retransTimer == nil {
 		return 0
 	}
-	return max(0, x.retransInterval-x.backoffLocked(0))
+	return max(0, x.retransInterval-x.baseBackoffLocked())
 }
 
 // considerClosed is matter.js MessageExchange.ts:376-378: closed, or —
@@ -509,6 +527,7 @@ func (x *Exchange) transmitLocked(opcode uint8, payload []byte, ackFor *uint32) 
 	}
 	if p != nil {
 		x.retransCount = 0
+		x.firstTransmitAt = x.m.clock.Now()
 		x.armRetransLocked(p, x.backoffLocked(0), x.expectedProcessingTimeLocked())
 	}
 	return p, nil
@@ -610,11 +629,36 @@ func (x *Exchange) sendAdditionalDelay() time.Duration {
 // at [bdxMaxRetransmissionInterval] even below the idle interval — matter.js
 // MessageExchange.ts:1234-1251 (#backOffFor).
 func (x *Exchange) backoffLocked(n int) time.Duration {
+	return x.backoffForLocked(n+x.sendOpts.BackoffOffset, x.sendOpts.InitialRetransmissionTime)
+}
+
+// baseBackoffLocked is the backoff of a first transmission on the base
+// MRP schedule, without the BackoffOffset and InitialRetransmissionTime
+// of the current send — matter.js #baseBackOff (MessageExchange.ts:1244-1249
+// at db021da0).
+func (x *Exchange) baseBackoffLocked() time.Duration { return x.backoffForLocked(0, 0) }
+
+// budgetSpentLocked reports whether transmission number n may not be sent
+// any more, by MaxRetransmissions (negative unlimited) or by
+// RetransmissionTimeLimit once [MaxTransmissions] went out. Mirrors
+// matter.js MessageExchange.#isTransmissionBudgetSpent
+// (MessageExchange.ts:909-927 at db021da0).
+func (x *Exchange) budgetSpentLocked(n int) bool {
+	if limit := x.sendOpts.MaxRetransmissions; limit >= 0 && n >= cmp.Or(limit, MaxTransmissions) {
+		return true
+	}
+	limit := x.sendOpts.RetransmissionTimeLimit
+	return limit > 0 && n >= MaxTransmissions && !x.firstTransmitAt.IsZero() && x.m.clock.Now().Sub(x.firstTransmitAt) >= limit
+}
+
+// backoffForLocked is #backOffFor (MessageExchange.ts:1274-1300 at
+// db021da0): the backoff of transmission n plus initial.
+func (x *Exchange) backoffForLocked(n int, initial time.Duration) time.Duration {
 	iv, active := x.session.timing()
 	d := RetransmissionIntervalPadded(n, iv, active, x.m.rand(), x.sendPad())
 	// Saturating: d is MaxInt64 once the unbounded fallback's backoff
 	// saturated (W4-ctlnet-01); matter.js MessageExchange.ts:1242-1250.
-	d = satAdd(d, x.sendOpts.InitialRetransmissionTime)
+	d = satAdd(d, initial)
 	if x.sendOpts.MaxRetransmissionTime > 0 {
 		d = min(d, max(x.sendOpts.MaxRetransmissionTime, iv.Idle))
 	}
@@ -658,15 +702,12 @@ func (x *Exchange) retransmit(p *pending, expectedProcessingTime time.Duration) 
 	}
 	x.retransArmed = false
 	x.retransCount++
-	limit := x.sendOpts.MaxRetransmissions
-	if limit == 0 {
-		limit = MaxTransmissions
-	}
-	// Mirrors matter.js MessageExchange.ts:907-910 with considerClosed
-	// (:390-392): closed, or an initiator closing — a responder exchange
-	// keeps retransmitting within its close wait (W4-ctlnet-06).
+	// Mirrors matter.js MessageExchange.ts:943 with considerClosed
+	// (:390-392) at db021da0: closed, or an initiator closing — a
+	// responder exchange keeps retransmitting within its close wait
+	// (W4-ctlnet-06).
 	closing := x.closed || (x.initiator && x.closing)
-	if closing || (limit > 0 && x.retransCount >= limit) {
+	if closing || x.budgetSpentLocked(x.retransCount) {
 		if expectedProcessingTime > 0 && !closing {
 			final := MaxPeerResponseTimePadded(nil, false, IntervalsOf(x.m.local), expectedProcessingTime, x.sendPad()) - x.retransInterval
 			if final > 0 {
@@ -726,7 +767,7 @@ func (x *Exchange) kickLocked(dup *Message) *pending {
 	if p == nil || !x.retransArmed || !p.hasAck || dup.Counter != p.ackCounter {
 		return nil
 	}
-	if limit := x.sendOpts.MaxRetransmissions; limit >= 0 && x.retransCount+1 >= cmp.Or(limit, MaxTransmissions) {
+	if x.budgetSpentLocked(x.retransCount + 1) {
 		return nil
 	}
 	iv, _ := x.session.timing()

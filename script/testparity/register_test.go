@@ -47,7 +47,8 @@ import (
 // // Pin lift wave P2 (#431) ports AttestationCertificateProfileTest.ts (in
 // part), CdSignersTest.ts and DeviceAttestationValidatorChipCdTest.ts as well: 13.
 // Pin lift wave P4 (#433) ports CommissioningClosedSessionReArmTest.ts: 12.
-const testparityPlannedRatchet = 12
+// Pin lift wave P4 (#433) ports InitialContactScheduleTest.ts: 11.
+const testparityPlannedRatchet = 11
 
 // testparityPortedRatchet is the number of ported entries, and
 // testparityMissingRatchet the number of matter.js it cases the partial
@@ -118,9 +119,10 @@ const testparityPlannedRatchet = 12
 // Pin lift wave P4 (#433): CommissioningClosedSessionReArmTest.ts ported, ConnectionStateTest.ts's two no-address cases: 150 ported, 1022 missing.
 // Pin lift wave P4 (#433): InputChunkTest.ts completed by the nine resolved-timestamp cases, ClientEventNotificationTest.ts's resolved delivery: 151 ported, 1012 missing.
 // Pin lift wave P4 (#433): the TCP limit cases of matter.js #4793 in MessageChannelTest.ts, TcpChannelTest.ts, SessionParametersTest.ts and BdxTest.ts: 998 missing.
+// Pin lift wave P4 (#433): InitialContactScheduleTest.ts ported, ClientConnectivityTest.ts's Sigma1 refresh: 152 ported, 997 missing.
 const (
-	testparityPortedRatchet  = 151
-	testparityMissingRatchet = 998
+	testparityPortedRatchet  = 152
+	testparityMissingRatchet = 997
 )
 
 // testparityLeftRatchet is the number of left it cases summed over the
