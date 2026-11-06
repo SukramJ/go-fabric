@@ -970,11 +970,10 @@ var chipFamilies = []family{
 	{name: "TSTAT", deviceType: dtThermostat},
 	{name: "TSUIC", deviceType: dtThermostat},
 	{
+		// 3.2 and 3.3 run against the garden tap's Level feature and
+		// DefaultOpenLevel, which every harness daemon enables
+		// (harnessExtensions, BD-chip-Valve-RulesInServer).
 		name: "VALCC", deviceType: dtWaterValve,
-		exclude: map[string]gap{
-			"3.2": {classNotSupported, "TC-VALCC-3.2 runs only with the Level feature (PICS VALCC.S.F01=0: the daemon's valve is open/closed)", true},
-			"3.3": {classNotSupported, "TC-VALCC-3.3 runs only with DefaultOpenLevel (PICS VALCC.S.A0006=0)", true},
-		},
 	},
 	{name: "WHM", deviceType: dtWaterHeater},
 	{name: "WNCV", deviceType: dtWindowCovering},

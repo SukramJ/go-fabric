@@ -205,8 +205,15 @@ type bridgeOptions struct {
 // (notes/parity/by_design.md) every daemon the harness starts enables, off
 // in the daemon by default: BD-chip-Thermostat-Suggestions serves
 // ThermostatSuggestions on the demo thermostat, which TC-TSTAT-4.3 needs
-// (PICS TSTAT.S.F0a).
-var harnessExtensions = []string{"BD-chip-Thermostat-Suggestions"}
+// (PICS TSTAT.S.F0a); BD-chip-ClosureControl-RulesInServer MotionLatching,
+// Speed and Calibration on the garage (TC-CLCTRL-3.1, 4.2: CLCTRL.S.F06,
+// F01); BD-chip-Valve-RulesInServer Level and TimeSync on the garden tap
+// (TC-VALCC-3.2, 3.3: VALCC.S.F01, A0006).
+var harnessExtensions = []string{
+	"BD-chip-Thermostat-Suggestions",
+	"BD-chip-ClosureControl-RulesInServer",
+	"BD-chip-Valve-RulesInServer",
+}
 
 // chipTestEnableKey is the test enable key CHIP's apps and certification
 // cases use by default (PIXIT.DGGEN.TEST_EVENT_TRIGGER_KEY,
