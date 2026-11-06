@@ -18,7 +18,7 @@ register rows are `BD-chip-JointFabricDatastore-RulesInServer`,
 
 | Part | Package | Source of the rules | Host ports |
 | --- | --- | --- | --- |
-| JointFabricDatastore (`0x0752`) | `jointfabric.Datastore` | `src/app/server/JointFabricDatastore.cpp`, `joint-fabric-datastore-server.cpp` | `DatastoreSync` (required), `DatastoreStore` |
+| JointFabricDatastore (`0x0752`) | `jointfabric.Datastore` | `src/app/server/JointFabricDatastore.cpp`, `joint-fabric-datastore-server.cpp` | `DatastoreSync` (required; `EndpointBindingSync` optional on it), `DatastoreStore` |
 | JointFabricAdministrator (`0x0753`) | `jointfabric.Administrator` | `joint-fabric-administrator-server.cpp`, `JCMCommissionee.cpp` | `AdministratorPort` (required), `CommissionerReach` |
 | The trust verification both roles share | `client/jcm` | `src/credentials/jcm/` | — |
 | The commissioner's JCM | `controller/commissioner` (`Options.JointFabric`) | `src/controller/jcm/` | `JointFabricOptions.Consent` |
@@ -73,6 +73,21 @@ goes `Committed`. A fetch that fails ends the refresh with the node still
 `Pending`. The host methods of the same names, such as
 `Datastore.AddACLToNode`, push before they return. `Datastore.Wait` waits
 for the pushes that commands started.
+
+A `DatastoreSync` that also implements `EndpointBindingSync` — chip's
+endpoint-scoped delegate overload `SyncNode(nodeId, endpointId,
+bindingEntries)` — receives a binding's add or removal as the endpoint's
+whole list instead of the one entry: the datastore fetches the endpoint's
+current bindings (`FetchEndpointBindingList`), appends the entry or
+removes the entries whose target matches the one removed (the node's
+entries carry no list id), and calls `SyncEndpointBindings` with the
+list, an empty list included; `SyncBinding` is not called. That is the
+merge chip's jf-admin-app delegate does with the one entry chip's
+datastore hands it — chip's datastore itself never calls the overload —
+moved into the module, so the host writes one Binding list and reads one.
+A fetch that fails is the push's error and leaves the entry `Pending` for
+the next `RefreshNode`, where chip's example would write the one entry
+over an empty list.
 
 The tables persist as one settings record under the device's StableKey
 when the declaration carries a `DatastoreStore`. The node's store is one.
@@ -138,8 +153,3 @@ administrator fabric has no ICAC, or that carries a VID Verification
 Statement, is refused. `JointFabricOptions.Progress` reports each stage.
 `Options.CATs` sets the CATs of the issued NOC. Commissioning an anchor
 uses the administrator and anchor CATs without `JointFabric`.
-
-## Not covered
-
-- chip's endpoint-scoped `SyncNode(nodeId, endpointId, bindings)` overload
-  is not in the port; the datastore never calls it.

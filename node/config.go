@@ -517,6 +517,17 @@ type OTAConfig struct {
 	// (OtaSoftwareUpdateRequestorServer.ts:410, :1323). Harness mode (a test's)
 	// without it waits 250 ms, as the matter.js cert requestor does.
 	AnnouncedUpdateQueryDelay *time.Duration
+	// TransferProtocols are the download protocols the requestor announces
+	// (mattercore.OTARequestorConfig.TransferProtocols); empty is BDX
+	// alone. Add [OTADownloadHTTPS] only where the node reaches the image
+	// hosts.
+	TransferProtocols []OTADownloadProtocol
+	// HTTPClient sends an HTTPS download's GET; nil is http.DefaultClient.
+	HTTPClient OTAHTTPClient
+	// HTTPSMaxImageSize and HTTPSTimeout bound an HTTPS download; 0 is
+	// 256 MiB and 10 minutes (mattercore.OTARequestorConfig).
+	HTTPSMaxImageSize int64
+	HTTPSTimeout      time.Duration
 }
 
 // ErrInvalidConfig wraps every [Config.Validate] failure.
