@@ -8405,70 +8405,70 @@
       "identifier": "TestOTARequestorHTTPS_BDXOfferStillWorks",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/ota_requestor_https_test.go",
-      "line": 378
+      "line": 379
     },
     {
       "package": "cluster/core",
       "identifier": "TestOTARequestorHTTPS_Config",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/ota_requestor_https_test.go",
-      "line": 414
+      "line": 415
     },
     {
       "package": "cluster/core",
       "identifier": "TestOTARequestorHTTPS_Download",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/ota_requestor_https_test.go",
-      "line": 139
+      "line": 140
     },
     {
       "package": "cluster/core",
       "identifier": "TestOTARequestorHTTPS_FetchRejected",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/ota_requestor_https_test.go",
-      "line": 357
+      "line": 358
     },
     {
       "package": "cluster/core",
       "identifier": "TestOTARequestorHTTPS_Redirect",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/ota_requestor_https_test.go",
-      "line": 188
+      "line": 189
     },
     {
       "package": "cluster/core",
       "identifier": "TestOTARequestorHTTPS_Refused",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/ota_requestor_https_test.go",
-      "line": 323
+      "line": 324
     },
     {
       "package": "cluster/core",
       "identifier": "TestOTARequestorHTTPS_SizeCap",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/ota_requestor_https_test.go",
-      "line": 237
+      "line": 238
     },
     {
       "package": "cluster/core",
       "identifier": "TestOTARequestorHTTPS_StatusNotOK",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/ota_requestor_https_test.go",
-      "line": 210
+      "line": 211
     },
     {
       "package": "cluster/core",
       "identifier": "TestOTARequestorHTTPS_Timeout",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/ota_requestor_https_test.go",
-      "line": 257
+      "line": 258
     },
     {
       "package": "cluster/core",
       "identifier": "TestOTARequestorHTTPS_TruncatedBody",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/ota_requestor_https_test.go",
-      "line": 221
+      "line": 222
     },
     {
       "package": "cluster/core",

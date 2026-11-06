@@ -122,7 +122,7 @@ type OTARequestorConfig struct {
 	// default false).
 	CanConsent bool
 	// TransferProtocols are the download protocols QueryImage announces
-	// (transferProtocolsSupported, :1366-1372); empty is BDX synchronous
+	// (transferProtocolsSupported, :1367-1372); empty is BDX synchronous
 	// alone, matter.js's default. Add [DownloadProtocolHTTPS] only where
 	// the node reaches the image hosts, as matter.js advises there. A list
 	// without [DownloadProtocolBDXSynchronous] does not conform; another

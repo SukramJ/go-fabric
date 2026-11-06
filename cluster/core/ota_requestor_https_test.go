@@ -85,8 +85,9 @@ func (h *otaHarness) offering(uri string, version uint32) provdef.QueryImageResp
 }
 
 func (h *otaHarness) downloadErrors() []otadef.DownloadErrorEvent {
-	var out []otadef.DownloadErrorEvent
-	for _, e := range h.events.of(otadef.EventDownloadError) {
+	events := h.events.of(otadef.EventDownloadError)
+	out := make([]otadef.DownloadErrorEvent, 0, len(events))
+	for _, e := range events {
 		out = append(out, e.(otadef.DownloadErrorEvent)) //nolint:forcetypeassert // test
 	}
 	return out
