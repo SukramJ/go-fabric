@@ -180,13 +180,20 @@ type ControlServer struct {
 	// currentLatch and targetLatch are the Latch fields (LT): nil is
 	// null. currentSpeed and targetSpeed are the Speed fields (SP), which
 	// carry no null: Auto until the drive or a MoveTo says otherwise.
-	// Each is replaced by a fresh pointer, never written through, so a
-	// read hands out the stored one: a stable pointer renders alike
-	// across reads (bridge reportInvokeChanges compares the rendered
-	// values, and a fresh copy per read reported an unchanged
-	// OverallCurrentState after every command).
+	// Each is replaced by a fresh pointer, never written through.
 	currentLatch, targetLatch *bool
 	currentSpeed, targetSpeed *closuredef.ThreeLevelAutoEnum
+
+	// currentView and targetView are what MatterRead answers for
+	// OverallCurrentState and OverallTargetState, rebuilt by refreshLocked
+	// on every change and the same pointer between changes: the bridge
+	// renders a read value with %#v to find what a command changed
+	// (bridge reportInvokeChanges), and a struct allocated per read
+	// rendered as changed every time — an unchanged OverallCurrentState
+	// was reported after every command, which TC-CLCTRL-5.1 step 4i takes
+	// for the latch it waits for.
+	currentView *wire.ClosureOverallCurrentState
+	targetView  *wire.ClosureOverallTargetState
 
 	// emitter and endpoint address the events (closurecontrol_events.go);
 	// the bridge wires both at reassembly.
@@ -249,6 +256,7 @@ func New(cfg Config) (*ControlServer, error) {
 		cur, tgt := closuredef.ThreeLevelAutoAuto, closuredef.ThreeLevelAutoAuto
 		s.currentSpeed, s.targetSpeed = &cur, &tgt
 	}
+	s.refreshLocked()
 	s.Init(inst)
 	return s, nil
 }
@@ -296,20 +304,9 @@ func (s *ControlServer) MatterRead(attrID uint32) (value any, ok bool) {
 		copy(out, s.errorList)
 		return out, true
 	case wire.ClosureControlAttrOverallCurrentState:
-		return &wire.ClosureOverallCurrentState{
-			Position:    s.currentPosition,
-			SecureState: s.secureState,
-			Latch:       s.currentLatch,
-			HasLatch:    s.has(wire.ClosureControlFeatureMotionLatching),
-			Speed:       s.currentSpeed,
-		}, true
+		return s.currentView, true
 	case wire.ClosureControlAttrOverallTargetState:
-		return &wire.ClosureOverallTargetState{
-			Position: s.targetPosition,
-			Latch:    s.targetLatch,
-			HasLatch: s.has(wire.ClosureControlFeatureMotionLatching),
-			Speed:    s.targetSpeed,
-		}, true
+		return s.targetView, true
 	case wire.ClosureControlAttrLatchControlModes:
 		if !s.has(wire.ClosureControlFeatureMotionLatching) {
 			return nil, false
@@ -506,6 +503,7 @@ func (s *ControlServer) invokeMoveTo(ctx context.Context, fields any) error {
 		s.targetSpeed = copyOf(speed)
 	}
 	s.mainState = wire.ClosureMainStateMoving
+	s.refreshLocked()
 	s.mu.Unlock()
 	s.NotifyFrom(contract.OriginCommand, wire.ClosureControlAttrMainState, wire.ClosureControlAttrOverallTargetState)
 	return nil
@@ -817,6 +815,20 @@ func (s *ControlServer) setCurrent(r currentReport) {
 	}
 	if l := s.currentLatch; r.setLatch && l != nil && s.targetLatch != nil && *l == *s.targetLatch {
 		s.targetLatch = nil
+	}
+	s.refreshLocked()
+}
+
+// refreshLocked rebuilds the views MatterRead answers the two state
+// structs with. Caller holds s.mu for writing.
+func (s *ControlServer) refreshLocked() {
+	lt := s.has(wire.ClosureControlFeatureMotionLatching)
+	s.currentView = &wire.ClosureOverallCurrentState{
+		Position: s.currentPosition, SecureState: s.secureState,
+		Latch: s.currentLatch, HasLatch: lt, Speed: s.currentSpeed,
+	}
+	s.targetView = &wire.ClosureOverallTargetState{
+		Position: s.targetPosition, Latch: s.targetLatch, HasLatch: lt, Speed: s.targetSpeed,
 	}
 }
 

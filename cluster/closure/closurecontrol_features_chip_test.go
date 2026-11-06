@@ -406,10 +406,21 @@ func TestClosureControlStateReadsRenderAlike(t *testing.T) {
 	t.Parallel()
 	s := newFeatured(t, fPS|fLT|fSP, &fullMover{modes: bothLatchModes})
 	s.SetCurrentLatch(ptr(false))
+	latch := true
+	if _, err := s.MatterInvoke(context.Background(), clusterwire.ClosureControlCmdMoveTo, moveTo(nil, &latch, nil)); err != nil {
+		t.Fatal(err)
+	}
+	before, _ := s.MatterRead(clusterwire.ClosureControlAttrOverallCurrentState)
+	s.SetCurrentLatch(ptr(true))
+	if after, _ := s.MatterRead(clusterwire.ClosureControlAttrOverallCurrentState); fmt.Sprintf("%#v", struct{ V any }{before}) == fmt.Sprintf("%#v", struct{ V any }{after}) {
+		t.Error("a changed OverallCurrentState renders as before")
+	}
 	for _, id := range []uint32{clusterwire.ClosureControlAttrOverallCurrentState, clusterwire.ClosureControlAttrOverallTargetState} {
+		// The bridge renders the value wrapped (im.AttributeValue), so a
+		// pointer renders as its address.
 		a, _ := s.MatterRead(id)
 		b, _ := s.MatterRead(id)
-		if fmt.Sprintf("%#v", a) != fmt.Sprintf("%#v", b) {
+		if fmt.Sprintf("%#v", struct{ V any }{a}) != fmt.Sprintf("%#v", struct{ V any }{b}) {
 			t.Errorf("attribute 0x%X renders differently on two reads: %#v / %#v", id, a, b)
 		}
 	}
