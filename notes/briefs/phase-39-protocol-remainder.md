@@ -123,6 +123,27 @@ text in English.
    separate worktrees on `m10/phase-39`; the guards, the pull request and
    the review run on the Linux machine.
 
+Owner decisions 2026-11-06, second wizard (after the four reports):
+
+4. **OTA over HTTPS**: the size cap stays (256 MiB); the total timeout
+   becomes an idle timeout between two received bytes (60 s) — a total
+   timeout couples image size to link speed; a redirect to `http://` is
+   refused by the module's default client (the brief refuses `http://`
+   URIs, the image validation checks no signature), a host client keeps its
+   own policy. Both recorded in `BD-Matter-OTARequestor-HTTPS`.
+5. **`SyncNode` with an endpoint**: a required method of `DatastoreSync`
+   (`SyncEndpointBindings`), an announced API break with the migration
+   guide — chosen over the recommended optional interface
+   (`EndpointBindingSync`) so every host writes the merged list; the
+   reference bridge implements it, the JFDS families exercise it on the
+   Linux machine.
+6. **TimeSynchronization**: `PlatformTime` stays as the third config field
+   (chip's delegate order); the device kit's MatterTime follows the root's
+   UTC offset in a follow-up wave (one Matter time per node).
+7. **Follow-ups as issues, not this phase**: `ble/bluez` implements
+   `MTUExchange` (esphome checked); the live multicast test selects its
+   node by discriminator; `node/commissioner_reach.go` sets the path flags.
+
 Decisions the brief takes itself (on record for the review):
 
 - **HTTPS is opt-in**, as matter.js's default list is BDX only:
