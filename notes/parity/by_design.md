@@ -5813,8 +5813,17 @@ the module's datastore merges itself, so the port does not carry it
 leaves the entry Pending or DeletePending for the next `RefreshNode`;
 jf-admin-app writes the one entry over an empty list
 (`JFADatastoreSync.cpp:1726-1730` at `6170af84`), which drops the node's
-other bindings on a transient read failure. Pinned by
-`datastore_endpoint_sync_test.go`.
+other bindings on a transient read failure. The fetch, the merge and the
+write run under one lock per node and endpoint, so two pushes to one
+endpoint cannot both merge into the list read before the other wrote;
+jf-admin-app's fetch-then-write has the same race in principle, two
+`SyncNode` calls in flight each fetching before either writes
+(`JFADatastoreSync.cpp:1706-1757` at `6170af84`). A push held at the port
+therefore holds the later pushes to its endpoint, so the two ports of
+chip's deferred-completion cases (`TestRemoveBindingIteratorUseAfterFree`,
+`TestAddBindingBackReferenceMarksWrongEntry` in `datastore_chip_test.go`)
+run their adds beside the held push, where chip's adds return before the
+delegate completes. Pinned by `datastore_endpoint_sync_test.go`.
 
 ### BD-chip-JointFabricAdministrator-RulesInServer — the administrator's commands and the commissionee's trust verification follow connectedhomeip; the anchor is recorded at CommissioningComplete as chip's example app does
 

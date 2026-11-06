@@ -9,6 +9,7 @@ import (
 	"slices"
 	"sync"
 	"testing"
+	"testing/synctest"
 
 	dsdef "github.com/SukramJ/go-fabric/cluster/spec/jointfabricdatastore"
 	"github.com/SukramJ/go-fabric/im"
@@ -25,6 +26,9 @@ type endpointSync struct {
 	writes    []endpointWrite
 	writeErr  error
 	fetchCall int
+	// release, when set, holds every fetch after it read the list until
+	// it is closed.
+	release chan struct{}
 }
 
 type endpointWrite struct {
@@ -44,7 +48,13 @@ func (s *endpointSync) FetchEndpointBindingList(_ context.Context, _ uint64, ep 
 	if s.fetchErr != nil {
 		return nil, s.fetchErr
 	}
-	return slices.Clone(s.device[ep]), nil
+	list, release := slices.Clone(s.device[ep]), s.release
+	if release != nil {
+		s.mu2.Unlock()
+		<-release
+		s.mu2.Lock()
+	}
+	return list, nil
 }
 
 func (s *endpointSync) SyncEndpointBindings(_ context.Context, nodeID uint64, ep uint16, entries []EndpointBindingEntry) error {
@@ -189,4 +199,43 @@ func TestEndpointBindingSyncCommandPushesAfterAnswer(t *testing.T) {
 	if w.nodeID != 123 || w.endpoint != 1 || len(w.entries) != 1 {
 		t.Fatalf("SyncEndpointBindings(%d, %d, %+v)", w.nodeID, w.endpoint, w.entries)
 	}
+}
+
+// TestEndpointBindingSyncSerialisesPushesPerEndpoint: two binding adds to
+// one endpoint in flight at once both land in the node's list — the second
+// push's fetch waits for the first push's write, where two fetches of the
+// same list would each write it with only their own entry.
+func TestEndpointBindingSyncSerialisesPushesPerEndpoint(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		s := newEndpointSync()
+		d := nodeWithEndpointSync(t, s)
+		s.release = make(chan struct{})
+		a := BindingTarget{Node: ptr[uint64](0x1111), Endpoint: ptr[uint16](2)}
+		b := BindingTarget{Group: ptr[uint16](10)}
+		errs := make(chan error, 2)
+		for _, target := range []BindingTarget{a, b} {
+			go func() { errs <- d.AddBindingToEndpointForNode(t.Context(), 123, 1, target) }()
+		}
+		synctest.Wait()
+		s.mu2.Lock()
+		fetches := s.fetchCall
+		s.mu2.Unlock()
+		if fetches != 1 {
+			t.Fatalf("%d fetches in flight on one endpoint, want 1", fetches)
+		}
+		close(s.release)
+		mustOK(t, <-errs)
+		mustOK(t, <-errs)
+		w := s.lastWrite(t)
+		if len(w.entries) != 2 ||
+			!slices.ContainsFunc(w.entries, func(e EndpointBindingEntry) bool { return bindingMatches(e.Binding, a) }) ||
+			!slices.ContainsFunc(w.entries, func(e EndpointBindingEntry) bool { return bindingMatches(e.Binding, b) }) {
+			t.Fatalf("the node's list after two concurrent adds = %+v, want both", w.entries)
+		}
+		for _, e := range d.EndpointBindingList() {
+			if e.StatusEntry.State != stateCommitted {
+				t.Fatalf("EndpointBindingList = %+v, want both committed", d.EndpointBindingList())
+			}
+		}
+	})
 }
