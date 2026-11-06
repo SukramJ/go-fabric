@@ -956,7 +956,7 @@
   },
   {
     "file": "cluster/core/general_commissioning.go",
-    "line": 1109,
+    "line": 1113,
     "citation": "packages/node/src/behaviors/general-commissioning/GeneralCommissioningServer.ts:55-66",
     "resolved": "packages/node/src/behaviors/general-commissioning/GeneralCommissioningServer.ts",
     "at": "862ad75f",
@@ -1408,7 +1408,7 @@
   },
   {
     "file": "cluster/thermo/thermostat_server.go",
-    "line": 1126,
+    "line": 1135,
     "citation": "ThermostatServer.ts:614",
     "resolved": "packages/node/src/behaviors/thermostat/ThermostatServer.ts",
     "at": "0ceb202d",
@@ -1418,7 +1418,7 @@
   },
   {
     "file": "cluster/thermo/thermostat_server.go",
-    "line": 1399,
+    "line": 1408,
     "citation": "thermostat-cluster.element.ts:510-514",
     "resolved": "packages/model/src/standard/elements/thermostat-cluster.element.ts",
     "identifier": "SetpointRaiseLowerModeEnum",
@@ -1427,7 +1427,7 @@
   },
   {
     "file": "cluster/thermo/thermostat_server.go",
-    "line": 1538,
+    "line": 1547,
     "citation": "ThermostatServer.ts:219-220",
     "resolved": "packages/node/src/behaviors/thermostat/ThermostatServer.ts",
     "at": "0ceb202d",
@@ -1437,7 +1437,7 @@
   },
   {
     "file": "cluster/thermo/thermostat_server.go",
-    "line": 1713,
+    "line": 1722,
     "citation": "thermostat-cluster.element.ts:322-323",
     "resolved": "packages/model/src/standard/elements/thermostat-cluster.element.ts",
     "identifier": "SetpointRaiseLower",
