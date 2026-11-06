@@ -123,7 +123,8 @@ pin lift confirms by re-reading the row, [`pin-lifts.md`](./pin-lifts.md)).
 | BD-chip-JCM-Commissioner | `ControllerCommissioningFlow.ts:576-583` runs `OperationalCredentials.Certificates` right after `OperationalCredentials.DeviceAttestation`, no Joint Commissioning step between (absence: the two step pushes, :573-585) | `packages/protocol/src/peer/ControllerCommissioningFlow.ts` | `"name: \"OperationalCredentials.DeviceAttestation\",\n            stepLogic: () => this.#deviceAttestation(),\n        });\n\n        this.commissioningSteps.push({\n            stepNumber: 11, // includes 11-13"` | connectedhomeip `src/controller/jcm/DeviceCommissioner.cpp` at `6170af84` (:45-550), `src/controller/jcm/AutoCommissioner.{h,cpp}` (the read paths `.h:56-66`), `src/controller/AutoCommissioner.cpp:522-531` (the stage after attestation), tests `src/controller/tests/jcm/TestJCMCommissioner.cpp` | no |
 | BD-Matter-SurfaceChange-ConfigurationVersion | `BasicInformationServer.ts:35-37` leaves the "when" to the application: the version is "seeded to 1 and constrained to only ever increase", and the application bumps it "with `increaseConfigurationVersion`" (`:132`); the only production caller at the pin is the bridged-to-root coupling, `BridgedDeviceBasicInformationServer.ts:86` | `packages/node/src/behaviors/basic-information/BasicInformationServer.ts` | `"node's configuration changes in a way clients should detect, bump it with {@link increaseConfigurationVersion},"` | this module: concept v11 §C.9, ADR 0030 decision 6, wave S4 — the node persists each endpoint's effective surface next to its ConfigurationVersion and raises the bridged and the root ConfigurationVersion (one change, matter.js's coupling) when the surface of a returning endpoint differs (`node/surface_stability.go`) | no |
 | BD-chip-FailSafeOfTheAccessingFabric | `OperationalCredentialsServer.ts:602-604` reads the one `failsafeContext` without asking for whose fabric it was armed (presence) | `packages/node/src/behaviors/operational-credentials/OperationalCredentialsServer.ts` | `"get #failsafeContext() {\n        return this.env.get(DeviceCommissioner).failsafeContext;\n    }"` | connectedhomeip `src/app/FailSafeContext.h:76-79` at `6170af84` (`IsFailSafeArmed(accessingFabricIndex)`), its callers `OperationalCredentialsCluster.cpp:341, :472, :760`, `ThreadBorderRouterManagementCluster.cpp:212`, `joint-fabric-administrator-server.cpp:325, :369`, `NetworkCommissioningCluster.cpp:155-172, :380, :568, :609` | no |
-| BD-chip-ClosureControl-RulesInServer | `ClosureControlServer.ts:17` is the empty subclass (absence: the class line, 17 lines in all) | `packages/node/src/behaviors/closure-control/ClosureControlServer.ts` | `"export class ClosureControlServer extends ClosureControlBehavior {}"` | connectedhomeip `src/app/clusters/closure-control-server/ClosureControlCluster.cpp` at `6170af84` (`HandleStop` :531-551, `HandleMoveTo` :554-639) | no |
+| BD-chip-ClosureControl-RulesInServer | `ClosureControlServer.ts:17` is the empty subclass (absence: the class line, 17 lines in all) | `packages/node/src/behaviors/closure-control/ClosureControlServer.ts` | `"export class ClosureControlServer extends ClosureControlBehavior {}"` | connectedhomeip `src/app/clusters/closure-control-server/ClosureControlCluster.cpp` at `6170af84` (`HandleStop` :531-551, `HandleMoveTo` :554-639, `HandleCalibrate` :642-665, the feature checks :45-66, :81, :107-117) | yes |
+| BD-chip-Valve-RulesInServer | `ValveConfigurationAndControlServer.ts:14` is the empty subclass (absence: the class line, 14 lines in all) | `packages/node/src/behaviors/valve-configuration-and-control/ValveConfigurationAndControlServer.ts` | `"export class ValveConfigurationAndControlServer extends ValveConfigurationAndControlBehavior {}"` | connectedhomeip `src/app/clusters/valve-configuration-and-control-server/ValveConfigurationAndControlCluster.cpp` at `6170af84` (`WriteImpl` :150-196, `CloseValve` :237-264, `HandleOpenCommand` :266-345, `OpenValve` :347-388, `SetAutoCloseTime` :391-413) | yes |
 | BD-chip-ScenesManagement-SceneNameLength | `ScenesManagementServer.ts:147` relaxes the AddScene SceneName constraint for the behaviour to answer, and `addScene` checks only SceneId and TransitionTime (`:283`, presence) | `packages/node/src/behaviors/scenes-management/ScenesManagementServer.ts` | `"transitionTime > 60000000) {"` | connectedhomeip `src/app/clusters/scenes-server/ScenesManagementCluster.cpp:535-541` at `6170af84` | no |
 | BD-Matter-ICDVerificationKeyConstantTime | `IcdManagementServer.ts:761` compares the presented VerificationKey with `Bytes.areEqual`, a data-dependent comparison (presence) | `packages/node/src/behaviors/icd-management/IcdManagementServer.ts` | `"!Bytes.areEqual(verificationKey, stored.key)"` | this module: Go `crypto/subtle.ConstantTimeCompare` (review 2026-11 W2-sec-04); the accept/refuse outcome is matter.js's | no |
 | BD-Matter-OtaImageHeaderSizeCap | `OtaImageReader.ts:181-183` reads the prefix's header size and collects that many bytes with no bound (absence: the line that would take the check, followed by the closing brace) | `packages/protocol/src/ota/OtaImageReader.ts` | `"this.#headerSize = headerReader.readUInt32();\n            }"` | connectedhomeip `src/lib/core/OTAImageHeader.cpp:53` (`kMaxHeaderSize = 1024`), checked at `:128` (review 2026-11 W4-ctlint-07) | no |
@@ -5349,6 +5350,80 @@ and the ignored Latch and Speed of features the server does not serve are
 the specification text matter.js carries (`closure-control.resource.ts`).
 Reasoning: chip is the only reference with rules (W3-club1-06). Retire when
 matter.js's server gains them.
+
+Phase 38 serves MotionLatching, Instantaneous, Speed and Calibration after
+the same file, behind the row (`closure.Ahead`, surface yes). A declared
+LT, SP or CL needs the `Mover`'s optional `closurecontrol.Latcher`,
+`SpeedMover` or `Calibrator` (`cluster/spec/closurecontrol/ports.go`),
+else `ErrFeatureMap` names the interface; IS is a declaration fact, and SP
+with IS is the definition's conformance refusal (chip's constructor dies
+on it, `:49-53`). LatchControlModes is the Latcher's, fixed (`:81`); Stop
+with IS is UNSUPPORTED_COMMAND (`:535`) and IS withdraws Stop and
+MovementCompleted from the lists (`:107`, `:680`); Calibrate is
+UNSUPPORTED_COMMAND without CL, SUCCESS without a call while Calibrating,
+INVALID_IN_STATE outside Stopped and SetupRequired, and MainState
+Calibrating after the Calibrator's success (`:642-665`). MoveTo's Latch
+needs RemoteLatching / RemoteUnlatching or is INVALID_IN_STATE
+(`:579-590`), an unknown Speed is CONSTRAINT_ERROR (`:592-597`), a Position
+change of a latched closure without Latch false INVALID_IN_STATE
+(`:607-620`); the drive hears unlatch, speed, motion, latch in that order,
+as chip's closure-app orders a panel's actions
+(`examples/closure-app/linux/ClosureManager.cpp` `HandlePanelUnlatchAction`
+:595, `HandlePanelSetTargetAction` :656). SecureState stays derived: with LT
+true only FullyClosed and latched, null with an unknown latch — chip
+refuses any other true SecureState (`:364-386`); a drive report carrying
+Latch or Speed without the feature is refused (`:342-360`); a reached latch
+clears OverallTargetState's Latch as an arrival clears its Position (the
+addition above). Two differences: a request whose Latch and Speed are
+both ignored keeps the fallback to OverallTargetState.Position and changes
+nothing without one, where chip calls the delegate and sets Moving; and a
+MoveTo is Moving, never WaitingForMotion — chip's `IsReadyToMove`
+(`:626-635`) has no port, the drive reports WaitingForMotion itself.
+CountdownTime and LT without PS stay out (the server serves Positioning
+always). Parity: `closurecontrol_features_chip_test.go` (the chip unit
+tests `TestHandleCalibrate`, `TestHandleMoveToAllFeatures`,
+`TestHandleMoveToLatchedPositionChangeRequiresUnlatch`,
+`TestHandleMoveToRemoteLatchingConformanceChecks`,
+`TestHandleMoveToConstraintValidation`,
+`TestSetOverallCurrentStateFeatureValidation`, by meaning).
+
+### BD-chip-Valve-RulesInServer — the valve's rules, Level and TimeSync are connectedhomeip's; matter.js has none
+
+matter.js's `ValveConfigurationAndControlServer` is the empty subclass
+(`packages/node/src/behaviors/valve-configuration-and-control/ValveConfigurationAndControlServer.ts:14`
+at `862ad75f`), so `cluster/valve.Server` follows connectedhomeip's
+`ValveConfigurationAndControlCluster.cpp` at `6170af84` behind the
+`StateSource` port, which holds the state chip's cluster keeps itself. The
+rules served before phase 38: an unchanged DefaultOpenDuration write is a
+no-op success (`:165-166`), Open and Close reach the source and a source
+error is FAILURE (chip's FailureDueToFault needs a ValveFault the port does
+not carry), an absent OpenDuration means DefaultOpenDuration and a present
+null an indefinite opening (`:300-310`). Phase 38 adds Level (LVL) and
+TimeSync (TS), behind the row (`valve.Ahead`, surface yes). LVL needs the
+source's `LevelSource` (CurrentLevel, TargetLevel), DefaultOpenLevel its
+`DefaultOpenLevelSource`, TS the node's Matter time (`valve.Config.MatterTime`,
+the kit's `core.MatterEpochSeconds` over the device clock — chip's Startup
+refuses TS without a time tracker, `:46-50`), each refused with
+`ErrSelection` naming what is missing. A DefaultOpenLevel write is 1 to 100
+and 100 or a multiple of LevelStep, an unchanged one a no-op (`:175-192`,
+`ValueCompliesWithLevelStep` `:483-490`); an Open resolves its level — the
+command's TargetLevel, else DefaultOpenLevel where served, else 100 — and a
+TargetLevel off the LevelStep grid is CONSTRAINT_ERROR (`:312-341`); the
+resolved level reaches the source in the request's TargetLevel, as chip
+hands it to `HandleOpenValve(level)`
+(`valve-configuration-and-control-delegate.h:40`). AutoCloseTime is the
+Matter time at the Open plus the opening's duration (`:391-413`), null for
+an indefinite opening, without a synchronized time (`:394`), after a Close
+(`:243-247`), and — where chip's countdown closes the valve — once the
+source reports no RemainingDuration. Differences: the Matter time carries
+epoch-s, so AutoCloseTime is whole seconds; TargetLevel 0 on Close
+(`:253-256`) and CurrentLevel are the source's report, not the server's
+write; a TargetLevel without LVL stays CONSTRAINT_ERROR where chip ignores
+it (issue 42777, `:274-276`). Parity: `valve_level_chip_test.go`
+(`WriteAttributeTestDefaultOpenLevelOutOfRange`,
+`SetAutoCloseTimeNoIntegerOverflow`, `OpenCommandFieldsValidation`, the
+Level reads, by meaning). Reasoning: chip is the only reference with
+rules. Retire when matter.js's server gains them.
 ### BD-Matter-ICDVerificationKeyConstantTime — the ICD VerificationKey is compared in constant time
 
 matter.js's `IcdManagementServer.ts:756-764` at `862ad75f` (`#assertMayModify`)

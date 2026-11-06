@@ -159,6 +159,8 @@ var measurements = map[string]measure{
 	"BD-chip-TimeSynchronization-Features":            measureTimeSynchronization,
 	"BD-Thread-NetComm-ThreadVariant":                 measureNetworkCommissioning,
 	"BD-chip-GeneralCommissioning-TermsAndConditions": measureGeneralCommissioning,
+	"BD-chip-ClosureControl-RulesInServer":            measureClosure,
+	"BD-chip-Valve-RulesInServer":                     measureValve,
 }
 
 // measureThermostat builds a heating Thermostat through the device layer
