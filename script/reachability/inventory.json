@@ -33360,7 +33360,7 @@
       "identifier": "TestCreateCSRRefusesANilKey",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/mattercert/der_edges_test.go",
-      "line": 521
+      "line": 530
     },
     {
       "package": "secure/mattercert",
@@ -33535,21 +33535,21 @@
       "identifier": "TestEncodeCanonicalOrderWithoutAnOrder",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/mattercert/der_edges_test.go",
-      "line": 387
+      "line": 396
     },
     {
       "package": "secure/mattercert",
       "identifier": "TestEncodeDERRefusals",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/mattercert/der_edges_test.go",
-      "line": 328
+      "line": 337
     },
     {
       "package": "secure/mattercert",
       "identifier": "TestEncodeRefusesOrdersWithoutValues",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/mattercert/der_edges_test.go",
-      "line": 355
+      "line": 364
     },
     {
       "package": "secure/mattercert",
@@ -33598,7 +33598,7 @@
       "identifier": "TestValidateRCACRefusals",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/mattercert/der_edges_test.go",
-      "line": 489
+      "line": 498
     },
     {
       "package": "secure/mattercert",
@@ -33612,7 +33612,7 @@
       "identifier": "TestVerifierConstructionAndExtractionRefusals",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/mattercert/der_edges_test.go",
-      "line": 424
+      "line": 433
     },
     {
       "package": "secure/mattercert",
@@ -37203,7 +37203,7 @@
       "identifier": "TestMessageCodecEncodeRefusesTheReservedDestSize",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/message/messagecodec_parity_matterjs_test.go",
-      "line": 320
+      "line": 321
     },
     {
       "package": "transport/message",

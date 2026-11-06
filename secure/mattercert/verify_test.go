@@ -166,7 +166,7 @@ func buildTBSCert(t *testing.T, opts verifyTestCertOpts) []byte {
 		e.PutUint(tlv.ContextTag(17), opts.subjectNodeID)
 	}
 	for i := range opts.subjectExtraRDNs {
-		e.PutUTF8(tlv.ContextTag(3), fmt.Sprintf("cn%d", i)) // commonName
+		e.PutUTF8(tlv.ContextTag(3), fmt.Sprintf("cn%d", i)) // serialNumber (tag 3), a standard attribute
 	}
 	if err := e.EndContainer(); err != nil {
 		t.Fatalf("EndContainer subject: %v", err)

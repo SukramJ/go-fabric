@@ -15,11 +15,13 @@ import (
 )
 
 // The DN rules of the matter.js pin db021da0 at the decoder: a
-// single-valued Matter attribute occurs at most once (TlvObject.ts:230,
-// DistinguishedName.ts:242-246 at db021da0 — "Tagged list contains field
-// … more than once"), and matter-vvs-id (tag 23) is decoded in every
+// single-valued Matter attribute occurs at most once
+// (DistinguishedName.ts:242-246, :261-283 at db021da0 — "Distinguished name
+// contains … more than once"), matter-vvs-id (tag 23) is decoded in every
 // operational certificate (definitions/operational.ts:64), so the NOC,
-// ICAC and RCAC checks can refuse it.
+// ICAC and RCAC checks can refuse it, and matter-firmware-signing-id (tag
+// 18) is decoded and counted as an RDN (OperationalCertificateVerifyTest.ts
+// :864-879 round-trips it).
 func TestDecodeDNRulesPinDB021da0(t *testing.T) {
 	t.Parallel()
 	build := func(subject func(e *tlv.Encoder)) []byte {
@@ -58,6 +60,19 @@ func TestDecodeDNRulesPinDB021da0(t *testing.T) {
 			t.Fatal(err)
 		}
 		if !c.Subject.HasVVSID || c.Subject.MatterVVSID != 0x77 || len(c.Subject.Order) != 1 || c.Subject.Order[0] != 23 {
+			t.Fatalf("subject = %+v", c.Subject)
+		}
+	})
+	t.Run("a matter-firmware-signing-id is decoded", func(t *testing.T) {
+		t.Parallel()
+		c, err := mattercert.Decode(build(func(e *tlv.Encoder) {
+			e.PutUint(tlv.ContextTag(17), uint64(1))
+			e.PutUint(tlv.ContextTag(18), uint64(0xFFFF_FFFF_FFFF_FFFF))
+		}))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !c.Subject.HasFirmwareSigningID || c.Subject.MatterFirmwareSigningID != 0xFFFF_FFFF_FFFF_FFFF || len(c.Subject.Order) != 2 || c.Subject.Order[1] != 18 {
 			t.Fatalf("subject = %+v", c.Subject)
 		}
 	})

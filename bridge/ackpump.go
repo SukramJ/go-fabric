@@ -511,7 +511,8 @@ func (b *Bridge) emitStandaloneAck(obl mrp.AckObligation) {
 	// Echo the peer's SourceNodeID as our DestNodeID so chip-tool's
 	// commissioner accepts the unsecured StandaloneAck (same rule as
 	// [Bridge.sendReply], Matter §4.4.1.2). For peers that don't set
-	// SourceNodeID the header stays bare. Skip on encrypted sessions —
+	// SourceNodeID the ack names the destination it addressed as our
+	// source (exchangeReplyTarget). Skip on encrypted sessions —
 	// chip-tool's secure-receive validator does not expect it there.
 	if target.sessionID == 0 && target.hasPeerSourceNodeID {
 		hdr.DestSize = message.DestNodeID

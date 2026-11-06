@@ -294,7 +294,7 @@ func TestDERDistinguishedNameEdges(t *testing.T) {
 	// — OperationalCertificateVerifyTest.ts:1014-1019 at db021da0); a
 	// repeated standard attribute is kept, every value in order
 	// (DistinguishedNameTest.ts:203-237, :1021-1030).
-	for _, oid := range []asn1.ObjectIdentifier{oidMatterNodeID, oidMatterICACID, oidMatterRCACID, oidMatterFabricID, oidMatterVVSID} {
+	for _, oid := range []asn1.ObjectIdentifier{oidMatterNodeID, oidMatterICACID, oidMatterRCACID, oidMatterFabricID, oidMatterVVSID, oidMatterFirmwareSigningID} {
 		_, err := derDN(name(attr(oid, asn1.TagUTF8String, "0000000000000001"), attr(oidMatterFabricID, asn1.TagUTF8String, "00000000000000AB"), attr(oid, asn1.TagUTF8String, "0000000000000002")))
 		if err == nil || !errors.Is(err, ErrMalformed) || !strings.Contains(err.Error(), "repeated") {
 			t.Fatalf("derDN(%v twice) = %v, want the repeated refusal", oid, err)
@@ -314,6 +314,15 @@ func TestDERDistinguishedNameEdges(t *testing.T) {
 		t.Fatalf("derDN(repeated standard attributes): %v", err)
 	}
 	if want := []uint8{1, 8, dnTagMatterNodeID, dnTagStandardLast, 8, dnTagMatterFabricID, 1, dnTagStandardLast}; !slices.Equal(dn.Order, want) { // commonName 1, organizationalUnitName 8
+		t.Fatalf("Order = %v, want %v", dn.Order, want)
+	}
+	// matter-firmware-signing-id is read from DER and counts as an RDN
+	// (asn.ts:98-99; OperationalCertificateVerifyTest.ts:864-879 at db021da0).
+	fw, err := derDN(name(attr(oidMatterNodeID, asn1.TagUTF8String, "0000000000000001"), attr(oidMatterFirmwareSigningID, asn1.TagUTF8String, "FFFFFFFFFFFFFFFF")))
+	if err != nil || !fw.HasFirmwareSigningID || fw.MatterFirmwareSigningID != 0xFFFF_FFFF_FFFF_FFFF || !slices.Equal(fw.Order, []uint8{dnTagMatterNodeID, dnTagMatterFirmwareSignID}) {
+		t.Fatalf("derDN(firmware signing id) = %+v, %v", fw, err)
+	}
+	if want := []uint8{1, 8, dnTagMatterNodeID, dnTagStandardLast, 8, dnTagMatterFabricID, 1, dnTagStandardLast}; !slices.Equal(dn.Order, want) {
 		t.Fatalf("Order = %v, want %v", dn.Order, want)
 	}
 	values := make([]string, 0, len(dn.Attributes))

@@ -3350,7 +3350,7 @@
   },
   {
     "file": "secure/mattercert/der.go",
-    "line": 339,
+    "line": 341,
     "citation": "Certificate.ts:685-726",
     "resolved": "packages/protocol/src/certificate/kinds/Certificate.ts",
     "identifier": "ecPublicKey",

@@ -3401,13 +3401,15 @@ bridge decodes OpenCommissioningWindow with its own
 into `cluster/wire.OpenWindowParams`, ahead of the definition. Two reasons:
 the `WindowController` port a host implements takes `OpenWindowParams`, and
 matter.js extends the request schema before it validates — its
-`AdministratorCommissioningServer.ts` relaxes the PakePasscodeVerifier,
-Iterations and Salt constraints to "none" so the behavior answers
-PakeParameterError (cluster status 0x03) rather than the interaction layer
-answering CONSTRAINT_ERROR. The generated decoder carries the element
-file's constraints without that extension; the hand-written one enforces
-only CommissioningTimeout's width and the Discriminator bound, as matter.js
-does, and leaves the PAKE checks to the server. The server also accepts the
+`AdministratorCommissioningServer.ts:38-43` (at db021da0) relaxes the
+PakePasscodeVerifier, Iterations, Salt and Discriminator constraints to
+"none" so the behavior answers PakeParameterError (cluster status 0x03) for
+the PAKE parameters and INVALID_COMMAND for a discriminator above 0xFFF
+(`:92-97`) rather than the interaction layer answering CONSTRAINT_ERROR. The
+generated decoder carries the element file's constraints without that
+extension; the hand-written one enforces only CommissioningTimeout's width,
+as matter.js does, and leaves the PAKE and discriminator checks to the
+server. The server also accepts the
 generated `OpenCommissioningWindowRequest` in process. Retire when the
 generator can apply a behavior's schema extension.
 

@@ -290,18 +290,19 @@ func TestMessageCodecDecodeRefusesCrossFieldShapes(t *testing.T) {
 			}
 		}
 	})
-	t.Run("an unsecured header with neither or both node ids is not encoded", func(t *testing.T) {
+	t.Run("the unsecured node-id rule is the decoder's, not the encoder's", func(t *testing.T) {
 		t.Parallel()
+		// matter.js's encodePacketHeader refuses only the group case
+		// (MessageCodec.ts:480-496 at db021da0); the senders name one node
+		// id by construction.
 		for _, h := range []Header{
 			{MessageCounter: 1},
 			{MessageCounter: 1, HasSourceNodeID: true, SourceNodeID: 1, DestSize: DestNodeID, DestNodeID: 2},
+			{MessageCounter: 1, HasSourceNodeID: true, SourceNodeID: 1},
 		} {
-			if _, err := h.MarshalPacket(); !errors.Is(err, ErrUnsecuredNodeIDs) {
-				t.Errorf("%+v: err = %v, want ErrUnsecuredNodeIDs", h, err)
+			if _, err := h.MarshalPacket(); err != nil {
+				t.Errorf("%+v: %v, want it encoded", h, err)
 			}
-		}
-		if _, err := (Header{MessageCounter: 1, HasSourceNodeID: true, SourceNodeID: 1}).MarshalPacket(); err != nil {
-			t.Errorf("one node id: %v", err)
 		}
 	})
 	t.Run("a unicast header with a destination group id is not encoded", func(t *testing.T) {

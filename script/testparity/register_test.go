@@ -100,14 +100,14 @@ const testparityPlannedRatchet = 16
 // Phase 39: packages/nodejs-ble/test joins the roots for the BTP
 // renegotiation; NobleBleChannelTest.ts ported (its 18 stall and ATT_MTU
 // cases), ScanControlTest.ts excluded: 158 ported.
-// Pin lift db021da0 wave P1: four planned files become partial with 56
+// Pin lift db021da0 wave P1: four planned files become partial with 53
 // missing cases named (the DNS-SD advertisement reads of an
 // administrator's window, the VVSC kind and issuer-DN cases of the
 // certificate tests, the vendor-id DN attributes, the DER round trips):
 // 1033 missing.
 const (
 	testparityPortedRatchet  = 146
-	testparityMissingRatchet = 1033
+	testparityMissingRatchet = 1030
 )
 
 // testparityLeftRatchet is the number of left it cases summed over the

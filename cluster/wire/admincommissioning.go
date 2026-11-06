@@ -427,10 +427,12 @@ func (a *AdministratorCommissioning) MatterInvoke(ctx context.Context, cmdID uin
 		// an administrator's open window (#assertNoCommissioningInProgress,
 		// :213-221), then the PAKE parameters (:82-90, each
 		// PAKEParameterError), then the timeout (INVALID_COMMAND,
-		// #windowTimeout :223-235; ours is the controller's, bound to the
-		// commissioned state) and the discriminator (:92-97,
-		// INVALID_COMMAND). A malformed-and-busy request therefore
-		// surfaces Busy, not the parameter error.
+		// #windowTimeout :223-235) and the discriminator (:92-97,
+		// INVALID_COMMAND). Ours checks the discriminator here and the
+		// timeout in the controller's OpenWindow, bound to the commissioned
+		// state — both INVALID_COMMAND, so the order between the two is not
+		// observable. A malformed-and-busy request surfaces Busy, not the
+		// parameter error.
 		_, fabIdx := im.FabricFilterFromContext(ctx)
 		if fabIdx == 0 {
 			return nil, fmt.Errorf("%w: opening a commissioning window requires a session on a fabric", errAdmCommPakeParameter)

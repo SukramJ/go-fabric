@@ -196,6 +196,12 @@ type DistinguishedName struct {
 	// 1.3.6.1.4.1.37244.1.7).
 	MatterVVSID uint64
 	HasVVSID    bool
+	// MatterFirmwareSigningID is the 64-bit matter-firmware-signing-id (DN
+	// tag 18, OID 1.3.6.1.4.1.37244.1.2 — matter.js definitions/asn.ts:98-99
+	// at db021da0), an optional attribute of an operational certificate
+	// that counts as an RDN like the others.
+	MatterFirmwareSigningID uint64
+	HasFirmwareSigningID    bool
 	// Order records the DN attribute tags in their original TLV
 	// arrival sequence. The X.509 DER reconstruction (TBSToDER)
 	// MUST emit the RDNs in this order — matter.js's Object.entries
@@ -389,10 +395,10 @@ func assignField(cert *Certificate, el tlv.Element, d *tlv.Decoder) error {
 func decodeDN(d *tlv.Decoder) (DistinguishedName, error) {
 	var dn DistinguishedName
 	// A single-valued Matter attribute occurs at most once in a DN —
-	// matter.js refuses a tagged list that carries a field twice
-	// (packages/types/src/tlv/TlvObject.ts:230 at db021da0, "Tagged list
-	// contains field … more than once"; DistinguishedName.ts:242-246),
-	// where the decoder used to keep the last value.
+	// matter.js's DN decoder refuses a Matter attribute that repeats
+	// ("Distinguished name contains … more than once",
+	// DistinguishedName.ts:261-283 at db021da0; the rule :242-246), where
+	// the decoder used to keep the last value.
 	seen := make(map[uint8]bool, 6)
 	once := func(tag uint8) error {
 		if seen[tag] {
@@ -439,6 +445,10 @@ func decodeDN(d *tlv.Decoder) (DistinguishedName, error) {
 		case dnTagMatterVVSID:
 			dn.MatterVVSID = el.Uint
 			dn.HasVVSID = true
+			dn.Order = append(dn.Order, tag)
+		case dnTagMatterFirmwareSignID:
+			dn.MatterFirmwareSigningID = el.Uint
+			dn.HasFirmwareSigningID = true
 			dn.Order = append(dn.Order, tag)
 		case dnTagMatterCASEAuth:
 			dn.CASEAuthTags = append(dn.CASEAuthTags, uint32(el.Uint&0xFFFFFFFF))

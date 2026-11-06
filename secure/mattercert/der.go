@@ -259,6 +259,8 @@ func (dn *DistinguishedName) derMatterAttribute(oid asn1.ObjectIdentifier, value
 	switch {
 	case oid.Equal(oidMatterVVSID):
 		field, has, tag = &dn.MatterVVSID, &dn.HasVVSID, dnTagMatterVVSID
+	case oid.Equal(oidMatterFirmwareSigningID):
+		field, has, tag = &dn.MatterFirmwareSigningID, &dn.HasFirmwareSigningID, dnTagMatterFirmwareSignID
 	case oid.Equal(oidMatterNodeID):
 		field, has, tag = &dn.MatterNodeID, &dn.HasNodeID, dnTagMatterNodeID
 	case oid.Equal(oidMatterICACID):
