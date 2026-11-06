@@ -3090,13 +3090,13 @@
         "cluster/transition:TestCyclicHueDownwards",
         "cluster/light:TestStopMoveStepReportsZero",
         "cluster/light:TestRemainingTimeOnStops",
-        "cluster/light:TestParityMatterJS_ColorControlServerTest"
+        "cluster/light:TestParityMatterJS_ColorControlServerTest",
+        "cluster/light:TestParityMatterJS_ColorControlPrimaries"
       ],
       "missing": [
-        "accepts a primary a light supplies without stating the number of primaries",
         "clears the end time the application states on StopMoveStep"
       ],
-      "reason": "The cyclic hue transition and the stop cases are ported locally, StopMoveStep leaving a running colour loop alone on a fabrictest extended colour light. Missing: the primaries case, M4: findings entry \"ColorControl serves no primaries\" (no Primary1X … Primary6Intensity attribute, so a light cannot supply one); the application end time, by_design BD-Matter-LevelControl-NativeRamp (the Go server keeps no application-stated transitionEndTime).",
+      "reason": "The cyclic hue transition and the stop cases are ported locally, StopMoveStep leaving a running colour loop alone on a fabrictest extended colour light; the primaries case since phase 38, NumberOfPrimaries counting the supplied primaries (by_design BD-chip-ColorControl-NumberOfPrimaries). Missing: the application end time, by_design BD-Matter-LevelControl-NativeRamp (the Go server keeps no application-stated transitionEndTime).",
       "snapshotSha": "23c14586e80efe7f245301082deb9ee284a84a97"
     },
     {

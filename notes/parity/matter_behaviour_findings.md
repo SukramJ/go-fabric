@@ -599,11 +599,6 @@ Line numbers at `862ad75f`. (Triage 2026-10-29: wave H3, node options and the em
 Found by the phase-18a system-set port (brief BN, PR #182, 2026-10-19).
 Line numbers at `862ad75f`. (Triage 2026-10-29: wave H1, the device IM and write path.)
 
-- **A bridged endpoint cannot opt into TagList.** `Descriptor.EnableTagList`
-  / `AddTags` exist on the server (`DescriptorServer.ts:122-147`), but
-  `endpoint.Spec` carries no tags, so a host's device model cannot set
-  them; the default stays off for Apple (the note at
-  `cluster/core/descriptor.go` `MatterAttributes`). (Triage 2026-10-29: wave H3, node options and the embedding layer.)
 - **The groups manager holds no key set 0.** `KeySetsTest.ts` reads the
   only key of the default key set and the second-newest key of the IPK
   key set (§4.14.2.6); `groups/manager.go` loads key sets from 1 and the
@@ -680,10 +675,6 @@ Found by the phase-17a port of the OnOff, LevelControl, ColorControl,
 Identify, WindowCovering and ServiceArea tests (brief BJ, PR #170,
 2026-10-19). Line numbers at `862ad75f`. (Triage 2026-10-29: harness note, the next CHIP image lift (not a parity gap).)
 
-- **ColorControl serves no primaries.** Primary1X … Primary6Intensity and
-  NumberOfPrimaries are absent from `cluster/light`, so a light cannot
-  supply one (ColorControlServerTest "accepts a primary a light supplies
-  without stating the number of primaries"). Optional attributes; low. (Triage 2026-10-29: when a consumer asks (brief BR decision 19.4); no wave.)
 - **ColorControl `MatterQuiesce` leaves the quieter's pending-report
   timers.** `cluster/light/colorcontrol_transitions.go` stops the engine
   only; the LevelControl fix of PR #170 (`MatterQuiesce` drops the held
