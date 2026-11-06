@@ -176,34 +176,40 @@ type airQualityBand struct {
 // the 24-hour-average parameters onto these classes, so the averaging
 // windows line up.
 func airQualityBands(class contract.MeasurementClass) ([]airQualityBand, bool) {
-	inf := math.Inf(1)
 	switch class {
 	case contract.MeasurementCO2:
-		return []airQualityBand{
-			{1000, aqdef.AirQualityGood}, {2000, aqdef.AirQualityPoor}, {inf, aqdef.AirQualityVeryPoor},
-		}, true
+		return co2Bands, true
 	case contract.MeasurementPM25:
-		return []airQualityBand{
-			{15, aqdef.AirQualityGood},
-			{25, aqdef.AirQualityFair},
-			{37.5, aqdef.AirQualityModerate},
-			{50, aqdef.AirQualityPoor},
-			{75, aqdef.AirQualityVeryPoor},
-			{inf, aqdef.AirQualityExtremelyPoor},
-		}, true
+		return pm25Bands, true
 	case contract.MeasurementPM10:
-		return []airQualityBand{
-			{45, aqdef.AirQualityGood},
-			{50, aqdef.AirQualityFair},
-			{75, aqdef.AirQualityModerate},
-			{100, aqdef.AirQualityPoor},
-			{150, aqdef.AirQualityVeryPoor},
-			{inf, aqdef.AirQualityExtremelyPoor},
-		}, true
+		return pm10Bands, true
 	default:
 		return nil, false
 	}
 }
+
+// The grading scales of [airQualityBands].
+var (
+	co2Bands = []airQualityBand{
+		{1000, aqdef.AirQualityGood}, {2000, aqdef.AirQualityPoor}, {math.Inf(1), aqdef.AirQualityVeryPoor},
+	}
+	pm25Bands = []airQualityBand{
+		{15, aqdef.AirQualityGood},
+		{25, aqdef.AirQualityFair},
+		{37.5, aqdef.AirQualityModerate},
+		{50, aqdef.AirQualityPoor},
+		{75, aqdef.AirQualityVeryPoor},
+		{math.Inf(1), aqdef.AirQualityExtremelyPoor},
+	}
+	pm10Bands = []airQualityBand{
+		{45, aqdef.AirQualityGood},
+		{50, aqdef.AirQualityFair},
+		{75, aqdef.AirQualityModerate},
+		{100, aqdef.AirQualityPoor},
+		{150, aqdef.AirQualityVeryPoor},
+		{math.Inf(1), aqdef.AirQualityExtremelyPoor},
+	}
+)
 
 // airQualityGrade grades v on bands into the grades levels serves. A
 // grade the selection leaves out folds towards Poor, which with Good and

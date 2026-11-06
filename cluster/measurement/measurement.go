@@ -1237,11 +1237,10 @@ func whToMilliWattHours(wh float64) int64 {
 type AirQualityServer struct {
 	cluster.DataVersionTracker
 	src contract.FloatMeasurementSource
-	// bands is the pollutant's grading scale in the source's own unit;
-	// graded is false for a class with no guideline, in which case the
-	// server reports Unknown.
-	bands  []airQualityBand
-	graded bool
+	// class names the pollutant, whose grading scale ([airQualityBands])
+	// is in the source's own unit; a class with no guideline reports
+	// Unknown.
+	class contract.MeasurementClass
 	// levels are the optional grades the selection serves, inst the
 	// definition bound to them.
 	levels contract.AirQualityLevels
@@ -1255,9 +1254,8 @@ var _ contract.ClusterDataVersion = (*AirQualityServer)(nil)
 // readings on the guideline scale for class, into the grades src's
 // [contract.ConcentrationSelection] serves.
 func NewAirQualityServer(class contract.MeasurementClass, src contract.FloatMeasurementSource) *AirQualityServer {
-	bands, graded := airQualityBands(class)
 	levels := concentrationSelectionOf(src).AirQuality
-	return &AirQualityServer{src: src, bands: bands, graded: graded, levels: levels, inst: airQualityInsts[levels]}
+	return &AirQualityServer{src: src, class: class, levels: levels, inst: airQualityInsts[levels]}
 }
 
 // MatterDataVersion implements [contract.ClusterDataVersion].
@@ -1282,11 +1280,12 @@ func (s *AirQualityServer) MatterRead(attrID uint32) (any, bool) {
 
 // level grades the current reading into an AirQualityEnum member.
 func (s *AirQualityServer) level() uint8 {
+	bands, graded := airQualityBands(s.class)
 	v, ok := s.src.MatterFloatValue()
-	if !ok || !s.graded || math.IsNaN(v) {
+	if !ok || !graded || math.IsNaN(v) {
 		return airQualityUnknown
 	}
-	return airQualityGrade(s.bands, s.levels, v)
+	return airQualityGrade(bands, s.levels, v)
 }
 
 // MatterWrite refuses the write as the definition answers it (see refuseWrite) — AirQuality carries a single "R V" attribute.
