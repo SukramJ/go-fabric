@@ -7,7 +7,9 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"net"
+	"slices"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -31,9 +33,18 @@ const (
 // names.
 func commissionedFabric(t *testing.T) (*net.UDPAddr, handshake.Fabric) {
 	t.Helper()
+	return commissionedFabricWithDeviceCATs(t, nil)
+}
+
+// commissionedFabricWithDeviceCATs commissions a node whose NOC carries
+// deviceCATs — matter.js CaseSessionCatsTest.ts commissionedPair's
+// deviceCats at db021da0.
+func commissionedFabricWithDeviceCATs(t *testing.T, deviceCATs []uint32) (*net.UDPAddr, handshake.Fabric) {
+	t.Helper()
 	n, addr := startNode(t)
 	c := bridgetest.Dial(t, n.Bridge().LocalAddr(), bridgetest.Options{
 		Passcode: testPasscode, Discriminator: 3840, FabricID: testFabricID, NodeID: testNodeID, Seed: 7,
+		DeviceCAT: deviceCATs,
 	})
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
@@ -67,7 +78,7 @@ func TestCASEAndResumption(t *testing.T) {
 	var sends, receipts atomic.Int32
 	var opened atomic.Pointer[exchange.Exchange]
 	s, resumed, err := handshake.CASE(ctx, m, addr, fabric, testNodeID, handshake.CASEOptions{
-		Resumption: store, CaseAuthenticatedTags: []uint32{},
+		Resumption: store,
 		Exchange: exchange.Options{
 			OnSend:    func(int) { sends.Add(1) },
 			OnReceive: func() { receipts.Add(1) },
@@ -112,40 +123,64 @@ func TestCASEAndResumption(t *testing.T) {
 }
 
 // TestCASEStaleRecordFallsBackToFullHandshake: a record the node does not
-// know makes it answer Sigma2; the new record replaces the stale one and
-// the session takes the record's CATs when the options name none
-// (CaseClient.ts:333-334, :357-364).
+// know makes it answer Sigma2; the new record replaces the stale one, and
+// the session and the record take the peer's CATs from its NOC, not the
+// stale record's — then a resumption carries the same CATs. Ports matter.js
+// CaseSessionCatsTest.ts "replaces the CATs of a rejected resumption with
+// the peer's CATs in full CASE", "uses the peer's CATs on a session we
+// initiate with full CASE" and "… with resumption", with and without CATs
+// in the device NOC (:24-148 at db021da0; CaseClient.ts:355-366).
 func TestCASEStaleRecordFallsBackToFullHandshake(t *testing.T) {
 	t.Parallel()
-	addr, fabric := commissionedFabric(t)
-	m, _ := newManager(t)
-	store := &handshake.MemoryResumptionStore{}
-	stale := handshake.ResumptionRecord{
-		Peer:                  handshake.PeerAddress{FabricIndex: 1, NodeID: testNodeID},
-		SharedSecret:          make([]byte, 32),
-		ResumptionID:          make([]byte, 16),
-		CaseAuthenticatedTags: []uint32{0x0001_0001},
+	for _, deviceCATs := range [][]uint32{{0x0002_0001}, nil} {
+		t.Run(fmt.Sprintf("device CATs %v", deviceCATs), func(t *testing.T) {
+			t.Parallel()
+			addr, fabric := commissionedFabricWithDeviceCATs(t, deviceCATs)
+			m, _ := newManager(t)
+			store := &handshake.MemoryResumptionStore{}
+			stale := handshake.ResumptionRecord{
+				Peer:                  handshake.PeerAddress{FabricIndex: 1, NodeID: testNodeID},
+				SharedSecret:          make([]byte, 32),
+				ResumptionID:          make([]byte, 16),
+				CaseAuthenticatedTags: []uint32{0x0003_0001}, // STALE_CAT
+			}
+			if err := store.SaveResumptionRecord(stale); err != nil {
+				t.Fatal(err)
+			}
+			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
+			s, resumed, err := handshake.CASE(ctx, m, addr, fabric, testNodeID, handshake.CASEOptions{Resumption: store})
+			if err != nil {
+				t.Fatalf("CASE: %v", err)
+			}
+			if resumed {
+				t.Fatal("resumed from a record the node never issued")
+			}
+			if cats := s.CaseAuthenticatedTags(); !slices.Equal(cats, deviceCATs) {
+				t.Fatalf("session CATs %v, want the peer's NOC's %v", cats, deviceCATs)
+			}
+			rec, _ := store.FindResumptionRecord(stale.Peer)
+			if bytes.Equal(rec.ResumptionID, stale.ResumptionID) {
+				t.Fatal("the stale record was not replaced")
+			}
+			if !slices.Equal(rec.CaseAuthenticatedTags, deviceCATs) {
+				t.Fatalf("record CATs %v, want the peer's NOC's %v", rec.CaseAuthenticatedTags, deviceCATs)
+			}
+			readNodeLabel(t, m, s)
+			s2, resumed, err := handshake.CASE(ctx, m, addr, fabric, testNodeID, handshake.CASEOptions{Resumption: store})
+			if err != nil {
+				t.Fatalf("second CASE: %v", err)
+			}
+			if !resumed {
+				t.Fatal("the second handshake did not resume")
+			}
+			if cats := s2.CaseAuthenticatedTags(); !slices.Equal(cats, deviceCATs) {
+				t.Fatalf("resumed session CATs %v, want the peer's NOC's %v", cats, deviceCATs)
+			}
+			m.CloseSession(ctx, s)
+			m.CloseSession(ctx, s2)
+		})
 	}
-	if err := store.SaveResumptionRecord(stale); err != nil {
-		t.Fatal(err)
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-	s, resumed, err := handshake.CASE(ctx, m, addr, fabric, testNodeID, handshake.CASEOptions{Resumption: store})
-	if err != nil {
-		t.Fatalf("CASE: %v", err)
-	}
-	if resumed {
-		t.Fatal("resumed from a record the node never issued")
-	}
-	if cats := s.CaseAuthenticatedTags(); len(cats) != 1 || cats[0] != 0x0001_0001 {
-		t.Fatalf("session CATs %v, want the record's", cats)
-	}
-	rec, _ := store.FindResumptionRecord(stale.Peer)
-	if bytes.Equal(rec.ResumptionID, stale.ResumptionID) {
-		t.Fatal("the stale record was not replaced")
-	}
-	readNodeLabel(t, m, s)
 }
 
 // TestCASEUnknownDestination: Sigma1 for a node id the node is not makes

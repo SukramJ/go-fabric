@@ -4,6 +4,7 @@
 package message
 
 import (
+	"errors"
 	"reflect"
 	"testing"
 )
@@ -28,7 +29,7 @@ func FuzzUnmarshalHeader(f *testing.F) {
 	// Known-good: the exact wire shapes the package's own round-trip
 	// tests pin — unsecured, unicast with source + dest, group dest, and
 	// a privacy-flagged header carrying a message extension.
-	f.Add(Header{SessionID: 0, MessageCounter: 0xCAFEBABE, SessionType: SessionUnsecured}.Marshal())
+	f.Add(Header{SessionID: 0, MessageCounter: 0xCAFEBABE, SessionType: SessionUnsecured, HasSourceNodeID: true, SourceNodeID: 0x0102030405060708}.Marshal())
 	f.Add(Header{
 		SessionID: 0x1234, MessageCounter: 42,
 		HasSourceNodeID: true, SourceNodeID: 0x0011223344556677,
@@ -48,10 +49,10 @@ func FuzzUnmarshalHeader(f *testing.F) {
 	f.Add([]byte{})
 	f.Add([]byte{0x00, 0x00, 0x00, 0x00})                                                // shorter than the 8-byte fixed part
 	f.Add([]byte{0x10, 0, 0, 0, 0, 0, 0, 0})                                             // non-zero version nibble
-	f.Add([]byte{0x03, 0, 0, 0, 0, 0, 0, 0})                                             // reserved DSIZ 0b11
+	f.Add([]byte{0x07, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0})                     // reserved DSIZ 0b11
 	f.Add([]byte{0x00, 0, 0, 0x40, 0, 0, 0, 0})                                          // control-message bit
 	f.Add([]byte{0x00, 0, 0, 0x02, 0, 0, 0, 0})                                          // session type 2
-	f.Add([]byte{0x00, 0, 0, 0x20, 0, 0, 0, 0, 0xFF, 0xFF})                              // extension length past the buffer
+	f.Add([]byte{0x04, 0, 0, 0x20, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0xFF, 0xFF})      // extension length past the buffer
 	f.Add([]byte{0x01, 0, 0, 0, 0, 0, 0, 0, 0x01, 0x02, 0x03})                           // dest node id truncated
 	f.Add(Header{MessageCounter: 1, DestSize: DestGroup, DestGroupID: 0xABCD}.Marshal()) // unicast with a group destination
 	f.Add([]byte{0x04, 0, 0, 0x01, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0})                  // group without a destination
@@ -63,12 +64,15 @@ func FuzzUnmarshalHeader(f *testing.F) {
 			return
 		}
 		// What it accepts keeps matter.js's cross-field rules
-		// (MessageCodec.ts:223-233).
+		// (MessageCodec.ts:230-247 at db021da0).
 		if h.SessionType == SessionUnsecured && h.DestSize == DestGroup {
 			t.Fatalf("accepted a unicast header with a group destination: %+v", h)
 		}
-		if h.SessionType == SessionGroup && (h.DestSize == DestNone || !h.HasSourceNodeID) {
-			t.Fatalf("accepted a group header without a destination or a source: %+v", h)
+		if h.SessionType == SessionUnsecured && h.SessionID == 0 && h.HasSourceNodeID == (h.DestSize == DestNodeID) {
+			t.Fatalf("accepted an unsecured header with both or neither node id: %+v", h)
+		}
+		if h.SessionType == SessionGroup && (h.DestSize != DestGroup || !h.HasSourceNodeID) {
+			t.Fatalf("accepted a group header without a destination group id or a source: %+v", h)
 		}
 		if n < 0 || n > len(buf) {
 			t.Fatalf("UnmarshalHeader consumed %d of %d bytes", n, len(buf))
@@ -149,17 +153,24 @@ func FuzzMarshalPacket(f *testing.F) {
 		case DestGroup:
 			h.DestGroupID = destGroup
 		}
+		// An unsecured message carries exactly one node id; the decoder
+		// drops the others (matter.js MessageCodec.ts:234-239 at db021da0).
+		unsecuredNodeIDs := h.SessionType == SessionUnsecured && h.SessionID == 0 &&
+			h.HasSourceNodeID == (h.DestSize == DestNodeID)
 		b, err := h.MarshalPacket()
 		if err != nil {
 			groupBroken := h.SessionType == SessionGroup && (h.DestSize != DestGroup || !h.HasSourceNodeID)
 			unicastGroup := h.SessionType == SessionUnsecured && h.DestSize == DestGroup
 			reserved := h.DestSize > DestGroup
-			if !ext && !groupBroken && !unicastGroup && !reserved {
+			if !ext && !groupBroken && !unicastGroup && !reserved && !unsecuredNodeIDs {
 				t.Fatalf("refused a valid header %+v: %v", h, err)
 			}
 			return
 		}
 		got, n, err := UnmarshalHeader(b)
+		if unsecuredNodeIDs && errors.Is(err, ErrUnsecuredNodeIDs) {
+			return
+		}
 		if err != nil || n != len(b) {
 			t.Fatalf("encoded header does not decode: %v (%d of %d)", err, n, len(b))
 		}

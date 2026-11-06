@@ -232,8 +232,10 @@ func (s *Session) SetTimingParameters(p sessionparams.Parameters) {
 	s.mu.Unlock()
 }
 
-// CaseAuthenticatedTags are the session's CASE Authenticated Tags (nil on
-// PASE) — matter.js NodeSession caseAuthenticatedTags.
+// CaseAuthenticatedTags are the peer's CASE Authenticated Tags from its
+// NOC, the subject CATs of its requests over this session (nil on PASE) —
+// matter.js NodeSession caseAuthenticatedTags (CaseClient.ts:355 at
+// db021da0 on the initiator side).
 func (s *Session) CaseAuthenticatedTags() []uint32 { return append([]uint32(nil), s.cats...) }
 
 // AttestationChallenge is the attestation challenge the session keys

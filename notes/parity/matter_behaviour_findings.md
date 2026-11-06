@@ -543,14 +543,13 @@ Line numbers at `862ad75f`. (Triage 2026-10-29: owner: a re-audit with Apple Hom
   (`AccessControlServer.ts:441-450`) is an overridable check per entry; Go
   has none. (Triage 2026-10-29: wave H2, commissioning and security (Fable).)
 
-- **AdministratorCommissioning checks in another order.** matter.js: an open
-  window → Busy, a timeout outside 180–900 s → InvalidCommand, an armed
-  fail-safe → Busy (`AdministratorCommissioningServer.ts:191-212`), then a
-  session without fabric → UnsupportedAccess (`:154-157`);
-  `bridge/commissioning_window.go` checks the fail-safe and the fabric
-  first, so an armed fail-safe with an invalid timeout gets Busy, and a PASE
-  session without fabric Busy instead of UnsupportedAccess. Needs a read
-  against chip's order and the CADMIN cases before a change. (Triage 2026-10-29: wave H2, commissioning and security (Fable).) Phase 36's OpenBasicCommissioningWindow takes the same gates in the same order as the enhanced command, so one read settles both.
+- **AdministratorCommissioning checks in another order** — closed
+  2026-11-06, pin lift db021da0 wave P1: matter.js #4878 settled the order
+  (`AdministratorCommissioningServer.ts:70-97`, `:164-177`, `:213-221` at
+  db021da0) and `cluster/wire/admincommissioning.go` follows it for both
+  window commands — a session without fabric PAKEParameterError (as chip),
+  Busy for an armed fail-safe or an administrator's open window before the
+  PAKE parameters, the timeout and the discriminator INVALID_COMMAND.
 - **No Basic commissioning window (BC)** — closed 2026-11-05, phase 36:
   `node.Commissioning.BasicCommissioning` serves the feature, the
   `CommissioningWindowLifetimeTest.ts` case is ported.

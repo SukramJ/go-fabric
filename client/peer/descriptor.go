@@ -35,8 +35,11 @@ type Descriptor struct {
 	// recent session that reported any; a report replaces the previous one
 	// as a whole (:60-65).
 	ReportedSessionParameters *sessionparams.Parameters
-	// CaseAuthenticatedTags are our CATs for CASE sessions to the peer;
-	// nil is unknown, as distinct from an empty set (:73-80).
+	// CaseAuthenticatedTags are the CATs configured for CASE sessions to
+	// the peer, kept as matter.js keeps them (:73-80) and, as there, not
+	// applied: a session's CATs are the peer's NOC's (CaseClient.ts:396-404
+	// at db021da0, matter.js #4884); nil is unknown, as distinct from an
+	// empty set.
 	CaseAuthenticatedTags []uint32
 	// TCPUnsupported records a peer that negotiated a TCP session but
 	// reported no TCP server: TCP is not attempted again until a later

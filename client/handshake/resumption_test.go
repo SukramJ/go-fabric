@@ -20,12 +20,12 @@ func TestMemoryResumptionStore_DeleteForgetsThePeer(t *testing.T) {
 	if ok, err := store.DeleteResumptionRecord(peer); err != nil || ok {
 		t.Fatalf("delete of an unknown peer = %v, %v; want false, nil", ok, err)
 	}
-	rec := handshake.ResumptionRecord{Peer: peer, SharedSecret: []byte{1, 2, 3}, ResumptionID: make([]byte, 16), PeerCATs: []uint32{0x0001_0001}}
+	rec := handshake.ResumptionRecord{Peer: peer, SharedSecret: []byte{1, 2, 3}, ResumptionID: make([]byte, 16), CaseAuthenticatedTags: []uint32{0x0001_0001}}
 	if err := store.SaveResumptionRecord(rec); err != nil {
 		t.Fatal(err)
 	}
 	got, ok := store.FindResumptionRecord(peer)
-	if !ok || got.PeerCATs[0] != 0x0001_0001 {
+	if !ok || got.CaseAuthenticatedTags[0] != 0x0001_0001 {
 		t.Fatalf("find = %+v, %v", got, ok)
 	}
 	got.SharedSecret[0] = 9

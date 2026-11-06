@@ -198,6 +198,16 @@ func derDN(name asn1.RawValue) (DistinguishedName, error) {
 	if err != nil {
 		return dn, fmt.Errorf("%w: invalid subject/issuer structure", ErrMalformed)
 	}
+	var seen []asn1.ObjectIdentifier
+	once := func(oid asn1.ObjectIdentifier) error {
+		for _, k := range seen {
+			if k.Equal(oid) {
+				return fmt.Errorf("%w: dn attribute %s repeated", ErrMalformed, oid)
+			}
+		}
+		seen = append(seen, oid)
+		return nil
+	}
 	for _, set := range rdns {
 		attrs, err := derChildren(set.Bytes)
 		if err != nil {
@@ -213,59 +223,76 @@ func derDN(name asn1.RawValue) (DistinguishedName, error) {
 				continue
 			}
 			value := string(kv[1].Bytes)
-			id := func(bits int) (uint64, error) {
-				v, err := strconv.ParseUint(value, 16, bits)
-				if err != nil {
-					return 0, fmt.Errorf("%w: matter id %q is not hex", ErrMalformed, value)
-				}
-				return v, nil
+			if handled, err := dn.derMatterAttribute(oid, value, once); err != nil {
+				return dn, err
+			} else if handled {
+				continue
 			}
-			switch {
-			case oid.Equal(oidMatterNodeID):
-				if dn.MatterNodeID, err = id(64); err != nil {
-					return dn, err
-				}
-				dn.HasNodeID = true
-				dn.Order = append(dn.Order, dnTagMatterNodeID)
-			case oid.Equal(oidMatterICACID):
-				if dn.MatterICACID, err = id(64); err != nil {
-					return dn, err
-				}
-				dn.HasICACID = true
-				dn.Order = append(dn.Order, dnTagMatterICACID)
-			case oid.Equal(oidMatterRCACID):
-				if dn.MatterRCACID, err = id(64); err != nil {
-					return dn, err
-				}
-				dn.HasRCACID = true
-				dn.Order = append(dn.Order, dnTagMatterRCACID)
-			case oid.Equal(oidMatterFabricID):
-				if dn.MatterFabricID, err = id(64); err != nil {
-					return dn, err
-				}
-				dn.HasFabricID = true
-				dn.Order = append(dn.Order, dnTagMatterFabricID)
-			case oid.Equal(oidMatterCASEAuthTag):
-				v, err := id(32)
-				if err != nil {
-					return dn, err
-				}
-				if v > math.MaxUint32 {
-					return dn, errors.New("mattercert: CASE authenticated tag exceeds 32 bits")
-				}
-				dn.CASEAuthTags = append(dn.CASEAuthTags, uint32(v))
-				dn.Order = append(dn.Order, dnTagMatterCASEAuth)
-			default:
-				tag, ok := standardDNTag(oid, kv[1].Tag)
-				if !ok {
-					continue
-				}
-				dn.Attributes = append(dn.Attributes, DNAttribute{Tag: tag, Value: value})
-				dn.Order = append(dn.Order, tag)
+			tag, ok := standardDNTag(oid, kv[1].Tag)
+			if !ok {
+				continue
 			}
+			dn.Attributes = append(dn.Attributes, DNAttribute{Tag: tag, Value: value})
+			dn.Order = append(dn.Order, tag)
 		}
 	}
 	return dn, nil
+}
+
+// derMatterAttribute takes a Matter-specific DN attribute of a DER name
+// into dn: the 64-bit ids and a CAT as hex strings, each single-valued id
+// refused when it repeats (once). It reports false for an OID that is not
+// a Matter attribute.
+func (dn *DistinguishedName) derMatterAttribute(oid asn1.ObjectIdentifier, value string, once func(asn1.ObjectIdentifier) error) (bool, error) {
+	id := func(bits int) (uint64, error) {
+		v, err := strconv.ParseUint(value, 16, bits)
+		if err != nil {
+			return 0, fmt.Errorf("%w: matter id %q is not hex", ErrMalformed, value)
+		}
+		return v, nil
+	}
+	var (
+		field *uint64
+		has   *bool
+		tag   uint8
+	)
+	switch {
+	case oid.Equal(oidMatterVVSID):
+		field, has, tag = &dn.MatterVVSID, &dn.HasVVSID, dnTagMatterVVSID
+	case oid.Equal(oidMatterFirmwareSigningID):
+		field, has, tag = &dn.MatterFirmwareSigningID, &dn.HasFirmwareSigningID, dnTagMatterFirmwareSignID
+	case oid.Equal(oidMatterNodeID):
+		field, has, tag = &dn.MatterNodeID, &dn.HasNodeID, dnTagMatterNodeID
+	case oid.Equal(oidMatterICACID):
+		field, has, tag = &dn.MatterICACID, &dn.HasICACID, dnTagMatterICACID
+	case oid.Equal(oidMatterRCACID):
+		field, has, tag = &dn.MatterRCACID, &dn.HasRCACID, dnTagMatterRCACID
+	case oid.Equal(oidMatterFabricID):
+		field, has, tag = &dn.MatterFabricID, &dn.HasFabricID, dnTagMatterFabricID
+	case oid.Equal(oidMatterCASEAuthTag):
+		v, err := id(32)
+		if err != nil {
+			return true, err
+		}
+		if v > math.MaxUint32 {
+			return true, errors.New("mattercert: CASE authenticated tag exceeds 32 bits")
+		}
+		dn.CASEAuthTags = append(dn.CASEAuthTags, uint32(v))
+		dn.Order = append(dn.Order, dnTagMatterCASEAuth)
+		return true, nil
+	default:
+		return false, nil
+	}
+	if err := once(oid); err != nil {
+		return true, err
+	}
+	v, err := id(64)
+	if err != nil {
+		return true, err
+	}
+	*field, *has = v, true
+	dn.Order = append(dn.Order, tag)
+	return true, nil
 }
 
 // standardDNTag is the DN TLV tag of a standard X.520 attribute OID with

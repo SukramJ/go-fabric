@@ -131,12 +131,24 @@ var (
 	ErrUnicastGroupDestination = errors.New("message: unicast session cannot have a destination group id")
 
 	// ErrGroupSessionHeader is returned for a group session type without
-	// a destination (DSIZ 0b00) or without a source node id. A
-	// destination node id is accepted (MCSP). Mirrors matter.js
-	// MessageCodec.ts:226-233 ("Group session must have
-	// destination group id or destination node id." / "Group session must
-	// have source node id.").
-	ErrGroupSessionHeader = errors.New("message: group session must have a destination and a source node id")
+	// a destination group id — none, or a destination node id, which is
+	// MCSP — or without a source node id. Mirrors matter.js
+	// MessageCodec.ts:240-247 at db021da0 ("Group session must have
+	// destination group id." — "A group session message to a destination
+	// node is MCSP, which the CHIP SDK does not process either" — /
+	// "Group session must have source node id."); chip's SessionManager
+	// leaves an MCSP message unprocessed (src/transport/SessionManager.cpp:1262-1270
+	// at 6170af84). Until the db021da0 pin lift a destination node id was
+	// accepted here.
+	ErrGroupSessionHeader = errors.New("message: group session must have a destination group id and a source node id")
+	// ErrUnsecuredNodeIDs is returned for an unsecured unicast message
+	// (session type unicast, session id 0) with both or neither of the
+	// source and the destination node id: only the initiator has a source
+	// node id, only the responder a destination. Mirrors matter.js
+	// MessageCodec.ts:234-239 at db021da0 ("Unsecured message must have
+	// either a source or a destination node id."; "The CHIP SDK drops these
+	// too").
+	ErrUnsecuredNodeIDs = errors.New("message: unsecured message must have either a source or a destination node id")
 
 	// ErrExtensionLength is returned when an extension block's uint16
 	// length prefix claims more bytes than remain in the buffer. Mirrors
@@ -300,14 +312,17 @@ func UnmarshalHeader(buf []byte) (Header, int, error) {
 	if secFlags&secFlagControl != 0 {
 		return Header{}, 0, ErrControlMessage
 	}
-	// The cross-field rules of matter.js MessageCodec.ts:223-233
+	// The cross-field rules of matter.js MessageCodec.ts:230-247 at db021da0
 	// (the fixed-header decode), checked before any variable field is read.
 	if h.SessionType == SessionUnsecured && h.DestSize == DestGroup {
 		return Header{}, 0, ErrUnicastGroupDestination
 	}
+	if h.SessionType == SessionUnsecured && h.SessionID == 0 && h.HasSourceNodeID == (h.DestSize == DestNodeID) {
+		return Header{}, 0, ErrUnsecuredNodeIDs
+	}
 	if h.SessionType == SessionGroup {
-		if h.DestSize == DestNone {
-			return Header{}, 0, fmt.Errorf("%w: no destination", ErrGroupSessionHeader)
+		if h.DestSize != DestGroup {
+			return Header{}, 0, fmt.Errorf("%w: no destination group id", ErrGroupSessionHeader)
 		}
 		if !h.HasSourceNodeID {
 			return Header{}, 0, fmt.Errorf("%w: no source node id", ErrGroupSessionHeader)

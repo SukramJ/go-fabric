@@ -36,6 +36,7 @@ const (
 	dnTagMatterICACID         uint8 = 19 // matter-icac-id (uint64)
 	dnTagMatterRCACID         uint8 = 20 // matter-rcac-id (uint64)
 	dnTagMatterFabricID       uint8 = 21 // matter-fabric-id (uint64)
+	dnTagMatterVVSID          uint8 = 23 // matter-vvs-id (uint64), a VVSC's
 	dnTagMatterCASEAuth       uint8 = 22 // matter-noc-cat (uint32, multiple)
 	// The standard X.520 attributes (Core § 6.5.6.1): tags 1-16 carry them
 	// as UTF8String — domainComponent (16) as IA5String — and tags 129-143
@@ -187,6 +188,20 @@ type DistinguishedName struct {
 	HasFabricID bool
 	HasRCACID   bool
 	HasICACID   bool
+	// MatterVVSID is the 64-bit Vendor ID Verification Signer ID
+	// (matter-vvs-id, DN tag 23): the subject of a VVSC carries exactly
+	// one, a NOC, ICAC or RCAC none. Mirrors matter.js
+	// packages/protocol/src/certificate/kinds/definitions/operational.ts:64
+	// at db021da0 (the TLV field) and definitions/asn.ts:113-114 (the OID
+	// 1.3.6.1.4.1.37244.1.7).
+	MatterVVSID uint64
+	HasVVSID    bool
+	// MatterFirmwareSigningID is the 64-bit matter-firmware-signing-id (DN
+	// tag 18, OID 1.3.6.1.4.1.37244.1.2 — matter.js definitions/asn.ts:98-99
+	// at db021da0), an optional attribute of an operational certificate
+	// that counts as an RDN like the others.
+	MatterFirmwareSigningID uint64
+	HasFirmwareSigningID    bool
 	// Order records the DN attribute tags in their original TLV
 	// arrival sequence. The X.509 DER reconstruction (TBSToDER)
 	// MUST emit the RDNs in this order — matter.js's Object.entries
@@ -379,6 +394,19 @@ func assignField(cert *Certificate, el tlv.Element, d *tlv.Decoder) error {
 // children until EndContainer.
 func decodeDN(d *tlv.Decoder) (DistinguishedName, error) {
 	var dn DistinguishedName
+	// A single-valued Matter attribute occurs at most once in a DN —
+	// matter.js's DN decoder refuses a Matter attribute that repeats
+	// ("Distinguished name contains … more than once",
+	// DistinguishedName.ts:261-283 at db021da0; the rule :242-246), where
+	// the decoder used to keep the last value.
+	seen := make(map[uint8]bool, 6)
+	once := func(tag uint8) error {
+		if seen[tag] {
+			return fmt.Errorf("%w: dn attribute %d repeated", ErrMalformed, tag)
+		}
+		seen[tag] = true
+		return nil
+	}
 	for {
 		el, err := d.Next()
 		if err != nil {
@@ -391,6 +419,12 @@ func decodeDN(d *tlv.Decoder) (DistinguishedName, error) {
 			return dn, fmt.Errorf("%w: dn entry with non-context tag", ErrMalformed)
 		}
 		tag := uint8(el.Tag.Number & 0xFF)
+		switch tag {
+		case dnTagMatterNodeID, dnTagMatterICACID, dnTagMatterRCACID, dnTagMatterFabricID, dnTagMatterVVSID, dnTagMatterFirmwareSignID:
+			if err := once(tag); err != nil {
+				return dn, err
+			}
+		}
 		switch tag {
 		case dnTagMatterNodeID:
 			dn.MatterNodeID = el.Uint
@@ -407,6 +441,14 @@ func decodeDN(d *tlv.Decoder) (DistinguishedName, error) {
 		case dnTagMatterFabricID:
 			dn.MatterFabricID = el.Uint
 			dn.HasFabricID = true
+			dn.Order = append(dn.Order, tag)
+		case dnTagMatterVVSID:
+			dn.MatterVVSID = el.Uint
+			dn.HasVVSID = true
+			dn.Order = append(dn.Order, tag)
+		case dnTagMatterFirmwareSignID:
+			dn.MatterFirmwareSigningID = el.Uint
+			dn.HasFirmwareSigningID = true
 			dn.Order = append(dn.Order, tag)
 		case dnTagMatterCASEAuth:
 			dn.CASEAuthTags = append(dn.CASEAuthTags, uint32(el.Uint&0xFFFFFFFF))

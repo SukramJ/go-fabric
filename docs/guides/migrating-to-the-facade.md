@@ -261,6 +261,17 @@ entry. New refusals a policy may see: `DacFormatInvalid`,
 `PaiFormatInvalid`, `CertificationDeclarationFormatInvalid` and
 `OfficialCdSignedByTestSigner`.
 
+## Changed after v0.17.0: the client stack's CASE options
+
+`handshake.CASEOptions.CaseAuthenticatedTags` is removed: a CASE session
+the client stack initiates carries the peer's CASE Authenticated Tags from
+its NOC, as matter.js's does since db021da0, and a configured set is not
+applied — delete the field from the literal. `handshake.ResumptionRecord`
+loses `PeerCATs`; its `CaseAuthenticatedTags` are the peer's CATs on both
+sides of the handshake — a `ResumptionStore` that persisted both keeps one.
+`peer.Descriptor.CaseAuthenticatedTags` is still recorded and no longer
+reaches the handshake.
+
 ## Changed after v0.17.0: `DatastoreSync.SyncEndpointBindings`
 
 `jointfabricdatastore.DatastoreSync` (`jointfabric.DatastoreSync`) gains

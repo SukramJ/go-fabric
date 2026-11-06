@@ -39,9 +39,6 @@ type CASEOptions struct {
 	// before the handshake (its operational DNS-SD record), nil for
 	// nothing.
 	PeerParameters *sessionparams.Parameters
-	// CaseAuthenticatedTags are the session's CATs; nil takes the
-	// resumption record's (CaseClient.ts:333-334).
-	CaseAuthenticatedTags []uint32
 	// Resumption holds the resumption records; nil neither offers nor
 	// saves one.
 	Resumption ResumptionStore
@@ -88,10 +85,11 @@ type CASEOptions struct {
 //     session's timing; the NOC must name the expected node on our
 //     fabric and its chain verify (an ICAC's fabric must match the NOC's,
 //     mattercert's chain check, so the fabric's); Sigma3 and the Success
-//     status; the session's CATs are the option's or the record's, the
-//     channel's peer CATs the responder NOC's (by_design
-//     BD-Matter-CaseInitiatorPeerCATs, as the device-side initiator); a
-//     new record with the responder's resumption id;
+//     status; the session's CATs are the responder NOC's (:285, :355 at
+//     db021da0, matter.js #4884 — the subject CATs of the requests the
+//     peer sends over this session), as are the channel's peer CATs; a
+//     new record with the responder's resumption id and those CATs
+//     (:360-366);
 //  4. the record is saved after the session exists, a failure only
 //     logged (:369-381).
 //
@@ -184,7 +182,7 @@ func (c *caseClient) pair(ctx context.Context) (*exchange.Session, ResumptionRec
 			ResumptionID: record.ResumptionID,
 			FabricIndex:  record.Peer.FabricIndex,
 			PeerNodeID:   record.Peer.NodeID,
-			PeerCATs:     record.PeerCATs,
+			PeerCATs:     record.CaseAuthenticatedTags,
 		}
 	}
 	init, err := sigma.NewPeerInitiator(cfg)
@@ -215,7 +213,7 @@ func (c *caseClient) pair(ctx context.Context) (*exchange.Session, ResumptionRec
 		s, rec, err := c.resume(ctx, init, record, sessionID, msg.Payload)
 		return s, rec, true, err
 	case mrp.SCOpcodeSigma2:
-		s, rec, err := c.full(ctx, init, record, sessionID, msg.Payload)
+		s, rec, err := c.full(ctx, init, sessionID, msg.Payload)
 		return s, rec, false, err
 	default:
 		// CaseMessenger.ts:46-59 (readSigma2).
@@ -270,7 +268,7 @@ func (c *caseClient) resume(ctx context.Context, init *sigma.Initiator, record *
 }
 
 // full is the Sigma2 branch, CaseClient.ts:234-367.
-func (c *caseClient) full(ctx context.Context, init *sigma.Initiator, record *ResumptionRecord, sessionID uint16, raw []byte) (*exchange.Session, ResumptionRecord, error) {
+func (c *caseClient) full(ctx context.Context, init *sigma.Initiator, sessionID uint16, raw []byte) (*exchange.Session, ResumptionRecord, error) {
 	sigma2, err := sigma.UnmarshalSigma2(raw)
 	if err != nil {
 		return nil, ResumptionRecord{}, fmt.Errorf("%w: malformed Sigma2: %w", ErrUnexpectedData, err)
@@ -289,11 +287,10 @@ func (c *caseClient) full(ctx context.Context, init *sigma.Initiator, record *Re
 	if _, err := nextMessage(ctx, c.x, mrp.SCOpcodeStatusReport, c.ept()); err != nil {
 		return nil, ResumptionRecord{}, err
 	}
-	cats := c.opts.CaseAuthenticatedTags
-	if cats == nil && record != nil {
-		cats = record.CaseAuthenticatedTags
-	}
 	res, _ := init.Result()
+	// The peer's CATs from its NOC are the session's (CaseClient.ts:285,
+	// :355 at db021da0); a configured set is not applied (:396-404).
+	cats := res.PeerCATs
 	s, err := c.mgr.NewSecureSession(exchange.SecureSessionConfig{
 		ID:   sessionID,
 		Addr: c.us.Addr(),
@@ -320,7 +317,6 @@ func (c *caseClient) full(ctx context.Context, init *sigma.Initiator, record *Re
 		ResumptionID:          res.ResumptionID,
 		SessionParameters:     s.Parameters(),
 		CaseAuthenticatedTags: cats,
-		PeerCATs:              res.PeerCATs,
 	}, nil
 }
 

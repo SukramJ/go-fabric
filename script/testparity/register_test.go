@@ -40,10 +40,13 @@ import (
 // node/test/behaviors share. Phase 33 widened the roots to
 // packages/general/test, packages/model/test, packages/nodejs/test and
 // packages/types/test (192 files) and decided every one of them in the
-// same pull request, so the count stays 2.
-// Pin lift wave P2 (#431) ports AttestationCertificateProfileTest.ts (in
-// part), CdSignersTest.ts and DeviceAttestationValidatorChipCdTest.ts: 17.
-const testparityPlannedRatchet = 17
+// same pull request, so the count stays 2. The db021da0 lift planned 18
+// new files on its waves P1–P4 (20); wave P1 ported its four
+// (AdministratorCommissioningServerTest, CaseSessionCatsTest,
+// DistinguishedNameTest, OperationalCertificateVerifyTest) as partial: 16.
+// // Pin lift wave P2 (#431) ports AttestationCertificateProfileTest.ts (in
+// part), CdSignersTest.ts and DeviceAttestationValidatorChipCdTest.ts as well: 13.
+const testparityPlannedRatchet = 13
 
 // testparityPortedRatchet is the number of ported entries, and
 // testparityMissingRatchet the number of matter.js it cases the partial
@@ -99,16 +102,21 @@ const testparityPlannedRatchet = 17
 // Phase 39: packages/nodejs-ble/test joins the roots for the BTP
 // renegotiation; NobleBleChannelTest.ts ported (its 18 stall and ATT_MTU
 // cases), ScanControlTest.ts excluded: 158 ported.
+// Pin lift db021da0 wave P1: four planned files become partial with 53
+// missing cases named (the DNS-SD advertisement reads of an
+// administrator's window, the VVSC kind and issuer-DN cases of the
+// certificate tests, the vendor-id DN attributes, the DER round trips):
+// 1033 missing.
 // Pin lift wave P2 (#431): CdSignersTest.ts and
 // DeviceAttestationValidatorChipCdTest.ts ported, DeviceAttestationValidatorTest.ts
 // completed (its five CD signer cases); the CD envelope cases of
 // CertificationDeclarationTest.ts and fourteen lookupCdSigner cases of
 // DclCertificateServiceTest.ts leave missing, the 23 distinguished-name
 // cases of AttestationCertificateProfileTest.ts (#4880, wave P1) join it:
-// 149 ported, 971 missing.
+// merged with wave P1: 149 ported, 1024 missing.
 const (
 	testparityPortedRatchet  = 149
-	testparityMissingRatchet = 971
+	testparityMissingRatchet = 1024
 )
 
 // testparityLeftRatchet is the number of left it cases summed over the
@@ -143,11 +151,14 @@ const (
 // retries, interview and abort handling (js-runtime-only, the platform's
 // behind the ble.Central seam) and the unsubscribe after a handshake
 // timeout (by-design, BD-Matter-BTP-RenegotiationAfterStall): 593.
+// Pin lift db021da0 wave P1 adds the twelve js-runtime-only rows of the
+// certificate tests' object-view API (DistinguishedName.rdnsOf, frozen
+// objects, spread copies, an undefined property): 604.
 // Pin lift wave P2 (#431) leaves two DclCertificateServiceTest.ts lookups
 // by design: the unreadable stored DER (the Go index holds it) and the
 // test signer, which the validator knows built in
-// (BD-Matter-Attestation-CDSignerTrust): 594.
-const testparityLeftRatchet = 594
+// (BD-Matter-Attestation-CDSignerTrust) — merged with wave P1: 606.
+const testparityLeftRatchet = 606
 
 // The matterjs-server register's four ratchets, exact in both directions as
 // the matter.js register's are (the comments above give the rules). Set by
