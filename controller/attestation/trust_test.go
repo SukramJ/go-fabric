@@ -41,8 +41,13 @@ func TestTrustModes(t *testing.T) {
 	if _, ok := dev.PAA(secattestation.TestPAANoVIDSKID); !ok || !dev.AcceptsTestCertificates() {
 		t.Fatal("Development misses the test roots")
 	}
-	if _, ok := dev.CDSigner(secattestation.TestCMSSignerSKID); !ok {
-		t.Fatal("Development misses the test CD signer")
+	// The test CD signer is built in and trusted while test certificates
+	// are (CdSigners.ts:76-83 at db021da0), so no store lists it.
+	if s, ok := attestation.KnownCDSigner(secattestation.TestCMSSignerSKID); !ok || !s.IsTestSigner {
+		t.Fatal("the test CD signer is not built in")
+	}
+	if _, ok := dev.CDSigner(secattestation.TestCMSSignerSKID); ok {
+		t.Fatal("Development lists the built-in test CD signer")
 	}
 
 	// The snapshot holds the root, yet the revocation question goes to

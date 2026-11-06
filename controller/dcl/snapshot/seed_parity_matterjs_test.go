@@ -166,8 +166,14 @@ func TestDclCertificateServiceSeed(t *testing.T) {
 		if !errors.Is(err, ErrMalformed) {
 			t.Fatalf("err %v", err)
 		}
-		if _, ok := snap.CDSigner(noVID); !ok {
+		// Consumed, but a PAA's certificate is no CD signer: it counts
+		// only if it verifies (lookupCdSigner, dcl/
+		// DclCertificateService.ts:918-970 at db021da0).
+		if _, cds := snap.Len(); cds != 1 {
 			t.Fatal("the CD signer stream was not consumed")
+		}
+		if _, ok := snap.CDSigner(noVID); ok {
+			t.Fatal("a PAA certificate seeded as CD signer was trusted")
 		}
 		if _, ok := snap.PAA(noVID); ok {
 			t.Fatal("the CD signer was seeded as a PAA")

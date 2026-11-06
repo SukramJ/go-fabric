@@ -4,6 +4,7 @@
 package dcl
 
 import (
+	"bytes"
 	"context"
 	"crypto/ecdsa"
 	"crypto/elliptic"
@@ -14,6 +15,7 @@ import (
 	"crypto/x509/pkix"
 	"encoding/asn1"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"encoding/pem"
 	"fmt"
@@ -21,6 +23,8 @@ import (
 	"math/big"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -28,6 +32,7 @@ import (
 	"time"
 
 	"github.com/SukramJ/go-fabric/clock/clocktest"
+	"github.com/SukramJ/go-fabric/controller/attestation"
 )
 
 var (
@@ -81,6 +86,8 @@ type certSpec struct {
 	key      *ecdsa.PrivateKey
 	noAKID   bool
 	notAfter time.Time
+	// pathLen0 sets a CA's pathLen to 0, as the PAI profile requires.
+	pathLen0 bool
 }
 
 // mint signs spec with parent (nil: self-signed).
@@ -114,6 +121,7 @@ func mint(t *testing.T, spec certSpec, parent *testCert) testCert {
 		KeyUsage:              usage,
 		BasicConstraintsValid: true,
 		IsCA:                  spec.ca,
+		MaxPathLenZero:        spec.pathLen0,
 		SubjectKeyId:          skid,
 		SignatureAlgorithm:    x509.ECDSAWithSHA256,
 	}
@@ -422,4 +430,51 @@ func newTestPKI(t *testing.T) testPKI {
 	pai := mint(t, certSpec{cn: "Test PAI", vid: u16(0xFFF1), pid: u16(0x8000), ca: true, serial: 0x2002}, &paa)
 	dac := mint(t, certSpec{cn: "Test DAC", vid: u16(0xFFF1), pid: u16(0x8000), usage: x509.KeyUsageDigitalSignature, serial: 0xC0FFEE}, &pai)
 	return testPKI{paa: paa, pai: pai, dac: dac}
+}
+
+// csaKey001 is the CSA "Certification Declaration Signing Key 001" of the
+// embedded snapshot data, a certificate the CSA CD root issued.
+func csaKey001(t *testing.T) testCert {
+	t.Helper()
+	der, err := os.ReadFile(filepath.Join("snapshot", "data", "cd-signers", "FE343F959947763B61EE4539131338494FE67D8E.der"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	c, err := x509.ParseCertificate(der)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return testCert{der: der, cert: c}
+}
+
+// futureSKID names the stand-in for a future CSA CD signing key.
+const futureSKID = "C0FFEE00C0FFEE00C0FFEE00C0FFEE00C0FFEE00"
+
+// csaFutureSigner is CSA signing key 001 with another subject key
+// identifier, a stand-in for a CSA key that is not built in
+// (DclCertificateServiceTest.ts:1758-1777 at db021da0); the CSA root
+// cannot sign it here, so standInCSA accepts exactly its DER.
+func csaFutureSigner(t *testing.T) testCert {
+	t.Helper()
+	k := csaKey001(t)
+	future, _ := hex.DecodeString(futureSKID)
+	der := bytes.Replace(k.der, k.cert.SubjectKeyId, future, 1)
+	c, err := x509.ParseCertificate(der)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return testCert{der: der, cert: c}
+}
+
+// standInCSA lets the store take signer as CSA-issued, as the matter.js
+// test's crypto accepts the root's signature over its TBSCertificate; every
+// other certificate is checked as attestation.VerifyCDSignerCertificate
+// checks it.
+func standInCSA(s *CertificateStore, signer testCert) {
+	s.verifyCDSigner = func(der, skid []byte) (*ecdsa.PublicKey, error) {
+		if bytes.Equal(der, signer.der) && bytes.Equal(skid, signer.cert.SubjectKeyId) {
+			return attestation.P256Key(signer.cert)
+		}
+		return attestation.VerifyCDSignerCertificate(der, skid)
+	}
 }

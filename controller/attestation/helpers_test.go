@@ -302,3 +302,20 @@ func newFixture(t *testing.T, s chainSpec, cd cdSpec) fixture {
 		},
 	}
 }
+
+// storeKey is a CD signer the store vouches for (a CSA-issued signer as a
+// DCL answer stands for it): neither built in nor the test signer.
+var storeKey, _ = ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+
+// storeKeySKID is storeKey's subject key identifier.
+var storeKeySKID = skid(&storeKey.PublicKey)
+
+// storeWithSigner is the TestStore that knows storeKey as a CD signer.
+func storeWithSigner() *attestation.StaticStore {
+	s := attestation.TestStore()
+	s.CDSigners = map[string]*ecdsa.PublicKey{fmt.Sprintf("%X", storeKeySKID): &storeKey.PublicKey}
+	return s
+}
+
+// storeSigned signs the CD with storeKey.
+func storeSigned(c *cdSpec) { c.signer, c.signerSKID = storeKey, storeKeySKID }

@@ -290,6 +290,8 @@ func TestDclCertificateServiceRevocationOffline(t *testing.T) {
 		}
 	})
 
+	// The key identifier is the Matter test CD signer's, which the
+	// validator knows built in; the store leaves it to the validator.
 	t.Run("answers a CD signer it does not hold without asking the DCL", func(t *testing.T) {
 		s := dclRevOpen(t, CertificateOptions{UpdateInterval: -1})
 		if key, ok := s.CDSigner(dclRevBytes(t, "62FA823359ACFAA9963E1CFA140ADDF504F37160")); ok || key != nil {

@@ -163,7 +163,7 @@ func TestPqcAttestationCertificatesAnnexHExamples(t *testing.T) {
 		// Dac.fromAsn1 refuses the key when it constructs the DAC
 		// (AttestationCertificates.ts:66-71); Go parses the certificate and
 		// refuses the key where it reads it, P256Key.
-		dac, err := parseAttCert(der, true)
+		dac, err := parseAttCert(der, kindPAI, true)
 		if err != nil {
 			return
 		}
@@ -181,7 +181,7 @@ func TestPqcAttestationCertificatesAnnexHExamples(t *testing.T) {
 		if block == nil {
 			t.Fatal("Annex H PEM does not decode")
 		}
-		_, err := parseAttCert(block.Bytes, true)
+		_, err := parseAttCert(block.Bytes, kindPAI, true)
 		if !errors.Is(err, ErrMLDSAAttestationDisabled) {
 			t.Fatalf("parseAttCert = %v, want ErrMLDSAAttestationDisabled", err)
 		}
@@ -210,7 +210,7 @@ func TestPqcAttestationCertificatesParsing(t *testing.T) {
 		})
 		// matter.js parses the certificate and refuses the key on access;
 		// crypto/x509 already cannot place the P-256 point on secp384r1.
-		c, err := parseAttCert(der, true)
+		c, err := parseAttCert(der, kindPAI, true)
 		if err != nil {
 			return
 		}
@@ -234,7 +234,7 @@ func TestPqcAttestationCertificatesParsing(t *testing.T) {
 	t.Run("rejects a signature algorithm that is not an OBJECT IDENTIFIER", func(t *testing.T) {
 		pai, _ := pqcTraditionalPAI(t)
 		altered := pqcRewrite(t, pai, "300a06082a8648ce3d040302", "300a02082a8648ce3d040302", 2)
-		if _, err := parseAttCert(altered, true); err == nil {
+		if _, err := parseAttCert(altered, kindPAI, true); err == nil {
 			t.Fatal("parseAttCert accepted a signature algorithm tagged INTEGER")
 		}
 	})
@@ -246,7 +246,7 @@ func TestPqcAttestationCertificatesParsing(t *testing.T) {
 	} {
 		t.Run("rejects "+c.description, func(t *testing.T) {
 			pai, _ := pqcTraditionalPAI(t)
-			if _, err := parseAttCert(pqcRewrite(t, pai, c.from, c.to, 1), true); err == nil {
+			if _, err := parseAttCert(pqcRewrite(t, pai, c.from, c.to, 1), kindPAI, true); err == nil {
 				t.Fatalf("parseAttCert accepted %s", c.description)
 			}
 		})
@@ -281,7 +281,7 @@ func TestPqcAttestationCertificatesParsing(t *testing.T) {
 		if len(bulky) <= 600 {
 			t.Fatalf("bulky PAI is %d bytes, want more than 600", len(bulky))
 		}
-		if _, err := parseAttCert(bulky, true); err == nil || !strings.Contains(err.Error(), "600 byte limit") {
+		if _, err := parseAttCert(bulky, kindPAI, true); err == nil || !strings.Contains(err.Error(), "600 byte limit") {
 			t.Fatalf("parseAttCert = %v, want the 600 byte limit", err)
 		}
 	})

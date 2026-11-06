@@ -97,9 +97,11 @@ var ErrMalformed = errors.New("snapshot: malformed entry")
 // Snapshot is a loaded trust set. It is an [attestation.PAAStore] and
 // safe for concurrent use (it does not change after Load).
 type Snapshot struct {
-	src       Source
-	paas      map[string]attestation.PAA
-	cdSigners map[string]*ecdsa.PublicKey
+	src  Source
+	paas map[string]attestation.PAA
+	// cdSigners keeps each seeded CD signer's DER; it counts only if it
+	// verifies, which CDSigner checks on use.
+	cdSigners map[string][]byte
 	skipped   int
 	// vendors are the vendor list's records over the static vendors
 	// ([Snapshot.Vendors]).
@@ -136,7 +138,7 @@ func Load(fsys fs.FS) (*Snapshot, error) { return load(fsys, clock.System{}.Now(
 func LoadAt(fsys fs.FS, now time.Time) (*Snapshot, error) { return load(fsys, now) }
 
 func load(fsys fs.FS, now time.Time) (*Snapshot, error) {
-	s := &Snapshot{paas: map[string]attestation.PAA{}, cdSigners: map[string]*ecdsa.PublicKey{}}
+	s := &Snapshot{paas: map[string]attestation.PAA{}, cdSigners: map[string][]byte{}}
 	errVendors := s.loadVendors(fsys)
 	b, err := fs.ReadFile(fsys, SourceFile)
 	if errors.Is(err, fs.ErrNotExist) {
@@ -194,12 +196,11 @@ func (s *Snapshot) consume(fsys fs.FS, sec Section, kind dcl.Kind, dir string, n
 			s.paas[skid] = attestation.PAA{DER: der, Production: true, FetchedAt: s.src.BuiltAt}
 			continue
 		}
-		key, err := attestation.P256Key(c)
-		if err != nil {
+		if _, err := attestation.P256Key(c); err != nil {
 			s.skipped++
 			continue
 		}
-		s.cdSigners[skid] = key
+		s.cdSigners[skid] = der
 	}
 	return nil
 }
@@ -224,8 +225,15 @@ func (s *Snapshot) PAA(skid []byte) (attestation.PAA, bool) {
 // holds production certificates only.
 func (s *Snapshot) AcceptsTestCertificates() bool { return false }
 
-// CDSigner implements [attestation.PAAStore].
+// CDSigner implements [attestation.PAAStore]: a seeded CD signer counts
+// only if the CSA CD root issued it for skid — the seed is a cache whose
+// certificates are checked on use, as lookupCdSigner checks a stored one
+// (dcl/DclCertificateService.ts:918-970 at db021da0).
 func (s *Snapshot) CDSigner(skid []byte) (*ecdsa.PublicKey, bool) {
-	k, ok := s.cdSigners[strings.ToUpper(hex.EncodeToString(skid))]
-	return k, ok
+	der, ok := s.cdSigners[strings.ToUpper(hex.EncodeToString(skid))]
+	if !ok {
+		return nil, false
+	}
+	k, err := attestation.VerifyCDSignerCertificate(der, skid)
+	return k, err == nil
 }

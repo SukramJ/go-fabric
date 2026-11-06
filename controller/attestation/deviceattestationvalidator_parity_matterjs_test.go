@@ -4,7 +4,7 @@
 package attestation_test
 
 // A port of matter.js packages/protocol/test/certificate/DeviceAttestationValidatorTest.ts at
-// 862ad75f: DeviceAttestationValidator.validate, check for check, on a PAI/DAC/CD fixture.
+// db021da0: DeviceAttestationValidator.validate, check for check, on a PAI/DAC/CD fixture.
 //
 // The Go surface differs in three places, the behaviour does not: the
 // chain is minted by this package's buildChain under the CSA test PAA
@@ -73,7 +73,7 @@ func davFinding(res attestation.Result, check attestation.Check) *attestation.Fi
 	return nil
 }
 
-// davWithCD re-signs the attestation elements over cd (buildAttestationWithCd, :159-167).
+// davWithCD re-signs the attestation elements over cd (buildAttestationWithCd, :174-182).
 func davWithCD(t *testing.T, f fixture, dacKey *ecdsa.PrivateKey, cd []byte) fixture {
 	t.Helper()
 	f.data.Elements = elements(t, cd, f.data.Nonce)
@@ -136,7 +136,7 @@ func (d davRevocations) IsRevoked(akid, serial []byte, issuerDN string) (bool, e
 func davIssuerDN(c *x509.Certificate) string { return strings.ToUpper(hex.EncodeToString(c.RawIssuer)) }
 
 // davResign replaces the 65-byte subject key of der by its copy with the
-// point marker 0x05 and re-signs the TBS with key (the brokenPai, :240-259).
+// point marker 0x05 and re-signs the TBS with key (the brokenPai, :255-274).
 func davResign(t *testing.T, der []byte, key *ecdsa.PrivateKey) []byte {
 	t.Helper()
 	var cert struct {
@@ -168,7 +168,7 @@ func davResign(t *testing.T, der []byte, key *ecdsa.PrivateKey) []byte {
 }
 
 // TestDeviceAttestationValidatorMalformedPeerCertificates: describe
-// "malformed peer certificates" (:207).
+// "malformed peer certificates" (:222).
 func TestDeviceAttestationValidatorMalformedPeerCertificates(t *testing.T) {
 	t.Parallel()
 	t.Run("throws CertificateUnparseable when the device returns an empty PAI", func(t *testing.T) {
@@ -186,7 +186,7 @@ func TestDeviceAttestationValidatorMalformedPeerCertificates(t *testing.T) {
 	t.Run("throws CertificateUnparseable when the DAC's public key is malformed", func(t *testing.T) {
 		t.Parallel()
 		f := davFixture(t)
-		// Flip the uncompressed-point marker, every DER length intact (:226-230).
+		// Flip the uncompressed-point marker, every DER length intact (:241-245).
 		broken := bytes.Clone(f.data.DAC)
 		broken[bytes.Index(broken, []byte{0x03, 0x42, 0x00, 0x04})+3] = 0x05
 		f.data.DAC = broken
@@ -197,10 +197,10 @@ func TestDeviceAttestationValidatorMalformedPeerCertificates(t *testing.T) {
 		f := davFixture(t)
 		f.data.PAI = davResign(t, f.data.PAI, secattestation.TestPAAFFF1PrivateKey)
 		// matter.js reads the PAI key in the chain step and expects "PAI
-		// whose public key cannot be read" (:272-273); crypto/x509 reads the
+		// whose public key cannot be read" (:287-288); crypto/x509 reads the
 		// key while parsing, so the Go validator reports the same check one
 		// step earlier with the step-1 message. The check, which the test
-		// says must survive (:271), is the same.
+		// says must survive (:286), is the same.
 		davReject(t, f, attestation.CertificateUnparseable, `PAI certificate that cannot be parsed`)
 	})
 	t.Run("throws CertificateUnparseable when the device returns a truncated PAI", func(t *testing.T) {
@@ -212,25 +212,25 @@ func TestDeviceAttestationValidatorMalformedPeerCertificates(t *testing.T) {
 }
 
 // TestDeviceAttestationValidatorMalformedElements: describe "malformed
-// attestation elements" (:294).
+// attestation elements" (:309).
 func TestDeviceAttestationValidatorMalformedElements(t *testing.T) {
 	t.Parallel()
 	t.Run("throws AttestationElementsUnparseable when the elements are not valid TLV", func(t *testing.T) {
 		t.Parallel()
 		f := davFixture(t)
-		f.data.Elements, _ = hex.DecodeString("15300102") // :301
+		f.data.Elements, _ = hex.DecodeString("15300102") // :316
 		davReject(t, f, attestation.AttestationElementsUnparseable, `attestation elements that cannot be decoded`)
 	})
 	t.Run("throws CertificationDeclarationUnparseable when the CD field holds something else", func(t *testing.T) {
 		t.Parallel()
 		f, key := davFixtureWithKey(t)
-		leaked, _ := hex.DecodeString("6c6f63616c686f73743a3131333131") // :310
+		leaked, _ := hex.DecodeString("6c6f63616c686f73743a3131333131") // :325
 		f = davWithCD(t, f, key, leaked)
 		davReject(t, f, attestation.CertificationDeclarationUnparseable, `Certification Declaration that cannot be parsed`)
 	})
 }
 
-// TestDeviceAttestationValidatorPAATrustStore: describe "PAA trust store" (:318).
+// TestDeviceAttestationValidatorPAATrustStore: describe "PAA trust store" (:333).
 func TestDeviceAttestationValidatorPAATrustStore(t *testing.T) {
 	t.Parallel()
 	t.Run("throws PaaNotTrusted when PAA is not in trust store", func(t *testing.T) {
@@ -241,21 +241,21 @@ func TestDeviceAttestationValidatorPAATrustStore(t *testing.T) {
 	})
 }
 
-// TestDeviceAttestationValidatorChain: describe "certificate chain verification" (:336).
+// TestDeviceAttestationValidatorChain: describe "certificate chain verification" (:351).
 func TestDeviceAttestationValidatorChain(t *testing.T) {
 	t.Parallel()
 	t.Run("throws CertificateChainInvalid for tampered PAI", func(t *testing.T) {
 		t.Parallel()
 		f := davFixture(t)
 		f.data.PAI = bytes.Clone(f.data.PAI)
-		f.data.PAI[len(f.data.PAI)-5] ^= 0xff // :342
+		f.data.PAI[len(f.data.PAI)-5] ^= 0xff // :357
 		davReject(t, f, attestation.CertificateChainInvalid, `PAI signature verification failed`)
 	})
 	t.Run("throws CertificateChainInvalid for tampered DAC", func(t *testing.T) {
 		t.Parallel()
 		f := davFixture(t)
 		f.data.DAC = bytes.Clone(f.data.DAC)
-		f.data.DAC[len(f.data.DAC)-5] ^= 0xff // :354
+		f.data.DAC[len(f.data.DAC)-5] ^= 0xff // :369
 		davReject(t, f, attestation.CertificateChainInvalid, `DAC signature verification failed`)
 	})
 	t.Run("throws CertificateChainInvalid when DAC is signed by wrong PAI", func(t *testing.T) {
@@ -268,7 +268,7 @@ func TestDeviceAttestationValidatorChain(t *testing.T) {
 }
 
 // TestDeviceAttestationValidatorValidityPeriod: describe "certificate
-// validity period (Step 3b)" (:376).
+// validity period (Step 3b)" (:391).
 func TestDeviceAttestationValidatorValidityPeriod(t *testing.T) {
 	t.Parallel()
 	t.Run("passes when DAC notBefore is within PAI and PAA validity window", func(t *testing.T) {
@@ -292,7 +292,7 @@ func TestDeviceAttestationValidatorValidityPeriod(t *testing.T) {
 	})
 }
 
-// TestDeviceAttestationValidatorVendorID: describe "VendorID matching" (:407).
+// TestDeviceAttestationValidatorVendorID: describe "VendorID matching" (:422).
 func TestDeviceAttestationValidatorVendorID(t *testing.T) {
 	t.Parallel()
 	t.Run("throws VendorIdMismatch when DAC vendorId does not match PAI vendorId", func(t *testing.T) {
@@ -304,7 +304,7 @@ func TestDeviceAttestationValidatorVendorID(t *testing.T) {
 	})
 }
 
-// TestDeviceAttestationValidatorNonce: describe "attestation nonce verification" (:422).
+// TestDeviceAttestationValidatorNonce: describe "attestation nonce verification" (:437).
 func TestDeviceAttestationValidatorNonce(t *testing.T) {
 	t.Parallel()
 	t.Run("passes when attestation nonce matches", func(t *testing.T) {
@@ -320,7 +320,7 @@ func TestDeviceAttestationValidatorNonce(t *testing.T) {
 	})
 }
 
-// TestDeviceAttestationValidatorSignature: describe "attestation signature verification" (:445).
+// TestDeviceAttestationValidatorSignature: describe "attestation signature verification" (:460).
 func TestDeviceAttestationValidatorSignature(t *testing.T) {
 	t.Parallel()
 	t.Run("passes with valid signature", func(t *testing.T) {
@@ -330,7 +330,7 @@ func TestDeviceAttestationValidatorSignature(t *testing.T) {
 	t.Run("throws AttestationSignatureInvalid for tampered signature", func(t *testing.T) {
 		t.Parallel()
 		f := davFixture(t)
-		f.data.Signature[10] ^= 0xff // :458
+		f.data.Signature[10] ^= 0xff // :473
 		davReject(t, f, attestation.AttestationSignatureInvalid, `Attestation signature verification failed`)
 	})
 	t.Run("throws AttestationSignatureInvalid when signed with wrong attestation challenge", func(t *testing.T) {
@@ -351,34 +351,38 @@ func TestDeviceAttestationValidatorSignature(t *testing.T) {
 }
 
 // TestDeviceAttestationValidatorCDSignature: describe "Certification
-// Declaration signature verification" (:500).
+// Declaration signature verification" (:515).
 func TestDeviceAttestationValidatorCDSignature(t *testing.T) {
 	t.Parallel()
 	t.Run("passes with valid CD signature when signer key is provided", func(t *testing.T) {
 		t.Parallel()
 		davPass(t, davFixture(t))
 	})
-	t.Run("skips CD signature verification when no CD signer is available", func(t *testing.T) {
+	t.Run("refuses a CD from a signer the DCL does not answer for", func(t *testing.T) {
 		t.Parallel()
-		f := davFixture(t)
-		st := attestation.TestStore()
-		st.CDSigners = nil // injectTestCdSigner: false (:509-511)
-		f.ctx.Store = st
-		davPass(t, f)
+		// attestationWithUnlistedCdSigner (:148-168): a random SKID and key.
+		f, key := davFixtureWithKey(t)
+		other, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+		id := make([]byte, 20)
+		_, _ = rand.Read(id)
+		cd := defaultCD()
+		cd.signer, cd.signerSKID = other, id
+		f = davWithCD(t, f, key, buildCD(t, cd))
+		davReject(t, f, attestation.CdSignerUnknown, `is not known to be a CD signer`)
 	})
 	t.Run("throws CertificationDeclarationSignatureInvalid for CD signed with wrong key", func(t *testing.T) {
 		t.Parallel()
 		f, key := davFixtureWithKey(t)
 		wrongKey, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 		cd := defaultCD()
-		cd.signer = wrongKey // the test signer's SKID, another key (:519-537)
+		cd.signer = wrongKey // the test signer's SKID, another key (:534-552)
 		f = davWithCD(t, f, key, buildCD(t, cd))
 		davReject(t, f, attestation.CertificationDeclarationSignatureInvalid, `Certification Declaration signature verification failed`)
 	})
 }
 
 // TestDeviceAttestationValidatorCDFields: describe "Certification
-// Declaration field validation" (:550).
+// Declaration field validation" (:567).
 func TestDeviceAttestationValidatorCDFields(t *testing.T) {
 	t.Parallel()
 	t.Run("passes with matching vendorId and productId", func(t *testing.T) {
@@ -389,7 +393,7 @@ func TestDeviceAttestationValidatorCDFields(t *testing.T) {
 		t.Parallel()
 		f, key := davFixtureWithKey(t)
 		cd := defaultCD()
-		cd.vid = 0xFFF2 // :562
+		cd.vid = 0xFFF2 // :579
 		f = davWithCD(t, f, key, buildCD(t, cd))
 		davReject(t, f, attestation.CertificationDeclarationFieldMismatch, `CD vendor_id.*does not match BasicInformation VendorID`)
 	})
@@ -397,7 +401,7 @@ func TestDeviceAttestationValidatorCDFields(t *testing.T) {
 		t.Parallel()
 		f, key := davFixtureWithKey(t)
 		cd := defaultCD()
-		cd.pids = []uint16{0x9999} // :577
+		cd.pids = []uint16{0x9999} // :594
 		f = davWithCD(t, f, key, buildCD(t, cd))
 		davReject(t, f, attestation.CertificationDeclarationFieldMismatch, `CD product_id_array.*does not contain BasicInformation ProductID`)
 	})
@@ -405,14 +409,14 @@ func TestDeviceAttestationValidatorCDFields(t *testing.T) {
 		t.Parallel()
 		f, key := davFixtureWithKey(t)
 		cd := defaultCD()
-		cd.vid = 0xFFF2 // :598-599
+		cd.vid = 0xFFF2 // :615-616
 		f = davWithCD(t, f, key, buildCD(t, cd))
 		f.data.VendorID = 0xFFF2
 		davReject(t, f, attestation.CertificationDeclarationFieldMismatch, `DAC vendorId.*does not match CD vendor_id`)
 	})
 }
 
-// TestDeviceAttestationValidatorRevocation: describe "certificate revocation checks" (:612).
+// TestDeviceAttestationValidatorRevocation: describe "certificate revocation checks" (:629).
 func TestDeviceAttestationValidatorRevocation(t *testing.T) {
 	t.Parallel()
 	t.Run("throws CertificateRevoked when DAC serial is in revocation list", func(t *testing.T) {
@@ -438,7 +442,7 @@ func TestDeviceAttestationValidatorRevocation(t *testing.T) {
 		f := davFixture(t)
 		dac := davParse(t, f.data.DAC)
 		f.ctx.Store = davRevocations{attestation.TestStore(), map[string]bool{
-			davKey(dac.AuthorityKeyId, []byte{0xDE, 0xAD, 0xBE, 0xEF}, davIssuerDN(dac)): true, // :660
+			davKey(dac.AuthorityKeyId, []byte{0xDE, 0xAD, 0xBE, 0xEF}, davIssuerDN(dac)): true, // :677
 		}}
 		davPass(t, f)
 	})
@@ -448,7 +452,7 @@ func TestDeviceAttestationValidatorRevocation(t *testing.T) {
 	})
 }
 
-// TestDeviceAttestationValidatorFindings: describe "findings model" (:676).
+// TestDeviceAttestationValidatorFindings: describe "findings model" (:750).
 func TestDeviceAttestationValidatorFindings(t *testing.T) {
 	t.Parallel()
 	t.Run("returns findings alongside dacPublicKey on successful validation", func(t *testing.T) {
@@ -460,16 +464,6 @@ func TestDeviceAttestationValidatorFindings(t *testing.T) {
 		}
 		if !res.DACPublicKey.Equal(davParse(t, f.data.DAC).PublicKey) {
 			t.Fatal("dacPublicKey is not the DAC's key")
-		}
-	})
-	t.Run("returns CdSignerVerificationSkipped warning when no CD signer is available", func(t *testing.T) {
-		t.Parallel()
-		f := davFixture(t)
-		st := attestation.TestStore()
-		st.CDSigners = nil
-		f.ctx.Store = st
-		if fd := davFinding(davPass(t, f), attestation.CdSignerVerificationSkipped); fd == nil || fd.Level != attestation.LevelWarning {
-			t.Fatalf("finding %+v, want a warning", fd)
 		}
 	})
 	t.Run("still throws DeviceAttestationError for hard failures", func(t *testing.T) {
@@ -484,15 +478,65 @@ func TestDeviceAttestationValidatorFindings(t *testing.T) {
 	})
 }
 
+// TestDeviceAttestationValidatorTestCDSigner: describe "Matter test CD
+// signer" (:693-748): the test signer is built in, a recoverable
+// TrustedAsTestCertificate under a production-only policy, and its
+// signature is still verified.
+func TestDeviceAttestationValidatorTestCDSigner(t *testing.T) {
+	t.Parallel()
+	t.Run("verifies a test-signed CD when test certificates are accepted", func(t *testing.T) {
+		t.Parallel()
+		if fd := davFinding(davPass(t, davFixture(t)), attestation.TrustedAsTestCertificate); fd != nil {
+			t.Fatalf("finding %+v", fd)
+		}
+	})
+	t.Run("verifies a test-signed CD but reports it as TrustedAsTestCertificate when test certificates are not accepted", func(t *testing.T) {
+		t.Parallel()
+		f := davFixture(t)
+		f.ctx.Store = davTestOnly(true, false)
+		res := davPass(t, f)
+		var trusted []attestation.Finding
+		for _, fd := range res.Findings {
+			if fd.Check == attestation.TrustedAsTestCertificate {
+				trusted = append(trusted, fd)
+			}
+		}
+		if len(trusted) != 1 || trusted[0].Level != attestation.LevelError || !strings.Contains(trusted[0].Message, "test CD signer") {
+			t.Fatalf("TrustedAsTestCertificate findings %+v", trusted)
+		}
+		if davFinding(res, attestation.CertificationTypeTest) == nil {
+			t.Fatal("no CertificationTypeTest finding")
+		}
+	})
+	t.Run("refuses a test-signed CD with a bad signature also when test certificates are not accepted", func(t *testing.T) {
+		t.Parallel()
+		f, key := davFixtureWithKey(t)
+		forger, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+		cd := defaultCD()
+		cd.signer = forger // the test signer's SKID, another key
+		f = davWithCD(t, f, key, buildCD(t, cd))
+		f.ctx.Store = davTestOnly(true, false)
+		davReject(t, f, attestation.CertificationDeclarationSignatureInvalid, `Certification Declaration signature verification failed`)
+	})
+}
+
 // TestDeviceAttestationValidatorCertificationType: describe
-// "certification_type findings" (:711).
+// "certification_type findings" (:773).
 func TestDeviceAttestationValidatorCertificationType(t *testing.T) {
 	t.Parallel()
+	t.Run("refuses certification_type 3, the first reserved value", func(t *testing.T) {
+		t.Parallel()
+		f, key := davFixtureWithKey(t)
+		cd := defaultCD()
+		cd.certType = 3 // :774-791, signed by the test signer
+		f = davWithCD(t, f, key, buildCD(t, cd))
+		davReject(t, f, attestation.CertificationDeclarationFormatInvalid, `certification_type 3 is a reserved value`)
+	})
 	t.Run("returns CertificationTypeProvisional warning for provisional CD (type=1)", func(t *testing.T) {
 		t.Parallel()
 		f, key := davFixtureWithKey(t)
 		cd := defaultCD()
-		cd.certType = 1 // generate(..., true), :716
+		cd.certType = 1 // generate(..., true), :797
 		f = davWithCD(t, f, key, buildCD(t, cd))
 		fd := davFinding(davPass(t, f), attestation.CertificationTypeProvisional)
 		if fd == nil || fd.Level != attestation.LevelWarning || !strings.Contains(fd.Message, "provisional") {
@@ -518,13 +562,13 @@ func davFetchedAt(at time.Time) *attestation.StaticStore {
 }
 
 // TestDeviceAttestationValidatorPAAFetchTime: describe "time-based PAA
-// trust store check" (:743).
+// trust store check" (:824).
 func TestDeviceAttestationValidatorPAAFetchTime(t *testing.T) {
 	t.Parallel()
 	t.Run("returns PaaTrustStoreTimeMismatch info when PAA was fetched after DAC notBefore", func(t *testing.T) {
 		t.Parallel()
 		f := davFixture(t)
-		f.ctx.Store = davFetchedAt(time.Date(2099, 1, 1, 0, 0, 0, 0, time.UTC)) // :754
+		f.ctx.Store = davFetchedAt(time.Date(2099, 1, 1, 0, 0, 0, 0, time.UTC)) // :835
 		fd := davFinding(davPass(t, f), attestation.PaaTrustStoreTimeMismatch)
 		if fd == nil || fd.Level != attestation.LevelInfo || !strings.Contains(fd.Message, "PAA was fetched at") {
 			t.Fatalf("finding %+v", fd)
@@ -533,7 +577,7 @@ func TestDeviceAttestationValidatorPAAFetchTime(t *testing.T) {
 	t.Run("does not report PaaTrustStoreTimeMismatch when PAA was fetched before DAC notBefore", func(t *testing.T) {
 		t.Parallel()
 		f := davFixture(t)
-		f.ctx.Store = davFetchedAt(time.Unix(0, 0)) // fetchedAt = 0, :772
+		f.ctx.Store = davFetchedAt(time.Unix(0, 0)) // fetchedAt = 0, :853
 		if fd := davFinding(davPass(t, f), attestation.PaaTrustStoreTimeMismatch); fd != nil {
 			t.Fatalf("finding %+v", fd)
 		}
@@ -551,7 +595,7 @@ func davTestOnly(production, acceptTest bool) *attestation.StaticStore {
 }
 
 // TestDeviceAttestationValidatorTestCertificatePAA: describe
-// "test-certificate PAA detection" (:781).
+// "test-certificate PAA detection" (:862).
 func TestDeviceAttestationValidatorTestCertificatePAA(t *testing.T) {
 	t.Parallel()
 	rows := []struct {
@@ -561,8 +605,9 @@ func TestDeviceAttestationValidatorTestCertificatePAA(t *testing.T) {
 	}{
 		{"emits TrustedAsTestCertificate when PAA is test-only and service disallows test certs", false, false, true},
 		{"does NOT emit TrustedAsTestCertificate when service acceptsTestCertificates is true", false, true, false},
-		// setupDclService: a PAA fetched from the production DCL, test certificates not fetched.
-		{"does NOT emit TrustedAsTestCertificate when the PAA is a production cert", true, false, false},
+		// setupDclService: a PAA fetched from the production DCL, test
+		// certificates accepted (:143), as the CD is test-signed.
+		{"does NOT emit TrustedAsTestCertificate when the PAA is a production cert", true, true, false},
 	}
 	for _, r := range rows {
 		t.Run(r.name, func(t *testing.T) {

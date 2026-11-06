@@ -8,12 +8,17 @@ import (
 	"crypto/ecdsa"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"math/big"
 	"slices"
 	"strings"
 	"time"
 )
+
+// cdFormatVersion is CD_FORMAT_VERSION, Matter Core §6.3.1
+// (DeviceAttestationValidator.ts:29-30 at db021da0).
+const cdFormatVersion = 1
 
 // Context is what [Validate] works with — matter.js
 // DeviceAttestationValidator.Context (DAV:113-124).
@@ -57,18 +62,19 @@ type Result struct {
 func Validate(ctx Context, data Data) (Result, error) {
 	var findings []Finding
 
-	// Step 1: parse DAC and PAI from DER (DAV:174-176).
-	dac, err := parsePeerCertificate("DAC", data.DAC, true)
+	// Step 1: parse the PAI, then the DAC, as the CHIP SDK checks the PAI
+	// format first (DeviceAttestationValidator.ts:262-264 at db021da0).
+	pai, err := parsePeerCertificate(kindPAI, data.PAI)
 	if err != nil {
 		return Result{}, err
 	}
-	// The DAC key must be EC P-256 (Dac constructor,
-	// kinds/AttestationCertificates.ts:66-72).
-	dacPublicKey, err := P256Key(dac.x509)
+	dac, err := parsePeerCertificate(kindDAC, data.DAC)
 	if err != nil {
-		return Result{}, &Error{Check: CertificateUnparseable, Message: "Device returned a DAC certificate that cannot be parsed: " + err.Error(), Err: err}
+		return Result{}, err
 	}
-	pai, err := parsePeerCertificate("PAI", data.PAI, true)
+	// parseAttCert admits only an EC P-256 DAC key (the Dac constructor,
+	// kinds/AttestationCertificates.ts:235-247 at db021da0).
+	dacPublicKey, err := P256Key(dac.x509)
 	if err != nil {
 		return Result{}, err
 	}
@@ -114,34 +120,41 @@ func Validate(ctx Context, data Data) (Result, error) {
 
 	// === Remaining local checks (CD validation), DAV:366 ===
 
-	// Step 8: the Certification Declaration parses (DAV:368-374) and its
-	// signer verifies it (DAV:376-400).
+	// Step 8: the Certification Declaration parses, a broken encoding rule
+	// apart from a CD that cannot be decoded (DeviceAttestationValidator.ts
+	// :138-158, :457 at db021da0).
 	cd, err := parseDeclaration(elements.declaration)
 	if err != nil {
+		var fe *cdFormatError
+		if errors.As(err, &fe) {
+			return Result{}, &Error{Check: CertificationDeclarationFormatInvalid, Message: "Certification Declaration breaks an encoding rule: " + fe.msg, Err: err}
+		}
 		return Result{}, &Error{Check: CertificationDeclarationUnparseable, Message: "Device returned a Certification Declaration that cannot be parsed: " + err.Error(), Err: err}
 	}
+	// Its signer is a known CD signer — the built-in ones, then what the
+	// trust store knows — and its signature always verifies; the test
+	// signer under a production-only policy is a recoverable error
+	// (DeviceAttestationValidator.ts:458-486 at db021da0).
 	cdSignerSkidHex := hex.EncodeToString(cd.signerSubjectKeyID)
-	if ctx.Store != nil {
-		if signer, ok := ctx.Store.CDSigner(cd.signerSubjectKeyID); ok {
-			digest := sha256.Sum256(cd.signedData)
-			if !ecdsa.VerifyASN1(signer, digest[:], cd.signature) {
-				return Result{}, fail(CertificationDeclarationSignatureInvalid, "Certification Declaration signature verification failed")
-			}
-		} else {
-			findings = append(findings, Finding{
-				Level: LevelWarning, Check: CdSignerVerificationSkipped,
-				Message: "CD signer SKID " + cdSignerSkidHex + " not found in trust store or DCL; skipping CD signature verification",
-			})
-		}
-	} else {
+	signer, ok := lookupCDSigner(ctx.Store, cd.signerSubjectKeyID)
+	if !ok {
+		return Result{}, fail(CdSignerUnknown, "CD signer SKID "+cdSignerSkidHex+" is not known to be a CD signer")
+	}
+	digest := sha256.Sum256(cd.signedData)
+	if !ecdsa.VerifyASN1(signer.PublicKey, digest[:], cd.signature) {
+		return Result{}, fail(CertificationDeclarationSignatureInvalid, "Certification Declaration signature verification failed")
+	}
+	if signer.IsTestSigner && ctx.Store != nil && !ctx.Store.AcceptsTestCertificates() {
 		findings = append(findings, Finding{
-			Level: LevelWarning, Check: CdSignerVerificationSkipped,
-			Message: "No DclCertificateService provided; skipping CD signature verification",
+			Level: LevelError, Check: TrustedAsTestCertificate,
+			Message: "CD is signed by the Matter test CD signer " + cdSignerSkidHex + "; " +
+				"the device presented a valid test attestation but production trust policy is in effect",
 		})
 	}
 
-	// Step 9: the CD's fields (DAV:402-526).
-	if err := checkDeclaration(cd.content, data, dac, pai, paa, &findings); err != nil {
+	// Step 9: the CD's fields (DeviceAttestationValidator.ts:488-634 at
+	// db021da0).
+	if err := checkDeclaration(cd.content, signer.IsTestSigner, data, dac, pai, paa, &findings); err != nil {
 		return Result{}, err
 	}
 
@@ -184,7 +197,7 @@ func checkChain(store PAAStore, dac, pai *attCert, findings *[]Finding) (*attCer
 
 	// Step 3: the chain's signatures (DAV:268-303). A trust-store PAA that
 	// does not parse is not the peer's fault: a plain error (DAV:270).
-	paa, err := parseAttCert(meta.DER, false)
+	paa, err := parseAttCert(meta.DER, kindPAA, false)
 	if err != nil {
 		return nil, fmt.Errorf("attestation: trust store PAA: %w", err)
 	}
@@ -255,10 +268,26 @@ func checkChain(store PAAStore, dac, pai *attCert, findings *[]Finding) (*attCer
 	return paa, nil
 }
 
-// checkDeclaration is Step 9, the CD's fields (DAV:402-526).
-func checkDeclaration(cd cdContent, data Data, dac, pai, paa *attCert, findings *[]Finding) error {
+// checkDeclaration is Step 9, the CD's fields (DeviceAttestationValidator.ts
+// :488-634 at db021da0).
+func checkDeclaration(cd cdContent, testSigner bool, data Data, dac, pai, paa *attCert, findings *[]Finding) error {
+	// format_version is 1 (Matter Core §6.3.1); a reserved
+	// certification_type is refused as CHIP does, though the specification
+	// only marks it reserved; an official CD is not the test signer's —
+	// §6.3.1 allows a test-signed CD of type test, CHIP also provisional
+	// (DeviceAttestationValidator.ts:491-513 at db021da0).
+	if cd.formatVersion != cdFormatVersion {
+		return fail(CertificationDeclarationFormatInvalid, fmt.Sprintf("CD format_version %d is not %d", cd.formatVersion, cdFormatVersion))
+	}
+	if cd.certificationType > CertificationOfficial {
+		return fail(CertificationDeclarationFormatInvalid, fmt.Sprintf("CD certification_type %d is a reserved value", cd.certificationType))
+	}
+	if cd.certificationType == CertificationOfficial && testSigner {
+		return fail(OfficialCdSignedByTestSigner, "CD with certification_type=2 (official) is signed by the Matter test CD signer")
+	}
+
 	// certification_type: provisional is a warning, test an info
-	// (DAV:405-419).
+	// (DeviceAttestationValidator.ts:515-527 at db021da0).
 	switch cd.certificationType {
 	case CertificationProvisional:
 		*findings = append(*findings, Finding{Level: LevelWarning, Check: CertificationTypeProvisional, Message: "Certification Declaration has certification_type=1 (provisional)"})
@@ -321,17 +350,27 @@ func checkDeclaration(cd cdContent, data Data, dac, pai, paa *attCert, findings 
 	return nil
 }
 
-// parsePeerCertificate is DAV:93-106: an empty certificate, or one that
-// does not parse, is CertificateUnparseable.
-func parsePeerCertificate(kind string, der []byte, authorityKeyID bool) (*attCert, error) {
+// parsePeerCertificate is DeviceAttestationValidator.ts:160-194 at
+// db021da0: an empty certificate, or one that does not parse, is
+// CertificateUnparseable; one that parses but breaks its profile is
+// DacFormatInvalid or PaiFormatInvalid.
+func parsePeerCertificate(kind certKind, der []byte) (*attCert, error) {
 	if len(der) == 0 {
-		return nil, fail(CertificateUnparseable, "Device returned an empty "+kind+" certificate")
+		return nil, fail(CertificateUnparseable, "Device returned an empty "+kind.String()+" certificate")
 	}
-	c, err := parseAttCert(der, authorityKeyID)
-	if err != nil {
-		return nil, &Error{Check: CertificateUnparseable, Message: "Device returned a " + kind + " certificate that cannot be parsed: " + err.Error(), Err: err}
+	c, err := parseAttCert(der, kind, false)
+	switch {
+	case err == nil:
+		return c, nil
+	case isProfileError(err):
+		check := PaiFormatInvalid
+		if kind == kindDAC {
+			check = DacFormatInvalid
+		}
+		return nil, &Error{Check: check, Message: fmt.Sprintf("Device returned a %s certificate that violates the %s profile: %v", kind, kind, err), Err: err}
+	default:
+		return nil, &Error{Check: CertificateUnparseable, Message: "Device returned a " + kind.String() + " certificate that cannot be parsed: " + err.Error(), Err: err}
 	}
-	return c, nil
 }
 
 // verifyRaw verifies a raw 64-byte r‖s ECDSA signature over SHA-256 of

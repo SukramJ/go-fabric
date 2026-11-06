@@ -195,8 +195,8 @@ func TestClientAttestationTrustStoreParity(t *testing.T) {
 		if lvl, ok := r.has(attestation.CertificationTypeTest); !ok || lvl != attestation.LevelInfo {
 			t.Fatalf("findings %+v: want CertificationTypeTest as info", r.findings)
 		}
-		if _, ok := r.has(attestation.CdSignerVerificationSkipped); ok {
-			t.Fatalf("findings %+v: the CD signer was not verified", r.findings)
+		if _, ok := r.has(attestation.CdSignerUnknown); ok {
+			t.Fatalf("findings %+v: the CD signer is unknown", r.findings)
 		}
 	})
 	t.Run("rejects with onAttestationFailure=false despite valid chain", func(t *testing.T) {

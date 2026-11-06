@@ -349,8 +349,9 @@ version in the reference controller's README).
 The commissioner checks the device's attestation against a trust store:
 
 - **`attestation.TestStore()`** (the quickstart's choice) holds the CSA
-  test PAAs and the test CD signer. It accepts the test devices that the
-  reference bridge and chip-tool present.
+  test PAAs and accepts test certificates, which trusts the Matter test
+  CD signer. It accepts the test devices that the reference bridge and
+  chip-tool present.
 - **A nil store** checks without one, as matter.js does without its DCL
   service.
 - **`dcl.OpenCertificateStore`** is the opt-in trust store from the CSA
@@ -379,6 +380,26 @@ service off the network: it then serves the stored, seeded and static
 vendors and answers every product as absent. `dcl.NewVendorInfoService`
 builds one without a controller.
 
+What the validator refuses follows matter.js and chip. The DAC and the
+PAI must meet their certificate profile (Matter Core §6.2.2.3,
+§6.2.2.4): version 3, basic constraints and key usage present and
+critical, a PAI a CA with pathLen 0 and key usage keyCertSign and
+cRLSign, a DAC no CA with digitalSignature alone. A violation is
+`PaiFormatInvalid` or `DacFormatInvalid`. The Certification Declaration
+must meet its CMS envelope, `format_version` 1 and a defined
+certification type (`CertificationDeclarationFormatInvalid`), and its
+signer must be a CD signer: the CSA signing keys 001–005 and the Matter
+test CD signer are built in (`attestation.KnownCDSigner`); a
+`dcl.CertificateStore` answers for a further signer only with a certificate
+the CSA "Matter Certification and Testing CA" issued, which it fetches and
+checks (`attestation.VerifyCDSignerCertificate`), while an
+`attestation.StaticStore` answers with the CD signer keys its host put
+there, unverified. A signer neither built in nor known to the store is
+`CdSignerUnknown`. A CD signed by the test
+signer under a store that refuses test certificates is a
+`TrustedAsTestCertificate` finding, and an official CD signed by it is
+`OfficialCdSignedByTestSigner`.
+
 PQC Phase 1 — ML-DSA-44 and ML-DSA-65 keys in a PAA and a PAI, ML-DSA
 signatures on any attestation certificate, the DAC key on EC P-256 — is
 implemented in `controller/attestation` over the standard library's
@@ -404,7 +425,7 @@ A rejection matches `commissioner.ErrAttestationRejected` through
 `errors.Is`, besides `commissioner.ErrCommissioning`, so a host tells a
 refused device from a network failure.
 
-*Source: `controller/attestation/doc.go:4-20`, `controller/attestation/store.go:87-93`, `controller/attestation/policy.go:17-61`, `controller/commissioner/commissioner.go:52-54`, `controller/dcl/doc.go:4-24`, `examples/reference-controller/cli/stack.go:192-274`.*
+*Source: `controller/attestation/doc.go:4-20`, `controller/attestation/store.go:87-93`, `controller/attestation/profile.go`, `controller/attestation/cdsigners.go`, `controller/attestation/validate.go`, `controller/attestation/policy.go:17-61`, `controller/commissioner/commissioner.go:52-54`, `controller/dcl/doc.go:4-24`, `examples/reference-controller/cli/stack.go:192-274`.*
 
 ## The registry and the device view
 
