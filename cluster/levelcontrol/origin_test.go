@@ -127,7 +127,7 @@ func TestEngineLevelControlOrigins(t *testing.T) {
 // and the last once the quieter's interval has passed — matter.js's
 // QuietEvent throttles only its `online` view
 // (packages/node/src/behavior/Events.ts:267-297, ServerBehaviorBacking.ts
-// :265-273).
+// :251-259).
 func TestHostSeesEveryChangeTheWireThrottles(t *testing.T) {
 	t.Parallel()
 	synctest.Test(t, func(t *testing.T) {

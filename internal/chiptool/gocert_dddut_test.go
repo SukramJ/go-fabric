@@ -596,8 +596,8 @@ func caseDD311() goCertCase {
 // ddFlowSupport is the support file the flow cases' steps are defined in.
 const ddFlowSupport = "tc-dd-flow-support.ts"
 
-// flowCase is defineFlowQrTest (tc-dd-flow-support.ts:70-205): per leg
-// (BLE, Wi-Fi PAF, IP network, :77-102) a generated payload offering the
+// flowCase is defineFlowQrTest (tc-dd-flow-support.ts:72-189): per leg
+// (BLE, Wi-Fi PAF, IP network, :77-99) a generated payload offering the
 // leg's capability over the flow, two parses, and — on the IP leg only —
 // the commissioning.
 func flowCase(tc string, flow int, flowPICS string) goCertCase {

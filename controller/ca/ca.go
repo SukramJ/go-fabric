@@ -49,7 +49,7 @@ var ErrConfig = errors.New("ca: stored credentials do not match the configuratio
 // sign: more than three tags, two tags with the same identifier (the upper
 // 16 bits), or a tag with version 0 (the lower 16 bits). matter.js applies
 // the same rules when it turns the subject into ASN.1
-// (kinds/Certificate.ts:989 → CaseAuthenticatedTag.validateNocTagList,
+// (kinds/Noc.ts:116 → CaseAuthenticatedTag.validateNocTagList,
 // datatype/CaseAuthenticatedTag.ts:96-105; version 0 refused at :32-33),
 // so a NOC the device would refuse at AddNOC (InvalidNOC) is never issued.
 var ErrInvalidCATs = errors.New("ca: invalid CASE Authenticated Tag list")

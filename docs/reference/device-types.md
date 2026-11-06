@@ -3,7 +3,7 @@
 # Device types
 
 The 91 device types of the `device` package, from the matter.js model at
-`862ad75` (Matter 1.6.1). Each section is what the type's `device.<Name>Type`
+`db021da` (Matter 1.6.1). Each section is what the type's `device.<Name>Type`
 carries: the server and client clusters matter.js's generator derives,
 whether the type mandates each, the features it requires and the
 attributes, commands and events it alters. A cluster with a typed package

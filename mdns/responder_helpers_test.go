@@ -202,7 +202,7 @@ func rrStrings(rrs []dns.RR) []string {
 }
 
 // sortedRRStrings is rrStrings in a canonical order — matter.js MdnsTest
-// compares announcements as sets (MdnsTest.ts:1075-1110 expectMessage).
+// compares announcements as sets (MdnsTest.ts:1001-1024 expectMessage).
 func sortedRRStrings(rrs []dns.RR) []string {
 	out := rrStrings(rrs)
 	slices.Sort(out)

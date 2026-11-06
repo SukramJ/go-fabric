@@ -825,7 +825,7 @@ type AttributeChangeNotifier interface {
 // (packages/node/src/behavior/Events.ts:228-236, :267-297;
 // cluster/ClusterBehaviorType.ts:343-344) — to which
 // ServerBehaviorBacking subscribes the report of a quieter property
-// (internal/ServerBehaviorBacking.ts:231-276).
+// (internal/ServerBehaviorBacking.ts:223-262).
 //
 // A type that forwards OnAttributeChange to a server implementing this
 // forwards OnAttributeReport too, or the bridge reports every change of

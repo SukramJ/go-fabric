@@ -169,7 +169,7 @@ func (s *Server) applyLevel(changes []transition.Change) error {
 // on the commit of each state write; Events.ts:267-297 QuietEvent is an
 // OnlineEvent whose own observers are not throttled). Under the engine
 // the wire report follows the quieter rules of the "Q" quality (matter.js
-// QuietEvent's QuietObservable, ServerBehaviorBacking.ts:265-273): at
+// QuietEvent's QuietObservable, ServerBehaviorBacking.ts:251-259): at
 // once from or to null and otherwise at most once a second, the end of a
 // transition flushing the last value — a report the quieter defers
 // carries the origin of the last change before it. On the hand-off path

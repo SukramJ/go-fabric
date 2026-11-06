@@ -113,7 +113,7 @@ func peerSet(t *testing.T, s *scripted) *peer.Set {
 	return set
 }
 
-// TestPeerProvider: the peer provider (PeerExchangeProvider.ts:19-163)
+// TestPeerProvider: the peer provider (PeerExchangeProvider.ts:19-159)
 // names the peer's address, runs an exchange on its newest session, and
 // with RequireExistingSession fails without one instead of connecting.
 func TestPeerProvider(t *testing.T) {
@@ -158,7 +158,7 @@ func TestPeerProvider(t *testing.T) {
 // MRP margin configured, the provider's MaximumPeerResponseTime — the
 // subscription liveness timeout's term — pads our own retransmissions,
 // as matter.js passes localAdditionalMrpDelay and localFixedMrpBackoff
-// (PeerExchangeProvider.ts:152-161, ExchangeManager.ts:533-545).
+// (PeerExchangeProvider.ts:150-158, ExchangeManager.ts:533-545).
 func TestMaximumPeerResponseTimeCarriesLocalPad(t *testing.T) {
 	t.Parallel()
 	m, err := exchange.NewManager(&fakeConn{ch: make(chan []byte, 16)}, exchange.Config{

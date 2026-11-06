@@ -32,7 +32,7 @@ import (
 // change notification on the commit of each state write
 // (packages/node/src/behavior/state/managed/Datasource.ts:1473-1476); the quieter ("Q") throttle stands in front of
 // the wire only (packages/node/src/behavior/Events.ts:267-297,
-// internal/ServerBehaviorBacking.ts:265-273).
+// internal/ServerBehaviorBacking.ts:251-259).
 
 // levelSeen is one change of the light's level as the host saw it.
 type levelSeen struct {
