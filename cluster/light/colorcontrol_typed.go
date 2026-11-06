@@ -43,9 +43,10 @@ var (
 // the server lacks is refused ([spec.ErrInvalidValue]).
 //
 // RemainingTime is the running transition's and NumberOfPrimaries,
-// ColorCapabilities, the physical colour temperature bounds and
-// CoupleColorTempToLevelMinMireds are the configuration's: a value other
-// than the one they read is refused with [spec.ErrNotHeld].
+// ColorCapabilities, the physical colour temperature bounds,
+// CoupleColorTempToLevelMinMireds and the colour points are the
+// configuration's: a value other than the one they read is refused with
+// [spec.ErrNotHeld].
 func (s *ColorControlServer) SetAttributes(values map[uint32]any) error {
 	checked, err := s.checkSet(values)
 	if err != nil || len(checked) == 0 {
@@ -97,16 +98,17 @@ func (s *ColorControlServer) checkSet(values map[uint32]any) (map[uint32]any, er
 		if err != nil {
 			return nil, err
 		}
-		switch id {
-		case ccdef.AttrRemainingTime:
+		_, isPoint := s.points[id]
+		switch {
+		case id == ccdef.AttrRemainingTime:
 			return nil, fmt.Errorf("%w: colorcontrol: RemainingTime is derived from the running transition", spec.ErrNotHeld)
-		case ccdef.AttrNumberOfPrimaries, ccdef.AttrColorCapabilities, ccdef.AttrColorTempPhysicalMinMireds,
-			ccdef.AttrColorTempPhysicalMaxMireds, ccdef.AttrCoupleColorTempToLevelMinMireds:
+		case isPoint, id == ccdef.AttrNumberOfPrimaries, id == ccdef.AttrColorCapabilities, id == ccdef.AttrColorTempPhysicalMinMireds,
+			id == ccdef.AttrColorTempPhysicalMaxMireds, id == ccdef.AttrCoupleColorTempToLevelMinMireds:
 			if cur, _ := s.MatterRead(id); v != cur {
 				return nil, fmt.Errorf("%w: colorcontrol: attribute 0x%04X is the configuration's (%v)", spec.ErrNotHeld, id, cur)
 			}
 			continue
-		case ccdef.AttrColorMode, ccdef.AttrEnhancedColorMode:
+		case id == ccdef.AttrColorMode, id == ccdef.AttrEnhancedColorMode:
 			if m, _ := v.(uint8); !s.supportsColorMode(ColorMode(m)) {
 				return nil, fmt.Errorf("%w: colorcontrol: colour mode %d has no feature here", spec.ErrInvalidValue, m)
 			}

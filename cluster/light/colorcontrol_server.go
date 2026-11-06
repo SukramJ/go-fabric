@@ -54,7 +54,9 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"maps"
 	"math"
+	"slices"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -134,6 +136,19 @@ type ColorControlServerConfig struct {
 	// default 0).
 	InitialHue, InitialSaturation uint8
 	InitialEnhancedHue            uint16
+	// Primaries are the light's primaries, at most six: Primary1X to
+	// Primary6Intensity serve them, and NumberOfPrimaries reads their
+	// count, null without any — the count connectedhomeip derives from
+	// the table the application supplies (ColorControlCluster.cpp:178-191
+	// at 6170af84).
+	Primaries []Chromaticity
+	// WhitePoint is the light's white point (WhitePointX, WhitePointY);
+	// nil serves neither.
+	WhitePoint *CIEPoint
+	// ColorPointR, ColorPointG and ColorPointB are the light's virtual
+	// primaries (ColorPointRX … ColorPointBIntensity); nil serves none of
+	// that point's attributes.
+	ColorPointR, ColorPointG, ColorPointB *Chromaticity
 	// ManageTransitions runs the commands as gradual transitions, stepping
 	// the values every TransitionStepInterval and reporting RemainingTime
 	// (matter.js managedTransitionTimeHandling). Without it every command
@@ -151,6 +166,67 @@ type ColorControlServerConfig struct {
 	Clock clock.Clock
 	// Logger receives the server's diagnostics; nil is slog.Default().
 	Logger *slog.Logger
+}
+
+// CIEPoint is a point in the CIE 1931 colour space, X and Y in the
+// attributes' unit (the coordinate × 65536, at most 0xFEFF).
+type CIEPoint struct {
+	X, Y uint16
+}
+
+// Chromaticity is a primary of a light: its [CIEPoint] and its intensity,
+// nil for null (the Intensity attributes' quality X).
+type Chromaticity struct {
+	X, Y      uint16
+	Intensity *uint8
+}
+
+// maxPrimaries is NumberOfPrimaries' maximum (color-control.element.ts,
+// "max 6").
+const maxPrimaries = 6
+
+// primaryAttrs are the X, Y and Intensity attributes of Primary1 to
+// Primary6.
+var primaryAttrs = [maxPrimaries][3]uint32{
+	{ccdef.AttrPrimary1X, ccdef.AttrPrimary1Y, ccdef.AttrPrimary1Intensity},
+	{ccdef.AttrPrimary2X, ccdef.AttrPrimary2Y, ccdef.AttrPrimary2Intensity},
+	{ccdef.AttrPrimary3X, ccdef.AttrPrimary3Y, ccdef.AttrPrimary3Intensity},
+	{ccdef.AttrPrimary4X, ccdef.AttrPrimary4Y, ccdef.AttrPrimary4Intensity},
+	{ccdef.AttrPrimary5X, ccdef.AttrPrimary5Y, ccdef.AttrPrimary5Intensity},
+	{ccdef.AttrPrimary6X, ccdef.AttrPrimary6Y, ccdef.AttrPrimary6Intensity},
+}
+
+// colorPoints maps the primaries, the white point and the colour points
+// cfg supplies onto their attributes, a null intensity onto nil.
+func colorPoints(cfg ColorControlServerConfig) (map[uint32]any, error) {
+	if len(cfg.Primaries) > maxPrimaries {
+		return nil, fmt.Errorf("%w: colorcontrol: %d primaries, at most %d", spec.ErrInvalidValue, len(cfg.Primaries), maxPrimaries)
+	}
+	points := map[uint32]any{}
+	add := func(ids [3]uint32, c Chromaticity) {
+		points[ids[0]], points[ids[1]] = c.X, c.Y
+		if c.Intensity != nil {
+			points[ids[2]] = *c.Intensity
+		} else {
+			points[ids[2]] = nil
+		}
+	}
+	for i, p := range cfg.Primaries {
+		add(primaryAttrs[i], p)
+	}
+	if wp := cfg.WhitePoint; wp != nil {
+		points[ccdef.AttrWhitePointX], points[ccdef.AttrWhitePointY] = wp.X, wp.Y
+	}
+	for ids, c := range map[[3]uint32]*Chromaticity{
+		{ccdef.AttrColorPointRx, ccdef.AttrColorPointRy, ccdef.AttrColorPointRIntensity}: cfg.ColorPointR,
+		{ccdef.AttrColorPointGx, ccdef.AttrColorPointGy, ccdef.AttrColorPointGIntensity}: cfg.ColorPointG,
+		{ccdef.AttrColorPointBx, ccdef.AttrColorPointBy, ccdef.AttrColorPointBIntensity}: cfg.ColorPointB,
+	} {
+		if c != nil {
+			add(ids, *c)
+		}
+	}
+	return points, nil
 }
 
 // OnOffState is the On/Off state of the endpoint a [ColorControlServer]
@@ -244,6 +320,9 @@ type ColorControlServer struct {
 	cfg    ColorControlServerConfig
 	inst   *spec.Instance
 	engine *transition.Engine
+	// points are the primaries, white point and colour points the
+	// configuration supplies, by attribute; fixed after construction.
+	points map[uint32]any
 	onOff  OnOffState
 	// scenes is the endpoint's ScenesManagement ([ColorControlServer.SetScenes]);
 	// nil leaves the scene invalidation to the endpoint layer.
@@ -337,18 +416,29 @@ func NewColorControl(cfg ColorControlServerConfig) (*ColorControlServer, error) 
 	if cfg.Features == 0 {
 		cfg.Features = ColorFeatureColorTemperature
 	}
+	points, err := colorPoints(cfg)
+	if err != nil {
+		return nil, err
+	}
 	inst, err := spec.New(ccdef.Definition, spec.Options{
 		Features: uint32(cfg.Features),
 		// RemainingTime is "O"; ColorTemperatureLight and
 		// ExtendedColorLight make it mandatory, and the server keeps it
 		// live (matter.js extended-color-light.ts alters remainingTime to
-		// not optional).
-		Attributes: []uint32{ccdef.AttrRemainingTime},
+		// not optional). The supplied colour points are served, as
+		// connectedhomeip lists a descriptor only when the application
+		// supplies it (ColorControlCluster.cpp:1780-1806 at 6170af84).
+		Attributes: append([]uint32{ccdef.AttrRemainingTime}, slices.Sorted(maps.Keys(points))...),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", ErrColorFeatures, err)
 	}
-	s := &ColorControlServer{cfg: cfg, inst: inst, onOff: cfg.OnOff}
+	s := &ColorControlServer{cfg: cfg, inst: inst, onOff: cfg.OnOff, points: points}
+	for _, id := range slices.Sorted(maps.Keys(points)) {
+		if _, err := inst.CheckSet(id, points[id], s.MatterRead); err != nil {
+			return nil, fmt.Errorf("colorcontrol: attribute 0x%04X: %w", id, err)
+		}
+	}
 	s.st = colorState{
 		mireds:        min(max(cfg.InitialMireds, cfg.MinMireds), cfg.MaxMireds),
 		x:             cfg.InitialX,
@@ -487,6 +577,9 @@ func (s *ColorControlServer) MatterRead(attrID uint32) (any, bool) {
 	if !s.inst.Serves(attrID) {
 		return nil, false
 	}
+	if v, ok := s.points[attrID]; ok {
+		return v, true
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	st := s.st
@@ -512,8 +605,13 @@ func (s *ColorControlServer) MatterRead(attrID uint32) (any, bool) {
 	case ccdef.AttrOptions:
 		return s.options, true
 	case ccdef.AttrNumberOfPrimaries:
-		// NumberOfPrimaries is mandatory with Quality X (nullable); the
-		// server declares no primaries, so it reads null.
+		// NumberOfPrimaries is mandatory with Quality X (nullable): the
+		// count of the supplied primaries, null without any
+		// (connectedhomeip ColorControlCluster.cpp:178-191 counts the
+		// supplied table; matter.js leaves the value to the application).
+		if n := len(s.cfg.Primaries); n > 0 {
+			return uint8(n), true //nolint:gosec // at most maxPrimaries
+		}
 		return nil, true
 	case ccdef.AttrEnhancedCurrentHue:
 		return st.enhancedHue, true
