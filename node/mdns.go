@@ -4,8 +4,13 @@
 package node
 
 import (
+	"github.com/SukramJ/go-fabric/internal/netwatch"
 	"github.com/SukramJ/go-fabric/mdns"
 )
+
+// netwatchDefaultInterval is the interface check interval of a zero
+// [Network.InterfaceCheck].
+const netwatchDefaultInterval = netwatch.DefaultInterval
 
 // MDNS configures the DNS-SD advertiser the node builds when
 // [Config].Advertiser is nil. The zero value advertises on the network.
@@ -48,6 +53,7 @@ func (n *Node) defaultAdvertiser() mdns.Advertiser {
 	r := mdns.NewResponder()
 	r.SetLogger(n.logger)
 	r.HostName = m.HostName
+	r.SetInterfaceCheckInterval(n.cfg.Network.interfaceCheck())
 	return r
 }
 

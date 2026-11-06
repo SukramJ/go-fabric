@@ -181,60 +181,32 @@ func (r *Responder) stopLocked(e *entry) {
 	e.run = nil
 }
 
-// broadcastLocked announces e's record set on every interface it has
-// records on: one response carrying all of them in the answer section
-// (RFC 6762 §8.3; matter.js MdnsServer.ts:205-241 #announceRecordsForInterface
-// and broadcast at 862ad75f), split where it outgrows a packet with every
-// part in the answer section (MdnsTest.ts:996-1070). Caller holds r.mu.
+// broadcastLocked announces e on every interface: one publication per
+// interface that carries e's records with the goodbyes of the records that
+// left, every record in the answer section (RFC 6762 §8.3; matter.js
+// MdnsServer.broadcast and InterfaceResponder.publish,
+// MdnsServer.ts:210-223 and InterfaceResponder.ts:271-302 at db021da0),
+// split where it outgrows a packet with every part in the answer section
+// (MdnsTest.ts:757-829 at db021da0). Caller holds r.mu.
 func (r *Responder) broadcastLocked(e *entry) {
 	if r.wire == nil {
 		return
 	}
 	for _, ifIndex := range r.wire.links() {
-		rrs := r.recordsForLocked(ifIndex).byService[e.key]
-		if len(rrs) == 0 {
-			continue
-		}
-		r.sendLocked(splitResponse(0, rrs, nil), ifIndex, nil)
+		r.publishLocked(ifIndex, map[string]bool{e.key: true}, false)
 	}
 }
 
-// goodbyeLocked sends e's record set with TTL 0 on every interface it has
-// records on — matter.js expireAnnouncements (MdnsServer.ts:243-275 at
-// 862ad75f): every record, the cache-flush bits kept. The responses of
-// several services go out back to back, without matter.js's 20–120 ms
-// between them (:258-260): a goodbye runs inside Withdraw and Close, which
-// return once it is sent. Caller holds r.mu.
-func (r *Responder) goodbyeLocked(e *entry) {
+// broadcastAllLocked announces every published service now: one message
+// per interface with each shared record once (MdnsServer.broadcast with no
+// service named, MdnsServer.ts:210-223 at db021da0; MdnsServerTest.ts
+// "announces all services in one packet with each shared record once").
+// Caller holds r.mu.
+func (r *Responder) broadcastAllLocked() {
 	if r.wire == nil {
 		return
 	}
 	for _, ifIndex := range r.wire.links() {
-		rrs := r.recordsForLocked(ifIndex).byService[e.key]
-		if len(rrs) == 0 {
-			continue
-		}
-		r.sendLocked(splitResponse(0, goodbyeRecords(rrs), nil), ifIndex, nil)
-	}
-}
-
-// broadcastAllLocked announces every published service now, 20–120 ms
-// apart (MdnsServer.ts:216-241 at 862ad75f). Caller holds r.mu.
-func (r *Responder) broadcastAllLocked() {
-	var delay time.Duration
-	for i, key := range r.order {
-		e := r.services[key]
-		if i == 0 {
-			r.broadcastLocked(e)
-			continue
-		}
-		delay += 20*time.Millisecond + time.Duration(rand.IntN(100))*time.Millisecond //nolint:gosec // G404: a timing jitter
-		r.clock.Load().AfterFunc(delay, func() {
-			r.mu.Lock()
-			defer r.mu.Unlock()
-			if !r.closed && r.services[key] == e {
-				r.broadcastLocked(e)
-			}
-		})
+		r.publishLocked(ifIndex, nil, true)
 	}
 }

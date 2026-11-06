@@ -174,8 +174,11 @@ func TestResponder_ScheduleEndsAtTheCommissioningTimeout(t *testing.T) {
 }
 
 // TestResponder_RepublishChangedSaysGoodbyeFirst: a changed record set
-// expires the old records before the new ones are announced, as matter.js
-// closes the advertisement and creates a new one.
+// is announced in one message that first says goodbye to the record that
+// left — the old TXT, without the cache-flush bit as its set still has a
+// record — and then carries the new set (InterfaceResponder.ts:445-490 at
+// db021da0; MdnsServerTest.ts "announces a changed record on the broadcast
+// after a refresh and says goodbye to its old value").
 func TestResponder_RepublishChangedSaysGoodbyeFirst(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
@@ -190,15 +193,15 @@ func TestResponder_RepublishChangedSaysGoodbyeFirst(t *testing.T) {
 		t.Fatal(err)
 	}
 	got := w.take()
-	expectSent(t, got, 2)
-	for _, rr := range got[0].msg.Answer {
-		if rr.Header().Ttl != 0 {
-			t.Errorf("first packet %v is not a goodbye", rr)
-		}
+	expectSent(t, got, 1)
+	answers := got[0].msg.Answer
+	if len(answers) < 2 || answers[0].Header().Ttl != 0 || answers[0].Header().Rrtype != dns.TypeTXT ||
+		answers[0].Header().Class&classCacheFlush != 0 {
+		t.Fatalf("the message does not open with the old TXT's goodbye: %v", answers)
 	}
-	for _, rr := range got[1].msg.Answer {
+	for _, rr := range answers[1:] {
 		if rr.Header().Ttl != recordTTL {
-			t.Errorf("second packet %v is not the announcement", rr)
+			t.Errorf("%v is not announced", rr)
 		}
 	}
 	if len(r.Active()) != 1 {
@@ -206,8 +209,9 @@ func TestResponder_RepublishChangedSaysGoodbyeFirst(t *testing.T) {
 	}
 }
 
-// TestResponder_TriggerReannounce announces every service now, the second
-// 20–120 ms after the first.
+// TestResponder_TriggerReannounce announces every service now, in one
+// message per interface (MdnsServer.broadcast, MdnsServer.ts:210-223 at
+// db021da0).
 func TestResponder_TriggerReannounce(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
@@ -219,9 +223,20 @@ func TestResponder_TriggerReannounce(t *testing.T) {
 	}
 	w.take()
 	r.TriggerReannounce(ctx)
-	expectSent(t, w.take(), 1)
+	// One publication, split into datagrams by size.
+	var srvs int
+	for _, p := range w.take() {
+		for _, rr := range p.msg.Answer {
+			if rr.Header().Rrtype == dns.TypeSRV {
+				srvs++
+			}
+		}
+	}
+	if srvs != 2 {
+		t.Errorf("the announcement carries %d SRV records, want both services'", srvs)
+	}
 	clk.Advance(120 * time.Millisecond)
-	expectSent(t, w.take(), 1)
+	expectSent(t, w.take(), 0)
 }
 
 // TestResponder_HostQuestions: the bare host-name questions — TC-SC-4.1 and

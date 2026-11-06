@@ -117,7 +117,12 @@ func (s *answerState) reset() {
 type linkRecords struct {
 	byService map[string][]dns.RR
 	owned     map[string]bool
-	at        time.Time
+	// byKey holds the identity (recordIdentity) of every record, setKeys
+	// the set (setKeyOf) of every record — matter.js's View.byKey and
+	// View.setKeys (InterfaceResponder.ts:880-892 at db021da0).
+	byKey   map[string]bool
+	setKeys map[string]bool
+	at      time.Time
 }
 
 // recordsForLocked returns the record sets on ifIndex, from the cache while
@@ -127,7 +132,10 @@ func (r *Responder) recordsForLocked(ifIndex int) *linkRecords {
 	if lr, ok := r.links[ifIndex]; ok && now.Sub(lr.at) < recordCacheLifetime {
 		return lr
 	}
-	lr := &linkRecords{byService: map[string][]dns.RR{}, owned: map[string]bool{}, at: now}
+	lr := &linkRecords{
+		byService: map[string][]dns.RR{}, owned: map[string]bool{},
+		byKey: map[string]bool{}, setKeys: map[string]bool{}, at: now,
+	}
 	addrs := r.wire.addrs(ifIndex)
 	if len(addrs) > 0 {
 		for _, key := range r.order {
@@ -145,6 +153,8 @@ func (r *Responder) recordsForLocked(ifIndex int) *linkRecords {
 			lr.byService[key] = rrs
 			for _, rr := range rrs {
 				lr.owned[strings.ToLower(rr.Header().Name)] = true
+				lr.byKey[recordIdentity(rr)] = true
+				lr.setKeys[setKeyOf(rr)] = true
 			}
 		}
 	}
@@ -406,10 +416,10 @@ func knownTo(known []dns.RR, rr dns.RR) bool {
 }
 
 // sendable clears the cache-flush bit wherever it would claim more than the
-// response carries (matter.js MdnsServer.ts:534-551 `sendable` at
-// 862ad75f, RFC 6762 §10.2 and §6.7): on every record of a unicast
+// response carries (RFC 6762 §10.2 and §6.7): on every record of a unicast
 // response, and on a record whose set (name, type, class) is sent
-// incompletely.
+// incompletely, the complete set counted with each record once (matter.js
+// InterfaceResponder.ts `sendable`, :934-962 at db021da0).
 func sendable(sent, complete []dns.RR, unicast bool) []dns.RR {
 	if len(sent) == 0 {
 		return nil
@@ -425,7 +435,7 @@ func sendable(sent, complete []dns.RR, unicast bool) []dns.RR {
 		}
 		return m
 	}
-	sentSizes, completeSizes := sizes(sent), sizes(complete)
+	sentSizes, completeSizes := sizes(sent), sizes(uniqueRecords(complete))
 	out := make([]dns.RR, 0, len(sent))
 	for _, rr := range sent {
 		if rr.Header().Class&classCacheFlush != 0 && (unicast || sentSizes[setKey(rr)] < completeSizes[setKey(rr)]) {
@@ -488,18 +498,33 @@ func splitResponse(id uint16, answers, additional []dns.RR) []*dns.Msg {
 }
 
 // sendLocked packs and sends msgs on ifIndex: to dst by unicast when set,
-// to the mDNS groups otherwise. Caller holds r.mu.
-func (r *Responder) sendLocked(msgs []*dns.Msg, ifIndex int, dst *net.UDPAddr) {
+// to the mDNS groups otherwise. It notes what the peers may now cache
+// (noteSentLocked) and reports how far the message reached. Caller holds
+// r.mu.
+func (r *Responder) sendLocked(msgs []*dns.Msg, ifIndex int, dst *net.UDPAddr) reach {
+	if len(msgs) == 0 {
+		return reachAll
+	}
+	now := r.clock.Load().Now()
+	rc, first := reachNone, true
 	for _, m := range msgs {
 		pkt, err := m.Pack()
-		if err != nil {
+		var one reach
+		switch {
+		case err != nil:
 			r.logger().Debug("mdns.responder.pack_failed", slog.Any("err", err))
-			continue
+			one = reachNone
+		case dst != nil:
+			one = r.wire.unicast(pkt, ifIndex, dst)
+		default:
+			one = r.wire.multicast(pkt, ifIndex)
 		}
-		if dst != nil {
-			r.wire.unicast(pkt, ifIndex, dst)
+		if first {
+			rc, first = one, false
 		} else {
-			r.wire.multicast(pkt, ifIndex)
+			rc = rc.combine(one)
 		}
 	}
+	r.noteSentLocked(ifIndex, msgs, rc, now)
+	return rc
 }

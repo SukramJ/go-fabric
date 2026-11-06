@@ -157,17 +157,3 @@ func addressRecords(host string, addrs []net.IP) []dns.RR {
 	}
 	return out
 }
-
-// goodbyeRecords returns copies of rrs with TTL 0 — a goodbye is the record
-// set with TTL 0, the cache-flush bits kept (matter.js
-// packages/protocol/src/mdns/MdnsServer.ts:253-256 at 862ad75f;
-// MdnsTest.ts:354-410 expects the bits on the expiry).
-func goodbyeRecords(rrs []dns.RR) []dns.RR {
-	out := make([]dns.RR, len(rrs))
-	for i, rr := range rrs {
-		c := dns.Copy(rr)
-		c.Header().Ttl = 0
-		out[i] = c
-	}
-	return out
-}
