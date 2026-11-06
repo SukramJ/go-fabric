@@ -31,6 +31,7 @@ pseudo-version of `main`.
 
 ### Changed
 
+- `cluster/light`: `ColorControlServerConfig` is no longer comparable — it carries the light's primaries (`Primaries []Chromaticity`); a host that compared two configurations compares their fields (phase 38).
 - `examples/reference-bridge`: the air quality sensor's CO2 cluster serves every concentration feature and its AirQuality every grade, the extended colour light two primaries, and the garage door and the patio door panel the Descriptor's TagList (phase 38).
 - `controller`: the OTA provider is the controller itself — `softwareupdate.Config.ProviderNodeID` is RootNodeID and the endpoint `controller.OTAProviderEndpoint`; a database that ran the provider on the former own node is migrated at the first start (the `controller.ownnode` record goes, the registry forgets that node, the next announcement round rewrites every node's DefaultOTAProviders). A group key set the reference controller created before this release is not carried over: run `group create` again.
 - `cluster/measurement`: the projected OccupancySensing's default selection is PassiveInfrared with OccupancyEvent (FeatureMap `0x202`, was `0x2`), and it lists OccupancyChanged, which the bridge now emits on each change of the reading — matter.js's server emits it with the feature. A host that wants the former surface states `contract.OccupancySelection{NoOccupancyEvent: true}`.
