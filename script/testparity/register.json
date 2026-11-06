@@ -4764,16 +4764,16 @@
         "controller/client:TestClientEventNotificationEventsOfParity",
         "controller/client:TestClientEventNotificationEventNumbersParity",
         "controller/client:TestHostReadDoesNotEmitEvents",
-        "controller/client:TestClientEventNotificationLocalParity"
+        "controller/client:TestClientEventNotificationLocalParity",
+        "controller/client:TestClientEventNotificationResolvedTimestampsParity"
       ],
       "missing": [
         "ignores events and event numbers of a replaced default subscription",
         "stores the number of the events the commissioning read emitted when the read fails",
         "does not store the number of an event dropped because the node is being deleted",
-        "delivers the timestamps the report decoder resolved",
         "warns once per kind of failure when a change observer fails for each event report"
       ],
-      "reason": "A switch's InitialPress, ShortRelease and MultiPressComplete delivered to the client node's event hook with their payloads, in order, and the event number the node stores — after the hook received the event, once, above the commissioning read's events, never lowered, asked above by a replacement subscription and after a controller restart — run on fabrictest (controller/client:TestClientEventNotification*; the switch is bridged, the Go root serves no Switch). A host's own read or subscription returns its events to the caller only and a sustained one resubscribes above the last event it delivered (controller/client:TestHostReadDoesNotEmitEvents, TestClientEventNotificationLocalParity). Left: ChangeNotificationService, the observer set and the emit job queue (js-runtime-only). Missing: the events of a held report of a replaced default subscription (its other callbacks are held by TestClientSubscribeDefaultSubscriptionParity), a read failing after its reports (no hook aborts a read mid-stream) and an event of a node being deleted (no hook inside Registry.Decommission).",
+      "reason": "A switch's InitialPress, ShortRelease and MultiPressComplete delivered to the client node's event hook with their payloads, in order, and the event number the node stores — after the hook received the event, once, above the commissioning read's events, never lowered, asked above by a replacement subscription and after a controller restart — run on fabrictest (controller/client:TestClientEventNotification*; the switch is bridged, the Go root serves no Switch). A host's own read or subscription returns its events to the caller only and a sustained one resubscribes above the last event it delivered (controller/client:TestHostReadDoesNotEmitEvents, TestClientEventNotificationLocalParity). Left: ChangeNotificationService, the observer set and the emit job queue (js-runtime-only). Missing: the events of a held report of a replaced default subscription (its other callbacks are held by TestClientSubscribeDefaultSubscriptionParity), a read failing after its reports (no hook aborts a read mid-stream) and an event of a node being deleted (no hook inside Registry.Decommission). Pin lift wave P4 (#433): a system timestamp and two system deltas of one report reach Hooks.Event with the wire delta and the resolved absolute time (controller/client:TestClientEventNotificationResolvedTimestampsParity).",
       "snapshotSha": "fa5b481efe35f50215d352674667b90e6df420c2",
       "left": [
         {
@@ -6619,26 +6619,16 @@
     },
     {
       "path": "packages/protocol/test/action/client/InputChunkTest.ts",
-      "status": "partial",
+      "status": "ported",
       "go": [
         "client/interaction:TestInputChunkAttributes",
         "client/interaction:TestInputChunkEvents",
         "client/interaction:TestInputChunkOrderingAcrossAttributesAndEvents",
-        "client/interaction:TestInputChunkRelaxedIntegerTypeChecks"
+        "client/interaction:TestInputChunkRelaxedIntegerTypeChecks",
+        "client/interaction:TestInputChunkResolvedTimestampsParity"
       ],
-      "reason": "All 18 cases ported against the controller's report assembler (InputChunk): path order, tag-compressed paths, status entries, chunked-array leftovers, malformed entries, event order, timestamps and statuses, and a signed value for an unsigned attribute through the wire; the Go Report keeps one slice per kind, so cross-kind order is checked per slice.",
-      "snapshotSha": "0931349a63e7e21320af3a28ade520ec565597d3",
-      "missing": [
-        "adds each system delta to the event before it, as the CHIP SDK encodes a report",
-        "does not skip back over an event without a timestamp",
-        "does not skip back over an unresolved delta to an older absolute timestamp",
-        "keeps the chain across an entry whose payload fails to decode",
-        "keeps the chain across an entry with an invalid path",
-        "leaves a delta unresolved when no absolute timestamp precedes it in the message",
-        "leaves a delta unresolved when the prior event used the other clock",
-        "resolves epoch deltas against the prior epoch timestamp",
-        "starts each report message without a prior timestamp"
-      ]
+      "reason": "All 18 cases ported against the controller's report assembler (InputChunk): path order, tag-compressed paths, status entries, chunked-array leftovers, malformed entries, event order, timestamps and statuses, and a signed value for an unsigned attribute through the wire; the Go Report keeps one slice per kind, so cross-kind order is checked per slice. Pin lift wave P4 (#433): the nine resolved-timestamp cases of matter.js #4832 against the assembler's EventTimestampChain (client/interaction:TestInputChunkResolvedTimestampsParity); the Go assembler keeps every payload as a node tree, so the case of a payload that fails to decode runs as the chain through a payload of an unexpected type.",
+      "snapshotSha": "0931349a63e7e21320af3a28ade520ec565597d3"
     },
     {
       "path": "packages/protocol/test/action/client/LargeMessageTransportTest.ts",

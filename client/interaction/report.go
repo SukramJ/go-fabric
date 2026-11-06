@@ -44,6 +44,15 @@ type EventData struct {
 	// epoch timestamp, else the system one, else the delta epoch one, else
 	// the delta system one, else 0.
 	Timestamp uint64
+	// ResolvedTimestamp is the absolute time in milliseconds on the clock
+	// of whichever variant the event carried: the absolute variant itself,
+	// or for a delta the absolute time of the event directly before it in
+	// the same ReportData message plus the delta. Nil when the event
+	// carried no timestamp, or carried a delta and the event before it has
+	// no absolute time on the same clock. Mirrors matter.js
+	// ReadResult.EventValue.resolvedTimestamp (ReadResult.ts:78-88 at
+	// db021da0).
+	ResolvedTimestamp *uint64
 	// The four timestamps as the event carried them, nil when absent.
 	EpochTimestamp       *uint64
 	SystemTimestamp      *uint64
@@ -378,12 +387,20 @@ func bestDuplicate(entries []*im.AttributeReport) (*im.AttributeReport, bool) {
 	return best, true
 }
 
-// emitEvents is InputChunk.ts:336-354 with decodeEventValue (:356-413)
-// and buildEventStatus (:415-432): an entry without a complete path is
-// skipped.
+// emitEvents is InputChunk.ts:337-356 with decodeEventValue (:408-469)
+// and buildEventStatus (:471) at db021da0: an entry without a complete path is
+// skipped. The timestamps of one ReportData message form one chain
+// (:341, :345): an event's timestamps are resolved before its path is
+// checked, so an entry with an invalid path keeps the chain as matter.js's
+// does, and a status entry does not touch it.
 func (a *assembler) emitEvents(rd *im.ReportData) {
+	var chain eventTimestampChain
 	for i := range rd.EventReports {
 		ev := &rd.EventReports[i]
+		var resolved *uint64
+		if !ev.IsStatus {
+			resolved = chain.resolve(ev)
+		}
 		if !ev.Path.HasEndpoint || !ev.Path.HasCluster || !ev.Path.HasEvent {
 			a.log.Warn("matter.controller.interaction.malformed_event_entry",
 				slog.Int("endpoint", int(ev.Path.Endpoint)), slog.Uint64("cluster", uint64(ev.Path.Cluster)), slog.Uint64("event", uint64(ev.Path.Event)))
@@ -398,7 +415,7 @@ func (a *assembler) emitEvents(rd *im.ReportData) {
 			a.report.EventStatuses = append(a.report.EventStatuses, s)
 			continue
 		}
-		d := EventData{Path: ev.Path, Number: ev.Number, Priority: ev.Priority}
+		d := EventData{Path: ev.Path, Number: ev.Number, Priority: ev.Priority, ResolvedTimestamp: resolved}
 		if r := ev.Received; r != nil {
 			if r.HasEpochTimestamp {
 				d.EpochTimestamp = ptr(ev.Timestamp)
@@ -427,6 +444,66 @@ func (a *assembler) emitEvents(rd *im.ReportData) {
 }
 
 func ptr[T any](v T) *T { return &v }
+
+// eventClock is the clock of an event timestamp.
+type eventClock uint8
+
+const (
+	clockEpoch eventClock = iota + 1
+	clockSystem
+)
+
+// eventTimestampChain reconstructs absolute event timestamps within one
+// ReportData message: a delta resolves against the event directly before
+// it when that event has an absolute time on the same clock; an event
+// without a timestamp, or with a delta that does not resolve, breaks the
+// chain. "Per Matter Core §10.7.3.1 a delta timestamp is relative to the
+// prior event. The CHIP SDK encodes each delta against the event directly
+// before it in the same message and starts each message with an absolute
+// timestamp, so a chain never spans messages." Mirrors matter.js
+// EventTimestampChain (packages/protocol/src/action/client/InputChunk.ts:360-405
+// at db021da0, matter.js #4832); the sum wraps where matter.js's Number
+// arithmetic loses precision, both far beyond any real clock.
+type eventTimestampChain struct {
+	clock eventClock // 0: no prior absolute time
+	value uint64
+}
+
+// resolve is EventTimestampChain.resolve (InputChunk.ts:373-392): the
+// epoch timestamp, else the system one, else the epoch delta, else the
+// system delta. A locally built report (Received nil) carries its epoch
+// timestamp.
+func (c *eventTimestampChain) resolve(ev *im.EventReport) *uint64 {
+	r := ev.Received
+	switch {
+	case r == nil || r.HasEpochTimestamp:
+		return c.advance(clockEpoch, ev.Timestamp)
+	case r.HasSystemTimestamp:
+		return c.advance(clockSystem, r.SystemTimestamp)
+	case r.HasDeltaEpochTimestamp:
+		return c.advanceBy(clockEpoch, r.DeltaEpochTimestamp)
+	case r.HasDeltaSystemTimestamp:
+		return c.advanceBy(clockSystem, r.DeltaSystemTimestamp)
+	}
+	c.clock = 0
+	return nil
+}
+
+// advance is InputChunk.ts:394-397.
+func (c *eventTimestampChain) advance(clock eventClock, v uint64) *uint64 {
+	c.clock, c.value = clock, v
+	return ptr(v)
+}
+
+// advanceBy is InputChunk.ts:399-405: a delta on the other clock than the
+// prior event's resolves to nothing and breaks the chain.
+func (c *eventTimestampChain) advanceBy(clock eventClock, delta uint64) *uint64 {
+	if c.clock != clock {
+		c.clock = 0
+		return nil
+	}
+	return c.advance(clock, c.value+delta)
+}
 
 // readAttributeValue keeps a report's value as a node tree.
 func readAttributeValue(_ im.ConcreteAttributePath, el tlv.Element, dec *tlv.Decoder) (im.AttributeValue, error) {

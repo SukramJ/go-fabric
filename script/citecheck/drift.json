@@ -1306,7 +1306,7 @@
   },
   {
     "file": "client/interaction/report.go",
-    "line": 75,
+    "line": 84,
     "citation": "ClientSubscriptionHandler.ts:89",
     "resolved": "packages/protocol/src/action/client/subscription/ClientSubscriptionHandler.ts",
     "identifier": "reportStarted",
@@ -2410,7 +2410,7 @@
   },
   {
     "file": "controller/client/registry_test.go",
-    "line": 356,
+    "line": 358,
     "citation": "CommissioningClient.ts:353-357",
     "resolved": "packages/node/src/behavior/system/commissioning/CommissioningClient.ts",
     "identifier": "OperationalCredentials",
