@@ -7,11 +7,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"math"
+	"net/http"
 	"os"
 	"slices"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -420,7 +423,7 @@ func (r *OTASoftwareUpdateRequestor) queryOtaProvider(ctx context.Context, sess 
 		VendorId:           info.VendorID,
 		ProductId:          info.ProductID,
 		SoftwareVersion:    info.SoftwareVersion,
-		ProtocolsSupported: []provdef.DownloadProtocolEnum{provdef.DownloadProtocolBdxSynchronous},
+		ProtocolsSupported: slices.Clone(r.cfg.TransferProtocols), // :852
 		HardwareVersion:    &hw,
 		Location:           &location,
 	}
@@ -464,6 +467,13 @@ func (r *OTASoftwareUpdateRequestor) queryOtaProvider(ctx context.Context, sess 
 
 	// :920-938: download.
 	file, err := r.handleDownload(ctx, sess, details.imageURI, details.softwareVersion)
+	var rejected *otaFetchRejected
+	if errors.As(err, &rejected) {
+		// fetch rejects with a TypeError, no MatterError: MatterError.accept
+		// rethrows it (:925) to #queryForUpdate's handler (:632-637), which
+		// treats the provider as having no update.
+		return outcomeFinished, err
+	}
 	if err != nil {
 		r.logger.Info("matter.ota.download_failed", slog.Any("err", err))
 		var de *otaDownloadError
@@ -508,23 +518,37 @@ func (e *otaDownloadError) Error() string {
 }
 func (e *otaDownloadError) Unwrap() error { return e.cause }
 
-// handleDownload mirrors #handleDownload (:1072-1115) for BDX: Downloading,
-// the transfer, the file validated against the offered version, progress
-// 100.
+// handleDownload mirrors matter.js #handleDownload
+// (OtaSoftwareUpdateRequestorServer.ts:1072-1115 at 862ad75f): a bdx:// or
+// https:// URI whose protocol the requestor announces moves to
+// Downloading and is fetched, any other URI — http:// among them — is
+// refused (:1106); the file is then validated against the offered version
+// (:1109) and progress set to 100.
 func (r *OTASoftwareUpdateRequestor) handleDownload(ctx context.Context, sess OtaProviderSession, uri string, version uint32) (string, error) {
-	if !strings.HasPrefix(uri, "bdx://") {
-		// HTTPS (:1094-1104) is not ported; any other scheme is refused
-		// as matter.js refuses it (:1106).
-		return "", fmt.Errorf("core: unsupported download URI: %s", uri)
-	}
 	v := version
-	r.updateState(otadef.UpdateStateDownloading, otadef.ChangeReasonSuccess, &v)
-	fd, _, err := bdx.ParseBdxURI(uri)
-	if err != nil {
-		return "", err
-	}
-	if err := r.handleBdxDownload(ctx, sess, fd); err != nil {
-		return "", err
+	switch {
+	case strings.HasPrefix(uri, "bdx://"):
+		if !slices.Contains(r.cfg.TransferProtocols, DownloadProtocolBDXSynchronous) {
+			return "", errors.New("core: BDX Synchronous not supported") // :1078-1083
+		}
+		r.updateState(otadef.UpdateStateDownloading, otadef.ChangeReasonSuccess, &v)
+		fd, _, err := bdx.ParseBdxURI(uri)
+		if err != nil {
+			return "", err
+		}
+		if err := r.handleBdxDownload(ctx, sess, fd); err != nil {
+			return "", err
+		}
+	case strings.HasPrefix(uri, "https://"):
+		if !slices.Contains(r.cfg.TransferProtocols, DownloadProtocolHTTPS) {
+			return "", errors.New("core: HTTPS not supported") // :1095-1096
+		}
+		r.updateState(otadef.UpdateStateDownloading, otadef.ChangeReasonSuccess, &v)
+		if err := r.handleHTTPSDownload(ctx, uri); err != nil {
+			return "", err
+		}
+	default:
+		return "", fmt.Errorf("core: unsupported download URI: %s", uri)
 	}
 	if _, err := r.validateUpdateFile(&version); err != nil {
 		return "", err
@@ -532,6 +556,164 @@ func (r *OTASoftwareUpdateRequestor) handleDownload(ctx context.Context, sess Ot
 	full := uint8(100)
 	r.setProgress(&full)
 	return r.downloadPath(), nil
+}
+
+// The bounds of an HTTPS download that matter.js's fetch does not set
+// (BD-Matter-OTARequestor-HTTPS); each fails the download.
+var (
+	errOtaHTTPSStalled        = errors.New("core: OTA HTTPS download stalled")
+	errOtaHTTPSTooLarge       = errors.New("core: OTA HTTPS download exceeds the size cap")
+	errOtaHTTPSRedirectScheme = errors.New("core: OTA HTTPS download redirected to a target other than https://")
+)
+
+// otaDefaultHTTPClient is the client of a requestor without
+// [OTARequestorConfig].HTTPClient: rt (nil is http.DefaultTransport), and
+// [otaCheckRedirect].
+func otaDefaultHTTPClient(rt http.RoundTripper) *http.Client {
+	return &http.Client{Transport: rt, CheckRedirect: otaCheckRedirect}
+}
+
+// otaCheckRedirect follows a redirect to an https:// target only — fetch
+// follows any (BD-Matter-OTARequestor-HTTPS) — and stops after ten, as
+// net/http's default policy does.
+func otaCheckRedirect(req *http.Request, via []*http.Request) error {
+	if req.URL.Scheme != "https" {
+		return errOtaHTTPSRedirectScheme
+	}
+	if len(via) >= 10 {
+		return errors.New("core: OTA HTTPS download stopped after 10 redirects")
+	}
+	return nil
+}
+
+// otaFetchRejected is a GET that got no response: matter.js's fetch
+// rejects (:1009) with an error that is no OtaDownloadError.
+type otaFetchRejected struct{ cause error }
+
+func (e *otaFetchRejected) Error() string { return "core: OTA HTTPS download: " + e.cause.Error() }
+func (e *otaFetchRejected) Unwrap() error { return e.cause }
+
+// otaIdleTimer fires when it is not re-armed within d. One goroutine, the
+// download's, arms and halts it.
+type otaIdleTimer struct {
+	clock otaClock
+	d     time.Duration
+	fire  func()
+	stop  func() bool
+}
+
+func (t *otaIdleTimer) arm() {
+	t.halt()
+	t.stop = t.clock.AfterFunc(t.d, t.fire)
+}
+
+func (t *otaIdleTimer) halt() {
+	if t.stop != nil {
+		t.stop()
+	}
+}
+
+// handleHTTPSDownload mirrors matter.js #handleHttpsDownload
+// (OtaSoftwareUpdateRequestorServer.ts:1008-1062 at 862ad75f): a GET of the
+// URI; a status outside 2xx is an OtaDownloadError carrying it
+// (:1010-1012); the body streams into the download location with progress
+// from Content-Length (:1013-1049); a failure while streaming is an
+// OtaDownloadError with the status and the bytes received (:1052-1060).
+// The GET runs on the [OtaHTTPClient]. Beyond fetch, the download ends
+// when it receives nothing for HTTPSIdleTimeout on the requestor's clock,
+// when it passes HTTPSMaxImageSize, and when the module's client refuses
+// a redirect to a target other than https://: each is an otaDownloadError
+// whose code is the status of the last response — the redirect's for a
+// refused redirect — or, before a response, UpdateState Unknown's value
+// (0) as the BDX path uses.
+func (r *OTASoftwareUpdateRequestor) handleHTTPSDownload(ctx context.Context, uri string) error {
+	ctx, cancel := context.WithCancelCause(ctx)
+	defer cancel(nil)
+	idle := &otaIdleTimer{clock: r.clock, d: r.cfg.HTTPSIdleTimeout, fire: func() { cancel(errOtaHTTPSStalled) }}
+	idle.arm()
+	defer idle.halt()
+	stalled := func() bool { return errors.Is(context.Cause(ctx), errOtaHTTPSStalled) }
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, uri, http.NoBody)
+	if err != nil {
+		return &otaFetchRejected{cause: err}
+	}
+	res, err := r.cfg.HTTPClient.Do(req)
+	if err != nil {
+		code := int64(otadef.UpdateStateUnknown)
+		switch {
+		case errors.Is(err, errOtaHTTPSRedirectScheme):
+			if res != nil { // net/http returns the redirect, its body closed
+				code = int64(res.StatusCode)
+			}
+			return &otaDownloadError{code: code, msg: err.Error(), cause: errOtaHTTPSRedirectScheme}
+		case stalled():
+			return &otaDownloadError{code: code, msg: errOtaHTTPSStalled.Error(), cause: errOtaHTTPSStalled}
+		}
+		return &otaFetchRejected{cause: err}
+	}
+	defer func() { _ = res.Body.Close() }()
+	idle.arm()
+	status := int64(res.StatusCode)
+	if res.StatusCode < 200 || res.StatusCode > 299 {
+		text := strings.TrimSpace(strings.TrimPrefix(res.Status, strconv.Itoa(res.StatusCode)))
+		return &otaDownloadError{code: status, msg: "HTTP Download error: " + text}
+	}
+	// :1015-1018: a missing or non-positive Content-Length is no size.
+	var total *uint64
+	if res.ContentLength > 0 {
+		t := uint64(res.ContentLength)
+		total = &t
+	}
+	zero := uint8(0)
+	r.setProgress(&zero) // :1020
+
+	w := &otaHTTPSWriter{
+		sink: bdx.NewFileSink(r.downloadPath()), limit: uint64(r.cfg.HTTPSMaxImageSize), //nolint:gosec // positive, defaulted in the constructor
+		total: total, progress: r.updateProgress, idle: idle,
+	}
+	if total != nil && *total > w.limit {
+		err = errOtaHTTPSTooLarge
+	} else {
+		_, err = io.Copy(w, res.Body)
+	}
+	if err != nil && stalled() {
+		err = errOtaHTTPSStalled
+	}
+	if cerr := w.sink.Close(err); err == nil {
+		err = cerr
+	}
+	if err != nil {
+		return &otaDownloadError{code: status, msg: err.Error(), bytesTransferred: w.n, cause: err}
+	}
+	r.logger.Info("matter.ota.https_download_finished", slog.Uint64("bytes", w.n))
+	return nil
+}
+
+// otaHTTPSWriter writes an HTTPS download into its sink, counting the bytes
+// for #updateProgress (:1036-1037) and re-arming the idle timer; it takes
+// the bytes up to the size cap and fails on the first one past it.
+type otaHTTPSWriter struct {
+	sink     *bdx.FileSink
+	n, limit uint64
+	total    *uint64
+	progress func(uint64, *uint64)
+	idle     *otaIdleTimer
+}
+
+func (w *otaHTTPSWriter) Write(p []byte) (int, error) {
+	var over error
+	if room := w.limit - w.n; uint64(len(p)) > room {
+		p, over = p[:room], errOtaHTTPSTooLarge
+	}
+	w.idle.arm()
+	n, err := w.sink.Write(p)
+	w.n += uint64(n) //nolint:gosec // a write count is not negative
+	w.progress(w.n, w.total)
+	if err == nil {
+		err = over
+	}
+	return n, err
 }
 
 // handleBdxDownload mirrors #handleBdxDownload (:959-1006): up to three

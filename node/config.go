@@ -281,8 +281,17 @@ type TimeSynchronization struct {
 	// connectedhomeip ([TimeSynchronizationConfig]); nil serves UTCTime
 	// and Granularity alone. The node persists their state in its store
 	// and clears a removed fabric's trusted time source; the config's
-	// Store is the node's. UTCTime stays the node's clock. Off excludes
-	// it.
+	// Store is the node's. Off excludes it.
+	//
+	// The node's UTC — UTCTime, and GeneralDiagnostics' TimeSnapshot — is
+	// [Config].Clock plus an offset, with or without Config: SetUTCTime
+	// sets the offset, and so does the time client, which runs from Start
+	// while the host clock is no time source (Config's PlatformTime): it
+	// reads the trusted time source's node over the client stack
+	// ([Config].Client) and falls back to Config's NTPClient asking
+	// DefaultNTP, emitting TimeFailure when neither answers. The host
+	// clock is never set, and the offset is not persisted: a restart
+	// serves the host clock again.
 	Config *TimeSynchronizationConfig
 }
 
@@ -508,6 +517,20 @@ type OTAConfig struct {
 	// (OtaSoftwareUpdateRequestorServer.ts:410, :1323). Harness mode (a test's)
 	// without it waits 250 ms, as the matter.js cert requestor does.
 	AnnouncedUpdateQueryDelay *time.Duration
+	// TransferProtocols are the download protocols the requestor announces
+	// (mattercore.OTARequestorConfig.TransferProtocols); empty is BDX
+	// alone. Add [OTADownloadHTTPS] only where the node reaches the image
+	// hosts; a list without [OTADownloadBDXSynchronous] fails the build.
+	TransferProtocols []OTADownloadProtocol
+	// HTTPClient sends an HTTPS download's GET; nil is the module's client,
+	// which follows a redirect only to an https:// target. A host's client
+	// keeps its own redirect policy (mattercore.OTARequestorConfig).
+	HTTPClient OTAHTTPClient
+	// HTTPSMaxImageSize caps an HTTPS download, HTTPSIdleTimeout the time it
+	// may receive nothing; 0 is 256 MiB and 60 seconds
+	// (mattercore.OTARequestorConfig).
+	HTTPSMaxImageSize int64
+	HTTPSIdleTimeout  time.Duration
 }
 
 // ErrInvalidConfig wraps every [Config.Validate] failure.

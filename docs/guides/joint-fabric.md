@@ -74,6 +74,22 @@ goes `Committed`. A fetch that fails ends the refresh with the node still
 `Datastore.AddACLToNode`, push before they return. `Datastore.Wait` waits
 for the pushes that commands started.
 
+A binding's add or removal reaches the node through
+`DatastoreSync.SyncEndpointBindings` — chip's endpoint-scoped delegate
+overload `SyncNode(nodeId, endpointId, bindingEntries)` — as the
+endpoint's whole list: the datastore fetches the endpoint's current
+bindings (`FetchEndpointBindingList`), appends the entry or removes the
+entries whose target matches the one removed (the node's entries carry
+no list id), and writes the list, an empty list included. That is the
+merge chip's jf-admin-app delegate does with the one entry chip's
+datastore hands it — chip's datastore itself never calls the overload —
+moved into the module, so every host writes one Binding list and reads
+one (owner decision 2026-11-06: a required method, not an optional
+interface); chip's single-entry delegate overload has no counterpart in
+the port. A fetch that fails is the push's error and leaves the entry `Pending` for
+the next `RefreshNode`, where chip's example would write the one entry
+over an empty list.
+
 The tables persist as one settings record under the device's StableKey
 when the declaration carries a `DatastoreStore`. The node's store is one.
 A change whose save fails is undone and answers `FAILURE`, as the TLS
@@ -138,8 +154,3 @@ administrator fabric has no ICAC, or that carries a VID Verification
 Statement, is refused. `JointFabricOptions.Progress` reports each stage.
 `Options.CATs` sets the CATs of the issued NOC. Commissioning an anchor
 uses the administrator and anchor CATs without `JointFabric`.
-
-## Not covered
-
-- chip's endpoint-scoped `SyncNode(nodeId, endpointId, bindings)` overload
-  is not in the port; the datastore never calls it.

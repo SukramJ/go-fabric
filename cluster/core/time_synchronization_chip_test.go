@@ -5,10 +5,14 @@ package core_test
 
 // TimeSynchronization's features after connectedhomeip at 6170af84:
 // src/app/clusters/time-synchronization-server/tests/
-// TestTimeSynchronizationCluster.cpp (AttributeTest :52-178,
-// ReadAttributeTest :180-340, SetTrustedTimeSourceTest :342-398), ported
-// by meaning. The blocks with the optional TimeSource attribute are left
-// out: the server does not serve it.
+// TestTimeSynchronizationCluster.cpp (AttributeTest :71-181,
+// ReadAttributeTest :183-363, SetTrustedTimeSourceTest :365-418), ported
+// by meaning. The server serves the optional TimeSource always, so the
+// blocks with it are the ones ported. chip's fixture stubs the platform
+// source (:41-51) so that no attempt reaches the trusted node; here the
+// default platform source — the test clock, past the Matter epoch — gives
+// the time, and no attempt starts either. The client itself is
+// time_synchronization_client_test.go's.
 
 import (
 	"context"
@@ -115,7 +119,7 @@ func tsStatus(err error) im.StatusCode {
 }
 
 // TestChipTimeSyncAttributeTest ports AttributeTest: each feature adds its
-// attributes to UTCTime and Granularity.
+// attributes to UTCTime, Granularity and TimeSource.
 func TestChipTimeSyncAttributeTest(t *testing.T) {
 	t.Parallel()
 	for _, tc := range []struct {
@@ -138,7 +142,7 @@ func TestChipTimeSyncAttributeTest(t *testing.T) {
 				got = append(got, id)
 			}
 		}
-		want := append([]uint32{tsdef.AttrUtcTime, tsdef.AttrGranularity}, tc.want...)
+		want := append([]uint32{tsdef.AttrUtcTime, tsdef.AttrGranularity, tsdef.AttrTimeSource}, tc.want...)
 		slices.Sort(got)
 		slices.Sort(want)
 		if !slices.Equal(got, want) {
@@ -167,7 +171,7 @@ func TestChipTimeSyncReadAttributeTest(t *testing.T) {
 	for id, want := range map[uint32]any{
 		tsdef.AttrTimeZoneListMaxSize:  uint8(2),
 		tsdef.AttrDstOffsetListMaxSize: uint8(2),
-		tsdef.AttrTimeZoneDatabase:     tsdef.TimeZoneDatabaseNone,
+		tsdef.AttrTimeZoneDatabase:     uint8(tsdef.TimeZoneDatabaseNone),
 	} {
 		if got, _ := srv.MatterRead(id); got != want {
 			t.Errorf("attribute 0x%04X = %v, want %v", id, got, want)

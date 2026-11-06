@@ -135,6 +135,12 @@ func ValidateSetupPIN(pin uint32) error {
 // TimeSynchronizationConfig is the type of [Config].TimeSynchronization: the root TimeSynchronization's features ([mattercore.TimeSynchronizationConfig]).
 type TimeSynchronizationConfig = mattercore.TimeSynchronizationConfig
 
+// NTPClient is the type of [TimeSynchronizationConfig].NTPClient: the host's NTP query the time client falls back to ([mattercore.NTPClient]).
+type NTPClient = mattercore.NTPClient
+
+// TimePeerReader is the type of [TimeSynchronizationConfig].PeerReader: the read of the trusted time source's node ([mattercore.TimePeerReader]); without one the node reads over its client stack.
+type TimePeerReader = mattercore.TimePeerReader
+
 // OTAImageSource is the type of [OTAProviderConfig].ImageSource: where the provider reads the images it offers ([mattercore.OTAImageSource]).
 type OTAImageSource = mattercore.OTAImageSource
 
@@ -155,6 +161,19 @@ type OTAUpdateStatus = mattercore.OTAUpdateStatus
 
 // OTAApplier is the type of [OTAConfig].Applier: the requestor's consent and apply hooks ([mattercore.OtaApplier]).
 type OTAApplier = mattercore.OtaApplier
+
+// OTADownloadProtocol is the element type of [OTAConfig].TransferProtocols ([mattercore.DownloadProtocol]).
+type OTADownloadProtocol = mattercore.DownloadProtocol
+
+// OTAHTTPClient is the type of [OTAConfig].HTTPClient: the GET of an HTTPS download ([mattercore.OtaHTTPClient]); *http.Client implements it.
+type OTAHTTPClient = mattercore.OtaHTTPClient
+
+// The download protocols [OTAConfig].TransferProtocols takes
+// ([mattercore.DownloadProtocolBDXSynchronous], [mattercore.DownloadProtocolHTTPS]).
+const (
+	OTADownloadBDXSynchronous = mattercore.DownloadProtocolBDXSynchronous
+	OTADownloadHTTPS          = mattercore.DownloadProtocolHTTPS
+)
 
 // WiFiReporter is the type of [WiFi].Reporter: the live Wi-Fi diagnostics the host reports ([mattercore.WiFiReporter]).
 type WiFiReporter = mattercore.WiFiReporter

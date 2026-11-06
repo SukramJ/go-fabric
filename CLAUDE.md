@@ -391,6 +391,15 @@ its family (go-fabric-ui, go-fabric-server, the hosts) is held to:
   implementing — the owner decides, the reasons are on record. A scope
   boundary that is a decision (no Thread radio on the device side, no
   device-side BLE) is kept unless the owner reopens it.
+- **Questions to the owner are a wizard, never a list.** Set 2026-11-06.
+  Every open decision is put one step at a time (`AskUserQuestion`, one
+  decision per step, the independent ones in one call): the options, the
+  recommendation first and marked as such, and in one or two sentences why
+  it is the best architecture — or, when the best architecture is not an
+  option the owner would want, that too. A report never ends with a bare
+  "questions for the owner" list; it ends with the wizard. Agents' reports
+  may list questions; the assistant turns them into the wizard before it
+  ends its turn.
 
 ## Which model does which work
 

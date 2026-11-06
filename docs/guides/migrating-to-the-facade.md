@@ -247,6 +247,20 @@ One value changed: `Cluster.Decoded` of a nullable struct attribute
 returns the generated struct now, as it does for a non-nullable one,
 where it returned a `map[uint32]any` by field id.
 
+## Changed after v0.17.0: `DatastoreSync.SyncEndpointBindings`
+
+`jointfabricdatastore.DatastoreSync` (`jointfabric.DatastoreSync`) gains
+the required method `SyncEndpointBindings(ctx, nodeID, endpointID,
+entries) error`. A host that implements the port adds it: write the
+`Binding` attribute of endpoint `endpointID` on node `nodeID` with the
+entries' `Binding` targets as the list, an empty list included — chip's
+jf-admin-app writes exactly that. The datastore now carries a binding's
+add or removal through it as the endpoint's merged list (fetched with the
+host's `FetchEndpointBindingList`, the entry appended or the matching
+targets removed), so the host no longer merges a single entry:
+`DatastoreSync.SyncBinding` is removed from the port — delete the method.
+See the [Joint Fabric guide](joint-fabric.md).
+
 ## Moved in v0.10.2: value helpers and the native-ramp ports
 
 A host that declares its devices (`<cluster>def.Declare`) reaches these

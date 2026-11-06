@@ -154,12 +154,12 @@ func (s jfSync) SyncNodeKeySet(_ context.Context, n uint64, _ jfdsdef.DatastoreN
 	return s.log("SyncNodeKeySet", n)
 }
 
-func (s jfSync) SyncBinding(_ context.Context, n uint64, _ jfdsdef.DatastoreEndpointBindingEntryStruct) error {
-	return s.log("SyncBinding", n)
-}
-
 func (s jfSync) SyncBindings(_ context.Context, n uint64, _ []jfdsdef.DatastoreEndpointBindingEntryStruct) error {
 	return s.log("SyncBindings", n)
+}
+
+func (s jfSync) SyncEndpointBindings(_ context.Context, n uint64, _ uint16, _ []jfdsdef.DatastoreEndpointBindingEntryStruct) error {
+	return s.log("SyncEndpointBindings", n)
 }
 
 func (s jfSync) SyncACL(_ context.Context, n uint64, _ jfdsdef.DatastoreACLEntryStruct) error {

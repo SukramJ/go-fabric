@@ -94,8 +94,11 @@ const testparityPlannedRatchet = 2
 // CommissioningWindowLifetimeTest.ts ported on the Basic feature: 585 missing.
 // Phase 36: OccupancySensingServerTest.ts ported on the OccupancyEvent
 // feature: 157 ported, 584 missing.
+// Phase 39: packages/nodejs-ble/test joins the roots for the BTP
+// renegotiation; NobleBleChannelTest.ts ported (its 18 stall and ATT_MTU
+// cases), ScanControlTest.ts excluded: 158 ported.
 const (
-	testparityPortedRatchet  = 157
+	testparityPortedRatchet  = 158
 	testparityMissingRatchet = 583
 )
 
@@ -127,7 +130,11 @@ const (
 // model resolution, hashing and key-format APIs (js-runtime-only).
 // T3-SW-1 adds ClientInvokeTest.ts's beforeDispatch row (js-runtime-only:
 // a server-only field of the shared Invoke type, Invoke.ts:52-55): 577.
-const testparityLeftRatchet = 576
+// Phase 39 adds NobleBleChannelTest.ts's 17 left rows — noble's connect
+// retries, interview and abort handling (js-runtime-only, the platform's
+// behind the ble.Central seam) and the unsubscribe after a handshake
+// timeout (by-design, BD-Matter-BTP-RenegotiationAfterStall): 593.
+const testparityLeftRatchet = 593
 
 // The matterjs-server register's four ratchets, exact in both directions as
 // the matter.js register's are (the comments above give the rules). Set by

@@ -76,11 +76,12 @@ these interfaces does not drag the host's dependencies into the module.
 | `Advertiser` | publishes the node over DNS-SD | the node's own `mdns.Responder`, shaped by `Network.MDNS`; with `Network.MDNS.Off` it is `mdns.NewNoop()`: nothing is discoverable, and the bridge logs `matter.mdns.commissioning_not_advertised` |
 | `Attestation` | DAC, PAI and Certification Declaration; `Files` names them on disk and `New` loads them | the CSA test chain and test CD: pairable everywhere, not shippable |
 | `Health` | the listener probe on the node's clock; `Node.Health` returns the last verdict | no probe |
-| `OTA` (`OTAConfig`) | mounts the OTA Software Update Requestor; `Applier` carries out an update | no requestor. A nil `Applier` is the facade's own, which validates the image and keeps it under `Dir/applied` |
+| `OTA` (`OTAConfig`) | mounts the OTA Software Update Requestor; `Applier` carries out an update; `TransferProtocols` adds the HTTPS download, whose GET goes through `HTTPClient` | no requestor. A nil `Applier` is the facade's own, which validates the image and keeps it under `Dir/applied`. Empty `TransferProtocols` announces BDX alone, and a list without `OTADownloadBDXSynchronous` fails the build; a nil `HTTPClient` is the module's client, which follows a redirect only to an `https://` target; a host's client keeps its own redirect policy |
 | `OTAProvider` | serves OTA images over BDX from an OtaProvider endpoint | no provider (also with a nil `ImageSource`). A nil `Consent` declines an image that needs consent; a nil `ApplyPolicy` proceeds at once |
 | `CommissionerControl` | mounts CommissionerControl on the Aggregator; `Approver` and `Commissioner` are required | no server |
 | `Network.WiFi.Reporter` | mounts WiFiNetworkDiagnostics and states the RootNode condition WiFi | no Wi-Fi diagnostics. EthernetNetworkDiagnostics is always mounted, with every link value null |
 | `Client` | the node's client stack, which the Binding entries reach other nodes through | no client stack. A Binding entry that names a node is dropped |
+| `TimeSynchronization.Config` (`PlatformTime`, `NTPClient`, `PeerReader`) | the host clock as a time source, the NTP query the time client falls back to, the read of the trusted time source's node | the host clock is the source (MixedNTP, milliseconds) while past the Matter epoch; no NTP fallback (TimeFailure); the node's own reader over `Client`, none without it ([Time synchronization](../getting-started/device.md#time-synchronization)) |
 | `EndpointPersistence` | scene tables and bridged NodeLabels, kept by the host | the facade's own, in the settings table |
 | `Groups` | the group state, for a host with its own assembler | the facade builds one over the credential store |
 | `Topology` | the host's own `bridge.Snapshotter`. The topology it returns comes from an `endpoint.Assembler` over the host's `endpoint.Spec`s; `Endpoint` and `Topology` are read-only to a host | the facade's Aggregator under one scope |
@@ -274,6 +275,7 @@ Host ports of the root servers, reached through `node.Config` or
 | --- | --- |
 | `core.WiFiReporter` | the Wi-Fi link values; the module ships no reporter |
 | `core.OtaApplier` | the host's part of an OTA update |
+| `core.OtaHTTPClient` | the GET of an HTTPS OTA download; `*http.Client` implements it, so a host restricts egress there |
 | `core.OTAImageSource`, `core.OTAConsent`, `core.OTAApplyPolicy` | the provider's catalogue, user consent, and apply decision |
 | `core.CommissioningApprover`, `core.ReverseCommissioner` | CommissionerControl's approval, and the commissioning of the approved node |
 | `core.ActionsHost` | an Actions server's lists and commands |

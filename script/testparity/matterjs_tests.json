@@ -5,6 +5,7 @@
     "packages/model/test",
     "packages/node/test",
     "packages/nodejs/test",
+    "packages/nodejs-ble/test",
     "packages/protocol/test",
     "packages/thread-br-client/test",
     "packages/types/test"
@@ -2849,6 +2850,23 @@
       "lines": 20,
       "sha": "eb4c08f0d95e02eefcb7abf1cbb8d2d24c0750e4",
       "describes": []
+    },
+    {
+      "path": "packages/nodejs-ble/test/NobleBleChannelTest.ts",
+      "lines": 1138,
+      "sha": "a503a1d478babcb72040f4f5dbaac2cbabef83ad",
+      "describes": [
+        "NobleBleCentralInterface",
+        "NobleBleChannel.create"
+      ]
+    },
+    {
+      "path": "packages/nodejs-ble/test/ScanControlTest.ts",
+      "lines": 286,
+      "sha": "82e28dddce1c6e61a7c8f2d09316041efc0655e0",
+      "describes": [
+        "ScanControl"
+      ]
     },
     {
       "path": "packages/nodejs/test/config/ConfigTest.ts",

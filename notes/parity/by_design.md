@@ -114,11 +114,11 @@ pin lift confirms by re-reading the row, [`pin-lifts.md`](./pin-lifts.md)).
 | BD-Thread-TND-FromBorderRouter | `ThreadNetworkDiagnosticsServer.ts:14` is the empty subclass (absence: the class line, 14 lines in all) | `packages/node/src/behaviors/thread-network-diagnostics/ThreadNetworkDiagnosticsServer.ts` | `"export class ThreadNetworkDiagnosticsServer extends ThreadNetworkDiagnosticsBehavior {}"` | connectedhomeip `src/app/clusters/thread-network-diagnostics-server/DirectThreadNetworkDiagnosticsProvider.cpp` at `6170af84` (`ReadAttribute` :59, the unconfigured nulls :65-92, `RoutingRole` :104-145, OverrunCount :178-182, the tables :184-293, the counts :325-571, the dataset attributes :577-689, `ResetCounts` :735-738), `ThreadNetworkDiagnosticsCluster.cpp` | no |
 | BD-Thread-NetComm-ThreadVariant | `NetworkCommissioningServer.ts:18` is the empty subclass: no network-type branch, no Thread logic (absence: the class line, 18 lines in all) | `packages/node/src/behaviors/network-commissioning/NetworkCommissioningServer.ts` | `"export class NetworkCommissioningServer extends NetworkCommissioningBehavior {}"` | connectedhomeip `src/app/clusters/network-commissioning/NetworkCommissioningCluster.cpp` at `6170af84` (the Thread paths: `HandleScanNetworks` :349-367, `HandleAddOrUpdateThreadNetwork` :561-587, `OnFinished` :904-928, `ReadAttribute` :1102-1108) over `src/platform/OpenThread/GenericNetworkCommissioningThreadDriver.cpp` | yes |
 | BD-chip-AmbientContextSensing-RulesInServer | `AmbientContextSensingServer.ts:14` is the empty subclass (absence: the class line, 14 lines in all) | `packages/node/src/behaviors/ambient-context-sensing/AmbientContextSensingServer.ts` | `"export class AmbientContextSensingServer extends AmbientContextSensingBehavior {}"` | connectedhomeip `src/app/clusters/ambient-context-sensing-server/AmbientContextSensingCluster.cpp` at `6170af84` (the constructor and `Startup` :48-89, `WriteAttribute` :140-159, `AddDetection` :205-301, `SetObjectCountConfig` :303-367, `SetObjectCount` :369-385, `SetHoldTimeLimits` :438-466, `TimerFired` :498-509, `UpdateDetectionAttributes` :600-646, `CheckPredictedActivity` :844-892; `AmbientContextSensingDelegate.h:78-106`), tests `tests/TestAmbientContextSensingCluster.cpp` | no |
-| BD-chip-TimeSynchronization-Features | `TimeSynchronizationServer.ts:14` is the empty subclass (absence: the class line, 14 lines in all) | `packages/node/src/behaviors/time-synchronization/TimeSynchronizationServer.ts` | `"export class TimeSynchronizationServer extends TimeSynchronizationBehavior {}"` | connectedhomeip `src/app/clusters/time-synchronization-server/TimeSynchronizationCluster.cpp` at `6170af84` (the attribute gating :186-248, the feature logic :619-1028, `HandleSetUTCTime` :1110-1136, the four handlers :1138-1275), `TimeSyncDataProvider.h:58-75`, tests `tests/TestTimeSynchronizationCluster.cpp` | yes |
+| BD-chip-TimeSynchronization-Features | `TimeSynchronizationServer.ts:14` is the empty subclass (absence: the class line, 14 lines in all) | `packages/node/src/behaviors/time-synchronization/TimeSynchronizationServer.ts` | `"export class TimeSynchronizationServer extends TimeSynchronizationBehavior {}"` | connectedhomeip `src/app/clusters/time-synchronization-server/TimeSynchronizationCluster.cpp` at `6170af84` (the attribute gating :186-248, the time client :379-593, the feature logic :619-1028, `SetUTCTime` :856-872, `HandleSetUTCTime` :1110-1136, the four handlers :1138-1275), `TimeSyncDataProvider.h:58-75`, tests `tests/TestTimeSynchronizationCluster.cpp` | yes |
 | BD-chip-GeneralCommissioning-TermsAndConditions | `GeneralCommissioningServer.ts:31` is the class line; no terms-and-conditions text in the file (absence: the class body, 285 lines in all) | `packages/node/src/behaviors/general-commissioning/GeneralCommissioningServer.ts` | `class GeneralCommissioningServer` | connectedhomeip `src/app/clusters/general-commissioning-server/GeneralCommissioningCluster.cpp` at `6170af84` (the attribute reads :199-230, the change notifications :73-135 and :367-372, the fail-safe revert :149-157, the CommissioningComplete gate :476-525, `HandleSetTCAcknowledgements` :617-672, `OnFabricRemoved` :357-374), `src/app/server/TermsAndConditionsProvider.h:35-220`, `DefaultTermsAndConditionsProvider.cpp:153-252`, tests `tests/TestGeneralCommissioningCluster.cpp`, the CSA cases TC-CGEN-2.5 to 2.11 | yes |
 | BD-chip-Thermostat-Events | `ThermostatServer.ts:525` is the only `events.` emit of the server, the custom `calibratedTemperature$Changed` (absence: none of the model's eight Thermostat events is emitted anywhere in the file, 1790 lines) | `packages/node/src/behaviors/thermostat/ThermostatServer.ts` | `"this.events.calibratedTemperature$Changed.emit(temperature, oldTemperature, this.context);"` | connectedhomeip `src/app/clusters/thermostat-server/ThermostatClusterEvents.cpp` at `6170af84` (every `Generate*` gated on `Feature::kEvents`, :33-36, :59-61, :83-86, :109-112), the emit sites `ThermostatClusterBase.cpp:158-162, :179-183, :246-250, :283-287`, `ThermostatClusterSetpointsBase.cpp:63-85`, `ThermostatClusterPresets.cpp:461-500`; the entry is the events paragraph of `BD-chip-Thermostat-Schedules` | yes |
 | BD-matterjs-server-CameraStreamManagement | `camera-controller.ts:133` mandates the requestor as the device type's whole server set — matter.js's controller-side camera surface is the WebRtcTransportRequestor and nothing above it (absence: the tree at the pin holds six WebRTC behaviour files and one test under `packages/node`, no stream management) | `packages/node/src/devices/camera-controller.ts` | `"export const server = { mandatory: { WebRtcTransportRequestor: WebRtcTransportRequestorServer } };"` | matterjs-server `packages/ws-controller/src/camera/CameraStreamManager.ts`, `streamPolicy.ts`, `sdpConstraints.ts`, `sessionRegistry.ts` at 0bd06f2; connectedhomeip `WebRTCTransportProviderCluster.cpp` at 6170af84 for the provider's rules | no |
-| BD-chip-JointFabricDatastore-RulesInServer | `JointFabricDatastoreServer.ts:14` is the empty subclass (absence: the class line, 14 lines in all) | `packages/node/src/behaviors/joint-fabric-datastore/JointFabricDatastoreServer.ts` | `"export class JointFabricDatastoreServer extends JointFabricDatastoreBehavior {}"` | connectedhomeip `src/app/server/JointFabricDatastore.cpp` at `6170af84` (the operations :181-2373, `RefreshNode`/`ContinueRefresh` :241-1130, the status codes), `JointFabricDatastore.h` (the capacities :512-517, the delegate :166-285, `MarkEntryCommittedIfFound` :75-85), `src/app/clusters/joint-fabric-datastore-server/joint-fabric-datastore-server.cpp` (the 20 commands :293-785), tests `src/app/server/tests/TestJointFabricDatastore.cpp` | no |
+| BD-chip-JointFabricDatastore-RulesInServer | `JointFabricDatastoreServer.ts:14` is the empty subclass (absence: the class line, 14 lines in all) | `packages/node/src/behaviors/joint-fabric-datastore/JointFabricDatastoreServer.ts` | `"export class JointFabricDatastoreServer extends JointFabricDatastoreBehavior {}"` | connectedhomeip `src/app/server/JointFabricDatastore.cpp` at `6170af84` (the operations :181-2373, `RefreshNode`/`ContinueRefresh` :241-1130, the status codes), `JointFabricDatastore.h` (the capacities :512-517, the delegate :166-285, `MarkEntryCommittedIfFound` :75-85), `src/app/clusters/joint-fabric-datastore-server/joint-fabric-datastore-server.cpp` (the 20 commands :293-785), tests `src/app/server/tests/TestJointFabricDatastore.cpp`, `examples/jf-admin-app/linux/JFADatastoreSync.cpp` (the endpoint's whole binding list, `SyncEndpointBindings`: the delegate's merge :1706-1757, the write :1759-1779 and :661-685) | no |
 | BD-chip-JointFabricAdministrator-RulesInServer | `JointFabricAdministratorServer.ts:14` is the empty subclass (absence: the class line, 14 lines in all) | `packages/node/src/behaviors/joint-fabric-administrator/JointFabricAdministratorServer.ts` | `"export class JointFabricAdministratorServer extends JointFabricAdministratorBehavior {}"` | connectedhomeip `src/app/clusters/joint-fabric-administrator-server/joint-fabric-administrator-server.cpp` at `6170af84` (the handlers :172-449), `JCMCommissionee.{h,cpp}`, `src/app/server/JointFabricAdministrator.h`, `src/credentials/jcm/` (`TrustVerification.cpp`, `VendorIdVerificationClient.cpp`), tests `joint-fabric-administrator-server/tests/TestJCMCommissionee.cpp`, `src/credentials/tests/jcm/` | no |
 | BD-chip-JCM-Commissioner | `ControllerCommissioningFlow.ts:576-583` runs `OperationalCredentials.Certificates` right after `OperationalCredentials.DeviceAttestation`, no Joint Commissioning step between (absence: the two step pushes, :573-585) | `packages/protocol/src/peer/ControllerCommissioningFlow.ts` | `"name: \"OperationalCredentials.DeviceAttestation\",\n            stepLogic: () => this.#deviceAttestation(),\n        });\n\n        this.commissioningSteps.push({\n            stepNumber: 11, // includes 11-13"` | connectedhomeip `src/controller/jcm/DeviceCommissioner.cpp` at `6170af84` (:45-550), `src/controller/jcm/AutoCommissioner.{h,cpp}` (the read paths `.h:56-66`), `src/controller/AutoCommissioner.cpp:522-531` (the stage after attestation), tests `src/controller/tests/jcm/TestJCMCommissioner.cpp` | no |
 | BD-Matter-SurfaceChange-ConfigurationVersion | `BasicInformationServer.ts:35-37` leaves the "when" to the application: the version is "seeded to 1 and constrained to only ever increase", and the application bumps it "with `increaseConfigurationVersion`" (`:132`); the only production caller at the pin is the bridged-to-root coupling, `BridgedDeviceBasicInformationServer.ts:86` | `packages/node/src/behaviors/basic-information/BasicInformationServer.ts` | `"node's configuration changes in a way clients should detect, bump it with {@link increaseConfigurationVersion},"` | this module: concept v11 §C.9, ADR 0030 decision 6, wave S4 — the node persists each endpoint's effective surface next to its ConfigurationVersion and raises the bridged and the root ConfigurationVersion (one change, matter.js's coupling) when the surface of a returning endpoint differs (`node/surface_stability.go`) | no |
@@ -2317,10 +2317,64 @@ differences:
 Recorded so they are not re-derived, not divergences: the host-facing
 surface — `OtaApplier` for matter.js's `requestUserConsent` / `applyUpdate`
 extension points, `OtaProviderConnector` for its node's peer connection, a
-host directory for its blob store — and the absence of HTTPS downloads,
-which matter.js's default `transferProtocolsSupported` (:139, :852 at `862ad75f`) does
-not announce either. Retire the `spec.Instance` half when `spec.Server`
-learns fabric-scoped attributes.
+host directory for its blob store. The HTTPS download is
+`BD-Matter-OTARequestor-HTTPS`. Retire the `spec.Instance` half when
+`spec.Server` learns fabric-scoped attributes.
+
+### BD-Matter-OTARequestor-HTTPS — the HTTPS download is opt-in as in matter.js, bounded in size and stall time where matter.js's `fetch` is not, and the module's client refuses a redirect to `http://`
+
+matter.js's requestor announces `transferProtocolsSupported`, BDX
+synchronous by default — "HTTPS can be added as protocol as well"
+(`packages/node/src/behaviors/ota-software-update-requestor/OtaSoftwareUpdateRequestorServer.ts:1367-1372`
+at `862ad75f`); `#handleDownload` routes a `bdx://` or `https://` URI by
+that list and refuses any other, `http://` among them (`:1077-1107`); and
+`#handleHttpsDownload` (`:1008-1062`) GETs the URI with `fetch`, turns a
+non-ok status into an `OtaDownloadError` carrying it (`:1010-1011`) and
+streams the body into the download location with progress from
+Content-Length, a failure while streaming being an `OtaDownloadError` with
+the status and the bytes received (`:1052-1060`). `cluster/core`'s
+requestor does the same, opt-in through `OTARequestorConfig.TransferProtocols`
+(`node.OTAConfig.TransferProtocols`; empty is BDX alone), the GET through
+an `OtaHTTPClient` (nil is the module's client over
+`http.DefaultTransport`), the body through the BDX path's `bdx.FileSink`
+temporary file, then `validateUpdateFile`. Three deviations:
+`HTTPSMaxImageSize` (default 256 MiB; a Content-Length above it fails
+before the body is read, a chunked answer after the bytes up to it);
+`HTTPSIdleTimeout` (default 60 seconds on the requestor's clock: no byte
+received for that long — waiting for the response or between two reads of
+the body — is a stall; no total time is bounded, owner decision
+2026-11-06, since a total timeout couples the image size to the link
+speed); and the module's client refusing a redirect whose target is not
+`https://` (`otaCheckRedirect`, at most ten redirects as `net/http`'s
+default, `net/http/client.go` "stopped after 10 redirects"), which `fetch`
+would follow (owner decision 2026-11-06: the requestor refuses an `http://`
+image URI, and `validateUpdateFile` checks no signature, so a downgrade
+must not reach the image either). A host's `OtaHTTPClient` keeps its own
+redirect policy. Each deviation fails the download as an `otaDownloadError`
+— DownloadError, Idle with Failure — whose code is the status of the last
+response (for a refused redirect the redirect's, which `net/http` returns
+with the error), or before a response UpdateState Unknown's value (0) as
+the BDX path uses.
+A fourth: `NewOTASoftwareUpdateRequestor` refuses a `TransferProtocols`
+list without BDX synchronous, where matter.js's `transferProtocolsSupported`
+takes any list a host sets and only its default carries BDX
+(`OtaSoftwareUpdateRequestorServer.ts:1372` at `862ad75f`).
+connectedhomeip's requestor announces BDX synchronous alone
+(`src/app/clusters/ota-requestor/DefaultOTARequestor.cpp:747` at
+`6170af84`); the refusal keeps BDX synchronous in every list, as both
+announce it.
+A GET that gets no response mirrors matter.js: `fetch` rejects with an
+error that is no `MatterError`, `MatterError.accept` rethrows it (`:925`)
+to `#queryForUpdate`'s handler (`:632-640`), and the provider counts as
+without update, with no DownloadError. matter.js has no test of the HTTPS branch at
+the pin — `packages/node/test/behaviors/ota/OtaTest.ts:65-84` mocks `fetch`
+only for the DCL endpoints — so its code is the parity case, held by
+`cluster/core/ota_requestor_https_test.go` (`TestOTARequestorHTTPS_*`,
+`httptest` over TLS). Reasoning: the image comes from a host on the open
+network, not from a fabric peer, so a hostile or broken host must neither
+fill the download directory nor hold the requestor in Downloading, and a
+redirect must not lower the transport below the URI the requestor accepted;
+a host that needs more raises either bound or supplies its own client.
 
 ### BD-Matter-OTARequestor-AnnouncementAnsweredAtOnce — an AnnounceOTAProvider that arrives during a query is answered at once and handled when the query ends
 
@@ -5745,6 +5799,40 @@ cleanly — chip leaves `mRefreshingNodeId` set (:247-249) and refuses every
 later refresh. Pinned by `datastore_chip_test.go` (chip's 26 cases) and
 `datastore_rules_test.go` (the rules of `TC_JFDS_2_2…2_5`).
 
+The delegate's endpoint-scoped overload `SyncNode(nodeId, endpointId,
+bindingEntries)` (`JointFabricDatastore.h:196-203` at `6170af84`) is
+`DatastoreSync.SyncEndpointBindings` (phase 39). chip's datastore never
+calls that overload — every `SyncNode` it makes carries one entry or a
+node's whole list — and its test delegate does not implement it; its
+jf-admin-app does, and carries the one binding entry the datastore pushes
+as the endpoint's merged list: it fetches the endpoint's current bindings,
+removes the entries whose target matches a DeletePending entry's (no list
+id travels to the node) or appends the entry, and writes the list to the
+endpoint's Binding attribute, an empty list included
+(`examples/jf-admin-app/linux/JFADatastoreSync.cpp:1706-1757` at
+`6170af84`, the write :1759-1779 and :661-685). The datastore does that
+merge for every port, so the host writes a list and reads a list
+(`FetchEndpointBindingList`), nothing more — owner decision 2026-11-06,
+against the recommendation of an optional interface: a required method,
+so every host writes the merged list; chip's delegate has the
+single-entry overload (`JointFabricDatastore.h:189-194` at `6170af84`),
+the module's datastore merges itself, so the port does not carry it
+(decision 8). One divergence: a fetch that fails is the push's error and
+leaves the entry Pending or DeletePending for the next `RefreshNode`;
+jf-admin-app writes the one entry over an empty list
+(`JFADatastoreSync.cpp:1726-1730` at `6170af84`), which drops the node's
+other bindings on a transient read failure. The fetch, the merge and the
+write run under one lock per node and endpoint, so two pushes to one
+endpoint cannot both merge into the list read before the other wrote;
+jf-admin-app's fetch-then-write has the same race in principle, two
+`SyncNode` calls in flight each fetching before either writes
+(`JFADatastoreSync.cpp:1706-1757` at `6170af84`). A push held at the port
+therefore holds the later pushes to its endpoint, so the two ports of
+chip's deferred-completion cases (`TestRemoveBindingIteratorUseAfterFree`,
+`TestAddBindingBackReferenceMarksWrongEntry` in `datastore_chip_test.go`)
+run their adds beside the held push, where chip's adds return before the
+delegate completes. Pinned by `datastore_endpoint_sync_test.go`.
+
 ### BD-chip-JointFabricAdministrator-RulesInServer — the administrator's commands and the commissionee's trust verification follow connectedhomeip; the anchor is recorded at CommissioningComplete as chip's example app does
 
 matter.js's `JointFabricAdministratorServer.ts:14` at `862ad75f` is the
@@ -5822,7 +5910,7 @@ ICAC, CASE) stays out, as matter.js admits ML-DSA only in the attestation
 certificates. Pinned by the `*_parity_matterjs_test.go` ports listed in
 `notes/briefs/reports/27A.md` (test register, planned ratchet 3).
 
-### BD-chip-TimeSynchronization-Features — TZ, NTPC, NTPS and TSC follow connectedhomeip when the host selects them; UTC stays the node's clock
+### BD-chip-TimeSynchronization-Features — TZ, NTPC, NTPS and TSC follow connectedhomeip when the host selects them; the node's UTC is an offset over its clock, with chip's time client
 
 matter.js's `TimeSynchronizationServer.ts:14` at `862ad75f` is the empty
 subclass. `core.NewTimeSynchronizationWith` (`node.Config.TimeSynchronization`)
@@ -5832,17 +5920,50 @@ handlers with their statuses and events (`HandleSetTrustedTimeSource`
 :1138-1157, `HandleSetTimeZone` :1161-1213, `HandleSetDSTOffset`
 :1216-1243, `HandleSetDefaultNTP` :1246-1275), LocalTime, fabric removal
 and persistence through `store.Settings` (chip's `TimeSyncDataProvider.h:58-75`).
-The features are off by default and `FeatureMap` is the host's selection;
-UTC stays the node's clock and chip's trusted-source client is not ported.
-`SetUTCTime` answers chip's statuses (:1110-1136) without setting the
-clock: INVALID_COMMAND for a granularity or time source outside its enum,
-TimeNotAccepted for NoTimeGranularity or a granularity coarser than the
-node's milliseconds (owner decision 2026-10-28). Two edges: a SetTimeZone
-list over two entries answers CONSTRAINT_ERROR from the request constraint
-before chip's RESOURCE_EXHAUSTED check (:1168-1171) can; an IPv4 NTP
-address counts as a domain, as in chip's default delegate; no DSTTableEmpty
-at startup, since the emitter attaches after construction. Pinned by
-`cluster/core` time-synchronization tests (3 chip cases, 9 rules, 1 wire).
+The features are off by default and `FeatureMap` is the host's selection.
+Two edges: a SetTimeZone list over two entries answers CONSTRAINT_ERROR
+from the request constraint before chip's RESOURCE_EXHAUSTED check
+(:1168-1171) can; an IPv4 NTP address counts as a domain, as in chip's
+default delegate; no DSTTableEmpty at startup, since the emitter attaches
+after construction.
+
+The node's UTC is a served source (owner decision 2026-11-06, phase 39,
+replacing the decision of 2026-10-28 that SetUTCTime answers chip's
+statuses without setting the clock): every server, with or without
+features, serves UTCTime as its clock plus an offset, with Granularity and
+the optional TimeSource. Until something sets the offset the host clock is
+the platform source — chip's `DefaultTimeSyncDelegate.cpp:42-58`,
+MillisecondsGranularity and MixedNTP while the clock is past the Matter
+epoch, or the host's `TimeSynchronizationConfig.PlatformTime` (chip's
+`UpdateTimeFromPlatformSource`). UTCTime is null without a granularity
+(:255-267). `SetUTCTime` sets the offset with chip's checks
+(`HandleSetUTCTime` :1110-1136, `SetUTCTime` :856-872, `UpdateUTCTime`
+:74-86): INVALID_COMMAND outside the enums; TimeNotAccepted for
+NoTimeGranularity, a granularity coarser than the current one while the
+node has a time, or seconds past 32 bits; TimeSource Admin. The time client
+is ported: `Start` (the node's server-ready, `OnPlatformEventFn` :556-569)
+and a trusted time source set while the node has no time (:584-587) run
+`AttemptToGetTime` (:541-554) — the trusted node's root UTCTime and
+Granularity read through `core.TimePeerReader` (:401-460, :525-539; the
+node's reader runs over its client stack, `node.Config.Client`), adopted
+with chip's conservative granularity and TimeSource NodeTimeCluster
+(:462-492); else the NTP fallback through the host's `core.NTPClient`
+asking DefaultNTP, adopted with milliseconds and NonMatterSNTP (:510-518);
+else TimeFailure (:379-398, :519-522). Differences, each because the host
+clock is never set: the offset lives in memory and a restart serves the
+host clock again (chip's system clock keeps the time); the platform source
+is read live, not once at server ready; Last Known Good Time is not
+updated (`UpdateUTCTime` :82; the module keeps none); an NTP answer
+before the Matter epoch or past 32-bit seconds is a failed query; each
+read and NTP query ends after `core.TimeSyncAttemptTimeout` (30 s) on the
+server's clock, a bound of the module's because the ports are a host's
+and an attempt that never ended would hold every later one. The
+Thermostat's and the Valve's Matter time (`core.MatterEpochSeconds` over
+the device's clock) does not see the offset. TimeSource and
+TimeZoneDatabase go out as plain integers; a named enum type went out as
+TLV null through the bridge's reply writer. Pinned by `cluster/core`
+time-synchronization tests (3 chip cases, 9 rules, 6 client cases, 1 wire)
+and `node`'s client wire test.
 
 ### BD-chip-GeneralCommissioning-TermsAndConditions — the TC feature follows connectedhomeip when the node states its terms
 
@@ -5978,22 +6099,53 @@ window TC-ZONEMGMT-2.4 allows (`TC_ZONEMGMT_2_4.py:279-285`). TESTING ONLY, off 
 stream, PTZ and chime state is kept in `--db` as
 `BD-Matter-CameraPersistenceIsTheHosts` leaves it to the host.
 
-### BD-Matter-BTP-NoStallRenegotiation — a BTP central that stalls after the handshake is not re-established with a smaller segment size
+### BD-Matter-BTP-RenegotiationAfterStall — a BTP central that stalls after the handshake is re-established once at the minimum segment size, as matter.js's channel does
 
-matter.js's `BtpSessionHandler` reports a session whose first messages are
-never acknowledged in submission order (`stalledAfterHandshake`,
-`packages/protocol/src/ble/BtpSessionHandler.ts:53-82` at `862ad75f`), and
-its own comment calls the remedy "an interop workaround with no basis in
-the specification": the noble transport may establish a fresh session with
-a smaller segment size and resend the messages (`NobleBleChannel.ts`, the
-handshake :591-630 with the segment size derived from the ATT MTU, :40-41,
-:523). `transport/btp` and `controller/ble` report the stall and close the
-session on the acknowledgement timeout, as a transport that cannot
-renegotiate does in matter.js (:79), and do not re-establish it: the
-workaround targets peripherals matter.js met through noble, none of which
-this module's `ble/bluez` or `ble/esphome` paths have shown; a stall seen
-in the field reopens this entry as a finding. Recorded at the milestone-6
-sweep (report 27-C, 2026-10-29).
+matter.js's `BtpSessionHandler` reports a central session above the minimum
+segment size whose peer completed the handshake and then sent no BTP packet
+before the acknowledgement timeout, although it was sent Matter data
+(`stalledAfterHandshake`, `packages/protocol/src/ble/BtpSessionHandler.ts:67-84`
+at `862ad75f`), and its own comment calls the remedy "an interop workaround
+with no basis in the specification": "Some peripherals were observed to
+behave this way with large segments on Bluetooth 4.1 adapters and to work
+with the minimum segment size; the cause is not established." Its central
+channel acts on the report (`packages/nodejs-ble/src/NobleBleChannel.ts:835`,
+`:864-889` `#startRenegotiation` — at most once per channel, every send
+awaits it, a failure closes the channel unless the channel is closing;
+`:891-918` `#renegotiate` — the C2 handler detached, C2 unsubscribed, a new
+handshake with `MINIMUM_ATT_MTU`, the session adopted, the unacknowledged
+messages replayed in order; `:920-926` the channel lost meanwhile ends it).
+connectedhomeip closes the endpoint when its acknowledgement timer fires
+(`src/ble/BLEEndPoint.cpp:1454-1464` at `6170af84`,
+`HandleAckReceivedTimeout`: "ack recv timeout, closing ep",
+`DoClose(kBleCloseFlag_AbortTransmission, BLE_ERROR_FRAGMENT_ACK_TIMED_OUT)`).
+Here `controller/ble.Channel` mirrors matter.js (phase 39): the session
+half (`transport/btp.Session.OnStall`, `Suspend`) reports the stall, the
+channel swaps the session behind its `btp.Conn` (`Channel.Conn` is the
+current one), `Channel.Send` waits for a renegotiation in flight and
+answers `ErrChannelClosed` when the channel is lost meanwhile, a failed
+renegotiation or a lost connection closes the channel, each C2 unsubscribe
+runs under `ble.DisconnectTimeout` (5 s, `BLE_DISCONNECT_TIMEOUT`,
+`NobleBleChannel.ts:38`, `:579`) and each handshake's C1 write and C2
+subscribe under its `btp.ConnRspTimeout` attempt (`:602-606`, `:634-641`),
+both on the channel's clock, so a peripheral that vanished without a
+disconnect event fails the renegotiation within the bound and the channel
+closes, and `Dial` waits up
+to `ATTMTUSettleTimeout` (2 s, `NobleBleChannel.ts:40-41`, `:526-567` at
+`862ad75f`) for a connection that reports its ATT_MTU exchange
+(`ble.MTUExchange`) before it sizes the segment. The workaround is adopted
+as matter.js's production-hardened behaviour (the order of authority:
+matter.js decides where it models something), and recorded here because
+the specification neither describes nor forbids it and connectedhomeip does
+not do it. One Go-side difference: the cleanup unsubscribe after a
+handshake timeout runs on a context that outlives the caller's and `Dial`
+reports `ErrHandshakeTimeout`, where matter.js raises its `AbortedError`
+when the abort lands during that unsubscribe
+(`packages/nodejs-ble/test/NobleBleChannelTest.ts:1075-1097` at `862ad75f`);
+the register leaves that case. Supersedes `BD-Matter-BTP-NoStallRenegotiation`
+(report 27-C, 2026-10-29), which recorded the absence. Proof:
+`controller/ble/channel_parity_matterjs_test.go` over the `bletest`
+peripheral's `Stall` and `Faults`; no chip-tool leg exists (no BTP family).
 
 ### BD-Matter-GeneratedServerSuffices — clusters whose generated server is complete: no source carries behaviour beyond the model
 

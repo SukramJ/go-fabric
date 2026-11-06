@@ -18,6 +18,7 @@ import (
 	"slices"
 	"sync"
 	"testing"
+	"testing/synctest"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	dsdef "github.com/SukramJ/go-fabric/cluster/spec/jointfabricdatastore"
@@ -35,8 +36,9 @@ type trackingSync struct {
 
 	lastEndpointGroup *EndpointGroupIDEntry
 	lastNodeKeySet    *NodeKeySetEntry
-	lastBinding       *EndpointBindingEntry
 	lastACL           *ACLEntry
+	// lastBindingWrite is the last SyncEndpointBindings call.
+	lastBindingWrite *bindingWrite
 
 	// defer* make the next push of the kind wait until released.
 	deferBinding, deferACL bool
@@ -72,7 +74,7 @@ func (s *trackingSync) wait(kind *bool) {
 func (s *trackingSync) reset() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.lastEndpointGroup, s.lastNodeKeySet, s.lastBinding, s.lastACL = nil, nil, nil, nil
+	s.lastEndpointGroup, s.lastNodeKeySet, s.lastBindingWrite, s.lastACL = nil, nil, nil, nil
 }
 
 func (s *trackingSync) SyncEndpointGroupID(_ context.Context, _ uint64, e EndpointGroupIDEntry) error {
@@ -89,11 +91,18 @@ func (s *trackingSync) SyncNodeKeySet(_ context.Context, _ uint64, e NodeKeySetE
 	return nil
 }
 
-func (s *trackingSync) SyncBinding(_ context.Context, _ uint64, e EndpointBindingEntry) error {
+// bindingWrite is one SyncEndpointBindings call.
+type bindingWrite struct {
+	nodeID   uint64
+	endpoint uint16
+	entries  []EndpointBindingEntry
+}
+
+func (s *trackingSync) SyncEndpointBindings(_ context.Context, nodeID uint64, ep uint16, entries []EndpointBindingEntry) error {
 	s.wait(&s.deferBinding)
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.lastBinding = &e
+	s.lastBindingWrite = &bindingWrite{nodeID: nodeID, endpoint: ep, entries: slices.Clone(entries)}
 	return nil
 }
 
@@ -407,8 +416,8 @@ func TestAddBindingAssignsListIdAndStoresCommittedEntry(t *testing.T) {
 	s := newTrackingSync()
 	d := nodeWithEndpoint(t, s)
 	mustOK(t, d.AddBindingToEndpointForNode(t.Context(), 123, 1, BindingTarget{Node: ptr[uint64](0x1111), Endpoint: ptr[uint16](2)}))
-	if s.lastBinding == nil {
-		t.Fatal("binding not pushed")
+	if w := s.lastBindingWrite; w == nil || w.nodeID != 123 || w.endpoint != 1 || len(w.entries) != 1 || w.entries[0].StatusEntry.State != statePending {
+		t.Fatalf("binding not pushed as the endpoint's list: %+v", w)
 	}
 	b := d.EndpointBindingList()
 	if len(b) != 1 || b[0].NodeId != 123 || b[0].EndpointId != 1 || b[0].Binding.Node == nil || *b[0].Binding.Node != 0x1111 || b[0].StatusEntry.State != stateCommitted {
@@ -424,8 +433,11 @@ func TestRemoveBindingSyncsDeletePendingPayload(t *testing.T) {
 	listID := d.EndpointBindingList()[0].ListId
 	s.reset()
 	mustOK(t, d.RemoveBindingFromEndpointForNode(t.Context(), listID, 123, 1))
-	if e := s.lastBinding; e == nil || e.NodeId != 123 || e.EndpointId != 1 || e.ListId != listID || e.StatusEntry.State != stateDeletePending {
-		t.Fatalf("last binding push %+v", e)
+	// chip's test reads the DeletePending payload of the single-entry push;
+	// here the push is the endpoint's list without the removed target, the
+	// port's fetch holding nothing: the empty list.
+	if w := s.lastBindingWrite; w == nil || w.nodeID != 123 || w.endpoint != 1 || len(w.entries) != 0 {
+		t.Fatalf("last binding push %+v", w)
 	}
 	if len(d.EndpointBindingList()) != 0 {
 		t.Fatalf("EndpointBindingList = %+v", d.EndpointBindingList())
@@ -475,23 +487,52 @@ func deferred(t *testing.T, s *trackingSync, binding bool, op func() error) (rel
 	}
 }
 
-// TestRemoveBindingIteratorUseAfterFree is :708-749: the removal's commit
-// finds the entry by its key after other bindings were added meanwhile.
-func TestRemoveBindingIteratorUseAfterFree(t *testing.T) {
-	s := newTrackingSync()
-	d := nodeWithEndpoint(t, s)
-	mustOK(t, d.AddBindingToEndpointForNode(t.Context(), 123, 1, BindingTarget{Node: ptr[uint64](0x1000), Endpoint: ptr[uint16](2)}))
-	listID0 := d.EndpointBindingList()[0].ListId
-	release := deferred(t, s, true, func() error { return d.RemoveBindingFromEndpointForNode(context.Background(), listID0, 123, 1) })
-	for i := uint64(1); i <= 12; i++ {
-		mustOK(t, d.AddBindingToEndpointForNode(t.Context(), 123, 1, BindingTarget{Node: ptr(0x2000 + i), Endpoint: ptr[uint16](2)}))
+// addBindingsBeside adds the bindings to node 123's endpoint 1 while a
+// push to that endpoint is held: each add changes the tables at once and
+// its push waits for the held one, as the pushes to one endpoint run one
+// after the other (Datastore.pushBinding). It returns once every add
+// changed the tables; wait reports each add's result after the release.
+func addBindingsBeside(t *testing.T, d *Datastore, targets []BindingTarget) (wait func()) {
+	t.Helper()
+	errs := make(chan error, len(targets))
+	for _, b := range targets {
+		go func() { errs <- d.AddBindingToEndpointForNode(context.Background(), 123, 1, b) }()
 	}
-	release()
-	for _, e := range d.EndpointBindingList() {
-		if e.ListId == listID0 {
-			t.Fatalf("the removed binding %d is still listed", listID0)
+	synctest.Wait()
+	return func() {
+		for range targets {
+			mustOK(t, <-errs)
 		}
 	}
+}
+
+// TestRemoveBindingIteratorUseAfterFree is :708-749: the removal's commit
+// finds the entry by its key after other bindings were added meanwhile.
+// chip's delegate completes asynchronously, so the adds return while the
+// removal's push is held; here they run beside it (addBindingsBeside).
+func TestRemoveBindingIteratorUseAfterFree(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		s := newTrackingSync()
+		d := nodeWithEndpoint(t, s)
+		mustOK(t, d.AddBindingToEndpointForNode(t.Context(), 123, 1, BindingTarget{Node: ptr[uint64](0x1000), Endpoint: ptr[uint16](2)}))
+		listID0 := d.EndpointBindingList()[0].ListId
+		release := deferred(t, s, true, func() error { return d.RemoveBindingFromEndpointForNode(context.Background(), listID0, 123, 1) })
+		var targets []BindingTarget
+		for i := uint64(1); i <= 12; i++ {
+			targets = append(targets, BindingTarget{Node: ptr(0x2000 + i), Endpoint: ptr[uint16](2)})
+		}
+		wait := addBindingsBeside(t, d, targets)
+		if n := len(d.EndpointBindingList()); n != 13 {
+			t.Fatalf("%d bindings listed while the removal is held, want 13", n)
+		}
+		release()
+		wait()
+		for _, e := range d.EndpointBindingList() {
+			if e.ListId == listID0 {
+				t.Fatalf("the removed binding %d is still listed", listID0)
+			}
+		}
+	})
 }
 
 // TestRemoveAclIteratorUseAfterFree is :787-827.
@@ -517,28 +558,33 @@ func TestRemoveAclIteratorUseAfterFree(t *testing.T) {
 // TestAddBindingBackReferenceMarksWrongEntry is :835-876: the deferred
 // commit marks the binding that was pushed, not the newest one.
 func TestAddBindingBackReferenceMarksWrongEntry(t *testing.T) {
-	s := newTrackingSync()
-	d := nodeWithEndpoint(t, s)
-	release := deferred(t, s, true, func() error {
-		return d.AddBindingToEndpointForNode(context.Background(), 123, 1, BindingTarget{Node: ptr[uint64](0x1000), Endpoint: ptr[uint16](2)})
-	})
-	listID1 := d.EndpointBindingList()[0].ListId
-	for i := uint64(2); i <= 13; i++ {
-		mustOK(t, d.AddBindingToEndpointForNode(t.Context(), 123, 1, BindingTarget{Node: ptr(0x2000 + i), Endpoint: ptr[uint16](2)}))
-	}
-	release()
-	found := false
-	for _, e := range d.EndpointBindingList() {
-		if e.ListId == listID1 {
-			found = true
-			if e.StatusEntry.State != stateCommitted {
-				t.Fatalf("binding %d is %d, want Committed", listID1, e.StatusEntry.State)
+	synctest.Test(t, func(t *testing.T) {
+		s := newTrackingSync()
+		d := nodeWithEndpoint(t, s)
+		release := deferred(t, s, true, func() error {
+			return d.AddBindingToEndpointForNode(context.Background(), 123, 1, BindingTarget{Node: ptr[uint64](0x1000), Endpoint: ptr[uint16](2)})
+		})
+		listID1 := d.EndpointBindingList()[0].ListId
+		var targets []BindingTarget
+		for i := uint64(2); i <= 13; i++ {
+			targets = append(targets, BindingTarget{Node: ptr(0x2000 + i), Endpoint: ptr[uint16](2)})
+		}
+		wait := addBindingsBeside(t, d, targets)
+		release()
+		wait()
+		found := false
+		for _, e := range d.EndpointBindingList() {
+			if e.ListId == listID1 {
+				found = true
+				if e.StatusEntry.State != stateCommitted {
+					t.Fatalf("binding %d is %d, want Committed", listID1, e.StatusEntry.State)
+				}
 			}
 		}
-	}
-	if !found {
-		t.Fatalf("binding %d not listed", listID1)
-	}
+		if !found {
+			t.Fatalf("binding %d not listed", listID1)
+		}
+	})
 }
 
 // TestOnFabricRemovedWipesDatastoreOnlyForAnchorFabric is :880-941.

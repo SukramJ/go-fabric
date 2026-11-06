@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 7675,
+  "entry_points": 7705,
   "entry_packages": [
     ".",
     "bdx",
@@ -279,9 +279,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 17646,
-    "reachable": 12301,
-    "whitelisted": 5345,
+    "total_exported": 17681,
+    "reachable": 12314,
+    "whitelisted": 5367,
     "unreachable": 0
   },
   "by_package": [],
@@ -8087,6 +8087,13 @@
     },
     {
       "package": "cluster/core",
+      "identifier": "DownloadProtocol",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/core/ota_software_update_requestor.go",
+      "line": 185
+    },
+    {
+      "package": "cluster/core",
       "identifier": "LeaveEvent",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/core/basic_information.go",
@@ -8413,6 +8420,83 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/ota_provider_test.go",
       "line": 165
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestOTARequestorHTTPS_BDXOfferStillWorks",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/ota_requestor_https_test.go",
+      "line": 477
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestOTARequestorHTTPS_Config",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/ota_requestor_https_test.go",
+      "line": 518
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestOTARequestorHTTPS_Download",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/ota_requestor_https_test.go",
+      "line": 140
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestOTARequestorHTTPS_FetchRejected",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/ota_requestor_https_test.go",
+      "line": 456
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestOTARequestorHTTPS_Redirect",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/ota_requestor_https_test.go",
+      "line": 192
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestOTARequestorHTTPS_Refused",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/ota_requestor_https_test.go",
+      "line": 422
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestOTARequestorHTTPS_SizeCap",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/ota_requestor_https_test.go",
+      "line": 274
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestOTARequestorHTTPS_SlowButSteady",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/ota_requestor_https_test.go",
+      "line": 359
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestOTARequestorHTTPS_Stall",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/ota_requestor_https_test.go",
+      "line": 294
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestOTARequestorHTTPS_StatusNotOK",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/ota_requestor_https_test.go",
+      "line": 247
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestOTARequestorHTTPS_TruncatedBody",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/ota_requestor_https_test.go",
+      "line": 258
     },
     {
       "package": "cluster/core",
@@ -9553,56 +9637,56 @@
       "identifier": "TestAddAclDeduplicatesAndRemoveAclSyncsDeletePayload",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/jointfabric/datastore_chip_test.go",
-      "line": 438
+      "line": 450
     },
     {
       "package": "cluster/jointfabric",
       "identifier": "TestAddAndUpdateAdminOwnsFriendlyNameAndIcac",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/jointfabric/datastore_chip_test.go",
-      "line": 245
+      "line": 254
     },
     {
       "package": "cluster/jointfabric",
       "identifier": "TestAddBindingAssignsListIdAndStoresCommittedEntry",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/jointfabric/datastore_chip_test.go",
-      "line": 406
+      "line": 415
     },
     {
       "package": "cluster/jointfabric",
       "identifier": "TestAddBindingBackReferenceMarksWrongEntry",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/jointfabric/datastore_chip_test.go",
-      "line": 519
+      "line": 560
     },
     {
       "package": "cluster/jointfabric",
       "identifier": "TestAddGroupAndUpdateEndpointOwnBufferBackedFriendlyNames",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/jointfabric/datastore_chip_test.go",
-      "line": 262
+      "line": 271
     },
     {
       "package": "cluster/jointfabric",
       "identifier": "TestAddGroupIDToEndpointForNodeAddsMissingNodeKeySet",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/jointfabric/datastore_chip_test.go",
-      "line": 351
+      "line": 360
     },
     {
       "package": "cluster/jointfabric",
       "identifier": "TestAddGroupIDToEndpointForNodeIsIdempotentForDuplicateAssignments",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/jointfabric/datastore_chip_test.go",
-      "line": 370
+      "line": 379
     },
     {
       "package": "cluster/jointfabric",
       "identifier": "TestAddGroupKeySetEntryOwnsSpanData",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/jointfabric/datastore_chip_test.go",
-      "line": 230
+      "line": 239
     },
     {
       "package": "cluster/jointfabric",
@@ -9616,7 +9700,7 @@
       "identifier": "TestAddPendingNodeNotifiesListener",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/jointfabric/datastore_chip_test.go",
-      "line": 184
+      "line": 193
     },
     {
       "package": "cluster/jointfabric",
@@ -9676,6 +9760,41 @@
     },
     {
       "package": "cluster/jointfabric",
+      "identifier": "TestEndpointBindingSyncAppendsToFetchedList",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/jointfabric/datastore_endpoint_sync_test.go",
+      "line": 93
+    },
+    {
+      "package": "cluster/jointfabric",
+      "identifier": "TestEndpointBindingSyncCommandPushesAfterAnswer",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/jointfabric/datastore_endpoint_sync_test.go",
+      "line": 191
+    },
+    {
+      "package": "cluster/jointfabric",
+      "identifier": "TestEndpointBindingSyncFetchFailureLeavesPending",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/jointfabric/datastore_endpoint_sync_test.go",
+      "line": 158
+    },
+    {
+      "package": "cluster/jointfabric",
+      "identifier": "TestEndpointBindingSyncRemovesByTarget",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/jointfabric/datastore_endpoint_sync_test.go",
+      "line": 118
+    },
+    {
+      "package": "cluster/jointfabric",
+      "identifier": "TestEndpointBindingSyncSerialisesPushesPerEndpoint",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/jointfabric/datastore_endpoint_sync_test.go",
+      "line": 208
+    },
+    {
+      "package": "cluster/jointfabric",
       "identifier": "TestErrorDuringStagePropagatesToCompletion",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/jointfabric/commissionee_chip_test.go",
@@ -9721,7 +9840,7 @@
       "identifier": "TestMarkEntryCommittedIfFound",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/jointfabric/datastore_chip_test.go",
-      "line": 589
+      "line": 635
     },
     {
       "package": "cluster/jointfabric",
@@ -9735,7 +9854,7 @@
       "identifier": "TestOnFabricRemovedWipesDatastoreOnlyForAnchorFabric",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/jointfabric/datastore_chip_test.go",
-      "line": 545
+      "line": 591
     },
     {
       "package": "cluster/jointfabric",
@@ -9819,49 +9938,49 @@
       "identifier": "TestRefreshNodeFetchesGroupKeySetsAndCommitsNode",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/jointfabric/datastore_chip_test.go",
-      "line": 318
+      "line": 327
     },
     {
       "package": "cluster/jointfabric",
       "identifier": "TestRefreshNonExistentNodeFails",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/jointfabric/datastore_chip_test.go",
-      "line": 206
+      "line": 215
     },
     {
       "package": "cluster/jointfabric",
       "identifier": "TestRemoveAclIteratorUseAfterFree",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/jointfabric/datastore_chip_test.go",
-      "line": 498
+      "line": 539
     },
     {
       "package": "cluster/jointfabric",
       "identifier": "TestRemoveBindingIteratorUseAfterFree",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/jointfabric/datastore_chip_test.go",
-      "line": 480
+      "line": 513
     },
     {
       "package": "cluster/jointfabric",
       "identifier": "TestRemoveBindingSyncsDeletePendingPayload",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/jointfabric/datastore_chip_test.go",
-      "line": 420
+      "line": 429
     },
     {
       "package": "cluster/jointfabric",
       "identifier": "TestRemoveGroupIdFromEndpointSyncsDeletePendingEntries",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/jointfabric/datastore_chip_test.go",
-      "line": 380
+      "line": 389
     },
     {
       "package": "cluster/jointfabric",
       "identifier": "TestRemoveListenerPreventsNotification",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/jointfabric/datastore_chip_test.go",
-      "line": 195
+      "line": 204
     },
     {
       "package": "cluster/jointfabric",
@@ -9903,28 +10022,28 @@
       "identifier": "TestUpdateGroupWithNullStoredGroupCATSucceeds",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/jointfabric/datastore_chip_test.go",
-      "line": 302
+      "line": 311
     },
     {
       "package": "cluster/jointfabric",
       "identifier": "TestUpdateGroupWithNullStoredGroupCATVersionSucceeds",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/jointfabric/datastore_chip_test.go",
-      "line": 310
+      "line": 319
     },
     {
       "package": "cluster/jointfabric",
       "identifier": "TestUpdateGroupWithNullStoredGroupKeySetIDSucceeds",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/jointfabric/datastore_chip_test.go",
-      "line": 294
+      "line": 303
     },
     {
       "package": "cluster/jointfabric",
       "identifier": "TestUpdateNodeChangesFriendlyNameAndNotifiesListener",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/jointfabric/datastore_chip_test.go",
-      "line": 214
+      "line": 223
     },
     {
       "package": "cluster/jointfabric",
@@ -32023,7 +32142,7 @@
       "identifier": "AttestationChain",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 181
+      "line": 200
     },
     {
       "package": "node",
@@ -32037,7 +32156,7 @@
       "identifier": "BDXResponder",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 197
+      "line": 216
     },
     {
       "package": "node",
@@ -32051,21 +32170,21 @@
       "identifier": "CapabilityMinimaStruct",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 169
+      "line": 188
     },
     {
       "package": "node",
       "identifier": "CommissionerControlServer",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 200
+      "line": 219
     },
     {
       "package": "node",
       "identifier": "CommissioningApprover",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 163
+      "line": 182
     },
     {
       "package": "node",
@@ -32093,7 +32212,7 @@
       "identifier": "DeviceTypeValidationMode",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 175
+      "line": 194
     },
     {
       "package": "node",
@@ -32107,7 +32226,7 @@
       "identifier": "DiscoveryNames",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 203
+      "line": 222
     },
     {
       "package": "node",
@@ -32128,7 +32247,7 @@
       "identifier": "GeneralDiagnosticsFeatures",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 172
+      "line": 191
     },
     {
       "package": "node",
@@ -32167,17 +32286,24 @@
     },
     {
       "package": "node",
+      "identifier": "NTPClient",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "node/facade.go",
+      "line": 139
+    },
+    {
+      "package": "node",
       "identifier": "OTAApplier",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 157
+      "line": 163
     },
     {
       "package": "node",
       "identifier": "OTAApplyPolicy",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 148
+      "line": 154
     },
     {
       "package": "node",
@@ -32191,14 +32317,21 @@
       "identifier": "OTAConsent",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 142
+      "line": 148
     },
     {
       "package": "node",
       "identifier": "OTAConsentState",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 145
+      "line": 151
+    },
+    {
+      "package": "node",
+      "identifier": "OTADownloadProtocol",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "node/facade.go",
+      "line": 166
     },
     {
       "package": "node",
@@ -32206,6 +32339,13 @@
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/routes.go",
       "line": 31
+    },
+    {
+      "package": "node",
+      "identifier": "OTAHTTPClient",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "node/facade.go",
+      "line": 169
     },
     {
       "package": "node",
@@ -32233,21 +32373,21 @@
       "identifier": "OTAImageSource",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 139
+      "line": 145
     },
     {
       "package": "node",
       "identifier": "OTAPeer",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 151
+      "line": 157
     },
     {
       "package": "node",
       "identifier": "OTAProviderServer",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 194
+      "line": 213
     },
     {
       "package": "node",
@@ -32261,7 +32401,7 @@
       "identifier": "OTAUpdateStatus",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 154
+      "line": 160
     },
     {
       "package": "node",
@@ -32289,7 +32429,7 @@
       "identifier": "ReverseCommissioner",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 166
+      "line": 185
     },
     {
       "package": "node",
@@ -32310,7 +32450,7 @@
       "identifier": "SessionParameters",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 191
+      "line": 210
     },
     {
       "package": "node",
@@ -32360,6 +32500,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "node/attestation_internal_test.go",
       "line": 111
+    },
+    {
+      "package": "node",
+      "identifier": "TestBuildOtaRequestorTransferProtocols",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "node/ota_owner_internal_test.go",
+      "line": 60
     },
     {
       "package": "node",
@@ -32415,7 +32562,7 @@
       "identifier": "TestOtaApplierCloseWaitsForTheRestart",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "node/ota_owner_internal_test.go",
-      "line": 18
+      "line": 21
     },
     {
       "package": "node",
@@ -32496,6 +32643,13 @@
     },
     {
       "package": "node",
+      "identifier": "TimePeerReader",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "node/facade.go",
+      "line": 142
+    },
+    {
+      "package": "node",
       "identifier": "TimeSynchronizationConfig",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
@@ -32520,14 +32674,14 @@
       "identifier": "WiFiReporter",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 160
+      "line": 179
     },
     {
       "package": "node",
       "identifier": "WindowStatus",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 178
+      "line": 197
     },
     {
       "package": "schema",
@@ -36566,28 +36720,28 @@
       "identifier": "TestBtpSessionClosesAtMinimumSegmentSize",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/btp/session_parity_matterjs_test.go",
-      "line": 815
+      "line": 818
     },
     {
       "package": "transport/btp",
       "identifier": "TestBtpSessionClosesOncePeerSentAnything",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/btp/session_parity_matterjs_test.go",
-      "line": 930
+      "line": 933
     },
     {
       "package": "transport/btp",
       "identifier": "TestBtpSessionClosesWhenNobodyObservesStall",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/btp/session_parity_matterjs_test.go",
-      "line": 806
+      "line": 809
     },
     {
       "package": "transport/btp",
       "identifier": "TestBtpSessionClosesWhenOnlyStandaloneAckUnanswered",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/btp/session_parity_matterjs_test.go",
-      "line": 916
+      "line": 919
     },
     {
       "package": "transport/btp",
@@ -36622,7 +36776,7 @@
       "identifier": "TestBtpSessionFailedWriteNeverReplays",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/btp/session_parity_matterjs_test.go",
-      "line": 826
+      "line": 829
     },
     {
       "package": "transport/btp",
@@ -36643,14 +36797,14 @@
       "identifier": "TestBtpSessionKeepsOfferedSegmentSize",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/btp/session_parity_matterjs_test.go",
-      "line": 1023
+      "line": 1026
     },
     {
       "package": "transport/btp",
       "identifier": "TestBtpSessionLateWriteFailureAfterStall",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/btp/session_parity_matterjs_test.go",
-      "line": 989
+      "line": 992
     },
     {
       "package": "transport/btp",
@@ -36664,7 +36818,7 @@
       "identifier": "TestBtpSessionNoAckForMessageWhoseHandlerClosed",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/btp/session_parity_matterjs_test.go",
-      "line": 858
+      "line": 861
     },
     {
       "package": "transport/btp",
@@ -36706,7 +36860,7 @@
       "identifier": "TestBtpSessionNothingWrittenAfterCloseDuringStandaloneAck",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/btp/session_parity_matterjs_test.go",
-      "line": 877
+      "line": 880
     },
     {
       "package": "transport/btp",
@@ -36783,7 +36937,7 @@
       "identifier": "TestBtpSessionStopsWritingSuspendedFragments",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/btp/session_parity_matterjs_test.go",
-      "line": 953
+      "line": 956
     },
     {
       "package": "transport/btp",

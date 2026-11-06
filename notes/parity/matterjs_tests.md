@@ -4,22 +4,22 @@
 
 # matter.js tests: the porting register
 
-matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` → `matter.sourceCommit`): 588 test files under `packages/general/test` and `packages/model/test` and `packages/node/test` and `packages/nodejs/test` and `packages/protocol/test` and `packages/thread-br-client/test` and `packages/types/test`.
+matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` → `matter.sourceCommit`): 590 test files under `packages/general/test` and `packages/model/test` and `packages/node/test` and `packages/nodejs/test` and `packages/nodejs-ble/test` and `packages/protocol/test` and `packages/thread-br-client/test` and `packages/types/test`.
 Out of the roots, each for its reason: `packages/matter.js` (the umbrella package and its legacy controller API,
-MatterController and PairedNode, whose behaviour the protocol and node roots hold), `packages/nodejs-ble` (Node.js BLE
-bindings over noble; the module's BLE is its own Go transport), `packages/nodejs-ws` (a WebSocket transport the module
-does not have), `packages/testing` (matter.js's test harness) and `support/codegen` (its TypeScript tooling).
+MatterController and PairedNode, whose behaviour the protocol and node roots hold), `packages/nodejs-ws` (a WebSocket
+transport the module does not have), `packages/testing` (matter.js's test harness) and `support/codegen` (its TypeScript
+tooling). `packages/nodejs-ble/test` is in the roots since phase 39: its channel's BTP renegotiation is ported.
 `ported`: the Go tests cover the file's `it` cases; `partial`: they cover some, the note names the rest;
 `planned`: not ported yet; `excluded`: left out, with its class. A `ported` or `partial` note's "Left"
 names the `it` cases that will not be ported, each with its class and reason. The guard is `make testparity-check`.
 
 | status | files |
 | --- | ---: |
-| ported | 157 |
+| ported | 158 |
 | partial | 138 |
 | planned | 2 |
-| excluded | 291 |
-| total | 588 |
+| excluded | 292 |
+| total | 590 |
 
 ## Per directory
 
@@ -128,6 +128,7 @@ names the `it` cases that will not be ported, each with its class and reason. Th
 | [nodejs/test/net](#nodejstestnet) | 5 | 0 | 0 | 0 | 5 |
 | [nodejs/test/storage](#nodejsteststorage) | 6 | 0 | 0 | 0 | 6 |
 | [nodejs/test/storage/sqlite](#nodejsteststoragesqlite) | 1 | 0 | 0 | 0 | 1 |
+| [nodejs-ble/test](#nodejs-bletest) | 2 | 1 | 0 | 0 | 1 |
 | [protocol/test/action](#protocoltestaction) | 1 | 0 | 1 | 0 | 0 |
 | [protocol/test/action/client](#protocoltestactionclient) | 5 | 3 | 2 | 0 | 0 |
 | [protocol/test/action/client/subscription](#protocoltestactionclientsubscription) | 2 | 0 | 2 | 0 | 0 |
@@ -1049,6 +1050,13 @@ names the `it` cases that will not be ported, each with its class and reason. Th
 | file | lines | status | Go tests or class | note |
 | --- | ---: | --- | --- | --- |
 | SqliteUtilTest.ts | 68 | excluded | `js-runtime-only` | SQLite helpers of matter.js's Node.js storage driver; the host owns persistence. |
+
+## nodejs-ble/test
+
+| file | lines | status | Go tests or class | note |
+| --- | ---: | --- | --- | --- |
+| NobleBleChannelTest.ts | 1138 | ported | `controller/ble:TestNobleBleChannelAttMtuSettle`<br>`controller/ble:TestNobleBleChannelRenegotiation`<br>`controller/ble:TestNobleBleChannelRenegotiationLoss` | controller/ble/channel_parity_matterjs_test.go ports the ATT_MTU settle wait and the BTP renegotiation after a stall by meaning (phase 39): the bletest peripheral's Stall and Faults play handshakeOnlyMatterService, a synctest bubble on clocktest plays MockTime, a goroutine the parked send. The left cases are noble's connect handling, the platform's behind the ble.Central seam, and one recorded difference. Left: “retries a connect reported as failed and gives up after three attempts” (js-runtime-only: noble's connect retries, interview and abort handling in NobleBleCentralInterface.openChannel (NobleBleChannel.ts:91-517): the platform's, behind the ble.Central seam — ble/bluez and ble/esphome connect on their own stacks and carry their own tests); “reports the last connect error as cause” (js-runtime-only: noble's connect retries, interview and abort handling in NobleBleCentralInterface.openChannel (NobleBleChannel.ts:91-517): the platform's, behind the ble.Central seam — ble/bluez and ble/esphome connect on their own stacks and carry their own tests); “retries a connect error reported as an Error instance” (js-runtime-only: noble's connect retries, interview and abort handling in NobleBleCentralInterface.openChannel (NobleBleChannel.ts:91-517): the platform's, behind the ble.Central seam — ble/bluez and ble/esphome connect on their own stacks and carry their own tests); “connects a peripheral a previous call left in the failed state” (js-runtime-only: noble's connect retries, interview and abort handling in NobleBleCentralInterface.openChannel (NobleBleChannel.ts:91-517): the platform's, behind the ble.Central seam — ble/bluez and ble/esphome connect on their own stacks and carry their own tests); “bounds the attempts when the connect error is reported from within connectAsync” (js-runtime-only: noble's connect retries, interview and abort handling in NobleBleCentralInterface.openChannel (NobleBleChannel.ts:91-517): the platform's, behind the ble.Central seam — ble/bluez and ble/esphome connect on their own stacks and carry their own tests); “continues with the connected peripheral once a retried connect succeeds” (js-runtime-only: noble's connect retries, interview and abort handling in NobleBleCentralInterface.openChannel (NobleBleChannel.ts:91-517): the platform's, behind the ble.Central seam — ble/bluez and ble/esphome connect on their own stacks and carry their own tests); “retries a link that drops while connecting and reports the disconnect reason as cause” (js-runtime-only: noble's connect retries, interview and abort handling in NobleBleCentralInterface.openChannel (NobleBleChannel.ts:91-517): the platform's, behind the ble.Central seam — ble/bluez and ble/esphome connect on their own stacks and carry their own tests); “keeps the peripheral reserved while a retry started from the interview runs” (js-runtime-only: noble's connect retries, interview and abort handling in NobleBleCentralInterface.openChannel (NobleBleChannel.ts:91-517): the platform's, behind the ble.Central seam — ble/bluez and ble/esphome connect on their own stacks and carry their own tests); “rejects without connecting when the abort signal is already set” (js-runtime-only: noble's connect retries, interview and abort handling in NobleBleCentralInterface.openChannel (NobleBleChannel.ts:91-517): the platform's, behind the ble.Central seam — ble/bluez and ble/esphome connect on their own stacks and carry their own tests); “stops retrying when the abort signal fires between attempts” (js-runtime-only: noble's connect retries, interview and abort handling in NobleBleCentralInterface.openChannel (NobleBleChannel.ts:91-517): the platform's, behind the ble.Central seam — ble/bluez and ble/esphome connect on their own stacks and carry their own tests); “leaves no abort listener behind once the attempts end” (js-runtime-only: noble's connect retries, interview and abort handling in NobleBleCentralInterface.openChannel (NobleBleChannel.ts:91-517): the platform's, behind the ble.Central seam — ble/bluez and ble/esphome connect on their own stacks and carry their own tests); “disconnects the peripheral when the abort lands during the interview” (js-runtime-only: noble's connect retries, interview and abort handling in NobleBleCentralInterface.openChannel (NobleBleChannel.ts:91-517): the platform's, behind the ble.Central seam — ble/bluez and ble/esphome connect on their own stacks and carry their own tests); “cancels a pending connect when the abort lands before the peripheral answers” (js-runtime-only: noble's connect retries, interview and abort handling in NobleBleCentralInterface.openChannel (NobleBleChannel.ts:91-517): the platform's, behind the ble.Central seam — ble/bluez and ble/esphome connect on their own stacks and carry their own tests); “rejects rather than throws when a disconnect-driven retry races the interface closing” (js-runtime-only: noble's connect retries, interview and abort handling in NobleBleCentralInterface.openChannel (NobleBleChannel.ts:91-517): the platform's, behind the ble.Central seam — ble/bluez and ble/esphome connect on their own stacks and carry their own tests); “closes a channel that completes after the caller aborted” (js-runtime-only: noble's connect retries, interview and abort handling in NobleBleCentralInterface.openChannel (NobleBleChannel.ts:91-517): the platform's, behind the ble.Central seam — ble/bluez and ble/esphome connect on their own stacks and carry their own tests); “bounds a disconnect that never completes after a failed channel setup” (js-runtime-only: noble leaves a disconnect pending for a vanished peripheral, so matter.js bounds it (BLE_DISCONNECT_TIMEOUT); a Go Connection.Disconnect returns, and a platform that cannot is the platform module's concern); “raises an abort during the unsubscribe that follows a handshake timeout” (by-design: the cleanup unsubscribe after a handshake timeout runs on a context that outlives the caller's and Dial reports ErrHandshakeTimeout, not the abort (BD-Matter-BTP-RenegotiationAfterStall)). |
+| ScanControlTest.ts | 286 | excluded | `js-runtime-only` | ScanControl keeps noble's radio scan where BleScanner wants it, one radio call at a time (ScanControl.ts:24-30): the platform's scan arbitration behind the ble.Central seam (StartScanning, StopScanning), which ble/bluez and ble/esphome implement on their own stacks. |
 
 ## protocol/test/action
 

@@ -5,6 +5,7 @@ package jointfabric
 
 import (
 	"context"
+	"fmt"
 	"slices"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
@@ -702,7 +703,7 @@ func (d *Datastore) addBindingLocked(nodeID uint64, endpointID uint16, binding B
 	d.t.Bindings = append(d.t.Bindings, entry)
 	d.markLocked(dsdef.AttrEndpointBindingList)
 	*p = append(*p, func(ctx context.Context) error { // :1943-1952
-		if err := d.sync.SyncBinding(ctx, nodeID, entry); err != nil {
+		if err := d.pushBinding(ctx, nodeID, entry); err != nil {
 			return err
 		}
 		d.commit(ctx, func() {
@@ -742,7 +743,7 @@ func (d *Datastore) removeBindingLocked(listID uint16, nodeID uint64, endpointID
 	d.markLocked(dsdef.AttrEndpointBindingList)
 	e := d.t.Bindings[i]
 	*p = append(*p, func(ctx context.Context) error { // :1970-1981
-		if err := d.sync.SyncBinding(ctx, nodeID, e); err != nil {
+		if err := d.pushBinding(ctx, nodeID, e); err != nil {
 			return err
 		}
 		d.commit(ctx, func() {
@@ -754,6 +755,54 @@ func (d *Datastore) removeBindingLocked(listID uint16, nodeID uint64, endpointID
 		})
 		return nil
 	})
+	return nil
+}
+
+// pushBinding carries one binding entry to its node as the endpoint's
+// whole list (SyncEndpointBindings), merged as connectedhomeip's
+// jf-admin-app delegate merges the one entry chip's datastore hands it
+// (examples/jf-admin-app/linux/JFADatastoreSync.cpp:1706-1757 at
+// 6170af84): the endpoint's current bindings are fetched (:1717-1719), a
+// DeletePending entry removes the entries whose target matches
+// (:1731-1741, the fields BindingMatches compares), any other entry is
+// appended (:1744), and the list is written (:1747). A fetch that fails is
+// the push's error, so the entry stays Pending or DeletePending for the
+// next RefreshNode — jf-admin-app writes the one entry over an empty list
+// instead (:1726-1730 at 6170af84), which would drop the node's other
+// bindings. chip's datastore pushes the one entry through the delegate's
+// single-entry overload (JointFabricDatastore.cpp:1944, :1970 at
+// 6170af84) and leaves the merge to the delegate; here the module merges,
+// so every host writes a list and the port has no single-entry write
+// (owner decision 2026-11-06). The fetch, the merge and the write run
+// under the lock of the node's endpoint, so two pushes to one endpoint —
+// a host call beside a command's push, or two commands' — cannot both
+// merge into the list read before the other wrote; jf-admin-app's
+// fetch-then-write has the same race in principle, two SyncNode calls in
+// flight each fetching before either wrote (JFADatastoreSync.cpp:1706-1757
+// at 6170af84).
+func (d *Datastore) pushBinding(ctx context.Context, nodeID uint64, e EndpointBindingEntry) error {
+	unlock, err := d.lockEndpoint(ctx, bindingEndpoint{node: nodeID, endpoint: e.EndpointId})
+	if err != nil {
+		return fmt.Errorf("binding list of node %d endpoint %d: %w", nodeID, e.EndpointId, err)
+	}
+	defer unlock()
+	current, err := d.sync.FetchEndpointBindingList(ctx, nodeID, e.EndpointId)
+	if err != nil {
+		return fmt.Errorf("FetchEndpointBindingList: %w", err)
+	}
+	merged := make([]EndpointBindingEntry, 0, len(current)+1)
+	if e.StatusEntry.State == stateDeletePending {
+		for _, c := range current {
+			if !bindingMatches(c.Binding, e.Binding) {
+				merged = append(merged, c)
+			}
+		}
+	} else {
+		merged = append(append(merged, current...), e)
+	}
+	if err := d.sync.SyncEndpointBindings(ctx, nodeID, e.EndpointId, merged); err != nil {
+		return fmt.Errorf("SyncEndpointBindings: %w", err)
+	}
 	return nil
 }
 

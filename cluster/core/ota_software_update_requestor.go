@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"log/slog"
 	"math/rand/v2"
+	"net/http"
 	"path/filepath"
 	"slices"
 	"sync"
@@ -19,6 +20,7 @@ import (
 	"github.com/SukramJ/go-fabric/clock"
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/cluster/spec"
+	provdef "github.com/SukramJ/go-fabric/cluster/spec/otasoftwareupdateprovider"
 	otadef "github.com/SukramJ/go-fabric/cluster/spec/otasoftwareupdaterequestor"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
@@ -29,8 +31,8 @@ import (
 
 // OTASoftwareUpdateRequestor is the OTA Software Update Requestor (0x002A)
 // on the root endpoint: it asks the OTA providers it knows for a newer
-// image, downloads one over BDX, has the host apply it and reports the
-// outcome (ADR 0019).
+// image, downloads one over BDX — or over HTTPS where the host announces
+// it — has the host apply it and reports the outcome (ADR 0019).
 //
 // Mirrors matter.js packages/node/src/behaviors/
 // ota-software-update-requestor/OtaSoftwareUpdateRequestorServer.ts, rule
@@ -45,9 +47,9 @@ import (
 //   - The download location (:201-217, a blob "ota-<vendor>-<product>" in
 //     the node's BDX store) is the file of that name in a host-provided
 //     directory, written through a temporary file ([bdx.FileSink]).
-//   - HTTPS downloads (#handleHttpsDownload, :1008-1062) are not ported:
-//     the requestor offers BDX only, matter.js's default
-//     transferProtocolsSupported (:1372).
+//   - An HTTPS download (#handleHttpsDownload, :1008-1062) goes through
+//     the host's [OtaHTTPClient] and is bounded in size and time, which
+//     matter.js's fetch is not (BD-Matter-OTARequestor-HTTPS).
 //   - DefaultOTAProviders is fabric-scoped, which spec.Server refuses
 //     (spec.ErrFabricScoped), so the server is built on [spec.Instance] as
 //     EcosystemInformation is.
@@ -119,6 +121,28 @@ type OTARequestorConfig struct {
 	// CanConsent says the host can ask the user for consent (:1381,
 	// default false).
 	CanConsent bool
+	// TransferProtocols are the download protocols QueryImage announces
+	// (transferProtocolsSupported, :1367-1372); empty is BDX synchronous
+	// alone, matter.js's default. Add [DownloadProtocolHTTPS] only where
+	// the node reaches the image hosts, as matter.js advises there. A list
+	// without [DownloadProtocolBDXSynchronous] does not conform and is
+	// refused, as is another protocol.
+	TransferProtocols []DownloadProtocol
+	// HTTPClient sends the GET of an HTTPS download; *http.Client
+	// implements it. nil is the module's client: http.DefaultTransport,
+	// and a redirect followed only to an https:// target, ten at most. A
+	// host's client — proxy, TLS roots — keeps its own redirect policy,
+	// so the https-only rule is the host's to set there.
+	HTTPClient OtaHTTPClient
+	// HTTPSMaxImageSize caps the bytes an HTTPS download takes; 0 is
+	// 256 MiB. A larger answer fails the download.
+	HTTPSMaxImageSize int64
+	// HTTPSIdleTimeout is how long an HTTPS download may receive nothing —
+	// from the request to the response, and between two reads of its body
+	// — on TimeSource; 0 is 60 seconds. A download stalled that long
+	// fails. It bounds no total time: a slow link that keeps delivering
+	// finishes.
+	HTTPSIdleTimeout time.Duration
 	// UpdateQueryInterval is how often a provider is queried (:1365,
 	// default 24 h).
 	UpdateQueryInterval time.Duration
@@ -154,6 +178,30 @@ type OtaNodeInformation struct {
 // node initiates (matter.js #connectOtaProviderFor, :553-565).
 type OtaProviderConnector interface {
 	ConnectOtaProvider(ctx context.Context, fabricIndex uint8, providerNodeID uint64) (OtaProviderSession, error)
+}
+
+// DownloadProtocol is a protocol of [OTARequestorConfig].TransferProtocols:
+// the OTA provider cluster's DownloadProtocolEnum.
+type DownloadProtocol = provdef.DownloadProtocolEnum
+
+// The download protocols the requestor implements.
+const (
+	// DownloadProtocolBDXSynchronous is a BDX download from the provider,
+	// the protocol every requestor supports.
+	DownloadProtocolBDXSynchronous = provdef.DownloadProtocolBdxSynchronous
+	// DownloadProtocolHTTPS is a download from the https:// URI the
+	// provider names.
+	DownloadProtocolHTTPS = provdef.DownloadProtocolHttps
+)
+
+// OtaHTTPClient sends the GET of an HTTPS download (matter.js's fetch,
+// :1009); *http.Client implements it. The request carries the download's
+// context, which ends when the download stalls for
+// [OTARequestorConfig].HTTPSIdleTimeout. Its redirect policy is its own:
+// only the module's client, used when [OTARequestorConfig].HTTPClient is
+// nil, refuses a redirect to a target other than https://.
+type OtaHTTPClient interface {
+	Do(req *http.Request) (*http.Response, error)
 }
 
 // OtaProviderSession is a secure session with a provider.
@@ -255,6 +303,13 @@ const (
 	otaCommissionedQueryDelay = 30 * time.Second
 )
 
+// The bounds of an HTTPS download, which matter.js's fetch does not set
+// (BD-Matter-OTARequestor-HTTPS); [OTARequestorConfig] overrides both.
+const (
+	defaultOtaHTTPSMaxImageSize = 256 << 20
+	defaultOtaHTTPSIdleTimeout  = 60 * time.Second
+)
+
 // scheduleReason is ScheduleReason (:89-95).
 type scheduleReason uint8
 
@@ -327,6 +382,29 @@ func NewOTASoftwareUpdateRequestor(cfg OTARequestorConfig) (*OTASoftwareUpdateRe
 	}
 	if cfg.MinimumApplyDelay <= 0 {
 		cfg.MinimumApplyDelay = 2 * time.Minute
+	}
+	for _, p := range cfg.TransferProtocols {
+		if p != DownloadProtocolBDXSynchronous && p != DownloadProtocolHTTPS {
+			return nil, fmt.Errorf("core: OTA requestor cannot download over protocol %d", p)
+		}
+	}
+	if len(cfg.TransferProtocols) == 0 {
+		cfg.TransferProtocols = []DownloadProtocol{DownloadProtocolBDXSynchronous}
+	} else if !slices.Contains(cfg.TransferProtocols, DownloadProtocolBDXSynchronous) {
+		// matter.js's query carries BDX synchronous by default
+		// (OtaSoftwareUpdateRequestorServer.ts:1367-1372 at 862ad75f).
+		return nil, errors.New("core: OTA requestor TransferProtocols must include DownloadProtocolBDXSynchronous")
+	} else {
+		cfg.TransferProtocols = slices.Clone(cfg.TransferProtocols)
+	}
+	if cfg.HTTPClient == nil {
+		cfg.HTTPClient = otaDefaultHTTPClient(nil)
+	}
+	if cfg.HTTPSMaxImageSize <= 0 {
+		cfg.HTTPSMaxImageSize = defaultOtaHTTPSMaxImageSize
+	}
+	if cfg.HTTPSIdleTimeout <= 0 {
+		cfg.HTTPSIdleTimeout = defaultOtaHTTPSIdleTimeout
 	}
 	r := &OTASoftwareUpdateRequestor{
 		Instance:       otaRequestorInst,

@@ -8,9 +8,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/SukramJ/go-fabric/client/handshake"
 	"github.com/SukramJ/go-fabric/client/interaction"
-	"github.com/SukramJ/go-fabric/client/peer"
 	"github.com/SukramJ/go-fabric/cluster/jointfabric"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	jfadef "github.com/SukramJ/go-fabric/cluster/spec/jointfabricadministrator"
@@ -36,23 +34,13 @@ type commissionerReach struct{ n *Node }
 
 var _ jointfabric.CommissionerReach = commissionerReach{}
 
-// errNoClientStack is a reach without the node's client stack.
-var errNoClientStack = errors.New("node: the commissioner reach needs Config.Client")
+// errNoClientStack is a reach of a peer without the node's client stack:
+// the commissioner reach's, or the time client's.
+var errNoClientStack = errors.New("node: reaching a peer needs Config.Client")
 
 // interaction opens the interaction with the peer, connecting first.
 func (r commissionerReach) interaction(ctx context.Context, p jointfabric.CommissionerPeer) (*interaction.Interaction, error) {
-	set := r.n.Peers()
-	if set == nil {
-		return nil, errNoClientStack
-	}
-	pr, err := set.For(handshake.PeerAddress{FabricIndex: p.FabricIndex, NodeID: p.NodeID}) //nolint:contextcheck // the peer runs on the peer set's context, not the invoke's
-	if err != nil {
-		return nil, fmt.Errorf("node: commissioner %d:%#x: %w", p.FabricIndex, p.NodeID, err)
-	}
-	if _, err := pr.Connect(ctx, peer.ConnectOptions{}); err != nil {
-		return nil, fmt.Errorf("node: commissioner %d:%#x: %w", p.FabricIndex, p.NodeID, err)
-	}
-	return interaction.ForPeer(pr, interaction.Config{Logger: r.n.logger, Clock: r.n.cfg.Clock}), nil
+	return r.n.peerInteraction(ctx, p.FabricIndex, p.NodeID)
 }
 
 // read reads one attribute unfiltered and returns its value; a status in

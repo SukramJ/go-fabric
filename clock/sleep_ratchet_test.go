@@ -36,7 +36,7 @@ import (
 // commit, so the count only falls.
 const (
 	sleepRatchet = 66
-	afterRatchet = 130
+	afterRatchet = 128
 )
 
 // TestSleepRatchet counts the wall-clock waits in every *_test.go of the

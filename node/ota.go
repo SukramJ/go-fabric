@@ -243,6 +243,11 @@ func buildOtaRequestor(cfg *Config, connector mattercore.OtaProviderConnector, b
 		CanConsent:      ota.harness,
 		Logger:          cfg.Logger,
 		TimeSource:      cfg.Clock,
+
+		TransferProtocols: ota.TransferProtocols,
+		HTTPClient:        ota.HTTPClient,
+		HTTPSMaxImageSize: ota.HTTPSMaxImageSize,
+		HTTPSIdleTimeout:  ota.HTTPSIdleTimeout,
 	}
 	switch {
 	case ota.AnnouncedUpdateQueryDelay != nil:
