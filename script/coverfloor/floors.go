@@ -100,8 +100,8 @@ var floors = []packageFloor{
 	{pkg: "github.com/SukramJ/go-fabric/conformance", min: 93},
 	{
 		pkg: "github.com/SukramJ/go-fabric/controller",
-		min: 79,
-		why: "the composition root: New, Close and the refusals of Pair are tested here; the commissioning Pair hands to Registry.Commission is covered in controller/client. 79, not 80, since 2026-11-04: CI measured 79.8 (run 41854166274, the Leave mini-fix, which did not touch the package) while five local runs measured 80.9-81.1 — the floor sat within the package's timing-dependent point; the flake pass (#383) revisits",
+		min: 80,
+		why: "the composition root: New, Close and the refusals of Pair are tested here; the commissioning Pair hands to Registry.Commission is covered in controller/client. 79 since 2026-11-04: CI measured 79.8 (run 41854166274, the Leave mini-fix, which did not touch the package) while five local runs measured 80.9-81.1 — the floor sat within the package's timing-dependent point; the flake pass (#383) revisits. 80 since pin lift wave P2 (#431): a local run measured 82.2, more than 3 points above 79; 80, not the 82 the check names, keeps the margin for CI's timing-dependent point",
 	},
 	{pkg: "github.com/SukramJ/go-fabric/controller/attestation", min: 92},
 	{pkg: "github.com/SukramJ/go-fabric/controller/ble", min: 90},
