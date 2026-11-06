@@ -31,10 +31,10 @@ const gdSupportedTrigger = uint64(0x1234)
 
 // gdDevice is createDevice: the server with key configured (nil: none) and
 // a trigger handler that supports gdSupportedTrigger and records it.
-func gdDevice(t *testing.T, key []byte) (*core.GeneralDiagnostics, *[]uint64) {
+func gdDevice(t *testing.T, key []byte) (g *core.GeneralDiagnostics, triggered *[]uint64) {
 	t.Helper()
-	g := core.NewGeneralDiagnostics(core.BootReasonPowerOnReboot)
-	triggered := &[]uint64{}
+	g = core.NewGeneralDiagnostics(core.BootReasonPowerOnReboot)
+	triggered = &[]uint64{}
 	if key != nil {
 		if err := g.EnableTestEventTriggers(key, func(_ context.Context, trigger uint64) error {
 			if trigger != gdSupportedTrigger {
@@ -67,7 +67,7 @@ func gdTrigger(t *testing.T, g *core.GeneralDiagnostics, key []byte, trigger uin
 	return gdStatus(t, err)
 }
 
-func gdPayload(t *testing.T, g *core.GeneralDiagnostics, key []byte, count uint16, value uint8) (im.StatusCode, []byte) {
+func gdPayload(t *testing.T, g *core.GeneralDiagnostics, key []byte, count uint16, value uint8) (status im.StatusCode, payload []byte) {
 	t.Helper()
 	resp, err := g.MatterInvoke(context.Background(), 0x03, map[uint8]any{0: key, 1: uint64(value), 2: uint64(count)})
 	if err != nil {

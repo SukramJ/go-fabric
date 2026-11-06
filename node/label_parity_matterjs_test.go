@@ -247,7 +247,7 @@ var (
 // TestUserLabelServerParity ports UserLabelServerTest.ts at db021da0: the
 // UserLabel server (UserLabelServer.ts at db021da0) behind a commissioned
 // device, written as a controller writes it.
-func TestUserLabelServerParity(t *testing.T) {
+func TestUserLabelServerParity(t *testing.T) { //nolint:tparallel // each subtest commissions a device on the shared test site; parallel subtests would wait for a site slot this test holds
 	t.Parallel()
 
 	// "writes within the limit" (UserLabelServerTest.ts:131-170).
@@ -446,7 +446,7 @@ func (lp *labelPair) fixedStored() []fixedlabeldef.LabelStruct {
 // TestFixedLabelServerParity ports FixedLabelServerTest.ts at db021da0: the
 // FixedLabel server, which has no logic of its own (FixedLabelServer.ts:14
 // at db021da0), behind a commissioned device.
-func TestFixedLabelServerParity(t *testing.T) {
+func TestFixedLabelServerParity(t *testing.T) { //nolint:tparallel // each subtest commissions a device on the shared test site; parallel subtests would wait for a site slot this test holds
 	t.Parallel()
 
 	// LabelList is "R V" (FixedLabelServerTest.ts:36).

@@ -383,8 +383,9 @@ func TestMdnsServerTransport(t *testing.T) {
 		w.setFail(nil)
 		broadcastKey(r)
 		clk.Advance(2 * time.Second)
-		var types []string
-		for _, rr := range goodbyesOf(w.take(), gbWindow) {
+		goodbyes := goodbyesOf(w.take(), gbWindow)
+		types := make([]string, 0, len(goodbyes))
+		for _, rr := range goodbyes {
 			types = append(types, dns.TypeToString[rr.Header().Rrtype])
 		}
 		sort.Strings(types)

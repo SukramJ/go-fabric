@@ -172,7 +172,7 @@ func (r *Responder) goodbyesLocked(st *linkState, lr *linkRecords, now time.Time
 		}
 	}
 	slices.SortFunc(keys, func(a, b string) int { return cmp.Compare(st.peers[a].seq, st.peers[b].seq) })
-	var out []dns.RR
+	out := make([]dns.RR, 0, len(keys))
 	for _, key := range keys {
 		p := st.peers[key]
 		g := dns.Copy(p.rr)
@@ -228,7 +228,9 @@ func (r *Responder) publishLocked(ifIndex int, services map[string]bool, all boo
 	// RFC 6762 §8.3: every record in the answer section. Goodbyes first,
 	// so a resolver that applies the TXT records of a packet in order ends
 	// on the new one (InterfaceResponder.ts:478-483 at db021da0).
-	answers := append(goodbye, sendable(announced, complete, false)...)
+	answers := make([]dns.RR, 0, len(goodbye)+len(announced))
+	answers = append(answers, goodbye...)
+	answers = append(answers, sendable(announced, complete, false)...)
 	if rc := r.sendLocked(splitResponse(0, answers, nil), ifIndex, nil); rc != reachAll && len(goodbye) > 0 {
 		r.logger().Debug("mdns.responder.goodbye_not_sent", slog.Int("iface", ifIndex))
 	}

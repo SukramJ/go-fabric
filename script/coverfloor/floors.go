@@ -237,6 +237,7 @@ var floors = []packageFloor{
 	{pkg: "github.com/SukramJ/go-fabric/internal/fabrictestseam", min: 0, why: "function variables only: fabrictest installs them, the module's tests call them (review 2026-11 W5-ex-12)"},
 	{pkg: "github.com/SukramJ/go-fabric/internal/forward", min: 100},
 	{pkg: "github.com/SukramJ/go-fabric/internal/inflight", min: 100},
+	{pkg: "github.com/SukramJ/go-fabric/internal/netwatch", min: 92},
 	{pkg: "github.com/SukramJ/go-fabric/internal/serialqueue", min: 97},
 	{
 		pkg: "github.com/SukramJ/go-fabric/internal/deviceseam",

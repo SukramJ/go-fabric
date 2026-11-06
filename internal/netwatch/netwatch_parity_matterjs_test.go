@@ -77,7 +77,7 @@ func (h *fakeHost) remove(name string) {
 	h.mu.Unlock()
 }
 
-func (h *fakeHost) state() (int, [][]string) {
+func (h *fakeHost) state() (listings int, emitted [][]string) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	return h.listings, slices.Clone(h.emitted)
