@@ -2385,6 +2385,11 @@
       "steps": 18,
       "stepsSkipped": 0
     },
+    "TSTAT/4.3": {
+      "tests": 1,
+      "steps": 19,
+      "stepsSkipped": 4
+    },
     "TSUIC/2.1": {
       "steps": 3,
       "stepsSkipped": 1
@@ -3883,7 +3888,6 @@
     "TIMESYNC/2.7": "TIMESYNC.S.F00",
     "TIMESYNC/2.8": "TIMESYNC.S.F00",
     "TIMESYNC/2.9": "TIMESYNC.S.F00",
-    "TSTAT/4.3": "TSTAT.S \u0026 TSTAT.S.F08 \u0026 TSTAT.S.F0a",
     "TSTAT/4.4": "TSTAT.S \u0026 TSTAT.S.F0b",
     "WNCV/6.1.Simulated": "WNCV.C",
     "WNCV/7.1.Simulated": "WNCV.C",
