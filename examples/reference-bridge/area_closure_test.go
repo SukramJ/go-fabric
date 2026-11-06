@@ -104,13 +104,11 @@ func TestPanelUnlatchesAndMoves(t *testing.T) {
 	if panel.DeviceType != closure.DeviceTypeClosurePanel {
 		t.Fatalf("panel advertises 0x%04X", panel.DeviceType)
 	}
-	// The one departure is the Descriptor's TAGLIST, which ClosurePanel
-	// marks mandatory (matter.js closure-panel-device.element.ts:16) and
-	// the module's Descriptor does not serve — by_design.md
-	// BD-Matter-ClosureWithoutTagList, the garage's Closure endpoint's
-	// departure as well.
+	// The panel opts into the Descriptor's TAGLIST, which ClosurePanel
+	// marks mandatory (matter.js closure-panel-device.element.ts:16), so
+	// it meets its device type without a departure.
 	for _, v := range endpoint.ValidateDeviceTypes(br.Topology()) {
-		if v.Endpoint == panel.ID && v.Requirement != "Descriptor.TAGLIST" {
+		if v.Endpoint == panel.ID {
 			t.Errorf("device type violation: %s", v)
 		}
 	}
