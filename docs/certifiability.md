@@ -169,6 +169,7 @@ Harness image: `ghcr.io/sukramj/go-fabric-chip@sha256:e443ea0c1b91478720ee8b94c3
 | BRBINFO | 5 | 1 | 0 | 0 | 3 | 1 | 0 |
 | CADMIN | 21 | 13 | 0 | 0 | 0 | 8 | 0 |
 | CGEN | 10 | 3 | 0 | 0 | 7 | 0 | 0 |
+| CGENTC | 10 | 10 | 0 | 0 | 0 | 0 | 0 |
 | CNET | 23 | 2 | 0 | 0 | 12 | 4 | 5 |
 | CNETWIFI | 23 | 6 | 0 | 0 | 11 | 6 | 0 |
 | DA | 13 | 4 | 0 | 0 | 5 | 4 | 0 |
@@ -299,7 +300,7 @@ Harness image: `ghcr.io/sukramj/go-fabric-chip@sha256:e443ea0c1b91478720ee8b94c3
 | TBRM | 5 | 3 | 0 | 0 | 1 | 1 | 0 |
 | DGTHREAD | 6 | 4 | 0 | 0 | 1 | 1 | 0 |
 | THNETDIR | 3 | 3 | 0 | 0 | 0 | 0 | 0 |
-| **all** | **829** | **549** | **0** | **2** | **135** | **138** | **5** |
+| **all** | **839** | **559** | **0** | **2** | **135** | **138** | **5** |
 
 ### Cases not run
 
@@ -730,6 +731,20 @@ per-device credentials stay classified in the table above. TC-EEVSE-2.3
 runs too: its eleventh ChargingTarget is the server's RESOURCE_EXHAUSTED,
 as chip answers (`BD-chip-EVSE-TargetsServerHeld`). No class (a) case is
 left.
+
+CGEN runs twice as well (phase 38). The `CGEN` row is the default
+composition, which serves no terms and conditions, so TC-CGEN-2.5 to 2.11
+are not applicable there. The `CGENTC` row runs the same cases against the
+daemon with `--tc-required`: GeneralCommissioning's TermsAndConditions
+feature (`CGEN.S.F00=1`, register row
+`BD-chip-GeneralCommissioning-TermsAndConditions`), version 1 with
+acknowledgement bit 1 required, the values connectedhomeip's CI starts its
+terms-and-conditions app with, with PICS generated from that daemon
+(`internal/chiptool/testdata/pics-tc/`). Its commissioned snapshots
+acknowledge the terms during commissioning, as a TC-aware commissioner
+does; TC-CGEN-2.5 to 2.11 commission the factory-fresh daemon themselves
+with the PIXITs from their CI arguments. TC-CGEN-2.8 and 2.9 stop at their
+factory-reset prompt, as in chip's CI.
 
 The second compositions (phase 34) run the same way, each family against
 the daemon variant that serves its clusters, with PICS generated from that

@@ -577,10 +577,13 @@ func commissionedSnapshot(ctx context.Context, t *testing.T, h *harness, bin str
 	switch kind {
 	case "py":
 		cctx, cancel := context.WithTimeout(ctx, 3*time.Minute)
-		out, err := h.execIn(cctx, dir, "python3", "/src/python_testing/hello_test.py", "--commission-only",
+		args := []string{
+			"python3", "/src/python_testing/hello_test.py", "--commission-only",
 			"--paa-trust-store-path", chipPAATrustStore,
 			"--commissioning-method", "on-network",
-			"--discriminator", strconv.Itoa(dutDiscriminator), "--passcode", strconv.Itoa(dutPasscode))
+			"--discriminator", strconv.Itoa(dutDiscriminator), "--passcode", strconv.Itoa(dutPasscode),
+		}
+		out, err := h.execIn(cctx, dir, append(args, tcCommissioningArgs("py")...)...)
 		cancel()
 		if err != nil || !strings.Contains(out, "Commissioning complete for node ID 0x0000000012344321: success") {
 			br.dump(t)
@@ -592,7 +595,7 @@ func commissionedSnapshot(ctx context.Context, t *testing.T, h *harness, bin str
 			t.Fatal(err)
 		}
 		_ = os.Chmod(ctl.storageDir, 0o777) //nolint:gosec // as above
-		out, err := ctl.pair(ctx, t, pairTargetHost, br.info.port, br.info.passcode)
+		out, err := ctl.pair(ctx, t, pairTargetHost, br.info.port, br.info.passcode, tcCommissioningArgs("yaml")...)
 		if err != nil || !commissioningComplete(out) {
 			br.dump(t)
 			t.Fatalf("chip-tool commissioning for the YAML snapshot stopped at %s: %v", handshakeStage(out), err)
@@ -806,6 +809,38 @@ func tail(s string, n int) string {
 		lines = lines[len(lines)-n:]
 	}
 	return strings.Join(lines, "\n")
+}
+
+// tcRevision and tcAcknowledgements are the terms the --tc-required daemon
+// requires, the values connectedhomeip's CI starts its
+// terms-and-conditions app with for the CGEN cases
+// (--tc-min-required-version 1 --tc-required-acknowledgements 1,
+// TC_CGEN_2_5.py's CI arguments at 6170af84). A commissioning of that
+// daemon acknowledges them (tcCommissioningArgs), or CommissioningComplete
+// answers TCAcknowledgementsNotReceived.
+const (
+	tcRevision         = "1"
+	tcAcknowledgements = "1"
+)
+
+// tcCommissioningArgs are the arguments a commissioning by the runner adds
+// against the --tc-required daemon (variantTC): the terms acknowledged
+// during commissioning, as a TC-aware commissioner sends
+// SetTCAcknowledgements before CommissioningComplete. kind "py" is the
+// Python TH's (--tc-version-to-simulate / --tc-user-response-to-simulate,
+// matter/testing/runner.py:1075-1077 at 6170af84, which TC_CGEN_2_10.py's
+// CI arguments use too), "yaml" chip-tool's pairing
+// (--tc-acknowledgements / --tc-acknowledgements-version,
+// examples/chip-tool/commands/pairing/PairingCommand.h:274-278 at
+// 6170af84). Empty for every other variant.
+func tcCommissioningArgs(kind string) []string {
+	if daemonVariant != variantTC {
+		return nil
+	}
+	if kind == "yaml" {
+		return []string{"--tc-acknowledgements", tcAcknowledgements, "--tc-acknowledgements-version", tcRevision}
+	}
+	return []string{"--tc-version-to-simulate", tcRevision, "--tc-user-response-to-simulate", tcAcknowledgements}
 }
 
 // monitorRestartFlag implements the CHIP Python harness's restart protocol

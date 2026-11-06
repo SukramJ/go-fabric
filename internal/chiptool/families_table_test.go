@@ -197,6 +197,10 @@ const (
 	// with ThreadNetworkDirectory and the root's ThreadNetworkDiagnostics
 	// (examples/reference-bridge/otbr.go).
 	variantThread = "thread"
+	// variantTC is the daemon with --tc-required: GeneralCommissioning's
+	// TermsAndConditions feature, version 1 with acknowledgement bit 1
+	// required (examples/reference-bridge/surface.go termsAndConditions).
+	variantTC = "tc"
 )
 
 // Device types only a variant's daemon has (variantDeviceTypes).
@@ -432,6 +436,27 @@ var chipFamilies = []family{
 		},
 	},
 	{name: "CGEN"},
+	{
+		// CGEN a second time, against the daemon with --tc-required
+		// (GeneralCommissioning's TermsAndConditions feature, CGEN.S.F00=1,
+		// register row BD-chip-GeneralCommissioning-TermsAndConditions):
+		// phase 38. The default run above keeps the certified composition
+		// (no TC). The commissioned snapshots acknowledge the terms as a
+		// TC-aware commissioner does (tcCommissioningArgs), so 2.1, 2.2 and
+		// 2.4 run on them. TC-CGEN-2.5 to 2.11 commission the factory-fresh
+		// daemon themselves, as connectedhomeip's CI runs them against its
+		// terms-and-conditions app (factory-reset: true,
+		// --in-test-commissioning-method on-network): their PIXITs
+		// (FailsafeExpiryLengthSeconds 900, TCRevision 1,
+		// RequiredTCAcknowledgements 1) and 2.10's --tc-version-to-simulate
+		// come from the descriptor's script-args, which the runner passes
+		// on (scriptArgs). 2.8 and 2.9 stop at their factory-reset prompt
+		// under PICS_USER_PROMPT=0, as in CHIP's CI.
+		name: "CGENTC", cases: "CGEN", variant: variantTC,
+		uncommissioned: map[string]bool{
+			"2.5": true, "2.6": true, "2.7": true, "2.8": true, "2.9": true, "2.10": true, "2.11": true,
+		},
+	},
 	{
 		name: "CNET",
 		// The Wi-Fi cases the descriptor gates on CNET.S.F00 are not

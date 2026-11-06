@@ -520,6 +520,56 @@
       "steps": 1,
       "stepsSkipped": 0
     },
+    "CGENTC/2.1": {
+      "tests": 1,
+      "steps": 8,
+      "stepsSkipped": 0
+    },
+    "CGENTC/2.10": {
+      "tests": 1,
+      "steps": 8,
+      "stepsSkipped": 0
+    },
+    "CGENTC/2.11": {
+      "tests": 1,
+      "steps": 7,
+      "stepsSkipped": 0
+    },
+    "CGENTC/2.2": {
+      "tests": 1,
+      "steps": 48,
+      "stepsSkipped": 12
+    },
+    "CGENTC/2.4": {
+      "tests": 1,
+      "steps": 1,
+      "stepsSkipped": 0
+    },
+    "CGENTC/2.5": {
+      "tests": 1,
+      "steps": 12,
+      "stepsSkipped": 0
+    },
+    "CGENTC/2.6": {
+      "tests": 1,
+      "steps": 2,
+      "stepsSkipped": 0
+    },
+    "CGENTC/2.7": {
+      "tests": 1,
+      "steps": 7,
+      "stepsSkipped": 0
+    },
+    "CGENTC/2.8": {
+      "tests": 1,
+      "steps": 11,
+      "stepsSkipped": 12
+    },
+    "CGENTC/2.9": {
+      "tests": 1,
+      "steps": 8,
+      "stepsSkipped": 4
+    },
     "CHANNEL/5.1": {
       "steps": 2,
       "stepsSkipped": 0
@@ -2798,6 +2848,18 @@
       "2.1"
     ],
     "CGEN": [
+      "2.1",
+      "2.2",
+      "2.4",
+      "2.5",
+      "2.6",
+      "2.7",
+      "2.8",
+      "2.9",
+      "2.10",
+      "2.11"
+    ],
+    "CGENTC": [
       "2.1",
       "2.2",
       "2.4",
