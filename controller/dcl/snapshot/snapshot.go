@@ -228,7 +228,7 @@ func (s *Snapshot) AcceptsTestCertificates() bool { return false }
 // CDSigner implements [attestation.PAAStore]: a seeded CD signer counts
 // only if the CSA CD root issued it for skid — the seed is a cache whose
 // certificates are checked on use, as lookupCdSigner checks a stored one
-// (dcl/DclCertificateService.ts:935-940 at db021da0).
+// (dcl/DclCertificateService.ts:918-970 at db021da0).
 func (s *Snapshot) CDSigner(skid []byte) (*ecdsa.PublicKey, bool) {
 	der, ok := s.cdSigners[strings.ToUpper(hex.EncodeToString(skid))]
 	if !ok {

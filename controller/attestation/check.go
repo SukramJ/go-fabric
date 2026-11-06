@@ -8,9 +8,9 @@ package attestation
 // matter.js's.
 type Check string
 
-// The checks, DeviceAttestationValidator.ts:32-93 at db021da0, without the
-// deprecated CdSignerVerificationSkipped (:81-82 at db021da0), which
-// matter.js no longer emits.
+// The checks, DeviceAttestationValidator.ts:32-93 at db021da0, without
+// CdSignerVerificationSkipped (:81-82 at db021da0), which matter.js keeps
+// for compatibility but no longer emits.
 const (
 	PaaNotTrusted                            Check = "PaaNotTrusted"
 	CertificateChainInvalid                  Check = "CertificateChainInvalid"

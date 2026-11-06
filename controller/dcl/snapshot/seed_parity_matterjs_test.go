@@ -168,7 +168,7 @@ func TestDclCertificateServiceSeed(t *testing.T) {
 		}
 		// Consumed, but a PAA's certificate is no CD signer: it counts
 		// only if it verifies (lookupCdSigner, dcl/
-		// DclCertificateService.ts:935-940 at db021da0).
+		// DclCertificateService.ts:918-970 at db021da0).
 		if _, cds := snap.Len(); cds != 1 {
 			t.Fatal("the CD signer stream was not consumed")
 		}

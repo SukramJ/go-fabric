@@ -148,8 +148,8 @@ func (e *certEncoding) critical(name string) bool {
 	return false
 }
 
-// readEncoding reads a certificate's encoding — parseAsn1Certificate's
-// version (Certificate.ts:698-706 at db021da0) and parseExtensions
+// readEncoding reads a certificate's encoding — the version
+// parseAsn1Certificate reads (Certificate.ts:667-706 at db021da0) and parseExtensions
 // (:431-596 at db021da0): an extension it does not interpret is skipped
 // whatever its encoding, an interpreted one needs its value OCTET STRING,
 // a critical flag or cA is a one-byte BOOLEAN, a pathLen an INTEGER with
@@ -290,11 +290,12 @@ func keyUsageBits(bitString []byte) uint32 {
 	return bits
 }
 
-// requiredExtensions is Certificate.REQUIRED_PAA_EXTENSIONS and
-// REQUIRED_EXTENSIONS (Certificate.ts:385-388 at db021da0) as each kind
-// requires them: a DAC and a PAI leave basic constraints out, whose
-// absence is a profile violation (DAC_PAI_REQUIRED_EXTENSIONS,
-// AttestationCertificates.ts:65-73 at db021da0).
+// requiredExtensions lists the extensions each kind requires. They are
+// Certificate.REQUIRED_PAA_EXTENSIONS and REQUIRED_EXTENSIONS
+// (Certificate.ts:385-388 at db021da0), except that a DAC and a PAI
+// leave basic constraints out, whose absence is a profile violation
+// (DAC_PAI_REQUIRED_EXTENSIONS, AttestationCertificates.ts:65-73 at
+// db021da0).
 func requiredExtensions(kind certKind, acceptProfileViolation bool) []string {
 	switch {
 	case kind == kindPAA && acceptProfileViolation:
@@ -308,8 +309,8 @@ func requiredExtensions(kind certKind, acceptProfileViolation bool) []string {
 	}
 }
 
-// checkRequiredExtensions is the required extensions check of
-// parseExtensions (Certificate.ts:589-593 at db021da0): an extension is
+// checkRequiredExtensions is the required extensions check that closes
+// parseExtensions (Certificate.ts:431-596 at db021da0): an extension is
 // missing unless the DER carries it and its value reads — a key usage
 // BIT STRING with content, a key identifier.
 func checkRequiredExtensions(kind certKind, acceptProfileViolation bool, enc *certEncoding) error {
