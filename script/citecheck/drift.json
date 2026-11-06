@@ -956,7 +956,7 @@
   },
   {
     "file": "cluster/core/general_commissioning.go",
-    "line": 1046,
+    "line": 1109,
     "citation": "packages/node/src/behaviors/general-commissioning/GeneralCommissioningServer.ts:55-66",
     "resolved": "packages/node/src/behaviors/general-commissioning/GeneralCommissioningServer.ts",
     "at": "862ad75f",
@@ -1390,7 +1390,7 @@
   },
   {
     "file": "cluster/thermo/thermostat_server.go",
-    "line": 250,
+    "line": 266,
     "citation": "packages/node/src/behaviors/thermostat/ThermostatServer.ts:594-601",
     "resolved": "packages/node/src/behaviors/thermostat/ThermostatServer.ts",
     "identifier": "systemMode",
@@ -1399,7 +1399,7 @@
   },
   {
     "file": "cluster/thermo/thermostat_server.go",
-    "line": 300,
+    "line": 316,
     "citation": "ThermostatServer.ts:219-220",
     "resolved": "packages/node/src/behaviors/thermostat/ThermostatServer.ts",
     "identifier": "SetpointRaiseLower",
@@ -1408,7 +1408,7 @@
   },
   {
     "file": "cluster/thermo/thermostat_server.go",
-    "line": 1100,
+    "line": 1126,
     "citation": "ThermostatServer.ts:614",
     "resolved": "packages/node/src/behaviors/thermostat/ThermostatServer.ts",
     "at": "0ceb202d",
@@ -1418,7 +1418,7 @@
   },
   {
     "file": "cluster/thermo/thermostat_server.go",
-    "line": 1365,
+    "line": 1399,
     "citation": "thermostat-cluster.element.ts:510-514",
     "resolved": "packages/model/src/standard/elements/thermostat-cluster.element.ts",
     "identifier": "SetpointRaiseLowerModeEnum",
@@ -1427,7 +1427,7 @@
   },
   {
     "file": "cluster/thermo/thermostat_server.go",
-    "line": 1504,
+    "line": 1538,
     "citation": "ThermostatServer.ts:219-220",
     "resolved": "packages/node/src/behaviors/thermostat/ThermostatServer.ts",
     "at": "0ceb202d",
@@ -1437,7 +1437,7 @@
   },
   {
     "file": "cluster/thermo/thermostat_server.go",
-    "line": 1679,
+    "line": 1713,
     "citation": "thermostat-cluster.element.ts:322-323",
     "resolved": "packages/model/src/standard/elements/thermostat-cluster.element.ts",
     "identifier": "SetpointRaiseLower",
@@ -1473,7 +1473,7 @@
   },
   {
     "file": "contract/matter.go",
-    "line": 683,
+    "line": 766,
     "citation": "packages/node/src/behaviors/thermostat/ThermostatServer.ts:451",
     "resolved": "packages/node/src/behaviors/thermostat/ThermostatServer.ts",
     "identifier": "reactTo",
