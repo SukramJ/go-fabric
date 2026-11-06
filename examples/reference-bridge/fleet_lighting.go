@@ -34,6 +34,16 @@ const (
 	lightInitialMireds uint16 = 370
 )
 
+// The extended colour light's two primaries, the sRGB red (0.64, 0.33)
+// and green (0.30, 0.60) in the attributes' unit (the coordinate × 65536);
+// the red one states its intensity, the green one leaves it null. They
+// make NumberOfPrimaries 2, so TC-CC-2.1 reads Primary1 and Primary2.
+const (
+	primaryRedX, primaryRedY     uint16 = 41943, 21627
+	primaryGreenX, primaryGreenY uint16 = 19661, 39322
+	primaryRedIntensity          uint8  = 254
+)
+
 // lightingSurface is what turns a [dimmer] into a colour-temperature light:
 // the LevelControl Lighting attributes and the colour temperature (the
 // OnOff Lighting state is the device layer's default OnOff server). The
@@ -85,7 +95,7 @@ func newDemoColorLight(name string) *dimmer {
 // path, where the device is assumed to ramp natively.
 //
 // The extended colour light is the same surface with every ColorControl
-// feature: hue and saturation, enhanced hue, the colour loop, x/y and the
+// feature and two primaries: hue and saturation, enhanced hue, the colour loop, x/y and the
 // colour temperature all step on the engine, and [lampColorWriter] receives
 // the whole colour in whichever mode — the CHIP ColorControl family runs
 // against it (TC-CC-3.x to 9.x). ScenesManagement is the assembler's: the
@@ -103,6 +113,9 @@ func (s *dimmer) lightingDeclarations() []device.Declaration {
 	if s.lighting.extended {
 		color.Features = extendedColorFeatures
 		color.ColorWriter = lampColorWriter{name: s.name}
+		rx, ry, gx, gy, ri := primaryRedX, primaryRedY, primaryGreenX, primaryGreenY, primaryRedIntensity
+		color.Initial.Primary1X, color.Initial.Primary1Y, color.Initial.Primary1Intensity = &rx, &ry, &ri
+		color.Initial.Primary2X, color.Initial.Primary2Y = &gx, &gy
 	}
 	return []device.Declaration{levelcontroldef.Declare{LevelSource: s, Transitions: true}, color}
 }
