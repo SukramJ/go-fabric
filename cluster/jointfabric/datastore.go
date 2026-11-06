@@ -250,7 +250,8 @@ func (d *Datastore) lockEndpoint(ctx context.Context, k bindingEndpoint) (func()
 	d.bindingMu.Unlock()
 	drop := func() {
 		d.bindingMu.Lock()
-		if l.refs--; l.refs == 0 {
+		l.refs--
+		if l.refs == 0 {
 			delete(d.bindingLocks, k)
 		}
 		d.bindingMu.Unlock()

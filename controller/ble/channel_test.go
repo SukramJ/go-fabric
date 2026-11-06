@@ -178,7 +178,7 @@ func TestChannelClosesWhenPeripheralDrops(t *testing.T) {
 // event leaves the unsubscribe or the handshake write pending, and the
 // renegotiation fails within the bound, closing the channel.
 func TestRenegotiationBoundsItsGATTCalls(t *testing.T) {
-	message := []byte{0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99}
+	payload := []byte{0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99}
 	small := []byte{0xaa, 0xbb}
 	cases := []struct {
 		name  string
@@ -195,7 +195,7 @@ func TestRenegotiationBoundsItsGATTCalls(t *testing.T) {
 				peer := newStallPeer(btp.MinimumATTMTU)
 				tc.fault(&peer.p.Faults)
 				ch := peer.dial(t, clock)
-				stall(t, clock, ch, peer, message)
+				stall(t, clock, ch, peer, payload)
 				parked := parkSend(ch, small)
 				synctest.Wait()
 				if isClosed(ch.Closed()) {
