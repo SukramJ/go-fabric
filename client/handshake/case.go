@@ -213,7 +213,7 @@ func (c *caseClient) pair(ctx context.Context) (*exchange.Session, ResumptionRec
 		s, rec, err := c.resume(ctx, init, record, sessionID, msg.Payload)
 		return s, rec, true, err
 	case mrp.SCOpcodeSigma2:
-		s, rec, err := c.full(ctx, init, record, sessionID, msg.Payload)
+		s, rec, err := c.full(ctx, init, sessionID, msg.Payload)
 		return s, rec, false, err
 	default:
 		// CaseMessenger.ts:46-59 (readSigma2).
@@ -268,7 +268,7 @@ func (c *caseClient) resume(ctx context.Context, init *sigma.Initiator, record *
 }
 
 // full is the Sigma2 branch, CaseClient.ts:234-367.
-func (c *caseClient) full(ctx context.Context, init *sigma.Initiator, record *ResumptionRecord, sessionID uint16, raw []byte) (*exchange.Session, ResumptionRecord, error) {
+func (c *caseClient) full(ctx context.Context, init *sigma.Initiator, sessionID uint16, raw []byte) (*exchange.Session, ResumptionRecord, error) {
 	sigma2, err := sigma.UnmarshalSigma2(raw)
 	if err != nil {
 		return nil, ResumptionRecord{}, fmt.Errorf("%w: malformed Sigma2: %w", ErrUnexpectedData, err)

@@ -316,7 +316,7 @@ func TestDERDistinguishedNameEdges(t *testing.T) {
 	if want := []uint8{1, 8, dnTagMatterNodeID, dnTagStandardLast, 8, dnTagMatterFabricID, 1, dnTagStandardLast}; !slices.Equal(dn.Order, want) { // commonName 1, organizationalUnitName 8
 		t.Fatalf("Order = %v, want %v", dn.Order, want)
 	}
-	var values []string
+	values := make([]string, 0, len(dn.Attributes))
 	for _, a := range dn.Attributes {
 		values = append(values, a.Value)
 	}
