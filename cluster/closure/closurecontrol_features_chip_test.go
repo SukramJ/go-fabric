@@ -415,6 +415,16 @@ func TestClosureControlStateReadsRenderAlike(t *testing.T) {
 	if after, _ := s.MatterRead(clusterwire.ClosureControlAttrOverallCurrentState); fmt.Sprintf("%#v", struct{ V any }{before}) == fmt.Sprintf("%#v", struct{ V any }{after}) {
 		t.Error("a changed OverallCurrentState renders as before")
 	}
+	// An equal state set again — fresh pointers from the drive — renders
+	// as the state before (bridge pathValues keeps an older rendering as
+	// its baseline).
+	deref := func(v any) string { return fmt.Sprintf("%#v", *v.(*clusterwire.ClosureOverallCurrentState)) }
+	again, _ := s.MatterRead(clusterwire.ClosureControlAttrOverallCurrentState)
+	s.SetCurrentLatch(ptr(true))
+	s.SetCurrentSpeed(closuredef.ThreeLevelAutoAuto)
+	if now, _ := s.MatterRead(clusterwire.ClosureControlAttrOverallCurrentState); deref(again) != deref(now) {
+		t.Errorf("an equal state renders differently: %s / %s", deref(again), deref(now))
+	}
 	for _, id := range []uint32{clusterwire.ClosureControlAttrOverallCurrentState, clusterwire.ClosureControlAttrOverallTargetState} {
 		// The bridge renders the value wrapped (im.AttributeValue), so a
 		// pointer renders as its address.

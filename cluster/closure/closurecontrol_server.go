@@ -821,15 +821,37 @@ func (s *ControlServer) setCurrent(r currentReport) {
 
 // refreshLocked rebuilds the views MatterRead answers the two state
 // structs with. Caller holds s.mu for writing.
+//
+// The views' fields point at interned values ([interned]): the bridge's
+// change detection renders a value with %#v, which prints a nested
+// pointer as its address, so equal states must share their pointers to
+// render alike — also against a baseline rendered before the state was
+// last replaced by an equal one (bridge pathValues).
 func (s *ControlServer) refreshLocked() {
 	lt := s.has(wire.ClosureControlFeatureMotionLatching)
 	s.currentView = &wire.ClosureOverallCurrentState{
-		Position: s.currentPosition, SecureState: s.secureState,
-		Latch: s.currentLatch, HasLatch: lt, Speed: s.currentSpeed,
+		Position: interned(s.currentPosition), SecureState: interned(s.secureState),
+		Latch: interned(s.currentLatch), HasLatch: lt, Speed: interned(s.currentSpeed),
 	}
 	s.targetView = &wire.ClosureOverallTargetState{
-		Position: s.targetPosition, Latch: s.targetLatch, HasLatch: lt, Speed: s.targetSpeed,
+		Position: interned(s.targetPosition), Latch: interned(s.targetLatch), HasLatch: lt, Speed: interned(s.targetSpeed),
 	}
+}
+
+// internTable holds one pointer per value of the small types the state
+// structs carry, so equal values share an address.
+var internTable sync.Map // map[any]any: the value → its pointer
+
+// interned is the shared pointer of *p's value; nil for nil.
+func interned[T comparable](p *T) *T {
+	if p == nil {
+		return nil
+	}
+	v, _ := internTable.LoadOrStore(*p, copyOf(p))
+	if t, ok := v.(*T); ok {
+		return t
+	}
+	return p
 }
 
 // secureLocked derives SecureState, "the closure is in a position that
