@@ -182,7 +182,7 @@ func (p *sessionProvider) Session() *exchange.Session   { return p.s }
 func (p *sessionProvider) Manager() *exchange.Manager   { return p.mgr }
 
 // PeerProvider is the provider over peer p — matter.js
-// PeerExchangeProvider (packages/protocol/src/peer/PeerExchangeProvider.ts:19-163):
+// PeerExchangeProvider (packages/protocol/src/peer/PeerExchangeProvider.ts:19-159):
 // each exchange runs on the peer's newest session, connecting first
 // unless RequireExistingSession is set (:73-150), reachability is the
 // peer's (:69-71).
@@ -267,7 +267,7 @@ func (p *peerProvider) MaximumPeerResponseTime(ept time.Duration, includeSending
 		return exchange.ReliableMaxPeerResponseTime(ept)
 	}
 	// Our own retransmissions carry the manager's local pad — matter.js
-	// PeerExchangeProvider.ts:152-161 (W4-ctlim-07).
+	// PeerExchangeProvider.ts:150-158 (W4-ctlim-07).
 	mgr := p.p.Exchanges()
 	local := exchange.IntervalsOf(mgr.LocalParameters())
 	pad := mgr.LocalPad()

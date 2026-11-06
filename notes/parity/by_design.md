@@ -99,7 +99,6 @@ pin lift confirms by re-reading the row, [`pin-lifts.md`](./pin-lifts.md)).
 | BD-chip-Thermostat-Schedules | `ThermostatServer.ts:82`, the class doc lists the feature unimplemented (presence; :126-128 warns when it is enabled) | `packages/node/src/behaviors/thermostat/ThermostatServer.ts` | `"MatterScheduleConfiguration: This feature is not implemented yet."` | connectedhomeip `src/app/clusters/thermostat-server/ThermostatClusterSchedules.cpp` at `645b267a` (`SetActiveSchedule` :741, `AppendPendingSchedule` :795, `ValidateScheduleTransitions` :292, `ValidateTransitionsPerDay` :457, the atomic hooks :620-663, `PrecommitSchedules` :1000) | yes |
 | BD-chip-Thermostat-Suggestions | `ThermostatServer.ts:81`, the class doc's list of the features it does not implement (presence, as `BD-chip-Thermostat-Schedules`'; absence: no suggestion text anywhere in the file, 1790 lines) | `packages/node/src/behaviors/thermostat/ThermostatServer.ts` | `"We implement all features beside the following:"` | connectedhomeip `src/app/clusters/thermostat-server/ThermostatClusterSuggestions.cpp` at `6170af84` (`RemoveExpiredSuggestions` :41, `RemoveFromThermostatSuggestionsList` :69, `AddThermostatSuggestion` :160, `RemoveThermostatSuggestion` :249, `ReEvaluateCurrentSuggestion` :271), the reference delegate `examples/thermostat/thermostat-common/src/thermostat-suggestions-delegate-impl.cpp` (`GetUniqueID` :169, `ReEvaluateCurrentSuggestion` :234) | yes |
 | BD-chip-Chime-RulesInServer | `ChimeServer.ts:14` is the empty subclass (absence: the class body, 14 lines in all) | `packages/node/src/behaviors/chime/ChimeServer.ts` | `class ChimeServer` | connectedhomeip `src/app/clusters/chime-server/ChimeCluster.cpp` at `6170af84` (`IsSupportedChimeID` :176, `SetSelectedChime` :215, `SetEnabled` :228, `HandlePlayChimeSound` :258, `GenerateChimeStartedPlayingEvent` :291), tests `tests/TestChimeCluster.cpp` | no |
-| BD-Matter-MessageCodec-PrivacyWithExtensions | `MessageCodec.ts:243-245` refuses a header with both the P and the MX flag (presence: the `NotImplementedError`) | `packages/protocol/src/codec/MessageCodec.ts` | `"Privacy enhancements with message extensions not supported."` | connectedhomeip `src/transport/raw/MessageHeader.cpp:224-232` at `6170af84` (the MX block is skipped whatever the P flag); `transport/message.UnmarshalHeader`, `bridge/privacy.go` `privacyHeaderEnd` (review 2026-11 W1-wire-05) | no |
 | BD-chip-CameraAvSettings-RulesInServer | `CameraAvSettingsUserLevelManagementServer.ts:18` is the empty subclass (absence: the class body, 18 lines in all) | `packages/node/src/behaviors/camera-av-settings-user-level-management/CameraAvSettingsUserLevelManagementServer.ts` | `class CameraAvSettingsUserLevelManagementServer` | connectedhomeip `src/app/clusters/camera-av-settings-user-level-management-server/CameraAvSettingsUserLevelManagementLogic.cpp` at `6170af84` (the handlers :721-1261, `OnPhysicalMovementComplete` :1265, the limit setters :339-407, the DPTZ streams :469-591), tests `tests/TestCameraAvSettingsUserLevelManagementCluster.cpp` | no |
 | BD-chip-CameraAvStreamManagement-RulesInServer | `CameraAvStreamManagementServer.ts:18` is the empty subclass (absence: the class body, 18 lines in all) | `packages/node/src/behaviors/camera-av-stream-management/CameraAvStreamManagementServer.ts` | `class CameraAvStreamManagementServer` | connectedhomeip `src/app/clusters/camera-av-stream-management-server/CameraAVStreamManagementCluster.cpp` at `6170af84` (`Init` :76, the reference counts :486-557, `SetViewport` :1137, the handlers :2065-2669, `IsResourceAvailableForStreamAllocation` :2717), `CameraAVStreamManagementCluster.h` (the delegate :159-372, `ValidateStreamForModifyOrDeallocateImpl` :794), tests `tests/TestCameraAVStreamManagementCluster.cpp` | no |
 | BD-chip-ZoneManagement-RulesInServer | `ZoneManagementServer.ts:14` is the empty subclass (absence: the class body, 14 lines in all) | `packages/node/src/behaviors/zone-management/ZoneManagementServer.ts` | `class ZoneManagementServer` | connectedhomeip `src/app/clusters/zone-management-server/ZoneManagementCluster.cpp` at `6170af84` (`ValidateConfiguration` :85, the Sensitivity write :259-284, the handlers :462-659, the events :701-733), `zone-geometry.h` (`IsZoneSelfIntersecting` :158), tests `tests/TestZoneManagementCluster.cpp`, `tests/TestZonePolygon.cpp` | no |
@@ -566,18 +565,25 @@ module speaks uses AES-CCM-128 with these parameters (Core § 3.6) and none
 uses CMAC, so a configurable mode would add attack surface without a
 caller.
 
-### BD-Matter-MessageCodec-PrivacyWithExtensions — a header with the privacy flag and message extensions is decoded
+### BD-Matter-MessageCodec-PrivacyWithExtensions — a header with the privacy flag and message extensions is decoded (caught up at the db021da0 lift)
 
-matter.js `decodePacket` refuses a packet header that sets both the P and the
-MX flag (`packages/protocol/src/codec/MessageCodec.ts:243-245` at 862ad75f,
+Until the pin lift of 2026-11-06 an *Ahead of matter.js* row: matter.js at
+862ad75f refused a packet header that set both the P and the MX flag
+(`packages/protocol/src/codec/MessageCodec.ts:243-245` at 862ad75f,
 `NotImplementedError("Privacy enhancements with message extensions not
-supported.")`); `transport/message.UnmarshalHeader` reads the MX length after
-the destination and skips the block, and the privacy mask
-(`bridge/privacy.go` `privacyHeaderEnd`) stops before it, so nothing is
-mis-parsed. chip skips the MX block whatever the P flag
-(`src/transport/raw/MessageHeader.cpp:224-232` at 6170af84); matter.js's
-refusal is an unimplemented feature, not a rule, so the header is accepted
-as chip accepts it (W1-wire-05).
+supported.")`), while `transport/message.UnmarshalHeader` reads the MX
+length after the destination and skips the block, and the privacy mask
+(`bridge/privacy.go` `privacyHeaderEnd`) stops before it, as chip does
+(`src/transport/raw/MessageHeader.cpp:224-232` at 6170af84). matter.js
+caught up with #4843 (`fix(protocol): group message decode checks
+GroupKeyMap for the destination group`): `decodeFixedHeader` keeps the
+obfuscated region of a privacy packet and the MX flag
+(`MessageCodec.ts:258-272` at db021da0) and the message extension is read
+length-checked after the fixed header (`:328-340`); a P flag on a unicast
+session is refused "as in the CHIP SDK" (`:251-253`), which the bridge
+already did (`bridge/privacy.go` `maybeUnmaskPrivacy`). The two
+implementations agree; no code moved here. Pinned by `transport/message`'s
+header tests and `bridge/privacy_test.go` (review 2026-11 W1-wire-05).
 
 ### BD-Matter-mDNSDeviceType — commissionable DT advertises RootNode, not Aggregator
 
@@ -1694,6 +1700,12 @@ CAT-scoped controller on the one session that exists right after a restart.
 Pinned by `TestPeerInitiator_FullHandshakeAgainstResponder`.
 
 ---
+
+Caught up at the db021da0 lift (2026-11-06): matter.js #4884 (`fix(protocol):
+CASE sessions we initiate carry the peer's CATs from its NOC`) takes the
+responder's CATs from the NOC in Sigma2 (`CaseClient.ts:282-290` at
+db021da0) and versions its resumption records; the two implementations
+agree, and this entry stays as the record of the earlier difference.
 
 ### BD-Matter-GroupSendOnEveryMulticastInterface — a group message leaves on every interface the listener joined
 

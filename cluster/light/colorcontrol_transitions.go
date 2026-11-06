@@ -209,7 +209,7 @@ func (s *ColorControlServer) write(ctx context.Context, ct ColorTemperatureWrite
 // — the Datasource queues each committed change's notification with its
 // session (Datasource.ts:1473-1476), and a QuietEvent's own observers are
 // not throttled (Events.ts:267-297); on the wire the "Q"
-// attributes follow their quieter rules (ServerBehaviorBacking.ts:265-273)
+// attributes follow their quieter rules (ServerBehaviorBacking.ts:251-259)
 // — a quieter report it defers carries the origin of the last change
 // before it — and the rest go at once.
 func (s *ColorControlServer) report(origin contract.Origin, prev, next colorState) {

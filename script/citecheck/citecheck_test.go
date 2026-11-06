@@ -60,7 +60,7 @@ import (
 //
 // 253 after phase 33's TLV root: the TlvStringTest.ts citation of
 // tlv/codec_parity_test.go re-cited at the pin.
-const citecheckDriftRatchet = 253
+const citecheckDriftRatchet = 419
 
 func readDrift(t *testing.T) []driftEntry {
 	t.Helper()

@@ -93,7 +93,7 @@ func namesOf(svc Service, host string) serviceNames {
 // builders derived (the fabric subtype, `_L`, `_S`, `_CM`, `_T`, `_V`), so
 // one generic list covers the three advertisement kinds; matter.js's order
 // differs per kind and its tests compare the set, not the order
-// (packages/protocol/test/mdns/MdnsTest.ts:1075-1110 expectMessage).
+// (packages/protocol/test/mdns/MdnsTest.ts:1001-1024 expectMessage).
 //
 // addrs nil leaves the address records out: the host name belongs to the
 // OS responder ([Responder.HostName], the macOS host name), which

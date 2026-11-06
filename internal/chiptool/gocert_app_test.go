@@ -44,7 +44,7 @@ func init() {
 }
 
 // readFabrics reads OperationalCredentials.Fabrics unfiltered
-// (TC-CADMIN-1.17.test.ts:67-72) and returns the fabric indices.
+// (tc-cadmin-support.ts:471-478) and returns the fabric indices.
 func (th *goTH) readFabrics(n *client.Node) ([]uint8, error) {
 	ctx, cancel := context.WithTimeout(th.ctx, time.Minute)
 	defer cancel()
@@ -163,7 +163,7 @@ func caseCADMIN117() goCertCase {
 				return nil
 			}},
 			{n: "7", line: 249, title: "DUT_CR1 sends RemoveFabric for TH_CR2's fabric", pics: "OPCREDS.C.C0a.Tx", run: func(th *goTH) error {
-				if cr2Index != 2 { // EXPECTED_CR2_FABRIC_INDEX (TC-CADMIN-1.17.test.ts:40)
+				if cr2Index != 2 { // EXPECTED_CR2_FABRIC_INDEX (tc-cadmin-support.ts:645)
 					return fmt.Errorf("TH_CR2's fabric index is %d, the plan assumes 2 for a dut→th_cr2→th_cr3 order", cr2Index)
 				}
 				r, err := th.invoke(cr[0].node, cmdPath(0, operationalcredentials.ClusterID, operationalcredentials.CmdRemoveFabric),

@@ -24,6 +24,109 @@ behaviour compared, never on the check's finding alone. Owner's work (Fable
 row); the reading map behind each section is a Sonnet `read-*.md` under
 `notes/reference/`, verified line by line before anything landed here.
 
+## 862ad75f → db021da0 (2026-11-06, milestone 10 after phase 39)
+
+63 commits; 17 skipped (9 `[CHIP BUILD]`, 3 version bumps / the 0.18.0
+release, 2 `chore`/`ci`, 3 Dockerfile-only harness images). Map:
+`notes/reference/read-matterjs-delta-db021da0.md`. Model: no change under
+`packages/model/src/standard/elements`, `packages/types/src/clusters` or
+`packages/types/src/globals` — no cluster, attribute, command, event,
+enum, revision or conformance moved; the snapshot's only change is
+`matter.sourceCommit` (and the generators' source line in every generated
+file). A behaviour lift, not the 1.7 pin (roadmap phase 40 waits for
+chip's `data_model/1.7` in matter.js's snapshot). Owner decision
+2026-11-06: the gaps are fixed before `v0.18.0`.
+
+The register's markers at db021da0 (`make ahead-check` against
+`origin/main`): **caught up** —
+`BD-Matter-MessageCodec-PrivacyWithExtensions` (#4843: `decodeFixedHeader`
+keeps the obfuscated region of a privacy packet and the MX flag,
+`MessageCodec.ts:258-272`; the message extension is read length-checked
+after the fixed header, `:328-340`; P on a unicast session refused "as in
+the CHIP SDK", `:251-253`); our parser and the bridge already did the
+same, the row closed, the entry kept as the record. A false alarm —
+`BD-matterjs-server-NetworkTopology`: the absence marker is the body of
+`class NetworkClient`, which #4808 edited (`WaitingForDeviceDiscovery` for
+a peer with no address); no topology service appeared, the row stays and
+its marker is re-read at the new pin. Every other marker holds. Also
+caught up outside the register: `BD-Matter-CaseInitiatorPeerCATs` (#4884,
+the initiator takes the responder's CATs from its NOC, `CaseClient.ts:282-290`).
+
+Citations that resolve at the pin — the bare `path:line` form without an
+`at <sha>` — now resolve at db021da0: 18 pointed beyond the end of a
+shrunken file (hard errors) and were re-read and updated, and the drift
+count of `make cite-check` rose from 253 to 419 (`citecheckDriftRatchet`
+raised in the lift's commit: a citation whose line moved without changing
+what it says drifts, and a lift moves many at once; the drift is worked
+off citation by citation as the files are touched, never by a sweep).
+The 18 hard errors: seven files; re-read and
+updated (`ServerBehaviorBacking.ts` quiet subscription `:251-259` /
+`#configureEventSuppression` `:223-262`, `PeerExchangeProvider.ts:19-159`
+/ `:150-158`, `validateNocTagList` now `Noc.ts:116`, the CADMIN flows in
+`tc-cadmin-support.ts`, `tc-dd-flow-support.ts:72-189`, `MdnsTest.ts`
+`expectMessage` `:1001-1024`, `Rcac.ts:135`).
+
+The matter.js test register (`script/testparity/register.json`) moved with
+the snapshot: 56 entries re-checked against their new blobs (395 new `it`
+cases listed as missing, 30 removed cases pruned, 11 ported files now
+partial), 3 files gone (the WAL cleaner and snapshot tests, the peer
+establishment progress test), 24 new files entered — 6 excluded as JS
+runtime, 18 planned on the lift's waves P1–P4. Ratchets: planned 2 → 20,
+ported 158 → 146, missing 583 → 977, left 593 → 592. The missing cases are
+the waves' port lists.
+
+### Security
+
+| PR | Fix | Verdict | Where |
+| --- | --- | --- | --- |
+| #4884 | the CASE initiator takes the peer's CATs from its NOC in Sigma2 (`CaseClient.ts:282-290`); resumption records versioned | **caught up** | `secure/sigma/initiator.go` `processSigma2`, `client/handshake/resumption.go:36-43` `PeerCATs` (BD-Matter-CaseInitiatorPeerCATs); the record version is a JS storage detail |
+| #4843 | group decode checks GroupKeyMap for the destination group (`GroupSession.ts:37-60`) | **have it** | `groups/decode.go:27-111` (a message belongs to the key set GroupKeyMap maps the group to) |
+| #4843 | the fixed header refuses a group session message with a destination node id (MCSP, `MessageCodec.ts:303`, as chip), and an unsecured unicast message with both or neither of source and destination node id (`:305`) | **gap → lift wave P1** | `transport/message/message.go:133-137` accepts MCSP (`ErrGroupSessionHeader` comment), no unsecured source/destination rule |
+| #4843 | the privacy flag on a unicast message refused (`:251-253`) | **have it** | `bridge/privacy.go` `maybeUnmaskPrivacy` |
+| #4843 | AES-CCM input limits shared by the two crypto implementations | **not applicable** | Go's stdlib AEAD |
+| #4865 | DAC/PAI certificate profile enforced in device attestation: version 2, basic constraints and key usage present and critical, no duplicate extension; PAI cA TRUE + pathLen 0 + keyUsage, DAC cA FALSE (`AttestationCertificates.ts:85-200`, `DacFormatInvalid`/`PaiFormatInvalid`) | **gap → lift wave P2** | `controller/attestation/cert.go:63-65` checks BasicConstraintsValid and KeyUsage != 0 only |
+| #4871 | Certification Declaration validated as chip does: CMS envelope, `format_version` 1, certification type, 20-byte signer SKID (`DeviceAttestationValidator.ts:456-515`); an unknown CD signer is `CdSignerUnknown`, an error, with a built-in trusted-signer set (`CdSigners.ts`) | **gap → lift wave P2** | `controller/attestation/validate.go:120-145` warns `CdSignerVerificationSkipped` and skips the signature; no format checks |
+| #4880 | operational certificates: a repeated single-valued DN field refused (`TlvObject.ts:230`, `DistinguishedName.ts:242-246`); matter-vvs-id (tag 23) decoded in NOC/ICAC/RCAC and refused there; a NOC must list serverAuth (`Noc.ts:148-154`); a VVSC with is-ca false accepted and its extensions checked (`Vvsc.ts`, `VendorIdVerification.ts`) | **gap → lift wave P1** | `secure/mattercert/decode.go:394-409` keeps the last value of a repeated field and skips tag 23; `verify.go:478` accepts serverAuth or clientAuth; the VVSC predicates of `cluster/core/vid_verification.go` to be compared |
+| #4880 | a CAT with version 0 refused; at most three CATs; a CAT id twice refused | **have it** | `secure/mattercert/verify.go:457-470` |
+| #4899 | message counter window edges (tests and comments; the "new" range ends at 2^32-1) | **have it** | `transport/mrp/window.go:12-62`; the edge tests are a parity port candidate (open, low) |
+| #4879 | resumption records and server subscriptions stored per peer | **not applicable** | JS storage layout; `store` keys them by fabric and node already |
+
+### Device side
+
+| PR | Fix | Verdict | Where |
+| --- | --- | --- | --- |
+| #4878 | AdministratorCommissioning: a discriminator above 0xFFF is INVALID_COMMAND in the handler, not CONSTRAINT_ERROR (`AdministratorCommissioningServer.ts:42-46, :91-97`); an open on a session without fabric answers PAKEParameterError; the check order Busy → window → parameters | **gap → lift wave P1** | `bridge/fields_reader_admincomm.go:57-61` (CONSTRAINT_ERROR), `bridge/commissioning_window.go:216, :377-378, :597-603` |
+| #4881 | GeneralDiagnostics: `systemTime()` shared by UpTime and TimeSnapshot.SystemTimeMs, suspend-aware high-water mark (`GeneralDiagnosticsServer.ts:61-86`); TestEventTriggersEnabled derived from the enable key (true iff not all zero, `:144-156`); one gate for TestEventTrigger and PayloadTestRequest | **gap → lift wave P3** | `cluster/core/general_diagnostics.go:376-384, :529-536, :636-683` |
+| #4844 | mDNS goodbyes only for records no remaining advertisement publishes; failed goodbyes retried with backoff (`InterfaceResponder.ts:46-67, :263-280`) | **gap → lift wave P3** | `mdns/announce.go`, `mdns/answer.go:77-111` |
+| #4842 | the responder follows interface address changes (polled every 60 s while observed): rebuilds records, goodbyes removed addresses, announces twice 1 s apart; GeneralDiagnostics re-reads NetworkInterfaces on change (`MdnsServer.ts:288-348`, `GeneralDiagnosticsServer.ts:112-115, :389-401`) | **gap → lift wave P3** | `mdns/responder.go:295-300` has `TriggerReannounce` only; `general_diagnostics.go:53-56, :453` static NetworkInterfaces |
+| #4841 | Thermostat Presets validated against the presets the transaction replaces (built-in and active-removal rules) | **open** — compare `cluster/thermo/atomic.go` with `ThermostatServer.ts` at db021da0 in wave P3 | `cluster/thermo/atomic.go`, `schedules_write.go:59-158` |
+| #4900 | UserLabel and FixedLabel server tests (test-only; any server fix inside them is read in wave P3) | **open (low)** | `cluster/core` label servers |
+| #4795 | a debug line when a node does not advertise because commissioning is disabled | **not applicable** | log only |
+| #4825, #4811, #4841 (rest), #4902 | managed state references, decorator derivation, typings | **not applicable** | JS runtime |
+
+### Controller side
+
+| PR | Fix | Verdict | Where |
+| --- | --- | --- | --- |
+| #4793 | the TCP send path is capped at min(channel, the peer's announced MAX_TCP_MESSAGE_SIZE); an oversized message is `MessageTooLargeError` (`MessageChannel.ts:87-112`, `Session.ts:230-241`) | **gap → lift wave P4** | `secure/sessionparams/sessionparams.go:92-104` has the default, `transport/tcp/conn.go:92-126` the channel cap; no min with the peer's value |
+| #4794 | a Sigma1 the peer never acknowledges is refreshed on a new exchange with a fresh ephemeral key after the MRP transmissions, per address, with the backoff continued (`InitialContactSchedule.ts:1-246`) | **gap → lift wave P4** | `client/handshake/case.go:51-56`, `client/peer/connection.go:842` retransmit the same Sigma1 only |
+| #4832 | delta event timestamps resolved per ReportData message against the previous event of the same clock (`InputChunk.ts:359-412`), `ReadResult.EventValue.resolvedTimestamp` | **gap → lift wave P4** | `client/interaction/report.go:50-51, :409-412` passes the raw delta through |
+| #4808 | a peer with no address at all reports WaitingForDeviceDiscovery (`NetworkClient.ts:541-546`) | **gap (small) → lift wave P4** | `controller/client/network.go:461-507` |
+| #4815 | the fail-safe re-arm between commissioning steps is skipped on a closed session (`ControllerCommissioningFlow.ts:835-849`) | **have it** (the periodic re-arm; the between-steps path is read in wave P4) | `controller/commissioner/network.go:596`, `flow.go:73-74` |
+| #4812 | legacy node enumeration skips unreadable peers | **not applicable** | the JS package's legacy API |
+| #4809 | shell: legacy peer migration | **not applicable** | JS shell |
+
+### Harness
+
+#4792, #4814, #4819, #4820, #4823, #4828, #4845, #4850, #4851, #4852,
+#4853, #4855, #4857, #4866, #4870, #4875, #4876, #4877: cert cases and
+chip-testing adapters of matter.js's own harness — **not applicable**;
+the cases they add (TC-CADMIN-1.1/1.2/1.18, TC-DA-1.3/1.4/1.8, TC-DD-1.9/
+2.2/3.5, TC-CC-x.4/x.5, TC-TSTAT-3.2, TC-DRLK-3.2, TC-OO-3.2, TC-I-3.2,
+TC-MOD-2.2, TC-LOWPOWER-2.2, TC-WNCV-6.1/7.1, TC-DGETH/DGSW/DGTHREAD/DGWIFI
+3.x) are the Go-TH leg's next candidates (`internal/chiptool/gocert_*`),
+tracked in `docs/certifiability.md`.
+
 ## Milestone 6 (2026-10-28, wave 27-C) — what the next lift re-reads
 
 No lift; the pin stays `862ad75f`. Milestone 6 added 18 rows to the

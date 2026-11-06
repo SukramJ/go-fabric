@@ -110,7 +110,7 @@ func buildRCACProbe(t *testing.T, pubKey []byte, o rcacBuildOpts, now uint64) []
 // one NotBefore will not verify against a cert re-serialised with a
 // different one. matter.js keeps this invariant by signing and
 // returning the same in-memory object (Certificate.ts:101
-// signEcdsa(key, this.asUnsignedDer()); Rcac.ts:140 verifies
+// signEcdsa(key, this.asUnsignedDer()); Rcac.ts:135 verifies
 // verifyEcdsa(..., this.asUnsignedDer(), this.signature) over that
 // same object) instead of re-deriving NotBefore per call.
 func buildRCACFull(t *testing.T, pubKey []byte, o rcacBuildOpts, sig []byte, now uint64) []byte {
@@ -421,7 +421,7 @@ func fixedP256RCACKey(t *testing.T) *ecdsa.PrivateKey {
 // self-signature must verify when the TBS-DER that gets hashed is the
 // TBS-DER that was actually signed.
 //
-// Mirrors matter.js packages/protocol/src/certificate/kinds/Rcac.ts:140
+// Mirrors matter.js packages/protocol/src/certificate/kinds/Rcac.ts:135
 // verifyEcdsa(PublicKey(...), this.asUnsignedDer(), this.signature),
 // which checks the self-signature against the same in-memory
 // certificate object that Certificate.ts:101 signEcdsa(key,

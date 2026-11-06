@@ -1494,7 +1494,7 @@ func (b *Bridge) wireRootNotifiersLocked(mgr *subscription.Manager) {
 // [contract.AttributeReportNotifier] is subscribed through its report view
 // — a quieter attribute by its throttle, as matter.js's
 // ServerBehaviorBacking subscribes a QuietEvent's `online` observable
-// (ServerBehaviorBacking.ts:265-273) — and through OnAttributeChange,
+// (ServerBehaviorBacking.ts:251-259) — and through OnAttributeChange,
 // which tells the host of every change at once, otherwise. Caller holds
 // b.mu.
 func (b *Bridge) wireAttributeNotifiersLocked(mgr *subscription.Manager) {
