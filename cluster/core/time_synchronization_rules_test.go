@@ -362,8 +362,8 @@ func TestTimeSyncSetUTCTimeStatuses(t *testing.T) {
 		want        im.StatusCode
 		notAccepted bool
 	}{
-		"milliseconds":        {tsdef.SetUtcTimeRequest{Granularity: tsdef.GranularityMillisecondsGranularity}, im.StatusSuccess, false},
-		"microseconds, gnss":  {tsdef.SetUtcTimeRequest{Granularity: tsdef.GranularityMicrosecondsGranularity, TimeSource: &gnss}, im.StatusSuccess, false},
+		"milliseconds":        {tsdef.SetUtcTimeRequest{UtcTime: 812_345_678_000_000, Granularity: tsdef.GranularityMillisecondsGranularity}, im.StatusSuccess, false},
+		"microseconds, gnss":  {tsdef.SetUtcTimeRequest{UtcTime: 812_345_678_000_000, Granularity: tsdef.GranularityMicrosecondsGranularity, TimeSource: &gnss}, im.StatusSuccess, false},
 		"granularity 5":       {tsdef.SetUtcTimeRequest{Granularity: 5}, im.StatusInvalidCommand, false},
 		"time source 17":      {tsdef.SetUtcTimeRequest{Granularity: tsdef.GranularityMillisecondsGranularity, TimeSource: &bad}, im.StatusInvalidCommand, false},
 		"seconds is coarser":  {tsdef.SetUtcTimeRequest{Granularity: tsdef.GranularitySecondsGranularity}, im.StatusFailure, true},
@@ -381,8 +381,24 @@ func TestTimeSyncSetUTCTimeStatuses(t *testing.T) {
 		if gotCS := errors.As(err, &cs) && cs.MatterClusterStatus() == uint8(tsdef.StatusCodeTimeNotAccepted); gotCS != tc.notAccepted {
 			t.Errorf("%s: %v, TimeNotAccepted %v", label, err, tc.notAccepted)
 		}
-		if after, _ := srv.UTC(); !after.Equal(before) {
-			t.Errorf("%s: the clock moved", label)
+		// Success sets the node's UTC to the request's time with its
+		// granularity and TimeSource Admin (:1127-1131); a refusal leaves
+		// it.
+		after, _ := srv.UTC()
+		if tc.want != im.StatusSuccess {
+			if !after.Equal(before) {
+				t.Errorf("%s: the node's UTC moved", label)
+			}
+			continue
+		}
+		if want := time.UnixMicro(int64(tc.req.UtcTime) + 946684800_000_000); !after.Equal(want) { //nolint:gosec // a test constant
+			t.Errorf("%s: UTC %v, want %v", label, after, want)
+		}
+		if g, _ := srv.MatterRead(tsdef.AttrGranularity); g != uint8(tc.req.Granularity) {
+			t.Errorf("%s: Granularity %v, want %d", label, g, tc.req.Granularity)
+		}
+		if src, _ := srv.MatterRead(tsdef.AttrTimeSource); src != uint8(tsdef.TimeSourceAdmin) {
+			t.Errorf("%s: TimeSource %v, want Admin", label, src)
 		}
 	}
 }

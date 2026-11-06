@@ -10,6 +10,7 @@ import (
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	tsdef "github.com/SukramJ/go-fabric/cluster/spec/timesynchronization"
+	"github.com/SukramJ/go-fabric/controller/client"
 	"github.com/SukramJ/go-fabric/fabrictest"
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/node"
@@ -59,6 +60,14 @@ func TestTimeSynchronizationFeaturesOnTheWire(t *testing.T) {
 	tts, ok := pair.Device.Node().Root().TimeSynchronization.TrustedTimeSource()
 	if !ok || tts.FabricIndex != 1 || tts.NodeId != pair.Controller.Fabric().RootNodeID {
 		t.Errorf("TrustedTimeSource %+v %v", tts, ok)
+	}
+	// The enum attributes go on the wire as their values: a named enum type
+	// went out as null.
+	for _, id := range []uint32{tsdef.AttrTimeZoneDatabase, tsdef.AttrTimeSource} {
+		v, err := fabrictest.Read(ctx, pair, client.AttributeAt(0, tsdef.ClusterID, id))
+		if err != nil || v.Value.El.IsNull {
+			t.Errorf("read 0x%04X: %+v %v, want a value", id, v.Value.El, err)
+		}
 	}
 	for _, id := range []uint32{tsdef.AttrTimeZone, tsdef.AttrDstOffset, tsdef.AttrLocalTime, tsdef.AttrTrustedTimeSource} {
 		if _, err := fabrictest.Read(ctx, pair, im.ConcreteAttributePath{Endpoint: 0, Cluster: tsdef.ClusterID, Attribute: id}); err != nil {

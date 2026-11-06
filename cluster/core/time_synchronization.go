@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"math"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/SukramJ/go-fabric/clock"
@@ -23,14 +24,21 @@ import (
 // [NewTimeSynchronization] serves UTCTime and Granularity, with no
 // feature; [NewTimeSynchronizationWith] adds the features TZ, NTPC, NTPS
 // and TSC after connectedhomeip (time_synchronization_features.go).
-// UTCTime is the host clock in either case.
+// UTCTime is the node's UTC in either case: the server's clock plus an
+// offset that SetUTCTime, the trusted time source and the NTP fallback set
+// (time_synchronization_client.go); the host clock is never set.
 //
 // chip-tool reads UTCTime + Granularity during ReadCommissioningInfo;
 // returning sensible values keeps the commissioning flow clean
 // instead of producing 0xC3 UnsupportedCluster errors.
 type TimeSynchronization struct {
-	// clock is the UTC source (see [TimeSynchronization.SetClock]).
+	// clock is the clock the node's UTC runs on (see
+	// [TimeSynchronization.SetClock]); utc its offset and quality once a
+	// source set them.
 	clock clockvar.Var
+	utc   atomic.Pointer[timeSyncUTC]
+	// client is the time client's run state.
+	client timeSyncClient
 	// inst is the definition bound to the selection; cfg the features'
 	// configuration.
 	inst *spec.Instance
@@ -42,7 +50,8 @@ type TimeSynchronization struct {
 	events  spec.Events
 }
 
-// SetClock sets the clock UTCTime is read from; nil is [clock.System].
+// SetClock sets the clock the node's UTC runs on; nil is [clock.System].
+// An offset already set stays relative to the new clock.
 func (t *TimeSynchronization) SetClock(c clock.Clock) { t.clock.Store(c) }
 
 const (
@@ -55,9 +64,14 @@ const (
 
 // timeSyncInst is the definition bound to no feature
 // (cluster/spec/timesynchronization, ADR 0013, from matter.js
-// time-synchronization.element.ts) — UTCTime, Granularity and SetUTCTime;
-// a server's own instance is bound to its selection (t.inst).
-var timeSyncInst = mustInstance(timesyncdef.Definition, spec.Options{})
+// time-synchronization.element.ts) — UTCTime, Granularity, the optional
+// TimeSource the server serves, and SetUTCTime; a server's own instance is
+// bound to its selection (t.inst).
+var timeSyncInst = mustInstance(timesyncdef.Definition, spec.Options{Attributes: timeSyncOptionalAttrs})
+
+// timeSyncOptionalAttrs are the optional attributes every server serves:
+// TimeSource, the source of the node's UTC.
+var timeSyncOptionalAttrs = []uint32{timesyncdef.AttrTimeSource}
 
 // GranularityEnum values per Matter §11.16.5.1.
 const (
@@ -72,11 +86,24 @@ const (
 // in Unix seconds: 30 years + 7 leap days.
 const matterEpochOffsetSec int64 = 946684800
 
-// UTC returns the node's UTC time — the host clock — and false while the
-// UTCTime attribute is null (a host clock before the Matter epoch). It is
-// the clock [GeneralDiagnostics.SetUTCClock] takes, so TimeSnapshot
-// carries a PosixTimeMs exactly when UTCTime is not null.
-func (t *TimeSynchronization) UTC() (time.Time, bool) { return utcOf(t.clock.Load()) }
+// UTC returns the node's UTC time — the server's clock plus the offset a
+// source set — and false while the UTCTime attribute is null: while the
+// node has no time (Granularity NoTimeGranularity, as connectedhomeip
+// answers it, TimeSynchronizationCluster.cpp:255-267 at 6170af84), or
+// before the Matter epoch. It is the clock [GeneralDiagnostics.SetUTCClock]
+// takes, so TimeSnapshot carries a PosixTimeMs exactly when UTCTime is not
+// null.
+func (t *TimeSynchronization) UTC() (time.Time, bool) {
+	q := t.quality()
+	if q.granularity == timesyncdef.GranularityNoTimeGranularity {
+		return time.Time{}, false
+	}
+	now := t.now().Add(q.offset)
+	if now.Unix() < matterEpochOffsetSec {
+		return time.Time{}, false
+	}
+	return now, true
+}
 
 // utcOf is UTCTime read from c: its time, and false before the Matter
 // epoch, where UTCTime is null.
@@ -89,11 +116,13 @@ func utcOf(c clock.Clock) (time.Time, bool) {
 }
 
 // MatterEpochSeconds is the UTCTime a TimeSynchronization server on clock
-// c serves, in Matter epoch seconds (§A.2, epoch-s), and false while it is
-// null — before the Matter epoch, or past what epoch-s holds. The node's
-// root server reads the node's clock ([TimeSynchronization.SetClock]), so
-// a server on an endpoint of the node that is given the node's clock
-// reads the root's UTCTime through it without holding the root: the
+// c serves while no source has set an offset, in Matter epoch seconds
+// (§A.2, epoch-s), and false while it is null — before the Matter epoch,
+// or past what epoch-s holds. The node's root server runs on the node's
+// clock ([TimeSynchronization.SetClock]), so a server on an endpoint of
+// the node that is given the node's clock reads the root's UTCTime through
+// it without holding the root — until SetUTCTime, the trusted time source
+// or the NTP fallback set the root's offset, which it does not see: the
 // device kit hands it to the Thermostat's suggestions
 // (thermo.ThermostatConfig.MatterTime), which connectedhomeip gates on
 // System::Clock::GetClock_MatterEpochS.
@@ -153,7 +182,7 @@ func (t *TimeSynchronization) instance() *spec.Instance {
 }
 
 // NewTimeSynchronization returns the cluster server with no feature:
-// UTCTime from the clock, Granularity fixed.
+// UTCTime, Granularity and TimeSource of the node's UTC, SetUTCTime.
 func NewTimeSynchronization() *TimeSynchronization { return &TimeSynchronization{} }
 
 var (
@@ -170,19 +199,25 @@ func (t *TimeSynchronization) MatterClusterID() uint32 { return timeSyncClusterI
 
 // MatterRead implements [contract.ClusterServer]. UTCTime is
 // reported as Matter's epoch_us (microseconds since 2000-01-01 UTC,
-// per §A.2). Granularity is fixed at MILLISECONDS_GRANULARITY since
-// the bridge syncs from the host clock (typically NTP-disciplined).
+// per §A.2), null while the node has no time. Granularity and TimeSource
+// are the ones the source of the node's UTC gave: the host clock's
+// (MillisecondsGranularity and MixedNTP by default,
+// [TimeSynchronizationConfig].PlatformTime) until SetUTCTime, the trusted
+// time source or the NTP fallback set them.
 func (t *TimeSynchronization) MatterRead(attrID uint32) (any, bool) {
 	switch attrID {
 	case timeSyncAttrUTCTime:
-		now, ok := t.UTC()
-		if !ok {
-			return nil, true // null per spec when host clock is pre-Matter-epoch
+		if v, ok := t.chipEpochMicros(); ok {
+			return v, true
 		}
-		// Matter §A.2: epoch is 2000-01-01 00:00:00 UTC.
-		return uint64(now.UnixMicro() - matterEpochOffsetSec*1_000_000), true //nolint:gosec // non-negative, UTC checked it
+		return nil, true // null: no time, or before the Matter epoch
 	case timeSyncAttrGranularity:
-		return GranularityMillisecGran, true
+		return uint8(t.quality().granularity), true
+	case timesyncdef.AttrTimeSource:
+		if !t.instance().Serves(attrID) {
+			return nil, false
+		}
+		return uint8(t.quality().source), true
 	case cluster.AttrGlobalFeatureMap, cluster.AttrGlobalClusterRevision:
 		return t.instance().ReadGlobal(attrID)
 	}
@@ -224,14 +259,10 @@ func (timeSyncReadOnlyErr) MatterStatusCode() im.StatusCode { return im.StatusUn
 const timeSyncCmdSetUTCTime = timesyncdef.CmdSetUtcTime
 
 // MatterInvoke implements [contract.ClusterServer].
-// SetUTCTime (0x00) is a mandatory command per Matter §11.16.9.1 when the
-// UTC feature bit is advertised. The bridge does not adjust the host clock,
-// so the command is accepted and returns Success without acting —
-// controllers that send SetUTCTime receive a well-formed response instead
-// of UnsupportedCommand, which some implementations treat as a fatal
-// commissioning error.
-// All other commands require feature flags the bridge does not advertise;
-// the IM dispatcher rejects them at the path level.
+// SetUTCTime (0x00, mandatory) sets the node's UTC — the offset over the
+// server's clock, never the host clock — with connectedhomeip's checks
+// (handleSetUTCTime). The other commands are the selection's features';
+// the IM dispatcher rejects the rest at the path level.
 func (t *TimeSynchronization) MatterInvoke(ctx context.Context, cmdID uint32, fields any) (any, error) {
 	if cmdID != timeSyncCmdSetUTCTime && t.instance().Accepts(cmdID) {
 		// chip's InvokeCommand (:1030-1064).
@@ -247,18 +278,18 @@ func (t *TimeSynchronization) MatterInvoke(ctx context.Context, cmdID uint32, fi
 		}
 	}
 	if cmdID == timeSyncCmdSetUTCTime {
-		return nil, handleSetUTCTime(fields)
+		return nil, t.handleSetUTCTime(ctx, fields)
 	}
 	return nil, im.UnsupportedCommandf("core: TimeSynchronization command 0x%02X not supported", cmdID)
 }
 
-// MatterReportable lists subscribe-able attributes: UTCTime, Granularity
-// and the features' attributes but the fixed ones.
+// MatterReportable lists subscribe-able attributes: UTCTime, Granularity,
+// TimeSource and the features' attributes but the fixed ones.
 func (t *TimeSynchronization) MatterReportable() []uint32 {
 	out := []uint32{timeSyncAttrUTCTime, timeSyncAttrGranularity}
 	for _, id := range t.instance().MatterAttributes() {
 		switch id {
-		case timesyncdef.AttrTrustedTimeSource, timesyncdef.AttrDefaultNtp, timesyncdef.AttrTimeZone,
+		case timesyncdef.AttrTimeSource, timesyncdef.AttrTrustedTimeSource, timesyncdef.AttrDefaultNtp, timesyncdef.AttrTimeZone,
 			timesyncdef.AttrDstOffset, timesyncdef.AttrLocalTime, timesyncdef.AttrNtpServerAvailable:
 			out = append(out, id)
 		}

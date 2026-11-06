@@ -281,8 +281,17 @@ type TimeSynchronization struct {
 	// connectedhomeip ([TimeSynchronizationConfig]); nil serves UTCTime
 	// and Granularity alone. The node persists their state in its store
 	// and clears a removed fabric's trusted time source; the config's
-	// Store is the node's. UTCTime stays the node's clock. Off excludes
-	// it.
+	// Store is the node's. Off excludes it.
+	//
+	// The node's UTC — UTCTime, and GeneralDiagnostics' TimeSnapshot — is
+	// [Config].Clock plus an offset, with or without Config: SetUTCTime
+	// sets the offset, and so does the time client, which runs from Start
+	// while the host clock is no time source (Config's PlatformTime): it
+	// reads the trusted time source's node over the client stack
+	// ([Config].Client) and falls back to Config's NTPClient asking
+	// DefaultNTP, emitting TimeFailure when neither answers. The host
+	// clock is never set, and the offset is not persisted: a restart
+	// serves the host clock again.
 	Config *TimeSynchronizationConfig
 }
 

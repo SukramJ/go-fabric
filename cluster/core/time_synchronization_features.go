@@ -29,12 +29,10 @@ import (
 // stored state (:333-353, TimeSyncDataProvider.h:58-75), the four command
 // handlers (:1138-1275) with the setters they call (:571-830) and the
 // state updates LocalTime runs (:874-1007), and the fabric removal
-// (:1020-1028). UTCTime stays the node's clock: chip's SetUTCTime sets the
-// system clock (:74-86, :856-872); this server keeps answering it without
-// effect (time_synchronization.go), and its Granularity is the host
-// clock's. chip's trusted-time-source client (reading UTCTime from the
-// trusted node, :379-556) is not ported: the trusted time source is
-// stored, reported and announced, the node's clock stays its UTC.
+// (:1020-1028). The node's UTC is an offset over the server's clock: chip's
+// SetUTCTime sets the system clock (:74-86, :856-872); this server sets
+// the offset, and so do the trusted-time-source client and the NTP
+// fallback (:379-569, time_synchronization_client.go).
 
 // TimeSynchronizationConfig selects the features a [TimeSynchronization]
 // serves and what each needs of the host.
@@ -68,6 +66,28 @@ type TimeSynchronizationConfig struct {
 	// across restarts (chip's TimeSyncDataProvider); nil keeps them in
 	// memory.
 	Store store.Settings
+	// PlatformTime is the host clock as the node's time source: the
+	// TimeSource and Granularity the node serves for it until SetUTCTime,
+	// the trusted time source or the NTP fallback set the node's UTC.
+	// connectedhomeip's Delegate::UpdateTimeFromPlatformSource
+	// (time-synchronization-delegate.h:68-84). NoTimeGranularity says the
+	// host clock is no source: UTCTime is null and the node asks the
+	// trusted time source (TSC), then the default NTP server (NTPC), at
+	// Start and whenever a trusted time source is set. nil is chip's
+	// DefaultTimeSyncDelegate: MixedNTP and MillisecondsGranularity while
+	// the clock is past the Matter epoch, no source before it. It is read
+	// on every use and must not block.
+	PlatformTime func() (timesyncdef.TimeSourceEnum, timesyncdef.GranularityEnum)
+	// PeerReader reads UTCTime and Granularity from the trusted time
+	// source's node (TSC); nil takes the node's own reader over its client
+	// stack ([TimeSynchronization.AttachTimePeerReader]), and without
+	// either the trusted time source is not read.
+	PeerReader TimePeerReader
+	// NTPClient asks DefaultNTP for the time when the trusted time source
+	// gives none (the NTP fallback); nil fails the fallback with
+	// TimeFailure, as chip's default delegate does. The host supplies it:
+	// the module ships no NTP client.
+	NTPClient NTPClient
 	// Logger logs a store failure; nil is slog.Default().
 	Logger *slog.Logger
 }
@@ -123,7 +143,7 @@ func NewTimeSynchronizationWith(cfg TimeSynchronizationConfig) (*TimeSynchroniza
 	if cfg.Features&^known != 0 {
 		return nil, fmt.Errorf("core: TimeSynchronization feature 0x%X is not one of TZ, NTPC, NTPS, TSC", uint32(cfg.Features&^known))
 	}
-	inst, err := spec.New(timesyncdef.Definition, spec.Options{Features: uint32(cfg.Features)})
+	inst, err := spec.New(timesyncdef.Definition, spec.Options{Features: uint32(cfg.Features), Attributes: timeSyncOptionalAttrs})
 	if err != nil {
 		return nil, fmt.Errorf("core: TimeSynchronization: %w", err)
 	}
@@ -202,7 +222,7 @@ func (t *TimeSynchronization) save(ctx context.Context, key string, v any) error
 // helpers do (kRootEndpointId, :91-168); an event outside the selection's
 // EventList is dropped (the helpers' feature checks).
 func (t *TimeSynchronization) emit(eventID uint32, data any) {
-	if err := t.events.Emit(t.inst, 0, eventID, data); err != nil && !errors.Is(err, spec.ErrNotEmitted) {
+	if err := t.events.Emit(t.instance(), 0, eventID, data); err != nil && !errors.Is(err, spec.ErrNotEmitted) {
 		t.logger().Warn("matter.timesync.event_failed", slog.String("reason", err.Error()))
 	}
 }
@@ -396,7 +416,9 @@ func (t *TimeSynchronization) readFeatureLocked(attrID uint32) (any, bool) {
 	case timesyncdef.AttrDstOffset:
 		return spec.List[timesyncdef.DSTOffsetStruct](slices.Clone(t.state.dstOffset)), true
 	case timesyncdef.AttrTimeZoneDatabase:
-		return t.timeZoneDatabase(), true
+		// A plain uint8: the bridge's reply writer encodes a named enum
+		// type as null.
+		return uint8(t.timeZoneDatabase()), true
 	case timesyncdef.AttrNtpServerAvailable:
 		return t.state.ntpServer, true
 	case timesyncdef.AttrTimeZoneListMaxSize:
@@ -440,6 +462,7 @@ func (t *TimeSynchronization) handleSetTrustedTimeSource(ctx context.Context, fi
 		t.logger().Warn("matter.timesync.store_failed", slog.String("what", "TrustedTimeSource"), slog.String("reason", err.Error()))
 	}
 	t.flush(contract.OriginFrom(ctx), &p)
+	t.requestTime() // :584-587
 	return nil
 }
 
@@ -461,6 +484,7 @@ func (t *TimeSynchronization) FabricRemoved(ctx context.Context, fabricIndex uin
 	t.mu.Unlock()
 	p.event(func() { t.emit(timesyncdef.EventMissingTrustedTimeSource, timesyncdef.MissingTrustedTimeSourceEvent{}) })
 	t.flush(contract.OriginHostSet, &p)
+	t.requestTime() // SetTrustedTimeSource, :584-587
 }
 
 // errTooMany is chip's CHIP_ERROR_BUFFER_TOO_SMALL from a setter, which
@@ -742,15 +766,16 @@ func (timeNotAccepted) MatterClusterStatus() uint8 {
 
 var _ im.MatterClusterStatusError = timeNotAccepted{}
 
-// handleSetUTCTime answers SetUTCTime with chip's statuses
-// (HandleSetUTCTime, TimeSynchronizationCluster.cpp:1110-1136 at
-// 6170af84): a granularity or a time source outside its enum is
-// INVALID_COMMAND; NoTimeGranularity, or one coarser than the current
-// Granularity, is TimeNotAccepted; anything else is SUCCESS. The clock is
-// not set: UTCTime stays the node's clock and Granularity the host
-// clock's (chip sets the system clock and takes the granularity, :856-872),
-// so the current granularity is always MillisecondsGranularity.
-func handleSetUTCTime(fields any) error {
+// handleSetUTCTime is chip's HandleSetUTCTime
+// (TimeSynchronizationCluster.cpp:1110-1136 at 6170af84): a granularity
+// or a time source outside its enum is INVALID_COMMAND; NoTimeGranularity,
+// one coarser than the current Granularity unless the node has no time,
+// or a time SetUTCTime refuses is TimeNotAccepted; otherwise the node's
+// UTC is set with the request's granularity and TimeSource Admin — not
+// the request's time source (:1127-1131) — and the answer is SUCCESS.
+// chip sets the system clock (:856-872); here the offset over the
+// server's clock.
+func (t *TimeSynchronization) handleSetUTCTime(ctx context.Context, fields any) error {
 	req, ok := requestFields[timesyncdef.SetUtcTimeRequest](fields)
 	if !ok {
 		return spec.Errorf(im.StatusInvalidCommand, "core: SetUTCTime carried %T", fields)
@@ -761,9 +786,19 @@ func handleSetUTCTime(fields any) error {
 	if ts := req.TimeSource; ts != nil && *ts > timesyncdef.TimeSourceGnss { // :1123-1126
 		return spec.Errorf(im.StatusInvalidCommand, "core: SetUTCTime time source %d", *ts)
 	}
-	current := timesyncdef.GranularityEnum(GranularityMillisecGran)
-	if req.Granularity != timesyncdef.GranularityNoTimeGranularity && req.Granularity >= current { // :1128-1133
-		return nil
+	var p pending
+	t.mu.Lock()
+	current := t.quality().granularity
+	err := error(timeNotAccepted{fmt.Sprintf("core: SetUTCTime granularity %d is coarser than the node's %d", req.Granularity, current)})
+	if req.Granularity != timesyncdef.GranularityNoTimeGranularity &&
+		(current == timesyncdef.GranularityNoTimeGranularity || req.Granularity >= current) { // :1127-1129
+		if serr := t.setUTCLocked(req.UtcTime, req.Granularity, timesyncdef.TimeSourceAdmin, &p); serr == nil {
+			err = nil
+		} else {
+			err = timeNotAccepted{fmt.Sprintf("core: SetUTCTime %d: %v", req.UtcTime, serr)}
+		}
 	}
-	return timeNotAccepted{fmt.Sprintf("core: SetUTCTime granularity %d is coarser than the node's %d", req.Granularity, current)}
+	t.mu.Unlock()
+	t.flush(contract.OriginFrom(ctx), &p)
+	return err
 }

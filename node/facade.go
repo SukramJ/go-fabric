@@ -135,6 +135,12 @@ func ValidateSetupPIN(pin uint32) error {
 // TimeSynchronizationConfig is the type of [Config].TimeSynchronization: the root TimeSynchronization's features ([mattercore.TimeSynchronizationConfig]).
 type TimeSynchronizationConfig = mattercore.TimeSynchronizationConfig
 
+// NTPClient is the type of [TimeSynchronizationConfig].NTPClient: the host's NTP query the time client falls back to ([mattercore.NTPClient]).
+type NTPClient = mattercore.NTPClient
+
+// TimePeerReader is the type of [TimeSynchronizationConfig].PeerReader: the read of the trusted time source's node ([mattercore.TimePeerReader]); without one the node reads over its client stack.
+type TimePeerReader = mattercore.TimePeerReader
+
 // OTAImageSource is the type of [OTAProviderConfig].ImageSource: where the provider reads the images it offers ([mattercore.OTAImageSource]).
 type OTAImageSource = mattercore.OTAImageSource
 

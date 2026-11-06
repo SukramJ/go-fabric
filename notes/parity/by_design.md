@@ -114,7 +114,7 @@ pin lift confirms by re-reading the row, [`pin-lifts.md`](./pin-lifts.md)).
 | BD-Thread-TND-FromBorderRouter | `ThreadNetworkDiagnosticsServer.ts:14` is the empty subclass (absence: the class line, 14 lines in all) | `packages/node/src/behaviors/thread-network-diagnostics/ThreadNetworkDiagnosticsServer.ts` | `"export class ThreadNetworkDiagnosticsServer extends ThreadNetworkDiagnosticsBehavior {}"` | connectedhomeip `src/app/clusters/thread-network-diagnostics-server/DirectThreadNetworkDiagnosticsProvider.cpp` at `6170af84` (`ReadAttribute` :59, the unconfigured nulls :65-92, `RoutingRole` :104-145, OverrunCount :178-182, the tables :184-293, the counts :325-571, the dataset attributes :577-689, `ResetCounts` :735-738), `ThreadNetworkDiagnosticsCluster.cpp` | no |
 | BD-Thread-NetComm-ThreadVariant | `NetworkCommissioningServer.ts:18` is the empty subclass: no network-type branch, no Thread logic (absence: the class line, 18 lines in all) | `packages/node/src/behaviors/network-commissioning/NetworkCommissioningServer.ts` | `"export class NetworkCommissioningServer extends NetworkCommissioningBehavior {}"` | connectedhomeip `src/app/clusters/network-commissioning/NetworkCommissioningCluster.cpp` at `6170af84` (the Thread paths: `HandleScanNetworks` :349-367, `HandleAddOrUpdateThreadNetwork` :561-587, `OnFinished` :904-928, `ReadAttribute` :1102-1108) over `src/platform/OpenThread/GenericNetworkCommissioningThreadDriver.cpp` | yes |
 | BD-chip-AmbientContextSensing-RulesInServer | `AmbientContextSensingServer.ts:14` is the empty subclass (absence: the class line, 14 lines in all) | `packages/node/src/behaviors/ambient-context-sensing/AmbientContextSensingServer.ts` | `"export class AmbientContextSensingServer extends AmbientContextSensingBehavior {}"` | connectedhomeip `src/app/clusters/ambient-context-sensing-server/AmbientContextSensingCluster.cpp` at `6170af84` (the constructor and `Startup` :48-89, `WriteAttribute` :140-159, `AddDetection` :205-301, `SetObjectCountConfig` :303-367, `SetObjectCount` :369-385, `SetHoldTimeLimits` :438-466, `TimerFired` :498-509, `UpdateDetectionAttributes` :600-646, `CheckPredictedActivity` :844-892; `AmbientContextSensingDelegate.h:78-106`), tests `tests/TestAmbientContextSensingCluster.cpp` | no |
-| BD-chip-TimeSynchronization-Features | `TimeSynchronizationServer.ts:14` is the empty subclass (absence: the class line, 14 lines in all) | `packages/node/src/behaviors/time-synchronization/TimeSynchronizationServer.ts` | `"export class TimeSynchronizationServer extends TimeSynchronizationBehavior {}"` | connectedhomeip `src/app/clusters/time-synchronization-server/TimeSynchronizationCluster.cpp` at `6170af84` (the attribute gating :186-248, the feature logic :619-1028, `HandleSetUTCTime` :1110-1136, the four handlers :1138-1275), `TimeSyncDataProvider.h:58-75`, tests `tests/TestTimeSynchronizationCluster.cpp` | yes |
+| BD-chip-TimeSynchronization-Features | `TimeSynchronizationServer.ts:14` is the empty subclass (absence: the class line, 14 lines in all) | `packages/node/src/behaviors/time-synchronization/TimeSynchronizationServer.ts` | `"export class TimeSynchronizationServer extends TimeSynchronizationBehavior {}"` | connectedhomeip `src/app/clusters/time-synchronization-server/TimeSynchronizationCluster.cpp` at `6170af84` (the attribute gating :186-248, the time client :379-593, the feature logic :619-1028, `SetUTCTime` :856-872, `HandleSetUTCTime` :1110-1136, the four handlers :1138-1275), `TimeSyncDataProvider.h:58-75`, tests `tests/TestTimeSynchronizationCluster.cpp` | yes |
 | BD-chip-GeneralCommissioning-TermsAndConditions | `GeneralCommissioningServer.ts:31` is the class line; no terms-and-conditions text in the file (absence: the class body, 285 lines in all) | `packages/node/src/behaviors/general-commissioning/GeneralCommissioningServer.ts` | `class GeneralCommissioningServer` | connectedhomeip `src/app/clusters/general-commissioning-server/GeneralCommissioningCluster.cpp` at `6170af84` (the attribute reads :199-230, the change notifications :73-135 and :367-372, the fail-safe revert :149-157, the CommissioningComplete gate :476-525, `HandleSetTCAcknowledgements` :617-672, `OnFabricRemoved` :357-374), `src/app/server/TermsAndConditionsProvider.h:35-220`, `DefaultTermsAndConditionsProvider.cpp:153-252`, tests `tests/TestGeneralCommissioningCluster.cpp`, the CSA cases TC-CGEN-2.5 to 2.11 | yes |
 | BD-chip-Thermostat-Events | `ThermostatServer.ts:525` is the only `events.` emit of the server, the custom `calibratedTemperature$Changed` (absence: none of the model's eight Thermostat events is emitted anywhere in the file, 1790 lines) | `packages/node/src/behaviors/thermostat/ThermostatServer.ts` | `"this.events.calibratedTemperature$Changed.emit(temperature, oldTemperature, this.context);"` | connectedhomeip `src/app/clusters/thermostat-server/ThermostatClusterEvents.cpp` at `6170af84` (every `Generate*` gated on `Feature::kEvents`, :33-36, :59-61, :83-86, :109-112), the emit sites `ThermostatClusterBase.cpp:158-162, :179-183, :246-250, :283-287`, `ThermostatClusterSetpointsBase.cpp:63-85`, `ThermostatClusterPresets.cpp:461-500`; the entry is the events paragraph of `BD-chip-Thermostat-Schedules` | yes |
 | BD-matterjs-server-CameraStreamManagement | `camera-controller.ts:133` mandates the requestor as the device type's whole server set — matter.js's controller-side camera surface is the WebRtcTransportRequestor and nothing above it (absence: the tree at the pin holds six WebRTC behaviour files and one test under `packages/node`, no stream management) | `packages/node/src/devices/camera-controller.ts` | `"export const server = { mandatory: { WebRtcTransportRequestor: WebRtcTransportRequestorServer } };"` | matterjs-server `packages/ws-controller/src/camera/CameraStreamManager.ts`, `streamPolicy.ts`, `sdpConstraints.ts`, `sessionRegistry.ts` at 0bd06f2; connectedhomeip `WebRTCTransportProviderCluster.cpp` at 6170af84 for the provider's rules | no |
@@ -5822,7 +5822,7 @@ ICAC, CASE) stays out, as matter.js admits ML-DSA only in the attestation
 certificates. Pinned by the `*_parity_matterjs_test.go` ports listed in
 `notes/briefs/reports/27A.md` (test register, planned ratchet 3).
 
-### BD-chip-TimeSynchronization-Features — TZ, NTPC, NTPS and TSC follow connectedhomeip when the host selects them; UTC stays the node's clock
+### BD-chip-TimeSynchronization-Features — TZ, NTPC, NTPS and TSC follow connectedhomeip when the host selects them; the node's UTC is an offset over its clock, with chip's time client
 
 matter.js's `TimeSynchronizationServer.ts:14` at `862ad75f` is the empty
 subclass. `core.NewTimeSynchronizationWith` (`node.Config.TimeSynchronization`)
@@ -5832,17 +5832,47 @@ handlers with their statuses and events (`HandleSetTrustedTimeSource`
 :1138-1157, `HandleSetTimeZone` :1161-1213, `HandleSetDSTOffset`
 :1216-1243, `HandleSetDefaultNTP` :1246-1275), LocalTime, fabric removal
 and persistence through `store.Settings` (chip's `TimeSyncDataProvider.h:58-75`).
-The features are off by default and `FeatureMap` is the host's selection;
-UTC stays the node's clock and chip's trusted-source client is not ported.
-`SetUTCTime` answers chip's statuses (:1110-1136) without setting the
-clock: INVALID_COMMAND for a granularity or time source outside its enum,
-TimeNotAccepted for NoTimeGranularity or a granularity coarser than the
-node's milliseconds (owner decision 2026-10-28). Two edges: a SetTimeZone
-list over two entries answers CONSTRAINT_ERROR from the request constraint
-before chip's RESOURCE_EXHAUSTED check (:1168-1171) can; an IPv4 NTP
-address counts as a domain, as in chip's default delegate; no DSTTableEmpty
-at startup, since the emitter attaches after construction. Pinned by
-`cluster/core` time-synchronization tests (3 chip cases, 9 rules, 1 wire).
+The features are off by default and `FeatureMap` is the host's selection.
+Two edges: a SetTimeZone list over two entries answers CONSTRAINT_ERROR
+from the request constraint before chip's RESOURCE_EXHAUSTED check
+(:1168-1171) can; an IPv4 NTP address counts as a domain, as in chip's
+default delegate; no DSTTableEmpty at startup, since the emitter attaches
+after construction.
+
+The node's UTC is a served source (owner decision 2026-11-06, phase 39,
+replacing the decision of 2026-10-28 that SetUTCTime answers chip's
+statuses without setting the clock): every server, with or without
+features, serves UTCTime as its clock plus an offset, with Granularity and
+the optional TimeSource. Until something sets the offset the host clock is
+the platform source — chip's `DefaultTimeSyncDelegate.cpp:42-58`,
+MillisecondsGranularity and MixedNTP while the clock is past the Matter
+epoch, or the host's `TimeSynchronizationConfig.PlatformTime` (chip's
+`UpdateTimeFromPlatformSource`). UTCTime is null without a granularity
+(:255-267). `SetUTCTime` sets the offset with chip's checks
+(`HandleSetUTCTime` :1110-1136, `SetUTCTime` :856-872, `UpdateUTCTime`
+:74-86): INVALID_COMMAND outside the enums; TimeNotAccepted for
+NoTimeGranularity, a granularity coarser than the current one while the
+node has a time, or seconds past 32 bits; TimeSource Admin. The time client
+is ported: `Start` (the node's server-ready, `OnPlatformEventFn` :556-569)
+and a trusted time source set while the node has no time (:584-587) run
+`AttemptToGetTime` (:541-554) — the trusted node's root UTCTime and
+Granularity read through `core.TimePeerReader` (:401-460, :525-539; the
+node's reader runs over its client stack, `node.Config.Client`), adopted
+with chip's conservative granularity and TimeSource NodeTimeCluster
+(:462-492); else the NTP fallback through the host's `core.NTPClient`
+asking DefaultNTP, adopted with milliseconds and NonMatterSNTP (:510-518);
+else TimeFailure (:379-398, :519-522). Differences, each because the host
+clock is never set: the offset lives in memory and a restart serves the
+host clock again (chip's system clock keeps the time); the platform source
+is read live, not once at server ready; Last Known Good Time is not
+updated (`UpdateUTCTime` :82; the module keeps none); an NTP answer
+before the Matter epoch or past 32-bit seconds is a failed query. The
+Thermostat's and the Valve's Matter time (`core.MatterEpochSeconds` over
+the device's clock) does not see the offset. TimeSource and
+TimeZoneDatabase go out as plain integers; a named enum type went out as
+TLV null through the bridge's reply writer. Pinned by `cluster/core`
+time-synchronization tests (3 chip cases, 9 rules, 5 client cases, 1 wire)
+and `node`'s client wire test.
 
 ### BD-chip-GeneralCommissioning-TermsAndConditions — the TC feature follows connectedhomeip when the node states its terms
 
