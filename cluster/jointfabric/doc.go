@@ -18,7 +18,8 @@
 // The shared trust verification is client/jcm.
 //
 // The host's admin application stays host-side behind the ports of the
-// generated definitions: [DatastoreSync] reaches the member nodes,
+// generated definitions: [DatastoreSync] reaches the member nodes (an
+// [EndpointBindingSync] writes an endpoint's whole binding list),
 // [DatastoreStore] persists the tables, [AdministratorPort] holds the
 // administrator key, [CommissionerReach] reads the announcing
 // commissioner. The node hands the Administrator its fabric table, its
