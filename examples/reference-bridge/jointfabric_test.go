@@ -135,13 +135,14 @@ func TestJointFabricSimSyncReachesNoNode(t *testing.T) {
 
 	s := jfSync{logger: slog.New(slog.DiscardHandler)}
 	for name, err := range map[string]error{
-		"SyncEndpointGroupID": s.SyncEndpointGroupID(ctx, 7, jfdsdef.DatastoreEndpointGroupIDEntryStruct{}),
-		"SyncNodeKeySet":      s.SyncNodeKeySet(ctx, 7, jfdsdef.DatastoreNodeKeySetEntryStruct{}),
-		"SyncBinding":         s.SyncBinding(ctx, 7, jfdsdef.DatastoreEndpointBindingEntryStruct{}),
-		"SyncBindings":        s.SyncBindings(ctx, 7, nil),
-		"SyncACL":             s.SyncACL(ctx, 7, jfdsdef.DatastoreACLEntryStruct{}),
-		"SyncACLs":            s.SyncACLs(ctx, 7, nil),
-		"SyncGroupKeySet":     s.SyncGroupKeySet(ctx, 7, jfdsdef.DatastoreGroupKeySetStruct{}),
+		"SyncEndpointGroupID":  s.SyncEndpointGroupID(ctx, 7, jfdsdef.DatastoreEndpointGroupIDEntryStruct{}),
+		"SyncNodeKeySet":       s.SyncNodeKeySet(ctx, 7, jfdsdef.DatastoreNodeKeySetEntryStruct{}),
+		"SyncBinding":          s.SyncBinding(ctx, 7, jfdsdef.DatastoreEndpointBindingEntryStruct{}),
+		"SyncBindings":         s.SyncBindings(ctx, 7, nil),
+		"SyncEndpointBindings": s.SyncEndpointBindings(ctx, 7, 1, nil),
+		"SyncACL":              s.SyncACL(ctx, 7, jfdsdef.DatastoreACLEntryStruct{}),
+		"SyncACLs":             s.SyncACLs(ctx, 7, nil),
+		"SyncGroupKeySet":      s.SyncGroupKeySet(ctx, 7, jfdsdef.DatastoreGroupKeySetStruct{}),
 	} {
 		if err != nil {
 			t.Fatalf("%s: %v", name, err)

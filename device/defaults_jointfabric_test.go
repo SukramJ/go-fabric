@@ -31,6 +31,10 @@ func (fakeDatastoreSync) SyncBindings(context.Context, uint64, []dsdef.Datastore
 	return nil
 }
 
+func (fakeDatastoreSync) SyncEndpointBindings(context.Context, uint64, uint16, []dsdef.DatastoreEndpointBindingEntryStruct) error {
+	return nil
+}
+
 func (fakeDatastoreSync) SyncACL(context.Context, uint64, dsdef.DatastoreACLEntryStruct) error {
 	return nil
 }

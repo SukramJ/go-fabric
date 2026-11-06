@@ -14,9 +14,8 @@ import (
 	"github.com/SukramJ/go-fabric/im"
 )
 
-// endpointSync is a DatastoreSync that is an EndpointBindingSync: it
-// holds the member node's Binding list per endpoint, as jf-admin-app's
-// delegate reads it (examples/jf-admin-app/linux/JFADatastoreSync.cpp:1717-1719
+// endpointSync is a DatastoreSync that holds the member node's Binding
+// list per endpoint, as jf-admin-app's delegate reads it (examples/jf-admin-app/linux/JFADatastoreSync.cpp:1717-1719
 // at 6170af84), and records each whole-list write.
 type endpointSync struct {
 	trackingSync
@@ -26,6 +25,7 @@ type endpointSync struct {
 	writes    []endpointWrite
 	writeErr  error
 	fetchCall int
+	single    int // SyncBinding calls: the datastore makes none
 }
 
 type endpointWrite struct {
@@ -46,6 +46,13 @@ func (s *endpointSync) FetchEndpointBindingList(_ context.Context, _ uint64, ep 
 		return nil, s.fetchErr
 	}
 	return slices.Clone(s.device[ep]), nil
+}
+
+func (s *endpointSync) SyncBinding(context.Context, uint64, EndpointBindingEntry) error {
+	s.mu2.Lock()
+	defer s.mu2.Unlock()
+	s.single++
+	return nil
 }
 
 func (s *endpointSync) SyncEndpointBindings(_ context.Context, nodeID uint64, ep uint16, entries []EndpointBindingEntry) error {
@@ -78,9 +85,8 @@ func (s *endpointSync) lastWrite(t *testing.T) endpointWrite {
 	return s.writes[len(s.writes)-1]
 }
 
-// TestEndpointBindingSyncAppendsToFetchedList: a port that is an
-// EndpointBindingSync takes the add of a binding as the endpoint's
-// current list plus the entry (JFADatastoreSync.cpp:1717-1747 at
+// TestEndpointBindingSyncAppendsToFetchedList: the add of a binding
+// reaches the port as the endpoint's current list plus the entry (JFADatastoreSync.cpp:1717-1747 at
 // 6170af84); SyncBinding is not called; the entry commits.
 func TestEndpointBindingSyncAppendsToFetchedList(t *testing.T) {
 	s := newEndpointSync()
@@ -93,8 +99,8 @@ func TestEndpointBindingSyncAppendsToFetchedList(t *testing.T) {
 	if w.nodeID != 123 || w.endpoint != 1 || len(w.entries) != 2 || !bindingMatches(w.entries[0].Binding, existing) || !bindingMatches(w.entries[1].Binding, added) {
 		t.Fatalf("SyncEndpointBindings(%d, %d, %+v)", w.nodeID, w.endpoint, w.entries)
 	}
-	if s.lastBinding != nil {
-		t.Fatalf("SyncBinding called with %+v", s.lastBinding)
+	if s.single != 0 {
+		t.Fatalf("SyncBinding called %d times", s.single)
 	}
 	b := d.EndpointBindingList()
 	if len(b) != 1 || b[0].StatusEntry.State != stateCommitted {

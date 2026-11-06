@@ -251,7 +251,7 @@ func (r *refreshSync) FetchEndpointBindingList(_ context.Context, _ uint64, ep u
 	return r.bindings[ep], nil
 }
 
-func (r *refreshSync) SyncBinding(context.Context, uint64, EndpointBindingEntry) error {
+func (r *refreshSync) SyncEndpointBindings(context.Context, uint64, uint16, []EndpointBindingEntry) error {
 	if r.failBinding {
 		return errors.New("refresh: node unreachable")
 	}

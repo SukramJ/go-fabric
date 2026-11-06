@@ -162,6 +162,10 @@ func (s jfSync) SyncBindings(_ context.Context, n uint64, _ []jfdsdef.DatastoreE
 	return s.log("SyncBindings", n)
 }
 
+func (s jfSync) SyncEndpointBindings(_ context.Context, n uint64, _ uint16, _ []jfdsdef.DatastoreEndpointBindingEntryStruct) error {
+	return s.log("SyncEndpointBindings", n)
+}
+
 func (s jfSync) SyncACL(_ context.Context, n uint64, _ jfdsdef.DatastoreACLEntryStruct) error {
 	return s.log("SyncACL", n)
 }

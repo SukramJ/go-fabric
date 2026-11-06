@@ -26,9 +26,6 @@ type (
 	// DatastoreSync carries the entries to the member nodes and fetches
 	// their lists.
 	DatastoreSync = dsdef.DatastoreSync
-	// EndpointBindingSync is the optional interface of a DatastoreSync
-	// that writes an endpoint's whole binding list.
-	EndpointBindingSync = dsdef.EndpointBindingSync
 	// DatastoreStore persists the tables.
 	DatastoreStore = dsdef.DatastoreStore
 	// GroupKeySet is a GroupKeySetList entry.
