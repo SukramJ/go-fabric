@@ -58,8 +58,10 @@ func TestReferenceNodeChain(t *testing.T) {
 	}
 }
 
-// TestNoStore: without a store only the local checks run and the two
-// warnings of DAV:224-231 and :394-399 precede the CD content's finding.
+// TestNoStore: without a store only the local checks run, the CD signature
+// is verified with the built-in signers, and the warning of
+// DeviceAttestationValidator.ts:312-319 at db021da0 precedes the CD
+// content's finding.
 func TestNoStore(t *testing.T) {
 	t.Parallel()
 	f := newFixture(t, defaultSpec(), defaultCD())
@@ -68,7 +70,7 @@ func TestNoStore(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := []string{"warning:DclServiceUnavailable", "warning:CdSignerVerificationSkipped", "info:CertificationTypeTest"}
+	want := []string{"warning:DclServiceUnavailable", "info:CertificationTypeTest"}
 	if got := checks(res.Findings); !slices.Equal(got, want) {
 		t.Fatalf("findings %v, want %v", got, want)
 	}
@@ -104,22 +106,23 @@ func TestFindings(t *testing.T) {
 		cd    func(*cdSpec)
 		want  []string
 	}{
-		{"missing CD signer", func() *attestation.StaticStore {
-			s := attestation.TestStore()
-			s.CDSigners = nil
-			return s
-		}, nil, []string{"warning:CdSignerVerificationSkipped", "info:CertificationTypeTest"}},
-		{"test root under production policy", func() *attestation.StaticStore {
+		{"test root and test CD signer under production policy", func() *attestation.StaticStore {
 			s := attestation.TestStore()
 			s.AcceptTest = false
 			return s
-		}, nil, []string{"error:TrustedAsTestCertificate", "info:CertificationTypeTest"}},
-		{"production root under production policy", func() *attestation.StaticStore {
+		}, nil, []string{"error:TrustedAsTestCertificate", "error:TrustedAsTestCertificate", "info:CertificationTypeTest"}},
+		{"production root, test CD signer under production policy", func() *attestation.StaticStore {
 			s := attestation.TestStore()
 			s.AcceptTest = false
 			s.PAAs = []attestation.PAA{{DER: paa, Production: true}}
 			return s
-		}, nil, []string{"info:CertificationTypeTest"}},
+		}, nil, []string{"error:TrustedAsTestCertificate", "info:CertificationTypeTest"}},
+		{"production root, store CD signer under production policy", func() *attestation.StaticStore {
+			s := storeWithSigner()
+			s.AcceptTest = false
+			s.PAAs = []attestation.PAA{{DER: paa, Production: true}}
+			return s
+		}, storeSigned, []string{"info:CertificationTypeTest"}},
 		{"root fetched after the DAC's notBefore", func() *attestation.StaticStore {
 			s := attestation.TestStore()
 			s.PAAs = []attestation.PAA{{DER: paa, FetchedAt: time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)}}
@@ -131,7 +134,7 @@ func TestFindings(t *testing.T) {
 			return s
 		}, nil, []string{"info:CertificationTypeTest"}},
 		{"provisional CD", attestation.TestStore, func(c *cdSpec) { c.certType = 1 }, []string{"warning:CertificationTypeProvisional"}},
-		{"official CD", attestation.TestStore, func(c *cdSpec) { c.certType = 2 }, []string{}},
+		{"official CD", storeWithSigner, func(c *cdSpec) { storeSigned(c); c.certType = 2 }, []string{}},
 		{"authorized PAA listed", attestation.TestStore, func(c *cdSpec) {
 			c.authorizedPAAs = [][]byte{make([]byte, 20), secattestation.TestPAAFFF1SKID}
 		}, []string{"info:CertificationTypeTest"}},

@@ -27,7 +27,13 @@ func certificatesDER(t *testing.T, s string) []byte {
 
 func certificatesParse(t *testing.T, der []byte, authorityKeyID bool) *attCert {
 	t.Helper()
-	a, err := parseAttCert(der, authorityKeyID)
+	// A DAC or PAI read without its profile, as the certificate tests
+	// read them (acceptProfileViolation); a PAA without an AKID.
+	kind := kindPAA
+	if authorityKeyID {
+		kind = kindPAI
+	}
+	a, err := parseAttCert(der, kind, true)
 	if err != nil {
 		t.Fatalf("parseAttCert: %v", err)
 	}

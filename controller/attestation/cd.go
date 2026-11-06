@@ -4,15 +4,19 @@
 package attestation
 
 // The Certification Declaration as the validator reads it: the CMS
-// SignedData walk of matter.js packages/protocol/src/certificate/kinds/
-// CertificationDeclaration.ts:68-159 (CertificationDeclaration.parse) and
-// the TLV content of kinds/definitions/certification-declaration.ts:31-48
-// (TlvDc) at 0ceb202d. secure/attestation/cd.go:62-135 is the device's
-// encoder of the same structure.
+// SignedData walk with its encoding rules of matter.js
+// packages/protocol/src/certificate/kinds/CertificationDeclaration.ts:
+// 58-206 (CertificationDeclaration.parse) at db021da0 and the TLV content
+// of kinds/definitions/certification-declaration.ts:31-48 (TlvDc) at
+// 0ceb202d. secure/attestation/cd.go:62-135 is the device's encoder of the
+// same structure.
 
 import (
+	"bytes"
 	"encoding/asn1"
+	"encoding/hex"
 	"errors"
+	"fmt"
 	"math"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
@@ -94,10 +98,86 @@ func nodeOf(raw asn1.RawValue) (derNode, error) {
 	return n, nil
 }
 
-// parseDeclaration is CertificationDeclaration.parse (:68-159): the
-// ContentInfo, the [0] SignedData, its encapContentInfo's [0] OCTET STRING
-// eContent, the first SignerInfo's [0] subjectKeyIdentifier and signature,
-// then the TLV content.
+// cdFormatError is matter.js CertificationDeclarationFormatError
+// (CertificationDeclaration.ts:58-59 at db021da0): the CD breaks an
+// encoding rule of Matter Core §6.3.1. The validator reports it as
+// CertificationDeclarationFormatInvalid, any other parse failure as
+// CertificationDeclarationUnparseable (DeviceAttestationValidator.ts:
+// 138-158 at db021da0).
+type cdFormatError struct{ msg string }
+
+func (e *cdFormatError) Error() string { return e.msg }
+
+// The CMS constants of a CD (CertificationDeclaration.ts:61-64 at
+// db021da0) and the algorithm OIDs it requires: sha256
+// (2.16.840.1.101.3.4.2.1) and ecdsa-with-SHA256 (1.2.840.10045.4.3.2).
+const (
+	cmsVersion        = 3
+	signerInfoVersion = 3
+	// signerSubjectKeyIDLength is SIGNER_SUBJECT_KEY_ID_LENGTH, a key
+	// identifier of 20 octets (:261-266 at db021da0).
+	signerSubjectKeyIDLength = 20
+)
+
+var (
+	oidPKCS7SignedData = []byte{0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x07, 0x02}
+	oidPKCS7Data       = []byte{0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x07, 0x01}
+	oidSHA256          = []byte{0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x01}
+	oidECDSAWithSHA256 = []byte{0x2a, 0x86, 0x48, 0xce, 0x3d, 0x04, 0x03, 0x02}
+)
+
+// The DER identifier octets of the CMS walk.
+const (
+	derOIDTag      = 0x06
+	derSequenceTag = 0x30
+	derSetTag      = 0x31
+)
+
+// requireOID is requireOid (CertificationDeclaration.ts:66-71 at db021da0).
+func requireOID(n *derNode, want []byte, rule string) error {
+	if n == nil || n.tag != derOIDTag || !bytes.Equal(n.bytes, want) {
+		found := "none"
+		if n != nil && n.tag == derOIDTag {
+			found = hex.EncodeToString(n.bytes)
+		}
+		return &cdFormatError{msg: rule + ", found OID " + found}
+	}
+	return nil
+}
+
+// requireAlgorithm is requireAlgorithm (:73-76 at db021da0): an
+// AlgorithmIdentifier SEQUENCE by its OID; the parameters are not
+// inspected.
+func requireAlgorithm(n *derNode, want []byte, rule string) error {
+	var oid *derNode
+	if n != nil && n.tag == derSequenceTag && len(n.elements) > 0 {
+		oid = &n.elements[0]
+	}
+	return requireOID(oid, want, rule)
+}
+
+// requireVersion is requireVersion (:78-83 at db021da0): an INTEGER whose
+// content is the one byte want.
+func requireVersion(n *derNode, want byte, rule string) error {
+	if n.tag != derIntegerTag || !bytes.Equal(n.bytes, []byte{want}) {
+		found := "none"
+		if n.tag == derIntegerTag {
+			found = "0x" + hex.EncodeToString(n.bytes)
+		}
+		return &cdFormatError{msg: rule + ", found " + found}
+	}
+	return nil
+}
+
+// parseDeclaration is CertificationDeclaration.parse (:108-206 at
+// db021da0): the ContentInfo, the [0] SignedData, its encapContentInfo's
+// [0] OCTET STRING eContent, the first SignerInfo's [0]
+// subjectKeyIdentifier and OCTET STRING signature, then the TLV content.
+// A broken CMS rule — contentType pkcs7-signedData, CMS version 3, at
+// least one digest algorithm and every one sha256, eContentType
+// pkcs7-data, SignerInfo version 3, a 20-byte subjectKeyIdentifier,
+// SignerInfo digest algorithm sha256, signature algorithm
+// ecdsa-with-SHA256 — is a [*cdFormatError].
 func parseDeclaration(b []byte) (*declaration, error) {
 	contentInfo, err := decodeDER(b)
 	if err != nil {
@@ -105,6 +185,9 @@ func parseDeclaration(b []byte) (*declaration, error) {
 	}
 	if len(contentInfo.elements) < 2 {
 		return nil, errors.New("attestation: invalid CMS ContentInfo structure")
+	}
+	if err := requireOID(&contentInfo.elements[0], oidPKCS7SignedData, "CMS contentType must be pkcs7-signedData"); err != nil {
+		return nil, err
 	}
 	wrapper := contentInfo.elements[1]
 	if wrapper.tag != 0xa0 || len(wrapper.elements) < 1 {
@@ -114,13 +197,31 @@ func parseDeclaration(b []byte) (*declaration, error) {
 	if len(signedData) < 4 {
 		return nil, errors.New("attestation: invalid CMS SignedData structure")
 	}
+	if err := requireVersion(&signedData[0], cmsVersion, "CMS version must be 3"); err != nil {
+		return nil, err
+	}
+	digestAlgorithms := signedData[1]
+	if digestAlgorithms.tag != derSetTag || len(digestAlgorithms.elements) == 0 {
+		return nil, &cdFormatError{msg: "CMS digestAlgorithms must hold sha256, found none"}
+	}
+	for i := range digestAlgorithms.elements {
+		if err := requireAlgorithm(&digestAlgorithms.elements[i], oidSHA256, "CMS digestAlgorithm must be sha256"); err != nil {
+			return nil, err
+		}
+	}
 	encap := signedData[2].elements
 	if len(encap) < 2 {
 		return nil, errors.New("attestation: invalid encapContentInfo structure")
 	}
+	if err := requireOID(&encap[0], oidPKCS7Data, "CMS eContentType must be pkcs7-data"); err != nil {
+		return nil, err
+	}
 	eContentWrapper := encap[1]
 	if eContentWrapper.tag != 0xa0 || len(eContentWrapper.elements) < 1 {
 		return nil, errors.New("attestation: invalid eContent wrapper in encapContentInfo")
+	}
+	if eContentWrapper.elements[0].tag != derOctetStringTag {
+		return nil, errors.New("attestation: expected OCTET STRING eContent in encapContentInfo")
 	}
 	eContent := eContentWrapper.elements[0].bytes
 	signerInfos := signedData[3].elements
@@ -131,8 +232,23 @@ func parseDeclaration(b []byte) (*declaration, error) {
 	if len(signerInfo) < 5 {
 		return nil, errors.New("attestation: invalid SignerInfo structure")
 	}
+	if err := requireVersion(&signerInfo[0], signerInfoVersion, "CMS SignerInfo version must be 3"); err != nil {
+		return nil, err
+	}
 	if signerInfo[1].tag != 0x80 {
 		return nil, errors.New("attestation: expected SubjectKeyIdentifier context tag [0] in SignerInfo")
+	}
+	if n := len(signerInfo[1].bytes); n != signerSubjectKeyIDLength {
+		return nil, &cdFormatError{msg: fmt.Sprintf("CMS SignerInfo subjectKeyIdentifier must be %d bytes, found %d", signerSubjectKeyIDLength, n)}
+	}
+	if err := requireAlgorithm(&signerInfo[2], oidSHA256, "CMS SignerInfo digestAlgorithm must be sha256"); err != nil {
+		return nil, err
+	}
+	if err := requireAlgorithm(&signerInfo[3], oidECDSAWithSHA256, "CMS SignerInfo signatureAlgorithm must be ecdsa-with-SHA256"); err != nil {
+		return nil, err
+	}
+	if signerInfo[4].tag != derOctetStringTag {
+		return nil, errors.New("attestation: expected OCTET STRING signature in SignerInfo")
 	}
 	content, err := decodeCDContent(eContent)
 	if err != nil {

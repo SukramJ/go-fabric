@@ -14,7 +14,7 @@ import (
 // (ControllerCommissioningFlow.ts:1341-1368).
 func TestPolicyTable(t *testing.T) {
 	t.Parallel()
-	findings := []attestation.Finding{{Level: attestation.LevelWarning, Check: attestation.CdSignerVerificationSkipped, Message: "m"}}
+	findings := []attestation.Finding{{Level: attestation.LevelWarning, Check: attestation.CertificationTypeProvisional, Message: "m"}}
 	boom := errors.New("boom")
 	rows := []struct {
 		name    string

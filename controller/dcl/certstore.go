@@ -132,6 +132,12 @@ type CertificateStore struct {
 	// so a shutdown does not wait out a multi-minute update (W4-ctlint-12).
 	periodic       context.Context
 	cancelPeriodic context.CancelFunc
+
+	// verifyCDSigner is attestation.VerifyCDSignerCertificate; a test
+	// stands in a CSA-issued signer the CSA CD root cannot sign here, as
+	// matter.js's DclCertificateServiceTest.ts:1758-1777 at db021da0 stands
+	// in the crypto.
+	verifyCDSigner func(der, skid []byte) (*ecdsa.PublicKey, error)
 }
 
 var (
@@ -144,7 +150,10 @@ var (
 // (DclCertificateService.ts:332-352). A failed update is logged, not
 // returned (update :952-972); a store that cannot be read is an error.
 func OpenCertificateStore(ctx context.Context, opts CertificateOptions) (*CertificateStore, error) {
-	s := &CertificateStore{opts: opts, clock: opts.Clock, log: opts.Logger, store: opts.Store, index: map[string]storedCertificate{}}
+	s := &CertificateStore{
+		opts: opts, clock: opts.Clock, log: opts.Logger, store: opts.Store, index: map[string]storedCertificate{},
+		verifyCDSigner: attestation.VerifyCDSignerCertificate,
+	}
 	s.periodic, s.cancelPeriodic = context.WithCancel(context.Background())
 	if s.clock == nil {
 		s.clock = exchange.SystemClock{}
@@ -497,62 +506,100 @@ func (s *CertificateStore) clientFor(isProduction bool) *Client {
 	return &c
 }
 
-// CDSigner implements attestation.PAAStore — getOrFetchCdSigner
-// (:851-891): a stored CD signer, else the production ledger's
-// certificate with that key identifier, stored as a production CD signer.
+// CDSigner implements attestation.PAAStore — lookupCdSigner
+// (dcl/DclCertificateService.ts:901-970 at db021da0): a key identifier of
+// 20 bytes, then a built-in CSA signing key (the Matter test CD signer is
+// left to the validator, which applies its test policy), then a stored
+// CD signer certificate that attestation.VerifyCDSignerCertificate
+// accepts — the store is a cache of DCL answers whose certificates count
+// only if they verify — then, online, the production ledger's
+// certificates with that key identifier, the first that verifies stored
+// as a production CD signer in place of a stored one that failed. Any
+// other certificate, a PAA or PAI under that key identifier in
+// particular, is no CD signer.
 func (s *CertificateStore) CDSigner(skid []byte) (*ecdsa.PublicKey, bool) {
-	id := hexUpper(skid)
-	if e, ok := s.lookup(id); ok && e.kind() == KindCDSigner {
-		c, err := parseCert(e.DER, false)
-		if err != nil {
-			s.log.Info("dcl.certificates.cd_signer_unparseable", slog.String("skid", id), slog.Any("err", err))
+	if len(skid) != cdSignerKeyIDLength {
+		return nil, false
+	}
+	if known, ok := attestation.KnownCDSigner(skid); ok {
+		if known.IsTestSigner {
 			return nil, false
 		}
-		k, err := attestation.P256Key(c.x509)
-		return k, err == nil
+		return known.PublicKey, true
+	}
+	id := hexUpper(skid)
+	e, stored := s.lookup(id)
+	if stored && e.kind() == KindCDSigner {
+		k, err := s.verifyCDSigner(e.DER, skid)
+		if err == nil {
+			return k, true
+		}
+		s.log.Debug("dcl.certificates.cd_signer_unverified", slog.String("skid", id), slog.String("source", "store"), slog.Any("err", err))
 	}
 	if s.offline() {
 		return nil, false
 	}
-	key, err := s.fetchCDSigner(context.Background(), id)
+	certs, err := s.opts.Client.CertificatesBySubjectKeyID(context.Background(), id)
 	if err != nil {
 		s.log.Info("dcl.certificates.cd_signer_fetch_failed", slog.String("skid", id), slog.Any("err", err),
 			slog.String("message", "Failed to fetch CD signer "+id+" from DCL"))
 		return nil, false
 	}
-	return key, key != nil
+	for i := range certs {
+		der, err := pemToDER(certs[i].PEMCert)
+		var k *ecdsa.PublicKey
+		if err == nil {
+			k, err = s.verifyCDSigner(der, skid)
+		}
+		if err != nil {
+			s.log.Debug("dcl.certificates.cd_signer_unverified", slog.String("skid", id), slog.String("source", "DCL"), slog.Any("err", err))
+			continue
+		}
+		// A stored CD signer that failed verification is replaced; a PAA
+		// under the same key identifier stays (:962-966 at db021da0).
+		if !stored || e.kind() == KindCDSigner {
+			s.putCDSigner(context.Background(), id, der)
+		}
+		return k, true
+	}
+	return nil, false
 }
 
-// fetchCDSigner is the DCL fallback of getOrFetchCdSigner (:870-890).
-func (s *CertificateStore) fetchCDSigner(ctx context.Context, id string) (*ecdsa.PublicKey, error) {
-	certs, err := s.opts.Client.CertificatesBySubjectKeyID(ctx, id)
+// cdSignerKeyIDLength is CertificationDeclaration.SIGNER_SUBJECT_KEY_ID_LENGTH
+// (kinds/CertificationDeclaration.ts:261-266 at db021da0).
+const cdSignerKeyIDLength = 20
+
+// putCDSigner is #putCertificate for a verified CD signer
+// (dcl/DclCertificateService.ts:862-884 at db021da0): stored as a
+// production CD signer, replacing what is stored under its key identifier.
+func (s *CertificateStore) putCDSigner(ctx context.Context, id string, der []byte) {
+	c, err := parseTrustStoreCertificate(der, KindCDSigner)
 	if err != nil {
-		return nil, err
+		return
 	}
-	if len(certs) == 0 {
-		return nil, nil
-	}
-	der, err := pemToDER(certs[0].PEMCert)
-	if err != nil {
-		return nil, err
-	}
-	if _, err := s.AddCertificate(ctx, der, KindCDSigner, true); err != nil {
-		return nil, err
-	}
-	c, err := parseCert(der, false)
-	if err != nil {
-		return nil, err
-	}
-	return attestation.P256Key(c.x509)
+	s.storeCertificate(id, der, CertificateMetadata{
+		Subject: c.x509.Subject.CommonName, SubjectKeyID: id, SerialNumber: hex.EncodeToString(serialContent(c.x509.SerialNumber)),
+		VID: vidOrZero(c), IsProduction: true, Kind: KindCDSigner,
+	})
+	s.saveIndex(ctx)
+	s.log.Info("dcl.certificates.added", slog.String("kind", string(KindCDSigner)), slog.String("skid", id), slog.Bool("production", true))
 }
 
 // AddCertificate puts a PAA or CD signer into the trust store — matter.js
-// addCertificate (:810-840). It reports false when a certificate with the
-// same key identifier is stored already (the store is then unchanged).
+// addCertificate (dcl/DclCertificateService.ts:822-859 at db021da0). It
+// reports false when a certificate with the same key identifier is stored
+// already (the store is then unchanged). A CD signer is the Matter test CD
+// signer's certificate or one attestation.VerifyCDSignerCertificate
+// accepts, as only those can sign a CD.
 func (s *CertificateStore) AddCertificate(ctx context.Context, der []byte, kind Kind, production bool) (bool, error) {
 	c, err := parseTrustStoreCertificate(der, kind)
 	if err != nil {
 		return false, err
+	}
+	if kind == KindCDSigner {
+		if err := s.checkCDSigner(c, der); err != nil {
+			return false, err
+		}
 	}
 	id := hexUpper(c.x509.SubjectKeyId)
 	if _, ok := s.lookup(id); ok {
@@ -565,6 +612,20 @@ func (s *CertificateStore) AddCertificate(ctx context.Context, der []byte, kind 
 	s.saveIndex(ctx)
 	s.log.Info("dcl.certificates.added", slog.String("kind", string(kind)), slog.String("skid", id), slog.Bool("production", production))
 	return true, nil
+}
+
+// checkCDSigner is addCertificate's CD signer rule (:843-851 at db021da0).
+func (s *CertificateStore) checkCDSigner(c *trustCert, der []byte) error {
+	skid := c.x509.SubjectKeyId
+	if !attestation.IsTestCDSigner(skid) {
+		_, err := s.verifyCDSigner(der, skid)
+		return err
+	}
+	test, _ := attestation.KnownCDSigner(skid)
+	if k, err := attestation.P256Key(c.x509); err != nil || !k.Equal(test.PublicKey) {
+		return errors.New("dcl: certificate has the test CD signer's key identifier but another key")
+	}
+	return nil
 }
 
 func vidOrZero(c *trustCert) uint16 {

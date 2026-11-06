@@ -41,7 +41,9 @@ import (
 // packages/general/test, packages/model/test, packages/nodejs/test and
 // packages/types/test (192 files) and decided every one of them in the
 // same pull request, so the count stays 2.
-const testparityPlannedRatchet = 20
+// Pin lift wave P2 (#431) ports AttestationCertificateProfileTest.ts (in
+// part), CdSignersTest.ts and DeviceAttestationValidatorChipCdTest.ts: 17.
+const testparityPlannedRatchet = 17
 
 // testparityPortedRatchet is the number of ported entries, and
 // testparityMissingRatchet the number of matter.js it cases the partial
@@ -97,9 +99,16 @@ const testparityPlannedRatchet = 20
 // Phase 39: packages/nodejs-ble/test joins the roots for the BTP
 // renegotiation; NobleBleChannelTest.ts ported (its 18 stall and ATT_MTU
 // cases), ScanControlTest.ts excluded: 158 ported.
+// Pin lift wave P2 (#431): CdSignersTest.ts and
+// DeviceAttestationValidatorChipCdTest.ts ported, DeviceAttestationValidatorTest.ts
+// completed (its five CD signer cases); the CD envelope cases of
+// CertificationDeclarationTest.ts and fourteen lookupCdSigner cases of
+// DclCertificateServiceTest.ts leave missing, the 23 distinguished-name
+// cases of AttestationCertificateProfileTest.ts (#4880, wave P1) join it:
+// 149 ported, 971 missing.
 const (
-	testparityPortedRatchet  = 146
-	testparityMissingRatchet = 977
+	testparityPortedRatchet  = 149
+	testparityMissingRatchet = 971
 )
 
 // testparityLeftRatchet is the number of left it cases summed over the
@@ -134,7 +143,11 @@ const (
 // retries, interview and abort handling (js-runtime-only, the platform's
 // behind the ble.Central seam) and the unsubscribe after a handshake
 // timeout (by-design, BD-Matter-BTP-RenegotiationAfterStall): 593.
-const testparityLeftRatchet = 592
+// Pin lift wave P2 (#431) leaves two DclCertificateServiceTest.ts lookups
+// by design: the unreadable stored DER (the Go index holds it) and the
+// test signer, which the validator knows built in
+// (BD-Matter-Attestation-CDSignerTrust): 594.
+const testparityLeftRatchet = 594
 
 // The matterjs-server register's four ratchets, exact in both directions as
 // the matter.js register's are (the comments above give the rules). Set by

@@ -5,16 +5,12 @@ package snapshot
 
 import (
 	"crypto/ecdsa"
-	"crypto/elliptic"
-	"crypto/rand"
-	"crypto/sha1" //nolint:gosec // key identifiers are SHA-1 of the key
 	"crypto/sha256"
-	"crypto/x509"
-	"crypto/x509/pkix"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
-	"math/big"
+	"os" //nolint:gosec // key identifiers are SHA-1 of the key
+	"path/filepath"
 	"strings"
 	"testing"
 	"testing/fstest"
@@ -26,29 +22,21 @@ import (
 
 var testNow = time.Date(2026, 10, 17, 12, 0, 0, 0, time.UTC)
 
-// cdSignerDER mints a CD signer certificate under the test PAA FFF1.
-func cdSignerDER(t *testing.T) (der []byte, skid string, key *ecdsa.PrivateKey) {
+// cdSignerDER is the CSA "Certification Declaration Signing Key 001" of
+// the embedded data, a certificate the CSA CD root issued, and its key.
+func cdSignerDER(t *testing.T) (der []byte, skid string, key *ecdsa.PublicKey) {
 	t.Helper()
-	paa, err := x509.ParseCertificate(secattestation.TestPAAFFF1Cert)
+	const id = "FE343F959947763B61EE4539131338494FE67D8E"
+	der, err := os.ReadFile(filepath.Join("data", CDSignerDir, id+".der"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	key, err = ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	raw, _ := hex.DecodeString(id)
+	k, err := attestation.VerifyCDSignerCertificate(der, raw)
 	if err != nil {
 		t.Fatal(err)
 	}
-	pub, _ := key.PublicKey.Bytes()
-	id := sha1.Sum(pub) //nolint:gosec // see the import
-	tmpl := &x509.Certificate{
-		SerialNumber: big.NewInt(7), Subject: pkix.Name{CommonName: "Certification Declaration Signing Key 900"},
-		NotBefore: testNow.Add(-time.Hour), NotAfter: testNow.Add(24 * time.Hour),
-		KeyUsage: x509.KeyUsageDigitalSignature, BasicConstraintsValid: true, SubjectKeyId: id[:],
-	}
-	der, err = x509.CreateCertificate(rand.Reader, tmpl, paa, &key.PublicKey, secattestation.TestPAAFFF1PrivateKey)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return der, strings.ToUpper(hex.EncodeToString(id[:])), key
+	return der, id, k
 }
 
 func entry(dir, skid string, der []byte, kind string) Entry {
@@ -116,7 +104,7 @@ func TestLoad(t *testing.T) {
 		t.Fatalf("PAA %+v %v", p, ok)
 	}
 	skid, _ := hex.DecodeString(cdSKID)
-	if k, ok := s.CDSigner(skid); !ok || !k.Equal(&cdKey.PublicKey) {
+	if k, ok := s.CDSigner(skid); !ok || !k.Equal(cdKey) {
 		t.Fatal("CD signer missing")
 	}
 	if s.AcceptsTestCertificates() {

@@ -42,7 +42,15 @@ mirror.
   element model extracted from HEAD — embedded from `parity/schema.json`
   (3,422,318 bytes) by the `//go:embed` in `parity/parity.go`.
 
-### connectedhomeip — nothing distributed
+### connectedhomeip — test vectors only, nothing distributed
+
+`controller/attestation/testdata/chip-commissioner-dut/vectors.json` holds
+connectedhomeip's commissioner DUT attestation vectors
+(`credentials/development/commissioner_dut/*/test_case_vector.json`), the
+`TestCredentials-FFF1-8001.json` credentials and the CD certificates of
+`credentials/development/cd-certs` at commit `6170af84` (Apache-2.0), as
+hex; the file names its source. They are test data only and reach no
+build of a consumer.
 
 The CHIP data model cross-check (`internal/chipdm`,
 [ADR 0015](./docs/adr/0015-chip-data-model-read-at-run-time.md)) reads

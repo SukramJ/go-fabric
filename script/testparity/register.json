@@ -6889,14 +6889,52 @@
     },
     {
       "path": "packages/protocol/test/certificate/AttestationCertificateProfileTest.ts",
-      "status": "planned",
-      "reason": "matter.js pin lift 862ad75f → db021da0 (2026-11-06): wave P2 (#431, the DAC/PAI profile and the CD validation after matter.js #4865/#4871) ports it by meaning.",
+      "status": "partial",
+      "go": [
+        "controller/attestation:TestAttestationProfileRefusesDAC",
+        "controller/attestation:TestAttestationProfileRefusesPAI",
+        "controller/attestation:TestAttestationProfileAcceptsSuccessVectors",
+        "controller/attestation:TestProfileAcceptViolation",
+        "controller/attestation:TestProfileParser",
+        "controller/attestation:TestProfileDeviceAttestationFindings"
+      ],
+      "missing": [
+        "reports a DAC with a ${name} as a profile violation",
+        "parses a DAC with a ${name} when accepting a malformed VendorID or ProductID, without the value",
+        "still reports a malformed VendorID when only accepting a profile violation",
+        "keeps the valid one of the two values when only the other is malformed",
+        "reads a VendorID as absent when the first of two VendorIDs is malformed and a malformed VendorID is accepted",
+        "reports a malformed VendorID in the issuer of a DAC like one in the subject",
+        "reports a PAI with a malformed VendorID as a profile violation",
+        "does not read the common name as VendorID when the OID value is malformed",
+        "reads only the first commonName that carries a VendorID or ProductID",
+        "ignores a malformed prefix in a later commonName",
+        "refuses a malformed prefix in an earlier commonName",
+        "does not read a value beyond the first 64 bytes of a commonName",
+        "reads VendorID 0x${vendorId.toString(16).toUpperCase()}",
+        "reads a value that ends at byte 64 of a commonName",
+        "cuts a commonName with invalid UTF-8 at byte 64 of the received bytes",
+        "refuses a value that byte 64 of a commonName cuts",
+        "does not read a prefix that starts after byte 64 of a commonName",
+        "reads the values from a later commonName and keeps the first commonName",
+        "reads the values from the first commonName when a later one carries none",
+        "is not read when the DN has a VendorID attribute",
+        "starts a device whose own DAC has a malformed VendorID",
+        "reports a DAC with a malformed VendorID as DacFormatInvalid",
+        "reports a PAI with a repeated VendorID as PaiFormatInvalid"
+      ],
+      "reason": "Pin lift wave P2 (#431): the DAC and PAI profile on connectedhomeip's commissioner DUT vectors (testdata/chip-commissioner-dut, chip 6170af84) and on edited certificates, the encoding the reader keeps, the acceptProfileViolation flag of parseAttCert and the validator's DacFormatInvalid / PaiFormatInvalid, PAI first. crypto/x509 refuses a certificate that carries any extension twice; the profile reports a twice-carried single extension from its own DER reading (BD-Matter-Attestation-ProfileOnCryptoX509), so 'parses a certificate with an extension it carries twice' holds for the encoding reader. Missing: describe('VendorID and ProductID in the distinguished name') — the malformed or repeated VendorID/ProductID as a profile violation, the acceptMalformedVidPid option and the 64-byte commonName window are matter.js #4880's DistinguishedName rules, pin lift wave P1.",
       "snapshotSha": "db88a9b238d33b07319810eb4440217b1b669dfd"
     },
     {
       "path": "packages/protocol/test/certificate/CdSignersTest.ts",
-      "status": "planned",
-      "reason": "matter.js pin lift 862ad75f → db021da0 (2026-11-06): wave P2 (#431, the DAC/PAI profile and the CD validation after matter.js #4865/#4871) ports it by meaning.",
+      "status": "ported",
+      "go": [
+        "controller/attestation:TestCdSignersCSAKeys",
+        "controller/attestation:TestCdSignersVerifyCertificate",
+        "controller/attestation:TestCdSignersKnown"
+      ],
+      "reason": "Pin lift wave P2 (#431): KnownCDSigner, IsTestCDSigner and VerifyCDSignerCertificate on the CSA CD certificates connectedhomeip ships in credentials/development/cd-certs at 6170af84 (matter.js copies them into CsaCdCertificates.ts); 'hands out a copy' is a fresh key per call.",
       "snapshotSha": "7bc4a792a7085eb26e26ec9046616cd867b3c67c"
     },
     {
@@ -6970,31 +7008,30 @@
       "path": "packages/protocol/test/certificate/CertificationDeclarationTest.ts",
       "status": "partial",
       "go": [
-        "controller/attestation:TestCertificationDeclarationParse"
+        "controller/attestation:TestCertificationDeclarationParse",
+        "controller/attestation:TestCertificationDeclarationEnvelope"
       ],
       "missing": [
-        "round-trips a provisional CD correctly",
-        "parses the CMS SignedData these tests vary",
-        "rejects a CMS SignedData with an empty digestAlgorithms SET",
-        "rejects a CMS version that is not an INTEGER",
-        "rejects a ContentInfo whose contentType is not pkcs7-signedData",
-        "rejects a SignerInfo digestAlgorithm that is a bare OID instead of an AlgorithmIdentifier",
-        "rejects a SignerInfo signature that is not an OCTET STRING",
-        "rejects a signer subject key identifier that is not 20 bytes",
-        "rejects an eContent that is not an OCTET STRING"
+        "round-trips a provisional CD correctly"
       ],
-      "reason": "The generate-then-parse round trip, the signer subject key identifier, the signature over signedData, the TlvDc decode of signedData and the refusal of garbage are ported on secure/attestation.BuildTestCertificationDeclaration and parseDeclaration; the provisional round trip is missing because the Go generator has no provisional flag (matter.js CertificationDeclaration.ts:165-181 generate(…, provisional)).",
+      "reason": "The generate-then-parse round trip, the signer subject key identifier, the signature over signedData, the TlvDc decode of signedData, the refusal of garbage and, with pin lift wave P2 (#431), the CMS envelope rules (TestCertificationDeclarationEnvelope) are ported on secure/attestation.BuildTestCertificationDeclaration and parseDeclaration; the provisional round trip is missing because the Go generator has no provisional flag (matter.js CertificationDeclaration.ts:165-181 generate(…, provisional)).",
       "snapshotSha": "f6317e94d346c0291b13ffb106a97462098a9a28"
     },
     {
       "path": "packages/protocol/test/certificate/DeviceAttestationValidatorChipCdTest.ts",
-      "status": "planned",
-      "reason": "matter.js pin lift 862ad75f → db021da0 (2026-11-06): wave P2 (#431, the DAC/PAI profile and the CD validation after matter.js #4865/#4871) ports it by meaning.",
+      "status": "ported",
+      "go": [
+        "controller/attestation:TestChipCDAcceptsValidCD",
+        "controller/attestation:TestChipCDEnvelopeRules",
+        "controller/attestation:TestChipCDSigner",
+        "controller/attestation:TestChipCDSignerTrust"
+      ],
+      "reason": "Pin lift wave P2 (#431): every case on connectedhomeip's commissioner DUT vectors at 6170af84 (testdata/chip-commissioner-dut, the name sets of matter.js ChipCdTestVectors.ts) through Validate; matter.js's offline DclCertificateService seeded with the CHIP test PAAs is attestation.TestStore.",
       "snapshotSha": "290a102e9467451709b4a05ee83df0d5dbfec9ec"
     },
     {
       "path": "packages/protocol/test/certificate/DeviceAttestationValidatorTest.ts",
-      "status": "partial",
+      "status": "ported",
       "go": [
         "controller/attestation:TestCertificateRules",
         "controller/attestation:TestParityChecks",
@@ -7014,17 +7051,11 @@
         "controller/attestation:TestDeviceAttestationValidatorFindings",
         "controller/attestation:TestDeviceAttestationValidatorCertificationType",
         "controller/attestation:TestDeviceAttestationValidatorPAAFetchTime",
-        "controller/attestation:TestDeviceAttestationValidatorTestCertificatePAA"
+        "controller/attestation:TestDeviceAttestationValidatorTestCertificatePAA",
+        "controller/attestation:TestDeviceAttestationValidatorTestCDSigner"
       ],
-      "reason": "Every it case is ported through attestation.Validate with the check and the matter.js message regex, the DclCertificateService standing as a StaticStore and its signed CRLs as the Revocations interface; the PAI with an unreadable key is CertificateUnparseable as upstream but with the step-1 message, because crypto/x509 reads the key while parsing.",
-      "snapshotSha": "b64ff9db7b831c50e5bc89527fcc4cddbb45f3a8",
-      "missing": [
-        "refuses a CD from a signer the DCL does not answer for",
-        "refuses a test-signed CD with a bad signature also when test certificates are not accepted",
-        "refuses certification_type 3, the first reserved value",
-        "verifies a test-signed CD but reports it as TrustedAsTestCertificate when test certificates are not accepted",
-        "verifies a test-signed CD when test certificates are accepted"
-      ]
+      "reason": "Every it case is ported through attestation.Validate with the check and the matter.js message regex, the DclCertificateService standing as a StaticStore and its signed CRLs as the Revocations interface; the PAI with an unreadable key is CertificateUnparseable as upstream but with the step-1 message, because crypto/x509 reads the key while parsing. Pin lift wave P2 (#431) ports the CD signer cases of db021da0: an unlisted signer is CdSignerUnknown, the built-in test signer a recoverable TrustedAsTestCertificate under a production-only policy, certification_type 3 refused.",
+      "snapshotSha": "b64ff9db7b831c50e5bc89527fcc4cddbb45f3a8"
     },
     {
       "path": "packages/protocol/test/certificate/DistinguishedNameTest.ts",
@@ -7325,33 +7356,32 @@
         "controller/dcl:TestDclCertificateServiceCustomGithubConfig",
         "controller/dcl:TestDclCertificateServiceIsProductionFlag",
         "controller/dcl:TestDclCertificateServiceAddCertificate",
-        "controller/dcl:TestDclCertificateServiceGetOrFetchCdSigner",
+        "controller/dcl:TestDclCertificateServiceLookupCdSigner",
         "controller/dcl:TestDclCertificateServiceRevocationSupport",
         "controller/dcl:TestDclCertificateServiceTestCertificateVisibility",
-        "controller/dcl:TestDclCertificateServiceGitHubRateLimitLogging"
+        "controller/dcl:TestDclCertificateServiceGitHubRateLimitLogging",
+        "controller/dcl:TestCertificateStoreCDSigner",
+        "controller/dcl/snapshot:TestDclCertificateServiceSeed",
+        "controller/dcl/snapshot:TestLoad"
       ],
       "missing": [
         "leaves no update timer running when closed during the startup fetch",
-        "fetches GitHub certs by default when test certs enabled",
-        "asks the DCL when the stored certificate cannot be read",
-        "does not know a signer offline, and does not trust a seeded certificate the CSA did not issue",
-        "does not know a signer the DCL does not list",
-        "does not know a signer while the DCL cannot be asked",
-        "does not know a signer whose DCL certificate cannot be parsed, and stores nothing",
-        "does not know a subject key identifier that is not 20 bytes and does not ask the DCL",
-        "does not take a CSA-issued certificate the DCL returns for another SKID",
-        "does not take a PAA or PAI the DCL returns for its own SKID as a CD signer",
-        "finds a built-in CSA signing key without asking the DCL",
-        "finds it offline from a seed",
-        "finds the test signer as such without asking the DCL, whatever the test certificate policy",
-        "maps a known signer and leaves any other lookup undefined",
-        "refuses a certificate the CSA did not issue",
-        "replaces a stored certificate that does not verify once the DCL answers with one that does",
-        "stores a CSA-issued certificate and the Matter test CD signer",
-        "trusts it from the DCL, stores it, and then finds it without asking again"
+        "fetches GitHub certs by default when test certs enabled"
       ],
-      "reason": "Every other it case is ported through CertificateStore over a MockFetch-like RoundTripper with the CHIP test PAAs and CD signer; missing: OpenCertificateStore returns no handle before its startup update ends, so nothing can close it during that fetch; GitHub stays opt-in (by_design BD-Matter-DCL-OptIn).",
-      "snapshotSha": "cdf9d0f4d2c28e9853db94c980e0408120d0ad97"
+      "reason": "Every other it case is ported through CertificateStore over a MockFetch-like RoundTripper with the CHIP test PAAs and CD signer; missing: OpenCertificateStore returns no handle before its startup update ends, so nothing can close it during that fetch; GitHub stays opt-in (by_design BD-Matter-DCL-OptIn). Pin lift wave P2 (#431): lookupCdSigner, addCertificate as CD signer and getOrFetchCdSigner on CertificateStore.CDSigner and AddCertificate (TestDclCertificateServiceLookupCdSigner, TestCertificateStoreCDSigner), the seed cases on controller/dcl/snapshot (a seeded certificate counts only if it verifies; TestDclCertificateServiceSeed, TestLoad); the CSA-issued signer that is not built in is CSA key 001 under another key identifier with the store's verification seam standing in for the root, as matter.js's test stands in the crypto.",
+      "snapshotSha": "cdf9d0f4d2c28e9853db94c980e0408120d0ad97",
+      "left": [
+        {
+          "it": "asks the DCL when the stored certificate cannot be read",
+          "class": "by-design",
+          "reason": "The Go store keeps each certificate's DER in its index, read with it (loadIndex drops an entry without one), so a stored CD signer whose DER cannot be read does not arise."
+        },
+        {
+          "it": "finds the test signer as such without asking the DCL, whatever the test certificate policy",
+          "class": "by-design",
+          "reason": "The validator knows the Matter test CD signer built in (attestation.KnownCDSigner, IsTestSigner) and applies the test policy; attestation.PAAStore.CDSigner carries no isTestSigner, so CertificateStore.CDSigner leaves that key identifier to the validator and asks no ledger (TestDclCertificateServiceLookupCdSigner) — BD-Matter-Attestation-CDSignerTrust."
+        }
+      ]
     },
     {
       "path": "packages/protocol/test/dcl/DclClientRevocationTest.ts",
