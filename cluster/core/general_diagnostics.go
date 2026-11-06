@@ -1160,6 +1160,15 @@ func (g *GeneralDiagnostics) SetInterfaceCheckInterval(d time.Duration) {
 	g.ifWatch.SetInterval(d)
 }
 
+// Stop ends the interface comparison until the next listener registers:
+// matter.js closes the Network, and with it the periodic check, when the
+// node's environment shuts down (Network.ts close, :239-244 at db021da0).
+// The node calls it from Stop, so no interface check stays armed on its
+// clock.
+func (g *GeneralDiagnostics) Stop() {
+	g.ifWatch.Stop()
+}
+
 // currentClock is the server's clock, for the interface watcher.
 func (g *GeneralDiagnostics) currentClock() clock.Clock {
 	g.mu.RLock()

@@ -230,7 +230,7 @@ func (r *Responder) publishLocked(ifIndex int, services map[string]bool, all boo
 	// on the new one (InterfaceResponder.ts:478-483 at db021da0).
 	answers := append(goodbye, sendable(announced, complete, false)...)
 	if rc := r.sendLocked(splitResponse(0, answers, nil), ifIndex, nil); rc != reachAll && len(goodbye) > 0 {
-		r.logger().Debug("mdns.responder.goodbye_not_sent", slog.Int("iface", ifIndex), slog.Int("reach", int(rc)))
+		r.logger().Debug("mdns.responder.goodbye_not_sent", slog.Int("iface", ifIndex))
 	}
 	r.settleGoodbyesLocked(ifIndex, st)
 }
