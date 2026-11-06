@@ -544,10 +544,14 @@ func (c *Channel) deliver(msg []byte) error {
 
 // Send is the exchange manager's carrier: one Matter message on the BTP
 // session; dst is the channel's own address. It waits for a renegotiation
-// in flight — the replay goes first — and returns [ErrChannelClosed] when
-// the channel is lost meanwhile (NobleBleChannel.ts:944-953 at 862ad75f:
-// "BtpFlowError from the suspended session would not read as channel
-// loss downstream").
+// in flight — the replay goes first — as matter.js's send awaits it before
+// it takes the session: "A renegotiation replaces the session, so sending
+// into the outgoing one would be rejected as inactive"
+// (NobleBleChannel.ts:944-953 at 862ad75f). It returns [ErrChannelClosed]
+// when the channel is lost meanwhile, the error matter.js's test asserts
+// for a send parked on a failed renegotiation: "BtpFlowError from the
+// suspended session would not read as channel loss downstream"
+// (packages/nodejs-ble/test/NobleBleChannelTest.ts:772 at 862ad75f).
 func (c *Channel) Send(_ *net.UDPAddr, payload []byte) error {
 	for {
 		// The renegotiation and the session are read in one critical
