@@ -301,7 +301,7 @@ CHIPTOOL_BIN_DIR     ?= bin
 # digest is a new commissioner and a new case set — lift CHIP_BASE_IMAGE and
 # the commit, dispatch chip-image.yml, then pin the digest it prints here.
 CHIP_BASE_IMAGE        ?= ghcr.io/matter-js/chip@sha256:d6f1de89d714309beb621543d451a98996690eea82fa74d1563abd7d2b3cb326
-CHIP_TEST_IMAGE        ?= ghcr.io/sukramj/go-fabric-chip@sha256:e443ea0c1b91478720ee8b94c34c46e95792d77493e1b50bbc99e3e603b77606
+CHIP_TEST_IMAGE        ?= ghcr.io/sukramj/go-fabric-chip@sha256:482f8caf68ff7921c7b7ffeeea4fb4f2afc6d04fb831e7b69b44b2d6de0234e4
 CHIP_TEST_IMAGE_COMMIT ?= 6170af8461b10b1766044122ac83332c6d00ab20
 
 # The CHIP data model directory the snapshot is cross-checked against

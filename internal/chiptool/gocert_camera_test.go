@@ -12,7 +12,6 @@ import (
 	"net"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -57,13 +56,6 @@ import (
 // not passed: it is the deferred-offer hint of a SolicitOffer
 // (webrtc-provider-manager.cpp:220 at 6170af84), and the session here
 // starts with ProvideOffer.
-//
-// The harness image at e443ea0c carries chip-camera-app but cannot load
-// it: libcurl.so.4 is missing, which the image build's autoremove took
-// (internal/chiptool/image/Dockerfile now keeps it). Until the next image,
-// the leg runs the same binary, held to the same sha256, from the
-// harness image's base (the Makefile's CHIP_BASE_IMAGE), and step 1 says
-// so (startCameraApp).
 
 func init() { registerGoCert(caseCameraGo) }
 
@@ -115,11 +107,6 @@ var cameraGoCandidate = wpdef.ICECandidateStruct{
 	SdpMid:        spec.Nullable[string]{Value: "0"},
 	SdpmLineIndex: spec.Nullable[uint16]{Value: 0},
 }
-
-// chipBaseImageEnv overrides the image the Makefile's CHIP_BASE_IMAGE pins.
-const chipBaseImageEnv = "GOFABRIC_CHIP_BASE_IMAGE"
-
-var reMakefileChipBaseImage = regexp.MustCompile(`(?m)^CHIP_BASE_IMAGE\s*\?=\s*(\S+)`)
 
 // cameraApp is the running chip-camera-app container.
 type cameraApp struct {
@@ -184,46 +171,24 @@ func (r *cameraRun) start(th *goTH) error {
 	return nil
 }
 
-// startCameraApp runs chip-camera-app in a container of its own. The
-// image is the harness image; when its chip-camera-app does not load
-// there, the same binary runs from the harness image's base, the image it
-// takes chip-camera-app from (internal/chiptool/image/Dockerfile), and how
-// says so.
+// startCameraApp runs chip-camera-app in a container of the harness
+// image. A binary that does not load there fails the step with ldd's
+// missing libraries rather than a container that exits unexplained.
 func startCameraApp(ctx context.Context, th *goTH) (*cameraApp, error) {
-	harness, err := pinnedChipImage()
+	image, err := pinnedChipImage()
 	if err != nil {
 		return nil, err
 	}
-	if err := ensureImage(ctx, harness); err != nil {
+	if err := ensureImage(ctx, image); err != nil {
 		return nil, err
 	}
-	image, how := harness, "chip-camera-app runs from the harness image "+shortDigest(harness)
-	missing, err := dockerSh(ctx, harness, "ldd /bin/chip-camera-app | grep 'not found' || true")
+	how := "chip-camera-app runs from the harness image " + shortDigest(image)
+	missing, err := dockerSh(ctx, image, "ldd /bin/chip-camera-app | grep 'not found' || true")
 	if err != nil {
-		return nil, fmt.Errorf("ldd chip-camera-app in %s: %w", harness, err)
+		return nil, fmt.Errorf("ldd chip-camera-app in %s: %w", image, err)
 	}
 	if missing = strings.TrimSpace(missing); missing != "" {
-		base, err := pinnedChipBaseImage()
-		if err != nil {
-			return nil, err
-		}
-		if err := ensureImage(ctx, base); err != nil {
-			return nil, err
-		}
-		sumHarness, err := dockerSh(ctx, harness, "sha256sum /bin/chip-camera-app")
-		if err != nil {
-			return nil, err
-		}
-		sumBase, err := dockerSh(ctx, base, "sha256sum /bin/chip-camera-app")
-		if err != nil {
-			return nil, err
-		}
-		if strings.Fields(sumHarness)[0] != strings.Fields(sumBase)[0] {
-			return nil, fmt.Errorf("the harness image's chip-camera-app does not load (%s), and the base image's is another binary (%s, %s)", missing, sumHarness, sumBase)
-		}
-		image = base
-		how = fmt.Sprintf("the harness image %s carries chip-camera-app but cannot load it (%s: its build's autoremove dropped libcurl4t64, fixed in internal/chiptool/image/Dockerfile for the next image); the same binary (sha256 %s) runs from the harness image's base %s",
-			shortDigest(harness), strings.Join(strings.Fields(missing), " "), strings.Fields(sumBase)[0][:12], shortDigest(base))
+		return nil, fmt.Errorf("the harness image %s carries chip-camera-app but cannot load it: %s", shortDigest(image), strings.Join(strings.Fields(missing), " "))
 	}
 	port, err := freeMatterPort()
 	if err != nil {
@@ -252,23 +217,6 @@ func startCameraApp(ctx context.Context, th *goTH) (*cameraApp, error) {
 	app := &cameraApp{name: name, image: image, port: port, how: how}
 	th.t.Cleanup(app.stop)
 	return app, nil
-}
-
-// pinnedChipBaseImage is $GOFABRIC_CHIP_BASE_IMAGE or the Makefile's
-// CHIP_BASE_IMAGE.
-func pinnedChipBaseImage() (string, error) {
-	if img := os.Getenv(chipBaseImageEnv); img != "" {
-		return img, nil
-	}
-	data, err := os.ReadFile(filepath.Join(moduleRoot(), "Makefile")) //nolint:gosec // a fixed path inside this module
-	if err != nil {
-		return "", err
-	}
-	m := reMakefileChipBaseImage.FindSubmatch(data)
-	if m == nil {
-		return "", errors.New("no CHIP_BASE_IMAGE pin in the Makefile")
-	}
-	return string(m[1]), nil
 }
 
 // ensureImage pulls img unless it is local.
