@@ -60,7 +60,11 @@ const (
 	matterAttrAdmCommFeatureMap      = spec.AttrFeatureMap
 	matterAttrAdmCommClusterRevision = spec.AttrClusterRevision
 
-	matterCmdAdmCommOpenWindow      = admdef.CmdOpenCommissioningWindow
+	matterCmdAdmCommOpenWindow = admdef.CmdOpenCommissioningWindow
+	// maxDiscriminator is the 12-bit discriminator's upper bound; above
+	// it OpenCommissioningWindow is INVALID_COMMAND (matter.js
+	// AdministratorCommissioningServer.ts:46, :92-97 at db021da0).
+	maxDiscriminator                = 0xFFF
 	matterCmdAdmCommOpenBasicWindow = admdef.CmdOpenBasicCommissioningWindow
 	matterCmdAdmCommRevoke          = admdef.CmdRevokeCommissioning
 
@@ -380,6 +384,25 @@ func (a *AdministratorCommissioning) MatterWrite(_ context.Context, attrID uint3
 	return err
 }
 
+// assertNoCommissioningInProgress is Busy while the fail-safe is armed
+// or an administrator's window is open, and without a controller to
+// open one. Mirrors matter.js
+// AdministratorCommissioningServer.ts:213-221 at db021da0
+// (#assertNoCommissioningInProgress: isFailsafeArmed, then
+// isAdministratorWindowOpen).
+func assertNoCommissioningInProgress(c WindowController, failSafeCheck func() bool) error {
+	if failSafeCheck != nil && failSafeCheck() {
+		return errAdmCommBusy
+	}
+	if c == nil {
+		return errAdmCommBusy
+	}
+	if c.CurrentWindow().Status != WindowStatusClosed {
+		return errAdmCommBusy
+	}
+	return nil
+}
+
 // MatterInvoke routes the OpenCommissioningWindow / RevokeCommissioning
 // commands.
 func (a *AdministratorCommissioning) MatterInvoke(ctx context.Context, cmdID uint32, fields any) (any, error) {
@@ -396,43 +419,38 @@ func (a *AdministratorCommissioning) MatterInvoke(ctx context.Context, cmdID uin
 		if !ok {
 			return nil, errAdmCommInvalidFields
 		}
-		// Validate PAKE parameters per Matter §11.19.8.1.2 FIRST — before
-		// the PASE / Busy / fail-safe gates. Mirrors matter.js
-		// AdministratorCommissioningServer.ts:82-97 (openCommissioningWindow
-		// checks the verifier length, iterations, and salt bounds — each
-		// raising PakeParameterError — BEFORE #assertCommissioningWindowRequirements
-		// runs the window-already-open / fail-safe Busy checks). A
-		// malformed-and-busy request therefore surfaces the PAKEParameterError
-		// (cluster status 0x03), not Busy. chip's
-		// administrator-commissioning-server.cpp likewise validates PAKE
-		// parameters before the window-state check.
+		// The check order of matter.js's openCommissioningWindow
+		// (AdministratorCommissioningServer.ts:70-97 at db021da0, #4878):
+		// the administrator's fabric first — a session without one (PASE
+		// before AddNOC) answers PAKEParameterError as chip does
+		// (#adminFabric, :164-177) — then Busy for an armed fail-safe or
+		// an administrator's open window (#assertNoCommissioningInProgress,
+		// :213-221), then the PAKE parameters (:82-90, each
+		// PAKEParameterError), then the timeout (INVALID_COMMAND,
+		// #windowTimeout :223-235) and the discriminator (:92-97,
+		// INVALID_COMMAND). Ours checks the discriminator here and the
+		// timeout in the controller's OpenWindow, bound to the commissioned
+		// state — both INVALID_COMMAND, so the order between the two is not
+		// observable. A malformed-and-busy request surfaces Busy, not the
+		// parameter error.
+		_, fabIdx := im.FabricFilterFromContext(ctx)
+		if fabIdx == 0 {
+			return nil, fmt.Errorf("%w: opening a commissioning window requires a session on a fabric", errAdmCommPakeParameter)
+		}
+		if err := assertNoCommissioningInProgress(c, failSafeCheck); err != nil {
+			return nil, err
+		}
+		if n := len(params.PAKEPasscodeVerifier); n != pakeVerifierBytes {
+			return nil, fmt.Errorf("%w: PAKEPasscodeVerifier length=%d, want %d", errAdmCommPakeParameter, n, pakeVerifierBytes)
+		}
 		if params.Iterations < pakeIterationsMin || params.Iterations > pakeIterationsMax {
 			return nil, fmt.Errorf("%w: Iterations=%d not in [%d, %d]", errAdmCommPakeParameter, params.Iterations, pakeIterationsMin, pakeIterationsMax)
 		}
 		if n := len(params.Salt); n < pakeSaltMinBytes || n > pakeSaltMaxBytes {
 			return nil, fmt.Errorf("%w: Salt length=%d not in [%d, %d]", errAdmCommPakeParameter, n, pakeSaltMinBytes, pakeSaltMaxBytes)
 		}
-		if n := len(params.PAKEPasscodeVerifier); n != pakeVerifierBytes {
-			return nil, fmt.Errorf("%w: PAKEPasscodeVerifier length=%d, want %d", errAdmCommPakeParameter, n, pakeVerifierBytes)
-		}
-		// OpenCommissioningWindow must be refused when called over a PASE
-		// session (fabricIndex == 0). Multi-Admin is a CASE-only operation.
-		// Mirrors chip AdministratorCommissioningCluster.cpp
-		// OpenCommissioningWindow VerifyOrExit(session.IsSecureSession(), ...).
-		_, fabIdx := im.FabricFilterFromContext(ctx)
-		if fabIdx == 0 {
-			return nil, errAdmCommBusy
-		}
-		// A FailSafe window being armed indicates another commissioning
-		// flow is already in progress; opening a second window on top
-		// produces overlapping fail-safe expiry races. Mirrors chip
-		// AdministratorCommissioningCluster.cpp
-		// VerifyOrExit(IsFailSafeFullyDisarmed, ...).
-		if failSafeCheck != nil && failSafeCheck() {
-			return nil, errAdmCommBusy
-		}
-		if c == nil {
-			return nil, errAdmCommBusy
+		if params.Discriminator > maxDiscriminator {
+			return nil, fmt.Errorf("%w: Discriminator %d exceeds the maximum of %d", errAdmCommInvalidFields, params.Discriminator, maxDiscriminator)
 		}
 		// Populate AdminFabricIndex from IM dispatcher context per
 		// Matter §11.19.5.2 and matter.js
@@ -528,25 +546,22 @@ func (a *AdministratorCommissioning) openBasicWindow(ctx context.Context, fields
 		return nil, errAdmCommInvalidFields
 	}
 	// The basic window takes the enhanced window's gates minus the
-	// PAKE parameters it does not carry: a CASE session, no armed
-	// fail-safe, a controller; the window's own timeout bounds and
-	// Busy for an open administrator window are the controller's
+	// PAKE parameters it does not carry: a session on a fabric
+	// (PAKEParameterError without one), no armed fail-safe and no open
+	// administrator window (Busy), a controller; the window's own
+	// timeout bounds are the controller's
 	// (bridge.CommissioningWindow.OpenWindow), as matter.js's
-	// openBasicCommissioningWindow runs the same
-	// #assertCommissioningWindowRequirements as openCommissioningWindow
-	// (AdministratorCommissioningServer.ts:105-117, :191-212 at
-	// 862ad75f) and opens through DeviceCommissioner
-	// .allowBasicCommissioning with the node's own passcode
-	// (DeviceCommissioner.ts:130-137).
+	// openBasicCommissioningWindow runs #adminFabric and
+	// #assertNoCommissioningInProgress like openCommissioningWindow
+	// (AdministratorCommissioningServer.ts:116-127, :164-177, :213-221
+	// at db021da0) and opens through DeviceCommissioner
+	// .allowBasicCommissioning with the node's own passcode.
 	_, fabIdx := im.FabricFilterFromContext(ctx)
 	if fabIdx == 0 {
-		return nil, errAdmCommBusy
+		return nil, fmt.Errorf("%w: opening a commissioning window requires a session on a fabric", errAdmCommPakeParameter)
 	}
-	if failSafeCheck != nil && failSafeCheck() {
-		return nil, errAdmCommBusy
-	}
-	if c == nil {
-		return nil, errAdmCommBusy
+	if err := assertNoCommissioningInProgress(c, failSafeCheck); err != nil {
+		return nil, err
 	}
 	params := OpenWindowParams{
 		CommissioningTimeoutSeconds: timeout,

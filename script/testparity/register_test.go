@@ -40,8 +40,11 @@ import (
 // node/test/behaviors share. Phase 33 widened the roots to
 // packages/general/test, packages/model/test, packages/nodejs/test and
 // packages/types/test (192 files) and decided every one of them in the
-// same pull request, so the count stays 2.
-const testparityPlannedRatchet = 20
+// same pull request, so the count stays 2. The db021da0 lift planned 18
+// new files on its waves P1–P4 (20); wave P1 ported its four
+// (AdministratorCommissioningServerTest, CaseSessionCatsTest,
+// DistinguishedNameTest, OperationalCertificateVerifyTest) as partial: 16.
+const testparityPlannedRatchet = 16
 
 // testparityPortedRatchet is the number of ported entries, and
 // testparityMissingRatchet the number of matter.js it cases the partial
@@ -97,9 +100,14 @@ const testparityPlannedRatchet = 20
 // Phase 39: packages/nodejs-ble/test joins the roots for the BTP
 // renegotiation; NobleBleChannelTest.ts ported (its 18 stall and ATT_MTU
 // cases), ScanControlTest.ts excluded: 158 ported.
+// Pin lift db021da0 wave P1: four planned files become partial with 53
+// missing cases named (the DNS-SD advertisement reads of an
+// administrator's window, the VVSC kind and issuer-DN cases of the
+// certificate tests, the vendor-id DN attributes, the DER round trips):
+// 1033 missing.
 const (
 	testparityPortedRatchet  = 146
-	testparityMissingRatchet = 977
+	testparityMissingRatchet = 1030
 )
 
 // testparityLeftRatchet is the number of left it cases summed over the
@@ -134,7 +142,10 @@ const (
 // retries, interview and abort handling (js-runtime-only, the platform's
 // behind the ble.Central seam) and the unsubscribe after a handshake
 // timeout (by-design, BD-Matter-BTP-RenegotiationAfterStall): 593.
-const testparityLeftRatchet = 592
+// Pin lift db021da0 wave P1 adds the twelve js-runtime-only rows of the
+// certificate tests' object-view API (DistinguishedName.rdnsOf, frozen
+// objects, spread copies, an undefined property): 604.
+const testparityLeftRatchet = 604
 
 // The matterjs-server register's four ratchets, exact in both directions as
 // the matter.js register's are (the comments above give the rules). Set by

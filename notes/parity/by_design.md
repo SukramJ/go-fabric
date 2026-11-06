@@ -1704,8 +1704,16 @@ Pinned by `TestPeerInitiator_FullHandshakeAgainstResponder`.
 Caught up at the db021da0 lift (2026-11-06): matter.js #4884 (`fix(protocol):
 CASE sessions we initiate carry the peer's CATs from its NOC`) takes the
 responder's CATs from the NOC in Sigma2 (`CaseClient.ts:282-290` at
-db021da0) and versions its resumption records; the two implementations
-agree, and this entry stays as the record of the earlier difference.
+db021da0) and versions its resumption records. The sigma layer agreed; the
+client stack's handshake did not yet: `client/handshake` gave an initiated
+session the configured CATs (`CASEOptions.CaseAuthenticatedTags`), falling
+back to the record's, and kept the peer's in a second field, while the
+Interaction Model server branch of the client stack takes a session's CATs
+as the subject CATs of the peer's requests. Wave P1 of the lift closes it:
+an initiated session's CATs are the peer's NOC CATs (`CaseClient.ts:285,
+:355-366` at db021da0), the record carries them as its one set, and the
+option is gone, as matter.js ignores its own (`:396-404`). This entry stays
+as the record of the earlier difference.
 
 ### BD-Matter-GroupSendOnEveryMulticastInterface — a group message leaves on every interface the listener joined
 
@@ -3393,13 +3401,15 @@ bridge decodes OpenCommissioningWindow with its own
 into `cluster/wire.OpenWindowParams`, ahead of the definition. Two reasons:
 the `WindowController` port a host implements takes `OpenWindowParams`, and
 matter.js extends the request schema before it validates — its
-`AdministratorCommissioningServer.ts` relaxes the PakePasscodeVerifier,
-Iterations and Salt constraints to "none" so the behavior answers
-PakeParameterError (cluster status 0x03) rather than the interaction layer
-answering CONSTRAINT_ERROR. The generated decoder carries the element
-file's constraints without that extension; the hand-written one enforces
-only CommissioningTimeout's width and the Discriminator bound, as matter.js
-does, and leaves the PAKE checks to the server. The server also accepts the
+`AdministratorCommissioningServer.ts:38-43` (at db021da0) relaxes the
+PakePasscodeVerifier, Iterations, Salt and Discriminator constraints to
+"none" so the behavior answers PakeParameterError (cluster status 0x03) for
+the PAKE parameters and INVALID_COMMAND for a discriminator above 0xFFF
+(`:92-97`) rather than the interaction layer answering CONSTRAINT_ERROR. The
+generated decoder carries the element file's constraints without that
+extension; the hand-written one enforces only CommissioningTimeout's width,
+as matter.js does, and leaves the PAKE and discriminator checks to the
+server. The server also accepts the
 generated `OpenCommissioningWindowRequest` in process. Retire when the
 generator can apply a behavior's schema extension.
 

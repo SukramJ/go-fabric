@@ -81,12 +81,19 @@ func newStartedBridge(t *testing.T) *Bridge {
 }
 
 // buildHeader encodes a minimal Matter message header with the given
-// SessionID and MessageCounter (no source/dest node IDs).
+// SessionID and MessageCounter. An unsecured header (SessionID 0) carries
+// the initiator's source node id — the decoder drops an unsecured message
+// with neither or both node ids (matter.js MessageCodec.ts:234-239 at
+// db021da0); a secure one carries no node ids.
 func buildHeader(sessionID uint16, msgCounter uint32) []byte {
-	return message.Header{
+	h := message.Header{
 		SessionID:      sessionID,
 		MessageCounter: msgCounter,
-	}.Marshal()
+	}
+	if sessionID == 0 {
+		h.HasSourceNodeID, h.SourceNodeID = true, 0x5A5A
+	}
+	return h.Marshal()
 }
 
 // buildProtocolHeader encodes a ProtocolHeader with the given ProtocolID

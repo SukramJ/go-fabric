@@ -252,11 +252,15 @@ func TestMessageCodecEncode(t *testing.T) {
 }
 
 // matter.js decodeFixedHeader refuses three header shapes before it reads
-// the counter (MessageCodec.ts:223-233 at 862ad75f, UnexpectedDataError):
+// the counter (MessageCodec.ts:230-247 at db021da0, UnexpectedDataError):
 // a unicast session with a destination group id (chip
-// MessageHeader.cpp:209-212 at 6170af84 agrees), a group session without
-// a destination, and a group session without a source node id. A group
-// session with a destination node id (MCSP) stays accepted.
+// MessageHeader.cpp:209-212 at 6170af84 agrees), an unsecured message
+// with both or neither of the source and the destination node id
+// (:234-239, "The CHIP SDK drops these too"), a group session without a
+// destination group id — none, or a destination node id, which is MCSP
+// (:241-243, "which the CHIP SDK does not process either") — and a group
+// session without a source node id. Until the db021da0 lift a group
+// session with a destination node id was accepted here.
 func TestMessageCodecDecodeRefusesCrossFieldShapes(t *testing.T) {
 	t.Parallel()
 	for _, tc := range []struct {
@@ -265,8 +269,11 @@ func TestMessageCodecDecodeRefusesCrossFieldShapes(t *testing.T) {
 		want error
 	}{
 		{"unicast session cannot have destination group id", "0200000001000000cdab", ErrUnicastGroupDestination},
-		{"group session must have destination group id or destination node id", "04000001010000000100000000000000", ErrGroupSessionHeader},
+		{"group session must have destination group id", "04000001010000000100000000000000", ErrGroupSessionHeader},
+		{"group session with a destination node id (MCSP) is refused", "0500000101000000" + "0100000000000000" + "0200000000000000", ErrGroupSessionHeader},
 		{"group session must have source node id", "0200000101000000cdab", ErrGroupSessionHeader},
+		{"an unsecured message without node id", "0000000001000000", ErrUnsecuredNodeIDs},
+		{"an unsecured message with both node ids", "0500000001000000" + "0100000000000000" + "0200000000000000", ErrUnsecuredNodeIDs},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
@@ -275,11 +282,27 @@ func TestMessageCodecDecodeRefusesCrossFieldShapes(t *testing.T) {
 			}
 		})
 	}
-	t.Run("group session with a destination node id is accepted", func(t *testing.T) {
+	t.Run("an unsecured message with one node id is accepted either way", func(t *testing.T) {
 		t.Parallel()
-		h, n, err := UnmarshalHeader(mcHex(t, "0500000101000000"+"0100000000000000"+"0200000000000000"))
-		if err != nil || n != 24 || h.DestNodeID != 2 || h.SessionType != SessionGroup {
-			t.Fatalf("UnmarshalHeader = %+v, %d, %v", h, n, err)
+		for _, hex := range []string{"0400000001000000" + "0100000000000000", "0100000001000000" + "0200000000000000"} {
+			if _, _, err := UnmarshalHeader(mcHex(t, hex)); err != nil {
+				t.Errorf("%s: %v", hex, err)
+			}
+		}
+	})
+	t.Run("the unsecured node-id rule is the decoder's, not the encoder's", func(t *testing.T) {
+		t.Parallel()
+		// matter.js's encodePacketHeader refuses only the group case
+		// (MessageCodec.ts:480-496 at db021da0); the senders name one node
+		// id by construction.
+		for _, h := range []Header{
+			{MessageCounter: 1},
+			{MessageCounter: 1, HasSourceNodeID: true, SourceNodeID: 1, DestSize: DestNodeID, DestNodeID: 2},
+			{MessageCounter: 1, HasSourceNodeID: true, SourceNodeID: 1},
+		} {
+			if _, err := h.MarshalPacket(); err != nil {
+				t.Errorf("%+v: %v, want it encoded", h, err)
+			}
 		}
 	})
 	t.Run("a unicast header with a destination group id is not encoded", func(t *testing.T) {

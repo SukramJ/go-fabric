@@ -18,7 +18,7 @@ const administratorCommissioningClusterID uint32 = 0x003C
 // cluster server takes, following matter.js
 // packages/model/src/standard/elements/administrator-commissioning.element.ts:
 // [0] CommissioningTimeout uint16, [1] PakePasscodeVerifier octets,
-// [2] Discriminator uint16 (max 4095), [3] Iterations uint32, [4] Salt
+// [2] Discriminator uint16 (above 0xFFF the handler's INVALID_COMMAND), [3] Iterations uint32, [4] Salt
 // octets.
 //
 // Without it the command reached the server as the generic tag map, which
@@ -57,9 +57,11 @@ func decodeOpenCommissioningWindowRequest(dec *tlv.Decoder) (wire.OpenWindowPara
 			if p.Discriminator, err = fieldUint16(cmd, "Discriminator", el); err != nil {
 				return p, err
 			}
-			if p.Discriminator > 0x0FFF {
-				return p, fieldConstraintError{fmt.Sprintf("%s: Discriminator %d > 4095", cmd, p.Discriminator)}
-			}
+			// A discriminator above 0xFFF is the handler's
+			// INVALID_COMMAND after the Busy checks (matter.js
+			// AdministratorCommissioningServer.ts:92-97 at db021da0,
+			// Discriminator with constraint "none" :42), not a
+			// constraint error here.
 		case 3:
 			if el.Uint > 0xFFFFFFFF {
 				return p, fieldConstraintError{fmt.Sprintf("%s: Iterations %d > uint32 max", cmd, el.Uint)}

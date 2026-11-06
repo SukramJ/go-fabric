@@ -837,7 +837,6 @@ func (c *connection) attemptOnce(att *attempt, attemptNo int) error {
 	params := p.SessionParameters()
 	opts := handshake.CASEOptions{
 		PeerParameters:               &params,
-		CaseAuthenticatedTags:        p.Descriptor().CaseAuthenticatedTags,
 		MaxInitialRetransmissions:    -1,
 		MaxInitialRetransmissionTime: c.timing.MaxDelayBetweenInitialContactRetries,
 		Exchange:                     notifiers,

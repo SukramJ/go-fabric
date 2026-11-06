@@ -95,6 +95,15 @@ type exchangeReplyTarget struct {
 	src                 net.Addr
 	hasPeerSourceNodeID bool
 	peerSourceNodeID    uint64
+	// hasPeerDestNodeID / peerDestNodeID is the node id the peer
+	// addressed us by on an unsecured message — the responder's
+	// messages of a CASE the bridge initiated carry only a destination
+	// (bridge/case_initiator.go). An ack to such a message names that
+	// id as our source: an unsecured message carries exactly one of
+	// the two node ids (matter.js MessageCodec.ts:234-239 at db021da0,
+	// "The CHIP SDK drops these too").
+	hasPeerDestNodeID bool
+	peerDestNodeID    uint64
 	// sessionID is the SessionID of the inbound message that owed the
 	// ACK. 0 means "unsecured" (PASE pre-fabric); non-zero means the
 	// synthesised StandaloneAck must encrypt under that session.
@@ -135,6 +144,8 @@ func (b *Bridge) owedInboundAck(src net.Addr, hdr *message.Header, proto message
 			src:                 src,
 			hasPeerSourceNodeID: hdr.HasSourceNodeID,
 			peerSourceNodeID:    hdr.SourceNodeID,
+			hasPeerDestNodeID:   hdr.DestSize == message.DestNodeID,
+			peerDestNodeID:      hdr.DestNodeID,
 			sessionID:           hdr.SessionID,
 		})
 	}
@@ -500,11 +511,18 @@ func (b *Bridge) emitStandaloneAck(obl mrp.AckObligation) {
 	// Echo the peer's SourceNodeID as our DestNodeID so chip-tool's
 	// commissioner accepts the unsecured StandaloneAck (same rule as
 	// [Bridge.sendReply], Matter §4.4.1.2). For peers that don't set
-	// SourceNodeID the header stays bare. Skip on encrypted sessions —
+	// SourceNodeID the ack names the destination it addressed as our
+	// source (exchangeReplyTarget). Skip on encrypted sessions —
 	// chip-tool's secure-receive validator does not expect it there.
 	if target.sessionID == 0 && target.hasPeerSourceNodeID {
 		hdr.DestSize = message.DestNodeID
 		hdr.DestNodeID = target.peerSourceNodeID
+	}
+	if target.sessionID == 0 && !target.hasPeerSourceNodeID && target.hasPeerDestNodeID {
+		// The peer addressed us by node id and named no source: the ack
+		// goes out as that node, so it carries exactly one node id.
+		hdr.HasSourceNodeID = true
+		hdr.SourceNodeID = target.peerDestNodeID
 	}
 
 	var datagram []byte

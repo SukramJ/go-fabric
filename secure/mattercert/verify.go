@@ -110,6 +110,9 @@ func ValidateRCAC(c *Certificate) error {
 	if !c.IsRoot() {
 		return fmt.Errorf("%w: cert is not a Root CA", ErrInvalidRCAC)
 	}
+	if err := checkDNLimits(c, "RCAC"); err != nil {
+		return fmt.Errorf("%w: %w", ErrInvalidRCAC, err)
+	}
 	// Self-signed: Subject RCAC-ID must equal Issuer RCAC-ID.
 	// Mirrors chip CHIPCert.cpp:1131 mSubjectDN.IsEqual(mIssuerDN).
 	if c.Subject.MatterRCACID != c.Issuer.MatterRCACID {
@@ -435,15 +438,42 @@ const (
 	maxCASEAuthTags                   = 3
 )
 
+// maxDNRDNs is the RDN count a Matter certificate's subject or issuer may
+// carry — "All implementations SHALL reject Matter certificates with more
+// than 5 RDNs in a single DN" (matter.js OperationalBase.ts:92-97 at
+// db021da0; chip CHIP_CONFIG_CERT_MAX_RDN_ATTRIBUTES).
+const maxDNRDNs = 5
+
+// checkDNLimits applies the DN rules every operational certificate shares:
+// at most [maxDNRDNs] RDNs in the subject and the issuer, and no
+// matter-vvs-id — "The subject DN SHALL NOT encode any matter-vvs-id
+// attribute" for a NOC (Noc.ts:109-111 at db021da0), an ICAC
+// (Icac.ts:93-95) and an RCAC (Rcac.ts:89-90).
+func checkDNLimits(c *Certificate, kind string) error {
+	if n := len(c.Subject.Order); n > maxDNRDNs {
+		return fmt.Errorf("%w: %s subject carries %d RDNs, at most %d allowed", ErrMalformed, kind, n, maxDNRDNs)
+	}
+	if n := len(c.Issuer.Order); n > maxDNRDNs {
+		return fmt.Errorf("%w: %s issuer carries %d RDNs, at most %d allowed", ErrMalformed, kind, n, maxDNRDNs)
+	}
+	if c.Subject.HasVVSID {
+		return fmt.Errorf("%w: %s subject must not carry a matter-vvs-id", ErrMalformed, kind)
+	}
+	return nil
+}
+
 // checkNOCShape applies the structural predicates a NOC must satisfy
 // beyond carrying a node id and a fabric id. Mirrors matter.js
 // packages/protocol/src/certificate/kinds/Noc.ts (validateFields + verify):
 // not a CA, only the four operational identifiers in the subject, an
 // operational node id, a non-zero fabric id, at most three CATs each with
 // a non-zero version, keyUsage digitalSignature, extendedKeyUsage carrying
-// serverAuth or clientAuth, and a 20-byte subjectKeyIdentifier. Every one
-// of them is what keeps a cryptographically valid certificate from
-// standing in for an identity it does not name.
+// serverAuth (Noc.ts:148-154 at db021da0: "CHIP requires only serverAuth
+// and accepts other purposes", so clientAuth alone is refused — until the
+// db021da0 lift either purpose passed here), and a 20-byte
+// subjectKeyIdentifier. Every one of them is what keeps a
+// cryptographically valid certificate from standing in for an identity it
+// does not name.
 func checkNOCShape(c *Certificate) error {
 	if c.Subject.HasICACID || c.Subject.HasRCACID {
 		return fmt.Errorf("%w: NOC subject must not carry an ICAC-ID or RCAC-ID", ErrMalformed)
@@ -468,6 +498,12 @@ func checkNOCShape(c *Certificate) error {
 		}
 		seen[id] = struct{}{}
 	}
+	// The DN limits after the CAT rules: a NOC with four CATs is "too many
+	// CATs" (matter.js validateFields at decode, Noc.ts), not "too many
+	// RDNs" (generalVerify, OperationalBase.ts:92-97 at db021da0).
+	if err := checkDNLimits(c, "NOC"); err != nil {
+		return err
+	}
 	ext := c.Extensions
 	if ext.HasBasicConstraints && ext.BasicConstraintsIsCA {
 		return fmt.Errorf("%w: NOC must not be a CA", ErrMalformed)
@@ -475,8 +511,8 @@ func checkNOCShape(c *Certificate) error {
 	if !ext.HasKeyUsage || ext.KeyUsage&keyUsageDigitalSignature == 0 {
 		return fmt.Errorf("%w: NOC keyUsage must carry digitalSignature", ErrMalformed)
 	}
-	if !ext.HasExtendedKeyUsage || !hasEKU(ext.ExtendedKeyUsage, extendedKeyUsageServerAuth, extendedKeyUsageClientAuth) {
-		return fmt.Errorf("%w: NOC extendedKeyUsage must carry serverAuth or clientAuth", ErrMalformed)
+	if !ext.HasExtendedKeyUsage || !hasEKU(ext.ExtendedKeyUsage, extendedKeyUsageServerAuth) {
+		return fmt.Errorf("%w: NOC extendedKeyUsage must carry serverAuth", ErrMalformed)
 	}
 	if !ext.HasSubjectKeyID || len(ext.SubjectKeyID) != 20 {
 		return fmt.Errorf("%w: NOC subjectKeyIdentifier must be 160 bit", ErrMalformed)
@@ -497,6 +533,9 @@ func checkNOCShape(c *Certificate) error {
 // ICAC minted for fabric A could issue a NOC for fabric B under the same
 // root, and the responder would open the session on B.
 func checkICACShape(icac, noc *Certificate) error {
+	if err := checkDNLimits(icac, "ICAC"); err != nil {
+		return err
+	}
 	if icac.Subject.HasRCACID {
 		return fmt.Errorf("%w: ICAC subject must not carry an RCAC-ID", ErrMalformed)
 	}

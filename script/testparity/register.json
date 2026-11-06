@@ -3082,8 +3082,40 @@
     },
     {
       "path": "packages/node/test/behaviors/administrator-commissioning/AdministratorCommissioningServerTest.ts",
-      "status": "planned",
-      "reason": "matter.js pin lift 862ad75f → db021da0 (2026-11-06): wave P1 (Fable, branch pin/p1-security) ports it by meaning with the rules it implements.",
+      "status": "partial",
+      "go": [
+        "cluster/wire:TestAdmComm_Read_WindowStatus_WithController_Enhanced",
+        "cluster/wire:TestAdmComm_Read_AdminFabricIndex_NotNull_ReturnsFabricIndex",
+        "bridge:TestCommissioningWindow_AdminFabric_StoredFromParams",
+        "bridge:TestCommissioningWindow_DurationBoundaries_Valid",
+        "bridge:TestCommissioningWindow_OpenWindow_DurationTooShort_ReturnsInvalid",
+        "bridge:TestCommissioningWindow_OpenWindow_DurationTooLong_ReturnsInvalid",
+        "bridge:TestParityMatterJS_CommissioningWindow_DurationInvalidReturnsInvalidCommand",
+        "cluster/wire:TestAdmComm_Invoke_OpenWindow_BusyBeatsMalformedPAKE",
+        "cluster/wire:TestAdmComm_OpenWindow_PinDB021da0Cases",
+        "bridge:TestCommandFieldsReader_OpenCommissioningWindow",
+        "cluster/wire:TestAdmComm_Basic_OpenBasicWindow_GatesLikeTheEnhancedCommand",
+        "bridge:TestCommissioningWindow_OpenWindow_Twice_ReturnsBusy",
+        "bridge:TestCommissioningWindow_OpenWindow_RejectsBusyWhenFailSafeArmed",
+        "bridge:TestCommissioningWindow_FabricRemovedClearsTheAdminFabric",
+        "cluster/wire:TestPin_OpenWindow_PaseReject",
+        "cluster/wire:TestAdmComm_Invoke_OpenWindow_PASEReturnsPakeParameterError",
+        "node:TestCommissioningWindowLifetime_AdministratorBasicWindow",
+        "cluster/wire:TestAdmComm_Basic_OpenBasicWindow_ForwardsABasicWindow",
+        "bridge:TestOwnWindow_RevokeCommissioningClosesIt",
+        "bridge:TestCommissioningWindow_RevokeWindow_OnOpenWindow_StatusReturnsToClosed",
+        "bridge:TestCommissioningWindow_OpenAfterRevoke_NotBusy",
+        "bridge:TestCommissioningWindow_AdminFabric_ClearedOnRevoke",
+        "bridge:TestCommissioningWindow_PaseSessionCloser_CalledOnRevokeEvenWhenClosed",
+        "bridge:TestCommissioningWindow_RevokeOverPaseDefersTheClose",
+        "bridge:TestCommissioningWindow_RevokeExpiresTheFailSafe"
+      ],
+      "missing": [
+        "advertises in enhanced commissioning mode with the requested discriminator",
+        "closes the window, resets the attributes and stops advertising once the timeout expires",
+        "reports a basic window and its opener and advertises in basic commissioning mode"
+      ],
+      "reason": "Pin lift db021da0, wave P1 (2026-11-06): the command gates in matter.js's order (#4878) — a session without fabric PAKEParameterError, Busy for an armed fail-safe or an administrator's window before the PAKE parameters, the parameter bounds by value, the discriminator above 4095 INVALID_COMMAND — are ported at cluster/wire; the window lifetime, the timeout bounds, the admin fabric's removal and RevokeCommissioning's PASE and fail-safe steps at bridge's CommissioningWindow. Missing: the three cases that read the DNS-SD advertisement (CM and discriminator) of an administrator's window, and the enhanced window's expiry with its advertisement withdrawn.",
       "snapshotSha": "f1fceac45a0a7a478e08967fa76e234f0f6593df"
     },
     {
@@ -4610,8 +4642,16 @@
     },
     {
       "path": "packages/node/test/node/CaseSessionCatsTest.ts",
-      "status": "planned",
-      "reason": "matter.js pin lift 862ad75f → db021da0 (2026-11-06): wave P1 (Fable, branch pin/p1-security) ports it by meaning with the rules it implements.",
+      "status": "partial",
+      "go": [
+        "client/handshake:TestCASEStaleRecordFallsBackToFullHandshake",
+        "secure/sigma:TestPeerInitiator_FullHandshakeAgainstResponder",
+        "secure/sigma:TestPeerInitiator_ResumesWithRecord"
+      ],
+      "missing": [
+        "resumes with the peer's CATs from a record that the CaseClient of this node wrote"
+      ],
+      "reason": "Pin lift db021da0, wave P1 (2026-11-06): the client stack's initiated session and its resumption record carry the peer's CATs from its NOC (matter.js #4884), the stale-record case replaces them, with and without CATs in the device NOC (bridgetest.Options.DeviceCAT); the sigma layer's cases at secure/sigma. Missing: the node-initiated resumption against the controller's CASE server from a record the client wrote (TestCASEServerFullAndResumed runs the flow without asserting CATs).",
       "snapshotSha": "224b6d12ca13531ffd8fe4a3d43ebe0342f470f4"
     },
     {
@@ -7028,14 +7068,152 @@
     },
     {
       "path": "packages/protocol/test/certificate/DistinguishedNameTest.ts",
-      "status": "planned",
-      "reason": "matter.js pin lift 862ad75f → db021da0 (2026-11-06): wave P1 (Fable, branch pin/p1-security) ports it by meaning with the rules it implements.",
+      "status": "partial",
+      "go": [
+        "secure/mattercert:TestDERDistinguishedNameEdges",
+        "secure/mattercert:TestBuildDNStandardAttributes",
+        "secure/mattercert:TestCertificatesTLVOrderParityMatterJS",
+        "secure/mattercert:TestVerifyAndExtractPubKey_StructuralPredicates",
+        "secure/mattercert:TestCertificatesSpecialNocEncodingCases",
+        "secure/mattercert:TestDecodeRefusesADNThatIsNotAList",
+        "secure/mattercert:TestDecodeDN_NonContextTagInIssuer",
+        "secure/mattercert:TestDecodeDN_UnknownContainerInIssuer",
+        "secure/mattercert:TestDecodeDNRulesPinDB021da0"
+      ],
+      "missing": [
+        "for CATs between other attributes",
+        "of a NOC with a repeated organizationalUnitName, from TLV and from DER",
+        "round trips ${name} from DER to TLV to DER",
+        "round trips a commonNamePs that carries a VendorID and a ProductID",
+        "reads a PrintableString domainComponent as domainComponent",
+        "round trips repeated attributes and interleaved CATs and verifies the signature",
+        "keeps the CATs in the order given",
+        "keeps CATs out of ascending order between other attributes of a decoded DN",
+        "leaves out a VendorID that its commonNamePs carries",
+        "leaves out a VendorID that a later commonName carries",
+        "keeps a VendorID that no commonName carries",
+        "encodes to TLV when the commonName gives the VendorID and ProductID",
+        "keeps a VendorID attribute that differs from the one in the commonName",
+        "leaves out the attributes when the commonName gives the same values",
+        "keeps both attributes when only one of them equals the commonName value",
+        "keeps a ProductID attribute next to a commonName with another ProductID",
+        "encodes a commonName with a malformed prefix next to a VendorID attribute",
+        "keeps the VendorID",
+        "cannot be converted to TLV",
+        "skips tag 144 of a PrintableString domainComponent",
+        "refuses a missing mandatory field when validate is ${validate}"
+      ],
+      "left": [
+        {
+          "it": "refuses a repeated commonName that the TLV decoder would cut at U+001F",
+          "class": "js-runtime-only",
+          "reason": "matter.js's TLV string decoder cutting a value at U+001F; the Go TLV decoder reads length-delimited strings"
+        },
+        {
+          "it": "holds its RDN list",
+          "class": "js-runtime-only",
+          "reason": "the object view and RDN-list API of matter.js's DistinguishedName (rdnsOf, frozen objects, spread copies); the Go DN is a typed struct with its Attributes and Order"
+        },
+        {
+          "it": "refuses a change in place",
+          "class": "js-runtime-only",
+          "reason": "frozen JavaScript objects"
+        },
+        {
+          "it": "encodes a changed copy from its properties",
+          "class": "js-runtime-only",
+          "reason": "the spread copy of a decoded JavaScript object"
+        },
+        {
+          "it": "encodes a copy with a forged RDN list from its properties",
+          "class": "js-runtime-only",
+          "reason": "a hidden rdns property of a JavaScript object"
+        },
+        {
+          "it": "refuses to encode a copy with an enumerable RDN list property",
+          "class": "js-runtime-only",
+          "reason": "an enumerable rdns property of a JavaScript object"
+        },
+        {
+          "it": "counts one RDN per property and per CAT",
+          "class": "js-runtime-only",
+          "reason": "DistinguishedName.rdnCount of the object view; Go counts len(Order)"
+        },
+        {
+          "it": "encodes its current properties after a change",
+          "class": "js-runtime-only",
+          "reason": "a mutable plain JavaScript object"
+        },
+        {
+          "it": "skips a property whose value is undefined",
+          "class": "js-runtime-only",
+          "reason": "an undefined JavaScript property"
+        },
+        {
+          "it": "refuses to encode a property ${name}",
+          "class": "js-runtime-only",
+          "reason": "untyped property names of a JavaScript object; the Go DN is a typed struct"
+        }
+      ],
+      "reason": "Pin lift db021da0, wave P1 (2026-11-06): the DN rules at the decoders — a repeated single-valued Matter attribute refused in TLV and DER, repeated standard attributes kept in order, the limit of five RDNs, the firmware signing id counted — are ported; the object-view API rows are JavaScript's. Missing: the DER → TLV → DER byte round trips, the interleaved-CAT and repeated-attribute signature cases, the vendor-id and product-id DN attributes of the attestation DN (wave P2's attestation profile may port them), and the DER-to-TLV refusals for them.",
       "snapshotSha": "c7dc86645ecae3b3946d51b3ecdcb08a773ba3f0"
     },
     {
       "path": "packages/protocol/test/certificate/OperationalCertificateVerifyTest.ts",
-      "status": "planned",
-      "reason": "matter.js pin lift 862ad75f → db021da0 (2026-11-06): wave P1 (Fable, branch pin/p1-security) ports it by meaning with the rules it implements.",
+      "status": "partial",
+      "go": [
+        "secure/mattercert:TestValidateRCAC_Valid",
+        "secure/mattercert:TestVerifyAndExtractPubKey_NOCViaICAC",
+        "secure/mattercert:TestVerifyAndExtractPubKey_NOCDirectFromRoot",
+        "secure/mattercert:TestVerifyAndExtractPubKey_StructuralPredicates",
+        "secure/mattercert:TestDecodeDNRulesPinDB021da0",
+        "secure/mattercert:TestDERDistinguishedNameEdges",
+        "secure/mattercert:TestVerifierConstructionAndExtractionRefusals",
+        "cluster/core:TestParityOpcreds_NonOperationalNOCNodeIDIsInvalidNodeOpID"
+      ],
+      "missing": [
+        "verifies a NOC with node ID 0xFFFF_FFEF_FFFF_FFFF, the top of the operational range",
+        "verifies a VVSC",
+        "verifies a NOC with an additional key usage flag",
+        "verifies a NOC whose key usage bitmap has a bit that has no name",
+        "verifies an issuer DN with exactly five RDNs",
+        "refuses an issuer DN with six RDNs",
+        "refuses a matter-rcac-id",
+        "refuses a key usage bitmap with a bit that has no name",
+        "refuses an RCAC in the ICAC position",
+        "refuses a matter-node-id",
+        "refuses a matter-vvs-id",
+        "refuses a key usage flag beyond keyCertSign, cRLSign and digitalSignature",
+        "accepts the optional digitalSignature flag",
+        "refuses a VVSC that is a CA",
+        "refuses a VVSC with a key usage flag besides digitalSignature",
+        "refuses a VVSC key usage bitmap with a bit that has no name",
+        "refuses a decoded VVSC whose key usage flags were changed afterwards",
+        "refuses a VVSC with an empty key usage",
+        "refuses a VVSC without digitalSignature",
+        "refuses a VVSC without a matter-vvs-id",
+        "refuses a matter-fabric-id",
+        "refuses a CAT that is not eight hexadecimal digits",
+        "parses a NOC with ${count} CASE Authenticated Tags",
+        "refuses ${field} text that is ${name}",
+        "accepts the maximum 64-bit value",
+        "refuses a NOC without matter-node-id",
+        "refuses an ICAC without matter-icac-id",
+        "refuses an RCAC without matter-rcac-id"
+      ],
+      "left": [
+        {
+          "it": "does not count an absent attribute of an in-memory certificate as an RDN",
+          "class": "js-runtime-only",
+          "reason": "an undefined property of an in-memory JavaScript certificate; Go counts the decoded Order"
+        },
+        {
+          "it": "reads the first value of a repeated standard attribute",
+          "class": "js-runtime-only",
+          "reason": "the object view of a DN reading the first value; the Go DN keeps every value in Attributes, in order"
+        }
+      ],
+      "reason": "Pin lift db021da0, wave P1 (2026-11-06): the NOC, ICAC and RCAC rules matter.js holds at the pin that the module shares — the chain, serverAuth required of a NOC, five RDNs, a repeated Matter attribute refused in TLV and DER, the firmware signing id decoded in both and counted, matter-vvs-id refused in an operational subject, the node-id range, fabric id 0, CAT version 0 — are ported. Missing: the VVSC kind (wave P4's peer VID verification, #433), the issuer-DN limit cases, the key-usage bitmap cases (the Go RCAC check is chip's ValidateRCAC, keyCertSign required and other flags tolerated — to be weighed against matter.js's named-flags rule), the DER parsing cases of the Matter attribute text, and the missing-mandatory-attribute cases per certificate kind. Two titles ('refuses fabric ID 0', 'refuses a second matter-fabric-id' …) appear under several describes; the RCAC describe's own rows are among the missing ones named once.",
       "snapshotSha": "471755ea6549b21d946b85baf1dd1c48311f5de1"
     },
     {
