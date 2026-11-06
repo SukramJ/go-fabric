@@ -23,8 +23,9 @@ import (
 
 // surfacePolicies are the daemon's surface policies, the node's and every
 // device's (node.Config.Surface, device.Options.Surface): the
-// "Ahead of matter.js" register rows --extensions names, and
-// BD-chip-Thermostat-Schedules with --thermostat-schedules; the level
+// "Ahead of matter.js" register rows --extensions names,
+// BD-chip-Thermostat-Schedules with --thermostat-schedules and
+// BD-chip-GeneralCommissioning-TermsAndConditions with --tc-required; the level
 // --spec-level names; the controller profiles --profile names. Every ID
 // must be one the module declares (node.AheadRows), the
 // level one of schema.Levels and every profile one of surface.Profiles; a
@@ -45,6 +46,9 @@ func surfacePolicies(f flags) (surface.Policies, error) {
 	}
 	if f.thermostatSchedules {
 		ids = append(ids, schedulesRow)
+	}
+	if f.tcRequired {
+		ids = append(ids, termsAndConditionsRow)
 	}
 	var p surface.Policies
 	if len(ids) > 0 {
@@ -263,4 +267,23 @@ func flat(raw json.RawMessage) bool {
 		}
 	}
 	return true
+}
+
+// termsAndConditionsRow is the "Ahead of matter.js" register row of
+// GeneralCommissioning's TermsAndConditions feature (cluster/core/ahead.go),
+// which --tc-required enables.
+const termsAndConditionsRow = "BD-chip-GeneralCommissioning-TermsAndConditions"
+
+// termsAndConditions is node.Commissioning.TermsAndConditions under
+// --tc-required: version 1 with acknowledgement bit 1 required, the
+// values connectedhomeip's terms-and-conditions app is started with for
+// the CGEN cases (--tc-min-required-version 1
+// --tc-required-acknowledgements 1, TC_CGEN_2_5.py's CI arguments at
+// 6170af84) and the cases read back as PIXIT.CGEN.TCRevision and
+// PIXIT.CGEN.RequiredTCAcknowledgements. nil without the flag.
+func termsAndConditions(f flags) *node.TermsAndConditions {
+	if !f.tcRequired {
+		return nil
+	}
+	return &node.TermsAndConditions{Version: 1, Acknowledgements: 1}
 }
