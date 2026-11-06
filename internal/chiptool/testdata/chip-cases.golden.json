@@ -617,25 +617,35 @@
       "steps": 9,
       "stepsSkipped": 0
     },
+    "CLCTRL/3.1": {
+      "tests": 1,
+      "steps": 31,
+      "stepsSkipped": 14
+    },
     "CLCTRL/4.1": {
       "tests": 1,
       "steps": 93,
-      "stepsSkipped": 106
+      "stepsSkipped": 60
+    },
+    "CLCTRL/4.2": {
+      "tests": 1,
+      "steps": 44,
+      "stepsSkipped": 46
     },
     "CLCTRL/4.3": {
       "tests": 1,
       "steps": 70,
-      "stepsSkipped": 102
+      "stepsSkipped": 94
     },
     "CLCTRL/5.1": {
       "tests": 1,
       "steps": 59,
-      "stepsSkipped": 68
+      "stepsSkipped": 20
     },
     "CLCTRL/6.1": {
       "tests": 1,
       "steps": 64,
-      "stepsSkipped": 72
+      "stepsSkipped": 58
     },
     "CLDIM/2.1": {
       "tests": 1,
@@ -2428,6 +2438,16 @@
       "steps": 9,
       "stepsSkipped": 0
     },
+    "VALCC/3.2": {
+      "tests": 1,
+      "steps": 9,
+      "stepsSkipped": 0
+    },
+    "VALCC/3.3": {
+      "tests": 1,
+      "steps": 14,
+      "stepsSkipped": 0
+    },
     "VALCC/3.4": {
       "tests": 1,
       "steps": 6,
@@ -3788,8 +3808,6 @@
     "CGEN/2.7": "CGEN.S \u0026 CGEN.S.F00",
     "CGEN/2.8": "CGEN.S \u0026 CGEN.S.F00",
     "CGEN/2.9": "CGEN.S \u0026 CGEN.S.F00",
-    "CLCTRL/3.1": "CLCTRL.S \u0026 CLCTRL.S.F06",
-    "CLCTRL/4.2": "CLCTRL.S \u0026 CLCTRL.S.F01",
     "CLCTRL/4.4": "CLCTRL.S \u0026 CLCTRL.S.A0000",
     "CLCTRL/7.1": "CLCTRL.S \u0026 CLCTRL.S.F00 \u0026 CLCTRL.S.C03.Rsp",
     "CLCTRL/7.2": "CLCTRL.S \u0026 CLCTRL.S.F01 \u0026 CLCTRL.S.C03.Rsp",
