@@ -407,8 +407,15 @@ func TestClosureControlStateReadsRenderAlike(t *testing.T) {
 	s := newFeatured(t, fPS|fLT|fSP, &fullMover{modes: bothLatchModes})
 	s.SetCurrentLatch(ptr(false))
 	latch := true
+	wrap := func(v any) string { return fmt.Sprintf("%#v", struct{ V any }{v}) }
+	beforeCmd, _ := s.MatterRead(clusterwire.ClosureControlAttrOverallCurrentState)
 	if _, err := s.MatterInvoke(context.Background(), clusterwire.ClosureControlCmdMoveTo, moveTo(nil, &latch, nil)); err != nil {
 		t.Fatal(err)
+	}
+	// A command that moves only the target leaves OverallCurrentState
+	// rendering as before (bridge reportInvokeChanges).
+	if afterCmd, _ := s.MatterRead(clusterwire.ClosureControlAttrOverallCurrentState); wrap(beforeCmd) != wrap(afterCmd) {
+		t.Error("a MoveTo of the latch alone renders OverallCurrentState as changed")
 	}
 	before, _ := s.MatterRead(clusterwire.ClosureControlAttrOverallCurrentState)
 	s.SetCurrentLatch(ptr(true))

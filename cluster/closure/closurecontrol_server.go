@@ -185,8 +185,8 @@ type ControlServer struct {
 	currentSpeed, targetSpeed *closuredef.ThreeLevelAutoEnum
 
 	// currentView and targetView are what MatterRead answers for
-	// OverallCurrentState and OverallTargetState, rebuilt by refreshLocked
-	// on every change and the same pointer between changes: the bridge
+	// OverallCurrentState and OverallTargetState, replaced by refreshLocked
+	// when their value moves and the same pointer otherwise: the bridge
 	// renders a read value with %#v to find what a command changed
 	// (bridge reportInvokeChanges), and a struct allocated per read
 	// rendered as changed every time — an unchanged OverallCurrentState
@@ -829,12 +829,22 @@ func (s *ControlServer) setCurrent(r currentReport) {
 // last replaced by an equal one (bridge pathValues).
 func (s *ControlServer) refreshLocked() {
 	lt := s.has(wire.ClosureControlFeatureMotionLatching)
-	s.currentView = &wire.ClosureOverallCurrentState{
+	cur := wire.ClosureOverallCurrentState{
 		Position: interned(s.currentPosition), SecureState: interned(s.secureState),
 		Latch: interned(s.currentLatch), HasLatch: lt, Speed: interned(s.currentSpeed),
 	}
-	s.targetView = &wire.ClosureOverallTargetState{
+	tgt := wire.ClosureOverallTargetState{
 		Position: interned(s.targetPosition), Latch: interned(s.targetLatch), HasLatch: lt, Speed: interned(s.targetSpeed),
+	}
+	// A view is replaced only when its value moved: the bridge renders
+	// the read value itself as a pointer, so a new view of an equal state
+	// would read as a change too. With interned fields, equal states
+	// compare equal.
+	if s.currentView == nil || *s.currentView != cur {
+		s.currentView = &cur
+	}
+	if s.targetView == nil || *s.targetView != tgt {
+		s.targetView = &tgt
 	}
 }
 
