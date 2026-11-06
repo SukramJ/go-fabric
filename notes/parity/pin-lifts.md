@@ -52,12 +52,28 @@ its marker is re-read at the new pin. Every other marker holds. Also
 caught up outside the register: `BD-Matter-CaseInitiatorPeerCATs` (#4884,
 the initiator takes the responder's CATs from its NOC, `CaseClient.ts:282-290`).
 
-Citations that resolve at the pin moved with seven files; re-read and
+Citations that resolve at the pin — the bare `path:line` form without an
+`at <sha>` — now resolve at db021da0: 18 pointed beyond the end of a
+shrunken file (hard errors) and were re-read and updated, and the drift
+count of `make cite-check` rose from 253 to 419 (`citecheckDriftRatchet`
+raised in the lift's commit: a citation whose line moved without changing
+what it says drifts, and a lift moves many at once; the drift is worked
+off citation by citation as the files are touched, never by a sweep).
+The 18 hard errors: seven files; re-read and
 updated (`ServerBehaviorBacking.ts` quiet subscription `:251-259` /
 `#configureEventSuppression` `:223-262`, `PeerExchangeProvider.ts:19-159`
 / `:150-158`, `validateNocTagList` now `Noc.ts:116`, the CADMIN flows in
 `tc-cadmin-support.ts`, `tc-dd-flow-support.ts:72-189`, `MdnsTest.ts`
 `expectMessage` `:1001-1024`, `Rcac.ts:135`).
+
+The matter.js test register (`script/testparity/register.json`) moved with
+the snapshot: 56 entries re-checked against their new blobs (395 new `it`
+cases listed as missing, 30 removed cases pruned, 11 ported files now
+partial), 3 files gone (the WAL cleaner and snapshot tests, the peer
+establishment progress test), 24 new files entered — 6 excluded as JS
+runtime, 18 planned on the lift's waves P1–P4. Ratchets: planned 2 → 20,
+ported 158 → 146, missing 583 → 977, left 593 → 592. The missing cases are
+the waves' port lists.
 
 ### Security
 

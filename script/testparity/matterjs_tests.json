@@ -1,5 +1,5 @@
 {
-  "commit": "862ad75f4d3c7ab528b8a3954168146082cad8a6",
+  "commit": "db021da06bafe6766cd1a05d505cea03b9ec5081",
   "roots": [
     "packages/general/test",
     "packages/model/test",
@@ -201,6 +201,14 @@
       ]
     },
     {
+      "path": "packages/general/test/net/NetworkInterfaceChangesTest.ts",
+      "lines": 238,
+      "sha": "823f1994fa5eafb5928b8854389915840d4fbb84",
+      "describes": [
+        "Network interface changes"
+      ]
+    },
+    {
       "path": "packages/general/test/net/RetryScheduleTest.ts",
       "lines": 392,
       "sha": "5d4a5c5592082083deaddf034f01c3235e8e21ca",
@@ -274,8 +282,8 @@
     },
     {
       "path": "packages/general/test/net/dns-sd/MdnsSocketTest.ts",
-      "lines": 747,
-      "sha": "7a1efc0626475cb6ca6e47be184775b540886541",
+      "lines": 987,
+      "sha": "b0e591986d1557095ca0d76415b729e20a72a9d0",
       "describes": [
         "MdnsSocket"
       ]
@@ -316,8 +324,8 @@
     },
     {
       "path": "packages/general/test/net/udp/UdpMulticastServerTest.ts",
-      "lines": 284,
-      "sha": "15242e8161ae5208a0aae3ca613d5ac558cdf73f",
+      "lines": 436,
+      "sha": "707c4369292f883420e9eb675544b7876fb78cc1",
       "describes": [
         "UdpMulticastServer"
       ]
@@ -379,49 +387,49 @@
       ]
     },
     {
-      "path": "packages/general/test/storage/wal/WalCleanerTest.ts",
-      "lines": 160,
-      "sha": "1f881056972d6f2d2afb0e5419702d0d459b56cd",
-      "describes": [
-        "WalCleaner"
-      ]
-    },
-    {
       "path": "packages/general/test/storage/wal/WalCommitTest.ts",
-      "lines": 187,
-      "sha": "a7e4187c065800a806efabc028a4ce2707ccbda8",
+      "lines": 175,
+      "sha": "6ead86f507859939aad1fb17e739075492fca857",
       "describes": [
         "WalCommit"
       ]
     },
     {
       "path": "packages/general/test/storage/wal/WalReaderTest.ts",
-      "lines": 167,
-      "sha": "973e4b4dee12d2a4afee22c03950d0a1f24848f0",
+      "lines": 188,
+      "sha": "6905630d55f28acb0ea1d71d89c56b05aa1bd9b7",
       "describes": [
         "WalReader"
       ]
     },
     {
-      "path": "packages/general/test/storage/wal/WalSnapshotTest.ts",
-      "lines": 305,
-      "sha": "6c16f130813562b947486efd5a8a4fc9bc303846",
+      "path": "packages/general/test/storage/wal/WalSegmentsTest.ts",
+      "lines": 129,
+      "sha": "16a6c49dc1b6eb01a4537ded123ab0d28b0ac083",
       "describes": [
-        "WalSnapshot"
+        "WalSegments"
+      ]
+    },
+    {
+      "path": "packages/general/test/storage/wal/WalSnapshotStoreTest.ts",
+      "lines": 482,
+      "sha": "3cf40d5c35af5a53a350f87e4d9c0430151f4eff",
+      "describes": [
+        "WalSnapshotStore"
       ]
     },
     {
       "path": "packages/general/test/storage/wal/WalStorageDriverTest.ts",
-      "lines": 678,
-      "sha": "62c9226a9d676fd4f9442a5ace585fe9c5d8c31b",
+      "lines": 998,
+      "sha": "1e49667e7d487a5a42982af78887ae4ae58136d9",
       "describes": [
         "WalStorageDriver"
       ]
     },
     {
       "path": "packages/general/test/storage/wal/WalWriterTest.ts",
-      "lines": 139,
-      "sha": "6e6192b847a7366b07372ae74368954b13a13341",
+      "lines": 181,
+      "sha": "268bd0002c84d1999d69fe49df175e2cc31da079",
       "describes": [
         "WalWriter"
       ]
@@ -880,8 +888,8 @@
     },
     {
       "path": "packages/model/test/decoration/semantics/ClassSemanticsTest.ts",
-      "lines": 213,
-      "sha": "a5b36ae0637637934c62d738adcb50277f12e16c",
+      "lines": 252,
+      "sha": "c2206910bf0ee0e35459e92a45557c07529d6d82",
       "describes": [
         "ClassSemantics"
       ]
@@ -1225,7 +1233,7 @@
     {
       "path": "packages/node/test/behavior/cluster/ClusterBehaviorTest.ts",
       "lines": 550,
-      "sha": "6e8c47f0d5a4a8928231f5b2132d6d1ed215a124",
+      "sha": "f28cbf8d54f772e74610dabe55e652a463d28249",
       "describes": [
         "ClusterBehavior"
       ]
@@ -1247,7 +1255,7 @@
     {
       "path": "packages/node/test/behavior/cluster/ClusterEventsTest.ts",
       "lines": 169,
-      "sha": "d933d66b47672b3e395caaa0fe5e9fbacf0ac864",
+      "sha": "e4bca4c1a942d0a6b0b086c3c1ca7f8b3535defc",
       "describes": [
         "ClusterEvents"
       ]
@@ -1274,6 +1282,14 @@
       "sha": "638c0c75d879a5200d48ef195e906eecee0fec24",
       "describes": [
         "ClusterState"
+      ]
+    },
+    {
+      "path": "packages/node/test/behavior/cluster/DecoratedClusterBehaviorTest.ts",
+      "lines": 569,
+      "sha": "ddbfbf845a3523b282f31833323dbcea475a7784",
+      "describes": [
+        "ClusterBehavior declared with the model decorators"
       ]
     },
     {
@@ -1318,24 +1334,32 @@
     },
     {
       "path": "packages/node/test/behavior/state/managed/DatasourceTest.ts",
-      "lines": 2523,
-      "sha": "c83e889ea70354ea13fc6a554f11aa6783d753a2",
+      "lines": 2712,
+      "sha": "836759594e947362518af426f68762e6a7ca92f9",
       "describes": [
         "Datasource"
       ]
     },
     {
+      "path": "packages/node/test/behavior/state/managed/ManagedReferenceTest.ts",
+      "lines": 522,
+      "sha": "22a407db70400d189b7c9fd1f82b25167453079e",
+      "describes": [
+        "ManagedReference"
+      ]
+    },
+    {
       "path": "packages/node/test/behavior/state/managed/values/ListManagerTest.ts",
-      "lines": 690,
-      "sha": "645a9c0b8c74d2666ecfc64581a7f2dbd960883a",
+      "lines": 1350,
+      "sha": "a617489e440896989b68542eae7c3da834701d31",
       "describes": [
         "ListManager"
       ]
     },
     {
       "path": "packages/node/test/behavior/state/managed/values/StructManagerTest.ts",
-      "lines": 792,
-      "sha": "ce9838f5b164c42f3531a2671d4b322b5370f6af",
+      "lines": 917,
+      "sha": "aed4755d2bec02dc4d89777563762ef5e841db1b",
       "describes": [
         "StructManager"
       ]
@@ -1535,8 +1559,8 @@
     },
     {
       "path": "packages/node/test/behavior/system/network/ConnectionStateTest.ts",
-      "lines": 207,
-      "sha": "ee5c84e8287b20be0454c11fbaa692f35dfeb8dd",
+      "lines": 281,
+      "sha": "83f5ea26601b2afee3b43f36a446375aae88d6b2",
       "describes": [
         "ConnectionState"
       ]
@@ -1583,16 +1607,16 @@
     },
     {
       "path": "packages/node/test/behavior/system/subscriptions/SubscriptionsServerTest.ts",
-      "lines": 179,
-      "sha": "97110a0dad23f70e9fdb36f0ce4802d4f2fe747d",
+      "lines": 300,
+      "sha": "195b58fd287fe6b92b48f6a20581ea468ddace5e",
       "describes": [
         "SubscriptionsServer"
       ]
     },
     {
       "path": "packages/node/test/behaviors/access-control/AccessControlAuxiliaryTest.ts",
-      "lines": 380,
-      "sha": "9ccf261c72c458d1aa3728439f626ea3b892e21e",
+      "lines": 400,
+      "sha": "ed7875ea2bd4798a1740058dbe28fbeee31bb3fa",
       "describes": [
         "AccessControlServer auxiliary ACL"
       ]
@@ -1603,6 +1627,14 @@
       "sha": "4ee3a54035ed20ee81b0e0687711943b476254c5",
       "describes": [
         "AccessControl custom extension"
+      ]
+    },
+    {
+      "path": "packages/node/test/behaviors/administrator-commissioning/AdministratorCommissioningServerTest.ts",
+      "lines": 532,
+      "sha": "f1fceac45a0a7a478e08967fa76e234f0f6593df",
+      "describes": [
+        "AdministratorCommissioningServer"
       ]
     },
     {
@@ -1745,33 +1777,57 @@
       ]
     },
     {
+      "path": "packages/node/test/behaviors/fixed-label/FixedLabelServerTest.ts",
+      "lines": 107,
+      "sha": "d0dfe0a20f02de08208df79547753681c2f461c9",
+      "describes": [
+        "FixedLabelServer"
+      ]
+    },
+    {
       "path": "packages/node/test/behaviors/general-diagnostics/GeneralDiagnosticsFeaturesTest.ts",
-      "lines": 78,
-      "sha": "c7221dfacafc1c25b8907cda1d5cf89dbed79b4f",
+      "lines": 113,
+      "sha": "5d2125dc61e47443274f2036292662e315eda707",
       "describes": [
         "GeneralDiagnosticsServer features"
       ]
     },
     {
+      "path": "packages/node/test/behaviors/general-diagnostics/GeneralDiagnosticsNetworkInterfacesTest.ts",
+      "lines": 81,
+      "sha": "e15a91f38ef7a07945faf089eb662fb50650f17d",
+      "describes": [
+        "GeneralDiagnosticsServer network interfaces"
+      ]
+    },
+    {
       "path": "packages/node/test/behaviors/general-diagnostics/GeneralDiagnosticsOperationalHoursTest.ts",
-      "lines": 157,
-      "sha": "ec3cd7f6d6f84ad51a3928e4bd2e02fca1618330",
+      "lines": 209,
+      "sha": "874aa320fce0728d471fb1735ae2e91049456e57",
       "describes": [
         "GeneralDiagnosticsServer operational hours"
       ]
     },
     {
+      "path": "packages/node/test/behaviors/general-diagnostics/GeneralDiagnosticsServerTest.ts",
+      "lines": 535,
+      "sha": "d5b64d9fd9b849b5dcf7872703d16f5642c9ebd3",
+      "describes": [
+        "GeneralDiagnosticsServer"
+      ]
+    },
+    {
       "path": "packages/node/test/behaviors/group-key-management/GroupKeyManagementServerTest.ts",
-      "lines": 209,
-      "sha": "0e0ef7a3c5c58a2d2acbff018c1d1a0be8db1c8e",
+      "lines": 289,
+      "sha": "7d94fabf1b1e55ae386080cba2dceb372e5fb212",
       "describes": [
         "GroupKeyManagementServer"
       ]
     },
     {
       "path": "packages/node/test/behaviors/groupcast/GroupcastServerTest.ts",
-      "lines": 2243,
-      "sha": "dfc099700a300680d98b261fe6752cc1cb8ac073",
+      "lines": 2536,
+      "sha": "fb7d4176bc75633d542d455b5f37794f3a10de5c",
       "describes": [
         "GroupcastServer"
       ]
@@ -1854,6 +1910,14 @@
       ]
     },
     {
+      "path": "packages/node/test/behaviors/localization-configuration/LocalizationConfigurationServerTest.ts",
+      "lines": 25,
+      "sha": "46be92b7ac7c39322d25b71eae41afa7c8e7cb31",
+      "describes": [
+        "LocalizationConfigurationServer"
+      ]
+    },
+    {
       "path": "packages/node/test/behaviors/measurement/MeasurementServersTest.ts",
       "lines": 64,
       "sha": "770e0af190627889e1c3c04ef28d1b188d40d530",
@@ -1879,10 +1943,18 @@
     },
     {
       "path": "packages/node/test/behaviors/operational-credentials/OperationalCredentialsServerTest.ts",
-      "lines": 360,
-      "sha": "7f12f9c5dad85f77a7f0874a4c4e156941d0d25b",
+      "lines": 373,
+      "sha": "c068be79b4e82b1a2e72df51a074f1b3f18b0ab1",
       "describes": [
         "OperationalCredentialsServer"
+      ]
+    },
+    {
+      "path": "packages/node/test/behaviors/operational-credentials/VendorIdVerificationTest.ts",
+      "lines": 156,
+      "sha": "42b8ce78e7007002e15da083f3657d5d1dba7204",
+      "describes": [
+        "VendorIdVerification"
       ]
     },
     {
@@ -1959,8 +2031,8 @@
     },
     {
       "path": "packages/node/test/behaviors/thermostat/PresetsAtomicWriteTest.ts",
-      "lines": 215,
-      "sha": "23cae0af7ec40de910fa411bb37f0157a4906c63",
+      "lines": 256,
+      "sha": "ea1e170c28406ba5770398f18b2a7684afd14afe",
       "describes": [
         "Presets atomic write"
       ]
@@ -1975,8 +2047,8 @@
     },
     {
       "path": "packages/node/test/behaviors/thermostat/PresetsLocalWriteTest.ts",
-      "lines": 460,
-      "sha": "7f2a9f8b2dfe56e3524b64f0a79664116d4bfeb4",
+      "lines": 470,
+      "sha": "d562cb6396c6c1683af3d2b8df6f0cdf1aee8cd4",
       "describes": [
         "Presets local write"
       ]
@@ -1999,8 +2071,8 @@
     },
     {
       "path": "packages/node/test/behaviors/time-format-localization/TimeFormatLocalizationServerTest.ts",
-      "lines": 48,
-      "sha": "d6a83ceaff7255a92378d54d9231513fb29972f6",
+      "lines": 85,
+      "sha": "037beeb02e73304c170205049e4bf0997ed5dbe8",
       "describes": [
         "TimeFormatLocalizationServer"
       ]
@@ -2011,6 +2083,14 @@
       "sha": "7cffd9224f08a54b27262f89ef6d0c526a61dd76",
       "describes": [
         "UnitLocalizationServer"
+      ]
+    },
+    {
+      "path": "packages/node/test/behaviors/user-label/UserLabelServerTest.ts",
+      "lines": 358,
+      "sha": "0e2154923651d15c7747cf8224f53253fd2c4c45",
+      "describes": [
+        "UserLabelServer"
       ]
     },
     {
@@ -2148,8 +2228,8 @@
     },
     {
       "path": "packages/node/test/endpoint/server/InteractionProtocolTest.ts",
-      "lines": 2672,
-      "sha": "3623f2b154cee5e8a0ba4d5e87dd61366af9cebd",
+      "lines": 2803,
+      "sha": "b8b8f4f62f5855ac21735b463dd7182d41ce76af",
       "describes": [
         "InteractionProtocol"
       ]
@@ -2351,6 +2431,14 @@
       ]
     },
     {
+      "path": "packages/node/test/node/CaseSessionCatsTest.ts",
+      "lines": 216,
+      "sha": "224b6d12ca13531ffd8fe4a3d43ebe0342f470f4",
+      "describes": [
+        "CASE session CATs"
+      ]
+    },
+    {
       "path": "packages/node/test/node/ClientAddressProbeTest.ts",
       "lines": 129,
       "sha": "2265059468a48efe509c0de97e04c6b9fa13fe23",
@@ -2360,8 +2448,8 @@
     },
     {
       "path": "packages/node/test/node/ClientAttestationTest.ts",
-      "lines": 680,
-      "sha": "f9312f9c95045cfa3ad304b8b2e26732aab89708",
+      "lines": 740,
+      "sha": "744f3ff7bff86003701e8ebd58be625e9e9b2270",
       "describes": [
         "device attestation during commissioning"
       ]
@@ -2406,16 +2494,16 @@
     },
     {
       "path": "packages/node/test/node/ClientConnectivityTest.ts",
-      "lines": 744,
-      "sha": "d8d5ef04cd30330aea21df86f89bd871e5043671",
+      "lines": 828,
+      "sha": "3dda3d0109c1d6ed85f5da3832c848b7a7ff3171",
       "describes": [
         "ClientConnectivityTest"
       ]
     },
     {
       "path": "packages/node/test/node/ClientEventNotificationTest.ts",
-      "lines": 1190,
-      "sha": "1575387a3d2a35e62b3fafe9eee015d83f320d2c",
+      "lines": 1260,
+      "sha": "fa5b481efe35f50215d352674667b90e6df420c2",
       "describes": [
         "Client Event Notification"
       ]
@@ -2462,8 +2550,8 @@
     },
     {
       "path": "packages/node/test/node/ClientNodeTcpTest.ts",
-      "lines": 387,
-      "sha": "6503ded1a403462512bb4bd206ee6f882ad140d9",
+      "lines": 469,
+      "sha": "4cedd1b21ab6b6f8301cee7f8351965da37795e1",
       "describes": [
         "ClientNodeTcp"
       ]
@@ -2494,8 +2582,8 @@
     },
     {
       "path": "packages/node/test/node/ClientSubscribeTest.ts",
-      "lines": 1333,
-      "sha": "135021253b6d8e65e441f9ad42fdb5dd5f695ff9",
+      "lines": 1334,
+      "sha": "6f24c7c29431bee6f95cf43b440ec1868640eeed",
       "describes": [
         "ClientSubscribe"
       ]
@@ -2517,6 +2605,14 @@
       ]
     },
     {
+      "path": "packages/node/test/node/CommissioningClosedSessionReArmTest.ts",
+      "lines": 72,
+      "sha": "b08e549f5ba36963dec113deac0cc568c0fd2151",
+      "describes": [
+        "Commissioning failsafe re-arm"
+      ]
+    },
+    {
       "path": "packages/node/test/node/CommissioningPaseLifetimeTest.ts",
       "lines": 65,
       "sha": "f0d47ddd295a239f55020671bc3f3b0a2eb5fe0e",
@@ -2526,8 +2622,8 @@
     },
     {
       "path": "packages/node/test/node/DecommissionTest.ts",
-      "lines": 698,
-      "sha": "1e1c5744fb3ee77eefc2ec262e9a685ee429585d",
+      "lines": 707,
+      "sha": "5b47ca0994036499252751cb35bd24c58eb30b3d",
       "describes": [
         "Decommission"
       ]
@@ -2550,8 +2646,8 @@
     },
     {
       "path": "packages/node/test/node/EventReadResponseTest.ts",
-      "lines": 496,
-      "sha": "42640add744cb2de9ca005d35a43500d8c723c05",
+      "lines": 503,
+      "sha": "4021d5971f674ff584362f0a46db84fb4c9c916f",
       "describes": [
         "EventReadResponse"
       ]
@@ -2805,8 +2901,8 @@
     },
     {
       "path": "packages/node/test/node/integration/ChangeNotificationServiceTest.ts",
-      "lines": 236,
-      "sha": "55ebb92ca1e165a35ad408114d7f0d27d574654e",
+      "lines": 262,
+      "sha": "a256a98dc4ae87bfa641c886888cdb230c0ceada",
       "describes": [
         "ChangeNotificationService"
       ]
@@ -2878,8 +2974,8 @@
     },
     {
       "path": "packages/nodejs/test/crypto/CryptoInteropTest.ts",
-      "lines": 134,
-      "sha": "2121d83698028234107dd93b4f774c84142e382d",
+      "lines": 261,
+      "sha": "d428af25ca97e58ba15cf9c68f287dd0145a1100",
       "describes": [
         "Crypto interop (StandardCrypto \u003c-\u003e NodeJsCrypto)"
       ]
@@ -2952,8 +3048,8 @@
     },
     {
       "path": "packages/nodejs/test/net/NodeJsNetworkTest.ts",
-      "lines": 403,
-      "sha": "0b4db3332e0265bcdf44ec2c28a106069de6cd39",
+      "lines": 462,
+      "sha": "93e57329eff76827a62c5a214dbd0b5558376cbb",
       "describes": [
         "NodeJsNetwork"
       ]
@@ -3068,8 +3164,8 @@
     },
     {
       "path": "packages/protocol/test/action/client/InputChunkTest.ts",
-      "lines": 672,
-      "sha": "772ad2cf993296093f21c9d2ebc71b6ac3f5092b",
+      "lines": 801,
+      "sha": "0931349a63e7e21320af3a28ade520ec565597d3",
       "describes": [
         "InputChunk"
       ]
@@ -3204,8 +3300,8 @@
     },
     {
       "path": "packages/protocol/test/bdx/BdxTest.ts",
-      "lines": 1726,
-      "sha": "83b5f6877874b26c71b8767638e147d2b5a56efb",
+      "lines": 1749,
+      "sha": "33029b4c048a97b9e01895c6f3cad0076b501c20",
       "describes": [
         "BdxTest"
       ]
@@ -3235,41 +3331,81 @@
       ]
     },
     {
+      "path": "packages/protocol/test/certificate/AttestationCertificateProfileTest.ts",
+      "lines": 679,
+      "sha": "db88a9b238d33b07319810eb4440217b1b669dfd",
+      "describes": [
+        "Attestation certificate profile"
+      ]
+    },
+    {
+      "path": "packages/protocol/test/certificate/CdSignersTest.ts",
+      "lines": 109,
+      "sha": "7bc4a792a7085eb26e26ec9046616cd867b3c67c",
+      "describes": [
+        "CdSigners"
+      ]
+    },
+    {
       "path": "packages/protocol/test/certificate/CertificateAuthorityTest.ts",
-      "lines": 311,
-      "sha": "419f52282aee51d6a30925790ebe251d76a790c3",
+      "lines": 340,
+      "sha": "b73f24722d5d61d3517fb6bd70e78ee6aa88a84d",
       "describes": [
         "CertificateAuthority"
       ]
     },
     {
       "path": "packages/protocol/test/certificate/CertificatesTest.ts",
-      "lines": 758,
-      "sha": "eb21fd73fb5c20b830d82dc26bf526478f47996d",
+      "lines": 798,
+      "sha": "c50ea526cfcd6a8b29d523f9ec23ee7ec4d6dc0b",
       "describes": [
         "Certificates"
       ]
     },
     {
       "path": "packages/protocol/test/certificate/CertificationDeclarationTest.ts",
-      "lines": 110,
-      "sha": "d500fb7a7c28446d3b6141f9b3a88f8907bce528",
+      "lines": 240,
+      "sha": "f6317e94d346c0291b13ffb106a97462098a9a28",
       "describes": [
         "CertificationDeclaration"
       ]
     },
     {
+      "path": "packages/protocol/test/certificate/DeviceAttestationValidatorChipCdTest.ts",
+      "lines": 234,
+      "sha": "290a102e9467451709b4a05ee83df0d5dbfec9ec",
+      "describes": [
+        "DeviceAttestationValidator with CHIP CD test vectors"
+      ]
+    },
+    {
       "path": "packages/protocol/test/certificate/DeviceAttestationValidatorTest.ts",
-      "lines": 887,
-      "sha": "cba8f1e8542818bc9e5ddae4a958ef5db3c0e8e3",
+      "lines": 947,
+      "sha": "b64ff9db7b831c50e5bc89527fcc4cddbb45f3a8",
       "describes": [
         "DeviceAttestationValidator"
       ]
     },
     {
+      "path": "packages/protocol/test/certificate/DistinguishedNameTest.ts",
+      "lines": 855,
+      "sha": "c7dc86645ecae3b3946d51b3ecdcb08a773ba3f0",
+      "describes": [
+        "Certificate distinguished name"
+      ]
+    },
+    {
+      "path": "packages/protocol/test/certificate/OperationalCertificateVerifyTest.ts",
+      "lines": 1033,
+      "sha": "471755ea6549b21d946b85baf1dd1c48311f5de1",
+      "describes": [
+        "Operational certificate verification"
+      ]
+    },
+    {
       "path": "packages/protocol/test/certificate/PqcAttestationCertificatesTest.ts",
-      "lines": 1014,
-      "sha": "1975ee1c9e9037e4bb081e4976244e5fd769b6e2",
+      "lines": 1013,
+      "sha": "64aa9992dc61650ae7f17ae3b486049d30a0a363",
       "describes": [
         "PQC Phase 1 attestation certificates",
         "PQC Phase 1 attestation certificates while forward Matter features are off"
@@ -3285,8 +3421,8 @@
     },
     {
       "path": "packages/protocol/test/codec/MessageCodecTest.ts",
-      "lines": 295,
-      "sha": "43912cc926a9c67615726e8fa7066614602cea08",
+      "lines": 355,
+      "sha": "ac02b942325e78ffea839b4da622359fb4b14749",
       "describes": [
         "MessageCodec"
       ]
@@ -3366,7 +3502,7 @@
     {
       "path": "packages/protocol/test/dcl/DclCertificateServiceRevocationTest.ts",
       "lines": 420,
-      "sha": "6b158ccb0336eef76953f5e6515049142720ed35",
+      "sha": "89e260f31854c8898e0fad7e0a30f8930fa3f723",
       "describes": [
         "DclCertificateService revocation outside the DCL"
       ]
@@ -3381,8 +3517,8 @@
     },
     {
       "path": "packages/protocol/test/dcl/DclCertificateServiceTest.ts",
-      "lines": 2259,
-      "sha": "7620f1460f0f81a91bed90c3efc89cdd216b4303",
+      "lines": 2497,
+      "sha": "cdf9d0f4d2c28e9853db94c980e0408120d0ad97",
       "describes": [
         "DclCertificateService"
       ]
@@ -3414,8 +3550,8 @@
     },
     {
       "path": "packages/protocol/test/dcl/DclCrlAuthenticationTest.ts",
-      "lines": 811,
-      "sha": "5ff3742c049554a6a36ec255019e878cc696f509",
+      "lines": 900,
+      "sha": "2ce0bbd5c9d5e5d3409ed3d596ce23a3e607c269",
       "describes": [
         "DclCertificateService CRL authentication (Matter Core §6.2.6.1)"
       ]
@@ -3614,19 +3750,44 @@
       ]
     },
     {
+      "path": "packages/protocol/test/mdns/CommissionableMdnsScannerWindowChangeTest.ts",
+      "lines": 321,
+      "sha": "65ac23f88c838fd746be94397757be933a2b7753",
+      "describes": [
+        "CommissionableMdnsScanner across a commissioning window change"
+      ]
+    },
+    {
+      "path": "packages/protocol/test/mdns/MdnsServerAddressChangeTest.ts",
+      "lines": 265,
+      "sha": "ca85534121a565c2158700f3fcac45b31a3d91b7",
+      "describes": [
+        "MdnsServer interface address changes"
+      ]
+    },
+    {
       "path": "packages/protocol/test/mdns/MdnsServerTest.ts",
-      "lines": 1836,
-      "sha": "9d109578a8f28b656872292d2e6b039badf1c2a7",
+      "lines": 3891,
+      "sha": "c8ccfd9850c809bea4bf88aa014204b9ccbca65b",
       "describes": [
         "MdnsServer"
       ]
     },
     {
-      "path": "packages/protocol/test/mdns/MdnsTest.ts",
-      "lines": 1110,
-      "sha": "1457c02635be7e2e331f32fe7f36473952a60e54",
+      "path": "packages/protocol/test/mdns/MdnsServerTransportTest.ts",
+      "lines": 559,
+      "sha": "4663aa6f30574b7b7dcb524ef94a9f8a19be13c0",
       "describes": [
-        "MDNS announcement overflow"
+        "MdnsServer on the UDP transport"
+      ]
+    },
+    {
+      "path": "packages/protocol/test/mdns/MdnsTest.ts",
+      "lines": 1036,
+      "sha": "9e34ca2034f477f94c46da52247ef3d2e324abaa",
+      "describes": [
+        "MDNS announcement overflow",
+        "MDNS goodbye of one advertisement among several"
       ]
     },
     {
@@ -3654,6 +3815,14 @@
       ]
     },
     {
+      "path": "packages/protocol/test/peer/InitialContactScheduleTest.ts",
+      "lines": 344,
+      "sha": "454f6c02c901fbed7421d7e3de896f49bdb15b2d",
+      "describes": [
+        "InitialContactSchedule"
+      ]
+    },
+    {
       "path": "packages/protocol/test/peer/NetworkProfileTest.ts",
       "lines": 112,
       "sha": "96b368b7b5483585ae5cced11100b36ba550ccd6",
@@ -3668,6 +3837,14 @@
       "describes": [
         "PeerAddressMonitor.verifyReachability",
         "PeerAddressMonitor backoff"
+      ]
+    },
+    {
+      "path": "packages/protocol/test/peer/PeerAddressStoreTest.ts",
+      "lines": 139,
+      "sha": "0a0c7be79e5a14077af75d8bf5733ffa389db9ba",
+      "describes": [
+        "PeerAddressStore"
       ]
     },
     {
@@ -3704,8 +3881,8 @@
     },
     {
       "path": "packages/protocol/test/peer/PeerConnectionKickTest.ts",
-      "lines": 441,
-      "sha": "4f67a160bce7d60f1b3c61366ac4d836bdee7267",
+      "lines": 400,
+      "sha": "f1f5581c208632561936cf7b4c862d4cca46a6e4",
       "describes": [
         "PeerConnection kick redesign"
       ]
@@ -3725,14 +3902,6 @@
       "describes": [
         "OperationalAddress.from",
         "ObservablePeerDescriptor"
-      ]
-    },
-    {
-      "path": "packages/protocol/test/peer/PeerEstablishmentProgressTest.ts",
-      "lines": 148,
-      "sha": "c24a7e3957d9be9c8550459acf4ccf8828b94b3a",
-      "describes": [
-        "PeerConnection establishment progress"
       ]
     },
     {
@@ -3769,8 +3938,8 @@
     },
     {
       "path": "packages/protocol/test/protocol/ExchangeManagerTest.ts",
-      "lines": 619,
-      "sha": "3a60949d5180b83fc1cd1261cd60bfe5c20d8323",
+      "lines": 1635,
+      "sha": "29a2e3cabe1983ba202fbd56883cbf5b762f1b2d",
       "describes": [
         "ExchangeManager"
       ]
@@ -3785,11 +3954,13 @@
     },
     {
       "path": "packages/protocol/test/protocol/MessageChannelTest.ts",
-      "lines": 81,
-      "sha": "3908edac6e19f14fef5b432ac167d0a7af5064cd",
+      "lines": 220,
+      "sha": "59cf9deb0ce2a262ea2ab36284f76100dd5f1f0d",
       "describes": [
         "MessageChannel socket swap",
-        "MessageChannel release"
+        "MessageChannel release",
+        "MessageChannel maxPayloadSize",
+        "MessageChannel send over TCP"
       ]
     },
     {
@@ -3810,8 +3981,8 @@
     },
     {
       "path": "packages/protocol/test/protocol/MessageReceptionStateTest.ts",
-      "lines": 803,
-      "sha": "abc287f99c416157f5e5fc930912f76917904101",
+      "lines": 1052,
+      "sha": "b676603b82db8ec777e1c48591f3ccf2d9b0055a",
       "describes": [
         "MessageReceptionState"
       ]
@@ -3874,8 +4045,8 @@
     },
     {
       "path": "packages/protocol/test/session/SecureSessionTest.ts",
-      "lines": 495,
-      "sha": "3efe98888bae9c4ca3424851cbd7b12045efb761",
+      "lines": 925,
+      "sha": "f736c901abc4ab113280135ebfc84d25398add4f",
       "describes": [
         "SecureSession"
       ]
@@ -3890,16 +4061,16 @@
     },
     {
       "path": "packages/protocol/test/session/SessionManagerTest.ts",
-      "lines": 924,
-      "sha": "db7bfa3a82d2296b888015c59abf7695f84c43b5",
+      "lines": 1159,
+      "sha": "3d85323af65f1aa93437af27387a33155487c059",
       "describes": [
         "SessionManager"
       ]
     },
     {
       "path": "packages/protocol/test/session/SessionParametersTest.ts",
-      "lines": 112,
-      "sha": "4cc44d0f3f46b537da788fd5f7c61479a0266426",
+      "lines": 124,
+      "sha": "dc94995d451ae0b0e6c2637e8015e28c140d95b9",
       "describes": [
         "SessionParameters"
       ]
@@ -3950,8 +4121,8 @@
     },
     {
       "path": "packages/protocol/test/transport/tcp/TcpChannelTest.ts",
-      "lines": 487,
-      "sha": "cde3430d5b10f5b9dd9cf60d76d3e9146e07b97e",
+      "lines": 518,
+      "sha": "9fbb1298c1a469d731d088e2d30b02ae87323ce9",
       "describes": [
         "TcpChannel"
       ]
@@ -4806,8 +4977,8 @@
     },
     {
       "path": "packages/types/test/tlv/TlvObjectTest.ts",
-      "lines": 595,
-      "sha": "954eb21b84893d68a740d76b2be3433319be6fcc",
+      "lines": 626,
+      "sha": "35e9343db99a3571ed38804be8d61d3298fe3f11",
       "describes": [
         "TlvObject tests"
       ]

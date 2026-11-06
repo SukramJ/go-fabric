@@ -452,6 +452,13 @@
       "snapshotSha": "3ec1d692b28e9b68f39f689e32bcd1dda1715772"
     },
     {
+      "path": "packages/general/test/net/NetworkInterfaceChangesTest.ts",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "The JS Network abstraction's interfacesChanged observable (#4842); the behaviour it drives — the mDNS responder and GeneralDiagnostics following interface changes — is the lift's wave P3 (#432), whose tests are MdnsServerAddressChangeTest.ts and GeneralDiagnosticsNetworkInterfacesTest.ts.",
+      "snapshotSha": "823f1994fa5eafb5928b8854389915840d4fbb84"
+    },
+    {
       "path": "packages/general/test/net/RetryScheduleTest.ts",
       "status": "partial",
       "go": [
@@ -907,7 +914,19 @@
         "sends a response with answers",
         "sends unicast message to specific destination",
         "sends oversized answer records with warning",
-        "ignores messages received after close starts"
+        "ignores messages received after close starts",
+        "carries the first failure and logs the later ones at debug level",
+        "is all when every datagram left on every address family",
+        "is none on an interface without an address family the socket uses",
+        "is some and sends the rest when one datagram left on no address family",
+        "is some when ${datagram} datagram left on IPv6 only",
+        "is some when a later datagram found no address family the socket uses",
+        "is some when the first datagram of a split query left nowhere",
+        "is some when the last datagram of an answer with spilled additional records left nowhere",
+        "is some with a network error when the address lookup for a later datagram fails",
+        "is undefined without a named interface",
+        "rejects with the first error when no datagram left on any address family",
+        "rejects without a named interface when the address lookup for a later datagram fails"
       ],
       "left": [
         {
@@ -972,7 +991,7 @@
         }
       ],
       "reason": "Response splitting with additional records spilled into follow-up packets (the responder), query splitting since phase 33 (mdns.PackDNSQueries, MdnsSocket.send and splitQueries: questions over MaxMessageSize split without known answers, known answers over it spilled after the question), closing, and the group addresses. Missing: the receive and send paths exercised through a socket rather than the codec and a fake wire.",
-      "snapshotSha": "7a1efc0626475cb6ca6e47be184775b540886541"
+      "snapshotSha": "b0e591986d1557095ca0d76415b729e20a72a9d0"
     },
     {
       "path": "packages/general/test/net/dns-sd/ServiceDiscoveryTest.ts",
@@ -1020,7 +1039,18 @@
         "sends at most once per IP family when an interface has multiple same-family addresses",
         "opens no broadcast channel for a send after the server closed",
         "closes the IPv4 socket when the IPv6 socket cannot be created",
-        "closes both sockets when the IPv6 socket cannot join the multicast group"
+        "closes both sockets when the IPv6 socket cannot join the multicast group",
+        "evicts the channel after a failed unicast send",
+        "names the first socket error as the cause",
+        "rejects when a multicast send fails, and leaves the logging to the caller",
+        "rejects when a unicast send fails",
+        "rejects when the interface has no address to send from",
+        "resolves a failed send while the server closes",
+        "resolves and logs a failed send without a named interface",
+        "resolves to all when the datagram left on every address family",
+        "resolves to none on an interface whose addresses are all of a family the server does not use",
+        "resolves to some with the failure of the other family when the datagram left on one family",
+        "sends only on IPv6 from an interface without an IPv4 address"
       ],
       "left": [
         {
@@ -1040,7 +1070,7 @@
         }
       ],
       "reason": "The Go counterpart is mdns/socket.go, one UDP socket per IP family. Missing: one send per family asserted, a send after close counted, and the closing of both sockets when one family fails, where the module keeps the surviving family (findings register, phase 33).",
-      "snapshotSha": "15242e8161ae5208a0aae3ca613d5ac558cdf73f"
+      "snapshotSha": "707c4369292f883420e9eb675544b7876fb78cc1"
     },
     {
       "path": "packages/general/test/storage/ByteStreamReaderTest.ts",
@@ -1092,46 +1122,46 @@
       "snapshotSha": "145788450f57d7a0d1128bb602915d0b82d3774f"
     },
     {
-      "path": "packages/general/test/storage/wal/WalCleanerTest.ts",
-      "status": "excluded",
-      "class": "js-runtime-only",
-      "reason": "matter.js's write-ahead-log storage driver; the module has no WAL driver, the host owns persistence.",
-      "snapshotSha": "1f881056972d6f2d2afb0e5419702d0d459b56cd"
-    },
-    {
       "path": "packages/general/test/storage/wal/WalCommitTest.ts",
       "status": "excluded",
       "class": "js-runtime-only",
       "reason": "matter.js's write-ahead-log storage driver; the module has no WAL driver, the host owns persistence.",
-      "snapshotSha": "a7e4187c065800a806efabc028a4ce2707ccbda8"
+      "snapshotSha": "6ead86f507859939aad1fb17e739075492fca857"
     },
     {
       "path": "packages/general/test/storage/wal/WalReaderTest.ts",
       "status": "excluded",
       "class": "js-runtime-only",
       "reason": "matter.js's write-ahead-log storage driver; the module has no WAL driver, the host owns persistence.",
-      "snapshotSha": "973e4b4dee12d2a4afee22c03950d0a1f24848f0"
+      "snapshotSha": "6905630d55f28acb0ea1d71d89c56b05aa1bd9b7"
     },
     {
-      "path": "packages/general/test/storage/wal/WalSnapshotTest.ts",
+      "path": "packages/general/test/storage/wal/WalSegmentsTest.ts",
       "status": "excluded",
       "class": "js-runtime-only",
-      "reason": "matter.js's write-ahead-log storage driver; the module has no WAL driver, the host owns persistence.",
-      "snapshotSha": "6c16f130813562b947486efd5a8a4fc9bc303846"
+      "reason": "The WAL storage driver's segment cleaning (#4816); the module's stores are SQLite tables.",
+      "snapshotSha": "16a6c49dc1b6eb01a4537ded123ab0d28b0ac083"
+    },
+    {
+      "path": "packages/general/test/storage/wal/WalSnapshotStoreTest.ts",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "The WAL storage driver's backup snapshot (#4816); the module's stores are SQLite tables.",
+      "snapshotSha": "3cf40d5c35af5a53a350f87e4d9c0430151f4eff"
     },
     {
       "path": "packages/general/test/storage/wal/WalStorageDriverTest.ts",
       "status": "excluded",
       "class": "js-runtime-only",
       "reason": "matter.js's write-ahead-log storage driver; the module has no WAL driver, the host owns persistence.",
-      "snapshotSha": "62c9226a9d676fd4f9442a5ace585fe9c5d8c31b"
+      "snapshotSha": "1e49667e7d487a5a42982af78887ae4ae58136d9"
     },
     {
       "path": "packages/general/test/storage/wal/WalWriterTest.ts",
       "status": "excluded",
       "class": "js-runtime-only",
       "reason": "matter.js's write-ahead-log storage driver; the module has no WAL driver, the host owns persistence.",
-      "snapshotSha": "6e6192b847a7366b07372ae74368954b13a13341"
+      "snapshotSha": "268bd0002c84d1999d69fe49df175e2cc31da079"
     },
     {
       "path": "packages/general/test/time/DurationTest.ts",
@@ -1839,7 +1869,7 @@
       "status": "excluded",
       "class": "js-runtime-only",
       "reason": "TypeScript decorators that attach model semantics to a class.",
-      "snapshotSha": "a5b36ae0637637934c62d738adcb50277f12e16c"
+      "snapshotSha": "c2206910bf0ee0e35459e92a45557c07529d6d82"
     },
     {
       "path": "packages/model/test/decoration/semantics/FieldSemanticsTest.ts",
@@ -2165,7 +2195,7 @@
       "status": "excluded",
       "class": "js-runtime-only",
       "reason": "The ClusterBehavior class mechanism (for/set/alter/with, ID derivation, method carry-forward, quiet event classes).",
-      "snapshotSha": "6e8c47f0d5a4a8928231f5b2132d6d1ed215a124"
+      "snapshotSha": "f28cbf8d54f772e74610dabe55e652a463d28249"
     },
     {
       "path": "packages/node/test/behavior/cluster/ClusterBehaviorVarianceTest.ts",
@@ -2186,7 +2216,7 @@
       "status": "excluded",
       "class": "js-runtime-only",
       "reason": "TypeScript typing of the ClusterEvents emitters.",
-      "snapshotSha": "d933d66b47672b3e395caaa0fe5e9fbacf0ac864"
+      "snapshotSha": "e4bca4c1a942d0a6b0b086c3c1ca7f8b3535defc"
     },
     {
       "path": "packages/node/test/behavior/cluster/ClusterInterfaceTest.ts",
@@ -2208,6 +2238,13 @@
       "class": "js-runtime-only",
       "reason": "TypeScript typing of the ClusterState class.",
       "snapshotSha": "638c0c75d879a5200d48ef195e906eecee0fec24"
+    },
+    {
+      "path": "packages/node/test/behavior/cluster/DecoratedClusterBehaviorTest.ts",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "Decorator-declared cluster behaviors derived like generated ones (#4811); Go has no decorators, the generated definitions are the one source.",
+      "snapshotSha": "ddbfbf845a3523b282f31833323dbcea475a7784"
     },
     {
       "path": "packages/node/test/behavior/cluster/ValidatedElementsTest.ts",
@@ -2304,7 +2341,14 @@
       "status": "excluded",
       "class": "js-runtime-only",
       "reason": "matter.js's Datasource: transactional state, id- and name-keyed containers, stored-value migration and persistence of the TypeScript state layer.",
-      "snapshotSha": "c83e889ea70354ea13fc6a554f11aa6783d753a2"
+      "snapshotSha": "836759594e947362518af426f68762e6a7ca92f9"
+    },
+    {
+      "path": "packages/node/test/behavior/state/managed/ManagedReferenceTest.ts",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "Managed state references over an absent container (#4825); Go servers hold plain values.",
+      "snapshotSha": "22a407db70400d189b7c9fd1f82b25167453079e"
     },
     {
       "path": "packages/node/test/behavior/state/managed/values/ListManagerTest.ts",
@@ -2332,17 +2376,63 @@
         "accepts an entry appended with push",
         "accepts a whole list assigned over an existing one",
         "refuses an entry stored with no session to supply the fabric",
-        "supplies the accessing fabric for an entry that omits it"
+        "supplies the accessing fabric for an entry that omits it",
+        "clones an entry again for a nested write after a commit",
+        "ignores a delete beyond the end and refuses one other than the last",
+        "ignores a delete beyond the end of a fabric-filtered list",
+        "inserts into a fabric-filtered list that holds an entry without a fabric",
+        "inserts several entries at the front",
+        "inserts several entries in the middle",
+        "inserts several entries into a fabric-filtered list",
+        "inserts several structs at the front",
+        "iterates a fabric-filtered list that changes during the iteration",
+        "iterates managed entries of a fabric-filtered list",
+        "leaves the caller",
+        "leaves the committed list unchanged on rollback",
+        "leaves the entries before the insert point untouched",
+        "leaves the list unchanged when a pushed entry is rejected",
+        "leaves the list unchanged when a splice inserts an entry without a value",
+        "leaves the list unchanged when an inserted entry is rejected",
+        "masks another fabric",
+        "passes a sort comparator one copy per entry",
+        "refuses a change a sort comparator makes to an entry",
+        "refuses a length that is not a non-negative integer",
+        "refuses a write beyond the maximum index with a write error",
+        "refuses a write that would leave a gap",
+        "refuses an entry of a fabric-filtered list that is not an object",
+        "refuses an entry without a value",
+        "refuses an insert beyond the maximum length and leaves the list unchanged",
+        "refuses list edits without write access",
+        "refuses to delete from a fabric-filtered list without write access",
+        "refuses to grow a fabric-filtered list through its length",
+        "refuses to grow the list through its length",
+        "removes every entry from the start index when no count is given",
+        "replaces one entry with two",
+        "reports the change when an entry of a fabric-filtered list is deleted",
+        "reports the change when pop() removes an entry from a fabric-filtered list",
+        "resolves field names for entries stored by tag number",
+        "returns a removed entry that is a list as a read-only view",
+        "returns removed entries as read-only views",
+        "returns the removed entry from pop() and shift()",
+        "reverses a list of structs",
+        "rolls back a nested write to an entry moved within a fabric-filtered list",
+        "rolls back a nested write to an entry that a list method moved",
+        "rolls back a nested write to an entry that moved up after a delete",
+        "sorts a list in default order without a comparator",
+        "sorts a list of structs",
+        "stores a separate copy for an entry that copyWithin() duplicates",
+        "stores a separate copy when copyWithin() duplicates an entry the transaction changed",
+        "treats a key that is not a canonical number as no index"
       ],
       "reason": "The managed list proxy; its fabric-filtered read and fabric-preserving write are Matter-visible and covered on the Go read/write paths, its array-proxy and fabricIndex-supply cases are not.",
-      "snapshotSha": "645a9c0b8c74d2666ecfc64581a7f2dbd960883a"
+      "snapshotSha": "a617489e440896989b68542eae7c3da834701d31"
     },
     {
       "path": "packages/node/test/behavior/state/managed/values/StructManagerTest.ts",
       "status": "excluded",
       "class": "js-runtime-only",
       "reason": "The managed struct proxy: nested defaults, id-keyed references, default synthesis for unreported client values and rollback.",
-      "snapshotSha": "ce9838f5b164c42f3531a2671d4b322b5370f6af"
+      "snapshotSha": "aed4755d2bec02dc4d89777563762ef5e841db1b"
     },
     {
       "path": "packages/node/test/behavior/state/managed/values/ValuePatcherTest.ts",
@@ -2883,10 +2973,12 @@
         "controller/client:TestConnectionStateParityMatterJS"
       ],
       "missing": [
-        "transitions to WaitingForDeviceDiscovery when a registered ICD misses its check-in"
+        "transitions to WaitingForDeviceDiscovery when a registered ICD misses its check-in",
+        "reports WaitingForDeviceDiscovery while a peer has no address to try",
+        "returns to Reconnecting when discovery finds an address for a peer without a subscription"
       ],
       "reason": "Ten cases run on the registry's client.Node of a commissioned fabrictest device: Node.ConnectionState and the ConnectionStateChanged hook every node of the registry gets; the establishment-unresponsive signal fires as in the field, the stopped device leaving the sustained subscription's CASE re-establishment unanswered (the Go peer's signal is not emitted from outside), the session loss is Peer.Disconnect with a cause (controller/client/connection_state_parity_matterjs_test.go). Missing, controller-side: the IcdClient's checkInMissed (ClientNode's ICD client, with the ICD files of milestone 5 phase 23); Register candidate.",
-      "snapshotSha": "ee5c84e8287b20be0454c11fbaa692f35dfeb8dd"
+      "snapshotSha": "83f5ea26601b2afee3b43f36a446375aae88d6b2"
     },
     {
       "path": "packages/node/test/behavior/system/network/FabricLabelReconciliationTest.ts",
@@ -2947,10 +3039,17 @@
         "drops every stored subscription of a session the peer closes",
         "drops the stored subscription when the node closes the session while it keeps running",
         "re-establishes the newest stored subscription of a peer first",
-        "keeps the stored subscriptions of a peer in creation order across restarts"
+        "keeps the stored subscriptions of a peer in creation order across restarts",
+        "clears stored subscriptions and the old state list at start when persistence is off",
+        "clears the stored subscriptions on factory reset",
+        "drops the stored subscriptions of a peer that does not return after a restart",
+        "ignores the old state list for a peer the subscription store has subscriptions for",
+        "re-establishes the subscriptions that older versions stored in the behavior state",
+        "starts and deletes a stored entry that is not a list of subscriptions",
+        "stores the subscriptions of a peer under that peer"
       ],
       "reason": "Re-establishing a persisted subscription after a restart is covered; the factory-reset, drop-on-session-close and ordering cases are not.",
-      "snapshotSha": "97110a0dad23f70e9fdb36f0ce4802d4f2fe747d"
+      "snapshotSha": "195b58fd287fe6b92b48f6a20581ea468ddace5e"
     },
     {
       "path": "packages/node/test/behaviors/access-control/AccessControlAuxiliaryTest.ts",
@@ -2969,16 +3068,23 @@
       "missing": [
         "ignores provider entries without AuxiliaryType",
         "keeps the applied real entries when auxiliary entries change during a controller ACL write",
-        "applies an overridden extension access check to a fabric commissioned after startup"
+        "applies an overridden extension access check to a fabric commissioned after startup",
+        "lets a subclass of a derived type override the extension methods and call super"
       ],
       "reason": "Provider entries next to the real ones, after a restart, across local and controller ACL writes, the refused AuxiliaryType on both, AuxiliaryAccessUpdated per changed fabric, the per-entry split and the feature gate are ported (cluster/core/access_control_auxiliary_parity_matterjs_test.go on fabrictest, the installed list asserted as the device's access check). Missing: \"ignores provider entries without AuxiliaryType\", js-runtime-only: a provider entry is a TypeScript object that may lack the field, where the Go AuxiliaryACLSource yields store.ACLEntry, served as Groupcast; \"keeps the applied real entries when auxiliary entries change during a controller ACL write\", M4: findings entry \"The effective ACL is applied entry by entry\" (matter.js delays the written list to the interaction's end, AccessControlServer.ts:545-602; the Go write lands in the store at once); \"applies an overridden extension access check to a fabric commissioned after startup\", M4: findings entry \"No extension access-check hook\" (:441-450).",
-      "snapshotSha": "9ccf261c72c458d1aa3728439f626ea3b892e21e"
+      "snapshotSha": "ed7875ea2bd4798a1740058dbe28fbeee31bb3fa"
     },
     {
       "path": "packages/node/test/behaviors/access-control/AccessControlCustomExtensionTest.ts",
       "status": "planned",
       "reason": "A manufacturer extension of AccessControl (a custom attribute and command): no subject exists in the module (the root AccessControl server takes no extension elements); the port waits until a consumer asks for one (owner decision 2026-10-29).",
       "snapshotSha": "4ee3a54035ed20ee81b0e0687711943b476254c5"
+    },
+    {
+      "path": "packages/node/test/behaviors/administrator-commissioning/AdministratorCommissioningServerTest.ts",
+      "status": "planned",
+      "reason": "matter.js pin lift 862ad75f → db021da0 (2026-11-06): wave P1 (Fable, branch pin/p1-security) ports it by meaning with the rules it implements.",
+      "snapshotSha": "f1fceac45a0a7a478e08967fa76e234f0f6593df"
     },
     {
       "path": "packages/node/test/behaviors/basic-information/BasicInformationValidatorsTest.ts",
@@ -3228,14 +3334,29 @@
       "snapshotSha": "1a06e54ae96892bf2537a0b7a52b6ac5856382cb"
     },
     {
+      "path": "packages/node/test/behaviors/fixed-label/FixedLabelServerTest.ts",
+      "status": "planned",
+      "reason": "matter.js pin lift 862ad75f → db021da0 (2026-11-06): wave P3 (#432, mDNS goodbye scope and interface following, GeneralDiagnostics after #4844/#4842/#4881; the label and localisation server tests of #4900 read for server fixes) ports it by meaning.",
+      "snapshotSha": "d0dfe0a20f02de08208df79547753681c2f461c9"
+    },
+    {
       "path": "packages/node/test/behaviors/general-diagnostics/GeneralDiagnosticsFeaturesTest.ts",
-      "status": "ported",
+      "status": "partial",
       "go": [
         "cluster/core:TestGeneralDiagnosticsFeatures",
         "node:TestStartChecksDataModelTest"
       ],
       "reason": "The feature selection of the server's own (NewGeneralDiagnosticsWith without DataModelTest), the refused start above one path per invoke, the accepted one at one, and the advisory at one and its absence above are ported on the server and CheckDataModelTest, the check matter.js runs from #online; the node runs it at Start from node.Config.GeneralDiagnosticsFeatures and MaxPathsPerInvoke (node:TestStartChecksDataModelTest, brief BO).",
-      "snapshotSha": "c7221dfacafc1c25b8907cda1d5cf89dbed79b4f"
+      "snapshotSha": "5d2125dc61e47443274f2036292662e315eda707",
+      "missing": [
+        "lets a subclass of a derived type override the extension methods and call super"
+      ]
+    },
+    {
+      "path": "packages/node/test/behaviors/general-diagnostics/GeneralDiagnosticsNetworkInterfacesTest.ts",
+      "status": "planned",
+      "reason": "matter.js pin lift 862ad75f → db021da0 (2026-11-06): wave P3 (#432, mDNS goodbye scope and interface following, GeneralDiagnostics after #4844/#4842/#4881; the label and localisation server tests of #4900 read for server fixes) ports it by meaning.",
+      "snapshotSha": "e15a91f38ef7a07945faf089eb662fb50650f17d"
     },
     {
       "path": "packages/node/test/behaviors/general-diagnostics/GeneralDiagnosticsOperationalHoursTest.ts",
@@ -3252,10 +3373,18 @@
         "cluster/core:TestGeneralDiagnosticsGoesOfflineCleanlyOnABackwardStep"
       ],
       "missing": [
-        "keeps the operational time counted across a backward wall-clock step"
+        "keeps the operational time counted across a backward wall-clock step",
+        "increments rebootCount once per reboot and keeps it across reboots",
+        "keeps totalOperationalHours across a reboot"
       ],
       "reason": "UpTime across forward and backward steps, its high-water reset across a restart, the non-negative counters and the clean offline transition on a backward step and the integer persisted counter are ported on a fabrictest device. Missing, M4: findings entry \"clock.Clock has no monotonic reading\": the operational time across a wall-clock-only step; clocktest.Fake has one reading, so its Set is MockTime.atTime (both clocks, and the timers' reference), and MockTime.stepWallClock has no Fake form.",
-      "snapshotSha": "ec3cd7f6d6f84ad51a3928e4bd2e02fca1618330"
+      "snapshotSha": "874aa320fce0728d471fb1735ae2e91049456e57"
+    },
+    {
+      "path": "packages/node/test/behaviors/general-diagnostics/GeneralDiagnosticsServerTest.ts",
+      "status": "planned",
+      "reason": "matter.js pin lift 862ad75f → db021da0 (2026-11-06): wave P3 (#432, mDNS goodbye scope and interface following, GeneralDiagnostics after #4844/#4842/#4881; the label and localisation server tests of #4900 read for server fixes) ports it by meaning.",
+      "snapshotSha": "d5b64d9fd9b849b5dcf7872703d16f5642c9ebd3"
     },
     {
       "path": "packages/node/test/behaviors/group-key-management/GroupKeyManagementServerTest.ts",
@@ -3268,10 +3397,13 @@
         "cluster/core:TestGroupKeyManagementMulticastPolicy"
       ],
       "missing": [
-        "drops the policy from key sets stored by earlier versions"
+        "drops the policy from key sets stored by earlier versions",
+        "clears the operational key map of a fabric whose last GroupKeyMap entry a local write removes",
+        "keeps the operational key map of a fabric whose entries a local write keeps",
+        "refuses group id 0 in GroupKeyMap"
       ],
       "reason": "The provisional Groupcast feature (the Go server has no feature selection: FeatureMap without GCAST) and GroupcastAdoption absent, the key-count limit at maxGroupKeysPerFabric 3 (on the server: node.Config carries no such option), the AllNodes policy accepted and not stored and KeySetRead reporting PerGroupID for key sets 1 and 0 over the wire, and the pruning of a removed key set's GroupKeyMap entries are ported (cluster/core/group_key_management_server_parity_matterjs_test.go). Missing, js-runtime-only: matter.js's persisted behavior state of earlier matter.js versions carried the policy; the Go key-set table has no policy column and never had one.",
-      "snapshotSha": "0e0ef7a3c5c58a2d2acbff018c1d1a0be8db1c8e"
+      "snapshotSha": "7d94fabf1b1e55ae386080cba2dceb372e5fb212"
     },
     {
       "path": "packages/node/test/behaviors/groupcast/GroupcastServerTest.ts",
@@ -3308,10 +3440,19 @@
         "node:TestGroupcastAuxiliaryAccessUpdatedAdminParityMatterJS"
       ],
       "missing": [
-        "removes a group a wildcard request empties without the Sender feature"
+        "removes a group a wildcard request empties without the Sender feature",
+        "creates the GKM groupTable entry without a GroupName",
+        "derives the arrival address from the fabric that owns the group id",
+        "derives the arrival address of an unauthenticated plain header group id from the fabric under test",
+        "does not use the fabric under test",
+        "drops authenticated messages of another fabric",
+        "reports a message without candidate key on the fabric under test although another fabric",
+        "reports a received datagram that a key of another group authenticated as failed authentication",
+        "reports failed authentication only to a fabric whose key was a candidate",
+        "uses the shared IANA address when the fabric that owns the group id no longer exists"
       ],
       "reason": "The server cases run in cluster/core/groupcast_parity_matterjs_test.go, one test per describe: JoinGroup, LeaveGroup with the wildcard, UpdateGroupKey, ConfigureAuxiliaryAcl, the GKM and endpoint mirrors, the legacy removal prune, the per-fabric quota, MaxMcastAddrCount (on GroupcastConfig.MaxMcastAddrCount 4), the testing duration on a fake clock, the testing events and the derived Membership. The cases on a commissioned node run on fabrictest in node/groupcast_server_parity_matterjs_test.go: the multicast policy ordering (fix: the policy before the endpoints, GroupcastServer.ts:253-258), the rebind after a restart, the shutdown cleanup, the IANA address shared across fabrics and the join failures (fix: one info line per failure streak, ServerGroupNetworking.ts:136-140, 159-176) on fabrictest's multicast model, the fabric removal, the reload cases on Device.Restart and the AuxiliaryAccessUpdated admin over CASE. Missing, M4: findings entry \"The Groupcast server has no Listener-only configuration\": \"removes a group a wildcard request empties without the Sender feature\" (the second title of the loop at GroupcastServerTest.ts:358-405, ListenerOnlyRootEndpoint) — the module builds the Groupcast server with Listener, Sender and PerGroup only (GroupcastServer.ts:81-83 as RootEndpoint installs it).",
-      "snapshotSha": "dfc099700a300680d98b261fe6752cc1cb8ac073"
+      "snapshotSha": "fb7d4176bc75633d542d455b5f37794f3a10de5c"
     },
     {
       "path": "packages/node/test/behaviors/groups/GroupsServerSchemaTest.ts",
@@ -3423,6 +3564,12 @@
       "snapshotSha": "57ecfbd7a1732693bd794dd7a6003c760ee98384"
     },
     {
+      "path": "packages/node/test/behaviors/localization-configuration/LocalizationConfigurationServerTest.ts",
+      "status": "planned",
+      "reason": "matter.js pin lift 862ad75f → db021da0 (2026-11-06): wave P3 (#432, mDNS goodbye scope and interface following, GeneralDiagnostics after #4844/#4842/#4881; the label and localisation server tests of #4900 read for server fixes) ports it by meaning.",
+      "snapshotSha": "46be92b7ac7c39322d25b71eae41afa7c8e7cb31"
+    },
+    {
       "path": "packages/node/test/behaviors/measurement/MeasurementServersTest.ts",
       "status": "partial",
       "go": [
@@ -3463,7 +3610,7 @@
     },
     {
       "path": "packages/node/test/behaviors/operational-credentials/OperationalCredentialsServerTest.ts",
-      "status": "ported",
+      "status": "partial",
       "go": [
         "node:TestOperationalCredentialsAddNOCAdminVendor",
         "node:TestOperationalCredentialsAddNOCCertificateChecks",
@@ -3472,7 +3619,16 @@
         "node:TestOperationalCredentialsFinalFabricChange"
       ],
       "reason": "The AddNOC admin vendor refusals and fail-safe check, the certificate checks (InvalidNodeOpId, InvalidAdminSubject, Ok) with the site CA's certificates over PASE, SetVIDVerificationStatement refusing vendor 0 (fix: VendorId.isOperational, OperationalCredentialsServer.ts:516-518), UpdateNOC keeping group keys, endpoints, multicast policy, group ACL and the socket's multicast memberships (fabrictest's multicast model, Network.WatchMemberships and Device.MulticastGroups), UpdateNOC keeping the group state across a fail-safe expiry, the refused NOC of another fabric, and UpdateFabricLabel and SetVIDVerificationStatement under a bare fail-safe reporting the fabric \"updated\" at once (fix: Observers.OnFabricUpdated after either, FabricManager.ts:236-246, CommissioningServer.ts:118-141) are ported on fabrictest (node/operational_credentials_server_parity_matterjs_test.go).",
-      "snapshotSha": "7f12f9c5dad85f77a7f0874a4c4e156941d0d25b"
+      "snapshotSha": "c068be79b4e82b1a2e72df51a074f1b3f18b0ab1",
+      "missing": [
+        "answers InvalidNoc for an RCAC in the ICAC field"
+      ]
+    },
+    {
+      "path": "packages/node/test/behaviors/operational-credentials/VendorIdVerificationTest.ts",
+      "status": "planned",
+      "reason": "matter.js pin lift 862ad75f → db021da0 (2026-11-06): wave P4 (#433, the TCP size cap, the Sigma1 refresh schedule, delta event timestamps, the discovery state and the between-steps re-arm after #4793/#4794/#4832/#4808/#4815; the peer VID verification of #4880) ports it by meaning.",
+      "snapshotSha": "42b8ce78e7007002e15da083f3657d5d1dba7204"
     },
     {
       "path": "packages/node/test/behaviors/ota/OtaTest.ts",
@@ -3606,7 +3762,7 @@
     },
     {
       "path": "packages/node/test/behaviors/thermostat/PresetsAtomicWriteTest.ts",
-      "status": "ported",
+      "status": "partial",
       "go": [
         "cluster/thermo:TestParityMatterJS_PresetsAtomicWriteTest"
       ],
@@ -3618,7 +3774,10 @@
         }
       ],
       "reason": "BeginWrite, the chunked Presets write, CommitWrite and RollbackWrite run over the wire on a commissioned fabrictest pair, the controller's cache being its Presets subscription and the device's announcements the server's OnMatterAttributesChanged. Left, js-runtime-only: an application observer on persistedPresets$Changing rewriting the presets in flight, a seam the Go server does not have (the host refuses through its PresetStore).",
-      "snapshotSha": "23cae0af7ec40de910fa411bb37f0157a4906c63"
+      "snapshotSha": "ea1e170c28406ba5770398f18b2a7684afd14afe",
+      "missing": [
+        "keeps a built-in preset that a write sends with a null builtIn"
+      ]
     },
     {
       "path": "packages/node/test/behaviors/thermostat/PresetsConfigurationTest.ts",
@@ -3634,7 +3793,7 @@
     },
     {
       "path": "packages/node/test/behaviors/thermostat/PresetsLocalWriteTest.ts",
-      "status": "ported",
+      "status": "partial",
       "go": [
         "cluster/thermo:TestParityMatterJS_PresetsLocalWriteTest"
       ],
@@ -3661,7 +3820,10 @@
         }
       ],
       "reason": "The local writes run on a fabrictest device with SetPresets inside Device.Act (the one local write, for Presets and persistedPresets alike), the restart on the node's own store (Aggregator.Add, Device.Restart), an application's refusal being its PresetStore's. Left, js-runtime-only: the four cases rewrite the presets in flight from an application observer on persistedPresets$Changing, a seam the Go server does not have.",
-      "snapshotSha": "7f2a9f8b2dfe56e3524b64f0a79664116d4bfeb4"
+      "snapshotSha": "d562cb6396c6c1683af3d2b8df6f0cdf1aee8cd4",
+      "missing": [
+        "keeps a built-in preset that a write sends with a null builtIn"
+      ]
     },
     {
       "path": "packages/node/test/behaviors/thermostat/ThermostatBehaviorTest.ts",
@@ -3684,12 +3846,16 @@
     },
     {
       "path": "packages/node/test/behaviors/time-format-localization/TimeFormatLocalizationServerTest.ts",
-      "status": "ported",
+      "status": "partial",
       "go": [
         "cluster/core:TestTimeFormatLocalizationServerParityMatterJS"
       ],
       "reason": "The accepted and the refused ActiveCalendarType run on the server built as createEndpoint builds it, the refusal as CONSTRAINT_ERROR of the \"in supportedCalendarTypes\" constraint (cluster/core/time_format_localization_server_parity_matterjs_test.go).",
-      "snapshotSha": "d6a83ceaff7255a92378d54d9231513fb29972f6"
+      "snapshotSha": "037beeb02e73304c170205049e4bf0997ed5dbe8",
+      "missing": [
+        "lets a subclass of the class itself override the detected formats with any enum value",
+        "uses the overridden detected formats of a derived type"
+      ]
     },
     {
       "path": "packages/node/test/behaviors/unit-localization/UnitLocalizationServerTest.ts",
@@ -3699,6 +3865,12 @@
       ],
       "reason": "The one case, the server initialising with its defaults, is covered.",
       "snapshotSha": "7cffd9224f08a54b27262f89ef6d0c526a61dd76"
+    },
+    {
+      "path": "packages/node/test/behaviors/user-label/UserLabelServerTest.ts",
+      "status": "planned",
+      "reason": "matter.js pin lift 862ad75f → db021da0 (2026-11-06): wave P3 (#432, mDNS goodbye scope and interface following, GeneralDiagnostics after #4844/#4842/#4881; the label and localisation server tests of #4900 read for server fixes) ports it by meaning.",
+      "snapshotSha": "0e2154923651d15c7747cf8224f53253fd2c4c45"
     },
     {
       "path": "packages/node/test/behaviors/web-rtc-transport-requestor/WebRtcTransportRequestorServerTest.ts",
@@ -3864,7 +4036,10 @@
       "missing": [
         "does not answer the subscriber's error status for the initial report with a status",
         "multi invoke response is split into multiple messages if needed",
-        "keeps already-sent chunks when a command on a later endpoint throws"
+        "keeps already-sent chunks when a command on a later endpoint throws",
+        "executes a group command whose key set GroupKeyMap maps to the group",
+        "reports failed authentication when GroupKeyMap changed between decode and dispatch",
+        "reports success without access when access control filters every endpoint"
       ],
       "left": [
         {
@@ -3884,7 +4059,7 @@
         }
       ],
       "reason": "The version filters, path ceilings, wildcard writes, the timed-interaction gates and the invoke-batch checks are covered on the Go IM paths; chunked-write holds, group dispatch, response chunking and the remaining read/subscribe cases are not ported case by case.",
-      "snapshotSha": "3623f2b154cee5e8a0ba4d5e87dd61366af9cebd"
+      "snapshotSha": "b8b8f4f62f5855ac21735b463dd7182d41ce76af"
     },
     {
       "path": "packages/node/test/endpoint/server/ProtocolServiceTest.ts",
@@ -4434,6 +4609,12 @@
       "snapshotSha": "4b4dd0e33775a00065001e755f1ff1b6bfa29482"
     },
     {
+      "path": "packages/node/test/node/CaseSessionCatsTest.ts",
+      "status": "planned",
+      "reason": "matter.js pin lift 862ad75f → db021da0 (2026-11-06): wave P1 (Fable, branch pin/p1-security) ports it by meaning with the rules it implements.",
+      "snapshotSha": "224b6d12ca13531ffd8fe4a3d43ebe0342f470f4"
+    },
+    {
       "path": "packages/node/test/node/ClientAddressProbeTest.ts",
       "status": "partial",
       "go": [
@@ -4464,10 +4645,13 @@
         "rejects an unrecoverable corrupt cached PAA when policy rejects, surfacing the cause",
         "rejects when PAI serial is in revocation list",
         "passes when revocation list has different serial numbers",
-        "dynamically fetches revocation data from DCL during commissioning"
+        "dynamically fetches revocation data from DCL during commissioning",
+        "commissions when policy accepts",
+        "emits TrustedAsTestCertificate for the test PAA and the test CD signer, callback rejects",
+        "reports DacFormatInvalid and rejects when policy rejects"
       ],
       "reason": "Accepting and rejecting a failed attestation and commissioning against the DCL trust store keep their commissioner and dcl tests; the matter.js cases run through the client registry on fabrictest (controller/client:TestClientAttestation*): without a trust store (DclServiceUnavailable), with the device's PAA trusted, trusted as a test root only, or another PAA trusted, under every form of onAttestationFailure and the callback contract (the reason as the CommissioningError's message with the cause kept, an error returned verbatim, one invocation). The trust store is an attestation.StaticStore with the case's roots and the CSA test CD signer (fabrictest.ControllerOptions.Attestation, NoAttestationStore). Missing: the corrupt cached PAA (self-healed by a DCL re-fetch, or surfaced as a ValidationError finding when the re-fetch is blocked) and the revocation cases (a CRL served by the DCL revoking the PAI, one revoking other serials, the on-demand revocation-point fetch): they need the DclCertificateService over a mocked DCL, which the dcl package tests cover with their fake ledger (TestCertificateStoreSelfHeal, the revocation tests) but not through a commissioning on fabrictest.",
-      "snapshotSha": "f9312f9c95045cfa3ad304b8b2e26732aab89708"
+      "snapshotSha": "744f3ff7bff86003701e8ebd58be625e9e9b2270"
     },
     {
       "path": "packages/node/test/node/ClientBridgeStructureTest.ts",
@@ -4528,10 +4712,11 @@
         "reconnects after device address change with expired records",
         "reconnects after device address change with stale MDNS records",
         "tracks peer online status with session lifecycle",
-        "subscribes to a peer that is not initially available (recreate)"
+        "subscribes to a peer that is not initially available (recreate)",
+        "refreshes a Sigma1 that is never acknowledged"
       ],
       "reason": "Staggered addresses and the last-known address as fallback keep their client/peer tests; on fabrictest (controller/client:TestClientConnectivityParity) a command to a stopped device fails and succeeds once it is back, the default subscription is lost and re-established with a new id after a timeout and a long absence and signals alive, a close during the reconnection and a shutdown while an exchange is being established log no error, disable ends the subscription and enable starts a fresh one, a restart keeps an uncommissioned node and subscribes to a device once it is back. Missing: a second device address, a moved address and blocked or stale DNS-SD (fabrictest gives a device one address and answers DNS-SD in-process; the peer-level tests cover the connection logic), the online/offline lifecycle events of sessions (no such events on client.Node; Hooks.ConnectionStateChanged is the subscription's state), a non-sustained subscription closed by disabling the node (client.Node.Disable closes the default subscription only — a register candidate), and hosts closed and recreated on the site's stored state (fabrictest keeps stores per host object; Restart is the supported path). Disable closes every subscription of the node, not only the default one (fix: ClientNode.disable cancelling the interaction, ClientNode.ts:239-253, ClientInteraction.ts:270-282).",
-      "snapshotSha": "d8d5ef04cd30330aea21df86f89bd871e5043671"
+      "snapshotSha": "3dda3d0109c1d6ed85f5da3832c848b7a7ff3171"
     },
     {
       "path": "packages/node/test/node/ClientEventNotificationTest.ts",
@@ -4545,10 +4730,12 @@
       "missing": [
         "ignores events and event numbers of a replaced default subscription",
         "stores the number of the events the commissioning read emitted when the read fails",
-        "does not store the number of an event dropped because the node is being deleted"
+        "does not store the number of an event dropped because the node is being deleted",
+        "delivers the timestamps the report decoder resolved",
+        "warns once per kind of failure when a change observer fails for each event report"
       ],
       "reason": "A switch's InitialPress, ShortRelease and MultiPressComplete delivered to the client node's event hook with their payloads, in order, and the event number the node stores — after the hook received the event, once, above the commissioning read's events, never lowered, asked above by a replacement subscription and after a controller restart — run on fabrictest (controller/client:TestClientEventNotification*; the switch is bridged, the Go root serves no Switch). A host's own read or subscription returns its events to the caller only and a sustained one resubscribes above the last event it delivered (controller/client:TestHostReadDoesNotEmitEvents, TestClientEventNotificationLocalParity). Left: ChangeNotificationService, the observer set and the emit job queue (js-runtime-only). Missing: the events of a held report of a replaced default subscription (its other callbacks are held by TestClientSubscribeDefaultSubscriptionParity), a read failing after its reports (no hook aborts a read mid-stream) and an event of a node being deleted (no hook inside Registry.Decommission).",
-      "snapshotSha": "1575387a3d2a35e62b3fafe9eee015d83f320d2c",
+      "snapshotSha": "fa5b481efe35f50215d352674667b90e6df420c2",
       "left": [
         {
           "it": "emits EventOccurrence for MS initialPress",
@@ -4567,11 +4754,6 @@
         },
         {
           "it": "delivers an event to every observer when one of them throws or rejects",
-          "class": "js-runtime-only",
-          "reason": "several, failing, asynchronous or rejecting event observers and their warn-once rule; Go has one synchronous observer, Hooks.Event (controller/client config.go)"
-        },
-        {
-          "it": "warns once per node and kind of failure when a change observer fails for each event report",
           "class": "js-runtime-only",
           "reason": "several, failing, asynchronous or rejecting event observers and their warn-once rule; Go has one synchronous observer, Hooks.Event (controller/client config.go)"
         },
@@ -4697,14 +4879,21 @@
     },
     {
       "path": "packages/node/test/node/ClientNodeTcpTest.ts",
-      "status": "ported",
+      "status": "partial",
       "go": [
         "controller:TestClientNodeTcpParity",
         "controller:TestLargeMessageReadOverTCP",
         "client/peer:TestPeerTransportGateParity"
       ],
       "reason": "The controller's and the device's TCP roles (controller.Config.TCP, node.Network.TCP), the transport preference (controller.Config.TransportPreference, Peer.SetTransportPreference), commissioning and default traffic over UDP, the soft TCP preference, the session-parameter gate and the tcp-unsupported flag, on a loopback site; the gate cases that set a peer's reported parameters by hand on a client/peer harness peer. Beyond matter.js, whose mock TCP does not survive CASE, a large-message read runs over a real TCP session.",
-      "snapshotSha": "6503ded1a403462512bb4bd206ee6f882ad140d9"
+      "snapshotSha": "4cedd1b21ab6b6f8301cee7f8351965da37795e1",
+      "missing": [
+        "accepts and announces the configured TCP maxMessageSize",
+        "ignores the TCP maxMessageSize while TCP is disabled",
+        "refuses to start with a TCP maxMessageSize above the uint32 range",
+        "refuses to start with a TCP maxMessageSize below the UDP message size",
+        "stops announcing TCP after a restart with TCP disabled"
+      ]
     },
     {
       "path": "packages/node/test/node/ClientNodeTest.ts",
@@ -5155,7 +5344,7 @@
         "controller/client:TestClientSubscribeEpochParity"
       ],
       "reason": "The empty subscription refused, the version filters a read or subscription sends (injected; the caller's kept, first and winning; none with the other fabric filter; recomputed from the caller's filters and its refreshRequest when a sustained subscription is replaced; the replacement applied by the refreshed request's fabric filter) and the versions kept across a controller restart run on fabrictest through a client node (controller/client:TestClientSubscribe*; fix: ClientStructure.injectVersionFilters' caller and fabric-filter rules and ClientNodeInteraction.subscribe's refreshRequest at 862ad75f). includeKnownVersions on a subscription — the caller's filters only, in the first request and in a sustained subscription's replacement — runs through client.SubscribeRequest (fix: ClientNodeInteraction.ts:123-124, a break: the request embeds the subscription's paths as ReadRequest does). Phase 32: the default subscription changed at run time (Node.SetDefaultSubscription, NetworkClient.#handleDefaultSubscriptionChange, NetworkClient.ts:117-128 at 862ad75f), serialised with Start and SetAutoSubscribe and its replaced or ended predecessor's callbacks ignored (:153-251); the cache's recorded fabric filter adopted from it, its versions forgotten on a switch, the epoch of an interaction that began before one, and the storage failures warned or logged (ClientStructure.adoptFabricFilter :343-390, ClientNodeStore.recordCacheFabricFiltered, NetworkClient.#adoptFabricFilter :273-298; controller/client:TestClientSubscribeDefaultSubscriptionParity, TestClientSubscribeEpochParity); a failing Updated answers the priming report INVALID_SUBSCRIPTION (SubscribeRequest.Updated returns an error). The cancelled priming report is answered INVALID_SUBSCRIPTION (controller/client:TestClientSubscribeCancelledParity; fix: ClientInteraction.ts:1084-1097, InteractionMessenger.ts:1116-1137). The session-signal variant is left: Go cancels by ctx only.",
-      "snapshotSha": "135021253b6d8e65e441f9ad42fdb5dd5f695ff9",
+      "snapshotSha": "6f24c7c29431bee6f95cf43b440ec1868640eeed",
       "left": [
         {
           "it": "answers the priming report with INVALID_SUBSCRIPTION when the session signal aborts",
@@ -5196,6 +5385,12 @@
       ],
       "reason": "Every other case runs over the wire on fabrictest (node:TestCommandInvokeResponseParity; fixes: wildcard-endpoint invokes, the Operate pass before existence, the outer FAILURE under a cluster status, INVALID_COMMAND for a non-structure payload); the dispatch-endpoint group is observed through the DelayReportData deferral (node:TestCommandInvokeResponseDispatchEndpointsParity; fix: only dispatchable endpoints are deferred). Missing: the group invoke — fabrictest's network carries no group messages.",
       "snapshotSha": "1ff5c131ac0cbf5b4f620b77a9af7db32a97617d"
+    },
+    {
+      "path": "packages/node/test/node/CommissioningClosedSessionReArmTest.ts",
+      "status": "planned",
+      "reason": "matter.js pin lift 862ad75f → db021da0 (2026-11-06): wave P4 (#433, the TCP size cap, the Sigma1 refresh schedule, delta event timestamps, the discovery state and the between-steps re-arm after #4793/#4794/#4832/#4808/#4815; the peer VID verification of #4880) ports it by meaning.",
+      "snapshotSha": "b08e549f5ba36963dec113deac0cc568c0fd2151"
     },
     {
       "path": "packages/node/test/node/CommissioningPaseLifetimeTest.ts",
@@ -5257,7 +5452,7 @@
         }
       ],
       "reason": "The decommission of a peer without a structure read or subscription (fabric index recorded, read, or read unfiltered), RemoveFabric never acknowledged (every datagram to the device dropped: the node kept, a second attempt accepted), one fabric operation at a time against a held commission or decommission (client.HoldOperation for peers.runCommissioning), ForDevice waiting for a held decommission, a node deleted by its decommission or by a leave the device reports (client.ErrClosed for DestroyedDependencyError) and nothing left in the store run on fabrictest (controller/client:TestDecommission*). The patched cases — an answer lost after the acknowledgement, a leave of our fabric or another inside the call, a non-Ok status (the device's InvalidFabricIndex for an index it does not hold) and a decommission held while ForDevice waits for the removal — run on client.PatchRemoveFabric and client.EmitLeave (export_test.go), matter.js's patchRemoveFabric: the Go device acknowledges RemoveFabric only with its answer, so no wire drop leaves the request acknowledged and the answer missing. Left: the node-level probe, a delete in flight or wrapped, the construction status (Crashed, isGone, act during deletion) and an event fed into the structure while the node is deleted — no construction lifecycle in Go.",
-      "snapshotSha": "1e1c5744fb3ee77eefc2ec262e9a685ee429585d"
+      "snapshotSha": "5b47ca0994036499252751cb35bd24c58eb30b3d"
     },
     {
       "path": "packages/node/test/node/DelayReportDataTest.ts",
@@ -5288,7 +5483,7 @@
         "node:TestEventReadResponseParity"
       ],
       "reason": "Every case runs over the wire on fabrictest (node:TestEventReadResponseParity), event numbers and the commissioning history asserted as the Go node's own; fixes: the existence statuses of a concrete event path, Messages and AccountLogin events fabric-sensitive.",
-      "snapshotSha": "42640add744cb2de9ca005d35a43500d8c723c05"
+      "snapshotSha": "4021d5971f674ff584362f0a46db84fb4c9c916f"
     },
     {
       "path": "packages/node/test/node/FailsafeCommissioningTest.ts",
@@ -5931,7 +6126,7 @@
       "status": "excluded",
       "class": "js-runtime-only",
       "reason": "matter.js's change notification service of a running runtime.",
-      "snapshotSha": "55ebb92ca1e165a35ad408114d7f0d27d574654e"
+      "snapshotSha": "a256a98dc4ae87bfa641c886888cdb230c0ceada"
     },
     {
       "path": "packages/node/test/node/integration/StateStreamTest.ts",
@@ -6085,7 +6280,7 @@
       "status": "excluded",
       "class": "js-runtime-only",
       "reason": "Agreement between matter.js's two JavaScript crypto backends (StandardCrypto, NodeJsCrypto); the module has one implementation over the Go standard library.",
-      "snapshotSha": "2121d83698028234107dd93b4f774c84142e382d"
+      "snapshotSha": "d428af25ca97e58ba15cf9c68f287dd0145a1100"
     },
     {
       "path": "packages/nodejs/test/crypto/NodeJsCryptoDefectTest.ts",
@@ -6246,7 +6441,7 @@
       "status": "excluded",
       "class": "js-runtime-only",
       "reason": "Interface enumeration through Node.js os.networkInterfaces(); the module enumerates through net.Interfaces in transport/udp and mdns, tested there.",
-      "snapshotSha": "0b4db3332e0265bcdf44ec2c28a106069de6cd39"
+      "snapshotSha": "93e57329eff76827a62c5a214dbd0b5558376cbb"
     },
     {
       "path": "packages/nodejs/test/net/NodeJsTcpConnectionTest.ts",
@@ -6382,7 +6577,7 @@
     },
     {
       "path": "packages/protocol/test/action/client/InputChunkTest.ts",
-      "status": "ported",
+      "status": "partial",
       "go": [
         "client/interaction:TestInputChunkAttributes",
         "client/interaction:TestInputChunkEvents",
@@ -6390,7 +6585,18 @@
         "client/interaction:TestInputChunkRelaxedIntegerTypeChecks"
       ],
       "reason": "All 18 cases ported against the controller's report assembler (InputChunk): path order, tag-compressed paths, status entries, chunked-array leftovers, malformed entries, event order, timestamps and statuses, and a signed value for an unsigned attribute through the wire; the Go Report keeps one slice per kind, so cross-kind order is checked per slice.",
-      "snapshotSha": "772ad2cf993296093f21c9d2ebc71b6ac3f5092b"
+      "snapshotSha": "0931349a63e7e21320af3a28ade520ec565597d3",
+      "missing": [
+        "adds each system delta to the event before it, as the CHIP SDK encodes a report",
+        "does not skip back over an event without a timestamp",
+        "does not skip back over an unresolved delta to an older absolute timestamp",
+        "keeps the chain across an entry whose payload fails to decode",
+        "keeps the chain across an entry with an invalid path",
+        "leaves a delta unresolved when no absolute timestamp precedes it in the message",
+        "leaves a delta unresolved when the prior event used the other clock",
+        "resolves epoch deltas against the prior epoch timestamp",
+        "starts each report message without a prior timestamp"
+      ]
     },
     {
       "path": "packages/protocol/test/action/client/LargeMessageTransportTest.ts",
@@ -6614,10 +6820,11 @@
       "missing": [
         "Block/BlockEof/BlockAck/BlockAckEof count blocks from zero (Sender-Driver)",
         "BlockQuery carries an ascending block counter starting at 0 (Receiver-Driver)",
-        "sessionId and sessionActiveTimestamp are accessible after transfer completes"
+        "sessionId and sessionActiveTimestamp are accessible after transfer completes",
+        "Proposes at most a 16-bit maxBlockSize on a channel with a larger payload size"
       ],
       "reason": "Every successful transfer (all sizes, drive modes, designators and partial transfers), the responder's reported parameters and every error case run between Send / Receive and a Responder with the messages of both sides recorded; the two per-block logging cases assert the log context BdxMessenger.ts:140-200 attaches to each sent message, which the Go messenger does not log, and the getters case reads the initiator BdxClient's secure session, an object the Go initiator API (which takes an Exchange) does not have.",
-      "snapshotSha": "83b5f6877874b26c71b8767638e147d2b5a56efb"
+      "snapshotSha": "33029b4c048a97b9e01895c6f3cad0076b501c20"
     },
     {
       "path": "packages/protocol/test/bdx/PersistedFileDesignatorTest.ts",
@@ -6681,8 +6888,20 @@
       "snapshotSha": "e96ca93753caec385ed3b4a01a4e4ee5dc29452b"
     },
     {
+      "path": "packages/protocol/test/certificate/AttestationCertificateProfileTest.ts",
+      "status": "planned",
+      "reason": "matter.js pin lift 862ad75f → db021da0 (2026-11-06): wave P2 (#431, the DAC/PAI profile and the CD validation after matter.js #4865/#4871) ports it by meaning.",
+      "snapshotSha": "db88a9b238d33b07319810eb4440217b1b669dfd"
+    },
+    {
+      "path": "packages/protocol/test/certificate/CdSignersTest.ts",
+      "status": "planned",
+      "reason": "matter.js pin lift 862ad75f → db021da0 (2026-11-06): wave P2 (#431, the DAC/PAI profile and the CD validation after matter.js #4865/#4871) ports it by meaning.",
+      "snapshotSha": "7bc4a792a7085eb26e26ec9046616cd867b3c67c"
+    },
+    {
       "path": "packages/protocol/test/certificate/CertificateAuthorityTest.ts",
-      "status": "ported",
+      "status": "partial",
       "go": [
         "controller/ca:TestRootAndNOCRoundTrip",
         "controller/ca:TestICACChain",
@@ -6697,11 +6916,15 @@
         "controller/ca:TestCertificateAuthorityCATs"
       ],
       "reason": "Every it case is ported through ca.New/GenerateNOC with a ca.MemoryStore standing for both the StorageContext and the exported Configuration; the node-ID range check runs through the CA's Verifier, and generateIntermediateCert left undefined is the new Config.DetectIntermediateCA.",
-      "snapshotSha": "419f52282aee51d6a30925790ebe251d76a790c3"
+      "snapshotSha": "b73f24722d5d61d3517fb6bd70e78ee6aa88a84d",
+      "missing": [
+        "generates an ICAC and NOC that verify against the root",
+        "keeps the subject DN order fabric ID, node ID, CATs"
+      ]
     },
     {
       "path": "packages/protocol/test/certificate/CertificatesTest.ts",
-      "status": "ported",
+      "status": "partial",
       "go": [
         "secure/mattercert:TestTBSToDER_MatchesMatterJSCommissionerFixtures",
         "secure/mattercert:TestValidateRCAC_MatterJSCommissionerRoots",
@@ -6726,7 +6949,7 @@
         "secure/mattercert:TestCertificatesCSRParityMatterJS"
       ],
       "reason": "Ported on the CERTIFICATE_SETS: TLV to TBS DER of NOCs, chain verification without an ICAC, the ICAC fabric-id mismatch, the CAT limits, the ICAC decode, the 400-byte TLV cap, the Mvid/Mpid fallback, PAA parsing and CSR key extraction; the TLV encoder and the X.509 DER codec of operational certificates (recode, fromAsn1, external, extension edges, the 600-byte cap, the root fabric id, TLV order, the CSR) are ported in phase 32 (secure/mattercert:TestCertificates*ParityMatterJS). Left: the fallback re-encoding cases (Go keeps x509.Raw).",
-      "snapshotSha": "eb21fd73fb5c20b830d82dc26bf526478f47996d",
+      "snapshotSha": "c50ea526cfcd6a8b29d523f9ec23ee7ec4d6dc0b",
       "left": [
         {
           "it": "re-encodes a fallback DAC without injecting Matter VID/PID OIDs",
@@ -6738,6 +6961,9 @@
           "class": "js-runtime-only",
           "reason": "Go keeps x509.Raw and never re-encodes an attestation certificate; the OID-injection hazard is matter.js's DER re-encoder"
         }
+      ],
+      "missing": [
+        "returns the RDN list of a DAC subject and issuer"
       ]
     },
     {
@@ -6747,14 +6973,28 @@
         "controller/attestation:TestCertificationDeclarationParse"
       ],
       "missing": [
-        "round-trips a provisional CD correctly"
+        "round-trips a provisional CD correctly",
+        "parses the CMS SignedData these tests vary",
+        "rejects a CMS SignedData with an empty digestAlgorithms SET",
+        "rejects a CMS version that is not an INTEGER",
+        "rejects a ContentInfo whose contentType is not pkcs7-signedData",
+        "rejects a SignerInfo digestAlgorithm that is a bare OID instead of an AlgorithmIdentifier",
+        "rejects a SignerInfo signature that is not an OCTET STRING",
+        "rejects a signer subject key identifier that is not 20 bytes",
+        "rejects an eContent that is not an OCTET STRING"
       ],
       "reason": "The generate-then-parse round trip, the signer subject key identifier, the signature over signedData, the TlvDc decode of signedData and the refusal of garbage are ported on secure/attestation.BuildTestCertificationDeclaration and parseDeclaration; the provisional round trip is missing because the Go generator has no provisional flag (matter.js CertificationDeclaration.ts:165-181 generate(…, provisional)).",
-      "snapshotSha": "d500fb7a7c28446d3b6141f9b3a88f8907bce528"
+      "snapshotSha": "f6317e94d346c0291b13ffb106a97462098a9a28"
+    },
+    {
+      "path": "packages/protocol/test/certificate/DeviceAttestationValidatorChipCdTest.ts",
+      "status": "planned",
+      "reason": "matter.js pin lift 862ad75f → db021da0 (2026-11-06): wave P2 (#431, the DAC/PAI profile and the CD validation after matter.js #4865/#4871) ports it by meaning.",
+      "snapshotSha": "290a102e9467451709b4a05ee83df0d5dbfec9ec"
     },
     {
       "path": "packages/protocol/test/certificate/DeviceAttestationValidatorTest.ts",
-      "status": "ported",
+      "status": "partial",
       "go": [
         "controller/attestation:TestCertificateRules",
         "controller/attestation:TestParityChecks",
@@ -6777,7 +7017,26 @@
         "controller/attestation:TestDeviceAttestationValidatorTestCertificatePAA"
       ],
       "reason": "Every it case is ported through attestation.Validate with the check and the matter.js message regex, the DclCertificateService standing as a StaticStore and its signed CRLs as the Revocations interface; the PAI with an unreadable key is CertificateUnparseable as upstream but with the step-1 message, because crypto/x509 reads the key while parsing.",
-      "snapshotSha": "cba8f1e8542818bc9e5ddae4a958ef5db3c0e8e3"
+      "snapshotSha": "b64ff9db7b831c50e5bc89527fcc4cddbb45f3a8",
+      "missing": [
+        "refuses a CD from a signer the DCL does not answer for",
+        "refuses a test-signed CD with a bad signature also when test certificates are not accepted",
+        "refuses certification_type 3, the first reserved value",
+        "verifies a test-signed CD but reports it as TrustedAsTestCertificate when test certificates are not accepted",
+        "verifies a test-signed CD when test certificates are accepted"
+      ]
+    },
+    {
+      "path": "packages/protocol/test/certificate/DistinguishedNameTest.ts",
+      "status": "planned",
+      "reason": "matter.js pin lift 862ad75f → db021da0 (2026-11-06): wave P1 (Fable, branch pin/p1-security) ports it by meaning with the rules it implements.",
+      "snapshotSha": "c7dc86645ecae3b3946d51b3ecdcb08a773ba3f0"
+    },
+    {
+      "path": "packages/protocol/test/certificate/OperationalCertificateVerifyTest.ts",
+      "status": "planned",
+      "reason": "matter.js pin lift 862ad75f → db021da0 (2026-11-06): wave P1 (Fable, branch pin/p1-security) ports it by meaning with the rules it implements.",
+      "snapshotSha": "471755ea6549b21d946b85baf1dd1c48311f5de1"
     },
     {
       "path": "packages/protocol/test/certificate/PqcAttestationCertificatesTest.ts",
@@ -6793,7 +7052,7 @@
         "controller/attestation:TestPqcAttestationCertificatesParsingParityMatterJS"
       ],
       "reason": "PQC Phase 1 in controller/attestation behind the module's forward-feature switch (internal/forward PQCPhase1, off as matter.js's pqc-phase-1, Specification.ts:78-105 at 862ad75f): the Annex H certificates (testdata/pqc-annex-h, PqcAnnexHCertificates.ts verbatim) parse with their key and signature algorithms and verify link by link (VerifyIssuedBy over crypto/mldsa), a tampered certificate, a foreign issuer key and an ML-DSA DAC key are refused, chains under ML-DSA PAAs and PAIs pass Validate and a PAI stronger than its PAA or not signed by it fails (mayIssue); with the feature off every ML-DSA certificate is ErrMLDSAAttestationDisabled; the traditional refusals and the device-side refusal stay as before. Phase 32: the DER surgery cases of 'parsing' and the product judged against the chain (controller/attestation:TestPqcAttestationCertificatesParsingParityMatterJS, secure/attestation:TestPqcAttestationCertificatesDeviceCertificationProduct). Left: the generation and OpenSSL cases, the ledger-store cases (BD-Matter-DCL-MirroredScope) and the re-encoding.",
-      "snapshotSha": "1975ee1c9e9037e4bb081e4976244e5fd769b6e2",
+      "snapshotSha": "64aa9992dc61650ae7f17ae3b486049d30a0a363",
       "left": [
         {
           "it": "creates certificates OpenSSL accepts",
@@ -6887,10 +7146,14 @@
         "groups:TestMessageCodecPrivacyTruncated"
       ],
       "missing": [
-        "encodePacket uses pre-serialized headerBytes when present"
+        "encodePacket uses pre-serialized headerBytes when present",
+        "leaves a privacy-enhanced payload truncated below the MIC length to the session",
+        "leaves a secured payload shorter than the MIC to the session",
+        "refuses ${what}",
+        "splits the message extensions off a privacy message"
       ],
       "reason": "The decode/encode vectors, the privacy-enhanced prefix and region, the MIC-length rejection (groups.tryDecrypt) and the extension refusals are ported; encodePacket's pre-serialized headerBytes has no Go counterpart, because channel.ObfuscateGroupHeader returns the wire header and the group sender concatenates it with the ciphertext itself.",
-      "snapshotSha": "43912cc926a9c67615726e8fa7066614602cea08"
+      "snapshotSha": "ac02b942325e78ffea839b4da622359fb4b14749"
     },
     {
       "path": "packages/protocol/test/codec/MessagePrivacyTest.ts",
@@ -7026,7 +7289,7 @@
         "controller/dcl:TestDclCertificateServiceRevocationParseRevocationSet"
       ],
       "reason": "Installed revocation sets (CertificateStore.InstallRevocations, InstalledRevocations, the canonical serial and the issuer-name matching), the offline store and ParseRevocationSet are ported case by case through the Go surface, and the constructor.s revocations option through CertificateOptions.Revocations.",
-      "snapshotSha": "6b158ccb0336eef76953f5e6515049142720ed35"
+      "snapshotSha": "89e260f31854c8898e0fad7e0a30f8930fa3f723"
     },
     {
       "path": "packages/protocol/test/dcl/DclCertificateServiceSeedTest.ts",
@@ -7069,10 +7332,26 @@
       ],
       "missing": [
         "leaves no update timer running when closed during the startup fetch",
-        "fetches GitHub certs by default when test certs enabled"
+        "fetches GitHub certs by default when test certs enabled",
+        "asks the DCL when the stored certificate cannot be read",
+        "does not know a signer offline, and does not trust a seeded certificate the CSA did not issue",
+        "does not know a signer the DCL does not list",
+        "does not know a signer while the DCL cannot be asked",
+        "does not know a signer whose DCL certificate cannot be parsed, and stores nothing",
+        "does not know a subject key identifier that is not 20 bytes and does not ask the DCL",
+        "does not take a CSA-issued certificate the DCL returns for another SKID",
+        "does not take a PAA or PAI the DCL returns for its own SKID as a CD signer",
+        "finds a built-in CSA signing key without asking the DCL",
+        "finds it offline from a seed",
+        "finds the test signer as such without asking the DCL, whatever the test certificate policy",
+        "maps a known signer and leaves any other lookup undefined",
+        "refuses a certificate the CSA did not issue",
+        "replaces a stored certificate that does not verify once the DCL answers with one that does",
+        "stores a CSA-issued certificate and the Matter test CD signer",
+        "trusts it from the DCL, stores it, and then finds it without asking again"
       ],
       "reason": "Every other it case is ported through CertificateStore over a MockFetch-like RoundTripper with the CHIP test PAAs and CD signer; missing: OpenCertificateStore returns no handle before its startup update ends, so nothing can close it during that fetch; GitHub stays opt-in (by_design BD-Matter-DCL-OptIn).",
-      "snapshotSha": "7620f1460f0f81a91bed90c3efc89cdd216b4303"
+      "snapshotSha": "cdf9d0f4d2c28e9853db94c980e0408120d0ad97"
     },
     {
       "path": "packages/protocol/test/dcl/DclClientRevocationTest.ts",
@@ -7137,10 +7416,18 @@
         "ignores an ML-DSA CRL signed with another key",
         "ignores an ML-DSA CRL whose algorithm identifier carries parameters",
         "accepts a CRL from an ML-DSA signer the approved PAA delegated",
-        "ignores an EC-signed CRL from an ML-DSA signer"
+        "ignores an EC-signed CRL from an ML-DSA signer",
+        "accepts a PAA-delegated signer without basic constraints",
+        "accepts a signer a PAI delegated without basic constraints",
+        "ignores a PAA-delegated signer whose PAA may not sign certificates",
+        "ignores a PAA-delegated signer whose VendorID is malformed",
+        "ignores a PAI signer whose VendorID is malformed",
+        "ignores a PAI signing its own CRL that violates the PAI profile",
+        "ignores a delegator that violates the PAI profile by lacking keyCertSign",
+        "ignores a delegator that violates the PAI profile by not being a CA"
       ],
       "reason": "Every signer-form, vendor/product, CRL-check, authority-name, partition, retry and forward-features-off case is ported against CertificateStore.IsRevoked; the five cases of describe(\"ML-DSA\") run with the pqc-phase-1 forward feature on, which the port does not have (it admits no ML-DSA CRL signer or signature), so the accepting ones would fail and the refusing ones would pass vacuously.",
-      "snapshotSha": "5ff3742c049554a6a36ec255019e878cc696f509"
+      "snapshotSha": "2ce0bbd5c9d5e5d3409ed3d596ce23a3e607c269"
     },
     {
       "path": "packages/protocol/test/dcl/DclOtaUpdateServiceTest.ts",
@@ -7509,6 +7796,18 @@
       "snapshotSha": "40364c02024c3a8f779f299934da5775c9c63f09"
     },
     {
+      "path": "packages/protocol/test/mdns/CommissionableMdnsScannerWindowChangeTest.ts",
+      "status": "planned",
+      "reason": "matter.js pin lift 862ad75f → db021da0 (2026-11-06): wave P3 (#432, mDNS goodbye scope and interface following, GeneralDiagnostics after #4844/#4842/#4881; the label and localisation server tests of #4900 read for server fixes) ports it by meaning.",
+      "snapshotSha": "65ac23f88c838fd746be94397757be933a2b7753"
+    },
+    {
+      "path": "packages/protocol/test/mdns/MdnsServerAddressChangeTest.ts",
+      "status": "planned",
+      "reason": "matter.js pin lift 862ad75f → db021da0 (2026-11-06): wave P3 (#432, mDNS goodbye scope and interface following, GeneralDiagnostics after #4844/#4842/#4881; the label and localisation server tests of #4900 read for server fixes) ports it by meaning.",
+      "snapshotSha": "ca85534121a565c2158700f3fcac45b31a3d91b7"
+    },
+    {
       "path": "packages/protocol/test/mdns/MdnsServerTest.ts",
       "status": "partial",
       "go": [
@@ -7528,13 +7827,135 @@
         "mdns:TestMdnsServerHostName"
       ],
       "missing": [
-        "server suppress response to same ANY query when up to 1s delay",
         "chooses the name on a network that reports interface details asynchronously",
         "names each interface by its own MAC when the interfaces cannot be listed",
-        "names each interface by its own MAC when none has a usable one"
+        "names each interface by its own MAC when none has a usable one",
+        "announces a changed record on the broadcast after a refresh and says goodbye to its old value",
+        "announces a record registered again at once after its goodbye",
+        "announces all services in one packet with each shared record once",
+        "announces another service in a withdrawal after the host name changed",
+        "announces another service only on listed interfaces",
+        "announces at once right after a multicast answer",
+        "announces changed addresses on the broadcast after a refresh and says goodbye to the old ones",
+        "announces every service once the host name changed",
+        "announces no other service in a withdrawal that replaces nothing",
+        "announces two services registered at the same time",
+        "answers a QM query at once after an announcement and after an answer that carried it as additional",
+        "answers a QU query by multicast right after an announcement",
+        "answers a lookup started 1.4 s after an announcement before a withdrawal 0.4 s later",
+        "answers a pointer query with the pointer of every service of the type",
+        "answers a query for a name registered after the names were claimed",
+        "answers a question after a goodbye and registration again once the second after the goodbye passed",
+        "answers a repeated question at 950 ms once the second has passed",
+        "answers a repeated question at once a second after the answer",
+        "answers again at once after a multicast whose send failed",
+        "answers for the remaining service a query that arrives while the goodbye is sent",
+        "answers from the last details when they cannot be read again",
+        "answers queries that arrive during the goodbye only for the remaining services",
+        "carries a record asked for twice in one query once and clears the bit of its incomplete set",
+        "claims no names after close, for a registration that the close interrupts or a withdrawal",
+        "claims no names on the socket for a refresh after close",
+        "closes only after the send in flight settled",
+        "combines the announcements of the same turn into one message",
+        "counts a deferred additional record sent alone as an answer",
+        "does not answer a repeated question that arrives in the tick of the answer",
+        "does not call the generators again when the handle of a replaced registration refreshes",
+        "does not multicast an unchanged record again within a second of a refresh",
+        "does not read a failed interface again for a registration within the retry interval",
+        "does not send a deferred record before its second has passed when the timer fires early",
+        "does not send a deferred record that another packet carried after its second passed",
+        "drops an answer for a service registered again while the answer waits",
+        "drops an answer for a service withdrawn while the answer waits",
+        "drops the deferred answer on close without waiting for it",
+        "ends with the host address of a service registered after the first goodbye",
+        "holds the address records of one name together",
+        "holds the address records of one name together across answers and additional records",
+        "ignores a query on an interface whose details cannot be read",
+        "ignores a replaced registration",
+        "includes the host addresses once no other service publishes them",
+        "includes the host addresses once when the last services are withdrawn together",
+        "keeps a service registered again under the same name while the goodbye runs",
+        "keeps additional records of a unicast reply that multicast would hold back",
+        "keeps answering after a goodbye whose send failed",
+        "keeps no registration whose generator throws",
+        "keeps nothing registered when the server closes while a registration runs",
+        "keeps saying goodbye for a record whose TTL outlasts the idle time of the interface",
+        "keeps the current registration when the handle of a replaced one withdraws",
+        "keeps the goodbye of an interface that one listing misses",
+        "keeps the host address of a service registered right after the last one was withdrawn",
+        "keeps the last details when an asynchronous read fails and reads them again later",
+        "leaves a service withdrawn while the announcement waits out of the announcement",
+        "logs a failed goodbye on an interface that is no longer listed at debug level",
+        "logs a failed interface listing during a broadcast and does not throw",
+        "logs a failed unicast answer at debug level",
+        "logs a goodbye that fails while the server closes at debug level",
+        "logs at debug level when withdrawing a service while the server closes",
+        "logs nothing above debug level when the server closes during a refresh",
+        "multicasts a record again to a QU query after its goodbye and registration again",
+        "multicasts a record once for overlapping queries",
+        "multicasts the reply to a query that mixes QU and QM questions",
+        "names the interface of a failed announcement and the failed listing in its log",
+        "notices a failing deferred send once per outage",
+        "notices failed goodbyes once per outage of the interface",
+        "notices once that the details of an interface cannot be read",
+        "notices once why a query on an interface without details is not answered",
+        "omits the host addresses a remaining service publishes when several services leave at once",
+        "omits the host addresses another service still publishes",
+        "publishes only the masked records after a refresh",
+        "reads an interface that reported no details again only after the retry interval",
+        "reads the details of a new interface once for two queries that arrive together",
+        "reads the details of an interface without earlier details again only after the retry interval",
+        "reads the interface addresses again after 15 minutes",
+        "returns an inert registration ${when}",
+        "returns the same promise from every close, unregisters its names and stops truncated queries",
+        "says goodbye on an interface whose details can no longer be read",
+        "says goodbye to a record only once",
+        "says goodbye to a record that went out only as an additional record",
+        "says goodbye to a replaced address without the cache-flush bit while its set has records",
+        "says goodbye to the vendor pointer on the broadcast after a refresh masks it",
+        "says goodbye with records that the server cannot change",
+        "says no goodbye to the records of a live service while the interface reports no details",
+        "sends a deferred additional record alone in the answer section",
+        "sends a record deferred as answer and as additional record in the answer section",
+        "sends a waiting goodbye on close and drops a waiting answer",
+        "sends each deferred record once its own second has passed",
+        "sends no additional records with a deferred answer to an address query",
+        "sends no announcement when the server closes before it goes out",
+        "sends no answer chunk of a withdrawn service after its goodbye",
+        "sends no deferred packet for a record withdrawn before it was due",
+        "sends no goodbye for records that peers no longer cache",
+        "sends no goodbye once every record it sent has expired",
+        "sends no packet when there is nothing to announce or say goodbye to",
+        "sends one deferred answer for many queries that hit the same held record",
+        "sends only goodbyes when the server closes while an announcement waits behind a send",
+        "sends only the held record in the deferred answer",
+        "sends the additional record of a deferred answer that was never multicast",
+        "sends the goodbye after an answer in flight and leaves out what was registered meanwhile",
+        "sends the next packet of an answer after a failed multicast send and notices the outage once",
+        "server answers the same ANY query within a second once the second has passed",
+        "server defers an additional record multicast less than a second ago",
+        "server does not answer a different query for the same records in the tick of the answer",
+        "server does not answer the same ANY query again when it arrives in the tick of the answer",
+        "skips the remaining announcements after a failed send and notices the outage",
+        "still holds back a record answered by multicast less than a second ago",
+        "stops an answer that waits between packets when the server closes",
+        "suppresses a known answer that writes the same IPv6 address another way",
+        "suppresses a known answer whose SRV target differs in case",
+        "suppresses a known answer whose pointer target differs in case",
+        "tells the socket the names it publishes and drops them after the last withdrawal",
+        "tells the socket the names once interface details appear after the registration",
+        "varies the delay between the packets of one answer",
+        "waits 20 to 120 ms between the packets of one answer",
+        "withdraws a service when its registration is disposed"
       ],
       "reason": "Ported against the module's own responder (issue #362): its answer engine runs over a fake transport and the fake clock with matter.js's record-generator fixtures, so the standard, cache-flush, known-answer, duplicate, unicast, split, TC-continuation, unknown-name and Close cases assert the same responses; the host-name choice runs against hostNameChooser. Missing stay the 1 s duplicate case (its matter.js assertion runs before the async handler, MdnsServerTest.ts:707-724, and at 1000 ms MdnsServer.ts's 999 ms window has expired, so the vector proves nothing), the asynchronous-network case (JS promise mechanics) and the two per-interface-MAC fallbacks (go-fabric publishes one host name for all interfaces and hashes the OS host name when no MAC is usable, by_design L7-D03).",
-      "snapshotSha": "9d109578a8f28b656872292d2e6b039badf1c2a7"
+      "snapshotSha": "c8ccfd9850c809bea4bf88aa014204b9ccbca65b"
+    },
+    {
+      "path": "packages/protocol/test/mdns/MdnsServerTransportTest.ts",
+      "status": "planned",
+      "reason": "matter.js pin lift 862ad75f → db021da0 (2026-11-06): wave P3 (#432, mDNS goodbye scope and interface following, GeneralDiagnostics after #4844/#4842/#4881; the label and localisation server tests of #4900 read for server fixes) ports it by meaning.",
+      "snapshotSha": "4663aa6f30574b7b7dcb524ef94a9f8a19be13c0"
     },
     {
       "path": "packages/protocol/test/mdns/MdnsTest.ts",
@@ -7548,10 +7969,21 @@
         "mdns:TestMdnsAnnouncementOverflow"
       ],
       "missing": [
-        "has correct crypto installed"
+        "has correct crypto installed",
+        "announces devices that start together in one announcement with each shared record once",
+        "broadcasts the controller commissioner on one port",
+        "broadcasts the device commissionable info on one port",
+        "broadcasts the device fabric on one port and expires",
+        "keeps answering for an advertisement that replaced one of the same service",
+        "keeps the host addresses and the service type when one of two operational advertisements ends",
+        "keeps the host addresses when a commissionable advertisement ends and the operational one stays",
+        "keeps the shared service type pointers when one of two commissionable advertisements ends",
+        "omits vendor details from commissioner broadcasts when privacy masked",
+        "says goodbye to the host addresses and the service type once the last advertisement ends",
+        "says goodbye to the vendor pointer when the commissioning window becomes privacy masked"
       ],
       "reason": "The announcement and TTL-0 expiry packets of the operational, commissionable and commissioner services, the multi-service announcement and the oversized-announcement split are ported against the module's own responder (issue #362) and compared as sets, as matter.js's expectMessage does; the TXT values are the builders' (the operational SAT is always emitted, notes/parity/by_design.md BD-mDNS-SAT-AlwaysEmitted). The crypto case checks matter.js's MockCrypto itself and stays missing.",
-      "snapshotSha": "1457c02635be7e2e331f32fe7f36473952a60e54"
+      "snapshotSha": "9e34ca2034f477f94c46da52247ef3d2e324abaa"
     },
     {
       "path": "packages/protocol/test/ota/OtaImageReaderTest.ts",
@@ -7597,6 +8029,12 @@
       "snapshotSha": "7733004c6b3613f0fff0ff0d45a9baa688ab3e17"
     },
     {
+      "path": "packages/protocol/test/peer/InitialContactScheduleTest.ts",
+      "status": "planned",
+      "reason": "matter.js pin lift 862ad75f → db021da0 (2026-11-06): wave P4 (#433, the TCP size cap, the Sigma1 refresh schedule, delta event timestamps, the discovery state and the between-steps re-arm after #4793/#4794/#4832/#4808/#4815; the peer VID verification of #4880) ports it by meaning.",
+      "snapshotSha": "454f6c02c901fbed7421d7e3de896f49bdb15b2d"
+    },
+    {
       "path": "packages/protocol/test/peer/NetworkProfileTest.ts",
       "status": "ported",
       "go": [
@@ -7631,6 +8069,13 @@
       ],
       "reason": "The session-suspect and address-change runs (current-only, channel-agnostic skip, migration, all-fail close), coalescing including a joining address-change, close awaiting the in-flight run, a joiner's own abort and the probe backoff (growth across address churn, the suspect reset, no debounce after a suspect run) are ported against a live session; the sleeping-LIT-ICD branch (PeerAddressMonitor.ts:143-172) is not in Go (no fabric ICD wakefulness model, ADR 0020 stage 4), the wall-clock steps need a second clock reading clocktest.Fake does not have, and the trackWork count has no Go counterpart (the peer tracks work in a WaitGroup with no observable count).",
       "snapshotSha": "6e69549d9e68858d4b087b95eb3c32703ae77a4d"
+    },
+    {
+      "path": "packages/protocol/test/peer/PeerAddressStoreTest.ts",
+      "status": "excluded",
+      "class": "js-runtime-only",
+      "reason": "The per-peer storage layout of resumption records (#4879); the store keys them by fabric and node already (pin-lifts.md, 862ad75f → db021da0).",
+      "snapshotSha": "0a0c7be79e5a14077af75d8bf5733ffa389db9ba"
     },
     {
       "path": "packages/protocol/test/peer/PeerAddressTest.ts",
@@ -7704,7 +8149,7 @@
         "Observable<[KickOrigin]> matches QuietObservable<[KickOrigin]>"
       ],
       "reason": "The kick timing defaults and overrides, the 3 s kick throttle with its origins, the shared per-origin restart cooldown, the retransmission gate, the per-try abort under the attempt and the per-try handler registration are ported against client/peer's connection process (kickGate and restartAllowedLocked split out of the kick handler); the QuietObservable-to-Observable assignability is a TypeScript type contract with no Go counterpart.",
-      "snapshotSha": "4f67a160bce7d60f1b3c61366ac4d836bdee7267"
+      "snapshotSha": "f1f5581c208632561936cf7b4c862d4cca46a6e4"
     },
     {
       "path": "packages/protocol/test/peer/PeerConnectionSocketOwnershipTest.ts",
@@ -7727,17 +8172,6 @@
       "class": "js-runtime-only",
       "reason": "matter.js's observable peer descriptor objects (interning, change notification).",
       "snapshotSha": "86149181d4acb3b3d57c407b1b74313932695ce2"
-    },
-    {
-      "path": "packages/protocol/test/peer/PeerEstablishmentProgressTest.ts",
-      "status": "ported",
-      "go": [
-        "client/peer:TestParityUnresponsiveDetector",
-        "client/peer:TestEstablishmentUnresponsive",
-        "client/peer:TestPeerEstablishmentProgressDetector"
-      ],
-      "reason": "The unresponsive-establishment latch (fire once past MRP.MAX_TRANSMISSIONS, re-arm at 0, one latch per detector instance) and its firing from a never-acked CASE exchange are ported against client/peer.",
-      "snapshotSha": "c24a7e3957d9be9c8550459acf4ccf8828b94b3a"
     },
     {
       "path": "packages/protocol/test/peer/PhysicalDevicePropertiesTest.ts",
@@ -7801,10 +8235,53 @@
         "reports the session lost when the clock stepped back since the session was created",
         "gives each message the address of its own datagram",
         "sends as the current node ID through an exchange opened before the fabric's node ID changed",
-        "wakes a sleeping LIT peer on a message no exchange accepts"
+        "wakes a sleeping LIT peer on a message no exchange accepts",
+        "accepts a UDP datagram of exactly the maximum payload size without an oversize log",
+        "closes every open exchange of every session with a shutdown cause",
+        "closes the least recently active exchange after an older exchange became active again",
+        "closes the least recently active exchange once a unicast session exceeds its exchange limit",
+        "closes the open exchanges when it closes",
+        "counts the exchange limit of a unicast session without group exchanges of the same session id",
+        "delivers a response to the exchange this node started",
+        "delivers the next message of an unsecured session to its exchange",
+        "does not apply the exchange limit to an unsecured session",
+        "does not commit the counter of a group data message with the ${flag} flag",
+        "does not count a closing exchange toward the exchange limit",
+        "does not deliver a group message to a unicast exchange with the same session and exchange id",
+        "drops ${what} unreported before trying any key",
+        "drops a group data message with the ${flag} flag before it creates a session",
+        "drops a group message for an unsupported protocol at debug level",
+        "drops a message for an unknown session at debug level",
+        "drops a message without a mapped key set and logs nothing above debug",
+        "drops a response for an exchange that is not open at debug level",
+        "drops a secured unicast message with ${what} at debug level",
+        "drops a unicast message for an unsupported protocol at debug level",
+        "drops an unsecured message whose payload header is cut short without a warning",
+        "fails every copy of a message whose authenticated payload does not parse",
+        "fails every copy of a message whose key set GroupKeyMap maps only to another group",
+        "gives another session the id that is open on one session",
+        "keeps an exchange this node initiated apart from a peer exchange with the same id",
+        "keeps replay state per source node",
+        "keeps the exchanges of two unsecured sessions with the same exchange id apart",
+        "lets an error other than a malformed datagram reach the error log",
+        "lets an error other than a parse failure of a group payload reach the error log",
+        "lets other errors of a group message reach the error log",
+        "logs an oversized UDP datagram at debug level",
+        "logs no UDP oversize line for a datagram over the payload size on another transport",
+        "refuses to start an exchange when every id is open on the session, before it creates one",
+        "reports a group message with a payload longer than AES-CCM allows as failed authentication",
+        "reports a plain group message with a payload shorter than the MIC as failed authentication",
+        "reports a privacy group message with a payload shorter than the MIC as failed authentication",
+        "reports a replayed group message with its group",
+        "reports a short group message on session id 0 as without key",
+        "reports messages that fail authentication once per session at notice level",
+        "skips the id of an exchange still open on the session",
+        "tries all 65536 ids for the one free id of a session",
+        "tries the keys of a group message whose payload is as long as the MIC",
+        "tries the keys of a privacy group message with message extensions"
       ],
       "reason": "Peer loss sparing the failing exchange and its suppression, a duplicate as peer activity and the release of unadopted inbound unsecured sessions are ported against the controller Manager; the clock-step case needs a monotonic reading clocktest.Fake cannot step apart from the wall clock, the controller has no group sessions and the device's group path hands no source address to a handler, the group Sender fixes the node id at creation (a gap in groups/, not in an owned package), and ICD wakefulness has no Go counterpart.",
-      "snapshotSha": "3a60949d5180b83fc1cd1261cd60bfe5c20d8323"
+      "snapshotSha": "29a2e3cabe1983ba202fbd56883cbf5b762f1b2d"
     },
     {
       "path": "packages/protocol/test/protocol/MRPTest.ts",
@@ -7830,10 +8307,17 @@
       ],
       "missing": [
         "stops observing the transport channel address without closing the channel",
-        "closes the transport channel of an unreliable transport on close"
+        "closes the transport channel of an unreliable transport on close",
+        "caps a TCP channel at the MAX_TCP_MESSAGE_SIZE the peer announced",
+        "does not cap a TCP channel below the UDP message size",
+        "ignores the peer",
+        "keeps the own TCP limit when the peer announces a larger one",
+        "refuses a message above the peer",
+        "uses the spec default for a TCP peer that announces no limit",
+        "uses the spec default for a peer that announces no TCP support"
       ],
       "reason": "The socket swap is ported against Session.SetAddr (the Go MessageChannel is folded into the Session and has no address observable, so the change is held as the reported and used address); the release cases have no Go counterpart, because every session sends on the manager's one socket and owns no transport channel to release or close.",
-      "snapshotSha": "3908edac6e19f14fef5b432ac167d0a7af5064cd"
+      "snapshotSha": "59cf9deb0ce2a262ea2ab36284f76100dd5f1f0d"
     },
     {
       "path": "packages/protocol/test/protocol/MessageCounterTest.ts",
@@ -7893,10 +8377,18 @@
         "transport/mrp:TestMessageReceptionStateUnencryptedWithRollover"
       ],
       "missing": [
-        "rejects out-of-range counter values"
+        "rejects out-of-range counter values",
+        "accepts every counter in a window that spans the 2^32 wrap exactly once",
+        "accepts every counter in the window exactly once",
+        "forward jump of window size + 1 clears the whole window",
+        "forward jump of window size - 1 keeps the oldest bit at the window edge",
+        "forward jumps of window size - 1, window size and window size + 1 across the 2^32 wrap",
+        "initial state with a non-zero max accepts only counters above max",
+        "initial state with a non-zero max starts with an empty window",
+        "initial state with a small max rejects the window part behind the 2^32 wrap"
       ],
       "reason": "Every diff and bitmap vector of the three reception states is ported against Window.diff and the bitmap after Window.Accept; the out-of-range case (-1, 0x100000000) is unrepresentable because the Go counter is a uint32 decoded from four wire bytes.",
-      "snapshotSha": "abc287f99c416157f5e5fc930912f76917904101"
+      "snapshotSha": "b676603b82db8ec777e1c48591f3ccf2d9b0055a"
     },
     {
       "path": "packages/protocol/test/protocol/ProtocolStatusCodeTest.ts",
@@ -8012,10 +8504,31 @@
       ],
       "missing": [
         "conveys the initiating exchange to its subscriptions",
-        "sends a cached group session's messages as the node ID of the current fabric object"
+        "sends a cached group session's messages as the node ID of the current fabric object",
+        "${reason === undefined ? ",
+        "accepts a key that the destination group",
+        "accepts a key whose key set GroupKeyMap maps the destination group to",
+        "authenticates a privacy message with message extensions",
+        "does not name a fabric whose key set is not mapped as a candidate",
+        "fails a key mapped to another group without parsing its payload",
+        "fails a mapped key whose authenticated payload does not parse",
+        "lets a crypto error other than a failed authentication escape",
+        "lets an error other than a parse failure of the payload escape",
+        "logs and uses the default when the peer announces zero",
+        "names a fabric once when several of its keys were candidates",
+        "names every fabric whose key was a candidate when no key passes",
+        "names the plain header group id without a fabric when no key authenticates",
+        "passes the largest unicast payload on to decryption",
+        "refuses a unicast payload over the limit before it decrypts",
+        "rejects a key whose key set GroupKeyMap maps only to another group",
+        "rejects a key whose key set holds other key material than the key set of the destination group",
+        "reports a key that GroupKeyMap maps only to another group as failed authentication",
+        "round-trips a group message without privacy and reports the plain header group id",
+        "tries the next candidate after one fails the GroupKeyMap check",
+        "uses the default silently when the peer announces no size"
       ],
       "reason": "The paths-per-invoke fallback, decrypt and encrypt against the pinned vectors and the group-session cases (header-derived nonce, both round trips with the unmapped-key report, the send address, the cached-session key, the privacy flag) are ported; Go sessions own no subscriptions and the peer-loss hook carries no exchange, and a cached groups.Sender keeps the node id it was created with across an UpdateNOC (register candidate).",
-      "snapshotSha": "3efe98888bae9c4ca3424851cbd7b12045efb761"
+      "snapshotSha": "f736c901abc4ab113280135ebfc84d25398add4f"
     },
     {
       "path": "packages/protocol/test/session/SessionIntervalsTest.ts",
@@ -8035,7 +8548,7 @@
     },
     {
       "path": "packages/protocol/test/session/SessionManagerTest.ts",
-      "status": "ported",
+      "status": "partial",
       "go": [
         "secure/operational:TestOpenFromPase_AllocatesDistinctIDs",
         "secure/operational:TestManager_AllocateID_WrapAround",
@@ -8052,7 +8565,7 @@
         "client/peer:TestNewestSessionActivityParityMatterJS"
       ],
       "reason": "Session-id allocation (skip, seed 0), the per-peer cap and the initiator sessions it spares, the group data counter and reception-state cases, the accepted local parameters and their merge are ported; the session pick by activity and the wall-clock steps run on the clock's monotonic reading (client/peer:TestNewestSessionActivityParityMatterJS, secure/operational:TestSessionManagerWallClockSteps, phase 32). Left: placeholder-only reuse (by design), subscriptions and log origins, the Lifetime and legacy-counter cases and values a Go field cannot carry. The peer-shutdown case after a backward clock step runs on the sweep's monotonic cutoff, Manager.ClosePeerLostSince (seam wave, issue #396): matter.js runs both causes through #handlePeerLoss with asOf on Time.nowUs, and the shutdown cause's keepSubscriptions is the controller's own subscriptions, no device-side subject.",
-      "snapshotSha": "db7bfa3a82d2296b888015c59abf7695f84c43b5",
+      "snapshotSha": "3d85323af65f1aa93437af27387a33155487c059",
       "left": [
         {
           "it": "stays within the ID range after reusing the session with the highest ID",
@@ -8104,6 +8617,19 @@
           "class": "js-runtime-only",
           "reason": "a value a Go uint16 or integer field cannot carry; the representable part is client/exchange's sessionmanager parity test"
         }
+      ],
+      "missing": [
+        "deletes a stored record whose fabric no longer exists",
+        "deletes records of another version",
+        "deletes records without a version that carry CATs",
+        "deletes the records of a removed fabric",
+        "forgets a deleted record by address and by resumption ID",
+        "moves the legacy array to per-peer keys and drops records of unknown fabrics",
+        "restores records after a restart and finds them by their current resumption ID",
+        "stores saved records with the version",
+        "uses records of the current version with CATs without storing them again",
+        "uses records without a version and without CATs and stores them with the version",
+        "writes only the changed peer"
       ]
     },
     {
@@ -8119,10 +8645,12 @@
       ],
       "missing": [
         "assumes one for a persisted limit the wire could not have carried",
-        "keeps supported transports given as an object"
+        "keeps supported transports given as an object",
+        "honors a peer-reported limit below the default",
+        "uses the spec default when the peer reports zero"
       ],
       "reason": "The factory (exchange.PeerParameters: intervals over one hour, the maxPathsPerInvoke fallbacks, the TCP spec-version gate) and reported (the decoded sessionparams.Parameters) are ported; the untyped persisted values (NaN, 2.5, \"10\", null, …) and the object form of supportedTransports are JavaScript-only shapes a Go uint16 bitmap field cannot hold.",
-      "snapshotSha": "4cc44d0f3f46b537da788fd5f7c61479a0266426"
+      "snapshotSha": "dc94995d451ae0b0e6c2637e8015e28c140d95b9"
     },
     {
       "path": "packages/protocol/test/session/secure/CasePairingTest.ts",
@@ -8209,10 +8737,14 @@
         "transport/tcp:TestTcpChannelAsyncIteration"
       ],
       "missing": [
-        "callback listeners take priority over iterator queue"
+        "callback listeners take priority over iterator queue",
+        "accepts a message of exactly MAX_TCP_MESSAGE_SIZE, which excludes the length header",
+        "accepts several messages at a small limit arriving in one chunk",
+        "accepts two maximum-size messages arriving in one chunk",
+        "rejects a message one byte over MAX_TCP_MESSAGE_SIZE"
       ],
       "reason": "Framing, send after close, properties, name, both size limits, zero-length frames, close and the message stream (Handler then Closed for the async iterator) are ported on a net.Pipe pair; the listener-over-iterator priority has no Go counterpart, as tcp.Conn has a single delivery path (the Handler).",
-      "snapshotSha": "cde3430d5b10f5b9dd9cf60d76d3e9146e07b97e"
+      "snapshotSha": "9fbb1298c1a469d731d088e2d30b02ae87323ce9"
     },
     {
       "path": "packages/protocol/test/transport/tcp/TcpTransportTest.ts",
@@ -9307,7 +9839,11 @@
         "cluster/spec:TestTlvObjectParityMatterJS"
       ],
       "missing": [
-        "strips fabricIndex for write interaction even when caller provided a value"
+        "strips fabricIndex for write interaction even when caller provided a value",
+        "decodes a field whose name is also an Object.prototype property",
+        "decodes a repeated field that occurs twice",
+        "keeps the last value in a plain tagged list when a field occurs twice",
+        "refuses to decode a field that is not repeated but occurs twice"
       ],
       "left": [
         {
@@ -9492,7 +10028,7 @@
         }
       ],
       "reason": "The two object vectors encoded and decoded on the raw codec, the tagged-list vectors the raw codec can state, an unknown field skipped (spec.DecodeFields), a fabric-scoped struct round-tripping its FabricIndex and one written without it (spec.EncodeJSON). Missing: the controller's encoder keeps a FabricIndex the caller supplies on a write (findings register, phase 33).",
-      "snapshotSha": "954eb21b84893d68a740d76b2be3433319be6fcc"
+      "snapshotSha": "35e9343db99a3571ed38804be8d61d3298fe3f11"
     },
     {
       "path": "packages/types/test/tlv/TlvOfModelTest.ts",
