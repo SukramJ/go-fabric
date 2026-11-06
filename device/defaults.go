@@ -315,6 +315,9 @@ func newColorControlServer(b defaultBuild) (contract.ClusterServer, error) {
 		cfg.OnOff = onOffOf(srv)
 	}
 	colorConfigFrom(&cfg, b.initial)
+	if err := colorPointsFrom(&cfg, b.initial); err != nil {
+		return nil, err
+	}
 	srv, err := light.NewColorControl(cfg)
 	if errors.Is(err, light.ErrColorFeatures) {
 		return nil, notServed(err)
@@ -364,6 +367,63 @@ func colorConfigFrom(cfg *light.ColorControlServerConfig, initial map[uint32]any
 	}
 }
 
+// colorPointsFrom takes the colour points the declaration's Initial
+// supplies into cfg: a primary is supplied when its X or Y is, its
+// Intensity null unless stated; the primaries are numbered without a gap,
+// so NumberOfPrimaries counts exactly the PrimaryN the server lists. The
+// white point and the colour points follow the same rule.
+func colorPointsFrom(cfg *light.ColorControlServerConfig, initial map[uint32]any) error {
+	primaries := [][3]uint32{
+		{ccdef.AttrPrimary1X, ccdef.AttrPrimary1Y, ccdef.AttrPrimary1Intensity},
+		{ccdef.AttrPrimary2X, ccdef.AttrPrimary2Y, ccdef.AttrPrimary2Intensity},
+		{ccdef.AttrPrimary3X, ccdef.AttrPrimary3Y, ccdef.AttrPrimary3Intensity},
+		{ccdef.AttrPrimary4X, ccdef.AttrPrimary4Y, ccdef.AttrPrimary4Intensity},
+		{ccdef.AttrPrimary5X, ccdef.AttrPrimary5Y, ccdef.AttrPrimary5Intensity},
+		{ccdef.AttrPrimary6X, ccdef.AttrPrimary6Y, ccdef.AttrPrimary6Intensity},
+	}
+	for i, ids := range primaries {
+		c, ok := chromaticityFrom(initial, ids)
+		if !ok {
+			continue
+		}
+		if len(cfg.Primaries) != i {
+			return fmt.Errorf("device: ColorControl: Primary%d without Primary%d", i+1, len(cfg.Primaries)+1)
+		}
+		cfg.Primaries = append(cfg.Primaries, c)
+	}
+	x, hasX := consume(initial, ccdef.AttrWhitePointX)
+	y, hasY := consume(initial, ccdef.AttrWhitePointY)
+	if hasX || hasY {
+		cfg.WhitePoint = &light.CIEPoint{X: uint16(min(x, math.MaxUint16)), Y: uint16(min(y, math.MaxUint16))} //nolint:gosec // bounded
+	}
+	for ids, dst := range map[[3]uint32]**light.Chromaticity{
+		{ccdef.AttrColorPointRx, ccdef.AttrColorPointRy, ccdef.AttrColorPointRIntensity}: &cfg.ColorPointR,
+		{ccdef.AttrColorPointGx, ccdef.AttrColorPointGy, ccdef.AttrColorPointGIntensity}: &cfg.ColorPointG,
+		{ccdef.AttrColorPointBx, ccdef.AttrColorPointBy, ccdef.AttrColorPointBIntensity}: &cfg.ColorPointB,
+	} {
+		if c, ok := chromaticityFrom(initial, ids); ok {
+			*dst = &c
+		}
+	}
+	return nil
+}
+
+// chromaticityFrom consumes the X, Y and Intensity of one colour point
+// from initial; ok is false when neither X nor Y is supplied, and an
+// Intensity alone stays for the server to refuse as unserved.
+func chromaticityFrom(initial map[uint32]any, ids [3]uint32) (light.Chromaticity, bool) {
+	x, hasX := consume(initial, ids[0])
+	y, hasY := consume(initial, ids[1])
+	if !hasX && !hasY {
+		return light.Chromaticity{}, false
+	}
+	c := light.Chromaticity{X: uint16(min(x, math.MaxUint16)), Y: uint16(min(y, math.MaxUint16))} //nolint:gosec // bounded
+	if in, hasIn := consume8(initial, ids[2]); hasIn {
+		c.Intensity = &in
+	}
+	return c, true
+}
+
 // newWindowCoveringServer is the module's WindowCovering server
 // ([cover.New]): without a mover a command moves the covering at once,
 // matter.js's WindowCoveringServer without a handleMovement of its own; a
@@ -403,7 +463,10 @@ const coverMoveStep = 950 * time.Millisecond
 // at its default limits and setpoints; a declared Sink
 // (thermostatdef.Declare) is told every change it admits. An Initial that
 // sets TemperatureSetpointHold or ThermostatRunningState serves it
-// (thermo.ThermostatConfig takes both by their attribute names).
+// (thermo.ThermostatConfig takes both by their attribute names). With
+// ThermostatSuggestions the server reads the node's Matter time: the
+// UTCTime the root's TimeSynchronization serves, which is the node's clock
+// the device's servers run on (core.MatterEpochSeconds).
 func newThermostatServer(b defaultBuild) (contract.ClusterServer, error) {
 	// The element's defaults: the absolute limits 7 / 30 °C (heat) and
 	// 16 / 32 °C (cool), the occupied setpoints 20 and 26 °C (matter.js
@@ -411,6 +474,7 @@ func newThermostatServer(b defaultBuild) (contract.ClusterServer, error) {
 	// 44-72) — thermo.DefaultThermostatConfig's.
 	cfg := thermo.DefaultThermostatConfig()
 	cfg.Features, cfg.Clock = b.opts.Features, b.clock
+	cfg.MatterTime = func() (uint32, bool) { return core.MatterEpochSeconds(b.clock) }
 	if d, ok := b.ports.(thermostatdef.Declare); ok {
 		if d.Sink != nil {
 			cfg.Sink = d.Sink

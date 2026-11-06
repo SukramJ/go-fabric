@@ -13,7 +13,6 @@ package measurement
 // file.
 
 import (
-	"github.com/SukramJ/go-fabric/cluster/spec"
 	codef "github.com/SukramJ/go-fabric/cluster/spec/carbonmonoxideconcentrationmeasurement"
 	hchodef "github.com/SukramJ/go-fabric/cluster/spec/formaldehydeconcentrationmeasurement"
 	no2def "github.com/SukramJ/go-fabric/cluster/spec/nitrogendioxideconcentrationmeasurement"
@@ -40,20 +39,6 @@ const (
 // Bq/m³, the unit the model carries for radon.
 const concUnitBecquerelPerCubicMeter = uint8(radondef.MeasurementUnitBqm3)
 
-// concOptions is the selection the seven servers serve: MEA only, as
-// CO2 / PM2.5 / PM10; Uncertainty ("[MEA]") is not served.
-var concOptions = spec.Options{Features: concFeatureMEA}
-
-var (
-	coInst    = mustInstance(codef.Definition, concOptions)
-	no2Inst   = mustInstance(no2def.Definition, concOptions)
-	o3Inst    = mustInstance(o3def.Definition, concOptions)
-	hchoInst  = mustInstance(hchodef.Definition, concOptions)
-	pm1Inst   = mustInstance(pm1def.Definition, concOptions)
-	tvocInst  = mustInstance(tvocdef.Definition, concOptions)
-	radonInst = mustInstance(radondef.Definition, concOptions)
-)
-
 // Each server inherits [cluster.DataVersionTracker] via concentrationServer.
 var (
 	_ contract.ClusterDataVersion = (*COConcentrationServer)(nil)
@@ -72,7 +57,7 @@ type COConcentrationServer struct{ concentrationServer }
 
 // NewCOConcentrationServer constructs a COConcentrationServer backed by src.
 func NewCOConcentrationServer(src contract.FloatMeasurementSource) *COConcentrationServer {
-	return &COConcentrationServer{concentrationServer{src: src, clusterID: ClusterCOConcentration, unit: concUnitPPM, inst: coInst}}
+	return &COConcentrationServer{newConcentrationServer(src, codef.Definition, concUnitPPM)}
 }
 
 // NO2ConcentrationServer projects a [contract.FloatMeasurementSource]
@@ -82,7 +67,7 @@ type NO2ConcentrationServer struct{ concentrationServer }
 
 // NewNO2ConcentrationServer constructs a NO2ConcentrationServer backed by src.
 func NewNO2ConcentrationServer(src contract.FloatMeasurementSource) *NO2ConcentrationServer {
-	return &NO2ConcentrationServer{concentrationServer{src: src, clusterID: ClusterNO2Concentration, unit: concUnitPPM, inst: no2Inst}}
+	return &NO2ConcentrationServer{newConcentrationServer(src, no2def.Definition, concUnitPPM)}
 }
 
 // OzoneConcentrationServer projects a [contract.FloatMeasurementSource]
@@ -91,7 +76,7 @@ type OzoneConcentrationServer struct{ concentrationServer }
 
 // NewOzoneConcentrationServer constructs an OzoneConcentrationServer backed by src.
 func NewOzoneConcentrationServer(src contract.FloatMeasurementSource) *OzoneConcentrationServer {
-	return &OzoneConcentrationServer{concentrationServer{src: src, clusterID: ClusterOzoneConcentration, unit: concUnitPPM, inst: o3Inst}}
+	return &OzoneConcentrationServer{newConcentrationServer(src, o3def.Definition, concUnitPPM)}
 }
 
 // FormaldehydeConcentrationServer projects a
@@ -101,7 +86,7 @@ type FormaldehydeConcentrationServer struct{ concentrationServer }
 
 // NewFormaldehydeConcentrationServer constructs a FormaldehydeConcentrationServer backed by src.
 func NewFormaldehydeConcentrationServer(src contract.FloatMeasurementSource) *FormaldehydeConcentrationServer {
-	return &FormaldehydeConcentrationServer{concentrationServer{src: src, clusterID: ClusterFormaldehydeConcentration, unit: concUnitPPM, inst: hchoInst}}
+	return &FormaldehydeConcentrationServer{newConcentrationServer(src, hchodef.Definition, concUnitPPM)}
 }
 
 // PM1ConcentrationServer projects a [contract.FloatMeasurementSource]
@@ -111,7 +96,7 @@ type PM1ConcentrationServer struct{ concentrationServer }
 
 // NewPM1ConcentrationServer constructs a PM1ConcentrationServer backed by src.
 func NewPM1ConcentrationServer(src contract.FloatMeasurementSource) *PM1ConcentrationServer {
-	return &PM1ConcentrationServer{concentrationServer{src: src, clusterID: ClusterPM1Concentration, unit: concUnitMicroGramPerCubicMeter, inst: pm1Inst}}
+	return &PM1ConcentrationServer{newConcentrationServer(src, pm1def.Definition, concUnitMicroGramPerCubicMeter)}
 }
 
 // TVOCConcentrationServer projects a [contract.FloatMeasurementSource]
@@ -121,7 +106,7 @@ type TVOCConcentrationServer struct{ concentrationServer }
 
 // NewTVOCConcentrationServer constructs a TVOCConcentrationServer backed by src.
 func NewTVOCConcentrationServer(src contract.FloatMeasurementSource) *TVOCConcentrationServer {
-	return &TVOCConcentrationServer{concentrationServer{src: src, clusterID: ClusterTVOCConcentration, unit: concUnitPPM, inst: tvocInst}}
+	return &TVOCConcentrationServer{newConcentrationServer(src, tvocdef.Definition, concUnitPPM)}
 }
 
 // RadonConcentrationServer projects a [contract.FloatMeasurementSource]
@@ -130,13 +115,13 @@ type RadonConcentrationServer struct{ concentrationServer }
 
 // NewRadonConcentrationServer constructs a RadonConcentrationServer backed by src.
 func NewRadonConcentrationServer(src contract.FloatMeasurementSource) *RadonConcentrationServer {
-	return &RadonConcentrationServer{concentrationServer{src: src, clusterID: ClusterRadonConcentration, unit: concUnitBecquerelPerCubicMeter, inst: radonInst}}
+	return &RadonConcentrationServer{newConcentrationServer(src, radondef.Definition, concUnitBecquerelPerCubicMeter)}
 }
 
 // concentrationMaterializers installs the seven kinds the same way the
 // CO2 / PM2.5 / PM10 kinds are installed: the concentration cluster plus
 // the mandatory AirQuality cluster. None of the seven has a guideline in
-// airQualityGoodBelow, so their AirQuality reads Unknown.
+// airQualityBands, so their AirQuality reads Unknown.
 func concentrationMaterializers() {
 	for class, build := range map[contract.MeasurementClass]func(contract.FloatMeasurementSource) contract.ClusterServer{
 		contract.MeasurementCO:    func(f contract.FloatMeasurementSource) contract.ClusterServer { return NewCOConcentrationServer(f) },

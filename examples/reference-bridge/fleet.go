@@ -183,6 +183,12 @@ const thermometerCelsius = 21.5
 //     a subscriber learns of the self-close from a report, as from a valve
 //     with its own clock (TC-VALCC-4.5 compares its subscription with a
 //     read once the opening has ended).
+//   - With the "Ahead of matter.js" row valveRow enabled
+//     (--extensions BD-chip-Valve-RulesInServer) the head also has a level:
+//     Level and TimeSync, DefaultOpenLevel and a LevelStep of
+//     valveLevelStep. An Open travels to the level the server resolved, a
+//     Close to 0; CurrentLevel reads the level on arrival and TargetLevel
+//     goes back to null (TC-VALCC-3.2, 3.3).
 type demoValve struct {
 	name string
 	notifier
@@ -202,16 +208,30 @@ type demoValve struct {
 	// moving. arrive fires when it gets there.
 	target *valvedef.ValveStateEnum
 	arrive *time.Timer
+	// level is the head's level in percent, levelTarget the level it
+	// travels to (nil once there); defaultLevel is DefaultOpenLevel.
+	level        uint8
+	levelTarget  *uint8
+	defaultLevel uint8
 }
+
+// valveRow is the "Ahead of matter.js" register row of the valve's Level
+// and TimeSync features (cluster/valve.Ahead).
+const valveRow = "BD-chip-Valve-RulesInServer"
+
+// valveLevelStep is the valve's LevelStep: a level is 100 or a multiple of
+// it.
+const valveLevelStep uint8 = 10
 
 // valveTravel is how long the head takes to open or close.
 const valveTravel = 200 * time.Millisecond
 
 // travelLocked starts the head towards to. Caller holds v.mu.
 func (v *demoValve) travelLocked(to valvedef.ValveStateEnum) {
-	if v.target == nil && v.state == to {
+	if v.target == nil && v.state == to && (v.levelTarget == nil || *v.levelTarget == v.level) {
 		// Already there: the head does not move, and nothing reads
 		// Transitioning (TC-VALCC-3.1 closes a closed valve first).
+		v.levelTarget = nil
 		return
 	}
 	if v.arrive != nil {
@@ -232,6 +252,10 @@ func (v *demoValve) arrived() {
 	v.state = *v.target
 	v.target = nil
 	v.arrive = nil
+	if v.levelTarget != nil {
+		v.level = *v.levelTarget
+		v.levelTarget = nil
+	}
 	v.mu.Unlock()
 	v.notify()
 }
@@ -250,13 +274,17 @@ func (v *demoValve) stopTravelLocked() {
 		v.arrive = nil
 	}
 	v.target = nil
+	v.levelTarget = nil
 }
 
 // Compile-time assertions: the device is the endpoint source, the host port
-// of the ValveConfigurationAndControl server, and its own change notifier.
+// of the ValveConfigurationAndControl server with its level, and its own
+// change notifier.
 var (
-	_ contract.ChangeNotifier = (*demoValve)(nil)
-	_ valvedef.StateSource    = (*demoValve)(nil)
+	_ contract.ChangeNotifier         = (*demoValve)(nil)
+	_ valvedef.StateSource            = (*demoValve)(nil)
+	_ valvedef.LevelSource            = (*demoValve)(nil)
+	_ valvedef.DefaultOpenLevelSource = (*demoValve)(nil)
 )
 
 // newDemoValve returns a closed valve whose default opening lasts
@@ -264,14 +292,56 @@ var (
 // field applies.
 func newDemoValve(name string, defaultOpenSeconds uint32) *demoValve {
 	seconds := defaultOpenSeconds
-	return &demoValve{name: name, state: valvedef.ValveStateClosed, defaultOpen: &seconds}
+	return &demoValve{name: name, state: valvedef.ValveStateClosed, defaultOpen: &seconds, defaultLevel: 100}
 }
 
 // declaration declares the valve's cluster: the device is the kit's
 // server's port — every attribute the cluster answers is read back out of
-// it, and both commands land on it.
-func (v *demoValve) declaration() device.Declaration {
-	return valvedef.Declare{StateSource: v}
+// it, and both commands land on it. With level, the Level and TimeSync
+// features, DefaultOpenLevel and LevelStep.
+func (v *demoValve) declaration(level bool) device.Declaration {
+	decl := valvedef.Declare{StateSource: v}
+	if level {
+		step, def := valveLevelStep, v.defaultLevel
+		decl.Features = valvedef.FeatureLevel | valvedef.FeatureTimeSync
+		decl.Initial = valvedef.Patch{LevelStep: &step, DefaultOpenLevel: &def}
+	}
+	return decl
+}
+
+// CurrentLevel implements [valvedef.LevelSource].
+func (v *demoValve) CurrentLevel() (uint8, bool) {
+	v.mu.Lock()
+	defer v.mu.Unlock()
+	v.expireLocked(time.Now())
+	return v.level, true
+}
+
+// TargetLevel implements [valvedef.LevelSource]: the level the head
+// travels to, null once it has arrived.
+func (v *demoValve) TargetLevel() (uint8, bool) {
+	v.mu.Lock()
+	defer v.mu.Unlock()
+	if v.levelTarget == nil {
+		return 0, false
+	}
+	return *v.levelTarget, true
+}
+
+// DefaultOpenLevel implements [valvedef.DefaultOpenLevelSource].
+func (v *demoValve) DefaultOpenLevel() uint8 {
+	v.mu.Lock()
+	defer v.mu.Unlock()
+	return v.defaultLevel
+}
+
+// SetDefaultOpenLevel implements [valvedef.DefaultOpenLevelSource].
+func (v *demoValve) SetDefaultOpenLevel(_ context.Context, percent uint8) error {
+	v.mu.Lock()
+	v.defaultLevel = percent
+	v.mu.Unlock()
+	slog.Info("valve.default_open_level", slog.String("device", v.name), slog.Int("percent", int(percent)))
+	return nil
 }
 
 // expireLocked applies a lapsed opening deadline. Caller holds v.mu.
@@ -282,6 +352,7 @@ func (v *demoValve) expireLocked(now time.Time) {
 	v.state = valvedef.ValveStateClosed
 	v.openFor = nil
 	v.closesAt = time.Time{}
+	v.level, v.levelTarget = 0, nil
 }
 
 // CurrentState implements [valvedef.StateSource]. Transitioning while the head
@@ -364,6 +435,10 @@ func (v *demoValve) Open(_ context.Context, req valvedef.OpenRequest) error {
 			duration = &d.Value
 		}
 	}
+	if req.TargetLevel != nil {
+		// The level the server resolved (Level feature only).
+		v.levelTarget = new(*req.TargetLevel)
+	}
 	v.travelLocked(valvedef.ValveStateOpen)
 	v.openFor = copyUint32(duration)
 	if v.closer != nil {
@@ -399,6 +474,9 @@ func (v *demoValve) Close(context.Context) error {
 	if v.closer != nil {
 		v.closer.Stop()
 		v.closer = nil
+	}
+	if v.levelTarget != nil || v.level != 0 {
+		v.levelTarget = new(uint8(0))
 	}
 	v.travelLocked(valvedef.ValveStateClosed)
 	v.openFor = nil
@@ -1188,7 +1266,8 @@ func (f *fleet) endpoints() ([]node.Endpoint, error) { //nolint:funlen // the fl
 	}
 	add(f.light.device(f.bridged("light", f.light.name)))
 	add(device.NewTemperatureSensor(f.bridged("thermometer", "Study Thermometer"), temperatureDeclaration(thermometerCelsius)))
-	add(device.NewWaterValve(f.bridged("valve", f.valve.name), f.valve.declaration()))
+	valveOpts := f.bridged("valve", f.valve.name)
+	add(device.NewWaterValve(valveOpts, f.valve.declaration(valveOpts.Surface.Extensions.Has(valveRow))))
 	add(device.NewModeSelect(f.bridged("selector", f.selector.name), f.selector.declaration()))
 	add(f.speaker.device(f.bridged("speaker", f.speaker.name)))
 

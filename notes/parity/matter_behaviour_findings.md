@@ -351,6 +351,7 @@ light and plug types (RootNode `GroupcastListenerCond`) — is built:
 PerGroup and, since wave 20 (report AN), Sender — FeatureMap 0x07, the
 group sender in `groups/`. What remains:
 
+- **The bridge decides what a command changed by printing attribute values with `%#v`.** `bridge/receive_dispatch.go` (`renderCluster`) and `bridge/subscribe.go` (`pathValues`) compare the rendered strings before and after an invoke; a `MatterRead` that returns a freshly allocated struct or nested pointers renders as addresses, so an unchanged attribute is reported after every command. Found in phase 38 by TC-CLCTRL-5.1 (step 4i matched a stale Latch report, 5d then INVALID_IN_STATE); `cluster/closure` works around it with cached state views rebuilt only on a value change. The robust fix compares by value (reflect.DeepEqual or the attribute's TLV encoding) in the bridge, and other servers that return pointers over-report the same way. (Found 2026-11-06, agent A's report; a wave of its own.)
 - **Field conformance does not hold the host's own values.** matter.js validates every commit, the host's included (`ValueValidator.ts:392-467`, `conformance.ts:19-60` at `862ad75f`). Since brief CT `spec.Instance.CheckConformance` holds a controller's write of a struct attribute on a generic server; the host's `Initial`/`Set` and the checks self-held servers call are not held, because the reference bridge's CHIP-mirrored tariff thresholds (both `O.b`) and DEM forecasts fail the check. Route: correct the samples (a chip-tool families run of SETRF and DEM decides what they publish), then hold the host path; brief CT report, question 1. (Triage 2026-10-29: wave H1, the device IM and write path.)
 - **A request field outside its constraint is answered by the handler, not refused on the wire.** matter.js's request TLV schema refuses it before the behavior runs (`CommandInvokeResponse.ts:484-487` at `862ad75f`, CONSTRAINT_ERROR); the Go generic server passes it to the handler, and the OnOff, DoorLock, EVSE, WaterHeater and CommodityPrice ports pin the handler's status. Route: a request-constraint check in `spec.Server`'s invoke path, with those ports' expectations re-read against the pin; brief CT report, question 2. (Triage 2026-10-29: wave H1, the device IM and write path.)
 - **A command response is held to field presence only.** matter.js validates the whole response payload (`ProtocolService.ts:725-740` at `862ad75f`; DoorLock switches the constraint off per response, `DoorLockServer.ts:704-707`); the Go server checks which fields a response carries, not their enum values or nested structs. Route: with the request check above. (Triage 2026-10-29: wave H1, the device IM and write path.)
@@ -599,11 +600,6 @@ Line numbers at `862ad75f`. (Triage 2026-10-29: wave H3, node options and the em
 Found by the phase-18a system-set port (brief BN, PR #182, 2026-10-19).
 Line numbers at `862ad75f`. (Triage 2026-10-29: wave H1, the device IM and write path.)
 
-- **A bridged endpoint cannot opt into TagList.** `Descriptor.EnableTagList`
-  / `AddTags` exist on the server (`DescriptorServer.ts:122-147`), but
-  `endpoint.Spec` carries no tags, so a host's device model cannot set
-  them; the default stays off for Apple (the note at
-  `cluster/core/descriptor.go` `MatterAttributes`). (Triage 2026-10-29: wave H3, node options and the embedding layer.)
 - **The groups manager holds no key set 0.** `KeySetsTest.ts` reads the
   only key of the default key set and the second-newest key of the IPK
   key set (§4.14.2.6); `groups/manager.go` loads key sets from 1 and the
@@ -680,10 +676,6 @@ Found by the phase-17a port of the OnOff, LevelControl, ColorControl,
 Identify, WindowCovering and ServiceArea tests (brief BJ, PR #170,
 2026-10-19). Line numbers at `862ad75f`. (Triage 2026-10-29: harness note, the next CHIP image lift (not a parity gap).)
 
-- **ColorControl serves no primaries.** Primary1X … Primary6Intensity and
-  NumberOfPrimaries are absent from `cluster/light`, so a light cannot
-  supply one (ColorControlServerTest "accepts a primary a light supplies
-  without stating the number of primaries"). Optional attributes; low. (Triage 2026-10-29: when a consumer asks (brief BR decision 19.4); no wave.)
 - **ColorControl `MatterQuiesce` leaves the quieter's pending-report
   timers.** `cluster/light/colorcontrol_transitions.go` stops the engine
   only; the LevelControl fix of PR #170 (`MatterQuiesce` drops the held

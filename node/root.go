@@ -172,14 +172,8 @@ func buildRoot(ctx context.Context, d rootDeps) (*RootClusters, error) { //nolin
 	r.GeneralDiagnostics.SetPersistedCounters(reboots, 0)
 	r.GeneralDiagnostics.SetPersistedOperationalTime(opTime)
 
-	r.GeneralCommissioning, err = mattercore.NewGeneralCommissioning(mattercore.GeneralCommissioningConfig{
-		Logger:                       d.logger,
-		LocationCapability:           cfg.Commissioning.LocationCapability,
-		SupportsConcurrentConnection: true,
-		Clock:                        cfg.Clock,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("general commissioning: %w", err)
+	if r.GeneralCommissioning, err = newGeneralCommissioning(ctx, d); err != nil {
+		return nil, err
 	}
 	generalCom := r.GeneralCommissioning
 
@@ -661,4 +655,29 @@ func buildWiFiDiagnostics(wifi *WiFi) (*mattercore.WiFiNetworkDiagnostics, error
 		return nil, fmt.Errorf("root wifi diagnostics: %w", err)
 	}
 	return srv, nil
+}
+
+// newGeneralCommissioning builds the root's GeneralCommissioning server
+// and restores the committed terms-and-conditions acceptance from the
+// node's store ([Commissioning].TermsAndConditions).
+func newGeneralCommissioning(ctx context.Context, d rootDeps) (*mattercore.GeneralCommissioning, error) {
+	cfg := d.cfg
+	gc, err := mattercore.NewGeneralCommissioning(mattercore.GeneralCommissioningConfig{
+		Logger:                       d.logger,
+		LocationCapability:           cfg.Commissioning.LocationCapability,
+		SupportsConcurrentConnection: true,
+		TermsAndConditions:           cfg.Commissioning.TermsAndConditions.core(),
+		Settings:                     d.st,
+		Clock:                        cfg.Clock,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("general commissioning: %w", err)
+	}
+	if err := gc.RestoreTermsAcceptance(ctx); err != nil {
+		// A malformed stored acceptance reads as none: the commissioner
+		// acknowledges the terms again (TCAcknowledgementsRequired true);
+		// the node starts.
+		d.logger.Warn("node.terms.restore", slog.Any("err", err))
+	}
+	return gc, nil
 }

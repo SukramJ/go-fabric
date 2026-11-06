@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 7613,
+  "entry_points": 7672,
   "entry_packages": [
     ".",
     "bdx",
@@ -279,9 +279,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 17595,
-    "reachable": 12265,
-    "whitelisted": 5330,
+    "total_exported": 17643,
+    "reachable": 12301,
+    "whitelisted": 5342,
     "unreachable": 0
   },
   "by_package": [],
@@ -8020,7 +8020,7 @@
       "identifier": "Mover",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/closure/closurecontrol_server.go",
-      "line": 93
+      "line": 125
     },
     {
       "package": "cluster/closure",
@@ -9938,35 +9938,35 @@
       "identifier": "Color",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/light/colorcontrol_server.go",
-      "line": 198
+      "line": 274
     },
     {
       "package": "cluster/light",
       "identifier": "ColorFeature",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/light/colorcontrol_server.go",
-      "line": 74
+      "line": 76
     },
     {
       "package": "cluster/light",
       "identifier": "ColorMode",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/light/colorcontrol_server.go",
-      "line": 89
+      "line": 91
     },
     {
       "package": "cluster/light",
       "identifier": "ColorTemperatureWriter",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/light/colorcontrol_server.go",
-      "line": 189
+      "line": 265
     },
     {
       "package": "cluster/light",
       "identifier": "ColorWriter",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/light/colorcontrol_server.go",
-      "line": 209
+      "line": 285
     },
     {
       "package": "cluster/lock",
@@ -9987,21 +9987,21 @@
       "identifier": "BooleanStateChangeEvent",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/measurement/definitions.go",
-      "line": 155
+      "line": 142
     },
     {
       "package": "cluster/measurement",
       "identifier": "ElectricalReadingsSource",
       "reason": "called from electricalSensorServers in materializers.go:142-150, which reaches it as a function value in the measurement-kind registry map — an indirect call RTA cannot follow",
       "file": "cluster/measurement/measurement.go",
-      "line": 969
+      "line": 960
     },
     {
       "package": "cluster/measurement",
       "identifier": "EnergyMeasurementStruct",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/measurement/definitions.go",
-      "line": 150
+      "line": 137
     },
     {
       "package": "cluster/measurement",
@@ -10015,21 +10015,21 @@
       "identifier": "NewElectricalPowerServerFromReadings",
       "reason": "called from electricalSensorServers in materializers.go:142-150, which reaches it as a function value in the measurement-kind registry map — an indirect call RTA cannot follow",
       "file": "cluster/measurement/measurement.go",
-      "line": 961
+      "line": 952
     },
     {
       "package": "cluster/measurement",
       "identifier": "NewPowerTopologyServer",
       "reason": "called from electricalSensorServers in materializers.go:142-150, which reaches it as a function value in the measurement-kind registry map — an indirect call RTA cannot follow",
       "file": "cluster/measurement/measurement.go",
-      "line": 1757
+      "line": 1773
     },
     {
       "package": "cluster/measurement",
       "identifier": "OccupancyChangedEvent",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/measurement/measurement.go",
-      "line": 889
+      "line": 880
     },
     {
       "package": "cluster/measurement",
@@ -10078,14 +10078,14 @@
       "identifier": "TestParityMatterJS_ConcentrationClustersShareRevision",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/measurement/parity_matterjs_test.go",
-      "line": 282
+      "line": 317
     },
     {
       "package": "cluster/measurement",
       "identifier": "TestParityMatterJS_FeatureGatedAttributesMatchFeatureMap",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/measurement/parity_matterjs_test.go",
-      "line": 220
+      "line": 245
     },
     {
       "package": "cluster/measurement",
@@ -22006,7 +22006,7 @@
       "identifier": "SetpointChange",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/thermo/thermostat_server.go",
-      "line": 320
+      "line": 336
     },
     {
       "package": "cluster/thermo",
@@ -22014,6 +22014,13 @@
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/thermo/thermostatuserinterfaceconfiguration.go",
       "line": 98
+    },
+    {
+      "package": "cluster/thermo",
+      "identifier": "Suggestion",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/thermo/suggestions.go",
+      "line": 51
     },
     {
       "package": "cluster/thermo",
@@ -22129,24 +22136,38 @@
     },
     {
       "package": "cluster/valve",
+      "identifier": "DefaultOpenLevelSource",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/valve/valve_server.go",
+      "line": 177
+    },
+    {
+      "package": "cluster/valve",
+      "identifier": "LevelSource",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/valve/valve_server.go",
+      "line": 172
+    },
+    {
+      "package": "cluster/valve",
       "identifier": "OpenRequest",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/valve/valve_server.go",
-      "line": 139
+      "line": 150
     },
     {
       "package": "cluster/valve",
       "identifier": "State",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/valve/valve_server.go",
-      "line": 116
+      "line": 127
     },
     {
       "package": "cluster/valve",
       "identifier": "StateSource",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/valve/valve_server.go",
-      "line": 157
+      "line": 168
     },
     {
       "package": "cluster/wire",
@@ -24834,7 +24855,7 @@
       "identifier": "TestParityAddNOCFields",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/parity_matterjs_test.go",
-      "line": 180
+      "line": 181
     },
     {
       "package": "controller/commissioner",
@@ -24848,14 +24869,14 @@
       "identifier": "TestParityErrorClassification",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/parity_matterjs_test.go",
-      "line": 97
+      "line": 98
     },
     {
       "package": "controller/commissioner",
       "identifier": "TestParityOperationalCredentialsResults",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/parity_matterjs_test.go",
-      "line": 138
+      "line": 139
     },
     {
       "package": "controller/commissioner",
@@ -26052,28 +26073,28 @@
       "identifier": "TestAheadDeclarationsAreThermo",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/surface_ahead_test.go",
-      "line": 43
+      "line": 55
     },
     {
       "package": "device",
       "identifier": "TestAheadThermostatDisabled",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/surface_ahead_test.go",
-      "line": 57
+      "line": 77
     },
     {
       "package": "device",
       "identifier": "TestAheadThermostatEnabled",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/surface_ahead_test.go",
-      "line": 112
+      "line": 132
     },
     {
       "package": "device",
       "identifier": "TestAheadThermostatNotSelected",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/surface_ahead_test.go",
-      "line": 87
+      "line": 107
     },
     {
       "package": "device",
@@ -26161,6 +26182,13 @@
     },
     {
       "package": "device",
+      "identifier": "TestColorControlDefaultServesColorPoints",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "device/defaults_colorpoints_test.go",
+      "line": 18
+    },
+    {
+      "package": "device",
       "identifier": "TestColorControlDefaultTakesTheDeclaration",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/defaults_coverage_test.go",
@@ -26207,6 +26235,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/controller_types_test.go",
       "line": 132
+    },
+    {
+      "package": "device",
+      "identifier": "TestDeclaredClosureAndValveAheadFeatures",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "device/defaults_declared_ahead_test.go",
+      "line": 43
     },
     {
       "package": "device",
@@ -26297,7 +26332,7 @@
       "identifier": "TestEveryKitServerHasItsHostDecided",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/host_methods_test.go",
-      "line": 375
+      "line": 376
     },
     {
       "package": "device",
@@ -26360,7 +26395,7 @@
       "identifier": "TestHostIsTheKitServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/host_methods_test.go",
-      "line": 410
+      "line": 411
     },
     {
       "package": "device",
@@ -28044,6 +28079,13 @@
     },
     {
       "package": "examples/reference-bridge",
+      "identifier": "TestAirQualitySensorServesEveryConcentrationFeature",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-bridge/consumer_features_test.go",
+      "line": 37
+    },
+    {
+      "package": "examples/reference-bridge",
       "identifier": "TestAppPipeCommandsReachTheDevices",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/control_test.go",
@@ -28212,6 +28254,13 @@
     },
     {
       "package": "examples/reference-bridge",
+      "identifier": "TestColorLightServesTwoPrimaries",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-bridge/consumer_features_test.go",
+      "line": 59
+    },
+    {
+      "package": "examples/reference-bridge",
       "identifier": "TestCommissioningCompleteClearsThePendingCredentialState",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/wiring_test.go",
@@ -28272,6 +28321,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/thermostat_schedules_test.go",
       "line": 23
+    },
+    {
+      "package": "examples/reference-bridge",
+      "identifier": "TestDemoThermostatSuggestionsAreGated",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-bridge/thermostat_suggestions_test.go",
+      "line": 20
     },
     {
       "package": "examples/reference-bridge",
@@ -28356,6 +28412,20 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/conformance_test.go",
       "line": 392
+    },
+    {
+      "package": "examples/reference-bridge",
+      "identifier": "TestGarageAheadFeatures",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-bridge/closure_valve_features_test.go",
+      "line": 25
+    },
+    {
+      "package": "examples/reference-bridge",
+      "identifier": "TestGarageServesTagList",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-bridge/consumer_features_test.go",
+      "line": 21
     },
     {
       "package": "examples/reference-bridge",
@@ -28674,10 +28744,17 @@
     },
     {
       "package": "examples/reference-bridge",
+      "identifier": "TestTermsAndConditionsFlag",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-bridge/terms_test.go",
+      "line": 19
+    },
+    {
+      "package": "examples/reference-bridge",
       "identifier": "TestThermostatHasItsUIConfiguration",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/area_closure_test.go",
-      "line": 137
+      "line": 135
     },
     {
       "package": "examples/reference-bridge",
@@ -28692,6 +28769,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/area_closure_test.go",
       "line": 39
+    },
+    {
+      "package": "examples/reference-bridge",
+      "identifier": "TestValveLevelFeatures",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-bridge/closure_valve_features_test.go",
+      "line": 105
     },
     {
       "package": "examples/reference-bridge",

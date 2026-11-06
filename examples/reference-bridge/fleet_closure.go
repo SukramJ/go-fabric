@@ -25,29 +25,76 @@ const garageTravel = 2 * time.Second
 // MovementCompleted and, at or away from FullyClosed, SecureStateChanged —
 // the device kit's ClosureControl server derives both from the drive's
 // report.
+//
+// With the "Ahead of matter.js" row closureRow enabled
+// (--extensions BD-chip-ClosureControl-RulesInServer) the drive also has a
+// bolt it latches and unlatches remotely, three speeds and a calibration
+// run (MotionLatching, Speed, Calibration — three of the closure-app's
+// ClosureControl features, connectedhomeip
+// examples/closure-app/closure-common/src/ClosureControlEndpoint.cpp:135-147
+// at 6170af84, latching and unlatching remotely as there): a latch or
+// speed change settles after garageSettle, a calibration after
+// garageCalibration, each reporting Stopped.
 type demoGarage struct {
 	name string
 
 	mu     sync.Mutex
 	travel *time.Timer
 	ctl    *ccldef.Server
+	// latchTo and speedTo are what the running action leaves the drive
+	// with; calibration is the calibration run.
+	latchTo     *bool
+	speedTo     *ccldef.ThreeLevelAutoEnum
+	calibration *time.Timer
 }
 
-var _ ccldef.Mover = (*demoGarage)(nil)
+var (
+	_ ccldef.Mover      = (*demoGarage)(nil)
+	_ ccldef.Latcher    = (*demoGarage)(nil)
+	_ ccldef.SpeedMover = (*demoGarage)(nil)
+	_ ccldef.Calibrator = (*demoGarage)(nil)
+)
+
+// closureRow is the "Ahead of matter.js" register row of the
+// ClosureControl features MotionLatching, Instantaneous, Speed and
+// Calibration (cluster/closure.Ahead).
+const closureRow = "BD-chip-ClosureControl-RulesInServer"
+
+// The drive's timings beyond travel: a latch or speed change, and a
+// calibration run, long enough for TC-CLCTRL-3.1 to read Calibrating and
+// calibrate again before it ends.
+const (
+	garageSettle      = 500 * time.Millisecond
+	garageCalibration = 3 * time.Second
+)
 
 func newDemoGarage(name string) *demoGarage { return &demoGarage{name: name} }
 
 // device builds the garage: fully closed and stopped.
 func (g *demoGarage) device(opts device.Options) (*device.Closure, error) {
 	closed, stopped := ccldef.CurrentPositionFullyClosed, ccldef.MainStateStopped
-	d, err := device.NewClosure(opts, ccldef.Declare{
+	// The Descriptor's TagList, which matter.js's Closure device enables
+	// (packages/node/src/devices/closure.ts:91 at 862ad75f): Closure
+	// namespace (0x44), GarageDoor (0x05). The device kit leaves it off
+	// unless a host opts in (BD-Matter-ClosureWithoutTagList).
+	opts.Tags = []device.SemanticTag{{MfgCode: spec.NullOf[uint16](), NamespaceId: 0x44, Tag: 0x05}}
+	decl := ccldef.Declare{
 		Features: ccldef.FeaturePositioning | ccldef.FeatureVentilation,
 		Mover:    g,
 		Initial: ccldef.Patch{
 			MainState:           &stopped,
 			OverallCurrentState: &ccldef.OverallCurrentStateStruct{Position: &spec.Nullable[ccldef.CurrentPositionEnum]{Value: closed}},
 		},
-	})
+	}
+	if opts.Surface.Extensions.Has(closureRow) {
+		// Unlatched at Auto: the cases unlatch first where they find a
+		// latched closure, and an unlatched one needs no preparation.
+		auto := ccldef.ThreeLevelAutoAuto
+		decl.Features |= ccldef.FeatureMotionLatching | ccldef.FeatureSpeed | ccldef.FeatureCalibration
+		decl.Initial.OverallCurrentState.Latch = &spec.Nullable[bool]{Value: false}
+		decl.Initial.OverallCurrentState.Speed = &auto
+	}
+	d, err := device.NewClosure(opts, decl)
 	if err != nil {
 		return withheldOr(d, err)
 	}
@@ -95,26 +142,117 @@ func (g *demoGarage) MoveTo(_ context.Context, target ccldef.TargetPositionEnum)
 		g.travel.Stop()
 	}
 	g.travel = time.AfterFunc(garageTravel, func() {
-		g.mu.Lock()
-		g.travel = nil
-		g.mu.Unlock()
-		pos, stopped := arrival, ccldef.MainStateStopped
-		g.report(&pos, &stopped)
-		slog.Info("garage.arrived", slog.String("device", g.name), slog.Int("position", int(pos)))
+		g.finish(&arrival)
+		slog.Info("garage.arrived", slog.String("device", g.name), slog.Int("position", int(arrival)))
 	})
 	g.mu.Unlock()
 	slog.Info("garage.move", slog.String("device", g.name), slog.Int("target", int(target)))
 	return nil
 }
 
+// LatchControlModes implements [ccldef.Latcher]: the bolt latches and
+// unlatches remotely.
+func (*demoGarage) LatchControlModes() ccldef.LatchControlModesBitmap {
+	return ccldef.LatchControlModesRemoteLatching | ccldef.LatchControlModesRemoteUnlatching
+}
+
+// Latch implements [ccldef.Latcher]: the bolt moves when the drive's
+// running action ends — a latch-only request after garageSettle, a latch
+// that accompanies a MoveTo on arrival.
+func (g *demoGarage) Latch(_ context.Context, latch bool) error {
+	g.mu.Lock()
+	g.latchTo = &latch
+	g.settleLocked()
+	g.mu.Unlock()
+	slog.Info("garage.latch", slog.String("device", g.name), slog.Bool("latch", latch))
+	return nil
+}
+
+// SetSpeed implements [ccldef.SpeedMover]: the drive takes the speed when
+// its running action ends, as Latch.
+func (g *demoGarage) SetSpeed(_ context.Context, speed ccldef.ThreeLevelAutoEnum) error {
+	g.mu.Lock()
+	g.speedTo = &speed
+	g.settleLocked()
+	g.mu.Unlock()
+	slog.Info("garage.speed", slog.String("device", g.name), slog.Int("speed", int(speed)))
+	return nil
+}
+
+// settleLocked arms the short action of a latch or speed change unless a
+// travel runs, which carries it out on arrival. Caller holds g.mu.
+func (g *demoGarage) settleLocked() {
+	if g.travel != nil {
+		return
+	}
+	g.travel = time.AfterFunc(garageSettle, func() { g.finish(nil) })
+}
+
+// finish ends the running action: the drive reports where it is — at
+// arrival, otherwise where it was — with the latch and speed the action
+// left it with, and Stopped.
+func (g *demoGarage) finish(arrival *ccldef.CurrentPositionEnum) {
+	g.mu.Lock()
+	g.travel = nil
+	latch, speed := g.latchTo, g.speedTo
+	g.latchTo, g.speedTo = nil, nil
+	g.mu.Unlock()
+	srv := g.server()
+	current := srv.Get().OverallCurrentState
+	if current == nil {
+		current = &ccldef.OverallCurrentStateStruct{}
+	}
+	if arrival != nil {
+		current.Position = &spec.Nullable[ccldef.CurrentPositionEnum]{Value: *arrival}
+	}
+	if latch != nil {
+		current.Latch = &spec.Nullable[bool]{Value: *latch}
+	}
+	if speed != nil {
+		current.Speed = speed
+	}
+	stopped := ccldef.MainStateStopped
+	if err := srv.Set(ccldef.Patch{OverallCurrentState: current, MainState: &stopped}); err != nil {
+		slog.Warn("garage.report", slog.String("device", g.name), slog.Any("err", err))
+	}
+}
+
+// Calibrate implements [ccldef.Calibrator]: a calibration run that ends,
+// Stopped, after garageCalibration; the server sets Calibrating once this
+// returns.
+func (g *demoGarage) Calibrate(context.Context) error {
+	g.mu.Lock()
+	if g.calibration != nil {
+		g.calibration.Stop()
+	}
+	g.calibration = time.AfterFunc(garageCalibration, func() {
+		g.mu.Lock()
+		g.calibration = nil
+		g.mu.Unlock()
+		stopped := ccldef.MainStateStopped
+		if err := g.server().Set(ccldef.Patch{MainState: &stopped}); err != nil {
+			slog.Warn("garage.calibrated", slog.String("device", g.name), slog.Any("err", err))
+		}
+		slog.Info("garage.calibrated", slog.String("device", g.name))
+	})
+	g.mu.Unlock()
+	slog.Info("garage.calibrate", slog.String("device", g.name))
+	return nil
+}
+
 // Stop implements [ccldef.Mover]: the drive halts between its stops, so
-// the position is no longer one of them.
+// the position is no longer one of them; a calibration run is abandoned.
 func (g *demoGarage) Stop(context.Context) error {
 	g.mu.Lock()
 	moving := g.travel != nil
 	if moving {
 		g.travel.Stop()
 		g.travel = nil
+	}
+	g.latchTo, g.speedTo = nil, nil
+	if g.calibration != nil {
+		g.calibration.Stop()
+		g.calibration = nil
 	}
 	g.mu.Unlock()
 	if moving {
@@ -212,6 +350,10 @@ func (p *demoPanel) device(opts device.Options) (*device.ClosurePanel, error) {
 	resolution, step, unit := uint16(100), panelStepValue, cdim.ClosureUnitMillimeter
 	axis, overflow := cdim.RotationAxisCenteredVertical, cdim.OverflowTopInside
 	latching := cdim.LatchControlModesRemoteLatching | cdim.LatchControlModesRemoteUnlatching
+	// The Descriptor's TagList, which matter.js's ClosurePanel device
+	// enables (packages/node/src/devices/closure-panel.ts:59 at 862ad75f):
+	// ClosurePanel namespace (0x45), Rotate (0x03).
+	opts.Tags = []device.SemanticTag{{MfgCode: spec.NullOf[uint16](), NamespaceId: 0x45, Tag: 0x03}}
 	d, err := device.NewClosurePanel(opts, cdim.Declare{
 		Features: cdim.FeaturePositioning | cdim.FeatureMotionLatching | cdim.FeatureUnit |
 			cdim.FeatureLimitation | cdim.FeatureSpeed | cdim.FeatureRotation,

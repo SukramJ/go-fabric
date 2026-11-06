@@ -161,7 +161,7 @@ jobs:
             "core-idm=IDM"
             "core-ace=ACE,ACL,OPCREDS,CGEN"
             "core-rest=DESC,BINFO,BRBINFO,GRPKEY,DT,RR,SM,TIMESYNC,DLOG,ICDM,BDX,BIND,FLABEL,ULABEL,LCFG,LTIME,LUNIT,DGSW,DGETH,DGWIFI,ACT,PSCFG,ECOINFO,MESS"
-            "commissioning=CADMIN,SC,DA,DD,CNET,CNETWIFI,G,GC"
+            "commissioning=CADMIN,SC,DA,DD,CNET,CNETWIFI,CGENTC,G,GC"
             "app-lights=OO,LVL,CC,I,S,SWTCH,BOOL,BOOLCFG,OCC,TMP,RH,FLW,CDOCONC,CMOCONC,FLDCONC,NDOCONC,OZCONC,PMHCONC,RNCONC,TVOCCONC,AIRQUAL,PMICONC,PMKCONC,SOIL"
             "app-appliances=DRLK,FAN,LWM,WASHERCTRL,DRYERCTRL,MOD,OPSTATE,PCC,PS,RVCCLEANM,RVCOPSTATE,RVCRUNM,SMOKECO,TSTAT,VALCC,WNCV,HEPAFREMON,ACFREMON,CLCTRL,TCCM,TCTL,EPREF,EWATERHTR,WHM,MTRID,DISHALM,REFALM,OVENOPSTATE,OTCCM,MWOCTRL,MWOM,SEAR,CLDIM,TSUIC"
             "app-energy=DEM,DEMM,EEVSE,EEVSEM,SETRF,COMMTR,EGC,SEPR,EEM,EPM,PWRTL"
@@ -206,7 +206,7 @@ jobs:
       contains(github.event.pull_request.labels.*.name, 'needs-chiptool') ||
       needs.changes.outputs.code == 'true'
     runs-on: ubuntu-24.04
-    timeout-minutes: 40
+    timeout-minutes: 55
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0

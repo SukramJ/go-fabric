@@ -558,6 +558,18 @@ func (n *Node) fabricRemoved(ctx context.Context, fabricIndex uint8) {
 	if srv := n.root.TimeSynchronization; srv != nil {
 		srv.FabricRemoved(ctx, fabricIndex)
 	}
+	// The last fabric's removal resets the terms-and-conditions acceptance
+	// (GeneralCommissioningCluster.cpp:357-374 at 6170af84).
+	if srv := n.root.GeneralCommissioning; srv != nil {
+		switch fabrics, err := n.st.ListFabrics(ctx); {
+		case err != nil:
+			n.logger.Warn("node.terms.reset", slog.Any("err", err))
+		case len(fabrics) == 0:
+			if err := srv.LastFabricRemoved(ctx); err != nil {
+				n.logger.Warn("node.terms.reset", slog.Any("err", err))
+			}
+		}
+	}
 	// The root's TLS tables drop the fabric's entries
 	// (TLSCertificateManagementCluster.cpp:571-575,
 	// TLSClientManagementCluster.cpp:272-275 at 6170af84).

@@ -169,10 +169,35 @@ func (stubFloatSrc) MatterMeasurementClass() contract.MeasurementClass {
 //	packages/model/src/standard/elements/power-source-cluster.element.ts
 //	packages/model/src/standard/elements/electrical-energy-measurement.element.ts
 //	packages/model/src/standard/elements/electrical-power-measurement.element.ts
+//	packages/model/src/standard/elements/concentration-measurement.element.ts
 var featureBitsByCluster = map[uint32]map[string]uint32{
-	ClusterPowerSource:      {"WIRED": 0, "BAT": 1, "RECHG": 2, "REPLC": 3},
-	ClusterElectricalEnergy: {"IMPE": 0, "EXPE": 1, "CUME": 2, "PERE": 3, "APPE": 4, "REAE": 5},
-	ClusterElectricalPower:  {"DIRC": 0, "ALTC": 1, "POLY": 2, "HARM": 3, "PWRQ": 4},
+	ClusterPowerSource:               {"WIRED": 0, "BAT": 1, "RECHG": 2, "REPLC": 3},
+	ClusterElectricalEnergy:          {"IMPE": 0, "EXPE": 1, "CUME": 2, "PERE": 3, "APPE": 4, "REAE": 5},
+	ClusterElectricalPower:           {"DIRC": 0, "ALTC": 1, "POLY": 2, "HARM": 3, "PWRQ": 4},
+	ClusterCO2Concentration:          concentrationFeatureBits,
+	ClusterPM10Concentration:         concentrationFeatureBits,
+	ClusterRadonConcentration:        concentrationFeatureBits,
+	ClusterCOConcentration:           concentrationFeatureBits,
+	ClusterTVOCConcentration:         concentrationFeatureBits,
+	ClusterPM25Concentration:         concentrationFeatureBits,
+	ClusterOzoneConcentration:        concentrationFeatureBits,
+	ClusterNO2Concentration:          concentrationFeatureBits,
+	ClusterPM1Concentration:          concentrationFeatureBits,
+	ClusterFormaldehydeConcentration: concentrationFeatureBits,
+}
+
+// concentrationFeatureBits are the ten concentration clusters' shared
+// FeatureMap bits.
+var concentrationFeatureBits = map[string]uint32{"MEA": 0, "LEV": 1, "MED": 2, "CRI": 3, "PEA": 4, "AVG": 5}
+
+// selectedFloatSrc is a concentration reading with a selection.
+type selectedFloatSrc struct {
+	stubFloatSrc
+	sel contract.ConcentrationSelection
+}
+
+func (s selectedFloatSrc) MatterConcentrationSelection() contract.ConcentrationSelection {
+	return s.sel
 }
 
 // mandatoryUnderFeatureMap decides whether a matter.js conformance
@@ -233,6 +258,16 @@ func TestParityMatterJS_FeatureGatedAttributesMatchFeatureMap(t *testing.T) {
 		{"PowerSource", NewPowerSourceServer(stubBoolSrc(false))},
 		{"ElectricalEnergyMeasurement", NewElectricalEnergyServer(stubFloatSrc(0))},
 		{"ElectricalPowerMeasurement", NewElectricalPowerServer(stubFloatSrc(0))},
+		// The concentration selections (contract.ConcentrationSelection):
+		// the numeric reading alone, every feature, the levels alone, and
+		// MED closed onto LEV.
+		{"CO2/MEA", NewCO2ConcentrationServer(stubFloatSrc(0))},
+		{"CO2/all", NewCO2ConcentrationServer(selectedFloatSrc{sel: contract.ConcentrationSelection{
+			Level: true, MediumLevel: true, CriticalLevel: true, Peak: true, Average: true,
+		}})},
+		{"PM10/LEV", NewPM10ConcentrationServer(selectedFloatSrc{sel: contract.ConcentrationSelection{Level: true}})},
+		{"Radon/PEA", NewRadonConcentrationServer(selectedFloatSrc{sel: contract.ConcentrationSelection{Peak: true}})},
+		{"TVOC/AVG+MED", NewTVOCConcentrationServer(selectedFloatSrc{sel: contract.ConcentrationSelection{Average: true, MediumLevel: true}})},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {

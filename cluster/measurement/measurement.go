@@ -100,16 +100,12 @@ const (
 // AirQuality (0x005B) attribute ID per Matter §2.9.6.1.
 const attrAirQualityLevel = aqdef.AttrAirQuality
 
-// AirQualityEnum members the server reports. Only Unknown, Good and Poor
-// carry conformance "M" (air-quality.element.ts) — Fair, Moderate,
-// VeryPoor and ExtremelyPoor are each gated on an optional FeatureMap
-// bit (FAIR / MOD / VPOOR / XPOOR) that [AirQualityServer] does not
-// advertise, so they never appear on the wire.
-const (
-	airQualityUnknown = uint8(aqdef.AirQualityUnknown)
-	airQualityGood    = uint8(aqdef.AirQualityGood)
-	airQualityPoor    = uint8(aqdef.AirQualityPoor)
-)
+// airQualityUnknown is the AirQualityEnum member of a source without a
+// reading or a pollutant without a grading scale. Unknown, Good and Poor
+// carry conformance "M" (air-quality.element.ts); Fair, Moderate,
+// VeryPoor and ExtremelyPoor are each gated on an optional FeatureMap bit
+// (FAIR / MOD / VPOOR / XPOOR) the source's selection names.
+const airQualityUnknown = uint8(aqdef.AirQualityUnknown)
 
 // Concentration Measurement (CO2 / PM2.5 / PM10) attribute IDs; the
 // three clusters share the layout of the base cluster.
@@ -127,11 +123,6 @@ const (
 	concUnitMicroGramPerCubicMeter = uint8(co2def.MeasurementUnitUgm3)
 	concMediumAir                  = uint8(co2def.MeasurementMediumAir)
 )
-
-// concFeatureMEA is the Numeric Measurement feature — what is always
-// advertised when projecting a Generic.Sensor[float64] onto a
-// concentration cluster. Other bits (LEV, MED, CRI, PEA, AVG) stay off.
-const concFeatureMEA = uint32(co2def.FeatureNumericMeasurement)
 
 // PowerSource (0x002F) attribute IDs. EndpointList (0x001F) is mandatory:
 // the list identifies which endpoints this power source serves.
@@ -1228,8 +1219,9 @@ func whToMilliWattHours(wh float64) int64 {
 // implementer's to define ("It is up to the device manufacturer to
 // determine the mapping between the measured values and their
 // corresponding enumeration values"), so the bridge grades against the
-// pollutant's published guideline value; see [airQualityGoodBelow].
-// FeatureMap stays 0, which restricts the reportable levels to the
+// pollutant's published guideline values; see [airQualityBands]. The
+// FeatureMap is the grades the source's [contract.ConcentrationSelection]
+// names (AirQuality); without them the reportable levels are the
 // conformance-mandatory Unknown / Good / Poor.
 //
 // The server deliberately does not implement
@@ -1245,44 +1237,25 @@ func whToMilliWattHours(wh float64) int64 {
 type AirQualityServer struct {
 	cluster.DataVersionTracker
 	src contract.FloatMeasurementSource
-	// goodBelow is the upper bound (inclusive) of the Good level in the
-	// source's own unit; graded is false for a class with no guideline,
-	// in which case the server reports Unknown.
-	goodBelow float64
-	graded    bool
+	// class names the pollutant, whose grading scale ([airQualityBands])
+	// is in the source's own unit; a class with no guideline reports
+	// Unknown.
+	class contract.MeasurementClass
+	// levels are the optional grades the selection serves, inst the
+	// definition bound to them.
+	levels contract.AirQualityLevels
+	inst   *spec.Instance
 }
 
 // Compile-time assertion: AirQualityServer satisfies MatterClusterDataVersion.
 var _ contract.ClusterDataVersion = (*AirQualityServer)(nil)
 
 // NewAirQualityServer constructs an AirQualityServer that grades src's
-// readings against the guideline value for class.
+// readings on the guideline scale for class, into the grades src's
+// [contract.ConcentrationSelection] serves.
 func NewAirQualityServer(class contract.MeasurementClass, src contract.FloatMeasurementSource) *AirQualityServer {
-	goodBelow, graded := airQualityGoodBelow(class)
-	return &AirQualityServer{src: src, goodBelow: goodBelow, graded: graded}
-}
-
-// airQualityGoodBelow returns the concentration at or below which the
-// air still counts as Good, expressed in the unit the model carries for
-// that pollutant, and whether the class has a guideline at all.
-//
-// CO2 is ppm and uses the 1000 ppm indoor-air limit above which a room
-// is considered inadequately ventilated. PM2.5 and PM10 are µg/m³ and
-// use the World Health Organization 2021 air-quality guideline levels
-// for the 24-hour mean (15 and 45 µg/m³) — the model classifies exactly
-// the 24-hour-average parameters onto these classes, so the averaging
-// windows line up.
-func airQualityGoodBelow(class contract.MeasurementClass) (float64, bool) {
-	switch class {
-	case contract.MeasurementCO2:
-		return 1000, true
-	case contract.MeasurementPM25:
-		return 15, true
-	case contract.MeasurementPM10:
-		return 45, true
-	default:
-		return 0, false
-	}
+	levels := concentrationSelectionOf(src).AirQuality
+	return &AirQualityServer{src: src, class: class, levels: levels, inst: airQualityInsts[levels]}
 }
 
 // MatterDataVersion implements [contract.ClusterDataVersion].
@@ -1300,26 +1273,24 @@ func (s *AirQualityServer) MatterRead(attrID uint32) (any, bool) {
 		// source without a reading yet reports Unknown rather than nil.
 		return s.level(), true
 	case cluster.AttrGlobalFeatureMap, cluster.AttrGlobalClusterRevision:
-		return airQualityInst.ReadGlobal(attrID)
+		return s.inst.ReadGlobal(attrID)
 	}
 	return nil, false
 }
 
 // level grades the current reading into an AirQualityEnum member.
 func (s *AirQualityServer) level() uint8 {
+	bands, graded := airQualityBands(s.class)
 	v, ok := s.src.MatterFloatValue()
-	if !ok || !s.graded || math.IsNaN(v) {
+	if !ok || !graded || math.IsNaN(v) {
 		return airQualityUnknown
 	}
-	if v <= s.goodBelow {
-		return airQualityGood
-	}
-	return airQualityPoor
+	return airQualityGrade(bands, s.levels, v)
 }
 
 // MatterWrite refuses the write as the definition answers it (see refuseWrite) — AirQuality carries a single "R V" attribute.
 func (s *AirQualityServer) MatterWrite(_ context.Context, attrID uint32, value any) error {
-	return refuseWrite(airQualityInst, attrID, value)
+	return refuseWrite(s.inst, attrID, value)
 }
 
 // MatterInvoke returns errNoCommands — the Matter Air Quality cluster has no commands.
@@ -1333,7 +1304,7 @@ func (s *AirQualityServer) MatterReportable() []uint32 { return []uint32{attrAir
 // MatterAttributes lists every AirQuality (0x005B) attribute the server
 // implements via MatterRead, so the dispatcher advertises the full
 // AttributeList rather than falling back to MatterReportable.
-func (s *AirQualityServer) MatterAttributes() []uint32 { return airQualityInst.MatterAttributes() }
+func (s *AirQualityServer) MatterAttributes() []uint32 { return s.inst.MatterAttributes() }
 
 // --- Concentration Measurement (CO2 / PM2.5 / PM10) ------------------
 
@@ -1347,6 +1318,12 @@ func (s *AirQualityServer) MatterAttributes() []uint32 { return airQualityInst.M
 // truncation — the model's unit is the spec unit (PPM for CO2, µg/m³
 // for PM2.5 / PM10), so no scaling is required.
 //
+// The feature selection is the source's [contract.ConcentrationSelection]
+// (NumericMeasurement always): LevelIndication with MediumLevel and
+// CriticalLevel serve LevelValue, PeakMeasurement and AverageMeasurement
+// the peak and average readings with their windows, each from the
+// source's [contract.ConcentrationReadings].
+//
 // concentrationServer embeds [cluster.DataVersionTracker] and
 // implements [contract.ClusterDataVersion] so the three named
 // wrapper types (CO2, PM2.5, PM10) inherit the tracker. See
@@ -1356,7 +1333,14 @@ type concentrationServer struct {
 	src       contract.FloatMeasurementSource
 	clusterID uint32
 	unit      uint8 // MeasurementUnit enum (PPM = 0, µg/m³ = 4)
+	sel       contract.ConcentrationSelection
 	inst      *spec.Instance
+}
+
+// newConcentrationServer binds def to src's selection.
+func newConcentrationServer(src contract.FloatMeasurementSource, def *spec.Cluster, unit uint8) concentrationServer {
+	sel := concentrationSelectionOf(src)
+	return concentrationServer{src: src, clusterID: def.ID, unit: unit, sel: sel, inst: concInstance(def, sel)}
 }
 
 // MatterDataVersion implements [contract.ClusterDataVersion].
@@ -1397,6 +1381,28 @@ func (s *concentrationServer) MatterRead(attrID uint32) (any, bool) {
 	case cluster.AttrGlobalFeatureMap, cluster.AttrGlobalClusterRevision:
 		return s.inst.ReadGlobal(attrID)
 	}
+	return s.readSelected(attrID)
+}
+
+// readSelected reads the attributes the selection gates.
+func (s *concentrationServer) readSelected(attrID uint32) (any, bool) {
+	if !s.inst.Serves(attrID) {
+		return nil, false
+	}
+	switch attrID {
+	case attrConcPeakMeasuredValue:
+		r := concentrationReadingsOf(s.src)
+		return concentrationValue(r.Peak, r.PeakObserved), true
+	case attrConcPeakMeasuredValueWindow:
+		return s.sel.PeakWindow, true
+	case attrConcAverageMeasuredValue:
+		r := concentrationReadingsOf(s.src)
+		return concentrationValue(r.Average, r.AverageObserved), true
+	case attrConcAverageMeasuredValueWindow:
+		return s.sel.AverageWindow, true
+	case attrConcLevelValue:
+		return concentrationLevel(s.sel, concentrationReadingsOf(s.src).Level), true
+	}
 	return nil, false
 }
 
@@ -1408,7 +1414,17 @@ func (s *concentrationServer) MatterInvoke(_ context.Context, cmdID uint32, _ an
 	return nil, fmt.Errorf("%w (cmd 0x%02X)", errNoCommands, cmdID)
 }
 
-func (s *concentrationServer) MatterReportable() []uint32 { return []uint32{attrConcMeasuredValue} }
+// MatterReportable lists MeasuredValue and the selection's readings, which
+// change with the source; the windows are the selection's.
+func (s *concentrationServer) MatterReportable() []uint32 {
+	ids := []uint32{attrConcMeasuredValue}
+	for _, id := range []uint32{attrConcPeakMeasuredValue, attrConcAverageMeasuredValue, attrConcLevelValue} {
+		if s.inst.Serves(id) {
+			ids = append(ids, id)
+		}
+	}
+	return ids
+}
 
 // MatterAttributes lists every concentration cluster attribute the
 // server implements via MatterRead. Apple Home's HAP service rebuild
@@ -1427,7 +1443,7 @@ var _ contract.ClusterDataVersion = (*CO2ConcentrationServer)(nil)
 
 // NewCO2ConcentrationServer constructs a CO2ConcentrationServer backed by src.
 func NewCO2ConcentrationServer(src contract.FloatMeasurementSource) *CO2ConcentrationServer {
-	return &CO2ConcentrationServer{concentrationServer{src: src, clusterID: ClusterCO2Concentration, unit: concUnitPPM, inst: co2Inst}}
+	return &CO2ConcentrationServer{newConcentrationServer(src, co2def.Definition, concUnitPPM)}
 }
 
 // PM25ConcentrationServer projects a [contract.FloatMeasurementSource]
@@ -1441,7 +1457,7 @@ var _ contract.ClusterDataVersion = (*PM25ConcentrationServer)(nil)
 
 // NewPM25ConcentrationServer constructs a PM25ConcentrationServer backed by src.
 func NewPM25ConcentrationServer(src contract.FloatMeasurementSource) *PM25ConcentrationServer {
-	return &PM25ConcentrationServer{concentrationServer{src: src, clusterID: ClusterPM25Concentration, unit: concUnitMicroGramPerCubicMeter, inst: pm25Inst}}
+	return &PM25ConcentrationServer{newConcentrationServer(src, pm25def.Definition, concUnitMicroGramPerCubicMeter)}
 }
 
 // PM10ConcentrationServer projects a [contract.FloatMeasurementSource]
@@ -1455,7 +1471,7 @@ var _ contract.ClusterDataVersion = (*PM10ConcentrationServer)(nil)
 
 // NewPM10ConcentrationServer constructs a PM10ConcentrationServer backed by src.
 func NewPM10ConcentrationServer(src contract.FloatMeasurementSource) *PM10ConcentrationServer {
-	return &PM10ConcentrationServer{concentrationServer{src: src, clusterID: ClusterPM10Concentration, unit: concUnitMicroGramPerCubicMeter, inst: pm10Inst}}
+	return &PM10ConcentrationServer{newConcentrationServer(src, pm10def.Definition, concUnitMicroGramPerCubicMeter)}
 }
 
 // --- PowerSource (0x002F) — battery or mains --------------------------

@@ -15,6 +15,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -339,7 +340,8 @@ func (c *controller) run(parent context.Context, t *testing.T, args ...string) (
 	return out, nil
 }
 
-// pair commissions the daemon over the full PASE → AddNOC → CASE flow.
+// pair commissions the daemon over the full PASE → AddNOC → CASE flow;
+// extra are further pairing arguments (tcCommissioningArgs).
 //
 // `already-discovered` with an explicit address needs no mDNS round trip
 // for the PASE stage, which keeps the commissioning failure surface down to
@@ -350,16 +352,15 @@ func (c *controller) run(parent context.Context, t *testing.T, args ...string) (
 // a red run ambiguous. (The daemon presents the CSA test chain from
 // attestation.BuildTestChain and its README claims the bypass is not
 // needed — that claim is untested here.)
-func (c *controller) pair(ctx context.Context, t *testing.T, addr string, port int, passcode uint32) (string, error) {
+func (c *controller) pair(ctx context.Context, t *testing.T, addr string, port int, passcode uint32, extra ...string) (string, error) {
 	t.Helper()
-	return c.run(
-		ctx, t,
+	return c.run(ctx, t, slices.Concat([]string{
 		"pairing", "already-discovered",
 		fmt.Sprintf("0x%X", c.nodeID),
 		strconv.FormatUint(uint64(passcode), 10),
 		addr, strconv.Itoa(port),
 		"--bypass-attestation-verifier", "true",
-	)
+	}, extra)...)
 }
 
 // unpair removes the chip-tool side of the fabric.

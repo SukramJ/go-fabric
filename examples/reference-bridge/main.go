@@ -107,6 +107,7 @@ type flags struct {
 	camera                                         cameraOptions
 	icdIdleSeconds, icdActiveMillis                uint
 	thermostatSchedules                            bool
+	tcRequired                                     bool
 	dumpSurface                                    bool
 	extensions                                     string
 	specLevel                                      string
@@ -138,6 +139,7 @@ func parseFlags() flags {
 	flag.StringVar(&f.wifiSimSSIDs, "wifi-sim-ssid", defaultWiFiSimSSIDs, "TESTING ONLY, with --wifi-sim: the networks the simulated driver finds and joins, comma-separated ssid:passphrase (an entry without a passphrase takes any); see wifisim.go")
 	flag.StringVar(&f.metricsExpvar, "metrics-expvar", "", "address (\"127.0.0.1:9090\") to serve the node's metrics on as expvar's /debug/vars; off when empty; see metrics.go")
 	flag.BoolVar(&f.thermostatSchedules, "thermostat-schedules", false, "serve MatterScheduleConfiguration (week programs) on the demo thermostat — enables the extension BD-chip-Thermostat-Schedules; off by default until a live ecosystem pairing is verified (issue #273); see fleet_climate.go")
+	flag.BoolVar(&f.tcRequired, "tc-required", false, "TESTING ONLY: serve GeneralCommissioning's TermsAndConditions feature with version 1 and acknowledgement bit 1 required — what the CSA's CGEN cases expect as PIXIT.CGEN.TCRevision / RequiredTCAcknowledgements — and enable the extension "+termsAndConditionsRow+"; a commissioner then has to send SetTCAcknowledgements before CommissioningComplete (chip-tool pairing --tc-acknowledgements 1 --tc-acknowledgements-version 1); see surface.go")
 	flag.StringVar(&f.extensions, "extensions", "", "comma-separated \"Ahead of matter.js\" register IDs to enable (surface.Policies.Extensions, notes/parity/by_design.md), on the node and every device; an unknown ID stops the daemon with the list of known ones; see surface.go")
 	flag.StringVar(&f.otbr, "otbr", "", "add a ThreadBorderRouter endpoint over the OpenThread Border Router's REST API at this URL (\"http://[fd00::1]:8081\"); off when empty; see otbr.go")
 	flag.BoolVar(&f.media, "media", false, "TESTING ONLY: add a simulated video player (CastingVideoPlayer) and content app (ContentApp) after chip's tv-app, for the media certification families; see media.go")
@@ -495,6 +497,9 @@ func nodeConfig(f flags, passcode uint32, discriminator uint16, tcp node.TCPConf
 			// serves it: TC-CADMIN-1.4 and 1.11 exercise
 			// OpenBasicCommissioningWindow (phase 36).
 			BasicCommissioning: true,
+			// --tc-required: GeneralCommissioning's TermsAndConditions
+			// feature, behind the extension surfacePolicies enables.
+			TermsAndConditions: termsAndConditions(f),
 		},
 		ProductDescription: node.ProductDescription{VendorID: testVendorID, ProductID: testProductID},
 		BasicInformation: node.BasicInformation{

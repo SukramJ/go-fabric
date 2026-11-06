@@ -407,7 +407,11 @@ func (b *demoButton) simulateIdle() error {
 // the cluster the device type mandates, and all ten concentration clusters
 // it lists as optional, each with a fixed reading in its cluster's unit;
 // AirQuality grades the CO2 reading (Good up to 1000 ppm, as the module's
-// AirQuality server grades it, cluster/measurement airQualityGoodBelow).
+// AirQuality server grades it, cluster/measurement airQualityBands) and
+// serves every optional grade (FAIR, MOD, VPOOR, XPOOR). The CO2 cluster
+// serves every feature — the level with its Medium and Critical grades,
+// the peak and the average over their windows — so the CHIP case
+// TC-CDOCONC-2.1 reads each attribute it gates.
 type demoAirQualitySensor struct{ name string }
 
 func newDemoAirQualitySensor(name string) *demoAirQualitySensor {
@@ -415,8 +419,11 @@ func newDemoAirQualitySensor(name string) *demoAirQualitySensor {
 }
 
 // The air quality sensor's readings. Each concentration cluster serves
-// NumericMeasurement (MEA) over 0 to 100000 in the air.
+// NumericMeasurement (MEA) over 0 to 100000 in the air; the CO2 cluster's
+// peak and average are over the last hour and the last day.
 const (
+	co2PeakPPM, co2AveragePPM           float32 = 820, 610
+	co2PeakWindowS, co2AverageWindowS   uint32  = 3600, 86400
 	co2PPM, coPPM, no2PPM, ozonePPM     float32 = 650, 0.5, 0.01, 0.02
 	pm25UG, pm1UG, pm10UG               float32 = 8, 5, 14
 	formaldehydePPM, tvocPPM, radonBQM3 float32 = 0.01, 0.1, 40
@@ -432,13 +439,21 @@ func (a *demoAirQualitySensor) declarations() []device.Declaration {
 	if co2PPM <= co2GoodBelow {
 		quality = aqdef.AirQualityGood
 	}
+	co2Level := co2def.LevelValueLow
 	v := func(f float32) *float32 { return &f }
 	lo, hi := v(concentrationMin), v(concentrationMax)
 	return []device.Declaration{
-		aqdef.Declare{Initial: aqdef.Patch{AirQuality: &quality}},
-		co2def.Declare{Features: co2def.FeatureNumericMeasurement, Initial: co2def.Patch{
+		aqdef.Declare{
+			Features: aqdef.FeatureFair | aqdef.FeatureModerate | aqdef.FeatureVeryPoor | aqdef.FeatureExtremelyPoor,
+			Initial:  aqdef.Patch{AirQuality: &quality},
+		},
+		co2def.Declare{Features: co2def.FeatureNumericMeasurement | co2def.FeatureLevelIndication | co2def.FeatureMediumLevel |
+			co2def.FeatureCriticalLevel | co2def.FeaturePeakMeasurement | co2def.FeatureAverageMeasurement, Initial: co2def.Patch{
 			MeasuredValue: v(co2PPM), MinMeasuredValue: lo, MaxMeasuredValue: hi,
 			MeasurementUnit: new(co2def.MeasurementUnitPpm), MeasurementMedium: new(co2def.MeasurementMediumAir),
+			PeakMeasuredValue: v(co2PeakPPM), PeakMeasuredValueWindow: new(co2PeakWindowS),
+			AverageMeasuredValue: v(co2AveragePPM), AverageMeasuredValueWindow: new(co2AverageWindowS),
+			LevelValue: &co2Level,
 		}},
 		codef.Declare{Features: codef.FeatureNumericMeasurement, Initial: codef.Patch{
 			MeasuredValue: v(coPPM), MinMeasuredValue: lo, MaxMeasuredValue: hi,

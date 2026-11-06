@@ -116,6 +116,7 @@ var daemonVariants = map[string][]string{
 	variantJointFabric: {"--jointfabric-sim"},
 	variantMessages:    {"--media-messages"},
 	variantThread:      {"--otbr", otbrURL},
+	variantTC:          {"--tc-required"},
 }
 
 // otbrURL is the virtual OTBR agent's REST API the thread variant's daemon
@@ -652,6 +653,7 @@ func runPythonCase(ctx context.Context, t *testing.T, h *harness, fam family, c 
 	// has the runner commission it in its commissioning step.
 	if fam.uncommissioned[c.Name] && !fam.labPath[c.Name] && !slices.Contains(args, "--qr-code") && !slices.Contains(args, "--manual-code") {
 		args = append(args, "--commissioning-method", "on-network", "--qr-code", br.info.qrCode)
+		args = append(args, tcCommissioningArgs("py")...)
 	}
 	if c.Subpath != "" {
 		args = append(args, "--tests", c.Subpath)

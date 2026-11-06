@@ -18,6 +18,7 @@ import (
 
 	"github.com/SukramJ/go-fabric/client/interaction"
 	"github.com/SukramJ/go-fabric/cluster/spec"
+	"github.com/SukramJ/go-fabric/controller/commissioner"
 	"github.com/SukramJ/go-fabric/device"
 	"github.com/SukramJ/go-fabric/endpoint"
 	"github.com/SukramJ/go-fabric/fabrictest"
@@ -104,6 +105,8 @@ type mockOptions struct {
 	light bool
 	// configure edits the node's configuration after the mock defaults.
 	configure func(*node.Config)
+	// commission edits the commissioner's options.
+	commission func(*commissioner.Options)
 }
 
 // mockPair is a commissioned pair whose device carries MockServerNode's
@@ -130,7 +133,7 @@ func newMockPair(t *testing.T, o mockOptions) *mockPair {
 		m.light = newLight(t, site, "light:1")
 		topo.Bridged = []node.Endpoint{m.light}
 	}
-	m.pair = site.CommissionedPair(fabrictest.PairOptions{Device: topo})
+	m.pair = site.CommissionedPair(fabrictest.PairOptions{Device: topo, Commission: fabrictest.CommissionOptions{Edit: o.commission}})
 	if o.light {
 		ep, ok := m.pair.Device.EndpointOf("light:1")
 		if !ok {

@@ -13,6 +13,7 @@ import (
 	"slices"
 
 	mattercore "github.com/SukramJ/go-fabric/cluster/core"
+	gencommdef "github.com/SukramJ/go-fabric/cluster/spec/generalcommissioning"
 	netcommdef "github.com/SukramJ/go-fabric/cluster/spec/networkcommissioning"
 	tsdef "github.com/SukramJ/go-fabric/cluster/spec/timesynchronization"
 	"github.com/SukramJ/go-fabric/contract"
@@ -47,6 +48,7 @@ var ErrReservedKey = errors.New("node: the endpoint's key is reserved")
 var aheadByCluster = map[uint32]surface.AheadSet{
 	tsdef.ClusterID:      mattercore.TimeSynchronizationAhead,
 	netcommdef.ClusterID: mattercore.NetworkCommissioningAhead,
+	gencommdef.ClusterID: mattercore.GeneralCommissioningAhead,
 }
 
 // AheadRows returns every "Ahead of matter.js" register ID the module's
@@ -78,6 +80,9 @@ func rootFeatures(cfg *Config) map[uint32]uint32 {
 			f = uint32(tc.Features)
 		}
 		out[tsdef.ClusterID] = f
+	}
+	if cfg.Commissioning.TermsAndConditions != nil {
+		out[gencommdef.ClusterID] = uint32(gencommdef.FeatureTermsAndConditions)
 	}
 	if cfg.Network.wifiCommissioning.Driver != nil {
 		out[netcommdef.ClusterID] = mattercore.NetworkCommFeatureWiFi
@@ -144,14 +149,19 @@ func composeRoot(cfg *Config) ([]surface.Decision, []surface.Element, error) {
 		keep[e] = true
 	}
 	for _, e := range cands {
-		if keep[e] || e.Cluster != tsdef.ClusterID {
-			// The Thread bit is never selected (rootFeatures): only
-			// TimeSynchronization can lose a feature here.
+		if keep[e] {
 			continue
 		}
-		ts := *cfg.TimeSynchronization.Config
-		ts.Features &^= tsdef.Feature(e.ID)
-		cfg.TimeSynchronization.Config = &ts
+		switch e.Cluster {
+		case tsdef.ClusterID:
+			ts := *cfg.TimeSynchronization.Config
+			ts.Features &^= tsdef.Feature(e.ID)
+			cfg.TimeSynchronization.Config = &ts
+		case gencommdef.ClusterID:
+			// The one selectable bit is the feature itself.
+			cfg.Commissioning.TermsAndConditions = nil
+		}
+		// The Thread bit is never selected (rootFeatures).
 	}
 	return decisions, cands, nil
 }

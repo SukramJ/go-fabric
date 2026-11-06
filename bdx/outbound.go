@@ -129,7 +129,7 @@ func (f *outboundFlow) drivenNext(ctx context.Context) (bool, error) {
 		return false, err
 	}
 	if done {
-		if err := f.m.SendBlockEOF(ctx, Block{BlockCounter: counter, Data: data}); err != nil {
+		if err := f.sendBlockEOF(ctx, Block{BlockCounter: counter, Data: data}); err != nil {
 			return false, err
 		}
 		f.transferred += uint64(len(data))
@@ -182,7 +182,7 @@ func (f *outboundFlow) followingNext(ctx context.Context) (bool, error) {
 		return false, err
 	}
 	if done {
-		if err := f.m.SendBlockEOF(ctx, Block{BlockCounter: counter, Data: data}); err != nil {
+		if err := f.sendBlockEOF(ctx, Block{BlockCounter: counter, Data: data}); err != nil {
 			return false, err
 		}
 		f.transferred += uint64(len(data))
@@ -194,6 +194,24 @@ func (f *outboundFlow) followingNext(ctx context.Context) (bool, error) {
 	}
 	f.transferred += uint64(len(data))
 	return false, nil
+}
+
+// sendBlockEOF sends the last block. A scope disabled while the send still
+// waits for the block's acknowledgement is the same case as one disabled
+// while the BlockAckEof is read (process): the receiver has the block —
+// an OTA requestor asks to apply only after it — and has moved on; the
+// send counts as done and the final acknowledgement read reports the
+// transfer finished.
+func (f *outboundFlow) sendBlockEOF(ctx context.Context, b Block) error {
+	if ctx.Err() != nil {
+		// Disabled before the block went out: nothing to count.
+		return context.Cause(ctx)
+	}
+	err := f.m.SendBlockEOF(ctx, b)
+	if err != nil && errors.Is(context.Cause(ctx), ErrScopeDisabled) {
+		return nil
+	}
+	return err
 }
 
 // process is Flow.processTransfer (flow/Flow.ts:121-147) for an outbound

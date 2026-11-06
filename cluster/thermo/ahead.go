@@ -21,10 +21,16 @@ import "github.com/SukramJ/go-fabric/surface"
 //     the custom `calibratedTemperature$Changed` (absence: none of the
 //     model's eight Thermostat events is emitted anywhere in the file,
 //     1790 lines)".
+//   - BD-chip-Thermostat-Suggestions: ThermostatSuggestions
+//     ([ThermostatFeatureTSUGGEST]). The register's matter.js marker:
+//     "`ThermostatServer.ts:81`, the class doc's list of the features it
+//     does not implement (presence, as BD-chip-Thermostat-Schedules';
+//     absence: no suggestion text anywhere in the file, 1790 lines)".
 //
 // The features' attributes, commands and events follow from the feature
 // bits; the rows add no further optional element.
 var Ahead = surface.AheadSet{
-	"BD-chip-Thermostat-Schedules": {Features: ThermostatFeatureMSCH},
-	"BD-chip-Thermostat-Events":    {Features: ThermostatFeatureTEVT},
+	"BD-chip-Thermostat-Schedules":   {Features: ThermostatFeatureMSCH},
+	"BD-chip-Thermostat-Events":      {Features: ThermostatFeatureTEVT},
+	"BD-chip-Thermostat-Suggestions": {Features: ThermostatFeatureTSUGGEST},
 }

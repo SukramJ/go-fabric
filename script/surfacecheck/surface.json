@@ -25,6 +25,10 @@
     {"cluster":"0x0000002e","endpoint":"","id":"0x0000002e","kind":"cluster","mandatory":false,"origin":"kit-default","policy":"","reason":"","reference":"","verdict":"keep"},
     {"cluster":"0x00000000","endpoint":"demo:airquality:1","id":"0x002c","kind":"device-type","mandatory":true,"origin":"device-type","policy":"","reason":"","reference":"","verdict":"keep"},
     {"cluster":"0x0000005b","endpoint":"demo:airquality:1","id":"0x0000005b","kind":"cluster","mandatory":true,"origin":"device-type","policy":"","reason":"","reference":"","verdict":"keep"},
+    {"cluster":"0x0000005b","endpoint":"demo:airquality:1","id":"0x00000001","kind":"feature","mandatory":false,"origin":"host-declared","policy":"","reason":"","reference":"","verdict":"keep"},
+    {"cluster":"0x0000005b","endpoint":"demo:airquality:1","id":"0x00000002","kind":"feature","mandatory":false,"origin":"host-declared","policy":"","reason":"","reference":"","verdict":"keep"},
+    {"cluster":"0x0000005b","endpoint":"demo:airquality:1","id":"0x00000004","kind":"feature","mandatory":false,"origin":"host-declared","policy":"","reason":"","reference":"","verdict":"keep"},
+    {"cluster":"0x0000005b","endpoint":"demo:airquality:1","id":"0x00000008","kind":"feature","mandatory":false,"origin":"host-declared","policy":"","reason":"","reference":"","verdict":"keep"},
     {"cluster":"0x0000005b","endpoint":"demo:airquality:1","id":"0x00000000","kind":"attribute","mandatory":true,"origin":"cluster-mandatory","policy":"","reason":"","reference":"","verdict":"keep"},
     {"cluster":"0x0000040c","endpoint":"demo:airquality:1","id":"0x0000040c","kind":"cluster","mandatory":false,"origin":"host-declared","policy":"","reason":"","reference":"","verdict":"keep"},
     {"cluster":"0x0000040c","endpoint":"demo:airquality:1","id":"0x00000001","kind":"feature","mandatory":true,"origin":"host-declared","policy":"","reason":"","reference":"","verdict":"keep"},
@@ -35,11 +39,21 @@
     {"cluster":"0x0000040c","endpoint":"demo:airquality:1","id":"0x00000009","kind":"attribute","mandatory":true,"origin":"cluster-mandatory","policy":"","reason":"","reference":"","verdict":"keep"},
     {"cluster":"0x0000040d","endpoint":"demo:airquality:1","id":"0x0000040d","kind":"cluster","mandatory":false,"origin":"host-declared","policy":"","reason":"","reference":"","verdict":"keep"},
     {"cluster":"0x0000040d","endpoint":"demo:airquality:1","id":"0x00000001","kind":"feature","mandatory":true,"origin":"host-declared","policy":"","reason":"","reference":"","verdict":"keep"},
+    {"cluster":"0x0000040d","endpoint":"demo:airquality:1","id":"0x00000002","kind":"feature","mandatory":true,"origin":"host-declared","policy":"","reason":"","reference":"","verdict":"keep"},
+    {"cluster":"0x0000040d","endpoint":"demo:airquality:1","id":"0x00000004","kind":"feature","mandatory":false,"origin":"host-declared","policy":"","reason":"","reference":"","verdict":"keep"},
+    {"cluster":"0x0000040d","endpoint":"demo:airquality:1","id":"0x00000008","kind":"feature","mandatory":false,"origin":"host-declared","policy":"","reason":"","reference":"","verdict":"keep"},
+    {"cluster":"0x0000040d","endpoint":"demo:airquality:1","id":"0x00000010","kind":"feature","mandatory":false,"origin":"host-declared","policy":"","reason":"","reference":"","verdict":"keep"},
+    {"cluster":"0x0000040d","endpoint":"demo:airquality:1","id":"0x00000020","kind":"feature","mandatory":false,"origin":"host-declared","policy":"","reason":"","reference":"","verdict":"keep"},
     {"cluster":"0x0000040d","endpoint":"demo:airquality:1","id":"0x00000000","kind":"attribute","mandatory":true,"origin":"cluster-mandatory","policy":"","reason":"","reference":"","verdict":"keep"},
     {"cluster":"0x0000040d","endpoint":"demo:airquality:1","id":"0x00000001","kind":"attribute","mandatory":true,"origin":"cluster-mandatory","policy":"","reason":"","reference":"","verdict":"keep"},
     {"cluster":"0x0000040d","endpoint":"demo:airquality:1","id":"0x00000002","kind":"attribute","mandatory":true,"origin":"cluster-mandatory","policy":"","reason":"","reference":"","verdict":"keep"},
+    {"cluster":"0x0000040d","endpoint":"demo:airquality:1","id":"0x00000003","kind":"attribute","mandatory":true,"origin":"cluster-mandatory","policy":"","reason":"","reference":"","verdict":"keep"},
+    {"cluster":"0x0000040d","endpoint":"demo:airquality:1","id":"0x00000004","kind":"attribute","mandatory":true,"origin":"cluster-mandatory","policy":"","reason":"","reference":"","verdict":"keep"},
+    {"cluster":"0x0000040d","endpoint":"demo:airquality:1","id":"0x00000005","kind":"attribute","mandatory":true,"origin":"cluster-mandatory","policy":"","reason":"","reference":"","verdict":"keep"},
+    {"cluster":"0x0000040d","endpoint":"demo:airquality:1","id":"0x00000006","kind":"attribute","mandatory":true,"origin":"cluster-mandatory","policy":"","reason":"","reference":"","verdict":"keep"},
     {"cluster":"0x0000040d","endpoint":"demo:airquality:1","id":"0x00000008","kind":"attribute","mandatory":true,"origin":"cluster-mandatory","policy":"","reason":"","reference":"","verdict":"keep"},
     {"cluster":"0x0000040d","endpoint":"demo:airquality:1","id":"0x00000009","kind":"attribute","mandatory":true,"origin":"cluster-mandatory","policy":"","reason":"","reference":"","verdict":"keep"},
+    {"cluster":"0x0000040d","endpoint":"demo:airquality:1","id":"0x0000000a","kind":"attribute","mandatory":true,"origin":"cluster-mandatory","policy":"","reason":"","reference":"","verdict":"keep"},
     {"cluster":"0x00000413","endpoint":"demo:airquality:1","id":"0x00000413","kind":"cluster","mandatory":false,"origin":"host-declared","policy":"","reason":"","reference":"","verdict":"keep"},
     {"cluster":"0x00000413","endpoint":"demo:airquality:1","id":"0x00000001","kind":"feature","mandatory":true,"origin":"host-declared","policy":"","reason":"","reference":"","verdict":"keep"},
     {"cluster":"0x00000413","endpoint":"demo:airquality:1","id":"0x00000000","kind":"attribute","mandatory":true,"origin":"cluster-mandatory","policy":"","reason":"","reference":"","verdict":"keep"},
@@ -140,6 +154,11 @@
     {"cluster":"0x00000300","endpoint":"demo:colorlight:1","id":"0x00000010","kind":"feature","mandatory":true,"origin":"device-type","policy":"","reason":"","reference":"","verdict":"keep"},
     {"cluster":"0x00000300","endpoint":"demo:colorlight:1","id":"0x00000002","kind":"attribute","mandatory":true,"origin":"device-type","policy":"","reason":"","reference":"","verdict":"keep"},
     {"cluster":"0x00000300","endpoint":"demo:colorlight:1","id":"0x00000007","kind":"attribute","mandatory":true,"origin":"cluster-mandatory","policy":"","reason":"","reference":"","verdict":"keep"},
+    {"cluster":"0x00000300","endpoint":"demo:colorlight:1","id":"0x00000011","kind":"attribute","mandatory":false,"origin":"host-declared","policy":"","reason":"","reference":"","verdict":"keep"},
+    {"cluster":"0x00000300","endpoint":"demo:colorlight:1","id":"0x00000012","kind":"attribute","mandatory":false,"origin":"host-declared","policy":"","reason":"","reference":"","verdict":"keep"},
+    {"cluster":"0x00000300","endpoint":"demo:colorlight:1","id":"0x00000013","kind":"attribute","mandatory":false,"origin":"host-declared","policy":"","reason":"","reference":"","verdict":"keep"},
+    {"cluster":"0x00000300","endpoint":"demo:colorlight:1","id":"0x00000015","kind":"attribute","mandatory":false,"origin":"host-declared","policy":"","reason":"","reference":"","verdict":"keep"},
+    {"cluster":"0x00000300","endpoint":"demo:colorlight:1","id":"0x00000016","kind":"attribute","mandatory":false,"origin":"host-declared","policy":"","reason":"","reference":"","verdict":"keep"},
     {"cluster":"0x00000300","endpoint":"demo:colorlight:1","id":"0x0000400b","kind":"attribute","mandatory":true,"origin":"cluster-mandatory","policy":"","reason":"","reference":"","verdict":"keep"},
     {"cluster":"0x00000300","endpoint":"demo:colorlight:1","id":"0x0000400c","kind":"attribute","mandatory":true,"origin":"cluster-mandatory","policy":"","reason":"","reference":"","verdict":"keep"},
     {"cluster":"0x00000000","endpoint":"demo:contact:1","id":"0x0015","kind":"device-type","mandatory":true,"origin":"device-type","policy":"","reason":"","reference":"","verdict":"keep"},
@@ -606,9 +625,9 @@
           {"accepted":["0x00000000","0x00000040"],"attributes":["0x00000000","0x00000001","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000000","generated":[],"id":"0x00000003","revision":6},
           {"accepted":[],"attributes":["0x00000000","0x00000001","0x00000002","0x00000003","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000000","generated":[],"id":"0x0000001d","revision":3},
           {"accepted":[],"attributes":["0x00000001","0x00000002","0x00000003","0x00000004","0x00000005","0x0000000e","0x0000000f","0x00000011","0x00000012","0x00000018","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":["0x00000003"],"featureMap":"0x00000000","generated":[],"id":"0x00000039","revision":6},
-          {"accepted":[],"attributes":["0x00000000","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000000","generated":[],"id":"0x0000005b","revision":1},
+          {"accepted":[],"attributes":["0x00000000","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x0000000f","generated":[],"id":"0x0000005b","revision":1},
           {"accepted":[],"attributes":["0x00000000","0x00000001","0x00000002","0x00000008","0x00000009","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000001","generated":[],"id":"0x0000040c","revision":5},
-          {"accepted":[],"attributes":["0x00000000","0x00000001","0x00000002","0x00000008","0x00000009","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000001","generated":[],"id":"0x0000040d","revision":5},
+          {"accepted":[],"attributes":["0x00000000","0x00000001","0x00000002","0x00000003","0x00000004","0x00000005","0x00000006","0x00000008","0x00000009","0x0000000a","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x0000003f","generated":[],"id":"0x0000040d","revision":5},
           {"accepted":[],"attributes":["0x00000000","0x00000001","0x00000002","0x00000008","0x00000009","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000001","generated":[],"id":"0x00000413","revision":5},
           {"accepted":[],"attributes":["0x00000000","0x00000001","0x00000002","0x00000008","0x00000009","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000001","generated":[],"id":"0x00000415","revision":5},
           {"accepted":[],"attributes":["0x00000000","0x00000001","0x00000002","0x00000008","0x00000009","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000001","generated":[],"id":"0x0000042a","revision":5},
@@ -681,7 +700,7 @@
           {"accepted":[],"attributes":["0x00000000","0x00000001","0x00000002","0x00000003","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000000","generated":[],"id":"0x0000001d","revision":3},
           {"accepted":[],"attributes":["0x00000001","0x00000002","0x00000003","0x00000004","0x00000005","0x0000000e","0x0000000f","0x00000011","0x00000012","0x00000018","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":["0x00000003"],"featureMap":"0x00000000","generated":[],"id":"0x00000039","revision":6},
           {"accepted":["0x00000000","0x00000001","0x00000002","0x00000003","0x00000004","0x00000005","0x00000006","0x00000040"],"attributes":["0x00000001","0x00000002","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000001","generated":["0x00000000","0x00000001","0x00000002","0x00000003","0x00000004","0x00000006","0x00000040"],"id":"0x00000062","revision":1},
-          {"accepted":["0x00000000","0x00000001","0x00000002","0x00000003","0x00000004","0x00000005","0x00000006","0x00000007","0x00000008","0x00000009","0x0000000a","0x00000040","0x00000041","0x00000042","0x00000043","0x00000044","0x00000047","0x0000004b","0x0000004c"],"attributes":["0x00000000","0x00000001","0x00000002","0x00000003","0x00000004","0x00000007","0x00000008","0x0000000f","0x00000010","0x00004000","0x00004001","0x00004002","0x00004003","0x00004004","0x00004005","0x00004006","0x0000400a","0x0000400b","0x0000400c","0x0000400d","0x00004010","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x0000001f","generated":[],"id":"0x00000300","revision":9}
+          {"accepted":["0x00000000","0x00000001","0x00000002","0x00000003","0x00000004","0x00000005","0x00000006","0x00000007","0x00000008","0x00000009","0x0000000a","0x00000040","0x00000041","0x00000042","0x00000043","0x00000044","0x00000047","0x0000004b","0x0000004c"],"attributes":["0x00000000","0x00000001","0x00000002","0x00000003","0x00000004","0x00000007","0x00000008","0x0000000f","0x00000010","0x00000011","0x00000012","0x00000013","0x00000015","0x00000016","0x00000017","0x00004000","0x00004001","0x00004002","0x00004003","0x00004004","0x00004005","0x00004006","0x0000400a","0x0000400b","0x0000400c","0x0000400d","0x00004010","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x0000001f","generated":[],"id":"0x00000300","revision":9}
         ],
         "deviceTypes": [
           {"id":"0x010d","revision":5},
@@ -889,7 +908,7 @@
       {
         "clusters": [
           {"accepted":["0x00000000","0x00000040"],"attributes":["0x00000000","0x00000001","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000000","generated":[],"id":"0x00000003","revision":6},
-          {"accepted":[],"attributes":["0x00000000","0x00000001","0x00000002","0x00000003","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000000","generated":[],"id":"0x0000001d","revision":3},
+          {"accepted":[],"attributes":["0x00000000","0x00000001","0x00000002","0x00000003","0x00000004","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000001","generated":[],"id":"0x0000001d","revision":3},
           {"accepted":[],"attributes":["0x00000001","0x00000002","0x00000003","0x00000004","0x00000005","0x0000000e","0x0000000f","0x00000011","0x00000012","0x00000018","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":["0x00000003"],"featureMap":"0x00000000","generated":[],"id":"0x00000039","revision":6},
           {"accepted":["0x00000000","0x00000001"],"attributes":["0x00000001","0x00000002","0x00000003","0x00000004","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":["0x00000000","0x00000001","0x00000003"],"featureMap":"0x00000011","generated":[],"id":"0x00000104","revision":1}
         ],
@@ -1018,7 +1037,7 @@
       {
         "clusters": [
           {"accepted":["0x00000000","0x00000040"],"attributes":["0x00000000","0x00000001","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000000","generated":[],"id":"0x00000003","revision":6},
-          {"accepted":[],"attributes":["0x00000000","0x00000001","0x00000002","0x00000003","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000000","generated":[],"id":"0x0000001d","revision":3},
+          {"accepted":[],"attributes":["0x00000000","0x00000001","0x00000002","0x00000003","0x00000004","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x00000001","generated":[],"id":"0x0000001d","revision":3},
           {"accepted":[],"attributes":["0x00000001","0x00000002","0x00000003","0x00000004","0x00000005","0x0000000e","0x0000000f","0x00000011","0x00000012","0x00000018","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":["0x00000003"],"featureMap":"0x00000000","generated":[],"id":"0x00000039","revision":6},
           {"accepted":["0x00000000","0x00000001"],"attributes":["0x00000000","0x00000001","0x00000002","0x00000003","0x00000004","0x00000005","0x00000006","0x00000008","0x00000009","0x0000000b","0x0000fff8","0x0000fff9","0x0000fffb","0x0000fffc","0x0000fffd"],"events":[],"featureMap":"0x0000005f","generated":[],"id":"0x00000105","revision":1}
         ],

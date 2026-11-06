@@ -169,6 +169,7 @@ Harness image: `ghcr.io/sukramj/go-fabric-chip@sha256:e443ea0c1b91478720ee8b94c3
 | BRBINFO | 5 | 1 | 0 | 0 | 3 | 1 | 0 |
 | CADMIN | 21 | 13 | 0 | 0 | 0 | 8 | 0 |
 | CGEN | 10 | 3 | 0 | 0 | 7 | 0 | 0 |
+| CGENTC | 10 | 10 | 0 | 0 | 0 | 0 | 0 |
 | CNET | 23 | 2 | 0 | 0 | 12 | 4 | 5 |
 | CNETWIFI | 23 | 6 | 0 | 0 | 11 | 6 | 0 |
 | DA | 13 | 4 | 0 | 0 | 5 | 4 | 0 |
@@ -216,7 +217,7 @@ Harness image: `ghcr.io/sukramj/go-fabric-chip@sha256:e443ea0c1b91478720ee8b94c3
 | RNCONC | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
 | TVOCCONC | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
 | SOIL | 2 | 2 | 0 | 0 | 0 | 0 | 0 |
-| CLCTRL | 12 | 5 | 0 | 0 | 7 | 0 | 0 |
+| CLCTRL | 12 | 7 | 0 | 0 | 5 | 0 | 0 |
 | CLDIM | 11 | 6 | 0 | 0 | 5 | 0 | 0 |
 | CC | 31 | 21 | 0 | 0 | 6 | 4 | 0 |
 | DRLK | 14 | 10 | 0 | 0 | 2 | 2 | 0 |
@@ -265,9 +266,9 @@ Harness image: `ghcr.io/sukramj/go-fabric-chip@sha256:e443ea0c1b91478720ee8b94c3
 | SMOKECO | 7 | 7 | 0 | 0 | 0 | 0 | 0 |
 | SWTCH | 5 | 3 | 0 | 0 | 2 | 0 | 0 |
 | TMP | 2 | 1 | 0 | 0 | 0 | 1 | 0 |
-| TSTAT | 6 | 3 | 0 | 0 | 2 | 1 | 0 |
+| TSTAT | 6 | 4 | 0 | 0 | 1 | 1 | 0 |
 | TSUIC | 2 | 2 | 0 | 0 | 0 | 0 | 0 |
-| VALCC | 10 | 8 | 0 | 0 | 2 | 0 | 0 |
+| VALCC | 10 | 10 | 0 | 0 | 0 | 0 | 0 |
 | WHM | 2 | 2 | 0 | 0 | 0 | 0 | 0 |
 | WNCV | 17 | 15 | 0 | 0 | 2 | 0 | 0 |
 | ALOGIN | 3 | 1 | 0 | 0 | 1 | 1 | 0 |
@@ -299,7 +300,7 @@ Harness image: `ghcr.io/sukramj/go-fabric-chip@sha256:e443ea0c1b91478720ee8b94c3
 | TBRM | 5 | 3 | 0 | 0 | 1 | 1 | 0 |
 | DGTHREAD | 6 | 4 | 0 | 0 | 1 | 1 | 0 |
 | THNETDIR | 3 | 3 | 0 | 0 | 0 | 0 | 0 |
-| **all** | **829** | **549** | **0** | **2** | **135** | **138** | **5** |
+| **all** | **839** | **564** | **0** | **2** | **130** | **138** | **5** |
 
 ### Cases not run
 
@@ -355,8 +356,6 @@ Harness image: `ghcr.io/sukramj/go-fabric-chip@sha256:e443ea0c1b91478720ee8b94c3
 | CHANNEL/5.4 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | CHANNEL/5.5 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | CHANNEL/5.6 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
-| CLCTRL/3.1 | (b) not supported | not applicable: the case's PICS `CLCTRL.S & CLCTRL.S.F06` is false for the reference DUT |
-| CLCTRL/4.2 | (b) not supported | not applicable: the case's PICS `CLCTRL.S & CLCTRL.S.F01` is false for the reference DUT |
 | CLCTRL/4.4 | (b) not supported | not applicable: the case's PICS `CLCTRL.S & CLCTRL.S.A0000` is false for the reference DUT |
 | CLCTRL/7.1 | (b) not supported | not applicable: the case's PICS `CLCTRL.S & CLCTRL.S.F00 & CLCTRL.S.C03.Rsp` is false for the reference DUT |
 | CLCTRL/7.2 | (b) not supported | not applicable: the case's PICS `CLCTRL.S & CLCTRL.S.F01 & CLCTRL.S.C03.Rsp` is false for the reference DUT |
@@ -577,10 +576,7 @@ Harness image: `ghcr.io/sukramj/go-fabric-chip@sha256:e443ea0c1b91478720ee8b94c3
 | TLSCERT/2.9 | (a) defect | TC-TLSCERT-2.9 step 13: the module's reads of ProvisionedRootCertificates and ProvisionedClientCertificates serve the full certificates on every transport (BD-chip-TlsCertificateManagement-RulesInServer, owner decision 2026-10-28, after matter.js's generated behaviour); chip encodes the ids alone outside a large-payload transport (TLSCertificateManagementCluster.cpp:136-166 at the harness pin), and the case reads over MRP expecting no certificate; two such client certificates exceed one MRP message, so the read answers RESOURCE_EXHAUSTED |
 | TMP/2.2 | (c) harness | TC-TMP-2.2 has an operator change the measured value between two reads (a UserPrompt under TMP.M.ManuallyControlled); an unattended run has no operator, and the YAML case has no app-pipe step that would stand in |
 | TSTAT/3.2 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
-| TSTAT/4.3 | (b) not supported | not applicable: the case's PICS `TSTAT.S & TSTAT.S.F08 & TSTAT.S.F0a` is false for the reference DUT |
 | TSTAT/4.4 | (b) not supported | not applicable: the case's PICS `TSTAT.S & TSTAT.S.F0b` is false for the reference DUT |
-| VALCC/3.2 | (b) not supported | TC-VALCC-3.2 runs only with the Level feature (PICS VALCC.S.F01=0: the daemon's valve is open/closed) (runs, and skips itself) |
-| VALCC/3.3 | (b) not supported | TC-VALCC-3.3 runs only with DefaultOpenLevel (PICS VALCC.S.A0006=0) (runs, and skips itself) |
 | WASHERCTRL/2.2 | (c) harness | TC-WASHERCTRL-2.2 step 6 writes NumberOfRinses 4, a value NumberOfRinsesEnum does not define, and expects INVALID_IN_STATE: chip decodes it to kUnknownEnumValue and refuses it as not a supported rinse (LaundryWasherControlsCluster.cpp:132-145 at 6170af84). matter.js refuses an undefined enum value as CONSTRAINT_ERROR before any server logic (UnknownEnumValueError, packages/protocol/src/action/errors.ts:99-103, thrown by conformance-compiler.ts:859-862 at 862ad75f), and this module answers as matter.js does |
 | WNCV/6.1.Simulated | (b) not supported | not applicable: the case's PICS `WNCV.C` is false for the reference DUT |
 | WNCV/7.1.Simulated | (b) not supported | not applicable: the case's PICS `WNCV.C` is false for the reference DUT |
@@ -730,6 +726,20 @@ per-device credentials stay classified in the table above. TC-EEVSE-2.3
 runs too: its eleventh ChargingTarget is the server's RESOURCE_EXHAUSTED,
 as chip answers (`BD-chip-EVSE-TargetsServerHeld`). No class (a) case is
 left.
+
+CGEN runs twice as well (phase 38). The `CGEN` row is the default
+composition, which serves no terms and conditions, so TC-CGEN-2.5 to 2.11
+are not applicable there. The `CGENTC` row runs the same cases against the
+daemon with `--tc-required`: GeneralCommissioning's TermsAndConditions
+feature (`CGEN.S.F00=1`, register row
+`BD-chip-GeneralCommissioning-TermsAndConditions`), version 1 with
+acknowledgement bit 1 required, the values connectedhomeip's CI starts its
+terms-and-conditions app with, with PICS generated from that daemon
+(`internal/chiptool/testdata/pics-tc/`). Its commissioned snapshots
+acknowledge the terms during commissioning, as a TC-aware commissioner
+does; TC-CGEN-2.5 to 2.11 commission the factory-fresh daemon themselves
+with the PIXITs from their CI arguments. TC-CGEN-2.8 and 2.9 stop at their
+factory-reset prompt, as in chip's CI.
 
 The second compositions (phase 34) run the same way, each family against
 the daemon variant that serves its clusters, with PICS generated from that

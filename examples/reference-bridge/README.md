@@ -173,6 +173,17 @@ the same two mechanisms CHIP's own example apps take (`control.go`):
   when the daemon starts, as chip's Linux driver does. Without the flag
   the composition is unchanged.
 
+- `--tc-required` (TESTING ONLY) serves GeneralCommissioning's
+  TermsAndConditions feature with version 1 and acknowledgement bit 1
+  required — the values the CSA's CGEN cases take as
+  `PIXIT.CGEN.TCRevision` and `PIXIT.CGEN.RequiredTCAcknowledgements` —
+  and enables the extension `BD-chip-GeneralCommissioning-TermsAndConditions`.
+  CommissioningComplete then fails with TCAcknowledgementsNotReceived until
+  the commissioner has sent SetTCAcknowledgements: `chip-tool pairing …
+  --tc-acknowledgements 1 --tc-acknowledgements-version 1`. A commissioner
+  without terms-and-conditions support cannot pair the daemon. Without the
+  flag the composition is unchanged.
+
 - `--ota-provider` (TESTING ONLY) serves one embedded test OTA image
   (`ota_provider.go`) through the node's OTA Software Update Provider
   (ADR 0021): an OtaProvider endpoint beside the Aggregator, the image —

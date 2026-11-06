@@ -151,6 +151,16 @@ type Options struct {
 	// RegulatoryCountryCode is the country; "" is
 	// [DefaultRegulatoryCountryCode].
 	RegulatoryCountryCode string
+	// TermsAndConditions, when set, is the acknowledgement the flow sends
+	// with SetTCAcknowledgements after the regulatory configuration — a
+	// device that serves GeneralCommissioning's TC feature refuses
+	// CommissioningComplete without one. matter.js's flow has no such
+	// step (ControllerCommissioningFlow.ts:558-567 at 862ad75f goes from
+	// ConfigureRegulatoryInformation to SynchronizeTime); the step is
+	// connectedhomeip's kConfigureTCAcknowledgments, skipped without the
+	// parameter (register row
+	// BD-chip-GeneralCommissioning-TermsAndConditions).
+	TermsAndConditions *TermsAndConditionsAcknowledgement
 	// OnAttestationFailure is the attestation policy (DAV:156). The zero
 	// value accepts every finding: a device whose attestation failed is
 	// commissioned and the findings are logged, as matter.js's flow does
@@ -643,4 +653,13 @@ func (c *Commissioner) handleNoSharedTrustRoots(err error) (time.Duration, bool,
 		return noSharedTrustRootsRetry, true, nil
 	}
 	return 0, false, nil
+}
+
+// TermsAndConditionsAcknowledgement is what a commissioner acknowledges
+// of a device's terms and conditions: the version and the acknowledgement
+// bits of SetTCAcknowledgements (chip's TermsAndConditionsAcknowledgement,
+// CommissioningDelegate.h:167-171 at 6170af84).
+type TermsAndConditionsAcknowledgement struct {
+	Version          uint16
+	Acknowledgements uint16
 }

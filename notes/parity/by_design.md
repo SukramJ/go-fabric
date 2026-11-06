@@ -97,6 +97,7 @@ pin lift confirms by re-reading the row, [`pin-lifts.md`](./pin-lifts.md)).
 | BD-chip-EVSE-TargetsServerHeld | `CommandInvokeResponse.ts:484-487` validates the request against the model before the invoker (presence), and `EnergyEvseServer.ts:14` is the empty subclass (absence: the class line) | `packages/protocol/src/action/server/CommandInvokeResponse.ts`<br>`packages/node/src/behaviors/energy-evse/EnergyEvseServer.ts` | `"            if (!skipValidation) {\n                requestTlv.validate(request);\n            }"`<br>`"export class EnergyEvseServer extends EnergyEvseBehavior {}"` | connectedhomeip `src/app/clusters/energy-evse-server/EnergyEvseCluster.cpp` at `6170af84` (`ValidateTargets` :564-565), case `src/python_testing/TC_EEVSE_2_3.py` step 19 (:411-439) | no |
 | BD-chip-ClosureDimension-RulesInServer | `ClosureDimensionServer.ts:17` is the empty subclass (absence: the class line, 17 lines in all) | `packages/node/src/behaviors/closure-dimension/ClosureDimensionServer.ts` | `"export class ClosureDimensionServer extends ClosureDimensionBehavior {}"` | connectedhomeip | no |
 | BD-chip-Thermostat-Schedules | `ThermostatServer.ts:82`, the class doc lists the feature unimplemented (presence; :126-128 warns when it is enabled) | `packages/node/src/behaviors/thermostat/ThermostatServer.ts` | `"MatterScheduleConfiguration: This feature is not implemented yet."` | connectedhomeip `src/app/clusters/thermostat-server/ThermostatClusterSchedules.cpp` at `645b267a` (`SetActiveSchedule` :741, `AppendPendingSchedule` :795, `ValidateScheduleTransitions` :292, `ValidateTransitionsPerDay` :457, the atomic hooks :620-663, `PrecommitSchedules` :1000) | yes |
+| BD-chip-Thermostat-Suggestions | `ThermostatServer.ts:81`, the class doc's list of the features it does not implement (presence, as `BD-chip-Thermostat-Schedules`'; absence: no suggestion text anywhere in the file, 1790 lines) | `packages/node/src/behaviors/thermostat/ThermostatServer.ts` | `"We implement all features beside the following:"` | connectedhomeip `src/app/clusters/thermostat-server/ThermostatClusterSuggestions.cpp` at `6170af84` (`RemoveExpiredSuggestions` :41, `RemoveFromThermostatSuggestionsList` :69, `AddThermostatSuggestion` :160, `RemoveThermostatSuggestion` :249, `ReEvaluateCurrentSuggestion` :271), the reference delegate `examples/thermostat/thermostat-common/src/thermostat-suggestions-delegate-impl.cpp` (`GetUniqueID` :169, `ReEvaluateCurrentSuggestion` :234) | yes |
 | BD-chip-Chime-RulesInServer | `ChimeServer.ts:14` is the empty subclass (absence: the class body, 14 lines in all) | `packages/node/src/behaviors/chime/ChimeServer.ts` | `class ChimeServer` | connectedhomeip `src/app/clusters/chime-server/ChimeCluster.cpp` at `6170af84` (`IsSupportedChimeID` :176, `SetSelectedChime` :215, `SetEnabled` :228, `HandlePlayChimeSound` :258, `GenerateChimeStartedPlayingEvent` :291), tests `tests/TestChimeCluster.cpp` | no |
 | BD-Matter-MessageCodec-PrivacyWithExtensions | `MessageCodec.ts:243-245` refuses a header with both the P and the MX flag (presence: the `NotImplementedError`) | `packages/protocol/src/codec/MessageCodec.ts` | `"Privacy enhancements with message extensions not supported."` | connectedhomeip `src/transport/raw/MessageHeader.cpp:224-232` at `6170af84` (the MX block is skipped whatever the P flag); `transport/message.UnmarshalHeader`, `bridge/privacy.go` `privacyHeaderEnd` (review 2026-11 W1-wire-05) | no |
 | BD-chip-CameraAvSettings-RulesInServer | `CameraAvSettingsUserLevelManagementServer.ts:18` is the empty subclass (absence: the class body, 18 lines in all) | `packages/node/src/behaviors/camera-av-settings-user-level-management/CameraAvSettingsUserLevelManagementServer.ts` | `class CameraAvSettingsUserLevelManagementServer` | connectedhomeip `src/app/clusters/camera-av-settings-user-level-management-server/CameraAvSettingsUserLevelManagementLogic.cpp` at `6170af84` (the handlers :721-1261, `OnPhysicalMovementComplete` :1265, the limit setters :339-407, the DPTZ streams :469-591), tests `tests/TestCameraAvSettingsUserLevelManagementCluster.cpp` | no |
@@ -114,6 +115,7 @@ pin lift confirms by re-reading the row, [`pin-lifts.md`](./pin-lifts.md)).
 | BD-Thread-NetComm-ThreadVariant | `NetworkCommissioningServer.ts:18` is the empty subclass: no network-type branch, no Thread logic (absence: the class line, 18 lines in all) | `packages/node/src/behaviors/network-commissioning/NetworkCommissioningServer.ts` | `"export class NetworkCommissioningServer extends NetworkCommissioningBehavior {}"` | connectedhomeip `src/app/clusters/network-commissioning/NetworkCommissioningCluster.cpp` at `6170af84` (the Thread paths: `HandleScanNetworks` :349-367, `HandleAddOrUpdateThreadNetwork` :561-587, `OnFinished` :904-928, `ReadAttribute` :1102-1108) over `src/platform/OpenThread/GenericNetworkCommissioningThreadDriver.cpp` | yes |
 | BD-chip-AmbientContextSensing-RulesInServer | `AmbientContextSensingServer.ts:14` is the empty subclass (absence: the class line, 14 lines in all) | `packages/node/src/behaviors/ambient-context-sensing/AmbientContextSensingServer.ts` | `"export class AmbientContextSensingServer extends AmbientContextSensingBehavior {}"` | connectedhomeip `src/app/clusters/ambient-context-sensing-server/AmbientContextSensingCluster.cpp` at `6170af84` (the constructor and `Startup` :48-89, `WriteAttribute` :140-159, `AddDetection` :205-301, `SetObjectCountConfig` :303-367, `SetObjectCount` :369-385, `SetHoldTimeLimits` :438-466, `TimerFired` :498-509, `UpdateDetectionAttributes` :600-646, `CheckPredictedActivity` :844-892; `AmbientContextSensingDelegate.h:78-106`), tests `tests/TestAmbientContextSensingCluster.cpp` | no |
 | BD-chip-TimeSynchronization-Features | `TimeSynchronizationServer.ts:14` is the empty subclass (absence: the class line, 14 lines in all) | `packages/node/src/behaviors/time-synchronization/TimeSynchronizationServer.ts` | `"export class TimeSynchronizationServer extends TimeSynchronizationBehavior {}"` | connectedhomeip `src/app/clusters/time-synchronization-server/TimeSynchronizationCluster.cpp` at `6170af84` (the attribute gating :186-248, the feature logic :619-1028, `HandleSetUTCTime` :1110-1136, the four handlers :1138-1275), `TimeSyncDataProvider.h:58-75`, tests `tests/TestTimeSynchronizationCluster.cpp` | yes |
+| BD-chip-GeneralCommissioning-TermsAndConditions | `GeneralCommissioningServer.ts:31` is the class line; no terms-and-conditions text in the file (absence: the class body, 285 lines in all) | `packages/node/src/behaviors/general-commissioning/GeneralCommissioningServer.ts` | `class GeneralCommissioningServer` | connectedhomeip `src/app/clusters/general-commissioning-server/GeneralCommissioningCluster.cpp` at `6170af84` (the attribute reads :199-230, the change notifications :73-135 and :367-372, the fail-safe revert :149-157, the CommissioningComplete gate :476-525, `HandleSetTCAcknowledgements` :617-672, `OnFabricRemoved` :357-374), `src/app/server/TermsAndConditionsProvider.h:35-220`, `DefaultTermsAndConditionsProvider.cpp:153-252`, tests `tests/TestGeneralCommissioningCluster.cpp`, the CSA cases TC-CGEN-2.5 to 2.11 | yes |
 | BD-chip-Thermostat-Events | `ThermostatServer.ts:525` is the only `events.` emit of the server, the custom `calibratedTemperature$Changed` (absence: none of the model's eight Thermostat events is emitted anywhere in the file, 1790 lines) | `packages/node/src/behaviors/thermostat/ThermostatServer.ts` | `"this.events.calibratedTemperature$Changed.emit(temperature, oldTemperature, this.context);"` | connectedhomeip `src/app/clusters/thermostat-server/ThermostatClusterEvents.cpp` at `6170af84` (every `Generate*` gated on `Feature::kEvents`, :33-36, :59-61, :83-86, :109-112), the emit sites `ThermostatClusterBase.cpp:158-162, :179-183, :246-250, :283-287`, `ThermostatClusterSetpointsBase.cpp:63-85`, `ThermostatClusterPresets.cpp:461-500`; the entry is the events paragraph of `BD-chip-Thermostat-Schedules` | yes |
 | BD-matterjs-server-CameraStreamManagement | `camera-controller.ts:133` mandates the requestor as the device type's whole server set — matter.js's controller-side camera surface is the WebRtcTransportRequestor and nothing above it (absence: the tree at the pin holds six WebRTC behaviour files and one test under `packages/node`, no stream management) | `packages/node/src/devices/camera-controller.ts` | `"export const server = { mandatory: { WebRtcTransportRequestor: WebRtcTransportRequestorServer } };"` | matterjs-server `packages/ws-controller/src/camera/CameraStreamManager.ts`, `streamPolicy.ts`, `sdpConstraints.ts`, `sessionRegistry.ts` at 0bd06f2; connectedhomeip `WebRTCTransportProviderCluster.cpp` at 6170af84 for the provider's rules | no |
 | BD-chip-JointFabricDatastore-RulesInServer | `JointFabricDatastoreServer.ts:14` is the empty subclass (absence: the class line, 14 lines in all) | `packages/node/src/behaviors/joint-fabric-datastore/JointFabricDatastoreServer.ts` | `"export class JointFabricDatastoreServer extends JointFabricDatastoreBehavior {}"` | connectedhomeip `src/app/server/JointFabricDatastore.cpp` at `6170af84` (the operations :181-2373, `RefreshNode`/`ContinueRefresh` :241-1130, the status codes), `JointFabricDatastore.h` (the capacities :512-517, the delegate :166-285, `MarkEntryCommittedIfFound` :75-85), `src/app/clusters/joint-fabric-datastore-server/joint-fabric-datastore-server.cpp` (the 20 commands :293-785), tests `src/app/server/tests/TestJointFabricDatastore.cpp` | no |
@@ -121,7 +123,8 @@ pin lift confirms by re-reading the row, [`pin-lifts.md`](./pin-lifts.md)).
 | BD-chip-JCM-Commissioner | `ControllerCommissioningFlow.ts:576-583` runs `OperationalCredentials.Certificates` right after `OperationalCredentials.DeviceAttestation`, no Joint Commissioning step between (absence: the two step pushes, :573-585) | `packages/protocol/src/peer/ControllerCommissioningFlow.ts` | `"name: \"OperationalCredentials.DeviceAttestation\",\n            stepLogic: () => this.#deviceAttestation(),\n        });\n\n        this.commissioningSteps.push({\n            stepNumber: 11, // includes 11-13"` | connectedhomeip `src/controller/jcm/DeviceCommissioner.cpp` at `6170af84` (:45-550), `src/controller/jcm/AutoCommissioner.{h,cpp}` (the read paths `.h:56-66`), `src/controller/AutoCommissioner.cpp:522-531` (the stage after attestation), tests `src/controller/tests/jcm/TestJCMCommissioner.cpp` | no |
 | BD-Matter-SurfaceChange-ConfigurationVersion | `BasicInformationServer.ts:35-37` leaves the "when" to the application: the version is "seeded to 1 and constrained to only ever increase", and the application bumps it "with `increaseConfigurationVersion`" (`:132`); the only production caller at the pin is the bridged-to-root coupling, `BridgedDeviceBasicInformationServer.ts:86` | `packages/node/src/behaviors/basic-information/BasicInformationServer.ts` | `"node's configuration changes in a way clients should detect, bump it with {@link increaseConfigurationVersion},"` | this module: concept v11 §C.9, ADR 0030 decision 6, wave S4 — the node persists each endpoint's effective surface next to its ConfigurationVersion and raises the bridged and the root ConfigurationVersion (one change, matter.js's coupling) when the surface of a returning endpoint differs (`node/surface_stability.go`) | no |
 | BD-chip-FailSafeOfTheAccessingFabric | `OperationalCredentialsServer.ts:602-604` reads the one `failsafeContext` without asking for whose fabric it was armed (presence) | `packages/node/src/behaviors/operational-credentials/OperationalCredentialsServer.ts` | `"get #failsafeContext() {\n        return this.env.get(DeviceCommissioner).failsafeContext;\n    }"` | connectedhomeip `src/app/FailSafeContext.h:76-79` at `6170af84` (`IsFailSafeArmed(accessingFabricIndex)`), its callers `OperationalCredentialsCluster.cpp:341, :472, :760`, `ThreadBorderRouterManagementCluster.cpp:212`, `joint-fabric-administrator-server.cpp:325, :369`, `NetworkCommissioningCluster.cpp:155-172, :380, :568, :609` | no |
-| BD-chip-ClosureControl-RulesInServer | `ClosureControlServer.ts:17` is the empty subclass (absence: the class line, 17 lines in all) | `packages/node/src/behaviors/closure-control/ClosureControlServer.ts` | `"export class ClosureControlServer extends ClosureControlBehavior {}"` | connectedhomeip `src/app/clusters/closure-control-server/ClosureControlCluster.cpp` at `6170af84` (`HandleStop` :531-551, `HandleMoveTo` :554-639) | no |
+| BD-chip-ClosureControl-RulesInServer | `ClosureControlServer.ts:17` is the empty subclass (absence: the class line, 17 lines in all) | `packages/node/src/behaviors/closure-control/ClosureControlServer.ts` | `"export class ClosureControlServer extends ClosureControlBehavior {}"` | connectedhomeip `src/app/clusters/closure-control-server/ClosureControlCluster.cpp` at `6170af84` (`HandleStop` :531-551, `HandleMoveTo` :554-639, `HandleCalibrate` :642-665, the feature checks :45-66, :81, :107-117) | yes |
+| BD-chip-Valve-RulesInServer | `ValveConfigurationAndControlServer.ts:14` is the empty subclass (absence: the class line, 14 lines in all) | `packages/node/src/behaviors/valve-configuration-and-control/ValveConfigurationAndControlServer.ts` | `"export class ValveConfigurationAndControlServer extends ValveConfigurationAndControlBehavior {}"` | connectedhomeip `src/app/clusters/valve-configuration-and-control-server/ValveConfigurationAndControlCluster.cpp` at `6170af84` (`WriteImpl` :150-196, `CloseValve` :237-264, `HandleOpenCommand` :266-345, `OpenValve` :347-388, `SetAutoCloseTime` :391-413) | yes |
 | BD-chip-ScenesManagement-SceneNameLength | `ScenesManagementServer.ts:147` relaxes the AddScene SceneName constraint for the behaviour to answer, and `addScene` checks only SceneId and TransitionTime (`:283`, presence) | `packages/node/src/behaviors/scenes-management/ScenesManagementServer.ts` | `"transitionTime > 60000000) {"` | connectedhomeip `src/app/clusters/scenes-server/ScenesManagementCluster.cpp:535-541` at `6170af84` | no |
 | BD-Matter-ICDVerificationKeyConstantTime | `IcdManagementServer.ts:761` compares the presented VerificationKey with `Bytes.areEqual`, a data-dependent comparison (presence) | `packages/node/src/behaviors/icd-management/IcdManagementServer.ts` | `"!Bytes.areEqual(verificationKey, stored.key)"` | this module: Go `crypto/subtle.ConstantTimeCompare` (review 2026-11 W2-sec-04); the accept/refuse outcome is matter.js's | no |
 | BD-Matter-OtaImageHeaderSizeCap | `OtaImageReader.ts:181-183` reads the prefix's header size and collects that many bytes with no bound (absence: the line that would take the check, followed by the closing brace) | `packages/protocol/src/ota/OtaImageReader.ts` | `"this.#headerSize = headerReader.readUInt32();\n            }"` | connectedhomeip `src/lib/core/OTAImageHeader.cpp:53` (`kMaxHeaderSize = 1024`), checked at `:128` (review 2026-11 W4-ctlint-07) | no |
@@ -343,12 +346,10 @@ alone.
 Since the schema pin 85cf6647 matter.js generates the Closure, ClosurePanel
 and ElectricalEnergyTariff device types with `DescriptorServer.with("TagList")`
 (08ef820f, #4576), so the divergence is now one from matter.js's code as
-well as its model. The reference daemon's garage door
-(`examples/reference-bridge/fleet_closure.go`) is such an endpoint, and the
-CHIP families that check device-type conformance run against it. The
-device-type validator (ADR 0016, warn mode) reports it at every start as
-`matter.devicetype.violation … requirement=Descriptor.TAGLIST`; that warning
-is this entry, not a new defect.
+well as its model. A Closure endpoint built without `Options.Tags` is such
+an endpoint: the device-type validator (ADR 0016, warn mode) reports it at
+every start as `matter.devicetype.violation … requirement=Descriptor.TAGLIST`;
+that warning is this entry, not a new defect.
 
 Phase 31 ported matter.js's corpus case "refuses a Closure endpoint without
 the tags its Descriptor TagList requires"
@@ -365,6 +366,14 @@ TagList requirement of Base is judged as matter.js judges it
 kit's default bridge composition — bridged siblings below the Aggregator
 — owes none; composed siblings without Tags are warned of the same way.
 The same Apple reason holds for both.
+
+Since phase 38 the reference daemon opts in: its garage door
+(`examples/reference-bridge/fleet_closure.go`) carries the Closure
+namespace's GarageDoor tag (0x44 / 0x05) and its patio door panel the
+ClosurePanel namespace's Rotate tag (0x45 / 0x03), so both meet their
+device types and TC-DESC-2.2 runs with TAGLIST on a bridged endpoint
+(`main:TestGarageServesTagList`, `main:TestPanelUnlatchesAndMoves`). The
+kit default stays off, for the Apple reason above.
 
 ### BD-Matter-ClosureControl-StopObserver — a bridged host hears of a Stop the server ignores
 
@@ -645,6 +654,23 @@ on the declaration route. matter.js keeps both attributes in its own node
 storage; a bridge's attribute state belongs to the host, so the host stores
 it, and a refused write keeps the previous values.
 
+### BD-Matter-LevelControl-NoFrequency — the Frequency feature is refused; neither reference implements it
+
+The FQ feature (CurrentFrequency, MinFrequency, MaxFrequency,
+MoveToClosestFrequency) is provisional in the model
+(`level-control.element.ts:26` at `862ad75f`, conformance `P`), and
+matter.js's server excludes it (`LevelControlServer.ts:51`
+`LevelControlBehavior.with(LevelControl.Feature.OnOff, LevelControl.Feature.Lighting)`).
+connectedhomeip's server has no logic for it either: its frequency handling
+is commented out pending the feature leaving provisional status
+(`level-control/codegen/level-control.cpp:207-232` at `6170af84`), and no
+server under `src/app/clusters` handles MoveToClosestFrequency.
+`levelcontrol.New` therefore refuses the feature (`cluster/levelcontrol/held.go`
+`ErrFeatures`), and the device kit keeps the generated server for a
+LevelControl with FQ (`ErrSelectionNotServed`). Retire this entry when
+either reference implements the feature or the conformance leaves `P`
+(owner decision 2026-11-06, phase 38).
+
 ### BD-Matter-ColorControl-SceneRecall — a recalled colour is applied in every mode the light has
 
 matter.js ColorControlServer `#applySceneValues`
@@ -695,6 +721,27 @@ need, so `light.ColorControlServer` converts with `XYToHSV` (the port of
 `TestXYToHueSaturationConvertsTheColour` (`cluster/light`), which fails on
 matter.js's call. Upstream matter.js issue candidate: call `xyToHsv`
 there. Retire this entry when matter.js does.
+
+### BD-chip-ColorControl-NumberOfPrimaries — NumberOfPrimaries counts the primaries a light supplies
+
+matter.js keeps the primaries as plain state and leaves NumberOfPrimaries to
+the application: its test "accepts a primary a light supplies without
+stating the number of primaries"
+(`packages/node/test/behaviors/color-control/ColorControlServerTest.ts:72-87`
+at `862ad75f`) serves `primary1X` beside `numberOfPrimaries: null`. Here
+`light.ColorControlServerConfig.Primaries` (and the kit's
+`colorcontroldef.Patch` Primary1X … Primary6Intensity) supplies them, and
+NumberOfPrimaries reads their count, null without any. connectedhomeip
+derives the count from the supplied table (`ColorControlCluster.cpp:178-191`
+at `6170af84`; it reads null only without a static configuration and 0
+with one that lists no primaries — a distinction the kit has no
+counterpart for, so none supplied reads null here) and lists only the
+supplied descriptors (`:1780-1806`). The white point and the colour points
+are served the same way. Reasoning: TC-CC-2.1 step 24 checks that
+NumberOfPrimaries matches the PrimaryN attributes listed, which a null
+beside a served primary fails; the kit numbers the primaries without a gap
+for the same reason. Pinned by `cluster/light:TestParityMatterJS_ColorControlPrimaries`
+and `TestColorControlPrimaries`.
 
 ### BD-Matter-BridgedVendorNameFallback — a bridged endpoint without a vendor serves the node's
 
@@ -1408,13 +1455,13 @@ implementation wave.
 
 ---
 
-### BD-Matter-P2-D13 — GeneralCommissioning optional Matter 1.5 attributes not exposed
+### BD-Matter-P2-D13 — GeneralCommissioning NetworkRecovery and IsCommissioningWithoutPower not exposed
 
-**Affected attributes:** `IsCommissioningWithoutPower` (id 0x0C), TC-feature attrs (ids 0x05–0x09), NetworkRecovery attrs (ids 0x0A, 0x0B). All carry `conformance: "O"` or are feature-gated in matter.js `packages/model/src/standard/elements/general-commissioning.element.ts`.
+**Affected attributes:** `IsCommissioningWithoutPower` (id 0x0C), NetworkRecovery attrs (ids 0x0A, 0x0B). All carry `conformance: "O"` or are feature-gated in matter.js `packages/model/src/standard/elements/general-commissioning.element.ts`. The TC-feature attributes (ids 0x05–0x09) are served since phase 38 when the node states its terms (`BD-chip-GeneralCommissioning-TermsAndConditions`).
 
 **Go path:** `cluster/core/general_commissioning.go`.
 
-**Rationale:** These attributes are optional in Matter 1.3 / 1.4 and are only required when the corresponding features (TC: TermsAndConditions; NetworkRecovery) are advertised via FeatureMap. go-fabric does not implement TC or NetworkRecovery — the FeatureMap reports neither feature. Advertising attributes without the corresponding feature bit is a schema violation; adding stubs without feature-bit support would be worse than omitting them. Implementation is gated on feature-demand; no Apple / chip-tool pair-abort risk in the current build.
+**Rationale:** NetworkRecovery (NR) is provisional in the model (`P, O`) and served by neither reference; `IsCommissioningWithoutPower` is optional and matter.js leaves it out. Advertising attributes without the corresponding feature bit is a schema violation; the FeatureMap reports NR off, and the attribute stays out until a reference serves it.
 
 ---
 
@@ -4982,6 +5029,53 @@ SetpointChange, and ActivePresetChange on a setpoint write fires only when
 a preset was active. ThermostatRunningMode is served with TEVT and AUTO,
 as the conformance says (chip's test serves it without AUTO). Pinned by
 the thermostat event cases of `cluster/thermo` (5 chip cases, 6 rules).
+### BD-chip-Thermostat-Suggestions — ThermostatSuggestions follows connectedhomeip; matter.js does not implement it
+
+matter.js's `ThermostatServer` has no suggestion logic: the 1790 lines of
+`packages/node/src/behaviors/thermostat/ThermostatServer.ts` at `862ad75f`
+hold no "suggestion" text, and its class doc (`:81-85`) lists the features
+it leaves out without naming this one. The TSUGGEST feature
+(`cluster/thermo/suggestions.go`) therefore follows connectedhomeip at
+`6170af84`, which keeps the rules in the cluster
+(`src/app/clusters/thermostat-server/ThermostatClusterSuggestions.cpp`:
+the checks of `AddThermostatSuggestion` in their order :163-198 — a
+preset handle over 16 bytes or a lifetime outside 30 to 1440 minutes
+CONSTRAINT_ERROR, an unsynchronised Matter time INVALID_IN_STATE, an
+unknown preset NOT_FOUND, a full list RESOURCE_EXHAUSTED before the
+expired suggestions go, an EffectiveTime past 24 h INVALID_COMMAND —,
+`RemoveThermostatSuggestion` :249-269, `RemoveExpiredSuggestions` :41-67,
+the change notifications :271-333) and the list in its reference delegate
+(`examples/thermostat/thermostat-common/src/thermostat-suggestions-delegate-impl.cpp`:
+`GetUniqueID` :169-197, the earliest-effective choice :275-298, the expiry
+timer :204-222). Here the server holds the list itself, and the
+requirement of Presets (`ThermostatCluster.h:80` at `6170af84`) is the
+feature check.
+Five choices beyond the reference delegate are recorded here. (1) Its
+timer callback re-evaluates without removing the expired suggestion
+(:213-222, :291), so the expired current suggestion is chosen again; the
+server removes the expired ones first. (2) A suggestion whose
+EffectiveTime lies ahead becomes current only at the next command there;
+the server arms its timer for that time as well. (3) A hold keeps the
+thermostat off the suggestion: ThermostatSuggestionNotFollowingReason
+OngoingHold and the active preset kept — the delegate's TODO at :258-260
+and the commented asserts of `src/python_testing/TC_TSTAT_4_3.py:368-375`
+—, and the end of the hold re-evaluates, which step 7b checks. (4) The
+device states its own reasons through `SetAttributes`
+(the delegate's `SetThermostatSuggestionNotFollowingReason`, :91-103);
+the served reason is null while no suggestion is current. (5) Following a
+suggestion runs `SetActivePresetRequest`'s path: the setpoints take the
+preset's through the Sink, as this server's `setActivePresetRequest` moves
+them after matter.js, and ActivePresetChange is emitted with TEVT, where the delegate sets the
+handle on the presets delegate alone (:261). The Matter time is the node's
+UTCTime (`cluster/core.MatterEpochSeconds`, the device kit's wiring);
+without it every Add answers INVALID_IN_STATE. Pinned by
+`suggestions_chip_test.go` (`TestThermostatSuggestionsAndHold.cpp:161-242`
+and TC_TSTAT_4_3's steps) and `suggestions_rules_test.go`; hosts serve the
+feature behind the register row, the reference bridge with
+`--extensions BD-chip-Thermostat-Suggestions`, which the chip-tool harness
+passes. Retire the row when matter.js implements the feature; then
+reconcile onto it.
+
 ### BD-Matter-Thermostat-Hold-ReachesHost — a TemperatureSetpointHold write reaches the Sink; matter.js only stores it
 
 matter.js's `ThermostatServer` initialises the hold's companions and
@@ -5258,6 +5352,80 @@ and the ignored Latch and Speed of features the server does not serve are
 the specification text matter.js carries (`closure-control.resource.ts`).
 Reasoning: chip is the only reference with rules (W3-club1-06). Retire when
 matter.js's server gains them.
+
+Phase 38 serves MotionLatching, Instantaneous, Speed and Calibration after
+the same file, behind the row (`closure.Ahead`, surface yes). A declared
+LT, SP or CL needs the `Mover`'s optional `closurecontrol.Latcher`,
+`SpeedMover` or `Calibrator` (`cluster/spec/closurecontrol/ports.go`),
+else `ErrFeatureMap` names the interface; IS is a declaration fact, and SP
+with IS is the definition's conformance refusal (chip's constructor dies
+on it, `:49-53`). LatchControlModes is the Latcher's, fixed (`:81`); Stop
+with IS is UNSUPPORTED_COMMAND (`:535`) and IS withdraws Stop and
+MovementCompleted from the lists (`:107`, `:680`); Calibrate is
+UNSUPPORTED_COMMAND without CL, SUCCESS without a call while Calibrating,
+INVALID_IN_STATE outside Stopped and SetupRequired, and MainState
+Calibrating after the Calibrator's success (`:642-665`). MoveTo's Latch
+needs RemoteLatching / RemoteUnlatching or is INVALID_IN_STATE
+(`:579-590`), an unknown Speed is CONSTRAINT_ERROR (`:592-597`), a Position
+change of a latched closure without Latch false INVALID_IN_STATE
+(`:607-620`); the drive hears unlatch, speed, motion, latch in that order,
+as chip's closure-app orders a panel's actions
+(`examples/closure-app/linux/ClosureManager.cpp` `HandlePanelUnlatchAction`
+:595, `HandlePanelSetTargetAction` :656). SecureState stays derived: with LT
+true only FullyClosed and latched, null with an unknown latch — chip
+refuses any other true SecureState (`:364-386`); a drive report carrying
+Latch or Speed without the feature is refused, and a speed outside the enum is ignored (`:342-360`); a reached latch
+clears OverallTargetState's Latch as an arrival clears its Position (the
+addition above). Two differences: a request whose Latch and Speed are
+both ignored keeps the fallback to OverallTargetState.Position and changes
+nothing without one, where chip calls the delegate and sets Moving; and a
+MoveTo is Moving, never WaitingForMotion — chip's `IsReadyToMove`
+(`:626-635`) has no port, the drive reports WaitingForMotion itself.
+CountdownTime and LT without PS stay out (the server serves Positioning
+always). Parity: `closurecontrol_features_chip_test.go` (the chip unit
+tests `TestHandleCalibrate`, `TestHandleMoveToAllFeatures`,
+`TestHandleMoveToLatchedPositionChangeRequiresUnlatch`,
+`TestHandleMoveToRemoteLatchingConformanceChecks`,
+`TestHandleMoveToConstraintValidation`,
+`TestSetOverallCurrentStateFeatureValidation`, by meaning).
+
+### BD-chip-Valve-RulesInServer — the valve's rules, Level and TimeSync are connectedhomeip's; matter.js has none
+
+matter.js's `ValveConfigurationAndControlServer` is the empty subclass
+(`packages/node/src/behaviors/valve-configuration-and-control/ValveConfigurationAndControlServer.ts:14`
+at `862ad75f`), so `cluster/valve.Server` follows connectedhomeip's
+`ValveConfigurationAndControlCluster.cpp` at `6170af84` behind the
+`StateSource` port, which holds the state chip's cluster keeps itself. The
+rules served before phase 38: an unchanged DefaultOpenDuration write is a
+no-op success (`:165-166`), Open and Close reach the source and a source
+error is FAILURE (chip's FailureDueToFault needs a ValveFault the port does
+not carry), an absent OpenDuration means DefaultOpenDuration and a present
+null an indefinite opening (`:300-310`). Phase 38 adds Level (LVL) and
+TimeSync (TS), behind the row (`valve.Ahead`, surface yes). LVL needs the
+source's `LevelSource` (CurrentLevel, TargetLevel), DefaultOpenLevel its
+`DefaultOpenLevelSource`, TS the node's Matter time (`valve.Config.MatterTime`,
+the kit's `core.MatterEpochSeconds` over the device clock — chip's Startup
+refuses TS without a time tracker, `:46-50`), each refused with
+`ErrSelection` naming what is missing. A DefaultOpenLevel write is 1 to 100
+and 100 or a multiple of LevelStep, an unchanged one a no-op (`:175-192`,
+`ValueCompliesWithLevelStep` `:483-490`); an Open resolves its level — the
+command's TargetLevel, else DefaultOpenLevel where served, else 100 — and a
+TargetLevel off the LevelStep grid is CONSTRAINT_ERROR (`:312-341`); the
+resolved level reaches the source in the request's TargetLevel, as chip
+hands it to `HandleOpenValve(level)`
+(`valve-configuration-and-control-delegate.h:40`). AutoCloseTime is the
+Matter time at the Open plus the opening's duration (`:391-413`), null for
+an indefinite opening, without a synchronized time (`:394`), after a Close
+(`:243-247`), and — where chip's countdown closes the valve — once the
+source reports no RemainingDuration. Differences: the Matter time carries
+epoch-s, so AutoCloseTime is whole seconds; TargetLevel 0 on Close
+(`:253-256`) and CurrentLevel are the source's report, not the server's
+write; a TargetLevel without LVL stays CONSTRAINT_ERROR where chip ignores
+it (issue 42777, `:274-276`). Parity: `valve_level_chip_test.go`
+(`WriteAttributeTestDefaultOpenLevelOutOfRange`,
+`SetAutoCloseTimeNoIntegerOverflow`, `OpenCommandFieldsValidation`, the
+Level reads, by meaning). Reasoning: chip is the only reference with
+rules. Retire when matter.js's server gains them.
 ### BD-Matter-ICDVerificationKeyConstantTime — the ICD VerificationKey is compared in constant time
 
 matter.js's `IcdManagementServer.ts:756-764` at `862ad75f` (`#assertMayModify`)
@@ -5676,6 +5844,43 @@ address counts as a domain, as in chip's default delegate; no DSTTableEmpty
 at startup, since the emitter attaches after construction. Pinned by
 `cluster/core` time-synchronization tests (3 chip cases, 9 rules, 1 wire).
 
+### BD-chip-GeneralCommissioning-TermsAndConditions — the TC feature follows connectedhomeip when the node states its terms
+
+matter.js's `GeneralCommissioningServer.ts:31` at `862ad75f` is the class
+line of a 285-line server without terms-and-conditions text.
+`core.GeneralCommissioningConfig.TermsAndConditions`
+(`node.Commissioning.TermsAndConditions`, the host's requirement: the
+version, the acknowledgement bits, the optional deadline) serves the TC
+feature as connectedhomeip's `GeneralCommissioningCluster.cpp` at
+`6170af84` serves it under `CHIP_CONFIG_TERMS_AND_CONDITIONS_REQUIRED`:
+`SetTCAcknowledgements` judges the version (TCMinVersionNotMet) and the
+bits (RequiredTCNotAccepted) against the requirement (:617-650) and
+records a changed acceptance tentatively while the fail-safe is armed,
+committed at once otherwise (:663-672); `CommissioningComplete` refuses
+without an acceptance (TCAcknowledgementsNotReceived), below the version
+or short of a bit (:476-510), then commits the tentative one (:512-525);
+an expired or disarmed fail-safe reverts the acceptance its window set
+(:149-157); the last fabric's removal resets it (:357-374), a factory
+reset erases the store it lives in (`store.SettingTermsAcceptance`);
+TCAcknowledgementsRequired is whether the acceptance in force satisfies
+the requirement (`DefaultTermsAndConditionsProvider.cpp:192-217`),
+TCUpdateDeadline the configured deadline or null (`GeneralCommissioningCluster.cpp:221-231`). Two
+differences to chip: the requirement is configuration, never absent
+while the feature is on (chip's provider may hold none, :199-202); and
+the gate runs after the fail-safe's fabric check rather than before the
+session-type check (:530), so a mismatched fabric answers
+InvalidAuthentication before the terms are judged — matter.js's order of
+the checks it has. Pinned by `cluster/core/general_commissioning_tc_chip_test.go`
+(TC-CGEN-2.5 to 2.11 by meaning) and the CGEN family against the daemon
+with `--tc-required`. Served behind `surface.Policies.Extensions`
+(surface `yes`). The commissioner side goes with it: matter.js's flow has
+no terms step (`ControllerCommissioningFlow.ts:558-567` at `862ad75f`
+runs ConfigureRegulatoryInformation, then SynchronizeTime);
+`commissioner.Options.TermsAndConditions` adds chip's
+kConfigureTCAcknowledgments stage as step 8.3 (`AutoCommissioner.cpp:485-487`,
+`CHIPDeviceController.cpp:3946-3970` at `6170af84`: SetTCAcknowledgements
+after the regulatory configuration, skipped without the acknowledgement).
+
 ### BD-chip-AirQuality-NoDefault — a feature-gated value is refused as chip refuses it; the attribute starts unset, as the model gives no default
 
 matter.js's `AirQualityServer.ts:14` at `862ad75f` is the empty subclass;
@@ -5687,6 +5892,29 @@ cases. An out-of-enum value answers ConstraintError (the definition's
 check) where chip answers InvalidValue. chip starts AirQuality at Unknown
 (`AirQualityCluster.h:43`); the kit starts unset, as matter.js's
 `DefaultValue.ts:26-75` gives an enum no default.
+
+### BD-chip-Concentration-ProjectedSelection — the projection serves the host's concentration selection; values it cannot refuse are held or read Unknown
+
+matter.js has no logic for the concentration clusters or AirQuality
+(`AirQualityServer.ts:14` and the ten `*ConcentrationMeasurementServer.ts`
+at `862ad75f` are empty subclasses). The measurement projection serves the
+selection a host states through `contract.ConcentrationSelection`
+(LevelIndication with MediumLevel and CriticalLevel, PeakMeasurement and
+AverageMeasurement with their windows, the AirQuality grades), the readings
+coming from `contract.ConcentrationReadings`, as connectedhomeip serves the
+values the application sets. The closure follows connectedhomeip
+(`ConcentrationMeasurementCluster.cpp:77-89` at `6170af84`: MED and CRI
+imply LEV). Three differences, because a projected read has no caller to
+refuse: a peak or average outside the measured range is held to it, and a
+window beyond one week to the week, where chip's setters answer
+CONSTRAINT_ERROR (`:170-176`, `:198`); a level the selection does not serve
+(Medium without MED, Critical without CRI) reads Unknown, where chip's
+`SetLevelValue` refuses it (`:213-225`). AirQuality grades on published
+scales — CO2 on the Umweltbundesamt's 1000 / 2000 ppm bounds, PM2.5 and
+PM10 on the WHO 2021 guideline and interim targets — and folds a grade the
+selection leaves out towards Poor; the specification leaves the mapping to
+the manufacturer. Pinned by `cluster/measurement:TestConcentrationSelection*`,
+`TestAirQualityGrades` and `TestParityMatterJS_FeatureGatedAttributesMatchFeatureMap`.
 
 ### BD-Matter-CompositeDeviceTypesAsParts — VideoDoorbell and FloodlightCamera compose their components as parts; no superset on the composite's own endpoint
 

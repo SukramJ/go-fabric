@@ -201,6 +201,20 @@ type bridgeOptions struct {
 	extraArgs []string
 }
 
+// harnessExtensions are the "Ahead of matter.js" register rows
+// (notes/parity/by_design.md) every daemon the harness starts enables, off
+// in the daemon by default: BD-chip-Thermostat-Suggestions serves
+// ThermostatSuggestions on the demo thermostat, which TC-TSTAT-4.3 needs
+// (PICS TSTAT.S.F0a); BD-chip-ClosureControl-RulesInServer MotionLatching,
+// Speed and Calibration on the garage (TC-CLCTRL-3.1, 4.2: CLCTRL.S.F06,
+// F01); BD-chip-Valve-RulesInServer Level and TimeSync on the garden tap
+// (TC-VALCC-3.2, 3.3: VALCC.S.F01, A0006).
+var harnessExtensions = []string{
+	"BD-chip-Thermostat-Suggestions",
+	"BD-chip-ClosureControl-RulesInServer",
+	"BD-chip-Valve-RulesInServer",
+}
+
 // chipTestEnableKey is the test enable key CHIP's apps and certification
 // cases use by default (PIXIT.DGGEN.TEST_EVENT_TRIGGER_KEY,
 // 000102030405060708090a0b0c0d0e0f).
@@ -271,6 +285,12 @@ func startBridgeWith(t *testing.T, bin string, flags map[string]bool, opts bridg
 	}
 	if opts.thermostatSchedules {
 		args = append(args, "--thermostat-schedules")
+	}
+	// --extensions enables the "Ahead of matter.js" register rows of
+	// harnessExtensions on every daemon, for the reason --wifi below is on
+	// every one: the PICS slices are generated once from one daemon.
+	if flags["extensions"] && len(harnessExtensions) > 0 {
+		args = append(args, "--extensions", strings.Join(harnessExtensions, ","))
 	}
 	// --wifi serves WiFiNetworkDiagnostics on the root from the daemon's
 	// simulated Wi-Fi link (examples/reference-bridge/wifi.go, brief AM),

@@ -17,8 +17,9 @@ import (
 // TestServerMatchesTheGeneratedDefinition holds every selection the server
 // serves against matter.js thermostat-cluster.element.ts
 // (spectest.CheckServer): HEAT, COOL, HEAT+COOL and HEAT+COOL+AUTO, each
-// with and without LTNE, OCC, PRES and MSCH (with PRES as well), and with
-// TEVT (with OCC, PRES and MSCH as well).
+// with and without LTNE, OCC, PRES and MSCH (with PRES as well), with
+// TEVT (with OCC, PRES and MSCH as well), and with PRES and TSUGGEST (with
+// TEVT as well).
 func TestServerMatchesTheGeneratedDefinition(t *testing.T) {
 	t.Parallel()
 	for _, base := range []uint32{
@@ -33,6 +34,8 @@ func TestServerMatchesTheGeneratedDefinition(t *testing.T) {
 			base | thermo.ThermostatFeatureMSCH, base | thermo.ThermostatFeaturePRES | thermo.ThermostatFeatureMSCH,
 			base | thermo.ThermostatFeatureTEVT,
 			base | thermo.ThermostatFeatureTEVT | thermo.ThermostatFeatureOCC | thermo.ThermostatFeaturePRES | thermo.ThermostatFeatureMSCH,
+			base | thermo.ThermostatFeaturePRES | thermo.ThermostatFeatureTSUGGEST,
+			base | thermo.ThermostatFeatureTEVT | thermo.ThermostatFeaturePRES | thermo.ThermostatFeatureTSUGGEST,
 		} {
 			cfg := thermo.DefaultThermostatConfig()
 			cfg.Features = f
@@ -55,10 +58,13 @@ func TestServerMatchesTheGeneratedDefinition(t *testing.T) {
 
 // TestFeaturesTheServerDoesNotServeAreRefused pins the refusal of a
 // feature whose elements the server does not serve — Setback, which
-// matter.js refuses, and the suggestions — New with ErrFeatures,
-// NewThermostatServer with a panic. MatterScheduleConfiguration ("not yet
-// implemented" in matter.js) and the events (which matter.js does not
-// emit) are served ahead of it (schedules.go, events.go).
+// matter.js refuses — and of the suggestions without Presets ("[PRES]",
+// connectedhomeip's ThermostatCluster.h:80 static_assert at 6170af84) —
+// New with ErrFeatures, NewThermostatServer with a panic.
+// MatterScheduleConfiguration ("not yet implemented" in matter.js), the
+// events (which matter.js does not emit) and the suggestions (which it
+// does not implement) are served ahead of it (schedules.go, events.go,
+// suggestions.go).
 func TestFeaturesTheServerDoesNotServeAreRefused(t *testing.T) {
 	t.Parallel()
 	for _, f := range []tdef.Feature{tdef.FeatureSetback, tdef.FeatureThermostatSuggestions} {

@@ -11,8 +11,12 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/SukramJ/go-fabric/cluster/closure"
+	ccldef "github.com/SukramJ/go-fabric/cluster/spec/closurecontrol"
 	thermostatdef "github.com/SukramJ/go-fabric/cluster/spec/thermostat"
+	valvedef "github.com/SukramJ/go-fabric/cluster/spec/valveconfigurationandcontrol"
 	"github.com/SukramJ/go-fabric/cluster/thermo"
+	"github.com/SukramJ/go-fabric/cluster/valve"
 	"github.com/SukramJ/go-fabric/endpoint"
 	"github.com/SukramJ/go-fabric/surface"
 )
@@ -25,17 +29,25 @@ var thermostatAheadRows = []struct {
 }{
 	{"BD-chip-Thermostat-Schedules", thermostatdef.FeatureMatterScheduleConfiguration},
 	{"BD-chip-Thermostat-Events", thermostatdef.FeatureEvents},
+	{"BD-chip-Thermostat-Suggestions", thermostatdef.FeatureThermostatSuggestions},
 }
 
 // aheadThermostat builds a heating Thermostat with features. With
 // MatterScheduleConfiguration the declaration carries the one schedule
-// type the server needs to start (thermo's schedule configuration rules).
+// type the server needs to start (thermo's schedule configuration rules);
+// ThermostatSuggestions ("[PRES]") comes with Presets and one preset type.
 func aheadThermostat(key string, features thermostatdef.Feature, p *surface.Policies) (*Thermostat, error) {
 	decl := thermostatdef.Declare{Features: thermostatdef.FeatureHeating | features}
 	if features&thermostatdef.FeatureMatterScheduleConfiguration != 0 {
 		types := []thermostatdef.ScheduleTypeStruct{{SystemMode: thermostatdef.SystemModeHeat, NumberOfSchedules: 1}}
 		one, transitions := uint8(1), uint8(4)
 		decl.Initial = thermostatdef.Patch{ScheduleTypes: &types, NumberOfSchedules: &one, NumberOfScheduleTransitions: &transitions}
+	}
+	if features&thermostatdef.FeatureThermostatSuggestions != 0 {
+		decl.Features |= thermostatdef.FeaturePresets
+		types := []thermostatdef.PresetTypeStruct{{PresetScenario: thermostatdef.PresetScenarioOccupied, NumberOfPresets: 1}}
+		one := uint8(1)
+		decl.Initial.PresetTypes, decl.Initial.NumberOfPresets = &types, &one
 	}
 	return NewThermostat(Options{StableKey: endpoint.StringKey(key), Name: key, Surface: *cmp.Or(p, &surface.Policies{})}, decl)
 }
@@ -49,8 +61,16 @@ func TestAheadDeclarationsAreThermo(t *testing.T) {
 			t.Errorf("thermo.Ahead names feature 0x%X as %q, want %q", uint32(r.feature), got, r.row)
 		}
 	}
-	if !slices.Equal(aheadRows(), thermo.Ahead.IDs()) {
-		t.Errorf("aheadRows() = %v, want %v", aheadRows(), thermo.Ahead.IDs())
+	if !reflect.DeepEqual(aheadByCluster[ccldef.ClusterID], closure.Ahead) || !reflect.DeepEqual(aheadByCluster[valvedef.ClusterID], valve.Ahead) {
+		t.Fatal("the device layer's ClosureControl or Valve declaration is not the server package's Ahead")
+	}
+	var want []string
+	for _, s := range []surface.AheadSet{thermo.Ahead, closure.Ahead, valve.Ahead} {
+		want = append(want, s.IDs()...)
+	}
+	slices.Sort(want)
+	if !slices.Equal(aheadRows(), want) {
+		t.Errorf("aheadRows() = %v, want %v", aheadRows(), want)
 	}
 }
 

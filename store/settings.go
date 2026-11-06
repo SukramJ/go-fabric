@@ -32,6 +32,10 @@ const (
 	// shape matter.js uses (BasicInformationServer's uniqueId, quality
 	// "FN": created once, restored from state afterwards).
 	SettingUniqueID = "basic_information.unique_id"
+	// SettingTermsAcceptance holds the committed terms-and-conditions
+	// acceptance of GeneralCommissioning's TC feature, "<version>:<bits>"
+	// (cluster/core general_commissioning_tc.go); erased with the store.
+	SettingTermsAcceptance = "general_commissioning.tc_acceptance"
 )
 
 // MetadataKeyEventNumber is the matter_metadata key holding the

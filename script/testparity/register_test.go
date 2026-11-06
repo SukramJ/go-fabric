@@ -96,7 +96,7 @@ const testparityPlannedRatchet = 2
 // feature: 157 ported, 584 missing.
 const (
 	testparityPortedRatchet  = 157
-	testparityMissingRatchet = 584
+	testparityMissingRatchet = 583
 )
 
 // testparityLeftRatchet is the number of left it cases summed over the
