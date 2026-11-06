@@ -11,23 +11,27 @@ import (
 )
 
 // TestHeaderRoundTripUnsecured covers the typical
-// commissioning frame: unsecured session, no source/dest, counter only.
+// commissioning frame: unsecured session, the initiator's source node id
+// and no destination — an unsecured message carries exactly one of the two
+// (matter.js MessageCodec.ts:234-239 at db021da0).
 func TestHeaderRoundTripUnsecured(t *testing.T) {
 	in := Header{
-		SessionID:      0,
-		MessageCounter: 0xCAFEBABE,
-		SessionType:    SessionUnsecured,
+		SessionID:       0,
+		MessageCounter:  0xCAFEBABE,
+		SessionType:     SessionUnsecured,
+		HasSourceNodeID: true,
+		SourceNodeID:    0x0102030405060708,
 	}
 	wire := in.Marshal()
-	if len(wire) != 8 {
-		t.Fatalf("len(wire)=%d, want 8 (no src/dst)", len(wire))
+	if len(wire) != 16 {
+		t.Fatalf("len(wire)=%d, want 16 (8 fixed + 8 src, no dst)", len(wire))
 	}
 	out, n, err := UnmarshalHeader(wire)
 	if err != nil {
 		t.Fatalf("Unmarshal err: %v", err)
 	}
-	if n != 8 {
-		t.Errorf("consumed %d bytes, want 8", n)
+	if n != 16 {
+		t.Errorf("consumed %d bytes, want 16", n)
 	}
 	out.Raw = nil // decode-only AAD cache; not part of the semantic header
 	if !reflect.DeepEqual(out, in) {
@@ -238,7 +242,7 @@ func TestHeaderRejectsNonZeroVersion(t *testing.T) {
 // TestHeaderRejectsReservedDestSize catches the 0b11 reserved
 // DSIZ encoding.
 func TestHeaderRejectsReservedDestSize(t *testing.T) {
-	wire := Header{}.Marshal()
+	wire := Header{HasSourceNodeID: true, SourceNodeID: 1}.Marshal()
 	wire[0] |= 0x03 // DSIZ = 0b11 (reserved)
 	_, _, err := UnmarshalHeader(wire)
 	if !errors.Is(err, ErrReservedDestSize) {
@@ -365,13 +369,15 @@ func TestProtocolHeaderTruncatedAckCounter(t *testing.T) {
 func TestHeaderMessageExtensionRoundTrip(t *testing.T) {
 	in := Header{
 		MessageCounter:   7,
+		HasSourceNodeID:  true,
+		SourceNodeID:     0x0102030405060708,
 		HasExtension:     true,
 		MessageExtension: []byte{0xDE, 0xAD, 0xBE, 0xEF},
 	}
 	wire := in.Marshal()
-	// 8 fixed + 2 length prefix + 4 data.
-	if len(wire) != 8+2+4 {
-		t.Fatalf("len(wire)=%d, want 14", len(wire))
+	// 8 fixed + 8 source node id + 2 length prefix + 4 data.
+	if len(wire) != 8+8+2+4 {
+		t.Fatalf("len(wire)=%d, want 22", len(wire))
 	}
 	out, n, err := UnmarshalHeader(wire)
 	if err != nil {
@@ -390,7 +396,7 @@ func TestHeaderMessageExtensionRoundTrip(t *testing.T) {
 // gap in issue #6: when the extension block is present, the protocol
 // header MUST be located after it, not at the extension's first byte.
 func TestHeaderExtensionThenProtocolHeader(t *testing.T) {
-	hdr := Header{MessageCounter: 1, HasExtension: true, MessageExtension: []byte{0x01, 0x02}}
+	hdr := Header{MessageCounter: 1, HasSourceNodeID: true, SourceNodeID: 1, HasExtension: true, MessageExtension: []byte{0x01, 0x02}}
 	proto := ProtocolHeader{Opcode: 0x42, ExchangeID: 0x1234, ProtocolID: 0x0001}
 	frame := append(hdr.Marshal(), proto.Marshal()...)
 
@@ -415,12 +421,13 @@ func TestHeaderExtensionThenProtocolHeader(t *testing.T) {
 // claims more bytes than the buffer holds — the bounds check mirrored
 // from matter.js MessageCodec.ts.
 func TestHeaderMessageExtensionLengthOverflow(t *testing.T) {
-	in := Header{MessageCounter: 1, HasExtension: true, MessageExtension: []byte{0xAA, 0xBB}}
+	in := Header{MessageCounter: 1, HasSourceNodeID: true, SourceNodeID: 1, HasExtension: true, MessageExtension: []byte{0xAA, 0xBB}}
 	wire := in.Marshal()
 	// Inflate the uint16 length prefix (immediately after the 8-byte fixed
-	// header) to exceed the 2 bytes that actually follow it.
-	wire[8] = 0xFF
-	wire[9] = 0xFF
+	// header and the 8-byte source node id) to exceed the 2 bytes that
+	// actually follow it.
+	wire[16] = 0xFF
+	wire[17] = 0xFF
 	_, _, err := UnmarshalHeader(wire)
 	if !errors.Is(err, ErrExtensionLength) {
 		t.Fatalf("err = %v, want ErrExtensionLength", err)
@@ -430,9 +437,9 @@ func TestHeaderMessageExtensionLengthOverflow(t *testing.T) {
 // TestHeaderMessageExtensionTruncatedLength rejects a header whose
 // extension flag is set but which ends before the 2-byte length prefix.
 func TestHeaderMessageExtensionTruncatedLength(t *testing.T) {
-	in := Header{MessageCounter: 1, HasExtension: true}
+	in := Header{MessageCounter: 1, HasSourceNodeID: true, SourceNodeID: 1, HasExtension: true}
 	wire := in.Marshal()
-	_, _, err := UnmarshalHeader(wire[:8]) // drop the length prefix
+	_, _, err := UnmarshalHeader(wire[:16]) // keep fixed header + source node id, drop the length prefix
 	if !errors.Is(err, ErrTruncated) {
 		t.Fatalf("err = %v, want ErrTruncated", err)
 	}

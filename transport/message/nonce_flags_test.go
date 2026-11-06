@@ -13,7 +13,7 @@ import "testing"
 // matter.js MessageCodec.ts:45 keeping securityFlags as a pure data
 // field for the nonce.
 func TestNonceSecurityFlagsKeepsReservedWireBits(t *testing.T) {
-	wire := Header{MessageCounter: 1, Privacy: true}.Marshal()
+	wire := Header{MessageCounter: 1, HasSourceNodeID: true, SourceNodeID: 1, Privacy: true}.Marshal()
 	wire[3] |= 0x08 // reserved bit 3
 	out, _, err := UnmarshalHeader(wire)
 	if err != nil {

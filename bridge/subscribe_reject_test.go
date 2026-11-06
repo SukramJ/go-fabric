@@ -98,7 +98,7 @@ func TestHandleSubscribeRequest_EmptyRequest_RejectsInvalidAction(t *testing.T) 
 	mgr := subscription.NewManager(subscription.Config{}, nil, nil)
 	b.AttachSubscriptionManager(mgr)
 
-	hdr := &message.Header{SessionID: 0, MessageCounter: 100}
+	hdr := &message.Header{SessionID: 0, MessageCounter: 100, HasSourceNodeID: true, SourceNodeID: 0x5A5A}
 	proto := message.ProtocolHeader{ProtocolID: im.InteractionModelProtocolID, Opcode: im.OpcodeSubscribeRequest, ExchangeID: 1}
 	req := im.SubscribeRequest{MinIntervalFloor: 0, MaxIntervalCeiling: 60}
 
@@ -137,7 +137,7 @@ func TestHandleSubscribeRequest_NoMatchingPaths_RejectsInvalidAction(t *testing.
 	mgr := subscription.NewManager(subscription.Config{}, nil, nil)
 	b.AttachSubscriptionManager(mgr)
 
-	hdr := &message.Header{SessionID: 0, MessageCounter: 101}
+	hdr := &message.Header{SessionID: 0, MessageCounter: 101, HasSourceNodeID: true, SourceNodeID: 0x5A5A}
 	proto := message.ProtocolHeader{ProtocolID: im.InteractionModelProtocolID, Opcode: im.OpcodeSubscribeRequest, ExchangeID: 1}
 	const noSuchCluster uint32 = 0xFFFF0001 // no cluster server anywhere in the topology advertises this ID.
 	req := im.SubscribeRequest{
@@ -196,7 +196,7 @@ func TestHandleSubscribeRequest_ManagerRejection_SendsStatusResponse(t *testing.
 			mgr := subscription.NewManager(tc.cfg, nil, nil)
 			b.AttachSubscriptionManager(mgr)
 
-			hdr := &message.Header{SessionID: 0, MessageCounter: 102}
+			hdr := &message.Header{SessionID: 0, MessageCounter: 102, HasSourceNodeID: true, SourceNodeID: 0x5A5A}
 			proto := message.ProtocolHeader{ProtocolID: im.InteractionModelProtocolID, Opcode: im.OpcodeSubscribeRequest, ExchangeID: 1}
 			req := tc.req
 			req.AttributeRequests = []im.ConcreteAttributePath{

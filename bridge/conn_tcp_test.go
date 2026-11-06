@@ -383,7 +383,7 @@ func (f *fakeConn) Reliable() bool   { return true }
 func TestReceiveOverReliableServesUnsecuredDropsGroup(t *testing.T) {
 	b := newStartedBridgeWithSnapshotter(t, wbEmptySnapshotter)
 	c := &fakeConn{}
-	unsecured := message.Header{SessionID: 0, MessageCounter: 1}
+	unsecured := message.Header{SessionID: 0, MessageCounter: 1, HasSourceNodeID: true, SourceNodeID: 0x5A5A}
 	// A PBKDFParamRequest without a payload: the dispatcher answers it
 	// (with a status report or nothing), the point is that it is not
 	// refused for its transport.

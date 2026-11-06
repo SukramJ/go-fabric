@@ -494,7 +494,7 @@ func TestEndpointCount_StartedBridgeWithoutSources_IsZero(t *testing.T) {
 func TestReplyTimedStatus_NilSrc_DoesNotPanic(t *testing.T) {
 	t.Parallel()
 	b := newStartedBridge(t)
-	hdr := &message.Header{SessionID: 0, MessageCounter: 1}
+	hdr := &message.Header{SessionID: 0, MessageCounter: 1, HasSourceNodeID: true, SourceNodeID: 0x5A5A}
 	proto := message.ProtocolHeader{ExchangeID: 1}
 	// nil src → sendReply will fail; function must not panic.
 	_ = b.replyTimedStatus(nil, hdr, proto, "test", im.StatusSuccess)
@@ -506,7 +506,7 @@ func TestReplyTimedStatus_NilSrc_DoesNotPanic(t *testing.T) {
 func TestReplyTimedStatus_WithSrc_DoesNotPanic(t *testing.T) {
 	t.Parallel()
 	b := newStartedBridge(t)
-	hdr := &message.Header{SessionID: 0, MessageCounter: 2}
+	hdr := &message.Header{SessionID: 0, MessageCounter: 2, HasSourceNodeID: true, SourceNodeID: 0x5A5A}
 	proto := message.ProtocolHeader{ExchangeID: 2}
 	_ = b.replyTimedStatus(loopbackSrc(), hdr, proto, "test", im.StatusSuccess)
 }

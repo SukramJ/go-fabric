@@ -30,9 +30,11 @@ func buildNeedsAckProto(exchangeID uint16, msgCounter uint32) message.ProtocolHe
 	}
 }
 
-// buildMsgHdr builds a minimal message.Header with the given counter.
+// buildMsgHdr builds a minimal unsecured message.Header with the given
+// counter and the initiator's source node id (an unsecured message carries
+// exactly one node id, matter.js MessageCodec.ts:234-239 at db021da0).
 func buildMsgHdr(counter uint32) *message.Header {
-	return &message.Header{SessionID: 0, MessageCounter: counter}
+	return &message.Header{SessionID: 0, MessageCounter: counter, HasSourceNodeID: true, SourceNodeID: 0x5A5A}
 }
 
 // openPeerSocket opens a real loopback UDP socket and returns it plus its
@@ -204,7 +206,7 @@ func TestAckPump_NoEchoWhenPeerHadNoSourceNodeID(t *testing.T) {
 		msgCounter uint32 = 0xBEEF
 	)
 	proto := buildNeedsAckProto(exchangeID, msgCounter)
-	hdr := buildMsgHdr(msgCounter)
+	hdr := &message.Header{SessionID: 0, MessageCounter: msgCounter} // no source node id
 
 	b.owedInboundAck(peerAddr, hdr, proto)
 	if n := b.RunAckPumpOnce(time.Now()); n != 1 {
@@ -219,12 +221,15 @@ func TestAckPump_NoEchoWhenPeerHadNoSourceNodeID(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ReadFromUDP: %v", err)
 	}
-	rxHdr, _, err := message.UnmarshalHeader(buf[:nRead])
-	if err != nil {
-		t.Fatalf("UnmarshalHeader: %v", err)
+	// The bare acknowledgement carries neither node id, a shape
+	// UnmarshalHeader now refuses (ErrUnsecuredNodeIDs, matter.js
+	// MessageCodec.ts:234-239 at db021da0), so the DSIZ bits are read
+	// from the message-flags byte directly.
+	if nRead < 1 {
+		t.Fatal("empty StandaloneAck datagram")
 	}
-	if rxHdr.DestSize != message.DestNone {
-		t.Errorf("DestSize = %d, want DestNone(%d)", rxHdr.DestSize, message.DestNone)
+	if got := message.DestSize(buf[0] & 0x03); got != message.DestNone {
+		t.Errorf("DestSize = %d, want DestNone(%d)", got, message.DestNone)
 	}
 }
 
