@@ -169,6 +169,7 @@ func (f *flow) initializeSteps() {
 		{7, 1, "GeneralCommissioning.ArmFailsafe", func(ctx context.Context) (stepResult, error) { return f.armFailsafe(ctx, 0) }},
 		{8, 1, "GeneralCommissioning.ConfigureRegulatoryInformation", f.configureRegulatoryInformation},
 		{8, 2, "TimeSynchronization.SynchronizeTime", f.synchronizeTime},
+		{8, 3, StepTermsAndConditions, f.configureTermsAndConditions},
 		{10, 1, "OperationalCredentials.DeviceAttestation", f.deviceAttestation},
 		{11, 1, "OperationalCredentials.Certificates", f.certificates},
 		{15, 1, "AccessControl", f.configureAccessControlLists},
@@ -685,6 +686,39 @@ func (f *flow) configureRegulatoryInformation(ctx context.Context) (stepResult, 
 		}
 	}
 	if err := f.ensureGeneralCommissioningSuccess("setRegulatoryConfig", resp.ErrorCode, resp.DebugText); err != nil {
+		return 0, err
+	}
+	return stepSuccess, nil
+}
+
+// StepTermsAndConditions is the step that acknowledges the device's terms
+// and conditions ([Options.TermsAndConditions]); it has no matter.js
+// counterpart.
+const StepTermsAndConditions = "GeneralCommissioning.ConfigureTCAcknowledgements"
+
+// configureTermsAndConditions is connectedhomeip's
+// kConfigureTCAcknowledgments stage (AutoCommissioner.cpp:485-487 after
+// the regulatory configuration; CHIPDeviceController.cpp:3946-3970 at
+// 6170af84): skipped without the acknowledgement, otherwise
+// SetTCAcknowledgements with the acknowledged version and bits, whose
+// error code fails the commissioning as any GeneralCommissioning
+// command's does.
+func (f *flow) configureTermsAndConditions(ctx context.Context) (stepResult, error) {
+	tc := f.opts.TermsAndConditions
+	if tc == nil {
+		return stepSkipped, nil
+	}
+	res, err := f.invoke(ctx, gencomm.ClusterID, gencomm.CmdSetTcAcknowledgements, gencomm.SetTcAcknowledgementsRequest{
+		TcVersion: tc.Version, TcUserResponse: tc.Acknowledgements,
+	}, false)
+	if err != nil {
+		return 0, err
+	}
+	var resp gencomm.SetTcAcknowledgementsResponse
+	if err := response(res, "SetTCAcknowledgementsResponse", resp.DecodeTLV); err != nil {
+		return 0, err
+	}
+	if err := f.ensureGeneralCommissioningSuccess("setTCAcknowledgements", resp.ErrorCode, ""); err != nil {
 		return 0, err
 	}
 	return stepSuccess, nil

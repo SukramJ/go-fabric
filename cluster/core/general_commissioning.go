@@ -18,6 +18,7 @@ import (
 	gencommdef "github.com/SukramJ/go-fabric/cluster/spec/generalcommissioning"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
+	"github.com/SukramJ/go-fabric/store"
 )
 
 // GeneralCommissioning implements the Matter GeneralCommissioning
@@ -72,6 +73,20 @@ type GeneralCommissioning struct {
 	// Static config.
 	failSafeMaxSeconds       uint16
 	cumulativeFailSafeMaxSec uint16
+
+	// inst is the definition bound to the served features: gencommInst, or
+	// gencommInstTC with the terms-and-conditions feature.
+	inst *spec.Instance
+	// The TermsAndConditions feature (general_commissioning_tc.go): the
+	// requirement, the store the committed acceptance lives in, the
+	// committed and the tentative acceptance, and whether the armed
+	// fail-safe window set one (chip
+	// FailSafeContext::UpdateTermsAndConditionsHasBeenInvoked).
+	tc          *TermsAndConditionsConfig
+	tcSettings  store.Settings
+	tcCommitted *termsAcceptance
+	tcTemporal  *termsAcceptance
+	tcTouched   bool
 
 	// dataVersion tracks the per-cluster monotonic counter per Matter
 	// §10.6.5. Bumped after every successful ArmFailSafe, SetRegulatoryConfig,
@@ -222,6 +237,14 @@ type GeneralCommissioningConfig struct {
 	// ArmFailSafe returns BusyWithOtherAdmin per Matter §11.10.6.2.
 	// Wired by the daemon post-construction; nil skips the check.
 	IsCommissioningWindowOpen func() bool
+	// TermsAndConditions serves the TC feature: the terms a commissioner
+	// acknowledges before CommissioningComplete succeeds
+	// ([TermsAndConditionsConfig]); nil leaves the feature off.
+	TermsAndConditions *TermsAndConditionsConfig
+	// Settings keeps the committed terms acceptance across restarts
+	// ([store.SettingTermsAcceptance]); nil keeps it in memory. Read by
+	// [GeneralCommissioning.RestoreTermsAcceptance].
+	Settings store.Settings
 	// Clock is the fail-safe's clock: its expiry, the cumulative limit and
 	// the expiry watcher. nil is [clock.System].
 	Clock clock.Clock
@@ -251,7 +274,14 @@ func NewGeneralCommissioning(cfg GeneralCommissioningConfig) (*GeneralCommission
 	if cfg.CumulativeFailSafeMaxSeconds < cfg.FailSafeMaxSeconds {
 		cfg.CumulativeFailSafeMaxSeconds = cfg.FailSafeMaxSeconds
 	}
+	inst := gencommInst
+	if cfg.TermsAndConditions != nil {
+		inst = gencommInstTC
+	}
 	return &GeneralCommissioning{
+		inst:                         inst,
+		tc:                           cfg.TermsAndConditions,
+		tcSettings:                   cfg.Settings,
 		log:                          cmp.Or(cfg.Logger, slog.Default()),
 		regulatoryConfig:             cfg.LocationCapability,
 		locationCapability:           cfg.LocationCapability,
@@ -350,13 +380,13 @@ func (g *GeneralCommissioning) MatterClusterID() uint32 { return gencommClusterI
 // the definition's — ArmFailSafe, SetRegulatoryConfig and
 // CommissioningComplete require Administer (access "A").
 func (g *GeneralCommissioning) MinInvokePrivilege(cmdID uint32) uint8 {
-	return gencommInst.MinInvokePrivilege(cmdID)
+	return g.inst.MinInvokePrivilege(cmdID)
 }
 
 // MinWritePrivilege implements [contract.ClusterAttributeWritePrivilege]:
 // the definition's — Breadcrumb requires Administer ("RW VA").
 func (g *GeneralCommissioning) MinWritePrivilege(attrID uint32) uint8 {
-	return gencommInst.MinWritePrivilege(attrID)
+	return g.inst.MinWritePrivilege(attrID)
 }
 
 // BasicCommissioningInfoStruct mirrors Matter §11.10.5.3.
@@ -384,9 +414,9 @@ func (g *GeneralCommissioning) MatterRead(attrID uint32) (any, bool) {
 	case gencommAttrSupportsConcurrentConnection:
 		return g.supportsConcurrentConnection, true
 	case cluster.AttrGlobalFeatureMap, cluster.AttrGlobalClusterRevision:
-		return gencommInst.ReadGlobal(attrID)
+		return g.inst.ReadGlobal(attrID)
 	}
-	return nil, false
+	return g.readTermsLocked(attrID)
 }
 
 // MatterWrite handles Breadcrumb writes (Matter §11.10.6.1). Other
@@ -395,7 +425,7 @@ func (g *GeneralCommissioning) MatterWrite(ctx context.Context, attrID uint32, v
 	if attrID != gencommAttrBreadcrumb {
 		// UNSUPPORTED_WRITE for a served read-only attribute,
 		// UNSUPPORTED_ATTRIBUTE otherwise, as the definition judges them.
-		_, err := gencommInst.ValidateWrite(attrID, value, nil)
+		_, err := g.inst.ValidateWrite(attrID, value, nil)
 		return refusedWrite{sentinel: fmt.Errorf("core: GeneralCommissioning attribute 0x%04X is read-only", attrID), status: err}
 	}
 	v, ok := value.(uint64)
@@ -484,6 +514,10 @@ func (g *GeneralCommissioning) dispatchCmd(ctx context.Context, cmdID uint32, fi
 		return g.handleSetRegulatoryConfig(fields)
 	case gencommCmdCommissioningComplete:
 		return g.handleCommissioningComplete(ctx)
+	case gencommdef.CmdSetTcAcknowledgements:
+		if g.tc != nil {
+			return g.handleSetTCAcknowledgements(ctx, fields)
+		}
 	}
 	return nil, im.UnsupportedCommandf("core: GeneralCommissioning command 0x%02X not supported", cmdID)
 }
@@ -503,25 +537,28 @@ func gencommCmdName(cmdID uint32) string {
 
 // MatterReportable lists the subscribe-able attributes.
 func (g *GeneralCommissioning) MatterReportable() []uint32 {
+	if g.tc != nil {
+		return append([]uint32{gencommAttrBreadcrumb, gencommAttrRegulatoryConfig}, gencommTCAttrs...)
+	}
 	return []uint32{gencommAttrBreadcrumb, gencommAttrRegulatoryConfig}
 }
 
 // MatterAttributes implements [contract.ClusterAttributeLister]
 // so wildcard subscribe enumerates the full cluster surface.
-func (g *GeneralCommissioning) MatterAttributes() []uint32 { return gencommInst.MatterAttributes() }
+func (g *GeneralCommissioning) MatterAttributes() []uint32 { return g.inst.MatterAttributes() }
 
 // MatterAcceptedCommands implements [contract.ClusterCommandLister]:
 // ArmFailSafe, SetRegulatoryConfig and CommissioningComplete.
-// SetTCAcknowledgements (0x06) is conformance TC, which the FeatureMap
-// does not advertise.
+// SetTCAcknowledgements (0x06) joins them with the TC feature
+// (general_commissioning_tc.go).
 func (g *GeneralCommissioning) MatterAcceptedCommands() []uint32 {
-	return gencommInst.MatterAcceptedCommands()
+	return g.inst.MatterAcceptedCommands()
 }
 
 // MatterGeneratedCommands implements [contract.ClusterCommandLister]: the
 // three responses.
 func (g *GeneralCommissioning) MatterGeneratedCommands() []uint32 {
-	return gencommInst.MatterGeneratedCommands()
+	return g.inst.MatterGeneratedCommands()
 }
 
 func (g *GeneralCommissioning) handleArmFailSafe(ctx context.Context, fields any) (any, error) {
@@ -606,6 +643,9 @@ func (g *GeneralCommissioning) handleArmFailSafe(ctx context.Context, fields any
 		if wasArmed {
 			g.breadcrumb = 0
 		}
+		// A tentative terms acceptance of the window goes with it
+		// (general_commissioning_tc.go revertTermsLocked).
+		termsReverted := wasArmed && g.revertTermsLocked()
 		// Bump DataVersion on disarm so Apple's MTRDevice sees a version
 		// change and invalidates its cached DataVersion=0.
 		// Mirrors chip MarkAttributeDirty(Breadcrumb).
@@ -617,6 +657,9 @@ func (g *GeneralCommissioning) handleArmFailSafe(ctx context.Context, fields any
 		hook := g.onFailSafeExpired
 		g.mu.Unlock()
 		unlocked = true
+		if termsReverted {
+			g.changes.Notify(gencommTCAttrs...)
+		}
 		if wasArmed && hook != nil {
 			hook(ctx, expiredFabric)
 		}
@@ -720,6 +763,7 @@ func (g *GeneralCommissioning) watchFailSafeExpiry(ctx context.Context, fabricIn
 	g.mu.Lock()
 	stillArmed := g.failSafeArmed && !g.failSafeExpiresAt.After(g.clock.Now())
 	hadBreadcrumb := stillArmed && g.breadcrumb != 0
+	termsReverted := false
 	if stillArmed {
 		g.failSafeArmed = false
 		// chip's GeneralCommissioningCluster.cpp:146 (kFailSafeTimerExpired
@@ -733,10 +777,14 @@ func (g *GeneralCommissioning) watchFailSafeExpiry(ctx context.Context, fabricIn
 		// starts fresh. Mirrors chip FailSafeContext::HandleMaxCumulativeFailSafeTimer
 		// which stops when the fail-safe expires.
 		g.failSafeCumulativeStarted = false
+		termsReverted = g.revertTermsLocked()
 	}
 	hook := g.onFailSafeExpired
 	g.mu.Unlock()
 	if stillArmed {
+		if termsReverted {
+			g.changes.Notify(gencommTCAttrs...)
+		}
 		// The reset is reported like any other change of the attribute:
 		// chip's kFailSafeTimerExpired branch calls SetBreadCrumb(0)
 		// (GeneralCommissioningCluster.cpp:145-146 at 6170af84), which
@@ -848,6 +896,17 @@ func (g *GeneralCommissioning) handleCommissioningComplete(ctx context.Context) 
 			ErrorCode: CommissioningErrorInvalidAuthentication,
 			DebugText: fmt.Sprintf("session fabric %d != failsafe fabric %d", sessFabric, g.failSafeFabricIndex),
 		}, nil
+	}
+	// The terms-and-conditions gate, then the commit of a tentative
+	// acceptance (chip GeneralCommissioningCluster.cpp:476-525 at 6170af84;
+	// general_commissioning_tc.go).
+	if code := g.termsGateLocked(); code != CommissioningErrorOK {
+		return CommissioningCompleteResponse{ErrorCode: code, DebugText: "terms and conditions not accepted"}, nil
+	}
+	if g.tcTouched {
+		if err := g.commitTermsLocked(ctx); err != nil {
+			return nil, err
+		}
 	}
 	g.failSafeArmed = false
 	g.failSafeFabricIndex = 0
@@ -977,9 +1036,13 @@ func (g *GeneralCommissioning) ExpireFailSafe(ctx context.Context) {
 	g.failSafeFabricIndex = 0
 	g.failSafeCumulativeStarted = false
 	g.breadcrumb = 0
+	termsReverted := g.revertTermsLocked()
 	g.dataVersion.Bump()
 	hook := g.onFailSafeExpired
 	g.mu.Unlock()
+	if termsReverted {
+		g.changes.Notify(gencommTCAttrs...)
+	}
 	if hook != nil {
 		hook(ctx, fabric)
 	}

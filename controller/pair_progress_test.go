@@ -67,6 +67,7 @@ func TestPairProgress(t *testing.T) {
 		"7.1 GeneralCommissioning.ArmFailsafe started", "7.1 GeneralCommissioning.ArmFailsafe succeeded",
 		"8.1 GeneralCommissioning.ConfigureRegulatoryInformation started", "8.1 GeneralCommissioning.ConfigureRegulatoryInformation skipped",
 		"8.2 TimeSynchronization.SynchronizeTime started", "8.2 TimeSynchronization.SynchronizeTime skipped",
+		"8.3 GeneralCommissioning.ConfigureTCAcknowledgements started", "8.3 GeneralCommissioning.ConfigureTCAcknowledgements skipped",
 		"10.1 OperationalCredentials.DeviceAttestation started", "10.1 OperationalCredentials.DeviceAttestation succeeded",
 		"11.1 OperationalCredentials.Certificates started", "11.1 OperationalCredentials.Certificates succeeded",
 		"15.1 AccessControl started", "15.1 AccessControl skipped",

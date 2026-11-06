@@ -63,6 +63,7 @@ func TestParityStepTable(t *testing.T) {
 		"7.1 GeneralCommissioning.ArmFailsafe",
 		"8.1 GeneralCommissioning.ConfigureRegulatoryInformation",
 		"8.2 TimeSynchronization.SynchronizeTime",
+		"8.3 GeneralCommissioning.ConfigureTCAcknowledgements",
 		"10.1 OperationalCredentials.DeviceAttestation",
 		"11.1 OperationalCredentials.Certificates",
 		"15.1 AccessControl",

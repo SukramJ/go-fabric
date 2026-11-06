@@ -60,7 +60,7 @@ func rootCluster(r surface.Report, id uint32) surface.Cluster {
 // servers' rows and the device layer's (the Thermostat's), sorted, each
 // once (W5-api-14).
 func TestNodeAheadRows(t *testing.T) {
-	want := append([]string{threadRow, timeSyncRow}, thermo.Ahead.IDs()...)
+	want := append([]string{threadRow, timeSyncRow, termsRow}, thermo.Ahead.IDs()...)
 	want = append(want, closure.Ahead.IDs()...)
 	want = append(want, valve.Ahead.IDs()...)
 	slices.Sort(want)

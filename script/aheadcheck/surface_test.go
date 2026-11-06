@@ -24,6 +24,7 @@ import (
 	_ "modernc.org/sqlite"
 
 	"github.com/SukramJ/go-fabric/cluster/core"
+	gencommdef "github.com/SukramJ/go-fabric/cluster/spec/generalcommissioning"
 	thermostatdef "github.com/SukramJ/go-fabric/cluster/spec/thermostat"
 	tbrmdef "github.com/SukramJ/go-fabric/cluster/spec/threadborderroutermanagement"
 	tsdef "github.com/SukramJ/go-fabric/cluster/spec/timesynchronization"
@@ -152,19 +153,25 @@ type measure func(t *testing.T, row string, with bool) surface.Cluster
 
 // measurements name how each declared row is measured.
 var measurements = map[string]measure{
-	"BD-chip-Thermostat-Schedules":         measureThermostat,
-	"BD-chip-Thermostat-Events":            measureThermostat,
-	"BD-chip-TimeSynchronization-Features": measureTimeSynchronization,
-	"BD-Thread-NetComm-ThreadVariant":      measureNetworkCommissioning,
+	"BD-chip-Thermostat-Schedules":                    measureThermostat,
+	"BD-chip-Thermostat-Events":                       measureThermostat,
+	"BD-chip-Thermostat-Suggestions":                  measureThermostat,
+	"BD-chip-TimeSynchronization-Features":            measureTimeSynchronization,
+	"BD-Thread-NetComm-ThreadVariant":                 measureNetworkCommissioning,
+	"BD-chip-GeneralCommissioning-TermsAndConditions": measureGeneralCommissioning,
 }
 
 // measureThermostat builds a heating Thermostat through the device layer
 // with every Thermostat row enabled, with or without the row's features;
 // MatterScheduleConfiguration carries the one schedule type the server
-// needs to start.
+// needs to start, and ThermostatSuggestions ("[PRES]") is measured on a
+// thermostat with Presets.
 func measureThermostat(t *testing.T, row string, with bool) surface.Cluster {
 	t.Helper()
 	features := thermostatdef.FeatureHeating
+	if thermo.Ahead[row].Features&thermo.ThermostatFeatureTSUGGEST != 0 {
+		features |= thermostatdef.FeaturePresets
+	}
 	decl := thermostatdef.Declare{}
 	if with {
 		features |= thermostatdef.Feature(thermo.Ahead[row].Features)
@@ -173,6 +180,11 @@ func measureThermostat(t *testing.T, row string, with bool) surface.Cluster {
 		types := []thermostatdef.ScheduleTypeStruct{{SystemMode: thermostatdef.SystemModeHeat, NumberOfSchedules: 1}}
 		one, transitions := uint8(1), uint8(4)
 		decl.Initial = thermostatdef.Patch{ScheduleTypes: &types, NumberOfSchedules: &one, NumberOfScheduleTransitions: &transitions}
+	}
+	if features&thermostatdef.FeaturePresets != 0 {
+		types := []thermostatdef.PresetTypeStruct{{PresetScenario: thermostatdef.PresetScenarioOccupied, NumberOfPresets: 1}}
+		one := uint8(1)
+		decl.Initial.PresetTypes, decl.Initial.NumberOfPresets = &types, &one
 	}
 	decl.Features = features
 	p := surface.Policies{Extensions: surface.NewExtensions(thermo.Ahead.IDs()...)}
@@ -325,4 +337,45 @@ func TestSurfaceColumnMeasured(t *testing.T) {
 			t.Errorf("%s: measured, but no server declares it", id)
 		}
 	}
+}
+
+// measureGeneralCommissioning builds a node on an in-memory store with
+// the row enabled and the root's GeneralCommissioning with or without the
+// terms-and-conditions requirement (node.Commissioning.TermsAndConditions).
+func measureGeneralCommissioning(t *testing.T, row string, with bool) surface.Cluster {
+	t.Helper()
+	db, err := sql.Open("sqlite", fmt.Sprintf("file:aheadcheck-%d?mode=memory&cache=shared", memoryDBs.Add(1)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = db.Close() })
+	cfg := node.Config{
+		Commissioning: node.Commissioning{Passcode: 20202021, Discriminator: 3840, PBKDFIterations: 1000, Salt: []byte("SPAKE2P Key Salt")},
+		ProductDescription: node.ProductDescription{
+			VendorID: 0xFFF1, ProductID: 0x8001,
+		},
+		BasicInformation: node.BasicInformation{
+			VendorName: "aheadcheck", ProductName: "aheadcheck", NodeLabel: "aheadcheck", SerialNumber: "AHEAD-1",
+			HardwareVersion: 1, HardwareVersionString: "1", SoftwareVersion: 1, SoftwareVersionString: "1",
+		},
+		Store:   node.Store{DB: db},
+		Logger:  slog.New(slog.DiscardHandler),
+		Network: node.Network{Listen: "127.0.0.1:0", PreferIPv4: true, MDNS: node.MDNS{Off: true}},
+		Surface: surface.Policies{Extensions: surface.NewExtensions(row)},
+	}
+	if with {
+		cfg.Commissioning.TermsAndConditions = &node.TermsAndConditions{Version: 1, Acknowledgements: 1}
+	}
+	n, err := node.New(context.Background(), cfg)
+	if err != nil {
+		t.Fatalf("%s: %v", row, err)
+	}
+	t.Cleanup(func() { _ = n.Stop(context.Background()) })
+	for _, c := range n.Surface().Effective.Root.Clusters {
+		if c.ID == gencommdef.ClusterID {
+			return c
+		}
+	}
+	t.Fatalf("%s: the root serves no GeneralCommissioning", row)
+	return surface.Cluster{}
 }

@@ -176,9 +176,14 @@ func buildRoot(ctx context.Context, d rootDeps) (*RootClusters, error) { //nolin
 		Logger:                       d.logger,
 		LocationCapability:           cfg.Commissioning.LocationCapability,
 		SupportsConcurrentConnection: true,
+		TermsAndConditions:           cfg.Commissioning.TermsAndConditions.core(),
+		Settings:                     d.st,
 		Clock:                        cfg.Clock,
 	})
 	if err != nil {
+		return nil, fmt.Errorf("general commissioning: %w", err)
+	}
+	if err := r.GeneralCommissioning.RestoreTermsAcceptance(ctx); err != nil {
 		return nil, fmt.Errorf("general commissioning: %w", err)
 	}
 	generalCom := r.GeneralCommissioning

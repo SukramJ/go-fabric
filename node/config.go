@@ -368,6 +368,36 @@ type Commissioning struct {
 	// a host that turns it on offers the weaker method knowingly (the
 	// window's PASE runs against the fixed setup passcode).
 	BasicCommissioning bool
+	// TermsAndConditions serves GeneralCommissioning's TermsAndConditions
+	// feature (TC): the terms a commissioner has to acknowledge with
+	// SetTCAcknowledgements before CommissioningComplete succeeds, after
+	// connectedhomeip (register row
+	// BD-chip-GeneralCommissioning-TermsAndConditions; matter.js serves no
+	// terms, GeneralCommissioningServer.ts:31 at 862ad75f). nil leaves the
+	// feature off. The node keeps the acceptance in its store, reverts a
+	// tentative one with the fail-safe and resets it with the last fabric.
+	// The row is served behind [Config].Surface's Extensions (ADR 0030).
+	TermsAndConditions *TermsAndConditions
+}
+
+// TermsAndConditions is the requirement [Commissioning].TermsAndConditions
+// states: GeneralCommissioning's TCMinRequiredVersion, the acknowledgement
+// bits every acceptance has to carry, and the optional TCUpdateDeadline
+// (Matter epoch seconds; nil reads null).
+type TermsAndConditions struct {
+	Version          uint16
+	Acknowledgements uint16
+	UpdateDeadline   *uint32
+}
+
+// core converts the requirement to the server's configuration.
+func (t *TermsAndConditions) core() *mattercore.TermsAndConditionsConfig {
+	if t == nil {
+		return nil
+	}
+	return &mattercore.TermsAndConditionsConfig{
+		RequiredVersion: t.Version, RequiredAcknowledgements: t.Acknowledgements, UpdateDeadline: t.UpdateDeadline,
+	}
 }
 
 // ProductDescription is matter.js `productDescription`

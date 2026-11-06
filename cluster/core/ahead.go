@@ -35,3 +35,14 @@ var TimeSynchronizationAhead = surface.AheadSet{
 var NetworkCommissioningAhead = surface.AheadSet{
 	"BD-Thread-NetComm-ThreadVariant": {Features: NetworkCommFeatureThread},
 }
+
+// GeneralCommissioningAhead declares the GeneralCommissioning server's
+// elements that implement a row of the "Ahead of matter.js" register
+// (notes/parity/by_design.md): the TermsAndConditions feature
+// (general_commissioning_tc.go), row
+// BD-chip-GeneralCommissioning-TermsAndConditions. The register's matter.js
+// marker: "`GeneralCommissioningServer.ts:31` is the class line (absence:
+// no terms-and-conditions text in the 285-line file)".
+var GeneralCommissioningAhead = surface.AheadSet{
+	"BD-chip-GeneralCommissioning-TermsAndConditions": {Features: gencommFeatureTC},
+}
