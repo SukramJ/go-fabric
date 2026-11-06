@@ -621,14 +621,16 @@ func (c *Channel) ClosedCause() error { return ErrChannelClosed }
 // Close closes the exchange manager and the BTP session, which
 // unsubscribes C2 and disconnects — matter.js close
 // (NobleBleChannel.ts:1004-1021 at 862ad75f). A renegotiation in flight
-// is abandoned, its parked sends released, and the connection a
-// suspended session no longer owns is dropped here.
+// is abandoned, its parked sends released, the C2 handler detached so
+// data that still arrives is dropped (:1010 #detachDataHandler), and the
+// connection a suspended session no longer owns is dropped here.
 func (c *Channel) Close() error {
 	c.mu.Lock()
 	c.closing = true
-	s := c.session
+	s, h := c.session, c.c2
 	c.mu.Unlock()
 	c.life.end()
+	h.detach()
 	c.mgr.Close()
 	err := s.Close()
 	if rerr := c.releaseGATT(false); err == nil {

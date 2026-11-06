@@ -6,7 +6,9 @@ package ble_test
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"slices"
+	"sync"
 	"testing"
 	"testing/synctest"
 	"time"
@@ -212,5 +214,85 @@ func TestRenegotiationBoundsItsGATTCalls(t *testing.T) {
 				}
 			})
 		})
+	}
+}
+
+// recorder is a log handler that keeps each record's message.
+type recorder struct {
+	mu   sync.Mutex
+	msgs []string
+}
+
+func (r *recorder) Enabled(context.Context, slog.Level) bool { return true }
+
+func (r *recorder) Handle(_ context.Context, rec slog.Record) error {
+	r.mu.Lock()
+	r.msgs = append(r.msgs, rec.Message)
+	r.mu.Unlock()
+	return nil
+}
+
+func (r *recorder) WithAttrs([]slog.Attr) slog.Handler { return r }
+func (r *recorder) WithGroup(string) slog.Handler      { return r }
+
+func (r *recorder) seen() []string {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return slices.Clone(r.msgs)
+}
+
+// answering is a connection whose peripheral answers the handshake; it
+// keeps the C2 handler, as a GATT stack can still call it after the
+// unsubscribe.
+type answering struct {
+	silent
+	mu sync.Mutex
+	on func([]byte)
+}
+
+func (a *answering) SubscribeC2(_ context.Context, on func([]byte)) error {
+	a.mu.Lock()
+	a.on = on
+	a.mu.Unlock()
+	resp := btp.EncodeHandshakeResponse(btp.HandshakeResponse{Version: 4, ATTMTU: btp.MinimumATTMTU, WindowSize: 4})
+	go on(resp)
+	return nil
+}
+
+func (a *answering) indicate(data []byte) {
+	a.mu.Lock()
+	on := a.on
+	a.mu.Unlock()
+	on(data)
+}
+
+// answeringConnCentral connects every peripheral over conn.
+type answeringConnCentral struct {
+	silentCentral
+	conn *answering
+}
+
+func (c *answeringConnCentral) Connect(context.Context, ble.Peripheral) (ble.Connection, error) {
+	return c.conn, nil
+}
+
+// TestCloseDetachesTheC2Handler: data on C2 after Close reaches no
+// session — matter.js's close detaches the handler
+// (packages/nodejs-ble/src/NobleBleChannel.ts:1010 at 862ad75f).
+func TestCloseDetachesTheC2Handler(t *testing.T) {
+	conn := &answering{silent: silent{gone: make(chan struct{})}}
+	rec := &recorder{}
+	ch, err := ble.Dial(t.Context(), &answeringConnCentral{conn: conn}, ble.Peripheral{Address: "x"},
+		ble.DialOptions{Clock: clocktest.New(time.Unix(0, 0)), Logger: slog.New(rec)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := ch.Close(); err != nil {
+		t.Fatal(err)
+	}
+	conn.indicate([]byte{0x05, 0x00, 0x00, 0x00})
+	msgs := rec.seen()
+	if !slices.Contains(msgs, "matter.ble.c2_after_detach") || slices.Contains(msgs, "matter.btp.rx_inactive") {
+		t.Fatalf("C2 data after Close reached the session: %v", msgs)
 	}
 }
