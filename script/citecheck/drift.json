@@ -1414,6 +1414,16 @@
     "occurrences": 6
   },
   {
+    "file": "client/jcm/vendorid.go",
+    "line": 171,
+    "citation": "VendorIdVerification.ts:230-293",
+    "resolved": "packages/node/src/behaviors/operational-credentials/VendorIdVerification.ts",
+    "at": "db021da0",
+    "identifier": "verifyData",
+    "nearest": 177,
+    "occurrences": 2
+  },
+  {
     "file": "client/peer/connection.go",
     "line": 52,
     "citation": "types/src/protocol/definitions/general.ts:33",
@@ -3375,6 +3385,15 @@
     "citation": "OperationalBase.ts:92-97",
     "resolved": "packages/protocol/src/certificate/kinds/OperationalBase.ts",
     "at": "db021da0",
+    "identifier": "generalVerify",
+    "nearest": 61,
+    "occurrences": 1
+  },
+  {
+    "file": "secure/mattercert/vvsc.go",
+    "line": 34,
+    "citation": "OperationalBase.ts:91-97",
+    "resolved": "packages/protocol/src/certificate/kinds/OperationalBase.ts",
     "identifier": "generalVerify",
     "nearest": 61,
     "occurrences": 1

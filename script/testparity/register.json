@@ -3657,8 +3657,11 @@
     },
     {
       "path": "packages/node/test/behaviors/operational-credentials/VendorIdVerificationTest.ts",
-      "status": "planned",
-      "reason": "matter.js pin lift 862ad75f → db021da0 (2026-11-06): wave P4 (#433, the TCP size cap, the Sigma1 refresh schedule, delta event timestamps, the discovery state and the between-steps re-arm after #4793/#4794/#4832/#4808/#4815; the peer VID verification of #4880) ports it by meaning.",
+      "status": "ported",
+      "go": [
+        "client/jcm:TestVendorIdVerificationParity"
+      ],
+      "reason": "The six verifyData cases against client/jcm.Verify (chip's procedure with the statement path of BD-Matter-VIDStatementVerification): a conformant chain verifies; a NOC that repeats or lacks a subject attribute, an RCAC that repeats one, a VVSC that repeats its matter-vvs-id and a VVSC that fails its profile do not (an error where matter.js returns false); the statement path itself is checked end to end beyond matter.js's cases (client/jcm:TestVendorIdVerificationParity). Pin lift wave P4 (#433).",
       "snapshotSha": "42b8ce78e7007002e15da083f3657d5d1dba7204"
     },
     {
@@ -7192,11 +7195,11 @@
         "secure/mattercert:TestDecodeDNRulesPinDB021da0",
         "secure/mattercert:TestDERDistinguishedNameEdges",
         "secure/mattercert:TestVerifierConstructionAndExtractionRefusals",
-        "cluster/core:TestParityOpcreds_NonOperationalNOCNodeIDIsInvalidNodeOpID"
+        "cluster/core:TestParityOpcreds_NonOperationalNOCNodeIDIsInvalidNodeOpID",
+        "secure/mattercert:TestVVSCProfileParity"
       ],
       "missing": [
         "verifies a NOC with node ID 0xFFFF_FFEF_FFFF_FFFF, the top of the operational range",
-        "verifies a VVSC",
         "verifies a NOC with an additional key usage flag",
         "verifies a NOC whose key usage bitmap has a bit that has no name",
         "verifies an issuer DN with exactly five RDNs",
@@ -7208,14 +7211,6 @@
         "refuses a matter-vvs-id",
         "refuses a key usage flag beyond keyCertSign, cRLSign and digitalSignature",
         "accepts the optional digitalSignature flag",
-        "refuses a VVSC that is a CA",
-        "refuses a VVSC with a key usage flag besides digitalSignature",
-        "refuses a VVSC key usage bitmap with a bit that has no name",
-        "refuses a decoded VVSC whose key usage flags were changed afterwards",
-        "refuses a VVSC with an empty key usage",
-        "refuses a VVSC without digitalSignature",
-        "refuses a VVSC without a matter-vvs-id",
-        "refuses a matter-fabric-id",
         "refuses a CAT that is not eight hexadecimal digits",
         "parses a NOC with ${count} CASE Authenticated Tags",
         "refuses ${field} text that is ${name}",
@@ -7236,7 +7231,7 @@
           "reason": "the object view of a DN reading the first value; the Go DN keeps every value in Attributes, in order"
         }
       ],
-      "reason": "Pin lift db021da0, wave P1 (2026-11-06): the NOC, ICAC and RCAC rules matter.js holds at the pin that the module shares — the chain, serverAuth required of a NOC, five RDNs, a repeated Matter attribute refused in TLV and DER, the firmware signing id decoded in both and counted, matter-vvs-id refused in an operational subject, the node-id range, fabric id 0, CAT version 0 — are ported. Missing: the VVSC kind (wave P4's peer VID verification, #433), the issuer-DN limit cases, the key-usage bitmap cases (the Go RCAC check is chip's ValidateRCAC, keyCertSign required and other flags tolerated — to be weighed against matter.js's named-flags rule), the DER parsing cases of the Matter attribute text, and the missing-mandatory-attribute cases per certificate kind. Two titles ('refuses fabric ID 0', 'refuses a second matter-fabric-id' …) appear under several describes; the RCAC describe's own rows are among the missing ones named once.",
+      "reason": "Pin lift db021da0, wave P1 (2026-11-06): the NOC, ICAC and RCAC rules matter.js holds at the pin that the module shares — the chain, serverAuth required of a NOC, five RDNs, a repeated Matter attribute refused in TLV and DER, the firmware signing id decoded in both and counted, matter-vvs-id refused in an operational subject, the node-id range, fabric id 0, CAT version 0 — are ported. Pin lift wave P4 (#433): the VVSC kind — not a CA, key usage exactly digitalSignature (an unnamed bit counted), a matter-vvs-id and no node id, fabric id or CAT in the subject, also on a certificate changed after decoding (secure/mattercert:TestVVSCProfileParity, mattercert.DecodeVVSC / ValidateVVSC); its \"refuses a matter-node-id\" shares the title with the RCAC describe's, which stays missing. Missing: the issuer-DN limit cases, the key-usage bitmap cases (the Go RCAC check is chip's ValidateRCAC, keyCertSign required and other flags tolerated — to be weighed against matter.js's named-flags rule), the DER parsing cases of the Matter attribute text, and the missing-mandatory-attribute cases per certificate kind. Two titles ('refuses fabric ID 0', 'refuses a second matter-fabric-id' …) appear under several describes; the RCAC describe's own rows are among the missing ones named once.",
       "snapshotSha": "471755ea6549b21d946b85baf1dd1c48311f5de1"
     },
     {

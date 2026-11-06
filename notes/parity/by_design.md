@@ -133,6 +133,7 @@ pin lift confirms by re-reading the row, [`pin-lifts.md`](./pin-lifts.md)).
 | BD-Matter-ClientNodeEventHistory | `ClientEventEmitter.ts:45-74` emits a peer's event to the node's observers and the ChangeNotificationService and keeps none; no code under `packages/node/src/node/client/` holds past events (absence: the end of `emitClientEvent`, :72-76, where a record would go) | `packages/node/src/node/client/ClientEventEmitter.ts` | `"            });\n        }\n    }\n\n    function getTarget(node: ClientNode, occurrence: ReadResult.EventValue, clusterName: string, eventName: string) {"` | matterjs-server `packages/ws-controller/src/server/WebSocketControllerHandler.ts:112`, `:368-380` at `0bd06f22` (a global last-25 list), kept per node here (issue #388 G-C2) | no |
 | BD-Matter-LogRing | absence: the default `LogDestination` formats a message and writes it (`LogDestination.ts:77-93`, `add` → `write`), `Logger.ts` fans a message out to its destinations and keeps nothing, and no file under `packages/general/src/log/` holds past records or a run-time level a host reads back as records | `packages/general/src/log/LogDestination.ts` | `"        add(message: Diagnostic.Message) {\n            this.write(this.format(message), message);\n        },"` | matterjs-server's dashboard sets and reads the console and file levels only (`packages/dashboard/src/components/dialogs/settings/log-level-section.ts:56-82` at `0bd06f22`: `getLogLevel`/`setLogLevel`, no records); the ring is this module's own design for go-fabric-ui's operation page (issue #393, M9 U5) | no |
 | BD-chip-OccupancySensing-HoldTimer | `OccupancySensingServer.ts:76-85` clears the HoldTime dependents (:93-104) when HoldTime is unset and arms no timer (absence: the whole class body, :21-91) | `packages/node/src/behaviors/occupancy-sensing/OccupancySensingServer.ts` | `class OccupancySensingServer` | connectedhomeip `src/app/clusters/occupancy-sensor-server/OccupancySensingCluster.cpp` at `6170af84` (`SetHoldTime` :206-275, `SetOccupancy` :277-297, `TimerFired` :299-302, the aliases :151-155, :170-181, `SetHoldTimeLimits` :333-351), tests `tests/TestOccupancySensingCluster.cpp` | no |
+| BD-Matter-VIDStatementVerification | `VendorIdVerification.ts:263-271` at `db021da0` accepts a VID Verification Statement without a VVSC ("TODO Fail if not available!"), and `:232-240` leaves the path of the VVSC to a trust anchor a TODO (presence) | `packages/node/src/behaviors/operational-credentials/VendorIdVerification.ts` | `"// TODO Fail if not available!"` | the specification's procedure as matter.js quotes it at `VendorIdVerification.ts:233-240`; connectedhomeip does not support the statement (`src/credentials/jcm/VendorIdVerificationClient.cpp:103-104` at `6170af84`) | no |
 
 ---
 
@@ -6259,3 +6260,31 @@ ignored and dropped by the next save — a facade option that does nothing
 is no option. Proof: `controller/client:TestRecordIgnoresRetiredCATs`; the
 `client/peer` merge row "CATs replace" (`PeerSet.ts:321-323`) is dropped
 from `client/peer:TestParityKnownPeerMerge`'s table.
+
+### BD-Matter-VIDStatementVerification — the VID Verification Statement path fails closed where matter.js's is open
+
+matter.js `VendorIdVerification.verifyData` (`packages/node/src/behaviors/operational-credentials/VendorIdVerification.ts:230-293`
+at `db021da0`) decodes a VVSC and checks its profile (`Vvsc.ts:25-30`,
+`:45-80`), compares its SubjectKeyID with the statement's signer and checks
+the statement signature; but it accepts a statement without a VVSC
+("TODO Fail if not available!", `:263-271`), leaves the path of the VVSC
+to a trust anchor of the vendor a TODO (`:232-240`), signs over the whole
+to-be-signed message where `createStatementBytes` names the fabric binding
+message (`:282-286` against `:311-322`), and parses a 76-byte binding
+message inside the statement (`:324-339`) that chip's 85-byte statement
+(`src/crypto/CHIPCryptoPAL.h:137-141` at `6170af84`, `version ||
+signer_skid || signature`) does not carry; chip does not support the
+statement at all (`src/credentials/jcm/VendorIdVerificationClient.cpp:103-104`).
+`client/jcm.Verify` takes the statement path when `Info` carries one: the
+statement in chip's 85-byte form, appended to the to-be-signed message
+(`CHIPCryptoPAL.h:150-155`), the VVSC through `mattercert.DecodeVVSC`, the
+signer key identifier, the statement signature over `version ||
+vendor_fabric_binding_message || signer_skid`, and the VVSC signed by the
+trust anchor `TrustAnchorLookup` returns for the vendor id and the VVSC's
+AuthorityKeyID (`mattercert.VerifyVVSCIssuedBy`; an intermediate is
+refused). Each difference fails closed: a statement anyone can sign with a
+self-made VVSC would otherwise verify any vendor id. The JCM trust
+verification still refuses a statement, as chip's does. Proof:
+`client/jcm:TestVendorIdVerificationParity`; Ahead row above. Retires when
+matter.js closes its TODOs — the statement message then follows matter.js
+or is recorded against it.
