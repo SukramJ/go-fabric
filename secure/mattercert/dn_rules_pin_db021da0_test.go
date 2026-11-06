@@ -64,7 +64,7 @@ func TestDecodeDNRulesPinDB021da0(t *testing.T) {
 	for _, tc := range []struct {
 		name string
 		tag  uint8
-	}{{"node id", 17}, {"fabric id", 21}, {"icac id", 19}, {"rcac id", 20}, {"vvs id", 23}} {
+	}{{"node id", 17}, {"firmware signing id", 18}, {"fabric id", 21}, {"icac id", 19}, {"rcac id", 20}, {"vvs id", 23}} {
 		t.Run("a repeated "+tc.name+" is refused", func(t *testing.T) {
 			t.Parallel()
 			_, err := mattercert.Decode(build(func(e *tlv.Encoder) {

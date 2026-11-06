@@ -165,7 +165,7 @@ func buildTBSCert(t *testing.T, opts verifyTestCertOpts) []byte {
 	if opts.subjectRepeatNodeID {
 		e.PutUint(tlv.ContextTag(17), opts.subjectNodeID)
 	}
-	for i := 0; i < opts.subjectExtraRDNs; i++ {
+	for i := range opts.subjectExtraRDNs {
 		e.PutUTF8(tlv.ContextTag(3), fmt.Sprintf("cn%d", i)) // commonName
 	}
 	if err := e.EndContainer(); err != nil {
@@ -278,7 +278,7 @@ func buildSignedCert(t *testing.T, opts verifyTestCertOpts, priv *ecdsa.PrivateK
 	if opts.subjectRepeatNodeID {
 		e.PutUint(tlv.ContextTag(17), opts.subjectNodeID)
 	}
-	for i := 0; i < opts.subjectExtraRDNs; i++ {
+	for i := range opts.subjectExtraRDNs {
 		e.PutUTF8(tlv.ContextTag(3), fmt.Sprintf("cn%d", i)) // serialNumber (tag 3), a standard attribute
 	}
 	if err := e.EndContainer(); err != nil {
