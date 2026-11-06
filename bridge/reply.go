@@ -240,8 +240,16 @@ func (b *Bridge) sendReplyTimed(
 	}
 	// Bridge's source-node-id is its own ephemeral until CASE
 	// installs an operational identity. For SessionID==0 (PASE
-	// pre-fabric) we leave HasSourceNodeID=false; the peer doesn't
-	// gate on it for unsecured traffic per spec §4.4.1.1.
+	// pre-fabric) HasSourceNodeID stays false while the peer named a
+	// source — the reply then carries the destination alone. A peer
+	// that addressed us by node id without a source (the responder of a
+	// CASE the bridge initiated, bridge/case_initiator.go) gets that id
+	// back as our source: an unsecured message carries exactly one of
+	// the two node ids (matter.js MessageCodec.ts:234-239 at db021da0).
+	if requestHdr.SessionID == 0 && !requestHdr.HasSourceNodeID && requestHdr.DestSize == message.DestNodeID {
+		respHdr.HasSourceNodeID = true
+		respHdr.SourceNodeID = requestHdr.DestNodeID
+	}
 
 	if requestHdr.SessionID == 0 {
 		respHdr.SessionID = 0

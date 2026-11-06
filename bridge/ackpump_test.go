@@ -192,27 +192,31 @@ func TestAckPump_EchoesPeerSourceNodeID(t *testing.T) {
 // HasSourceNodeID on the inbound message, the StandaloneAck stays
 // bare-header (DestSize=DestNone). Matches the sendReply behaviour
 // for plain unsecured replies.
-func TestAckPump_NoEchoWhenPeerHadNoSourceNodeID(t *testing.T) {
+// TestAckPump_SourceFromTheInboundDestination: a peer that addressed the
+// bridge by node id without naming a source — the responder of a CASE the
+// bridge initiated — gets its StandaloneAck from that node id as the
+// source, so the unsecured acknowledgement carries exactly one node id
+// (matter.js MessageCodec.ts:234-239 at db021da0, "Unsecured message must
+// have either a source or a destination node id"; the bridge's own parser
+// refuses the other shapes with ErrUnsecuredNodeIDs).
+func TestAckPump_SourceFromTheInboundDestination(t *testing.T) {
 	t.Parallel()
 	b := newStartedBridge(t)
 	tracker := mrp.NewAckTracker(0)
 	b.AttachAckTracker(tracker)
-
 	peerConn, peerAddr := openPeerSocket(t)
 	defer peerConn.Close()
-
 	const (
 		exchangeID uint16 = 22
 		msgCounter uint32 = 0xBEEF
+		ourNodeID  uint64 = 0x1122334455667788
 	)
 	proto := buildNeedsAckProto(exchangeID, msgCounter)
-	hdr := &message.Header{SessionID: 0, MessageCounter: msgCounter} // no source node id
-
+	hdr := &message.Header{SessionID: 0, MessageCounter: msgCounter, DestSize: message.DestNodeID, DestNodeID: ourNodeID}
 	b.owedInboundAck(peerAddr, hdr, proto)
 	if n := b.RunAckPumpOnce(time.Now()); n != 1 {
 		t.Fatalf("RunAckPumpOnce: want 1, got %d", n)
 	}
-
 	if err := peerConn.SetReadDeadline(time.Now().Add(200 * time.Millisecond)); err != nil {
 		t.Fatalf("SetReadDeadline: %v", err)
 	}
@@ -221,15 +225,12 @@ func TestAckPump_NoEchoWhenPeerHadNoSourceNodeID(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ReadFromUDP: %v", err)
 	}
-	// The bare acknowledgement carries neither node id, a shape
-	// UnmarshalHeader now refuses (ErrUnsecuredNodeIDs, matter.js
-	// MessageCodec.ts:234-239 at db021da0), so the DSIZ bits are read
-	// from the message-flags byte directly.
-	if nRead < 1 {
-		t.Fatal("empty StandaloneAck datagram")
+	ack, _, err := message.UnmarshalHeader(buf[:nRead])
+	if err != nil {
+		t.Fatalf("UnmarshalHeader: %v", err)
 	}
-	if got := message.DestSize(buf[0] & 0x03); got != message.DestNone {
-		t.Errorf("DestSize = %d, want DestNone(%d)", got, message.DestNone)
+	if !ack.HasSourceNodeID || ack.SourceNodeID != ourNodeID || ack.DestSize != message.DestNone {
+		t.Errorf("ack header = %+v, want source %#x and no destination", ack, ourNodeID)
 	}
 }
 

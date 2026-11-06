@@ -58,6 +58,11 @@ func (h Header) MarshalPacket() ([]byte, error) {
 	if h.SessionType == SessionUnsecured && h.DestSize == DestGroup {
 		return nil, ErrUnicastGroupDestination
 	}
+	if h.SessionType == SessionUnsecured && h.SessionID == 0 && h.HasSourceNodeID == (h.DestSize == DestNodeID) {
+		// The decoder's rule (UnmarshalHeader, ErrUnsecuredNodeIDs) on the
+		// way out: a peer at matter.js db021da0 drops such a datagram.
+		return nil, ErrUnsecuredNodeIDs
+	}
 	return h.Marshal(), nil
 }
 
