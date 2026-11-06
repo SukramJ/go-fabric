@@ -165,10 +165,11 @@ var hostCases = map[uint32]hostCase{
 	h_lock.ClusterID:    {kit: kitOf[*lock.DoorLockServer](), host: hostOf[h_lock.Host](h_lock.Wrap), covered: []string{"ReportAlarm", "SetLockState", "User"}},
 	h_wc.ClusterID:      {kit: kitOf[*cover.WindowCoveringServer](), covered: []string{"SetCurrentPosition", "SetOperationalStatus", "SetTargetPosition"}},
 	h_thermostat.ClusterID: {kit: kitOf[*thermo.ThermostatServer](), covered: []string{
-		"ActivePresetHandle", "ActiveScheduleHandle", "Presets", "Schedules",
+		"ActivePresetHandle", "ActiveScheduleHandle", "CurrentSuggestion", "Presets", "Schedules",
 		"SetAbsoluteSetpointLimit", "SetActivePresetHandle", "SetActiveScheduleHandle", "SetLocalTemperature",
 		"SetOccupied", "SetOccupiedCoolingSetpoint", "SetOccupiedHeatingSetpoint", "SetPresets", "SetSchedules",
 		"SetSystemMode", "SetTemperatureSetpointHold", "SetThermostatRunningMode", "SetThermostatRunningState",
+		"Suggestions",
 	}},
 	h_color.ClusterID:  {kit: kitOf[*light.ColorControlServer](), covered: []string{"Color", "Set", "SetColorWriter", "SetScenes", "SetWriter", "SyncColorTemperatureWithLevel"}},
 	h_eco.ClusterID:    {kit: kitOf[*core.EcosystemInformation](), host: hostOf[h_eco.Host](h_eco.Wrap)},
