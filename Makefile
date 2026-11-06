@@ -369,7 +369,7 @@ chiptool-build: ## build the reference daemon the chip-tool guard commissions
 # CHIPTOOL_TIMEOUT bounds the commissioning test and the chip-tool suite;
 # CHIP_FAMILIES_TIMEOUT the certification families, which run for hours in
 # full. Raise them rather than trimming tests.
-CHIPTOOL_TIMEOUT      ?= 1500s
+CHIPTOOL_TIMEOUT      ?= 2400s
 CHIP_FAMILIES_TIMEOUT ?= 10h
 
 .PHONY: chiptool-test

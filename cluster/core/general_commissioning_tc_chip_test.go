@@ -17,6 +17,7 @@ import (
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/store"
+	"github.com/SukramJ/go-fabric/surface"
 )
 
 // The TermsAndConditions feature after connectedhomeip
@@ -460,5 +461,18 @@ func TestGencommTerms_StoreErrors(t *testing.T) {
 	resp, err := ok.MatterInvoke(caseCtx(), gencommdef.CmdSetTcAcknowledgements, &gencommdef.SetTcAcknowledgementsRequest{TcVersion: 1, TcUserResponse: 1})
 	if err != nil || resp.(gencommdef.SetTcAcknowledgementsResponse).ErrorCode != gencommdef.CommissioningErrorOk {
 		t.Fatalf("pointer request: %v / %v", resp, err)
+	}
+}
+
+// The register row the feature implements is declared by the server's
+// AheadSet (cluster/core/ahead.go), so the node tags the TC bit with it.
+func TestGencommTerms_AheadRow(t *testing.T) {
+	t.Parallel()
+	const row = "BD-chip-GeneralCommissioning-TermsAndConditions"
+	if got := core.GeneralCommissioningAhead.Row(surface.KindFeature, uint32(gencommdef.FeatureTermsAndConditions)); got != row {
+		t.Fatalf("Row(TC) = %q, want %q", got, row)
+	}
+	if ids := core.GeneralCommissioningAhead.IDs(); len(ids) != 1 || ids[0] != row {
+		t.Fatalf("IDs() = %v", ids)
 	}
 }
