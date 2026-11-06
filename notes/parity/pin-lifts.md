@@ -52,7 +52,14 @@ its marker is re-read at the new pin. Every other marker holds. Also
 caught up outside the register: `BD-Matter-CaseInitiatorPeerCATs` (#4884,
 the initiator takes the responder's CATs from its NOC, `CaseClient.ts:282-290`).
 
-Citations that resolve at the pin moved with seven files; re-read and
+Citations that resolve at the pin — the bare `path:line` form without an
+`at <sha>` — now resolve at db021da0: 18 pointed beyond the end of a
+shrunken file (hard errors) and were re-read and updated, and the drift
+count of `make cite-check` rose from 253 to 419 (`citecheckDriftRatchet`
+raised in the lift's commit: a citation whose line moved without changing
+what it says drifts, and a lift moves many at once; the drift is worked
+off citation by citation as the files are touched, never by a sweep).
+The 18 hard errors: seven files; re-read and
 updated (`ServerBehaviorBacking.ts` quiet subscription `:251-259` /
 `#configureEventSuppression` `:223-262`, `PeerExchangeProvider.ts:19-159`
 / `:150-158`, `validateNocTagList` now `Noc.ts:116`, the CADMIN flows in
