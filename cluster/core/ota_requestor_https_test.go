@@ -184,23 +184,59 @@ func TestOTARequestorHTTPS_Download(t *testing.T) {
 	}
 }
 
-// TestOTARequestorHTTPS_Redirect: the GET follows a redirect as fetch does;
-// the client's own policy decides.
+// TestOTARequestorHTTPS_Redirect: the module's client (HTTPClient nil)
+// follows a redirect to an https:// target as fetch does, and refuses one
+// to http://, which fetch would follow: an otaDownloadError carrying the
+// redirect's status (BD-Matter-OTARequestor-HTTPS). A host's client keeps
+// its own policy and follows it.
 func TestOTARequestorHTTPS_Redirect(t *testing.T) {
 	t.Parallel()
-	var img []byte
-	s := newOtaHTTPSServer(t, func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/image.ota" {
-			http.Redirect(w, r, "/moved.ota", http.StatusFound)
-			return
-		}
-		imageHandler(img, true)(w, r)
-	})
-	h := newHTTPSHarness(t, s, nil)
-	img = h.image(2)
-	h.r.performUpdateQuery(context.Background())
-	if s.hits.Load() != 2 || len(h.applier.applied) != 1 {
-		t.Fatalf("%d requests, applied %v", s.hits.Load(), h.applier.applied)
+	for name, tc := range map[string]struct {
+		toPlain, hostClient bool
+	}{
+		"https":             {},
+		"http-refused":      {toPlain: true},
+		"http-host-follows": {toPlain: true, hostClient: true},
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			var img []byte
+			var plainHits atomic.Int32
+			plain := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				plainHits.Add(1)
+				imageHandler(img, true)(w, r)
+			}))
+			t.Cleanup(plain.Close)
+			s := newOtaHTTPSServer(t, func(w http.ResponseWriter, r *http.Request) {
+				switch {
+				case r.URL.Path != "/image.ota":
+					imageHandler(img, true)(w, r)
+				case tc.toPlain:
+					http.Redirect(w, r, plain.URL+"/image.ota", http.StatusFound)
+				default:
+					http.Redirect(w, r, "/moved.ota", http.StatusFound)
+				}
+			})
+			h := newHTTPSHarness(t, s, func(c *OTARequestorConfig) {
+				if !tc.hostClient {
+					// The module's client, over a transport that trusts the
+					// test server's certificate.
+					c.HTTPClient = otaDefaultHTTPClient(s.srv.Client().Transport)
+				}
+			})
+			img = h.image(2)
+			h.r.performUpdateQuery(context.Background())
+			if tc.toPlain && !tc.hostClient {
+				h.failedDownload(t, http.StatusFound, 0)
+				if plainHits.Load() != 0 {
+					t.Fatal("the http:// target was requested")
+				}
+				return
+			}
+			if len(h.applier.applied) != 1 || s.hits.Load()+plainHits.Load() != 2 {
+				t.Fatalf("%d+%d requests, applied %v", s.hits.Load(), plainHits.Load(), h.applier.applied)
+			}
+		})
 	}
 }
 
@@ -251,13 +287,13 @@ func TestOTARequestorHTTPS_SizeCap(t *testing.T) {
 	}
 }
 
-// TestOTARequestorHTTPS_Timeout: a download still running after
-// HTTPSTimeout on the requestor's clock fails — with the status and the
+// TestOTARequestorHTTPS_Stall: a download that receives nothing for
+// HTTPSIdleTimeout on the requestor's clock fails — with the status and the
 // bytes received once the answer began, with UpdateState Unknown's value
-// before (BD-Matter-OTARequestor-HTTPS).
-func TestOTARequestorHTTPS_Timeout(t *testing.T) {
+// while it waits for the response (BD-Matter-OTARequestor-HTTPS).
+func TestOTARequestorHTTPS_Stall(t *testing.T) {
 	t.Parallel()
-	const timeout = 7 * time.Minute
+	const timeout = 45 * time.Second
 	// The answer states 100 bytes and sends 99: progress reads 98 % only
 	// once all 99 arrived (:1066).
 	const part = 99
@@ -277,7 +313,7 @@ func TestOTARequestorHTTPS_Timeout(t *testing.T) {
 				}
 			})
 			t.Cleanup(func() { close(release) }) // before the server's Close, which waits for the handler
-			h := newHTTPSHarness(t, s, func(c *OTARequestorConfig) { c.HTTPSTimeout = timeout })
+			h := newHTTPSHarness(t, s, func(c *OTARequestorConfig) { c.HTTPSIdleTimeout = timeout })
 
 			done := make(chan struct{})
 			go func() {
@@ -306,7 +342,7 @@ func TestOTARequestorHTTPS_Timeout(t *testing.T) {
 			select {
 			case <-done:
 			case <-ctx.Done():
-				t.Fatal("the timeout did not end the download")
+				t.Fatal("the stall did not end the download")
 			}
 			if began {
 				h.failedDownload(t, http.StatusOK, part)
@@ -314,6 +350,68 @@ func TestOTARequestorHTTPS_Timeout(t *testing.T) {
 				h.failedDownload(t, int64(otadef.UpdateStateUnknown), 0)
 			}
 		})
+	}
+}
+
+// TestOTARequestorHTTPS_SlowButSteady: the idle timeout bounds no total
+// time — a download that waits just under it for the response and again
+// inside the body finishes after more than the timeout in all.
+func TestOTARequestorHTTPS_SlowButSteady(t *testing.T) {
+	t.Parallel()
+	const idle = 45 * time.Second
+	var img []byte
+	first, next := make(chan struct{}), make(chan struct{})
+	s := newOtaHTTPSServer(t, func(w http.ResponseWriter, r *http.Request) {
+		for _, gate := range []chan struct{}{first, next} {
+			select {
+			case <-gate:
+			case <-r.Context().Done():
+				return
+			}
+			if gate == first {
+				w.Header().Set("Content-Length", strconv.Itoa(len(img)))
+				_, _ = w.Write(img[:len(img)/2])
+				w.(http.Flusher).Flush() //nolint:forcetypeassert // httptest's writer flushes
+			}
+		}
+		_, _ = w.Write(img[len(img)/2:])
+	})
+	h := newHTTPSHarness(t, s, func(c *OTARequestorConfig) { c.HTTPSIdleTimeout = idle })
+	img = h.image(2)
+	start := h.clock.Now()
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		h.r.performUpdateQuery(context.Background())
+	}()
+	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+	defer cancel()
+	waitFor := func(what string, ok func() bool) {
+		t.Helper()
+		for !ok() || !slices.Contains(h.clock.pending(), idle) {
+			if ctx.Err() != nil {
+				t.Fatalf("never %s", what)
+			}
+			h.clock.Yield()
+		}
+	}
+	waitFor("requested", func() bool { return s.hits.Load() == 1 })
+	h.clock.advance(idle - time.Second)
+	close(first)
+	waitFor("half received", func() bool { p, ok := h.progressValue(); return ok && p == 49 })
+	h.clock.advance(idle - time.Second)
+	close(next)
+	select {
+	case <-done:
+	case <-ctx.Done():
+		t.Fatal("the download did not finish")
+	}
+	if len(h.applier.applied) != 1 || len(h.downloadErrors()) != 0 {
+		t.Fatalf("applied %v, DownloadError %+v", h.applier.applied, h.downloadErrors())
+	}
+	if took := h.clock.Now().Sub(start); took <= idle {
+		t.Fatalf("took %v, not past the idle timeout", took)
 	}
 }
 
@@ -430,11 +528,30 @@ func TestOTARequestorHTTPS_Config(t *testing.T) {
 		t.Fatal(err)
 	}
 	list[1] = DownloadProtocolBDXSynchronous
-	if r.cfg.TransferProtocols[1] != DownloadProtocolHTTPS || r.cfg.HTTPClient != http.DefaultClient ||
-		r.cfg.HTTPSMaxImageSize != defaultOtaHTTPSMaxImageSize || r.cfg.HTTPSTimeout != defaultOtaHTTPSTimeout {
+	hc, ok := r.cfg.HTTPClient.(*http.Client)
+	if r.cfg.TransferProtocols[1] != DownloadProtocolHTTPS || !ok || hc.Transport != nil || hc.CheckRedirect == nil ||
+		r.cfg.HTTPSMaxImageSize != defaultOtaHTTPSMaxImageSize || r.cfg.HTTPSIdleTimeout != defaultOtaHTTPSIdleTimeout {
 		t.Fatalf("config %+v", r.cfg)
 	}
-	if !errors.Is(&otaFetchRejected{cause: errOtaHTTPSTimeout}, errOtaHTTPSTimeout) {
+	if !errors.Is(&otaFetchRejected{cause: errOtaHTTPSStalled}, errOtaHTTPSStalled) {
 		t.Fatal("otaFetchRejected does not unwrap")
+	}
+
+	// The module's redirect policy: https:// targets, ten at most.
+	req := func(raw string) *http.Request {
+		q, err := http.NewRequest(http.MethodGet, raw, http.NoBody)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return q
+	}
+	if err := otaCheckRedirect(req("https://a.example/x"), make([]*http.Request, 9)); err != nil {
+		t.Fatal(err)
+	}
+	if err := otaCheckRedirect(req("https://a.example/x"), make([]*http.Request, 10)); err == nil {
+		t.Fatal("an eleventh redirect followed")
+	}
+	if err := otaCheckRedirect(req("http://a.example/x"), nil); !errors.Is(err, errOtaHTTPSRedirectScheme) {
+		t.Fatalf("http:// target: %v", err)
 	}
 }

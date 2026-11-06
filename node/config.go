@@ -522,12 +522,15 @@ type OTAConfig struct {
 	// alone. Add [OTADownloadHTTPS] only where the node reaches the image
 	// hosts.
 	TransferProtocols []OTADownloadProtocol
-	// HTTPClient sends an HTTPS download's GET; nil is http.DefaultClient.
+	// HTTPClient sends an HTTPS download's GET; nil is the module's client,
+	// which follows a redirect only to an https:// target. A host's client
+	// keeps its own redirect policy (mattercore.OTARequestorConfig).
 	HTTPClient OTAHTTPClient
-	// HTTPSMaxImageSize and HTTPSTimeout bound an HTTPS download; 0 is
-	// 256 MiB and 10 minutes (mattercore.OTARequestorConfig).
+	// HTTPSMaxImageSize caps an HTTPS download, HTTPSIdleTimeout the time it
+	// may receive nothing; 0 is 256 MiB and 60 seconds
+	// (mattercore.OTARequestorConfig).
 	HTTPSMaxImageSize int64
-	HTTPSTimeout      time.Duration
+	HTTPSIdleTimeout  time.Duration
 }
 
 // ErrInvalidConfig wraps every [Config.Validate] failure.

@@ -128,17 +128,21 @@ type OTARequestorConfig struct {
 	// without [DownloadProtocolBDXSynchronous] does not conform; another
 	// protocol is refused.
 	TransferProtocols []DownloadProtocol
-	// HTTPClient sends the GET of an HTTPS download; nil is
-	// http.DefaultClient. A host restricts egress here — proxy, TLS roots,
-	// redirect policy; *http.Client implements it.
+	// HTTPClient sends the GET of an HTTPS download; *http.Client
+	// implements it. nil is the module's client: http.DefaultTransport,
+	// and a redirect followed only to an https:// target, ten at most. A
+	// host's client — proxy, TLS roots — keeps its own redirect policy,
+	// so the https-only rule is the host's to set there.
 	HTTPClient OtaHTTPClient
 	// HTTPSMaxImageSize caps the bytes an HTTPS download takes; 0 is
 	// 256 MiB. A larger answer fails the download.
 	HTTPSMaxImageSize int64
-	// HTTPSTimeout bounds an HTTPS download from the request to the last
-	// byte, on TimeSource; 0 is 10 minutes. A download still running then
-	// fails.
-	HTTPSTimeout time.Duration
+	// HTTPSIdleTimeout is how long an HTTPS download may receive nothing —
+	// from the request to the response, and between two reads of its body
+	// — on TimeSource; 0 is 60 seconds. A download stalled that long
+	// fails. It bounds no total time: a slow link that keeps delivering
+	// finishes.
+	HTTPSIdleTimeout time.Duration
 	// UpdateQueryInterval is how often a provider is queried (:1365,
 	// default 24 h).
 	UpdateQueryInterval time.Duration
@@ -192,7 +196,10 @@ const (
 
 // OtaHTTPClient sends the GET of an HTTPS download (matter.js's fetch,
 // :1009); *http.Client implements it. The request carries the download's
-// context, which ends at [OTARequestorConfig].HTTPSTimeout.
+// context, which ends when the download stalls for
+// [OTARequestorConfig].HTTPSIdleTimeout. Its redirect policy is its own:
+// only the module's client, used when [OTARequestorConfig].HTTPClient is
+// nil, refuses a redirect to a target other than https://.
 type OtaHTTPClient interface {
 	Do(req *http.Request) (*http.Response, error)
 }
@@ -300,7 +307,7 @@ const (
 // (BD-Matter-OTARequestor-HTTPS); [OTARequestorConfig] overrides both.
 const (
 	defaultOtaHTTPSMaxImageSize = 256 << 20
-	defaultOtaHTTPSTimeout      = 10 * time.Minute
+	defaultOtaHTTPSIdleTimeout  = 60 * time.Second
 )
 
 // scheduleReason is ScheduleReason (:89-95).
@@ -387,13 +394,13 @@ func NewOTASoftwareUpdateRequestor(cfg OTARequestorConfig) (*OTASoftwareUpdateRe
 		cfg.TransferProtocols = slices.Clone(cfg.TransferProtocols)
 	}
 	if cfg.HTTPClient == nil {
-		cfg.HTTPClient = http.DefaultClient
+		cfg.HTTPClient = otaDefaultHTTPClient(nil)
 	}
 	if cfg.HTTPSMaxImageSize <= 0 {
 		cfg.HTTPSMaxImageSize = defaultOtaHTTPSMaxImageSize
 	}
-	if cfg.HTTPSTimeout <= 0 {
-		cfg.HTTPSTimeout = defaultOtaHTTPSTimeout
+	if cfg.HTTPSIdleTimeout <= 0 {
+		cfg.HTTPSIdleTimeout = defaultOtaHTTPSIdleTimeout
 	}
 	r := &OTASoftwareUpdateRequestor{
 		Instance:       otaRequestorInst,

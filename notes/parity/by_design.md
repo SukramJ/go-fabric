@@ -2321,7 +2321,7 @@ host directory for its blob store. The HTTPS download is
 `BD-Matter-OTARequestor-HTTPS`. Retire the `spec.Instance` half when
 `spec.Server` learns fabric-scoped attributes.
 
-### BD-Matter-OTARequestor-HTTPS — the HTTPS download is opt-in as in matter.js, and bounded in size and time where matter.js's `fetch` is not
+### BD-Matter-OTARequestor-HTTPS — the HTTPS download is opt-in as in matter.js, bounded in size and stall time where matter.js's `fetch` is not, and the module's client refuses a redirect to `http://`
 
 matter.js's requestor announces `transferProtocolsSupported`, BDX
 synchronous by default — "HTTPS can be added as protocol as well"
@@ -2335,28 +2335,38 @@ Content-Length, a failure while streaming being an `OtaDownloadError` with
 the status and the bytes received (`:1052-1060`). `cluster/core`'s
 requestor does the same, opt-in through `OTARequestorConfig.TransferProtocols`
 (`node.OTAConfig.TransferProtocols`; empty is BDX alone), the GET through
-the host's `OtaHTTPClient` (nil is `http.DefaultClient`), the body through
-the BDX path's `bdx.FileSink` temporary file, then `validateUpdateFile`.
-Two deviations: `HTTPSMaxImageSize` (default 256 MiB; a Content-Length
-above it fails before the body is read, a chunked answer after the bytes up
-to it) and `HTTPSTimeout` (default 10 minutes on the requestor's clock,
-from the request to the last byte). Each fails the download as an
-`otaDownloadError` — DownloadError, Idle with Failure — carrying the status,
-or before a response UpdateState Unknown's value (0) as the BDX path does.
+an `OtaHTTPClient` (nil is the module's client over
+`http.DefaultTransport`), the body through the BDX path's `bdx.FileSink`
+temporary file, then `validateUpdateFile`. Three deviations:
+`HTTPSMaxImageSize` (default 256 MiB; a Content-Length above it fails
+before the body is read, a chunked answer after the bytes up to it);
+`HTTPSIdleTimeout` (default 60 seconds on the requestor's clock: no byte
+received for that long — waiting for the response or between two reads of
+the body — is a stall; no total time is bounded, owner decision
+2026-11-06, since a total timeout couples the image size to the link
+speed); and the module's client refusing a redirect whose target is not
+`https://` (`otaCheckRedirect`, at most ten redirects as `net/http`'s
+default, `net/http/client.go` "stopped after 10 redirects"), which `fetch`
+would follow (owner decision 2026-11-06: the requestor refuses an `http://`
+image URI, and `validateUpdateFile` checks no signature, so a downgrade
+must not reach the image either). A host's `OtaHTTPClient` keeps its own
+redirect policy. Each deviation fails the download as an `otaDownloadError`
+— DownloadError, Idle with Failure — whose code is the status of the last
+response (for a refused redirect the redirect's, which `net/http` returns
+with the error), or before a response UpdateState Unknown's value (0) as
+the BDX path uses.
 A GET that gets no response mirrors matter.js: `fetch` rejects with an
 error that is no `MatterError`, `MatterError.accept` rethrows it (`:925`)
 to `#queryForUpdate`'s handler (`:632-640`), and the provider counts as
-without update, with no DownloadError. Redirects follow the client's
-policy, as `fetch` follows them (Go's default client stops after ten,
-`net/http/client.go` "stopped after 10 redirects"); no scheme policy is
-added for a redirect target. matter.js has no test of the HTTPS branch at
+without update, with no DownloadError. matter.js has no test of the HTTPS branch at
 the pin — `packages/node/test/behaviors/ota/OtaTest.ts:65-84` mocks `fetch`
 only for the DCL endpoints — so its code is the parity case, held by
 `cluster/core/ota_requestor_https_test.go` (`TestOTARequestorHTTPS_*`,
 `httptest` over TLS). Reasoning: the image comes from a host on the open
 network, not from a fabric peer, so a hostile or broken host must neither
-fill the download directory nor hold the requestor in Downloading; a host
-that needs more raises either bound.
+fill the download directory nor hold the requestor in Downloading, and a
+redirect must not lower the transport below the URI the requestor accepted;
+a host that needs more raises either bound or supplies its own client.
 
 ### BD-Matter-OTARequestor-AnnouncementAnsweredAtOnce — an AnnounceOTAProvider that arrives during a query is answered at once and handled when the query ends
 

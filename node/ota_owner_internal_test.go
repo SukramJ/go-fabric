@@ -62,7 +62,7 @@ func TestBuildOtaRequestorTransferProtocols(t *testing.T) {
 	build := func(protocols ...OTADownloadProtocol) error {
 		cfg := &Config{OTA: &OTAConfig{
 			Dir: filepath.Join(t.TempDir(), "ota"), Applier: nopOTAApplier{},
-			TransferProtocols: protocols, HTTPClient: http.DefaultClient, HTTPSMaxImageSize: 1 << 20, HTTPSTimeout: time.Minute,
+			TransferProtocols: protocols, HTTPClient: http.DefaultClient, HTTPSMaxImageSize: 1 << 20, HTTPSIdleTimeout: time.Minute,
 		}}
 		_, _, err := buildOtaRequestor(cfg, nil, &mattercore.BasicInformation{})
 		return err
