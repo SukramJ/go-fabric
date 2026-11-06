@@ -561,7 +561,10 @@ func (n *Node) fabricRemoved(ctx context.Context, fabricIndex uint8) {
 	// The last fabric's removal resets the terms-and-conditions acceptance
 	// (GeneralCommissioningCluster.cpp:357-374 at 6170af84).
 	if srv := n.root.GeneralCommissioning; srv != nil {
-		if fabrics, err := n.st.ListFabrics(ctx); err == nil && len(fabrics) == 0 {
+		switch fabrics, err := n.st.ListFabrics(ctx); {
+		case err != nil:
+			n.logger.Warn("node.terms.reset", slog.Any("err", err))
+		case len(fabrics) == 0:
 			if err := srv.LastFabricRemoved(ctx); err != nil {
 				n.logger.Warn("node.terms.reset", slog.Any("err", err))
 			}

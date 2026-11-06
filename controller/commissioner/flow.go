@@ -697,9 +697,10 @@ func (f *flow) configureRegulatoryInformation(ctx context.Context) (stepResult, 
 const StepTermsAndConditions = "GeneralCommissioning.ConfigureTCAcknowledgements"
 
 // configureTermsAndConditions is connectedhomeip's
-// kConfigureTCAcknowledgments stage (AutoCommissioner.cpp:485-487 after
-// the regulatory configuration; CHIPDeviceController.cpp:3946-3970 at
-// 6170af84): skipped without the acknowledgement, otherwise
+// kConfigureTCAcknowledgments stage (AutoCommissioner.cpp:485-487, between
+// the regulatory configuration and the UTC time; CHIPDeviceController.cpp:3946-3970
+// at 6170af84) — numbered 8.3 here because 8.2 keeps matter.js's
+// SynchronizeTime stub, which does nothing: skipped without the acknowledgement, otherwise
 // SetTCAcknowledgements with the acknowledged version and bits, whose
 // error code fails the commissioning as any GeneralCommissioning
 // command's does.

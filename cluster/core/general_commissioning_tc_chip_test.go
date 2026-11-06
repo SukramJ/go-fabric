@@ -35,7 +35,7 @@ type settingsFake struct {
 
 func newSettingsFake() *settingsFake { return &settingsFake{kv: map[string]string{}} }
 
-func (f *settingsFake) GetSetting(_ context.Context, key string) (string, bool, error) {
+func (f *settingsFake) GetSetting(_ context.Context, key string) (value string, ok bool, err error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	v, ok := f.kv[key]
@@ -59,7 +59,7 @@ func (f *settingsFake) DeleteSetting(_ context.Context, key string) error {
 	return f.fail
 }
 
-func (f *settingsFake) GetMetadataCounter(context.Context, string) (uint64, bool, error) {
+func (f *settingsFake) GetMetadataCounter(context.Context, string) (value uint64, ok bool, err error) {
 	return 0, false, nil
 }
 
@@ -113,7 +113,7 @@ func readBool(t *testing.T, gc *core.GeneralCommissioning, attr uint32) bool {
 	return b
 }
 
-func setTerms(t *testing.T, gc *core.GeneralCommissioning, ctx context.Context, version, acks uint16) gencommdef.CommissioningErrorEnum {
+func setTerms(ctx context.Context, t *testing.T, gc *core.GeneralCommissioning, version, acks uint16) gencommdef.CommissioningErrorEnum {
 	t.Helper()
 	resp, err := gc.MatterInvoke(ctx, gencommdef.CmdSetTcAcknowledgements, gencommdef.SetTcAcknowledgementsRequest{TcVersion: version, TcUserResponse: acks})
 	if err != nil {
@@ -122,7 +122,7 @@ func setTerms(t *testing.T, gc *core.GeneralCommissioning, ctx context.Context, 
 	return resp.(gencommdef.SetTcAcknowledgementsResponse).ErrorCode
 }
 
-func armFailSafe(t *testing.T, gc *core.GeneralCommissioning, ctx context.Context, seconds uint16) {
+func armFailSafe(ctx context.Context, t *testing.T, gc *core.GeneralCommissioning, seconds uint16) {
 	t.Helper()
 	resp, err := gc.MatterInvoke(ctx, gencommdef.CmdArmFailSafe, core.ArmFailSafeRequest{ExpiryLengthSeconds: seconds})
 	if err != nil {
@@ -133,7 +133,7 @@ func armFailSafe(t *testing.T, gc *core.GeneralCommissioning, ctx context.Contex
 	}
 }
 
-func commissioningComplete(t *testing.T, gc *core.GeneralCommissioning, ctx context.Context) uint8 {
+func commissioningComplete(ctx context.Context, t *testing.T, gc *core.GeneralCommissioning) uint8 {
 	t.Helper()
 	resp, err := gc.MatterInvoke(ctx, gencommdef.CmdCommissioningComplete, nil)
 	if err != nil {
@@ -229,8 +229,8 @@ func TestGencommTerms_AcceptanceCommitsAtCommissioningComplete(t *testing.T) {
 		changed = append(changed, c.Attributes...)
 	})
 	ctx := caseCtx()
-	armFailSafe(t, gc, ctx, 60)
-	if code := setTerms(t, gc, ctx, 1, 1); code != gencommdef.CommissioningErrorOk {
+	armFailSafe(ctx, t, gc, 60)
+	if code := setTerms(ctx, t, gc, 1, 1); code != gencommdef.CommissioningErrorOk {
 		t.Fatalf("SetTCAcknowledgements = %d, want OK", code)
 	}
 	if readBool(t, gc, gencommdef.AttrTcAcknowledgementsRequired) {
@@ -239,7 +239,7 @@ func TestGencommTerms_AcceptanceCommitsAtCommissioningComplete(t *testing.T) {
 	if _, ok := st.kv[store.SettingTermsAcceptance]; ok {
 		t.Fatal("a tentative acceptance was persisted before CommissioningComplete")
 	}
-	if code := commissioningComplete(t, gc, ctx); code != core.CommissioningErrorOK {
+	if code := commissioningComplete(ctx, t, gc); code != core.CommissioningErrorOK {
 		t.Fatalf("CommissioningComplete = %d, want OK", code)
 	}
 	if got := readUint16(t, gc, gencommdef.AttrTcAcceptedVersion); got != 1 {
@@ -263,8 +263,8 @@ func TestGencommTerms_CommissioningCompleteWithoutAcceptance(t *testing.T) {
 	t.Parallel()
 	gc := newTermsGencomm(t, newSettingsFake(), nil)
 	ctx := caseCtx()
-	armFailSafe(t, gc, ctx, 60)
-	if code := commissioningComplete(t, gc, ctx); code != uint8(gencommdef.CommissioningErrorTcAcknowledgementsNotReceived) {
+	armFailSafe(ctx, t, gc, 60)
+	if code := commissioningComplete(ctx, t, gc); code != uint8(gencommdef.CommissioningErrorTcAcknowledgementsNotReceived) {
 		t.Fatalf("CommissioningComplete = %d, want TCAcknowledgementsNotReceived (6)", code)
 	}
 	if !gc.FailSafeArmed() {
@@ -280,31 +280,31 @@ func TestGencommTerms_InvalidAcceptanceIsRefused(t *testing.T) {
 	t.Parallel()
 	gc := newTermsGencomm(t, newSettingsFake(), nil)
 	ctx := caseCtx()
-	armFailSafe(t, gc, ctx, 60)
-	if code := setTerms(t, gc, ctx, 0, 0xFFFF); code != gencommdef.CommissioningErrorTcMinVersionNotMet {
+	armFailSafe(ctx, t, gc, 60)
+	if code := setTerms(ctx, t, gc, 0, 0xFFFF); code != gencommdef.CommissioningErrorTcMinVersionNotMet {
 		t.Fatalf("version 0: %d, want TCMinVersionNotMet (7)", code)
 	}
-	if code := setTerms(t, gc, ctx, 1, 0); code != gencommdef.CommissioningErrorRequiredTcNotAccepted {
+	if code := setTerms(ctx, t, gc, 1, 0); code != gencommdef.CommissioningErrorRequiredTcNotAccepted {
 		t.Fatalf("bits 0: %d, want RequiredTCNotAccepted (5)", code)
 	}
 	if got := readUint16(t, gc, gencommdef.AttrTcAcceptedVersion); got != 0 {
 		t.Fatalf("TcAcceptedVersion = %d after refused acceptances, want 0", got)
 	}
-	if code := commissioningComplete(t, gc, ctx); code != uint8(gencommdef.CommissioningErrorTcAcknowledgementsNotReceived) {
+	if code := commissioningComplete(ctx, t, gc); code != uint8(gencommdef.CommissioningErrorTcAcknowledgementsNotReceived) {
 		t.Fatalf("CommissioningComplete = %d, want TCAcknowledgementsNotReceived", code)
 	}
 	// A valid acceptance, then CommissioningComplete succeeds (2.7 steps 6-7).
-	if code := setTerms(t, gc, ctx, 1, 1); code != gencommdef.CommissioningErrorOk {
+	if code := setTerms(ctx, t, gc, 1, 1); code != gencommdef.CommissioningErrorOk {
 		t.Fatalf("valid acceptance: %d", code)
 	}
-	if code := commissioningComplete(t, gc, ctx); code != core.CommissioningErrorOK {
+	if code := commissioningComplete(ctx, t, gc); code != core.CommissioningErrorOK {
 		t.Fatalf("CommissioningComplete = %d, want OK", code)
 	}
 	// 2.10 after commissioning: invalid acceptances leave the committed one.
-	if code := setTerms(t, gc, ctx, 0, 0xFFFF); code != gencommdef.CommissioningErrorTcMinVersionNotMet {
+	if code := setTerms(ctx, t, gc, 0, 0xFFFF); code != gencommdef.CommissioningErrorTcMinVersionNotMet {
 		t.Fatalf("version 0 after commissioning: %d", code)
 	}
-	if code := setTerms(t, gc, ctx, 2, 0); code != gencommdef.CommissioningErrorRequiredTcNotAccepted {
+	if code := setTerms(ctx, t, gc, 2, 0); code != gencommdef.CommissioningErrorRequiredTcNotAccepted {
 		t.Fatalf("bits 0 after commissioning: %d", code)
 	}
 	if v, a := readUint16(t, gc, gencommdef.AttrTcAcceptedVersion), readUint16(t, gc, gencommdef.AttrTcAcknowledgements); v != 1 || a != 1 {
@@ -318,7 +318,7 @@ func TestGencommTerms_UpdateAfterCommissioningCommitsAtOnce(t *testing.T) {
 	st := newSettingsFake()
 	gc := newTermsGencomm(t, st, nil)
 	ctx := caseCtx()
-	if code := setTerms(t, gc, ctx, 2, 1); code != gencommdef.CommissioningErrorOk {
+	if code := setTerms(ctx, t, gc, 2, 1); code != gencommdef.CommissioningErrorOk {
 		t.Fatalf("SetTCAcknowledgements = %d", code)
 	}
 	if got := readUint16(t, gc, gencommdef.AttrTcAcceptedVersion); got != 2 {
@@ -327,14 +327,14 @@ func TestGencommTerms_UpdateAfterCommissioningCommitsAtOnce(t *testing.T) {
 	if v := st.kv[store.SettingTermsAcceptance]; v != "2:1" {
 		t.Fatalf("persisted %q, want 2:1", v)
 	}
-	if code := setTerms(t, gc, ctx, 2, 0xFFFF); code != gencommdef.CommissioningErrorOk {
+	if code := setTerms(ctx, t, gc, 2, 0xFFFF); code != gencommdef.CommissioningErrorOk {
 		t.Fatalf("SetTCAcknowledgements all bits = %d", code)
 	}
 	if got := readUint16(t, gc, gencommdef.AttrTcAcknowledgements); got != 0xFFFF {
 		t.Fatalf("TcAcknowledgements = %d, want 65535", got)
 	}
 	// The same acceptance again changes nothing and is OK.
-	if code := setTerms(t, gc, ctx, 2, 0xFFFF); code != gencommdef.CommissioningErrorOk {
+	if code := setTerms(ctx, t, gc, 2, 0xFFFF); code != gencommdef.CommissioningErrorOk {
 		t.Fatalf("repeated acceptance = %d", code)
 	}
 }
@@ -346,10 +346,12 @@ func TestGencommTerms_FailSafeExpiryRevertsTentativeAcceptance(t *testing.T) {
 	t.Parallel()
 	for _, tc := range []struct {
 		name string
-		end  func(t *testing.T, gc *core.GeneralCommissioning, ctx context.Context)
+		end  func(ctx context.Context, gc *core.GeneralCommissioning)
 	}{
-		{"expire", func(_ *testing.T, gc *core.GeneralCommissioning, ctx context.Context) { gc.ExpireFailSafe(ctx) }},
-		{"disarm", func(t *testing.T, gc *core.GeneralCommissioning, ctx context.Context) { armFailSafe(t, gc, ctx, 0) }},
+		{"expire", func(ctx context.Context, gc *core.GeneralCommissioning) { gc.ExpireFailSafe(ctx) }},
+		{"disarm", func(ctx context.Context, gc *core.GeneralCommissioning) {
+			_, _ = gc.MatterInvoke(ctx, gencommdef.CmdArmFailSafe, core.ArmFailSafeRequest{ExpiryLengthSeconds: 0})
+		}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
@@ -357,17 +359,17 @@ func TestGencommTerms_FailSafeExpiryRevertsTentativeAcceptance(t *testing.T) {
 			gc := newTermsGencomm(t, st, nil)
 			ctx := caseCtx()
 			// A committed acceptance from an earlier commissioning.
-			if code := setTerms(t, gc, ctx, 1, 1); code != gencommdef.CommissioningErrorOk {
+			if code := setTerms(ctx, t, gc, 1, 1); code != gencommdef.CommissioningErrorOk {
 				t.Fatalf("committed acceptance: %d", code)
 			}
-			armFailSafe(t, gc, ctx, 60)
-			if code := setTerms(t, gc, ctx, 3, 0xFFFF); code != gencommdef.CommissioningErrorOk {
+			armFailSafe(ctx, t, gc, 60)
+			if code := setTerms(ctx, t, gc, 3, 0xFFFF); code != gencommdef.CommissioningErrorOk {
 				t.Fatalf("tentative acceptance: %d", code)
 			}
 			if got := readUint16(t, gc, gencommdef.AttrTcAcceptedVersion); got != 3 {
 				t.Fatalf("TcAcceptedVersion = %d during the window, want 3", got)
 			}
-			tc.end(t, gc, ctx)
+			tc.end(ctx, gc)
 			if got := readUint16(t, gc, gencommdef.AttrTcAcceptedVersion); got != 1 {
 				t.Fatalf("TcAcceptedVersion = %d after the window, want the committed 1", got)
 			}
@@ -380,10 +382,10 @@ func TestGencommTerms_FailSafeExpiryRevertsTentativeAcceptance(t *testing.T) {
 		t.Parallel()
 		gc := newTermsGencomm(t, newSettingsFake(), nil)
 		ctx := caseCtx()
-		if code := setTerms(t, gc, ctx, 1, 1); code != gencommdef.CommissioningErrorOk {
+		if code := setTerms(ctx, t, gc, 1, 1); code != gencommdef.CommissioningErrorOk {
 			t.Fatalf("acceptance: %d", code)
 		}
-		armFailSafe(t, gc, ctx, 60)
+		armFailSafe(ctx, t, gc, 60)
 		gc.ExpireFailSafe(ctx)
 		if got := readUint16(t, gc, gencommdef.AttrTcAcceptedVersion); got != 1 {
 			t.Fatalf("TcAcceptedVersion = %d, want 1", got)
@@ -398,7 +400,7 @@ func TestGencommTerms_PersistenceAndReset(t *testing.T) {
 	st := newSettingsFake()
 	gc := newTermsGencomm(t, st, nil)
 	ctx := caseCtx()
-	if code := setTerms(t, gc, ctx, 1, 1); code != gencommdef.CommissioningErrorOk {
+	if code := setTerms(ctx, t, gc, 1, 1); code != gencommdef.CommissioningErrorOk {
 		t.Fatalf("acceptance: %d", code)
 	}
 	restarted := newTermsGencomm(t, st, nil)
@@ -474,5 +476,53 @@ func TestGencommTerms_AheadRow(t *testing.T) {
 	}
 	if ids := core.GeneralCommissioningAhead.IDs(); len(ids) != 1 || ids[0] != row {
 		t.Fatalf("IDs() = %v", ids)
+	}
+}
+
+// A commit that fails at CommissioningComplete keeps the acceptance
+// tentative: the fail-safe window's expiry still reverts it (chip keeps
+// UpdateTermsAndConditionsHasBeenInvoked on a failed commit).
+func TestGencommTerms_FailedCommitStaysTentative(t *testing.T) {
+	t.Parallel()
+	st := newSettingsFake()
+	gc := newTermsGencomm(t, st, nil)
+	ctx := caseCtx()
+	armFailSafe(ctx, t, gc, 60)
+	if code := setTerms(ctx, t, gc, 1, 1); code != gencommdef.CommissioningErrorOk {
+		t.Fatalf("acceptance: %d", code)
+	}
+	st.mu.Lock()
+	st.fail = errors.New("disk")
+	st.mu.Unlock()
+	if _, err := gc.MatterInvoke(ctx, gencommdef.CmdCommissioningComplete, nil); err == nil {
+		t.Fatal("CommissioningComplete succeeded with a failing store")
+	}
+	if !gc.FailSafeArmed() {
+		t.Fatal("the failed commit disarmed the fail-safe")
+	}
+	gc.ExpireFailSafe(ctx)
+	if got := readUint16(t, gc, gencommdef.AttrTcAcceptedVersion); got != 0 {
+		t.Fatalf("TcAcceptedVersion = %d after the expiry, want the unpersisted acceptance reverted", got)
+	}
+	if _, ok := st.kv[store.SettingTermsAcceptance]; ok {
+		t.Fatal("an acceptance was persisted by the failing store")
+	}
+}
+
+// ArmFailSafeFor's disarm (the window's revocation fallback) reverts a
+// tentative acceptance as the wire disarm does.
+func TestGencommTerms_ArmFailSafeForZeroReverts(t *testing.T) {
+	t.Parallel()
+	gc := newTermsGencomm(t, newSettingsFake(), nil)
+	ctx := caseCtx()
+	armFailSafe(ctx, t, gc, 60)
+	if code := setTerms(ctx, t, gc, 1, 1); code != gencommdef.CommissioningErrorOk {
+		t.Fatalf("acceptance: %d", code)
+	}
+	if err := gc.ArmFailSafeFor(ctx, 0, tcFabric); err != nil {
+		t.Fatal(err)
+	}
+	if got := readUint16(t, gc, gencommdef.AttrTcAcceptedVersion); got != 0 {
+		t.Fatalf("TcAcceptedVersion = %d, want 0", got)
 	}
 }

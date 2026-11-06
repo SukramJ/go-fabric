@@ -979,8 +979,12 @@ func (g *GeneralCommissioning) ArmFailSafeFor(ctx context.Context, seconds uint3
 		// longer armed. Bump DataVersion so Apple's MTRDevice invalidates its
 		// cached snapshot, matching the wire-disarm and expiry paths.
 		g.breadcrumb = 0
+		termsReverted := g.revertTermsLocked()
 		g.dataVersion.Bump()
 		g.mu.Unlock()
+		if termsReverted {
+			g.changes.Notify(gencommTCAttrs...)
+		}
 		return nil
 	}
 	req := ArmFailSafeRequest{

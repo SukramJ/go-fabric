@@ -47,7 +47,8 @@ import (
 //     store it lives in;
 //   - TCAcknowledgementsRequired reports whether the acceptance satisfies
 //     the requirement (GetAcknowledgementsRequired :192-217);
-//     TCUpdateDeadline is the configured deadline or null (:221-230).
+//     TCUpdateDeadline is the configured deadline or null
+//     (GeneralCommissioningCluster.cpp:221-231).
 
 // TermsAndConditionsConfig states the terms and conditions a commissioner
 // has to acknowledge before CommissioningComplete succeeds: the TC feature
@@ -216,17 +217,21 @@ func (g *GeneralCommissioning) termsGateLocked() uint8 {
 // commitTermsLocked commits a tentative acceptance: persisted when the
 // server has a store, then the one in force (CommitAcceptance :153-164).
 func (g *GeneralCommissioning) commitTermsLocked(ctx context.Context) error {
-	g.tcTouched = false
 	if g.tcTemporal == nil {
+		g.tcTouched = false
 		return nil
 	}
 	if g.tcSettings != nil {
 		v := strconv.FormatUint(uint64(g.tcTemporal.version), 10) + ":" + strconv.FormatUint(uint64(g.tcTemporal.acks), 10)
 		if err := g.tcSettings.SetSetting(ctx, store.SettingTermsAcceptance, v); err != nil {
+			// The window's flag stays: the acceptance is still tentative,
+			// and the fail-safe's expiry reverts it (chip keeps
+			// UpdateTermsAndConditionsHasBeenInvoked on a failed commit,
+			// GeneralCommissioningCluster.cpp:512-526).
 			return fmt.Errorf("core: GeneralCommissioning: persist the terms acceptance: %w", err)
 		}
 	}
-	g.tcCommitted, g.tcTemporal = g.tcTemporal, nil
+	g.tcCommitted, g.tcTemporal, g.tcTouched = g.tcTemporal, nil, false
 	return nil
 }
 

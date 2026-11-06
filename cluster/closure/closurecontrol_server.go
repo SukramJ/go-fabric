@@ -755,9 +755,10 @@ func (s *ControlServer) SetCurrentLatch(latch *bool) {
 }
 
 // SetCurrentSpeed records the speed the device reported (Speed). Without
-// Speed it changes nothing.
+// Speed, or with a value outside the enum, it changes nothing (chip
+// refuses an unknown speed, ClosureControlCluster.cpp:357-359 at 6170af84).
 func (s *ControlServer) SetCurrentSpeed(speed closuredef.ThreeLevelAutoEnum) {
-	if !s.has(wire.ClosureControlFeatureSpeed) {
+	if !s.has(wire.ClosureControlFeatureSpeed) || speed > closuredef.ThreeLevelAutoHigh {
 		return
 	}
 	s.setCurrent(currentReport{speed: &speed})

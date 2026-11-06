@@ -103,10 +103,10 @@ func MatterEpochSeconds(c clock.Clock) (uint32, bool) {
 		return 0, false
 	}
 	s := now.Unix() - matterEpochOffsetSec
-	if s > math.MaxUint32 {
+	if s < 0 || s > math.MaxUint32 {
 		return 0, false
 	}
-	return uint32(s), true
+	return uint32(s), true //nolint:gosec // bounded above
 }
 
 // MatterAcceptedCommands implements [contract.ClusterCommandLister]:

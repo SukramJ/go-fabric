@@ -469,16 +469,25 @@ type ThermostatServer struct {
 // run from #setupValidations at :582-583, after the deadband is captured
 // at :154-164); here the deadband is the fixed default, set before the
 // reconcile.
-func New(cfg ThermostatConfig) (*ThermostatServer, error) {
-	features := cfg.Features
-	// AUTO requires HEAT+COOL — clear it if either is missing.
+// resolveFeatures is the served selection of a requested FeatureMap: AUTO
+// requires HEAT and COOL and is cleared without them; a bit the server
+// does not serve is ErrFeatures.
+func resolveFeatures(features uint32) (uint32, error) {
 	if features&ThermostatFeatureAUTO != 0 {
 		if features&ThermostatFeatureHEAT == 0 || features&ThermostatFeatureCOOL == 0 {
 			features &^= ThermostatFeatureAUTO
 		}
 	}
 	if features&^servedFeatures != 0 {
-		return nil, fmt.Errorf("%w: 0x%X names features the server does not serve", ErrFeatures, features&^servedFeatures)
+		return 0, fmt.Errorf("%w: 0x%X names features the server does not serve", ErrFeatures, features&^servedFeatures)
+	}
+	return features, nil
+}
+
+func New(cfg ThermostatConfig) (*ThermostatServer, error) {
+	features, err := resolveFeatures(cfg.Features)
+	if err != nil {
+		return nil, err
 	}
 	inst, err := spec.New(tdef.Definition, spec.Options{Features: features, Attributes: servedOptionalFor(cfg, features), Events: servedEvents(features)})
 	if err != nil {

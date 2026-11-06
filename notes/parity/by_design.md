@@ -732,8 +732,10 @@ at `862ad75f`) serves `primary1X` beside `numberOfPrimaries: null`. Here
 `light.ColorControlServerConfig.Primaries` (and the kit's
 `colorcontroldef.Patch` Primary1X … Primary6Intensity) supplies them, and
 NumberOfPrimaries reads their count, null without any. connectedhomeip
-derives the count from the supplied table the same way
-(`ColorControlCluster.cpp:178-191` at `6170af84`) and lists only the
+derives the count from the supplied table (`ColorControlCluster.cpp:178-191`
+at `6170af84`; it reads null only without a static configuration and 0
+with one that lists no primaries — a distinction the kit has no
+counterpart for, so none supplied reads null here) and lists only the
 supplied descriptors (`:1780-1806`). The white point and the colour points
 are served the same way. Reasoning: TC-CC-2.1 step 24 checks that
 NumberOfPrimaries matches the PrimaryN attributes listed, which a null
@@ -5372,7 +5374,7 @@ as chip's closure-app orders a panel's actions
 :595, `HandlePanelSetTargetAction` :656). SecureState stays derived: with LT
 true only FullyClosed and latched, null with an unknown latch — chip
 refuses any other true SecureState (`:364-386`); a drive report carrying
-Latch or Speed without the feature is refused (`:342-360`); a reached latch
+Latch or Speed without the feature is refused, and a speed outside the enum is ignored (`:342-360`); a reached latch
 clears OverallTargetState's Latch as an arrival clears its Position (the
 addition above). Two differences: a request whose Latch and Speed are
 both ignored keeps the fallback to OverallTargetState.Position and changes
@@ -5862,7 +5864,7 @@ an expired or disarmed fail-safe reverts the acceptance its window set
 reset erases the store it lives in (`store.SettingTermsAcceptance`);
 TCAcknowledgementsRequired is whether the acceptance in force satisfies
 the requirement (`DefaultTermsAndConditionsProvider.cpp:192-217`),
-TCUpdateDeadline the configured deadline or null (:221-230). Two
+TCUpdateDeadline the configured deadline or null (`GeneralCommissioningCluster.cpp:221-231`). Two
 differences to chip: the requirement is configuration, never absent
 while the feature is on (chip's provider may hold none, :199-202); and
 the gate runs after the fail-safe's fabric check rather than before the

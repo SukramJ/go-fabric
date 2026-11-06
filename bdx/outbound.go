@@ -203,6 +203,10 @@ func (f *outboundFlow) followingNext(ctx context.Context) (bool, error) {
 // send counts as done and the final acknowledgement read reports the
 // transfer finished.
 func (f *outboundFlow) sendBlockEOF(ctx context.Context, b Block) error {
+	if ctx.Err() != nil {
+		// Disabled before the block went out: nothing to count.
+		return context.Cause(ctx)
+	}
 	err := f.m.SendBlockEOF(ctx, b)
 	if err != nil && errors.Is(context.Cause(ctx), ErrScopeDisabled) {
 		return nil
