@@ -29,17 +29,25 @@ var thermostatAheadRows = []struct {
 }{
 	{"BD-chip-Thermostat-Schedules", thermostatdef.FeatureMatterScheduleConfiguration},
 	{"BD-chip-Thermostat-Events", thermostatdef.FeatureEvents},
+	{"BD-chip-Thermostat-Suggestions", thermostatdef.FeatureThermostatSuggestions},
 }
 
 // aheadThermostat builds a heating Thermostat with features. With
 // MatterScheduleConfiguration the declaration carries the one schedule
-// type the server needs to start (thermo's schedule configuration rules).
+// type the server needs to start (thermo's schedule configuration rules);
+// ThermostatSuggestions ("[PRES]") comes with Presets and one preset type.
 func aheadThermostat(key string, features thermostatdef.Feature, p *surface.Policies) (*Thermostat, error) {
 	decl := thermostatdef.Declare{Features: thermostatdef.FeatureHeating | features}
 	if features&thermostatdef.FeatureMatterScheduleConfiguration != 0 {
 		types := []thermostatdef.ScheduleTypeStruct{{SystemMode: thermostatdef.SystemModeHeat, NumberOfSchedules: 1}}
 		one, transitions := uint8(1), uint8(4)
 		decl.Initial = thermostatdef.Patch{ScheduleTypes: &types, NumberOfSchedules: &one, NumberOfScheduleTransitions: &transitions}
+	}
+	if features&thermostatdef.FeatureThermostatSuggestions != 0 {
+		decl.Features |= thermostatdef.FeaturePresets
+		types := []thermostatdef.PresetTypeStruct{{PresetScenario: thermostatdef.PresetScenarioOccupied, NumberOfPresets: 1}}
+		one := uint8(1)
+		decl.Initial.PresetTypes, decl.Initial.NumberOfPresets = &types, &one
 	}
 	return NewThermostat(Options{StableKey: endpoint.StringKey(key), Name: key, Surface: *cmp.Or(p, &surface.Policies{})}, decl)
 }
