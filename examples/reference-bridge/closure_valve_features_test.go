@@ -109,7 +109,7 @@ func TestValveLevelFeatures(t *testing.T) {
 		t.Fatalf("declaration(true) = %+v", decl)
 	}
 	synctest.Test(t, func(t *testing.T) {
-		v := newDemoValve("lvl", 600)
+		v := newDemoValve("lvl", 300)
 		ctx := context.Background()
 		forty := uint8(40)
 		if err := v.Open(ctx, valve.OpenRequest{TargetLevel: &forty}); err != nil {

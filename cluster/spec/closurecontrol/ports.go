@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright (C) 2026 SukramJ.
 
+// Package closurecontrol is the generated definition of the Matter
+// ClosureControl cluster (definition_gen.go, server_gen.go) and the
+// hand-written capability ports of its Mover (ports.go).
 package closurecontrol
 
 import "context"

@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright (C) 2026 SukramJ.
 
+// Package valveconfigurationandcontrol is the generated definition of the
+// Matter ValveConfigurationAndControl cluster (definition_gen.go,
+// server_gen.go) and the hand-written capability ports of its StateSource
+// (ports.go).
 package valveconfigurationandcontrol
 
 import "context"

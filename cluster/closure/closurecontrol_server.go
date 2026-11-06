@@ -34,6 +34,7 @@ import (
 	"fmt"
 	"math"
 	"slices"
+	"strings"
 	"sync"
 
 	"github.com/SukramJ/go-fabric/cluster"
@@ -97,7 +98,7 @@ var capabilityFeatures = []struct {
 // servable is the feature set the server serves on m: [servedFeatures]
 // and each capability feature whose interface m implements.
 func servable(m Mover) uint32 {
-	fm := uint32(servedFeatures)
+	fm := servedFeatures
 	for _, c := range capabilityFeatures {
 		if m != nil && c.has(m) {
 			fm |= c.bit
@@ -212,13 +213,14 @@ func DerivedFeatureMap(cfg Config) uint32 {
 func New(cfg Config) (*ControlServer, error) {
 	fm := DerivedFeatureMap(cfg)
 	if cfg.FeatureMap != 0 && cfg.FeatureMap != fm {
-		msg := fmt.Sprintf("0x%X, the server serves 0x%X", cfg.FeatureMap, fm)
+		var msg strings.Builder
+		fmt.Fprintf(&msg, "0x%X, the server serves 0x%X", cfg.FeatureMap, fm)
 		for _, c := range capabilityFeatures {
 			if cfg.FeatureMap&c.bit != 0 && fm&c.bit == 0 {
-				msg += fmt.Sprintf("; %s needs a Mover that implements %s", c.name, c.iface)
+				fmt.Fprintf(&msg, "; %s needs a Mover that implements %s", c.name, c.iface)
 			}
 		}
-		return nil, fmt.Errorf("%w: %s", ErrFeatureMap, msg)
+		return nil, fmt.Errorf("%w: %s", ErrFeatureMap, msg.String())
 	}
 	// Positioning holds "O.a+" and "[PS]"; Speed "[PS & !IS]" is the one
 	// conformance a served selection can break, and spec.New refuses it.
@@ -517,8 +519,8 @@ func (s *ControlServer) drive(ctx context.Context, target *wire.ClosureTargetPos
 			return err
 		}
 	}
-	if speed != nil {
-		if err := s.mover.(closuredef.SpeedMover).SetSpeed(ctx, *speed); err != nil {
+	if speeder, ok := s.mover.(closuredef.SpeedMover); ok && speed != nil {
+		if err := speeder.SetSpeed(ctx, *speed); err != nil {
 			return err
 		}
 	}
@@ -557,7 +559,11 @@ func (s *ControlServer) invokeCalibrate(ctx context.Context) error {
 	default:
 		return spec.Errorf(im.StatusInvalidInState, "closure: Calibrate in MainState %d", state)
 	}
-	if err := s.mover.(closuredef.Calibrator).Calibrate(ctx); err != nil {
+	calibrator, ok := s.mover.(closuredef.Calibrator)
+	if !ok {
+		return errors.New("closure: Calibrate has no calibrator")
+	}
+	if err := calibrator.Calibrate(ctx); err != nil {
 		return fmt.Errorf("closure: Calibrate: %w", err)
 	}
 	s.mu.Lock()
