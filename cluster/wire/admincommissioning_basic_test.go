@@ -68,9 +68,10 @@ func TestAdmComm_Basic_OpenBasicWindow_GatesLikeTheEnhancedCommand(t *testing.T)
 	if _, err := ac.MatterInvoke(context.Background(), admCommCmdOpenBasicWindow, req); !errors.Is(err, wire.ErrAdmCommPakeParameter) {
 		t.Errorf("over PASE: %v, want ErrAdmCommPakeParameter", err)
 	}
-	// An administrator's open window: Busy.
+	// An administrator's open enhanced window: Busy
+	// (AdministratorCommissioningServerTest.ts:457-463 at db021da0).
 	ac = newBasicAdmComm()
-	ac.SetController(&fakeWindowController{snapshot: wire.WindowStatusSnapshot{Status: wire.WindowStatusBasic, AdminFabricIndex: 2}})
+	ac.SetController(&fakeWindowController{snapshot: wire.WindowStatusSnapshot{Status: wire.WindowStatusEnhanced, AdminFabricIndex: 2}})
 	if _, err := ac.MatterInvoke(im.WithFabricFilter(context.Background(), true, 1), admCommCmdOpenBasicWindow, req); !errors.Is(err, wire.ErrAdmCommBusy) {
 		t.Errorf("window open: %v, want ErrAdmCommBusy", err)
 	}

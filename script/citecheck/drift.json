@@ -154,7 +154,7 @@
   },
   {
     "file": "bridge/ackpump_test.go",
-    "line": 521,
+    "line": 527,
     "citation": "MessageExchange.ts:428-433",
     "resolved": "packages/protocol/src/protocol/MessageExchange.ts",
     "identifier": "requiresAck",
@@ -559,7 +559,7 @@
   },
   {
     "file": "bridge/receive_test.go",
-    "line": 328,
+    "line": 335,
     "citation": "MessageCodec.ts:377",
     "resolved": "packages/protocol/src/codec/MessageCodec.ts",
     "identifier": "vendorId",
@@ -568,7 +568,7 @@
   },
   {
     "file": "bridge/receive_test.go",
-    "line": 626,
+    "line": 633,
     "citation": "InteractionServer.ts:409-412",
     "resolved": "packages/node/src/node/server/InteractionServer.ts",
     "identifier": "TimedRequest",
@@ -1000,7 +1000,7 @@
   },
   {
     "file": "client/exchange/manager.go",
-    "line": 418,
+    "line": 421,
     "citation": "NodeSession.ts:316-318",
     "resolved": "packages/protocol/src/session/NodeSession.ts",
     "identifier": "suppressPeerLoss",
@@ -1009,7 +1009,7 @@
   },
   {
     "file": "client/exchange/manager.go",
-    "line": 425,
+    "line": 428,
     "citation": "NodeSession.ts:408-413",
     "resolved": "packages/protocol/src/session/NodeSession.ts",
     "identifier": "FabricIndex",
@@ -1018,7 +1018,7 @@
   },
   {
     "file": "client/exchange/manager.go",
-    "line": 507,
+    "line": 510,
     "citation": "ExchangeManager.ts:716-726",
     "resolved": "packages/protocol/src/protocol/ExchangeManager.ts",
     "identifier": "#sendCloseSession",
@@ -1027,7 +1027,7 @@
   },
   {
     "file": "client/exchange/manager.go",
-    "line": 762,
+    "line": 765,
     "citation": "ExchangeManager.ts:261-264",
     "resolved": "packages/protocol/src/protocol/ExchangeManager.ts",
     "identifier": "createUnsecuredSession",
@@ -1036,7 +1036,7 @@
   },
   {
     "file": "client/exchange/manager.go",
-    "line": 994,
+    "line": 997,
     "citation": "ExchangeManager.ts:556-579",
     "resolved": "packages/protocol/src/protocol/ExchangeManager.ts",
     "identifier": "MessageExchangeContext",
@@ -1045,7 +1045,7 @@
   },
   {
     "file": "client/exchange/manager.go",
-    "line": 997,
+    "line": 1000,
     "citation": "SessionManager.ts:636-638",
     "resolved": "packages/protocol/src/session/SessionManager.ts",
     "identifier": "asOf",
@@ -1054,7 +1054,7 @@
   },
   {
     "file": "client/exchange/manager.go",
-    "line": 1037,
+    "line": 1040,
     "citation": "SessionManager.ts:636-638",
     "resolved": "packages/protocol/src/session/SessionManager.ts",
     "identifier": "handlePeerLoss",
@@ -1063,7 +1063,7 @@
   },
   {
     "file": "client/exchange/manager.go",
-    "line": 1055,
+    "line": 1058,
     "citation": "ExchangeManager.ts:423-434",
     "resolved": "packages/protocol/src/protocol/ExchangeManager.ts",
     "identifier": "#addExchange",
@@ -1099,7 +1099,7 @@
   },
   {
     "file": "client/exchange/session.go",
-    "line": 247,
+    "line": 249,
     "citation": "NodeSession.ts:408-413",
     "resolved": "packages/protocol/src/session/NodeSession.ts",
     "identifier": "peerAddress",
@@ -1108,7 +1108,7 @@
   },
   {
     "file": "client/exchange/session.go",
-    "line": 363,
+    "line": 365,
     "citation": "NodeSession.ts:320-322",
     "resolved": "packages/protocol/src/session/NodeSession.ts",
     "identifier": "isPeerLost",
@@ -1117,7 +1117,7 @@
   },
   {
     "file": "client/exchange/session.go",
-    "line": 384,
+    "line": 386,
     "citation": "NodeSession.ts:311-314",
     "resolved": "packages/protocol/src/session/NodeSession.ts",
     "identifier": "handlePeerLoss",
@@ -1126,16 +1126,7 @@
   },
   {
     "file": "client/handshake/case.go",
-    "line": 43,
-    "citation": "CaseClient.ts:333-334",
-    "resolved": "packages/protocol/src/session/case/CaseClient.ts",
-    "identifier": "CaseAuthenticatedTags",
-    "nearest": 355,
-    "occurrences": 0
-  },
-  {
-    "file": "client/handshake/case.go",
-    "line": 61,
+    "line": 58,
     "citation": "PeerConnection.ts:829-860",
     "resolved": "packages/protocol/src/peer/PeerConnection.ts",
     "identifier": "CaseClient",
@@ -1162,7 +1153,7 @@
   },
   {
     "file": "client/handshake/resumption.go",
-    "line": 60,
+    "line": 58,
     "citation": "session/SessionManager.ts:468-480",
     "resolved": "packages/protocol/src/session/SessionManager.ts",
     "identifier": "deleteResumptionRecord",
@@ -1171,7 +1162,7 @@
   },
   {
     "file": "client/handshake/resumption.go",
-    "line": 61,
+    "line": 59,
     "citation": "PeerConnection.ts:681-685",
     "resolved": "packages/protocol/src/peer/PeerConnection.ts",
     "identifier": "NoSharedTrustRoots",
@@ -1441,7 +1432,7 @@
   },
   {
     "file": "client/peer/connection.go",
-    "line": 1061,
+    "line": 1060,
     "citation": "SessionManager.ts:468-480",
     "resolved": "packages/protocol/src/session/SessionManager.ts",
     "identifier": "deleteResumptionRecord",
@@ -3359,7 +3350,7 @@
   },
   {
     "file": "secure/mattercert/der.go",
-    "line": 314,
+    "line": 339,
     "citation": "Certificate.ts:685-726",
     "resolved": "packages/protocol/src/certificate/kinds/Certificate.ts",
     "identifier": "ecPublicKey",
@@ -3383,6 +3374,16 @@
     "identifier": "signEcdsa",
     "nearest": 130,
     "occurrences": 2
+  },
+  {
+    "file": "secure/mattercert/verify.go",
+    "line": 503,
+    "citation": "OperationalBase.ts:92-97",
+    "resolved": "packages/protocol/src/certificate/kinds/OperationalBase.ts",
+    "at": "db021da0",
+    "identifier": "generalVerify",
+    "nearest": 61,
+    "occurrences": 1
   },
   {
     "file": "secure/operational/manager.go",
@@ -3719,7 +3720,7 @@
   },
   {
     "file": "transport/message/fuzz_message_test.go",
-    "line": 130,
+    "line": 134,
     "citation": "MessageCodec.ts:481-504",
     "resolved": "packages/protocol/src/codec/MessageCodec.ts",
     "identifier": "encodePacket",

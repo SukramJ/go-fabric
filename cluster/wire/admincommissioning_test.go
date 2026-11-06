@@ -731,3 +731,87 @@ func TestAdmComm_DataVersionFollowsTheWindow(t *testing.T) {
 		t.Error("an opened window kept the version")
 	}
 }
+
+// TestAdmComm_OpenWindow_PinDB021da0Cases ports the remaining cases of
+// matter.js AdministratorCommissioningServerTest.ts at db021da0 that the
+// command gates decide: the PAKE parameter bounds by value (:305-339 —
+// verifier 96 and 98 bytes, iterations 999 and 100001, salt 15 and 33
+// bytes refused, the valid boundary pairs accepted), a session without
+// fabric that armed the fail-safe (:411-417, PAKEParameterError before
+// Busy), no window opened on such a session and the next one accepted
+// (:419-429), and Busy for an enhanced open over an administrator's basic
+// window (:341-349).
+func TestAdmComm_OpenWindow_PinDB021da0Cases(t *testing.T) {
+	t.Parallel()
+	caseCtx := im.WithFabricFilter(context.Background(), true, 1)
+	params := func(verifier, salt int, iterations uint32) wire.OpenWindowParams {
+		return wire.OpenWindowParams{
+			CommissioningTimeoutSeconds: 300,
+			Iterations:                  iterations,
+			Salt:                        make([]byte, salt),
+			PAKEPasscodeVerifier:        make([]byte, verifier),
+		}
+	}
+	for _, tc := range []struct {
+		name                string
+		verifier, salt      int
+		iterations          uint32
+		wantPAKEParamStatus bool
+	}{
+		{"a verifier of 96 bytes", 96, 16, 1000, true},
+		{"a verifier of 98 bytes", 98, 16, 1000, true},
+		{"999 iterations", 97, 16, 999, true},
+		{"100001 iterations", 97, 16, 100001, true},
+		{"a salt of 15 bytes", 97, 15, 1000, true},
+		{"a salt of 33 bytes", 97, 33, 1000, true},
+		{"100000 iterations and a salt of 16 bytes", 97, 16, 100000, false},
+		{"1000 iterations and a salt of 32 bytes", 97, 32, 1000, false},
+	} {
+		ac := newAdmComm()
+		ctrl := &fakeWindowController{}
+		ac.SetController(ctrl)
+		_, err := ac.MatterInvoke(caseCtx, admCommCmdOpenWindow, params(tc.verifier, tc.salt, tc.iterations))
+		if tc.wantPAKEParamStatus {
+			if !errors.Is(err, wire.ErrAdmCommPakeParameter) {
+				t.Errorf("%s: %v, want ErrAdmCommPakeParameter", tc.name, err)
+			}
+			if ctrl.openWindowCalls != 0 {
+				t.Errorf("%s: the controller was reached", tc.name)
+			}
+		} else if err != nil || ctrl.openWindowCalls != 1 {
+			t.Errorf("%s: %v (controller calls %d), want the window opened", tc.name, err, ctrl.openWindowCalls)
+		}
+	}
+
+	// A session without fabric that armed the fail-safe: PAKEParameterError,
+	// the fabric check before Busy.
+	ac := newAdmComm()
+	ctrl := &fakeWindowController{}
+	ac.SetController(ctrl)
+	ac.SetIsFailSafeArmed(func() bool { return true })
+	if _, err := ac.MatterInvoke(context.Background(), admCommCmdOpenWindow, params(97, 16, 1000)); !errors.Is(err, wire.ErrAdmCommPakeParameter) {
+		t.Errorf("no fabric, fail-safe armed: %v, want ErrAdmCommPakeParameter", err)
+	}
+
+	// No window on a session without fabric; the next window is accepted.
+	ac = newAdmComm()
+	ctrl = &fakeWindowController{}
+	ac.SetController(ctrl)
+	if _, err := ac.MatterInvoke(context.Background(), admCommCmdOpenWindow, params(97, 16, 1000)); !errors.Is(err, wire.ErrAdmCommPakeParameter) {
+		t.Errorf("no fabric: %v, want ErrAdmCommPakeParameter", err)
+	}
+	if ctrl.openWindowCalls != 0 {
+		t.Errorf("no fabric: the controller was reached")
+	}
+	if _, err := ac.MatterInvoke(caseCtx, admCommCmdOpenWindow, params(97, 16, 1000)); err != nil || ctrl.openWindowCalls != 1 {
+		t.Errorf("the next window: %v (controller calls %d), want it opened", err, ctrl.openWindowCalls)
+	}
+
+	// An enhanced open over an administrator's basic window: Busy.
+	ac = newAdmComm()
+	ctrl = &fakeWindowController{snapshot: wire.WindowStatusSnapshot{Status: wire.WindowStatusBasic, AdminFabricIndex: 2}}
+	ac.SetController(ctrl)
+	if _, err := ac.MatterInvoke(caseCtx, admCommCmdOpenWindow, params(97, 16, 1000)); !errors.Is(err, wire.ErrAdmCommBusy) {
+		t.Errorf("over a basic window: %v, want ErrAdmCommBusy", err)
+	}
+}
