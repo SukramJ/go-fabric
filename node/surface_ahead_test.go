@@ -12,10 +12,12 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/SukramJ/go-fabric/cluster/closure"
 	mattercore "github.com/SukramJ/go-fabric/cluster/core"
 	netcommdef "github.com/SukramJ/go-fabric/cluster/spec/networkcommissioning"
 	tsdef "github.com/SukramJ/go-fabric/cluster/spec/timesynchronization"
 	"github.com/SukramJ/go-fabric/cluster/thermo"
+	"github.com/SukramJ/go-fabric/cluster/valve"
 	"github.com/SukramJ/go-fabric/device"
 	"github.com/SukramJ/go-fabric/endpoint"
 	"github.com/SukramJ/go-fabric/node"
@@ -59,6 +61,8 @@ func rootCluster(r surface.Report, id uint32) surface.Cluster {
 // once (W5-api-14).
 func TestNodeAheadRows(t *testing.T) {
 	want := append([]string{threadRow, timeSyncRow}, thermo.Ahead.IDs()...)
+	want = append(want, closure.Ahead.IDs()...)
+	want = append(want, valve.Ahead.IDs()...)
 	slices.Sort(want)
 	want = slices.Compact(want)
 	if got := node.AheadRows(); !slices.Equal(got, want) {
