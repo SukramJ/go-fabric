@@ -2121,7 +2121,7 @@
   },
   {
     "file": "controller/attestation/cert.go",
-    "line": 160,
+    "line": 179,
     "citation": "Certificate.ts:345-352",
     "resolved": "packages/protocol/src/certificate/kinds/Certificate.ts",
     "identifier": "parseInt",
@@ -2130,7 +2130,7 @@
   },
   {
     "file": "controller/attestation/cert.go",
-    "line": 185,
+    "line": 204,
     "citation": "Certificate.ts:249-258",
     "resolved": "packages/protocol/src/certificate/kinds/Certificate.ts",
     "identifier": "parseMatterFallbackVidPid",
@@ -2148,7 +2148,7 @@
   },
   {
     "file": "controller/attestation/certificates_parity_matterjs_test.go",
-    "line": 46,
+    "line": 52,
     "citation": "CertificatesTest.ts:295",
     "resolved": "packages/protocol/test/certificate/CertificatesTest.ts",
     "identifier": "ProductID",
@@ -2157,7 +2157,7 @@
   },
   {
     "file": "controller/attestation/certificates_parity_matterjs_test.go",
-    "line": 73,
+    "line": 79,
     "citation": "CertificatesTest.ts:357",
     "resolved": "packages/protocol/test/certificate/CertificatesTest.ts",
     "identifier": "parseMatterFallbackVidPid",
@@ -2174,17 +2174,38 @@
     "occurrences": 4
   },
   {
-    "file": "controller/attestation/store.go",
-    "line": 91,
-    "citation": "kinds/CertificationDeclaration.ts:220-226",
-    "resolved": "packages/protocol/src/certificate/kinds/CertificationDeclaration.ts",
-    "identifier": "testSignerInfo",
-    "nearest": 274,
+    "file": "controller/attestation/profile.go",
+    "line": 152,
+    "citation": "Certificate.ts:698-706",
+    "resolved": "packages/protocol/src/certificate/kinds/Certificate.ts",
+    "at": "db021da0",
+    "identifier": "parseAsn1Certificate",
+    "nearest": 667,
     "occurrences": 1
   },
   {
+    "file": "controller/attestation/profile.go",
+    "line": 294,
+    "citation": "Certificate.ts:385-388",
+    "resolved": "packages/protocol/src/certificate/kinds/Certificate.ts",
+    "at": "db021da0",
+    "identifier": "requiredExtensions",
+    "nearest": 433,
+    "occurrences": 6
+  },
+  {
+    "file": "controller/attestation/profile.go",
+    "line": 312,
+    "citation": "Certificate.ts:589-593",
+    "resolved": "packages/protocol/src/certificate/kinds/Certificate.ts",
+    "at": "db021da0",
+    "identifier": "parseExtensions",
+    "nearest": 431,
+    "occurrences": 2
+  },
+  {
     "file": "controller/attestation/validate.go",
-    "line": 374,
+    "line": 413,
     "citation": "Certificate.ts:650",
     "resolved": "packages/protocol/src/certificate/kinds/Certificate.ts",
     "identifier": "serialNumber",
@@ -2537,7 +2558,7 @@
   },
   {
     "file": "controller/dcl/certstore.go",
-    "line": 274,
+    "line": 283,
     "citation": "DeviceAttestationValidator.ts:235",
     "resolved": "packages/protocol/src/certificate/DeviceAttestationValidator.ts",
     "identifier": "considerTestCertificates",
@@ -2546,7 +2567,7 @@
   },
   {
     "file": "controller/dcl/certstore_test.go",
-    "line": 244,
+    "line": 246,
     "citation": "DeviceAttestationValidator.ts:235",
     "resolved": "packages/protocol/src/certificate/DeviceAttestationValidator.ts",
     "identifier": "getCertificate",
@@ -2555,7 +2576,7 @@
   },
   {
     "file": "controller/dcl/commission_test.go",
-    "line": 172,
+    "line": 183,
     "citation": "DeviceAttestationValidator.ts:343-355",
     "resolved": "packages/protocol/src/certificate/DeviceAttestationValidator.ts",
     "identifier": "CertificateRevoked",
@@ -2606,6 +2627,26 @@
     "identifier": "nextUpdate",
     "nearest": 1941,
     "occurrences": 4
+  },
+  {
+    "file": "controller/dcl/snapshot/seed_parity_matterjs_test.go",
+    "line": 171,
+    "citation": "dcl/DclCertificateService.ts:935-940",
+    "resolved": "packages/protocol/src/dcl/DclCertificateService.ts",
+    "at": "db021da0",
+    "identifier": "lookupCdSigner",
+    "nearest": 918,
+    "occurrences": 5
+  },
+  {
+    "file": "controller/dcl/snapshot/snapshot.go",
+    "line": 231,
+    "citation": "dcl/DclCertificateService.ts:935-940",
+    "resolved": "packages/protocol/src/dcl/DclCertificateService.ts",
+    "at": "db021da0",
+    "identifier": "lookupCdSigner",
+    "nearest": 918,
+    "occurrences": 5
   },
   {
     "file": "controller/softwareupdate/script.go",
