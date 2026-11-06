@@ -169,3 +169,48 @@ func TestChannelClosesWhenPeripheralDrops(t *testing.T) {
 		t.Fatal("the channel did not close")
 	}
 }
+
+// TestRenegotiationBoundsItsGATTCalls covers the bounds matter.js puts on
+// the renegotiation's GATT calls (packages/nodejs-ble/src/NobleBleChannel.ts:579,
+// :602-606 at 862ad75f): a peripheral that vanished without a disconnect
+// event leaves the unsubscribe or the handshake write pending, and the
+// renegotiation fails within the bound, closing the channel.
+func TestRenegotiationBoundsItsGATTCalls(t *testing.T) {
+	message := []byte{0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99}
+	small := []byte{0xaa, 0xbb}
+	cases := []struct {
+		name  string
+		fault func(*bletest.Faults)
+		bound time.Duration
+	}{
+		{"an unsubscribe that never completes", func(f *bletest.Faults) { f.HangUnsubscribeC2From = 1 }, ble.DisconnectTimeout},
+		{"a handshake write that never completes", func(f *bletest.Faults) { f.HangHandshakeWriteFrom = 2 }, btp.ConnRspTimeout},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			synctest.Test(t, func(t *testing.T) {
+				clock := clocktest.New(time.Unix(0, 0))
+				peer := newStallPeer(btp.MinimumATTMTU)
+				tc.fault(&peer.p.Faults)
+				ch := peer.dial(t, clock)
+				stall(t, clock, ch, peer, message)
+				parked := parkSend(ch, small)
+				synctest.Wait()
+				if isClosed(ch.Closed()) {
+					t.Fatal("the channel closed before the bound")
+				}
+				if !slices.Contains(clock.Armed(), tc.bound) {
+					t.Fatalf("no %v bound armed (armed %v)", tc.bound, clock.Armed())
+				}
+				clock.Advance(tc.bound)
+				synctest.Wait()
+				if !isClosed(ch.Closed()) {
+					t.Fatal("the channel stayed open after the bound")
+				}
+				if err := <-parked; !errors.Is(err, btp.ErrDisconnected) {
+					t.Fatalf("the parked send = %v", err)
+				}
+			})
+		})
+	}
+}

@@ -6104,7 +6104,13 @@ half (`transport/btp.Session.OnStall`, `Suspend`) reports the stall, the
 channel swaps the session behind its `btp.Conn` (`Channel.Conn` is the
 current one), `Channel.Send` waits for a renegotiation in flight and
 answers `ErrChannelClosed` when the channel is lost meanwhile, a failed
-renegotiation or a lost connection closes the channel, and `Dial` waits up
+renegotiation or a lost connection closes the channel, each C2 unsubscribe
+runs under `ble.DisconnectTimeout` (5 s, `BLE_DISCONNECT_TIMEOUT`,
+`NobleBleChannel.ts:38`, `:579`) and each handshake's C1 write and C2
+subscribe under its `btp.ConnRspTimeout` attempt (`:602-606`, `:634-641`),
+both on the channel's clock, so a peripheral that vanished without a
+disconnect event fails the renegotiation within the bound and the channel
+closes, and `Dial` waits up
 to `ATTMTUSettleTimeout` (2 s, `NobleBleChannel.ts:40-41`, `:526-567` at
 `862ad75f`) for a connection that reports its ATT_MTU exchange
 (`ble.MTUExchange`) before it sizes the segment. The workaround is adopted
