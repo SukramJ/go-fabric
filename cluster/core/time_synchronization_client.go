@@ -37,7 +37,9 @@ import (
 // :525-539 at 6170af84). The result holds a value for each requested path
 // the report carried one for, keyed by that path; a path answered with a
 // status is absent. The node implements it over its client stack
-// (node.Config.Client).
+// (node.Config.Client). A call ends when its context ends: the server
+// bounds each read by [TimeSyncAttemptTimeout] on its clock and moves on
+// to the NTP fallback.
 type TimePeerReader interface {
 	ReadPeerAttributes(ctx context.Context, fabricIndex uint8, nodeID uint64, paths []im.ConcreteAttributePath) (map[im.ConcreteAttributePath]spec.Node, error)
 }
@@ -47,10 +49,20 @@ type TimePeerReader interface {
 // (time-synchronization-delegate.h:86-97 at 6170af84), which sets the
 // system clock; here the time it returns becomes the node's UTC. server
 // is the DefaultNTP attribute: an IPv6 address, or a domain name when
-// SupportsDNSResolve is set.
+// SupportsDNSResolve is set. A call ends when its context ends: the server
+// bounds each query by [TimeSyncAttemptTimeout] on its clock and emits
+// TimeFailure.
 type NTPClient interface {
 	QueryTime(ctx context.Context, server string) (time.Time, error)
 }
+
+// TimeSyncAttemptTimeout bounds each call of an attempt to get the time —
+// the trusted time source's read and the NTP query, each on its own — on
+// the server's clock. The bound is this module's: the node's own
+// [TimePeerReader] ends with its peer set's timing, a host's reader or
+// [NTPClient] need not, and an attempt that never ended would hold every
+// later one, the trusted source's change included.
+const TimeSyncAttemptTimeout = 30 * time.Second
 
 // timeSyncUTC is the node's UTC over the server's clock: the offset
 // SetUTCTime, the trusted time source or the NTP fallback set, with the
@@ -271,7 +283,9 @@ func (t *TimeSynchronization) timeFromTrustedNode(ctx context.Context) bool {
 	}
 	utcPath := timeSyncRootPath(timeSyncAttrUTCTime)
 	granPath := timeSyncRootPath(timeSyncAttrGranularity)
-	vals, err := reader.ReadPeerAttributes(ctx, tts.FabricIndex, tts.NodeId, []im.ConcreteAttributePath{utcPath, granPath})
+	rctx, cancel := clock.WithTimeout(ctx, t.clock.Load(), TimeSyncAttemptTimeout)
+	vals, err := reader.ReadPeerAttributes(rctx, tts.FabricIndex, tts.NodeId, []im.ConcreteAttributePath{utcPath, granPath})
+	cancel()
 	if err != nil {
 		t.logger().Info("matter.timesync.trusted_source_unreachable", slog.String("reason", err.Error()))
 		return false
@@ -329,7 +343,9 @@ func (t *TimeSynchronization) fallbackNTP(ctx context.Context) {
 		t.emitTimeFailure()
 		return
 	}
-	at, err := t.cfg.NTPClient.QueryTime(ctx, server)
+	qctx, cancel := clock.WithTimeout(ctx, t.clock.Load(), TimeSyncAttemptTimeout)
+	at, err := t.cfg.NTPClient.QueryTime(qctx, server)
+	cancel()
 	if err == nil {
 		if s := at.Unix() - matterEpochOffsetSec; s < 0 || s > math.MaxUint32 {
 			err = errTimeSyncUTCRange

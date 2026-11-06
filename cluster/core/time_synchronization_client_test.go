@@ -409,3 +409,78 @@ func TestTimeSyncSetUTCTimeSetsTheOffset(t *testing.T) {
 		t.Errorf("UTC %v after the refusals, want the last accepted %v", utc, day)
 	}
 }
+
+// hangingPeer is a TimePeerReader whose node never answers: the read
+// ends only with its context; entered is signalled on each call.
+type hangingPeer struct{ entered chan struct{} }
+
+func (h *hangingPeer) ReadPeerAttributes(ctx context.Context, _ uint8, _ uint64, _ []im.ConcreteAttributePath) (map[im.ConcreteAttributePath]spec.Node, error) {
+	h.entered <- struct{}{}
+	<-ctx.Done()
+	return nil, ctx.Err()
+}
+
+// hangingNTP is an NTPClient whose server never answers.
+type hangingNTP struct{ entered chan struct{} }
+
+func (h *hangingNTP) QueryTime(ctx context.Context, _ string) (time.Time, error) {
+	h.entered <- struct{}{}
+	<-ctx.Done()
+	return time.Time{}, ctx.Err()
+}
+
+// Each call of an attempt ends after TimeSyncAttemptTimeout on the
+// server's clock: a trusted node that never answers is abandoned for the
+// NTP fallback, an NTP server that never answers ends in TimeFailure.
+func TestTimeSyncBoundsEachCallOfAnAttempt(t *testing.T) {
+	t.Parallel()
+	waitEntered := func(t *testing.T, entered chan struct{}, what string) {
+		t.Helper()
+		ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+		defer cancel()
+		select {
+		case <-entered:
+		case <-ctx.Done():
+			t.Fatalf("no %s", what)
+		}
+	}
+	t.Run("a trusted node that never answers", func(t *testing.T) {
+		t.Parallel()
+		ntpAt := tsNow.Add(-2 * time.Hour)
+		peer := &hangingPeer{entered: make(chan struct{}, 1)}
+		ntp := &fakeNTP{at: ntpAt}
+		srv, sig, clk := tsClient(t, core.TimeSynchronizationConfig{
+			Features: tsdef.FeatureTimeSyncClient, PlatformTime: noPlatformTime, PeerReader: peer, NTPClient: ntp,
+		}, "fd00::1")
+		setTrusted(t, srv, 0x42)
+		srv.Start(context.Background())
+		waitEntered(t, peer.entered, "read of the trusted node")
+		if !slices.Contains(clk.Armed(), core.TimeSyncAttemptTimeout) {
+			t.Fatalf("no %v bound armed (armed %v)", core.TimeSyncAttemptTimeout, clk.Armed())
+		}
+		clk.Advance(core.TimeSyncAttemptTimeout)
+		sig.wait(t, "UTCTime change")
+		if gran, src := readQuality(srv); gran != uint8(tsdef.GranularityMillisecondsGranularity) || src != uint8(tsdef.TimeSourceNonMatterSntp) {
+			t.Errorf("Granularity %v TimeSource %v, want the NTP fallback's", gran, src)
+		}
+		if utc, ok := srv.UTC(); !ok || !utc.Equal(ntpAt) {
+			t.Errorf("UTC %v %v, want the NTP time", utc, ok)
+		}
+	})
+	t.Run("an NTP server that never answers", func(t *testing.T) {
+		t.Parallel()
+		ntp := &hangingNTP{entered: make(chan struct{}, 1)}
+		srv, sig, clk := tsClient(t, core.TimeSynchronizationConfig{
+			Features: tsdef.FeatureTimeSyncClient, PlatformTime: noPlatformTime,
+			PeerReader: &fakePeer{err: errors.New("no route")}, NTPClient: ntp,
+		}, "fd00::1")
+		setTrusted(t, srv, 0x42)
+		srv.Start(context.Background())
+		waitEntered(t, ntp.entered, "NTP query")
+		clk.Advance(core.TimeSyncAttemptTimeout)
+		sig.wait(t, "TimeFailure")
+		if ev, _ := sig.seen(); !slices.Equal(ev, []uint32{tsdef.EventTimeFailure}) {
+			t.Errorf("events %v, want TimeFailure", ev)
+		}
+	})
+}

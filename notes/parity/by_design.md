@@ -5954,12 +5954,15 @@ clock is never set: the offset lives in memory and a restart serves the
 host clock again (chip's system clock keeps the time); the platform source
 is read live, not once at server ready; Last Known Good Time is not
 updated (`UpdateUTCTime` :82; the module keeps none); an NTP answer
-before the Matter epoch or past 32-bit seconds is a failed query. The
+before the Matter epoch or past 32-bit seconds is a failed query; each
+read and NTP query ends after `core.TimeSyncAttemptTimeout` (30 s) on the
+server's clock, a bound of the module's because the ports are a host's
+and an attempt that never ended would hold every later one. The
 Thermostat's and the Valve's Matter time (`core.MatterEpochSeconds` over
 the device's clock) does not see the offset. TimeSource and
 TimeZoneDatabase go out as plain integers; a named enum type went out as
 TLV null through the bridge's reply writer. Pinned by `cluster/core`
-time-synchronization tests (3 chip cases, 9 rules, 5 client cases, 1 wire)
+time-synchronization tests (3 chip cases, 9 rules, 6 client cases, 1 wire)
 and `node`'s client wire test.
 
 ### BD-chip-GeneralCommissioning-TermsAndConditions — the TC feature follows connectedhomeip when the node states its terms
