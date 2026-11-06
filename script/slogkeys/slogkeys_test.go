@@ -71,7 +71,7 @@ var areaKeys = []string{
 	"accept_test", "accepted_findings", "ack_counter", "action",
 	"active_preset_handle", "additional_mrp_delay", "address",
 	"address_index", "addresses", "adjusted", "admin_vendor_id",
-	"advertised_ms", "after", "age", "akid", "also_named_by", "attempt",
+	"advertised_ms", "after", "age", "akid", "also_named_by", "att_mtu", "attempt",
 	"attribute_reports", "attribute_set", "attribute_statuses", "attributes",
 	"authorities", "auxiliary_acl", "backoff", "boot_reason",
 	"bridged_endpoints", "budget", "by", "bytes", "candidate",

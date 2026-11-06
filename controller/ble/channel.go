@@ -261,11 +261,11 @@ func segmentSizeFor(ctx context.Context, conn Connection, clock exchange.Clock, 
 		}
 	}
 	if mtu <= 0 {
-		log.Info("matter.ble.att_mtu_unknown", slog.String("address", address), slog.Int("segment_size", btp.MinimumATTMTU))
+		log.Info("matter.ble.att_mtu_unknown", slog.String("address", address), slog.Int("fragment_size", btp.MinimumATTMTU))
 		return btp.MinimumATTMTU, nil
 	}
 	segment := btp.SegmentSizeFromATTMTU(mtu)
-	log.Debug("matter.ble.segment_size", slog.String("address", address), slog.Int("segment_size", segment), slog.Int("att_mtu", mtu))
+	log.Debug("matter.ble.segment_size", slog.String("address", address), slog.Int("fragment_size", segment), slog.Int("att_mtu", mtu))
 	return segment, nil
 }
 
@@ -403,7 +403,7 @@ func (c *Channel) renegotiate(replay [][]byte) error {
 	old := c.c2
 	c.mu.Unlock()
 	old.detach()
-	c.log.Info("matter.ble.renegotiate", slog.String("address", c.peripheral.Address), slog.Int("segment_size", btp.MinimumATTMTU))
+	c.log.Info("matter.ble.renegotiate", slog.String("address", c.peripheral.Address), slog.Int("fragment_size", btp.MinimumATTMTU))
 	if err := c.conn.UnsubscribeC2(c.life.ctx); err != nil {
 		return fmt.Errorf("ble: unsubscribe C2 for the renegotiation: %w", err)
 	}
