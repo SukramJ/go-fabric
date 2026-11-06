@@ -384,7 +384,7 @@ func profileValidate(t *testing.T, dac, pai []byte) *Error {
 }
 
 // TestProfileDeviceAttestationFindings: describe "device attestation
-// findings" (:659-698 at db021da0).
+// findings" (:646-678 at db021da0).
 func TestProfileDeviceAttestationFindings(t *testing.T) {
 	t.Parallel()
 	_, validPAI := validProfilePair(t)

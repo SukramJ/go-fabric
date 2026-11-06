@@ -389,11 +389,13 @@ cRLSign, a DAC no CA with digitalSignature alone. A violation is
 must meet its CMS envelope, `format_version` 1 and a defined
 certification type (`CertificationDeclarationFormatInvalid`), and its
 signer must be a CD signer: the CSA signing keys 001–005 and the Matter
-test CD signer are built in (`attestation.KnownCDSigner`), and any other
-signer must be a certificate the CSA "Matter Certification and Testing
-CA" issued, which `dcl.CertificateStore` fetches and checks
-(`attestation.VerifyCDSignerCertificate`). Any other signer is
-`CdSignerUnknown`, with or without a trust store. A CD signed by the test
+test CD signer are built in (`attestation.KnownCDSigner`); a
+`dcl.CertificateStore` answers for a further signer only with a certificate
+the CSA "Matter Certification and Testing CA" issued, which it fetches and
+checks (`attestation.VerifyCDSignerCertificate`), while an
+`attestation.StaticStore` answers with the CD signer keys its host put
+there, unverified. A signer neither built in nor known to the store is
+`CdSignerUnknown`. A CD signed by the test
 signer under a store that refuses test certificates is a
 `TrustedAsTestCertificate` finding, and an official CD signed by it is
 `OfficialCdSignedByTestSigner`.

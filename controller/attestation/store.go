@@ -41,10 +41,11 @@ type PAAStore interface {
 	// CDSigner returns the public key of the Certification Declaration
 	// signer whose subject key identifier is skid. [Validate] asks only
 	// for a signer that is not built in ([KnownCDSigner]); the answer is
-	// trusted as a CSA-issued signer, so a store answers only with a
-	// certificate [VerifyCDSignerCertificate] accepts
+	// trusted as a CSA-issued signer: a ledger-backed store answers only
+	// with a certificate [VerifyCDSignerCertificate] accepts
 	// (DclCertificateService.lookupCdSigner, dcl/DclCertificateService.ts:
-	// 901-970 at db021da0), never with a PAA or PAI key.
+	// 901-970 at db021da0), never with a PAA or PAI key; a [StaticStore]
+	// answers with the keys its caller vouches for.
 	CDSigner(skid []byte) (*ecdsa.PublicKey, bool)
 }
 

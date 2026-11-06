@@ -77,11 +77,19 @@ func parseAttCert(der []byte, kind certKind, acceptProfileViolation bool) (*attC
 	c, err := x509.ParseCertificate(der)
 	if err != nil {
 		// crypto/x509 refuses a certificate that carries an extension
-		// twice (RFC 5280 §4.2), which matter.js parses and refuses in the
-		// DAC and PAI profile for the four single extensions only.
+		// twice (RFC 5280 §4.2) or a version field above 2, which
+		// matter.js parses and refuses in the DAC and PAI profile
+		// (AttestationCertificates.ts:122-124, :130-139 at db021da0) — after
+		// the required extensions of the parse (Certificate.ts:589-593),
+		// which come first here too.
 		if (kind == kindDAC || kind == kindPAI) && !acceptProfileViolation {
-			if enc, encErr := readEncoding(der); encErr == nil && enc.hasDuplicateSingleExtension() {
-				return nil, assertCommonProfile(kind, &enc)
+			if enc, encErr := readEncoding(der); encErr == nil {
+				if reqErr := checkRequiredExtensions(kind, false, &enc); reqErr != nil {
+					return nil, reqErr
+				}
+				if !enc.isV3() || enc.hasDuplicateSingleExtension() {
+					return nil, assertCommonProfile(kind, &enc)
+				}
 			}
 		}
 		return nil, err
@@ -98,6 +106,13 @@ func parseAttCert(der []byte, kind certKind, acceptProfileViolation bool) (*attC
 	}
 	if err := checkRequiredExtensions(kind, acceptProfileViolation, &enc); err != nil {
 		return nil, err
+	}
+	// A PAA or CD signer below v3 carries no extensions crypto/x509 reads
+	// (RFC 5280 §4.1.2.9), so its key identifiers would stay empty and the
+	// chain fail later with a misleading mismatch; refuse it here. A DAC or
+	// PAI gets the profile's version rule below.
+	if (kind == kindPAA || kind == kindCDSigner) && !enc.isV3() {
+		return nil, fmt.Errorf("attestation: %s version field must be 2 (v3), not %s", kind, enc.version)
 	}
 	a := &attCert{x509: c, notBefore: matterTime(c.NotBefore), notAfter: matterTime(c.NotAfter)}
 	if a.vendorID, a.productID, err = MatterIDs(c); err != nil {

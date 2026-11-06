@@ -8,7 +8,7 @@ package attestation
 // packages/protocol/src/certificate/kinds/CertificationDeclaration.ts:
 // 58-206 (CertificationDeclaration.parse) at db021da0 and the TLV content
 // of kinds/definitions/certification-declaration.ts:31-48 (TlvDc) at
-// 0ceb202d. secure/attestation/cd.go:62-135 is the device's encoder of the
+// db021da0. secure/attestation/cd.go:62-135 is the device's encoder of the
 // same structure.
 
 import (

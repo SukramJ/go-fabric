@@ -148,6 +148,9 @@ func (e *certEncoding) critical(name string) bool {
 	return false
 }
 
+// isV3 reports a version field of 2 (an X.509 v3 certificate).
+func (e *certEncoding) isV3() bool { return e.version != nil && e.version.Cmp(big.NewInt(2)) == 0 }
+
 // readEncoding reads a certificate's encoding — the version
 // parseAsn1Certificate reads (Certificate.ts:667-706 at db021da0) and parseExtensions
 // (:431-596 at db021da0): an extension it does not interpret is skipped

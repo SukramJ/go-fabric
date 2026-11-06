@@ -85,16 +85,29 @@ type CDSigner struct {
 	IsTestSigner bool
 }
 
+// The Matter test CD signer of Appendix F as this package's own trust
+// anchor: copies taken at initialisation, so a later change to the exported
+// secure/attestation test variables cannot move what this package trusts.
+var (
+	testCDSignerSKID  = mustHex("62fa823359acfaa9963e1cfa140addf504f37160")
+	testCDSignerPoint = func() []byte {
+		point, err := secattestation.TestCMSSignerPrivateKey.PublicKey.Bytes()
+		if err != nil {
+			panic(err)
+		}
+		if !bytes.Equal(secattestation.TestCMSSignerSKID, testCDSignerSKID) {
+			panic("attestation: the test CD signer's subject key identifier moved")
+		}
+		return point
+	}()
+)
+
 // KnownCDSigner is CdSigners.known (CdSigners.ts:76-83 at db021da0): the
 // built-in CSA signing key or the Matter test CD signer skid names. Each
 // call hands out its own key.
 func KnownCDSigner(skid []byte) (CDSigner, bool) {
 	if IsTestCDSigner(skid) {
-		point, err := secattestation.TestCMSSignerPrivateKey.PublicKey.Bytes()
-		if err != nil {
-			panic(err)
-		}
-		return CDSigner{PublicKey: p256Point(point), IsTestSigner: true}, true
+		return CDSigner{PublicKey: p256Point(testCDSignerPoint), IsTestSigner: true}, true
 	}
 	if point, ok := csaCDSigningKeys[strings.ToUpper(hex.EncodeToString(skid))]; ok {
 		return CDSigner{PublicKey: p256Point(mustHex(point))}, true
@@ -105,7 +118,7 @@ func KnownCDSigner(skid []byte) (CDSigner, bool) {
 // IsTestCDSigner is CdSigners.isTestSigner (CdSigners.ts:85-88 at
 // db021da0): skid names the Matter test CD signer of Appendix F.
 func IsTestCDSigner(skid []byte) bool {
-	return bytes.Equal(skid, secattestation.TestCMSSignerSKID)
+	return bytes.Equal(skid, testCDSignerSKID)
 }
 
 // VerifyCDSignerCertificate is CdSigners.verifyCertificate (CdSigners.ts:

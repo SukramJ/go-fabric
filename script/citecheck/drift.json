@@ -2121,7 +2121,7 @@
   },
   {
     "file": "controller/attestation/cert.go",
-    "line": 179,
+    "line": 194,
     "citation": "Certificate.ts:345-352",
     "resolved": "packages/protocol/src/certificate/kinds/Certificate.ts",
     "identifier": "parseInt",
@@ -2130,7 +2130,7 @@
   },
   {
     "file": "controller/attestation/cert.go",
-    "line": 204,
+    "line": 219,
     "citation": "Certificate.ts:249-258",
     "resolved": "packages/protocol/src/certificate/kinds/Certificate.ts",
     "identifier": "parseMatterFallbackVidPid",
