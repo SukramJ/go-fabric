@@ -85,9 +85,8 @@ merge chip's jf-admin-app delegate does with the one entry chip's
 datastore hands it — chip's datastore itself never calls the overload —
 moved into the module, so every host writes one Binding list and reads
 one (owner decision 2026-11-06: a required method, not an optional
-interface). `SyncBinding`, chip's single-entry overload, stays in the
-port for the delegate's shape and is not called by the datastore. A
-fetch that fails is the push's error and leaves the entry `Pending` for
+interface); chip's single-entry delegate overload has no counterpart in
+the port. A fetch that fails is the push's error and leaves the entry `Pending` for
 the next `RefreshNode`, where chip's example would write the one entry
 over an empty list.
 

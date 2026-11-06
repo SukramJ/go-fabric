@@ -5806,11 +5806,10 @@ endpoint's Binding attribute, an empty list included
 merge for every port, so the host writes a list and reads a list
 (`FetchEndpointBindingList`), nothing more — owner decision 2026-11-06,
 against the recommendation of an optional interface: a required method,
-so every host writes the merged list. `SyncBinding`, the delegate's
+so every host writes the merged list; chip's delegate has the
 single-entry overload (`JointFabricDatastore.h:189-194` at `6170af84`),
-stays in the port for the delegate's shape; the datastore does not call
-it, where chip's pushes one entry through it (:1944, :1970). One
-divergence: a fetch that fails is the push's error and
+the module's datastore merges itself, so the port does not carry it
+(decision 8). One divergence: a fetch that fails is the push's error and
 leaves the entry Pending or DeletePending for the next `RefreshNode`;
 jf-admin-app writes the one entry over an empty list
 (`JFADatastoreSync.cpp:1726-1730` at `6170af84`), which drops the node's

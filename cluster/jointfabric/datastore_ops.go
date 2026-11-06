@@ -769,9 +769,10 @@ func (d *Datastore) removeBindingLocked(listID uint16, nodeID uint64, endpointID
 // the push's error, so the entry stays Pending or DeletePending for the
 // next RefreshNode — jf-admin-app writes the one entry over an empty list
 // instead (:1726-1730 at 6170af84), which would drop the node's other
-// bindings. chip's datastore pushes the one entry (SyncBinding;
-// JointFabricDatastore.cpp:1944, :1970 at 6170af84) and leaves the merge
-// to the delegate; here the module merges, so every host writes a list
+// bindings. chip's datastore pushes the one entry through the delegate's
+// single-entry overload (JointFabricDatastore.cpp:1944, :1970 at
+// 6170af84) and leaves the merge to the delegate; here the module merges,
+// so every host writes a list and the port has no single-entry write
 // (owner decision 2026-11-06).
 func (d *Datastore) pushBinding(ctx context.Context, nodeID uint64, e EndpointBindingEntry) error {
 	current, err := d.sync.FetchEndpointBindingList(ctx, nodeID, e.EndpointId)

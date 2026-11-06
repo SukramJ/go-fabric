@@ -23,10 +23,6 @@ func (fakeDatastoreSync) SyncNodeKeySet(context.Context, uint64, dsdef.Datastore
 	return nil
 }
 
-func (fakeDatastoreSync) SyncBinding(context.Context, uint64, dsdef.DatastoreEndpointBindingEntryStruct) error {
-	return nil
-}
-
 func (fakeDatastoreSync) SyncBindings(context.Context, uint64, []dsdef.DatastoreEndpointBindingEntryStruct) error {
 	return nil
 }

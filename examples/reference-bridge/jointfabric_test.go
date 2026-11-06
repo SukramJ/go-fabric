@@ -137,7 +137,6 @@ func TestJointFabricSimSyncReachesNoNode(t *testing.T) {
 	for name, err := range map[string]error{
 		"SyncEndpointGroupID":  s.SyncEndpointGroupID(ctx, 7, jfdsdef.DatastoreEndpointGroupIDEntryStruct{}),
 		"SyncNodeKeySet":       s.SyncNodeKeySet(ctx, 7, jfdsdef.DatastoreNodeKeySetEntryStruct{}),
-		"SyncBinding":          s.SyncBinding(ctx, 7, jfdsdef.DatastoreEndpointBindingEntryStruct{}),
 		"SyncBindings":         s.SyncBindings(ctx, 7, nil),
 		"SyncEndpointBindings": s.SyncEndpointBindings(ctx, 7, 1, nil),
 		"SyncACL":              s.SyncACL(ctx, 7, jfdsdef.DatastoreACLEntryStruct{}),

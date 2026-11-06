@@ -45,10 +45,6 @@ func (nopSync) SyncEndpointGroupID(context.Context, uint64, jointfabric.Endpoint
 
 func (nopSync) SyncNodeKeySet(context.Context, uint64, jointfabric.NodeKeySetEntry) error { return nil }
 
-func (nopSync) SyncBinding(context.Context, uint64, jointfabric.EndpointBindingEntry) error {
-	return nil
-}
-
 func (nopSync) SyncBindings(context.Context, uint64, []jointfabric.EndpointBindingEntry) error {
 	return nil
 }

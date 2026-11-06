@@ -25,7 +25,6 @@ type endpointSync struct {
 	writes    []endpointWrite
 	writeErr  error
 	fetchCall int
-	single    int // SyncBinding calls: the datastore makes none
 }
 
 type endpointWrite struct {
@@ -46,13 +45,6 @@ func (s *endpointSync) FetchEndpointBindingList(_ context.Context, _ uint64, ep 
 		return nil, s.fetchErr
 	}
 	return slices.Clone(s.device[ep]), nil
-}
-
-func (s *endpointSync) SyncBinding(context.Context, uint64, EndpointBindingEntry) error {
-	s.mu2.Lock()
-	defer s.mu2.Unlock()
-	s.single++
-	return nil
 }
 
 func (s *endpointSync) SyncEndpointBindings(_ context.Context, nodeID uint64, ep uint16, entries []EndpointBindingEntry) error {
@@ -87,7 +79,7 @@ func (s *endpointSync) lastWrite(t *testing.T) endpointWrite {
 
 // TestEndpointBindingSyncAppendsToFetchedList: the add of a binding
 // reaches the port as the endpoint's current list plus the entry (JFADatastoreSync.cpp:1717-1747 at
-// 6170af84); SyncBinding is not called; the entry commits.
+// 6170af84); the entry commits.
 func TestEndpointBindingSyncAppendsToFetchedList(t *testing.T) {
 	s := newEndpointSync()
 	existing := BindingTarget{Node: ptr[uint64](0x2222), Endpoint: ptr[uint16](3)}
@@ -98,9 +90,6 @@ func TestEndpointBindingSyncAppendsToFetchedList(t *testing.T) {
 	w := s.lastWrite(t)
 	if w.nodeID != 123 || w.endpoint != 1 || len(w.entries) != 2 || !bindingMatches(w.entries[0].Binding, existing) || !bindingMatches(w.entries[1].Binding, added) {
 		t.Fatalf("SyncEndpointBindings(%d, %d, %+v)", w.nodeID, w.endpoint, w.entries)
-	}
-	if s.single != 0 {
-		t.Fatalf("SyncBinding called %d times", s.single)
 	}
 	b := d.EndpointBindingList()
 	if len(b) != 1 || b[0].StatusEntry.State != stateCommitted {

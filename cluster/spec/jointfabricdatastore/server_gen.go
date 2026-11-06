@@ -450,16 +450,15 @@ func (s *Server) Host() Host {
 // (FetchEndpointBindingList), appends the entry or removes the entries
 // whose target matches the removed one, and writes the list — the
 // merge jf-admin-app's delegate does with one entry (:1706-1757 at
-// 6170af84). SyncBinding, the delegate's single-entry overload
-// (JointFabricDatastore.h:189-194 at 6170af84), is kept for that shape
-// and is not called by the datastore. An error leaves the entry as it
-// was (Pending or DeletePending) for the next RefreshNode. Each Fetch
+// 6170af84); the delegate's single-entry overload
+// (JointFabricDatastore.h:189-194 at 6170af84) has no counterpart here,
+// as the datastore merges itself. An error leaves the entry as it was
+// (Pending or DeletePending) for the next RefreshNode. Each Fetch
 // reads the node's current list; an error ends the refresh with the
 // node Pending. The datastore calls it outside its lock.
 type DatastoreSync interface {
 	SyncEndpointGroupID(ctx context.Context, nodeID uint64, entry DatastoreEndpointGroupIDEntryStruct) error
 	SyncNodeKeySet(ctx context.Context, nodeID uint64, entry DatastoreNodeKeySetEntryStruct) error
-	SyncBinding(ctx context.Context, nodeID uint64, entry DatastoreEndpointBindingEntryStruct) error
 	SyncBindings(ctx context.Context, nodeID uint64, entries []DatastoreEndpointBindingEntryStruct) error
 	SyncEndpointBindings(ctx context.Context, nodeID uint64, endpointID uint16, entries []DatastoreEndpointBindingEntryStruct) error
 	SyncACL(ctx context.Context, nodeID uint64, entry DatastoreACLEntryStruct) error

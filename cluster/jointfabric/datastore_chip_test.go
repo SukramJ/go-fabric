@@ -90,10 +90,6 @@ func (s *trackingSync) SyncNodeKeySet(_ context.Context, _ uint64, e NodeKeySetE
 	return nil
 }
 
-// SyncBinding is the delegate's single-entry overload the datastore does
-// not call (JointFabricDatastore.h:189-194 at 6170af84).
-func (*trackingSync) SyncBinding(context.Context, uint64, EndpointBindingEntry) error { return nil }
-
 // bindingWrite is one SyncEndpointBindings call.
 type bindingWrite struct {
 	nodeID   uint64

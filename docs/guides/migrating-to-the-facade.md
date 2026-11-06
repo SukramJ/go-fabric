@@ -257,9 +257,9 @@ entries' `Binding` targets as the list, an empty list included — chip's
 jf-admin-app writes exactly that. The datastore now carries a binding's
 add or removal through it as the endpoint's merged list (fetched with the
 host's `FetchEndpointBindingList`, the entry appended or the matching
-targets removed), so the host no longer merges in `SyncBinding`; that
-method stays in the port and is not called. See the
-[Joint Fabric guide](joint-fabric.md).
+targets removed), so the host no longer merges a single entry:
+`DatastoreSync.SyncBinding` is removed from the port — delete the method.
+See the [Joint Fabric guide](joint-fabric.md).
 
 ## Moved in v0.10.2: value helpers and the native-ramp ports
 
