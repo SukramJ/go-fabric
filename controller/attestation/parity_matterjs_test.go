@@ -10,8 +10,9 @@ import (
 )
 
 // TestParityChecks: the DeviceAttestationCheck values of matter.js
-// packages/protocol/src/certificate/DeviceAttestationValidator.ts:28-52 at
-// 0ceb202d, in declaration order.
+// packages/protocol/src/certificate/DeviceAttestationValidator.ts:32-93 at
+// db021da0, in declaration order, without the deprecated
+// CdSignerVerificationSkipped (:81-82), which matter.js no longer emits.
 func TestParityChecks(t *testing.T) {
 	t.Parallel()
 	got := []attestation.Check{
@@ -20,8 +21,10 @@ func TestParityChecks(t *testing.T) {
 		attestation.CertificationDeclarationSignatureInvalid, attestation.CertificationDeclarationFieldMismatch,
 		attestation.CertificateRevoked, attestation.FirmwareInfoMismatch, attestation.CertificationTypeProvisional,
 		attestation.CertificationTypeTest, attestation.CertificateIDNotVerified, attestation.CertificateUnparseable,
+		attestation.DacFormatInvalid, attestation.PaiFormatInvalid,
 		attestation.AttestationElementsUnparseable, attestation.CertificationDeclarationUnparseable,
-		attestation.CdSignerVerificationSkipped, attestation.PaaTrustStoreTimeMismatch,
+		attestation.CertificationDeclarationFormatInvalid, attestation.CdSignerUnknown,
+		attestation.OfficialCdSignedByTestSigner, attestation.PaaTrustStoreTimeMismatch,
 		attestation.DclServiceUnavailable, attestation.TrustedAsTestCertificate, attestation.ValidationError,
 	}
 	want := []string{
@@ -29,8 +32,10 @@ func TestParityChecks(t *testing.T) {
 		"AttestationSignatureInvalid", "AttestationNonceMismatch", "CertificationDeclarationSignatureInvalid",
 		"CertificationDeclarationFieldMismatch", "CertificateRevoked", "FirmwareInfoMismatch",
 		"CertificationTypeProvisional", "CertificationTypeTest", "CertificateIdNotVerified",
-		"CertificateUnparseable", "AttestationElementsUnparseable", "CertificationDeclarationUnparseable",
-		"CdSignerVerificationSkipped", "PaaTrustStoreTimeMismatch", "DclServiceUnavailable",
+		"CertificateUnparseable", "DacFormatInvalid", "PaiFormatInvalid",
+		"AttestationElementsUnparseable", "CertificationDeclarationUnparseable",
+		"CertificationDeclarationFormatInvalid", "CdSignerUnknown", "OfficialCdSignedByTestSigner",
+		"PaaTrustStoreTimeMismatch", "DclServiceUnavailable",
 		"TrustedAsTestCertificate", "ValidationError",
 	}
 	if len(got) != len(want) {

@@ -197,18 +197,20 @@ func TestCertificateStoreRejectsBadRoots(t *testing.T) {
 	}
 }
 
-// TestCertificateStoreCDSigner: a CD signer absent locally is fetched by
-// key identifier from the production ledger and stored as a production
-// CD signer (:870-883); the next lookup is local. A PAA is not a CD
-// signer; a key identifier the ledger lacks is none.
+// TestCertificateStoreCDSigner: a CSA-issued CD signer absent locally is
+// fetched by key identifier from the production ledger and stored as a
+// production CD signer (lookupCdSigner, DclCertificateService.ts:901-970 at
+// db021da0); the next lookup is local. A PAA is not a CD signer; a key
+// identifier the ledger lacks is none.
 func TestCertificateStoreCDSigner(t *testing.T) {
 	t.Parallel()
 	f := newFakeDCL(t)
 	pki := newTestPKI(t)
-	signer := mint(t, certSpec{cn: "CD signer", ca: false, usage: 1}, &pki.paa)
+	signer := csaFutureSigner(t)
 	f.addRoot(pki.paa)
 	f.addBySKID(signer)
 	s := openStore(t, CertificateOptions{Client: f.client(), Clock: newManualClock()})
+	standInCSA(s, signer)
 	key, ok := s.CDSigner(signer.skid())
 	if !ok || !key.Equal(signer.cert.PublicKey) {
 		t.Fatal("CD signer not fetched")
@@ -326,8 +328,11 @@ func TestCertificateStoreGitHub(t *testing.T) {
 	if _, ok := on.PAA(mirror.paa.skid()); ok {
 		t.Fatal("a dcld_mirror_ file was stored")
 	}
-	if k, ok := on.CDSigner(signer.skid()); !ok || !k.Equal(signer.cert.PublicKey) {
-		t.Fatal("GitHub CD signer missing")
+	// Stored as a test CD signer, but a certificate the CSA CD root did
+	// not issue is no CD signer (lookupCdSigner, DclCertificateService.ts:
+	// 935-940 at db021da0).
+	if _, ok := on.CDSigner(signer.skid()); ok {
+		t.Fatal("a GitHub certificate the CSA did not issue was trusted as CD signer")
 	}
 	for _, m := range on.Certificates() {
 		if m.SubjectKeyID == signer.skidHex() && (m.Kind != KindCDSigner || m.IsProduction || m.Subject != "Chip-Test-CD-Signing-Cert") {

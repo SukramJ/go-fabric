@@ -3875,19 +3875,16 @@ snapshot (`TestSnapshotIsNoRevocationSource`; Matter PKI CP §1.4.5,
 `notes/reference/dcl-data-terms-2026-10-17.md`.
 
 A CD signer the snapshot does not name is fetched from the ledger by
-subject key id and trusted as fetched: `dcl.CertificateStore.CDSigner`
-stores the first certificate of `/dcl/pki/all-certificates?subjectKeyId=`
-as a production CD signer, without a chain check, exactly as matter.js's
-`getOrFetchCdSigner` does (`DclCertificateService.ts:864-891` at `862ad75f`,
-`certs[0]`, `addCertificate(…, "CDSigner", { isProduction: true })`). The
-SKID is a free field of the certificate's author, so this is a trust
-decision on the ledger's approval, not on the CSA CD root; chip accepts CD
-signers from its fixed set only (`DefaultDeviceAttestationVerifier.cpp:146-256`).
-Only an unknown SKID reaches the fetch (the snapshot answers the five known
-signers first), and without any signer the CD signature is skipped with a
-`CdSignerVerificationSkipped` warning the policy judges
-(`controller/attestation/validate.go`). Owner decision 2026-11-02 (review
-W4-ctlint-09): parity, no tightening.
+subject key id and trusted only when the CSA CD root issued it for that
+key identifier (`attestation.VerifyCDSignerCertificate`), as matter.js
+db021da0 trusts CD signers like chip (`CdSigners.ts:90-136`,
+`dcl/DclCertificateService.ts:901-970` at `db021da0`): the five CSA keys
+are built in (`attestation.KnownCDSigner`), the snapshot's and the store's
+certificates count only if they verify, and a CD whose signer is none of
+these is `CdSignerUnknown` (`BD-Matter-Attestation-CDSignerTrust`). This
+replaces the earlier trust-as-fetched parity (owner decision 2026-11-02,
+review W4-ctlint-09), which matter.js left at #4871 (pin lift wave P2,
+#431).
 
 By design. Same trust decision as matter.js's seed, a different place in
 the graph; the named signer set is chip's own.
@@ -4119,6 +4116,53 @@ By design. A re-encoded attestation certificate has no consumer here; the
 vendor-id read happens on the parsed name. The operational-certificate
 side is different: there the TBS is rebuilt from every DN attribute the
 TLV carries (the X.520 gap closed after PR #164).
+
+### BD-Matter-Attestation-ProfileOnCryptoX509 — the DAC and PAI profile is read beside crypto/x509, which refuses more
+
+The DAC and PAI profile is matter.js's (`kinds/AttestationCertificates.ts:92-196`
+at `db021da0`), read from the DER by `controller/attestation/profile.go`
+beside `crypto/x509`, which parses the rest. `crypto/x509` refuses a
+certificate that carries any extension twice and a critical flag that is
+not DER (`0x00`/`0xFF`); matter.js parses both (`Certificate.ts:390-397`
+at `db021da0` reads any non-zero byte as true) and refuses a duplicate only
+of basic constraints, key usage, SKID or AKID, in the profile. A DAC or PAI
+that carries one of those four twice is still `DacFormatInvalid` or
+`PaiFormatInvalid` (the profile reads the DER when `crypto/x509` refuses
+it); one that repeats another extension, a PAA that repeats any, or a
+non-DER critical flag is `CertificateUnparseable` here. The commissioner's
+DAC key after a policy accepted a failed attestation is read by
+`crypto/x509` too (`controller/commissioner/flow.go` `dacKeyOf`), the
+`acceptProfileViolation` read of `ControllerCommissioningFlow.ts`. Pin
+lift wave P2 (#431).
+
+By design. RFC 5280 §4.2 forbids every duplicate and DER every other
+BOOLEAN encoding, so the stricter refusal names no certificate a CSA
+vector or a certified device carries; the four single extensions, where a
+duplicate is a CHIP refusal, keep matter.js's check.
+
+### BD-Matter-Attestation-CDSignerTrust — the store answers CSA-issued CD signers only; the test signer is the validator's
+
+matter.js's `DclCertificateService.lookupCdSigner` returns the built-in
+signers, the Matter test CD signer marked `isTestSigner`, and a stored or
+fetched certificate that `CdSigners.verifyCertificate` accepts
+(`dcl/DclCertificateService.ts:901-970` at `db021da0`). Here the validator
+asks `attestation.KnownCDSigner` first (`controller/attestation/cdsigners.go`
+`lookupCDSigner`, mirroring `DeviceAttestationValidator.ts:460-463` at
+`db021da0`) and only then the trust store, whose
+`attestation.PAAStore.CDSigner` carries no test flag: `dcl.CertificateStore`
+answers the CSA keys and verified certificates and leaves the test
+signer's key identifier alone, and `controller/dcl/snapshot` checks a
+seeded certificate on use. An `attestation.StaticStore`'s `CDSigners` are
+the caller's keys, not checked against the CSA CD root. The deprecated
+`CdSignerVerificationSkipped` (`DeviceAttestationValidator.ts:81-82` at
+`db021da0`) is removed rather than kept, as the module removes a replaced
+symbol while its consumer is the reference host (owner rule 2026-10-21).
+Pin lift wave P2 (#431).
+
+By design. The validator applies the test policy where matter.js does
+(`:478-486`); a store that answered the test signer could not say so
+through the port, and the caller who fills a `StaticStore` vouches for its
+keys as a seed's author does.
 
 ### BD-Matter-NoLegacyGroupCounters — no legacy group counter layout to migrate
 

@@ -22,6 +22,7 @@ import (
 	"math/big"
 	"net/http"
 	"runtime"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -1038,59 +1039,156 @@ func TestDclCertificateServiceAddCertificate(t *testing.T) {
 	})
 }
 
-// TestDclCertificateServiceGetOrFetchCdSigner ports describe("getOrFetchCdSigner"):
-// CDSigner answers the key; the stored metadata answers isProduction.
-func TestDclCertificateServiceGetOrFetchCdSigner(t *testing.T) {
+// TestDclCertificateServiceLookupCdSigner ports describe("lookupCdSigner"),
+// "addCertificate as CD signer" and "getOrFetchCdSigner"
+// (DclCertificateServiceTest.ts:1580-1903 at db021da0) on CDSigner and
+// AddCertificate. The Matter test CD signer, which lookupCdSigner returns
+// marked, is the validator's here (attestation.KnownCDSigner): CDSigner
+// has no isTestSigner to carry, so it leaves that key identifier alone. The
+// stored-DER-unreadable and seed cases have no counterpart: the Go store
+// keeps the DER in its index, and a seed is controller/dcl/snapshot.
+func TestDclCertificateServiceLookupCdSigner(t *testing.T) {
 	t.Parallel()
-	signerSKID := hexUpper(secattestation.TestCMSSignerSKID)
-	signerKey := &secattestation.TestCMSSignerPrivateKey.PublicKey
-	t.Run("returns locally injected CD signer without DCL lookup", func(t *testing.T) {
-		t.Parallel()
-		f := &dclCertSvcFetch{}
-		f.addMocks("")
-		s := dclCertSvcOpen(t, f, CertificateOptions{})
-		if _, err := s.AddCertificate(context.Background(), dclCertSvcCDSigner, KindCDSigner, false); err != nil {
-			t.Fatal(err)
+	const unknownSKID = "DEADBEEFDEADBEEFDEADBEEFDEADBEEFDEADBEEF"
+	skidCalls := func(f *dclCertSvcFetch) int { return f.called("all-certificates") }
+	skidAnswer := func(f *dclCertSvcFetch, skid string, certs ...[]byte) {
+		raw, _ := hex.DecodeString(skid)
+		colons := colonHex(raw)
+		records := make([]any, len(certs))
+		for i, der := range certs {
+			records[i] = map[string]any{"pemCert": dclCertSvcPEM(der), "schemaVersion": 0}
 		}
-		before := f.callCount()
-		key, ok := s.CDSigner(secattestation.TestCMSSignerSKID)
-		if !ok || !key.Equal(signerKey) {
-			t.Fatal("CD signer key")
-		}
-		if dclCertSvcMustCert(t, s, signerSKID).IsProduction {
-			t.Fatal("isProduction")
-		}
-		if f.callCount() != before {
-			t.Fatal("asked the ledger")
-		}
-	})
-	t.Run("fetches CD signer from DCL on cache miss", func(t *testing.T) {
-		t.Parallel()
-		f := &dclCertSvcFetch{}
-		f.addMocks("")
-		colons := colonHex(secattestation.TestCMSSignerSKID)
 		f.add("/dcl/pki/all-certificates?subjectKeyId="+encodeURIComponent(colons), map[string]any{"certificates": []any{map[string]any{
-			"subject": "", "subjectKeyId": colons, "schemaVersion": 0,
-			"certs": []any{map[string]any{"pemCert": dclCertSvcPEM(dclCertSvcCDSigner), "schemaVersion": 0}},
+			"subject": "", "subjectKeyId": colons, "schemaVersion": 0, "certs": records,
 		}}})
-		s := dclCertSvcOpen(t, f, CertificateOptions{})
-		key, ok := s.CDSigner(secattestation.TestCMSSignerSKID)
-		if !ok || !key.Equal(signerKey) {
-			t.Fatal("CD signer key")
-		}
-		if !dclCertSvcMustCert(t, s, signerSKID).IsProduction {
-			t.Fatal("a fetched CD signer is not production")
-		}
-	})
-	t.Run("returns undefined when DCL has no CD signer for the SKID", func(t *testing.T) {
-		t.Parallel()
+	}
+	online := func(t *testing.T) (*dclCertSvcFetch, *CertificateStore) {
+		t.Helper()
 		f := &dclCertSvcFetch{}
 		f.addMocks("")
+		return f, dclCertSvcOpen(t, f, CertificateOptions{})
+	}
+	key001 := csaKey001(t)
+	t.Run("finds a built-in CSA signing key without asking the DCL", func(t *testing.T) {
+		t.Parallel()
+		f, s := online(t)
+		k, ok := s.CDSigner(key001.skid())
+		if !ok || !k.Equal(key001.cert.PublicKey) || skidCalls(f) != 0 {
+			t.Fatalf("CDSigner = %v %v, %d DCL calls", k, ok, skidCalls(f))
+		}
+	})
+	t.Run("leaves the test signer to the validator without asking the DCL", func(t *testing.T) {
+		t.Parallel()
+		f, s := online(t)
+		if k, ok := s.CDSigner(secattestation.TestCMSSignerSKID); ok || k != nil || skidCalls(f) != 0 {
+			t.Fatalf("CDSigner = %v %v, %d DCL calls", k, ok, skidCalls(f))
+		}
+	})
+	t.Run("does not know a subject key identifier that is not 20 bytes and does not ask the DCL", func(t *testing.T) {
+		t.Parallel()
+		f, s := online(t)
+		if _, ok := s.CDSigner([]byte{0xAB, 0xCD}); ok || skidCalls(f) != 0 {
+			t.Fatalf("found, %d DCL calls", skidCalls(f))
+		}
+	})
+	t.Run("does not know a signer the DCL does not list", func(t *testing.T) {
+		t.Parallel()
+		f, s := online(t)
 		f.add("/dcl/pki/all-certificates?subjectKeyId=", map[string]any{"certificates": []any{}})
-		s := dclCertSvcOpen(t, f, CertificateOptions{})
-		id, _ := hex.DecodeString("DEADBEEFDEADBEEFDEADBEEFDEADBEEFDEADBEEF")
+		id, _ := hex.DecodeString(unknownSKID)
 		if _, ok := s.CDSigner(id); ok {
 			t.Fatal("found")
+		}
+	})
+	t.Run("does not know a signer whose DCL certificate cannot be parsed, and stores nothing", func(t *testing.T) {
+		t.Parallel()
+		f, s := online(t)
+		skidAnswer(f, unknownSKID, []byte{0x30, 0x03, 0x02, 0x01, 0x01})
+		id, _ := hex.DecodeString(unknownSKID)
+		if _, ok := s.CDSigner(id); ok {
+			t.Fatal("found")
+		}
+		if slices.ContainsFunc(s.Certificates(), func(m CertificateMetadata) bool { return m.SubjectKeyID == unknownSKID }) {
+			t.Fatal("stored")
+		}
+	})
+	t.Run("does not take a PAA or PAI the DCL returns for its own SKID as a CD signer", func(t *testing.T) {
+		t.Parallel()
+		f, s := online(t)
+		paaSKID := hexUpper(secattestation.TestPAAFFF1SKID)
+		skidAnswer(f, paaSKID, secattestation.TestPAAFFF1Cert)
+		if _, ok := s.CDSigner(secattestation.TestPAAFFF1SKID); ok {
+			t.Fatal("a PAA was taken as a CD signer")
+		}
+		if slices.ContainsFunc(s.Certificates(), func(m CertificateMetadata) bool { return m.SubjectKeyID == paaSKID && m.Kind == KindCDSigner }) {
+			t.Fatal("stored as a CD signer")
+		}
+	})
+	t.Run("does not take a CSA-issued certificate the DCL returns for another SKID", func(t *testing.T) {
+		t.Parallel()
+		f, s := online(t)
+		skidAnswer(f, unknownSKID, key001.der)
+		id, _ := hex.DecodeString(unknownSKID)
+		if _, ok := s.CDSigner(id); ok {
+			t.Fatal("found")
+		}
+	})
+	t.Run("does not know a signer while the DCL cannot be asked", func(t *testing.T) {
+		t.Parallel()
+		f, s := online(t)
+		f.add("/dcl/pki/all-certificates?subjectKeyId=", map[string]any{"message": "unavailable"}, http.StatusServiceUnavailable)
+		id, _ := hex.DecodeString(unknownSKID)
+		if _, ok := s.CDSigner(id); ok {
+			t.Fatal("found")
+		}
+	})
+	t.Run("a CSA-issued signer that is not built in: trusts it from the DCL, stores it, and then finds it without asking again", func(t *testing.T) {
+		t.Parallel()
+		f, s := online(t)
+		future := csaFutureSigner(t)
+		standInCSA(s, future)
+		skidAnswer(f, futureSKID, secattestation.TestPAAFFF1Cert, future.der)
+		k, ok := s.CDSigner(future.skid())
+		if !ok || !k.Equal(key001.cert.PublicKey) {
+			t.Fatal("not trusted from the DCL")
+		}
+		if m := dclCertSvcMustCert(t, s, futureSKID); m.Kind != KindCDSigner || !m.IsProduction {
+			t.Fatalf("stored %+v", m)
+		}
+		if _, ok := s.CDSigner(future.skid()); !ok || skidCalls(f) != 1 {
+			t.Fatalf("%d DCL calls", skidCalls(f))
+		}
+	})
+	t.Run("a CSA-issued signer that is not built in: replaces a stored certificate that does not verify once the DCL answers with one that does", func(t *testing.T) {
+		t.Parallel()
+		f, s := online(t)
+		future := csaFutureSigner(t)
+		standInCSA(s, future)
+		// A stored CD signer under the key identifier that does not verify.
+		s.storeCertificate(futureSKID, secattestation.TestPAAFFF1Cert, CertificateMetadata{SubjectKeyID: futureSKID, Kind: KindCDSigner})
+		skidAnswer(f, futureSKID, future.der)
+		if _, ok := s.CDSigner(future.skid()); !ok {
+			t.Fatal("not trusted from the DCL")
+		}
+		e, _ := s.lookup(futureSKID)
+		if !bytes.Equal(e.DER, future.der) || !e.IsProduction {
+			t.Fatal("the stored certificate was not replaced")
+		}
+	})
+	t.Run("addCertificate as CD signer: stores a CSA-issued certificate and the Matter test CD signer", func(t *testing.T) {
+		t.Parallel()
+		_, s := online(t)
+		for _, der := range [][]byte{key001.der, dclCertSvcCDSigner} {
+			if added, err := s.AddCertificate(context.Background(), der, KindCDSigner, false); !added || err != nil {
+				t.Fatalf("added %v %v", added, err)
+			}
+		}
+	})
+	t.Run("addCertificate as CD signer: refuses a certificate the CSA did not issue", func(t *testing.T) {
+		t.Parallel()
+		_, s := online(t)
+		if added, err := s.AddCertificate(context.Background(), secattestation.TestPAAFFF1Cert, KindCDSigner, false); added || err == nil {
+			t.Fatalf("added %v %v", added, err)
 		}
 	})
 }

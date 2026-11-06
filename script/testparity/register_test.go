@@ -44,7 +44,9 @@ import (
 // new files on its waves P1–P4 (20); wave P1 ported its four
 // (AdministratorCommissioningServerTest, CaseSessionCatsTest,
 // DistinguishedNameTest, OperationalCertificateVerifyTest) as partial: 16.
-const testparityPlannedRatchet = 16
+// // Pin lift wave P2 (#431) ports AttestationCertificateProfileTest.ts (in
+// part), CdSignersTest.ts and DeviceAttestationValidatorChipCdTest.ts as well: 13.
+const testparityPlannedRatchet = 13
 
 // testparityPortedRatchet is the number of ported entries, and
 // testparityMissingRatchet the number of matter.js it cases the partial
@@ -105,9 +107,16 @@ const testparityPlannedRatchet = 16
 // administrator's window, the VVSC kind and issuer-DN cases of the
 // certificate tests, the vendor-id DN attributes, the DER round trips):
 // 1033 missing.
+// Pin lift wave P2 (#431): CdSignersTest.ts and
+// DeviceAttestationValidatorChipCdTest.ts ported, DeviceAttestationValidatorTest.ts
+// completed (its five CD signer cases); the CD envelope cases of
+// CertificationDeclarationTest.ts and fourteen lookupCdSigner cases of
+// DclCertificateServiceTest.ts leave missing, the 23 distinguished-name
+// cases of AttestationCertificateProfileTest.ts (#4880, wave P1) join it:
+// merged with wave P1: 149 ported, 1024 missing.
 const (
-	testparityPortedRatchet  = 146
-	testparityMissingRatchet = 1030
+	testparityPortedRatchet  = 149
+	testparityMissingRatchet = 1024
 )
 
 // testparityLeftRatchet is the number of left it cases summed over the
@@ -145,7 +154,11 @@ const (
 // Pin lift db021da0 wave P1 adds the twelve js-runtime-only rows of the
 // certificate tests' object-view API (DistinguishedName.rdnsOf, frozen
 // objects, spread copies, an undefined property): 604.
-const testparityLeftRatchet = 604
+// Pin lift wave P2 (#431) leaves two DclCertificateServiceTest.ts lookups
+// by design: the unreadable stored DER (the Go index holds it) and the
+// test signer, which the validator knows built in
+// (BD-Matter-Attestation-CDSignerTrust) — merged with wave P1: 606.
+const testparityLeftRatchet = 606
 
 // The matterjs-server register's four ratchets, exact in both directions as
 // the matter.js register's are (the comments above give the rules). Set by

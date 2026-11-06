@@ -28,9 +28,10 @@ type PAA struct {
 }
 
 // PAAStore is the trust store [Validate] consults — the part of matter.js
-// DclCertificateService the validator uses (DAV:233-400): getCertificate /
-// getCertificateAsDer by subject key identifier with test certificates
-// considered, acceptsTestCertificates, getOrFetchCdSigner.
+// DclCertificateService the validator uses (DeviceAttestationValidator.ts:
+// 321-486 at db021da0): getCertificate / getCertificateAsDer by subject key
+// identifier with test certificates considered, acceptsTestCertificates,
+// lookupCdSigner.
 type PAAStore interface {
 	// PAA returns the root whose subject key identifier is skid.
 	PAA(skid []byte) (PAA, bool)
@@ -38,7 +39,13 @@ type PAAStore interface {
 	// one; when false a test root is an error finding (DAV:243-251).
 	AcceptsTestCertificates() bool
 	// CDSigner returns the public key of the Certification Declaration
-	// signer whose subject key identifier is skid.
+	// signer whose subject key identifier is skid. [Validate] asks only
+	// for a signer that is not built in ([KnownCDSigner]); the answer is
+	// trusted as a CSA-issued signer: a ledger-backed store answers only
+	// with a certificate [VerifyCDSignerCertificate] accepts
+	// (DclCertificateService.lookupCdSigner, dcl/DclCertificateService.ts:
+	// 901-970 at db021da0), never with a PAA or PAI key; a [StaticStore]
+	// answers with the keys its caller vouches for.
 	CDSigner(skid []byte) (*ecdsa.PublicKey, bool)
 }
 
@@ -52,7 +59,9 @@ type Revocations interface {
 	IsRevoked(akid, serial []byte, issuerDN string) (bool, error)
 }
 
-// StaticStore is a [PAAStore] over a fixed set of roots and CD signers.
+// StaticStore is a [PAAStore] over a fixed set of roots and CD signers. Its
+// CD signers are the caller's: unlike a DCL answer they are not checked
+// against the CSA CD root, so the caller vouches that each is a CD signer.
 type StaticStore struct {
 	// PAAs are the trusted roots.
 	PAAs []PAA
@@ -86,18 +95,15 @@ func (s *StaticStore) CDSigner(skid []byte) (*ecdsa.PublicKey, bool) {
 
 // TestStore is the CSA test trust store: the two test PAAs of
 // secure/attestation (the roots the reference node's chain and
-// chip-tool's test chains end in) as test roots, the Appendix F test CD
-// signer (matter.js CertificationDeclaration.testSignerInfo,
-// kinds/CertificationDeclaration.ts:220-226), and test certificates
-// accepted.
+// chip-tool's test chains end in) as test roots, and test certificates
+// accepted, which also trusts the Appendix F test CD signer — built in
+// like the CSA CD signing keys ([KnownCDSigner]), so the store lists no CD
+// signer.
 func TestStore() *StaticStore {
 	return &StaticStore{
 		PAAs: []PAA{
 			{DER: secattestation.TestPAAFFF1Cert},
 			{DER: secattestation.TestPAANoVIDCert},
-		},
-		CDSigners: map[string]*ecdsa.PublicKey{
-			strings.ToUpper(hex.EncodeToString(secattestation.TestCMSSignerSKID)): &secattestation.TestCMSSignerPrivateKey.PublicKey,
 		},
 		AcceptTest: true,
 	}

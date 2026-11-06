@@ -15,6 +15,7 @@ import (
 	"math/big"
 	"net"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -146,13 +147,23 @@ func TestCommissionWithDCLStore(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Commission: %v", err)
 	}
+	// The node's CD is signed by the Matter test CD signer, which is built
+	// in: it is not fetched, and under the store's production-only policy
+	// it is a recoverable TrustedAsTestCertificate
+	// (DeviceAttestationValidator.ts:478-486 at db021da0).
 	for _, f := range findings {
-		if f.Check != attestation.CertificationTypeTest && f.Check != attestation.PaaTrustStoreTimeMismatch {
+		switch f.Check {
+		case attestation.CertificationTypeTest, attestation.PaaTrustStoreTimeMismatch:
+		case attestation.TrustedAsTestCertificate:
+			if !strings.Contains(f.Message, "test CD signer") {
+				t.Errorf("finding %s: %s", f.Check, f.Message)
+			}
+		default:
 			t.Errorf("finding %s: %s", f.Check, f.Message)
 		}
 	}
-	if !slices.ContainsFunc(store.Certificates(), func(m CertificateMetadata) bool { return m.Kind == KindCDSigner && m.IsProduction }) {
-		t.Fatal("the CD signer was not stored")
+	if slices.ContainsFunc(store.Certificates(), func(m CertificateMetadata) bool { return m.Kind == KindCDSigner }) {
+		t.Fatal("the built-in test CD signer was fetched and stored")
 	}
 
 	// Without the PAA in the ledger.
@@ -176,7 +187,7 @@ func TestCommissionRevokedDAC(t *testing.T) {
 		t.Fatal(err)
 	}
 	paa := testCert{der: secattestation.TestPAANoVIDCert, cert: paaCert, key: secattestation.TestPAANoVIDPrivateKey}
-	pai := mint(t, certSpec{cn: "Matter Dev PAI 0xFFF1", vid: u16(0xFFF1), ca: true, serial: 0x3003}, &paa)
+	pai := mint(t, certSpec{cn: "Matter Dev PAI 0xFFF1", vid: u16(0xFFF1), ca: true, pathLen0: true, serial: 0x3003}, &paa)
 	dacKey, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	dac := mint(t, certSpec{cn: "Matter Dev DAC 0xFFF1/0x8001", vid: u16(0xFFF1), pid: u16(0x8001), usage: x509.KeyUsageDigitalSignature, serial: 0x4004, key: dacKey}, &pai)
 	if dac.cert.NotBefore.After(time.Now()) {

@@ -114,6 +114,11 @@ func FuzzParseAttCert(f *testing.F) {
 		if len(der) > 1<<16 {
 			return
 		}
-		_, _ = parseAttCert(der, authorityKeyID)
+		kind := kindPAA
+		if authorityKeyID {
+			kind = kindDAC
+		}
+		_, _ = parseAttCert(der, kind, false)
+		_, _ = parseAttCert(der, kind, true)
 	})
 }

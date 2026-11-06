@@ -2112,7 +2112,7 @@
   },
   {
     "file": "controller/attestation/cert.go",
-    "line": 160,
+    "line": 194,
     "citation": "Certificate.ts:345-352",
     "resolved": "packages/protocol/src/certificate/kinds/Certificate.ts",
     "identifier": "parseInt",
@@ -2121,7 +2121,7 @@
   },
   {
     "file": "controller/attestation/cert.go",
-    "line": 185,
+    "line": 219,
     "citation": "Certificate.ts:249-258",
     "resolved": "packages/protocol/src/certificate/kinds/Certificate.ts",
     "identifier": "parseMatterFallbackVidPid",
@@ -2139,7 +2139,7 @@
   },
   {
     "file": "controller/attestation/certificates_parity_matterjs_test.go",
-    "line": 46,
+    "line": 52,
     "citation": "CertificatesTest.ts:295",
     "resolved": "packages/protocol/test/certificate/CertificatesTest.ts",
     "identifier": "ProductID",
@@ -2148,7 +2148,7 @@
   },
   {
     "file": "controller/attestation/certificates_parity_matterjs_test.go",
-    "line": 73,
+    "line": 79,
     "citation": "CertificatesTest.ts:357",
     "resolved": "packages/protocol/test/certificate/CertificatesTest.ts",
     "identifier": "parseMatterFallbackVidPid",
@@ -2165,17 +2165,8 @@
     "occurrences": 4
   },
   {
-    "file": "controller/attestation/store.go",
-    "line": 91,
-    "citation": "kinds/CertificationDeclaration.ts:220-226",
-    "resolved": "packages/protocol/src/certificate/kinds/CertificationDeclaration.ts",
-    "identifier": "testSignerInfo",
-    "nearest": 274,
-    "occurrences": 1
-  },
-  {
     "file": "controller/attestation/validate.go",
-    "line": 374,
+    "line": 413,
     "citation": "Certificate.ts:650",
     "resolved": "packages/protocol/src/certificate/kinds/Certificate.ts",
     "identifier": "serialNumber",
@@ -2528,7 +2519,7 @@
   },
   {
     "file": "controller/dcl/certstore.go",
-    "line": 274,
+    "line": 283,
     "citation": "DeviceAttestationValidator.ts:235",
     "resolved": "packages/protocol/src/certificate/DeviceAttestationValidator.ts",
     "identifier": "considerTestCertificates",
@@ -2537,7 +2528,7 @@
   },
   {
     "file": "controller/dcl/certstore_test.go",
-    "line": 244,
+    "line": 246,
     "citation": "DeviceAttestationValidator.ts:235",
     "resolved": "packages/protocol/src/certificate/DeviceAttestationValidator.ts",
     "identifier": "getCertificate",
@@ -2546,7 +2537,7 @@
   },
   {
     "file": "controller/dcl/commission_test.go",
-    "line": 172,
+    "line": 183,
     "citation": "DeviceAttestationValidator.ts:343-355",
     "resolved": "packages/protocol/src/certificate/DeviceAttestationValidator.ts",
     "identifier": "CertificateRevoked",

@@ -247,6 +247,20 @@ One value changed: `Cluster.Decoded` of a nullable struct attribute
 returns the generated struct now, as it does for a non-nullable one,
 where it returned a `map[uint32]any` by field id.
 
+## Changed after v0.17.0: the attestation checks
+
+`attestation.CdSignerVerificationSkipped` is removed: the validator no
+longer skips a Certification Declaration's signature. A CD whose signer
+is neither built in (`attestation.KnownCDSigner`: the CSA signing keys
+001–005 and the Matter test CD signer) nor a CSA-issued signer the trust
+store knows fails with the error `attestation.CdSignerUnknown`. A policy
+(`attestation.Policy.Decide`) or a test that looked for
+`CdSignerVerificationSkipped` looks for `CdSignerUnknown`; a
+`StaticStore` whose `CDSigners` held only the test CD signer can drop the
+entry. New refusals a policy may see: `DacFormatInvalid`,
+`PaiFormatInvalid`, `CertificationDeclarationFormatInvalid` and
+`OfficialCdSignedByTestSigner`.
+
 ## Changed after v0.17.0: the client stack's CASE options
 
 `handshake.CASEOptions.CaseAuthenticatedTags` is removed: a CASE session

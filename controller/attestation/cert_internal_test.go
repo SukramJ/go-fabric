@@ -59,8 +59,8 @@ func selfSigned(t *testing.T, tmpl *x509.Certificate, curve elliptic.Curve) *x50
 	return c
 }
 
-// TestCertificateRules: the required extensions (Certificate.ts:397-401,
-// :549-551), the CN fallback when no OID is present, the non-well-defined
+// TestCertificateRules: the required extensions (Certificate.ts:385-388,
+// :589-593 at db021da0), the CN fallback when no OID is present, the non-well-defined
 // notAfter as 0, and the P-256 key rule.
 func TestCertificateRules(t *testing.T) {
 	t.Parallel()
@@ -70,10 +70,7 @@ func TestCertificateRules(t *testing.T) {
 		SubjectKeyId: make([]byte, 20), AuthorityKeyId: make([]byte, 20),
 	}
 	c := selfSigned(t, full, elliptic.P256())
-	if err := checkRequiredExtensions(c, true); err != nil {
-		t.Fatal(err)
-	}
-	a, err := parseAttCert(c.Raw, true)
+	a, err := parseAttCert(c.Raw, kindPAI, true)
 	if err != nil || a.vendorID == nil || *a.vendorID != 0xFFF1 || a.productID == nil || *a.productID != 0x8001 || a.notAfter != 0 {
 		t.Fatalf("parsed %+v (%v)", a, err)
 	}
@@ -91,12 +88,16 @@ func TestCertificateRules(t *testing.T) {
 		"keyUsage":         {BasicConstraintsValid: true, SubjectKeyId: make([]byte, 20), AuthorityKeyId: make([]byte, 20)},
 		"authorityKeyId":   {BasicConstraintsValid: true, KeyUsage: x509.KeyUsageDigitalSignature, SubjectKeyId: make([]byte, 20)},
 	} {
-		if err := checkRequiredExtensions(selfSigned(t, tmpl, elliptic.P256()), true); err == nil {
-			t.Errorf("missing %s accepted", name)
+		kind := kindPAI
+		if name == "basicConstraints" {
+			kind = kindPAA // a DAC or PAI without it breaks its profile
+		}
+		if _, err := parseAttCert(selfSigned(t, tmpl, elliptic.P256()).Raw, kind, false); err == nil || isProfileError(err) {
+			t.Errorf("missing %s accepted (%v)", name, err)
 		}
 	}
 	bad := selfSigned(t, &x509.Certificate{Subject: pkix.Name{CommonName: "Mvid:12"}, BasicConstraintsValid: true, KeyUsage: x509.KeyUsageDigitalSignature, SubjectKeyId: make([]byte, 20), AuthorityKeyId: make([]byte, 20)}, elliptic.P256())
-	if _, err := parseAttCert(bad.Raw, true); err == nil {
+	if _, err := parseAttCert(bad.Raw, kindPAI, true); err == nil {
 		t.Fatal("a malformed Mvid: fallback parsed")
 	}
 	if serialBytes(big.NewInt(0x80))[0] != 0 || len(serialBytes(big.NewInt(0))) != 1 {

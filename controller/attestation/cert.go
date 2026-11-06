@@ -5,8 +5,9 @@ package attestation
 
 // The X.509 side of the attestation certificates: what matter.js
 // Certificate.parseAsn1Certificate (packages/protocol/src/certificate/
-// kinds/Certificate.ts at 0ceb202d) reads of a DAC, PAI or PAA that the
-// validator uses, on top of crypto/x509's parser.
+// kinds/Certificate.ts at db021da0) reads of a DAC, PAI or PAA that the
+// validator uses, on top of crypto/x509's parser; the profile is
+// profile.go.
 
 import (
 	"crypto/ecdsa"
@@ -54,38 +55,43 @@ type attCert struct {
 	notAfter  int64
 }
 
-// requiredExtensions are Certificate.REQUIRED_PAA_EXTENSIONS and
-// REQUIRED_EXTENSIONS (Certificate.ts:397-401): basicConstraints,
-// keyUsage and subjectKeyIdentifier, plus authorityKeyIdentifier for a
-// PAI and a DAC; a missing one is a CertificateError (:549-551).
-func checkRequiredExtensions(c *x509.Certificate, authorityKeyID bool) error {
-	switch {
-	case !c.BasicConstraintsValid:
-		return errors.New("attestation: missing required extension basicConstraints")
-	case c.KeyUsage == 0:
-		return errors.New("attestation: missing required extension keyUsage")
-	case len(c.SubjectKeyId) == 0:
-		return errors.New("attestation: missing required extension subjectKeyIdentifier")
-	case authorityKeyID && len(c.AuthorityKeyId) == 0:
-		return errors.New("attestation: missing required extension authorityKeyIdentifier")
-	}
-	return nil
-}
-
 // parseAttCert is Paa/Pai/Dac.fromAsn1 (kinds/AttestationCertificates.ts:
-// 34-72): the DER parse with the size limit and the required extensions,
-// the Matter vendor and product id of the subject, the validity in Matter
-// epoch seconds. It parses with PQC Phase 1's size limit
-// (parseAttestationCertificate, :31-39, Certificate.ts:610-622); a
-// traditional certificate stays bound to 600 bytes, and one that uses
-// ML-DSA while the feature is off is [ErrMLDSAAttestationDisabled]
-// (pqc.go).
-func parseAttCert(der []byte, authorityKeyID bool) (*attCert, error) {
+// 50-233 at db021da0): the DER parse with the size limit and the required
+// extensions of the kind, the Matter vendor and product id of the subject,
+// the validity in Matter epoch seconds; a DAC's key is EC P-256 (the Dac
+// constructor, :235-247 at db021da0), and a DAC or PAI is held to its
+// profile (:107-196 at db021da0), a violation being a [*profileError]. It
+// parses with PQC Phase 1's size limit (parseAttestationCertificate,
+// :50-63 at db021da0); a traditional certificate stays bound to 600 bytes,
+// and one that uses ML-DSA while the feature is off is
+// [ErrMLDSAAttestationDisabled] (pqc.go). The PAA profile is not checked.
+//
+// acceptProfileViolation is AttestationParseOptions.acceptProfileViolation
+// (:29-48 at db021da0): no profile check, and basic constraints not
+// required of a PAA either; key usage and the key identifiers stay
+// required, as a certificate without them is unusable.
+func parseAttCert(der []byte, kind certKind, acceptProfileViolation bool) (*attCert, error) {
 	if len(der) > maxPQCDERCertificateSize {
 		return nil, fmt.Errorf("attestation: DER certificate of %d bytes exceeds the %d byte limit", len(der), maxPQCDERCertificateSize)
 	}
 	c, err := x509.ParseCertificate(der)
 	if err != nil {
+		// crypto/x509 refuses a certificate that carries an extension
+		// twice (RFC 5280 §4.2) or a version field above 2, which
+		// matter.js parses and refuses in the DAC and PAI profile
+		// (AttestationCertificates.ts:122-124, :130-139 at db021da0) — after
+		// the required extensions of the parse (Certificate.ts:589-593),
+		// which come first here too.
+		if (kind == kindDAC || kind == kindPAI) && !acceptProfileViolation {
+			if enc, encErr := readEncoding(der); encErr == nil {
+				if reqErr := checkRequiredExtensions(kind, false, &enc); reqErr != nil {
+					return nil, reqErr
+				}
+				if !enc.isV3() || enc.hasDuplicateSingleExtension() {
+					return nil, assertCommonProfile(kind, &enc)
+				}
+			}
+		}
 		return nil, err
 	}
 	switch {
@@ -94,11 +100,39 @@ func parseAttCert(der []byte, authorityKeyID bool) (*attCert, error) {
 	case !usesMLDSA(c) && len(der) > maxDERCertificateSize:
 		return nil, fmt.Errorf("attestation: DER certificate of %d bytes exceeds the %d byte limit", len(der), maxDERCertificateSize)
 	}
-	if err := checkRequiredExtensions(c, authorityKeyID); err != nil {
+	enc, err := readEncoding(der)
+	if err != nil {
 		return nil, err
+	}
+	if err := checkRequiredExtensions(kind, acceptProfileViolation, &enc); err != nil {
+		return nil, err
+	}
+	// A PAA or CD signer below v3 carries no extensions crypto/x509 reads
+	// (RFC 5280 §4.1.2.9), so its key identifiers would stay empty and the
+	// chain fail later with a misleading mismatch; refuse it here. A DAC or
+	// PAI gets the profile's version rule below.
+	if (kind == kindPAA || kind == kindCDSigner) && !enc.isV3() {
+		return nil, fmt.Errorf("attestation: %s version field must be 2 (v3), not %s", kind, enc.version)
 	}
 	a := &attCert{x509: c, notBefore: matterTime(c.NotBefore), notAfter: matterTime(c.NotAfter)}
 	if a.vendorID, a.productID, err = MatterIDs(c); err != nil {
+		return nil, err
+	}
+	switch kind {
+	case kindDAC:
+		if _, err := P256Key(c); err != nil {
+			return nil, fmt.Errorf("attestation: DAC public key must be EC P-256: %w", err)
+		}
+		if !acceptProfileViolation {
+			err = assertDacProfile(&enc)
+		}
+	case kindPAI:
+		if !acceptProfileViolation {
+			err = assertPaiProfile(&enc)
+		}
+	case kindPAA, kindCDSigner:
+	}
+	if err != nil {
 		return nil, err
 	}
 	return a, nil

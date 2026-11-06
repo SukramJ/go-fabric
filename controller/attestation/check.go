@@ -4,11 +4,13 @@
 package attestation
 
 // Check names a check of the validation — matter.js DeviceAttestationCheck
-// (DeviceAttestationValidator.ts:28-52 at 0ceb202d). The string values are
+// (DeviceAttestationValidator.ts:32-93 at db021da0). The string values are
 // matter.js's.
 type Check string
 
-// The checks, DAV:28-52.
+// The checks, DeviceAttestationValidator.ts:32-93 at db021da0, without
+// CdSignerVerificationSkipped (:81-82 at db021da0), which matter.js keeps
+// for compatibility but no longer emits.
 const (
 	PaaNotTrusted                            Check = "PaaNotTrusted"
 	CertificateChainInvalid                  Check = "CertificateChainInvalid"
@@ -24,12 +26,36 @@ const (
 	CertificationTypeTest                    Check = "CertificationTypeTest"
 	CertificateIDNotVerified                 Check = "CertificateIdNotVerified"
 	CertificateUnparseable                   Check = "CertificateUnparseable"
-	AttestationElementsUnparseable           Check = "AttestationElementsUnparseable"
-	CertificationDeclarationUnparseable      Check = "CertificationDeclarationUnparseable"
-	CdSignerVerificationSkipped              Check = "CdSignerVerificationSkipped"
-	PaaTrustStoreTimeMismatch                Check = "PaaTrustStoreTimeMismatch"
-	DclServiceUnavailable                    Check = "DclServiceUnavailable"
-	TrustedAsTestCertificate                 Check = "TrustedAsTestCertificate"
+	// DacFormatInvalid: the DAC parses but violates the DAC certificate
+	// profile, Matter Core §6.2.2.3 (DeviceAttestationValidator.ts:49-54 at
+	// db021da0).
+	DacFormatInvalid Check = "DacFormatInvalid"
+	// PaiFormatInvalid: the PAI parses but violates the PAI certificate
+	// profile, Matter Core §6.2.2.4 (DeviceAttestationValidator.ts:56-61 at
+	// db021da0).
+	PaiFormatInvalid                    Check = "PaiFormatInvalid"
+	AttestationElementsUnparseable      Check = "AttestationElementsUnparseable"
+	CertificationDeclarationUnparseable Check = "CertificationDeclarationUnparseable"
+	// CertificationDeclarationFormatInvalid: the CD breaks an encoding rule
+	// of Matter Core §6.3.1 — its CMS envelope, format_version — or has a
+	// reserved certification_type, which CHIP refuses
+	// (DeviceAttestationValidator.ts:66-70 at db021da0).
+	CertificationDeclarationFormatInvalid Check = "CertificationDeclarationFormatInvalid"
+	// CdSignerUnknown: the CD's signer is neither a built-in CSA key, the
+	// Matter test CD signer, nor a CSA-issued certificate the trust store
+	// knows (DeviceAttestationValidator.ts:72-76 at db021da0).
+	CdSignerUnknown Check = "CdSignerUnknown"
+	// OfficialCdSignedByTestSigner: a CD of certification_type official is
+	// signed by the Matter test CD signer (DeviceAttestationValidator.ts:
+	// 78-79 at db021da0).
+	OfficialCdSignedByTestSigner Check = "OfficialCdSignedByTestSigner"
+	PaaTrustStoreTimeMismatch    Check = "PaaTrustStoreTimeMismatch"
+	DclServiceUnavailable        Check = "DclServiceUnavailable"
+	// TrustedAsTestCertificate: a test PAA or the Matter test CD signer
+	// while the trust store does not accept test certificates, collected as
+	// a recoverable error so the policy decides
+	// (DeviceAttestationValidator.ts:85-89 at db021da0).
+	TrustedAsTestCertificate Check = "TrustedAsTestCertificate"
 	// ValidationError is an unexpected error during validation (an
 	// unrecoverably corrupt trust-store certificate, say), DAV:50-51.
 	ValidationError Check = "ValidationError"
