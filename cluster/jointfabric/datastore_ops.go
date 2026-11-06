@@ -758,24 +758,22 @@ func (d *Datastore) removeBindingLocked(listID uint16, nodeID uint64, endpointID
 	return nil
 }
 
-// pushBinding carries one binding entry to its node. A port that is an
-// [EndpointBindingSync] takes the endpoint's whole list, merged as
-// connectedhomeip's jf-admin-app delegate merges the one entry chip's
-// datastore hands it (examples/jf-admin-app/linux/JFADatastoreSync.cpp:1706-1757
-// at 6170af84): the endpoint's current bindings are fetched (:1717-1719),
-// a DeletePending entry removes the entries whose target matches
+// pushBinding carries one binding entry to its node as the endpoint's
+// whole list (SyncEndpointBindings), merged as connectedhomeip's
+// jf-admin-app delegate merges the one entry chip's datastore hands it
+// (examples/jf-admin-app/linux/JFADatastoreSync.cpp:1706-1757 at
+// 6170af84): the endpoint's current bindings are fetched (:1717-1719), a
+// DeletePending entry removes the entries whose target matches
 // (:1731-1741, the fields BindingMatches compares), any other entry is
 // appended (:1744), and the list is written (:1747). A fetch that fails is
 // the push's error, so the entry stays Pending or DeletePending for the
 // next RefreshNode — jf-admin-app writes the one entry over an empty list
 // instead (:1726-1730 at 6170af84), which would drop the node's other
-// bindings. Any other port takes the one entry (SyncBinding), as chip's
-// datastore pushes it (JointFabricDatastore.cpp:1944, :1970 at 6170af84).
+// bindings. chip's datastore pushes the one entry (SyncBinding;
+// JointFabricDatastore.cpp:1944, :1970 at 6170af84) and leaves the merge
+// to the delegate; here the module merges, so every host writes a list
+// (owner decision 2026-11-06).
 func (d *Datastore) pushBinding(ctx context.Context, nodeID uint64, e EndpointBindingEntry) error {
-	ebs, ok := d.sync.(EndpointBindingSync)
-	if !ok {
-		return d.sync.SyncBinding(ctx, nodeID, e)
-	}
 	current, err := d.sync.FetchEndpointBindingList(ctx, nodeID, e.EndpointId)
 	if err != nil {
 		return fmt.Errorf("FetchEndpointBindingList: %w", err)
@@ -790,7 +788,7 @@ func (d *Datastore) pushBinding(ctx context.Context, nodeID uint64, e EndpointBi
 	} else {
 		merged = append(append(merged, current...), e)
 	}
-	if err := ebs.SyncEndpointBindings(ctx, nodeID, e.EndpointId, merged); err != nil {
+	if err := d.sync.SyncEndpointBindings(ctx, nodeID, e.EndpointId, merged); err != nil {
 		return fmt.Errorf("SyncEndpointBindings: %w", err)
 	}
 	return nil

@@ -440,17 +440,28 @@ func (s *Server) Host() Host {
 // is DeletePending removes it; a zero entry with only the ids set
 // removes it too) or, for the bindings and the ACLs, the node's whole
 // list; SyncBindings may mark an entry of the list CommitFailed with
-// its FailureCode in place. An error leaves the entry as it was
-// (Pending or DeletePending) for the next RefreshNode. Each Fetch
+// its FailureCode in place. SyncEndpointBindings writes one endpoint's
+// whole binding list, an empty list included — the delegate's
+// SyncNode(nodeId, endpointId, bindingEntries) (JointFabricDatastore.h:196-203
+// at 6170af84), which chip's jf-admin-app writes as the endpoint's
+// Binding attribute (examples/jf-admin-app/linux/JFADatastoreSync.cpp:1759-1779,
+// :661-685 at 6170af84). A binding's add or removal reaches the node
+// through it: the datastore fetches the endpoint's current bindings
+// (FetchEndpointBindingList), appends the entry or removes the entries
+// whose target matches the removed one, and writes the list — the
+// merge jf-admin-app's delegate does with one entry (:1706-1757 at
+// 6170af84). SyncBinding, the delegate's single-entry overload
+// (JointFabricDatastore.h:189-194 at 6170af84), is kept for that shape
+// and is not called by the datastore. An error leaves the entry as it
+// was (Pending or DeletePending) for the next RefreshNode. Each Fetch
 // reads the node's current list; an error ends the refresh with the
-// node Pending. The datastore calls it outside its lock. A
-// DatastoreSync that also implements [EndpointBindingSync] receives a
-// binding's push as the endpoint's whole list and no SyncBinding.
+// node Pending. The datastore calls it outside its lock.
 type DatastoreSync interface {
 	SyncEndpointGroupID(ctx context.Context, nodeID uint64, entry DatastoreEndpointGroupIDEntryStruct) error
 	SyncNodeKeySet(ctx context.Context, nodeID uint64, entry DatastoreNodeKeySetEntryStruct) error
 	SyncBinding(ctx context.Context, nodeID uint64, entry DatastoreEndpointBindingEntryStruct) error
 	SyncBindings(ctx context.Context, nodeID uint64, entries []DatastoreEndpointBindingEntryStruct) error
+	SyncEndpointBindings(ctx context.Context, nodeID uint64, endpointID uint16, entries []DatastoreEndpointBindingEntryStruct) error
 	SyncACL(ctx context.Context, nodeID uint64, entry DatastoreACLEntryStruct) error
 	SyncACLs(ctx context.Context, nodeID uint64, entries []DatastoreACLEntryStruct) error
 	SyncGroupKeySet(ctx context.Context, nodeID uint64, keySet DatastoreGroupKeySetStruct) error
@@ -460,28 +471,6 @@ type DatastoreSync interface {
 	FetchGroupKeySetList(ctx context.Context, nodeID uint64) ([]uint16, error)
 	FetchGroupKeySet(ctx context.Context, nodeID uint64, groupKeySetID uint16) (DatastoreGroupKeySetStruct, error)
 	FetchACLList(ctx context.Context, nodeID uint64) ([]DatastoreACLEntryStruct, error)
-}
-
-// EndpointBindingSync is an optional interface of a [DatastoreSync]:
-// SyncEndpointBindings writes a node's endpoint's whole binding list —
-// connectedhomeip's Delegate SyncNode(nodeId, endpointId,
-// bindingEntries) (JointFabricDatastore.h:196-203 at 6170af84), the
-// overload chip's datastore itself never calls. Its jf-admin-app writes
-// the list as the endpoint's Binding attribute, an empty list too
-// (examples/jf-admin-app/linux/JFADatastoreSync.cpp:1759-1779,
-// :661-685 at 6170af84). A DatastoreSync that implements it receives
-// the push of one binding (AddBindingToEndpointForNode,
-// RemoveBindingFromEndpointForNode) as the merged list, the way
-// jf-admin-app's delegate carries one entry (:1706-1757 at 6170af84):
-// the datastore fetches the endpoint's current bindings
-// (FetchEndpointBindingList), removes the entries whose target matches
-// a DeletePending entry's or appends the entry, and writes the list;
-// SyncBinding is not called. A fetch that fails is the push's error and
-// leaves the entry Pending for the next RefreshNode — jf-admin-app
-// writes the one entry over an empty list instead (:1726-1730 at
-// 6170af84).
-type EndpointBindingSync interface {
-	SyncEndpointBindings(ctx context.Context, nodeID uint64, endpointID uint16, entries []DatastoreEndpointBindingEntryStruct) error
 }
 
 // DatastoreStore persists the datastore's tables as one settings

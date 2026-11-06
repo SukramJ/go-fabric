@@ -53,6 +53,10 @@ func (nopSync) SyncBindings(context.Context, uint64, []jointfabric.EndpointBindi
 	return nil
 }
 
+func (nopSync) SyncEndpointBindings(context.Context, uint64, uint16, []jointfabric.EndpointBindingEntry) error {
+	return nil
+}
+
 func (nopSync) SyncACL(context.Context, uint64, jointfabric.ACLEntry) error { return nil }
 
 func (nopSync) SyncACLs(context.Context, uint64, []jointfabric.ACLEntry) error { return nil }

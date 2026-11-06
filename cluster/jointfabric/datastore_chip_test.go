@@ -35,8 +35,9 @@ type trackingSync struct {
 
 	lastEndpointGroup *EndpointGroupIDEntry
 	lastNodeKeySet    *NodeKeySetEntry
-	lastBinding       *EndpointBindingEntry
 	lastACL           *ACLEntry
+	// lastBindingWrite is the last SyncEndpointBindings call.
+	lastBindingWrite *bindingWrite
 
 	// defer* make the next push of the kind wait until released.
 	deferBinding, deferACL bool
@@ -72,7 +73,7 @@ func (s *trackingSync) wait(kind *bool) {
 func (s *trackingSync) reset() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.lastEndpointGroup, s.lastNodeKeySet, s.lastBinding, s.lastACL = nil, nil, nil, nil
+	s.lastEndpointGroup, s.lastNodeKeySet, s.lastBindingWrite, s.lastACL = nil, nil, nil, nil
 }
 
 func (s *trackingSync) SyncEndpointGroupID(_ context.Context, _ uint64, e EndpointGroupIDEntry) error {
@@ -89,11 +90,22 @@ func (s *trackingSync) SyncNodeKeySet(_ context.Context, _ uint64, e NodeKeySetE
 	return nil
 }
 
-func (s *trackingSync) SyncBinding(_ context.Context, _ uint64, e EndpointBindingEntry) error {
+// SyncBinding is the delegate's single-entry overload the datastore does
+// not call (JointFabricDatastore.h:189-194 at 6170af84).
+func (*trackingSync) SyncBinding(context.Context, uint64, EndpointBindingEntry) error { return nil }
+
+// bindingWrite is one SyncEndpointBindings call.
+type bindingWrite struct {
+	nodeID   uint64
+	endpoint uint16
+	entries  []EndpointBindingEntry
+}
+
+func (s *trackingSync) SyncEndpointBindings(_ context.Context, nodeID uint64, ep uint16, entries []EndpointBindingEntry) error {
 	s.wait(&s.deferBinding)
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.lastBinding = &e
+	s.lastBindingWrite = &bindingWrite{nodeID: nodeID, endpoint: ep, entries: slices.Clone(entries)}
 	return nil
 }
 
@@ -407,8 +419,8 @@ func TestAddBindingAssignsListIdAndStoresCommittedEntry(t *testing.T) {
 	s := newTrackingSync()
 	d := nodeWithEndpoint(t, s)
 	mustOK(t, d.AddBindingToEndpointForNode(t.Context(), 123, 1, BindingTarget{Node: ptr[uint64](0x1111), Endpoint: ptr[uint16](2)}))
-	if s.lastBinding == nil {
-		t.Fatal("binding not pushed")
+	if w := s.lastBindingWrite; w == nil || w.nodeID != 123 || w.endpoint != 1 || len(w.entries) != 1 || w.entries[0].StatusEntry.State != statePending {
+		t.Fatalf("binding not pushed as the endpoint's list: %+v", w)
 	}
 	b := d.EndpointBindingList()
 	if len(b) != 1 || b[0].NodeId != 123 || b[0].EndpointId != 1 || b[0].Binding.Node == nil || *b[0].Binding.Node != 0x1111 || b[0].StatusEntry.State != stateCommitted {
@@ -424,8 +436,11 @@ func TestRemoveBindingSyncsDeletePendingPayload(t *testing.T) {
 	listID := d.EndpointBindingList()[0].ListId
 	s.reset()
 	mustOK(t, d.RemoveBindingFromEndpointForNode(t.Context(), listID, 123, 1))
-	if e := s.lastBinding; e == nil || e.NodeId != 123 || e.EndpointId != 1 || e.ListId != listID || e.StatusEntry.State != stateDeletePending {
-		t.Fatalf("last binding push %+v", e)
+	// chip's test reads the DeletePending payload of the single-entry push;
+	// here the push is the endpoint's list without the removed target, the
+	// port's fetch holding nothing: the empty list.
+	if w := s.lastBindingWrite; w == nil || w.nodeID != 123 || w.endpoint != 1 || len(w.entries) != 0 {
+		t.Fatalf("last binding push %+v", w)
 	}
 	if len(d.EndpointBindingList()) != 0 {
 		t.Fatalf("EndpointBindingList = %+v", d.EndpointBindingList())
