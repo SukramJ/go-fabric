@@ -7,15 +7,11 @@ import (
 	"fmt"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
-	aqdef "github.com/SukramJ/go-fabric/cluster/spec/airquality"
 	booldef "github.com/SukramJ/go-fabric/cluster/spec/booleanstate"
-	co2def "github.com/SukramJ/go-fabric/cluster/spec/carbondioxideconcentrationmeasurement"
 	eemdef "github.com/SukramJ/go-fabric/cluster/spec/electricalenergymeasurement"
 	epmdef "github.com/SukramJ/go-fabric/cluster/spec/electricalpowermeasurement"
 	flowdef "github.com/SukramJ/go-fabric/cluster/spec/flowmeasurement"
 	illdef "github.com/SukramJ/go-fabric/cluster/spec/illuminancemeasurement"
-	pm10def "github.com/SukramJ/go-fabric/cluster/spec/pm10concentrationmeasurement"
-	pm25def "github.com/SukramJ/go-fabric/cluster/spec/pm25concentrationmeasurement"
 	psdef "github.com/SukramJ/go-fabric/cluster/spec/powersource"
 	ptdef "github.com/SukramJ/go-fabric/cluster/spec/powertopology"
 	prsdef "github.com/SukramJ/go-fabric/cluster/spec/pressuremeasurement"
@@ -43,15 +39,6 @@ var (
 	// change, the feature matter.js BooleanStateServer enables by
 	// default; it makes the event mandatory.
 	booleanStateInst = mustInstance(booldef.Definition, spec.Options{Features: uint32(booldef.FeatureChangeEvent)})
-
-	// No feature: the reportable levels are the conformance-mandatory
-	// Unknown / Good / Poor.
-	airQualityInst = mustInstance(aqdef.Definition, spec.Options{})
-
-	// MEA only; Uncertainty ("[MEA]") is not served.
-	co2Inst  = mustInstance(co2def.Definition, spec.Options{Features: concFeatureMEA})
-	pm25Inst = mustInstance(pm25def.Definition, spec.Options{Features: concFeatureMEA})
-	pm10Inst = mustInstance(pm10def.Definition, spec.Options{Features: concFeatureMEA})
 
 	// BAT; BatPercentRemaining ("[BAT]") only with a percentage source.
 	powerSourceInst      = mustInstance(psdef.Definition, spec.Options{Features: pwrFeatureBAT})

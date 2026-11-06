@@ -671,6 +671,89 @@ type PowerSourceSelectionSource interface {
 	MatterPowerSourceSelection() PowerSourceSelection
 }
 
+// ConcentrationLevel is a concentration sensor's graded reading, the
+// concentration measurement clusters' LevelValueEnum.
+type ConcentrationLevel uint8
+
+// The concentration levels. Medium is served only with
+// [ConcentrationSelection.MediumLevel], Critical only with
+// [ConcentrationSelection.CriticalLevel].
+const (
+	ConcentrationLevelUnknown ConcentrationLevel = iota
+	ConcentrationLevelLow
+	ConcentrationLevelMedium
+	ConcentrationLevelHigh
+	ConcentrationLevelCritical
+)
+
+// AirQualityLevels are the grades an air quality sensor's AirQuality
+// cluster serves beyond the mandatory Unknown, Good and Poor, one bit per
+// grade; the bits are AirQuality's FeatureMap bits 0-3 (Fair, Moderate,
+// VeryPoor, ExtremelyPoor).
+type AirQualityLevels uint8
+
+// The optional air quality grades.
+const (
+	AirQualityFair AirQualityLevels = 1 << iota
+	AirQualityModerate
+	AirQualityVeryPoor
+	AirQualityExtremelyPoor
+)
+
+// ConcentrationWindowMax is the longest peak or average window a
+// concentration cluster serves, one week in seconds.
+const ConcentrationWindowMax = 604800
+
+// ConcentrationSelection is what a concentration sensor serves of its
+// concentration measurement cluster beyond the numeric reading, and which
+// grades the AirQuality cluster of its endpoint reports. The zero value is
+// the numeric reading alone, graded Unknown, Good or Poor.
+type ConcentrationSelection struct {
+	// Level serves the LevelIndication feature: the graded reading
+	// (LevelValue) of the source's [ConcentrationReadings].
+	Level bool
+	// MediumLevel and CriticalLevel add the Medium and Critical grades;
+	// either implies Level.
+	MediumLevel, CriticalLevel bool
+	// Peak and Average serve the PeakMeasurement and AverageMeasurement
+	// features: the peak and average readings of the source's
+	// [ConcentrationReadings] over PeakWindow and AverageWindow seconds,
+	// at most [ConcentrationWindowMax].
+	Peak, Average             bool
+	PeakWindow, AverageWindow uint32
+	// AirQuality are the optional grades the endpoint's AirQuality
+	// cluster grades the reading into.
+	AirQuality AirQualityLevels
+}
+
+// ConcentrationSelectionSource is the optional capability of a
+// [FloatMeasurementSource] of a concentration class ([MeasurementCO2] and
+// the nine further ones) that states its sensor's
+// [ConcentrationSelection]. A source without it is the zero selection. The
+// selection is part of the endpoint's surface: a host that changes it
+// reassembles.
+type ConcentrationSelectionSource interface {
+	MatterConcentrationSelection() ConcentrationSelection
+}
+
+// ConcentrationReadings are the readings a [ConcentrationSelection]
+// serves beside the numeric one, in the unit of the source's
+// MatterFloatValue. A reading not observed is null on the wire; a level
+// the selection does not serve reads Unknown.
+type ConcentrationReadings struct {
+	Level                         ConcentrationLevel
+	Peak, Average                 float64
+	PeakObserved, AverageObserved bool
+}
+
+// ConcentrationReadingsSource is the optional capability of a
+// [ConcentrationSelectionSource] that supplies its [ConcentrationReadings].
+// A source that selects Level, Peak or Average without it reads Unknown
+// and null.
+type ConcentrationReadingsSource interface {
+	MatterConcentrationReadings() ConcentrationReadings
+}
+
 // ChangeNotifier is the push-side complement to the read-side
 // FloatMeasurementSource / BoolMeasurementSource pull
 // interfaces. Implementations fire `cb` whenever their observable
