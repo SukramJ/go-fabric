@@ -1704,8 +1704,16 @@ Pinned by `TestPeerInitiator_FullHandshakeAgainstResponder`.
 Caught up at the db021da0 lift (2026-11-06): matter.js #4884 (`fix(protocol):
 CASE sessions we initiate carry the peer's CATs from its NOC`) takes the
 responder's CATs from the NOC in Sigma2 (`CaseClient.ts:282-290` at
-db021da0) and versions its resumption records; the two implementations
-agree, and this entry stays as the record of the earlier difference.
+db021da0) and versions its resumption records. The sigma layer agreed; the
+client stack's handshake did not yet: `client/handshake` gave an initiated
+session the configured CATs (`CASEOptions.CaseAuthenticatedTags`), falling
+back to the record's, and kept the peer's in a second field, while the
+Interaction Model server branch of the client stack takes a session's CATs
+as the subject CATs of the peer's requests. Wave P1 of the lift closes it:
+an initiated session's CATs are the peer's NOC CATs (`CaseClient.ts:285,
+:355-366` at db021da0), the record carries them as its one set, and the
+option is gone, as matter.js ignores its own (`:396-404`). This entry stays
+as the record of the earlier difference.
 
 ### BD-Matter-GroupSendOnEveryMulticastInterface — a group message leaves on every interface the listener joined
 

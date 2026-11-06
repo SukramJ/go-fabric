@@ -409,7 +409,10 @@ type SecureSessionConfig struct {
 	PeerParameters sessionparams.Parameters
 	// ReportedParameters is what the peer reported, nil for nothing.
 	ReportedParameters *sessionparams.Parameters
-	// CaseAuthenticatedTags are the session's CATs (CASE only).
+	// CaseAuthenticatedTags are the peer's CATs from its NOC (CASE only):
+	// the subject CATs of the requests the peer sends over this session,
+	// on both sides of the handshake (matter.js NodeSession
+	// caseAuthenticatedTags; CaseClient.ts:355 at db021da0).
 	CaseAuthenticatedTags []uint32
 	// AttestationChallenge is the third 16 bytes of the session keys.
 	AttestationChallenge []byte

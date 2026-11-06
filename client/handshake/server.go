@@ -239,7 +239,7 @@ func (l recordLookup) GetByID(id []byte) (*sigma.ResumptionRecord, error) {
 		ResumptionID: id,
 		FabricIndex:  l.rec.Peer.FabricIndex,
 		PeerNodeID:   l.rec.Peer.NodeID,
-		PeerCATs:     l.rec.PeerCATs,
+		PeerCATs:     l.rec.CaseAuthenticatedTags,
 	}, nil
 }
 
@@ -397,7 +397,6 @@ func (c *CASEServer) full(ctx context.Context, x *exchange.Exchange, responder *
 		ResumptionID:          responder.ResumptionID(),
 		SessionParameters:     s.Parameters(),
 		CaseAuthenticatedTags: cats,
-		PeerCATs:              cats,
 	})
 	return nil
 }
