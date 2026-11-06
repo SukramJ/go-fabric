@@ -6,6 +6,7 @@ package core
 import (
 	"context"
 	"fmt"
+	"math"
 	"sync"
 	"time"
 
@@ -75,12 +76,37 @@ const matterEpochOffsetSec int64 = 946684800
 // UTCTime attribute is null (a host clock before the Matter epoch). It is
 // the clock [GeneralDiagnostics.SetUTCClock] takes, so TimeSnapshot
 // carries a PosixTimeMs exactly when UTCTime is not null.
-func (t *TimeSynchronization) UTC() (time.Time, bool) {
-	now := t.clock.Load().Now()
+func (t *TimeSynchronization) UTC() (time.Time, bool) { return utcOf(t.clock.Load()) }
+
+// utcOf is UTCTime read from c: its time, and false before the Matter
+// epoch, where UTCTime is null.
+func utcOf(c clock.Clock) (time.Time, bool) {
+	now := clock.Or(c).Now()
 	if now.Unix() < matterEpochOffsetSec {
 		return time.Time{}, false
 	}
 	return now, true
+}
+
+// MatterEpochSeconds is the UTCTime a TimeSynchronization server on clock
+// c serves, in Matter epoch seconds (§A.2, epoch-s), and false while it is
+// null — before the Matter epoch, or past what epoch-s holds. The node's
+// root server reads the node's clock ([TimeSynchronization.SetClock]), so
+// a server on an endpoint of the node that is given the node's clock
+// reads the root's UTCTime through it without holding the root: the
+// device kit hands it to the Thermostat's suggestions
+// (thermo.ThermostatConfig.MatterTime), which connectedhomeip gates on
+// System::Clock::GetClock_MatterEpochS.
+func MatterEpochSeconds(c clock.Clock) (uint32, bool) {
+	now, ok := utcOf(c)
+	if !ok {
+		return 0, false
+	}
+	s := now.Unix() - matterEpochOffsetSec
+	if s > math.MaxUint32 {
+		return 0, false
+	}
+	return uint32(s), true
 }
 
 // MatterAcceptedCommands implements [contract.ClusterCommandLister]:
