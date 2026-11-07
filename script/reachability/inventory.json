@@ -7034,21 +7034,21 @@
       "identifier": "TestAdoptSessions",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/set_test.go",
-      "line": 160
+      "line": 169
     },
     {
       "package": "client/peer",
       "identifier": "TestCloseDeleteAndDisconnect",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/set_test.go",
-      "line": 221
+      "line": 230
     },
     {
       "package": "client/peer",
       "identifier": "TestCloseSweepsSessionsAfterWorkers",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/set_test.go",
-      "line": 302
+      "line": 311
     },
     {
       "package": "client/peer",
@@ -7153,7 +7153,7 @@
       "identifier": "TestInitiateConnectionWithLiveSession",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/set_test.go",
-      "line": 271
+      "line": 280
     },
     {
       "package": "client/peer",
@@ -7237,7 +7237,7 @@
       "identifier": "TestNewestSessionActivityParityMatterJS",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/set_test.go",
-      "line": 331
+      "line": 340
     },
     {
       "package": "client/peer",
@@ -7496,7 +7496,7 @@
       "identifier": "TestSessionParametersPreferTheReport",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/set_test.go",
-      "line": 201
+      "line": 210
     },
     {
       "package": "client/peer",
