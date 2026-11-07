@@ -6943,14 +6943,14 @@
       "identifier": "TestInputChunkResolvedTimestampsParity",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/interaction/input_chunk_timestamps_parity_matterjs_test.go",
-      "line": 70
+      "line": 71
     },
     {
       "package": "client/interaction",
       "identifier": "TestInputChunkTimestampsSkipEmptyEntry",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/interaction/input_chunk_timestamps_parity_matterjs_test.go",
-      "line": 148
+      "line": 151
     },
     {
       "package": "client/interaction",

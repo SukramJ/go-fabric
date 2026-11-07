@@ -11,7 +11,7 @@ Second tree: a sentence naming matterjs-server is checked against `MATTERJS_SERV
 | Resolved: exact path from a tree root (packages/, support/, examples/) | 1968 |
 | Resolved: unique suffix | 228 |
 | Resolved: unique basename | 6105 |
-| Checked at their own `at <sha>` | 1585 |
+| Checked at their own `at <sha>` | 1586 |
 | Checked against matterjs-server (`MATTERJS_SERVER_DIR`) at their `at <sha>` | 644 |
 | Drift-checked (the sentence names a name the file contains) | 3833 |
 | Hard-checked only | 4468 |

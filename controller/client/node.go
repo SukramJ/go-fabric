@@ -440,7 +440,8 @@ func (n *Node) Start(ctx context.Context) error {
 		// The peer coming online is proof it is awake (IcdClient.ts:156-158).
 		n.icd.noteActive()
 	}
-	stop := n.observePeer()
+	stop := n.observePeer() //nolint:contextcheck // the observation outlives Start's ctx; Stop ends it
+
 	n.mu.Lock()
 	n.stopObserve = stop
 	n.mu.Unlock()

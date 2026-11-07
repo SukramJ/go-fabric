@@ -57,12 +57,13 @@ func resolvedOf(t *testing.T, messages ...[]im.EventReport) []int64 {
 		rds = append(rds, &im.ReportData{EventReports: m})
 	}
 	var out []int64
-	for _, ev := range icAssemble(t, nil, rds...).report.Events {
-		if ev.ResolvedTimestamp == nil {
+	events := icAssemble(t, nil, rds...).report.Events
+	for i := range events {
+		if events[i].ResolvedTimestamp == nil {
 			out = append(out, -1)
 			continue
 		}
-		out = append(out, int64(*ev.ResolvedTimestamp)) //nolint:gosec // test values
+		out = append(out, int64(*events[i].ResolvedTimestamp)) //nolint:gosec // test values
 	}
 	return out
 }
@@ -80,8 +81,10 @@ func TestInputChunkResolvedTimestampsParity(t *testing.T) {
 		t.Parallel()
 		const base = 0x4364c617
 		deltas := []uint64{1, 4, 1, 3, 1, 4, 1}
-		evs := []im.EventReport{tsEvent(1, sys(base), p)}
-		want := []int64{base}
+		evs := make([]im.EventReport, 0, 1+len(deltas))
+		evs = append(evs, tsEvent(1, sys(base), p))
+		want := make([]int64, 0, 1+len(deltas))
+		want = append(want, base)
 		for i, d := range deltas {
 			evs = append(evs, tsEvent(uint64(i)+2, dsys(d), p)) //nolint:gosec // test index
 			want = append(want, want[len(want)-1]+int64(d))     //nolint:gosec // test values

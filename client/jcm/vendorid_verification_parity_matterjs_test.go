@@ -64,7 +64,7 @@ func newKey(t *testing.T) *ecdsa.PrivateKey {
 
 // vvscSignedBy is a VVSC of key signed by issuer (VendorIdVerificationTest.ts
 // :30-50 signs it with its own key; here a vendor's trust anchor does).
-func vvscSignedBy(t *testing.T, key, issuer *ecdsa.PrivateKey, keyUsage uint16) ([]byte, []byte) {
+func vvscSignedBy(t *testing.T, key, issuer *ecdsa.PrivateKey, keyUsage uint16) (raw, subjectKeyID []byte) {
 	t.Helper()
 	pub := pubOf(t, key)
 	skid := sha1.Sum(pub)              //nolint:gosec // SubjectKeyID
@@ -89,7 +89,7 @@ func vvscSignedBy(t *testing.T, key, issuer *ecdsa.PrivateKey, keyUsage uint16) 
 		t.Fatal(err)
 	}
 	c.Signature = rawSign(t, issuer, tbs)
-	raw, err := mattercert.Encode(c)
+	raw, err = mattercert.Encode(c)
 	if err != nil {
 		t.Fatal(err)
 	}

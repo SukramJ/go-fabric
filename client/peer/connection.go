@@ -869,13 +869,7 @@ func (c *connection) attemptOnce(att *attempt, schedule *initialContactSchedule,
 		return ErrTCPUnsupported
 	}
 	if err == nil {
-		c.mu.Lock()
-		c.session = s
-		c.mu.Unlock()
-		p.set.initiated.Store(s, struct{}{})
-		go func() { <-s.Closing(); p.set.initiated.Delete(s) }()
-		p.set.Adopt(s)
-		c.cancel()
+		c.adopt(s)
 		return nil
 	}
 	if ch != nil {
@@ -886,9 +880,27 @@ func (c *connection) attemptOnce(att *attempt, schedule *initialContactSchedule,
 	if local.Err() != nil {
 		return nil
 	}
-	// An unacknowledged Sigma1 is the schedule moving on, not a failure:
-	// retry at once, without the error handling (PeerConnection.ts:639-653).
-	log := p.log.With(slog.String("address", att.addr.String()))
+	return c.afterFailure(att, a, err)
+}
+
+// adopt takes the session the attempt established and ends the process.
+func (c *connection) adopt(s *exchange.Session) {
+	p := c.p
+	c.mu.Lock()
+	c.session = s
+	c.mu.Unlock()
+	p.set.initiated.Store(s, struct{}{})
+	go func() { <-s.Closing(); p.set.initiated.Delete(s) }()
+	p.set.Adopt(s)
+	c.cancel()
+}
+
+// afterFailure ends the attempt a with its handshake's err: an
+// unacknowledged Sigma1 is the schedule moving on, not a failure, and
+// retries at once without the error handling (nil); anything else is
+// returned for it (PeerConnection.ts:639-653 at db021da0).
+func (c *connection) afterFailure(att *attempt, a *contactAttempt, err error) error {
+	log := c.p.log.With(slog.String("address", att.addr.String()))
 	switch a.fail(err) {
 	case contactSwitched:
 		log.Info("matter.controller.peer.sigma1_refresh", slog.Any("err", err))
