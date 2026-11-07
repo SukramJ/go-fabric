@@ -269,8 +269,8 @@ its NOC, as matter.js's does since db021da0, and a configured set is not
 applied — delete the field from the literal. `handshake.ResumptionRecord`
 loses `PeerCATs`; its `CaseAuthenticatedTags` are the peer's CATs on both
 sides of the handshake — a `ResumptionStore` that persisted both keeps one.
-`peer.Descriptor.CaseAuthenticatedTags` is still recorded and no longer
-reaches the handshake.
+The configured set itself is removed as well — see "Changed after v0.17.0:
+the configured CATs" below.
 
 ## Changed after v0.17.0: the TCP message limit
 

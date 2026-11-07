@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 7731,
+  "entry_points": 7733,
   "entry_packages": [
     ".",
     "bdx",
@@ -279,9 +279,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 17715,
+    "total_exported": 17716,
     "reachable": 12329,
-    "whitelisted": 5386,
+    "whitelisted": 5387,
     "unreachable": 0
   },
   "by_package": [],
@@ -7118,6 +7118,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/icd_parity_matterjs_test.go",
       "line": 23
+    },
+    {
+      "package": "client/peer",
+      "identifier": "TestInitialContactRefreshKickBeforeSend",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/peer/initial_contact_schedule_parity_matterjs_test.go",
+      "line": 452
     },
     {
       "package": "client/peer",

@@ -1434,12 +1434,22 @@
   },
   {
     "file": "client/peer/connection.go",
-    "line": 1071,
+    "line": 1078,
     "citation": "SessionManager.ts:468-480",
     "resolved": "packages/protocol/src/session/SessionManager.ts",
     "identifier": "deleteResumptionRecord",
     "nearest": 523,
     "occurrences": 1
+  },
+  {
+    "file": "client/peer/initial_contact_schedule_parity_matterjs_test.go",
+    "line": 450,
+    "citation": "PeerConnection.ts:544",
+    "resolved": "packages/protocol/src/peer/PeerConnection.ts",
+    "at": "db021da0",
+    "identifier": "attemptOnce",
+    "nearest": 514,
+    "occurrences": 2
   },
   {
     "file": "client/peer/observer.go",

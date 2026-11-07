@@ -783,6 +783,13 @@ func (c *connection) connect(att *attempt) {
 // error handling (:639-653).
 func (c *connection) attemptOnce(att *attempt, schedule *initialContactSchedule, attemptNo int) error {
 	p := c.p
+	// The previous try's exchange is not this try's: until the handshake
+	// creates the new one the kick sees none. matter.js registers the kick
+	// only after createExchange (PeerConnection.ts:544, :579 at db021da0),
+	// where a fresh exchange reports no restart saving; measured on the
+	// closed exchange of the try before, a refresh attempt would pass the
+	// blocker and be restarted before it sent anything.
+	att.exchange.Store(nil)
 	if p.set.isDisconnected() {
 		return ErrNotConnectable
 	}

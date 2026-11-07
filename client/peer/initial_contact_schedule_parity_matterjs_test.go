@@ -441,3 +441,71 @@ func TestInitialContactScheduleParity(t *testing.T) {
 		r.settle(t, fresh)
 	})
 }
+
+// TestInitialContactRefreshKickBeforeSend: a kick between the start of a
+// refresh attempt and its first transmission is blocked. The attempt's
+// count passes the retransmission threshold (it counts the earlier
+// attempts), so the saving decides: the try's exchange is cleared at the
+// start of attemptOnce, and a fresh exchange reports no saving
+// (PeerConnection.ts:544, :579 at db021da0 register the kick only after
+// createExchange).
+func TestInitialContactRefreshKickBeforeSend(t *testing.T) {
+	t.Parallel()
+	t.Run("a fresh exchange reports no saving", func(t *testing.T) {
+		t.Parallel()
+		r := newScheduleRig(t)
+		s := newInitialContactSchedule(DefaultTiming(), func() {})
+		identical := r.sendSigma1(t, s, false)
+		identical.attempt.fail(r.settle(t, identical))
+		identical.x.Close()
+		a, err := s.begin(false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer a.dispose()
+		us, err := r.mgr.NewUnsecuredSession(&net.UDPAddr{IP: net.ParseIP("fd00::1"), Port: 5540}, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		x, err := r.mgr.Initiate(us, mrp.SecureChannelProtocolID, exchange.Options{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer x.Close()
+		if !a.isRefresh || a.earlier < DefaultTiming().KickMinRetransmissions {
+			t.Fatalf("attempt %+v, want a refresh past the retransmission threshold", a)
+		}
+		if got := a.kickBlocker(x.RetransmissionRestartSaving(), false); got != kickBlockedSaving {
+			t.Fatalf("blocker %q before the first transmission, want saving", got)
+		}
+	})
+	t.Run("attemptOnce clears the previous try's exchange", func(t *testing.T) {
+		t.Parallel()
+		r := newScheduleRig(t)
+		us, err := r.mgr.NewUnsecuredSession(&net.UDPAddr{IP: net.ParseIP("fd00::1"), Port: 5540}, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		stale, err := r.mgr.Initiate(us, mrp.SecureChannelProtocolID, exchange.Options{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		stale.Close()
+		// A disconnected set: the try ends before its handshake.
+		h := newHarness(t, nil)
+		p, err := h.set.For(testAddr)
+		if err != nil {
+			t.Fatal(err)
+		}
+		h.set.Disconnect(t.Context())
+		c := &connection{p: p, timing: DefaultTiming()}
+		att := &attempt{ctx: t.Context()}
+		att.exchange.Store(stale)
+		if err := c.attemptOnce(att, newInitialContactSchedule(DefaultTiming(), func() {}), 1); !errors.Is(err, ErrNotConnectable) {
+			t.Fatalf("attemptOnce: %v, want ErrNotConnectable", err)
+		}
+		if att.exchange.Load() != nil {
+			t.Fatal("the previous try's exchange is still the kick's")
+		}
+	})
+}
