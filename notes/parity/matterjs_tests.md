@@ -839,7 +839,7 @@ names the `it` cases that will not be ported, each with its class and reason. Th
 
 | file | lines | status | Go tests or class | note |
 | --- | ---: | --- | --- | --- |
-| UserLabelServerTest.ts | 358 | ported | `node:TestUserLabelServerParity` | Ported over the wire on a commissioned fabrictest light (#4900): REPLACE_ALL alone and chunked with ADD, the empty list, the 16-character limits, the maxLabels limit with RESOURCE_EXHAUSTED for a REPLACE_ALL and the crossing ADD, the 255 default, the LabelStruct constraints in both write forms, UNSUPPORTED_ACCESS for an Operate-only writer and persistence across a restart on the same store. No server fix was needed. Left: “answers a lone ADD to a non-empty list with BUSY and keeps the list” (skip: The skipped subtest names it: im/write.go applies an ADD without a preceding write to the same attribute, matter.js answers BUSY (InteractionServer.ts:511-531 at db021da0); findings register T3-P3-1.). |
+| UserLabelServerTest.ts | 358 | ported | `node:TestUserLabelServerParity` | Ported over the wire on a commissioned fabrictest light (#4900): REPLACE_ALL alone and chunked with ADD, the empty list, the 16-character limits, the maxLabels limit with RESOURCE_EXHAUSTED for a REPLACE_ALL and the crossing ADD, the 255 default, the LabelStruct constraints in both write forms, UNSUPPORTED_ACCESS for an Operate-only writer and persistence across a restart on the same store, and the lone ADD answered BUSY with the list kept (the IM write path's marker, issue 438). No server fix was needed. |
 
 ## node/test/behaviors/web-rtc-transport-requestor
 

@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 7774,
+  "entry_points": 7775,
   "entry_packages": [
     ".",
     "bdx",
@@ -280,9 +280,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 17742,
+    "total_exported": 17743,
     "reachable": 12337,
-    "whitelisted": 5405,
+    "whitelisted": 5406,
     "unreachable": 0
   },
   "by_package": [],
@@ -30022,7 +30022,7 @@
       "identifier": "TestChunkedWriteIsAuthorizedOnce",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/write_chunked_acl_test.go",
-      "line": 46
+      "line": 48
     },
     {
       "package": "im",
@@ -30635,10 +30635,17 @@
     },
     {
       "package": "im",
+      "identifier": "TestListAddMarkerParityMatterJS",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "im/write_list_add_parity_matterjs_test.go",
+      "line": 15
+    },
+    {
+      "package": "im",
       "identifier": "TestListAppendWriteMark",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/write_chunked_acl_test.go",
-      "line": 81
+      "line": 83
     },
     {
       "package": "im",

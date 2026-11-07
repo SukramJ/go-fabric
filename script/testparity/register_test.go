@@ -181,7 +181,9 @@ const (
 // BD-Matter-MdnsFollowsAdvertisedAddresses), three state-field cases of
 // GeneralDiagnosticsServerTest.ts and the lone-ADD skip (findings T3-P3-1),
 // merged with waves P1 and P2: 619.
-const testparityLeftRatchet = 619
+// Issue 438 (wave W7) closes the lone-ADD skip: im/write.go answers it
+// BUSY as matter.js does (InteractionServer.ts:511-531 at db021da0): 618.
+const testparityLeftRatchet = 618
 
 // The matterjs-server register's four ratchets, exact in both directions as
 // the matter.js register's are (the comments above give the rules). Set by

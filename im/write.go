@@ -309,6 +309,34 @@ func HandleWriteRequest(ctx context.Context, d Dispatcher, req WriteRequest) Wri
 	defer func() { tx.lastWritten = lastWritten }()
 	var wr WriteResponse
 	for _, w := range req.Writes {
+		concrete := w.Path.HasEndpoint && w.Path.HasCluster && w.Path.HasAttribute
+		// An attribute another interaction's chunked write holds is
+		// answered BUSY (matter.js packages/node/src/node/server/
+		// InteractionServer.ts:505-508 at db021da0, #isHeldByOther →
+		// Status.Busy).
+		if concrete && tx.heldByOther(w.Path.Endpoint, w.Path.Cluster, w.Path.Attribute) {
+			wr.Responses = append(wr.Responses, AttributeStatus{
+				Path:   w.Path,
+				Status: StatusIB{Status: StatusBusy},
+			})
+			continue
+		}
+		// A list ADD (null list index) is valid only right after a write
+		// path of the same attribute in this interaction — across its
+		// chunks — whatever that write's outcome; otherwise it is answered
+		// BUSY, as chip does, and leaves the marker where it was. It comes
+		// before every other check, the writability and the ACL included:
+		// a lone ADD to a read-only list is BUSY too. Mirrors matter.js
+		// InteractionServer.ts:511-531 at db021da0 (the marker
+		// previousProcessedAttributePath, :456-458, not moved by a BUSY
+		// path, :529).
+		if w.Path.ListAppend && !tx.followsLastQueued(w.Path) {
+			wr.Responses = append(wr.Responses, AttributeStatus{
+				Path:   w.Path,
+				Status: StatusIB{Status: StatusBusy},
+			})
+			continue
+		}
 		// A write path MUST name a concrete cluster and attribute. Matter
 		// reserves wildcards for Read/Subscribe; a wildcard-attribute write
 		// has no per-attribute privilege to gate on, so it would apply one
@@ -327,18 +355,12 @@ func HandleWriteRequest(ctx context.Context, d Dispatcher, req WriteRequest) Wri
 			})
 			continue
 		}
-		// An attribute another interaction's chunked write holds is
-		// answered BUSY; a concrete path this interaction accepts is held
-		// before it is written when the write is chunked or holds already.
-		// Mirrors matter.js packages/node/src/node/server/
-		// InteractionServer.ts:505-508 (#isHeldByOther → Status.Busy) and
-		// :536-543 (the hold, taken before any await).
-		if w.Path.HasEndpoint && !tx.holdUnlessBusy(w.Path, req.MoreChunkedMessages) {
-			wr.Responses = append(wr.Responses, AttributeStatus{
-				Path:   w.Path,
-				Status: StatusIB{Status: StatusBusy},
-			})
-			continue
+		// A concrete path this interaction accepts is held before it is
+		// written when the write is chunked or holds already, and becomes
+		// the marker a following ADD is checked against (matter.js
+		// InteractionServer.ts:533-543, the hold taken before any await).
+		if w.Path.HasEndpoint {
+			tx.accept(w.Path, req.MoreChunkedMessages)
 		}
 		// ACL gate for a concrete path. The required privilege is
 		// per-attribute (AccessControl.ACL → Administer,
@@ -540,16 +562,32 @@ func (tx *WriteTransaction) heldByOther(endpoint uint16, cluster, attribute uint
 }
 
 // holdUnlessBusy reports false when another interaction holds the
-// attribute (the write is answered BUSY); otherwise it takes the hold
-// [WriteTransaction.hold] decides on and records the attribute as the
-// chunk's last accepted one.
+// attribute (the write is answered BUSY); otherwise it accepts the path
+// ([WriteTransaction.accept]).
 func (tx *WriteTransaction) holdUnlessBusy(p ConcreteAttributePath, more bool) bool {
 	if tx.heldByOther(p.Endpoint, p.Cluster, p.Attribute) {
 		return false
 	}
+	tx.accept(p, more)
+	return true
+}
+
+// accept takes the hold [WriteTransaction.hold] decides on and records
+// the attribute as the interaction's last accepted one — matter.js's
+// previousProcessedAttributePath (InteractionServer.ts:533-537 at
+// db021da0).
+func (tx *WriteTransaction) accept(p ConcreteAttributePath, more bool) {
 	tx.hold(p, more)
 	tx.lastQueued = &writeHoldKey{p.Endpoint, p.Cluster, p.Attribute}
-	return true
+}
+
+// followsLastQueued reports whether p names the attribute the
+// interaction accepted last, the condition of a list ADD
+// (InteractionServer.ts:513-517 at db021da0); a path without an endpoint
+// never does.
+func (tx *WriteTransaction) followsLastQueued(p ConcreteAttributePath) bool {
+	return tx.lastQueued != nil && p.HasEndpoint &&
+		*tx.lastQueued == writeHoldKey{p.Endpoint, p.Cluster, p.Attribute}
 }
 
 // hold takes the attribute for this interaction when the write is chunked
