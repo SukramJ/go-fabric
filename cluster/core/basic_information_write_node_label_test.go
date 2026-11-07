@@ -161,3 +161,30 @@ func TestBasicInfo_UnchangedWriteCommitsNothing(t *testing.T) {
 		t.Errorf("DataVersion %d after the unchanged writes, want %d (only Location's first write advances)", b.MatterDataVersion(), afterHost+1)
 	}
 }
+
+// TestBasicInfo_RestoresUseTheDefinition (issue 414): the restores refuse
+// what a controller's write is refused, with its status — NodeLabel over 32
+// bytes, a Location that is not two characters — and keep the served value.
+func TestBasicInfo_RestoresUseTheDefinition(t *testing.T) {
+	t.Parallel()
+	b := newValidBasicInfo(t)
+	for name, err := range map[string]error{
+		"label":          b.RestoreNodeLabel(strings.Repeat("y", 33)),
+		"location":       b.RestoreLocation("DEU"),
+		"empty location": b.RestoreLocation(""),
+	} {
+		sce, ok := errors.AsType[im.StatusCodeError](err)
+		if !ok || sce.MatterStatusCode() != im.StatusConstraintError {
+			t.Errorf("%s: %v, want CONSTRAINT_ERROR", name, err)
+		}
+	}
+	if err := b.RestoreNodeLabel(""); err != nil {
+		t.Errorf("RestoreNodeLabel(\"\"): %v", err)
+	}
+	if err := b.RestoreLocation("FR"); err != nil {
+		t.Errorf("RestoreLocation(FR): %v", err)
+	}
+	if v, _ := b.MatterRead(0x0006); v.(tlv.BoundedString).Value != "FR" {
+		t.Errorf("Location = %v, want FR", v)
+	}
+}

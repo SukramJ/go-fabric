@@ -905,14 +905,15 @@ func (b *BasicInformation) SetNodeLabel(ctx context.Context, label string) error
 // RestoreNodeLabel is the boot-time restore of a persisted NodeLabel (a
 // controller's or the host's earlier write, node.New reads it back before
 // the node serves), as [BasicInformation.RestoreConfigurationVersion]
-// restores its value. Goes through the same length check as the Matter
-// write path. Does NOT fire the persistence hook — restores must not echo
+// restores its value. Held to the attribute's constraint as the Matter
+// write path is ([BasicInformation.checkLabelWrite], CONSTRAINT_ERROR).
+// Does NOT fire the persistence hook — restores must not echo
 // back into the store — and neither advances the DataVersion nor reports
 // a change: nothing has been served yet. A run-time rename is
 // [BasicInformation.SetNodeLabel].
 func (b *BasicInformation) RestoreNodeLabel(s string) error {
-	if len(s) > 32 {
-		return errors.New("core: NodeLabel exceeds 32 utf-8 bytes")
+	if err := b.checkLabelWrite(basicInfoAttrNodeLabel, s); err != nil {
+		return err
 	}
 	b.mu.Lock()
 	b.nodeLabel = s
@@ -953,12 +954,12 @@ func (b *BasicInformation) SetSoftwareVersion(version uint32, versionString stri
 }
 
 // RestoreLocation is the boot-time restore of a persisted Location (a
-// controller's earlier write). Same validation as the Matter write path;
-// does NOT fire the persistence hook, advance the DataVersion or report a
+// controller's earlier write). Held to the attribute's constraint as the
+// Matter write path is ([BasicInformation.checkLabelWrite]); does NOT fire the persistence hook, advance the DataVersion or report a
 // change.
 func (b *BasicInformation) RestoreLocation(s string) error {
-	if len(s) != 2 {
-		return fmt.Errorf("core: Location must be ISO-3166 2-letter (got len=%d)", len(s))
+	if err := b.checkLabelWrite(basicInfoAttrLocation, s); err != nil {
+		return err
 	}
 	b.mu.Lock()
 	b.location = s
