@@ -175,12 +175,18 @@ func Verify(ctx context.Context, info *Info, clientChallenge, attestationChallen
 // against a trust anchor (a TODO at :232-240); and the statement signature
 // covers the 76-byte fabric binding message, as createStatementBytes
 // names its input (:311-322), where matter.js passes the whole
-// to-be-signed message (:282-286). A VVSC under an intermediate
+// to-be-signed message (:282-286) — a message that carries the client
+// and attestation challenges of one request, which a statement set once
+// per fabric (SetVIDVerificationStatement, FabricDescriptorStruct field
+// 6) cannot have been signed over. A VVSC under an intermediate
 // certificate is refused: lookup's answer must have signed it.
 func verifyStatement(ctx context.Context, info *Info, binding []byte, lookup TrustAnchorLookup) error {
 	s := info.AdminVIDVerificationStatement
-	if len(s) != statementSize || s[0] != statementVersion1 {
-		return fmt.Errorf("%w: %d bytes, version %#x", ErrStatement, len(s), s[0])
+	if len(s) != statementSize {
+		return fmt.Errorf("%w: %d bytes, want %d", ErrStatement, len(s), statementSize)
+	}
+	if s[0] != statementVersion1 {
+		return fmt.Errorf("%w: version %#x", ErrStatement, s[0])
 	}
 	skid, sig := s[1:21], s[21:]
 	if len(info.AdminVVSC) == 0 {

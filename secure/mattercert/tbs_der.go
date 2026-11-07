@@ -238,8 +238,9 @@ func buildDN(dn DistinguishedName) []asn1.RawValue {
 	}
 	// Fallback path: caller built a DN without populating Order
 	// (e.g. test code constructing a synthetic DistinguishedName by
-	// hand). Emit in spec-canonical order so test fixtures still
-	// produce a consistent TBS.
+	// hand). Emit every Matter attribute in spec-canonical order so a
+	// hand-built DN still produces a consistent TBS — an attribute the
+	// fallback skipped would sign a TBS the certificate does not carry.
 	if len(dn.Order) == 0 {
 		if dn.HasRCACID {
 			emit(oidMatterRCACID, hex16(dn.MatterRCACID))
@@ -252,6 +253,12 @@ func buildDN(dn DistinguishedName) []asn1.RawValue {
 		}
 		if dn.HasFabricID {
 			emit(oidMatterFabricID, hex16(dn.MatterFabricID))
+		}
+		if dn.HasVVSID {
+			emit(oidMatterVVSID, hex16(dn.MatterVVSID))
+		}
+		if dn.HasFirmwareSigningID {
+			emit(oidMatterFirmwareSigningID, hex16(dn.MatterFirmwareSigningID))
 		}
 		for _, cat := range dn.CASEAuthTags {
 			emit(oidMatterCASEAuthTag, hex8(cat))

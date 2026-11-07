@@ -2730,3 +2730,69 @@ func TestTBSToDER_CASEAuthTag(t *testing.T) {
 		t.Error("TBSToDER returned empty bytes")
 	}
 }
+
+// TestTBSToDER_FallbackOrder_HasVVSIDAndFirmwareSigningID: a DN built
+// without Order emits matter-vvs-id and matter-firmware-signing-id too —
+// the fallback's TBS equals the arrival-order TBS of a subject that
+// carries them in the canonical sequence.
+func TestTBSToDER_FallbackOrder_HasVVSIDAndFirmwareSigningID(t *testing.T) {
+	t.Parallel()
+	priv, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	pub := marshalPub(priv)
+
+	enc := tlv.NewEncoder()
+	enc.StartStruct(tlv.AnonymousTag())
+	enc.PutOctets(tlv.ContextTag(1), []byte{0x01})
+	enc.PutUint(tlv.ContextTag(2), mattercert.SigAlgoECDSAWithSHA256)
+	enc.StartList(tlv.ContextTag(3))
+	enc.PutUint(tlv.ContextTag(20), uint64(0x1111)) // RCAC
+	if err := enc.EndContainer(); err != nil {
+		t.Fatalf("issuer end: %v", err)
+	}
+	enc.PutUint(tlv.ContextTag(4), uint64(0))
+	enc.PutUint(tlv.ContextTag(5), uint64(0))
+	enc.StartList(tlv.ContextTag(6))
+	enc.PutUint(tlv.ContextTag(17), uint64(0xAAAA))                // NodeID
+	enc.PutUint(tlv.ContextTag(23), uint64(0x0123_4567_89AB_CDEF)) // matter-vvs-id
+	enc.PutUint(tlv.ContextTag(18), uint64(0xFEDC_BA98_7654_3210)) // matter-firmware-signing-id
+	if err := enc.EndContainer(); err != nil {
+		t.Fatalf("subject end: %v", err)
+	}
+	enc.PutUint(tlv.ContextTag(7), mattercert.PubKeyAlgoEC)
+	enc.PutUint(tlv.ContextTag(8), mattercert.CurvePrime256v1)
+	enc.PutOctets(tlv.ContextTag(9), pub)
+	enc.StartList(tlv.ContextTag(10))
+	if err := enc.EndContainer(); err != nil {
+		t.Fatalf("ext end: %v", err)
+	}
+	enc.PutOctets(tlv.ContextTag(11), make([]byte, 64))
+	if err := enc.EndContainer(); err != nil {
+		t.Fatalf("top end: %v", err)
+	}
+	raw, err := enc.Bytes()
+	if err != nil {
+		t.Fatalf("Bytes: %v", err)
+	}
+	cert, err := mattercert.Decode(raw)
+	if err != nil {
+		t.Fatalf("Decode: %v", err)
+	}
+	if !cert.Subject.HasVVSID || !cert.Subject.HasFirmwareSigningID {
+		t.Fatalf("subject = %+v, want vvs-id and firmware-signing-id", cert.Subject)
+	}
+	ordered, err := mattercert.TBSToDER(cert)
+	if err != nil {
+		t.Fatalf("TBSToDER (arrival order): %v", err)
+	}
+
+	cert.TBSDER = nil
+	cert.Subject.Order = nil
+	cert.Issuer.Order = nil
+	fallback, err := mattercert.TBSToDER(cert)
+	if err != nil {
+		t.Fatalf("TBSToDER with cleared Order: %v", err)
+	}
+	if !bytes.Equal(ordered, fallback) {
+		t.Fatalf("fallback TBS differs from the arrival-order TBS:\n%x\n%x", ordered, fallback)
+	}
+}
