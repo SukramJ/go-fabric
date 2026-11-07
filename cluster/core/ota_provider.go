@@ -524,27 +524,19 @@ func (p *OTAProvider) offerBDX(peer OTAPeer, token []byte, img OTAImage) (string
 		}
 		// OP:314-320: a failed download is retried on a fresh session, so
 		// the listener stays for the whole update.
-		details := p.detailsForPeer(peer, token)
-		if details == nil {
+		entry, _ := p.inProgressForPeer(peer, token)
+		if entry == nil {
 			return
 		}
 		p.updateInProgress(peer, token, OTAUpdateDownloading, &version, false)
 		s.OnProgress(func(uint64, *uint64) { // OP:329-331
 			p.mu.Lock()
-			details.timestamp = p.cfg.Clock.Now()
+			entry.timestamp = p.cfg.Clock.Now()
 			p.mu.Unlock()
 		})
 		s.OnFinished(func(uint64) { p.updateInProgress(peer, token, OTAUpdateWaitForApply, &version, false) })
 		s.OnCancelled(func() { p.updateInProgress(peer, token, OTAUpdateCancelled, &version, false) })
-		s.OnClosed(func() { // OP:348-364
-			if d := p.detailsForPeer(peer, token); d != nil {
-				switch d.lastState {
-				case OTAUpdateWaitForApply, OTAUpdateApplying, OTAUpdateDone, OTAUpdateCancelled:
-				default:
-					p.updateInProgress(peer, token, OTAUpdateCancelled, &version, false)
-				}
-			}
-		})
+		s.OnClosed(func() { p.cancelUnlessSettled(peer, token, version) }) // OP:348-364
 	})
 	// OP:368-377: the entry's cleanup unregisters the listener. off takes
 	// the responder's listener lock: it runs after p.mu is released, as
@@ -669,7 +661,22 @@ func (p *OTAProvider) hasUpdateConsent(peer OTAPeer, version uint32) bool {
 
 // detailsForPeer is #inProgressDetailsForPeer (OP:511-534): the entry of
 // the token, or the peer's first; a stale one is removed and not returned.
+// The result is a copy taken under p.mu, without the entry's cleanup: its
+// readers — the invoke path, the transfer sessions' listeners on the
+// responder's goroutines — decide on it while updateInProgress writes the
+// entry. matter.js reads the live object because its provider runs on one
+// thread; here the entry's fields are p.mu's, and a reader that held the
+// pointer past the lock raced ApplyUpdateRequest's write.
 func (p *OTAProvider) detailsForPeer(peer OTAPeer, token []byte) *otaInProgress {
+	_, snapshot := p.inProgressForPeer(peer, token)
+	return snapshot
+}
+
+// inProgressForPeer is detailsForPeer with the live entry beside the copy,
+// for the one caller that writes the entry it looked up (the transfer's
+// progress listener, OP:329-331, which matter.js gives the object itself).
+// The live entry's fields are read and written only under p.mu.
+func (p *OTAProvider) inProgressForPeer(peer OTAPeer, token []byte) (live, snapshot *otaInProgress) {
 	p.mu.Lock()
 	var cleanup func()
 	var out *otaInProgress
@@ -697,11 +704,16 @@ func (p *OTAProvider) detailsForPeer(peer OTAPeer, token []byte) *otaInProgress 
 			}
 		}
 	}
+	if out != nil {
+		c := *out // versionToApply is replaced, never written through
+		c.cleanup = nil
+		snapshot = &c
+	}
 	p.mu.Unlock()
 	if cleanup != nil {
 		cleanup()
 	}
-	return out
+	return out, snapshot
 }
 
 // sortedKeysLocked returns the entry keys in a stable order (a JavaScript
@@ -737,18 +749,69 @@ func (p *OTAProvider) removeInProgress(peer OTAPeer) {
 // sets directConsentObtained to its argument, false by default (:572,
 // :598), as matter.js does.
 func (p *OTAProvider) updateInProgress(peer OTAPeer, token []byte, state OTAUpdateStatus, version *uint32, directConsent bool) {
+	p.mu.Lock()
+	u := p.updateInProgressLocked(peer, token, state, version, directConsent)
+	p.mu.Unlock()
+	p.announce(u)
+}
+
+// cancelUnlessSettled is the transfer session's closed listener
+// (OP:348-364): the update of the token, unless it already waits for its
+// apply, applies, is done or cancelled, is cancelled. The decision and the
+// write take one hold of p.mu — matter.js runs both in one turn of its
+// thread — so an ApplyUpdateRequest moving the update to Applying between
+// them is never overwritten with Cancelled. A stale entry is removed and
+// not cancelled, as #inProgressDetailsForPeer does (OP:511-548).
+func (p *OTAProvider) cancelUnlessSettled(peer OTAPeer, token []byte, version uint32) {
 	key := otaKey(peer, token)
 	now := p.cfg.Clock.Now()
 	p.mu.Lock()
 	d := p.inProgress[key]
-	previous := OTAUpdateUnknown
+	if d == nil {
+		p.mu.Unlock()
+		return
+	}
+	if d.timestamp.Add(otaProgressTimeout).Before(now) {
+		p.logger.Info("ota.provider.stale_entry", slog.Uint64("node_id", peer.NodeID), slog.Duration("age", now.Sub(d.timestamp)))
+		cleanup := d.cleanup
+		delete(p.inProgress, key)
+		p.mu.Unlock()
+		if cleanup != nil {
+			cleanup()
+		}
+		return
+	}
+	switch d.lastState {
+	case OTAUpdateWaitForApply, OTAUpdateApplying, OTAUpdateDone, OTAUpdateCancelled:
+		p.mu.Unlock()
+	default:
+		u := p.updateInProgressLocked(peer, token, OTAUpdateCancelled, &version, false)
+		p.mu.Unlock()
+		p.announce(u)
+	}
+}
+
+// otaStatusUpdate is what updateInProgressLocked leaves to do once p.mu is
+// released: the log, the status hook and the terminal entry's cleanup.
+type otaStatusUpdate struct {
+	peer            OTAPeer
+	state, previous OTAUpdateStatus
+	applied         uint32
+	cleanup         func()
+}
+
+// updateInProgressLocked is updateInProgress's write; p.mu is held.
+func (p *OTAProvider) updateInProgressLocked(peer OTAPeer, token []byte, state OTAUpdateStatus, version *uint32, directConsent bool) otaStatusUpdate {
+	key := otaKey(peer, token)
+	d := p.inProgress[key]
+	u := otaStatusUpdate{peer: peer, state: state, previous: OTAUpdateUnknown}
 	if d == nil {
 		d = &otaInProgress{peer: peer}
 	} else {
-		previous = d.lastState
+		u.previous = d.lastState
 	}
 	d.lastState = state
-	d.timestamp = now
+	d.timestamp = p.cfg.Clock.Now()
 	if version != nil {
 		if d.versionToApply != nil && *d.versionToApply != *version {
 			p.logger.Warn("ota.provider.version_changed", slog.Uint64("from", uint64(*d.versionToApply)), slog.Uint64("to", uint64(*version)))
@@ -758,24 +821,26 @@ func (p *OTAProvider) updateInProgress(peer OTAPeer, token []byte, state OTAUpda
 	}
 	d.directConsentObtained = directConsent
 	p.inProgress[key] = d
-	var cleanup func()
 	if state == OTAUpdateDone || state == OTAUpdateCancelled {
 		// OP:614-618: a terminal state does not block future updates.
-		cleanup = d.cleanup
+		u.cleanup = d.cleanup
 		d.cleanup = nil
 		delete(p.inProgress, key)
 	}
-	var applied uint32
 	if d.versionToApply != nil {
-		applied = *d.versionToApply
+		u.applied = *d.versionToApply
 	}
-	p.mu.Unlock()
-	p.logger.Info("ota.provider.status", slog.Uint64("node_id", peer.NodeID), slog.String("state", state.String()), slog.String("previous", previous.String()))
+	return u
+}
+
+// announce is an update's log, status hook and cleanup, after p.mu.
+func (p *OTAProvider) announce(u otaStatusUpdate) {
+	p.logger.Info("ota.provider.status", slog.Uint64("node_id", u.peer.NodeID), slog.String("state", u.state.String()), slog.String("previous", u.previous.String()))
 	if fn := p.cfg.OnStatusChange; fn != nil {
-		fn(peer, state, applied)
+		fn(u.peer, u.state, u.applied)
 	}
-	if cleanup != nil {
-		cleanup()
+	if u.cleanup != nil {
+		u.cleanup()
 	}
 }
 

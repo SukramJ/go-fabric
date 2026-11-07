@@ -6,6 +6,7 @@ package discovery
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/miekg/dns"
@@ -124,15 +125,30 @@ func TestBrowse_CachedInstancesAndWithdrawals(t *testing.T) {
 	}
 
 	// A goodbye for the PTR withdraws the instance once it takes effect.
+	// The wait is for the goodbye's own effect — the PTR retired to the
+	// eviction delay — not for a non-empty expiry set: every installed
+	// record is in that set (name.go installRecord), so the clock could
+	// move before the goodbye was read and its eviction timer armed after.
+	conn.reset()
 	ctx3, cancel3 := context.WithCancel(t.Context())
 	defer cancel3()
 	done = startBrowse(ctx3, n, eType)
 	waitFor(t, func() bool { return asked(t, conn, eType, TypePTR) })
 	inject(t, conn, 0, []dns.RR{ptrRR(eType, eInst, 0)})
 	waitFor(t, func() bool {
-		var pending bool
-		onLoop(t, n, func() { pending = len(n.expiring) > 0 })
-		return pending
+		var retired bool
+		onLoop(t, n, func() {
+			nm := n.maybeGet(eType)
+			if nm == nil {
+				return
+			}
+			for _, r := range nm.records.values() {
+				if r.Type == TypePTR && strings.EqualFold(strings.TrimSuffix(r.PTR, "."), eInst) && r.TTL == DefaultEvictionDelay {
+					retired = true
+				}
+			}
+		})
+		return retired
 	})
 	clk.advance(n, DefaultEvictionDelay)
 	cancel3()

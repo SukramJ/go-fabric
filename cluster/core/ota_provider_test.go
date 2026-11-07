@@ -483,3 +483,68 @@ func TestOTAProvider_NeedsACASEPeer(t *testing.T) {
 		t.Fatalf("designator with a slash: %v", err)
 	}
 }
+
+// TestOTAProvider_ApplyWhileTheTransferCloses: the requestor's
+// ApplyUpdateRequest arrives while the responder still closes the transfer
+// that just ended — the invoke runs on its exchange goroutine, the
+// session's OnClosed listener on the responder's. The listener's decision
+// reads the update's state under the provider's lock; before it did, the
+// race detector flagged the read against ApplyUpdateRequest's write
+// (TestReferenceControllerOTA, CI race leg 2026-11-05…07). The interleaving
+// is the scheduler's, so the test repeats the window; under -race one
+// unsynchronised read is enough to fail it.
+func TestOTAProvider_ApplyWhileTheTransferCloses(t *testing.T) {
+	t.Parallel()
+	for range 40 {
+		f := newOTAFixture(t, nil)
+		r := f.query(t, 7, bdxQuery())
+		m, done := f.startDownload(t, 7, *r.ImageUri)
+		ctx := context.Background()
+		for c := uint32(0); ; c++ {
+			_ = m.SendBlockQuery(ctx, c)
+			typ, _, err := m.ReadBlock(ctx)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if typ == bdx.MessageBlockEOF {
+				_ = m.SendBlockAckEOF(ctx, c)
+				break
+			}
+		}
+		// No wait for done: the apply races the responder's close.
+		if a := f.apply(t, *r.UpdateToken, 2); a.Action != provdef.ApplyUpdateActionProceed {
+			t.Fatalf("ApplyUpdateResponse %+v", a)
+		}
+		<-done
+	}
+}
+
+// TestOTAProvider_ClosedTransferCancelsOnlyUnsettled: the transfer
+// session's closed listener (OP:348-364) cancels an update that is
+// querying or downloading and leaves one that waits for its apply or
+// applies; it decides and writes under one hold of the provider's lock,
+// so an apply between the two is not overwritten.
+func TestOTAProvider_ClosedTransferCancelsOnlyUnsettled(t *testing.T) {
+	t.Parallel()
+	token := []byte{1, 2, 3}
+	for _, tc := range []struct {
+		state OTAUpdateStatus
+		want  OTAUpdateStatus
+	}{
+		{OTAUpdateQuerying, OTAUpdateCancelled},
+		{OTAUpdateDownloading, OTAUpdateCancelled},
+		{OTAUpdateWaitForApply, OTAUpdateWaitForApply},
+		{OTAUpdateApplying, OTAUpdateApplying},
+	} {
+		f := newOTAFixture(t, nil)
+		f.p.updateInProgress(otaTestPeer, token, tc.state, nil, false)
+		f.p.cancelUnlessSettled(otaTestPeer, token, 2)
+		got := OTAUpdateCancelled // a cancelled entry is removed (OP:614-618)
+		if d := f.p.detailsForPeer(otaTestPeer, token); d != nil {
+			got = d.lastState
+		}
+		if got != tc.want {
+			t.Errorf("closed in %v: %v, want %v", tc.state, got, tc.want)
+		}
+	}
+}

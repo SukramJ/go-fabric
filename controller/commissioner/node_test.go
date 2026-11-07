@@ -44,6 +44,12 @@ const (
 // client/handshake and client/peer tests do.
 func startNode(t *testing.T, adv mdns.Advertiser, listen string) (*node.Node, *net.UDPAddr) {
 	t.Helper()
+	return startNodeWith(t, adv, listen, nodePasscode, nodeDiscriminator)
+}
+
+// startNodeWith is startNode with the node's passcode and discriminator.
+func startNodeWith(t *testing.T, adv mdns.Advertiser, listen string, passcode uint32, discriminator uint16) (*node.Node, *net.UDPAddr) {
+	t.Helper()
 	db, err := sql.Open("sqlite", "file:"+filepath.Join(t.TempDir(), "node.db")+"?_pragma=foreign_keys(1)&_pragma=busy_timeout(5000)")
 	if err != nil {
 		t.Fatal(err)
@@ -52,7 +58,7 @@ func startNode(t *testing.T, adv mdns.Advertiser, listen string) (*node.Node, *n
 	n, err := node.New(context.Background(), node.Config{
 		Network:            node.Network{Listen: listen, PreferIPv4: listen == "127.0.0.1:0"},
 		Advertiser:         adv,
-		Commissioning:      node.Commissioning{Passcode: nodePasscode, Discriminator: nodeDiscriminator, PBKDFIterations: 1000, Salt: []byte("SPAKE2P Key Salt")},
+		Commissioning:      node.Commissioning{Passcode: passcode, Discriminator: discriminator, PBKDFIterations: 1000, Salt: []byte("SPAKE2P Key Salt")},
 		ProductDescription: node.ProductDescription{VendorID: 0xFFF1, ProductID: 0x8001},
 		BasicInformation: node.BasicInformation{
 			VendorName: "go-fabric test", ProductName: "commissioner test", NodeLabel: "commissioned node", SerialNumber: "COM-1",

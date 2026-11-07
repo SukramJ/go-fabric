@@ -260,6 +260,20 @@ func TestProviderDeviceParityMatterjsServer(t *testing.T) {
 		if err := d.provider().UpsertSession(d.cameraSession(4, 999)); err != nil {
 			t.Fatal(err)
 		}
+		// The service starts on a camera whose sessions the controller's
+		// image already lists, as the matterjs-server test starts its
+		// second run on them (WebRtcProviderDeviceTest.ts:215-249 at
+		// 0bd06f2): the sweep runs at the service's first report batch,
+		// once per endpoint and run, and a batch end ahead of the
+		// sessions' own report swept the endpoint empty.
+		d.eventually("the leftovers in the controller's image", func() bool {
+			e := d.n.Endpoint(d.ep)
+			if e == nil {
+				return false
+			}
+			st, _ := wpdef.StateFrom(e.Cluster(wpdef.ClusterID))
+			return len(st.CurrentSessions) == 2
+		})
 		d.startService()
 		d.eventually("the leftover's end", func() bool { return slices.Equal(d.port.logged(), []string{"endSession:3"}) })
 	})
@@ -315,8 +329,15 @@ func TestProviderDeviceParityMatterjsServer(t *testing.T) {
 		d := newDevSite(t)
 		d.startService()
 		d.eventually("the first report", func() bool { return len(d.reports()) > 0 })
+		// The camera comes with the session an earlier run left, as the
+		// matterjs-server test sets it in the add's own tick
+		// (WebRtcProviderDeviceTest.ts:285-292 at 0bd06f2): the sweep runs
+		// once per endpoint and run, at the first report batch that carries
+		// the endpoint, so a session set after that batch is no leftover
+		// of this run's sweep. Set after the add's Run, the session raced
+		// the endpoint's first report, which can go out while the site
+		// paces the add.
 		added := devCamera(t, d.port, "camera2")
-		d.run(func(ctx context.Context) error { return d.dev.Node().Aggregator().Add(ctx, added) })
 		p, ok := added.WebRtcTransportProvider().Underlying().(*clustercamera.Provider)
 		if !ok {
 			t.Fatal("no provider on the added camera")
@@ -324,6 +345,7 @@ func TestProviderDeviceParityMatterjsServer(t *testing.T) {
 		if err := p.UpsertSession(d.cameraSession(8, d.c.Fabric().RootNodeID)); err != nil {
 			t.Fatal(err)
 		}
+		d.run(func(ctx context.Context) error { return d.dev.Node().Aggregator().Add(ctx, added) })
 		d.eventually("the added endpoint's leftover end", func() bool { return slices.Contains(d.port.logged(), "endSession:8") })
 	})
 	t.Run("hands a camera's session report to the camera manager", func(t *testing.T) {

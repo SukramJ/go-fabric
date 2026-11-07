@@ -145,6 +145,15 @@ func TestServiceChangeUpdatesDiscoveryData(t *testing.T) {
 		if sp.SessionIdleInterval != 800 || sp.SessionActiveInterval != 300 || sp.SessionActiveThreshold != exchange.FallbackActiveThreshold {
 			t.Fatalf("SessionParameters from TXT = %+v", sp)
 		}
+		// The replacement arrives later on the bubble's clock, as matter.js's
+		// test advances MockTime before it (DnssdNamesTest.ts:1203-1215 at
+		// db021da0): the old record's eviction changes the parameters only
+		// when a TXT record installed strictly after it remains
+		// (IpService.ts:240-247, Service.isSuperseded). Without the advance
+		// the step raced the first wait — when that wait found the record
+		// without sleeping, both records carried one InstalledAt, the
+		// eviction was no supersession and the peer kept SII.
+		time.Sleep(time.Second)
 		h.mdns.announce(t, txtRR(h.qname, 0, "SII=800", "SAI=300"), txtRR(h.qname, 120, "SAI=500"))
 		eventually(t, "the second TXT record", func() bool {
 			dd := p.Descriptor().DiscoveryData

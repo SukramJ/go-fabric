@@ -154,7 +154,7 @@
   },
   {
     "file": "bridge/ackpump_test.go",
-    "line": 527,
+    "line": 533,
     "citation": "MessageExchange.ts:428-433",
     "resolved": "packages/protocol/src/protocol/MessageExchange.ts",
     "identifier": "requiresAck",
@@ -172,7 +172,7 @@
   },
   {
     "file": "bridge/bridge.go",
-    "line": 697,
+    "line": 700,
     "citation": "ExchangeManager.ts:425-431",
     "resolved": "packages/protocol/src/protocol/ExchangeManager.ts",
     "identifier": "CloseSession",
@@ -181,7 +181,7 @@
   },
   {
     "file": "bridge/bridge.go",
-    "line": 1396,
+    "line": 1399,
     "citation": "NodeSession.ts:384-393",
     "resolved": "packages/protocol/src/session/NodeSession.ts",
     "identifier": "gracefulClose",
@@ -190,7 +190,7 @@
   },
   {
     "file": "bridge/bridge.go",
-    "line": 1398,
+    "line": 1401,
     "citation": "ExchangeManager.ts:693",
     "resolved": "packages/protocol/src/protocol/ExchangeManager.ts",
     "identifier": "CloseSession",
@@ -199,7 +199,7 @@
   },
   {
     "file": "bridge/bridge.go",
-    "line": 1435,
+    "line": 1438,
     "citation": "NodeSession.ts:384-393",
     "resolved": "packages/protocol/src/session/NodeSession.ts",
     "identifier": "gracefulClose",
@@ -208,7 +208,7 @@
   },
   {
     "file": "bridge/bridge.go",
-    "line": 1458,
+    "line": 1461,
     "citation": "Fabric.ts:408-415",
     "resolved": "packages/protocol/src/fabric/Fabric.ts",
     "identifier": "initiateForceClose",
@@ -217,7 +217,7 @@
   },
   {
     "file": "bridge/bridge.go",
-    "line": 1783,
+    "line": 1786,
     "citation": "Session.ts:248",
     "resolved": "packages/protocol/src/session/Session.ts",
     "identifier": "initiateClose",
@@ -226,7 +226,7 @@
   },
   {
     "file": "bridge/bridge.go",
-    "line": 1784,
+    "line": 1787,
     "citation": "ExchangeManager.ts:716-726",
     "resolved": "packages/protocol/src/protocol/ExchangeManager.ts",
     "identifier": "#sendCloseSession",
@@ -1714,7 +1714,7 @@
   },
   {
     "file": "cluster/core/ota_provider.go",
-    "line": 642,
+    "line": 634,
     "citation": "SoftwareUpdateManager.ts:1219-1232",
     "resolved": "packages/node/src/behavior/system/software-update/SoftwareUpdateManager.ts",
     "identifier": "NotifyUpdateApplied",

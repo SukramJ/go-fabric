@@ -353,7 +353,12 @@ The site is quiet once, for the settle period (`Options.Settle`, default
   stands in for work no counter names, and its bound keeps the goroutines
   of tests running beside this one from starving the site's clock. On
   loopback sockets, whose kernel work no counter sees, and on a wall-clock
-  site it holds as long as a goroutine works.
+  site the check is strict: the sites' own poll loops do not count as
+  work, and a working goroutine holds the site for at most a second while
+  nothing on the site moves. Past that second the site moves on and logs
+  it, as for counted work: the work is taken to be another test's, and
+  uncounted work of the site's own that was starved that long can be
+  overtaken.
 
 `Device.Stop` (and `Restart`) returns once the network and every host's
 counters are quiet after the node's stop, holding the clock meanwhile: the
@@ -451,7 +456,8 @@ wall clock; `Topology.Configure` may set the device's listen address
   `controller/ble/bletest` with `bridgetest.ServeConn`.
 - `Run` reads goroutine states for the whole test process, so the work of a
   parallel test in the same binary delays a clock step — by at most 50 ms
-  on an in-memory site with a fake clock, until it is idle on loopback.
+  on an in-memory site with a fake clock, and on loopback by at most a
+  second while nothing on the site moves.
 - Devices carry the CSA test attestation chain, the controllers trust the
   CSA test PAAs, and every credential is fixed and public: the package is
   for tests.
