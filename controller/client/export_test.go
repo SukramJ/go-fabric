@@ -171,3 +171,11 @@ func EmitLeave(r *Registry, n *Node, fabricIndex uint8) {
 	r.onEvent(n, 0, basicinformation.ClusterID, basicinformation.EventLeave, basicinformation.LeaveEvent{FabricIndex: fabricIndex})
 	r.work.Wait()
 }
+
+// HoldsDefaultSubscription reports whether n holds a default subscription,
+// established or being established; Stop clears it first.
+func HoldsDefaultSubscription(n *Node) bool {
+	n.mu.RLock()
+	defer n.mu.RUnlock()
+	return n.subOwner != nil
+}

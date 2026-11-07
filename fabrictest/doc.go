@@ -74,8 +74,10 @@
 // — no datagram sent or queued, no work counted in hand on a host
 // (internal/inflight: a datagram being handled, a message an exchange's
 // reader has not finished with, a report being sent, a host callback, a
-// node's start or stop), and no goroutine of the process working (on an
-// in-memory site with a fake clock for at most a short grace) — so a
+// node's start or stop), and no goroutine of the process working but the
+// sites' own pollers (on an in-memory site with a fake clock for at most a
+// short grace, on any other for at most a second with nothing on the site
+// moving) — so a
 // timer the work waits on fires. That is MockTime.resolve, which moves
 // time only while no task and no host operation is pending. A site given
 // clock.System runs on the wall clock, and Run only runs the work.

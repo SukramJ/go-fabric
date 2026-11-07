@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 7760,
+  "entry_points": 7769,
   "entry_packages": [
     ".",
     "bdx",
@@ -280,9 +280,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 17730,
+    "total_exported": 17736,
     "reachable": 12335,
-    "whitelisted": 5395,
+    "whitelisted": 5401,
     "unreachable": 0
   },
   "by_package": [],
@@ -503,84 +503,105 @@
       "identifier": "TestAckPumpStandaloneAckCarriesTheBridgeExchangeRole",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/ackpump_test.go",
-      "line": 370
+      "line": 376
     },
     {
       "package": "bridge",
       "identifier": "TestAckPump_AttachAckTrackerAlsoSetsAckHandler",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/ackpump_test.go",
-      "line": 603
+      "line": 609
     },
     {
       "package": "bridge",
       "identifier": "TestAckPump_Discharge",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/ackpump_test.go",
-      "line": 239
+      "line": 245
     },
     {
       "package": "bridge",
       "identifier": "TestAckPump_EchoesPeerSourceNodeID",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/ackpump_test.go",
-      "line": 144
+      "line": 150
     },
     {
       "package": "bridge",
       "identifier": "TestAckPump_ExpediteDuplicateAck",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/ackpump_test.go",
-      "line": 529
+      "line": 535
     },
     {
       "package": "bridge",
       "identifier": "TestAckPump_ExpediteDuplicateAck_UnknownObligationNoOp",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/ackpump_test.go",
-      "line": 587
+      "line": 593
     },
     {
       "package": "bridge",
       "identifier": "TestAckPump_MultipleExchanges",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/ackpump_test.go",
-      "line": 434
+      "line": 440
     },
     {
       "package": "bridge",
       "identifier": "TestAckPump_NoSrcDropsObligation",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/ackpump_test.go",
-      "line": 457
+      "line": 463
     },
     {
       "package": "bridge",
       "identifier": "TestAckPump_NoTrackerNoOp",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/ackpump_test.go",
-      "line": 58
+      "line": 64
     },
     {
       "package": "bridge",
       "identifier": "TestAckPump_OweAndEmit",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/ackpump_test.go",
-      "line": 76
+      "line": 82
     },
     {
       "package": "bridge",
       "identifier": "TestAckPump_SessionScopedExchangeCollision",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/ackpump_test.go",
-      "line": 274
+      "line": 280
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestAckPump_SleepsWhileIdle",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/ackpump_test.go",
+      "line": 684
     },
     {
       "package": "bridge",
       "identifier": "TestAckPump_SourceFromTheInboundDestination",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/ackpump_test.go",
-      "line": 202
+      "line": 208
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestAckPump_TimedRequestWakesThePump",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/ackpump_test.go",
+      "line": 715
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestAckPump_TrackedMessageWakesThePump",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/ackpump_test.go",
+      "line": 703
     },
     {
       "package": "bridge",
@@ -5578,7 +5599,7 @@
       "identifier": "TestTickOutboundReliable_NilListener",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/ackpump_test.go",
-      "line": 494
+      "line": 500
     },
     {
       "package": "bridge",
@@ -5753,28 +5774,28 @@
       "identifier": "TestBrowse_AsksForWhatAnInstanceLacks",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/discovery/browse_test.go",
-      "line": 70
+      "line": 71
     },
     {
       "package": "client/discovery",
       "identifier": "TestBrowse_CachedInstancesAndWithdrawals",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/discovery/browse_test.go",
-      "line": 97
+      "line": 98
     },
     {
       "package": "client/discovery",
       "identifier": "TestBrowse_FindsAForeignServiceType",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/discovery/browse_test.go",
-      "line": 34
+      "line": 35
     },
     {
       "package": "client/discovery",
       "identifier": "TestBrowse_Refusals",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/discovery/browse_test.go",
-      "line": 144
+      "line": 160
     },
     {
       "package": "client/discovery",
@@ -7027,21 +7048,21 @@
       "identifier": "TestAdoptSessions",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/set_test.go",
-      "line": 160
+      "line": 169
     },
     {
       "package": "client/peer",
       "identifier": "TestCloseDeleteAndDisconnect",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/set_test.go",
-      "line": 221
+      "line": 230
     },
     {
       "package": "client/peer",
       "identifier": "TestCloseSweepsSessionsAfterWorkers",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/set_test.go",
-      "line": 302
+      "line": 311
     },
     {
       "package": "client/peer",
@@ -7146,7 +7167,7 @@
       "identifier": "TestInitiateConnectionWithLiveSession",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/set_test.go",
-      "line": 271
+      "line": 280
     },
     {
       "package": "client/peer",
@@ -7230,7 +7251,7 @@
       "identifier": "TestNewestSessionActivityParityMatterJS",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/set_test.go",
-      "line": 331
+      "line": 340
     },
     {
       "package": "client/peer",
@@ -7489,7 +7510,7 @@
       "identifier": "TestSessionParametersPreferTheReport",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/set_test.go",
-      "line": 201
+      "line": 210
     },
     {
       "package": "client/peer",
@@ -8382,6 +8403,13 @@
     },
     {
       "package": "cluster/core",
+      "identifier": "TestOTAProvider_ApplyWhileTheTransferCloses",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/ota_provider_test.go",
+      "line": 496
+    },
+    {
+      "package": "cluster/core",
       "identifier": "TestOTAProvider_BDXNotEnabled",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/ota_provider_test.go",
@@ -8393,6 +8421,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/ota_provider_test.go",
       "line": 243
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestOTAProvider_ClosedTransferCancelsOnlyUnsettled",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/ota_provider_test.go",
+      "line": 527
     },
     {
       "package": "cluster/core",
@@ -23141,7 +23176,7 @@
       "identifier": "TestDeviceIOImageParityMatterjsServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/camera/device_fabrictest_internal_test.go",
-      "line": 346
+      "line": 368
     },
     {
       "package": "controller/camera",
@@ -23961,6 +23996,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/export_test.go",
       "line": 39
+    },
+    {
+      "package": "controller/client",
+      "identifier": "HoldsDefaultSubscription",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/client/export_test.go",
+      "line": 177
     },
     {
       "package": "controller/client",
@@ -24800,7 +24842,7 @@
       "identifier": "TestAcceptedFailedAttestation",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/node_test.go",
-      "line": 385
+      "line": 391
     },
     {
       "package": "controller/commissioner",
@@ -24842,14 +24884,14 @@
       "identifier": "TestCommissionForgetsTheDevice",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/node_test.go",
-      "line": 433
+      "line": 439
     },
     {
       "package": "controller/commissioner",
       "identifier": "TestCommissionLiveThroughMulticast",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/node_live_test.go",
-      "line": 20
+      "line": 32
     },
     {
       "package": "controller/commissioner",
@@ -24863,7 +24905,7 @@
       "identifier": "TestCommissionTheNode",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/node_test.go",
-      "line": 220
+      "line": 226
     },
     {
       "package": "controller/commissioner",
@@ -24961,7 +25003,7 @@
       "identifier": "TestEstablishPASE",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/node_test.go",
-      "line": 354
+      "line": 360
     },
     {
       "package": "controller/commissioner",
@@ -25017,7 +25059,7 @@
       "identifier": "TestFinalizeCommissioning",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/node_test.go",
-      "line": 296
+      "line": 302
     },
     {
       "package": "controller/commissioner",
@@ -25220,7 +25262,7 @@
       "identifier": "TestRejectedAttestation",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/node_test.go",
-      "line": 328
+      "line": 334
     },
     {
       "package": "controller/commissioner",

@@ -461,7 +461,10 @@ type Bridge struct {
 	serveDone           chan struct{}
 	pumpCancel          context.CancelFunc // optional; nil when no AckTracker wired
 	pumpDone            chan struct{}
-	started             bool
+	// ackPump is the running ACK pump's ticker state (runAckPump), nil
+	// while no pump runs; wakeAckPump re-arms an idle one.
+	ackPump atomic.Pointer[ackPumpTicker]
+	started bool
 	// reannounces is the session re-announce goroutines
 	// (triggerSessionReannounce), added under mu while started and waited
 	// for by Stop before the advertiser closes.

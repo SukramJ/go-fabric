@@ -76,6 +76,10 @@ type outboundReliableTracker struct {
 	// localFixedMrpBackoff, set by IcdManagementServer.ts:257). Zero for a
 	// node that is no ICD.
 	fixedBackoff atomic.Int64
+	// wake, when set, wakes the bridge's idle ACK pump once an entry is
+	// tracked (Bridge.wakeAckPump). Set once after construction, before
+	// the pump starts; read without the mutex.
+	wake func()
 }
 
 // outboundEntry captures one in-flight reliable datagram and the
@@ -236,6 +240,9 @@ func (t *outboundReliableTracker) track(counter uint32, sessionID, exchangeID ui
 	// peer-appropriate base interval for every transmission including
 	// the first.
 	delay := mrp.BackoffDuration(t.entryBase(sessionID, peer, now)+margin, 0, rand.Float64) + time.Duration(t.fixedBackoff.Load())
+	if t.wake != nil {
+		defer t.wake() // after the unlock below: the entry is in pending first
+	}
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	t.pending[outboundKey{sessionID, counter}] = &outboundEntry{

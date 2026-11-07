@@ -686,6 +686,7 @@ func (b *Bridge) dispatchTimedRequest(src net.Addr, requestHdr *message.Header, 
 	// Key on (sessionID, exchangeID) so a different session cannot
 	// consume a deadline registered by another session.
 	b.routing.timedDeadlines.Store(timedKey{sessionID: requestHdr.SessionID, exchangeID: proto.ExchangeID}, deadline)
+	b.wakeAckPump() // the pump sweeps a deadline its follow-up never consumes
 	// Reclaim abandoned deadlines at the site that creates them: a
 	// controller whose follow-up Write / Invoke never arrives leaves an
 	// entry nothing consumes, so the table would otherwise grow for the

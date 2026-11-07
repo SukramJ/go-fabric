@@ -134,6 +134,17 @@ type exchangeRouting struct {
 	statusResponseWaits sync.Map
 }
 
+// hasTimedDeadlines reports whether any timed deadline is registered —
+// one the ACK pump's sweep may still have to reclaim.
+func (r *exchangeRouting) hasTimedDeadlines() bool {
+	found := false
+	r.timedDeadlines.Range(func(any, any) bool {
+		found = true
+		return false
+	})
+	return found
+}
+
 // maybeSweepExpiredTimedDeadlines runs the expiry sweep at most once
 // per [timedSweepInterval] and reports how many entries it reclaimed.
 // Callers pass the time they already hold, so the sweep costs a single

@@ -316,6 +316,8 @@ func (s *Site) Step(ctx context.Context, d time.Duration) error {
 func (s *Site) drain(ctx context.Context, own *inflight.Group) error {
 	own.Enter(inflight.NodeStop)
 	defer own.Leave(inflight.NodeStop)
+	pollers.Add(1)
+	defer pollers.Add(-1)
 	until := s.waitUntil(ctx)
 	wall := s.wall
 	samples := make([]metrics.Sample, len(busyMetrics))
@@ -339,6 +341,7 @@ func (s *Site) drain(ctx context.Context, own *inflight.Group) error {
 	}
 	last, _, _ := s.state()
 	since := wall.Now()
+	moved, starved := since, false
 	for {
 		select {
 		case <-ctx.Done():
@@ -352,8 +355,8 @@ func (s *Site) drain(ctx context.Context, own *inflight.Group) error {
 		cur, _, pinned := s.state()
 		switch {
 		case cur != last || s.pending() > 0:
-			last, since = cur, now
-		case s.opts.Loopback && busy(samples, &s.inSyscall):
+			last, since, moved = cur, now, now
+		case s.opts.Loopback && s.busyHolds(samples, now.Sub(moved), &starved):
 			since = now
 		default:
 			stable := now.Sub(since)
@@ -361,7 +364,7 @@ func (s *Site) drain(ctx context.Context, own *inflight.Group) error {
 				return nil
 			}
 		}
-		clock.Sleep(wall, time.Millisecond, nil)
+		pollSleep(wall, time.Millisecond, nil)
 	}
 }
 
@@ -494,8 +497,11 @@ func (s *Site) waitUntil(ctx context.Context) time.Time {
 // past holdBudget with nothing moving), and the process-wide goroutine
 // check passed (strictBusy) or its grace ran out.
 func (s *Site) quiet(ctx context.Context, done <-chan struct{}, until time.Time) error {
+	pollers.Add(1)
+	defer pollers.Add(-1)
 	wall := s.wall
 	since := wall.Now()
+	moved, starved := since, false
 	last, _, _ := s.state()
 	samples := make([]metrics.Sample, len(busyMetrics))
 	for i, name := range busyMetrics {
@@ -520,8 +526,8 @@ func (s *Site) quiet(ctx context.Context, done <-chan struct{}, until time.Time)
 		strict := s.strictBusy()
 		switch {
 		case cur != last || s.pending() > 0:
-			last, since = cur, now
-		case strict && busy(samples, &s.inSyscall):
+			last, since, moved = cur, now, now
+		case strict && s.busyHolds(samples, now.Sub(moved), &starved):
 			since = now
 		default:
 			stable := now.Sub(since)
@@ -531,7 +537,7 @@ func (s *Site) quiet(ctx context.Context, done <-chan struct{}, until time.Time)
 			if held && (pinned || stable < holdBudget) {
 				break
 			}
-			if !strict && stable < busyGrace && busy(samples, &s.inSyscall) {
+			if !strict && stable < busyGrace && busy(samples, &s.inSyscall, false) {
 				break
 			}
 			if held {
@@ -540,8 +546,57 @@ func (s *Site) quiet(ctx context.Context, done <-chan struct{}, until time.Time)
 			}
 			return nil
 		}
-		clock.Sleep(wall, time.Millisecond, done)
+		pollSleep(wall, time.Millisecond, done)
 	}
+}
+
+// pollers is the number of the process's goroutines awake in a site's
+// quiet or drain loop — every site's, the caller's own included. The
+// strict busy check discounts them: a poller is a site waiting, not a host
+// working.
+// A package's parallel fabrictest tests run many sites in one binary, and
+// their pollers wake every millisecond; counted as work, those wake-ups
+// alone kept a loopback site's strict check from ever reading the process
+// idle for a settle period, so a Device.Stop's drain on a loopback site
+// waited out its context while nothing on the site moved
+// (TestControllerServesTheCameraRequestor in the controller package's
+// full run, brief FP2 §2).
+var pollers atomic.Int64
+
+// pollSleep is clock.Sleep for a poll loop: the goroutine is no poller
+// while it sleeps.
+func pollSleep(wall clock.Clock, d time.Duration, done <-chan struct{}) {
+	pollers.Add(-1)
+	defer pollers.Add(1)
+	clock.Sleep(wall, d, done)
+}
+
+// busyHolds is the strict goroutine check of a loopback or wall-clock
+// site: whether a working goroutine of the process holds the site, still
+// is how long nothing on the site moved. It holds for at most
+// holdBudget of stillness: past it, the work is taken to be the tests'
+// beside this one, and holding longer let a busy package starve a
+// loopback site's steps until its context ended
+// (TestControllerServesTheCameraRequestor's Restart and Close in the
+// controller package's full run, brief FP2 §2). It does not tell whose
+// goroutine works: uncounted work of the site's own, starved past
+// holdBudget, can be overtaken by the next step, and the site logs it, as
+// it logs abandoned counted work (which this check does not touch).
+// matter.js MockTime abandons a host operation the same way
+// (MAX_HOST_ASYNC_MS, packages/testing/src/mocks/time.ts:63-70 at
+// db021da0). The site logs the first time it moves on in one wait.
+func (s *Site) busyHolds(samples []metrics.Sample, still time.Duration, starved *bool) bool {
+	if !busy(samples, &s.inSyscall, true) {
+		return false
+	}
+	if still < holdBudget {
+		return true
+	}
+	if !*starved {
+		*starved = true
+		s.tb.Logf("fabrictest: the process stayed busy %v with nothing on the site moving; the site moves on (the work is beside the site's)", holdBudget)
+	}
+	return false
 }
 
 // busyMetrics are the goroutine states of work in progress.
@@ -559,9 +614,22 @@ var busyMetrics = []string{
 // why an in-memory site with a fake clock bounds it (busyGrace) and
 // relies on its hosts' counters (internal/inflight) for the work they
 // name. The standing goroutines in a system call (standing, the fewest
-// seen) are not work; a reading below it lowers it.
-func busy(samples []metrics.Sample, standing *atomic.Uint64) bool {
+// seen) are not work; a reading below it lowers it. With discount, the
+// strict check of a loopback or wall-clock site, the awake pollers
+// (pollers, the caller among them) are not work either; the lower of the
+// counts read before and after the sample is discounted. A poller that
+// went to sleep, or parked on a lock, around the sample can hide one
+// goroutine from that one sample; a quiet period needs every sample of
+// its settle period idle, which work lasting that long is not hidden
+// from. The in-memory site's graced check counts them as before: it waits
+// at most busyGrace for them.
+func busy(samples []metrics.Sample, standing *atomic.Uint64, discount bool) bool {
+	before := pollers.Load()
 	metrics.Read(samples)
+	awake := uint64(1)
+	if discount {
+		awake = uint64(max(min(before, pollers.Load()), 1)) //nolint:gosec // G115: at least 1
+	}
 	var n, inSyscall uint64
 	for i := range samples {
 		if samples[i].Value.Kind() == metrics.KindUint64 {
@@ -577,7 +645,7 @@ func busy(samples []metrics.Sample, standing *atomic.Uint64) bool {
 			break
 		}
 	}
-	return n > 1+standing.Load()
+	return n > awake+standing.Load()
 }
 
 func (s *Site) sent() uint64 {
