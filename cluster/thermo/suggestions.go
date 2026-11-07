@@ -127,7 +127,7 @@ func (s *ThermostatServer) AttachMatterTime(matterTime clock.MatterTime) {
 // on the command queue: a suggestion whose ExpirationTime the new time
 // has passed leaves the list, one whose EffectiveTime it reached becomes
 // current, and the timer is armed anew from the new time. A node calls it
-// whenever its UTC moves; the host of a server outside a node calls it
+// whenever it adopts a time; the host of a server outside a node calls it
 // when its time does. Beyond connectedhomeip, whose suggestion timer runs
 // on the monotonic clock and does not see a change of UTC
 // (thermostat-suggestions-delegate-impl.cpp:264-269 at 6170af84): the

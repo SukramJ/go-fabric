@@ -24,8 +24,8 @@ import (
 // host clock without the offset (issue 445). The node hands each the root
 // TimeSynchronization's UTC in epoch seconds
 // (core.TimeSynchronization.MatterEpochSeconds) as its endpoint joins the
-// topology, and tells each when that UTC moves — SetUTCTime, the trusted
-// time source, the NTP fallback — so a controller reads one time from
+// topology, and tells each whenever the node adopts a time — SetUTCTime,
+// the trusted time source, the NTP fallback — so a controller reads one time from
 // the node, as connectedhomeip's servers read the one system clock
 // SetUTCTime sets (SystemClock.cpp:284-306, TimeSynchronizationCluster.cpp:
 // 856-872 at 6170af84). A node without the root cluster
@@ -34,7 +34,7 @@ import (
 type matterTimeParticipant interface {
 	// AttachMatterTime hands the server the node's Matter time.
 	AttachMatterTime(matterTime clock.MatterTime)
-	// MatterTimeChanged tells the server the time moved: the Valve sets
+	// MatterTimeChanged tells the server the node adopted a time: the Valve sets
 	// AutoCloseTime anew from RemainingDuration, the Thermostat
 	// re-evaluates its suggestions.
 	MatterTimeChanged()
@@ -117,13 +117,19 @@ func (n *Node) attachMatterTime(t *endpoint.Topology) error {
 	return nil
 }
 
-// watchMatterTime tells the participants whenever the root's UTCTime
-// moves — every path that moves it reports UTCTime
-// (core.TimeSynchronization's adoption of a time), as connectedhomeip's
-// SetUTCTime reports it and calls the delegate's
-// UTCTimeAvailabilityChanged (TimeSynchronizationCluster.cpp:856-872, the
-// call :865 at 6170af84), which the reference application hands to the
-// valve (examples/all-clusters-app/linux/ValveControlDelegate.cpp:70-73).
+// watchMatterTime tells the participants whenever the node adopts a time:
+// each adoption (core.TimeSynchronization's adoptLocked — SetUTCTime, the
+// trusted time source, the NTP fallback) reports UTCTime. A move of the
+// host clock or of the PlatformTime source is no adoption and tells
+// nobody. Mirrors connectedhomeip's SetUTCTime, which reports UTCTime and
+// calls the delegate's UTCTimeAvailabilityChanged
+// (TimeSynchronizationCluster.cpp:856-872, the call :865 at 6170af84) —
+// for SetUTCTime (:1129) and the trusted source's time (:479) — and which
+// the reference application hands to the valve
+// (examples/all-clusters-app/linux/ValveControlDelegate.cpp:70-73). chip's
+// NTP fallback sets the time through its delegate without the call
+// (:510-522); the node tells its participants of that adoption too, since
+// it moves the one time they read.
 func (n *Node) watchMatterTime() {
 	ts := n.root.TimeSynchronization
 	if ts == nil {

@@ -5235,8 +5235,8 @@ handle on the presets delegate alone (:261). The Matter time is the node's
 UTC, which the node hands the server as its endpoint joins the topology
 (`thermo.ThermostatServer.AttachMatterTime` with the root
 TimeSynchronization's `MatterEpochSeconds`, so SetUTCTime moves it);
-without it every Add answers INVALID_IN_STATE. Ahead of chip: when the
-node's UTC moves, the node tells the server (`MatterTimeChanged`) and the
+without it every Add answers INVALID_IN_STATE. Ahead of chip: whenever the
+node adopts a time, the node tells the server (`MatterTimeChanged`) and the
 suggestions are re-evaluated against the new time — a jump past a
 suggestion's ExpirationTime removes it, one to its EffectiveTime makes it
 current — where chip's expiration timer runs on the monotonic clock and
@@ -5600,7 +5600,7 @@ resolved level reaches the source in the request's TargetLevel, as chip
 hands it to `HandleOpenValve(level)`
 (`valve-configuration-and-control-delegate.h:40`). AutoCloseTime is the
 Matter time at the Open plus the opening's duration (`:391-413`), set anew
-as the time plus RemainingDuration whenever the node's UTC moves while
+as the time plus RemainingDuration whenever the node adopts a time while
 the valve counts down — chip's `UpdateAutoCloseTime` (`:415-423`), which
 the reference application's `UTCTimeAvailabilityChanged` calls
 (`examples/all-clusters-app/linux/ValveControlDelegate.cpp:70-73`) —, null for
@@ -6096,11 +6096,17 @@ and an attempt that never ended would hold every later one. The node's UTC
 is the Matter time of Thermostat TSUGGEST and Valve TS (issue 428): the node hands
 `TimeSynchronization.MatterEpochSeconds` to the Thermostat's suggestions
 and the Valve's AutoCloseTime as their endpoints join the topology
-(`AttachMatterTime`) and tells them when it moves (`MatterTimeChanged`,
-on every report of UTCTime), as chip's servers read the system clock
+(`AttachMatterTime`) and tells them whenever it adopts a time
+(`MatterTimeChanged`: SetUTCTime, the trusted time source, the NTP
+fallback; a move of the host clock or of `PlatformTime` tells nobody), as
+chip's SetUTCTime calls `UTCTimeAvailabilityChanged` for SetUTCTime
+(`TimeSynchronizationCluster.cpp:1129`) and the trusted source's time
+(`:479`) — chip's NTP fallback (`:510-522`) makes no such call, the node
+tells of that adoption too because it moves the time the participants
+read —, and as chip's servers read the system clock
 SetUTCTime sets through `GetClock_MatterEpochS`
-(`src/system/SystemClock.cpp:284-306` at `6170af84`) and SetUTCTime calls
-the delegate's `UTCTimeAvailabilityChanged` (`TimeSynchronizationCluster.cpp:865`). Difference,
+(`src/system/SystemClock.cpp:284-306` at `6170af84`; the delegate call is
+`TimeSynchronizationCluster.cpp:865`). Difference,
 until issue 445: the other device-side readers of real time — the event
 log's EpochTimestamp, ResourceMonitoring's LastChangedTime, DiagnosticLogs,
 the energy servers — read the host clock without the offset, where chip
