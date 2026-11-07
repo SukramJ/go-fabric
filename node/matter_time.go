@@ -4,6 +4,8 @@
 package node
 
 import (
+	"errors"
+	"fmt"
 	"slices"
 	"sync"
 
@@ -24,7 +26,8 @@ import (
 // the node, as connectedhomeip's servers read the one system clock
 // SetUTCTime sets (SystemClock.cpp:284-306, TimeSynchronizationCluster.cpp:
 // 856-872 at 6170af84). A node without the root cluster
-// ([TimeSynchronization].Off) has no UTC and hands none.
+// ([TimeSynchronization].Off) has no UTC: it hands none, and refuses a
+// participant that requires it ([matterTimeParticipant.RequiresMatterTime]).
 type matterTimeParticipant interface {
 	// AttachMatterTime hands the server the node's Matter time.
 	AttachMatterTime(matterTime clock.MatterTime)
@@ -32,6 +35,12 @@ type matterTimeParticipant interface {
 	// AutoCloseTime anew from RemainingDuration, the Thermostat
 	// re-evaluates its suggestions.
 	MatterTimeChanged()
+	// RequiresMatterTime reports whether the server cannot be served
+	// without the node's time: the Valve with TS, which connectedhomeip's
+	// Startup refuses without a time tracker
+	// (ValveConfigurationAndControlCluster.cpp:46-50 at 6170af84). The node
+	// refuses such a server when TimeSynchronization is off.
+	RequiresMatterTime() bool
 }
 
 // matterTimeSync is the topology's Matter time participants, the ones
@@ -41,9 +50,17 @@ type matterTimeSync struct {
 	participants []matterTimeParticipant
 }
 
+// errNoMatterTime is a topology server that needs the node's Matter time
+// on a node without the root TimeSynchronization.
+var errNoMatterTime = errors.New("node: the server needs the node's Matter time, and TimeSynchronization is off")
+
 // attachMatterTime hands the topology's Matter time participants the
-// root TimeSynchronization's UTC and records them.
-func (n *Node) attachMatterTime(t *endpoint.Topology) {
+// root TimeSynchronization's UTC and records them. On a node without the
+// root cluster a participant that requires the time fails the topology,
+// naming its endpoint and cluster — the node's fail-closed form of
+// connectedhomeip's Startup refusal (ValveConfigurationAndControlCluster.cpp:
+// 46-50 at 6170af84).
+func (n *Node) attachMatterTime(t *endpoint.Topology) error {
 	ts := n.root.TimeSynchronization
 	var ps []matterTimeParticipant
 	for _, ep := range t.Endpoints {
@@ -52,7 +69,12 @@ func (n *Node) attachMatterTime(t *endpoint.Topology) {
 		}
 		for _, srv := range endpoint.ClusterServers(ep) {
 			p, ok := srv.(matterTimeParticipant)
-			if !ok || ts == nil {
+			switch {
+			case !ok:
+				continue
+			case ts == nil && p.RequiresMatterTime():
+				return fmt.Errorf("%w: endpoint %d, cluster 0x%04X", errNoMatterTime, ep.ID, srv.MatterClusterID())
+			case ts == nil:
 				continue
 			}
 			p.AttachMatterTime(ts.MatterEpochSeconds)
@@ -62,6 +84,7 @@ func (n *Node) attachMatterTime(t *endpoint.Topology) {
 	n.matterTime.mu.Lock()
 	n.matterTime.participants = ps
 	n.matterTime.mu.Unlock()
+	return nil
 }
 
 // watchMatterTime tells the participants whenever the root's UTCTime

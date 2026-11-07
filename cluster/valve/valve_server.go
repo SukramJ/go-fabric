@@ -643,6 +643,12 @@ func (s *Server) MatterTimeChanged() {
 	s.tracker().Bump()
 }
 
+// RequiresMatterTime reports whether the server cannot be served without
+// the node's Matter time: with TS, as connectedhomeip's Startup refuses TS
+// without a time tracker (ValveConfigurationAndControlCluster.cpp:46-50
+// at 6170af84) — a node without TimeSynchronization refuses such a valve.
+func (s *Server) RequiresMatterTime() bool { return s.timeSync }
+
 // setAutoClose records the AutoCloseTime of the last Open (nil: null).
 func (s *Server) setAutoClose(at *uint64) {
 	s.mu.Lock()

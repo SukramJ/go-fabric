@@ -5,6 +5,8 @@ package node_test
 
 import (
 	"context"
+	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -169,5 +171,73 @@ func TestOneMatterTimePerNode(t *testing.T) {
 		if len(state.ThermostatSuggestions) != 1 || !near(uint64(state.ThermostatSuggestions[0].EffectiveTime), at) {
 			t.Errorf("ThermostatSuggestions %+v, want one effective at the node's UTC %v", state.ThermostatSuggestions, at)
 		}
+	}
+}
+
+// TestTimeSyncValveNeedsTheNodesTime: a Valve with TimeSync on a node with
+// TimeSynchronization off fails the topology, naming its endpoint and
+// cluster — the node's fail-closed form of connectedhomeip's Startup,
+// which refuses TS without a time tracker
+// (ValveConfigurationAndControlCluster.cpp:46-50 at 6170af84) —, at Start
+// as at a later Add; a valve without TS and a Thermostat with TSUGGEST
+// (chip gates each suggestion, ThermostatClusterSuggestions.cpp:173-178)
+// are served without the time.
+func TestTimeSyncValveNeedsTheNodesTime(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	rows := surface.NewExtensions(append([]string{"BD-chip-Thermostat-Suggestions"}, valve.Ahead.IDs()...)...)
+	newValve := func(key string, features valvedef.Feature) node.Endpoint {
+		t.Helper()
+		v, err := device.NewWaterValve(device.Options{StableKey: device.StringKey(key), Name: key, Surface: surface.Policies{Extensions: rows}},
+			valvedef.Declare{Features: features, StateSource: timedValve{}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return v
+	}
+	config := func(name string) node.Config {
+		cfg := minimalConfig(openDB(t, filepath.Join(t.TempDir(), name+".db")))
+		cfg.TimeSynchronization.Off = true
+		cfg.Surface.Extensions = rows
+		return cfg
+	}
+
+	// At Start.
+	n := newNode(t, config("n"))
+	if err := n.Aggregator().Add(ctx, newValve("ts-valve", valvedef.FeatureTimeSync)); err != nil {
+		t.Fatal(err)
+	}
+	err := n.Start(ctx)
+	if err == nil || !strings.Contains(err.Error(), "TimeSynchronization is off") || !strings.Contains(err.Error(), "cluster 0x0081") {
+		t.Fatalf("Start with a TS valve and TimeSynchronization off: %v, want the refusal naming the cluster", err)
+	}
+
+	// At a later Add; the plain valve and the TSUGGEST thermostat are served.
+	m := newNode(t, config("m"))
+	handle := []byte("Home")
+	heat := int16(2100)
+	count := uint8(1)
+	types := []thermostatdef.PresetTypeStruct{{PresetScenario: thermostatdef.PresetScenarioOccupied, NumberOfPresets: 1}}
+	presets := []thermostatdef.PresetStruct{{PresetHandle: spec.ValueOf(handle), PresetScenario: thermostatdef.PresetScenarioOccupied, HeatingSetpoint: &heat, BuiltIn: spec.ValueOf(true)}}
+	thermostat, err := device.NewThermostat(device.Options{StableKey: device.StringKey("thermostat"), Name: "Thermostat", Surface: surface.Policies{Extensions: rows}},
+		thermostatdef.Declare{
+			Features: thermostatdef.FeatureHeating | thermostatdef.FeaturePresets | thermostatdef.FeatureThermostatSuggestions,
+			Initial:  thermostatdef.Patch{NumberOfPresets: &count, PresetTypes: &types, Presets: &presets},
+		})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := m.Aggregator().Add(ctx, newValve("plain-valve", 0)); err != nil {
+		t.Fatal(err)
+	}
+	if err := m.Aggregator().Add(ctx, thermostat); err != nil {
+		t.Fatal(err)
+	}
+	if err := m.Start(ctx); err != nil {
+		t.Fatalf("Start with a plain valve and a TSUGGEST thermostat: %v", err)
+	}
+	err = m.Aggregator().Add(ctx, newValve("late-ts-valve", valvedef.FeatureTimeSync))
+	if err == nil || !strings.Contains(err.Error(), "TimeSynchronization is off") {
+		t.Errorf("Add of a TS valve after Start: %v, want the refusal", err)
 	}
 }

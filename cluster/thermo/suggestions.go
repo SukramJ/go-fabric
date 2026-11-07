@@ -130,6 +130,14 @@ func (s *ThermostatServer) AttachMatterTime(matterTime clock.MatterTime) {
 // moves what is due.
 func (s *ThermostatServer) MatterTimeChanged() { s.scheduleSuggestionReevaluation() }
 
+// RequiresMatterTime is false: the Thermostat serves TSUGGEST without the
+// node's time, each suggestion refused with INVALID_IN_STATE while there
+// is none — connectedhomeip's thermostat has no TimeSynchronization
+// dependency and gates each AddThermostatSuggestion on
+// GetClock_MatterEpochS (ThermostatClusterSuggestions.cpp:173-178 at
+// 6170af84).
+func (s *ThermostatServer) RequiresMatterTime() bool { return false }
+
 // matterNow is the Matter time in epoch seconds; false while it is not
 // synchronised — always before [ThermostatServer.AttachMatterTime].
 func (s *ThermostatServer) matterNow() (uint32, bool) {

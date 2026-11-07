@@ -5564,10 +5564,13 @@ UTC, which the node hands the server as its endpoint joins the topology
 (`valve.Server.AttachMatterTime`, the server's one input of it), as chip's
 tracker asks the node's TimeSynchronization for a valid time and reads the
 clock SetUTCTime sets (`CodegenIntegration.cpp:46-58`, `:391-400`). Chip's
-Startup refuses TS without a time tracker (`:46-50`); a TS server outside
-a node is built without a time and, until its host attaches one, every
-Open leaves AutoCloseTime null — the standalone case's recorded
-divergence, since `valve.New` cannot know whether the host will attach. A DefaultOpenLevel write is 1 to 100
+Startup refuses TS without a time tracker (`:46-50`): a node with
+`TimeSynchronization.Off` refuses a TS valve in the same way, failing the
+topology with an error that names the endpoint and cluster
+(`valve.Server.RequiresMatterTime`); a TS server outside a node is built
+without a time and, until its host attaches one, every Open leaves
+AutoCloseTime null — the standalone case's recorded divergence, since
+`valve.New` cannot know whether the host will attach. A DefaultOpenLevel write is 1 to 100
 and 100 or a multiple of LevelStep, an unchanged one a no-op (`:175-192`,
 `ValueCompliesWithLevelStep` `:483-490`); an Open resolves its level — the
 command's TargetLevel, else DefaultOpenLevel where served, else 100 — and a
