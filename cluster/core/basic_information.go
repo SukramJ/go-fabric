@@ -43,6 +43,11 @@ type BasicInformation struct {
 	// location, softwareVersion, softwareString, onPersistentWrite, endpoint
 	// and emitter. ReadAttribute reads the fixed fields under it as well.
 	mu sync.RWMutex
+	// writeMu serialises the NodeLabel and Location writes and restores
+	// across compare, store and set, so the store keeps the label the
+	// cluster serves when writers race (commitLabel); matter.js serialises
+	// them through its transaction. It is taken before mu, never under it.
+	writeMu sync.Mutex
 
 	// log is the cluster's logger ([Config.Logger]; slog.Default() when nil).
 	log *slog.Logger
@@ -830,7 +835,16 @@ func (b *BasicInformation) MatterWrite(ctx context.Context, attrID uint32, value
 // values canonical, postCommit (:1286-1324) emits the change events, and
 // a failed store write rolls back (:1329-1340) to the canonical values
 // with nothing emitted.
+//
+// writeMu holds from the compare through the store write to the set and
+// the advance, so racing writers persist and serve in one order. The
+// report goes out after it is released: a change names attributes, not
+// values — the subscription reads the served value when it reports — so
+// the order of two writers' reports does not matter, and an inline
+// observer that writes the label from OnAttributeChanged does not
+// deadlock on its own write.
 func (b *BasicInformation) commitLabel(ctx context.Context, attrID uint32, s string) error {
+	b.writeMu.Lock()
 	b.mu.RLock()
 	label, loc, persist := b.nodeLabel, b.location, b.onPersistentWrite
 	b.mu.RUnlock()
@@ -839,11 +853,13 @@ func (b *BasicInformation) commitLabel(ctx context.Context, attrID uint32, s str
 		cur = &loc
 	}
 	if *cur == s {
+		b.writeMu.Unlock()
 		return nil
 	}
 	*cur = s
 	if persist != nil {
 		if err := persist(label, loc); err != nil {
+			b.writeMu.Unlock()
 			return fmt.Errorf("core: BasicInformation 0x%04X write not persisted: %w", attrID, err)
 		}
 	}
@@ -855,6 +871,7 @@ func (b *BasicInformation) commitLabel(ctx context.Context, attrID uint32, s str
 	}
 	b.mu.Unlock()
 	b.dataVersion.Bump()
+	b.writeMu.Unlock()
 	b.changes.NotifyFrom(contract.OriginFrom(ctx), attrID)
 	return nil
 }
@@ -935,6 +952,8 @@ func (b *BasicInformation) RestoreNodeLabel(s string) error {
 	if err := b.checkLabelWrite(basicInfoAttrNodeLabel, s); err != nil {
 		return err
 	}
+	b.writeMu.Lock()
+	defer b.writeMu.Unlock()
 	b.mu.Lock()
 	b.nodeLabel = s
 	b.mu.Unlock()
@@ -981,6 +1000,8 @@ func (b *BasicInformation) RestoreLocation(s string) error {
 	if err := b.checkLabelWrite(basicInfoAttrLocation, s); err != nil {
 		return err
 	}
+	b.writeMu.Lock()
+	defer b.writeMu.Unlock()
 	b.mu.Lock()
 	b.location = s
 	b.mu.Unlock()

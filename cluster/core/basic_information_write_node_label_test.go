@@ -6,8 +6,10 @@ package core_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"slices"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/SukramJ/go-fabric/contract"
@@ -223,5 +225,39 @@ func TestBasicInfo_StoreFailureFailsTheWrite(t *testing.T) {
 	}
 	if b.MatterDataVersion() != before || len(*changes) != 0 {
 		t.Errorf("a failed store write moved: version %d→%d, changes %+v", before, b.MatterDataVersion(), *changes)
+	}
+}
+
+// TestBasicInfo_RacingWritersKeepStoreAndServedInStep (issue 414, review
+// L3): writers racing on NodeLabel leave the store holding the label the
+// cluster serves — the compare, the store write and the set are one step.
+func TestBasicInfo_RacingWritersKeepStoreAndServedInStep(t *testing.T) {
+	t.Parallel()
+	for range 50 {
+		b := newValidBasicInfo(t)
+		var mu sync.Mutex
+		var stored string
+		b.SetOnPersistentWrite(func(nodeLabel, _ string) error {
+			mu.Lock()
+			stored = nodeLabel
+			mu.Unlock()
+			return nil
+		})
+		var wg sync.WaitGroup
+		for i := range 8 {
+			wg.Go(func() {
+				if err := b.SetNodeLabel(context.Background(), fmt.Sprintf("label-%d", i)); err != nil {
+					t.Error(err)
+				}
+			})
+		}
+		wg.Wait()
+		v, _ := b.MatterRead(0x0005)
+		mu.Lock()
+		got := stored
+		mu.Unlock()
+		if served := v.(tlv.BoundedString).Value; served != got {
+			t.Fatalf("served %q, stored %q", served, got)
+		}
 	}
 }
