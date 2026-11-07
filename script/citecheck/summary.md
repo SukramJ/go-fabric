@@ -13,7 +13,7 @@ Second tree: a sentence naming matterjs-server is checked against `MATTERJS_SERV
 | Resolved: unique basename | 6105 |
 | Checked at their own `at <sha>` | 1585 |
 | Checked against matterjs-server (`MATTERJS_SERVER_DIR`) at their `at <sha>` | 644 |
-| Drift-checked (the sentence names a name the file contains) | 3834 |
-| Hard-checked only | 4467 |
+| Drift-checked (the sentence names a name the file contains) | 3833 |
+| Hard-checked only | 4468 |
 | **Hard errors** | 0 |
-| **Drift** | 421 |
+| **Drift** | 416 |

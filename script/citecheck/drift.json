@@ -1414,16 +1414,6 @@
     "occurrences": 6
   },
   {
-    "file": "client/jcm/vendorid.go",
-    "line": 171,
-    "citation": "VendorIdVerification.ts:230-293",
-    "resolved": "packages/node/src/behaviors/operational-credentials/VendorIdVerification.ts",
-    "at": "db021da0",
-    "identifier": "verifyData",
-    "nearest": 177,
-    "occurrences": 2
-  },
-  {
     "file": "client/peer/connection.go",
     "line": 52,
     "citation": "types/src/protocol/definitions/general.ts:33",
@@ -1442,16 +1432,6 @@
     "occurrences": 1
   },
   {
-    "file": "client/peer/initial_contact_schedule_parity_matterjs_test.go",
-    "line": 450,
-    "citation": "PeerConnection.ts:544",
-    "resolved": "packages/protocol/src/peer/PeerConnection.ts",
-    "at": "db021da0",
-    "identifier": "attemptOnce",
-    "nearest": 514,
-    "occurrences": 2
-  },
-  {
     "file": "client/peer/observer.go",
     "line": 26,
     "citation": "Peer.ts:190-195",
@@ -1460,16 +1440,6 @@
     "identifier": "#save",
     "nearest": 105,
     "occurrences": 2
-  },
-  {
-    "file": "client/peer/peer_connection_kick_parity_matterjs_test.go",
-    "line": 225,
-    "citation": "InitialContactSchedule.ts:112-126",
-    "resolved": "packages/protocol/src/peer/InitialContactSchedule.ts",
-    "at": "db021da0",
-    "identifier": "PeerConnection",
-    "nearest": 21,
-    "occurrences": 1
   },
   {
     "file": "client/peer/probe.go",
@@ -1497,16 +1467,6 @@
     "identifier": "fabricFor",
     "nearest": 453,
     "occurrences": 2
-  },
-  {
-    "file": "client/peer/sigma1_refresh_parity_matterjs_test.go",
-    "line": 12,
-    "citation": "PeerConnection.ts:639-653",
-    "resolved": "packages/protocol/src/peer/PeerConnection.ts",
-    "at": "db021da0",
-    "identifier": "InitialContactSchedule",
-    "nearest": 518,
-    "occurrences": 4
   },
   {
     "file": "client/peer/store.go",
@@ -3395,15 +3355,6 @@
     "citation": "OperationalBase.ts:92-97",
     "resolved": "packages/protocol/src/certificate/kinds/OperationalBase.ts",
     "at": "db021da0",
-    "identifier": "generalVerify",
-    "nearest": 61,
-    "occurrences": 1
-  },
-  {
-    "file": "secure/mattercert/vvsc.go",
-    "line": 34,
-    "citation": "OperationalBase.ts:91-97",
-    "resolved": "packages/protocol/src/certificate/kinds/OperationalBase.ts",
     "identifier": "generalVerify",
     "nearest": 61,
     "occurrences": 1

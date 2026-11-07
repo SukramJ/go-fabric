@@ -222,8 +222,8 @@ func TestPeerConnectionKickRateLimiting(t *testing.T) {
 
 // kickOpen reports whether a kick may restart the first try's exchange x:
 // retransmitted often enough and a restart saving enough — the gate the
-// schedule's attempt applies (InitialContactSchedule.ts:112-126 at
-// db021da0; matter.js #4794 moved it there from PeerConnection, its
+// schedule's attempt applies (kickBlocker, InitialContactSchedule.ts:112-126
+// at db021da0; matter.js #4794 moved it there from the connection, its
 // "kick gate" describe to InitialContactScheduleTest.ts).
 func kickOpen(x *exchange.Exchange) bool {
 	timing := DefaultTiming()

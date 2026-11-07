@@ -9,8 +9,8 @@ package peer
 // peer whose Sigma1 messages are all lost is first sent one Sigma1 for at
 // least the MRP budget, then fresh ones — a new exchange and ephemeral key
 // each — three transmissions apiece with the backoff continued instead of
-// restarting at its base interval (PeerConnection.ts:639-653,
-// InitialContactSchedule.ts). matter.js loses every Sigma1 of a running
+// restarting at its base interval (attempt.fail, PeerConnection.ts:639-653
+// at db021da0; the schedule is initial_contact.go's). matter.js loses every Sigma1 of a running
 // device for 20 minutes and then lets one through; here the socket
 // answers nothing, and the 20 minutes are read the same way.
 

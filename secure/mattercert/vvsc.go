@@ -31,7 +31,8 @@ func DecodeVVSC(raw []byte) (*Certificate, error) {
 
 // ValidateVVSC checks the profile of a Vendor ID Verification Signer
 // Certificate (Matter Core §6.5.12): at most five RDNs in its subject and
-// in its issuer (OperationalBase.ts:91-97 generalVerify), basic
+// in its issuer (generalVerify, OperationalBase.ts:61-107, the RDN rule
+// :91-97), basic
 // constraints with is-ca false (Vvsc.ts:25-30 validateFields: "The basic
 // constraints extension SHALL be encoded with is-ca set to false"), a key
 // usage of exactly digitalSignature, an unnamed bit counted as set

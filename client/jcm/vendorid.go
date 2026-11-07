@@ -168,8 +168,8 @@ func Verify(ctx context.Context, info *Info, clientChallenge, attestationChallen
 // statement_version || vendor_fabric_binding_message || signer_skid; and
 // a trust anchor of the vendor — lookup for the vendor id and the VVSC's
 // AuthorityKeyID — signed the VVSC. Mirrors matter.js
-// VendorIdVerification.verifyData (VendorIdVerification.ts:230-293 at
-// db021da0) with three differences, each failing closed where matter.js
+// VendorIdVerification.verifyData (VendorIdVerification.ts:177-293 at
+// db021da0, the statement part :230-293) with three differences, each failing closed where matter.js
 // does not: a statement without a VVSC fails (matter.js returns true,
 // "TODO Fail if not available!", :263-271); the VVSC's issuer is checked
 // against a trust anchor (a TODO at :232-240); and the statement signature

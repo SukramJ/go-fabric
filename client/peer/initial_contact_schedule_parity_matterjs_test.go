@@ -446,9 +446,9 @@ func TestInitialContactScheduleParity(t *testing.T) {
 // refresh attempt and its first transmission is blocked. The attempt's
 // count passes the retransmission threshold (it counts the earlier
 // attempts), so the saving decides: the try's exchange is cleared at the
-// start of attemptOnce, and a fresh exchange reports no saving
-// (PeerConnection.ts:544, :579 at db021da0 register the kick only after
-// createExchange).
+// start of a try, and a fresh exchange reports no saving; matter.js
+// registers the kick only after createExchange (PeerConnection.ts:544,
+// :579 at db021da0).
 func TestInitialContactRefreshKickBeforeSend(t *testing.T) {
 	t.Parallel()
 	t.Run("a fresh exchange reports no saving", func(t *testing.T) {

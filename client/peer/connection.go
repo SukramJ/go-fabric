@@ -839,7 +839,7 @@ func (c *connection) attemptOnce(att *attempt, schedule *initialContactSchedule,
 	}
 	logConnecting("matter.controller.peer.connecting",
 		slog.String("address", att.addr.String()), slog.Int("address_index", att.addrNo), slog.Int("attempt", attemptNo),
-		slog.Bool("fallback", markedFallback), slog.Bool("refresh", a.isRefresh))
+		slog.Bool("fallback", markedFallback))
 	params := p.SessionParameters()
 	opts := handshake.CASEOptions{
 		PeerParameters:                 &params,
