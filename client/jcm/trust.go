@@ -26,6 +26,14 @@ type Info struct {
 	AdminRCAC        []byte
 	AdminICAC        []byte
 	AdminNOC         []byte
+	// AdminVIDVerificationStatement and AdminVVSC are the administrator
+	// fabric's VID Verification Statement (FabricDescriptorStruct field 6)
+	// and VID Verification Signer Certificate (NOCStruct field 3), empty
+	// when the fabric has none; [Verify] takes the statement path with
+	// them. The JCM trust verification refuses a statement, as chip's
+	// does, so only a direct [Verify] sets them.
+	AdminVIDVerificationStatement []byte
+	AdminVVSC                     []byte
 }
 
 // NewInfo is an Info with nothing known: the invalid endpoint, the

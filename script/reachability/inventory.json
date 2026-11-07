@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 7739,
+  "entry_points": 7751,
   "entry_packages": [
     ".",
     "bdx",
@@ -280,9 +280,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 17714,
-    "reachable": 12327,
-    "whitelisted": 5387,
+    "total_exported": 17727,
+    "reachable": 12333,
+    "whitelisted": 5394,
     "unreachable": 0
   },
   "by_package": [],
@@ -6415,6 +6415,13 @@
     },
     {
       "package": "client/exchange",
+      "identifier": "TestMessageChannelTCPLimitParity",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/exchange/messagechannel_tcp_parity_matterjs_test.go",
+      "line": 60
+    },
+    {
+      "package": "client/exchange",
       "identifier": "TestMessageExchangeAckWaitAbort",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/messageexchange_parity_matterjs_test.go",
@@ -6681,6 +6688,13 @@
     },
     {
       "package": "client/exchange",
+      "identifier": "TestSessionParametersMaxTCPMessageSizeParity",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/exchange/messagechannel_tcp_parity_matterjs_test.go",
+      "line": 140
+    },
+    {
+      "package": "client/exchange",
       "identifier": "TestShutdownWaitsForTheHandlers",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/handler_test.go",
@@ -6926,6 +6940,20 @@
     },
     {
       "package": "client/interaction",
+      "identifier": "TestInputChunkResolvedTimestampsParity",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/interaction/input_chunk_timestamps_parity_matterjs_test.go",
+      "line": 71
+    },
+    {
+      "package": "client/interaction",
+      "identifier": "TestInputChunkTimestampsSkipEmptyEntry",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/interaction/input_chunk_timestamps_parity_matterjs_test.go",
+      "line": 151
+    },
+    {
+      "package": "client/interaction",
       "identifier": "TestInvokeLargeMessageParity",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/interaction/large_message_parity_matterjs_test.go",
@@ -6999,21 +7027,21 @@
       "identifier": "TestAdoptSessions",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/set_test.go",
-      "line": 162
+      "line": 160
     },
     {
       "package": "client/peer",
       "identifier": "TestCloseDeleteAndDisconnect",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/set_test.go",
-      "line": 223
+      "line": 221
     },
     {
       "package": "client/peer",
       "identifier": "TestCloseSweepsSessionsAfterWorkers",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/set_test.go",
-      "line": 304
+      "line": 302
     },
     {
       "package": "client/peer",
@@ -7042,6 +7070,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/network_profile_parity_matterjs_test.go",
       "line": 293
+    },
+    {
+      "package": "client/peer",
+      "identifier": "TestConnectionRefreshesUnacknowledgedSigma1Parity",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/peer/sigma1_refresh_parity_matterjs_test.go",
+      "line": 26
     },
     {
       "package": "client/peer",
@@ -7094,10 +7129,24 @@
     },
     {
       "package": "client/peer",
+      "identifier": "TestInitialContactRefreshKickBeforeSend",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/peer/initial_contact_schedule_parity_matterjs_test.go",
+      "line": 455
+    },
+    {
+      "package": "client/peer",
+      "identifier": "TestInitialContactScheduleParity",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/peer/initial_contact_schedule_parity_matterjs_test.go",
+      "line": 165
+    },
+    {
+      "package": "client/peer",
       "identifier": "TestInitiateConnectionWithLiveSession",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/set_test.go",
-      "line": 273
+      "line": 271
     },
     {
       "package": "client/peer",
@@ -7111,7 +7160,7 @@
       "identifier": "TestMemoryResumptionStore",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/store_test.go",
-      "line": 45
+      "line": 44
     },
     {
       "package": "client/peer",
@@ -7181,7 +7230,7 @@
       "identifier": "TestNewestSessionActivityParityMatterJS",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/set_test.go",
-      "line": 333
+      "line": 331
     },
     {
       "package": "client/peer",
@@ -7223,14 +7272,14 @@
       "identifier": "TestParityKnownPeerMerge",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/parity_matterjs_test.go",
-      "line": 176
+      "line": 157
     },
     {
       "package": "client/peer",
       "identifier": "TestParityProbeCooldownFibonacci",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/parity_matterjs_test.go",
-      "line": 153
+      "line": 134
     },
     {
       "package": "client/peer",
@@ -7245,13 +7294,6 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/parity_matterjs_test.go",
       "line": 58
-    },
-    {
-      "package": "client/peer",
-      "identifier": "TestParityUnresponsiveDetector",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "client/peer/parity_matterjs_test.go",
-      "line": 132
     },
     {
       "package": "client/peer",
@@ -7332,24 +7374,17 @@
     },
     {
       "package": "client/peer",
-      "identifier": "TestPeerConnectionKickGate",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "client/peer/peer_connection_kick_parity_matterjs_test.go",
-      "line": 224
-    },
-    {
-      "package": "client/peer",
       "identifier": "TestPeerConnectionKickLocalAbort",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/peer_connection_kick_parity_matterjs_test.go",
-      "line": 282
+      "line": 269
     },
     {
       "package": "client/peer",
       "identifier": "TestPeerConnectionKickObserver",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/peer_connection_kick_parity_matterjs_test.go",
-      "line": 344
+      "line": 331
     },
     {
       "package": "client/peer",
@@ -7378,13 +7413,6 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/transport_parity_matterjs_test.go",
       "line": 242
-    },
-    {
-      "package": "client/peer",
-      "identifier": "TestPeerEstablishmentProgressDetector",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "client/peer/peer_establishment_progress_parity_matterjs_test.go",
-      "line": 18
     },
     {
       "package": "client/peer",
@@ -7447,7 +7475,7 @@
       "identifier": "TestServiceChangeUpdatesDiscoveryData",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/set_test.go",
-      "line": 132
+      "line": 130
     },
     {
       "package": "client/peer",
@@ -7461,7 +7489,7 @@
       "identifier": "TestSessionParametersPreferTheReport",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/set_test.go",
-      "line": 203
+      "line": 201
     },
     {
       "package": "client/peer",
@@ -7475,7 +7503,7 @@
       "identifier": "TestStoresImplementTheInterfaces",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/store_test.go",
-      "line": 72
+      "line": 71
     },
     {
       "package": "client/peer",
@@ -24251,6 +24279,13 @@
     },
     {
       "package": "controller/client",
+      "identifier": "TestConnectionStateWithoutAddressParity",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/client/connection_state_address_parity_matterjs_test.go",
+      "line": 44
+    },
+    {
+      "package": "controller/client",
       "identifier": "TestCullCommissioned",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/addresses_internal_test.go",
@@ -24387,7 +24422,7 @@
       "identifier": "TestNodeRecord",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/record_internal_test.go",
-      "line": 190
+      "line": 192
     },
     {
       "package": "controller/client",
@@ -24478,7 +24513,7 @@
       "identifier": "TestRecordApplyPeer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/record_internal_test.go",
-      "line": 117
+      "line": 120
     },
     {
       "package": "controller/client",
@@ -24492,7 +24527,14 @@
       "identifier": "TestRecordDevice",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/record_internal_test.go",
-      "line": 147
+      "line": 149
+    },
+    {
+      "package": "controller/client",
+      "identifier": "TestRecordIgnoresRetiredCATs",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/client/record_internal_test.go",
+      "line": 238
     },
     {
       "package": "controller/client",
@@ -24506,21 +24548,21 @@
       "identifier": "TestRegistryAutoStart",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/registry_internal_test.go",
-      "line": 261
+      "line": 263
     },
     {
       "package": "controller/client",
       "identifier": "TestRegistryConfig",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/registry_internal_test.go",
-      "line": 155
+      "line": 157
     },
     {
       "package": "controller/client",
       "identifier": "TestRegistryErase",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/registry_internal_test.go",
-      "line": 315
+      "line": 317
     },
     {
       "package": "controller/client",
@@ -24534,7 +24576,7 @@
       "identifier": "TestRegistryRestore",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/registry_internal_test.go",
-      "line": 193
+      "line": 195
     },
     {
       "package": "controller/client",
@@ -24829,6 +24871,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/signer_test.go",
       "line": 110
+    },
+    {
+      "package": "controller/commissioner",
+      "identifier": "TestCommissioningClosedSessionReArmParity",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/commissioner/closed_session_rearm_parity_matterjs_test.go",
+      "line": 34
     },
     {
       "package": "controller/commissioner",
@@ -37579,17 +37628,17 @@
     },
     {
       "package": "transport/tcp",
+      "identifier": "TestAssemblerNoReceiveBufferCap",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "transport/tcp/frame_test.go",
+      "line": 115
+    },
+    {
+      "package": "transport/tcp",
       "identifier": "TestAssemblerOversizedAnnouncedLengthCloses",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/tcp/frame_test.go",
       "line": 98
-    },
-    {
-      "package": "transport/tcp",
-      "identifier": "TestAssemblerReceiveBufferBound",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "transport/tcp/frame_test.go",
-      "line": 115
     },
     {
       "package": "transport/tcp",
@@ -37736,63 +37785,63 @@
       "identifier": "TestTcpChannelAsyncIteration",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/tcp/conn_parity_matterjs_test.go",
-      "line": 251
+      "line": 291
     },
     {
       "package": "transport/tcp",
       "identifier": "TestTcpChannelChannelProperties",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/tcp/conn_parity_matterjs_test.go",
-      "line": 102
+      "line": 110
     },
     {
       "package": "transport/tcp",
       "identifier": "TestTcpChannelClose",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/tcp/conn_parity_matterjs_test.go",
-      "line": 229
+      "line": 269
     },
     {
       "package": "transport/tcp",
       "identifier": "TestTcpChannelName",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/tcp/conn_parity_matterjs_test.go",
-      "line": 136
+      "line": 144
     },
     {
       "package": "transport/tcp",
       "identifier": "TestTcpChannelNetworkAddress",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/tcp/conn_parity_matterjs_test.go",
-      "line": 126
+      "line": 134
     },
     {
       "package": "transport/tcp",
       "identifier": "TestTcpChannelOversizedMessageHandling",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/tcp/conn_parity_matterjs_test.go",
-      "line": 151
+      "line": 159
     },
     {
       "package": "transport/tcp",
       "identifier": "TestTcpChannelSendAfterClose",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/tcp/conn_parity_matterjs_test.go",
-      "line": 90
+      "line": 98
     },
     {
       "package": "transport/tcp",
       "identifier": "TestTcpChannelSendSideSizeCheck",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/tcp/conn_parity_matterjs_test.go",
-      "line": 205
+      "line": 245
     },
     {
       "package": "transport/tcp",
       "identifier": "TestTcpChannelZeroLengthFrameHandling",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/tcp/conn_parity_matterjs_test.go",
-      "line": 187
+      "line": 227
     },
     {
       "package": "transport/tcp",

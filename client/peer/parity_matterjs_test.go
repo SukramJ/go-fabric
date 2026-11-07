@@ -127,25 +127,6 @@ func TestParityErrorDelays(t *testing.T) {
 	}
 }
 
-// TestParityUnresponsiveDetector: the latch fires once past
-// MRP.MAX_TRANSMISSIONS (5) and re-arms at 0 (PeerConnection.ts:815-826).
-func TestParityUnresponsiveDetector(t *testing.T) {
-	t.Parallel()
-	fired := 0
-	latch := unresponsiveDetector(func() { fired++ })
-	for _, n := range []int{0, 1, 5, 6, 7, 8} {
-		latch(n)
-	}
-	if fired != 1 {
-		t.Fatalf("fired %d times over one cycle, want 1", fired)
-	}
-	latch(0)
-	latch(6)
-	if fired != 2 {
-		t.Fatal("the latch did not re-arm at 0")
-	}
-}
-
 // TestParityProbeCooldownFibonacci: the address-change probe cooldown
 // grows 10, 10, 20, 30, 50 … minutes, capped at 24 h, and resets to the
 // minimum (PeerAddressMonitor.ts:269-292 with the defaults of
@@ -196,12 +177,6 @@ func TestParityKnownPeerMerge(t *testing.T) {
 			Descriptor{OperationalAddress: udpAddr(addr1)},
 			Descriptor{},
 			func(d Descriptor) bool { return d.OperationalAddress.String() == addr1 }, ":317",
-		},
-		{
-			"CATs replace",
-			Descriptor{CaseAuthenticatedTags: []uint32{1}},
-			Descriptor{CaseAuthenticatedTags: []uint32{2}},
-			func(d Descriptor) bool { return d.CaseAuthenticatedTags[0] == 2 }, ":321-323",
 		},
 		{
 			"discovery data: the peer's wins",

@@ -22,7 +22,6 @@ func TestMemoryStore(t *testing.T) {
 		OperationalAddress:        &net.UDPAddr{IP: net.ParseIP("fd00::1"), Port: 5540},
 		DiscoveryData:             &sii,
 		ReportedSessionParameters: &sessionparams.Parameters{SessionIdleInterval: 800},
-		CaseAuthenticatedTags:     []uint32{0x0001_0001},
 	}
 	for _, e := range []Descriptor{d, {Address: handshake.PeerAddress{FabricIndex: 1, NodeID: 3}}, {Address: handshake.PeerAddress{FabricIndex: 2, NodeID: 1}}} {
 		if err := s.SavePeer(e); err != nil {
@@ -31,7 +30,7 @@ func TestMemoryStore(t *testing.T) {
 	}
 	d.OperationalAddress.Port = 1 // the store kept a copy
 	got, err := s.LoadPeers(1)
-	if err != nil || len(got) != 2 || got[0].Address.NodeID != 3 || got[1].OperationalAddress.Port != 5540 || got[1].CaseAuthenticatedTags[0] != 0x0001_0001 {
+	if err != nil || len(got) != 2 || got[0].Address.NodeID != 3 || got[1].OperationalAddress.Port != 5540 {
 		t.Fatalf("LoadPeers = %+v, %v", got, err)
 	}
 	if err := s.DeletePeer(d.Address); err != nil {

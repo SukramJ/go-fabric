@@ -48,6 +48,8 @@ type regHarness struct {
 	clock  *manualClock
 	store  *MemoryStore
 	logs   *logRecorder
+	// mdns carries the DNS-SD responses the discovery cache reads.
+	mdns chan mdns.QueryResponse
 }
 
 const regFabricID uint64 = 0x0F0D
@@ -60,7 +62,8 @@ func newRegHarness(t *testing.T) *regHarness {
 		t.Fatal(err)
 	}
 	h.mgr = mgr
-	names := discovery.NewNames(silentMDNS{out: make(chan mdns.QueryResponse)}, slog.New(slog.DiscardHandler))
+	h.mdns = make(chan mdns.QueryResponse)
+	names := discovery.NewNames(silentMDNS{out: h.mdns}, slog.New(slog.DiscardHandler))
 	t.Cleanup(func() { _ = names.Close() }) // its resolver goroutine ends with the test (a synctest bubble requires it)
 	// The CA issues on the harness's clock: a case in a synctest bubble
 	// reads 2000-01-01 UTC on the system clock, and a certificate
@@ -134,12 +137,11 @@ func (h *regHarness) seed(t *testing.T, id string, rec Record, s settings) {
 
 func commissionedRecord(nodeID uint64) Record {
 	return Record{
-		PeerAddress:           &handshake.PeerAddress{FabricIndex: 1, NodeID: nodeID},
-		CaseAuthenticatedTags: []uint32{0x0002_0001},
-		Addresses:             []NetworkAddress{{IP: netip.MustParseAddr("fd00::10"), Port: 5540}},
-		DiscoveredAt:          time.UnixMilli(1_800_000_000_000),
-		CommissionedAt:        time.UnixMilli(1_800_000_001_000),
-		FabricIndexOnPeer:     2,
+		PeerAddress:       &handshake.PeerAddress{FabricIndex: 1, NodeID: nodeID},
+		Addresses:         []NetworkAddress{{IP: netip.MustParseAddr("fd00::10"), Port: 5540}},
+		DiscoveredAt:      time.UnixMilli(1_800_000_000_000),
+		CommissionedAt:    time.UnixMilli(1_800_000_001_000),
+		FabricIndexOnPeer: 2,
 	}
 }
 
@@ -221,7 +223,7 @@ func TestRegistryRestore(t *testing.T) {
 		t.Fatal("peer1 is not bound to its peer")
 	}
 	d := p.Descriptor()
-	if d.OperationalAddress.String() != "[fd00::10]:5540" || !slices.Equal(d.CaseAuthenticatedTags, []uint32{0x0002_0001}) {
+	if d.OperationalAddress.String() != "[fd00::10]:5540" {
 		t.Fatalf("the peer's descriptor %+v", d)
 	}
 	if got := ids(r.Commissioned()); !slices.Equal(got, []string{"peer1"}) {

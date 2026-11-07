@@ -16,14 +16,14 @@ import (
 	"github.com/SukramJ/go-fabric/client/interaction"
 	"github.com/SukramJ/go-fabric/client/peer"
 	"github.com/SukramJ/go-fabric/secure/sessionparams"
+	"github.com/SukramJ/go-fabric/tlv"
 )
 
 func fullRecord() Record {
 	at := time.UnixMilli(1_700_000_000_123)
 	yes := false
 	return Record{
-		PeerAddress:           &handshake.PeerAddress{FabricIndex: 2, NodeID: 0x4323},
-		CaseAuthenticatedTags: []uint32{0x0001_0001},
+		PeerAddress: &handshake.PeerAddress{FabricIndex: 2, NodeID: 0x4323},
 		Addresses: []NetworkAddress{
 			{IP: netip.MustParseAddr("fe80::1%eth0"), Port: 5540, TTL: 120 * time.Second, DiscoveredAt: at},
 			{IP: netip.MustParseAddr("192.0.2.7"), Port: 5541},
@@ -53,7 +53,7 @@ func TestRecordRoundTrip(t *testing.T) {
 		t.Fatalf("%d ids, want %d", len(values), recordFields)
 	}
 	for id, b := range values {
-		if b == nil {
+		if b == nil && id != recRetiredCATs {
 			t.Fatalf("field %d absent", id)
 		}
 	}
@@ -74,9 +74,9 @@ func TestRecordRoundTrip(t *testing.T) {
 		}
 	}
 	// Empty, non-nil lists are kept as such.
-	lists, _ := Record{CaseAuthenticatedTags: []uint32{}, Addresses: []NetworkAddress{}}.encode()
+	lists, _ := Record{Addresses: []NetworkAddress{}}.encode()
 	got, err := decodeRecord(lists)
-	if err != nil || got.CaseAuthenticatedTags == nil || got.Addresses == nil {
+	if err != nil || got.Addresses == nil {
 		t.Fatalf("empty lists %+v %v", got, err)
 	}
 	// A clone shares nothing.
@@ -94,6 +94,9 @@ func TestRecordDecodeErrors(t *testing.T) {
 	t.Parallel()
 	good, _ := fullRecord().encode()
 	for id := range uint32(recordFields) {
+		if id == recRetiredCATs {
+			continue // read and ignored (TestRecordIgnoresRetiredCATs)
+		}
 		values := map[uint32][]byte{id: good[recDeviceIdentifier]}
 		if id == recDeviceIdentifier || id == recHostname || id == recDeviceName || id == recRotatingIdentifier || id == recPairingInstructions {
 			values[id] = good[recFabricIndexOnPeer]
@@ -120,14 +123,13 @@ func TestRecordApplyPeer(t *testing.T) {
 	dn := "renamed"
 	r.applyPeer(peer.Descriptor{
 		OperationalAddress:        &net.UDPAddr{IP: net.ParseIP("fd00::9"), Port: 5550},
-		CaseAuthenticatedTags:     []uint32{7},
 		ReportedSessionParameters: &sessionparams.Parameters{SessionIdleInterval: 1},
 		DiscoveryData:             &discovery.TXTData{DN: &dn},
 	})
 	if len(r.Addresses) != 1 || r.Addresses[0].String() != "[fd00::9]:5550" || !r.Addresses[0].DiscoveredAt.IsZero() {
 		t.Fatalf("addresses %+v", r.Addresses)
 	}
-	if len(r.CaseAuthenticatedTags) != 1 || r.ReportedSessionParameters.SessionIdleInterval != 1 || r.TCPUnsupported {
+	if r.ReportedSessionParameters.SessionIdleInterval != 1 || r.TCPUnsupported {
 		t.Fatalf("record %+v", r)
 	}
 	// The TXT keys a record announces replace the record's; VP absent
@@ -138,7 +140,7 @@ func TestRecordApplyPeer(t *testing.T) {
 	// Without an operational address or discovery data the addresses and
 	// TXT fields stay; the reported parameters stay without new ones.
 	r.applyPeer(peer.Descriptor{})
-	if len(r.Addresses) != 1 || r.DeviceName != "renamed" || r.ReportedSessionParameters == nil || r.CaseAuthenticatedTags != nil {
+	if len(r.Addresses) != 1 || r.DeviceName != "renamed" || r.ReportedSessionParameters == nil {
 		t.Fatalf("after an empty descriptor %+v", r)
 	}
 }
@@ -180,7 +182,7 @@ func TestRecordDevice(t *testing.T) {
 		t.Fatalf("operational device %+v", op)
 	}
 	kd := fullRecord().knownDescriptor()
-	if kd.Address.NodeID != 0x4323 || kd.OperationalAddress.Port != 5540 || kd.CaseAuthenticatedTags[0] != 0x0001_0001 || kd.DiscoveryData == nil {
+	if kd.Address.NodeID != 0x4323 || kd.OperationalAddress.Port != 5540 || kd.DiscoveryData == nil {
 		t.Fatalf("known descriptor %+v", kd)
 	}
 }
@@ -226,5 +228,37 @@ func TestNodeRecord(t *testing.T) {
 	}
 	if err := n.Erase(t.Context()); err != nil || n.IsCommissioned() || n.Record().Hostname != "" {
 		t.Fatalf("Erase kept the record: %v", err)
+	}
+}
+
+// TestRecordIgnoresRetiredCATs reads a record stored before the db021da0
+// lift, which still carries the configured CATs at field 1: the field is
+// ignored and the next save clears it (CaseClient.ts:396-404 at db021da0:
+// a CASE session's CATs are the peer's NOC's).
+func TestRecordIgnoresRetiredCATs(t *testing.T) {
+	t.Parallel()
+	values, err := fullRecord().encode()
+	if err != nil {
+		t.Fatal(err)
+	}
+	e := tlv.NewEncoder()
+	e.StartArray(tlv.AnonymousTag())
+	e.PutUint(tlv.AnonymousTag(), 0x0001_0001)
+	if err := e.EndContainer(); err != nil {
+		t.Fatal(err)
+	}
+	if values[recRetiredCATs], err = e.Bytes(); err != nil {
+		t.Fatal(err)
+	}
+	got, err := decodeRecord(values)
+	if err != nil || got.PeerAddress == nil || got.PeerAddress.NodeID != 0x4323 {
+		t.Fatalf("legacy record %+v, %v", got, err)
+	}
+	again, err := got.encode()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if b, ok := again[recRetiredCATs]; !ok || b != nil {
+		t.Fatalf("the save keeps field %d: %x", recRetiredCATs, b)
 	}
 }

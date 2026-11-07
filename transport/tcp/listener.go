@@ -47,8 +47,9 @@ type Config struct {
 	// PreferIPv4 forces an IPv4-only socket. Default (false) opens an
 	// IPv6 dual-stack socket which also accepts IPv4 connections.
 	PreferIPv4 bool
-	// MaxPayloadSize is the maximum frame size (length prefix plus
-	// message). Zero means [DefaultMaxPayloadSize] (TcpTransport.ts:62).
+	// MaxPayloadSize is the largest message a connection sends or
+	// receives, the length prefix not counted (MAX_TCP_MESSAGE_SIZE,
+	// TcpChannel.ts:37-41 at db021da0). Zero means [DefaultMaxPayloadSize].
 	MaxPayloadSize int
 	// Logger receives the listener's log lines. nil means slog.Default.
 	Logger *slog.Logger
@@ -112,7 +113,7 @@ func Listen(cfg Config) (*Listener, error) {
 		logger = slog.Default()
 	}
 	maxPayload := cfg.MaxPayloadSize
-	if maxPayload <= FramingHeaderSize {
+	if maxPayload <= 0 {
 		maxPayload = DefaultMaxPayloadSize
 	}
 	return &Listener{

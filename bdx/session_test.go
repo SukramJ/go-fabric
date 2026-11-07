@@ -509,3 +509,24 @@ func TestFileSink(t *testing.T) {
 		t.Fatal("empty transfer not committed")
 	}
 }
+
+// TestReceive_BlockSizeAtMost16Bit ports "Proposes at most a 16-bit
+// maxBlockSize on a channel with a larger payload size" (BdxTest.ts:337-358
+// at db021da0, matter.js #4793): an exchange carrying more than 65539
+// bytes offers 0xFFFF, where the offer failed before
+// (bdx-session-initiator.ts:155). matter.js sends; the receiving side is
+// the same computation.
+func TestReceive_BlockSizeAtMost16Bit(t *testing.T) {
+	t.Parallel()
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	a, b := newPipe(100_000)
+	s := newSender(t, b, bdx.ReceiveAccept{TransferControl: bdx.TransferControl{ReceiverDrive: true}, MaxBlockSize: 0xFFFF}, testData(2048))
+	go s.serve(ctx)
+	if _, err := bdx.Receive(ctx, bdx.NewMessenger(a, 0), bdx.ReceiveOptions{TransferFileDesignator: bdx.FileDesignator("f"), Sink: &memSink{}}); err != nil {
+		t.Fatal(err)
+	}
+	if init := <-s.gotInit; init.MaxBlockSize != 0xFFFF {
+		t.Fatalf("offered %d, want 0xFFFF", init.MaxBlockSize)
+	}
+}

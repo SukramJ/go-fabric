@@ -121,9 +121,6 @@ type CommissionOptions struct {
 	// (defaultCaseConnectionTiming, CommissioningClient.ts:798-811 at
 	// 862ad75f).
 	commissioner.Options
-	// CaseAuthenticatedTags are our CATs for CASE sessions to the node
-	// (CommissioningClient.ts:304-306); nil keeps the peer's.
-	CaseAuthenticatedTags []uint32
 	// AutoSubscribe nil or true subscribes the node — "unless disabled
 	// explicitly" (CommissioningClient.ts:310-311).
 	AutoSubscribe *bool
@@ -203,11 +200,9 @@ func (r *Registry) commission(ctx context.Context, n *Node, o CommissionOptions)
 		return err
 	}
 	p := r.cfg.Peers.Get(res.Address)
-	if o.CaseAuthenticatedTags != nil || p == nil {
-		// The CATs reach the peer as #catsChanged gives them
-		// (CommissioningClient.ts:696-712 at 862ad75f).
+	if p == nil {
 		//nolint:contextcheck // the peer's service resolves under the DNS-SD cache's context
-		if p, err = r.cfg.Peers.AddKnownPeer(peer.Descriptor{Address: res.Address, CaseAuthenticatedTags: o.CaseAuthenticatedTags}); err != nil {
+		if p, err = r.cfg.Peers.AddKnownPeer(peer.Descriptor{Address: res.Address}); err != nil {
 			return err
 		}
 	}
@@ -219,9 +214,6 @@ func (r *Registry) commission(ctx context.Context, n *Node, o CommissionOptions)
 		rec.CommissionedAt = now
 		rec.FabricIndexOnPeer = res.FabricIndexOnPeer
 		rec.applyPeer(d)
-		if o.CaseAuthenticatedTags != nil {
-			rec.CaseAuthenticatedTags = slices.Clone(o.CaseAuthenticatedTags)
-		}
 	})
 	r.bindPeer(n, p)
 	n.mu.Lock()

@@ -789,6 +789,22 @@ with a port of the named case.
   `Address` (`HealthyAt`, `UnhealthyAt`) and has no copy step.
 - **The responder sockets keep the surviving IP family** — closed 2026-11-05: `BD-Matter-MdnsResponderKeepsTheSurvivingFamily` (owner decision).
 
+## matter.js pin db021da0 — open items (pin lift 2026-11-06)
+
+- **F-db021da0-1: the device side sends above the peer's MAX_TCP_MESSAGE_SIZE.**
+  matter.js refuses a message above the TCP limit of its session — the
+  peer's announced MAX_TCP_MESSAGE_SIZE under the channel's own — with
+  `MessageTooLargeError` on both roles (`MessageChannel.send`,
+  `packages/protocol/src/protocol/MessageChannel.ts:104-112` at `db021da0`,
+  matter.js #4793). The client stack does since wave P4
+  (`client/exchange` `checkSize`); the bridge sizes its report chunks by the
+  peer's announced size without the 64000 fallback or the 1232 floor and
+  does not refuse a larger message (`bridge/reply.go:379-400`
+  `chunkLimitsFor`), and its BDX exchange sizes blocks by the connection
+  alone (`bridge/ota_provider_link.go:558-566` `MaxPayloadSize`). Fix:
+  the session's peer cap in both and the refusal before the send. Found in
+  the review of wave P4 (#433); left out of that wave's scope.
+
 ## Tier 3 — LOW
 
 

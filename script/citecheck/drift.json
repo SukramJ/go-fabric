@@ -436,6 +436,7 @@
     "line": 556,
     "citation": "MessageExchange.ts:435-439",
     "resolved": "packages/protocol/src/protocol/MessageExchange.ts",
+    "at": "db021da0",
     "identifier": "maxPayloadSize",
     "nearest": 465,
     "occurrences": 3
@@ -784,7 +785,7 @@
   },
   {
     "file": "client/exchange/channel.go",
-    "line": 57,
+    "line": 60,
     "citation": "packages/protocol/src/protocol/ExchangeManager.ts:651-665",
     "resolved": "packages/protocol/src/protocol/ExchangeManager.ts",
     "identifier": "TransportClosedError",
@@ -793,7 +794,7 @@
   },
   {
     "file": "client/exchange/channel.go",
-    "line": 129,
+    "line": 132,
     "citation": "ExchangeManager.ts:668-710",
     "resolved": "packages/protocol/src/protocol/ExchangeManager.ts",
     "identifier": "#closeTcpChannelIfLastSession",
@@ -802,7 +803,7 @@
   },
   {
     "file": "client/exchange/channel.go",
-    "line": 185,
+    "line": 188,
     "citation": "support/chip-testing/src/cert/InProcessControllerAdapter.ts:1707-1735",
     "resolved": "support/chip-testing/src/cert/InProcessControllerAdapter.ts",
     "identifier": "severTransportConnection",
@@ -820,7 +821,7 @@
   },
   {
     "file": "client/exchange/errors.go",
-    "line": 118,
+    "line": 127,
     "citation": "NodeSession.ts:305-309",
     "resolved": "packages/protocol/src/session/NodeSession.ts",
     "identifier": "handlePeerClose",
@@ -847,7 +848,7 @@
   },
   {
     "file": "client/exchange/exchange.go",
-    "line": 312,
+    "line": 329,
     "citation": "MessageExchange.ts:410-413",
     "resolved": "packages/protocol/src/protocol/MessageExchange.ts",
     "identifier": "retransmissionCount",
@@ -856,16 +857,7 @@
   },
   {
     "file": "client/exchange/exchange.go",
-    "line": 327,
-    "citation": "MessageExchange.ts:1258-1266",
-    "resolved": "packages/protocol/src/protocol/MessageExchange.ts",
-    "identifier": "retransmissionRestartSaving",
-    "nearest": 1305,
-    "occurrences": 1
-  },
-  {
-    "file": "client/exchange/exchange.go",
-    "line": 338,
+    "line": 356,
     "citation": "MessageExchange.ts:376-378",
     "resolved": "packages/protocol/src/protocol/MessageExchange.ts",
     "identifier": "considerClosed",
@@ -874,7 +866,7 @@
   },
   {
     "file": "client/exchange/exchange.go",
-    "line": 348,
+    "line": 366,
     "citation": "MessageExchange.ts:376-378",
     "resolved": "packages/protocol/src/protocol/MessageExchange.ts",
     "identifier": "considerClosed",
@@ -883,7 +875,7 @@
   },
   {
     "file": "client/exchange/exchange.go",
-    "line": 553,
+    "line": 583,
     "citation": "MessageExchange.ts:987-997",
     "resolved": "packages/protocol/src/protocol/MessageExchange.ts",
     "identifier": "#endAckWait",
@@ -892,7 +884,7 @@
   },
   {
     "file": "client/exchange/exchange.go",
-    "line": 594,
+    "line": 624,
     "citation": "MessageExchange.ts:1215-1222",
     "resolved": "packages/protocol/src/protocol/MessageExchange.ts",
     "identifier": "#sendAdditionalDelay",
@@ -1126,7 +1118,7 @@
   },
   {
     "file": "client/handshake/case.go",
-    "line": 58,
+    "line": 66,
     "citation": "PeerConnection.ts:829-860",
     "resolved": "packages/protocol/src/peer/PeerConnection.ts",
     "identifier": "CaseClient",
@@ -1306,7 +1298,7 @@
   },
   {
     "file": "client/interaction/report.go",
-    "line": 75,
+    "line": 84,
     "citation": "ClientSubscriptionHandler.ts:89",
     "resolved": "packages/protocol/src/action/client/subscription/ClientSubscriptionHandler.ts",
     "identifier": "reportStarted",
@@ -1432,7 +1424,7 @@
   },
   {
     "file": "client/peer/connection.go",
-    "line": 1060,
+    "line": 1090,
     "citation": "SessionManager.ts:468-480",
     "resolved": "packages/protocol/src/session/SessionManager.ts",
     "identifier": "deleteResumptionRecord",
@@ -2310,15 +2302,6 @@
     "occurrences": 2
   },
   {
-    "file": "controller/client/network.go",
-    "line": 458,
-    "citation": "NetworkClient.ts:215-238",
-    "resolved": "packages/node/src/behavior/system/network/NetworkClient.ts",
-    "identifier": "#recomputeConnectionState",
-    "nearest": 108,
-    "occurrences": 10
-  },
-  {
     "file": "controller/client/node.go",
     "line": 78,
     "citation": "NetworkClient.ts:385-391",
@@ -2383,7 +2366,7 @@
   },
   {
     "file": "controller/client/record.go",
-    "line": 129,
+    "line": 130,
     "citation": "CommissioningClient.ts:836-845",
     "resolved": "packages/node/src/behavior/system/commissioning/CommissioningClient.ts",
     "identifier": "AdvertisedIntervals",
@@ -2392,7 +2375,7 @@
   },
   {
     "file": "controller/client/record.go",
-    "line": 461,
+    "line": 451,
     "citation": "behavior/system/commissioning/RemoteDescriptor.ts:214-234",
     "resolved": "packages/node/src/behavior/system/commissioning/RemoteDescriptor.ts",
     "identifier": "toLongForm",
@@ -2401,7 +2384,7 @@
   },
   {
     "file": "controller/client/record.go",
-    "line": 485,
+    "line": 475,
     "citation": "RemoteDescriptor.ts:91-143",
     "resolved": "packages/node/src/behavior/system/commissioning/RemoteDescriptor.ts",
     "identifier": "fromLongForm",
@@ -2410,7 +2393,7 @@
   },
   {
     "file": "controller/client/record.go",
-    "line": 690,
+    "line": 681,
     "citation": "CommissioningClient.ts:586",
     "resolved": "packages/node/src/behavior/system/commissioning/CommissioningClient.ts",
     "identifier": "peerAddress",
@@ -2419,7 +2402,7 @@
   },
   {
     "file": "controller/client/registry_test.go",
-    "line": 356,
+    "line": 358,
     "citation": "CommissioningClient.ts:353-357",
     "resolved": "packages/node/src/behavior/system/commissioning/CommissioningClient.ts",
     "identifier": "OperationalCredentials",

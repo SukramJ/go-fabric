@@ -11,48 +11,44 @@ import (
 
 // FramingHeaderSize is the size of the length prefix in front of every
 // message. Mirrors matter.js
-// packages/protocol/src/transport/tcp/TcpChannel.ts:28
+// packages/protocol/src/transport/tcp/TcpChannel.ts:29 at db021da0
 // (FRAMING_HEADER_SIZE = 4).
 const FramingHeaderSize = 4
 
-// DefaultMaxPayloadSize is the default maximum frame size (length
-// prefix plus message). Mirrors matter.js
-// packages/general/src/net/tcp/TcpConnection.ts:11
-// (DEFAULT_MAX_TCP_MESSAGE_SIZE = 64_000), which TcpChannel.ts:72 and
-// TcpTransport.ts:62 take as their default maxPayloadSize.
+// DefaultMaxPayloadSize is the default MAX_TCP_MESSAGE_SIZE: the largest
+// Matter message carried over TCP, the 4-byte length prefix not counted.
+// Mirrors matter.js packages/general/src/net/tcp/TcpConnection.ts:10-15 at
+// db021da0 (DEFAULT_MAX_TCP_MESSAGE_SIZE = 64_000), which TcpChannel.ts:69
+// takes as its default maxPayloadSize — "the maximum message size
+// excluding the 4-byte length header, as MAX_TCP_MESSAGE_SIZE defines it"
+// (:37-41). Until the db021da0 lift (matter.js #4793) the prefix counted
+// against it, and a message of 63997 to 64000 bytes was refused.
 const DefaultMaxPayloadSize = 64_000
-
-// maxReceiveBufferFactor bounds the bytes buffered without completing a
-// message at this multiple of the maximum payload size. Mirrors
-// TcpChannel.ts:32 (MAX_RECEIVE_BUFFER_FACTOR = 2).
-const maxReceiveBufferFactor = 2
 
 // Errors.
 var (
 	// ErrMessageTooLarge is returned by [Conn.Send] for a message above
-	// the connection's [Conn.MaxMessageSize] (TcpChannel.ts:125-126).
+	// the connection's [Conn.MaxMessageSize] — matter.js
+	// MessageTooLargeError (TcpChannel.ts:116-120 at db021da0).
 	ErrMessageTooLarge = errors.New("tcp: message exceeds the TCP limit")
 	// ErrConnClosed is returned by [Conn.Send] after the connection
-	// closed (TcpChannel.ts:120-122).
+	// closed (TcpChannel.ts:111-113 at db021da0).
 	ErrConnClosed = errors.New("tcp: connection closed")
 	// ErrZeroLengthFrame closes a connection that announced an empty
 	// message: one can never hold the mandatory message header
-	// (TcpChannel.ts:257-264).
+	// (TcpChannel.ts:245-249 at db021da0).
 	ErrZeroLengthFrame = errors.New("tcp: zero-length frame")
 	// ErrFrameTooLarge closes a connection that announced a message
-	// above the limit (TcpChannel.ts:266-271).
+	// above the limit (TcpChannel.ts:251-256 at db021da0).
 	ErrFrameTooLarge = errors.New("tcp: announced message exceeds the TCP limit")
-	// ErrReceiveBufferExceeded closes a connection whose buffered bytes
-	// passed twice the maximum payload size without completing a
-	// message (TcpChannel.ts:211-218).
-	ErrReceiveBufferExceeded = errors.New("tcp: receive buffer exceeded")
 )
 
-// encodeFrame prefixes msg with its 4-byte little-endian length.
-// Mirrors TcpChannel.ts:119-133 send.
+// encodeFrame prefixes msg with its 4-byte little-endian length; msg may
+// carry maxPayloadSize bytes. Mirrors TcpChannel.ts:110-127 send at
+// db021da0.
 func encodeFrame(msg []byte, maxPayloadSize int) ([]byte, error) {
-	if limit := maxPayloadSize - FramingHeaderSize; len(msg) > limit {
-		return nil, fmt.Errorf("%w: %d > %d", ErrMessageTooLarge, len(msg), limit)
+	if len(msg) > maxPayloadSize {
+		return nil, fmt.Errorf("%w: %d > %d", ErrMessageTooLarge, len(msg), maxPayloadSize)
 	}
 	frame := make([]byte, FramingHeaderSize+len(msg))
 	binary.LittleEndian.PutUint32(frame, uint32(len(msg))) //nolint:gosec // bounded by maxPayloadSize above
@@ -72,27 +68,25 @@ func newAssembler(maxPayloadSize int) *assembler {
 	return &assembler{maxPayloadSize: maxPayloadSize}
 }
 
-// maxMessageSize mirrors TcpChannel.ts:114-117.
-func (a *assembler) maxMessageSize() int { return a.maxPayloadSize - FramingHeaderSize }
-
 // push appends chunk and returns every message it completed, each in
 // its own slice. A non-nil error means the connection must be closed;
 // the messages completed before the offending frame are still returned,
 // as matter.js delivers them before it reaches the bad header.
 func (a *assembler) push(chunk []byte) ([][]byte, error) {
+	// No cap on the buffered bytes: a header announcing more than the
+	// limit closes the connection, which bounds an incomplete message, and
+	// several complete frames in one read are all taken (TcpChannel.ts:204
+	// at db021da0; the cap of twice the limit closed such a connection
+	// until the db021da0 lift).
 	a.buf = append(a.buf, chunk...)
-	// Receive buffer cap, checked before extraction (TcpChannel.ts:211-218).
-	if len(a.buf) > a.maxPayloadSize*maxReceiveBufferFactor {
-		return nil, fmt.Errorf("%w: %d > %d bytes", ErrReceiveBufferExceeded, len(a.buf), a.maxPayloadSize*maxReceiveBufferFactor)
-	}
 	var out [][]byte
 	for len(a.buf) >= FramingHeaderSize {
 		n := int(binary.LittleEndian.Uint32(a.buf))
 		if n == 0 {
 			return out, ErrZeroLengthFrame
 		}
-		if n > a.maxMessageSize() {
-			return out, fmt.Errorf("%w: %d > %d", ErrFrameTooLarge, n, a.maxMessageSize())
+		if n > a.maxPayloadSize {
+			return out, fmt.Errorf("%w: %d > %d", ErrFrameTooLarge, n, a.maxPayloadSize)
 		}
 		total := FramingHeaderSize + n
 		if len(a.buf) < total {
