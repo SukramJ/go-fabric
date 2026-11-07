@@ -51,6 +51,9 @@ type matterTimeParticipant interface {
 type matterTimeSync struct {
 	mu           sync.Mutex
 	participants []matterTimeParticipant
+	// unwatch ends the watch of the root's UTC (watchMatterTime); nil
+	// when nothing is watched.
+	unwatch func()
 }
 
 // errNoMatterTime is a topology server that needs the node's Matter time
@@ -135,7 +138,7 @@ func (n *Node) watchMatterTime() {
 	if ts == nil {
 		return
 	}
-	ts.OnAttributeChange(func(c contract.Change) {
+	unwatch := ts.OnAttributeChange(func(c contract.Change) {
 		if !slices.Contains(c.Attributes, tsdef.AttrUtcTime) {
 			return
 		}
@@ -146,4 +149,19 @@ func (n *Node) watchMatterTime() {
 			p.MatterTimeChanged()
 		}
 	})
+	n.matterTime.mu.Lock()
+	n.matterTime.unwatch = unwatch
+	n.matterTime.mu.Unlock()
+}
+
+// unwatchMatterTime ends the watch: an adoption after [Node.Stop] — a late
+// NTP answer — reaches no participant.
+func (n *Node) unwatchMatterTime() {
+	n.matterTime.mu.Lock()
+	unwatch := n.matterTime.unwatch
+	n.matterTime.unwatch = nil
+	n.matterTime.mu.Unlock()
+	if unwatch != nil {
+		unwatch()
+	}
 }

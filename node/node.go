@@ -936,6 +936,7 @@ func (n *Node) stopLocked(ctx context.Context) error {
 	if n.root.OTARequestor != nil {
 		n.root.OTARequestor.Stop()
 	}
+	n.unwatchMatterTime()
 	if ts := n.root.TimeSynchronization; ts != nil {
 		ts.Stop()
 	}

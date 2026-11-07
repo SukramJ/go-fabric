@@ -266,3 +266,47 @@ func TestTimeSyncValveNeedsTheNodesTime(t *testing.T) {
 		t.Errorf("the set %v, want plain-valve, second-plain-valve and thermostat", got)
 	}
 }
+
+// TestMatterTimeWatchEndsAtStop: after Node.Stop an adoption of a time —
+// a late NTP answer, here SetUTCTime on the root server — reaches no
+// participant: the stopped node's valve keeps its AutoCloseTime.
+func TestMatterTimeWatchEndsAtStop(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	rows := surface.NewExtensions(append([]string{"BD-chip-TimeSynchronization-Features"}, valve.Ahead.IDs()...)...)
+	v, err := device.NewWaterValve(device.Options{StableKey: device.StringKey("valve"), Name: "valve", Surface: surface.Policies{Extensions: rows}},
+		valvedef.Declare{Features: valvedef.FeatureTimeSync, StateSource: timedValve{}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg := minimalConfig(openDB(t, filepath.Join(t.TempDir(), "n.db")))
+	cfg.Surface.Extensions = rows
+	n := newNode(t, cfg)
+	if err := n.Aggregator().Add(ctx, v); err != nil {
+		t.Fatal(err)
+	}
+	if err := n.Start(ctx); err != nil {
+		t.Fatal(err)
+	}
+	srv := v.Server(valvedef.ClusterID)
+	if _, err := srv.MatterInvoke(ctx, valvedef.CmdOpen, valvedef.OpenRequest{OpenDuration: &spec.Nullable[uint32]{Value: 600}}); err != nil {
+		t.Fatal(err)
+	}
+	before, _ := srv.MatterRead(valvedef.AttrAutoCloseTime)
+	if before == nil {
+		t.Fatal("no AutoCloseTime on the node's time")
+	}
+	ts := n.Root().TimeSynchronization
+	if err := n.Stop(ctx); err != nil {
+		t.Fatal(err)
+	}
+	at := time.Now().Add(30 * 24 * time.Hour)
+	if _, err := ts.MatterInvoke(ctx, tsdef.CmdSetUtcTime, tsdef.SetUtcTimeRequest{
+		UtcTime: uint64(at.UnixMicro() - 946684800_000_000), Granularity: tsdef.GranularityMillisecondsGranularity, //nolint:gosec // after the epoch
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if after, _ := srv.MatterRead(valvedef.AttrAutoCloseTime); after != before {
+		t.Errorf("AutoCloseTime %v after an adoption past Stop, want %v unchanged", after, before)
+	}
+}
